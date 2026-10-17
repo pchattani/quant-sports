@@ -48,7 +48,7 @@ def test_full_build_payload_keys(site):
     assert B.main(site["args"]) == 0
     d = site["data"]
     assert (d.parent / "assets" / "base.css").exists()
-    for f in ("tokens.css", "quant.css", "quant.js", "quant-charts.js"):
+    for f in ("tokens.css", "quant.css", "quant.js", "quant-charts.js", "plotly-ec.js"):
         assert (d.parent / "assets" / "qk" / f).exists(), f
     idx = rj(d / "index.json")
     for k in ("updated_at", "season", "phase", "today", "live", "recent", "upcoming", "playoff_odds", "leaders", "gaps", "teams"):

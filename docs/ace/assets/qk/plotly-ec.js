@@ -1,4 +1,8 @@
-/* The Quant — Plotly-compatible charts on Apache ECharts (the kit's chart library).
+/* The Quant — Plotly-compatible charts on Apache ECharts (the kit's chart library). Optional kit module.
+ *
+ * Load it after quant.js and quant-charts.js on any page that still has Plotly-era views:
+ *   <script src="assets/qk/plotly-ec.js" defer></script>
+ * or on demand (inject the script the first time an old view draws). Then the Plotly CDN bundle is not needed.
  *
  * The sport sites were written against Plotly (Plotly.newPlot(el, traces, layout)). This file defines a
  * small window.Plotly with the same entry points, so every existing chart renders through ECharts and the

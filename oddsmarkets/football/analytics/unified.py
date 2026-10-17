@@ -1315,6 +1315,13 @@ class Unified:
                     s["current"] = bool(nt and str(nt["tid"]) == str(s["tid"]))
             arch_rows = self._person_archive(pid, seasons, tslug, frame)
             years = season_totals(seasons + arch_rows)
+            # A career list the old cap cut short: the season it stopped in, and every older one, may miss
+            # competitions (the backfill lists it again); those years say so instead of reading "full".
+            cut = self.career_cut(pid, tslug, frame)
+            if cut:
+                for y in years:
+                    if era_key(y["era"]) <= era_key(cut):
+                        y["coverage"], y["gap"] = COVERAGE_PARTIAL, "career"
             comps_used = {a[2] for a in apps} | {r["comp"] for r in arch_rows if r.get("comp")}
             teams = {}
             for a in apps:
@@ -1347,6 +1354,8 @@ class Unified:
             payload["seasons"] = seasons
             if arch_rows:
                 payload["archive"] = arch_rows
+            if cut:
+                payload["career_gap"] = {"through": cut}
             payload["years"] = years
             _write(people_dir / f"{pid}.json", payload)
             written.add(pid)
@@ -1468,27 +1477,13 @@ class Unified:
                 continue
             if slug and not sid and (slug, season) in have:
                 continue
-            c = self.comps.get(slug or "", {})
-            kind = c.get("kind") or ("international" if int(e.get("tid") or 0) in (16, 1, 133, 270, 246, 140) else "league")
-            sm = self.season_meta.get((slug, sid)) if slug and sid else None
-            if kind == "international":
-                mid = (sm or {}).get("mid")
-                # No dates for an edition no store holds: a tournament named for a year closes the
-                # split season ending that year (June and July), or is that calendar year.
-                y = re.search(r"(?:19|20)\d{2}", str(season or e.get("year") or ""))
-                era = frame_era(frame, mid, INTL_SPLIT_START_MONTH) if mid else (
-                    (f"{int(y.group(0)) - 1}/{int(y.group(0)) % 100:02d}" if frame == "split" else y.group(0)) if y else era)
-            elif sm and sm.get("era"):
-                era = sm["era"]
-            elif slug:
-                era = edition_era(slug, era, (), self.era_shift.get(slug))
-            # The archive spells a club its own way ("Inter Miami CF"): the club's id and name when one club matches.
+            kind = self._archive_kind(e, slug)
+            era = self._archive_era(e, slug, sid, season, era, kind, frame)
+            # The archive spells a club its own way ("Inter Miami CF", "Paris Saint-Germain"): the club's id and name when one club matches.
             team, team_tid = e.get("team"), None
-            hits = self._club_tokens().get(_tokens(team or ""), set())
-            if len(hits) == 1:
-                t = next(iter(hits))
-                if bool((self.clubs.get(t) or {}).get("national")) == (kind == "international"):
-                    team_tid, team = int(t), (self.clubs.get(t) or {}).get("name") or team
+            t = self._archive_club(team, slug, kind == "international")
+            if t is not None:
+                team_tid, team = int(t), (self.clubs.get(t) or {}).get("name") or team
             out.append({"comp": slug, "tournament": e.get("tname"), "kind": kind,
                         "scope": "international" if kind == "international" else "club",
                         "season": season, "era": era, "team": team, **({"tid": team_tid} if team_tid is not None else {}),
@@ -1497,6 +1492,81 @@ class Unified:
                         "coverage": COVERAGE_TOTALS, "source": "archive"})
         out.sort(key=lambda r: era_key(r.get("era") or ""), reverse=True)
         return out
+
+    def _archive_kind(self, e: dict, slug: str | None) -> str:
+        c = self.comps.get(slug or "", {})
+        return c.get("kind") or ("international" if int(e.get("tid") or 0) in (16, 1, 133, 270, 246, 140) else "league")
+
+    def _archive_era(self, e: dict, slug: str | None, sid: str | None, season: str | None, era: str | None, kind: str,
+                     frame: str) -> str | None:
+        """The season an archive entry counts in, in the player's frame."""
+        sm = self.season_meta.get((slug, sid)) if slug and sid else None
+        if kind == "international":
+            mid = (sm or {}).get("mid")
+            # No dates for an edition no store holds: a tournament named for a year closes the
+            # split season ending that year (June and July), or is that calendar year.
+            y = re.search(r"(?:19|20)\d{2}", str(season or e.get("year") or ""))
+            return frame_era(frame, mid, INTL_SPLIT_START_MONTH) if mid else (
+                (f"{int(y.group(0)) - 1}/{int(y.group(0)) % 100:02d}" if frame == "split" else y.group(0)) if y else era)
+        if sm and sm.get("era"):
+            return sm["era"]
+        if slug:
+            return edition_era(slug, era, (), self.era_shift.get(slug))
+        return era
+
+    # The fetcher's old rule cut a career's season list at this many rows, newest first, so it could end
+    # mid-season (Mbappe's list stopped at the Champions League 2023/24, without Ligue 1 or anything
+    # older). A list it chose and filled to the cap is read as cut; the fetcher lists it again
+    # (scripts/fetch_sofascore_history.py: needs_relist) and stamps the new rule.
+    LEGACY_LIST_CAP = 12
+    LIST_RULE = 2
+
+    def career_cut(self, pid: str, tslug: dict[int, str], frame: str = "split") -> str | None:
+        """The oldest season of a career list the old cap cut short (that season and older may miss competitions), else None."""
+        rec = (self.archive.get("players") or {}).get(pid) or {}
+        listed = rec.get("season_list") or []
+        if rec.get("list_rule") == self.LIST_RULE or len(listed) < self.LEGACY_LIST_CAP:
+            return None
+        eras = []
+        for e in listed:
+            slug = tslug.get(int(e.get("tid") or 0))
+            sid = str(e.get("sid")) if e.get("sid") is not None else None
+            season, era = season_label(e.get("sname"), e.get("year"))
+            era = self._archive_era(e, slug, sid, fan_label(slug, season), era, self._archive_kind(e, slug), frame)
+            if era:
+                eras.append(era)
+        return min(eras, key=era_key) if eras else None
+
+    def _archive_club(self, team: str | None, slug: str | None, international: bool) -> str | None:
+        """
+        The one club (or national team) an archive spelling names: its folded words, else the
+        competitions' registries' canonical form ("Paris Saint-Germain" -> "PSG"), narrowed to the
+        clubs of that competition when several match. None when it stays ambiguous.
+        """
+        if not team:
+            return None
+        tok = self._club_tokens()
+        kind_ok = lambda t: bool((self.clubs.get(t) or {}).get("national")) == international  # noqa: E731
+        cands = {t for t in tok.get(_tokens(team), set()) if kind_ok(t)}
+        if len(cands) != 1:
+            from oddsmarkets.football.sources.teams import normalize_team_name
+
+            regs = [(self.comps.get(slug or "") or {}).get("registry")] + [c.get("registry") for c in self.comps.values()]
+            more: set = set()
+            for reg in dict.fromkeys(r for r in regs if r):
+                try:
+                    nm = normalize_team_name(team, reg)
+                except Exception:  # noqa: BLE001
+                    continue
+                if nm and nm != team:
+                    more |= {t for t in tok.get(_tokens(nm), set()) if kind_ok(t)}
+            if more:
+                cands = more
+        if len(cands) > 1 and slug:
+            inside = {t for t in cands if slug in ((self.clubs.get(t) or {}).get("names") or {})}
+            if inside:
+                cands = inside
+        return next(iter(cands)) if len(cands) == 1 else None
 
     def _club_tokens(self) -> dict[tuple, set]:
         """Every club's and national team's spellings (folded, without club affixes) -> ids."""

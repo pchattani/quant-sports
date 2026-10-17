@@ -1760,11 +1760,13 @@ def build_liga(args, sims: int | None) -> dict:
 # ── site-wide payloads ───────────────────────────────────────────────────────
 
 HUB_RATING_MINUTES = 450
+UPCOMING_STATUSES = ("scheduled", "live")
 
 
-def build_hub(entries: list[dict]) -> dict:
+def build_hub(entries: list[dict], now: datetime | None = None) -> dict:
     """The scoreboard across competitions for the coming week, and the leaders across them."""
-    today = datetime.now(timezone.utc).date()
+    today = (now or datetime.now(timezone.utc)).date()
+    today_s = today.isoformat()
     lo = (today - timedelta(days=HUB_DAYS_BACK)).isoformat()
     hi = (today + timedelta(days=HUB_DAYS_AHEAD)).isoformat()
     days: dict[str, list[dict]] = {}
@@ -1780,14 +1782,18 @@ def build_hub(entries: list[dict]) -> dict:
         rows = c.get("_fixtures") or []
         # Outside the window every competition still contributes its latest
         # results day and its next fixtures day, so the scoreboard is never
-        # empty during an international break.
-        played_days = sorted({(r.get("date") or "")[:10] for r in rows if r.get("status") == "finished" and r.get("date")})
-        next_days = sorted({(r.get("date") or "")[:10] for r in rows if r.get("status") in ("scheduled", "live") and r.get("date")})
+        # empty during an international break. The next day is today or later and
+        # lists only matches still to play: a fixture the store never closed (a
+        # postponed or re-listed tie keeps "scheduled" under its old id) once made a
+        # September day of finished CAF ties "upcoming" in October.
+        played_days = sorted({d for r in rows if r.get("status") == "finished" and (d := (r.get("date") or "")[:10]) and d <= today_s})
+        next_days = sorted({d for r in rows if r.get("status") in UPCOMING_STATUSES and (d := (r.get("date") or "")[:10]) and d >= today_s})
         last_day = played_days[-1] if played_days else None
         next_day = next_days[0] if next_days else None
         for r in rows:
             d = (r.get("date") or "")[:10]
-            bucket = "window" if d and lo <= d <= hi else "recent" if d and d == last_day else "upcoming" if d and d == next_day else None
+            bucket = "window" if d and lo <= d <= hi else "recent" if d and d == last_day else \
+                "upcoming" if d and d == next_day and r.get("status") in UPCOMING_STATUSES else None
             if not bucket:
                 continue
             item = {

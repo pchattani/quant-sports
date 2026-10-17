@@ -5,7 +5,8 @@
  *   QK.SECTIONS / QK.sections(key)     the information architecture every sport uses
  *   QK.shell(opts)                     top bar + sport switcher + section nav + search + footer
  *   QK.theme.get/set/toggle/onChange   dark | light, remembered per viewer
- *   QK.table(el, spec)                 sortable sticky-header table, percentile chips
+ *   QK.table(el, spec)                 sortable sticky-header table, percentile chips, raw/year columns
+ *   QK.tableHTML(cols, rows, o)        static table HTML; QK.sortable(el) wires header sorting + row links
  *   QK.tabs(root) QK.seg(root, cb) QK.chips(root, cb)
  *   QK.matchCard(g) QK.tick(g) QK.probBar() QK.mvm()   game rendering
  *   QK.teamMark(t) QK.color.*          team colours with contrast checks
@@ -16,7 +17,7 @@
 'use strict';
 
 var QK = root.QK || {};
-QK.version = '1.0.0';
+QK.version = '1.1.0';
 
 /* ─────────────────────────────────────── helpers */
 function esc(s) {
@@ -159,7 +160,7 @@ QK.SPORTS = [
   { key: 'football',   label: 'Football',   site: 'The Quant Footballer', repo: 'the-quant-footballer', folder: 'site',     leagues: 'Europe, the Americas, Asia, Africa · 69 competitions' },
   { key: 'nfl',        label: 'NFL',        site: 'The Quant Gridiron',   repo: 'the-quant-gridiron',   folder: 'gridiron', leagues: 'NFL' },
   { key: 'basketball', label: 'Basketball', site: 'The Quant Hardwood',   repo: 'the-quant-hardwood',   folder: 'hardwood', leagues: 'NBA · WNBA' },
-  { key: 'baseball',   label: 'Baseball',   site: 'The Quant Bullpen',    repo: 'the-quant-bullpen',    folder: 'bullpen',  leagues: 'MLB · AAA · NPB' },
+  { key: 'baseball',   label: 'Baseball',   site: 'The Quant Bullpen',    repo: 'the-quant-bullpen',    folder: 'bullpen',  leagues: 'MLB · Triple-A' },
   { key: 'hockey',     label: 'Hockey',     site: 'The Quant Rink',       repo: 'the-quant-rink',       folder: 'rink',     leagues: 'NHL' },
   { key: 'f1',         label: 'F1',         site: 'The Quant Paddock',    repo: 'the-quant-paddock',    folder: 'paddock',  leagues: 'Formula 1 · 1950 to today' },
   { key: 'tennis',     label: 'Tennis',     site: 'The Quant Ace',        repo: 'the-quant-ace',        folder: 'ace',      leagues: 'ATP · WTA' }
@@ -269,24 +270,38 @@ QK.shell = function (o) {
     (o.search ? '<button class="qk-searchbtn" type="button" data-qk-search aria-label="Search">' + ICON.search + '<span>Search teams, players…</span><kbd>/</kbd></button>' : '') +
     '<button class="qk-iconbtn" type="button" data-qk-theme-toggle></button></div>';
   var secs = o.sections || (sportKey ? QK.sections(sportKey) : null);
-  var secnav = secs ? '<nav class="qk-secnav" aria-label="Sections"><div class="qk-secnav-in">' +
+  /* links scroll in their own box; the context controls sit beside them (desktop) or on a second row (phones) */
+  var secnav = secs ? '<nav class="qk-secnav' + (o.ctx ? ' has-ctx' : '') + '" aria-label="Sections"><div class="qk-secnav-in"><div class="qk-secnav-links">' +
     secs.map(function (s) { return '<a href="' + esc(s.href) + '" data-sec="' + esc(s.key) + '"' + (s.key === o.section ? ' aria-current="page"' : '') + '>' + esc(s.label) + '</a>'; }).join('') +
-    (o.ctx ? '<div class="qk-secnav-ctx">' + o.ctx + '</div>' : '') + '</div></nav>' : '';
+    '</div>' + (o.ctx ? '<div class="qk-secnav-ctx">' + o.ctx + '</div>' : '') + '</div></nav>' : '';
   mount.innerHTML = (o.demo ? '' : '<a class="qk-skip" href="#main">Skip to content</a>') + '<header class="qk-topbar"><div class="qk-topbar-in">' + brand +
     '<span class="qk-brand-sep" aria-hidden="true"></span>' + sports + actions + '</div></header>' + secnav;
   $$('[data-qk-theme-toggle]', mount).forEach(function (b) { b.addEventListener('click', QK.theme.toggle); });
   QK.theme.paint();
   if (o.search && !o.demo) QK.search.init(o.search);
-  var cur = $('.qk-sport[aria-current="page"]', mount);
-  if (cur && cur.scrollIntoView && root.innerWidth < 860) { try { cur.scrollIntoView({ inline: 'center', block: 'nearest' }); } catch (e) { /* old browsers */ } }
+  /* centre the current sport and section inside their own scrolling rows (never scrollIntoView, which can
+   * also scroll the page sideways) */
+  QK.centreIn($('.qk-sport[aria-current="page"]', mount), $('.qk-sports', mount));
+  QK.centreIn($('.qk-secnav a[aria-current="page"]', mount), $('.qk-secnav-links', mount));
   if (o.footer !== false && !o.demo) QK.footer(o.footer);
   QK.tooltips();
   var api = {
-    setSection: function (key) { $$('.qk-secnav a', mount).forEach(function (a) { if (a.getAttribute('data-sec') === key) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }); },
+    setSection: function (key) {
+      $$('.qk-secnav a[data-sec]', mount).forEach(function (a) { if (a.getAttribute('data-sec') === key) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+      QK.centreIn($('.qk-secnav a[aria-current="page"]', mount), $('.qk-secnav-links', mount));
+    },
     setLive: function (map) { $$('.qk-sport[data-sport]', mount).forEach(function (a) { var l = $('.qk-sport-live', a); if (l) l.hidden = !(map && map[a.getAttribute('data-sport')]); }); }
   };
   if (o.live) api.setLive(o.live);
   return api;
+};
+/* Scroll a horizontal row so `item` sits in its middle, without touching the page's own scroll. */
+QK.centreIn = function (item, row) {
+  if (!item || !row || row.scrollWidth <= row.clientWidth + 1) return;
+  try {
+    var r = row.getBoundingClientRect(), i = item.getBoundingClientRect();
+    row.scrollLeft += (i.left + i.width / 2) - (r.left + r.width / 2);
+  } catch (e) { /* detached */ }
 };
 QK.footer = function (sel) {
   var el = typeof sel === 'string' ? $(sel) : sel;
@@ -322,13 +337,15 @@ QK.search = (function () {
     var nq = norm(q).trim();
     if (!rows) { list.innerHTML = '<li class="qk-search-empty">Loading the index…</li>'; return; }
     if (!nq) { list.innerHTML = '<li class="qk-search-empty">Type a team, player or competition. ' + fmt.num(rows.length) + ' entries across every sport.</li>'; items = []; return; }
+    /* rank: where the match starts (start of name, start of a word, inside a word), then the row's weight
+     * (r.w, higher first: a star before a reserve, a club before its youth side), then the shorter name */
     var scored = [];
-    for (var i = 0; i < rows.length && scored.length < 400; i++) {
+    for (var i = 0; i < rows.length && scored.length < 3000; i++) {
       var r = rows[i], n = r._n || (r._n = norm(r.t)), k = n.indexOf(nq);
-      if (k >= 0) scored.push([k === 0 ? 0 : (n.charAt(k - 1) === ' ' ? 1 : 2), n.length, r]);
+      if (k >= 0) scored.push([k === 0 ? 0 : (n.charAt(k - 1) === ' ' ? 1 : 2), isNum(r.w) ? -r.w : 0, n.length, r]);
     }
-    scored.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
-    items = scored.slice(0, 30).map(function (x) { return x[2]; });
+    scored.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1] || a[2] - b[2]; });
+    items = scored.slice(0, 30).map(function (x) { return x[3]; });
     sel = 0;
     if (!items.length) { list.innerHTML = '<li class="qk-search-empty">Nothing matches “' + esc(q) + '”.</li>'; return; }
     list.innerHTML = items.map(function (r, i) {
@@ -444,7 +461,7 @@ QK.table = function (el, spec) {
   var st = spec.sort || null;
   function cell(c, r) {
     var v = r[c.key];
-    var html = c.fmt ? c.fmt(v, r) : (isNum(v) ? fmt.num(v, c.d || 0) : esc(v === undefined || v === null ? '—' : v));
+    var html = typeof c.fmt === 'function' ? c.fmt(v, r) : (isNum(v) ? (isRaw(c, v) ? esc(String(v)) : fmt.num(v, c.d || 0)) : esc(v === undefined || v === null ? '—' : v));
     if (c.pctl && isNum(r[c.pctl])) html = '<span class="qk-row" style="justify-content:flex-end;gap:8px;flex-wrap:nowrap">' + html + QK.pctlChip(r[c.pctl]) + '</span>';
     return '<td class="' + (c.num ? 'num ' : '') + (c.sticky ? 'sticky-col ' : '') + (c.cls || '') + '">' + html + '</td>';
   }
@@ -482,6 +499,86 @@ QK.table = function (el, spec) {
   render();
   return { setRows: function (r) { rows = r.slice(); render(); }, sort: function (k, d) { st = { key: k, dir: d || 'desc' }; render(); } };
 };
+/* A column shows numbers as written (no thousands separator: 2026, not 2,026) when it says so (raw: true,
+ * year: true, or fmt: 'raw' | 'year') or when it is a year-like column (key year / season / yr ...) holding a
+ * whole number between 1000 and 2999. */
+var YEARISH = /^(year|season|yr|draft_year|draft|from|to|since|born|first|last)$/i;
+function isRaw(c, v) {
+  if (c.raw || c.year || c.fmt === 'raw' || c.fmt === 'year') return true;
+  return YEARISH.test(String(c.key || '')) && Math.round(v) === v && v >= 1000 && v <= 2999;
+}
+QK.fmt.raw = function (v) { return v === undefined || v === null || v === '' ? '—' : String(v); };
+
+/* Static table HTML on the kit markup, for pages that build HTML strings (wire it with QK.sortable(el)).
+ *   cols: [{ label, align: 'right', title (tooltip), sortable: false, cls }] or plain label strings
+ *   rows: [{ cells, _class, _href, _attrs }] or arrays of cells; a cell is { v, html, cls, align, title, style }
+ *         or a primitive (a string with tags counts as html). v is the sort value.
+ *   opts: { cls, id, maxHeight, sticky (pin the first column), dense (default true), caption } */
+QK.tableHTML = function (cols, rows, opts) {
+  var o = opts || {};
+  var hh = '<div class="qk-table-wrap"' + (o.id ? ' id="' + esc(o.id) + '"' : '') + (o.maxHeight ? ' style="--table-max:' + o.maxHeight + 'px"' : '') + '><table class="qk-table' + (o.dense === false ? '' : ' dense') + (o.cls ? ' ' + o.cls : '') + '">' +
+    (o.caption ? '<caption class="qk-sr">' + esc(o.caption) + '</caption>' : '') + '<thead><tr>';
+  cols.forEach(function (c, i) {
+    var cc = typeof c === 'string' ? { label: c } : c;
+    var num = cc.align === 'right';
+    var lab = cc.title ? '<span data-tip="' + esc(cc.title) + '">' + esc(cc.label) + '</span>' : esc(cc.label);
+    hh += '<th scope="col" class="' + (num ? 'num ' : '') + (o.sticky && i === 0 ? 'sticky-col ' : '') + (cc.cls || '') + '"' + (cc.sortable === false ? '' : ' aria-sort="none"') + '>' +
+      (cc.sortable === false ? lab : '<button type="button">' + lab + '</button>') + '</th>';
+  });
+  hh += '</tr></thead><tbody>';
+  (rows || []).forEach(function (r) {
+    var row = Array.isArray(r) ? { cells: r } : r;
+    hh += '<tr' + (row._class ? ' class="' + row._class + '"' : '') + (row._href ? ' data-href="' + esc(row._href) + '"' : '') + (row._attrs || '') + '>';
+    row.cells.forEach(function (c0, i) {
+      var c = (c0 !== null && typeof c0 === 'object') ? c0 : (typeof c0 === 'string' && /<[a-z\/]/i.test(c0) ? { html: c0 } : { v: c0 });
+      var col = typeof cols[i] === 'object' ? cols[i] : {};
+      var align = c.align || col.align;
+      var cls = [align === 'right' ? 'num' : '', o.sticky && i === 0 ? 'sticky-col' : '', c.cls, col.cls].filter(Boolean).join(' ');
+      var sortV = c.v !== undefined && c.v !== null ? c.v : (c.html !== undefined ? String(c.html).replace(/<[^>]*>/g, '') : '');
+      hh += '<td data-v="' + esc(sortV) + '"' + (cls ? ' class="' + cls + '"' : '') + (c.title ? ' title="' + esc(c.title) + '"' : '') + (c.style ? ' style="' + c.style + '"' : '') + '>' +
+        (c.html !== undefined ? c.html : esc(c.v === null || c.v === undefined ? '—' : c.v)) + '</td>';
+    });
+    hh += '</tr>';
+  });
+  return hh + '</tbody></table></div>';
+};
+/* Sortable headers (aria-sort buttons) and data-href row links for every table.qk-table under el
+ * (QK.tableHTML output, or any table with th[aria-sort] buttons and td[data-v] sort values). Idempotent. */
+QK.sortable = function (el) {
+  var rootEl = typeof el === 'string' ? (document.getElementById(el) || $(el)) : el;
+  if (!rootEl) return;
+  var tables = rootEl.tagName === 'TABLE' ? [rootEl] : $$('table.qk-table', rootEl);
+  tables.forEach(function (table) {
+    if (table.getAttribute('data-sort-wired')) return;
+    table.setAttribute('data-sort-wired', '1');
+    var ths = $$('thead th', table);
+    ths.forEach(function (th, idx) {
+      var b = $('button', th);
+      if (!b || !th.hasAttribute('aria-sort')) return;
+      b.addEventListener('click', function () {
+        var tbody = $('tbody', table);
+        var trs = $$('tr', tbody);
+        var cur = th.getAttribute('aria-sort');
+        var asc = cur === 'descending' ? true : cur === 'ascending' ? false : !th.classList.contains('num');
+        ths.forEach(function (x) { if (x.hasAttribute('aria-sort')) x.setAttribute('aria-sort', 'none'); });
+        th.setAttribute('aria-sort', asc ? 'ascending' : 'descending');
+        function sv(tr) { var td = tr.children[idx]; if (!td) return ''; var v = td.getAttribute('data-v'); return v === null ? td.textContent.trim() : v; }
+        trs.sort(function (a, b2) {
+          var av = sv(a), bv = sv(b2);
+          var an = parseFloat(av), bn = parseFloat(bv), aN = av !== '' && !isNaN(an) && isFinite(av), bN = bv !== '' && !isNaN(bn) && isFinite(bv);
+          var cmp = aN && bN ? an - bn : aN ? -1 : bN ? 1 : String(av).localeCompare(String(bv));
+          return asc ? cmp : -cmp;
+        });
+        trs.forEach(function (r) { tbody.appendChild(r); });
+      });
+    });
+    $$('tr[data-href]', table).forEach(function (tr) {
+      tr.style.cursor = 'pointer';
+      tr.addEventListener('click', function (ev) { if (ev.target.closest('a, button, input, select')) return; root.location.hash = tr.getAttribute('data-href'); });
+    });
+  });
+};
+
 /* Percentile 0-100 → banded chip; bands at 20/40/60/80. */
 QK.pctlChip = function (p) {
   if (!isNum(p)) return '';
@@ -629,13 +726,19 @@ QK.spark = function (vals, o) {
 };
 
 /* ─────────────────────────────────────── KPI tile */
-/* QK.kpi({ label, value, sub, delta, deltaFmt, spark: [..], text: true, tip }) */
+/* QK.kpi({ label, value, sub, delta, deltaFmt, spark: [..] | '<svg…>', text: true, tip, accent, cls, html })
+ * html: true takes value and sub as HTML (links, team marks); otherwise they are escaped text.
+ * Values wrap rather than truncate; on phones they step down a size (quant.css). */
 QK.kpi = function (k) {
   var dl = isNum(k.delta) ? '<span class="qk-delta ' + (k.delta > 0 ? 'up' : k.delta < 0 ? 'down' : 'flat') + '">' + esc(k.deltaFmt ? k.deltaFmt(k.delta) : fmt.signed(k.delta)) + '</span>' : '';
-  return '<div class="qk-kpi"' + (k.accent ? ' style="--accent:' + k.accent + '"' : '') + '><div class="qk-kpi-label">' + (k.tip ? '<span data-tip="' + esc(k.tip) + '">' + esc(k.label) + '</span>' : esc(k.label)) + '</div>' +
-    '<div class="qk-kpi-value' + (k.text ? ' is-text' : '') + '"' + (k.spark ? ' style="max-width:56%"' : '') + '>' + esc(k.value) + '</div>' +
-    (dl || k.sub ? '<div class="qk-kpi-sub">' + dl + (k.sub ? '<span class="qk-truncate">' + esc(k.sub) + '</span>' : '') + '</div>' : '') +
-    (k.spark ? QK.spark(k.spark, { color: k.sparkColor || 'var(--accent)', w: 120, h: 34 }) : '') + '</div>';
+  var empty = k.value === undefined || k.value === null || k.value === '';
+  var val = empty ? '—' : (k.html ? String(k.value) : esc(k.value));
+  var sub = k.sub === undefined || k.sub === null || k.sub === '' ? '' : (k.html ? String(k.sub) : esc(k.sub));
+  var spark = typeof k.spark === 'string' ? k.spark : (k.spark ? QK.spark(k.spark, { color: k.sparkColor || 'var(--accent)', w: 120, h: 34 }) : '');
+  return '<div class="qk-kpi' + (k.cls ? ' ' + esc(k.cls) : '') + '"' + (k.accent ? ' style="--accent:' + esc(k.accent) + '"' : '') + '><div class="qk-kpi-label">' + (k.tip ? '<span data-tip="' + esc(k.tip) + '">' + esc(k.label) + '</span>' : esc(k.label)) + '</div>' +
+    '<div class="qk-kpi-value' + (k.text ? ' is-text' : '') + '"' + (k.spark && typeof k.spark !== 'string' ? ' style="max-width:56%"' : '') + '>' + val + '</div>' +
+    (dl || sub ? '<div class="qk-kpi-sub">' + dl + (sub ? '<span class="qk-truncate">' + sub + '</span>' : '') + '</div>' : '') +
+    spark + '</div>';
 };
 
 /* ─────────────────────────────────────── skeleton + empty */

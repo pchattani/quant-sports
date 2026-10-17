@@ -1270,8 +1270,9 @@ function layout(extra) {
   if (extra && extra.font) out.font = Object.assign({}, DARK_LAYOUT.font, extra.font);
   return out;
 }
-/* Plotly is loaded only when a legacy chart asks for it (the redesigned pages draw with ECharts). */
-const PLOTLY_SRC = 'https://cdn.plot.ly/plotly-2.27.0.min.js';
+/* A legacy chart written against Plotly loads the kit's Plotly-on-ECharts module on first use (the Plotly
+ * CDN bundle is no longer used; the redesigned pages draw with QKC directly). */
+const PLOTLY_SRC = 'assets/qk/plotly-ec.js';
 let plotlyP = null;
 function loadPlotly() {
   if (typeof Plotly !== 'undefined') return Promise.resolve(true);

@@ -12,7 +12,10 @@ Two queues, spent from one call budget per run, cheapest first:
      rating — get their details, the
      list of seasons Sofascore has statistics for, and one call per (tournament,
      season) for the tournaments the site follows plus the international ones,
-     newest first, up to SEASONS_PER_PLAYER.
+     newest first, whole seasons only, for the PLAYER_YEARS newest seasons he has.
+     (Until 17 October 2026 the list was cut at twelve rows, which ended a busy
+     career mid-season: Mbappe's 2023/24 kept the Champions League and lost Ligue 1,
+     and 2022/23 was gone. A list cut that way is listed again: needs_relist.)
 
   3. Past results (newest first): every match of the seasons older than the two
      each store keeps (up to PAST_SEASONS_BACK), results only, into
@@ -75,7 +78,9 @@ SEASONS_PATH = ROOT / "oddsmarkets" / "football" / "competitions" / "league" / "
 
 DEFAULT_BUDGET = 60
 SEASONS_BACK = 8
-SEASONS_PER_PLAYER = 12
+LEGACY_SEASONS_PER_PLAYER = 12   # the old cap: a count of rows, so it could cut a season in two
+PLAYER_YEARS = 5                 # seasons of a career kept (by the year a season ends), whole seasons only
+LIST_RULE = 2                    # stamped on a season list chosen by select_career
 PROFILED_PER_COMPETITION = 25
 PAUSE_S = 1.0
 MAX_CONSECUTIVE_FAILURES = 3
@@ -293,13 +298,12 @@ def fetch_player(archive: dict, player: dict, budget, allowed: set[int]) -> bool
         if details is None:
             return False
         rec["details"] = details
-    if rec.get("season_list") is None:
+    if rec.get("season_list") is None or needs_relist(rec):
         listed = sofascore.player_seasons(pid, budget=budget)
         if listed is None:
             return False
-        keep = [s for s in listed if int(s.get("tid") or 0) in allowed]
-        keep.sort(key=lambda s: _year_key(s.get("year")), reverse=True)
-        rec["season_list"] = keep[:SEASONS_PER_PLAYER]
+        rec["season_list"] = select_career(listed, allowed)
+        rec["list_rule"] = LIST_RULE
     have = {(int(s["tid"]), int(s["sid"])) for s in rec["seasons"]}
     for s in rec["season_list"]:
         key = (int(s["tid"]), int(s["sid"]))
@@ -314,9 +318,40 @@ def fetch_player(archive: dict, player: dict, budget, allowed: set[int]) -> bool
             rec["seasons"].append({**s, "stats": {}, "team": None, "empty": True})
             continue
         rec["seasons"].append({**s, "stats": stats["stats"], "team": stats["team"]})
-    rec["complete"] = len(rec["seasons"]) >= len(rec["season_list"])
+    have = {(int(s["tid"]), int(s["sid"])) for s in rec["seasons"]}
+    rec["complete"] = all((int(s["tid"]), int(s["sid"])) in have for s in rec["season_list"])
     rec["fetched_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     return True
+
+
+def season_end_year(year) -> int:
+    """The year a season ends: "23/24" and "2023/2024" -> 2024, "2024" -> 2024 (EURO 2024 closes 2023/24)."""
+    y = str(year or "")
+    if "/" in y:
+        a, b = (part.strip() for part in y.split("/", 1))
+        if b.isdigit():
+            return int(b) if len(b) == 4 else 2000 + int(b[-2:])
+        return _year_key(y) + 1
+    return _year_key(y)
+
+
+def select_career(listed: list[dict], allowed: set[int], years: int = PLAYER_YEARS) -> list[dict]:
+    """
+    The seasons of a career to fetch: the followed tournaments, newest first, every
+    tournament of each of his `years` newest seasons and none older. Whole seasons, so
+    a season is never cut in two (a row count did that: a busy 2023/24 kept the
+    Champions League and lost the league).
+    """
+    keep = [s for s in listed if int(s.get("tid") or 0) in allowed]
+    keep.sort(key=lambda s: season_end_year(s.get("year")), reverse=True)
+    newest = sorted({season_end_year(s.get("year")) for s in keep}, reverse=True)[:years]
+    return [s for s in keep if season_end_year(s.get("year")) in set(newest)]
+
+
+def needs_relist(rec: dict) -> bool:
+    """A season list chosen by the old row cap and full to it: it may have cut a season short, so it is listed again."""
+    listed = rec.get("season_list")
+    return listed is not None and rec.get("list_rule") != LIST_RULE and len(listed) >= LEGACY_SEASONS_PER_PLAYER
 
 
 def _year_key(year) -> int:
@@ -581,7 +616,7 @@ def main() -> int:
             if budget.left < 3 or sofascore.is_blocked():
                 break
             rec = archive["players"].get(str(player.get("id") or ""))
-            if rec and rec.get("complete"):
+            if rec and rec.get("complete") and not needs_relist(rec):
                 continue
             try:
                 ok = fetch_player(archive, player, budget, allowed)

@@ -344,8 +344,8 @@ def test_glossary_covers_the_value_section():
     assert "value.json" in js and "value_validation.json" in js
     assert "?." not in re.sub(r"'[^']*'", "''", js) and "??" not in js
     html = (ROOT / "docs" / "ace" / "index.html").read_text(encoding="utf-8")
-    assert 'src="assets/js/value.js"' in html and 'data-nav="value"' in html
+    assert 'src="assets/js/value.js"' in html and 'assets/qk/quant.js' in html      # the kit shell (docs/REDESIGN.md)
     core = (ROOT / "docs" / "ace" / "assets" / "js" / "core.js").read_text(encoding="utf-8")
-    assert "addRoute('value', 'value')" in core
+    assert "addRoute('value', 'value')" in core and "value: [['value', 'Player value'" in core   # routed and in the Value section
     for f in V.FKEYS:
         assert f in js, f                                     # every feature has a label on the page

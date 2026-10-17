@@ -306,6 +306,11 @@ def _seed_from_branch(branch: str) -> int:
             print(f"::error::seed branch {branch} not cloned")
             return 1
         n = 0
+        copied: list[Path] = []
+        mt_file = dest / ".seed-mtimes.json"
+        mtimes = json.loads(mt_file.read_text(encoding="utf-8")) if mt_file.exists() else {}
+        if mt_file.exists():
+            mt_file.unlink()
         parts: dict[Path, list[Path]] = {}
         for p in dest.rglob("*"):
             if not p.is_file() or ".git" in p.relative_to(dest).parts:
@@ -318,6 +323,7 @@ def _seed_from_branch(branch: str) -> int:
             if not t.exists():
                 t.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(p), t)
+                copied.append(t)
                 n += 1
         for whole, pieces in parts.items():
             t = ROOT / whole.relative_to(dest)
@@ -327,8 +333,16 @@ def _seed_from_branch(branch: str) -> int:
             with open(t, "wb") as out:
                 for piece in sorted(pieces):
                     out.write(piece.read_bytes())
+            copied.append(t)
             n += 1
-        print(f"seeded {n} files from {branch}")
+        # the PC's modification times, so the builds' input signatures (size + mtime) match the deployed manifests
+        restored = 0
+        for t in copied:
+            ns = mtimes.get(t.relative_to(ROOT).as_posix())
+            if ns:
+                os.utime(t, ns=(ns, ns))
+                restored += 1
+        print(f"seeded {n} files from {branch} ({restored} with the PC's modification times)")
     return 0
 
 
@@ -338,11 +352,14 @@ SEEDS = {"gridiron": seed_gridiron, "rink": seed_branch("rink", guard_rink),
 
 
 def cmd_seed(site: str) -> int:
+    """Prints seeded=true|false (for $GITHUB_OUTPUT): a seeded run saves its model caches under a new key."""
     f = SEEDS.get(site)
     cmds = f(ctx_for(site)) if f else None
     if not cmds:
         print("working set complete: nothing to seed")
+        print("seeded=false")
         return 0
+    print("seeded=true")
     for c in cmds:
         if c[0] == "SEED_BRANCH":
             _seed_from_branch(c[1])

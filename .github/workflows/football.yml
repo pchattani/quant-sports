@@ -105,12 +105,13 @@ jobs:
           echo "live site: $(git -C "$RUNNER_TEMP/site" log -1 --format='%h %cI %s')"
 
       - name: 'Seed the working set if the cache was cold'
+        id: seed
         timeout-minutes: 40
         env:
           STORES_DEPLOY_KEY: ${{ secrets.STORES_DEPLOY_KEY }}
           STORES_REPO: ${{ vars.STORES_REPO || 'pchattani/quant-sports-stores' }}
         run: |
-          uv run --frozen python scripts/ci_site.py seed --site football
+          uv run --frozen python scripts/ci_site.py seed --site football | tee -a "$GITHUB_OUTPUT"
 
       - name: 'Build every competition'
         timeout-minutes: 100

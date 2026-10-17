@@ -56,7 +56,6 @@
 .qk-secnav-ctx .bp-level button { padding: 4px 10px; }
 .qk-secnav-ctx .bp-season { height: 30px; padding: 0 8px; }
 @media (max-width: 720px) {
-  .qk-secnav-ctx { padding-left: 6px; }
   .qk-secnav-ctx .bp-level button { padding: 4px 7px; }
   .bp-sec-title h1 { font-size: var(--fs-xl); }
   .bp-blurb { display: none; }

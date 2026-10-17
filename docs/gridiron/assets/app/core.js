@@ -850,9 +850,7 @@ function chartBox(id, h, label) { return '<div id="' + esc(id) + '" class="gi-ch
 /* A KPI tile; value is HTML (links allowed). o: {cls, accent, tip, text, spark} */
 function kpi(label, value, sub, o) {
   o = o || {};
-  return '<div class="qk-kpi' + (o.cls ? ' ' + o.cls : '') + '"' + (o.accent ? ' style="--accent:' + esc(o.accent) + '"' : '') + '><div class="qk-kpi-label">' + (o.tip ? '<span data-tip="' + esc(o.tip) + '">' + esc(label) + '</span>' : esc(label)) + '</div>' +
-    '<div class="qk-kpi-value' + (o.text ? ' is-text' : '') + '">' + (value === undefined || value === null || value === '' ? '—' : value) + '</div>' +
-    (sub ? '<div class="qk-kpi-sub"><span class="qk-truncate">' + sub + '</span></div>' : '') + (o.spark || '') + '</div>';
+  return QK.kpi({ label: label, value: value, sub: sub, html: true, cls: o.cls, accent: o.accent, tip: o.tip, text: o.text, spark: o.spark || undefined });
 }
 function kpis(list, cls) { return '<div class="qk-kpis gi-kpis' + (cls ? ' ' + cls : '') + '">' + list.filter(Boolean).join('') + '</div>'; }
 function chip(text, kind) { return '<span class="qk-badge' + (kind ? ' ' + kind : '') + '">' + esc(text) + '</span>'; }
@@ -917,70 +915,11 @@ function wireRows(node, fn) {
   });
   node.classList.add('gi-rowlinks');
 }
-/* Static HTML table on kit markup (sortable once wired with sortable(el)). cols: [{label, align, title, sortable:false, cls}];
- * rows: [{cells, _class, _href}] or arrays of cells; a cell is {v, html, cls, align, title, style} or a primitive.
- * opts {cls, id, maxHeight, sticky (first column)}. */
-function tableHTML(cols, rows, opts) {
-  const o = opts || {};
-  let h = '<div class="qk-table-wrap"' + (o.id ? ' id="' + esc(o.id) + '"' : '') + (o.maxHeight ? ' style="--table-max:' + o.maxHeight + 'px"' : '') + '><table class="qk-table dense' + (o.cls ? ' ' + o.cls : '') + '"><thead><tr>';
-  cols.forEach((c, i) => {
-    const cc = typeof c === 'string' ? { label: c } : c;
-    const num = cc.align === 'right';
-    const lab = cc.title ? '<span data-tip="' + esc(cc.title) + '">' + esc(cc.label) + '</span>' : esc(cc.label);
-    h += '<th scope="col" class="' + (num ? 'num ' : '') + (o.sticky && i === 0 ? 'sticky-col ' : '') + (cc.cls || '') + '"' + (cc.sortable === false ? '' : ' aria-sort="none"') + '>' +
-      (cc.sortable === false ? lab : '<button type="button">' + lab + '</button>') + '</th>';
-  });
-  h += '</tr></thead><tbody>';
-  (rows || []).forEach(r => {
-    const row = Array.isArray(r) ? { cells: r } : r;
-    h += '<tr' + (row._class ? ' class="' + row._class + '"' : '') + (row._href ? ' data-href="' + esc(row._href) + '"' : '') + (row._attrs || '') + '>';
-    row.cells.forEach((c0, i) => {
-      const c = (c0 !== null && typeof c0 === 'object') ? c0 : (typeof c0 === 'string' && /<[a-z\/]/i.test(c0) ? { html: c0 } : { v: c0 });
-      const col = typeof cols[i] === 'object' ? cols[i] : {};
-      const align = c.align || col.align;
-      const cls = [align === 'right' ? 'num' : '', o.sticky && i === 0 ? 'sticky-col' : '', c.cls, col.cls].filter(Boolean).join(' ');
-      const sortV = c.v !== undefined && c.v !== null ? c.v : (c.html !== undefined ? String(c.html).replace(/<[^>]*>/g, '') : '');
-      h += '<td data-v="' + esc(sortV) + '"' + (cls ? ' class="' + cls + '"' : '') + (c.title ? ' title="' + esc(c.title) + '"' : '') + (c.style ? ' style="' + c.style + '"' : '') + '>' +
-        (c.html !== undefined ? c.html : esc(c.v === null || c.v === undefined ? '—' : c.v)) + '</td>';
-    });
-    h += '</tr>';
-  });
-  return h + '</tbody></table></div>';
-}
-/* Sortable headers (kit aria-sort buttons) and data-href rows for every tableHTML table under el. */
-function sortable(el) {
-  const root = typeof el === 'string' ? document.getElementById(el) : el;
-  if (!root) return;
-  const tables = root.tagName === 'TABLE' ? [root] : Array.prototype.slice.call(root.querySelectorAll('table.qk-table'));
-  tables.forEach(table => {
-    if (table.dataset.sortWired) return;
-    table.dataset.sortWired = '1';
-    const ths = Array.prototype.slice.call(table.querySelectorAll('thead th'));
-    ths.forEach((th, idx) => {
-      const b = th.querySelector('button');
-      if (!b || !th.hasAttribute('aria-sort')) return;
-      b.addEventListener('click', () => {
-        const tbody = table.querySelector('tbody');
-        const rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
-        const cur = th.getAttribute('aria-sort');
-        const asc = cur === 'descending' ? true : cur === 'ascending' ? false : !th.classList.contains('num');
-        ths.forEach(x => { if (x.hasAttribute('aria-sort')) x.setAttribute('aria-sort', 'none'); });
-        th.setAttribute('aria-sort', asc ? 'ascending' : 'descending');
-        rows.sort((a, b2) => {
-          const av = a.children[idx] ? a.children[idx].dataset.v : '', bv = b2.children[idx] ? b2.children[idx].dataset.v : '';
-          const an = parseFloat(av), bn = parseFloat(bv), aN = av !== '' && !isNaN(an) && isFinite(av), bN = bv !== '' && !isNaN(bn) && isFinite(bv);
-          const cmp = aN && bN ? an - bn : aN ? -1 : bN ? 1 : String(av).localeCompare(String(bv));
-          return asc ? cmp : -cmp;
-        });
-        rows.forEach(r => tbody.appendChild(r));
-      });
-    });
-    table.querySelectorAll('tr[data-href]').forEach(tr => {
-      tr.style.cursor = 'pointer';
-      tr.addEventListener('click', ev => { if (ev.target.closest('a, button, input, select')) return; location.hash = tr.dataset.href; });
-    });
-  });
-}
+/* Static HTML table on kit markup and its sortable headers / data-href rows: the kit's QK.tableHTML and
+ * QK.sortable (ported from here). cols: [{label, align, title, sortable:false, cls}]; rows: [{cells, _class, _href}]
+ * or arrays of cells; a cell is {v, html, cls, align, title, style} or a primitive. opts {cls, id, maxHeight, sticky}. */
+function tableHTML(cols, rows, opts) { return QK.tableHTML(cols, rows, opts); }
+function sortable(el) { return QK.sortable(el); }
 function pill(text, colour, title) { return '<span class="gi-grade" style="--g:' + esc(colour || 'var(--ink-3)') + '"' + (title ? ' title="' + esc(title) + '"' : '') + '>' + esc(text) + '</span>'; }
 function teamBar(t) { return '<i class="gi-dot" style="--tc:' + esc(teamColour(t)) + '" aria-hidden="true"></i>'; }
 function weekNav(S, w) {

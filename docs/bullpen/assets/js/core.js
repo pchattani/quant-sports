@@ -1,6 +1,6 @@
 /* The Quant Bullpen — core: namespace, state, routing, cached loading, helpers, search, and the
  * shell from The Quant design kit (assets/qk: QK.shell top bar, the nine-section nav, search palette,
- * theme; charts through assets/js/plotly-ec.js on ECharts).
+ * theme; charts through the kit module assets/qk/plotly-ec.js on ECharts).
  *
  * Sections (docs/REDESIGN.md), each a group of routes with its own tab strip (SECTION_TABS below):
  *   Overview #/<L> · Games (scoreboard, game centre, odds board) · Standings (standings, postseason,

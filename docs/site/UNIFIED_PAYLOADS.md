@@ -661,6 +661,13 @@ build writes. Everything earlier keeps its keys; the additions below are new key
   part; the club part is the rest), `teams` [club tids by minutes], `coverage` ("partial" when any row in it
   is a lower bound)}. Built from `seasons` + `archive`, so the competitions always add up to the season.
   Zero `xg`, `xa`, `starts` and empty `intl`, `teams` are left out.
+- `career_gap` {`through`: era} (17 October 2026): the archive's career list for him was cut by the
+  fetcher's old twelve-row cap, which could stop mid-season (Mbappe's stopped at the Champions League
+  2023/24: no Ligue 1, Coupe de France or anything from 2022/23). That season and every older one may miss
+  competitions, so their `years[]` rows read `coverage: "partial"`, `gap: "career"` until the backfill
+  lists him again (`fetch_sofascore_history.py`: `needs_relist`, whole seasons for `PLAYER_YEARS`).
+- `archive[]` rows match their club through the competitions' team registries as well as the folded name
+  ("Paris Saint-Germain" -> PSG, 1644), narrowed to the competition's clubs when several match.
 - `mv` (Sofascore's market value, EUR unless `mvc`), `until` (contract end, ISO date), `foot`: the squad list
   that counts for him first (`squads/store.json`), then the archive's profile.
 

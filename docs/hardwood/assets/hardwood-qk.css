@@ -237,7 +237,6 @@ body.qk { font-size: var(--fs-md); }
 @keyframes hw-shim { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .hw-plot-wait { animation: none; } }
 .qk-secnav-ctx .hw-league button { padding: 4px 10px; }
-@media (max-width: 720px) { .qk-secnav-ctx { padding-left: 6px; } .qk-secnav-ctx .hw-season { max-width: 96px; } }
 /* legacy section heads inside a redesigned section: the section heading already names the page */
 .hw-legacy > .page-head:first-child h2 { font-size: var(--fs-lg); }
 
@@ -262,7 +261,7 @@ body.qk { font-size: var(--fs-md); }
 .hw-deal:last-child { border-bottom: 0; }
 .hw-deal .side { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 4px; font-size: var(--fs-sm); }
 .hw-deal .items { color: var(--ink-2); font-size: var(--fs-xs); }
-.hw-tx { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--line-1); font-size: var(--fs-sm); }
+.hw-tx { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--line-1); font-size: var(--fs-sm); }
 .hw-tx:last-child { border-bottom: 0; }
 .hw-tx .d { color: var(--ink-3); font: 500 var(--fs-xs) var(--font-num); }
 @media (max-width: 720px) { .hw-tx { grid-template-columns: 56px minmax(0, 1fr); } }

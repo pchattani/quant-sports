@@ -32,7 +32,10 @@ body.qk::before { /* faint terminal grid wash behind everything */
 .qk .num, .qk-num { font-family: var(--font-num); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 .qk-skip { position: absolute; left: -999px; top: 8px; z-index: 999; background: var(--brand); color: var(--brand-ink); padding: 8px 12px; border-radius: var(--r-2); font-weight: 600; }
 .qk-skip:focus { left: 8px; }
-.qk-sr { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.qk-sr { position: absolute !important; top: 0; left: 0; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+/* .qk-sr is absolutely placed: give the kit's scrolling and clipping boxes a positioning context so a
+ * screen-reader-only caption or label never escapes to the page and widens it */
+.qk-table-wrap, .qk-card-body, .qk-secnav-in, .qk-secnav-links, .qk-secnav-ctx, .qk-seg, .qk-chips, .qk-tabs, .qk-hscroll, .qk-ticker { position: relative; }
 .qk-kicker { font: 600 var(--fs-2xs)/1.2 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-3); }
 .qk-muted { color: var(--ink-3); }
 .qk-sub { color: var(--ink-2); font-size: var(--fs-sm); }
@@ -81,22 +84,36 @@ body.qk::before { /* faint terminal grid wash behind everything */
 .qk-searchbtn kbd { margin-left: auto; font: 500 var(--fs-2xs) var(--font-num); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line-2); color: var(--ink-3); }
 
 .qk-secnav { position: sticky; top: var(--topbar-h); z-index: calc(var(--z-bar) - 1); background: var(--s-glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--line-1); }
-.qk-secnav-in { max-width: var(--page-max); margin: 0 auto; padding: 0 var(--gutter); height: var(--secnav-h); display: flex; align-items: stretch; gap: 2px; overflow-x: auto; scrollbar-width: none; }
-.qk-secnav-in::-webkit-scrollbar { display: none; }
+.qk-secnav-in { position: relative; max-width: var(--page-max); margin: 0 auto; padding: 0 var(--gutter); min-height: var(--secnav-h); display: flex; align-items: stretch; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.qk-secnav-in::-webkit-scrollbar, .qk-secnav-links::-webkit-scrollbar, .qk-secnav-ctx::-webkit-scrollbar { display: none; }
+/* the section links scroll inside their own row; the context controls (league, season) never ride along */
+.qk-secnav-links { display: flex; align-items: stretch; gap: 2px; flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .qk-secnav a { display: inline-flex; align-items: center; padding: 0 12px; font-size: var(--fs-sm); font-weight: 600; color: var(--ink-3); white-space: nowrap; position: relative; transition: color var(--t-fast); }
 .qk-secnav a:hover { color: var(--ink-1); }
 .qk-secnav a[aria-current="page"] { color: var(--ink-1); }
 .qk-secnav a[aria-current="page"]::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
-.qk-secnav .qk-secnav-ctx { margin-left: auto; display: flex; align-items: center; gap: 8px; padding-left: 12px; }
+.qk-secnav .qk-secnav-ctx { margin-left: auto; display: flex; align-items: center; gap: 8px; padding-left: 12px; flex: none; max-width: 100%; }
+.qk-secnav-ctx .qk-select { max-width: 100%; min-width: 0; }
 
 @media (max-width: 860px) {
   .qk-searchbtn { min-width: 0; width: 36px; padding: 0; justify-content: center; }
   .qk-searchbtn span, .qk-searchbtn kbd { display: none; }
   .qk-topbar-in { flex-wrap: wrap; height: auto; padding-top: 8px; padding-bottom: 0; row-gap: 6px; }
   .qk-brand-sep { display: none; }
-  .qk-sports { order: 3; flex-basis: 100%; padding-bottom: 8px; margin: 0 calc(-1 * var(--gutter)); padding-left: var(--gutter); padding-right: var(--gutter); }
+  /* the switcher takes its own row and scrolls inside it; its box never exceeds the bar (no page widening) */
+  .qk-sports { order: 3; flex: 0 0 100%; max-width: 100%; padding-bottom: 8px; }
   html { scroll-padding-top: 140px; }
   .qk-secnav { top: 96px; }
+}
+@media (max-width: 720px) {
+  /* phones: section links on one scrolling row, the context controls (league / season) on a second row of
+   * their own, reachable without scrolling the nav sideways */
+  .qk-secnav-in { flex-wrap: wrap; overflow: visible; row-gap: 0; }
+  .qk-secnav-links { flex: 1 0 100%; height: var(--secnav-h); }
+  .qk-secnav .qk-secnav-ctx { flex: 1 0 100%; margin-left: 0; padding: 6px 0 8px; border-top: 1px solid var(--line-1); overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
+  .qk-secnav-ctx > * { flex: none; }
+  .qk-secnav-ctx .qk-select { flex: 0 1 auto; }
+  html { scroll-padding-top: 180px; }
 }
 
 /* ═════════════════════════════════════════════ layout */
@@ -136,10 +153,19 @@ body.qk::before { /* faint terminal grid wash behind everything */
 .qk-kpis { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
 .qk-kpi { background: var(--s-1); border: 1px solid var(--line-1); border-radius: var(--r-3); padding: 14px 16px; min-width: 0; position: relative; overflow: hidden; }
 .qk-kpi-label { font: 600 var(--fs-2xs)/1.2 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-3); }
-.qk-kpi-value { font: 600 var(--fs-2xl)/1.1 var(--font-num); letter-spacing: -0.04em; margin-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qk-kpi-value { font: 600 var(--fs-2xl)/1.1 var(--font-num); letter-spacing: -0.04em; margin-top: 8px; overflow-wrap: anywhere; min-width: 0; }
+.qk-kpi-value a { color: inherit; }
 .qk-kpi-value.is-text { font-family: var(--font-ui); font-weight: 700; font-size: var(--fs-lg); letter-spacing: -0.015em; }
 .qk-kpi-sub { font-size: var(--fs-xs); color: var(--ink-3); margin-top: 4px; display: flex; gap: 8px; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qk-kpi .qk-spark { position: absolute; right: 12px; bottom: 12px; width: 42%; height: 34px; opacity: 0.95; }
+@media (max-width: 720px) {
+  /* phones: values wrap and step down a size instead of being cut off with an ellipsis */
+  .qk-kpis { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+  .qk-kpi { padding: 12px 14px; }
+  .qk-kpi-value { font-size: var(--fs-xl); }
+  .qk-kpi-value.is-text { font-size: var(--fs-md); }
+  .qk-kpi-sub { white-space: normal; }
+}
 .qk-delta { font: 600 var(--fs-xs) var(--font-num); display: inline-flex; align-items: center; gap: 2px; }
 .qk-delta.up { color: var(--up); } .qk-delta.down { color: var(--down); } .qk-delta.flat { color: var(--ink-3); }
 .qk-delta.up::before { content: "▲"; font-size: 0.7em; } .qk-delta.down::before { content: "▼"; font-size: 0.7em; }
@@ -201,7 +227,9 @@ body.qk::before { /* faint terminal grid wash behind everything */
 .qk-tab[aria-selected="true"]::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2px; background: var(--accent); border-radius: 2px; }
 .qk-tab:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; border-radius: 4px; }
 .qk-tabpanel[hidden] { display: none; }
-.qk-seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--s-2); border: 1px solid var(--line-1); border-radius: var(--r-2); }
+.qk-seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--s-2); border: 1px solid var(--line-1); border-radius: var(--r-2); max-width: 100%; overflow-x: auto; scrollbar-width: none; vertical-align: middle; }
+.qk-seg::-webkit-scrollbar { display: none; }
+.qk-seg button { flex: none; }
 .qk-seg button { all: unset; cursor: pointer; padding: 5px 11px; border-radius: 6px; font-size: var(--fs-xs); font-weight: 600; color: var(--ink-3); white-space: nowrap; }
 .qk-seg button:hover { color: var(--ink-1); }
 .qk-seg button[aria-pressed="true"] { background: var(--s-4); color: var(--ink-1); box-shadow: var(--sh-1); }

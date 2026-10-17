@@ -49,7 +49,7 @@ function board(node, L) {
           (d.sides || []).map(sd => '<div class="side">' + U.grade(sd.grade_now || sd.grade) + U.teamEnt(L, sd.team, { abbr: true }) + '<span class="items">gets ' + esc(itemsTxt(L, sd['in'])) + '</span></div>').join('') + '</div>').join('') + '</div>', { cls: tIds.length ? 'qk-span-7' : 'qk-span-12', flush: true }) : '') + '</div></section>';
     }
     if (latest.length) h += '<section class="qk-section"><div class="qk-section-head"><div><h2>Latest moves</h2><div class="qk-sub">Signings, trades, waivers and injury-list moves from ESPN’s transaction feed.</div></div>' + U.link(HW.href(L, 'value') + '?tab=moves&mt=feed', 'The full feed') + '</div>' +
-      '<div class="qk-card">' + latest.map(x => '<div class="hw-tx"><span class="d">' + esc(HW.fmtDate(x.date, { year: false, weekday: false })) + '</span><span>' + (x.team ? U.teamEnt(L, x.team, { abbr: true }) + ' ' : '') + esc(x.text) + '</span></div>').join('') + '</div></section>';
+      '<div class="qk-card">' + latest.map(x => '<div class="hw-tx"><span class="d">' + esc(HW.fmtDate(x.date, { year: 'auto', weekday: false })) + '</span><span>' + (x.team ? U.teamEnt(L, x.team, { abbr: true }) + ' ' : '') + esc(x.text) + '</span></div>').join('') + '</div></section>';
     node.innerHTML = h;
     QKC.mount('#vb-top', Tk => {
       const ya = QKC.axis(Tk, { type: 'category', data: top.map(r => r.name), split: false, inverse: true }); ya.axisLabel.color = Tk.ink2; ya.axisLabel.width = 140; ya.axisLabel.overflow = 'truncate';

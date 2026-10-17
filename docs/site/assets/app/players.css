@@ -72,6 +72,5 @@ a .fb-pl-res:hover { outline: 1px solid var(--accent); }
 @media (max-width: 720px) {
   .fb-page-players .fb-toolbar .fb-field { flex: 1 1 100%; width: 100%; }
   .fb-page-players .fb-toolbar .qk-select, .fb-page-players .fb-toolbar .qk-input { width: 100%; max-width: 100%; min-width: 0; }
-  .fb-page-players .fb-toolbar .qk-seg { max-width: 100%; overflow-x: auto; }
   .fb-pl-filter .qk-select { width: 100%; }
 }

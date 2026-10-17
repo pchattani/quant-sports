@@ -256,6 +256,31 @@ def test_script_lists_every_payload_it_reads() -> None:
         assert prefix in js, prefix
 
 
+# ── the hub ──────────────────────────────────────────────────────────────────
+
+def test_hub_upcoming_lists_only_matches_still_to_play() -> None:
+    """A fixture the store never closed (still "scheduled" a month on) must not drag its day into "upcoming"."""
+    from datetime import datetime, timezone
+
+    import scripts.build_site_all as b
+
+    def fx(gid, date, status):
+        return {"id": gid, "date": date, "home": "H" + gid, "away": "A" + gid, "status": status}
+
+    caf = {"ok": True, "slug": "caf-champions-league", "name": "CAF Champions League", "kind": "cup", "_fixtures": [
+        fx("1", "2026-09-11T14:00:00Z", "scheduled"),     # stale: never closed by the store
+        fx("2", "2026-09-11T14:00:00Z", "finished"),
+        fx("3", "2026-09-20T14:00:00Z", "finished"),
+        fx("4", "2026-11-01T14:00:00Z", "postponed"),
+        fx("5", "2026-11-01T16:00:00Z", "scheduled"),
+    ]}
+    hub = b.build_hub([caf], now=datetime(2026, 10, 17, 12, tzinfo=timezone.utc))
+    assert [m["id"] for m in hub["upcoming"]] == ["5"]
+    assert all(m["status"] in ("scheduled", "live") and m["date"][:10] >= hub["today"] for m in hub["upcoming"])
+    assert [m["id"] for m in hub["recent"]] == ["3"]
+    assert hub["days"] == {}
+
+
 # ── tuned model parameters ───────────────────────────────────────────────────
 
 def test_model_params_fall_back_to_defaults_and_read_tuned_entries(tmp_path, monkeypatch) -> None:

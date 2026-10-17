@@ -523,3 +523,57 @@ def test_old_detail_gets_no_match_page() -> None:
     assert has_match_page("1", "2025-08-16", {"1"}, now)                 # the live edition: always
     assert has_match_page("2", "2025-10-20", set(), now)                 # inside the year
     assert not has_match_page("3", "2025-08-16", set(), now)             # a backfilled match from last August
+
+
+# ── careers the fetcher's old row cap cut short ──────────────────────────────
+
+def test_fetcher_keeps_whole_seasons_and_relists_lists_the_old_cap_cut() -> None:
+    h = importlib.import_module("fetch_sofascore_history")
+    assert [h.season_end_year(y) for y in ("23/24", "2023/2024", "2024", "26/27", None)] == [2024, 2024, 2024, 2027, 0]
+    # Mbappe's list, Sofascore order: per tournament, newest first.
+    listed = [{"tid": 8, "sid": 1, "year": "25/26"}, {"tid": 8, "sid": 2, "year": "24/25"},
+              {"tid": 7, "sid": 3, "year": "25/26"}, {"tid": 7, "sid": 4, "year": "24/25"}, {"tid": 7, "sid": 5, "year": "23/24"},
+              {"tid": 7, "sid": 6, "year": "22/23"}, {"tid": 34, "sid": 7, "year": "23/24"}, {"tid": 34, "sid": 8, "year": "22/23"},
+              {"tid": 1, "sid": 9, "year": "2024"}, {"tid": 999, "sid": 10, "year": "25/26"}]
+    allowed = {8, 7, 34, 1}
+    keep = h.select_career(listed, allowed, years=3)
+    assert {s["sid"] for s in keep} == {1, 2, 3, 4, 5, 7, 9}      # 2023/24 whole: CL, Ligue 1 and EURO 2024
+    assert [h.season_end_year(s["year"]) for s in keep] == sorted((h.season_end_year(s["year"]) for s in keep), reverse=True)
+    old = {"season_list": [{"tid": 7, "sid": i, "year": "25/26"} for i in range(12)], "complete": True}
+    assert h.needs_relist(old)
+    assert not h.needs_relist({**old, "list_rule": h.LIST_RULE})
+    assert not h.needs_relist({"season_list": old["season_list"][:11]})
+    assert not h.needs_relist({"season_list": None})
+
+
+def _career_world(tmp_path, n_listed):
+    """A Ligue 1 club (PSG in the stores) and a player whose archive career the old cap may have cut."""
+    league = _store([_m("1", "PSG", "Lyon", 1644, 1649, 2, 0, "2026-09-01T15:00:00Z", 20)],
+                    {"1": _lineup("PSG", "7", "Seven")}, current=20, players={"7": {"n": "Seven", "pos": "F", "dob": 900000000}})
+    seasons = {"ligue-1": {"tournament_id": 34, "seasons": [{"season_id": 20, "name": "Ligue 1 26/27", "year": "26/27"}]},
+               "champions-league": {"tournament_id": 7, "seasons": []}}
+    listed = [{"tid": 34, "tname": "Ligue 1", "sid": 100 + i, "sname": f"Ligue 1 {25 - i:02d}/{26 - i:02d}", "year": f"{25 - i:02d}/{26 - i:02d}"}
+              for i in range(n_listed)]
+    arch_seasons = [{**s, "team": "Paris Saint-Germain", "stats": {"appearances": 30, "minutesPlayed": 2500, "goals": 20}} for s in listed]
+    archive = {"seasons": {}, "season_lists": {}, "players": {"7": {"season_list": listed, "seasons": arch_seasons, "complete": True}}}
+    u = U.Unified(tmp_path, seasons, archive=archive, today=TODAY)
+    u.add_store("ligue-1", league)
+    u.finish()
+    return _j(tmp_path / "people" / "7.json")
+
+
+def test_a_career_cut_by_the_old_cap_reads_partial_from_where_it_stops(tmp_path) -> None:
+    p = _career_world(tmp_path, 12)
+    cut = p["career_gap"]["through"]
+    assert cut == "2014/15"                                       # the oldest season the cut list reached
+    years = {y["era"]: y for y in p["years"]}
+    assert years["2014/15"]["coverage"] == "partial" and years["2014/15"]["gap"] == "career"
+    assert years["2015/16"]["coverage"] == "full" and "gap" not in years["2015/16"]
+    assert years["2026/27"]["coverage"] == "full"
+    # "Paris Saint-Germain" in the archive is PSG (1644) in the stores, through the Ligue 1 registry.
+    assert {r.get("tid") for r in p["archive"]} == {1644}
+
+
+def test_a_short_or_relisted_career_has_no_gap(tmp_path) -> None:
+    p = _career_world(tmp_path, 5)
+    assert "career_gap" not in p and all(y["coverage"] == "full" for y in p["years"])

@@ -86,12 +86,13 @@ jobs:
           uv run --frozen python scripts/bb_hydrate.py
 
       - name: 'Seed the working set if the cache was cold'
+        id: seed
         timeout-minutes: 40
         env:
           STORES_DEPLOY_KEY: ${{ secrets.STORES_DEPLOY_KEY }}
           STORES_REPO: ${{ vars.STORES_REPO || 'pchattani/quant-sports-stores' }}
         run: |
-          uv run --frozen python scripts/ci_site.py seed --site hardwood
+          uv run --frozen python scripts/ci_site.py seed --site hardwood | tee -a "$GITHUB_OUTPUT"
 
       - name: 'Fetch NBA (ESPN)'
         if: ${{ steps.ctx.outputs.nba == 'true' }}
@@ -172,10 +173,10 @@ jobs:
             data/basketball/pbp
           key: ${{ steps.rawkey.outputs.key }}
 
-      - name: 'Save model caches (once a day)'
-        if: ${{ !cancelled() && steps.model.outputs.cache-hit != 'true' }}
+      - name: 'Save model caches (once a day, and after a seed)'
+        if: ${{ !cancelled() && (steps.model.outputs.cache-hit != 'true' || steps.seed.outputs.seeded == 'true') }}
         uses: actions/cache/save@v4
         with:
           path: |
             data/basketball/cache
-          key: hardwood-model-v1-${{ steps.ctx.outputs.today }}
+          key: hardwood-model-v1-${{ steps.ctx.outputs.today }}${{ steps.seed.outputs.seeded == 'true' && format('-seed-{0}', github.run_id) || '' }}

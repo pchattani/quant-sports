@@ -227,26 +227,14 @@ function renderGame(el, params) {
       const top = (g.plays || []).filter(p => isNum(p.dwp_home) || isNum(p.wpa)).slice().sort((x, y) => Math.abs(y.dwp_home || y.wpa) - Math.abs(x.dwp_home || x.wpa)).slice(0, 5);
       const tMax = Math.max(pts[pts.length - 1][0], 4 * PERIOD_S(L));
       const per = []; for (let t = PERIOD_S(L); t < tMax; t += t < 4 * PERIOD_S(L) ? PERIOD_S(L) : 300) per.push(t);
-      const pAt = t => { let v = pts[0][1]; for (let i = 0; i < pts.length && pts[i][0] <= t; i++) v = pts[i][1]; return v; };
-      QKC.mount('#gm-wp', T => {
-        const hc = U.pair(L, H, A);
-        const band = (k, c) => ({ type: 'line', step: 'end', data: pts.map(x => [x[0], k ? Math.min(0.5, x[1]) : Math.max(0.5, x[1])]), showSymbol: false, silent: true, lineStyle: { width: 0, opacity: 0 }, areaStyle: { color: QKC.hexA(c, 0.24), origin: 0.5 }, tooltip: { show: false } });
-        return {
-          grid: { left: 8, right: 16, top: 22, bottom: 8, containLabel: true },
-          xAxis: QKC.axis(T, { type: 'value', min: 0, max: tMax, split: false, line: true, interval: PERIOD_S(L), fmt: v => (v < 4 * PERIOD_S(L) ? 'Q' + (Math.round(v / PERIOD_S(L)) + 1) : '') }),
-          yAxis: QKC.axis(T, { min: 0, max: 1, interval: 0.25, fmt: v => (v === 0.5 ? '50%' : v === 1 ? HW.teamAbbr(L, H) : v === 0 ? HW.teamAbbr(L, A) : '') }),
-          tooltip: QKC.tooltip(T, { trigger: 'axis', formatter: ps => { const t = ps[0].axisValue; const p = pAt(t);
-            return '<div style="color:' + T.ink3 + ';font-size:11px">' + esc(tLabel(L, t)) + '</div>' + QKC.tipRow(hc[0], HW.teamName(L, H), U.pct(p)) + QKC.tipRow(hc[1], HW.teamName(L, A), U.pct(1 - p)); } }),
-          series: [
-            band(0, hc[0]), band(1, hc[1]),
-            { type: 'line', step: 'end', z: 5, showSymbol: false, data: pts.map(x => [x[0], x[1]]), lineStyle: { width: 2, color: T.ink1 }, itemStyle: { color: T.ink1 },
-              markLine: { silent: true, symbol: 'none', lineStyle: { color: T.axis, type: [3, 3] }, label: { show: false }, data: [{ yAxis: 0.5 }].concat(per.map(t => ({ xAxis: t }))) },
-              markPoint: top.length ? { symbol: 'circle', symbolSize: 8, itemStyle: { color: T.brand, borderColor: T.s1, borderWidth: 2 },
-                label: { show: true, position: 'top', color: T.ink2, fontSize: 10, fontWeight: 600, formatter: q => q.name }, data: top.map((x, i) => ({ name: String(i + 1), coord: [x.t, isNum(x.wp) ? x.wp : pAt(x.t)] })) } : undefined },
-            espn.length ? { type: 'line', step: 'end', name: 'ESPN', silent: true, z: 4, showSymbol: false, data: espn.map(x => [x[0], x[1]]), lineStyle: { width: 1.2, type: [3, 3], color: T.ink3 } } : null
-          ].filter(Boolean)
-        };
-      }, { label: 'Win probability through the game' });
+      const hc = U.pair(L, H, A);
+      QKC.winProb('#gm-wp', {
+        t: pts.map(x => x[0]), p: pts.map(x => x[1]), step: true, tMin: 0, tMax: tMax, interval: PERIOD_S(L), periods: per,
+        home: { name: HW.teamName(L, H), abbr: HW.teamAbbr(L, H), colour: hc[0] }, away: { name: HW.teamName(L, A), abbr: HW.teamAbbr(L, A), colour: hc[1] },
+        tFmt: v => (v < 4 * PERIOD_S(L) ? 'Q' + (Math.round(v / PERIOD_S(L)) + 1) : ''), tLabel: t => tLabel(L, t),
+        events: top.map((x, i) => ({ t: x.t, p: isNum(x.wp) ? x.wp : undefined, label: String(i + 1) })),
+        compare: espn.length ? { name: 'ESPN', t: espn.map(x => x[0]), p: espn.map(x => x[1]) } : null
+      });
     }
     if (document.getElementById('gm-flow')) {
       const fl = g.flow;

@@ -1,6 +1,6 @@
 /* The Quant Ace — core: namespace, state, routing, cached loading, helpers, search, and the shell from
  * The Quant design kit (assets/qk: QK.shell top bar, the section nav, search palette, theme; charts
- * through assets/js/plotly-ec.js on ECharts).
+ * through the kit module assets/qk/plotly-ec.js on ECharts).
  *
  * Sections (docs/REDESIGN.md; tennis labels): Overview #/<T> · Draws (tournaments, draws and draw
  * simulations, match centre, odds board) · Rankings (rankings, race, Elo) · Players (players, player

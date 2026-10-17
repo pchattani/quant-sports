@@ -662,9 +662,7 @@ function chartBox(id, h, label) { return '<div id="' + esc(id) + '" class="fb-ch
 /* A KPI tile; value is HTML. o: {sub (HTML), tip, text, cls, accent, spark (HTML)} */
 function kpi(label, value, o) {
   o = o || {};
-  return '<div class="qk-kpi' + (o.cls ? ' ' + o.cls : '') + '"' + (o.accent ? ' style="--accent:' + esc(o.accent) + '"' : '') + '><div class="qk-kpi-label">' + (o.tip ? '<span data-tip="' + esc(o.tip) + '">' + esc(label) + '</span>' : esc(label)) + '</div>' +
-    '<div class="qk-kpi-value' + (o.text ? ' is-text' : '') + '">' + (value === undefined || value === null || value === '' ? '—' : value) + '</div>' +
-    (o.sub ? '<div class="qk-kpi-sub"><span class="qk-truncate">' + o.sub + '</span></div>' : '') + (o.spark || '') + '</div>';
+  return QK.kpi({ label: label, value: value, sub: o.sub, html: true, cls: o.cls, accent: o.accent, tip: o.tip, text: o.text, spark: o.spark || undefined });
 }
 function kpis(list, cls) { return '<div class="qk-kpis fb-kpis' + (cls ? ' ' + cls : '') + '">' + list.join('') + '</div>'; }
 function badge(text, kind, tip) { return '<span class="qk-badge' + (kind ? ' ' + kind : '') + '"' + (tip ? ' data-tip="' + esc(tip) + '"' : '') + '>' + esc(text) + '</span>'; }
@@ -739,18 +737,22 @@ function setCompPicker(slug) {
   var sel = document.getElementById('fb-comp-pick');
   if (sel) sel.value = slug && comp(slug) ? slug : '';
 }
+/* Search rows; w ranks matches that start equally well (kit QK.search): competitions, then clubs by reach, then
+   players by market value and minutes, so a star comes before a namesake in the reserves. */
 function searchRows() {
   return Promise.all([clubsIndex(), peopleIndex()]).then(function (arr) {
     var out = [];
     INDEX.comps.filter(function (c) { return c.ok; }).forEach(function (c) {
-      out.push({ sport: 'football', t: c.name, s: 'Competition · ' + (c.country || (FAMILIES.filter(function (f) { return f.key === familyOf(c); })[0] || {}).label || ''), href: href.comp(c.slug) });
+      out.push({ sport: 'football', t: c.name, s: 'Competition · ' + (c.country || (FAMILIES.filter(function (f) { return f.key === familyOf(c); })[0] || {}).label || ''), href: href.comp(c.slug), w: 6 });
     });
     var clubs = arr[0].list.slice().sort(function (a, b) { return (b.home ? 1 : 0) - (a.home ? 1 : 0) || (b.comps || []).length - (a.comps || []).length; });
     clubs.forEach(function (t) {
-      out.push({ sport: 'football', t: t.name, s: (t.national ? 'National team' : 'Club') + (t.home ? ' · ' + compName(t.home, true) : t.country ? ' · ' + t.country : ''), href: href.club(t.id) });
+      out.push({ sport: 'football', t: t.name, s: (t.national ? 'National team' : 'Club') + (t.home ? ' · ' + compName(t.home, true) : t.country ? ' · ' + t.country : ''), href: href.club(t.id),
+        w: 3 + (t.home ? 1 : 0) + Math.min(3, (t.comps || []).length) * 0.3 });
     });
     arr[1].list.forEach(function (p) {
-      out.push({ sport: 'football', t: p.name, s: (POS_LABEL[p.pos] || 'Player') + (p.club ? ' · ' + p.club : '') + (p.nt ? ' · ' + p.nt : ''), href: href.player(p.id) });
+      out.push({ sport: 'football', t: p.name, s: (POS_LABEL[p.pos] || 'Player') + (p.club ? ' · ' + p.club : '') + (p.nt ? ' · ' + p.nt : ''), href: href.player(p.id),
+        w: (isNum(p.mv) && p.mv > 0 ? Math.max(0, Math.log10(p.mv) - 4) : 0) + Math.min(1, (isNum(p.min) ? p.min : 0) / 3000) });
     });
     [['Matches today', '#/matches'], ['Value leaderboard', '#/value'], ['Transfers', '#/value/transfers'], ['Transfer simulator', '#/value/simulator'],
       ['Fantasy', '#/fantasy'], ['Player lab', '#/lab'], ['Compare players', '#/compare/players'], ['Compare clubs', '#/compare/clubs'], ['Clubs on one scale', '#/clubs'],

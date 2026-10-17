@@ -89,7 +89,7 @@ function render(el, params) {
     const dl = deals && deals.teams ? deals.teams[tid] : null;
     h += '<div class="qk-grid hw-sec">' + U.card2('Schedule', upcoming.length ? 'Next games with the model’s win probability' : 'Results', '<div id="tp-sched"></div>', { cls: 'qk-span-6', flush: true });
     if (txs.length || dl) h += U.card2('Moves', dl ? dl.n + ' rated trade' + (dl.n === 1 ? '' : 's') + ' in 12 months · net ' + U.signed(dl.net_now, 1) + ' WAR in today’s view' : 'Transactions in the last 12 months',
-      '<div>' + txs.map(x => '<div class="hw-tx"><span class="d">' + esc(HW.fmtDate(x.date, { year: false, weekday: false })) + '</span><span>' + esc(x.text) + '</span></div>').join('') + '</div>',
+      '<div>' + txs.map(x => '<div class="hw-tx"><span class="d">' + esc(HW.fmtDate(x.date, { year: 'auto', weekday: false })) + '</span><span>' + esc(x.text) + '</span></div>').join('') + '</div>',
       { cls: 'qk-span-6', flush: true, foot: U.link(HW.href(L, 'value') + '?tab=moves&team=' + encodeURIComponent(tid), 'Trade grades and the full feed') });
     h += '</div>';
     el.innerHTML = h;

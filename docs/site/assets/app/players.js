@@ -525,6 +525,7 @@ function drawOverview(el, body, doc, R, q) {
 function yearsTable(box, Y, doc, open) {
   if (!box) return;
   if (!Y.length) { box.innerHTML = FB.empty('No season in the filter'); return; }
+  var gapThrough = doc && doc.career_gap ? doc.career_gap.through : null;
   var head = '<tr><th class="sticky-col">Season</th><th>Competition</th><th>Team</th><th class="num">Apps</th><th class="num">Min</th><th class="num">G</th><th class="num">A</th><th class="num">xG</th><th class="num">xA</th><th class="num">G+A/90</th><th class="num">Rating</th><th>Data</th></tr>';
   var bodies = Y.map(function (y, i) {
     var isOpen = i < open;
@@ -536,7 +537,7 @@ function yearsTable(box, Y, doc, open) {
       '<td>' + esc(teams.slice(0, 2).join(', ')) + '</td>' +
       '<td class="num">' + int(y.apps) + '</td><td class="num">' + int(y.min) + '</td><td class="num"><b>' + int(y.g) + '</b></td><td class="num"><b>' + int(y.a) + '</b></td>' +
       '<td class="num">' + nn(y.xg, 1) + '</td><td class="num">' + nn(y.xa, 1) + '</td><td class="num">' + nn(per90(y.g + y.a, y.min), 2) + '</td><td class="num">' + nn(y.rt, 2) + '</td>' +
-      '<td>' + (y.partial ? '<span class="fb-cov partial" data-tip="At least one competition this season is a lower bound (line-ups missing).">Partial</span>' : y.totals ? '<span class="fb-cov totals" data-tip="Includes Sofascore season totals where our line-ups were incomplete.">Totals</span>' : '<span class="fb-cov full">Full</span>') + '</td></tr>';
+      '<td>' + (gapThrough && eraKey(y.era) <= eraKey(gapThrough) ? '<span class="fb-cov partial" data-tip="His career list from Sofascore is still being backfilled: competitions from this season and older may be missing, so the season is a lower bound.">Partial</span>' : y.partial ? '<span class="fb-cov partial" data-tip="At least one competition this season is a lower bound (line-ups missing).">Partial</span>' : y.totals ? '<span class="fb-cov totals" data-tip="Includes Sofascore season totals where our line-ups were incomplete.">Totals</span>' : '<span class="fb-cov full">Full</span>') + '</td></tr>';
     var kids = y.rows.map(function (r) {
       var sh = r.comp ? seasonHref(r.comp, r.sid, 'players') : null;
       return '<tr class="fb-pl-sub"' + (isOpen ? '' : ' hidden') + '>' +

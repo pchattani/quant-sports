@@ -428,9 +428,7 @@ function chartBox(id, h, label) { return '<div id="' + esc(id) + '" class="pd-ch
 /* A KPI tile; value is HTML (links allowed). */
 function kpi(label, value, sub, o) {
   o = o || {};
-  return '<div class="qk-kpi' + (o.cls ? ' ' + o.cls : '') + '"' + (o.accent ? ' style="--accent:' + esc(o.accent) + '"' : '') + '><div class="qk-kpi-label">' + (o.tip ? '<span data-tip="' + esc(o.tip) + '">' + esc(label) + '</span>' : esc(label)) + '</div>' +
-    '<div class="qk-kpi-value' + (o.text ? ' is-text' : '') + '">' + (value === undefined || value === null || value === '' ? '—' : value) + '</div>' +
-    (sub ? '<div class="qk-kpi-sub"><span class="qk-truncate">' + sub + '</span></div>' : '') + (o.spark || '') + '</div>';
+  return QK.kpi({ label: label, value: value, sub: sub, html: true, cls: o.cls, accent: o.accent, tip: o.tip, text: o.text, spark: o.spark || undefined });
 }
 function kpis(list, cls) { return '<div class="qk-kpis pd-kpis' + (cls ? ' ' + cls : '') + '">' + list.join('') + '</div>'; }
 function chip(text, kind) { return '<span class="qk-badge' + (kind ? ' ' + kind : '') + '">' + esc(text) + '</span>'; }

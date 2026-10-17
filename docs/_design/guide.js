@@ -148,6 +148,23 @@ QKC.heatmap('#ch-hm', { x: counts, y: pitches, data: hm, diverging: true, mid: 0
 var t = [], p = [], q = 0.55; for (var m = 0; m <= 60; m++) { q = Math.max(0.02, Math.min(0.98, q + Math.sin(m / 3.1) * 0.035 + (m === 21 ? 0.14 : 0) + (m === 44 ? -0.42 : 0) + (m === 57 ? 0.3 : 0))); t.push(m); p.push(m === 60 ? 1 : q); }
 QKC.winProb('#ch-wp', { t: t, p: p, home: { name: 'Broncos', abbr: 'DEN', colour: '#FB4F14' }, away: { name: 'Seahawks', abbr: 'SEA', colour: '#002244' }, periods: [15, 30, 45], interval: 15, tFmt: function (v) { return 'Q' + Math.min(4, Math.floor(v / 15) + 1) + ' ' + (15 - v % 15) + ':00'; }, events: [{ t: 21, label: 'TD' }, { t: 44, label: 'INT' }, { t: 57, label: 'FG' }] });
 
+/* v1.1 additions: numeric x with band, error bars and inverted y; whiskers + market tick; range; butterfly; diagonal */
+var wk = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+var rk = [12, 10, 9, 9, 7, 6, 6, 4, 3, 3], se = [3, 2.6, 2.4, 2.2, 2, 1.8, 1.7, 1.5, 1.4, 1.2];
+QKC.line('#ch-band', { xType: 'value', x: wk, xName: 'Week', yInverse: true, yName: 'Power rank', yMin: 1, xMin: 1, xMax: 10,
+  series: [{ name: 'Rank', data: rk, band: { lo: rk.map(function (v, i) { return Math.max(1, v - se[i]); }), hi: rk.map(function (v, i) { return v + se[i]; }) } },
+    { name: 'Preseason', data: [14, 14, 13, 12, 12, 11, 10, 10, 9, 9], dash: true, err: [2, 2, 2, 2, 2, 2, 2, 2, 2, 2] }] });
+var pj = [['Allen', 24.1, 17, 31, 22.5], ['Jackson', 23.4, 15, 32, 24.5], ['Hurts', 21.8, 15, 29, 20.5], ['Mahomes', 20.9, 14, 28, 21.5], ['Burrow', 19.6, 13, 27, 19.5]];
+QKC.bar('#ch-whisk', { cats: pj.map(function (x) { return x[0]; }), legend: true, marketName: 'Market line', fmt: function (v) { return v.toFixed(1); },
+  series: [{ name: 'Projection', data: pj.map(function (x) { return x[1]; }), lo: pj.map(function (x) { return x[2]; }), hi: pj.map(function (x) { return x[3]; }), market: pj.map(function (x) { return x[4]; }) }] });
+QKC.range('#ch-range', { rows: pj.map(function (x) { return { label: x[0], lo: x[2], hi: x[3], mid: x[1] }; }), fmt: function (v) { return v.toFixed(1); } });
+QKC.butterfly('#ch-fly', { cats: ['Arsenal', 'Liverpool', 'Man City', 'Chelsea', 'Spurs'], left: { name: 'Goals against', data: [6, 8, 9, 11, 13], color: QK.cssVar('--c-8') }, right: { name: 'Goals for', data: [19, 21, 18, 16, 15] }, fmt: function (v) { return String(v); } });
+var md = []; for (var i2 = 0; i2 < 30; i2++) { var e2 = 0.15 + 0.7 * ((i2 * 37) % 30) / 30; md.push({ name: 'Game ' + (i2 + 1), x: e2, y: Math.max(0, Math.min(1, e2 + Math.sin(i2 * 2.3) * 0.12)), color: i2 % 3 ? QK.cssVar('--c-1') : QK.cssVar('--c-2') }); }
+QKC.scatter('#ch-diag', { points: md, xName: 'Model', yName: 'Actual', xFmt: function (v) { return QK.fmt.pct(v, 0); }, yFmt: function (v) { return QK.fmt.pct(v, 0); }, diagonal: { label: 'perfect' },
+  xMin: 0, xMax: 1, yMin: 0, yMax: 1, legendItems: [{ name: 'Regular season', color: QK.cssVar('--c-1') }, { name: 'Playoffs', color: QK.cssVar('--c-2') }] });
+var hm2 = []; ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].forEach(function (d, yi) { [9, 12, 15, 18, 21].forEach(function (hh, xi) { hm2.push([xi, yi, Math.round(10 + 50 * Math.abs(Math.sin(xi * 1.1 + yi * 0.7)))]); }); });
+QKC.heatmap('#ch-hm2', { x: ['09h', '12h', '15h', '18h', '21h'], y: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], data: hm2, labelMin: 30, fmt: function (v) { return String(Math.round(v)); } });
+
 /* shot maps: deterministic pseudo-random */
 var seed = 7; function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
 function shots(n, f) { var out = []; for (var i = 0; i < n; i++) out.push(f(i)); return out; }

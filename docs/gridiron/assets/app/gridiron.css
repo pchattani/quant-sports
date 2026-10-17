@@ -366,8 +366,4 @@
 .gi-pick-l li { padding-bottom: 10px; border-bottom: 1px solid var(--line-1); }
 .gi-pick-l li:last-child { border-bottom: 0; padding-bottom: 0; }
 @media (max-width: 860px) { .gi-o2 { grid-template-columns: 1fr; } }
-/* segmented controls never widen the page: they scroll inside their row */
-.gi-page .qk-seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
-.gi-page .qk-seg::-webkit-scrollbar { display: none; }
-.gi-page .qk-seg button { flex: none; }
 .gi-toolbar > * { min-width: 0; max-width: 100%; }
