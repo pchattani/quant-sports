@@ -63,6 +63,28 @@ Pages repo (vars.SITE_REPO) → https://pchattani.github.io/the-quant-footballer
 
 ## 2. The front-end
 
+> **Rebuilt on 17 October 2026 (docs/REDESIGN.md, workstream C).** The FH modules described in 2.1-3.10 below are
+> retired (removed from `docs/site/assets/js/`); they are kept here as the record of what each capability did. The
+> site now runs on the shared kit (`assets/qk/`, copied by `build_site_all.py` from `docs/_design/`) with one module
+> per section under `docs/site/assets/app/`, namespace `window.FB`:
+>
+> | File | Section / routes |
+> |---|---|
+> | `core.js` | router (`FB.route`), old-route redirects (`legacyRedirect`: `#/<slug>/<tab>`, `#/<slug>/match/<id>`, `#/<slug>/team/<club>`, `#/<slug>/player/<id>`, `#/nations`, `#/leaders`, `#/transfer`, `#/glossary`, `#/methodology`, `#/disclaimer`, `#/hub` …), cached loading (`FB.load`, `FB.compFile` never requests a file a competition does not write), clubs/people indexes, crests (`data/crests.json`: only ids with a file get an image), links, formatting, HTML builders, shell + search + competition picker |
+> | `charts.js` | `FB.charts`: shot maps on the pitch, formations, radar, rating colours |
+> | `overview.js` | `#/` Overview: today's matches with model v market, title races, leaders, leagues at a glance |
+> | `matches.js` | `#/matches`, `#/match/<slug>/<id>` (match centre) |
+> | `competition.js` | `#/competitions`, `#/competition/<slug>[/<tab>][?s=<sid>&view=]` (tabs overview, table, fixtures, bracket, odds, power, players, analytics, clubs, seasons; past seasons via `?s=`) |
+> | `clubs.js` | `#/clubs[/leagues\|nations\|pricer]`, `#/club/<tid>` (one club across every competition, year by year) |
+> | `players.js` | `#/players[/leaders]`, `#/player/<pid>` (one player across every competition, season by season) |
+> | `value.js`, `fantasy.js` | `#/value[/positions\|transfers\|simulator\|budgets\|method]`, `#/fantasy` |
+> | `lab.js`, `model.js` | `#/lab`, `#/compare/...`; `#/model[/methodology\|glossary\|calibration\|coverage\|disclaimer]` |
+>
+> Each module keeps its CSS in `assets/app/<module>.css` (prefixed); `football.css` holds the shared layout.
+> `docs/site/assets/style.css` is no longer used by football and stays only because the sister sites copy it as
+> `base.css`. Payloads the new front end no longer reads (can be retired from the build once the backend agrees):
+> `search.json`, `season_index.json`, `careers/`, `history/<slug>.json`, `<slug>/club_matches.json`.
+
 ### 2.1 Files
 
 | File | Role |

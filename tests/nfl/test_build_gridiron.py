@@ -78,7 +78,7 @@ def test_build_end_to_end(synth):
     pi = _read(d / "players_index.json")
     pid, row = next(iter(pi.items()))
     assert len(row) == 5 and (d / "players" / f"{pid}.json").exists()
-    assert (d.parent / "assets" / "base.css").exists()
+    assert (d.parent / "assets" / "qk" / "quant.js").exists()
     h = _read(d / "history.json")
     assert set(h["seasons"]) == {SEASON - 1, SEASON}
     # value pages (docs/VALUE_SECTIONS.md): value.json every season; trade.json and needs/<abbr>.json for the current one

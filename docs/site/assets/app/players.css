@@ -1,0 +1,77 @@
+/* The Quant Footballer — Players section layout (fb-pl- prefix). */
+.fb-pl-leadgrid { display: grid; gap: var(--sp-4); grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1000px) { .fb-pl-leadgrid { grid-template-columns: 1fr; } }
+.fb-pl-rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.fb-pl-rank li { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--line-1); font-size: var(--fs-sm); }
+.fb-pl-rank li:last-child { border-bottom: 0; }
+.fb-pl-rank .r { font: 600 var(--fs-xs) var(--font-num); color: var(--ink-3); }
+.fb-pl-rank .n { min-width: 0; display: grid; }
+.fb-pl-rank .n .fb-link { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-pl-rank .s { font-size: var(--fs-2xs); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-pl-rank .x { font-size: var(--fs-2xs); color: var(--ink-3); min-width: 52px; text-align: right; }
+@media (max-width: 720px) { .fb-pl-rank .fb-rowbar { display: none; } }
+.fb-pl-search { min-width: 240px; }
+.fb-pl-num { width: 96px; }
+.fb-pl-wide { max-width: 260px; }
+@media (max-width: 720px) { .fb-pl-search { min-width: 0; width: 100%; } .fb-pl-wide { max-width: 100%; } .fb-toolbar .fb-field { flex: 1 1 140px; } }
+.fb-pl-who { display: inline-flex; align-items: center; gap: 6px; }
+.fb-pl-era { font-size: var(--fs-2xs); }
+.fb-pl-team { color: var(--ink-2); }
+.fb-pl-dim { color: var(--ink-3); font-size: 0.72em; font-weight: 500; }
+
+/* hero */
+.fb-pl-hero { --tc: var(--accent); }
+.fb-pl-av { color: var(--ink-1); }
+.fb-pl-hero-main { min-width: 0; flex: 1 1 280px; }
+.fb-pl-hero h1 { margin: 4px 0 6px; }
+.fb-pl-clubs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: var(--fs-sm); }
+.fb-pl-sep { color: var(--ink-4); }
+@media (max-width: 720px) { .fb-pl-hero .qk-hero-stats { gap: var(--sp-3) var(--sp-5); } .fb-pl-av { width: 56px; height: 56px; font-size: 18px; } }
+
+.fb-pl-filter { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.fb-pl-filter .qk-select { max-width: 100%; }
+.fb-pl-kpihead { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.fb-pl-h2 { font-size: var(--fs-xl); }
+.fb-pl-kpis2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.fb-pl-cap0 { margin: 0 0 var(--sp-3); }
+.fb-pl-links { padding-top: var(--sp-2); }
+.fb-pl-pad { padding: var(--sp-4); }
+
+/* season-by-season nested table */
+.fb-pl-years tbody.fb-pl-yb { border-top: 1px solid var(--line-2); }
+.fb-pl-yr td { background: color-mix(in srgb, var(--s-2) 55%, var(--s-1)); }
+.fb-pl-yr td.sticky-col { background: color-mix(in srgb, var(--s-2) 55%, var(--s-1)); }
+.fb-pl-tog { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.fb-pl-tog:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
+.fb-pl-car { display: inline-block; transition: transform var(--t-fast); color: var(--ink-3); font-size: 10px; }
+.fb-pl-tog[aria-expanded="true"] .fb-pl-car { transform: rotate(90deg); }
+.fb-pl-sub td { font-size: var(--fs-xs); }
+.fb-pl-indent { padding-left: 16px; display: inline-block; }
+.fb-pl-years tr[hidden] { display: none; }
+
+/* profile */
+.fb-pl-prof { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 1fr); gap: var(--sp-5); align-items: start; }
+.fb-pl-groups { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.fb-pl-group .qk-kicker { margin-bottom: 8px; }
+@media (max-width: 900px) { .fb-pl-prof { grid-template-columns: 1fr; } }
+.fb-pl-shotmap { max-width: 560px; margin: 0 auto; }
+
+/* match log */
+.fb-pl-res { font: 600 var(--fs-xs) var(--font-num); white-space: nowrap; padding: 1px 6px; border-radius: 4px; background: var(--s-3); }
+.fb-pl-res.w { background: color-mix(in srgb, var(--st-good) 22%, transparent); }
+.fb-pl-res.l { background: color-mix(in srgb, var(--st-crit) 22%, transparent); }
+a .fb-pl-res:hover { outline: 1px solid var(--accent); }
+.fb-pl-rt { display: inline-block; min-width: 30px; text-align: center; padding: 1px 4px; border-radius: 4px; font-weight: 700; color: #fff; background: var(--rc); }
+.fb-pl-grade { display: inline-grid; place-items: center; width: 22px; height: 20px; border-radius: 5px; font: 800 11px var(--font-num); background: var(--s-3); color: var(--ink-1); }
+.fb-pl-grade.g-A { background: color-mix(in srgb, var(--st-good) 55%, var(--s-1)); }
+.fb-pl-grade.g-B { background: color-mix(in srgb, var(--st-good) 28%, var(--s-1)); }
+.fb-pl-grade.g-D { background: color-mix(in srgb, var(--st-serious) 35%, var(--s-1)); }
+.fb-pl-grade.g-E { background: color-mix(in srgb, var(--st-crit) 50%, var(--s-1)); }
+.fb-pl-body > * + * { margin-top: var(--sp-4); }
+.fb-pl-body { display: block; }
+@media (max-width: 720px) {
+  .fb-page-players .fb-toolbar .fb-field { flex: 1 1 100%; width: 100%; }
+  .fb-page-players .fb-toolbar .qk-select, .fb-page-players .fb-toolbar .qk-input { width: 100%; max-width: 100%; min-width: 0; }
+  .fb-page-players .fb-toolbar .qk-seg { max-width: 100%; overflow-x: auto; }
+  .fb-pl-filter .qk-select { width: 100%; }
+}

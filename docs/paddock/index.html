@@ -1,188 +1,118 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en" data-sport="f1">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Quant Paddock</title>
-<meta name="theme-color" content="#0d1117">
+<meta name="description" content="Formula 1 through a quant's lens: race and championship forecasts from a Monte Carlo model, the model against the market, car pace against driver skill, lap-by-lap race centres, strategy, telemetry and history back to 1950.">
 <meta property="og:site_name" content="The Quant Paddock">
 <meta property="og:title" content="The Quant Paddock">
-<meta property="og:description" content="Formula 1 through a quant's lens: race and championship forecasts from a Monte Carlo model, the model against the market, car pace against driver skill, lap-by-lap race centres, strategy, telemetry and history back to 1950.">
+<meta property="og:description" content="Formula 1 race and championship forecasts, the model against the market, car pace against driver skill, race centres, telemetry and history back to 1950.">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary">
-<meta name="description" content="Formula 1 through a quant's lens: race and championship forecasts from a Monte Carlo model, the model against the market, car pace against driver skill, lap-by-lap race centres, strategy, telemetry and history back to 1950.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230d1117'/%3E%3Cpath d='M7 22 L16 9 L25 22' fill='none' stroke='%23f85149' stroke-width='2.5' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='22' r='2.4' fill='%2358a6ff'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="assets/base.css">
-<link rel="stylesheet" href="assets/paddock.css">
-<link rel="stylesheet" href="assets/pages.css">
-<script src="https://cdn.plot.ly/plotly-2.27.0.min.js" charset="utf-8"></script>
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#07090c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ffb020'/%3E%3Cpath d='M6 23l7-9 5 4 8-11' stroke='%231a1203' stroke-width='3.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=/[?&]theme=(light|dark)/.exec(location.search);t=t?t[1]:localStorage.getItem('qk-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/qk/tokens.css">
+<link rel="stylesheet" href="assets/qk/quant.css">
+<link rel="stylesheet" href="assets/app/paddock.css">
 </head>
-<body>
-
-<div id="loading-overlay">
-  <div class="spinner"></div>
-  <div class="loading-text">Loading…</div>
-</div>
-
-<header class="site-header">
-  <div class="container-xl">
-    <div class="header-row">
-      <h1 class="site-title"><a href="#/"><span class="brand-mark pd-mark"></span><span class="brand-text">The Quant Paddock<span class="brand-tag">Odds, models and analytics for Formula 1</span></span></a></h1>
-      <div class="search-box">
-        <input id="search-input" type="search" placeholder="Search drivers, teams, circuits, races…" autocomplete="off" spellcheck="false">
-        <div id="search-results" class="search-results"></div>
-      </div>
-      <div class="comp-picker season-picker">
-        <label for="season-select">Season</label>
-        <select id="season-select"></select>
-      </div>
-      <a class="sister-link" href="https://pchattani.github.io/the-quant-footballer/" title="The sister site: football odds, models and analytics">⚽ The Quant Footballer</a>
-      <a class="sister-link" href="https://pchattani.github.io/the-quant-hardwood/" title="The sister site: NBA and WNBA odds, season simulations, shot charts and analytics">🏀 The Quant Hardwood</a>
-      <a class="sister-link" href="https://pchattani.github.io/the-quant-ace/" title="The sister site: ATP and WTA odds, exact match models, draw simulations and analytics">🎾 The Quant Ace</a>
-      <a class="sister-link" href="https://pchattani.github.io/the-quant-bullpen/" title="The sister site: MLB odds, pitch models and analytics">⚾ The Quant Bullpen</a>
-      <a class="sister-link" href="https://pchattani.github.io/the-quant-gridiron/" title="The sister site: NFL odds, models and analytics">🏈 The Quant Gridiron</a>
-      <a class="sister-link" href="https://pchattani.github.io/the-quant-rink/" title="The sister site: NHL odds, models and analytics">🏒 The Quant Rink</a>
-      <nav class="global-nav pd-nav">
-        <a href="#/" data-nav="hub">Hub</a><a href="#/season" data-nav="season">Season</a><a href="#/races" data-nav="races">Races</a><a href="#/drivers" data-nav="drivers">Drivers</a><a href="#/teams" data-nav="teams">Teams</a><a href="#/value" data-nav="value">Value</a><a href="#/swap" data-nav="swap">Swap</a><a href="#/fantasy" data-nav="fantasy">Fantasy</a><a href="#/circuits" data-nav="circuits">Circuits</a><a href="#/lab" data-nav="lab">Lab</a><a href="#/compare" data-nav="compare">Compare</a><a href="#/markets" data-nav="markets">Markets</a><a href="#/calibration" data-nav="calibration">Calibration</a><a href="#/glossary" data-nav="glossary">Glossary</a><a href="#/methodology" data-nav="methodology">Methodology</a>
-      </nav>
-      <div class="site-sub"><span id="meta-line">—</span></div>
-    </div>
-  </div>
-</header>
-
-<main id="app" class="container-xl pd-main"></main>
+<body class="qk">
+<div id="qk-shell"></div>
+<main id="main" class="qk-page" tabindex="-1"><div id="app"><div role="status" aria-label="Loading" class="pd-boot"><div class="qk-skel line"></div><div class="qk-skel line"></div><div class="qk-skel line short"></div></div></div></main>
+<div id="qk-footer"></div>
 
 <template id="disclaimer-template">
-  <div class="card">
-    <div class="card-header">Disclaimer &amp; terms of use <span class="card-sub">Last updated 30 September 2026</span></div>
-    <div class="prose-dark pad legal">
-      <p>The Quant Paddock is an independent, non-commercial hobby project that applies statistical models to
-      publicly available Formula 1 data. By using this site you agree to the terms below. If you do not agree, please
-      do not use the site.</p>
-
-      <h5>1. Not betting, financial or professional advice</h5>
-      <p>Everything on this site &mdash; race and championship probabilities, expected positions and points, &ldquo;fair
-      odds&rdquo;, projections, ratings, pace estimates, market comparisons and commentary &mdash; is provided for
-      <strong>information, education and entertainment only</strong>. None of it is betting, gambling, financial,
-      investment or any other professional advice, and none of it is a recommendation to place any wager or trade.
-      Model probabilities carry no margin; they are not prices offered by anyone and cannot be bet on here. The site does
-      not accept bets, take payments or link to bookmakers for commercial gain.</p>
-
-      <h5>2. Gambling responsibly</h5>
-      <p>If you choose to gamble elsewhere, you do so entirely at your own risk and responsibility. Only gamble where
-      it is legal for you to do so and if you are of legal age in your jurisdiction (18+ or 21+ in many places). Never
-      stake more than you can afford to lose. If gambling is causing you harm, free and confidential help is available:
-      <a href="https://www.connexontario.ca" target="_blank" rel="noopener">ConnexOntario</a> (Canada, 1-866-531-2600),
-      <a href="https://www.ncpgambling.org" target="_blank" rel="noopener">1-800-GAMBLER</a> (United States),
-      <a href="https://www.begambleaware.org" target="_blank" rel="noopener">BeGambleAware</a> (United Kingdom),
-      or <a href="https://www.gamblingtherapy.org" target="_blank" rel="noopener">Gambling Therapy</a> (worldwide).</p>
-
-      <h5>3. Models are estimates and can be wrong</h5>
-      <p>Model outputs are statistical estimates built on assumptions and incomplete data. Motor racing is full of
-      events no model sees coming &mdash; crashes, safety cars, mechanical failures, weather, penalties and team orders
-      &mdash; and the forecasts here are frequently wrong, sometimes by a wide margin. Past performance does not predict
-      future results. Timing, lap, telemetry and result data may be delayed, incomplete, provisional (before stewards&rsquo;
-      decisions), mislabelled or out of date, and pages can show errors. The site and all content are provided
-      <strong>&ldquo;as is&rdquo; and &ldquo;as available&rdquo;, without warranties of any kind</strong>, express or implied,
-      including accuracy, completeness, timeliness, fitness for a particular purpose and non-infringement.</p>
-
-      <h5>4. Limitation of liability</h5>
-      <p>To the fullest extent permitted by law, the author accepts no liability for any loss or damage of any kind
-      &mdash; including financial loss, lost winnings, or losses from wagers, trades or other decisions &mdash; arising
-      from use of, reliance on, or inability to use this site or its content. You are solely responsible for your own
-      decisions.</p>
-
-      <h5>5. No affiliation; trademarks</h5>
-      <p>This site is unofficial and is not affiliated with, endorsed by, sponsored by or connected to Formula 1, the
-      Formula One group of companies, the FIA, any team, constructor, driver, circuit, promoter, data provider, betting
-      operator or prediction market. F1, FORMULA ONE, FORMULA 1, FIA FORMULA ONE WORLD CHAMPIONSHIP, GRAND PRIX and related
-      marks are trade marks of Formula One Licensing B.V. or their respective owners. No team, series or sponsor logos are
-      used. Team, driver, circuit and event names appear only to identify the competitors and events discussed and to
-      report factual sporting statistics; team colours are used only to tell the cars apart on charts.</p>
-
-      <h5>6. Data sources</h5>
-      <p>Results, qualifying and historical data come from the Jolpica-F1 API (the continuation of the Ergast dataset);
-      lap, stint, pit, race control, weather and car telemetry data from the OpenF1 API; prediction-market prices from
-      public market data where shown. Those sources own their data and are not responsible for this site or its models.
-      Statistics shown here are derived and transformed and may differ from official classifications.</p>
-
-      <h5>7. Rights holders and corrections</h5>
-      <p>If you own rights in any material on this site and object to its use, or you spot an error, contact the
-      author through <a href="https://github.com/pchattani" target="_blank" rel="noopener">GitHub (@pchattani)</a>.
-      Material will be reviewed promptly and removed or corrected where appropriate.</p>
-
-      <h5>8. Privacy</h5>
-      <p>The site sets no cookies, runs no analytics or advertising, and collects no personal data. Your browser
-      remembers only that you dismissed the first-visit notice, locally on your device. The page loads its charting
-      library from a third-party content delivery network (cdn.plot.ly), and the telemetry lab may ask the public OpenF1
-      API for raw car data; like any web server, these receive your IP address when your browser makes a request. The site
-      itself is hosted on GitHub Pages, whose own privacy terms apply to its server logs.</p>
-
-      <h5>9. Changes</h5>
-      <p>These terms may change at any time; the date above shows the latest version. Continued use of the site after
-      a change means you accept the updated terms. Nothing in these terms limits any rights you have that cannot be
-      limited under the law that applies to you.</p>
-    </div>
-  </div>
+  <h3>Disclaimer and terms of use</h3>
+  <p class="qk-sub">Last updated 17 October 2026</p>
+  <p>The Quant Paddock is an independent, non-commercial hobby project that applies statistical models to
+  publicly available Formula 1 data. By using this site you agree to the terms below. If you do not agree, please
+  do not use the site.</p>
+  <h4>1. Not betting, financial or professional advice</h4>
+  <p>Everything on this site &mdash; race and championship probabilities, expected positions and points, &ldquo;fair
+  odds&rdquo;, projections, ratings, pace estimates, market comparisons and commentary &mdash; is provided for
+  <strong>information, education and entertainment only</strong>. None of it is betting, gambling, financial,
+  investment or any other professional advice, and none of it is a recommendation to place any wager or trade.
+  Model probabilities carry no margin; they are not prices offered by anyone and cannot be bet on here. The site does
+  not accept bets, take payments or link to bookmakers for commercial gain.</p>
+  <h4>2. Gambling responsibly</h4>
+  <p>If you choose to gamble elsewhere, you do so entirely at your own risk and responsibility. Only gamble where
+  it is legal for you to do so and if you are of legal age in your jurisdiction (18+ or 21+ in many places). Never
+  stake more than you can afford to lose. If gambling is causing you harm, free and confidential help is available:
+  <a href="https://www.connexontario.ca" target="_blank" rel="noopener">ConnexOntario</a> (Canada, 1-866-531-2600),
+  <a href="https://www.ncpgambling.org" target="_blank" rel="noopener">1-800-GAMBLER</a> (United States),
+  <a href="https://www.begambleaware.org" target="_blank" rel="noopener">BeGambleAware</a> (United Kingdom),
+  or <a href="https://www.gamblingtherapy.org" target="_blank" rel="noopener">Gambling Therapy</a> (worldwide).</p>
+  <h4>3. Models are estimates and can be wrong</h4>
+  <p>Model outputs are statistical estimates built on assumptions and incomplete data. Motor racing is full of
+  events no model sees coming &mdash; crashes, safety cars, mechanical failures, weather, penalties and team orders
+  &mdash; and the forecasts here are frequently wrong, sometimes by a wide margin. Past performance does not predict
+  future results. Timing, lap, telemetry and result data may be delayed, incomplete, provisional (before stewards&rsquo;
+  decisions), mislabelled or out of date, and pages can show errors. The site and all content are provided
+  <strong>&ldquo;as is&rdquo; and &ldquo;as available&rdquo;, without warranties of any kind</strong>, express or implied,
+  including accuracy, completeness, timeliness, fitness for a particular purpose and non-infringement.</p>
+  <h4>4. Limitation of liability</h4>
+  <p>To the fullest extent permitted by law, the author accepts no liability for any loss or damage of any kind
+  &mdash; including financial loss, lost winnings, or losses from wagers, trades or other decisions &mdash; arising
+  from use of, reliance on, or inability to use this site or its content. You are solely responsible for your own
+  decisions.</p>
+  <h4>5. No affiliation; trademarks</h4>
+  <p>This site is unofficial and is not affiliated with, endorsed by, sponsored by or connected to Formula 1, the
+  Formula One group of companies, the FIA, any team, constructor, driver, circuit, promoter, data provider, betting
+  operator or prediction market. F1, FORMULA ONE, FORMULA 1, FIA FORMULA ONE WORLD CHAMPIONSHIP, GRAND PRIX and related
+  marks are trade marks of Formula One Licensing B.V. or their respective owners. No team, series or sponsor logos are
+  used. Team, driver, circuit and event names appear only to identify the competitors and events discussed and to
+  report factual sporting statistics; team colours are used only to tell the cars apart on charts.</p>
+  <h4>6. Data sources</h4>
+  <p>Results, qualifying and historical data come from the Jolpica-F1 API (the continuation of the Ergast dataset);
+  lap, stint, pit, race control, weather and car telemetry data from the OpenF1 API; prediction-market prices from
+  public market data where shown. Those sources own their data and are not responsible for this site or its models.
+  Statistics shown here are derived and transformed and may differ from official classifications.</p>
+  <h4>7. Rights holders and corrections</h4>
+  <p>If you own rights in any material on this site and object to its use, or you spot an error, contact the
+  author through <a href="https://github.com/pchattani" target="_blank" rel="noopener">GitHub (@pchattani)</a>.
+  Material will be reviewed promptly and removed or corrected where appropriate.</p>
+  <h4>8. Privacy</h4>
+  <p>The site sets no cookies, runs no analytics or advertising, and collects no personal data. Your browser
+  remembers only your theme choice and that you dismissed the first-visit notice, locally on your device. The page
+  loads its fonts from Google Fonts and its charting library from a content delivery network (cdn.jsdelivr.net), and the
+  telemetry lab may ask the public OpenF1 API for raw car data; like any web server, these receive your IP address when
+  your browser makes a request. The site itself is hosted on GitHub Pages, whose own privacy terms apply to its server logs.</p>
+  <h4>9. Changes</h4>
+  <p>These terms may change at any time; the date above shows the latest version. Continued use of the site after
+  a change means you accept the updated terms. Nothing in these terms limits any rights you have that cannot be
+  limited under the law that applies to you.</p>
 </template>
 
-<footer class="site-footer">
-  <div class="container-xl">
-    <span id="footer-meta">The Quant Paddock</span>
-    · Data from Jolpica-F1 and OpenF1 · Monte Carlo race and championship model ·
-    <a href="https://pchattani.github.io/the-quant-footballer/">⚽ The Quant Footballer</a> ·
-    <a href="https://pchattani.github.io/the-quant-hardwood/">🏀 The Quant Hardwood</a> ·
-    <a href="https://pchattani.github.io/the-quant-ace/">🎾 The Quant Ace</a> ·
-    <a href="https://pchattani.github.io/the-quant-bullpen/">⚾ The Quant Bullpen</a> ·
-    <a href="https://pchattani.github.io/the-quant-gridiron/">🏈 The Quant Gridiron</a> ·
-    <a href="https://pchattani.github.io/the-quant-rink/">🏒 The Quant Rink</a>
-    <div class="footer-legal">For information and entertainment only &mdash; not betting, financial or professional advice. Probabilities are model estimates and can be wrong; no bets are offered. Unofficial: not affiliated with or endorsed by Formula 1, the FIA, any team, driver, circuit, data provider or bookmaker; no logos are used and names belong to their owners. 18+. Gamble responsibly. <a href="#/disclaimer">Disclaimer &amp; terms</a></div>
-  </div>
-</footer>
-
-<div id="first-visit-notice" class="fv-notice" hidden>
-  <div class="container-xl fv-row">
-    <span><strong>For information and entertainment only.</strong> Race and title probabilities are model estimates, not
-    betting or financial advice. Unofficial: not affiliated with Formula 1, the FIA, any team or driver; no logos are used.
-    18+ where gambling is discussed. <a href="#/disclaimer">Read the disclaimer &amp; terms</a>.</span>
-    <button type="button" id="fv-dismiss" class="fv-btn">I understand</button>
-  </div>
+<div id="first-visit-notice" class="pd-notice" hidden>
+  <span><strong>For information and entertainment only.</strong> Race and title probabilities are model estimates, not
+  betting or financial advice. Unofficial: not affiliated with Formula 1, the FIA, any team or driver; no logos are used.
+  18+ where gambling is discussed. <a href="#/disclaimer">Read the disclaimer and terms</a>.</span>
+  <button type="button" id="fv-dismiss" class="qk-btn primary">I understand</button>
 </div>
-<script>
-(function () {
-  var KEY = 'qp-notice-v1', el = document.getElementById('first-visit-notice');
-  var seen = false;
-  try { seen = window.localStorage.getItem(KEY) === '1'; } catch (e) { seen = false; }
-  if (!seen) el.hidden = false;
-  document.getElementById('fv-dismiss').addEventListener('click', function () {
-    el.hidden = true;
-    try { window.localStorage.setItem(KEY, '1'); } catch (e) { /* private mode: shown again next visit */ }
-  });
-})();
-</script>
-<script src="assets/js/core.js"></script>
-<script src="assets/js/charts.js"></script>
-<script src="assets/js/hub.js"></script>
-<script src="assets/js/season.js"></script>
-<script src="assets/js/race.js"></script>
-<script src="assets/js/drivers.js"></script>
-<script src="assets/js/teams.js"></script>
-<script src="assets/js/circuits.js"></script>
-<script src="assets/js/lab.js"></script>
-<script src="assets/js/compare.js"></script>
-<script src="assets/js/markets.js"></script>
-<script src="assets/js/calibration.js"></script>
-<script src="assets/js/telemetry.js"></script>
-<script src="assets/js/value.js"></script>
-<script src="assets/js/swap.js"></script>
-<script src="assets/js/fantasy.js"></script>
-<script src="assets/js/docs.js"></script>
-<script>
-/* The disclaimer route lives with the shell: its text is the <template> above. */
-PD.route('disclaimer', function (el) {
-  var t = document.getElementById('disclaimer-template');
-  el.innerHTML = t ? t.innerHTML : '';
-});
-</script>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" defer></script>
+<script src="assets/qk/quant.js" defer></script>
+<script src="assets/qk/quant-charts.js" defer></script>
+<script src="assets/app/core.js" defer></script>
+<script src="assets/app/charts.js" defer></script>
+<script src="assets/app/overview.js" defer></script>
+<script src="assets/app/races.js" defer></script>
+<script src="assets/app/race.js" defer></script>
+<script src="assets/app/telemetry.js" defer></script>
+<script src="assets/app/standings.js" defer></script>
+<script src="assets/app/constructors.js" defer></script>
+<script src="assets/app/drivers.js" defer></script>
+<script src="assets/app/value.js" defer></script>
+<script src="assets/app/fantasy.js" defer></script>
+<script src="assets/app/lab.js" defer></script>
+<script src="assets/app/compare.js" defer></script>
+<script src="assets/app/model.js" defer></script>
+<script src="assets/app/method-text.js" defer></script>
+<script src="assets/app/boot.js" defer></script>
 </body>
 </html>

@@ -155,6 +155,98 @@ def guard_gridiron(ctx: dict) -> list[str]:
     return problems
 
 
+def guard_rink(ctx: dict) -> list[str]:
+    """Every season's derived events and stints, box scores, MoneyPuck benchmark files and (2021-22 on) EDGE pages:
+    the careers, award boards, RAPM, lines and leaders read them; without them past seasons are rebuilt from less
+    and the pages change without any step failing (shadow run of 17 Oct 2026)."""
+    season = int(ctx["season"])
+    raw = ROOT / "data/nhl"
+    seasons = [y * 10001 + 1 for y in range(2009, season // 10000)]           # 20092010 .. the previous season
+    problems = []
+    for what, f in (("derived events", lambda s: raw / "derived" / str(s) / "events.parquet"),
+                    ("derived stints", lambda s: raw / "derived" / str(s) / "stints.parquet"),
+                    ("MoneyPuck benchmark", lambda s: raw / "moneypuck" / f"shots_{s}.parquet")):
+        missing = [s for s in seasons if not f(s).exists() and not (what == "derived stints" and s < 20102011)]
+        if missing:                                     # shift charts (and so stints) start in 2010-11
+            problems.append(f"{what} missing for {len(missing)} seasons ({missing[0]}..{missing[-1]})")
+    missing = [s for s in seasons if not any((raw / "box" / str(s)).glob("*.json.gz"))]
+    if missing:
+        problems.append(f"box scores missing for {len(missing)} seasons ({missing[0]}..{missing[-1]})")
+    missing = [s for s in seasons if s >= 20212022 and not (raw / "edge" / str(s)).exists()]
+    if missing:
+        problems.append(f"EDGE pages missing for {len(missing)} seasons")
+    return problems
+
+
+def guard_hardwood(ctx: dict) -> list[str]:
+    """The walk-forward backtests and, per league, the two latest seasons' play-by-play directories: the
+    calibration and win-probability pages use the latest season with play-by-play on the machine (shadow run of
+    17 Oct 2026: a cold runner published the 2026 NBA calibration instead of 2027's)."""
+    problems = []
+    cache, pbp = ROOT / "data/basketball/cache", ROOT / "data/basketball/pbp"
+    for lg, v in (ctx.get("leagues") or {}).items():
+        if not (cache / f"backtest_{lg}.json").exists():
+            problems.append(f"{lg}: walk-forward backtest cache missing")
+        cur = int(v["current"])
+        for s in (cur - 1, cur):
+            d = pbp / lg / str(s)
+            if not (d.exists() and any(d.iterdir())) and not (s == cur and not v["in_season"]):
+                problems.append(f"{lg} {s}: play-by-play missing")
+    return problems
+
+
+def guard_bullpen(ctx: dict) -> list[str]:
+    """The current season's Statcast tables (both levels), every season's prepared pitch tables (the multi-season
+    models read them; CI has no past Statcast to rebuild them from) and the Stats API cache (shadow run of
+    17 Oct 2026: a cold runner published empty metric tables and two valuation steps failed)."""
+    y = int(ctx["year"])
+    sc, prep = ROOT / "data/baseball/statcast", ROOT / "data/baseball/cache/prep"
+    problems = []
+    for lvl in ("mlb", "aaa"):
+        if not (sc / lvl / f"{y}.parquet").exists():
+            problems.append(f"{lvl} {y} Statcast table missing")
+    for lvl, first in (("mlb", 2015), ("aaa", 2023)):
+        missing = [s for s in range(first, y + 1) if not any(prep.glob(f"{lvl}_{s}_*.parquet"))]
+        if missing:
+            problems.append(f"{lvl} prepared pitch tables missing for {missing}")
+    if not any((ROOT / "data/baseball/cache/statsapi").glob("*")):
+        problems.append("Stats API cache empty")
+    return problems
+
+
+def guard_ace(ctx: dict) -> list[str]:
+    """The walk-forward backtests, the WTA serve/return stats pages, the Match Charting Project files and this
+    year's tennis-data workbooks (shadow run of 17 Oct 2026: a cold runner lost the WTA serve/return tables; and
+    tennis-data.co.uk answers 403 to datacenter addresses, so its workbooks come from the PC)."""
+    y = int(ctx["year"])
+    raw = ROOT / "data/tennis"
+    problems = []
+    for tour in ("atp", "wta"):
+        if not (raw / "cache" / f"backtest_{tour}.json").exists():
+            problems.append(f"{tour}: walk-forward backtest cache missing")
+        if not any((raw / "td" / tour).glob(f"{y}.xls*")):
+            problems.append(f"{tour}: tennis-data workbook for {y} missing")
+    if sum(1 for _ in (raw / "wta").glob("*/*")) < 100:
+        problems.append("WTA stats pages missing")
+    if not (raw / "charting" / "charting-m-matches.csv").exists():
+        problems.append("Match Charting Project files missing")
+    return problems
+
+
+def guard_paddock(ctx: dict) -> list[str]:
+    """Raw telemetry for every session this year that has a published summary (the summary step would otherwise
+    rewrite them from less), and the model caches (the fantasy backtest)."""
+    y = int(ctx["year"])
+    have = {d.name for d in (ROOT / "data/f1/telemetry" / str(y)).glob("*") if d.is_dir()}
+    summaries = {p.stem for p in (ROOT / "docs/paddock/data" / str(y) / "telemetry").glob("*.json")}
+    problems = []
+    if summaries - have:
+        problems.append(f"raw telemetry missing for {len(summaries - have)} of {len(summaries)} summarised sessions")
+    if not (ROOT / "data/f1/cache/fantasy").exists():
+        problems.append("fantasy backtest cache missing")
+    return problems
+
+
 def guard_payload_floor(site: str, minimum: int):
     """A deploy must not shrink the site to a fraction: the built copy keeps at least `minimum` JSON payloads."""
     def g(ctx: dict) -> list[str]:
@@ -183,7 +275,66 @@ def seed_gridiron(ctx: dict) -> list[list[str]] | None:
              "--phases", "releases,plays", "--releases", "all"]]
 
 
-SEEDS = {"gridiron": seed_gridiron}
+def seed_branch(site: str, guard):
+    """Seed-on-miss from the private seed branch `seed-<site>` of the stores repo (scripts/push_seed.py on the PC):
+    cloned with the read-only STORES_DEPLOY_KEY, and only files the runner does not have are copied in."""
+    def f(ctx: dict):
+        if not guard(ctx):
+            return None
+        return [["SEED_BRANCH", f"seed-{site}"]]
+    return f
+
+
+def _seed_from_branch(branch: str) -> int:
+    key = os.environ.get("STORES_DEPLOY_KEY", "")
+    repo = os.environ.get("STORES_REPO") or "pchattani/quant-sports-stores"
+    if not key:
+        print("::error::STORES_DEPLOY_KEY not available: cannot seed")
+        return 1
+    import base64
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        kf = Path(d) / "k"
+        kf.write_bytes(base64.b64decode(key))
+        os.chmod(kf, 0o600)
+        dest = Path(d) / "seed"
+        env = {**os.environ, "GIT_SSH_COMMAND": f"ssh -i {kf} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"}
+        r = subprocess.run(["git", "clone", "-q", "--depth", "1", "--branch", branch, f"git@github.com:{repo}.git", str(dest)],
+                           env=env)
+        kf.unlink()
+        if r.returncode != 0:
+            print(f"::error::seed branch {branch} not cloned")
+            return 1
+        n = 0
+        parts: dict[Path, list[Path]] = {}
+        for p in dest.rglob("*"):
+            if not p.is_file() or ".git" in p.relative_to(dest).parts:
+                continue
+            m = re.match(r"^(.*)\.seedpart\.(\d{3})$", p.name)
+            if m:                                       # a file over 100 MB, stored in pieces
+                parts.setdefault(p.parent / m.group(1), []).append(p)
+                continue
+            t = ROOT / p.relative_to(dest)
+            if not t.exists():
+                t.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(p), t)
+                n += 1
+        for whole, pieces in parts.items():
+            t = ROOT / whole.relative_to(dest)
+            if t.exists():
+                continue
+            t.parent.mkdir(parents=True, exist_ok=True)
+            with open(t, "wb") as out:
+                for piece in sorted(pieces):
+                    out.write(piece.read_bytes())
+            n += 1
+        print(f"seeded {n} files from {branch}")
+    return 0
+
+
+SEEDS = {"gridiron": seed_gridiron, "rink": seed_branch("rink", guard_rink),
+         "hardwood": seed_branch("hardwood", guard_hardwood), "bullpen": seed_branch("bullpen", guard_bullpen),
+         "ace": seed_branch("ace", guard_ace), "paddock": seed_branch("paddock", guard_paddock)}
 
 
 def cmd_seed(site: str) -> int:
@@ -193,10 +344,58 @@ def cmd_seed(site: str) -> int:
         print("working set complete: nothing to seed")
         return 0
     for c in cmds:
+        if c[0] == "SEED_BRANCH":
+            _seed_from_branch(c[1])
+            continue
         print("seeding:", " ".join(c[1:]), flush=True)
         r = subprocess.run(c, cwd=ROOT)
         if r.returncode != 0:
             print(f"::warning::seed step exited {r.returncode}")
+    return 0
+
+
+# ── feeds from the PC (sources that block datacenter addresses) ───────────────────────────────────
+
+FEEDS = {"ace": ["data/tennis/td"]}      # tennis-data.co.uk answers 403 to runners: the PC fetches its workbooks
+
+
+def cmd_feed(site: str) -> int:
+    """Copy the PC-fetched inputs of a site from the stores repo's main snapshot (sparse, shallow clone), replacing
+    the runner's copies: the snapshot is the newer one (the PC fetches it every hour)."""
+    paths = FEEDS.get(site)
+    if not paths:
+        return 0
+    key = os.environ.get("STORES_DEPLOY_KEY", "")
+    repo = os.environ.get("STORES_REPO") or "pchattani/quant-sports-stores"
+    if not key:
+        print("::warning::STORES_DEPLOY_KEY not available: no feed")
+        return 0
+    import base64
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        kf = Path(d) / "k"
+        kf.write_bytes(base64.b64decode(key))
+        os.chmod(kf, 0o600)
+        dest = Path(d) / "feed"
+        env = {**os.environ, "GIT_SSH_COMMAND": f"ssh -i {kf} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"}
+        r = subprocess.run(["git", "clone", "-q", "--depth", "1", "--filter=blob:none", "--sparse",
+                            f"git@github.com:{repo}.git", str(dest)], env=env)
+        if r.returncode == 0:
+            r = subprocess.run(["git", "-C", str(dest), "sparse-checkout", "set", *paths], env=env)
+        kf.unlink()
+        if r.returncode != 0:
+            print("::warning::feed not read from the stores repo")
+            return 0
+        n = 0
+        for base in paths:
+            for q in (dest / base).rglob("*"):
+                if q.is_file():
+                    t = ROOT / q.relative_to(dest)
+                    if not t.exists() or t.read_bytes() != q.read_bytes():
+                        t.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(q, t)
+                        n += 1
+        print(f"feed: {n} files updated from the stores snapshot ({', '.join(paths)})")
     return 0
 
 
@@ -207,18 +406,19 @@ SITES = {
                  "guard": guard_payload_floor("site", 2000)},
     "paddock": {"docs": "paddock", "repo": "the-quant-paddock", "prune": None, "excluded": (),
                 "newer_wins": ("data/*/store.json", "data/*/sessions/*.json", "data/*/telemetry/*.json"),
-                "guard": guard_payload_floor("paddock", 500)},
+                "guard": chain(guard_paddock, guard_payload_floor("paddock", 500))},
     "hardwood": {"docs": "hardwood", "repo": "the-quant-hardwood", "prune": prune_hardwood,
-                 "excluded": ("shots.json", "stints.json"), "guard": guard_payload_floor("hardwood", 2000)},
+                 "excluded": ("shots.json", "stints.json"),
+                 "guard": chain(guard_hardwood, guard_payload_floor("hardwood", 2000))},
     "ace": {"docs": "ace", "repo": "the-quant-ace", "prune": prune_ace, "excluded": (),
-            "guard": guard_payload_floor("ace", 2000)},
+            "guard": chain(guard_ace, guard_payload_floor("ace", 2000))},
     "bullpen": {"docs": "bullpen", "repo": "the-quant-bullpen", "prune": prune_bullpen, "excluded": (),
-                "guard": guard_payload_floor("bullpen", 2000)},
+                "guard": chain(guard_bullpen, guard_payload_floor("bullpen", 2000))},
     "gridiron": {"docs": "gridiron", "repo": "the-quant-gridiron", "prune": prune_gridiron, "excluded": (),
                  "guard": chain(guard_gridiron, guard_payload_floor("gridiron", 2000)),
                  "gate": ("games", "live"), "time_key": "kickoff", "after": timedelta(hours=4, minutes=30)},
     "rink": {"docs": "rink", "repo": "the-quant-rink", "prune": prune_rink, "excluded": (),
-             "guard": guard_payload_floor("rink", 2000),
+             "guard": chain(guard_rink, guard_payload_floor("rink", 2000)),
              "gate": ("live", "today", "upcoming"), "time_key": "start", "after": timedelta(hours=3, minutes=30)},
 }
 
@@ -513,7 +713,7 @@ def cmd_cachekey(name: str, paths: list[str]) -> int:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=("ctx", "gate", "restore", "seed", "cachekey", "guard", "deploy"))
+    ap.add_argument("command", choices=("ctx", "gate", "restore", "seed", "feed", "cachekey", "guard", "deploy"))
     ap.add_argument("--site", choices=sorted(SITES))
     ap.add_argument("--name")
     ap.add_argument("--paths", nargs="*", default=[])
@@ -542,6 +742,8 @@ def main(argv=None) -> int:
         return cmd_restore(a.site, a.prev)
     if a.command == "seed":
         return cmd_seed(a.site)
+    if a.command == "feed":
+        return cmd_feed(a.site)
     if a.command == "guard":
         problems = SITES[a.site]["guard"](ctx_for(a.site))
         for pr in problems:

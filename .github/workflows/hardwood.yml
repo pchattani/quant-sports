@@ -87,6 +87,9 @@ jobs:
 
       - name: 'Seed the working set if the cache was cold'
         timeout-minutes: 40
+        env:
+          STORES_DEPLOY_KEY: ${{ secrets.STORES_DEPLOY_KEY }}
+          STORES_REPO: ${{ vars.STORES_REPO || 'pchattani/quant-sports-stores' }}
         run: |
           uv run --frozen python scripts/ci_site.py seed --site hardwood
 

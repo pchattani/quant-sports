@@ -32,7 +32,7 @@ def test_quick_build_writes_every_payload(paddock_data):
     keys = payload_keys()
     for name in ("index.json", "glossary.json", "calibration.json", "markets.json", "elo.json", "lab.json"):
         assert set(_load(data / name)) >= keys[name], name
-    assert (data.parent / "assets" / "base.css").exists()
+    assert (data.parent / "assets" / "qk" / "quant.js").exists()   # the shared design kit
     circuits = _load(data / "circuits.json")
     assert set(circuits) == {"circ0", "circ1", "circ2"}
     assert set(next(iter(circuits.values()))) >= {"name", "country", "profile", "history", "records"}

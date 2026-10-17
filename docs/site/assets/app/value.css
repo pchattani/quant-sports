@@ -1,0 +1,58 @@
+/* The Quant Footballer — Value & Transfers layout (fb-va- prefix). */
+.fb-va-role { display: inline-grid; place-items: center; min-width: 26px; height: 18px; padding: 0 5px; border-radius: 4px; font: 700 10px var(--font-num); color: var(--ink-1); background: color-mix(in srgb, var(--k) 32%, var(--s-2)); }
+.fb-va-num { width: 96px; }
+.fb-va-wide { max-width: 220px; }
+.fb-va-filters .fb-field .qk-select { max-width: 200px; }
+.fb-va-drv { display: inline-block; font: 600 var(--fs-2xs) var(--font-num); padding: 1px 5px; border-radius: 4px; white-space: nowrap; }
+.fb-va-drv.up { color: var(--up); background: color-mix(in srgb, var(--up) 12%, transparent); }
+.fb-va-drv.down { color: var(--down); background: color-mix(in srgb, var(--down) 12%, transparent); }
+.fb-va-sim { font-size: var(--fs-xs); white-space: nowrap; }
+.fb-va-grade { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; font: 800 11px var(--font-num); color: #0b0d10; background: var(--ink-4); }
+.fb-va-grade.g-A { background: var(--st-good); color: #fff; } .fb-va-grade.g-B { background: color-mix(in srgb, var(--st-good) 55%, var(--st-warn)); }
+.fb-va-grade.g-C { background: var(--st-warn); } .fb-va-grade.g-D { background: var(--st-serious); } .fb-va-grade.g-E { background: var(--st-crit); color: #fff; }
+.fb-va-kind { display: inline-block; font: 700 9.5px/1 var(--font-ui); letter-spacing: 0.05em; text-transform: uppercase; padding: 4px 6px; border-radius: 4px; background: var(--s-3); color: var(--ink-2); white-space: nowrap; }
+.fb-va-kind.k-fee { background: color-mix(in srgb, var(--c-2) 22%, transparent); color: var(--ink-1); }
+.fb-va-kind.k-loan, .fb-va-kind.k-loan_end { background: color-mix(in srgb, var(--c-7) 20%, transparent); }
+.fb-va-kind.k-free { background: color-mix(in srgb, var(--c-3) 20%, transparent); }
+.fb-va-views { margin-top: 2px; }
+.fb-va-views .qk-chip { text-decoration: none; }
+.fb-va-best { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.fb-va-bestc { border-top: 2px solid var(--k); }
+.fb-va-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: va; }
+.fb-va-list li { counter-increment: va; display: grid; gap: 3px; min-width: 0; }
+.fb-va-li-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.fb-va-li-top::before { content: counter(va); font: 600 var(--fs-2xs) var(--font-num); color: var(--ink-3); width: 14px; flex: none; }
+.fb-va-li-n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-va-li-sub, .fb-va-li-why { font-size: var(--fs-2xs); color: var(--ink-3); padding-left: 22px; }
+.fb-va-bar { display: block; height: 4px; border-radius: 2px; background: var(--s-3); margin-left: 22px; overflow: hidden; }
+.fb-va-bar i { display: block; height: 100%; background: var(--k); border-radius: 2px; }
+.fb-va-picks { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+@media (max-width: 720px) { .fb-va-picks { grid-template-columns: 1fr; } }
+.fb-va-pick { position: relative; }
+.fb-va-pick .qk-input { width: 100%; }
+.fb-va-res { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20; list-style: none; margin: 0; padding: 4px; max-height: 320px; overflow: auto; background: var(--s-2); border: 1px solid var(--line-2); border-radius: var(--r-2); box-shadow: var(--sh-3); text-transform: none; letter-spacing: 0; }
+.fb-va-res[hidden] { display: none; }
+.fb-va-res button { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 6px; width: 100%; padding: 7px 8px; border-radius: 6px; font-size: var(--fs-sm); font-weight: 500; color: var(--ink-1); flex-wrap: wrap; }
+.fb-va-res button:hover, .fb-va-res button:focus-visible { background: var(--s-3); }
+.fb-va-res-n { font-weight: 600; }
+.fb-va-res-empty { padding: 8px; color: var(--ink-3); font-size: var(--fs-sm); }
+.fb-va-hero h2.fb-va-hero-n { font-size: clamp(1.4rem, 3.5vw, 2rem); font-weight: 800; letter-spacing: -0.03em; margin: 4px 0 0; }
+.fb-va-hero-n a { color: inherit; }
+.fb-va-hero-why { position: relative; margin-top: var(--sp-3); }
+.fb-va-unit { font: 700 var(--fs-2xs) var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-3); margin: var(--sp-4) 0 6px; }
+tr.fb-va-new td { background: color-mix(in srgb, var(--up) 8%, transparent); }
+tr.fb-va-gone td { opacity: 0.55; }
+.fb-va-outs { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.fb-va-out { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--ink-2); }
+.fb-va-sw { font: 700 var(--fs-xs) var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-2); }
+.fb-va-sw.up { color: var(--up); } .fb-va-sw.down { color: var(--down); }
+.fb-va-ol { margin: 6px 0 0; padding-left: 18px; font-size: var(--fs-sm); color: var(--ink-2); display: grid; gap: 4px; }
+.fb-va-aff { font: 700 9.5px/1 var(--font-ui); text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 6px; border-radius: 4px; }
+.fb-va-aff.a-yes { color: var(--up); background: color-mix(in srgb, var(--up) 14%, transparent); }
+.fb-va-aff.a-stretch { color: var(--st-warn); background: color-mix(in srgb, var(--st-warn) 14%, transparent); }
+.fb-va-aff.a-no { color: var(--down); background: color-mix(in srgb, var(--down) 14%, transparent); }
+@media (max-width: 720px) {
+  .fb-page-value .fb-toolbar > .fb-field { flex: 1 1 100%; }
+  .fb-page-value .fb-field .qk-select, .fb-page-value .fb-field .qk-input { width: 100%; max-width: 100%; }
+  .fb-page-value .qk-seg { max-width: 100%; flex-wrap: wrap; }
+}

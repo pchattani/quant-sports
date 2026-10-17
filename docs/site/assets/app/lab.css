@@ -1,0 +1,93 @@
+/* The Quant Footballer — Lab and Compare (fb-lb- prefix). Side A is the model blue (--c-1), side B the orange (--c-2). */
+.fb-lb-ctl .fb-toolbar .qk-select { max-width: 260px; }
+.fb-lb-range { display: inline-flex; align-items: center; gap: 8px; height: 34px; }
+.fb-lb-range input { width: 150px; accent-color: var(--accent); }
+.fb-lb-range b { min-width: 44px; color: var(--ink-1); font-size: var(--fs-sm); }
+.fb-lb-swap { padding: 0 12px; align-self: flex-end; }
+.fb-lb-checks { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: var(--sp-3); }
+.fb-lb-checks [hidden] { display: none; }
+.fb-lb-mix { display: inline-block; max-width: 340px; white-space: normal; font-size: var(--fs-xs); line-height: 1.35; }
+#lb-chart { --h: 640px; }
+@media (max-width: 720px) {
+  #lb-chart { height: 460px; }
+  .fb-lb-ctl .fb-toolbar { gap: 8px 10px; }
+  .fb-lb-ctl .fb-field { flex: 1 1 140px; }
+  .fb-lb-ctl .fb-toolbar .qk-select, .fb-lb-ctl .qk-input { width: 100%; max-width: 100%; }
+  .fb-lb-range input { width: 100%; }
+  .fb-lb-mix { max-width: 200px; }
+}
+
+/* side markers */
+.fb-lb-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; flex: none; }
+.fb-lb-dot.a { background: var(--c-1); } .fb-lb-dot.b { background: var(--c-2); }
+
+/* pickers */
+.fb-lb-pick .fb-toolbar { align-items: flex-end; }
+.fb-lb-picker { position: relative; display: inline-flex; align-items: center; }
+.fb-lb-picker .qk-input { width: 260px; max-width: 100%; }
+.fb-lb-res { position: absolute; left: 0; top: calc(100% + 4px); z-index: var(--z-pop); width: min(340px, 86vw); max-height: 320px; overflow: auto; padding: 4px; border-radius: var(--r-2); border: 1px solid var(--line-2); background: var(--s-1); box-shadow: var(--sh-3); text-transform: none; letter-spacing: 0; }
+.fb-lb-res[hidden] { display: none; }
+.fb-lb-res button { all: unset; box-sizing: border-box; cursor: pointer; display: flex; gap: 10px; align-items: center; width: 100%; padding: 7px 8px; border-radius: 6px; font-size: var(--fs-sm); color: var(--ink-1); }
+.fb-lb-res button:hover, .fb-lb-res button:focus-visible { background: var(--s-2); }
+.fb-lb-res small { display: block; color: var(--ink-3); font-size: var(--fs-2xs); font-weight: 500; }
+.fb-lb-none { display: block; padding: 10px; color: var(--ink-3); font-size: var(--fs-sm); }
+.fb-lb-picked { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: var(--sp-3); }
+.fb-lb-picked .qk-badge { text-transform: none; letter-spacing: 0; font-size: var(--fs-xs); height: 24px; }
+@media (max-width: 720px) { .fb-lb-pick .fb-field { flex: 1 1 100%; } .fb-lb-picker, .fb-lb-picker .qk-input { width: 100%; } }
+
+/* identity heroes */
+.fb-lb-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); }
+@media (max-width: 900px) { .fb-lb-pair { grid-template-columns: minmax(0, 1fr); } }
+.fb-lb-hero { display: grid; gap: var(--sp-4); }
+.fb-lb-hero.a { --tc: var(--c-1); } .fb-lb-hero.b { --tc: var(--c-2); }
+.fb-lb-hero h2 { font-size: clamp(1.3rem, 3vw, 1.8rem); margin: 4px 0 0; letter-spacing: -0.025em; }
+.fb-lb-hero h2 a:hover { color: var(--accent); }
+.fb-lb-hero-t { min-width: 0; }
+.fb-lb-hero .qk-kicker { display: flex; align-items: center; gap: 4px; }
+.fb-lb-hero .qk-kicker .fb-ent { text-transform: none; letter-spacing: 0; font-size: var(--fs-xs); }
+.fb-lb-kpis { position: relative; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+.fb-lb-kpis .qk-kpi-value { font-size: var(--fs-xl); }
+
+/* verdict */
+.fb-lb-verdict { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, 260px) minmax(0, 1fr); gap: var(--sp-4); align-items: center; }
+.fb-lb-verdict ul { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: var(--fs-sm); color: var(--ink-2); }
+.fb-lb-vside.b { text-align: right; }
+.fb-lb-vside.b .qk-kicker { justify-content: flex-end; display: flex; align-items: center; }
+.fb-lb-vmid { text-align: center; }
+.fb-lb-score { font: 700 var(--fs-3xl)/1 var(--font-num); display: flex; justify-content: center; gap: 10px; }
+.fb-lb-score .a { color: var(--c-1); } .fb-lb-score .b { color: var(--c-2); }
+.fb-lb-wins { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px; margin: 10px 0 6px; }
+.fb-lb-wins span { min-width: 0; } .fb-lb-wins .a { background: var(--c-1); } .fb-lb-wins .b { background: var(--c-2); } .fb-lb-wins .t { background: var(--s-3); }
+@media (max-width: 720px) { .fb-lb-verdict { grid-template-columns: minmax(0, 1fr); } .fb-lb-vside.b { text-align: left; } .fb-lb-vside.b .qk-kicker { justify-content: flex-start; } .fb-lb-vmid { order: -1; } }
+
+/* paired bars */
+.fb-lb-h2h { padding: 7px 0; border-bottom: 1px solid var(--line-1); }
+.fb-lb-h2h:last-child { border-bottom: 0; }
+.fb-lb-h2h-l { font-size: var(--fs-xs); color: var(--ink-2); margin-bottom: 4px; }
+.fb-lb-h2h-r { display: grid; grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr) 56px; gap: 6px; align-items: center; }
+.fb-lb-h2h-r .fb-num { font-size: var(--fs-sm); color: var(--ink-3); }
+.fb-lb-h2h-r .fb-num:last-child { text-align: right; }
+.fb-lb-h2h-r .fb-num.win { color: var(--ink-1); font-weight: 700; }
+.fb-lb-bar { height: 8px; border-radius: 4px; background: var(--s-3); position: relative; overflow: hidden; }
+.fb-lb-bar i { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+.fb-lb-bar.a i { right: 0; background: var(--c-1); } .fb-lb-bar.b i { left: 0; background: var(--c-2); }
+.fb-lb-gap { position: relative; display: inline-block; width: 90px; height: 8px; border-radius: 4px; background: var(--s-3); vertical-align: middle; }
+.fb-lb-gap::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--axis); }
+.fb-lb-gap i { position: absolute; top: 0; bottom: 0; }
+.fb-lb-gap i.a { right: 50%; background: var(--c-1); border-radius: 4px 0 0 4px; }
+.fb-lb-gap i.b { left: 50%; background: var(--c-2); border-radius: 0 4px 4px 0; }
+.fb-lb-win { color: var(--ink-1); }
+.fb-lb-rk { font-size: var(--fs-2xs); }
+.fb-lb-res-W { color: var(--up); font-weight: 700; } .fb-lb-res-L { color: var(--down); font-weight: 700; } .fb-lb-res-D { color: var(--ink-2); font-weight: 700; }
+.fb-lb-cup { font-size: 12px; }
+
+/* the price */
+.fb-lb-prices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-4); }
+@media (max-width: 900px) { .fb-lb-prices { grid-template-columns: minmax(0, 1fr); } }
+.fb-lb-price { display: grid; gap: 8px; padding: 12px; border-radius: var(--r-3); background: var(--s-2); border: 1px solid var(--line-1); min-width: 0; }
+.fb-lb-price-g { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.fb-lb-price-g div { display: grid; gap: 2px; min-width: 0; }
+.fb-lb-price-g span { font-size: var(--fs-2xs); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-lb-price-g b { font-size: var(--fs-lg); }
+.fb-lb-price-g small { font: 500 var(--fs-2xs) var(--font-num); color: var(--ink-3); }
+.fb-lb-price .fb-p3 { min-width: 0; }

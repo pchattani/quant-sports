@@ -3,8 +3,8 @@
 Build The Quant Gridiron's payloads (oddsmarkets/nfl/PAYLOADS.md) into docs/gridiron/data/.
 
 Site-wide: index.json, glossary.json, calibration.json, history.json (1999 onward, era-adjusted), coaches.json,
-referees.json, players_index.json, players/<pid>.json (careers); and docs/gridiron/assets/base.css (copied from the
-football site's docs/site/assets/style.css).
+referees.json, players_index.json, players/<pid>.json (careers); and docs/gridiron/assets/qk/ (the shared design kit, copied from
+docs/_design).
 
 Per season, data/<S>/: players.json, teams.json, season.json, schedule.json, weeks/<w>.json, fourth_downs.json,
 referees.json, leaders.json, lab.json, awards.json, value.json (player value and the best at each position),
@@ -44,7 +44,6 @@ import gc
 import hashlib
 import json
 import logging
-import shutil
 import sys
 import time
 import traceback
@@ -58,7 +57,6 @@ sys.path.insert(0, str(ROOT))
 from oddsmarkets.nfl import analytics as an  # noqa: E402
 
 logger = logging.getLogger("build_gridiron")
-CSS_SRC = ROOT / "docs" / "site" / "assets" / "style.css"
 BUILD_VERSION = 2              # 2: value.json for every season (15 Oct 2026)
 
 
@@ -543,12 +541,11 @@ def main(argv: list[str] | None = None) -> int:
            "no_careers": args.no_careers, "no_models": args.no_models, "contracts": args.contracts,
            "no_transactions": args.no_transactions, "no_fantasy": args.no_fantasy}
 
-    def css():
-        dst = data.parent / "assets" / "base.css"
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(CSS_SRC, dst)
-        b.written.append(dst)
-    b.step("copy base.css", css)
+    def kit():
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from design_kit import copy_kit      # scripts/design_kit.py: the shared design kit into assets/qk/
+        b.written.append(copy_kit(data.parent))
+    b.step("copy the design kit", kit)
     from oddsmarkets.nfl.analytics import leaders as LD
     b.write_or_fail("glossary.json", "glossary", LD.glossary)
     seasons = an.seasons_on_disk()

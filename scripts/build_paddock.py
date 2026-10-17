@@ -43,7 +43,6 @@ import json
 import logging
 import math
 import os
-import shutil
 import sys
 import time
 import traceback
@@ -58,7 +57,6 @@ from oddsmarkets.f1 import canon  # noqa: E402
 from oddsmarkets.f1 import analytics as an  # noqa: E402
 
 logger = logging.getLogger("build_paddock")
-CSS_SRC = ROOT / "docs" / "site" / "assets" / "style.css"
 
 
 def _now() -> str:
@@ -268,13 +266,12 @@ def main(argv: list[str] | None = None) -> int:
     current = current_season(years)
     logger.info("data root %s: %d seasons on disk, current %s", data, len(years), current)
 
-    # css for the front-end shell
-    def css():
-        dst = data.parent / "assets" / "base.css"
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(CSS_SRC, dst)
-        b.written.append(dst)
-    b.step("copy base.css", css)
+    # the shared design kit (docs/_design -> assets/qk), as every redesigned site does
+    def kit():
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from design_kit import copy_kit
+        b.written.append(copy_kit(data.parent))
+    b.step("copy the design kit", kit)
     b.write_or_fail("glossary.json", "glossary", build_glossary)
     if current is None:
         b.write("index.json", {"ok": False, "reason": "no season stores on disk", "updated_at": _now(), "seasons": []})

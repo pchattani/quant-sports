@@ -1,73 +1,39 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en" data-sport="nfl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Quant Gridiron</title>
-<meta name="theme-color" content="#0d1117">
+<meta name="description" content="Odds, models and analytics for the NFL: game, spread, total and playoff odds against the market, our own expected points and win probability, every fourth down graded, player percentiles, value, trades, fantasy and a lab.">
 <meta property="og:site_name" content="The Quant Gridiron">
 <meta property="og:title" content="The Quant Gridiron">
-<meta property="og:description" content="Odds, models and analytics for the NFL: game, spread, total and playoff odds against the market, our own expected points and win probability, every fourth down graded, player percentiles and a lab.">
+<meta property="og:description" content="NFL odds, models and analytics: every game priced against the market, the playoff race simulated, every fourth down graded, player percentiles and value.">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary">
-<meta name="description" content="Odds, models and analytics for the NFL: game, spread, total and playoff odds against the market, our own expected points and win probability, every fourth down graded, player percentiles and a lab.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23173d27'/%3E%3Cellipse cx='16' cy='16' rx='12' ry='7.5' transform='rotate(-35 16 16)' fill='%238a4b22'/%3E%3Cpath d='M11.5 19.5 L20.5 12.5' stroke='%23f4efe6' stroke-width='1.6'/%3E%3Cpath d='M13.6 15.6 l1.6 1.9 M15.4 14.2 l1.6 1.9 M17.2 12.8 l1.6 1.9' stroke='%23f4efe6' stroke-width='1.2'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="assets/base.css">
-<link rel="stylesheet" href="assets/gridiron.css">
-<link rel="stylesheet" href="assets/pages.css">
-<link rel="stylesheet" href="assets/pages-f.css">
-<script src="https://cdn.plot.ly/plotly-2.27.0.min.js" charset="utf-8"></script>
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#07090c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ffb020'/%3E%3Cpath d='M6 23l7-9 5 4 8-11' stroke='%231a1203' stroke-width='3.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=/[?&]theme=(light|dark)/.exec(location.search);t=t?t[1]:localStorage.getItem('qk-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/qk/tokens.css">
+<link rel="stylesheet" href="assets/qk/quant.css">
+<link rel="stylesheet" href="assets/app/gridiron.css">
 </head>
-<body>
-
-<div id="loading-overlay">
-  <div class="spinner"></div>
-  <div class="loading-text">Loading…</div>
-</div>
-
-<header class="site-header">
-  <div class="container-xl">
-    <div class="header-row">
-      <h1 class="site-title"><a href="#/"><span class="brand-mark gi-mark"></span><span class="brand-text">The Quant Gridiron<span class="brand-tag">Odds, models and analytics for the NFL</span></span></a></h1>
-      <div class="search-box">
-        <input id="search-input" type="search" placeholder="Search players and teams…" autocomplete="off" spellcheck="false">
-        <div id="search-results" class="search-results"></div>
-      </div>
-      <div class="comp-picker season-picker">
-        <label for="season-select">Season</label>
-        <select id="season-select"></select>
-      </div>
-      <div class="comp-picker week-picker">
-        <label for="week-select">Week</label>
-        <select id="week-select"></select>
-      </div>
-      <div class="sister-group" aria-label="Sister sites">
-        <a class="sister-link" href="https://pchattani.github.io/the-quant-footballer/" title="The sister site: football odds, models and analytics">⚽ Footballer</a>
-        <a class="sister-link" href="https://pchattani.github.io/the-quant-paddock/" title="The sister site: Formula 1 odds, models and analytics">🏁 Paddock</a>
-        <a class="sister-link" href="https://pchattani.github.io/the-quant-hardwood/" title="The sister site: NBA and WNBA odds, models and analytics">🏀 Hardwood</a>
-        <a class="sister-link" href="https://pchattani.github.io/the-quant-ace/" title="The sister site: ATP and WTA tennis odds, models and analytics">🎾 Ace</a>
-        <a class="sister-link" href="https://pchattani.github.io/the-quant-bullpen/" title="The sister site: MLB odds, pitch models and analytics">⚾ Bullpen</a>
-        <a class="sister-link" href="https://pchattani.github.io/the-quant-rink/" title="The sister site: NHL odds, models and analytics">🏒 Rink</a>
-      </div>
-      <nav class="global-nav hw-nav gi-nav">
-        <a href="#/" data-nav="hub">Hub</a><a href="#/" data-nav="week">Week</a><a href="#/" data-nav="standings">Standings</a><a href="#/" data-nav="playoffs">Playoffs</a><a href="#/teams" data-nav="teams">Teams</a><a href="#/players" data-nav="players">Players</a><a href="#/value" data-nav="value">Value</a><a href="#/trade" data-nav="trade">Trade</a><a href="#/transactions" data-nav="transactions">Transactions</a><a href="#/fantasy" data-nav="fantasy">Fantasy</a><a href="#/fourth-downs" data-nav="fourth">Fourth downs</a><a href="#/coaches" data-nav="coaches">Coaches</a><a href="#/leaders" data-nav="leaders">Leaders</a><a href="#/history" data-nav="history">History</a><a href="#/lab" data-nav="lab">Lab</a><a href="#/compare" data-nav="compare">Compare</a><a href="#/markets" data-nav="markets">Markets</a><a href="#/calibration" data-nav="calibration">Calibration</a><a href="#/glossary" data-nav="glossary">Glossary</a><a href="#/methodology" data-nav="methodology">Methodology</a>
-      </nav>
-      <div class="site-sub"><span id="meta-line">—</span></div>
-    </div>
-  </div>
-</header>
-
-<main id="app" class="container-xl hw-main gi-main"></main>
+<body class="qk">
+<div id="qk-shell"></div>
+<main id="main" class="qk-page" tabindex="-1"><div id="app"><div role="status" aria-label="Loading" class="gi-boot"><div class="qk-skel line"></div><div class="qk-skel line"></div><div class="qk-skel line short"></div></div></div></main>
+<div id="qk-footer"></div>
 
 <template id="disclaimer-template">
-  <div class="card">
-    <div class="card-header">Disclaimer &amp; terms of use <span class="card-sub">Last updated 1 October 2026</span></div>
-    <div class="prose-dark pad legal">
+  <h3>Disclaimer and terms of use</h3>
+  <p class="qk-sub">Last updated 17 October 2026</p>
       <p>The Quant Gridiron is an independent, non-commercial hobby project that applies statistical models to publicly
       available American football data for the National Football League. By using this site you agree to the terms below.
       If you do not agree, please do not use the site.</p>
 
-      <h5>1. Not betting, financial or professional advice</h5>
+      <h4>1. Not betting, financial or professional advice</h4>
       <p>Everything on this site &mdash; game, spread, total, division, playoff, conference, Super Bowl, draft-order and
       award probabilities, &ldquo;fair odds&rdquo;, live win probabilities, fourth-down recommendations and grades,
       projections, player and team ratings, market comparisons and commentary &mdash; is provided for <strong>information,
@@ -76,7 +42,7 @@
       margin; they are not prices offered by anyone and cannot be bet on here. The site does not accept bets, take payments
       or link to bookmakers for commercial gain.</p>
 
-      <h5>2. Gambling responsibly</h5>
+      <h4>2. Gambling responsibly</h4>
       <p>If you choose to gamble elsewhere, you do so entirely at your own risk and responsibility. Only gamble where
       it is legal for you to do so and if you are of legal age in your jurisdiction (18+, or 21+ in many places). Never
       stake more than you can afford to lose. If gambling is causing you harm, free and confidential help is available:
@@ -85,7 +51,7 @@
       <a href="https://www.begambleaware.org" target="_blank" rel="noopener">BeGambleAware</a> (United Kingdom),
       or <a href="https://www.gamblingtherapy.org" target="_blank" rel="noopener">Gambling Therapy</a> (worldwide).</p>
 
-      <h5>3. Models are estimates and can be wrong</h5>
+      <h4>3. Models are estimates and can be wrong</h4>
       <p>Model outputs are statistical estimates built on assumptions and incomplete data. Football is full of things no
       model sees coming &mdash; late injuries and inactives, quarterback changes, weather, officiating, play calling and
       plain variance &mdash; and the forecasts here are frequently wrong, sometimes by a wide margin. Expected points, win
@@ -96,13 +62,13 @@
       warranties of any kind</strong>, express or implied, including accuracy, completeness, timeliness, fitness for a
       particular purpose and non-infringement.</p>
 
-      <h5>4. Limitation of liability</h5>
+      <h4>4. Limitation of liability</h4>
       <p>To the fullest extent permitted by law, the author accepts no liability for any loss or damage of any kind
       &mdash; including financial loss, lost winnings, or losses from wagers, trades or other decisions &mdash; arising
       from use of, reliance on, or inability to use this site or its content. You are solely responsible for your own
       decisions.</p>
 
-      <h5>5. No affiliation; trademarks</h5>
+      <h4>5. No affiliation; trademarks</h4>
       <p>This site is unofficial and is not affiliated with, endorsed by, sponsored by or connected to the National Football
       League (NFL), any club or team, any player or the players&rsquo; association, ESPN, nflverse, FTN, any other data
       provider, bookmaker, betting operator or prediction market. League, club and competition names and related marks are
@@ -110,7 +76,7 @@
       coach and venue names appear only to identify the competitors and events discussed and to report factual sporting
       statistics.</p>
 
-      <h5>6. Data sources and licences</h5>
+      <h4>6. Data sources and licences</h4>
       <p>Play-by-play, schedules, results, closing lines, rosters, injuries and the other season data come from the
       <a href="https://github.com/nflverse" target="_blank" rel="noopener">nflverse</a> project&rsquo;s public data releases,
       licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">Creative Commons
@@ -128,94 +94,59 @@
       ESPN&rsquo;s public site data, for personal, non-commercial use; market prices come from public prediction-market data
       (Kalshi, Polymarket) where shown. Those sources own their data and are not responsible for this site or its models.</p>
 
-      <h5>7. Rights holders and corrections</h5>
+      <h4>7. Rights holders and corrections</h4>
       <p>If you own rights in any material on this site and object to its use, or you spot an error, contact the
       author through <a href="https://github.com/pchattani" target="_blank" rel="noopener">GitHub (@pchattani)</a>.
       Material will be reviewed promptly and removed or corrected where appropriate.</p>
 
-      <h5>8. Privacy</h5>
+      <h4>8. Privacy</h4>
       <p>The site sets no cookies, runs no analytics or advertising, and collects no personal data. Your browser
-      remembers only that you dismissed the first-visit notice, locally on your device. The page loads its charting
-      library from a third-party content delivery network (cdn.plot.ly), which receives your IP address when your browser
-      makes the request, like any web server. The site itself is hosted on GitHub Pages, whose own privacy terms apply to
+      remembers only your theme choice and that you dismissed the first-visit notice, locally on your device. The page loads its fonts from Google Fonts and its charting library from a content delivery network (cdn.jsdelivr.net),
+      which receive your IP address when your browser makes a request, like any web server. The site itself is hosted on GitHub Pages, whose own privacy terms apply to
       its server logs.</p>
 
-      <h5>9. Changes</h5>
+      <h4>9. Changes</h4>
       <p>These terms may change at any time; the date above shows the latest version. Continued use of the site after
       a change means you accept the updated terms. Nothing in these terms limits any rights you have that cannot be
       limited under the law that applies to you.</p>
-    </div>
-  </div>
+    
 </template>
 
-<footer class="site-footer">
-  <div class="container-xl">
-    <span id="footer-meta">The Quant Gridiron</span>
-    · Play-by-play and season data from <a href="https://github.com/nflverse">nflverse</a> (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>) ·
-    charting: FTN Data via nflverse (<a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>; derived charting data shared alike) ·
-    tracking measures: NFL Next Gen Stats, credited, for informational non-commercial use ·
-    live data, win probability and lines from ESPN; public prediction markets ·
-    <a href="https://pchattani.github.io/the-quant-footballer/">⚽ The Quant Footballer</a> ·
-    <a href="https://pchattani.github.io/the-quant-paddock/">🏁 The Quant Paddock</a> ·
-    <a href="https://pchattani.github.io/the-quant-hardwood/">🏀 The Quant Hardwood</a> ·
-    <a href="https://pchattani.github.io/the-quant-ace/">🎾 The Quant Ace</a> ·
-    <a href="https://pchattani.github.io/the-quant-bullpen/">⚾ The Quant Bullpen</a> ·
-    <a href="https://pchattani.github.io/the-quant-rink/">🏒 The Quant Rink</a>
-    <div class="footer-legal">For information and entertainment only &mdash; not betting, financial or professional advice. Probabilities are model estimates and can be wrong; no bets are offered. Unofficial: not affiliated with or endorsed by the NFL, any club, player, ESPN or bookmaker; no logos are used and names belong to their owners. 18+. Gamble responsibly. <a href="#/disclaimer">Disclaimer &amp; terms</a></div>
-  </div>
-</footer>
-
-<div id="first-visit-notice" class="fv-notice" hidden>
-  <div class="container-xl fv-row">
-    <span><strong>For information and entertainment only.</strong> Game, playoff and award probabilities are model
-    estimates, not betting or financial advice. Unofficial: not affiliated with the NFL, any club, player or ESPN;
-    no logos are used. 18+ where gambling is discussed. <a href="#/disclaimer">Read the disclaimer &amp; terms</a>.</span>
-    <button type="button" id="fv-dismiss" class="fv-btn">I understand</button>
-  </div>
+<div id="first-visit-notice" class="gi-notice" hidden>
+  <span><strong>For information and entertainment only.</strong> Game, playoff and award probabilities are model
+  estimates, not betting or financial advice. Unofficial: not affiliated with the NFL, any club, player or ESPN;
+  no logos are used. 18+ where gambling is discussed. <a href="#/disclaimer">Read the disclaimer and terms</a>.</span>
+  <button type="button" id="fv-dismiss" class="qk-btn primary">I understand</button>
 </div>
-<script>
-(function () {
-  var KEY = 'qg-notice-v1', el = document.getElementById('first-visit-notice');
-  var seen = false;
-  try { seen = window.localStorage.getItem(KEY) === '1'; } catch (e) { seen = false; }
-  if (!seen) el.hidden = false;
-  document.getElementById('fv-dismiss').addEventListener('click', function () {
-    el.hidden = true;
-    try { window.localStorage.setItem(KEY, '1'); } catch (e) { /* private mode: shown again next visit */ }
-  });
-})();
-</script>
-<script src="assets/js/core.js"></script>
-<script src="assets/js/charts.js"></script>
-<script src="assets/js/fx.js"></script>
-<script src="assets/js/hub.js"></script>
-<script src="assets/js/week.js"></script>
-<script src="assets/js/game.js"></script>
-<script src="assets/js/standings.js"></script>
-<script src="assets/js/playoffs.js"></script>
-<script src="assets/js/markets.js"></script>
-<script src="assets/js/players.js"></script>
-<script src="assets/js/player.js"></script>
-<script src="assets/js/teams.js"></script>
-<script src="assets/js/team.js"></script>
-<script src="assets/js/fourth.js"></script>
-<script src="assets/js/coaches.js"></script>
-<script src="assets/js/leaders.js"></script>
-<script src="assets/js/history.js"></script>
-<script src="assets/js/lab.js"></script>
-<script src="assets/js/compare.js"></script>
-<script src="assets/js/value.js"></script>
-<script src="assets/js/trade.js"></script>
-<script src="assets/js/transactions.js"></script>
-<script src="assets/js/fantasy.js"></script>
-<script src="assets/js/calibration.js"></script>
-<script src="assets/js/docs.js"></script>
-<script>
-/* The disclaimer route lives with the shell: its text is the <template> above. */
-GI.route('disclaimer', function (el) {
-  var t = document.getElementById('disclaimer-template');
-  el.innerHTML = t ? t.innerHTML : '';
-});
-</script>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" defer></script>
+<script src="assets/qk/quant.js" defer></script>
+<script src="assets/qk/quant-charts.js" defer></script>
+<script src="assets/app/core.js" defer></script>
+<script src="assets/app/charts.js" defer></script>
+<script src="assets/app/overview.js" defer></script>
+<script src="assets/app/games.js" defer></script>
+<script src="assets/app/game.js" defer></script>
+<script src="assets/app/standings.js" defer></script>
+<script src="assets/app/playoffs.js" defer></script>
+<script src="assets/app/futures.js" defer></script>
+<script src="assets/app/teams.js" defer></script>
+<script src="assets/app/team.js" defer></script>
+<script src="assets/app/players.js" defer></script>
+<script src="assets/app/player.js" defer></script>
+<script src="assets/app/leaders.js" defer></script>
+<script src="assets/app/history.js" defer></script>
+<script src="assets/app/value.js" defer></script>
+<script src="assets/app/trade.js" defer></script>
+<script src="assets/app/transactions.js" defer></script>
+<script src="assets/app/fantasy.js" defer></script>
+<script src="assets/app/lab.js" defer></script>
+<script src="assets/app/compare.js" defer></script>
+<script src="assets/app/fourth.js" defer></script>
+<script src="assets/app/coaches.js" defer></script>
+<script src="assets/app/calibration.js" defer></script>
+<script src="assets/app/model.js" defer></script>
+<script src="assets/app/method-text.js" defer></script>
+<script src="assets/app/boot.js" defer></script>
 </body>
 </html>

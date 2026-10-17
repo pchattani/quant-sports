@@ -7,8 +7,8 @@ built, the payloads the front-end reads, internally consistent. Sofascore is
 unreachable from CI, so this is exactly how the hourly job runs.
 
 The front-end is static and there is no browser here, so the last tests check the
-contract between app.js and index.html by inspection: every element id the script
-writes to exists, and every tab a manifest can name has a pane.
+contract between the router (assets/app/*.js) and index.html by inspection: every module loads, every
+route has a page, and every tab a manifest can name lands on a competition tab.
 """
 from __future__ import annotations
 
@@ -29,7 +29,6 @@ LEAGUE_PAYLOADS = [
     "fixtures.json", "team_stats.json", "history.json", "market_odds.json",
 ]
 SITE_PAYLOADS = ["competitions.json", "hub.json", "search.json"]
-JS_DIR = SITE / "assets" / "js"
 
 
 @pytest.fixture(scope="module")
@@ -175,66 +174,86 @@ raise SystemExit(b.main())
 
 
 # ── front-end contract ───────────────────────────────────────────────────────
+# The front end (docs/site/index.html + assets/app/*.js on the shared kit in assets/qk/, docs/REDESIGN.md) is a hash
+# router: core.js declares the routes, each module registers its pages with FB.route(name, fn), and every older
+# route is redirected by core's legacyRedirect(). There is no browser here, so these tests check that contract by
+# inspection; scratchpad headless-Chrome runs check the rendering.
+
+APP_DIR = SITE / "assets" / "app"
+APP_MODULES = ["core", "charts", "overview", "matches", "competition", "clubs", "players", "value", "fantasy", "lab", "model", "boot"]
+
 
 def _js() -> str:
-    return "\n".join(f.read_text(encoding="utf-8") for f in sorted(JS_DIR.glob("*.js")))
+    return "\n".join((APP_DIR / f"{m}.js").read_text(encoding="utf-8") for m in APP_MODULES)
 
 
 def _html() -> str:
     return (SITE / "index.html").read_text(encoding="utf-8")
 
 
-def test_every_element_id_the_script_writes_to_exists() -> None:
-    js, html = _js(), _html()
-    ids = set(re.findall(r'id="([^"]+)"', html))
-    # Ids the pages create inside the shared page pane at render time.
-    for pattern in (r"id=\"([a-z]+-[a-z-]+)\"", r"id=\\?\"([a-z]+-[a-z-]+)\\?\""):
-        ids |= set(re.findall(pattern, js))
-    used = set()
-    for pattern in (r"getElementById\('([^']+)'\)", r"setHTML\('([^']+)'", r"plot\('([^']+)'", r"sortableIn\('([^']+)'",
-                    r"wireRowLinks\('([^']+)'", r"render[A-Za-z]+\('([a-z-]+)'"):
-        used |= set(re.findall(pattern, js))
-    missing = sorted(u for u in used if u not in ids)
-    assert not missing, missing
-    # Every script the shell loads exists, in the order the modules need.
-    scripts = re.findall(r'<script src="assets/js/([a-z]+)\.js"', html)
-    assert scripts == ["core", "charts", "tabs", "pages", "global", "match", "lab", "analytics", "seasons", "people", "docs", "hub", "value", "fantasy"], scripts
-    # The pages above the competitions have a pane each and a renderer each.
-    panes = set(re.findall(r'id="tab-([a-z]+)"', html))
-    assert {"clubs", "leaders", "compare", "page", "lab", "nations", "disclaimer", "value", "transfer"} <= panes
-    for name in ("clubs: renderClubs", "leaders: renderLeaders", "compare: renderCompare", "person: renderPerson", "club: renderClub", "lab: renderLab", "FH.PAGES.match = renderMatchPage",
-                 "glossary", "methodologysite", "FH.RENDERERS.home = renderHome", "analytics: renderAnalytics",
-                 "value: renderValue", "transfer: renderTransfer", "FH.renderClubNeeds = renderClubNeeds"):
-        assert name in js, name
-    for name in scripts:
-        assert (JS_DIR / f"{name}.js").exists()
+def test_shell_loads_the_kit_and_every_module_in_order() -> None:
+    html = _html()
+    scripts = re.findall(r'<script src="assets/([a-z]+)/([a-z-]+)\.js"', html)
+    assert scripts[:2] == [("qk", "quant"), ("qk", "quant-charts")], scripts
+    assert [m for d, m in scripts if d == "app"] == APP_MODULES
+    for d, m in scripts:
+        assert (SITE / "assets" / d / f"{m}.js").exists(), (d, m)
+    for css in re.findall(r'<link rel="stylesheet" href="(assets/[^"]+)"', html):
+        assert (SITE / css).exists(), css
+    assert "assets/style.css" not in html and "plotly" not in html.lower()
+    assert 'id="app"' in html and 'id="qk-shell"' in html and 'id="disclaimer-template"' in html
+    # the older-browser rule shared with the kit
+    js = _js()
+    assert "?." not in re.sub(r"'[^'\n]*'|\"[^\"\n]*\"|/\*.*?\*/|//[^\n]*", "", js, flags=re.S)
+    assert "??" not in js
 
 
-def test_every_manifest_tab_has_a_pane_and_a_renderer() -> None:
+def test_every_route_has_a_page() -> None:
+    js = _js()
+    core = (APP_DIR / "core.js").read_text(encoding="utf-8")
+    declared = set(re.findall(r"addRoute\('[^']*', '([A-Za-z]+)'", core))
+    registered = set(re.findall(r"FB\.route\('([A-Za-z]+)'", js)) | set(re.findall(r"HANDLERS\.([A-Za-z]+) = ", core))
+    assert declared and declared <= registered, sorted(declared - registered)
+    for section in ("overview", "matches", "competitions", "competition", "clubs", "club", "players", "player",
+                    "value", "fantasy", "lab", "compare", "model"):
+        assert section in declared, section
+
+
+def test_every_manifest_tab_lands_on_a_competition_tab() -> None:
     import scripts.build_site_all as b
 
-    js, html = _js(), _html()
-    panes = set(re.findall(r'id="tab-([a-z]+)"', html))
-    block = js[js.index("const RENDERERS = {"):]
+    core = (APP_DIR / "core.js").read_text(encoding="utf-8")
+    block = core[core.index("var COMP_TAB_MAP = {"):]
     block = block[: block.index("};")]
-    renderers = set(re.findall(r"\b([a-z]+): render[A-Za-z]+", block))
-    for tabs in (b.TABS_LEAGUE, b.TABS_CONFERENCE, b.TABS_PLAYOFF, b.TABS_CUP, b.TABS_KNOCKOUT, b.TABS_FIXED, b.TABS_PRE, b.TABS_LIGA):
-        for tab in tabs:
-            assert tab in panes, tab
-            assert tab in renderers, tab
-    # The club, player and match pages are registered too.
-    # (the player page is the person page in people.js since the 2 October 2026 redesign)
-    assert "team: renderTeamPage" in js and "person: renderPerson" in js and "FH.PAGES.match = renderMatchPage" in js
+    mapped = dict(re.findall(r"'?([a-z-]+)'?: \['([a-z]+)'", block))
+    tabs = set(re.findall(r"'([a-z]+)'", core[core.index("var COMP_TABS = ["):].split("]")[0]))
+    for manifest in (b.TABS_LEAGUE, b.TABS_CONFERENCE, b.TABS_PLAYOFF, b.TABS_CUP, b.TABS_KNOCKOUT, b.TABS_FIXED,
+                     b.TABS_PRE, b.TABS_INTERNATIONAL, b.TABS_LIGA):
+        for tab in manifest:
+            if tab == "methodology":       # moved to #/model/methodology?c=<slug>
+                continue
+            assert tab in mapped, tab
+            assert mapped[tab] in tabs, (tab, mapped[tab])
+    comp_js = (APP_DIR / "competition.js").read_text(encoding="utf-8")
+    for tab in tabs:
+        assert f"'{tab}'" in comp_js, tab
+    # old routes still land: per-competition tabs, match, club and player pages, and the old global pages
+    for old in ("'match'", "'player'", "'team'", "'nations'", "'leaders'", "'transfer'", "'glossary'", "'methodology'", "'disclaimer'"):
+        assert old in core, old
 
 
 def test_script_lists_every_payload_it_reads() -> None:
-    """Each payload the build writes is declared in the front-end's FILES map."""
+    """Each payload the build writes for a competition is declared in core's FILES map; the site-wide ones are read."""
     js = _js()
     declared = set(re.findall(r"([a-z_]+\.json)'", js))
     for name in LEAGUE_PAYLOADS:
         assert name in declared, name
-    for name in ("zones.json", "bracket.json", "anual.json", "relegation.json", "competitions.json", "hub.json", "search.json"):
+    for name in ("zones.json", "bracket.json", "anual.json", "relegation.json", "seasons.json", "sensitivity.json",
+                 "competitions.json", "hub.json", "crests.json", "clubs_index.json", "people_index.json",
+                 "pool.json", "nations.json", "glossary.json"):
         assert name in declared, name
+    for prefix in ("'people/'", "'clubs/'", "'value/", "'fantasy/"):
+        assert prefix in js, prefix
 
 
 # ── tuned model parameters ───────────────────────────────────────────────────

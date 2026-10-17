@@ -1953,6 +1953,13 @@ def main() -> int:
         market_rates.refresh()  # at most once a day per file; cached under data/football/odds/raw
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    # The shared design kit (docs/_design -> docs/site/assets/qk): the front end is built on it (docs/REDESIGN.md).
+    try:
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from design_kit import copy_kit
+        copy_kit(SITE_DIR)
+    except Exception as exc:  # noqa: BLE001 - a missing kit must not stop the data build
+        logger.error("design kit copy failed: %s", exc)
     seasons = _read_json(SEASONS_PATH, {}).get("leagues", {})
     if not seasons:
         logger.warning("No %s — leagues will build from their stores alone", SEASONS_PATH)
@@ -2083,6 +2090,9 @@ def main() -> int:
         if slug in prev:
             prev[slug].pop("winner", None)      # set again below only while the competition is between editions
             prev[slug].update(fields)
+    # Which clubs have a crest file: the front end draws a monogram for any other id instead of requesting a 404.
+    _step("crest list", lambda: _write(DATA_DIR, "crests.json", {"ids": sorted(
+        int(f.stem) for f in CRESTS_DIR.glob("*.png") if f.stem.isdigit())}))
     ordered = [prev[s] for s in list(LEAGUES) + [LIGA_ARGENTINA_SLUG] + list(CUPS) if s in prev]
     _write(DATA_DIR, "competitions.json", {"competitions": ordered, "updated_at": _now()})
 

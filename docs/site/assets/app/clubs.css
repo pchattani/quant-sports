@@ -1,0 +1,75 @@
+/* The Quant Footballer — Clubs: directory and the club page (fb-cl- prefix). */
+.fb-cl-find { position: relative; width: min(340px, 100%); }
+.fb-cl-find .qk-input { width: 100%; }
+.fb-cl-find-r { position: absolute; z-index: 20; left: 0; right: 0; top: 40px; margin: 0; padding: 6px; list-style: none; background: var(--s-1); border: 1px solid var(--line-2); border-radius: var(--r-3); box-shadow: var(--sh-3); max-height: 360px; overflow: auto; }
+.fb-cl-find-r[hidden] { display: none; }
+.fb-cl-find-r a { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 7px 8px; border-radius: var(--r-2); font-size: var(--fs-sm); }
+.fb-cl-find-r a:hover { background: var(--s-2); }
+.fb-cl-find-r .n { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-cl-find-r .s { color: var(--ink-3); font-size: var(--fs-2xs); white-space: nowrap; }
+.fb-cl-find-r .none { padding: 10px; color: var(--ink-3); font-size: var(--fs-sm); }
+.fb-cl-ptb .fb-field { flex: 0 1 300px; }
+.fb-field .qk-select.fb-cl-wide { width: 100%; }
+.fb-cl-price .qk-kpis { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.fb-cl-price .fb-p3 { height: 22px; font-size: 11px; line-height: 22px; }
+
+/* club hero and bar */
+.fb-cl-hero .qk-team-mark.lg { width: 72px; height: 72px; }
+.fb-cl-hero-t { min-width: 0; }
+.fb-cl-hero h1 { margin: 4px 0 0; }
+.fb-cl-hero .qk-hero-meta .fb-comp { color: var(--ink-1); }
+.fb-cl-bar { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line-1); }
+.fb-cl-bar .fb-subnav .qk-tabs { border-bottom: 0; }
+.fb-cl-bar .fb-subnav { min-width: 0; max-width: 100%; }
+.fb-cl-filter { display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 6px; }
+.fb-cl-filter .qk-select { max-width: 220px; height: 32px; font-size: var(--fs-xs); }
+.fb-cl-clear { height: 32px; }
+.fb-cl-body > * + * { margin-top: var(--sp-4); }
+.fb-cl-body > .fb-sec { margin-top: var(--sp-6); }
+.fb-cl-k { margin: 6px 0 2px; }
+
+/* this season list */
+.fb-cl-now { list-style: none; margin: 0; padding: 0; }
+.fb-cl-now li { display: grid; grid-template-columns: 112px minmax(0, 1.3fr) minmax(0, 1fr) auto auto auto; gap: 10px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line-1); font-size: var(--fs-sm); }
+.fb-cl-now li:last-child { border-bottom: 0; }
+.fb-cl-now-c { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-cl-now-f { color: var(--ink-2); font-size: var(--fs-xs); }
+.fb-cl-now-rec { color: var(--ink-3); font-size: var(--fs-xs); white-space: nowrap; }
+.fb-cl-now-r { font: 700 var(--fs-xs) var(--font-num); color: var(--accent); }
+@media (max-width: 720px) {
+  .fb-cl-now li { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; padding: 10px 12px; }
+  .fb-cl-now li .fb-kind { grid-column: 1 / -1; justify-self: start; }
+}
+
+/* most used */
+.fb-cl-most { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+.fb-cl-mp { display: grid; gap: 3px; padding: 10px 12px; border: 1px solid var(--line-1); border-radius: var(--r-2); background: var(--s-2); min-width: 0; }
+.fb-cl-mp:hover { border-color: var(--line-3); }
+.fb-cl-mp-n { font-weight: 600; font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-cl-mp-s { color: var(--ink-3); font-size: var(--fs-xs); }
+
+/* seasons */
+.fb-cl-era { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-bottom: var(--sp-3); }
+.fb-cl-era h2 { font-size: var(--fs-xl); display: flex; align-items: center; gap: 8px; }
+.fb-cl-tot { color: var(--ink-2); font-size: var(--fs-sm); }
+.fb-cl-trophy { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: 5px; font: 700 10px/1 var(--font-ui); letter-spacing: 0.04em; text-transform: uppercase; color: var(--brand); background: var(--brand-soft); white-space: nowrap; }
+.fb-cl-trophy::before { content: "★"; font-size: 9px; }
+.fb-cl-win { color: var(--brand); }
+.fb-cl-pos { margin-top: var(--sp-4); }
+.fb-cl-pos:first-child { margin-top: 0; }
+.fb-cl-pos h3 { font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--ink-2); margin: 0 0 6px; }
+
+/* results, grades, budgets */
+.fb-cl-res { display: inline-block; min-width: 54px; padding: 1px 6px; border-radius: 4px; font: 600 var(--fs-xs) var(--font-num); text-align: center; background: var(--s-3); }
+.fb-cl-res.r-W { background: color-mix(in srgb, var(--st-good) 22%, transparent); color: var(--ink-1); }
+.fb-cl-res.r-L { background: color-mix(in srgb, var(--st-crit) 22%, transparent); color: var(--ink-1); }
+.fb-cl-grade { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; font: 800 11px var(--font-num); color: #0b0d10; background: var(--ink-4); }
+.fb-cl-grade.g-A { background: #2fb37b; } .fb-cl-grade.g-B { background: #7ee787; } .fb-cl-grade.g-C { background: #e3b341; } .fb-cl-grade.g-D { background: #e8833a; } .fb-cl-grade.g-E { background: #e05d5d; color: #fff; }
+.fb-cl-aff { font: 700 10px var(--font-ui); text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 6px; border-radius: 4px; }
+.fb-cl-aff.a-yes { color: var(--st-good); background: color-mix(in srgb, var(--st-good) 14%, transparent); }
+.fb-cl-aff.a-stretch { color: var(--st-warn); background: color-mix(in srgb, var(--st-warn) 14%, transparent); }
+.fb-cl-aff.a-no { color: var(--st-crit); background: color-mix(in srgb, var(--st-crit) 14%, transparent); }
+.fb-cl-list { margin: 0; padding-left: 18px; display: grid; gap: 8px; font-size: var(--fs-sm); color: var(--ink-2); }
+.fb-cl-list b { color: var(--ink-1); }
+.fb-cl-ftb .fb-field { flex: 1 1 160px; max-width: 280px; }
+.fb-cl-ftb .qk-select, .fb-cl-ftb .qk-input { width: 100%; }
