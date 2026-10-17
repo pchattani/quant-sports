@@ -52,6 +52,8 @@ def test_build_writes_every_payload(root):
     assert _run(root) == 0
     d = root / "nba"
     assert (root.parent / "assets" / "base.css").exists()
+    for f in ("tokens.css", "quant.css", "quant.js", "quant-charts.js"):      # the design kit (docs/_design)
+        assert (root.parent / "assets" / "qk" / f).exists(), f
     idx = _load(root / "index.json")
     lg = idx["leagues"]["nba"]
     assert {"name", "current_season", "seasons", "phase", "today", "next_games", "last_games", "teams", "champions"} <= set(lg)

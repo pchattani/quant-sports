@@ -1,63 +1,40 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en" data-sport="hockey">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Quant Rink</title>
-<meta name="theme-color" content="#0d1117">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#07090c">
 <meta property="og:site_name" content="The Quant Rink">
 <meta property="og:title" content="The Quant Rink">
 <meta property="og:description" content="Odds, models and analytics for the NHL: game, puck line, total and playoff odds against the market, our own expected goals and win probability, shot maps, line combinations, player percentiles and a lab.">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary">
 <meta name="description" content="Odds, models and analytics for the NHL: game, puck line, total and playoff odds against the market, our own expected goals and win probability, shot maps, line combinations, player percentiles and a lab.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23dcecf5'/%3E%3Crect x='14.6' y='0' width='2.8' height='32' fill='%23d6303c'/%3E%3Ccircle cx='16' cy='16' r='5.2' fill='none' stroke='%232f6fb0' stroke-width='1.4'/%3E%3Cellipse cx='16' cy='18.6' rx='7.5' ry='3' fill='%23111'/%3E%3Crect x='8.5' y='15' width='15' height='3.6' fill='%23111'/%3E%3Cellipse cx='16' cy='15' rx='7.5' ry='3' fill='%23333'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ffb020'/%3E%3Cpath d='M6 23l7-9 5 4 8-11' stroke='%231a1203' stroke-width='3.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=/[?&]theme=(light|dark)/.exec(location.search);t=t?t[1]:localStorage.getItem('qk-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="assets/base.css">
 <link rel="stylesheet" href="assets/rink.css">
 <link rel="stylesheet" href="assets/pages.css">
 <link rel="stylesheet" href="assets/pages-f.css">
-<script src="https://cdn.plot.ly/plotly-2.27.0.min.js" charset="utf-8"></script>
+<link rel="stylesheet" href="assets/qk/tokens.css">
+<link rel="stylesheet" href="assets/qk/quant.css">
+<link rel="stylesheet" href="assets/rink-qk.css">
 </head>
-<body>
-
-<div id="loading-overlay">
-  <div class="spinner"></div>
-  <div class="loading-text">Loading…</div>
-</div>
-
-<header class="site-header">
-  <div class="container-xl">
-    <div class="header-row">
-      <h1 class="site-title"><a href="#/"><span class="brand-mark rk-mark"></span><span class="brand-text">The Quant Rink<span class="brand-tag">Odds, models and analytics for the NHL</span></span></a></h1>
-      <div class="search-box">
-        <input id="search-input" type="search" placeholder="Search players and teams…" autocomplete="off" spellcheck="false">
-        <div id="search-results" class="search-results"></div>
-      </div>
-      <div class="comp-picker season-picker">
-        <label for="season-select">Season</label>
-        <select id="season-select"></select>
-      </div>
-      <div class="sister-group" aria-label="Sister sites">
-        <a class="sister-link" href="https://pchattani.github.io/the-quant-footballer/" title="The sister site: football odds, models and analytics">⚽ Footballer</a>
-        <a class="sister-link" href="https://pchattani.github.io/the-quant-paddock/" title="The sister site: Formula 1 odds, models and analytics">🏁 Paddock</a>
-        <a class="sister-link" href="https://pchattani.github.io/the-quant-hardwood/" title="The sister site: NBA and WNBA odds, models and analytics">🏀 Hardwood</a>
-        <a class="sister-link" href="https://pchattani.github.io/the-quant-ace/" title="The sister site: ATP and WTA tennis odds, models and analytics">🎾 Ace</a>
-        <a class="sister-link" href="https://pchattani.github.io/the-quant-bullpen/" title="The sister site: MLB odds, pitch models and analytics">⚾ Bullpen</a>
-        <a class="sister-link" href="https://pchattani.github.io/the-quant-gridiron/" title="The sister site: NFL odds, models and analytics">🏈 Gridiron</a>
-      </div>
-      <nav class="global-nav hw-nav rk-nav">
-        <a href="#/" data-nav="hub">Hub</a><a href="#/games" data-nav="games">Games</a><a href="#/standings" data-nav="standings">Standings</a><a href="#/playoffs" data-nav="playoffs">Playoffs</a><a href="#/teams" data-nav="teams">Teams</a><a href="#/skaters" data-nav="skaters">Skaters</a><a href="#/goalies" data-nav="goalies">Goalies</a><a href="#/value" data-nav="value">Value</a><a href="#/trade" data-nav="trade">Trade</a><a href="#/moves" data-nav="moves">Moves</a><a href="#/fantasy" data-nav="fantasy">Fantasy</a><a href="#/lines" data-nav="lines">Lines</a><a href="#/leaders" data-nav="leaders">Leaders</a><a href="#/history" data-nav="history">History</a><a href="#/lab" data-nav="lab">Lab</a><a href="#/compare" data-nav="compare">Compare</a><a href="#/markets" data-nav="markets">Markets</a><a href="#/calibration" data-nav="calibration">Calibration</a><a href="#/glossary" data-nav="glossary">Glossary</a><a href="#/methodology" data-nav="methodology">Methodology</a>
-      </nav>
-      <div class="site-sub"><span id="meta-line">—</span></div>
-    </div>
-  </div>
-</header>
-
-<main id="app" class="container-xl hw-main rk-main"></main>
+<body class="qk">
+<div id="qk-shell"></div>
+<main id="main" class="qk-page rk-main">
+  <div id="app"></div>
+  <div class="rk-meta" id="meta-line" aria-live="polite"></div>
+</main>
 
 <template id="disclaimer-template">
   <div class="card">
-    <div class="card-header">Disclaimer &amp; terms of use <span class="card-sub">Last updated 16 October 2026</span></div>
+    <div class="card-header">Disclaimer &amp; terms of use <span class="card-sub">Last updated 17 October 2026</span></div>
     <div class="prose-dark pad legal">
       <p>The Quant Rink is an independent, non-commercial hobby project that applies statistical models to publicly
       available ice hockey data for the National Hockey League. By using this site you agree to the terms below.
@@ -128,9 +105,10 @@
 
       <h5>8. Privacy</h5>
       <p>The site sets no cookies, runs no analytics or advertising, and collects no personal data. Your browser
-      remembers only that you dismissed the first-visit notice, locally on your device. The page loads its charting
-      library from a third-party content delivery network (cdn.plot.ly), which receives your IP address when your browser
-      makes the request, like any web server. The site itself is hosted on GitHub Pages, whose own privacy terms apply to
+      remembers only that you dismissed the first-visit notice and your theme, locally on your device. The page loads its fonts from
+      Google Fonts and its charting libraries from third-party content delivery networks (cdn.jsdelivr.net, and
+      cdn.plot.ly for some detailed charts), which receive your IP address when your browser makes the request, like any
+      web server. The site itself is hosted on GitHub Pages, whose own privacy terms apply to
       its server logs.</p>
 
       <h5>9. Changes</h5>
@@ -141,28 +119,21 @@
   </div>
 </template>
 
-<footer class="site-footer">
-  <div class="container-xl">
-    <span id="footer-meta">The Quant Rink</span>
-    · NHL schedules, play-by-play, shifts and statistics from the NHL&rsquo;s public data, for informational non-commercial use ·
-    xG benchmark data from <a href="https://moneypuck.com">MoneyPuck.com</a> ·
-    game lines, transactions and injury status from ESPN; public prediction markets ·
-    <a href="https://pchattani.github.io/the-quant-footballer/">⚽ The Quant Footballer</a> ·
-    <a href="https://pchattani.github.io/the-quant-paddock/">🏁 The Quant Paddock</a> ·
-    <a href="https://pchattani.github.io/the-quant-hardwood/">🏀 The Quant Hardwood</a> ·
-    <a href="https://pchattani.github.io/the-quant-ace/">🎾 The Quant Ace</a> ·
-    <a href="https://pchattani.github.io/the-quant-bullpen/">⚾ The Quant Bullpen</a> ·
-    <a href="https://pchattani.github.io/the-quant-gridiron/">🏈 The Quant Gridiron</a>
-    <div class="footer-legal">For information and entertainment only &mdash; not betting, financial or professional advice. Probabilities are model estimates and can be wrong; no bets are offered. Unofficial: not affiliated with or endorsed by the NHL, the NHLPA, any club, player, ESPN or bookmaker; no logos are used and names belong to their owners. 18+. Gamble responsibly. <a href="#/disclaimer">Disclaimer &amp; terms</a></div>
+<div class="rk-legal">
+  <div class="rk-legal-in">
+    <p>NHL schedules, play-by-play, shifts and statistics from the NHL&rsquo;s public data, for informational non-commercial use ·
+    xG benchmark data from <a href="https://moneypuck.com">MoneyPuck.com</a> · game lines, transactions and injury status from ESPN; public prediction markets.</p>
+    <p>For information and entertainment only &mdash; not betting, financial or professional advice. Probabilities are model estimates and can be wrong; no bets are offered. Unofficial: not affiliated with or endorsed by the NHL, the NHLPA, any club, player, ESPN or bookmaker; no logos are used and names belong to their owners. 18+. Gamble responsibly. <a href="#/disclaimer">Disclaimer &amp; terms</a></p>
   </div>
-</footer>
+</div>
+<div id="qk-footer"></div>
 
-<div id="first-visit-notice" class="fv-notice" hidden>
-  <div class="container-xl fv-row">
+<div id="first-visit-notice" class="rk-fv" role="region" aria-label="Notice" hidden>
+  <div class="rk-fv-in">
     <span><strong>For information and entertainment only.</strong> Game, playoff and award probabilities are model
     estimates, not betting or financial advice. Unofficial: not affiliated with the NHL, the NHLPA, any club, player or
     ESPN; no logos are used. 18+ where gambling is discussed. <a href="#/disclaimer">Read the disclaimer &amp; terms</a>.</span>
-    <button type="button" id="fv-dismiss" class="fv-btn">I understand</button>
+    <button type="button" id="fv-dismiss" class="qk-btn primary">I understand</button>
   </div>
 </div>
 <script>
@@ -177,6 +148,9 @@
   });
 })();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="assets/qk/quant.js"></script>
+<script src="assets/qk/quant-charts.js"></script>
 <script src="assets/js/core.js"></script>
 <script src="assets/js/charts.js"></script>
 <script src="assets/js/fx.js"></script>
@@ -203,11 +177,19 @@
 <script src="assets/js/compare.js"></script>
 <script src="assets/js/calibration.js"></script>
 <script src="assets/js/docs.js"></script>
+<script src="assets/js/rk-ui.js"></script>
+<script src="assets/js/rk-overview.js"></script>
+<script src="assets/js/rk-games.js"></script>
+<script src="assets/js/rk-sections.js"></script>
+<script src="assets/js/rk-team.js"></script>
+<script src="assets/js/rk-player.js"></script>
+<script src="assets/js/rk-value.js"></script>
+<script src="assets/js/rk-fantasy.js"></script>
 <script>
 /* The disclaimer route lives with the shell: its text is the <template> above. */
 RK.route('disclaimer', function (el) {
   var t = document.getElementById('disclaimer-template');
-  el.innerHTML = t ? t.innerHTML : '';
+  el.innerHTML = (RK.ui ? RK.ui.secHead('model', 'Model', 'How the models work, how well they have done, what every number means, and the terms of use.') + RK.ui.modelTabs('terms') : '') + (t ? t.innerHTML : '');
 });
 </script>
 </body>

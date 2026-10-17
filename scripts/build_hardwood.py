@@ -579,6 +579,14 @@ def main(argv: list[str] | None = None) -> int:
         shutil.copyfile(CSS_SRC, dst)
         b.written.append(dst)
     b.step("copy base.css", css)
+
+    def kit():
+        # The Quant design kit (docs/_design: tokens, components, chart kit) -> docs/hardwood/assets/qk/
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from design_kit import copy_kit
+        dst = copy_kit(data.parent)
+        b.written.extend(sorted(dst.glob("*")))
+    b.step("copy design kit", kit)
     from oddsmarkets.basketball.analytics.glossary import build_glossary
     b.write_or_fail("glossary.json", "glossary", build_glossary)
 

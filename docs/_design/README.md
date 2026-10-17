@@ -173,4 +173,5 @@ at the public GitHub Pages sites; `--links local` points them at `../site/`, `..
 Live scores: the page itself polls each sport's published `index.json` (football: `hub.json`) once a minute while
 one of its games is live or about to start. GitHub Pages sends `Access-Control-Allow-Origin: *` (checked
 17 Oct 2026 on all seven sites), so no proxy or per-sport `home.json` is needed. If a fetch fails the page keeps
-the built snapshot. The home URL in `QK.HOME_URL` is a placeholder until workstream D picks the hosting.
+the built snapshot. `QK.HOME_URL` is https://pchattani.github.io/the-quant/: the Pages repo pchattani/the-quant,
+deployed by the `home.yml` workflow of the public build repo pchattani/quant-sports (docs/HOSTING_MIGRATION.md).

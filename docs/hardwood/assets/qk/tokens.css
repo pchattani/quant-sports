@@ -1,0 +1,163 @@
+/* The Quant design tokens — v1 (premium data terminal).
+ *
+ * Dark is the default. Light applies when the OS asks for it and the viewer has not
+ * chosen, or when <html data-theme="light"> is set by the theme toggle. Dark is
+ * re-declared under [data-theme="dark"] so the toggle wins in both directions.
+ *
+ * Naming: --bg-* page planes, --s-* surfaces (cards), --ink-* text, --line-* rules,
+ * --a-* sport accents, --c-* chart categorical slots, --st-* status (never series).
+ * Every value a component uses comes from here; components never hard-code colour. */
+
+:root {
+  color-scheme: dark;
+
+  /* ── planes & surfaces (dark) ───────────────────────────── */
+  --bg:        #07090c;   /* page */
+  --bg-raise:  #0c0f14;   /* top bar, side rails */
+  --s-1:       #11151b;   /* card */
+  --s-2:       #171c24;   /* card header, inputs, hover */
+  --s-3:       #1f2530;   /* pressed, selected, skeleton base */
+  --s-4:       #2a3240;   /* skeleton shine, strong fills */
+  --s-glass:   rgba(12, 15, 20, 0.78);
+
+  /* ── ink ────────────────────────────────────────────────── */
+  --ink-1:     #eef1f5;   /* primary — 16.9:1 on --s-1 */
+  --ink-2:     #a9b2bf;   /* secondary — 8.4:1 */
+  --ink-3:     #7c8696;   /* muted, axis labels — 4.9:1 */
+  --ink-4:     #566070;   /* disabled, decorations only (not text) */
+  --ink-inv:   #07090c;
+
+  /* ── rules ──────────────────────────────────────────────── */
+  --line-1:    rgba(255, 255, 255, 0.07);  /* hairline */
+  --line-2:    rgba(255, 255, 255, 0.12);  /* card ring */
+  --line-3:    rgba(255, 255, 255, 0.22);  /* focusable control border */
+  --grid:      rgba(255, 255, 255, 0.06);  /* chart gridline */
+  --axis:      rgba(255, 255, 255, 0.18);
+
+  /* ── brand ──────────────────────────────────────────────── */
+  --brand:     #ffb020;   /* terminal amber */
+  --brand-ink: #1a1203;
+  --brand-soft: rgba(255, 176, 32, 0.14);
+  --focus:     #7cc4ff;
+
+  /* ── sport accents (identity only; text beside them stays ink) ── */
+  --a-football:   #2fd38a;
+  --a-f1:         #ff4b4b;
+  --a-basketball: #ff8a3d;
+  --a-tennis:     #c8f04e;
+  --a-baseball:   #5b9bff;
+  --a-nfl:        #b28cff;
+  --a-hockey:     #3fd7f2;
+  --accent:       var(--brand);         /* a site sets --accent: var(--a-<sport>) on <html> */
+  --accent-soft:  color-mix(in srgb, var(--accent) 15%, transparent);
+
+  /* ── chart categorical slots (validated reference palette, dark steps) ── */
+  --c-1: #3987e5;  /* blue — "model" */
+  --c-2: #d95926;  /* orange — "market" */
+  --c-3: #199e70;  /* aqua */
+  --c-4: #c98500;  /* yellow */
+  --c-5: #d55181;  /* magenta */
+  --c-6: #008300;  /* green */
+  --c-7: #9085e9;  /* violet */
+  --c-8: #e66767;  /* red */
+  --c-model:  var(--c-1);
+  --c-market: var(--c-2);
+  --c-other:  #6b7480;
+
+  /* sequential (blue) & diverging (blue <-> red, grey midpoint) */
+  --seq-1: #104281; --seq-2: #1c5cab; --seq-3: #2a78d6; --seq-4: #5598e7; --seq-5: #9ec5f4;
+  --div-neg: #e66767; --div-mid: #383835; --div-pos: #3987e5;
+
+  /* ── status (reserved; always with an icon or label) ── */
+  --st-good: #0ca30c; --st-warn: #fab219; --st-serious: #ec835a; --st-crit: #d03b3b;
+  --up:   #3ccf6e;    /* delta text, up/good */
+  --down: #ff6b6b;    /* delta text, down/bad */
+  --live: #ff3b4e;
+
+  /* ── type ───────────────────────────────────────────────── */
+  --font-ui:   "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-num:  "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --fs-2xs: 0.6875rem;  /* 11 — micro labels, chips */
+  --fs-xs:  0.75rem;    /* 12 — table, captions */
+  --fs-sm:  0.8125rem;  /* 13 — body dense */
+  --fs-md:  0.9375rem;  /* 15 — body */
+  --fs-lg:  1.125rem;   /* 18 — card titles */
+  --fs-xl:  1.5rem;     /* 24 — section titles */
+  --fs-2xl: 2rem;       /* 32 — page titles, KPI */
+  --fs-3xl: 3rem;       /* 48 — hero number */
+  --fs-4xl: clamp(2.5rem, 6vw, 4.5rem); /* hero headline */
+  --lh-tight: 1.15; --lh-snug: 1.35; --lh-body: 1.55;
+  --tracking-caps: 0.08em;
+
+  /* ── space (4px grid) ───────────────────────────────────── */
+  --sp-0: 2px; --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px;
+  --sp-6: 24px; --sp-8: 32px; --sp-10: 40px; --sp-12: 48px; --sp-16: 64px;
+  --gutter: 16px;
+  --page-max: 1440px;
+  --topbar-h: 56px;
+  --secnav-h: 44px;
+
+  /* ── radii, shadows, motion ─────────────────────────────── */
+  --r-1: 4px; --r-2: 8px; --r-3: 12px; --r-4: 16px; --r-pill: 999px;
+  --sh-1: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sh-2: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 24px rgba(0, 0, 0, 0.45);
+  --sh-3: 0 20px 48px rgba(0, 0, 0, 0.6);
+  --glow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent), 0 0 24px color-mix(in srgb, var(--accent) 18%, transparent);
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --t-fast: 120ms; --t-med: 220ms; --t-slow: 420ms;
+  --z-bar: 50; --z-pop: 80; --z-modal: 100;
+}
+
+/* ── light ──────────────────────────────────────────────────────── */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #f3f5f8; --bg-raise: #ffffff;
+    --s-1: #ffffff; --s-2: #f5f7fa; --s-3: #e9edf2; --s-4: #dde3ea;
+    --s-glass: rgba(255, 255, 255, 0.82);
+    --ink-1: #0d1117; --ink-2: #48505c; --ink-3: #66707e; --ink-4: #9aa3ae; --ink-inv: #ffffff;
+    --line-1: rgba(13, 17, 23, 0.07); --line-2: rgba(13, 17, 23, 0.11); --line-3: rgba(13, 17, 23, 0.24);
+    --grid: rgba(13, 17, 23, 0.07); --axis: rgba(13, 17, 23, 0.22);
+    --brand: #c27800; --brand-ink: #ffffff; --brand-soft: rgba(194, 120, 0, 0.12); --focus: #0b6bcb;
+    --a-football: #0f9d63; --a-f1: #d91f26; --a-basketball: #d9620f; --a-tennis: #6f9200;
+    --a-baseball: #1f63d8; --a-nfl: #6e45d6; --a-hockey: #0389a6;
+    --c-1: #2a78d6; --c-2: #eb6834; --c-3: #1baf7a; --c-4: #eda100; --c-5: #e87ba4; --c-6: #008300; --c-7: #6250d6; --c-8: #e34948;
+    --c-other: #98a1ac;
+    --seq-1: #cde2fb; --seq-2: #86b6ef; --seq-3: #3987e5; --seq-4: #1c5cab; --seq-5: #0d366b;
+    --div-neg: #e34948; --div-mid: #f0efec; --div-pos: #2a78d6;
+    --up: #0f8a3c; --down: #c92a2a; --live: #e0112b;
+    --sh-1: 0 1px 2px rgba(13, 17, 23, 0.06), 0 0 0 1px rgba(13, 17, 23, 0.04);
+    --sh-2: 0 6px 20px rgba(13, 17, 23, 0.08), 0 0 0 1px rgba(13, 17, 23, 0.04);
+    --sh-3: 0 20px 48px rgba(13, 17, 23, 0.16);
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f3f5f8; --bg-raise: #ffffff;
+  --s-1: #ffffff; --s-2: #f5f7fa; --s-3: #e9edf2; --s-4: #dde3ea;
+  --s-glass: rgba(255, 255, 255, 0.82);
+  --ink-1: #0d1117; --ink-2: #48505c; --ink-3: #66707e; --ink-4: #9aa3ae; --ink-inv: #ffffff;
+  --line-1: rgba(13, 17, 23, 0.07); --line-2: rgba(13, 17, 23, 0.11); --line-3: rgba(13, 17, 23, 0.24);
+  --grid: rgba(13, 17, 23, 0.07); --axis: rgba(13, 17, 23, 0.22);
+  --brand: #c27800; --brand-ink: #ffffff; --brand-soft: rgba(194, 120, 0, 0.12); --focus: #0b6bcb;
+  --a-football: #0f9d63; --a-f1: #d91f26; --a-basketball: #d9620f; --a-tennis: #6f9200;
+  --a-baseball: #1f63d8; --a-nfl: #6e45d6; --a-hockey: #0389a6;
+  --c-1: #2a78d6; --c-2: #eb6834; --c-3: #1baf7a; --c-4: #eda100; --c-5: #e87ba4; --c-6: #008300; --c-7: #6250d6; --c-8: #e34948;
+  --c-other: #98a1ac;
+  --seq-1: #cde2fb; --seq-2: #86b6ef; --seq-3: #3987e5; --seq-4: #1c5cab; --seq-5: #0d366b;
+  --div-neg: #e34948; --div-mid: #f0efec; --div-pos: #2a78d6;
+  --up: #0f8a3c; --down: #c92a2a; --live: #e0112b;
+  --sh-1: 0 1px 2px rgba(13, 17, 23, 0.06), 0 0 0 1px rgba(13, 17, 23, 0.04);
+  --sh-2: 0 6px 20px rgba(13, 17, 23, 0.08), 0 0 0 1px rgba(13, 17, 23, 0.04);
+  --sh-3: 0 20px 48px rgba(13, 17, 23, 0.16);
+}
+:root[data-theme="dark"] { color-scheme: dark; }
+
+/* sport accent per site: <html data-sport="nfl"> */
+:root[data-sport="football"]   { --accent: var(--a-football); }
+:root[data-sport="f1"]         { --accent: var(--a-f1); }
+:root[data-sport="basketball"] { --accent: var(--a-basketball); }
+:root[data-sport="tennis"]     { --accent: var(--a-tennis); }
+:root[data-sport="baseball"]   { --accent: var(--a-baseball); }
+:root[data-sport="nfl"]        { --accent: var(--a-nfl); }
+:root[data-sport="hockey"]     { --accent: var(--a-hockey); }

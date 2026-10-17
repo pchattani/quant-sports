@@ -121,7 +121,7 @@ function syncUrl(S) {
     if (String(ST.n) !== '100') q.n = String(ST.n);
     if (Number(S) !== k.curSeason()) q.s = String(S);
     const qs = Object.keys(q).map(x => encodeURIComponent(x) + '=' + encodeURIComponent(q[x])).join('&');
-    history.replaceState(null, '', '#/value' + (qs ? '?' + qs : ''));
+    history.replaceState(null, '', '#/value?tab=season' + (qs ? '&' + qs : ''));
   } catch (e) { /* history unavailable */ }
 }
 

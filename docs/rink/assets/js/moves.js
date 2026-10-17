@@ -147,7 +147,7 @@ function draw(el, S, tx, dl, tabs) {
       if (MT.team !== 'all') qs.push('team=' + encodeURIComponent(MT.team));
       if (MT.type !== 'all') qs.push('type=' + encodeURIComponent(MT.type));
       if (MT.minor === '1') qs.push('minor=1');
-      history.replaceState(null, '', '#/moves' + (qs.length ? '?' + qs.join('&') : ''));
+      history.replaceState(null, '', '#/value?tab=moves' + (qs.length ? '&' + qs.join('&') : ''));
     } catch (e) { /* history unavailable */ }
   }
   $('mv-team').onchange = e => { MT.team = e.target.value; MT.n = 150; sync(); drawDeals(); drawTx(); };

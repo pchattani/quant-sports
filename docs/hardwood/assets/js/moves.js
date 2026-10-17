@@ -57,7 +57,8 @@ function render(el, params, state) {
   return fx.ready().then(() => {
     const S = fx.current(L) || fx.S(params, state, L);
     const q = (params && params.query) || {};
-    ['tab', 'basis', 'team', 'type'].forEach(k => { if (q[k]) ST[k] = q[k]; });
+    if (q.mt) ST.tab = q.mt;
+    ['basis', 'team', 'type'].forEach(k => { if (q[k]) ST[k] = q[k]; });
     return HW.loadAll([fx.path(L, S, 'deals.json'), fx.path(L, S, 'transactions.json')]).then(r => {
       if (!fx.alive(el)) return;
       const dp = r[0], tx = r[1];
@@ -161,11 +162,12 @@ function picks(L, dp, box) {
 function syncUrl(L) {
   try {
     const q = [];
-    if (ST.tab !== 'ratings') q.push('tab=' + ST.tab);
+    q.push('tab=moves');
+    if (ST.tab !== 'ratings') q.push('mt=' + ST.tab);
     if (ST.basis !== 'now') q.push('basis=' + ST.basis);
     if (ST.team !== 'all') q.push('team=' + encodeURIComponent(ST.team));
     if (ST.type !== 'all') q.push('type=' + encodeURIComponent(ST.type));
-    history.replaceState(null, '', '#/' + L + '/moves' + (q.length ? '?' + q.join('&') : ''));
+    history.replaceState(null, '', '#/' + L + '/value' + (q.length ? '?' + q.join('&') : ''));
   } catch (e) { /* history unavailable */ }
 }
 

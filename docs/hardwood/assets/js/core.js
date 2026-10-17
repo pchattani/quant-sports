@@ -115,28 +115,75 @@ addRoute('compare/teams/:a', 'compare-teams', ['compare'], { kind: 'teams' });
 addRoute('compare/teams/:a/:b', 'compare-teams', ['compare'], { kind: 'teams' });
 addRoute('markets', 'markets');
 addRoute('calibration', 'calibration');
+addRoute('standings', 'standings');
+addRoute('model', 'model');
 addRoute('glossary', 'glossary', [], {}, true);
 addRoute('methodology', 'methodology', [], {}, true);
 addRoute('disclaimer', 'disclaimer', [], {}, true);
 
 const ALIASES = {
-  home: 'hub', index: 'hub', '': 'hub', league: 'hub',
+  home: 'hub', index: 'hub', '': 'hub', league: 'hub', overview: 'hub',
   'compare/players': 'compare-players', 'compare_players': 'compare-players',
   'compare/teams': 'compare-teams', 'compare_teams': 'compare-teams',
   schedule: 'games', scores: 'games', bracket: 'playoffs', docs: 'methodology'
 };
 
+/* Old routes (before the October 2026 redesign) -> [section route, tab]. The league prefix and the other
+ * query keys are kept; '#/<L>/season/<S>' keeps its season as ?s=. Deep links with an id (#/glossary/<key>,
+ * #/methodology/<part>, #/<L>/compare/players/<a>/<b>) still render where they are, inside their section. */
+const REDIRECTS = {
+  season: ['standings', null], leaders: ['players', 'leaders'], awards: ['players', 'awards'],
+  playoffs: ['standings', 'bracket'], bracket: ['standings', 'bracket'], markets: ['standings', 'markets'],
+  trade: ['value', 'trade'], moves: ['value', 'moves'], calibration: ['model', 'calibration'],
+  glossary: ['model', 'glossary'], methodology: ['model', 'methodology'], docs: ['model', 'methodology'],
+  hub: ['', null], overview: ['', null], schedule: ['games', null], scores: ['games', null]
+};
+/* The moves view kept its own ?tab= before it moved under Value & Moves; it is ?mt= now. */
+const RENAME_Q = { moves: { tab: 'mt' } };
+function redirectFor(hash) {
+  let h = String(hash || '').replace(/^#\/?/, '');
+  let q = '';
+  const qi = h.indexOf('?');
+  if (qi >= 0) { q = h.slice(qi + 1); h = h.slice(0, qi); }
+  let parts = h.split('/').filter(x => x !== '');
+  let L = null;
+  if (parts.length && isLeague(parts[0].toLowerCase())) { L = parts[0].toLowerCase(); parts = parts.slice(1); }
+  if (!parts.length) return null;
+  const head = parts[0];
+  const to = REDIRECTS[head];
+  if (!to) return null;
+  const extra = [];
+  if (parts.length > 1) {
+    if (head === 'season' && parts.length === 2 && /^\d{4}$/.test(parts[1])) extra.push('s=' + parts[1]);
+    else return null;                      // glossary/<key>, methodology/<part>: rendered in place
+  }
+  const ren = RENAME_Q[head] || {};
+  let query = q.split('&').filter(Boolean).map(kv => { const k = kv.split('=')[0]; return ren[k] ? ren[k] + kv.slice(k.length) : kv; });
+  if (to[1]) query = ['tab=' + to[1]].concat(query.filter(kv => !/^tab=/.test(kv)));
+  if (head === 'season' && extra.length) query = query.filter(kv => !/^s=/.test(kv));
+  const all = query.concat(extra);
+  return '#/' + (L || state.league) + (to[0] ? '/' + to[0] : '') + (all.length ? '?' + all.join('&') : '');
+}
+
 const TITLES = {
-  hub: 'Hub', season: 'Season', games: 'Games', game: 'Game centre', team: 'Team', player: 'Player',
-  players: 'Players', teams: 'Teams', value: 'Player value', trade: 'Trade simulator', moves: 'Moves', fantasy: 'Fantasy', leaders: 'Leaders', awards: 'Awards', playoffs: 'Playoffs', lab: 'Lab',
-  compare: 'Compare', 'compare-players': 'Compare players', 'compare-teams': 'Compare teams',
+  hub: 'Overview', season: 'Standings', standings: 'Standings', games: 'Games', game: 'Game centre', team: 'Team', player: 'Player',
+  players: 'Players', teams: 'Teams', value: 'Value & Moves', trade: 'Trade simulator', moves: 'Moves', fantasy: 'Fantasy', leaders: 'Leaders', awards: 'Awards', playoffs: 'Playoffs', lab: 'Lab',
+  compare: 'Compare', 'compare-players': 'Compare players', 'compare-teams': 'Compare teams', model: 'Model',
   markets: 'Markets', calibration: 'Calibration', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
 };
-// Which top-nav link lights up for each route.
-const NAV_OF = { hub: 'hub', season: 'season', games: 'games', game: 'games', team: 'teams', teams: 'teams',
-  player: 'players', players: 'players', value: 'value', trade: 'trade', moves: 'moves', fantasy: 'fantasy', leaders: 'leaders', awards: 'awards', playoffs: 'playoffs', lab: 'lab',
-  compare: 'compare', 'compare-players': 'compare', 'compare-teams': 'compare', markets: 'markets',
-  calibration: 'calibration', glossary: 'glossary', methodology: 'methodology' };
+/* Which kit section (QK.SECTIONS key) each route belongs to. */
+const SECTION_OF = { hub: 'overview', season: 'standings', standings: 'standings', playoffs: 'standings', markets: 'standings',
+  games: 'fixtures', game: 'fixtures', team: 'teams', teams: 'teams',
+  player: 'players', players: 'players', leaders: 'players', awards: 'players',
+  value: 'value', trade: 'value', moves: 'value', fantasy: 'fantasy',
+  lab: 'lab', compare: 'lab', 'compare-players': 'lab', 'compare-teams': 'lab',
+  model: 'model', calibration: 'model', glossary: 'model', methodology: 'model', disclaimer: 'model' };
+const NAV_OF = SECTION_OF;
+/* Route names the redesigned pages own: a legacy module's HW.route(name) registers a view (HW.view(name))
+ * that a section page renders inside its tabs, not the route itself. */
+const OWNED = { hub: 1, games: 1, game: 1, standings: 1, teams: 1, team: 1, players: 1, player: 1, value: 1, fantasy: 1,
+  lab: 1, compare: 1, 'compare-players': 1, 'compare-teams': 1, model: 1, glossary: 1, methodology: 1, disclaimer: 1 };
+const VIEWS = {};
 // Where a page lands when the league is switched (id pages fall back to their list).
 const SWITCH_TO = { game: 'games', team: 'teams', player: 'players', 'compare-players': 'compare', 'compare-teams': 'compare' };
 
@@ -158,12 +205,21 @@ function route(name, fn) {
     if (hit) key = hit.name;
     else if (!ALIASES[raw]) { addRoute(raw, raw); key = raw; }
   }
+  VIEWS[key] = fn;
+  if (OWNED[key]) return;
   HANDLERS[key] = fn;
   // A late registration for the page on screen renders it now.
   if (state.route === key || (state.route && !HANDLERS[state.route] && (routeEntry(state.route) || {}).fallbacks && routeEntry(state.route).fallbacks.indexOf(key) >= 0)) {
     if (booted) render();
   }
 }
+/* Register a redesigned page (owns its route). */
+function page(name, fn) {
+  if (typeof fn !== 'function') return;
+  HANDLERS[name] = fn;
+  if (state.route === name && booted) render();
+}
+function view(name) { return VIEWS[name] || null; }
 function routeEntry(name) { return ROUTES.find(r => r.name === name) || null; }
 
 function parseQuery(s) {
@@ -223,10 +279,13 @@ function runCleanups() {
   list.forEach(fn => { try { fn(); } catch (e) { console.warn('cleanup failed', e); } });
 }
 
-let booted = false;
-function render() {
+let booted = false, renderSeq = 0;
+function render(opts) {
+  const keep = !!(opts && opts.keep === true);
+  const y0 = window.scrollY;
+  const rd = redirectFor(location.hash);
+  if (rd) { try { location.replace(rd); } catch (e) { location.hash = rd; } return; }
   runCleanups();
-  closeSearch();
   const r = parseHash();
   const prevLeague = state.league, prevSeason = state.season;
   if (r.league) setLeagueState(r.league);
@@ -243,31 +302,45 @@ function render() {
   markNav(NAV_OF[r.name] || '');
   const app = document.getElementById('app');
   if (!app) return;
+  disposeCharts(app);
   app.innerHTML = '';
   const el = document.createElement('div');
   el.className = 'page page-' + r.name.replace(/[^a-z0-9-]/gi, '-') + ' league-' + state.league;
   app.appendChild(el);
-  document.title = (r.name === 'hub' ? LEAGUE_NAME[state.league] + ' · ' : (TITLES[r.name] || 'Page') + (r.global ? '' : ' · ' + LEAGUE_NAME[state.league]) + ' · ') + 'The Quant Hardwood';
+  document.title = (r.name === 'hub' ? LEAGUE_NAME[state.league] + ' odds, models and analytics · ' : (TITLES[r.name] || 'Page') + (r.global ? '' : ' · ' + LEAGUE_NAME[state.league]) + ' · ') + 'The Quant Hardwood';
   setMeta('');
-  window.scrollTo(0, 0);
+  if (!keep) window.scrollTo(0, 0);
   const fn = handlerFor(r.name);
   if (!fn) {
     el.innerHTML = r.name === 'notfound'
-      ? comingHTML('Page not found', 'There is no page at <code>' + esc(location.hash) + '</code>. Try the hub or the search box.')
+      ? comingHTML('Page not found', 'There is no page at <code>' + esc(location.hash) + '</code>. Try the overview or the search (press /).')
       : comingHTML((TITLES[r.name] || 'This page') + ' is coming', 'This part of The Quant Hardwood is still being built.');
     return;
   }
+  const seq = ++renderSeq;
   try {
     const out = fn(el, r.params, state);
-    if (out && typeof out.then === 'function') out.then(null, err => showError(el, err));
+    if (out && typeof out.then === 'function') out.then(() => { if (keep && seq === renderSeq) window.scrollTo(0, y0); }, err => showError(el, err));
+    else if (keep) window.scrollTo(0, y0);
   } catch (err) {
     showError(el, err);
   }
 }
 
+/* ECharts instances outlive their nodes (resize observers, progressive rendering): free them before a page goes. */
+function disposeCharts(root) {
+  if (!root || !root.querySelectorAll) return;
+  root.querySelectorAll('.qk-chart').forEach(n => {
+    const e = n.__qkc;
+    if (!e) return;
+    try { if (e.ro) e.ro.disconnect(); e.chart.dispose(); } catch (err) { /* gone */ }
+    n.__qkc = null;
+  });
+}
+
 function comingHTML(title, body) {
   return '<div class="card coming"><div class="pad"><div class="coming-title">' + esc(title) + '</div>' +
-    '<p class="muted-inline">' + body + '</p><p><a href="' + href(state.league, '') + '">Back to the hub →</a></p></div></div>';
+    '<p class="muted-inline">' + body + '</p><p><a href="' + href(state.league, '') + '">Back to the overview →</a></p></div></div>';
 }
 function showError(el, err) {
   console.error(err);
@@ -342,6 +415,22 @@ function learn(p, d) {
     if (/\/lab\.json$/.test(p) && Array.isArray(d.fields) && Array.isArray(d.rows)) {
       const ii = d.fields.indexOf('id'), ni = d.fields.indexOf('name'), ti = d.fields.indexOf('team');
       if (ii >= 0 && ni >= 0) d.rows.forEach(r => { if (r[ii] && r[ni] && !(NAMES[L].players[r[ii]] || {}).name) putP(L, String(r[ii]), { name: r[ni], team: ti >= 0 ? r[ti] : undefined }); });
+    }
+    if (/\/awards\.json$/.test(p) && Array.isArray(d.keys)) {
+      d.keys.forEach(k => { const f = (d[k] || {}).features || {}; Object.keys(f).forEach(id => { const x = f[id] || {}; if (x.name && !(NAMES[L].players[id] || {}).name) putP(L, id, pick(x, ['name', 'team'])); }); });
+    }
+    // {cols, rows} payloads with ids and names (valuation, value, trade, fantasy): current rosters
+    const tab = Array.isArray(d.cols) ? d : (d.players && Array.isArray(d.players.cols) ? d.players : null);
+    if (tab && Array.isArray(tab.rows)) {
+      const ii = tab.cols.indexOf('id'), ni = tab.cols.indexOf('name'), ti = tab.cols.indexOf('team'), pi = tab.cols.indexOf('pos');
+      if (ii >= 0 && ni >= 0) tab.rows.forEach(r => {
+        const id = String(r[ii]); const cur = NAMES[L].players[id] || {};
+        if (!r[ni]) return;
+        const info = { name: cur.name || r[ni] };
+        if (!cur.team && ti >= 0 && r[ti]) info.team = String(r[ti]);
+        if (!cur.pos && pi >= 0 && r[pi]) info.pos = r[pi];
+        putP(L, id, info);
+      });
     }
     if (d.names && typeof d.names === 'object' && !Array.isArray(d.names)) {
       Object.keys(d.names).forEach(id => { const n = d.names[id]; if (typeof n === 'string' && !(NAMES[L].players[id] || {}).name) putP(L, id, { name: n }); });
@@ -553,11 +642,21 @@ function teamColour(L, id) {
   const a = args(arguments); const x = NAMES[a[0]].teams[String(a[1])];
   if (x && x.colour) {
     const c = hexOf(x.colour);
+    // The kit raises a dark kit colour in HSL until it clears 3:1 on the card (both themes).
+    if (window.QK && QK.color && QK.color.parse(c)) {
+      const alt = hexOf(x.alt_colour);
+      const dark = QK.theme.get() === 'dark';
+      if (dark && luminance(c) < 0.06 && QK.color.parse(alt) && luminance(alt) > 0.12 && luminance(alt) < 0.8) return QK.color.team(alt);
+      return QK.color.team(c);
+    }
     if (luminance(c) < 0.18 && x.alt_colour && luminance(hexOf(x.alt_colour)) > luminance(c)) return hexOf(x.alt_colour);
     return luminance(c) < 0.08 ? '#9aa4b2' : c;
   }
   return a[1] ? PALETTE[hashIndex(a[1], PALETTE.length)] : C.text3;
 }
+/* The team's own primary colour, unadjusted (for kit marks, which adjust it themselves). */
+function teamColourRaw(L, id) { const a = args(arguments); const x = NAMES[a[0]].teams[String(a[1])]; return x && x.colour ? hexOf(x.colour) : ''; }
+function teamAlt(L, id) { const a = args(arguments); const x = NAMES[a[0]].teams[String(a[1])]; return x && x.alt_colour ? hexOf(x.alt_colour) : ''; }
 function teamBar(L, id) { const a = args(arguments); return '<span class="team-bar" style="background:' + esc(teamColour(a[0], a[1])) + '"></span>'; }
 /* '?s=S' when S is not the league's current season, else ''. */
 function sq(L, S) {
@@ -571,7 +670,7 @@ function href(L, sub, S) {
   const s = String(sub || '').replace(/^\/+/, '');
   return '#/' + l + (s ? '/' + s : '') + (s ? sq(l, S) : '');
 }
-function seasonHref(L, S) { const l = isLeague(L) ? L : state.league; return '#/' + l + '/season/' + (S || (l === state.league ? state.season : currentSeason(l))); }
+function seasonHref(L, S) { const l = isLeague(L) ? L : state.league; const s = S || (l === state.league ? state.season : currentSeason(l)); return '#/' + l + '/standings' + (s && Number(s) !== currentSeason(l) ? '?s=' + s : ''); }
 function teamHref(L, id, S) { const a = args(arguments); return href(a[0], 'team/' + encodeURIComponent(a[1]), a[2]); }
 function playerHref(L, id, S) { const a = args(arguments); return href(a[0], 'player/' + encodeURIComponent(a[1]), a[2]); }
 function gameHref(L, id, S) { const a = args(arguments); return href(a[0], 'game/' + encodeURIComponent(a[1]), a[2]); }
@@ -851,17 +950,28 @@ function layout(extra) {
   if (extra && extra.font) out.font = Object.assign({}, DARK_LAYOUT.font, extra.font);
   return out;
 }
-/* Draw a Plotly chart into el (element or id); degrades to a muted line. */
-function plot(el, traces, lay, conf) {
-  const node = typeof el === 'string' ? document.getElementById(el) : el;
-  if (!node) return null;
-  if (typeof Plotly === 'undefined') {
-    node.innerHTML = '<div class="muted">The chart library did not load. The tables carry the same data.</div>';
-    return null;
+/* Plotly is loaded only when a pre-redesign chart asks for it (the redesigned pages draw with ECharts). */
+const PLOTLY_SRC = 'https://cdn.plot.ly/plotly-2.27.0.min.js';
+let plotlyP = null;
+function loadPlotly() {
+  if (typeof Plotly !== 'undefined') return Promise.resolve(true);
+  if (!plotlyP) {
+    plotlyP = new Promise(res => {
+      const sc = document.createElement('script');
+      sc.src = PLOTLY_SRC; sc.charset = 'utf-8'; sc.async = true;
+      sc.onload = () => res(true);
+      sc.onerror = () => { plotlyP = null; res(false); };
+      document.head.appendChild(sc);
+    });
   }
+  return plotlyP;
+}
+/* Plotly.on() exists only once the chart is drawn; legacy code wires clicks right after plot(). */
+function drawPlot(node, traces, lay, conf) {
   try {
     const p = Plotly.newPlot(node, traces, lay && lay.paper_bgcolor !== undefined ? lay : layout(lay), Object.assign({}, PLOTLY_CONF, conf || {}));
     onLeave(() => { try { Plotly.purge(node); } catch (e) { /* gone */ } });
+    if (p && p.then) p.then(() => { (node.__hwOn || []).forEach(x => node.on(x[0], x[1])); node.__hwOn = null; });
     return p;
   } catch (err) {
     console.warn('chart failed', err);
@@ -869,15 +979,47 @@ function plot(el, traces, lay, conf) {
     return null;
   }
 }
+/* Draw a Plotly chart into el (element or id); the library loads on first use. */
+function plot(el, traces, lay, conf) {
+  const node = typeof el === 'string' ? document.getElementById(el) : el;
+  if (!node) return null;
+  if (typeof Plotly !== 'undefined') return drawPlot(node, traces, lay, conf);
+  // Until Plotly is here, node.on(ev, fn) is queued and bound once the chart exists.
+  if (!node.on) node.on = (ev, fn) => { (node.__hwOn || (node.__hwOn = [])).push([ev, fn]); };
+  node.classList.add('hw-plot-wait');
+  const route0 = state.hash;
+  return loadPlotly().then(ok => {
+    node.classList.remove('hw-plot-wait');
+    if (!node.isConnected || state.hash !== route0) return null;
+    if (!ok) { node.innerHTML = '<div class="muted">The chart library did not load. The tables carry the same data.</div>'; return null; }
+    const queued = node.__hwOn || [];
+    try { delete node.on; } catch (e) { node.on = undefined; }
+    node.__hwOn = queued;
+    return drawPlot(node, traces, lay, conf);
+  });
+}
+/* The legacy colour constants and the Plotly layout follow the kit's tokens (dark or light). */
+function retheme() {
+  if (!window.QKC) return;
+  const T = QKC.tokens();
+  C.bg = T.bg; C.bg2 = T.s1; C.bg3 = T.s2; C.border = T.s4;
+  C.text = T.ink1; C.text2 = T.ink2; C.text3 = T.ink3;
+  C.blue = T.model; C.orange = T.market; C.green = T.up; C.red = T.down;
+  DARK_LAYOUT.font = { color: T.ink2, family: T.fontUI, size: 11 };
+  DARK_LAYOUT.xaxis = { gridcolor: T.grid, zerolinecolor: T.axis, linecolor: T.axis, tickfont: { family: T.fontNum, color: T.ink3 } };
+  DARK_LAYOUT.yaxis = { gridcolor: T.grid, zerolinecolor: T.axis, linecolor: T.axis, tickfont: { family: T.fontNum, color: T.ink3 } };
+  DARK_LAYOUT.hoverlabel = { bgcolor: T.s4, bordercolor: T.line2, font: { color: T.ink1, size: 12, family: T.fontUI } };
+}
 
-// ── header: league switch, season picker, nav, meta, search ────────────────
+// ── header: the kit shell, league switch, season picker, section nav, meta, search ─────────
 
+let SHELL = null;
 function setLeagueState(L) {
   if (!isLeague(L)) return;
   state.league = L;
   try { window.localStorage.setItem(LS_LEAGUE, L); } catch (e) { /* private mode */ }
 }
-/* Switch league, keeping the page type where the other league has it. */
+/* Switch league, keeping the page type (and the section tab) where the other league has it. */
 function switchLeague(L) {
   if (!isLeague(L)) return;
   const r = state.route || 'hub';
@@ -890,19 +1032,19 @@ function switchLeague(L) {
     if (h !== location.hash) go(h); else render();
     return;
   }
+  const tab = ((state.params || {}).query || {}).tab;
+  const keepTab = tab && ['standings', 'players', 'value', 'fantasy', 'lab', 'model', 'teams', 'games'].indexOf(to) >= 0 ? '?tab=' + encodeURIComponent(tab) : '';
   if (to === 'hub') go('#/' + L);
-  else if (to === 'season') go('#/' + L + '/season/' + currentSeason(L));
-  else go('#/' + L + '/' + routeEntry(to).pattern.replace(/\/:.*$/, ''));
+  else go('#/' + L + '/' + routeEntry(to).pattern.replace(/\/:.*$/, '') + keepTab);
 }
 /* Change the season shown, keeping the page where it makes sense. */
 function setSeason(S) {
   const s = parseInt(S, 10);
   if (isNaN(s)) return;
   const L = state.league, r = state.route || 'hub';
-  if (r === 'season' || r === 'hub') { go('#/' + L + '/season/' + s); return; }
   if (r === 'game') { go(href(L, 'games', s)); return; }
   if ((routeEntry(r) || {}).global) { state.season = s; return; }
-  const h = String(location.hash || '').replace(/\?.*$/, '');
+  const h = String(location.hash || '').replace(/\?.*$/, '') || '#/' + L;
   const q = Object.assign({}, state.params.query || {});
   if (s === currentSeason(L)) delete q.s; else q.s = String(s);
   const qs = Object.keys(q).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(q[k])).join('&');
@@ -919,24 +1061,22 @@ function fillSeasonPicker() {
   sel.value = String(state.season || currentSeason(L));
   pickerFilled = true;
 }
+/* Section hrefs carry the league (and the season when it is not the current one). */
+function sectionHref(key, L, S) {
+  const sub = { overview: '', fixtures: 'games', standings: 'standings', teams: 'teams', players: 'players', value: 'value', fantasy: 'fantasy', lab: 'lab', model: 'model' }[key];
+  if (key === 'overview') return '#/' + L + (S && Number(S) !== currentSeason(L) ? '?s=' + S : '');
+  if (key === 'fantasy' || key === 'model') return '#/' + L + '/' + sub;
+  return href(L, sub, S);
+}
 function updateHeader() {
   const L = state.league, S = state.season;
-  document.querySelectorAll('.lg-btn[data-league]').forEach(b => {
-    b.classList.toggle('active', b.dataset.league === L);
-    b.setAttribute('aria-pressed', b.dataset.league === L ? 'true' : 'false');
-  });
-  const links = { hub: '#/' + L, season: seasonHref(L, S), games: href(L, 'games', S), teams: href(L, 'teams', S),
-    players: href(L, 'players', S), value: href(L, 'value', S), trade: href(L, 'trade'), moves: href(L, 'moves'), fantasy: href(L, 'fantasy'), leaders: href(L, 'leaders', S), awards: href(L, 'awards', S), playoffs: href(L, 'playoffs', S),
-    lab: href(L, 'lab', S), compare: href(L, 'compare', S), markets: href(L, 'markets', S), calibration: href(L, 'calibration'),
-    glossary: '#/glossary', methodology: '#/methodology' };
-  document.querySelectorAll('.global-nav a[data-nav]').forEach(a => { if (links[a.dataset.nav]) a.setAttribute('href', links[a.dataset.nav]); });
-  const t = document.querySelector('.site-title a');
-  if (t) t.setAttribute('href', '#/' + L);
-  const input = document.getElementById('search-input');
-  if (input) input.placeholder = 'Search ' + LEAGUE_NAME[L] + ' teams and players…';
+  document.querySelectorAll('.qk-secnav a[data-sec]').forEach(a => a.setAttribute('href', sectionHref(a.getAttribute('data-sec'), L, S)));
+  document.querySelectorAll('[data-league-btn]').forEach(b => b.setAttribute('aria-pressed', b.getAttribute('data-league-btn') === L ? 'true' : 'false'));
+  const brand = document.querySelector('.qk-brand-name b');
+  if (brand) brand.textContent = 'Hardwood';
 }
 function markNav(key) {
-  document.querySelectorAll('.global-nav a[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === key));
+  if (SHELL) SHELL.setSection(key);
 }
 function setMeta(html) {
   const el = document.getElementById('meta-line');
@@ -944,79 +1084,78 @@ function setMeta(html) {
   const d = INDEX.data;
   const ph = (state.season || currentSeason(state.league)) === currentSeason(state.league) ? phase(state.league) : null;
   const base = [LEAGUE_NAME[state.league] + ' ' + seasonLabel(state.league, state.season || currentSeason(state.league)) + (ph ? ' · ' + titleCase(ph) : ''),
-    d && d.updated_at ? 'Updated ' + esc(fmtStamp(d.updated_at)) : ''].filter(Boolean).join(' · ');
+    d && d.updated_at ? 'Data updated ' + esc(fmtStamp(d.updated_at)) : ''].filter(Boolean).join(' · ');
   el.innerHTML = [html, base].filter(Boolean).join(' · ');
 }
 
+/* Search rows for the kit's command palette: both leagues' teams and current players (by minutes). */
 const SEARCH = {};
-function loadSearch() {
-  const L = state.league, S = state.season || currentSeason(L);
+function loadSearch(L0, S0) {
+  const L = L0 || state.league, S = S0 || currentSeason(L);
   const key = L + '/' + S;
   if (SEARCH[key]) return SEARCH[key];
-  SEARCH[key] = loadAll([path('players.json', L, S), path('teams.json', L, S)]).then(arr => {
+  SEARCH[key] = loadAll([path('players.json', L, S), L + '/' + S + '/valuation.json']).then(arr => {
     const items = [], seen = {};
-    const add = (kind, id, label, sub, h, tid) => {
+    const add = (kind, id, label, sub, h, tid, w) => {
       const k = kind + ':' + id;
       if (seen[k]) return; seen[k] = 1;
-      items.push({ kind: kind, id: id, label: label, sub: sub, href: h, team: tid, norm: norm(label + ' ' + (sub || '')) });
+      items.push({ kind: kind, id: id, label: label, sub: sub, href: h, team: tid, w: w || 0 });
     };
     const teams = NAMES[L].teams;
-    Object.keys(teams).forEach(id => { const t = teams[id]; add('Teams', id, t.name || teamName(L, id), [t.abbr, t.conference].filter(Boolean).join(' · '), teamHref(L, id, S), id); });
+    Object.keys(teams).forEach(id => { const t = teams[id]; add('Teams', id, t.name || teamName(L, id), [t.abbr, t.conference].filter(Boolean).join(' · '), teamHref(L, id, S), id, 1e6); });
+    // current rosters first (valuation.json is built from the latest rosters), then everyone in the catalogue
+    const v = arr[1];
+    if (v && v.ok !== false && Array.isArray(v.cols)) {
+      const c = v.cols, ix = n => c.indexOf(n);
+      (v.rows || []).forEach(r => add('Players', String(r[ix('id')]), r[ix('name')], [r[ix('pos')], r[ix('team')] ? teamAbbr(L, r[ix('team')]) : 'free agent'].filter(Boolean).join(' · '), playerHref(L, r[ix('id')], S), r[ix('team')], 1000 + (Number(r[ix('mpg')]) || 0)));
+    }
     const pl = (arr[0] && arr[0].players) || {};
-    const ids = Object.keys(pl).length ? Object.keys(pl) : Object.keys(NAMES[L].players);
-    ids.sort((a, b) => ((pl[b] || {}).min || 0) - ((pl[a] || {}).min || 0));
-    ids.forEach(id => {
-      const x = pl[id] || NAMES[L].players[id] || {};
-      add('Players', id, x.name || playerName(L, id), [x.pos, x.team ? teamAbbr(L, x.team) : ''].filter(Boolean).join(' · '), playerHref(L, id, S), x.team);
+    Object.keys(pl).forEach(id => {
+      const x = pl[id] || {};
+      add('Players', id, x.name || playerName(L, id), [x.pos, x.team ? teamAbbr(L, x.team) : ''].filter(Boolean).join(' · '), playerHref(L, id, S), x.team, (x.min || 0) / 100);
     });
+    items.sort((a, b) => b.w - a.w);
     return items;
   });
   return SEARCH[key];
 }
-function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
-function closeSearch() {
-  const box = document.getElementById('search-results');
-  if (box) { box.innerHTML = ''; box.style.display = 'none'; }
-}
-function runSearch(q) {
-  const box = document.getElementById('search-results');
-  const n = norm(q.trim());
-  if (n.length < 2 || !box) { closeSearch(); return; }
-  const L = state.league;
-  loadSearch().then(items => {
-    const words = n.split(/\s+/).filter(Boolean);
-    const hits = items.filter(it => words.every(w => it.norm.indexOf(w) >= 0));
-    let html = '';
-    ['Teams', 'Players'].forEach(g => {
-      const list = hits.filter(h => h.kind === g).slice(0, g === 'Teams' ? 5 : 9);
-      if (!list.length) return;
-      html += '<div class="sr-head">' + g + '</div>' + list.map(h =>
-        '<a class="sr-item" href="' + esc(h.href) + '">' + (h.team ? teamBar(L, h.team) : '') + '<span>' + esc(h.label) + '</span><span class="sr-sub">' + esc(h.sub || '') + '</span></a>').join('');
-    });
-    box.innerHTML = html || '<div class="sr-empty">No ' + LEAGUE_NAME[L] + ' team or player matches.</div>';
-    box.style.display = 'block';
-  });
-}
-function initSearch() {
-  const input = document.getElementById('search-input');
-  if (!input) return;
-  let timer = null;
-  input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => runSearch(input.value), 120); });
-  input.addEventListener('focus', () => { loadSearch(); if (input.value.trim().length >= 2) runSearch(input.value); });
-  input.addEventListener('keydown', ev => {
-    if (ev.key === 'Escape') { input.value = ''; closeSearch(); input.blur(); }
-    if (ev.key === 'Enter') { const a = document.querySelector('#search-results a.sr-item'); if (a) { location.hash = a.getAttribute('href'); input.value = ''; closeSearch(); } }
-  });
-  document.addEventListener('click', ev => { if (!ev.target.closest('.search-box')) closeSearch(); });
-  const box = document.getElementById('search-results');
-  if (box) box.addEventListener('click', ev => { if (ev.target.closest('a')) { input.value = ''; closeSearch(); } });
-}
+function closeSearch() { /* the kit's palette closes itself on navigation */ }
 
+function leagueSeg() {
+  return '<div class="qk-seg hw-league" role="group" aria-label="League">' + LEAGUES.map(l =>
+    '<button type="button" data-league-btn="' + l + '" aria-pressed="' + (l === state.league ? 'true' : 'false') + '">' + LEAGUE_NAME[l] + '</button>').join('') + '</div>';
+}
 function initHeader() {
+  if (window.QK) {
+    SHELL = QK.shell({
+      sport: 'basketball', section: 'overview',
+      sections: QK.sections('basketball').map(s => { s.href = sectionHref(s.key, state.league, null); return s; }),
+      ctx: leagueSeg() + '<label class="qk-sr" for="season-select">Season</label><select id="season-select" class="qk-select hw-season" aria-label="Season"></select>',
+      search: {
+        load: () => Promise.all(LEAGUES.map(l => loadSearch(l, currentSeason(l)))).then(lists => {
+          // the league on screen first
+          const order = lists.map((x, i) => ({ l: LEAGUES[i], x: x })).sort((a, b) => (a.l === state.league ? -1 : 0) - (b.l === state.league ? -1 : 0));
+          const out = [];
+          order.forEach(o => o.x.forEach(it => out.push({ sport: 'basketball', t: it.label, s: LEAGUE_NAME[o.l] + ' · ' + (it.kind === 'Teams' ? 'Team' : '') + (it.kind === 'Teams' && it.sub ? ' · ' : '') + (it.sub || ''), href: it.href })));
+          return out;
+        })
+      }
+    });
+    retheme();
+    QK.theme.onChange(() => {
+      setTimeout(() => {
+        retheme();
+        const app = document.getElementById('app');
+        // legacy Plotly charts and team-coloured legacy HTML are painted once: draw the page again
+        if (app && app.querySelector('.js-plotly-plot, .team-bar, .hw-legacy')) render({ keep: true });
+      }, 40);
+    });
+    document.querySelectorAll('[data-league-btn]').forEach(b => b.addEventListener('click', () => switchLeague(b.getAttribute('data-league-btn'))));
+  }
   const sel = document.getElementById('season-select');
   if (sel) sel.addEventListener('change', () => setSeason(sel.value));
-  document.querySelectorAll('.lg-btn[data-league]').forEach(b => b.addEventListener('click', () => switchLeague(b.dataset.league)));
 }
+function initSearch() { /* the kit shell owns search */ }
 
 function init() {
   load('index.json').then(idx => {
@@ -1026,7 +1165,7 @@ function init() {
     const ov = document.getElementById('loading-overlay');
     if (ov) ov.style.display = 'none';
     booted = true;
-    window.addEventListener('hashchange', render);
+    window.addEventListener('hashchange', () => render());
     render();
   });
 }
@@ -1035,7 +1174,8 @@ else setTimeout(init, 0);
 
 return {
   // state and routing
-  state: state, route: route, go: go, parseHash: parseHash, onLeave: onLeave, interval: interval, render: render,
+  state: state, route: route, page: page, view: view, VIEWS: VIEWS, SECTION_OF: SECTION_OF, redirectFor: redirectFor, go: go,
+  loadPlotly: loadPlotly, retheme: retheme, loadSearch: loadSearch, teamColourRaw: teamColourRaw, teamAlt: teamAlt, routeEntry: routeEntry, parseHash: parseHash, onLeave: onLeave, interval: interval, render: render,
   ROUTES: ROUTES, HANDLERS: HANDLERS, TITLES: TITLES, LEAGUES: LEAGUES, LEAGUE_NAME: LEAGUE_NAME,
   switchLeague: switchLeague, setSeason: setSeason, setMeta: setMeta,
   // data

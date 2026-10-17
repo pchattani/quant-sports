@@ -162,7 +162,7 @@ function writeState(st) {
     const q = [];
     if (st.teams.length) q.push('t=' + st.teams.join(','));
     if (m) q.push('m=' + m);
-    history.replaceState(null, '', '#/trade' + (q.length ? '?' + q.join('&') : ''));
+    history.replaceState(null, '', '#/value?tab=trade' + (q.length ? '&' + q.join('&') : ''));
   } catch (e) { /* history unavailable */ }
 }
 

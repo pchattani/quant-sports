@@ -440,7 +440,7 @@ K.legendTop = () => ({ showlegend: true, legend: { orientation: 'h', y: 1.14, x:
 K.DIVERGE = [[0, '#2166ac'], [0.25, '#67a9cf'], [0.5, '#2d333b'], [0.75, '#ef8a62'], [1, '#b2182b']];
 K.SEQ = [[0, '#161b22'], [0.25, '#1f3b57'], [0.5, '#2f6f9f'], [0.75, '#e08a3c'], [1, '#f85149']];
 /* Click a Plotly point -> its customdata hash. */
-K.clickThrough = id => { const n = typeof id === 'string' ? document.getElementById(id) : id; if (n && n.on) n.on('plotly_click', ev => { const h = ev.points && ev.points[0] && ev.points[0].customdata; if (h && typeof h === 'string' && h.charAt(0) === '#') location.hash = h; }); };
+K.clickThrough = id => { const n = typeof id === 'string' ? document.getElementById(id) : id; if (RK.clickThrough) RK.clickThrough(n); };
 /* Hide a chart node (and its height) with a muted line instead. */
 K.empty = (node, text) => { const n = typeof node === 'string' ? document.getElementById(node) : node; if (!n) return; n.innerHTML = K.muted(text); n.style.height = 'auto'; };
 
@@ -811,7 +811,7 @@ function renderSkaters(el, params, state) {
     $('cat-extra').onchange = e => { const x = e.target.value; if (x && ST.extra.indexOf(x) < 0 && ctx.heads.every(m => m.key !== x)) ST.extra.push(x); e.target.value = ''; draw(); };
     $('cat-clear').onclick = () => { ST.extra = []; draw(); };
     $('cat-chips').onclick = ev => { const b = ev.target.closest('[data-rm]'); if (!b) return; ST.extra = ST.extra.filter(x => x !== b.dataset.rm); draw(); };
-    k.wireToggle(el, 'cat-group', v => { ST.group = v; ST.pos = ''; ST.floor = null; ST.team = ''; ST.sortKey = null; ctx = setup(); draw(); try { history.replaceState(null, '', k.withQ('#/skaters', S, { p: v === 'A' ? '' : v })); } catch (e) { /* ok */ } });
+    k.wireToggle(el, 'cat-group', v => { ST.group = v; ST.pos = ''; ST.floor = null; ST.team = ''; ST.sortKey = null; ctx = setup(); draw(); try { history.replaceState(null, '', k.withQ('#/players', S, { tab: 'skaters', p: v === 'A' ? '' : v })); } catch (e) { /* ok */ } });
     draw();
   });
 }

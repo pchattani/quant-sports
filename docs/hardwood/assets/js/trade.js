@@ -146,7 +146,7 @@ function writeState(L, st) {
     const q = [];
     if (st.teams.length) q.push('t=' + st.teams.map(encodeURIComponent).join(','));
     if (m) q.push('m=' + m);
-    history.replaceState(null, '', '#/' + L + '/trade' + (q.length ? '?' + q.join('&') : ''));
+    history.replaceState(null, '', '#/' + L + '/value?tab=trade' + (q.length ? '&' + q.join('&') : ''));
   } catch (e) { /* history unavailable */ }
 }
 

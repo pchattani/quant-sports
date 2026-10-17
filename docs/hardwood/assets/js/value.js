@@ -127,7 +127,7 @@ function syncUrl(L, S, asked) {
     const s = asked || S;
     if (s !== FX().current(L)) q.s = String(s);
     const qs = Object.keys(q).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(q[k])).join('&');
-    history.replaceState(null, '', '#/' + L + '/value' + (qs ? '?' + qs : ''));
+    history.replaceState(null, '', '#/' + L + '/value?tab=war' + (qs ? '&' + qs : ''));
   } catch (e) { /* history unavailable */ }
 }
 

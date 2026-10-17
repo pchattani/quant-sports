@@ -46,6 +46,16 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
+      # build_home.py reads each sport's built summaries from docs/<site>/data; in CI they come from the live sites
+      - name: Fetch the sites' published summaries
+        run: |
+          get() { mkdir -p "docs/$1/data"; curl -fsSL --retry 3 -o "docs/$1/data/$3" "https://pchattani.github.io/$2/data/$3" || echo "::warning::$2/data/$3 not read"; }
+          for f in hub.json competitions.json clubs_index.json; do get site the-quant-footballer "$f"; done
+          for f in index.json markets.json; do get paddock the-quant-paddock "$f"; done
+          get hardwood the-quant-hardwood index.json
+          get ace the-quant-ace index.json
+          for f in index.json players_index.json; do get bullpen the-quant-bullpen "$f"; get gridiron the-quant-gridiron "$f"; get rink the-quant-rink "$f"; done
+
       - name: Build
         run: uv run --frozen python scripts/build_home.py
 

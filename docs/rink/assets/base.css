@@ -516,6 +516,7 @@ a.team-link.rev { flex-direction: row-reverse; }
 
 /* ── Global pages ────────────────────────────────────────────────────────── */
 .hypo .prob-bar { height: 24px; font-size: 0.78rem; margin-bottom: 12px; }
+/* driver chips: unused here since the Ballon d'Or went, but the sister sites copy this file as base.css (F1 uses them) */
 .drivers { display: flex; gap: 4px; flex-wrap: wrap; }
 .drv { display: inline-block; font-size: 0.64rem; padding: 0 6px; border-radius: 9px; border: 1px solid; color: var(--text); white-space: nowrap; line-height: 16px; }
 .picker { position: relative; flex: 1 1 220px; max-width: 320px; }
@@ -567,3 +568,53 @@ a.team-link.rev { flex-direction: row-reverse; }
 /* Link to the sister site (The Quant Paddock, F1). */
 .sister-link { font-size: 0.78rem; color: var(--text2); border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px; white-space: nowrap; text-decoration: none; }
 .sister-link:hover { color: var(--text); border-color: var(--blue); }
+
+/* ── Seasons, people and clubs (seasons.js, people.js) ───────────────────── */
+.season-picker select { min-width: 120px; }
+.season-picker[hidden] { display: none; }
+@media (max-width: 420px) { .season-picker label { display: none; } }
+.season-head .card-header { flex-wrap: wrap; }
+.season-back { margin-left: auto; }
+.season-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.season-pill { display: flex; flex-direction: column; min-width: 92px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); line-height: 1.25; }
+.season-pill b { font-size: 0.86rem; }
+.season-pill span { font-size: 0.7rem; color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+.season-pill:hover { border-color: var(--blue); color: var(--text); }
+.season-pill.active { border-color: var(--blue); background: var(--bg3); }
+.chip.ok { border-color: var(--green); color: var(--green); }
+.chip.nt-chip { border-color: var(--teal); color: var(--teal); }
+a.chip.nt-chip:hover { background: var(--bg3); }
+.kind-chip { font-size: 0.64rem; padding: 0 6px; }
+.kind-chip.kind-league { border-color: var(--blue); color: var(--blue); }
+.kind-chip.kind-continental_club { border-color: var(--purple); color: var(--purple); }
+.kind-chip.kind-domestic_cup { border-color: var(--teal); color: var(--teal); }
+.kind-chip.kind-super_cup { border-color: var(--yellow); color: var(--yellow); }
+.kind-chip.kind-international { border-color: var(--green); color: var(--green); }
+.filter-card { margin-bottom: 16px; }
+.filter-bar { align-items: center; }
+.filter-bar label { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text2); }
+.filter-bar select { max-width: 240px; }
+.scope-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.filter-note { margin-left: auto; font-size: 0.74rem; }
+.dossier-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 26px 0 10px; padding-top: 14px; border-top: 1px solid var(--border); }
+.dossier-head h3 { margin: 0; font-size: 1.1rem; }
+.dossier-head a { margin-left: auto; font-size: 0.8rem; }
+.dossier-chips { margin: 0 0 12px; }
+.past-bracket { display: flex; gap: 16px; overflow-x: auto; }
+.pb-round { min-width: 200px; display: flex; flex-direction: column; gap: 8px; }
+.pb-round-head { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text3); }
+.pb-tie { border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
+.pb-side { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; font-size: 0.82rem; color: var(--text2); }
+.pb-side + .pb-side { border-top: 1px solid var(--border); }
+.pb-side.win { color: var(--text); font-weight: 600; }
+.leaders-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+@media (max-width: 640px) {
+  .filter-bar select { max-width: 100%; }
+  .filter-bar label { flex: 1 1 100%; }
+  .filter-bar label select { flex: 1 1 auto; min-width: 0; }
+  .filter-note { margin-left: 0; }
+  .dossier-head a { margin-left: 0; }
+  .season-back { margin-left: 0; }
+  .page-header { align-items: flex-start; }
+  .ph-body { min-width: 0; }
+}

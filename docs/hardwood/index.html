@@ -1,66 +1,40 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en" data-sport="basketball">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Quant Hardwood</title>
-<meta name="theme-color" content="#0d1117">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#07090c">
 <meta property="og:site_name" content="The Quant Hardwood">
 <meta property="og:title" content="The Quant Hardwood">
-<meta property="og:description" content="The NBA and WNBA through a quant's lens: game, season and title forecasts against the market, team ratings with uncertainty, player impact, shot quality, win probability, lineups and rotations.">
+<meta property="og:description" content="The NBA and WNBA through a quant's lens: game, season and title forecasts against the market, team ratings with uncertainty, player impact and value, shot quality, win probability, trades and fantasy.">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary">
-<meta name="description" content="The NBA and WNBA through a quant's lens: game, season and title forecasts against the market, team ratings with uncertainty, player impact, shot quality, win probability, lineups and rotations.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230d1117'/%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%23f0883e' stroke-width='2.4'/%3E%3Cpath d='M6 16 H26 M16 6 V26' stroke='%23f0883e' stroke-width='1.6'/%3E%3C/svg%3E">
+<meta name="description" content="The NBA and WNBA through a quant's lens: game, season and title forecasts against the market, team ratings with uncertainty, player impact and value, shot quality, win probability, trades and fantasy.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ffb020'/%3E%3Cpath d='M6 23l7-9 5 4 8-11' stroke='%231a1203' stroke-width='3.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=/[?&]theme=(light|dark)/.exec(location.search);t=t?t[1]:localStorage.getItem('qk-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="assets/base.css">
 <link rel="stylesheet" href="assets/hardwood.css">
 <link rel="stylesheet" href="assets/pages.css">
 <link rel="stylesheet" href="assets/pages-f.css">
-<script src="https://cdn.plot.ly/plotly-2.27.0.min.js" charset="utf-8"></script>
+<link rel="stylesheet" href="assets/qk/tokens.css">
+<link rel="stylesheet" href="assets/qk/quant.css">
+<link rel="stylesheet" href="assets/hardwood-qk.css">
 </head>
-<body>
-
-<div id="loading-overlay">
-  <div class="spinner"></div>
-  <div class="loading-text">Loading…</div>
-</div>
-
-<header class="site-header">
-  <div class="container-xl">
-    <div class="header-row">
-      <h1 class="site-title"><a href="#/"><span class="brand-mark hw-mark"></span><span class="brand-text">The Quant Hardwood<span class="brand-tag">Odds, models and analytics for the NBA and WNBA</span></span></a></h1>
-      <div class="league-switch" role="group" aria-label="League">
-        <button type="button" class="lg-btn" data-league="nba">NBA</button><button type="button" class="lg-btn" data-league="wnba">WNBA</button>
-      </div>
-      <div class="search-box">
-        <input id="search-input" type="search" placeholder="Search teams and players…" autocomplete="off" spellcheck="false">
-        <div id="search-results" class="search-results"></div>
-      </div>
-      <div class="comp-picker season-picker">
-        <label for="season-select">Season</label>
-        <select id="season-select"></select>
-      </div>
-      <div class="sister-group" aria-label="Sister sites">
-        <a class="sister-link" href="https://pchattani.github.io/the-quant-footballer/" title="The sister site: football odds, models and analytics">⚽ Footballer</a>
-        <a class="sister-link" href="https://pchattani.github.io/the-quant-paddock/" title="The sister site: Formula 1 odds, models and analytics">🏁 Paddock</a>
-        <a class="sister-link" href="https://pchattani.github.io/the-quant-ace/" title="The sister site: ATP and WTA odds, exact match models, draw simulations and analytics">🎾 Ace</a>
-        <a class="sister-link" href="https://pchattani.github.io/the-quant-bullpen/" title="The sister site: MLB odds, pitch models and analytics">⚾ Bullpen</a>
-        <a class="sister-link" href="https://pchattani.github.io/the-quant-gridiron/" title="The sister site: NFL odds, models and analytics">🏈 Gridiron</a>
-        <a class="sister-link" href="https://pchattani.github.io/the-quant-rink/" title="The sister site: NHL odds, models and analytics">🏒 Rink</a>
-      </div>
-      <nav class="global-nav hw-nav">
-        <a href="#/" data-nav="hub">Hub</a><a href="#/" data-nav="season">Season</a><a href="#/" data-nav="games">Games</a><a href="#/" data-nav="teams">Teams</a><a href="#/" data-nav="players">Players</a><a href="#/" data-nav="value">Value</a><a href="#/" data-nav="trade">Trade</a><a href="#/" data-nav="moves">Moves</a><a href="#/" data-nav="fantasy">Fantasy</a><a href="#/" data-nav="leaders">Leaders</a><a href="#/" data-nav="awards">Awards</a><a href="#/" data-nav="playoffs">Playoffs</a><a href="#/" data-nav="lab">Lab</a><a href="#/" data-nav="compare">Compare</a><a href="#/" data-nav="markets">Markets</a><a href="#/" data-nav="calibration">Calibration</a><a href="#/glossary" data-nav="glossary">Glossary</a><a href="#/methodology" data-nav="methodology">Methodology</a>
-      </nav>
-      <div class="site-sub"><span id="meta-line">—</span></div>
-    </div>
-  </div>
-</header>
-
-<main id="app" class="container-xl hw-main"></main>
+<body class="qk">
+<div id="qk-shell"></div>
+<main id="main" class="qk-page hw-main">
+  <div id="app"><div role="status" aria-label="Loading" class="hw-boot"><div class="qk-skel line short"></div><div class="qk-skel block"></div></div></div>
+  <div class="hw-meta" id="meta-line" aria-live="polite"></div>
+</main>
 
 <template id="disclaimer-template">
   <div class="card">
-    <div class="card-header">Disclaimer &amp; terms of use <span class="card-sub">Last updated 1 October 2026</span></div>
+    <div class="card-header">Disclaimer &amp; terms of use <span class="card-sub">Last updated 17 October 2026</span></div>
     <div class="prose-dark pad legal">
       <p>The Quant Hardwood is an independent, non-commercial hobby project that applies statistical models to
       publicly available NBA and WNBA data. By using this site you agree to the terms below. If you do not agree, please
@@ -121,10 +95,11 @@
 
       <h5>8. Privacy</h5>
       <p>The site sets no cookies, runs no analytics or advertising, and collects no personal data. Your browser
-      remembers only that you dismissed the first-visit notice and which league you last viewed, locally on your
-      device. The page loads its charting library from a third-party content delivery network (cdn.plot.ly), which
-      receives your IP address when your browser makes the request, like any web server. The site itself is hosted on
-      GitHub Pages, whose own privacy terms apply to its server logs.</p>
+      remembers only that you dismissed the first-visit notice, which league you last viewed and your light or dark
+      theme, locally on your device. The page loads its fonts from Google Fonts and its charting libraries from
+      content delivery networks (cdn.jsdelivr.net, and cdn.plot.ly on some detailed views), which receive your IP address
+      when your browser makes the request, like any web server. The site itself is hosted on GitHub Pages, whose own
+      privacy terms apply to its server logs.</p>
 
       <h5>9. Changes</h5>
       <p>These terms may change at any time; the date above shows the latest version. Continued use of the site after
@@ -134,25 +109,20 @@
   </div>
 </template>
 
-<footer class="site-footer">
-  <div class="container-xl">
-    <span id="footer-meta">The Quant Hardwood</span>
-    · Data from ESPN and public markets · team ratings, game and season models ·
-    <a href="https://pchattani.github.io/the-quant-footballer/">⚽ The Quant Footballer</a> ·
-    <a href="https://pchattani.github.io/the-quant-paddock/">🏁 The Quant Paddock</a> · <a href="https://pchattani.github.io/the-quant-ace/">🎾 The Quant Ace</a> ·
-    <a href="https://pchattani.github.io/the-quant-bullpen/">⚾ The Quant Bullpen</a> ·
-    <a href="https://pchattani.github.io/the-quant-gridiron/">🏈 The Quant Gridiron</a> ·
-    <a href="https://pchattani.github.io/the-quant-rink/">🏒 The Quant Rink</a>
-    <div class="footer-legal">For information and entertainment only &mdash; not betting, financial or professional advice. Probabilities are model estimates and can be wrong; no bets are offered. Unofficial: not affiliated with or endorsed by the NBA, the WNBA, any team, player, ESPN or bookmaker; no logos are used and names belong to their owners. 18+. Gamble responsibly. <a href="#/disclaimer">Disclaimer &amp; terms</a></div>
+<div class="hw-legal">
+  <div class="hw-legal-in">
+    <p>Schedules, scores, box scores, play-by-play, shot locations, injury reports and transactions from ESPN&rsquo;s public site data; market prices from public prediction markets and sportsbooks where shown. Possessions, lineups and on-floor intervals are reconstructed from play-by-play and may differ from official statistics.</p>
+    <p>For information and entertainment only &mdash; not betting, financial or professional advice. Probabilities are model estimates and can be wrong; no bets are offered. Unofficial: not affiliated with or endorsed by the NBA, the WNBA, any team, player, ESPN or bookmaker; no logos are used and names belong to their owners. 18+. Gamble responsibly. <a href="#/disclaimer">Disclaimer &amp; terms</a></p>
   </div>
-</footer>
+</div>
+<div id="qk-footer"></div>
 
-<div id="first-visit-notice" class="fv-notice" hidden>
-  <div class="container-xl fv-row">
+<div id="first-visit-notice" class="hw-fv" role="region" aria-label="Notice" hidden>
+  <div class="hw-fv-in">
     <span><strong>For information and entertainment only.</strong> Game and title probabilities are model estimates, not
     betting or financial advice. Unofficial: not affiliated with the NBA, the WNBA, any team, player or ESPN; no logos are used.
     18+ where gambling is discussed. <a href="#/disclaimer">Read the disclaimer &amp; terms</a>.</span>
-    <button type="button" id="fv-dismiss" class="fv-btn">I understand</button>
+    <button type="button" id="fv-dismiss" class="qk-btn primary">I understand</button>
   </div>
 </div>
 <script>
@@ -167,6 +137,9 @@
   });
 })();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="assets/qk/quant.js"></script>
+<script src="assets/qk/quant-charts.js"></script>
 <script src="assets/js/core.js"></script>
 <script src="assets/js/charts.js"></script>
 <script src="assets/js/fx.js"></script>
@@ -187,8 +160,16 @@
 <script src="assets/js/compare.js"></script>
 <script src="assets/js/calibration.js"></script>
 <script src="assets/js/docs.js"></script>
+<script src="assets/js/hw-ui.js"></script>
+<script src="assets/js/hw-overview.js"></script>
+<script src="assets/js/hw-games.js"></script>
+<script src="assets/js/hw-sections.js"></script>
+<script src="assets/js/hw-team.js"></script>
+<script src="assets/js/hw-player.js"></script>
+<script src="assets/js/hw-value.js"></script>
+<script src="assets/js/hw-fantasy.js"></script>
 <script>
-/* The disclaimer route lives with the shell: its text is the <template> above. */
+/* The disclaimer text lives with the shell (the <template> above); the Model section shows it as its Terms tab. */
 HW.route('disclaimer', function (el) {
   var t = document.getElementById('disclaimer-template');
   el.innerHTML = t ? t.innerHTML : '';

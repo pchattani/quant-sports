@@ -241,7 +241,7 @@ function syncUrl(L) {
     if (ST.hz !== 'pg') q.push('hz=' + ST.hz);
     const p = Object.keys(ST.punt);
     if (p.length) q.push('punt=' + p.join(','));
-    history.replaceState(null, '', '#/' + L + '/fantasy' + (q.length ? '?' + q.join('&') : ''));
+    history.replaceState(null, '', '#/' + L + '/fantasy?tab=tools' + (q.length ? '&' + q.join('&') : ''));
   } catch (e) { /* history unavailable */ }
 }
 

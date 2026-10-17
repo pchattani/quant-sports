@@ -148,43 +148,69 @@ addRoute('games/:date', 'games');
 addRoute('game/:id', 'game');
 addRoute('standings', 'standings');
 addRoute('standings/:S', 'standings', { seasonal: true });
-addRoute('playoffs', 'playoffs');
-addRoute('playoffs/:S', 'playoffs', { seasonal: true });
 addRoute('teams', 'teams');
 addRoute('team/:id', 'team');
-addRoute('skaters', 'skaters');
-addRoute('goalies', 'goalies');
+addRoute('players', 'players');
 addRoute('player/:id', 'player');
-addRoute('lines', 'lines');
 addRoute('value', 'value');
-addRoute('trade', 'trade');
-addRoute('moves', 'moves');
 addRoute('fantasy', 'fantasy');
-addRoute('leaders', 'leaders');
-addRoute('history', 'history');
 addRoute('lab', 'lab');
 addRoute('compare', 'compare');
 addRoute('compare/:a', 'compare');
 addRoute('compare/:a/:b', 'compare');
-addRoute('markets', 'markets');
-addRoute('calibration', 'calibration');
+addRoute('model', 'model');
 addRoute('glossary', 'glossary');
 addRoute('glossary/:id', 'glossary');
 addRoute('methodology', 'methodology');
 addRoute('disclaimer', 'disclaimer');
 
-const ALIASES = { home: 'hub', index: 'hub', '': 'hub', schedule: 'games', scores: 'games', scoreboard: 'games', postseason: 'playoffs',
-  bracket: 'playoffs', docs: 'methodology', leaderboards: 'leaders', players: 'skaters' };
-const ALIAS_SEGS = { schedule: 'games', scores: 'games', scoreboard: 'games', postseason: 'playoffs', bracket: 'playoffs', docs: 'methodology',
-  leaderboards: 'leaders', players: 'skaters' };
-const TITLES = {
-  hub: 'Hub', games: 'Games', game: 'Game centre', standings: 'Standings', playoffs: 'Playoffs', teams: 'Teams', team: 'Team',
-  skaters: 'Skaters', goalies: 'Goalies', player: 'Player', lines: 'Lines', value: 'Player value', trade: 'Trade simulator', moves: 'Moves', fantasy: 'Fantasy', leaders: 'Leaders', history: 'History', lab: 'Lab',
-  compare: 'Compare', markets: 'Markets', calibration: 'Calibration', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
+const ALIASES = { home: 'hub', index: 'hub', '': 'hub' };
+const ALIAS_SEGS = { schedule: 'games', scores: 'games', scoreboard: 'games' };
+/* Old routes (before the October 2026 redesign) -> [section route, tab]. A one-segment hash (plus its query) is
+ * replaced; '#/playoffs/<S>' keeps its season. Deep links with an id (#/glossary/<key>, #/methodology/<part>,
+ * #/compare/<a>/<b>) still render where they are, inside their section. */
+const REDIRECTS = {
+  skaters: ['players', 'skaters'], goalies: ['players', 'goalies'], leaders: ['players', 'leaders'], leaderboards: ['players', 'leaders'],
+  lines: ['players', 'lines'], awards: ['players', 'awards'],
+  playoffs: ['standings', 'bracket'], bracket: ['standings', 'bracket'], postseason: ['standings', 'bracket'],
+  markets: ['standings', 'markets'], history: ['standings', 'history'],
+  trade: ['value', 'trade'], moves: ['value', 'moves'], valuation: ['value', 'val'],
+  calibration: ['model', 'calibration'], docs: ['model', 'methodology'], hub: ['', null]
 };
-const NAV_OF = { hub: 'hub', games: 'games', game: 'games', standings: 'standings', playoffs: 'playoffs', teams: 'teams', team: 'teams',
-  skaters: 'skaters', goalies: 'goalies', player: 'skaters', lines: 'lines', value: 'value', trade: 'trade', moves: 'moves', fantasy: 'fantasy', leaders: 'leaders', history: 'history', lab: 'lab',
-  compare: 'compare', markets: 'markets', calibration: 'calibration', glossary: 'glossary', methodology: 'methodology' };
+function redirectFor(hash) {
+  let h = String(hash || '').replace(/^#\/?/, '');
+  let q = '';
+  const qi = h.indexOf('?');
+  if (qi >= 0) { q = h.slice(qi + 1); h = h.slice(0, qi); }
+  const parts = h.split('/').filter(x => x !== '');
+  if (!parts.length) return null;
+  let to = REDIRECTS[parts[0]];
+  if (!to && (parts[0] === 'glossary' || parts[0] === 'methodology') && parts.length === 1) to = ['model', parts[0]];
+  if (!to) return null;
+  const extra = [];
+  if (parts.length > 1) {
+    if ((parts[0] === 'playoffs' || parts[0] === 'bracket' || parts[0] === 'postseason') && parts.length === 2 && toSeason(parts[1])) extra.push('s=' + toSeason(parts[1]));
+    else return null;
+  }
+  const query = q.split('&').filter(Boolean).filter(kv => !(to[1] && /^tab=/.test(kv) && to[0] !== 'value'));
+  if (to[1] && !(to[0] === 'value' && query.some(kv => /^tab=/.test(kv)))) query.unshift('tab=' + to[1]);
+  const all = query.concat(extra);
+  return '#/' + to[0] + (all.length ? '?' + all.join('&') : '');
+}
+const TITLES = {
+  hub: 'Overview', games: 'Games', game: 'Game centre', standings: 'Standings', teams: 'Teams', team: 'Team', players: 'Players', player: 'Player',
+  value: 'Value & Moves', fantasy: 'Fantasy', lab: 'Lab', compare: 'Compare', model: 'Model', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
+};
+/* Which kit section each route belongs to (QK.SECTIONS keys). */
+const SECTION_OF = { hub: 'overview', games: 'fixtures', game: 'fixtures', standings: 'standings', teams: 'teams', team: 'teams',
+  players: 'players', player: 'players', value: 'value', fantasy: 'fantasy', lab: 'lab', compare: 'lab',
+  model: 'model', glossary: 'model', methodology: 'model', disclaimer: 'model' };
+const NAV_OF = SECTION_OF;
+/* Names the redesigned pages own: a legacy module's RK.route(name) registers a view (RK.view(name)) that a section
+ * page renders inside its tabs, not the route itself. */
+const OWNED = { hub: 1, games: 1, game: 1, standings: 1, teams: 1, team: 1, players: 1, player: 1, value: 1, fantasy: 1, lab: 1, compare: 1,
+  model: 1, glossary: 1, methodology: 1 };
+const VIEWS = {};
 
 function normPattern(s) {
   return String(s || '').trim().replace(/^#/, '').replace(/^\/+|\/+$/g, '').replace(/<(\w+)>/g, ':$1');
@@ -202,9 +228,18 @@ function route(name, fn) {
     if (hit) key = hit.name;
     else if (!ALIASES[raw]) { addRoute(raw, raw); key = raw; }
   }
+  VIEWS[key] = fn;
+  if (OWNED[key]) return;
   HANDLERS[key] = fn;
   if (state.route === key && booted) render();
 }
+/* Register a redesigned page (owns its route). */
+function page(name, fn) {
+  if (typeof fn !== 'function') return;
+  HANDLERS[name] = fn;
+  if (state.route === name && booted) render();
+}
+function view(name) { return VIEWS[name] || null; }
 function routeEntry(name) { return ROUTES.find(r => r.name === name) || null; }
 
 function parseQuery(s) {
@@ -266,6 +301,8 @@ let booted = false, renderSeq = 0;
 function render(opts) {
   const keep = !!(opts && opts.keep === true);
   const y0 = window.scrollY;
+  const rd = redirectFor(location.hash);
+  if (rd) { try { location.replace(rd); } catch (e) { location.hash = rd; } return; }
   runCleanups();
   closeSearch();
   const r = parseHash();
@@ -285,7 +322,7 @@ function render(opts) {
   const el = document.createElement('div');
   el.className = 'page page-' + r.name.replace(/[^a-z0-9-]/gi, '-');
   app.appendChild(el);
-  document.title = (r.name === 'hub' ? '' : (TITLES[r.name] || 'Page') + ' · ') + SITE;
+  document.title = (r.name === 'hub' ? 'NHL odds, models and analytics · ' : (TITLES[r.name] || 'Page') + ' · ') + SITE;
   setMeta('');
   if (!keep) window.scrollTo(0, 0);
   const fn = handlerFor(r.name);
@@ -296,7 +333,7 @@ function render(opts) {
     return;
   }
   const seq = ++renderSeq;
-  el.innerHTML = '<div class="muted">Loading…</div>';
+  el.innerHTML = window.QK ? QK.skeleton('lines', 6) : '<div class="muted">Loading…</div>';
   ensureNames().then(() => {
     if (seq !== renderSeq || !el.isConnected) return;
     el.innerHTML = '';
@@ -1233,22 +1270,54 @@ function layout(extra) {
   if (extra && extra.font) out.font = Object.assign({}, DARK_LAYOUT.font, extra.font);
   return out;
 }
-function plot(el, traces, lay, conf) {
-  const node = typeof el === 'string' ? document.getElementById(el) : el;
-  if (!node) return null;
-  if (typeof Plotly === 'undefined') {
-    node.innerHTML = '<div class="muted">The chart library did not load. The tables carry the same data.</div>';
-    return null;
+/* Plotly is loaded only when a legacy chart asks for it (the redesigned pages draw with ECharts). */
+const PLOTLY_SRC = 'https://cdn.plot.ly/plotly-2.27.0.min.js';
+let plotlyP = null;
+function loadPlotly() {
+  if (typeof Plotly !== 'undefined') return Promise.resolve(true);
+  if (!plotlyP) {
+    plotlyP = new Promise(res => {
+      const sc = document.createElement('script');
+      sc.src = PLOTLY_SRC; sc.charset = 'utf-8'; sc.async = true;
+      sc.onload = () => res(true);
+      sc.onerror = () => { plotlyP = null; res(false); };
+      document.head.appendChild(sc);
+    });
   }
+  return plotlyP;
+}
+function drawPlot(node, traces, lay, conf) {
   try {
     const p = Plotly.newPlot(node, traces, lay && lay.paper_bgcolor !== undefined ? lay : layout(lay), Object.assign({}, PLOTLY_CONF, conf || {}));
     onLeave(() => { try { Plotly.purge(node); } catch (e) { /* gone */ } });
+    if (node.__rkClick && p && p.then) p.then(() => clickThrough(node));
     return p;
   } catch (err) {
     console.warn('chart failed', err);
     node.innerHTML = '<div class="muted">The chart could not be drawn.</div>';
     return null;
   }
+}
+/* Click a Plotly point -> its customdata hash (attached once the chart exists). */
+function clickThrough(node) {
+  if (!node) return;
+  if (!node.on) { node.__rkClick = true; return; }
+  if (node.__rkClickBound) return;
+  node.__rkClickBound = true;
+  node.on('plotly_click', ev => { const h = ev.points && ev.points[0] && ev.points[0].customdata; if (h && typeof h === 'string' && h.charAt(0) === '#') location.hash = h; });
+}
+function plot(el, traces, lay, conf) {
+  const node = typeof el === 'string' ? document.getElementById(el) : el;
+  if (!node) return null;
+  if (typeof Plotly !== 'undefined') return drawPlot(node, traces, lay, conf);
+  node.classList.add('rk-plot-wait');
+  const route0 = state.hash;
+  return loadPlotly().then(ok => {
+    node.classList.remove('rk-plot-wait');
+    if (!node.isConnected || state.hash !== route0) return null;
+    if (!ok) { node.innerHTML = '<div class="muted">The chart library did not load. The tables carry the same data.</div>'; return null; }
+    return drawPlot(node, traces, lay, conf);
+  });
 }
 /* Purge every Plotly chart under a node (before replacing its HTML). */
 function purge(root) {
@@ -1286,14 +1355,20 @@ function fillPickers() {
 }
 function updateHeader() {
   const S = state.season;
+  if (SHELL) {
+    const map = { overview: '#/', fixtures: gamesHref(null, S), standings: standingsHref(S), teams: href('teams', S), players: href('players', S),
+      value: href('value', S), fantasy: '#/fantasy', lab: href('lab', S), model: '#/model' };
+    document.querySelectorAll('.qk-secnav a[data-sec]').forEach(a => { const h = map[a.getAttribute('data-sec')]; if (h) a.setAttribute('href', h); });
+  }
   const links = { hub: '#/', games: gamesHref(null, S), standings: standingsHref(S), playoffs: playoffsHref(S),
     teams: href('teams', S), skaters: href('skaters', S), goalies: href('goalies', S), lines: href('lines', S), value: href('value', S), trade: '#/trade', leaders: href('leaders', S),
     history: '#/history', lab: href('lab', S), compare: '#/compare', markets: '#/markets', calibration: '#/calibration', glossary: '#/glossary',
     methodology: '#/methodology' };
   document.querySelectorAll('.global-nav a[data-nav]').forEach(a => { if (links[a.dataset.nav]) a.setAttribute('href', links[a.dataset.nav]); });
 }
+let SHELL = null;
 function markNav(key) {
-  document.querySelectorAll('.global-nav a[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === key));
+  if (SHELL) SHELL.setSection(key);
 }
 function setMeta(html) {
   const el = document.getElementById('meta-line');
@@ -1373,7 +1448,34 @@ function initSearch() {
   const box = document.getElementById('search-results');
   if (box) box.addEventListener('click', ev => { if (ev.target.closest('a')) { input.value = ''; closeSearch(); } });
 }
+/* Legacy colour constants and the Plotly layout follow the kit's tokens (dark or light). */
+function retheme() {
+  if (!window.QKC) return;
+  const T = QKC.tokens();
+  C.bg = T.bg; C.bg2 = T.s1; C.bg3 = T.s2; C.border = T.s4;
+  C.text = T.ink1; C.text2 = T.ink2; C.text3 = T.ink3; C.market = T.ink1; C.espn = T.ink3;
+  DARK_LAYOUT.font = { color: T.ink2, family: T.fontUI, size: 11 };
+  DARK_LAYOUT.xaxis = { gridcolor: T.grid, zerolinecolor: T.axis, linecolor: T.axis, tickfont: { family: T.fontNum, color: T.ink3 } };
+  DARK_LAYOUT.yaxis = { gridcolor: T.grid, zerolinecolor: T.axis, linecolor: T.axis, tickfont: { family: T.fontNum, color: T.ink3 } };
+  DARK_LAYOUT.hoverlabel = { bgcolor: T.s4, bordercolor: T.line2, font: { color: T.ink1, size: 12, family: T.fontUI } };
+}
 function initHeader() {
+  if (window.QK) {
+    SHELL = QK.shell({
+      sport: 'hockey', section: 'overview',
+      sections: QK.sections('hockey'),
+      ctx: '<label class="qk-sr" for="season-select">Season</label><select id="season-select" class="qk-select rk-season" aria-label="Season"></select>',
+      search: { load: () => loadSearch().then(items => items.map(it => ({ sport: 'hockey', t: it.label, s: (it.kind === 'Teams' ? 'Team · ' : '') + (it.sub || ''), href: it.href }))) }
+    });
+    retheme();
+    QK.theme.onChange(() => {
+      setTimeout(() => {
+        retheme();
+        const app = document.getElementById('app');
+        if (app && app.querySelector('.js-plotly-plot, .rk-legacy-colour')) render({ keep: true });
+      }, 40);
+    });
+  }
   const sel = document.getElementById('season-select');
   if (sel) sel.addEventListener('change', () => setSeason(sel.value));
 }
@@ -1394,7 +1496,8 @@ else setTimeout(init, 0);
 
 return {
   // state and routing
-  state: state, route: route, go: go, parseHash: parseHash, onLeave: onLeave, interval: interval, render: render, routeEntry: routeEntry,
+  state: state, route: route, page: page, view: view, VIEWS: VIEWS, SECTION_OF: SECTION_OF, redirectFor: redirectFor, go: go,
+  loadPlotly: loadPlotly, clickThrough: clickThrough, retheme: retheme, parseHash: parseHash, onLeave: onLeave, interval: interval, render: render, routeEntry: routeEntry,
   ROUTES: ROUTES, HANDLERS: HANDLERS, TITLES: TITLES, SITE: SITE, FIRST_SEASON: FIRST_SEASON, MONEYPUCK_CREDIT: MONEYPUCK_CREDIT,
   setSeason: setSeason, setMeta: setMeta, markNav: markNav,
   // data

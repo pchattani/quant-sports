@@ -34,7 +34,7 @@ function render(el, params, state) {
       if (!fx.alive(el)) return;
       const cat = res[0][0], season = res[0][2];
       drawBoards(L, S, season, cat);
-      if (!fx.ok(cat) || !cat.players) { document.getElementById('ld-table').innerHTML = fx.notBuilt('The ' + fx.seasonLabel(L, S) + ' player catalogue', cat); return; }
+      if (!fx.ok(cat) || !cat.players || !Object.keys(cat.players).length) { document.getElementById('ld-table').innerHTML = fx.notBuilt('The ' + fx.seasonLabel(L, S) + ' player catalogue', cat); return; }
       const metrics = (cat.metrics || []).filter(m => Object.keys(cat.players).some(id => fx.isNum((cat.players[id].values || {})[m.key])));
       const meta = fx.metaOf(metrics);
       if (!LS.metric || !meta[LS.metric]) LS.metric = fx.pick(metrics, ['pts_g', 'pts_pg', 'ppg', 'pts', /^pts/, 'hpm']) || (metrics[0] || {}).key;
