@@ -7,8 +7,9 @@ way for every site:
     ctx      --site S                       season ids etc. as KEY=VALUE lines (append to $GITHUB_OUTPUT)
     gate     --site S                       run=true|false: is a game live or within its window (game-window crons)
     restore  --site S --prev DIR            the previous deploy (a shallow clone of the Pages repo at DIR) fills in
-                                            payloads and stores the checkout does not have; for the stores the CI
-                                            run is the store of record for (Paddock), the newer copy wins
+                                            payloads and stores the checkout does not have; for the committed inputs
+                                            the pipeline keeps updating (stores, registries, calibrations: the
+                                            site's newer_wins patterns) the copy with the newer stamp wins
     seed     --site S                       seed-on-miss: when the site's raw inputs are incomplete (a cold or evicted
                                             cache), fetch the full working set the models need before the build
     cachekey --name N --paths P...          key=N-<hash of the files' paths and sizes>: a content key, so an Actions cache
@@ -422,19 +423,25 @@ SITES = {
     "football": {"docs": "site", "repo": "the-quant-footballer", "prune": prune_football, "excluded": (),
                  "guard": guard_payload_floor("site", 2000)},
     "paddock": {"docs": "paddock", "repo": "the-quant-paddock", "prune": None, "excluded": (),
-                "newer_wins": ("data/*/store.json", "data/*/sessions/*.json", "data/*/telemetry/*.json"),
+                "newer_wins": ("data/*/store.json", "data/*/sessions/*.json", "data/*/telemetry/*.json",
+                               "data/calibration.json"),
                 "guard": chain(guard_paddock, guard_payload_floor("paddock", 500))},
     "hardwood": {"docs": "hardwood", "repo": "the-quant-hardwood", "prune": prune_hardwood,
+                 "newer_wins": ("data/*/calibration.json", "data/*/*/store.json"),
                  "excluded": ("shots.json", "stints.json"),
                  "guard": chain(guard_hardwood, guard_payload_floor("hardwood", 2000))},
     "ace": {"docs": "ace", "repo": "the-quant-ace", "prune": prune_ace, "excluded": (),
+            "newer_wins": ("data/*/registry.json", "data/*/calibration.json", "data/*/*/store.json"),
             "guard": chain(guard_ace, guard_payload_floor("ace", 2000))},
     "bullpen": {"docs": "bullpen", "repo": "the-quant-bullpen", "prune": prune_bullpen, "excluded": (),
+                "newer_wins": ("data/*/calibration.json", "data/*/*/store.json"),
                 "guard": chain(guard_bullpen, guard_payload_floor("bullpen", 2000))},
     "gridiron": {"docs": "gridiron", "repo": "the-quant-gridiron", "prune": prune_gridiron, "excluded": (),
+                 "newer_wins": ("data/calibration.json", "data/*/store.json"),
                  "guard": chain(guard_gridiron, guard_payload_floor("gridiron", 2000)),
                  "gate": ("games", "live"), "time_key": "kickoff", "after": timedelta(hours=4, minutes=30)},
     "rink": {"docs": "rink", "repo": "the-quant-rink", "prune": prune_rink, "excluded": (),
+             "newer_wins": ("data/calibration.json", "data/*/store.json"),
              "guard": chain(guard_rink, guard_payload_floor("rink", 2000)),
              "gate": ("live", "today", "upcoming"), "time_key": "start", "after": timedelta(hours=3, minutes=30)},
 }
@@ -487,8 +494,8 @@ def _stamp_of(path: Path) -> str:
         return ""
     if not isinstance(d, dict):
         return ""
-    cands = [(d.get("meta") or {}).get("updated_at") if isinstance(d.get("meta"), dict) else None,
-             d.get("fetched_at"), d.get("updated_at")]
+    meta = d.get("meta") if isinstance(d.get("meta"), dict) else {}
+    cands = [meta.get("updated_at"), meta.get("generated_at"), d.get("fetched_at"), d.get("updated_at"), d.get("generated_at")]
     return max((str(c) for c in cands if c), default="")
 
 
