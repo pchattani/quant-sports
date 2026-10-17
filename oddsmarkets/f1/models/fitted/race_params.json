@@ -1,0 +1,34 @@
+{
+ "fitted_at": "2026-10-01T20:08:04Z",
+ "method": "scripts/f1_tune.py: walk-forward grid over 2012-2026 (2014-2026 scored; each season picks the configuration best on the seasons before it). The post-qualifying pick was the same configuration in every season (p0.9_k40). The pre-qualifying grid source is the qualifying model, which was best overall at 2,000 simulations and the walk-forward pick from 2021 on.",
+ "params": {
+  "PACE_PER_Z_PCT": 0.9,
+  "A_BLEND_K": 40.0,
+  "PRE_GRID": "quali_model",
+  "QUALI_PACE_W": 0.4,
+  "QUALI_PACE_SD_MULT": 0.5,
+  "qualifying.PRACTICE_SHORT_W": 0.5
+ },
+ "data_calibrated_in_code": {
+  "STOP_DEV_P": 0.1,
+  "LAP1_SD_MULT": 0.4,
+  "LAP1_BAD_P": 0.1,
+  "LAP1_BAD_SCALE": 8.0,
+  "PIT_WINDOW": 6,
+  "decomposition.Q_FIXED": {
+   "race": 0.06,
+   "quali": 0.07
+  },
+  "decomposition.TEAM_ROUND_NOISE": true
+ },
+ "walk_forward_2014_2026_winner_ll": {
+  "post": 1.335,
+  "pre": 1.4796,
+  "pre_results_only": 1.4937
+ },
+ "edge_research_2026_10_02": {
+  "source": "scripts/f1_edge.py, docs/research/f1_edge.md",
+  "QUALI_PACE_W/QUALI_PACE_SD_MULT": "grid w in {0.25..0.75} x sd in {0.35..1.0}, 3000 sims, 267 races 2014-2026; chosen on 2014-2022 (winner log-loss after qualifying 1.383 -> 1.323), walk-forward picks converge on (0.4, 0.5) from 2021; 2023-2026 1.199 -> 1.108",
+  "qualifying.PRACTICE_SHORT_W": "practice one-lap pace in the qualifying model (sessions starting before GP qualifying); grid {0.25,0.5,0.75,1.0} on 2023-2026. Strict walk-forward on pole log-loss (train 2023, expanding) picks 0.25 each season: 2024-2026 pole 1.824 -> 1.628. 0.5 is best over all 2023-2026 pole data (1.611 vs 1.616 at 0.25) and better for the race winner (2024-2026 1.711 -> 1.640), so 0.5"
+ }
+}

@@ -1,0 +1,348 @@
+id,TBA202507010
+version,2
+info,visteam,ATH
+info,hometeam,TBA
+info,site,TAM02
+info,date,2025/07/01
+info,number,0
+info,gametype,regular
+info,starttime,7:05PM
+info,daynight,night
+info,innings,9
+info,tiebreaker,2
+info,usedh,true
+info,umphome,ticht901
+info,ump1b,hamaa901
+info,ump2b,jeanj901
+info,ump3b,tumpj901
+info,umplf,(none)
+info,umprf,(none)
+info,inputtime,2025/08/23 09:14:29
+info,howscored,unknown
+info,pitches,pitches
+info,oscorer,mathb701
+info,temp,84
+info,winddir,tocf
+info,windspeed,10
+info,fieldcond,unknown
+info,precip,none
+info,sky,cloudy
+info,timeofgame,179
+info,attendance,10046
+info,wp,kellm004
+info,lp,montm003
+info,save,millm004
+start,butll001,"Lawrence Butler",0,1,9
+start,rookb001,"Brent Rooker",0,2,10
+start,langs001,"Shea Langeliers",0,3,2
+start,kurtn001,"Nick Kurtz",0,4,3
+start,muncm002,"Max Muncy",0,5,5
+start,urial001,"Luis Urias",0,6,4
+start,thomc005,"Colby Thomas",0,7,7
+start,clard004,"Denzel Clarke",0,8,8
+start,schum002,"Max Schuemann",0,9,6
+start,sprij001,"Jeffrey Springs",0,0,1
+start,diazy001,"Yandy Diaz",1,1,10
+start,meadc001,"Curtis Mead",1,2,3
+start,loweb001,"Brandon Lowe",1,3,4
+start,camij001,"Junior Caminero",1,4,5
+start,morec001,"Christopher Morel",1,5,7
+start,lowej002,"Josh Lowe",1,6,9
+start,cabaj001,"Jose Caballero",1,7,6
+start,jansd001,"Danny Jansen",1,8,2
+start,simpc001,"Chandler Simpson",1,9,8
+start,baz-s001,"Shane Baz",1,0,1
+play,1,0,butll001,00,X,S8/G4M
+play,1,0,rookb001,12,SB1S*S,K
+play,1,0,langs001,01,CS,WP.1-2
+play,1,0,langs001,12,CS.BC,K
+play,1,0,kurtn001,02,FC>B,SB3
+play,1,0,kurtn001,12,FC>B.S,K
+play,1,1,diazy001,32,BBSBFB,W
+play,1,1,meadc001,12,CBF.X,46(1)/FO/G4.B-1
+play,1,1,loweb001,00,X,6/P6D
+play,1,1,camij001,12,1FBS.>B,SB2
+play,1,1,camij001,22,1FBS.>B.C,K
+play,2,0,muncm002,00,X,3/P4S
+play,2,0,urial001,31,BBBC.B,W
+play,2,0,thomc005,11,BCX,3(B)4(1)/GDP/G3S-
+play,2,1,morec001,00,X,HR/L78XD
+play,2,1,lowej002,32,CBSBBF.X,7/F7D
+play,2,1,cabaj001,31,FBBBB,W
+play,2,1,jansd001,00,11,SB2.1-3(E3/TH)
+play,2,1,jansd001,30,11.BBBB,W
+play,2,1,simpc001,10,B+3,PO3(25)
+play,2,1,simpc001,12,B+3.CFFX,63/G6
+play,3,0,clard004,11,BFX,63/G6
+play,3,0,schum002,02,SSC,K
+play,3,0,butll001,32,BFS.BBS,K
+play,3,1,diazy001,11,CBX,9/F9D
+play,3,1,meadc001,32,BBBCC.FX,9/L9S
+play,3,1,loweb001,21,BBCX,HR/F9LD
+com,"$Umpire reviewed (home run), call on the field was upheld."
+play,3,1,camij001,00,X,63/G6D
+play,4,0,rookb001,22,BCBFS,K
+play,4,0,langs001,00,X,D8/L8XD+
+play,4,0,kurtn001,01,CX,7/L7
+play,4,0,muncm002,00,X,HR/F89XD.2-H
+play,4,0,urial001,11,CBX,S7/G56
+play,4,0,thomc005,00,X,D7/L7LD+.1-3
+play,4,0,clard004,22,B*BFF.X,53/G6S
+play,4,1,morec001,32,BCS.FBFBS,K
+play,4,1,lowej002,32,BFBFFBFX,7/F7
+play,4,1,cabaj001,12,SFBC,K
+play,5,0,schum002,10,BX,63/G56D
+play,5,0,butll001,12,CBFFC,K
+play,5,0,rookb001,00,X,53/G5
+play,5,1,jansd001,02,CSS,K
+play,5,1,simpc001,10,BX,S8/G4M
+play,5,1,diazy001,20,B1BX,4/L4D
+play,5,1,meadc001,21,BCBX,9/F3D
+play,6,0,langs001,00,X,HR/F7D
+play,6,0,kurtn001,01,SX,63/G6M
+play,6,0,muncm002,31,BBS.BX,S4/G4M
+play,6,0,urial001,12,.CBFB,WP.1-2
+play,6,0,urial001,22,.CBFB.C,K
+play,6,0,thomc005,02,C*SS,K
+play,6,1,loweb001,32,CBBF.BX,7/F7S
+play,6,1,camij001,22,BBF.FX,D9/L9L
+play,6,1,morec001,00,,NP
+sub,sterj001,"Justin Sterner",0,0,1
+play,6,1,morec001,00,.,NP
+sub,aranj001,"Jonathan Aranda",1,5,11
+play,6,1,aranj001,12,..BFS.X,8/F8XD+.2-3
+play,6,1,lowej002,00,X,43/G4
+play,7,0,clard004,00,,NP
+sub,wallt003,"Taylor Walls",1,2,6
+play,7,0,clard004,00,.,NP
+sub,aranj001,"Jonathan Aranda",1,5,3
+play,7,0,clard004,00,..,NP
+sub,cabaj001,"Jose Caballero",1,7,7
+play,7,0,clard004,22,...S.BBFFS,K
+play,7,0,schum002,12,BSS.X,63/G6
+play,7,0,butll001,22,FBSVS,K
+play,7,1,cabaj001,32,BFBBCFX,63/G6
+play,7,1,jansd001,21,CBBX,HR/F7LD
+play,7,1,simpc001,00,,NP
+sub,newcs001,"Sean Newcomb",0,0,1
+play,7,1,simpc001,10,.BX,63/G6MS
+play,7,1,diazy001,12,BSSX,63/G6-
+play,8,0,rookb001,00,,NP
+sub,cleag001,"Garrett Cleavinger",1,0,1
+play,8,0,rookb001,32,.CBBSBS,K
+play,8,0,langs001,12,F.SBX,9/F9S
+play,8,0,kurtn001,22,CBS.BC,K
+play,8,1,wallt003,31,BCBBX,S8/L8
+play,8,1,loweb001,32,BBCBS.C,K
+play,8,1,camij001,10,1B>B,SB2
+play,8,1,camij001,30,1B>B.VV,IW
+play,8,1,aranj001,10,BX,8/F8
+play,8,1,lowej002,02,FCS,K
+play,9,0,muncm002,00,,NP
+sub,fairp001,"Pete Fairbanks",1,0,1
+play,9,0,muncm002,02,.C.F*S,K.BX1(23)
+play,9,0,urial001,22,BBC.CX,3/P13
+play,9,0,thomc005,12,SBCS,K
+play,9,1,cabaj001,00,,NP
+sub,kellm004,"Michael Kelly",0,0,1
+play,9,1,cabaj001,00,.X,S9/L9S
+play,9,1,jansd001,00,,NP
+sub,thaim001,"Matt Thaiss",1,8,11
+play,9,1,thaim001,00,.>B,CS2(26)
+com,"$Rays challenged (tag play), call on the field was upheld."
+play,9,1,thaim001,22,.>B.BC.CX,31/G34
+play,9,1,simpc001,12,CBCX,S7/G56
+play,9,1,diazy001,11,B1CB,WP.1-2
+play,9,1,diazy001,31,B1CB.VV,IW
+play,9,1,wallt003,12,CBSX,3/G34
+play,10,0,clard004,00,,NP
+sub,thaim001,"Matt Thaiss",1,8,2
+play,10,0,clard004,00,.,NP
+sub,montm003,"Mason Montgomery",1,0,1
+radj,thomc005,2
+com,"Colby Thomas starts inning at 2nd base."
+play,10,0,clard004,31,...B+2BBMX,54/SH/BG25.2-3
+play,10,0,schum002,32,BFBSB.B,W
+play,10,0,butll001,00,,NP
+sub,wynna001,"Austin Wynns",0,1,11
+play,10,0,wynna001,02,.CFF>X,7/SF/F78D/NDP.3-H(UR);1XH(82)(E3/TH)
+com,"$Athletics challenged (home-plate collision), call on the field was upheld."
+play,10,1,loweb001,00,,NP
+sub,sodet001,"Tyler Soderstrom",0,1,7
+play,10,1,loweb001,00,.,NP
+sub,thomc005,"Colby Thomas",0,7,9
+play,10,1,loweb001,00,..,NP
+sub,millm004,"Mason Miller",0,0,1
+radj,wallt003,2
+com,"Taylor Walls starts inning at 2nd base."
+play,10,1,loweb001,12,....BSC.S,K
+play,10,1,camij001,01,.FX,7/F78D
+play,10,1,aranj001,30,VVVV,IW
+play,10,1,lowej002,22,CBBSN,BK.2-3;1-2
+play,10,1,lowej002,22,CBBSN.S,K
+data,er,millm004,0
+data,er,sterj001,1
+data,er,kellm004,0
+data,er,newcs001,0
+data,er,sprij001,2
+data,er,fairp001,0
+data,er,baz-s001,3
+data,er,montm003,0
+data,er,cleag001,0
+id,WAS202505200
+version,2
+info,visteam,ATL
+info,hometeam,WAS
+info,site,WAS11
+info,date,2025/05/20
+info,number,0
+info,gametype,regular
+info,starttime,6:45PM
+info,daynight,night
+info,innings,9
+info,tiebreaker,2
+info,usedh,true
+info,umphome,hudsm901
+info,ump1b,gibsh902
+info,ump2b,blakr901
+info,ump3b,thomd901
+info,umplf,(none)
+info,umprf,(none)
+info,inputtime,2025/08/27 09:15:33
+info,howscored,unknown
+info,pitches,pitches
+info,oscorer,vatzd701
+info,temp,68
+info,winddir,fromcf
+info,windspeed,2
+info,fieldcond,unknown
+info,precip,none
+info,sky,cloudy
+info,timeofgame,145
+info,attendance,26517
+info,wp,parkm001
+info,lp,stris002
+info,save,finnk001
+start,verda001,"Alex Verdugo",0,1,7
+start,rilea001,"Austin Riley",0,2,5
+start,ozunm001,"Marcell Ozuna",0,3,10
+start,olsom001,"Matt Olson",0,4,3
+start,murps001,"Sean Murphy",0,5,2
+start,albio001,"Ozzie Albies",0,6,4
+start,white006,"Eli White",0,7,9
+start,harrm004,"Michael Harris II",0,8,8
+start,allen002,"Nick Allen",0,9,6
+start,stris002,"Spencer Strider",0,0,1
+start,abrac001,"CJ Abrams",1,1,6
+start,woodj004,"James Wood",1,2,7
+start,lowen001,"Nathaniel Lowe",1,3,3
+start,ruizk001,"Keibert Ruiz",1,4,2
+start,garcl006,"Luis Garcia Jr.",1,5,4
+start,bellj005,"Josh Bell",1,6,10
+start,calla002,"Alex Call",1,7,9
+start,tenaj001,"Jose Tena",1,8,5
+start,crewd001,"Dylan Crews",1,9,8
+start,parkm001,"Mitchell Parker",1,0,1
+play,1,0,verda001,21,BCBX,53/G6
+play,1,0,rilea001,32,BCFBBT,K
+play,1,0,ozunm001,01,CX,63/G6
+play,1,1,abrac001,01,CX,53/G6MS
+play,1,1,woodj004,30,BBBX,S7/G6
+play,1,1,lowen001,22,B*SBFX,S9/G34.1-3
+play,1,1,ruizk001,01,F.X,D9/L9LS.3-H;1-3
+play,1,1,garcl006,12,SFFBX,S9/L89S.3-H;2-3
+play,1,1,bellj005,02,CFB,WP.3-H(NR);1-2
+play,1,1,bellj005,12,CFB.S,K
+play,1,1,calla002,01,SN,CS3(1)
+play,2,0,olsom001,21,BCBX,HR/F8XD
+play,2,0,murps001,01,.CX,53/G56
+play,2,0,albio001,02,FFX,D9/L9L
+play,2,0,white006,01,SX,D7/F78XD+.2-H
+play,2,0,harrm004,32,B*BFBCX,D8/L78XD.2-H
+play,2,0,allen002,01,CX,FC/G6.2X3(65);B-1
+play,2,0,verda001,21,BBFX,63/G4
+play,2,1,calla002,31,BBCBX,8/F78XD
+play,2,1,tenaj001,12,FBCC,K
+play,2,1,crewd001,30,BBBX,HR/F7D
+play,2,1,abrac001,12,CBSH,HP
+play,2,1,woodj004,10,B1,OA.1XH(E1/TH)(525)
+play,3,0,rilea001,32,BFFBBB,W
+play,3,0,ozunm001,10,BX,S7/G56S.1-2
+play,3,0,olsom001,20,BBX,46(1)3/GDP/G34.2-3
+play,3,0,murps001,22,CBBC.X,3/P3D
+play,3,1,woodj004,21,CBBX,S9/G34
+play,3,1,lowen001,32,BFFF.BFF*B>C,K+CS2(26)/DP
+play,3,1,ruizk001,02,SCX,43/G34
+play,4,0,albio001,11,BFX,9/F9LSF/FL
+play,4,0,white006,02,FFT,K
+play,4,0,harrm004,12,BSS.FX,7/F7LD
+play,4,1,garcl006,02,SF.X,53/G6
+play,4,1,bellj005,00,H,HP
+play,4,1,calla002,10,BX,9/F9D
+play,4,1,tenaj001,12,*BCFX,46(1)/FO/G34.B-1
+play,5,0,allen002,12,SCBFX,S4/G4
+play,5,0,verda001,21,BCBX,7/F7D
+play,5,0,rilea001,11,BFX,9/F9S
+play,5,0,ozunm001,12,CC.*BS,K
+play,5,1,crewd001,31,BBSB.B,W
+play,5,1,abrac001,02,FSX,8/F89D+
+play,5,1,woodj004,00,,NP
+sub,bumma001,"Aaron Bummer",0,0,1
+play,5,1,woodj004,10,.BX,36(1)/FO/G34.B-1
+play,5,1,lowen001,12,CS.BX,2/P2F/FL
+play,6,0,olsom001,00,,NP
+sub,nunen001,"Nasim Nunez",1,9,8
+play,6,0,olsom001,02,.FFS,K
+play,6,0,murps001,00,,NP
+sub,henrc001,"Cole Henry",1,0,1
+play,6,0,murps001,01,.S.X,7/F7LD
+play,6,0,albio001,12,CBSX,3/G3
+play,6,1,ruizk001,11,BC.X,7/F78XD
+play,6,1,garcl006,00,X,43/G34
+play,6,1,bellj005,31,BBCBB,W
+play,6,1,calla002,22,BCC.BFX,4(1)/FO/G4M.B-1
+play,7,0,white006,11,BFX,8/L8
+play,7,0,harrm004,00,,NP
+sub,ferrj002,"Jose A. Ferrer",1,0,1
+play,7,0,harrm004,10,.BX,23/G2-
+play,7,0,allen002,02,FFX,8/F89D
+play,7,1,tenaj001,00,,NP
+sub,lee-d005,"Dylan Lee",0,0,1
+play,7,1,tenaj001,00,.X,S3/BG34S
+play,7,1,nunen001,00,X,3/BP3S
+play,7,1,abrac001,00,X,S8/L78.1-2
+play,7,1,woodj004,31,SBBBN,BK.2-3;1-2
+play,7,1,woodj004,31,SBBBN.B,W
+play,7,1,lowen001,00,X,7/SF/L7L.3-H
+play,7,1,ruizk001,02,.CFX,6/F6D
+play,8,0,verda001,00,,NP
+sub,fairs001,"Stuart Fairchild",0,1,11
+play,8,0,fairs001,22,.CS.BBX,S8/G6M
+play,8,0,rilea001,00,,NP
+sub,lopej004,"Jorge Lopez",1,0,1
+play,8,0,rilea001,12,.CFBX,54(1)3/GDP/G56
+play,8,0,ozunm001,20,BBX,43/G34
+play,8,1,garcl006,00,,NP
+sub,fairs001,"Stuart Fairchild",0,1,9
+play,8,1,garcl006,00,.,NP
+sub,white006,"Eli White",0,7,7
+play,8,1,garcl006,00,..,NP
+sub,montr004,"Rafael Montero",0,0,1
+play,8,1,garcl006,22,...BSBFX,13/G34S-
+play,8,1,bellj005,32,CBF.BBB,W
+play,8,1,calla002,22,FF.*BBFS,K
+play,8,1,tenaj001,00,X,6(1)/FO/G6M.B-1
+play,9,0,olsom001,00,,NP
+sub,finnk001,"Kyle Finnegan",1,0,1
+play,9,0,olsom001,02,.SF.FFX,7/F7
+play,9,0,murps001,01,CX,63/G6
+play,9,0,albio001,02,CSX,53/G56
+data,er,stris002,4
+data,er,lee-d005,1
+data,er,montr004,0
+data,er,bumma001,0
+data,er,ferrj002,0
+data,er,finnk001,0
+data,er,henrc001,0
+data,er,parkm001,3
+data,er,lopej004,0

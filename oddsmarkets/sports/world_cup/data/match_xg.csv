@@ -1,0 +1,315 @@
+home_team,away_team,match_date,home_xg,away_xg,competition,source
+Russia,Saudi Arabia,2018-06-14,1.2816,0.2488,WC 2018,statsbomb
+Egypt,Uruguay,2018-06-15,0.3645,1.9408,WC 2018,statsbomb
+Morocco,Iran,2018-06-15,1.0592,0.6976,WC 2018,statsbomb
+Portugal,Spain,2018-06-15,1.4346,1.6609,WC 2018,statsbomb
+Argentina,Iceland,2018-06-16,2.0805,1.0321,WC 2018,statsbomb
+Croatia,Nigeria,2018-06-16,1.6945,0.7623,WC 2018,statsbomb
+France,Australia,2018-06-16,1.5616,0.98,WC 2018,statsbomb
+Peru,Denmark,2018-06-16,1.9264,1.1216,WC 2018,statsbomb
+Brazil,Switzerland,2018-06-17,1.8666,0.4721,WC 2018,statsbomb
+Costa Rica,Serbia,2018-06-17,0.596,1.9926,WC 2018,statsbomb
+Germany,Mexico,2018-06-17,2.2993,0.9933,WC 2018,statsbomb
+Belgium,Panama,2018-06-18,1.2121,0.6254,WC 2018,statsbomb
+Sweden,South Korea,2018-06-18,2.0151,0.4144,WC 2018,statsbomb
+Tunisia,England,2018-06-18,0.9457,2.6264,WC 2018,statsbomb
+Colombia,Japan,2018-06-19,0.8063,2.3207,WC 2018,statsbomb
+Poland,Senegal,2018-06-19,1.0423,1.4278,WC 2018,statsbomb
+Russia,Egypt,2018-06-19,0.9812,1.6975,WC 2018,statsbomb
+Iran,Spain,2018-06-20,0.4265,2.197,WC 2018,statsbomb
+Portugal,Morocco,2018-06-20,0.885,1.4551,WC 2018,statsbomb
+Uruguay,Saudi Arabia,2018-06-20,1.8074,0.2735,WC 2018,statsbomb
+Argentina,Croatia,2018-06-21,1.2181,1.8317,WC 2018,statsbomb
+Denmark,Australia,2018-06-21,1.0144,1.4122,WC 2018,statsbomb
+France,Peru,2018-06-21,1.8624,0.6252,WC 2018,statsbomb
+Brazil,Costa Rica,2018-06-22,3.0964,0.1587,WC 2018,statsbomb
+Nigeria,Iceland,2018-06-22,1.3122,1.5522,WC 2018,statsbomb
+Serbia,Switzerland,2018-06-22,1.1535,1.5573,WC 2018,statsbomb
+Belgium,Tunisia,2018-06-23,5.3364,1.1882,WC 2018,statsbomb
+Germany,Sweden,2018-06-23,1.3181,0.8152,WC 2018,statsbomb
+South Korea,Mexico,2018-06-23,0.8218,1.8776,WC 2018,statsbomb
+England,Panama,2018-06-24,3.1683,1.08,WC 2018,statsbomb
+Japan,Senegal,2018-06-24,0.9822,1.8783,WC 2018,statsbomb
+Poland,Colombia,2018-06-24,1.1142,1.3869,WC 2018,statsbomb
+Iran,Portugal,2018-06-25,1.577,1.5224,WC 2018,statsbomb
+Saudi Arabia,Egypt,2018-06-25,2.5458,0.9237,WC 2018,statsbomb
+Spain,Morocco,2018-06-25,2.6045,1.0718,WC 2018,statsbomb
+Uruguay,Russia,2018-06-25,2.4826,0.1802,WC 2018,statsbomb
+Australia,Peru,2018-06-26,1.6293,0.3364,WC 2018,statsbomb
+Denmark,France,2018-06-26,0.139,0.4181,WC 2018,statsbomb
+Iceland,Croatia,2018-06-26,2.1327,0.6739,WC 2018,statsbomb
+Nigeria,Argentina,2018-06-26,1.3053,0.8506,WC 2018,statsbomb
+Mexico,Sweden,2018-06-27,1.6107,2.7905,WC 2018,statsbomb
+Serbia,Brazil,2018-06-27,0.9483,1.4198,WC 2018,statsbomb
+South Korea,Germany,2018-06-27,1.7746,2.7064,WC 2018,statsbomb
+Switzerland,Costa Rica,2018-06-27,1.2197,1.5762,WC 2018,statsbomb
+England,Belgium,2018-06-28,1.2007,0.9653,WC 2018,statsbomb
+Japan,Poland,2018-06-28,0.8906,1.0407,WC 2018,statsbomb
+Panama,Tunisia,2018-06-28,0.6908,2.8525,WC 2018,statsbomb
+Senegal,Colombia,2018-06-28,0.3609,0.2849,WC 2018,statsbomb
+France,Argentina,2018-06-30,1.638,1.4466,WC 2018,statsbomb
+Uruguay,Portugal,2018-06-30,0.476,0.9956,WC 2018,statsbomb
+Croatia,Denmark,2018-07-01,6.0877,4.614,WC 2018,statsbomb
+Spain,Russia,2018-07-01,5.3586,4.5404,WC 2018,statsbomb
+Belgium,Japan,2018-07-02,2.9178,0.6938,WC 2018,statsbomb
+Brazil,Mexico,2018-07-02,3.3204,0.5828,WC 2018,statsbomb
+Colombia,England,2018-07-03,4.7487,6.1618,WC 2018,statsbomb
+Sweden,Switzerland,2018-07-03,0.9105,0.533,WC 2018,statsbomb
+Brazil,Belgium,2018-07-06,2.6092,0.4053,WC 2018,statsbomb
+Uruguay,France,2018-07-06,0.6932,0.5388,WC 2018,statsbomb
+Russia,Croatia,2018-07-07,4.9884,5.568,WC 2018,statsbomb
+Sweden,England,2018-07-07,0.8342,0.7582,WC 2018,statsbomb
+France,Belgium,2018-07-10,1.6817,0.5669,WC 2018,statsbomb
+Croatia,England,2018-07-11,2.1413,0.5467,WC 2018,statsbomb
+Belgium,England,2018-07-14,1.3207,1.3354,WC 2018,statsbomb
+France,Croatia,2018-07-15,1.098,1.4803,WC 2018,statsbomb
+Turkey,Italy,2021-06-11,0.151,1.5909,EURO 2020,statsbomb
+Belgium,Russia,2021-06-12,1.3934,0.2573,EURO 2020,statsbomb
+Denmark,Finland,2021-06-12,1.9526,0.2885,EURO 2020,statsbomb
+Wales,Switzerland,2021-06-12,0.5759,1.5599,EURO 2020,statsbomb
+Austria,North Macedonia,2021-06-13,1.4414,0.8399,EURO 2020,statsbomb
+England,Croatia,2021-06-13,0.7069,0.3401,EURO 2020,statsbomb
+Netherlands,Ukraine,2021-06-13,1.4298,0.5937,EURO 2020,statsbomb
+Poland,Slovakia,2021-06-14,1.3888,0.3538,EURO 2020,statsbomb
+Scotland,Czech Republic,2021-06-14,1.7327,0.8108,EURO 2020,statsbomb
+Spain,Sweden,2021-06-14,1.9276,0.8158,EURO 2020,statsbomb
+France,Germany,2021-06-15,0.446,0.8254,EURO 2020,statsbomb
+Hungary,Portugal,2021-06-15,0.1976,2.681,EURO 2020,statsbomb
+Finland,Russia,2021-06-16,0.9651,1.259,EURO 2020,statsbomb
+Italy,Switzerland,2021-06-16,1.7058,0.3338,EURO 2020,statsbomb
+Turkey,Wales,2021-06-16,1.3103,2.874,EURO 2020,statsbomb
+Denmark,Belgium,2021-06-17,1.623,1.0519,EURO 2020,statsbomb
+Netherlands,Austria,2021-06-17,3.3375,0.3981,EURO 2020,statsbomb
+Ukraine,North Macedonia,2021-06-17,3.2405,1.9847,EURO 2020,statsbomb
+Croatia,Czech Republic,2021-06-18,0.9902,1.9126,EURO 2020,statsbomb
+England,Scotland,2021-06-18,0.8539,0.7354,EURO 2020,statsbomb
+Sweden,Slovakia,2021-06-18,1.584,0.5532,EURO 2020,statsbomb
+Hungary,France,2021-06-19,0.4735,1.69,EURO 2020,statsbomb
+Portugal,Germany,2021-06-19,1.9357,2.1305,EURO 2020,statsbomb
+Spain,Poland,2021-06-19,2.6149,0.5523,EURO 2020,statsbomb
+Italy,Wales,2021-06-20,1.6691,0.2407,EURO 2020,statsbomb
+Switzerland,Turkey,2021-06-20,1.984,1.2448,EURO 2020,statsbomb
+Finland,Belgium,2021-06-21,0.2402,1.1404,EURO 2020,statsbomb
+North Macedonia,Netherlands,2021-06-21,0.7442,3.2199,EURO 2020,statsbomb
+Russia,Denmark,2021-06-21,1.091,2.3304,EURO 2020,statsbomb
+Ukraine,Austria,2021-06-21,0.4103,1.4935,EURO 2020,statsbomb
+Croatia,Scotland,2021-06-22,0.7815,1.1114,EURO 2020,statsbomb
+Czech Republic,England,2021-06-22,0.393,0.6423,EURO 2020,statsbomb
+Germany,Hungary,2021-06-23,2.0977,0.7371,EURO 2020,statsbomb
+Portugal,France,2021-06-23,2.0424,1.5066,EURO 2020,statsbomb
+Slovakia,Spain,2021-06-23,0.093,3.2231,EURO 2020,statsbomb
+Sweden,Poland,2021-06-23,1.0418,1.6608,EURO 2020,statsbomb
+Italy,Austria,2021-06-26,1.5171,1.0385,EURO 2020,statsbomb
+Wales,Denmark,2021-06-26,0.5984,2.1553,EURO 2020,statsbomb
+Belgium,Portugal,2021-06-27,0.2243,1.2148,EURO 2020,statsbomb
+Netherlands,Czech Republic,2021-06-27,0.838,1.2731,EURO 2020,statsbomb
+Croatia,Spain,2021-06-28,2.7882,2.78,EURO 2020,statsbomb
+France,Switzerland,2021-06-28,6.5634,5.7715,EURO 2020,statsbomb
+England,Germany,2021-06-29,1.1635,1.0585,EURO 2020,statsbomb
+Sweden,Ukraine,2021-06-29,0.9119,1.3443,EURO 2020,statsbomb
+Belgium,Italy,2021-07-02,1.8028,1.1426,EURO 2020,statsbomb
+Switzerland,Spain,2021-07-02,3.9578,6.9281,EURO 2020,statsbomb
+Czech Republic,Denmark,2021-07-03,1.1617,1.212,EURO 2020,statsbomb
+Ukraine,England,2021-07-03,0.3376,1.2155,EURO 2020,statsbomb
+Italy,Spain,2021-07-06,4.3157,4.5361,EURO 2020,statsbomb
+England,Denmark,2021-07-07,3.0502,0.3755,EURO 2020,statsbomb
+Italy,England,2021-07-11,5.9994,4.3437,EURO 2020,statsbomb
+Qatar,Ecuador,2022-11-20,0.3042,1.154,WC 2022,statsbomb
+England,Iran,2022-11-21,1.9872,1.4557,WC 2022,statsbomb
+Senegal,Netherlands,2022-11-21,0.6915,1.1239,WC 2022,statsbomb
+USA,Wales,2022-11-21,0.6025,1.3953,WC 2022,statsbomb
+Argentina,Saudi Arabia,2022-11-22,2.4916,0.1535,WC 2022,statsbomb
+Denmark,Tunisia,2022-11-22,1.5666,1.0599,WC 2022,statsbomb
+France,Australia,2022-11-22,3.1705,0.3233,WC 2022,statsbomb
+Mexico,Poland,2022-11-22,0.5291,1.1379,WC 2022,statsbomb
+Belgium,Canada,2022-11-23,0.67,2.5462,WC 2022,statsbomb
+Germany,Japan,2022-11-23,2.768,1.2493,WC 2022,statsbomb
+Morocco,Croatia,2022-11-23,0.3626,0.8499,WC 2022,statsbomb
+Spain,Costa Rica,2022-11-23,2.7619,0.0,WC 2022,statsbomb
+Brazil,Serbia,2022-11-24,2.1239,0.1633,WC 2022,statsbomb
+Portugal,Ghana,2022-11-24,2.0969,0.78,WC 2022,statsbomb
+Switzerland,Cameroon,2022-11-24,1.4265,0.6131,WC 2022,statsbomb
+Uruguay,South Korea,2022-11-24,0.4173,0.493,WC 2022,statsbomb
+England,USA,2022-11-25,0.4606,0.5143,WC 2022,statsbomb
+Netherlands,Ecuador,2022-11-25,0.1045,1.6511,WC 2022,statsbomb
+Qatar,Senegal,2022-11-25,0.9601,0.903,WC 2022,statsbomb
+Wales,Iran,2022-11-25,0.6156,1.454,WC 2022,statsbomb
+Argentina,Mexico,2022-11-26,0.3252,0.2064,WC 2022,statsbomb
+France,Denmark,2022-11-26,1.9336,0.8885,WC 2022,statsbomb
+Poland,Saudi Arabia,2022-11-26,1.7342,1.972,WC 2022,statsbomb
+Tunisia,Australia,2022-11-26,1.0522,0.359,WC 2022,statsbomb
+Belgium,Morocco,2022-11-27,0.6426,0.9911,WC 2022,statsbomb
+Croatia,Canada,2022-11-27,2.6102,0.2868,WC 2022,statsbomb
+Japan,Costa Rica,2022-11-27,0.7735,0.1994,WC 2022,statsbomb
+Spain,Germany,2022-11-27,0.6395,1.147,WC 2022,statsbomb
+Brazil,Switzerland,2022-11-28,0.9227,0.2886,WC 2022,statsbomb
+Cameroon,Serbia,2022-11-28,2.0703,1.7381,WC 2022,statsbomb
+Portugal,Uruguay,2022-11-28,1.2137,1.2167,WC 2022,statsbomb
+South Korea,Ghana,2022-11-28,1.3678,1.1805,WC 2022,statsbomb
+Ecuador,Senegal,2022-11-29,1.0017,1.7075,WC 2022,statsbomb
+Iran,USA,2022-11-29,0.9208,1.1697,WC 2022,statsbomb
+Netherlands,Qatar,2022-11-29,1.714,0.1437,WC 2022,statsbomb
+Wales,England,2022-11-29,0.208,2.9155,WC 2022,statsbomb
+Australia,Denmark,2022-11-30,0.4697,0.7372,WC 2022,statsbomb
+Poland,Argentina,2022-11-30,0.1976,3.0767,WC 2022,statsbomb
+Saudi Arabia,Mexico,2022-11-30,1.0761,2.3221,WC 2022,statsbomb
+Tunisia,France,2022-11-30,0.2983,0.477,WC 2022,statsbomb
+Canada,Morocco,2022-12-01,1.0956,0.4264,WC 2022,statsbomb
+Costa Rica,Germany,2022-12-01,1.0347,4.3161,WC 2022,statsbomb
+Croatia,Belgium,2022-12-01,0.695,2.3818,WC 2022,statsbomb
+Japan,Spain,2022-12-01,1.1578,0.8577,WC 2022,statsbomb
+Cameroon,Brazil,2022-12-02,0.3834,2.3782,WC 2022,statsbomb
+Ghana,Uruguay,2022-12-02,1.3927,1.6366,WC 2022,statsbomb
+Serbia,Switzerland,2022-12-02,1.189,3.1035,WC 2022,statsbomb
+South Korea,Portugal,2022-12-02,1.399,0.9737,WC 2022,statsbomb
+Argentina,Australia,2022-12-03,1.4816,0.4261,WC 2022,statsbomb
+Netherlands,USA,2022-12-03,1.4819,1.6521,WC 2022,statsbomb
+England,Senegal,2022-12-04,1.02,0.9728,WC 2022,statsbomb
+France,Poland,2022-12-04,1.1264,1.5935,WC 2022,statsbomb
+Brazil,South Korea,2022-12-05,3.2614,0.3448,WC 2022,statsbomb
+Japan,Croatia,2022-12-05,4.203,3.9884,WC 2022,statsbomb
+Morocco,Spain,2022-12-06,3.7044,2.8455,WC 2022,statsbomb
+Portugal,Switzerland,2022-12-06,2.2843,1.2718,WC 2022,statsbomb
+Croatia,Brazil,2022-12-09,3.7669,4.9503,WC 2022,statsbomb
+Netherlands,Argentina,2022-12-09,4.487,5.8567,WC 2022,statsbomb
+England,France,2022-12-10,2.3526,0.8394,WC 2022,statsbomb
+Morocco,Portugal,2022-12-10,0.972,0.7441,WC 2022,statsbomb
+Argentina,Croatia,2022-12-13,1.8644,0.4101,WC 2022,statsbomb
+France,Morocco,2022-12-14,2.0024,1.2304,WC 2022,statsbomb
+Croatia,Morocco,2022-12-17,0.8493,0.9915,WC 2022,statsbomb
+Argentina,France,2022-12-18,5.8923,5.4066,WC 2022,statsbomb
+Ivory Coast,Guinea-Bissau,2024-01-13,0.7069,0.5296,AFCON 2023,statsbomb
+Egypt,Mozambique,2024-01-14,1.9292,0.7282,AFCON 2023,statsbomb
+Ghana,Cape Verde,2024-01-14,1.4379,2.7202,AFCON 2023,statsbomb
+Nigeria,Equatorial Guinea,2024-01-14,2.6873,0.3321,AFCON 2023,statsbomb
+Algeria,Angola,2024-01-15,0.6969,1.1975,AFCON 2023,statsbomb
+Cameroon,Guinea,2024-01-15,0.8792,0.7102,AFCON 2023,statsbomb
+Senegal,Gambia,2024-01-15,1.7207,1.0084,AFCON 2023,statsbomb
+Burkina Faso,Mauritania,2024-01-16,1.1367,0.5157,AFCON 2023,statsbomb
+Mali,South Africa,2024-01-16,2.342,1.3899,AFCON 2023,statsbomb
+Tunisia,Namibia,2024-01-16,0.8707,1.6101,AFCON 2023,statsbomb
+DR Congo,Zambia,2024-01-17,2.6823,0.0964,AFCON 2023,statsbomb
+Morocco,Tanzania,2024-01-17,2.3003,0.0119,AFCON 2023,statsbomb
+Egypt,Ghana,2024-01-18,1.2036,0.4259,AFCON 2023,statsbomb
+Equatorial Guinea,Guinea-Bissau,2024-01-18,1.7775,1.0344,AFCON 2023,statsbomb
+Ivory Coast,Nigeria,2024-01-18,0.6072,1.5756,AFCON 2023,statsbomb
+Cape Verde,Mozambique,2024-01-19,0.599,0.331,AFCON 2023,statsbomb
+Guinea,Gambia,2024-01-19,2.4385,0.2545,AFCON 2023,statsbomb
+Senegal,Cameroon,2024-01-19,1.2312,0.2485,AFCON 2023,statsbomb
+Algeria,Burkina Faso,2024-01-20,1.998,1.259,AFCON 2023,statsbomb
+Mauritania,Angola,2024-01-20,1.1113,2.044,AFCON 2023,statsbomb
+Tunisia,Mali,2024-01-20,0.53,0.8458,AFCON 2023,statsbomb
+Morocco,DR Congo,2024-01-21,1.0546,2.3102,AFCON 2023,statsbomb
+South Africa,Namibia,2024-01-21,2.2157,0.5685,AFCON 2023,statsbomb
+Zambia,Tanzania,2024-01-21,0.7972,0.3904,AFCON 2023,statsbomb
+Cape Verde,Egypt,2024-01-22,0.407,1.7645,AFCON 2023,statsbomb
+Equatorial Guinea,Ivory Coast,2024-01-22,1.0927,2.0695,AFCON 2023,statsbomb
+Guinea-Bissau,Nigeria,2024-01-22,0.3515,0.9708,AFCON 2023,statsbomb
+Mozambique,Ghana,2024-01-22,1.5396,1.8432,AFCON 2023,statsbomb
+Angola,Burkina Faso,2024-01-23,0.8843,0.9952,AFCON 2023,statsbomb
+Gambia,Cameroon,2024-01-23,1.2965,1.3672,AFCON 2023,statsbomb
+Guinea,Senegal,2024-01-23,0.5532,0.9428,AFCON 2023,statsbomb
+Mauritania,Algeria,2024-01-23,1.3283,1.1864,AFCON 2023,statsbomb
+Namibia,Mali,2024-01-24,0.6562,0.6812,AFCON 2023,statsbomb
+South Africa,Tunisia,2024-01-24,0.5204,1.0177,AFCON 2023,statsbomb
+Tanzania,DR Congo,2024-01-24,0.0586,0.6591,AFCON 2023,statsbomb
+Zambia,Morocco,2024-01-24,0.44,2.4215,AFCON 2023,statsbomb
+Angola,Namibia,2024-01-27,1.5855,0.8708,AFCON 2023,statsbomb
+Nigeria,Cameroon,2024-01-27,1.3097,0.3006,AFCON 2023,statsbomb
+Egypt,DR Congo,2024-01-28,8.4241,8.6268,AFCON 2023,statsbomb
+Equatorial Guinea,Guinea,2024-01-28,0.9561,0.5573,AFCON 2023,statsbomb
+Cape Verde,Mauritania,2024-01-29,1.5715,0.777,AFCON 2023,statsbomb
+Senegal,Ivory Coast,2024-01-29,5.2354,5.0381,AFCON 2023,statsbomb
+Mali,Burkina Faso,2024-01-30,0.6658,1.46,AFCON 2023,statsbomb
+Morocco,South Africa,2024-01-30,2.0904,0.2407,AFCON 2023,statsbomb
+DR Congo,Guinea,2024-02-02,1.6526,1.1352,AFCON 2023,statsbomb
+Nigeria,Angola,2024-02-02,1.4617,0.955,AFCON 2023,statsbomb
+Cape Verde,South Africa,2024-02-03,5.4274,4.2307,AFCON 2023,statsbomb
+Mali,Ivory Coast,2024-02-03,1.3171,0.8374,AFCON 2023,statsbomb
+Ivory Coast,DR Congo,2024-02-07,0.8496,0.8261,AFCON 2023,statsbomb
+Nigeria,South Africa,2024-02-07,5.4088,4.8925,AFCON 2023,statsbomb
+South Africa,DR Congo,2024-02-10,5.7507,7.1661,AFCON 2023,statsbomb
+Nigeria,Ivory Coast,2024-02-11,0.2582,1.4139,AFCON 2023,statsbomb
+Germany,Scotland,2024-06-14,1.8446,0.0605,EURO 2024,statsbomb
+Hungary,Switzerland,2024-06-15,1.1028,2.0958,EURO 2024,statsbomb
+Italy,Albania,2024-06-15,1.4498,0.3546,EURO 2024,statsbomb
+Spain,Croatia,2024-06-15,1.5672,2.4821,EURO 2024,statsbomb
+Poland,Netherlands,2024-06-16,0.9092,1.3128,EURO 2024,statsbomb
+Serbia,England,2024-06-16,0.2494,0.5588,EURO 2024,statsbomb
+Slovenia,Denmark,2024-06-16,0.9664,1.5112,EURO 2024,statsbomb
+Austria,France,2024-06-17,0.7483,1.9045,EURO 2024,statsbomb
+Belgium,Slovakia,2024-06-17,1.7503,0.7111,EURO 2024,statsbomb
+Romania,Ukraine,2024-06-17,1.1211,0.5435,EURO 2024,statsbomb
+Portugal,Czech Republic,2024-06-18,1.8375,0.3148,EURO 2024,statsbomb
+Turkey,Georgia,2024-06-18,2.4034,1.5786,EURO 2024,statsbomb
+Croatia,Albania,2024-06-19,1.8586,1.3259,EURO 2024,statsbomb
+Germany,Hungary,2024-06-19,1.4837,1.228,EURO 2024,statsbomb
+Scotland,Switzerland,2024-06-19,0.7719,0.9902,EURO 2024,statsbomb
+Denmark,England,2024-06-20,0.7333,1.1727,EURO 2024,statsbomb
+Slovenia,Serbia,2024-06-20,1.5522,1.4613,EURO 2024,statsbomb
+Spain,Italy,2024-06-20,1.5339,0.1434,EURO 2024,statsbomb
+Argentina,Canada,2024-06-21,3.5383,0.9773,Copa Am 2024,statsbomb
+Netherlands,France,2024-06-21,0.7382,1.2184,EURO 2024,statsbomb
+Poland,Austria,2024-06-21,1.4381,1.8217,EURO 2024,statsbomb
+Slovakia,Ukraine,2024-06-21,0.7461,1.7317,EURO 2024,statsbomb
+Belgium,Romania,2024-06-22,1.6458,1.246,EURO 2024,statsbomb
+Ecuador,Venezuela,2024-06-22,0.7356,1.585,Copa Am 2024,statsbomb
+Georgia,Czech Republic,2024-06-22,1.1799,2.8655,EURO 2024,statsbomb
+Peru,Chile,2024-06-22,0.6773,1.0248,Copa Am 2024,statsbomb
+Turkey,Portugal,2024-06-22,0.779,1.9012,EURO 2024,statsbomb
+Mexico,Jamaica,2024-06-23,1.1361,0.5062,Copa Am 2024,statsbomb
+Scotland,Hungary,2024-06-23,0.1835,1.001,EURO 2024,statsbomb
+Switzerland,Germany,2024-06-23,0.2801,1.5417,EURO 2024,statsbomb
+USA,Bolivia,2024-06-23,2.4047,0.1497,Copa Am 2024,statsbomb
+Albania,Spain,2024-06-24,0.5032,0.9517,EURO 2024,statsbomb
+Colombia,Paraguay,2024-06-24,0.6219,0.8276,Copa Am 2024,statsbomb
+Croatia,Italy,2024-06-24,1.4832,0.9854,EURO 2024,statsbomb
+Uruguay,Panama,2024-06-24,1.3614,0.5409,Copa Am 2024,statsbomb
+Brazil,Costa Rica,2024-06-25,1.6212,0.0367,Copa Am 2024,statsbomb
+Denmark,Serbia,2024-06-25,0.5515,0.3244,EURO 2024,statsbomb
+England,Slovenia,2024-06-25,0.7562,0.1649,EURO 2024,statsbomb
+France,Poland,2024-06-25,1.8915,1.1791,EURO 2024,statsbomb
+Netherlands,Austria,2024-06-25,1.5102,1.0579,EURO 2024,statsbomb
+Peru,Canada,2024-06-25,0.5764,0.909,Copa Am 2024,statsbomb
+Chile,Argentina,2024-06-26,0.131,2.7841,Copa Am 2024,statsbomb
+Czech Republic,Turkey,2024-06-26,1.4103,1.2175,EURO 2024,statsbomb
+Ecuador,Jamaica,2024-06-26,2.3658,0.9347,Copa Am 2024,statsbomb
+Georgia,Portugal,2024-06-26,1.3455,2.3561,EURO 2024,statsbomb
+Slovakia,Romania,2024-06-26,0.8447,1.1219,EURO 2024,statsbomb
+Ukraine,Belgium,2024-06-26,0.7092,0.634,EURO 2024,statsbomb
+Panama,USA,2024-06-27,0.7308,0.9143,Copa Am 2024,statsbomb
+Venezuela,Mexico,2024-06-27,1.1386,2.3843,Copa Am 2024,statsbomb
+Colombia,Costa Rica,2024-06-28,2.9023,0.1653,Copa Am 2024,statsbomb
+Uruguay,Bolivia,2024-06-28,2.321,0.0508,Copa Am 2024,statsbomb
+Germany,Denmark,2024-06-29,2.2266,1.0735,EURO 2024,statsbomb
+Paraguay,Brazil,2024-06-29,0.6917,3.7477,Copa Am 2024,statsbomb
+Switzerland,Italy,2024-06-29,0.7824,0.7257,EURO 2024,statsbomb
+Argentina,Peru,2024-06-30,2.1058,0.1666,Copa Am 2024,statsbomb
+Canada,Chile,2024-06-30,0.6995,0.454,Copa Am 2024,statsbomb
+England,Slovakia,2024-06-30,1.5867,1.5478,EURO 2024,statsbomb
+Spain,Georgia,2024-06-30,2.7647,0.1131,EURO 2024,statsbomb
+France,Belgium,2024-07-01,1.262,0.3632,EURO 2024,statsbomb
+Jamaica,Venezuela,2024-07-01,0.6676,1.7144,Copa Am 2024,statsbomb
+Mexico,Ecuador,2024-07-01,0.9376,0.3058,Copa Am 2024,statsbomb
+Portugal,Slovenia,2024-07-01,4.0717,3.066,EURO 2024,statsbomb
+Austria,Turkey,2024-07-02,2.487,0.8825,EURO 2024,statsbomb
+Bolivia,Panama,2024-07-02,0.7934,1.3406,Copa Am 2024,statsbomb
+Romania,Netherlands,2024-07-02,0.2677,2.6262,EURO 2024,statsbomb
+USA,Uruguay,2024-07-02,0.471,1.2715,Copa Am 2024,statsbomb
+Brazil,Colombia,2024-07-03,0.3058,1.503,Copa Am 2024,statsbomb
+Costa Rica,Paraguay,2024-07-03,0.2721,1.4401,Copa Am 2024,statsbomb
+Argentina,Ecuador,2024-07-05,4.7761,4.5225,Copa Am 2024,statsbomb
+Portugal,France,2024-07-05,4.5428,4.9849,EURO 2024,statsbomb
+Spain,Germany,2024-07-05,1.5341,1.6291,EURO 2024,statsbomb
+Colombia,Panama,2024-07-06,2.1804,0.61,Copa Am 2024,statsbomb
+England,Switzerland,2024-07-06,4.4545,4.3354,EURO 2024,statsbomb
+Netherlands,Turkey,2024-07-06,0.7189,1.1824,EURO 2024,statsbomb
+Venezuela,Canada,2024-07-06,5.6231,6.0521,Copa Am 2024,statsbomb
+Uruguay,Brazil,2024-07-07,4.5473,3.8099,Copa Am 2024,statsbomb
+Spain,France,2024-07-09,0.4215,0.8508,EURO 2024,statsbomb
+Argentina,Canada,2024-07-10,1.7542,0.7176,Copa Am 2024,statsbomb
+Netherlands,England,2024-07-10,0.4122,1.2366,EURO 2024,statsbomb
+Uruguay,Colombia,2024-07-11,0.7546,1.172,Copa Am 2024,statsbomb
+Canada,Uruguay,2024-07-14,6.2053,4.6504,Copa Am 2024,statsbomb
+Spain,England,2024-07-14,1.7917,0.7264,EURO 2024,statsbomb
+Argentina,Colombia,2024-07-15,1.0827,0.9723,Copa Am 2024,statsbomb

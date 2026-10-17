@@ -1,0 +1,24 @@
+{
+ "_doc": "Hard identity cases, per tour. names: a raw source name (tennis-data 'Surname I.' or a full name) -> pid. espn_names: an ESPN athlete id whose ESPN profile carries the wrong name -> the right full name. same: pid -> pid to merge. _why explains each entry.",
+ "atp": {
+  "names": {
+   "Barrios M.": "9923",
+   "Miguel L.": "14643"
+  },
+  "_why": {
+   "Barrios M.": "Marcelo Tomas Barrios Vera: tennis-data uses his first given name, ESPN 'Tomas Barrios Vera'",
+   "Miguel L.": "Luiz Augusto (Guto) Miguel: tennis-data initial L, ESPN 'Guto Miguel'",
+   "espn:5029": "ESPN's ATP scoreboards (2016 ...) show athlete 5029 as 'Yuliya Hatouka' (a WTA player) in Rogerio Dutra Silva's matches (tennis-data: 'Dutra Silva R.')"
+  },
+  "same": {},
+  "espn_names": {
+   "5029": "Rogerio Dutra Silva"
+  }
+ },
+ "wta": {
+  "names": {},
+  "_why": {},
+  "same": {},
+  "espn_names": {}
+ }
+}

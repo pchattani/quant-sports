@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Quant Footballer — football odds, models and analytics</title>
+<meta name="theme-color" content="#0d1117">
+<meta property="og:site_name" content="The Quant Footballer">
+<meta property="og:title" content="The Quant Footballer">
+<meta property="og:description" content="Football through a quant's lens: Monte Carlo title, qualification and cup odds, fair prices, xG, and Baseball-Savant-style club and player analytics across 69 leagues, cups and national-team competitions, with every past season and one page per player and per club.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://pchattani.github.io/the-quant-footballer/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="The Quant Footballer">
+<meta name="twitter:description" content="Football through a quant's lens: Monte Carlo title, qualification and cup odds, fair prices, xG, and Baseball-Savant-style club and player analytics across 69 leagues, cups and national-team competitions, with every past season and one page per player and per club.">
+<link rel="canonical" href="https://pchattani.github.io/the-quant-footballer/">
+<meta name="description" content="Football through a quant's lens: Monte Carlo title, qualification and cup odds, fair prices, xG, and Baseball-Savant-style club and player analytics across 69 leagues, cups and national-team competitions, with every past season and one page per player and per club.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230d1117'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%2358a6ff' stroke-width='2.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/analytics.css">
+<link rel="stylesheet" href="assets/docs.css">
+<link rel="stylesheet" href="assets/hub.css">
+<link rel="stylesheet" href="assets/value.css">
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js" charset="utf-8"></script>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Loading…</div>
+</div>
+
+<header class="site-header">
+  <div class="container-xl">
+    <div class="header-row">
+      <h1 class="site-title"><a href="#/"><span class="brand-mark"></span><span class="brand-text">The Quant Footballer<span class="brand-tag">Odds, models and analytics for world football</span></span></a></h1>
+      <div class="search-box">
+        <input id="search-input" type="search" placeholder="Search clubs, players, competitions…" autocomplete="off" spellcheck="false">
+        <div id="search-results" class="search-results"></div>
+      </div>
+      <div class="comp-picker">
+        <label for="comp-select">Competition</label>
+        <select id="comp-select"><option value="">Hub — all competitions</option></select>
+      </div>
+      <div class="comp-picker season-picker" id="season-picker" hidden>
+        <label for="season-select">Season</label>
+        <select id="season-select"></select>
+      </div>
+      <a class="sister-link" href="https://pchattani.github.io/the-quant-paddock/" title="The sister site: Formula 1 odds, race simulations, telemetry and analytics">🏁 The Quant Paddock (F1)</a>
+      <a class="sister-link" href="https://pchattani.github.io/the-quant-hardwood/" title="The sister site: NBA and WNBA odds, season simulations, shot charts and analytics">🏀 The Quant Hardwood</a>
+      <a class="sister-link" href="https://pchattani.github.io/the-quant-ace/" title="The sister site: ATP and WTA odds, exact match models, draw simulations and analytics">🎾 The Quant Ace</a>
+      <a class="sister-link" href="https://pchattani.github.io/the-quant-bullpen/" title="The sister site: MLB odds, pitch models and analytics">⚾ The Quant Bullpen</a>
+      <a class="sister-link" href="https://pchattani.github.io/the-quant-gridiron/" title="The sister site: NFL odds, models and analytics">🏈 The Quant Gridiron</a>
+      <a class="sister-link" href="https://pchattani.github.io/the-quant-rink/" title="The sister site: NHL odds, models and analytics">🏒 The Quant Rink</a>
+      <nav class="global-nav">
+        <a href="#/">Hub</a><a href="#/clubs">Clubs across leagues</a><a href="#/nations">National teams</a><a href="#/leaders">Global leaders</a><a href="#/lab">Player lab</a><a href="#/value">Player value</a><a href="#/transfer">Transfers</a><a href="#/fantasy">Fantasy</a><a href="#/compare">Compare</a><a href="#/glossary">Glossary</a><a href="#/methodology">Methodology</a>
+      </nav>
+      <div class="site-sub"><span id="meta-line">—</span></div>
+    </div>
+  </div>
+</header>
+
+<div id="tab-bar">
+  <div class="container-xl">
+    <ul id="mainTabs"></ul>
+  </div>
+</div>
+
+<div class="container-xl" style="padding-bottom:60px;">
+
+  <div id="stale-banners"></div>
+
+  <!-- ── Hub ─────────────────────────────────────────────────────────── -->
+  <div id="tab-home" class="tab-pane">
+    <div class="hub-band">
+      <div class="card"><div class="pad">
+        <div class="hb-date" id="hub-date"></div>
+        <div class="hb-title">World football, priced and measured</div>
+        <div class="hb-stats" id="hub-stats"></div>
+        <div class="hb-updated" id="hub-updated"></div>
+      </div></div>
+      <div class="card"><div class="card-header">Explore</div><div class="pad hub-links">
+        <a href="#/lab"><b>Player lab</b><span>Scatter any two metrics, by position, across the world</span></a>
+        <a href="#/value"><b>Player value</b><span>Goals above replacement, the best at every position</span></a>
+        <a href="#/transfer"><b>Transfer simulator</b><span>Move a player and see both clubs' odds change</span></a>
+        <a href="#/clubs"><b>Clubs across leagues</b><span>Every club on one scale, price any match</span></a>
+        <a href="#/nations"><b>National teams</b><span>Ratings and a pricer for any pairing</span></a>
+        <a href="#/leaders"><b>Global leaders</b><span>Raw and league-adjusted rates</span></a>
+        <a href="#/compare"><b>Compare</b><span>Two players or two clubs, side by side</span></a>
+        <a href="#/glossary"><b>Glossary</b><span>What every number means</span></a>
+        <a href="#/methodology"><b>Methodology</b><span>How the models work</span></a>
+      </div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Scoreboard <span class="card-sub">Results and fixtures across every competition followed, with the model's line. Refreshed hourly.</span></div>
+      <div id="date-strip" class="date-strip"></div>
+      <div id="scoreboard" class="scoreboard"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Competitions <span class="card-sub" id="home-sub"></span></div>
+      <div class="home-toolbar"><div id="home-family"></div><input id="home-search" type="search" placeholder="Find a competition…"></div>
+      <div class="pad"><div class="home-grid" id="home-grid"></div></div>
+    </div>
+    <div class="hub-row">
+      <div class="card"><div class="card-header">Title races <span class="card-sub">The favourite in each competition.</span></div><div id="hub-races"></div></div>
+      <div class="card"><div class="card-header">Leaders across competitions</div><div class="pad" id="hub-leaders"></div></div>
+      <div class="card"><div class="card-header">Strongest national teams</div><div id="hub-nations"></div>
+        <div class="card-header">Between editions <span class="card-sub">No edition in progress: the last one, as it finished.</span></div><div id="hub-last"></div></div>
+    </div>
+  </div>
+
+  <!-- ── Overview ────────────────────────────────────────────────────── -->
+  <div id="tab-overview" class="tab-pane">
+    <div id="ov-note"></div>
+    <div id="ov-tiles"></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">Latest results</div>
+        <div class="fx-list" id="ov-results"></div>
+      </div>
+      <div class="card">
+        <div class="card-header">Next fixtures <span class="card-sub">With the model's win / draw / loss line.</span></div>
+        <div class="fx-list" id="ov-fixtures"></div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">The race</div>
+        <div id="ov-race" style="height:340px;"></div>
+      </div>
+      <div class="card">
+        <div class="card-header">Leaders</div>
+        <div class="pad" id="ov-leaders"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Every season <span class="card-sub">Past editions: final tables, results and leaders. Also in the season picker above.</span></div>
+      <div class="pad" id="ov-seasons"></div>
+    </div>
+  </div>
+
+  <!-- ── Table ───────────────────────────────────────────────────────── -->
+  <div id="tab-table" class="tab-pane">
+    <div class="card">
+      <div class="card-header">Standings <span class="card-sub" id="table-sub"></span></div>
+      <div class="band-legend" id="band-legend"></div>
+      <div id="table-grid" class="pad"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Finishing-position distribution</div>
+      <div id="position-heatmap" style="height:640px;"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Upcoming fixtures</div>
+      <div id="upcoming-fixtures"></div>
+    </div>
+  </div>
+
+  <!-- ── Fixtures & Results ──────────────────────────────────────────── -->
+  <div id="tab-fixtures" class="tab-pane">
+    <div class="card">
+      <div class="card-header">Fixtures &amp; results <span class="card-sub" id="fx-count"></span></div>
+      <div class="controls">
+        <select id="fx-status" class="team-select" style="max-width:180px">
+          <option value="upcoming">Upcoming</option>
+          <option value="played">Played</option>
+          <option value="all">All matches</option>
+        </select>
+        <select id="fx-stage" class="team-select" style="max-width:220px"></select>
+        <select id="fx-team" class="team-select" style="max-width:240px"></select>
+        <span class="legend-inline"><span class="pb-key pb-h"></span> home <span class="pb-key pb-d"></span> draw <span class="pb-key pb-a"></span> away</span>
+      </div>
+      <div class="fx-list" id="fx-list"></div>
+    </div>
+  </div>
+
+  <!-- ── Zones (Argentina) ───────────────────────────────────────────── -->
+  <div id="tab-zones" class="tab-pane">
+    <div class="card">
+      <div class="card-header">League phase <span class="card-sub" id="zones-sub"></span></div>
+      <div class="cut-note">The dashed line marks the cut for the Round of 16 (top 8).</div>
+      <div class="zone-grid pad" id="zone-grid"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Upcoming fixtures</div>
+      <div id="zone-upcoming"></div>
+    </div>
+  </div>
+
+  <!-- ── Playoffs / knockout ─────────────────────────────────────────── -->
+  <div id="tab-bracket" class="tab-pane">
+    <div class="card">
+      <div class="card-header">Bracket <span class="card-sub" id="bracket-sub"></span></div>
+      <div id="bracket-note" class="prose-dark pad"></div>
+      <div id="bracket-body" class="pad"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Probability of reaching each round</div>
+      <div id="reach-table"></div>
+    </div>
+  </div>
+
+  <!-- ── Tabla Anual (Argentina) ─────────────────────────────────────── -->
+  <div id="tab-anual" class="tab-pane">
+    <div class="card">
+      <div class="card-header">Tabla Anual <span class="card-sub" id="anual-sub"></span></div>
+      <div id="anual-note" class="prose-dark pad"></div>
+      <div id="anual-table"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Finishing-position distribution</div>
+      <div id="anual-heatmap" style="height:640px;"></div>
+    </div>
+  </div>
+
+  <!-- ── Relegation (Argentina) ──────────────────────────────────────── -->
+  <div id="tab-relegation" class="tab-pane">
+    <div class="card">
+      <div class="card-header">Relegation <span class="card-sub" id="releg-sub"></span></div>
+      <div id="releg-explainer" class="prose-dark pad"></div>
+      <div id="releg-table"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Relegation risk</div>
+      <div id="releg-chart" style="height:420px;"></div>
+    </div>
+  </div>
+
+  <!-- ── Probabilities ───────────────────────────────────────────────── -->
+  <div id="tab-probs" class="tab-pane">
+    <div class="card">
+      <div class="card-header">Summary by club <span class="card-sub">Click a header to sort.</span></div>
+      <div id="probs-table"></div>
+    </div>
+  </div>
+
+  <!-- ── Power Rankings ──────────────────────────────────────────────── -->
+  <div id="tab-power" class="tab-pane">
+    <div class="card">
+      <div class="card-header">Model strength <span class="card-sub">Expected points per game against an average opponent at a neutral venue.</span></div>
+      <div id="power-explainer" class="prose-dark pad"></div>
+      <div id="power-table"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Luck: actual points against what the xG deserved <span class="card-sub">Right: clubs outperforming their xG; left: underperforming.</span></div>
+      <div id="luck-chart" style="height:520px;"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Schedule <span class="card-sub">Mean strength of opponents already played against those still to come.</span></div>
+      <div id="sos-chart" style="height:460px;"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Elo over the season</div>
+      <div id="elo-chart" style="height:480px;"></div>
+    </div>
+  </div>
+
+  <!-- ── Clubs ───────────────────────────────────────────────────────── -->
+  <div id="tab-team" class="tab-pane">
+    <div class="card">
+      <div class="card-header">Clubs <span class="card-sub">Open a club for its season profile, results with xG, squad percentiles and the model's line on its fixtures.</span></div>
+      <div class="pad"><select id="team-select" class="team-select"></select></div>
+      <div class="pad" id="team-grid"></div>
+    </div>
+  </div>
+
+  <!-- ── Players ─────────────────────────────────────────────────────── -->
+  <div id="tab-players" class="tab-pane">
+    <div class="card">
+      <div class="card-header">Leaderboard <span class="card-sub" id="players-sub"></span></div>
+      <div class="controls">
+        <select id="metric-select" class="team-select" style="max-width:240px"></select>
+        <select id="player-pos-filter" class="team-select" style="max-width:150px">
+          <option value="">All positions</option>
+          <option value="G">Goalkeepers</option>
+          <option value="D">Defenders</option>
+          <option value="M">Midfielders</option>
+          <option value="F">Forwards</option>
+        </select>
+        <select id="player-team-filter" class="team-select" style="max-width:220px"></select>
+        <label>min. minutes <input type="number" id="min-minutes" value="270" min="0" step="90" style="width:70px"></label>
+        <label><input type="checkbox" id="qualified-only"> qualified only</label>
+      </div>
+      <div id="players-table"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Top-scorer race <span class="card-sub">Probability of finishing as the season's top scorer, from the same simulation.</span></div>
+      <div id="scorer-race"></div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">Compare players <span class="card-sub">Percentile profile against positional peers.</span></div>
+        <div class="controls">
+          <select id="cmp-a" class="team-select"></select>
+          <select id="cmp-b" class="team-select"></select>
+        </div>
+        <div id="compare-chart" style="height:440px;"></div>
+      </div>
+      <div class="card">
+        <div class="card-header">Creation against finishing <span class="card-sub">Qualified outfield players; size by goals, colour by rating.</span></div>
+        <div id="player-scatter" style="height:520px;"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Shot map <span class="card-sub">Marker size by xG.</span></div>
+      <div class="pad"><select id="shotmap-player" class="team-select"></select></div>
+      <div id="shotmap" style="height:520px;"></div>
+    </div>
+  </div>
+
+  <!-- ── Matches ─────────────────────────────────────────────────────── -->
+  <div id="tab-matches" class="tab-pane">
+    <div class="card">
+      <div class="card-header">Matches <span class="card-sub" id="matches-sub"></span></div>
+      <div class="controls">
+        <select id="matches-team" class="team-select" style="max-width:240px"></select>
+        <label><input type="checkbox" id="matches-detail-only" checked> with full match data only</label>
+      </div>
+      <div id="matches-list"></div>
+    </div>
+  </div>
+
+  <!-- ── Market ──────────────────────────────────────────────────────── -->
+  <div id="tab-market" class="tab-pane">
+    <div class="card">
+      <div class="card-header">Model against market <span class="card-sub" id="market-sub"></span></div>
+      <div id="market-explainer" class="prose-dark pad"></div>
+      <div id="market-matches"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Outright winner <span class="card-sub">Title market (Kalshi, and Polymarket where listed) against the season simulation.</span></div>
+      <div id="market-outrights"></div>
+    </div>
+  </div>
+
+  <!-- ── History ─────────────────────────────────────────────────────── -->
+  <div id="tab-history" class="tab-pane">
+    <div class="card">
+      <div class="card-header">How the probabilities have moved <span class="card-sub">Each point is one hourly model run.</span></div>
+      <div class="pad"><select id="history-series" class="team-select"></select></div>
+      <div id="history-chart" style="height:520px;"></div>
+    </div>
+  </div>
+
+  <!-- ── Methodology ─────────────────────────────────────────────────── -->
+  <div id="tab-methodology" class="tab-pane">
+    <div id="methodology-doc"></div>
+  </div>
+
+  <!-- ── Analytics (per competition) ────────────────────────────────────── -->
+  <div id="tab-analytics" class="tab-pane">
+    <div id="analytics-root"></div>
+  </div>
+
+  <!-- ── Glossary and site-wide methodology ─────────────────────────────── -->
+  <div id="tab-glossary" class="tab-pane">
+    <div id="glossary-root"></div>
+  </div>
+  <div id="tab-methodologysite" class="tab-pane">
+    <div id="methodology-site-root"></div>
+  </div>
+
+  <!-- ── Clubs across leagues ─────────────────────────────────────────── -->
+  <div id="tab-clubs" class="tab-pane">
+    <div class="card">
+      <div class="card-header">Leagues on one scale <span class="card-sub">From the pooled Dixon-Coles fit: cup matches put every club on one surface. A league's bridge is the number of cup matches connecting it; the scale between continents rests on the Intercontinental Cup and the Club World Cup and is the least certain thing on the page.</span></div>
+      <div id="leagues-table"></div>
+      <div id="bridges-note" class="prose-dark pad"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">If they met <span class="card-sub">Any two clubs, priced from the pooled model.</span></div>
+      <div class="controls">
+        <select id="hypo-a" class="team-select" style="max-width:300px"></select>
+        <span class="muted-inline">v</span>
+        <select id="hypo-b" class="team-select" style="max-width:300px"></select>
+        <select id="hypo-venue" class="team-select" style="max-width:180px"><option value="home">first club at home</option><option value="neutral">neutral venue</option></select>
+      </div>
+      <div class="pad" id="hypo-result"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Every club <span class="card-sub" id="clubs-sub"></span></div>
+      <div class="controls">
+        <select id="clubs-league" class="team-select" style="max-width:260px"></select>
+        <input id="clubs-search" type="search" placeholder="Find a club…" style="max-width:220px">
+      </div>
+      <div id="clubs-table"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">The strongest 25</div>
+      <div id="clubs-chart" style="height:640px;"></div>
+    </div>
+  </div>
+
+  <!-- ── Disclaimer & terms ────────────────────────────────────────────── -->
+  <div id="tab-disclaimer" class="tab-pane">
+    <div class="card">
+      <div class="card-header">Disclaimer &amp; terms of use <span class="card-sub">Last updated 29 September 2026</span></div>
+      <div class="prose-dark pad legal">
+        <p>The Quant Footballer is an independent, non-commercial hobby project that applies statistical models to
+        publicly available football data. By using this site you agree to the terms below. If you do not agree, please
+        do not use the site.</p>
+
+        <h5>1. Not betting, financial or professional advice</h5>
+        <p>Everything on this site &mdash; probabilities, &ldquo;fair odds&rdquo;, projections, rankings, ratings, market
+        comparisons and commentary &mdash; is provided for <strong>information, education and entertainment only</strong>.
+        None of it is betting, gambling, financial, investment or any other professional advice, and none of it is a
+        recommendation to place any wager or trade. &ldquo;Fair odds&rdquo; are model outputs with no margin; they are not
+        prices offered by anyone and cannot be bet on here. The site does not accept bets, take payments or link to
+        bookmakers for commercial gain.</p>
+
+        <h5>2. Gambling responsibly</h5>
+        <p>If you choose to gamble elsewhere, you do so entirely at your own risk and responsibility. Only gamble where
+        it is legal for you to do so and if you are of legal age in your jurisdiction (18+ or 21+ in many places). Never
+        stake more than you can afford to lose. If gambling is causing you harm, free and confidential help is available:
+        <a href="https://www.connexontario.ca" target="_blank" rel="noopener">ConnexOntario</a> (Canada, 1-866-531-2600),
+        <a href="https://www.ncpgambling.org" target="_blank" rel="noopener">1-800-GAMBLER</a> (United States),
+        <a href="https://www.begambleaware.org" target="_blank" rel="noopener">BeGambleAware</a> (United Kingdom),
+        or <a href="https://www.gamblingtherapy.org" target="_blank" rel="noopener">Gambling Therapy</a> (worldwide).</p>
+
+        <h5>3. Models are estimates and can be wrong</h5>
+        <p>Model outputs are statistical estimates built on assumptions and incomplete data. They are frequently wrong,
+        sometimes by a wide margin, and past performance does not predict future results. Data may be delayed,
+        incomplete, mislabelled or out of date, and pages can show errors. The site and all content are provided
+        <strong>&ldquo;as is&rdquo; and &ldquo;as available&rdquo;, without warranties of any kind</strong>, express or implied,
+        including accuracy, completeness, timeliness, fitness for a particular purpose and non-infringement.</p>
+
+        <h5>4. Limitation of liability</h5>
+        <p>To the fullest extent permitted by law, the author accepts no liability for any loss or damage of any kind
+        &mdash; including financial loss, lost winnings, or losses from wagers, trades or other decisions &mdash; arising
+        from use of, reliance on, or inability to use this site or its content. You are solely responsible for your own
+        decisions.</p>
+
+        <h5>5. No affiliation; trademarks</h5>
+        <p>This site is not affiliated with, endorsed by, sponsored by or connected to any club, league, competition,
+        governing body (including FIFA, UEFA, CONMEBOL, CONCACAF, CAF and AFC), player, data provider, betting operator
+        or prediction market. Club and competition names, crests, logos and other marks are the property of
+        their respective owners and appear only to identify the teams and competitions discussed. Player names are used
+        only to report factual sporting statistics.</p>
+
+        <h5>6. Data sources</h5>
+        <p>Match and player statistics are derived from publicly accessible sources, principally Sofascore; prediction
+        market prices come from Polymarket&rsquo;s public data. Transfers, fees and market values are Sofascore&rsquo;s, as it
+        publishes them; fair fees, grades, budgets and fantasy points and prices are this site&rsquo;s own models. The fantasy
+        pages use no data from Fantasy Premier League (its owner&rsquo;s terms do not allow reuse). Those sources own their data
+        and are not responsible for this site or its models. Statistics shown here are derived and transformed and may
+        differ from the sources.</p>
+
+        <h5>7. Rights holders and corrections</h5>
+        <p>If you own rights in any material on this site and object to its use, or you spot an error, contact the
+        author through <a href="https://github.com/pchattani" target="_blank" rel="noopener">GitHub (@pchattani)</a>.
+        Material will be reviewed promptly and removed or corrected where appropriate.</p>
+
+        <h5>8. Privacy</h5>
+        <p>The site sets no cookies, runs no analytics or advertising, and collects no personal data. Your browser
+        remembers only that you dismissed the first-visit notice, locally on your device. The page loads its charting
+        library from a third-party content delivery network (cdn.plot.ly), which, like any web server, receives your IP
+        address when your browser requests it. The site itself is hosted on GitHub Pages, whose own privacy terms apply
+        to its server logs.</p>
+
+        <h5>9. Changes</h5>
+        <p>These terms may change at any time; the date above shows the latest version. Continued use of the site after
+        a change means you accept the updated terms. Nothing in these terms limits any rights you have that cannot be
+        limited under the law that applies to you.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── National teams ────────────────────────────────────────────────── -->
+  <div id="tab-nations" class="tab-pane">
+    <div class="card">
+      <div class="card-header">National teams on one scale <span class="card-sub" id="nations-sub"></span></div>
+      <div id="nations-note" class="prose-dark pad"></div>
+      <div class="controls">
+        <select id="nations-conf" class="team-select" style="max-width:220px"></select>
+        <input id="nations-search" type="search" placeholder="Find a team…" style="max-width:220px">
+      </div>
+      <div id="nations-table"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">If they met <span class="card-sub">Any two national teams, priced from the international fit.</span></div>
+      <div class="controls">
+        <select id="nhypo-a" class="team-select" style="max-width:300px"></select>
+        <span class="muted-inline">v</span>
+        <select id="nhypo-b" class="team-select" style="max-width:300px"></select>
+        <select id="nhypo-venue" class="team-select" style="max-width:180px"><option value="neutral">neutral venue</option><option value="home">first team at home</option></select>
+      </div>
+      <div class="pad" id="nhypo-result"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Next internationals <span class="card-sub">Across every national-team competition followed, with the model's line.</span></div>
+      <div class="fx-list" id="nations-fixtures"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">The strongest 25</div>
+      <div id="nations-chart" style="height:640px;"></div>
+    </div>
+  </div>
+
+  <!-- ── Player lab ─────────────────────────────────────────────────────── -->
+  <div id="tab-lab" class="tab-pane">
+    <div class="card">
+      <div class="card-header">Player lab <span class="card-sub" id="lab-sub"></span></div>
+      <div class="controls lab-controls">
+        <label>View <select id="lab-win" class="team-select"></select></label>
+        <label><input id="lab-shrink" type="checkbox"> Shrink small samples</label>
+      </div>
+      <div class="controls lab-controls">
+        <label><span id="lab-comp-label">Scope</span> <select id="lab-comp" class="team-select"></select></label>
+        <label>Position <select id="lab-pos" class="team-select"></select></label>
+        <label>Chart <select id="lab-preset" class="team-select"></select></label>
+        <label>Min. minutes <input id="lab-min" type="range" min="90" max="2000" step="30"> <span id="lab-min-v"></span></label>
+        <label id="lab-adj-wrap"><input id="lab-adj" type="checkbox"> League-adjust attacking rates</label>
+      </div>
+      <div class="controls lab-controls">
+        <label>X <select id="lab-x" class="team-select"></select></label>
+        <button type="button" id="lab-swap" class="btn-ghost" title="Swap the axes">⇄</button>
+        <label>Y <select id="lab-y" class="team-select"></select></label>
+        <label>Size <select id="lab-size" class="team-select"></select></label>
+        <label>Colour <select id="lab-color" class="team-select"></select></label>
+        <input id="lab-q" type="search" placeholder="Highlight a player…" style="max-width:200px">
+      </div>
+      <div id="lab-cover" class="pad-x"></div>
+      <div id="lab-chart" style="height:640px"></div>
+      <div class="prose-dark pad"><p class="muted-inline" id="lab-note"></p></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Ranked on this view <span class="card-sub">Top 60 by combined standard score; percentiles within the group shown.</span></div>
+      <div id="lab-table"></div>
+    </div>
+  </div>
+
+  <!-- ── Global leaders ────────────────────────────────────────────────── -->
+  <div id="tab-leaders" class="tab-pane">
+    <div class="card">
+      <div class="card-header">Players across competitions <span class="card-sub" id="leaders-sub"></span></div>
+      <div id="leaders-note" class="prose-dark pad"></div>
+      <div class="controls">
+        <select id="leaders-metric" class="team-select" style="max-width:280px"></select>
+        <select id="leaders-pos" class="team-select" style="max-width:150px">
+          <option value="">All positions</option>
+          <option value="G">Goalkeepers</option>
+          <option value="D">Defenders</option>
+          <option value="M">Midfielders</option>
+          <option value="F">Forwards</option>
+        </select>
+        <select id="leaders-comp" class="team-select" style="max-width:240px"></select>
+        <label>min. minutes <input type="number" id="leaders-min" value="270" min="0" step="90" style="width:70px"></label>
+      </div>
+      <div id="leaders-table"></div>
+    </div>
+  </div>
+
+  <!-- ── Compare ───────────────────────────────────────────────────────── -->
+  <div id="tab-compare" class="tab-pane"></div>
+
+  <!-- ── Player value and the transfer simulator (value.js) ───────────── -->
+  <div id="tab-value" class="tab-pane"></div>
+  <div id="tab-transfer" class="tab-pane"></div>
+  <div id="tab-fantasy" class="tab-pane"></div>
+
+  <!-- ── A past season of a competition (seasons.js) ─────────────────── -->
+  <div id="tab-past" class="tab-pane"></div>
+
+  <!-- ── Person, club and match pages ──────────────────────────────────── -->
+  <div id="tab-page" class="tab-pane"></div>
+
+</div>
+
+<footer class="site-footer">
+  <div class="container-xl">
+    <span id="footer-meta">—</span>
+    · The Quant Footballer · Data from Sofascore · Dixon-Coles + Elo model ·
+    <a href="https://pchattani.github.io/the-quant-paddock/">🏁 The Quant Paddock</a> ·
+    <a href="https://pchattani.github.io/the-quant-hardwood/">🏀 The Quant Hardwood</a> ·
+    <a href="https://pchattani.github.io/the-quant-ace/">🎾 The Quant Ace</a> ·
+    <a href="https://pchattani.github.io/the-quant-bullpen/">⚾ The Quant Bullpen</a> ·
+    <a href="https://pchattani.github.io/the-quant-gridiron/">🏈 The Quant Gridiron</a> ·
+    <a href="https://pchattani.github.io/the-quant-rink/">🏒 The Quant Rink</a>
+    <div class="footer-legal">For information and entertainment only &mdash; not betting, financial or professional advice. Probabilities and fair odds are model estimates and can be wrong; no bets are offered. Not affiliated with or endorsed by any club, league, governing body, data provider or bookmaker; names and crests belong to their owners. 18+. Gamble responsibly. <a href="#/disclaimer">Disclaimer &amp; terms</a></div>
+  </div>
+</footer>
+
+<div id="first-visit-notice" class="fv-notice" hidden>
+  <div class="container-xl fv-row">
+    <span><strong>For information and entertainment only.</strong> Model probabilities and fair odds are estimates, not
+    betting or financial advice. Not affiliated with any club, league or data provider. 18+ where gambling is discussed.
+    <a href="#/disclaimer">Read the disclaimer &amp; terms</a>.</span>
+    <button type="button" id="fv-dismiss" class="fv-btn">I understand</button>
+  </div>
+</div>
+<script>
+(function () {
+  var KEY = 'qf-notice-v1', el = document.getElementById('first-visit-notice');
+  var seen = false;
+  try { seen = window.localStorage.getItem(KEY) === '1'; } catch (e) { seen = false; }
+  if (!seen) el.hidden = false;
+  document.getElementById('fv-dismiss').addEventListener('click', function () {
+    el.hidden = true;
+    try { window.localStorage.setItem(KEY, '1'); } catch (e) { /* private mode: shown again next visit */ }
+  });
+})();
+</script>
+<script src="assets/js/core.js"></script>
+<script src="assets/js/charts.js"></script>
+<script src="assets/js/tabs.js"></script>
+<script src="assets/js/pages.js"></script>
+<script src="assets/js/global.js"></script>
+<script src="assets/js/match.js"></script>
+<script src="assets/js/lab.js"></script>
+<script src="assets/js/analytics.js"></script>
+<script src="assets/js/seasons.js"></script>
+<script src="assets/js/people.js"></script>
+<script src="assets/js/docs.js"></script>
+<script src="assets/js/hub.js"></script>
+<script src="assets/js/value.js"></script>
+<script src="assets/js/fantasy.js"></script>
+</body>
+</html>

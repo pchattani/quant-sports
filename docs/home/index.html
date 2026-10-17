@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Quant</title>
+<meta name="description" content="Live scores, model probabilities and model-v-market edges across football, the NFL, NBA, MLB, NHL, F1 and tennis.">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#07090c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ffb020'/%3E%3Cpath d='M6 23l7-9 5 4 8-11' stroke='%231a1203' stroke-width='3.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=/[?&]theme=(light|dark)/.exec(location.search);t=t?t[1]:localStorage.getItem('qk-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/qk/tokens.css">
+<link rel="stylesheet" href="assets/qk/quant.css">
+<link rel="stylesheet" href="assets/home.css">
+</head>
+<body class="qk">
+<div id="qk-shell"></div>
+<div class="qk-ticker" id="ticker" aria-label="Scores"></div>
+
+<main id="main" class="qk-page">
+  <section class="hm-hero">
+    <div class="hm-hero-main">
+      <div class="qk-kicker" id="hero-date">Today</div>
+      <h1 class="hm-headline">Every game, <span>priced.</span></h1>
+      <p class="hm-lede">Live scores, model probabilities and the places our models disagree with the market, across seven sports.</p>
+      <div class="hm-hero-kpis" id="hero-kpis">
+        <div class="qk-skel line"></div><div class="qk-skel line"></div><div class="qk-skel line"></div><div class="qk-skel line"></div>
+      </div>
+    </div>
+    <div class="hm-hero-side">
+      <div class="qk-card hm-feature" id="feature"><div class="qk-card-body"><div class="qk-skel line short"></div><div class="qk-skel block"></div></div></div>
+      <div class="qk-card hm-stat" id="stat"></div>
+    </div>
+  </section>
+
+  <section class="qk-section" id="sports">
+    <div class="qk-section-head"><div><h2>Pick your sport</h2><div class="qk-sub">Seven sites, one look. Each opens on today’s games, standings and the models behind them.</div></div></div>
+    <div class="hm-tiles" id="tiles"></div>
+  </section>
+
+  <section class="qk-section" id="games">
+    <div class="qk-section-head">
+      <div><h2>Games</h2><div class="qk-sub" id="games-sub">Model win probability on every card; a model-v-market strip where a price exists.</div></div>
+      <div class="qk-seg" id="when" role="group" aria-label="When">
+        <button type="button" aria-pressed="true" data-value="now">Live &amp; next</button>
+        <button type="button" aria-pressed="false" data-value="results">Results</button>
+      </div>
+    </div>
+    <div class="qk-chips scroll" id="sport-chips" role="group" aria-label="Filter by sport"></div>
+    <div class="qk-auto hm-games" id="game-grid" style="--min:280px;margin-top:14px"></div>
+    <div class="hm-more" id="game-more"></div>
+  </section>
+
+  <section class="qk-section" id="edges">
+    <div class="qk-section-head"><div><h2>Model v market</h2><div class="qk-sub">The biggest disagreements right now between our probabilities and the betting and prediction markets, at most four per sport.</div></div></div>
+    <div class="qk-grid">
+      <div class="qk-card qk-span-8"><div class="qk-card-head"><div><div class="qk-card-title">Biggest disagreements</div><div class="qk-card-sub">Blue is the model, orange the market; the bar between them is the gap</div></div></div>
+        <div class="qk-card-body"><div id="ch-gaps" style="--h:520px"></div></div></div>
+      <div class="qk-card qk-span-4"><div class="qk-card-head"><div><div class="qk-card-title">The list</div><div class="qk-card-sub">Sorted by size of gap</div></div></div><div class="qk-card-body flush" id="gap-list"></div></div>
+    </div>
+  </section>
+
+  <section class="qk-section" id="futures">
+    <div class="qk-section-head"><div><h2>Who wins it all</h2><div class="qk-sub">Championship odds from each sport’s season simulation; market prices alongside where we have them.</div></div></div>
+    <div class="qk-card">
+      <div class="qk-tabs" role="tablist" id="fut-tabs" style="padding:0 8px"></div>
+      <div class="qk-card-body" id="fut-panels"></div>
+    </div>
+  </section>
+
+  <section class="qk-section" id="charts">
+    <div class="qk-section-head"><div><h2>Charts of the week</h2><div class="qk-sub">One headline picture from each site. Tap through for the full story.</div></div></div>
+    <div class="qk-grid" id="chart-grid"></div>
+  </section>
+
+  <section class="qk-section" id="leaders">
+    <div class="qk-section-head"><div><h2>Leaders</h2><div class="qk-sub">Who is top of the numbers that matter in each sport.</div></div></div>
+    <div class="hm-leaders" id="leader-grid"></div>
+  </section>
+
+  <p class="qk-sub hm-updated" id="updated"></p>
+</main>
+<div id="qk-footer"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" defer></script>
+<script src="assets/qk/quant.js" defer></script>
+<script src="assets/qk/quant-charts.js" defer></script>
+<script src="assets/home.js" defer></script>
+</body>
+</html>

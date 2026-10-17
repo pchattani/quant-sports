@@ -1,0 +1,2310 @@
+{
+ "dates": [
+  {
+   "date": "2026-09-27",
+   "games": [
+    {
+     "gamePk": 990679,
+     "link": "/api/v1.1/game/990679/feed/live",
+     "gameType": "R",
+     "season": "2026",
+     "gameDate": "2026-09-27T17:05:00Z",
+     "officialDate": "2026-09-27",
+     "status": {
+      "abstractGameState": "Final",
+      "codedGameState": "F",
+      "detailedState": "Final",
+      "statusCode": "F",
+      "startTimeTBD": false,
+      "abstractGameCode": "F"
+     },
+     "teams": {
+      "away": {
+       "team": {
+        "id": 121,
+        "name": "New York Mets",
+        "link": "/api/v1/teams/121",
+        "abbreviation": "NYM",
+        "venue": {
+         "id": 3289,
+         "name": "Citi Field",
+         "link": "/api/v1/venues/3289"
+        }
+       },
+       "probablePitcher": {
+        "id": 9500020,
+        "fullName": "Player 020",
+        "link": "/api/v1/people/9500020"
+       },
+       "splitSquad": false,
+       "score": 4,
+       "isWinner": false
+      },
+      "home": {
+       "team": {
+        "id": 120,
+        "name": "Washington Nationals",
+        "link": "/api/v1/teams/120",
+        "abbreviation": "WSH",
+        "venue": {
+         "id": 3309,
+         "name": "Nationals Park",
+         "link": "/api/v1/venues/3309"
+        }
+       },
+       "probablePitcher": {
+        "id": 9500019,
+        "fullName": "Player 019",
+        "link": "/api/v1/people/9500019"
+       },
+       "splitSquad": false,
+       "score": 5,
+       "isWinner": true
+      }
+     },
+     "venue": {
+      "id": 3309,
+      "name": "Nationals Park",
+      "link": "/api/v1/venues/3309",
+      "active": true,
+      "season": "2026"
+     },
+     "officials": [
+      {
+       "official": {
+        "id": 9500023,
+        "fullName": "Player 023",
+        "link": "/api/v1/people/9500023"
+       },
+       "officialType": "Home Plate"
+      },
+      {
+       "official": {
+        "id": 9500024,
+        "fullName": "Player 024",
+        "link": "/api/v1/people/9500024"
+       },
+       "officialType": "First Base"
+      },
+      {
+       "official": {
+        "id": 9500025,
+        "fullName": "Player 025",
+        "link": "/api/v1/people/9500025"
+       },
+       "officialType": "Second Base"
+      },
+      {
+       "official": {
+        "id": 9500026,
+        "fullName": "Player 026",
+        "link": "/api/v1/people/9500026"
+       },
+       "officialType": "Third Base"
+      }
+     ],
+     "weather": {
+      "condition": "Overcast",
+      "temp": "64",
+      "wind": "9 mph, In From LF"
+     },
+     "gameNumber": 1,
+     "publicFacing": true,
+     "doubleHeader": "N",
+     "gamedayType": "P",
+     "tiebreaker": "N",
+     "calendarEventID": "14-990679-2026-09-27",
+     "seasonDisplay": "2026",
+     "dayNight": "day",
+     "scheduledInnings": 9,
+     "reverseHomeAwayStatus": false,
+     "gamesInSeries": 3,
+     "seriesGameNumber": 1,
+     "seriesDescription": "Regular Season",
+     "ifNecessary": "N",
+     "ifNecessaryDescription": "Normal Game",
+     "linescore": {
+      "currentInning": 9,
+      "scheduledInnings": 9,
+      "innings": [
+       {
+        "num": 1,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 1,
+         "hits": 2,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 2,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 3,
+        "home": {
+         "runs": 3,
+         "hits": 4,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 4,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 5,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 2,
+         "hits": 3,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 6,
+        "home": {
+         "runs": 1,
+         "hits": 2,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 7,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 8,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 1,
+         "hits": 2,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 9,
+        "home": {
+         "runs": 1,
+         "hits": 2,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       }
+      ],
+      "teams": {
+       "home": {
+        "runs": 5,
+        "hits": 14,
+        "errors": 0,
+        "leftOnBase": 7,
+        "isWinner": true
+       },
+       "away": {
+        "runs": 4,
+        "hits": 13,
+        "errors": 0,
+        "leftOnBase": 7,
+        "isWinner": false
+       }
+      }
+     },
+     "decisions": {
+      "winner": {
+       "id": 9500021,
+       "fullName": "Player 021",
+       "link": "/api/v1/people/9500021"
+      },
+      "loser": {
+       "id": 9500022,
+       "fullName": "Player 022",
+       "link": "/api/v1/people/9500022"
+      }
+     },
+     "lineups": {
+      "homePlayers": [
+       {
+        "id": 9500001,
+        "fullName": "Player 001",
+        "link": "/api/v1/people/9500001",
+        "primaryPosition": {
+         "abbreviation": "CF"
+        }
+       },
+       {
+        "id": 9500002,
+        "fullName": "Player 002",
+        "link": "/api/v1/people/9500002",
+        "primaryPosition": {
+         "abbreviation": "SS"
+        }
+       },
+       {
+        "id": 9500003,
+        "fullName": "Player 003",
+        "link": "/api/v1/people/9500003",
+        "primaryPosition": {
+         "abbreviation": "RF"
+        }
+       },
+       {
+        "id": 9500004,
+        "fullName": "Player 004",
+        "link": "/api/v1/people/9500004",
+        "primaryPosition": {
+         "abbreviation": "1B"
+        }
+       },
+       {
+        "id": 9500005,
+        "fullName": "Player 005",
+        "link": "/api/v1/people/9500005",
+        "primaryPosition": {
+         "abbreviation": "DH"
+        }
+       },
+       {
+        "id": 9500006,
+        "fullName": "Player 006",
+        "link": "/api/v1/people/9500006",
+        "primaryPosition": {
+         "abbreviation": "3B"
+        }
+       },
+       {
+        "id": 9500007,
+        "fullName": "Player 007",
+        "link": "/api/v1/people/9500007",
+        "primaryPosition": {
+         "abbreviation": "LF"
+        }
+       },
+       {
+        "id": 9500008,
+        "fullName": "Player 008",
+        "link": "/api/v1/people/9500008",
+        "primaryPosition": {
+         "abbreviation": "2B"
+        }
+       },
+       {
+        "id": 9500009,
+        "fullName": "Player 009",
+        "link": "/api/v1/people/9500009",
+        "primaryPosition": {
+         "abbreviation": "C"
+        }
+       }
+      ],
+      "awayPlayers": [
+       {
+        "id": 9500010,
+        "fullName": "Player 010",
+        "link": "/api/v1/people/9500010",
+        "primaryPosition": {
+         "abbreviation": "CF"
+        }
+       },
+       {
+        "id": 9500011,
+        "fullName": "Player 011",
+        "link": "/api/v1/people/9500011",
+        "primaryPosition": {
+         "abbreviation": "SS"
+        }
+       },
+       {
+        "id": 9500012,
+        "fullName": "Player 012",
+        "link": "/api/v1/people/9500012",
+        "primaryPosition": {
+         "abbreviation": "RF"
+        }
+       },
+       {
+        "id": 9500013,
+        "fullName": "Player 013",
+        "link": "/api/v1/people/9500013",
+        "primaryPosition": {
+         "abbreviation": "1B"
+        }
+       },
+       {
+        "id": 9500014,
+        "fullName": "Player 014",
+        "link": "/api/v1/people/9500014",
+        "primaryPosition": {
+         "abbreviation": "DH"
+        }
+       },
+       {
+        "id": 9500015,
+        "fullName": "Player 015",
+        "link": "/api/v1/people/9500015",
+        "primaryPosition": {
+         "abbreviation": "3B"
+        }
+       },
+       {
+        "id": 9500016,
+        "fullName": "Player 016",
+        "link": "/api/v1/people/9500016",
+        "primaryPosition": {
+         "abbreviation": "LF"
+        }
+       },
+       {
+        "id": 9500017,
+        "fullName": "Player 017",
+        "link": "/api/v1/people/9500017",
+        "primaryPosition": {
+         "abbreviation": "2B"
+        }
+       },
+       {
+        "id": 9500018,
+        "fullName": "Player 018",
+        "link": "/api/v1/people/9500018",
+        "primaryPosition": {
+         "abbreviation": "C"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "gamePk": 990490,
+     "link": "/api/v1.1/game/990490/feed/live",
+     "gameType": "R",
+     "season": "2026",
+     "gameDate": "2026-09-27T17:05:00Z",
+     "officialDate": "2026-09-27",
+     "status": {
+      "abstractGameState": "Final",
+      "codedGameState": "C",
+      "detailedState": "Cancelled",
+      "statusCode": "CR",
+      "startTimeTBD": false,
+      "reason": "Rain",
+      "abstractGameCode": "F"
+     },
+     "teams": {
+      "away": {
+       "team": {
+        "id": 110,
+        "name": "Baltimore Orioles",
+        "link": "/api/v1/teams/110",
+        "abbreviation": "BAL",
+        "venue": {
+         "id": 2,
+         "name": "Oriole Park at Camden Yards",
+         "link": "/api/v1/venues/2"
+        }
+       },
+       "probablePitcher": {
+        "id": 9500028,
+        "fullName": "Player 028",
+        "link": "/api/v1/people/9500028"
+       },
+       "splitSquad": false
+      },
+      "home": {
+       "team": {
+        "id": 147,
+        "name": "New York Yankees",
+        "link": "/api/v1/teams/147",
+        "abbreviation": "NYY",
+        "venue": {
+         "id": 3313,
+         "name": "Yankee Stadium",
+         "link": "/api/v1/venues/3313"
+        }
+       },
+       "probablePitcher": {
+        "id": 9500027,
+        "fullName": "Player 027",
+        "link": "/api/v1/people/9500027"
+       },
+       "splitSquad": false
+      }
+     },
+     "venue": {
+      "id": 3313,
+      "name": "Yankee Stadium",
+      "link": "/api/v1/venues/3313",
+      "active": true,
+      "season": "2026"
+     },
+     "officials": [],
+     "weather": {},
+     "gameNumber": 1,
+     "publicFacing": true,
+     "doubleHeader": "N",
+     "gamedayType": "P",
+     "tiebreaker": "N",
+     "calendarEventID": "14-990490-2026-09-27",
+     "seasonDisplay": "2026",
+     "dayNight": "day",
+     "scheduledInnings": 9,
+     "reverseHomeAwayStatus": false,
+     "gamesInSeries": 3,
+     "seriesGameNumber": 1,
+     "seriesDescription": "Regular Season",
+     "ifNecessary": "N",
+     "ifNecessaryDescription": "Normal Game"
+    }
+   ]
+  },
+  {
+   "date": "2026-09-30",
+   "games": [
+    {
+     "gamePk": 990841,
+     "link": "/api/v1.1/game/990841/feed/live",
+     "gameType": "F",
+     "season": "2026",
+     "gameDate": "2026-09-30T18:00:00Z",
+     "officialDate": "2026-09-30",
+     "status": {
+      "abstractGameState": "Final",
+      "codedGameState": "F",
+      "detailedState": "Final",
+      "statusCode": "F",
+      "startTimeTBD": false,
+      "abstractGameCode": "F"
+     },
+     "teams": {
+      "away": {
+       "team": {
+        "id": 143,
+        "name": "Philadelphia Phillies",
+        "link": "/api/v1/teams/143",
+        "abbreviation": "PHI",
+        "venue": {
+         "id": 2681,
+         "name": "Citizens Bank Park",
+         "link": "/api/v1/venues/2681"
+        }
+       },
+       "probablePitcher": {
+        "id": 9500048,
+        "fullName": "Player 048",
+        "link": "/api/v1/people/9500048"
+       },
+       "splitSquad": false,
+       "score": 4,
+       "isWinner": true
+      },
+      "home": {
+       "team": {
+        "id": 144,
+        "name": "Atlanta Braves",
+        "link": "/api/v1/teams/144",
+        "abbreviation": "ATL",
+        "venue": {
+         "id": 4705,
+         "name": "Truist Park",
+         "link": "/api/v1/venues/4705"
+        }
+       },
+       "probablePitcher": {
+        "id": 9500047,
+        "fullName": "Player 047",
+        "link": "/api/v1/people/9500047"
+       },
+       "splitSquad": false,
+       "score": 3,
+       "isWinner": false
+      }
+     },
+     "venue": {
+      "id": 4705,
+      "name": "Truist Park",
+      "link": "/api/v1/venues/4705",
+      "active": true,
+      "season": "2026"
+     },
+     "officials": [
+      {
+       "official": {
+        "id": 9500051,
+        "fullName": "Player 051",
+        "link": "/api/v1/people/9500051"
+       },
+       "officialType": "Home Plate"
+      },
+      {
+       "official": {
+        "id": 9500052,
+        "fullName": "Player 052",
+        "link": "/api/v1/people/9500052"
+       },
+       "officialType": "First Base"
+      },
+      {
+       "official": {
+        "id": 9500053,
+        "fullName": "Player 053",
+        "link": "/api/v1/people/9500053"
+       },
+       "officialType": "Second Base"
+      },
+      {
+       "official": {
+        "id": 9500054,
+        "fullName": "Player 054",
+        "link": "/api/v1/people/9500054"
+       },
+       "officialType": "Third Base"
+      }
+     ],
+     "weather": {
+      "condition": "Clear",
+      "temp": "71",
+      "wind": "7 mph, Out To CF"
+     },
+     "gameNumber": 1,
+     "publicFacing": true,
+     "doubleHeader": "N",
+     "gamedayType": "P",
+     "tiebreaker": "N",
+     "calendarEventID": "14-990841-2026-09-30",
+     "seasonDisplay": "2026",
+     "dayNight": "day",
+     "scheduledInnings": 9,
+     "reverseHomeAwayStatus": false,
+     "gamesInSeries": 3,
+     "seriesGameNumber": 2,
+     "seriesDescription": "NL Wild Card Series",
+     "ifNecessary": "N",
+     "ifNecessaryDescription": "Normal Game",
+     "linescore": {
+      "currentInning": 10,
+      "scheduledInnings": 9,
+      "innings": [
+       {
+        "num": 1,
+        "home": {
+         "runs": 1,
+         "hits": 2,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 2,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 2,
+         "hits": 3,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 3,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 4,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 5,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 1,
+         "hits": 2,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 6,
+        "home": {
+         "runs": 2,
+         "hits": 3,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 7,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 8,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 9,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 10,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 1,
+         "hits": 2,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       }
+      ],
+      "teams": {
+       "home": {
+        "runs": 3,
+        "hits": 13,
+        "errors": 0,
+        "leftOnBase": 7,
+        "isWinner": false
+       },
+       "away": {
+        "runs": 4,
+        "hits": 14,
+        "errors": 0,
+        "leftOnBase": 7,
+        "isWinner": true
+       }
+      }
+     },
+     "decisions": {
+      "winner": {
+       "id": 9500049,
+       "fullName": "Player 049",
+       "link": "/api/v1/people/9500049"
+      },
+      "loser": {
+       "id": 9500050,
+       "fullName": "Player 050",
+       "link": "/api/v1/people/9500050"
+      }
+     },
+     "lineups": {
+      "homePlayers": [
+       {
+        "id": 9500029,
+        "fullName": "Player 029",
+        "link": "/api/v1/people/9500029",
+        "primaryPosition": {
+         "abbreviation": "CF"
+        }
+       },
+       {
+        "id": 9500030,
+        "fullName": "Player 030",
+        "link": "/api/v1/people/9500030",
+        "primaryPosition": {
+         "abbreviation": "SS"
+        }
+       },
+       {
+        "id": 9500031,
+        "fullName": "Player 031",
+        "link": "/api/v1/people/9500031",
+        "primaryPosition": {
+         "abbreviation": "RF"
+        }
+       },
+       {
+        "id": 9500032,
+        "fullName": "Player 032",
+        "link": "/api/v1/people/9500032",
+        "primaryPosition": {
+         "abbreviation": "1B"
+        }
+       },
+       {
+        "id": 9500033,
+        "fullName": "Player 033",
+        "link": "/api/v1/people/9500033",
+        "primaryPosition": {
+         "abbreviation": "DH"
+        }
+       },
+       {
+        "id": 9500034,
+        "fullName": "Player 034",
+        "link": "/api/v1/people/9500034",
+        "primaryPosition": {
+         "abbreviation": "3B"
+        }
+       },
+       {
+        "id": 9500035,
+        "fullName": "Player 035",
+        "link": "/api/v1/people/9500035",
+        "primaryPosition": {
+         "abbreviation": "LF"
+        }
+       },
+       {
+        "id": 9500036,
+        "fullName": "Player 036",
+        "link": "/api/v1/people/9500036",
+        "primaryPosition": {
+         "abbreviation": "2B"
+        }
+       },
+       {
+        "id": 9500037,
+        "fullName": "Player 037",
+        "link": "/api/v1/people/9500037",
+        "primaryPosition": {
+         "abbreviation": "C"
+        }
+       }
+      ],
+      "awayPlayers": [
+       {
+        "id": 9500038,
+        "fullName": "Player 038",
+        "link": "/api/v1/people/9500038",
+        "primaryPosition": {
+         "abbreviation": "CF"
+        }
+       },
+       {
+        "id": 9500039,
+        "fullName": "Player 039",
+        "link": "/api/v1/people/9500039",
+        "primaryPosition": {
+         "abbreviation": "SS"
+        }
+       },
+       {
+        "id": 9500040,
+        "fullName": "Player 040",
+        "link": "/api/v1/people/9500040",
+        "primaryPosition": {
+         "abbreviation": "RF"
+        }
+       },
+       {
+        "id": 9500041,
+        "fullName": "Player 041",
+        "link": "/api/v1/people/9500041",
+        "primaryPosition": {
+         "abbreviation": "1B"
+        }
+       },
+       {
+        "id": 9500042,
+        "fullName": "Player 042",
+        "link": "/api/v1/people/9500042",
+        "primaryPosition": {
+         "abbreviation": "DH"
+        }
+       },
+       {
+        "id": 9500043,
+        "fullName": "Player 043",
+        "link": "/api/v1/people/9500043",
+        "primaryPosition": {
+         "abbreviation": "3B"
+        }
+       },
+       {
+        "id": 9500044,
+        "fullName": "Player 044",
+        "link": "/api/v1/people/9500044",
+        "primaryPosition": {
+         "abbreviation": "LF"
+        }
+       },
+       {
+        "id": 9500045,
+        "fullName": "Player 045",
+        "link": "/api/v1/people/9500045",
+        "primaryPosition": {
+         "abbreviation": "2B"
+        }
+       },
+       {
+        "id": 9500046,
+        "fullName": "Player 046",
+        "link": "/api/v1/people/9500046",
+        "primaryPosition": {
+         "abbreviation": "C"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "gamePk": 990846,
+     "link": "/api/v1.1/game/990846/feed/live",
+     "gameType": "F",
+     "season": "2026",
+     "gameDate": "2026-09-30T21:00:00Z",
+     "officialDate": "2026-09-30",
+     "status": {
+      "abstractGameState": "Final",
+      "codedGameState": "F",
+      "detailedState": "Final",
+      "statusCode": "F",
+      "startTimeTBD": false,
+      "abstractGameCode": "F"
+     },
+     "teams": {
+      "away": {
+       "team": {
+        "id": 145,
+        "name": "Chicago White Sox",
+        "link": "/api/v1/teams/145",
+        "abbreviation": "CWS",
+        "venue": {
+         "id": 4,
+         "name": "Rate Field",
+         "link": "/api/v1/venues/4"
+        }
+       },
+       "probablePitcher": {
+        "id": 9500074,
+        "fullName": "Player 074",
+        "link": "/api/v1/people/9500074"
+       },
+       "splitSquad": false,
+       "score": 10,
+       "isWinner": true
+      },
+      "home": {
+       "team": {
+        "id": 117,
+        "name": "Houston Astros",
+        "link": "/api/v1/teams/117",
+        "abbreviation": "HOU",
+        "venue": {
+         "id": 2392,
+         "name": "Daikin Park",
+         "link": "/api/v1/venues/2392"
+        }
+       },
+       "probablePitcher": {
+        "id": 9500073,
+        "fullName": "Player 073",
+        "link": "/api/v1/people/9500073"
+       },
+       "splitSquad": false,
+       "score": 1,
+       "isWinner": false
+      }
+     },
+     "venue": {
+      "id": 2392,
+      "name": "Daikin Park",
+      "link": "/api/v1/venues/2392",
+      "active": true,
+      "season": "2026"
+     },
+     "officials": [
+      {
+       "official": {
+        "id": 9500077,
+        "fullName": "Player 077",
+        "link": "/api/v1/people/9500077"
+       },
+       "officialType": "Home Plate"
+      },
+      {
+       "official": {
+        "id": 9500078,
+        "fullName": "Player 078",
+        "link": "/api/v1/people/9500078"
+       },
+       "officialType": "First Base"
+      },
+      {
+       "official": {
+        "id": 9500079,
+        "fullName": "Player 079",
+        "link": "/api/v1/people/9500079"
+       },
+       "officialType": "Second Base"
+      },
+      {
+       "official": {
+        "id": 9500080,
+        "fullName": "Player 080",
+        "link": "/api/v1/people/9500080"
+       },
+       "officialType": "Third Base"
+      }
+     ],
+     "weather": {
+      "condition": "Sunny",
+      "temp": "78",
+      "wind": "5 mph, R To L"
+     },
+     "gameNumber": 1,
+     "publicFacing": true,
+     "doubleHeader": "N",
+     "gamedayType": "P",
+     "tiebreaker": "N",
+     "calendarEventID": "14-990846-2026-09-30",
+     "seasonDisplay": "2026",
+     "dayNight": "day",
+     "scheduledInnings": 9,
+     "reverseHomeAwayStatus": false,
+     "gamesInSeries": 3,
+     "seriesGameNumber": 2,
+     "seriesDescription": "AL Wild Card Series",
+     "ifNecessary": "N",
+     "ifNecessaryDescription": "Normal Game",
+     "linescore": {
+      "currentInning": 9,
+      "scheduledInnings": 9,
+      "innings": [
+       {
+        "num": 1,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 2,
+         "hits": 3,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 2,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 2,
+         "hits": 3,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 3,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 2,
+         "hits": 3,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 4,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 5,
+        "home": {
+         "runs": 1,
+         "hits": 2,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 1,
+         "hits": 2,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 6,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 7,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 1,
+         "hits": 2,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 8,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 2,
+         "hits": 3,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 9,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       }
+      ],
+      "teams": {
+       "home": {
+        "runs": 1,
+        "hits": 10,
+        "errors": 0,
+        "leftOnBase": 7,
+        "isWinner": false
+       },
+       "away": {
+        "runs": 10,
+        "hits": 19,
+        "errors": 0,
+        "leftOnBase": 7,
+        "isWinner": true
+       }
+      }
+     },
+     "decisions": {
+      "winner": {
+       "id": 9500075,
+       "fullName": "Player 075",
+       "link": "/api/v1/people/9500075"
+      },
+      "loser": {
+       "id": 9500076,
+       "fullName": "Player 076",
+       "link": "/api/v1/people/9500076"
+      }
+     },
+     "lineups": {
+      "homePlayers": [
+       {
+        "id": 9500055,
+        "fullName": "Player 055",
+        "link": "/api/v1/people/9500055",
+        "primaryPosition": {
+         "abbreviation": "CF"
+        }
+       },
+       {
+        "id": 9500056,
+        "fullName": "Player 056",
+        "link": "/api/v1/people/9500056",
+        "primaryPosition": {
+         "abbreviation": "SS"
+        }
+       },
+       {
+        "id": 9500057,
+        "fullName": "Player 057",
+        "link": "/api/v1/people/9500057",
+        "primaryPosition": {
+         "abbreviation": "RF"
+        }
+       },
+       {
+        "id": 9500058,
+        "fullName": "Player 058",
+        "link": "/api/v1/people/9500058",
+        "primaryPosition": {
+         "abbreviation": "1B"
+        }
+       },
+       {
+        "id": 9500059,
+        "fullName": "Player 059",
+        "link": "/api/v1/people/9500059",
+        "primaryPosition": {
+         "abbreviation": "DH"
+        }
+       },
+       {
+        "id": 9500060,
+        "fullName": "Player 060",
+        "link": "/api/v1/people/9500060",
+        "primaryPosition": {
+         "abbreviation": "3B"
+        }
+       },
+       {
+        "id": 9500061,
+        "fullName": "Player 061",
+        "link": "/api/v1/people/9500061",
+        "primaryPosition": {
+         "abbreviation": "LF"
+        }
+       },
+       {
+        "id": 9500062,
+        "fullName": "Player 062",
+        "link": "/api/v1/people/9500062",
+        "primaryPosition": {
+         "abbreviation": "2B"
+        }
+       },
+       {
+        "id": 9500063,
+        "fullName": "Player 063",
+        "link": "/api/v1/people/9500063",
+        "primaryPosition": {
+         "abbreviation": "C"
+        }
+       }
+      ],
+      "awayPlayers": [
+       {
+        "id": 9500064,
+        "fullName": "Player 064",
+        "link": "/api/v1/people/9500064",
+        "primaryPosition": {
+         "abbreviation": "CF"
+        }
+       },
+       {
+        "id": 9500065,
+        "fullName": "Player 065",
+        "link": "/api/v1/people/9500065",
+        "primaryPosition": {
+         "abbreviation": "SS"
+        }
+       },
+       {
+        "id": 9500066,
+        "fullName": "Player 066",
+        "link": "/api/v1/people/9500066",
+        "primaryPosition": {
+         "abbreviation": "RF"
+        }
+       },
+       {
+        "id": 9500067,
+        "fullName": "Player 067",
+        "link": "/api/v1/people/9500067",
+        "primaryPosition": {
+         "abbreviation": "1B"
+        }
+       },
+       {
+        "id": 9500068,
+        "fullName": "Player 068",
+        "link": "/api/v1/people/9500068",
+        "primaryPosition": {
+         "abbreviation": "DH"
+        }
+       },
+       {
+        "id": 9500069,
+        "fullName": "Player 069",
+        "link": "/api/v1/people/9500069",
+        "primaryPosition": {
+         "abbreviation": "3B"
+        }
+       },
+       {
+        "id": 9500070,
+        "fullName": "Player 070",
+        "link": "/api/v1/people/9500070",
+        "primaryPosition": {
+         "abbreviation": "LF"
+        }
+       },
+       {
+        "id": 9500071,
+        "fullName": "Player 071",
+        "link": "/api/v1/people/9500071",
+        "primaryPosition": {
+         "abbreviation": "2B"
+        }
+       },
+       {
+        "id": 9500072,
+        "fullName": "Player 072",
+        "link": "/api/v1/people/9500072",
+        "primaryPosition": {
+         "abbreviation": "C"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "gamePk": 990848,
+     "link": "/api/v1.1/game/990848/feed/live",
+     "gameType": "F",
+     "season": "2026",
+     "gameDate": "2026-10-01T00:00:00Z",
+     "officialDate": "2026-09-30",
+     "status": {
+      "abstractGameState": "Final",
+      "codedGameState": "F",
+      "detailedState": "Final",
+      "statusCode": "F",
+      "startTimeTBD": false,
+      "abstractGameCode": "F"
+     },
+     "teams": {
+      "away": {
+       "team": {
+        "id": 111,
+        "name": "Boston Red Sox",
+        "link": "/api/v1/teams/111",
+        "abbreviation": "BOS",
+        "venue": {
+         "id": 3,
+         "name": "Fenway Park",
+         "link": "/api/v1/venues/3"
+        }
+       },
+       "probablePitcher": {
+        "id": 9500100,
+        "fullName": "Player 100",
+        "link": "/api/v1/people/9500100"
+       },
+       "splitSquad": false,
+       "score": 7,
+       "isWinner": false
+      },
+      "home": {
+       "team": {
+        "id": 147,
+        "name": "New York Yankees",
+        "link": "/api/v1/teams/147",
+        "abbreviation": "NYY",
+        "venue": {
+         "id": 3313,
+         "name": "Yankee Stadium",
+         "link": "/api/v1/venues/3313"
+        }
+       },
+       "probablePitcher": {
+        "id": 9500099,
+        "fullName": "Player 099",
+        "link": "/api/v1/people/9500099"
+       },
+       "splitSquad": false,
+       "score": 8,
+       "isWinner": true
+      }
+     },
+     "venue": {
+      "id": 3313,
+      "name": "Yankee Stadium",
+      "link": "/api/v1/venues/3313",
+      "active": true,
+      "season": "2026"
+     },
+     "officials": [
+      {
+       "official": {
+        "id": 9500103,
+        "fullName": "Player 103",
+        "link": "/api/v1/people/9500103"
+       },
+       "officialType": "Home Plate"
+      },
+      {
+       "official": {
+        "id": 9500104,
+        "fullName": "Player 104",
+        "link": "/api/v1/people/9500104"
+       },
+       "officialType": "First Base"
+      },
+      {
+       "official": {
+        "id": 9500105,
+        "fullName": "Player 105",
+        "link": "/api/v1/people/9500105"
+       },
+       "officialType": "Second Base"
+      },
+      {
+       "official": {
+        "id": 9500106,
+        "fullName": "Player 106",
+        "link": "/api/v1/people/9500106"
+       },
+       "officialType": "Third Base"
+      }
+     ],
+     "weather": {
+      "condition": "Roof Closed",
+      "temp": "72",
+      "wind": "0 mph, None"
+     },
+     "gameNumber": 1,
+     "publicFacing": true,
+     "doubleHeader": "N",
+     "gamedayType": "P",
+     "tiebreaker": "N",
+     "calendarEventID": "14-990848-2026-09-30",
+     "seasonDisplay": "2026",
+     "dayNight": "day",
+     "scheduledInnings": 9,
+     "reverseHomeAwayStatus": false,
+     "gamesInSeries": 3,
+     "seriesGameNumber": 2,
+     "seriesDescription": "AL Wild Card Series",
+     "ifNecessary": "N",
+     "ifNecessaryDescription": "Normal Game",
+     "linescore": {
+      "currentInning": 9,
+      "scheduledInnings": 9,
+      "innings": [
+       {
+        "num": 1,
+        "home": {
+         "runs": 2,
+         "hits": 3,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 2,
+        "home": {
+         "runs": 1,
+         "hits": 2,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 2,
+         "hits": 3,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 3,
+        "home": {
+         "runs": 2,
+         "hits": 3,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 4,
+        "home": {
+         "runs": 1,
+         "hits": 2,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 5,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 6,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 2,
+         "hits": 3,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 7,
+        "home": {
+         "runs": 2,
+         "hits": 3,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 1,
+         "hits": 2,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 8,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 9,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 2,
+         "hits": 3,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       }
+      ],
+      "teams": {
+       "home": {
+        "runs": 8,
+        "hits": 17,
+        "errors": 0,
+        "leftOnBase": 7,
+        "isWinner": true
+       },
+       "away": {
+        "runs": 7,
+        "hits": 16,
+        "errors": 0,
+        "leftOnBase": 7,
+        "isWinner": false
+       }
+      }
+     },
+     "decisions": {
+      "winner": {
+       "id": 9500101,
+       "fullName": "Player 101",
+       "link": "/api/v1/people/9500101"
+      },
+      "loser": {
+       "id": 9500102,
+       "fullName": "Player 102",
+       "link": "/api/v1/people/9500102"
+      }
+     },
+     "lineups": {
+      "homePlayers": [
+       {
+        "id": 9500081,
+        "fullName": "Player 081",
+        "link": "/api/v1/people/9500081",
+        "primaryPosition": {
+         "abbreviation": "CF"
+        }
+       },
+       {
+        "id": 9500082,
+        "fullName": "Player 082",
+        "link": "/api/v1/people/9500082",
+        "primaryPosition": {
+         "abbreviation": "SS"
+        }
+       },
+       {
+        "id": 9500083,
+        "fullName": "Player 083",
+        "link": "/api/v1/people/9500083",
+        "primaryPosition": {
+         "abbreviation": "RF"
+        }
+       },
+       {
+        "id": 9500084,
+        "fullName": "Player 084",
+        "link": "/api/v1/people/9500084",
+        "primaryPosition": {
+         "abbreviation": "1B"
+        }
+       },
+       {
+        "id": 9500085,
+        "fullName": "Player 085",
+        "link": "/api/v1/people/9500085",
+        "primaryPosition": {
+         "abbreviation": "DH"
+        }
+       },
+       {
+        "id": 9500086,
+        "fullName": "Player 086",
+        "link": "/api/v1/people/9500086",
+        "primaryPosition": {
+         "abbreviation": "3B"
+        }
+       },
+       {
+        "id": 9500087,
+        "fullName": "Player 087",
+        "link": "/api/v1/people/9500087",
+        "primaryPosition": {
+         "abbreviation": "LF"
+        }
+       },
+       {
+        "id": 9500088,
+        "fullName": "Player 088",
+        "link": "/api/v1/people/9500088",
+        "primaryPosition": {
+         "abbreviation": "2B"
+        }
+       },
+       {
+        "id": 9500089,
+        "fullName": "Player 089",
+        "link": "/api/v1/people/9500089",
+        "primaryPosition": {
+         "abbreviation": "C"
+        }
+       }
+      ],
+      "awayPlayers": [
+       {
+        "id": 9500090,
+        "fullName": "Player 090",
+        "link": "/api/v1/people/9500090",
+        "primaryPosition": {
+         "abbreviation": "CF"
+        }
+       },
+       {
+        "id": 9500091,
+        "fullName": "Player 091",
+        "link": "/api/v1/people/9500091",
+        "primaryPosition": {
+         "abbreviation": "SS"
+        }
+       },
+       {
+        "id": 9500092,
+        "fullName": "Player 092",
+        "link": "/api/v1/people/9500092",
+        "primaryPosition": {
+         "abbreviation": "RF"
+        }
+       },
+       {
+        "id": 9500093,
+        "fullName": "Player 093",
+        "link": "/api/v1/people/9500093",
+        "primaryPosition": {
+         "abbreviation": "1B"
+        }
+       },
+       {
+        "id": 9500094,
+        "fullName": "Player 094",
+        "link": "/api/v1/people/9500094",
+        "primaryPosition": {
+         "abbreviation": "DH"
+        }
+       },
+       {
+        "id": 9500095,
+        "fullName": "Player 095",
+        "link": "/api/v1/people/9500095",
+        "primaryPosition": {
+         "abbreviation": "3B"
+        }
+       },
+       {
+        "id": 9500096,
+        "fullName": "Player 096",
+        "link": "/api/v1/people/9500096",
+        "primaryPosition": {
+         "abbreviation": "LF"
+        }
+       },
+       {
+        "id": 9500097,
+        "fullName": "Player 097",
+        "link": "/api/v1/people/9500097",
+        "primaryPosition": {
+         "abbreviation": "2B"
+        }
+       },
+       {
+        "id": 9500098,
+        "fullName": "Player 098",
+        "link": "/api/v1/people/9500098",
+        "primaryPosition": {
+         "abbreviation": "C"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "gamePk": 990842,
+     "link": "/api/v1.1/game/990842/feed/live",
+     "gameType": "F",
+     "season": "2026",
+     "gameDate": "2026-10-01T02:00:00Z",
+     "officialDate": "2026-09-30",
+     "status": {
+      "abstractGameState": "Final",
+      "codedGameState": "F",
+      "detailedState": "Final",
+      "statusCode": "F",
+      "startTimeTBD": false,
+      "abstractGameCode": "F"
+     },
+     "teams": {
+      "away": {
+       "team": {
+        "id": 112,
+        "name": "Chicago Cubs",
+        "link": "/api/v1/teams/112",
+        "abbreviation": "CHC",
+        "venue": {
+         "id": 17,
+         "name": "Wrigley Field",
+         "link": "/api/v1/venues/17"
+        }
+       },
+       "probablePitcher": {
+        "id": 9500126,
+        "fullName": "Player 126",
+        "link": "/api/v1/people/9500126"
+       },
+       "splitSquad": false,
+       "score": 3,
+       "isWinner": false
+      },
+      "home": {
+       "team": {
+        "id": 135,
+        "name": "San Diego Padres",
+        "link": "/api/v1/teams/135",
+        "abbreviation": "SD",
+        "venue": {
+         "id": 2680,
+         "name": "Petco Park",
+         "link": "/api/v1/venues/2680"
+        }
+       },
+       "probablePitcher": {
+        "id": 9500125,
+        "fullName": "Player 125",
+        "link": "/api/v1/people/9500125"
+       },
+       "splitSquad": false,
+       "score": 5,
+       "isWinner": true
+      }
+     },
+     "venue": {
+      "id": 2680,
+      "name": "Petco Park",
+      "link": "/api/v1/venues/2680",
+      "active": true,
+      "season": "2026"
+     },
+     "officials": [
+      {
+       "official": {
+        "id": 9500129,
+        "fullName": "Player 129",
+        "link": "/api/v1/people/9500129"
+       },
+       "officialType": "Home Plate"
+      },
+      {
+       "official": {
+        "id": 9500130,
+        "fullName": "Player 130",
+        "link": "/api/v1/people/9500130"
+       },
+       "officialType": "First Base"
+      },
+      {
+       "official": {
+        "id": 9500131,
+        "fullName": "Player 131",
+        "link": "/api/v1/people/9500131"
+       },
+       "officialType": "Second Base"
+      },
+      {
+       "official": {
+        "id": 9500132,
+        "fullName": "Player 132",
+        "link": "/api/v1/people/9500132"
+       },
+       "officialType": "Third Base"
+      }
+     ],
+     "weather": {
+      "condition": "Clear",
+      "temp": "66",
+      "wind": "11 mph, Out To RF"
+     },
+     "gameNumber": 1,
+     "publicFacing": true,
+     "doubleHeader": "N",
+     "gamedayType": "P",
+     "tiebreaker": "N",
+     "calendarEventID": "14-990842-2026-09-30",
+     "seasonDisplay": "2026",
+     "dayNight": "day",
+     "scheduledInnings": 9,
+     "reverseHomeAwayStatus": false,
+     "gamesInSeries": 3,
+     "seriesGameNumber": 2,
+     "seriesDescription": "NL Wild Card Series",
+     "ifNecessary": "N",
+     "ifNecessaryDescription": "Normal Game",
+     "linescore": {
+      "currentInning": 9,
+      "scheduledInnings": 9,
+      "innings": [
+       {
+        "num": 1,
+        "home": {
+         "runs": 1,
+         "hits": 2,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 2,
+         "hits": 3,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 2,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 3,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 4,
+        "home": {
+         "runs": 2,
+         "hits": 3,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 5,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 6,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 7,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 8,
+        "home": {
+         "runs": 2,
+         "hits": 3,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 1,
+         "hits": 2,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       },
+       {
+        "num": 9,
+        "home": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        },
+        "away": {
+         "runs": 0,
+         "hits": 1,
+         "errors": 0,
+         "leftOnBase": 1
+        }
+       }
+      ],
+      "teams": {
+       "home": {
+        "runs": 5,
+        "hits": 14,
+        "errors": 0,
+        "leftOnBase": 7,
+        "isWinner": true
+       },
+       "away": {
+        "runs": 3,
+        "hits": 12,
+        "errors": 0,
+        "leftOnBase": 7,
+        "isWinner": false
+       }
+      }
+     },
+     "decisions": {
+      "winner": {
+       "id": 9500127,
+       "fullName": "Player 127",
+       "link": "/api/v1/people/9500127"
+      },
+      "loser": {
+       "id": 9500128,
+       "fullName": "Player 128",
+       "link": "/api/v1/people/9500128"
+      }
+     },
+     "lineups": {
+      "homePlayers": [
+       {
+        "id": 9500107,
+        "fullName": "Player 107",
+        "link": "/api/v1/people/9500107",
+        "primaryPosition": {
+         "abbreviation": "CF"
+        }
+       },
+       {
+        "id": 9500108,
+        "fullName": "Player 108",
+        "link": "/api/v1/people/9500108",
+        "primaryPosition": {
+         "abbreviation": "SS"
+        }
+       },
+       {
+        "id": 9500109,
+        "fullName": "Player 109",
+        "link": "/api/v1/people/9500109",
+        "primaryPosition": {
+         "abbreviation": "RF"
+        }
+       },
+       {
+        "id": 9500110,
+        "fullName": "Player 110",
+        "link": "/api/v1/people/9500110",
+        "primaryPosition": {
+         "abbreviation": "1B"
+        }
+       },
+       {
+        "id": 9500111,
+        "fullName": "Player 111",
+        "link": "/api/v1/people/9500111",
+        "primaryPosition": {
+         "abbreviation": "DH"
+        }
+       },
+       {
+        "id": 9500112,
+        "fullName": "Player 112",
+        "link": "/api/v1/people/9500112",
+        "primaryPosition": {
+         "abbreviation": "3B"
+        }
+       },
+       {
+        "id": 9500113,
+        "fullName": "Player 113",
+        "link": "/api/v1/people/9500113",
+        "primaryPosition": {
+         "abbreviation": "LF"
+        }
+       },
+       {
+        "id": 9500114,
+        "fullName": "Player 114",
+        "link": "/api/v1/people/9500114",
+        "primaryPosition": {
+         "abbreviation": "2B"
+        }
+       },
+       {
+        "id": 9500115,
+        "fullName": "Player 115",
+        "link": "/api/v1/people/9500115",
+        "primaryPosition": {
+         "abbreviation": "C"
+        }
+       }
+      ],
+      "awayPlayers": [
+       {
+        "id": 9500116,
+        "fullName": "Player 116",
+        "link": "/api/v1/people/9500116",
+        "primaryPosition": {
+         "abbreviation": "CF"
+        }
+       },
+       {
+        "id": 9500117,
+        "fullName": "Player 117",
+        "link": "/api/v1/people/9500117",
+        "primaryPosition": {
+         "abbreviation": "SS"
+        }
+       },
+       {
+        "id": 9500118,
+        "fullName": "Player 118",
+        "link": "/api/v1/people/9500118",
+        "primaryPosition": {
+         "abbreviation": "RF"
+        }
+       },
+       {
+        "id": 9500119,
+        "fullName": "Player 119",
+        "link": "/api/v1/people/9500119",
+        "primaryPosition": {
+         "abbreviation": "1B"
+        }
+       },
+       {
+        "id": 9500120,
+        "fullName": "Player 120",
+        "link": "/api/v1/people/9500120",
+        "primaryPosition": {
+         "abbreviation": "DH"
+        }
+       },
+       {
+        "id": 9500121,
+        "fullName": "Player 121",
+        "link": "/api/v1/people/9500121",
+        "primaryPosition": {
+         "abbreviation": "3B"
+        }
+       },
+       {
+        "id": 9500122,
+        "fullName": "Player 122",
+        "link": "/api/v1/people/9500122",
+        "primaryPosition": {
+         "abbreviation": "LF"
+        }
+       },
+       {
+        "id": 9500123,
+        "fullName": "Player 123",
+        "link": "/api/v1/people/9500123",
+        "primaryPosition": {
+         "abbreviation": "2B"
+        }
+       },
+       {
+        "id": 9500124,
+        "fullName": "Player 124",
+        "link": "/api/v1/people/9500124",
+        "primaryPosition": {
+         "abbreviation": "C"
+        }
+       }
+      ]
+     }
+    }
+   ]
+  }
+ ]
+}

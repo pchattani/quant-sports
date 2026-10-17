@@ -1,0 +1,100 @@
+{
+  "tournament_id": 155,
+  "discovered_at": "2026-08-20T22:12:39Z",
+  "seasons": [
+    {
+      "year": 2026,
+      "apertura": 87913,
+      "names": {
+        "apertura": "Primera LPF 2026",
+        "clausura": "Primera LPF 2026"
+      },
+      "clausura": 87913
+    },
+    {
+      "year": 2025,
+      "clausura": 77826,
+      "names": {
+        "clausura": "Torneo Clausura",
+        "apertura": "Torneo Apertura"
+      },
+      "apertura": 70268
+    }
+  ],
+  "zones": {
+    "2026": {
+      "clausura": {
+        "A": [
+          "Instituto",
+          "Vélez Sarsfield",
+          "Independiente",
+          "Gimnasia Mendoza",
+          "Defensa y Justicia",
+          "Newell's Old Boys",
+          "Estudiantes",
+          "Deportivo Riestra",
+          "Lanús",
+          "Boca Juniors",
+          "Central Córdoba",
+          "San Lorenzo",
+          "Platense",
+          "Unión",
+          "Talleres"
+        ],
+        "B": [
+          "Argentinos Juniors",
+          "Belgrano",
+          "Rosario Central",
+          "Sarmiento",
+          "Barracas Central",
+          "Gimnasia LP",
+          "Atlético Tucumán",
+          "Tigre",
+          "Huracán",
+          "Independiente Rivadavia",
+          "Banfield",
+          "Racing Club",
+          "Estudiantes Río Cuarto",
+          "River Plate",
+          "Aldosivi"
+        ]
+      },
+      "apertura": {
+        "A": [
+          "Estudiantes",
+          "Boca Juniors",
+          "Vélez Sarsfield",
+          "Talleres",
+          "Independiente",
+          "Lanús",
+          "San Lorenzo",
+          "Unión",
+          "Instituto",
+          "Defensa y Justicia",
+          "Gimnasia Mendoza",
+          "Platense",
+          "Central Córdoba",
+          "Newell's Old Boys",
+          "Deportivo Riestra"
+        ],
+        "B": [
+          "Independiente Rivadavia",
+          "River Plate",
+          "Argentinos Juniors",
+          "Rosario Central",
+          "Belgrano",
+          "Gimnasia LP",
+          "Huracán",
+          "Racing Club",
+          "Barracas Central",
+          "Tigre",
+          "Sarmiento",
+          "Banfield",
+          "Atlético Tucumán",
+          "Aldosivi",
+          "Estudiantes Río Cuarto"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,116 @@
+{
+ "gamePk": 990679,
+ "gameData": {
+  "game": {
+   "pk": 990679,
+   "type": "R",
+   "doubleHeader": "N",
+   "gameNumber": 1,
+   "season": "2026"
+  },
+  "teams": {
+   "home": {
+    "id": 120,
+    "abbreviation": "WSH"
+   },
+   "away": {
+    "id": 121,
+    "abbreviation": "NYM"
+   }
+  },
+  "absChallenges": {
+   "hasChallenges": true,
+   "away": {
+    "usedSuccessful": 0,
+    "usedFailed": 1,
+    "remaining": 1
+   },
+   "home": {
+    "usedSuccessful": 2,
+    "usedFailed": 0,
+    "remaining": 2
+   }
+  },
+  "moundVisits": {
+   "away": {
+    "used": 4,
+    "remaining": 1
+   },
+   "home": {
+    "used": 1,
+    "remaining": 4
+   }
+  },
+  "weather": {
+   "condition": "Overcast",
+   "temp": "64",
+   "wind": "9 mph, In From LF"
+  },
+  "status": {
+   "abstractGameState": "Final",
+   "codedGameState": "F",
+   "detailedState": "Final",
+   "statusCode": "F",
+   "startTimeTBD": false,
+   "abstractGameCode": "F"
+  },
+  "venue": {
+   "id": 3309,
+   "name": "Nationals Park"
+  }
+ },
+ "liveData": {
+  "boxscore": {
+   "teams": {
+    "home": {
+     "team": {
+      "id": 120
+     },
+     "battingOrder": [
+      9500001,
+      9500002,
+      9500003,
+      9500004,
+      9500005,
+      9500006,
+      9500007,
+      9500008,
+      9500009
+     ]
+    },
+    "away": {
+     "team": {
+      "id": 121
+     },
+     "battingOrder": [
+      9500010,
+      9500011,
+      9500012,
+      9500013,
+      9500014,
+      9500015,
+      9500016,
+      9500017,
+      9500018
+     ]
+    }
+   }
+  },
+  "linescore": {
+   "teams": {
+    "home": {
+     "runs": 5,
+     "hits": 14,
+     "errors": 0,
+     "leftOnBase": 7
+    },
+    "away": {
+     "runs": 4,
+     "hits": 13,
+     "errors": 0,
+     "leftOnBase": 7
+    }
+   }
+  }
+ }
+}

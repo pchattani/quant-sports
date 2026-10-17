@@ -1,0 +1,175 @@
+id,TOR202510240
+version,2
+info,visteam,LAN
+info,hometeam,TOR
+info,site,TOR02
+info,date,2025/10/24
+info,number,0
+info,gametype,worldseries
+info,starttime,8:00PM
+info,daynight,night
+info,innings,9
+info,tiebreaker,
+info,usedh,true
+info,umphome,littw901
+info,ump1b,wegnm901
+info,ump2b,tumpj901
+info,ump3b,porta901
+info,umplf,hamaa901
+info,umprf,bakej902
+info,inputtime,2025/10/26 09:00:52
+info,howscored,unknown
+info,pitches,pitches
+info,oscorer,lajor701
+info,temp,68
+info,winddir,unknown
+info,windspeed,0
+info,fieldcond,unknown
+info,precip,none
+info,sky,dome
+info,timeofgame,193
+info,attendance,44353
+info,wp,domis001
+info,lp,snelb001
+info,save,
+start,ohtas001,"Shohei Ohtani",0,1,10
+start,bettm001,"Mookie Betts",0,2,6
+start,freef001,"Freddie Freeman",0,3,3
+start,smitw003,"Will Smith",0,4,2
+start,hernt002,"Teoscar Hernandez",0,5,9
+start,muncm001,"Max Muncy",0,6,5
+start,herne001,"Enrique Hernandez",0,7,7
+start,edmat001,"Tommy Edman",0,8,4
+start,pagea001,"Andy Pages",0,9,8
+start,snelb001,"Blake Snell",0,0,1
+start,sprig001,"George Springer",1,1,10
+start,schnd001,"Davis Schneider",1,2,7
+start,guerv002,"Vladimir Guerrero Jr.",1,3,3
+start,bichb001,"Bo Bichette",1,4,4
+start,kirka001,"Alejandro Kirk",1,5,2
+start,varsd001,"Daulton Varsho",1,6,8
+start,cleme002,"Ernie Clement",1,7,5
+start,stram002,"Myles Straw",1,8,9
+start,gimea001,"Andres Gimenez",1,9,6
+start,yesat001,"Trey Yesavage",1,0,1
+play,1,0,ohtas001,22,BCF.BS,K
+play,1,0,bettm001,32,BBSCBX,63/G6
+play,1,0,freef001,12,FFBX,43/G34
+play,1,1,sprig001,10,BX,63/G6D
+play,1,1,schnd001,11,BCX,6/P6D
+play,1,1,guerv002,32,CBBBC.F*B,W
+play,1,1,bichb001,30,BBBX,S9/G34.1-3
+play,1,1,kirka001,32,BFBBF.>F>F>F>*B,W.1-2
+play,1,1,varsd001,12,BCSX,8/F8
+play,2,0,smitw003,31,.BBCBB,W
+play,2,0,hernt002,12,*BCC.X,64(1)/FO/G56.B-1
+play,2,0,muncm001,01,CX,S7/L78.1-2
+play,2,0,herne001,11,BSX,S8/G6+.2-H;1-2
+badj,edmat001,R
+play,2,0,edmat001,22,BSS.*BX,S5/G56S.2-3;1-2
+play,2,0,pagea001,32,CF.*BBBS,K
+play,2,0,ohtas001,21,SBBX,3/G3
+play,2,1,cleme002,02,CFX,S7/L7S
+play,2,1,stram002,12,CBFT,K
+play,2,1,gimea001,22,*BBSFT,K
+play,2,1,sprig001,00,X,S3/G34S-.1X3(315)
+play,3,0,bettm001,31,BCBBB,W
+play,3,0,freef001,31,FB1*BBB,W.1-2
+play,3,0,smitw003,32,CSBBB.X,S9/G34.2-H;1X3(965);B-2
+play,3,0,hernt002,32,FBBSBX,43/G4M.2-3
+play,3,0,muncm001,22,*BCSBS,K
+play,3,1,schnd001,32,CBBS.BS,K
+play,3,1,guerv002,32,BCFBBX,S7/G56
+play,3,1,bichb001,01,SX,36(1)3/GDP/G3S
+play,4,0,herne001,02,TF.S,K
+badj,edmat001,R
+play,4,0,edmat001,12,BFFF*S,K
+play,4,0,pagea001,00,X,9/F89XD+
+play,4,1,kirka001,22,CFFBFFBX,S9/L9LD
+play,4,1,varsd001,00,X,HR/F8XD.1-H
+play,4,1,cleme002,00,X,8/F78S
+play,4,1,stram002,01,FX,7/L8
+play,4,1,gimea001,22,BFSBC,K
+play,5,0,ohtas001,00,,NP
+sub,fluhm001,"Mason Fluharty",1,0,1
+play,5,0,ohtas001,22,.CS.BBC,K
+play,5,0,bettm001,22,BBCCX,S8/G6
+play,5,0,freef001,12,BCFFFFX,8/F8XD
+play,5,0,smitw003,00,,NP
+sub,domis001,"Seranthony Dominguez",1,0,1
+play,5,0,smitw003,00,.X,9/F9
+play,5,1,sprig001,10,BX,S7/L7
+play,5,1,schnd001,22,*BC*BC.1FX,54(1)3/GDP/G56S
+play,5,1,guerv002,02,SCX,43/G4MD
+play,6,0,hernt002,22,FBBS.C,K
+play,6,0,muncm001,20,BBX,5/P5F/FL
+play,6,0,herne001,12,TBS.S,K
+play,6,1,bichb001,32,BBBCFB,W
+play,6,1,kirka001,00,,NP
+sub,kinei001,"Isiah Kiner-Falefa",1,4,12
+play,6,1,kirka001,00,.X,S9/G34.1-2
+play,6,1,varsd001,32,*BBFSF*BFFH,HP.2-3;1-2
+play,6,1,cleme002,00,,NP
+sub,sheee001,"Emmet Sheehan",0,0,1
+play,6,1,cleme002,01,.FX,S8/G6M.3-H;2-3;1-2
+play,6,1,stram002,00,,NP
+sub,luken001,"Nathan Lukes",1,8,11
+play,6,1,luken001,32,.STFBBFBFB,W.3-H;2-3;1-2
+play,6,1,gimea001,12,FFBX,S9/L9+.3-H;2-3;1-2
+play,6,1,sprig001,00,X,62(3)/FO/G6.2-3;1-2;B-1
+play,6,1,schnd001,00,,NP
+sub,barga001,"Addison Barger",1,2,11
+play,6,1,barga001,00,.,NP
+sub,banda001,"Anthony Banda",0,0,1
+play,6,1,barga001,21,..BFBX,HR/F89XD.3-H;2-H;1-H
+play,6,1,guerv002,00,X,S8/F8
+play,6,1,kinei001,11,SBX,7/F78D
+play,6,1,kirka001,10,BX,HR/F78XD.1-H
+play,6,1,varsd001,10,BX,7/F6D
+play,7,0,edmat001,00,,NP
+sub,barga001,"Addison Barger",1,2,9
+play,7,0,edmat001,00,.,NP
+sub,kinei001,"Isiah Kiner-Falefa",1,4,4
+play,7,0,edmat001,00,..,NP
+sub,luken001,"Nathan Lukes",1,8,7
+play,7,0,edmat001,00,...,NP
+sub,fishb002,"Braydon Fisher",1,0,1
+play,7,0,edmat001,30,....BBBB,W
+play,7,0,pagea001,22,CBFBC,K
+play,7,0,ohtas001,12,CBC.FX,HR/F9LD.1-H
+play,7,0,bettm001,12,CCBS,K
+play,7,0,freef001,12,TSFBX,9/F89
+play,7,1,cleme002,00,,NP
+sub,wrobj001,"Justin Wrobleski",0,0,1
+play,7,1,cleme002,02,.CTFX,8/F8XD
+play,7,1,luken001,01,FX,53/G15
+play,7,1,gimea001,32,BBBCF.FFX,43/G4
+play,8,0,smitw003,00,,NP
+sub,bassc001,"Chris Bassitt",1,0,1
+play,8,0,smitw003,12,.CFBX,3/G3S
+play,8,0,hernt002,32,CS.BFBB*B,W
+play,8,0,muncm001,22,CBCFBS,K
+play,8,0,herne001,12,CBFS,K
+play,8,1,sprig001,00,,NP
+sub,kleiw001,"Will Klein",0,0,1
+play,8,1,sprig001,12,.FBSFX,7/F78
+play,8,1,barga001,01,CX,S7/G1S
+play,8,1,guerv002,12,CF*BX,8/F89D
+play,8,1,kinei001,02,FFX,7/F78
+play,9,0,edmat001,00,,NP
+sub,lauee001,"Eric Lauer",1,0,1
+play,9,0,edmat001,00,.X,2/P2F/FL
+play,9,0,pagea001,21,CBBX,9/L89
+play,9,0,ohtas001,31,SBBBB,W
+play,9,0,bettm001,22,C1BFBFFS,K
+data,er,banda001,3
+data,er,kleiw001,0
+data,er,wrobj001,0
+data,er,snelb001,5
+data,er,sheee001,3
+data,er,bassc001,0
+data,er,lauee001,0
+data,er,yesat001,2
+data,er,domis001,0
+data,er,fluhm001,0
+data,er,fishb002,2

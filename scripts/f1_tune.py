@@ -1,0 +1,239 @@
+#!/usr/bin/env python
+"""
+Walk-forward tuning of the race simulator's constants (oddsmarkets/f1/models/race_sim.py).
+
+1. ``prep``: for every Grand Prix in the seasons asked for, the parts of the race inputs that do not depend on
+   the tunable constants (``race_sim.race_components``: entry list, circuit profile and reference lap, raw
+   results observations, the decomposition's pace, the actual grid and the qualifying model's grid
+   distribution), computed from data strictly before the race and pickled per race under
+   ``data/f1/cache/tune/<year>_<round>.pkl`` with the race's outcomes.
+2. ``grid``: every configuration in a JSON list of constant overrides is simulated for every race (common
+   random numbers: one seed per race), before qualifying (with and without the decomposition) and after,
+   and scored (winner log-loss, binary log-loss per event). Races are processed one at a time in worker
+   processes; nothing but the scores is kept.
+3. ``select``: walk-forward choice: for each season Y the configuration with the lowest mean winner log-loss
+   over the races of the seasons before Y (from ``--burn-in`` on) is scored on season Y; the production
+   choice is the configuration that is best over every season, written to
+   ``oddsmarkets/f1/models/fitted/race_params.json`` with ``--write``.
+
+    python scripts/f1_tune.py prep --from 2012 --to 2026
+    python scripts/f1_tune.py grid --configs configs.json --sims 2000 --out data/f1/cache/tune_grid.json
+    python scripts/f1_tune.py select --grid data/f1/cache/tune_grid.json --first 2014 [--write]
+"""
+from __future__ import annotations
+
+import argparse
+import gc
+import json
+import logging
+import math
+import os
+import pickle
+import sys
+
+for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):   # one BLAS thread per worker process
+    os.environ.setdefault(_v, "1")
+import time
+import warnings
+from datetime import datetime, timezone
+from multiprocessing import Pool
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+import numpy as np  # noqa: E402
+
+logger = logging.getLogger("f1_tune")
+TUNE = ROOT / "data" / "f1" / "cache" / "tune"
+VARIANTS = ("pre", "post", "pre_results_only")
+EPS = 1e-4
+
+
+# ----------------------------------------------------------------------------------------------- prep
+
+def _prep_season(year: int) -> tuple[int, int, float]:
+    warnings.filterwarnings("ignore")
+    from oddsmarkets.f1.models import backtest as bt
+    from oddsmarkets.f1.models import race_sim as rs
+    t0 = time.perf_counter()
+    TUNE.mkdir(parents=True, exist_ok=True)
+    n = 0
+    for r, race in bt._season_races(year):
+        oc = bt._outcomes(race)
+        if len(oc) < 2:
+            continue
+        try:
+            comp = rs.race_components(year, r, before_quali=True, use_a=True)
+            post = rs.race_components(year, r, before_quali=False, use_a=False)
+        except Exception as exc:                                      # one bad race must not stop the run
+            logger.warning("%s/%s: %s", year, r, exc)
+            continue
+        comp["grid_actual"] = post["grid"]
+        comp["quali_pace_actual"] = post.get("quali_pace")
+        comp["outcomes"] = oc
+        with open(TUNE / f"{year}_{r}.pkl", "wb") as fh:
+            pickle.dump(comp, fh, protocol=pickle.HIGHEST_PROTOCOL)
+        n += 1
+        del comp, post
+    gc.collect()
+    return year, n, round(time.perf_counter() - t0, 1)
+
+
+# ----------------------------------------------------------------------------------------------- grid
+
+def _variant_inputs(rs, comp: dict, variant: str):
+    c = dict(comp)
+    if variant == "post":
+        c["grid"], c["grid_dist"] = comp["grid_actual"], None
+        c["quali_pace"] = comp.get("quali_pace_actual")       # absent from pickles made before October 2026
+    elif variant == "pre_results_only":
+        c["a"], c["grid_dist"], c["grid"] = None, None, None
+    else:
+        c["grid"] = None
+    return rs.inputs_from_components(c)
+
+
+def score_race(res_drivers: dict, oc: dict) -> dict:
+    """Winner log-loss and binary log-loss sums for one race's forecast."""
+    drivers = list(oc)
+    N = len(drivers)
+    pw = np.array([float((res_drivers.get(d) or {}).get("p_win", 1.0 / N)) for d in drivers])
+    winner = next((i for i, d in enumerate(drivers) if oc[d]["win"]), None)
+    out = {"ll": {}, "pw": [round(float(x), 5) for x in pw], "win": [oc[d]["win"] for d in drivers]}
+    s = pw.sum()
+    out["wll"] = -math.log(max(pw[winner] / s if s > 0 else 0.0, EPS)) if winner is not None else None
+    for e, key in (("win", "p_win"), ("podium", "p_podium"), ("points", "p_points"), ("dnf", "p_dnf")):
+        p = np.clip(np.array([float((res_drivers.get(d) or {}).get(key, 0.0)) for d in drivers]), EPS, 1 - EPS)
+        y = np.array([oc[d][e] for d in drivers], float)
+        out["ll"][e] = [float(-np.sum(y * np.log(p) + (1 - y) * np.log(1 - p))), int(N)]
+    return out
+
+
+def _grid_chunk(args: tuple) -> dict:
+    files, configs, sims, variants = args
+    warnings.filterwarnings("ignore")
+    from oddsmarkets.f1.models import race_sim as rs
+    base = {k: getattr(rs, k) for cfg in configs for k in cfg if k != "id"}
+    out: dict = {}
+    for f in files:
+        with open(f, "rb") as fh:
+            comp = pickle.load(fh)
+        key = f"{comp['year']}_{comp['round']}"
+        seed = 1000 * comp["year"] + comp["round"]
+        for cfg in configs:
+            rs.set_params(**{k: v for k, v in base.items()})
+            rs.set_params(**{k: (tuple(v) if isinstance(base.get(k), tuple) else v) for k, v in cfg.items() if k != "id"})
+            for v in variants:
+                if v == "post" and not comp.get("grid_actual"):
+                    continue
+                inp = _variant_inputs(rs, comp, v)
+                res = rs.simulate_race(inp, n=sims, seed=seed)
+                out.setdefault(cfg["id"], {}).setdefault(v, {})[key] = score_race(res["drivers"], comp["outcomes"])
+                del res, inp
+        del comp
+        gc.collect()
+    rs.set_params(**base)
+    return out
+
+
+def run_grid(configs: list[dict], sims: int, seasons: list[int], workers: int, variants=VARIANTS) -> dict:
+    files = sorted(p for p in TUNE.glob("*.pkl") if int(p.stem.split("_")[0]) in seasons)
+    chunks = [files[i::workers * 3] for i in range(workers * 3)]
+    merged: dict = {}
+    with Pool(workers, maxtasksperchild=4) as pool:
+        for part in pool.imap_unordered(_grid_chunk, [(c, configs, sims, variants) for c in chunks if c]):
+            for cid, vv in part.items():
+                for v, races in vv.items():
+                    merged.setdefault(cid, {}).setdefault(v, {}).update(races)
+    return merged
+
+
+# ----------------------------------------------------------------------------------------------- select
+
+def summarise(grid: dict, cid: str, variant: str, seasons: list[int] | None = None) -> dict:
+    races = {k: v for k, v in (grid.get(cid, {}).get(variant) or {}).items() if seasons is None or int(k.split("_")[0]) in seasons}
+    wl = [v["wll"] for v in races.values() if v.get("wll") is not None]
+    ll = {}
+    for e in ("win", "podium", "points", "dnf"):
+        s = sum(v["ll"][e][0] for v in races.values())
+        n = sum(v["ll"][e][1] for v in races.values())
+        ll[e] = round(s / n, 5) if n else None
+    return {"races": len(races), "winner_ll": round(float(np.mean(wl)), 4) if wl else None, "ll": ll}
+
+
+def walk_forward(grid: dict, variant: str, first: int, burn_in: int) -> dict:
+    """Per season Y >= first: the config best on seasons [burn_in, Y) is scored on Y."""
+    seasons = sorted({int(k.split("_")[0]) for cid in grid for k in (grid[cid].get(variant) or {})})
+    picks, rows = {}, []
+    for y in seasons:
+        if y < first:
+            continue
+        train = [s for s in seasons if burn_in <= s < y]
+        best = min(grid, key=lambda c: summarise(grid, c, variant, train)["winner_ll"] or 9e9)
+        picks[y] = best
+        rows += [v for k, v in grid[best][variant].items() if int(k.split("_")[0]) == y]
+    wl = [v["wll"] for v in rows if v.get("wll") is not None]
+    return {"picks": picks, "winner_ll": round(float(np.mean(wl)), 4) if wl else None, "races": len(rows)}
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    p1 = sub.add_parser("prep")
+    p1.add_argument("--from", dest="start", type=int, default=2012)
+    p1.add_argument("--to", dest="end", type=int, default=datetime.now(timezone.utc).year)
+    p1.add_argument("--workers", type=int, default=8)
+    p2 = sub.add_parser("grid")
+    p2.add_argument("--configs", required=True)
+    p2.add_argument("--sims", type=int, default=2000)
+    p2.add_argument("--from", dest="start", type=int, default=2012)
+    p2.add_argument("--to", dest="end", type=int, default=datetime.now(timezone.utc).year)
+    p2.add_argument("--workers", type=int, default=8)
+    p2.add_argument("--variants", default=",".join(VARIANTS))
+    p2.add_argument("--out", required=True)
+    p3 = sub.add_parser("select")
+    p3.add_argument("--grid", required=True)
+    p3.add_argument("--first", type=int, default=2014)
+    p3.add_argument("--burn-in", type=int, default=2012)
+    p3.add_argument("--write", action="store_true")
+    args = ap.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    if args.cmd == "prep":
+        with Pool(args.workers, maxtasksperchild=1) as pool:
+            for y, n, s in pool.imap_unordered(_prep_season, range(args.start, args.end + 1)):
+                logger.info("prep %d: %d races (%.1f s)", y, n, s)
+        return 0
+    if args.cmd == "grid":
+        configs = json.loads(Path(args.configs).read_text(encoding="utf-8"))
+        t0 = time.perf_counter()
+        g = run_grid(configs, args.sims, list(range(args.start, args.end + 1)), args.workers, tuple(args.variants.split(",")))
+        Path(args.out).write_text(json.dumps({"configs": configs, "sims": args.sims, "grid": g}), encoding="utf-8")
+        logger.info("grid: %d configs in %.0f s", len(configs), time.perf_counter() - t0)
+        for c in configs:
+            logger.info("%s %s", c["id"], {v: summarise(g, c["id"], v)["winner_ll"] for v in VARIANTS if v in g.get(c["id"], {})})
+        return 0
+    d = json.loads(Path(args.grid).read_text(encoding="utf-8"))
+    g, configs = d["grid"], {c["id"]: c for c in d["configs"]}
+    report = {}
+    for v in VARIANTS:
+        if not any(v in g[c] for c in g):
+            continue
+        wf = walk_forward(g, v, args.first, args.burn_in)
+        seasons = sorted({int(k.split("_")[0]) for c in g for k in (g[c].get(v) or {})})
+        best = min(g, key=lambda c: summarise(g, c, v, [s for s in seasons if s >= args.burn_in])["winner_ll"] or 9e9)
+        report[v] = {"walk_forward": wf, "best_overall": best, "best_summary": summarise(g, best, v)}
+        print(v, json.dumps(report[v]))
+    if args.write:
+        best = report["post"]["best_overall"]
+        cfg = {k: v for k, v in configs[best].items() if k != "id"}
+        out = ROOT / "oddsmarkets" / "f1" / "models" / "fitted" / "race_params.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps({"fitted_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "config": best,
+                                   "params": cfg, "selection": report}, indent=1), encoding="utf-8")
+        print("wrote", out)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

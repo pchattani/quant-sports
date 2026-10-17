@@ -1,0 +1,116 @@
+{
+ "gamePk": 990841,
+ "gameData": {
+  "game": {
+   "pk": 990841,
+   "type": "F",
+   "doubleHeader": "N",
+   "gameNumber": 1,
+   "season": "2026"
+  },
+  "teams": {
+   "home": {
+    "id": 144,
+    "abbreviation": "ATL"
+   },
+   "away": {
+    "id": 143,
+    "abbreviation": "PHI"
+   }
+  },
+  "absChallenges": {
+   "hasChallenges": true,
+   "away": {
+    "usedSuccessful": 2,
+    "usedFailed": 2,
+    "remaining": 0
+   },
+   "home": {
+    "usedSuccessful": 1,
+    "usedFailed": 1,
+    "remaining": 1
+   }
+  },
+  "moundVisits": {
+   "away": {
+    "used": 3,
+    "remaining": 2
+   },
+   "home": {
+    "used": 2,
+    "remaining": 3
+   }
+  },
+  "weather": {
+   "condition": "Clear",
+   "temp": "71",
+   "wind": "7 mph, Out To CF"
+  },
+  "status": {
+   "abstractGameState": "Final",
+   "codedGameState": "F",
+   "detailedState": "Final",
+   "statusCode": "F",
+   "startTimeTBD": false,
+   "abstractGameCode": "F"
+  },
+  "venue": {
+   "id": 4705,
+   "name": "Truist Park"
+  }
+ },
+ "liveData": {
+  "boxscore": {
+   "teams": {
+    "home": {
+     "team": {
+      "id": 144
+     },
+     "battingOrder": [
+      9500029,
+      9500030,
+      9500031,
+      9500032,
+      9500033,
+      9500034,
+      9500035,
+      9500036,
+      9500037
+     ]
+    },
+    "away": {
+     "team": {
+      "id": 143
+     },
+     "battingOrder": [
+      9500038,
+      9500039,
+      9500040,
+      9500041,
+      9500042,
+      9500043,
+      9500044,
+      9500045,
+      9500046
+     ]
+    }
+   }
+  },
+  "linescore": {
+   "teams": {
+    "home": {
+     "runs": 3,
+     "hits": 13,
+     "errors": 0,
+     "leftOnBase": 7
+    },
+    "away": {
+     "runs": 4,
+     "hits": 14,
+     "errors": 0,
+     "leftOnBase": 7
+    }
+   }
+  }
+ }
+}

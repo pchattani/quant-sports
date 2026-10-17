@@ -1,0 +1,111 @@
+/* The Quant Footballer — player value, strengths and needs, the transfer simulator (value.js).
+ * Football-specific and self-contained: style.css is the shared base the sister sites copy,
+ * so nothing here overrides it. */
+
+.vsmall { font-size: 0.78rem; color: var(--text2); }
+.vsmall p, p.vsmall { margin: 0 0 6px; }
+.vup { color: var(--green); font-weight: 600; }
+.vdown { color: var(--red); font-weight: 600; }
+
+/* Role badges: the eight roles read from formations, and the three coarse fallbacks. */
+.vrole { display: inline-block; min-width: 26px; padding: 0 5px; border-radius: 4px; font-size: 0.66rem; font-weight: 700;
+         text-align: center; line-height: 1.6; background: var(--bg3); color: var(--text2); border: 1px solid var(--border); }
+.vrole-GK { background: #4b3a12; color: #e3b341; border-color: #4b3a12; }
+.vrole-CB, .vrole-FB, .vrole-DF { background: #12324b; color: #79c0ff; border-color: #12324b; }
+.vrole-DM, .vrole-CM, .vrole-MF { background: #123f2a; color: #56d364; border-color: #123f2a; }
+.vrole-AM, .vrole-W { background: #2f2350; color: #d2a8ff; border-color: #2f2350; }
+.vrole-ST, .vrole-FW { background: #4b1f1f; color: #ff7b72; border-color: #4b1f1f; }
+
+/* The components that drive a value. */
+.vdrv { display: inline-block; font-size: 0.72rem; padding: 0 6px; border-radius: 10px; border: 1px solid var(--border); white-space: nowrap; margin: 1px 0; }
+.vdrv.up { color: var(--green); border-color: rgba(63,185,80,0.45); }
+.vdrv.down { color: var(--red); border-color: rgba(248,81,73,0.45); }
+
+/* Best at each position. */
+.vbest { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; padding: 12px; }
+.vbest-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.vbest-head { font-weight: 700; font-size: 0.86rem; margin-bottom: 4px; }
+.vbest-card ol { margin: 0; padding-left: 20px; }
+.vbest-card li { margin: 0 0 6px; font-size: 0.8rem; }
+.vbest-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.vbest-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vbest-val { font-variant-numeric: tabular-nums; font-weight: 700; }
+.vbest-sub { color: var(--text3); font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vbest-why { margin-top: 1px; }
+
+/* Strengths and needs on the club page. */
+.vgrade { display: inline-block; width: 24px; height: 24px; line-height: 24px; border-radius: 6px; font-weight: 800; text-align: center; color: #0d1117; }
+.vgrade-A { background: #3fb950; } .vgrade-B { background: #8bd17c; } .vgrade-C { background: #d29922; }
+.vgrade-D { background: #f0883e; } .vgrade-E { background: #f85149; }
+.vsw ol { margin: 4px 0 0; padding-left: 20px; font-size: 0.82rem; color: var(--text2); }
+.vsw li { margin-bottom: 5px; line-height: 1.5; }
+.vsw-head { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); font-weight: 700; }
+.vsw-head.up { color: var(--green); } .vsw-head.down { color: var(--red); }
+.vneed-unit { padding: 8px 14px 2px; font-weight: 700; font-size: 0.86rem; border-top: 1px solid var(--border); }
+
+/* The transfer simulator. */
+.vtr-pick { align-items: flex-end; }
+.vtr-pick label { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.vgrow { flex: 1 1 260px; }
+.vpicker { position: relative; width: 100%; flex: 0 0 auto; max-width: none; }
+.vpicker input { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 0.86rem; }
+.vpicker .search-results { left: 0; right: 0; }
+.vplayer-name { font-size: 1.15rem; font-weight: 700; }
+.vkpis { margin: 10px 0 8px; }
+.vunit-head { padding: 10px 14px 2px; font-weight: 700; font-size: 0.84rem; }
+tr.vnew td { background: rgba(63,185,80,0.08); }
+tr.vgone td { opacity: 0.55; }
+.vouts { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.vout { font-size: 0.8rem; color: var(--text2); white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .vtr-pick { flex-direction: column; align-items: stretch; }
+  .vgrow { flex: 1 1 auto; }
+  .vbest { grid-template-columns: 1fr; padding: 8px; }
+  .vout { white-space: normal; }
+}
+
+/* Grid cells holding wide tables must be allowed to shrink (the table scrolls in its wrapper). */
+.vcell, .vsw > div, .vneeds .grid-2 > div { min-width: 0; }
+
+/* ── transfers (feed, deals, windows, ledgers) ── */
+.tkind { display: inline-block; padding: 0 6px; border-radius: 4px; font-size: 0.68rem; font-weight: 600; white-space: nowrap; background: #21262d; color: var(--text2); }
+.tkind-fee { background: #12324b; color: #79c0ff; }
+.tkind-free { background: #123f2a; color: #56d364; }
+.tkind-loan { background: #2f2350; color: #d2a8ff; }
+.tkind-undisclosed { background: #3a2f12; color: #e3b341; }
+.tafford { display: inline-block; padding: 0 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+.tafford-yes { background: rgba(63,185,80,0.18); color: #56d364; }
+.tafford-stretch { background: rgba(210,153,34,0.18); color: #e3b341; }
+.tafford-no { background: rgba(248,81,73,0.18); color: #ff7b72; }
+a.fam-btn { text-decoration: none; display: inline-block; }
+
+/* ── fantasy ── */
+.fpos { display: inline-block; min-width: 30px; padding: 0 4px; border-radius: 4px; font-size: 0.64rem; font-weight: 700; text-align: center; }
+.fpos-G { background: #4b3a12; color: #e3b341; } .fpos-D { background: #12324b; color: #79c0ff; }
+.fpos-M { background: #123f2a; color: #56d364; } .fpos-F { background: #4b1f1f; color: #ff7b72; }
+.ftier { display: inline-block; min-width: 20px; border-radius: 10px; font-size: 0.7rem; font-weight: 700; color: #0d1117; }
+.ftier-1 { background: #3fb950; } .ftier-2 { background: #8bd17c; } .ftier-3 { background: #d29922; }
+.ftier-4 { background: #db6d28; } .ftier-5, .ftier-6 { background: #8b949e; }
+.fa-views { flex-wrap: wrap; }
+.fa-caps { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; padding: 10px 14px; }
+.fa-cap { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center; padding: 8px; border: 1px solid var(--border, #30363d); border-radius: 8px; }
+.fa-cap-rank { font-weight: 800; color: var(--text2); text-align: center; }
+.fa-cap-pts { text-align: right; font-weight: 700; font-size: 1.05rem; }
+.fa-pick-sub { padding: 0 0 6px; }
+.fdr-wrap td { padding: 3px; }
+.fdr { display: inline-block; min-width: 54px; margin: 1px; padding: 2px 4px; border-radius: 4px; font-size: 0.68rem; font-weight: 700; color: #0d1117; text-align: center; }
+.fdr span { display: block; font-weight: 500; font-size: 0.64rem; }
+.fdr-1 { background: #3fb950; } .fdr-2 { background: #8bd17c; } .fdr-3 { background: #c9d1d9; }
+.fdr-4 { background: #f0883e; } .fdr-5 { background: #f85149; } .fdr-blank { background: #21262d; color: var(--text2); }
+.fa-pitch { background: linear-gradient(180deg, rgba(46,160,67,0.10), rgba(46,160,67,0.04)); border-radius: 8px; margin: 6px 14px; padding: 4px 0; }
+.fa-line { padding: 6px 14px; }
+.fa-line-label { font-size: 0.72rem; color: var(--text2); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.fa-line-players { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.fa-shirt { min-width: 120px; max-width: 170px; padding: 6px 8px; border: 1px solid var(--border, #30363d); border-radius: 8px; text-align: center; background: var(--bg2, #161b22); }
+.fa-shirt-name { font-weight: 600; font-size: 0.8rem; }
+@media (max-width: 640px) {
+  .fa-shirt { min-width: 0; flex: 1 1 42%; }
+  .fa-caps { grid-template-columns: 1fr; padding: 8px; }
+  .fdr { min-width: 40px; }
+}

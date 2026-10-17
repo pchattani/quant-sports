@@ -1,0 +1,2374 @@
+{
+  "discovered_at": "2026-09-30T23:02:34Z",
+  "leagues": {
+    "premier-league": {
+      "tournament_id": 17,
+      "seasons": [
+        {
+          "season_id": 96668,
+          "name": "Premier League 26/27",
+          "year": "26/27"
+        },
+        {
+          "season_id": 76986,
+          "name": "Premier League 25/26",
+          "year": "25/26"
+        }
+      ],
+      "teams": [
+        "Manchester City",
+        "Arsenal",
+        "Brighton",
+        "Brentford",
+        "Leeds",
+        "Liverpool",
+        "Everton",
+        "Hull",
+        "Newcastle",
+        "Chelsea",
+        "Ipswich",
+        "Manchester United",
+        "Nottingham Forest",
+        "Sunderland",
+        "Crystal Palace",
+        "Aston Villa",
+        "Bournemouth",
+        "Coventry",
+        "Fulham",
+        "Tottenham"
+      ],
+      "conferences": {},
+      "previous_rank": {
+        "Arsenal": 1,
+        "Manchester City": 2,
+        "Manchester United": 3,
+        "Aston Villa": 4,
+        "Liverpool": 5,
+        "Bournemouth": 6,
+        "Sunderland": 7,
+        "Brighton": 8,
+        "Brentford": 9,
+        "Chelsea": 10,
+        "Fulham": 11,
+        "Newcastle": 12,
+        "Everton": 13,
+        "Leeds": 14,
+        "Crystal Palace": 15,
+        "Nottingham Forest": 16,
+        "Tottenham": 17,
+        "West Ham": 18,
+        "Burnley": 19,
+        "Wolves": 20
+      },
+      "bands_seen": [
+        "Champions League",
+        "Europa League",
+        "Relegation"
+      ]
+    },
+    "la-liga": {
+      "tournament_id": 8,
+      "seasons": [
+        {
+          "season_id": 97268,
+          "name": "LaLiga 26/27",
+          "year": "26/27"
+        },
+        {
+          "season_id": 77559,
+          "name": "LaLiga 25/26",
+          "year": "25/26"
+        }
+      ],
+      "teams": [
+        "Barcelona",
+        "Atlético Madrid",
+        "Real Madrid",
+        "Real Betis",
+        "Sevilla",
+        "Alavés",
+        "Deportivo La Coruña",
+        "Athletic Club",
+        "Getafe",
+        "Rayo Vallecano",
+        "Osasuna",
+        "Celta Vigo",
+        "Espanyol",
+        "Real Sociedad",
+        "Racing Santander",
+        "Villarreal",
+        "Levante",
+        "Elche",
+        "Valencia",
+        "Málaga"
+      ],
+      "conferences": {},
+      "previous_rank": {
+        "Barcelona": 1,
+        "Real Madrid": 2,
+        "Villarreal": 3,
+        "Atlético Madrid": 4,
+        "Real Betis": 5,
+        "Celta Vigo": 6,
+        "Getafe": 7,
+        "Rayo Vallecano": 8,
+        "Valencia": 9,
+        "Real Sociedad": 10,
+        "Espanyol": 11,
+        "Athletic Club": 12,
+        "Sevilla": 13,
+        "Alavés": 14,
+        "Elche": 15,
+        "Levante": 16,
+        "Osasuna": 17,
+        "Mallorca": 18,
+        "Girona": 19,
+        "Oviedo": 20
+      },
+      "bands_seen": [
+        "Champions League",
+        "Conference League Qualification",
+        "Europa League",
+        "Relegation"
+      ]
+    },
+    "serie-a": {
+      "tournament_id": 23,
+      "seasons": [
+        {
+          "season_id": 95836,
+          "name": "Serie A 26/27",
+          "year": "26/27"
+        },
+        {
+          "season_id": 76457,
+          "name": "Serie A 25/26",
+          "year": "25/26"
+        }
+      ],
+      "teams": [
+        "Roma",
+        "Inter",
+        "Lazio",
+        "Cagliari",
+        "Frosinone",
+        "Como",
+        "Milan",
+        "Juventus",
+        "Napoli",
+        "Sassuolo",
+        "Atalanta",
+        "Lecce",
+        "Udinese",
+        "Torino",
+        "Parma",
+        "Monza",
+        "Fiorentina",
+        "Bologna",
+        "Genoa",
+        "Venezia"
+      ],
+      "conferences": {},
+      "previous_rank": {
+        "Inter": 1,
+        "Napoli": 2,
+        "Roma": 3,
+        "Como": 4,
+        "Milan": 5,
+        "Juventus": 6,
+        "Atalanta": 7,
+        "Bologna": 8,
+        "Lazio": 9,
+        "Udinese": 10,
+        "Sassuolo": 11,
+        "Torino": 12,
+        "Parma": 13,
+        "Cagliari": 14,
+        "Fiorentina": 15,
+        "Genoa": 16,
+        "Lecce": 17,
+        "Cremonese": 18,
+        "Hellas Verona": 19,
+        "Pisa": 20
+      },
+      "bands_seen": [
+        "Champions League",
+        "Conference League Qualification",
+        "Europa League",
+        "Relegation"
+      ]
+    },
+    "bundesliga": {
+      "tournament_id": 35,
+      "seasons": [
+        {
+          "season_id": 97464,
+          "name": "Bundesliga 26/27",
+          "year": "26/27"
+        },
+        {
+          "season_id": 77333,
+          "name": "Bundesliga 25/26",
+          "year": "25/26"
+        }
+      ],
+      "teams": [
+        "Dortmund",
+        "Bayern München",
+        "Freiburg",
+        "Augsburg",
+        "Leverkusen",
+        "Mainz",
+        "Elversberg",
+        "Werder Bremen",
+        "RB Leipzig",
+        "Eintracht Frankfurt",
+        "Schalke",
+        "Köln",
+        "Hoffenheim",
+        "Stuttgart",
+        "Hamburg",
+        "Paderborn",
+        "Union Berlin",
+        "Mönchengladbach"
+      ],
+      "conferences": {},
+      "previous_rank": {
+        "Bayern München": 1,
+        "Dortmund": 2,
+        "RB Leipzig": 3,
+        "Stuttgart": 4,
+        "Hoffenheim": 5,
+        "Leverkusen": 6,
+        "Freiburg": 7,
+        "Eintracht Frankfurt": 8,
+        "Augsburg": 9,
+        "Mainz": 10,
+        "Union Berlin": 11,
+        "Mönchengladbach": 12,
+        "Hamburg": 13,
+        "Köln": 14,
+        "Werder Bremen": 15,
+        "Wolfsburg": 16,
+        "Heidenheim": 17,
+        "St. Pauli": 18
+      },
+      "bands_seen": [
+        "Champions League",
+        "Conference League Qualification",
+        "Europa League",
+        "Relegation",
+        "Relegation Playoffs"
+      ]
+    },
+    "ligue-1": {
+      "tournament_id": 34,
+      "seasons": [
+        {
+          "season_id": 96127,
+          "name": "Ligue 1 26/27",
+          "year": "26/27"
+        },
+        {
+          "season_id": 77356,
+          "name": "Ligue 1 25/26",
+          "year": "25/26"
+        }
+      ],
+      "teams": [
+        "Monaco",
+        "Lyon",
+        "Paris FC",
+        "Lille",
+        "Rennes",
+        "Angers",
+        "Strasbourg",
+        "Le Mans",
+        "Auxerre",
+        "PSG",
+        "Brest",
+        "Lorient",
+        "Toulouse",
+        "Nice",
+        "Lens",
+        "Troyes",
+        "Marseille",
+        "Le Havre"
+      ],
+      "conferences": {},
+      "previous_rank": {
+        "PSG": 1,
+        "Lens": 2,
+        "Lille": 3,
+        "Lyon": 4,
+        "Marseille": 5,
+        "Rennes": 6,
+        "Monaco": 7,
+        "Strasbourg": 8,
+        "Lorient": 9,
+        "Toulouse": 10,
+        "Paris FC": 11,
+        "Brest": 12,
+        "Angers": 13,
+        "Le Havre": 14,
+        "Auxerre": 15,
+        "Nice": 16,
+        "Nantes": 17,
+        "Metz": 18
+      },
+      "bands_seen": [
+        "Champions League",
+        "Champions League Qualification",
+        "Conference League Qualification",
+        "Europa League",
+        "Relegation",
+        "Relegation Playoffs"
+      ]
+    },
+    "eredivisie": {
+      "tournament_id": 37,
+      "seasons": [
+        {
+          "season_id": 96143,
+          "name": "Eredivisie 26/27",
+          "year": "26/27"
+        },
+        {
+          "season_id": 77012,
+          "name": "VriendenLoterij Eredivisie 25/26",
+          "year": "25/26"
+        }
+      ],
+      "teams": [
+        "AZ",
+        "Feyenoord",
+        "PSV",
+        "Twente",
+        "Ajax",
+        "Fortuna Sittard",
+        "Excelsior",
+        "Groningen",
+        "Go Ahead Eagles",
+        "Heerenveen",
+        "NEC",
+        "Sparta Rotterdam",
+        "Telstar",
+        "Cambuur",
+        "Utrecht",
+        "PEC Zwolle",
+        "ADO Den Haag",
+        "Willem II"
+      ],
+      "conferences": {},
+      "previous_rank": {
+        "PSV": 1,
+        "Feyenoord": 2,
+        "NEC": 3,
+        "Twente": 4,
+        "Ajax": 5,
+        "Utrecht": 6,
+        "AZ": 7,
+        "Heerenveen": 8,
+        "Groningen": 9,
+        "Sparta Rotterdam": 10,
+        "Fortuna Sittard": 11,
+        "Go Ahead Eagles": 12,
+        "Excelsior": 13,
+        "Telstar": 14,
+        "PEC Zwolle": 15,
+        "Volendam": 16,
+        "NAC Breda": 17,
+        "Heracles": 18
+      },
+      "bands_seen": [
+        "Champions League",
+        "Champions League Qualification",
+        "Europa League Qualification",
+        "Qualification Playoffs",
+        "Relegation",
+        "Relegation Playoffs"
+      ]
+    },
+    "primeira-liga": {
+      "tournament_id": 238,
+      "seasons": [
+        {
+          "season_id": 97436,
+          "name": "Liga Portugal 26/27",
+          "year": "26/27"
+        },
+        {
+          "season_id": 77806,
+          "name": "Liga Portugal 25/26",
+          "year": "25/26"
+        }
+      ],
+      "teams": [
+        "Porto",
+        "Benfica",
+        "Sporting",
+        "Santa Clara",
+        "Arouca",
+        "Académico Viseu",
+        "Estrela Amadora",
+        "Moreirense",
+        "Braga",
+        "Gil Vicente",
+        "Alverca",
+        "Marítimo",
+        "Famalicão",
+        "Vitória Guimarães",
+        "Nacional",
+        "Rio Ave",
+        "Estoril",
+        "Casa Pia"
+      ],
+      "conferences": {},
+      "previous_rank": {
+        "Porto": 1,
+        "Sporting": 2,
+        "Benfica": 3,
+        "Braga": 4,
+        "Famalicão": 5,
+        "Gil Vicente": 6,
+        "Moreirense": 7,
+        "Arouca": 8,
+        "Vitória Guimarães": 9,
+        "Estoril": 10,
+        "Alverca": 11,
+        "Rio Ave": 12,
+        "Santa Clara": 13,
+        "Nacional": 14,
+        "Estrela Amadora": 15,
+        "Casa Pia": 16,
+        "Tondela": 17,
+        "AVS": 18
+      },
+      "bands_seen": [
+        "Champions League",
+        "Champions League Qualification",
+        "Conference League Qualification",
+        "Europa League Qualification",
+        "Relegation",
+        "Relegation Playoffs"
+      ]
+    },
+    "brasileirao": {
+      "tournament_id": 325,
+      "seasons": [
+        {
+          "season_id": 87678,
+          "name": "Brasileiro Serie A 2026",
+          "year": "2026"
+        },
+        {
+          "season_id": 72034,
+          "name": "Brasileiro Serie A 2025",
+          "year": "2025"
+        }
+      ],
+      "teams": [
+        "Flamengo",
+        "Palmeiras",
+        "Athletico Paranaense",
+        "Bahia",
+        "Fluminense",
+        "Cruzeiro",
+        "Atlético Mineiro",
+        "Santos",
+        "Coritiba",
+        "Bragantino",
+        "São Paulo",
+        "Botafogo",
+        "Vitória",
+        "Corinthians",
+        "Mirassol",
+        "Vasco da Gama",
+        "Grêmio",
+        "Internacional",
+        "Remo",
+        "Chapecoense"
+      ],
+      "conferences": {},
+      "previous_rank": {
+        "Flamengo": 1,
+        "Palmeiras": 2,
+        "Cruzeiro": 3,
+        "Mirassol": 4,
+        "Fluminense": 5,
+        "Botafogo": 6,
+        "Bahia": 7,
+        "São Paulo": 8,
+        "Grêmio": 9,
+        "Bragantino": 10,
+        "Atlético Mineiro": 11,
+        "Santos": 12,
+        "Corinthians": 13,
+        "Vasco da Gama": 14,
+        "Vitória": 15,
+        "Internacional": 16,
+        "Ceará": 17,
+        "Fortaleza": 18,
+        "Juventude": 19,
+        "Sport Recife": 20
+      },
+      "bands_seen": [
+        "Copa Libertadores",
+        "Copa Libertadores Qualification",
+        "Copa Sudamericana",
+        "Relegation"
+      ]
+    },
+    "mls": {
+      "tournament_id": 242,
+      "seasons": [
+        {
+          "season_id": 86668,
+          "name": "MLS 2026",
+          "year": "2026"
+        },
+        {
+          "season_id": 70158,
+          "name": "MLS 2025",
+          "year": "2025"
+        }
+      ],
+      "teams": [
+        "Nashville",
+        "Vancouver Whitecaps",
+        "New England",
+        "Inter Miami",
+        "Houston Dynamo",
+        "St. Louis City",
+        "FC Dallas",
+        "Charlotte",
+        "San Jose",
+        "LAFC",
+        "Chicago Fire",
+        "Colorado Rapids",
+        "Philadelphia Union",
+        "Orlando City",
+        "NY Red Bulls",
+        "FC Cincinnati",
+        "LA Galaxy",
+        "Portland Timbers",
+        "NYCFC",
+        "San Diego",
+        "Austin",
+        "Real Salt Lake",
+        "Seattle Sounders",
+        "Minnesota United",
+        "DC United",
+        "Toronto",
+        "Columbus Crew",
+        "Atlanta United",
+        "CF Montréal",
+        "Sporting KC"
+      ],
+      "conferences": {
+        "Eastern": [
+          "Nashville",
+          "New England",
+          "Inter Miami",
+          "Charlotte",
+          "Chicago Fire",
+          "Philadelphia Union",
+          "Orlando City",
+          "NY Red Bulls",
+          "FC Cincinnati",
+          "NYCFC",
+          "DC United",
+          "Toronto",
+          "Columbus Crew",
+          "Atlanta United",
+          "CF Montréal"
+        ],
+        "Western": [
+          "Vancouver Whitecaps",
+          "Houston Dynamo",
+          "St. Louis City",
+          "FC Dallas",
+          "San Jose",
+          "LAFC",
+          "Colorado Rapids",
+          "LA Galaxy",
+          "Portland Timbers",
+          "San Diego",
+          "Austin",
+          "Real Salt Lake",
+          "Seattle Sounders",
+          "Minnesota United",
+          "Sporting KC"
+        ]
+      },
+      "previous_rank": {
+        "Philadelphia Union": 1,
+        "FC Cincinnati": 2,
+        "Inter Miami": 3,
+        "San Diego": 4,
+        "Vancouver Whitecaps": 5,
+        "LAFC": 6,
+        "Charlotte": 7,
+        "Minnesota United": 8,
+        "NYCFC": 9,
+        "Seattle Sounders": 10,
+        "Nashville": 11,
+        "Columbus Crew": 12,
+        "Chicago Fire": 13,
+        "Orlando City": 14,
+        "Austin": 15,
+        "FC Dallas": 16,
+        "Portland Timbers": 17,
+        "NY Red Bulls": 18,
+        "Real Salt Lake": 19,
+        "San Jose": 20,
+        "Colorado Rapids": 21,
+        "Houston Dynamo": 22,
+        "New England": 23,
+        "St. Louis City": 24,
+        "Toronto": 25,
+        "LA Galaxy": 26,
+        "Sporting KC": 27,
+        "CF Montréal": 28,
+        "Atlanta United": 29,
+        "DC United": 30
+      },
+      "bands_seen": [
+        "Playoffs",
+        "Qualification Playoffs"
+      ]
+    },
+    "saudi-pro-league": {
+      "tournament_id": 955,
+      "seasons": [
+        {
+          "season_id": 99275,
+          "name": "Saudi Pro League 26/27",
+          "year": "26/27"
+        },
+        {
+          "season_id": 80443,
+          "name": "Saudi Pro League 25/26",
+          "year": "25/26"
+        }
+      ],
+      "teams": [
+        "Al-Hilal",
+        "Al-Ittihad",
+        "Al-Nassr",
+        "Al-Qadsiah",
+        "Neom",
+        "Al-Ahli",
+        "Al-Kholood",
+        "Diriyah",
+        "Al-Ettifaq",
+        "Al-Hazem",
+        "Al-Riyadh",
+        "Al-Fayha",
+        "Al-Khaleej",
+        "Al-Shabab",
+        "Al-Fateh",
+        "Al-Faisaly",
+        "Al-Taawoun",
+        "Abha"
+      ],
+      "conferences": {},
+      "previous_rank": {
+        "Al-Nassr": 1,
+        "Al-Hilal": 2,
+        "Al-Ahli": 3,
+        "Al-Qadsiah": 4,
+        "Al-Ittihad": 5,
+        "Al-Taawoun": 6,
+        "Al-Ettifaq": 7,
+        "Neom": 8,
+        "Al-Hazem": 9,
+        "Al-Fayha": 10,
+        "Al-Fateh": 11,
+        "Al-Khaleej": 12,
+        "Al-Shabab": 13,
+        "Al-Kholood": 14,
+        "Al-Riyadh": 15,
+        "Damac": 16,
+        "Al-Okhdood": 17,
+        "Al-Najma": 18
+      },
+      "bands_seen": [
+        "Champions League 2",
+        "Champions League Elite",
+        "Relegation"
+      ]
+    },
+    "liga-mx": {
+      "tournament_id": 11621,
+      "seasons": [
+        {
+          "season_id": 96191,
+          "name": "Liga MX, Apertura 2026",
+          "year": "2026",
+          "tournament_id": 11621
+        },
+        {
+          "season_id": 87699,
+          "name": "Liga MX, Clausura 2026",
+          "year": "25/26",
+          "tournament_id": 11620
+        },
+        {
+          "season_id": 76500,
+          "name": "Liga MX, Apertura 2025",
+          "year": "25/26",
+          "tournament_id": 11621
+        }
+      ],
+      "teams": [
+        "Toluca",
+        "Guadalajara",
+        "América",
+        "Cruz Azul",
+        "Querétaro",
+        "León",
+        "Tijuana",
+        "Puebla",
+        "Atlas",
+        "Monterrey",
+        "Pachuca",
+        "Pumas UNAM",
+        "Atlético San Luis",
+        "Atlante",
+        "Necaxa",
+        "Tigres",
+        "Santos Laguna",
+        "Juárez"
+      ],
+      "conferences": {},
+      "previous_rank": {
+        "Pumas UNAM": 1,
+        "Guadalajara": 2,
+        "Cruz Azul": 3,
+        "Pachuca": 4,
+        "Toluca": 5,
+        "Atlas": 6,
+        "Tigres": 7,
+        "América": 8,
+        "Tijuana": 9,
+        "León": 10,
+        "Querétaro": 11,
+        "Juárez": 12,
+        "Monterrey": 13,
+        "Atlético San Luis": 14,
+        "Necaxa": 15,
+        "Mazatlán": 16,
+        "Puebla": 17,
+        "Santos Laguna": 18
+      },
+      "bands_seen": [
+        "Playoffs"
+      ]
+    },
+    "belgian-pro-league": {
+      "tournament_id": 38,
+      "seasons": [
+        {
+          "season_id": 96616,
+          "name": "Pro League 26/27",
+          "year": "26/27",
+          "tournament_id": 38
+        },
+        {
+          "season_id": 77040,
+          "name": "Pro League 25/26",
+          "year": "25/26",
+          "tournament_id": 38
+        }
+      ],
+      "teams": [
+        "Union SG",
+        "Gent",
+        "Club Brugge",
+        "Charleroi",
+        "Anderlecht",
+        "Zulte Waregem",
+        "Standard Liège",
+        "Westerlo",
+        "Genk",
+        "Beveren",
+        "Sint-Truiden",
+        "Lommel",
+        "Antwerp",
+        "La Louvière",
+        "OH Leuven",
+        "Kortrijk",
+        "Cercle Brugge",
+        "Mechelen"
+      ],
+      "conferences": {},
+      "previous_rank": {
+        "Union SG": 1,
+        "Club Brugge": 2,
+        "Sint-Truiden": 3,
+        "Gent": 4,
+        "Mechelen": 5,
+        "Anderlecht": 6,
+        "Genk": 7,
+        "Standard Liège": 8,
+        "Westerlo": 9,
+        "Antwerp": 10,
+        "Charleroi": 11,
+        "OH Leuven": 12,
+        "Zulte Waregem": 13,
+        "Cercle Brugge": 14,
+        "La Louvière": 15,
+        "Dender": 16
+      },
+      "bands_seen": [
+        "Champions League",
+        "Champions League Qualification",
+        "Conference League Qualification",
+        "Europa League Qualification",
+        "Relegation"
+      ]
+    },
+    "champions-league": {
+      "tournament_id": 7,
+      "seasons": [
+        {
+          "season_id": 96518,
+          "name": "UEFA Champions League 26/27",
+          "year": "26/27",
+          "tournament_id": 7
+        },
+        {
+          "season_id": 76953,
+          "name": "UEFA Champions League 25/26",
+          "year": "25/26",
+          "tournament_id": 7
+        }
+      ],
+      "teams": [
+        "Paris Saint-Germain",
+        "FC Bayern München",
+        "FC Barcelona",
+        "Manchester United",
+        "Como",
+        "Sporting CP",
+        "VfB Stuttgart",
+        "Manchester City",
+        "Aston Villa",
+        "RC Lens",
+        "Real Betis",
+        "Borussia Dortmund",
+        "Liverpool FC",
+        "Real Madrid",
+        "Arsenal",
+        "AEK Athens",
+        "AS Roma",
+        "PSV Eindhoven",
+        "Shakhtar Donetsk",
+        "Fenerbahçe",
+        "SK Slavia Praha",
+        "Villarreal",
+        "Club Brugge KV",
+        "Lille",
+        "Atlético Madrid",
+        "Inter",
+        "LASK",
+        "SSC Napoli",
+        "Galatasaray",
+        "Viking FK",
+        "FC Porto",
+        "RB Leipzig",
+        "Feyenoord",
+        "Sabah FK",
+        "ŠK Slovan Bratislava",
+        "Bodø/Glimt"
+      ],
+      "conferences": {},
+      "previous_rank": {}
+    },
+    "europa-league": {
+      "tournament_id": 679,
+      "seasons": [
+        {
+          "season_id": 96522,
+          "name": "UEFA Europa League 26/27",
+          "year": "26/27",
+          "tournament_id": 679
+        },
+        {
+          "season_id": 76984,
+          "name": "UEFA Europa League 25/26",
+          "year": "25/26",
+          "tournament_id": 679
+        }
+      ],
+      "teams": [
+        "Juventus",
+        "Crystal Palace",
+        "AC Sparta Praha",
+        "Beşiktaş JK",
+        "Royale Union Saint-Gilloise",
+        "Ferencváros TC",
+        "Benfica",
+        "Bayer 04 Leverkusen",
+        "OFI Crete",
+        "Bournemouth",
+        "Olympique Lyonnais",
+        "Torreense",
+        "Olympiacos FC",
+        "Red Bull Salzburg",
+        "Omonia Nicosia",
+        "Sunderland",
+        "GNK Dinamo Zagreb",
+        "Hapoel Be'er Sheva",
+        "SK Sturm Graz",
+        "Stade Rennais",
+        "Jagiellonia Białystok",
+        "Lillestrøm SK",
+        "Real Sociedad",
+        "RSC Anderlecht",
+        "AZ Alkmaar",
+        "Levski Sofia",
+        "Celta Vigo",
+        "Celtic",
+        "AC Milan",
+        "NK Celje",
+        "TSG Hoffenheim",
+        "Olympique de Marseille",
+        "FC Ararat-Armenia",
+        "FC Viktoria Plzeň",
+        "Lech Poznań",
+        "NEC Nijmegen"
+      ],
+      "conferences": {},
+      "previous_rank": {}
+    },
+    "conference-league": {
+      "tournament_id": 17015,
+      "seasons": [
+        {
+          "season_id": 96529,
+          "name": "UEFA Conference League 26/27",
+          "year": "26/27",
+          "tournament_id": 17015
+        },
+        {
+          "season_id": 76960,
+          "name": "UEFA Conference League 25/26",
+          "year": "25/26",
+          "tournament_id": 17015
+        }
+      ],
+      "teams": [
+        "AGF",
+        "AFC Ajax",
+        "AS Monaco",
+        "Atalanta",
+        "Brighton & Hove Albion",
+        "Universitatea Craiova",
+        "FC København",
+        "FC Iberia 1999",
+        "FC Lugano",
+        "FC Midtjylland",
+        "FC Nordsjælland",
+        "FC Thun",
+        "FC Twente",
+        "FK Borac Banja Luka",
+        "FK Crvena Zvezda",
+        "FK Jablonec",
+        "FK Kauno Žalgiris",
+        "Getafe",
+        "Heart of Midlothian",
+        "HNK Hajduk Split",
+        "Inter Club d'Escaldes",
+        "KAA Gent",
+        "FC Kairat Almaty",
+        "KF Egnatia",
+        "Kuopion Palloseura",
+        "Lincoln Red Imps",
+        "Mjällby AIF",
+        "Pafos FC",
+        "Panathinaikos FC",
+        "CSKA Sofia",
+        "Riga FC",
+        "Sporting Braga",
+        "SC Freiburg",
+        "SK Brann",
+        "Sint-Truidense VV",
+        "Trabzonspor"
+      ],
+      "conferences": {},
+      "previous_rank": {}
+    },
+    "libertadores": {
+      "tournament_id": 384,
+      "seasons": [
+        {
+          "season_id": 87760,
+          "name": "CONMEBOL Libertadores 2026",
+          "year": "2026",
+          "tournament_id": 384
+        },
+        {
+          "season_id": 70083,
+          "name": "CONMEBOL Libertadores 2025",
+          "year": "2025",
+          "tournament_id": 384
+        }
+      ],
+      "teams": [
+        "Flamengo",
+        "Estudiantes de La Plata",
+        "Independiente Medellín",
+        "Cusco FC",
+        "Coquimbo Unido",
+        "Deportes Tolima",
+        "Nacional",
+        "Universitario de Deportes",
+        "Independiente Rivadavia",
+        "Fluminense",
+        "Bolívar",
+        "Deportivo La Guaira",
+        "Universidad Católica",
+        "Cruzeiro",
+        "Boca Juniors",
+        "Barcelona SC Guayaquil",
+        "Corinthians",
+        "Club Atlético Platense",
+        "Independiente Santa Fe",
+        "Club Atlético Peñarol",
+        "Cerro Porteño",
+        "Palmeiras",
+        "Club Sporting Cristal",
+        "Junior Barranquilla",
+        "LDU",
+        "Mirassol",
+        "CA Lanús",
+        "Club Always Ready",
+        "Independiente del Valle",
+        "Rosario Central",
+        "Universidad Central",
+        "Libertad"
+      ],
+      "conferences": {
+        "A": [
+          "Flamengo",
+          "Estudiantes de La Plata",
+          "Independiente Medellín",
+          "Cusco FC"
+        ],
+        "B": [
+          "Coquimbo Unido",
+          "Deportes Tolima",
+          "Nacional",
+          "Universitario de Deportes"
+        ],
+        "C": [
+          "Independiente Rivadavia",
+          "Fluminense",
+          "Bolívar",
+          "Deportivo La Guaira"
+        ],
+        "D": [
+          "Universidad Católica",
+          "Cruzeiro",
+          "Boca Juniors",
+          "Barcelona SC Guayaquil"
+        ],
+        "E": [
+          "Corinthians",
+          "Club Atlético Platense",
+          "Independiente Santa Fe",
+          "Club Atlético Peñarol"
+        ],
+        "F": [
+          "Cerro Porteño",
+          "Palmeiras",
+          "Club Sporting Cristal",
+          "Junior Barranquilla"
+        ],
+        "G": [
+          "LDU",
+          "Mirassol",
+          "CA Lanús",
+          "Club Always Ready"
+        ],
+        "H": [
+          "Independiente del Valle",
+          "Rosario Central",
+          "Universidad Central",
+          "Libertad"
+        ]
+      },
+      "previous_rank": {}
+    },
+    "sudamericana": {
+      "tournament_id": 480,
+      "seasons": [
+        {
+          "season_id": 87770,
+          "name": "CONMEBOL Sudamericana 2026",
+          "year": "2026",
+          "tournament_id": 480
+        },
+        {
+          "season_id": 70070,
+          "name": "CONMEBOL Sudamericana 2025",
+          "year": "2025",
+          "tournament_id": 480
+        }
+      ],
+      "teams": [
+        "Macará",
+        "Tigre",
+        "América de Cali",
+        "Alianza Atlético de Sullana",
+        "Atlético Mineiro",
+        "Cienciano",
+        "Juventud de Las Piedras",
+        "Academia Puerto Cabello",
+        "São Paulo",
+        "O'Higgins",
+        "Millonarios",
+        "Boston River",
+        "Recoleta FC",
+        "Santos",
+        "San Lorenzo",
+        "Deportivo Cuenca",
+        "Botafogo",
+        "Caracas F.C.",
+        "Racing Club",
+        "Club Independiente Petrolero",
+        "Montevideo City Torque",
+        "Grêmio",
+        "Deportivo Riestra",
+        "Palestino",
+        "Olimpia",
+        "Vasco da Gama",
+        "Audax Italiano",
+        "Barracas Central",
+        "River Plate",
+        "Red Bull Bragantino",
+        "Carabobo FC",
+        "Blooming"
+      ],
+      "conferences": {
+        "A": [
+          "Macará",
+          "Tigre",
+          "América de Cali",
+          "Alianza Atlético de Sullana"
+        ],
+        "B": [
+          "Atlético Mineiro",
+          "Cienciano",
+          "Juventud de Las Piedras",
+          "Academia Puerto Cabello"
+        ],
+        "C": [
+          "São Paulo",
+          "O'Higgins",
+          "Millonarios",
+          "Boston River"
+        ],
+        "D": [
+          "Recoleta FC",
+          "Santos",
+          "San Lorenzo",
+          "Deportivo Cuenca"
+        ],
+        "E": [
+          "Botafogo",
+          "Caracas F.C.",
+          "Racing Club",
+          "Club Independiente Petrolero"
+        ],
+        "F": [
+          "Montevideo City Torque",
+          "Grêmio",
+          "Deportivo Riestra",
+          "Palestino"
+        ],
+        "G": [
+          "Olimpia",
+          "Vasco da Gama",
+          "Audax Italiano",
+          "Barracas Central"
+        ],
+        "H": [
+          "River Plate",
+          "Red Bull Bragantino",
+          "Carabobo FC",
+          "Blooming"
+        ]
+      },
+      "previous_rank": {}
+    },
+    "intercontinental-cup": {
+      "tournament_id": 23674,
+      "seasons": [
+        {
+          "season_id": 101512,
+          "name": "FIFA Intercontinental Cup 2026",
+          "year": "2026",
+          "tournament_id": 23674
+        },
+        {
+          "season_id": 78702,
+          "name": "FIFA Intercontinental Cup 2025",
+          "year": "2025",
+          "tournament_id": 23674
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {}
+    },
+    "afc-champions-league": {
+      "tournament_id": 463,
+      "seasons": [
+        {
+          "season_id": 99217,
+          "name": "AFC Champions League Elite 26/27",
+          "year": "26/27",
+          "tournament_id": 463
+        },
+        {
+          "season_id": 77010,
+          "name": "AFC Champions League Elite 25/26",
+          "year": "25/26",
+          "tournament_id": 463
+        }
+      ],
+      "teams": [
+        "Al-Ain",
+        "Esteghlal FC",
+        "Al-Hilal",
+        "Al-Qadsiah",
+        "Neftchi Fergana",
+        "Shabab Al-Ahli Dubai",
+        "Al-Ahli",
+        "Al-Ittihad",
+        "Al Shamal SC",
+        "Pakhtakor Tashkent",
+        "Al-Gharafa",
+        "Al Wasl",
+        "Al-Quwa Al-Jawiya",
+        "Tractor FC",
+        "Al-Sadd",
+        "Al-Nassr"
+      ],
+      "conferences": {},
+      "previous_rank": {}
+    },
+    "caf-champions-league": {
+      "tournament_id": 1054,
+      "seasons": [
+        {
+          "season_id": 100698,
+          "name": "CAF Champions League 26/27",
+          "year": "26/27",
+          "tournament_id": 1054
+        },
+        {
+          "season_id": 80447,
+          "name": "CAF Champions League 25/26",
+          "year": "25/26",
+          "tournament_id": 1054
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {}
+    },
+    "concacaf-champions-cup": {
+      "tournament_id": 498,
+      "seasons": [
+        {
+          "season_id": 87494,
+          "name": "CONCACAF Champions Cup 2026",
+          "year": "2026",
+          "tournament_id": 498
+        },
+        {
+          "season_id": 69806,
+          "name": "CONCACAF Champions Cup 2025",
+          "year": "2025",
+          "tournament_id": 498
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {}
+    },
+    "uefa-super-cup": {
+      "tournament_id": 465,
+      "seasons": [
+        {
+          "season_id": 95511,
+          "name": "UEFA Super Cup 2026",
+          "year": "26/27",
+          "tournament_id": 465
+        },
+        {
+          "season_id": 76138,
+          "name": "UEFA Super Cup 2025",
+          "year": "25/26",
+          "tournament_id": 465
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
+    },
+    "leagues-cup": {
+      "tournament_id": 13783,
+      "seasons": [
+        {
+          "season_id": 91033,
+          "name": "Leagues Cup 2026",
+          "year": "2026",
+          "tournament_id": 13783
+        },
+        {
+          "season_id": 72227,
+          "name": "Leagues Cup 2025",
+          "year": "2025",
+          "tournament_id": 13783
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "cup"
+    },
+    "campeones-cup": {
+      "tournament_id": 11454,
+      "seasons": [
+        {
+          "season_id": 99379,
+          "name": "Campeones Cup 2026",
+          "year": "2026",
+          "tournament_id": 11454
+        },
+        {
+          "season_id": 79229,
+          "name": "Campeones Cup 2025",
+          "year": "2025",
+          "tournament_id": 11454
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
+    },
+    "club-world-cup": {
+      "tournament_id": 357,
+      "seasons": [
+        {
+          "season_id": 69619,
+          "name": "FIFA Club World Cup 2025",
+          "year": "2025",
+          "tournament_id": 357
+        },
+        {
+          "season_id": 54799,
+          "name": "Club World Championship 2023",
+          "year": "23/24",
+          "tournament_id": 357
+        }
+      ],
+      "teams": [
+        "Palmeiras",
+        "Inter Miami CF",
+        "FC Porto",
+        "Al Ahly FC",
+        "Paris Saint-Germain",
+        "Botafogo",
+        "Atlético Madrid",
+        "Seattle Sounders FC",
+        "Benfica",
+        "FC Bayern München",
+        "Boca Juniors",
+        "Auckland City",
+        "Flamengo",
+        "Chelsea",
+        "Espérance Sportive De Tunis",
+        "Los Angeles FC",
+        "Inter",
+        "CF Monterrey",
+        "River Plate",
+        "Urawa Red Diamonds",
+        "Borussia Dortmund",
+        "Fluminense",
+        "Mamelodi Sundowns",
+        "Ulsan HD",
+        "Manchester City",
+        "Juventus",
+        "Al-Ain",
+        "Wydad Casablanca",
+        "Real Madrid",
+        "Al-Hilal",
+        "Red Bull Salzburg",
+        "CF Pachuca"
+      ],
+      "conferences": {
+        "A": [
+          "Palmeiras",
+          "Inter Miami CF",
+          "FC Porto",
+          "Al Ahly FC"
+        ],
+        "B": [
+          "Paris Saint-Germain",
+          "Botafogo",
+          "Atlético Madrid",
+          "Seattle Sounders FC"
+        ],
+        "C": [
+          "Benfica",
+          "FC Bayern München",
+          "Boca Juniors",
+          "Auckland City"
+        ],
+        "D": [
+          "Flamengo",
+          "Chelsea",
+          "Espérance Sportive De Tunis",
+          "Los Angeles FC"
+        ],
+        "E": [
+          "Inter",
+          "CF Monterrey",
+          "River Plate",
+          "Urawa Red Diamonds"
+        ],
+        "F": [
+          "Borussia Dortmund",
+          "Fluminense",
+          "Mamelodi Sundowns",
+          "Ulsan HD"
+        ],
+        "G": [
+          "Manchester City",
+          "Juventus",
+          "Al-Ain",
+          "Wydad Casablanca"
+        ],
+        "H": [
+          "Real Madrid",
+          "Al-Hilal",
+          "Red Bull Salzburg",
+          "CF Pachuca"
+        ]
+      },
+      "previous_rank": {},
+      "family": "cup"
+    },
+    "fa-cup": {
+      "tournament_id": 19,
+      "seasons": [
+        {
+          "season_id": 102079,
+          "name": "FA Cup 26/27",
+          "year": "26/27",
+          "tournament_id": 19
+        },
+        {
+          "season_id": 82557,
+          "name": "FA Cup 25/26",
+          "year": "25/26",
+          "tournament_id": 19
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "domestic"
+    },
+    "efl-cup": {
+      "tournament_id": 21,
+      "seasons": [
+        {
+          "season_id": 96185,
+          "name": "EFL Cup 26/27",
+          "year": "26/27",
+          "tournament_id": 21
+        },
+        {
+          "season_id": 77500,
+          "name": "EFL Cup 25/26",
+          "year": "25/26",
+          "tournament_id": 21
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "domestic"
+    },
+    "community-shield": {
+      "tournament_id": 346,
+      "seasons": [
+        {
+          "season_id": 95402,
+          "name": "Community Shield 2026",
+          "year": "26/27",
+          "tournament_id": 346
+        },
+        {
+          "season_id": 77151,
+          "name": "Community Shield 2025",
+          "year": "25/26",
+          "tournament_id": 346
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
+    },
+    "copa-del-rey": {
+      "tournament_id": 329,
+      "seasons": [
+        {
+          "season_id": 104108,
+          "name": "Copa del Rey 26/27",
+          "year": "26/27",
+          "tournament_id": 329
+        },
+        {
+          "season_id": 82988,
+          "name": "Copa del Rey 25/26",
+          "year": "25/26",
+          "tournament_id": 329
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "domestic"
+    },
+    "supercopa-espana": {
+      "tournament_id": 213,
+      "seasons": [
+        {
+          "season_id": 97380,
+          "name": "Supercopa 2027",
+          "year": "26/27",
+          "tournament_id": 213
+        },
+        {
+          "season_id": 78978,
+          "name": "Supercopa 2026",
+          "year": "25/26",
+          "tournament_id": 213
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
+    },
+    "coppa-italia": {
+      "tournament_id": 328,
+      "seasons": [
+        {
+          "season_id": 97028,
+          "name": "Coppa Italia 26/27",
+          "year": "26/27",
+          "tournament_id": 328
+        },
+        {
+          "season_id": 77308,
+          "name": "Coppa Italia 25/26",
+          "year": "25/26",
+          "tournament_id": 328
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "domestic"
+    },
+    "supercoppa-italiana": {
+      "tournament_id": 341,
+      "seasons": [
+        {
+          "season_id": 83227,
+          "name": "Supercoppa 2025",
+          "year": "25/26",
+          "tournament_id": 341
+        },
+        {
+          "season_id": 67807,
+          "name": "Supercoppa 2024",
+          "year": "24/25",
+          "tournament_id": 341
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
+    },
+    "dfb-pokal": {
+      "tournament_id": 217,
+      "seasons": [
+        {
+          "season_id": 95860,
+          "name": "DFB Pokal 26/27",
+          "year": "26/27",
+          "tournament_id": 217
+        },
+        {
+          "season_id": 76910,
+          "name": "DFB Pokal 25/26",
+          "year": "25/26",
+          "tournament_id": 217
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "domestic"
+    },
+    "coupe-de-france": {
+      "tournament_id": 335,
+      "seasons": [
+        {
+          "season_id": 85565,
+          "name": "Coupe de France 25/26",
+          "year": "25/26",
+          "tournament_id": 335
+        },
+        {
+          "season_id": 68468,
+          "name": "Coupe de France 24/25",
+          "year": "24/25",
+          "tournament_id": 335
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "domestic"
+    },
+    "trophee-des-champions": {
+      "tournament_id": 339,
+      "seasons": [
+        {
+          "season_id": 95812,
+          "name": "Trophee des Champions 2026",
+          "year": "26/27",
+          "tournament_id": 339
+        },
+        {
+          "season_id": 85980,
+          "name": "Trophee des Champions 2026",
+          "year": "25/26",
+          "tournament_id": 339
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
+    },
+    "knvb-beker": {
+      "tournament_id": 330,
+      "seasons": [
+        {
+          "season_id": 100342,
+          "name": "KNVB beker 26/27",
+          "year": "26/27",
+          "tournament_id": 330
+        },
+        {
+          "season_id": 81932,
+          "name": "KNVB beker 25/26",
+          "year": "25/26",
+          "tournament_id": 330
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "domestic"
+    },
+    "johan-cruijff-schaal": {
+      "tournament_id": 340,
+      "seasons": [
+        {
+          "season_id": 95430,
+          "name": "Johan Cruijff Schaal 2026",
+          "year": "25/26",
+          "tournament_id": 340
+        },
+        {
+          "season_id": 76817,
+          "name": "Johan Cruijff Schaal 2025",
+          "year": "2025",
+          "tournament_id": 340
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
+    },
+    "taca-de-portugal": {
+      "tournament_id": 336,
+      "seasons": [
+        {
+          "season_id": 100051,
+          "name": "Taca de Portugal 26/27",
+          "year": "26/27",
+          "tournament_id": 336
+        },
+        {
+          "season_id": 80287,
+          "name": "Taca de Portugal 25/26",
+          "year": "25/26",
+          "tournament_id": 336
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "domestic"
+    },
+    "taca-da-liga": {
+      "tournament_id": 327,
+      "seasons": [
+        {
+          "season_id": 98066,
+          "name": "League Cup 26/27",
+          "year": "26/27",
+          "tournament_id": 327
+        },
+        {
+          "season_id": 77807,
+          "name": "League Cup 25/26",
+          "year": "25/26",
+          "tournament_id": 327
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "domestic"
+    },
+    "supertaca-portugal": {
+      "tournament_id": 345,
+      "seasons": [
+        {
+          "season_id": 97571,
+          "name": "Super Cup 2026",
+          "year": "26/27",
+          "tournament_id": 345
+        },
+        {
+          "season_id": 76982,
+          "name": "Super Cup 2025",
+          "year": "2025",
+          "tournament_id": 345
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
+    },
+    "belgian-cup": {
+      "tournament_id": 326,
+      "seasons": [
+        {
+          "season_id": 101839,
+          "name": "Beker van Belgie 26/27",
+          "year": "26/27",
+          "tournament_id": 326
+        },
+        {
+          "season_id": 81462,
+          "name": "Beker van Belgie 25/26",
+          "year": "25/26",
+          "tournament_id": 326
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "domestic"
+    },
+    "belgian-super-cup": {
+      "tournament_id": 338,
+      "seasons": [
+        {
+          "season_id": 96554,
+          "name": "Super Cup 2026",
+          "year": "26/27",
+          "tournament_id": 338
+        },
+        {
+          "season_id": 76981,
+          "name": "Super Cup 2025",
+          "year": "25/26",
+          "tournament_id": 338
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
+    },
+    "supercopa-do-brasil": {
+      "tournament_id": 14602,
+      "seasons": [
+        {
+          "season_id": 88072,
+          "name": "Supercopa do Brasil 2026",
+          "year": "2026",
+          "tournament_id": 14602
+        },
+        {
+          "season_id": 70291,
+          "name": "Supercopa do Brasil 2025",
+          "year": "2025",
+          "tournament_id": 14602
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
+    },
+    "copa-argentina": {
+      "tournament_id": 1024,
+      "seasons": [
+        {
+          "season_id": 88177,
+          "name": "Copa Argentina 2026",
+          "year": "2026",
+          "tournament_id": 1024
+        },
+        {
+          "season_id": 70664,
+          "name": "Copa Argentina 2025",
+          "year": "2025",
+          "tournament_id": 1024
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "domestic"
+    },
+    "supercopa-argentina": {
+      "tournament_id": 1618,
+      "seasons": [
+        {
+          "season_id": 98654,
+          "name": "Super Cup 2026",
+          "year": "2026",
+          "tournament_id": 1618
+        },
+        {
+          "season_id": 70679,
+          "name": "Super Cup 2025",
+          "year": "2025",
+          "tournament_id": 1618
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
+    },
+    "saudi-super-cup": {
+      "tournament_id": 2119,
+      "seasons": [
+        {
+          "season_id": 77228,
+          "name": "Super Cup 2025",
+          "year": "25/26",
+          "tournament_id": 2119
+        },
+        {
+          "season_id": 61942,
+          "name": "Super Cup 2024",
+          "year": "24/25",
+          "tournament_id": 2119
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
+    },
+    "us-open-cup": {
+      "tournament_id": 495,
+      "seasons": [
+        {
+          "season_id": 90046,
+          "name": "US Open Cup 2026",
+          "year": "2026",
+          "tournament_id": 495
+        },
+        {
+          "season_id": 71737,
+          "name": "US Open Cup 2025",
+          "year": "2025",
+          "tournament_id": 495
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "domestic"
+    },
+    "campeon-de-campeones": {
+      "tournament_id": 2103,
+      "seasons": [
+        {
+          "season_id": 95485,
+          "name": "Trofeo de Campeon de Campeones 2026",
+          "year": "2026",
+          "tournament_id": 2103
+        },
+        {
+          "season_id": 76299,
+          "name": "Trofeo de Campeon de Campeones 2025",
+          "year": "2025",
+          "tournament_id": 2103
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
+    },
+    "world-cup": {
+      "tournament_id": 16,
+      "seasons": [
+        {
+          "season_id": 58210,
+          "name": "World Cup 2026",
+          "year": "2026",
+          "tournament_id": 16
+        },
+        {
+          "season_id": 41087,
+          "name": "World Cup 2022",
+          "year": "2022",
+          "tournament_id": 16
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "international"
+    },
+    "euro": {
+      "tournament_id": 1,
+      "seasons": [
+        {
+          "season_id": 56953,
+          "name": "EURO 2024",
+          "year": "2024",
+          "tournament_id": 1
+        },
+        {
+          "season_id": 26542,
+          "name": "Euro Cup 2020",
+          "year": "2021",
+          "tournament_id": 1
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "international"
+    },
+    "copa-america": {
+      "tournament_id": 133,
+      "seasons": [
+        {
+          "season_id": 57114,
+          "name": "Copa America 2024",
+          "year": "2024",
+          "tournament_id": 133
+        },
+        {
+          "season_id": 26681,
+          "name": "Copa America 2021",
+          "year": "2021",
+          "tournament_id": 133
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "international"
+    },
+    "nations-league": {
+      "tournament_id": 10783,
+      "seasons": [
+        {
+          "season_id": 89945,
+          "name": "UEFA Nations League 26/27",
+          "year": "26/27",
+          "tournament_id": 10783
+        },
+        {
+          "season_id": 58337,
+          "name": "UEFA Nations League 24/25",
+          "year": "24/25",
+          "tournament_id": 10783
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "international"
+    },
+    "kings-cup": {
+      "tournament_id": 2058,
+      "seasons": [
+        {
+          "season_id": 95444,
+          "name": "Kings Cup 26/27",
+          "year": "26/27",
+          "tournament_id": 2058
+        },
+        {
+          "season_id": 76343,
+          "name": "Kings Cup 25/26",
+          "year": "25/26",
+          "tournament_id": 2058
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "domestic"
+    },
+    "copa-do-brasil": {
+      "tournament_id": 373,
+      "seasons": [
+        {
+          "season_id": 89353,
+          "name": "Copa do Brasil 2026",
+          "year": "2026",
+          "tournament_id": 373
+        },
+        {
+          "season_id": 71944,
+          "name": "Copa do Brasil 2025",
+          "year": "2025",
+          "tournament_id": 373
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "domestic"
+    },
+    "wc-qual-uefa": {
+      "tournament_id": 11,
+      "seasons": [
+        {
+          "season_id": 69427,
+          "name": "World Cup Qualification, UEFA 2026",
+          "year": "2026",
+          "tournament_id": 11
+        },
+        {
+          "season_id": 35021,
+          "name": "World Cup Qualification, UEFA 2022",
+          "year": "2022",
+          "tournament_id": 11
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "international"
+    },
+    "wc-qual-conmebol": {
+      "tournament_id": 295,
+      "seasons": [
+        {
+          "season_id": 53820,
+          "name": "World Cup Qualification, CONMEBOL 2025",
+          "year": "2026",
+          "tournament_id": 295
+        },
+        {
+          "season_id": 26781,
+          "name": "World Cup Qualification, CONMEBOL 2022",
+          "year": "2022",
+          "tournament_id": 295
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "international"
+    },
+    "wc-qual-concacaf": {
+      "tournament_id": 14,
+      "seasons": [
+        {
+          "season_id": 58146,
+          "name": "World Cup Qualification 2026, CONCACAF",
+          "year": "2025",
+          "tournament_id": 14
+        },
+        {
+          "season_id": 29436,
+          "name": "World Cup 2022, CONCACAF Qualification",
+          "year": "2022",
+          "tournament_id": 14
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "international"
+    },
+    "wc-qual-caf": {
+      "tournament_id": 13,
+      "seasons": [
+        {
+          "season_id": 56249,
+          "name": "FIFA World Cup, Qualification CAF 2025",
+          "year": "2025",
+          "tournament_id": 13
+        },
+        {
+          "season_id": 24680,
+          "name": "World Cup Qualification, CAF 2022",
+          "year": "2022",
+          "tournament_id": 13
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "international"
+    },
+    "wc-qual-afc": {
+      "tournament_id": 308,
+      "seasons": [
+        {
+          "season_id": 53508,
+          "name": "World Cup Qualification, AFC 2025",
+          "year": "23-25",
+          "tournament_id": 308
+        },
+        {
+          "season_id": 23606,
+          "name": "World Cup Qualification, AFC 2022",
+          "year": "2022",
+          "tournament_id": 308
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "international"
+    },
+    "afcon": {
+      "tournament_id": 270,
+      "seasons": [
+        {
+          "season_id": 71636,
+          "name": "Africa Cup of Nations 2025",
+          "year": "2025",
+          "tournament_id": 270
+        },
+        {
+          "season_id": 56021,
+          "name": "Africa Cup of Nations 2023",
+          "year": "2023",
+          "tournament_id": 270
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "international"
+    },
+    "asian-cup": {
+      "tournament_id": 246,
+      "seasons": [
+        {
+          "season_id": 94444,
+          "name": "AFC Asian Cup 2027",
+          "year": "2027",
+          "tournament_id": 246
+        },
+        {
+          "season_id": 51384,
+          "name": "AFC Asian Cup 2023",
+          "year": "2023",
+          "tournament_id": 246
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "international"
+    },
+    "gold-cup": {
+      "tournament_id": 140,
+      "seasons": [
+        {
+          "season_id": 72840,
+          "name": "CONCACAF Gold Cup 2025",
+          "year": "2025",
+          "tournament_id": 140
+        },
+        {
+          "season_id": 50492,
+          "name": "Gold Cup 2023",
+          "year": "2023",
+          "tournament_id": 140
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "international"
+    },
+    "concacaf-nations-league": {
+      "tournament_id": 14100,
+      "seasons": [
+        {
+          "season_id": 99469,
+          "name": "CONCACAF Nations League 26/27",
+          "year": "26/27",
+          "tournament_id": 14100
+        },
+        {
+          "season_id": 61662,
+          "name": "CONCACAF Nations League 24/25",
+          "year": "24/25",
+          "tournament_id": 14100
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "international"
+    },
+    "friendlies": {
+      "tournament_id": 851,
+      "seasons": [
+        {
+          "season_id": 87155,
+          "name": "Int. Friendly Games 2026",
+          "year": "2026",
+          "tournament_id": 851
+        },
+        {
+          "season_id": 69578,
+          "name": "Int. Friendly Games 2025",
+          "year": "2025",
+          "tournament_id": 851
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "international"
+    },
+    "dfl-supercup": {
+      "tournament_id": 799,
+      "seasons": [
+        {
+          "season_id": 95403,
+          "name": "Super Cup 2026",
+          "year": "26/27",
+          "tournament_id": 799
+        },
+        {
+          "season_id": 101463,
+          "name": "Super Cup 2025",
+          "year": "25/26",
+          "tournament_id": 799
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
+    },
+    "recopa-sudamericana": {
+      "tournament_id": 490,
+      "seasons": [
+        {
+          "season_id": 87761,
+          "name": "CONMEBOL Recopa 2026",
+          "year": "2026",
+          "tournament_id": 490
+        },
+        {
+          "season_id": 69954,
+          "name": "CONMEBOL Recopa 2025",
+          "year": "2025",
+          "tournament_id": 490
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
+    },
+    "euro-qualifiers": {
+      "tournament_id": 27,
+      "seasons": [
+        {
+          "season_id": 46599,
+          "name": "European Championship 2024, Qualification",
+          "year": "2024",
+          "tournament_id": 27
+        },
+        {
+          "season_id": 19857,
+          "name": "European Championship 2021, Qualification",
+          "year": "2021",
+          "tournament_id": 27
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "international"
+    },
+    "afcon-qualifiers": {
+      "tournament_id": 1848,
+      "seasons": [
+        {
+          "season_id": 90940,
+          "name": "Africa Cup of Nations Qualification 2026",
+          "year": "2026",
+          "tournament_id": 1848
+        },
+        {
+          "season_id": 58857,
+          "name": "Africa Cup of Nations, Qualification 2024",
+          "year": "2024",
+          "tournament_id": 1848
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "international"
+    }
+  }
+}

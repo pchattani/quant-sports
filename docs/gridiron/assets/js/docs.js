@@ -1,0 +1,400 @@
+/* The Quant Gridiron — docs: the glossary (#/glossary, #/glossary/<key>, #/glossary/g:<group>) and the
+ * methodology (#/methodology, #/methodology/<section>).
+ *
+ * The glossary reads data/glossary.json ({groups: [{name, entries: [METRIC + kind]}], model: [{key, label, group,
+ * desc}], notices}); until that is published it is assembled from the season's player and team catalogues. The
+ * methodology is static text: every constant in it was read from the Python under oddsmarkets/nfl/ (canon.py,
+ * sources/*.py, models/*.py, analytics/*.py) on 1 October 2026, and each section names its source files. Fitted
+ * values (the gradient-boosted models, stabilisation constants) are refitted when the models are refitted and are
+ * published on the pages and the calibration page. Uses GI.fk where present. */
+(function (GI) {
+'use strict';
+
+const K = () => GI.fk;
+const esc = s => (typeof GI.esc === 'function' ? GI.esc(s) : String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'));
+const muted = t => '<div class="muted">' + t + '</div>';
+const fold = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const NFLVERSE = 'Play-by-play, schedules, rosters, player and team statistics from nflverse (nflfastR, nflreadr, nflverse-data), licensed CC-BY 4.0.';
+const FTN = 'FTN Data via nflverse, licensed CC-BY-SA 4.0; charting data derived from it on this site are shared alike under the same licence.';
+const NGS = 'NFL Next Gen Stats via nflverse, shown for informational, non-commercial use.';
+
+// ── glossary ───────────────────────────────────────────────────────────────
+
+/* Terms the pages use that are not catalogue metrics (the build's own "model" entries come first). */
+const MODEL_TERMS = [
+  ['Football basics', [
+    ['epa', 'EPA (expected points added)', 'The change in expected points from before a play to after it. Expected points are the average net points the offence goes on to score from that situation (down, distance, field position, time, score and more), counting the next score by either team. A 3rd-and-8 completion for 12 yards might be worth +2.0; a sack on the same play −1.5.'],
+    ['success_term', 'Success rate', 'The share of plays with positive EPA: the play left the offence better placed than before it. It rewards staying on schedule rather than a few long gains.'],
+    ['yl100', 'Field position (yards to go to score)', 'nflverse\'s yardline_100: the distance to the opponent\'s goal line. 75 is your own 25; 20 is the red zone.'],
+    ['wp_term', 'Win probability (WP)', 'The probability the team wins from the current game state; WPA is a play\'s change in it.'],
+    ['proe_term', 'PROE (pass rate over expected)', 'A team\'s pass rate minus the pass rate expected for the same down, distance, field position, score, time and win probability (nflfastR\'s xpass). Positive means pass-heavier than the league in the same spots.'],
+    ['adot_term', 'aDOT', 'Average depth of target: air yards per pass attempt (or per target, for receivers), measured from the line of scrimmage to where the ball was aimed.']
+  ]],
+  ['Play models', [
+    ['cpoe_term', 'CPOE', 'Completion percentage over expected: completions minus the sum of each throw\'s completion probability (from air yards, target location, pressure and charting), per attempt, in percentage points.'],
+    ['yacoe_term', 'YAC over expected', 'Yards after the catch minus the expected YAC at the catch point.'],
+    ['ryoe_term', 'RYOE', 'Rushing yards over expected: yards gained minus the expected yards for the run\'s situation (box count, down, distance, field position, formation). Next Gen Stats publishes its own RYOE from player tracking; the site shows both.'],
+    ['fg_oe_term', 'FG over expected', 'Field goals made minus the sum of each attempt\'s make probability (distance, weather, altitude, roof, surface).'],
+    ['fourth_grade', 'Fourth-down grade', 'For every fourth down, the win probability of going for it, punting and kicking; WP lost is the best option\'s win probability minus the chosen one\'s, graded A (up to 0.5 points), B (up to 1.5), C (up to 3), D (up to 6) or F. A and B are shown as right calls, C as a close call, D and F as mistakes.'],
+    ['goe_term', 'GOE (go rate over expected)', 'A coach\'s fourth-down go rate minus how often the league goes for it in the same situations (a logistic model fitted per season). It measures aggressiveness against the league, not correctness.']
+  ]],
+  ['Value', [
+    ['gv_term', 'Gridiron Value', 'EPA above an average player in the same role (passer, receiver or rusher): a per-season ridge regression of every dropback\'s and designed run\'s EPA on the players involved and the defence shares each play out and adjusts for opponent and supporting cast; value = coefficient × plays.'],
+    ['composite_term', 'QB composite', 'EPA per dropback, CPOE, sack avoidance and turnover-worthy plays, each shrunk by its stabilisation point, combined on a scale where 100 is average and 10 is one standard deviation.'],
+    ['splash_term', 'Splash EPA', 'For defenders: the EPA prevented on plays a player is credited with (sacks, interceptions, forced fumbles, passes defensed, tackles for loss), shared among the credited players. Individual defensive value is limited by the public data.']
+  ]],
+  ['Statistics on the pages', [
+    ['percentile_term', 'Percentile', 'Where a player ranks in his position group (100 = best, reversed where less is better), after shrinking his value towards the group mean by the metric\'s stabilisation point.'],
+    ['stabilisation_term', 'Stabilisation point', 'The sample at which a metric\'s split-half reliability reaches 0.7: with r(n) = n / (n + k), n₀.₇ = 7k/3. Before it, the number is mostly noise.'],
+    ['era_term', 'Era-adjusted (+)', '100 + 10 z against that season\'s qualified players at the position, so seasons are compared with their own league.'],
+    ['devig', 'De-vig', 'Removing the bookmaker\'s margin: the implied probabilities 1/odds are scaled so that they sum to one.'],
+    ['log_loss', 'Log-loss', '−mean(y ln p + (1 − y) ln(1 − p)); lower is better; a coin scores ln 2 = 0.693.'],
+    ['brier_term', 'Brier score', 'mean((p − y)²); lower is better; a coin scores 0.25.']
+  ]]
+];
+
+function slug(s) { return String(s || 'group').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+
+function loadGlossary() {
+  return GI.load('glossary.json').then(g => {
+    if (g && g.ok !== false && ((g.groups || []).length || (g.metrics || []).length)) {
+      if (!(g.groups || []).length) {
+        const groups = [];
+        g.metrics.forEach(m => { let grp = groups.find(x => x.name === (m.group || 'Other')); if (!grp) { grp = { name: m.group || 'Other', entries: [] }; groups.push(grp); } grp.entries.push(m); });
+        return Object.assign({ source: 'payload' }, g, { groups: groups });
+      }
+      return Object.assign({ source: 'payload' }, g);
+    }
+    const k = K(), S = k ? k.S({}, GI.state) : new Date().getFullYear();
+    return Promise.all([GI.load(S + '/players.json'), GI.load(S + '/teams.json')]).then(res => {
+      const groups = [];
+      res.forEach((cat, i) => ((cat || {}).metrics || []).forEach(m => {
+        const gname = (['Players', 'Teams'][i]) + ': ' + (m.group || 'Other');
+        let grp = groups.find(x => x.name === gname);
+        if (!grp) { grp = { name: gname, entries: [] }; groups.push(grp); }
+        grp.entries.push(Object.assign({}, m, { kind: ['player', 'team'][i] }));
+      }));
+      return { groups: groups, source: 'catalogue' };
+    });
+  });
+}
+/* Strip build-internal wording ("builder B's ...") from published descriptions. */
+function clean(s) { return String(s || '').replace(/\(?builder [A-Z]'s ([a-z_ ]+?) model; /gi, '(').replace(/builder [A-Z]'s /gi, 'our ').replace(/\s+\(\)/g, '').replace(/player_value/g, 'player-value model').replace(/team_strength/g, 'team-strength model'); }
+
+function tagsOf(e) {
+  const tags = [];
+  const f = e.fmt;
+  if (f === 'pct') tags.push(['rate', '']);
+  else if (f === 'prob') tags.push(['probability', '']);
+  else if (f === 'int') tags.push(['count', '']);
+  else if (f === 'epa') tags.push(['EPA', 'model']);
+  if (e.lower) tags.push(['lower is better', 'lower']);
+  if (e.scope && !/^(all)$/.test(e.scope)) tags.push([String(e.scope) === 'style' ? 'tendency' : String(e.scope).replace(/ /g, ' · '), 'out']);
+  if (typeof e.stabilises_at === 'number') tags.push(['stabilises ~' + Math.round(e.stabilises_at).toLocaleString('en-GB') + ' ' + (e.unit || 'plays'), 'gk']);
+  return tags.map(t => '<span class="gl-tag' + (t[1] ? ' ' + t[1] : '') + '">' + esc(t[0]) + '</span>').join('');
+}
+let USED_IDS = {};
+function entryHTML(e, isModel) {
+  const q = [e.label, e.key, e.desc, e.group, e.scope, e.kind, isModel ? 'model' : ''].join(' ');
+  let id = e.key;
+  if (USED_IDS[e.key]) { id = e.key + '-' + (e.kind || 'x') + '-' + USED_IDS[e.key]; USED_IDS[e.key] += 1; } else USED_IDS[e.key] = 1;
+  return '<div class="gl-entry" id="gl-' + esc(id) + '" data-q="' + esc(fold(q)) + '" data-scope="' + esc(isModel ? 'model' : 'metric') + '">' +
+    '<dt><span>' + esc(e.label || e.key) + ' <a class="doc-anchor" href="#/glossary/' + encodeURIComponent(e.key) + '" title="Link to this entry">#</a></span>' +
+    '<span class="gl-tags"><span class="gl-key">' + esc(e.key) + '</span>' + (isModel ? '<span class="gl-tag model">model term</span>' : tagsOf(e)) + '</span></dt>' +
+    '<dd>' + (e.desc ? esc(clean(e.desc)) : '<span class="muted-inline">No definition yet.</span>') + '</dd></div>';
+}
+
+function renderGlossary(el, params) {
+  const key = params.id || (params.rest || [])[0] || (params.query || {}).k || '';
+  el.innerHTML = '<div id="glossary-root">' + muted('Loading the glossary…') + '</div>';
+  return loadGlossary().then(g => {
+    const root = document.getElementById('glossary-root');
+    if (!root || !el.isConnected) return;
+    const groups = g.groups || [];
+    USED_IDS = {};
+    const MT = MODEL_TERMS.map(x => [x[0], x[1].slice()]);
+    (g.model || []).forEach(t => { let grp = MT.find(x => x[0] === (t.group || 'Models')); if (!grp) { grp = [t.group || 'Models', []]; MT.push(grp); } if (!grp[1].some(y => y[1] === t.label)) grp[1].push([t.key + '_model', t.label, t.desc]); });
+    const nMetrics = groups.reduce((s, x) => s + (x.entries || []).length, 0);
+    const nModel = MT.reduce((s0, x) => s0 + x[1].length, 0);
+    const nStab = groups.reduce((s, x) => s + (x.entries || []).filter(e => typeof e.stabilises_at === 'number').length, 0);
+    const index = groups.map(x => '<a href="#/glossary/g:' + esc(slug(x.name)) + '" data-group="' + esc(slug(x.name)) + '">' + esc(x.name) + '</a>').join('') +
+      MT.map(x => '<a href="#/glossary/g:model-' + esc(slug(x[0])) + '" data-group="model-' + esc(slug(x[0])) + '">' + esc(x[0]) + '</a>').join('');
+    const cardOf = (name, sl, entries, isModel) => '<div class="card gl-group" data-group="' + esc(sl) + '"><div class="card-header">' + esc(name) + ' <span class="card-sub">' + entries.length + '</span></div><dl class="gl-list">' + entries.map(e => entryHTML(e, isModel)).join('') + '</dl></div>';
+    const N = g.notices || {};
+    root.innerHTML =
+      '<div class="card"><div class="card-header">Glossary <span class="card-sub">Every metric the site computes for players and teams, with the sample at which it stabilises, and the terms the pages use. How each is computed is in the <a href="#/methodology">methodology</a>.</span></div>' +
+      '<div class="gl-top"><input id="gl-search" type="search" placeholder="Filter the glossary…" autocomplete="off" spellcheck="false">' +
+      '<select id="gl-kind"><option value="">metrics and terms</option><option value="metric">catalogue metrics</option><option value="model">terms and models</option></select><span class="gl-count" id="gl-count"></span></div>' +
+      '<div class="gl-index">' + index + '</div>' +
+      '<div class="doc-meta">' + nMetrics + ' metrics in ' + groups.length + ' groups and ' + nModel + ' terms' + (nStab ? '; ' + nStab + ' with a stabilisation point (the sample at which split-half reliability reaches 0.7, which also sets how hard the catalogue shrinks small samples)' : '') +
+      (g.updated_at ? ' · updated ' + esc(K() ? K().fmtDate(g.updated_at) : g.updated_at) : '') + (g.source === 'catalogue' ? ' · assembled from this season\'s catalogues until data/glossary.json is published' : '') + '</div></div>' +
+      (nStab ? '<div class="card"><div class="card-header">Stabilisation points <span class="card-sub">The sample at which a metric is 70% signal: with r(n) = n/(n + k), n₀.₇ = 7k/3. Before it, treat the number as mostly noise; the catalogue shrinks each value by (n·x + k·mean)/(n + k).</span></div><div id="gl-stab"></div></div>' : '') +
+      groups.map(x => cardOf(x.name, slug(x.name), x.entries || [], false)).join('') +
+      MT.map(x => cardOf('Terms: ' + x[0], 'model-' + slug(x[0]), x[1].map(t => ({ key: t[0], label: t[1], desc: t[2] })), true)).join('') +
+      '<div class="card gl-empty" id="gl-none" style="display:none">Nothing in the glossary matches that.</div>' +
+      '<div class="card"><div class="card-header">Data credits</div><div class="gq-read"><p>' + esc(N.nflverse || NFLVERSE) + '</p><p>' + esc(N.ftn || FTN) + '</p><p>' + esc(N.ngs || NGS) + '</p></div></div>';
+    if (nStab && K()) {
+      const k = K();
+      const rows = [];
+      groups.forEach(x => (x.entries || []).forEach(e => { if (k.isNum(e.stabilises_at) && !rows.some(r => r.key === e.key)) rows.push(Object.assign({ _g: x.name }, e)); }));
+      rows.sort((a, b) => a.stabilises_at - b.stabilises_at);
+      document.getElementById('gl-stab').innerHTML = k.table([{ label: 'Metric' }, { label: 'Group' }, { label: 'Stabilises at', align: 'right' }, { label: 'Measured per' }, { label: 'Shrinkage k', align: 'right', title: '3/7 of the stabilisation point' }],
+        rows.map(e => [{ v: e.label, html: '<a href="#/glossary/' + encodeURIComponent(e.key) + '">' + esc(e.label || e.key) + '</a>' }, { v: e._g, html: esc(e._g) }, { v: e.stabilises_at, html: '<strong>' + k.int(e.stabilises_at) + '</strong>' }, { v: e.unit || '', html: esc(e.unit || 'plays') }, { v: e.stabilises_at * 3 / 7, html: k.int(e.stabilises_at * 3 / 7) }]), { compact: true });
+      k.sortable(document.getElementById('gl-stab'));
+    }
+    const input = document.getElementById('gl-search'), kindSel = document.getElementById('gl-kind'), count = document.getElementById('gl-count');
+    const entries = Array.prototype.slice.call(root.querySelectorAll('.gl-entry'));
+    const cards = Array.prototype.slice.call(root.querySelectorAll('.gl-group'));
+    const total = entries.length;
+    const filter = () => {
+      const needle = fold(input.value.trim()), kind = kindSel.value;
+      let shown = 0;
+      entries.forEach(e => {
+        const hit = (!needle || needle.split(/\s+/).every(w => e.dataset.q.indexOf(w) >= 0)) && (!kind || e.dataset.scope === kind);
+        e.classList.toggle('hidden', !hit); if (hit) shown++;
+      });
+      cards.forEach(c => c.classList.toggle('hidden', !c.querySelector('.gl-entry:not(.hidden)')));
+      document.getElementById('gl-none').style.display = shown ? 'none' : '';
+      count.textContent = needle || kind ? shown + ' of ' + total + ' entries' : total + ' entries';
+    };
+    input.addEventListener('input', filter);
+    input.addEventListener('keydown', ev => { if (ev.key === 'Escape') { input.value = ''; filter(); } });
+    kindSel.addEventListener('change', filter);
+    filter();
+    root.querySelectorAll('.gl-index a').forEach(a => a.addEventListener('click', ev => {
+      ev.preventDefault();
+      const grp = root.querySelector('.gl-group[data-group="' + a.dataset.group + '"]');
+      if (grp) { grp.classList.remove('hidden'); grp.scrollIntoView({ block: 'start' }); }
+      history.replaceState(null, '', a.getAttribute('href'));
+    }));
+    if (key) {
+      if (key.indexOf('g:') === 0) {
+        const grp = root.querySelector('.gl-group[data-group="' + key.slice(2).replace(/"/g, '') + '"]');
+        if (grp) setTimeout(() => grp.scrollIntoView({ block: 'start' }), 0);
+      } else {
+        const e = document.getElementById('gl-' + key);
+        if (e) { e.classList.add('hit'); setTimeout(() => e.scrollIntoView({ block: 'center' }), 50); setTimeout(() => e.scrollIntoView({ block: 'center' }), 400); }
+        else { input.value = key.replace(/_/g, ' '); filter(); }
+      }
+    }
+  });
+}
+
+// ── methodology ────────────────────────────────────────────────────────────
+
+const SRC = f => '<span class="src">oddsmarkets/nfl/' + f + '</span>';
+
+const METHOD_HTML = [
+`<section id="m-overview"><h2>What the site does</h2>
+<p>The Quant Gridiron prices every NFL game, the season and the playoffs with its own models, sets those prices beside the closing lines and the prediction markets, and backs them with play-level analytics from 1999: our own expected points and win probability, every fourth down graded, completion probability, expected yards after the catch, rushing yards over expected, kicking and player value.</p>
+<p>Four layers carry it. <strong>Play models</strong> value every play (expected points, win probability, completion, YAC, rushing, kicking, fourth-down options). <strong>Player and team measures</strong> turn plays into catalogues by position group with stabilisation-aware percentiles, opponent-adjusted unit ratings and tendencies. <strong>Team strength and the game model</strong> turn units into a margin and total distribution for every game, and a <strong>season simulation</strong> plays out the rest of the schedule with the NFL's tiebreakers and playoff format. A walk-forward <strong>backtest</strong> scores the game model against the closing spread and moneyline and is published on the <a href="#/calibration">calibration page</a>, with our EP and WP against nflfastR's.</p>
+<p>Every constant below is the value in the code on 1 October 2026, and every fitted coefficient quoted is the committed fit under <code>oddsmarkets/nfl/models/fitted/</code> that the site runs on; each section names its source files. Fitted quantities (the gradient-boosted models, stabilisation constants, the game model's coefficients) are refitted and shown on the pages and the calibration page.</p></section>`,
+
+`<section id="m-data"><h2>Data sources and licences</h2>
+<h3>nflverse</h3>
+<p>Everything play-level comes from the nflverse data releases on GitHub (<code>github.com/nflverse/nflverse-data/releases</code>), downloaded as Parquet: play-by-play from 1999 (372 columns, including nflfastR's EP, WP, CPOE and expected YAC, kept for comparison), schedules with closing spreads and totals from 1999 and moneylines from 2006, Next Gen Stats weekly and season rows from 2016, FTN charting from 2022, play participation for 2016–2025 (formation, personnel, box count, coverage, pressure; published after each season, never in-season), depth charts from 2001, injuries from 2009, rosters, the player id crosswalk (names, positions, birth dates, colleges, and draft slots from the 2008 draft on), ESPN QBR from 2006 and player and team statistics. Each release publishes a <code>timestamp.txt</code>; a file is re-requested only when that timestamp changes, and then only downloaded when its ETag (or size and date) changed; a download is streamed to a temporary file, checked against its Content-Length and against the columns the models need, and only then replaces the old file, so a broken download never overwrites a good one. Requests are paced 0.2 s apart.</p>
+<p><strong>Not used</strong>: anything nflverse takes from Pro Football Reference, whose terms say no websites or tools should be built on its data: snap counts, PFR advanced stats, the trade and draft-pick tables, the combine, the crosswalk's draft slots before 2008 (player pages show a draft only from 2008) and PFR's ids. Where on-field counts are needed they come from the play participation above.</p>
+<p class="doc-note">Data from nflverse (nflfastR, nflreadr, nflverse-data), licensed <strong>CC-BY 4.0</strong>. <strong>FTN Data via nflverse</strong>, licensed CC-BY-SA 4.0: charting data derived from it on this site are shared alike under the same licence. <strong>NFL Next Gen Stats</strong> are redistributed NFL data, credited and shown for informational, non-commercial use.</p>${SRC('sources/nflverse.py')}${SRC('canon.py')}
+<h3>ESPN</h3>
+<p>The public scoreboard and game summaries (no key) give live state, drives, plays and ESPN's own win probability, and the core odds endpoint gives lines by book with opening and closing prices from about 2017. Requests are paced one a second. DraftKings is preferred, then the other US books; with three or more books, a book is set aside as suspect when its spread is more than 3.5 points or its total more than 5 points from the median, or its moneyline favourite disagrees with its spread favourite at 2.5 points or more; in-play rows are dropped. ESPN events are matched to nflverse games by the schedule's ESPN id, else season, week and teams, else teams and the nearest kickoff within 36 hours.</p>${SRC('sources/espn.py')}
+<h3>Prediction markets</h3>
+<p>Kalshi (Super Bowl, conference and division winners, the 1 seed, playoffs, win-total ladders, the awards, games, spreads, totals and team totals) and Polymarket (tag "nfl" futures and the game series). See <a href="#/methodology/markets">markets</a>.</p>${SRC('sources/markets.py')}
+<h3>The client</h3>
+<p>One paced client never raises on a bad answer: a 120 s timeout, four attempts, 5 s × attempt after a network error and Retry-After (else 10 s × attempt, at most 120 s) after HTTP 429 or a server error, and a budget of calls per run that stops a backfill cleanly so the next run resumes. Its user agent names the site and says it is non-commercial. Pro Football Reference is not used (its terms forbid scraping), nor the NFL's own Next Gen Stats API.</p>${SRC('sources/_client.py')}</section>`,
+
+`<section id="m-identity"><h2>Identity, coverage and conventions</h2>
+<p>A season is the year it starts (2026 includes the playoffs of January and February 2027). Games are nflverse ids (<code>2026_04_PIT_CLE</code>), players gsis ids (<code>00-0036355</code>) and teams the nflverse abbreviation used that season; franchises keep their history across relocations: St. Louis to Los Angeles (Rams, 2016, abbreviation LA), San Diego to Los Angeles (Chargers, 2017), Oakland to Las Vegas (Raiders, 2020). 1999–2001 had six divisions and 31 teams (Houston joined in 2002). Regular seasons were 16 games to 2020 and are 17 from 2021; the playoffs had 12 teams (two byes per conference) to 2019 and have 14 (one bye) from 2020, reseeded after each round.</p>
+<p>Coverage: play-by-play from 1999; our completion model from 2009 (2006–2008 play-by-play records air yards on completions only); NGS from 2016; participation 2016–2025; FTN from 2022; closing spreads and totals from 1999, moneylines from 2006, ESPN lines by book from about 2017. 67 stadiums carry location, altitude, roof and time zone, checked against the schedules (every home ground within 80 km of its club's city; roof types agree with nflverse's). Spreads are the home team's betting line, negative when the home side is favoured (nflverse's <code>spread_line</code> negated).</p>
+<p>Payloads round probabilities to 4 decimals and EPA to 3; fractions are stored 0–1.</p>${SRC('canon.py')}${SRC('store.py')}${SRC('models/_io.py')}</section>`,
+
+`<section id="m-ep"><h2>Expected points</h2>
+<p>Expected points are the value of the next score in the same half (overtime is its own half) from the offence's point of view. A LightGBM multiclass model gives every first-to-fourth-down snap a probability for seven outcomes: touchdown, field goal, safety, no score, and the opponent's safety, field goal and touchdown, valued 7, 3, 2, 0, −2, −3, −7 (a touchdown counts 7 because the try is a separate play):</p>
+<div class="eq">EP = Σ<sub>c</sub> p<sub>c</sub> · v<sub>c</sub>      EPA = EP<sub>after</sub> − EP<sub>before</sub></div>
+<p>EP after a play is the next snap's EP (sign flipped when possession changes), the points on a scoring play, or zero at the end of a half. Inputs: down, distance, goal to go, yard line, seconds left in the half, the half, score difference, both teams' timeouts, home, roof and era (the season). Settings: learning rate 0.1, 63 leaves, at least 400 plays per leaf, L2 5.0, up to 600 rounds. The model is <strong>cross-fitted</strong>: seasons are dealt into five folds and every play is scored by a model that never saw its season, with early stopping on a 10% holdout of games; the production model is refitted on all seasons at the folds' mean best iteration.</p>
+<p>It is validated against nflfastR's published next-score probabilities on the same plays (log-loss, per-class calibration, binned EP against the realised value), overall, 1999–2019, from 2020 and by season. nflfastR's model was fitted on 1999–2019, so its numbers there are in-sample. The comparison is on the <a href="#/calibration">calibration page</a>.</p>${SRC('models/ep.py')}${SRC('models/_io.py')}</section>`,
+
+`<section id="m-wp"><h2>Win probability</h2>
+<p>A LightGBM binary model of whether the team with the ball wins, on every snap, cross-fitted by season like EP (ties left out). Inputs: score difference, seconds left in the game and the half, the half, down, distance, yard line, both teams' timeouts, home, the pre-game spread from the offence's side, the era (season), and three derived terms with e the share of the game elapsed:</p>
+<div class="eq">spread_time = spread · exp(−4e)      diff_time = score difference · exp(4e)
+bm_z = (score difference + spread · (1 − e)) / (13.5 · √(1 − e + 0.005))</div>
+<p>bm_z is the Brownian-motion view of a game (13.5 points is the standard deviation of a final margin about the spread); it cut the gap to nflfastR's spread-aware model in the first quarter. The model is constrained to rise with score difference, the spread terms and the offence's timeouts and to fall with distance from the goal line and the defence's timeouts. Settings: learning rate 0.08, 63 leaves, at least 300 plays per leaf, L2 5.0, up to 800 rounds. With no time left a decided game is exactly 0 or 1. Whether the team with the ball receives the second-half kickoff is not an input (the current version, wp-3, dropped it): in the data it carries selection as well as the extra possession, and it inflated the value of keeping the ball in fourth-down decisions. It is still computed for the payloads.</p>
+<p>Validation is against nflfastR's <code>wp</code> (which does not know the spread) and <code>vegas_wp</code> (which does, the fair comparison), by quarter and by season, on the <a href="#/calibration">calibration page</a>; the honest summary is that ours beats the plain model clearly and sits slightly behind vegas_wp overall.</p>${SRC('models/wp.py')}
+<h3>Live win probability</h3>
+<p>During games the same model runs on ESPN's live state, with the pre-game spread replaced by our pre-game expected margin, so pre-game strength fades as the clock runs exactly as the model learned. The fallback is Φ((D + E + μf) / (σ√f + 0.5)), with D the score difference, f the share of the game left, μ the pre-game margin, σ the game model's margin SD and E a simple field-position value clip(6.3 − 0.07·yards to go to score − 0.35·(down − 1) − 0.03·(distance − 10), −1, 6). Game pages plot ours against ESPN's.</p>${SRC('models/live.py')}</section>`,
+
+`<section id="m-fourth"><h2>Fourth downs and two-point tries</h2>
+<p>For every fourth down the win probability of each option is computed with our WP model, flipping the state (score, home, spread, timeouts) when the other side gets the ball:</p>
+<ul><li><strong>Go for it</strong>: the conversion probability times the WP after a conversion, plus the WP after a turnover on downs. Yards gained on a conversion and short on a failure are drawn from the league's quantiles (10th, 30th, 50th, 70th, 90th) by distance bucket (1, 2, 3–4, 5–7, 8–10, 11–15, 16+); a gain past the goal line is a touchdown worth 6 plus the try.</li>
+<li><strong>Field goal</strong> (attempt distance = yards to the goal line + 17, up to 66): the make probability from the kicking model for this team's kicker, era, wind, temperature, roof and altitude; a make is +3 and the opponent receives; a miss gives the ball at the spot of the kick (at least the opponent's 20).</li>
+<li><strong>Punt</strong>: five landing spots from the league's punts from that yard line, plus the return-touchdown rate.</li></ul>
+<p>Each option costs clock (go 6 s, punt 8 s, field goal 5 s); kickoffs are placed at the season's median drive start after a kickoff (75 before 2024, 70 in 2024, 65 from 2025 by default). The <strong>recommendation</strong> is the option with the highest WP; <strong>WP lost</strong> = max(0, WP(best) − WP(chosen)). Each decision gets a letter from its WP lost: <strong>A</strong> up to 0.5 percentage points, <strong>B</strong> up to 1.5, <strong>C</strong> up to 3, <strong>D</strong> up to 6, <strong>F</strong> beyond. The pages show A and B as a right call, C as a close call and D and F as a mistake (so a right call gives up at most 1.5 points, a close call more than 1.5 and at most 3, a mistake more than 3). Overtime fourth downs are listed but not graded.</p>
+<p>The <strong>conversion model</strong> is a LightGBM binary model on every third- and fourth-down run or pass since 1999 (converted = reached the line to gain or scored, without a turnover), on distance, yard line, goal to go, fourth down, the offence's and opponent's pre-game EPA per play (each game's EPA decayed by 0.97 per game, carried across seasons at 0.4 and shrunk with 300 pseudo-plays), era and roof; monotone in distance and the two strengths; learning rate 0.05, 15 leaves, at least 300 plays per leaf, L2 10, cross-fitted by season. Its calibration on fourth downs is on the calibration page; it under-predicts long conversions (11+ yards).</p>
+<p><strong>Two-point tries</strong>: WP(kick) = P(PAT)·WP(+1) + (1 − P(PAT))·WP(+0) and WP(go for two) = P(2pt)·WP(+2) + (1 − P(2pt))·WP(+0), with the season's PAT rate and P(2pt) = (successes + 0.48·100)/(attempts + 100).</p>
+<p><strong>Go rate over expected (GOE)</strong>, the aggressiveness measure on the coaches and fourth-down pages, compares a team's go rate with a league logistic regression of going for it fitted on the same season (log distance, yard line and its square, score difference, game seconds, win probability, and trailing in the last 15 minutes) in <code>analytics/fourth.py</code>: it measures aggressiveness relative to the league, not correctness. (The fourth-down model file also fits a gradient-boosted go model for its own coach tables; the site does not publish those.) "Went when the model said go" counts the fourth downs where going was the highest-WP option. Coach and team rates leave out the last two minutes of each half and win probabilities below 5% or above 95%.</p>${SRC('models/fourth_down.py')}${SRC('analytics/fourth.py')}${SRC('analytics/games.py')}</section>`,
+
+`<section id="m-passing"><h2>Completion probability, CPOE and expected YAC</h2>
+<h3>Completion probability</h3>
+<p>A LightGBM binary model of whether a targeted pass is completed (2009 on), in four tiers that use the richest data a season has: <strong>base</strong> (air yards, the room behind the target, yard line, distance, down, goal to go, seconds left in the half, score, pass location, QB hit, shotgun, no huddle, roof, wind, era); <strong>participation</strong> 2016–2025 (adds pressure, time to throw, rushers, box count, coverage and man or zone); <strong>FTN</strong> 2022 on (adds blitzers, rushers, box, out of pocket, play action, screen); and both. Each row is scored by the richest tier fitted on seasons with its data. Learning rate 0.06, 31 leaves, at least 300 plays per leaf, L2 5, monotone in air yards, cross-fitted. One logit shift per season makes the league's mean completion probability equal its completion rate, so <strong>CPOE is against that season's league</strong>:</p>
+<div class="eq">CPOE = 100 · mean(completed − cp)  (percentage points)      CROE (receivers) = mean(caught − cp)</div>
+<p>Pressure, blitz and coverage are inputs, so a quarterback is credited for completing under pressure; drops are not inputs (FTN drops can be removed for a drop-adjusted CPOE). Season CPOE agrees with nflverse's closely and tracks NGS's at least as well.</p>${SRC('models/completion.py')}
+<h3>Expected yards after the catch</h3>
+<p>A LightGBM regression of YAC (clipped to [−10, room to the goal line]) on air yards, room, yard line, distance, down, whether the catch is past the sticks, location, time, score, shotgun, QB hit, roof and era, with participation (box, rushers, coverage) and FTN (screen, play action, motion, contested) tiers as above. YACOE = YAC − xYAC per reception.</p>${SRC('models/yac.py')}</section>`,
+
+`<section id="m-rushing"><h2>Rushing yards over expected</h2>
+<p>A LightGBM regression of rushing yards on designed runs (clipped to [−15, distance to the goal line]) on yard line, distance, down, goal to go, time, score, run location and gap, shotgun, no huddle, roof and era; participation adds box count and the numbers of backs, tight ends and receivers and the formation (2016–2025), and FTN adds box count, backfield, motion, RPO and sneaks (2022 on). Monotone: more men in the box never raises the expectation.</p>
+<div class="eq">RYOE = yards − expected yards      RYOE per carry = mean over carries</div>
+<p>Team and defence quality are deliberately not inputs, so RYOE credits the runner and his blocking together. Next Gen Stats publishes its own RYOE from player tracking (defenders' positions and speeds at the handoff), which this model cannot see; player pages show both. Season RYOE per carry correlates with NGS's more closely than yards per carry does.</p>${SRC('models/ryoe.py')}</section>`,
+
+`<section id="m-kicking"><h2>Kicking and punting</h2>
+<p><strong>Field goals</strong>: a logistic regression on every attempt from 15 to 75 yards since 1999 (a block counts as a miss), piecewise-linear in distance with knots at 30, 40 and 50 yards, plus era and its interaction with distance, wind outdoors (and its interaction with distance), cold outdoors (degrees below 50 °F), indoor, and altitude of 3,000 ft or more (and its interaction with distance); ridge 0.001. Each kicker gets a random effect b ~ N(0, τ²), fitted as a posterior mode with τ² by the method of moments over kickers with 20+ attempts. <strong>FG over expected</strong> = makes − Σp, with p for a league kicker in the same conditions; points over expected = 3 × FGOE + extra points over the league rate.</p>
+<p><strong>Punts</strong>: the receiving team's spot (100 − yard line + distance − return; the 20 on a touchback) from the league's punts within two yards of the same launch point (widened until 60 punts), at the 10th to 90th percentiles, and a return-TD rate (TDs + 0.5)/(punts + 100). Punter value = expected spot − actual spot.</p>${SRC('models/kicking.py')}</section>`,
+
+`<section id="m-value"><h2>Player value and the QB composite</h2>
+<h3>Gridiron Value</h3>
+<p><strong>Raw credit</strong> is conventional and not additive across roles: the passer is credited with the whole EPA of his dropbacks (passes, sacks, scrambles, throwaways), a receiver with the whole EPA of his targets, and a rusher with his designed runs, so a pass's EPA appears under both the passer and the receiver. For receivers the target's EPA is also split into air EPA (the EP at the catch point less the EP before, or the whole play if incomplete) and YAC EPA (the rest); the split is shown, not used to share credit. There are no fixed shares between passer and receiver.</p>
+<p><strong>Gridiron Value</strong> does the sharing out. Per season, a ridge regression of every dropback's and designed run's EPA on indicators for the passer, the receiver (on targets), the rusher (on designed runs) and the defence faced, with unpenalised pass and run intercepts, so a receiver is measured net of his quarterback and the defences he faced, and vice versa. Penalties, in pseudo-plays of league-average play: 200 for passers, 60 for receivers, 120 for rushers and 600 for defences. Value = coefficient × plays, the EPA above an average player in that role; the catalogue falls back to raw credit when the model is not available. For 2016–2025 an on-field ridge (RAPM-style) of play EPA on all eleven offensive players and the defence (penalty 1,500; seasons with 500+ charted plays) is also estimated; linemen are nearly collinear and heavily shrunk, so read them as team blocking credit, not individual grades.</p>${SRC('models/player_value.py')}
+<h3>QB composite</h3>
+<p>Four components per quarterback: EPA per dropback, CPOE, sack rate and turnover-worthy rate (FTN interception-worthy throws when FTN charts 80% or more of his attempts, else interceptions). Each is shrunk, (n·x + k·prior)/(n + k), towards a prior from his own history (weighted 0.6<sup>years back</sup> × volume, itself shrunk to the league) with k from the stabilisation fits. The weights come from a weighted regression of next season's EPA per dropback on this season's standardised components (pairs with 200+ dropbacks in both seasons), and the composite is shown as 100 + 10 z among qualified quarterbacks. When the model is not available the catalogue blends the shrunk components 0.55 EPA, 0.2 CPOE, 0.1 sacks and 0.15 turnovers.</p>${SRC('models/qb.py')}${SRC('analytics/players.py')}
+<h3>Defenders</h3>
+<p>The public data has no individual coverage charting in-season and participation arrives only after a season, so defenders are rated on what play-by-play credits them with: sacks (half sacks 0.5), QB hits, tackles for loss, interceptions, passes defensed, forced fumbles and tackles. <strong>Splash EPA</strong> shares the EPA prevented on each sack, interception, forced fumble, pass defensed or tackle for loss equally among the credited players.</p>${SRC('analytics/players.py')}${SRC('models/pressure.py')}</section>`,
+
+`<section id="m-trade"><h2>Value above replacement, strengths and needs, and the trade simulator</h2>
+<h3>The currency</h3>
+<p>The <a href="#/value">value page</a> puts every player in one unit: <strong>points (EPA) above a replacement-level player at the same position</strong>. For QB, RB, WR and TE it starts from Gridiron Value: the ridge regression's per-play coefficient for each role the player filled (passer, receiver, rusher), less a <strong>replacement rate</strong> for that position and role, times his plays in the role. The replacement rate is the 20th percentile of the role's rates among the position's regulars (at least 30 dropbacks or 10 per team game for passers, 10 targets or 2 per team game for receivers, 15 carries or 3 per team game for rushers). Receivers' raw coefficients are not centred on zero (targeted passes are worth more than the sacks and throwaways that sit in the intercept), so the replacement level is what makes a receiver's number comparable with a quarterback's. Kickers: points over expected per attempt shrunk with k = 60 attempts, less the 20th-percentile kicker's rate, times attempts. Punters: punting EPA over the league's average punt, shrunk with k = 60 punts, the same way. Defenders (edge, interior line, linebacker, cornerback, safety): Splash EPA per game shrunk with k = 6 games toward the position mean, less the 20th percentile, times games.</p>
+<div class="eq">value above replacement = Σ<sub>roles</sub> (rate<sub>role</sub> − replacement<sub>position, role</sub>) × plays<sub>role</sub></div>
+<p>Defensive values are only what the box score credits (sacks, interceptions, forced fumbles, passes defensed, tackles for loss): coverage, pressure without a hit and run fits are invisible, so they are a floor. At team level splash EPA per game does track opponent-adjusted defensive EPA per game (2006–2025, 640 team-seasons: slope 1.29, r 0.71), but individual values are used at face value, never scaled up. As a check on the offensive currency, team Gridiron Value per game against opponent-adjusted offensive EPA per game has slope 1.10 and r 0.95 over the same team-seasons. <strong>Offensive linemen are not valued individually</strong>: public data have no blocking assignments and on-field plus-minus cannot separate five linemen who play every snap together; teams are graded on pass protection as a unit (pressure allowed, which the backs and the quarterback share). Edge and interior roles come from the latest weekly roster's NGS position, else PFF's position in the nflverse player table, else the depth chart, else the listed position.</p>
+<p>Best at each position lists the ten qualified players (the catalogue's sample floors) with the most value above replacement; the percentile is of value per game among qualified players at the position. The trend is Gridiron Value per game against last season's (the raw currency of the players page).</p>
+<h3>Strengths and needs</h3>
+<p>Each team page grades <strong>units</strong> (the starting QB's term in the team-strength model, pass and rush offence and defence as opponent-adjusted EPA per play, pass protection and pass rush as pressure rates, special teams) and <strong>positions</strong> against the 32 teams. A position's value is the sum of its starters' per-game value above replacement (QB 1, RB 2, WR 3, TE 2, edge 2, interior 2, linebacker 2, cornerback 3, safety 2, K 1, P 1), from the players on the latest nflverse weekly roster who are active or inactive (injured reserve and the practice squad are left out), each floored at zero because a team can always field a replacement. Grades: A from the 80th percentile, B 60th, C 40th, D 20th, F below. The three strongest and three weakest items (60th percentile and up, 40th and down) are listed with the number behind them.</p>
+<p><strong>Ways to improve</strong> ranks players on other rosters at the weak positions by what they would add: he replaces the weakest starter if he is better, and the gain is that difference times the game model's response (below), in points a game, with the change in expected wins and playoff odds from the team's sensitivity curve. Each candidate shows what his own team would lose (its next man up takes his place) and, where the data support it, a hint: his team is out of contention (playoff odds under 10%), he costs his team less than half what he adds (depth), or his age. Unsigned players are those the latest weekly roster lists as released (or that nflverse's player table lists as released with no current roster entry), with this season's values or last season's. These are model suggestions on on-field value only: salary cap, contracts, scheme fit, medicals and whether a club would deal are not considered.</p>
+<h3>The trade simulator</h3>
+<p>The <a href="#/trade">trade simulator</a> moves players between two or three teams and recomputes each team's position values (an incoming player displaces the weakest starter if he is better; a departing starter is replaced by the team's own next man up). Players carry the per-game value they have shown: a part-timer's per-play rate is never stretched to a starter's workload. A quarterback changes the team through the team-strength model's QB term: the new starter is the better of the incoming QB and the current one (or, if the starter leaves, the next QB on the depth chart), and the change is the difference in EPA per dropback times the league's dropbacks per game, as in the season simulation's starting-QB override. The change in strength is</p>
+<div class="eq">Δ = k<sub>resp</sub> × (Σ<sub>positions</sub> Δvalue + NP × ΔQB)      k<sub>resp</sub> = s + b<sub>mr</sub> × 0.77</div>
+<p>with s and b<sub>mr</sub> the game model's coefficients on the rating difference and the market rating (0.85 with the committed fit): the margin's response to a one-point rating change once the market ratings carry it, exactly as for a starting-QB change.</p>
+<p><strong>Sensitivity curves</strong> turn Δ into odds without guesswork. For every team, the season simulation is run with that team's strength shifted, and the playoff, division, bye, conference and Super Bowl odds, mean wins and mean draft slot are recorded at shifts from −10 to +10 points a game. To keep the build fast, each team gets one run of 2,000 simulations in which only its own rating error is drawn from a three-times-wider normal; each simulation is then weighted by the ratio of the shifted to the drawn density (importance sampling), the curves are made non-decreasing in the shift (isotonic) and anchored at zero to the published 20,000-run odds (probabilities in log-odds). The shift applies to every remaining game and to the playoffs. Checked on 15 October 2026 against direct simulations with the shift applied (20,000 runs each, four teams, shifts ±3 and ±6): playoff odds differ by 0.8 points on average (largest 4.1), division odds 0.9 (3.4), Super Bowl 0.3 (0.9), mean wins 0.04 (0.15), mean draft slot 0.16 (0.48). A starting-QB override run through the simulation itself (the backup in for the starter at four teams) agrees with the curve within 0.08 wins and 2.6 points of playoff odds; Super Bowl odds read 0.6–1.3 points higher off the curve because the simulation's playoff games apply the full rating change where the curve applies the game model's 0.85. Each team's odds come from its own curve: when two rivals trade, the effect of one's change on the other is not re-simulated. The curves are cached on the simulation's inputs and recomputed when results, ratings or starting quarterbacks change.</p>
+<p>The verdict per team: "wins now" when expected wins rise by 0.15 or playoff odds by 2 points, "weakens now" for the same falls, otherwise little change; a team receiving players three or more years younger on average is flagged as a possible long-term gain, not quantified (there is no ageing model). The trade's state is in the address (<code>#/trade?t=KC,BUF&amp;m=&lt;player&gt;:&lt;to team&gt;</code>), so a link reproduces it.</p>
+<p><strong>Salary cap and contracts</strong>: not shown or checked. The only source we have is nflverse's contracts release, which is OverTheCap's data, and OverTheCap's terms do not allow its contract data to be republished on a website without its consent. The build can read it (cap hits, contract years, a cap check against the season cap) once permission exists; until then trades are judged on on-field value only.</p>${SRC('analytics/value.py')}${SRC('analytics/contracts.py')}${SRC('models/season_sim.py')}</section>`,
+
+`<section id="m-valuation"><h2>Valuation v2, transactions and trade ratings</h2>
+<h3>Projected value</h3>
+<p>The <a href="#/value">value page</a>'s projected table carries each player's value forward: his <strong>current level</strong> is the games-weighted mean of this season's and the last two seasons' value per game (last season's games count half, the one before a quarter), shrunk toward the position mean with r = g / (g + k); k is read off the season-to-season regression of value per game (k ≈ 13 games for QBs and WRs, 17 for RBs, 9 for TEs, 13–15 for edge and interior rushers, 34–43 for linebackers and defensive backs). Quarterbacks with a team-strength QB value use the QB model instead: (EPA per dropback − the model's value for an unknown QB) × the league's dropbacks per game, carried toward an average QB at the model's 0.95 a season. <strong>Ageing</strong>: the regression next = a + b·x + c₁A + c₂A² (A = age − 27, players with four or more games in both seasons, 1999–2025) gives the expected change in level from one age to the next for an average player; RBs and WRs decline from about 25, QBs gently from about 28. <strong>Availability</strong>: the chance a player of that position, age band and level plays the next season and the share of games he plays, blended with his own games over club games for this season and last; injured reserve removes the next four games. <strong>Value</strong> = Σ 0.9<sup>k</sup> × max(0, level<sub>k</sub>) × expected games<sub>k</sub> over the rest of this season and the next three; the 10th–90th percentile band comes from 400 random-walk draws (the season-ahead residual SD, then the extra spread two seasons out). Wins = value × k<sub>resp</sub> × wins per point of season margin (≈ 0.028, fitted on 2002–2025 results). <strong>Scarcity</strong>: the marginal starter at a position is the (32 × starters)-th best projected level league-wide; the index compares the top five's lead over him with the average position's.</p>
+<h3>Draft-pick value curve</h3>
+<p>Each pick's realised value is its player's first four seasons of value above replacement (discounted 10% a season, seasons below replacement and seasons not played count zero), over the 2008–2022 drafts; offensive linemen and long snappers are excluded because we cannot value them, so the curve reads "a pick spent on a position we value". The pick means are fitted with c + a·e<sup>−b(p−1)</sup>. Draft slots come from nflverse's players release, which takes them from the NFL's own draft data from 2008; its earlier slots, and nflverse's separate draft-pick table, come from Pro Football Reference, whose terms forbid this use, so they are not used.</p>
+<h3>Transactions and trade ratings</h3>
+<p>The <a href="#/transactions">transactions page</a> reads ESPN's public list of club transaction notes for the last twelve months (refetched at most every six hours) and parses them: each note is split into its sentences, trades are read from "Traded … to … for …", "Acquired … from … in exchange for …" and "Received …" forms, players are matched to their ids by name (allowing a close spelling within the position, preferring a player on the giving club's roster), picks by round and year (no year means the next draft; conditional picks count half), and the notes both clubs file on the same trade are merged. nflverse's trades table is not used: it is built from Pro Football Reference.</p>
+<p>Each side is valued <strong>at the time</strong> (a player's projection from the seasons completed before the trade; in-season form before a mid-season trade is not re-modelled; a pick at the curve, its round's mean when the slot is unknown, discounted for the seasons until it is used) and <strong>now</strong> (what he has produced for his new club since — his value per game in each season times the games he played for it after the trade date — plus what is still projected while he is on that roster; picks keep their curve value because our sources do not say which player a traded pick became). Net = value received − value sent, in points and wins; grades: A ≥ +1 win, B ≥ +0.3, C within 0.3, D ≥ −1, F below. Defensive values are a floor (box-score credit only), so deals for defenders read worse than they may be; offensive linemen are flagged as not valued. Contracts and cap figures are not considered: the only source (OverTheCap) does not permit republishing.</p>${SRC('analytics/valuation.py')}${SRC('analytics/transactions.py')}</section>`,
+
+`<section id="m-fantasy"><h2>Fantasy projections</h2>
+<p>The <a href="#/fantasy">fantasy page</a> projects PPR, half-PPR and standard points for the coming week and the rest of the season. Per player and week, from the games before it only:</p>
+<ul>
+<li><strong>Usage</strong>: his shares of the team's targets, carries, expected receiving TDs and expected rushing TDs (QBs: pass attempts) in the games he played, weighted by recency, with last season's shares as a prior. Expected TDs come from a play-level table fitted on the three seasons before: the chance a target scores given its yard line and air yards, a carry given its yard line — this is how red-zone usage enters.</li>
+<li><strong>Team volume and game script</strong>: the team's targets and carries per game, shifted by the expected margin from our game model (team implied points minus the opponent's) with fitted slopes; team offensive TDs = a + b × implied points, split between passing and rushing by the team's expected-TD mix.</li>
+<li><strong>Efficiency, shrunk</strong>: catch rate and yards per target toward the player's own expected values from where his targets are thrown, yards per carry toward his expected yards per carry, QB yards per attempt and interception rate toward the league.</li>
+<li><strong>Opponent</strong>: fantasy points the defence allows to the position against the league average (recency-weighted, shrunk, last season as a prior), applied to yards and TDs.</li>
+<li><strong>Injuries</strong>: the injury report (nflverse, from the NFL) — out at zero, doubtful and questionable at the rate such players have played; injured reserve and similar statuses at zero; a missing player's targets and carries are shared among his team-mates. The starting QB is our game card's.</li>
+<li><strong>Kickers</strong> from the team's implied points with a tilt for its kicking history; <strong>D/ST</strong> from the expected points-allowed score (the opponent's implied points with a fitted spread) plus sacks and takeaways from the defence's rate and the opponent's rate allowed.</li>
+</ul>
+<p>Floor and ceiling are the 10th and 90th percentiles of a normal whose SD grows with the projection, fitted on backtest residuals. Tiers break where the drop to the next player is at least 1.5 times the median drop. Start/sit compares players by simulating their bands. Buy-low and sell-high compare points with expected points from usage (each target and carry valued at what such plays produced league-wide). Waiver targets use a proxy for availability — outside the top scorers at the position — because we have no league ownership data.</p>
+<p><strong>Backtest</strong>: every week of 2019–2025 projected from the games before it (game-model prices walk-forward too), parameters tuned on 2014–2018 only, compared with season-to-date and last-season points per game for the fantasy-relevant pool; the numbers are on the page's backtest tab. <strong>Not used</strong>: snap counts (nflverse's come from Pro Football Reference, whose terms forbid this use), routes (no public in-season source), and any fantasy platform's ADP, ownership or salaries (their terms restrict reuse).</p>${SRC('analytics/fantasy.py')}${SRC('analytics/fantasy_model.py')}</section>`,
+
+`<section id="m-catalogue"><h2>Catalogues, percentiles and stabilisation</h2>
+<p>Each season's catalogue rates every player in his position group (QB, RB, WR, TE, K, P and defence) on the regular season's plays. A player is <strong>qualified</strong> with 14 attempts per team game (QB), 6.25 carries (RB), 3 targets (WR), 2 targets (TE), 0.8 field-goal attempts (K), 2 punts (P), or half his team's games and 2.5 tackles-equivalent per game (defence). A metric needs its own sample floor before it gets a percentile (50 dropbacks, 30 carries, 15 targets, 5 attempts, 10 punts, 3 games).</p>
+<p><strong>Stabilisation</strong>: for each metric, players with at least 2n events have their first 2n split into odd and even halves; the correlation of the halves r(n) is fitted with the Spearman–Brown form and k by least squares, pooled across seasons:</p>
+<div class="eq">r(n) = n / (n + k)      n₀.₇ = 0.7k / 0.3 = 7k/3 ("stabilises at")      shrunk value = (n·x + k·m) / (n + k)</div>
+<p>Percentiles place the shrunk value (m is the qualified pool's mean) against the qualified players, (below + ½ ties)/n, reversed where less is better, so 100 is always best; displayed values are never shrunk. The position percentile compares within the listed position (defence: DL, LB, DB) once five players share it. Receivers (WR and TE) share one pool. Team metrics are ranked among the 32 clubs; tendencies (PROE, pace, formation) are neither good nor bad, so they carry ranks, not percentiles.</p>
+<p>The <strong>lab</strong> can shrink a rate the same way towards the median of the players on screen; totals, values and the composite are never shrunk there. <strong>Era-adjusted</strong> numbers on the history and career pages are 100 + 10 z within that season's qualified players at the position.</p>${SRC('models/stabilise.py')}${SRC('analytics/__init__.py')}${SRC('analytics/history.py')}${SRC('analytics/careers.py')}</section>`,
+
+`<section id="m-teams"><h2>Team units, tendencies and pace</h2>
+<p><strong>EPA units</strong>: play EPA = μ + offence + defence, fitted by an alternating ridge (30 sweeps, penalty 60 plays per team) on scrimmage plays, overall and separately for dropbacks and designed runs; special teams are EPA per game on kicks, punts and returns net of the opponent's. Points per game multiply by the league's plays per team game.</p>
+<p><strong>PROE</strong> = mean(dropback − nflfastR's expected pass rate), overall and in neutral situations (win probability 20–80%, first or second down, outside the last two minutes of a half), on third down, in the red zone, and leading or trailing by 8 or more. Play action, RPO, motion and screens come from FTN (2022 on); personnel and formation from participation (2016–2025); blitz rate is five or more rushers or any blitzer (FTN). <strong>Pace</strong> is seconds between consecutive snaps of the same drive (1–60 s), in neutral situations and overall.</p>${SRC('analytics/teams.py')}</section>`,
+
+`<section id="m-strength"><h2>Team strength</h2>
+<p>Team ratings are opponent-adjusted unit ratings refitted after every week. For each unit, a weighted ridge regression on rows of game × offence (× passer for passing):</p>
+<div class="eq">pass:   y = μ + hfa·h + PT<sub>team</sub> + QB<sub>q</sub> + PD<sub>opp</sub>
+rush:   y = μ + hfa·h + RO<sub>team</sub> + RD<sub>opp</sub>
+special teams:   s = ST<sub>t</sub> − ST<sub>o</sub>
+minimise Σ w<sub>i</sub>(y<sub>i</sub> − x<sub>i</sub>b)² + Σ λ<sub>j</sub>(b<sub>j</sub> − m<sub>j</sub>)²,   w = plays · 0.5<sup>age in weeks / 30</sup></div>
+<p>with y the EPA per play (and success rate), h = +½ at home, −½ away and 0 at a neutral site, and a half-life of 30 weeks. The quarterback is his own component, so a change of starter moves the rating. Penalties (pseudo-plays): pass team 500, QB 350, pass defence 450, rush offence 450, rush defence 550, special teams 6. Each season starts from a <strong>prior</strong> m = carry × last season's estimate, mapped across relocations. The carry-overs the site runs on are the committed fit (<code>models/fitted/team_strength_params.json</code>, each unit's slope of end-of-season rating on the previous season's): pass team 0.571, QB 0.95, pass defence 0.541, rush offence 0.644, rush defence 0.574, special teams 0.459 (the code's defaults, used only without that file, are 0.575, 0.95, 0.50, 0.60, 0.505 and 0.45). A quarterback with no history starts at −0.02 EPA per dropback. The half-life, penalties, QB carry-over and new-QB prior were chosen by walk-forward game log-loss over 2006–2025. The <strong>net rating</strong> in points per game against an average team on a neutral field is</p>
+<div class="eq">net = NP·(PT + QB<sub>starter</sub> − PD) + NR·(RO − RD) + ST</div>
+<p>with NP and NR the league's dropbacks and designed runs per team game (35 and 26 by default) and the starter the main passer of the team's latest game. The same ridge is fitted on success rate; the game model uses that as a separate term. A roster-continuity term (the share of last season's snaps, counted from the play participation, played by players on this season's opening roster) exists but is set to zero.</p>${SRC('models/team_strength.py')}${SRC('models/_cdata.py')}</section>`,
+
+`<section id="m-game"><h2>The game model</h2>
+<p>The expected home margin:</p>
+<div class="eq">μ = s·(net<sub>h</sub> − net<sub>a</sub>) + b<sub>sr</sub>·(SR<sub>h</sub> − SR<sub>a</sub>) + (HFA + trend·(season − 2015)/10 + HFA<sub>season</sub>)·[not neutral] + b<sub>div</sub>·[not neutral]·[division game]
+    + b<sub>rest</sub>·(clip(rest<sub>h</sub>, 4, 14) − clip(rest<sub>a</sub>, 4, 14))/7 + b<sub>bye</sub>·(bye<sub>h</sub> − bye<sub>a</sub>) + b<sub>short</sub>·(short week<sub>h</sub> − short week<sub>a</sub>)
+    + b<sub>travel</sub>·(km<sub>a</sub> − km<sub>h</sub>)/1000 + b<sub>tz</sub>·(time zones<sub>a</sub> − time zones<sub>h</sub>) + b<sub>mr</sub>·MR</div>
+<p>SR is the <strong>success-rate composite</strong>: the same opponent-adjusted ridge as team strength fitted on success rate instead of EPA, as successful plays per game above the league, NP·(SR<sub>pass offence</sub> − SR<sub>pass defence</sub>) + NR·(SR<sub>rush offence</sub> − SR<sub>rush defence</sub>), with the starting quarterback's term in the pass offence. Home-field advantage is estimated by season (each season's own term ridge-penalised towards the trend, penalty 40), because it has declined. Every coefficient is fitted by ridge regression on walk-forward rows (ratings fitted only from games before each week). MR is the <strong>market rating</strong> line (added 2 October 2026): before each week, a ridge of every earlier played game's closing spread on home field and one term per team (half-life two weeks, prior 0.8 × last season's final rating), with each game's starting quarterbacks taken out and this game's added back, so it is the line the market's own recent opinion implies for these two teams and quarterbacks. It never uses the game's own price. Out of sample (2017–2026) it lowered the moneyline log-loss by 0.006, and against the spread and on totals (a market total rating) by similar amounts; the model still trails the closing line. The site runs on the committed fit, <code>models/fitted/game_params.json</code> (5,145 games, 2006–2026): s 0.250, b<sub>mr</sub> 0.775, b<sub>sr</sub> 0.276, home field 0.94 points with a trend of +0.05 per decade (the market rating carries most of home field), division −0.97, rest 1.35 per week of difference, bye 0.16, short week −0.07, travel 0.171 per 1,000 km and time zones −0.355 per hour. The backtest refits them walk-forward season by season (on the <a href="#/calibration">calibration page</a>). The margin is a <strong>discrete distribution</strong> over −80…80, a normal with σ = 13.26 points reweighted by key-number multipliers k(|m|) fitted on past games (k(3) 2.78, k(7) 1.81; k(0) 0.078, so ties are about 13 times rarer than a normal puts on [−½, ½]):</p>
+<div class="eq">p(m) ∝ [Φ((m + ½ − μ)/σ) − Φ((m − ½ − μ)/σ)] · k(|m|)      P(home win) = P(m &gt; 0) (+ half the tie in the playoffs)</div>
+<p>The <strong>total</strong> = a time-weighted league baseline (the mean total of earlier games, half-life 256 games) − 0.63 + 0.303 × the four units' expected EPA in points + 0.497 × (the market total rating from earlier closing totals − the baseline) + wind (−0.338 per mph above 8, outdoors) + cold (−0.027 per °F below 45, outdoors) + 1.35 indoors or under a closed roof, with σ 13.46 (the committed fit); team points are (total ± margin)/2. Market spreads use the fitted σ of the margin about the closing line, 13.18. Spread and total probabilities come from the same distributions; market spreads are turned into probabilities through the same machinery.</p>${SRC('models/game.py')}
+<h3>Drive simulation</h3>
+<p>For score distributions, team totals and margins, a drive-level Monte Carlo: each drive's result (touchdown, field goal, punt, turnover, downs, missed field goal, end of half, safety, defensive touchdown) from a multinomial logit on the starting field position (and its square) and the offence's expected EPA edge, drives per half from a normal (10.56 ± 2.12 in the committed drive model, <code>models/fitted/drive_model.json</code>), next starting spots from the league's histograms after each kind of result, tries (two-point attempts 10% of the time at 48%, otherwise the PAT rate), and the overtime rules of each era (sudden death, the modified rules, both teams possessing from 2025 in the regular season and 2022 in the playoffs). The offence edge is calibrated so that expected points per drive match the game model's team points. Each build runs 10,000 drive simulations for every game in its pricing window (from yesterday to the days ahead; 2,000 in a quick build); a completed game's page carries the game model's margin and total distributions without a drive simulation.</p>${SRC('models/drive_sim.py')}</section>`,
+
+`<section id="m-season"><h2>Season and playoff simulation</h2>
+<p>20,000 simulations of the rest of the season. Each team's strength gets a draw z ~ N(0, se²) for the run and a weekly random walk with steps of 0.35 points, so uncertainty grows with the horizon; a game's margin is the game model's μ plus the two teams' drift plus noise with the remaining variance (at least 0.85σ), ties with the era's tie rate (0.35% before 2017, 0.5% for 2017–2024, 0.4% from 2025).</p>
+<p>Standings use the NFL's <strong>tiebreaking procedures</strong> exactly as published (nfl.com/standings/tie-breaking-procedures, read 1 October 2026), stored as data: for two clubs in a division, head-to-head, division record, common games, conference record, strength of victory, strength of schedule, combined ranking among conference teams and among all teams in points scored and allowed, net points in common games, net points in all games, net touchdowns, then a coin toss; for wild cards, head-to-head if applicable, conference record, common games (minimum four), strength of victory and so on, with the three-club rules (eliminate all but the highest club in each division first; head-to-head only on a sweep). Where the text is silent: ties count half a win, strength of victory and schedule count every game, ranks are competition ranks, and the coin is a seeded draw; net touchdowns are not simulated (that step passes to the coin). The simulation restarts a three-club tie at step one when a fourth club drops out; the "if the season ended today" seeding continues with the next step, which can order the same tie differently in rare cases.</p>
+<p>Seven teams per conference (four division winners, three wild cards; six and two byes before 2020), wild-card games, reseeding, the Super Bowl at a neutral site. Outputs: division, playoff, bye, conference and Super Bowl odds, seed and win distributions, magic numbers (wins only, tiebreaks assumed lost), draft order odds (exit round, then win percentage, then strength of schedule) and interventional next-game odds (each simulation reweighted by 1/P(result)).</p>${SRC('models/season_sim.py')}${SRC('tiebreak.py')}${SRC('canon.py')}</section>`,
+
+`<section id="m-awards"><h2>Award races</h2>
+<p>MVP, Offensive and Defensive Player of the Year, Offensive and Defensive Rookie of the Year, Comeback Player and Coach of the Year, by a conditional logit per award, P(i) = exp(β·z<sub>i</sub>) / Σ<sub>j</sub> exp(β·z<sub>j</sub>), with features standardised within each season's candidates and β by maximum likelihood (ridge 0.3) on the AP winners 2006–2025, checked against the award records. Features include EPA-based value, passing EPA, team win percentage and the 1 seed (MVP); scrimmage yards and touchdowns (OPOY); sacks, interceptions, forced fumbles, tackles for loss, passes defensed and the defence's points allowed (DPOY); the change in value and games missed (Comeback); and wins over expectation (Coach). In season, counting statistics are scaled to a full season and the probabilities are tempered by how much of the season has been played.</p>${SRC('models/awards.py')}${SRC('models/award_winners.py')}</section>`,
+
+`<section id="m-markets"><h2>Markets and de-vig</h2>
+<p>A prediction-market price is the midpoint of a live two-sided quote, (bid + ask)/2, used only when 0 &lt; bid ≤ ask &lt; 1 and the spread is at most 0.12; a last trade is never a price. A field market (Super Bowl, conference, division, awards) is published only when at least max(4, half the field) runners are accounted for and the implied total lies within 0.8–1.3, then de-vigged multiplicatively, p<sub>i</sub> = (1/o<sub>i</sub>) / Σ(1/o<sub>j</sub>); win-total ladders are forced to be monotone. Bookmaker moneylines: q = 100/(ml + 100) for positive prices and −ml/(−ml + 100) for negative, p<sub>home</sub> = q<sub>home</sub>/(q<sub>home</sub> + q<sub>away</sub>). A game's market probability is the mean of the prediction markets, else the de-vigged closing moneyline. Edges measure disagreement, not value. Nothing here is advice; 18+.</p>${SRC('sources/markets.py')}</section>`,
+
+`<section id="m-backtest"><h2>Backtest and calibration</h2>
+<p>Every game from 2006 is priced walk-forward: team strength refitted before every week from that season's earlier games (with the preseason prior chained from 1999), the game model's coefficients refitted on earlier rows only. It is scored with log-loss and Brier (probabilities clipped at 10<sup>−4</sup>, ties left out) and ten-bin reliability against: ratings alone; NFL Elo (K = 20, home field 48 points, margin multiplier ln(|m| + 1) · 2.2 / (0.001·ΔElo + 2.2), a third of the way back to 1505 between seasons); the de-vigged closing moneyline; the closing spread run through the same margin distribution; and, from about 2017, each book's closing line on ESPN. Every forecaster is also scored on just the games with a closing moneyline, so the comparison is like for like. Against the spread: P(home covers the closing spread) from the margin distribution (pushes removed) is scored against a coin, and the record of the model's side where it leans 55% or more is reported; totals likewise. Season odds: 2,000 simulations before weeks 1, 5, 10 and 14 of each completed season, fitted strictly before, scored for the playoffs, division, bye, conference and Super Bowl.</p>
+<p>The <a href="#/calibration">calibration page</a> writes its reading from those numbers and calls a difference smaller than the noise a tie. Beating a closing line is rare; being close to it is the realistic goal.</p>${SRC('models/backtest.py')}${SRC('models/ep.py')}${SRC('models/wp.py')}</section>`,
+
+`<section id="m-site"><h2>How the pages compute what they show</h2>
+<ul><li><strong>Percentiles</strong> place a player's shrunk value against the qualified players of his group (or position), 100 = best; players below the floor show values without percentiles.</li>
+<li><strong>Compare</strong> counts a metric as won by the higher percentile and lists the three largest gaps each way; with one side picked, the other defaults to the nearest player on the headline percentiles. Players from different groups are compared on the metrics both groups carry.</li>
+<li><strong>Similar players</strong> are this season's nearest qualified players in the group by root-mean-square distance on the percentile profile; similarity = 100 − distance.</li>
+<li><strong>The lab</strong> ranks by the sum of standard scores on both axes in the better direction; labelled players are the eight best and four worst on that score.</li>
+<li><strong>History</strong> boards rank single seasons era-adjusted (100 + 10 z among that season's qualified players; floors QB 250 attempts, RB 120 carries, WR 60 targets, TE 45, K 18 attempts, P 40 punts, DEF 40 tackles) and careers by totals since 1999.</li>
+<li><strong>Team schedules</strong> plot wins minus the model's expected wins; the against-the-spread column is the margin plus the closing spread.</li>
+<li><strong>Fourth-down grades</strong> are the letter for the WP lost against the model's best option: A (up to 0.5 points) and B (up to 1.5) are right calls, C (up to 3) a close call, D (up to 6) and F mistakes.</li></ul>${SRC('analytics/leaders.py')}${SRC('analytics/careers.py')}</section>`,
+
+`<section id="m-limitations"><h2>Limitations</h2>
+<ul><li><strong>The closing line is sharper than the model</strong>, as it should be: it knows injuries, inactives, weather and money that the model reads late or not at all.</li>
+<li><strong>No individual coverage data in-season.</strong> Defensive backs cannot be rated on coverage; defenders are rated on credited plays (sacks, hits, takeaways, passes defensed, tackles) only.</li>
+<li><strong>Participation data covers 2016–2025 only</strong> and is published after each season, never during it: pressure, coverage, formation and personnel inputs fall back to FTN charting (2022 on) or are missing in the current season, and the on-field (RAPM-style) value is not available in-season.</li>
+<li><strong>Offensive linemen</strong> have no individual metrics; their contribution sits inside team units and the runners' RYOE.</li>
+<li><strong>RYOE</strong> from play-by-play cannot see defenders' positions; NGS's tracking-based RYOE can. They will disagree on individual runs.</li>
+<li><strong>Next Gen Stats</strong> come as weekly and season rows, only for the players NGS lists (it applies its own volume minimums), and never per play. Game pages take time to throw, separation and NGS RYOE from the weekly rows; player pages use the season rows.</li>
+<li><strong>Coverage by era</strong>: our CPOE starts in 2009; NGS in 2016; FTN in 2022; moneylines in 2006; books by name from about 2017. Older seasons are rated on less.</li>
+<li><strong>nflfastR comparisons</strong> on 1999–2019 flatter nflfastR, whose models were fitted on those seasons.</li>
+<li><strong>Parameters</strong>: the team-strength carry-overs and the game model's coefficients are the committed walk-forward fit quoted above (1 October 2026); they change only when the fit is rerun and committed. The conversion model under-predicts long fourth-down conversions (11+ yards).</li>
+<li><strong>Tiebreakers</strong>: net touchdowns are not simulated (that step passes to a coin), and the simulation and the "ended today" seeding treat a rare three-club case differently (see the season simulation).</li>
+<li><strong>Simulations</strong> do not model injuries, trades or suspensions beyond the current starting quarterback, and hold team strength to a random walk.</li>
+<li><strong>Small samples</strong>: most rates need hundreds of plays to mean much; early-season numbers are noisy even after shrinkage (see the stabilisation points in the <a href="#/glossary">glossary</a>).</li></ul></section>`
+
+].join('\n');
+
+function renderMethodology(el, params) {
+  const want = (params.rest || [])[0] || params.id || '';
+  const tmp = document.createElement('div');
+  tmp.innerHTML = METHOD_HTML;
+  const secs = Array.prototype.slice.call(tmp.querySelectorAll('section[id]')).map(s => {
+    const h2 = s.querySelector('h2');
+    const title = h2 ? h2.textContent : s.id;
+    if (h2) h2.parentNode.removeChild(h2);
+    return { id: s.id.replace(/^m-/, ''), title: title, html: s.innerHTML };
+  });
+  const toc = '<div class="doc-toc"><div class="doc-toc-head">Methodology</div><ol>' + secs.map(s => '<li><a href="#/methodology/' + esc(s.id) + '" data-target="method-' + esc(s.id) + '">' + esc(s.title) + '</a></li>').join('') +
+    '</ol><div class="doc-toc-head" style="margin-top:10px">See also</div><ol class="plain"><li><a href="#/glossary">Glossary</a></li><li><a href="#/calibration">Calibration</a></li><li><a href="#/lab">Lab</a></li><li><a href="#/disclaimer">Disclaimer and terms</a></li></ol></div>';
+  const intro = '<div class="card"><div class="card-header">Methodology <span class="card-sub">Where the data comes from, how every model works, and where it is wrong. Every constant is the one in the code on 1 October 2026, and each section names its file under <code>oddsmarkets/nfl/</code>.</span></div>' +
+    '<div class="doc-meta">' + secs.length + ' sections · fitted values (gradient-boosted models, stabilisation constants, ratings) are refitted with the models and shown on the pages and the <a href="#/calibration">calibration page</a></div></div>';
+  el.innerHTML = '<div class="doc gq-doc">' + toc + '<div class="doc-body">' + intro + secs.map((s, i) => '<div class="card" id="method-' + esc(s.id) + '"><div class="card-header">' + (i + 1) + '. ' + esc(s.title) +
+    ' <a class="doc-anchor" href="#/methodology/' + esc(s.id) + '" title="Link to this section">#</a></div><div class="pad">' + s.html + '</div></div>').join('') + '</div></div>';
+  el.querySelectorAll('.doc-toc a[data-target]').forEach(a => a.addEventListener('click', ev => {
+    ev.preventDefault();
+    const t = document.getElementById(a.dataset.target);
+    if (t) t.scrollIntoView({ block: 'start' });
+    history.replaceState(null, '', a.getAttribute('href'));
+  }));
+  if (want) { const t = document.getElementById('method-' + String(want).replace(/^m-/, '')); if (t) setTimeout(() => t.scrollIntoView({ block: 'start' }), 0); }
+}
+
+if (typeof GI.route === 'function') {
+  [['glossary', renderGlossary], ['methodology', renderMethodology]].forEach(r => { try { GI.route(r[0], r[1]); } catch (e) { /* bound */ } });
+}
+})(window.GI || (window.GI = {}));

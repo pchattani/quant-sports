@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en" data-sport="tennis">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>The Quant Ace</title>
+<meta name="description" content="Odds, models and analytics for the ATP and WTA tours: match and tournament odds against the market, surface Elo, serve and return ratings inferred from scores, draw simulations, breakouts and luck, and a player lab.">
+<meta name="theme-color" content="#07090c">
+<meta property="og:site_name" content="The Quant Ace">
+<meta property="og:title" content="The Quant Ace">
+<meta property="og:description" content="Odds, models and analytics for the ATP and WTA tours: match and tournament odds against the market, surface Elo, serve and return ratings inferred from scores, draw simulations, breakouts and luck, and a player lab.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ffb020'/%3E%3Ccircle cx='16' cy='16' r='9.5' fill='%231a1203'/%3E%3Cpath d='M8.6 11.2c4.6 2 4.6 7.6 0 9.6M23.4 11.2c-4.6 2-4.6 7.6 0 9.6' fill='none' stroke='%23ffb020' stroke-width='1.8'/%3E%3C/svg%3E">
+<script>try{var t=/[?&]theme=(light|dark)/.exec(location.search);t=t?t[1]:localStorage.getItem('qk-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/qk/tokens.css">
+<link rel="stylesheet" href="assets/qk/quant.css">
+<link rel="stylesheet" href="assets/legacy.css">
+<link rel="stylesheet" href="assets/ace-qk.css">
+</head>
+<body class="qk">
+<div id="qk-shell"></div>
+<main id="main" class="qk-page ta-page"><div id="app"></div></main>
+
+<template id="disclaimer-template">
+  <div class="card">
+    <div class="card-header">Disclaimer &amp; terms of use <span class="card-sub">Last updated 17 October 2026</span></div>
+    <div class="prose-dark pad legal">
+      <p>The Quant Ace is an independent, non-commercial hobby project that applies statistical models to publicly
+      available ATP and WTA tennis data. By using this site you agree to the terms below. If you do not agree, please do
+      not use the site.</p>
+
+      <h5>1. Not betting, financial or professional advice</h5>
+      <p>Everything on this site &mdash; match, set, game, tournament, ranking, race and title probabilities, &ldquo;fair
+      odds&rdquo;, Elo and serve/return ratings, live win probabilities, market comparisons and commentary &mdash; is
+      provided for <strong>information, education and entertainment only</strong>. None of it is betting, gambling,
+      financial, investment or any other professional advice, and none of it is a recommendation to place any wager or
+      trade. Model probabilities carry no margin; they are not prices offered by anyone and cannot be bet on here. The
+      site does not accept bets, take payments or link to bookmakers for commercial gain.</p>
+
+      <h5>2. Gambling responsibly</h5>
+      <p>If you choose to gamble elsewhere, you do so entirely at your own risk and responsibility. Only gamble where
+      it is legal for you to do so and if you are of legal age in your jurisdiction (18+ or 21+ in many places). Never
+      stake more than you can afford to lose. If gambling is causing you harm, free and confidential help is available:
+      <a href="https://www.connexontario.ca" target="_blank" rel="noopener">ConnexOntario</a> (Canada, 1-866-531-2600),
+      <a href="https://www.ncpgambling.org" target="_blank" rel="noopener">1-800-GAMBLER</a> (United States),
+      <a href="https://www.begambleaware.org" target="_blank" rel="noopener">BeGambleAware</a> (United Kingdom),
+      or <a href="https://www.gamblingtherapy.org" target="_blank" rel="noopener">Gambling Therapy</a> (worldwide).</p>
+
+      <h5>3. Models are estimates and can be wrong</h5>
+      <p>Model outputs are statistical estimates built on assumptions and incomplete data. Tennis is full of things no
+      model sees coming &mdash; injuries and retirements, withdrawals, illness, fatigue from a long previous round,
+      conditions, motivation and plain variance &mdash; and the forecasts here are frequently wrong, sometimes by a wide
+      margin. Serve and return strengths for most matches are <strong>inferred from game and set scores</strong>, not
+      measured point by point, and are labelled as such. Past performance does not predict future results. Scores,
+      draws, rankings, statistics and market prices may be delayed, incomplete, provisional, mislabelled or out of date,
+      and pages can show errors. The site and all content are provided <strong>&ldquo;as is&rdquo; and &ldquo;as
+      available&rdquo;, without warranties of any kind</strong>, express or implied, including accuracy, completeness,
+      timeliness, fitness for a particular purpose and non-infringement.</p>
+
+      <h5>4. Limitation of liability</h5>
+      <p>To the fullest extent permitted by law, the author accepts no liability for any loss or damage of any kind
+      &mdash; including financial loss, lost winnings, or losses from wagers, trades or other decisions &mdash; arising
+      from use of, reliance on, or inability to use this site or its content. You are solely responsible for your own
+      decisions.</p>
+
+      <h5>5. No affiliation; trademarks</h5>
+      <p>This site is unofficial and is not affiliated with, endorsed by, sponsored by or connected to the ATP, the WTA,
+      the ITF, any tournament or its organisers, any player, ESPN, any other data provider, bookmaker, betting operator or
+      prediction market. ATP, WTA, ITF, tournament names and related marks are trade marks of their respective owners.
+      <strong>No tour, tournament or sponsor logos are used.</strong> Player and tournament names appear only to identify
+      the competitors and events discussed and to report factual sporting statistics.</p>
+
+      <h5>6. Data sources and licences</h5>
+      <p>Results and closing odds come from <a href="http://www.tennis-data.co.uk/" target="_blank" rel="noopener">tennis-data.co.uk</a>,
+      with thanks; live scores, draws and rankings from ESPN&rsquo;s public site data; per-match serve and return
+      statistics for women&rsquo;s matches from the WTA&rsquo;s public data; market prices from public prediction-market
+      data where shown. Those sources own their data and are not responsible for this site or its models.</p>
+      <p>Shot-level style profiles use data from the
+      <a href="https://github.com/JeffSackmann/tennis_MatchChartingProject" target="_blank" rel="noopener">Match Charting Project</a>
+      by Jeff Sackmann and its volunteer charters, licensed under
+      <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener">Creative Commons
+      Attribution-NonCommercial-ShareAlike 4.0 (CC BY-NC-SA 4.0)</a>. The style data derived from it on this site (serve
+      direction, rally length, shot outcome and net profiles) is adapted from that data and is shared alike under the
+      same licence, for non-commercial use with attribution. Only selected matches are charted, so profiles describe the
+      charted matches, not every match a player has played.</p>
+      <p>Statistics shown here are derived and transformed (serve and return ratings are inferred from scores, game
+      orders within a set are reconstructed) and may differ from official statistics.</p>
+
+      <h5>7. Rights holders and corrections</h5>
+      <p>If you own rights in any material on this site and object to its use, or you spot an error, contact the
+      author through <a href="https://github.com/pchattani" target="_blank" rel="noopener">GitHub (@pchattani)</a>.
+      Material will be reviewed promptly and removed or corrected where appropriate.</p>
+
+      <h5>8. Privacy</h5>
+      <p>The site sets no cookies, runs no analytics or advertising, and collects no personal data. Your browser
+      remembers only that you dismissed the first-visit notice, which tour you last viewed and whether you chose the light
+      or dark theme, locally on your device. The page loads its charting library (Apache ECharts) from a third-party content
+      delivery network (cdn.jsdelivr.net) and its typefaces from Google Fonts (fonts.googleapis.com, fonts.gstatic.com);
+      each receives your IP address when your browser makes the request, like any web server. The site itself is hosted
+      on GitHub Pages, whose own privacy terms apply to its server logs.</p>
+
+      <h5>9. Changes</h5>
+      <p>These terms may change at any time; the date above shows the latest version. Continued use of the site after
+      a change means you accept the updated terms. Nothing in these terms limits any rights you have that cannot be
+      limited under the law that applies to you.</p>
+    </div>
+  </div>
+</template>
+
+<div class="ta-legal">
+  <div class="ta-legal-in">
+    <p>Results and closing odds from <a href="http://www.tennis-data.co.uk/">tennis-data.co.uk</a>; scores from ESPN; WTA match statistics; public
+    prediction markets. Style data from the <a href="https://github.com/JeffSackmann/tennis_MatchChartingProject">Match Charting Project</a>
+    (<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a>).</p>
+    <p>For information and entertainment only &mdash; not betting, financial or professional advice. Probabilities are model estimates and can be wrong;
+    no bets are offered. Unofficial: not affiliated with or endorsed by the ATP, the WTA, the ITF, any tournament, player, ESPN or bookmaker; no logos are
+    used and names belong to their owners. 18+. Gamble responsibly. <a href="#/disclaimer">Disclaimer &amp; terms</a></p>
+  </div>
+</div>
+<div id="qk-footer"></div>
+
+<div id="first-visit-notice" class="fv-notice" hidden>
+  <div class="fv-row">
+    <span><strong>For information and entertainment only.</strong> Match and title probabilities are model estimates, not
+    betting or financial advice. Unofficial: not affiliated with the ATP, the WTA, the ITF, any tournament, player or ESPN;
+    no logos are used. 18+ where gambling is discussed. <a href="#/disclaimer">Read the disclaimer &amp; terms</a>.</span>
+    <button type="button" id="fv-dismiss" class="qk-btn primary">I understand</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" defer></script>
+<script src="assets/qk/quant.js" defer></script>
+<script src="assets/qk/quant-charts.js" defer></script>
+<script src="assets/js/plotly-ec.js" defer></script>
+<script src="assets/js/core.js" defer></script>
+<script src="assets/js/charts.js" defer></script>
+<script src="assets/js/fx.js" defer></script>
+<script src="assets/js/overview.js" defer></script>
+<script src="assets/js/event.js" defer></script>
+<script src="assets/js/match.js" defer></script>
+<script src="assets/js/rankings.js" defer></script>
+<script src="assets/js/race.js" defer></script>
+<script src="assets/js/calendar.js" defer></script>
+<script src="assets/js/markets.js" defer></script>
+<script src="assets/js/players.js" defer></script>
+<script src="assets/js/elo.js" defer></script>
+<script src="assets/js/h2h.js" defer></script>
+<script src="assets/js/lab.js" defer></script>
+<script src="assets/js/compare.js" defer></script>
+<script src="assets/js/calibration.js" defer></script>
+<script src="assets/js/value.js" defer></script>
+<script src="assets/js/docs.js" defer></script>
+<script src="assets/js/site.js" defer></script>
+</body>
+</html>

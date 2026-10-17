@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Quant design system</title>
+<meta name="description" content="Tokens, components and charts shared by every The Quant sports site.">
+<meta name="color-scheme" content="dark light">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%23ffb020%27/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="quant.css">
+<style>
+  .sg-swatches { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
+  .sg-sw { border: 1px solid var(--line-1); border-radius: var(--r-2); overflow: hidden; background: var(--s-1); font-size: var(--fs-2xs); }
+  .sg-sw i { display: block; height: 46px; background: var(--k); }
+  .sg-sw div { padding: 6px 8px; display: grid; gap: 1px; }
+  .sg-sw b { font-size: var(--fs-xs); color: var(--ink-1); }
+  .sg-sw code { font-family: var(--font-num); color: var(--ink-3); }
+  .sg-type > div { display: flex; align-items: baseline; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--line-1); }
+  .sg-type code { font: 500 var(--fs-2xs) var(--font-num); color: var(--ink-3); width: 120px; flex: none; }
+  .sg-space { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .sg-space span { display: grid; gap: 4px; justify-items: center; font: 500 10px var(--font-num); color: var(--ink-3); }
+  .sg-space i { display: block; background: var(--accent); border-radius: 2px; }
+  .sg-team { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 6px 14px; align-items: center; font-size: var(--fs-xs); }
+  .sg-team .bar { height: 10px; border-radius: 3px; width: 90px; }
+  @media (max-width: 600px) { .sg-team { gap: 6px 8px; } .sg-team .bar { width: 28px; } .sg-team .qk-kicker { font-size: 9px; letter-spacing: .02em; } }
+  .sg-anchor { display: flex; gap: 6px 14px; flex-wrap: wrap; font-size: var(--fs-xs); }
+  .sg-anchor a { color: var(--ink-2); } .sg-anchor a:hover { color: var(--accent); }
+  .sg-demo-shell { border: 1px dashed var(--line-3); border-radius: var(--r-3); overflow: hidden; }
+  .sg-demo-shell .qk-topbar, .sg-demo-shell .qk-secnav { position: relative; top: 0; }
+</style>
+</head>
+<body class="qk">
+<div id="qk-shell"></div>
+<main id="main" class="qk-page">
+
+  <section class="qk-hero" style="--tc: var(--brand)">
+    <div class="qk-hero-in">
+      <div>
+        <div class="qk-kicker">Design system · v1</div>
+        <h1>The Quant design system</h1>
+        <div class="qk-hero-meta"><span>Premium data terminal</span><span>Dark first, light too</span><span>Framework-free</span><span>Charts on <b>Apache ECharts 5.5</b></span></div>
+      </div>
+      <div class="qk-hero-stats">
+        <div class="qk-hero-stat"><div class="v">7</div><div class="l">Sports</div></div>
+        <div class="qk-hero-stat"><div class="v">9</div><div class="l">Sections each</div></div>
+        <div class="qk-hero-stat"><div class="v">4</div><div class="l">Files</div></div>
+      </div>
+    </div>
+  </section>
+  <nav class="sg-anchor qk-section" style="margin-top:16px" aria-label="On this page">
+    <a href="#colour">Colour</a><a href="#teams">Team colours</a><a href="#type">Type</a><a href="#space">Space & shape</a><a href="#shell">Shell & navigation</a>
+    <a href="#cards">Cards & KPIs</a><a href="#tables">Tables</a><a href="#controls">Controls</a><a href="#games">Match cards</a><a href="#headers">Team & player headers</a>
+    <a href="#feedback">Loading & empty</a><a href="#charts">Charts</a><a href="#surfaces">Shot & spray maps</a><a href="#a11y">Accessibility</a>
+  </nav>
+
+  <!-- COLOUR -->
+  <section class="qk-section" id="colour">
+    <div class="qk-section-head"><div><h2>Colour</h2><div class="qk-sub">Tokens in <code>tokens.css</code>. Toggle the theme in the top bar: every swatch is the live value.</div></div></div>
+    <div class="qk-grid">
+      <div class="qk-card qk-span-6"><div class="qk-card-head"><div><div class="qk-card-title">Surfaces & ink</div><div class="qk-card-sub">Page plane, four surface steps, four ink steps</div></div></div><div class="qk-card-body"><div class="sg-swatches" id="sw-surface"></div></div></div>
+      <div class="qk-card qk-span-6"><div class="qk-card-head"><div><div class="qk-card-title">Brand & sport accents</div><div class="qk-card-sub">Accents mark identity (nav, tiles, rules) — text beside them stays ink</div></div></div><div class="qk-card-body"><div class="sg-swatches" id="sw-accent"></div></div></div>
+      <div class="qk-card qk-span-6"><div class="qk-card-head"><div><div class="qk-card-title">Chart categorical order</div><div class="qk-card-sub">Fixed order, never cycled. Slot 1 is always the model, slot 2 the market.</div></div></div><div class="qk-card-body"><div class="sg-swatches" id="sw-cat"></div></div></div>
+      <div class="qk-card qk-span-6"><div class="qk-card-head"><div><div class="qk-card-title">Sequential, diverging, status</div><div class="qk-card-sub">Status colours are reserved and always carry an icon or label</div></div></div><div class="qk-card-body"><div class="sg-swatches" id="sw-seq"></div></div></div>
+    </div>
+  </section>
+
+  <!-- TEAM COLOURS -->
+  <section class="qk-section" id="teams">
+    <div class="qk-section-head"><div><h2>Team colours with contrast checks</h2><div class="qk-sub"><code>QK.color.team(hex)</code> nudges a kit colour until it clears 3:1 on the card surface; <code>QK.color.ink(bg)</code> picks the monogram ink.</div></div></div>
+    <div class="qk-card"><div class="qk-card-body"><div class="sg-team" id="team-contrast"></div></div></div>
+  </section>
+
+  <!-- TYPE -->
+  <section class="qk-section" id="type">
+    <div class="qk-section-head"><div><h2>Type</h2><div class="qk-sub">Inter for words, JetBrains Mono for every number that should line up. Tabular figures throughout data.</div></div></div>
+    <div class="qk-card"><div class="qk-card-body sg-type">
+      <div><code>--fs-4xl / 800</code><span style="font-size:var(--fs-4xl);font-weight:800;letter-spacing:-0.035em;line-height:1">Saturday’s slate</span></div>
+      <div><code>--fs-3xl num</code><span class="num" style="font-size:var(--fs-3xl);font-weight:600">62.4%</span></div>
+      <div><code>--fs-2xl / 700</code><span style="font-size:var(--fs-2xl);font-weight:700;letter-spacing:-0.025em">Page title</span></div>
+      <div><code>--fs-xl / 700</code><span style="font-size:var(--fs-xl);font-weight:700">Section title</span></div>
+      <div><code>--fs-lg / 700</code><span style="font-size:var(--fs-lg);font-weight:700">Card title</span></div>
+      <div><code>--fs-md / 400</code><span>Body copy for methodology notes and explanations, set at 15px with a 1.55 line height.</span></div>
+      <div><code>--fs-sm / 400</code><span style="font-size:var(--fs-sm)">Dense body for tables and cards.</span></div>
+      <div><code>--fs-2xs caps</code><span class="qk-kicker">Kicker · micro label</span></div>
+      <div><code>num</code><span class="num">1,234.56 · −0.42 · +3.6 · 08:30</span></div>
+    </div></div>
+  </section>
+
+  <!-- SPACE -->
+  <section class="qk-section" id="space">
+    <div class="qk-section-head"><div><h2>Space, radii, elevation</h2><div class="qk-sub">A 4px grid; 16px gutters at every width (375px phones included).</div></div></div>
+    <div class="qk-grid">
+      <div class="qk-card qk-span-6"><div class="qk-card-body"><div class="sg-space" id="sg-space"></div></div></div>
+      <div class="qk-card qk-span-6"><div class="qk-card-body"><div class="qk-row" style="gap:14px">
+        <div class="qk-kpi" style="border-radius:var(--r-1);box-shadow:var(--sh-1)">r-1 · sh-1</div>
+        <div class="qk-kpi" style="border-radius:var(--r-2);box-shadow:var(--sh-1)">r-2</div>
+        <div class="qk-kpi" style="border-radius:var(--r-3);box-shadow:var(--sh-2)">r-3 · sh-2</div>
+        <div class="qk-kpi" style="border-radius:var(--r-4);box-shadow:var(--sh-3)">r-4 · sh-3</div>
+        <div class="qk-kpi" style="box-shadow:var(--glow)">glow</div>
+      </div></div></div>
+    </div>
+  </section>
+
+  <!-- SHELL -->
+  <section class="qk-section" id="shell">
+    <div class="qk-section-head"><div><h2>Shell & navigation</h2><div class="qk-sub">One top bar on every site: brand, sport switcher (live dot when a sport has games in play), search (<kbd>/</kbd> or Ctrl K), theme. Sport sites add the nine-section nav.</div></div></div>
+    <div class="sg-demo-shell" id="shell-demo"></div>
+    <p class="qk-sub" style="margin-top:10px">Above: <code>QK.shell({ sport: 'nfl', section: 'standings', sections: QK.sections('nfl') })</code> rendered into a demo mount. The F1 and tennis sections relabel (Races, Drivers, Constructors; Draws, Rankings) but keep the order.</p>
+  </section>
+
+  <!-- CARDS -->
+  <section class="qk-section" id="cards">
+    <div class="qk-section-head"><div><h2>Cards, KPI tiles, sparkline tiles</h2></div></div>
+    <div class="qk-kpis" id="kpis"></div>
+    <div class="qk-grid" style="margin-top:16px">
+      <div class="qk-card qk-span-4 accent-top"><div class="qk-card-head"><div><div class="qk-card-title">Card with accent rule</div><div class="qk-card-sub">Header, body, footer</div></div><span class="qk-badge accent">New</span></div><div class="qk-card-body"><p class="qk-sub">Cards hold one idea each: a chart, a table, a list. The title says what the reader learns, the sub says the unit.</p></div><div class="qk-card-foot"><span>Updated 4 min ago</span><a href="#cards">Open →</a></div></div>
+      <a class="qk-card qk-span-4 is-link" href="#cards"><div class="qk-card-head"><div><div class="qk-card-title">Linked card</div><div class="qk-card-sub">Lifts on hover, focus ring on keyboard</div></div></div><div class="qk-card-body"><div id="spark-big"></div></div></a>
+      <div class="qk-card qk-span-4"><div class="qk-card-head"><div><div class="qk-card-title">Note</div></div></div><div class="qk-card-body"><div class="qk-note">Probabilities are model estimates from simulated seasons. The market line is the de-vigged price where one exists.</div></div></div>
+    </div>
+  </section>
+
+  <!-- TABLES -->
+  <section class="qk-section" id="tables">
+    <div class="qk-section-head"><div><h2>Tables</h2><div class="qk-sub">Sticky header, sortable columns (click or Enter), rank re-numbers, percentile chips. Wraps scroll sideways on phones with the name column pinned.</div></div></div>
+    <div class="qk-grid">
+      <div class="qk-card qk-span-8"><div class="qk-card-head"><div><div class="qk-card-title">Quarterbacks · composite</div><div class="qk-card-sub">Demo data · percentiles among qualified passers</div></div></div><div class="qk-card-body flush" id="tbl"></div></div>
+      <div class="qk-card qk-span-4"><div class="qk-card-head"><div><div class="qk-card-title">Percentile bars</div><div class="qk-card-sub">Player profile, against position peers</div></div></div><div class="qk-card-body" id="pbars"></div></div>
+    </div>
+  </section>
+
+  <!-- CONTROLS -->
+  <section class="qk-section" id="controls">
+    <div class="qk-section-head"><div><h2>Controls</h2><div class="qk-sub">Tabs (arrow keys), segmented control, filter chips, selects, inputs, buttons. Filters sit in one row above what they filter.</div></div></div>
+    <div class="qk-card"><div class="qk-card-body qk-stack">
+      <div class="qk-tabs" role="tablist" id="tabs-demo">
+        <button class="qk-tab" role="tab" aria-controls="tp1" aria-selected="true">Overview</button>
+        <button class="qk-tab" role="tab" aria-controls="tp2">Splits</button>
+        <button class="qk-tab" role="tab" aria-controls="tp3">Game log</button>
+      </div>
+      <div class="qk-tabpanel" role="tabpanel" id="tp1"><p class="qk-sub">Tab panel one.</p></div>
+      <div class="qk-tabpanel" role="tabpanel" id="tp2" hidden><p class="qk-sub">Tab panel two.</p></div>
+      <div class="qk-tabpanel" role="tabpanel" id="tp3" hidden><p class="qk-sub">Tab panel three.</p></div>
+      <div class="qk-row" style="gap:12px">
+        <div class="qk-seg" id="seg-demo"><button aria-pressed="true" data-value="season">Season</button><button aria-pressed="false" data-value="l10">Last 10</button><button aria-pressed="false" data-value="career">Career</button></div>
+        <select class="qk-select" aria-label="Season"><option>2026</option><option>2025</option></select>
+        <input class="qk-input" placeholder="Filter players" aria-label="Filter players">
+        <button class="qk-btn">Secondary</button><button class="qk-btn primary">Primary</button>
+        <button class="qk-btn" data-qk-search>Open search</button>
+      </div>
+      <div class="qk-chips scroll" id="chips-demo"></div>
+    </div></div>
+  </section>
+
+  <!-- GAMES -->
+  <section class="qk-section" id="games">
+    <div class="qk-section-head"><div><h2>Match & game cards, score ticker</h2><div class="qk-sub">One card for every sport: away over home, model probability, a model-v-market strip when a price exists, an “Edge” badge past 8 points.</div></div></div>
+    <div class="sg-demo-shell" style="margin-bottom:12px"><div class="qk-ticker" id="ticker-demo"></div></div>
+    <div class="qk-auto" style="--min:270px" id="cards-demo"></div>
+  </section>
+
+  <!-- HEADERS -->
+  <section class="qk-section" id="headers">
+    <div class="qk-section-head"><div><h2>Team & player headers</h2><div class="qk-sub">The team colour washes the header (<code>--tc</code>), checked for contrast first.</div></div></div>
+    <div class="qk-grid">
+      <div class="qk-span-6" id="hdr-team"></div>
+      <div class="qk-span-6" id="hdr-player"></div>
+    </div>
+  </section>
+
+  <!-- FEEDBACK -->
+  <section class="qk-section" id="feedback">
+    <div class="qk-section-head"><div><h2>Loading, empty, tooltips</h2></div></div>
+    <div class="qk-grid">
+      <div class="qk-card qk-span-4"><div class="qk-card-head"><div class="qk-card-title">Skeleton · lines</div></div><div class="qk-card-body" id="sk1"></div></div>
+      <div class="qk-card qk-span-4"><div class="qk-card-head"><div class="qk-card-title">Skeleton · chart</div></div><div class="qk-card-body" id="sk2"></div></div>
+      <div class="qk-card qk-span-4"><div class="qk-card-head"><div class="qk-card-title">Empty state</div></div><div class="qk-card-body" id="empty1"></div></div>
+      <div class="qk-card qk-span-12"><div class="qk-card-body"><p class="qk-sub" style="margin:0">Glossary terms carry tooltips on hover and keyboard focus: <span tabindex="0" data-tip="Expected goals: the probability a shot is scored, given where and how it was taken.">xG</span>, <span tabindex="0" data-tip="Expected points added per play, against the league-average outcome from the same down, distance and field position.">EPA</span>, <span tabindex="0" data-tip="Goals saved above expected: goals an average goalie would have conceded on the same shots, minus goals actually conceded.">GSAx</span>.</p></div></div>
+    </div>
+  </section>
+
+  <!-- CHARTS -->
+  <section class="qk-section" id="charts">
+    <div class="qk-section-head"><div><h2>Chart kit</h2><div class="qk-sub"><code>quant-charts.js</code> on ECharts 5.5. Thin marks, recessive grid, crosshair tooltips, direct end labels, colour from tokens.</div></div></div>
+    <div class="qk-grid">
+      <div class="qk-card qk-span-8"><div class="qk-card-head"><div><div class="qk-card-title">Line · title race</div><div class="qk-card-sub">Cumulative points by round, team colours, end labels</div></div></div><div class="qk-card-body"><div id="ch-line" style="--h:300px"></div></div></div>
+      <div class="qk-card qk-span-4"><div class="qk-card-head"><div><div class="qk-card-title">Area · rating trend</div><div class="qk-card-sub">Net rating, points per 100</div></div></div><div class="qk-card-body"><div id="ch-area" style="--h:300px"></div></div></div>
+      <div class="qk-card qk-span-6"><div class="qk-card-head"><div><div class="qk-card-title">Horizontal bar · title odds</div><div class="qk-card-sub">Share of 20,000 simulations</div></div></div><div class="qk-card-body"><div id="ch-hbar" style="--h:280px"></div></div></div>
+      <div class="qk-card qk-span-6"><div class="qk-card-head"><div><div class="qk-card-title">Dumbbell · model v market</div><div class="qk-card-sub">Blue model, orange market; the bar is the disagreement</div></div></div><div class="qk-card-body"><div id="ch-db" style="--h:280px"></div></div></div>
+      <div class="qk-card qk-span-6"><div class="qk-card-head"><div><div class="qk-card-title">Bar · diverging</div><div class="qk-card-sub">Goals above expected, by team</div></div></div><div class="qk-card-body"><div id="ch-bar" style="--h:260px"></div></div></div>
+      <div class="qk-card qk-span-6"><div class="qk-card-head"><div><div class="qk-card-title">Scatter · process v results</div><div class="qk-card-sub">xG share against points %, quadrant labels</div></div></div><div class="qk-card-body"><div id="ch-sc" style="--h:260px"></div></div></div>
+      <div class="qk-card qk-span-7"><div class="qk-card-head"><div><div class="qk-card-title">Heatmap · diverging</div><div class="qk-card-sub">Run value by count and pitch type</div></div></div><div class="qk-card-body"><div id="ch-hm" style="--h:280px"></div></div></div>
+      <div class="qk-card qk-span-5"><div class="qk-card-head"><div><div class="qk-card-title">Win probability</div><div class="qk-card-sub">Home side above the midline, key plays marked</div></div></div><div class="qk-card-body"><div id="ch-wp" style="--h:280px"></div></div></div>
+    </div>
+  </section>
+
+  <section class="qk-section" id="surfaces">
+    <div class="qk-section-head"><div><h2>Shot & spray maps</h2><div class="qk-sub">Surfaces are SVG in real units (metres for the pitch, feet elsewhere) drawn behind an ECharts scatter on the same axes. Marker area scales with xG.</div></div></div>
+    <div class="qk-grid">
+      <div class="qk-card qk-span-6"><div class="qk-card-head"><div><div class="qk-card-title">Pitch · 105 × 68 m</div></div></div><div class="qk-card-body"><div id="sm-pitch"></div></div></div>
+      <div class="qk-card qk-span-6"><div class="qk-card-head"><div><div class="qk-card-title">Rink · 200 × 85 ft</div></div></div><div class="qk-card-body"><div id="sm-rink"></div></div></div>
+      <div class="qk-card qk-span-6"><div class="qk-card-head"><div><div class="qk-card-title">Half court · 50 × 47 ft</div></div></div><div class="qk-card-body"><div id="sm-court" style="max-width:460px;margin:0 auto"></div></div></div>
+      <div class="qk-card qk-span-6"><div class="qk-card-head"><div><div class="qk-card-title">Spray chart · feet from home plate</div></div></div><div class="qk-card-body"><div id="sm-field" style="max-width:460px;margin:0 auto"></div></div></div>
+    </div>
+  </section>
+
+  <!-- A11Y -->
+  <section class="qk-section" id="a11y">
+    <div class="qk-section-head"><div><h2>Accessibility</h2></div></div>
+    <div class="qk-card"><div class="qk-card-body qk-prose">
+      <ul class="qk-sub" style="margin:0;padding-left:18px;display:grid;gap:6px">
+        <li>Text contrast: primary ink 16.9:1, secondary 8.4:1, muted 4.9:1 on the dark card; light mode is similar. Muted ink is the floor for any text.</li>
+        <li>Marks: team and accent colours pass through <code>QK.color.ensure()</code> to reach 3:1 against the surface before they are drawn.</li>
+        <li>Identity is never colour alone: legends on every multi-series chart, direct end labels, team abbreviations on marks, icons and words on status.</li>
+        <li>Keyboard: skip link, visible focus rings, tabs move with arrow keys, sortable headers are buttons, search opens with <kbd>/</kbd> and moves with arrows.</li>
+        <li>Motion: <code>prefers-reduced-motion</code> turns off pulses, shimmer, lifts and chart animation.</li>
+        <li>Charts carry <code>role="img"</code> and an aria-label; every headline chart sits beside a table or list with the same numbers.</li>
+        <li>Forced colours and print fall back to system colours and drop the sticky chrome.</li>
+      </ul>
+    </div></div>
+  </section>
+</main>
+<div id="qk-footer"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="quant.js"></script>
+<script src="quant-charts.js"></script>
+<script src="guide.js"></script>
+</body>
+</html>

@@ -1,0 +1,94 @@
+/* The Quant Footballer — analytics styles: the Analytics tab and the club page's
+   analytics cards. Colours come from the theme variables in style.css. */
+
+/* ── card furniture ──────────────────────────────────────────────────────── */
+.an-meta { color: var(--text3); font-size: 0.76rem; margin: -4px 0 12px; }
+.an-ctl { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font-weight: 500; }
+.an-select { width: auto; max-width: 280px; padding: 4px 8px; font-size: 0.78rem; }
+.an-desc { padding: 10px 14px 0; font-size: 0.82rem; color: var(--text2); line-height: 1.5; }
+.an-desc strong { color: var(--text); }
+.an-chip { border-color: var(--blue); color: var(--blue); font-weight: 700; }
+
+/* ── the pitch ───────────────────────────────────────────────────────────── */
+.an-totw { gap: 0; }
+.an-totw > div:first-child { border-right: 1px solid var(--border); }
+@media (max-width: 960px) { .an-totw > div:first-child { border-right: none; border-bottom: 1px solid var(--border); } }
+.an-pitch { height: 520px; }
+@media (max-width: 640px) { .an-pitch { height: 400px; } }
+.an-pitch.an-clickable .points path { cursor: pointer; }
+.an-pitch-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px 0; font-size: 0.78rem; min-height: 22px; }
+.an-bench { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 4px 14px 12px; font-size: 0.78rem; align-items: center; }
+.an-bench-head { color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.64rem; margin-right: 4px; }
+.an-bench-item { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.an-bench-rt { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 0.72rem; }
+.an-xi-table { padding: 8px 0 0; }
+
+/* ── awards ──────────────────────────────────────────────────────────────── */
+.aw-potw { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+.aw-potw-row { display: flex; gap: 12px; align-items: flex-start; margin-top: 4px; }
+.aw-potw-rt { flex: none; width: 48px; height: 48px; border-radius: 10px; color: #fff; font-weight: 800; font-size: 1.15rem; line-height: 48px; text-align: center; font-variant-numeric: tabular-nums; }
+.aw-potw-name { font-size: 1.05rem; font-weight: 700; }
+.aw-potw-name a { color: var(--text); }
+.aw-why { color: var(--text2); font-size: 0.8rem; margin-top: 4px; line-height: 1.45; }
+.aw-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+@media (max-width: 520px) { .aw-grid { grid-template-columns: 1fr; } }
+.aw-tile { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.aw-label { font-size: 0.64rem; color: var(--text2); text-transform: uppercase; letter-spacing: 0.08em; }
+.aw-name { font-weight: 700; font-size: 0.92rem; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aw-name a { color: var(--text); }
+.aw-team { font-size: 0.76rem; color: var(--text2); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aw-team a { color: var(--text2); }
+.aw-value { margin-top: 4px; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.aw-unit { color: var(--text3); font-size: 0.72rem; }
+.aw-sub { font-size: 0.74rem; color: var(--text3); margin-top: 2px; }
+.aw-sub a { color: var(--text2); }
+
+/* ── performers ──────────────────────────────────────────────────────────── */
+.an-perf { gap: 0; padding: 6px 0 4px; }
+.an-perf > div:first-child { border-right: 1px solid var(--border); }
+@media (max-width: 960px) { .an-perf > div:first-child { border-right: none; border-bottom: 1px solid var(--border); } }
+.perf-head { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); padding: 8px 14px 2px; }
+.perf-list { padding: 0 8px 6px; }
+.perf-row { display: grid; grid-template-columns: 22px minmax(0, 1.3fr) minmax(0, 1fr) 30px 64px 34px; gap: 6px; align-items: center; padding: 5px 6px; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
+.perf-row:last-child { border-bottom: none; }
+.perf-rank { color: var(--text3); font-variant-numeric: tabular-nums; text-align: right; }
+.perf-name, .perf-club { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.perf-club a { color: var(--text2); }
+.perf-val { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.perf-pct { text-align: center; }
+@media (max-width: 520px) { .perf-row { grid-template-columns: 20px minmax(0, 1.4fr) minmax(0, 1fr) 56px 30px; } .perf-pos { display: none; } }
+
+/* ── team rankings and the style map ─────────────────────────────────────── */
+.an-rank { gap: 0; padding-top: 6px; }
+.an-rank > div:first-child { border-right: 1px solid var(--border); }
+@media (max-width: 960px) { .an-rank > div:first-child { border-right: none; } }
+.heat-cell { display: inline-block; min-width: 34px; padding: 2px 6px; border-radius: 4px; color: #fff; font-weight: 700; font-size: 0.72rem; font-variant-numeric: tabular-nums; cursor: default; }
+.heat-cell.empty { background: var(--bg3); color: var(--text3); }
+#an-style-map .wc-table td, #an-style-map .wc-table th { padding: 4px 6px; }
+#an-style-map .wc-table th { font-size: 0.68rem; }
+
+/* ── form ────────────────────────────────────────────────────────────────── */
+.an-spark { color: var(--text3); font-size: 0.72rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ── club page: analytics cards ──────────────────────────────────────────── */
+.rank-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 24px; padding: 10px 14px; }
+@media (max-width: 760px) { .rank-groups { grid-template-columns: 1fr; } }
+.rank-group-head { grid-column: 1 / -1; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin: 6px 0 0; }
+.rank-row { display: grid; grid-template-columns: minmax(0, 1fr) 62px 34px 70px; gap: 8px; align-items: center; font-size: 0.8rem; padding: 3px 0; border-bottom: 1px solid var(--border); }
+.rank-row:last-child { border-bottom: none; }
+.rank-label { color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank-val { text-align: right; font-variant-numeric: tabular-nums; }
+.rank-pos { text-align: right; color: var(--text3); font-variant-numeric: tabular-nums; font-size: 0.74rem; }
+.rank-pos strong { color: var(--text); }
+.tb-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; padding: 10px 14px; }
+.tb-block { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+.tb-head { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text2); margin-bottom: 4px; }
+.tb-sub { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text3); margin: 6px 0 2px; }
+.tb-row { display: grid; grid-template-columns: minmax(0, 1fr) 56px 34px; gap: 6px; align-items: center; font-size: 0.78rem; padding: 2px 0; }
+.tb-row .tb-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb-row .tb-val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.tb-row .tb-pct { text-align: center; }
+.squad-pos-head { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); padding: 10px 14px 2px; }
+.tp-xi-wrap { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 0; }
+.tp-xi-wrap > div:first-child { border-right: 1px solid var(--border); }
+@media (max-width: 960px) { .tp-xi-wrap { grid-template-columns: 1fr; } .tp-xi-wrap > div:first-child { border-right: none; } }

@@ -1,0 +1,357 @@
+{
+  "tuned_at": "2026-09-22T17:02:20Z",
+  "folds": 6,
+  "min_train": 200,
+  "margin": 0.002,
+  "global": {
+    "xi": 0.002,
+    "ridge": 2.0,
+    "elo_home_advantage": 50.0,
+    "k_league": 30,
+    "dc_weight": 1.0
+  },
+  "pooled": {
+    "xi": 0.0035,
+    "ridge": 1.0,
+    "elo_home_advantage": 50.0,
+    "k_league": 30,
+    "dc_weight": 1.0
+  },
+  "leagues": {
+    "premier-league": {
+      "method": "pooled",
+      "params": {
+        "xi": 0.0035,
+        "ridge": 1.0,
+        "elo_home_advantage": 50.0,
+        "k_league": 30,
+        "dc_weight": 1.0
+      },
+      "log_loss": 1.05075,
+      "baseline_log_loss": 1.09861,
+      "scores": {
+        "default": 1.07175,
+        "global": 1.06563,
+        "per-league": 1.06212,
+        "pooled": 1.05075
+      },
+      "n_eval": 230,
+      "per_league_params": {
+        "xi": 0.008,
+        "ridge": 0.5,
+        "elo_home_advantage": 30.0,
+        "k_league": 15,
+        "dc_weight": 1.0
+      }
+    },
+    "la-liga": {
+      "method": "global",
+      "params": {
+        "xi": 0.002,
+        "ridge": 2.0,
+        "elo_home_advantage": 50.0,
+        "k_league": 30,
+        "dc_weight": 1.0
+      },
+      "log_loss": 0.99241,
+      "baseline_log_loss": 1.04412,
+      "scores": {
+        "default": 0.99872,
+        "global": 0.99241,
+        "per-league": 0.9913,
+        "pooled": 0.99791
+      },
+      "n_eval": 249,
+      "per_league_params": {
+        "xi": 0.0035,
+        "ridge": 2.0,
+        "elo_home_advantage": 70.0,
+        "k_league": 20,
+        "dc_weight": 0.9
+      }
+    },
+    "serie-a": {
+      "method": "per-league",
+      "params": {
+        "xi": 0.001,
+        "ridge": 1.0,
+        "elo_home_advantage": 30.0,
+        "k_league": 15,
+        "dc_weight": 0.65
+      },
+      "log_loss": 0.97039,
+      "baseline_log_loss": 1.07924,
+      "scores": {
+        "default": 0.97392,
+        "global": 0.97863,
+        "per-league": 0.97039,
+        "pooled": 1.00002
+      },
+      "n_eval": 230,
+      "per_league_params": {
+        "xi": 0.001,
+        "ridge": 1.0,
+        "elo_home_advantage": 30.0,
+        "k_league": 15,
+        "dc_weight": 0.65
+      }
+    },
+    "bundesliga": {
+      "method": "pooled",
+      "params": {
+        "xi": 0.0035,
+        "ridge": 1.0,
+        "elo_home_advantage": 50.0,
+        "k_league": 30,
+        "dc_weight": 1.0
+      },
+      "log_loss": 0.98656,
+      "baseline_log_loss": 1.07937,
+      "scores": {
+        "default": 1.02383,
+        "global": 1.00729,
+        "per-league": 1.00706,
+        "pooled": 0.98656
+      },
+      "n_eval": 144,
+      "per_league_params": {
+        "xi": 0.0035,
+        "ridge": 2.0,
+        "elo_home_advantage": 30.0,
+        "k_league": 15,
+        "dc_weight": 1.0
+      }
+    },
+    "ligue-1": {
+      "method": "pooled",
+      "params": {
+        "xi": 0.0035,
+        "ridge": 1.0,
+        "elo_home_advantage": 50.0,
+        "k_league": 30,
+        "dc_weight": 1.0
+      },
+      "log_loss": 1.03116,
+      "baseline_log_loss": 1.09861,
+      "scores": {
+        "default": 1.07009,
+        "global": 1.05268,
+        "per-league": 1.05204,
+        "pooled": 1.03116
+      },
+      "n_eval": 154,
+      "per_league_params": {
+        "xi": 0.0035,
+        "ridge": 2.0,
+        "elo_home_advantage": 30.0,
+        "k_league": 15,
+        "dc_weight": 1.0
+      }
+    },
+    "eredivisie": {
+      "method": "per-league",
+      "params": {
+        "xi": 0.001,
+        "ridge": 0.25,
+        "elo_home_advantage": 30.0,
+        "k_league": 15,
+        "dc_weight": 1.0
+      },
+      "log_loss": 0.99686,
+      "baseline_log_loss": 1.08738,
+      "scores": {
+        "default": 1.01601,
+        "global": 1.00429,
+        "per-league": 0.99686,
+        "pooled": 1.02471
+      },
+      "n_eval": 184,
+      "per_league_params": {
+        "xi": 0.001,
+        "ridge": 0.25,
+        "elo_home_advantage": 30.0,
+        "k_league": 15,
+        "dc_weight": 1.0
+      }
+    },
+    "primeira-liga": {
+      "method": "pooled",
+      "params": {
+        "xi": 0.0035,
+        "ridge": 1.0,
+        "elo_home_advantage": 50.0,
+        "k_league": 30,
+        "dc_weight": 1.0
+      },
+      "log_loss": 0.95242,
+      "baseline_log_loss": 1.09688,
+      "scores": {
+        "default": 0.99785,
+        "global": 0.97952,
+        "per-league": 0.97921,
+        "pooled": 0.95242
+      },
+      "n_eval": 170,
+      "per_league_params": {
+        "xi": 0.001,
+        "ridge": 2.0,
+        "elo_home_advantage": 30.0,
+        "k_league": 30,
+        "dc_weight": 1.0
+      }
+    },
+    "brasileirao": {
+      "method": "global",
+      "params": {
+        "xi": 0.002,
+        "ridge": 2.0,
+        "elo_home_advantage": 50.0,
+        "k_league": 30,
+        "dc_weight": 1.0
+      },
+      "log_loss": 1.01356,
+      "baseline_log_loss": 1.05355,
+      "scores": {
+        "default": 1.01994,
+        "global": 1.01356,
+        "per-league": 1.01418,
+        "pooled": 1.02009
+      },
+      "n_eval": 370,
+      "per_league_params": {
+        "xi": 0.002,
+        "ridge": 2.0,
+        "elo_home_advantage": 90.0,
+        "k_league": 15,
+        "dc_weight": 1.0
+      }
+    },
+    "mls": {
+      "method": "pooled",
+      "params": {
+        "xi": 0.0035,
+        "ridge": 1.0,
+        "elo_home_advantage": 50.0,
+        "k_league": 30,
+        "dc_weight": 1.0
+      },
+      "log_loss": 1.05445,
+      "baseline_log_loss": 1.06665,
+      "scores": {
+        "default": 1.06546,
+        "global": 1.05817,
+        "per-league": 1.05939,
+        "pooled": 1.05445
+      },
+      "n_eval": 414,
+      "per_league_params": {
+        "xi": 0.002,
+        "ridge": 2.0,
+        "elo_home_advantage": 50.0,
+        "k_league": 30,
+        "dc_weight": 0.9
+      }
+    },
+    "saudi-pro-league": {
+      "method": "pooled",
+      "params": {
+        "xi": 0.0035,
+        "ridge": 1.0,
+        "elo_home_advantage": 50.0,
+        "k_league": 30,
+        "dc_weight": 1.0
+      },
+      "log_loss": 0.94208,
+      "baseline_log_loss": 1.08036,
+      "scores": {
+        "default": 0.95109,
+        "global": 0.95105,
+        "per-league": 0.94899,
+        "pooled": 0.94208
+      },
+      "n_eval": 169,
+      "per_league_params": {
+        "xi": 0.005,
+        "ridge": 1.0,
+        "elo_home_advantage": 50.0,
+        "k_league": 15,
+        "dc_weight": 0.9
+      }
+    },
+    "liga-argentina": {
+      "method": "per-league",
+      "params": {
+        "xi": 0.008,
+        "ridge": 2.0,
+        "elo_home_advantage": 70.0,
+        "k_league": 30,
+        "dc_weight": 0.8
+      },
+      "log_loss": 1.06549,
+      "baseline_log_loss": 1.08061,
+      "scores": {
+        "default": 1.09014,
+        "global": 1.08561,
+        "per-league": 1.06549
+      },
+      "n_eval": 190,
+      "per_league_params": {
+        "xi": 0.008,
+        "ridge": 2.0,
+        "elo_home_advantage": 70.0,
+        "k_league": 30,
+        "dc_weight": 0.8
+      }
+    },
+    "liga-mx": {
+      "method": "per-league",
+      "params": {
+        "xi": 0.005,
+        "ridge": 2.0,
+        "elo_home_advantage": 50.0,
+        "k_league": 15,
+        "dc_weight": 0.8
+      },
+      "log_loss": 1.04789,
+      "baseline_log_loss": 1.0687,
+      "scores": {
+        "default": 1.05951,
+        "global": 1.05588,
+        "per-league": 1.04789
+      },
+      "n_eval": 216,
+      "per_league_params": {
+        "xi": 0.005,
+        "ridge": 2.0,
+        "elo_home_advantage": 50.0,
+        "k_league": 15,
+        "dc_weight": 0.8
+      }
+    },
+    "belgian-pro-league": {
+      "method": "per-league",
+      "params": {
+        "xi": 0.001,
+        "ridge": 0.25,
+        "elo_home_advantage": 30.0,
+        "k_league": 20,
+        "dc_weight": 0.8
+      },
+      "log_loss": 0.96908,
+      "baseline_log_loss": 1.06616,
+      "scores": {
+        "default": 0.97121,
+        "global": 0.98117,
+        "per-league": 0.96908
+      },
+      "n_eval": 184,
+      "per_league_params": {
+        "xi": 0.001,
+        "ridge": 0.25,
+        "elo_home_advantage": 30.0,
+        "k_league": 20,
+        "dc_weight": 0.8
+      }
+    }
+  }
+}

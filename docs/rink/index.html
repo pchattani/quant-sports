@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Quant Rink</title>
+<meta name="theme-color" content="#0d1117">
+<meta property="og:site_name" content="The Quant Rink">
+<meta property="og:title" content="The Quant Rink">
+<meta property="og:description" content="Odds, models and analytics for the NHL: game, puck line, total and playoff odds against the market, our own expected goals and win probability, shot maps, line combinations, player percentiles and a lab.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="description" content="Odds, models and analytics for the NHL: game, puck line, total and playoff odds against the market, our own expected goals and win probability, shot maps, line combinations, player percentiles and a lab.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23dcecf5'/%3E%3Crect x='14.6' y='0' width='2.8' height='32' fill='%23d6303c'/%3E%3Ccircle cx='16' cy='16' r='5.2' fill='none' stroke='%232f6fb0' stroke-width='1.4'/%3E%3Cellipse cx='16' cy='18.6' rx='7.5' ry='3' fill='%23111'/%3E%3Crect x='8.5' y='15' width='15' height='3.6' fill='%23111'/%3E%3Cellipse cx='16' cy='15' rx='7.5' ry='3' fill='%23333'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/base.css">
+<link rel="stylesheet" href="assets/rink.css">
+<link rel="stylesheet" href="assets/pages.css">
+<link rel="stylesheet" href="assets/pages-f.css">
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js" charset="utf-8"></script>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Loading…</div>
+</div>
+
+<header class="site-header">
+  <div class="container-xl">
+    <div class="header-row">
+      <h1 class="site-title"><a href="#/"><span class="brand-mark rk-mark"></span><span class="brand-text">The Quant Rink<span class="brand-tag">Odds, models and analytics for the NHL</span></span></a></h1>
+      <div class="search-box">
+        <input id="search-input" type="search" placeholder="Search players and teams…" autocomplete="off" spellcheck="false">
+        <div id="search-results" class="search-results"></div>
+      </div>
+      <div class="comp-picker season-picker">
+        <label for="season-select">Season</label>
+        <select id="season-select"></select>
+      </div>
+      <div class="sister-group" aria-label="Sister sites">
+        <a class="sister-link" href="https://pchattani.github.io/the-quant-footballer/" title="The sister site: football odds, models and analytics">⚽ Footballer</a>
+        <a class="sister-link" href="https://pchattani.github.io/the-quant-paddock/" title="The sister site: Formula 1 odds, models and analytics">🏁 Paddock</a>
+        <a class="sister-link" href="https://pchattani.github.io/the-quant-hardwood/" title="The sister site: NBA and WNBA odds, models and analytics">🏀 Hardwood</a>
+        <a class="sister-link" href="https://pchattani.github.io/the-quant-ace/" title="The sister site: ATP and WTA tennis odds, models and analytics">🎾 Ace</a>
+        <a class="sister-link" href="https://pchattani.github.io/the-quant-bullpen/" title="The sister site: MLB odds, pitch models and analytics">⚾ Bullpen</a>
+        <a class="sister-link" href="https://pchattani.github.io/the-quant-gridiron/" title="The sister site: NFL odds, models and analytics">🏈 Gridiron</a>
+      </div>
+      <nav class="global-nav hw-nav rk-nav">
+        <a href="#/" data-nav="hub">Hub</a><a href="#/games" data-nav="games">Games</a><a href="#/standings" data-nav="standings">Standings</a><a href="#/playoffs" data-nav="playoffs">Playoffs</a><a href="#/teams" data-nav="teams">Teams</a><a href="#/skaters" data-nav="skaters">Skaters</a><a href="#/goalies" data-nav="goalies">Goalies</a><a href="#/value" data-nav="value">Value</a><a href="#/trade" data-nav="trade">Trade</a><a href="#/moves" data-nav="moves">Moves</a><a href="#/fantasy" data-nav="fantasy">Fantasy</a><a href="#/lines" data-nav="lines">Lines</a><a href="#/leaders" data-nav="leaders">Leaders</a><a href="#/history" data-nav="history">History</a><a href="#/lab" data-nav="lab">Lab</a><a href="#/compare" data-nav="compare">Compare</a><a href="#/markets" data-nav="markets">Markets</a><a href="#/calibration" data-nav="calibration">Calibration</a><a href="#/glossary" data-nav="glossary">Glossary</a><a href="#/methodology" data-nav="methodology">Methodology</a>
+      </nav>
+      <div class="site-sub"><span id="meta-line">—</span></div>
+    </div>
+  </div>
+</header>
+
+<main id="app" class="container-xl hw-main rk-main"></main>
+
+<template id="disclaimer-template">
+  <div class="card">
+    <div class="card-header">Disclaimer &amp; terms of use <span class="card-sub">Last updated 16 October 2026</span></div>
+    <div class="prose-dark pad legal">
+      <p>The Quant Rink is an independent, non-commercial hobby project that applies statistical models to publicly
+      available ice hockey data for the National Hockey League. By using this site you agree to the terms below.
+      If you do not agree, please do not use the site.</p>
+
+      <h5>1. Not betting, financial or professional advice</h5>
+      <p>Everything on this site &mdash; game, regulation, overtime, puck line, total, division, playoff, conference,
+      Stanley Cup, Presidents&rsquo; Trophy, draft-lottery and award probabilities, &ldquo;fair odds&rdquo;, live win
+      probabilities, expected goals, projections, player, line, goalie and team ratings, market comparisons and commentary
+      &mdash; is provided for <strong>information, education and entertainment only</strong>. None of it is betting,
+      gambling, financial, investment or any other professional advice, and none of it is a recommendation to place any
+      wager or trade. Model probabilities carry no margin; they are not prices offered by anyone and cannot be bet on
+      here. The site does not accept bets, take payments or link to bookmakers for commercial gain.</p>
+
+      <h5>2. Gambling responsibly</h5>
+      <p>If you choose to gamble elsewhere, you do so entirely at your own risk and responsibility. Only gamble where
+      it is legal for you to do so and if you are of legal age in your jurisdiction (18+, or 19+ or 21+ in many places).
+      Never stake more than you can afford to lose. If gambling is causing you harm, free and confidential help is available:
+      <a href="https://www.connexontario.ca" target="_blank" rel="noopener">ConnexOntario</a> (Canada, 1-866-531-2600),
+      <a href="https://www.ncpgambling.org" target="_blank" rel="noopener">1-800-GAMBLER</a> (United States),
+      <a href="https://www.begambleaware.org" target="_blank" rel="noopener">BeGambleAware</a> (United Kingdom),
+      or <a href="https://www.gamblingtherapy.org" target="_blank" rel="noopener">Gambling Therapy</a> (worldwide).</p>
+
+      <h5>3. Models are estimates and can be wrong</h5>
+      <p>Model outputs are statistical estimates built on assumptions and incomplete data. Hockey is full of things no
+      model sees coming &mdash; late goalie changes, injuries and scratches, line shuffles, officiating, bounces and plain
+      variance &mdash; and the forecasts here are frequently wrong, sometimes by a wide margin. Expected goals, win
+      probability, on-ice impact, player value and projections are our own estimates and will differ from official or
+      third-party figures. Past performance does not predict future results. Scores, line-ups, shift data, statistics
+      and market prices may be delayed, incomplete, provisional, mislabelled or out of date, and pages can show errors.
+      The site and all content are provided <strong>&ldquo;as is&rdquo; and &ldquo;as available&rdquo;, without warranties
+      of any kind</strong>, express or implied, including accuracy, completeness, timeliness, fitness for a particular
+      purpose and non-infringement.</p>
+
+      <h5>4. Limitation of liability</h5>
+      <p>To the fullest extent permitted by law, the author accepts no liability for any loss or damage of any kind
+      &mdash; including financial loss, lost winnings, or losses from wagers, trades or other decisions &mdash; arising
+      from use of, reliance on, or inability to use this site or its content. You are solely responsible for your own
+      decisions.</p>
+
+      <h5>5. No affiliation; trademarks</h5>
+      <p>This site is unofficial and is not affiliated with, endorsed by, sponsored by or connected to the National Hockey
+      League (NHL), the National Hockey League Players&rsquo; Association (NHLPA), any club or team, any player, ESPN,
+      MoneyPuck, any other data provider, bookmaker, betting operator or prediction market. League, club and competition
+      names and related marks are trade marks of their respective owners. <strong>No league, club or sponsor logos are
+      used.</strong> Player, team and arena names appear only to identify the competitors and events discussed and to
+      report factual sporting statistics.</p>
+
+      <h5>6. Data sources</h5>
+      <p>Schedules, results, play-by-play, shift charts, rosters, standings and player statistics come from the NHL&rsquo;s
+      public web data (including NHL EDGE skating and shot measures where shown). NHL data is shown for
+      <strong>informational, non-commercial use</strong> only; the NHL owns its data and is not responsible for this site
+      or its models. Expected goals, win probability, on-ice impact (RAPM), team ratings and the other values shown here
+      are our own models fitted on that data.</p>
+      <p><strong>xG benchmark data from <a href="https://moneypuck.com" target="_blank" rel="noopener">MoneyPuck.com</a></strong>,
+      used only to benchmark our own expected-goals model, for non-commercial use and credited wherever it is shown.</p>
+      <p>Game lines (DraftKings lines as ESPN shows them, with opening and closing numbers) come from ESPN&rsquo;s public
+      site data, for personal, non-commercial use; market prices come from public prediction-market data (Kalshi,
+      Polymarket) where shown. Those sources own their data and are not responsible for this site or its models.</p>
+      <p>Transactions (trades, signings, recalls and the rest) and injury status come from ESPN&rsquo;s public site data and
+      draft records from the NHL&rsquo;s records site, for personal, non-commercial use; trade grades, valuations and fantasy
+      projections are our own models. No salary or contract data is used, and no fantasy platform&rsquo;s data.</p>
+
+      <h5>7. Rights holders and corrections</h5>
+      <p>If you own rights in any material on this site and object to its use, or you spot an error, contact the
+      author through <a href="https://github.com/pchattani" target="_blank" rel="noopener">GitHub (@pchattani)</a>.
+      Material will be reviewed promptly and removed or corrected where appropriate.</p>
+
+      <h5>8. Privacy</h5>
+      <p>The site sets no cookies, runs no analytics or advertising, and collects no personal data. Your browser
+      remembers only that you dismissed the first-visit notice, locally on your device. The page loads its charting
+      library from a third-party content delivery network (cdn.plot.ly), which receives your IP address when your browser
+      makes the request, like any web server. The site itself is hosted on GitHub Pages, whose own privacy terms apply to
+      its server logs.</p>
+
+      <h5>9. Changes</h5>
+      <p>These terms may change at any time; the date above shows the latest version. Continued use of the site after
+      a change means you accept the updated terms. Nothing in these terms limits any rights you have that cannot be
+      limited under the law that applies to you.</p>
+    </div>
+  </div>
+</template>
+
+<footer class="site-footer">
+  <div class="container-xl">
+    <span id="footer-meta">The Quant Rink</span>
+    · NHL schedules, play-by-play, shifts and statistics from the NHL&rsquo;s public data, for informational non-commercial use ·
+    xG benchmark data from <a href="https://moneypuck.com">MoneyPuck.com</a> ·
+    game lines, transactions and injury status from ESPN; public prediction markets ·
+    <a href="https://pchattani.github.io/the-quant-footballer/">⚽ The Quant Footballer</a> ·
+    <a href="https://pchattani.github.io/the-quant-paddock/">🏁 The Quant Paddock</a> ·
+    <a href="https://pchattani.github.io/the-quant-hardwood/">🏀 The Quant Hardwood</a> ·
+    <a href="https://pchattani.github.io/the-quant-ace/">🎾 The Quant Ace</a> ·
+    <a href="https://pchattani.github.io/the-quant-bullpen/">⚾ The Quant Bullpen</a> ·
+    <a href="https://pchattani.github.io/the-quant-gridiron/">🏈 The Quant Gridiron</a>
+    <div class="footer-legal">For information and entertainment only &mdash; not betting, financial or professional advice. Probabilities are model estimates and can be wrong; no bets are offered. Unofficial: not affiliated with or endorsed by the NHL, the NHLPA, any club, player, ESPN or bookmaker; no logos are used and names belong to their owners. 18+. Gamble responsibly. <a href="#/disclaimer">Disclaimer &amp; terms</a></div>
+  </div>
+</footer>
+
+<div id="first-visit-notice" class="fv-notice" hidden>
+  <div class="container-xl fv-row">
+    <span><strong>For information and entertainment only.</strong> Game, playoff and award probabilities are model
+    estimates, not betting or financial advice. Unofficial: not affiliated with the NHL, the NHLPA, any club, player or
+    ESPN; no logos are used. 18+ where gambling is discussed. <a href="#/disclaimer">Read the disclaimer &amp; terms</a>.</span>
+    <button type="button" id="fv-dismiss" class="fv-btn">I understand</button>
+  </div>
+</div>
+<script>
+(function () {
+  var KEY = 'qr-notice-v1', el = document.getElementById('first-visit-notice');
+  var seen = false;
+  try { seen = window.localStorage.getItem(KEY) === '1'; } catch (e) { seen = false; }
+  if (!seen) el.hidden = false;
+  document.getElementById('fv-dismiss').addEventListener('click', function () {
+    el.hidden = true;
+    try { window.localStorage.setItem(KEY, '1'); } catch (e) { /* private mode: shown again next visit */ }
+  });
+})();
+</script>
+<script src="assets/js/core.js"></script>
+<script src="assets/js/charts.js"></script>
+<script src="assets/js/fx.js"></script>
+<script src="assets/js/hub.js"></script>
+<script src="assets/js/games.js"></script>
+<script src="assets/js/game.js"></script>
+<script src="assets/js/standings.js"></script>
+<script src="assets/js/playoffs.js"></script>
+<script src="assets/js/markets.js"></script>
+<script src="assets/js/skaters.js"></script>
+<script src="assets/js/goalies.js"></script>
+<script src="assets/js/player.js"></script>
+<script src="assets/js/teams.js"></script>
+<script src="assets/js/team.js"></script>
+<script src="assets/js/value.js"></script>
+<script src="assets/js/trade.js"></script>
+<script src="assets/js/valuation.js"></script>
+<script src="assets/js/moves.js"></script>
+<script src="assets/js/fantasy.js"></script>
+<script src="assets/js/lines.js"></script>
+<script src="assets/js/leaders.js"></script>
+<script src="assets/js/history.js"></script>
+<script src="assets/js/lab.js"></script>
+<script src="assets/js/compare.js"></script>
+<script src="assets/js/calibration.js"></script>
+<script src="assets/js/docs.js"></script>
+<script>
+/* The disclaimer route lives with the shell: its text is the <template> above. */
+RK.route('disclaimer', function (el) {
+  var t = document.getElementById('disclaimer-template');
+  el.innerHTML = t ? t.innerHTML : '';
+});
+</script>
+</body>
+</html>

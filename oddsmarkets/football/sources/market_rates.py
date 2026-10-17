@@ -1,0 +1,145 @@
+"""
+Market-implied goal rates of past matches, as extra Dixon-Coles training rows.
+
+For every finished league match in a store that football-data.co.uk also lists with
+closing prices (Pinnacle; after January 2026, when football-data's Pinnacle columns
+stop, the Betfair exchange close, else the market average), the closing 1X2 (and over/under 2.5 where present) is turned
+into the pair of goal rates (home, away) that reproduces it under a Dixon-Coles score
+model (rho = -0.05). The build adds one extra row per such match, carrying those rates
+in the xG columns (so `DixonColesModel` scores it with its continuous-Poisson path) and
+weight `W_MKT`; the match's own goals (or xG) row is kept as it was.
+
+Why: a closing line summarises everything the market knew about both teams on the
+day (injuries, lineups, form), so it is a much less noisy measurement of team strength
+than a single scoreline. In the walk-forward research (docs/research/football_edge.md,
+2019/20-2026/27 test seasons, production parameters, the 12 site leagues) adding these
+rows at weight 3 cut the 1X2 log-loss by 0.0079 (95% CI 0.0065-0.0092) and improved
+every one of the 12 leagues. It does not use any price of the match being predicted:
+only closing prices of matches already played.
+
+Only *past* closing prices enter the fit, and they are the prices of matches that are
+finished, so nothing about a future fixture leaks into its own prediction.
+
+The raw CSVs live under data/football/odds/raw (git-ignored). Without them (CI, or a
+fresh clone) this module returns no rows and the model is exactly the goals/xG model.
+"""
+from __future__ import annotations
+
+import logging
+from functools import lru_cache
+
+import numpy as np
+import pandas as pd
+
+from oddsmarkets.football.sources import football_data as fd
+
+logger = logging.getLogger(__name__)
+
+W_MKT = 3.0
+# football-data division / extra-league file for each site league with a closing line.
+SITE_FILES: dict[str, tuple[str, str]] = {
+    "premier-league": ("main", "E0"), "la-liga": ("main", "SP1"), "serie-a": ("main", "I1"),
+    "bundesliga": ("main", "D1"), "ligue-1": ("main", "F1"), "eredivisie": ("main", "N1"),
+    "primeira-liga": ("main", "P1"), "belgian-pro-league": ("main", "B1"),
+    "brasileirao": ("extra", "BRA"), "mls": ("extra", "USA"), "liga-mx": ("extra", "MEX"),
+    "liga-argentina": ("extra", "ARG"),
+}
+
+
+def refresh(max_age_hours: float = 24.0) -> None:
+    """Fetch the current season's files for the site leagues when older than a day (polite, cached)."""
+    cur = fd.season_codes()[-2:]  # the season in progress and the one before (both feed a two-season frame)
+    divs = [code for kind, code in SITE_FILES.values() if kind == "main"]
+    extras = [code for kind, code in SITE_FILES.values() if kind == "extra"]
+    try:
+        fd.download(divisions=divs, seasons=cur, extras=extras, refresh_current=True, max_age_hours=max_age_hours)
+    except Exception as exc:  # noqa: BLE001 - the build must never fail on this
+        logger.warning("football-data refresh failed: %s", exc)
+
+
+def _first(*arrays: np.ndarray) -> np.ndarray:
+    out = arrays[0].copy()
+    for a in arrays[1:]:
+        fill = ~np.isfinite(out).all(axis=-1) if out.ndim == 2 else ~np.isfinite(out)
+        out[fill] = a[fill]
+    return out
+
+
+def closing_probs(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+    """
+    De-vigged closing 1X2 and P(over 2.5): Pinnacle where football-data has it (to
+    January 2026), else the Betfair exchange close, else the market-average close.
+    """
+    from oddsmarkets.football.research.walkforward import devig
+
+    p1 = _first(devig(df[["psc_h", "psc_d", "psc_a"]].to_numpy(float)),
+                devig(df[["bfec_h", "bfec_d", "bfec_a"]].to_numpy(float)),
+                devig(df[["avgc_h", "avgc_d", "avgc_a"]].to_numpy(float)))
+    po = _first(devig(df[["pc_o25", "pc_u25"]].to_numpy(float))[:, 0],
+                devig(df[["bfec_o25", "bfec_u25"]].to_numpy(float))[:, 0],
+                devig(df[["avgc_o25", "avgc_u25"]].to_numpy(float))[:, 0],
+                devig(df[["maxc_o25", "maxc_u25"]].to_numpy(float))[:, 0])
+    return p1, po
+
+
+@lru_cache(maxsize=None)
+def _league_prices(slug: str) -> pd.DataFrame:
+    from oddsmarkets.football.research.walkforward import implied_rates
+
+    kind, code = SITE_FILES[slug]
+    frames = []
+    if kind == "main":
+        for s in fd.season_codes()[-3:]:
+            p = fd.RAW_DIR / "mmz4281" / s / f"{code}.csv"
+            if p.exists():
+                frames.append(fd.parse_main(p, code, s))
+    else:
+        p = fd.RAW_DIR / "new" / f"{code}.csv"
+        if p.exists():
+            df = fd.parse_extra(p, code)
+            frames.append(df[df.start_time >= pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=1100)])
+    frames = [f for f in frames if len(f)]
+    if not frames:
+        return pd.DataFrame()
+    df = pd.concat(frames, ignore_index=True).dropna(subset=["hg", "ag"]).reset_index(drop=True)
+    p1, po = closing_probs(df)
+    df["mkt_h"], df["mkt_a"] = implied_rates(p1, po)
+    _, ev = fd.map_to_sofascore(df, slug)
+    df["game_id"] = ev.astype("string")
+    return df.dropna(subset=["game_id", "mkt_h", "mkt_a"])
+
+
+def market_rows(train_df: pd.DataFrame, slug: str, weight: float = W_MKT) -> pd.DataFrame:
+    """Extra training rows (same columns as `train_df`) for the matches with a closing line."""
+    if slug not in SITE_FILES or train_df is None or not len(train_df) or "game_id" not in train_df:
+        return train_df.iloc[0:0] if train_df is not None else pd.DataFrame()
+    try:
+        prices = _league_prices(slug)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("%s: market rates unavailable (%s)", slug, exc)
+        return train_df.iloc[0:0]
+    if not len(prices):
+        return train_df.iloc[0:0]
+    rates = prices.set_index("game_id")[["mkt_h", "mkt_a"]]
+    rates = rates[~rates.index.duplicated()]
+    gid = train_df["game_id"].astype(str)
+    hit = gid.isin(rates.index).to_numpy()
+    if not hit.any():
+        return train_df.iloc[0:0]
+    extra = train_df[hit].copy()
+    r = rates.loc[gid[hit]]
+    extra["home_xg"] = r["mkt_h"].to_numpy()
+    extra["away_xg"] = r["mkt_a"].to_numpy()
+    extra["weight"] = extra.get("weight", 1.0) * weight
+    extra["game_id"] = extra["game_id"].astype(str) + ":mkt"
+    return extra
+
+
+def with_market_rows(train_df: pd.DataFrame, slug: str, weight: float = W_MKT) -> pd.DataFrame:
+    """`train_df` plus its market rows (for the Dixon-Coles fit only, never for Elo or calibration)."""
+    extra = market_rows(train_df, slug, weight)
+    if not len(extra):
+        return train_df
+    logger.info("%s: %d market-rate rows added to the Dixon-Coles fit (%d matches)", slug, len(extra), len(train_df))
+    out = pd.concat([train_df, extra], ignore_index=True)
+    return out.sort_values("match_date").reset_index(drop=True)
