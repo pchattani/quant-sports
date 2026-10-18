@@ -103,6 +103,7 @@ from oddsmarkets.football.competitions.league.store import (  # noqa: E402
     training_frame,
 )
 from oddsmarkets.football.competitions.liga import store as _liga  # noqa: E402
+from oddsmarkets.football.competitions.liga.store import overdue as _liga_overdue  # noqa: E402
 from oddsmarkets.football.core.markets import build_match_markets, build_outright_markets  # noqa: E402
 from oddsmarkets.football.competitions.liga.strength import (  # noqa: E402
     FORM_WINDOW,
@@ -1022,8 +1023,41 @@ def fetch_markets_safe(cfg, fixtures: list[dict] | None = None, teams: Iterable[
     return {"h2h": rows, "outright": outright}
 
 
+# A title market kept from an earlier build when the markets return nothing (a transient failure) is dropped after
+# this many hours; match lines are kept only until kick-off.
+MARKET_KEEP_HOURS = 48
+
+
+def _parse_utc(s: Any) -> datetime | None:
+    try:
+        d = datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+
+def prune_stale_markets(prev: dict, now: datetime | None = None) -> dict:
+    """The previous market_odds.json reduced to what is still current: fixtures that have not kicked off, and the
+    title market while it is under MARKET_KEEP_HOURS old. Before 18 Oct 2026 the whole previous file was kept with
+    ok:false, so a competition between matchdays (AFC Champions League, the Nations Leagues, friendlies, Copa
+    Argentina) went on showing last matchday's lines, played fixtures included, with updated_at frozen at the last
+    fetch that found any."""
+    now = now or datetime.now(timezone.utc)
+    m = dict(prev.get("matches") or {})
+    keep = [f for f in m.get("fixtures") or [] if (_parse_utc(f.get("commence")) or now) > now]
+    m["fixtures"] = keep
+    m["actionable"] = sum(1 for f in keep if f.get("actionable"))
+    upd = _parse_utc(prev.get("updated_at"))
+    out = prev.get("outrights") or {}
+    if not (out.get("available") and upd is not None and now - upd <= timedelta(hours=MARKET_KEEP_HOURS)):
+        out = {"available": False, "teams": []}
+    return {**prev, "ok": False, "checked_at": _now(), "matches": m, "outrights": out}
+
+
 def write_market_odds(out_dir: Path, raw: dict | None, model, title_model: dict[str, float] | None = None) -> None:
-    """market_odds.json: match lines and the title market against the model; the previous file is kept when nothing came back."""
+    """market_odds.json: match lines and the title market against the model. When nothing came back, the previous file
+    is kept with ok:false but only for what is still current (prune_stale_markets): lines of fixtures not yet kicked
+    off and a title market from the last MARKET_KEEP_HOURS."""
     path = out_dir / "market_odds.json"
     matches = build_match_markets(raw["h2h"], model) if raw and raw.get("h2h") and model is not None else {"fixtures": []}
     outrights = build_outright_markets(raw["outright"], title_model or {}) if raw and raw.get("outright") and title_model else {"available": False, "teams": []}
@@ -1036,9 +1070,7 @@ def write_market_odds(out_dir: Path, raw: dict | None, model, title_model: dict[
         return
     prev = _read_json(path, None)
     if prev:
-        prev["ok"] = False
-        prev["checked_at"] = _now()
-        path.write_text(json.dumps(prev, ensure_ascii=False), encoding="utf-8")
+        path.write_text(json.dumps(prune_stale_markets(prev), ensure_ascii=False), encoding="utf-8")
     else:
         _write(out_dir, "market_odds.json", {
             "ok": False, "updated_at": None, "checked_at": _now(),
@@ -1057,9 +1089,10 @@ def build_fixtures_json(store: dict, norm, model, season_filter, xg_map: dict, n
     """
     lineups = store.get("lineups") or {}
     rows = []
+    now = datetime.now(timezone.utc)
     for gid, raw in (store.get("matches") or {}).items():
-        if not isinstance(raw, dict) or not season_filter(raw):
-            continue
+        if not isinstance(raw, dict) or not season_filter(raw) or raw.get("superseded_by"):
+            continue                                  # superseded: the old copy of a re-listed fixture
         home, away = norm(str(raw.get("home") or "")), norm(str(raw.get("away") or ""))
         if not home or not away:
             continue
@@ -1069,12 +1102,19 @@ def build_fixtures_json(store: dict, norm, model, season_filter, xg_map: dict, n
             status = "postponed"
         elif raw_status in ("cancelled", "canceled"):
             status = "cancelled"
+        # Still "not started" hours after kick-off and held nowhere else: the source never closed it. It is not
+        # shown as to come (pages treat postponed as void); the model keeps pricing it as still to be played.
+        missing = status == "scheduled" and _liga_overdue(raw, now)
+        if missing:
+            status = "postponed"
         row: dict = {
             "id": str(gid), "date": raw.get("date"), "round": raw.get("round"),
             "stage": raw.get("stage") or "league", "status": status,
             "home": home, "away": away, "hs": raw.get("hs"), "as": raw.get("as"),
             "detail": str(gid) in lineups,
         }
+        if missing:
+            row["result_missing"] = True
         for key in ("group", "split_group", "torneo", "zone"):
             if raw.get(key):
                 row[key] = raw[key]

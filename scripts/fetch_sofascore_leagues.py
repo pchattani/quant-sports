@@ -57,7 +57,7 @@ sys.path.insert(0, str(ROOT))
 from oddsmarkets.football.competitions.cup.config import CUPS  # noqa: E402
 from oddsmarkets.football.competitions.league.config import LEAGUES  # noqa: E402
 from oddsmarkets.football.competitions.league.store import store_signature  # noqa: E402
-from oddsmarkets.football.competitions.liga.store import load_store, save_store  # noqa: E402
+from oddsmarkets.football.competitions.liga.store import load_store, mark_superseded, save_store  # noqa: E402
 from oddsmarkets.football.sources import sofascore  # noqa: E402
 from oddsmarkets.football.sources.teams import normalize_cup_name, normalize_team_name  # noqa: E402
 
@@ -164,6 +164,11 @@ def refresh_fixtures(store: dict, cfg, entry: dict) -> dict:
     if not fetched_any:
         return status
     status["ok"] = True
+    # The season list rewrites a re-listed match's old id as "notstarted" every hour; close it against its new copy
+    # again (load_store does the same on every read, so builds agree).
+    closed = mark_superseded(store)
+    if closed:
+        status["superseded"] = len(closed)
 
     # Conference membership and the id of the season being simulated travel with the
     # store so the build needs nothing but the store and the config.

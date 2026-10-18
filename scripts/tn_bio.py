@@ -8,17 +8,19 @@ ATP player pages: neither tennis-data nor ESPN's scoreboards carry one, and the 
 Writes docs/ace/data/<tour>/bio.json:
 
     {"_meta": {"source", "updated_at", "players", "with_dob"},
-     pid: {"dob": "YYYY-MM-DD" | null, "espn": id, "checked": "YYYY-MM-DD"}}
+     pid: {"dob": "YYYY-MM-DD" | null, "espn": id, "checked": "YYYY-MM-DD", "rejected"?: "YYYY-MM-DD"}}
 
 Candidates: players with an ESPN id (the pid itself when numeric, else the registry's "espn") and at least --min-matches
 rated matches since --since on disk, who have no date of birth yet (from the WTA API or an earlier run). A player ESPN
-answered without a date is re-asked after --recheck-days. Paced like every tennis source (0.5 s, --budget calls per run;
+answered without a date (or with an impossible one, kept as "rejected": analytics.plausible_dob, since ESPN reuses
+old ids for other players) is re-asked after --recheck-days. Paced like every tennis source (0.5 s, --budget calls per run;
 an interrupted run keeps what it fetched: the file is saved every 100 players). The build only reads the file
 (TourData.players fills a missing "dob" from it); it never calls ESPN for it.
 
     python scripts/tn_bio.py --tour atp
     python scripts/tn_bio.py --tour wta --budget 500
     python scripts/tn_bio.py --tour atp --dry-run          # count the candidates
+    python scripts/tn_bio.py --tour atp --clean            # null out stored dates that fail plausible_dob (no calls)
 """
 from __future__ import annotations
 
@@ -69,6 +71,28 @@ def candidates(td: an.TourData, bio: dict, since: str, min_matches: int, recheck
     return out
 
 
+def checked_dob(td: an.TourData, pid: str, raw: str | None, today: date) -> tuple[str | None, str | None]:
+    """(dob, rejected): ESPN's date when plausible for the player's match span, else (None, the raw date)."""
+    reg = td.registry
+    cp = (reg.canonical(pid) or pid) if (reg is not None and reg.redirects) else pid
+    sp = td.spans.get(cp) or (None,) * 4
+    ok = an.plausible_dob(raw, sp[1], today, sp[3])
+    return ok, (raw if raw and not ok else None)
+
+
+def clean(td: an.TourData, bio: dict, today: date) -> list[tuple[str, str, str, str]]:
+    """Null out stored dates that fail plausible_dob, in place. Returns (pid, name, date, span) per change."""
+    out = []
+    for pid, rec in bio.items():
+        if pid.startswith("_") or not isinstance(rec, dict) or not rec.get("dob"):
+            continue
+        ok, bad = checked_dob(td, pid, rec["dob"], today)
+        if bad:
+            rec["dob"], rec["rejected"] = None, bad
+            out.append((pid, td.name(pid), bad, " / ".join(td.spans.get(pid, ("?", "?", "?"))[:3])))
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--tour", choices=list(an.TOURS), required=True)
@@ -78,6 +102,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--min-matches", type=int, default=5)
     ap.add_argument("--recheck-days", type=int, default=180)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--clean", action="store_true", help="only re-check the stored dates (no ESPN calls)")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     for noisy in ("urllib3", "requests"):
@@ -86,6 +111,21 @@ def main(argv: list[str] | None = None) -> int:
     td = an.TourData(args.tour, today)
     path = bio_path(td.tour)
     bio = an.read_json(path) or {}
+
+    def save():
+        meta = {"source": "ESPN core athlete API (dateOfBirth)", "updated_at": an.now(),
+                "players": sum(1 for k in bio if not k.startswith("_")),
+                "with_dob": sum(1 for k, v in bio.items() if not k.startswith("_") and (v or {}).get("dob"))}
+        an.write_json(path, {"_meta": meta, **{k: v for k, v in sorted(bio.items()) if not k.startswith("_")}})
+
+    if args.clean:
+        bad = clean(td, bio, today)
+        for row in bad:
+            logger.info("%s %s (%s): date of birth %s rejected (matches first / median / last %s)", td.tour, row[0], row[1], row[2], row[3])
+        logger.info("%s: %d stored dates rejected", td.tour, len(bad))
+        if bad and not args.dry_run:
+            save()
+        return 0
     todo = candidates(td, bio, args.since, args.min_matches, args.recheck_days, today)
     logger.info("%s: %d players to ask ESPN for a date of birth (%d already in %s)", td.tour, len(todo),
                 sum(1 for k, v in bio.items() if not k.startswith("_") and (v or {}).get("dob")), path)
@@ -95,17 +135,12 @@ def main(argv: list[str] | None = None) -> int:
     t0 = time.monotonic()
     got = 0
 
-    def save():
-        meta = {"source": "ESPN core athlete API (dateOfBirth)", "updated_at": an.now(),
-                "players": sum(1 for k in bio if not k.startswith("_")),
-                "with_dob": sum(1 for k, v in bio.items() if not k.startswith("_") and (v or {}).get("dob"))}
-        an.write_json(path, {"_meta": meta, **{k: v for k, v in sorted(bio.items()) if not k.startswith("_")}})
-
     try:
         for i, (pid, espn_id) in enumerate(todo):
             rec = espn.parse_athlete(espn.athlete_raw(c, td.tour, espn_id))
-            bio[pid] = {"dob": (rec or {}).get("dob"), "espn": espn_id, "checked": today.isoformat()}
-            got += 1 if (rec or {}).get("dob") else 0
+            dob, bad = checked_dob(td, pid, (rec or {}).get("dob"), today)
+            bio[pid] = {"dob": dob, "espn": espn_id, "checked": today.isoformat(), **({"rejected": bad} if bad else {})}
+            got += 1 if dob else 0
             if (i + 1) % 100 == 0:
                 save()
                 logger.info("%d / %d asked, %d dates, %.0f s", i + 1, len(todo), got, time.monotonic() - t0)

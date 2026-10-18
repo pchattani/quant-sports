@@ -23,6 +23,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: write      # prunecaches: delete this site's superseded Actions caches after a save
 
 env:
   SITE: football
@@ -159,11 +160,19 @@ jobs:
 
       - name: 'Save raw data (only when it changed)'
         if: ${{ !cancelled() && steps.rawkey.outputs.files != '0' && steps.rawkey.outputs.key != steps.raw.outputs.cache-matched-key }}
+        id: rawsave
         uses: actions/cache/save@v4
         with:
           path: |
             data/football/odds/raw
           key: ${{ steps.rawkey.outputs.key }}
+
+      - name: 'Delete superseded raw-data caches'
+        if: ${{ !cancelled() && steps.rawkey.outputs.files != '0' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          uv run --frozen python scripts/ci_site.py prunecaches --prefix football-raw-v1- --keep "${{ steps.rawkey.outputs.key }}"
 
       - name: 'History stores content key'
         if: ${{ !cancelled() }}
@@ -173,7 +182,15 @@ jobs:
 
       - name: 'Save the title-odds history stores'
         if: ${{ !cancelled() && steps.hist.outputs.cache-matched-key != steps.histkey.outputs.key }}
+        id: histsave
         uses: actions/cache/save@v4
         with:
           path: docs/site/data/*/history_store.json
           key: ${{ steps.histkey.outputs.key }}
+
+      - name: 'Delete superseded history-store caches'
+        if: ${{ !cancelled() && steps.histkey.outputs.files != '0' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          uv run --frozen python scripts/ci_site.py prunecaches --prefix football-history-v1- --keep "${{ steps.histkey.outputs.key }}"

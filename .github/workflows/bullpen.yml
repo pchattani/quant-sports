@@ -23,6 +23,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: write      # prunecaches: delete this site's superseded Actions caches after a save
 
 env:
   SITE: bullpen
@@ -154,16 +155,32 @@ jobs:
 
       - name: 'Save raw data (only when it changed)'
         if: ${{ !cancelled() && steps.rawkey.outputs.files != '0' && steps.rawkey.outputs.key != steps.raw.outputs.cache-matched-key }}
+        id: rawsave
         uses: actions/cache/save@v4
         with:
           path: |
             data/baseball/statcast
           key: ${{ steps.rawkey.outputs.key }}
 
+      - name: 'Delete superseded raw-data caches'
+        if: ${{ !cancelled() && steps.rawkey.outputs.files != '0' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          uv run --frozen python scripts/ci_site.py prunecaches --prefix bullpen-raw-v1- --keep "${{ steps.rawkey.outputs.key }}"
+
       - name: 'Save model caches (once a day, and after a seed)'
         if: ${{ !cancelled() && (!startsWith(steps.model.outputs.cache-matched-key, format('bullpen-model-v1-{0}', steps.ctx.outputs.today)) || steps.seed.outputs.seeded == 'true') }}
+        id: modelsave
         uses: actions/cache/save@v4
         with:
           path: |
             data/baseball/cache
           key: bullpen-model-v1-${{ steps.ctx.outputs.today }}${{ steps.seed.outputs.seeded == 'true' && format('-seed-{0}', github.run_id) || '' }}
+
+      - name: 'Delete superseded model caches'
+        if: ${{ !cancelled() && (steps.modelsave.outcome == 'success' || steps.model.outputs.cache-matched-key != '') }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          uv run --frozen python scripts/ci_site.py prunecaches --prefix bullpen-model-v1- --keep "${{ steps.modelsave.outcome == 'success' && format('bullpen-model-v1-{0}{1}', steps.ctx.outputs.today, steps.seed.outputs.seeded == 'true' && format('-seed-{0}', github.run_id) || '') || steps.model.outputs.cache-matched-key }}"

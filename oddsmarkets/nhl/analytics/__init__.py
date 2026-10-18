@@ -299,13 +299,15 @@ def age_on(dob: Any, season: int) -> float | None:
 # ---------------------------------------------------------------------------------------------- catalogue
 
 def metric(key: str, label: str, group: str, fmt: str, lower: bool = False, scope: str = "all", desc: str = "",
-           den: str | None = None, stab: str | None = None, k: float | None = None, pct: bool = True) -> dict:
+           den: str | None = None, stab: str | None = None, k: float | None = None, pct: bool = True,
+           min_n: tuple[str, float] | None = None) -> dict:
     """METRIC = {"key","label","group","fmt","lower","scope","desc","stabilises_at"} (PAYLOADS.md), plus the private
     "_den" (the sample the metric is measured on: toi5 seconds, shots, faceoffs, ...), "_stab" (the stabilise.py
     metric whose k shrinks it) or "_k" (a fixed k in the den's unit) and "_pct" (False: no percentile, e.g. counts of
-    games); the private keys are dropped from payloads by `public_metric`."""
+    games) and "_min" ((sample, amount): a fixed floor on rows[pid]["n"][sample], unprorated, on top of the floors;
+    see skaters.VALUE_PCT_MIN_TOI); the private keys are dropped from payloads by `public_metric`."""
     return {"key": key, "label": label, "group": group, "fmt": fmt, "lower": bool(lower), "scope": scope, "desc": desc,
-            "stabilises_at": None, "_den": den, "_stab": stab, "_k": k, "_pct": pct}
+            "stabilises_at": None, "_den": den, "_stab": stab, "_k": k, "_pct": pct, "_min": min_n}
 
 
 DEN_UNIT = {"toi": "minutes", "toi5": "5v5 minutes", "toipp": "PP minutes", "toipk": "PK minutes", "shots": "shots", "fo": "faceoffs",
@@ -409,6 +411,8 @@ def add_percentiles(rows: dict[str, dict], metrics: list[dict], reference: Itera
       floors[den]. Metrics without a denominator (counting stats, GSAx, RAPM, Rink value) are held to the floor of
       `default_den` (games played in the catalogues), unshrunk: one game's goals or GAR ranks no one, and the pool
       they are placed against is the players at or above that floor.
+    * A metric's "_min" floor (sample, amount) is fixed, not prorated; rows below it get no percentile and leave the
+      pool (the Value group: skaters.VALUE_PCT_MIN_TOI).
     * Shrinkage: the value placed is shrunk toward the reference mean with the metric's stabilisation k:
       v_s = (n v + k m) / (n + k). Displayed values are never shrunk.
     * Direction from the metric's `lower` (100 = best).
@@ -445,6 +449,10 @@ def add_percentiles(rows: dict[str, dict], metrics: list[dict], reference: Itera
             if not den and default_den and floors.get(default_den) is not None:
                 n0 = fnum((rows[pid].get("n") or {}).get(default_den))
                 if (n0 or 0) < floors[default_den]:
+                    return None
+            if m.get("_min"):
+                mk, mx = m["_min"]
+                if (fnum((rows[pid].get("n") or {}).get(mk)) or 0) < mx:
                     return None
             return shrunk(v, n, k, mu) if den else v
         sv = {pid: sval(pid) for pid in rows}

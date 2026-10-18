@@ -234,7 +234,7 @@ function hero(c, f, m, hit) {
   var xg = m && m.xg ? m.xg : f.xg;
   var rnd = FB.roundText(f, c.slug);
   var status = f.status === 'live' ? '<span class="qk-badge live">Live</span>' : f.status === 'finished' ? '<span class="qk-badge final">Full time</span>'
-    : f.status === 'postponed' ? '<span class="qk-badge">Postponed</span>' : f.status === 'cancelled' ? '<span class="qk-badge">Cancelled</span>'
+    : f.result_missing ? '<span class="qk-badge">No result reported</span>' : f.status === 'postponed' ? '<span class="qk-badge">Postponed</span>' : f.status === 'cancelled' ? '<span class="qk-badge">Cancelled</span>'
     : '<span class="qk-badge accent">' + esc(FB.relDay(f.date)) + ' ' + esc(FB.fmtTime(f.date)) + '</span>';
   function side(tid, name) {
     return '<a class="fb-mx-team"' + (tid ? ' href="' + esc(FB.href.club(tid, { c: c.slug })) + '"' : '') + '>' + FB.crest(tid, name, 'lg') + '<span>' + esc(name) + '</span></a>';

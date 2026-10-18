@@ -76,6 +76,23 @@ def test_season_value_rates_percentiles_best_by_position():
     assert v["currency"]["goals_per_win"] == pytest.approx(6.0, abs=0.01)
 
 
+def test_season_value_percentiles_need_the_minutes_floor():
+    """Early in a season (skaters.VALUE_PCT_MIN_TOI): no percentile under 200 minutes (600 for goalies), and those
+    players are not in the pool; the floor scales with a short schedule (48 games in 2012-13), not with games played."""
+    rows = [(f"s{i}", "CLRD"[i % 4], 250.0 + 10 * i, True, 0.01 * i, 0.01 * i / 6.0, {}) for i in range(10)]
+    rows += [(f"e{i}", "C", 60.0 + i, True, 0.5, 0.5 / 6.0, {}) for i in range(10)]          # near-ties at a few games
+    sk = _cat(rows, team_games=10)
+    gk = _cat([(f"g{i}", "G", 400.0 + 100 * i, True, 1.0 * i, i / 6.0, None) for i in range(5)], kind="G", team_games=10)
+    v = V.season_value(S3, sk, gk)
+    R = {r[0]: dict(zip(v["cols"], r)) for r in v["rows"]}
+    assert all(R[f"e{i}"]["pct"] is None and R[f"e{i}"]["pct_pos"] is None for i in range(10))
+    assert R["s9"]["pct"] == 95 and R["s0"]["pct"] == 5            # placed among the ten past the floor only
+    assert R["g0"]["pct"] is None and R["g1"]["pct"] is None and R["g4"]["pct"] == 83
+    assert v["min_toi_pct"] == {"S": 200, "G": 600}
+    from oddsmarkets.nhl.analytics.skaters import value_min_toi
+    assert value_min_toi(20122013)["S"] == pytest.approx(200 * 48 / 82) and value_min_toi(20262027)["S"] == 200
+
+
 def test_goals_per_win_needs_a_sample():
     assert V.goals_per_win([{"gar": 6.0, "war": 1.0}] * 19) is None
     assert V.goals_per_win([{"gar": 6.0, "war": 1.0}] * 20 + [{"gar": 0.1, "war": 0.01}]) == pytest.approx(6.0)

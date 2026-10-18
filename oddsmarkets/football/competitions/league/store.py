@@ -47,9 +47,12 @@ def _status_of(raw: object) -> str:
 
 def iter_matches(store: dict[str, Any], cfg: LeagueConfig,
                  season_id: int | None = None) -> Iterable[LeagueMatch]:
-    """Every match in the store, optionally restricted to one season id."""
+    """Every match in the store, optionally restricted to one season id (an old copy of a re-listed fixture,
+    `superseded_by` another id, is skipped)."""
     for gid, raw in (store.get("matches") or {}).items():
         if season_id is not None and raw.get("season_id") != season_id:
+            continue
+        if raw.get("superseded_by"):
             continue
         home = normalize_team_name(str(raw.get("home", "")), cfg.registry)
         away = normalize_team_name(str(raw.get("away", "")), cfg.registry)

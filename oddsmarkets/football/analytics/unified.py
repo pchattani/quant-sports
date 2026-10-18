@@ -38,6 +38,7 @@ from oddsmarkets.football.analytics.archive import season_row, sort_key
 from oddsmarkets.football.analytics.players import METRICS, add_percentiles, aggregate_players, player_incidents
 from oddsmarkets.football.competitions.cup.config import CUPS
 from oddsmarkets.football.competitions.league.config import LEAGUES, LIGA_ARGENTINA_SLUG
+from oddsmarkets.football.competitions.liga.store import overdue as _overdue
 
 logger = logging.getLogger(__name__)
 
@@ -683,7 +684,7 @@ class Unified:
 
         by_season: dict[Any, dict[str, dict]] = {}
         for gid, m in matches.items():
-            if not isinstance(m, dict):
+            if not isinstance(m, dict) or m.get("superseded_by"):     # the old copy of a re-listed fixture
                 continue
             k = key_of(m)
             if k is None:
@@ -1952,6 +1953,8 @@ def _status(m: dict) -> str:
         return "postponed"
     if raw in ("canceled", "cancelled"):
         return "cancelled"
+    if _overdue(m):              # "not started" hours after kick-off: never closed by the source, not to come
+        return "postponed"
     return "scheduled"
 
 
@@ -1962,6 +1965,8 @@ def _fixture_row(gid: str, m: dict, detail: bool) -> dict:
     for k in ("group", "winner", "agg_winner", "torneo", "zone", "split_group", "pens"):
         if m.get(k):
             row[k] = m[k]
+    if row["status"] == "postponed" and _overdue(m):
+        row["result_missing"] = True
     if detail:
         row["detail"] = True
     return {k: v for k, v in row.items() if v is not None}

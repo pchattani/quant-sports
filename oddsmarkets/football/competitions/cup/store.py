@@ -29,6 +29,8 @@ def iter_matches(store: dict[str, Any], season_id: int | None = None) -> Iterabl
     for gid, raw in (store.get("matches") or {}).items():
         if season_id is not None and raw.get("season_id") != season_id:
             continue
+        if raw.get("superseded_by"):                  # the old copy of a re-listed fixture (liga.store.mark_superseded)
+            continue
         home, away = str(raw.get("home", "")), str(raw.get("away", ""))
         if not home or not away or raw.get("stage") in ("qualifying", "other"):
             continue

@@ -28,6 +28,24 @@ M = an.metric
 QUAL_5V5_MIN = 250.0
 FLOORS = {"toi5": 3000.0, "toi": 6000.0, "shots": 20.0, "att": 20.0, "fo": 50.0, "toipp": 1200.0, "toipk": 1200.0, "gp": 5.0}
 MIN = 60.0                         # k for time denominators are in seconds
+# Value-group percentiles (GAR, WAR, GAR/60 and the components; value.json's WAR percentiles use the same floors)
+# need VALUE_PCT_MIN_TOI minutes in all situations (per 82-game schedule: a 48- or 56-game season scales it down, but
+# it does not grow with games played). Early in a season nearly every skater sits within a few hundredths of a win of
+# zero (WAR sd 0.095 among 623 qualified skaters after 10 team games, against 0.63 over a full season), so a
+# percentile there is an ordering of near-ties that one game reshuffles: between two CI builds of 18 Oct 2026 one more
+# game day moved 33 of 691 value percentiles by 10 points or more. 200 minutes is a third of GAR/60's stabilisation k
+# (600 minutes): about 10-12 games of a regular. Past seasons keep their meaning: every qualified skater there is
+# above the floor (the pool is unchanged); only call-ups under it lose the percentile. Goalies (value.json):
+# VALUE_PCT_MIN_TOI_G, about ten full games (every past qualified goalie is above it).
+VALUE_PCT_MIN_TOI = 200.0
+VALUE_PCT_MIN_TOI_G = 600.0
+
+
+def value_min_toi(season: int) -> dict[str, float]:
+    """{"S": skater minutes, "G": goalie minutes} a player needs for a Value-group percentile in `season`."""
+    from oddsmarkets.nhl import canon
+    f = min(1.0, canon.games_per_team(season) / 82.0)
+    return {"S": VALUE_PCT_MIN_TOI * f, "G": VALUE_PCT_MIN_TOI_G * f}
 
 METRICS = [
     # production (all situations)
@@ -378,7 +396,8 @@ def build(ctx: SeasonContext) -> dict | None:
                     rows[p]["values"][f"qot_{mk}"] = rr.get("qot")
                     rows[p]["values"][f"qoc_{mk}"] = rr.get("qoc")
     _projections(ctx, rows, reference, n_season, tg_n)
-    an.finish(rows, METRICS, reference, pos_of, FLOORS)
+    vmin = ("toi", value_min_toi(ctx.season)["S"] * MIN)                # n["toi"] is in seconds
+    an.finish(rows, [dict(m, _min=vmin) if m["group"] == "Value" else m for m in METRICS], reference, pos_of, FLOORS)
     for r in rows.values():
         r["pct_pos"] = r.pop("pct_pos", {})
     ref_n = len(reference)

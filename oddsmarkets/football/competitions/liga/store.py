@@ -54,8 +54,81 @@ EMPTY_STORE: dict[str, Any] = {
 }
 
 
+# Fixtures past their kick-off that the store still calls not started. Sofascore sometimes re-lists a match under a
+# new event id (a moved kick-off, a postponed tie, a friendly entered twice) and keeps the old id as "notstarted"
+# for good; the fetcher's season list then rewrites it every hour and nothing ever closes it (18 Oct 2026: eight
+# such fixtures in friendlies, the CAF Champions League and the Copa del Rey, kick-offs 11 Sep to 11 Oct).
+STALE_FIXTURE_HOURS = 6
+NOT_STARTED = {"notstarted", "not_started", "scheduled", ""}
+SUPERSEDE_DAYS_NO_ROUND = 3          # a re-listing without a round must kick off within this many days of the old one
+
+
+def overdue(raw: dict, now: datetime | None = None, hours: float = STALE_FIXTURE_HOURS) -> bool:
+    """True for a fixture still "not started" more than `hours` after its kick-off."""
+    if str(raw.get("status") or "").strip().lower().replace(" ", "") not in NOT_STARTED:
+        return False
+    d = _parse_date(raw.get("date"))
+    now = now or datetime.now(timezone.utc)
+    return d is not None and (now - d).total_seconds() > hours * 3600
+
+
+def mark_superseded(store: dict[str, Any], now: datetime | None = None) -> list[tuple[str, str]]:
+    """
+    Close overdue fixtures that the store holds again under another id, in place: same season, same home and away
+    sides, same stage and round, and the other copy played, live or still to come (a fixture without a round must
+    be within SUPERSEDE_DAYS_NO_ROUND days); or the sides swapped, played or live within a day of the old kick-off. The old copy becomes status "canceled" with "superseded_by" (the id of
+    the copy kept) and "status_was"; every reader already drops a cancelled copy of a pair that exists twice.
+    An overdue fixture with no other copy is left as it is (overdue() lets a page call it "result missing").
+    Returns [(old id, kept id)]. Idempotent; the fetcher runs it after every fixture refresh and load_store on load.
+    """
+    matches = store.get("matches") or {}
+    now = now or datetime.now(timezone.utc)
+    stale = [(g, m) for g, m in matches.items() if isinstance(m, dict) and not m.get("superseded_by") and overdue(m, now)]
+    if not stale:
+        return []
+    by_pair: dict[tuple, list[tuple[str, dict]]] = {}
+    for g, m in matches.items():
+        if isinstance(m, dict) and not m.get("superseded_by"):
+            by_pair.setdefault((m.get("season_id"), m.get("home"), m.get("away")), []).append((g, m))
+    out = []
+    for gid, m in stale:
+        d0 = _parse_date(m.get("date"))
+        best = None
+        same = [(g2, m2, False) for g2, m2 in by_pair.get((m.get("season_id"), m.get("home"), m.get("away")), [])]
+        swapped = [(g2, m2, True) for g2, m2 in by_pair.get((m.get("season_id"), m.get("away"), m.get("home")), [])]
+        for g2, m2, flipped in same + swapped:
+            if g2 == gid or m2.get("stage") != m.get("stage") or m2.get("round") != m.get("round"):
+                continue
+            st = str(m2.get("status") or "").strip().lower().replace(" ", "")
+            d2 = _parse_date(m2.get("date"))
+            if flipped:
+                # the same match listed with the sides the other way round (a neutral or swapped venue): played or
+                # live, within a day; never a two-legged tie's other leg
+                if not (st in FINISHED_STATUSES or st in LIVE_STATUSES) or d0 is None or d2 is None                         or abs((d2 - d0).total_seconds()) > 86400:
+                    continue
+            elif st in FINISHED_STATUSES or st in LIVE_STATUSES:
+                pass
+            elif st in NOT_STARTED and d2 is not None and d0 is not None and d2 > d0 and not overdue(m2, now):
+                pass                                      # rescheduled, still to come
+            else:
+                continue
+            if m.get("round") is None and (d0 is None or d2 is None or abs((d2 - d0).total_seconds()) > SUPERSEDE_DAYS_NO_ROUND * 86400):
+                continue
+            if best is None or (d2 and best[1] and abs((d2 - d0).total_seconds()) < abs((best[1] - d0).total_seconds())):
+                best = (g2, d2)
+        if best is not None:
+            m["status_was"] = m.get("status")
+            m["status"] = "canceled"
+            m["superseded_by"] = str(best[0])
+            out.append((str(gid), str(best[0])))
+    if out:
+        logger.info("closed %d overdue fixtures held again under another id: %s", len(out), out)
+    return out
+
+
 def load_store(path: Path) -> dict[str, Any]:
-    """Load a store, returning an empty one rather than raising if it is absent."""
+    """Load a store, returning an empty one rather than raising if it is absent. Overdue fixtures held again under
+    another id are closed on load (mark_superseded), so every reader sees them cancelled."""
     if not path.exists():
         logger.warning("No Liga store at %s — starting empty", path)
         return {k: (dict(v) if isinstance(v, dict) else v) for k, v in EMPTY_STORE.items()}
@@ -66,6 +139,10 @@ def load_store(path: Path) -> dict[str, Any]:
         return {k: (dict(v) if isinstance(v, dict) else v) for k, v in EMPTY_STORE.items()}
     for key, default in EMPTY_STORE.items():
         store.setdefault(key, dict(default) if isinstance(default, dict) else default)
+    try:
+        mark_superseded(store)
+    except Exception as exc:  # noqa: BLE001 - a malformed store must still load
+        logger.warning("store at %s: stale-fixture check failed (%s)", path, exc)
     return store
 
 

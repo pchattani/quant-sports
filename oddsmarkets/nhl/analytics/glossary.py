@@ -58,6 +58,8 @@ MODEL = [
      "(skaters: 250 minutes at 5v5 per 82 team games, prorated; goalies: a quarter of the team's minutes) after shrinking the value "
      "toward the pool mean with the metric's stabilisation constant: (n v + k m) / (n + k); a metric needs its sample floor (50 "
      "minutes at 5v5, 20 shots, 50 faceoffs, 20 PP or PK minutes, 100 unblocked attempts faced) before it gets a percentile. "
+     "Rink value (GAR, WAR and their parts) needs 200 minutes (goalies 600) per 82-game schedule, not prorated: early in a "
+     "season nearly everyone is within a few hundredths of a win of zero and one game would reorder them. "
      "pct_pos compares forwards with forwards and defencemen with defencemen."),
     ("stabilisation", "Stabilisation", "Catalogue", "The sample at which split-half reliability reaches 0.7: r(n) = n / (n + k), "
      "n_0.7 = 0.7 k / 0.3 (k fitted per metric over seasons)."),

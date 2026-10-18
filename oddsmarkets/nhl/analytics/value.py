@@ -165,12 +165,19 @@ def season_value(season: int, sk: dict | None, gk: dict | None, prev_sk: dict | 
                          "prev_war": _f(pvv.get("war")) if pgar is not None and ptoi > 0 else None,
                          "d_rate": rate - pgar / ptoi * 60.0 if pgar is not None and ptoi > 0 else None,
                          "gsax": _f(v.get("gsax")) if kind == "G" else None, "why": why, **{c: comps.get(c) for c in COMPONENTS}}
+    # percentiles need a fixed minimum of minutes (skaters.VALUE_PCT_MIN_TOI: early-season WAR values are near-ties
+    # that one game reorders); below it pct is null and the player is not in the pool
+    from oddsmarkets.nhl.analytics.skaters import value_min_toi
+    vmin = value_min_toi(season)
     for kind in ("S", "G"):
-        ref = sorted(x["war"] for x in rows.values() if x["kind"] == kind and x["q"] and x["war"] is not None)
-        refr = {k: sorted(x["war"] for x in rows.values() if x["kind"] == kind and x["q"] and x["pos"] == k and x["war"] is not None)
-                for k in ROLES}
+        el = [x for x in rows.values() if x["kind"] == kind and x["war"] is not None and x["toi"] >= vmin[kind]]
+        ref = sorted(x["war"] for x in el if x["q"])
+        refr = {k: sorted(x["war"] for x in el if x["q"] and x["pos"] == k) for k in ROLES}
         for x in rows.values():
             if x["kind"] != kind or x["war"] is None:
+                continue
+            if x["toi"] < vmin[kind]:
+                x["pct"] = x["pct_pos"] = None
                 continue
             x["pct"] = place(ref, x["war"]) if len(ref) >= 2 else None
             rr = refr.get(x["pos"]) or []
@@ -194,7 +201,9 @@ def season_value(season: int, sk: dict | None, gk: dict | None, prev_sk: dict | 
             "roles": dict(ROLE_LABELS), "cols": cols, "rows": out_rows, "best": best,
             "n_qualified": {"S": sum(1 for x in rows.values() if x["kind"] == "S" and x["q"]),
                             "G": sum(1 for x in rows.values() if x["kind"] == "G" and x["q"])},
-            "note": "GAR: goals above replacement (Rink value); WAR = GAR / goals per win. Percentiles against qualified players."}
+            "min_toi_pct": {k: round(v) for k, v in vmin.items()},
+            "note": "GAR: goals above replacement (Rink value); WAR = GAR / goals per win. Percentiles against qualified players "
+                    "with at least min_toi_pct minutes (none below it)."}
 
 
 def goals_per_win(rows: Iterable[dict]) -> float | None:

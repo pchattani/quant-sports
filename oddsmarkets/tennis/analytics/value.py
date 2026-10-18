@@ -1054,6 +1054,7 @@ class Ctx:
         self.typ = typical_opponents(self.T)
         self.L = match_luck(self.T, self.lp, self.typ)
         self.dob = {p: an.day(x.get("dob")) for p, x in td.players.items() if x.get("dob")}
+        self.dob_from = {p: td.dob_from(p) for p in self.dob}
         self.w = blend_weights(td.tour)
         prm = td.elo_params() or {}
         self.elo_w = float(prm.get("w_surf", 0.5))
@@ -1098,7 +1099,7 @@ def features_at(C: Ctx, t: date, ranks: dict[str, tuple[float, float]], elo: dic
         last_day = int(dd[past & (T["st"][ix] != 3)].max()) if (past & (T["st"][ix] != 3)).any() else None
         idle = (d - last_day) if last_day is not None else 365
         dob = C.dob.get(p)
-        age = (t - dob).days / 365.25 if dob else None
+        age = an.age_at(dob, t, C.dob_from.get(p))
         e6 = elo_6m.get(p)
         rk6 = rank_near(C.rs, p, d - 182, RANK_AROUND, before=d)
         held, drop12, _ = points_view(C.ep.get(p), d, h_days["12m"])
@@ -1915,7 +1916,7 @@ def build_value(td: an.TourData, entries: dict | None = None, preds: dict | None
             "gap": _r(math.log(rk) - math.log(im), 3) if (rk and im) else None,
             "pts_imp": _r(pts_at.get(int(im)), 0) if im is not None else None,
             "elo": _r(act[p][0], 0), "elo_rank": erank.get(p), "g_rank": grank.get(p), "sr_rank": srank.get(p),
-            "age": _r(((t - C.dob[p]).days / 365.25) if p in C.dob else None, 1),
+            "age": _r(an.age_at(C.dob.get(p), t, C.dob_from.get(p)), 1),
             "surf": {s: [_r(R_s[s][p] + offset, 0), s_rank[s].get(p), int((surf_n.get(p) or {}).get(s, 0))]
                      for s in an.SURFACES if p in R_s[s]}})
     value_rows.sort(key=lambda x: x["mrank"])

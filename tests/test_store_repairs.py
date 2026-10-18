@@ -333,3 +333,67 @@ def test_a_single_tournament_season_keeps_its_own_zones(monkeypatch) -> None:
 
     assert list(zones) == [CLAUSURA]
     assert zones[CLAUSURA] == {"A": ["Boca Juniors"], "B": ["River Plate"]}
+
+
+# ── overdue fixtures held again under another id (liga.store.mark_superseded) ──
+
+def _fx(home, away, date, status="notstarted", rnd=None, stage="league", sid=1, hs=None, as_=None):
+    return {"home": home, "away": away, "date": date, "status": status, "round": rnd, "stage": stage, "season_id": sid,
+            "hs": hs, "as": as_}
+
+
+def test_overdue_relisted_fixtures_are_closed_and_others_flagged(tmp_path) -> None:
+    """Sofascore keeps a re-listed match's old id as "notstarted": it is closed against the copy (same sides, or the
+    sides swapped within a day), a second leg is never taken for it, and a lone overdue fixture is left to the
+    pages ("result not reported"). Loading the store applies it; the file is not rewritten."""
+    from datetime import datetime, timezone
+
+    from oddsmarkets.football.competitions.liga import store as L
+
+    now = datetime(2026, 10, 18, 12, tzinfo=timezone.utc)
+    store = {"matches": {
+        "old1": _fx("A", "B", "2026-10-01T12:00:00Z"),                                       # friendly entered twice
+        "new1": _fx("A", "B", "2026-10-01T14:00:00Z", "finished", hs=0, as_=6),
+        "old2": _fx("C", "D", "2026-09-11T14:00:00Z", rnd="r1", stage="qualifying"),          # sides swapped
+        "new2": _fx("D", "C", "2026-09-11T14:00:00Z", "finished", rnd="r1", stage="qualifying", hs=0, as_=4),
+        "leg2": _fx("D", "C", "2026-10-03T12:00:00Z", "finished", rnd="r1", stage="qualifying", hs=0, as_=1),
+        "old3": _fx("E", "F", "2026-09-23T13:00:00Z", rnd="2", stage="qualifying"),          # postponed, re-listed
+        "new3": _fx("E", "F", "2026-10-24T17:00:00Z", rnd="2", stage="qualifying"),
+        "lone": _fx("G", "H", "2026-10-17T12:00:00Z", rnd="r32", stage="playoff"),           # no copy anywhere
+        "soon": _fx("I", "J", "2026-10-18T10:00:00Z"),                                       # two hours ago: not overdue
+        "far": _fx("K", "L", "2026-09-01T12:00:00Z"),                                        # a pair met again weeks later
+        "far2": _fx("K", "L", "2026-10-01T12:00:00Z", "finished", hs=1, as_=0),
+    }}
+    out = dict(L.mark_superseded(store, now))
+    assert out == {"old1": "new1", "old2": "new2", "old3": "new3"}
+    m = store["matches"]
+    assert m["old1"]["status"] == "canceled" and m["old1"]["status_was"] == "notstarted"
+    assert L.overdue(m["lone"], now) and not L.overdue(m["soon"], now) and not L.overdue(m["new3"], now)
+    assert m["far"]["status"] == "notstarted"                         # no round, 30 days apart: not the same match
+    assert L.mark_superseded(store, now) == []                        # idempotent
+    path = tmp_path / "store.json"
+    raw = {"matches": {"old1": _fx("A", "B", "2026-10-01T12:00:00Z"), "new1": _fx("A", "B", "2026-10-01T14:00:00Z", "finished", hs=0, as_=6)},
+           "meta": {}}
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    s = L.load_store(path)
+    assert s["matches"]["old1"]["superseded_by"] == "new1"
+    assert json.loads(path.read_text(encoding="utf-8")) == raw
+
+
+def test_superseded_and_overdue_fixtures_in_the_payloads() -> None:
+    """fixtures.json drops the old copy and calls a lone overdue fixture postponed with result_missing; the league and
+    cup readers skip the old copy, so it is never simulated twice."""
+    import scripts.build_site_all as b
+    from oddsmarkets.football.competitions.cup import store as cup_store
+
+    store = {"matches": {
+        "old": dict(_fx("A", "B", "2020-10-01T12:00:00Z"), status="canceled", superseded_by="new"),
+        "new": _fx("A", "B", "2020-10-01T14:00:00Z", "finished", hs=1, as_=0),
+        "lone": _fx("C", "D", "2020-10-02T12:00:00Z"),
+        "next": _fx("E", "F", "2099-10-02T12:00:00Z"),
+    }, "lineups": {}}
+    rows = {r["id"]: r for r in b.build_fixtures_json(store, lambda n: n, None, lambda raw: True, {})["matches"]}
+    assert "old" not in rows and rows["new"]["status"] == "finished"
+    assert rows["lone"]["status"] == "postponed" and rows["lone"]["result_missing"] is True
+    assert rows["next"]["status"] == "scheduled" and "result_missing" not in rows["next"]
+    assert [m.game_id for m, _ in cup_store.iter_matches(store)] == ["new", "lone", "next"]

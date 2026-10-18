@@ -180,6 +180,52 @@ def day(d: Any) -> date | None:
         return None
 
 
+# Plausible dates of birth. ESPN's core athlete API reuses old ids: some early-2000s players get the date of birth
+# of a different, younger person (Andrei Pavel "born 2004", ages of -3 in his own seasons), and some current players
+# share their id with an early-2000s namesake's matches (Casper Ruud's id carries matches from 2000). So a date is
+# kept when it is a real date from DOB_MIN_YEAR on, not in the future, and puts the player between TYPICAL_MIN and
+# TYPICAL_MAX at the median date of their latest run of matches on disk (no gap over CAREER_GAP days, so a reused
+# id's older namesake does not count; TourData.spans) and at least START_MIN at that run's first match; otherwise
+# it is treated as missing (scripts/tn_bio.py stores null, TourData.players drops it). An age at a date more than
+# 180 days before that latest run, or outside AGE_MIN..AGE_MAX, is shown as unknown (age_at, TourData.dob_from).
+DOB_MIN_YEAR = 1940
+AGE_MIN, AGE_MAX = 12.0, 60.0
+TYPICAL_MIN, TYPICAL_MAX = 15.0, 50.0
+START_MIN = 13.0
+CAREER_GAP = 730
+
+
+def years_between(a: date, b: date) -> float:
+    return (b - a).days / 365.25
+
+
+def age_at(dob: Any, when: Any, since: Any = None) -> float | None:
+    """Age in years at `when`, None when unknown, outside AGE_MIN..AGE_MAX or before `since` (TourData.dob_from)."""
+    d, w = day(dob), day(when)
+    if d is None or w is None:
+        return None
+    s = day(since)
+    if s is not None and w < s - timedelta(days=180):
+        return None
+    a = years_between(d, w)
+    return a if AGE_MIN <= a <= AGE_MAX else None
+
+
+def plausible_dob(dob: Any, typical: Any = None, today: date | None = None, start: Any = None) -> str | None:
+    """The ISO date of birth when plausible (see DOB_MIN_YEAR), else None. typical / start: the median and first
+    date of the player's latest run of matches (TourData.spans; None: not checked)."""
+    d = day(dob) if dob not in (None, "") else None
+    if d is None or d.year < DOB_MIN_YEAR or d > (today or today_utc()):
+        return None
+    t = day(typical)
+    if t is not None and not (TYPICAL_MIN <= years_between(d, t) <= TYPICAL_MAX):
+        return None
+    s = day(start)
+    if s is not None and years_between(d, s) < START_MIN:
+        return None
+    return d.isoformat()
+
+
 def fmt_value(v: Any, fmt: str) -> Any:
     """Round a metric value for its format (int, 1, 2, 3, pct = fraction 3 dp, prob 4 dp, signed 2 dp)."""
     x = fnum(v)
@@ -387,6 +433,7 @@ class TourData:
             self.registry = None
         self._stores: dict[int, dict] = {}
         self._players: dict[str, dict] | None = None
+        self._spans: dict[str, tuple[str, str, str, str]] | None = None
         self._elo = None
         self._elo_idx: dict[str, tuple] | None = None
         self._elo_at: dict[str, dict] = {}
@@ -450,7 +497,13 @@ class TourData:
                     for k, v in p.items():
                         if v not in (None, "", []):
                             cur[k] = v
-            # dates of birth from ESPN's athlete API (scripts/tn_bio.py) where neither the registry nor a store has one
+            # dates of birth from ESPN's athlete API (scripts/tn_bio.py) where neither the registry nor a store has
+            # one; every date (whatever its source) must be plausible for the player's match span (plausible_dob)
+            spans = self.spans
+            for pid, cur in out.items():
+                if cur.get("dob"):
+                    sp = spans.get(pid) or (None,) * 4
+                    cur["dob"] = plausible_dob(cur["dob"], sp[1], self.today, sp[3])
             bio = read_json(data_root() / self.tour / "bio.json") or {}
             redirect = self.registry.canonical if (self.registry is not None and self.registry.redirects) else None
             for pid, rec in bio.items():
@@ -458,9 +511,41 @@ class TourData:
                     continue
                 p = (redirect(pid) or pid) if redirect else pid
                 if p in out and not out[p].get("dob"):
-                    out[p]["dob"] = rec["dob"]
+                    sp = spans.get(p) or (None,) * 4
+                    out[p]["dob"] = plausible_dob(rec["dob"], sp[1], self.today, sp[3])
             self._players = out
         return self._players
+
+    @property
+    def spans(self) -> dict[str, tuple[str, str, str, str]]:
+        """pid -> (first, typical, last, run start) ISO date of the player's matches on disk (a match without a date takes its
+        event's start, so does one dated outside the store's year +-1); typical is the median date of the latest run of matches, which starts at run start. For plausible_dob and age."""
+        if self._spans is None:
+            out: dict[str, list[str]] = {}
+            for y in self.years:
+                evs = self.events(y)
+                ok = (str(y - 1), str(y), str(y + 1))
+                for m in self.matches(y).values():
+                    d = str(m.get("date") or "")[:10]
+                    if d[:4] not in ok:                 # missing, or a stray date (2007's store has some in 2050)
+                        d = str((evs.get(m.get("event")) or {}).get("start") or "")[:10]
+                    if len(d) != 10 or d[:4] not in ok:
+                        continue
+                    for side in ("p1", "p2"):
+                        if m.get(side):
+                            out.setdefault(str(m[side]), []).append(d)
+            spans = {}
+            for k, v in out.items():
+                v.sort()
+                # the latest unbroken run of matches (no gap over CAREER_GAP days): a reused id's older namesake
+                # stays out of the median
+                i = len(v) - 1
+                while i > 0 and (date.fromisoformat(v[i]) - date.fromisoformat(v[i - 1])).days <= CAREER_GAP:
+                    i -= 1
+                run = v[i:]
+                spans[k] = (v[0], run[len(run) // 2], v[-1], run[0])
+            self._spans = spans
+        return self._spans
 
     def name(self, pid: Any) -> str:
         p = self.players.get(str(pid)) or {}
@@ -471,10 +556,14 @@ class TourData:
         return str(p.get("short") or p.get("name") or pid)
 
     def age(self, pid: str, when: date) -> float | None:
-        dob = day((self.players.get(pid) or {}).get("dob"))
-        if dob is None:
-            return None
-        return round((when - dob).days / 365.25, 1)
+        a = age_at((self.players.get(pid) or {}).get("dob"), when, self.dob_from(pid))
+        return round(a, 1) if a is not None else None
+
+    def dob_from(self, pid: str) -> str | None:
+        """The first date the player's date of birth applies to: the start of their latest run of matches (an
+        older namesake under a reused id gets no age)."""
+        sp = self.spans.get(str(pid))
+        return sp[3] if sp else None
 
     # style (charting)
     @property

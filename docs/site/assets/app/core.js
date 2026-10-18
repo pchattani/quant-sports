@@ -600,7 +600,7 @@ function toGame(f, slug, extra) {
   var g = {
     sport: 'football', league: (extra && extra.league) || compName(s, true), id: f.id, start: f.date, status: st,
     home: { name: f.home, logo: hid ? crestUrl(hid) : null }, away: { name: f.away, logo: aid ? crestUrl(aid) : null },
-    hs: f.hs, as: f.as, note: roundText(f, s, true) + (f.status === 'postponed' ? ' · postponed' : f.status === 'cancelled' ? ' · cancelled' : ''),
+    hs: f.hs, as: f.as, note: roundText(f, s, true) + (f.result_missing ? ' · result not reported' : f.status === 'postponed' ? ' · postponed' : f.status === 'cancelled' ? ' · cancelled' : ''),
     href: f.detail ? href.match(s, f.id) : (extra && extra.href) || href.match(s, f.id)
   };
   if (f.model && st !== 'final') { g.p_home = f.model.h; g.p_draw = f.model.d; g.p_away = f.model.a; }
@@ -634,7 +634,7 @@ function fixtureRow(f, opts) {
   var done = f.status === 'finished' || f.status === 'live';
   var when = f.status === 'live' ? '<span class="qk-badge live">Live</span>'
     : f.status === 'finished' ? '<span class="fb-fx-ft">FT</span>'
-    : f.status === 'postponed' ? '<span class="fb-fx-ft">PPD</span>' : f.status === 'cancelled' ? '<span class="fb-fx-ft">CANC</span>'
+    : f.result_missing ? '<span class="fb-fx-ft" title="Past its kick-off with no result from the source">N/R</span>' : f.status === 'postponed' ? '<span class="fb-fx-ft">PPD</span>' : f.status === 'cancelled' ? '<span class="fb-fx-ft">CANC</span>'
     : '<span class="fb-fx-t">' + esc(fmtTime(f.date) || 'TBD') + '</span>';
   var link = f.detail || !done ? href.match(s, f.id) : null;
   var extra = done ? (f.xg && isNum(f.xg[0]) ? '<span class="fb-fx-xg">xG ' + num(f.xg[0], 1) + '–' + num(f.xg[1], 1) + '</span>' : '') : (f.model ? probBar3(f.model, { small: true }) : '');

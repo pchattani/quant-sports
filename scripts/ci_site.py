@@ -14,6 +14,10 @@ way for every site:
                                             cache), fetch the full working set the models need before the build
     cachekey --name N --paths P...          key=N-<hash of the files' paths and sizes>: a content key, so an Actions cache
                                             is saved only when its contents changed (not every run)
+    prunecaches --prefix X --keep K         after a save: delete the repo's other Actions caches whose key starts with X,
+                                            once K is listed (restores take the newest by prefix, so older copies
+                                            are dead weight that pushes the repo past its 10 GB and makes GitHub evict
+                                            live keys); needs GITHUB_TOKEN with actions: write
     guard    --site S                       refuse to deploy from an incomplete working set (a cold or evicted cache
                                             can otherwise publish wrong pages without any step failing)
     deploy   --site S --clone DIR           sync docs/<site>/ into the clone (the same DIR as --prev: one clone per
@@ -37,6 +41,7 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
@@ -734,11 +739,59 @@ def cmd_cachekey(name: str, paths: list[str]) -> int:
     return 0
 
 
+def _gh_api(method: str, path: str, token: str):
+    req = urllib.request.Request(f"https://api.github.com{path}", method=method,
+                                 headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
+                                          "X-GitHub-Api-Version": "2022-11-28"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        raw = r.read()
+        return r.status, (json.loads(raw) if raw else None)
+
+
+def list_caches(repo: str, token: str, prefix: str) -> list[dict]:
+    out, page = [], 1
+    while True:
+        _, r = _gh_api("GET", f"/repos/{repo}/actions/caches?per_page=100&page={page}&key={urllib.parse.quote(prefix)}", token)
+        rows = (r or {}).get("actions_caches") or []
+        out += [c for c in rows if str(c.get("key", "")).startswith(prefix)]
+        if len(rows) < 100:
+            return out
+        page += 1
+
+
+def cmd_prunecaches(prefix: str, keep: str) -> int:
+    """Delete superseded Actions caches of one prefix, keeping `keep` (the key this run saved or restored). Does nothing
+    unless `keep` is listed, so a save that did not land never leaves the prefix empty. Never fails the job."""
+    token, repo = os.environ.get("GITHUB_TOKEN"), os.environ.get("GITHUB_REPOSITORY")
+    if not (token and repo and prefix and keep and keep.startswith(prefix)):
+        print("prunecaches: nothing to do (token, repository, prefix or keep missing)")
+        return 0
+    try:
+        rows = list_caches(repo, token, prefix)
+        if not any(c.get("key") == keep for c in rows):
+            print(f"prunecaches: {keep} not listed yet; nothing deleted")
+            return 0
+        gone, freed = 0, 0
+        for c in rows:
+            if c.get("key") == keep:
+                continue
+            try:
+                _gh_api("DELETE", f"/repos/{repo}/actions/caches/{c['id']}", token)
+                gone += 1
+                freed += int(c.get("size_in_bytes") or 0)
+            except Exception as exc:                            # noqa: BLE001
+                print(f"prunecaches: could not delete {c.get('key')}: {exc}")
+        print(f"prunecaches: kept {keep}; deleted {gone} older {prefix}* caches ({freed / 1e6:.0f} MB)")
+    except Exception as exc:                                    # noqa: BLE001
+        print(f"::warning::prunecaches failed: {exc}")
+    return 0
+
+
 # ── main ─────────────────────────────────────────────────────────────────────────────────────────
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=("ctx", "gate", "restore", "seed", "feed", "cachekey", "guard", "deploy"))
+    ap.add_argument("command", choices=("ctx", "gate", "restore", "seed", "feed", "cachekey", "prunecaches", "guard", "deploy"))
     ap.add_argument("--site", choices=sorted(SITES))
     ap.add_argument("--name")
     ap.add_argument("--paths", nargs="*", default=[])
@@ -746,9 +799,13 @@ def main(argv=None) -> int:
     ap.add_argument("--clone", type=Path)
     ap.add_argument("--shadow", type=Path)
     ap.add_argument("--allow-mass-delete", action="store_true")
+    ap.add_argument("--prefix")
+    ap.add_argument("--keep")
     a = ap.parse_args(argv)
     if a.command == "cachekey":
         return cmd_cachekey(a.name, a.paths)
+    if a.command == "prunecaches":
+        return cmd_prunecaches(a.prefix, a.keep)
     if not a.site:
         ap.error("--site is required")
     if a.command == "ctx":

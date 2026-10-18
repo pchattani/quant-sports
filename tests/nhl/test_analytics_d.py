@@ -86,6 +86,18 @@ def test_count_metrics_need_the_games_floor():
     assert "g" in rows2["one"]["pct"]
 
 
+def test_metric_min_floor_is_fixed_and_leaves_the_pool():
+    """A metric's "_min" (skaters' Value group: VALUE_PCT_MIN_TOI minutes) holds rows below it out of the
+    percentile and out of the pool, whatever the prorated floors say."""
+    mets = [dict(an.metric("gar", "Rink value", "Value", "1"), _min=("toi", 12000.0)), an.metric("g", "Goals", "s", "int")]
+    rows = {str(i): {"values": {"gar": 0.1 * i, "g": i}, "n": {"gp": 10.0, "toi": 15000.0}} for i in range(5)}
+    rows.update({f"x{i}": {"values": {"gar": 0.05 * i, "g": i}, "n": {"gp": 10.0, "toi": 9000.0}} for i in range(5)})
+    an.add_percentiles(rows, mets, list(rows), {p: "F" for p in rows}, {"gp": 5.0}, default_den="gp")
+    assert all("gar" not in rows[f"x{i}"]["pct"] and "g" in rows[f"x{i}"]["pct"] for i in range(5))
+    assert rows["4"]["pct"]["gar"] == 90 and rows["0"]["pct"]["gar"] == 10    # (below + half ties) / 5
+    assert "_min" not in an.public_metric(mets[0])
+
+
 def test_finish_applies_the_games_floor_by_default():
     mets = [an.metric("p", "Points", "s", "int")]
     rows = {str(i): {"values": {"p": i}, "n": {"gp": 6.0}} for i in range(6)}

@@ -281,6 +281,32 @@ def test_hub_upcoming_lists_only_matches_still_to_play() -> None:
     assert hub["days"] == {}
 
 
+def test_stale_market_odds_keep_only_what_is_still_current(tmp_path) -> None:
+    """With no market data back, the previous market_odds.json keeps only lines of fixtures not yet kicked off and a
+    title market under MARKET_KEEP_HOURS old (it used to keep last matchday's lines for good)."""
+    from datetime import datetime, timezone
+
+    import scripts.build_site_all as b
+
+    now = datetime(2026, 10, 18, 12, tzinfo=timezone.utc)
+    prev = {"ok": True, "updated_at": "2026-10-14T04:12:48Z", "checked_at": "2026-10-14T04:12:48Z", "sources": ["polymarket"],
+            "matches": {"min_edge": 0.03, "actionable": 2, "fixtures": [
+                {"match_id": "1", "commence": "2026-10-14T10:00:00Z", "actionable": True},
+                {"match_id": "2", "commence": "2099-10-19T10:00:00Z", "actionable": True},
+                {"match_id": "3", "commence": None, "actionable": False}]},
+            "outrights": {"available": True, "teams": [{"team": "X", "model": 0.5, "market": 0.4}]}}
+    out = b.prune_stale_markets(prev, now)
+    assert [f["match_id"] for f in out["matches"]["fixtures"]] == ["2"] and out["matches"]["actionable"] == 1
+    assert out["ok"] is False and out["outrights"] == {"available": False, "teams": []}
+    assert out["updated_at"] == prev["updated_at"] and out["checked_at"] != prev["checked_at"]
+    fresh = dict(prev, updated_at="2026-10-17T12:00:00Z")
+    assert b.prune_stale_markets(fresh, now)["outrights"]["available"] is True
+    (tmp_path / "market_odds.json").write_text(json.dumps(prev), encoding="utf-8")
+    b.write_market_odds(tmp_path, None, None)
+    written = json.loads((tmp_path / "market_odds.json").read_text(encoding="utf-8"))
+    assert all(f["match_id"] != "1" for f in written["matches"]["fixtures"])
+
+
 # ── tuned model parameters ───────────────────────────────────────────────────
 
 def test_model_params_fall_back_to_defaults_and_read_tuned_entries(tmp_path, monkeypatch) -> None:
