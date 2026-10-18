@@ -1,1 +1,1 @@
-{"version":"xwoba-3","season":2026,"feats":["launch_speed","launch_angle","hang","_d_lf","_d_lcf","_d_cf","_d_rcf","_d_rf","wall_mean","elev","roof","speed"],"rake":[1.000105,0.998946,0.998735,1.002804,1.005033],"weights":[0.0,0.9,1.25,1.6,2.0],"classes":["out","1B","2B","3B","HR"]}
+{"version":"xwoba-3","season":2025,"feats":["launch_speed","launch_angle","hang","_d_lf","_d_lcf","_d_cf","_d_rcf","_d_rf","wall_mean","elev","roof","speed"],"rake":[0.999449,0.999537,1.000453,1.016078,1.007964],"weights":[0.0,0.9,1.25,1.6,2.0],"classes":["out","1B","2B","3B","HR"]}
