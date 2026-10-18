@@ -34,7 +34,7 @@ env:
 jobs:
   update:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - name: 'Checkout'
         uses: actions/checkout@v5
@@ -110,7 +110,7 @@ jobs:
           uv run --frozen python scripts/mlb_fetch.py --level aaa --refresh-current --budget 300
 
       - name: 'Build'
-        timeout-minutes: 40
+        timeout-minutes: 80
         run: |
           uv run --frozen python scripts/build_bullpen.py --game-page-seasons 2
 
