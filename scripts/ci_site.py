@@ -197,15 +197,16 @@ def guard_hardwood(ctx: dict) -> list[str]:
 
 
 def guard_bullpen(ctx: dict) -> list[str]:
-    """The current season's Statcast tables (both levels), every season's prepared pitch tables (the multi-season
-    models read them; CI has no past Statcast to rebuild them from) and the Stats API cache (shadow run of
+    """Every season's Statcast pitch tables (both levels: pitcher projections and Triple-A's preseason projections read
+    the past ones), every season's prepared pitch tables (the multi-season models) and the Stats API cache (shadow run of
     17 Oct 2026: a cold runner published empty metric tables and two valuation steps failed)."""
     y = int(ctx["year"])
     sc, prep = ROOT / "data/baseball/statcast", ROOT / "data/baseball/cache/prep"
     problems = []
-    for lvl in ("mlb", "aaa"):
-        if not (sc / lvl / f"{y}.parquet").exists():
-            problems.append(f"{lvl} {y} Statcast table missing")
+    for lvl, first in (("mlb", 2015), ("aaa", 2023)):
+        missing = [s for s in range(first, y + 1) if not (sc / lvl / f"{s}.parquet").exists()]
+        if missing:
+            problems.append(f"{lvl} Statcast tables missing for {missing}")
     for lvl, first in (("mlb", 2015), ("aaa", 2023)):
         missing = [s for s in range(first, y + 1) if not any(prep.glob(f"{lvl}_{s}_*.parquet"))]
         if missing:
