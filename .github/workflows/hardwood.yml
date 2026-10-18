@@ -8,6 +8,8 @@ name: Hardwood (NBA, WNBA)
 on:
   schedule:
     - cron: '47 * * * *'
+  repository_dispatch:
+    types: [hourly]
   workflow_dispatch:
     inputs:
       shadow:

@@ -8,6 +8,8 @@ name: Bullpen (MLB)
 on:
   schedule:
     - cron: '7 * * * *'
+  repository_dispatch:
+    types: [hourly]
   workflow_dispatch:
     inputs:
       shadow:

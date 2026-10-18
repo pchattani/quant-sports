@@ -8,6 +8,8 @@ name: Paddock (F1)
 on:
   schedule:
     - cron: '37 * * * *'
+  repository_dispatch:
+    types: [hourly]
   workflow_dispatch:
     inputs:
       shadow:

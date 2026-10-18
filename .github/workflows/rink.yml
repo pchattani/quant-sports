@@ -9,6 +9,8 @@ on:
   schedule:
     - cron: '32 * * * *'
     - cron: '2,17,47 * * * *'
+  repository_dispatch:
+    types: [hourly]
   workflow_dispatch:
     inputs:
       shadow:

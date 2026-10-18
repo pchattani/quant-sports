@@ -8,6 +8,8 @@ name: Ace (tennis)
 on:
   schedule:
     - cron: '27 * * * *'
+  repository_dispatch:
+    types: [hourly]
   workflow_dispatch:
     inputs:
       shadow:
