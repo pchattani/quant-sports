@@ -218,6 +218,10 @@ def guard_bullpen(ctx: dict) -> list[str]:
             problems.append(f"{lvl} prepared pitch tables missing for {missing}")
     if not any((ROOT / "data/baseball/cache/statsapi").glob("*")):
         problems.append("Stats API cache empty")
+    # Retrosheet tables (1908-2014): without them history.json is rebuilt from the Statcast seasons alone (shadow run
+    # of 19 Oct 2026: 12 seasons instead of 119)
+    if sum(1 for _ in (ROOT / "data/baseball/retro/pa").glob("*.parquet")) < 100:
+        problems.append("Retrosheet tables missing")
     return problems
 
 

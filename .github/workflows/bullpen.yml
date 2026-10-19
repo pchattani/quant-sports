@@ -61,6 +61,7 @@ jobs:
         with:
           path: |
             data/baseball/statcast
+            data/baseball/retro
           key: bullpen-raw-v1-none
           restore-keys: bullpen-raw-v1-
 
@@ -113,7 +114,7 @@ jobs:
       - name: 'Build'
         timeout-minutes: 80
         run: |
-          uv run --frozen python scripts/build_bullpen.py --game-page-seasons 2
+          uv run --frozen python scripts/build_bullpen.py --game-page-seasons 1
 
       - name: 'Completeness guard (refuse to deploy from an incomplete working set)'
         run: |
@@ -151,7 +152,7 @@ jobs:
         if: ${{ !cancelled() }}
         id: rawkey
         run: |
-          uv run --frozen python scripts/ci_site.py cachekey --name bullpen-raw-v1 --paths data/baseball/statcast | tee -a "$GITHUB_OUTPUT"
+          uv run --frozen python scripts/ci_site.py cachekey --name bullpen-raw-v1 --paths data/baseball/statcast data/baseball/retro | tee -a "$GITHUB_OUTPUT"
 
       - name: 'Save raw data (only when it changed)'
         if: ${{ !cancelled() && steps.rawkey.outputs.files != '0' && steps.rawkey.outputs.key != steps.raw.outputs.cache-matched-key }}
@@ -160,6 +161,7 @@ jobs:
         with:
           path: |
             data/baseball/statcast
+            data/baseball/retro
           key: ${{ steps.rawkey.outputs.key }}
 
       - name: 'Delete superseded raw-data caches'
