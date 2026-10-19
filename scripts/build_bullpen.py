@@ -111,11 +111,13 @@ class Build:
 # ---------------------------------------------------------------------------------------------- signatures
 
 def _file_sig(p: Path) -> str | None:
-    try:
-        st = p.stat()
-    except OSError:
+    """Size and content digest (memoised on size and mtime by `_io.content_digest`): the same file signs the same on
+    any machine, whatever its path or modification time (CI restores and checkouts reset mtimes)."""
+    from oddsmarkets.baseball.models import _io as _pio
+    d = _pio.content_digest(p)
+    if d is None:
         return None
-    return f"{st.st_size}-{st.st_mtime_ns}"
+    return f"{p.stat().st_size}-{d[:20]}"
 
 
 def _content_sig(p: Path) -> str | None:

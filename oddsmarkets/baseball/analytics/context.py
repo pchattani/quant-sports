@@ -42,13 +42,12 @@ _C = ("xwoba", "catchprob", "framing", "umpire", "re24", "war")
 
 
 def _file_key(*parts: Any) -> str:
+    """Path-independent (relative path, size, content digest: `_io.path_sig`), so caches travel between machines."""
+    from pathlib import Path
+    from oddsmarkets.baseball.models import _io as _pio
     h = hashlib.sha1()
     for p in parts:
-        try:
-            st = p.stat()
-            h.update(f"{p}|{st.st_size}|{st.st_mtime_ns}".encode())
-        except (AttributeError, OSError):
-            h.update(str(p).encode())
+        h.update((_pio.path_sig(p) if isinstance(p, Path) else str(p)).encode())
         h.update(b"|")
     return h.hexdigest()[:16]
 

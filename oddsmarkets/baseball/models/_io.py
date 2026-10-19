@@ -226,15 +226,123 @@ def write_json(path: Path, obj: Any, gz: bool = False, nd: int | None = None) ->
     return p
 
 
+# Cache keys are path-independent: a file enters a key as its path relative to the root it lives under, its size and
+# a digest of its content, never its absolute path or modification time. A cache fitted on one machine (the PC) is
+# then reused on another (a CI runner, whose checkout has other paths and fresh mtimes for committed files). Digests
+# are memoised per (relative path, size, mtime_ns) in <cache>/_digests.json, so a file is read once per change.
+_DIGESTS: dict[str, dict] = {}          # memo file -> {tag: [size, mtime_ns, sha1]} (one per cache root)
+_DIGESTS_DIRTY: dict[str, int] = {}
+
+
+def rel_tag(path: Path) -> str:
+    """`<root>:<path relative to it>` for a file under the cache, fitted, raw, data or repository root; else its name."""
+    p = Path(path)
+    try:
+        ap = p.resolve()
+    except OSError:
+        ap = p.absolute()
+    for tag, root in (("cache", cache_root()), ("fitted", FITTED), ("raw", raw_root()), ("data", data_root()), ("root", ROOT)):
+        try:
+            return f"{tag}:{ap.relative_to(Path(root).resolve()).as_posix()}"
+        except (ValueError, OSError):
+            continue
+    return p.name
+
+
+def _memo_path() -> Path:
+    return cache_root() / "_digests.json"
+
+
+def _memo() -> dict:
+    mp = str(_memo_path())
+    m = _DIGESTS.get(mp)
+    if m is None:
+        try:
+            m = json.loads(Path(mp).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            m = None
+        m = _DIGESTS[mp] = m if isinstance(m, dict) else {}
+    return m
+
+
+def flush_digests() -> None:
+    """Write the digest memos (merged with what another process may have written meanwhile)."""
+    for mp, n in list(_DIGESTS_DIRTY.items()):
+        if not n or mp not in _DIGESTS:
+            continue
+        p = Path(mp)
+        try:
+            cur = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+            if not isinstance(cur, dict):
+                cur = {}
+        except (OSError, ValueError):
+            cur = {}
+        cur.update(_DIGESTS[mp])
+        try:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            tmp = p.with_name(f"{p.name}.{os.getpid()}.tmp")
+            tmp.write_text(json.dumps(cur, separators=(",", ":"), sort_keys=True), encoding="utf-8")
+            os.replace(tmp, p)
+            _DIGESTS_DIRTY[mp] = 0
+        except OSError:
+            pass
+
+
+def content_digest(path: Path) -> str | None:
+    """sha1 of the file's bytes (memoised on relative path, size and mtime_ns); None when it is missing."""
+    p = Path(path)
+    try:
+        st = p.stat()
+    except OSError:
+        return None
+    if not p.is_file():
+        return None
+    tag = rel_tag(p)
+    memo = _memo()
+    hit = memo.get(tag)
+    if isinstance(hit, list) and len(hit) == 3 and hit[0] == st.st_size and hit[1] == st.st_mtime_ns:
+        return hit[2]
+    h = hashlib.sha1()
+    try:
+        with open(p, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 22), b""):
+                h.update(chunk)
+    except OSError:
+        return None
+    d = h.hexdigest()
+    memo[tag] = [st.st_size, st.st_mtime_ns, d]
+    mp = str(_memo_path())
+    _DIGESTS_DIRTY[mp] = _DIGESTS_DIRTY.get(mp, 0) + 1
+    if _DIGESTS_DIRTY[mp] >= 25 or st.st_size > 20_000_000:
+        flush_digests()
+    return d
+
+
+def path_sig(path: Path) -> str:
+    """A file's part of a cache key: relative path, size and content digest (or 'missing')."""
+    p = Path(path)
+    d = content_digest(p)
+    if d is None:
+        return f"{rel_tag(p)}|missing"
+    return f"{rel_tag(p)}|{p.stat().st_size}|{d}"
+
+
+def stamp(path: Path) -> str:
+    """A short content stamp of a file for cache file names ('0' when missing)."""
+    d = content_digest(Path(path))
+    return d[:12] if d else "0"
+
+
+import atexit as _atexit  # noqa: E402
+
+_atexit.register(flush_digests)
+
+
 def file_key(*parts: Any) -> str:
     h = hashlib.sha1()
     for p in parts:
         if isinstance(p, Path):
-            try:
-                st = p.stat()
-                h.update(f"{p}|{st.st_size}|{st.st_mtime_ns}".encode())
-            except OSError:
-                h.update(f"{p}|missing".encode())
+            h.update(path_sig(p).encode())
         else:
             h.update(json.dumps(p, sort_keys=True, default=str).encode())
         h.update(b"|")

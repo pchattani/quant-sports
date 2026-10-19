@@ -69,6 +69,7 @@ import pandas as pd
 
 from oddsmarkets.baseball.models import _dio
 from oddsmarkets.baseball.models._dio import E, EVENTS, NE
+from oddsmarkets.baseball.models import _io as _pio
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +169,7 @@ def pa_table(level: str, season: int, use_cache: bool = True) -> pd.DataFrame:
     src = _dio.pitch_path(level, season)
     if not src.exists():
         return pd.DataFrame()
-    stamp = int(src.stat().st_mtime)
+    stamp = _pio.stamp(src)
     p = _cache(f"pa_{level}_{season}_{stamp}.parquet")
     if use_cache and p.exists():
         try:
@@ -245,7 +246,7 @@ def season_aggregates(level: str, season: int, use_cache: bool = True) -> tuple[
     src = _dio.pitch_path(level, season)
     if not src.exists():
         return pd.DataFrame(), pd.DataFrame()
-    stamp = int(src.stat().st_mtime)
+    stamp = _pio.stamp(src)
     ph, pp = _cache(f"agg_h_{level}_{season}_{stamp}.parquet"), _cache(f"agg_p_{level}_{season}_{stamp}.parquet")
     if use_cache and ph.exists() and pp.exists():
         try:

@@ -75,7 +75,8 @@ def stint_table(level: str, season: int, store: dict | None = None) -> pd.DataFr
     if not src.exists():
         olds = sorted(cdir.glob(f"stints_{level}_{season}_*.parquet"))
         return pd.read_parquet(olds[-1]) if olds else None
-    cp = cdir / f"stints_{level}_{season}_{int(src.stat().st_mtime)}.parquet"
+    from oddsmarkets.baseball.models import _io as _pio
+    cp = cdir / f"stints_{level}_{season}_{_pio.stamp(src)}.parquet"
     if cp.exists():
         try:
             return pd.read_parquet(cp)

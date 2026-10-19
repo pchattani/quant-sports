@@ -38,11 +38,8 @@ def _sig(*parts) -> str:
     h = hashlib.sha1()
     for p in parts:
         if isinstance(p, Path):
-            try:
-                st = p.stat()
-                h.update(f"{p}:{st.st_size}:{st.st_mtime_ns}".encode())
-            except OSError:
-                h.update(f"{p}:missing".encode())
+            from oddsmarkets.baseball.models import _io as _pio
+            h.update(_pio.path_sig(p).encode())      # path-independent: relative path, size, content digest
         else:
             h.update(json.dumps(p, sort_keys=True, default=str).encode())
     return h.hexdigest()[:16]

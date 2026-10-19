@@ -33,6 +33,7 @@ import pandas as pd
 from oddsmarkets.baseball import analytics as an
 from oddsmarkets.baseball.analytics import fantasy as F
 from oddsmarkets.baseball.analytics import mlbapi
+from oddsmarkets.baseball.models import _io as _pio
 
 log = logging.getLogger(__name__)
 VERSION = "fantasy-1"
@@ -265,7 +266,7 @@ def ros_rates(level: str, S: int, D_: str) -> tuple[pd.DataFrame, pd.DataFrame] 
     cdir = an.cache_root() / "fantasy"
     cdir.mkdir(parents=True, exist_ok=True)
     src = an.pitch_path(level, S)
-    stamp = int(src.stat().st_mtime) if src.exists() else 0
+    stamp = _pio.stamp(src) if src.exists() else 0
     cp = cdir / f"ros_{level}_{S}_{D_}_{stamp if D_ >= str(date.today() - timedelta(days=3)) else 0}.pkl"
     if cp.exists():
         try:
@@ -676,7 +677,7 @@ def backtests(D: Data, current: int, force: bool = False) -> dict:
     for T in seasons:
         src = an.pitch_path(D.level, T)
         # a past season is fixed; the season under way is recomputed once a day
-        sig = f"{VERSION}-{len(D.lines[T]['hitting'])}-" + (str(date.today()) if T == current else str(int(src.stat().st_mtime) if src.exists() else 0))
+        sig = f"{VERSION}-{len(D.lines[T]['hitting'])}-" + (str(date.today()) if T == current else _pio.stamp(src))
         cp = cdir / f"backtest_{D.level}_{T}.json"
         got = an.read_json(cp)
         if got and got.get("sig") == sig and not force:

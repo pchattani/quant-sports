@@ -510,14 +510,12 @@ def pearson(a, b) -> float | None:
 # ============================================================================ cache / payload helpers
 
 def file_key(*parts: Any) -> str:
+    """Path-independent cache key (relative path, size and content digest of each file: `_io.path_sig`)."""
+    from oddsmarkets.baseball.models import _io as _pio
     h = hashlib.sha1()
     for p in parts:
         if isinstance(p, Path):
-            try:
-                st = p.stat()
-                h.update(f"{p}|{st.st_size}|{st.st_mtime_ns}".encode())
-            except OSError:
-                h.update(f"{p}|missing".encode())
+            h.update(_pio.path_sig(p).encode())
         else:
             h.update(json.dumps(p, sort_keys=True, default=str).encode())
         h.update(b"|")
