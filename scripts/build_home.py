@@ -21,6 +21,11 @@ the last build. See docs/_design/README.md.
 Usage:
     python scripts/build_home.py                  # links point at the public GitHub Pages sites
     python scripts/build_home.py --links local    # links point at ../site/, ../paddock/ ... (preview)
+    python scripts/build_home.py --links local --with-pending   # also the sites not launched yet (local preview)
+
+Sites not launched yet (PENDING, e.g. The Quant Campus) are left out of home.json and search.json unless their key
+is in LAUNCHED or --with-pending is given, so the live home page never links a Pages site that does not exist.
+The kit hides them the same way (QK.SPORTS drops `pending` entries outside local preview).
 """
 from __future__ import annotations
 
@@ -45,6 +50,11 @@ SPORTS = [
     ("nfl", "gridiron", "gridiron", "NFL", "The Quant Gridiron"),
     ("hockey", "rink", "rink", "NHL", "The Quant Rink"),
 ]
+# Built but not launched (no public Pages site yet): only with --with-pending or once listed in LAUNCHED.
+PENDING = [
+    ("college", "campus", "campus", "College", "The Quant Campus"),
+]
+LAUNCHED: set[str] = {"college"}   # The Quant Campus, launched 21 Oct 2026
 
 # Football competitions in rough order of how many fans care; used to pick which fixtures
 # make the home page when a day has a hundred of them.
@@ -807,8 +817,69 @@ def build_hockey(ctx: Ctx, base: str, out: dict):
             "updated_at": idx.get("updated_at")}
 
 
+# ───────────────────────────────────────────────────────────── college (pending launch)
+def build_college(ctx: Ctx, base: str, out: dict):
+    """The Quant Campus: docs/campus/data/index.json (oddsmarkets/college/site.py) and its search.json."""
+    d = DOCS / "campus" / "data"
+    idx = load(d / "index.json")
+    if not idx or not idx.get("levels"):
+        raise RuntimeError("index.json missing")
+    status, kpis = [], []
+    phase_lab = {"preseason": "preseason", "regular": "regular season", "conf_champ": "championship week",
+                 "bowls": "bowls", "playoff": "playoff", "offseason": "offseason", "conf_tourneys": "conference tournaments",
+                 "ncaa": "NCAA tournament"}
+    for L in ("cfb", "mbb", "wbb"):
+        lg = (idx["levels"] or {}).get(L) or {}
+        if not lg.get("ok"):
+            continue
+        teams = lg.get("teams") or {}
+        LU = L.upper()
+        S = lg.get("current_season")
+
+        def tm(tid, rank=None):
+            t = teams.get(str(tid)) or {}
+            nm = t.get("short") or t.get("name") or str(tid)
+            return team((f"#{rank} " if rank and rank <= 25 else "") + nm, t.get("abbr"), t.get("colour"),
+                        href=base + "#/" + L + "/team/" + str(tid))
+
+        seen, games = set(), []
+        for g in (lg.get("today") or []) + (lg.get("next_games") or []) + (lg.get("last_games") or []):
+            if g.get("id") in seen:
+                continue
+            seen.add(g.get("id"))
+            m, mk = g.get("model") or {}, g.get("market") or {}
+            note = g.get("round") if g.get("stype") in ("cfp", "ncaa", "bowl") else None
+            href = base + "#/" + L + "/game/" + str(g["id"]) + ("" if g.get("season") in (None, S) else f"?season={g['season']}")
+            games.append(game("college", LU, g["id"], g.get("date"), g.get("status"), tm(g["home"], g.get("hr")),
+                              tm(g["away"], g.get("ar")), g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
+                              market_home=r4(mk.get("p_home")), spread=mk.get("spread_home"), total=m.get("total"),
+                              note=note, href=href))
+            if norm_status(g.get("status")) == "pre":
+                gr = gap_row("college", f"{tm(g['away'])['name']} @ {tm(g['home'])['name']} ({LU})",
+                             m.get("p_home"), mk.get("p_home"), href, detail="home win")
+                if gr:
+                    out["gaps"].append(gr)
+        out["games"].extend(pick_games(ctx, games, 4, 6))
+        rows = [r for r in (lg.get("title_odds") or []) if r.get("p")][:8]
+        if rows:
+            out["futures"]["college" if L == "cfb" else "college_" + L] = {
+                "title": f"{LU} national title", "rows": [
+                    {"name": (teams.get(r["team"]) or {}).get("name") or r["team"], "abbr": (teams.get(r["team"]) or {}).get("abbr"),
+                     "p": r4(r["p"]), "market": r4(r.get("market")), "colour": (teams.get(r["team"]) or {}).get("colour"),
+                     "href": base + "#/" + L + "/team/" + r["team"]} for r in rows]}
+            t0 = teams.get(rows[0]["team"]) or {}
+            kpis.append({"label": f"{LU} fav", "value": t0.get("short") or t0.get("name") or rows[0]["team"],
+                         "sub": f"{(rows[0]['p'] or 0) * 100:.0f}% title"})
+        status.append(f"{LU} {phase_lab.get(lg.get('phase'), lg.get('phase') or '')}".strip())
+    srch = load(d / "search.json") or []
+    for r in srch if isinstance(srch, list) else []:
+        if r.get("t") and r.get("href"):
+            out["search"].append(["college", r["t"], r.get("s") or "", base + r["href"]])
+    return {"phase": " · ".join(status), "status": " · ".join(status), "kpis": kpis[:3], "updated_at": idx.get("updated_at")}
+
+
 BUILDERS = {"football": build_football, "f1": build_f1, "basketball": build_basketball, "tennis": build_tennis,
-            "baseball": build_baseball, "nfl": build_nfl, "hockey": build_hockey}
+            "baseball": build_baseball, "nfl": build_nfl, "hockey": build_hockey, "college": build_college}
 
 
 def football_search(base: str, out: dict):
@@ -836,12 +907,14 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--links", choices=["public", "local"], default="public")
     ap.add_argument("--no-kit", action="store_true", help="do not copy docs/_design into docs/home/assets/qk")
+    ap.add_argument("--with-pending", action="store_true",
+                    help="include sites not launched yet (PENDING, e.g. The Quant Campus) for local preview")
     a = ap.parse_args(argv)
     now = datetime.now(timezone.utc).replace(microsecond=0)
     ctx = Ctx(a.links, now)
     out = {"games": [], "gaps": [], "futures": {}, "leaders": {}, "charts": {}, "stats": [], "search": []}
     sports = []
-    for key, folder, repo, label, site in SPORTS:
+    for key, folder, repo, label, site in SPORTS + [x for x in PENDING if x[0] in LAUNCHED or a.with_pending]:
         base = ctx.base(folder, repo)
         entry = {"key": key, "label": label, "site": site, "url": base, "data": PUBLIC.format(repo) + "data/",
                  "ok": False}

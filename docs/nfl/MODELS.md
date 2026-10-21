@@ -29,6 +29,7 @@ Contents
 17. Where the code and other texts disagree
 18. Valuation v2, transactions and trade ratings, fantasy
 19. Pro Football Reference data removed (16 October 2026)
+20. Model-improvement program (21 October 2026): starters out, total key numbers, market-line calibration
 
 ---
 
@@ -502,6 +503,7 @@ net_t = NP·(PT_t + QB_starter(t) − PD_t) + NR·(RO_t − RD_t) + ST_t. A star
   + (HFA + trend·(season − 2015)/10 + HFA_season)·[not neutral] + b_div·[not neutral]·[division game]
   + b_rest·(clip(rest_h, 4, 14) − clip(rest_a, 4, 14))/7 + b_bye·(bye_h − bye_a) + b_short·(short_h − short_a)
   + b_travel·(km_a − km_h)/1000 + b_tz·(tz_a − tz_h) + b_mr·mr
+  + b_so_off·(so_off_h − so_off_a) + b_so_def·(so_def_h − so_def_a)
 ```
 
 **Market ratings** (`mr`, added 2 October 2026; `models/market_ratings.py`, `game.attach_market`): before each
@@ -517,6 +519,20 @@ log-loss −0.0063 (95% CI −0.0098 to −0.0029), ATS −0.0058, totals −0.0
 (`mrt` = market total rating − base). `predict_frame` attaches it from the season's games on disk, or from
 `market_games` (the season simulation passes its games cut at the simulation date, so only results before then
 enter); a frame without it (a hypothetical matchup) falls back to 0.77 × net difference + 2 × home field.
+
+**Starters out** (`so_off`, `so_def`, added 21 October 2026; `models/availability.py`, `game.attach_availability`):
+for each side, the depth-chart starters as of the team's previous game (nflverse depth charts; QBs, kickers and other
+specialists left out) who miss this game, offence (offensive line, receivers and tight ends, backs) and defence
+(line, linebackers, backs) counted separately. A starter counts by the final injury report (Out 1, Doubtful 0.85,
+Questionable 0.15; nflverse injuries, 2009 on) until the game-day status is known; from 2020 nflverse's weekly rosters
+carry it, and then an inactive (or a move to reserve, suspension or release) counts 1 and anyone active 0, provided the
+player is news this week (on the week's report or active the week before; a starter left on a stale chart while on
+reserve for weeks is already in the ratings). No snap counts are used. The terms enter the fit only once 256 earlier
+games have a non-zero value (the reports start in 2009; without this rule the 2009 coefficient, fitted on a handful
+of games, cost 0.02 in log-loss that season). Committed fit: −0.65 points per offensive starter out and −0.52 per
+defensive starter. Out of sample (2017–2026) the moneyline log-loss fell by 0.0025 (95% CI 0.0007–0.0043; section 20).
+A game more than a few days out has no report yet and gets 0, so the published price of a game moves when its
+report and inactives arrive.
 
 sr is a success-rate composite NP(SR_PO − SR_PD) + NR(SR_RO − SR_RD); short is a short week
 (≤ 5 days); travel the distance from the home stadium to the venue; tz the hours between
@@ -540,25 +556,40 @@ total = base_s + t_c + t_off·O + b_wind·max(wind − 8, 0)·outdoor + b_cold·
 O = NP·(PO_h + PD_a + PO_a + PD_h) + NR·(RO_h + RD_a + RO_a + RD_h)
 ```
 
-base_s is the exponentially weighted mean total of earlier games (half-life 256 games);
-total ~ Normal(total, σ_total); team points = (total ± margin)/2. Missing wind is read as
-5 mph and missing temperature as 60 °F.
+base_s is the exponentially weighted mean total of earlier games (half-life 256 games).
+Since 21 October 2026 the total is discrete like the margin: p(t) ∝ [Φ((t + ½ − total)/σ_total) −
+Φ((t − ½ − total)/σ_total)] · tk(t), with total key multipliers tk fitted by `fit_total_keys` (observed over expected
+counts of each final total, adjusted only where more than 5 games are expected, clipped to 0.3–3); before, a plain
+Normal on the integers. Team points = (total ± margin)/2. Missing wind is read as 5 mph and missing temperature as 60 °F.
+
+**Market-line calibration** (added 21 October 2026): P(home covers the market's spread) and P(over the market's total),
+read straight off the distributions, were badly overconfident: out of sample the logit slope of the outcome on them was
+0.11 (ATS) and 0.20 (totals), where 1 is calibrated, and the ATS log-loss (0.7035 on 2017–2026) was worse than a coin.
+The market line already holds nearly everything the model knows, and the model's disagreement with it is mostly noise.
+`market_cover` / `market_over` (used for the cover and over probabilities the site publishes at the market's line)
+pass those two probabilities through a Platt map, logit p' = a + b·logit p; (a, b) are fitted on the backtest's
+out-of-sample predictions (walk-forward inside the backtest; the committed map, fitted on every season 2006–2026, is
+(−0.037, 0.230) for ATS and (−0.032, 0.307) for totals). This makes the published probabilities honest; it adds no
+information. The margin, total, win probability, fair spread and every other line are unchanged.
 
 **Markets through the same machinery**: `spread_to_p(line)` turns a market margin into
 P(home) through the discrete distribution with σ_market; `ml_to_p` de-vigs American
 moneylines multiplicatively.
 
-| Parameter | Code default | Committed fit (`game_params.json`, 5,145 walk-forward rows from 2006; refit 2 Oct 2026) |
+| Parameter | Code default | Committed fit (`game_params.json`, 5,176 walk-forward rows from 2006; refit 21 Oct 2026; 2 Oct 2026 in brackets) |
 |---|---|---|
-| s (net rating) | 0.9 | 0.250 (0.774 before the market term) |
-| b_mr (market ratings) | 0 | 0.775 |
-| b_sr | 0 | 0.276 |
-| HFA, trend per decade | 1.9, −0.7 | 0.942, 0.053 (the market term carries most of home field) |
-| division, rest, bye, short week | −0.4, 0.3, 0.5, −0.3 | −0.965, 1.351, 0.159, −0.070 |
-| travel (per 1,000 km), time zones | 0.15, 0.2 | 0.171, −0.355 |
-| σ, σ_market | 13.2, 13.0 | 13.261, 13.179 |
-| t_off, wind, cold, dome, b_mrt, t_c | 1.0, −0.35, −0.05, 1.0, 0, 0 | 0.303, −0.338, −0.027, 1.347, 0.497, −0.630 |
-| σ_total, t_base | 13.3, 44 | 13.462, 44 |
+| s (net rating) | 0.9 | 0.252 (0.250; 0.774 before the market term) |
+| b_mr (market ratings) | 0 | 0.773 (0.775) |
+| b_so_off, b_so_def (starters out) | 0, 0 | −0.651, −0.524 (new) |
+| b_sr | 0 | 0.247 (0.276) |
+| HFA, trend per decade | 1.9, −0.7 | 0.929, 0.036 (the market term carries most of home field) |
+| division, rest, bye, short week | −0.4, 0.3, 0.5, −0.3 | −0.980, 1.332, −0.099, −0.035 |
+| travel (per 1,000 km), time zones | 0.15, 0.2 | 0.198, −0.383 |
+| σ, σ_market | 13.2, 13.0 | 13.217, 13.168 |
+| t_off, wind, cold, dome, b_mrt, t_c | 1.0, −0.35, −0.05, 1.0, 0, 0 | 0.306, −0.337, −0.027, 1.374, 0.499, −0.642 |
+| σ_total, t_base | 13.3, 44 | 13.453, 44 |
+| total key multipliers tk(t) | none (Normal) | fitted on 0–150 (new): 33, 37, 41, 44, 47, 51 above 1 |
+| market-line calibration (a, b): ATS, totals | none | (−0.037, 0.230), (−0.032, 0.307) (new; section 11.2) |
 
 `game.params()` reads the cache, else the committed fit, else the defaults; the site runs on
 the committed fit. The backtest refits these per season (`params_by_season` in
@@ -755,19 +786,24 @@ was written at 21:18 UTC on 1 October 2026.
 
 | Forecaster | All games: n, log-loss, Brier | Games with a closing moneyline: n, log-loss |
 |---|---|---|
-| model | 5,466, **0.6204**, 0.2160 | 5,331, 0.6194 |
-| ratings only | 5,466, 0.6268, 0.2190 | – |
-| Elo | 5,466, 0.6302, 0.2203 | – |
-| closing moneyline | 5,331, **0.6099**, 0.2113 | 5,331, 0.6099 |
-| closing spread | 5,466, 0.6118, 0.2120 | – |
+| model | 5,496, **0.6189**, 0.2153 | 5,361, 0.6179 |
+| ratings only | 5,496, 0.6267, 0.2189 | – |
+| Elo | 5,496, 0.6301, 0.2202 | – |
+| closing moneyline | 5,361, **0.6101**, 0.2114 | 5,361, 0.6101 |
+| closing spread | 5,496, 0.6120, 0.2120 | – |
 
-(Run of 2 October 2026 with the market term; before it the model was 0.6267 / 0.6257, beat Elo in 13 seasons and
-the moneyline in 3.) The model beats Elo by about 0.010 overall and in 19 of the 21 seasons, and **trails the
-closing line by about 0.010** (it beats the moneyline in 4 seasons: 2006, 2015, 2018 and the games of 2026 so far).
-Margin RMSE: model 13.34 against the closing line's 13.18. Every ESPN book with 500+ games still beats the model on
-the same games (DraftKings 0.596 v 0.631; Unibet 0.610 v 0.622; Westgate 0.612 v 0.623).
+(Run of 21 October 2026 with starters out, total key numbers and the market-line calibration; the 2 October run was
+0.6204 on 5,466 games, and 0.6267 before the market term. The two runs differ in games as well as model: 2026 weeks
+5–6 were added.) The model beats Elo by about 0.011 overall and in 19 of the 21 seasons, and **trails the closing
+line by about 0.008** (it beats the moneyline in 5 seasons: 2006, 2014, 2015, 2018 and the games of 2026 so far).
+Margin RMSE: model 13.30 against the closing line's 13.17. Every large ESPN book still beats the model on the same
+games (DraftKings 0.597 v 0.628; Unibet 0.610 v 0.620; Westgate 0.612 v 0.621).
 
-**Against the spread and totals** (no edge, as expected): ATS log-loss 0.7013 against
+**Against the spread and totals** (no edge, as expected; numbers below are the 2 October run, before the market-line
+calibration). Since 21 October the published probabilities are calibrated: ATS log-loss 0.6930 (5,369 games; raw
+0.7001), totals 0.6937 (5,432; raw 0.6975 with total keys), against ln 2 = 0.6931, i.e. no better than a coin, as an
+honest price at the market's own line should be; the calibrated side at P ≥ 0.55 won 52.9% of 518 (ATS) and 53.2% of
+707 (totals). 2 October: ATS log-loss 0.7013 against
 ln 2 = 0.6931 (5,341 games); the model's side at P ≥ 0.55 won 52.1% of 2,746. Totals
 0.7007 (5,401); the side at P ≥ 0.55 won 52.3% of 3,062; total RMSE 13.48 against the
 closing total's 13.35. Prices that could actually be bet (CLV at the opener, Kalshi, futures):
@@ -789,9 +825,11 @@ closing total's 13.35. Prices that could actually be bet (CLV at the opener, Kal
 
 ## 16. Known limitations
 
-1. **The closing line beats the model**, as it should: about 0.010 in log-loss over
-   2006–2026 (0.016 before the market term). The market knows injuries, inactives, weather and money that the model reads
-   late or not at all.
+1. **The closing line beats the model**, as it should: about 0.008 in log-loss over
+   2006–2026 (0.010 before starters out, 0.016 before the market term). The market knows injuries, inactives, weather
+   and money that the model reads late or not at all; starters out reads the injury report and inactives, but only as
+   counts of depth-chart starters by side of the ball, with no player-level value. At the market's own spread and
+   total the model has no information beyond the line (its calibrated probabilities score like a coin).
 2. **Participation is post-season only**: the current season's completion, YAC and RYOE run
    on the base and FTN tiers, and there is no on-field value in-season.
 3. **No individual coverage data**; defenders are rated on credited plays; offensive
@@ -1002,4 +1040,32 @@ FTN from 2023; 2016–2025):
   the market, now close to `base`'s +0.0120). `cont` (k = 0.5) paired against `base`: +0.0001 [−0.0001, +0.0004] (no
   gain, as before). `mr_inj` 2017–2026 moneyline +0.0129 against the market before and after. Neither feature is promoted.
 - **Valuation**: the draft-pick curve already used 2008 onward only; unchanged.
+
+## 20. Model-improvement program (21 October 2026)
+
+Research, every number and the experiment log: `docs/research/nfl_edge.md` ("Model-improvement program, Oct 2026").
+Split as before: design choices on 2006–2016, tested on 2017–2026 (close), 2023–2026 (ESPN openers), 2025–2026
+(Kalshi); coefficients walk-forward every week; 95% CIs by block bootstrap over season-weeks.
+
+Promoted (each beat the 2 Oct production model on 2017–2026 with a paired CI excluding zero, Brier not worse):
+
+| Change | Market | Log-loss change, 2017–2026 [95% CI] | Gap to the close |
+|---|---|---|---|
+| starters out (`so_off`, `so_def`) | moneyline | −0.0025 [−0.0043, −0.0007] | 0.0128 → 0.0104 |
+| total key multipliers | totals | −0.0041 [−0.0063, −0.0020] | 0.0111 → 0.0070 |
+| market-line calibration (with the two above) | ATS | −0.0106 [−0.0160, −0.0053] | 0.0111 → 0.0004 |
+| market-line calibration (with the two above) | totals | −0.0108 [−0.0152, −0.0063] | 0.0111 → 0.0004 |
+
+The calibration lifts the ATS logit slope from 0.11 to 0.61 and the totals slope from 0.20 to 0.38 (ECE 0.056 → 0.011
+and 0.057 → 0.014); the moneyline was already calibrated (slope 1.08) and a Platt map there changed nothing
+(−0.0002 [−0.0013, +0.0009]), so none is applied. Not promoted: late-season stakes from the season simulation
+(clinched / eliminated; −0.0014 [−0.0028, +0.0000]), starters out by six position groups (−0.0020 [−0.0042, +0.0001];
+pooled offence / defence was chosen on 2006–2016), starters-out terms for totals (worse on 2006–2016).
+
+Code: `models/availability.py` (new), `models/game.py` (VERSION 3: `so_off` / `so_def`, `attach_availability`,
+`total_pmf` / `fit_total_keys` / `total_keys`, `market_cover` / `market_over`, the warm-up rule in `fit_from_rows`),
+`models/backtest.py` (season total keys, walk-forward market-line calibration, `ats_raw` / `totals_raw`,
+`market_calibration`), `models/fit_c.py` (saves the calibration), `analytics/adapters.py` (published cover / over
+probabilities and the total distribution use them). Season odds barely move (playoffs 0.4257, division 0.3457, bye
+0.1909, conference 0.1710, Super Bowl 0.1143 log-loss; 0.427 / 0.346 / 0.191 / 0.171 / 0.114 before).
 

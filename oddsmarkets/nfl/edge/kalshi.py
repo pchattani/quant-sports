@@ -10,9 +10,11 @@ A quote is used only when both sides are two-sided (0 < bid <= ask < 1) and each
 Totals (KXNFLTOTAL "Over X") and spreads (KXNFLSPREAD "<TEAM> wins by over X"): per game and decision, the strike whose
 mid is nearest 0.5 AT THE DECISION (never chosen with a later price); YES and NO are the two selections.
 
-model_p: the game model's close-mode probabilities (listed QBs, game-day weather): at t - 24 h the final injury report
-and the starters are known, weather is a 24-hour forecast; the use of the reading at kickoff is a small look-ahead
-noted in docs/research/nfl_edge.md. `book` decisions price Kalshi's last pre-kickoff quote with the de-vigged book
+model_p: the game model's probabilities. Since 21 Oct 2026 each decision gets its own information set (`P_by_hour`):
+t - 1 h the close-mode rows (listed starters, known from the inactives 90 minutes before kickoff, and the game-day
+weather), t - 24 h the openA rows (ratings through the previous week, the QB who started the team's latest game, no
+weather), so the day-before decision has no look-ahead. Before, both used the close-mode rows (a look-ahead at
+t - 24 h noted in docs/research/nfl_edge.md). `book` decisions price Kalshi's last pre-kickoff quote with the de-vigged book
 close (nflverse) as model_p, i.e. "is Kalshi behind the books at kickoff?", judged on outcomes only.
 """
 from __future__ import annotations
@@ -50,8 +52,11 @@ def _cost(p):
     return kalshi_cost(p)
 
 
-def game_rows(m: pd.DataFrame, c: pd.DataFrame, P: pd.DataFrame, hours=(24.0, 1.0), book: bool = True) -> pd.DataFrame:
-    """Per game, team and decision. P: the close-mode predictions (game_id, p_home, nfv_ml_h, nfv_ml_a, margin)."""
+def game_rows(m: pd.DataFrame, c: pd.DataFrame, P: pd.DataFrame, hours=(24.0, 1.0), book: bool = True,
+              P_by_hour: dict | None = None) -> pd.DataFrame:
+    """Per game, team and decision. P: the close-mode predictions (game_id, p_home, nfv_ml_h, nfv_ml_a, margin);
+    P_by_hour {hours: predictions} overrides P's p_home for that decision (e.g. {24.0: openA rows})."""
+    ph_by = {h: X.drop_duplicates("game_id").set_index("game_id")["p_home"] for h, X in (P_by_hour or {}).items()}
     g = m[(m["kind"] == "game") & m["game_id"].notna()]
     if "primary" in g:
         g = g[g["primary"].fillna(True).astype(bool)]     # Kalshi lists zero-volume duplicates on a wrong date
@@ -73,8 +78,9 @@ def game_rows(m: pd.DataFrame, c: pd.DataFrame, P: pd.DataFrame, hours=(24.0, 1.
             continue
         mid = (qc["yes_bid_close"] + qc["yes_ask_close"]) / 2
         fc_h = mid[tk[home]] / (mid[tk[home]] + mid[tk[away]])
-        y_h = 1.0 if r["margin"] > 0 else (0.0 if r["margin"] < 0 else 0.5)
-        dec = [(f"kalshi_t-{int(h)}h", ko - pd.Timedelta(hours=h), float(r["p_home"])) for h in hours]
+        y_h = np.nan if not np.isfinite(r["margin"]) else (1.0 if r["margin"] > 0 else (0.0 if r["margin"] < 0 else 0.5))
+        dec = [(f"kalshi_t-{int(h)}h", ko - pd.Timedelta(hours=h), float(ph_by[h].get(gid, np.nan)) if h in ph_by
+                else float(r["p_home"])) for h in hours]
         if book:
             from oddsmarkets.nfl.edge.prices import devig2
             ph, _ = devig2(r["nfv_ml_h"], r["nfv_ml_a"])
@@ -100,10 +106,13 @@ def game_rows(m: pd.DataFrame, c: pd.DataFrame, P: pd.DataFrame, hours=(24.0, 1.
 
 
 def ladder_rows(m: pd.DataFrame, c: pd.DataFrame, P: pd.DataFrame, kind: str, kk_by: dict, tk_by: dict,
-                hours=(24.0, 1.0)) -> pd.DataFrame:
-    """Totals ('total') or spreads ('spread'): the strike nearest 0.5 at each decision."""
+                hours=(24.0, 1.0), P_by_hour: dict | None = None, cal=None) -> pd.DataFrame:
+    """Totals ('total') or spreads ('spread'): the strike nearest 0.5 at each decision. P_by_hour as in game_rows
+    (mu, sigma, mu_t, sigma_t taken from that decision's rows); cal: {season: (a, b)} market-line Platt maps applied
+    to P(yes | no push) (game.market_cover / market_over), None = raw."""
     g = m[(m["kind"] == kind) & m["game_id"].notna() & m["floor_strike"].notna()]
     Pi = P.drop_duplicates("game_id").set_index("game_id")
+    Pi_by = {h: X.drop_duplicates("game_id").set_index("game_id") for h, X in (P_by_hour or {}).items()}
     rows = []
     for gid, gg in g.groupby("game_id"):
         if gid not in Pi.index:
@@ -111,7 +120,9 @@ def ladder_rows(m: pd.DataFrame, c: pd.DataFrame, P: pd.DataFrame, kind: str, kk
         r = Pi.loc[gid]
         ko = pd.Timestamp(gg["kickoff_utc"].iloc[0])
         qclose = quote_at(c, gg["ticker"], ko - pd.Timedelta(minutes=1))
+        r_close = r
         for h in hours:
+            r = Pi_by[h].loc[gid] if h in Pi_by and gid in Pi_by[h].index else r_close
             t = ko - pd.Timedelta(hours=h)
             q = quote_at(c, gg["ticker"], t)
             q = q[q["ok"]]
@@ -134,6 +145,11 @@ def ladder_rows(m: pd.DataFrame, c: pd.DataFrame, P: pd.DataFrame, kind: str, kk
                 p_yes, push = MK.cover_home(Pm, np.array([-X]))          # team margin > X
                 y = 1.0 if sign * r["margin"] > X else (0.0 if sign * r["margin"] < X else 0.5)
                 line = X
+            if cal and cal.get(s):                       # the map is for P(home covers) / P(over)
+                home_side = kind == "total" or sign > 0
+                pq = float(p_yes[0]) if home_side else 1.0 - float(p_yes[0])
+                pq = GM.platt(pq, cal[s])
+                p_yes = np.array([pq if home_side else 1.0 - pq])
             b, a = float(q.loc[tick, "yes_bid_close"]), float(q.loc[tick, "yes_ask_close"])
             fd = (a + b) / 2
             fc = np.nan

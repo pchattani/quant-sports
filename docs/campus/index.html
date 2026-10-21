@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en" data-sport="college">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Quant Campus</title>
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#07090c">
+<meta property="og:site_name" content="The Quant Campus">
+<meta property="og:title" content="The Quant Campus">
+<meta property="og:description" content="College football and men's and women's college basketball through a quant's lens: ratings with uncertainty, game and title forecasts against the market, the College Football Playoff and NCAA tournament brackets simulated, player value, inferred transfers and fantasy.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="description" content="College football and men's and women's college basketball through a quant's lens: ratings with uncertainty, game and title forecasts against the market, the College Football Playoff and NCAA tournament brackets simulated, player value, inferred transfers and fantasy.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ffb020'/%3E%3Cpath d='M6 23l7-9 5 4 8-11' stroke='%231a1203' stroke-width='3.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=/[?&]theme=(light|dark)/.exec(location.search);t=t?t[1]:localStorage.getItem('qk-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/qk/tokens.css">
+<link rel="stylesheet" href="assets/qk/quant.css">
+<link rel="stylesheet" href="assets/campus.css">
+</head>
+<body class="qk">
+<div id="qk-shell"></div>
+<main id="main" class="qk-page cc-main">
+  <div id="app"><div role="status" aria-label="Loading" class="cc-boot"><div class="qk-skel line short"></div><div class="qk-skel block"></div></div></div>
+  <div class="cc-meta" id="meta-line" aria-live="polite"></div>
+</main>
+
+<template id="disclaimer-template">
+  <div class="qk-card cc-prose legal">
+    <h3>Disclaimer &amp; terms of use</h3>
+    <p class="qk-muted">Last updated 19 October 2026</p>
+    <p>The Quant Campus is an independent, non-commercial hobby project that applies statistical models to publicly
+    available college football and college basketball data. By using this site you agree to the terms below. If you do
+    not agree, please do not use the site.</p>
+
+    <h4>1. Not betting, financial or professional advice</h4>
+    <p>Everything on this site &mdash; game, conference, playoff, tournament and title probabilities, projected margins
+    and totals, &ldquo;fair&rdquo; spreads, ratings, bracket and playoff projections, the committee and selection proxies,
+    player value, inferred transfers, fantasy projections, market comparisons and commentary &mdash; is provided for
+    <strong>information, education and entertainment only</strong>. None of it is betting, gambling, financial,
+    investment or any other professional advice, and none of it is a recommendation to place any wager or trade. Model
+    probabilities carry no margin; they are not prices offered by anyone and cannot be bet on here. The site does not
+    accept bets, take payments or link to bookmakers for commercial gain.</p>
+
+    <h4>2. Gambling responsibly</h4>
+    <p>If you choose to gamble elsewhere, you do so entirely at your own risk and responsibility. Only gamble where it is
+    legal for you to do so and if you are of legal age in your jurisdiction (18+ or 21+ in many places). Wagering on
+    college sports is restricted or prohibited in some places; check the law where you are. Never stake more than you can
+    afford to lose. If gambling is causing you harm, free and confidential help is available:
+    <a href="https://www.connexontario.ca" target="_blank" rel="noopener">ConnexOntario</a> (Canada, 1-866-531-2600),
+    <a href="https://www.ncpgambling.org" target="_blank" rel="noopener">1-800-GAMBLER</a> (United States),
+    <a href="https://www.begambleaware.org" target="_blank" rel="noopener">BeGambleAware</a> (United Kingdom),
+    or <a href="https://www.gamblingtherapy.org" target="_blank" rel="noopener">Gambling Therapy</a> (worldwide).</p>
+
+    <h4>3. Models are estimates and can be wrong</h4>
+    <p>Model outputs are statistical estimates built on assumptions and incomplete data. College sports are full of
+    things no model sees coming &mdash; injuries, suspensions, eligibility rulings, coaching changes, transfers, weather,
+    motivation and plain variance &mdash; and the forecasts here are frequently wrong, sometimes by a wide margin. The
+    College Football Playoff committee and the NCAA tournament selection committee decide for themselves; the proxies here
+    only estimate how they might rank teams. Transfers shown here are inferred from rosters and box scores and are not the
+    official transfer portal. Past performance does not predict future results. Scores, box scores, plays, rankings,
+    rosters and market prices may be delayed, incomplete, provisional, mislabelled or out of date, and pages can show
+    errors. The site and all content are provided <strong>&ldquo;as is&rdquo; and &ldquo;as available&rdquo;, without
+    warranties of any kind</strong>, express or implied, including accuracy, completeness, timeliness, fitness for a
+    particular purpose and non-infringement.</p>
+
+    <h4>4. Limitation of liability</h4>
+    <p>To the fullest extent permitted by law, the author accepts no liability for any loss or damage of any kind
+    &mdash; including financial loss, lost winnings, or losses from wagers, trades or other decisions &mdash; arising from
+    use of, reliance on, or inability to use this site or its content. You are solely responsible for your own
+    decisions.</p>
+
+    <h4>5. No affiliation; trademarks</h4>
+    <p>This site is unofficial and is not affiliated with, endorsed by, sponsored by or connected to the National
+    Collegiate Athletic Association (NCAA), the College Football Playoff, any conference, college, university, school,
+    team, player, the Associated Press, the coaches&rsquo; poll, ESPN, any other data provider, betting operator or
+    prediction market. NCAA, College Football Playoff, March Madness, conference, school and team names and related marks
+    are trade marks of their respective owners. No league, conference, school or sponsor logos are used. Team and player
+    names appear only to identify the competitors and games discussed and to report factual sporting statistics; team
+    colours are used only to tell teams apart on charts. The athletes are students; nothing here judges them beyond their
+    publicly reported on-field statistics.</p>
+
+    <h4>6. Data sources</h4>
+    <p>Schedules, scores, box scores, plays, win probability, polls and rankings, rosters and betting lines come from
+    ESPN&rsquo;s public site data; market prices from the public Kalshi and Polymarket APIs where shown. Those sources own
+    their data and are not responsible for this site or its models. Sources whose terms forbid reuse are not used
+    (Sports-Reference, KenPom, Barttorvik, 247Sports, On3, Rivals, Massey and NCAA.com among them). Statistics shown here
+    are derived and transformed and may differ from official statistics.</p>
+
+    <h4>7. Rights holders and corrections</h4>
+    <p>If you own rights in any material on this site and object to its use, or you spot an error, contact the author
+    through <a href="https://github.com/pchattani" target="_blank" rel="noopener">GitHub (@pchattani)</a>. Material will
+    be reviewed promptly and removed or corrected where appropriate.</p>
+
+    <h4>8. Privacy</h4>
+    <p>The site sets no cookies, runs no analytics or advertising, and collects no personal data. Your browser remembers
+    only that you dismissed the first-visit notice, which level (football, men&rsquo;s or women&rsquo;s basketball) you
+    last viewed and your light or dark theme, locally on your device. The page loads its fonts from Google Fonts and its
+    charting library from a content delivery network (cdn.jsdelivr.net), which receive your IP address when your browser
+    makes the request, like any web server. The site itself is hosted on GitHub Pages, whose own privacy terms apply to
+    its server logs.</p>
+
+    <h4>9. Changes</h4>
+    <p>These terms may change at any time; the date above shows the latest version. Continued use of the site after a
+    change means you accept the updated terms. Nothing in these terms limits any rights you have that cannot be limited
+    under the law that applies to you.</p>
+  </div>
+</template>
+
+<div class="cc-legal">
+  <div class="cc-legal-in">
+    <p>Schedules, scores, box scores, plays, polls, rosters and betting lines from ESPN&rsquo;s public site data; market prices from Kalshi and Polymarket where shown. Transfers are inferred from rosters and box scores, not the official portal.</p>
+    <p>For information and entertainment only &mdash; not betting, financial or professional advice. Probabilities are model estimates and can be wrong; no bets are offered. Unofficial: not affiliated with or endorsed by the NCAA, the College Football Playoff, any conference, school, team, player, ESPN or bookmaker; no logos are used and names belong to their owners. 18+. Gamble responsibly. <a href="#/disclaimer">Disclaimer &amp; terms</a></p>
+  </div>
+</div>
+<div id="qk-footer"></div>
+
+<div id="first-visit-notice" class="cc-fv" role="region" aria-label="Notice" hidden>
+  <div class="cc-fv-in">
+    <span><strong>For information and entertainment only.</strong> Game, playoff and tournament probabilities are model
+    estimates, not betting or financial advice. Unofficial: not affiliated with the NCAA, the College Football Playoff, any
+    conference, school, ESPN or bookmaker; no logos are used. 18+ where gambling is discussed.
+    <a href="#/disclaimer">Read the disclaimer &amp; terms</a>.</span>
+    <button type="button" id="fv-dismiss" class="qk-btn primary">I understand</button>
+  </div>
+</div>
+<script>
+(function () {
+  var KEY = 'qc-notice-v1', el = document.getElementById('first-visit-notice');
+  var seen = false;
+  try { seen = window.localStorage.getItem(KEY) === '1'; } catch (e) { seen = false; }
+  if (!seen) el.hidden = false;
+  document.getElementById('fv-dismiss').addEventListener('click', function () {
+    el.hidden = true;
+    try { window.localStorage.setItem(KEY, '1'); } catch (e) { /* private mode: shown again next visit */ }
+  });
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="assets/qk/quant.js"></script>
+<script src="assets/qk/quant-charts.js"></script>
+<script src="assets/js/cc-core.js"></script>
+<script src="assets/js/cc-overview.js"></script>
+<script src="assets/js/cc-games.js"></script>
+<script src="assets/js/cc-standings.js"></script>
+<script src="assets/js/cc-teams.js"></script>
+<script src="assets/js/cc-players.js"></script>
+<script src="assets/js/cc-value.js"></script>
+<script src="assets/js/cc-model.js"></script>
+</body>
+</html>

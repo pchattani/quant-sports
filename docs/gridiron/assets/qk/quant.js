@@ -1,7 +1,8 @@
 /* The Quant — shared UI kit (v1). Framework-free; one global, QK.
  * Older-browser rule shared with the sites: no optional chaining, no nullish coalescing.
  *
- *   QK.SPORTS / QK.sport(key)          the seven sites: names, URLs, accents, icons
+ *   QK.SPORTS / QK.sport(key)          the sites shown in the switcher: names, URLs, accents, icons
+ *   QK.ALL_SPORTS                      every site, including ones not launched yet (pending: true)
  *   QK.SECTIONS / QK.sections(key)     the information architecture every sport uses
  *   QK.shell(opts)                     top bar + sport switcher + section nav + search + footer
  *   QK.theme.get/set/toggle/onChange   dark | light, remembered per viewer
@@ -148,6 +149,7 @@ var ICON = {
   baseball: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="8"/><path d="M5.2 3.6c1.8 3.8 1.8 9 0 12.8M14.8 3.6c-1.8 3.8-1.8 9 0 12.8" stroke-dasharray="1.6 1.4"/></svg>',
   nfl: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3.5 16.5C2 11 5.5 4.5 16.5 3.5 18 9 14.5 15.5 3.5 16.5z"/><path d="M7 13l6-6M8.5 9.5l2 2M10 8l2 2"/></svg>',
   hockey: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="10" cy="8" rx="7" ry="3"/><path d="M3 8v4c0 1.7 3.1 3 7 3s7-1.3 7-3V8"/></svg>',
+  college: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2.5v15"/><path d="M4 3.5l12.5 3.8L4 11.2z"/><path d="M7 6.2l4.5 1.3"/></svg>',
   empty: '<svg viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="8" width="26" height="20" rx="3"/><path d="M5 14h26M11 20h8M11 24h5"/></svg>',
   arrow: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>'
 };
@@ -156,22 +158,32 @@ QK.ICON = ICON;
 /* ─────────────────────────────────────── sports registry + IA */
 var PUB = 'https://pchattani.github.io/';
 QK.HOME_URL = PUB + 'the-quant/';
-QK.SPORTS = [
+/* pending: true marks a site that is built but not launched (no public Pages site yet). It stays out of the
+ * switcher, footer and home page everywhere except on its own pages and in local preview (QK.visible). */
+QK.ALL_SPORTS = [
   { key: 'football',   label: 'Football',   site: 'The Quant Footballer', repo: 'the-quant-footballer', folder: 'site',     leagues: 'Europe, the Americas, Asia, Africa · 69 competitions' },
   { key: 'nfl',        label: 'NFL',        site: 'The Quant Gridiron',   repo: 'the-quant-gridiron',   folder: 'gridiron', leagues: 'NFL' },
   { key: 'basketball', label: 'Basketball', site: 'The Quant Hardwood',   repo: 'the-quant-hardwood',   folder: 'hardwood', leagues: 'NBA · WNBA' },
   { key: 'baseball',   label: 'Baseball',   site: 'The Quant Bullpen',    repo: 'the-quant-bullpen',    folder: 'bullpen',  leagues: 'MLB · Triple-A' },
   { key: 'hockey',     label: 'Hockey',     site: 'The Quant Rink',       repo: 'the-quant-rink',       folder: 'rink',     leagues: 'NHL' },
   { key: 'f1',         label: 'F1',         site: 'The Quant Paddock',    repo: 'the-quant-paddock',    folder: 'paddock',  leagues: 'Formula 1 · 1950 to today' },
-  { key: 'tennis',     label: 'Tennis',     site: 'The Quant Ace',        repo: 'the-quant-ace',        folder: 'ace',      leagues: 'ATP · WTA' }
+  { key: 'tennis',     label: 'Tennis',     site: 'The Quant Ace',        repo: 'the-quant-ace',        folder: 'ace',      leagues: 'ATP · WTA' },
+  { key: 'college',    label: 'College',    site: 'The Quant Campus',     repo: 'the-quant-campus',     folder: 'campus',   leagues: 'CFB · Men’s and women’s college basketball' }
 ];
-QK.SPORTS.forEach(function (s) { s.url = PUB + s.repo + '/'; s.data = s.url + 'data/'; s.accent = 'var(--a-' + s.key + ')'; });
-QK.sport = function (key) { for (var i = 0; i < QK.SPORTS.length; i++) if (QK.SPORTS[i].key === key) return QK.SPORTS[i]; return null; };
+QK.ALL_SPORTS.forEach(function (s) { s.url = PUB + s.repo + '/'; s.data = s.url + 'data/'; s.accent = 'var(--a-' + s.key + ')'; });
+QK.sport = function (key) { for (var i = 0; i < QK.ALL_SPORTS.length; i++) if (QK.ALL_SPORTS[i].key === key) return QK.ALL_SPORTS[i]; return null; };
 /* Local preview: when a page is served from docs/ (http://127.0.0.1:<port>/home/...), link sibling folders. */
 QK.localBase = function () {
   var l = root.location || {};
   return /^(localhost|127\.0\.0\.1)$/.test(l.hostname || '') || l.protocol === 'file:';
 };
+/* A pending site shows only on its own pages (<html data-sport="college">) and in local preview. */
+QK.visible = function (s) {
+  if (!s || !s.pending) return !!s;
+  var own = root.document && document.documentElement ? document.documentElement.getAttribute('data-sport') : null;
+  return own === s.key || QK.localBase();
+};
+QK.SPORTS = QK.ALL_SPORTS.filter(QK.visible);
 QK.sportUrl = function (key) { var s = QK.sport(key); if (!s) return '#'; return QK.localBase() ? '../' + s.folder + '/' : s.url; };
 QK.homeUrl = function () { return QK.localBase() ? '../home/' : QK.HOME_URL; };
 
@@ -191,7 +203,8 @@ QK.SECTIONS = [
 var SECTION_LABELS = {
   f1: { fixtures: 'Races', teams: 'Constructors', players: 'Drivers' },
   tennis: { fixtures: 'Draws', standings: 'Rankings', teams: null },
-  baseball: { fixtures: 'Games' }, basketball: { fixtures: 'Games' }, hockey: { fixtures: 'Games' }, nfl: { fixtures: 'Games' }
+  baseball: { fixtures: 'Games' }, basketball: { fixtures: 'Games' }, hockey: { fixtures: 'Games' }, nfl: { fixtures: 'Games' },
+  college: { fixtures: 'Games' }
 };
 QK.sections = function (sportKey, overrides) {
   var lab = SECTION_LABELS[sportKey] || {};

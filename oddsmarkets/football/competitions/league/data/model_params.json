@@ -47,8 +47,8 @@
     "la-liga": {
       "method": "global",
       "params": {
-        "xi": 0.002,
-        "ridge": 2.0,
+        "xi": 0.0035,
+        "ridge": 1.0,
         "elo_home_advantage": 50.0,
         "k_league": 30,
         "dc_weight": 1.0
@@ -68,16 +68,21 @@
         "elo_home_advantage": 70.0,
         "k_league": 20,
         "dc_weight": 0.9
+      },
+      "params_before_oct2026": {
+        "xi": 0.002,
+        "ridge": 2.0,
+        "dc_weight": 1.0
       }
     },
     "serie-a": {
       "method": "per-league",
       "params": {
-        "xi": 0.001,
+        "xi": 0.0035,
         "ridge": 1.0,
         "elo_home_advantage": 30.0,
         "k_league": 15,
-        "dc_weight": 0.65
+        "dc_weight": 1.0
       },
       "log_loss": 0.97039,
       "baseline_log_loss": 1.07924,
@@ -93,6 +98,11 @@
         "ridge": 1.0,
         "elo_home_advantage": 30.0,
         "k_league": 15,
+        "dc_weight": 0.65
+      },
+      "params_before_oct2026": {
+        "xi": 0.001,
+        "ridge": 1.0,
         "dc_weight": 0.65
       }
     },
@@ -151,8 +161,8 @@
     "eredivisie": {
       "method": "per-league",
       "params": {
-        "xi": 0.001,
-        "ridge": 0.25,
+        "xi": 0.0035,
+        "ridge": 1.0,
         "elo_home_advantage": 30.0,
         "k_league": 15,
         "dc_weight": 1.0
@@ -171,6 +181,11 @@
         "ridge": 0.25,
         "elo_home_advantage": 30.0,
         "k_league": 15,
+        "dc_weight": 1.0
+      },
+      "params_before_oct2026": {
+        "xi": 0.001,
+        "ridge": 0.25,
         "dc_weight": 1.0
       }
     },
@@ -203,8 +218,8 @@
     "brasileirao": {
       "method": "global",
       "params": {
-        "xi": 0.002,
-        "ridge": 2.0,
+        "xi": 0.0035,
+        "ridge": 1.0,
         "elo_home_advantage": 50.0,
         "k_league": 30,
         "dc_weight": 1.0
@@ -223,6 +238,11 @@
         "ridge": 2.0,
         "elo_home_advantage": 90.0,
         "k_league": 15,
+        "dc_weight": 1.0
+      },
+      "params_before_oct2026": {
+        "xi": 0.002,
+        "ridge": 2.0,
         "dc_weight": 1.0
       }
     },
@@ -281,11 +301,11 @@
     "liga-argentina": {
       "method": "per-league",
       "params": {
-        "xi": 0.008,
-        "ridge": 2.0,
+        "xi": 0.0035,
+        "ridge": 1.0,
         "elo_home_advantage": 70.0,
         "k_league": 30,
-        "dc_weight": 0.8
+        "dc_weight": 1.0
       },
       "log_loss": 1.06549,
       "baseline_log_loss": 1.08061,
@@ -301,16 +321,21 @@
         "elo_home_advantage": 70.0,
         "k_league": 30,
         "dc_weight": 0.8
+      },
+      "params_before_oct2026": {
+        "xi": 0.008,
+        "ridge": 2.0,
+        "dc_weight": 0.8
       }
     },
     "liga-mx": {
       "method": "per-league",
       "params": {
-        "xi": 0.005,
-        "ridge": 2.0,
+        "xi": 0.0035,
+        "ridge": 1.0,
         "elo_home_advantage": 50.0,
         "k_league": 15,
-        "dc_weight": 0.8
+        "dc_weight": 1.0
       },
       "log_loss": 1.04789,
       "baseline_log_loss": 1.0687,
@@ -326,16 +351,21 @@
         "elo_home_advantage": 50.0,
         "k_league": 15,
         "dc_weight": 0.8
+      },
+      "params_before_oct2026": {
+        "xi": 0.005,
+        "ridge": 2.0,
+        "dc_weight": 0.8
       }
     },
     "belgian-pro-league": {
       "method": "per-league",
       "params": {
-        "xi": 0.001,
-        "ridge": 0.25,
+        "xi": 0.0035,
+        "ridge": 1.0,
         "elo_home_advantage": 30.0,
         "k_league": 20,
-        "dc_weight": 0.8
+        "dc_weight": 1.0
       },
       "log_loss": 0.96908,
       "baseline_log_loss": 1.06616,
@@ -351,7 +381,13 @@
         "elo_home_advantage": 30.0,
         "k_league": 20,
         "dc_weight": 0.8
+      },
+      "params_before_oct2026": {
+        "xi": 0.001,
+        "ridge": 0.25,
+        "dc_weight": 0.8
       }
     }
-  }
+  },
+  "oct2026_market_rows": "21 Oct 2026: with the market-rate rows at weight 96 and their own decay 0.03 (oddsmarkets/football/sources/market_rates.py), every own-fit league uses the pooled xi 0.0035 / ridge 1.0 and dc_weight 1.0; the earlier tuned values are kept under params_before_oct2026. Chosen walk-forward on 2014-2018 football-data seasons (docs/research/football_edge.md, Model-improvement programme, Oct 2026). Re-running scripts/tune_league_models.py would overwrite this: its folds do not include the market rows."
 }

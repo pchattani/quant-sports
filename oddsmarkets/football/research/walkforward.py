@@ -166,6 +166,11 @@ class Spec:
     elo_k: float = 30.0
     fit_rho: bool = True
     max_goals: int = 10
+    # Oct 2026 additions (defaults keep the 2 Oct behaviour):
+    xi_mkt: float | None = None  # own daily decay for the market rows (None: xi)
+    xi_shots: float | None = None  # own daily decay for the shots rows (None: xi)
+    ah: bool = True              # compute the Asian-handicap columns (off for fast tuning runs)
+    elo_out: bool = False        # also return the production Elo's H/D/A (p_elo_*) for stacking
 
 
 class Elo:
@@ -273,9 +278,11 @@ def run_league(L: pd.DataFrame, spec: Spec, first_season: int | None = None, las
             # Rate rows: combine shots proxy and market rates as separate rows.
             H, A, W, RH, RA = [], [], [], [], []
             if spec.w_shots > 0:
-                H.append(hi[tr]); A.append(ai[tr]); W.append(w * spec.w_shots); RH.append(sxh[tr]); RA.append(sxa[tr])
+                ws = w if spec.xi_shots is None else np.exp(-spec.xi_shots * age)
+                H.append(hi[tr]); A.append(ai[tr]); W.append(ws * spec.w_shots); RH.append(sxh[tr]); RA.append(sxa[tr])
             if spec.w_mkt > 0:
-                H.append(hi[tr]); A.append(ai[tr]); W.append(w * spec.w_mkt); RH.append(mh[tr]); RA.append(ma[tr])
+                wm = w if spec.xi_mkt is None else np.exp(-spec.xi_mkt * age)
+                H.append(hi[tr]); A.append(ai[tr]); W.append(wm * spec.w_mkt); RH.append(mh[tr]); RA.append(ma[tr])
             k = len(H)
             data = fastdc.FitData(
                 hi=np.concatenate([hi[tr]] + H), ai=np.concatenate([ai[tr]] + A),
@@ -302,6 +309,11 @@ def run_league(L: pd.DataFrame, spec: Spec, first_season: int | None = None, las
         la = np.exp(att[ai[rows]] + dfn[hi[rows]])
         M = fastdc.score_matrix(lh, la, rho, spec.max_goals)
         p = fastdc.outcome_probs(M)
+        if use_elo or spec.elo_out:
+            draw_rate = float((hg[tr] == ag[tr]).mean())
+            e = elo_for(int(sy[rows[0]]), snap_day)
+            pe = np.array([e.p_home(L.home.iat[r], L.away.iat[r]) for r in rows])
+            p_elo = np.column_stack([pe, (1 - pe) * draw_rate, (1 - pe) * (1 - draw_rate)])
         if use_elo:
             # production EnsembleModel: linear H/D/A blend with Elo, Elo draws split by the
             # empirical draw rate; matrix blended with an Elo Poisson matrix.
@@ -322,8 +334,10 @@ def run_league(L: pd.DataFrame, spec: Spec, first_season: int | None = None, las
             "p_o25": fastdc.over_prob(M), "lam_h": lh, "lam_a": la, "rho": rho, "home_adv": home,
             "n_train": int(tr.sum()),
         })
+        if spec.elo_out:
+            res["p_elo_h"], res["p_elo_d"], res["p_elo_a"] = p_elo[:, 0], p_elo[:, 1], p_elo[:, 2]
         # Asian handicap: P(win) and P(push) on each half of the snapshot and closing lines.
-        for tag, col in (("o", "ah_line"), ("c", "ahc_line")):
+        for tag, col in ((("o", "ah_line"), ("c", "ahc_line")) if spec.ah else ()):
             line = L[col].to_numpy(float)[rows]
             ok = np.isfinite(line)
             for half, sh in (("lo", -0.25), ("hi", 0.25)):

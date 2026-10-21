@@ -82,6 +82,10 @@ def ctx_for(site: str) -> dict:
             a, b = canon.season_window(name, s)
             lg[name] = {"current": int(s), "in_season": a - timedelta(days=14) <= today <= b + timedelta(days=7)}
         out["leagues"] = lg
+    elif site == "campus":
+        from oddsmarkets.college import canon
+        out["leagues"] = {lv: {"current": int(canon.current_season(lv, today)), "in_season": canon.in_season(lv, today)}
+                          for lv in canon.LEVELS}
     return out
 
 
@@ -97,6 +101,16 @@ def prune_hardwood(rel: PurePosixPath, ctx: dict) -> bool:
     if len(p) >= 5 and p[0] == "data" and p[3] == "games" and p[2].isdigit():
         lg = (ctx.get("leagues") or {}).get(p[1])
         return bool(lg) and int(p[2]) <= int(lg["current"]) - 3
+    return False
+
+
+def prune_campus(rel: PurePosixPath, ctx: dict) -> bool:
+    # game pages: the current season and the previous season's postseason only (oddsmarkets/college/PAYLOADS.md);
+    # anything older that a past build left behind is not published
+    p = rel.parts
+    if len(p) >= 5 and p[0] == "data" and p[3] == "games" and p[2].isdigit():
+        lv = (ctx.get("leagues") or {}).get(p[1])
+        return bool(lv) and int(p[2]) <= int(lv["current"]) - 2
     return False
 
 
@@ -198,6 +212,26 @@ def guard_hardwood(ctx: dict) -> list[str]:
             d = pbp / lg / str(s)
             if not (d.exists() and any(d.iterdir())) and not (s == cur and not v["in_season"]):
                 problems.append(f"{lg} {s}: play-by-play missing")
+    return problems
+
+
+def guard_campus(ctx: dict) -> list[str]:
+    """Every season's store per level (the walk-forward backtests, the selection / committee-proxy fits and the
+    history pages read them all), every football season's plays (the EP model and the EPA ratings) and the current
+    basketball season's play-by-play once games have been played. The stores are in the Actions cache; a cold
+    runner seeds them from seed-campus (scripts/push_seed.py --site campus)."""
+    from oddsmarkets.college import canon
+    stores, plays, pbp = ROOT / "data/college/stores", ROOT / "data/college/cfb/plays", ROOT / "data/college/pbp"
+    problems = []
+    for lv, v in (ctx.get("leagues") or {}).items():
+        cur = int(v["current"])
+        missing = [s for s in range(canon.FIRST_SEASON[lv], cur + 1) if not (stores / lv / f"{s}.json.gz").exists()]
+        if missing:
+            problems.append(f"{lv} stores missing for {len(missing)} seasons ({missing[0]}..{missing[-1]})")
+        if lv == "cfb":
+            missing = [s for s in range(canon.FIRST_SEASON[lv], cur + 1) if not (plays / f"{s}.json.gz").exists()]
+            if missing:
+                problems.append(f"cfb plays missing for {len(missing)} seasons ({missing[0]}..{missing[-1]})")
     return problems
 
 
@@ -359,7 +393,8 @@ def _seed_from_branch(branch: str) -> int:
 
 SEEDS = {"gridiron": seed_gridiron, "rink": seed_branch("rink", guard_rink),
          "hardwood": seed_branch("hardwood", guard_hardwood), "bullpen": seed_branch("bullpen", guard_bullpen),
-         "ace": seed_branch("ace", guard_ace), "paddock": seed_branch("paddock", guard_paddock)}
+         "ace": seed_branch("ace", guard_ace), "paddock": seed_branch("paddock", guard_paddock),
+         "campus": seed_branch("campus", guard_campus)}
 
 
 def cmd_seed(site: str) -> int:
@@ -454,6 +489,9 @@ SITES = {
              "newer_wins": ("data/calibration.json", "data/*/store.json"),
              "guard": chain(guard_rink, guard_payload_floor("rink", 2000)),
              "gate": ("live", "today", "upcoming"), "time_key": "start", "after": timedelta(hours=3, minutes=30)},
+    # The Quant Campus (college): built, not launched; the workflow runs only by hand until the user approves it
+    "campus": {"docs": "campus", "repo": "the-quant-campus", "prune": prune_campus, "excluded": (),
+               "guard": chain(guard_campus, guard_payload_floor("campus", 3000))},
 }
 
 

@@ -2,8 +2,10 @@
 data/edge/nfl.parquet (docs/research/EDGE_PROTOCOL.md section 3): one row per selection per decision.
 
 Decisions written
-    nflverse_close   2006 -> : the close (kickoff). model_p = the promoted close model (raw, not shrunk: the portfolio
-                     layer estimates its own haircut walk-forward). fair_p_close = fair_p_decision (the same price).
+    nflverse_close   2006 -> : the close. model_p = the promoted close model (not shrunk: the portfolio layer
+                     estimates its own haircut walk-forward; since 21 Oct 2026 spread / total probabilities carry the
+                     walk-forward market-line calibration, game.market_cover / market_over). fair_p_close =
+                     fair_p_decision (the same price). Seasons <= 2016 are split = 'tune' (never bet).
     espn_open        2023 -> : ESPN's opener (ESPN BET / DraftKings). model_p = the move model (blend.py) on the
                      conservative open rows (ratings through the week BEFORE the previous one, QB as of then), so it
                      is valid even for look-ahead openers. fair_p_close at the opener's line through market.LineMap.
@@ -12,7 +14,8 @@ Decisions written
                      start_time = the season's last regular-season kickoff, settle_time = that + 24 h (futures.py);
                      settle_time is NaN on every other row (the portfolio layer's default applies).
 
-decision_time: the close = kickoff; the opener = the information cutoff (00:00 UTC of the first game day of the
+decision_time: the close = kickoff - 5 min (21 Oct 2026; was kickoff); Kalshi t-24h / t-1h as named (t-24h uses
+the openA rows, no look-ahead); the opener = the information cutoff (00:00 UTC of the first game day of the
 week before the game's week; ESPN does not timestamp openers). Probabilities of spreads / totals are conditional on no
 push (p_push given); outcome 0.5 = push. devig = multiplicative. slate = season-week-decision; corr_group = game id
 (every market of one game is correlated).
@@ -30,7 +33,7 @@ from oddsmarkets.nfl.edge import prices as PR
 COLS = ["event_id", "sport", "league", "season", "start_time", "market", "selection", "line", "decision_time", "model_p",
         "price_dec", "price_src", "fair_p_decision", "price_close", "fair_p_close", "outcome", "slate", "corr_group",
         "max_stake_hint", "p_push", "devig", "decision", "week", "line_close", "settle_time", "quality_ok",
-        "quality_note"]
+        "quality_note", "split"]
 
 
 def _finish(S: pd.DataFrame, decision_time, slate_tag: str) -> pd.DataFrame:
@@ -66,12 +69,53 @@ def _close_prices(S: pd.DataFrame, P: pd.DataFrame, pre: str) -> pd.DataFrame:
     return S
 
 
-def close_rows(P: pd.DataFrame, lm: MK.LineMap) -> pd.DataFrame:
+def market_cal(P: pd.DataFrame) -> dict:
+    """Walk-forward market-line Platt maps {"spread": {season: (a, b)}, "total": {...}} from close-mode predictions:
+    P(home covers) / P(over) at the nflverse closing line against the outcomes of earlier seasons (game.market_cover)."""
+    from oddsmarkets.nfl.edge import compare as CP
+    G = CP.game_probs(P, "nfv")
+    _, ca = CP.wf_platt(G["p_ats"], G["y_ats"], G["season"])
+    _, ct = CP.wf_platt(G["p_tot"], G["y_tot"], G["season"])
+    return {"spread": ca, "total": ct}
+
+
+def apply_market_cal(S: pd.DataFrame, cal: dict | None) -> pd.DataFrame:
+    """Platt-map the spread (home side) and total (over side) probabilities of selection rows; the other side is
+    1 - p. Rows of seasons without a map keep the raw model."""
+    if not cal:
+        return S
+    from oddsmarkets.nfl.models import game as GM
+    S = S.copy()
+    for mk, base_sel in (("spread", "home"), ("total", "over")):
+        maps = cal.get(mk) or {}
+        m = (S["market"] == mk).to_numpy()
+        for i in np.flatnonzero(m):
+            ab = maps.get(int(S["season"].iat[i]))
+            if not ab:
+                continue
+            p = float(S["model_p"].iat[i])
+            if S["selection"].iat[i] == base_sel:
+                S.iat[i, S.columns.get_loc("model_p")] = GM.platt(p, ab)
+            else:
+                S.iat[i, S.columns.get_loc("model_p")] = 1.0 - GM.platt(1.0 - p, ab)
+    return S
+
+
+CLOSE_LEAD = pd.Timedelta(minutes=5)
+
+
+def close_rows(P: pd.DataFrame, lm: MK.LineMap, cal: dict | None = None, tune_until: int = 2016) -> pd.DataFrame:
+    """The nflverse close. decision_time = kickoff - 5 min (the closing price is the last pre-kickoff quote; the
+    close-mode inputs, listed starters and game-day weather, are known by then). Seasons <= tune_until are marked
+    split = 'tune' (design seasons of this research: history for the portfolio layer's shrinkage, never bet)."""
     P = P[P["season"] >= 2006]
     S = EV.selections(P, "nfv", "nfv", lm, "nflverse_close", "close")
+    S = apply_market_cal(S, cal)
     S = _close_prices(S, P, "nfv")
     S["fair_p_close"] = S["fair_p_decision"]
-    return _finish(S, pd.to_datetime(S["start_time"], utc=True), "close")
+    out = _finish(S, pd.to_datetime(S["start_time"], utc=True) - CLOSE_LEAD, "close")
+    out["split"] = np.where(out["season"] <= tune_until, "tune", "test")
+    return out
 
 
 def open_rows(P: pd.DataFrame, lm: MK.LineMap, betas: dict, kk: np.ndarray, tk, sigma_m: float = 13.2,
@@ -126,7 +170,7 @@ def move_betas(P: pd.DataFrame, mr: pd.DataFrame, mode: str, seasons, qb_s: floa
             for s in seasons}
 
 
-def write(exp: str = "mr", out_path=None, extra: list[pd.DataFrame] | None = None) -> pd.DataFrame:
+def write(exp: str = "mr", out_path=None, extra: list[pd.DataFrame] | None = None, cal: dict | None = None) -> pd.DataFrame:
     """Close and open decisions from the saved predictions of experiment `exp` (scripts/nfl_edge.py --save-preds),
     plus any extra decision frames (Kalshi, futures); writes data/edge/nfl.parquet."""
     import pickle
@@ -145,7 +189,7 @@ def write(exp: str = "mr", out_path=None, extra: list[pd.DataFrame] | None = Non
     lm = MK.LineMap(13.2, Pc.attrs["keys"][s_last], 13.5, Pc.attrs["tkeys"].get(s_last))
     mr = pd.read_parquet(cache / "mr_base.parquet")
     betas = move_betas(Pb, mr, "openB", range(2023, 2027))
-    parts = [close_rows(Pc, lm), open_rows(Pb, lm, betas, Pb.attrs["keys"][s_last], Pb.attrs["tkeys"].get(s_last))]
+    parts = [close_rows(Pc, lm, cal), open_rows(Pb, lm, betas, Pb.attrs["keys"][s_last], Pb.attrs["tkeys"].get(s_last))]
     parts += [x for x in (extra or []) if x is not None and len(x)]
     T = pd.concat(parts, ignore_index=True)
     out_path = Path(out_path) if out_path else D.REPO / "data" / "edge" / "nfl.parquet"

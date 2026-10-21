@@ -1,6 +1,6 @@
 # The Quant: sports sites build repository
 
-The code, models and front ends behind seven free, non-commercial sports analytics sites, and the GitHub
+The code, models and front ends behind eight free, non-commercial sports analytics sites, and the GitHub
 Actions workflows that fetch, build and publish them every hour:
 
 | Site | Sport | Workflow |
@@ -12,12 +12,13 @@ Actions workflows that fetch, build and publish them every hour:
 | [The Quant Bullpen](https://pchattani.github.io/the-quant-bullpen/) | MLB | `bullpen.yml` |
 | [The Quant Gridiron](https://pchattani.github.io/the-quant-gridiron/) | NFL | `gridiron.yml` |
 | [The Quant Rink](https://pchattani.github.io/the-quant-rink/) | NHL | `rink.yml` |
+| [The Quant Campus](https://pchattani.github.io/the-quant-campus/) | college football (FBS), men's and women's college basketball (D-I) | `campus.yml` |
 | [The Quant](https://pchattani.github.io/the-quant/) | the landing page | `home.yml` |
 
 ## Layout
 
 * `oddsmarkets/<sport>/`: data sources, stores, models, simulations and analytics, one package per sport
-  (`football`, `f1`, `basketball`, `tennis`, `baseball`, `nfl`, `nhl`; shared code in `common` and `sports`).
+  (`football`, `f1`, `basketball`, `tennis`, `baseball`, `nfl`, `nhl`, `college`; shared code in `common` and `sports`).
 * `scripts/`: the fetchers (`*_fetch.py`), fits (`*_fit.py`), hydrate steps and site builds (`build_*.py`);
   `scripts/ci_site.py` is the shared CI helper (restore, completeness guards, prune and deploy).
 * `docs/<site>/`: each site's static front end and its committed inputs (completed seasons' stores,

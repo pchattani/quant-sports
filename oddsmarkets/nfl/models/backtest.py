@@ -18,8 +18,12 @@ Every predictor is also scored on the games with a closing moneyline ("vs_market
 
 Against the spread: P(home covers the closing spread) from the model's margin distribution (push removed and
 renormalised), scored against covers (pushes excluded): log-loss against ln 2, Brier, reliability, and the record
-of the side the model prefers when P >= 0.55. Totals: P(over the closing total) likewise; RMSE of the model's total
-against the closing total's.
+of the side the model prefers when P >= 0.55. Totals: P(over the closing total) from the discrete total distribution
+with the season's total key multipliers likewise; RMSE of the model's total against the closing total's.
+Since 21 Oct 2026 the published ATS and totals probabilities carry the market-line calibration (game.market_cover /
+market_over): a Platt map fitted walk-forward on the earlier seasons' backtest predictions (applied once 500 earlier
+games exist; earlier seasons stay raw). The uncalibrated scores are kept as `ats_raw` / `totals_raw`, and the map
+fitted on every season (`market_calibration`) is what fit_c saves into game_params.json for the site.
 
 Season odds: at checkpoints before weeks 1, 5, 10 and 14 of each completed season, 2,000 simulations with ratings and
 coefficients fitted strictly before the checkpoint; scored against playoffs (played a postseason game), division
@@ -140,11 +144,13 @@ def backtest(seasons: Iterable[int] | None = None, wf: pd.DataFrame | None = Non
     preds: list[dict] = []
     params_by_season = {}
     keys_by_season: dict = {}
+    tkeys_by_season: dict = {}
     for s in seasons:
         earlier_all = wf[wf["season"] < s]
         p_season = GM.fit_from_rows(earlier_all)            # includes key multipliers
         kk = GM.keys(p_season)
         keys_by_season[s] = p_season.get("keys")
+        tkeys_by_season[s] = p_season.get("tkeys")
         params_by_season[str(s)] = {k: p_season.get(k) for k in ("s", "hfa", "hfa_trend", "div", "rest", "bye", "short",
                                                                "travel", "tz", "sigma", "sigma_market", "t_off", "wind",
                                                                "cold", "dome", "sigma_total", "n")}
@@ -226,6 +232,7 @@ def backtest(seasons: Iterable[int] | None = None, wf: pd.DataFrame | None = Non
                    "market_line": rmse(P.loc[has_line, "line"], P.loc[has_line, "margin"])}
     # ATS
     ats_rows, tot_rows = [], []
+    tk_by = {int(s): GM.total_keys({"tkeys": v}) for s, v in tkeys_by_season.items()}
     for r in P[has_line].itertuples(index=False):
         spread_home = -r.line
         c = GM.cover_prob(r.mu, r.sigma, spread_home, kk_by.get(int(r.season)))
@@ -234,13 +241,17 @@ def backtest(seasons: Iterable[int] | None = None, wf: pd.DataFrame | None = Non
         pc = c["home"] / max(c["home"] + c["away"], 1e-9)
         ats_rows.append((pc, 1.0 if r.margin + spread_home > 0 else 0.0, r.season))
     for r in P[P["total_line"].notna()].itertuples(index=False):
-        c = GM.total_prob(r.mu_total, r.sigma_total, r.total_line)
+        c = GM.total_prob(r.mu_total, r.sigma_total, r.total_line, tk_by.get(int(r.season)))
         if abs(r.total - r.total_line) < 1e-9:
             continue
         po = c["over"] / max(c["over"] + c["under"], 1e-9)
         tot_rows.append((po, 1.0 if r.total > r.total_line else 0.0, r.season))
-    ats = _side_summary(ats_rows)
-    totals = _side_summary(tot_rows)
+    ats_cal, cal_ats = market_calibration(ats_rows)
+    tot_cal, cal_tot = market_calibration(tot_rows)
+    ats = _side_summary(ats_cal)
+    totals = _side_summary(tot_cal)
+    ats_raw = _side_summary(ats_rows)
+    totals_raw = _side_summary(tot_rows)
     totals["rmse_model_total"] = rmse(P.loc[P["total_line"].notna(), "mu_total"], P.loc[P["total_line"].notna(), "total"])
     totals["rmse_market_total"] = rmse(P.loc[P["total_line"].notna(), "total_line"], P.loc[P["total_line"].notna(), "total"])
     # home field by season: mean of (mu - s * net) over non-neutral games, from the season's final coefficients
@@ -250,7 +261,9 @@ def backtest(seasons: Iterable[int] | None = None, wf: pd.DataFrame | None = Non
     out = {"generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "model_version": GM.VERSION,
            "seasons": [int(s) for s in seasons], "games": int(len(P)), "ties_excluded": int((~decided).sum()),
            "metrics": metrics, "metrics_vs_market": vs_market, "per_season": per_season, "books": books,
-           "margin_rmse": margin_rmse, "ats": ats, "totals": totals, "hfa_by_season": hfa,
+           "margin_rmse": margin_rmse, "ats": ats, "totals": totals, "ats_raw": _strip_season(ats_raw),
+           "totals_raw": _strip_season(totals_raw), "market_calibration": {"cal_ats": cal_ats, "cal_tot": cal_tot},
+           "hfa_by_season": hfa,
            "params_by_season": params_by_season, "season_sim": sim, "runtime_s": round(time.perf_counter() - t0, 1)}
     if write:
         write_calibration(out)
@@ -259,6 +272,46 @@ def backtest(seasons: Iterable[int] | None = None, wf: pd.DataFrame | None = Non
         except OSError:
             pass
     return out
+
+
+def _platt_fit(p: np.ndarray, y: np.ndarray) -> list[float]:
+    """(a, b) of y ~ Bernoulli(expit(a + b logit p)), Newton steps."""
+    q = np.clip(p, EPS, 1 - EPS)
+    x = np.log(q / (1 - q))
+    a, b = 0.0, 1.0
+    for _ in range(50):
+        z = 1 / (1 + np.exp(-(a + b * x)))
+        w = z * (1 - z)
+        g = np.array([np.sum(y - z), np.sum((y - z) * x)])
+        H = np.array([[w.sum(), (w * x).sum()], [(w * x).sum(), (w * x * x).sum()]]) + np.eye(2) * 1e-9
+        st = np.linalg.solve(H, g)
+        a, b = a + st[0], b + st[1]
+        if np.abs(st).max() < 1e-10:
+            break
+    return [round(float(a), 5), round(float(b), 5)]
+
+
+def market_calibration(rows: list[tuple], min_rows: int = 500) -> tuple[list[tuple], list[float] | None]:
+    """Walk-forward Platt map of (p, y, season) rows: each season's p mapped with (a, b) fitted on the earlier
+    seasons (seasons with fewer than min_rows earlier rows stay raw). Returns the mapped rows and the map fitted on
+    every row (what the site uses)."""
+    if not rows:
+        return rows, None
+    a = np.array(rows, float)
+    p, y, sea = a[:, 0], a[:, 1], a[:, 2]
+    out = p.copy()
+    for s in np.unique(sea):
+        tr = sea < s
+        if tr.sum() < min_rows:
+            continue
+        ab = _platt_fit(p[tr], y[tr])
+        te = sea == s
+        out[te] = [GM.platt(v, ab) for v in p[te]]
+    return [(float(o), float(yy), ss) for o, yy, ss in zip(out, y, sea)], (_platt_fit(p, y) if len(p) >= min_rows else None)
+
+
+def _strip_season(d: dict) -> dict:
+    return {k: v for k, v in d.items() if k not in ("by_season", "reliability")}
 
 
 def _side_summary(rows: list[tuple]) -> dict:

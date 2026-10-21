@@ -119,7 +119,11 @@ def test_market_rows_only_for_matched_games(monkeypatch):
     out = mr.with_market_rows(train, "premier-league")
     assert len(out) == 5
     extra = out[out.game_id.str.endswith(":mkt")]
-    assert sorted(extra.home_xg) == [1.4, 1.9] and (extra.weight == mr.W_MKT).all()
+    want = mr.W_MKT * mr.decay_factor(extra.match_date, mr.fit_xi("premier-league"), mr.XI_MKT)
+    assert sorted(extra.home_xg) == [1.4, 1.9] and np.allclose(extra.weight.to_numpy(), want)
+    # explicit weight and no own decay: plain weight
+    same = mr.market_rows(train, "premier-league", weight=3.0, xi_fit=0.0035, xi_mkt=0.0035)
+    assert np.allclose(same.weight.to_numpy(), 3.0)
     assert out[~out.game_id.str.endswith(":mkt")].home_xg.isna().all()
     # unknown league or no prices: the frame comes back unchanged
     assert mr.with_market_rows(train, "saudi-pro-league") is train
@@ -142,3 +146,17 @@ def test_closing_probs_fallback_order():
     assert abs(p1[0, 0] - (1 / 2.0) / (1 / 2.0 + 1 / 3.5 + 1 / 4.0)) < 1e-12   # Pinnacle first
     assert abs(p1[1, 0] - (1 / 1.5) / (1 / 1.5 + 1 / 4.5 + 1 / 7.0)) < 1e-12   # then Betfair
     assert abs(po[0] - 0.5) < 1e-12 and abs(po[1] - (1 / 1.8) / (1 / 1.8 + 1 / 2.2)) < 1e-12
+
+
+def test_market_row_decay_factor():
+    from oddsmarkets.football.sources import market_rates as mr
+
+    now = pd.Timestamp("2026-10-21", tz="UTC")
+    d = pd.Series(pd.to_datetime(["2026-10-21", "2026-09-21", "2025-10-21"], utc=True))
+    f = mr.decay_factor(d, 0.0035, 0.03, now=now)
+    days = np.array([0.0, 30.0, 365.0])
+    # fit weight exp(-0.0035 d) times the factor = exp(-0.03 d)
+    assert np.allclose(np.exp(-0.0035 * days) * f, np.exp(-0.03 * days))
+    assert np.allclose(mr.decay_factor(d, None, 0.03, now=now), 1.0)
+    assert mr.fit_xi("premier-league") is not None
+

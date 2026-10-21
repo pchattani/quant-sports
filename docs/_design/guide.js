@@ -28,7 +28,7 @@ function sw(list) {
 }
 function paintSwatches() {
   $('#sw-surface').innerHTML = sw([['--bg', 'Page'], ['--bg-raise', 'Raised'], ['--s-1', 'Card'], ['--s-2', 'Card head'], ['--s-3', 'Pressed'], ['--s-4', 'Strong'], ['--ink-1', 'Ink 1'], ['--ink-2', 'Ink 2'], ['--ink-3', 'Ink 3 (muted)'], ['--ink-4', 'Ink 4 (decor)']]);
-  $('#sw-accent').innerHTML = sw([['--brand', 'Brand amber'], ['--a-football', 'Football'], ['--a-nfl', 'NFL'], ['--a-basketball', 'Basketball'], ['--a-baseball', 'Baseball'], ['--a-hockey', 'Hockey'], ['--a-f1', 'F1'], ['--a-tennis', 'Tennis'], ['--focus', 'Focus ring'], ['--live', 'Live']]);
+  $('#sw-accent').innerHTML = sw([['--brand', 'Brand amber'], ['--a-football', 'Football'], ['--a-nfl', 'NFL'], ['--a-basketball', 'Basketball'], ['--a-baseball', 'Baseball'], ['--a-hockey', 'Hockey'], ['--a-f1', 'F1'], ['--a-tennis', 'Tennis'], ['--a-college', 'College'], ['--focus', 'Focus ring'], ['--live', 'Live']]);
   $('#sw-cat').innerHTML = sw([['--c-1', '1 Model'], ['--c-2', '2 Market'], ['--c-3', '3'], ['--c-4', '4'], ['--c-5', '5'], ['--c-6', '6'], ['--c-7', '7'], ['--c-8', '8'], ['--c-other', 'Other']]);
   $('#sw-seq').innerHTML = sw([['--seq-1', 'Seq 1'], ['--seq-3', 'Seq 3'], ['--seq-5', 'Seq 5'], ['--div-neg', 'Diverging −'], ['--div-mid', 'Midpoint'], ['--div-pos', 'Diverging +'], ['--st-good', 'Good'], ['--st-warn', 'Warning'], ['--st-serious', 'Serious'], ['--st-crit', 'Critical'], ['--up', 'Delta up'], ['--down', 'Delta down']]);
   var teams = [['Chicago Bears', '#0B162A'], ['Seattle Kraken', '#001628'], ['Los Angeles Kings', '#111111'], ['Boston Bruins', '#FFB81C'], ['Pittsburgh Pirates', '#27251f'], ['Mercedes', '#00D7B6'], ['Philadelphia Flyers', '#F74902'], ['Brooklyn Nets', '#000000']];

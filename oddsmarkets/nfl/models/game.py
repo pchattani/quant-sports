@@ -13,6 +13,7 @@ Margin (home minus away)
        + b_trav  * (km_a - km_h) / 1000                   distance from home stadium to the venue
        + b_tz    * (tz_a - tz_h)                          hours between home time zone and the venue's
        + b_mr    * mr                                     market-implied line from EARLIER closing lines (below)
+       + b_so_off * so_off + b_so_def * so_def            depth-chart starters out, home minus away (below)
 
 Market ratings (feature `mr`, models/market_ratings.py): before each week, a ridge of every earlier played game's
 closing line on home field + team terms (half-life 2 weeks, prior 0.8 x last season's final), with each game's
@@ -21,6 +22,14 @@ starting QBs taken out (0.77 x NP x QB value), so mr = the market's rating diffe
 depth, money) that the EPA ratings miss. Added 2 Oct 2026 after the edge research (docs/research/nfl_edge.md): on
 2017-2026 out of sample it cut the moneyline log-loss by 0.0063 (95% CI 0.0029-0.0098), ATS by 0.0058 and totals
 by 0.0038 (total ratings: feature `mrt` = market total - base). With unfitted parameters (b_mr = 0) nothing changes.
+
+Starters out (features `so_off`, `so_def`, models/availability.py; added 21 Oct 2026): for each side, the depth-chart
+starters (as of the team's previous game; QBs and specialists excluded) who miss the game, offence (OL, receivers,
+backs) and defence (DL, LB, DB) separately, home minus away. Before kickoff a starter counts by the final injury report
+(Out 1, Doubtful 0.85, Questionable 0.15); from 2020, once nflverse's weekly roster carries the game-day status, the
+actual inactives (and reserve moves) count 1. On 2017-2026 out of sample it lowered the moneyline log-loss by 0.0025
+(95% CI 0.0007-0.0043; docs/research/nfl_edge.md). A feature enters the fit only once 256 earlier games have a
+non-zero value (the reports start in 2009). Games without reports yet (more than a few days out) get 0.
 
 HFA by season: HFA_s are one coefficient per season, ridge-penalised toward 0 (penalty LAM_HFA in game units), plus a
 linear trend hfa_trend * (season - 2015) / 10, so the decline in home advantage is estimated from the data and a
@@ -38,8 +47,18 @@ Total
     total = base_s + t_off * O + b_wind * max(wind - 8, 0) * outdoor + b_cold * max(45 - temp, 0) * outdoor
             + b_dome * [dome or closed roof] + c
 O = NP * (PO_h + PD_a + PO_a + PD_h) + NR * (RO_h + RD_a + RO_a + RD_h)  (EPA/play edges, pass offence with the QB)
-base_s = exponentially weighted mean total of earlier games (half-life 256 games). Total ~ Normal(total, sigma_t);
-team points = (total +- margin) / 2.
+base_s = exponentially weighted mean total of earlier games (half-life 256 games). The total is discrete: p(t) is
+proportional to the Normal(total, sigma_t) mass on [t - 1/2, t + 1/2] times a total key multiplier tk(t) (37, 41, 44,
+51 ... are commoner than a Normal says), tk fitted by `fit_total_keys` like the margin keys (added 21 Oct 2026; before,
+a plain Normal). Team points = (total +- margin) / 2.
+
+Market-line calibration (added 21 Oct 2026): the probability that the home side covers the MARKET spread, or that the
+game goes over the MARKET total, is overconfident when read straight off the distributions: the market line already
+holds most of what the model knows, and the model's disagreement with it is mostly noise (walk-forward logit slope of
+the outcome on the model's cover probability about 0.2, on the over probability about 0.35). `market_cover` and
+`market_over` therefore pass those two probabilities through a Platt map, logit p' = a + b logit p, with (a, b)
+(`cal_ats`, `cal_tot`) fitted on the backtest's out-of-sample predictions (models/backtest.py; walk-forward there).
+The margin and total distributions themselves, the win probability and every other line are unchanged.
 
 Markets: `spread_to_p(line)` = P(home wins) for a market margin `line` ("home favoured by") through the same discrete
 distribution with sigma_m (fitted sd of margin - line); `ml_to_p` de-vigs American moneylines multiplicatively.
@@ -60,16 +79,17 @@ from oddsmarkets.nfl.models import team_strength as TS
 
 logger = logging.getLogger(__name__)
 
-VERSION = 2
-MARGIN_FEATURES = ("net", "sr", "hfa", "div", "rest", "bye", "short", "travel", "tz", "mr")
+VERSION = 3
+MARGIN_FEATURES = ("net", "sr", "hfa", "div", "rest", "bye", "short", "travel", "tz", "mr", "so_off", "so_def")
+WARMUP = {"so_off": 256, "so_def": 256}       # rows with a non-zero value needed before a feature is fitted
 TOTAL_FEATURES = ("off", "wind", "cold", "dome", "mrt")
 LAM_HFA = 40.0
 KEY_MAX = 30
 DEFAULTS: dict[str, Any] = {
     "s": 0.9, "sr": 0.0, "hfa": 1.9, "hfa_trend": -0.7, "hfa_by_season": {}, "div": -0.4, "rest": 0.3, "bye": 0.5, "short": -0.3,
-    "travel": 0.15, "tz": 0.2, "mr": 0.0, "sigma": 13.2, "sigma_market": 13.0,
+    "travel": 0.15, "tz": 0.2, "mr": 0.0, "so_off": 0.0, "so_def": 0.0, "sigma": 13.2, "sigma_market": 13.0,
     "t_off": 1.0, "wind": -0.35, "cold": -0.05, "dome": 1.0, "mrt": 0.0, "t_c": 0.0, "t_base": 44.0, "sigma_total": 13.3,
-    "keys": None, "fitted": False, "n": 0,
+    "keys": None, "tkeys": None, "cal_ats": None, "cal_tot": None, "fitted": False, "n": 0,
 }
 _P: dict | None = None
 
@@ -116,6 +136,8 @@ def margin_features(df: pd.DataFrame) -> pd.DataFrame:
         "travel": (df["km_a"].to_numpy(float) - df["km_h"].to_numpy(float)) / 1000.0,
         "tz": df["tz_a"].to_numpy(float) - df["tz_h"].to_numpy(float),
         "mr": _mr_feature(df, hfa.to_numpy()),
+        "so_off": pd.to_numeric(df["f_so_off"], errors="coerce").fillna(0.0).to_numpy(float) if "f_so_off" in df else np.zeros(len(df)),
+        "so_def": pd.to_numeric(df["f_so_def"], errors="coerce").fillna(0.0).to_numpy(float) if "f_so_def" in df else np.zeros(len(df)),
     }, index=df.index)
 
 
@@ -146,7 +168,7 @@ def mu_margin(F: pd.DataFrame, seasons: np.ndarray, p: dict, ratings_only: bool 
     trend = p["hfa_trend"] * (np.asarray(seasons, float) - 2015.0) / 10.0
     mu = p["s"] * F["net"].to_numpy() + (p["hfa"] + trend + hfa_s) * F["hfa"].to_numpy()
     if not ratings_only:
-        for k in ("sr", "div", "rest", "bye", "short", "travel", "tz", "mr"):
+        for k in ("sr", "div", "rest", "bye", "short", "travel", "tz", "mr", "so_off", "so_def"):
             mu = mu + p.get(k, 0.0) * F[k].to_numpy()
     return mu
 
@@ -204,12 +226,80 @@ def cover_prob(mu: float, sigma: float, spread_home: float, kk=None) -> dict:
     return {"home": float(P[adj > 0].sum()), "push": float(P[np.abs(adj) < 1e-9].sum()), "away": float(P[adj < 0].sum())}
 
 
-def total_prob(mu_t: float, sigma_t: float, line: float) -> dict:
-    """P(over / push / under) for a total line (Normal on integers)."""
-    s = np.arange(0, 151)
-    P = ndtr((s + 0.5 - mu_t) / sigma_t) - ndtr((s - 0.5 - mu_t) / sigma_t)
-    P /= P.sum()
+TOT_SUPPORT = np.arange(0, 151)
+
+
+def total_keys(p: dict | None = None) -> np.ndarray | None:
+    """Total key multipliers on TOT_SUPPORT from the parameters (None: a plain Normal on the integers)."""
+    tk = (p or params()).get("tkeys")
+    if not tk:
+        return None
+    out = np.ones(len(TOT_SUPPORT))
+    arr = np.asarray(tk, float)[: len(TOT_SUPPORT)]
+    out[: len(arr)] = arr
+    return out
+
+
+def total_pmf(mu_t, sigma_t: float, tk: np.ndarray | None = None) -> np.ndarray:
+    """P(total = t) on TOT_SUPPORT (rows per mu_t when an array): Normal mass on [t - 1/2, t + 1/2] x tk(t)."""
+    mu = np.atleast_1d(np.asarray(mu_t, float))[:, None]
+    P = ndtr((TOT_SUPPORT[None, :] + 0.5 - mu) / sigma_t) - ndtr((TOT_SUPPORT[None, :] - 0.5 - mu) / sigma_t)
+    if tk is not None:
+        P = P * np.asarray(tk, float)[None, : P.shape[1]]
+    return P / P.sum(1, keepdims=True)
+
+
+def total_prob(mu_t: float, sigma_t: float, line: float, tk: np.ndarray | None = None) -> dict:
+    """P(over / push / under) for a total line (discrete total; tk = total key multipliers, None = plain Normal)."""
+    s = TOT_SUPPORT
+    P = total_pmf(mu_t, sigma_t, tk)[0]
     return {"over": float(P[s > line].sum()), "push": float(P[np.abs(s - line) < 1e-9].sum()), "under": float(P[s < line].sum())}
+
+
+def fit_total_keys(mu: np.ndarray, y: np.ndarray, sigma: float, iters: int = 3) -> np.ndarray:
+    """Total key multipliers tk(t): observed / expected counts of each total, iterated through the renormalisation;
+    only totals with more than 5 expected games are adjusted, values clipped to [0.3, 3]."""
+    tk = np.ones(len(TOT_SUPPORT))
+    obs = np.bincount(np.clip(np.round(np.asarray(y, float)).astype(int), 0, len(TOT_SUPPORT) - 1),
+                      minlength=len(TOT_SUPPORT)).astype(float)
+    mu = np.asarray(mu, float)
+    for _ in range(iters):
+        exp = np.zeros(len(TOT_SUPPORT))
+        for ch in np.array_split(np.arange(len(mu)), max(1, len(mu) // 3000)):
+            exp += total_pmf(mu[ch], sigma, tk).sum(0)
+        tk = np.clip(tk * np.where(exp > 5, obs / np.maximum(exp, 1e-9), 1.0), 0.3, 3.0)
+    return tk
+
+
+def platt(prob: float, ab) -> float:
+    """logit p' = a + b logit p (ab None: p unchanged)."""
+    if not ab or prob is None or not np.isfinite(prob):
+        return prob
+    q = min(max(float(prob), 1e-4), 1 - 1e-4)
+    z = float(ab[0]) + float(ab[1]) * math.log(q / (1 - q))
+    return 1.0 / (1.0 + math.exp(-z))
+
+
+def _calibrated(d: dict, a: str, b: str, ab) -> dict:
+    if not ab:
+        return d
+    rest = 1.0 - d["push"]
+    if rest <= 0:
+        return d
+    pc = platt(d[a] / rest, ab)
+    return {a: pc * rest, "push": d["push"], b: (1.0 - pc) * rest}
+
+
+def market_cover(mu: float, sigma: float, spread_home: float, kk=None, p: dict | None = None) -> dict:
+    """cover_prob at a MARKET spread with the market-line calibration (cal_ats) applied to P(home covers | no push)."""
+    return _calibrated(cover_prob(mu, sigma, spread_home, kk), "home", "away", (p or params()).get("cal_ats"))
+
+
+def market_over(mu_t: float, sigma_t: float, line: float, tk=None, p: dict | None = None) -> dict:
+    """total_prob at a MARKET total with the total keys and the market-line calibration (cal_tot)."""
+    pp = p or params()
+    return _calibrated(total_prob(mu_t, sigma_t, line, total_keys(pp) if tk is None else tk), "over", "under",
+                       pp.get("cal_tot"))
 
 
 def spread_to_p(line: float | None, sd: float | None = None, kk=None) -> float | None:
@@ -304,6 +394,22 @@ def attach_market(df: pd.DataFrame, games: pd.DataFrame | None = None, rd: dict 
     return out
 
 
+def attach_availability(df: pd.DataFrame) -> pd.DataFrame:
+    """f_so_off / f_so_def (models/availability.py) for the frame's games; zeros when the inputs are missing."""
+    if df.empty or "season" not in df:
+        return df
+    try:
+        from oddsmarkets.nfl.models import availability as AV
+        L = AV.load(sorted(set(int(x) for x in df["season"])))
+        out = AV.attach(df, L, open_modes_zero=False)
+        keep = ["f_so_off", "f_so_def"]
+        drop = [c for c in out.columns if c not in df.columns and c not in keep]
+        return out.drop(columns=drop)
+    except Exception as exc:  # noqa: BLE001 - the feature is optional: 0 means "no news"
+        logger.info("availability unavailable: %s", exc)
+        return df.assign(f_so_off=0.0, f_so_def=0.0)
+
+
 def attach_ratings(g: pd.DataFrame, rd: dict, use_listed_qb: bool = True, qb_override: dict | None = None) -> pd.DataFrame:
     """net_h, net_a, off_sum (and the unit edges) for games under one ratings snapshot."""
     lg = rd.get("league") or {}
@@ -379,6 +485,7 @@ def walk_forward(seasons: list[int], first: int | None = None, units_of=None, ga
         return pd.DataFrame()
     df = pd.concat(out, ignore_index=True)
     df = attach_market(df, G)
+    df = attach_availability(df)
     MF = margin_features(df)
     TF = total_features(df)
     for c in MF.columns:
@@ -410,6 +517,9 @@ def fit_from_rows(rows: pd.DataFrame, min_rows: int = 200, with_keys: bool = Tru
     if len(r) < min_rows:
         return p
     F = _mf(r)
+    for c, n_min in WARMUP.items():                      # too little history: the feature stays out (coefficient 0)
+        if c in F and (F[c].to_numpy() != 0).sum() < n_min:
+            F[c] = 0.0
     seasons = r["season"].to_numpy(int)
     us = sorted(set(seasons))
     trend = (seasons - 2015.0) / 10.0 * F["hfa"].to_numpy()
@@ -446,6 +556,8 @@ def fit_from_rows(rows: pd.DataFrame, min_rows: int = 200, with_keys: bool = Tru
     p["t_c"] = float(bt[-1])
     rt = yt - Xt @ bt
     p["sigma_total"] = float(np.sqrt((rt ** 2).sum() / max(len(yt) - len(TOTAL_FEATURES) - 1, 1)))
+    if with_keys:
+        p["tkeys"] = fit_total_keys(r["base"].to_numpy(float) + Xt @ bt, r["total"].to_numpy(float), p["sigma_total"]).tolist()
     p["n"] = int(len(r))
     p["fitted"] = True
     p["seasons"] = [int(min(us)), int(max(us))]
@@ -485,6 +597,8 @@ def predict_frame(g: pd.DataFrame, rd: dict, p: dict | None = None, base: float 
             g = attach_market(g.assign(base=b), market_games, rd)
         except Exception as exc:  # noqa: BLE001 - margin_features falls back to the ratings
             logger.info("market ratings unavailable: %s", exc)
+    if (p.get("so_off") or p.get("so_def")) and "f_so_off" not in g and len(g) and "season" in g:
+        g = attach_availability(g)
     MF = margin_features(g)
     TF = total_features(g)
     seasons = g["season"].to_numpy(int)

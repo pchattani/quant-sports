@@ -88,6 +88,12 @@ def fit_all(last: int | None = None, committed: bool = True, season_sims: int = 
         log["season_sim"] = obj
     bt = BT.backtest(seasons=list(range(BACKTEST_FROM, last + 1)), wf=wf, season_sims=season_sims, games=G)
     log["backtest"] = BT.summary_table(bt)
+    # market-line calibration (game.market_cover / market_over): the Platt maps fitted on the backtest's
+    # out-of-sample ATS and totals predictions
+    mc = bt.get("market_calibration") or {}
+    gp["cal_ats"], gp["cal_tot"] = mc.get("cal_ats"), mc.get("cal_tot")
+    GM.save_params(gp, committed=committed)
+    log["market_calibration"] = mc
     log["runtime_s"] = round(time.perf_counter() - t0, 1)
     return log
 

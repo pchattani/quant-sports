@@ -55,6 +55,7 @@ jobs:
           get hardwood the-quant-hardwood index.json
           get ace the-quant-ace index.json
           for f in index.json players_index.json; do get bullpen the-quant-bullpen "$f"; get gridiron the-quant-gridiron "$f"; get rink the-quant-rink "$f"; done
+          for f in index.json search.json; do get campus the-quant-campus "$f"; done
 
       - name: Build
         run: uv run --frozen python scripts/build_home.py

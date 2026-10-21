@@ -31,7 +31,7 @@ copy_kit(DOCS / "rink")                  # -> docs/rink/assets/qk/{tokens.css, q
 
 ```html
 <!doctype html>
-<html lang="en" data-sport="hockey">             <!-- football | f1 | basketball | tennis | baseball | nfl | hockey -->
+<html lang="en" data-sport="hockey">             <!-- football | f1 | basketball | tennis | baseball | nfl | hockey | college -->
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
@@ -154,6 +154,9 @@ tokens, so no page needs the Plotly bundle; migrate them to QKC chart by chart.
 
 - **Dark first, light selected, not inverted.** Each theme has its own surface, ink and chart steps. The
   page follows the OS until the viewer clicks the toggle, which is then remembered (`localStorage['qk-theme']`).
+- **Sites not launched yet.** An entry in `QK.ALL_SPORTS` with `pending: true` (The Quant Campus, Oct 2026) is left out
+  of `QK.SPORTS` (switcher, footer, home tiles) except on its own pages (`data-sport` set on `<html>`) and in local
+  preview (`QK.localBase()`); `QK.sport(key)` still finds it. Launching = removing the flag.
 - **Brand amber + one accent per sport.** Amber (`--brand`) marks The Quant; each site sets `data-sport`
   and its accent (`--a-<sport>`) colours the nav underline, section rules and tiles. Accents mark identity
   only; text beside them stays ink.

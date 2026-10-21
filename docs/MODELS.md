@@ -127,8 +127,8 @@ The ridge is not scaled by the number of matches and does not apply to `home_adv
 
 | Name | Class default | Where overridden |
 |---|---|---|
-| `xi` (daily decay) | 0.0018 | per league from `model_params.json` (0.001 to 0.008); pooled 0.0035; own-fit cups 0.0035; international 0.002 |
-| `ridge` | 1.0 | per league (0.25 to 2.0); pooled 1.0; cups 1.0; international 1.0 |
+| `xi` (daily decay) | 0.0018 | `model_params.json`: 0.0035 in every league since 21 October 2026 (it was 0.001 to 0.008 per league); pooled 0.0035; own-fit cups 0.0035; international 0.002 |
+| `ridge` | 1.0 | 1.0 in every league since 21 October 2026 (it was 0.25 to 2.0); pooled 1.0; cups 1.0; international 1.0 |
 | `max_goals` | 8 | `LeagueConfig`, `CupConfig`, `LigaConfig` all 8 |
 | rho bounds | [-0.99, 0] | fixed |
 | minimum rows to fit | 50 (league, cup own fit, Liga, pooled); 30 (international) | build code |
@@ -142,7 +142,18 @@ With xi = 0.0035 the half-life is ln 2 / 0.0035, about 198 days. With xi = 0.008
 
 ### 2.5 Market-rate rows (since 2 October 2026)
 
-`oddsmarkets/football/sources/market_rates.py` adds one extra training row per finished league match that football-data.co.uk lists with closing prices: the pair of goal rates (home, away) that reproduces the de-vigged closing 1X2 and over/under 2.5 under a Dixon-Coles score model (rho -0.05), carried in the xG columns (so the row uses the continuous-Poisson path) with weight `W_MKT = 3`. The match's own goals or xG row stays as it was. Closing prices are Pinnacle's where the files have them (to January 2026), else the Betfair exchange close, else the market average; the research found average-close rates exactly as useful as Pinnacle's (difference -0.0002 nats, CI -0.0005 to +0.0001).
+`oddsmarkets/football/sources/market_rates.py` adds one extra training row per finished league match that football-data.co.uk lists with closing prices: the pair of goal rates (home, away) that reproduces the de-vigged closing 1X2 and over/under 2.5 under a Dixon-Coles score model (rho -0.05), carried in the xG columns (so the row uses the continuous-Poisson path) with weight `W_MKT`. The match's own goals or xG row stays as it was. Closing prices are Pinnacle's where the files have them (to January 2026), else the Betfair exchange close, else the market average; the research found average-close rates exactly as useful as Pinnacle's (difference -0.0002 nats, CI -0.0005 to +0.0001).
+
+**Since 21 October 2026** the rows weigh `W_MKT = 96` and decay with their own `XI_MKT = 0.03` a day (half-life 23 days), against `exp(-xi * days)` for goals and xG rows. `DixonColesModel` is unchanged; `market_rows` multiplies each row's weight by `exp(-(XI_MKT - xi_fit) * days_ago)`, where `xi_fit` is the decay of the fit the rows go into, read per league from `model_params.json` (`fit_xi`: the `pooled` block for pooled leagues, else the league's own). The same change moved the seven own-fit leagues (LaLiga, Serie A, Eredivisie, Brasileirão, Argentina, Liga MX, Belgium) to xi 0.0035, ridge 1.0 and dc_weight 1.0; their old values are kept in the file under `params_before_oct2026`. The ratings now mostly follow the last few weeks of closing lines. Walk-forward results (settings chosen on 2014-2018 football-data seasons, tested on 2019/20 to October 2026; `docs/research/football_edge.md`, "Model-improvement programme, Oct 2026"):
+
+| | before (weight 3, the fit's decay, tuned per-league params) | after |
+|---|---|---|
+| site's 12 leagues, log-loss gap to Pinnacle's pre-match snapshot (n 17,356) | +0.0143 | +0.0046 (95% CI 0.0031 to 0.0061) |
+| site's 12 leagues, gap to Pinnacle's close (n 27,537) | +0.0177 | +0.0097 (0.0083 to 0.0111) |
+| 20 football-data divisions, gap to the snapshot (n 46,398) | +0.0115 | +0.0047 (0.0037 to 0.0057) |
+| paired change, site's 12 (n 31,127) | | log-loss -0.0075 (-0.0087 to -0.0064), Brier -0.0049 (-0.0057 to -0.0042) |
+
+Every one of 35 leagues improved. The model still trails the snapshot, the close and the Kalshi/Polymarket prices; a walk-forward recalibration and a stack with a goals-only fit were tested and not adopted (no significant gain; the totals recalibration lost on the test seasons). **Caution:** `scripts/tune_league_models.py` does not include the market rows in its folds; re-running it would put back the long decays and Elo shares that lose with the rows in.
 
 - Where: `pooled_training_frame` (league parts) and `build_model`'s own fit in `scripts/build_site_all.py`, and the Argentine fit in `scripts/build_site_liga.py`. The rows go to the Dixon-Coles fit only; Elo, `empirical_calibration` and the seeding read the plain one-row-per-match frame.
 - Leagues: the twelve with a football-data file (not the Saudi Pro League); fixtures are matched to Sofascore events by day and score (`football_data.map_to_sofascore`).
@@ -298,7 +309,7 @@ Where the pooled fit ran, all methods are re-scored on the pooled test rows so t
 
 **Selection.** `global` is the reference. `pooled`, then `per-league`, replaces the current choice only if it beats that choice by `margin = 0.002` log-loss. The winner must also beat the better of two baselines: uniform (ln 3 = 1.0986) and a home-advantage-only prior (H/D/A frequencies over the first 200 rows). Otherwise `method = "default"` with `DEFAULTS`.
 
-**Output.** `oddsmarkets/football/competitions/league/data/model_params.json` (current file tuned 2026-09-22):
+**Output.** `oddsmarkets/football/competitions/league/data/model_params.json` (tuned 2026-09-22; on 21 October 2026 the own-fit leagues' xi, ridge and dc_weight were set by hand to 0.0035 / 1.0 / 1.0, section 2.5; the table shows the tuner's values, kept in the file as `params_before_oct2026`):
 
 | League | Method | xi | ridge | Elo HA | K | dc_weight | log-loss | best baseline | n_eval |
 |---|---|---|---|---|---|---|---|---|---|

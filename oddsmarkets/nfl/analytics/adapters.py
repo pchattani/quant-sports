@@ -385,15 +385,21 @@ def price_dist(ctx, pr: dict, g: dict, n: int = 10000) -> dict | None:
     sup = np.asarray(GMm.SUPPORT)
     keep = np.abs(sup) <= 40
     tl = np.arange(10, 91)
-    T = ndtr((tl + 0.5 - mt) / st) - ndtr((tl - 0.5 - mt) / st)
+    if hasattr(GMm, "total_pmf"):                                  # discrete total with key multipliers (21 Oct 2026)
+        T = GMm.total_pmf(mt, st, GMm.total_keys(p))[0][10:91]
+    else:
+        T = ndtr((tl + 0.5 - mt) / st) - ndtr((tl - 0.5 - mt) / st)
     out: dict = {"margin": {"lo": int(sup[keep][0]), "p": [round(float(x), 5) for x in P[keep]]},
                  "total": {"lo": 10, "p": [round(float(x), 5) for x in T / T.sum()]},
                  "margin_sd": round(sig, 2), "total_sd": round(st, 2)}
     ln = g.get("lines") or {}
+    # cover / over at the market's own line: the market-line calibrated probabilities (game.market_cover / market_over)
+    cov = getattr(GMm, "market_cover", None) or (lambda m_, s_, l_, k_: GMm.cover_prob(m_, s_, l_, k_))
+    ovr = getattr(GMm, "market_over", None) or (lambda m_, s_, l_: GMm.total_prob(m_, s_, l_))
     if ln.get("spread_home") is not None:
-        out["cover"] = {k: round(v, 4) for k, v in GMm.cover_prob(mu, sig, float(ln["spread_home"]), kk).items()}
+        out["cover"] = {k: round(v, 4) for k, v in cov(mu, sig, float(ln["spread_home"]), kk).items()}
     if ln.get("total") is not None:
-        out["over"] = {k: round(v, 4) for k, v in GMm.total_prob(mt, st, float(ln["total"])).items()}
+        out["over"] = {k: round(v, 4) for k, v in ovr(mt, st, float(ln["total"])).items()}
     DS = _module("drive_sim")
     if DS is not None and n > 0 and pr.get("home_pts") is not None and pr.get("away_pts") is not None:
         try:

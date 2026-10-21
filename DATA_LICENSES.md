@@ -1,6 +1,6 @@
 # Data sources, credits and terms
 
-The sites built from this repository (The Quant Footballer, Paddock, Hardwood, Ace, Bullpen, Gridiron and Rink)
+The sites built from this repository (The Quant Footballer, Paddock, Hardwood, Ace, Bullpen, Gridiron, Rink and Campus)
 are non-commercial. They publish model outputs and compact facts derived from the sources below, credit each
 source on the site, and do not re-host raw feeds. The rule throughout: a source whose terms forbid reuse or
 redistribution is not used (Nippon Professional Baseball's npb.jp, Basketball-Reference, Pro Football
@@ -12,7 +12,7 @@ Reference, Spotrac, HoopsHype and OverTheCap contracts are left out for that rea
 | **StatsBomb Open Data** | World Cup player and expected-goals aggregates (`oddsmarkets/sports/world_cup/data/`) | StatsBomb's open-data user agreement: free use with attribution | aggregates; credit: *Data provided by StatsBomb* |
 | **Jolpica F1** (Ergast successor) | Formula 1 results, qualifying, laps and pit stops | free API; Formula 1 timing data belongs to Formula One Management | Paddock season stores (`docs/paddock/data/`) |
 | **OpenF1** (openf1.org) | sessions, stints, race control, telemetry | unofficial, from F1 live timing; non-commercial | session records and telemetry **summaries**; raw telemetry is never committed |
-| **ESPN** public JSON | NBA/WNBA play-by-play and box scores, tennis, MLB/NFL/NHL odds and scores | no published API terms; used non-commercially, credited | compact season stores and derived tables; raw responses are not published |
+| **ESPN** public JSON | NBA/WNBA and college (FBS football, D-I basketball) scores, box scores, play-by-play, polls and closing lines; tennis; MLB/NFL/NHL odds and scores | no published API terms; used non-commercially, credited | compact season stores and derived tables; raw responses are not published |
 | **WTA** stats API | WTA draws, matches and match statistics | terms unstated | compact stores only |
 | **tennis-data.co.uk** | tennis results and closing odds | free download | compact stores only |
 | **Match Charting Project** (Jeff Sackmann and contributors) | tennis shot-level style profiles (`docs/ace/data/*/style.json`) and test excerpts | **CC BY-NC-SA 4.0** | the derived style tables, which are shared alike under CC BY-NC-SA 4.0 (licence and credit in each file's `_meta`) |
