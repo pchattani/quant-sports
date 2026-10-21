@@ -528,6 +528,14 @@ def test_backtest_on_synthetic(lg, rink_roots):
     assert {r["model"] for r in rows} >= {"model", "elo", "xg_baseline", "market"}
 
 
+def test_write_calibration_keeps_season_odds_on_games_only_refresh(rink_roots):
+    path = rink_roots["data"] / "calibration.json"
+    BT.write_calibration({"generated_at": "t1", "metrics": {}, "season_sim": {"n_sims": 7}})
+    BT.write_calibration({"generated_at": "t2", "metrics": {"model": {"n": 1}}})
+    cal = json.loads(path.read_text())
+    assert cal["season_sim"] == {"n_sims": 7} and cal["game_model"]["generated_at"] == "t2"
+
+
 def test_elo_basics():
     g = pd.DataFrame([{"game_id": str(i), "season": S3, "date": pd.Timestamp("2026-10-01") + pd.Timedelta(days=i), "gtype": "REG",
                        "home": "BOS", "away": "TOR", "played": True, "margin": 2.0, "so": False, "neutral": False} for i in range(10)])

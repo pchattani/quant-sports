@@ -814,6 +814,58 @@ item 17), k_pull 2.0, r_en 0.12, k_ot 2.366 / 1.302, so_home 0.496; Rink value's
 (2010–11 to 2025–26), R² 0.560 offence and 0.063 defence, Pythagorean x 2.1; award logits fitted for all five
 trophies (Hart top-1 9 of 17 seasons, Vezina 11 of 17, Norris 6 of 17, Calder 11 of 16, Selke 0 of 13).
 
+**Totals in this section were wrong** (corrected in section 14.5): the 0.6068 / 0.6169 against 0.6867 and the RMSE
+44.4 came from a line-parsing bug, not from the model.
+
+### 14.5 Model-improvement program (21 October 2026)
+
+Full write-up, experiment log and edge backtest: `docs/research/nhl_edge.md` (code `scripts/nhl_edge.py`). Split
+fixed before reading any test number: warm-up 2019–20, dev 2020–21 to 2022–23, sealed test 2023–24 to 2025–26
+(4,190 games with a closing line); CIs are paired, bootstrapped by game day.
+
+**Totals fix (items 23 and the 14.4 totals).** On 2 October some 2022–23 ESPN captures carried a price (−110) in the
+total-line field; `_cdata.line_fields` was fixed on 3 October (a total outside 3–12 falls back to the main line) but
+`calibration.json` was not regenerated, so the site published a model that "beat" the market on totals by 0.07
+log-loss and a market RMSE of 44.4. `calibration.json`'s `game_model` block was regenerated on 21 October with the
+current code and the committed fits (`backtest.write_calibration` now keeps the season-odds block on a games-only
+refresh; season odds unchanged). Moneyline and puck-line numbers are unchanged. Corrected totals, 2019–20 to 2025–26:
+
+| | n | log-loss | Brier | mean P(over) / base rate |
+|---|---|---|---|---|
+| model, P(over the closing total) | 8,932 | 0.6938 | 0.2503 | 0.478 / 0.501 |
+| market's de-vigged over price | 8,574 | **0.6912** | 0.2490 | 0.502 / 0.501 |
+| model on the same 8,574 games | 8,574 | 0.6939 | 0.2504 | |
+| total goals RMSE: model's expected total / the closing line | 8,932 | 2.318 / 2.332 | | |
+
+The market's over price is better than the model's; the model's P(over) is also over-dispersed (calibration slope
+0.29 on the test seasons) and leans to the under.
+
+**Before (production) against the prices, test seasons.** Moneyline: 0.6703 against the close's 0.6645 (+0.0058
+[+0.0030, +0.0086]; Brier +0.0027 [+0.0014, +0.0041]); at 08:00 ET with the expected starter, 0.6707 against ESPN's
+open 0.6675 (+0.0032 [+0.0008, +0.0055]) and, on 1,475 games of 2025–26, 0.6847 against Kalshi's mid 0.6795
+(+0.0052 [+0.0006, +0.0097]). Calibration intercept / slope −0.040 / 1.135. Puck line against the market +0.0049
+[+0.0017, +0.0083]; totals +0.0031 [+0.0005, +0.0056].
+
+**What was tried, and why nothing was promoted.** Team ratings implied by past closing lines (ridge on the de-vigged
+closing logit, half-life 60 days), net or not of the starting goalie; walk-forward Platt scaling and logistic stacks
+with Elo; the skaters who dressed (known at puck drop: the share of a team's usual ice time missing, and the change in
+TOI-weighted points and on-ice xG rates); offset stacks that keep the model's own calibration; for the puck line and
+totals, Platt scaling, the stacked moneyline and past closing totals as team pace ratings. Every variant helped on the
+dev seasons (up to −0.0072 log-loss) and none on the test seasons: the best, model + lineup + market ratings with the
+model's logit as an offset, is −0.0010 [−0.0036, +0.0016] (calibration +0.013 / 1.003), closing 17% of the gap to the
+close, not significantly. The dev seasons were unusual (COVID absences, a no-fans 2020–21; the model's calibration
+slope 1.6 there against 1.13 on the test seasons), and the free stacks learnt that era and were over-confident on the
+test seasons (slopes 0.76–0.82). The site's game model is therefore unchanged.
+
+**Item 17 resolved (no change).** The regulation-score likelihood is flat in tie_k from 0.1 to 0.4 (0.0006 a game on
+4,000 games); 0.2–0.4 reproduce the observed regulation-tie rate (22.7%); 0.1 is the noise of `fit_shape`'s 4,000-game
+subsample, not a boundary. θ = 0 is the bivariate Poisson's own boundary (it cannot correlate negatively); θ = 0.04 is
+worse by 0.0009 a game.
+
+**Edge backtest** (`scripts/edge_backtest.py`, quarter-Kelly, shrinkage on): no edge; every market loses to the
+closing line (all markets CLV −2.80% [−4.53, −1.91], ROI −6.67% [−13.91, −1.12], 439 bets; the moneyline has 19 bets
+because the fitted weight on the model is negative).
+
 ---
 
 ## 15. Known limitations
@@ -943,7 +995,9 @@ the text says, what the code holds, and a suggested resolution.
     was 2010–11 (1,319 games, log-loss 0.6861). Suggested: use `game.DEFAULTS` there.
 17. **Grid edges.** The committed game fit put θ (0.0) and tie_k (0.4) on the lower edges of
     their grids, and the se_scale scan chose its upper edge (1.0); widen the grids at the
-    refit if they stay there.
+    refit if they stay there. *Resolved 21 October 2026 (section 14.5): the grid was widened to 0.1 and tie_k still
+    lands there, but the likelihood is flat from 0.1 to 0.4 and the pick is subsample noise; θ = 0 is the model's own
+    boundary. No change.*
 18. **Team-strength carry-overs not fitted.** `fit_carryover` needs 40 franchise pairs a
     unit; with one pair of consecutive seasons the committed file equals the defaults
     (section 9). The full history fixes this.
@@ -965,7 +1019,9 @@ the text says, what the code holds, and a suggested resolution.
 
 23. **Total-goals RMSE of the market line.** `calibration.json` `game_model.total_rmse.line` is 44.38 on 8,941 games
     (the model's 2.316): not a plausible RMSE of a closing total; probably a unit or matching problem in
-    `backtest.py`'s totals block. Not investigated.
+    `backtest.py`'s totals block. Not investigated. *Resolved 21 October 2026 (section 14.5): a line-parsing bug
+    (prices read as total lines in some 2022-23 ESPN captures), fixed in code on 3 October; `calibration.json`
+    regenerated. The closing total's RMSE is 2.332, the model's 2.318.*
 24. **Launch xG claim.** The memory note and section 14.2's reading that our xG beats MoneyPuck held only for the
     two-season, within-season cross-fit; after the refit MoneyPuck is ahead in every season (section 14.4).
 

@@ -315,7 +315,8 @@ def write_calibration(out: dict) -> None:
     path = D.data_root() / "calibration.json"
     cur = D.read_json(path) or {}
     cur["game_model"] = {k: v for k, v in out.items() if k != "season_sim"}
-    cur["season_sim"] = out.get("season_sim")
+    # a games-only refresh (season_sims=0) keeps the season-odds block already in the file
+    cur["season_sim"] = out.get("season_sim") or cur.get("season_sim")
     cur["updated_at"] = out["generated_at"]
     D.write_json(path, cur)
 
