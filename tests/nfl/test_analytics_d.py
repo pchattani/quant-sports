@@ -161,6 +161,49 @@ def test_game_page_blocks(synth):
     assert again["plays"] == page["plays"] and again["drives"] == page["drives"]
 
 
+def test_espn_join_int_keys():
+    """ESPN's whole-number quarters and clocks parse as int64; the as-of join with the float nflverse keys must not
+    raise (every CI game page of week 6, 2026 failed on it)."""
+    import pandas as pd
+    from oddsmarkets.nfl.analytics import games as GM
+    ep = [[1, 1, 900, "NE", 0, 0, 65, "Kickoff", "kick", 0, 0, 0.6], [2, 1, 880, "NYJ", 1, 10, 75, "Rush", "run", 0, 0, 0.58],
+          [3, 2, 300, "NE", 2, 5, 40, "Pass", "pass", 7, 3, 0.7]]
+    df = pd.DataFrame({"qtr": [1.0, 1.0, 2.0], "quarter_seconds_remaining": [890.0, 870.0, 200.0]})
+    w = GM._espn_join(df, ep)
+    assert list(w.round(2)) == [0.6, 0.58, 0.7]
+
+
+def test_game_page_espn_fallback(synth, monkeypatch):
+    """No nflverse plays for the game yet: the page is built from ESPN's record (plays, WP, drives, score, box) and
+    marked source "espn"; once nflverse has the game the page switches to it."""
+    from oddsmarkets.nfl.analytics import games as GM
+    from oddsmarkets.nfl.sources import espn
+    from .conftest import load_fixture_json
+    rec = espn.compact_summary(load_fixture_json("espn_summary_401873001.json"), "2026_06_NYJ_NE", 2026)
+    ctx = _ctx()
+    g = {"game_id": "2026_06_NYJ_NE", "season": 2026, "week": 6, "home": "NE", "away": "NYJ", "hs": 26, "as": 19, "status": "final"}
+    monkeypatch.setattr(GM, "espn_summary", lambda g: rec)
+    page = GM.build_page(ctx, g, None, GM.card(ctx, g), None, None, {}, {}, None)
+    assert page["ok"] and page["source"] == "espn"
+    assert page["plays"]["cols"] == GM.PLAY_COLS + GM.EXTRA_PLAY_COLS and len(page["plays"]["rows"]) > 100
+    assert all(len(r) == len(page["plays"]["cols"]) for r in page["plays"]["rows"])
+    assert sum(1 for r in page["wp"]["rows"] if r[3] is not None) > 100
+    assert page["drives"]["rows"] and all(len(r) == len(GM.DRIVE_COLS) for r in page["drives"]["rows"])
+    assert {r[8] for r in page["drives"]["rows"]} & {"Touchdown", "Punt", "Field goal"}
+    assert sum(page["score"]["home"]) == 26 and sum(page["score"]["away"]) == 19
+    box = page["box"]
+    assert box["away"]["passing"][0]["name"] == "Geno Smith" and box["away"]["passing"][0]["att"] == 30
+    assert box["home"]["rushing"] and box["home"]["receiving"] and box["home"]["defense"]
+    assert all(r["name"] for side in box.values() for sec in ("passing", "rushing", "receiving", "defense") for r in side[sec])
+    assert box["away"]["team"]["third_down"] == [3, 10] and page["key_plays"]
+    # a later ESPN-sourced rebuild replaces an old ESPN page; an nflverse page is never downgraded to ESPN
+    again = GM.build_page(ctx, g, None, GM.card(ctx, g), None, page, {}, {}, None)
+    assert again["source"] == "espn" and again["plays"] == page["plays"]
+    nv = dict(page, source="nflverse", plays={"cols": GM.PLAY_COLS, "rows": [[1]]})
+    kept = GM.build_page(ctx, g, None, GM.card(ctx, g), None, nv, {}, {}, None)
+    assert kept["source"] == "nflverse" and kept["plays"] == nv["plays"]
+
+
 def test_model_failure_is_isolated(synth, monkeypatch):
     """Play- and player-level models that raise are recorded in model_errors; the catalogue still builds."""
     import sys

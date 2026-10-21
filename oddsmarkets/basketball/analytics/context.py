@@ -5,7 +5,8 @@ model never stops the rest of the season's payloads).
 
     store, games (league members only), box (regular-season box rows), box_all (every counted game),
     shots (the season's shot table with xPTS), stints (stint frame) and team_stints, xpts (shots.for_season),
-    impact (impact.for_season), ratings (ratings.for_season), wp_model, pbp (the pbp pass), sim (season_sim),
+    impact (impact.for_season), ratings (ratings.for_season), informed (the market-informed game model's inputs),
+    wp_model, pbp (the pbp pass), sim (season_sim),
     elo (the league history, shared), markets (futures and game prices for the current season).
 """
 from __future__ import annotations
@@ -179,6 +180,16 @@ class SeasonContext:
                 self.store.get("games") or {}, through=d - timedelta(days=1), prior=self.prior or None, league=self.league,
                 teams=self.teams), {"teams": {}})
         return self._fits[key]
+
+    @cached_property
+    def informed(self) -> dict | None:
+        """Per-day inputs of the market-informed game model (`models/informed.py`): market ratings from the store's
+        closing lines and expected availability; None where the league does not use it, and for past seasons (their
+        game pages keep the base model; the calibration page scores the informed model walk-forward)."""
+        from oddsmarkets.basketball.models import informed as INF
+        if not INF.enabled(self.league) or self.season != self.current:
+            return None
+        return _safe("informed inputs", lambda: INF.season_inputs(self.league, self.season, self.store), None)
 
     @cached_property
     def schedule(self):

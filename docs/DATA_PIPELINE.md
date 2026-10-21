@@ -77,7 +77,7 @@ to the public site repository.
                              + committed crests docs/site/assets/crests/<team_id>.png
                            writes docs/site/data/**: competitions.json, hub.json,
                              search.json, season_index.json, nations.json, pool.json,
-                             players_global.json, careers/, history/, and per
+                             lab/ (one row per person), careers/, history/, and per
                              competition <slug>/{fixtures,table,probs,bracket,strength,
                              teams,players_live,player_leaders,shots,team_stats,
                              matches,meta,history,market_odds,club_matches}.json,

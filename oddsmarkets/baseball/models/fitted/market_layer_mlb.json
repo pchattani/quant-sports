@@ -1,0 +1,47 @@
+{
+ "version": 1,
+ "platt": [
+  0.00999,
+  0.93862
+ ],
+ "tot_recal": [
+  -0.03265,
+  0.24979
+ ],
+ "runline": [
+  -0.01907,
+  0.79384,
+  0.92491
+ ],
+ "n": {
+  "moneyline": 25056,
+  "totals": 23918,
+  "runline": 24763
+ },
+ "seasons": [
+  2016,
+  2026
+ ],
+ "cfg_ml": {
+  "tau": 60.0,
+  "carry": 0.7,
+  "window": 400,
+  "lam": {
+   "team": 1.0,
+   "sp": 2.0
+  }
+ },
+ "cfg_tot": {
+  "tau": 60.0,
+  "carry": 0.7,
+  "window": 400,
+  "lam": {
+   "off": 1.0,
+   "def": 1.0,
+   "venue": 1.0,
+   "sp": 1.0
+  }
+ },
+ "k_run": 10.0,
+ "mean_offset": 0.44
+}

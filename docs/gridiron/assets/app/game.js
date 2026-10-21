@@ -44,7 +44,7 @@ function wpSeries(g, plays, pre) {
     const rows = R(w);
     const mk = key => rows.filter(r => isNum(r[key])).map((r, k) => { const i = isNum(r.play_index) ? Number(r.play_index) : k; const pl = P[i] || {}; return { i: i, qtr: pl.qtr, clock: pl.clock, p: Number(r[key]), desc: pl.desc || '' }; });
     const ours = mk('wp_home_ours'), nf = mk('wp_home_nflfastr'), espn = mk('wp_home_espn');
-    return ours.length >= 2 ? { ours: ours, espn: espn, name: 'Our model' } : { ours: nf, espn: espn, name: 'nflfastR' };
+    return ours.length >= 2 || nf.length < 2 ? { ours: ours, espn: espn, name: 'Our model' } : { ours: nf, espn: espn, name: 'nflfastR' };
   }
   const ours = [], espn = [], nf = [];
   const p0 = pre && pre.model && isNum(pre.model.p_home) ? Number(pre.model.p_home) : null;
@@ -331,11 +331,15 @@ function driveTable(g, drives) {
       return [d.n, { html: GI.teamChip(d.team), v: d.team }, { html: esc(GI.clockText(d.qtr, d.clock)), v: d.n }, { html: esc(GI.fieldPos(d.start, d.team, opp)), v: d.start },
         isNum(d.plays) ? d.plays : '—', isNum(d.yards) ? Math.round(d.yards) : '—', d.time ? GI.fmtClock(d.time) : '—', { html: GI.pill(r.label, r.colour), v: r.label }, { html: isNum(d.epa) ? GI.signed(d.epa, 2) : '—', v: d.epa }]; }), { maxHeight: 420 });
 }
+/* Pages built from ESPN's record while nflverse has not published the week: say so where the nflverse-only parts are missing. */
+function espnNote(g) {
+  return g.source === 'espn' ? GI.muted('Provisional: built from ESPN’s play-by-play and box score until nflverse publishes this week (usually within a day); EPA, fourth-down grades, game balls and the advanced box columns fill in then.') : '';
+}
 function flowTab(g, pre, plays) {
   const fd = fourthOf(g, plays), sc = scoringOf(g, plays), kp = keyPlaysOf(g, plays), wp = wpSeries(g, plays, pre);
   const hasWp = wp.ours.length >= 2 || wp.espn.length >= 2;
   const hasDrives = GI.ch.driveRows(g.drives).length > 0;
-  let h = GI.card('Win probability', esc(GI.teamAbbr(g.home)) + ' (home) · ' + (wp.name === 'Our model' ? 'our model' : esc(wp.name)) + ' solid' + (wp.espn.length ? ', ESPN dotted' : '') + ' · ◆ 4th downs by grade · ● scores · numbers: key plays' +
+  let h = espnNote(g) + GI.card('Win probability', esc(GI.teamAbbr(g.home)) + ' (home) · ' + (wp.name === 'Our model' ? 'our model' : esc(wp.name)) + ' solid' + (wp.espn.length ? ', ESPN dotted' : '') + ' · ◆ 4th downs by grade · ● scores · numbers: key plays' +
     (wp.name !== 'Our model' ? ' · our WP model is not fitted for this game, so nflfastR\'s published WP is shown' : ''),
     hasWp ? GI.chartBox('gm-wp', 360, 'Win probability through the game') : GI.muted(GI.isPre(g) ? 'The win-probability chart starts at kickoff.' : 'No win-probability path for this game yet.'));
   h += GI.card('Drive chart', 'every drive from where it started to where it ended, own goal line on the left; colour is the result', hasDrives ? GI.chartBox('gm-drives', 400, 'Drive chart') +
@@ -351,6 +355,7 @@ function flowTab(g, pre, plays) {
 
 function pbpTab(g, plays) {
   if (!plays.length) return { html: GI.card('Play-by-play', '', GI.muted(GI.isPre(g) ? 'Plays appear at kickoff.' : 'No plays yet.')) };
+  const note = espnNote(g);
   const f = FILT[g.game_id] = FILT[g.game_id] || { team: 'all', qtr: 'all', kind: 'all', epa: '0', wpa: '0', q: '' };
   const qtrs = [];
   plays.forEach(p => { if (isNum(p.qtr) && qtrs.indexOf(Number(p.qtr)) < 0) qtrs.push(Number(p.qtr)); });
@@ -392,7 +397,7 @@ function pbpTab(g, plays) {
     wrap.innerHTML = list.length ? '<div class="qk-table-wrap gi-plays"><table class="qk-table dense"><thead><tr><th class="num">Clock</th><th>Team</th><th>Situation</th><th>Play</th><th class="num"><span data-tip="Expected points added for the offence">EPA</span></th>' +
       '<th class="num"><span data-tip="Home win probability added, points">WPA</span></th><th class="num"><span data-tip="Home win probability after the play: ours (ESPN below)">WP</span></th></tr></thead><tbody>' + body + '</tbody></table></div>' : GI.muted('No plays match these filters.');
   };
-  return { html: GI.card('Play-by-play', 'EPA for the offence · WPA and WP from ' + esc(GI.teamAbbr(g.home)) + '\'s side', ctl + '<div id="pbp-wrap"></div>'), after: root => {
+  return { html: note + GI.card('Play-by-play', 'EPA for the offence · WPA and WP from ' + esc(GI.teamAbbr(g.home)) + '\'s side', ctl + '<div id="pbp-wrap"></div>'), after: root => {
     [['pf-team', 'team'], ['pf-qtr', 'qtr'], ['pf-kind', 'kind'], ['pf-epa', 'epa'], ['pf-wpa', 'wpa']].forEach(x => { const n = root.querySelector('#' + x[0]); if (n) n.addEventListener('change', () => { f[x[1]] = n.value; draw(root); }); });
     const qn = root.querySelector('#pf-q');
     if (qn) qn.addEventListener('input', () => { f.q = qn.value; draw(root); });
@@ -455,7 +460,8 @@ function boxTab(g) {
   const keys = Object.keys(box);
   if (!keys.length && !Object.keys(ngs).length) return { html: GI.card('Box score', '', GI.muted(GI.isPre(g) ? 'The box score fills in from kickoff.' : 'No box score yet.')) };
   keys.sort((a, b) => { const ia = BOX_ORDER.indexOf(a), ib = BOX_ORDER.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
-  return { html: keys.map(k => boxSection(g, k, box[k], /passing|rushing|receiving/.test(k) ? 'with EPA and our advanced columns' : '')).join('') +
+  const espn = g.source === 'espn';
+  return { html: espnNote(g) + keys.map(k => boxSection(g, k, box[k], espn ? 'ESPN box score' : (/passing|rushing|receiving/.test(k) ? 'with EPA and our advanced columns' : ''))).join('') +
     Object.keys(ngs).map(k => boxSection(g, k, ngs[k], 'NFL Next Gen Stats (via nflverse), credited; informational, non-commercial use')).join('') +
     '<p class="gi-cap">EPA is our expected points added. Columns with an NGS tooltip are NFL Next Gen Stats; charting columns are FTN Data via nflverse (CC BY-SA 4.0).</p>' };
 }

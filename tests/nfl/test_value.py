@@ -221,3 +221,11 @@ def test_contracts_table_and_gate(monkeypatch):
     monkeypatch.setenv("GRIDIRON_CONTRACTS", "1")
     assert CT.enabled() is True
     assert CT.season_cap(tab) is None                               # too few rows to read the cap from
+
+
+def test_valuation_person_name_fallback(monkeypatch):
+    """A rostered player with no snap in the panel is named from the crosswalk, never published as his gsis id."""
+    from oddsmarkets.nfl.analytics import people, valuation
+    monkeypatch.setattr(people, "_PEOPLE", {"00-0035264": {"name": "Jarrett Stidham"}})
+    assert valuation._person_name("00-0035264") == "Jarrett Stidham"
+    assert valuation._person_name("00-0000000") is None

@@ -502,7 +502,38 @@ class SeasonContext:
     def player_name(self, pid: Any) -> str | None:
         p = self.players.get(an.sid(pid)) or {}
         nm = p.get("name") or " ".join(x for x in (p.get("first"), p.get("last")) if x)
-        return nm or None
+        if nm:
+            return nm
+        k = an.sid(pid)
+        if not k:
+            return None
+        return self.extra_names().get(k) or None
+
+    def extra_names(self) -> dict[str, str]:
+        """Names of players the store's roster pass missed (call-ups after it ran, which otherwise publish as their id):
+        full names from the stats reports of this season, then of the seasons either side. Read once, on the first miss
+        (a few small files; the play-by-play roster spots would cost a minute a season)."""
+        xn = getattr(self, "_xnames", None)
+        if xn is not None:
+            return xn
+        import gzip
+        import json as _json
+        out: dict[str, str] = {}
+        root = an.raw_root()
+        for season in (self.season, self.season - 10001, self.season + 10001):
+            for rep, col in (("skater_summary_2", "skaterFullName"), ("skater_summary_3", "skaterFullName"),
+                             ("goalie_summary_2", "goalieFullName"), ("goalie_summary_3", "goalieFullName")):
+                try:
+                    with gzip.open(root / "stats" / str(season) / f"{rep}.json.gz", "rt", encoding="utf-8") as fh:
+                        rows = _json.load(fh)
+                except (OSError, ValueError, EOFError):
+                    continue
+                for r in rows or []:
+                    k, v = an.sid(r.get("playerId")), r.get(col)
+                    if k and v:
+                        out.setdefault(k, str(v))
+        self._xnames = out
+        return out
 
     def team_games(self) -> int:
         n: dict[str, int] = {}

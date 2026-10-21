@@ -1803,6 +1803,12 @@ HUB_RATING_MINUTES = 450
 UPCOMING_STATUSES = ("scheduled", "live")
 
 
+def _once(rows: list[dict]) -> list[dict]:
+    """Each player's first (best) row of a sorted leader list: a player in two competitions is listed once."""
+    seen: set[str] = set()
+    return [r for r in rows if not (str(r.get("id")) in seen or seen.add(str(r.get("id"))))]
+
+
 def build_hub(entries: list[dict], now: datetime | None = None) -> dict:
     """The scoreboard across competitions for the coming week, and the leaders across them."""
     today = (now or datetime.now(timezone.utc)).date()
@@ -1873,7 +1879,8 @@ def build_hub(entries: list[dict], now: datetime | None = None) -> dict:
     return {
         "days": days, "window": [lo, hi], "today": today.isoformat(),
         "recent": recent, "upcoming": upcoming,
-        "leaders": {"goals": goals[:15], "assists": assists[:15], "rating": ratings[:15]},
+        # One row per player (his best line): the cross-competition totals are data/lab/leaders.json.
+        "leaders": {"goals": _once(goals)[:15], "assists": _once(assists)[:15], "rating": _once(ratings)[:15]},
         "updated_at": _now(),
     }
 
@@ -1890,7 +1897,14 @@ def build_search(entries: list[dict]) -> dict:
             players.append({"id": p["player_id"], "n": p["name"], "t": p["team"], "comp": c["slug"],
                             "pos": p.get("position"), "min": p.get("minutes", 0)})
     players.sort(key=lambda p: -p["min"])
-    return {"teams": teams, "players": players, "updated_at": _now()}
+    # One row per player: his competition with most minutes, the others listed (the people index is the full registry).
+    comps: dict[str, list[str]] = {}
+    for p in players:
+        comps.setdefault(str(p["id"]), []).append(p["comp"])
+    once = _once(players)
+    for p in once:
+        p["comps"] = comps[str(p["id"])]
+    return {"teams": teams, "players": once, "updated_at": _now()}
 
 
 # ── people, clubs, seasons ───────────────────────────────────────────────────
@@ -1902,12 +1916,22 @@ def build_unified(entries: list[dict], seasons: dict, archive: dict) -> dict[str
     data/<slug>/s/<sid>/season.json); see docs/site/UNIFIED_PAYLOADS.md. Stores
     are read one at a time. Returns the per-competition keys for competitions.json.
     """
-    from oddsmarkets.football.analytics.unified import Unified, competitions, liga_season_key
+    from oddsmarkets.football.analytics.people_lines import PeopleLines
+    from oddsmarkets.football.analytics.unified import (
+        INTL_SPLIT_START_MONTH, NEUTRAL_COMPETITIONS, Unified, competitions, liga_season_key,
+    )
     from oddsmarkets.football.analytics.value import ValueCollector
 
     global LAST_UNIFIED
     comps_u = competitions()
     collector = ValueCollector()
+
+    def gather(slug: str, store: dict, key_of=lambda m: m.get("season_id")) -> None:
+        # One line per person (data/lab/): the same stores, each edition in its season (u.season_meta).
+        try:
+            lines.add_store(slug, store, era_of=lambda m: (u.season_meta.get((slug, str(key_of(m)))) or {}).get("era"))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("people lines: %s skipped: %s", slug, exc)
 
     def collect(slug: str, store: dict, **kw) -> None:
         # The value model reads the same stores; one failing store must not stop the registries.
@@ -1920,12 +1944,14 @@ def build_unified(entries: list[dict], seasons: dict, archive: dict) -> dict[str
                 past=_read_json(DATA_DIR / "past" / "store.json", {}) or {},
                 squads=_read_json(DATA_DIR / "squads" / "store.json", {}) or {},
                 entries=entries, pool=_read_json(DATA_DIR / "pool.json", {}) or {})
+    lines = PeopleLines(comps_u, today=u.today, neutral=NEUTRAL_COMPETITIONS, intl_split_month=INTL_SPLIT_START_MONTH)
     for slug in list(LEAGUES) + list(CUPS):
         path = DATA_DIR / slug / "store.json"
         if path.exists():
             store = load_store(path)
             u.add_store(slug, store)
             collect(slug, store, current_key=u.current.get(slug))
+            gather(slug, store)
             del store
     if LIGA_STORE.exists():
         import scripts.build_site_liga as liga_build
@@ -1935,9 +1961,18 @@ def build_unified(entries: list[dict], seasons: dict, archive: dict) -> dict[str
         store = load_store(LIGA_STORE)
         u.add_store(LIGA_ARGENTINA_SLUG, store, current_key=f"{year}-{phase}" if phase else None)
         collect(LIGA_ARGENTINA_SLUG, store, season_key=liga_season_key, current_key=u.current.get(LIGA_ARGENTINA_SLUG))
+        gather(LIGA_ARGENTINA_SLUG, store, key_of=liga_season_key)
         del store
     counts = u.finish()
     u.mark_departed()
+    try:
+        pool = _read_json(DATA_DIR / "pool.json", {}) or {}
+        factors = {s: float(L["factor_att"]) for s, L in (pool.get("leagues") or {}).items() if L.get("factor_att") is not None}
+        lines.merge_aliases(u.aliases)
+        lines.finish(DATA_DIR, frames=u.frame_of_person, people=u.people, club_of=getattr(u, "club_of", {}) or {},
+                     clubs=u.clubs, factors=factors)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("people lines failed: %s\n%s", exc, traceback.format_exc())
     LAST_UNIFIED = {"unified": u, "rows": collector.finish(), "comps": comps_u}
     logger.info("unified: %d people, %d clubs, %d competitions with seasons", counts["people"], counts["clubs"], len(u.manifests))
     return u.competition_fields()
@@ -2110,12 +2145,10 @@ def main() -> int:
     _step("club matches", lambda: build_club_matches(DATA_DIR, hub_entries))
     if n_index is not None:
         logger.info("season index: %d players", n_index)
-    global_out = _step("pool and global players", lambda: site_global.build_global(DATA_DIR, hub_entries, pooled, POOL_CONNECTIONS, POOL_BRIDGES))
-    players_global = global_out[0] if global_out else []
+    _step("pool", lambda: site_global.build_global(DATA_DIR, hub_entries, pooled, POOL_CONNECTIONS, POOL_BRIDGES))
     archive = _step("archive", lambda: load_archive(DATA_DIR / "archive" / "store.json")) or {}
     counts = _step("archive pages", lambda: site_global.build_archive_pages(DATA_DIR, archive)) or {"careers": 0, "seasons": 0}
-    logger.info("site-wide payloads: %d global players, %d careers, %d past seasons",
-                len(players_global), counts["careers"], counts["seasons"])
+    logger.info("site-wide payloads: %d careers, %d past seasons", counts["careers"], counts["seasons"])
 
     unified = _step("people, clubs and seasons", lambda: build_unified(hub_entries, seasons, archive)) or {}
     if not args.no_value:

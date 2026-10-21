@@ -545,7 +545,12 @@ def test_site_wide_payloads(built) -> None:
     assert any(i["comp"] == "premier-league" and i["model"] for i in hub["upcoming"] + [x for d in hub["days"].values() for x in d])
     search = _load(data, "search.json")
     assert any(t["comp"] == "mls" for t in search["teams"])
-    assert search["players"] and all({"id", "n", "t", "comp"} <= set(p) for p in search["players"])
+    assert search["players"] and all({"id", "n", "t", "comp", "comps"} <= set(p) for p in search["players"])
+    ids = [p["id"] for p in search["players"]]
+    assert len(ids) == len(set(ids))                                    # one row per player
+    for k in ("goals", "assists", "rating"):
+        ids = [r["id"] for r in hub["leaders"][k]]
+        assert len(ids) == len(set(ids)), k
     idx = {c["slug"]: c for c in _load(data, "competitions.json")["competitions"]}
     epl = idx["premier-league"]
     assert epl["leader"]["team"] and epl["top_scorer"]["goals"] >= 1 and epl["next"]["home"] and epl["last"]["hs"] is not None
@@ -553,7 +558,7 @@ def test_site_wide_payloads(built) -> None:
 
 
 def test_the_layer_above_the_competitions(built) -> None:
-    """The pooled scale and the global player table, offline; no Ballon d'Or payload any more."""
+    """The pooled scale and the one-row-per-person player views, offline; no Ballon d'Or payload any more."""
     data, _ = built
     pool = _load(data, "pool.json")
     assert pool["model"] and pool["clubs"] and pool["leagues"]
@@ -564,13 +569,35 @@ def test_the_layer_above_the_competitions(built) -> None:
     assert epl["n_clubs"] == 20 and epl["factor_att"] > 0 and epl["block"] == "Europe" and "connection" in epl
     assert isinstance(pool["bridges"], dict)
 
-    g = _load(data, "players_global.json")
-    assert g["players"] and g["metrics"] and g["minutes_floor"] > 0
-    row = next(p for p in g["players"] if p["comp"] == "premier-league" and not p.get("is_gk") and p.get("npxg_90") is not None)
-    assert row["npxg_90_adj"] == pytest.approx(row["npxg_90"] * row["adj_factor"], abs=1e-3)
-    assert row["adj_factor"] == pytest.approx(epl["factor_att"], abs=1e-3)
-    qualified = [p for p in g["players"] if p.get("qualified")]
-    assert qualified and all(p["pct_global"] and p["pool_global"]["key"] for p in qualified)
+    # One row per person across competitions (data/lab/, UNIFIED_PAYLOADS 14); the per-competition files are retired.
+    ix = _load(data, "lab", "index.json")
+    assert ix["metrics"] and ix["adjusted_keys"] and {w["key"] for w in ix["windows"]} == {"season", "last", "365", "ytd"}
+    assert ix["comps"]["premier-league"]["factor"] == pytest.approx(epl["factor_att"], abs=1e-3)
+    checked = 0
+    for win, scopes in ix["scopes"].items():
+        if not scopes.get("all"):
+            continue
+        lab = _load(data, "lab", win, "all.json")
+        f = {k: i for i, k in enumerate(lab["fields"])}
+        ids = [r[f["player_id"]] for r in lab["rows"]]
+        assert ids and len(ids) == len(set(ids)) and lab["floor"] >= 90, win          # one row per person
+        # A person's row sums his competitions: minutes add up, the factor is their minutes-weighted blend.
+        mins: dict = {}
+        for slug in scopes:
+            if slug in ("all", "club", "intl"):
+                continue
+            one = _load(data, "lab", win, f"{slug}.json")
+            assert {r[f["player_id"]] for r in one["rows"]} <= set(ids)
+            for r in one["rows"]:
+                mins.setdefault(r[f["player_id"]], {})[slug] = r[f["minutes"]]
+        for r in lab["rows"]:
+            by = mins.get(r[f["player_id"]]) or {}
+            if by and sum(by.values()) == r[f["minutes"]]:
+                blend = sum(ix["comps"][s_]["factor"] * m for s_, m in by.items()) / r[f["minutes"]]
+                assert r[f["factor"]] == pytest.approx(blend, abs=1e-3)
+                checked += 1
+    assert checked
+    assert not (data / "players_global.json").exists() and not (data / "players_lab.json").exists()
 
     assert not (data / "ballon-dor").exists()
 

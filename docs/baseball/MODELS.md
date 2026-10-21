@@ -89,6 +89,7 @@ Contents
 | Stabilisation | `stabilise.py` (`stab-3`) | `fitted/stabilise_mlb.json` | shrinkage, the glossary |
 | Projections | `projections.py` (version 1) | `fitted/proj_agg_{h,p}_mlb_<S>.parquet` (aggregates) | game inputs, catalogues, prospects |
 | Game simulation | `game_sim.py` (version 1) | `fitted/transitions_mlb.json` (2024–2026) | every game price |
+| Market layer | `market_layer.py` (version 1) | `fitted/market_layer_mlb.json` (2016–2026) | the published MLB game prices (from 21 Oct 2026) |
 | Live WP | `live.py` | – | live cards, game pages |
 | Season simulation | `season_sim.py` | – | season.json, the bracket, series odds |
 | Awards | `awards.py` | verified winners table | award races |
@@ -735,6 +736,55 @@ automatic runner; the PA in progress uses count multipliers (K ×exp(0.60s − 0
 ×exp(0.78b − 0.60s)). Milliseconds per state. A league-average model with no home advantage is
 the reference for archive games (`ours_kind` "league").
 
+### 17.4 The market layer (`market_layer.py`, from 21 October 2026)
+
+The simulation's MLB prices are corrected by what the **closing lines of games already played** say about the
+teams, the starters and the parks. The game being priced never sees its own market line, so the published price
+can still differ from the market and the site's "edge" column keeps its meaning.
+
+- **Moneyline.** For each finished game with a close and a simulation price, r = logit(de-vigged close) −
+  logit(simulation). Each day an exponentially weighted ridge regression on the games of the last 400 days
+  (weight e^(−age/60 days), ×0.7 per season back) explains r by a constant, the two teams (home +1, away −1, ridge
+  1) and the two starters (ridge 2). Published P(home) = sigmoid(a + b (logit p_sim + r̂)), Platt coefficients
+  a = 0.010, b = 0.939 (committed, fitted on 2016–2026).
+- **Totals.** The same regression on r_t = closing total + 10 × (fair P(over) − ½) + 0.44 − simulated mean
+  (0.44: runs scored above the closing total on average in 2016–2021, because the line is a median and totals skew
+  high), with a venue effect, both teams' offence, both teams' run prevention and both starters (ridge 1 each).
+  The simulated distribution of total runs is shifted by r̂_t (the published distribution and expected total);
+  P(over L) = sigmoid(a + b logit P_shift(over L)) with a = −0.033, b = 0.250, applied in full near the expected
+  total (weight exp(−½((L − mean)/2.5)²)) and fading to the shifted distribution further out; whole-run lines
+  exclude pushes. The small b says that even after the shift the simulation's game-to-game totals views are
+  mostly noise: the published over/under probabilities sit close to one half.
+- **Run line.** P(home covers ±1.5) = sigmoid(−0.019 + 0.794 logit P_sim(cover) + 0.925 (logit p_layer −
+  logit p_sim)).
+- **History in production**: the backtest cache's simulation prices (`data/baseball/cache/backtest`) and the
+  build's own ledger of pre-game simulation prices (manifest `sim_prices`, written by `scripts/build_bullpen.py`),
+  joined to the store's closing lines (`edge.game_prices`); this season and the last. With fewer than 300 usable
+  games the layer is off and the simulation is published as it is. Triple-A has no market lines and no layer. A
+  page's payload keeps the simulation's own numbers under `sim` and the layer's inputs under `layer`.
+- **Cost**: about 5 seconds per build (two stores, one ridge solve per market); no refit of any player model.
+- **Validation** (walk-forward: ratings refitted daily, coefficients monthly, on earlier games only; choices made
+  on 2016–2021, tested on 2022–2026; 95% CIs resample dates):
+
+| test seasons 2022–2026 | n | simulation | with the layer | market | layer − simulation | share of the gap closed |
+|---|---|---|---|---|---|---|
+| moneyline v close | 12,236 | 0.6791 | 0.6772 | 0.6744 | −0.0019 (−0.0030 to −0.0010) | 40% |
+| run line v close | 12,061 | 0.6782 | 0.6756 | 0.6737 | −0.0026 (−0.0042 to −0.0011) | 57% |
+| over/under v close | 11,895 | 0.6981 | 0.6933 | 0.6920 | −0.0047 (−0.0068 to −0.0027) | 78% |
+| moneyline v Kalshi 1 h (2025–26) | 4,545 | 0.6838 | 0.6828 | 0.6805 | −0.0010 (−0.0026 to +0.0005) | 32% |
+| moneyline v open (2025–26, rotation-guess starters) | 4,888 | 0.6815 | 0.6811 | 0.6806 | −0.0005 (−0.0020 to +0.0010) | n/s |
+
+  Brier moves the same way (moneyline −0.0009, CI −0.0014 to −0.0005). Calibration: the moneyline's slope of
+  results on logit p is 0.92 against the simulation's 0.95 on 2022–2026 (paired difference −0.03, CI −0.07 to
+  +0.00; 0.89 without the Platt step, which was added after this was seen); the run line's moves from 0.74 to
+  1.04 and the over/under's from 0.24 to 0.34 (ECE 0.042 to 0.012). The layer does not beat any market: the close,
+  the open and Kalshi all stay sharper.
+- **Tried and not adopted**: ratings from the closes themselves (not the residual over the simulation) stacked
+  with the simulation (tune 0.6712 against 0.6704 for the residual version); a flag for starters with fewer
+  than three starts in the window; fitting the stack to the close instead of the results (equal); moving the
+  simulated totals to the line and reading P(over) off the distribution (0.6948–0.6952 on 2017–2021, worse than
+  recalibrating, 0.6925).
+
 ---
 
 ## 18. Season and postseason simulation: `season_sim.py`
@@ -841,6 +891,12 @@ generated 08:34 UTC on 2 October 2026). It replaces the 05:17 UTC run of the sam
 quoted below as "before".
 
 ### 20.2 Results (committed `calibration.json`, 2016–2026)
+
+From 21 October 2026 the committed file's `games` block scores the **published** model, the simulation with the
+market layer (section 17.4), walk-forward over 2016–2026 (`scripts/mlb_market_layer.py`); the simulation alone is
+kept under `games.sim`. Pooled: moneyline 0.6746 (simulation 0.6766; on the games with a close 0.6745 against
+0.6714), over/under 0.6931 (0.6999; market 0.6923), run line 0.6766 (0.6807; market 0.6754), expected total 9.03
+runs against 9.03 actual and within 0.15 in every season. The tables below are the simulation alone (2 October).
 
 Log-loss (Brier) per season. "Model" and "ratings" and "S&R" (starter and record) are over every
 scored game; "model v close" and "close" are on the games with a closing moneyline.
@@ -971,13 +1027,16 @@ Reading it honestly:
    (0.6754 against 0.6807 pooled, every season) once ESPN's swapped run-line prices are put right
    (section 20.2). Against the prices one could have bet, the model shows no edge at the close and no
    robust edge at the open (docs/research/mlb_edge.md). The model is ahead of
-   team ratings pooled (0.6766 against 0.6786) and behind them in two seasons (2018, 2025).
+   team ratings pooled (0.6766 against 0.6786) and behind them in two seasons (2018, 2025). The market layer (section
+   17.4, from 21 October 2026) closes 40% of the moneyline gap on 2022–2026 (0.6772 against the close's 0.6744,
+   the simulation 0.6791) and 57% of the run-line gap, but no market is beaten.
 2. **Totals**: the mean is unbiased pooled (+0.02 runs a game) but misses by about 0.4 runs in
    seasons whose run environment moved within the year (2019, 2020, 2022), and the over/under
    probabilities still score worse than a coin (0.6999 against 0.6931; the market 0.6923): the
    model's game-to-game deviations from the closing total carry almost no information (section
    20.2). Park extremes (Coors Field, the pre-humidor Chase Field) are under-predicted with the
-   contact park factors. Hitters' wOBA projections trail the Marcel baseline (−2.4%) in seasons
+   contact park factors. The market layer's venue effects take the park extremes from earlier closing totals and
+   bring the published over/under to a coin's score (0.6933 on 2022–2026; the market 0.6920). Hitters' wOBA projections trail the Marcel baseline (−2.4%) in seasons
    of rising offence (section 16).
 3. **Inferred fielder positions**: OAA agrees with Savant's moderately (r 0.41–0.62 over 2016–2026), least at
    shortstop; framing agrees closely.

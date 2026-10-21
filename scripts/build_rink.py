@@ -336,6 +336,7 @@ def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, frozen: d
         payload = b.step(f"game {gid}", build)
         if payload is None:
             payload = {"ok": False, "reason": "game page could not be built", "game_id": gid}
+            new_sigs[gid] = None                                 # unsigned: the next run tries again
         b.write(f"{ctx.season}/games/{gid}.json", payload)
         written += 1
     gc.collect()
@@ -660,6 +661,8 @@ def main(argv: list[str] | None = None) -> int:
             rows = dict((res.get(s) or {}).get("rows") or {})
             extra = b.step(f"stats rows {s}", lambda s=s: CR.stats_rows(s), {}) or {}
             for p, r in extra.items():
+                if p in rows and str(rows[p].get("name") or p) == p and r.get("name"):
+                    rows[p] = {**rows[p], "name": r["name"]}
                 rows.setdefault(p, r)
             rows_by[s] = rows
         blocks: dict[str, dict] = {}

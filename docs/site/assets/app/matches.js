@@ -213,6 +213,16 @@ FB.route('match', function (el, p) {
   });
 });
 
+// Why a finished match has no detail: older than a year (season and player pages only), or a recent tie the
+// detail fetch leaves out (qualifying and early cup rounds without a followed club, where Sofascore usually has no
+// line-ups), or one Sofascore has not published detail for.
+function noDetailReason(f) {
+  var t = Date.parse(f.date || '');
+  var old = isFinite(t) && Date.now() - t > 365 * 864e5;
+  if (old) return 'the detailed data (line-ups, shots, statistics) is not in the store; matches older than a year feed the season and player pages only.';
+  return 'there are no line-ups, shots or statistics for this tie: qualifying and early cup rounds without a followed club are tracked from the result only, and Sofascore publishes no detail for many of them.';
+}
+
 function renderMatch(el, c, f, m, mk, hit) {
   var html = hero(c, f, m, hit);
   if (f.status !== 'finished' && f.model) html += modelCard(f, mk);
@@ -220,7 +230,7 @@ function renderMatch(el, c, f, m, mk, hit) {
     html += '<div id="mx-detail"></div>';
   } else {
     html += '<div class="fb-mt">' + FB.note(f.status === 'finished'
-      ? 'No match page for this one: ' + (f.detail === false ? 'the detailed data (line-ups, shots, statistics) is not in the store; matches older than a year feed the season and player pages only.' : 'it is fetched a few hours after the final whistle.')
+      ? 'No match page for this one: ' + (f.detail === false ? noDetailReason(f) : 'it is fetched a few hours after the final whistle.')
       : 'The match centre opens with line-ups, shots and statistics once the match has been played.') + '</div><div id="mx-preview"></div>';
   }
   el.innerHTML = html;

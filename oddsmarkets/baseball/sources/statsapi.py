@@ -286,7 +286,8 @@ def roster(c: Client, tid: str, kind: str = "40Man", season: int | None = None) 
     d = c.get(f"{API}/v1/teams/{tid}/roster", p)
     out = []
     for r in (d or {}).get("roster") or []:
-        out.append({"pid": _pid(r.get("person")), "pos": (r.get("position") or {}).get("abbreviation"),
+        out.append({"pid": _pid(r.get("person")), "name": (r.get("person") or {}).get("fullName"),
+                    "pos": (r.get("position") or {}).get("abbreviation"),
                     "status": (r.get("status") or {}).get("description"), "note": r.get("note")})
     return out
 

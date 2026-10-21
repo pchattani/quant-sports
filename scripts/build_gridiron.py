@@ -346,6 +346,18 @@ def price_window(ctx, cfg: dict) -> dict[str, dict]:
     return out
 
 
+def _stub(p: Path) -> bool:
+    """A final game's page that holds a failure stub or no play-level data (an empty page): rebuilt on the next run even
+    when its signature matches (pages failed before 21 Oct 2026 were still signed). Only small files are read."""
+    try:
+        if p.stat().st_size > 24_000:
+            return False
+    except OSError:
+        return False
+    d = an.read_json(p) or {}
+    return not d.get("ok") or not (d.get("plays") or d.get("espn_plays"))
+
+
 def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, cards: list[dict], cat: dict | None, tms: dict | None,
                frozen: dict | None = None, wf: dict | None = None, markets: dict | None = None) -> dict:
     import pandas as pd
@@ -374,7 +386,7 @@ def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, cards: li
             dd = None
         live = g.get("status") != "final"
         in_window = dd is not None and lo <= dd <= hi
-        if cfg["all_games"] or not exists or old_sigs.get(gid) != s or (ctx.current and live and in_window):
+        if cfg["all_games"] or not exists or old_sigs.get(gid) != s or (ctx.current and live and in_window)                 or (not live and _stub(gdir / f"{gid}.json")):
             due.append(gid)
     logger.info("%s: %d game pages due of %d", ctx.season, len(due), len(by_card))
     if not due:
@@ -429,6 +441,7 @@ def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, cards: li
         payload = b.step(f"game {gid}", build)
         if payload is None:
             payload = {"ok": False, "reason": "game page could not be built", "game_id": gid}
+            new_sigs[gid] = None                                 # unsigned: the next build retries it
         b.write(f"{ctx.season}/games/{gid}.json", payload)
         written += 1
     del groups

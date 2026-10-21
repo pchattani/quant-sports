@@ -949,14 +949,20 @@ def deals_payload(league: str, season: int, rated: list[dict], curve: dict, n_ro
 
 
 def transactions_payload(league: str, season: int, parsed: list[dict], deal_of: dict[tuple, str], since: str, until: str,
-                         unmatched: list[str], updated_at: str | None = None) -> dict:
-    rows = []
+                         unmatched: list[str], updated_at: str | None = None, people: dict[str, str] | None = None) -> dict:
+    """The feed. `names` carries {pid: name} for every player a row links: most of them (waived, two-way, unsigned) are
+    in no other payload the page loads, and without it they would show as their ESPN id."""
+    rows, names = [], {}
     for r in parsed:
         if not (since <= r["date"] <= until):
             continue
         rows.append([r["date"], r["team"], r["types"], r["text"], r["players"], deal_of.get((r["date"], r["team"]))])
+        for pid in r["players"] or []:
+            nm = (people or {}).get(str(pid))
+            if nm:
+                names[str(pid)] = nm
     return {"ok": True, "league": league, "season": int(season), "updated_at": updated_at or an.now(), "since": since, "until": until,
-            "types": TYPES, "cols": ["date", "team", "types", "text", "players", "deal"], "rows": rows,
+            "types": TYPES, "cols": ["date", "team", "types", "text", "players", "deal"], "rows": rows, "names": names,
             "unmatched": sorted(set(unmatched))[:200], "source": "ESPN transactions (free text, parsed by the site)"}
 
 
@@ -1027,7 +1033,7 @@ def build(ctx, valuation: dict | None, prm: dict, fit: dict, refresh: bool = Tru
         for r in dl["rows"]:
             deal_of[(r["date"], r["team"])] = dl["id"]
     now = an.now()
-    tx = transactions_payload(league, season, parsed, deal_of, since, until, unmatched, updated_at=now)
+    tx = transactions_payload(league, season, parsed, deal_of, since, until, unmatched, updated_at=now, people=people)
     dp = deals_payload(league, season, rated, curve, len(window_rows), sorted(set(unmatched)), updated_at=now, window=(since, until))
     return {"transactions": tx, "deals": dp, "info": {**info, "rows": len(window_rows), "deals": len(rated),
                                                       "unmatched": len(set(unmatched))}}

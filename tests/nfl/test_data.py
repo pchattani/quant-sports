@@ -243,6 +243,20 @@ def test_espn_summary_compact():
     assert rec["plays"][-1][9:11] == [28, 6]
 
 
+def test_espn_summary_box_and_linescores():
+    """The compact record carries ESPN's box score and line score (the game page's fallback before nflverse
+    publishes the week): NYJ at NE, week 6 of 2026, 19-26."""
+    raw = load_fixture_json("espn_summary_401873001.json")
+    rec = espn.compact_summary(raw, "2026_06_NYJ_NE", 2026)
+    assert rec["status"] == "final" and (rec["home"], rec["away"]) == ("NE", "NYJ")
+    assert rec["linescores"] == {"home": [7, 10, 0, 9], "away": [3, 0, 10, 6]}
+    assert set(rec["box"]) == {"NE", "NYJ"}
+    nyj = rec["box"]["NYJ"]
+    assert nyj["players"]["passing"]["keys"][0] == "completions/passingAttempts"
+    assert nyj["players"]["passing"]["rows"][0][:4] == ["15864", "Geno Smith", "20/30", "252"]
+    assert dict(nyj["team"])["thirdDownEff"] == "3-10"
+
+
 # ── canon ───────────────────────────────────────────────────────────────────
 
 def test_relocations_and_alignment():

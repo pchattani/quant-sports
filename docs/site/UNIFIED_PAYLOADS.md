@@ -283,7 +283,7 @@ the hourly task with the other stores:
 ## 6. Backwards compatibility
 
 Unchanged: `competitions.json` (new keys only), `hub.json`, `search.json`,
-`season_index.json`, `players_global.json`, `players_lab*.json`, `pool.json`,
+`season_index.json`, `pool.json` (`players_global.json` and `players_lab*.json`: retired, section 14),
 `nations.json`, `careers/`, `history/`, and every `data/<slug>/*.json` current-season
 payload. They can be retired by the front end once it reads the new files; tell the
 backend and they will be dropped from the build.
@@ -712,6 +712,7 @@ people, clubs and season payloads only. `clubs/<tid>.json` `matches[].detail` an
   `floor_rule`, `left_out` (competitions whose built edition is not this season's), and `season` on each row.
 - Unchanged: `value/players.json` (last 365 days of club football, its own 450/900-minute floors) and
   `players_lab_365.json` / `players_lab_ytd.json` (rolling windows of equal length for every player).
+- Superseded on 21 October 2026 by `data/lab/` (section 14): one row per person in every view.
 
 ### 13.8 Stores: `detail_missing`
 
@@ -722,3 +723,95 @@ every finished match of every season the store holds (the previous season in ful
 in tiers: the current season's new matches, its old-format ones, then the previous seasons of the followed
 leagues, of the continental cups, of the rest; a backfilled match is three calls (line-ups, team statistics,
 incidents; no shot map or momentum).
+
+---
+
+## 14. As built (21 October 2026): one row per person everywhere
+
+Why: the cross-competition lists were one row per player per competition. Lionel Messi was seven dots in the
+Player lab (MLS, Leagues Cup, Champions Cup, Campeones Cup, Club World Cup, World Cup, CONMEBOL qualifying), the
+global leaderboard listed 1,609 players more than once, the value page's "this season" view 4,542, the players
+page's rating card had Messi twice, and `players_lab.json` "this season" still carried finished editions (Copa
+America 2024, the 2026 World Cup) because it read every built competition. Every such list is now one row per
+person, keyed by Sofascore player id, with an explicit scope.
+
+### 14.1 `data/lab/` (new; replaces `players_lab*.json` and `players_global.json`)
+
+Written by `analytics/people_lines.py` (`PeopleLines`) inside `build_unified`: the same store loop as the
+registry, each player-match added to compact accumulators keyed (person, competition, season tag), finalised by
+`players.finalize_player` (the competition pages' own arithmetic: a one-competition line equals that
+competition's `players_live.json` line).
+
+- **Windows.** `season`: the player's current season in his own frame (13.1: a European's 2026/27, a
+  Brazilian's 2026), the same season as his `years[0]` and `people_index.json` `min`; `last`: the season
+  before; `365`: the last twelve months; `ytd`: the calendar year so far. A club edition counts in its own
+  season (`season_meta` era); an international or world-club match counts in the player's frame by date (13.1).
+- **Scopes.** `all` (every competition), `club` (club competitions), `intl` (national-team football), or a
+  competition slug.
+- `lab/<window>/<scope>.json`: {`window`, `scope`, `floor`, `fields`, `rows`}, one row per person with 90+
+  minutes in the view. `fields`: `player_id`, `name`, `team` and `tid` (his current club, 2.3, for `all` and
+  `club`; the national team for `intl`; the team he played for in a single competition), `position`, `age`,
+  `minutes`, `matches`, `mix` ("MLS 2360' · World Cup 740' · ..."), `factor` (the pooled scoring factor,
+  minutes-weighted over the competitions he played), `comp` (his main competition: most minutes, a club one
+  first for `all`), then every rate of the catalogue (`lab_keys()`). `floor` is 30% of the minutes the view's
+  regulars have played (its 95th percentile), at least 90: the default ranking floor of the view.
+- `lab/index.json`: `windows` [{key, label, eras {split, calendar} | start, end}], `scopes` {window: {scope:
+  {n, floor}}}, `scope_labels`, `comps` {slug: {name, short, kind, scope, factor, first_detail}}, `fields`,
+  `metrics` (catalogue entries with `pct` and `lower`), `adjusted_keys`, `min_minutes`, `rule`, `updated_at`.
+- `lab/leaders.json`: this season's top 15 by goals (with xG), assists (with xA) and rating (450+ minutes)
+  for `all`, `club` and `intl`: {id, name, team, tid, comp, mix, value, minutes}.
+- About 79 MB in 221 files on 21 October 2026 (the four retired files were 44 MB). The build deletes
+  `players_lab.json`, `players_lab_365.json`, `players_lab_ytd.json` and `players_global.json` from the data
+  directory after writing `lab/` (CI's restore step would otherwise copy the deployed ones back for ever).
+  `build_global` writes `pool.json` only.
+
+### 14.2 Front end
+
+- **Player lab** (`#/lab/<all|club|intl|slug>/<pos>?w=season|last|365|ytd`): Season and Competitions pickers;
+  one dot per player. Old `#/lab/<slug>/<pos>` links are the single-competition scope.
+- **Leaders** (`#/players/leaders?w=&c=&m=&pos=&min=`): the same views; percentiles against the players shown;
+  league-adjusted rates are the row's rate times its `factor`.
+- **Players page** leader cards: `lab/leaders.json`, with an All / Club / National team switch.
+- **Compare players** (`#/compare/players/<a>/<b>?scope=`): "Compare on" All competitions (default), Club
+  competitions, National team (rows of `lab/season/<scope>.json`, percentiles against the same position in that
+  view over its floor, at most 450), or one competition (its `players_live.json`, as before; an old
+  `<comp>:<id>` key means that competition).
+- **Value, this season** (`#/value?v=season&c=`): All competitions (default), Club competitions and National
+  team sum each player's `value/lines.json` lines into one row (minutes, GAR and PAR add; GAR/90 is their ratio;
+  rating and components minutes-weighted; percentile against the same unit among the rows shown with 900+
+  minutes); a competition shows its own lines.
+- `hub.json` `leaders` (each player's best competition line) and `search.json` `players` (his competition with
+  most minutes, the others in `comps`) are one row per player too; nothing on the page reads `search.json` now.
+- Unchanged and already one row per person: search and the compare pickers (`people_index.json`),
+  `value/players.json`, club squads (`clubs/<tid>.json`). Per-competition by design: a competition's player
+  tables and fantasy lists.
+
+### 14.3 Duplicate Sofascore ids of one person
+
+Sofascore sometimes lists one player under two ids (a roster copy beside the senior record). Rule
+(`unified.same_person_aliases`, `MERGE_RULE`): two ids are one person only when the **exact name, date of birth
+and nationality** are all present and all equal, and the two ids never appear in the same line-up. The id kept
+has the most minutes, then the most appearances, then an archive career, then the lower number. A common name
+with one birth date in two countries (Omar Ali, Qatar and Ghana, 1992-10-10) stays two people. On 21 October
+2026 the rule merged 12 pairs (Luis Gabriel Rey, Kamika, Issah Haruna, Salman Al-Jadani, Diogo Pimentel, Antonio
+Ceza, Romain Oller, Vachagan Danielyan, Carlos Barrio, Carlos Herrera, Jordan Hodkin, Sebastian Calabrese);
+almost all were a roster-only copy with no minutes.
+
+### 14.4 What a merge writes
+
+- The alias's appearances, identity gaps, roster entry (the fresher one) and archive career (when the person
+  has none) go to the person; `people_index.json` lists the person once and gains `aliases` {alias: person} and
+  `merge_rule`.
+- `people/<alias>.json` is a stub {`id`, `merged_into`, `name`}; the person page redirects to the person, and
+  `FB.peopleIndex().byId[alias]` is the person's row.
+- A club squad lists the person once; the lab lines add the alias's matches to the person's.
+- The value layer (`analytics/value*`) still keys its rows by the id it saw; the value page's season view folds an
+  alias into the person when the people index is already loaded. Aliases are roster copies with almost no
+  minutes, so this has not yet mattered.
+
+### 14.5 The Argentine archive year
+
+The Argentine store keys its seasons by torneo (`2026-apertura`, `2026-clausura`), so the archive's whole-year
+edition (Sofascore season 87913, "2026") never matched a store row on its id and was added on top: 55 players
+had their 2026 counted twice (Nahuel Losada 5,790 minutes for 3,450 played). An archive Argentine league season
+in a year the store holds is now the store's.

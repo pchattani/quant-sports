@@ -99,7 +99,28 @@ def price(ctx: SeasonContext, g: dict, n: int) -> dict | None:
     from oddsmarkets.baseball.models import game_sim as G
     res = GI.predict(g, gc, n=n)
     out = G.summary_for_payload(res)
+    lay = market_layer(ctx)
+    if lay is not None:
+        try:
+            out = lay.apply(out, g)
+        except Exception as exc:                                 # noqa: BLE001
+            logger.info("market layer %s failed: %s", g.get("gpk"), exc)
     return an.clean(out)
+
+
+def market_layer(ctx: SeasonContext):
+    """The MLB market layer (models/market_layer.py) for the context's season as of its `today`, built once per
+    context; None for Triple-A, without history, or when it fails (the simulation is then published as it is)."""
+    if "_market_layer" not in ctx.__dict__:
+        lay = None
+        if ctx.level == "mlb":
+            try:
+                from oddsmarkets.baseball.models import market_layer as ML
+                lay = ML.build(ctx.level, ctx.season, ctx.store, as_of=ctx.today)
+            except Exception as exc:                             # noqa: BLE001
+                logger.info("market layer unavailable: %s", exc)
+        ctx.__dict__["_market_layer"] = lay
+    return ctx.__dict__["_market_layer"]
 
 
 def model_block(summary: dict | None, g: dict) -> dict | None:

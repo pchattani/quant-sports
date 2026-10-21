@@ -122,8 +122,12 @@ def current_extras(c: Client, level: str, s: dict, today: date) -> None:
     if not last or (datetime.now(timezone.utc) - _iso_dt(last)).total_seconds() > 20 * 3600:
         ros = {}
         for tid in sorted(s["teams"]):
-            ros[tid] = {"40man": [r["pid"] for r in statsapi.roster(c, tid, "40Man", season)],
-                        "injured": [[r["pid"], r["status"], r["note"]] for r in statsapi.roster(c, tid, "injured", season)]}
+            forty, inj = statsapi.roster(c, tid, "40Man", season), statsapi.roster(c, tid, "injured", season)
+            # names and positions too: a 40-man player without a game this season is in no other table, and the team
+            # page would otherwise show their MLBAM id
+            ros[tid] = {"40man": [r["pid"] for r in forty], "injured": [[r["pid"], r["status"], r["note"]] for r in inj],
+                        "names": {r["pid"]: r["name"] for r in forty + inj if r.get("pid") and r.get("name")},
+                        "pos": {r["pid"]: r["pos"] for r in forty + inj if r.get("pid") and r.get("pos")}}
         s["meta"]["rosters"] = ros
         s["meta"]["rosters_at"] = st.now()
     tx = statsapi.transactions(c, today - timedelta(days=14), today, level)

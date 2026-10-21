@@ -398,8 +398,37 @@ def compact_summary(raw: dict | None, game_id: str | None = None, season: int | 
            "home": team(hid), "away": team(aid), "home_score": _int(h.get("score")), "away_score": _int(a.get("score")),
            "drives": drives, "plays": plays,
            "wp_home": (raw.get("winprobability") or [{}])[-1].get("homeWinPercentage") if raw.get("winprobability") else None,
-           "odds": lines_from_pickcenter(raw), "predictor": _predictor(raw), "injuries": _injuries(raw, yr)}
+           "odds": lines_from_pickcenter(raw), "predictor": _predictor(raw), "injuries": _injuries(raw, yr),
+           "linescores": {"home": _linescores(h), "away": _linescores(a)}, "box": _boxscore(raw, yr)}
     return rec
+
+
+def _linescores(c: dict) -> list[int] | None:
+    ls = [_int((x or {}).get("displayValue", (x or {}).get("value"))) for x in c.get("linescores") or []]
+    return ls if ls and all(v is not None for v in ls) else None
+
+
+def _boxscore(raw: dict, season: int | None) -> dict | None:
+    """ESPN's box score, compact: {team: {"players": {category: {"keys": [...], "rows": [[espn_id, name, *stats]]}},
+    "team": [[stat name, display value], ...]}}. Stats stay as ESPN displays them ("20/30", "3-25")."""
+    bx = raw.get("boxscore") or {}
+    out: dict[str, dict] = {}
+    for t in bx.get("players") or []:
+        ab = canon.abbr_from_espn(str((t.get("team") or {}).get("id") or ""), season) if season else None
+        if not ab:
+            continue
+        cats = {}
+        for c in t.get("statistics") or []:
+            rows = [[str((x.get("athlete") or {}).get("id") or ""), (x.get("athlete") or {}).get("displayName"), *(x.get("stats") or [])]
+                    for x in c.get("athletes") or []]
+            if c.get("name") and c.get("keys"):
+                cats[c["name"]] = {"keys": list(c["keys"]), "rows": rows}
+        out.setdefault(ab, {})["players"] = cats
+    for t in bx.get("teams") or []:
+        ab = canon.abbr_from_espn(str((t.get("team") or {}).get("id") or ""), season) if season else None
+        if ab:
+            out.setdefault(ab, {})["team"] = [[s.get("name"), s.get("displayValue")] for s in t.get("statistics") or [] if s.get("name")]
+    return out or None
 
 
 def _yl100(start: dict, dteam: str | None, home: str | None) -> int | None:

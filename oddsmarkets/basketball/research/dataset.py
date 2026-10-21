@@ -358,8 +358,23 @@ def production_roster_impact(league: str, season: int, store: dict) -> dict[str,
     return out or None
 
 
+def actual_S(ros: "Rosters", g: dict, team: str) -> np.ndarray | None:
+    """S (rapm, box, o, d) of the players who actually played in game `g` for `team`, seconds-weighted (as
+    `Rosters.update` records it). ORACLE: known only after the game; never a model input (research upper bound)."""
+    players = (((g.get("box") or {}).get(str(team)) or {}).get("players")) or []
+    secs = sum(float(r[2] or 0) for r in players)
+    if secs <= 0:
+        return None
+    tot = np.zeros(ros.NV)
+    for r in players:
+        sec = float(r[2] or 0)
+        if sec > 0:
+            tot += ros._vec(str(r[0])) * sec
+    return tot / secs * 5
+
+
 def build(league: str, seasons: Iterable[int], lag: int = 1, first_on_disk: int | None = None,
-          garbage: bool = False, roster_prior: bool = False) -> pd.DataFrame:
+          garbage: bool = False, roster_prior: bool = False, oracle: bool = False) -> pd.DataFrame:
     league = _league(league)
     seasons = sorted(int(s) for s in seasons)
     on_disk = G.seasons_on_disk(league)
@@ -453,6 +468,10 @@ def build(league: str, seasons: Iterable[int], lag: int = 1, first_on_disk: int 
                         rec[f"S_{nm}_{side}"] = float(se[j])
                         rec[f"dS_{nm}_{side}"] = float(se[j] - sr[j])
                     rec[f"prior_share_{side}"] = ps
+                    if oracle:
+                        sa = actual_S(ros, g, t)
+                        for j, nm in enumerate(("rapm", "box", "o", "d")):
+                            rec[f"dSact_{nm}_{side}"] = float(sa[j] - sr[j]) if sa is not None else np.nan
                 lg = ln.get(r["id"]) or {}
                 for when in ("open", "close"):
                     b = lg.get(when) or {}

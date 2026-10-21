@@ -285,10 +285,14 @@ def build_season(b: Build, league: str, season: int, full: bool, cfg: dict, shar
                     pages_new[gid] = page_sig(store, gid, False)
                     continue                          # never downgrade a page built with play-by-play
             payload = b.step(f"game {league}/{gid}", lambda: GMS.build_game(ctx, gid, None))
-            if payload is None:
+            failed = payload is None
+            if failed:
                 payload = {"ok": False, "reason": "game page could not be built", "id": gid}
             b.write(f"{d}games/{gid}.json", payload)
-            pages_new[gid] = page_sig(store, gid, has_raw(gid))
+            # Unsigned (retried next run) when the page failed, or when the play-by-play pass should have built it
+            # (raw on disk, the game has play-by-play) but its callback failed: a signed box-only page is never redone.
+            pbp_missed = bool(g.get("has_pbp") and has_raw(gid) and ctx.pbp_available)
+            pages_new[gid] = None if (failed or pbp_missed) else page_sig(store, gid, has_raw(gid))
             n += 1
         return n
     n_other = b.step(f"{league} {season} game pages", other_pages, 0)

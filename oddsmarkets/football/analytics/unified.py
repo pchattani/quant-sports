@@ -641,6 +641,7 @@ class Unified:
         self.era_shift: dict[str, int] = {}          # slug -> label year to season start (split competitions named by a year)
         self.unavailable: dict[str, set[str]] = {}   # slug -> match ids Sofascore has no line-ups for
         self.followed: set[str] = set()              # clubs of the followed leagues' current seasons (the fetch's scope)
+        self.aliases: dict[str, str] = {}             # duplicate Sofascore id -> the person's id (same_person_aliases)
         # The model's home/draw/away line per fixture still to play (fixtures.json's, from the fixture's home side).
         self.models: dict[str, dict] = {}
         for e in self.entries.values():
@@ -1217,6 +1218,45 @@ class Unified:
                     break
         return out
 
+    def _merge_duplicates(self, roster: dict, roster_row: dict) -> dict[str, str]:
+        """
+        Fold every alias id (same_person_aliases) into its canonical id: appearances,
+        identity gaps, the roster entry (the fresher one) and the archive career when
+        the canonical id has none. Returns {alias: canonical}. The alias's identity
+        stays in `people` (the value layer reads it by id).
+        """
+        arch = self.archive.get("players") or {}
+        weight = {pid: (sum(a[10] for a in self.apps.get(pid, [])), len(self.apps.get(pid, [])),
+                        1 if (arch.get(pid) or {}).get("details") else 0)
+                  for pid in self.people}
+        aliases = same_person_aliases(self.people, weight)
+        # Two ids in one match line-up are two people, whatever their records say.
+        for alias, canon in list(aliases.items()):
+            if {a[1] for a in self.apps.get(alias, [])} & {a[1] for a in self.apps.get(canon, [])}:
+                del aliases[alias]
+        merged_arch = None
+        for alias, canon in aliases.items():
+            self.apps.setdefault(canon, []).extend(self.apps.pop(alias, []))
+            ident = self.people.setdefault(canon, {})
+            for k, v in (self.people.get(alias) or {}).items():
+                if v and not ident.get(k):
+                    ident[k] = v
+            if alias in roster:
+                if canon not in roster or roster[alias][1] > roster[canon][1]:
+                    roster[canon] = roster[alias]
+                    if roster_row.get(alias):
+                        roster_row[canon] = roster_row[alias]
+                roster.pop(alias, None)
+                roster_row.pop(alias, None)
+            if (arch.get(alias) or {}).get("details") and not (arch.get(canon) or {}).get("details"):
+                merged_arch = merged_arch if merged_arch is not None else dict(arch)
+                merged_arch[canon] = arch[alias]
+        if merged_arch is not None:
+            self.archive = {**self.archive, "players": merged_arch}
+        if aliases:
+            logger.info("unified: %d duplicate player ids merged (%s)", len(aliases), MERGE_RULE)
+        return aliases
+
     def current_club(self, pid: str, apps: list[list], roster: dict, rostered: set[str]) -> dict | None:
         """The rules in UNIFIED_PAYLOADS.md section 2.3."""
         club_apps = [a for a in apps if self.comps.get(a[2], {}).get("scope") == "club" and a[4] is not None]
@@ -1276,8 +1316,12 @@ class Unified:
                 # A goalkeeper whose line-ups carry no position still makes saves.
                 if not ident.get("pos") and (p.get("is_gk") or (p.get("saves") or 0) >= 3):
                     ident["pos"] = "G"
-        all_pids = set(self.apps) | {p for p in archive_players if (archive_players[p] or {}).get("details")} | set(roster) | listed
         roster_row = self._roster_rows(roster)
+        # Genuine duplicate Sofascore ids of one person fold into one record (same_person_aliases).
+        self.aliases = self._merge_duplicates(roster, roster_row)
+        archive_players = self.archive.get("players") or {}
+        all_pids = set(self.apps) | {p for p in archive_players if (archive_players[p] or {}).get("details")} | set(roster) | listed
+        all_pids -= set(self.aliases)
         self.frame_of_person: dict[str, str] = {}
 
         for pid in all_pids:
@@ -1370,11 +1414,17 @@ class Unified:
                                sorted(comps_used, key=lambda s: -sum(a[10] for a in apps if a[2] == s)),
                                now_row["min"] if now_row else 0, apps[0][0] if apps else None, season_now,
                                payload.get("mv")])
+        # A merged duplicate id keeps a stub that points at the person, so old links still land.
+        for alias, canon in sorted(self.aliases.items()):
+            if canon in written:
+                _write(people_dir / f"{alias}.json", {"id": alias, "merged_into": canon, "name": (self.people.get(canon) or {}).get("name")})
+                written.add(alias)
         pruned = _prune(people_dir, written)
         index_rows.sort(key=lambda r: (-(r[10] or 0), r[1] or ""))
         _write(self.data_dir / "people_index.json", {
             "fields": ["id", "name", "pos", "nat", "dob", "club_tid", "club", "nt_tid", "nt", "comps", "min", "last", "season", "mv"],
-            "rows": index_rows, "updated_at": today.strftime("%Y-%m-%dT%H:%M:%SZ")})
+            "rows": index_rows, "aliases": dict(sorted(self.aliases.items())), "merge_rule": MERGE_RULE,
+            "updated_at": today.strftime("%Y-%m-%dT%H:%M:%SZ")})
         n_clubs = self._write_clubs(clubs_dir, club_of, nt_of, roster, rostered)
         self.club_of = club_of
         logger.info("unified: %d people (%d pruned), %d clubs", len(written), pruned, n_clubs)
@@ -1455,6 +1505,9 @@ class Unified:
         for r in seasons:
             by_sid.setdefault((r["comp"], str(r.get("sid"))), []).append(r)
         have = {(r["comp"], r.get("season")) for r in seasons}
+        # The Argentine store keys its seasons by torneo ("2026-apertura"), not by Sofascore's season id, so the
+        # archive's whole-year edition never matches on sid: a year the store holds is the store's.
+        liga_eras = {r.get("era") for r in seasons if r["comp"] == LIGA_ARGENTINA_SLUG}
         out = []
         for e in rec.get("seasons") or []:
             if e.get("empty"):
@@ -1480,6 +1533,8 @@ class Unified:
                 continue
             kind = self._archive_kind(e, slug)
             era = self._archive_era(e, slug, sid, season, era, kind, frame)
+            if slug == LIGA_ARGENTINA_SLUG and era in liga_eras:
+                continue
             # The archive spells a club its own way ("Inter Miami CF", "Paris Saint-Germain"): the club's id and name when one club matches.
             team, team_tid = e.get("team"), None
             t = self._archive_club(team, slug, kind == "international")
@@ -1672,7 +1727,13 @@ class Unified:
             era_now = max(club_eras, key=era_key) if club_eras else None
             if tid in squads_teams and not national:
                 rec = squads_teams[tid]
-                members = [(str(p["id"]), p) for p in rec.get("players") or []]
+                aliases = getattr(self, "aliases", {}) or {}
+                members, seen_ids = [], set()
+                for p in rec.get("players") or []:
+                    pid = aliases.get(str(p["id"]), str(p["id"]))      # a duplicate id is listed once, as the person
+                    if pid not in seen_ids:
+                        seen_ids.add(pid)
+                        members.append((pid, p))
                 source, as_of = "roster", str(rec.get("fetched_at") or "")[:10]
             else:
                 ids = by_nt.get(tid, []) if national else by_club.get(tid, [])
@@ -1906,6 +1967,34 @@ def _gap(cs: dict) -> str:
     if cs.get("bf_n"):
         return "backfill"
     return "unavailable" if cs.get("na_n") else "outside"
+
+
+MERGE_RULE = "same exact name, date of birth and nationality, never two ids in one line-up; the id with most minutes is kept"
+
+
+def same_person_aliases(people: dict[str, dict], weight: dict[str, tuple] | None = None) -> dict[str, str]:
+    """
+    Genuine duplicate Sofascore ids of one person: Sofascore sometimes lists a player
+    under two ids (a youth-team or roster copy beside the senior record). Two ids are
+    one person only when the exact name, date of birth and nationality are all present
+    and all equal; a common name with one birth date in two countries (Omar Ali, Qatar
+    and Ghana) stays two people. The canonical id has the most minutes, then the most
+    appearances, then an archive career, then the lower number. Returns {alias: canonical}.
+    """
+    weight = weight or {}
+    groups: dict[tuple[str, str, str], list[str]] = {}
+    for pid, ident in people.items():
+        name, dob, nat = str(ident.get("name") or "").strip(), str(ident.get("dob") or "")[:10], str(ident.get("nat") or "").strip()
+        if name and len(dob) == 10 and nat:
+            groups.setdefault((name, dob, nat), []).append(str(pid))
+    out: dict[str, str] = {}
+    for pids in groups.values():
+        if len(pids) < 2:
+            continue
+        ranked = sorted(pids, key=lambda p: tuple(-x for x in weight.get(p, (0, 0, 0))) + ((int(p), p) if p.isdigit() else (10 ** 18, p)))
+        for p in ranked[1:]:
+            out[p] = ranked[0]
+    return out
 
 
 def coverage_flag(with_detail: int, finished: int) -> str:

@@ -13,7 +13,7 @@
 'use strict';
 
 const FX = () => HW.fx;
-const LABELS = { model: 'Game model', model_ratings_only: 'Ratings + home court only', elo: 'Elo', market: 'DraftKings spread', espn: 'ESPN predictor', model_on_market_games: 'Game model (market games)' };
+const LABELS = { model: 'Game model', model_base: 'Base model (no market inputs)', model_ratings_only: 'Ratings + home court only', elo: 'Elo', market: 'DraftKings spread', espn: 'ESPN predictor', model_on_market_games: 'Game model (market games)' };
 const ORDER = ['model', 'model_ratings_only', 'elo', 'market', 'espn'];
 const COL = { model: '#58a6ff', model_ratings_only: '#79c0ff', elo: '#bc8cff', market: '#f0883e', espn: '#3fb950' };
 const label = k => LABELS[k] || HW.titleCase(k);
@@ -130,6 +130,7 @@ function render(el, params, state) {
       '<li><strong>Elo</strong>: game Elo from 1997 with a margin-of-victory multiplier, home court and regression between seasons; its pregame probability.</li>' +
       '<li><strong>DraftKings spread</strong>: the closing home spread from ESPN pickcenter turned into a probability, p = Φ(−spread / σ<sub>m</sub>), with σ<sub>m</sub> fitted on earlier seasons. Scored only on games with a line; the strongest public baseline.</li>' +
       '<li><strong>ESPN predictor</strong>: ESPN\'s pregame win probability where the store carries one.</li></ul>' +
+      (L === 'nba' ? '<p>In the NBA the game model is the market-informed model (since 21 October 2026). It uses the closing lines of earlier games and each team\'s expected availability, never the game\'s own line, and it is scored with each season\'s fit from earlier seasons only. The base model\'s scores are kept in the file as <code>model_base</code>.</p>' : '') +
       '<p>Details in the <a href="#/methodology/backtest">methodology</a> → backtest and calibration.</p></div></div>';
     el.innerHTML = h;
 

@@ -213,9 +213,12 @@ def build_season(b: Build, level: str, season: int, full: bool, cfg: dict, share
     if full and current:
         prices = b.step(f"game prices {level} {season}", lambda: price_window(ctx, cfg), {}) or {}
     frozen = dict(manifest.get("prices") or {})
+    sim_ledger = dict(manifest.get("sim_prices") or {})
     for gpk, pr in prices.items():
         if pr.get("model"):
             frozen[gpk] = pr["model"]
+        if pr.get("sim") and str((ctx.games.get(gpk) or {}).get("status")) in ("pre", "scheduled"):
+            sim_ledger[gpk] = pr["sim"]
     sched = b.write_or_fail(d + "schedule.json", f"schedule {level} {season}", lambda: schedule(ctx, prices, frozen, markets),
                             level=level, season=season)
     tms = b.write_or_fail(d + "teams.json", f"teams {level} {season}", lambda: TM.build(ctx, hit, pit, sim, (sched or {}).get("games")),
@@ -252,7 +255,7 @@ def build_season(b: Build, level: str, season: int, full: bool, cfg: dict, share
     if level == "mlb" and full:
         out["proj"] = ctx.model("proj_next") if not cfg["no_models"] else None
         out["hit_cat"], out["pit_cat"] = hit, pit
-    manifest = {"sig": sig, "built_at": _now(), "full": full, "phase": ctx.phase, "games": pages, "prices": frozen,
+    manifest = {"sig": sig, "built_at": _now(), "full": full, "phase": ctx.phase, "games": pages, "prices": frozen, "sim_prices": sim_ledger,
                 "model_errors": ctx.model_errors, "timings": {k: round(v, 1) for k, v in ctx.timings.items()}}
     b.step(f"manifest {level} {season}", lambda: b.write(d + "manifest.json", manifest))
     for k, v in ctx.timings.items():
@@ -303,8 +306,20 @@ def price_window(ctx, cfg: dict) -> dict[str, dict]:
             summ = GM.price(ctx, g, cfg["game_sims"])
         except Exception as exc:                                 # noqa: BLE001
             logger.info("price %s failed: %s", gpk, exc)
-        out[str(gpk)] = {"summary": summ, "model": GM.model_block(summ, g), "market": mk.get(str(gpk)), "priced_at": _now()}
+        out[str(gpk)] = {"summary": summ, "model": GM.model_block(summ, g), "market": mk.get(str(gpk)), "priced_at": _now(),
+                         "sim": sim_price(summ)}
     return out
+
+
+def sim_price(summ: dict | None) -> dict | None:
+    """The simulation's own pre-game price {"p", "t"} (before the market layer): the ledger the market layer learns from
+    (manifest "sim_prices"; models/market_layer.py)."""
+    if not summ or summ.get("p_home") is None:
+        return None
+    sim = summ.get("sim") or {}
+    p = sim.get("p_home", summ.get("p_home"))
+    t = sim.get("total", (summ.get("runs") or {}).get("total"))
+    return {"p": an.rnd(p, 5), "t": an.rnd(t, 3)}
 
 
 def schedule(ctx, prices: dict, frozen: dict, markets: dict | None) -> dict:
@@ -387,17 +402,18 @@ def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, sched: di
             if pa_all is not None and len(pa_all):
                 pas = {str(k): v for k, v in pa_all.groupby("game_pk")}
         for gpk in batch:
-            written += _one_page(b, ctx, gpk, groups.get(gpk), cards, prices, gdir, arsenal, umps, re_info, parks, fls.get(gpk), pas.get(gpk))
+            written += _one_page(b, ctx, gpk, groups.get(gpk), cards, prices, gdir, arsenal, umps, re_info, parks, fls.get(gpk), pas.get(gpk),
+                                 sigs=new_sigs)
         del gp_all, groups, fls, pas
         gc.collect()
     for gpk in without:
-        written += _one_page(b, ctx, gpk, None, cards, prices, gdir, arsenal, umps, re_info, parks)
+        written += _one_page(b, ctx, gpk, None, cards, prices, gdir, arsenal, umps, re_info, parks, sigs=new_sigs)
     logger.info("%s %s: %d game pages written", ctx.level, ctx.season, written)
     return new_sigs
 
 
 def _one_page(b: Build, ctx, gpk: str, gp, cards: dict, prices: dict, gdir: Path, arsenal: dict, umps: dict, re_info, parks,
-              fl=None, pa=None) -> int:
+              fl=None, pa=None, sigs: dict | None = None) -> int:
     from oddsmarkets.baseball.analytics import games as GM
     g = ctx.games[gpk]
     old = an.read_json(gdir / f"{gpk}.json") if (gdir / f"{gpk}.json").exists() else None
@@ -412,6 +428,8 @@ def _one_page(b: Build, ctx, gpk: str, gp, cards: dict, prices: dict, gdir: Path
     payload = b.step(f"game {ctx.level}/{gpk}", build)
     if payload is None:
         payload = {"ok": False, "reason": "game page could not be built", "gpk": gpk}
+        if sigs is not None:
+            sigs[gpk] = None                                     # unsigned: the next run tries again
     b.write(f"{ctx.level}/{ctx.season}/games/{gpk}.json", payload)
     return 1
 

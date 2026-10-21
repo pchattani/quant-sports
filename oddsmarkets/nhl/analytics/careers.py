@@ -304,7 +304,10 @@ def write_careers(write: Callable[[str, dict], None], rows_by: dict[int, dict[st
         seasons.sort(key=lambda r: r["season"])
         last = seasons[-1]
         info = people.get(pid) or {}
-        doc = {"id": pid, "name": info.get("name") or last.get("name"), "pos": info.get("pos") or last.get("pos"),
+        # the latest season row with a real name (a row named by its id came from a season whose store missed the player)
+        named = next((r.get("name") for r in reversed(seasons) if r.get("name") and str(r.get("name")) != pid), None)
+        nm = info.get("name") or named or last.get("name")
+        doc = {"id": pid, "name": nm, "pos": info.get("pos") or last.get("pos"),
                "shoots": info.get("shoots"), "dob": info.get("dob"), "height": info.get("height"), "weight": info.get("weight"),
                "number": info.get("number"), "kind": last.get("kind"),
                "seasons": [{k: r.get(k) for k in ("season", "team", "teams", "pos", "age", "qualified", "values", "plus", "source")} for r in seasons],

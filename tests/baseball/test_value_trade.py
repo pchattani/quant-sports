@@ -252,3 +252,14 @@ def test_allocate_respects_availability():
     al = TR.allocate(roster)
     assert al["share"]["callup"]["SS"] == pytest.approx(0.3) and al["share"]["reg"]["SS"] == pytest.approx(0.7)
     assert al["share"]["sp1"]["SP"] == pytest.approx(0.1)                          # half of a fifth of the starts
+
+
+def test_forty_man_rows_take_the_roster_feeds_name():
+    """A 40-man player with no game this season is named from the roster feed (not shown as his MLBAM id)."""
+    from types import SimpleNamespace
+    from oddsmarkets.baseball.analytics import teams as TM
+    ctx = SimpleNamespace(store={"meta": {"rosters": {"109": {"40man": ["691009"], "injured": [], "names": {"691009": "Rookie Arm"},
+                                                             "pos": {"691009": "P"}}}}},
+                          players={}, name=lambda pid: str(pid))
+    rows = TM.roster(ctx, "109", {}, {})
+    assert rows == [{"pid": "691009", "name": "Rookie Arm", "pos": "P", "kind": "40man", "injured": None}]

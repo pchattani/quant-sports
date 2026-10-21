@@ -297,3 +297,21 @@ def test_backtest_spearman_and_blend():
         assert FB._blend(20.0, "b", std, pd.Series({"b": 1})) == 20.0
     finally:
         FB.BLEND = old
+
+
+def test_transactions_payload_names_every_linked_player():
+    parsed = [{"date": "2026-10-17", "team": "9", "types": ["release"], "text": "Waived F Alex Toohey.", "players": ["5170949"]},
+              {"date": "2020-01-01", "team": "9", "types": ["sign"], "text": "Out of the window.", "players": ["1"]}]
+    p = MV.transactions_payload("nba", 2027, parsed, {}, "2026-01-01", "2026-12-31", [], people={"5170949": "Alex Toohey", "1": "Old"})
+    assert p["names"] == {"5170949": "Alex Toohey"}
+    assert len(p["rows"]) == 1
+
+
+def test_team_payload_names_players_missing_from_the_catalogue():
+    from types import SimpleNamespace
+    from oddsmarkets.basketball.analytics import teams as TM
+    ctx = SimpleNamespace(players={"11": {"name": "In Lineup"}, "12": {"name": "On Off"}, "13": {"name": "Catalogued"},
+                                   "14": {"name": "Injured"}})
+    out_teams = {"25": {"lineups": [{"players": ["11", "13"]}], "on_off": {"12": {"diff": 1.0}}, "injuries": [{"id": "14"}]}}
+    names = TM._names(ctx, out_teams, {"13": {"name": "Catalogued"}})
+    assert names == {"11": "In Lineup", "12": "On Off", "14": "Injured"}

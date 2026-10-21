@@ -73,6 +73,33 @@ def people() -> dict[str, dict]:
     return out
 
 
+_ESPN: dict[str, str] | None = None
+
+
+def espn_xwalk() -> dict[str, str]:
+    """{espn athlete id: gsis_id} from the nflverse players release (ESPN box scores on game pages before nflverse
+    publishes the week)."""
+    global _ESPN
+    if _ESPN is not None:
+        return _ESPN
+    out: dict[str, str] = {}
+    try:
+        from oddsmarkets.nfl.analytics.context import load_release
+        df = load_release("players", None)
+    except Exception as exc:                                     # noqa: BLE001
+        logger.info("players crosswalk (espn): %s", exc)
+        df = None
+    if df is not None and len(df):
+        idc, ec = _col(df, "gsis_id", "player_id"), _col(df, "espn_id")
+        if idc and ec:
+            for g, e in zip(df[idc], df[ec]):
+                g, e = an.sid(g), an.sid(e)
+                if g and e and g.startswith("00-"):
+                    out[e[:-2] if e.endswith(".0") else e] = g
+    _ESPN = out
+    return out
+
+
 def _draft(r: dict, dy: str | None, dr: str | None, dp: str | None, dt: str | None) -> dict | None:
     """{year, round, pick, team} for drafts from DRAFT_API_FROM (the NFL draft API's); None otherwise."""
     year = an.inum(r.get(dy)) if dy else None
@@ -83,8 +110,9 @@ def _draft(r: dict, dy: str | None, dr: str | None, dp: str | None, dt: str | No
 
 
 def reset() -> None:
-    global _PEOPLE
+    global _PEOPLE, _ESPN
     _PEOPLE = None
+    _ESPN = None
 
 
 def season_roster(ctx) -> dict[str, dict]:

@@ -447,7 +447,7 @@ function wpChart(el, ours, opts) {
 
 // ── percentile sliders (Savant style) ──────────────────────────────────────
 
-function sliderRow(label, p, valueText, title) {
+function sliderRow(label, p, valueText, title, none) {
   const known = isNum(p);
   const x = known ? Math.max(0, Math.min(100, Number(p))) : 0;
   const col = BP.pctColor(p);
@@ -455,7 +455,7 @@ function sliderRow(label, p, valueText, title) {
     '<span class="ps-label">' + label + '</span>' +
     '<span class="ps-track">' + (known
       ? '<span class="ps-fill" style="width:' + x + '%;background:' + col + '"></span><span class="ps-dot" style="left:' + x + '%;background:' + col + ';color:' + (BP.pctInk ? BP.pctInk(p) : '#fff') + '">' + Math.round(p) + '</span>'
-      : '<span class="ps-none">below the sample floor</span>') +
+      : '<span class="ps-none">' + esc(none || 'below the sample floor') + '</span>') +
     '<i class="ps-tick" style="left:10%"></i><i class="ps-tick mid" style="left:50%"></i><i class="ps-tick" style="left:90%"></i></span>' +
     '<span class="ps-val">' + (valueText === undefined ? '' : valueText) + '</span></div>';
 }
@@ -466,7 +466,8 @@ function percentileSliders(metrics, vals, pcts, opts) {
   if (o.onlyKnown) list = list.filter(m => isNum((pcts || {})[m.key]));
   if (!list.length) return '<div class="muted">No percentiles yet.</div>';
   const row = m => sliderRow((o.glossary === false ? esc(m.label) : '<a class="gl-link" href="' + BP.glossHref(m.key) + '">' + esc(m.label) + '</a>') + (m.lower ? ' <span class="ps-lower" title="Lower is better: the percentile already accounts for it">↓</span>' : ''),
-    (pcts || {})[m.key], BP.fmtVal((vals || {})[m.key], m.fmt), (m.desc || '') + (isNum(m.stabilises_at) ? ' · stabilises at about ' + m.stabilises_at : ''));
+    (pcts || {})[m.key], BP.fmtVal((vals || {})[m.key], m.fmt), (m.desc || '') + (isNum(m.stabilises_at) ? ' · stabilises at about ' + m.stabilises_at : '') + (m._pctNote ? ' · ' + m._pctNote : ''),
+    !isNum((vals || {})[m.key]) ? 'no data' : m._noPct ? 'no percentile for this stat' : 'below the sample floor');
   let body;
   if (o.groups === false) body = '<div class="ps-group">' + list.map(row).join('') + '</div>';
   else {

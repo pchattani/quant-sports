@@ -222,31 +222,37 @@ def _age(dob_ts, now: datetime | None = None) -> int | None:
     return int((now - born).days // 365.25)
 
 
+def tally_incidents(incs, out: dict[str, dict[str, int]]) -> dict[str, dict[str, int]]:
+    """Add one match's incidents to `out`: cards and penalty goals per player id (or name when the id is missing)."""
+    if not isinstance(incs, list):
+        return out
+    for inc in incs:
+        if not isinstance(inc, dict):
+            continue
+        key = str(inc.get("player_id") or inc.get("player_name") or "")
+        if not key:
+            continue
+        kind = str(inc.get("incident_type") or "").lower()
+        cls = str(inc.get("incident_class") or "").lower()
+        tally = out.setdefault(key, {"yellow": 0, "red": 0, "pens": 0, "own_goals": 0})
+        if kind == "card":
+            if "red" in cls:
+                tally["red"] += 1
+            else:
+                tally["yellow"] += 1
+        elif kind == "goal":
+            if cls == "penalty":
+                tally["pens"] += 1
+            elif "own" in cls:
+                tally["own_goals"] += 1
+    return out
+
+
 def player_incidents(store: dict[str, Any]) -> dict[str, dict[str, int]]:
     """Cards and penalty goals per player, keyed by player id (or name when the id is missing)."""
     out: dict[str, dict[str, int]] = {}
     for incs in (store.get("incidents") or {}).values():
-        if not isinstance(incs, list):
-            continue
-        for inc in incs:
-            if not isinstance(inc, dict):
-                continue
-            key = str(inc.get("player_id") or inc.get("player_name") or "")
-            if not key:
-                continue
-            kind = str(inc.get("incident_type") or "").lower()
-            cls = str(inc.get("incident_class") or "").lower()
-            tally = out.setdefault(key, {"yellow": 0, "red": 0, "pens": 0, "own_goals": 0})
-            if kind == "card":
-                if "red" in cls:
-                    tally["red"] += 1
-                else:
-                    tally["yellow"] += 1
-            elif kind == "goal":
-                if cls == "penalty":
-                    tally["pens"] += 1
-                elif "own" in cls:
-                    tally["own_goals"] += 1
+        tally_incidents(incs, out)
     return out
 
 
@@ -346,92 +352,105 @@ def aggregate_players(store: dict[str, Any], registry="liga_argentina") -> list[
     now = datetime.now(timezone.utc)
     out = []
     for pid, a in acc.items():
-        mins = a["minutesPlayed"]
-        p90 = max(mins, 1.0) / 90.0
         meta = meta_all.get(pid) if isinstance(meta_all.get(pid), dict) else {}
-        pos = positions.get(pid)
         inc = incidents.get(pid) or incidents.get(a["name"]) or {}
-        pens = int(inc.get("pens", 0))
-        goals = int(a["goals"])
-        is_gk = pos == "G" if pos else bool(a["saves"] > 0 or a["keeperSaveValue"] > 0 or a["savedShotsFromInsideTheBox"] > 0)
-        shots = int(a["totalShots"])
-        rec: dict[str, Any] = {
-            "player_id": pid, "name": a["name"], "team": a["team"],
-            "short_name": meta.get("sn"), "position": pos, "is_gk": is_gk,
-            "age": _age(meta.get("dob"), now), "country": meta.get("c"), "height": meta.get("h"),
-            "shirt": a["shirt"] or meta.get("no"),
-            "matches": a["matches"], "starts": a["starts"], "minutes": int(mins),
-            "goals": goals, "assists": int(a["goalAssist"]),
-            "pens": pens, "npg": goals - pens,
-            "xg": round(a["expectedGoals"], 2), "npxg": round(max(a["expectedGoals"] - PEN_XG * pens, 0.0), 2),
-            "xa": round(a["expectedAssists"], 2), "xgot": round(a["expectedGoalsOnTarget"], 2),
-            "g_minus_xg": round(goals - a["expectedGoals"], 2),
-            "shots": shots, "sot": int(a["onTargetScoringAttempt"]),
-            "shots_blocked": int(a["blockedScoringAttempt"]), "woodwork": int(a["hitWoodwork"]),
-            "sot_pct": _rate(a["onTargetScoringAttempt"], shots),
-            "xg_per_shot": round(a["expectedGoals"] / shots, 3) if shots else None,
-            "key_passes": int(a["keyPass"]), "big_chances": int(a["bigChanceCreated"]),
-            "big_chances_missed": int(a["bigChanceMissed"]),
-            "passes": int(a["totalPass"]), "passes_acc": int(a["accuratePass"]),
-            "pass_pct": round(100 * a["accuratePass"] / max(a["totalPass"], 1), 1),
-            "opp_half_passes": int(a["accurateOppositionHalfPasses"]),
-            "long_balls": int(a["accurateLongBalls"]), "long_balls_att": int(a["totalLongBalls"]),
-            "long_ball_pct": _rate(a["accurateLongBalls"], a["totalLongBalls"]),
-            "crosses": int(a["accurateCross"]), "crosses_att": int(a["totalCross"]),
-            "cross_pct": _rate(a["accurateCross"], a["totalCross"]),
-            "dribbles": int(a["wonContest"]), "dribbles_att": int(a["totalContest"]),
-            "dribble_pct": _rate(a["wonContest"], a["totalContest"]),
-            "carries": int(a["ballCarriesCount"]), "prog_carries": int(a["progressiveBallCarriesCount"]),
-            "carry_dist": int(a["totalBallCarriesDistance"]),
-            "touches": int(a["touches"]), "dispossessed": int(a["dispossessed"]),
-            "poss_lost": int(a["possessionLostCtrl"]),
-            "tackles": int(a["totalTackle"]), "tackles_won": int(a["wonTackle"]),
-            "tackle_pct": _rate(a["wonTackle"], a["totalTackle"]),
-            "interceptions": int(a["interceptionWon"]), "clearances": int(a["totalClearance"]),
-            "blocks": int(a["outfielderBlock"]), "recoveries": int(a["ballRecovery"]),
-            "duels_won": int(a["duelWon"]), "duels_lost": int(a["duelLost"]),
-            "duel_pct": _rate(a["duelWon"], a["duelWon"] + a["duelLost"]),
-            "aerials_won": int(a["aerialWon"]), "aerials_lost": int(a["aerialLost"]),
-            "aerial_pct": _rate(a["aerialWon"], a["aerialWon"] + a["aerialLost"]),
-            "fouls": int(a["fouls"]), "fouled": int(a["wasFouled"]),
-            "errors": int(a["errorLeadToAShot"] + a["errorLeadToAGoal"]), "offsides": int(a["totalOffside"]),
-            "saves": int(a["saves"]), "saves_in_box": int(a["savedShotsFromInsideTheBox"]),
-            "goals_prevented": round(a["goalsPrevented"], 2),
-            "conceded": int(round(a["_conceded"])),
-            "save_pct": _rate(a["saves"], a["saves"] + a["_conceded"]) if is_gk else None,
-            "sweeper": int(a["totalKeeperSweeper"]), "high_claims": int(a["goodHighClaim"]),
-            "punches": int(a["punches"]),
-            "km": round(a["kilometersCovered"], 1),
-            "hsr_km": round(a["metersCoveredHighSpeedRunningKm"] + a["metersCoveredSprintingKm"], 2),
-            "sprints": int(a["numberOfSprints"]), "top_speed": round(a["top_speed"], 1),
-            "rating": round(a["_rat_w"] / a["_rat_min"], 2) if a["_rat_min"] > 0 else None,
-            "yellow": int(inc.get("yellow", 0)), "red": int(inc.get("red", 0)),
-            "own_goals": int(a["ownGoals"]),
-        }
-        # Per-90 rates: what makes a rotation player comparable to an ever-present,
-        # and what the leaderboards and percentiles sort on.
-        for m in PER90:
-            v = rec.get(m)
-            rec[f"{m}_90"] = round(float(v) / p90, 3) if v is not None else None
-        # Derived metrics (the "Advanced" group of the catalogue).
-        np_shots = max(shots - pens - int(a["penaltyMiss"]), 0)
-        rec["npxg_xa_90"] = round((rec["npxg"] + rec["xa"]) / p90, 3)
-        rec["ga_90"] = round((goals + rec["assists"]) / p90, 3)
-        rec["finishing"] = round((rec["npg"] - rec["npxg"]) / np_shots, 3) if np_shots >= 1 else None
-        rec["placement"] = round((a["expectedGoalsOnTarget"] - a["expectedGoals"]) / shots, 3) if shots else None
-        rec["xa_per_kp"] = round(rec["xa"] / rec["key_passes"], 3) if rec["key_passes"] else None
-        rec["shot_creation_90"] = round((shots + rec["key_passes"]) / p90, 3)
-        rec["prog_actions_90"] = round((rec["prog_carries"] + rec["dribbles"]) / p90, 3)
-        rec["def_actions_90"] = round((rec["tackles"] + rec["interceptions"] + rec["blocks"] + rec["clearances"]) / p90, 3)
-        rec["padj_tkl_int_90"] = round(a["_padj"] / p90, 3)
-        rec["ball_wins_90"] = round((rec["tackles_won"] + rec["interceptions"] + rec["recoveries"]) / p90, 3)
-        rec["duels_90"] = round((rec["duels_won"] + rec["duels_lost"]) / p90, 3)
-        rec["aerials_90"] = round((rec["aerials_won"] + rec["aerials_lost"]) / p90, 3)
-        rec["loss_per_100"] = round(100.0 * rec["poss_lost"] / rec["touches"], 1) if rec["touches"] else None
-        out.append(rec)
+        out.append(finalize_player(pid, a, meta, positions.get(pid), inc, now))
 
     out.sort(key=lambda r: (-r["goals"], -r["xg"]))
     return out
+
+
+def finalize_player(pid: str, a: dict[str, Any], meta: dict | None, pos: str | None, inc: dict | None,
+                    now: datetime | None = None) -> dict[str, Any]:
+    """
+    One player's line from his accumulated match stats (`a`: SUM_KEYS plus matches,
+    starts, the rating weights, top speed, goals conceded and the possession-adjusted
+    defending, as aggregate_players builds them), his store metadata, position letter
+    and incident tally. Shared with the consolidated per-person lines (people_lines.py).
+    """
+    meta = meta or {}
+    inc = inc or {}
+    now = now or datetime.now(timezone.utc)
+    mins = a["minutesPlayed"]
+    p90 = max(mins, 1.0) / 90.0
+    pens = int(inc.get("pens", 0))
+    goals = int(a["goals"])
+    is_gk = pos == "G" if pos else bool(a["saves"] > 0 or a["keeperSaveValue"] > 0 or a["savedShotsFromInsideTheBox"] > 0)
+    shots = int(a["totalShots"])
+    rec: dict[str, Any] = {
+        "player_id": pid, "name": a["name"], "team": a["team"],
+        "short_name": meta.get("sn"), "position": pos, "is_gk": is_gk,
+        "age": _age(meta.get("dob"), now), "country": meta.get("c"), "height": meta.get("h"),
+        "shirt": a["shirt"] or meta.get("no"),
+        "matches": a["matches"], "starts": a["starts"], "minutes": int(mins),
+        "goals": goals, "assists": int(a["goalAssist"]),
+        "pens": pens, "npg": goals - pens,
+        "xg": round(a["expectedGoals"], 2), "npxg": round(max(a["expectedGoals"] - PEN_XG * pens, 0.0), 2),
+        "xa": round(a["expectedAssists"], 2), "xgot": round(a["expectedGoalsOnTarget"], 2),
+        "g_minus_xg": round(goals - a["expectedGoals"], 2),
+        "shots": shots, "sot": int(a["onTargetScoringAttempt"]),
+        "shots_blocked": int(a["blockedScoringAttempt"]), "woodwork": int(a["hitWoodwork"]),
+        "sot_pct": _rate(a["onTargetScoringAttempt"], shots),
+        "xg_per_shot": round(a["expectedGoals"] / shots, 3) if shots else None,
+        "key_passes": int(a["keyPass"]), "big_chances": int(a["bigChanceCreated"]),
+        "big_chances_missed": int(a["bigChanceMissed"]),
+        "passes": int(a["totalPass"]), "passes_acc": int(a["accuratePass"]),
+        "pass_pct": round(100 * a["accuratePass"] / max(a["totalPass"], 1), 1),
+        "opp_half_passes": int(a["accurateOppositionHalfPasses"]),
+        "long_balls": int(a["accurateLongBalls"]), "long_balls_att": int(a["totalLongBalls"]),
+        "long_ball_pct": _rate(a["accurateLongBalls"], a["totalLongBalls"]),
+        "crosses": int(a["accurateCross"]), "crosses_att": int(a["totalCross"]),
+        "cross_pct": _rate(a["accurateCross"], a["totalCross"]),
+        "dribbles": int(a["wonContest"]), "dribbles_att": int(a["totalContest"]),
+        "dribble_pct": _rate(a["wonContest"], a["totalContest"]),
+        "carries": int(a["ballCarriesCount"]), "prog_carries": int(a["progressiveBallCarriesCount"]),
+        "carry_dist": int(a["totalBallCarriesDistance"]),
+        "touches": int(a["touches"]), "dispossessed": int(a["dispossessed"]),
+        "poss_lost": int(a["possessionLostCtrl"]),
+        "tackles": int(a["totalTackle"]), "tackles_won": int(a["wonTackle"]),
+        "tackle_pct": _rate(a["wonTackle"], a["totalTackle"]),
+        "interceptions": int(a["interceptionWon"]), "clearances": int(a["totalClearance"]),
+        "blocks": int(a["outfielderBlock"]), "recoveries": int(a["ballRecovery"]),
+        "duels_won": int(a["duelWon"]), "duels_lost": int(a["duelLost"]),
+        "duel_pct": _rate(a["duelWon"], a["duelWon"] + a["duelLost"]),
+        "aerials_won": int(a["aerialWon"]), "aerials_lost": int(a["aerialLost"]),
+        "aerial_pct": _rate(a["aerialWon"], a["aerialWon"] + a["aerialLost"]),
+        "fouls": int(a["fouls"]), "fouled": int(a["wasFouled"]),
+        "errors": int(a["errorLeadToAShot"] + a["errorLeadToAGoal"]), "offsides": int(a["totalOffside"]),
+        "saves": int(a["saves"]), "saves_in_box": int(a["savedShotsFromInsideTheBox"]),
+        "goals_prevented": round(a["goalsPrevented"], 2),
+        "conceded": int(round(a["_conceded"])),
+        "save_pct": _rate(a["saves"], a["saves"] + a["_conceded"]) if is_gk else None,
+        "sweeper": int(a["totalKeeperSweeper"]), "high_claims": int(a["goodHighClaim"]),
+        "punches": int(a["punches"]),
+        "km": round(a["kilometersCovered"], 1),
+        "hsr_km": round(a["metersCoveredHighSpeedRunningKm"] + a["metersCoveredSprintingKm"], 2),
+        "sprints": int(a["numberOfSprints"]), "top_speed": round(a["top_speed"], 1),
+        "rating": round(a["_rat_w"] / a["_rat_min"], 2) if a["_rat_min"] > 0 else None,
+        "yellow": int(inc.get("yellow", 0)), "red": int(inc.get("red", 0)),
+        "own_goals": int(a["ownGoals"]),
+    }
+    # Per-90 rates: what makes a rotation player comparable to an ever-present,
+    # and what the leaderboards and percentiles sort on.
+    for m in PER90:
+        v = rec.get(m)
+        rec[f"{m}_90"] = round(float(v) / p90, 3) if v is not None else None
+    # Derived metrics (the "Advanced" group of the catalogue).
+    np_shots = max(shots - pens - int(a["penaltyMiss"]), 0)
+    rec["npxg_xa_90"] = round((rec["npxg"] + rec["xa"]) / p90, 3)
+    rec["ga_90"] = round((goals + rec["assists"]) / p90, 3)
+    rec["finishing"] = round((rec["npg"] - rec["npxg"]) / np_shots, 3) if np_shots >= 1 else None
+    rec["placement"] = round((a["expectedGoalsOnTarget"] - a["expectedGoals"]) / shots, 3) if shots else None
+    rec["xa_per_kp"] = round(rec["xa"] / rec["key_passes"], 3) if rec["key_passes"] else None
+    rec["shot_creation_90"] = round((shots + rec["key_passes"]) / p90, 3)
+    rec["prog_actions_90"] = round((rec["prog_carries"] + rec["dribbles"]) / p90, 3)
+    rec["def_actions_90"] = round((rec["tackles"] + rec["interceptions"] + rec["blocks"] + rec["clearances"]) / p90, 3)
+    rec["padj_tkl_int_90"] = round(a["_padj"] / p90, 3)
+    rec["ball_wins_90"] = round((rec["tackles_won"] + rec["interceptions"] + rec["recoveries"]) / p90, 3)
+    rec["duels_90"] = round((rec["duels_won"] + rec["duels_lost"]) / p90, 3)
+    rec["aerials_90"] = round((rec["aerials_won"] + rec["aerials_lost"]) / p90, 3)
+    rec["loss_per_100"] = round(100.0 * rec["poss_lost"] / rec["touches"], 1) if rec["touches"] else None
+    return rec
 
 
 # Minutes a player needs before he is ranked (percentiles, leaderboards): this share of the

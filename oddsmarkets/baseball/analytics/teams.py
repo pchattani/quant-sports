@@ -434,8 +434,12 @@ def roster(ctx: SeasonContext, tid: str, hp: dict, pp: dict) -> list:
                         "war": r["values"].get("war"), "ra9": r["values"].get("ra9"), "stuff_plus": r["values"].get("stuff_plus"),
                         "injured": inj.get(pid)})
     out.sort(key=lambda x: -(x.get("war") or -99))
+    rn, rp = meta.get("names") or {}, meta.get("pos") or {}
     for pid in meta.get("40man") or []:
         if str(pid) not in {x["pid"] for x in out}:
-            out.append({"pid": str(pid), "name": ctx.name(pid), "pos": (ctx.players.get(str(pid)) or {}).get("pos"), "kind": "40man",
+            nm = ctx.name(pid)
+            if not nm or nm == str(pid):
+                nm = rn.get(str(pid)) or nm
+            out.append({"pid": str(pid), "name": nm, "pos": (ctx.players.get(str(pid)) or {}).get("pos") or rp.get(str(pid)), "kind": "40man",
                         "injured": inj.get(str(pid))})
     return out

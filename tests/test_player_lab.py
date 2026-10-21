@@ -1,8 +1,9 @@
 """
-Advanced player metrics, the Player lab payload and the match page's lineup
-order: derived ratios are computed from the season totals, defending is
-possession-adjusted per match, the lab file is column-oriented and consistent,
-and starters keep the source's order within a line so formations can be drawn.
+Advanced player metrics, the one-row-per-person lab payloads and the match page's
+lineup order: derived ratios are computed from the season totals, defending is
+possession-adjusted per match, a person is one row in every view (window x scope)
+and his duplicate ids fold into one, and starters keep the source's order within a
+line so formations can be drawn.
 """
 from __future__ import annotations
 
@@ -89,55 +90,137 @@ def test_lineups_keep_the_source_order_within_a_line() -> None:
     assert mid["pl"] == 6 and mid["pc"] == 2
 
 
-def test_the_lab_payload_is_consistent(tmp_path) -> None:
-    import build_site_global as g
-
-    players = aggregate_players(_store(), registry={})
-    entries = [{"slug": "premier-league", "name": "Premier League", "kind": "league", "ok": True, "_players": players,
-                "_teams": {"Home": {"slug": "home"}}},
-               {"slug": "empty-cup", "name": "Empty", "kind": "cup", "ok": True, "_players": [], "_teams": {}}]
-    n = g.build_lab(tmp_path, entries, {"premier-league": "EPL"}, {"premier-league": 1.1})
-    lab = json.loads((tmp_path / "players_lab.json").read_text(encoding="utf-8"))
-    assert n == len(lab["rows"]) == 5                                  # the 20-minute sub is under the floor
-    assert set(lab["comps"]) == {"premier-league"} and lab["comps"]["premier-league"]["factor"] == 1.1
-    assert all(len(r) == len(lab["fields"]) for r in lab["rows"])
-    f = {k: i for i, k in enumerate(lab["fields"])}
-    assert {"player_id", "name", "team", "position", "minutes", "comp", "team_slug", "padj_tkl_int_90", "finishing"} <= set(f)
-    assert {m["key"] for m in lab["metrics"]} == set(lab["fields"][f["team_slug"] + 1:])
-    st = next(r for r in lab["rows"] if r[f["name"]] == "Striker")
-    assert st[f["comp"]] == "premier-league" and st[f["team_slug"]] == "home" and st[f["ga_90"]] == 2.0
-
-
-def test_calendar_windows_merge_competitions_and_keep_the_club(tmp_path) -> None:
-    """A player's window line spans competitions; his club is the latest club, never his national team."""
+def _lines(today=None):
     from datetime import datetime, timezone
 
-    import build_site_global as g
+    from oddsmarkets.football.analytics.people_lines import PeopleLines
 
-    league = _store()                                                  # two Home matches, 2 and 1 Sept
-    intl = {"matches": {"9": {"home": "Norway", "away": "Italy", "hs": 3, "as": 0, "status": "finished", "date": "2026-09-09T18:00:00Z"}},
-            "lineups": {"9": {"30": _player("Striker", "Norway", "F", goals=2, expectedGoals=1.5, totalShots=5)}},
+    comps = {"premier-league": {"name": "Premier League", "short": "EPL", "kind": "league", "scope": "club"},
+             "champions-league": {"name": "Champions League", "short": "UCL", "kind": "continental_club", "scope": "club"},
+             "world-cup": {"name": "World Cup", "short": "World Cup", "kind": "international", "scope": "international"},
+             "mls": {"name": "MLS", "short": "MLS", "kind": "league", "scope": "club"}}
+    return PeopleLines(comps, today=today or datetime(2026, 9, 30, tzinfo=timezone.utc), intl_split_month=8)
+
+
+def _read(path):
+    d = json.loads(path.read_text(encoding="utf-8"))
+    f = {k: i for i, k in enumerate(d["fields"])}
+    return d, f, {r[f["player_id"]]: r for r in d["rows"]}
+
+
+def test_a_one_competition_line_equals_the_competition_page(tmp_path) -> None:
+    """The consolidated line of one competition is the competition's own season line (same arithmetic)."""
+    store = _store()
+    for m in store["matches"].values():
+        m["season_id"] = 2
+    pl = _lines()
+    pl.add_store("premier-league", store, era_of=lambda m: "2026/27")
+    pl.finish(tmp_path, frames={pid: "split" for pid in ("10", "11", "12", "20", "30", "31")})
+    ref = {r["player_id"]: r for r in aggregate_players(store, registry={})}
+    d, f, rows = _read(tmp_path / "lab" / "season" / "premier-league.json")
+    assert set(rows) == {"10", "11", "12", "20", "30"}                  # the 20-minute sub is under the floor
+    for pid, r in rows.items():
+        for k in ("minutes", "matches", "goals_90", "npxg_xa_90", "padj_tkl_int_90", "pass_pct", "rating", "finishing", "loss_per_100"):
+            assert r[f[k]] == (None if ref[pid].get(k) is None else round(float(ref[pid][k]), 3)), (pid, k)
+    assert d["floor"] >= 90 and d["window"] == "season" and d["scope"] == "premier-league"
+    idx = json.loads((tmp_path / "lab" / "index.json").read_text(encoding="utf-8"))
+    assert idx["fields"] == d["fields"] and idx["scopes"]["season"]["all"]["n"] == 5
+    assert {m["key"] for m in idx["metrics"]} == set(d["fields"][d["fields"].index("comp") + 1:])
+
+
+def test_one_row_per_person_in_every_scope(tmp_path) -> None:
+    """A player in a league, a European cup and a World Cup qualifier is one row per view; the scope picks what it sums."""
+    league, cup = _store(), _store()
+    for m in league["matches"].values():
+        m["season_id"] = 2
+    cup["matches"] = {"7": {**league["matches"]["1"], "date": "2026-09-16T19:00:00Z", "season_id": 9}}
+    cup["lineups"] = {"7": {"30": _player("Striker", "Home", "F", goals=2, expectedGoals=1.1, totalShots=3)}}
+    cup["team_stats"] = {}
+    intl = {"matches": {"9": {"home": "Norway", "away": "Italy", "home_id": 4705, "away_id": 4707, "hs": 3, "as": 0,
+                              "status": "finished", "date": "2026-09-09T18:00:00Z", "season_id": 5}},
+            "lineups": {"9": {"30": _player("Striker", "Norway", "F", goals=1, expectedGoals=0.5, totalShots=2)}},
             "team_stats": {}, "players": {}, "incidents": {}, "shots": {}}
-    old = {"matches": {"5": {"home": "Home", "away": "Away", "hs": 1, "as": 1, "status": "finished", "date": "2025-03-01T15:00:00Z"}},
-           "lineups": {"5": {"30": _player("Striker", "Home", "F", goals=1)}}, "team_stats": {}, "players": {}, "incidents": {}, "shots": {}}
-    for slug, st in (("premier-league", league), ("world-cup", intl), ("old-cup", old)):
-        (tmp_path / slug).mkdir()
-        (tmp_path / slug / "store.json").write_text(json.dumps(st), encoding="utf-8")
-    entries = [{"slug": "premier-league", "name": "Premier League", "kind": "league", "_teams": {"Home": {"slug": "home"}}},
-               {"slug": "world-cup", "name": "World Cup", "kind": "cup", "family": "international", "_teams": {}},
-               {"slug": "old-cup", "name": "Old Cup", "kind": "cup", "family": "cup", "_teams": {}}]
-    out = g.build_lab_windows(tmp_path, entries, {"premier-league": "EPL", "world-cup": "World Cup"}, {"premier-league": 1.2},
-                              now=datetime(2026, 9, 30, tzinfo=timezone.utc))
-    assert set(out) == {"365", "ytd"}
-    lab = json.loads((tmp_path / "players_lab_365.json").read_text(encoding="utf-8"))
-    f = {k: i for i, k in enumerate(lab["fields"])}
-    st = next(r for r in lab["rows"] if r[f["name"]] == "Striker")
-    assert st[f["minutes"]] == 270 and st[f["team"]] == "Home"             # 2 league + 1 international, club kept
-    assert st[f["comp"]] == "premier-league" and st[f["mix"]].startswith("EPL 180'")
-    assert st[f["factor"]] == pytest.approx((1.2 * 180 + 1.0 * 90) / 270, abs=1e-3)
-    assert st[f["goals_90"]] == pytest.approx(4 / 3, abs=1e-3)              # the March 2025 match is outside the window
-    assert lab["window"] == {"tag": "365", "label": "Last 12 months", "start": "2025-09-30", "end": "2026-09-30"}
-    assert lab["comps"]["premier-league"]["first_detail"] == "2026-09-01"
+    for st in (league, cup):
+        for m in st["matches"].values():
+            m["home_id"], m["away_id"] = 17, 18
+    pl = _lines()
+    pl.add_store("premier-league", league, era_of=lambda m: "2026/27")
+    pl.add_store("champions-league", cup, era_of=lambda m: "2026/27")
+    pl.add_store("world-cup", intl, era_of=lambda m: "2026")
+    (tmp_path / "players_lab.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "players_global.json").write_text("{}", encoding="utf-8")
+    pl.finish(tmp_path, frames={"30": "split"}, people={"30": {"name": "Erling Striker", "dob": "2000-07-21"}},
+              club_of={"30": {"tid": 17, "name": "Manchester City"}},
+              clubs={"17": {"name": "Manchester City"}, "4705": {"name": "Norway"}}, factors={"premier-league": 1.2})
+    lab = tmp_path / "lab" / "season"
+    _d, f, allr = _read(lab / "all.json")
+    _d, _f, club = _read(lab / "club.json")
+    _d, _f, nat = _read(lab / "intl.json")
+    _d, _f, ucl = _read(lab / "champions-league.json")
+    st = allr["30"]
+    assert st[f["name"]] == "Erling Striker" and st[f["age"]] == 26
+    assert st[f["minutes"]] == 360 and st[f["matches"]] == 4                          # 2 league + 1 cup + 1 qualifier
+    assert st[f["team"]] == "Manchester City" and st[f["tid"]] == 17 and st[f["comp"]] == "premier-league"
+    assert st[f["goals_90"]] == pytest.approx(5 / 4) and st[f["mix"]] == "EPL 180' · UCL 90' · World Cup 90'"
+    assert st[f["factor"]] == pytest.approx((1.2 * 180 + 90 + 90) / 360, abs=1e-4)
+    assert club["30"][f["minutes"]] == 270 and club["30"][f["goals_90"]] == pytest.approx(4 / 3, abs=1e-3)
+    assert nat["30"][f["minutes"]] == 90 and nat["30"][f["team"]] == "Norway" and nat["30"][f["tid"]] == 4705
+    assert ucl["30"][f["minutes"]] == 90 and set(ucl) == {"30"}
+    assert not (tmp_path / "players_lab.json").exists() and not (tmp_path / "players_global.json").exists()
+    board = json.loads((tmp_path / "lab" / "leaders.json").read_text(encoding="utf-8"))["scopes"]
+    assert [r["id"] for r in board["all"]["goals"]][:1] == ["30"] and board["all"]["goals"][0]["value"] == 5
+    assert board["intl"]["goals"][0]["value"] == 1
+
+
+def test_seasons_follow_the_players_own_frame(tmp_path) -> None:
+    """A July international closes a European's season and is in a Brazilian's current one."""
+    intl = {"matches": {"9": {"home": "Brazil", "away": "Norway", "hs": 1, "as": 1, "status": "finished",
+                              "date": "2026-07-10T18:00:00Z", "season_id": 5}},
+            "lineups": {"9": {"1": _player("European", "Norway", "F"), "2": _player("Brazilian", "Brazil", "F")}},
+            "team_stats": {}, "players": {}, "incidents": {}, "shots": {}}
+    old = {"matches": {"5": {"home": "Home", "away": "Away", "hs": 1, "as": 1, "status": "finished",
+                             "date": "2024-03-01T15:00:00Z", "season_id": 1}},
+           "lineups": {"5": {"1": _player("European", "Home", "F")}}, "team_stats": {}, "players": {}, "incidents": {}, "shots": {}}
+    pl = _lines()
+    pl.add_store("world-cup", intl, era_of=lambda m: "2026")
+    pl.add_store("premier-league", old, era_of=lambda m: "2023/24")             # two seasons back: in no view
+    pl.finish(tmp_path, frames={"1": "split", "2": "calendar"})
+    _d, _f, now = _read(tmp_path / "lab" / "season" / "all.json")
+    _d, _f, last = _read(tmp_path / "lab" / "last" / "all.json")
+    _d, _f, y365 = _read(tmp_path / "lab" / "365" / "all.json")
+    assert set(now) == {"2"} and set(last) == {"1"} and set(y365) == {"1", "2"}
+    idx = json.loads((tmp_path / "lab" / "index.json").read_text(encoding="utf-8"))
+    w = {x["key"]: x for x in idx["windows"]}
+    assert w["season"]["eras"] == {"split": "2026/27", "calendar": "2026"} and w["last"]["eras"] == {"split": "2025/26", "calendar": "2025"}
+    assert w["365"]["start"] == "2025-09-30" and w["ytd"]["start"] == "2026-01-01"
+
+
+def test_duplicate_ids_merge_only_on_name_birth_date_and_nationality() -> None:
+    from oddsmarkets.football.analytics.unified import same_person_aliases
+
+    people = {"1097368": {"name": "Luis Gabriel Rey", "dob": "2002-09-14", "nat": "MEX"},
+              "1097364": {"name": "Luis Gabriel Rey", "dob": "2002-09-14", "nat": "MEX"},
+              "1139870": {"name": "Omar Ali", "dob": "1992-10-10", "nat": "QAT"},
+              "992928": {"name": "Omar Ali", "dob": "1992-10-10", "nat": "GHA"},           # one birth date, two countries
+              "5": {"name": "Rey", "dob": "2002-09-14", "nat": "MEX"},                      # not the exact name
+              "6": {"name": "Luis Gabriel Rey", "nat": "MEX"}}                               # no birth date: never merged
+    out = same_person_aliases(people, {"1097368": (1232, 14, 0), "1097364": (0, 0, 0)})
+    assert out == {"1097364": "1097368"}
+    # Without minutes the lower id is kept.
+    assert same_person_aliases(people) == {"1097368": "1097364"}
+
+
+def test_merged_ids_sum_into_one_line(tmp_path) -> None:
+    a, b = _store(), _store()
+    b["matches"] = {"3": {**a["matches"]["1"], "date": "2026-09-20T15:00:00Z"}}
+    b["lineups"] = {"3": {"99": _player("Striker", "Home", "F", goals=1)}}
+    pl = _lines()
+    pl.add_store("premier-league", a, era_of=lambda m: "2026/27")
+    pl.add_store("mls", b, era_of=lambda m: "2026")
+    pl.merge_aliases({"99": "30"})
+    pl.finish(tmp_path, frames={"30": "split"})
+    _d, f, rows = _read(tmp_path / "lab" / "365" / "all.json")
+    assert "99" not in rows and rows["30"][f["minutes"]] == 270 and rows["30"][f["goals_90"]] == pytest.approx(1.0)
 
 
 def test_detail_queue_backfills_the_whole_previous_season() -> None:

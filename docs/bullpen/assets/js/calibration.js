@@ -46,6 +46,11 @@ function reading(d) {
     out.push('<p><strong>Coverage.</strong> ' + k.int(P.n_games) + ' games ' + (seasons.length > 1 ? 'from ' + seasons[0] + ' to ' + seasons[seasons.length - 1] : 'in ' + seasons[0]) + ' were priced walk-forward, each with projections refitted from games strictly before it. ' +
       k.int((V.market || {}).n) + ' of them (' + k.num(100 * ((V.market || {}).n || 0) / P.n_games, 0) + '%) have an ESPN closing moneyline to compare with.</p>');
   }
+  const SP = (G.sim || {}).pooled || {};
+  if (k.isNum(ll(SP, 'model')) && k.isNum(ll(P, 'model'))) {
+    out.push('<p><strong>The market layer.</strong> The game model scored here is the plate-appearance simulation corrected by ratings learned from earlier games\' closing lines (teams, starters and parks; the game itself never sees its own line), run walk-forward. The simulation alone scores ' + k.num(ll(SP, 'model'), 4) + ' over every game against ' + k.num(ll(P, 'model'), 4) + ' with the layer' +
+      (k.isNum(((SP.totals || {}).logloss)) && k.isNum((P.totals || {}).logloss) ? ', and ' + k.num(SP.totals.logloss, 4) + ' against ' + k.num(P.totals.logloss, 4) + ' on the over/under' : '') + '.</p>');
+  }
   if (k.isNum(ll(P, 'model')) && k.isNum(ll(P, 'ratings'))) {
     const dR = ll(P, 'ratings') - ll(P, 'model'), dS = ll(P, 'starter_record') - ll(P, 'model');
     out.push('<p><strong>Against the simple baselines.</strong> Over every scored game the game model\'s log-loss is ' + k.num(ll(P, 'model'), 4) + ', against ' + k.num(ll(P, 'ratings'), 4) + ' for team ratings from run differential and ' + k.num(ll(P, 'starter_record'), 4) + ' for the starter-and-record baseline. ' +
@@ -70,7 +75,7 @@ function reading(d) {
   const r = P.runs || {};
   if (k.isNum(r.model_mean_total)) {
     const T = P.totals || {}, TM = P.totals_market || {}, RL = P.runline || {}, RM = P.runline_market || {};
-    out.push('<p><strong>Totals and run lines.</strong> The simulation expected ' + k.num(r.model_mean_total, 2) + ' runs a game; ' + k.num(r.actual_mean_total, 2) + ' were scored (' + (r.model_mean_total > r.actual_mean_total ? 'too many' : 'too few') + ' by ' + k.num(Math.abs(r.model_mean_total - r.actual_mean_total), 2) + '). ' +
+    out.push('<p><strong>Totals and run lines.</strong> The model expected ' + k.num(r.model_mean_total, 2) + ' runs a game; ' + k.num(r.actual_mean_total, 2) + ' were scored (' + (r.model_mean_total > r.actual_mean_total ? 'too many' : 'too few') + ' by ' + k.num(Math.abs(r.model_mean_total - r.actual_mean_total), 2) + '). ' +
       (k.isNum(T.logloss) && k.isNum(TM.logloss) ? 'On the over/under at the closing total the model scores ' + k.num(T.logloss, 4) + ' against the market\'s ' + k.num(TM.logloss, 4) + '. ' : '') +
       (k.isNum(RL.logloss) && k.isNum(RM.logloss) ? 'On the closing run line, ' + k.num(RL.logloss, 4) + ' against ' + k.num(RM.logloss, 4) + '.' : '') + '</p>');
   }

@@ -35,13 +35,45 @@ GI.picker = function (host, o) {
   GI.onLeave(() => document.removeEventListener('click', outside));
 };
 
+/* The build ranks rates, not the volume lines (attempts, yards, touchdowns, tackles: fmt "int"), so those rows had no
+ * percentile here and never counted. They get one against the qualified players of the same group (100 = best, ties at
+ * the midpoint), for every player of the group with a value: by volume, except a quarterback's interceptions, which are
+ * placed per attempt with fewer as better. Once per catalogue, kept apart (cat._volPct {id: {key: pct}}) so the shared
+ * payload other pages read is not changed. */
+function volumePct(cat) {
+  if (!cat || cat._volPct || !cat.players) return;
+  const out = {};
+  cat._volPct = out;
+  const P = cat.players, ids = Object.keys(P);
+  GI.GROUPS.forEach(g => {
+    const mine = ids.filter(id => GI.groupOf(P[id].pos, P[id].group) === g);
+    const pool = mine.filter(id => P[id].qualified === true);
+    if (pool.length < 5) return;
+    GI.metricsFor(cat, g).filter(m => m && m.fmt === 'int' && !mine.some(id => isNum((P[id].pct || {})[m.key]))).forEach(m => {
+      const perAtt = g === 'QB' && m.key === 'ints';
+      const sv = id => { const v = (P[id].values || {})[m.key]; if (!isNum(v)) return null; if (!perAtt) return Number(v); const a = (P[id].values || {}).att; return isNum(a) && a > 0 ? Number(v) / a : null; };
+      const refv = pool.map(sv).filter(isNum).sort((a, b) => a - b);
+      if (refv.length < 5) return;
+      const n = refv.length;
+      mine.forEach(id => {
+        const v = sv(id);
+        if (!isNum(v)) return;
+        let lo = 0, hi = 0;
+        refv.forEach(y => { if (y < v) lo++; if (y <= v) hi++; });
+        const tie = Math.max(0, hi - lo - 1);
+        out[id] = out[id] || {};
+        out[id][m.key] = Math.max(0, Math.min(100, Math.round(100 * ((perAtt ? n - hi : lo) + 0.5 * tie) / (n - 1))));
+      });
+    });
+  });
+}
 function teamId(s) { const m = /^t:?([A-Za-z]{2,3})$/.exec(String(s || '')); return m ? m[1].toUpperCase() : (/^[A-Z]{2,3}$/.test(String(s || '')) ? String(s) : null); }
 function entity(id, cat, tc) {
   const t = teamId(id);
   if (t && tc && tc.teams[t]) { const x = tc.teams[t]; return { kind: 'team', id: t, name: GI.teamName(t), values: x.values || {}, pct: x.pct || {}, rank: x.rank || {}, team: t, rec: x.record || {} }; }
   const p = cat && cat.players[String(id)];
   if (!p) return null;
-  return { kind: 'player', id: String(id), name: p.name || GI.playerName(id), values: p.values || {}, pct: p.pct || {}, rank: {}, team: p.team, pos: p.pos, group: GI.groupOf(p.pos, p.group), age: p.age, games: p.games, qualified: p.qualified };
+  return { kind: 'player', id: String(id), name: p.name || GI.playerName(id), values: p.values || {}, pct: Object.assign({}, (cat._volPct || {})[String(id)] || {}, p.pct || {}), rank: {}, team: p.team, pos: p.pos, group: GI.groupOf(p.pos, p.group), age: p.age, games: p.games, qualified: p.qualified };
 }
 function nearest(A, cat, tc) {
   let best = null, bd = 1e9;
@@ -76,6 +108,7 @@ GI.route('compare', function (el, params) {
   return GI.loadAll([GI.ypath('players.json', S), GI.ypath('teams.json', S)]).then(res => {
     if (!el.isConnected) return;
     const cat = GI.catOf(res[0]);
+    volumePct(cat);
     const tc = GI.TM.of(res[1]);
     if (a0 || b0) MODE = teamId(a0 || b0) && tc && tc.teams[teamId(a0 || b0)] ? 'team' : 'player';
     let A = a0 ? entity(a0, cat, tc) : null, B = b0 ? entity(b0, cat, tc) : null;

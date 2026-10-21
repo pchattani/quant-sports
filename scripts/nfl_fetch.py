@@ -231,8 +231,10 @@ def espn_live(c: Client, s: dict, now: datetime) -> None:
         in_play = ref.get("state") == "in"
         soon = now <= ko <= now + timedelta(hours=24)
         cached = st.read_json(st.espn_summary_path(season, gid)) or {}
+        # a final record is fetched once, again if it predates the box score (the game page's fallback until nflverse
+        # publishes the week's play-by-play)
         just_final = (ref.get("state") == "post" or g.get("status") == "final") and now - ko < timedelta(hours=36) \
-            and cached.get("status") != "final"
+            and (cached.get("status") != "final" or "box" not in cached)
         if not (in_play or soon or just_final):
             continue
         raw = espn.summary(c, g["espn_id"])

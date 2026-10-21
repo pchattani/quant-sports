@@ -325,11 +325,13 @@ def build_tour(b: Build, tour: str, args, cfg: dict) -> dict:
             for y, m, sig in chunk:
                 payload = b.step(f"match {tour}/{m['id']}", lambda: MT.build_match(td, m, full_preds.get(m["id"]) or preds.get(m["id"]),
                                                                                   prices.get(m["id"]), td.events(y).get(m.get("event"))))
-                if payload is None:
+                failed = payload is None
+                if failed:
                     payload = {"ok": False, "reason": "match page could not be built", "id": m["id"]}
                 b.write(f"{tour}/matches/{an.fname(m['id'])}.json", payload)
                 skipped = bool((full_preds.get(m["id"]) or {}).get("_sr_skipped"))
-                man["pages"][m["id"]] = sig if (m["id"] not in live_ids and not skipped) else None
+                # a failed page is left unsigned so the next run tries again (a signed stub would never be rebuilt)
+                man["pages"][m["id"]] = sig if (m["id"] not in live_ids and not skipped and not failed) else None
                 n += 1
         return n
     n_pages = b.step(f"{tour} match pages", match_pages, 0)

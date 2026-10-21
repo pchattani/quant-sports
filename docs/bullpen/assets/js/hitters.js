@@ -264,11 +264,11 @@ K.pctColor = p => {
 K.ink = p => (has('pctInk') ? BP.pctInk(p) : '#fff');
 K.pill = p => (isNum(p) ? '<span class="pct-pill" style="background:' + K.pctColor(p) + ';color:' + K.ink(p) + '">' + Math.round(p) + '</span>' : '<span class="pct-pill empty">—</span>');
 /* Savant-style percentile slider: a track, a coloured disc carrying the percentile, the value on the right. */
-K.slider = (label, p, valueText, title, href) => {
+K.slider = (label, p, valueText, title, href, none) => {
   const known = isNum(p), x = known ? Math.max(0, Math.min(100, p)) : 0;
   const lab = href ? '<a href="' + href + '" class="gq-sl-a">' + K.esc(label) + '</a>' : K.esc(label);
   return '<div class="gq-sl"' + (title ? ' title="' + K.esc(title) + '"' : '') + '><span class="gq-sl-label">' + lab + '</span><div class="gq-sl-track">' +
-    (known ? '<div class="gq-sl-fill" style="width:' + x + '%;background:' + K.pctColor(p) + '"></div><span class="gq-sl-dot" style="left:' + x + '%;background:' + K.pctColor(p) + ';color:' + K.ink(p) + '">' + Math.round(p) + '</span>' : '<span class="gq-sl-none">not enough data</span>') +
+    (known ? '<div class="gq-sl-fill" style="width:' + x + '%;background:' + K.pctColor(p) + '"></div><span class="gq-sl-dot" style="left:' + x + '%;background:' + K.pctColor(p) + ';color:' + K.ink(p) + '">' + Math.round(p) + '</span>' : '<span class="gq-sl-none">' + K.esc(none || 'not enough data') + '</span>') +
     '</div><span class="gq-sl-val">' + (valueText === undefined ? '' : valueText) + '</span></div>';
 };
 /* Grouped sliders over a whole catalogue. opts {onlyKnown, note, cols, glossary: true}. */
@@ -280,8 +280,8 @@ K.sliders = (metrics, vals, pcts, opts) => {
   if (!groups.length) return K.muted('No metrics in the catalogue yet.');
   return '<div class="gq-sl-cols">' + groups.map(g => '<div class="gq-sl-group"><div class="gq-sl-head">' + K.esc(g.name) + '</div>' +
     g.items.map(m => K.slider(m.label + (m.lower ? ' ↓' : ''), (pcts || {})[m.key], K.fmt(m, (vals || {})[m.key]),
-      (m.desc || m.label) + (m.lower ? ' (lower is better; the percentile already accounts for it)' : '') + (isNum(m.stabilises_at) ? ' · stabilises at about ' + K.int(m.stabilises_at) + ' ' + (m.unit || 'PA/BF') : ''),
-      o.glossary === false ? null : '#/glossary/' + enc(m.key))).join('') + '</div>').join('') + '</div>' + (o.note ? '<div class="pg-note gq-note">' + o.note + '</div>' : '');
+      (m.desc || m.label) + (m.lower ? ' (lower is better; the percentile already accounts for it)' : '') + (isNum(m.stabilises_at) ? ' · stabilises at about ' + K.int(m.stabilises_at) + ' ' + (m.unit || 'PA/BF') : '') + (m._pctNote ? ' · ' + m._pctNote : ''),
+      o.glossary === false ? null : '#/glossary/' + enc(m.key), K.noPctText(m, (vals || {})[m.key]))).join('') + '</div>').join('') + '</div>' + (o.note ? '<div class="pg-note gq-note">' + o.note + '</div>' : '');
 };
 
 /* Tables: the shell's when present (same signature as Hardwood's HW.tableHTML), else this copy. */
@@ -640,11 +640,72 @@ K.glossLink = (key, text) => '<a class="gl-link" href="#/glossary/' + enc(key) +
 /* Catalogue payload -> {metrics, players, ...}; tolerates a wrapper {"ok", "hitters": {...}}. */
 K.catOf = (d, key) => {
   if (!d || d.ok === false) return null;
-  if (d.players && d.metrics) return d;
-  const inner = d[key] || d.catalogue || d.data;
-  if (inner && inner.players) return Object.assign({}, d, inner);
-  return d.players ? d : null;
+  let out = null;
+  if (d.players && d.metrics) out = d;
+  else {
+    const inner = d[key] || d.catalogue || d.data;
+    if (inner && inner.players) out = Object.assign({}, d, inner);
+    else if (d.players) out = d;
+  }
+  if (out && /hitter|pitcher/.test(String(key || ''))) K.countPct(out, /pitcher/.test(key) ? 'pitcher' : 'hitter');
+  return out;
 };
+/* The build leaves the counting stats (fmt "int": G, PA, HR, W, SO...) without a percentile, so the top line of every
+ * player's percentile panel and of compare used to read as a missing sample. They get one here, placed like the
+ * build's (100 = best, ties at the midpoint) against the regulars (the payload's reference rule, e.g. PA >= 2.1 a team
+ * game), for every player at or above the catalogue's sample floor: by volume when more is better (HR, SO for a
+ * pitcher), per PA / BF when fewer is better (a hitter's SO, a pitcher's BB), so playing time is not read as a fault.
+ * Metrics left without a percentile (a 0/1 flag, too few regulars) are marked m._noPct. Runs once per catalogue. */
+K.countPct = (cat, kind) => {
+  if (!cat || cat._countPct || !cat.players || !Array.isArray(cat.metrics)) return cat;
+  cat._countPct = true;
+  const P = cat.players, ids = Object.keys(P);
+  const has = {};
+  ids.forEach(id => { const pc = P[id].pct || {}; Object.keys(pc).forEach(x => { if (isNum(pc[x])) has[x] = 1; }); });
+  const todo = cat.metrics.filter(m => m && m.key && !has[m.key] && m.fmt === 'int');
+  if (!todo.length) return cat;
+  const pit = kind === 'pitcher';
+  const nOf = p => K.sampleOf(p, kind);
+  const ref = cat.reference || {};
+  const refMin = isNum(pit ? ref.min_bf : ref.min_pa) ? Number(pit ? ref.min_bf : ref.min_pa) : null;
+  const fl = cat.floors || {};
+  const floor = isNum(pit ? fl.bf : fl.pa) ? Number(pit ? fl.bf : fl.pa) : 50;
+  let pool = ids.filter(id => (refMin !== null ? nOf(P[id]) >= refMin : P[id].qualified === true));
+  if (pool.length < 10) pool = ids.filter(id => nOf(P[id]) >= floor);
+  const roleOf = id => { const p = P[id]; if (pit) return K.roleOf(p); const r = String(p.pos || '').toUpperCase(); return r === 'LF' || r === 'RF' ? 'LF/RF' : r; };
+  const place = (sorted, v, lower) => {
+    const n = sorted.length;
+    if (n < 2) return null;
+    let lo = 0, hi = 0;
+    sorted.forEach(y => { if (y < v) lo++; if (y <= v) hi++; });
+    const below = lo, above = n - hi, tie = Math.max(0, hi - lo - 1);
+    return Math.max(0, Math.min(100, Math.round(100 * ((lower ? above : below) + 0.5 * tie) / (n - 1))));
+  };
+  todo.forEach(m => {
+    if (/flag/.test(m.key)) { m._noPct = true; return; }
+    const lower = !!m.lower;
+    const sv = id => { const v = (P[id].values || {})[m.key], n = nOf(P[id]); if (!isNum(v) || n < floor || n <= 0) return null; return lower ? Number(v) / n : Number(v); };
+    const refv = pool.map(sv).filter(isNum).sort((a, b) => a - b);
+    if (refv.length < 10) { m._noPct = true; return; }
+    const byRole = {};
+    pool.forEach(id => { const v = sv(id); if (isNum(v)) (byRole[roleOf(id)] = byRole[roleOf(id)] || []).push(v); });
+    Object.keys(byRole).forEach(r => byRole[r].sort((a, b) => a - b));
+    m._pctNote = lower ? 'percentile per ' + (pit ? 'batter faced' : 'plate appearance') + ' among the regulars, computed on the page' : 'percentile by volume among the regulars, computed on the page';
+    ids.forEach(id => {
+      const v = sv(id);
+      if (!isNum(v)) return;
+      const p = P[id];
+      p.pct = p.pct || {};
+      const x = place(refv, v, lower);
+      if (isNum(x)) p.pct[m.key] = x;
+      const rv = byRole[roleOf(id)] || [];
+      if (rv.length >= 5) { p.pct_role = p.pct_role || {}; const y = place(rv, v, lower); if (isNum(y)) p.pct_role[m.key] = y; }
+    });
+  });
+  return cat;
+};
+/* What a slider without a percentile says: no value at all, no percentile by design, or a sample under the floor. */
+K.noPctText = (m, v) => (!isNum(v) ? 'no data' : m && m._noPct ? 'no percentile for this stat' : 'below the sample floor');
 K.sampleOf = (p, kind) => (kind === 'pitcher' ? [p.bf, p.tbf, p.n, (p.values || {}).bf].find(isNum) : [p.pa, p.n, (p.values || {}).pa].find(isNum)) || 0;
 K.roleOf = p => {
   const r = String(p.role || p.pos || '').toUpperCase();

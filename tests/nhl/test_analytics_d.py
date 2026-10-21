@@ -335,3 +335,26 @@ def test_markets_payload_shapes(rink):
     assert conf["EDM"]["market"] == 0.4
     pts = p["points"][0]
     assert pts["points"] == 90 and pts["model"] == 0.4 and pts["edge"] == pytest.approx(-0.1)
+
+
+def test_player_name_falls_back_to_stats_reports(rink):
+    """A player the store's roster pass missed (a call-up) takes his name from the stats reports, not his id."""
+    import gzip
+    d = rink["raw"] / "stats" / "20252026"
+    d.mkdir(parents=True, exist_ok=True)
+    with gzip.open(d / "skater_summary_2.json.gz", "wt", encoding="utf-8") as fh:
+        json.dump([{"playerId": 8499999, "skaterFullName": "Called Up"}], fh)
+    c = ctx_for()
+    c.players.pop("8499999", None)
+    assert c.player_name("8499999") == "Called Up"
+    assert c.player_name("8400000") is None
+    assert c.player_name(None) is None
+
+
+def test_careers_name_prefers_a_real_name_over_the_id():
+    from oddsmarkets.nhl.analytics import careers
+    rows = {20242025: {"8499999": {"season": 20242025, "kind": "skater", "team": "NJD", "name": "Called Up", "pos": "D", "values": {}}},
+            20252026: {"8499999": {"season": 20252026, "kind": "skater", "team": "NJD", "name": "8499999", "pos": "D", "values": {}}}}
+    written = {}
+    idx = careers.write_careers(lambda rel, d: written.__setitem__(rel, d), rows, {}, lambda p: None, 20252026, {})
+    assert idx["8499999"][0] == "Called Up"

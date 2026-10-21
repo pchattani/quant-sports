@@ -7,7 +7,10 @@ For every finished regular-season, Cup, play-in and playoff game of the chosen s
 
 * ``model``: the game model with ratings refitted weekly from games strictly before the week
   (`game.walk_forward`, preseason prior from the previous season) and coefficients / sigma
-  fitted on the *earlier* seasons only (`game.fit_from_rows`; defaults for the first season).
+  fitted on the *earlier* seasons only (`game.fit_from_rows`; defaults for the first season). In a league that
+  uses the market-informed model (`informed.INFORMED_LEAGUES`) it is that model wherever it applies (daily
+  ratings, market ratings from earlier games' closing lines, availability; its walk-forward fit for the season,
+  `informed_<L>.json` "wf"); ``model_base`` is the base model on every game.
 * ``model_ratings_only``: the same ratings with home court only (no rest / travel / altitude).
 * ``elo``: the pregame Elo probability (`elo.history`).
 * ``market``: the DraftKings closing spread from ESPN pickcenter, p = Phi(-spread_home / sigma_m),
@@ -101,12 +104,63 @@ def season_outcomes(store: dict) -> dict:
     return {"playoffs": teams, "finalists": {str(last["home"]), str(last["away"])}, "champion": champ}
 
 
+def _odds_cache_lines(league: str, season: int, store: dict) -> dict:
+    """Closing lines for the market-informed model's history: the store's, filled from the local ESPN line cache
+    (scripts/bb_odds_history.py; absent on CI) where the store has none (the NBA 2024 and 2025 stores carry no lines)."""
+    from oddsmarkets.basketball.models import informed as INF
+    out = INF.store_lines(store.get("games") or {})
+    try:
+        from oddsmarkets.basketball.research import lines as LN
+        cache = LN.game_lines(league, season)
+    except Exception:  # noqa: BLE001
+        cache = {}
+    for gid, v in cache.items():
+        c = v.get("close") or {}
+        if c.get("sp_h") is not None or c.get("tot") is not None:
+            cur = out.get(str(gid)) or {}
+            out[str(gid)] = {"sp": c.get("sp_h") if c.get("sp_h") is not None else cur.get("sp"),
+                             "tot": c.get("tot") if c.get("tot") is not None else cur.get("tot")}
+    return out
+
+
+def informed_season(league: str, season: int, store: dict, prior: dict, prm: dict, fit: dict) -> dict[str, dict]:
+    """{game_id: game.predict output} of the market-informed model for every finished game of a season, as the site
+    would have shown it before tip-off: daily ratings through the day before, inputs from games of earlier days, the
+    walk-forward fit `fit` (seasons before this one only)."""
+    from oddsmarkets.basketball.models import informed as INF
+    lines_for = lambda s, st: _odds_cache_lines(league, s, st)  # noqa: E731
+    si = INF.season_inputs(league, season, store, lines=lines_for(season, store),
+                           prior=INF.season_market_prior(league, season, lines_for=lines_for), live=False)
+    games = store.get("games") or {}
+    sched = GM.Schedule(games, store.get("teams") or {}, league)
+    teams = R.league_teams(store)
+    fits: dict = {}
+    out = {}
+    for r in G.finished(games, league):
+        inp = INF.inputs_for_game(si, r["day"], r["home"], r["away"])
+        if inp is None:
+            continue
+        if r["day"] not in fits:
+            fits[r["day"]] = R.fit_ratings(games, through=r["day"] - timedelta(days=1), prior=prior, league=league, teams=teams)
+        ctx = {"league": league, "ratings": fits[r["day"]], "schedule": sched, "params": prm, "neutral": r["neutral"],
+               "stype": r["stype"], "informed": inp, "informed_fit": fit}
+        out[r["id"]] = GM.predict(r["home"], r["away"], r["day"], ctx)
+    return out
+
+
 def backtest(league: str = "nba", seasons: Iterable[int] | None = None, refit_days: int = GM.REFIT_DAYS,
              write: bool = True, season_sims: int = 2000, checkpoints: Iterable[float] = CHECKPOINTS,
-             stores: dict[int, dict] | None = None, seed: int = 0) -> dict:
-    """Walk-forward backtest (module docstring). `stores` ({season: store}) bypasses the disk (tests)."""
+             stores: dict[int, dict] | None = None, seed: int = 0, informed: bool | None = None) -> dict:
+    """Walk-forward backtest (module docstring). `stores` ({season: store}) bypasses the disk (tests). `informed`
+    (default: on for an INFORMED_LEAGUES league read from disk) scores the market-informed model as "model" wherever
+    it applies, with its walk-forward fit for the season (`informed_<L>.json` "wf"); "model_base" keeps the base
+    model on every game."""
     t0 = time.perf_counter()
     league = "wnba" if str(league).lower() == "wnba" else "nba"
+    from oddsmarkets.basketball.models import informed as INF
+    if informed is None:
+        informed = stores is None and INF.enabled(league)
+    inf_wf = ((INF.fitted(league) or {}).get("wf") or {}) if informed else {}
     if stores is None:
         on_disk = G.seasons_on_disk(league)
         seasons = sorted(seasons) if seasons is not None else on_disk
@@ -153,11 +207,25 @@ def backtest(league: str = "nba", seasons: Iterable[int] | None = None, refit_da
         params_used[str(s)] = {k: prm.get(k) for k in ("rating_scale", "hca", "b2b", "rest", "travel_1000km", "tz",
                                                          "altitude", "sigma", "sigma_market", "n", "fitted")}
         srows: dict[str, list] = {}
+        inf_pred: dict[str, dict] = {}
+        if inf_wf.get(str(s)):
+            last = ends.get(s - 1) if ends.get(s - 1) and ends[s - 1]["n_games"] >= 30 else None
+            prior = R.preseason_prior(league, s, last=last, coef=coef, teams=R.league_teams(stores[s]))
+            try:
+                inf_pred = informed_season(league, s, stores[s], prior, prm, {"version": INF.VERSION, **inf_wf[str(s)]})
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("%s %s informed model failed: %s", league, s, exc)
+            params_used[str(s)]["informed_games"] = len(inf_pred)
         for r in wf[s]:
             y = int(r["margin"] > 0)
             mu = _mu(r, prm)
-            preds = {"model": float(norm.cdf(mu / prm["sigma"])),
+            base_p = float(norm.cdf(mu / prm["sigma"]))
+            preds = {"model": base_p, "model_base": base_p,
                      "model_ratings_only": float(norm.cdf(_mu(r, prm, True) / prm["sigma"]))}
+            ip = inf_pred.get(r["id"])
+            if ip and ip.get("model") == "informed":
+                preds["model"] = float(ip["p_home"])
+                mu = float(ip["margin"])
             if r["id"] in elo_p:
                 preds["elo"] = float(elo_p[r["id"]])
             mk = GM.spread_to_p(r["spread_home"], league, sd=prm.get("sigma_market") or prm["sigma"])

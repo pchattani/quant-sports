@@ -4,7 +4,9 @@ The game centre (`games/<id>.json`) and the game cards of the hub (`index.json`)
 Pregame: the game model (`models/game.py`) with ratings fitted on games strictly before the game
 day (so a finished game shows what the model said before tip-off), the rest / travel / altitude
 context, and an injury adjustment from the ESPN injury list (players listed "Out", each worth
-(HPM - replacement) x expected minutes); the market (prediction-market moneylines where fetched,
+(HPM - replacement) x expected minutes). In the NBA the market-informed model (`models/informed.py`) replaces it
+wherever the season's stored lines allow: market ratings from earlier games' closing lines and expected
+availability, with injury-report Outs set to "does not play" inside the availability term; the market (prediction-market moneylines where fetched,
 else the DraftKings spread via `game.spread_to_p`); and the Elo probability.
 
 With play-by-play (local raw file): margin flow, our win probability and ESPN's per play, every
@@ -81,9 +83,16 @@ def model_line(ctx: SeasonContext, g: dict, use_injuries: bool = True) -> dict |
     if d is None:
         return None
     rt = ctx.ratings_before(d) if g.get("status") in ("post", "in") else ctx.ratings
-    inj = injury_inputs(ctx, g)[0] if (use_injuries and g.get("status") == "pre") else {}
+    pre = use_injuries and g.get("status") == "pre"
+    inj = injury_inputs(ctx, g)[0] if pre else {}
     c = {"league": ctx.league, "ratings": rt, "schedule": ctx.schedule, "injuries": inj, "params": ctx.params,
          "neutral": bool(g.get("neutral")), "stype": g.get("stype")}
+    si = ctx.informed
+    if si:
+        from oddsmarkets.basketball.models import informed as INF
+        outs = {str(t): {str(r[0]) for r in (lst or []) if len(r) > 1 and str(r[1] or "").lower() == "out"}
+                for t, lst in (g.get("injuries") or {}).items()} if pre else None
+        c["informed"] = INF.inputs_for_game(si, d, h, a, out=outs, upcoming=g.get("status") == "pre")
     p = GM.predict(h, a, d, c)
     return _io.clean(p, 4)
 

@@ -40,6 +40,7 @@ Pace is possessions per 48 minutes (NBA) or 40 (WNBA).
 |---|---|---|---|
 | Team ratings | `models/ratings.py` | `VERSION = 2` | off, def, net, pace with se; Kalman paths; preseason prior |
 | Game model | `models/game.py` | `VERSION = 4` | margin ~ Normal(mu, sigma): p_home, spread; calibrated total |
+| Market-informed game model (NBA) | `models/informed.py` | `VERSION = 1` | close predictor: market ratings + availability; p_home, spread, total (section 3.3) |
 | Season format | `models/config.py` | — | `SeasonFormat` per league and season |
 | Season simulation | `models/season_sim.py` | — | 20,000 seasons: wins, seeds, playoffs, title, lottery, magic numbers |
 | Elo | `models/elo.py` | `VERSION = 1` | pregame P(home) for every rated game |
@@ -254,6 +255,84 @@ Denver or Utah host; it was −0.36 on two seasons). Travel stays slightly posit
 plausible on its own; it is small and shares its signal with the time-zone term
 (−0.31 per hour), so the two are best read together. The live win-probability models:
 NBA K = 20 on 1,978,778 states, WNBA K = 10 on 336,743.
+
+### 3.3 Market-informed model, NBA (`models/informed.py`, 21 October 2026)
+
+In the NBA the site's pregame line comes from a close predictor (the research model "C",
+`docs/research/basketball_edge.md`, "Model-improvement program"). It adds two things the base model ignores:
+what earlier closing lines say about each team, and who is likely to play.
+
+```
+mk     = h_m [not neutral] + r_home - r_away       market ratings: weighted ridge on the store's closing spreads of
+                                                  games before the day (half-life 20 d, ridge 1; prior 0.6 x last
+                                                  season's final market ratings, centred)
+av_t   = (S_expected - S_reference)_net x (1 - prior_share)    availability, points per 100
+mu_C   = const + b_mk mk + b_r (net_h - net_a) pace_g/100 + b_av (av_h - av_a) pace_g/100
+         + b_b2b b2b + b_rest rest + b_trav travel + b_tz tz + b_alt altitude + b_hca [not neutral]
+margin = mu_C + cal_c0,   P(home) = Phi(margin / cal_sd),   spread_fair = -margin
+total  = CT: const + b mk_tot + b base_total + b x_tot_av + schedule sums + playoffs + early season + league means
+pts    = total / 2 +- margin / 2
+```
+
+Availability, component by component:
+
+- `S_expected` is the expected rotation's strength: each player's EWMA minutes (α 0.2) × P(plays), scaled to five
+  players' minutes and filled at replacement (−2).
+- P(plays) depends on the team games the player has missed in a row: 0.94, 0.62, 0.37, 0.24, 0.18, … (NBA).
+- Player values are last season's, over the season before last's: 0.5 RAPM + 0.5 box impact, shrunk with 250
+  pseudo-minutes towards −2.
+- `S_reference` is what the team rating already reflects: last season's actual S (weight `ratings.RIDGE`) blended
+  with this season's games at the ratings' half-life. `prior_share` is the share of that prior.
+- `x_tot_av` is the O − D version of the same delta.
+
+The coefficients of `mu_C` and CT are fitted to closing spreads and totals by ridge (λ 1, intercept free).
+(`cal_c0`, `cal_sd`) come from a probit on outcomes of the out-of-sample `mu_C`. All of it is in
+`models/fitted/informed_nba.json`, which `research/improve.final_fit` writes through `scripts/bb_fit.py`. The file
+also holds the walk-forward path `wf` (season s fitted on seasons < s), which the backtest scores. Fitted through
+2026:
+
+| Term | Coefficient |
+|---|---|
+| const / cal_c0 | 0.476 / −0.245 |
+| mk_mu | 0.656 |
+| rating | 0.413 |
+| x_av | 0.905 |
+| b2b / rest / travel / tz | −1.430 / 0.101 / 0.003 / −0.017 |
+| altitude / hca | 0.406 / 0.256 |
+| cal_sd | 11.546 |
+| total | 39.97 + 0.464 mk_tot + 0.598 base_total + 0.917 x_tot_av − 0.31 b2b sum + 0.16 rest sum − 0.86 early − 6.36 playoffs + 0.29 altitude − 0.22 league pace − 0.28 league ORtg |
+
+Inputs and fallbacks:
+
+- **Lines.** Lines are the store's `odds` (the last line ESPN showed before tip-off). Where a season has fewer
+  stored lines than half its finished games after 50 games, or neither a line nor a prior, `inputs_for_game`
+  returns None and the base model applies. The NBA 2024 and 2025 stores have no lines; 2026 has none before mid-November 2025.
+- **Player values.** The two finished seasons the current season needs are committed
+  (`models/fitted/informed_values_nba.json`, from `bb_fit.py`), so CI never refits a past season's impact model.
+  Otherwise they are computed and cached on the season's content.
+- **Season scope.** `SeasonContext.informed` runs for the current season only. Past seasons' game pages keep the
+  base model.
+- **Injury report.** Players listed Out on ESPN's injury report get P(plays) = 0 inside the availability term
+  (`inputs_for_game(..., out=, upcoming=True)`). That replaces the base model's separate injury adjustment, so
+  nothing is counted twice. This part is unvalidated: no injury-report history exists.
+- **Payload.** `predict` returns `model: "informed"` and the base line under `base`. The game page's margin parts
+  keep their keys and still sum to the margin:
+  - `rating` = team ratings + market ratings (without the market's home edge);
+  - `hca` = both home terms + the constants;
+  - `injury` = availability;
+  - `market_rating`, `team_rating` and `availability` are given as well.
+- **WNBA.** The WNBA is not in `INFORMED_LEAGUES`: its test-season gain was not significant (−0.0050 [−0.0165,
+  +0.0067] log-loss on 908 games).
+
+Out of sample (NBA 2024–2026, 3,937 games with ESPN open and close):
+
+| | Base M0 | Informed | ESPN close |
+|---|---|---|---|
+| Log-loss | 0.6043 | 0.5935 | 0.5815 |
+| Δ log-loss v base | — | −0.0108 [−0.0153, −0.0065] | |
+
+That closes 47 % of the gap to the close; the informed model is level with ESPN's open (0.5930). Calibration slope
+1.12 → 0.99. Total RMSE 18.55 → 18.44.
 
 ---
 
@@ -677,6 +756,13 @@ Written to `data/basketball/cache/backtest_<league>.json`; the build turns it in
 From the committed `calibration.json` files, generated on 1 October 2026 on the full
 history after the backfill (walk-forward over every store on disk; scored seasons as
 below):
+
+**Update, 21 October 2026 (NBA).** `model` is now the market-informed model (section 3.3) wherever it applies,
+with its walk-forward fit for each season and the local ESPN line cache filling the store's missing lines
+(2024, 2025, early 2026); `model_base` is the base model. NBA 2017–2026, 12,852 games: model log-loss 0.6127 /
+Brier 0.2122 (base 0.6235 / 0.2171); on the 9,960 games with a line 0.6183 against the line's 0.6061 (base
+0.6283); margin RMSE 13.45 (base 13.65), 13.31 on the line games against the line's 13.07. The WNBA table below is
+unchanged (base model). The tables below are the 1 October numbers.
 
 **NBA, 2017–2026, 12,852 games**
 

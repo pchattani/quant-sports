@@ -105,8 +105,18 @@ def build_rankings(td: an.TourData, prev_payload: dict | None = None, defend: di
     act = active_elo(td, when)
     order = sorted(act, key=lambda p: -act[p]["all"])[:200]
     elo_rows = [[i + 1, p, round(act[p]["all"], 1), {k: round(act[p][k], 1) for k in an.SURFACES}] for i, p in enumerate(order)]
+    rc = race_rows if race_rows is not None else race(td, td.current)
+    # names of the ranked players: many in the official top 500 have no match in our data, so no players_index entry,
+    # and would show as their id
+    people = s.get("players") or {}
+    names = {}
+    ids = [r[1] for r in official + elo_rows] + [x[0] for x in (rc or []) if isinstance(x, list) and x]
+    for pid in (str(x) for x in ids if x is not None):
+        nm = (people.get(pid) or {}).get("name")
+        if nm:
+            names[pid] = nm
     return {"ok": True, "tour": td.tour, "updated_at": an.now(), "date": date_, "source": rk.get("source"),
-            "official": official, "elo": elo_rows, "race": race_rows if race_rows is not None else race(td, td.current),
+            "official": official, "elo": elo_rows, "race": rc, "names": names,
             "to_defend": defend if defend is not None else to_defend(td), "previous": previous,
             "notes": ["Race and points to defend count Slams, the Finals, Masters / 1000s, 500s and 250s only "
                       "(no qualifying, Challenger / WTA 125 points, no best-of-N rule)."]}

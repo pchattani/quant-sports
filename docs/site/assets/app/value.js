@@ -141,20 +141,68 @@ function needLines() {
   return Promise.all([FB.load('value/lines.json'), FB.clubsIndex()]).then(function (d) { LINES = FB.rows(d[0]); return LINES; });
 }
 
+/* This season's lines (lines.json: one per player per competition) for one scope: a competition's own lines, or one
+   row per player summing his lines over every competition, club competitions or national-team football (minutes, GAR
+   and PAR add up; GAR/90 is their ratio; rating and the components are minutes-weighted; the percentile is against
+   the same unit among the rows shown with 900+ minutes). A merged duplicate id counts as the person. */
+var POOLED = { '': 'All competitions', club: 'Club competitions', intl: 'National team' };
+function seasonLines(q) {
+  var scopeOf = function (slug) { var c = FB.comp(slug) || {}; return c.scope || (FB.kindOf(slug) === 'international' ? 'international' : 'club'); };
+  var pid = function (id) { return FB.personId(id); };
+  var line = function (l) {
+    var pl = BYID[pid(l.id)] || BYID[String(l.id)] || {};
+    return { id: pid(l.id), name: pl.name || ('#' + l.id), age: pl.age, comp: l.comp, tid: l.tid || pl.tid, club: !l.tid || l.tid === pl.tid ? pl.club : FB.clubName(l.tid),
+      role: l.role, min: l.min, gar90: l.gar90, gar: l.gar, par: l.par, pct: l.pct, prev90: l.prev90, rt: l.rt, c: l.c, fvi: pl.fvi, proj: pl.proj, mv: pl.mv, v2: pl.v2 };
+  };
+  if (!(q.c in POOLED)) return (LINES || []).filter(function (l) { return l.comp === q.c; }).map(line);
+  var by = {}, order = [];
+  (LINES || []).forEach(function (l) {
+    var sc = scopeOf(l.comp);
+    if ((q.c === 'club' && sc === 'international') || (q.c === 'intl' && sc !== 'international') || !has(l.gar90)) return;
+    var r = line(l), k = r.id, a = by[k];
+    if (!a) { a = by[k] = { rows: [] }; order.push(k); }
+    a.rows.push(r);
+  });
+  var out = order.map(function (k) {
+    var rs = by[k].rows.slice().sort(function (x, y) { return (y.min || 0) - (x.min || 0); });
+    var main = rs[0], pl = BYID[k] || {};
+    var min = 0, gar = 0, par = 0, rw = 0, rm = 0, pw = 0, pm = 0, comps = [];
+    rs.forEach(function (r) {
+      min += r.min || 0; gar += r.gar || 0; par += r.par || 0;
+      if (has(r.rt)) { rw += r.rt * r.min; rm += r.min; }
+      if (has(r.prev90)) { pw += r.prev90 * r.min; pm += r.min; }
+      comps.push(r.comp);
+    });
+    var c = null;
+    rs.forEach(function (r) { if (!r.c) return; if (!c) c = r.c.map(function () { return 0; }); r.c.forEach(function (v, i) { c[i] += (v || 0) * r.min / Math.max(min, 1); }); });
+    return { id: k, name: main.name, age: main.age, comp: main.comp, comps: comps, tid: q.c === 'intl' ? main.tid : (pl.tid || main.tid), club: q.c === 'intl' ? FB.clubName(main.tid, main.club) : (pl.club || main.club),
+      role: pl.role || main.role, min: min, gar90: min ? gar * 90 / min : null, gar: gar, par: par, pct: null, prev90: pm ? pw / pm : null, rt: rm ? rw / rm : null, c: c,
+      fvi: main.fvi, proj: main.proj, mv: main.mv, v2: main.v2, mix: rs.map(function (r) { return FB.compName(r.comp, true) + ' ' + Math.round(r.min) + '\''; }).join(' · ') };
+  });
+  var pools = {};
+  out.forEach(function (r) { if (r.min >= 900 && has(r.gar90)) (pools[UNIT_OF[r.role] || 'MID'] = pools[UNIT_OF[r.role] || 'MID'] || []).push(r.gar90); });
+  Object.keys(pools).forEach(function (u) { pools[u].sort(function (a, b) { return a - b; }); });
+  out.forEach(function (r) {
+    var vals = pools[UNIT_OF[r.role] || 'MID'];
+    if (r.min < 900 || !vals || vals.length < 5) return;
+    var lo = 0; while (lo < vals.length && vals[lo] < r.gar90) lo++;
+    var up = lo; while (up < vals.length && vals[up] === r.gar90) up++;
+    r.pct = Math.round(100 * (lo + 0.5 * (up - lo)) / vals.length);
+  });
+  return out;
+}
+
 /* The rows of the current view, filtered: last 12 months (players.json) or this season (lines.json). */
 function valueRows(q) {
   var season = q.v === 'season';
   var comps = (META || {}).comps || {};
-  var min = has(q.min) && q.min !== '' ? Number(q.min) : (season ? ((comps[q.c] || {}).floor || 270) : 900);
+  var pooled = season && (q.c || '') in POOLED;
+  var min = has(q.min) && q.min !== '' ? Number(q.min) : (season ? (pooled ? 450 : ((comps[q.c] || {}).floor || 270)) : 900);
   var qn = q.q ? norm(q.q) : '';
   var tierOf = function (slug) { return (comps[slug] || {}).tier || ''; };
   var rows;
   if (season) {
-    rows = (LINES || []).map(function (l) {
-      var pl = BYID[String(l.id)] || {};
-      return { id: l.id, name: pl.name || ('#' + l.id), age: pl.age, comp: l.comp, tid: l.tid || pl.tid, club: !l.tid || l.tid === pl.tid ? pl.club : FB.clubName(l.tid),
-        role: l.role, min: l.min, gar90: l.gar90, gar: l.gar, par: l.par, pct: l.pct, prev90: l.prev90, rt: l.rt, c: l.c, fvi: pl.fvi, proj: pl.proj, mv: pl.mv, v2: pl.v2 };
-    });
+    rows = seasonLines(FB.merge(q, { c: q.c || '' }));
   } else {
     rows = PLAYERS.filter(function (pl) { return (pl.min || 0) > 0; }).map(function (pl) {
       return { id: pl.id, name: pl.name, age: pl.age, comp: pl.league, tid: pl.tid, club: pl.club, role: pl.role, min: pl.min, gar90: pl.gar90, gar: pl.gar, par: pl.par,
@@ -162,7 +210,7 @@ function valueRows(q) {
     });
   }
   return rows.filter(function (r) {
-    return (r.min || 0) >= min && has(r.gar90) && (!q.c || r.comp === q.c) && (!q.t || tierOf(r.comp) === q.t) && (!q.club || String(r.tid) === String(q.club)) &&
+    return (r.min || 0) >= min && has(r.gar90) && (pooled || !q.c || r.comp === q.c) && (!q.t || tierOf(r.comp) === q.t) && (!q.club || String(r.tid) === String(q.club)) &&
       (!q.r || r.role === q.r || (q.r.length > 2 && UNIT_OF[r.role] === q.r)) && (!qn || norm(r.name).indexOf(qn) >= 0);
   });
 }
@@ -179,11 +227,12 @@ function filterBar(q, withRole) {
   var clubs = {};
   base.forEach(function (r) { if (r.tid && r.club) clubs[r.tid] = r.club; });
   var clubOpts = Object.keys(clubs).map(function (t) { return [t, clubs[t]]; }).sort(function (a, b) { return a[1].localeCompare(b[1]); });
-  var minDefault = season ? ((comps[q.c] || {}).floor || 270) : 900;
+  var minDefault = season ? ((q.c || '') in POOLED ? 450 : ((comps[q.c] || {}).floor || 270)) : 900;
   var roles = ROLE_ORDER.filter(function (r) { return PLAYERS.some(function (pl) { return pl.role === r; }); });
   return FB.toolbar([
     FB.field('Window', FB.seg('va-v', [['', 'Last 12 months'], ['season', 'This season']], season ? 'season' : '', 'Window')),
-    FB.field(season ? 'Competition' : 'League', FB.select('va-c', [['', season ? 'All competitions' : 'All leagues']].concat(compOpts.map(function (o) { return [o[0], o[1]]; })), q.c || '', 'Competition')),
+    FB.field(season ? 'Competitions' : 'League', FB.select('va-c', (season ? [['', 'All competitions (one row per player)'], ['club', 'Club competitions'], ['intl', 'National team']] : [['', 'All leagues']])
+      .concat(season ? [{ group: 'One competition', items: compOpts.map(function (o) { return [o[0], o[1]]; }) }] : compOpts.map(function (o) { return [o[0], o[1]]; })), q.c || '', 'Competition')),
     FB.field('Tier', FB.select('va-t', [['', 'Every tier']].concat(((META || {}).tiers || []).map(function (t) { return [t, t]; })), q.t || '', 'Tier')),
     FB.field('Club', FB.select('va-club', [['', 'Every club']].concat(clubOpts), q.club || '', 'Club', 'fb-va-wide')),
     withRole ? FB.field('Position', FB.select('va-r', [['', 'Every position']].concat(roles.map(function (r) { return [r, roleLabel(r)]; })), q.r || '', 'Position')) : '',
@@ -243,13 +292,14 @@ function drawPlayersBody(el, q) {
   var rows = valueRows(q).sort(function (a, b) { return (b.gar90 || 0) - (a.gar90 || 0); });
   var shown = rows.slice(0, 150);
   FB.set('va-note', intl(rows.length) + ' players' + (rows.length > shown.length ? ' (the top ' + shown.length + ' shown)' : '') + ' · ' +
-    (season ? 'this season\'s lines in each competition; percentiles within the competition and position group over its minutes floor; trend against last season in the same competition.'
+    (season ? ((q.c || '') in POOLED ? 'this season, one row per player: his lines summed over ' + (q.c === 'club' ? 'club competitions' : q.c === 'intl' ? 'national-team football' : 'every competition') + '; percentiles within the position group among the players shown with 900+ minutes; trend against last season, minutes-weighted.'
+      : 'this season\'s lines in ' + FB.compName(q.c) + '; percentiles within the competition and position group over its minutes floor; trend against last season in the same competition.')
       : 'club football over the last 12 months, every competition; percentiles among regulars (900+ minutes) in the same role.'));
   var cols = [
     { key: 'name', label: 'Player', sticky: true, fmt: function (v, r) { return plink(r.id, v) + (r.free ? ' ' + FB.badge('no club', '', 'Sofascore lists him without a club') : ''); } },
     { key: 'role', label: 'Pos', fmt: function (v) { return roleBadge(v); } },
     { key: 'club', label: 'Club', fmt: function (v, r) { return clink(r.tid, v); } },
-    { key: 'comp', label: season ? 'Competition' : 'League', fmt: function (v) { return v ? FB.compLink(v, { short: true }) : '—'; } },
+    { key: 'comp', label: season ? 'Competition' : 'League', fmt: function (v, r) { return r.mix && r.comps && r.comps.length > 1 ? '<span class="qk-muted fb-lb-mix">' + esc(r.mix) + '</span>' : v ? FB.compLink(v, { short: true }) : '—'; } },
     { key: 'age', label: 'Age', num: true },
     { key: 'min', label: 'Min', num: true },
     { key: 'gar90', label: 'GAR/90', num: true, tip: 'Goals above replacement per 90 minutes', pctl: 'pct', fmt: function (v) { return '<b>' + g2(v) + '</b>'; } },

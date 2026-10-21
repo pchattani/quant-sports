@@ -398,6 +398,15 @@ def draft_table() -> dict[str, dict]:
 
 # ---------------------------------------------------------------------------------------------- the payload
 
+def _person_name(pid: str) -> str | None:
+    """The crosswalk's name for a gsis id (players on a roster with no snap in the panel have no name of their own)."""
+    try:
+        from oddsmarkets.nfl.analytics import people
+        return (people.people().get(pid) or {}).get("name")
+    except Exception:                                            # noqa: BLE001
+        return None
+
+
 COLS = ["pid", "name", "team", "pos", "age", "status", "lvl", "r", "proj", "games", "value", "lo", "hi", "wins", "over_ms", "now_pg", "src"]
 
 
@@ -441,7 +450,7 @@ def build(season: int, recs: dict[str, dict], qbs: dict[str, float] | None, np_l
         if age is None and (p1 or p2):
             a0 = (p1 or p2).get("age")
             age = None if a0 is None else a0 + (1 if p1 else 2)
-        cand[pid] = {"pid": pid, "name": base.get("name") or pid, "team": ro.get("team"), "pos": pos, "age": age, "games": 0,
+        cand[pid] = {"pid": pid, "name": base.get("name") or ro.get("name") or _person_name(pid) or pid, "team": ro.get("team"), "pos": pos, "age": age, "games": 0,
                      "gvar_pg": None, "status": ro.get("status"), "src": season}
     for pid, rc in cand.items():
         pos = rc.get("pos")
@@ -490,7 +499,10 @@ def build(season: int, recs: dict[str, dict], qbs: dict[str, float] | None, np_l
         pj = project(c, theta0, age, rem, avail, H, qb_model=qbm, sd_post=sd_post, rng=rng, qb_target=np_lg * (0.0 - qb_new),
                      own_share=(g_own, tg_own) if tg_own > 0 else None)
         levels_next[pid] = (pos, pj["levels"][1])
-        out_rows.append({"pid": pid, "name": rc.get("name"), "team": team, "pos": pos, "age": an.rnd(age, 1), "status": st,
+        nm = rc.get("name")
+        if not nm or nm == pid:
+            nm = _person_name(pid) or nm
+        out_rows.append({"pid": pid, "name": nm, "team": team, "pos": pos, "age": an.rnd(age, 1), "status": st,
                          "lvl": an.rnd(theta0, 2), "r": an.rnd(r, 2), "proj": [an.rnd(x, 2) for x in pj["levels"]],
                          "games": [an.rnd(x, 1) for x in pj["games"]], "value": an.rnd(pj["total"], 1), "lo": an.rnd(pj["lo"], 1),
                          "hi": an.rnd(pj["hi"], 1), "wins": an.rnd(pj["total"] * k_resp * wpp, 2),

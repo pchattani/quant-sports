@@ -2,15 +2,16 @@
  * competition he plays, season by season.
  *
  *   #/players                     search the people index (position, nationality, competition, club or name), the
- *                                 most-played players this season, leader cards (hub.json) and the value leaders
- *   #/players/leaders             every competition's qualified players on one board (players_global.json, 32 MB:
- *                                 read only when this tab opens), raw and league-adjusted rates, percentile chips
+ *                                 most-played players this season, leader cards (data/lab/leaders.json) and the value leaders
+ *   #/players/leaders             one row per player over every competition, club football, his national team or one
+ *                                 competition, this season, last season or a calendar window (data/lab/, UNIFIED_PAYLOADS
+ *                                 14), raw and league-adjusted rates, percentiles
  *   #/player/<pid>[?tab=overview|seasons|matches|shots|transfers&scope=club|intl&c=<slug>&e=<era>]
  *                                 the player: hero, this season, season by season (years, each season's competitions
  *                                 nested, coverage chips), charts, value, the match log with form, percentiles and the
  *                                 shot map per competition, transfers. Filters live in the query.
  *
- * Reads people/<pid>.json (docs/site/UNIFIED_PAYLOADS.md 2, 9-13), people_index.json, hub.json, value/players.json,
+ * Reads people/<pid>.json (docs/site/UNIFIED_PAYLOADS.md 2, 9-14), people_index.json, data/lab/, value/players.json,
  * value/lines.json, value/transfers.json and, per live competition, players_live.json and shots.json. */
 (function (FB) {
 'use strict';
@@ -137,14 +138,18 @@ FB.route('players', function (el, p) {
   el.innerHTML = FB.pageHead('Players', 'Every player, every competition',
     'One record per player, however many competitions he plays in: search the registry, see who has played most this season, and open any player for his season-by-season career.') +
     playersNav('find') +
-    '<div class="fb-pl-leadgrid" id="pl-leads">' + FB.card('Goals', 'This season, every competition', FB.loading('lines', 5)) + FB.card('Assists', '', FB.loading('lines', 5)) + FB.card('Rating', '450+ minutes', FB.loading('lines', 5)) + '</div>' +
+    '<div id="pl-leadscope" class="fb-pl-leadscope"></div><div class="fb-pl-leadgrid" id="pl-leads">' + FB.card('Goals', 'This season, every competition', FB.loading('lines', 5)) + FB.card('Assists', '', FB.loading('lines', 5)) + FB.card('Rating', '450+ minutes', FB.loading('lines', 5)) + '</div>' +
     FB.card('Find a player', '<span id="pl-count">Loading the registry…</span>',
       '<div id="pl-tools"></div><div id="pl-table">' + FB.loading('lines', 8) + '</div>', { flush: false }) +
     FB.grid(FB.card('Value leaders', 'Goals above replacement (GAR) over the last 12 months of club football: the goals a player adds over a freely available replacement in his role. <a href="#/value">Full value leaderboard →</a>',
       FB.chartBox('pl-gar', 380, 'Top players by goals above replacement'), { span: 7 }) +
       FB.card('Most valuable', 'Sofascore market value (reference only), current squads.', '<div id="pl-mv">' + FB.loading('lines', 6) + '</div>', { span: 5 }));
 
-  FB.load('hub.json').then(function (h) { if (FB.alive(el)) drawLeadCards(el, h); });
+  FB.load('lab/leaders.json').then(function (board) {
+    if (!FB.alive(el)) return;
+    if (board && board.scopes) { drawLeadCards(el, board, null); return; }
+    FB.load('hub.json').then(function (h) { if (FB.alive(el)) drawLeadCards(el, null, h); });
+  });
   var people = FB.peopleIndex().then(function (pi) {
     if (!FB.alive(el)) return;
     drawFinder(el, pi.list, q);
@@ -154,21 +159,39 @@ FB.route('players', function (el, p) {
   return people;
 });
 
-function drawLeadCards(el, h) {
-  var L = (h || {}).leaders || {};
-  function list(rows, fmt, sub) {
-    if (!rows || !rows.length) return FB.muted('No player data yet.');
-    return '<ol class="fb-pl-rank">' + rows.slice(0, 6).map(function (r, i) {
-      return '<li><span class="r">' + (i + 1) + '</span><span class="n">' + FB.playerLink(r.id, r.name) + '<span class="s">' + esc(r.team || '') + ' · ' + esc(r.comp_name || FB.compName(r.comp, true)) + '</span></span>' +
-        '<b class="fb-num">' + fmt(r.value) + '</b>' + (sub ? '<span class="x fb-num">' + sub(r) + '</span>' : '') + '</li>';
-    }).join('') + '</ol>';
-  }
+/* Goals, assists and rating leaders, one row per player (data/lab/leaders.json): every competition, club football
+   or national-team football this season. Falls back to hub.json's per-competition lists, one row per player. */
+var LEAD_SCOPE = 'all';
+function drawLeadCards(el, board, hub) {
   var box = el.querySelector('#pl-leads');
   if (!box) return;
+  var scopes = (board || {}).scopes || null;
+  var L, sub;
+  if (scopes && scopes[LEAD_SCOPE]) {
+    L = scopes[LEAD_SCOPE];
+    sub = 'This season, ' + (LEAD_SCOPE === 'club' ? 'club competitions' : LEAD_SCOPE === 'intl' ? 'national-team football' : 'every competition') + ' together';
+  } else {
+    // hub.json lists lines per competition: keep each player's best one.
+    var once = function (rows) { var seen = {}; return (rows || []).filter(function (r) { if (seen[r.id]) return false; seen[r.id] = 1; return true; }); };
+    var H = (hub || {}).leaders || {};
+    L = { goals: once(H.goals), assists: once(H.assists), rating: once((H.rating || []).filter(function (r) { return (r.minutes || 0) >= 450; })) };
+    sub = 'This season, his best competition';
+  }
+  function list(rows, fmt, extra) {
+    if (!rows || !rows.length) return FB.muted('No player data yet.');
+    return '<ol class="fb-pl-rank">' + rows.slice(0, 6).map(function (r, i) {
+      var where = r.mix ? r.mix.split(' · ').slice(0, 2).join(' · ') + (r.mix.split(' · ').length > 2 ? ' …' : '') : (r.comp_name || FB.compName(r.comp, true));
+      return '<li><span class="r">' + (i + 1) + '</span><span class="n">' + FB.playerLink(r.id, r.name) + '<span class="s">' + esc(r.team || '') + ' · ' + esc(where) + '</span></span>' +
+        '<b class="fb-num">' + fmt(r.value) + '</b>' + (extra ? '<span class="x fb-num">' + extra(r) + '</span>' : '') + '</li>';
+    }).join('') + '</ol>';
+  }
+  var segBox = el.querySelector('#pl-leadscope');
+  if (segBox) segBox.innerHTML = scopes ? FB.toolbar([FB.field('Leaders over', FB.seg('pl-lead-scope', [['all', 'All competitions'], ['club', 'Club competitions'], ['intl', 'National team']], LEAD_SCOPE, 'Leaders over'))]) : '';
   box.innerHTML =
-    FB.card('Goals', 'This season, each competition', list(L.goals, function (v) { return int(v); }, function (r) { return isNum(r.xg) ? 'xG ' + num(r.xg, 1) : ''; })) +
-    FB.card('Assists', 'This season, each competition', list(L.assists, function (v) { return int(v); }, function (r) { return isNum(r.xa) ? 'xA ' + num(r.xa, 1) : ''; })) +
-    FB.card('Rating', '450+ minutes, minutes-weighted', list((L.rating || []).filter(function (r) { return (r.minutes || 0) >= 450; }), function (v) { return num(v, 2); }, function (r) { return int(r.minutes) + ' min'; }));
+    FB.card('Goals', esc(sub), list(L.goals, function (v) { return int(v); }, function (r) { return isNum(r.xg) ? 'xG ' + num(r.xg, 1) : ''; })) +
+    FB.card('Assists', esc(sub), list(L.assists, function (v) { return int(v); }, function (r) { return isNum(r.xa) ? 'xA ' + num(r.xa, 1) : ''; })) +
+    FB.card('Rating', '450+ minutes, minutes-weighted · ' + esc(sub.replace(/^This season, /, '')), list(L.rating, function (v) { return num(v, 2); }, function (r) { return int(r.minutes) + ' min'; }));
+  if (scopes && segBox) FB.wireSeg(segBox, 'pl-lead-scope', function (v) { LEAD_SCOPE = v; drawLeadCards(el, board, hub); });
 }
 
 var FIND = { q: '', pos: '', nat: '', comp: '', min: 0 };
@@ -254,31 +277,34 @@ function drawGar(el, v) {
 
 // ── #/players/leaders ─────────────────────────────────────────────────────
 
+/* One row per player (data/lab/<window>/<scope>.json): every competition, club football, national-team football or
+   one competition, this season, last season or a calendar window. Attacking rates can be league-adjusted (the row's
+   minutes-weighted scoring factor); percentiles are against the same position in the view, over its floor. */
+var LD_WIN = [['season', 'This season'], ['last', 'Last season'], ['365', 'Last 12 months'], ['ytd', 'Calendar year so far']];
 function renderLeaders(el, p) {
   var q = p.query || {};
   el.innerHTML = FB.pageHead('Players', 'Leaders across competitions',
-    'Every competition\'s qualified players on one board, this season. Attacking rates can be league-adjusted with the pooled model\'s scoring factors so output from different leagues sits on one footing.') +
+    'Every player once: his minutes and rates over every competition he played, club football only, his national team only, or one competition. Attacking rates can be league-adjusted with the pooled model\'s scoring factors so output from different leagues sits on one footing.') +
     playersNav('leaders') +
-    '<div id="ld-body">' + FB.card('Loading the global board', 'players_global.json is large (about 32 MB): the first load takes a few seconds.', FB.loading('lines', 10)) + '</div>';
-  return FB.load('players_global.json').then(function (g) {
+    '<div id="ld-body">' + FB.card('Loading the board', '', FB.loading('lines', 10)) + '</div>';
+  var st = { win: q.w || 'season', scope: q.c || q.scope || 'all', pos: q.pos || '', min: isNum(Number(q.min)) && q.min !== undefined && q.min !== '' ? Number(q.min) : null, key: q.m || 'npxg_90_adj' };
+  return FB.labIndex().then(function (ix) {
     if (!FB.alive(el)) return;
     var body = el.querySelector('#ld-body');
-    var all = (g || {}).players || [];
-    if (!all.length) { body.innerHTML = FB.empty('No board yet', 'The global leaderboard is rebuilt with the site.'); return; }
-    var metrics = g.metrics || [], adjusted = g.adjusted_keys || [];
-    var compsIn = {};
-    all.forEach(function (r) { compsIn[r.comp] = 1; });
-    var st = { pos: q.pos || '', comp: q.c || '', min: isNum(Number(q.min)) && q.min !== undefined ? Number(q.min) : (g.minutes_floor || 270), key: q.m || 'npxg_90_adj', qual: q.all ? false : true };
-    body.innerHTML = FB.card(int(all.length) + ' players across ' + Object.keys(g.leagues || {}).length + ' leagues and the cups',
-      (g.floor_share ? 'Each over ' + Math.round(g.floor_share * 100) + '% of the minutes his competition has played so far. ' : '') + esc(g.note || ''),
+    if (!ix || !ix.scopes) { body.innerHTML = FB.empty('No board yet', 'The leaderboards (data/lab/) are rebuilt with the site.'); return; }
+    if (!ix.scopes[st.win]) st.win = 'season';
+    var metrics = ix.metrics || [], adjusted = ix.adjusted_keys || [];
+    body.innerHTML = FB.card('<span id="ld-title">Leaders</span>', '<span id="ld-sub"></span>',
       '<div id="ld-tools"></div>' + FB.chartBox('ld-chart', 420, 'Top 15 on the chosen metric') + '<div id="ld-table" class="fb-mt"></div>');
+    var V = null;
+    function single() { return !FB.LAB_SCOPES[st.scope]; }
     function metricOpts(scope) {
       var groups = [];
       metrics.filter(function (m) { return scope === 'all' || m.scope === 'all' || m.scope === scope; }).forEach(function (m) {
         var gr = groups.filter(function (x) { return x.group === m.group; })[0];
         if (!gr) { gr = { group: m.group, items: [] }; groups.push(gr); }
         gr.items.push([m.key, m.label]);
-        if (adjusted.indexOf(m.key) >= 0) gr.items.push([m.key + '_adj', m.label + ' (league-adjusted)']);
+        if (adjusted.indexOf(m.key) >= 0 && !single()) gr.items.push([m.key + '_adj', m.label + ' (league-adjusted)']);
       });
       return groups;
     }
@@ -287,59 +313,86 @@ function renderLeaders(el, p) {
       var groups = metricOpts(scope);
       var keys = [];
       groups.forEach(function (gr) { gr.items.forEach(function (i) { keys.push(i[0]); }); });
-      if (keys.indexOf(st.key) < 0) st.key = scope === 'gk' ? 'saves_90' : 'npxg_90_adj';
+      if (keys.indexOf(st.key) < 0) st.key = keys.indexOf(st.key.replace(/_adj$/, '')) >= 0 ? st.key.replace(/_adj$/, '') : (scope === 'gk' ? 'saves_90' : (single() ? 'npxg_90' : 'npxg_90_adj'));
       el.querySelector('#ld-tools').innerHTML = FB.toolbar([
+        FB.field('Season', FB.select('ld-w', LD_WIN.filter(function (w) { return ix.scopes[w[0]]; }), st.win, 'Season or window')),
+        FB.field('Competitions', FB.select('ld-c', FB.labScopeOptions(ix, st.win), st.scope, 'Which competitions count', 'fb-pl-wide')),
         FB.field('Metric', FB.select('ld-m', groups, st.key, 'Metric', 'fb-pl-wide')),
         FB.field('Position', FB.seg('ld-pos', [['', 'All'], ['G', 'GK'], ['D', 'DEF'], ['M', 'MID'], ['F', 'FWD']], st.pos, 'Position')),
-        FB.field('Competition', FB.select('ld-c', [['', 'All competitions']].concat(FB.comps().filter(function (c) { return compsIn[c.slug]; }).map(function (c) { return [c.slug, c.name]; })), st.comp, 'Competition', 'fb-pl-wide')),
-        FB.field('Min. minutes', '<input class="qk-input fb-pl-num" id="ld-min" type="number" min="0" step="90" value="' + st.min + '">'),
-        '<label class="fb-check"><input type="checkbox" id="ld-q"' + (st.qual ? ' checked' : '') + '> Qualified only</label>'
+        FB.field('Min. minutes', '<input class="qk-input fb-pl-num" id="ld-min" type="number" min="0" step="90" value="' + st.min + '">')
       ]);
+      el.querySelector('#ld-w').addEventListener('change', function (e) { st.win = e.target.value; st.min = null; load(); });
+      el.querySelector('#ld-c').addEventListener('change', function (e) { st.scope = e.target.value; st.min = null; load(); });
       el.querySelector('#ld-m').addEventListener('change', function (e) { st.key = e.target.value; sync(); draw(); });
       FB.wireSeg(el, 'ld-pos', function (v) { st.pos = v; sync(); tools(); draw(); });
-      el.querySelector('#ld-c').addEventListener('change', function (e) { st.comp = e.target.value; sync(); draw(); });
       el.querySelector('#ld-min').addEventListener('change', function (e) { st.min = Number(e.target.value) || 0; sync(); draw(); });
-      el.querySelector('#ld-q').addEventListener('change', function (e) { st.qual = e.target.checked; sync(); draw(); });
     }
-    function sync() { FB.setQuery({ m: st.key, pos: st.pos || null, c: st.comp || null, min: st.min, all: st.qual ? null : '1' }); }
-    function draw() {
-      var key = st.key, base = key.replace(/_adj$/, '');
-      var metric = metrics.filter(function (m) { return m.key === base; })[0] || { fmt: '2', label: key };
-      var rows = all.filter(function (r) {
-        return (r.minutes || 0) >= st.min && (!st.qual || r.qualified !== false) && (!st.comp || r.comp === st.comp) &&
-          (!st.pos || (st.pos === 'G' ? r.is_gk : r.position === st.pos)) && isNum(r[key]);
-      }).sort(function (a, b) { return metric.lower ? a[key] - b[key] : b[key] - a[key]; }).slice(0, 100);
-      var pk = function (r) { var pg = r.pct_global || {}; return isNum(pg[key]) ? pg[key] : isNum(pg[base]) ? pg[base] : (r.pct_comp || {})[base]; };
-      var data = rows.map(function (r, i) {
-        return { i: i + 1, id: r.player_id, name: r.name, team: r.team, tid: FB.tidFromCrest(r.crest), comp: r.comp, cname: r.comp_name, pos: r.position, age: r.age, min: r.minutes, v: r[key], raw: r[base], f: r.adj_factor, pct: pk(r), g: r.goals, a: r.assists, rt: r.rating };
+    function sync() { FB.setQuery({ w: st.win === 'season' ? null : st.win, c: st.scope === 'all' ? null : st.scope, scope: null, m: st.key, pos: st.pos || null, min: st.min, all: null }); }
+    function load() {
+      var have = ix.scopes[st.win] || {};
+      if (!have[st.scope]) st.scope = 'all';
+      FB.set('ld-table', FB.loading('lines', 8));
+      return FB.labView(st.win, st.scope).then(function (v) {
+        if (!FB.alive(el)) return;
+        V = v;
+        if (!V) { FB.set('ld-table', FB.empty('No board for this view', 'Try another season or set of competitions.')); return; }
+        if (st.min === null) st.min = Math.max(90, single() ? V.floor : Math.min(V.floor, 450));
+        tools(); sync(); draw();
       });
-      var lab = (metric.label || key) + (/_adj$/.test(key) ? ' (adj.)' : '');
+    }
+    function draw() {
+      if (!V) return;
+      var I = V.idx, key = st.key, base = key.replace(/_adj$/, ''), adj = /_adj$/.test(key);
+      var metric = metrics.filter(function (m) { return m.key === base; })[0] || { fmt: '2', label: key };
+      var value = function (r) { var v = I[base] === undefined ? null : r[I[base]]; return isNum(v) ? (adj ? v * (r[I.factor] || 1) : v) : null; };
+      var inPos = function (r) { return !st.pos || r[I.position] === st.pos; };
+      var floorRows = V.rows.filter(function (r) { return (r[I.minutes] || 0) >= st.min && inPos(r) && isNum(value(r)); });
+      var sorted = floorRows.map(value).sort(function (a, b) { return a - b; });
+      var pctOf = function (v) {
+        var lo = 0, hi = sorted.length; while (lo < hi) { var mid = (lo + hi) >> 1; if (sorted[mid] < v) lo = mid + 1; else hi = mid; }
+        var up = lo; while (up < sorted.length && sorted[up] === v) up++;
+        var rank = sorted.length ? (lo + 0.5 * (up - lo)) / sorted.length : null;
+        return rank === null ? null : Math.round(100 * (metric.lower ? 1 - rank : rank));
+      };
+      var rows = floorRows.slice().sort(function (a, b) { return metric.lower ? value(a) - value(b) : value(b) - value(a); }).slice(0, 100);
+      var per = function (r, k) { var v = r[I[k]]; return isNum(v) ? Math.round(v * (r[I.minutes] || 0) / 90) : null; };
+      var data = rows.map(function (r, i) {
+        var v = value(r);
+        return { i: i + 1, id: r[I.player_id], name: r[I.name], team: r[I.team], tid: r[I.tid], comp: r[I.comp], mix: r[I.mix], pos: r[I.position], age: r[I.age], min: r[I.minutes],
+          v: v, raw: r[I[base]], f: r[I.factor], pct: pctOf(v), g: per(r, 'goals_90'), a: per(r, 'assists_90'), rt: r[I.rating] };
+      });
+      var lab = (metric.label || key) + (adj ? ' (adj.)' : '');
+      var W = (ix.windows || []).filter(function (w) { return w.key === st.win; })[0];
+      FB.set('ld-title', esc(lab) + ': ' + esc(FB.labScopeName(st.scope, ix).toLowerCase()));
+      FB.set('ld-sub', FB.int(floorRows.length) + ' players over ' + st.min + ' minutes · ' + esc(FB.labWindowText(W)) + ' · one row per player' +
+        (single() ? '' : ', his minutes summed across ' + (st.scope === 'intl' ? 'national-team football' : st.scope === 'club' ? 'club competitions' : 'every competition')) +
+        '. Percentiles are against the players shown (the same position when one is picked).');
+      var personQ = single() ? { c: st.scope } : st.scope === 'club' ? { scope: 'club' } : st.scope === 'intl' ? { scope: 'intl' } : null;
       FB.table(el.querySelector('#ld-table'), [
         { key: 'i', label: '#', num: true },
-        { key: 'name', label: 'Player', sticky: true, fmt: function (v, r) { return '<span class="fb-pl-who">' + FB.playerLink(r.id, v) + ' ' + FB.posBadge(r.pos) + '</span>'; } },
-        { key: 'team', label: 'Club', fmt: function (v, r) { return teamA(r.tid, v); } },
-        { key: 'cname', label: 'Competition', fmt: function (v, r) { return FB.compLink(r.comp, { short: true }); } },
+        { key: 'name', label: 'Player', sticky: true, fmt: function (v, r) { return '<span class="fb-pl-who"><a class="fb-link" href="' + esc(FB.href.player(r.id, personQ)) + '">' + esc(v) + '</a> ' + FB.posBadge(r.pos) + '</span>'; } },
+        { key: 'team', label: st.scope === 'intl' ? 'National team' : 'Club', fmt: function (v, r) { return teamA(r.tid, v); } },
+        { key: 'mix', label: single() ? 'Competition' : 'Competitions (minutes)', fmt: function (v, r) { return single() ? FB.compLink(st.scope, { short: true }) : '<span class="qk-muted fb-lb-mix">' + esc(v || '') + '</span>'; } },
         { key: 'age', label: 'Age', num: true }, { key: 'min', label: 'Min', num: true },
         { key: 'v', label: lab, num: true, fmt: function (v) { return '<b>' + FB.fmtMetric(v, metric.fmt) + '</b>'; } },
-        { key: 'raw', label: 'Raw', num: true, tip: 'Before the league adjustment', fmt: function (v) { return /_adj$/.test(key) ? FB.fmtMetric(v, metric.fmt) : '—'; } },
-        { key: 'f', label: 'Factor', num: true, tip: 'The league\'s scoring factor (pooled model)', fmt: function (v) { return nn(v, 2); } },
-        { key: 'pct', label: 'Pctl', num: true, tip: 'Percentile in the global position pool', fmt: function (v) { return isNum(v) ? FB.pctl(v) : '—'; } },
+        { key: 'raw', label: 'Raw', num: true, tip: 'Before the league adjustment', fmt: function (v) { return adj ? FB.fmtMetric(v, metric.fmt) : '—'; } },
+        { key: 'f', label: 'Factor', num: true, tip: 'The scoring factor (pooled model), minutes-weighted over the competitions he played', fmt: function (v) { return nn(v, 2); } },
+        { key: 'pct', label: 'Pctl', num: true, tip: 'Percentile among the players shown', fmt: function (v) { return isNum(v) ? FB.pctl(v) : '—'; } },
         { key: 'g', label: 'G', num: true }, { key: 'a', label: 'A', num: true }, { key: 'rt', label: 'Rating', num: true, fmt: function (v) { return nn(v, 2); } }
-      ], data, { maxHeight: 640, caption: 'Global leaders' });
+      ], data, { maxHeight: 640, caption: 'Leaders' });
       var top = data.slice(0, 15);
       var box = el.querySelector('#ld-chart');
       if (!top.length) { chartEmpty(box, 'No player clears the filters'); return; }
       box.style.height = '420px';
       QKC.bar(box, {
         horizontal: true, labels: true, labelWidth: 150, fmt: function (x) { return FB.fmtMetric(x, metric.fmt); },
-        cats: top.map(function (r) { return r.name + ' · ' + FB.compName(r.comp, true); }),
+        cats: top.map(function (r) { return r.name + ' · ' + (r.team || FB.compName(r.comp, true)); }),
         series: [{ name: lab, data: top.map(function (r) { return r.v; }) }],
         colors: top.map(function (r) { return FB.kindColorHex(FB.kindOf(r.comp)); }),
-        hrefs: top.map(function (r) { return FB.href.player(r.id); }), label: lab + ': top 15'
+        hrefs: top.map(function (r) { return FB.href.player(r.id, personQ); }), label: lab + ': top 15'
       });
     }
-    tools();
-    draw();
+    return load();
   });
 }
 
@@ -354,6 +407,8 @@ FB.route('player', function (el, p) {
   return Promise.all([FB.load('people/' + pid + '.json'), FB.clubsIndex()]).then(function (arr) {
     if (!FB.alive(el)) return;
     var doc = arr[0];
+    // A duplicate Sofascore id merged into the person (UNIFIED_PAYLOADS 14.4): his page is the person's.
+    if (doc && doc.merged_into) { try { history.replaceState(null, '', FB.href.player(doc.merged_into, p.query || null)); } catch (e) { location.hash = FB.href.player(doc.merged_into); return; } FB.render(); return; }
     if (!doc || !doc.id) {
       el.innerHTML = FB.pageHead('Player', 'Player not found', 'No player with id ' + esc(pid) + ' is in the registry.') + FB.empty('Not in the registry', 'Search for a player with / or open the players directory.') +
         '<p class="fb-mt"><a class="qk-btn" href="#/players">Find a player →</a></p>';

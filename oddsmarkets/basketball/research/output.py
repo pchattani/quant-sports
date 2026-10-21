@@ -10,8 +10,11 @@ Decisions
     taker fee; fair_p_close = the mid of the last hourly candle before tip-off. max_stake_hint = open interest
     (contracts) at the decision candle.
 
-model_p is the C2 probability (close predictor shrunk towards the open; experiments.py); model_p_raw the plain
-game model (M1 margin / T2 total) for reference. fair_p_* are multiplicative de-vigs (`devig` column); for spreads
+model_p (since the October 2026 model-improvement program) is the market-informed model as the site publishes it
+(research/improve.py, models/informed.py: margin from the close predictor C with its probit calibration, total from
+the close-total predictor CT; it never uses the game's own prices); model_p_raw is the production base model (M0
+margin, production-structure total). `write(model="c2")` reproduces the 2 October rows (C2 = C shrunk towards the
+open; model_p_raw M1/T2). fair_p_* are multiplicative de-vigs (`devig` column); for spreads
 and totals fair_p_close is the closing market's win probability AT THE DECISION LINE, conditional on no push
 (close_push gives the push probability), so a line move counts as closing-line value.
 line_close is the closing line of the selection (spread: the closing home line, negated for the away side; total:
@@ -47,7 +50,60 @@ def _abbr(league: str, seasons) -> dict[int, dict[str, str]]:
     return out
 
 
-def league_rows(league: str, lag: int = 1) -> tuple[pd.DataFrame, pd.DataFrame]:
+def _finish(out: pd.DataFrame) -> pd.DataFrame:
+    out["sport"] = "basketball"
+    out["slate"] = out["league"] + "_" + out["day"].astype(str)
+    out["corr_group"] = out["league"] + "_" + out["event_id"].astype(str)
+    out["devig"] = np.where(out["price_src"] == "kalshi_ask", "mid", "multiplicative")
+    out["start_time"] = pd.to_datetime(out["start_time"], utc=True)
+    out["decision_time"] = pd.to_datetime(out["decision_time"], utc=True)
+    for c in COLS:
+        if c not in out:
+            out[c] = np.nan
+    extra = [c for c in ("day", "gp", "price_clv", "model_p_c2") if c in out]
+    return out[COLS + extra]
+
+
+def league_rows(league: str, lag: int = 1, model: str = "informed") -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Protocol rows for one league. model="informed" (October 2026): model_p is the market-informed model as the
+    site publishes it (research/improve.py: close predictor C with the probit calibration for margins, the close-total
+    predictor CT for totals; no use of the game's own prices), model_p_raw the production base model (M0 margin,
+    production-structure totals). model="c2": the 2 October rows (C2 = C shrunk towards the open)."""
+    if model == "c2":
+        return _league_rows_c2(league, lag)
+    from oddsmarkets.basketball.research import improve as I
+    p = I.add_probs(I.candidates(league), league)
+    test = p[p.season.isin(X.TEST)].copy()
+    test = test[test.open_sp_h.notna() | test.open_ml_h.notna() | test.open_tot.notna()]
+    sig_m, sig_t = float(test.sig_m.iloc[0]), float(test.sig_t.iloc[0])
+    for c in ("inf_mu", "inf_sd", "inf_tot", "inf_tsd"):
+        if c not in test:
+            raise RuntimeError(f"missing {c}")
+    test["inf_mu"] = test["inf_mu"].fillna(test["mu1"])
+    test["inf_sd"] = test["inf_sd"].fillna(test["sd1"])
+    test["inf_tot"] = test["inf_tot"].fillna(test["tp_mu"])
+    test["inf_tsd"] = test["inf_tsd"].fillna(test["tp_sd"])
+    s2 = M.selections(test, "inf_mu", "inf_sd", "inf_tot", "inf_tsd", sig_m, sig_t)
+    raw = M.selections(test, "m0_mu", "m0_sd", "tp_mu", "tp_sd", sig_m, sig_t)
+    key = ["event_id", "market", "selection"]
+    s2 = s2.merge(raw[key + ["model_p"]].rename(columns={"model_p": "model_p_raw"}), on=key, how="left")
+    s2["price_src"] = s2["price_src_book"].map({"espn_espnbet": "espn_espnbet_open", "espn_dk": "espn_dk_open"})
+    s2["max_stake_hint"] = np.nan
+    from scipy.stats import norm
+    t = test.copy()
+    t["p_inf"] = norm.cdf(t["inf_mu"] / t["inf_sd"])
+    t["p_raw"] = norm.cdf(t["m0_mu"] / t["m0_sd"])
+    t["day"] = pd.to_datetime(t["day"]).dt.date
+    k = K.load(league, t, _abbr(league, t.season.unique()))
+    ks = K.selections(k, t, "p_inf") if not k.empty else pd.DataFrame()
+    if not ks.empty:
+        kr = K.selections(k, t, "p_raw")
+        ks = ks.merge(kr[["event_id", "selection", "model_p"]].rename(columns={"model_p": "model_p_raw"}),
+                      on=["event_id", "selection"], how="left")
+    return _finish(pd.concat([s2, ks], ignore_index=True, sort=False)), k
+
+
+def _league_rows_c2(league: str, lag: int = 1) -> tuple[pd.DataFrame, pd.DataFrame]:
     r = X.run_league(league, lag)
     test = r["test"].copy()
     sig_m, sig_t = r["result"]["sig_m"], r["result"]["sig_t"]
@@ -58,7 +114,6 @@ def league_rows(league: str, lag: int = 1) -> tuple[pd.DataFrame, pd.DataFrame]:
     s2 = s2.merge(raw[key + ["model_p"]].rename(columns={"model_p": "model_p_raw"}), on=key, how="left")
     s2["price_src"] = s2["price_src_book"].map({"espn_espnbet": "espn_espnbet_open", "espn_dk": "espn_dk_open"})
     s2["max_stake_hint"] = np.nan
-    # Kalshi at the same decision time
     from scipy.stats import norm
     t = test.copy()
     t["p_c2"] = norm.cdf(t["c2_mu"] / sig_m)
@@ -69,23 +124,13 @@ def league_rows(league: str, lag: int = 1) -> tuple[pd.DataFrame, pd.DataFrame]:
         kr = K.selections(k, t, "p_raw")
         ks = ks.merge(kr[["event_id", "selection", "model_p"]].rename(columns={"model_p": "model_p_raw"}),
                       on=["event_id", "selection"], how="left")
-    out = pd.concat([s2, ks], ignore_index=True, sort=False)
-    out["sport"] = "basketball"
-    out["slate"] = out["league"] + "_" + out["day"].astype(str)
-    out["corr_group"] = out["league"] + "_" + out["event_id"].astype(str)
-    out["devig"] = np.where(out["price_src"] == "kalshi_ask", "mid", "multiplicative")
-    out["start_time"] = pd.to_datetime(out["start_time"], utc=True)
-    out["decision_time"] = pd.to_datetime(out["decision_time"], utc=True)
-    for c in COLS:
-        if c not in out:
-            out[c] = np.nan
-    return out[COLS + ["day", "gp", "price_clv"]] if "price_clv" in out else out[COLS + ["day", "gp"]], k
+    return _finish(pd.concat([s2, ks], ignore_index=True, sort=False)), k
 
 
-def write(leagues=("nba", "wnba")) -> Path:
+def write(leagues=("nba", "wnba"), model: str = "informed") -> Path:
     frames = []
     for lg in leagues:
-        rows, k = league_rows(lg)
+        rows, k = league_rows(lg, model=model)
         frames.append(rows)
         logger.info("%s: %d selections (%d Kalshi games)", lg, len(rows), len(k))
     df = pd.concat(frames, ignore_index=True)

@@ -1,9 +1,10 @@
 /* The Quant Footballer — Lab (#/lab) and Compare (#/compare).
  *
- *   #/lab[/<comp|all>/<F|M|D|G|O>][?w=season|365|ytd&x=&y=&size=&color=&min=&preset=&shrink=0&adj=0&q=]
- *        the player lab: any two metrics against each other for one position group, in one competition or across
- *        every competition, over this season or a calendar window; presets, size and colour encodings, medians,
- *        labelled extremes, a highlight search and the group ranked on the view (players_lab*.json)
+ *   #/lab[/<all|club|intl|comp>/<F|M|D|G|O>][?w=season|last|365|ytd&x=&y=&size=&color=&min=&preset=&shrink=0&adj=0&q=]
+ *        the player lab: any two metrics against each other for one position group, one dot per player over every
+ *        competition, club football, national-team football or one competition, this season, last season or a
+ *        calendar window; presets, size and colour encodings, medians, labelled extremes, a highlight search and the
+ *        group ranked on the view (data/lab/<window>/<scope>.json, UNIFIED_PAYLOADS 14)
  *   #/compare/players/<a>/<b>   two players side by side; a key is a person id, or the old <comp>:<id>
  *   #/compare/clubs/<a>/<b>     two clubs side by side; a key is a club id, or the old <comp>:<club-slug>
  *
@@ -39,39 +40,40 @@ var PRESETS = {
   O: [['npxg_xa_90', 'padj_tkl_int_90', 'Attacking output against defending'], ['prog_actions_90', 'shot_creation_90', 'Progression against chance creation'], ['duels_90', 'duel_pct', 'Duels: volume against success']]
 };
 var EXTRA_ADJ = ['npxg_xa_90', 'ga_90', 'shot_creation_90'];
-var WINDOWS = { season: 'This season, per competition', '365': 'Last 12 months, all competitions', ytd: 'Calendar year so far, all competitions' };
-var WIN_FILE = { season: 'players_lab.json', '365': 'players_lab_365.json', ytd: 'players_lab_ytd.json' };
+var WIN_ORDER = ['season', 'last', '365', 'ytd'];
 var SHRINK_K = 450;
-var LABS = {};
-var LAB = null, MU = {};
+var LAB = null, MU = {}, IX = null;
 var S = null;
 
-function prep(raw) {
-  var idx = {};
-  raw.fields.forEach(function (f, i) { idx[f] = i; });
+/* One view of data/lab/ (one row per person) with the index's catalogue. */
+function prep(ix, view) {
   var meta = {};
-  (raw.metrics || []).forEach(function (m) { meta[m.key] = m; });
+  (ix.metrics || []).forEach(function (m) { meta[m.key] = m; });
   meta.minutes = { key: 'minutes', label: 'Minutes', fmt: 'int' };
   meta.age = { key: 'age', label: 'Age', fmt: 'int' };
   var adj = {};
-  (raw.adjusted_keys || []).concat(EXTRA_ADJ).forEach(function (k) { adj[k] = 1; });
-  return { idx: idx, meta: meta, metrics: raw.metrics || [], comps: raw.comps || {}, adj: adj, rows: raw.rows || [], window: raw.window || null, updated_at: raw.updated_at };
+  (ix.adjusted_keys || []).concat(EXTRA_ADJ).forEach(function (k) { adj[k] = 1; });
+  var win = (ix.windows || []).filter(function (w) { return w.key === view.window; })[0] || null;
+  return { idx: view.idx, meta: meta, metrics: ix.metrics || [], comps: ix.comps || {}, adj: adj, rows: view.rows, floor: view.floor, window: win, scope: view.scope, updated_at: ix.updated_at };
 }
-function loadWindow(w) {
-  if (LABS[w]) return Promise.resolve(LABS[w]);
-  return FB.load(WIN_FILE[w]).then(function (raw) {
-    if (!raw || !(raw.rows || []).length) return null;
-    LABS[w] = prep(raw);
-    return LABS[w];
+function loadView(win, scope) {
+  return FB.labIndex().then(function (ix) {
+    if (!ix || !ix.scopes) return null;
+    IX = ix;
+    var have = ix.scopes[win] || {};
+    if (!have[scope]) scope = have.all ? 'all' : Object.keys(have)[0];
+    if (!scope) return null;
+    return FB.labView(win, scope).then(function (v) { return v ? prep(ix, v) : null; });
   });
 }
-function adjOn() { return S.adj && (!S.comp || S.win !== 'season'); }
+function single() { return !FB.LAB_SCOPES[S.scope]; }
+function adjOn() { return S.adj && !single(); }
 function rawV(r, key) {
   var i = LAB.idx[key];
   if (i === undefined) return null;
   var v = r[i];
   if (v === null || v === undefined) return null;
-  if (adjOn() && LAB.adj[key]) v = v * (LAB.idx.factor !== undefined ? (r[LAB.idx.factor] || 1) : ((LAB.comps[r[LAB.idx.comp]] || {}).factor || 1));
+  if (adjOn() && LAB.adj[key]) v = v * (r[LAB.idx.factor] || 1);
   return v;
 }
 function val(r, key) {
@@ -88,10 +90,12 @@ function label(key) {
 }
 function lower(key) { return !!(LAB.meta[key] || {}).lower; }
 function fmtK(key, v) { return FB.fmtMetric(v, (LAB.meta[key] || {}).fmt || '2'); }
+/* The default minimum: the view's floor (30% of what its regulars have played), at most 450 when it mixes competitions
+   whose seasons are at different points (a European 2026/27 weeks old beside a Brazilian 2026 near its end). */
+function defMin() { var f = LAB.floor || 90; return Math.max(90, single() ? f : Math.min(f, 450)); }
 function pool() {
   var I = LAB.idx;
   return LAB.rows.filter(function (r) {
-    if (S.comp && r[I.comp] !== S.comp) return false;
     var p = r[I.position];
     if (S.pos === 'O' ? (p === 'G' || !p) : p !== S.pos) return false;
     return (r[I.minutes] || 0) >= S.min;
@@ -111,48 +115,57 @@ function metricOpts(scope) {
   });
   var out = [];
   if (scope === 'size') out.push(['minutes', 'Minutes played'], ['', 'Same size']);
-  if (scope === 'color') out.push(['comp', 'Competition'], ['team', 'Club'], ['', 'One colour']);
+  if (scope === 'color') out.push(['comp', 'Main competition'], ['team', 'Club'], ['', 'One colour']);
   order.forEach(function (g) { out.push({ group: g, items: groups[g] }); });
   if (!scope) out.push({ group: 'Profile', items: [['age', 'Age'], ['minutes', 'Minutes']] });
   return out;
 }
+function winOpts() {
+  var ws = (IX && IX.windows) || [];
+  return WIN_ORDER.filter(function (k) { return ws.some(function (w) { return w.key === k; }) && (IX.scopes || {})[k]; }).map(function (k) {
+    var w = ws.filter(function (x) { return x.key === k; })[0];
+    return [k, k === 'season' ? 'This season' : w.label];
+  });
+}
 
-/* State <-> hash: comp and position in the path (the old deep links), the rest in the query. */
+/* State <-> hash: scope and position in the path (#/lab/<all|club|intl|slug>/<pos>, the old per-competition links
+   included), the rest in the query. */
 function stateFromRoute(p) {
   var q = p.query || {};
-  var st = { win: WINDOWS[q.w] ? q.w : 'season', comp: p.comp && p.comp !== 'all' ? p.comp : '', pos: POS[p.pos] ? p.pos : (POS[q.pos] ? q.pos : 'F'),
+  var st = { win: WIN_ORDER.indexOf(q.w) >= 0 ? q.w : 'season', scope: p.comp || 'all', pos: POS[p.pos] ? p.pos : (POS[q.pos] ? q.pos : 'F'),
     min: isNum(q.min) ? Number(q.min) : null, adj: q.adj !== '0', shrink: q.shrink !== '0', preset: isNum(q.preset) ? Number(q.preset) : 0,
     x: q.x || '', y: q.y || '', size: q.size === 'none' ? '' : (q.size || 'minutes'), color: q.color === undefined ? null : (q.color === 'none' ? '' : q.color), q: q.q || '' };
   if (st.x && st.y && q.preset === undefined) st.preset = -1;
   return st;
 }
 function writeHash() {
-  var q = { w: S.win === 'season' ? null : S.win, min: S.min, preset: S.preset >= 0 ? (S.preset ? S.preset : null) : null,
+  var q = { w: S.win === 'season' ? null : S.win, min: S.min === defMin() ? null : S.min, preset: S.preset >= 0 ? (S.preset ? S.preset : null) : null,
     x: S.preset < 0 ? S.x : null, y: S.preset < 0 ? S.y : null, size: S.size === 'minutes' ? null : (S.size || 'none'), color: S.color === S.defColor ? null : (S.color || 'none'),
     shrink: S.shrink ? null : '0', adj: S.adj ? null : '0', q: S.q || null };
-  FB.setHashQuiet('#/lab/' + (S.comp || 'all') + '/' + S.pos + FB.qs(q));
+  FB.setHashQuiet('#/lab/' + (S.scope || 'all') + '/' + S.pos + FB.qs(q));
 }
 
 FB.route('lab', function (el, p) {
   S = stateFromRoute(p);
-  el.innerHTML = FB.pageHead('Lab', 'Player lab', 'Scatter any two player metrics for one position group, within a competition or across every competition on the site. Presets pick the pairs that separate styles of player; medians split the chart into quadrants.') +
+  el.innerHTML = FB.pageHead('Lab', 'Player lab', 'Scatter any two player metrics for one position group. Every player is one dot: his matches in the season or window, across every competition, club football only, his national team only, or one competition. Presets pick the pairs that separate styles of player; medians split the chart into quadrants.') +
     subnav('lab') +
     '<section class="qk-card fb-lb-ctl"><div class="qk-card-body" id="lb-ctl">' + FB.loading('lines', 3) + '</div></section>' +
     '<div id="lb-cover"></div>' +
     FB.card('<span id="lb-title">The chart</span>', '<span id="lb-sub"></span>', FB.chartBox('lb-chart', 640, 'Player lab scatter') + '<p class="fb-cap" id="lb-note"></p>', { id: 'lb-chart-card' }) +
     FB.card('Ranked on this view', 'The group ranked by the sum of standard scores on both axes (better direction); percentiles within the group shown. Top 60.', '<div id="lb-table"></div>', { flush: true });
-  return show(el, S.win, true);
+  return show(el, true);
 });
 
-function show(el, w, first) {
-  return loadWindow(w).then(function (lab) {
+function show(el, first) {
+  return loadView(S.win, S.scope).then(function (lab) {
     if (!FB.alive(el)) return;
-    if (!lab) { FB.set('lb-ctl', FB.empty('This view is not built yet', 'The lab payload for this window is written by the next build.')); FB.set('lb-chart', ''); return; }
+    if (!lab) { FB.set('lb-ctl', FB.empty('This view is not built yet', 'The lab payloads (data/lab/) are written by the next build.')); FB.set('lb-chart', ''); return; }
     LAB = lab;
-    if (S.comp && !LAB.comps[S.comp]) S.comp = '';
-    if (!isNum(S.min) || !first) S.min = (S.comp && S.win === 'season') ? 270 : 450;
-    S.defColor = S.comp ? 'rating' : 'comp';
+    S.scope = lab.scope;
+    if (!isNum(S.min) || !first) S.min = defMin();
+    S.defColor = single() ? 'rating' : 'comp';
     if (S.color === null || (S.color && S.color !== 'comp' && S.color !== 'team' && LAB.idx[S.color] === undefined)) S.color = S.defColor;
+    if (single() && S.color === 'comp') S.color = 'rating';
     if (S.size && S.size !== 'minutes' && LAB.idx[S.size] === undefined) S.size = 'minutes';
     if (!S.x || !S.y || LAB.idx[S.x] === undefined || LAB.idx[S.y] === undefined) { if (S.preset < 0) S.preset = 0; applyPreset(); }
     controls(el);
@@ -161,10 +174,9 @@ function show(el, w, first) {
 }
 
 function controls(el) {
-  var comps = Object.keys(LAB.comps).sort(function (a, b) { return String(LAB.comps[a].name).localeCompare(String(LAB.comps[b].name)); });
   var html = FB.toolbar([
-    FB.field('View', FB.select('lb-win', Object.keys(WINDOWS).map(function (k) { return [k, WINDOWS[k]]; }), S.win, 'Window')),
-    FB.field(S.win === 'season' ? 'Scope' : 'Main competition', FB.select('lb-comp', [['', 'All competitions']].concat(comps.map(function (k) { return [k, FB.compName(k) !== k ? FB.compName(k) : LAB.comps[k].name]; })), S.comp, 'Scope')),
+    FB.field('Season', FB.select('lb-win', winOpts(), S.win, 'Season or window')),
+    FB.field('Competitions', FB.select('lb-comp', FB.labScopeOptions(IX, S.win), S.scope, 'Which competitions count', 'fb-pl-wide')),
     FB.field('Position', FB.select('lb-pos', Object.keys(POS).map(function (k) { return [k, POS[k]]; }), S.pos, 'Position')),
     FB.field('Chart', FB.select('lb-preset', PRESETS[S.pos].map(function (pp, i) { return [String(i), pp[2]]; }).concat([['-1', 'Custom axes']]), String(S.preset), 'Preset')),
     FB.field('Min. minutes', '<span class="fb-lb-range"><input type="range" id="lb-min" min="90" max="2000" step="30" value="' + S.min + '" aria-label="Minimum minutes"><b class="fb-num" id="lb-min-v">' + S.min + '\'</b></span>')
@@ -177,15 +189,14 @@ function controls(el) {
     FB.field('Highlight', '<input class="qk-input" id="lb-q" type="search" placeholder="A player…" value="' + esc(S.q) + '" autocomplete="off">')
   ], 'fb-mt') + '<div class="fb-lb-checks">' +
     '<label class="fb-check"><input type="checkbox" id="lb-shrink"' + (S.shrink ? ' checked' : '') + '> Shrink small samples</label>' +
-    '<label class="fb-check" id="lb-adj-wrap"' + (S.comp && S.win === 'season' ? ' hidden' : '') + '><input type="checkbox" id="lb-adj"' + (S.adj ? ' checked' : '') + '> League-adjust attacking rates</label></div>';
+    '<label class="fb-check" id="lb-adj-wrap"' + (single() ? ' hidden' : '') + '><input type="checkbox" id="lb-adj"' + (S.adj ? ' checked' : '') + '> League-adjust attacking rates</label></div>';
   FB.set('lb-ctl', html);
   var $ = function (id) { return el.querySelector('#' + id); };
-  $('lb-win').onchange = function (e) { S.win = e.target.value; show(el, S.win, false); };
+  $('lb-win').onchange = function (e) { S.win = e.target.value; show(el, false); };
   $('lb-comp').onchange = function (e) {
-    S.comp = e.target.value; S.min = (S.comp && S.win === 'season') ? 270 : 450;
-    if (S.comp && S.color === 'comp') S.color = 'rating'; if (!S.comp && S.color === 'rating') S.color = 'comp';
-    S.defColor = S.comp ? 'rating' : 'comp';
-    controls(el); draw(el);
+    S.scope = e.target.value;
+    if (!single() && S.color === 'rating') S.color = 'comp';
+    show(el, false);
   };
   $('lb-pos').onchange = function (e) { S.pos = e.target.value; S.preset = 0; applyPreset(); controls(el); draw(el); };
   $('lb-preset').onchange = function (e) { S.preset = parseInt(e.target.value, 10); applyPreset(); controls(el); draw(el); };
@@ -214,11 +225,11 @@ function draw(el) {
     }
   });
   var rows = base0.filter(function (r) { return val(r, S.x) !== null && val(r, S.y) !== null; });
-  var scopeName = S.comp ? ((LAB.comps[S.comp] || {}).name || S.comp) : 'every competition';
+  var scopeName = FB.labScopeName(S.scope, IX);
   var W = LAB.window;
   FB.set('lb-title', esc(label(S.y)) + ' against ' + esc(label(S.x)));
-  FB.set('lb-sub', FB.int(rows.length) + ' ' + POS[S.pos].toLowerCase() + (S.win === 'season' ? ' in ' + esc(scopeName) : (S.comp ? ' whose main competition is ' + esc(scopeName) : '') + (W ? ', ' + esc(String(W.label).toLowerCase()) + ' (' + esc(W.start) + ' to ' + esc(W.end) + ')' : '')) + ' with ' + S.min + '+ minutes');
-  if (S.win !== 'season' && W) {
+  FB.set('lb-sub', FB.int(rows.length) + ' ' + POS[S.pos].toLowerCase() + ' · ' + esc(single() ? scopeName : scopeName.toLowerCase()) + ' · ' + esc(FB.labWindowText(W)) + ' · ' + S.min + '+ minutes · one dot per player');
+  if (W && W.start) {
     var present = {};
     rows.forEach(function (r) { present[r[I.comp]] = 1; });
     var late = Object.keys(LAB.comps).filter(function (k) { return present[k] && LAB.comps[k].first_detail && LAB.comps[k].first_detail > W.start; })
@@ -230,7 +241,7 @@ function draw(el) {
   var box = el.querySelector('#lb-chart');
   if (rows.length < 3) {
     if (box.__qkc) { try { box.__qkc.chart.dispose(); } catch (e) { /* gone */ } box.__qkc = null; }
-    box.innerHTML = FB.empty('Too few players', 'Lower the minutes or widen the scope.');
+    box.innerHTML = FB.empty('Too few players', 'Lower the minutes or widen the competitions.');
     FB.set('lb-table', ''); FB.set('lb-note', '');
     return;
   }
@@ -241,8 +252,8 @@ function draw(el) {
   var q = norm(S.q.trim());
   var hits = q ? rows.filter(function (r) { return norm(r[I.name]).indexOf(q) >= 0; }) : [];
   var labelled = {};
-  ranked.slice(0, 12).forEach(function (o) { labelled[o.r[I.player_id] + '|' + o.r[I.comp]] = 1; });
-  hits.forEach(function (r) { labelled[r[I.player_id] + '|' + r[I.comp]] = 1; });
+  ranked.slice(0, 12).forEach(function (o) { labelled[o.r[I.player_id]] = 1; });
+  hits.forEach(function (r) { labelled[r[I.player_id]] = 1; });
   var sortedX = xs.slice().sort(function (a, b) { return a - b; }), sortedY = ys.slice().sort(function (a, b) { return a - b; });
   var pxOf = function (v) { var pp = pctRank(sortedX, v); return dirx > 0 ? pp : 100 - pp; };
   var pyOf = function (v) { var pp = pctRank(sortedY, v); return diry > 0 ? pp : 100 - pp; };
@@ -264,8 +275,9 @@ function draw(el) {
   } else groups.push({ name: continuous ? label(S.color) : 'Players', rows: rows });
   var cv = continuous ? rows.map(function (r) { return val(r, S.color); }).filter(isNum) : [];
   var clo = cv.length ? Math.min.apply(null, cv) : 0, chi = cv.length ? Math.max.apply(null, cv) : 1;
-  var href = function (r) { return FB.href.player(r[I.player_id], S.win === 'season' ? { c: r[I.comp] } : null); };
-  var compLabel = function (r) { return I.mix !== undefined ? r[I.mix] : ((LAB.comps[r[I.comp]] || {}).name || r[I.comp]) + ' · ' + r[I.minutes] + '\''; };
+  var personQ = single() ? { c: S.scope } : S.scope === 'club' ? { scope: 'club' } : S.scope === 'intl' ? { scope: 'intl' } : null;
+  var href = function (r) { return FB.href.player(r[I.player_id], personQ); };
+  var compLabel = function (r) { return r[I.mix] || ((LAB.comps[r[I.comp]] || {}).name || r[I.comp]) + ' · ' + r[I.minutes] + '\''; };
 
   QKC.mount(box, function (T) {
     var series = groups.map(function (g, gi) {
@@ -274,10 +286,9 @@ function draw(el) {
         type: 'scatter', name: g.name, large: false, itemStyle: continuous ? undefined : { color: c },
         symbolSize: function (v, prm) { return prm.data.sz; },
         data: g.rows.map(function (r) {
-          var key = r[I.player_id] + '|' + r[I.comp];
           return { value: [val(r, S.x), val(r, S.y), continuous ? val(r, S.color) : null], name: r[I.name], href: href(r), r: r, sz: sizeOf(r),
             itemStyle: continuous ? { borderColor: T.s1, borderWidth: 0.6, opacity: 0.85 } : { color: QKC.hexA(c, 0.72), borderColor: T.s1, borderWidth: 0.6 },
-            label: { show: !!labelled[key], formatter: FB.surname(r[I.name]), position: 'top', color: T.ink1, fontSize: 10.5, fontWeight: 600, fontFamily: T.fontUI } };
+            label: { show: !!labelled[r[I.player_id]], formatter: FB.surname(r[I.name]), position: 'top', color: T.ink1, fontSize: 10.5, fontWeight: 600, fontFamily: T.fontUI } };
         }),
         labelLayout: { hideOverlap: true },
         emphasis: { scale: 1.5, label: { show: true } },
@@ -298,7 +309,7 @@ function draw(el) {
       tooltip: QKC.tooltip(T, { formatter: function (prm) {
         var r = (prm.data || {}).r; if (!r) return '';
         var vx = val(r, S.x), vy = val(r, S.y);
-        return '<div style="font-weight:700">' + esc(r[I.name]) + '</div><div style="color:' + T.ink3 + ';font-size:11px;max-width:260px;white-space:normal">' + esc(r[I.team]) + ' · ' + esc(compLabel(r)) + (r[I.age] ? ' · age ' + r[I.age] : '') + '</div>' +
+        return '<div style="font-weight:700">' + esc(r[I.name]) + '</div><div style="color:' + T.ink3 + ';font-size:11px;max-width:260px;white-space:normal">' + esc(r[I.team] || '') + ' · ' + esc(compLabel(r)) + (r[I.age] ? ' · age ' + r[I.age] : '') + '</div>' +
           QKC.tipRow(prm.color, label(S.x), fmtK(S.x, vx) + ' · pct ' + Math.round(pxOf(vx))) + QKC.tipRow(prm.color, label(S.y), fmtK(S.y, vy) + ' · pct ' + Math.round(pyOf(vy))) +
           (S.shrink ? '<div style="color:' + T.ink3 + ';font-size:11px">unshrunk ' + fmtK(S.x, rawV(r, S.x)) + ' · ' + fmtK(S.y, rawV(r, S.y)) + '</div>' : '');
       } }),
@@ -310,21 +321,21 @@ function draw(el) {
     return opt;
   }, { label: 'Player lab: ' + label(S.y) + ' against ' + label(S.x) });
 
-  FB.set('lb-note', 'Dotted lines are the medians of this group. ' + (lower(S.x) || lower(S.y) ? 'Axes where less is better are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
+  FB.set('lb-note', 'One dot per player: his minutes and rates over ' + esc(single() ? scopeName : scopeName.toLowerCase()) + ' in the view, however many competitions that spans. Dotted lines are the medians of this group. ' + (lower(S.x) || lower(S.y) ? 'Axes where less is better are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
     'Labelled: the twelve players furthest into that corner (sum of standard scores on both axes)' + (hits.length ? ', and your search (amber rings)' : '') + '. Click a dot to open the player.' +
-    (adjOn() ? ' Attacking rates marked "adj." are multiplied by the league\'s scoring factor from the pooled model' + (S.win !== 'season' ? ' (for a calendar window, the minutes-weighted blend of the competitions he played in).' : '.') : '') +
+    (adjOn() ? ' Attacking rates marked "adj." are multiplied by the scoring factor from the pooled model: the minutes-weighted blend of the competitions he played in.' : '') +
     (S.shrink ? ' Rates marked "shrunk" are pulled towards the group median by ' + SHRINK_K + ' minutes of prior, so a player five matches in is not ranked on five matches alone; the tooltip shows the raw figures.' : '') +
     ' <a href="#/model/glossary/shrinkage">Glossary →</a>');
 
   var trows = ranked.slice(0, 60).map(function (o, i) {
     var r = o.r, vx = val(r, S.x), vy = val(r, S.y);
-    return { i: i + 1, name: r[I.name], pid: r[I.player_id], comp: r[I.comp], team: r[I.team], mix: compLabel(r), age: r[I.age], min: r[I.minutes], vx: vx, px: pxOf(vx), vy: vy, py: pyOf(vy), z: o.z, href: href(r) };
+    return { i: i + 1, name: r[I.name], pid: r[I.player_id], comp: r[I.comp], team: r[I.team], tid: r[I.tid], mix: compLabel(r), age: r[I.age], min: r[I.minutes], vx: vx, px: pxOf(vx), vy: vy, py: pyOf(vy), z: o.z, href: href(r) };
   });
   FB.table(el.querySelector('#lb-table'), [
     { key: 'i', label: '#', num: true },
     { key: 'name', label: 'Player', sticky: true, fmt: function (v, r) { return '<a class="fb-link" href="' + esc(r.href) + '">' + esc(v) + '</a>'; } },
-    { key: 'team', label: 'Club', fmt: function (v) { return esc(v); } },
-    { key: 'mix', label: I.mix !== undefined ? 'Competitions (minutes)' : 'Competition', fmt: function (v) { return '<span class="qk-muted fb-lb-mix">' + esc(v) + '</span>'; } },
+    { key: 'team', label: S.scope === 'intl' ? 'National team' : 'Club', fmt: function (v, r) { return r.tid && FB.clubRow(r.tid) ? FB.clubLink(r.tid, v || FB.clubName(r.tid)) : esc(v || ''); } },
+    { key: 'mix', label: 'Competitions (minutes)', fmt: function (v) { return '<span class="qk-muted fb-lb-mix">' + esc(v) + '</span>'; } },
     { key: 'age', label: 'Age', num: true },
     { key: 'min', label: 'Min', num: true },
     { key: 'vx', label: (LAB.meta[S.x] || {}).label || S.x, num: true, pctl: 'px', fmt: function (v) { return fmtK(S.x, v); } },
@@ -376,7 +387,7 @@ FB.route('compare', function (el, p) {
     return;
   }
   FB.set('lb-body', FB.loading('card', 4));
-  return kind === 'players' ? comparePlayers(el, a, b) : compareClubs(el, a, b);
+  return kind === 'players' ? comparePlayers(el, a, b, (p.query || {}).scope) : compareClubs(el, a, b);
 });
 
 function picker(id, placeholder, side) {
@@ -419,7 +430,17 @@ function liveComps(doc) {
   return (doc.seasons || []).filter(function (s) { return (!era || s.era === era) && s.source === 'live' && FB.hasFile(s.comp, 'players_live'); })
     .sort(function (x, y) { return (y.min || 0) - (x.min || 0); }).map(function (s) { return s.comp; });
 }
-function comparePlayers(el, ka, kb) {
+/* A lab row (data/lab/season/<scope>.json) as the object buildPlayers reads: the rates, percentiles against the same
+   position in the same view, and whether he is over the view's floor. */
+function labRowObject(view, r, metrics, floor) {
+  var I = view.idx, o = {};
+  view.fields.forEach(function (f, i) { o[f] = r[i]; });
+  o.is_gk = r[I.position] === 'G';
+  o.qualified = (r[I.minutes] || 0) >= floor;
+  o.pct = o.qualified ? FB.labPct(view, r, metrics.filter(function (m) { return m.pct; }), floor) : {};
+  return o;
+}
+function comparePlayers(el, ka, kb, scopeQ) {
   var keys = [splitKey(ka), splitKey(kb)];
   return FB.peopleIndex().then(function (pi) {
     if (!FB.alive(el)) return;
@@ -429,31 +450,60 @@ function comparePlayers(el, ka, kb) {
       FB.set('lb-body', FB.empty('Player not found', 'One of the ids is not in the player registry. Use the search boxes.'));
       return;
     }
-    return Promise.all(keys.map(function (k) { return FB.load('people/' + k[1] + '.json'); })).then(function (docs) {
+    keys = keys.map(function (k) { return [k[0], String(pi.byId[k[1]].id)]; });       // a merged duplicate id -> the person
+    // Scope: ?scope= (all, club, intl or a competition); an old <comp>:<id> key means that competition.
+    var scope = scopeQ || keys[0][0] || keys[1][0] || 'all';
+    return Promise.all(keys.map(function (k) { return FB.load('people/' + k[1] + '.json'); }).concat([FB.labIndex()])).then(function (docs) {
       if (!FB.alive(el)) return;
-      var P = docs.map(function (d, i) {
+      var ix = docs[2];
+      var pooled = !!FB.LAB_SCOPES[scope];
+      var P = docs.slice(0, 2).map(function (d, i) {
         d = d || { id: keys[i][1], name: pi.byId[keys[i][1]].name, seasons: [], years: [], apps: [] };
         var cands = liveComps(d);
-        var want = keys[i][0];
-        var comp = want && FB.hasFile(want, 'players_live') ? want : (cands[0] || null);
-        return { id: String(keys[i][1]), doc: d, comp: comp };
+        var comp = !pooled && FB.hasFile(scope, 'players_live') ? scope : (cands[0] || null);
+        return { id: String(keys[i][1]), doc: d, comp: comp, cands: cands, scope: scope };
       });
-      FB.set('lb-picked', P.map(function (x, i) { return '<span class="qk-badge">' + sideDot(i) + esc(x.doc.name) + (x.comp ? ' · ' + esc(FB.compName(x.comp, true)) : '') + '</span>'; }).join(' <span class="qk-muted">v</span> '));
-      return Promise.all(P.map(function (x) { return x.comp ? FB.compFiles(x.comp, ['players_live', 'shots']) : Promise.resolve({}); })).then(function (files) {
+      scopePicker(el, P, scope, ix);
+      var view = pooled && ix ? FB.labView('season', scope) : Promise.resolve(null);
+      return Promise.all([view].concat(P.map(function (x) { return x.comp ? FB.compFiles(x.comp, ['players_live', 'shots']) : Promise.resolve({}); }))).then(function (files) {
         if (!FB.alive(el)) return;
+        var V = files[0];
         P.forEach(function (x, i) {
-          var live = files[i].players_live || {};
-          x.live = live;
-          x.metrics = live.metrics || [];
-          x.row = (live.players || []).filter(function (r) { return String(r.player_id) === x.id; })[0] || null;
-          var sh = (files[i].shots || {}).players || {};
+          var live = files[i + 1].players_live || {};
+          var sh = (files[i + 1].shots || {}).players || {};
           x.shots = [];
           Object.keys(sh).forEach(function (n) { if (String(sh[n].player_id) === x.id) x.shots = sh[n].shots || []; });
+          if (pooled) {
+            var floor = V ? Math.max(90, Math.min(V.floor, 450)) : 450;
+            var r = V ? V.rows.filter(function (row) { return String(row[V.idx.player_id]) === x.id; })[0] : null;
+            x.pooled = FB.labScopeName(scope, ix);
+            x.live = { minutes_floor: floor };
+            x.metrics = (ix || {}).metrics || [];
+            x.row = r ? labRowObject(V, r, x.metrics, floor) : null;
+          } else {
+            x.live = live;
+            x.metrics = live.metrics || [];
+            x.row = (live.players || []).filter(function (r) { return String(r.player_id) === x.id; })[0] || null;
+          }
         });
         buildPlayers(el, P);
       });
     });
   });
+}
+/* The scope picker beside the two names: every competition, club football, national-team football, or one
+   competition either player has played this season. */
+function scopePicker(el, P, scope, ix) {
+  var opts = [['all', 'All competitions'], ['club', 'Club competitions'], ['intl', 'National team']];
+  var seen = {};
+  P.forEach(function (x) { x.cands.forEach(function (c) { seen[c] = 1; }); });
+  if (!FB.LAB_SCOPES[scope]) seen[scope] = 1;
+  var comps = Object.keys(seen).sort(function (a, b) { return FB.compName(a).localeCompare(FB.compName(b)); });
+  if (comps.length) opts.push({ group: 'One competition (its own percentiles)', items: comps.map(function (c) { return [c, FB.compName(c)]; }) });
+  FB.set('lb-picked', P.map(function (x, i) { return '<span class="qk-badge">' + sideDot(i) + esc(x.doc.name) + '</span>'; }).join(' <span class="qk-muted">v</span> ') +
+    ' <span class="fb-lb-scope">' + FB.field('Compare on', FB.select('lb-scope', opts, scope, 'Which competitions count', 'fb-pl-wide')) + '</span>');
+  var sel = el.querySelector('#lb-scope');
+  if (sel) sel.addEventListener('change', function () { FB.setQuery({ scope: sel.value === 'all' ? null : sel.value }, true); });
 }
 
 function buildPlayers(el, P) {
@@ -475,14 +525,14 @@ function buildPlayers(el, P) {
       FB.kpi('Season ' + esc(yr.era || ''), FB.int(yr.min || 0) + '\'', { sub: (yr.apps || 0) + ' apps · all competitions' }),
       FB.kpi('Goals · assists', (yr.g || 0) + ' · ' + (yr.a || 0), { sub: isNum(yr.xg) ? 'xG ' + num(yr.xg, 1) + ' · xA ' + num(yr.xa, 1) : '' }),
       FB.kpi('Rating', isNum(yr.rt) ? num(yr.rt, 2) : '—', { sub: 'minutes-weighted' }),
-      FB.kpi(r.is_gk ? 'Save %' : 'npxG/90', r.is_gk ? FB.fmtMetric(r.save_pct, 'pct') : (isNum(r.npxg_90) ? num(r.npxg_90, 2) : '—'), { sub: x.comp ? esc(FB.compName(x.comp, true)) : '' })
+      FB.kpi(r.is_gk ? 'Save %' : 'npxG/90', r.is_gk ? FB.fmtMetric(r.save_pct, 'pct') : (isNum(r.npxg_90) ? num(r.npxg_90, 2) : '—'), { sub: x.pooled ? esc(x.pooled) : x.comp ? esc(FB.compName(x.comp, true)) : '' })
     ];
     var meta = [FB.POS_LABEL[d.pos] || '', d.age ? d.age + ' years' : '', d.nat || '', d.height ? d.height + ' cm' : '', isNum(d.mv) ? 'Value ' + FB.money(d.mv, d.mvc) : ''].filter(Boolean);
     return '<section class="qk-hero fb-lb-hero ' + SIDE[i] + '"><div class="qk-hero-in"><div class="qk-avatar">' + esc(FB.initials(d.name)) + '</div><div class="fb-lb-hero-t">' +
       '<div class="qk-kicker">' + sideDot(i) + (club.tid ? FB.clubLink(club.tid, club.name) : 'No current club') + '</div>' +
       '<h2><a href="' + esc(FB.href.player(x.id, x.comp ? { c: x.comp } : null)) + '">' + esc(d.name) + '</a></h2>' +
       '<div class="qk-hero-meta">' + meta.map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('') + '</div>' +
-      (x.row ? (r.qualified === false ? '<div class="fb-cap">Below the ' + (x.live.minutes_floor || 0) + '-minute floor in ' + esc(FB.compName(x.comp)) + ': no percentiles yet.</div>' : '') : '<div class="fb-cap">' + (x.comp ? 'No line in ' + esc(FB.compName(x.comp)) + ' this season.' : 'No competition with player data this season.') + '</div>') +
+      (x.row ? (r.qualified === false ? '<div class="fb-cap">Below the ' + (x.live.minutes_floor || 0) + '-minute floor in ' + esc(x.pooled ? x.pooled.toLowerCase() : FB.compName(x.comp)) + ': no percentiles yet.</div>' : '') : '<div class="fb-cap">' + (x.pooled ? 'No minutes in ' + esc(x.pooled.toLowerCase()) + ' this season.' : x.comp ? 'No line in ' + esc(FB.compName(x.comp)) + ' this season.' : 'No competition with player data this season.') + '</div>') +
       '</div></div>' + FB.kpis(tiles, 'fb-lb-kpis') + '</section>';
   };
 
@@ -498,7 +548,7 @@ function buildPlayers(el, P) {
     verdict = '<div class="fb-lb-verdict"><div class="fb-lb-vside a"><div class="qk-kicker">' + sideDot(0) + esc(short(A)) + ' leads on</div><ul>' + say(wa) + '</ul></div>' +
       '<div class="fb-lb-vmid"><div class="fb-lb-score"><span class="a">' + wa.length + '</span><span class="qk-muted">–</span><span class="b">' + wb.length + '</span></div>' +
       '<div class="fb-lb-wins"><span class="a" style="flex:' + wa.length + '"></span><span class="t" style="flex:' + lev + '"></span><span class="b" style="flex:' + wb.length + '"></span></div>' +
-      '<div class="fb-cap">metrics won of ' + n + (lev ? ' · ' + lev + ' level' : '') + (A.comp !== B.comp ? ' · different competitions: each percentile is against its own peers' : '') + '</div></div>' +
+      '<div class="fb-cap">metrics won of ' + n + (lev ? ' · ' + lev + ' level' : '') + (A.pooled ? ' · ' + esc(A.pooled.toLowerCase()) + ' this season, one line per player' : A.comp !== B.comp ? ' · different competitions: each percentile is against its own peers' : '') + '</div></div>' +
       '<div class="fb-lb-vside b"><div class="qk-kicker">' + sideDot(1) + esc(short(B)) + ' leads on</div><ul>' + say(wb) + '</ul></div></div>';
   }
 
@@ -516,7 +566,7 @@ function buildPlayers(el, P) {
     '<div class="fb-lb-pair">' + idCard(A, 0) + idCard(B, 1) + '</div>' +
     FB.card('Verdict', 'Who wins each of the ' + pctMetrics.length + ' percentile metrics of the ' + (gk ? 'goalkeeper' : 'outfield') + ' scope, and the biggest gaps each way.' + (mixed ? ' A goalkeeper and an outfield player share few metrics.' : ''), verdict, { cls: 'fb-mt' }) +
     '<div class="fb-mt">' + FB.grid(
-      FB.card('Profile', 'Percentiles in each player\'s competition, on the position\'s axes.', both ? FB.chartBox('lb-radar', 380, 'Percentile radar') : FB.muted('Needs a line for both players.'), { span: 6 }) +
+      FB.card('Profile', A.pooled ? 'Percentiles against every player of the same position in ' + esc(A.pooled.toLowerCase()) + ' this season (each over ' + A.live.minutes_floor + ' minutes), on the position\'s axes.' : 'Percentiles in each player\'s competition, on the position\'s axes.', both ? FB.chartBox('lb-radar', 380, 'Percentile radar') : FB.muted('Needs a line for both players.'), { span: 6 }) +
       FB.card('Head to head per 90', 'Eight headline rates; the brighter figure is the better one.', h2h || FB.muted('No per-90 rates for both.'), { span: 6 })
     ) + '</div>' +
     FB.card('Every metric', 'The whole catalogue for the ' + (gk ? 'goalkeeper' : 'outfield') + ' scope: value, percentile and the gap in percentile points.', '<div class="fb-toolbar">' + FB.seg('lb-mmode', [['group', 'By group'], ['gap', 'By size of gap']], 'group', 'Order') + '</div><div id="lb-metrics"></div>', { cls: 'fb-mt' }) +
@@ -540,12 +590,12 @@ function buildPlayers(el, P) {
       FB.card(sideDot(1) + esc(B.doc.name) + ': this season, every competition', '', '<div id="lb-ss-b"></div>', { span: 6, flush: true })
     ) + '</div>' +
     '<p class="fb-cap">' + P.map(function (x) { return '<a href="' + esc(FB.href.player(x.id)) + '">' + esc(x.doc.name) + ' →</a>'; }).join(' · ') +
-    ' · <a href="#/lab/' + esc(A.comp && A.comp === B.comp ? A.comp : 'all') + '/' + esc(gk ? 'G' : ({ D: 'D', M: 'M', F: 'F' }[A.doc.pos] || 'M')) + '">Player lab →</a> · <a href="#/model/glossary">Glossary →</a></p>';
+    ' · <a href="#/lab/' + esc(A.pooled ? A.scope : A.comp && A.comp === B.comp ? A.comp : 'all') + '/' + esc(gk ? 'G' : ({ D: 'D', M: 'M', F: 'F' }[A.doc.pos] || 'M')) + '">Player lab →</a> · <a href="#/model/glossary">Glossary →</a></p>';
 
   if (both) {
     var axes = gk ? RADAR_GK : RADAR_OUT;
     FB.charts.radar(el.querySelector('#lb-radar'), { axes: axes.map(function (a) { return { name: a[1], max: 100 }; }),
-      series: P.map(function (x, i) { return { name: x.doc.name + ' (' + FB.compName(x.comp, true) + ')', values: axes.map(function (a) { return (x.row.pct || {})[a[0]]; }), color: QK.cssVar(i ? '--c-2' : '--c-1') }; }) });
+      series: P.map(function (x, i) { return { name: x.doc.name + ' (' + (x.pooled || FB.compName(x.comp, true)) + ')', values: axes.map(function (a) { return (x.row.pct || {})[a[0]]; }), color: QK.cssVar(i ? '--c-2' : '--c-1') }; }) });
   }
   // metric table
   var groupOrder = [];

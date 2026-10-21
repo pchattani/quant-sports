@@ -577,3 +577,58 @@ def test_a_career_cut_by_the_old_cap_reads_partial_from_where_it_stops(tmp_path)
 def test_a_short_or_relisted_career_has_no_gap(tmp_path) -> None:
     p = _career_world(tmp_path, 5)
     assert "career_gap" not in p and all(y["coverage"] == "full" for y in p["years"])
+
+
+# ── one person, one record ───────────────────────────────────────────────────
+
+def _dup_world(tmp_path, same_lineup=False):
+    """A roster listing one player under two Sofascore ids (same name, birth date, nationality) and a namesake from elsewhere."""
+    lineups = {"1": {**_lineup("Guadalajara", "1097368", "Luis Gabriel Rey"), **_lineup("America", "9", "Nine")}}
+    if same_lineup:
+        lineups["1"].update(_lineup("Guadalajara", "1097364", "Luis Gabriel Rey"))
+    league = _store([_m("1", "Guadalajara", "America", 1, 2, 1, 0, "2026-09-01T02:00:00Z", 300)], lineups, current=300)
+    dob = 1031961600                                                    # 2002-09-14
+    squads = {"teams": {"1": {"name": "Guadalajara", "fetched_at": "2026-10-01T00:00:00Z", "players": [
+        {"id": "1097368", "n": "Luis Gabriel Rey", "pos": "F", "dob": dob, "c": "MEX"},
+        {"id": "1097364", "n": "Luis Gabriel Rey", "pos": "F", "dob": dob, "c": "MEX", "mv": 900000},
+        {"id": "5", "n": "Luis Gabriel Rey", "pos": "F", "dob": dob, "c": "COL"}]}}}
+    u = U.Unified(tmp_path, {}, squads=squads, today=TODAY)
+    u.add_store("liga-mx", league)
+    u.finish()
+    return u
+
+
+def test_duplicate_ids_of_one_person_fold_into_one_record(tmp_path) -> None:
+    u = _dup_world(tmp_path)
+    assert u.aliases == {"1097364": "1097368"}                          # the id with minutes is kept; Colombia's namesake is not merged
+    idx = _j(tmp_path / "people_index.json")
+    ids = [r[0] for r in idx["rows"]]
+    assert "1097368" in ids and "1097364" not in ids and "5" in ids and idx["aliases"] == {"1097364": "1097368"}
+    assert "nationality" in idx["merge_rule"]
+    assert _j(tmp_path / "people" / "1097364.json") == {"id": "1097364", "merged_into": "1097368", "name": "Luis Gabriel Rey"}
+    p = _j(tmp_path / "people" / "1097368.json")
+    assert p["current_club"]["tid"] == 1 and len(p["apps"]) == 1
+    squad = [r["id"] for r in _j(tmp_path / "clubs" / "1.json")["squad"]["players"]]
+    assert squad.count("1097368") == 1 and "1097364" not in squad and "5" in squad
+
+
+def test_two_ids_in_one_line_up_are_two_people(tmp_path) -> None:
+    u = _dup_world(tmp_path, same_lineup=True)
+    assert u.aliases == {}
+
+
+def test_the_argentine_archive_year_is_not_counted_twice(tmp_path) -> None:
+    """The store keys Argentina's seasons by torneo; the archive's whole-year edition of the same year is the store's."""
+    st = _store([_m("1", "Lanus", "Boca Juniors", 3218, 3202, 1, 0, "2026-03-01T20:00:00Z", 87913, torneo="apertura"),
+                 _m("2", "Lanus", "River Plate", 3218, 3211, 0, 0, "2026-08-01T20:00:00Z", 87913, torneo="clausura")],
+                {"1": _lineup("Lanus", "384552", "Nahuel Losada"), "2": _lineup("Lanus", "384552", "Nahuel Losada")}, current=None)
+    year = lambda y, sid, mins: {"tid": 155, "tname": "Liga Profesional de Futbol", "sid": sid, "sname": f"Liga Profesional {y}",  # noqa: E731
+                                 "year": str(y), "team": "Lanus", "stats": {"appearances": 26, "minutesPlayed": mins}}
+    archive = {"seasons": {}, "season_lists": {}, "players": {"384552": {"seasons": [year(2026, 87913, 2340), year(2024, 57478, 1980)]}}}
+    u = U.Unified(tmp_path, {}, archive=archive, today=TODAY)
+    u.add_store("liga-argentina", st, current_key="2026-clausura")
+    u.finish()
+    p = _j(tmp_path / "people" / "384552.json")
+    assert [r["era"] for r in p.get("archive", [])] == ["2024"]          # 2026 is the store's two torneos, never also the archive's year
+    y2026 = next(y for y in p["years"] if y["era"] == "2026")
+    assert y2026["min"] == 180

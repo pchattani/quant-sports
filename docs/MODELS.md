@@ -632,7 +632,12 @@ catalogue, so they get percentiles on player pages and appear in the Player lab:
 | `loss_per_100` | possession lost per 100 touches (lower is better) | ball security, independent of how often a player is on the ball |
 
 
-### 11.2 League adjustment: `players_global.json`
+### 11.2 League adjustment: `players_global.json` (retired 21 October 2026)
+
+Since 21 October 2026 the cross-competition player rows are one per person (`data/lab/`, docs/site/UNIFIED_PAYLOADS.md 14):
+each row carries `factor`, the competitions' `factor_att` weighted by his minutes in them, and the page multiplies
+the `ADJUSTED_KEYS` rates by it; percentiles are computed in the page against the players shown. The description
+below is of the retired `players_global.json`, kept for the record.
 
 `build_global` in `scripts/build_site_global.py`:
 1. Collects every qualified player row from every built competition.

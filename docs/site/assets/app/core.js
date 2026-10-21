@@ -364,16 +364,88 @@ function clubsIndex() {
 }
 function clubRow(tid) { return CLUBS ? CLUBS.byId[String(tid)] || null : null; }
 function clubName(tid, fallback) { var r = clubRow(tid); return r ? r.name : (fallback || ''); }
-/* people_index.json as { list, byId } (3.6 MB: search and a few lookups only). */
+/* people_index.json as { list, byId, aliases } (3.6 MB: search and a few lookups only). A duplicate Sofascore id of
+   one person (`aliases`, UNIFIED_PAYLOADS 14.4) looks up the person's row, so an old link still finds him. */
 function peopleIndex() {
   if (PEOPLE) return Promise.resolve(PEOPLE);
   return load('people_index.json').then(function (d) {
     var list = rows(d);
-    var byId = {};
+    var byId = {}, aliases = (d || {}).aliases || {};
     list.forEach(function (r) { byId[String(r.id)] = r; });
-    PEOPLE = { list: list, byId: byId };
+    Object.keys(aliases).forEach(function (a) { if (byId[String(aliases[a])] && !byId[a]) byId[a] = byId[String(aliases[a])]; });
+    PEOPLE = { list: list, byId: byId, aliases: aliases };
     return PEOPLE;
   });
+}
+/* The person id of a player id (a merged duplicate id -> the person's). */
+function personId(pid) { var a = PEOPLE ? PEOPLE.aliases[String(pid)] : null; return a ? String(a) : String(pid); }
+
+// ── one row per person: data/lab/ (UNIFIED_PAYLOADS 14) ─────────────────────
+
+var LABV = {};
+/* data/lab/index.json: the windows, the scopes each has, the competitions, the metric catalogue. */
+function labIndex() { return load('lab/index.json'); }
+/* One view, data/lab/<window>/<scope>.json, as { idx, rows, floor, window, scope }: one row per person. */
+function labView(win, scope) {
+  var key = win + '/' + scope;
+  if (LABV[key]) return Promise.resolve(LABV[key]);
+  return load('lab/' + key + '.json').then(function (d) {
+    if (!d || !d.fields) return null;
+    var idx = {};
+    d.fields.forEach(function (f, i) { idx[f] = i; });
+    LABV[key] = { idx: idx, fields: d.fields, rows: d.rows || [], floor: d.floor || 90, window: win, scope: scope, pct: {} };
+    return LABV[key];
+  });
+}
+var LAB_SCOPES = { all: 'All competitions', club: 'Club competitions', intl: 'National team' };
+function labScopeName(scope, ix) {
+  if (LAB_SCOPES[scope]) return LAB_SCOPES[scope];
+  var c = ((ix || {}).comps || {})[scope];
+  return comp(scope) ? compName(scope) : (c ? c.name : String(scope || ''));
+}
+/* The scope picker's options for one window: the three groupings, then every competition with a view. */
+function labScopeOptions(ix, win) {
+  var have = (((ix || {}).scopes || {})[win]) || {};
+  var out = ['all', 'club', 'intl'].filter(function (k) { return have[k]; }).map(function (k) { return [k, LAB_SCOPES[k]]; });
+  var comps = Object.keys(have).filter(function (k) { return !LAB_SCOPES[k]; });
+  var byKind = {};
+  comps.forEach(function (k) { var c = ((ix || {}).comps || {})[k] || {}; var g = c.scope === 'international' ? 'National-team competitions' : c.kind === 'league' ? 'Leagues' : 'Cups'; (byKind[g] = byKind[g] || []).push(k); });
+  ['Leagues', 'Cups', 'National-team competitions'].forEach(function (g) {
+    if (!byKind[g]) return;
+    out.push({ group: g, items: byKind[g].sort(function (a, b) { return labScopeName(a, ix).localeCompare(labScopeName(b, ix)); }).map(function (k) { return [k, labScopeName(k, ix)]; }) });
+  });
+  return out;
+}
+/* The window's label with its seasons or dates. */
+function labWindowText(w) {
+  if (!w) return '';
+  if (w.eras) return w.label.replace(/ \(.*\)$/, '') + ' (' + w.eras.split + ' in split-season football, ' + w.eras.calendar + ' in calendar-year football)';
+  return w.label + ' (' + w.start + ' to ' + w.end + ')';
+}
+/* Percentiles of one row in its view: against the same position (G, D, M, F) among rows over `floor` minutes,
+   inverted where less is better (players.add_percentiles). metrics: catalogue entries with pct. */
+function labPct(view, row, metrics, floor) {
+  var I = view.idx, pos = row[I.position] || 'O', key = pos + '|' + floor, cache = view.pct[key];
+  if (!cache) {
+    var peers = view.rows.filter(function (r) { return (r[I.position] || 'O') === pos && (r[I.minutes] || 0) >= floor; });
+    cache = view.pct[key] = { n: peers.length, vals: {} };
+    metrics.forEach(function (m) {
+      if (I[m.key] === undefined) return;
+      cache.vals[m.key] = peers.map(function (r) { return r[I[m.key]]; }).filter(isNum).sort(function (a, b) { return a - b; });
+    });
+  }
+  var out = {};
+  metrics.forEach(function (m) {
+    if ((m.scope === 'gk' && pos !== 'G') || (m.scope === 'out' && pos === 'G')) return;
+    var vals = cache.vals[m.key], v = I[m.key] === undefined ? null : row[I[m.key]];
+    if (!vals || vals.length < 3 || !isNum(v)) return;
+    var lo = 0, hi = vals.length;
+    while (lo < hi) { var mid = (lo + hi) >> 1; if (vals[mid] < v) lo = mid + 1; else hi = mid; }
+    var up = lo; while (up < vals.length && vals[up] === v) up++;
+    var rank = (lo + 0.5 * (up - lo)) / vals.length;
+    out[m.key] = Math.round(100 * (m.lower ? 1 - rank : rank));
+  });
+  return out;
 }
 /* Only 1 in 8 clubs has a crest file: data/crests.json (written by the build) lists the ids that do, and any
    other id gets the monogram without a request. Until the list loads, no crest is requested. */
@@ -830,6 +902,7 @@ return {
   comps: comps, comp: comp, familyOf: familyOf, compName: compName, hasFile: hasFile, compFile: compFile, compFiles: compFiles,
   currentSeason: currentSeason, isLastEdition: isLastEdition, shortSeason: shortSeason, seasonsOf: seasonsOf, loadPastSeason: loadPastSeason,
   clubsIndex: clubsIndex, hasCrest: hasCrest, clubRow: clubRow, clubName: clubName, peopleIndex: peopleIndex, crestUrl: crestUrl, tidFromCrest: tidFromCrest,
+  personId: personId, labIndex: labIndex, labView: labView, labScopeName: labScopeName, labScopeOptions: labScopeOptions, labWindowText: labWindowText, labPct: labPct, LAB_SCOPES: LAB_SCOPES,
   isNum: isNum, esc: esc, num: num, int: int, pct: pct, signed: signed, money: money, fmtMetric: fmtMetric, parseDate: parseDate,
   fmtDate: fmtDate, fmtTime: fmtTime, fmtStamp: fmtStamp, localDay: localDay, today: today, relDay: relDay, ordinal: ordinal, ageOf: ageOf,
   median: median, sum: sum, wavg: wavg, initials: initials, surname: surname, eraKey: eraKey, eraLabel: eraLabel, MONTHS: MONTHS, DAYS: DAYS,

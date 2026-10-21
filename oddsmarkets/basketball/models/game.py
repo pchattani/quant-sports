@@ -27,6 +27,10 @@ rating and home terms); the calibration (`fit_from_rows`, walk-forward) removes 
 (NBA: about 2 points low in the regular season and 3 to 10 high in the playoffs; docs/research/basketball_edge.md).
 The calibration shift is split equally between pts_h and pts_a.
 
+In the NBA, `predict` returns the market-informed model's line instead (`models/informed.py`: market ratings from
+earlier closing lines, availability, fitted to closing spreads) when `ctx["informed"]` carries its inputs
+(`informed.inputs_for_game`); "model" says which ("base" / "informed") and "base" keeps the base line.
+
 A market spread converts to a probability with `spread_to_p`: p = Phi(-spread_home / sigma_m),
 sigma_m fitted as the sd of (margin + spread_home) over history (default = sigma).
 """
@@ -252,10 +256,39 @@ def predict(home: str, away: str, date: Any, ctx: dict) -> dict:
     total = float(prm.get("total_a", 0.0)) + float(prm.get("total_b", 1.0)) * raw_total + float(prm.get("total_post", 0.0)) * post
     pts_h += (total - raw_total) / 2
     pts_a += (total - raw_total) / 2
-    return {"p_home": p, "margin": mu, "sd": sd, "total": total, "spread_fair": -mu,
-            "pts_home": pts_h, "pts_away": pts_a, "total_raw": raw_total,
-            "detail": {"rating": rating, **terms, "injury": injury, "injury_home": ih, "injury_away": ia,
-                       "pace": pace_g, **f.get("detail", {})}}
+    out = {"p_home": p, "margin": mu, "sd": sd, "total": total, "spread_fair": -mu,
+           "pts_home": pts_h, "pts_away": pts_a, "total_raw": raw_total, "model": "base",
+           "detail": {"rating": rating, **terms, "injury": injury, "injury_home": ih, "injury_away": ia,
+                      "pace": pace_g, **f.get("detail", {})}}
+    inf = ctx.get("informed")
+    if inf:
+        from oddsmarkets.basketball.models import informed as INF
+        fit = ctx.get("informed_fit") or (INF.fitted(league) if INF.enabled(league) else None)
+        if fit:
+            out = _informed(out, INF.predict(inf, f, th, ta, L, P, neutral, ctx.get("stype"), fit), inf, fit, neutral)
+    return out
+
+
+def _informed(base: dict, r: dict, inp: dict, fit: dict, neutral: bool) -> dict:
+    """The market-informed model's line (models/informed.py) in `predict`'s shape. The margin parts keep the base
+    model's keys so the game page's breakdown still sums to the margin: "rating" = team ratings + market ratings
+    (without the market's home edge), "hca" = home court (both models' home terms and the constants), "injury" =
+    availability (expected rotation, injury-report Outs), the schedule terms as fitted."""
+    t = r["terms"]
+    b_mk = float(fit["spread"].get("mk_mu", 0.0))
+    mk_home = b_mk * float(inp["mk_h"]) * (0.0 if neutral else 1.0)
+    det = dict(base["detail"])
+    det.update({"rating": t["rating"] + t["mk_mu"] - mk_home,
+                "hca": t["hca"] + mk_home + float(fit["spread"].get("const", 0.0)) + float(fit["cal_c0"]),
+                "b2b": t["b2b"], "rest": t["rest"], "travel": t["travel_1000km"], "tz": t["tz"], "altitude": t["altitude"],
+                "injury": t["x_av"], "injury_home": None, "injury_away": None,
+                "market_rating": t["mk_mu"], "team_rating": t["rating"], "availability": t["x_av"],
+                "n_lines": inp.get("n_lines")})
+    mu, sd = r["margin"], r["sd"]
+    total = r.get("total", base["total"])
+    return {**base, "p_home": r["p_home"], "margin": mu, "sd": sd, "spread_fair": -mu, "total": total,
+            "pts_home": total / 2 + mu / 2, "pts_away": total / 2 - mu / 2, "model": "informed",
+            "base": {"p_home": base["p_home"], "margin": base["margin"], "total": base["total"]}, "detail": det}
 
 
 # ── walk-forward rows and fitting ────────────────────────────────────────────

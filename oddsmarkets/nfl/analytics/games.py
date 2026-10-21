@@ -9,7 +9,10 @@ Page: pre-game (model win / spread / total and score distribution, market, line 
 weather, unit matchups), score by quarter, drives with result and EPA, the play table with our EPA / WP against
 nflfastR's and ESPN's, the win-probability chart, every fourth down with the recommendation and the WP lost, the box
 score with advanced and NGS stats, key plays and game awards. A page is never downgraded: when this machine has no
-play-by-play for the game (CI before nflverse publishes it) the previous page's play-level blocks are kept.
+play-by-play for the game (CI before nflverse publishes it) the previous page's nflverse blocks are kept; a game nflverse
+has not published yet is built from ESPN's record (plays, ESPN and our live WP, drives, score by quarter and ESPN's box
+score, source "espn"), replaced by the nflverse blocks on the first build after nflverse publishes (the page signature
+counts the game's nflverse plays).
 """
 from __future__ import annotations
 
@@ -179,9 +182,11 @@ def _espn_join(df: pd.DataFrame, ep: list | None) -> pd.Series:
     e.columns = ["seq", "qtr", "clock_s", "team", "down", "dist", "yl100", "type", "text", "hsc", "asc", "wp"][:e.shape[1]]
     if "wp" not in e:
         return pd.Series(np.nan, index=df.index)
-    e = e.assign(t=pd.to_numeric(e["qtr"], errors="coerce") * 1000 - pd.to_numeric(e["clock_s"], errors="coerce"))
+    # both keys float: ESPN's whole-number quarters and clocks parse as int64, and merge_asof refuses mixed key dtypes
+    # (every CI page of week 6, 2026, failed on it once the ESPN summaries were cached)
+    e = e.assign(t=(pd.to_numeric(e["qtr"], errors="coerce") * 1000 - pd.to_numeric(e["clock_s"], errors="coerce")).astype(float))
     e = e.dropna(subset=["t"]).sort_values("t")
-    d = pd.DataFrame({"i": df.index, "t": num(df, "qtr") * 1000 - num(df, "quarter_seconds_remaining")}).dropna().sort_values("t")
+    d = pd.DataFrame({"i": df.index, "t": (num(df, "qtr") * 1000 - num(df, "quarter_seconds_remaining")).astype(float)}).dropna().sort_values("t")
     if not len(d) or not len(e):
         return pd.Series(np.nan, index=df.index)
     m = pd.merge_asof(d, e[["t", "wp"]], on="t", direction="backward")
@@ -455,23 +460,142 @@ def build_page(ctx: SeasonContext, g: dict, G: pd.DataFrame | None, crd: dict, p
     sm = espn_summary(g) if g.get("status") != "final" or not (old or {}).get("injuries") else None
     out["injuries"] = g.get("injuries") or (sm or {}).get("injuries") or (injuries or {}).get(g["game_id"]) or (old or {}).get("injuries")
     out["espn_predictor"] = (sm or {}).get("predictor") or (old or {}).get("espn_predictor")
+    ep = espn_plays(g) if G is None or not len(G) else None
     if G is not None and len(G):
         plays, wp, G2 = plays_block(G, g)
         out.update(plays=plays, wp=wp, drives=drives_block(G2), score=quarters(G2, g), fourth_downs=fourth_block(G2),
                    box=box_block(G2, g, names, ngs_w), key_plays=key_plays(G2), awards=game_awards(G2, g, names), source="nflverse")
-    elif old and old.get("plays"):
+    elif old and old.get("plays") and (old.get("source") == "nflverse" or not ep):
         for k in ("plays", "wp", "drives", "score", "fourth_downs", "box", "key_plays", "awards", "source"):
             out[k] = old.get(k)
     else:
-        ep = espn_plays(g)
+        # nflverse has not published the week yet: the page is built from ESPN's record (plays, drives, ESPN and our
+        # live WP, score by quarter, ESPN's box score); the next build after nflverse publishes replaces it
         out.update(plays=None, wp=None, drives=None, score=None, fourth_downs=[], box=None, key_plays=[], awards=None,
                    source="espn" if ep else None)
         if ep:
-            out["espn_plays"] = {"cols": ["seq", "qtr", "clock_s", "team", "down", "dist", "yl100", "type", "text", "home_score",
-                                          "away_score", "wp_home"], "rows": ep}
             from oddsmarkets.nfl.analytics import adapters
             pre = (pregame or {}).get("model") or (crd or {}).get("model")
             ser = adapters.live_series(ctx, g, {"plays": ep}, pre)
-            if ser:
-                out["wp"] = {"cols": ["seq", "wp_home_ours", "wp_home_espn"], "rows": ser, "source": "espn live record"}
+            out.update(espn_blocks(g, ep, espn_summary(g) or {}, ser))
     return out
+
+
+ESPN_DRIVE_RESULT = {"TD": "Touchdown", "FG": "Field goal", "PUNT": "Punt", "INT": "Interception", "FUMBLE": "Fumble",
+                     "DOWNS": "Turnover on downs", "MISSED FG": "Missed field goal", "BLOCKED FG": "Blocked field goal",
+                     "BLOCKED PUNT": "Blocked punt", "END OF HALF": "End of half", "END OF GAME": "End of game", "SAFETY": "Safety",
+                     "FG MISSED": "Missed field goal", "END OF 4TH QUARTER": "End of game"}
+
+
+def _pair(v: Any, sep: str = "/") -> tuple[int | None, int | None]:
+    """'20/30' -> (20, 30); '3-25' with sep '-' -> (3, 25)."""
+    try:
+        a, b = str(v).split(sep, 1)
+        return an.inum(a), an.inum(b)
+    except (ValueError, AttributeError):
+        return None, None
+
+
+def _game_seconds(qtr: Any, clock_s: Any) -> int | None:
+    q, c = an.inum(qtr), an.inum(clock_s)
+    if q is None or c is None:
+        return None
+    return (4 - q) * 900 + c if q <= 4 else c
+
+
+def espn_box(g: dict, sm: dict, xwalk: dict | None = None) -> dict | None:
+    """ESPN's box score in the nflverse box's shape ({"home"|"away": {passing, rushing, receiving, defense, kicking,
+    punting, team}}); pid is the gsis id when the crosswalk knows the ESPN athlete, else None (the name always shows)."""
+    bx = sm.get("box") or {}
+    if not bx:
+        return None
+    xw = xwalk or {}
+    out: dict[str, Any] = {}
+    for side in ("home", "away"):
+        t = bx.get(g.get(side)) or {}
+        pl = t.get("players") or {}
+
+        def rows(cat):
+            c = pl.get(cat) or {}
+            keys = c.get("keys") or []
+            for r in c.get("rows") or []:
+                yield {"pid": xw.get(str(r[0])), "name": r[1]}, dict(zip(keys, r[2:]))
+        blk: dict[str, Any] = {}
+        blk["passing"] = []
+        for head, s in rows("passing"):
+            cmp_, att = _pair(s.get("completions/passingAttempts"))
+            blk["passing"].append({**head, "cmp": cmp_, "att": att, "yds": an.inum(s.get("passingYards")), "td": an.inum(s.get("passingTouchdowns")),
+                                   "int": an.inum(s.get("interceptions")), "sacks": _pair(s.get("sacks-sackYardsLost"), "-")[0]})
+        blk["rushing"] = [{**head, "car": an.inum(s.get("rushingAttempts")), "yds": an.inum(s.get("rushingYards")),
+                           "td": an.inum(s.get("rushingTouchdowns"))} for head, s in rows("rushing")]
+        blk["receiving"] = [{**head, "tgt": an.inum(s.get("receivingTargets")), "rec": an.inum(s.get("receptions")),
+                             "yds": an.inum(s.get("receivingYards")), "td": an.inum(s.get("receivingTouchdowns"))} for head, s in rows("receiving")]
+        ints = {h["name"]: an.inum(s.get("interceptions")) for h, s in rows("interceptions")}
+        dfn = []
+        for head, s in rows("defensive"):
+            dfn.append({**head, "tkl": an.inum(s.get("totalTackles")), "sacks": an.fnum(s.get("sacks")), "tfl": an.inum(s.get("tacklesForLoss")),
+                        "pd": an.inum(s.get("passesDefended")), "hits": an.inum(s.get("QBHits")), "int": ints.get(head["name"]) or 0})
+        blk["defense"] = sorted(dfn, key=lambda x: -((x["tkl"] or 0) + 3 * (x["sacks"] or 0) + 3 * (x["int"] or 0)))[:12]
+        kick = []
+        for head, s in rows("kicking"):
+            fgm, fga = _pair(s.get("fieldGoalsMade/fieldGoalAttempts"))
+            xpm, _ = _pair(s.get("extraPointsMade/extraPointAttempts"))
+            kick.append({**head, "fgm": fgm, "fga": fga, "xpm": xpm})
+        blk["kicking"] = kick
+        blk["punting"] = [{**head, "punts": an.inum(s.get("punts")), "yds": an.inum(s.get("puntYards"))} for head, s in rows("punting")]
+        ts = {k: v for k, v in t.get("team") or []}
+        third = _pair(ts.get("thirdDownEff"), "-")
+        pen = _pair(ts.get("totalPenaltiesYards"), "-")
+        blk["team"] = {"plays": an.inum(ts.get("totalOffensivePlays")), "yards": an.inum(ts.get("totalYards")), "epa": None, "epa_play": None,
+                       "success": None, "pass_epa": None, "rush_epa": None,
+                       "third_down": [third[0], third[1]] if third[1] is not None else None, "turnovers": an.inum(ts.get("turnovers")),
+                       "penalties": pen[0], "penalty_yds": pen[1], "proe": None}
+        out[side] = blk
+    return out if any((out.get(s) or {}).get("passing") for s in ("home", "away")) else None
+
+
+def espn_blocks(g: dict, ep: list, sm: dict, ser: list | None = None) -> dict:
+    """The play-level blocks of a game page from ESPN's record, in the nflverse blocks' shapes (EPA, fourth-down
+    grades and game balls need nflverse and stay empty)."""
+    home = g.get("home")
+    ours = {an.inum(r[0]): an.fnum(r[1]) for r in ser or [] if isinstance(r, (list, tuple)) and len(r) >= 2}
+    P = [p for p in ep if isinstance(p, (list, tuple)) and len(p) >= 12]
+    rows, wps = [], []
+    for i, p in enumerate(P):
+        seq, qtr, clk, team, down, dist, yl, typ, text, hsc, asc, w = p[:12]
+        w_prev = an.fnum(P[i - 1][11]) if i else None
+        dw = (an.fnum(w) - w_prev) if an.fnum(w) is not None and w_prev is not None else None
+        wpa = None if dw is None or not team else (dw if team == home else -dw)
+        gs = _game_seconds(qtr, clk)
+        o = ours.get(an.inum(seq))
+        rows.append([an.inum(qtr), _clock(clk), team, an.inum(down) or None, an.inum(dist), an.inum(yl), typ, text, None, an.rnd(wpa, 4),
+                     an.rnd(o, 4), an.rnd(w, 4), None, None, [], an.inum(seq), gs, None, None, an.inum(hsc), an.inum(asc)])
+        wps.append([gs, an.rnd(o, 4), None, an.rnd(w, 4), i])
+    drives = []
+    for n, d in enumerate(sm.get("drives") or [], start=1):
+        res = str(d.get("result") or "").strip()
+        res = ESPN_DRIVE_RESULT.get(res.upper(), res.title() if res.isupper() else res) or None
+        s, y = an.inum(d.get("start_yl100")), an.inum(d.get("yards"))
+        end = 0 if res == "Touchdown" else (max(0, min(100, s - y)) if s is not None and y is not None else None)
+        drives.append([n, d.get("team"), an.inum(d.get("start_q")), _clock(d.get("start_clock")), s, end, an.inum(d.get("plays")), y, res,
+                       None, d.get("elapsed"), None, None, None])
+    ls = sm.get("linescores") or {}
+    if ls.get("home") and ls.get("away") and len(ls["home"]) == len(ls["away"]):
+        score = {"home": [int(x) for x in ls["home"]], "away": [int(x) for x in ls["away"]]}
+    else:                                                        # by quarter from the running score of the plays
+        score, ph, pa = {"home": [], "away": []}, 0, 0
+        for q in sorted({r[0] for r in rows if r[0] is not None}):
+            qr = [r for r in rows if r[0] == q and r[19] is not None]
+            h, a = (max(r[19] for r in qr), max(r[20] for r in qr)) if qr else (ph, pa)
+            score["home"].append(h - ph)
+            score["away"].append(a - pa)
+            ph, pa = h, a
+    kp = sorted((r for r in rows if r[9] is not None), key=lambda r: -abs(r[9]))[:8]
+    key = [{"play_id": r[15], "qtr": r[0], "clock": r[1], "team": r[2], "desc": r[7], "wpa": r[9], "epa": None,
+            "wp_home_before": None, "wp_home_after": r[11]} for r in kp]
+    from oddsmarkets.nfl.analytics import people
+    return {"plays": {"cols": PLAY_COLS + EXTRA_PLAY_COLS, "rows": rows},
+            "wp": {"cols": ["game_seconds_remaining", "wp_home_ours", "wp_home_nflfastr", "wp_home_espn", "play_index"], "rows": wps,
+                   "source": "espn"},
+            "drives": {"cols": DRIVE_COLS, "rows": drives}, "score": score, "fourth_downs": [], "key_plays": key,
+            "box": espn_box(g, sm, people.espn_xwalk()), "awards": None, "source": "espn"}

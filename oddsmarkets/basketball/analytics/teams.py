@@ -371,7 +371,37 @@ def build(ctx: SeasonContext, players_cat: dict | None = None, lineup_tables: di
     for t, r in rows.items():
         out_teams[t].update({"values": r["values"], "pct": r["pct"], "rank": r["rank"]})
     return {"ok": True, "league": league, "season": season, "updated_at": an.now(), "metrics": METRICS, "groups": GROUPS,
-            "teams": out_teams}
+            "teams": out_teams, "names": _names(ctx, out_teams, pcat)}
+
+
+def _names(ctx: SeasonContext, out_teams: dict, pcat: dict) -> dict[str, str]:
+    """{pid: name} for every player the team pages list (lineups, rotations, rosters, injuries) who is not in the season's
+    player catalogue (players.json keeps the players above its minutes floor only): without it the page shows the id."""
+    ids: set[str] = set()
+
+    def walk(o, key=None):
+        if isinstance(o, dict):
+            for k, v in o.items():
+                if k in ("id", "pid") and isinstance(v, (str, int)) and not isinstance(v, bool):
+                    ids.add(str(v))
+                if str(k).isdigit():                         # tables keyed by player (on_off)
+                    ids.add(str(k))
+                walk(v, k)
+        elif isinstance(o, list):
+            for v in o:
+                if key == "players" and isinstance(v, (str, int)) and not isinstance(v, bool):
+                    ids.add(str(v))
+                walk(v, key)
+    walk(out_teams)
+    people = ctx.players or {}
+    out = {}
+    for pid in sorted(ids):
+        if (pcat.get(pid) or {}).get("name"):
+            continue
+        nm = (people.get(pid) or {}).get("name")
+        if nm:
+            out[pid] = nm
+    return out
 
 
 def _pregame(ctx: SeasonContext, df) -> dict[str, dict[str, float]]:
