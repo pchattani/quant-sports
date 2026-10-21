@@ -7,9 +7,11 @@ priced through the exact match chain (`match_chain.py`).
    probabilities p_i = point_prob_from_hold(h_i) feed the chain, giving sr_p = P(player 1 wins).
 2. Elo: elo_p = elo.p_win(r1, r2, surface, best_of, params).
 3. Blend at the win-probability logit with fitted weights (no intercept; the model is symmetric):
-       logit p = w_elo * logit(elo_p) + w_sr * logit(sr_p) + w_gelo * gelo_diff
+       logit p = w_elo * logit(elo_p) + w_sr * logit(sr_p) + w_gelo * gelo_diff + w_mr * mr_diff
    where gelo_diff is the game-share Elo difference (gelo.py, a margin-of-victory rating; 0 when either player
-   has never been rated). w_gelo is 0 (the term off) unless the committed fit carries it.
+   has never been rated) and mr_diff the market-rating difference on the match's logit scale (mrating.py: the
+   players' strengths learnt from earlier matches' closing prices and results; a player never seen takes the
+   unranked prior). w_gelo / w_mr are 0 (the term off) unless the committed fit carries them.
    `blend_w` = w_elo / (w_elo + w_sr) is the Elo share and w_elo + w_sr the sharpness. The weights are
    fitted by maximum likelihood on walk-forward predictions (backtest.py) and committed per tour in
    models/fitted/predict_<tour>.json; DEFAULT_BLEND applies until then.
@@ -92,31 +94,40 @@ def blend_params(tour: str) -> dict:
     f = _io.read_json(_io.FITTED / f"predict_{t}.json")
     if isinstance(f, dict) and "w_elo" in f and "w_sr" in f:
         return {"w_elo": float(f["w_elo"]), "w_sr": float(f["w_sr"]), "w_gelo": float(f.get("w_gelo") or 0.0),
+                "w_mr": float(f.get("w_mr") or 0.0),
                 "sigma": float(f["sigma"]) if f.get("sigma") is not None else DEFAULT_BLEND[t]["sigma"],
                 "version": f.get("version", VERSION), "fitted": True}
     return {**DEFAULT_BLEND[t], "version": VERSION, "fitted": False}
 
 
-def blend(elo_p, sr_p, w_elo: float, w_sr: float, gdiff=None, w_gelo: float = 0.0):
+def blend(elo_p, sr_p, w_elo: float, w_sr: float, gdiff=None, w_gelo: float = 0.0, mdiff=None, w_mr: float = 0.0):
     z = w_elo * logit(elo_p) + w_sr * logit(sr_p)
     if gdiff is not None and w_gelo:
         z = z + w_gelo * np.asarray(gdiff, float)
+    if mdiff is not None and w_mr:
+        z = z + w_mr * np.asarray(mdiff, float)
     return sigmoid(z)
 
 
 def fit_blend(elo_p: Iterable[float], sr_p: Iterable[float], y: Iterable[int], ridge: float = 1e-3,
-              gdiff: Iterable[float] | None = None) -> dict:
-    """Max-likelihood (w_elo, w_sr[, w_gelo]) for logit p = w_elo logit(elo) + w_sr logit(sr) [+ w_gelo gdiff]
-    (Newton, tiny ridge). Without `gdiff` the result is the two-weight blend (no "w_gelo" key)."""
+              gdiff: Iterable[float] | None = None, mdiff: Iterable[float] | None = None) -> dict:
+    """Max-likelihood (w_elo, w_sr[, w_gelo][, w_mr]) for logit p = w_elo logit(elo) + w_sr logit(sr)
+    [+ w_gelo gdiff] [+ w_mr mdiff] (Newton, tiny ridge). Without `gdiff` / `mdiff` the result has no "w_gelo" /
+    "w_mr" key."""
     cols = [logit(list(elo_p)), logit(list(sr_p))]
+    names = ["w_elo", "w_sr"]
     if gdiff is not None:
         cols.append(np.asarray(list(gdiff), float))
+        names.append("w_gelo")
+    if mdiff is not None:
+        cols.append(np.asarray(list(mdiff), float))
+        names.append("w_mr")
     X = np.column_stack(cols)
     k = X.shape[1]
     yy = np.asarray(list(y), float)
     if len(yy) < 50:
         return {"w_elo": None, "w_sr": None, "n": int(len(yy))}
-    w = np.array([0.5, 0.5, 0.0][:k])
+    w = np.array([0.5, 0.5] + [0.0] * (k - 2))
     for _ in range(50):
         p = sigmoid(X @ w)
         g = X.T @ (yy - p) - ridge * w
@@ -128,8 +139,8 @@ def fit_blend(elo_p: Iterable[float], sr_p: Iterable[float], y: Iterable[int], r
     p = np.clip(sigmoid(X @ w), 1e-4, 1 - 1e-4)
     ll = float(-np.mean(yy * np.log(p) + (1 - yy) * np.log(1 - p)))
     out = {"w_elo": float(w[0]), "w_sr": float(w[1]), "n": int(len(yy)), "logloss": round(ll, 5)}
-    if k == 3:
-        out["w_gelo"] = float(w[2])
+    for nm, v in zip(names[2:], w[2:]):
+        out[nm] = float(v)
     return out
 
 
@@ -150,15 +161,16 @@ class Context:
     Build with `context(tour, date)` or pass pieces explicitly (tests, backtests):
         elo_ratings {pid: {"all","hard","clay","grass","n"}}, elo_params, elo_mod (with p_win),
         sr_model (serve_return.fit output), sr_mod (with hold_prob, point_prob_from_hold),
-        blend {"w_elo","w_sr"[,"w_gelo"]}, gelo_ratings {pid: {"all","hard","clay","grass"}} and gelo_params
-        (gelo.py); or a `p_srv_fn(p1, p2, surface, level, best_of) -> (pa, pb)`, `elo_fn(p1, p2, surface,
-        best_of) -> p` and `gelo_fn(p1, p2, surface) -> diff` overriding the modules.
+        blend {"w_elo","w_sr"[,"w_gelo"][,"w_mr"]}, gelo_ratings {pid: {"all","hard","clay","grass"}} and
+        gelo_params (gelo.py), mr_states {pid: state} and mr_params (mrating.py); or a `p_srv_fn(p1, p2, surface,
+        level, best_of) -> (pa, pb)`, `elo_fn(p1, p2, surface, best_of) -> p`, `gelo_fn(p1, p2, surface) -> diff`
+        and `mr_fn(p1, p2, surface, best_of) -> scaled diff` overriding the modules.
     """
 
     def __init__(self, tour: str, when: Any = None, elo_ratings: dict | None = None, elo_params: dict | None = None,
                  elo_mod=None, sr_model: dict | None = None, sr_mod=None, blend: dict | None = None,
                  p_srv_fn=None, elo_fn=None, gelo_ratings: dict | None = None, gelo_params: dict | None = None,
-                 gelo_fn=None):
+                 gelo_fn=None, mr_states: dict | None = None, mr_params: dict | None = None, mr_fn=None):
         self.tour = _io.tour_key(tour)
         self.date = _io.day(when)
         self.elo_ratings = elo_ratings
@@ -172,6 +184,20 @@ class Context:
         self.gelo_ratings = gelo_ratings
         self.gelo_params = gelo_params
         self.gelo_fn = gelo_fn
+        self.mr_states = mr_states
+        self.mr_params = mr_params
+        self.mr_fn = mr_fn
+
+    # market rating, on the match's logit scale (0 when unavailable: the blend then has no market term)
+    def mr_diff(self, p1: str, p2: str, surface: str, best_of: int) -> float:
+        if self.mr_fn is not None:
+            v = self.mr_fn(p1, p2, surface, best_of)
+            return float(v) if v is not None and math.isfinite(v) else 0.0
+        if self.mr_states is None:
+            return 0.0
+        from oddsmarkets.tennis.models import mrating as MRt
+        prm = self.mr_params or MRt.params(self.tour)
+        return MRt.scale(best_of, prm) * MRt.diff(self.mr_states.get(p1), self.mr_states.get(p2), surface, prm)
 
     # game-share Elo (0 when unavailable: the blend then reduces to Elo + serve/return)
     def gelo_diff(self, p1: str, p2: str, surface: str) -> float:
@@ -242,6 +268,18 @@ def _sr_state(tour: str, when) -> tuple:
         return None, None
 
 
+def _mr_state(tour: str) -> tuple:
+    """(current market-rating states, params); (None, None) when unavailable. Current = after every match on
+    disk (finished matches are priced from their exact pre-match values by the site, analytics/matches.py)."""
+    try:
+        from oddsmarkets.tennis.models import mrating as MRt
+        hist = MRt.history(tour)
+        return hist.get("current") or {}, hist.get("params") or MRt.params(tour)
+    except Exception as exc:  # noqa: BLE001
+        logger.info("tennis predict: market rating state failed (%s)", exc)
+        return None, None
+
+
 def _gelo_state(tour: str, when) -> tuple:
     """(ratings before `when`, params) of the game-share Elo; (None, None) when unavailable."""
     try:
@@ -268,6 +306,8 @@ def context(tour: str, when: Any = None, **kw) -> Context:
     gk: dict = {}
     if "gelo_ratings" not in kw and "gelo_fn" not in kw:
         gk["gelo_ratings"], gk["gelo_params"] = _gelo_state(t, d)
+    if "mr_states" not in kw and "mr_fn" not in kw and blend_params(t).get("w_mr"):
+        gk["mr_states"], gk["mr_params"] = _mr_state(t)
     ctx = Context(t, d, elo_ratings=rt, elo_params=prm, elo_mod=E, sr_model=srm, sr_mod=S, **gk, **kw)
     if not kw:
         _CTX[key] = ctx
@@ -292,6 +332,9 @@ def predict_many(ctx: Context, rows: list[dict], with_dist: bool = True, shift: 
     pa, pb = np.zeros(n), np.zeros(n)
     elo = np.full(n, np.nan)
     gd = np.array([ctx.gelo_diff(r["p1"], r["p2"], r.get("surface")) for r in rows]) if w_g else np.zeros(n)
+    w_m = float(ctx.blend.get("w_mr") or 0.0)
+    md = (np.array([ctx.mr_diff(r["p1"], r["p2"], r.get("surface"), 5 if int(r.get("best_of") or 3) == 5 else 3)
+                    for r in rows]) if w_m else np.zeros(n))
     has_sr = np.zeros(n, bool)
     for i, r in enumerate(rows):
         bo = 5 if int(r.get("best_of") or 3) == 5 else 3
@@ -317,7 +360,7 @@ def predict_many(ctx: Context, rows: list[dict], with_dist: bool = True, shift: 
         e = elo[ix]
         hs = has_sr[ix]
         he = np.isfinite(e)
-        p = np.where(he & hs, blend(np.where(he, e, 0.5), sr_p, w_elo, w_sr, gd[ix], w_g),
+        p = np.where(he & hs, blend(np.where(he, e, 0.5), sr_p, w_elo, w_sr, gd[ix], w_g, md[ix], w_m),
                      np.where(he, np.where(he, e, 0.5), np.where(hs, sr_p, 0.5)))
         # the serve-point edge that reproduces the blended P(win) (skipped when only probabilities are wanted)
         delta = mc.solve_shift(p, pa[ix], pb[ix], bo, rule) if (shift or with_dist) else np.zeros(len(ix))
@@ -338,7 +381,8 @@ def predict_many(ctx: Context, rows: list[dict], with_dist: bool = True, shift: 
                       "p_srv_sr": [float(pa[i]), float(pb[i])] if has_sr[i] else None,
                       "elo_p": float(e[k]) if he[k] else None, "sr_p": float(sr_p[k]) if hs[k] else None,
                       "blend_w": round(w_elo / (w_elo + w_sr), 4) if (w_elo + w_sr) else None,
-                      "blend": {"w_elo": w_elo, "w_sr": w_sr, "w_gelo": w_g}, "gelo_diff": float(gd[i]), "basis": "blend" if (he[k] and hs[k]) else
+                      "blend": {"w_elo": w_elo, "w_sr": w_sr, "w_gelo": w_g, "w_mr": w_m}, "gelo_diff": float(gd[i]),
+                      "mr_diff": float(md[i]), "basis": "blend" if (he[k] and hs[k]) else
                       ("elo" if he[k] else ("serve_return" if hs[k] else "none")),
                       "best_of": bo, "final_set_rule": rule, "dist": d, "version": VERSION}
     return out  # type: ignore[return-value]

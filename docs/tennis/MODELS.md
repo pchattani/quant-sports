@@ -52,6 +52,7 @@ Contents
 | Surface Elo | `elo.py` | constants: `fitted/elo_params_<tour>.json` (2005–2019 log-loss); ratings sequential | half of every match price, Elo pages, draw difficulty, wins over expected |
 | Serve/return | `serve_return.py` | constants: `fitted/serve_return_<tour>.json`; fits redone per date from the stores | the other half of the price, hold/break and serve-point metrics, the chain's serve level |
 | Game-share Elo | `gelo.py` | constants `gelo.PARAMS` (dev years 2012–2017, docs/research/tennis_edge.md); ratings sequential | the blend's third term (margin of victory), H2H page |
+| Market rating | `mrating.py` | constants `mrating.PARAMS` (dev years 2012–2017); states from earlier matches' closes and results | the blend's fourth term (section 2.2); not on the H2H page |
 | WTA point layer | `serve_return.py` (`stats=True`) | in the same fit, WTA only | sharper WTA strengths, calibrated hold and SPW, real-stat expectations |
 | Match chain | `match_chain.py` | no parameters | win, set-score, games, handicap, tiebreak probabilities; live WP |
 | Blend and σ | `predict.py` | `fitted/predict_<tour>.json` (backtest) | the match price |
@@ -122,6 +123,47 @@ Walkovers and matches without games are skipped. K and w per tour (ATP 0.06 / 0.
 the dev years 2012–2017 only, over the grid K ∈ {0.06, 0.12, 0.24} × w ∈ {0.2, 0.4, 0.6}. Out of sample (2018–2025)
 adding it to the blend cut log-loss by 0.0024 (ATP) and 0.0046 (WTA), with 95 % CIs excluding zero. `history(tour)` is
 cached under `ACE_CACHE/gelo/` (the build's `TourData.gelo` under `ace_gelo`); about 3 s per tour.
+
+### 2.2 Market rating: `mrating.py` (added 21 October 2026; in the ATP price, WTA pending its refit)
+
+Each player's strength as the betting market priced it, learnt from the **closing prices of matches already
+played** (tennis-data's Pinnacle, else Betfair exchange, else market average, Bet365, Max; power de-vig; a book whose
+margin is outside 0-12 % is skipped) and from results. It is a Kalman filter on the logit scale: an overall rating R
+(variance P) and a surface offset D (variance Q) per player.
+
+```
+before a match on surface S, best of b:   d = (R_i + D_i,S) - (R_j + D_j,S),  p = sigmoid(s_b d),  V = P_i + Q_i,S + P_j + Q_j,S
+after it, 1. its close (if any):           e = logit(p_close) / s_b - d;  each state += (its variance / (V + r_obs)) e
+                                           (signs by side); variances shrink the Kalman way
+          2. its result (done; ret/def at half weight; walkovers never):
+                                           shift = k_res s_b (y - p) / (1 + V s_b^2 p (1 - p)), each state += its variance x shift
+idle days:  P += q per day, Q += q_s per day (capped at the priors)
+new player: R = -c1 (ln rank - ln 100) (the MATCH row's rank, `unranked` without one), P = p0, D = 0, Q = ps0
+```
+
+Every match of a day is priced from the states at the end of the day before. The WTA stores hold some matches twice
+on one date under two events: the same match as a WTA 125 ("ch") row and a tour-level row, or in two seasons' stores
+across New Year (`shenzhen-2018-R32-...` and `shenzhen-2019-R32-...`, both 30 December 2018). A strictly sequential
+pass lets the twin's result into the price (WTA test years, the 4 % of matches with a same-day earlier match: 0.556
+log-loss against Pinnacle's 0.608). Elo, the game-share Elo and the serve/return fits run sequentially and carry the
+same leak on those rows (section 13, item 10).
+
+| Constant | ATP | WTA |
+|---|---|---|
+| q (rating variance per idle day), q_s (surface offset) | 0.001, 0.00003 | 0.002, 0.001 |
+| r_obs (noise of a close, logit²) | 0.3 | 0.5 |
+| k_res (result step) | 1.25 | 0.8 |
+| p0, ps0 (prior variances) | 4.0, 0.2 | 1.5, 0.05 |
+| c1 (rank prior slope), unranked | 1.0, 400 | 1.2, 800 |
+| s5 (best-of-five stretch) | 1.4 | – |
+
+The constants were chosen by a coordinate search on the dev years 2012–2017 (walk-forward log-loss of the full blend)
+and frozen before the test years 2018–2025 were scored (docs/research/tennis_edge.md, "Model-improvement program").
+`history(tour, matches)` returns `pre` (each match's pre-match d for its p1 and V) and `current` (every player's
+state); the build caches it under `ACE_CACHE/ace_mrating` (`TourData.mrating`, one pass, about 2 s per tour).
+`TourData.mr_pre(m)` gives a finished match its exact pre-match value and an upcoming one today's states (a player
+never rated takes the rank prior from the row). The tournament backtest takes the entrants' states before the event
+(`mrating.snapshots`). The match price uses w_mr · s_b · d (section 5).
 
 ---
 
@@ -352,8 +394,10 @@ match). Everything is exact, not simulated.
    server (chain scale), p_i = G⁻¹(h_i), and `sr_p` = the chain's P(win).
 2. **Elo**: `elo_p` = `elo.p_win(r1, r2, surface, best_of, params)`.
 3. **Blend** on the log-odds scale with no intercept (the model is symmetric):
-   `logit p = w_elo · logit(elo_p) + w_sr · logit(sr_p) + w_gelo · gelo_diff`, gelo_diff the game-share Elo
-   difference (section 2.1; 0 when either player was never rated, and `w_gelo` 0 when a fit does not carry it).
+   `logit p = w_elo · logit(elo_p) + w_sr · logit(sr_p) + w_gelo · gelo_diff + w_mr · mr_diff`, gelo_diff the
+   game-share Elo difference (section 2.1; 0 when either player was never rated, and `w_gelo` 0 when a fit does not
+   carry it), mr_diff the market-rating difference on the match's logit scale, s_b · d (section 2.2; a player never
+   rated takes the rank prior; `w_mr` 0 when a fit does not carry it).
    `blend_w` = w_elo / (w_elo + w_sr) is the Elo share among the two probability terms.
 4. **Shift**: δ (40 bisection steps) such that the chain at (p_A + δ, p_B − δ)
    returns p; the serve dominance p_A + p_B, which drives tiebreaks and total games,
@@ -367,8 +411,13 @@ match). Everything is exact, not simulated.
 |---|---|---|---|---|---|
 | `DEFAULT_BLEND` ATP | 0.55 | 0.45 | 0 | 0.03 | – |
 | `DEFAULT_BLEND` WTA | 0.6 | 0.4 | 0 | 0.03 | – |
-| `predict_atp.json` | 0.4924 | 0.2110 | 1.0511 | 0.04 | 41,491 matches 2010–2026, log-loss 0.5945 (was 0.6569 / 0.2879 / –, 0.5964) |
-| `predict_wta.json` | 0.4661 | 0.2896 | 0.7204 | 0.04 | 39,238 matches 2010–2026, log-loss 0.6011 (was 0.7041 / 0.2985 / –, 0.6049) |
+| `predict_atp.json` (21 Oct 2026) | −0.0294 | 0.0269 | 0.4552 | 0.04 | plus **w_mr 0.8400**; 41,601 matches 2010–2026, log-loss 0.5838 (the 3-term fit before: 0.4924 / 0.2110 / 1.0511, 0.5945; kept as "fundamental": 0.4929 / 0.2113 / 1.0492) |
+| `predict_wta.json` | 0.4661 | 0.2896 | 0.7204 | 0.04 | 39,238 matches 2010–2026, log-loss 0.6011 (was 0.7041 / 0.2985 / –, 0.6049); no w_mr yet (switch-on pending, docs/research/tennis_edge.md 10.6) |
+
+With the market rating (ATP) Elo's and serve/return's weights fall to about zero: the market rating carries the
+strength signal they carried; serve/return still sets the scoreline distributions through the chain. The
+"fundamental" block is the same blend fitted without the market term; the Value section (`value.blend_weights`) and
+`model.json`'s browser formula (the H2H page) use it.
 
 With the game-share term the two probability weights shrink (it carries part of the strength signal). The
 game-share term is added only in the full blend (Elo and serve/return both present). Fallbacks: without a serve/return
@@ -557,6 +606,11 @@ scored year and σ). Run by `scripts/tn_fit.py --backtest` or
 
 ### 10.2 Results (committed `calibration.json`, regenerated 2 October 2026 with the game-share term)
 
+**ATP, regenerated 21 October 2026 with the market rating** (41,601 matches; 39,012 with Pinnacle): model 0.5840
+log-loss / 0.2006 Brier over all, 0.5831 on the Pinnacle subset; the same blend without the market rating
+(`model_fund`) 0.5948 / 0.5940; Pinnacle 0.5703. Tournament title log-loss before the draw 0.0765 (0.0787 before).
+The WTA tables below are still the 2 October run. The ATP table below is the 2 October run, kept for comparison.
+
 **ATP, 2010–2026, 41,491 matches (39,012 with Pinnacle, 40,442 with an average price)**
 
 | Forecaster | log-loss, all | Brier, all | log-loss, Pinnacle subset |
@@ -696,8 +750,18 @@ recursive closures, but over small lists of ids, not arrays.
    VERIFY in `canon.py` and apply the 2025 points to every year.
 8. **Charted style data is a selected sample** weighted to big matches and well-known
    players, and is a career profile, not a season one.
-9. **The market beats the model**, as it should: Pinnacle's closing price is about
-   0.025 better in log-loss on both tours.
+9. **The market beats the model**, as it should. Since 21 October 2026 the price carries the market rating
+   (section 2.2), which cut the walk-forward gap to Pinnacle's close on the 2018–2025 test years from 0.026 to 0.014
+   (ATP) and, in the research run, from 0.017 to 0.012 (WTA; its switch-on is pending) nats per match; the rest is largely news and lower-level results the stores do
+   not have (docs/research/tennis_edge.md).
+10. **Same-day duplicates in the WTA stores.** Some matches are stored twice on one date under two events: as a
+   WTA 125 ("ch") row and a tour-level row, or in two seasons' stores across New Year. In the test years 2018–2025
+   about 250 scored WTA matches (1.4 %) have such a twin earlier in the (date, round, id) order, another 500 a genuine
+   same-day earlier match (double rounds, qualifying and main draw on one date). Elo, the game-share Elo and the
+   serve/return fits run sequentially and see the twin's result before pricing the scored row, which flatters the
+   WTA backtest on those rows (Elo 0.48 log-loss against Pinnacle's 0.58-0.59 there; about 0.002 nats on the whole
+   WTA test set). The market rating prices each day from the states at the end of the day before and does not
+   leak. The fix belongs in the store merge (one row per match); ATP shows no such effect.
 
 ---
 

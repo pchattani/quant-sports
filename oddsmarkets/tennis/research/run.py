@@ -12,6 +12,12 @@ start of the match) and:
   beat Pinnacle's close, which makes "Max-odds shopping against Pinnacle fair" the closing-time test.
 * Kalshi (from June 2025) gives a genuinely earlier decision time ("open", "late": kalshi_edge.py), judged against
   tennis-data's later close.
+
+Model-improvement program (21 Oct 2026): the MRATING specs add the market rating (models/mrating.py: a Kalman
+filter on earlier matches' de-vigged closes and results) to the production blend P0 (Elo + serve/return + game-share
+Elo, each year's weights fitted on earlier years). Every spec is compared with P0 and with Pinnacle's close (log-loss
+and Brier, 95 % CIs by event), and its calibration (intercept, slope of y on logit p) is reported. BEST_FUND, the
+model written as `model_p`, was chosen on the dev years; `model_p_site` is the site's own price (R2).
 """
 from __future__ import annotations
 
@@ -63,7 +69,24 @@ MARKET = [
     S("M9 Pinnacle + model + all, ridge 100", ["ps", "model"] + ALL, ridge=100.0),
     S("M10 Pinnacle power + model + all, ridge 100", ["ps_pow", "model"] + ALL, ridge=100.0),
 ]
-BEST_FUND = "E15 all features"
+MRATING = [
+    S("P0 production (Elo + serve/return + game-share Elo)", ["elo", "sr", "gelo"], ridge=0.001),
+    S("R1 market rating alone", ["mr"], ridge=0.001),
+    S("R2 P0 + market rating (the new production price)", ["elo", "sr", "gelo", "mr"], ridge=0.001),
+    S("R3 R2 + certainty interaction", ["elo", "sr", "gelo", "mr", "mr_xV"], ridge=1.0),
+    S("R4 R2 + core features (rest, m30, points, form, retirement, h2h)",
+      ["elo", "sr", "gelo", "mr", "rest", "m30", "pts", "form", "ret", "h2h"], ridge=1.0),
+    S("R5 E15 all features + market rating", ["model"] + ALL + ["mr"]),
+    S("R6 P0 + results-only rating (no prices)", ["elo", "sr", "gelo", "mr_nm"], ridge=0.001),
+    S("R7 P0 + market rating from the average close only", ["elo", "sr", "gelo", "mr_avg"], ridge=0.001),
+    S("R8 P0 + market rating, sequential within the day (leaks through same-day duplicates)",
+      ["elo", "sr", "gelo", "mr_seq"], ridge=0.001),
+    S("R9 P0 + market rating, closes known 3 days late", ["elo", "sr", "gelo", "mr_ol3"], ridge=0.001),
+]
+MARKET.append(S("M11 Pinnacle power + market rating + model", ["ps_pow", "mr", "model"], ridge=5.0))
+P0 = MRATING[0].name
+SITE = MRATING[2].name
+BEST_FUND = MRATING[4].name                # chosen on the dev years (lowest dev log-loss on both tours)
 BEST_MKT = "M10 Pinnacle power + model + all, ridge 100"
 FLB = "M2 Pinnacle power de-vig, recalibrated"
 
@@ -97,6 +120,39 @@ def bets(df: pd.DataFrame, p: pd.Series, book: str, thr: float, years, mask=None
     return pd.concat(out)
 
 
+def versus(df: pd.DataFrame, a: pd.Series, b: pd.Series, years, mask=None) -> dict:
+    """a against b on rows with both and a Pinnacle close: log-loss and Brier differences with 95 % CIs by event."""
+    m = df["year"].isin(years) & a.notna() & b.notna() & df["ps_fair"].notna()
+    if mask is not None:
+        m &= mask
+    if not m.any():
+        return {"n": 0}
+    y = df.loc[m, "y"].to_numpy(float)
+    la, lb = X.ll_vec(a[m], y), X.ll_vec(b[m], y)
+    ba, bb = (a[m].to_numpy() - y) ** 2, (b[m].to_numpy() - y) ** 2
+    g = df.loc[m, "event"].astype(str).to_numpy()
+    lo, hi = X.boot_ci(la - lb, g)
+    blo, bhi = X.boot_ci(ba - bb, g, seed=1)
+    return {"n": int(m.sum()), "ll": round(float(la.mean()), 5), "ll_ref": round(float(lb.mean()), 5),
+            "d_ll": round(float((la - lb).mean()), 5), "d_ll_ci": [round(lo, 5), round(hi, 5)],
+            "brier": round(float(ba.mean()), 5), "brier_ref": round(float(bb.mean()), 5),
+            "d_brier": round(float((ba - bb).mean()), 5), "d_brier_ci": [round(blo, 5), round(bhi, 5)]}
+
+
+def calibration(p, y) -> dict:
+    """Logistic recalibration y ~ a + b logit(p) (a = 0, b = 1 when calibrated) and the 10-bin ECE."""
+    p = np.clip(np.asarray(p, float), 1e-4, 1 - 1e-4)
+    y = np.asarray(y, float)
+    A = np.column_stack([np.ones_like(p), X.logit(p)])
+    w = np.array([0.0, 1.0])
+    for _ in range(30):
+        q = X.sig(A @ w)
+        w -= np.linalg.solve(-(A.T * (q * (1 - q))) @ A, A.T @ (y - q))
+    b = np.minimum((p * 10).astype(int), 9)
+    ece = sum(abs(p[b == k].mean() - y[b == k].mean()) * (b == k).mean() for k in range(10) if (b == k).any())
+    return {"intercept": round(float(w[0]), 4), "slope": round(float(w[1]), 4), "ece": round(float(ece), 4)}
+
+
 def summarise(b: pd.DataFrame) -> dict:
     if len(b) == 0:
         return {"n": 0}
@@ -124,12 +180,58 @@ def tour_tables(tour: str, log=print) -> tuple[dict, pd.DataFrame]:
         log(f"{tour} {sp.name:55s} dev {r['dev']['ll']:.5f} (prod {r['dev']['ll_prod']:.5f}, ps {r['dev']['ll_ref']:.5f})"
             f" | test {r['test']['ll']:.5f} d_prod {r['test']['d_prod']:+.5f} {r['test']['d_prod_ci']}"
             f" d_ps {r['test']['d_ref']:+.5f} {r['test']['d_ref_ci']}")
-    res["coefs_best_fund"] = X.coefs(df, next(s for s in FUNDAMENTAL if s.name == BEST_FUND))
+    # the market-rating specs, against the production blend P0 and Pinnacle's close
+    res["mrating"] = []
+    for sp in MRATING:
+        preds[sp.name] = X.walk_forward(df, sp)
+    for sp in MRATING:
+        p = preds[sp.name]
+        r = {"spec": sp.name, "feats": sp.feats, "ridge": sp.ridge}
+        for split, yrs in (("dev", X.DEV), ("test", X.TEST)):
+            r[split] = {"v_P0": versus(df, p, preds[P0], yrs), "v_close": versus(df, p, df["ps_fair"], yrs)}
+        mt = df["year"].isin(X.TEST) & p.notna() & df["ps_fair"].notna()
+        r["calibration_test"] = calibration(p[mt], df.loc[mt, "y"])
+        res["mrating"].append(r)
+        log(f"{tour} {sp.name:62s} dev d_P0 {r['dev']['v_P0']['d_ll']:+.5f} d_close {r['dev']['v_close']['d_ll']:+.5f}"
+            f" | test d_P0 {r['test']['v_P0']['d_ll']:+.5f} {r['test']['v_P0']['d_ll_ci']}"
+            f" d_close {r['test']['v_close']['d_ll']:+.5f} {r['test']['v_close']['d_ll_ci']}"
+            f" dBrier_P0 {r['test']['v_P0']['d_brier']:+.5f} {r['test']['v_P0']['d_brier_ci']} cal {r['calibration_test']}")
+    mt = df["year"].isin(X.TEST) & df["ps_fair"].notna()
+    res["calibration_close_test"] = calibration(df.loc[mt, "ps_fair"], df.loc[mt, "y"])
+    # where the gap closes (test years): new players and rank bands
+    nmin = np.minimum(df["gelo_n_A"].fillna(0), df["gelo_n_B"].fillna(0))
+    rmax = np.maximum(df["rank_A"].fillna(2000), df["rank_B"].fillna(2000))
+    res["mrating_strata"] = {}
+    sameday = (df["days_A"] == 0) | (df["days_B"] == 0)      # where the stores' same-day duplicates sit
+    for k, msk in {"no same-day earlier match": ~sameday, "a same-day earlier match": sameday,
+                   "a player with < 10 rated matches": nmin < 10, "both 10-99": (nmin >= 10) & (nmin < 100),
+                   "both 100+": nmin >= 100, "max rank <= 20": rmax <= 20, "max rank 21-100": (rmax > 20) & (rmax <= 100),
+                   "max rank 101-200": (rmax > 100) & (rmax <= 200), "max rank > 200": rmax > 200}.items():
+        a = versus(df, preds[P0], df["ps_fair"], X.TEST, msk)
+        b = versus(df, preds[SITE], df["ps_fair"], X.TEST, msk)
+        c = versus(df, preds[SITE], preds[P0], X.TEST, msk)
+        res["mrating_strata"][k] = {"n": a["n"], "P0_minus_close": a.get("d_ll"), "R2_minus_close": b.get("d_ll"),
+                                    "R2_minus_P0": c.get("d_ll"), "ci": c.get("d_ll_ci")}
+    # per year, 2026 against Betfair / the average (no Pinnacle in tennis-data from February 2026)
+    res["mrating_by_year"] = {}
+    for Y in X.TEST + (2026,):
+        m = (df["year"] == Y) & preds[P0].notna() & preds[SITE].notna()
+        if not m.any():
+            continue
+        y = df.loc[m, "y"].to_numpy(float)
+        d = X.ll_vec(preds[SITE][m], y) - X.ll_vec(preds[P0][m], y)
+        lo, hi = X.boot_ci(d, df.loc[m, "event"].astype(str).to_numpy())
+        res["mrating_by_year"][int(Y)] = {"n": int(m.sum()), "R2_minus_P0": round(float(d.mean()), 5),
+                                          "ci": [round(lo, 5), round(hi, 5)]}
+    res["coefs_best_fund"] = X.coefs(df, next(s for s in FUNDAMENTAL + MRATING if s.name == BEST_FUND))
+    res["coefs_site"] = X.coefs(df, MRATING[2])
     res["coefs_best_mkt"] = X.coefs(df, next(s for s in MARKET if s.name == BEST_MKT))
     # betting at closing prices, test years only
     strategies = [("model (production) @ Pinnacle", "prod", "ps"), ("model (production) @ Max", "prod", "max"),
-                  ("model E15 @ Pinnacle", BEST_FUND, "ps"), ("model E15 @ Max", BEST_FUND, "max"),
-                  ("model E15 @ Bet365", BEST_FUND, "b365"),
+                  ("model E15 @ Pinnacle", "E15 all features", "ps"), ("model E15 @ Max", "E15 all features", "max"),
+                  ("best fundamental (R4) @ Pinnacle", BEST_FUND, "ps"), ("best fundamental (R4) @ Max", BEST_FUND, "max"),
+                  ("best fundamental (R4) @ Bet365", BEST_FUND, "b365"),
+                  ("site price (R2) @ Max", SITE, "max"),
                   ("Pinnacle fair @ Max (line shopping)", "ps_fair", "max"),
                   ("FLB-corrected Pinnacle M2 @ Max", FLB, "max"), ("FLB-corrected Pinnacle M2 @ Pinnacle", FLB, "ps"),
                   ("market + model M10 @ Max", BEST_MKT, "max"), ("market + model M10 @ Pinnacle", BEST_MKT, "ps"),
@@ -143,7 +245,7 @@ def tour_tables(tour: str, log=print) -> tuple[dict, pd.DataFrame]:
                     log(f"{tour} BET {label:40s} thr {thr:.2f} {s}")
     # strata for the two closing-time strategies that can beat Pinnacle's close
     for label, key in (("FLB-corrected Pinnacle M2 @ Max", FLB), ("market + model M10 @ Max", BEST_MKT),
-                       ("model E15 @ Max", BEST_FUND)):
+                       ("best fundamental (R4) @ Max", BEST_FUND)):
         b = bets(df, preds[key], "max", 0.02, X.TEST)
         b["rank_max"] = np.nan
         groups = {"level": b["level"],
@@ -155,6 +257,8 @@ def tour_tables(tour: str, log=print) -> tuple[dict, pd.DataFrame]:
             for val, bb in b.groupby(g):
                 res["strata"].append({"strategy": label, "by": gname, "value": str(val), **summarise(bb)})
     df["_p_fund"] = preds[BEST_FUND]
+    df["_p_site"] = preds[SITE]
+    df["_p_P0"] = preds[P0]
     df["_p_mkt"] = preds[BEST_MKT]
     df["_p_flb"] = preds[FLB]
     return res, df
@@ -167,7 +271,8 @@ def kalshi_tables(tour: str, df: pd.DataFrame, log=print) -> tuple[dict, pd.Data
     out: dict = {"tour": tour, "n_events": 0}
     if k.empty:
         return out, k
-    j = k.merge(df[["id", "A", "B", "y", "year", "event", "level", "round", "_p_fund", "model", "ps_fair", "bfe_fair",
+    j = k.merge(df[["id", "A", "B", "y", "year", "event", "level", "round", "_p_fund", "_p_site", "_p_P0", "model",
+                    "ps_fair", "bfe_fair",
                     "avg_fair", "ps_A", "ps_B", "bfe_A", "bfe_B", "avg_A", "avg_B", "max_A", "max_B"]], on="id", how="inner")
     if j.empty:
         return out, j
@@ -191,8 +296,8 @@ def kalshi_tables(tour: str, df: pd.DataFrame, log=print) -> tuple[dict, pd.Data
         g = g[g["_p_fund"].notna()]
         y = g["y"].to_numpy(float)
         r = {"n": int(len(g))}
-        for name, p in (("kalshi_mid", g["mid_A"]), ("model_E15", g["_p_fund"]), ("model_prod", g["model"]),
-                        ("close_fair", g["close_fair"])):
+        for name, p in (("kalshi_mid", g["mid_A"]), ("model_best", g["_p_fund"]), ("model_two_term", g["model"]),
+                        ("model_P0", g["_p_P0"]), ("model_site", g["_p_site"]), ("close_fair", g["close_fair"])):
             mm = p.notna()
             r[f"ll_{name}"] = round(float(X.ll_vec(p[mm], y[mm.to_numpy()]).mean()), 5) if mm.any() else None
         both = g["close_fair"].notna()
@@ -205,6 +310,16 @@ def kalshi_tables(tour: str, df: pd.DataFrame, log=print) -> tuple[dict, pd.Data
             d2 = X.ll_vec(gg["_p_fund"], yy) - X.ll_vec(gg["mid_A"], yy)
             lo, hi = X.boot_ci(d2, gg["event"].astype(str).to_numpy())
             r["model_minus_kalshi"] = {"d": round(float(d2.mean()), 5), "ci": [round(lo, 5), round(hi, 5)]}
+            for nm in ("_p_P0", "_p_site"):
+                mm = gg[nm].notna().to_numpy()
+                d3 = X.ll_vec(gg.loc[mm, nm], yy[mm]) - X.ll_vec(gg.loc[mm, "mid_A"], yy[mm])
+                b3 = (gg.loc[mm, nm].to_numpy() - yy[mm]) ** 2 - (gg.loc[mm, "mid_A"].to_numpy() - yy[mm]) ** 2
+                ev_ = gg.loc[mm, "event"].astype(str).to_numpy()
+                lo, hi = X.boot_ci(d3, ev_)
+                blo, bhi = X.boot_ci(b3, ev_, seed=1)
+                r[f"{nm[3:]}_minus_kalshi"] = {"n": int(mm.sum()), "d": round(float(d3.mean()), 5),
+                                               "ci": [round(lo, 5), round(hi, 5)], "d_brier": round(float(b3.mean()), 5),
+                                               "brier_ci": [round(blo, 5), round(bhi, 5)]}
         # bets: the model against Kalshi's ask (fee included in the edge test and P&L), CLV v the later close
         for thr in (0.0, 0.02, 0.05):
             rows = []
@@ -306,6 +421,7 @@ def edge_rows(tour: str, df: pd.DataFrame, kal: pd.DataFrame) -> pd.DataFrame:
                 "event_id": g["id"], "sport": "tennis", "league": tour, "season": g["year"], "start_time": g["start_time"],
                 "market": "moneyline", "selection": np.where(sgn, g["A"], g["B"]), "line": np.nan,
                 "decision_time": g["start_time"], "model_p": g["_p_fund"] if sgn else 1 - g["_p_fund"],
+                "model_p_site": g["_p_site"] if sgn else 1 - g["_p_site"],
                 "model_p_mkt": g["_p_mkt"] if sgn else 1 - g["_p_mkt"],
                 "model_p_flb": g["_p_flb"] if sgn else 1 - g["_p_flb"],
                 "price_dec": pr[ok], "price_src": name,
@@ -328,7 +444,8 @@ def edge_rows(tour: str, df: pd.DataFrame, kal: pd.DataFrame) -> pd.DataFrame:
                 "event_id": k["id"], "sport": "tennis", "league": tour, "season": k["year"], "start_time": k["start_time"],
                 "market": "moneyline", "selection": np.where(sgn, k["A"], k["B"]), "line": np.nan,
                 "decision_time": pd.to_datetime(k["ts"], unit="s", utc=True),
-                "model_p": k["_p_fund"] if sgn else 1 - k["_p_fund"], "model_p_mkt": np.nan, "model_p_flb": np.nan,
+                "model_p": k["_p_fund"] if sgn else 1 - k["_p_fund"],
+                "model_p_site": k["_p_site"] if sgn else 1 - k["_p_site"], "model_p_mkt": np.nan, "model_p_flb": np.nan,
                 "price_dec": 1 / cost, "price_src": "kalshi_ask_" + k["decision"],
                 "fair_p_decision": k["mid_A"] if sgn else 1 - k["mid_A"], "devig": "kalshi mid (bid+ask)/2",
                 "book_fair_p": k["mid_A"] if sgn else 1 - k["mid_A"],

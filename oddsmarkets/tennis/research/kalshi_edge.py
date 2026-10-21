@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import json
 import math
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import numpy as np
 import pandas as pd
@@ -111,10 +111,17 @@ def load(tour: str) -> pd.DataFrame:
     for m in idx:
         by_ev.setdefault(m["event_ticker"], []).append(m)
     stores: dict = {}
+    by_day: dict = {}                     # year -> {date: [matches]} (an index: a scan per event took ~25 min)
 
     def store(y):
         if y not in stores:
             stores[y] = _io.load_store(t, y) or {}
+            idx_: dict = {}
+            for mm in (stores[y].get("matches") or {}).values():
+                d = _io.day(mm.get("date"))
+                if d and mm.get("p1") and mm.get("p2"):
+                    idx_.setdefault(d, []).append(mm)
+            by_day[y] = idx_
         return stores[y]
     rows = []
     for ev, ms in by_ev.items():
@@ -128,11 +135,9 @@ def load(tour: str) -> pd.DataFrame:
             continue
         cands = []
         for y in {ed.year, (ed.year - 1) if ed.month == 1 else ed.year}:
-            st = store(y)
-            for mm in (st.get("matches") or {}).values():
-                d = _io.day(mm.get("date"))
-                if d and abs((d - ed).days) <= 3 and mm.get("p1") and mm.get("p2"):
-                    cands.append(mm)
+            store(y)
+            for k in range(-3, 4):
+                cands.extend(by_day[y].get(ed + timedelta(days=k), []))
         field = sorted({str(x[k]) for x in cands for k in ("p1", "p2")})
         players = {}
         for y in {ed.year, ed.year - 1}:

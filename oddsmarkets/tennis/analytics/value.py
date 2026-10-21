@@ -746,8 +746,15 @@ def sr_at(td: an.TourData, through: date, fits: dict | None = None) -> dict | No
 # ---------------------------------------------------------------------------------------------- model rating
 
 def blend_weights(tour: str) -> dict:
+    """The fundamental blend's weights: the committed fit's "fundamental" block when the match price carries the
+    market-rating term (models/mrating.py; the Value section rates players on results and the model, and sets the
+    market against it), else the match price's own weights."""
+    from oddsmarkets.tennis.models import _io
     from oddsmarkets.tennis.models import predict as P
     b = P.blend_params(tour)
+    f = (_io.read_json(_io.FITTED / f"predict_{_io.tour_key(tour)}.json") or {}).get("fundamental") if b.get("w_mr") else None
+    if isinstance(f, dict) and f.get("w_elo") is not None:
+        b = f
     return {"w_elo": float(b.get("w_elo", 0.6)), "w_sr": float(b.get("w_sr", 0.4)), "w_gelo": float(b.get("w_gelo", 0.0))}
 
 

@@ -14,9 +14,9 @@
 'use strict';
 
 const K = () => TA.fk;
-const LABELS = { model: 'Match model', elo: 'Elo', serve_return: 'Serve/return chain', rank: 'Ranking', pinnacle: 'Pinnacle closing', b365: 'Bet365 closing', avg: 'Average closing', max: 'Best price closing', bt: 'Bradley-Terry' };
-const ORDER = ['model', 'elo', 'serve_return', 'rank', 'bt', 'pinnacle', 'b365', 'avg', 'max'];
-const COL = { model: '#d9f24f', elo: '#bc8cff', serve_return: '#39d0d8', rank: '#8b949e', bt: '#79c0ff', pinnacle: '#f97316', b365: '#3fb950', avg: '#58a6ff', max: '#f85149' };
+const LABELS = { model: 'Match model', model_fund: 'Model without market rating', elo: 'Elo', serve_return: 'Serve/return chain', rank: 'Ranking', pinnacle: 'Pinnacle closing', b365: 'Bet365 closing', avg: 'Average closing', max: 'Best price closing', bt: 'Bradley-Terry' };
+const ORDER = ['model', 'model_fund', 'elo', 'serve_return', 'rank', 'bt', 'pinnacle', 'b365', 'avg', 'max'];
+const COL = { model: '#d9f24f', model_fund: '#e3b341', elo: '#bc8cff', serve_return: '#39d0d8', rank: '#8b949e', bt: '#79c0ff', pinnacle: '#f97316', b365: '#3fb950', avg: '#58a6ff', max: '#f85149' };
 const BOOK = { pinnacle: 1, b365: 1, avg: 1, max: 1 };
 const label = k => LABELS[k] || String(k).replace(/_/g, ' ');
 const H = p => (p > 0 && p < 1 ? -(p * Math.log(p) + (1 - p) * Math.log(1 - p)) : null);
@@ -67,7 +67,8 @@ function reading(d, T) {
     const dE = ll(M, 'elo') - ll(M, 'model'), dR = ll(M, 'rank') - ll(M, 'model');
     out.push('<p><strong>Model against the simple baselines.</strong> Over all scored matches the model\'s log-loss is ' + k.num(ll(M, 'model'), 4) + ', against ' + k.num(ll(M, 'elo'), 4) + ' for Elo alone' +
       (k.isNum(ll(M, 'serve_return')) ? ', ' + k.num(ll(M, 'serve_return'), 4) + ' for the serve/return chain alone' : '') + (k.isNum(ll(M, 'rank')) ? ' and ' + k.num(ll(M, 'rank'), 4) + ' for the ranking baseline' : '') + '. ' +
-      (dE > 0 ? 'Blending the two halves beats Elo by ' + k.num(dE, 4) + ' nats a match: small, because surface Elo already carries most of what the scores say. ' : 'The blend does not beat Elo alone here. ') +
+      (k.isNum(ll(M, 'model_fund')) ? 'The model beats Elo by ' + k.num(dE, 4) + ' nats a match; without its market rating (the strength of each player learnt from the closing prices and results of earlier matches) it scores ' + k.num(ll(M, 'model_fund'), 4) + ', ' + k.num(ll(M, 'elo') - ll(M, 'model_fund'), 4) + ' better than Elo. ' :
+        (dE > 0 ? 'Blending the two halves beats Elo by ' + k.num(dE, 4) + ' nats a match: small, because surface Elo already carries most of what the scores say. ' : 'The blend does not beat Elo alone here. ')) +
       (k.isNum(dR) ? (dR > 0 ? 'Against the ranking the gain is ' + k.num(dR, 4) + ' nats, which means the model gives the actual winner about ' + k.num(100 * (Math.exp(dR) - 1), 1) + '% more probability on average (geometric).' : 'The ranking baseline is not beaten, which is a red flag.') : '') + '</p>');
   }
   if (k.isNum(ll(V, 'model')) && k.isNum(ll(V, 'pinnacle'))) {
@@ -76,7 +77,8 @@ function reading(d, T) {
     out.push('<p><strong>Model against Pinnacle.</strong> On the ' + k.int((V.pinnacle || {}).n) + ' matches with a Pinnacle close, the model scores ' + k.num(ll(V, 'model'), 4) + ' and Pinnacle\'s de-vigged closing price ' + k.num(ll(V, 'pinnacle'), 4) +
       (k.isNum(ll(V, 'avg')) ? ' (the market average ' + k.num(ll(V, 'avg'), 4) + ', Bet365 ' + k.num(ll(V, 'b365'), 4) + ')' : '') + '. ' +
       (gap > 0 ? 'The closing market is sharper by ' + k.num(gap, 4) + ' nats a match. That is the expected order: the close knows about injuries, fatigue, form within the week and money the model never sees. ' +
-        (share !== null ? 'Measured from the ranking baseline, the model closes ' + k.num(100 * share, 0) + '% of the distance to Pinnacle.' : '')
+        (share !== null ? 'Measured from the ranking baseline, the model closes ' + k.num(100 * share, 0) + '% of the distance to Pinnacle.' : '') +
+        (k.isNum(ll(V, 'model_fund')) && ll(V, 'model_fund') > ll(V, 'pinnacle') ? ' Without the market rating the gap would be ' + k.num(ll(V, 'model_fund') - ll(V, 'pinnacle'), 4) + ' nats: learning from past closing prices closes ' + k.num(100 * (ll(V, 'model_fund') - ll(V, 'model')) / (ll(V, 'model_fund') - ll(V, 'pinnacle')), 0) + '% of it. The market rating uses only matches finished before the day being priced, never the price of the match itself.' : '')
         : 'The model is at least as sharp as Pinnacle\'s close here, which would be extraordinary: treat it as a bug until proved otherwise.') + '</p>');
   }
   const bins = (((M.model || {}).reliability) || []).filter(b => b.n >= 100);

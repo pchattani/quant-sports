@@ -633,6 +633,50 @@ class TourData:
             self._gelo = _io.cached("ace_gelo", self.tour, key, lambda: G.history(self.tour, matches=rated))
         return self._gelo
 
+    # market rating (the blend's fourth term, models/mrating.py): earlier matches' closing prices and results
+    @property
+    def mrating(self) -> dict:
+        if getattr(self, "_mrating", None) is None:
+            from oddsmarkets.tennis.models import _io
+            from oddsmarkets.tennis.models import mrating as MRt
+            rated = self.rated_matches()
+            prm = MRt.params(self.tour)
+            key = digest(MRt.VERSION, prm, len(rated), hashlib.sha1("".join(
+                f"{m['id']}{m.get('p1')}{m.get('p2')}{m.get('status')}{m.get('winner')}{m.get('date')}{m.get('sets')}"
+                f"{m.get('best_of')}{m.get('rank1')}{m.get('rank2')}{sorted((m.get('odds') or {}).items())}"
+                for m in rated).encode()).hexdigest())
+            self._mrating = _io.cached("ace_mrating", self.tour, key, lambda: MRt.history(self.tour, matches=rated))
+        return self._mrating
+
+    def mr_pre(self, m: dict) -> float | None:
+        """Market-rating term for m.p1 on the match's logit scale: the exact pre-match value for a rated match,
+        else today's states (a player never rated takes the prior from the row's rank, as the sequential pass
+        does); None when the history is unavailable."""
+        from oddsmarkets.tennis.models import mrating as MRt
+        try:
+            h = self.mrating
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("%s market rating failed: %s", self.tour, exc)
+            return None
+        prm = h.get("params") or MRt.params(self.tour)
+        v = (h.get("pre") or {}).get(str(m.get("id")))
+        if v is not None:
+            d = float(v[0])
+        else:
+            cur = h.get("current") or {}
+
+            def st(pid, rk):
+                x = cur.get(str(pid))
+                if x is not None:
+                    return x
+                try:
+                    r = float(rk) if rk and float(rk) >= 1 else None
+                except (TypeError, ValueError):
+                    r = None
+                return MRt.prior(prm, r)
+            d = MRt.diff(st(m.get("p1"), m.get("rank1")), st(m.get("p2"), m.get("rank2")), m.get("surface") or "hard", prm)
+        return MRt.scale(m.get("best_of"), prm) * d
+
     def gelo_at(self, when: date) -> dict:
         memo = self.__dict__.setdefault("_gelo_at", {})
         k = when.isoformat()
@@ -737,12 +781,14 @@ class TourData:
         return self.sr_fit(self.season_end(year))
 
     # prediction contexts
-    def context(self, when: date, exact_elo: dict | None = None, exact_gelo: dict | None = None):
+    def context(self, when: date, exact_elo: dict | None = None, exact_gelo: dict | None = None,
+                exact_mr: dict | None = None):
         """predict.Context at `when`: Elo ratings at that day (or exact pre-match Elo P by (p1, p2) when
         given), the serve/return fit through the day before, the committed blend. The game-share Elo term uses the
         exact pre-match differences by (p1, p2) when given (finished matches, as the backtest scored them), else the
         ratings at `when` for a current context (today or yesterday); a past context without exact values prices
-        the term at 0 (ratings snapshots for every month would cost a pass over the history each)."""
+        the term at 0 (ratings snapshots for every month would cost a pass over the history each). The market-rating
+        term likewise: exact values by (p1, p2) when given (`mr_pre`), else today's states for a current context."""
         from oddsmarkets.tennis.models import elo as E
         from oddsmarkets.tennis.models import predict as P
         from oddsmarkets.tennis.models import serve_return as SR
@@ -756,10 +802,17 @@ class TourData:
                     gr, gp = self.gelo_at(when), self.gelo.get("params")
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("%s game-share Elo at %s failed: %s", self.tour, when, exc)
+            mst, mpr = None, None
+            if P.blend_params(self.tour).get("w_mr") and when >= self.today - timedelta(days=1):
+                try:
+                    mst, mpr = self.mrating.get("current") or {}, self.mrating.get("params")
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("%s market rating at %s failed: %s", self.tour, when, exc)
             base = P.Context(self.tour, when, elo_ratings=self.elo_at(when), elo_params=self.elo_params(), elo_mod=E,
-                             sr_model=sr, sr_mod=SR if sr else None, gelo_ratings=gr, gelo_params=gp)
+                             sr_model=sr, sr_mod=SR if sr else None, gelo_ratings=gr, gelo_params=gp,
+                             mr_states=mst, mr_params=mpr)
             self._ctx[key] = base
-        if not exact_elo and not exact_gelo:
+        if not exact_elo and not exact_gelo and not exact_mr:
             return base
         elo_fn = None
         if exact_elo:
@@ -779,9 +832,21 @@ class TourData:
                     return 0.0
                 from oddsmarkets.tennis.models import gelo as G
                 return G.diff(base.gelo_ratings.get(p1), base.gelo_ratings.get(p2), surface, base.gelo_params)
+        mr_fn = None
+        if exact_mr:
+            def mr_fn(p1, p2, surface, best_of):
+                v = exact_mr.get((p1, p2))
+                if v is not None:
+                    return v
+                if base.mr_states is None:
+                    return 0.0
+                from oddsmarkets.tennis.models import mrating as MRt
+                prm = base.mr_params or MRt.params(self.tour)
+                return MRt.scale(best_of, prm) * MRt.diff(base.mr_states.get(p1), base.mr_states.get(p2), surface, prm)
         return P.Context(self.tour, when, elo_ratings=base.elo_ratings, elo_params=base.elo_params, elo_mod=E,
                          sr_model=base.sr_model, sr_mod=base.sr_mod, elo_fn=elo_fn, gelo_fn=gelo_fn,
-                         gelo_ratings=base.gelo_ratings, gelo_params=base.gelo_params)
+                         gelo_ratings=base.gelo_ratings, gelo_params=base.gelo_params, mr_fn=mr_fn,
+                         mr_states=base.mr_states, mr_params=base.mr_params)
 
     def gelo_pre(self, m: dict) -> float | None:
         """Game-share Elo difference for m.p1 before the match (gelo history), None when it has no row."""

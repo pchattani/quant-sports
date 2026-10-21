@@ -51,7 +51,9 @@ def predictions(td: an.TourData, matches: list[dict], with_dist: bool = False) -
     for cp, ms in sorted(groups.items()):
         exact = {}
         exact_g = {}
+        exact_m = {}
         use_g = hasattr(td, "gelo_pre") and bool(P.blend_params(getattr(td, "tour", "atp")).get("w_gelo"))
+        use_m = hasattr(td, "mr_pre") and bool(P.blend_params(getattr(td, "tour", "atp")).get("w_mr"))
         if cp != td.today:
             for m in ms:
                 e = td.elo_pre(m)
@@ -60,8 +62,17 @@ def predictions(td: an.TourData, matches: list[dict], with_dist: bool = False) -
                 g = td.gelo_pre(m) if use_g else None
                 if g is not None:
                     exact_g[(m["p1"], m["p2"])] = g
-        ctx = (td.context(cp, exact_elo=exact or None, exact_gelo=exact_g) if exact_g
-               else td.context(cp, exact_elo=exact or None))
+        if use_m:                       # finished: exact pre-match values; today: current states (rank prior if new)
+            for m in ms:
+                v = td.mr_pre(m)
+                if v is not None:
+                    exact_m[(m["p1"], m["p2"])] = v
+        kw = {}
+        if exact_g:
+            kw["exact_gelo"] = exact_g
+        if exact_m:
+            kw["exact_mr"] = exact_m
+        ctx = td.context(cp, exact_elo=exact or None, **kw)
         rows = [{"p1": m["p1"], "p2": m["p2"], "surface": m.get("surface") or "hard", "best_of": int(m.get("best_of") or 3),
                  "level": m.get("level") or "250", "indoor": bool(m.get("indoor")), "final_set_rule": an.chain_rule(m),
                  "date": m.get("date"),

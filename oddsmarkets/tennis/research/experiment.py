@@ -24,6 +24,7 @@ import pandas as pd
 
 from oddsmarkets.tennis.research import base as B
 from oddsmarkets.tennis.research import features as F
+from oddsmarkets.tennis.research import mfeats as MF
 from oddsmarkets.common.edge import devig as _dv
 
 DEV = tuple(range(2012, 2018))
@@ -61,6 +62,7 @@ def load(tour: str) -> pd.DataFrame:
     base = B.base_frame(tour)
     feats = F.build(tour)
     df = F.orient(base, feats, tour)
+    df = MF.add(df, tour)                                  # market-rating features (Oct 2026)
     df = df[(df["year"] >= 2010) & df["model"].notna()].copy()
     ok = df["ps_A"].notna() & df["ps_B"].notna()
     df["ps_fair"] = np.where(ok, devig_mult(df["ps_A"], df["ps_B"]), np.nan)
@@ -157,6 +159,10 @@ def design(df: pd.DataFrame, names: list[str]) -> np.ndarray:
             v = lm * df["round"].isin(["R128", "R64", "R32"]).to_numpy(float)
         elif n == "x_level250":
             v = lm * (df["level"].to_numpy() == "250")
+        elif n in ("mr", "mr_nm", "mr_avg", "mr_ol3", "mr_seq"):   # market rating, the match's logit scale
+            v = df[n].to_numpy(float)
+        elif n == "mr_xV":           # the market rating, damped where its variance is high
+            v = df["mr"].to_numpy(float) * np.exp(-np.nan_to_num(df["mr_V"].to_numpy(float), nan=2.0))
         elif n == "x_ps_model":      # interaction for the market blend: sharpen/shrink by disagreement
             v = (logit(df["ps_fair"]) - lm) * np.abs(logit(df["ps_fair"]) - lm)
         else:

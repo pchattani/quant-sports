@@ -76,6 +76,20 @@ def model_payload(td: an.TourData) -> dict:
     from oddsmarkets.tennis.models import serve_return as SR
     prm = td.elo_params() or {}
     bl = P.blend_params(td.tour)
+    mkt = None
+    if bl.get("w_mr"):
+        # the match price adds the market rating (models/mrating.py), which this payload does not carry per player:
+        # the browser formula below keeps the fundamental blend (fitted without it), and "market" documents the rest
+        from oddsmarkets.tennis.models import _io
+        from oddsmarkets.tennis.models import mrating as MRt
+        fund = (_io.read_json(_io.FITTED / f"predict_{td.tour}.json") or {}).get("fundamental") or {}
+        mkt = {"w_elo": bl.get("w_elo"), "w_sr": bl.get("w_sr"), "w_gelo": bl.get("w_gelo"), "w_mr": bl.get("w_mr"),
+               "params": MRt.params(td.tour), "version": MRt.VERSION,
+               "formula": "the site's match prices: logit p = w_elo logit(elo_p) + w_sr logit(sr_p) + w_gelo (m1 - m2) + "
+                          "w_mr s_b (M1 - M2), M = the market rating (R + D_surface; a Kalman filter on earlier "
+                          "matches' de-vigged closing prices and results), s_b = params.s5 for best of five, else 1"}
+        if fund.get("w_elo") is not None:
+            bl = dict(bl, w_elo=fund["w_elo"], w_sr=fund["w_sr"], w_gelo=fund.get("w_gelo", bl.get("w_gelo")))
     sr = td.sr_fit(td.today - timedelta(days=1)) or {}
     base = dict(sr.get("base") or {})
     rules = {}
@@ -92,7 +106,10 @@ def model_payload(td: an.TourData) -> dict:
                       "formula": "logit p = w_elo logit(elo_p) + w_sr logit(sr_p) + w_gelo (m1 - m2), m = gelo_w_surf G_surface "
                                  "+ (1 - gelo_w_surf) G_all from the game-share Elo (elo.json current 'g': all, hard, clay, "
                                  "grass; 0 when either is missing); sr_p = chain(p_srv1, p_srv2); the serve-point "
-                                 "pair is then shifted (p1 + d, p2 - d) until the chain returns p"},
+                                 "pair is then shifted (p1 + d, p2 - d) until the chain returns p" +
+                                 ("; these are the fundamental weights (fitted without the market rating): the match "
+                                  "pages' prices add it ('market')" if mkt else "")},
+            **({"market": mkt} if mkt else {}),
             "serve_return": {"base": base, "through": sr.get("through"), "version": sr.get("version") or SR.VERSION,
                              "formula": "logit hold(i v j) = mu + clay|grass + indoor + bo5 + level[lv] + (s_i + ds_i,surface) - "
                                         "(r_j + dr_j,surface); unknown players s = new_s, r = new_r; p_srv = inverse of "
