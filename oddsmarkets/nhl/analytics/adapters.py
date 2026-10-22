@@ -498,7 +498,7 @@ def walk_forward(ctx) -> dict[str, dict]:
     if GMm is None or not ctx.use_models or not hasattr(GMm, "walk_forward"):
         return {}
     import hashlib
-    parts = [str(getattr(GMm, "VERSION", "")), str(getattr(_module("team_strength"), "VERSION", "")), "wf-2"]
+    parts = [str(getattr(GMm, "VERSION", "")), str(getattr(_module("team_strength"), "VERSION", "")), "wf-3"]
     for q in (an.store_path(ctx.season), an.store_path(an.prev_season(ctx.season)), an.events_path(ctx.season),
               an.events_path(an.prev_season(ctx.season))):
         try:
@@ -515,7 +515,10 @@ def walk_forward(ctx) -> dict[str, dict]:
     got = an.read_json(cp)
     if isinstance(got, dict):
         return got
-    rows = GMm.walk_forward([ctx.season])
+    try:
+        rows = GMm.walk_forward([ctx.season], players=True)
+    except TypeError:                                            # a game module without the player term
+        rows = GMm.walk_forward([ctx.season])
     if rows is None or not len(rows):
         return {}
     p = GMm.params()
@@ -824,7 +827,7 @@ def fitted_summary(catalogues: dict | None = None) -> dict:
         out["team_strength"] = {k: ts.get(k) for k in ("half_life_days", "lam", "k_fin", "k_goalie", "carry", "goalie_new")}
     gp = (_fitted_json("game_params").get("result") or {})
     if gp:
-        out["game"] = {k: gp.get(k) for k in ("b0", "b_xg", "b_g", "home", "s", "theta", "tie_k", "k_pull", "r_en", "pull1",
+        out["game"] = {k: gp.get(k) for k in ("b0", "b_xg", "b_p", "b_g", "home", "s", "theta", "tie_k", "k_pull", "r_en", "pull1",
                                              "pull2", "k_ot", "so_home", "n", "seasons", "fitted")}
     lv = _module("live")
     if lv is not None:
@@ -837,7 +840,8 @@ def fitted_summary(catalogues: dict | None = None) -> dict:
         seasons = xg.get("seasons") or []
         imp = _lit(xg.get("importance")) or {}
         val = _lit(xg.get("validation")) or {}
-        out["xg"] = {"seasons": seasons, "n_seasons": len(seasons), "folding": "season" if len(seasons) >= 3 else "game",
+        out["xg"] = {"seasons": seasons, "n_seasons": len(seasons),
+                     "folding": xg.get("scheme") or ("season" if len(seasons) >= 3 else "game"), "half_life": xg.get("half_life"),
                      "features": xg.get("features"), "best_iter": xg.get("best_iter"), "platt": xg.get("platt"),
                      "importance": imp, "validation": (val or {}).get("overall") if isinstance(val, dict) else None}
     st = _fitted_json("stabilise")

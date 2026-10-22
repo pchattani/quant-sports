@@ -628,3 +628,57 @@ def test_season_conventions_agree():
     for d, want in ((date(2026, 6, 30), 20252026), (date(2026, 7, 1), 20262027), (date(2026, 8, 15), 20262027),
                     (date(2027, 1, 10), 20262027)):
         assert canon.current_season(d) == D.season_of_date(d) == M.season_for(d) == AN.current_season(d) == want
+
+
+# ── round 4: the player term (models/players.py) ─────────────────────────────
+
+def test_player_term_in_means_and_features(lg):
+    from oddsmarkets.nhl.models import players as PL
+    rd = TS.fit(lg["tg"][S3], S3, None, None).as_dict()
+    teams = sorted(rd["teams"])
+    h, a = teams[0], teams[1]
+    g = pd.DataFrame([{"home": h, "away": a, "season": S3, "gtype": "REG", "neutral": False}])
+    F0 = GM.features(g, rd)
+    assert F0["lp_h"].isna().all()                                   # no player block: no player term
+    base = float(rd["league"]["ev_xg60"])
+    th, ta = rd["teams"][h], rd["teams"][a]
+    # a player block equal to the team composition reproduces lx exactly
+    rd2 = dict(rd)
+    rd2["players"] = {D.franchise(h): {"op": th["ev_off"], "dp": -th["ev_def"]},
+                      D.franchise(a): {"op": ta["ev_off"], "dp": -ta["ev_def"]}}
+    ev = PL.ev_rates(rd2, h, a)
+    assert ev is not None and abs(ev[0] - (base + th["ev_off"] + ta["ev_def"])) < 1e-9
+    F1 = GM.features(g, rd2)
+    assert abs(F1["lp_h"].iloc[0] - F1["lx_h"].iloc[0]) < 1e-9 and abs(F1["lp_a"].iloc[0] - F1["lx_a"].iloc[0]) < 1e-9
+    # means: b_p weighs lp; without lp (NaN) it falls back to lx, so b_xg + b_p act on the team composition
+    p = dict(GP, b_xg=0.4, b_p=0.3)
+    m_nan = GM.means(F0, p)
+    m_eq = GM.means(F1, p)
+    assert np.allclose(m_nan[0], m_eq[0]) and np.allclose(m_nan[1], m_eq[1])
+    F2 = F1.copy()
+    F2["lp_h"] = F2["lp_h"] + 0.1
+    assert GM.means(F2, p)[0][0] > m_eq[0][0] * math.exp(0.029)
+
+
+def test_fit_means_fits_b_p_only_with_lp(lg):
+    wf = GM.walk_forward([S2, S3], games=lg["games"], tg_of=SC.tg_getter(lg))
+    p = GM.fit_means(wf, dict(GP))
+    assert p["b_p"] == 0.0
+    w2 = wf.copy()
+    rng = np.random.default_rng(0)
+    w2["lp_h"] = w2["lx_h"] + rng.normal(0, 0.05, len(w2))
+    w2["lp_a"] = w2["lx_a"] + rng.normal(0, 0.05, len(w2))
+    p2 = GM.fit_means(w2, dict(GP))
+    assert "b_p" in p2 and np.isfinite(p2["b_p"]) and p2["b_p"] != 0.0
+
+
+def test_player_composite_weights():
+    from oddsmarkets.nhl.models import players as PL
+    rat = {1: (0.2, 0.1), 2: (-0.1, 0.0)}
+    prior = {3: (0.5, 0.5)}
+    o, d = PL.composite(rat, prior, [(1, 900.0), (2, 300.0), (3, 600.0), (4, 600.0)])
+    # shares 5 x toi / 2400; player 3 from the prior x CARRY; player 4 unknown = 0
+    sh = [5 * 900 / 2400, 5 * 300 / 2400, 5 * 600 / 2400]
+    assert abs(o - (sh[0] * 0.2 - sh[1] * 0.1 + sh[2] * PL.CARRY * 0.5)) < 1e-12
+    assert abs(d - (sh[0] * 0.1 + sh[2] * PL.CARRY * 0.5)) < 1e-12
+    assert PL.composite(rat, prior, []) is None

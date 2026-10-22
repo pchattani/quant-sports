@@ -42,11 +42,19 @@ import pandas as pd
 
 from oddsmarkets.nhl.models import _io
 
-MODEL_VERSION = "nhlxg-3"            # 3: arena adjustment through 2022-23 (_io.TRACKING_FIRST 20232024)
-FEATURES = ["distance", "angle", "x", "abs_y", "shot_type_code", "rebound", "rebound_angle", "rush", "dt_prev",
-            "dist_prev", "speed_prev", "prev_type_code", "prev_x", "sk_for", "sk_against", "empty_net", "score_state",
-            "is_home", "period", "sec", "hand_y"]
-CATEGORICAL = ["shot_type_code", "prev_type_code"]
+MODEL_VERSION = "nhlxg-4"            # 3: arena adjustment through 2022-23 (_io.TRACKING_FIRST 20232024)
+                                     # 4: round-4 features, handedness from any season, walk-forward recency-weighted fit
+BASE_FEATURES = ["distance", "angle", "x", "abs_y", "shot_type_code", "rebound", "rebound_angle", "rush", "dt_prev",
+                 "dist_prev", "speed_prev", "prev_type_code", "prev_x", "sk_for", "sk_against", "empty_net", "score_state",
+                 "is_home", "period", "sec", "hand_y"]
+NEW_FEATURES = ["prev_y", "prev_same", "prev2_type_code", "dt_prev2", "since_fo", "fo_zone", "team_att_10",
+                "opp_att_10", "since_state", "shooter_d", "shift_shooter", "shift_for", "shift_against"]
+FEATURES = BASE_FEATURES + NEW_FEATURES
+CATEGORICAL = ["shot_type_code", "prev_type_code", "prev2_type_code"]
+HALF_LIFE = 1.0                      # training seasons weighted 0.5 ** ((last training season - season) / HALF_LIFE)
+EARLY = 50
+WF_MIN_SEASONS = 5                   # fewer seasons: cross-fitted (by season from three, by game below), unweighted
+FLURRY_S = 10.0
 PARAMS = {"learning_rate": 0.04, "num_leaves": 31, "min_data_in_leaf": 300, "lambda_l2": 10.0, "feature_fraction": 0.85,
           "max_cat_to_onehot": 16, "cat_smooth": 20.0}
 ROUNDS = 1500
@@ -241,17 +249,179 @@ def attempts(ev: pd.DataFrame, season: int | None = None, adjust: bool | None = 
     X["is_home"] = ih[idx]
     X["period"] = np.minimum(sh["period"].to_numpy(float), 4)
     X["sec"] = sh["sec"].to_numpy(float)
-    try:
-        hand = _io.players(season)["shoots"]
-        sgn = sh["shooter"].map(lambda p: {"L": 1.0, "R": -1.0}.get(hand.get(int(p)) if p == p else None, np.nan)).to_numpy(float)
-    except Exception:  # noqa: BLE001
-        sgn = np.full(len(sh), np.nan)
+    hand = hand_map(season)
+    sgn = sh["shooter"].map(lambda p: {"L": 1.0, "R": -1.0}.get(hand.get(int(p)) if p == p else None, np.nan)).to_numpy(float)
     X["hand_y"] = sgn * sh["y_adj"].to_numpy(float)
     sh = sh.rename(columns={"x": "x_raw"})
     sh = sh.drop(columns=[c for c in FEATURES if c in sh.columns])
-    out = pd.concat([sh.reset_index(drop=True), X[FEATURES].reset_index(drop=True).astype("float32")], axis=1)
+    out = pd.concat([sh.reset_index(drop=True), X[BASE_FEATURES].reset_index(drop=True).astype("float32")], axis=1)
     out["goal"] = (out["type"] == "goal").astype(float)
+    out = _add_r4_features(out, e, season)
     return out, ainfo
+
+
+_HAND: dict = {}
+
+
+def hand_map(season: int | None = None) -> dict:
+    """{player: "L" / "R"}: `season`'s store first, then every other season's on disk (a skater's hand does not
+    change; the 2023-24 to 2025-26 stores miss it for up to a quarter of the attempts)."""
+    key = _io.sid(season) if season else 0
+    if key in _HAND:
+        return _HAND[key]
+    out: dict = {}
+    order = ([key] if key else []) + sorted((s for s in _io.seasons_on_disk() if s != key), reverse=True)
+    for s in order:
+        try:
+            h = _io.players(s)["shoots"].dropna()
+        except Exception:  # noqa: BLE001
+            continue
+        for k, v in h.items():
+            if v in ("L", "R"):
+                out.setdefault(int(k), v)
+    if len(_HAND) > 8:
+        _HAND.clear()
+    _HAND[key] = out
+    return out
+
+
+def _raw_stint_of_events(season: int) -> pd.DataFrame | None:
+    """(game_id, idx, stint): builder A's stint index of every event, keyed to the canonical idx (the per-game rank by
+    period, sec and event id, as _io._normalise_events builds it)."""
+    p = _io.events_path(season)
+    if not p.exists():
+        return None
+    need = ["game_id", "period", "sec", "event_id", "stint"]
+    if not set(need) <= set(_io.parquet_columns(p)):
+        return None
+    r = pd.read_parquet(p, columns=need)
+    r["game_id"] = pd.to_numeric(r["game_id"], errors="coerce").astype("int64")
+    r = r.sort_values(["game_id", "period", "sec", "event_id"], kind="mergesort").reset_index(drop=True)
+    r["idx"] = r.groupby("game_id").cumcount().astype(float)
+    return r[["game_id", "idx", "stint"]]
+
+
+def _shift_starts(season: int) -> pd.DataFrame | None:
+    """(game_id, stint, side, player, on_since): when each skater's current shift began (game seconds): the start of
+    his run of contiguous stints within the period."""
+    p = _io.stints_path(season)
+    if not p.exists():
+        return None
+    cols = _io.parquet_columns(p)
+    slots = [c for c in cols if c.startswith("home_s") or c.startswith("away_s")]
+    if not slots or not {"game_id", "stint", "period", "start", "end"} <= set(cols):
+        return None
+    st = pd.read_parquet(p, columns=["game_id", "stint", "period", "start", "end", *slots])
+    parts = []
+    for c in slots:
+        q = st[["game_id", "stint", "period", "start", "end", c]].rename(columns={c: "player"})
+        q = q[q["player"].notna()]
+        q["side"] = 1 if c.startswith("home") else 0
+        parts.append(q)
+    L = pd.concat(parts, ignore_index=True)
+    L["player"] = L["player"].astype("int64")
+    L = L.sort_values(["player", "game_id", "start"], kind="mergesort").reset_index(drop=True)
+    pl, g, per = L["player"].to_numpy(), L["game_id"].to_numpy(), L["period"].to_numpy()
+    s0, e0 = L["start"].to_numpy(float), L["end"].to_numpy(float)
+    cont = np.r_[False, (pl[1:] == pl[:-1]) & (g[1:] == g[:-1]) & (per[1:] == per[:-1]) & (np.abs(s0[1:] - e0[:-1]) < 0.5)]
+    run = np.cumsum(~cont)
+    L["on_since"] = pd.Series(s0).groupby(run).transform("min").to_numpy()
+    return L[["game_id", "stint", "side", "player", "on_since"]]
+
+
+def _add_r4_features(t: pd.DataFrame, e: pd.DataFrame, season: int) -> pd.DataFrame:
+    """NEW_FEATURES for the attempts `t` (keys game_id, idx) from the season's canonical events `e` (the frame
+    attempts() reads: no shootout, typed rows, feed order) and builder A's stints. All known at the shot:
+      prev_y, prev_same           the previous event's y in the shooter's frame; whether it was the shooting team's
+      prev2_type_code, dt_prev2   the event two back: type and seconds since
+      since_fo, fo_zone           seconds since the period's last faceoff; its zone from the shooter's side (O 1, N 0,
+                                  D -1)
+      team_att_10, opp_att_10     attempts (blocked included) by the shooting / the other team in the previous 10 s
+      since_state                 seconds since the strength state (skaters, goalies) last changed in the period
+      shooter_d                   the shooter is a defenceman
+      shift_shooter, shift_for, shift_against   seconds into the shooter's shift; mean current-shift time of the
+                                  shooting and the defending skaters (from the shift charts; NaN without them)"""
+    for c in NEW_FEATURES:
+        t[c] = np.nan
+    if not len(t) or len(e) < 3:
+        return t
+    g = e["game_id"].to_numpy()
+    per = e["period"].to_numpy(float)
+    sec = e["sec"].to_numpy(float)
+    team = e["team"].to_numpy(object)
+    typ = e["type"].to_numpy(object)
+    same = np.r_[False, (g[1:] == g[:-1]) & (per[1:] == per[:-1])]
+    same2 = np.r_[False, False, (g[2:] == g[:-2]) & (per[2:] == per[:-2])]
+    sameteam = same & np.r_[False, team[1:] == team[:-1]]
+    py = np.r_[np.nan, e["y"].to_numpy(float)[:-1]]
+    F = pd.DataFrame({"game_id": g, "idx": e["idx"].to_numpy(float)})
+    F["prev_y"] = np.where(same, np.where(sameteam, py, -py), np.nan)
+    F["prev_same"] = np.where(same, sameteam.astype(float), np.nan)
+    t2 = np.r_[np.array([None, None], dtype=object), typ[:-2]]
+    F["prev2_type_code"] = np.array([_io.TYPE_CODE.get(v, len(_io.TYPE_CODE)) if (s2 and v is not None) else np.nan
+                                     for v, s2 in zip(t2, same2)], float)
+    F["dt_prev2"] = np.where(same2, sec - np.r_[np.nan, np.nan, sec[:-2]], np.nan)
+    key = pd.Series(g.astype(np.int64) * 10 + np.nan_to_num(per).astype(np.int64))
+    isfo = typ == "faceoff"
+    fo_t = pd.Series(np.where(isfo, sec, np.nan)).groupby(key).ffill().to_numpy()
+    zmap = {"O": 1.0, "N": 0.0, "D": -1.0}
+    fz = np.array([zmap.get(z, np.nan) for z in e["zone"].to_numpy(object)], float)
+    fo_z = pd.Series(np.where(isfo, fz, np.nan)).groupby(key).ffill().to_numpy()
+    fo_team = pd.Series(np.where(isfo, team, None), dtype=object).groupby(key).ffill().to_numpy(object)
+    F["since_fo"] = sec - fo_t
+    F["fo_zone"] = np.where(fo_team == team, fo_z, -fo_z)
+    att = np.isin(typ.astype(str), list(_io.ATTEMPTS))
+    tser = pd.Series(team, dtype=object).fillna("?")
+    tcode, tuniq = pd.factorize(tser)
+    tcode = tcode.astype(np.int64)
+    codes = {v: i for i, v in enumerate(tuniq)}
+    base = pd.factorize(key)[0].astype(np.int64) * 64
+    a_keys = np.sort(((base + tcode) * 100000 + sec)[att & np.isfinite(sec)])
+
+    def count(tc):
+        k = (base + tc) * 100000 + sec
+        return (np.searchsorted(a_keys, k, "left") - np.searchsorted(a_keys, k - FLURRY_S, "left")).astype(float)
+    F["team_att_10"] = count(tcode)
+    ih = e["is_home"].to_numpy(float)
+    other = np.where(ih == 1, e["away_team"].to_numpy(object), e["home_team"].to_numpy(object))
+    ocode = np.array([codes.get(v, -1) for v in other], np.int64)
+    F["opp_att_10"] = np.where(ocode >= 0, count(np.maximum(ocode, 0)), np.nan)
+    state = (e["sk_h"].to_numpy(float) * 1000 + e["sk_a"].to_numpy(float) * 100 + e["g_h"].to_numpy(float) * 10
+             + e["g_a"].to_numpy(float))
+    chg = ~same | np.r_[True, state[1:] != state[:-1]]
+    F["since_state"] = sec - pd.Series(np.where(chg, sec, np.nan)).groupby(key).ffill().to_numpy()
+    try:
+        grp = _io.players(season)["group"]
+        F["shooter_d"] = np.array([(1.0 if grp.get(int(p)) == "D" else 0.0) if p == p else np.nan
+                                   for p in e["shooter"].to_numpy(float)], float)
+    except Exception:  # noqa: BLE001
+        F["shooter_d"] = np.nan
+    t = t.drop(columns=[c for c in NEW_FEATURES if c in F.columns]).merge(F, on=["game_id", "idx"], how="left")
+    try:
+        es, ss = _raw_stint_of_events(season), _shift_starts(season)
+    except Exception:  # noqa: BLE001
+        es = ss = None
+    if es is not None and ss is not None and len(es) and len(ss):
+        t = t.merge(es, on=["game_id", "idx"], how="left")
+        side_mean = ss.groupby(["game_id", "stint", "side"])["on_since"].mean().rename("m").reset_index()
+        sec_t = t["sec"].to_numpy(float)
+        iht = t["is_home"].to_numpy(float)
+        k1 = pd.DataFrame({"game_id": t["game_id"].to_numpy(), "stint": t["stint"].to_numpy(), "side": iht})
+        k2 = k1.assign(side=1 - iht)
+        side_mean["side"] = side_mean["side"].astype(float)
+        m_for = k1.merge(side_mean, on=["game_id", "stint", "side"], how="left")["m"].to_numpy(float)
+        m_ag = k2.merge(side_mean, on=["game_id", "stint", "side"], how="left")["m"].to_numpy(float)
+        k3 = pd.DataFrame({"game_id": t["game_id"].to_numpy(), "stint": t["stint"].to_numpy(),
+                           "player": pd.to_numeric(t["shooter"], errors="coerce").to_numpy(float)})
+        s1 = ss.drop_duplicates(["game_id", "stint", "player"])[["game_id", "stint", "player", "on_since"]]
+        k3 = k3.merge(s1.astype({"player": "float64"}), on=["game_id", "stint", "player"], how="left")
+        t["shift_for"] = np.clip(sec_t - m_for, 0, 600)
+        t["shift_against"] = np.clip(sec_t - m_ag, 0, 600)
+        t["shift_shooter"] = np.clip(sec_t - k3["on_since"].to_numpy(float), 0, 600)
+        t = t.drop(columns=["stint"])
+    for c in NEW_FEATURES:
+        t[c] = t[c].astype("float32")
+    return t
 
 
 def _season_rows(season: int) -> tuple[pd.DataFrame, dict]:
@@ -326,11 +496,41 @@ def validate(t: pd.DataFrame, p: np.ndarray) -> dict:
     return out
 
 
+def _train_one(t: pd.DataFrame, y: np.ndarray, w: np.ndarray | None, rounds: int = 3000) -> dict:
+    """One model on the rows of `t`: LightGBM on the manned-net attempts (sample weights `w`), early-stopped on a 10%
+    game holdout and Platt-recalibrated on that holdout; the empty-net logistic on the empty-net rows."""
+    en = t["empty_net"].to_numpy(float) == 1
+    mn = ~en
+    tr = t[mn]
+    ym = y[mn]
+    vm = _io._valid_mask(tr["game_id"].to_numpy())
+    wm = None if w is None else w[mn]
+    bst, info = _io.lgb_train(tr.loc[~vm, FEATURES], ym[~vm], "binary", PARAMS, tr.loc[vm, FEATURES], ym[vm],
+                              rounds=rounds, early=EARLY, weight=None if wm is None else wm[~vm], categorical=CATEGORICAL)
+    pv = bst.predict(tr.loc[vm, FEATURES], num_iteration=bst.best_iteration or None)
+    ab = _io.platt(ym[vm], pv) if vm.sum() > 1000 else (0.0, 1.0)
+    en_coef = en_fit(t[en], y[en]) if en.sum() >= 20 else list(EN_PRIOR)
+    out = {"main": _io.booster_dump(bst), "platt": [float(v) for v in ab], "empty_net": en_coef,
+           "best_iter": int(info["best_iter"]), "n_train": int((~vm).sum())}
+    del bst
+    return out
+
+
+def recency_weights(seasons: np.ndarray, ref: int, half_life: float = HALF_LIFE) -> np.ndarray:
+    """0.5 ** (|start year of ref - start year of the row's season| / half_life)."""
+    yr = np.asarray(seasons, int) // 10000
+    return 0.5 ** (np.abs(int(ref) // 10000 - yr) / float(half_life))
+
+
 def fit(seasons=None, k: int = K_FOLDS, use_cache: bool = True, rounds: int = ROUNDS) -> dict:
-    """Cross-fit and refit on `seasons` (all on disk by default). Writes per-season out-of-fold xG to the
-    cache (`xg_oof/<season>.parquet`) and the fit to the cache."""
+    """Fit on `seasons` (all on disk by default). With WF_MIN_SEASONS or more seasons, **walk-forward**: each season is
+    scored by a model trained on the seasons before it, weighted 0.5 ** ((last training season - season) / HALF_LIFE)
+    (the first season by one trained on the seasons after it, weighted from the next one); the production model is
+    trained on every season, weighted from the last. Fewer seasons: cross-fitted (by season from three, else by game),
+    unweighted, refitted at the folds' mean best iteration. Out-of-sample xG per
+    season goes to the cache (`xg_oof/<season>.parquet`), the fit to the cache."""
     seasons = _io.season_range(seasons)
-    key = _io.file_key(*[_io.events_path(s) for s in seasons], MODEL_VERSION, k)
+    key = _io.file_key(*[_io.events_path(s) for s in seasons], MODEL_VERSION, k, HALF_LIFE)
     if use_cache:
         f = _io.get_fit("xg", MODEL_VERSION)
         if f and f.get("key") == key:
@@ -347,29 +547,56 @@ def fit(seasons=None, k: int = K_FOLDS, use_cache: bool = True, rounds: int = RO
     t = pd.concat(parts, ignore_index=True)
     del parts
     y = t["goal"].to_numpy(float)
-    folds = _io.fold_ids(t["season"].to_numpy(int), t["game_id"].to_numpy(), k)
+    sea = t["season"].to_numpy(int)
+    us = sorted(np.unique(sea).tolist())
     en = t["empty_net"].to_numpy(float) == 1
+    oof = np.full(len(t), np.nan)
     oof_raw = np.full(len(t), np.nan)
-    mn = ~en
-    oof_raw[mn], infos = _io.crossfit(t.loc[mn, FEATURES], y[mn], folds[mn], t["game_id"].to_numpy()[mn], "binary", PARAMS,
-                                      rounds, CATEGORICAL)
-    ok = np.isfinite(oof_raw) & mn
-    ab = _io.platt(y[ok], oof_raw[ok]) if ok.sum() > 1000 else (0.0, 1.0)
-    oof = _io.apply_platt(oof_raw, ab)
-    for f_ in np.unique(folds[en]):                      # empty net: cross-fitted logistic
-        te = en & (folds == f_)
-        tr = en & (folds != f_)
-        oof[te] = en_predict(en_fit(t.loc[tr], y[tr]) if tr.sum() >= 20 else None, t.loc[te])
-    oof_raw[en] = oof[en]
-    en_coef = en_fit(t.loc[en], y[en]) if en.sum() >= 20 else list(EN_PRIOR)
-    best = int(np.mean([i["best_iter"] for i in infos])) if infos else 300
-    model, _ = _io.fit_full(t.loc[mn, FEATURES], y[mn], "binary", PARAMS, rounds=best, categorical=CATEGORICAL)
+    infos: list[dict] = []
+    if len(us) >= WF_MIN_SEASONS:
+        for i, s in enumerate(us):
+            te = sea == s
+            if i > 0:
+                trm = sea < s
+                ref = us[i - 1]
+            else:
+                trm = sea > s
+                ref = us[1]
+            m = _train_one(t[trm], y[trm], recency_weights(sea[trm], ref), rounds)
+            raw = _io.lgb_predict(m["main"], t.loc[te, FEATURES])
+            p = _io.apply_platt(raw, m["platt"])
+            ten = te & en
+            if ten.any():
+                p[en[te]] = en_predict(m["empty_net"], t.loc[ten])
+                raw[en[te]] = p[en[te]]
+            oof[te], oof_raw[te] = p, raw
+            infos.append({"season": int(s), "best_iter": m["best_iter"], "n_train": m["n_train"], "platt": m["platt"]})
+        main = _train_one(t, y, recency_weights(sea, us[-1]), rounds)
+        model, ab, en_coef, best = main["main"], main["platt"], main["empty_net"], main["best_iter"]
+    else:
+        folds = _io.fold_ids(sea, t["game_id"].to_numpy(), k)
+        mn = ~en
+        oof_raw[mn], infos = _io.crossfit(t.loc[mn, FEATURES], y[mn], folds[mn], t["game_id"].to_numpy()[mn], "binary",
+                                          PARAMS, rounds, CATEGORICAL)
+        ok = np.isfinite(oof_raw) & mn
+        ab = _io.platt(y[ok], oof_raw[ok]) if ok.sum() > 1000 else (0.0, 1.0)
+        oof = _io.apply_platt(oof_raw, ab)
+        for f_ in np.unique(folds[en]):                      # empty net: cross-fitted logistic
+            te = en & (folds == f_)
+            tr = en & (folds != f_)
+            oof[te] = en_predict(en_fit(t.loc[tr], y[tr]) if tr.sum() >= 20 else None, t.loc[te])
+        oof_raw[en] = oof[en]
+        en_coef = en_fit(t.loc[en], y[en]) if en.sum() >= 20 else list(EN_PRIOR)
+        best = int(np.mean([i["best_iter"] for i in infos])) if infos else 300
+        model, _ = _io.fit_full(t.loc[mn, FEATURES], y[mn], "binary", PARAMS, rounds=best, categorical=CATEGORICAL)
+        ab = [float(v) for v in ab]
     fitd = {"version": MODEL_VERSION, "ok": True, "key": key, "seasons": [int(s) for s in seasons], "features": FEATURES,
+            "scheme": "walk-forward" if len(us) >= WF_MIN_SEASONS else "crossfit", "half_life": HALF_LIFE,
             "platt": list(ab), "empty_net": en_coef, "best_iter": best, "folds": infos, "models": {"main": model},
             "importance": _io.importances(model, FEATURES), "arena": arenas,
             "validation": validate(t, oof), "validation_uncalibrated": summary(y, oof_raw)}
-    for s in np.unique(t["season"].to_numpy(int)):
-        m = t["season"].to_numpy(int) == s
+    for s in us:
+        m = sea == s
         o = pd.DataFrame({"game_id": t["game_id"].to_numpy()[m], "idx": t["idx"].to_numpy()[m],
                           "xg": oof[m].astype("float32")})
         _write_oof(int(s), o, key)

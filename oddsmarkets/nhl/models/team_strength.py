@@ -324,9 +324,10 @@ def goalie_value(rd: dict, q: str | None, prm: dict | None = None) -> float:
 
 
 def expected_goals(rd: dict, home: str, away: str, goalie_h: str | None = None, goalie_a: str | None = None,
-                   detail: bool = False):
+                   detail: bool = False, ev_h: float | None = None, ev_a: float | None = None):
     """(G_home, G_away) regulation goals (no empty-net goals) on neutral terms; goalie_x None = the team's starter
-    ("avg" = a league-average goalie). With detail=True also a dict of the parts."""
+    ("avg" = a league-average goalie). With detail=True also a dict of the parts. ev_h / ev_a replace the 5v5 xG
+    rates (per 60) of the team-aggregate composition (the player composition, models/players.py)."""
     L = rd.get("league") or DEFAULTS["league"]
     th = (rd.get("teams") or {}).get(home) or AVG
     ta = (rd.get("teams") or {}).get(away) or AVG
@@ -341,8 +342,8 @@ def expected_goals(rd: dict, home: str, away: str, goalie_h: str | None = None, 
     ppm_h = float(np.clip(L["pp_min"] + th.get("draw", 0.0) + ta.get("take", 0.0), 1.0, 12.0))
     ppm_a = float(np.clip(L["pp_min"] + ta.get("draw", 0.0) + th.get("take", 0.0), 1.0, 12.0))
     evm = 60.0 - ppm_h - ppm_a
-    ev_h = max(L["ev_xg60"] + th.get("ev_off", 0.0) + ta.get("ev_def", 0.0), 0.4)
-    ev_a = max(L["ev_xg60"] + ta.get("ev_off", 0.0) + th.get("ev_def", 0.0), 0.4)
+    ev_h = max(L["ev_xg60"] + th.get("ev_off", 0.0) + ta.get("ev_def", 0.0) if ev_h is None else ev_h, 0.4)
+    ev_a = max(L["ev_xg60"] + ta.get("ev_off", 0.0) + th.get("ev_def", 0.0) if ev_a is None else ev_a, 0.4)
     pp_h = max(L["pp_xg60"] + th.get("pp", 0.0) + ta.get("pk", 0.0), 1.0)
     pp_a = max(L["pp_xg60"] + ta.get("pp", 0.0) + th.get("pk", 0.0), 1.0)
     sh = L.get("sh_g60", 0.75) / max(L.get("conv", 1.0), 1e-6)
@@ -556,6 +557,11 @@ def for_season(season: int, through: Any = None, prm: dict | None = None, back: 
     out = r.as_dict()
     out["goalie_prior"] = dict(pr["goalies"])
     out["prior"] = pr
+    if tg_of is D.team_games and season >= 20102011:
+        # the player composition (each team's latest skaters, walk-forward RAPM through `through`): game.features'
+        # lp term; left out on any failure (the game model then reads the team composition in its place)
+        from oddsmarkets.nhl.models import players as PL
+        PL.attach(out, season, through)
     return out
 
 

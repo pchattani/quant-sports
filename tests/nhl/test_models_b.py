@@ -315,3 +315,37 @@ def test_export_and_fitted_fallback(world, monkeypatch, tmp_path):
     t, _ = xg.attempts(_io.events(SEASONS[2]), SEASONS[2])
     p = xg.predict_raw(f, t)
     assert np.isfinite(p).all() and abs(p.mean() - t["goal"].mean()) < 0.01
+
+
+# ----------------------------------------------------------------------------- round 4: xG features, player ratings
+
+def test_round4_xg_features(world):
+    from oddsmarkets.nhl.models import xg
+    t, _ = xg.attempts(_io.events(SEASONS[1]), SEASONS[1])
+    assert set(xg.NEW_FEATURES) <= set(t.columns) and list(xg.FEATURES[:len(xg.BASE_FEATURES)]) == xg.BASE_FEATURES
+    assert t["prev_same"].dropna().isin([0.0, 1.0]).all()
+    assert (t["team_att_10"] >= 0).all() and (t["since_fo"].dropna() >= 0).all()
+    assert t["fo_zone"].dropna().isin([-1.0, 0.0, 1.0]).all()
+    # a rebound is an attempt by the same team within 3 s: at least that one attempt in the previous 10 s
+    reb = t["rebound"] == 1
+    assert reb.any() and (t.loc[reb, "team_att_10"] >= 1).mean() > 0.95
+    assert xg.recency_weights(np.array([20232024, 20242025, 20252026]), 20252026).tolist() == [0.25, 0.5, 1.0]
+
+
+def test_walk_forward_player_ratings(world):
+    from oddsmarkets.nhl.models import players as PL
+    m = PL.SeasonRAPM(SEASONS[2], {})
+    assert m.P > 0
+    before = m.solve()
+    assert all(v == (0.0, 0.0) for v in before.values())             # nothing played yet: the (empty) prior
+    m.advance(None)
+    rat = m.solve()
+    tr = world["truth"]
+    # the planted 5v5 offence and defence show through (as the RAPM test checks, on the walk-forward solver)
+    df = pd.DataFrame([{"p": p, "o": v[0], "d": v[1]} for p, v in rat.items()])
+    assert _io.pearson(df["o"], df["p"].map(tr["off"])) > 0.4
+    assert _io.pearson(df["d"], df["p"].map(tr["def"])) > 0.35
+    lu = PL.lineups(SEASONS[2])
+    assert lu and all(len(v) >= 10 for v in lu.values())
+    c = PL.composite(rat, {}, next(iter(lu.values())))
+    assert c is not None and all(np.isfinite(c))

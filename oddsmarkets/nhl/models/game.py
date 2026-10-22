@@ -256,13 +256,23 @@ def means(F: pd.DataFrame, p: dict) -> tuple[np.ndarray, np.ndarray]:
     sf = sum(float(s.get(k, 0.0)) * F[k].to_numpy(float) for k in SCHED) if len(F) else np.zeros(0)
     base_h = p["b0"] + p["b_xg"] * F["lx_h"].to_numpy(float) + p["b_g"] * F["lg_h"].to_numpy(float)
     base_a = p["b0"] + p["b_xg"] * F["lx_a"].to_numpy(float) + p["b_g"] * F["lg_a"].to_numpy(float)
+    bp = float(p.get("b_p") or 0.0)
+    if bp:
+        # the player composition (models/players.py); without it lp = lx, the team composition
+        lp_h = F["lp_h"].to_numpy(float) if "lp_h" in F else F["lx_h"].to_numpy(float)
+        lp_a = F["lp_a"].to_numpy(float) if "lp_a" in F else F["lx_a"].to_numpy(float)
+        base_h = base_h + bp * np.where(np.isfinite(lp_h), lp_h, F["lx_h"].to_numpy(float))
+        base_a = base_a + bp * np.where(np.isfinite(lp_a), lp_a, F["lx_a"].to_numpy(float))
     hm = p["home"] * F["hfa"].to_numpy(float)
     return np.exp(base_h + hm + 0.5 * sf), np.exp(base_a - 0.5 * sf)
 
 
 def features(g: pd.DataFrame, rd: dict, goalies: dict | None = None) -> pd.DataFrame:
-    """lx_h, lx_a (log xG-composed goals), lg_h, lg_a (log goals-model goals), hfa (1 unless neutral), schedule features. Starters from
-    the games' goalie_h / goalie_a columns (else the team's usual starter); `goalies` {team: id} overrides."""
+    """lx_h, lx_a (log xG-composed goals), lg_h, lg_a (log goals-model goals), lp_h, lp_a (log goals with the 5v5 term
+    from the teams' player composition, rd["players"]; NaN without it), hfa (1 unless neutral), schedule features.
+    Starters from the games' goalie_h / goalie_a columns (else the team's usual starter); `goalies` {team: id}
+    overrides."""
+    from oddsmarkets.nhl.models import players as PL
     rows = []
     gl = goalies or {}
     for r in g.itertuples(index=False):
@@ -270,9 +280,17 @@ def features(g: pd.DataFrame, rd: dict, goalies: dict | None = None) -> pd.DataF
         qa = gl.get(r.away) or (getattr(r, "goalie_a", None) if isinstance(getattr(r, "goalie_a", None), str) else None)
         xh, xa = TS.expected_goals(rd, r.home, r.away, qh, qa)
         gh, ga = TS.goals_model(rd, r.home, r.away)
-        rows.append((math.log(max(xh, 0.05)), math.log(max(xa, 0.05)), math.log(max(gh, 0.05)), math.log(max(ga, 0.05))))
-    a = np.array(rows, float).reshape(-1, 4)
-    F = pd.DataFrame({"lx_h": a[:, 0], "lx_a": a[:, 1], "lg_h": a[:, 2], "lg_a": a[:, 3]}, index=g.index)
+        ev = PL.ev_rates(rd, r.home, r.away) if rd.get("players") else None
+        if ev is not None and (rd.get("mode") or "xg") != "goals":
+            ph, pa = TS.expected_goals(rd, r.home, r.away, qh, qa, ev_h=ev[0], ev_a=ev[1])
+            lp = (math.log(max(ph, 0.05)), math.log(max(pa, 0.05)))
+        else:
+            lp = (math.nan, math.nan)
+        rows.append((math.log(max(xh, 0.05)), math.log(max(xa, 0.05)), math.log(max(gh, 0.05)), math.log(max(ga, 0.05)),
+                     lp[0], lp[1]))
+    a = np.array(rows, float).reshape(-1, 6)
+    F = pd.DataFrame({"lx_h": a[:, 0], "lx_a": a[:, 1], "lg_h": a[:, 2], "lg_a": a[:, 3], "lp_h": a[:, 4], "lp_a": a[:, 5]},
+                     index=g.index)
     F["hfa"] = (~g["neutral"].astype(bool)).astype(float).to_numpy() if "neutral" in g else 1.0
     if "rest_h" in g:
         S = TS.schedule_features(g)
@@ -287,13 +305,15 @@ def features(g: pd.DataFrame, rd: dict, goalies: dict | None = None) -> pd.DataF
 # ── walk-forward rows ────────────────────────────────────────────────────────
 
 def walk_forward(seasons: list[int], games: pd.DataFrame | None = None, tg_of=None, prm_ts: dict | None = None,
-                 refit_days: int = 7, first: int | None = None, progress: bool = False) -> pd.DataFrame:
+                 refit_days: int = 7, first: int | None = None, progress: bool = False, players: bool = False) -> pd.DataFrame:
     """
     One row per game of `seasons` (played or not) with features from ratings fitted only on games before the game's
     refit block (blocks of `refit_days` days; the preseason prior chained from `first`, default the season before
     the earliest), plus outcomes (reg_h, reg_a, ot, so, hs, as_) and closing-line fields. Bounded memory: one
-    season's team-game table at a time.
+    season's team-game table at a time. players=True adds lp_h / lp_a (models/players.py): skater ratings fitted on
+    the season's games before the block, each team's skaters in its previous game (seasons from players.FIRST).
     """
+    from oddsmarkets.nhl.models import players as PL
     tg_of = tg_of or D.team_games
     p = prm_ts or TS.params()
     seasons = sorted(int(s) for s in seasons)
@@ -308,11 +328,24 @@ def walk_forward(seasons: list[int], games: pd.DataFrame | None = None, tg_of=No
         return pd.DataFrame()
     G = D.add_context(G[G["season"].isin(chain)])
     out, last, book = [], None, {}
+    acc = PL.prior_for(chain[0]) if players and chain[0] > PL.FIRST else {}
     for s in chain:
         tg = tg_of(s)
         gs = G[G["season"] == s]
         teams = sorted(set(gs["home"]) | set(gs["away"])) or None
         prior = TS.preseason_prior(last, s, p, book, teams)
+        pm = lb = None
+        nxt_prior = None
+        if players and s not in seasons:
+            # a season only chained through: the committed prior of the next season stands in for its fit (CI)
+            nxt_prior = (PL.committed().get("priors") or {}).get(str(D.next_season(s)))
+            if nxt_prior:
+                acc = PL._as_prior(nxt_prior)
+        if players and s >= PL.FIRST and not nxt_prior:
+            try:
+                pm, lb = PL.SeasonRAPM(s, acc), (PL.LineupBook(s) if s in seasons else None)
+            except Exception as exc:                              # noqa: BLE001
+                logger.warning("walk_forward players %s: %s", s, exc)
         if s in seasons and not gs.empty:
             d0 = gs["date"].min()
             blk = ((gs["date"] - d0).dt.days // max(refit_days, 1)).to_numpy()
@@ -323,6 +356,9 @@ def walk_forward(seasons: list[int], games: pd.DataFrame | None = None, tg_of=No
                 rd = r.as_dict()
                 rd["goalie_prior"] = prior["goalies"]
                 F = features(gb, rd)
+                if pm is not None and lb is not None:
+                    pm.advance(thr)
+                    F["lp_h"], F["lp_a"] = _player_lp(gb, rd, pm.solve(), acc, lb)
                 F["n_rated"] = r.league.get("n_games", 0)
                 F["net_h"] = [rd["teams"].get(t, {}).get("net", 0.0) for t in gb["home"]]
                 F["net_a"] = [rd["teams"].get(t, {}).get("net", 0.0) for t in gb["away"]]
@@ -333,12 +369,36 @@ def walk_forward(seasons: list[int], games: pd.DataFrame | None = None, tg_of=No
             end = TS.fit(tg, s, None, prior, p, teams=teams)
             TS.update_goalie_book(book, end)
             last = end
+        if pm is not None:
+            pm.advance(None)
+            acc = {**acc, **pm.solve()}
         if progress:
             logger.info("walk_forward %s: %d games", s, len(gs))
         del tg
     if not out:
         return pd.DataFrame()
     return pd.concat(out, ignore_index=True)
+
+
+def _player_lp(gb: pd.DataFrame, rd: dict, rat: dict, prior: dict, lb) -> tuple[np.ndarray, np.ndarray]:
+    """lp_h, lp_a of a block's games: each team's skaters in its game before this one, rated by `rat`."""
+    from oddsmarkets.nhl.models import players as PL
+    L = rd.get("league") or {}
+    base = float(L.get("ev_xg60", 2.45))
+    lh, la = np.full(len(gb), np.nan), np.full(len(gb), np.nan)
+    if (rd.get("mode") or "xg") == "goals":
+        return lh, la
+    for i, r in enumerate(gb.itertuples(index=False)):
+        ch = PL.composite(rat, prior, lb.lineup(r.home, r.date))
+        ca = PL.composite(rat, prior, lb.lineup(r.away, r.date))
+        if ch is None or ca is None:
+            continue
+        qh = getattr(r, "goalie_h", None)
+        qa = getattr(r, "goalie_a", None)
+        xh, xa = TS.expected_goals(rd, r.home, r.away, qh if isinstance(qh, str) else None, qa if isinstance(qa, str) else None,
+                                   ev_h=base + ch[0] - ca[1], ev_a=base + ca[0] - ch[1])
+        lh[i], la[i] = math.log(max(xh, 0.05)), math.log(max(xa, 0.05))
+    return lh, la
 
 
 # ── fitting ──────────────────────────────────────────────────────────────────
@@ -366,10 +426,14 @@ def _played_rows(rows: pd.DataFrame) -> pd.DataFrame:
 
 
 def fit_means(rows: pd.DataFrame, p: dict | None = None, use_goals: bool = True) -> dict:
-    """b0, b_xg, b_g, home, s from regulation goals of played walk-forward rows (Poisson GLM, small ridge on all but
-    the intercept)."""
+    """b0, b_xg, b_g, b_p, home, s from regulation goals of played walk-forward rows (Poisson GLM, small ridge on all but
+    the intercept). b_p (the player composition, lp_h / lp_a) is fitted when the rows carry it (walk_forward with
+    players=True), on the rows that have it; otherwise it is 0."""
     p = dict(p or params())
     r = _played_rows(rows)
+    use_p = "lp_h" in r and "lp_a" in r and bool((r["lp_h"].notna() & r["lp_a"].notna()).mean() > 0.5)
+    if use_p:
+        r = r[r["lp_h"].notna() & r["lp_a"].notna()]
     if len(r) < 200:
         return p
     S = TS.schedule_features(r) if "rest_h" in r else pd.DataFrame({k: np.zeros(len(r)) for k in SCHED}, index=r.index)
@@ -378,7 +442,8 @@ def fit_means(rows: pd.DataFrame, p: dict | None = None, use_goals: bool = True)
     lx = np.concatenate([r["lx_h"].to_numpy(float), r["lx_a"].to_numpy(float)])
     lg = np.concatenate([r["lg_h"].to_numpy(float), r["lg_a"].to_numpy(float)])
     hm = np.concatenate([r["hfa"].to_numpy(float), np.zeros(n)])
-    cols = [one, lx] + ([lg] if use_goals else []) + [hm]
+    lp = np.concatenate([r["lp_h"].to_numpy(float), r["lp_a"].to_numpy(float)]) if use_p else None
+    cols = [one, lx] + ([lp] if use_p else []) + ([lg] if use_goals else []) + [hm]
     for k in SCHED:
         v = S[k].to_numpy(float)
         cols.append(np.concatenate([0.5 * v, -0.5 * v]))
@@ -390,6 +455,10 @@ def fit_means(rows: pd.DataFrame, p: dict | None = None, use_goals: bool = True)
     i = 0
     p["b0"] = float(b[i]); i += 1
     p["b_xg"] = float(b[i]); i += 1
+    if use_p:
+        p["b_p"] = float(b[i]); i += 1
+    else:
+        p["b_p"] = 0.0
     if use_goals:
         p["b_g"] = float(b[i]); i += 1
     else:

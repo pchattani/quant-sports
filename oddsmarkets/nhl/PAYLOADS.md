@@ -121,6 +121,8 @@ Names above are kept; additions and the exact shapes the front end reads:
   (goalies: shots faced, `faced: true`), onice {5v5 values (toi5, cf60, ca60, cf_pct, xgf60, xga60, xgf_pct, gf60, ga60,
   gf_pct, on_sh_pct, on_sv_pct, pdo, rel and adjusted) + pct + by_strength {"5v5" | "pp" | "pk": {toi (min), cf60, ca60, ff60,
   fa60, sf60, sa60, gf60, ga60, xgf60, xga60, cf_pct, xgf_pct, gf_pct}}}, rapm {rapm_* incl. _se + pct}, deployment,
+  game_model {o, d (walk-forward RAPM, xG/60), team, toi5 (expected 5v5 s a game), share (5 x lineup TOI share), xgd60
+  (share x (o + d)): the game model's player term, models/players.py; skaters in a latest lineup, others o and d only},
   projection, edge, linemates [[pid, name, toi_min]] (shared 5v5 time), pct; goalies `goalie` (catalogue values)};
   similar [[pid, name, team, distance]]. Shot grid arrays (`att`, `xg`, `g`) use the teams.json grid (row-major,
   iy * nx + ix); `points` are the last 400 unblocked attempts [x, y, xg, goal]. seasons[].values / plus are nested dicts

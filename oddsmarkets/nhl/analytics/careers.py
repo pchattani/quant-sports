@@ -190,6 +190,13 @@ def current_blocks(ctx, sk: dict | None, gk: dict | None) -> dict[str, dict]:
     keys_proj = ["proj_pts", "proj_g", "proj_xgf_pct", "pts_pace"]
     from oddsmarkets.nhl.analytics import adapters
     proj_m = adapters.projections(ctx)
+    gm_w: dict = {}
+    if ctx.use_models:
+        try:                        # the game model's player term (models/players.py): rating and lineup weight now
+            from oddsmarkets.nhl.models import players as PL
+            gm_w = PL.player_table(ctx.season)
+        except Exception as exc:    # noqa: BLE001
+            ctx.model_errors["players"] = f"{type(exc).__name__}: {exc}"
     for p, r in SP.items():
         b = out.setdefault(p, {"season": ctx.season, "kind": "skater"})
         v = r.get("values") or {}
@@ -199,6 +206,9 @@ def current_blocks(ctx, sk: dict | None, gk: dict | None) -> dict[str, dict]:
             b["onice"]["by_strength"] = by_str[p]
         b["rapm"] = {k: v.get(k) for k in keys_rapm} | {"pct": {k: pc.get(k) for k in keys_rapm if pc.get(k) is not None}}
         b["deployment"] = {k: v.get(k) for k in keys_dep}
+        w = gm_w.get(int(p)) if str(p).isdigit() else None
+        if w:
+            b["game_model"] = w
         b["projection"] = {k: v.get(k) for k in keys_proj} | ({"model": proj_m.get(p)} if proj_m.get(p) else {})
         e = edge.player_block(ctx.season, p)
         if e:

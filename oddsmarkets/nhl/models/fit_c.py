@@ -59,12 +59,12 @@ def fit_all(committed: bool = True, season_sims: int = 1000, se_scales=(0.5, 0.7
         D.write_json(D.FITTED / "team_strength_params.json", {"version": TS.VERSION, "result": p})
     G = D.games_frame(sorted(set(seasons) | {D.prev_season(s) for s in seasons}))
     t1 = time.perf_counter()
-    wf = GM.walk_forward(seasons, games=G, prm_ts=p)
+    wf = GM.walk_forward(seasons, games=G, prm_ts=p, players=True)
     log["walk_forward_s"] = round(time.perf_counter() - t1, 1)
     wf.to_parquet(D.c_cache() / "wf_rows.parquet", index=False)
     gp = GM.fit_from_rows(wf)
     GM.save_params(gp, committed=committed)
-    log["game"] = {k: gp.get(k) for k in ("b0", "b_xg", "b_g", "home", "s", "theta", "tie_k", "r_en", "k_pull", "k_ot",
+    log["game"] = {k: gp.get(k) for k in ("b0", "b_xg", "b_p", "b_g", "home", "s", "theta", "tie_k", "r_en", "k_pull", "k_ot",
                                          "so_home", "n", "loglik_reg")}
     try:
         af = AWD.fit()

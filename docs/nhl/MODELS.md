@@ -67,7 +67,8 @@ Contents
 
 | Model | File (version) | Fitted where | Used for |
 |---|---|---|---|
-| Expected goals | `xg.py` (`nhlxg-2`) | `fitted/xg.json` + `xg_main.txt.gz` (2024–25, 2025–26) | every xG on the site, GSAx, GAx, on-ice xG, RAPM |
+| Expected goals | `xg.py` (`nhlxg-4`, 22 Oct 2026; section 14.7) | `fitted/xg.json` + `xg_main.txt.gz` (2009–10 to 2025–26, walk-forward) | every xG on the site, GSAx, GAx, on-ice xG, RAPM |
+| Player term | `players.py` (`nhlplayers-1`, section 14.7) | `fitted/player_ratings.json` (priors for 2024–25 to 2026–27, expected TOI) | the game model's lp term, player pages |
 | Shooting | `shooting.py` (`nhlshoot-1`) | – (per season; k from stabilise) | GAx, shooting talent |
 | Goaltending | `goalies.py` (`nhlgoal-1`) | – (per season) | GSAx by danger, shot type, situation |
 | Enriched stints | `_stints.py` (`nhlstints-2`) | – (per season) | on-ice rates, lines, RAPM, value |
@@ -885,6 +886,33 @@ Write-up: `docs/research/nhl_edge.md`, "Round 3" (code `scripts/nhl_edge_r3.py`;
   (sigma -> 0) and a 4-11% narrower spread of expected totals; that improves P(over) on the test seasons by -0.0005
   [-0.0011, +0.0001], slope 0.29 -> 0.32: not significant. The P(over) slope problem comes from the closing line
   holding information the model lacks, not from the score distribution.
+
+### 14.7 Round 4: the xG model and the player term (22 October 2026)
+
+Write-up, pre-registration and every number: `docs/research/nhl_edge.md`, "Round 4" (code `scripts/nhl_edge_r4.py`).
+Both changes were promoted; they supersede sections 2.1, 2.3, 9 and 10.1 where they differ.
+
+- **Expected goals (`nhlxg-4`).** Thirteen new features (`xg.NEW_FEATURES`): the previous event's y and team, the event
+  two back (type, seconds), seconds since the period's last faceoff and its zone, attempts by each team in the previous
+  10 s, seconds since the strength state changed, a defenceman shooter, and from the shift charts the shooter's
+  current-shift time and the mean current-shift time of both sides' skaters. Handedness is read from any season's
+  store (`hand_map`; the 2023–24 to 2025–26 stores miss it for 3–24% of attempts). The fit is **walk-forward** with
+  five or more seasons (`WF_MIN_SEASONS`): each season scored by a model trained on the seasons before it, rows
+  weighted 0.5^(years back) (`HALF_LIFE` 1), early-stopped (`EARLY` 50) and Platt-recalibrated on a 10% game holdout;
+  the current season by the model on every completed season. Fewer seasons keep the old cross-fit. Held-out 2025–26:
+  0.2186 against 0.2257 for the old recipe trained the same way (−0.0071 [−0.0077, −0.0065]), calibration better; the
+  recency weighting carries almost all of it. On 2026–27 (out of sample for both) MoneyPuck leads by 0.0030 a shot
+  instead of 0.0107. Committed fit: 17 seasons, best iteration 78, Platt (−0.115, 0.959), walk-forward log-loss 0.2100.
+- **Player term (`players.py`).** Walk-forward RAPM on 5v5 xG (`rapm.design`, ridge `LAM` 1,000, prior `CARRY` 0.7 ×
+  the skater's latest end-of-season estimate) refitted from the season's games before the cutoff (`SeasonRAPM`); each
+  team's latest lineup (`LineupBook`: its skaters in its last game, weighted by their mean 5v5 TOI over their last ten
+  games) gives OP and DP; `team_strength.expected_goals(ev_h=…, ev_a=…)` with the 5v5 rate league + OP_h − DP_a gives
+  G^p, and the game model adds b_p · log G^p (`game.means`; without a player block lp falls back to lx).
+  `team_strength.for_season` attaches the block (`players.attach`), `game.walk_forward(players=True)` computes it per
+  game (fit_c and the CI walk-forward prices use it). Committed `game_params.json`: b_xg −0.335, b_p 0.861, b_g 0.497,
+  home 0.078. Test seasons 2023–26 against round 3: −0.0017 [−0.0027, −0.0005] at the close, −0.0016 [−0.0027,
+  −0.0005] at the open, no calibration loss; gap to the close 0.0058 → 0.0041; level with the ESPN open and Kalshi
+  within the CI; totals P(over) slope 0.29 → 0.47.
 
 ---
 
