@@ -148,6 +148,8 @@ def box_frame(season: int, st: dict | None = None) -> pd.DataFrame:
                     if not r:
                         continue
                     pid = str(r[0])
+                    if not data.real_team(pid):     # ESPN's team row (negative id, name "Team"): not a player
+                        continue
                     d = per.setdefault(pid, {})
                     for j, c in enumerate(cols):
                         k = mp.get(c)

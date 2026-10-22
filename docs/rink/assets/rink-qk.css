@@ -209,3 +209,20 @@ body.qk { font-size: var(--fs-md); }
 .qk .rk-st td .qk-badge { vertical-align: middle; }
 
 @media (max-width: 720px) { .rk-kpis .qk-kpi-value { font-size: var(--fs-lg); } .rk-kpis .qk-kpi { padding: 10px 12px; } }
+
+/* ═════════════════════════════════ 4. Design System 2.0 (the reference pages: overview, game, player, compare) */
+.rk-games.rk-gc { grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); }
+#ov-kpis { margin-top: var(--sp-2); }
+.rk-kpis .qk-stats { margin-bottom: var(--sp-5); }
+.rk-lead .v { font: 800 var(--fs-md) var(--font-display); font-stretch: var(--stretch-display); font-variant-numeric: tabular-nums; }
+.rk-lead li:first-child .v { color: var(--signal); }
+.rk-score { font-family: var(--font-display); font-weight: 900; font-stretch: var(--stretch-display); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.rk-score-pre { font-size: clamp(1.4rem, 3.5vw, 2rem); color: var(--ink-2); }
+.rk-gh .side .nm { font-family: var(--font-display); font-stretch: var(--stretch-display); font-weight: 800; letter-spacing: 0; }
+.rk-hero2 .rk-hero-bar { position: relative; max-width: 720px; margin: var(--sp-5) auto 0; display: grid; gap: 8px; }
+.rk-hero2 .rk-hero-bar > .qk-kicker { text-align: center; }
+.rk-hero-mkt { display: flex; justify-content: center; font-size: var(--fs-xs); }
+.rk-cmp-pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); }
+.rk-cmp-slot { display: grid; gap: 6px; padding-left: 10px; border-left: 3px solid var(--ec); min-width: 0; }
+.rk-cmp-slot .qk-input { width: 100%; min-width: 0; }
+@media (max-width: 720px) { .rk-cmp-pick { grid-template-columns: 1fr; } }

@@ -294,13 +294,15 @@ def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, frozen: d
     st_idx = st.groupby("game_id").indices if len(st) else {}
     pg_idx = pg.groupby("game_id").indices if len(pg) else {}
     gg_idx = gg.groupby("game_id").indices if len(gg) else {}
+    # current season only: shift charts there can still be filling in (past seasons' pages keep their signatures)
+    st_sec = st.groupby("game_id")["dur"].sum().round().astype(int).to_dict() if ctx.current and len(st) and "dur" in st else {}
     lo = cfg["today"] - timedelta(days=1)
     hi = cfg["today"] + timedelta(days=cfg["days_ahead"])
     due, new_sigs = [], {}
     for gid, g in ctx.games.items():
         if gid not in by_card:
             continue
-        s = GM.page_sig(g, len(ev_idx.get(gid, ())), mv)
+        s = GM.page_sig(g, len(ev_idx.get(gid, ())), mv, st_sec.get(gid, 0) if ctx.current else None)
         new_sigs[gid] = s
         exists = (gdir / f"{gid}.json").exists()
         try:

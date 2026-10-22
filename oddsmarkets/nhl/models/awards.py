@@ -31,6 +31,7 @@ from __future__ import annotations
 import logging
 import math
 import unicodedata
+import warnings
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -325,7 +326,13 @@ def candidates(award: str, ps: pd.DataFrame) -> pd.DataFrame:
 
 def _z(X: np.ndarray) -> np.ndarray:
     X = np.where(np.isfinite(X), X, np.nan)
-    mu = np.nanmean(X, 0) if len(X) else np.zeros(X.shape[1])
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)          # "mean of empty slice" for an all-missing feature
+        mu = np.nanmean(X, 0) if len(X) else np.zeros(X.shape[1])
+    # a feature missing for every candidate (e.g. B's value not on disk for a season) contributes nothing; left as
+    # NaN it made the whole likelihood NaN and the fit stopped at its zero start (Oct 2026 audit: Hart, Norris and
+    # Selke committed with all-zero coefficients, so every candidate got the same probability)
+    mu = np.where(np.isfinite(mu), mu, 0.0)
     X = np.where(np.isnan(X), mu, X)
     sd = X.std(0)
     return (X - X.mean(0)) / np.where(sd > 1e-9, sd, 1.0)
@@ -391,8 +398,8 @@ def fit(seasons: list[int] | None = None, ps_of=None) -> dict:
             p /= p.sum()
             ll += math.log(max(p[y], 1e-12))
             top1 += int(np.argmax(p) == y)
-        out["awards"][aw] = {"ok": True, "features": FEATURES[aw], "beta": b.tolist(), "n_seasons": len(groups),
-                             "missing": miss, "loglik": ll, "top1": top1}
+        out["awards"][aw] = {"ok": usable_fit({"ok": True, "beta": b.tolist(), "loglik": ll}), "features": FEATURES[aw],
+                             "beta": b.tolist(), "n_seasons": len(groups), "missing": miss, "loglik": ll, "top1": top1}
     return out
 
 
@@ -400,6 +407,16 @@ def save(fitd: dict, committed: bool = False) -> None:
     D.write_json(D.c_cache() / "awards_fit.json", fitd)
     if committed:
         D.write_json(D.FITTED / "awards_fit.json", fitd)
+
+
+def usable_fit(f: dict | None) -> bool:
+    """A fitted award is usable when it says ok, its coefficients are finite and not all zero (the optimiser's start)
+    and its log-likelihood is finite; otherwise every candidate would get the same probability."""
+    if not f or not f.get("ok"):
+        return False
+    b = np.asarray(f.get("beta") or [], float)
+    ll = f.get("loglik")
+    return bool(len(b) and np.isfinite(b).all() and np.abs(b).max() > 1e-9 and ll is not None and np.isfinite(float(ll)))
 
 
 def load_fit() -> dict | None:
@@ -468,10 +485,20 @@ def predict(season: int, ps: pd.DataFrame | None = None, fitd: dict | None = Non
         if not f.get("ok"):
             out[a] = {"ok": False, "reason": "award model not fitted"}
             continue
+        if not usable_fit(f):
+            out[a] = {"ok": False, "reason": "award model fit degenerate (needs a refit)"}
+            continue
         pr = logit_probs(a, proj, f["beta"], played_share)
         out[a] = {"ok": bool(pr), "probs": dict(sorted(pr.items(), key=lambda kv: -kv[1])),
                   "names": {k: names.get(k) for k in pr}, "basis": "clogit", "played_share": played_share}
     prev_rate = {}
+    if prev is None:
+        # last season's rates shrink the Art Ross / Rocket Richard simulation; the build never passed them, so before
+        # 20 games both races were missing (Oct 2026 audit). The stats REST summary on disk is enough (no model run).
+        try:
+            prev = _from_stats_files(D.prev_season(season))
+        except Exception:  # noqa: BLE001 - a missing or unreadable file only means no prior
+            prev = None
     if prev is not None and len(prev):
         pv = prev[prev["gp"].fillna(0) >= 20]
         prev_rate = {"pts": dict(zip(pv["player"].astype(str), pv["pts"] / pv["gp"])),

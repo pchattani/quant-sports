@@ -31,6 +31,10 @@ from oddsmarkets.nfl.analytics import teamsref
 
 logger = logging.getLogger(__name__)
 
+# the team of each credited tackler / fumble forcer (nflfastR): the tackler after a turnover or on a punt is not the defteam
+TEAM_CREDIT_COLS = ["solo_tackle_1_team", "solo_tackle_2_team", "assist_tackle_1_team", "assist_tackle_2_team",
+                    "assist_tackle_3_team", "assist_tackle_4_team", "tackle_with_assist_1_team", "tackle_with_assist_2_team",
+                    "forced_fumble_player_1_team", "forced_fumble_player_2_team"]
 PBP_COLS = [
     "game_id", "play_id", "season", "week", "season_type", "game_date", "home_team", "away_team", "posteam", "defteam",
     "posteam_type", "yardline_100", "qtr", "down", "ydstogo", "time", "game_seconds_remaining", "half_seconds_remaining",
@@ -54,6 +58,12 @@ PBP_COLS = [
     "result", "total", "spread_line", "total_line", "div_game", "timeout", "timeout_team", "td_team", "punt_blocked",
     "return_yards", "play_deleted", "aborted_play", "special_teams_play", "fourth_down_converted",
     "fourth_down_failed", "third_down_converted", "third_down_failed", "out_of_bounds", "order_sequence",
+    # official-style yardage (laterals credited to the lateral player) and every credited defender with his team
+    "passing_yards", "receiving_yards", "rushing_yards", "pass_attempt", "rush_attempt", "td_player_id",
+    "lateral_receiver_player_id", "lateral_receiving_yards", "lateral_rusher_player_id", "lateral_rushing_yards",
+    "solo_tackle_2_player_id", "assist_tackle_2_player_id", "assist_tackle_3_player_id", "assist_tackle_4_player_id",
+    "tackle_with_assist_2_player_id", "tackle_for_loss_2_player_id", "forced_fumble_player_2_player_id",
+    *TEAM_CREDIT_COLS,
 ]
 FTN_COLS = ["nflverse_game_id", "nflverse_play_id", "is_motion", "is_play_action", "is_screen_pass", "is_rpo", "is_trick_play",
             "is_qb_out_of_pocket", "is_interception_worthy", "is_throw_away", "is_catchable_ball", "is_contested_ball",
@@ -104,10 +114,14 @@ def load_release(release: str, season: int | None = None, columns: list[str] | N
         from oddsmarkets.nfl.sources import nflverse as NV
         f = getattr(NV, "load", None)
         if f is not None:
+            # the kind (NGS passing / rushing / receiving, QBR season / week) must reach the loader: without it every
+            # kind read the release's first file, so NGS rushing and receiving were the passing rows (separation,
+            # cushion, 8-man boxes empty on every season until 22 Oct 2026)
+            kw = {"kind": kind} if kind else {}
             try:
-                df = f(release, season, columns=columns) if columns is not None else f(release, season)
+                df = f(release, season, columns=columns, **kw) if columns is not None else f(release, season, **kw)
             except TypeError:
-                df = f(release, season)
+                df = None if kind else f(release, season)
     except Exception as exc:                                     # noqa: BLE001
         logger.debug("nflverse.load(%s, %s): %s", release, season, exc)
         df = None
@@ -228,7 +242,7 @@ class SeasonContext:
             df = df.loc[:, ~df.columns.duplicated()]
             if "play_deleted" in df:
                 df = df[df["play_deleted"].fillna(0) != 1]
-            for c in ("posteam", "defteam", "home_team", "away_team", "penalty_team", "timeout_team", "td_team"):
+            for c in ("posteam", "defteam", "home_team", "away_team", "penalty_team", "timeout_team", "td_team", *TEAM_CREDIT_COLS):
                 if c in df:
                     df[c] = df[c].map(lambda x: teamsref.canon_abbr(x, self.season) if isinstance(x, str) else x)
             self._pbp = df.reset_index(drop=True)

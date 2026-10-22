@@ -190,7 +190,7 @@ def build(ctx: SeasonContext, players_cat: dict | None = None, lineup_tables: di
     fut = ctx.futures or {}
     champ = ((fut.get("champion") or {}).get("probs") or {}) if isinstance(fut.get("champion"), dict) else {}
     pcat = (players_cat or {}).get("players") or {}
-    sh = ctx.shots
+    sh = ctx.season_shots
     shot_by_team = dict(tuple(sh.groupby("team"))) if sh is not None and not sh.empty else {}
     def_by_team: dict[str, pd.DataFrame] = {}
     if sh is not None and not sh.empty:
@@ -200,7 +200,7 @@ def build(ctx: SeasonContext, players_cat: dict | None = None, lineup_tables: di
             opp[(gid, str(g.get("away")))] = str(g.get("home"))
         dt = pd.Series([opp.get((g, t)) for g, t in zip(sh["game_id"].astype(str), sh["team"].astype(str))], index=sh.index)
         def_by_team = dict(tuple(sh.assign(def_team=dt).groupby("def_team")))
-    ts = ctx.team_stints
+    ts = ctx.season_team_stints
     oo_all = {}
     tot = (ctx.pbp_totals or {}).get("teams") or {}
     b2b = _b2b(ctx)

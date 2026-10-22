@@ -110,6 +110,33 @@ class Build:
         return payload
 
 
+def pick_calibration(committed: Path, cache: Path | None = None) -> dict:
+    """calibration.json: the newer of the cached walk-forward backtest (`models.backtest.OUT`) and the committed
+    calibration.json, by `generated_at`. The full backtest runs locally and its output is committed; CI restores an
+    older model cache, which must not overwrite a newer committed run (it did from 2 to 22 October 2026)."""
+    from oddsmarkets.f1.models import backtest as bt
+    cache = Path(bt.OUT) if cache is None else cache
+    old = None
+    if committed.exists():
+        try:
+            old = json.loads(committed.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            old = None
+        if not (old or {}).get("ok"):
+            old = None
+    if not cache.exists():
+        if old:
+            return old
+        return {"ok": False, "reason": "no cached backtest (run oddsmarkets.f1.models.backtest.backtest())", "updated_at": _now()}
+    d = json.loads(cache.read_text(encoding="utf-8"))
+    if old and str(old.get("generated_at") or "") > str(d.get("generated_at") or ""):
+        return old
+    d.update({"ok": True, "updated_at": d.get("generated_at") or _now(), "races": d.get("races"),
+              "seasons": sorted(int(y) for y in (d.get("seasons_used") or {})), "skipped": d.get("skipped") or {},
+              "summary": bt.summary_table(d)})
+    return d
+
+
 def current_season(years: list[int]) -> int | None:
     """The newest season on disk with a calendar."""
     for y in sorted(years, reverse=True):
@@ -305,23 +332,7 @@ def main(argv: list[str] | None = None) -> int:
     b.write_or_fail("lab.json", "lab", lambda: ssn.lab_payload({y: c for y, c in cats.items() if c}, current))
     b.write_or_fail("circuits.json", "circuits site-wide", lambda: shared["circuits"] or None)
 
-    def calibration():
-        from oddsmarkets.f1.models import backtest as bt
-        if not Path(bt.OUT).exists():
-            # CI has no backtest cache (the walk-forward run is local and slow): keep the
-            # committed calibration.json rather than replacing it with "not built".
-            prev = an.data_root() / "calibration.json"
-            if prev.exists():
-                old = json.loads(prev.read_text(encoding="utf-8"))
-                if old.get("ok"):
-                    return old
-            return {"ok": False, "reason": "no cached backtest (run oddsmarkets.f1.models.backtest.backtest())", "updated_at": _now()}
-        d = json.loads(Path(bt.OUT).read_text(encoding="utf-8"))
-        d.update({"ok": True, "updated_at": d.get("generated_at") or _now(), "races": d.get("races"),
-                  "seasons": sorted(int(y) for y in (d.get("seasons_used") or {})), "skipped": d.get("skipped") or {},
-                  "summary": bt.summary_table(d)})
-        return d
-    b.write_or_fail("calibration.json", "calibration", calibration)
+    b.write_or_fail("calibration.json", "calibration", lambda: pick_calibration(an.data_root() / "calibration.json"))
 
     def fantasy_backtest():
         from oddsmarkets.f1.analytics import fantasy as FT

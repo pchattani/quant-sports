@@ -98,7 +98,9 @@ def _actors(typ: str, d: dict) -> tuple:
     if typ == "hit":
         return None, None, None, None, d.get("hittingPlayerId"), d.get("hitteePlayerId")
     if typ == "penalty":
-        return None, None, None, None, d.get("committedByPlayerId") or d.get("servedByPlayerId"), d.get("drawnByPlayerId")
+        # the offender only: a bench minor (typeCode BEN) has no committedByPlayerId, and the player who serves it is
+        # not charged with it (the NHL's PIM and penalties taken count it against the team, not the server)
+        return None, None, None, None, d.get("committedByPlayerId"), d.get("drawnByPlayerId")
     if typ in ("giveaway", "takeaway"):
         return None, None, None, None, d.get("playerId"), None
     return None, None, None, None, d.get("playerId"), None

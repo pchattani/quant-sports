@@ -111,3 +111,17 @@ def test_broken_payload_does_not_raise(tmp_path):
     (d / "cfb" / "2026" / "schedule.json").write_text("{not json", encoding="utf-8")
     idx = site.build_index(d, NOW)
     assert idx["levels"]["cfb"]["ok"] and idx["levels"]["cfb"]["today"] == []
+
+
+def test_pick_games_today_is_the_us_sports_day():
+    """A Wednesday 8 pm Eastern game (00:00Z Thursday) is Wednesday's result, not Thursday's; a 10:30 pm Pacific
+    kick-off (05:30Z) stays on its evening."""
+    now = datetime(2026, 10, 22, 19, 17, tzinfo=timezone.utc)            # Thursday afternoon Eastern
+    cards = [fixture.card("wed_late", "2026-10-22T00:00:00Z", "post", "1", "2", p=0.5),
+             fixture.card("thu", "2026-10-22T23:00:00Z", "pre", "1", "2", p=0.5),
+             fixture.card("thu_pac", "2026-10-23T05:30:00Z", "pre", "1", "2", p=0.5),
+             fixture.card("fri", "2026-10-23T23:00:00Z", "pre", "1", "2", p=0.5)]
+    today, nxt, last = site.pick_games(cards, now)
+    assert [c["id"] for c in today] == ["thu", "thu_pac"]
+    assert [c["id"] for c in last] == ["wed_late"]
+    assert [c["id"] for c in nxt] == ["fri"]

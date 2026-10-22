@@ -31,7 +31,7 @@ from oddsmarkets.baseball import analytics as an
 from oddsmarkets.baseball.analytics import pitchagg as PG
 
 logger = logging.getLogger(__name__)
-AGG_VERSION = "agg-4"
+AGG_VERSION = "agg-5"   # agg-5: bat_last / pit_last in date order (traded players)
 SCORES_VERSION = "scores-1"
 WPA_VERSION = "wpa-1"
 CHUNK = 150_000

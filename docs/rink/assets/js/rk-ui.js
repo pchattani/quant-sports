@@ -60,14 +60,15 @@ U.tcol = abbr => {
   const c = RK.teamColourRaw(abbr);
   return QK.color.parse(c) ? QK.color.team(c) : QK.cssVar('--c-other');
 };
-/* Two clubs' chart colours that can be told apart (kit rule: the second falls back to the market orange). */
+/* Two clubs' chart colours that can be told apart (kit rule QK.color.distinct: the second falls back to its alternate colour, then the win-probability orange). */
 U.pair = (a, b) => {
   const ca = U.tcol(a); let cb = U.tcol(b);
-  if (QK.color.contrast(ca, cb) < 1.6) {
+  const ok = (x, y) => (QK.color.distinct ? QK.color.distinct(x, y) : QK.color.contrast(x, y) >= 1.6);
+  if (!ok(ca, cb)) {
     const alt = RK.teamAlt(b);
     const alt2 = QK.color.parse(alt) ? QK.color.team(alt) : null;
-    cb = alt2 && QK.color.contrast(ca, alt2) >= 1.6 ? alt2 : QK.cssVar('--c-2');
-    if (QK.color.contrast(ca, cb) < 1.6) cb = QK.cssVar('--c-1');
+    cb = alt2 && ok(ca, alt2) ? alt2 : QK.cssVar('--wp-b');
+    if (!ok(ca, cb)) cb = QK.cssVar('--wp-a');
   }
   return [ca, cb];
 };
@@ -131,5 +132,75 @@ U.alive = el => !!el && el.isConnected;
 U.ord = n => RK.ordinal(n);
 /* Days in the viewer's zone. */
 U.dayKey = iso => RK.localDay(iso);
+
+/* ── Design System 2.0 helpers (the pattern every sport follows; docs/_design/MIGRATION_V2.md) ─────────── */
+
+/* The comparison metric set, defined once for the player card, the compare page and the percentile card:
+   stable (year-to-year reliable) and predictive rates first, peer group = same position group (F / D / G) with the
+   payload's sample floors (skaters.json / goalies.json "reference"). docs/METRICS_SPEC.md is the source of truth:
+   change the set there first, then here. */
+U.SK_SET = [
+  ['Scoring', ['p60', 'p1_60', 'g60', 'ixg60_all', 'gax']],
+  ['Play driving (5v5)', ['xgf_pct', 'xgf_pct_rel', 'cf_pct', 'xga60', 'rapm_off', 'rapm_def']],
+  ['Value', ['gar', 'gar_ev_off', 'gar_ev_def', 'gar_pp']],
+  ['Physical and more', ['hits60', 'blocks60', 'take60', 'pen_diff60', 'fo_pct', 'edge_max_speed']]
+];
+U.G_SET = [
+  ['Results', ['gsax60', 'sv_pct', 'dfsv_pct', 'qs_pct', 'gaa']],
+  ['By danger', ['sv_pct_low', 'sv_pct_med', 'sv_pct_high', 'gsax_high']],
+  ['By situation', ['sv_pct_5v5', 'sv_pct_sh', 'reb_rate']]
+];
+U.GROUP_NAME = { F: 'NHL forwards', D: 'NHL defencemen', G: 'NHL goalies' };
+/* Format a value by its catalogue metadata (glossary or payload "metrics" entry). */
+U.fmtBy = (meta, v) => {
+  if (!isNum(v)) return '—';
+  const f = (meta || {}).fmt;
+  if (f === 'pct') return U.pct(v, 1);
+  if (f === 'toi_min') return RK.fmtTOI(v, { minutes: true });
+  if (f === 'int') return String(Math.round(v));
+  if (f === 'goals') return U.signed(v, 2);
+  if (f === 'p60') return Number(v).toFixed(2);
+  return RK.fmtVal ? RK.fmtVal(v, f || '2') : U.f(v, 2);
+};
+/* A metric catalogue as a map: payload.metrics -> { key: meta } */
+U.metaMap = d => { const m = {}; ((d && d.metrics) || []).forEach(x => { if (x && x.key) m[x.key] = x; }); return m; };
+/* The sample a metric's reliability is measured in, for one catalogue row (skaters.json / goalies.json player). */
+U.sampleOf = (p, unit) => {
+  const v = (p && p.values) || {};
+  if (unit === 'minutes') return isNum(p.toi) ? p.toi : null;
+  if (unit === '5v5 minutes') return isNum(v.toi5) ? v.toi5 : null;
+  if (unit === 'shots') return isNum(v.sog) ? v.sog : null;
+  if (unit === 'faceoffs') return isNum(v.fo_taken) ? v.fo_taken : null;
+  if (unit === 'games') return isNum(p.gp) ? p.gp : null;
+  if (unit === 'unblocked shots faced') return isNum(v.fa) ? v.fa : null;
+  return null;
+};
+/* Percentile-card groups for one player from the catalogue: position-pool percentiles (pct_pos) when present.
+   early = the sample is still short of where the metric stabilises (metrics[].stabilises_at). */
+U.pctGroups = (p, meta, sets) => (sets || []).map(g => ({
+  label: g[0],
+  rows: g[1].map(k => {
+    const m = meta[k] || {}, pc = ((p.pct_pos && isNum(p.pct_pos[k])) ? p.pct_pos : (p.pct || {}))[k];
+    if (!isNum(pc) || m.unavailable) return null;
+    const n = isNum(m.stabilises_at) ? U.sampleOf(p, m.unit) : null;
+    return { label: m.label || k, pctl: pc, value: U.fmtBy(m, (p.values || {})[k]), tip: m.desc || '', early: isNum(n) && n < m.stabilises_at };
+  }).filter(Boolean)
+}));
+U.sampleLine = (p, ref, goalie) => {
+  if (!p) return '';
+  const fl = (ref && ref.floors) || {};
+  if (goalie) return p.gp + ' GP · ' + U.f(p.toi, 0) + ' min' + (isNum(fl.gp) ? ' · peers need ' + fl.gp + ' GP' : '');
+  const v = p.values || {};
+  return p.gp + ' GP · ' + U.f(p.toi, 0) + ' min · ' + U.f(v.toi5, 0) + ' at 5v5' + (isNum(fl.gp) ? ' · peers need ' + fl.gp + ' GP' : '');
+};
+/* A kit v2 game with records from the standings rows (team -> row). */
+U.gameV2 = (c, o, rows) => {
+  const g = U.game(c, o);
+  const rec = t => { const r = rows && rows[t]; return r && isNum(r.w) ? r.w + '-' + r.l + '-' + (r.otl || 0) : ''; };
+  g.home.record = rec(c.home); g.away.record = rec(c.away);
+  return g;
+};
+U.gc = (c, o, rows) => QK.gameCard(U.gameV2(c, o, rows), { sport: false, marketLabel: 'Market', marketTip: 'The prediction-market or no-vig line probability for the home side, shown as a reference next to ours' });
+U.head = o => QK.sectionHead(Object.assign({ kicker: 'NHL · ' + RK.seasonLabel(RK.state.season || RK.currentSeason()) }, o));
 
 })(window.RK);

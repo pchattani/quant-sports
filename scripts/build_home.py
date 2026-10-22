@@ -56,6 +56,7 @@ PENDING = [
     ("college", "campus", "campus", "College", "The Quant Campus"),
 ]
 LAUNCHED: set[str] = {"college"}   # The Quant Campus, launched 21 Oct 2026
+STALE_HOURS = 6   # a sport whose input is older than this is flagged stale in home.json
 
 # Football competitions in rough order of how many fans care; used to pick which fixtures
 # make the home page when a day has a hundred of them.
@@ -144,6 +145,10 @@ class Ctx:
         self.now = now
         self.lo = now - timedelta(hours=40)
         self.hi = now + timedelta(days=5)
+        # A "live" game that started longer ago than any game lasts, or a "pre" game well past its start, comes from
+        # a stale input (a site that has not rebuilt, a source outage): it is left off rather than shown as live.
+        self.live_max = timedelta(hours=8)
+        self.pre_grace = timedelta(hours=3)
 
     def base(self, folder: str, repo: str) -> str:
         return f"../{folder}/" if self.links == "local" else PUBLIC.format(repo)
@@ -178,7 +183,9 @@ def game(sport, league, gid, start, status, home, away, hs=None, as_=None, **kw)
 def in_window(ctx: Ctx, g) -> bool:
     d = parse_ts(g.get("start"))
     if g["status"] == "live":
-        return True
+        return d is None or ctx.now - ctx.live_max <= d <= ctx.now + ctx.pre_grace
+    if g["status"] == "pre":
+        return d is not None and ctx.now - ctx.pre_grace <= d <= ctx.hi
     return d is not None and ctx.lo <= d <= ctx.hi
 
 
@@ -289,8 +296,8 @@ def build_football(ctx: Ctx, base: str, out: dict):
     out["leaders"]["football"] = {"title": "Goals", "unit": "goals", "rows": goals}
     out["gaps"].extend(gaps)
 
-    n_live = sum(1 for g in games if g["status"] == "live")
-    today = hub.get("today")
+    n_live = sum(1 for g in games if g["status"] == "live" and in_window(ctx, g))
+    today = iso(ctx.now)[:10]
     n_today = sum(1 for g in games if (g["start"] or "")[:10] == today)
     top = goals[0] if goals else None
     sp = {"phase": "In season", "status": f"{n_today} matches today" + (f" · {n_live} live" if n_live else ""),
@@ -809,7 +816,8 @@ def build_hockey(ctx: Ctx, base: str, out: dict):
     k0 = rows[0] if rows else None
     top = srows[0] if srows else None
     return {"phase": (idx.get("phase") or "").capitalize(),
-            "status": f"{sum(1 for g in games if g['status'] == 'live')} live · {len(idx.get('upcoming') or [])} upcoming",
+            "status": f"{sum(1 for g in games if g['status'] == 'live' and in_window(ctx, g))} live · "
+                      f"{len(idx.get('upcoming') or [])} upcoming",
             "kpis": [{"label": "Cup fav", "value": (teams.get(k0[0]) or {}).get("name", "—").split(" ")[-1] if k0 else "—",
                       "sub": f"{k0[1]['p_cup'] * 100:.0f}%" if k0 else None},
                      {"label": "1st", "value": top["team"] if top else "—",
@@ -912,13 +920,45 @@ def copy_kit():
     _copy(OUT)
 
 
+def season_files(docs: Path = DOCS):
+    """The per-season files this build reads beyond each site's fixed summaries, as (folder, repo, path) rows.
+
+    In CI the sport trees are not on disk: the home workflow downloads each site's index.json (and the other
+    fixed files) from the live sites, then asks for this list so it can fetch the files whose paths depend on
+    the current season. Without them F1 standings and title odds, basketball futures, NFL rating movers, NHL
+    standings and the football title races were silently empty on the live home page (accuracy audit, 22 Oct 2026).
+    """
+    rows = []
+    for slug in TITLE_LEAGUES:
+        rows += [("site", "the-quant-footballer", f"{slug}/probs.json"),
+                 ("site", "the-quant-footballer", f"{slug}/market_odds.json")]
+    idx = load(docs / "paddock" / "data" / "index.json") or {}
+    if idx.get("current_season"):
+        rows.append(("paddock", "the-quant-paddock", f"{idx['current_season']}/season.json"))
+    idx = load(docs / "hardwood" / "data" / "index.json") or {}
+    for L, lg in (idx.get("leagues") or {}).items():
+        if lg.get("current_season"):
+            rows.append(("hardwood", "the-quant-hardwood", f"{L}/{lg['current_season']}/season.json"))
+    for folder in ("gridiron", "rink"):
+        idx = load(docs / folder / "data" / "index.json") or {}
+        if idx.get("season"):
+            rows.append((folder, f"the-quant-{folder}", f"{idx['season']}/season.json"))
+    return rows
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--season-files", action="store_true",
+                    help="print the season-dependent files to fetch ('<folder> <repo> <path>' per line) and exit")
     ap.add_argument("--links", choices=["public", "local"], default="public")
     ap.add_argument("--no-kit", action="store_true", help="do not copy docs/_design into docs/home/assets/qk")
     ap.add_argument("--with-pending", action="store_true",
                     help="include sites not launched yet (PENDING, e.g. The Quant Campus) for local preview")
     a = ap.parse_args(argv)
+    if a.season_files:
+        for row in season_files():
+            print(" ".join(row))
+        return
     now = datetime.now(timezone.utc).replace(microsecond=0)
     ctx = Ctx(a.links, now)
     out = {"games": [], "gaps": [], "futures": {}, "leaders": {}, "charts": {}, "stats": [], "search": []}
@@ -936,6 +976,10 @@ def main(argv=None):
             log(f"{key}: skipped ({exc!r})")
         else:
             entry["ok"] = True
+            upd = parse_ts(entry.get("updated_at"))
+            if upd:  # how old this sport's input is, so a stale tile can say so instead of looking current
+                entry["age_hours"] = round((now - upd).total_seconds() / 3600, 1)
+                entry["stale"] = entry["age_hours"] > STALE_HOURS
             for k, v in part.items():
                 if isinstance(v, list):
                     out[k].extend(v)

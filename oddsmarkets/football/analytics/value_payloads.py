@@ -14,6 +14,10 @@ transfer simulator's inputs, from the fitted value model (value.py).
     data/value/transfers.json     the transfers feed with grades, the best and worst deals
                                   of the last 12 months, window summaries by league
                                   (transfers.py)
+    data/value/moves.json         (23 Oct 2026) who moves next: each followed club's players'
+                                  chance of leaving in the coming window, how and where to if
+                                  they move (moves.py); the club files carry `movement` (the
+                                  outlook by position and ranked targets)
 
 Field contract: docs/site/UNIFIED_PAYLOADS.md section 11. Nothing here invents a
 fee, a salary or availability: Sofascore's market value and contract dates appear
@@ -31,6 +35,7 @@ from typing import Any
 
 import numpy as np
 
+from oddsmarkets.football.analytics import moves as MV
 from oddsmarkets.football.analytics import transfers as TR
 from oddsmarkets.football.analytics import value as V
 
@@ -520,9 +525,12 @@ def build_value(ctx: ValueContext, R: V.Rows, vm: V.ValueModel | None = None, ou
     l_rows.sort(key=lambda r: (r[1], -(r[6] or 0)))
     _write(out_dir / "lines.json", {"fields": l_fields, "rows": l_rows, "updated_at": ctx.today.strftime("%Y-%m-%dT%H:%M:%SZ")})
 
+    # ── who moves next (moves.py): data/value/moves.json and the clubs' `movement` ──
+    mres = build_movement(ctx, R, store, offsets, followed, player_info, trx, pool_clubs, out_dir)
+
     # ── clubs: strengths and needs ──────────────────────────────────────────
     n_clubs = write_club_needs(ctx, R, vals, player_info, role_of, cur_pairs, ppg, pool_clubs, mv, until, free, fvi_of, out_dir,
-                               offsets, trx=trx)
+                               offsets, trx=trx, movement=mres["clubs"])
 
     # ── meta.json ───────────────────────────────────────────────────────────
     comps_meta = {}
@@ -559,6 +567,7 @@ def build_value(ctx: ValueContext, R: V.Rows, vm: V.ValueModel | None = None, ou
             "coverage": trx.meta["coverage"], "grades": trx.meta["grades"], "runtime_s": trx.meta["runtime_s"],
             "source": "Sofascore: each followed club's recent transfers and players' transfer histories (fees as Sofascore publishes them)"},
         "windows": windows, "today": today.isoformat(),
+        "moves": {k: v for k, v in mres["meta"].items() if k not in ("models", "reference")},
         "targets": {"max_age": TARGET_MAX_AGE, "strength_margin": TARGET_STRENGTH_MARGIN, "league_step": TARGET_LEAGUE_STEP,
                     "free_max_age": FREE_MAX_AGE, "per_need": TARGETS_PER_NEED,
                     "regular_share": REGULAR_SHARE, "minutes_cap": MINUTES_CAP},
@@ -574,26 +583,53 @@ def build_value(ctx: ValueContext, R: V.Rows, vm: V.ValueModel | None = None, ou
             "_fantasy_score": {pid: v.get("v2y1", 0.0) for pid, v in trx.players.items()}}
 
 
+def make_fee_fn(trx: "TR.TransferResult | None", player_info: dict[int, dict], pool_clubs: dict[int, dict]):
+    """The fair fee of a player to a buyer, (fee, 25th, 75th percentile) in EUR, or None without the fee model."""
+    if trx is None or trx.fee_model is None:
+        return None
+
+    def fee_fn(pid: int, buyer_tid: int) -> tuple[float, float, float] | None:
+        info, tv = player_info.get(pid), trx.players.get(pid)
+        if not info or not tv or info["min"] < 450:
+            return None
+        sx = (pool_clubs.get(info["tid"]) or {}).get("xgd") if info["tid"] is not None else None
+        bx = (pool_clubs.get(buyer_tid) or {}).get("xgd")
+        X = TR.features(np.array([tv["v2"]]), np.array([info["proj"]]),
+                        np.array([info["age"] if info["age"] is not None else np.nan]), [V.unit_of_role(info["role"])],
+                        np.array([sx if sx is not None else np.nan]), np.array([bx if bx is not None else np.nan]),
+                        np.array([info["min"] / 90.0]))
+        lp = float(trx.fee_model.predict_log(X)[0])
+        z = 0.6745 * trx.fee_model.sigma
+        return math.exp(lp), math.exp(lp - z), math.exp(lp + z)
+    return fee_fn
+
+
+def build_movement(ctx: ValueContext, R: V.Rows, store: dict, offsets: dict[str, float], followed: set[int],
+                   player_info: dict[int, dict], trx: "TR.TransferResult", pool_clubs: dict[int, dict],
+                   out_dir: Path) -> dict:
+    """data/value/moves.json and each club's `movement` block (moves.py); a failure leaves {"ok": false}."""
+    today = ctx.today.date()
+    try:
+        lg_off = {slug: float(v) for slug, v in offsets.items()
+                  if (ctx.comps.get(slug) or {}).get("kind") == "league" and (ctx.comps.get(slug) or {}).get("scope", "club") == "club"}
+        dob = {pid: p.get("dob") for pid, p in ctx.people.items() if p.get("dob")}
+        names = {int(t): (c or {}).get("name") for t, c in ctx.clubs.items() if str(t).isdigit()}
+        res = MV.build_moves(R, TR.normalise(store, today), dob, lg_off, today, followed, names, player_info,
+                             club_of=ctx.club_of, fee_fn=make_fee_fn(trx, player_info, pool_clubs),
+                             budgets={t: (c or {}).get("budget") for t, c in trx.clubs.items()})
+    except Exception as exc:  # noqa: BLE001 - the value pages must not fail with this section
+        logger.error("moves: not built: %s", exc, exc_info=True)
+        res = {"players": {"fields": MV.P_FIELDS, "rows": []}, "clubs": {}, "meta": {"ok": False, "reason": str(exc)[:200]}}
+    _write(out_dir / "moves.json", {**res["players"], "meta": res["meta"], "updated_at": ctx.today.strftime("%Y-%m-%dT%H:%M:%SZ")})
+    return res
+
+
 def write_club_needs(ctx: ValueContext, R: V.Rows, vals: np.ndarray, player_info: dict[int, dict], role_of: dict[int, str],
                      cur_pairs: set, ppg: dict, pool_clubs: dict[int, dict], mv: dict, until: dict, free: dict,
                      fvi_of: dict[int, int], out_dir: Path, offsets: dict[str, float] | None = None,
-                     trx: "TR.TransferResult | None" = None) -> int:
+                     trx: "TR.TransferResult | None" = None, movement: dict[int, dict] | None = None) -> int:
     today = ctx.today.date()
-    fee_fn = None
-    if trx is not None and trx.fee_model is not None:
-        def fee_fn(pid: int, buyer_tid: int) -> tuple[float, float, float] | None:
-            info, tv = player_info.get(pid), trx.players.get(pid)
-            if not info or not tv or info["min"] < 450:
-                return None
-            sx = (pool_clubs.get(info["tid"]) or {}).get("xgd") if info["tid"] is not None else None
-            bx = (pool_clubs.get(buyer_tid) or {}).get("xgd")
-            X = TR.features(np.array([tv["v2"]]), np.array([info["proj"]]),
-                            np.array([info["age"] if info["age"] is not None else np.nan]), [V.unit_of_role(info["role"])],
-                            np.array([sx if sx is not None else np.nan]), np.array([bx if bx is not None else np.nan]),
-                            np.array([info["min"] / 90.0]))
-            lp = float(trx.fee_model.predict_log(X)[0])
-            z = 0.6745 * trx.fee_model.sigma
-            return math.exp(lp), math.exp(lp - z), math.exp(lp + z)
+    fee_fn = make_fee_fn(trx, player_info, pool_clubs)
     club_dir = out_dir / "club"
     league_slugs = [s for s, m in ctx.comps.items() if m.get("kind") == "league" and m.get("scope") == "club"]
     entries = {e.get("slug"): e for e in ctx.entries if e.get("slug")}
@@ -753,6 +789,7 @@ def write_club_needs(ctx: ValueContext, R: V.Rows, vals: np.ndarray, player_info
                 "window": V.window_status(slug, today),
                 "budget": (trx.clubs.get(tid) or {}).get("budget") if trx else None,
                 "ledger": (trx.clubs.get(tid) or {}).get("ledger") if trx else None,
+                "movement": (movement or {}).get(tid),
             }
             _write(club_dir / f"{tid}.json", payload)
             written.add(f"{tid}.json")

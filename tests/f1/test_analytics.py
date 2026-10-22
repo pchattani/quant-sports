@@ -234,3 +234,48 @@ def test_red_flag_test_does_not_match_the_chequered_flag() -> None:
     import re
     assert re.search(r"(?<![A-Z])RED FLAG", "CHEQUERED FLAG") is None
     assert re.search(r"(?<![A-Z])RED FLAG", "RED FLAG - RACE SUSPENDED") is not None
+
+
+def _hist_store(name_rows: list[tuple[str, list[tuple[str, str, int, float]]]]) -> dict:
+    """A tiny season store: rounds of (race name, [(driver, constructor, position, points)])."""
+    races = {}
+    for i, (name, rows) in enumerate(name_rows, 1):
+        races[str(i)] = {"name": name, "results": [{"driver": d, "constructor": t, "position": p, "position_text": str(p),
+                                                    "points": pts, "status": "Finished", "grid": p} for d, t, p, pts in rows]}
+    return {"races": races, "drivers": {}, "constructors": {}}
+
+
+def test_1958_constructors_skip_indy_and_the_fastest_lap_point(monkeypatch):
+    store = _hist_store([
+        ("Argentine Grand Prix", [("moss", "cooper", 1, 8.0), ("musso", "ferrari", 2, 6.0), ("fangio", "maserati", 4, 4.0)]),
+        ("Belgian Grand Prix", [("brooks", "vanwall", 1, 8.0), ("hawthorn", "ferrari", 2, 7.0)]),   # 6 + fastest lap
+        ("Indianapolis 500", [("bryan", "epperly", 1, 8.0), ("amick", "epperly", 2, 6.0)]),
+        ("Monaco Grand Prix", [("trintignant", "cooper", 1, 8.0), ("hawthorn", "ferrari", 11, 1.0)]),  # fastest lap only
+    ])
+    monkeypatch.setattr(ssn.canon, "season", lambda y: store)
+    st = ssn.standings(1958)
+    cons = {r["team"]: r["points"] for r in st["constructors"]}
+    assert "epperly" not in cons                                   # Indy-only constructor: no constructors' entry
+    assert cons["ferrari"] == 12.0 and cons["maserati"] == 3.0     # position table, no fastest-lap point
+    assert cons["cooper"] == 16.0 and cons["vanwall"] == 8.0
+    drv = {r["driver"]: r["points"] for r in st["drivers"]}
+    assert drv["bryan"] == 8.0 and drv["hawthorn"] == 8.0          # drivers keep the Indy 500 and the fastest-lap point
+    prog = ssn.progression(1958)
+    assert "epperly" not in prog["constructors"] and prog["constructors"]["ferrari"][-1] == 12.0
+
+
+def test_championship_exclusions(monkeypatch):
+    store = _hist_store([
+        ("Race A", [("michael_schumacher", "ferrari", 1, 10.0), ("villeneuve", "williams", 2, 6.0), ("hakkinen", "mclaren", 3, 4.0)]),
+        ("Race B", [("villeneuve", "williams", 1, 10.0), ("michael_schumacher", "ferrari", 2, 6.0), ("raikkonen", "mclaren", 3, 4.0)]),
+    ])
+    monkeypatch.setattr(ssn.canon, "season", lambda y: store)
+    st = ssn.standings(1997)
+    assert st["drivers"][0]["driver"] == "villeneuve"
+    last = st["drivers"][-1]
+    assert last["driver"] == "michael_schumacher" and last["points"] == 0.0 and last["points_gross"] == 16.0
+    assert last["excluded"] and last["pos"] == len(st["drivers"]) and last["wins"] == 1
+    st = ssn.standings(2007)
+    assert st["constructors"][0]["team"] == "ferrari" and st["constructors"][-1]["team"] == "mclaren"
+    assert st["constructors"][-1]["points"] == 0.0 and st["constructors"][-1]["excluded"]
+    assert all(not r.get("excluded") for r in ssn.standings(2008)["constructors"])

@@ -375,6 +375,17 @@ def test_club_files_grade_every_unit_against_the_league(built_value) -> None:
     assert gk[0]["rank"] == 1 and gk[0]["pct"] >= gk[-1]["pct"]
 
 
+def test_moves_payload_is_written_even_without_transfer_history(built_value) -> None:
+    from oddsmarkets.football.analytics import moves as MV
+    data, _ = built_value
+    doc = json.loads((data / "value" / "moves.json").read_text(encoding="utf-8"))
+    assert doc["fields"] == MV.P_FIELDS and "meta" in doc
+    meta = json.loads((data / "value" / "meta.json").read_text(encoding="utf-8"))
+    assert "moves" in meta
+    club = json.loads(next((data / "value" / "club").glob("*.json")).read_text(encoding="utf-8"))
+    assert "movement" in club and "targets" in club
+
+
 # ── the people payload is slimmer ────────────────────────────────────────────
 
 def test_person_files_carry_no_season_line_and_no_crest_paths(tmp_path) -> None:

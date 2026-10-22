@@ -374,6 +374,31 @@ def _pct(w, n):
     return w / n if n else None
 
 
+def titles_finals(td: an.TourData, year: int) -> dict[str, dict[str, list[int]]]:
+    """{pid: {"all" | surface: [titles, finals]}} from the season's tour-level finals, walkovers included: a final won
+    by a walkover is still a title and its opponent still a finalist (the entries leave walkovers out, as every rate
+    should)."""
+    out: dict[str, dict[str, list[int]]] = {}
+    for m in td.matches(year).values():
+        if (m.get("round") != "F" or not an.is_tour_level(m) or m.get("status") not in an.FINISHED or not m.get("winner")
+                or not m.get("p1") or not m.get("p2")):
+            continue
+        for p in (str(m["p1"]), str(m["p2"])):
+            for k in ("all", m.get("surface") or "hard"):
+                c = out.setdefault(p, {}).setdefault(k, [0, 0])
+                c[1] += 1
+                c[0] += int(p == str(m["winner"]))
+    return out
+
+
+def _apply_titles(v: dict, nn: dict | None, tf: list[int] | None) -> None:
+    """Titles / finals / final win % from `titles_finals` (walkover finals counted)."""
+    t, f = tf or (0, 0)
+    v.update(titles=t, finals=f, final_win_pct=_pct(t, f))
+    if nn is not None:
+        nn["finals"] = f
+
+
 def values_from(E: list[dict], rec: dict | None) -> tuple[dict, dict]:
     """(metric values, sample sizes) from a player's entries and her serve/return record."""
     v: dict[str, Any] = {}
@@ -619,6 +644,7 @@ def build(td: an.TourData, year: int, entries: dict[str, list[dict]] | None = No
     extras = extras or {}
     end = td.season_end(year)
     floor = qualified_floor(td, year)
+    tf = titles_finals(td, year)
     pids = [p for p, E in entries.items() if len(E) >= MIN_LIST]
     form = form_values(td, year, pids)
     srp = (sr or {}).get("players") or {}
@@ -634,6 +660,7 @@ def build(td: an.TourData, year: int, entries: dict[str, list[dict]] | None = No
         E = entries[p]
         rec_all = (srp.get(p) or {}).get("all")
         v, nn = values_from(E, rec_all)
+        _apply_titles(v, nn, (tf.get(p) or {}).get("all"))
         for s in an.SURFACES:
             r = (srp.get(p) or {}).get(s)
             if r:
@@ -661,6 +688,7 @@ def build(td: an.TourData, year: int, entries: dict[str, list[dict]] | None = No
             if not Es:
                 continue
             sv, sn = values_from(Es, (srp.get(p) or {}).get(s))
+            _apply_titles(sv, sn, (tf.get(p) or {}).get(s))
             surf_vals.setdefault(s, {})[p] = {k: sv.get(k) for k in SURFACE_KEYS}
             surf_n.setdefault(s, {})[p] = sn
     qual = {p for p in pids if rows[p]["matches"] >= floor}
@@ -736,7 +764,8 @@ def season_summary(E: list[dict], titles_finals: tuple[int, int] | None = None) 
         if x:
             bys[s] = [sum(1 for e in x if e["won"]), sum(1 for e in x if not e["won"])]
     fin = [e for e in E if e["round"] == "F"]
-    return {"w": w, "l": len(E) - w, "titles": sum(1 for e in fin if e["won"]), "finals": len(fin), "by_surface": bys}
+    t, f = titles_finals if titles_finals is not None else (sum(1 for e in fin if e["won"]), len(fin))
+    return {"w": w, "l": len(E) - w, "titles": t, "finals": f, "by_surface": bys}
 
 
 def split_tables(E: list[dict]) -> dict:
@@ -830,7 +859,10 @@ def h2h_lists(td: an.TourData, top: int = 30) -> dict[str, list]:
 
 def career_payload(td: an.TourData, pid: str, per_year: dict[int, list[dict]], sr_by_year: dict[int, dict | None],
                    elo_series: list | None, ranks: list | None, results: list[dict], h2h_rows: list | None,
-                   defend: list | None, odds: dict | None, current: dict | None, results_all: list | None = None) -> dict:
+                   defend: list | None, odds: dict | None, current: dict | None, results_all: list | None = None,
+                   titles_by_year: dict[int, list | tuple] | None = None) -> dict:
+    """`titles_by_year` {year: [titles, finals]} (titles_finals, walkover finals counted); without it the
+    played finals are counted."""
     info = td.players.get(pid) or {}
     seasons = []
     allE: list[dict] = []
@@ -839,7 +871,8 @@ def career_payload(td: an.TourData, pid: str, per_year: dict[int, list[dict]], s
         if not E:
             continue
         allE += E
-        row = {"year": int(y), **season_summary(E)}
+        tfy = None if titles_by_year is None else tuple(titles_by_year.get(y) or (0, 0))
+        row = {"year": int(y), **season_summary(E, tfy)}
         rec = (((sr_by_year.get(y) or {}).get("players") or {}).get(pid) or {}).get("all") or {}
         row["hold"] = an.rnd(rec.get("hold"), 3)
         row["brk"] = an.rnd(rec.get("break"), 3)

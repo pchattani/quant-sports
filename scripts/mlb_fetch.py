@@ -76,13 +76,19 @@ def schedule(c: Client, level: str, s: dict, refresh: bool, today: date) -> None
     if current:
         hi = min(hi, today + timedelta(days=10))
     weeks_done = s["meta"].setdefault("weeks", {})
+    # repair: a played make-up game the old merge rule turned back into "postponed" (its original listing carries the
+    # make-up date); its make-up week is read again once, which brings the final record back
+    checked = s["meta"].setdefault("rescheduled_checked", {})
+    repair = [(g["date"], gpk) for gpk, g in s["games"].items()
+              if g.get("status") == "postponed" and g.get("date") and gpk not in checked and _d(g["date"]) < today]
     n_calls = 0
     for a, b in statsapi.weeks(lo, hi):
         key = a.isoformat()
         at = weeks_done.get(key)
         settled = at and _d(at) > b + timedelta(days=2)
         hot = current and refresh and b >= today - timedelta(days=3) and a <= today + timedelta(days=7)
-        if settled and not hot:
+        fix = [gpk for d, gpk in repair if a <= _d(d) <= b]
+        if settled and not hot and not fix:
             continue
         games = statsapi.schedule(c, level, a, b)
         n_calls += 1
@@ -96,6 +102,11 @@ def schedule(c: Client, level: str, s: dict, refresh: bool, today: date) -> None
                         if level == "mlb" and tid not in canon.TEAMS:      # "NL Higher Seed", "ATL/PHI" ...
                             s["teams"][tid]["placeholder"] = True
         weeks_done[key] = st.now()
+        for gpk in fix:
+            checked[gpk] = st.now()
+    gone = statsapi.settle_unneeded(s)
+    if gone:
+        logger.info("%s %d schedule: %d unneeded postseason games marked cancelled", level, season, len(gone))
     # teams of the season (names, divisions, venues) once, weekly for the current season
     t_at = s["meta"].get("teams_at")
     if not t_at or (current and (today - _d(t_at)).days >= 7) or len(s["teams"]) < (30 if level == "mlb" else 28):

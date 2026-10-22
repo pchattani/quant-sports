@@ -121,7 +121,7 @@ $('#empty1').innerHTML = QK.empty('No games today', 'The next slate starts Satur
 var rounds = []; for (var i = 1; i <= 17; i++) rounds.push(i);
 function cum(seed, pts) { var s = 0, out = []; for (var i = 0; i < 17; i++) { s += pts[(i * seed + 3) % pts.length]; out.push(s); } return out; }
 QKC.line('#ch-line', {
-  x: rounds, xLabel: function (r) { return 'Round ' + r; }, yFmt: function (v) { return QK.fmt.num(v); }, label: 'Drivers championship points by round',
+  x: rounds, xLabel: function (r) { return 'Round ' + r; }, yFmt: function (v) { return QK.fmt.num(v); }, label: 'Drivers championship points by round', xName: 'Round', yName: 'Points',
   series: [
     { name: 'Antonelli', color: '#00D7B6', data: cum(5, [25, 18, 25, 15, 25, 12, 18, 25]) },
     { name: 'Russell', color: '#7fe8d8', data: cum(3, [18, 15, 12, 25, 10, 15, 8, 18]), dash: true },
@@ -130,7 +130,7 @@ QKC.line('#ch-line', {
     { name: 'Norris', color: '#F47600', data: cum(4, [10, 12, 6, 12, 18, 8, 12, 6]) }
   ]
 });
-QKC.line('#ch-area', { x: ['W1', 'W2', 'W3', 'W4', 'W5', 'W6'], series: [{ name: 'Net rating', data: [1.3, 2.9, 4.2, 3.8, 5.6, 6.1], area: true, color: QK.cssVar('--accent') }], ref: { y: 0, label: 'avg' }, yFmt: function (v) { return QK.fmt.signed(v, 0); }, endLabels: false });
+QKC.line('#ch-area', { x: ['W1', 'W2', 'W3', 'W4', 'W5', 'W6'], series: [{ name: 'Net rating', data: [1.3, 2.9, 4.2, 3.8, 5.6, 6.1], area: true, color: QK.cssVar('--accent') }], ref: { y: 0, label: 'avg' }, yFmt: function (v) { return QK.fmt.signed(v, 0); }, endLabels: false, xName: 'Week', yName: 'Net rating' });
 var odds = [['Bills', 0.19, '#00338D'], ['Jaguars', 0.118, '#006778'], ['Lions', 0.084, '#0076B6'], ['Chiefs', 0.081, '#E31837'], ['Vikings', 0.073, '#4F2683'], ['Patriots', 0.06, '#002244'], ['Rams', 0.043, '#003594'], ['Bengals', 0.028, '#FB4F14']];
 QKC.bar('#ch-hbar', { horizontal: true, cats: odds.map(function (o) { return o[0]; }), series: [{ name: 'Super Bowl', data: odds.map(function (o) { return o[1]; }) }], colors: odds.map(function (o) { return o[2]; }), labels: true, fmt: function (v) { return QK.fmt.pct(v, 1); }, label: 'Super Bowl odds' });
 QKC.dumbbell('#ch-db', { rows: [
@@ -138,7 +138,7 @@ QKC.dumbbell('#ch-db', { rows: [
   { label: 'Bears make the playoffs', a: 0.296, b: 0.553 }, { label: 'Verstappen wins in Austin', a: 0.179, b: 0.374 }, { label: 'Inter win Serie A', a: 0.796, b: 0.598 }
 ] });
 var ga = [['NYR', 6.2], ['TOR', 4.1], ['EDM', 3.0], ['COL', 1.4], ['BOS', 0.3], ['DAL', -0.8], ['VGK', -1.9], ['CHI', -3.6], ['SJS', -5.4]];
-QKC.bar('#ch-bar', { cats: ga.map(function (x) { return x[0]; }), series: [{ name: 'Goals above expected', data: ga.map(function (x) { return x[1]; }) }], diverging: true, fmt: function (v) { return QK.fmt.signed(v, 1); } });
+QKC.bar('#ch-bar', { cats: ga.map(function (x) { return x[0]; }), series: [{ name: 'Goals above expected', data: ga.map(function (x) { return x[1]; }) }], diverging: true, fmt: function (v) { return QK.fmt.signed(v, 1); }, valName: 'Goals above expected' });
 var sc = [['VGK', 0.57, 0.778, '#B4975A'], ['COL', 0.58, 0.69, '#6F263D'], ['CAR', 0.6, 0.72, '#CE1126'], ['EDM', 0.55, 0.6, '#FF4C00'], ['SJS', 0.43, 0.3, '#006D75'], ['CHI', 0.44, 0.38, '#CF0A2C'], ['BOS', 0.47, 0.71, '#FFB81C'], ['FLA', 0.54, 0.42, '#C8102E'], ['NYR', 0.49, 0.66, '#0038A8'], ['TOR', 0.52, 0.5, '#00205B'], ['DAL', 0.53, 0.58, '#006847'], ['SEA', 0.46, 0.62, '#99D9D9']];
 QKC.scatter('#ch-sc', { points: sc.map(function (p) { return { name: p[0], x: p[1], y: p[2], color: p[3], label: p[0] }; }), xName: 'xG share 5v5', yName: 'Points %', xFmt: function (v) { return QK.fmt.pct(v, 0); }, yFmt: function (v) { return QK.fmt.pct(v, 0); }, refX: 0.5, refY: 0.5, labelAll: true, quadrants: ['Lucky', 'Good', 'Bad', 'Unlucky'] });
 var counts = ['0-0', '0-1', '0-2', '1-0', '1-1', '1-2', '2-0', '2-1', '2-2', '3-0', '3-1', '3-2'];
@@ -155,9 +155,9 @@ QKC.line('#ch-band', { xType: 'value', x: wk, xName: 'Week', yInverse: true, yNa
   series: [{ name: 'Rank', data: rk, band: { lo: rk.map(function (v, i) { return Math.max(1, v - se[i]); }), hi: rk.map(function (v, i) { return v + se[i]; }) } },
     { name: 'Preseason', data: [14, 14, 13, 12, 12, 11, 10, 10, 9, 9], dash: true, err: [2, 2, 2, 2, 2, 2, 2, 2, 2, 2] }] });
 var pj = [['Allen', 24.1, 17, 31, 22.5], ['Jackson', 23.4, 15, 32, 24.5], ['Hurts', 21.8, 15, 29, 20.5], ['Mahomes', 20.9, 14, 28, 21.5], ['Burrow', 19.6, 13, 27, 19.5]];
-QKC.bar('#ch-whisk', { cats: pj.map(function (x) { return x[0]; }), legend: true, marketName: 'Market line', fmt: function (v) { return v.toFixed(1); },
+QKC.bar('#ch-whisk', { cats: pj.map(function (x) { return x[0]; }), legend: true, marketName: 'Market (reference)', valName: 'Fantasy points', fmt: function (v) { return v.toFixed(1); },
   series: [{ name: 'Projection', data: pj.map(function (x) { return x[1]; }), lo: pj.map(function (x) { return x[2]; }), hi: pj.map(function (x) { return x[3]; }), market: pj.map(function (x) { return x[4]; }) }] });
-QKC.range('#ch-range', { rows: pj.map(function (x) { return { label: x[0], lo: x[2], hi: x[3], mid: x[1] }; }), fmt: function (v) { return v.toFixed(1); } });
+QKC.range('#ch-range', { rows: pj.map(function (x) { return { label: x[0], lo: x[2], hi: x[3], mid: x[1] }; }), fmt: function (v) { return v.toFixed(1); }, valName: 'Fantasy points' });
 QKC.butterfly('#ch-fly', { cats: ['Arsenal', 'Liverpool', 'Man City', 'Chelsea', 'Spurs'], left: { name: 'Goals against', data: [6, 8, 9, 11, 13], color: QK.cssVar('--c-8') }, right: { name: 'Goals for', data: [19, 21, 18, 16, 15] }, fmt: function (v) { return String(v); } });
 var md = []; for (var i2 = 0; i2 < 30; i2++) { var e2 = 0.15 + 0.7 * ((i2 * 37) % 30) / 30; md.push({ name: 'Game ' + (i2 + 1), x: e2, y: Math.max(0, Math.min(1, e2 + Math.sin(i2 * 2.3) * 0.12)), color: i2 % 3 ? QK.cssVar('--c-1') : QK.cssVar('--c-2') }); }
 QKC.scatter('#ch-diag', { points: md, xName: 'Model', yName: 'Actual', xFmt: function (v) { return QK.fmt.pct(v, 0); }, yFmt: function (v) { return QK.fmt.pct(v, 0); }, diagonal: { label: 'perfect' },

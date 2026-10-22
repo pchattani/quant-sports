@@ -172,3 +172,32 @@ def test_glossary():
     keys = {m["key"] for m in g["model"]}
     assert {"percentile", "stabilisation", "xwoba_plus", "war", "game_model"} <= keys
     assert g["notices"]["retrosheet"] == an.RETRO_NOTICE
+
+
+def test_last_team_follows_dates_not_game_pks():
+    """A traded player's team is the one of his latest game by date. The pitch frame is sorted by game_pk, and a
+    gamePk is not date order (Luis Arraez, Tarik Skubal, Adley Rutschman showed their pre-trade clubs in 2026)."""
+    from oddsmarkets.baseball.analytics import pitchagg as PG
+    df = pd.DataFrame({
+        "game_pk": [900, 100, 500], "game_date": pd.to_datetime(["2026-04-01", "2026-08-01", "2026-06-01"]),
+        "at_bat_number": [1, 1, 1], "batter": [7, 7, 7], "pitcher": [9, 9, 8],
+        "inning_topbot": ["Top", "Top", "Bot"], "home_team": ["DET", "LAD", "SF"], "away_team": ["SF", "PHI", "PHI"],
+    }).sort_values("game_pk")
+    assert PG.last_team(df, "batter", "bat")["7"] == "PHI"       # 1 Aug, away at LAD (pk 100, the lowest)
+    assert PG.last_team(df, "pitcher", "fld")["9"] == "LAD"      # fielding side of his latest game
+
+
+def test_steals_come_from_the_official_line(ctx, monkeypatch):
+    """SB / CS show MLB's official line when the Stats API cache has one (the pitch-data estimate over-counted by
+    2.6 a hitter in 2026: wild pitches and indifference), the estimate otherwise; unintentional walks say so."""
+    from oddsmarkets.baseball.analytics import hitters, mlbapi
+    h0 = hitters.build(ctx)
+    pid = max(h0["players"], key=lambda p: h0["players"][p]["pa"])
+    other = next(p for p in h0["players"] if p != pid)
+    monkeypatch.setattr(mlbapi, "season_lines", lambda level, season, group, *a, **k:
+                        {pid: {"sb": 7, "cs": 2}} if (level, season, group) == ("mlb", 2025, "hitting") else None)
+    h = hitters.build(ctx)
+    assert h["players"][pid]["values"]["sb"] == 7 and h["players"][pid]["values"]["cs"] == 2
+    assert h["players"][other]["values"]["sb"] == h0["players"][other]["values"]["sb"]
+    labels = {m["key"]: m["label"] for m in h["metrics"]}
+    assert labels["bb"] == "uBB" and labels["sb"] == "SB"

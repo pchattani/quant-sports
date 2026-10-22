@@ -1446,14 +1446,18 @@ class Unified:
         for a in apps:
             key = (a[2], a[3], a[4], self.app_era(a, frame))
             r = acc.setdefault(key, {"apps": 0, "starts": 0, "min": 0, "g": 0, "a": 0, "xg": 0.0, "xa": 0.0, "_rw": 0.0, "_rm": 0.0,
-                                     "sh": 0, "kp": 0, "yc": 0, "rc": 0})
+                                     "_nxg": 0, "_nxa": 0, "sh": 0, "kp": 0, "yc": 0, "rc": 0})
             r["apps"] += 1
             r["starts"] += a[9]
             r["min"] += a[10]
             r["g"] += a[11]
             r["a"] += a[12]
-            r["xg"] += a[13] or 0.0
-            r["xa"] += a[14] or 0.0
+            if a[13] is not None:
+                r["xg"] += a[13]
+                r["_nxg"] += 1
+            if a[14] is not None:
+                r["xa"] += a[14]
+                r["_nxa"] += 1
             if a[15] is not None:
                 r["_rw"] += a[15] * a[10]
                 r["_rm"] += a[10]
@@ -1470,7 +1474,13 @@ class Unified:
                    "team": (self.clubs.get(str(tid)) or {}).get("names", {}).get(comp) or (self.clubs.get(str(tid)) or {}).get("name"),
                    "source": self._row_source(comp, str(sid)),
                    "apps": r["apps"], "starts": r["starts"], "min": r["min"], "g": r["g"], "a": r["a"],
-                   "xg": round(r["xg"], 2), "xa": round(r["xa"], 2), "sh": r["sh"], "kp": r["kp"], "yc": r["yc"], "rc": r["rc"]}
+                   "sh": r["sh"], "kp": r["kp"], "yc": r["yc"], "rc": r["rc"]}
+            # xG and xA only where some appearance carried them: a competition without xG (most cups, the
+            # qualifiers) used to show 0.00, and the year's total then set all its goals against part of its xG.
+            if r["_nxg"]:
+                row["xg"] = round(r["xg"], 2)
+            if r["_nxa"]:
+                row["xa"] = round(r["xa"], 2)
             if r["_rm"] > 0:
                 row["rt"] = round(r["_rw"] / r["_rm"], 2)
             # Coverage: how many of the team's finished matches in this edition have line-ups. A player's
@@ -1883,6 +1893,10 @@ def season_totals(rows: list[dict]) -> list[dict]:
         y["starts"] += int(_num(r.get("starts")))
         y["xg"] += _num(r.get("xg"))
         y["xa"] += _num(r.get("xa"))
+        if r.get("xg") is not None:
+            # What the year's xG covers: compare xg_g (goals in rows with xG) with xg, not g, when xg_min < min.
+            y["xg_min"] = y.get("xg_min", 0) + int(_num(r.get("min")))
+            y["xg_g"] = y.get("xg_g", 0) + int(_num(r.get("g")))
         if r.get("rt") and r.get("min"):
             y["_rw"] += float(r["rt"]) * float(r["min"])
             y["_rm"] += float(r["min"])

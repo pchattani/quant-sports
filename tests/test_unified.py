@@ -632,3 +632,23 @@ def test_the_argentine_archive_year_is_not_counted_twice(tmp_path) -> None:
     assert [r["era"] for r in p.get("archive", [])] == ["2024"]          # 2026 is the store's two torneos, never also the archive's year
     y2026 = next(y for y in p["years"] if y["era"] == "2026")
     assert y2026["min"] == 180
+
+
+def test_competitions_without_xg_carry_no_xg(tmp_path) -> None:
+    """A competition whose line-ups carry no xG (most cups, the qualifiers) has no xg in its season row, not 0.00;
+    the year says how much of it the xG covers (accuracy audit, 22 Oct 2026)."""
+    league = _store([_m("1", "Home", "Away", 1, 2, 1, 0, "2026-09-01T15:00:00Z", 20)],
+                    {"1": _lineup("Home", "7", "Seven", goals=1)}, current=20, players={"7": {"n": "Seven", "pos": "M"}})
+    no_xg = {"7": {"n": "Seven", "t": "Norway", "p": "M", "s": {"minutesPlayed": 80, "goals": 2, "goalAssist": 0, "rating": 8.0}}}
+    intl = _store([_m("30", "Norway", "Italy", 50, 51, 3, 0, "2026-09-07T18:00:00Z", 70)], {"30": no_xg}, current=70)
+    seasons = {"premier-league": {"tournament_id": 17, "seasons": [{"season_id": 20, "name": "PL 26/27", "year": "26/27"}]},
+               "wc-qual-uefa": {"tournament_id": 11, "seasons": [{"season_id": 70, "name": "WCQ 2026", "year": "2026"}]}}
+    u = U.Unified(tmp_path, seasons, today=TODAY)
+    u.add_store("premier-league", league)
+    u.add_store("wc-qual-uefa", intl)
+    u.finish()
+    p = _j(tmp_path / "people" / "7.json")
+    rows = {s["comp"]: s for s in p["seasons"]}
+    assert rows["premier-league"]["xg"] == 0.1 and "xg" not in rows["wc-qual-uefa"] and "xa" not in rows["wc-qual-uefa"]
+    y = next(y for y in p["years"] if y["era"] == "2026/27")
+    assert y["g"] == 3 and y["xg"] == 0.1 and y["xg_min"] == 90 and y["xg_g"] == 1

@@ -1,7 +1,13 @@
-# The Quant design system (v1)
+# The Quant design system (v2 "Signal", Oct 2026)
 
-One look for every sports site: a **premium data terminal**. Dark first with a light mode, dense
-but legible, charts and tables up front. Framework-free: four static files and one CDN chart library.
+One look for every sports site: Bloomberg density, ESPN scoreboard energy, 538 probability stories and Savant
+percentile cards, in a look of our own. Dark first with a light mode, our numbers in one signature violet, the market
+a quiet grey reference. Framework-free: four static files and one CDN chart library.
+
+**v2 docs:** `STYLE_GUIDE.md` (the spec: identity, type, colour, components, charts, motion, copy),
+`MIGRATION_V2.md` (moving a page to v2, old → new map, copy changes), `showcase.html` (every v2 component on sample
+data; not shipped). The reference pages are `docs/home` and the Rink overview, game, player and compare pages.
+Everything below is the v1 reference, still valid: every v1 call works and renders in the v2 look.
 
 Living style guide: `docs/_design/index.html` (serve `docs/` and open `/_design/`; add `?theme=light`
 or `?theme=dark` to force a theme). Every component on that page is the real kit.
@@ -13,7 +19,9 @@ or `?theme=dark` to force a theme). Every component on that page is the real kit
 | `quant.js` | `window.QK`: shell (top bar, sport switcher, section nav, search, footer), theme, tables, tabs, chips, match cards, ticker, team marks, colour/contrast, sparklines, formatting, fetch |
 | `quant-charts.js` | `window.QKC`: the chart kit on Apache ECharts 5.5.1 |
 | `plotly-ec.js` | optional: `window.Plotly` (newPlot, react, purge, relayout, `plotly_click`) drawn by ECharts on the tokens, for views still written against Plotly. Load it after `quant-charts.js`, or inject it on first use (Hardwood, Rink); no site loads the Plotly CDN any more |
-| `index.html`, `guide.js` | The style guide (not copied into sites) |
+| `index.html`, `guide.js` | The v1 style guide (not copied into sites) |
+| `showcase.html`, `showcase.js` | The v2 showcase (not copied into sites) |
+| `STYLE_GUIDE.md`, `MIGRATION_V2.md` | The v2 spec and the migration guide |
 
 ## Adopting the kit in a site
 
@@ -39,7 +47,7 @@ copy_kit(DOCS / "rink")                  # -> docs/rink/assets/qk/{tokens.css, q
   <!-- no flash of the wrong theme: the viewer's pinned choice applies before CSS paints -->
   <script>try{var t=localStorage.getItem('qk-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="assets/qk/tokens.css">
   <link rel="stylesheet" href="assets/qk/quant.css">
   <link rel="stylesheet" href="assets/rink.css">  <!-- site-specific layout only, written against the tokens -->
@@ -157,7 +165,7 @@ tokens, so no page needs the Plotly bundle; migrate them to QKC chart by chart.
 - **Sites not launched yet.** An entry in `QK.ALL_SPORTS` with `pending: true` (The Quant Campus, Oct 2026) is left out
   of `QK.SPORTS` (switcher, footer, home tiles) except on its own pages (`data-sport` set on `<html>`) and in local
   preview (`QK.localBase()`); `QK.sport(key)` still finds it. Launching = removing the flag.
-- **Brand amber + one accent per sport.** Amber (`--brand`) marks The Quant; each site sets `data-sport`
+- **v2: the signal + one identity accent per sport.** The signal violet (`--signal`; `--brand` points at it) marks The Quant and *ours* (forecasts, primary actions). v1 used amber here. The rest of this bullet is v1: each site sets `data-sport`
   and its accent (`--a-<sport>`) colours the nav underline, section rules and tiles. Accents mark identity
   only; text beside them stays ink.
 - **Chart colour by job.** Categorical slots in a fixed order (the validated reference palette); slot 1
@@ -167,7 +175,7 @@ tokens, so no page needs the Plotly bundle; migrate them to QKC chart by chart.
   becomes a brighter blue, not grey) until a kit colour reaches 3:1 on the card; `QK.color.ink(bg)` picks
   white or black text for monograms. Where two kits are too alike the bar falls back to blue v orange.
 - **Numbers in mono.** Inter for words; JetBrains Mono with tabular figures for scores, odds, tables and axes.
-- **Model v market everywhere.** A shared strip (blue dot model, orange dot market, the gap between) on game
+- **v1: model v market everywhere** (v2: ours first, the market a quiet grey ring or tick; no gap or edge labels). A shared strip (blue dot model, orange dot market, the gap between) on game
   cards and a dumbbell chart for lists. Shown before games only: a live market has moved with the score and
   the pre-game model has not.
 

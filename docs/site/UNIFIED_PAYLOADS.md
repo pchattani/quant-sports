@@ -815,3 +815,59 @@ The Argentine store keys its seasons by torneo (`2026-apertura`, `2026-clausura`
 edition (Sofascore season 87913, "2026") never matched a store row on its id and was added on top: 55 players
 had their 2026 counted twice (Nahuel Losada 5,790 minutes for 3,450 played). An archive Argentine league season
 in a year the store holds is now the store's.
+
+## 15. As built (23 October 2026): who moves next (`value/moves.json`, clubs' `movement`)
+
+Code: `oddsmarkets/football/analytics/moves.py`, called by `build_movement` in `value_payloads.py` inside the
+value step (about 8 seconds a build). Method and validation: `docs/MODELS.md` 11e and
+`docs/research/football_moves.md`. No field of an existing payload was renamed; the club files gain one key.
+
+### 15.1 `value/moves.json` (new, about 0.9 MB)
+
+`{"fields", "rows", "meta", "updated_at"}`, one row per player of a followed league's club who played for it in the
+last 180 days (about 7,500), most likely to leave first:
+
+| Field | Meaning |
+|---|---|
+| `id`, `tid` | Sofascore player id (string), his club |
+| `p` | chance he leaves the club in the coming window (`meta.horizon`): a **base rate**, see `basis` |
+| `basis` | `league_band` (his league x role band in the reference window), `loan` (his region's on-loan rate), `region` (no window of this kind for his league yet: Liga Argentina) |
+| `band` | `regular` (50%+ of the club's minutes since he joined it), `rotation` (20-50%), `fringe` |
+| `loan` | 1 when his latest move into the club was a loan |
+| `share` | his share of the club's minutes since he joined it (last 12 months, capped at 1) |
+| `types` | if he moves: chance of each of `meta.types` (`transfer`, `free`, `loan`, `loan_end`, `release`); sums to 1 |
+| `dests` | if he moves: chance of each of `meta.dests` (`same` league, `stronger`, `weaker`, `outside` our leagues); sums to 1 |
+| `p_club` | chance he joins another club of our leagues in the window (`p` x not a release or loan end x not outside) |
+
+`meta`: `ok` (false with `reason` when nothing could be built), `method` (the Model page's text), `horizon`
+("Winter 2026/27"), `horizon_start`, `today`, `windows` (the labelled windows: `window`, `n`, `rate`),
+`reference` (the base-rate table: `window`, `overall`, `region`, `league` {slug: {rate, n}}, `cell`
+{"slug|band": {rate, n}}, `loan` {region: {rate, n}}), `validation` (the pre-registered test's numbers, fixed:
+`leave`, `type`, `dest`, `arrivals`, `targets`, `choice`, each with `passed`), `types`, `type_labels`, `dests`,
+`dest_labels`, `units` (G/D/M/F names), `bands`, `models` (the type, destination and destination-club models'
+coefficients), `arrivals` (`window`, `mean_per_club`, `mix` by unit), `n_players`, `n_clubs`, `runtime_s`.
+
+### 15.2 `value/club/<tid>.json`: `movement` (new key, about 4 KB a club)
+
+```
+"movement": {
+  "horizon": "Winter 2026/27",
+  "basis": {"leave": "base_rate", "window": "Winter 2025/26", "arrivals": "league" | "region", "arrivals_clubs": n},
+  "expected_out": {"G","D","M","F": players expected to leave (sum of the players' p)}, "out_total",
+  "expected_in": {"G","D","M","F": expected arrivals (the reference window's arrivals per club in the league x its unit mix)}, "in_total",
+  "p_add": {"G","D","M","F": chance of adding at least one there (1 - exp(-expected_in))},
+  "roster": [[pid, p, most likely type]],                # every player in the population, most likely to leave first
+  "targets": [{"id","name","tid","club","league","unit","role","age",
+               "p_join",                                  # chance he joins this club in the window (the rank)
+               "p_move","p_club",                         # his chance of leaving; of joining any club of our leagues
+               "plaus",                                   # this club's share of his likely destinations x the number of clubs (1 = an average club)
+               "q_gap",                                   # his match rating (shrunk) minus the club's minutes-weighted rating at his unit
+               "need",                                    # the club's expected departures at his unit / its usual starters there
+               "proj","fee","afford",                     # projected GAR/90; fair fee to this club and budget fit, as `targets`
+               "why"}]                                    # one line: role at his club, league step, loan, rating gap
+} | null                                                  # null: the club has no player in the population
+```
+
+Targets are players who would improve the club (450+ minutes for their club in 12 months, `q_gap` >= 0) and leave
+out a player whose fair fee to the club is over 1.5 x its 90th-percentile summer budget (as the existing `targets`). The existing `targets` (by weak unit, on value) are unchanged; `movement.targets` is the
+movement-based list.

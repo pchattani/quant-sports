@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:,">
+<title>The Quant · Kit v2 showcase</title>
+<!-- Design System 2.0 showcase: every v2 component on sample data. Lives in docs/_design only; design_kit.py never
+     copies it into a site. Serve docs/ and open /_design/showcase.html (add ?theme=light or ?theme=dark). -->
+<script>try{var t=/[?&]theme=(light|dark)/.exec(location.search);t=t?t[1]:localStorage.getItem('qk-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="quant.css">
+<style>
+  .sc-swatches { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .sc-sw { border-radius: 10px; border: 1px solid var(--line-1); overflow: hidden; background: var(--s-1); font-size: var(--fs-xs); }
+  .sc-sw i { display: block; height: 54px; background: var(--k); }
+  .sc-sw div { padding: 8px 10px; } .sc-sw b { display: block; font-weight: 700; } .sc-sw code { color: var(--ink-3); font: 500 11px var(--font-num); }
+  .sc-ramp { height: 18px; border-radius: 9px; background: linear-gradient(90deg, var(--pc-0), var(--pc-25), var(--pc-50), var(--pc-75), var(--pc-100)); }
+  .sc-type .qk-card-body > div { padding: 12px 0; border-bottom: 1px solid var(--line-1); display: grid; grid-template-columns: 160px 1fr; gap: 12px; align-items: baseline; }
+  .sc-type code { color: var(--ink-3); font: 500 11px var(--font-num); }
+  @media (max-width: 600px) { .sc-type .qk-card-body > div { grid-template-columns: 1fr; gap: 4px; } }
+  .sc-do { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 720px) { .sc-do { grid-template-columns: 1fr; } }
+  .sc-do .qk-card-body p { margin: 0 0 8px; font-size: var(--fs-sm); }
+  .sc-bad { color: var(--down); font-weight: 700; } .sc-good { color: var(--up); font-weight: 700; }
+  section.sc { scroll-margin-top: 120px; }
+</style>
+</head>
+<body class="qk">
+<div id="qk-shell"></div>
+<div class="qk-ticker" id="sc-ticker" aria-label="Scores"></div>
+<main id="main" class="qk-page">
+  <div id="sc-hero"></div>
+
+  <section class="qk-section sc" id="identity">
+    <div id="h-identity"></div>
+    <div class="sc-swatches" id="sc-swatches"></div>
+    <div style="margin-top:16px" class="qk-card"><div class="qk-card-body">
+      <div class="qk-kicker" style="margin-bottom:8px">Percentile scale · 0 (cold, worst in the peer group) to 100 (hot, best)</div>
+      <div class="sc-ramp"></div>
+      <div class="qk-row" style="justify-content:space-between;margin-top:8px" id="sc-chips"></div>
+    </div></div>
+    <div class="qk-card sc-type" style="margin-top:16px"><div class="qk-card-body" id="sc-type"></div></div>
+  </section>
+
+  <section class="qk-section sc" id="scoreboard">
+    <div id="h-scoreboard"></div>
+    <div class="qk-auto" style="--min:290px" id="sc-cards"></div>
+  </section>
+
+  <section class="qk-section sc" id="stats">
+    <div id="h-stats"></div>
+    <div id="sc-stats"></div>
+  </section>
+
+  <section class="qk-section sc" id="player">
+    <div id="h-player"></div>
+    <div id="sc-ph"></div>
+    <div class="qk-grid" style="margin-top:16px">
+      <div class="qk-span-5" id="sc-pcard"></div>
+      <div class="qk-span-7"><div class="qk-card"><div class="qk-card-head"><div><div class="qk-card-title">Where he sits: points per 60</div><div class="qk-card-sub">Every qualified forward this season; bars coloured by percentile</div></div></div>
+        <div class="qk-card-body"><div id="sc-dist" style="--h:260px"></div><p class="qk-caption">Sample data. Marks: the player (signal) and the peer median (dashed).</p></div></div>
+        <div class="qk-card" style="margin-top:16px"><div class="qk-card-head"><div><div class="qk-card-title">Tale of the tape</div><div class="qk-card-sub">Matchup bar: the better side is solid</div></div></div><div class="qk-card-body" id="sc-mu"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="qk-section sc" id="forecast">
+    <div id="h-forecast"></div>
+    <div class="qk-grid">
+      <div class="qk-span-8"><div class="qk-card"><div class="qk-card-head"><div><div class="qk-card-title">Chance to make the playoffs</div><div class="qk-card-sub">Our season simulation after every game day; shaded: the 80% range</div></div></div>
+        <div class="qk-card-body"><div id="sc-fc" style="--h:340px"></div></div></div></div>
+      <div class="qk-span-4"><div class="qk-card"><div class="qk-card-head"><div><div class="qk-card-title">Who wins the Cup</div><div class="qk-card-sub">Our chance; the grey tick is the market, for reference</div></div></div>
+        <div class="qk-card-body" id="sc-chances"></div></div></div>
+    </div>
+    <div class="qk-grid" style="margin-top:16px">
+      <div class="qk-span-6"><div class="qk-card"><div class="qk-card-head"><div><div class="qk-card-title">Win probability, in game</div><div class="qk-card-sub">Live model; dots mark goals</div></div></div><div class="qk-card-body"><div id="sc-wp" style="--h:260px"></div></div></div></div>
+      <div class="qk-span-6"><div class="qk-card"><div class="qk-card-head"><div><div class="qk-card-title">Title chances (chart form)</div><div class="qk-card-sub">QKC.chances: ours as bars, the market as a tick</div></div></div><div class="qk-card-body"><div id="sc-chc" style="--h:260px"></div></div></div></div>
+    </div>
+  </section>
+
+  <section class="qk-section sc" id="tables">
+    <div id="h-tables"></div>
+    <div class="qk-card"><div class="qk-card-head"><div><div class="qk-card-title">Points leaders</div><div class="qk-card-sub">Leaderboard: entity, heat cells by percentile, inline bar, last-ten sparkline</div></div></div>
+      <div class="qk-card-body flush" id="sc-lb"></div></div>
+  </section>
+
+  <section class="qk-section sc" id="compare">
+    <div id="h-compare"></div>
+    <div class="qk-card"><div class="qk-card-body" id="sc-cmp2"></div></div>
+    <div class="qk-card" style="margin-top:16px"><div class="qk-card-body" id="sc-cmp3"></div></div>
+  </section>
+
+  <section class="qk-section sc" id="copy">
+    <div id="h-copy"></div>
+    <div class="sc-do" id="sc-copy"></div>
+  </section>
+</main>
+<div id="qk-footer"></div>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="quant.js"></script>
+<script src="quant-charts.js"></script>
+<script src="showcase.js"></script>
+</body>
+</html>

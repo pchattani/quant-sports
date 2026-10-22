@@ -310,22 +310,29 @@ def fourth_block(G: pd.DataFrame) -> list[dict]:
 
 
 def box_block(G: pd.DataFrame, g: dict, names: dict, ngs_w: dict) -> dict:
+    """Box score by side. Counting rules match players.json and the player game logs (the official count): two-point
+    tries out, spikes are attempts, official yardage with laterals credited to the lateral player, every defensive
+    credit (special teams included) to the credited player's own team."""
+    from oddsmarkets.nfl.analytics.players import _pid, def_credits, lateral_yards, pass_yards, rec_yards, rush_yards, scrimmage, td_credit
     out: dict[str, Any] = {}
-    S = G[G["play_type"].isin(["pass", "run"])] if "play_type" in G else G.iloc[0:0]
+    S = scrimmage(G, two_point=False)
+    C = def_credits(G) if len(S) else def_credits(G.iloc[0:0])
     for side, team in (("home", g.get("home")), ("away", g.get("away"))):
         T = S[S["posteam"] == team]
-        Dd = S[S["defteam"] == team]
         blk: dict[str, Any] = {}
-        pid = T["passer_id"] if "passer_id" in T else T.get("passer_player_id")
+        pid = _pid(T, "passer_id", "passer_player_id") if ("passer_id" in T or "passer_player_id" in T) else None
         db = (flag(T, "qb_dropback").fillna(0) == 1)
+        K = G[(G["play_type"] == "qb_spike") & (G["posteam"] == team)] if "play_type" in G and "posteam" in G else G.iloc[0:0]
+        spikes = _pid(K, "passer_id", "passer_player_id").dropna().astype(str).value_counts() if len(K) else pd.Series(dtype=float)
         rows = []
         if pid is not None:
             for p, d in T[db & pid.notna()].groupby(pid[db & pid.notna()]):
                 att = d[(flag(d, "sack").fillna(0) == 0) & (flag(d, "qb_scramble").fillna(0) == 0)]
                 cpo = num(att, "cp_ours") if "cp_ours" in att and att["cp_ours"].notna().any() else num(att, "cp")
                 n = ngs_w.get(("passing", str(p))) or {}
-                rows.append({"pid": str(p), "name": names.get(str(p)), "cmp": int(flag(att, "complete_pass").fillna(0).sum()), "att": int(len(att)),
-                             "yds": int(num(att, "yards_gained").fillna(0).where(flag(att, "complete_pass").fillna(0) == 1, 0).sum()),
+                rows.append({"pid": str(p), "name": names.get(str(p)), "cmp": int(flag(att, "complete_pass").fillna(0).sum()),
+                             "att": int(len(att)) + int(spikes.get(str(p), 0) or 0),
+                             "yds": int(pass_yards(att).sum()),
                              "td": int(flag(d, "pass_touchdown").fillna(0).sum()), "int": int(flag(d, "interception").fillna(0).sum()),
                              "sacks": int(flag(d, "sack").fillna(0).sum()), "epa": an.rnd(num(d, "_epa").sum(), 2),
                              "epa_db": an.rnd(num(d, "_epa").mean(), 3),
@@ -334,26 +341,33 @@ def box_block(G: pd.DataFrame, g: dict, names: dict, ngs_w: dict) -> dict:
         blk["passing"] = sorted(rows, key=lambda x: -x["att"])
         rows = []
         R = T[(T["play_type"] == "run") & (flag(T, "qb_scramble").fillna(0) == 0)]
-        rid = R["rusher_id"] if "rusher_id" in R else R.get("rusher_player_id")
+        rid = _pid(R, "rusher_player_id", "rusher_id") if ("rusher_id" in R or "rusher_player_id" in R) else None
+        lat_r = lateral_yards(T, "rushing")
         if rid is not None and len(R):
             for p, d in R[rid.notna()].groupby(rid[rid.notna()]):
                 xr = num(d, "xrush_ours")
                 n = ngs_w.get(("rushing", str(p))) or {}
-                rows.append({"pid": str(p), "name": names.get(str(p)), "car": int(len(d)), "yds": int(num(d, "yards_gained").fillna(0).sum()),
-                             "td": int(flag(d, "rush_touchdown").fillna(0).sum()), "epa": an.rnd(num(d, "_epa").sum(), 2),
+                rows.append({"pid": str(p), "name": names.get(str(p)), "car": int(len(d)),
+                             "yds": int(rush_yards(d).sum() + float(lat_r[lat_r.index.get_level_values(0) == str(p)].sum() if len(lat_r) else 0)),
+                             "td": int(td_credit(d.assign(pid=str(p)), "rush_touchdown").sum()), "epa": an.rnd(num(d, "_epa").sum(), 2),
                              "success": an.rnd((num(d, "_epa") > 0).mean(), 3),
                              "ryoe": an.rnd((num(d, "yards_gained") - xr).sum(), 1) if xr.notna().any() else an.rnd(n.get("rush_yards_over_expected"), 1)})
         blk["rushing"] = sorted(rows, key=lambda x: -x["car"])
         rows = []
         X = T[(T["play_type"] == "pass")]
-        xid = X["receiver_id"] if "receiver_id" in X else X.get("receiver_player_id")
+        xid = _pid(X, "receiver_id", "receiver_player_id") if ("receiver_id" in X or "receiver_player_id" in X) else None
+        lat_x, lat_t = lateral_yards(T, "receiving"), lateral_yards(T, "receiving", tds=True)
+
+        def _lat(sr: pd.Series, p: str) -> float:
+            return float(sr[sr.index.get_level_values(0) == p].sum()) if len(sr) else 0.0
         if xid is not None and len(X):
             for p, d in X[xid.notna()].groupby(xid[xid.notna()]):
                 c = flag(d, "complete_pass").fillna(0)
                 n = ngs_w.get(("receiving", str(p))) or {}
                 xy = num(d, "xyac_ours") if "xyac_ours" in d and d["xyac_ours"].notna().any() else num(d, "xyac_mean_yardage")
                 rows.append({"pid": str(p), "name": names.get(str(p)), "tgt": int(len(d)), "rec": int(c.sum()),
-                             "yds": int(num(d, "yards_gained").fillna(0).where(c == 1, 0).sum()), "td": int(flag(d, "pass_touchdown").fillna(0).sum()),
+                             "yds": int(rec_yards(d).sum() + _lat(lat_x, str(p))),
+                             "td": int(td_credit(d.assign(pid=str(p)), "pass_touchdown").sum() + _lat(lat_t, str(p))),
                              "epa": an.rnd(num(d, "_epa").sum(), 2), "air": an.inum(num(d, "air_yards").sum()),
                              "yac": an.inum(num(d, "yards_after_catch").where(c == 1).sum()),
                              "yacoe": an.rnd((num(d, "yards_after_catch") - xy).where(c == 1).sum(), 1) if xy.notna().any() else None,
@@ -361,16 +375,18 @@ def box_block(G: pd.DataFrame, g: dict, names: dict, ngs_w: dict) -> dict:
         blk["receiving"] = sorted(rows, key=lambda x: -x["tgt"])
         # defence: sacks, tackles, interceptions, passes defensed
         drows: dict[str, dict] = {}
-        for col, key, w in (("sack_player_id", "sacks", 1.0), ("half_sack_1_player_id", "sacks", 0.5), ("half_sack_2_player_id", "sacks", 0.5),
-                            ("solo_tackle_1_player_id", "tkl", 1.0), ("assist_tackle_1_player_id", "tkl", 1.0),
-                            ("tackle_with_assist_1_player_id", "tkl", 1.0), ("interception_player_id", "int", 1.0),
-                            ("pass_defense_1_player_id", "pd", 1.0), ("pass_defense_2_player_id", "pd", 1.0), ("qb_hit_1_player_id", "hits", 1.0),
-                            ("tackle_for_loss_1_player_id", "tfl", 1.0), ("forced_fumble_player_1_player_id", "ff", 1.0)):
-            if col not in Dd:
+        key_of = {"sacks": "sacks", "tackles": "tkl", "ints": "int", "pd": "pd", "qb_hits": "hits", "tfl": "tfl", "ff": "ff"}
+        Ct = C[C["team"] == team] if len(C) else C
+        for (p, stat), w in (Ct.groupby(["pid", "stat"])["w"].sum().items() if len(Ct) else []):
+            key = key_of.get(stat)
+            if key is None:
                 continue
-            for p, c in Dd[col].dropna().astype(str).value_counts().items():
-                drows.setdefault(p, {"pid": p, "name": names.get(p)})
-                drows[p][key] = drows[p].get(key, 0) + w * int(c)
+            drows.setdefault(str(p), {"pid": str(p), "name": names.get(str(p))})
+            drows[str(p)][key] = drows[str(p)].get(key, 0) + float(w)
+        for r in drows.values():
+            for k, v in r.items():
+                if isinstance(v, float) and v.is_integer():
+                    r[k] = int(v)
         blk["defense"] = sorted(drows.values(), key=lambda x: -(x.get("tkl", 0) + 3 * x.get("sacks", 0) + 3 * x.get("int", 0)))[:12]
         # team line
         e = num(T, "_epa")

@@ -95,21 +95,37 @@ def _ranked(c: dict) -> bool:
     return bool(c.get("hr") or c.get("ar") or c.get("hseed") or c.get("aseed"))
 
 
+_ET = None
+
+
+def sports_day(t: datetime):
+    """The US sports day of an instant: its US Eastern date, with games that start before 5 am Eastern (late
+    West Coast and Hawaii games) kept on the evening before, as the scoreboards file them."""
+    global _ET
+    if _ET is None:
+        from zoneinfo import ZoneInfo
+        _ET = ZoneInfo("America/New_York")
+    return (t.astimezone(_ET) - timedelta(hours=5)).date()
+
+
 def pick_games(cards: list[dict], now: datetime) -> tuple[list, list, list]:
-    """today / next_games / last_games of PAYLOADS.md. Today = the viewer-neutral UTC day of `now` (plus anything
-    live); next = the next 3 days (at most 40, ranked and close games first); when nothing falls in the next 3
-    days (preseason), the next 40 games within 3 weeks instead; last = the last 2 days (at most 40)."""
+    """today / next_games / last_games of PAYLOADS.md. Today = the US sports day of `now` (`sports_day`: Eastern
+    date, games before 5 am Eastern on the evening before; plus anything live), so a Wednesday-night game that ends
+    after midnight UTC is not shown as Thursday's; next = the next 3 days (at most 40, ranked and close games
+    first); when nothing falls in the next 3 days (preseason), the next 40 games within 3 weeks instead; last = the
+    last 2 days before today (at most 40)."""
     today, nxt, last = [], [], []
-    d0 = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    day0 = sports_day(now)
     for c in cards:
         t = parse_ts(c.get("date"))
         if t is None or c.get("status") in ("canceled", "postponed") and t < now - timedelta(days=2):
             continue
-        if c.get("status") == "in" or d0 <= t < d0 + timedelta(days=1) + timedelta(hours=8):
+        day = sports_day(t)
+        if c.get("status") == "in" or day == day0:
             today.append(c)
         elif now < t <= now + timedelta(days=3) and c.get("status") == "pre":
             nxt.append(c)
-        elif now - timedelta(days=2) <= t < d0 and c.get("status") == "post":
+        elif now - timedelta(days=2) <= t and day < day0 and c.get("status") == "post":
             last.append(c)
     if not today and not nxt:
         nxt = [c for c in cards if c.get("status") == "pre" and (parse_ts(c.get("date")) or now) > now

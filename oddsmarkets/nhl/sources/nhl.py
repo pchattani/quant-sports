@@ -234,7 +234,8 @@ def goalies_from_box(raw: dict | None) -> dict | None:
         if starter is None and used:
             starter = max(used, key=lambda g: _toi(g.get("toi")))["playerId"]
         out[side] = {"starter": starter, "used": [g["playerId"] for g in used],
-                     "decision": next((g["playerId"] for g in gs if g.get("decision") == "W" or g.get("decision") == "L"), None)}
+                     # goalie of record: W / L, or O (an overtime / shootout loss)
+                     "decision": next((g["playerId"] for g in gs if g.get("decision") in ("W", "L", "O")), None)}
     return out if any(v["starter"] for v in out.values()) else None
 
 

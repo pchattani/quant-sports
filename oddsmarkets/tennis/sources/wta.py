@@ -210,6 +210,8 @@ def _side(m: dict, s: str) -> dict | None:
     first, last = (m.get(f"PlayerNameFirst{s}") or "").strip(), (m.get(f"PlayerNameLast{s}") or "").strip()
     if not pid or pid == "0" or not last:
         return None
+    if pid.upper().startswith("EX"):
+        return None             # "EXW..." ids: exhibition entries the API lists inside a draw (men at Rovereto 2026)
     entry = (m.get(f"EntryType{s}") or "").strip().upper() or None
     return {"name": f"{first} {last}".strip(), "first": first, "last": last, "wta": pid,
             "country": m.get(f"PlayerCountry{s}") or None, "seed": _int(m.get(f"Seed{s}")),

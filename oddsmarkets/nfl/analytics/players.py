@@ -162,7 +162,8 @@ DEF_METRICS = [
     M("qb_hits", "QB hits", "Pass rush", "int", scope="DEF", desc="QB hits."),
     M("pressures_pg", "Sacks + hits / game", "Pass rush", "2", scope="DEF", den="games", k=6.0, desc="Sacks and QB hits per game."),
     M("tfl", "Tackles for loss", "Run defence", "int", scope="DEF", desc="Tackles for loss."),
-    M("tackles", "Tackles", "Run defence", "int", scope="DEF", desc="Solo and assisted tackles."),
+    M("tackles", "Tackles", "Run defence", "int", scope="DEF",
+      desc="Solo and assisted tackles, special teams included (the official count)."),
     M("ints", "Interceptions", "Coverage", "int", scope="DEF", desc="Interceptions."),
     M("pd", "Passes defensed", "Coverage", "int", scope="DEF", desc="Passes defensed."),
     M("ff", "Forced fumbles", "Coverage", "int", scope="DEF", desc="Forced fumbles."),
@@ -195,18 +196,80 @@ def reg_plays(ctx: SeasonContext) -> pd.DataFrame:
     return P[P["season_type"].astype(str).str.upper() == "REG"]
 
 
-def scrimmage(P: pd.DataFrame) -> pd.DataFrame:
+def scrimmage(P: pd.DataFrame, two_point: bool = True) -> pd.DataFrame:
+    """Pass and run plays; two_point=False drops two-point tries (they are not attempts, carries or targets in the
+    official count, and nflverse's player stats leave them out)."""
     if "play_type" not in P:
         return P.iloc[0:0]
-    return P[P["play_type"].isin(["pass", "run"])]
+    S = P[P["play_type"].isin(["pass", "run"])]
+    if not two_point and "two_point_attempt" in S:
+        S = S[flag(S, "two_point_attempt").fillna(0) != 1]
+    return S
+
+
+def pass_yards(D: pd.DataFrame) -> pd.Series:
+    """Passing yards per play: nflfastR's passing_yards (official credit), else yards gained on a completion."""
+    fb = num(D, "yards_gained").fillna(0).where(flag(D, "complete_pass").fillna(0) == 1, 0)
+    return num(D, "passing_yards").fillna(fb).fillna(0)
+
+
+def rec_yards(X: pd.DataFrame) -> pd.Series:
+    """Receiving yards credited to the targeted receiver: nflfastR's receiving_yards (a lateral's yards go to the
+    lateral receiver), else yards gained on a completion."""
+    c = flag(X, "complete_pass").fillna(0) == 1
+    return num(X, "receiving_yards").where(c).fillna(num(X, "yards_gained").where(c)).fillna(0).where(c, 0)
+
+
+def rush_yards(R: pd.DataFrame) -> pd.Series:
+    """Rushing yards credited to the ball carrier: nflfastR's rushing_yards, else yards gained."""
+    return num(R, "rushing_yards").fillna(num(R, "yards_gained")).fillna(0)
+
+
+def td_credit(df: pd.DataFrame, col: str) -> pd.Series:
+    """A touchdown flag credited to the play's player only when he scored it (td_player_id; a lateral's scorer is
+    credited by lateral_yards(..., tds=True))."""
+    td = flag(df, col).fillna(0)
+    if "td_player_id" not in df:
+        return td
+    who = df["td_player_id"]
+    me = df["pid"] if "pid" in df else None
+    if me is None:
+        return td
+    return td.where(who.isna() | (who.astype(object) == me.astype(object)), 0.0)
+
+
+def lateral_yards(df: pd.DataFrame, kind: str, tds: bool = False) -> pd.Series:
+    """Yards after a lateral credited to the lateral receiver (kind 'receiving' or 'rushing'), by (pid, game_id);
+    tds=True: the lateral receiver's touchdowns instead."""
+    if kind == "receiving":
+        idc, yc = "lateral_receiver_player_id", "lateral_receiving_yards"
+    else:
+        idc, yc = "lateral_rusher_player_id", "lateral_rushing_yards"
+    if idc not in df or yc not in df or not len(df):
+        return pd.Series(dtype=float)
+    m = df[idc].notna()
+    if not m.any():
+        return pd.Series(dtype=float)
+    d = df[m]
+    if tds:
+        if "td_player_id" not in d:
+            return pd.Series(dtype=float)
+        v = (d["td_player_id"].astype(object) == d[idc].astype(object)).astype(float)
+        v = v[v > 0]
+        return v.groupby([d.loc[v.index, idc].astype(str), d.loc[v.index, "game_id"]]).sum()
+    return num(d, yc).fillna(0).groupby([d[idc].astype(str), d["game_id"]]).sum()
 
 
 def _pid(df: pd.DataFrame, *cols: str) -> pd.Series:
+    """The first non-missing id across cols, in order (nflfastR's passer_id is empty on spikes, its rusher_id on
+    scrambles; on an aborted snap rusher_id names the player who fumbled it, rusher_player_id the official carrier)."""
+    out = None
     for c in cols:
         if c in df:
             s = df[c].astype(object)
-            return s.where(s.notna(), None)
-    return pd.Series(None, index=df.index, dtype=object)
+            s = s.where(s.notna(), None)
+            out = s if out is None else out.where(out.notna(), s)
+    return out if out is not None else pd.Series(None, index=df.index, dtype=object)
 
 
 def _team_last(df: pd.DataFrame, idcol: str, teamcol: str) -> dict[str, str]:
@@ -240,7 +303,7 @@ def ngs_map(ctx: SeasonContext, kind: str) -> dict[str, dict]:
 # ---------------------------------------------------------------------------------------------- groups
 
 def qb_rows(ctx: SeasonContext, P: pd.DataFrame, tg: int) -> dict[str, dict]:
-    S = scrimmage(P)
+    S = scrimmage(P, two_point=False)
     if not len(S):
         return {}
     pid = _pid(S, "passer_id", "passer_player_id")
@@ -260,7 +323,7 @@ def qb_rows(ctx: SeasonContext, P: pd.DataFrame, tg: int) -> dict[str, dict]:
     cp = num(D, "cp_ours") if "cp_ours" in D and D["cp_ours"].notna().any() else num(D, "cp")
     D["cpoe_"] = (D["cmp_"] - cp).where((D["att_"] == 1) & cp.notna())
     D["succ_"] = (D["epa_"] > 0).astype(float).where(D["epa_"].notna())
-    D["pyd_"] = num(D, "yards_gained").fillna(0).where(D["att_"] == 1, 0)
+    D["pyd_"] = pass_yards(D).where(D["att_"] == 1, 0)
     D["ptd_"] = flag(D, "pass_touchdown").fillna(0)
     D["sackyds_"] = (-num(D, "yards_gained").fillna(0)).where(D["sack_"] == 1, 0)
     pr = flag(D, "was_pressure")
@@ -285,16 +348,20 @@ def qb_rows(ctx: SeasonContext, P: pd.DataFrame, tg: int) -> dict[str, dict]:
     ep_npa = D[D["pa_"] == 0].groupby("pid")["epa_"].mean()
     # designed QB runs
     R = S[(S.get("play_type") == "run") & (flag(S, "qb_scramble").fillna(0) == 0)]
-    rid = _pid(R, "rusher_id", "rusher_player_id")
+    rid = _pid(R, "rusher_player_id", "rusher_id")
     R = R.assign(pid=rid)
     rq = R[R["pid"].isin(agg.index)].groupby("pid")
     run_epa = rq.apply(lambda x: num(x, "epa").sum()) if len(R[R["pid"].isin(agg.index)]) else pd.Series(dtype=float)
     run_n = rq.size() if len(R[R["pid"].isin(agg.index)]) else pd.Series(dtype=float)
+    # spikes are pass attempts (incomplete) in the official count
+    K = P[P["play_type"] == "qb_spike"] if "play_type" in P else P.iloc[0:0]
+    kid = _pid(K, "passer_id", "passer_player_id")
+    spikes = kid[kid.notna()].astype(str).value_counts() if len(K) else pd.Series(dtype=float)
     ngs = ngs_map(ctx, "passing")
     games = _games([(D, "pid"), (R, "pid")])
     team = _team_last(D, "pid", "posteam")
     for p, r in agg.iterrows():
-        att, dbs = r["att"], r["dropbacks"]
+        att, dbs = r["att"] + float(spikes.get(str(p), 0) or 0), r["dropbacks"]
         n_runs = float(run_n.get(p, 0) or 0)
         ng = ngs.get(p) or {}
         epa_tot = r["epa_sum"] + float(run_epa.get(p, 0) or 0)
@@ -322,23 +389,26 @@ def qb_rows(ctx: SeasonContext, P: pd.DataFrame, tg: int) -> dict[str, dict]:
 
 
 def rush_rows(ctx: SeasonContext, P: pd.DataFrame, tg: int) -> tuple[dict[str, dict], pd.DataFrame]:
-    S = scrimmage(P)
+    S = scrimmage(P, two_point=False)
     R = S[(S.get("play_type") == "run") & (flag(S, "qb_scramble").fillna(0) == 0)].copy() if len(S) else S
-    R["pid"] = _pid(R, "rusher_id", "rusher_player_id")
+    R["pid"] = _pid(R, "rusher_player_id", "rusher_id")
     R = R[R["pid"].notna()]
     if not len(R):
         return {}, R
     R["epa_"] = num(R, "epa")
-    R["yds_"] = num(R, "yards_gained").fillna(0)
+    R["yds_"] = rush_yards(R)
     R["succ_"] = (R["epa_"] > 0).astype(float).where(R["epa_"].notna())
     R["exp_"] = (R["yds_"] >= 10).astype(float)
     R["stuff_"] = (R["yds_"] <= 0).astype(float)
-    R["td_"] = flag(R, "rush_touchdown").fillna(0)
+    R["td_"] = td_credit(R, "rush_touchdown")
     R["ryoe_"] = (R["yds_"] - num(R, "xrush_ours")) if "xrush_ours" in R and R["xrush_ours"].notna().any() else np.nan
     g = R.groupby("pid")
     agg = pd.DataFrame({"carries": g.size(), "epa": g["epa_"].mean(), "epa_sum": g["epa_"].sum(), "succ": g["succ_"].mean(),
                         "yds": g["yds_"].sum(), "exp": g["exp_"].mean(), "stuff": g["stuff_"].mean(), "td": g["td_"].sum(),
                         "ryoe": g["ryoe_"].mean(), "ryoe_n": g["ryoe_"].count()})
+    lat = lateral_yards(S, "rushing")
+    if len(lat):
+        agg["yds"] = agg["yds"] + lat.groupby(level=0).sum().reindex(agg.index.astype(str)).fillna(0).to_numpy()
     ngs = ngs_map(ctx, "rushing")
     team = _team_last(R, "pid", "posteam")
     out = {}
@@ -354,7 +424,7 @@ def rush_rows(ctx: SeasonContext, P: pd.DataFrame, tg: int) -> tuple[dict[str, d
 
 
 def rec_rows(ctx: SeasonContext, P: pd.DataFrame, tg: int) -> tuple[dict[str, dict], pd.DataFrame]:
-    S = scrimmage(P)
+    S = scrimmage(P, two_point=False)
     T = S[(S.get("play_type") == "pass") & (flag(S, "sack").fillna(0) == 0)].copy() if len(S) else S
     T["pid"] = _pid(T, "receiver_id", "receiver_player_id")
     if not len(T):
@@ -367,13 +437,13 @@ def rec_rows(ctx: SeasonContext, P: pd.DataFrame, tg: int) -> tuple[dict[str, di
         return {}, X
     X["epa_"] = num(X, "epa")
     X["cmp_"] = flag(X, "complete_pass").fillna(0)
-    X["yds_"] = num(X, "yards_gained").fillna(0).where(X["cmp_"] == 1, 0)
+    X["yds_"] = rec_yards(X)
     X["yac_"] = num(X, "yards_after_catch").where(X["cmp_"] == 1)
     xyac = num(X, "xyac_ours") if "xyac_ours" in X and X["xyac_ours"].notna().any() else num(X, "xyac_mean_yardage")
     X["yacoe_"] = (X["yac_"] - xyac).where(X["cmp_"] == 1)
     cp = num(X, "cp_ours") if "cp_ours" in X and X["cp_ours"].notna().any() else num(X, "cp")
     X["croe_"] = (X["cmp_"] - cp).where(cp.notna())
-    X["td_"] = flag(X, "pass_touchdown").fillna(0)
+    X["td_"] = td_credit(X, "pass_touchdown")
     X["catchable_"] = flag(X, "is_catchable_ball")
     X["drop_"] = flag(X, "is_drop")
     X["cont_"] = flag(X, "is_contested_ball")
@@ -384,6 +454,12 @@ def rec_rows(ctx: SeasonContext, P: pd.DataFrame, tg: int) -> tuple[dict[str, di
                         "yacoe": g["yacoe_"].mean(), "croe": g["croe_"].mean(), "td": g["td_"].sum(),
                         "catchable": g["catchable_"].sum(), "catchable_n": g["catchable_"].count(), "drops": g["drop_"].sum(),
                         "cont": g["cont_"].sum(), "contc": g["contc_"].sum()})
+    lat = lateral_yards(S, "receiving")
+    if len(lat):
+        agg["yds"] = agg["yds"] + lat.groupby(level=0).sum().reindex(agg.index.astype(str)).fillna(0).to_numpy()
+    ltd = lateral_yards(S, "receiving", tds=True)
+    if len(ltd):
+        agg["td"] = agg["td"] + ltd.groupby(level=0).sum().reindex(agg.index.astype(str)).fillna(0).to_numpy()
     pg = X[["pid", "game_id", "posteam"]].drop_duplicates().merge(team_g.reset_index(), on=["game_id", "posteam"], how="left")
     vol = pg.groupby("pid").agg(team_att=("team_att", "sum"), team_air=("team_air", "sum"))
     ngs = ngs_map(ctx, "receiving")
@@ -498,33 +574,59 @@ def punt_rows(ctx: SeasonContext, P: pd.DataFrame, tg: int) -> dict[str, dict]:
 DEF_CREDIT = {
     "sack_player_id": ("sacks", 1.0, True), "half_sack_1_player_id": ("sacks", 0.5, True), "half_sack_2_player_id": ("sacks", 0.5, True),
     "qb_hit_1_player_id": ("qb_hits", 1.0, False), "qb_hit_2_player_id": ("qb_hits", 1.0, False),
-    "tackle_for_loss_1_player_id": ("tfl", 1.0, True), "interception_player_id": ("ints", 1.0, True),
+    "tackle_for_loss_1_player_id": ("tfl", 1.0, True), "tackle_for_loss_2_player_id": ("tfl", 1.0, True),
+    "interception_player_id": ("ints", 1.0, True),
     "pass_defense_1_player_id": ("pd", 1.0, True), "pass_defense_2_player_id": ("pd", 1.0, True),
-    "forced_fumble_player_1_player_id": ("ff", 1.0, True), "solo_tackle_1_player_id": ("tackles", 1.0, False),
-    "assist_tackle_1_player_id": ("tackles", 1.0, False), "tackle_with_assist_1_player_id": ("tackles", 1.0, False),
+    "forced_fumble_player_1_player_id": ("ff", 1.0, True), "forced_fumble_player_2_player_id": ("ff", 1.0, True),
+    "solo_tackle_1_player_id": ("tackles", 1.0, False), "solo_tackle_2_player_id": ("tackles", 1.0, False),
+    "assist_tackle_1_player_id": ("tackles", 1.0, False), "assist_tackle_2_player_id": ("tackles", 1.0, False),
+    "assist_tackle_3_player_id": ("tackles", 1.0, False), "assist_tackle_4_player_id": ("tackles", 1.0, False),
+    "tackle_with_assist_1_player_id": ("tackles", 1.0, False), "tackle_with_assist_2_player_id": ("tackles", 1.0, False),
 }
+CREDIT_COLUMNS = ["pid", "game_id", "team", "stat", "w", "splash", "epa", "key", "scrim"]
+
+
+def def_credits(P: pd.DataFrame) -> pd.DataFrame:
+    """Every defensive credit on every play (special teams included, as in the official count and nflverse's player
+    stats): pid, game_id, team, stat, w, splash, epa, key (game|play), scrim (a pass or run play, two-point tries out).
+    The credited player's team comes from nflfastR's per-credit team column where it has one (a tackle after an
+    interception or on a punt is made by the offence / kicking team), else the play's defteam."""
+    if not len(P) or "game_id" not in P:
+        return pd.DataFrame(columns=CREDIT_COLUMNS)
+    epa = num(P, "epa")
+    scrim = P["play_type"].isin(["pass", "run"]) if "play_type" in P else pd.Series(False, index=P.index)
+    if "two_point_attempt" in P:
+        scrim = scrim & (flag(P, "two_point_attempt").fillna(0) != 1)
+    dteam = P["defteam"] if "defteam" in P else pd.Series(None, index=P.index, dtype=object)
+    play = P["play_id"].astype(str) if "play_id" in P else pd.Series(P.index.astype(str), index=P.index)
+    parts = []
+    for col, (stat, w, splash) in DEF_CREDIT.items():
+        if col not in P:
+            continue
+        m = P[col].notna()
+        if not m.any():
+            continue
+        tcol = col.replace("_player_id", "_team")
+        team = dteam[m]
+        if tcol != col and tcol in P:
+            team = P.loc[m, tcol].where(P.loc[m, tcol].notna(), team)
+        parts.append(pd.DataFrame({"pid": P.loc[m, col].astype(str), "game_id": P.loc[m, "game_id"], "team": team, "stat": stat,
+                                   "w": w, "splash": splash, "epa": epa[m], "key": P.loc[m, "game_id"].astype(str) + "|" + play[m],
+                                   "scrim": scrim[m]}))
+    if not parts:
+        return pd.DataFrame(columns=CREDIT_COLUMNS)
+    return pd.concat(parts, ignore_index=True)
 
 
 def def_rows(ctx: SeasonContext, P: pd.DataFrame, tg: int) -> dict[str, dict]:
-    S = P[P["play_type"].isin(["pass", "run"])] if "play_type" in P else P.iloc[0:0]
-    if not len(S):
+    if "play_type" not in P or not P["play_type"].isin(["pass", "run"]).any():
         return {}
-    epa = num(S, "epa")
-    parts = []
-    for col, (stat, w, splash) in DEF_CREDIT.items():
-        if col not in S:
-            continue
-        m = S[col].notna()
-        if not m.any():
-            continue
-        parts.append(pd.DataFrame({"pid": S.loc[m, col].astype(str), "game_id": S.loc[m, "game_id"], "team": S.loc[m, "defteam"],
-                                   "stat": stat, "w": w, "splash": splash, "epa": epa[m], "key": S.loc[m, "game_id"].astype(str) + "|" +
-                                   S.loc[m, "play_id"].astype(str)}))
-    if not parts:
+    C = def_credits(P)
+    if not len(C):
         return {}
-    C = pd.concat(parts, ignore_index=True)
     stats = C.pivot_table(index="pid", columns="stat", values="w", aggfunc="sum", fill_value=0)
-    sp = C[C["splash"]]
+    # splash value and splash plays: scrimmage plays only
+    sp = C[C["splash"].astype(bool) & C["scrim"].astype(bool)]
     # splash EPA: -EPA of the play shared among its splash-credited players (one share per player per play)
     sp_u = sp.drop_duplicates(["pid", "key"])
     share = sp_u.groupby("key")["pid"].transform("size")
@@ -547,6 +649,13 @@ def def_rows(ctx: SeasonContext, P: pd.DataFrame, tg: int) -> dict[str, dict]:
 
 
 # ---------------------------------------------------------------------------------------------- the catalogue
+
+def group_for(g: Any, default: str) -> str:
+    """A player's catalogue group: his listed group when it is one of ours; the default when unknown; a known group
+    outside ours (OL, long snappers) stays out: a centre who tackles after an interception or falls on a fumbled
+    snap is not a defender or a running back."""
+    return g if g in GROUPS else (default if not g else str(g))
+
 
 def build(ctx: SeasonContext) -> dict | None:
     P = reg_plays(ctx)
@@ -572,8 +681,7 @@ def build(ctx: SeasonContext) -> dict | None:
             names.update(dict(zip(d[c_id].astype(str), d[c_nm].astype(str))))
 
     def group_of(pid: str, default: str) -> str:
-        g = people.info(pid, roster).get("group")
-        return g if g in GROUPS else default
+        return group_for(people.info(pid, roster).get("group"), default)
 
     # QBs: dropback passers whose listed position is QB (or unknown with 20+ dropbacks)
     for p, r in qb.items():
@@ -581,7 +689,7 @@ def build(ctx: SeasonContext) -> dict | None:
             raw[p] = {**r, "group": "QB"}
     for p, r in rushers.items():
         grp = group_of(p, "RB")
-        if grp == "QB":
+        if grp == "QB" or grp not in GROUPS:
             continue
         base = raw.get(p) or {"values": {}, "n": {}, "team": r.get("team"), "group": grp}
         base["values"].update(r["values"])
@@ -589,7 +697,7 @@ def build(ctx: SeasonContext) -> dict | None:
         raw[p] = base
     for p, r in recs.items():
         grp = group_of(p, "WR")
-        if grp in ("QB", "K", "P", "DEF"):
+        if grp in ("QB", "K", "P", "DEF") or grp not in GROUPS:
             continue
         base = raw.get(p) or {"values": {}, "n": {}, "team": r.get("team"), "group": grp}
         base["values"].update(r["values"])

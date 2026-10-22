@@ -40,7 +40,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from oddsmarkets.football.analytics.players import (
-    FLOOR_MIN, FLOOR_SHARE, METRICS, SUM_KEYS, _f, finalize_player, positions_from_store, tally_incidents,
+    FLOOR_MIN, FLOOR_SHARE, METRICS, SUM_KEYS, _f, finalize_player, paired_stats, positions_from_store, tally_incidents,
 )
 from oddsmarkets.football.analytics.pool import ADJUSTED_KEYS
 
@@ -187,7 +187,7 @@ class PeopleLines:
             for pid, p in lineup.items():
                 if not isinstance(p, dict):
                     continue
-                s = p.get("s") or {}
+                s = paired_stats(p.get("s") or {})
                 mins = _f(s.get("minutesPlayed"))
                 if mins <= 0:
                     continue

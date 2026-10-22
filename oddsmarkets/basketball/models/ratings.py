@@ -21,7 +21,8 @@ Without a prior the shrinkage is towards zero (the league mean). The system is s
 augmented sparse least-squares problem with `scipy.sparse.linalg.lsqr`. Reported:
 
     off_i = L + o_i - mean(o),  def_i = L + d_i - mean(d),  net_i = off_i - def_i,  L = league ORtg
-    se_net_i from the posterior covariance s^2 (A'WA + P)^-1, s^2 the weighted residual variance.
+    se_net_i from the posterior covariance s^2 (A'WA + P)^-1, s^2 the weighted residual variance (with 40
+    pseudo-observations at the league's typical residual sd, so it stays sane in a season's first days).
 
 Pace is a separate ridge fit of possessions per 48 minutes (per 40 in the WNBA):
 `pace_game = P + p_home + p_away`, reported as `pace_i = P + p_i`.
@@ -64,7 +65,11 @@ DEFAULT_B = 0.65
 DEFAULT_SE = {"nba": 4.0, "wnba": 5.0}
 EXPANSION_NET = -4.0
 Q_PER_DAY = {"nba": 0.03, "wnba": 0.05}
-VERSION = 2
+# residual sd per 100 possessions of one offence's scoring rate (full-season fits 2024-26: NBA 10.9-11.0,
+# WNBA 12.1) and its weight in observations, so the se of an early-season fit is not driven by a handful of games
+RESID_SD_PRIOR = {"nba": 11.0, "wnba": 12.0}
+RESID_PRIOR_N = 40.0
+VERSION = 3                    # 3: residual variance with a prior (early-season se)
 
 
 def _league(league: str | None) -> str:
@@ -165,7 +170,13 @@ def fit_ratings(games, through: Any = None, half_life_days: float | None = None,
     mu, h = sol[0], sol[1]
     o, d = sol[2:2 + T], sol[2 + T:]
     resid = y - A @ sol
-    s2 = float(np.sum(w * resid ** 2) / max(1.0, w.sum() - p * 0.5))
+    # Residual variance with a conjugate prior: RESID_PRIOR_N pseudo-observations at the league's typical sd. Without
+    # it the degrees of freedom (w.sum() - p/2) fall to the floor of 1 in a season's first days (15 games give 30
+    # observations against 62 parameters), s2 becomes the whole residual sum and se_net jumped to ~21 points per 100
+    # (live NBA 2026-27 after opening night: win totals 13-81 at the 5-95 %, title odds near uniform).
+    dof = max(0.0, float(w.sum()) - p * 0.5)
+    s0 = RESID_SD_PRIOR[league]
+    s2 = float((np.sum(w * resid ** 2) + RESID_PRIOR_N * s0 ** 2) / (dof + RESID_PRIOR_N))
     # posterior covariance (dense: p is ~62)
     Ad = A.toarray()
     H = (Ad * w[:, None]).T @ Ad

@@ -259,7 +259,7 @@ def build_season(b: Build, league: str, season: int, full: bool, cfg: dict, shar
                                                                               on_game=write_page, want_page=due), None)
         if res:
             ctx.pbp_summaries = res["games"]
-            ctx.pbp_totals = pbpx.season_totals(res["games"])
+            ctx.pbp_totals = pbpx.season_totals(ctx.season_pbp_summaries())    # the catalogue's games only
             logger.info("%s %s pbp pass: %d parsed, %d cached, %d without raw", league, season, res["n_parsed"], res["n_cached"],
                         res["n_missing"])
     else:
@@ -268,7 +268,7 @@ def build_season(b: Build, league: str, season: int, full: bool, cfg: dict, shar
                                                                                use_cache=True), None)
         if res and res["games"]:
             ctx.pbp_summaries = res["games"]
-            ctx.pbp_totals = pbpx.season_totals(res["games"])
+            ctx.pbp_totals = pbpx.season_totals(ctx.season_pbp_summaries())
 
     # the rest of the game pages (no raw play-by-play: pregame, box-only, or raw not on this machine)
     def other_pages():
@@ -300,7 +300,8 @@ def build_season(b: Build, league: str, season: int, full: bool, cfg: dict, shar
 
     # lineups (5-man tables per team, shared by players and teams)
     lineup_tables = b.step(f"{league} {season} lineups", lambda: {
-        t: LU.lineup_table(ctx.team_stints, t, 5, ctx.hpm) for t in ctx.teams} if ctx.team_stints is not None and not ctx.team_stints.empty
+        t: LU.lineup_table(ctx.season_team_stints, t, 5, ctx.hpm) for t in ctx.teams}
+        if ctx.season_team_stints is not None and not ctx.season_team_stints.empty
         else {}, {}) or {}
     hist = _player_history(shared.get("catalogues") or {}, season)
     cat = b.write_or_fail(d + "players.json", f"players {league} {season}", lambda: PL.build(ctx, hist, lineup_tables),
@@ -413,7 +414,7 @@ def shots_league(ctx) -> dict:
     from oddsmarkets.basketball.analytics.players import grid_payload, zones_table
     from oddsmarkets.basketball.models import shots as SH
     x = ctx.xpts or {}
-    sh = ctx.shots
+    sh = ctx.season_shots
     if sh is None or sh.empty:
         return {"ok": False, "reason": "no shot table for this season (box-score era or not derived yet)", "league": ctx.league,
                 "season": ctx.season}

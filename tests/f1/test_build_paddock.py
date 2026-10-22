@@ -114,3 +114,21 @@ def test_failing_step_is_isolated(paddock_data, monkeypatch):
     assert t["ok"] is False and "teams" in t["reason"]
     assert _load(data / str(YEAR) / "season.json")["ok"] is True       # everything after the failure was still built
     assert (data / str(YEAR) / "races" / "5.json").exists()
+
+
+def test_calibration_prefers_the_newer_of_cache_and_committed(tmp_path):
+    bp = _build_module()
+    committed, cache = tmp_path / "calibration.json", tmp_path / "backtest.json"
+    new = {"ok": True, "generated_at": "2026-10-21T23:41:01Z", "races": 269}
+    old_cache = {"generated_at": "2026-10-02T21:25:21Z", "races": 267, "seasons_used": {"2014": "complete"}, "metrics": {}}
+    committed.write_text(json.dumps(new), encoding="utf-8")
+    cache.write_text(json.dumps(old_cache), encoding="utf-8")
+    assert bp.pick_calibration(committed, cache)["races"] == 269          # an older CI cache must not win
+    newer_cache = dict(old_cache, generated_at="2026-10-30T00:00:00Z", races=271)
+    cache.write_text(json.dumps(newer_cache), encoding="utf-8")
+    got = bp.pick_calibration(committed, cache)
+    assert got["races"] == 271 and got["ok"] and got["updated_at"] == "2026-10-30T00:00:00Z"
+    cache.unlink()
+    assert bp.pick_calibration(committed, cache)["races"] == 269
+    committed.unlink()
+    assert bp.pick_calibration(committed, cache)["ok"] is False

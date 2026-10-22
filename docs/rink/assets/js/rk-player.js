@@ -1,11 +1,13 @@
-/* The Quant Rink — the player page (#/player/<pid>), on the kit.
+/* The Quant Rink — the player page (#/player/<pid>), Design System 2.0 reference player page.
  *
- * Hero (club colour, number, position, age, size); KPI strip; Overview: percentiles against his position
- * (Savant-style bars), season by season (chart against the league and the table), this season's game log
- * chart, splits (by strength, home and away, last ten), the shot map, value (this season and the four-season
- * valuation), linemates and similar players; Detail (?view=detail): the full pre-redesign player page.
+ * Player card header (club colour band, number, position, age, size, headline stats); stat tiles with percentile
+ * chips; Overview: the Savant-style percentile card against his position group (forwards / defencemen / goalies,
+ * the payload's sample floors, the sample shown, early metrics dashed), where he sits in the peer distribution,
+ * season by season, this season's game log, the career table, splits, the shot map, value, linemates and the most
+ * similar players (with compare links); Detail (?view=detail): the full pre-redesign player page.
  *
- * Reads data/players/<pid>.json, data/glossary.json (labels), <S>/value.json and <S>/valuation.json (current). */
+ * Reads data/players/<pid>.json, data/glossary.json (labels), <S>/skaters.json or goalies.json (position-pool
+ * percentiles, the metric catalogue and the peer distribution), <S>/value.json and <S>/valuation.json (current). */
 (function (RK) {
 'use strict';
 
@@ -20,26 +22,7 @@ function labels() {
   });
 }
 
-const SK_PCT = [
-  ['Scoring', ['p60', 'g60', 'ixg60_all', 'sh_pct', 'gax']],
-  ['Play driving (5v5)', ['xgf_pct', 'cf_pct', 'xgf_pct_rel', 'rapm_off', 'rapm_def']],
-  ['Value', ['gar', 'gar_ev_off', 'gar_ev_def', 'gar_pp']],
-  ['Physical and more', ['hits60', 'blocks60', 'take60', 'pen_diff60', 'fo_pct', 'edge_max_speed']]
-];
-const G_PCT = [
-  ['Results', ['sv_pct', 'gsax', 'gsax60', 'qs_pct', 'gaa']],
-  ['By danger', ['sv_pct_low', 'sv_pct_med', 'sv_pct_high', 'gsax_high']],
-  ['By situation', ['sv_pct_5v5', 'sv_pct_sh', 'reb_rate']]
-];
-function fmtBy(meta, v) {
-  if (!isNum(v)) return '—';
-  const f = (meta || {}).fmt;
-  if (f === 'pct') return U.pct(v, 1);
-  if (f === 'toi_min') return RK.fmtTOI(v, { minutes: true });
-  if (f === 'int') return String(Math.round(v));
-  if (f === 'goals') return U.signed(v, 2);
-  return RK.fmtVal ? RK.fmtVal(v, f || '2') : U.f(v, 2);
-}
+function fmtBy(meta, v) { return U.fmtBy(meta, v); }
 function age(dob) { const d = RK.parseDate(dob); if (!d) return null; return Math.floor((Date.now() - d.getTime()) / (365.25 * 864e5)); }
 
 function render(el, params, state) {
@@ -47,7 +30,8 @@ function render(el, params, state) {
   const view = ((params.query || {}).view) === 'detail' ? 'detail' : 'overview';
   const S = RK.currentSeason();
   el.innerHTML = QK.skeleton('card', 1) + QK.skeleton('chart', 1);
-  return Promise.all([RK.loadPlayer(pid), labels(), RK.loadYear('value.json', S), RK.loadYear('valuation.json', S)]).then(res => {
+  const kindGuess = (RK.player(pid) || {}).pos === 'G' ? 'goalies.json' : 'skaters.json';
+  return Promise.all([RK.loadPlayer(pid), labels(), RK.loadYear('value.json', S), RK.loadYear('valuation.json', S), RK.loadYear(kindGuess, S)]).then(res => {
     if (!U.alive(el)) return;
     const p = res[0];
     if (!p || !p.name) { el.innerHTML = U.secHead('players', RK.playerName(pid), 'No career file for this player yet.', null, null, 'NHL · Player') + U.card2('Not found', '', QK.empty('No player ' + pid, 'Try the search.')); return; }
@@ -64,42 +48,47 @@ function render(el, params, state) {
     document.title = p.name + ' · ' + RK.SITE;
     const a = age(p.dob);
     const ht = isNum(p.height) ? Math.floor(p.height / 12) + '′' + (p.height % 12) + '″' : '';
-    const stat = (v, l) => '<div class="qk-hero-stat"><div class="v">' + v + '</div><div class="l">' + esc(l) + '</div></div>';
-    const stats = goalie ? [stat(isNum(lv.gp) ? lv.gp : '—', 'GP'), stat(isNum(lv.sv_pct) ? RK.fmtVal(lv.sv_pct, '3') : '—', 'Save %'), stat(U.signed(lv.gsax, 1), 'GSAx'), stat(isNum(lv.w) ? lv.w + '-' + (lv.l || 0) + '-' + (lv.otl || 0) : '—', 'Record')]
-      : [stat(isNum(lv.gp) ? lv.gp : '—', 'GP'), stat(isNum(lv.g) ? lv.g : '—', 'Goals'), stat(isNum(lv.a) ? lv.a : '—', 'Assists'), stat(isNum(lv.p) ? lv.p : '—', 'Points')];
-    const tc = curTeam ? U.tcol(curTeam) : 'var(--accent)';
-    const hero = '<section class="qk-hero" style="--tc:' + esc(tc) + '"><div class="qk-hero-in"><div class="qk-avatar">' + esc(isNum(p.number) ? '#' + p.number : QK.fmt.initials(p.name)) + '</div>' +
-      '<div style="min-width:0"><div class="qk-kicker">' + esc([goalie ? 'Goalie' : ({ C: 'Centre', L: 'Left wing', R: 'Right wing', D: 'Defence' }[p.pos] || p.pos), last.season ? RK.seasonLabel(last.season) : ''].filter(Boolean).join(' · ')) + '</div><h1>' + esc(p.name) + '</h1>' +
-      '<div class="qk-hero-meta">' + (curTeam ? '<span>' + U.teamEnt(curTeam) + '</span>' : '') + (a ? '<span>Age <b>' + a + '</b></span>' : '') + (ht ? '<span><b>' + ht + '</b>' + (isNum(p.weight) ? ' · ' + p.weight + ' lb' : '') + '</span>' : '') +
-      (p.shoots ? '<span>' + (goalie ? 'Catches' : 'Shoots') + ' <b>' + esc(p.shoots) + '</b></span>' : '') + (vv && Array.isArray(vv.inj) && vv.inj[0] ? '<span class="rk-inj">' + esc(vv.inj[0]) + '</span>' : '') + '</div></div>' +
-      '<div class="qk-hero-stats">' + stats.join('') + '</div></div></section>';
+    const catP = res[4] && res[4].players ? res[4].players[pid] : null;
+    const cat = catP ? res[4] : null;
+    const meta = U.metaMap(cat);
+    Object.keys(LB).forEach(k2 => { if (!meta[k2]) meta[k2] = LB[k2]; });
+    const group = catP ? (goalie ? 'G' : catP.group) : (goalie ? 'G' : null);
+    const posName = goalie ? 'Goalie' : ({ C: 'Centre', L: 'Left wing', R: 'Right wing', D: 'Defence' }[p.pos] || p.pos);
+    const stats = goalie ? [{ label: 'GP', value: isNum(lv.gp) ? lv.gp : '—' }, { label: 'Save %', value: isNum(lv.sv_pct) ? RK.fmtVal(lv.sv_pct, '3') : '—' }, { label: 'GSAx', value: U.signed(lv.gsax, 1) }, { label: 'Record', value: isNum(lv.w) ? lv.w + '-' + (lv.l || 0) + '-' + (lv.otl || 0) : '—' }]
+      : [{ label: 'GP', value: isNum(lv.gp) ? lv.gp : '—' }, { label: 'Goals', value: isNum(lv.g) ? lv.g : '—' }, { label: 'Assists', value: isNum(lv.a) ? lv.a : '—' }, { label: 'Points', value: isNum(lv.p) ? lv.p : '—' }];
+    const tc = curTeam ? U.tcol(curTeam) : 'var(--signal)';
+    const tagsH = [];
+    if (catP && catP.qualified) tagsH.push(QK.tag('Qualified for percentiles', 'signal'));
+    if (vv && Array.isArray(vv.inj) && vv.inj[0]) tagsH.push('<span class="qk-tag rk-inj">' + esc(vv.inj[0]) + '</span>');
+    const hero = QK.playerHeader({ name: p.name, number: p.number, pos: posName, kicker: last.season ? RK.seasonLabel(last.season) : '',
+      team: curTeam ? { name: RK.teamName(curTeam), abbr: RK.teamAbbr(curTeam), colour: RK.teamColourRaw(curTeam), href: RK.teamHref(curTeam) } : null,
+      meta: [a ? ['Age', String(a)] : null, ht ? ['Height', ht + (isNum(p.weight) ? ' · ' + p.weight + ' lb' : '')] : null, p.shoots ? [goalie ? 'Catches' : 'Shoots', p.shoots] : null], stats: stats, tags: tagsH });
     const tabs = [{ key: 'overview', label: 'Overview', href: RK.playerHref(pid) }, { key: 'detail', label: 'Detail: every metric, shot maps, game log, on-ice, comparisons', href: RK.playerHref(pid) + '?view=detail' }];
     el.innerHTML = '<div class="qk-kicker" style="margin-bottom:10px"><a href="#/players">← Players</a></div>' + hero + '<div style="margin-top:var(--sp-4)"></div>' + U.tabsHTML(tabs, view) + '<div id="pp-body"></div>';
     const body = el.querySelector('#pp-body');
     if (view === 'detail') return U.legacy('player', body, params, state);
 
-    // KPIs
+    // stat tiles: ours first, each with its percentile against the position group where there is one
+    const pp = (catP && (catP.pct_pos || catP.pct)) || {};
     const k = [];
-    if (vrow) k.push(QK.kpi({ label: 'Rink value this season', value: U.f(vrow.war, 2) + ' WAR', sub: U.f(vrow.gar, 1) + ' GAR · ' + (isNum(vrow.pct_pos) ? RK.ordinal(vrow.pct_pos) + ' pctl at his position' : ''), tip: 'Wins and goals above replacement, our model' }));
-    if (vv) k.push(QK.kpi({ label: 'Four-season value', value: U.f(vv.total, 1) + ' WAR', sub: '10th–90th: ' + U.f(vv.p10, 1) + ' to ' + U.f(vv.p90, 1), tip: 'Discounted WAR over the rest of this season and the next three' }));
-    if (c && c.projection && isNum(c.projection.proj_pts)) k.push(QK.kpi({ label: 'Projected points', value: U.f(c.projection.proj_pts, 0), sub: isNum(c.projection.proj_g) ? U.f(c.projection.proj_g, 0) + ' goals, full season' : '' }));
-    if (c && c.onice && isNum(c.onice.xgf_pct)) k.push(QK.kpi({ label: '5v5 xGF%', value: U.pct(c.onice.xgf_pct, 1), sub: isNum(c.onice.xgf_pct_rel) ? U.signed(c.onice.xgf_pct_rel * 100, 1) + ' pts relative to team' : '', delta: null }));
-    if (c && c.rapm && isNum(c.rapm.rapm_net)) k.push(QK.kpi({ label: 'RAPM net', value: U.signed(c.rapm.rapm_net, 2), sub: '± ' + U.f(c.rapm.rapm_net_se, 2) + ' xG/60', tip: 'Regularised adjusted plus-minus: on-ice expected-goal impact after teammates and opponents' }));
-    if (!goalie && c && c.game_model && isNum(c.game_model.xgd60)) { const gm = c.game_model; k.push(QK.kpi({ label: 'Weight in the game model', value: U.signed(gm.xgd60, 3), sub: 'xG/60 to his team · ' + U.f(gm.share, 2) + ' of 5 skaters', tip: 'How much he moves his team’s game prices: his walk-forward RAPM (offence ' + U.signed(gm.o, 3) + ', defence ' + U.signed(gm.d, 3) + ' xG/60) times his share of the lineup’s expected 5v5 ice time (' + U.f(gm.toi5 / 60, 1) + ' min a game), as the game model reads the latest lineup' })); }
-    if (goalie && c && c.goalie) { const g = c.goalie; k.push(QK.kpi({ label: 'Goals saved above expected', value: U.signed(g.gsax, 2), sub: U.signed(g.gsax60, 3) + ' per 60' }), QK.kpi({ label: 'High-danger save %', value: RK.fmtVal(g.sv_pct_high, '3'), sub: 'expected ' + RK.fmtVal(g.xfsv_pct, '3') + ' overall' })); }
+    if (vrow) k.push({ label: 'Rink value this season', value: U.f(vrow.war, 2), unit: 'WAR', sub: U.f(vrow.gar, 1) + ' goals above replacement', pctl: isNum(vrow.pct_pos) ? vrow.pct_pos : null, signal: true, tip: 'Wins and goals above replacement, our model' });
+    if (vv) k.push({ label: 'Four-season value', value: U.f(vv.total, 1), unit: 'WAR', sub: 'likely range ' + U.f(vv.p10, 1) + ' to ' + U.f(vv.p90, 1), tip: 'Discounted WAR over the rest of this season and the next three; the range is the 10th to 90th percentile' });
+    if (!goalie && catP) k.push({ label: 'Points per 60', value: U.f((catP.values || {}).p60, 2), pctl: pp.p60, sub: 'all situations', tip: (meta.p60 || {}).desc });
+    if (c && c.onice && isNum(c.onice.xgf_pct)) k.push({ label: '5v5 expected-goals share', value: U.f(c.onice.xgf_pct * 100, 1), unit: '%', pctl: pp.xgf_pct, sub: isNum(c.onice.xgf_pct_rel) ? U.signed(c.onice.xgf_pct_rel * 100, 1) + ' pts relative to his team' : '', tip: 'Of the expected goals at 5v5 with him on the ice, the share that went his team’s way' });
+    if (c && c.rapm && isNum(c.rapm.rapm_net)) k.push({ label: 'On-ice impact (RAPM)', value: U.signed(c.rapm.rapm_net, 2), pctl: pp.rapm_net, sub: '± ' + U.f(c.rapm.rapm_net_se, 2) + ' xG per 60 (one standard error)', tip: 'Regularised adjusted plus-minus: his on-ice expected-goal impact after teammates and opponents' });
+    if (goalie && c && c.goalie) { const gg = c.goalie; k.push({ label: 'Goals saved above expected', value: U.signed(gg.gsax, 2), pctl: pp.gsax60, signal: true, sub: U.signed(gg.gsax60, 3) + ' per 60' }, { label: 'High-danger save %', value: RK.fmtVal(gg.sv_pct_high, '3'), pctl: pp.sv_pct_high, sub: 'expected ' + RK.fmtVal(gg.xfsv_pct, '3') + ' overall' }); }
 
-    const groups = goalie ? G_PCT : SK_PCT;
-    const pc = (c && c.pct) || {};
-    const vals = goalie ? ((c && c.goalie) || {}) : Object.assign({}, lv, (c && c.onice) || {}, (c && c.rapm) || {}, (c && c.edge) || {});
-    const pctHTML = groups.map(g => {
-      const rows = g[1].filter(kk => isNum(pc[kk])).map(kk => ({ label: (LB[kk] || {}).label || kk, pctl: pc[kk], value: isNum(vals[kk]) ? fmtBy(LB[kk], vals[kk]) : '' }));
-      return rows.length ? '<div class="qk-kicker" style="margin:12px 0 8px">' + esc(g[0]) + '</div>' + QK.pctlBars(rows) : '';
-    }).join('');
+    const groups = catP ? U.pctGroups(catP, meta, goalie ? U.G_SET : U.SK_SET) : [];
+    const peer = catP ? (catP.pct_pos ? U.GROUP_NAME[group] || 'his position' : 'all NHL skaters') : '';
+    const pcard = QK.pctCard({ title: 'Percentile rankings', peer: peer, sample: catP ? U.sampleLine(catP, cat.reference, goalie) : '', groups: groups,
+      emptyText: catP ? 'He is short of the sample floors for this season.' : 'No current-season profile yet.' });
 
-    let h = (k.length ? '<div class="qk-kpis rk-kpis">' + k.join('') + '</div>' : '') +
-      '<div class="qk-grid"><div class="qk-span-5">' + U.card2('Percentiles', c ? 'Against ' + (goalie ? 'goalies' : 'his position') + ' this season, 100 = best (needs the metric\'s sample floor)' : 'No current-season profile', pctHTML || QK.empty('Not enough data yet', 'Percentiles appear once he passes the sample floors.')) + '</div>' +
-      '<div class="qk-span-7"><div class="rk-stack">' + U.card2('Season by season', goalie ? 'Save % and goals saved above expected' : 'Points and value by season; 100 = average for a qualified player at his position', U.chart('pp-seasons', 280, 'Season by season')) +
-      ((c && (c.log || {}).rows || []).length ? U.card2('This season, game by game', goalie ? 'Goals saved above expected per game' : 'Game score per game (bars) and individual xG', U.chart('pp-log', 220, 'Game log')) : '') + '</div></div></div>';
+    let h = (k.length ? '<div class="rk-kpis">' + QK.stats(k) + '</div>' : '') +
+      '<div class="qk-grid"><div class="qk-span-5">' + pcard + '</div>' +
+      '<div class="qk-span-7"><div class="rk-stack">' +
+      (catP ? U.card2('Where he sits', 'Every qualified ' + (U.GROUP_NAME[group] || 'player').replace('NHL ', '') + ' this season; bars coloured by percentile', '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('pp-dist', 240, 'Distribution of the peer group')) : '') +
+      U.card2('Season by season', goalie ? 'Save % and goals saved above expected' : 'Points and value by season; 100 = average for a qualified player at his position', U.chart('pp-seasons', 280, 'Season by season')) +
+      ((c && (c.log || {}).rows || []).length ? U.card2('This season, game by game', goalie ? 'Goals saved above expected per game' : 'Game score per game (bars) and individual xG (line)', U.chart('pp-log', 220, 'Game log')) : '') + '</div></div></div>';
 
     // season table
     h += '<section class="qk-section">' + U.card2('Career', seasons.length + ' season' + (seasons.length === 1 ? '' : 's') + ' in the data', '<div id="pp-career"></div>', { flush: true }) + '</section>';
@@ -111,10 +100,30 @@ function render(el, params, state) {
     h += '</div></section>';
     const side = [];
     if (c && (c.linemates || []).length) side.push('<div class="qk-span-4">' + U.card2('Linemates', 'Shared 5v5 minutes this season', '<ul class="rk-list">' + c.linemates.slice(0, 6).map(m => '<li>' + U.playerEnt(m[0], m[1]) + '<span class="v">' + U.f(m[2], 0) + ' min</span></li>').join('') + '</ul>', { flush: true }) + '</div>');
-    if ((p.similar || []).length) side.push('<div class="qk-span-4">' + U.card2('Most similar', 'Nearest on this season\'s profile', '<ul class="rk-list">' + p.similar.slice(0, 6).map(m => '<li>' + U.playerEnt(m[0], m[1], m[2]) + '<a class="v rk-link" href="' + RK.compareHref(pid, m[0]) + '">Compare</a></li>').join('') + '</ul>', { flush: true }) + '</div>');
+    if ((p.similar || []).length) side.push('<div class="qk-span-4">' + U.card2('Most similar', 'Nearest on this season\'s profile', '<ul class="rk-list">' + p.similar.slice(0, 6).map(m => '<li>' + U.playerEnt(m[0], m[1], m[2]) + '<a class="v rk-link" href="' + RK.compareHref(pid, m[0]) + '">Compare</a></li>').join('') + '</ul>', { flush: true, foot: '<span></span><a href="' + RK.compareHref(pid, (p.similar[0] || [])[0]) + (p.similar[1] ? '/' + encodeURIComponent(p.similar[1][0]) : '') + '">Compare the top three →</a>' }) + '</div>');
     if (vrow && (vrow.why || []).length) side.push('<div class="qk-span-4">' + U.card2('Where his value comes from', 'GAR by component this season', '<ul class="rk-list">' + vrow.why.map(w => '<li><span>' + esc(w[0]) + '</span><span class="v">' + esc(isNum(w[1]) ? (Math.abs(w[1]) < 1 && w[0].indexOf('%') >= 0 ? RK.fmtVal(w[1], '3') : U.signed(w[1], 2)) : '') + '</span></li>').join('') + '</ul>', { flush: true, foot: '<span></span><a href="#/value">Value leaderboard →</a>' }) + '</div>');
     if (side.length) h += '<section class="qk-section"><div class="qk-grid">' + side.join('') + '</div></section>';
     body.innerHTML = h;
+
+    // where he sits: the peer distribution of one metric, with him and the median marked
+    if (catP && body.querySelector('#pp-dist')) {
+      const peers = Object.keys(cat.players).map(id => cat.players[id]).filter(x => x && x.qualified && (goalie || x.group === group));
+      const opts = goalie ? [['gsax60', 'GSAx / 60'], ['sv_pct', 'Save %'], ['sv_pct_high', 'High-danger sv%']] : [['p60', 'Points / 60'], ['xgf_pct', '5v5 xGF%'], ['ixg60_all', 'ixG / 60'], ['gar', 'GAR']];
+      const segEl = body.querySelector('#pp-dist-m');
+      segEl.innerHTML = opts.map((o, i) => '<button type="button" aria-pressed="' + (i === 0) + '" data-value="' + o[0] + '">' + esc(o[1]) + '</button>').join('');
+      const drawDist = key => {
+        const mm = meta[key] || {};
+        const vals = peers.map(x => (x.values || {})[key]).filter(isNum).sort((x, y) => x - y);
+        const mine = (catP.values || {})[key];
+        if (vals.length < 5) { body.querySelector('#pp-dist').innerHTML = QK.empty('Too few qualified peers yet'); return; }
+        const med = vals[Math.floor(vals.length / 2)];
+        const f = mm.fmt === 'pct' ? (v => U.f(v * 100, 1) + '%') : (v => U.f(v, 2));
+        QKC.distribution('#pp-dist', { values: vals, binCount: 22, lowerBetter: !!mm.lower, fmt: f, xName: (mm.label || key) + ' · ' + vals.length + ' qualified peers', yName: 'Players',
+          marks: (isNum(mine) ? [{ x: mine, label: RK.playerSurname(pid) }] : []).concat([{ x: med, label: 'Median' }]), label: 'Distribution of ' + (mm.label || key) });
+      };
+      drawDist(opts[0][0]);
+      QK.seg(segEl, drawDist);
+    }
 
     // season chart
     const sx = seasons.map(s => RK.seasonLabel(s.season, true));
@@ -127,7 +136,7 @@ function render(el, params, state) {
           yAxis: [QKC.axis(T, { fmt: v => v.toFixed(0), name: 'Goals saved above expected', nameAlign: 'left' }), QKC.axis(T, { fmt: v => v.toFixed(3), split: false, scale: true, name: 'Save %', nameAlign: 'right' })],
           tooltip: QKC.tooltip(T, { trigger: 'axis' }),
           series: [{ type: 'bar', name: 'GSAx', data: seasons.map(s => ({ value: (s.values || {}).gsax, itemStyle: { color: (s.values || {}).gsax >= 0 ? T.pos : T.neg, borderRadius: 3 } })), barMaxWidth: 26 },
-            { type: 'line', name: 'Save %', yAxisIndex: 1, data: seasons.map(s => (s.values || {}).sv_pct), lineStyle: { color: T.market, width: 2 }, itemStyle: { color: T.market }, symbolSize: 6 }]
+            { type: 'line', name: 'Save %', yAxisIndex: 1, data: seasons.map(s => (s.values || {}).sv_pct), lineStyle: { color: T.cat[1], width: 2 }, itemStyle: { color: T.cat[1] }, symbolSize: 6 }]
         }), { label: 'Goalie seasons' });
       } else {
         QKC.mount('#pp-seasons', T => ({
@@ -137,7 +146,7 @@ function render(el, params, state) {
           yAxis: [QKC.axis(T, { fmt: v => v.toFixed(0), name: 'Points', nameAlign: 'left' }), QKC.axis(T, { split: false, scale: true, name: 'Index (100 = average)', nameAlign: 'right' })],
           tooltip: QKC.tooltip(T, { trigger: 'axis' }),
           series: [{ type: 'bar', name: 'Points', barMaxWidth: 26, data: seasons.map(s => ({ value: (s.values || {}).p, itemStyle: { color: QK.color.ensure(RK.teamColourRaw(s.team) || T.model, T.s1, 3), borderRadius: [3, 3, 0, 0] } })) },
-            { type: 'line', name: 'Points/60 index', yAxisIndex: 1, data: seasons.map(s => (s.plus || {}).p60), lineStyle: { color: T.market, width: 2 }, itemStyle: { color: T.market }, symbolSize: 6, connectNulls: true },
+            { type: 'line', name: 'Points/60 index', yAxisIndex: 1, data: seasons.map(s => (s.plus || {}).p60), lineStyle: { color: T.cat[1], width: 2 }, itemStyle: { color: T.cat[1] }, symbolSize: 6, connectNulls: true },
             { type: 'line', name: 'xGF% index', yAxisIndex: 1, data: seasons.map(s => (s.plus || {}).xgf_pct), lineStyle: { color: T.cat[2], width: 2, type: 'dashed' }, itemStyle: { color: T.cat[2] }, symbolSize: 6, connectNulls: true,
               markLine: { silent: true, symbol: 'none', lineStyle: { color: T.axis, type: [3, 3] }, label: { show: false }, data: [{ yAxis: 100 }] } }]
         }), { label: 'Points and indexes by season' });
@@ -154,7 +163,7 @@ function render(el, params, state) {
         tooltip: QKC.tooltip(T, { trigger: 'axis', formatter: ps => { const r = lg[ps[0].dataIndex]; return '<b>' + esc((r.home ? 'v ' : '@ ') + r.opp) + ' · ' + esc(r.result || '') + '</b>' + ps.map(q => QKC.tipRow(q.color, q.seriesName, U.f(q.value, 2))).join('') + (goalie ? QKC.tipRow(T.other, 'Saves', (r.sa - r.ga) + '/' + r.sa) : QKC.tipRow(T.other, 'G-A', r.g + '-' + r.a)); } }),
         series: goalie ? [{ type: 'bar', name: 'GSAx', data: lg.map(r => ({ value: r.gsax, itemStyle: { color: r.gsax >= 0 ? T.pos : T.neg, borderRadius: 3 } })), barMaxWidth: 18 }]
           : [{ type: 'bar', name: 'Game score', data: lg.map(r => ({ value: r.gs, itemStyle: { color: QKC.hexA(tc.charAt(0) === '#' ? tc : T.model, 0.85), borderRadius: 3 } })), barMaxWidth: 18 },
-            { type: 'line', name: 'ixG', data: lg.map(r => r.ixg), lineStyle: { color: T.market, width: 2 }, itemStyle: { color: T.market }, symbolSize: 5 }]
+            { type: 'line', name: 'ixG', data: lg.map(r => r.ixg), lineStyle: { color: T.cat[1], width: 2 }, itemStyle: { color: T.cat[1] }, symbolSize: 5 }]
       }), { label: 'Game log' });
     }
     // career table

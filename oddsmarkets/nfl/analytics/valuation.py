@@ -438,6 +438,10 @@ def build(season: int, recs: dict[str, dict], qbs: dict[str, float] | None, np_l
     for pid, ro in (roster or {}).items():
         if pid in cand or ro.get("status") not in ROSTERED or not ro.get("team"):
             continue
+        # linemen and long snappers carry no value; an old season's catalogue could list a centre who made a tackle
+        # after an interception as a linebacker (fixed in players.py 22 Oct 2026; past seasons keep it until rebuilt)
+        if str(ro.get("pos") or "").upper() in NO_VALUE_POS:
+            continue
         pr = prev_recs.get(pid) or {}
         p1, p2 = rows_by.get((pid, season - 1)), rows_by.get((pid, season - 2))
         if not pr and not p1 and not p2 and not (str(ro.get("pos") or "").upper() == "QB" and (qbs or {}).get(pid) is not None):

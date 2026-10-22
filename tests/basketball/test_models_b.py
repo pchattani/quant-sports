@@ -112,6 +112,22 @@ def test_ratings_prior_and_shrinkage(nba_full):
     assert none["teams"] and all(abs(none["teams"][t]["net"] - tn[t]) < 1e-9 for t in tn)
 
 
+def test_ratings_se_sane_on_opening_night(nba_full):
+    """A season's first night (fewer observations than parameters) must not blow the se up: the residual variance
+    used to floor its degrees of freedom at 1, giving se_net ~21 per 100 on the live NBA 2026-27 site."""
+    st, truth = nba_full
+    rows = sorted(st["games"].values(), key=lambda g: g["date"])
+    prior = {"teams": {t: {"off": v["off"], "def": v["def"], "net": v["net"], "pace": v["pace"], "se_net": 3.5}
+                       for t, v in truth["teams"].items()}, "league_ortg": 114.0, "league_pace": 99.0}
+    for n in (1, 7, 14, 30):
+        fit = R.fit_ratings(rows[:n], league="nba", prior=prior, teams=list(st["teams"]))
+        se = [v["se_net"] for v in fit["teams"].values()]
+        assert max(se) < 8.0, (n, max(se))
+    # a full season is driven by its own residuals (the prior pseudo-observations barely matter)
+    full = R.fit_ratings(rows, league="nba", prior=prior, teams=list(st["teams"]), half_life_days=1e6)
+    assert all(v["se_net"] < 3.5 for v in full["teams"].values())
+
+
 def test_rating_paths(nba_full):
     st, truth = nba_full
     paths = R.rating_paths(st["games"], league="nba")

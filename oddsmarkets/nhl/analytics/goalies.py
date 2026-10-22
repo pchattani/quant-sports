@@ -75,11 +75,22 @@ KEYS = [m["key"] for m in METRICS]
 
 
 def decisions(ctx, gg: pd.DataFrame) -> dict[tuple, str]:
-    """{(game_id, goalie pid): "w" | "l" | "otl"} for the goalie with the most time on each team."""
+    """{(game_id, goalie pid): "w" | "l" | "otl"}: the goalie of record from the boxscore (the store's
+    games[gid].goalies[side].decision: the goalie in net for the deciding goal), else the one with the most time.
+
+    The NHL credits the decision to the goalie in net when the winning goal is scored, not to the one who played
+    longer: a starter pulled after the deciding goal keeps the loss and his reliever gets no decision."""
     out = {}
     if not len(gg):
         return out
-    top = gg.sort_values("toi", ascending=False).drop_duplicates(["game_id", "team"])
+    pick = []
+    for (gid, team), grp in gg.groupby(["game_id", "team"], sort=False):
+        g = ctx.games.get(gid) or {}
+        side = "home" if team == g.get("home") else "away" if team == g.get("away") else None
+        off = an.inum((((g.get("goalies") or {}).get(side) or {}).get("decision")) if side else None)
+        hit = grp[[an.inum(p) == off for p in grp["pid"]]] if off is not None else grp.iloc[0:0]
+        pick.append(hit.iloc[0] if len(hit) else grp.sort_values("toi", ascending=False).iloc[0])
+    top = pd.DataFrame(pick) if pick else gg.iloc[0:0]
     for r in top.itertuples(index=False):
         g = ctx.games.get(r.game_id) or {}
         hs, as_ = an.inum(g.get("hs")), an.inum(g.get("as"))

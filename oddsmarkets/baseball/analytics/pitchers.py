@@ -46,7 +46,7 @@ METRICS: list[dict] = [
     M("bf", "BF", "Traditional", "int", desc="Batters faced."),
     M("h", "H", "Traditional", "int", lower=True, desc="Hits allowed."),
     M("hr", "HR", "Traditional", "int", lower=True, desc="Home runs allowed."),
-    M("bb", "BB", "Traditional", "int", lower=True, desc="Walks (unintentional)."),
+    M("bb", "uBB", "Traditional", "int", lower=True, desc="Unintentional walks (MLB's BB includes IBB: add the IBB column)."),
     M("ibb", "IBB", "Traditional", "int", lower=True, desc="Intentional walks."),
     M("hbp", "HBP", "Traditional", "int", lower=True, desc="Hit batters."),
     M("so", "SO", "Traditional", "int", desc="Strikeouts."),

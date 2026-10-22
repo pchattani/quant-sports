@@ -235,6 +235,12 @@ def _primary_team(bf: pd.DataFrame) -> pd.Series:
     return tm.drop_duplicates("player_id", keep="last").set_index("player_id")["team"]
 
 
+def _latest_team(bf: pd.DataFrame) -> pd.Series:
+    """{player: team of his latest box-score row (a DNP is not a row)}: where a traded player plays now."""
+    pl = bf.assign(_gid=bf["game_id"].astype(str)).sort_values(["date", "_gid"])
+    return pl.drop_duplicates("player_id", keep="last").set_index("player_id")["team"]
+
+
 def _b2b_flags(ctx: SeasonContext) -> dict[tuple[str, str], bool]:
     """{(team, game_id): second night of a back-to-back} from the season's game days."""
     from oddsmarkets.basketball.models._games import local_day
@@ -363,10 +369,10 @@ def shot_metrics(shots: pd.DataFrame) -> dict[str, dict]:
 
 def defence_on_floor(ctx: SeasonContext) -> dict[str, dict]:
     """{pid: {"opp_rim_fg_on","opp_xpps_on","opp_fg3_on","_opp_shots"}} from opponents' shots with him on the floor."""
-    sh = ctx.shots
-    if sh is None or sh.empty or ctx.stints is None or ctx.stints.empty:
+    sh = ctx.season_shots
+    if sh is None or sh.empty or ctx.season_stints is None or ctx.season_stints.empty:
         return {}
-    on = LU.shots_on_floor(sh, ctx.stints, ctx.games)
+    on = LU.shots_on_floor(sh, ctx.season_stints, ctx.games)
     df = pd.concat([sh[["made", "value", "zone"] + (["xpts"] if "xpts" in sh else [])], on], axis=1)
     df = df[df["d1"].notna()]
     long = pd.concat([df.assign(pid=df[f"d{i}"]) for i in range(1, 6)], ignore_index=True)
@@ -412,6 +418,10 @@ def build(ctx: SeasonContext, history: dict | None = None, lineup_tables: dict |
         return meta
     agg = box_aggregate(bf)
     prim = _primary_team(bf)
+    # The shown team: in the current season the team a player plays for now (a traded player's latest game; WNBA
+    # 2026 listed 12 traded players, Kelsey Plum and DeWanna Bonner among them, under the team they left), in past
+    # seasons the team he played most for. Team-context metrics (availability, team win %) keep the primary team.
+    shown = _latest_team(bf) if ctx.season >= ctx.current else prim
     b2b = _b2b_flags(ctx)
     bfp = bf[bf["sec"] > 0].copy()
     bfp["gmsc"] = (bfp["pts"] + 0.4 * bfp["fgm"] - 0.7 * bfp["fga"] - 0.4 * (bfp["fta"] - bfp["ftm"]) + 0.7 * bfp["oreb"]
@@ -423,9 +433,9 @@ def build(ctx: SeasonContext, history: dict | None = None, lineup_tables: dict |
     lg_tsa = float((agg["fga"] + 0.44 * agg["fta"]).sum())
     lg_ts = float(agg["pts"].sum() / max(2 * lg_tsa, 1e-9))
     gmin = _io.game_minutes(league)
-    shots = shot_metrics(ctx.shots)
+    shots = shot_metrics(ctx.season_shots)
     dfl = defence_on_floor(ctx)
-    oo = LU.on_off(ctx.team_stints) if ctx.team_stints is not None and not ctx.team_stints.empty else {}
+    oo = LU.on_off(ctx.season_team_stints) if ctx.season_team_stints is not None and not ctx.season_team_stints.empty else {}
     tot = ctx.pbp_totals or {}
     ev, wpa = tot.get("players") or {}, tot.get("wpa") or {}
     rteams = (ctx.ratings or {}).get("teams") or {}
@@ -566,7 +576,8 @@ def build(ctx: SeasonContext, history: dict | None = None, lineup_tables: dict |
             v["career_hpm"] = (ch + v["hpm"] * mins) / (cm + mins) if cm + mins > 0 else None
             prev = (history.get("prev_hpm") or {}).get(pid)
             v["hpm_delta"] = (v["hpm"] - prev) if prev is not None else None
-        rows[pid] = {"name": info.get("name") or pid, "team": team, "pos": info.get("pos"), "pool": info.get("pool") or "F",
+        team_now = str(shown.get(pid)) if pid in shown.index else team
+        rows[pid] = {"name": info.get("name") or pid, "team": team_now, "pos": info.get("pos"), "pool": info.get("pool") or "F",
                      "age": an.rnd(age, 1), "gp": int(gp), "min": int(round(mins)), "values": an.round_values(v, METRICS)}
     max_min = max((r["min"] for r in rows.values()), default=0)
     floor = int(round(MIN_FLOOR_SHARE * max_min))
@@ -635,7 +646,7 @@ def current_blocks(ctx: SeasonContext, catalogue: dict, lineup_tables: dict | No
         return out
     ba = ctx.box_all
     sums = ctx.pbp_summaries or {}
-    sh = ctx.shots
+    sh = ctx.season_shots
     ref = None
     if sh is not None and not sh.empty:
         try:
@@ -643,7 +654,7 @@ def current_blocks(ctx: SeasonContext, catalogue: dict, lineup_tables: dict | No
         except Exception:  # noqa: BLE001
             ref = None
     by_shooter = dict(tuple(sh.groupby("shooter"))) if sh is not None and not sh.empty else {}
-    oo = LU.on_off(ctx.team_stints) if ctx.team_stints is not None and not ctx.team_stints.empty else {}
+    oo = LU.on_off(ctx.season_team_stints) if ctx.season_team_stints is not None and not ctx.season_team_stints.empty else {}
     unit_by_player: dict[str, list] = {}
     for tid, units in (lineup_tables or {}).items():
         for u in units:

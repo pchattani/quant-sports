@@ -353,8 +353,13 @@ def calibration(league: str, data_root: Path, seasons: list[int] | None = None) 
     p = an.cache_root() / f"backtest_{league}.json"
     prev = data_root / league / "calibration.json"
     old = (an.read_json(prev) if prev.exists() else None) or {}
-    if p.exists():
-        d = json.loads(p.read_text(encoding="utf-8"))
+    cached = json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+    # The newer backtest wins: CI restores an Actions cache whose backtest can predate the committed copy (the
+    # promoted NBA model's 21 Oct calibration never reached the live site, which kept serving the 1 Oct backtest).
+    if cached is not None and old.get("ok") and str(old.get("generated_at") or "") > str(cached.get("generated_at") or ""):
+        cached = None
+    if cached is not None:
+        d = cached
         d.update({"ok": True, "updated_at": d.get("generated_at") or an.now(), "summary": BT.summary_table(d)})
     elif old.get("ok"):
         d = old

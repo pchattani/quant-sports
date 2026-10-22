@@ -256,15 +256,58 @@ def player_incidents(store: dict[str, Any]) -> dict[str, dict[str, int]]:
     return out
 
 
+# Success-rate pairs (numerator, denominator). Some line-ups (an older Sofascore format, many UEFA qualifiers) carry
+# the numerator without the denominator, e.g. wonTackle without totalTackle: summed as they are, the season's rate went
+# past 100% (Conference League tackle success up to 600%, 71 players, 22 Oct 2026). An action won is an action tried,
+# so a match's denominator is taken as at least its numerator.
+RATE_PAIRS = (
+    ("wonTackle", "totalTackle"), ("accuratePass", "totalPass"), ("accurateOwnHalfPasses", "totalOwnHalfPasses"),
+    ("accurateOppositionHalfPasses", "totalOppositionHalfPasses"), ("accurateLongBalls", "totalLongBalls"),
+    ("accurateCross", "totalCross"), ("wonContest", "totalContest"), ("accurateKeeperSweeper", "totalKeeperSweeper"),
+    ("onTargetScoringAttempt", "totalShots"),
+)
+
+
+def paired_stats(s: dict[str, Any]) -> dict[str, Any]:
+    """A match's statistics with every rate's denominator at least its numerator (RATE_PAIRS); `s` itself if whole."""
+    out = s
+    for num, den in RATE_PAIRS:
+        n = _f(s.get(num))
+        if n > _f(s.get(den)):
+            if out is s:
+                out = dict(s)
+            out[den] = n
+    return out
+
+
+# Positions known outside a competition's own store (the current squads, other competitions' player metadata).
+# A UEFA qualifier or a light-detail store often has line-ups without positions and no metadata for clubs
+# outside the followed leagues; without a fallback those players had no position, so no positional peers
+# (22 Oct 2026: 738 of 1,953 Conference League players). Set once per build by set_fallback_positions().
+_FALLBACK_POSITIONS: dict[str, str] = {}
+POSITION_LETTERS = ("G", "D", "M", "F")
+
+
+def set_fallback_positions(positions: dict[str, str] | None) -> None:
+    """Install the build-wide position map used when a store knows nothing of a player's position."""
+    _FALLBACK_POSITIONS.clear()
+    for pid, pos in (positions or {}).items():
+        if pos in POSITION_LETTERS:
+            _FALLBACK_POSITIONS[str(pid)] = pos
+
+
 def positions_from_store(store: dict[str, Any]) -> dict[str, str]:
-    """Each player's position letter: the store's metadata, else the most common per-match position."""
+    """Each player's position letter: the store's metadata, else the most common per-match position, else the
+    build-wide fallback (set_fallback_positions)."""
     out: dict[str, str] = {}
     meta = store.get("players") or {}
     votes: dict[str, dict[str, int]] = {}
+    seen: set[str] = set()
     for players in (store.get("lineups") or {}).values():
         if not isinstance(players, dict):
             continue
         for pid, p in players.items():
+            seen.add(str(pid))
             pos = p.get("p") if isinstance(p, dict) else None
             if pos:
                 v = votes.setdefault(str(pid), {})
@@ -274,6 +317,10 @@ def positions_from_store(store: dict[str, Any]) -> dict[str, str]:
     for pid, m in meta.items():
         if isinstance(m, dict) and m.get("pos"):
             out[str(pid)] = str(m["pos"])
+    if _FALLBACK_POSITIONS:
+        for pid in seen:
+            if pid not in out and pid in _FALLBACK_POSITIONS:
+                out[pid] = _FALLBACK_POSITIONS[pid]
     return out
 
 
@@ -316,7 +363,7 @@ def aggregate_players(store: dict[str, Any], registry="liga_argentina") -> list[
         for pid, p in players.items():
             if not isinstance(p, dict):
                 continue
-            s = p.get("s") or {}
+            s = paired_stats(p.get("s") or {})
             mins = _f(s.get("minutesPlayed"))
             a = entry(str(pid), p)
             a["name"] = p.get("n", a["name"])

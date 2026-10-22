@@ -12,8 +12,15 @@ best 5 of the first 6 rounds plus best 4 of the remaining 5; 1981-1990: best 11)
 points = sum over blocks of the best k per-round scores (a round's score = the sum of the
 driver's rows in it, so a shared drive counts once). Constructors (from 1958): 1958-1978 a
 constructor scores only its best-placed car's points in each round, with the same block rule
-applied (an approximation of the period rules); from 1979 every car's points count. Ties are
-broken by countback (most wins, then second places, ...; Grand Prix results only).
+applied (an approximation of the period rules); from 1979 every car's points count. The
+Indianapolis 500 (a drivers' round 1950-60) never counted for constructors, and in 1958-59 the
+fastest-lap point went to the driver only, so a constructor's round score there is the position
+table value of its best car (`CONSTRUCTOR_TABLE_YEARS`). Ties are broken by countback (most
+wins, then second places, ...; Grand Prix results only).
+
+Exclusions (`EXCLUDED`): Michael Schumacher was excluded from the 1997 drivers' championship and
+McLaren from the 2007 constructors' championship. Their rows keep their results and gross
+points, carry `"excluded": "<reason>"` and 0 counted points, and rank last.
 
 The season payload's championship block maps `models.championship.simulate_championship`:
 p_title, exp_points, p05/p95 (5th/95th percentile of final points), pos_dist, the magic
@@ -46,6 +53,40 @@ DROP_RULES: dict[int, list[tuple[int | None, int]]] = {
     1975: [(7, 6), (None, 6)], 1976: [(8, 7), (None, 7)], 1977: [(9, 8), (None, 7)], 1978: [(8, 7), (None, 7)],
     1979: [(7, 4), (None, 4)], 1980: [(7, 5), (None, 5)], **{y: [(None, 11)] for y in range(1981, 1991)},
 }
+
+# Seasons whose constructors' round score is the position table value of the best car (no fastest-lap point).
+CONSTRUCTOR_TABLE_YEARS: dict[int, list[float]] = {1958: [8, 6, 4, 3, 2], 1959: [8, 6, 4, 3, 2]}
+# (year, "drivers" | "constructors", id) -> reason: excluded from that championship by the FIA.
+EXCLUDED: dict[tuple[int, str, str], str] = {
+    (1997, "drivers", "michael_schumacher"): "Excluded from the 1997 championship (European Grand Prix collision)",
+    (2007, "constructors", "mclaren"): "Excluded from the 2007 constructors' championship",
+}
+
+
+def _indy(race: dict) -> bool:
+    return "indianapolis" in str(race.get("name") or "").lower()
+
+
+def _constructor_score(year: int, row: dict, points: float) -> float:
+    """A row's points as they count for its constructor (module docstring)."""
+    table = CONSTRUCTOR_TABLE_YEARS.get(int(year))
+    if table is None:
+        return points
+    pos = inum(row.get("position"))
+    if not pos or pos > len(table):
+        return 0.0
+    return min(points, float(table[pos - 1]))
+
+
+def _apply_exclusions(year: int, kind: str, rows: list[dict], key: str) -> None:
+    """Zero the counted points of excluded entries, flag them, and move them to the end (in place)."""
+    hit = False
+    for r in rows:
+        why = EXCLUDED.get((int(year), kind, r[key]))
+        if why:
+            r["points"], r["excluded"], hit = 0.0, why, True
+    if hit:
+        rows.sort(key=lambda r: bool(r.get("excluded")))     # stable: the others keep their order
 
 KNOWN_COLOURS = {
     "ferrari": "#E8002D", "mclaren": "#FF8000", "mercedes": "#27F4D2", "red_bull": "#3671C6", "williams": "#64C4FF",
@@ -131,9 +172,14 @@ def standings(year: int) -> dict:
     team_last: dict[str, str] = {}
     team_count: dict[str, Counter] = defaultdict(Counter)
     poles: Counter = Counter()
+    indy_only: dict[str, bool] = {}
     for i, k in enumerate(rounds):
         race = st["races"][k]
         best_car: dict[str, float] = {}
+        indy = _indy(race)
+        for row in race.get("results") or []:
+            if row.get("constructor"):
+                indy_only[row["constructor"]] = indy_only.get(row["constructor"], True) and indy
         for row in (race.get("results") or []) + (race.get("sprint") or []):
             d, t, p = row.get("driver"), row.get("constructor"), fnum(row.get("points")) or 0.0
             if not d:
@@ -142,8 +188,10 @@ def standings(year: int) -> dict:
             if t:
                 team_last[d] = t
                 team_count[d][t] += 1
+                if indy:                                       # never a constructors' round
+                    continue
                 if 1958 <= int(year) <= 1978:                  # only the best-placed car scored (no sprints then)
-                    best_car[t] = max(best_car.get(t, 0.0), p)
+                    best_car[t] = max(best_car.get(t, 0.0), _constructor_score(year, row, p))
                 else:
                     t_scores[t][i] += p
         for t, p in best_car.items():
@@ -152,7 +200,7 @@ def standings(year: int) -> dict:
             pos = inum(row.get("position"))
             if pos and status_kind(row) == "finished" and pos <= 30:
                 d_cb[row["driver"]][pos - 1] += 1
-                if row.get("constructor"):
+                if row.get("constructor") and not indy:
                     t_cb[row["constructor"]][pos - 1] += 1
         q = next((r.get("driver") for r in race.get("qualifying") or [] if inum(r.get("position")) == 1), None)
         q = q or next((r.get("driver") for r in race.get("results") or [] if inum(r.get("grid")) == 1), None)
@@ -164,15 +212,19 @@ def standings(year: int) -> dict:
                         "points": round(_counted(sc, rule), 2), "points_gross": round(sum(sc), 2),
                         "wins": d_cb[d][0], "podiums": sum(d_cb[d][:3]), "poles": poles.get(d, 0), "_cb": d_cb[d]})
     drivers.sort(key=lambda r: (-r["points"], [-x for x in r["_cb"]], r["driver"]))
+    _apply_exclusions(year, "drivers", drivers, "driver")
     for k, r in enumerate(drivers, 1):
         r["pos"] = k
         r.pop("_cb")
     cons = []
     if int(year) >= 1958:
         for t, sc in t_scores.items():
+            if indy_only.get(t):
+                continue
             cons.append({"team": t, "points": round(_counted(sc, rule if int(year) <= 1978 else None), 2), "points_gross": round(sum(sc), 2),
                          "wins": t_cb[t][0], "podiums": sum(t_cb[t][:3]), "_cb": t_cb[t]})
         cons.sort(key=lambda r: (-r["points"], [-x for x in r["_cb"]], r["team"]))
+        _apply_exclusions(year, "constructors", cons, "team")
         for k, r in enumerate(cons, 1):
             r["pos"] = k
             r.pop("_cb")
@@ -190,13 +242,14 @@ def progression(year: int) -> dict:
     for i, k in enumerate(rounds):
         race = st["races"][k]
         best_car: dict[str, float] = {}
+        indy = _indy(race)
         for row in (race.get("results") or []) + (race.get("sprint") or []):
             d, t, p = row.get("driver"), row.get("constructor"), fnum(row.get("points")) or 0.0
             if d:
                 acc_d[d] += p
-            if t:
+            if t and not indy:
                 if 1958 <= int(year) <= 1978 and row in (race.get("results") or []):
-                    best_car[t] = max(best_car.get(t, 0.0), p)
+                    best_car[t] = max(best_car.get(t, 0.0), _constructor_score(year, row, p))
                 else:
                     acc_t[t] += p
         for t, p in best_car.items():
@@ -294,9 +347,10 @@ def build_season(year: int, current: int, *, forecasts: dict | None = None, effe
     return {
         "ok": True, "year": year, "updated_at": _now(), "rounds_total": len(rs), "rounds_done": len(stand["rounds_done"]),
         "finished": fin, "calendar": calendar(year, forecasts),
-        "standings": {"drivers": [{k: r[k] for k in ("pos", "driver", "team", "points", "points_gross", "wins", "podiums", "poles")}
-                                  for r in stand["drivers"]],
-                      "constructors": [{k: r[k] for k in ("pos", "team", "points", "points_gross", "wins", "podiums")} for r in stand["constructors"]],
+        "standings": {"drivers": [{k: r[k] for k in ("pos", "driver", "team", "points", "points_gross", "wins", "podiums", "poles", "excluded")
+                                   if k in r} for r in stand["drivers"]],
+                      "constructors": [{k: r[k] for k in ("pos", "team", "points", "points_gross", "wins", "podiums", "excluded") if k in r}
+                                       for r in stand["constructors"]],
                       "dropped_scores": stand.get("dropped_scores", False)},
         "progression": progression(year),
         "championship": None if fin else _champ_block(championship),

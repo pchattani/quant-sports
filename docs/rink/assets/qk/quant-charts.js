@@ -1,4 +1,4 @@
-/* The Quant — chart kit (v1) on Apache ECharts 5.
+/* The Quant — chart kit (v2 "Signal"; every v1 call still works) on Apache ECharts 5. Conventions: STYLE_GUIDE.md.
  * Load after quant.js and after
  *   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" defer></script>
  *
@@ -12,6 +12,10 @@
  *   QKC.range(el, spec) (floor–ceiling)  QKC.butterfly(el, spec) (two sides of one category list)
  *   QKC.tokens()  QKC.palette()  QKC.axis(T, {ticks})  QKC.legendSeries(T, items)
  *   QKC.plotlyLayout()  and the optional module plotly-ec.js (window.Plotly on this kit) for old views
+ * v2: QKC.forecast(el, spec) (538-style chance over time: end labels, annotations, bands, today, projection)
+ *     QKC.distribution(el, spec) (histogram on the percentile scale with labelled marks)
+ *     QKC.chances(el, spec) (our chance as bars, the market as a quiet tick)
+ *     T.model is the signal (ours), T.market a quiet grey; dumbbells read "Our model" v "Market", no gap row.
  *
  * ECharts 5.5.1 note: never pair a line series with a piecewise visualMap (it throws "coord" errors on
  * some data); colour a line by side with two series or area fills instead (winProb does). */
@@ -29,7 +33,8 @@ QKC.tokens = function () {
     ink1: tok('--ink-1'), ink2: tok('--ink-2'), ink3: tok('--ink-3'), ink4: tok('--ink-4'),
     s1: tok('--s-1'), s2: tok('--s-2'), s3: tok('--s-3'), s4: tok('--s-4'), bg: tok('--bg'),
     grid: tok('--grid'), axis: tok('--axis'), line2: tok('--line-2'),
-    model: tok('--c-1'), market: tok('--c-2'), other: tok('--c-other'), accent: tok('--accent'), brand: tok('--brand'),
+    model: tok('--c-model') || tok('--signal'), market: tok('--c-market'), other: tok('--c-other'), accent: tok('--accent'), brand: tok('--signal'), signal: tok('--signal'),
+    wpA: tok('--wp-a'), wpB: tok('--wp-b'), c3: tok('--c-3'),
     up: tok('--up'), down: tok('--down'), live: tok('--live'),
     neg: tok('--div-neg'), mid: tok('--div-mid'), pos: tok('--div-pos'),
     seq: [tok('--seq-1'), tok('--seq-2'), tok('--seq-3'), tok('--seq-4'), tok('--seq-5')],
@@ -314,7 +319,7 @@ QKC.bar = function (el, s) {
     var hz = !!s.horizontal;
     var nS = s.series.length;
     var ser = s.series.map(function (x, i) {
-      var c = x.color ? QK.color.ensure(x.color, T.s1, 3) : T.cat[i % 8];
+      var c = x.color === 'model' ? T.model : x.color ? QK.color.ensure(x.color, T.s1, 3) : T.cat[i % 8];
       return {
         type: 'bar', name: x.name, stack: s.stack ? 'a' : undefined, barMaxWidth: hz ? 16 : 28, barCategoryGap: '30%', barGap: '20%',
         itemStyle: { color: s.diverging ? T.pos : c },
@@ -362,7 +367,7 @@ QKC.bar = function (el, s) {
       });
     });
     var anyMarket = s.series.some(function (x) { return !!x.market; });
-    var legendItems = (s.legendItems || []).slice();
+    var legendItems = (s.legendItems || []).map(function (it) { return it.color === 'model' || it.color === 'ink' ? { name: it.name, color: it.color === 'model' ? T.model : T.ink2, icon: it.icon } : it; });
     if (anyMarket && (s.legend || legendItems.length)) legendItems.push({ name: s.marketName || 'Market', color: T.market, icon: 'line' });
     var catAx = axis(T, { type: 'category', data: s.cats, split: false, line: !hz, inverse: hz });
     catAx.axisLabel.color = T.ink2; catAx.axisLabel.fontSize = 11; catAx.axisLabel.width = hz ? labelW(ent.el, s.labelWidth || 110) : (s.labelWidth || 110); catAx.axisLabel.overflow = 'truncate';
@@ -403,7 +408,7 @@ QKC.dumbbell = function (el, s) {
   var rows = s.rows;
   return QKC.mount(el, function (T, ent) {
     var cats = rows.map(function (r) { return r.label; });
-    var aN = s.aName || 'Model', bN = s.bName || 'Market';
+    var aN = s.aName || 'Our model', bN = s.bName || 'Market';
     var f = s.fmt || fmt.pct;
     /* the value axis says what it measures: a probability unless the caller names it (valName / xName) */
     var vName = s.valName || s.xName || (!s.fmt || s.fmt === fmt.pct ? 'Probability' : '');
@@ -413,27 +418,27 @@ QKC.dumbbell = function (el, s) {
     var gB = 6 + nameAxis(xa, vName, 'bottom');
     return {
       grid: { left: 8, right: 20, top: 26, bottom: gB, containLabel: true },
-      legend: { top: 0, left: 0, icon: 'circle', itemWidth: 9, itemHeight: 9, textStyle: { color: T.ink2 }, data: [aN, bN] },
+      legend: { top: 0, left: 0, itemWidth: 9, itemHeight: 9, textStyle: { color: T.ink2 }, data: [{ name: aN, icon: 'circle' }, { name: bN, icon: 'emptyCircle' }] },
       xAxis: xa,
       yAxis: ya,
       tooltip: tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: hexA(T.ink1, 0.04) } },
         formatter: function (ps) {
           var r = rows[ps[0].dataIndex];
           return '<div style="font-weight:600;margin-bottom:4px;max-width:240px;white-space:normal">' + esc(r.label) + '</div>' + (r.sub ? '<div style="color:' + T.ink3 + ';font-size:11px;margin-bottom:4px">' + esc(r.sub) + '</div>' : '') +
-            tipRow(T.model, aN, f(r.a)) + tipRow(T.market, bN, f(r.b)) + tipRow(T.other, 'Gap', fmt.pp(r.a - r.b));
+            tipRow(T.model, aN, f(r.a)) + tipRow(T.market, bN, f(r.b));
         } }),
       series: [
         { type: 'custom', name: 'gap', silent: true, z: 1,
           renderItem: function (params, api) {
             var y = api.value(2), p1 = api.coord([api.value(0), y]), p2 = api.coord([api.value(1), y]);
-            return { type: 'line', shape: { x1: p1[0], y1: p1[1], x2: p2[0], y2: p2[1] }, style: { stroke: hexA(T.ink2, 0.55), lineWidth: 2.5, lineCap: 'round' } };
+            return { type: 'line', shape: { x1: p1[0], y1: p1[1], x2: p2[0], y2: p2[1] }, style: { stroke: hexA(T.ink3, 0.35), lineWidth: 2, lineCap: 'round' } };
           },
           data: rows.map(function (r, i) { return [r.a, r.b, i]; }), encode: { x: [0, 1], y: 2 } },
-        { type: 'scatter', name: bN, z: 2, symbolSize: 11, itemStyle: { color: T.market, borderColor: T.s1, borderWidth: 2 }, data: rows.map(function (r, i) { return { value: [r.b, i], href: r.href }; }) },
-        { type: 'scatter', name: aN, z: 3, symbolSize: 11, itemStyle: { color: T.model, borderColor: T.s1, borderWidth: 2 }, data: rows.map(function (r, i) { return { value: [r.a, i], href: r.href }; }) }
+        { type: 'scatter', name: bN, z: 2, symbol: 'emptyCircle', symbolSize: 8, itemStyle: { color: T.market, borderColor: T.market, borderWidth: 2 }, data: rows.map(function (r, i) { return { value: [r.b, i], href: r.href }; }) },
+        { type: 'scatter', name: aN, z: 3, symbolSize: 13, itemStyle: { color: T.model, borderColor: T.s1, borderWidth: 2 }, data: rows.map(function (r, i) { return { value: [r.a, i], href: r.href }; }) }
       ]
     };
-  }, { label: s.label || (s.aName || 'Model') + ' against ' + (s.bName || 'market') });
+  }, { label: s.label || (s.aName || 'Our model') + ', with ' + (s.bName || 'the market') + ' for reference' });
 };
 
 /* ─────────────────────────────────────── scatter */
@@ -557,7 +562,7 @@ QKC.winProb = function (el, s) {
   return QKC.mount(el, function (T) {
     var hc = s.home && s.home.colour ? QK.color.ensure(s.home.colour, T.s1, 3) : T.model;
     var ac = s.away && s.away.colour ? QK.color.ensure(s.away.colour, T.s1, 3) : T.market;
-    if (QK.color.contrast(hc, ac) < 1.6) ac = T.market;
+    if (!(QK.color.distinct ? QK.color.distinct(hc, ac) : QK.color.contrast(hc, ac) >= 1.6)) ac = T.wpB || T.market;
     var pts = ts.map(function (t, i) { return [t, s.p[i]]; }).filter(function (q) { return isNum(q[0]) && isNum(q[1]); });
     var step = s.step ? 'end' : false;
     var ev = (s.events || []).map(function (e) { var t = numeric ? e.t : nearestIdx(s.t, e.t); return { coord: [t, isNum(e.p) ? e.p : pAt(t)], name: e.label, value: e.label }; });
@@ -661,7 +666,7 @@ QKC.shotMap = function (el, s) {
   el.style.setProperty('--ar', (S.x[1] - S.x[0]) + ' / ' + (S.y[1] - S.y[0]));
   return QKC.mount(el, function (T) {
     el.style.backgroundImage = 'url("data:image/svg+xml,' + encodeURIComponent(QKC.surfaceSVG(s.surface, T)) + '")';
-    var made = s.colorMade || T.market, miss = s.colorMiss || T.model;
+    var made = s.colorMade || T.wpB || T.market, miss = s.colorMiss || T.wpA || T.model;
     function pts(flag) {
       return s.shots.filter(function (p) { return !!p.made === flag; }).map(function (p) {
         return { value: [p.x, p.y, p.v], name: p.name, href: p.href, itemStyle: { color: flag ? made : hexA(miss, 0.55), borderColor: flag ? T.s1 : miss, borderWidth: flag ? 1.5 : 1 } };
@@ -772,6 +777,149 @@ QKC.plotlyLayout = function () {
   };
 };
 QKC.PLOTLY_CONFIG = { displayModeBar: false, responsive: true };
+
+/* ═══════════════════════════════════════ v2 "Signal" charts ═══ */
+
+/* ─────────────────────────────────────── forecast over time (538 style) */
+/* QKC.forecast(el, { x: [...], xType: 'time' (ISO dates or ms) | 'category' | 'value',
+ *   series: [{ name, data: [..] (0-1 for chances), color, label (end label; default the name), band: { lo, hi },
+ *              ours: true (the signal colour, a heavier line), dash }],
+ *   annotations: [{ x, label }]   dashed verticals labelled at the top (trades, injuries, a goal, the deadline ...)
+ *   today: x (a solid "Today" rule) · split: { x, label } (shade what follows as a projection)
+ *   yFmt (default a percentage), yMin, yMax (default 0 and 1 for chances; 'auto' to fit), yName, xName, label })
+ * Lines carry their own end labels with the last value ("BOS 34%"), so there is no legend. */
+QKC.forecast = function (el, s) {
+  return QKC.mount(el, function (T, ent) {
+    var numX = s.xType === 'time' || s.xType === 'value';
+    var xs = (s.x || []).map(function (v) { return s.xType === 'time' && !isNum(v) ? new Date(v).getTime() : v; });
+    var yF = s.yFmt || function (v) { return fmt.pct(v, 0); };
+    function pts(arr) { return numX ? (arr || []).map(function (v, j) { return [xs[j], v]; }) : arr; }
+    function xv(v) { return s.xType === 'time' && !isNum(v) ? new Date(v).getTime() : v; }
+    var narrow = ent.el.clientWidth && ent.el.clientWidth < 520;
+    var bands = [], lines = [];
+    (s.series || []).forEach(function (x, i) {
+      var c = x.ours ? T.model : (x.color ? QK.color.ensure(x.color, T.s1, 3) : T.cat[i % 8]);
+      if (x.band && x.band.lo && x.band.hi) bands.push(bandSeries(T, x.band.lo, x.band.hi, xs, numX, c, x.name));
+      var last = null;
+      for (var j = (x.data || []).length - 1; j >= 0; j--) if (isNum(x.data[j])) { last = x.data[j]; break; }
+      lines.push({
+        type: 'line', name: x.name, data: pts(x.data), showSymbol: false, symbol: 'circle', symbolSize: 7, z: x.ours ? 6 : 4, connectNulls: false,
+        lineStyle: { width: x.ours ? 3 : 2, color: c, type: x.dash ? [5, 4] : 'solid', cap: 'round', join: 'round' }, itemStyle: { color: c, borderColor: T.s1, borderWidth: 2 },
+        emphasis: { focus: 'series', lineStyle: { width: (x.ours ? 3 : 2) + 1 } },
+        endLabel: s.endLabels === false ? undefined : { show: true, color: c, fontFamily: T.fontUI, fontSize: 11, fontWeight: 700, distance: 6,
+          formatter: function () { return (x.label || x.name) + (isNum(last) && !narrow ? ' ' + yF(last) : ''); } },
+        labelLayout: { moveOverlap: 'shiftY' }
+      });
+    });
+    /* annotations, today and the projection split ride on the first line as markLine / markArea */
+    var ml = [];
+    (s.annotations || []).forEach(function (a, k) {
+      ml.push({ xAxis: numX ? xv(a.x) : a.x, lineStyle: { color: T.ink3, type: [3, 4], width: 1 },
+        label: { show: true, formatter: a.label, position: 'end', rotate: 0, color: T.ink2, fontSize: 10, fontWeight: 600, fontFamily: T.fontUI, distance: k % 2 ? 16 : 4 } });
+    });
+    if (s.today !== undefined && s.today !== null) ml.push({ xAxis: numX ? xv(s.today) : s.today, lineStyle: { color: T.ink2, type: 'solid', width: 1 }, label: { show: true, formatter: 'Today', position: 'end', rotate: 0, color: T.ink1, fontSize: 10, fontWeight: 700, distance: 4 } });
+    if (lines.length) {
+      if (ml.length) lines[0].markLine = { silent: true, symbol: 'none', animation: false, data: ml };
+      if (s.split && s.split.x !== undefined) lines[0].markArea = { silent: true, itemStyle: { color: hexA(T.ink1, T.dark ? 0.035 : 0.04) }, label: { show: !!s.split.label, position: 'insideTopRight', color: T.ink3, fontSize: 10, fontWeight: 600, formatter: s.split.label || '' },
+        data: [[{ xAxis: numX ? xv(s.split.x) : s.split.x }, { xAxis: numX ? (isNum(xs[xs.length - 1]) ? xs[xs.length - 1] : 'max') : s.x[s.x.length - 1] }]] };
+    }
+    var chance = !s.yFmt;
+    var xa = axis(T, { type: s.xType === 'time' ? 'time' : (numX ? 'value' : 'category'), data: numX ? undefined : s.x, split: false, line: true, fmt: s.xFmt, boundaryGap: numX ? undefined : false,
+      min: s.xMin !== undefined ? s.xMin : (numX ? 'dataMin' : undefined), max: s.xMax !== undefined ? s.xMax : (numX ? 'dataMax' : undefined), ticks: s.xTicks });
+    var ya = axis(T, { fmt: yF, min: s.yMin !== undefined ? s.yMin : (chance ? 0 : undefined), max: s.yMax === 'auto' ? undefined : (s.yMax !== undefined ? s.yMax : (chance ? 1 : undefined)), scale: s.yMax === 'auto' || !chance, interval: s.yInterval });
+    var gB = 8 + nameAxis(xa, s.xName || (s.xType === 'time' ? 'Date' : ''), 'bottom');
+    var gT = 14 + nameAxis(ya, s.yName || (chance ? 'Chance' : ''), 'side');
+    return {
+      grid: { left: 10, right: s.endLabels === false ? 10 : (narrow ? 64 : 104), top: gT + (ml.length ? 14 : 0), bottom: gB, containLabel: true },
+      xAxis: xa, yAxis: ya,
+      tooltip: tooltip(T, { trigger: 'axis', formatter: function (ps) {
+        ps = ps.filter(function (p) { return p.seriesType === 'line'; });
+        if (!ps.length) return '';
+        var xl = s.xLabel ? s.xLabel(ps[0].axisValue) : (s.xType === 'time' ? fmt.date(new Date(ps[0].axisValue).toISOString(), { day: 'numeric', month: 'short', year: 'numeric' }) : ps[0].axisValueLabel);
+        return '<div style="color:' + T.ink3 + ';font-size:11px;margin-bottom:4px">' + esc(xl) + '</div>' + ps.slice().sort(function (a, b) { return (val(b) || 0) - (val(a) || 0); }).map(function (p) {
+          var x = (s.series || [])[p.seriesIndex - bands.length] || {}, j = p.dataIndex, txt = yF(val(p));
+          if (x.band && x.band.lo && isNum(x.band.lo[j]) && isNum(x.band.hi[j])) txt += ' (' + yF(x.band.lo[j]) + '–' + yF(x.band.hi[j]) + ')';
+          return tipRow(p.color, p.seriesName, txt);
+        }).join('');
+      } }),
+      series: bands.concat(lines)
+    };
+  }, { label: s.label || 'Forecast over time' });
+};
+
+/* ─────────────────────────────────────── distribution / histogram */
+/* QKC.distribution(el, { values: [..] (raw values; binned here) | bins: [{ x0, x1, n }], binCount: 20, binWidth,
+ *   marks: [{ x, label, color }] (a player, the league average ...), fmt (x labels), xName, yName ('Players'),
+ *   colorBy: 'pctl' (bars on the percentile scale by where they sit; default) | 'flat', lowerBetter, label })
+ * Bars show how many fall in each bin; marks are labelled verticals, the first in the signal colour. */
+QKC.distribution = function (el, s) {
+  var bins = s.bins;
+  if (!bins) {
+    var v = (s.values || []).filter(isNum).sort(function (a, b) { return a - b; });
+    var lo = isNum(s.min) ? s.min : (v.length ? v[0] : 0), hi = isNum(s.max) ? s.max : (v.length ? v[v.length - 1] : 1);
+    if (hi === lo) { hi = lo + 1; }
+    var w = s.binWidth || (hi - lo) / (s.binCount || 20);
+    var n = Math.max(1, Math.ceil((hi - lo) / w - 1e-9));
+    bins = [];
+    for (var i = 0; i < n; i++) bins.push({ x0: lo + i * w, x1: lo + (i + 1) * w, n: 0 });
+    v.forEach(function (x) { var k = Math.min(n - 1, Math.max(0, Math.floor((x - lo) / w))); bins[k].n++; });
+  }
+  var total = bins.reduce(function (a, b) { return a + b.n; }, 0) || 1;
+  return QKC.mount(el, function (T) {
+    var f = s.fmt || function (x) { return fmt.num(x, 1); };
+    var cum = 0;
+    var data = bins.map(function (b) {
+      var mid = cum + b.n / 2; cum += b.n;
+      var pctl = 100 * mid / total; if (s.lowerBetter) pctl = 100 - pctl;
+      var c = s.colorBy === 'flat' ? hexA(T.ink3, 0.5) : hexA(QK.pctHex(pctl), 0.85);
+      return { value: [b.x0, b.x1, b.n], itemStyle: { color: c } };
+    });
+    var x0 = bins[0].x0, x1 = bins[bins.length - 1].x1;
+    var ml = (s.marks || []).filter(function (m) { return isNum(m.x); }).map(function (m, k) {
+      var c = m.color && typeof T[m.color] === 'string' ? T[m.color] : (m.color || (k === 0 ? T.model : T.ink2));
+      var at = x1 > x0 ? (m.x - x0) / (x1 - x0) : 0.5;
+      return { xAxis: m.x, lineStyle: { color: c, type: k === 0 ? 'solid' : [4, 3], width: k === 0 ? 2 : 1.2 },
+        label: { show: true, formatter: m.label + (m.noValue ? '' : ' ' + f(m.x)), position: 'end', rotate: 0, align: at > 0.82 ? 'right' : at < 0.18 ? 'left' : 'center', color: c, fontSize: 10.5, fontWeight: 700, fontFamily: T.fontUI, distance: k % 2 ? 16 : 3 } };
+    });
+    var xa = axis(T, { type: 'value', min: bins[0].x0, max: bins[bins.length - 1].x1, fmt: f, split: false, line: true });
+    var ya = axis(T, { fmt: function (x) { return fmt.num(x, 0); }, minInterval: 1 });
+    ya.minInterval = 1;
+    var gB = 8 + nameAxis(xa, s.xName || 'Value', 'bottom');
+    var gT = 14 + nameAxis(ya, s.yName || 'Players', 'side') + (ml.length ? 16 : 0);
+    return {
+      grid: { left: 8, right: 16, top: gT, bottom: gB, containLabel: true },
+      xAxis: xa, yAxis: ya,
+      tooltip: tooltip(T, { formatter: function (p) { var d = p.value; return '<div style="font-weight:600">' + esc(f(d[0])) + ' to ' + esc(f(d[1])) + '</div>' + tipRow(p.color, s.yName || 'Players', fmt.num(d[2], 0)); } }),
+      series: [{
+        type: 'custom', name: s.yName || 'Players', data: data, encode: { x: [0, 1], y: 2 }, z: 2,
+        renderItem: function (params, api) {
+          var a = api.coord([api.value(0), api.value(2)]), b = api.coord([api.value(1), 0]);
+          var d = data[params.dataIndex] || {};
+          return { type: 'rect', shape: { x: a[0] + 0.5, y: a[1], width: Math.max(1, b[0] - a[0] - 1), height: b[1] - a[1], r: [2, 2, 0, 0] }, style: { fill: (d.itemStyle || {}).color || T.ink3 } };
+        },
+        markLine: ml.length ? { silent: true, symbol: 'none', animation: false, data: ml } : undefined
+      }]
+    };
+  }, { label: s.label || 'Distribution' });
+};
+
+/* ─────────────────────────────────────── chances (horizontal probability bars, ours first) */
+/* QKC.chances(el, { rows: [{ label, p, market, color, href, sub }], valName: 'Chance', marketName: 'Market', max, limit })
+ * The bars are our chance (team colour or the signal); the market, where there is one, is a quiet grey tick. */
+QKC.chances = function (el, s) {
+  var rows = (s.rows || []).filter(function (r) { return r && isNum(r.p); }).slice().sort(function (a, b) { return b.p - a.p; });
+  if (s.limit) rows = rows.slice(0, s.limit);
+  var anyM = rows.some(function (r) { return isNum(r.market); });
+  var mx = s.max;
+  if (!isNum(mx)) { var m = Math.max.apply(null, rows.map(function (r) { return Math.max(r.p, isNum(r.market) ? r.market : 0); }).concat([0.01])); mx = m > 0.6 ? 1 : Math.min(1, Math.ceil(m * 20 + 0.5) / 20); }
+  return QKC.bar(el, {
+    horizontal: true, cats: rows.map(function (r) { return r.label; }), labels: true, max: mx, min: 0, fmt: function (v) { return fmt.pct(v); },
+    series: [{ name: s.oursName || 'Our chance', color: 'model', data: rows.map(function (r) { return r.p; }), market: anyM ? rows.map(function (r) { return isNum(r.market) ? r.market : null; }) : undefined }],
+    colors: rows.map(function (r) { return r.color || null; }), hrefs: rows.map(function (r) { return r.href; }), labelWidth: s.labelWidth || 150,
+    marketName: s.marketName || 'Market (reference)', legendItems: anyM ? [{ name: s.oursName || 'Our chance', color: rows.some(function (r) { return !!r.color; }) ? 'ink' : 'model' }] : [],
+    valName: s.valName || 'Chance', label: s.label || 'Chances'
+  });
+};
 
 root.QKC = QKC;
 })(window);

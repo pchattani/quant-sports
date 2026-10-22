@@ -188,7 +188,7 @@ class Lock:
 # copy on disk, so concurrent processes running different phases never undo each other's work).
 OWNED_GAME = {"statcast": ("has_statcast",), "games": ("abs", "mound_visits", "lineups"), "espn": ("espn", "lines"),
               "people": ()}
-OWNED_META = {"schedule": ("weeks", "teams_at", "complete_through", "standings", "rosters", "rosters_at"),
+OWNED_META = {"schedule": ("weeks", "teams_at", "complete_through", "standings", "rosters", "rosters_at", "rescheduled_checked"),
               "statcast": (), "games": ("feed",), "espn": ("espn_days", "espn_odds"), "people": ("crosswalk",)}
 OWNED_TOP = {"schedule": ("teams", "venues"), "people": ("players", "umpires")}
 

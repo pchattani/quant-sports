@@ -188,6 +188,43 @@ def test_rescheduled_game_keeps_the_better_record():
     assert store["games"]["990679"]["status"] == "postponed"
 
 
+def test_postponed_listing_with_the_makeup_date_never_replaces_the_played_game():
+    """The Stats API lists a rescheduled game twice under one gamePk: on its original date with the make-up
+    officialDate, the original gameDate and "Postponed", and on the make-up date as played. A rescan of the
+    original week used to win (same officialDate) and drop the result (14 MLB games in 2026)."""
+    g = next(x for x in _schedule_games() if x["gamePk"] == 990679)
+    makeup = dict(g, officialDate="2026-07-07", gameDate="2026-07-07T18:15:00Z")
+    listing = dict(g, officialDate="2026-07-07", gameDate="2026-05-05T23:45:00Z",
+                   status={"abstractGameState": "Final", "detailedState": "Postponed", "codedGameState": "D"})
+    for order in ((makeup, listing), (listing, makeup)):
+        store = st.new_store("mlb", 2026)
+        for x in order:
+            statsapi.take_game(store, x, st.merge_game)
+        rec = store["games"]["990679"]
+        assert rec["status"] == "final" and rec["start"] == "2026-07-07T18:15:00Z" and rec["hs"] is not None
+    # a scheduled game postponed in place (same listing, make-up date now set) does turn postponed
+    store = st.new_store("mlb", 2026)
+    pre = dict(g, officialDate="2026-05-05", gameDate="2026-05-05T23:45:00Z",
+               status={"abstractGameState": "Preview", "detailedState": "Scheduled"})
+    statsapi.take_game(store, pre, st.merge_game)
+    assert store["games"]["990679"]["status"] == "pre"
+    assert statsapi.take_game(store, listing, st.merge_game) is True
+    assert store["games"]["990679"]["status"] == "postponed"
+
+
+def test_settle_unneeded_postseason_games():
+    def gm(gpk, n, home, away, hs=None, as_=None, status="final", of=5):
+        return {"gpk": gpk, "gtype": "D", "home": home, "away": away, "hs": hs, "as": as_, "status": status,
+                "series": {"desc": "ALDS", "game": n, "of": of}}
+    store = {"games": {"1": gm("1", 1, "A", "B", 3, 1), "2": gm("2", 2, "A", "B", 2, 0), "3": gm("3", 3, "B", "A", 1, 4),
+                       "4": gm("4", 4, "B", "A", status="pre"), "5": gm("5", 5, "A", "B", status="pre"),
+                       # a series still open keeps its scheduled games
+                       "6": gm("6", 1, "C", "D", 1, 0), "7": gm("7", 2, "C", "D", status="pre")}}
+    assert sorted(statsapi.settle_unneeded(store)) == ["4", "5"]
+    assert store["games"]["4"]["status"] == "cancelled" and store["games"]["4"]["not_needed"] is True
+    assert store["games"]["7"]["status"] == "pre"
+
+
 def test_merge_game_keeps_richer_fields():
     store = st.new_store("mlb", 2026)
     g = statsapi.compact_game(next(x for x in _schedule_games() if x["gamePk"] == 990841))
@@ -507,3 +544,33 @@ def test_save_owned_merges_concurrent_phases(bullpen_roots):
     assert final["meta"]["espn_odds"] == {"990841": "x"} and final["players"]["1"] == {"name": "P"}
     assert sch["games"]["990841"]["lines"] == {"ml": [-103, -117]}           # memory refreshed from disk
     assert not st.season_path("mlb", 2026).with_name("store.json.lock").exists()
+
+
+def test_schedule_rescans_a_lost_makeup_week_once(monkeypatch):
+    """mlb_fetch.schedule reads a settled week again for a past game still marked postponed, once, so a store the
+    old merge rule damaged gets its played make-up game back; decided series lose their unneeded games."""
+    import importlib.util
+    from pathlib import Path
+    spec = importlib.util.spec_from_file_location("mlb_fetch_t", Path(__file__).resolve().parents[2] / "scripts" / "mlb_fetch.py")
+    mf = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mf)
+    g = next(x for x in _schedule_games() if x["gamePk"] == 990679)
+    makeup = dict(g, officialDate="2026-07-07", gameDate="2026-07-07T18:15:00Z")
+    s = st.new_store("mlb", 2026)
+    s["games"]["990679"] = dict(statsapi.compact_game(makeup), status="postponed", start="2026-05-05T23:45:00Z", hs=None)
+    for a, b in statsapi.weeks(*canon.season_window(2026)):
+        s["meta"].setdefault("weeks", {})[a.isoformat()] = "2026-12-01T00:00:00Z"      # every week settled
+    s["meta"]["teams_at"] = "2026-12-01T00:00:00Z"
+    s["teams"] = {str(k): {"venue": None} for k in range(30)}
+    calls = []
+
+    def fake_schedule(c, level, a, b, game_types=None):
+        calls.append((a, b))
+        return [makeup] if a <= date(2026, 7, 7) <= b else []
+    monkeypatch.setattr(statsapi, "schedule", fake_schedule)
+    monkeypatch.setattr(statsapi, "venues", lambda c, ids, season=None: {})
+    mf.schedule(None, "mlb", s, refresh=False, today=date(2026, 12, 1))
+    assert len(calls) == 1 and s["games"]["990679"]["status"] == "final"
+    assert "990679" in s["meta"]["rescheduled_checked"]
+    mf.schedule(None, "mlb", s, refresh=False, today=date(2026, 12, 1))
+    assert len(calls) == 1                                                       # once only

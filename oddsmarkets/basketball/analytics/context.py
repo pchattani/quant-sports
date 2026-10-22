@@ -138,6 +138,36 @@ class SeasonContext:
     def team_stints(self) -> pd.DataFrame:
         return _safe("team_stints", lambda: LU.team_stints(self.stints, self.games), pd.DataFrame())
 
+    # The season's aggregates (player and team shot profiles, on/off, lineups, play-by-play totals) count the same
+    # games as the box-score catalogue (CATALOGUE_STYPES): shots.json and stints.json also hold the preseason and the
+    # playoffs, which made 67 of the first 81 NBA 2026-27 games in those tables exhibitions. Game pages keep the
+    # unfiltered tables.
+    @cached_property
+    def season_game_ids(self) -> set[str]:
+        return {str(g) for g, v in self.games.items() if v.get("stype") in CATALOGUE_STYPES}
+
+    def _season_rows(self, df: pd.DataFrame) -> pd.DataFrame:
+        if df is None or df.empty or "game_id" not in df.columns:
+            return df
+        return df[df["game_id"].astype(str).isin(self.season_game_ids)]
+
+    @cached_property
+    def season_shots(self) -> pd.DataFrame:
+        return _safe("season_shots", lambda: self._season_rows(self.shots), pd.DataFrame())
+
+    @cached_property
+    def season_stints(self) -> pd.DataFrame:
+        return _safe("season_stints", lambda: self._season_rows(self.stints), pd.DataFrame())
+
+    @cached_property
+    def season_team_stints(self) -> pd.DataFrame:
+        return _safe("season_team_stints", lambda: self._season_rows(self.team_stints), pd.DataFrame())
+
+    def season_pbp_summaries(self, summaries: dict | None = None) -> dict:
+        """The play-by-play summaries of the catalogue's games only (for season totals)."""
+        s = self.pbp_summaries if summaries is None else summaries
+        return {g: v for g, v in (s or {}).items() if str(g) in self.season_game_ids}
+
     @cached_property
     def recon(self) -> dict:
         return an.load_table(self.league, self.season, "recon.json") or {}

@@ -118,3 +118,14 @@ def test_post_pass_conf_games_and_cfp_seeds():
     cc.post_pass(s)
     assert s["games"]["1"]["conf_game"] is True and s["games"]["2"]["conf_game"] is False
     assert s["games"]["3"]["seeds"] == {"home": 1, "away": 4}
+
+
+def test_merge_player_drops_implausible_body_typos():
+    """ESPN rosters carry typos such as a 5 lb lineman; they never overwrite a good value and are cleared if stored."""
+    s = st.new_store("cfb", 2026)
+    st.merge_player(s, "p", {"name": "X", "height_in": 75, "weight_lb": 240})
+    st.merge_player(s, "p", {"weight_lb": 5, "height_in": 7})
+    assert s["players"]["p"]["weight_lb"] == 240 and s["players"]["p"]["height_in"] == 75
+    s["players"]["q"] = {"name": "Y", "height_in": 93, "weight_lb": 2, "teams": []}     # stored before the bounds
+    st.merge_player(s, "q", {"class": "SR"})
+    assert s["players"]["q"]["weight_lb"] is None and s["players"]["q"]["height_in"] == 93   # a 7'9" centre is real

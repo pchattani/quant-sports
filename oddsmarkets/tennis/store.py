@@ -384,6 +384,29 @@ def _same_era(a: Any, b: Any) -> bool:
         return False
 
 
+# ESPN's stand-in time for a match with no start time: midnight US Eastern (04:00 UTC in summer, 05:00 in winter)
+ESPN_NO_TIME = ("04:00", "05:00")
+
+
+def _take_date(od: Any, nd: Any, src: str) -> bool:
+    """Whether a source record's date replaces the stored one. A timestamp beats a plain date (within a year of it);
+    ESPN's own times are the start times, so an ESPN time replaces a different stored time (a rescheduled match, or
+    the stand-in midnight an earlier read kept), and an ESPN date with no valid time clears a stored stand-in
+    midnight of the same day."""
+    if not nd:
+        return False
+    od, nd = str(od or ""), str(nd)
+    if not od:
+        return True
+    if not _same_era(nd, od):
+        return False
+    if len(nd) > len(od):
+        return True
+    if src == "espn" and len(nd) == len(od) == 16 and nd != od:
+        return True
+    return src == "espn" and len(nd) == 10 and len(od) == 16 and od[:10] == nd and od[11:16] in ESPN_NO_TIME
+
+
 def _merge_match(old: dict, new: dict, conflicts: list | None = None) -> dict:
     """Fold `new` into `old` (same match). Precedence: final beats live beats upcoming; tennis-data
     owns odds/ranks and the official result; ESPN/WTA add tiebreak points, times and live state;
@@ -441,8 +464,8 @@ def _merge_match(old: dict, new: dict, conflicts: list | None = None) -> dict:
             st = new["stats"]
             out["stats"] = st if not flip else {"p1": st["p2"], "p2": st["p1"],
                                                 "by_set": [{"set": x["set"], "p1": x["p2"], "p2": x["p1"]} for x in st.get("by_set") or []]}
-    if new.get("date") and (not old.get("date") or (len(str(new["date"])) > len(str(old.get("date") or ""))
-                                                   and _same_era(new["date"], old["date"]))):
+    # the ESPN rules apply to a fresh source record only, not to two stored rows being folded
+    if _take_date(old.get("date"), new.get("date"), src if len(new.get("sources") or []) == 1 else "?"):
         out["date"] = new["date"]
     if new.get("duration_min") and not old.get("duration_min"):
         out["duration_min"] = new["duration_min"]
@@ -807,6 +830,63 @@ def dedupe_seasons(prev: dict, cur: dict) -> int:
 
 # ── event roll-ups ──────────────────────────────────────────────────────────
 
+KO_ORDER = {"Q1": 0, "Q2": 1, "Q3": 2, "R128": 3, "R64": 4, "R32": 5, "R16": 6, "QF": 8, "SF": 9, "F": 11}
+
+
+def drop_superseded(s: dict) -> int:
+    """Drop scheduled matches the draw has moved past: an upcoming knockout match one of whose players has already
+    finished a match of the same round against someone else, or of a later round, in the same event. Such rows are a
+    source's provisional pairing (ESPN lists a first-round match before the draw settles, and keeps it after the
+    player meets a lucky loser instead); left in, they show as upcoming for ever. Returns the number dropped."""
+    by_ev: dict[str, list[tuple[str, dict]]] = {}
+    for mid, m in s["matches"].items():
+        by_ev.setdefault(m.get("event"), []).append((mid, m))
+    gone = []
+    for rows in by_ev.values():
+        done: dict[str, list[tuple[str, int]]] = {}
+        for mid, m in rows:
+            if m.get("status") in FINAL and m.get("round") in KO_ORDER:
+                for p in (m.get("p1"), m.get("p2")):
+                    if p:
+                        done.setdefault(str(p), []).append((mid, KO_ORDER[m["round"]]))
+        for mid, m in rows:
+            r = KO_ORDER.get(m.get("round"))
+            if m.get("status") != "upcoming" or r is None:
+                continue
+            if any(k != mid and rr >= r for p in (m.get("p1"), m.get("p2")) if p for k, rr in done.get(str(p), ())):
+                gone.append(mid)
+    for mid in gone:
+        s["matches"].pop(mid, None)
+    if gone:
+        drop_index(s)
+        logger.info("%s %s: %d superseded scheduled matches dropped", s.get("tour"), s.get("year"), len(gone))
+    return len(gone)
+
+
+def prefer_tour_tids(s: dict) -> int:
+    """Give a tour-level event its city's plain tid when the id went to a Challenger / WTA 125 event, or to an event
+    since merged away, that was created first ("madrid-2-2026" for the 2026 Madrid 1000 because a 125 in Madrid two
+    weeks earlier took "madrid"; "lyon-2-2026"): the plain tid is what links an event to its past editions (history,
+    champions). The lower-level holder moves to the next free suffix. Returns the number of events renamed."""
+    n = 0
+    for eid in list(s["events"]):
+        ev = s["events"].get(eid)
+        if not ev or str(ev.get("level")) not in canon.TOUR_LEVELS:
+            continue
+        tid = str(ev.get("tid") or "")
+        base, _, k = tid.rpartition("-")
+        if not base or not k.isdigit():
+            continue
+        holder = next((k2 for k2, e2 in s["events"].items() if k2 != eid and e2.get("tid") == base), None)
+        if holder is not None:
+            if str(s["events"][holder].get("level")) in canon.TOUR_LEVELS:
+                continue                          # two tour events in one city and year ("adelaide-2"): both real
+            rename_event(s, holder, f"{base}-{int(k) + 1}")
+        rename_event(s, eid, base)
+        n += 1
+    return n
+
+
 def finalize_events(s: dict, today: date | None = None) -> None:
     """Event status and champion from its matches; reconstructed draws where none was fetched."""
     today = today or date.today()
@@ -817,6 +897,14 @@ def finalize_events(s: dict, today: date | None = None) -> None:
                     and (s["events"].get(m["event"], {}).get("end") or "9999") < cut]:
             s["matches"].pop(mid)
         drop_index(s)
+    drop_superseded(s)
+    # exhibition entries ("EXW..." WTA ids) are not tour players: rows the WTA API listed before wta.py skipped them
+    ex = {p for p, v in (s.get("players") or {}).items() if str((v or {}).get("wta") or "").upper().startswith("EX")}
+    if ex:
+        for mid in [k for k, m in s["matches"].items() if m.get("p1") in ex or m.get("p2") in ex]:
+            s["matches"].pop(mid)
+        drop_index(s)
+    prefer_tour_tids(s)
     by_ev: dict[str, list[dict]] = {}
     for m in s["matches"].values():
         by_ev.setdefault(m["event"], []).append(m)

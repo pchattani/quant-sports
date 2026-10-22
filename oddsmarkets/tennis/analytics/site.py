@@ -88,6 +88,15 @@ def model_payload(td: an.TourData) -> dict:
                "formula": "the site's match prices: logit p = w_elo logit(elo_p) + w_sr logit(sr_p) + w_gelo (m1 - m2) + "
                           "w_mr s_b (M1 - M2), M = the market rating (R + D_surface; a Kalman filter on earlier "
                           "matches' de-vigged closing prices and results), s_b = params.s5 for best of five, else 1"}
+        from oddsmarkets.tennis.models import sched as SC
+        if SC.on(td.tour) and bl.get("w_x"):
+            # the schedule and form terms (models/sched.py) are part of the price on this tour
+            mkt["w_x"] = {k: round(float(v), 5) for k, v in bl["w_x"].items()}
+            mkt["sched_version"] = SC.VERSION
+            mkt["formula"] += (" + sum_k w_x[k] (x1_k - x2_k), x = [rest: log days since the last match (1-60), m30: "
+                               "matches in the last 30 days (difference clipped to +-15, / 5), pts: log ranking points, "
+                               "form: decayed mean of result - Elo expectation (half-life 8 matches, x 5), ret: retired "
+                               "in the last match, h2h: (wins - losses) / (meetings + 3)]")
         if fund.get("w_elo") is not None:
             bl = dict(bl, w_elo=fund["w_elo"], w_sr=fund["w_sr"], w_gelo=fund.get("w_gelo", bl.get("w_gelo")))
     sr = td.sr_fit(td.today - timedelta(days=1)) or {}

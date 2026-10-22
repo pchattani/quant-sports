@@ -209,10 +209,15 @@ def wp_series(evg: pd.DataFrame, g: dict, pre: dict | None) -> dict:
 
 # ---------------------------------------------------------------------------------------------- pages
 
-def page_sig(g: dict, n_events: int, mv: dict) -> str:
+def page_sig(g: dict, n_events: int, mv: dict, stint_s: int | None = None) -> str:
     keys = {k: g.get(k) for k in ("status", "hs", "as", "period", "clock", "ot", "so", "goalies", "lines", "attendance", "start")}
     if g.get("probables"):                      # only games that have them: other pages keep their signatures
         keys["probables"] = g.get("probables")
+    if stint_s is not None:
+        # seconds covered by the game's shift charts: the stats REST shift charts often arrive incomplete right after a
+        # game and are re-read until they settle, with the same play-by-play; without this the page kept the early
+        # build's ice times (Oct 2026 audit: MTL-SJS 20 Oct showed both goalies at 49 min of 62, skaters 246 of 303)
+        keys["st"] = int(stint_s)
     keys["n"] = n_events
     keys["mv"] = mv
     return hashlib.sha1(json.dumps(an.clean(keys), sort_keys=True, default=str).encode()).hexdigest()[:16]

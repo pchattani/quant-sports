@@ -317,10 +317,40 @@ def member_teams(store: dict) -> list[str]:
     return sorted(t for t in (store.get("teams") or {}) if t not in bad)
 
 
-def superseded(store: dict) -> set[str]:
-    """Postponed / cancelled games replayed under another id (same two teams, a later date)."""
-    games = store.get("games") or {}
+_SERIES_WON = ("wins series", "win series", "won series")
+UNPLAYED_AFTER_H = 48
+
+
+def unneeded_playoff_games(store: dict, now: datetime | None = None) -> set[str]:
+    """'If necessary' playoff games that were never played: still scheduled ("pre") while ESPN's series summary says
+    the series is over ("ATL wins series 3-0"), or dated more than two days ago. ESPN drops such days from its
+    calendar, so the fetcher never rescans them and the games stayed in the store as upcoming (WNBA 2026: four
+    semifinal games 4-5 on 11 and 14 Oct at the midnight-ET placeholder time, and they kept the phase in the playoffs)."""
+    now = now or datetime.now(timezone.utc)
     out = set()
+    for gid, g in (store.get("games") or {}).items():
+        if not g or g.get("status") != "pre" or g.get("stype") not in ("post", "playin"):
+            continue
+        summ = str((g.get("series") or {}).get("summary") or "").lower()
+        if any(s in summ for s in _SERIES_WON):
+            out.add(str(gid))
+            continue
+        try:
+            tip = datetime.fromisoformat(str(g.get("date") or "").replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if tip.tzinfo is None:
+            tip = tip.replace(tzinfo=timezone.utc)
+        if (now - tip).total_seconds() > UNPLAYED_AFTER_H * 3600:
+            out.add(str(gid))
+    return out
+
+
+def superseded(store: dict) -> set[str]:
+    """Postponed / cancelled games replayed under another id (same two teams, a later date), and playoff games
+    that were never needed (`unneeded_playoff_games`)."""
+    games = store.get("games") or {}
+    out = unneeded_playoff_games(store)
     by_pair: dict[frozenset, list[dict]] = {}
     for g in games.values():
         by_pair.setdefault(frozenset((str(g.get("home")), str(g.get("away")))), []).append(g)

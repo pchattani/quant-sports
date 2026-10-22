@@ -138,17 +138,49 @@ def compact_game(g: dict) -> dict:
 
 def take_game(store: dict, g: dict, merge) -> bool:
     """Merge a schedule game into a store, resolving rescheduled games (one gamePk listed on its original
-    date as postponed and again on the make-up date): a record from another date only replaces one of
-    lower or equal status rank. Returns True when the store changed."""
+    date as postponed and again on the make-up date): a record from another date or start time only replaces
+    one of lower or equal status rank. The Stats API gives the postponed listing the make-up officialDate but
+    the original gameDate, so the date alone does not tell them apart: comparing only dates let a rescan of
+    the original week turn 14 played 2026 make-up games back into "postponed" (lost from standings and logs).
+    Returns True when the store changed."""
     rec = compact_game(g)
     if not rec["home"] or not rec["away"] or rec["gtype"] not in canon.SEASON_TYPES:
         return False
     old = store["games"].get(rec["gpk"])
-    if old and old.get("date") != rec["date"]:
+    if old and (old.get("date") != rec["date"] or old.get("start") != rec["start"]):
         if STATUS_RANK.get(rec["status"], 0) < STATUS_RANK.get(old.get("status"), 0):
-            return False
+            # the stored listing itself postponed (same start, make-up date set) still updates a game not yet played
+            if not (old.get("start") == rec["start"] and old.get("status") == "pre"):
+                return False
     merge(store, rec)
     return True
+
+
+def settle_unneeded(store: dict) -> list[str]:
+    """Mark the "if necessary" games of a decided postseason series cancelled (`not_needed`). The Stats API drops
+    them from its schedule once a series ends, so a store that listed them earlier kept them as "pre" on dates that
+    had passed (2026: four Division Series and four LCS games, priced and shown as scheduled). Returns their gpks."""
+    games = store.get("games") or {}
+    wins: dict[tuple, dict] = {}
+    for g in games.values():
+        if g.get("gtype") in canon.POSTSEASON and g.get("status") == "final" and g.get("home") and g.get("away") \
+                and g.get("hs") is not None and g.get("as") is not None and g["hs"] != g["as"]:
+            key = (g["gtype"], frozenset((g["home"], g["away"])))
+            w = g["home"] if g["hs"] > g["as"] else g["away"]
+            wins.setdefault(key, {})[w] = wins.setdefault(key, {}).get(w, 0) + 1
+    out = []
+    for gpk, g in games.items():
+        if g.get("gtype") not in canon.POSTSEASON or g.get("status") != "pre":
+            continue
+        of = _int((g.get("series") or {}).get("of"))
+        if not of or not g.get("home") or not g.get("away"):
+            continue
+        w = wins.get((g["gtype"], frozenset((g["home"], g["away"])))) or {}
+        if w and max(w.values()) >= of // 2 + 1:
+            g["status"] = "cancelled"
+            g["not_needed"] = True
+            out.append(str(gpk))
+    return out
 
 
 def team_refs(g: dict) -> dict[str, dict]:

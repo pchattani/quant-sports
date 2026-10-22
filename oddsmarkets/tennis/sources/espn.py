@@ -228,6 +228,8 @@ def parse_competition(c: dict, tour: str, meta: dict) -> dict | None:
     when = str(c.get("date") or c.get("startDate") or "")[:16] or None
     if when and meta.get("start") and (not when[:4].isdigit() or abs(int(when[:4]) - int(str(meta["start"])[:4])) > 1):
         when = None                     # ESPN dates some old matches 1900-01-0x: not a date at all
+    if when and c.get("timeValid") is False:
+        when = when[:10]                # no start time yet: ESPN's "T04:00Z" is a stand-in midnight (US Eastern)
     return {"src": "espn", "tour": tour, "year": None, "event": meta, "round": rnd, "round_raw": rnd_raw,
             "date": when, "best_of": best_of,
             "a": a, "b": b, "winner": winner if status != "live" else None, "status": status, "sets": sets,

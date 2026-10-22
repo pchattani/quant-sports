@@ -160,7 +160,7 @@ def season_players(ctx: dict, season: int) -> dict:
     if season in ctx["values"]:
         return ctx["values"][season]
     st = data.load_store(season)
-    key = f"{players.__name__}|v5|{season}|{data.results_key(season, st)}|{data.file_md5(store.plays_path(season))}|{ep_fit(ctx).get('key')}"
+    key = f"{players.__name__}|v6|{season}|{data.results_key(season, st)}|{data.file_md5(store.plays_path(season))}|{ep_fit(ctx).get('key')}"
     import hashlib
     k = hashlib.md5(key.encode()).hexdigest()[:16]
     c = data.cache_get(f"players_{season}", k)
@@ -422,7 +422,10 @@ def _standings(S: dict) -> dict:
     rec: dict[str, dict] = {t: {"team": t, "w": 0, "l": 0, "conf_w": 0, "conf_l": 0, "home": [0, 0], "away": [0, 0],
                                  "neutral": [0, 0], "streak": "", "pf": 0, "pa": 0, "_res": []} for t in S["mem"]}
     g2 = gf[gf["final"]]
-    for h, a, hs, as_, neu, cg in zip(g2["home"], g2["away"], g2["hs"], g2["as"], g2["neutral"], g2["conf_game"]):
+    # conference record = regular-season conference games only: the championship game (stype "conf") counts in the
+    # overall record but not in conf_w / conf_l, as the conferences and ESPN's standings count it
+    sty = g2["stype"] if "stype" in g2 else ["reg"] * len(g2)
+    for h, a, hs, as_, neu, cg, sy in zip(g2["home"], g2["away"], g2["hs"], g2["as"], g2["neutral"], g2["conf_game"], sty):
         for t, o, pf, pa, side in ((h, a, hs, as_, "home"), (a, h, as_, hs, "away")):
             if t not in rec:
                 continue
@@ -434,7 +437,7 @@ def _standings(S: dict) -> dict:
             x["pf"] += int(pf)
             x["pa"] += int(pa)
             x["_res"].append("W" if won else "L")
-            if cg and tm.get(t, {}).get("conference") == tm.get(o, {}).get("conference"):
+            if cg and sy == "reg" and tm.get(t, {}).get("conference") == tm.get(o, {}).get("conference"):
                 x["conf_w" if won else "conf_l"] += 1
     ap = latest_poll(st, "ap")
     apr = {r["team"]: r["rank"] for r in ap}

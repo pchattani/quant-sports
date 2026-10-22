@@ -397,3 +397,162 @@ def test_superseded_and_overdue_fixtures_in_the_payloads() -> None:
     assert rows["lone"]["status"] == "postponed" and rows["lone"]["result_missing"] is True
     assert rows["next"]["status"] == "scheduled" and "result_missing" not in rows["next"]
     assert [m.game_id for m, _ in cup_store.iter_matches(store)] == ["new", "lone", "next"]
+
+
+def test_cancelled_fixture_is_cancelled_and_void_matches_carry_no_score() -> None:
+    """Sofascore's "canceled" event (with a placeholder 0-0) used to show as postponed with a 0-0 score: "canceled" is
+    also in _POSTPONED, which the payload checked first (accuracy audit, 22 Oct 2026: Rayo Vallecano v Athletic Club)."""
+    import scripts.build_site_all as b
+
+    store = {"matches": {
+        "c": _fx("A", "B", "2026-10-10T12:00:00Z", "canceled", hs=0, as_=0),
+        "p": _fx("C", "D", "2099-12-12T15:00:00Z", "postponed"),
+        "f": _fx("E", "F", "2026-10-11T12:00:00Z", "finished", hs=2, as_=1),
+    }, "lineups": {}}
+    rows = {r["id"]: r for r in b.build_fixtures_json(store, lambda n: n, None, lambda raw: True, {})["matches"]}
+    assert rows["c"]["status"] == "cancelled" and rows["c"]["hs"] is None and rows["c"]["as"] is None
+    assert rows["p"]["status"] == "postponed" and rows["p"]["hs"] is None
+    assert (rows["f"]["status"], rows["f"]["hs"], rows["f"]["as"]) == ("finished", 2, 1)
+
+
+def test_positions_fall_back_to_the_squads_and_other_stores() -> None:
+    """A store that saw a player only in line-ups without a position (UEFA qualifiers) takes it from the current
+    squads, then other stores' metadata; the store's own knowledge always wins (accuracy audit, 22 Oct 2026)."""
+    import scripts.build_site_all as b
+    from oddsmarkets.football.analytics import players as P
+
+    squads = {"teams": {"1": {"players": [{"id": 7, "pos": "D"}, {"id": 8, "pos": "F"}]}}}
+    other = {"players": {"9": {"pos": "G"}, "7": {"pos": "M"}}}
+    fb = b.fallback_positions(squads, [other])
+    assert fb == {"7": "D", "8": "F", "9": "G"}           # squads first
+    store = {"players": {"8": {"pos": "M"}}, "lineups": {"g1": {
+        "7": {"n": "Seven", "s": {}}, "8": {"n": "Eight", "s": {}}, "9": {"n": "Nine", "p": "F", "s": {}}, "10": {"n": "Ten", "s": {}}}}}
+    try:
+        assert P.positions_from_store(store) == {"8": "M", "9": "F"}
+        P.set_fallback_positions(fb)
+        assert P.positions_from_store(store) == {"7": "D", "8": "M", "9": "F"}
+    finally:
+        P.set_fallback_positions({})
+
+
+def _cup(slug_rounds):
+    from types import SimpleNamespace
+    return SimpleNamespace(kind="knockout", rounds=slug_rounds)
+
+
+def _km(home, away, date, rnd, stage="playoff", hs=None, as_=None, status=None, sid=1, **kw):
+    st = status or ("finished" if hs is not None else "notstarted")
+    return {"home": home, "away": away, "date": date, "round": rnd, "stage": stage, "hs": hs, "as": as_, "status": st,
+            "season_id": sid, **kw}
+
+
+def test_national_cup_rounds_go_on_the_bracket() -> None:
+    """Sofascore's "Round 2", "Round 3" of a national cup were "qualifying" (never simulated): the EFL Cup ran from its
+    first round alone, so West Ham, out in the third round, were 21% to win it (accuracy audit, 22 Oct 2026)."""
+    from oddsmarkets.football.competitions.cup import store as cs
+
+    cfg = _cup((("r1", 1), ("r2", 1), ("r3", 1), ("r4", 1), ("qf", 1), ("sf", 2), ("final", 1)))
+    store = {"matches": {
+        "1": _km("West Ham", "Portsmouth", "2026-08-08T18:00:00Z", "r1", hs=3, as_=1),
+        "2": _km("Southampton", "West Ham", "2026-08-25T18:00:00Z", 2, stage="qualifying", hs=1, as_=4),
+        "3": _km("West Ham", "Fulham", "2026-09-15T18:00:00Z", 3, stage="qualifying", hs=2, as_=3),
+        "4": _km("Fulham", "Everton", "2026-10-28T19:00:00Z", 4, stage="qualifying"),
+    }}
+    assert cs.normalize_knockout_rounds(store, cfg) == 3
+    assert [(m["stage"], m["round"]) for m in store["matches"].values()] == [
+        ("playoff", "r1"), ("playoff", "r2"), ("playoff", "r3"), ("playoff", "r4")]
+    results, pairs = cs.tie_results(list(cs.iter_matches(store)))
+    assert results[frozenset(("West Ham", "Fulham"))] == "Fulham"
+    assert cs.normalize_knockout_rounds(store, cfg) == 0                       # idempotent
+    assert cs.normalize_knockout_rounds(store, _cup((("r1", 1),)).__class__(kind="groups", rounds=())) == 0
+
+
+def test_qualifying_rounds_are_not_the_first_round_proper() -> None:
+    """The FA Cup's first qualifying round (September) and its first round proper (November) both read "r1": a club in
+    two first-round ties, "reach" 2.0. The earlier ties are qualifying, and so is a numbered round before the first
+    round proper."""
+    from oddsmarkets.football.competitions.cup import store as cs
+
+    cfg = _cup((("r1", 1), ("r2", 1), ("r3", 1), ("final", 1)))
+    store = {"matches": {
+        "q1": _km("Desborough", "Rushden", "2026-09-05T14:00:00Z", "r1", hs=0, as_=3),
+        "q1b": _km("Alpha", "Beta", "2026-09-05T14:00:00Z", "r1", hs=1, as_=0),
+        "q2": _km("Rushden", "Peterborough Sports", "2026-09-19T14:00:00Z", 2, stage="qualifying", hs=3, as_=1),
+        "p1": _km("Burton", "Rushden", "2026-11-07T15:00:00Z", "r1"),
+        "p1b": _km("Gamma", "Delta", "2026-11-07T15:00:00Z", "r1"),
+    }}
+    cs.normalize_knockout_rounds(store, cfg)
+    stage = {g: (m["stage"], m["round"]) for g, m in store["matches"].items()}
+    assert stage["q1"][0] == stage["q1b"][0] == stage["q2"][0] == "qualifying"
+    assert stage["p1"] == stage["p1b"] == ("playoff", "r1")
+
+
+def test_a_bracket_that_skips_a_real_round_keeps_only_the_rounds_after_it() -> None:
+    """The Copa do Brasil has five early rounds and the configured bracket three: the third round's winners are not
+    the round of 16's clubs, so the early rounds stay off the bracket."""
+    from oddsmarkets.football.competitions.cup import store as cs
+
+    cfg = _cup((("r1", 1), ("r2", 1), ("r16", 2), ("qf", 2)))
+    ms = {"a": _km("A", "B", "2026-02-18T22:00:00Z", "r1", hs=1, as_=0),
+          "b": _km("A", "C", "2026-03-04T22:00:00Z", 2, stage="qualifying", hs=2, as_=0)}
+    for i in range(8):
+        ms[f"r16_{i}"] = _km(f"T{2 * i}", f"T{2 * i + 1}", "2026-08-01T22:00:00Z", "r16")
+    store = {"matches": ms}
+    cs.normalize_knockout_rounds(store, cfg)
+    assert store["matches"]["a"]["stage"] == store["matches"]["b"]["stage"] == "qualifying"
+    assert all(store["matches"][f"r16_{i}"]["stage"] == "playoff" for i in range(8))
+
+
+def test_postponed_and_cancelled_copies_are_not_legs() -> None:
+    """A postponed copy of a fixture played under another id kept the tie open (Everton 1-0 Wolves simulated again, its
+    pair read Everton v Everton); a cancelled tie made its clubs reach the round twice (CONCACAF 2026)."""
+    from oddsmarkets.football.competitions.cup import store as cs
+
+    store = {"matches": {
+        "pp": _km("Everton", "Wolves", "2026-09-09T18:45:00Z", "r3", status="postponed"),
+        "ok": _km("Everton", "Wolves", "2026-09-16T18:45:00Z", "r3", hs=1, as_=0),
+        "cx": _km("Forge", "San Miguelito", "2026-02-03T00:00:00Z", "r1", status="canceled"),
+        "l1": _km("San Miguelito", "LA Galaxy", "2026-02-20T00:00:00Z", "r1", hs=1, as_=1),
+        "l2": _km("LA Galaxy", "San Miguelito", "2026-02-26T00:00:00Z", "r1", hs=0, as_=0, agg_winner="LA Galaxy"),
+        "two1": _km("X", "Y", "2026-02-20T00:00:00Z", "r1", hs=1, as_=0),
+        "two2": _km("Y", "X", "2026-02-27T00:00:00Z", "r1", status="postponed"),
+    }}
+    results, pairs = cs.tie_results(list(cs.iter_matches(store)))
+    assert results[frozenset(("Everton", "Wolves"))] == "Everton" and ("Everton", "Wolves") in pairs["r3"]
+    assert results[frozenset(("LA Galaxy", "San Miguelito"))] == "LA Galaxy"
+    assert not any("Forge" in p for p in pairs["r1"])
+    assert frozenset(("X", "Y")) not in results                 # a postponed second leg still keeps the tie open
+
+
+def test_top_flight_membership_is_the_league_s_clubs_not_the_country() -> None:
+    """team_league comes from the country code, so every English club counted as Premier League and the FA Cup showed
+    Burton Albion 15% to win before the top flight entered (accuracy audit, 22 Oct 2026)."""
+    from types import SimpleNamespace
+
+    import scripts.build_site_all as b
+
+    dom = SimpleNamespace(family="domestic")
+    early = SimpleNamespace(teams=["Burton Albion", "Bury FC"], team_league={"Burton Albion": "premier-league", "Bury FC": "premier-league"})
+    later = SimpleNamespace(teams=["Burton Albion", "Arsenal"], team_league={"Burton Albion": "premier-league", "Arsenal": "premier-league"})
+    top = {"premier-league": {"Arsenal", "Chelsea"}}
+    assert b.cup_field_partial(dom, early, top) is True
+    assert b.cup_field_partial(dom, later, top) is False
+    assert b.cup_field_partial(dom, early) is False                       # the country-only reading this replaces
+    assert b.cup_field_partial(dom, early, {"premier-league": set()}) is False   # clubs unknown: the country reading
+
+
+def test_a_rate_never_passes_100_percent() -> None:
+    """Line-ups with wonTackle but no totalTackle summed to a season tackle success of 266.7% (Robert, FC København,
+    Conference League; 71 players over 100%, accuracy audit 22 Oct 2026)."""
+    from oddsmarkets.football.analytics.players import aggregate_players, paired_stats
+
+    assert paired_stats({"wonTackle": 3}) == {"wonTackle": 3, "totalTackle": 3}
+    whole = {"wonTackle": 1, "totalTackle": 2}
+    assert paired_stats(whole) is whole
+    store = {"matches": {"1": {"home": "A", "away": "B", "hs": 0, "as": 0, "date": "2026-10-01T18:00:00Z"},
+                         "2": {"home": "A", "away": "B", "hs": 0, "as": 0, "date": "2026-10-08T18:00:00Z"}},
+             "lineups": {"1": {"7": {"n": "Seven", "t": "A", "p": "M", "s": {"minutesPlayed": 90, "wonTackle": 5}}},
+                         "2": {"7": {"n": "Seven", "t": "A", "p": "M", "s": {"minutesPlayed": 90, "wonTackle": 1, "totalTackle": 3}}}},
+             "players": {}, "incidents": {}}
+    row = aggregate_players(store, registry="none")[0]
+    assert (row["tackles"], row["tackles_won"], row["tackle_pct"]) == (8, 6, 75.0)

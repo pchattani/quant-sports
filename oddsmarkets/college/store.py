@@ -217,13 +217,26 @@ def merge_team(store: dict[str, Any], tid: str, rec: dict[str, Any], weak: tuple
     return old
 
 
+# plausible bounds for ESPN's roster height (inches) and weight (pounds); ESPN carries typos such as 5 lb or
+# 2 lb for real players, which are dropped rather than shown
+BODY_BOUNDS = {"height_in": (55, 100), "weight_lb": (90, 450)}
+
+
+def _body_ok(k: str, v: Any) -> bool:
+    lo_hi = BODY_BOUNDS.get(k)
+    return lo_hi is None or not isinstance(v, (int, float)) or lo_hi[0] <= v <= lo_hi[1]
+
+
 def merge_player(store: dict[str, Any], pid: str, rec: dict[str, Any], tid: str | None = None) -> dict[str, Any]:
     old = store["players"].setdefault(str(pid), {"name": None, "short": None, "pos": None, "jersey": None, "class": None,
                                                  "height_in": None, "weight_lb": None, "hometown": None, "teams": []})
     for k, v in rec.items():
-        if k in ("id", "teams") or v is None or v == "":
+        if k in ("id", "teams") or v is None or v == "" or not _body_ok(k, v):
             continue
         old[k] = v
+    for k in BODY_BOUNDS:                 # clear a typo stored before the bounds existed
+        if not _body_ok(k, old.get(k)):
+            old[k] = None
     for t in ([tid] if tid else []) + list(rec.get("teams") or []):
         if t and str(t) not in old["teams"]:
             old["teams"].append(str(t))

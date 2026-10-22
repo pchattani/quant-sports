@@ -121,3 +121,30 @@ def test_value_and_careers(built):
     assert car["ok"] and car["seasons"] and {"season", "team", "gp", "value"} <= set(car["seasons"][0])
     cal = _load(built["out"] / "calibration.json")
     assert cal["summary"]["vs_close"]["n"] > 0 and cal["committee"]["n_seasons"] >= 1
+
+
+def test_box_frame_drops_espn_team_rows():
+    """ESPN's box carries a team row (negative id, name " Team") for team rushes and punts: never a player."""
+    st = {"games": {"1": {"status": "post", "home": "10", "away": "20", "date": "2026-09-05T16:00:00Z",
+                          "stype": "reg", "week": 1,
+                          "box": {"10": {"players": {"rushing": {
+                              "cols": ["rushing_attempts", "rushing_yards", "yards_per_rush_attempt", "rushing_touchdowns",
+                                       "long_rushing"],
+                              "rows": [["501", 12, 80, 6.7, 1, 30], ["-103071", 3, -5, -1.7, 0, 0]]}}}}}}}
+    df = players.box_frame(2026, st)
+    assert df["pid"].tolist() == ["501"]
+    assert df.loc[0, "rush_yds"] == 80
+
+
+def test_conference_record_excludes_the_title_game():
+    """ESPN and the conferences count a championship game in the overall record only (Indiana 2025: 9-0 Big Ten)."""
+    gf = pd.DataFrame([
+        {"final": True, "home": "1", "away": "2", "hs": 30, "as": 20, "neutral": False, "conf_game": True, "stype": "reg"},
+        {"final": True, "home": "1", "away": "2", "hs": 24, "as": 21, "neutral": True, "conf_game": True, "stype": "conf"},
+        {"final": True, "home": "3", "away": "1", "hs": 10, "as": 35, "neutral": False, "conf_game": False, "stype": "reg"}])
+    tm = {"1": {"conference": "5"}, "2": {"conference": "5"}, "3": {"conference": "8"}}
+    out = build._standings({"st": {}, "gf": gf, "tm": tm, "ratings": {}, "mem": ["1", "2", "3"]})
+    one = next(r for r in out["5"] if r["team"] == "1")
+    assert (one["w"], one["l"], one["conf_w"], one["conf_l"]) == (3, 0, 1, 0)
+    two = next(r for r in out["5"] if r["team"] == "2")
+    assert (two["w"], two["l"], two["conf_w"], two["conf_l"]) == (0, 2, 0, 1)

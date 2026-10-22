@@ -1208,6 +1208,86 @@ expected goals, so they should do at least as well as the stand-in.
 
 ---
 
+## 11e. Who moves next: chance of leaving, how and where, club outlook and targets
+
+Added 23 October 2026. Code: `oddsmarkets/football/analytics/moves.py`, called by `build_movement` in
+`value_payloads.py`; research and validation `scripts/football_moves.py`; pre-registration and results
+`docs/research/football_moves.md`. Payloads: `docs/site/UNIFIED_PAYLOADS.md` section 15.
+
+### 11e.1 Data, windows and labels
+
+- **Data.** The line-ups the value model reads (value.Rows) and the transfer store (11c.1). No new calls. **No
+  contract data**: Transfermarkt's, Spotrac's and similar sites' terms forbid reuse; Sofascore's contract end dates
+  exist only as today's snapshot, so a model cannot learn from them.
+- **Windows** are halves of the year, as the fee model and the ledgers use them (11c.2): summer 1 May to 31 October,
+  winter 1 November to 30 April; every league's registration period (`value.WINDOWS`) falls inside its half. The page
+  forecasts the half that contains today + 60 days. Labels are complete from Winter 2025/26 (`LABELS_FROM`): the club
+  lists reach back to about December 2025; earlier windows have only the rated players' histories.
+- **Population** (`build_panel`): a player whose latest club appearance before the window opens was for a club of a
+  followed league, within 180 days, with no departure from that club recorded since (and, for the coming window, not
+  listed by Sofascore's squads at another club).
+- **Label**: a move from that club inside the half (transfer with a fee or undisclosed, free transfer, loan out,
+  loan ending, release to "No team" or retirement) or a club appearance for another club inside it (type unknown).
+  Destination: the same league, a stronger or weaker one (by the league offsets of 11b.2), or outside our leagues.
+
+### 11e.2 Features (before the window opens only)
+
+Age and its square; his share of the club's minutes since his first appearance for it, its 90-day trend and starts
+per match; log minutes; his match rating against his letter-unit teammates (minutes-weighted, him excluded); his
+depth rank beyond the unit's usual starters (G 1, D 4, M 4, F 2); the club's xG difference per match and its 90-day
+trend; the league's offset and region; a recent arrival (a first appearance within 150 days after another club, or a
+move in); on loan now; loans in two years and permanent moves in three; national-team minutes; days since his last
+appearance; his letter; the window's kind.
+
+### 11e.3 Models
+
+- **Leaves**: ridge logistic regression on the 27 features (ridge 10, chosen on the dev window).
+- **Type if he moves**: ridge multinomial (5 classes) on 17 features; **destination if he moves**: ridge
+  multinomial (4 classes) on 11 (both ridge 10).
+- **Destination club** (`fit_clogit`): conditional logit over the followed clubs on: same league, same region, league
+  offset step and its square, club xG-difference step and its square, his quality (match rating shrunk toward 6.7
+  by 450 minutes) minus the club's at his unit and its square, the club's expected departures at his unit per usual
+  starter, and the club's recent arrivals (ridge 1).
+- **Chance he joins club c** = chance he leaves x (1 - release - loan end) x (1 - outside) x the conditional logit's
+  share of c. A club's targets are the top 10 by this among players who would improve it (450+ minutes for their club
+  in 12 months and a shrunk rating at least the club's at the unit), with the fair fee to the club and the budget fit
+  of 11c.7 (over 1.5 x the 90th-percentile budget: left out). The fit filter was added after the test (on the test
+  window it lifts precision at 10 from 0.28% to 0.40%, keeping a third of the actual signings eligible: post hoc,
+  reported, not a claim).
+
+### 11e.4 Validation (pre-registered, one held-out window)
+
+Dev = Winter 2025/26 (5,924 player-windows, 17.5% left); test = Summer 2026 (7,100, 31.8% left); the winter model's
+level shifted to the summer by the store histories' summer-to-winter ratio (1.92). Club-bootstrap 95% CIs:
+
+| Test (Summer 2026) | Model | Base | Model - base [95% CI] | Verdict |
+|---|---|---|---|---|
+| Leaves, log-loss | 0.673 | 0.626 | +0.047 [+0.029, +0.065] | fails (slope 0.30, AUC 0.58) |
+| Type, joint 6 classes, log-loss | 0.998 | 1.117 | -0.119 [-0.149, -0.090] | passes |
+| Destination, log-loss (1,506 movers) | 1.177 | 1.327 | -0.149 [-0.188, -0.112] | passes |
+| Arrivals per club, Poisson deviance | 5.97 | 2.13 | +3.84 [+3.21, +4.48] | fails |
+| Targets, precision at 10 (251 clubs) | 0.28% | 0.04% (availability alone) | +0.24 pts [+0.08, +0.44] | passes; same-league heuristic 0.24% |
+
+The leave and arrivals models failed because the windows move different players: in the winter half the Americas
+lose players (their main window) and Europe keeps them; in the summer half the reverse. One window of each kind
+cannot teach a model the difference.
+
+### 11e.5 What is published
+
+- **Chance of leaving**: base rates of the latest window of the same kind (11e.4's rule), by league x role band
+  (regular 50%+ of the club's minutes, rotation 20-50%, fringe), shrunk toward the league by 30 player-windows and the
+  league toward its region by 60; on loan: the region's on-loan rate (shrunk by 30). Winter 2025/26: MLS 30%,
+  Brasileirão 32%, Liga MX 24%, Premier League 9%, LaLiga 6%; on loan in South America 60%.
+- **Type and destination if he moves**, the **destination-club model** and **targets**: the models that passed,
+  refitted on both windows (the window's kind as a term); targets use the base rates as availability.
+- **Club outlook**: expected departures by unit = the sum of the players' base rates; expected arrivals = the
+  reference window's arrivals per club in the league (its unit mix shrunk toward all leagues'); chance of adding at a
+  unit = 1 - exp(-expected arrivals there). Base rates, labelled.
+- **Forward test**: the region-aware player model's Winter 2026/27 forecasts are frozen
+  (`docs/research/football_moves_forward_2026W.json`, SHA-256 in the research note) and scored after 30 April 2027.
+
+---
+
 ## 12. Market odds
 
 ### 12.1 Club match markets: `oddsmarkets/football/core/markets.py`

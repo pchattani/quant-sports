@@ -82,7 +82,8 @@ SIMPLIFICATIONS = [
     "no qualifying or Challenger points",
     "strengths held at today's values for the rest of the season",
     "injury absences inferred from missed Slams / 1000s since the last match (returns with probability 0.5), not from news",
-    "calendar = this season's listed events plus last season's for events not yet listed (shifted 52 weeks)",
+    "calendar = this season's listed events plus last season's for events not yet listed (shifted 52 weeks, plus the "
+    "whole weeks by which this season's calendar has been running late or early)",
 ]
 N_SEEDS = {128: 32, 96: 32, 64: 16, 56: 16, 48: 16, 32: 8, 28: 8, 16: 4}
 
@@ -255,7 +256,7 @@ def simulate_season(state: dict, n: int = N_SIMS, seed: int = 0) -> dict:
             for j, p in enumerate(fs["pids"]):
                 if p in idx:
                     new_pts[:, idx[p]] += fs["points"][:n, j]
-            ev_log.append({"id": ev.get("id"), "method": "tournament_sim (drawn, results fixed)"})
+            ev_log.append({"id": ev.get("id"), "start": ev.get("start"), "method": "tournament_sim (drawn, results fixed)"})
             continue
         L = L_for(ev.get("surface"), ev.get("best_of"))
         if ev.get("alive") is not None:
@@ -284,7 +285,7 @@ def simulate_season(state: dict, n: int = N_SIMS, seed: int = 0) -> dict:
                     i = idx[p]
                     e = ex[:, i]
                     new_pts[:, i] += np.where(e >= 0, vals[np.clip(e, 0, len(vals) - 1)], 0.0)
-            ev_log.append({"id": ev.get("id"), "method": "in progress, alive players re-drawn"})
+            ev_log.append({"id": ev.get("id"), "start": ev.get("start"), "method": "in progress, alive players re-drawn"})
             continue
         # a future event: entries, draw, results
         D = int(ev.get("draw_size") or 32)
@@ -323,7 +324,7 @@ def simulate_season(state: dict, n: int = N_SIMS, seed: int = 0) -> dict:
         hb = had_bye[:, :P] & (ex[:, :P] == 1)
         pts = np.where(hb, vals[0], pts)
         new_pts += pts
-        ev_log.append({"id": ev.get("id"), "method": "entry model + seeded draw", "draw_size": D,
+        ev_log.append({"id": ev.get("id"), "start": ev.get("start"), "method": "entry model + seeded draw", "draw_size": D,
                        "p_enter_top10": round(float(E[:, :10].mean()), 3)})
     # Race and qualification
     race = race_now[None, :] + new_pts
@@ -471,6 +472,29 @@ def _field_logit(Lr: np.ndarray, lo: int = 60, hi: int = 120) -> np.ndarray:
     return L
 
 
+def calendar_drift(ev_cur: dict, ev_prev: dict, d: date, last: int = 6) -> int:
+    """Days by which this season's calendar runs from last season's shifted 52 weeks: the median, over the last
+    `last` tour events of this season that have started by `d` and were also played last season, of (start - (last
+    season's start + 364)), rounded to whole weeks and capped at two. 2026 runs a week later than 2025 + 364 from
+    the summer on, so without it Basel and Vienna were simulated in Almaty's and Brussels' week and collided with
+    Paris (one event a week per player)."""
+    prev = {}
+    for eid, ev in ev_prev.items():
+        st = _io.day(ev.get("start"))
+        if str(ev.get("level") or "") in TOUR_EVENT_LEVELS and st is not None:
+            prev[str(ev.get("tid") or eid.rsplit("-", 1)[0])] = st
+    offs = []
+    for eid, ev in ev_cur.items():
+        st = _io.day(ev.get("start"))
+        p = prev.get(str(ev.get("tid") or eid.rsplit("-", 1)[0]))
+        if str(ev.get("level") or "") in TOUR_EVENT_LEVELS and st is not None and p is not None and st <= d:
+            offs.append((st, (st - p).days - 364))
+    recent = [o for _, o in sorted(offs)[-last:]]
+    if not recent:
+        return 0
+    return int(max(-14, min(14, 7 * round(float(np.median(recent)) / 7))))
+
+
 def build_state(tour: str, as_of: Any = None, stores: dict | None = None, ctx=None, n_players: int = N_PLAYERS,
                 prob: Callable | None = None, n: int = N_SIMS, seed: int = 0) -> dict:
     """State for simulate_season from the stores (this season and last). `stores` {year: store} bypasses disk;
@@ -566,14 +590,17 @@ def build_state(tour: str, as_of: Any = None, stores: dict | None = None, ctx=No
         st = _io.day(ev.get("start"))
         if str(ev.get("level") or "") in TOUR_EVENT_LEVELS and st is not None and st > d and ev.get("status") != "done":
             future.append(dict(ev, id=eid))
+    shift = timedelta(days=364 + calendar_drift(ev_cur, ev_prev, d))
     for eid, ev in ev_prev.items():
         tid = str(ev.get("tid") or eid.rsplit("-", 1)[0])
         st = _io.day(ev.get("start"))
         if str(ev.get("level") or "") in TOUR_EVENT_LEVELS and st is not None and tid not in listed:
-            st2 = st + timedelta(days=364)
-            en2 = (_io.day(ev.get("end")) or (st + timedelta(days=6))) + timedelta(days=364)
-            # not listed yet and not over by last season's dates: still to come (calendars move by a few days)
-            if en2 > d and st2 <= date(Y, 12, 31):
+            st2 = st + shift
+            en2 = (_io.day(ev.get("end")) or (st + timedelta(days=6))) + shift
+            # not listed yet and not over by last season's dates: still to come (calendars move by a few days);
+            # one that should have started more than three days ago (after the drift) would be listed by now:
+            # dropped from this season's calendar (Stockholm 2026, Lyon's week)
+            if en2 > d and st2 <= date(Y, 12, 31) and st2 >= d - timedelta(days=3):
                 st2 = max(st2, d + timedelta(days=1))
                 future.append(dict(ev, id=f"{tid}-{Y}", start=st2.isoformat(), year=Y, status="upcoming", draw=None,
                                    shifted_from=eid))

@@ -45,7 +45,7 @@ def build(td: an.TourData, sim: dict | None, futures: dict | None = None) -> dic
         if ev is None:                      # a future event listed from last season's calendar (shifted 52 weeks)
             old = prev.get(str(e.get("id") or "").rsplit("-", 1)[0]) or {}
             d = an.day(old.get("start"))
-            ev = dict(old, start=(d + timedelta(days=364)).isoformat() if d else None)
+            ev = dict(old, start=e.get("start") or ((d + timedelta(days=364)).isoformat() if d else None))
         rem.append({"id": e.get("id"), "name": ev.get("name"), "level": ev.get("level"), "start": ev.get("start"),
                     "surface": ev.get("surface"), "method": e.get("method"), "draw_size": e.get("draw_size")})
     fut = futures or {}

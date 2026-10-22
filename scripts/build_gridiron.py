@@ -506,8 +506,17 @@ def calibration(b: Build, adapters) -> None:
         cur = {"ok": False, "reason": "no backtest and no EP / WP validation yet"}
     else:
         cur["ok"] = True
-        cur["updated_at"] = _now()
+        cur["updated_at"] = calibration_stamp(cur) or _now()
     b.write("calibration.json", cur)
+
+
+def calibration_stamp(cur: dict) -> str | None:
+    """calibration.json's updated_at is its content's stamp (the backtest's generated_at), never the build time: CI
+    restores the deployed copy over the committed one when its stamp is newer (ci_site.py restore, newer_wins), so a
+    build-time stamp kept the 2 Oct backtest on the site after the 21 Oct refit was committed (accuracy audit,
+    22 Oct 2026)."""
+    gm = cur.get("game_model") if isinstance(cur.get("game_model"), dict) else {}
+    return str(gm.get("generated_at")) if gm.get("generated_at") else None
 
 
 def _phase(p: str | None) -> str:

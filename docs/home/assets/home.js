@@ -1,5 +1,6 @@
-/* The Quant home. Reads data/home.json (scripts/build_home.py) and refreshes live scores in the
- * browser from each sport's published index.json on GitHub Pages (CORS: Access-Control-Allow-Origin *). */
+/* The Quant home (Design System 2.0). Reads data/home.json (scripts/build_home.py) and refreshes live scores in the
+ * browser from each sport's published index.json on GitHub Pages (CORS: Access-Control-Allow-Origin *).
+ * Our numbers lead everywhere; a market probability, where one exists, is a quiet reference (STYLE_GUIDE.md). */
 (function () {
 'use strict';
 var $ = QK.$, $$ = QK.$$, esc = QK.esc, fmt = QK.fmt, isNum = QK.isNum;
@@ -20,9 +21,19 @@ var shell = QK.shell({
 function sportOf(k) { return QK.sport(k) || { label: k, accent: 'var(--accent)' }; }
 function spIcon(k) { return '<span class="hm-sp-ic" style="--sa:' + sportOf(k).accent + '" aria-hidden="true">' + (QK.ICON[k] || '') + '</span>'; }
 
+/* section heads (static copy) */
+$('#h-sports').innerHTML = QK.sectionHead({ kicker: 'Eight sites, one look', title: 'Pick your sport', sub: 'Each site opens on today’s games, the standings, the players and the models behind them.' });
+$('#h-futures').innerHTML = QK.sectionHead({ kicker: 'Season simulations', title: 'Who wins it all', sub: 'Our title chances from thousands of simulated seasons. Where a prediction market trades the same question, its number is a grey tick, for reference.' });
+$('#h-charts').innerHTML = QK.sectionHead({ kicker: 'One picture per site', title: 'Charts of the week', sub: 'A headline chart from each sport. Tap through for the full story.' });
+$('#h-leaders').innerHTML = QK.sectionHead({ kicker: 'Leaderboards', title: 'Leaders', sub: 'Who is top of the numbers that matter in each sport.' });
+$('#h-games').innerHTML = QK.sectionHead({ kicker: 'Scoreboard', title: 'Games', sub: 'Our win chance on every card, the favourite in violet. Tap a game for the full breakdown.',
+  actions: '<div class="qk-seg" id="when" role="group" aria-label="When"><button type="button" aria-pressed="true" data-value="now">Live &amp; next</button><button type="button" aria-pressed="false" data-value="results">Results</button></div>' });
+
 /* ───────────────────────────── load */
 QK.fetchJSON('data/home.json', { cache: 'no-cache' }).then(function (j) {
   D = j;
+  /* accuracy guard: a game still marked live or upcoming 12 hours after its start is a stale snapshot, not a fact */
+  D.games = (D.games || []).filter(function (g) { return g.status === 'final' || !g.start || (Date.now() - new Date(g.start)) / 36e5 < 12; });
   renderAll();
   startLive();
 }, function (e) {
@@ -32,8 +43,8 @@ QK.fetchJSON('data/home.json', { cache: 'no-cache' }).then(function (j) {
 function renderAll() {
   var today = new Date();
   $('#hero-date').textContent = today.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }) + ' · ' + sportCount();
-  renderTicker(); renderHeroKpis(); renderFeature(); renderStats(); renderTiles(); renderChips(); renderGames();
-  renderGaps(); renderFutures(); renderCharts(); renderLeaders();
+  var jobs = [renderTicker, renderHeroStats, renderFeature, renderStats, renderTiles, renderChips, renderGames, renderFutures, renderCharts, renderLeaders];
+  jobs.forEach(function (f) { try { f(); } catch (e) { if (window.console) console.error(e); } });
   $('#updated').textContent = 'Data built ' + fmt.ago(D.updated_at) + ' (' + new Date(D.updated_at).toLocaleString() + '). Live scores refresh every minute while games are on.';
   QK.seg($('#when'), function (v) { state.when = v; state.shown = PAGE; renderGames(); });
 }
@@ -44,26 +55,27 @@ function liveMap() { var m = {}; D.games.forEach(function (g) { if (g.status ===
 
 /* ───────────────────────────── ticker */
 function renderTicker() {
-  var g = D.games.filter(function (x) { return !x.event; });
-  var order = { live: 0, pre: 1, final: 2 };
-  g.sort(function (a, b) { return order[a.status] - order[b.status] || (a.status === 'final' ? (b.start > a.start ? 1 : -1) : (a.start > b.start ? 1 : -1)); });
-  $('#ticker').innerHTML = g.slice(0, 40).map(QK.tick).join('');
+  $('#ticker').innerHTML = QK.ticker(D.games.filter(function (x) { return !x.event; }), { max: 48 });
   shell.setLive(liveMap());
 }
 
 /* ───────────────────────────── hero */
 function isToday(iso) { return fmt.relDay(iso) === 'Today'; }
-function renderHeroKpis() {
+function twoWay(g) { return g.status === 'pre' && !g.event && isNum(g.p_home) && !isNum(g.p_draw); }
+function label(g) { return (g.away.abbr || g.away.name) + ' @ ' + (g.home.abbr || g.home.name); }
+function renderHeroStats() {
   var live = D.games.filter(function (g) { return g.status === 'live'; }).length;
   var today = D.games.filter(function (g) { return isToday(g.start) && !g.event; }).length;
-  var big = D.gaps[0];
-  var priced = D.games.filter(function (g) { return isNum(g.market_home) && g.status === 'pre'; }).length;
-  $('#hero-kpis').innerHTML = [
-    QK.kpi({ label: 'Live now', value: String(live), sub: live ? 'games in play' : 'nothing in play' }),
-    QK.kpi({ label: 'Featured today', value: String(today), sub: 'games on this page' }),
-    QK.kpi({ label: 'Priced games', value: String(priced), sub: 'model v market' }),
-    QK.kpi({ label: 'Biggest gap', value: big ? fmt.pp(big.diff) : '—', sub: big ? big.label : '', tip: 'Model probability minus market probability, in percentage points' })
-  ].join('');
+  var soon = D.games.filter(function (g) { var h = (new Date(g.start) - Date.now()) / 36e5; return twoWay(g) && h > -1 && h < 36; });
+  var close = soon.slice().sort(function (a, b) { return Math.abs(a.p_home - 0.5) - Math.abs(b.p_home - 0.5); })[0];
+  var fav = soon.slice().sort(function (a, b) { return Math.abs(b.p_home - 0.5) - Math.abs(a.p_home - 0.5); })[0];
+  function favTeam(g) { return g.p_home >= 0.5 ? g.home : g.away; }
+  $('#hero-stats').innerHTML = QK.stats([
+    { label: 'Live now', value: String(live), sub: live ? 'games in play' : 'nothing in play right now' },
+    { label: 'On today', value: String(today), sub: 'games across the sites' },
+    close ? { label: 'Closest call', value: label(close), text: true, href: close.href, sub: 'our chance ' + fmt.pct(Math.max(close.p_home, 1 - close.p_home)) + ' for ' + (favTeam(close).abbr || favTeam(close).name), tip: 'The upcoming game our model finds hardest to call' } : null,
+    fav ? { label: 'Biggest favourite', value: (favTeam(fav).abbr || favTeam(fav).name) + ' ' + fmt.pct(Math.max(fav.p_home, 1 - fav.p_home)), text: true, signal: true, href: fav.href, sub: label(fav) + ' · ' + sportOf(fav.sport).label } : null
+  ]);
 }
 
 function featureScore(g) {
@@ -76,7 +88,6 @@ function featureScore(g) {
   if (g.sport === 'football' && FOOTBALL_TOP.indexOf(g.comp) >= 0) s += 18;
   if (g.event) s += 16;
   if (isNum(g.p_home)) s += 10 * (1 - Math.abs(g.p_home - (isNum(g.p_draw) ? (1 - g.p_draw) / 2 : 0.5)) * 2);
-  if (isNum(g.market_home)) s += 6;
   return s - Math.max(0, hrs) * 0.35;
 }
 function renderFeature() {
@@ -85,37 +96,31 @@ function renderFeature() {
   if (!c) { el.innerHTML = QK.empty('No marquee game right now'); return; }
   var sp = sportOf(c.sport);
   if (c.event) return featureRace(el, c, sp);
-  var ac = QK.probColour(c.away, c.home, 'left');
-  var hc = QK.probColour(c.home, c.away, 'right');
+  var ac = QK.probColour(c.away, c.home, 'left'), hc = QK.probColour(c.home, c.away, 'right');
   el.style.setProperty('--fh', hc); el.style.setProperty('--fa', ac);
   var pA = isNum(c.p_away) ? c.p_away : (isNum(c.p_home) ? 1 - c.p_home - (c.p_draw || 0) : null);
   var live = c.status === 'live';
+  var favA = isNum(pA) && isNum(c.p_home) && pA > c.p_home;
   var mid = live || c.status === 'final' ? '<span class="sc">' + esc(isNum(c.as) ? c.as : 0) + '–' + esc(isNum(c.hs) ? c.hs : 0) + '</span>' + QK.statusBadge(c) :
-    '<span>' + esc(fmt.relDay(c.start)) + '</span><span class="num" style="color:var(--ink-1);font-size:var(--fs-md)">' + esc(fmt.time(c.start)) + '</span>';
+    '<span>' + esc(fmt.relDay(c.start)) + '</span><span class="tm">' + esc(fmt.time(c.start)) + '</span>';
+  var pl = live ? 'live chance' : 'our chance';
   el.innerHTML = '<a class="qk-card-body" href="' + esc(c.href || '#') + '" style="display:block">' +
-    '<div class="qk-row" style="justify-content:space-between"><span class="qk-kicker" style="color:var(--brand)">Game of the day</span><span class="qk-sportpill" style="--sa:' + sp.accent + '">' + esc(sp.label) + ' · ' + esc(c.league) + (c.note ? ' · ' + esc(c.note) : '') + '</span></div>' +
-    '<div class="hm-vs"><div class="hm-vs-team">' + QK.teamMark(c.away, 'lg') + '<span class="nm">' + esc(c.away.name) + '</span><span class="p" style="color:' + ac + '">' + (isNum(pA) ? fmt.pct(pA) : '') + '</span></div>' +
+    '<div class="hm-feature-top"><span class="qk-sh-kicker" style="margin:0">Game of the day</span><span class="qk-sportpill" style="--sa:' + sp.accent + '">' + esc(sp.label) + ' · ' + esc(c.league) + (c.note ? ' · ' + esc(c.note) : '') + '</span></div>' +
+    '<div class="hm-vs"><div class="hm-vs-team">' + QK.teamMark(c.away, 'lg') + '<span class="nm">' + esc(c.away.name) + '</span><span class="p' + (favA ? ' fav' : '') + '">' + (isNum(pA) ? fmt.pct(pA) : '') + '</span><span class="pl">' + pl + '</span></div>' +
     '<div class="hm-vs-mid">' + mid + '</div>' +
-    '<div class="hm-vs-team">' + QK.teamMark(c.home, 'lg') + '<span class="nm">' + esc(c.home.name) + '</span><span class="p" style="color:' + hc + '">' + (isNum(c.p_home) ? fmt.pct(c.p_home) : '') + '</span></div></div>' +
-    QK.probBar(pA, c.p_draw, c.p_home, c.away, c.home) +
-    '<div class="hm-feature-foot"><span>Model win probability' + (isNum(c.p_draw) ? ' · draw <b>' + fmt.pct(c.p_draw) + '</b>' : '') + '</span>' +
-    (isNum(c.market_home) ? '<span>Market has ' + esc(c.home.name) + ' at <b>' + fmt.pct(c.market_home) + '</b> (' + fmt.pp(c.p_home - c.market_home) + ')</span>' : '') +
-    (isNum(c.total) ? '<span>Projected total <b>' + fmt.num(c.total, 1) + '</b></span>' : '') + '</div></a>';
+    '<div class="hm-vs-team">' + QK.teamMark(c.home, 'lg') + '<span class="nm">' + esc(c.home.name) + '</span><span class="p' + (!favA ? ' fav' : '') + '">' + (isNum(c.p_home) ? fmt.pct(c.p_home) : '') + '</span><span class="pl">' + pl + '</span></div></div>' +
+    QK.wpBar(pA, c.p_draw, c.p_home, c.away, c.home, { size: 'lg', labels: false, label: live ? 'Live win chance' : 'Our win chance' }) +
+    '<div class="hm-feature-foot"><span>' + (isNum(c.p_draw) ? 'Draw <b>' + fmt.pct(c.p_draw) + '</b>' : (live ? 'Our live model' : 'Our pre-game model')) + '</span>' +
+    (isNum(c.total) ? '<span>Projected total <b>' + fmt.num(c.total, 1) + '</b></span>' : '') +
+    (isNum(c.market_home) && c.status === 'pre' ? '<span class="qk-mkt">Market <b>' + esc(c.home.abbr || c.home.name) + ' ' + fmt.pct(c.market_home) + '</b></span>' : '') + '</div></a>';
 }
 function featureRace(el, c, sp) {
   var r = D.charts.f1_next_race || {};
-  var f = (r.field || []).slice(0, 5);
-  var mx = Math.max.apply(null, f.map(function (x) { return Math.max(x.p || 0, x.market || 0); }).concat([0.05]));
+  var f = (r.field || []).slice(0, 6);
   el.style.setProperty('--fh', 'var(--a-f1)'); el.style.setProperty('--fa', 'var(--a-f1)');
-  el.innerHTML = '<a class="qk-card-body" href="' + esc(r.href || c.href) + '" style="display:block"><div class="qk-row" style="justify-content:space-between"><span class="qk-kicker" style="color:var(--brand)">Race weekend</span><span class="qk-sportpill" style="--sa:' + sp.accent + '">F1 · Round ' + esc(r.round) + '</span></div>' +
-    '<h3 style="font-size:var(--fs-xl);margin-top:10px">' + esc(r.name) + '</h3><div class="qk-sub">' + esc(r.circuit || '') + ' · ' + esc(r.locality || '') + ' · lights out ' + esc(fmt.date((r.sessions || {}).race || r.date)) + ' ' + esc(fmt.time((r.sessions || {}).race)) + '</div>' +
-    '<div style="display:grid;gap:8px;margin-top:14px">' + f.map(function (d) {
-      var col = QK.color.team(d.colour);
-      return '<div style="display:grid;grid-template-columns:44px 1fr 48px;gap:10px;align-items:center;font-size:var(--fs-xs)"><b class="num">' + esc(d.code || '') + '</b>' +
-        '<span style="position:relative;height:14px"><span style="position:absolute;left:0;top:0;height:8px;border-radius:4px;background:' + col + ';width:' + (100 * (d.p || 0) / mx) + '%"></span>' +
-        (isNum(d.market) ? '<span title="Market" style="position:absolute;top:-2px;width:2px;height:12px;background:var(--c-2);left:' + (100 * d.market / mx) + '%"></span>' : '') + '</span>' +
-        '<span class="num" style="text-align:right">' + fmt.pct(d.p) + '</span></div>';
-    }).join('') + '</div><div class="hm-feature-foot"><span>Bar: model win probability</span><span><i style="display:inline-block;width:2px;height:10px;background:var(--c-2);vertical-align:middle"></i> market price</span></div></a>';
+  el.innerHTML = '<a class="qk-card-body" href="' + esc(r.href || c.href) + '" style="display:block"><div class="hm-feature-top"><span class="qk-sh-kicker" style="margin:0">Race weekend</span><span class="qk-sportpill" style="--sa:' + sp.accent + '">F1 · Round ' + esc(r.round) + '</span></div>' +
+    '<h3 class="qk-display" style="font-size:var(--fs-xl);margin-top:10px">' + esc(r.name) + '</h3><div class="qk-sub">' + esc(r.circuit || '') + ' · ' + esc(r.locality || '') + ' · lights out ' + esc(fmt.date((r.sessions || {}).race || r.date)) + ' ' + esc(fmt.time((r.sessions || {}).race)) + '</div>' +
+    '<div class="hm-race">' + QK.chances(f.map(function (d) { return { label: d.code || d.name, p: d.p || 0, market: d.market, color: d.colour }; }), { oursName: 'Our chance to win' }) + '</div></a>';
 }
 
 var statIdx = 0, statTimer = null;
@@ -128,12 +133,12 @@ function renderStats() {
   function paint() {
     var s = S[statIdx], sp = sportOf(s.sport);
     el.style.setProperty('--sa', sp.accent);
-    el.innerHTML = '<div class="qk-row" style="justify-content:space-between"><span class="qk-kicker">Stat of the day · ' + esc(s.kicker) + '</span>' + spIcon(s.sport) + '</div>' +
+    el.innerHTML = '<div class="qk-row" style="justify-content:space-between"><span class="qk-sh-kicker" style="margin:0">Stat of the day · ' + esc(s.kicker) + '</span>' + spIcon(s.sport) + '</div>' +
       '<a href="' + esc(s.href || '#') + '"><div class="big">' + esc(s.value) + '</div><div class="unit">' + esc(s.unit || '') + '</div><p>' + esc(s.text) + '</p></a>' +
       '<div class="hm-stat-nav" role="group" aria-label="More stats">' + S.map(function (x, i) { return '<button type="button" aria-label="Stat ' + (i + 1) + ': ' + esc(x.kicker) + '" aria-pressed="' + (i === statIdx) + '" data-i="' + i + '"></button>'; }).join('') + '</div>';
     $$('.hm-stat-nav button', el).forEach(function (b) { b.addEventListener('click', function () { statIdx = +b.getAttribute('data-i'); paint(); restart(); }); });
   }
-  function restart() { if (statTimer) clearInterval(statTimer); if (!QK.reducedMotion()) statTimer = setInterval(function () { statIdx = (statIdx + 1) % S.length; paint(); }, 8000); }
+  function restart() { if (statTimer) clearInterval(statTimer); if (!QK.reducedMotion()) statTimer = setInterval(function () { statIdx = (statIdx + 1) % S.length; paint(); }, 9000); }
   paint(); restart();
   el.addEventListener('mouseenter', function () { if (statTimer) clearInterval(statTimer); });
   el.addEventListener('mouseleave', restart);
@@ -148,10 +153,10 @@ function renderTiles() {
     var url = QK.sportUrl(q.key);
     /* a tile figure with no value (a dash, nothing behind it) says nothing: leave it out */
     var kp = (s.kpis || []).filter(function (k) { var v = k && k.value; return v !== null && v !== undefined && v !== '' && v !== '—' && v !== '-'; }).slice(0, 3);
-    return '<a class="hm-tile" href="' + esc(url) + '" style="--sa:' + q.accent + '"><svg class="hm-tile-go" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>' +
+    return '<a class="hm-tile" href="' + esc(url) + '" style="--sa:' + q.accent + '"><svg class="hm-tile-go" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg>' +
       '<div class="hm-tile-top"><span class="hm-tile-ic">' + QK.ICON[q.key] + '</span><div><div class="hm-tile-name">' + esc(q.label) + '</div><div class="hm-tile-site">' + esc(q.site) + '</div></div></div>' +
       '<div class="hm-tile-status">' + (lm[q.key] ? '<span class="qk-badge live">Live</span>' : '') + '<span class="qk-truncate">' + esc(s.ok === false ? 'Data unavailable' : (s.status || q.leagues)) + '</span></div>' +
-      '<div class="hm-tile-kpis">' + kp.map(function (k) { return '<div><div class="l">' + esc(k.label) + '</div><div class="v">' + esc(k.value) + '</div>' + (k.sub ? '<div class="s">' + esc(k.sub) + '</div>' : '') + '</div>'; }).join('') + '</div></a>';
+      (kp.length ? '<div class="hm-tile-kpis">' + kp.map(function (k) { return '<div><div class="l">' + esc(k.label) + '</div><div class="v">' + esc(k.value) + '</div>' + (k.sub ? '<div class="s">' + esc(k.sub) + '</div>' : '') + '</div>'; }).join('') + '</div>' : '') + '</a>';
   }).join('');
 }
 
@@ -166,7 +171,7 @@ function gamesFor() {
 function renderChips() {
   var counts = { all: 0 };
   D.games.forEach(function (g) { if (!g.event) { counts.all++; counts[g.sport] = (counts[g.sport] || 0) + 1; } });
-  var chips = [['all', 'All sports', 'var(--brand)', '']].concat(QK.SPORTS.filter(function (s) { return counts[s.key]; }).map(function (s) { return [s.key, s.label, s.accent, QK.ICON[s.key]]; }));
+  var chips = [['all', 'All sports', 'var(--signal)', '']].concat(QK.SPORTS.filter(function (s) { return counts[s.key]; }).map(function (s) { return [s.key, s.label, s.accent, QK.ICON[s.key]]; }));
   $('#sport-chips').innerHTML = chips.map(function (c) {
     return '<button type="button" class="qk-chip" data-value="' + c[0] + '" aria-pressed="' + (state.sport === c[0]) + '" style="--ca:' + c[2] + '">' + c[3] + esc(c[1]) + ' <span class="n">' + (counts[c[0]] || 0) + '</span></button>';
   }).join('');
@@ -182,33 +187,19 @@ function renderGames() {
   var grid = $('#game-grid');
   if (!list.length) { grid.innerHTML = '<div style="grid-column:1/-1">' + QK.empty(state.when === 'results' ? 'No recent results' : 'Nothing scheduled in the window', 'Try another sport, or the other tab.') + '</div>'; $('#game-more').innerHTML = ''; return; }
   var html = '', lastDay = null;
-  list.slice(0, state.shown).forEach(function (g, i) {
+  list.slice(0, state.shown).forEach(function (g) {
     var day = g.status === 'live' ? 'Live now' : fmt.relDay(g.start);
     if (day !== lastDay) { html += '<div class="hm-day">' + esc(day) + '</div>'; lastDay = day; }
-    html += QK.matchCard(g);
+    html += QK.gameCard(g);
   });
   grid.innerHTML = html;
-  $$('.qk-match', grid).forEach(function (el, i) { el.style.animationDelay = Math.min(i, 12) * 25 + 'ms'; });
+  $$('.qk-gc', grid).forEach(function (el, i) { el.style.animationDelay = Math.min(i, 12) * 25 + 'ms'; });
   var more = list.length - state.shown;
   $('#game-more').innerHTML = more > 0 ? '<button class="qk-btn" type="button">Show ' + Math.min(more, PAGE) + ' more <span class="qk-muted">of ' + more + '</span></button>' : '';
   var b = $('#game-more button'); if (b) b.addEventListener('click', function () { state.shown += PAGE; renderGames(); });
 }
 
-/* ───────────────────────────── model v market */
-function renderGaps() {
-  var G = D.gaps || [];
-  if (!G.length) { $('#ch-gaps').innerHTML = QK.empty('No disagreements over 3 points'); return; }
-  var top = G.slice(0, 14);
-  $('#ch-gaps').style.setProperty('--h', Math.max(300, top.length * 36 + 40) + 'px');
-  QKC.dumbbell('#ch-gaps', { rows: top.map(function (g) { return { label: g.label, a: g.model, b: g.market, href: g.href, sub: sportOf(g.sport).label + (g.detail ? ' · ' + g.detail : '') }; }), labelWidth: window.innerWidth < 600 ? 120 : 220,
-    label: 'Biggest gaps between model and market probabilities' });
-  $('#gap-list').innerHTML = G.map(function (g) {
-    return '<a class="hm-gap-row" href="' + esc(g.href || '#') + '">' + spIcon(g.sport) + '<span><div class="lb">' + esc(g.label) + '</div><div class="sb">model ' + fmt.pct(g.model) + ' · market ' + fmt.pct(g.market) + '</div></span>' +
-      '<span class="d ' + (g.diff > 0 ? 'pos' : 'neg') + '" title="' + (g.diff > 0 ? 'Model higher than market' : 'Model lower than market') + '">' + fmt.pp(g.diff).replace(' pts', '') + '</span></a>';
-  }).join('');
-}
-
-/* ───────────────────────────── futures */
+/* ───────────────────────────── title races */
 function renderFutures() {
   var F = D.futures || {};
   var tabs = [];
@@ -232,17 +223,19 @@ function renderFutures() {
 }
 function futuresPanel(p, f, sport) {
   var rows = f.rows.filter(function (r) { return r.p > 0; });
-  var hasMkt = rows.some(function (r) { return isNum(r.market); });
-  var lead = rows[0];
-  p.innerHTML = '<div class="hm-fut"><div><div class="qk-kicker" style="margin-bottom:6px">' + esc(f.title) + (hasMkt ? ' · model v market' : ' · model') + '</div><div class="fut-ch" style="--h:' + Math.max(220, rows.length * 34 + 40) + 'px"></div></div>' +
-    '<div class="hm-fut-side">' + (lead ? QK.kpi({ label: 'Favourite', value: lead.name, text: true, sub: fmt.pct(lead.p) + ' to win' + (isNum(lead.market) ? ' · market ' + fmt.pct(lead.market) : '') }) : '') +
-    (rows[1] ? QK.kpi({ label: 'Field v favourite', value: fmt.pct(1 - lead.p), sub: 'chance someone else wins' }) : '') +
-    '<a class="qk-btn" href="' + esc(QK.sportUrl(sport)) + '">Full odds on ' + esc(sportOf(sport).site) + ' →</a></div></div>';
-  var el = $('.fut-ch', p);
-  if (hasMkt) QKC.dumbbell(el, { rows: rows.map(function (r) { return { label: r.name, a: r.p, b: isNum(r.market) ? r.market : r.p, href: r.href }; }), max: niceMax(rows), labelWidth: 150, valName: 'Title probability' });
-  else QKC.bar(el, { horizontal: true, cats: rows.map(function (r) { return r.name; }), series: [{ name: f.title, data: rows.map(function (r) { return r.p; }) }], colors: rows.map(function (r) { return r.colour; }), hrefs: rows.map(function (r) { return r.href; }), labels: true, fmt: function (v) { return fmt.pct(v, 1); }, labelWidth: 150 });
+  var lead = rows.slice().sort(function (a, b) { return b.p - a.p; })[0];
+  var top = rows.slice().sort(function (a, b) { return b.p - a.p; }).slice(0, 3);
+  var top3 = top.reduce(function (a, r) { return a + r.p; }, 0);
+  p.innerHTML = '<div class="hm-fut"><div><div class="qk-kicker" style="margin-bottom:10px">' + esc(f.title) + ' · our chance</div>' +
+    QK.chances(rows.map(function (r) { return { label: r.name, p: r.p, market: r.market, color: r.colour, href: r.href, mark: r.abbr ? { abbr: r.abbr, colour: r.colour } : null }; }), { limit: 12 }) + '</div>' +
+    '<div class="hm-fut-side">' + QK.stats([
+      lead ? { label: 'Favourite', value: lead.name, text: true, sub: fmt.pct(lead.p) + ' to win', signal: true } : null,
+      rows.length > 1 ? { label: 'The field', value: fmt.pct(1 - (lead ? lead.p : 0)), sub: 'chance someone else wins' } : null,
+      top.length === 3 ? { label: 'Top three combined', value: fmt.pct(top3), sub: top.map(function (r) { return r.abbr || r.name.split(' ').slice(-1)[0]; }).join(' · ') } : null,
+      { label: 'Contenders', value: String(rows.filter(function (r) { return r.p >= 0.01; }).length), sub: 'with at least a 1% chance' }
+    ]) +
+    '<a class="qk-btn" href="' + esc(QK.sportUrl(sport)) + '">Full forecast on ' + esc(sportOf(sport).site) + ' →</a></div></div>';
 }
-function niceMax(rows) { var m = Math.max.apply(null, rows.map(function (r) { return Math.max(r.p || 0, r.market || 0); })); return m > 0.6 ? 1 : Math.ceil(m * 10 + 0.5) / 10; }
 function footballFutures(p, list) {
   p.innerHTML = '<div class="qk-row" style="margin-bottom:12px"><label class="qk-sub" for="fl-sel">League</label><select class="qk-select" id="fl-sel">' + list.map(function (l, i) { return '<option value="' + i + '">' + esc(l.league) + '</option>'; }).join('') + '</select></div><div class="fl-body"></div>';
   function show(i) {
@@ -256,51 +249,49 @@ function footballFutures(p, list) {
 /* ───────────────────────────── charts of the week */
 function card(span, title, sub, sport, href, body) {
   var sp = sportOf(sport);
-  return '<div class="qk-card ' + span + ' accent-top" style="--accent:' + sp.accent + '"><div class="qk-card-head"><div><div class="qk-card-title">' + esc(title) + '</div><div class="qk-card-sub">' + esc(sub) + '</div></div>' + spIcon(sport) + '</div>' +
+  return '<div class="qk-card ' + span + '" style="--accent:' + sp.accent + '"><div class="qk-card-head"><div><div class="qk-card-title">' + esc(title) + '</div><div class="qk-card-sub">' + esc(sub) + '</div></div>' + spIcon(sport) + '</div>' +
     '<div class="qk-card-body">' + body + '</div>' + (href ? '<div class="qk-card-foot"><span>' + esc(sp.site) + '</span><a href="' + esc(href) + '">Open →</a></div>' : '') + '</div>';
 }
 function renderCharts() {
   var C = D.charts || {}, out = [], jobs = [];
   var tr = C.f1_title_race;
   if (tr && tr.series && tr.series.length) {
-    out.push(card('qk-span-8', 'F1 title race', 'Drivers’ points after every round of ' + tr.year, 'f1', tr.href, '<div id="c-f1" style="--h:300px"></div>'));
+    out.push(card('qk-span-8', 'F1 title race', 'Drivers’ points after every round of ' + tr.year + ', each line labelled at its end', 'f1', tr.href, '<div id="c-f1" style="--h:300px"></div>'));
     jobs.push(function () { QKC.line('#c-f1', { x: tr.rounds, xName: 'Round', yName: 'Points', xLabel: function (r) { return 'Round ' + r; }, label: 'F1 drivers championship points by round', series: tr.series.map(function (s) { return { name: s.code || s.name, label: s.code, color: s.colour, dash: s.dash, data: s.points }; }) }); });
   }
   var nr = C.f1_next_race;
   if (nr && nr.field && nr.field.length) {
-    out.push(card('qk-span-4', nr.name, 'Win probability: model v market', 'f1', nr.href, '<div id="c-f1n" style="--h:300px"></div>'));
-    jobs.push(function () { QKC.dumbbell('#c-f1n', { rows: nr.field.slice(0, 7).map(function (d) { return { label: d.code || d.name, a: d.p || 0, b: isNum(d.market) ? d.market : (d.p || 0), href: d.href, sub: d.name }; }), max: 0.5, labelWidth: 50, valName: 'Win probability' }); });
+    out.push(card('qk-span-4', nr.name, 'Our chance of winning the race; grey tick: the market', 'f1', nr.href, QK.chances(nr.field.slice(0, 8).map(function (d) { return { label: d.code || d.name, sub: '', p: d.p || 0, market: d.market, color: d.colour, href: d.href }; }))));
   }
   var mv = C.nfl_movers;
   if (mv && mv.series && mv.series.length) {
     out.push(card('qk-span-6', 'NFL: who has moved', 'Net rating by week, the six biggest changes since week 1 (points v an average team)', 'nfl', mv.href, '<div id="c-nfl" style="--h:300px"></div>'));
-    jobs.push(function () { QKC.line('#c-nfl', { x: mv.series[0].weeks.map(function (w) { return 'W' + w; }), xName: 'Week', yName: 'Rating (pts)', ref: { y: 0, label: 'average' }, yFmt: function (v) { return fmt.signed(v, 1); }, label: 'NFL net rating movers', series: mv.series.map(function (s) { return { name: s.abbr, label: s.abbr + ' ' + fmt.signed(s.delta, 1), data: s.net }; }) }); });
+    jobs.push(function () { QKC.line('#c-nfl', { x: mv.series[0].weeks.map(function (w) { return 'W' + w; }), xName: 'Week', yName: 'Rating (pts v average)', ref: { y: 0, label: 'average' }, yFmt: function (v) { return fmt.signed(v, 1); }, label: 'NFL net rating movers', series: mv.series.map(function (s) { return { name: s.abbr, label: s.abbr + ' ' + fmt.signed(s.delta, 1), data: s.net }; }) }); });
   }
   var xg = C.nhl_xg;
   if (xg && xg.points && xg.points.length) {
-    out.push(card('qk-span-6', 'NHL: process v results', 'Expected-goals share against points %: above the line is winning more than the shots say', 'hockey', xg.href, '<div id="c-nhl" style="--h:300px"></div>'));
-    jobs.push(function () { QKC.scatter('#c-nhl', { points: xg.points.map(function (p) { return { name: p.name, label: p.abbr, x: p.x, y: p.y, color: p.colour, href: p.href, size: 11 }; }), xName: 'xG share', yName: 'Points %', xFmt: function (v) { return fmt.pct(v, 0); }, yFmt: function (v) { return fmt.pct(v, 0); }, refX: 0.5, refY: 0.5, labelTop: 10, quadrants: ['Running hot', 'Good', 'Struggling', 'Unlucky'] }); });
+    out.push(card('qk-span-6', 'NHL: process v results', 'Points % against 5v5 expected-goals share: top left is winning more than the shots say', 'hockey', xg.href, '<div id="c-nhl" style="--h:300px"></div>'));
+    jobs.push(function () { QKC.scatter('#c-nhl', { points: xg.points.map(function (p) { return { name: p.name, label: p.abbr, x: p.x, y: p.y, color: p.colour, href: p.href, size: 11 }; }), xName: 'Expected-goals share (5v5)', yName: 'Points %', xFmt: function (v) { return fmt.pct(v, 0); }, yFmt: function (v) { return fmt.pct(v, 0); }, refX: 0.5, refY: 0.5, labelTop: 10, quadrants: ['Running hot', 'Good and winning', 'Struggling', 'Unlucky'] }); });
   }
   var fav = C.football_favourites;
   if (fav && fav.length) {
     var top = fav.slice(0, 10);
-    out.push(card('qk-span-6', 'Football: title favourites', 'Each league’s favourite and its title odds from the season simulation', 'football', QK.sportUrl('football'), '<div id="c-fb" style="--h:' + (top.length * 30 + 30) + 'px"></div>'));
-    jobs.push(function () { QKC.bar('#c-fb', { horizontal: true, cats: top.map(function (f) { return f.team + ' · ' + f.league; }), series: [{ name: 'Title odds', data: top.map(function (f) { return f.p; }) }], hrefs: top.map(function (f) { return f.href; }), labels: true, fmt: function (v) { return fmt.pct(v, 0); }, labelWidth: 200, max: 1 }); });
+    out.push(card('qk-span-6', 'Football: title favourites', 'Each league’s favourite and our title chance from the season simulation', 'football', QK.sportUrl('football'), QK.chances(top.map(function (f) { return { label: f.team, sub: f.league, p: f.p, href: f.href }; }), { max: 1, sort: false })));
   }
   var ms = C.mlb_series;
   if (ms && ms.length) {
-    out.push(card('qk-span-6', 'MLB postseason', 'Series in play: wins so far and the model’s chance to advance', 'baseball', QK.sportUrl('baseball') + '#/postseason', '<div class="hm-series">' + ms.map(function (s) {
+    out.push(card('qk-span-6', 'MLB postseason', 'Series in play: wins so far and our chance to advance', 'baseball', QK.sportUrl('baseball') + '#/postseason', '<div class="hm-series">' + ms.map(function (s) {
       var pa = s.p && isNum(s.p[0]) ? s.p[0] : null;
       return '<div class="hm-series-row"><div class="qk-kicker">' + esc(s.round) + ' · best of ' + esc(s.best_of) + '</div>' +
         '<div class="hm-series-teams"><span class="qk-row">' + QK.teamMark(s.a) + esc(s.a.name) + '</span><span class="w">' + esc(s.wins[0]) + '–' + esc(s.wins[1]) + '</span><span class="qk-row">' + esc(s.b.name) + QK.teamMark(s.b) + '</span></div>' +
-        (isNum(pa) ? QK.probBar(pa, null, 1 - pa, s.a, s.b) + '<div class="qk-row" style="justify-content:space-between;font-size:var(--fs-xs);color:var(--ink-3)"><span class="num">' + fmt.pct(pa) + ' to advance</span>' + (s.market ? '<span>market ' + fmt.pct(s.market[0]) + '</span>' : '') + '<span class="num">' + fmt.pct(1 - pa) + '</span></div>' : '') + '</div>';
+        (isNum(pa) ? QK.wpBar(pa, null, 1 - pa, s.a, s.b, { label: 'Our chance to advance', market: s.market && isNum(s.market[0]) ? s.market[0] : null }) : '') + '</div>';
     }).join('') + wsOdds() + '</div>'));
   }
   var np = C.nba_power;
   if (np && np.rows && np.rows.length) {
     var r = np.rows.slice(0, 8).concat(np.rows.slice(-4));
-    out.push(card('qk-span-12', 'NBA: preseason power', 'Net rating (points per 100 possessions v average): the top eight and the bottom four', 'basketball', QK.sportUrl('basketball'), '<div id="c-nba" style="--h:260px"></div>'));
-    jobs.push(function () { QKC.bar('#c-nba', { cats: r.map(function (x) { return x.abbr; }), series: [{ name: 'Net rating', data: r.map(function (x) { return x.value; }) }], diverging: true, hrefs: r.map(function (x) { return x.href; }), labels: true, valName: 'Net rating (pts per 100 poss.)', fmt: function (v) { return fmt.signed(v, 1); } }); });
+    out.push(card('qk-span-12', 'NBA: power ratings', 'Net rating (points per 100 possessions v average): the top eight and the bottom four', 'basketball', QK.sportUrl('basketball'), '<div id="c-nba" style="--h:260px"></div>'));
+    jobs.push(function () { QKC.bar('#c-nba', { cats: r.map(function (x) { return x.abbr; }), series: [{ name: 'Net rating', data: r.map(function (x) { return x.value; }) }], diverging: true, hrefs: r.map(function (x) { return x.href; }), labels: true, catName: 'Team', valName: 'Net rating (pts per 100 poss.)', fmt: function (v) { return fmt.signed(v, 1); } }); });
   }
   $('#chart-grid').innerHTML = out.join('');
   jobs.forEach(function (f) { try { f(); } catch (e) { if (window.console) console.error(e); } });
@@ -309,10 +300,7 @@ function renderCharts() {
 function wsOdds() {
   var f = (D.futures || {}).baseball;
   if (!f || !f.rows.length) return '';
-  return '<div class="qk-kicker" style="margin-top:6px">World Series odds</div>' + f.rows.map(function (r) {
-    return '<div class="hm-lead-row" style="padding:4px 0;grid-template-columns:26px 1fr auto">' + QK.teamMark(r, 'sm') + '<span class="n">' + esc(r.name) + '</span><span class="v">' + fmt.pct(r.p) + '</span></div>' +
-      '<div class="hm-lead-bar" style="margin:0 0 4px 36px;--sa:' + QK.color.team(r.colour) + '"><i style="width:' + 100 * r.p + '%"></i></div>';
-  }).join('');
+  return '<div class="qk-kicker" style="margin-top:6px">World Series · our chance</div>' + QK.chances(f.rows.map(function (r) { return { label: r.name, p: r.p, market: r.market, color: r.colour, href: r.href }; }), { key: false });
 }
 
 /* ───────────────────────────── leaders */
@@ -324,10 +312,10 @@ function renderLeaders() {
     var rows = l.rows.slice(0, 5);
     var mx = Math.max.apply(null, rows.map(function (r) { return Math.abs(r.value) || 0; }));
     var mn = k.indexOf('tennis') === 0 ? Math.min.apply(null, l.rows.map(function (r) { return r.value; })) - 50 : 0;
-    return '<div class="qk-card" style="--sa:' + sp.accent + '"><div class="qk-card-head"><div><div class="qk-card-title">' + esc(l.title) + '</div><div class="qk-card-sub">' + esc(sp.label) + '</div></div>' + spIcon(sport) + '</div><div class="qk-card-body flush" style="padding:8px 0 12px">' +
+    return '<div class="qk-card" style="--sa:' + sp.accent + '"><div class="qk-card-head"><div><div class="qk-card-title">' + esc(l.title) + '</div><div class="qk-card-sub">' + esc(sp.label) + (k.indexOf('tennis_') === 0 ? ' · ' + esc(k.slice(7).toUpperCase()) : '') + '</div></div>' + spIcon(sport) + '</div><div class="qk-card-body flush" style="padding:8px 0 12px">' +
       rows.map(function (r, i) {
         var w = mx > mn ? 100 * ((Math.abs(r.value) || 0) - mn) / (mx - mn) : 0;
-        return '<a class="hm-lead-row" href="' + esc(r.href || '#') + '"><span class="r">' + (i + 1) + '</span><span class="n">' + esc(r.name) + (r.team ? '<small>' + esc(r.team) + '</small>' : '') + '</span><span class="v">' + esc(isNum(r.value) ? fmt.num(r.value, r.value % 1 ? 1 : 0) : r.value) + (l.unit ? ' <small class="qk-muted">' + esc(l.unit) + '</small>' : '') + '</span></a>' +
+        return '<a class="hm-lead-row" href="' + esc(r.href || '#') + '"><span class="r">' + (i + 1) + '</span><span class="n">' + esc(r.name) + (r.team ? '<small>' + esc(r.team) + '</small>' : '') + '</span><span class="v">' + esc(isNum(r.value) ? fmt.num(r.value, r.value % 1 ? 1 : 0) : r.value) + (l.unit ? ' <small class="qk-muted" style="font:500 11px var(--font-ui)">' + esc(l.unit) + '</small>' : '') + '</span></a>' +
           '<div class="hm-lead-bar" aria-hidden="true"><i style="width:' + w + '%"></i></div>';
       }).join('') + '</div></div>';
   }).join('');
@@ -374,7 +362,7 @@ function refreshLive() {
           g.period = x.period; g.clock = x.clock; changed = true;
         }
       });
-      if (changed) { renderTicker(); renderGames(); renderHeroKpis(); renderFeature(); }
+      if (changed) { renderTicker(); renderGames(); renderHeroStats(); renderFeature(); }
     }, function () { /* offline or blocked: keep the built snapshot */ });
   });
 }

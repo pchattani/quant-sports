@@ -77,8 +77,11 @@ def reduce_cat(cat: dict | None, season: int) -> dict[str, dict] | None:
 
 
 def _gamelog(P: pd.DataFrame, ctx: SeasonContext) -> dict[str, list]:
-    """Per player per game: [game_id, week, team, opp, role stats...] with a column list per player kind."""
-    S = P[P["play_type"].isin(["pass", "run"])] if "play_type" in P else P.iloc[0:0]
+    """Per player per game: [game_id, week, team, opp, role stats...] with a column list per player kind. Counting
+    rules match players.py (and so the season totals): two-point tries out, spikes are attempts, official yardage
+    columns with laterals credited to the lateral player, every defensive credit on every play."""
+    from oddsmarkets.nfl.analytics.players import def_credits, lateral_yards, pass_yards, rec_yards, rush_yards, scrimmage
+    S = scrimmage(P, two_point=False)
     if not len(S):
         return {}
     epa = num(S, "epa")
@@ -89,21 +92,30 @@ def _gamelog(P: pd.DataFrame, ctx: SeasonContext) -> dict[str, list]:
         d[key] = d.get(key, 0.0) + val
     S = S.assign(_epa=epa.fillna(0), _cmp=flag(S, "complete_pass").fillna(0), _ptd=flag(S, "pass_touchdown").fillna(0),
                  _int=flag(S, "interception").fillna(0), _sack=flag(S, "sack").fillna(0), _rtd=flag(S, "rush_touchdown").fillna(0))
-    pid = S["passer_id"] if "passer_id" in S else S.get("passer_player_id")
+    from oddsmarkets.nfl.analytics.players import _pid, td_credit
+    pid = _pid(S, "passer_id", "passer_player_id") if ("passer_id" in S or "passer_player_id" in S) else None
     if pid is not None:
         D = S[(flag(S, "qb_dropback").fillna(0) == 1) & pid.notna()]
         D = D.assign(_p=pid[D.index], _att=((flag(D, "sack").fillna(0) == 0) & (flag(D, "qb_scramble").fillna(0) == 0)).astype(float))
         g = D.groupby(["_p", "game_id"]).agg(att=("_att", "sum"), cmp=("_cmp", "sum"), td=("_ptd", "sum"),
                                              ints=("_int", "sum"), sacks=("_sack", "sum"), epa=("_epa", "sum"), db=("_epa", "size"))
-        yd = num(D, "yards_gained").fillna(0).where((D["_att"] == 1) & (flag(D, "complete_pass").fillna(0) == 1), 0).groupby([D["_p"], D["game_id"]]).sum()
+        yd = pass_yards(D).where(D["_att"] == 1, 0).groupby([D["_p"], D["game_id"]]).sum()
         for (p, gid), r in g.iterrows():
             for k in ("att", "cmp", "td", "ints", "sacks", "epa", "db"):
                 add(str(p), gid, "p_" + k, float(r[k]))
             add(str(p), gid, "p_yds", float(yd.get((p, gid), 0)))
-    rid = S["rusher_id"] if "rusher_id" in S else S.get("rusher_player_id")
+        # spikes are pass attempts (incomplete) in the official count
+        K = P[(P["play_type"] == "qb_spike")] if "play_type" in P else P.iloc[0:0]
+        if len(K):
+            K = K.assign(_k=_pid(K, "passer_id", "passer_player_id"))
+            for (p, gid), n in K[["_k", "game_id"]].dropna().groupby(["_k", "game_id"]).size().items():
+                if str(p) in out and gid in out[str(p)]:
+                    add(str(p), gid, "p_att", float(n))
+    rid = _pid(S, "rusher_player_id", "rusher_id") if ("rusher_id" in S or "rusher_player_id" in S) else None
     if rid is not None:
         R = S[(S["play_type"] == "run") & (flag(S, "qb_scramble").fillna(0) == 0) & rid.notna()]
-        R = R.assign(_p=rid[R.index], _y=num(R, "yards_gained").fillna(0), _x=num(R, "xrush_ours"))
+        R = R.assign(_p=rid[R.index], _y=rush_yards(R), _x=num(R, "xrush_ours"))
+        R = R.assign(_rtd=td_credit(R.assign(pid=R["_p"]), "rush_touchdown"))
         g = R.groupby(["_p", "game_id"]).agg(car=("_y", "size"), yds=("_y", "sum"), td=("_rtd", "sum"), epa=("_epa", "sum"),
                                              xr=("_x", "sum"), xn=("_x", "count"))
         for (p, gid), r in g.iterrows():
@@ -111,23 +123,28 @@ def _gamelog(P: pd.DataFrame, ctx: SeasonContext) -> dict[str, list]:
                 add(str(p), gid, "r_" + k, float(r[k]))
             if r["xn"] >= 0.5 * r["car"]:
                 add(str(p), gid, "r_ryoe", float(r["yds"] - r["xr"]))
+        for (p, gid), y in lateral_yards(S, "rushing").items():
+            add(p, gid, "r_yds", float(y))
     xid = S["receiver_id"] if "receiver_id" in S else S.get("receiver_player_id")
     if xid is not None:
         X = S[(S["play_type"] == "pass") & xid.notna()]
         c = flag(X, "complete_pass").fillna(0)
-        X = X.assign(_p=xid[X.index], _c=c, _y=num(X, "yards_gained").fillna(0).where(c == 1, 0), _air=num(X, "air_yards").fillna(0))
+        X = X.assign(_p=xid[X.index], _c=c, _y=rec_yards(X), _air=num(X, "air_yards").fillna(0))
+        X = X.assign(_ptd=td_credit(X.assign(pid=X["_p"]), "pass_touchdown"))
         g = X.groupby(["_p", "game_id"]).agg(tgt=("_c", "size"), rec=("_c", "sum"), yds=("_y", "sum"), td=("_ptd", "sum"),
                                              epa=("_epa", "sum"), air=("_air", "sum"))
         for (p, gid), r in g.iterrows():
             for k in ("tgt", "rec", "yds", "td", "epa", "air"):
                 add(str(p), gid, "x_" + k, float(r[k]))
-    from oddsmarkets.nfl.analytics.players import DEF_CREDIT
-    D2 = P[P["play_type"].isin(["pass", "run"])] if "play_type" in P else P.iloc[0:0]
+        for (p, gid), y in lateral_yards(S, "receiving").items():
+            add(p, gid, "x_yds", float(y))
+        for (p, gid), y in lateral_yards(S, "receiving", tds=True).items():
+            add(p, gid, "x_td", float(y))
     short = {"sacks": "d_sacks", "qb_hits": "d_hits", "tfl": "d_tfl", "ints": "d_int", "pd": "d_pd", "ff": "d_ff", "tackles": "d_tkl"}
-    for col, (stat, w, _) in DEF_CREDIT.items():
-        if col in D2:
-            for (p, gid), n in D2[[col, "game_id"]].dropna().groupby([col, "game_id"]).size().items():
-                add(str(p), gid, short[stat], w * float(n))
+    C = def_credits(P) if "play_type" in P and P["play_type"].isin(["pass", "run"]).any() else def_credits(P.iloc[0:0])
+    if len(C):
+        for (p, gid, stat), w in C.groupby(["pid", "game_id", "stat"])["w"].sum().items():
+            add(str(p), gid, short[stat], float(w))
     if "play_type" in P and "kicker_player_id" in P:
         K = P[P["play_type"].isin(["field_goal", "extra_point"]) & P["kicker_player_id"].notna()]
         for r in K[["kicker_player_id", "game_id", "play_type", "field_goal_result", "extra_point_result", "kick_distance"]
@@ -147,14 +164,14 @@ def _gamelog(P: pd.DataFrame, ctx: SeasonContext) -> dict[str, list]:
             add(p, gid, "u_net", float(x) if x == x else 0.0)
     meta = {gid: (g.get("week"), g.get("home"), g.get("away")) for gid, g in ctx.games.items()}
     team_of: dict[tuple, str] = {}
-    for col in ("passer_id", "rusher_id", "receiver_id", "kicker_player_id", "punter_player_id"):
+    for col in ("passer_id", "passer_player_id", "rusher_id", "rusher_player_id", "receiver_id", "lateral_receiver_player_id",
+                "lateral_rusher_player_id", "kicker_player_id", "punter_player_id"):
         if col in P:
             d = P[[col, "game_id", "posteam"]].dropna().drop_duplicates([col, "game_id"])
             team_of.update({(str(a), b): c for a, b, c in d.itertuples(index=False)})
-    for col in DEF_CREDIT:
-        if col in D2:
-            d = D2[[col, "game_id", "defteam"]].dropna().drop_duplicates([col, "game_id"])
-            team_of.update({(str(a), b): c for a, b, c in d.itertuples(index=False)})
+    if len(C):
+        d = C[["pid", "game_id", "team"]].dropna().drop_duplicates(["pid", "game_id"])
+        team_of.update({(str(a), b): c for a, b, c in d.itertuples(index=False)})
     for col in ("passer_id", "rusher_id", "receiver_id"):
         if col in S:
             d = S[[col, "game_id", "posteam"]].dropna().drop_duplicates([col, "game_id"])

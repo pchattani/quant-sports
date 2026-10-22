@@ -86,6 +86,29 @@ def settled(game_date: str | None, fetched_at: str | None) -> bool:
     return bool(f and f >= cut)
 
 
+# The NHL publishes scoring changes (a goal re-credited, an assist added or removed) and official shot / PIM
+# corrections days after a game; a read the day after misses them (Oct 2026 audit: 8 skaters' goals or assists, 46
+# skaters' shots and 27 goalies' shots against off the official totals). Play-by-play and boxscores of the current
+# season are read once more at midnight UTC of each of these days after the game (about four more calls a game).
+LATE_READ_DAYS = (3, 7)
+LATE_READ_KINDS = ("pbp", "box")
+
+
+def late_read_due(game_date: str | None, fetched_at: str | None, today: date) -> bool:
+    """True when the file was last read before the latest late checkpoint that has passed (LATE_READ_DAYS)."""
+    if not fetched_at or not game_date:
+        return False
+    f = _dt(fetched_at)
+    if f is None:
+        return False
+    gd = _d(game_date)
+    passed = [k for k in LATE_READ_DAYS if gd + timedelta(days=k) <= today]
+    if not passed:
+        return False
+    cut = datetime.combine(gd + timedelta(days=max(passed)), datetime.min.time(), tzinfo=timezone.utc)
+    return f < cut
+
+
 # ── season dates ────────────────────────────────────────────────────────────
 
 _SEASONS: dict | None = None
@@ -176,7 +199,7 @@ def schedule(c: Client, s: dict, refresh: bool, today: date) -> None:
 
 def _todo(s: dict, kind: str, path_fn, refresh: bool, today: date, max_games: int | None) -> list[dict]:
     """Final games whose `kind` file is missing; with --refresh-current also recent games read before they settled
-    (and empty shift answers, retried until settled)."""
+    (and empty shift answers, retried until settled), and play-by-play / boxscores once more at each late checkpoint."""
     meta = s["meta"].setdefault(kind, {})
     out = []
     for g in final_games(s):
@@ -187,6 +210,9 @@ def _todo(s: dict, kind: str, path_fn, refresh: bool, today: date, max_games: in
         if not path_fn(s["season"], gid).exists():
             out.append(g)
         elif (refresh or empty) and not settled(g.get("date"), at_ts) and _d(g["date"]) >= today - timedelta(days=3):
+            out.append(g)
+        elif (refresh and kind in LATE_READ_KINDS and _d(g["date"]) >= today - timedelta(days=max(LATE_READ_DAYS) + 1)
+              and late_read_due(g.get("date"), at_ts, today)):
             out.append(g)
     return out[:max_games] if max_games else out
 

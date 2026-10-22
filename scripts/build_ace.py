@@ -416,6 +416,7 @@ def careers(b: Build, td: an.TourData, entries: dict[int, dict], preds: dict, de
     ranks = PL.rank_paths(td)
     h2h = PL.h2h_lists(td)
     r_all = PL.results_all_rows(td)
+    tf = {y: PL.titles_finals(td, y) for y in entries}
     last2 = {td.current, td.current - 1}
     recent: dict[str, list] = {}
     for y in last2 & set(td.years):
@@ -441,7 +442,8 @@ def careers(b: Build, td: an.TourData, entries: dict[int, dict], preds: dict, de
         payload = PL.career_payload(td, pid, per[pid], sr_by_year, elo_series.get(pid), ranks.get(pid),
                                     PL.results_rows(td, pid, recent.get(pid) or [], preds), h2h.get(pid), defend.get(pid),
                                     {"finals_qual": an.prob(fq.get(pid)), "year_end_no1": an.prob(no1.get(pid))}, cur,
-                                    r_all.get(pid))
+                                    r_all.get(pid),
+                                    {y: ((tf.get(y) or {}).get(pid) or {}).get("all") or (0, 0) for y in per[pid]})
         if b.write_if_changed(td.tour, f"{td.tour}/players/{an.fname(pid)}.json", payload):
             n += 1
     return n

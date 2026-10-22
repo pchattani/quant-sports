@@ -9,7 +9,7 @@ once the draw has been made.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable
 
 from oddsmarkets.football.competitions.cup.config import COUNTRY_LEAGUE, CupConfig
@@ -48,6 +48,124 @@ def iter_matches(store: dict[str, Any], season_id: int | None = None) -> Iterabl
         ), raw
 
 
+# Ties in a fully drawn named round.
+FULL_TIES = {"r64": 32, "r32": 16, "r16": 8, "qf": 4, "sf": 2, "final": 1}
+
+
+def _tie_winners(legs: list[dict]) -> set[str]:
+    """The winners of the decided ties among these matches (legs of one tie share the pair of clubs)."""
+    ties: dict[frozenset, list[dict]] = {}
+    for raw in legs:
+        ties.setdefault(frozenset((str(raw.get("home")), str(raw.get("away")))), []).append(raw)
+    out: set[str] = set()
+    for pair, ms in ties.items():
+        if len(pair) != 2 or any(_status_of(m.get("status")) != "finished" or m.get("hs") is None or m.get("as") is None for m in ms):
+            continue
+        goals: dict[str, int] = {}
+        for m in ms:
+            goals[str(m["home"])] = goals.get(str(m["home"]), 0) + int(m["hs"])
+            goals[str(m["away"])] = goals.get(str(m["away"]), 0) + int(m["as"])
+        a, b = sorted(pair)
+        if goals.get(a, 0) != goals.get(b, 0):
+            out.add(a if goals.get(a, 0) > goals.get(b, 0) else b)
+            continue
+        ms.sort(key=lambda m: str(m.get("date") or ""))
+        win = next((m.get("agg_winner") or m.get("winner") for m in reversed(ms) if m.get("agg_winner") or m.get("winner")), None)
+        if win:
+            out.add(str(win))
+    return out
+
+
+def normalize_knockout_rounds(store: dict[str, Any], cfg: CupConfig) -> int:
+    """
+    Put a national cup's rounds on its bracket, in place; returns the number of matches relabelled.
+
+    Sofascore names a national cup's rounds "Round 1", "Round 2", ...: only "round-1" reaches a knockout key (the MLS
+    table's), and a bare number outside the bracket became "qualifying", which the simulator skips. So until 22 Oct 2026
+    the EFL Cup simulated from its first round alone (West Ham, out in the third round, 21% to win), the DFB-Pokal
+    ignored its second-round draw, and the FA Cup and KNVB Beker filed their qualifying first rounds under the first
+    round proper (a club in two first-round ties: "reach" 2.0). Per season:
+
+    1. a bare round number N becomes "rN" when the bracket has an "rN";
+    2. a club in two different ties of one round marks the earlier ties as an earlier stage: every match of that round
+       before the first club's latest tie is qualifying (same opponents, a replay or second leg, is one tie);
+    3. a round cannot start before the previous bracket round: its matches dated earlier are qualifying;
+    4. a bracket that skips one of the cup's real rounds keeps only the rounds after the gap (see below).
+    """
+    if getattr(cfg, "kind", "") != "knockout":
+        return 0
+    order = [code for code, _legs in (cfg.rounds or ())]
+    bracket = set(order)
+    seasons: dict[Any, list[tuple[dict, datetime | None]]] = {}
+    for raw in (store.get("matches") or {}).values():
+        if not isinstance(raw, dict) or raw.get("superseded_by") or raw.get("stage") not in ("league", "qualifying", "playoff"):
+            continue
+        seasons.setdefault(raw.get("season_id"), []).append((raw, _liga._parse_date(raw.get("date"))))
+    changed = 0
+    for rows in seasons.values():
+        key: dict[int, str | None] = {}
+        for raw, _d in rows:
+            r = raw.get("round")
+            s = str(r).strip() if r is not None else ""
+            if s.isdigit() and f"r{int(s)}" in bracket:
+                key[id(raw)] = f"r{int(s)}"
+            elif raw.get("stage") == "playoff" and s in bracket:
+                key[id(raw)] = s
+            else:
+                key[id(raw)] = None                   # outside the bracket: left as it is
+        for code in order:
+            ms = [(raw, d) for raw, d in rows if key[id(raw)] == code and d is not None]
+            ties: dict[str, dict[frozenset, datetime]] = {}
+            for raw, d in ms:
+                pair = frozenset((str(raw.get("home")), str(raw.get("away"))))
+                for t in pair:
+                    first = ties.setdefault(t, {}).get(pair)
+                    ties[t][pair] = d if first is None or d < first else first
+            late = [max(by_pair.values()) for by_pair in ties.values() if len(by_pair) > 1]
+            if late:
+                cutoff = min(late) - timedelta(days=1)
+                for raw, d in ms:
+                    if d < cutoff:
+                        key[id(raw)] = "q"
+        prev_start: datetime | None = None
+        for code in order:
+            ms = [(raw, d) for raw, d in rows if key[id(raw)] == code and d is not None]
+            if prev_start is not None:
+                for raw, d in ms:
+                    if d < prev_start:
+                        key[id(raw)] = "q"
+            kept = [d for raw, d in ms if key[id(raw)] == code]
+            if kept:
+                prev_start = min(kept)
+        # 4. consecutive rounds: when a later named round is fully drawn (8 ties for "r16", ...), every winner of the
+        # bracket round before it must be in it; if one is missing, the configured bracket skips a round the cup really
+        # has (the Copa do Brasil's fourth and fifth, the Belgian Cup's seventh) and that round and every earlier one
+        # are left out, as before this function existed.
+        present = [c for c in order if any(key[id(raw)] == c for raw, _d in rows)]
+        for i in range(len(present) - 1, 0, -1):
+            nxt, cur = present[i], present[i - 1]
+            full = FULL_TIES.get(nxt)
+            nxt_pairs = {frozenset((str(r.get("home")), str(r.get("away")))) for r, _d in rows if key[id(r)] == nxt}
+            if full is None or len(nxt_pairs) != full:
+                continue
+            in_next = {t for p in nxt_pairs for t in p}
+            winners = _tie_winners([r for r, _d in rows if key[id(r)] == cur])
+            if winners and not winners <= in_next:
+                for raw, _d in rows:
+                    if key[id(raw)] in present[:i]:
+                        key[id(raw)] = "q"
+                break
+        for raw, _d in rows:
+            k = key[id(raw)]
+            if k is None:
+                continue
+            want = ("qualifying", raw.get("round")) if k == "q" else ("playoff", k)
+            if (raw.get("stage"), raw.get("round")) != want:
+                raw["stage"], raw["round"] = want
+                changed += 1
+    return changed
+
+
 def tie_results(matches: list[tuple[LeagueMatch, dict]]) -> tuple[dict[frozenset, str], dict[str, list[tuple[str, str]]]]:
     """
     Decided ties and known pairings from the knockout matches.
@@ -64,6 +182,16 @@ def tie_results(matches: list[tuple[LeagueMatch, dict]]) -> tuple[dict[frozenset
     results: dict[frozenset, str] = {}
     pairs: dict[str, list[tuple[str, str]]] = {}
     for (rnd, pair), legs in by_tie.items():
+        # A postponed copy of a fixture played under another id with the same home side is not a leg: counted as one,
+        # the tie never closed (Everton 1-0 Wolves, EFL Cup third round 2026, was simulated again) and its "pair" read
+        # Everton v Everton. A two-legged tie's legs have different home sides, so a postponed second leg stays.
+        # A cancelled match is no leg at all (Forge FC v Sporting San Miguelito, CONCACAF 2026: the club then played LA
+        # Galaxy, and its "reach" read 2.0).
+        legs = [(m, raw) for m, raw in legs if str(raw.get("status") or "").strip().lower() not in ("canceled", "cancelled")]
+        if not legs:
+            continue
+        played_homes = {m.home_team for m, _ in legs if not m.postponed}
+        legs = [(m, raw) for m, raw in legs if not (m.postponed and m.home_team in played_homes)]
         legs.sort(key=lambda mr: (mr[0].date or datetime.max.replace(tzinfo=timezone.utc), mr[0].game_id))
         first, last = legs[0][0], legs[-1][0]
         # Leg-one host first, leg-two host second; a single match lists home then away.

@@ -254,6 +254,8 @@ def build_level(b, level: str, current: int, cfg: dict, sims: int | None = None)
                                                                     (ext or curves), cfg, sims))
     if level == "mlb" and vctx is not None:
         b.step("moves and trades mlb", lambda: write_moves(b, vctx, cfg))
+        if not cfg.get("no_movement"):
+            b.step("movement mlb", lambda: write_movement(b, vctx, cfg))
     log.info("value %s: %d value files written, %.1f s", level, n_written, time.perf_counter() - t0)
     return {"seasons": sorted(rows)}
 
@@ -299,6 +301,20 @@ def write_moves(b, vctx, cfg: dict) -> None:
         val = TRR.validate(vctx.world, vctx.trades)
         an.write_json(cp, {"key": key, "validation": val})
     write_if_changed(b, "mlb/trades.json", MB.trades_payload(vctx, "mlb", today, teams, val))
+
+
+def write_movement(b, vctx, cfg: dict) -> None:
+    """mlb/movement.json (analytics/movement.py: chance of moving, outlook, targets), refreshed once a day."""
+    from oddsmarkets.baseball.analytics import movement as MVB
+    today = cfg.get("today") or date.today()
+    old = an.read_json(b.data / "mlb" / "movement.json") if (b.data / "mlb" / "movement.json").exists() else None
+    if old and old.get("snapshot") == today.isoformat() and old.get("version") == MVB.VERSION:
+        return
+    tp = an.read_json(b.data / "mlb" / str(max(vctx.rows)) / "teams.json") or {}
+    teams = {t: {k: x.get(k) for k in ("name", "abbr", "short", "league", "division", "colour")} for t, x in (tp.get("teams") or {}).items()}
+    pay = MVB.build(today, vctx.rows, vctx.parsed, vctx.il, teams)
+    if pay:
+        write_if_changed(b, "mlb/movement.json", pay)
 
 
 def _team_games(rows: list[dict]) -> int:

@@ -1,73 +1,95 @@
-/* The Quant design tokens — v1 (premium data terminal).
+/* The Quant design tokens — v2 "Signal" (Design System 2.0, Oct 2026). Spec: docs/_design/STYLE_GUIDE.md.
  *
  * Dark is the default. Light applies when the OS asks for it and the viewer has not
  * chosen, or when <html data-theme="light"> is set by the theme toggle. Dark is
  * re-declared under [data-theme="dark"] so the toggle wins in both directions.
  *
  * Naming: --bg-* page planes, --s-* surfaces (cards), --ink-* text, --line-* rules,
- * --a-* sport accents, --c-* chart categorical slots, --st-* status (never series).
- * Every value a component uses comes from here; components never hard-code colour. */
+ * --signal* the one signature accent (our forecasts, primary actions), --a-* sport accents (identity marks only),
+ * --c-* chart categorical slots, --pc-* the percentile scale (cold -> hot), --wp-* win-probability fallbacks,
+ * --st-* status (never series). Every value a component uses comes from here; components never hard-code colour.
+ * v1 names are all still defined (backward compatible); v2 changed some values: --brand is the signal violet, not
+ * amber; --c-model is the signal, --c-market a quiet grey; the NFL accent is gold, not violet. */
 
 :root {
   color-scheme: dark;
 
   /* ── planes & surfaces (dark) ───────────────────────────── */
-  --bg:        #07090c;   /* page */
-  --bg-raise:  #0c0f14;   /* top bar, side rails */
-  --s-1:       #11151b;   /* card */
-  --s-2:       #171c24;   /* card header, inputs, hover */
-  --s-3:       #1f2530;   /* pressed, selected, skeleton base */
-  --s-4:       #2a3240;   /* skeleton shine, strong fills */
-  --s-glass:   rgba(12, 15, 20, 0.78);
+  --bg:        #08090d;   /* page */
+  --bg-raise:  #0d0f15;   /* top bar, ticker, side rails */
+  --s-1:       #12141b;   /* card */
+  --s-2:       #181b24;   /* card header, inputs, hover */
+  --s-3:       #20242f;   /* pressed, selected, skeleton base, tracks */
+  --s-4:       #2b303d;   /* skeleton shine, strong fills, tooltips */
+  --s-glass:   rgba(13, 15, 21, 0.82);
 
   /* ── ink ────────────────────────────────────────────────── */
-  --ink-1:     #eef1f5;   /* primary — 16.9:1 on --s-1 */
-  --ink-2:     #a9b2bf;   /* secondary — 8.4:1 */
-  --ink-3:     #7c8696;   /* muted, axis labels — 4.9:1 */
-  --ink-4:     #566070;   /* disabled, decorations only (not text) */
-  --ink-inv:   #07090c;
+  --ink-1:     #f0f2f6;   /* primary — 16.9:1 on --s-1 */
+  --ink-2:     #aab1be;   /* secondary — 8.4:1 */
+  --ink-3:     #7d8697;   /* muted, axis labels — 4.9:1 (the floor for text) */
+  --ink-4:     #565f70;   /* disabled, decorations only (not text) */
+  --ink-inv:   #08090d;
 
   /* ── rules ──────────────────────────────────────────────── */
   --line-1:    rgba(255, 255, 255, 0.07);  /* hairline */
   --line-2:    rgba(255, 255, 255, 0.12);  /* card ring */
   --line-3:    rgba(255, 255, 255, 0.22);  /* focusable control border */
   --grid:      rgba(255, 255, 255, 0.06);  /* chart gridline */
-  --axis:      rgba(255, 255, 255, 0.18);
+  --axis:      rgba(255, 255, 255, 0.20);
 
-  /* ── brand ──────────────────────────────────────────────── */
-  --brand:     #ffb020;   /* terminal amber */
-  --brand-ink: #1a1203;
-  --brand-soft: rgba(255, 176, 32, 0.14);
-  --focus:     #7cc4ff;
+  /* ── the signature accent: "signal" violet ───────────────
+   * One strong accent on every site. It means "ours": our probability, our rating, the forecast line, the primary
+   * action, the focused tab. Never a team, never the market, never good/bad. */
+  --signal:      #9384ff;   /* 5.7:1 on --s-1 */
+  --signal-2:    #b3a8ff;   /* hover, highlights on dark */
+  --signal-ink:  #0c0820;   /* text on a signal fill */
+  --signal-soft: rgba(147, 132, 255, 0.15);
+  --brand:       var(--signal);
+  --brand-ink:   var(--signal-ink);
+  --brand-soft:  var(--signal-soft);
+  --focus:       #7cc4ff;
 
-  /* ── sport accents (identity only; text beside them stays ink) ── */
+  /* ── sport accents (identity only: switcher icon, sport pill, section tick; text beside them stays ink) ── */
   --a-football:   #2fd38a;
   --a-f1:         #ff4b4b;
   --a-basketball: #ff8a3d;
   --a-tennis:     #c8f04e;
   --a-baseball:   #5b9bff;
-  --a-nfl:        #b28cff;
+  --a-nfl:        #e3b04b;   /* v2: gold (violet is the signal now) */
   --a-hockey:     #3fd7f2;
   --a-college:    #ff6fae;   /* 7.1:1 on --s-1 */
-  --accent:       var(--brand);         /* a site sets --accent: var(--a-<sport>) on <html> */
+  --accent:       var(--signal);        /* a site sets data-sport on <html>, which points --accent at its sport */
   --accent-soft:  color-mix(in srgb, var(--accent) 15%, transparent);
 
   /* ── chart categorical slots (validated reference palette, dark steps) ── */
-  --c-1: #3987e5;  /* blue — "model" */
-  --c-2: #d95926;  /* orange — "market" */
+  --c-1: #3987e5;  /* blue */
+  --c-2: #d95926;  /* orange */
   --c-3: #199e70;  /* aqua */
   --c-4: #c98500;  /* yellow */
   --c-5: #d55181;  /* magenta */
   --c-6: #008300;  /* green */
   --c-7: #9085e9;  /* violet */
   --c-8: #e66767;  /* red */
-  --c-model:  var(--c-1);
-  --c-market: var(--c-2);
+  --c-model:  var(--signal);   /* v2: ours is always the signal */
+  --c-market: #8a93a3;         /* v2: the market is a quiet grey reference, never a headline */
   --c-other:  #6b7480;
 
   /* sequential (blue) & diverging (blue <-> red, grey midpoint) */
   --seq-1: #104281; --seq-2: #1c5cab; --seq-3: #2a78d6; --seq-4: #5598e7; --seq-5: #9ec5f4;
   --div-neg: #e66767; --div-mid: #383835; --div-pos: #3987e5;
+
+  /* ── percentile scale (Savant-style, cold -> hot, colour-blind safe: a blue-grey-red diverging ramp that also
+   *    steps in lightness). 0 = worst in the peer group, 100 = best. Interpolate between the five anchors. ── */
+  --pc-0:   #2f66d6;
+  --pc-25:  #6f97e6;
+  --pc-50:  #8b929f;
+  --pc-75:  #ec8c6c;
+  --pc-100: #e23b2b;
+
+  /* ── win probability: team colours first (contrast-checked); these when two kits clash or none is known ── */
+  --wp-a:    #4b8ff0;   /* left / away fallback (blue) */
+  --wp-b:    #f2913d;   /* right / home fallback (orange) */
+  --wp-draw: #6b7480;
 
   /* ── status (reserved; always with an icon or label) ── */
   --st-good: #0ca30c; --st-warn: #fab219; --st-serious: #ec835a; --st-crit: #d03b3b;
@@ -75,9 +97,11 @@
   --down: #ff6b6b;    /* delta text, down/bad */
   --live: #ff3b4e;
 
-  /* ── type ───────────────────────────────────────────────── */
+  /* ── type: Archivo (display: headlines, big numbers), Inter (UI), JetBrains Mono (tables, ticker, axes) ── */
+  --font-display: "Archivo", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-ui:   "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-num:  "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --stretch-display: 88%;   /* Archivo width axis: semi-condensed for scoreboard numbers and headlines */
   --fs-2xs: 0.6875rem;  /* 11 — micro labels, chips */
   --fs-xs:  0.75rem;    /* 12 — table, captions */
   --fs-sm:  0.8125rem;  /* 13 — body dense */
@@ -87,7 +111,12 @@
   --fs-2xl: 2rem;       /* 32 — page titles, KPI */
   --fs-3xl: 3rem;       /* 48 — hero number */
   --fs-4xl: clamp(2.5rem, 6vw, 4.5rem); /* hero headline */
-  --lh-tight: 1.15; --lh-snug: 1.35; --lh-body: 1.55;
+  /* display scale (Archivo) */
+  --fs-d1: clamp(2.6rem, 7vw, 5.25rem);   /* home headline */
+  --fs-d2: clamp(1.9rem, 4.2vw, 3rem);    /* page title, scoreboard score */
+  --fs-d3: clamp(1.6rem, 3vw, 2.25rem);   /* stat tile number */
+  --fs-d4: 1.375rem;                      /* card numbers, chances in lists */
+  --lh-tight: 1.1; --lh-snug: 1.35; --lh-body: 1.55;
   --tracking-caps: 0.08em;
 
   /* ── space (4px grid) ───────────────────────────────────── */
@@ -113,44 +142,48 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     color-scheme: light;
-    --bg: #f3f5f8; --bg-raise: #ffffff;
-    --s-1: #ffffff; --s-2: #f5f7fa; --s-3: #e9edf2; --s-4: #dde3ea;
-    --s-glass: rgba(255, 255, 255, 0.82);
-    --ink-1: #0d1117; --ink-2: #48505c; --ink-3: #66707e; --ink-4: #9aa3ae; --ink-inv: #ffffff;
-    --line-1: rgba(13, 17, 23, 0.07); --line-2: rgba(13, 17, 23, 0.11); --line-3: rgba(13, 17, 23, 0.24);
-    --grid: rgba(13, 17, 23, 0.07); --axis: rgba(13, 17, 23, 0.22);
-    --brand: #c27800; --brand-ink: #ffffff; --brand-soft: rgba(194, 120, 0, 0.12); --focus: #0b6bcb;
+    --bg: #f4f5f8; --bg-raise: #ffffff;
+    --s-1: #ffffff; --s-2: #f5f6f9; --s-3: #e9ecf1; --s-4: #dde2e9;
+    --s-glass: rgba(255, 255, 255, 0.86);
+    --ink-1: #0d1017; --ink-2: #474f5c; --ink-3: #646e7c; --ink-4: #9aa3ae; --ink-inv: #ffffff;
+    --line-1: rgba(13, 16, 23, 0.07); --line-2: rgba(13, 16, 23, 0.11); --line-3: rgba(13, 16, 23, 0.24);
+    --grid: rgba(13, 16, 23, 0.07); --axis: rgba(13, 16, 23, 0.24);
+    --signal: #5a44e4; --signal-2: #4330c9; --signal-ink: #ffffff; --signal-soft: rgba(90, 68, 228, 0.10); --focus: #0b6bcb;
     --a-football: #0f9d63; --a-f1: #d91f26; --a-basketball: #d9620f; --a-tennis: #6f9200;
-    --a-baseball: #1f63d8; --a-nfl: #6e45d6; --a-hockey: #0389a6; --a-college: #c2185b;
+    --a-baseball: #1f63d8; --a-nfl: #9a6b00; --a-hockey: #0389a6; --a-college: #c2185b;
     --c-1: #2a78d6; --c-2: #eb6834; --c-3: #1baf7a; --c-4: #eda100; --c-5: #e87ba4; --c-6: #008300; --c-7: #6250d6; --c-8: #e34948;
-    --c-other: #98a1ac;
+    --c-market: #8a93a0; --c-other: #98a1ac;
     --seq-1: #cde2fb; --seq-2: #86b6ef; --seq-3: #3987e5; --seq-4: #1c5cab; --seq-5: #0d366b;
     --div-neg: #e34948; --div-mid: #f0efec; --div-pos: #2a78d6;
+    --pc-0: #1f57c9; --pc-25: #7ea3ea; --pc-50: #b9bfc8; --pc-75: #f29b7f; --pc-100: #d42c1f;
+    --wp-a: #2a72d8; --wp-b: #e8771f; --wp-draw: #98a1ac;
     --up: #0f8a3c; --down: #c92a2a; --live: #e0112b;
-    --sh-1: 0 1px 2px rgba(13, 17, 23, 0.06), 0 0 0 1px rgba(13, 17, 23, 0.04);
-    --sh-2: 0 6px 20px rgba(13, 17, 23, 0.08), 0 0 0 1px rgba(13, 17, 23, 0.04);
-    --sh-3: 0 20px 48px rgba(13, 17, 23, 0.16);
+    --sh-1: 0 1px 2px rgba(13, 16, 23, 0.06), 0 0 0 1px rgba(13, 16, 23, 0.04);
+    --sh-2: 0 6px 20px rgba(13, 16, 23, 0.08), 0 0 0 1px rgba(13, 16, 23, 0.04);
+    --sh-3: 0 20px 48px rgba(13, 16, 23, 0.16);
   }
 }
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f3f5f8; --bg-raise: #ffffff;
-  --s-1: #ffffff; --s-2: #f5f7fa; --s-3: #e9edf2; --s-4: #dde3ea;
-  --s-glass: rgba(255, 255, 255, 0.82);
-  --ink-1: #0d1117; --ink-2: #48505c; --ink-3: #66707e; --ink-4: #9aa3ae; --ink-inv: #ffffff;
-  --line-1: rgba(13, 17, 23, 0.07); --line-2: rgba(13, 17, 23, 0.11); --line-3: rgba(13, 17, 23, 0.24);
-  --grid: rgba(13, 17, 23, 0.07); --axis: rgba(13, 17, 23, 0.22);
-  --brand: #c27800; --brand-ink: #ffffff; --brand-soft: rgba(194, 120, 0, 0.12); --focus: #0b6bcb;
+  --bg: #f4f5f8; --bg-raise: #ffffff;
+  --s-1: #ffffff; --s-2: #f5f6f9; --s-3: #e9ecf1; --s-4: #dde2e9;
+  --s-glass: rgba(255, 255, 255, 0.86);
+  --ink-1: #0d1017; --ink-2: #474f5c; --ink-3: #646e7c; --ink-4: #9aa3ae; --ink-inv: #ffffff;
+  --line-1: rgba(13, 16, 23, 0.07); --line-2: rgba(13, 16, 23, 0.11); --line-3: rgba(13, 16, 23, 0.24);
+  --grid: rgba(13, 16, 23, 0.07); --axis: rgba(13, 16, 23, 0.24);
+  --signal: #5a44e4; --signal-2: #4330c9; --signal-ink: #ffffff; --signal-soft: rgba(90, 68, 228, 0.10); --focus: #0b6bcb;
   --a-football: #0f9d63; --a-f1: #d91f26; --a-basketball: #d9620f; --a-tennis: #6f9200;
-  --a-baseball: #1f63d8; --a-nfl: #6e45d6; --a-hockey: #0389a6; --a-college: #c2185b;
+  --a-baseball: #1f63d8; --a-nfl: #9a6b00; --a-hockey: #0389a6; --a-college: #c2185b;
   --c-1: #2a78d6; --c-2: #eb6834; --c-3: #1baf7a; --c-4: #eda100; --c-5: #e87ba4; --c-6: #008300; --c-7: #6250d6; --c-8: #e34948;
-  --c-other: #98a1ac;
+  --c-market: #8a93a0; --c-other: #98a1ac;
   --seq-1: #cde2fb; --seq-2: #86b6ef; --seq-3: #3987e5; --seq-4: #1c5cab; --seq-5: #0d366b;
   --div-neg: #e34948; --div-mid: #f0efec; --div-pos: #2a78d6;
+  --pc-0: #1f57c9; --pc-25: #7ea3ea; --pc-50: #b9bfc8; --pc-75: #f29b7f; --pc-100: #d42c1f;
+  --wp-a: #2a72d8; --wp-b: #e8771f; --wp-draw: #98a1ac;
   --up: #0f8a3c; --down: #c92a2a; --live: #e0112b;
-  --sh-1: 0 1px 2px rgba(13, 17, 23, 0.06), 0 0 0 1px rgba(13, 17, 23, 0.04);
-  --sh-2: 0 6px 20px rgba(13, 17, 23, 0.08), 0 0 0 1px rgba(13, 17, 23, 0.04);
-  --sh-3: 0 20px 48px rgba(13, 17, 23, 0.16);
+  --sh-1: 0 1px 2px rgba(13, 16, 23, 0.06), 0 0 0 1px rgba(13, 16, 23, 0.04);
+  --sh-2: 0 6px 20px rgba(13, 16, 23, 0.08), 0 0 0 1px rgba(13, 16, 23, 0.04);
+  --sh-3: 0 20px 48px rgba(13, 16, 23, 0.16);
 }
 :root[data-theme="dark"] { color-scheme: dark; }
 

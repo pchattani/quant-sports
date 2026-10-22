@@ -405,7 +405,14 @@ def pitcher_lines(pa: pd.DataFrame) -> pd.DataFrame:
 
 
 def last_team(df: pd.DataFrame, by: str, side: str) -> pd.Series:
-    """The team (abbreviation) of each player's most recent pitch."""
+    """The team (abbreviation) of each player's most recent pitch. The frame is sorted by game_pk (load), which is not
+    date order (a gamePk is assigned when the schedule is made; a make-up game keeps its early pk), so the rows are
+    put in date order first: without that a traded player was shown on whichever club he faced in his highest gamePk."""
     t = team_of(df, side)
-    last = pd.DataFrame({"k": df[by].astype(str), "t": t}).groupby("k")["t"].last()
-    return last
+    d = pd.DataFrame({"k": df[by].astype(str).to_numpy(), "t": t.to_numpy()})
+    if "game_date" in df:
+        d["d"] = pd.to_datetime(df["game_date"], errors="coerce").to_numpy()
+        d["pk"] = pd.to_numeric(df["game_pk"], errors="coerce").to_numpy()
+        d["ab"] = pd.to_numeric(df["at_bat_number"], errors="coerce").to_numpy() if "at_bat_number" in df else 0
+        d = d.sort_values(["d", "pk", "ab"], kind="mergesort", na_position="first")
+    return d.groupby("k")["t"].last()

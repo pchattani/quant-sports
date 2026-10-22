@@ -68,7 +68,7 @@ sys.path.insert(0, str(ROOT))
 
 from oddsmarkets.football.analytics.glossary import build_glossary  # noqa: E402
 from oddsmarkets.football.analytics.insights import build_analytics  # noqa: E402
-from oddsmarkets.football.analytics.players import METRICS, POSITION_LABELS, add_percentiles  # noqa: E402
+from oddsmarkets.football.analytics.players import METRICS, POSITION_LABELS, add_percentiles, set_fallback_positions  # noqa: E402
 from oddsmarkets.football.analytics.unified import MATCH_PAGE_DAYS  # noqa: E402
 from oddsmarkets.football.analytics.teams import TEAM_METRICS, season_team_stats  # noqa: E402
 from oddsmarkets.football.competitions.cup import store as cup_store  # noqa: E402
@@ -172,16 +172,36 @@ PARTIAL_FIELD_NOTE = ("The top-flight clubs have not entered this edition yet (t
                       "they enter; the round-by-round chances count only today's field.")
 
 
-def cup_field_partial(cfg, state) -> bool:
+def cup_field_partial(cfg, state, top_flight: dict[str, set[str]] | None = None) -> bool:
     """
     A national cup whose current field has no club of the country's followed top league yet (the FA Cup and the
     Coupe de France before the top flight enters): the simulated winner would be the best of the clubs already in
     the draw, a lower-division side (Waltham Abbey 10% to win the FA Cup, 22 Oct 2026).
+
+    `top_flight` (league slug -> its clubs this season, from top_flight_clubs) is what membership means: the state's
+    team_league maps every club of the country to the league (it comes from the country code), so without it any
+    English club counted as Premier League and the rule never fired (Burton Albion 15% to win the FA Cup, 22 Oct).
     """
     if getattr(cfg, "family", "") != "domestic":
         return False
     field = [t for t in getattr(state, "teams", []) if t != AVERAGE]
-    return bool(field) and not any((getattr(state, "team_league", {}) or {}).get(t) for t in field)
+    league_of = getattr(state, "team_league", {}) or {}
+    def top(t: str) -> bool:
+        league = league_of.get(t)
+        clubs = (top_flight or {}).get(league or "")
+        # A league whose clubs are unknown (no teams.json: its build failed or was not run) keeps the country reading.
+        return bool(league) and (t in clubs if clubs else True)
+
+    return bool(field) and not any(top(t) for t in field)
+
+
+def top_flight_clubs(state) -> dict[str, set[str]]:
+    """League slug -> the clubs of its current season (its teams.json, written by this build's league pass)."""
+    out: dict[str, set[str]] = {}
+    for league in set((getattr(state, "team_league", {}) or {}).values()):
+        teams = (_read_json(DATA_DIR / str(league) / "teams.json", {}) or {}).get("teams") or {}
+        out[str(league)] = set(teams)
+    return out
 
 
 def lineup_lines(fixtures: list[dict]) -> dict[str, dict[str, float]]:
@@ -271,6 +291,24 @@ def _read_json(path: Path, default):
     except Exception as exc:  # noqa: BLE001
         logger.warning("could not read %s: %s", path, exc)
         return default
+
+
+def fallback_positions(squads: dict | None, stores: Iterable[dict] = ()) -> dict[str, str]:
+    """
+    Player id -> position letter from the current squads (first) and every given store's player metadata, for
+    players a competition's store saw only in line-ups without a position (UEFA qualifiers, clubs outside the
+    followed leagues). Installed with players.set_fallback_positions before the competitions are built.
+    """
+    out: dict[str, str] = {}
+    for team in ((squads or {}).get("teams") or {}).values():
+        for p in (team or {}).get("players") or []:
+            if isinstance(p, dict) and p.get("id") is not None and p.get("pos"):
+                out.setdefault(str(p["id"]), str(p["pos"]))
+    for store in stores:
+        for pid, m in ((store or {}).get("players") or {}).items():
+            if isinstance(m, dict) and m.get("pos"):
+                out.setdefault(str(pid), str(m["pos"]))
+    return out
 
 
 def _slug(team: str) -> str:
@@ -1169,19 +1207,23 @@ def build_fixtures_json(store: dict, norm, model, season_filter, xg_map: dict, n
             continue
         raw_status = str(raw.get("status") or "").strip().lower()
         status = _status_of(raw.get("status"))
-        if raw_status in _POSTPONED:
-            status = "postponed"
-        elif raw_status in ("cancelled", "canceled"):
+        # Cancelled before postponed: _POSTPONED holds "canceled" too (for the simulator, which treats both as
+        # still to be played), so the cancelled branch never ran and a cancelled match showed as postponed.
+        if raw_status in ("cancelled", "canceled"):
             status = "cancelled"
+        elif raw_status in _POSTPONED:
+            status = "postponed"
         # Still "not started" hours after kick-off and held nowhere else: the source never closed it. It is not
         # shown as to come (pages treat postponed as void); the model keeps pricing it as still to be played.
         missing = status == "scheduled" and _liga_overdue(raw, now)
         if missing:
             status = "postponed"
+        void = status in ("postponed", "cancelled")
         row: dict = {
             "id": str(gid), "date": raw.get("date"), "round": raw.get("round"),
             "stage": raw.get("stage") or "league", "status": status,
-            "home": home, "away": away, "hs": raw.get("hs"), "as": raw.get("as"),
+            # A void match has no result: the source's 0-0 on a cancelled event is a placeholder, not a score.
+            "home": home, "away": away, "hs": None if void else raw.get("hs"), "as": None if void else raw.get("as"),
             "detail": str(gid) in lineups,
         }
         if missing:
@@ -1590,6 +1632,10 @@ def build_cup(cfg: CupConfig, entry: dict, args, sims: int | None, pooled: Dixon
         return {**base, "ok": False, "reason": "no store yet"}, None
     if cfg.kind == "international":
         return build_international(cfg, store, out_dir, base, args, intl_model), None
+    # A national cup's "Round 2", "Round 3" ... onto its bracket, its qualifying rounds off it (cup_store docstring).
+    relabelled = cup_store.normalize_knockout_rounds(store, cfg)
+    if relabelled:
+        logger.info("%s: %d matches put on the bracket's rounds", cfg.slug, relabelled)
     age = store_age_hours(store)
     store_fresh = age is not None and age < _stale_after(store)
     synthetic = bool((store.get("meta") or {}).get("synthetic"))
@@ -1623,7 +1669,7 @@ def build_cup(cfg: CupConfig, entry: dict, args, sims: int | None, pooled: Dixon
     external = {k: v for k, v in champions.items() if k in wanted}
     results = CupSimulator(model, state, cfg=cfg, seed=args.seed, external_champions=external).run()
     winner_dist = {t: p for t, p in results.p_win.items() if p > 0 and t != AVERAGE}
-    partial = cup_field_partial(cfg, state)
+    partial = cup_field_partial(cfg, state, top_flight_clubs(state))
     if partial:
         logger.info("%s: the top flight has not entered yet; winner chances withheld", cfg.slug)
         winner_dist = {}
@@ -2154,6 +2200,13 @@ def main() -> int:
         cup_stores = {k: v for k, v in cup_stores.items() if v.get("matches")}
         pooled_params = _read_json(MODEL_PARAMS_PATH, {}).get("pooled") or DEFAULT_PARAMS
         pooled = fit_pooled(stores, pooled_params, cup_stores)
+
+    # Positions for players a store saw without one (players.positions_from_store's fallback).
+    try:
+        loaded = list(stores.values()) + list(cup_stores.values()) if (pooled_slugs or cup_slugs) else []
+        set_fallback_positions(fallback_positions(_read_json(DATA_DIR / "squads" / "store.json", {}), loaded))
+    except Exception as exc:  # noqa: BLE001 - positions are an extra; the builds stand without them
+        logger.warning("fallback positions skipped: %s", exc)
 
     # Line-up term (docs/MODELS.md 2.6): fixtures whose confirmed XIs the fetcher stored in the last hour.
     global LINEUP_TERMS

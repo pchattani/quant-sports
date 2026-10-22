@@ -38,7 +38,7 @@ Pace is possessions per 48 minutes (NBA) or 40 (WNBA).
 
 | Model | File | Version string | Output |
 |---|---|---|---|
-| Team ratings | `models/ratings.py` | `VERSION = 2` | off, def, net, pace with se; Kalman paths; preseason prior |
+| Team ratings | `models/ratings.py` | `VERSION = 3` | off, def, net, pace with se; Kalman paths; preseason prior |
 | Game model | `models/game.py` | `VERSION = 4` | margin ~ Normal(mu, sigma): p_home, spread; calibrated total |
 | Market-informed game model (NBA) | `models/informed.py` | `VERSION = 1` | close predictor: market ratings + availability; p_home, spread, total (section 3.3) |
 | Season format | `models/config.py` | — | `SeasonFormat` per league and season |
@@ -75,9 +75,14 @@ least-squares problem (`scipy.sparse.linalg.lsqr`). Reported, centred:
 ```
 L = mu + mean(o) + mean(d)                (league ORtg)
 off_i = L + o_i − mean(o),  def_i = L + d_i − mean(d),  net_i = off_i − def_i
-se_net_i from s² (A'WA + P)⁻¹,  s² the weighted residual variance
+se_net_i from s² (A'WA + P)⁻¹,  s² = (wRSS + 40 · s0²) / (max(0, Σw − p/2) + 40)
 hca_pts = h · league_pace / 100
 ```
+
+The residual variance carries 40 pseudo-observations at the league's typical sd (`VERSION = 3`, 22 Oct 2026). Before,
+its degrees of freedom were floored at 1, so in a season's first days (fewer observations than the 62 parameters)
+s² was the whole residual sum and se_net reached ~21 per 100 (live NBA 2026-27 after opening night: win totals
+13-81 at the 5-95 %, OKC 8 % for the title). Full seasons are unchanged.
 
 Pace is a separate ridge fit, `pace_game = P + p_home + p_away`, reported as
 `pace_i = league_pace + p_i − mean(p)`. A finished game without a box score gets the
@@ -88,6 +93,7 @@ is left out of the pace fit (`impute_poss`).
 |---|---|---|
 | `HALF_LIFE` (days) | 75 | 45 |
 | `RIDGE` (games-equivalents) | 8 | 6 |
+| `RESID_SD_PRIOR` s0 (per 100; 40 pseudo-observations, `RESID_PRIOR_N`) | 11.0 | 12.0 |
 | League ORtg before any fit (`config.GAME_DEFAULTS["ortg"]`) | 114.0 | 104.0 |
 | League pace before any fit (`GAME_DEFAULTS["pace"]`) | 99.0 | 80.0 |
 

@@ -1,11 +1,11 @@
-/* The Quant Rink — Overview (#/): the numbers and charts first.
+/* The Quant Rink — Overview (#/), Design System 2.0 reference page for every sport's overview.
  *
- *   KPI strip: games today (live), the Stanley Cup favourite, the top-rated club, the points leader, the
- *              biggest model–market gap;
- *   games: live and today's games (then the next and the latest results) as kit match cards, model v market;
- *   charts: Stanley Cup odds model v market (dumbbell), today's games model v market, power ratings,
- *           results v process (points % against 5v5 xGF%), playoff odds by conference;
- *   standings snapshot by conference and four leader boards (counting stats: no sample floor needed).
+ *   headline and stat tiles: games today (live), the Cup favourite, the top-rated club, the points leader, the
+ *              best goalie by goals saved above expected (ours first; no market headline);
+ *   scoreboard: live and today's games (then the next ones and the latest results) as v2 game cards;
+ *   charts: Stanley Cup chances (ours as bars, Kalshi / Polymarket as a quiet tick), projected points with the
+ *           simulation's 90% range, power ratings, results v process (points % against 5v5 xGF%);
+ *   playoff race by conference (chance bars) beside the standings; four leader boards (counting stats).
  *
  * Reads index.json, <S>/season.json, <S>/markets.json. Refreshes every minute while a game is live. */
 (function (RK) {
@@ -13,21 +13,19 @@
 
 const U = RK.ui, esc = RK.esc, isNum = RK.isNum;
 
-function kpis(idx, rows, cup) {
+function tiles(idx, rows, cup) {
   const today = idx.today || [], live = (idx.live || []).length || today.filter(g => U.status(g) === 'live').length;
   const fav = cup.slice().sort((a, b) => (b.model || 0) - (a.model || 0))[0];
   const top = rows.slice().filter(r => isNum(r.rating)).sort((a, b) => b.rating - a.rating)[0];
   const ld = ((idx.leaders || {}).s_p || [])[0];
-  const gap = (idx.gaps || [])[0];
-  const gapTxt = gap ? (gap.kind === 'game' ? RK.teamAbbr(gap.away) + ' @ ' + RK.teamAbbr(gap.home) : RK.teamAbbr(gap.team) + ' ' + (gap.kind === 'cup' ? 'Cup' : gap.kind)) : '—';
-  const out = [
-    QK.kpi({ label: live ? 'Live now' : 'Games today', value: String(live || today.length), sub: live ? today.length + ' on the slate today' : (today.length ? 'first puck drop ' + QK.fmt.time((today[0] || {}).start) : 'no games today') }),
-    QK.kpi({ label: 'Cup favourite', value: fav ? RK.teamAbbr(fav.team) + ' ' + U.pct(fav.model) : '—', sub: fav && isNum(fav.market) ? 'market ' + U.pct(fav.market) : 'model, 20,000 simulations', tip: 'Probability of winning the Stanley Cup in our season simulation' }),
-    QK.kpi({ label: 'Top-rated club', value: top ? RK.teamAbbr(top.team) + ' ' + U.signed(top.rating, 2) : '—', sub: top ? 'goals a game better than average' : '', tip: 'Our team rating: expected goal difference per game against an average club' }),
-    QK.kpi({ label: 'Points leader', value: ld ? RK.playerSurname(ld[0]) + ' ' + ld[1] : '—', sub: ld ? RK.teamAbbr(RK.player(ld[0]).team) : '', text: false }),
-    QK.kpi({ label: 'Biggest gap v market', value: gap ? QK.fmt.pp(gap.edge) : '—', sub: gapTxt, tip: 'Model probability minus the market price, the largest disagreement right now' })
-  ];
-  return '<div class="qk-kpis rk-kpis">' + out.join('') + '</div>';
+  const gk = ((idx.leaders || {}).g_gsax || [])[0];
+  return QK.stats([
+    { label: live ? 'Live now' : 'Games today', value: String(live || today.length), sub: live ? today.length + ' on the slate today' : (today.length ? 'first puck drop ' + QK.fmt.time((today[0] || {}).start) : 'no games today') },
+    { label: 'Cup favourite', value: fav ? RK.teamAbbr(fav.team) + ' ' + U.pct(fav.model) : '—', signal: true, href: fav ? RK.teamHref(fav.team) : null, sub: 'from 20,000 simulated seasons', tip: 'Our chance of winning the Stanley Cup in the season simulation' },
+    { label: 'Top-rated club', value: top ? RK.teamAbbr(top.team) + ' ' + U.signed(top.rating, 2) : '—', href: top ? RK.teamHref(top.team) : null, sub: top ? 'goals a game better than an average club' : '', tip: 'Our team rating: expected goal difference per game against an average club' },
+    { label: 'Points leader', value: ld ? RK.playerSurname(ld[0]) + ' ' + ld[1] : '—', href: ld ? RK.playerHref(ld[0]) : null, sub: ld ? RK.teamName(RK.player(ld[0]).team) : '' },
+    { label: 'Best goalie so far', value: gk ? RK.playerSurname(gk[0]) + ' ' + U.signed(gk[1], 1) : '—', href: gk ? RK.playerHref(gk[0]) : null, sub: 'goals saved above expected', tip: 'Goals he has stopped beyond what the shot quality he faced predicts' }
+  ]);
 }
 
 function gamesBlock(idx) {
@@ -37,107 +35,94 @@ function gamesBlock(idx) {
   live.concat(today).forEach(g => { if (!seen[g.game_id]) { seen[g.game_id] = 1; list.push(g); } });
   const order = { live: 0, pre: 1, final: 2 };
   list.sort((a, b) => order[U.status(a)] - order[U.status(b)] || String(a.start).localeCompare(String(b.start)));
-  const up = (idx.upcoming || []).filter(g => !seen[g.game_id]).slice(0, 6);
-  const rec = (idx.recent || []).filter(g => !seen[g.game_id]).slice().sort((a, b) => String(b.start).localeCompare(String(a.start))).slice(0, 6);
+  const up = (idx.upcoming || []).filter(g => !seen[g.game_id]).slice(0, 8);
+  const rec = (idx.recent || []).filter(g => !seen[g.game_id]).slice().sort((a, b) => String(b.start).localeCompare(String(a.start))).slice(0, 8);
   return { today: list, upcoming: up, recent: rec };
 }
 
-function render(el, params) {
+function render(el) {
   const S = RK.currentSeason();
   const idx = RK.index() || {};
-  el.innerHTML = '<header class="rk-head"><div><div class="qk-kicker">NHL · ' + esc(RK.seasonLabel(S)) + (RK.phaseLabel() ? ' · ' + esc(RK.phaseLabel()) : '') + '</div>' +
-    '<h1>Every NHL game, priced.</h1><div class="qk-sub">Our win probability on every game against the market, playoff and Cup odds from 20,000 simulations of the season, and the numbers behind them.</div></div>' +
-    '<div class="rk-flex"><a class="qk-btn" href="#/games">All games</a><a class="qk-btn" href="#/standings">Standings</a></div></header>' +
+  const seg = '<div class="qk-seg" id="ov-when" role="group" aria-label="Games"><button type="button" aria-pressed="true" data-value="today">Today</button><button type="button" aria-pressed="false" data-value="next">Next</button><button type="button" aria-pressed="false" data-value="results">Results</button></div>';
+  el.innerHTML = QK.sectionHead({ kicker: 'NHL · ' + RK.seasonLabel(S) + (RK.phaseLabel() ? ' · ' + RK.phaseLabel() : ''), title: 'Every NHL game, by the numbers.', size: 'lg', tag: 'h1',
+    sub: 'Our win chance for every game, playoff and Cup chances from 20,000 simulated seasons, expected goals, and the players behind it all.',
+    actions: '<a class="qk-btn" href="#/games">All games</a><a class="qk-btn" href="#/standings">Standings</a>' }) +
     '<div id="ov-kpis">' + QK.skeleton('lines', 2) + '</div>' +
-    '<section class="qk-section" style="margin-top:var(--sp-6)"><div class="qk-section-head"><div><h2 id="ov-gh">Tonight</h2><div class="qk-sub">Model win probability on every card; the blue dot is our model, the orange the market.</div></div>' +
-    '<div class="qk-seg" id="ov-when" role="group" aria-label="Games"><button type="button" aria-pressed="true" data-value="today">Today</button><button type="button" aria-pressed="false" data-value="next">Next</button><button type="button" aria-pressed="false" data-value="results">Results</button></div></div>' +
-    '<div class="rk-games" id="ov-games">' + QK.skeleton('card', 3) + '</div></section>' +
-    '<section class="qk-section"><div class="qk-grid">' +
-    '<div class="qk-span-7">' + U.card2('Stanley Cup odds', 'Blue: our model · orange: the market (Kalshi and Polymarket, de-vigged)', U.chart('ov-cup', 430, 'Stanley Cup odds, model against market'), { id: 'ov-cup-card', foot: '<span>Gap = model minus market</span><a href="#/standings?tab=markets">Every futures market →</a>' }) + '</div>' +
-    '<div class="qk-span-5">' + U.card2('Power ratings', 'Expected goal difference a game against an average club', U.chart('ov-power', 430, 'Team ratings'), { foot: '<span>All 32 clubs</span><a href="#/standings?tab=ratings">Ratings by component →</a>' }) + '</div>' +
-    '</div></section>' +
-    '<section class="qk-section"><div class="qk-grid">' +
-    '<div class="qk-span-6">' + U.card2('Results v process', 'Points % against share of 5v5 expected goals: right of the line plays better than it looks, above it is winning more than its play', U.chart('ov-luck', 360, 'Points percentage against expected goals share'), { foot: '<span>Click a club for its page</span><a href="#/teams">All teams →</a>' }) + '</div>' +
-    '<div class="qk-span-6">' + U.card2('Tonight: model v market', 'Home win probability, our model against the market', '<div id="ov-mvm"></div>', { foot: '<span>Pre-game prices only</span><a href="#/games">Games →</a>' }) + '</div>' +
-    '</div></section>' +
-    '<section class="qk-section"><div class="qk-section-head"><div><h2>Playoff race</h2><div class="qk-sub">Probability of making the playoffs, by conference, from the season simulation.</div></div>' +
-    '<div class="qk-seg" id="ov-conf" role="group" aria-label="Conference"><button type="button" aria-pressed="true" data-value="Eastern">East</button><button type="button" aria-pressed="false" data-value="Western">West</button></div></div>' +
-    '<div class="qk-grid"><div class="qk-span-7">' + U.card2('Playoff odds', 'Bars: P(playoffs); the line is the 50% mark', U.chart('ov-po', 440, 'Playoff odds')) + '</div>' +
-    '<div class="qk-span-5">' + U.card2('Standings', 'Points, points % and the simulated playoff odds', '<div id="ov-st"></div>', { flush: true, foot: '<span>Wild-card format</span><a href="#/standings">Full standings →</a>' }) + '</div></div></section>' +
-    '<section class="qk-section"><div class="qk-section-head"><div><h2>Leaders</h2><div class="qk-sub">Counting stats this season. Rates with sample floors are on the <a class="qk-link" href="#/players">Players</a> page.</div></div></div>' +
+    '<section class="qk-section" style="margin-top:var(--sp-8)">' + QK.sectionHead({ kicker: 'Scoreboard', title: '<span id="ov-gh">Tonight</span>', html: true, sub: 'Our win chance on every card, the favourite in violet. A grey tick on the bar marks the market, for reference.', actions: seg }) +
+    '<div class="rk-games rk-gc" id="ov-games">' + QK.skeleton('card', 3) + '</div></section>' +
+    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Season simulation', title: 'Who wins the Cup', sub: 'Our chances from 20,000 simulated seasons, with each club’s projected points and the range it lands in nine times out of ten.' }) +
+    '<div class="qk-grid"><div class="qk-span-5">' + U.card2('Stanley Cup chances', 'Our chance; the grey tick is the Kalshi / Polymarket number, for reference', '<div id="ov-cup"></div>', { foot: '<span>Top twelve of 32</span><a href="#/standings?tab=markets">Every season forecast →</a>' }) + '</div>' +
+    '<div class="qk-span-7">' + U.card2('Projected points', 'Mean of the simulated seasons (dot) and its 90% range (bar)', U.chart('ov-range', 470, 'Projected points with a 90% range'), { foot: '<span>Range: 5th to 95th percentile of 20,000 seasons</span><a href="#/standings">Standings →</a>' }) + '</div></div></section>' +
+    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Team strength', title: 'Ratings and process', sub: 'How good each club is per game, and whether its results match the chances it creates.' }) +
+    '<div class="qk-grid"><div class="qk-span-5">' + U.card2('Power ratings', 'Expected goal difference a game against an average club', U.chart('ov-power', 470, 'Team ratings'), { foot: '<span>All 32 clubs</span><a href="#/standings?tab=ratings">Ratings by component →</a>' }) + '</div>' +
+    '<div class="qk-span-7">' + U.card2('Results v process', 'Points % against share of 5v5 expected goals. Right of centre: plays better than its record; above: winning more than its play', U.chart('ov-luck', 470, 'Points percentage against expected goals share'), { foot: '<span>Tap a club for its page</span><a href="#/teams">All teams →</a>' }) + '</div></div></section>' +
+    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Playoff race', title: 'Who makes the playoffs', sub: 'Our chance of a playoff spot by conference, beside the table as it stands.',
+      actions: '<div class="qk-seg" id="ov-conf" role="group" aria-label="Conference"><button type="button" aria-pressed="true" data-value="Eastern">East</button><button type="button" aria-pressed="false" data-value="Western">West</button></div>' }) +
+    '<div class="qk-grid"><div class="qk-span-6">' + U.card2('Playoff chances', 'Our chance of making the playoffs', '<div id="ov-po"></div>') + '</div>' +
+    '<div class="qk-span-6">' + U.card2('Standings', 'Points, points % and our playoff chance', '<div id="ov-st"></div>', { flush: true, foot: '<span>Wild-card format</span><a href="#/standings">Full standings →</a>' }) + '</div></div></section>' +
+    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Leaderboards', title: 'Leaders', sub: 'Counting stats this season, so everyone ranks. Rates with sample floors are on the Players page.', actions: '<a class="qk-btn" href="#/players">Players →</a>' }) +
     '<div class="qk-grid" id="ov-leaders"></div></section>';
 
   return Promise.all([RK.load(S + '/season.json'), RK.load(S + '/markets.json')]).then(res => {
     if (!U.alive(el)) return;
     const season = RK.ok(res[0]) ? res[0] : {}, mk = RK.ok(res[1]) ? res[1] : {};
     const rows = ((season.standings || {}).rows || []).slice();
+    const byTeam = {}; rows.forEach(r => { byTeam[r.team] = r; });
     const cup = (((mk.futures || {}).cup) || []).slice();
     const odds = idx.playoff_odds || {};
     if (!cup.length) Object.keys(odds).forEach(t => cup.push({ team: t, model: odds[t].p_cup, market: null }));
-    el.querySelector('#ov-kpis').innerHTML = kpis(idx, rows, cup);
+    el.querySelector('#ov-kpis').innerHTML = tiles(idx, rows, cup);
 
-    // games
+    // scoreboard
     const G = gamesBlock(idx);
     const draw = w => {
       const list = w === 'next' ? G.upcoming : w === 'results' ? G.recent : G.today;
       el.querySelector('#ov-gh').textContent = w === 'next' ? 'Next up' : w === 'results' ? 'Latest results' : (G.today.length ? 'Tonight' : 'Today');
-      el.querySelector('#ov-games').innerHTML = list.length ? list.slice(0, 9).map(g => U.card(g)).join('') : QK.empty('No games', w === 'today' ? 'No games today: see the next ones.' : 'Nothing to show yet.');
+      el.querySelector('#ov-games').innerHTML = list.length ? list.slice(0, 9).map(g => U.gc(g, null, byTeam)).join('') : QK.empty('No games', w === 'today' ? 'No games today: see the next ones.' : 'Nothing to show yet.');
     };
     draw(G.today.length ? 'today' : 'next');
     if (!G.today.length) el.querySelectorAll('#ov-when button').forEach(b => b.setAttribute('aria-pressed', b.getAttribute('data-value') === 'next' ? 'true' : 'false'));
     QK.seg(el.querySelector('#ov-when'), draw);
 
-    // cup odds
-    const cupRows = cup.filter(r => isNum(r.model)).sort((a, b) => b.model - a.model).slice(0, 12);
-    const hasMk = cupRows.some(r => isNum(r.market));
-    if (hasMk) {
-      const dr = cupRows.map(r => ({ label: RK.teamName(r.team), a: r.model, b: isNum(r.market) ? r.market : r.model, href: RK.teamHref(r.team), sub: isNum(r.market) ? 'Gap ' + QK.fmt.pp(r.model - r.market) : 'no market price' }));
-      const mx = Math.max.apply(null, dr.map(r => Math.max(r.a, r.b)));
-      QKC.dumbbell('#ov-cup', { rows: dr, aName: 'Model', bName: 'Market', min: 0, max: Math.min(1, Math.ceil(mx * 20) / 20 + 0.02), labelWidth: 150, valName: 'Chance of winning the Cup' });
-    } else {
-      QKC.bar('#ov-cup', { cats: cupRows.map(r => RK.teamName(r.team)), series: [{ name: 'Model', data: cupRows.map(r => r.model) }], horizontal: true, labels: true, fmt: v => U.pct(v), colors: cupRows.map(r => RK.teamColourRaw(r.team)), hrefs: cupRows.map(r => RK.teamHref(r.team)), valName: 'Chance of winning the Cup' });
-    }
+    // cup chances: ours first, the market a tick
+    el.querySelector('#ov-cup').innerHTML = QK.chances(cup.filter(r => isNum(r.model)).map(r => ({ label: RK.teamName(r.team), p: r.model, market: isNum(r.market) ? r.market : null, color: RK.teamColourRaw(r.team), href: RK.teamHref(r.team), mark: U.team(r.team) })),
+      { limit: 12, marketName: 'Market (Kalshi / Polymarket)' });
+
+    // projected points: mean and the 90% range from the simulation
+    const sim = (season.sim && season.sim.teams) || {};
+    const rr = Object.keys(sim).filter(t => isNum(sim[t].mean_pts) && isNum(sim[t].pts_p05) && isNum(sim[t].pts_p95)).sort((a, b) => sim[b].mean_pts - sim[a].mean_pts);
+    if (rr.length) {
+      const show = rr.slice(0, 16);
+      QKC.range('#ov-range', { rows: show.map(t => ({ label: RK.teamName(t), lo: sim[t].pts_p05, hi: sim[t].pts_p95, mid: sim[t].mean_pts, href: RK.teamHref(t), color: RK.teamColourRaw(t), sub: U.pct(sim[t].p_playoffs) + ' to make the playoffs' })),
+        fmt: v => U.f(v, 0), loName: '5th', hiName: '95th percentile', midName: 'Projected points', valName: 'Points at season end', labelWidth: 150 });
+      el.querySelector('#ov-range').insertAdjacentHTML('afterend', '<p class="qk-caption">The top sixteen by projected points. Each bar spans the 5th to 95th percentile of the club’s points across the simulated seasons.</p>');
+    } else el.querySelector('#ov-range').innerHTML = QK.empty('No simulation yet', 'The projection appears once the season simulation has run.');
 
     // power
     const pw = rows.filter(r => isNum(r.rating)).sort((a, b) => b.rating - a.rating);
     if (pw.length) {
-      QKC.bar('#ov-power', { cats: pw.map(r => r.team), series: [{ name: 'Rating', data: pw.map(r => r.rating) }], horizontal: true, diverging: true, fmt: v => U.signed(v, 2), hrefs: pw.map(r => RK.teamHref(r.team)), labelWidth: 44, valName: 'Expected goal difference a game' });
+      QKC.bar('#ov-power', { cats: pw.map(r => r.team), series: [{ name: 'Rating', data: pw.map(r => r.rating) }], horizontal: true, diverging: true, fmt: v => U.signed(v, 2), hrefs: pw.map(r => RK.teamHref(r.team)), labelWidth: 44, valName: 'Expected goal difference a game', catName: 'Club' });
     } else el.querySelector('#ov-power').innerHTML = QK.empty('No ratings yet', 'Ratings arrive with the first games.');
 
     // results v process
     const pts = rows.filter(r => isNum(r.xgf_pct) && isNum(r.p_pct) && r.gp > 0).map(r => ({ x: r.xgf_pct, y: r.p_pct, name: RK.teamName(r.team) + ' · ' + r.pts + ' pts in ' + r.gp, label: r.team, color: RK.teamColourRaw(r.team), href: RK.teamHref(r.team), size: 13 }));
-    if (pts.length) QKC.scatter('#ov-luck', { points: pts, xName: '5v5 xGF%', yName: 'Points %', xFmt: v => Math.round(v * 100) + '%', yFmt: v => Math.round(v * 100) + '%', refX: 0.5, refY: 0.5, labelAll: true,
-      quadrants: ['Lucky', 'Good and winning', 'Struggling', 'Unlucky'] });
+    if (pts.length) QKC.scatter('#ov-luck', { points: pts, xName: '5v5 share of expected goals', yName: 'Points %', xFmt: v => Math.round(v * 100) + '%', yFmt: v => Math.round(v * 100) + '%', refX: 0.5, refY: 0.5, labelAll: true,
+      quadrants: ['Winning more than its play', 'Good and winning', 'Struggling', 'Better than its record'] });
     else el.querySelector('#ov-luck').innerHTML = QK.empty('Not yet', 'The chart fills in after the first games.');
-
-    // tonight model v market
-    const pre = (idx.today || []).concat(idx.upcoming || []).filter(g => U.status(g) === 'pre' && g.model && isNum(g.model.p_home) && g.market && isNum(g.market.p_home)).slice(0, 10);
-    if (pre.length) {
-      el.querySelector('#ov-mvm').innerHTML = U.chart('ov-mvm-c', Math.max(220, 34 * pre.length + 50), 'Home win probability, model against market');
-      QKC.dumbbell('#ov-mvm-c', { rows: pre.map(g => ({ label: RK.teamAbbr(g.away) + ' @ ' + RK.teamAbbr(g.home), a: g.model.p_home, b: g.market.p_home, href: RK.gameHref(g.game_id), sub: RK.fmtDate(g.start || g.date, { year: false, time: true }) + ' · ' + RK.srcLabel(g.market.sources) })), aName: 'Model', bName: 'Market', labelWidth: 90, valName: 'Home win probability' });
-    } else el.querySelector('#ov-mvm').innerHTML = QK.empty('No pre-game prices', 'Model-v-market appears for games that have not started.');
 
     // playoff race + standings snapshot
     const conf = c => rows.filter(r => r.conference === c);
     const drawConf = c => {
-      const rs = conf(c).filter(r => isNum(r.p_playoffs)).sort((a, b) => b.p_playoffs - a.p_playoffs);
-      QKC.mount('#ov-po', T => ({
-        grid: { left: 8, right: 46, top: 8, bottom: 30, containLabel: true },
-        xAxis: QKC.axis(T, { min: 0, max: 1, fmt: v => Math.round(v * 100) + '%', name: 'Playoff probability', nameLocation: 'middle', nameGap: 26 }),
-        yAxis: (function () { const a = QKC.axis(T, { type: 'category', data: rs.map(r => RK.teamName(r.team)), split: false, inverse: true }); a.axisLabel.color = T.ink2; a.axisLabel.width = 150; a.axisLabel.overflow = 'truncate'; return a; })(),
-        tooltip: QKC.tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: ps => '<b>' + esc(ps[0].name) + '</b>' + QKC.tipRow(ps[0].color, 'Playoffs', U.pct(ps[0].value)) }),
-        series: [{ type: 'bar', barMaxWidth: 14, data: rs.map(r => ({ value: r.p_playoffs, href: RK.teamHref(r.team), itemStyle: { color: QK.color.ensure(RK.teamColourRaw(r.team) || T.model, T.s1, 3), borderRadius: [0, 4, 4, 0] } })),
-          label: { show: true, position: 'right', color: T.ink2, fontFamily: T.fontNum, fontSize: 10.5, formatter: p => U.pct(p.value) },
-          markLine: { silent: true, symbol: 'none', lineStyle: { color: T.axis, type: [3, 3] }, label: { show: false }, data: [{ xAxis: 0.5 }] } }]
-      }), { label: 'Playoff odds, ' + c + ' Conference' });
+      const rs = conf(c).filter(r => isNum(r.p_playoffs));
+      el.querySelector('#ov-po').innerHTML = rs.length ? QK.chances(rs.map(r => ({ label: RK.teamName(r.team), p: r.p_playoffs, color: RK.teamColourRaw(r.team), href: RK.teamHref(r.team), mark: U.team(r.team) })), { max: 1, oursName: 'Our playoff chance' }) : QK.empty('No simulation yet');
       const st = conf(c).slice().sort((a, b) => (b.pts - a.pts) || (b.p_pct - a.p_pct));
-      QK.table(el.querySelector('#ov-st'), {
-        dense: true, rank: true, columns: [
-          { key: 'team', label: 'Club', sticky: true, fmt: (v) => U.teamEnt(v, { abbr: true }) },
+      QK.leaderboard(el.querySelector('#ov-st'), {
+        dense: true, rank: true, rowHref: r => RK.teamHref(r.team), columns: [
+          { key: 'name', label: 'Club', type: 'entity', mark: r => U.team(r.team), href: r => RK.teamHref(r.team) },
           { key: 'gp', label: 'GP', num: true }, { key: 'pts', label: 'Pts', num: true },
           { key: 'p_pct', label: 'Pts%', num: true, fmt: v => RK.fmtVal(v, '3') },
-          { key: 'p_playoffs', label: 'Playoffs', num: true, fmt: v => U.pct(v) }
-        ], rows: st
+          { key: 'p_playoffs', label: 'Playoffs', type: 'bar', max: 1, fmt: v => U.pct(v) }
+        ], rows: st.map(r => Object.assign({ name: RK.teamShort(r.team) }, r))
       });
     };
     drawConf('Eastern');
@@ -148,7 +133,7 @@ function render(el, params) {
     const boards = [['s_p', 'Points', v => String(v)], ['s_g', 'Goals', v => String(v)], ['s_gar', 'Rink value (GAR)', v => U.f(v, 1)], ['g_gsax', 'Goals saved above expected', v => U.signed(v, 1)]];
     el.querySelector('#ov-leaders').innerHTML = boards.map(b => {
       const r = (L[b[0]] || []).slice(0, 5);
-      return '<div class="qk-span-3">' + U.card2(b[1], '', r.length ? '<ul class="rk-list">' + r.map((x, i) => '<li><span class="n">' + (i + 1) + '</span>' + U.playerEnt(x[0], null, RK.player(x[0]).team) + '<span class="v">' + esc(b[2](x[1])) + '</span></li>').join('') + '</ul>' : QK.empty('No leaders yet'), { flush: true }) + '</div>';
+      return '<div class="qk-span-3">' + U.card2(b[1], '', r.length ? '<ul class="rk-list rk-lead">' + r.map((x, i) => '<li><span class="n">' + (i + 1) + '</span>' + U.playerEnt(x[0], null, RK.player(x[0]).team) + '<span class="v">' + esc(b[2](x[1])) + '</span></li>').join('') + '</ul>' : QK.empty('No leaders yet'), { flush: true }) + '</div>';
     }).join('');
 
     RK.setMeta('');

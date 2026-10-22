@@ -41,7 +41,7 @@ METRICS: list[dict] = [
     M("b2", "2B", "Traditional", "int", desc="Doubles."),
     M("b3", "3B", "Traditional", "int", desc="Triples."),
     M("hr", "HR", "Traditional", "int", desc="Home runs."),
-    M("bb", "BB", "Traditional", "int", desc="Walks (unintentional)."),
+    M("bb", "uBB", "Traditional", "int", desc="Unintentional walks (MLB's BB includes IBB: add the IBB column)."),
     M("ibb", "IBB", "Traditional", "int", desc="Intentional walks."),
     M("hbp", "HBP", "Traditional", "int", desc="Hit by pitch."),
     M("so", "SO", "Traditional", "int", lower=True, desc="Strikeouts."),
@@ -225,8 +225,10 @@ METRICS: list[dict] = [
       desc="Steals (wSB) plus extra bases taken on hits against the league for the same hit, base and outs (builder C)."),
     M("wsb", "wSB", "Baserunning", "1", scope="model", desc="Stolen-base runs above average (FanGraphs' constants)."),
     M("ebt_runs", "Extra-base runs", "Baserunning", "1", scope="model", desc="Runs from taking extra bases on hits."),
-    M("sb", "SB (est.)", "Baserunning", "int", scope="model", desc="Stolen bases detected in the pitch data (estimated)."),
-    M("cs", "CS (est.)", "Baserunning", "int", lower=True, scope="model", desc="Caught stealing detected in the pitch data (estimated)."),
+    M("sb", "SB", "Baserunning", "int", scope="model",
+      desc="Stolen bases: MLB's official line (Stats API); estimated from the pitch data only when no official line is on file."),
+    M("cs", "CS", "Baserunning", "int", lower=True, scope="model",
+      desc="Caught stealing: MLB's official line (Stats API); estimated from the pitch data only when no official line is on file."),
     # defence
     M("oaa", "OAA", "Defence", "1", den="chances", k=60, scope="model",
       desc="Outs above average from our catch-probability model (landing spot, hang time, alignment-inferred start)."),
@@ -276,6 +278,16 @@ def _woba(num, den):
     return an.div(num, den)
 
 
+def _official_lines(ctx: SeasonContext) -> dict:
+    """{pid: official hitting line} for the season from the Stats API cache (analytics/mlbapi.py; no network here: the
+    fantasy layer refreshes it), or {} when none is on file."""
+    try:
+        from oddsmarkets.baseball.analytics import mlbapi
+        return mlbapi.season_lines(ctx.level, ctx.season, "hitting") or {}
+    except Exception:                                            # noqa: BLE001 - a missing / unreadable cache
+        return {}
+
+
 def build(ctx: SeasonContext) -> dict:
     A = ctx.agg()
     bat = A.get("bat") if A else None
@@ -298,6 +310,7 @@ def build(ctx: SeasonContext) -> dict:
     xwc = _xwobacon(ctx)
     clutch = _clutch(ctx)
     tg = ctx.team_games() or 1
+    official = _official_lines(ctx)
     rows: dict[str, dict] = {}
     role_of: dict[str, str] = {}
     for pid, r in bat.iterrows():
@@ -447,8 +460,12 @@ def build(ctx: SeasonContext) -> dict:
         v["bsr"] = CT.g(wr, "baserunning")
         v["wsb"] = CT.g(wr, "wsb")
         v["ebt_runs"] = CT.g(wr, "ebt_runs")
-        v["sb"] = CT.g(wr, "sb_est")
-        v["cs"] = CT.g(wr, "cs_est")
+        ol = official.get(str(pid))
+        if ol is not None:            # the pitch-data estimate counts wild pitches and indifference as steals (+2.6 a player)
+            v["sb"], v["cs"] = an.fnum(ol.get("sb")), an.fnum(ol.get("cs"))
+        else:
+            v["sb"] = CT.g(wr, "sb_est")
+            v["cs"] = CT.g(wr, "cs_est")
         # defence
         fr = fld.get(pid) or {}
         if fr:
