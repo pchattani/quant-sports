@@ -136,6 +136,12 @@ PRE_GRID_MIX = 0.5        # "blend": weight of the quali model's expected slot a
 # on 2023-2026. 0 switches it off.
 QUALI_PACE_W = 0.0
 QUALI_PACE_SD_MULT = 1.0
+# Post-qualifying win temperature (October 2026, docs/research/f1_edge.md "Model-improvement program"): the
+# published post-qualifying win probabilities become p^T renormalised, T > 1 sharpening a timid favourite.
+# ``WIN_TEMP_POST`` holds {"YYYY_R": T} with T fitted only on the races before that one (walk-forward, every Grand
+# Prix from 2014, scripts/f1_tune.py wintemp) and "latest" (all races to date) for rounds not in the table.
+# Empty = off. Only p_win changes: positions, podium, points and the championship are the simulator's own.
+WIN_TEMP_POST: dict = {}
 
 # Constants fitted by the walk-forward backtest (scripts/f1_tune.py) override the defaults above.
 FITTED_PATH = Path(__file__).resolve().parent / "fitted" / "race_params.json"
@@ -624,6 +630,38 @@ def race_inputs(year: int, round: int, before_quali: bool = True, session: str =
 
 
 # ----------------------------------------------------------------------------------------------- simulation
+
+def win_temp_post(year: int, rnd: int) -> float:
+    """The post-qualifying win temperature for (year, round): its walk-forward entry in ``WIN_TEMP_POST``, else
+    the "latest" fit (a round after the last fit), else 1 (off)."""
+    tab = WIN_TEMP_POST or {}
+    t = tab.get(f"{int(year)}_{int(rnd)}")
+    if t is None:
+        t = tab.get("latest", 1.0)
+    try:
+        t = float(t)
+    except (TypeError, ValueError):
+        return 1.0
+    return t if math.isfinite(t) and 0.2 <= t <= 5.0 else 1.0
+
+
+def temper_win(drivers: dict[str, dict], T: float) -> dict[str, dict]:
+    """Sharpen (T > 1) or flatten the win probabilities of a ``simulate_race`` result in place: p ~ p^T
+    renormalised over the field, then capped at the driver's podium probability (a win is a podium). Returns
+    the same dict. Nothing else is touched."""
+    if not drivers or T == 1.0:
+        return drivers
+    ds = list(drivers)
+    p = np.array([float(drivers[d].get("p_win") or 0.0) for d in ds])
+    if p.sum() <= 0:
+        return drivers
+    q = np.where(p > 0, np.power(np.clip(p, 1e-12, 1.0), T), 0.0)
+    q = q / q.sum()
+    for d, v in zip(ds, q):
+        pod = drivers[d].get("p_podium")
+        drivers[d]["p_win"] = float(min(v, pod)) if pod is not None else float(v)
+    return drivers
+
 
 def bunch(T: np.ndarray, running: np.ndarray) -> np.ndarray:
     """Safety-car compression: running cars keep their order, gaps reset to SC_GAP per position."""

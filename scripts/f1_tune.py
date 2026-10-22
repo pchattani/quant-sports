@@ -19,6 +19,10 @@ Walk-forward tuning of the race simulator's constants (oddsmarkets/f1/models/rac
     python scripts/f1_tune.py prep --from 2012 --to 2026
     python scripts/f1_tune.py grid --configs configs.json --sims 2000 --out data/f1/cache/tune_grid.json
     python scripts/f1_tune.py select --grid data/f1/cache/tune_grid.json --first 2014 [--write]
+    python scripts/f1_tune.py wintemp --grid data/f1/cache/tune_grid.json --config <id> [--write]
+
+4. ``wintemp``: the post-qualifying win temperature table (``race_sim.WIN_TEMP_POST``): per race, T fitted on every
+   earlier race of the grid's configuration (walk-forward), plus "latest" over all races.
 """
 from __future__ import annotations
 
@@ -177,6 +181,25 @@ def walk_forward(grid: dict, variant: str, first: int, burn_in: int) -> dict:
     return {"picks": picks, "winner_ll": round(float(np.mean(wl)), 4) if wl else None, "races": len(rows)}
 
 
+def win_temp_table(grid: dict, cid: str, variant: str = "post", min_races: int = 20) -> dict:
+    """Walk-forward win temperature: for every race, the T minimising the winner log-loss of p^T (renormalised)
+    over all earlier races of the grid (1.0 until ``min_races`` are available); "latest" over every race."""
+    from scipy.optimize import minimize_scalar
+    races = grid[cid][variant]
+    keys = sorted((k for k in races if races[k].get("wll") is not None and sum(races[k]["win"]) == 1),
+                  key=lambda k: tuple(int(x) for x in k.split("_")))
+
+    def fit(ks):
+        lv = [(np.log(np.clip(np.array(races[k]["pw"], float), 1e-6, None)), races[k]["win"].index(1)) for k in ks]
+
+        def f(t):
+            return sum(-(t * v[w] - np.log(np.sum(np.exp(t * v)))) for v, w in lv)
+        return round(float(minimize_scalar(f, bounds=(0.5, 3.0), method="bounded").x), 4)
+    out = {k: (fit(keys[:i]) if i >= min_races else 1.0) for i, k in enumerate(keys)}
+    out["latest"] = fit(keys)
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -197,6 +220,10 @@ def main() -> int:
     p3.add_argument("--first", type=int, default=2014)
     p3.add_argument("--burn-in", type=int, default=2012)
     p3.add_argument("--write", action="store_true")
+    p4 = sub.add_parser("wintemp", help="walk-forward post-qualifying win temperature table -> race_params.json")
+    p4.add_argument("--grid", required=True)
+    p4.add_argument("--config", required=True)
+    p4.add_argument("--write", action="store_true")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     if args.cmd == "prep":
@@ -215,6 +242,21 @@ def main() -> int:
         return 0
     d = json.loads(Path(args.grid).read_text(encoding="utf-8"))
     g, configs = d["grid"], {c["id"]: c for c in d["configs"]}
+    if args.cmd == "wintemp":
+        tab = win_temp_table(g, args.config)
+        print(json.dumps({k: v for k, v in tab.items() if k == "latest" or k.startswith("2026")}))
+        if args.write:
+            out = ROOT / "oddsmarkets" / "f1" / "models" / "fitted" / "race_params.json"
+            fitted = json.loads(out.read_text(encoding="utf-8"))
+            fitted.setdefault("params", {})["WIN_TEMP_POST"] = tab
+            fitted["win_temp_post"] = {"fitted_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                                       "grid": Path(args.grid).name, "config": args.config, "sims": d.get("sims"),
+                                       "races": len(tab) - 1,
+                                       "method": "per race, T minimising the winner log-loss of p^T over every earlier "
+                                                 "race of the grid (1.0 for the first 20); latest = all races"}
+            out.write_text(json.dumps(fitted, indent=1), encoding="utf-8")
+            print("wrote", out)
+        return 0
     report = {}
     for v in VARIANTS:
         if not any(v in g[c] for c in g):

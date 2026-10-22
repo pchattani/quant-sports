@@ -7,7 +7,9 @@ For every round the forecast is what the model would have said at the time:
             only results / lap times strictly before the round and the grid is sampled from
             the pre-qualifying model (qualifying.quali_model through the previous round);
     post    after qualifying: the same pace with the round's actual grid
-            (race_inputs(..., before_quali=False)); None until qualifying is on disk;
+            (race_inputs(..., before_quali=False)); None until qualifying is on disk. Its win
+            probabilities are sharpened by the walk-forward temperature race_sim.win_temp_post(year,
+            round) (fitted only on earlier races);
     sprint  the sprint (sprint weekends only), with the sprint grid once the sprint has run
             or its grid is known, else a sampled grid.
 
@@ -37,7 +39,8 @@ from oddsmarkets.f1.analytics import data_root, rnd as _r
 
 logger = logging.getLogger(__name__)
 
-VERSION = "fc-3"   # fc-3 (Oct 2026): qualifying pace after qualifying, practice in the qualifying model
+VERSION = "fc-4"   # fc-3 (Oct 2026): qualifying pace after qualifying, practice in the qualifying model;
+#                   fc-4 (21 Oct 2026): post-qualifying win temperature (race_sim.WIN_TEMP_POST), day sds
 CACHE = _store.ROOT / "data" / "f1" / "cache" / "forecasts"
 _DIGESTS: dict[int, tuple[float, dict[int, str]]] = {}
 
@@ -75,6 +78,11 @@ def signature(year: int, rnd: int, kind: str, n: int) -> str:
     h.update(json.dumps([(race.get("circuit") or {}).get("id"), [r.get("driver") for r in race.get("qualifying") or race.get("results") or []]],
                         default=str).encode())
     if kind == "post":
+        try:
+            from oddsmarkets.f1.models import race_sim as _rsm
+            h.update(f"T{_rsm.win_temp_post(year, rnd):.4f}".encode())
+        except Exception:                                        # pragma: no cover - defensive
+            pass
         h.update(json.dumps([(r.get("driver"), r.get("position")) for r in race.get("qualifying") or []] +
                             [(r.get("driver"), r.get("grid")) for r in race.get("results") or []], default=str).encode())
     if kind == "sprint":
@@ -149,6 +157,8 @@ def forecast(year: int, rnd: int, kind: str = "pre", n: int = 3000, use_cache: b
             return None
         seed = year * 1000 + rnd * 10 + {"pre": 1, "post": 2, "sprint": 3}.get(kind, 0)
         sim = rs.simulate_race(inp, n=n, seed=seed, sprint=(kind == "sprint"))
+        if kind == "post":                                       # walk-forward win temperature (race_sim.WIN_TEMP_POST)
+            rs.temper_win(sim["drivers"], rs.win_temp_post(year, rnd))
         out = compact(sim)
         out["generated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     except Exception as exc:

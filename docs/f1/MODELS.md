@@ -424,8 +424,8 @@ h   = −ln(1 − min(0.6, p_m + p_i)) / laps
 
 | Step | Rule (constants in `race_sim.py`) |
 |---|---|
-| race-day pace | `x_d = mu_d + sd_d e1 + 0.16 e2(team) + 0.10 e3` (`DAY_TEAM_SD`, `DAY_DRIVER_SD`, × ref/90) |
-| lap 1 | `score = slot + m[slot] + 0.4 s[slot] k_c e + B·Exp(8) − 1.0 (x_d − median x)`, B = 1 with p 0.10 (`LAP1_SD_MULT`, `LAP1_BAD_P`, `LAP1_BAD_SCALE`), ranked; cars 0.65 s apart (`LAP1_SPACING`); lap-1 retirement with the slot's incident probability, capped at 0.5 |
+| race-day pace | `x_d = mu_d + sd_d e1 + 0.16 e2(team) + 0.05 e3` (`DAY_TEAM_SD`, `DAY_DRIVER_SD`, × ref/90; the driver day sd was 0.10 until 21 October 2026, fitted file) |
+| lap 1 | `score = slot + m[slot] + 0.4 s[slot] k_c e + B·Exp(8) − 1.0 (x_d − median x)`, B = 1 with p 0.02 (`LAP1_SD_MULT`, `LAP1_BAD_P`, `LAP1_BAD_SCALE`; 0.10 until 21 October 2026, fitted file), ranked; cars 0.65 s apart (`LAP1_SPACING`); lap-1 retirement with the slot's incident probability, capped at 0.5 |
 | lap time | `x_d + deg · age + 0.06 (L − lap) + 0.35 e` (× ref/90) + the reference lap (`DEG_DEFAULT = 0.06`, `FUEL_PER_LAP = 0.06`, `LAP_SD = 0.35`) |
 | strategy | the race's stops `k_race = 1 + Binomial(2, (m − 1)/2)` drawn once per simulation; each car k_race ± 1 with p 0.1 (`STOP_DEV_P`), clipped to [1, 3]; stop j at `L j/(k+1) + N(0, 0.07 L)`; cost `pit_loss + N(0, 0.6)`, slow stop +U(4, 8) s with p 0.03; under SC 0.5 × pit loss, under VSC 0.65 ×; planned stops within 6 laps of a neutralisation brought forward (`PIT_WINDOW`); sprints no stops |
 | overtaking | front to back; a car finishing the lap within 0.4 s (`HOLD_GAP`) of the nearest non-pitting car ahead must pass: `P = sigmoid((dpace − thr) / 0.25)`, dpace without lap noise; success puts it 0.1 s ahead (`PASS_MARGIN`), failure 0.4 s behind; no passing under SC/VSC; only the nearest car ahead is checked |
@@ -463,6 +463,34 @@ Outputs per driver: `p_win, p_podium, p_points, p_dnf, exp_pos, exp_points,
 pos_dist`; per team `exp_points, p_double_points`; per race `p_sc, p_vsc, p_wet`.
 
 ---
+
+### 6.3 Post-qualifying win temperature and the 21 October 2026 constants
+
+The model-improvement program of October 2026 (docs/research/f1_edge.md, "Model-improvement program, Oct 2026")
+changed three things, all chosen without the 2023–2026 test races:
+
+- `DAY_DRIVER_SD` 0.10 → 0.05 and `LAP1_BAD_P` 0.10 → 0.02 (fitted file). Chosen on 2014–2022 winner log-loss after
+  qualifying among 21 configurations (day sds, pace spread and sd multipliers, lap-1 tail and core, overtaking
+  threshold; 3,000 simulations, common random numbers): 2014–2022 1.2790 → 1.2732. On 2023–2026 (87 races, sealed):
+  1.1083 → 1.0827, paired difference −0.0256 [−0.0346, −0.0155]; podium log-loss −0.0017 per driver-race. Before
+  qualifying the same constants give −0.0082 [−0.0167, +0.0012] (not significant). The lower lap-1 tail also fits
+  the data better: the old constants let the pole-sitter lead after lap 1 in 56% of simulations against 72% of
+  races (2014–2025).
+- `WIN_TEMP_POST` (fitted file, `scripts/f1_tune.py wintemp`): for every Grand Prix from 2014, the temperature T
+  minimising the winner log-loss of p^T over all earlier races (walk-forward; 1.0 for the first 20), plus "latest"
+  over every race for rounds after the fit. `race_sim.temper_win` applies it to the post-qualifying win
+  probabilities only (`forecasts.forecast(..., "post")`, `backtest` `model_post`), capped at the podium probability;
+  positions, podium, points and the championship stay the simulator's own. Refit with every backtest run.
+  It is a lagging correction: on 2014–2022, where the raw simulator was calibrated, the walk-forward temperature
+  costs +0.0073 [+0.0025, +0.0123] a race; over all 269 races it is level. It is kept because 2023 on is timid.
+- Together, against the 2 October production model on 2023–2026: winner log-loss after qualifying −0.0417
+  [−0.0584, −0.0227], Brier −0.0178 [−0.0261, −0.0089], podium −0.0017 [−0.0027, −0.0007]; calibration slope of
+  the win probabilities 1.74 → 1.56 (intercept 0.93 → 0.67), ECE 0.0206 → 0.0174. The temperature alone on top of
+  the new constants gains −0.0161 [−0.0256, −0.0058].
+
+Not changed (tested): wider pace spread (helps 2023–2026, hurts 2014–2022: an era effect a fixed constant cannot
+pick up honestly), smaller pace sd, harder overtaking (worse everywhere), a market-informed prior from earlier
+races' prices (no gain), a rolling 44-race temperature (−0.055 [−0.130, +0.033], too noisy).
 
 ## 7. Championship simulator: `models/championship.py`
 
@@ -764,6 +792,12 @@ pick after qualifying was `PACE_PER_Z_PCT = 0.9, A_BLEND_K = 40` in every season
 
 ### 12.2 Results (October 2026)
 
+**Run of 21 October 2026** (driver day sd 0.05, lap-1 tail 2%, walk-forward post-qualifying win temperature; 269
+races 2014–2026 round 17, 4,000 simulations, 1,131 s, 310 MB peak): `model_post` winner log-loss 1.2153 (2014–2022
+1.2831, 2023–2026 1.0725; without the temperature 1.2155), T 1.12, win / podium / points / DNF log-loss 0.0963 /
+0.2059 / 0.4669 / 0.4113; `model_pre` 1.4504 (T 1.02); `model_pre_results_only` 1.4839; `grid_order` 1.5041.
+Section 6.3 has the paired comparisons on the 2023–2026 test races.
+
 **Run of 2 October 2026** (after the edge research: this round's qualifying pace after qualifying, practice in
 the qualifying model, the shortened-race laps fix; 267 races, 4,000 simulations, 1,279 s, 357 MB peak):
 
@@ -924,7 +958,10 @@ median in the same session (`analytics/drivers._telemetry_style`).
   whose layout changed since its last race uses the old lap until it is raced.
 - **Overtaking** checks only the nearest car ahead, so a much faster car can clear
   two cars in a lap.
-- **Favourites slightly timid** after qualifying in 2023–2026 (T = 1.17 over 2014–2026, 1.01 over 2014–2022;
+- **Favourites timid after qualifying in 2023–2026.** The raw simulator's win temperature there is about 1.6 (1.0 on
+  2014–2022): pole-sitters won 61% of 2023–2026 races against 41% forecast. Since 21 October 2026 a walk-forward
+  temperature sharpens the published post-qualifying win probabilities (section 6.3); it recovers part of it
+  (calibration slope 1.74 → 1.56 on 2023–2026), not all. Earlier note:
   section 12.2).
 - **Practice long runs are not used**: without fuel loads they made the winner forecast worse.
 - **Pre-1991 points** are simplified to 9-6-4-3-2-1 in the simulator (which only

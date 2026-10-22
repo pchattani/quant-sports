@@ -9,7 +9,9 @@ classified; did-not-start entries are dropped).
 Models
 ------
 * ``model_pre`` / ``model_post``: ``simulate_race`` (``n_sims`` per race, default 4,000) before / after qualifying,
-  with Builder A's pace where importable (blended as in ``race_sim``).
+  with Builder A's pace where importable (blended as in ``race_sim``). ``model_post``'s win probabilities carry the
+  walk-forward win temperature ``race_sim.win_temp_post`` (fitted only on earlier races), as the site's do;
+  ``model_post_untempered`` in the output keeps the raw simulator's winner log-loss and temperature.
 * ``model_pre_results_only``: the same with the results-only pace estimator (reported when A is importable).
 * ``grid_order`` (post-qualifying baseline): per event ``p = sigmoid(a + b * slot)`` (pit-lane start = last slot),
   fitted by maximum likelihood on all races of the previous seasons on disk (earlier rounds of the same season
@@ -395,6 +397,7 @@ def backtest(seasons: Iterable[int] = tuple(range(2014, 2027)), n_sims: int = 40
     rows: dict[str, dict[str, list]] = {}
     season_rows: dict[int, dict[str, dict[str, list]]] = {}
     winmc: dict[str, list] = {}
+    untempered: list = []                     # model_post's win probabilities before the win temperature
     per_race = []
     errors = []
     for y, rnds in used.items():
@@ -415,6 +418,10 @@ def backtest(seasons: Iterable[int] = tuple(range(2014, 2027)), n_sims: int = 40
                 try:
                     inp = _rs.race_inputs(y, r, before_quali=bq, use_a=use_a)
                     res = _rs.simulate_race(inp, n=n_sims, seed=sd)
+                    if name == "model_post":
+                        raw = {d: v["p_win"] for d, v in res["drivers"].items()}
+                        untempered.append(({d: raw.get(d, 0.0) for d in drivers}, winner))
+                        _rs.temper_win(res["drivers"], _rs.win_temp_post(y, r))   # walk-forward table
                     preds[name] = {d: {"win": v["p_win"], "podium": v["p_podium"], "points": v["p_points"], "dnf": v["p_dnf"]}
                                    for d, v in res["drivers"].items()}
                     del res, inp
@@ -473,6 +480,7 @@ def backtest(seasons: Iterable[int] = tuple(range(2014, 2027)), n_sims: int = 40
         "metrics": metrics, "per_season": per_season, "per_race": per_race, "unavailable": unavailable, "errors": errors[:50],
         "runtime_s": round(time.perf_counter() - t0, 1), "memory_mb": {**mem, "end": _rss_mb()},
         "race_params": getattr(_rs, "FITTED", {}).get("params") or {},
+        "model_post_untempered": {"win_multiclass": _win_mc(untempered), "win_temperature": win_temperature(untempered)},
     }
     if write:
         try:
