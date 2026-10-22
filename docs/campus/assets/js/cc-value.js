@@ -10,17 +10,11 @@
 'use strict';
 var U = CC.ui, esc = CC.esc, isNum = CC.isNum;
 
-function vrowCells(L, S, r, fb) {
-  return [{ html: '<a href="' + esc(CC.playerHref(L, r.id, S)) + '">' + esc(r.name || CC.pname(L, r.id)) + '</a>', v: r.name }, { html: U.teamEnt(L, r.team, { season: S, abbr: true }), v: CC.tname(L, r.team) }, esc(r.pos || '—'), esc(r['class'] || '—'),
-    isNum(r.gp) ? r.gp : '—', { v: r.value, html: '<b>' + CC.f(r.value, fb ? 1 : 2) + '</b>' }, { v: r.value_pg, html: CC.f(r.value_pg, 2) }, { v: r.pctl, html: isNum(r.pctl) ? QK.pctlChip(r.pctl) : '—' }, { html: '<span class="qk-muted">' + esc(r.why || '') + '</span>', v: r.why || '' }];
-}
-var VCOLS = ['Player', 'Team', 'Pos', 'Class', { label: 'GP', align: 'right' }, { label: 'Value', align: 'right' }, { label: 'Per game', align: 'right' }, { label: 'Pctl', align: 'right' }, 'Why'];
-
 CC.route('value', function (el, p) {
   var L = p.L, S = p.S, fb = CC.fb(L);
   var list = [['value', 'Value'], ['position', 'By position'], ['transfers', 'Transfers']];
   var tab = U.tab(p, ['value', 'position', 'transfers'], 'value');
-  el.innerHTML = U.head('Value & Moves', '', U.kicker(L, S)) + U.tabs(L, 'value', list, S, tab) + '<div id="vb">' + QK.skeleton('lines', 8) + '</div>';
+  el.innerHTML = U.head('Value & Moves', 'What every player is worth on the field in our value model, the best at each position, and the transfers we can see in the box scores.', U.kicker(L, S)) + U.tabs(L, 'value', list, S, tab) + '<div id="vb">' + QK.skeleton('lines', 8) + '</div>';
   var body = QK.$('#vb', el);
   return Promise.all([CC.load(CC.path(L, S, tab === 'transfers' ? 'moves.json' : 'value.json')), CC.season(L, S)]).then(function (a) {
     if (!U.alive(el)) return;
@@ -28,22 +22,33 @@ CC.route('value', function (el, p) {
     if (!CC.ok(d)) { body.innerHTML = U.missing(tab === 'transfers' ? 'Transfers' : 'Player value', d); return; }
     if (tab === 'transfers') { transfers(body, L, S, d); U.wire(body); return; }
     var cur = d.currency || {};
-    var sub = '<b>' + esc(cur.label || 'Value') + '</b>' + (cur.desc ? ': ' + esc(cur.desc) : '') + '.';
+    var sub = (d.basis === 'last_season' ? QK.tag('Last season’s values: ' + CC.seasonLabel(L, S - 1) + ', players on this season’s rosters', 'signal') + ' ' : '') + '<b>' + esc(cur.label || 'Value') + '</b>' + (cur.desc ? ': ' + esc(cur.desc) : '') + '.';
     var rows = d.leaders || [];
     if (!rows.length) { body.innerHTML = '<p class="cc-note">' + sub + '</p>' + QK.empty('No value numbers yet', 'They appear once games have been played this season. Try last season with the season picker.'); return; }
     if (tab === 'value') {
       var pos = {}; rows.forEach(function (r) { if (r.pos) pos[r.pos] = (pos[r.pos] || 0) + 1; });
       var chips = '<div class="qk-chips scroll cc-filters" id="v-pos" role="group" aria-label="Position">' + ['all'].concat(Object.keys(pos).sort(function (x, y) { return pos[y] - pos[x]; })).map(function (k, i) {
-        return '<button type="button" class="qk-chip" style="--ca:var(--accent)" data-value="' + esc(k) + '" aria-pressed="' + (i === 0) + '">' + esc(k === 'all' ? 'All' : k) + '</button>'; }).join('') + '</div>';
-      body.innerHTML = '<p class="cc-note">' + sub + '</p>' + chips + '<div class="qk-grid cc-grid"><div class="qk-span-5">' + U.card('Top 20', '', U.chart('v-top', 560, 'Top 20 players by value')) + '</div><div class="qk-span-7" id="v-tbl"></div></div>';
+        return '<button type="button" class="qk-chip" style="--ca:var(--signal)" data-value="' + esc(k) + '" aria-pressed="' + (i === 0) + '">' + esc(k === 'all' ? 'All' : k) + '</button>'; }).join('') + '</div>';
+      var r0 = rows[0], pg0 = rows.filter(function (r) { return isNum(r.value_pg); }).slice().sort(function (x, y) { return y.value_pg - x.value_pg; })[0];
+      var tl = [];
+      if (r0) tl.push({ label: 'Most valuable', value: String(r0.name || '').split(' ').slice(-1)[0] + ' ' + CC.f(r0.value, fb ? 1 : 1), signal: true, href: CC.playerHref(L, r0.id, S), sub: (r0.pos || '') + ' · ' + CC.tname(L, r0.team), tip: 'Our value model: ' + (cur.label || 'value') });
+      if (pg0) tl.push({ label: 'Most valuable a game', value: String(pg0.name || '').split(' ').slice(-1)[0] + ' ' + CC.f(pg0.value_pg, 2), href: CC.playerHref(L, pg0.id, S), sub: (pg0.pos || '') + ' · ' + CC.tname(L, pg0.team) });
+      tl.push({ label: 'Players ranked', value: QK.fmt.num(rows.length), sub: d.basis === 'last_season' ? 'on this season’s rosters, valued on last season' : 'qualified players this season' });
+      body.innerHTML = U.stats(tl) + '<p class="cc-note">' + sub + '</p>' + chips + '<div class="qk-grid cc-grid"><div class="qk-span-5">' + U.card('Top 20', 'Our value this season, in team colours.', U.chart('v-top', 560, 'Top 20 players by value')) + '</div><div class="qk-span-7">' + U.card('Leaderboard', '<span id="v-n"></span>', U.lb('v-tbl'), { flush: true }) + '</div></div>';
       var curPos = 'all';
       var paint = function () {
         var rs = rows.filter(function (r) { return curPos === 'all' || r.pos === curPos; });
-        QK.$('#v-tbl', body).innerHTML = U.card('Leaderboard', rs.length + ' players', U.table(VCOLS, rs.map(function (r) { return { cells: vrowCells(L, S, r, fb), _href: CC.playerHref(L, r.id, S) }; }), { maxHeight: 620 }));
-        U.wire(QK.$('#v-tbl', body));
+        QK.$('#v-n', body).textContent = rs.length + ' players · the value cell is coloured by its percentile against every qualified player';
+        QK.leaderboard(QK.$('#v-tbl', body), { dense: true, rank: true, maxHeight: 620, rowHref: function (r) { return CC.playerHref(L, r.id, S); }, columns: [
+          { key: 'name', label: 'Player', type: 'entity', sub: 'sub', mark: function (r) { return U.mark(L, r.team); }, href: function (r) { return CC.playerHref(L, r.id, S); } },
+          { key: 'gp', label: 'GP', num: true },
+          { key: 'value', label: 'Value', type: 'pctl', pctl: 'pctl', fmt: function (v) { return CC.f(v, fb ? 1 : 2); }, tip: (cur.label || 'Value') + (cur.desc ? ': ' + cur.desc : '') },
+          { key: 'value_pg', label: 'Per game', num: true, fmt: function (v) { return CC.f(v, 2); } },
+          { key: 'why', label: 'Why', sort: false, fmt: function (v) { return '<span class="qk-muted">' + esc(v || '') + '</span>'; } }
+        ], rows: rs.map(function (r) { return Object.assign({ sub: [CC.tabbr(L, r.team), r.pos, r['class']].filter(Boolean).join(' · ') }, r); }) });
         var top = rs.slice(0, 20);
         QKC.bar('#v-top', { cats: top.map(function (r) { return (r.name || '').replace(/^(\S)\S*\s/, '$1. ') + ' · ' + CC.tabbr(L, r.team); }), series: [{ name: cur.label || 'Value', data: top.map(function (r) { return r.value; }) }], horizontal: true, labels: true, fmt: function (v) { return CC.f(v, 1); },
-          colors: top.map(function (r) { return CC.tcol(L, r.team); }), hrefs: top.map(function (r) { return CC.playerHref(L, r.id, S); }), labelWidth: 150 });
+          colors: top.map(function (r) { return CC.tcol(L, r.team); }), hrefs: top.map(function (r) { return CC.playerHref(L, r.id, S); }), labelWidth: 150, valName: cur.label || 'Value', catName: 'Player' });
       };
       QK.chips(QK.$('#v-pos', body), function (v) { curPos = v[0] || 'all'; paint(); });
       paint();
@@ -64,9 +69,9 @@ function transfers(node, L, S, d) {
   var bt = d.by_team || {};
   var teams = Object.keys(bt).filter(function (t) { return isNum(bt[t].net_value); }).sort(function (x, y) { return bt[y].net_value - bt[x].net_value; });
   var top = teams.slice(0, 10).concat(teams.slice(-10).filter(function (t) { return teams.indexOf(t) >= 10; }));
-  var html = '<p class="cc-note"><b>' + esc(d.note || 'Inferred from box scores and rosters; not the official transfer portal.') + '</b></p>';
-  html += '<div class="qk-kpis cc-kpis">' + QK.kpi({ label: 'Moves found', value: String(mv.length) }) + QK.kpi({ label: 'Teams involved', value: String(Object.keys(bt).length) }) +
-    (teams[0] ? QK.kpi({ label: 'Biggest net gain', html: true, value: esc(CC.tabbr(L, teams[0])) + ' ' + CC.signed(bt[teams[0]].net_value, 1), sub: esc(CC.tname(L, teams[0])) }) : '') + '</div>';
+  var html = '<p class="cc-note">' + QK.tag('Inferred from box scores, not the official transfer portal') + ' ' + esc(d.note || '') + '</p>';
+  html += U.stats([teams[0] ? { label: 'Biggest net gain', value: CC.tabbr(L, teams[0]) + ' ' + CC.signed(bt[teams[0]].net_value, 1), signal: true, href: CC.teamHref(L, teams[0], S), sub: CC.tname(L, teams[0]) + ' · value in minus value out' } : null,
+    { label: 'Moves found', value: QK.fmt.num(mv.length), sub: 'the same athlete on a new team' }, { label: 'Teams involved', value: QK.fmt.num(Object.keys(bt).length) }]);
   html += '<div class="qk-grid cc-grid"><div class="qk-span-5">' + U.card('Net value by team', 'Value of players in minus value of players out (most and least).', top.length ? U.chart('mv-net', Math.max(300, top.length * 22 + 30), 'Net transfer value by team') : QK.empty('No moves', '')) + '</div><div class="qk-span-7">' +
     U.card('All moves', 'Value before (last season, old team) and after (this season, new team).', mv.length ? U.table(['Player', 'Pos', 'From', 'To', { label: 'Before', align: 'right' }, { label: 'After', align: 'right' }, 'Grade'], mv.map(function (m) {
       return { cells: [{ html: '<a href="' + esc(CC.playerHref(L, m.player, S)) + '">' + esc(m.name || CC.pname(L, m.player)) + '</a>', v: m.name }, esc(m.pos || '—'), { html: U.teamEnt(L, m.from, { abbr: true }), v: CC.tname(L, m.from) }, { html: U.teamEnt(L, m.to, { season: S, abbr: true }), v: CC.tname(L, m.to) },
@@ -88,14 +93,16 @@ CC.route('fantasy', function (el, p) {
     var FN = { ppr: 'PPR', half: 'Half PPR', standard: 'Standard', points: 'Points league', '9cat': '9-category', nine_cat: '9-category', std: 'Standard' };
     var proj = d.projections || [];
     var bt = d.backtest || {};
-    var html = U.head('Fantasy', 'Projections for ' + esc(d.period || 'the coming period') + ' from usage, efficiency and the opponent. Our own scoring; no official fantasy-game prices or ownership (their terms do not allow reuse).', U.kicker(L, S));
-    html += '<div class="qk-kpis cc-kpis">' + QK.kpi({ label: 'Projection error', value: CC.f(bt.mae, 2), sub: 'mean absolute, points; naive ' + CC.f(bt.mae_naive, 2), tip: 'Walk-forward backtest against the actual fantasy points' }) +
-      QK.kpi({ label: 'Rank correlation', value: CC.f(bt.rank_corr, 2), sub: 'naive ' + CC.f(bt.rank_corr_naive, 2) }) + QK.kpi({ label: 'Games tested', value: isNum(bt.n) ? QK.fmt.num(bt.n) : '—' }) + '</div>';
+    var html = U.head('Fantasy', 'Projections for ' + esc(d.period || 'the coming period') + ' from usage, efficiency and the opponent. Our own scoring; no official fantasy-game data or ownership (their terms do not allow reuse).', U.kicker(L, S));
+    var top0 = (proj || []).slice().sort(function (x, y) { return (y.proj || 0) - (x.proj || 0); })[0];
+    html += U.stats([top0 ? { label: 'Top projection', value: String(top0.name || '').split(' ').slice(-1)[0] + ' ' + CC.f(top0.proj, 1), signal: true, href: CC.playerHref(L, top0.id, S), sub: (top0.pos || '') + ' · ' + CC.tname(L, top0.team) + (isNum(top0.proj_lo) ? ' · ' + CC.f(top0.proj_lo, 1) + '–' + CC.f(top0.proj_hi, 1) : '') } : null,
+      isNum(bt.mae) ? { label: 'Projection error', value: CC.f(bt.mae, 2), unit: 'pts', sub: 'mean absolute; a naive projection ' + CC.f(bt.mae_naive, 2), tip: 'Walk-forward backtest against the actual fantasy points' } : null,
+      isNum(bt.rank_corr) ? { label: 'Rank correlation', value: CC.f(bt.rank_corr, 2), sub: 'naive ' + CC.f(bt.rank_corr_naive, 2) } : null, isNum(bt.n) ? { label: 'Games tested', value: QK.fmt.num(bt.n) } : null]);
     if (!proj.length) { el.innerHTML = html + (CC.isCur(L, S) ? QK.empty('No projections yet', 'They appear before the first games of the period.') : QK.empty('No projections for this season', 'Weekly projections are kept for the current season; the backtest above covers the past seasons.')); return; }
     var poss = {}; proj.forEach(function (r) { if (r.pos) poss[r.pos] = 1; });
     html += '<div class="cc-toolbar">' + (fmts.length ? '<div class="qk-seg" id="ff-fmt" role="group" aria-label="Scoring format">' + fmts.map(function (f, i) { return '<button type="button" data-value="' + esc(f) + '" aria-pressed="' + (i === 0) + '">' + esc(FN[f] || f) + '</button>'; }).join('') + '</div>' : '') +
-      '<div class="qk-chips scroll" id="ff-pos" role="group" aria-label="Position">' + ['all'].concat(Object.keys(poss)).map(function (k, i) { return '<button type="button" class="qk-chip" style="--ca:var(--accent)" data-value="' + esc(k) + '" aria-pressed="' + (i === 0) + '">' + esc(k === 'all' ? 'All' : k) + '</button>'; }).join('') + '</div></div>';
-    html += '<div class="qk-grid cc-grid"><div class="qk-span-5">' + U.card('Top 25: floor to ceiling', 'Projected points with the 10th to 90th percentile range.', U.chart('ff-rng', 640, 'Projected fantasy points with range, top 25')) + '</div><div class="qk-span-7" id="ff-tbl"></div></div>';
+      '<div class="qk-chips scroll" id="ff-pos" role="group" aria-label="Position">' + ['all'].concat(Object.keys(poss)).map(function (k, i) { return '<button type="button" class="qk-chip" style="--ca:var(--signal)" data-value="' + esc(k) + '" aria-pressed="' + (i === 0) + '">' + esc(k === 'all' ? 'All' : k) + '</button>'; }).join('') + '</div></div>';
+    html += '<div class="qk-grid cc-grid"><div class="qk-span-5">' + U.card('Top 25: floor to ceiling', 'Our projected points (dot) with the likely range, 10th to 90th percentile (bar).', U.chart('ff-rng', 640, 'Projected fantasy points with range, top 25')) + '</div><div class="qk-span-7" id="ff-tbl"></div></div>';
     var pById = {}; proj.forEach(function (r) { pById[r.id] = r; });
     function mini(title, sub, list) { list = (list || []).map(function (r) { return Object.assign({}, pById[r.id] || {}, r); }); return list && list.length ? U.card(title, sub, '<ul class="cc-list">' + list.slice(0, 10).map(function (r) { return '<li>' + U.playerEnt(L, r.id, r.name, r.team, (r.pos || '') + (r.opp ? ' v ' + CC.tabbr(L, r.opp) : ''), S) + '<span class="v">' + CC.f(r.proj, 1) + '</span></li>'; }).join('') + '</ul>') : ''; }
     var m1 = mini('Start or sit', 'Closest calls among likely starters.', d.start_sit), m2 = mini('Sleepers', 'Projected well above their usual usage.', d.sleepers);

@@ -112,6 +112,33 @@ def test_game_page(built):
     assert obj["epa"] and all("epa_play" in v for v in obj["epa"].values())
 
 
+def test_players_rate_fields(built):
+    """Metrics spec (docs/_design/metrics/college.json): rate fields by position, `qualified_rate`, rate percentiles
+    within the position among rate-qualified players only (100 = best, lower-is-better rates reversed)."""
+    from oddsmarkets.college.football import players as FP
+    cat = _load(built["out"] / "2024" / "players.json")
+    keys = {m["key"] for m in cat["metrics"]}
+    assert keys >= {k for ks in FP.RATE_FIELDS.values() for k in ks}
+    assert set(cat["min_floor"]["rate"]) >= {"QB", "RB", "WR", "DL", "K", "P"}
+    pl = cat["players"]
+    qbs = [p for p in pl.values() if p["pos"] == "QB" and p["qualified_rate"]]
+    assert qbs and all("epa_db" in p["values"] and "epa_db" in p["pct_pos"] for p in qbs)
+    assert all("epa_db" not in p["pct"] for p in qbs)
+    for p in pl.values():
+        for k in FP.RATE_FIELDS.get(p["pos"], []):
+            if k in p["pct_pos"]:
+                assert p["qualified_rate"]
+    lo = [p for p in qbs if p["values"].get("int_rate") is not None]
+    if len(lo) >= 2:
+        a, b = min(lo, key=lambda p: p["values"]["int_rate"]), max(lo, key=lambda p: p["values"]["int_rate"])
+        assert a["pct_pos"]["int_rate"] >= b["pct_pos"]["int_rate"]
+    for p in pl.values():
+        v = p["values"]
+        for k in ("cmp_pct", "sr_db", "tgt_share", "rush_share", "fg_pct"):
+            if v.get(k) is not None:
+                assert 0 <= v[k] <= 1.0001, (k, v[k])
+
+
 def test_value_and_careers(built):
     v = _load(built["out"] / "2024" / "value.json")
     assert v["leaders"] and {"id", "name", "team", "pos", "value", "value_pg", "pctl", "why"} <= set(v["leaders"][0])
@@ -148,3 +175,65 @@ def test_conference_record_excludes_the_title_game():
     assert (one["w"], one["l"], one["conf_w"], one["conf_l"]) == (3, 0, 1, 0)
     two = next(r for r in out["5"] if r["team"] == "2")
     assert (two["w"], two["l"], two["conf_w"], two["conf_l"]) == (0, 2, 0, 1)
+
+
+def test_play_flags_and_credit_rates():
+    """Play-credit rates (metrics spec): sacks, completions, yards per role, 20+ / 10+ explosives, stuffs."""
+    pa = pd.DataFrame([
+        dict(gid="g", kind="pass", type_id=24, yards=25, text="A B pass complete to C D for 25 yds", passer_id="qb", target_id="wr",
+             rusher_id=None),
+        dict(gid="g", kind="pass", type_id=3, yards=0, text="A B pass incomplete to C D", passer_id="qb", target_id="wr", rusher_id=None),
+        dict(gid="g", kind="pass", type_id=7, yards=-8, text="A B sacked by X Y for a loss of 8 yards", passer_id="qb", target_id=None,
+             rusher_id=None),
+        dict(gid="g", kind="pass", type_id=26, yards=12, text="A B pass intercepted Z return for 12 yds", passer_id="qb", target_id="wr",
+             rusher_id=None),
+        dict(gid="g", kind="rush", type_id=5, yards=-2, text="R B run for a loss of 2", passer_id=None, target_id=None, rusher_id="rb"),
+        dict(gid="g", kind="rush", type_id=5, yards=14, text="R B run for 14 yds", passer_id=None, target_id=None, rusher_id="rb"),
+    ])
+    pa = pa.assign(scrim=True, garbage=False, epa=0.1, success=1.0)
+    c = players.play_credit(pa).set_index("pid")
+    assert (c.loc["qb", "db_n"], c.loc["qb", "db_sack"], c.loc["qb", "db_cmp"], c.loc["qb", "db_expl"]) == (4, 1, 1, 1)
+    assert c.loc["qb", "db_yds"] == 25 - 8                       # the interception's return yards are not his
+    assert (c.loc["wr", "tg_n"], c.loc["wr", "tg_cmp"], c.loc["wr", "tg_yds"], c.loc["wr", "tg_expl"]) == (3, 1, 25, 1)
+    assert (c.loc["rb", "ru_n"], c.loc["rb", "ru_stuff"], c.loc["rb", "ru_expl"], c.loc["rb", "ru_yds"]) == (2, 1, 1, 12)
+
+
+def test_new_rate_fields_and_box_count_direction(built):
+    """sack_rate ... expl_tgt reach players.json with lower-is-better reversed; box counts with lower=True (pass_int)
+    rank so that 100 = best (fewest interceptions)."""
+    cat = _load(built["out"] / "2024" / "players.json")
+    keys = {m["key"]: m for m in cat["metrics"]}
+    for k in ("sack_rate", "expl_pass", "ypd", "qb_rush_epa", "expl_rush", "stuff_rate", "ypt", "catch_rate", "expl_tgt",
+              "fga_pg", "fg_long"):
+        assert k in keys, k
+    assert keys["sack_rate"]["lower"] and keys["stuff_rate"]["lower"]
+    pl = cat["players"]
+    wrs = [p for p in pl.values() if p["pos"] == "WR" and p["values"].get("catch_rate") is not None]
+    assert wrs and all(0 <= p["values"]["catch_rate"] <= 1 for p in wrs)
+    assert any("ypt" in p["pct_pos"] for p in wrs)
+    qbs = [p for p in pl.values() if p["pos"] == "QB" and "pass_int" in p["pct_pos"]]
+    if len(qbs) >= 2:
+        a = min(qbs, key=lambda p: p["values"]["pass_int"])
+        b = max(qbs, key=lambda p: p["values"]["pass_int"])
+        if a["values"]["pass_int"] < b["values"]["pass_int"]:
+            assert a["pct_pos"]["pass_int"] > b["pct_pos"]["pass_int"]
+            assert a["pct"]["pass_int"] > b["pct"]["pass_int"]
+
+
+def test_team_adjusted_pass_and_rush_epa(built):
+    """teams.json gains opponent-adjusted pass and rush EPA, offence and defence (the EPA ridge split by play type);
+    the raw pass_epa / rush_epa stay as they were."""
+    import numpy as np
+    t = _load(built["out"] / "2024" / "teams.json")
+    meta = {m["key"]: m for m in t["metrics"]}
+    assert not meta["off_pass_epa"]["lower"] and meta["def_pass_epa"]["lower"] and meta["def_rush_epa"]["lower"]
+    rows = [r["values"] for r in t["teams"].values()]
+    for k in ("off_pass_epa", "def_pass_epa", "off_rush_epa", "def_rush_epa", "pass_epa", "rush_epa"):
+        assert all(isinstance(v.get(k), float) for v in rows), k
+    raw = np.array([v["pass_epa"] for v in rows])
+    adj = np.array([v["off_pass_epa"] for v in rows])
+    assert np.corrcoef(raw, adj)[0, 1] > 0.5
+    best = max(t["teams"].values(), key=lambda r: r["values"]["off_pass_epa"])
+    assert best["pct"]["off_pass_epa"] == 100
+    low = min(t["teams"].values(), key=lambda r: r["values"]["def_pass_epa"])
+    assert low["pct"]["def_pass_epa"] == 100                     # fewest allowed = best

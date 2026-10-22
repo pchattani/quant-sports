@@ -89,3 +89,179 @@ Payloads (contract: `docs/site/UNIFIED_PAYLOADS.md` section 15): `data/value/mov
 Render `moves.json` `meta.method` verbatim under a "Who moves next" heading, then a small table of
 `meta.validation` (leave, type, destination, arrivals, targets: model v base, CI, passed). It says, as the brief
 requires, that there is no contract data and why.
+
+---
+
+## College (The Quant Campus: CFB, MBB, WBB)
+
+Payloads (contract: `oddsmarkets/college/PAYLOADS.md`, "movement.json"): `data/<L>/<S>/movement.json` for the current
+season (`players` is a packed list: expand with `CC.unpack` as every Campus payload) and `movement` on the current
+season's team pages (`teams/<tid>.json`). The horizon is "before the <next> season" (`meta.next_season`): show it in
+every title ("Chance of leaving before 2027"). Every view carries the label **"Inferred from box scores, not the
+official transfer portal"** (a chip plus the info tip with `meta.method`).
+
+**What is a model and what is a base rate** (from `meta.validation`):
+- `p`, `p_transfer`, `p_gone` are a **model that passed** its held-out test on all three levels (tip: the log-loss and
+  CI in `meta.validation.leave`).
+- `expected_in` / `p_add` are a **base rate** (last offseason's inferred transfers in per team): "base rate" chip.
+- Targets exist for MBB and WBB only (`movement.targets` is null for CFB: the CFB destination model did not pass).
+  For CFB, hide the Targets table and show one line: "Targets: not shown for football: our destination model did not
+  beat a simple ranking on held-out seasons."
+- When `movement.json` has `ok: false` (basketball until about mid-December 2026: `reason` says why), every view
+  shows `QK.empty` with the reason, e.g. "Forecasts start when the 2026-27 season has a quarter of its box scores."
+
+### 1. Roster column "Chance of leaving" (team page roster; Players catalogue)
+
+- Join `movement.json` players to the roster by `id` (or use `movement.roster` [pid, p, p_transfer] on the team page).
+- Cell: a 0-100% bar for `p`, split into two segments: "Transfer" (`p_transfer`) and "No line next season" (`p_gone`;
+  tip: "graduation, the pros, a lower division, injury or not playing"). Percentage label = `p`.
+- Suffixes: `class` when present (this season's ESPN roster class, a fact), "transferred in" when `new_in` = 1.
+- Football: offensive linemen have no box-score line, so no estimate: "-" with the tip "no box-score line (offensive
+  line)". Football positions in this file are box-inferred (WR includes tight ends); show the roster position from the
+  team page where it exists and fall back to `pos`.
+
+### 2. Team "Outlook" card (team page, Value & Moves)
+
+- Title "Outlook: before 2027". KPIs: "Expected departures" `out_total`, "Expected transfers out" (sum of
+  `expected_transfers_out`), "Expected transfers in" (sum of `expected_in`, "base rate" chip).
+- A grid by position (`meta.positions`: CFB QB, RB, WR, DL, LB, DB, K; basketball G, F, C): expected out (with the
+  transfer part), expected in, "Chance of adding" (`p_add`) as a bar. Mark the position with the largest
+  `expected_out - expected_in` "Biggest gap"; mark the existing `needs` units from the same page with a "need" chip.
+- Optional chart: a diverging `QKC.bar` by position (departures left, arrivals right), x axis "Players (expected)",
+  y axis "Position".
+
+### 3. "Targets" table (MBB and WBB team pages, Value & Moves)
+
+- Title "Who they could land"; sub "Likely transfers ranked by chance of joining: availability x fit x plausibility".
+  From `movement.targets` (10 rows).
+- Columns: rank; player (link `#/<L>/player/<id>`), position, current team (`team`); **Chance of joining** (`p_join`,
+  one decimal %; tip "the chance he ends up here; around 0.5% is a strong target among ~360 teams"); **Availability**
+  (`p_transfer` bar); **Fit** (`pctl`: "84th percentile of guards this season", and the team's expected departures at
+  his position from the Outlook card); **Plausibility** (`plaus`: "3.4x an average team"; `margin_step` as "a step up /
+  down for him"); **Why** (`why`).
+- Tip with the validation: "On the 2023-24 to 2025-26 offseasons, a team's top 10 held its actual incoming transfers 4x
+  as often as the most likely transfers alone (0.36% v 0.09% of names, MBB; 0.46% v 0.13%, WBB)."
+
+### 4. Player page "Movement" card
+
+- Title "Movement: before <next season>". Big number `p` ("Chance of leaving"), with the split bar (transfer / no line)
+  and one line of context: experience ("3 earlier seasons in our box scores"), `class` if present, "transferred in
+  this season" if `new_in`.
+- "Teams that fit" (optional, when the page loads the level's team pages): teams whose `movement.targets` list him, with
+  their `p_join`.
+- The existing career `moves` list (inferred transfers that happened) sits under it as history.
+
+### Model page text
+
+Render `movement.json` `meta.method` under "Who moves next", then a table of `meta.validation` (leave, joint, targets:
+model v base, CI, passed) for the level shown.
+
+---
+
+## US sports (The Quant Hardwood, Gridiron, Bullpen, Rink)
+
+One payload shape for all five leagues (engine `oddsmarkets/common/movement.py` `payload()`; method and validation in
+`docs/research/moves_model.md`, `moves_hardwood.md`, `moves_gridiron.md`, `moves_rink.md`):
+
+| League | Payload | Phase today | Value unit | Positions |
+|---|---|---|---|---|
+| NBA | `hardwood/data/nba/movement.json` | season start (`inseason`) | WAR (Hardwood) | G, F, C |
+| WNBA | `hardwood/data/wnba/movement.json` | after the season (`offseason`) | WAR (Hardwood) | G, F, C |
+| NFL | `gridiron/data/<S>/movement.json` | week 6 (`inseason`) | points above replacement | QB RB WR TE OL EDGE DL LB CB S K P LS |
+| MLB | `bullpen/data/mlb/movement.json` | after the season (`offseason`) | WAR (Bullpen) | C 1B 2B 3B SS LF CF RF DH SP RP |
+| NHL | `rink/data/<SSSSSSSS>/movement.json` | ~12% into the season (`inseason`) | WAR (Rink) | C LW RW D G |
+
+Keys (never renamed; read by name, not position):
+- `players`: rows with `player_fields` = `pid, name, team, pos, age, yrs, value, p_next, p_<type>... , p_dl, why`.
+  `p_next` = chance he is not with this team at `horizons.next`; `p_<type>` (in `types` order, labels in
+  `type_labels`) split it and sum to it; `p_dl` = chance he moves before `horizons.deadline`, labelled with
+  `deadline_label` ("traded" for MLB, "traded or claimed" elsewhere: the box scores cannot tell the two apart);
+  `why` = up to two drivers in words ("age 34, a small role"). A probability is `null` when its block is not
+  published.
+- `teams[tid]`: `wp`, `status` ("contending" / "in the middle" / "rebuilding", cut-offs in `status_cuts`), `traj`,
+  `exp_departures`, `exp_arrivals`, `outlook` rows (`team_fields.outlook`: `pos, p_add, exp_arrivals, need,
+  exp_departures, players`), `targets` rows (`team_fields.targets`: `pid, name, team, pos, age, value, gain, p_move,
+  p_join, why`). Empty lists / `null` when not published.
+- `published` {next, deadline, type, arrivals, targets}, `reasons` {block: one sentence, show it verbatim where the
+  block would be}, `base_rates` {next, deadline, types}, `base_arrivals` {pos: [p_add, mean]}, `team_horizon`
+  ("deadline" or "next": the horizon of the Outlook and Targets), `horizons` (`deadline`, `deadline_estimated` where
+  set, `next`), `validation` (per block `test`/`dev`: n, rate, log-loss and Brier with gains and CIs, calibration
+  slope, in-the-large, deciles), `drivers` (the largest standardised coefficients), `notes`, `snapshot`.
+- Sport extras: NBA/WNBA `roster_source`, `recent_rates`; NHL `label_check` (in-season moves the games found v ESPN's trade and waiver rows); NFL
+  `horizons.snapshot_week`.
+
+**What is published today (22 Oct 2026)** — the views must follow `published`, not this table:
+
+| | Leaves by next season | Before the deadline | Type split | Outlook | Targets |
+|---|---|---|---|---|---|
+| MLB | model | base rate (calibration miss) | model | model | model |
+| NBA | model | model | model | base rate | hidden |
+| WNBA | base rate | base rate | base shares | base rate | hidden |
+| NFL | model | model | base shares | base rate | hidden |
+| NHL | model ("not in the lineup") | base rate | base shares | base rate | hidden |
+
+### 1. Roster column "Chance of moving" (team page roster table; Players catalogue)
+
+- Header "Chance of moving", tip: "by `horizons.next`" plus the first `notes` line. Cell: a 0-100% bar
+  (`QK.chanceBar({ label: name, p: p_next })`, kit v2 "Signal") with the percentage, the bar segmented by
+  `p_<type>` in the `types` order with a `QK.keys` legend once per table (Trade / Release or waiver / Free agency /
+  Other; NFL: In-season move / Released in season / Offseason departure). When `published.type` is false add the
+  "base shares" chip to the legend: the split is the league's shares, not the player's.
+- A second, narrower column "Deadline" (`p_dl`, label from `deadline_label`: "Traded" or "Traded or claimed") when
+  `published.deadline`; otherwise one line above the table: "About `base_rates.deadline` of players are
+  traded/claimed before `horizons.deadline`" with the "base rate" chip and `reasons.deadline` in its tip.
+- `why` as a muted second line under the name on desktop, inside the row's expand on phone.
+- When `published.next` is false (WNBA today), do not show a per-player column: show the league line "About
+  `base_rates.next` of rostered players leave by next season (last three seasons: `recent_rates.next`)" with the
+  base-rate chip and `reasons.next`.
+- Default sort: `p_next` descending. MLB NHL wording: NHL `p_next` reads "Chance he's not in the lineup next season"
+  (it includes a season in the minors); MLB and NBA "Chance he's gone by next season".
+
+### 2. Team "Outlook" card (team page, Value & Moves, beside Strengths and needs)
+
+- Title "Outlook: `horizons.next`" (or "to the deadline" when `team_horizon` = "deadline"), with the `status` as a
+  chip ("contending", "rebuilding": from our standings, cut-offs in the tip).
+- Stat tiles (`QK.stats`): "Expected departures" `exp_departures`, "Expected arrivals"
+  `exp_arrivals` (from other teams' rosters; prospects, draft picks and players from outside the league are not
+  counted: say so in the tip).
+- A position grid from `outlook`: position, "Chance of adding" (`p_add` bar), expected arrivals, expected departures
+  there, and `need` as a percentile chip (`QK.pctlChip((1 - need) * 100)`: the team's strength at the position among
+  the league). Mark positions that are also in the existing `weaknesses` with a "need" chip.
+- When `published.arrivals` is false: the grid shows `base_arrivals[pos][0]` with the "base rate" chip and
+  `reasons.arrivals`, and the expected-arrivals tile shows the sum of `base_arrivals[pos][1]` labelled "league
+  average".
+- Optional chart: a diverging `QKC.bar` per position (departures left, arrivals right); x axis "Players
+  (expected)", y axis "Position".
+
+### 3. "Targets" table (team page, Value & Moves; the trade simulator can prefill from it)
+
+- Only when `published.targets` (MLB today). Title "Who they could get"; sub "Ranked by chance of joining: chance he
+  moves x chance he lands here; only players who would upgrade your weakest regular at the position".
+- Columns: rank; player (link), age, position; team (mark); **Chance of joining** (`p_join`, one decimal: "1.8%";
+  tip: "the chance he joins this team by `horizons.next`; 1-2% is a strong target among 30 teams"); **Availability**
+  (`p_move` bar); **Fit** (`gain` signed in `unit`: "+0.7 WAR over your 3B slot"); **Why** (`why`).
+- Info tip from `validation.targets.test`: "On 2023-2025, 2.7% of a team's top 10 joined it, against 0.3% for the
+  best upgrades alone and 0.8% by chance." Keep it modest: a shortlist, not a prediction of the move.
+- Where targets are hidden, show `reasons.targets` in a `QK.empty` and keep the existing "Ways to improve" list as it
+  is (it is the need x value ranking).
+
+### 4. Player page "Movement" card
+
+- Title "Movement". `QK.playerHeader` stat or a stat tile: "Chance of moving" `p_next` with the horizon; under it the
+  type split as a stacked bar with the legend, and "Before the deadline" `p_dl` when published.
+- Context line from the row: age, `yrs` ("8 seasons since his debut" MLB; "8 accrued seasons" NFL; "seasons in the
+  league" NBA/NHL), `value`, and `why`.
+- "Teams that fit" (optional, MLB): the teams whose `targets` list him, with `p_join`.
+- Facts never mixed into the number: his transactions history (existing moves/transactions payloads).
+
+### Model page text
+
+Under "Who moves next": the `notes` verbatim (they include the no-contract-data sentence the brief requires), then a
+table from `validation` (block, sealed seasons `split.test`, n, rate, model v base log-loss, gain with CI, Brier gain,
+calibration slope, published yes/no with `reasons`) and a decile chart for `next` (`QKC.line` or scatter of
+`deciles`: x axis "Predicted chance", y axis "Observed share", the diagonal as reference).
+
+Kit note (US sports): the v2 "Signal" kit is committed (855814be; `docs/_design/MIGRATION_V2.md`), so build these
+views with `QK.sectionHead`, `QK.stats`, `QK.chanceBar` / `QK.chances`, `QK.leaderboard`, `QK.keys`, `QK.pctlChip`,
+`QK.playerHeader` and `QK.empty`. A payload written before 22 Oct 17:30 may lack `team_horizon` and `base_arrivals`
+until its daily refresh: treat a missing `team_horizon` as "deadline" in season and "next" after it.

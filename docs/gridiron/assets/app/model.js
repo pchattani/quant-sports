@@ -20,7 +20,7 @@ GI.route('methodology', function (el, params) {
   });
   el.innerHTML = GI.pageHead('Model', 'Methodology', 'Where the data comes from, how every model works, and where it is wrong. Every constant is the one in the code on 1 October 2026; each section names its source file under <code>oddsmarkets/nfl/</code>.') + GI.sectionNav('model', 'methodology') +
     '<div class="gi-doc"><nav class="qk-card gi-toc" aria-label="Sections"><b>Contents</b><ol>' + secs.map(s => '<li><a href="#/methodology/' + esc(s.id) + '" data-target="method-' + esc(s.id) + '">' + esc(s.title) + '</a></li>').join('') + '</ol></nav>' +
-    '<div class="gi-doc-body">' + secs.map((s, i) => '<section class="qk-card gi-prose" id="method-' + esc(s.id) + '"><div class="qk-card-body"><h2><span class="gi-num" style="color:var(--accent)">' + (i + 1) + '</span> ' + esc(s.title) + '</h2>' + s.html + '</div></section>').join('') + '</div></div>';
+    '<div class="gi-doc-body">' + secs.map((s, i) => '<section class="qk-card gi-prose" id="method-' + esc(s.id) + '"><div class="qk-card-body"><h2><span class="gi-num" style="color:var(--signal)">' + (i + 1) + '</span> ' + esc(s.title) + '</h2>' + s.html + '</div></section>').join('') + '</div></div>';
   el.querySelectorAll('.gi-toc a[data-target]').forEach(a => a.addEventListener('click', ev => {
     ev.preventDefault();
     const t = document.getElementById(a.dataset.target);
@@ -51,7 +51,7 @@ GI.route('glossary', function (el, params) {
         if (isNum(e.stabilises_at)) tags.push('stabilises ~' + GI.int(e.stabilises_at) + ' ' + (e.unit || 'plays'));
       }
       return '<div class="gi-gl-e" id="gl-' + esc(id) + '" data-q="' + esc(GI.fold([e.label, e.key, e.desc, e.group, e.scope].join(' '))) + '" data-scope="' + (isModel ? 'model' : 'metric') + '"><dt><a href="#/glossary/' + encodeURIComponent(e.key) + '">' + esc(e.label || e.key) + '</a> <code>' + esc(e.key) + '</code>' +
-        tags.map(t => '<span class="qk-badge">' + esc(t) + '</span>').join('') + '</dt><dd>' + (e.desc ? esc(GI.cleanDesc(e.desc)) : '<span class="qk-muted">No definition yet.</span>') + '</dd></div>';
+        tags.map(t => '<span class="qk-badge">' + esc(t) + '</span>').join('') + '</dt><dd>' + (e.desc ? esc(GI.copyText(GI.cleanDesc(e.desc))) : '<span class="qk-muted">No definition yet.</span>') + '</dd></div>';
     };
     const cards = groups.map(x => ({ name: x.name, sl: slug(x.name), html: (x.entries || []).map(e => entry(e, false)).join(''), n: (x.entries || []).length }))
       .concat(MT.map(x => ({ name: 'Terms: ' + x[0], sl: 'model-' + slug(x[0]), html: x[1].map(t => entry({ key: t[0], label: t[1], desc: t[2] }, true)).join(''), n: x[1].length })));

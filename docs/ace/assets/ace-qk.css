@@ -16,11 +16,11 @@
 
 /* ── page frame */
 .ta-page { padding-top: var(--sp-5); min-height: 60vh; }
-.ta-page a { color: var(--accent); }
+.ta-page a { color: var(--signal); }
 .ta-page a:hover { color: var(--ink-1); }
 .ta-page a.ply-link, .ta-page a.team-link, .ta-page a.game-link, .ta-page a.ump-link, .ta-page a.park-link, .ta-page .qk-table a,
 .ta-page .wc-table a, .ta-page a.qk-match, .ta-page a.qk-card, .ta-page a.qk-btn, .ta-page a.ov-div-row, .ta-page .rk-name a { color: var(--ink-1); }
-.ta-page a.ply-link:hover, .ta-page a.team-link:hover, .ta-page .qk-table a:hover, .ta-page .wc-table a:hover, .ta-page .rk-name a:hover { color: var(--accent); }
+.ta-page a.ply-link:hover, .ta-page a.team-link:hover, .ta-page .qk-table a:hover, .ta-page .wc-table a:hover, .ta-page .rk-name a:hover { color: var(--signal); }
 .ta-page a.qk-btn.primary { color: var(--ink-inv); }
 .ta-page code { background: var(--s-2); padding: 1px 5px; border-radius: 4px; font: 500 0.85em var(--font-num); }
 .ta-page h2 { font-size: var(--fs-lg); }
@@ -227,3 +227,51 @@ tr.row-link { cursor: pointer; }
 .ov-ev-meta { font-size: var(--fs-xs); color: var(--ink-3); }
 .ov-ev-fav { margin-top: 6px; font-size: var(--fs-sm); color: var(--ink-2); }
 .ov-ev-fav .num { font-family: var(--font-num); color: var(--accent); font-weight: 600; }
+
+/* ═════════════════════════════════ Design System 2.0 ("Signal"): the v2 pages */
+.ta-secbar .qk-sh.ta-sh { margin-bottom: 0; }
+.ta-secbar .ta-meta { margin-top: 6px; text-align: left; }
+.ta-page .page-head.qk-sh { margin-top: var(--sp-2); }
+.ta-page .page-head .ph-nav { display: flex; gap: 6px 14px; flex-wrap: wrap; font-size: var(--fs-xs); font-weight: 600; }
+.ta-page .qk-sh-sub a { color: var(--signal); }
+.edge-pos { color: var(--up); font-weight: 600; }
+/* old KPI grids hold v2 stat tiles */
+.ta-page .kpi-grid { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: var(--sp-4); }
+.ta-page .kpi-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ta-page .qk-stat-v.text { font-size: var(--fs-lg); font-family: var(--font-display); font-stretch: var(--stretch-display); font-weight: 800; line-height: 1.15; }
+.ta-page .qk-stat-v a { color: var(--ink-1); }
+.ta-page .qk-stat-sub a { color: var(--signal); }
+@media (max-width: 720px) { .ta-page .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .ta-page .kpi-grid.three { grid-template-columns: 1fr; } }
+/* v2 tennis game card: rank, name, set cells, then our chance (before) or sets won */
+.ta-page a.qk-gc { color: var(--ink-1); }
+.ta-gcrow { grid-template-columns: 20px minmax(0, 1fr) auto 2.6ch; }
+.ta-gcrow .ta-rank { text-align: right; }
+.ta-gcrow .ta-sets { gap: 2px; }
+.ta-gcrow .ta-set { min-width: 15px; font-size: var(--fs-sm); }
+.ta-win { color: var(--up); font-size: var(--fs-xs); }
+.ta-gc-grid { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); }
+.gc-grid { grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); }
+/* v2 overview */
+.ta-ov-kpis { margin: var(--sp-2) 0 var(--sp-6); }
+.ta-ticker { margin: 0 0 var(--sp-5); border: 1px solid var(--line-1); border-radius: var(--r-3); overflow-x: auto; }
+.ta-evcards { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.ta-evcard { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; background: var(--s-1); border: 1px solid var(--line-1); border-radius: var(--r-3); position: relative; overflow: hidden; color: var(--ink-1) !important; }
+.ta-evcard::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--sf, var(--accent)); }
+.ta-evcard:hover { border-color: var(--line-3); }
+.ta-evcard .k { font: 700 var(--fs-2xs)/1.2 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-3); }
+.ta-evcard b { font: 800 var(--fs-lg)/1.15 var(--font-display); font-stretch: var(--stretch-display); }
+.ta-evcard .m { font-size: var(--fs-xs); color: var(--ink-3); }
+.ta-evcard .f { font-size: var(--fs-sm); color: var(--ink-2); margin-top: 4px; }
+.ta-evcard .f b { font: 800 var(--fs-md) var(--font-display); color: var(--signal); }
+.ta-list { list-style: none; margin: 0; padding: 0; }
+.ta-list li { display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-bottom: 1px solid var(--line-1); min-width: 0; }
+.ta-list li:last-child { border-bottom: 0; }
+.ta-list .n { color: var(--ink-3); font: 500 var(--fs-xs) var(--font-num); width: 18px; text-align: right; flex: none; }
+.ta-list .nm { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ta-list .s { color: var(--ink-3); font-size: var(--fs-xs); white-space: nowrap; }
+.ta-list .v { margin-left: auto; font: 800 var(--fs-md) var(--font-display); font-stretch: var(--stretch-display); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ta-list li:first-child .v { color: var(--signal); }
+.ta-page .qk-chart { width: 100%; height: var(--h, 280px); }
+.ta-cap { color: var(--ink-3); font-size: var(--fs-xs); margin: 8px 0 0; }
+.ta-stack > * + * { margin-top: var(--sp-4); }
+.ta-hint { color: var(--ink-3); font-size: var(--fs-xs); }

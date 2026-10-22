@@ -51,7 +51,7 @@ def test_team_metrics_and_model_terms_are_complete() -> None:
     assert len(keys) == len(set(keys))
     assert {"xg_for", "xg_against", "xg_diff", "goals_for", "goals_against", "finishing", "keeping", "xpts_per_match", "luck",
             "possession", "field_tilt", "ppda", "shots", "shots_against", "shot_quality", "shot_quality_against", "sot_pct",
-            "big_chances", "big_chances_missed", "corners", "aerial_pct", "ground_duel_pct", "passes", "pass_pct",
+            "sot_diff", "big_chances", "big_chances_missed", "corners", "aerial_pct", "ground_duel_pct", "passes", "pass_pct",
             "long_ball_share", "crosses", "dribbles", "fouls", "cards", "km", "sprints", "rating"} == set(keys)
     for t in g.TEAM_METRICS:
         assert set(t) == {"key", "label", "desc", "fmt", "lower", "group"}

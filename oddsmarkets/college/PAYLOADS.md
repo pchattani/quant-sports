@@ -160,6 +160,9 @@ BRACKET (cfb): `{"seeds": [{"seed","team","auto": bool}], "games": [{"round","sl
 For a finished season `actual` is filled and `odds` are our pre-tournament probabilities (with results).
 
 `teams.json` (catalogue): `{"ok","metrics":[METRIC],"teams": {tid: {"name","conference","w","l","rating_rank","values":{key:v},"pct":{key:0-100}}}}`.
+CFB `values` also carry `off_pass_epa`, `def_pass_epa`, `off_rush_epa`, `def_rush_epa` (23 Oct 2026): opponent-adjusted
+EPA per dropback / per rush, for and allowed (lower = better allowed), from the EPA ridge split by play type with a fresh
+in-season prior (`ratings.split_adjusted`); `pass_epa` / `rush_epa` stay raw offence-only.
 
 `teams/<tid>.json` (team page)
 ```
@@ -177,12 +180,64 @@ For a finished season `actual` is filled and `odds` are our pre-tournament proba
 
 `players.json` (catalogue): `{"ok","metrics":[METRIC],"positions": {pos: {"label","n"}},"min_floor": {...},
  "players": {pid: {"name","team","pos","class","gp","qualified","values":{key:v},"pct":{key},"pct_pos":{key}}}}`.
+Metric rates (the metrics spec, `docs/_design/metrics/college.json`, added 22 Oct 2026):
+- football: `values` gains the position's rate fields (`players.RATE_FIELDS`: QB `db, epa_db, sr_db, cmp_pct, ypa,
+  td_rate, int_rate, rush_pg`; RB `epa_rush, sr_rush, ypc, rush_share, tgt_share`; WR/TE `epa_tgt, sr_tgt, tgt_share,
+  yptpa, ypr`; DL/LB/DB `tkl_pg, tfl_pg, sacks_pg, hurries_pg, pd_pg, def_int_pg, havoc_pg`; K `fg_pct, xp_pct`;
+  P `gross, in20_rate, tb_rate`), each player `"qualified_rate": bool` (the position's volume per team game,
+  `min_floor.rate` {pos: {"field","per_team_game"}}, prorated by the team's games so far), and the rate fields'
+  percentiles only in `pct_pos`, among rate-qualified players of the position, 100 = best (lower-is-better rates
+  reversed). Shares are of the team's credited targets / carries in the player's games; fractions 0-1.
+  Play-credit rates (23 Oct 2026, players cache v7): QB `sack_rate` (lower), `expl_pass` (20+ completions per dropback),
+  `ypd` (yards per dropback after sacks), `qb_rush_epa`; RB `expl_rush` (10+ carries), `stuff_rate` (lower: no gain or a
+  loss); WR/TE `ypt`, `catch_rate`, `expl_tgt` (20+ catches per target); K `fga_pg`, `fg_long` (season's longest made).
+  Box counts in `pct` / `pct_pos` follow the metric's `lower` too (100 = fewest `pass_int`).
+- basketball: `values` gains `pts100, ts_add, efg, tpar, ftr, fta100, ast_pct, tov_pct, ast_tov, orb_pct, drb_pct,
+  trb_pct, stl_pct, blk_pct, pf100` (`players.RATE_KEYS`; per 100 possessions on the floor, shares 0-1); each player
+  `"role": "G"|"W"|"B"` (`players.classify_roles`, the Hardwood rule on box rates) and `"pct_role": {key}` (within the
+  role among qualified players; rate keys `build.ROLE_PCT_KEYS` only; empty in archive seasons like `pct`); catalogue
+  `"roles": {role: {"label","n"}}` and `"role_rule": {"threshold","rule"}`.
 
 `value.json`: `{"ok","currency": {"key","label","desc"},"leaders": [VALUE_ROW] (top 200),"by_position": {pos: [VALUE_ROW] (top 10)}}`
 VALUE_ROW `{"id","name","team","pos","class","gp","value","value_pg","pctl","why": str}`.
 
 `moves.json`: `{"ok","season","note","moves": [MOVE],"by_team": {tid: {"in","out","net_value"}},"best": [MOVE],"summary": {...}}`
 MOVE `{"player","name","pos","from","to","value_before","value_after"|null,"class","grade"|null}`.
+
+`movement.json` (current season only; `oddsmarkets/college/movement.py`, written by `build_campus.py` after the season's
+build; added 23 October 2026). Who moves next: each player with a box-score line this season, his chance of leaving
+the team before next season. Moves are **inferred** (the same ESPN athlete on another team's box score next season),
+not the official portal. Until the current season has a quarter of a season's box scores, `{"ok": false, "reason",
+"meta"}` (basketball before about mid-December).
+```
+{"ok","level","season","updated_at",
+ "meta": {"method" (the Model page's text), "validation" (the pre-registered test, fixed numbers: leave, joint, targets,
+          each with passed), "season_share", "next_season", "positions", "training": [{"season","n","rate","transfer"}],
+          "arrivals": {"basis","mean": {pos: transfers in per team}}, "models", "settings", "inferred": true},
+ "players": packed [{"id","name","team","pos",
+                     "p",              # chance he is not with the team next season (transfer or no line)
+                     "p_transfer",     # chance of an inferred transfer to another FBS / D-I team
+                     "p_gone",         # chance of no box-score line next season (graduation, pros, lower division, injury or not playing)
+                     "exp",            # earlier seasons with a box-score line (0-4, 4 = 4+)
+                     "class"|null,     # this season's roster class (ESPN), shown as a fact, not a model input
+                     "pctl"|null,      # this season's production percentile among his position
+                     "new_in"}]}       # 1 when he transferred in this season
+```
+Football positions in this file are inferred from the box score (QB, RB, WR including tight ends, DL, LB, DB, K: the
+past stores carry no roster position); offensive linemen have no box-score line and no estimate.
+
+Team pages (`teams/<tid>.json`, current season): a new key `movement`
+```
+{"season","next_season",
+ "expected_out": {pos: expected departures}, "out_total", "expected_transfers_out": {pos},
+ "expected_in": {pos: last complete offseason's inferred transfers in per team (a base rate)}, "in_basis": "base_rate",
+ "p_add": {pos: 1 - exp(-expected_in)},
+ "roster": [[pid, p, p_transfer]] (most likely to leave first),
+ "targets": [{"id","name","team","pos","p_join" (chance he joins this team: the rank),"p_transfer","pctl",
+              "margin_step" (this team's scoring margin minus his team's),"plaus" (this team's share of his likely
+              destinations x the number of teams; 1 = an average team),"why"}] | null}   # null: not shown (CFB)
+```
+The existing `moves` (inferred transfers that happened) is unchanged.
 
 `fantasy.json`: `{"ok","season","scoring": {...},"period": str ("Week 9" / "next 7 days"),"projections": [{"id","name","team","pos","opp","proj","proj_lo","proj_hi","tier"}],
  "rankings": {fmt: [...]},"start_sit": [...],"sleepers": [...],"backtest": {"n","mae","mae_naive","rank_corr","rank_corr_naive"}}`.

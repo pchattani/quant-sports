@@ -1,40 +1,18 @@
-/* The Quant Hardwood — the player page (#/<L>/player/<pid>).
+/* The Quant Hardwood — the player page (#/<L>/player/<pid>), on Design System 2.0 (the Rink player page is the
+ * reference).
  *
- * Overview tab: a header with the team colour and the season line; headline numbers (impact, value, minutes,
- * award odds); percentiles against his position pool or the league; season by season (impact chart and table);
- * the game log as a chart with splits (home/away, wins/losses, last ten); the shot chart on the half court; value
- * (projected WAR by season and the four-season band); similar players and awards.
+ * Overview tab: the player card header (team band, role, age, the season line); stat tiles with percentile chips
+ * (impact, WAR, projected WAR, scoring, award chance); the Savant-style percentile card against his role (guards,
+ * wings or bigs, qualified players, the sample shown, metrics short of their reliability sample dashed) from the one
+ * metric set (HW.ui.MSET); where he sits in the role's distribution; season by season; the game log and splits; the
+ * shot chart on the half court; value; the career table; similar players (with compare links) and awards.
  * Detail tab (?tab=detail): the pre-redesign player page in full (the whole catalogue, radar, on/off, clutch,
  * projection, lineups, game log table).
- * Data: <L>/players/<pid>.json (career), <L>/<S>/players.json (catalogue), value.json, valuation.json (current). */
+ * Data: <L>/players/<pid>.json (career), <L>/<S>/players.json (catalogue), value.json (roles, WAR), valuation.json. */
 (function (HW) {
 'use strict';
 
 const U = HW.ui, esc = HW.esc, isNum = HW.isNum;
-const PCT_KEYS = [['pts100', 'Scoring / 100'], ['ts', 'True shooting'], ['usg', 'Usage'], ['pox100', 'Shot-making'], ['ast_pct', 'Assist rate'], ['tov_pct', 'Ball security'],
-  ['trb_pct', 'Rebounding'], ['stl_pct', 'Steal rate'], ['blk_pct', 'Block rate'], ['hpm_o', 'Offensive impact'], ['hpm_d', 'Defensive impact'], ['hpm', 'Total impact'], ['on_off', 'On/off'], ['wpa', 'Win prob. added']];
-
-/* Hex cells on the half court: size = volume, colour = points per shot against the league from the same spot. */
-function hexMap(node, cells) {
-  node.classList.add('qk-chart', 'sq', 'qk-surface');
-  const S = QKC.SURF.court;
-  node.style.setProperty('--ar', (S.x[1] - S.x[0]) + ' / ' + (S.y[1] - S.y[0]));
-  const ns = cells.map(c => c.n || 1).sort((x, y) => x - y);
-  const capN = ns[Math.floor(ns.length * 0.9)] || 1;
-  return QKC.mount(node, T => {
-    node.style.backgroundImage = 'url("data:image/svg+xml,' + encodeURIComponent(QKC.surfaceSVG('court', T)) + '")';
-    return {
-      grid: { left: 0, right: 0, top: 0, bottom: 0 },
-      xAxis: { type: 'value', min: S.x[0], max: S.x[1], show: false }, yAxis: { type: 'value', min: S.y[0], max: S.y[1], show: false },
-      visualMap: { show: true, dimension: 2, min: -0.4, max: 0.4, inRange: { color: [T.neg, T.mid, T.pos] }, orient: 'horizontal', right: 8, top: 6, itemWidth: 10, itemHeight: 90, calculable: false,
-        text: ['better', 'worse'], textStyle: { color: T.ink3, fontSize: 10 } },
-      tooltip: QKC.tooltip(T, { formatter: p => { const c = cells[p.dataIndex]; return '<div style="font-weight:600">' + (c.n || 0) + ' shots</div>' + QKC.tipRow(p.color, 'FG%', HW.fmtVal(c.fg, 'pct')) + QKC.tipRow(p.color, 'Pts / shot', U.f(c.pps, 2)) + QKC.tipRow(p.color, 'v league', U.signed(c.d, 2)); } }),
-      series: [{ type: 'scatter', symbol: 'path://M0,-1L0.866,-0.5L0.866,0.5L0,1L-0.866,0.5L-0.866,-0.5Z', data: cells.map(c => [c.x, c.y, isNum(c.d) ? c.d : 0]),
-        symbolSize: (v, p) => { const px = (node.clientWidth || 400) / 50 * 3.1; return Math.max(3, px * (0.35 + 0.65 * Math.sqrt(Math.min(1, (cells[p.dataIndex].n || 1) / capN)))); }, itemStyle: { opacity: 0.92 } }]
-    };
-  }, { label: 'Shot chart' });
-}
-
 function splits(log) {
   const agg = list => {
     const n = list.length; if (!n) return null;
@@ -60,16 +38,18 @@ function render(el, params) {
     let asked = null;
     if (seasons.length && seasons.indexOf(S) < 0) { const prev = seasons.filter(x => x <= S).sort((a, b) => b - a)[0] || Math.max.apply(null, seasons); if (prev !== S) { asked = S; S = prev; } }
     const isCurS = U.isCur(L, S);
-    return Promise.all([HW.load(HW.path('players.json', L, S)), HW.load(HW.path('value.json', L, S)), HW.load(HW.path('valuation.json', L, curS))]).then(a => {
+    return Promise.all([HW.load(HW.path('players.json', L, S)), HW.load(HW.path('value.json', L, S)), HW.load(HW.path('valuation.json', L, curS)), U.movement(L)]).then(a => {
       if (!U.alive(el)) return;
-      draw(el, L, S, pid, career, U.ok(a[0]) ? a[0] : null, U.ok(a[1]) ? a[1] : null, U.ok(a[2]) ? a[2] : null, asked, tab, params, isCurS);
+      draw(el, L, S, pid, career, U.ok(a[0]) ? a[0] : null, U.ok(a[1]) ? a[1] : null, U.ok(a[2]) ? a[2] : null, asked, tab, params, a[3]);
     });
   });
 }
 
-function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params) {
+function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
   const P = (cat && cat.players) || {};
   const p = P[pid] || null;
+  const roles = {};
+  U.rowsOf(sv).forEach(r => { if (r.role) roles[String(r.id)] = r.role; });
   const cs = ((career && career.seasons) || []).slice().sort((a, b) => a.season - b.season);
   const srow = cs.find(x => x.season === S) || {};
   const cur = career && career.current && (!career.current.season || career.current.season === S) ? career.current : {};
@@ -77,77 +57,106 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params) {
   const swar = U.rowsOf(sv).find(x => String(x.id) === pid) || null;
   const name = (p && p.name) || (career && career.name) || (vrow && vrow.name) || HW.playerName(L, pid);
   const team = (vrow && vrow.team) || (p && p.team) || srow.team || null;
-  const col = team ? U.tcol(L, team) : QK.cssVar('--c-1');
+  const col = team ? U.tcol(L, team) : QK.cssVar('--signal');
   const v = (p && p.values) || {};
   const pos = (p && p.pos) || (career && career.pos) || (vrow && vrow.pos) || '';
+  const role = U.roleOf(p, pid, roles) || (swar && swar.role) || null;
   const age = p && isNum(p.age) ? Math.floor(p.age) : vrow && isNum(vrow.age) ? Math.floor(vrow.age) : null;
   document.title = name + ' · ' + HW.leagueName(L) + ' · The Quant Hardwood';
-  const line = [['PPG', v.pts_g, '1'], ['RPG', v.reb_g, '1'], ['APG', v.ast_g, '1'], ['TS%', v.ts, 'pct'], ['MPG', v.mpg, '1']].filter(x => isNum(x[1]));
+  const line = [['PPG', v.pts_g, '1'], ['RPG', v.reb_g, '1'], ['APG', v.ast_g, '1'], ['TS%', v.ts, 'pct']].filter(x => isNum(x[1]));
   const lineFallback = !line.length && srow.season ? [['PPG', srow.pts, '1'], ['RPG', srow.reb, '1'], ['APG', srow.ast, '1'], ['TS%', srow.ts, 'pct']].filter(x => isNum(x[1])) : [];
-  const ini = QK.fmt.initials(name);
-  let h = '<div class="qk-hero" style="--tc:' + esc(col) + '"><div class="hw-teamhead"><div class="qk-avatar" aria-hidden="true">' + esc(ini) + '</div><div><div class="qk-kicker">' + esc(HW.leagueName(L) + ' · ' + HW.seasonLabel(L, S)) + '</div><h1>' + esc(name) + '</h1>' +
-    '<div class="qk-hero-meta">' + (team ? '<span>' + U.teamEnt(L, team, { season: S }) + '</span>' : '<span>Free agent</span>') + (pos ? '<span>' + esc(pos) + '</span>' : '') + (age !== null ? '<span>Age <b>' + age + '</b></span>' : '') +
-    (vrow && vrow.inj ? '<span class="hw-inj">' + esc(vrow.inj) + '</span>' : '') + (asked ? '<span class="qk-badge">No ' + esc(HW.seasonLabel(L, asked)) + ' games yet: showing ' + esc(HW.seasonLabel(L, S)) + '</span>' : '') + '</div></div>' +
-    '<div class="qk-hero-stats">' + line.concat(lineFallback).map(x => '<div class="qk-hero-stat"><div class="l">' + x[0] + '</div><div class="v">' + HW.fmtVal(x[1], x[2]) + '</div></div>').join('') + '</div></div></div>';
+  const tags = [];
+  if (p && p.qualified) tags.push(QK.tag('Qualified for percentiles', 'signal'));
+  else if (p) tags.push(QK.tag('Short of the minutes floor'));
+  if (vrow && vrow.inj) tags.push('<span class="qk-tag hw-inj">' + esc(vrow.inj) + '</span>');
+  if (asked) tags.push(QK.tag('No ' + HW.seasonLabel(L, asked) + ' games yet: showing ' + HW.seasonLabel(L, S)));
+  let h = '<div class="qk-kicker" style="margin-bottom:10px"><a href="' + esc(HW.href(L, 'players', S)) + '">← Players</a></div>' +
+    QK.playerHeader({ name: name, pos: role ? (U.ROLE1 || {})[role] || role : pos, kicker: HW.leagueName(L) + ' · ' + HW.seasonLabel(L, S),
+      team: team ? { name: HW.teamName(L, team), abbr: HW.teamAbbr(L, team), colour: HW.teamColourRaw(L, team), href: HW.teamHref(L, team, S) } : { name: 'Free agent' },
+      meta: [age !== null ? ['Age', String(age)] : null, pos ? ['Listed', pos] : null, p ? ['Minutes', Number(Math.round(p.min || 0)).toLocaleString('en-GB') + ' in ' + (p.gp || 0) + ' games'] : null],
+      stats: line.concat(lineFallback).map(x => ({ label: x[0], value: HW.fmtVal(x[1], x[2]) })), tags: tags });
   const base = HW.playerHref(L, pid, S);
-  h += U.tabsHTML([{ key: 'overview', label: 'Overview', href: base }, { key: 'detail', label: 'Full catalogue, on/off and lineups', href: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'tab=detail' }], tab);
+  h += '<div style="margin-top:var(--sp-4)"></div>' + U.tabsHTML([{ key: 'overview', label: 'Overview', href: base }, { key: 'detail', label: 'Detail: the whole catalogue, on/off and lineups', href: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'tab=detail' }], tab);
   if (tab === 'detail') { el.innerHTML = h + '<div class="hw-sub"></div>'; U.legacy('player', el.querySelector('.hw-sub'), params); return; }
-  // headline numbers
+  // stat tiles: ours first, each with its percentile against his role where there is one
   const k = [];
   const hpm = isNum(v.hpm) ? v.hpm : srow.hpm;
-  if (isNum(hpm)) k.push(QK.kpi({ label: 'Impact (HPM)', value: U.signed(hpm, 1), sub: 'offence ' + U.signed(isNum(v.hpm_o) ? v.hpm_o : srow.o, 1) + ' · defence ' + U.signed(isNum(v.hpm_d) ? v.hpm_d : srow.d, 1), tip: 'Hardwood Plus-Minus: points per 100 possessions better than an average player' }));
-  if (swar && isNum(swar.war)) k.push(QK.kpi({ label: 'Wins above replacement', value: U.f(swar.war, 1), sub: HW.seasonLabel(L, S) + (isNum(swar.pct) ? ' · ' + HW.ordinal(swar.pct) + ' percentile' : '') }));
-  if (vrow) k.push(QK.kpi({ label: 'Projected WAR', value: U.f(vrow.w0, 1), sub: 'rest of ' + HW.seasonLabel(L, HW.currentSeason(L)) + ' · 4-yr value ' + U.f(vrow.v, 1), tip: 'Valuation over four seasons, discounted; see Value & Moves' }));
-  if (p) k.push(QK.kpi({ label: 'Minutes', value: U.f(p.min, 0), sub: (p.gp || 0) + ' games' + (p.qualified === false ? ' · below the floor' : '') }));
+  if (isNum(hpm)) k.push({ label: 'Total impact (HPM)', value: U.signed(hpm, 1), signal: true, pctl: p ? U.rolePctl(cat, roles, pid, 'hpm') : null, sub: 'offence ' + U.signed(isNum(v.hpm_o) ? v.hpm_o : srow.o, 1) + ' · defence ' + U.signed(isNum(v.hpm_d) ? v.hpm_d : srow.d, 1) + ' per 100', tip: 'Hardwood Plus-Minus: points per 100 possessions he adds to his team’s margin over an average player (play-by-play on/off blended with the box score)' });
+  if (swar && isNum(swar.war)) k.push({ label: 'Wins above replacement', value: U.f(swar.war, 1), pctl: isNum(swar.pct_role) ? swar.pct_role : null, sub: HW.seasonLabel(L, S) + (role ? ' · percentile among ' + U.ROLE_NAME[role] : ''), tip: 'Our wins above a replacement-level player this season, from HPM and minutes' });
+  if (vrow) k.push({ label: 'Projected WAR', value: U.f(vrow.w0, 1), sub: 'rest of ' + HW.seasonLabel(L, HW.currentSeason(L)) + (isNum(vrow.p10) ? ' · four seasons ' + U.f(vrow.v, 1) + ' (80%: ' + U.f(vrow.p10, 1) + ' to ' + U.f(vrow.p90, 1) + ')' : ''), tip: 'Our projection of his wins above replacement; the four-season value is discounted, with its 80% range' });
+  if (isNum(v.pts100)) k.push({ label: 'Points per 100', value: U.f(v.pts100, 1), pctl: p ? U.rolePctl(cat, roles, pid, 'pts100') : null, sub: 'true shooting ' + HW.fmtVal(v.ts, 'pct') });
   const aw = cur.awards || {};
   const best = Object.keys(aw).filter(x => isNum(aw[x]) || (aw[x] && isNum(aw[x].p))).sort((a, b) => (isNum(aw[b]) ? aw[b] : aw[b].p) - (isNum(aw[a]) ? aw[a] : aw[a].p))[0];
-  if (best) k.push(QK.kpi({ label: 'Award odds', value: U.pct(isNum(aw[best]) ? aw[best] : aw[best].p), sub: best.toUpperCase() }));
-  if (k.length) h += '<div class="qk-kpis hw-kpis">' + k.join('') + '</div>';
-  const pct = p ? (p.pct_pool || p.pct || {}) : {};
-  const pk = PCT_KEYS.filter(x => isNum(pct[x[0]]));
+  if (best) k.push({ label: 'Our ' + (best === 'mvp' ? 'MVP' : best.toUpperCase()) + ' chance', value: U.pct(isNum(aw[best]) ? aw[best] : aw[best].p), sub: 'from the award model' });
+  if (k.length) h += '<div class="hw-kpis">' + QK.stats(k) + '</div>';
+
+  const groups = p ? U.pctGroups(L, cat, roles, pid) : [];
+  const peer = role ? U.peerName(L, role) : '';
+  const set = role && U.MSET ? U.MSET.roles[role] : null;
+  const style = set ? set.style.filter(x => isNum(v[x])) : [];
+  const pcard = QK.pctCard({ title: 'Percentile rankings', peer: peer, sample: p ? U.sampleLine(L, cat, p) : '', groups: groups,
+    note: style.length ? 'Style, not better or worse: ' + style.map(x => U.mMeta(x).label + ' ' + U.fmtM(x, v[x])).join(' · ') + '.' : '',
+    emptyText: p ? 'No role yet for this player: percentiles appear once he has a role in the value table.' : 'No numbers for this season yet.' });
   const log = (cur.log || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  const cells = cur.shots && cur.shots.grid ? U.rowsOf(cur.shots.grid).filter(c => isNum(c.x) && isNum(c.y) && c.y <= 41.5).map(c => Object.assign({}, c, { d: isNum(c.pps_diff) ? c.pps_diff : (isNum(c.pps) && isNum(c.lg_pps) ? c.pps - c.lg_pps : null) })) : [];
-  h += '<div class="qk-grid hw-sec">';
-  if (pk.length) h += U.card2('Percentiles', '<span id="pp-pbasis">Against ' + esc({ G: 'guards', F: 'forwards', C: 'centres' }[(p || {}).pool] || 'his position pool') + '</span>',
-    '<div class="qk-seg" id="pp-seg" role="group" aria-label="Compare with" style="margin-bottom:12px"><button type="button" data-value="pool" aria-pressed="true">Position</button><button type="button" data-value="league" aria-pressed="false">League</button></div><div id="pp-pct"></div>',
-    { cls: 'qk-span-5' });
-  if (cs.length > 1) h += U.card2('Season by season', 'Impact per 100 possessions: total, offence and defence', U.chart('pp-career', 300, 'Impact by season'), { cls: pk.length ? 'qk-span-7' : 'qk-span-12' });
-  h += '</div>';
+  const cells = cur.shots && cur.shots.grid ? U.rowsOf(cur.shots.grid).filter(c => isNum(c.x) && isNum(c.y) && c.y <= 41.5) : [];
+  h += '<div class="qk-grid"><div class="qk-span-5">' + pcard + '</div><div class="qk-span-7"><div class="hw-stack2">' +
+    (groups.length ? U.card2('Where he sits', 'Every qualified ' + esc(peer.replace(HW.leagueName(L) + ' ', '')) + ' this season; bars coloured by percentile', '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('pp-dist', 240, 'Where he sits among his peers')) : '') +
+    (cs.length > 1 ? U.card2('Season by season', 'Impact per 100 possessions: total, offence and defence', U.chart('pp-career', 280, 'Impact by season')) : '') + '</div></div></div>';
   if (log.length) {
-    h += '<div class="qk-grid hw-sec">' + U.card2('Game by game', 'Game score per game (Hollinger); green when his team was ahead with him (plus-minus)', U.chart('pp-log', 220, 'Game score per game'), { cls: 'qk-span-7' }) +
-      U.card2('Splits', 'Per game', '<div id="pp-splits"></div>', { cls: 'qk-span-5', flush: true }) + '</div>';
+    h += '<div class="qk-grid hw-sec"><div class="qk-span-7">' + U.card2('Game by game', 'Game score per game (Hollinger); green when his team was ahead with him on the floor', U.chart('pp-log', 240, 'Game score per game')) + '</div>' +
+      '<div class="qk-span-5">' + U.card2('Splits', 'Per game', '<div id="pp-splits"></div>', { flush: true }) + '</div></div>';
+  }
+  // Who moves next: only where the block passed its held-out test (published); never a placeholder
+  const mr = mv && mv.pub.next ? mv.by[pid] : null;
+  if (mr && isNum(mr.p_next)) {
+    const m = mv.m;
+    h += '<div class="qk-grid hw-sec"><div class="qk-span-12">' + U.card2('Movement', 'Our chance he has left his team ' + esc(U.mvHorizon(mv)) + ', and how. No contract data is used (Model page).',
+      '<div class="hw-mvcard">' + QK.stats([{ label: 'Chance of moving', value: U.pctMv(mr.p_next), signal: true, sub: U.mvHorizon(mv), tip: (m.notes || [])[0] || '' },
+        mv.pub.deadline && isNum(mr.p_dl) ? { label: 'Before the deadline', value: U.pctMv(mr.p_dl), sub: (m.deadline_label || 'traded or claimed') + ' by ' + HW.fmtDate(String((m.horizons || {}).deadline || ''), { weekday: false }) } : null]) +
+      '<div style="margin-top:12px">' + U.mvBar(mv, mr) + '</div><div style="margin-top:8px">' + U.mvKeys(mv) + '</div>' +
+      '<div class="hw-mvctx">' + esc([isNum(mr.age) && !/age/.test(mr.why || '') ? 'Age ' + Math.floor(mr.age) : '', isNum(mr.yrs) && !/seasons in the league/.test(mr.why || '') ? mr.yrs + ' seasons in the league' : '', isNum(mr.value) ? U.f(mr.value, 1) + ' WAR (last two seasons, 3:2)' : '', mr.why || ''].filter(Boolean).join(' · ')) + '</div></div>') + '</div></div>';
   }
   if (cells.length || vrow) {
     h += '<div class="qk-grid hw-sec">';
-    if (cells.length) h += U.card2('Shot chart', 'Size is volume; colour is points per shot against the league from the same spot', '<div id="pp-shots"></div>', { cls: vrow ? 'qk-span-6' : 'qk-span-12' });
-    if (vrow) h += U.card2('Value', 'Projected WAR by season (mean path; ages and survival priced in). Four-season value ' + U.f(vrow.v, 1) + ' (80% band ' + U.f(vrow.p10, 1) + ' to ' + U.f(vrow.p90, 1) + ')',
-      U.chart('pp-val', 240, 'Projected WAR by season'), { cls: cells.length ? 'qk-span-6' : 'qk-span-12', foot: U.link(HW.href(L, 'value'), 'Value & Moves') });
+    if (cells.length) h += '<div class="qk-span-' + (vrow ? 6 : 12) + '">' + U.card2('Shot chart', 'Size is volume; colour is points per shot against the league from the same spot', '<div id="pp-shots" class="hw-court-max"></div>') + '</div>';
+    if (vrow) h += '<div class="qk-span-' + (cells.length ? 6 : 12) + '">' + U.card2('Value', 'Projected WAR by season (mean path; ageing and survival included). Four-season value ' + U.f(vrow.v, 1) + ' (80% range ' + U.f(vrow.p10, 1) + ' to ' + U.f(vrow.p90, 1) + ')',
+      U.chart('pp-val', 260, 'Projected WAR by season'), { foot: '<span></span>' + U.link(HW.href(L, 'value'), 'Value & Moves') }) + '</div>';
     h += '</div>';
   }
-  h += '<section class="qk-section"><div class="qk-section-head"><div><h2>Career</h2><div class="qk-sub">Box scores from 1997, play-by-play numbers (RAPM, WPA) from about 2017.</div></div></div><div class="qk-card"><div id="pp-ctab"></div></div></section>';
-  const sim = (career && career.similar) || [], awards = (career && career.career_awards) || [];
-  if (sim.length || awards.length) {
-    h += '<div class="qk-grid hw-sec">' + (sim.length ? U.card2('Similar players', 'Nearest on the percentile profile', '<ul class="hw-list">' + sim.slice(0, 8).map(x => '<li>' + U.playerEnt(L, x.id, x.name, null, HW.seasonLabel(L, x.season), x.season) + '<span class="v">' + U.f(x.distance, 2) + '</span></li>').join('') + '</ul>', { cls: awards.length ? 'qk-span-7' : 'qk-span-12', flush: true }) : '') +
-      (awards.length ? U.card2('Awards', '', '<div class="hw-pills">' + awards.slice().sort((a, b) => b[0] - a[0]).map(x => '<span class="qk-badge accent">' + esc(HW.seasonLabel(L, x[0]) + ' ' + x[1]) + '</span>').join('') + '</div>', { cls: sim.length ? 'qk-span-5' : 'qk-span-12' }) : '') + '</div>';
+  h += '<section class="qk-section">' + U.head({ kicker: 'History', title: 'Career', sub: 'Box scores from 1997, play-by-play numbers (RAPM, WPA) from about 2017.' }) + '<div class="qk-card"><div id="pp-ctab"></div></div></section>';
+  const awards = (career && career.career_awards) || [];
+  const simR = (career && Array.isArray(career.similar_role) && career.similar_role.length) ? career.similar_role.filter(x => Number(x.season) === Number(S)).map(x => ({ id: String(x.id), name: x.name, d: x.distance }))
+    : (p && p.qualified ? U.similarRole(L, cat, roles, pid, 5) : []);
+  if (simR.length || awards.length) {
+    h += '<div class="qk-grid hw-sec">' + (simR.length ? '<div class="qk-span-' + (awards.length ? 7 : 12) + '">' + U.card2('Most similar this season', 'Other qualified ' + esc((U.ROLE_NAME || {})[role] || 'players') + ', on the role\'s headline profile (each metric weighted by how stable it is)', '<ul class="hw-list">' + simR.map(x => '<li>' + U.playerEnt(L, x.id, x.name || HW.playerName(L, x.id), (P[x.id] || {}).team, null, S) +
+      '<span class="s">distance ' + U.f(x.d, 2) + '</span><a class="v hw-link" href="' + esc(HW.href(L, 'compare/players/' + encodeURIComponent(pid) + '/' + encodeURIComponent(x.id), S)) + '">Compare</a></li>').join('') + '</ul>',
+      { flush: true, foot: '<span></span>' + U.link(HW.href(L, 'compare/players/' + encodeURIComponent(pid) + '/' + simR.slice(0, 2).map(x => encodeURIComponent(x.id)).join('/'), S), 'Compare the top two') }) + '</div>' : '') +
+      (awards.length ? '<div class="qk-span-' + (simR.length ? 5 : 12) + '">' + U.card2('Awards', '', '<div class="hw-pills">' + awards.slice().sort((a, b) => b[0] - a[0]).map(x => QK.tag(HW.seasonLabel(L, x[0]) + ' ' + (String(x[1]).length <= 5 ? String(x[1]).toUpperCase() : x[1]), 'signal')).join('') + '</div>') + '</div>' : '') + '</div>';
   }
   if (!p && !cs.length) h += U.empty('No numbers', 'This player has no games in the data yet.');
   el.innerHTML = h;
 
-  if (pk.length) {
-    const drawPct = basis => {
-      const src = basis === 'league' ? (p.pct || {}) : (p.pct_pool || p.pct || {});
-      const meta = {}; ((cat && cat.metrics) || []).forEach(m => { meta[m.key] = m; });
-      document.getElementById('pp-pct').innerHTML = QK.pctlBars(pk.filter(x => isNum(src[x[0]])).map(x => ({ label: x[1], pctl: src[x[0]], value: HW.fmtVal(v[x[0]], (meta[x[0]] || {}).fmt) })));
-      document.getElementById('pp-pbasis').textContent = basis === 'league' ? 'Against every qualified player' : 'Against ' + ({ G: 'guards', F: 'forwards', C: 'centres' }[p.pool] || 'his position pool');
+  // where he sits: the peer distribution of one metric of his role's set, with him and the median marked
+  if (document.getElementById('pp-dist')) {
+    const peers = U.rolePeers(cat, roles, role);
+    const opts = set.groups.reduce((a, g) => a.concat(g[1]), []).filter(x => isNum(v[x])).slice(0, 6);
+    const segEl = document.getElementById('pp-dist-m');
+    segEl.innerHTML = opts.map((o, i) => '<button type="button" aria-pressed="' + (i === 0) + '" data-value="' + o + '">' + esc(U.mMeta(o).label.replace(/ \(HPM\)$/, '')) + '</button>').join('');
+    const drawDist = key => {
+      const m = U.mMeta(key);
+      const vals = peers.map(x => (x.values || {})[key]).filter(isNum).sort((a, b) => a - b);
+      if (vals.length < 5) { document.getElementById('pp-dist').innerHTML = QK.empty('Too few qualified peers yet'); return; }
+      const med = vals[Math.floor(vals.length / 2)];
+      QKC.distribution('#pp-dist', { values: vals, binCount: 22, lowerBetter: m.better === 'low', fmt: x => U.fmtM(key, x), xName: m.label + ' · ' + vals.length + ' qualified ' + U.ROLE_NAME[role], yName: 'Players',
+        marks: (isNum(v[key]) ? [{ x: v[key], label: name.split(' ').slice(-1)[0] }] : []).concat([{ x: med, label: 'Median' }]), label: 'Distribution of ' + m.label });
     };
-    drawPct('pool');
-    QK.seg(document.getElementById('pp-seg'), drawPct);
+    if (opts.length) { drawDist(opts[0]); QK.seg(segEl, drawDist); }
   }
   if (document.getElementById('pp-career')) {
     QKC.line('#pp-career', { x: cs.map(x => HW.seasonLabel(L, x.season)), series: [
-      { name: 'Total', data: cs.map(x => (isNum(x.hpm) ? Math.round(x.hpm * 10) / 10 : null)), color: col, width: 3 },
-      { name: 'Offence', data: cs.map(x => (isNum(x.o) ? Math.round(x.o * 10) / 10 : null)), dash: true },
-      { name: 'Defence', data: cs.map(x => (isNum(x.d) ? Math.round(x.d * 10) / 10 : null)), dash: true }], yFmt: v2 => U.signed(v2, 1), ref: { y: 0 }, xName: 'Season', yName: 'HPM per 100' });
+      { name: 'Total', data: cs.map(x => (isNum(x.hpm) ? Math.round(x.hpm * 10) / 10 : null)), color: QKC.tokens().model, width: 3 },
+      { name: 'Offence', data: cs.map(x => (isNum(x.o) ? Math.round(x.o * 10) / 10 : null)), color: QKC.tokens().cat[1], dash: true },
+      { name: 'Defence', data: cs.map(x => (isNum(x.d) ? Math.round(x.d * 10) / 10 : null)), color: QKC.tokens().cat[2], dash: true }], yFmt: v2 => U.signed(v2, 1), ref: { y: 0 }, xName: 'Season', yName: 'Impact (points per 100 possessions)', label: 'Impact by season' });
   }
   if (log.length) {
     QKC.mount('#pp-log', T => ({
@@ -163,11 +172,11 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params) {
     QK.table(document.getElementById('pp-splits'), { dense: true, rows: splits(log), columns: [{ key: 'split', label: 'Split', sort: false }, { key: 'n', label: 'G', num: true }, { key: 'min', label: 'Min', num: true, fmt: x => U.f(x, 1) },
       { key: 'pts', label: 'Pts', num: true, fmt: x => U.f(x, 1) }, { key: 'reb', label: 'Reb', num: true, fmt: x => U.f(x, 1) }, { key: 'ast', label: 'Ast', num: true, fmt: x => U.f(x, 1) }, { key: 'ts', label: 'TS%', num: true, fmt: x => HW.fmtVal(x, 'pct') }, { key: 'pm', label: '+/-', num: true, fmt: x => U.sgnHTML(x, 1) }] });
   }
-  if (cells.length) hexMap(document.getElementById('pp-shots'), cells);
+  if (cells.length) HW.charts.cellChart('pp-shots', L, cells, { size: 1.55 });
   if (vrow) {
     const slots = val && Array.isArray(val.slots) && val.slots.length === 4 ? val.slots.map(x => String(x).replace(/^rest of /, 'Rest of ')) : ['Rest of season', '+1', '+2', '+3'];
     QKC.bar('#pp-val', { cats: slots, series: [{ name: 'WAR', data: [vrow.w0, vrow.w1, vrow.w2, vrow.w3].map(x => (isNum(x) ? Math.round(x * 10) / 10 : 0)) }], labels: true, fmt: x => U.f(x, 1), colors: [col, col, col, col], valName: 'Projected WAR', catName: 'Season',
-      max: v => (v.max > 0 ? Math.ceil(v.max * 12) / 10 : 0) });
+      max: x => (x.max > 0 ? Math.ceil(x.max * 12) / 10 : 0) });
   }
   const ct = document.getElementById('pp-ctab');
   if (cs.length) {

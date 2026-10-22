@@ -37,18 +37,16 @@ const SCORE_COLS = [{ label: 'Model' }, { label: 'Games', align: 'right' }, { la
 /* Reliability: series [{name, colour, bins: [{mean_p|p_mean, freq|y_mean, n, lo, hi}]}] */
 function reliability(elId, series) {
   const fx = FX();
-  const tr = [{ type: 'scatter', mode: 'lines', x: [0, 1], y: [0, 1], line: { color: '#6e7681', dash: 'dot', width: 1 }, hoverinfo: 'skip', showlegend: false }];
+  const ser = [];
   series.forEach(s => {
     const bins = (s.bins || []).map(b => ({ x: fx.has(b.mean_p) ? b.mean_p : b.p_mean, y: fx.has(b.freq) ? b.freq : b.y_mean, n: b.n || 0, lo: b.lo, hi: b.hi })).filter(b => fx.isNum(b.x) && fx.isNum(b.y) && b.n > 0);
-    if (!bins.length) return;
-    const maxN = Math.max.apply(null, bins.map(b => b.n));
-    tr.push({ type: 'scatter', mode: 'lines+markers', name: s.name, x: bins.map(b => b.x), y: bins.map(b => b.y), customdata: bins.map(b => [b.n, fx.pct(b.lo, 0), fx.pct(b.hi, 0)]),
-      marker: { size: bins.map(b => 6 + 14 * Math.sqrt(b.n / maxN)), color: s.colour }, line: { color: s.colour, width: 1.5 },
-      hovertemplate: fx.esc(s.name) + '<br>bin %{customdata[1]}–%{customdata[2]}: forecast %{x:.1%}, observed %{y:.1%} (n=%{customdata[0]})<extra></extra>' });
+    if (bins.length) ser.push({ name: s.name, color: s.colour, symbols: true, data: bins.map(b => [b.x, b.y]) });
   });
-  if (tr.length < 2) { document.getElementById(elId).innerHTML = fx.muted('No reliability bins.'); return; }
-  fx.plot(elId, tr, fx.layout({ showlegend: true, legend: { orientation: 'h', y: -0.2, font: { color: fx.C.text2 } }, margin: { l: 55, r: 15, t: 10, b: 80 },
-    xaxis: { title: 'Forecast probability (bin mean)', tickformat: '.0%', range: [0, 1] }, yaxis: { title: 'Observed frequency', tickformat: '.0%', range: [0, 1] } }));
+  const node = document.getElementById(elId);
+  if (!ser.length) { node.innerHTML = fx.muted('No reliability bins.'); return; }
+  node.style.setProperty('--h', (node.clientHeight || 340) + 'px');
+  QKC.line(node, { xType: 'value', series: [{ name: 'Perfect calibration', color: QKC.tokens().ink3, width: 1, dash: true, data: [[0, 0], [1, 1]] }].concat(ser), xMin: 0, xMax: 1, yMin: 0, yMax: 1, legend: true, endLabels: false,
+    xName: 'Forecast chance (bin mean)', yName: 'Observed frequency', xFmt: v => Math.round(v * 100) + '%', yFmt: v => Math.round(v * 100) + '%', label: 'Reliability: forecast against observed' });
 }
 
 function reading(d, L) {

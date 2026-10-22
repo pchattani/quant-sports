@@ -346,7 +346,7 @@ function result(L, S, ix, st, A, B) {
       '<div class="kpi-grid">' + BP.statTile('Value in / out', s1(R.inWar) + ' / ' + s1(R.outWar), 'WAR this season') + BP.statTile('Next season', s1(R.inProj - R.outProj), 'projected WAR in minus out') +
       BP.statTile('Depth chart', BP.signed(R.dWins, 1), 'wins over a full season, position by position') + BP.statTile('Rating', BP.signed(R.dWins / ({ mlb: 162, npb: 143 }[L] || 162) * (R.rpw || 10), 2), 'runs a game (' + BP.signed(R.dWins * (R.rpw || 10), 0) + ' a season)') + '</div>' +
       '<div class="pad trd-text"><b>Who loses time:</b> ' + disp + '.' + (repl ? ' <b>Left at replacement level:</b> ' + esc(repl) + '.' : '') + '</div>' +
-      BP.tableHTML([{ label: 'Odds' }, { label: 'Before', align: 'right' }, { label: 'After', align: 'right' }, { label: 'Change', align: 'right' }], oddsRows, { compact: true }) +
+      BP.tableHTML([{ label: 'Our chance' }, { label: 'Before', align: 'right' }, { label: 'After', align: 'right' }, { label: 'Change', align: 'right' }], oddsRows, { compact: true }) +
       '<div class="pad trd-text muted-inline">Expected wins ' + n1(R.x0) + ' → ' + n1(isNum(R.x0) ? R.x0 + R.dNow : null) + ' over the horizon.</div>' +
       BP.tableHTML([{ label: '' }, { label: 'Player' }, { label: 'Pos' }, { label: 'Age', align: 'right' }, { label: 'WAR', align: 'right', title: 'This season' },
         { label: 'Next', align: 'right', title: 'Projected WAR next season' }, { label: '3 seasons', align: 'right', title: 'Projected WAR over the next three seasons, aged' }], mv, { compact: true }) +

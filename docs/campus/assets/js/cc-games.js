@@ -17,12 +17,8 @@ function weekKey(c) {
 var WK_LABEL = { cfp: 'Playoff', bowls: 'Bowls', champ: 'Championships', other: 'Other' };
 function wkLabel(k) { return WK_LABEL[k] || ('Week ' + k.slice(1)); }
 function dayKey(iso) { return QK.fmt.dayKey(iso); }
-function isClose(c) {
-  var mk = c.market || {}, m = c.model || {};
-  if (isNum(mk.spread_home)) return Math.abs(mk.spread_home) <= (CC.fb(CC.state.L) ? 7 : 5);
-  return isNum(m.p_home) && Math.abs(m.p_home - 0.5) <= 0.15;
-}
-function gap(c) { var mk = c.market || {}, m = c.model || {}; return isNum(mk.p_home) && isNum(m.p_home) ? m.p_home - mk.p_home : null; }
+/* A close game by our own forecast: neither side above 65%. */
+function isClose(c) { var m = c.model || {}; return isNum(m.p_home) && Math.abs(m.p_home - 0.5) <= 0.15; }
 
 CC.route('games', function (el, p) {
   var L = p.L, S = p.S, fb = CC.fb(L), q = p.query || {};
@@ -50,7 +46,7 @@ CC.route('games', function (el, p) {
       if (!CC.isCur(L, S)) dflt = keys[keys.length - 1];
     }
     var cur = q.w && byKey[q.w] ? q.w : (q.d && byKey[q.d] ? q.d : dflt);
-    var flt = { ranked: false, conf: false, close: false, edge: false, cid: q.conf || '' };
+    var flt = { ranked: false, conf: false, close: false, cid: q.conf || '' };
     var confs = {};
     cards.forEach(function (c) { [c.home, c.away].forEach(function (t) { var tm = CC.team(L, t); if (tm && tm.member && tm.conference) confs[tm.conference] = 1; }); });
     var confOpts = '<option value="">All conferences</option>' + Object.keys(confs).sort(function (x, y) { return CC.cname(L, x).localeCompare(CC.cname(L, y)); }).map(function (c) { return '<option value="' + esc(c) + '">' + esc(CC.cname(L, c)) + '</option>'; }).join('');
@@ -60,9 +56,9 @@ CC.route('games', function (el, p) {
         var n = byKey[k].length; return '<option value="' + esc(k) + '"' + (k === cur ? ' selected' : '') + '>' + esc(fb ? wkLabel(k) : CC.date(k + 'T12:00:00Z')) + ' · ' + n + ' game' + (n > 1 ? 's' : '') + '</option>';
       }).join('') + '</select><button class="qk-btn" type="button" id="g-next" aria-label="Next"' + (i >= keys.length - 1 ? ' disabled' : '') + '>→</button></div>';
     var chips = '<div class="qk-chips scroll cc-filters" id="g-chips" role="group" aria-label="Filters">' +
-      [['ranked', fb ? 'Ranked' : 'Ranked or seeded'], ['conf', 'Conference games'], ['close', 'Close lines'], ['edge', 'Model v market gap']].map(function (x) {
-        return '<button type="button" class="qk-chip" style="--ca:var(--accent)" data-value="' + x[0] + '" aria-pressed="false">' + esc(x[1]) + '</button>'; }).join('') + '</div>';
-    el.innerHTML = U.head('Games', fb ? 'Every game involving an FBS team, week by week, with our pregame win probability and the market.' : 'Every game involving a Division I team, day by day, with our pregame win probability and the market.', U.kicker(L, S)) +
+      [['ranked', fb ? 'Ranked' : 'Ranked or seeded'], ['conf', 'Conference games'], ['close', 'Toss-ups (35–65%)']].map(function (x) {
+        return '<button type="button" class="qk-chip" style="--ca:var(--signal)" data-value="' + x[0] + '" aria-pressed="false">' + esc(x[1]) + '</button>'; }).join('') + '</div>';
+    el.innerHTML = U.head('Games', fb ? 'Every game involving an FBS team, week by week, with our win chance on each card (the favourite in violet; the grey tick is the market, for reference). Tap a game for its page.' : 'Every game involving a Division I team, day by day, with our win chance on each card (the favourite in violet; the grey tick is the market, for reference). Tap a game for its page.', U.kicker(L, S)) +
       '<div class="cc-toolbar">' + nav + '<select class="qk-select" id="g-conf" aria-label="Conference">' + confOpts + '</select></div>' + chips + '<div id="g-sum" class="cc-note"></div><div id="g-list"></div>';
     QK.$('#g-conf', el).value = flt.cid;
     function paint() {
@@ -70,15 +66,12 @@ CC.route('games', function (el, p) {
         if (flt.ranked && !(c.hr || c.ar || c.hseed || c.aseed)) return false;
         if (flt.conf && !c.conf_game) return false;
         if (flt.close && !isClose(c)) return false;
-        if (flt.edge) { var g = gap(c); if (!isNum(g) || Math.abs(g) < 0.05) return false; }
         if (flt.cid) { var h = CC.team(L, c.home) || {}, w = CC.team(L, c.away) || {}; if (String(h.conference) !== flt.cid && String(w.conference) !== flt.cid) return false; }
         return true;
       });
       var fin = list.filter(function (c) { return c.status === 'post' && c.result; });
       var right = fin.filter(function (c) { return c.result.model_correct === true; }).length;
-      var ats = fin.filter(function (c) { return c.result.cover && c.result.cover !== 'push' && c.market; });
-      QK.$('#g-sum', el).innerHTML = list.length + ' game' + (list.length === 1 ? '' : 's') + (fin.length ? ' · the model picked the winner in <b>' + right + ' of ' + fin.length + '</b>' : '') +
-        (ats.length ? ' · lines on ' + ats.length : '');
+      QK.$('#g-sum', el).innerHTML = list.length + ' game' + (list.length === 1 ? '' : 's') + (fin.length ? ' · our favourite won <b>' + right + ' of ' + fin.length + '</b>' : '');
       if (!list.length) { QK.$('#g-list', el).innerHTML = QK.empty('No games match', 'Clear a filter or pick another ' + (fb ? 'week' : 'day') + '.'); return; }
       var html = '', last = null;
       list.forEach(function (c) {
@@ -93,7 +86,7 @@ CC.route('games', function (el, p) {
     QK.$('#g-prev', el).addEventListener('click', function () { if (i > 0) go(keys[i - 1]); });
     QK.$('#g-next', el).addEventListener('click', function () { if (i < keys.length - 1) go(keys[i + 1]); });
     QK.$('#g-conf', el).addEventListener('change', function (e) { flt.cid = e.target.value; paint(); });
-    QK.chips(QK.$('#g-chips', el), function (v) { flt.ranked = v.indexOf('ranked') >= 0; flt.conf = v.indexOf('conf') >= 0; flt.close = v.indexOf('close') >= 0; flt.edge = v.indexOf('edge') >= 0; paint(); }, true);
+    QK.chips(QK.$('#g-chips', el), function (v) { flt.ranked = v.indexOf('ranked') >= 0; flt.conf = v.indexOf('conf') >= 0; flt.close = v.indexOf('close') >= 0; paint(); }, true);
     paint();
   });
 });
@@ -124,59 +117,125 @@ function breaks(L, season, tMax) {
 }
 function ydLine(yte) { if (!isNum(yte)) return '—'; return yte > 50 ? 'Own ' + (100 - yte) : yte === 50 ? '50' : 'Opp ' + yte; }
 
+/* Two teams' colours that can be told apart (kit rule QK.color.distinct; the second falls back to the win-probability orange). */
+CC.pair = function (L, a, h) {
+  var ca = CC.tcol(L, a), ch = CC.tcol(L, h);
+  var ok = function (x, y) { return QK.color.distinct ? QK.color.distinct(x, y) : QK.color.contrast(x, y) >= 1.6; };
+  if (!ok(ca, ch)) { ch = QK.cssVar('--wp-b'); if (!ok(ca, ch)) ch = QK.cssVar('--wp-a'); }
+  return [ca, ch];
+};
+function pickOf(L, g, margin) { return isNum(margin) ? (Math.abs(margin) < 0.05 ? 'Even' : CC.tabbr(L, margin > 0 ? g.home : g.away) + ' by ' + CC.f(Math.abs(margin), 1)) : '—'; }
+
 function hero(L, g) {
-  var st = CC.status(g), fin = st === 'final';
-  var h = CC.team(L, g.home) || { name: 'Team ' + g.home }, a = CC.team(L, g.away) || { name: 'Team ' + g.away };
+  var st = CC.status(g), fin = st === 'final', live = st === 'live', pre = st === 'pre';
+  var pg = g.pregame || {}, m = pg.model || g.model || {}, mk = pg.market || g.market || {};
   var tag = CC.roundLabel(g) || (g.conf_game ? 'Conference game' : 'Non-conference');
-  function side(t, tid, sc, won, rk) {
-    return '<a class="cc-gh-team' + (fin && !won ? ' lost' : '') + '" href="' + esc(CC.teamHref(L, tid, g.season)) + '">' + QK.teamMark(t, 'lg') + '<span class="nm">' + esc(rk) + esc(t.short || t.name) + '</span>' +
-      '<span class="sc">' + (st !== 'pre' && isNum(sc) ? sc : '') + '</span></a>';
+  var rk = function (side0) { var s0 = side0 === 'home' ? g.hseed : g.aseed, r = side0 === 'home' ? g.hr : g.ar; return isNum(s0) && (g.stype === 'ncaa' || g.stype === 'cfp') ? '(' + s0 + ') ' : (isNum(r) && r <= 25 ? '#' + r + ' ' : ''); };
+  var A = CC.team(L, g.away) || { name: 'Team ' + g.away }, H = CC.team(L, g.home) || { name: 'Team ' + g.home };
+  var cols = CC.pair(L, g.away, g.home);
+  function side(t, tid, cls) {
+    var rec = CC.rec(L, g.season, tid);
+    return '<div class="side ' + cls + '">' + (cls === 'home' ? '' : QK.teamMark(t, 'lg')) + '<div style="min-width:0"><a class="nm" href="' + esc(CC.teamHref(L, tid, g.season)) + '">' + esc(rk(cls) + (t.short || t.name)) + '</a>' +
+      '<div class="sb">' + (cls === 'home' ? (g.neutral ? 'Neutral site' : 'Home') : 'Away') + (rec ? ' · ' + esc(rec) : '') + '</div></div>' + (cls === 'home' ? QK.teamMark(t, 'lg') : '') + '</div>';
   }
-  var hw = isNum(g.hs) && isNum(g.as) ? g.hs > g.as : false;
-  var rk = function (side0) { var s = side0 === 'home' ? g.hseed : g.aseed, r = side0 === 'home' ? g.hr : g.ar; return isNum(s) && (g.stype === 'ncaa' || g.stype === 'cfp') ? '(' + s + ') ' : (isNum(r) && r <= 25 ? '#' + r + ' ' : ''); };
-  var badge = st === 'live' ? '<span class="qk-badge live">Live</span>' : fin ? '<span class="qk-badge final">Final' + (isNum(g.periods) && g.periods > (CC.fb(L) ? 4 : (L === 'mbb' ? 2 : 4)) ? '/OT' : '') + '</span>' : '<span class="qk-badge">' + esc(CC.when(g)) + '</span>';
+  var score = pre ? '<div class="cc-score pre"><span>' + esc(CC.tba(g) ? 'TBA' : QK.fmt.time(g.date)) + '</span></div>'
+    : '<div class="cc-score"><span>' + (isNum(g.as) ? g.as : '–') + '</span><span class="dash">–</span><span>' + (isNum(g.hs) ? g.hs : '–') + '</span></div>';
+  var badge = live ? '<span class="qk-badge live">Live' + (g.period ? ' · ' + esc(perLabel(L, g.season, g.period)) : '') + '</span>' : fin ? '<span class="qk-badge final">Final' + (isNum(g.periods) && g.periods > (CC.fb(L) ? 4 : (L === 'mbb' ? 2 : 4)) ? '/OT' : '') + '</span>' : '<span class="qk-badge">' + esc(CC.date(CC.gameDate(g))) + '</span>';
   var venue = g.venue && g.venue.name ? g.venue.name + (g.venue.city ? ', ' + g.venue.city : '') + (g.venue.state ? ', ' + g.venue.state : '') : '';
-  return '<section class="qk-hero cc-gh" style="--tc:' + esc(QK.color.parse(h.colour) ? h.colour : 'var(--accent)') + '"><div class="cc-gh-top"><span class="qk-kicker">' + esc(CC.LSHORT[L] + ' · ' + CC.seasonLabel(L, g.season) + ' · ' + tag + (isNum(g.week) && g.stype === 'reg' ? ' · Week ' + g.week : '')) + '</span>' + badge + '</div>' +
-    '<div class="cc-gh-teams">' + side(a, g.away, g.as, !hw, rk('away')) + '<span class="cc-gh-at">' + (g.neutral ? 'v' : '@') + '</span>' + side(h, g.home, g.hs, hw, rk('home')) + '</div>' +
-    '<div class="qk-hero-meta">' + (venue ? '<span>' + esc(venue) + (g.neutral ? ' (neutral)' : '') + '</span>' : '') + (isNum(g.attendance) ? '<span>Attendance <b>' + QK.fmt.num(g.attendance) + '</b></span>' : '') +
-    (g.note && g.stype === 'reg' ? '<span>' + esc(g.note) + '</span>' : '') + '<span>' + esc(CC.when(g)) + '</span></div></section>';
+  var meta = [CC.when(g), venue ? venue + (g.neutral ? ' (neutral)' : '') : '', isNum(g.attendance) ? QK.fmt.num(g.attendance) + ' fans' : '', g.note && g.stype === 'reg' ? g.note : ''].filter(Boolean);
+  /* live: the last point of our in-game curve; before: ours with the market's split as a quiet tick; after: our pre-game call */
+  var wpm = g.wp && g.wp.model && g.wp.model.length ? g.wp.model[g.wp.model.length - 1][1] : null;
+  var pH = live && isNum(wpm) ? wpm : (isNum(m.p_home) ? m.p_home : null);
+  var src = CC.mkSource(mk);
+  var At = { name: A.short || A.name, abbr: A.abbr, colour: cols[0] }, Ht = { name: H.short || H.name, abbr: H.abbr, colour: cols[1] };
+  var bar = isNum(pH) ? '<div class="cc-hero-bar"><div class="qk-kicker">' + (live ? 'Our live win chance' : fin ? 'Our pre-game win chance' : 'Our win chance') + '</div>' +
+    QK.wpBar(1 - pH, null, pH, At, Ht, { colors: cols, size: 'lg', market: pre && isNum(mk.p_home) ? 1 - mk.p_home : null, label: live ? 'Live win chance' : 'Our win chance' }) +
+    (pre && isNum(mk.p_home) ? '<div class="cc-hero-mkt"><span class="qk-mkt" data-tip="The market’s chance for the home side, shown as a reference next to ours">Market' + (src ? ' (' + esc(src) + ')' : '') + ' <b>' + esc(CC.tabbr(L, g.home)) + ' ' + CC.pct(mk.p_home) + '</b></span></div>' : '') + '</div>' : '';
+  return '<section class="qk-hero cc-hero2" style="--tc:' + esc(cols[1]) + '"><div class="cc-gh-top"><span class="qk-kicker">' + esc(CC.LSHORT[L] + ' · ' + CC.seasonLabel(L, g.season) + ' · ' + tag + (isNum(g.week) && g.stype === 'reg' ? ' · Week ' + g.week : '')) + '</span></div>' +
+    '<div class="cc-g2">' + side(A, g.away, 'away') + '<div class="mid">' + score + badge + '</div>' + side(H, g.home, 'home') + '</div>' + bar +
+    '<div class="cc-hero-meta">' + meta.map(function (x) { return '<span>' + esc(x) + '</span>'; }).join('') + '</div></section>';
+}
+
+function tiles(L, g) {
+  var st = CC.status(g), pg = g.pregame || {}, m = pg.model || g.model || {};
+  var out = [];
+  if (isNum(m.p_home)) {
+    var hf = m.p_home >= 0.5;
+    out.push({ label: st === 'pre' ? 'Our win chance' : 'Our pre-game call', value: CC.tabbr(L, hf ? g.home : g.away) + ' ' + CC.pct(Math.max(m.p_home, 1 - m.p_home)), signal: true,
+      sub: isNum(m.margin) ? 'projected margin: ' + pickOf(L, g, m.margin) : '', tip: 'Our pre-game chance of winning, from the two teams’ ratings, home field and rest' });
+  }
+  var wpm = g.wp && g.wp.model && g.wp.model.length ? g.wp.model[g.wp.model.length - 1][1] : null;
+  if (st === 'live' && isNum(wpm)) out.push({ label: 'Live win chance', value: CC.tabbr(L, wpm >= 0.5 ? g.home : g.away) + ' ' + CC.pct(Math.max(wpm, 1 - wpm)), signal: true, sub: 'our in-game model, every play' });
+  if (isNum(m.margin) && isNum(m.total) && st === 'pre') {
+    var hs = (m.total + m.margin) / 2, as = (m.total - m.margin) / 2;
+    out.push({ label: 'Projected score', value: CC.f(as, 0) + '–' + CC.f(hs, 0), sub: CC.tabbr(L, g.away) + ' – ' + CC.tabbr(L, g.home) + ' · ' + CC.f(m.total, 1) + ' points expected' });
+  }
+  if (isNum(m.sd)) out.push({ label: 'Margin uncertainty', value: '± ' + CC.f(m.sd, 1), unit: 'pts', sub: 'one standard deviation of the final margin', tip: 'How far the final margin typically lands from our projection' });
+  if (st === 'final' && (g.plays || []).length) {
+    var top = g.plays.slice().sort(function (x, y) { return Math.abs(y.wpa || 0) - Math.abs(x.wpa || 0); })[0];
+    if (top && isNum(top.wpa)) out.push({ label: 'Biggest swing', value: Math.round(Math.abs(top.wpa) * 100) + ' pts', sub: perLabel(L, g.season, top.period) + (top.team ? ' · ' + CC.tabbr(L, top.team) : '') + ' · the largest win-chance move in one play' });
+  }
+  if (st === 'final' && g.result && g.result.model_correct !== undefined && g.result.model_correct !== null) out.push({ label: 'Our pick', value: g.result.model_correct ? 'Right' : 'Wrong', text: true, sub: g.result.model_correct ? 'our favourite won' : 'our favourite lost' });
+  return out.length ? U.stats(out) : '';
 }
 
 function pregame(L, g) {
   var pg = g.pregame || {}, m = pg.model || g.model || {}, mk = pg.market || g.market || null;
-  var h = CC.tshort(L, g.home), a = CC.tshort(L, g.away);
-  var rows = [];
-  rows.push(['Home win probability', CC.pct(m.p_home, 1), mk && isNum(mk.p_home) ? CC.pct(mk.p_home, 1) : '—']);
-  var fair = isNum(m.spread_fair) ? m.spread_fair : (isNum(m.margin) ? -m.margin : null);
-  rows.push(['Spread (' + h + ')', CC.spread(fair), mk && isNum(mk.spread_home) ? CC.spread(mk.spread_home) : '—']);
-  rows.push(['Total points', CC.f(m.total, 1), mk && isNum(mk.total) ? CC.f(mk.total, 1) : '—']);
-  if (isNum(pg.espn_predictor)) rows.push(['ESPN predictor (home)', CC.pct(pg.espn_predictor, 1), '']);
-  if (isNum(pg.elo_p_home)) rows.push(['Elo baseline (home)', CC.pct(pg.elo_p_home, 1), '']);
-  var tbl = U.table(['', { label: 'Model', align: 'right' }, { label: 'Market', align: 'right' }], rows, { sticky: false });
+  var h = CC.tabbr(L, g.home), a = CC.tabbr(L, g.away), hs = CC.tshort(L, g.home), as = CC.tshort(L, g.away);
+  if (!isNum(m.p_home)) return U.card('Our forecast', '', QK.empty('No forecast for this game', 'Our forecast covers games between two rated teams.'));
+  var mkM = mk && isNum(mk.spread_home) ? -mk.spread_home : null;
+  var rows = [
+    ['Win', h + ' ' + CC.pct(m.p_home) + ' · ' + a + ' ' + CC.pct(1 - m.p_home), mk && isNum(mk.p_home) ? h + ' ' + CC.pct(mk.p_home) : '—'],
+    ['Winning margin', pickOf(L, g, m.margin) + (isNum(m.sd) ? ' (± ' + CC.f(m.sd, 1) + ')' : ''), isNum(mkM) ? pickOf(L, g, mkM) : '—'],
+    ['Total points', isNum(m.total) ? CC.f(m.total, 1) + ' expected' : '—', mk && isNum(mk.total) ? CC.f(mk.total, 1) : '—']
+  ];
+  var refs = [];
+  if (isNum(pg.espn_predictor)) refs.push('ESPN predictor ' + h + ' ' + CC.pct(pg.espn_predictor));
+  if (isNum(pg.elo_p_home)) refs.push('our Elo baseline ' + h + ' ' + CC.pct(pg.elo_p_home));
+  var src = CC.mkSource(mk);
+  var tbl = '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Question</th><th>Our forecast</th><th><span data-tip="The market’s numbers, shown as a reference next to ours">Market' + (src ? ' (' + esc(src) + ')' : '') + '</span></th></tr></thead><tbody>' +
+    rows.map(function (r) { return '<tr><td>' + esc(r[0]) + '</td><td class="num" style="text-align:left;color:var(--ink-1);font-weight:600">' + esc(r[1]) + '</td><td class="num qk-muted" style="text-align:left">' + esc(r[2]) + '</td></tr>'; }).join('') + '</tbody></table></div>';
   var inf = m.informed || null, tri = m.trial || null, built = '';
   if (inf || tri) {
     var x = inf || tri, brows = [];
-    var cell = function (sp, p) { return (isNum(sp) ? CC.spread(sp) : '—') + (isNum(p) ? ' · ' + CC.pct(p, 1) : ''); };
-    brows.push(['Ratings model', cell(isNum(x.base_margin) ? -x.base_margin : null, x.base_p)]);
-    if (isNum(x.mk_spread)) brows.push(['Market ratings', cell(x.mk_spread, null)]);
-    brows.push([inf ? 'Published line' : 'Trial line', cell(isNum(x.margin) ? -x.margin : null, x.p_home)]);
-    if (mk && (isNum(mk.spread_home) || isNum(mk.p_home))) brows.push(['Market', cell(mk.spread_home, mk.p_home)]);
+    var cell = function (mg, p) { return pickOf(L, g, mg) + (isNum(p) ? ' · ' + h + ' ' + CC.pct(p, 1) : ''); };
+    brows.push(['Ratings model', cell(x.base_margin, x.base_p)]);
+    if (isNum(x.mk_spread)) brows.push(['Market ratings', cell(-x.mk_spread, null)]);
+    brows.push([inf ? 'Our forecast' : 'Trial forecast (on trial, not published)', cell(x.margin, x.p_home)]);
+    if (mk && (isNum(mk.spread_home) || isNum(mk.p_home))) brows.push(['Market (reference)', cell(isNum(mk.spread_home) ? -mk.spread_home : null, mk.p_home)]);
     var moved = isNum(x.margin) && isNum(x.base_margin) ? x.margin - x.base_margin : null;
-    var note = inf ? 'The published line stacks the ratings model with market ratings (team ratings learned from earlier games’ closing lines; promoted 22 Oct 2026 after a sealed test on 2021-26).'
-      : 'Trial line, not the published forecast: the ratings model stacked with market ratings (team ratings learned from earlier games’ closing lines), tested forward on 2026-27 before it can replace the model above.';
-    if (isNum(moved)) note += ' Here it moves the line ' + CC.f(Math.abs(moved), 1) + ' points toward ' + esc(moved > 0 ? h : a) + '.';
+    var note = inf ? 'Our forecast stacks the ratings model with market ratings (team ratings learned from the market’s closing numbers on earlier games; adopted 22 Oct 2026 after a sealed test on 2021-26).'
+      : 'A trial, not our published forecast: the ratings model stacked with market ratings (team ratings learned from the market’s closing numbers on earlier games), tested forward on 2026-27 before it can replace the forecast above.';
+    if (isNum(moved)) note += ' Here it moves the margin ' + CC.f(Math.abs(moved), 1) + ' points toward ' + (moved > 0 ? hs : as) + '.';
     if (inf && inf.early) note += ' Early in the season the market part leans on last season’s market ratings and returning production.';
-    built = '<div class="cc-sub">How the line is built</div>' + U.table(['', { label: h + ' line · win', align: 'right' }], brows, { sticky: false }) + '<p class="cc-note">' + note + '</p>';
+    built = '<div class="cc-sub">How our forecast is built</div><div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th></th><th>Margin · ' + esc(h) + ' win chance</th></tr></thead><tbody>' +
+      brows.map(function (r) { var ours = r[0] === 'Our forecast'; return '<tr><td>' + esc(r[0]) + '</td><td class="num" style="text-align:left' + (ours ? ';color:var(--signal);font-weight:700' : (/^Market/.test(r[0]) ? ';color:var(--ink-3)' : '')) + '">' + esc(r[1]) + '</td></tr>'; }).join('') +
+      '</tbody></table></div><p class="cc-note">' + esc(note) + '</p>';
   }
-  var bar = isNum(m.p_home) ? QK.probBar(1 - m.p_home, null, m.p_home, CC.team(L, g.away), CC.team(L, g.home)) + '<div class="cc-pb-lab"><span>' + esc(a) + ' ' + CC.pct(1 - m.p_home) + '</span><span>' + esc(h) + ' ' + CC.pct(m.p_home) + '</span></div>' : '';
-  var mvm = mk && isNum(mk.p_home) && isNum(m.p_home) ? QK.mvm(m.p_home, mk.p_home, h + ' win') : '';
-  var res = '';
-  if (g.result && CC.status(g) === 'final') {
-    res = '<div class="cc-chips-row">' + (g.result.model_correct === true ? '<span class="qk-badge accent">Model picked the winner</span>' : g.result.model_correct === false ? '<span class="qk-badge">Model missed</span>' : '') +
-      (g.result.cover ? '<span class="qk-badge">' + esc(g.result.cover === 'push' ? 'Push against the spread' : CC.tshort(L, g.result.cover === 'home' ? g.home : g.away) + ' covered') + '</span>' : '') + '</div>';
-  }
-  var src = mk && mk.source ? { kalshi: 'Kalshi', polymarket: 'Polymarket', espn_close: 'ESPN closing line', espn: 'ESPN line' }[mk.source] || mk.source : null;
-  return U.card('Before the game', 'Model against the market' + (src ? ' (' + esc(src) + ')' : '') + '. ' + (isNum(m.sd) ? 'Margin uncertainty ± ' + CC.f(m.sd, 1) + ' points.' : ''), '<div class="qk-stack">' + bar + mvm + tbl + built + res + '</div>');
+  return U.card(CC.status(g) === 'pre' ? 'Our forecast' : 'Our pre-game forecast', 'Chances from our game model; the market column is a reference.' + (refs.length ? ' Also: ' + esc(refs.join(', ')) + '.' : ''), '<div class="qk-stack">' + tbl + built + '</div>');
+}
+
+/* Tale of the tape: the two teams' season profile from the ratings (season.json ratings[team]). */
+function tape(L, g, season) {
+  var R = (season && season.ratings) || {}, a = R[String(g.away)] || {}, h = R[String(g.home)] || {}, fb = CC.fb(L);
+  var rows = fb ? [
+    { label: 'Rating (points v average)', a: a.rating, b: h.rating, fmt: function (v) { return CC.signed(v, 1); }, tip: 'Our rating: expected margin against an average FBS team on a neutral field' },
+    { label: 'Offense (points added a game)', a: a.off, b: h.off, fmt: function (v) { return CC.f(v, 1); } },
+    { label: 'Defense (points prevented a game)', a: a.def, b: h.def, fmt: function (v) { return CC.f(v, 1); } },
+    { label: 'Offensive EPA per play', a: a.epa_off, b: h.epa_off, fmt: function (v) { return CC.signed(v, 3); } },
+    { label: 'Defensive EPA per play allowed', a: a.epa_def, b: h.epa_def, fmt: function (v) { return CC.signed(v, 3); }, better: 'low' },
+    { label: 'Offensive success rate', a: a.sr_off, b: h.sr_off, fmt: function (v) { return CC.pct(v, 1); } },
+    { label: 'Strength of schedule', a: a.sos, b: h.sos, fmt: function (v) { return CC.signed(v, 1); } }
+  ] : [
+    { label: 'Rating (margin per 100)', a: a.rating, b: h.rating, fmt: function (v) { return CC.signed(v, 1); }, tip: 'Our rating: adjusted efficiency margin per 100 possessions' },
+    { label: 'Offense (points per 100)', a: a.off, b: h.off, fmt: function (v) { return CC.f(v, 1); } },
+    { label: 'Defense (points allowed per 100)', a: a.def, b: h.def, fmt: function (v) { return CC.f(v, 1); }, better: 'low' },
+    { label: 'Strength of schedule', a: a.sos, b: h.sos, fmt: function (v) { return CC.signed(v, 1); } }
+  ];
+  if (!rows.some(function (r) { return isNum(r.a) && isNum(r.b); })) return '';
+  var cols = CC.pair(L, g.away, g.home), A = U.mark(L, g.away), H = U.mark(L, g.home);
+  A.colour = cols[0]; H.colour = cols[1];
+  return U.card('Tale of the tape', 'Season ratings ' + (CC.isCur(L, g.season) ? 'so far' : 'at season end') + '; the stronger side of each bar is solid.', QK.matchupBar({ left: A, right: H, rows: rows, colors: cols }));
 }
 
 function teamStats(L, g) {
@@ -269,14 +328,17 @@ CC.route('game', function (el, p) {
     if (!g) { el.innerHTML = U.head('Game', '', U.kicker(L, S)) + QK.empty('Game not found', 'No game ' + gid + ' in ' + CC.seasonLabel(L, S) + '. Past regular-season games keep their result in the schedule only.'); return; }
     if (!g.season) g.season = S;
     var fb = CC.fb(L), st = CC.status(g);
-    var html = hero(L, g);
+    var season = CC.ok(a[2]) ? a[2] : null;
+    var back = '<div class="qk-kicker" style="margin-bottom:10px"><a href="' + esc(CC.href(L, 'games', null, g.season, fb && isNum(g.week) && g.stype === 'reg' ? 'w=w' + g.week : '')) + '">← ' + esc(CC.LSHORT[L]) + ' games</a></div>';
+    var html = back + hero(L, g) + '<div style="margin-top:var(--sp-4)">' + tiles(L, g) + '</div>';
     if (g.light) html += '<p class="cc-note">' + (st === 'pre' ? 'The full game page appears on game day.' : 'This game has no detailed page (game pages are kept for the current season and the last postseason); the result and the pregame numbers are below.') + '</p>';
-    html += '<div class="qk-grid cc-grid"><div class="qk-span-5">' + pregame(L, g) + '</div><div class="qk-span-7" id="gc-wpcard"></div>';
+    var tp = tape(L, g, season);
+    html += '<div class="qk-grid cc-grid"><div class="qk-span-6"><div class="qk-stack">' + pregame(L, g) + '</div></div><div class="qk-span-6"><div class="qk-stack"><div id="gc-wpcard"></div>' + tp + '</div></div>';
     var wp = g.wp || null, flow = g.flow || null;
     html += '</div>';
     if (fb && (g.drives || g.epa)) html += '<div class="qk-grid cc-grid"><div class="qk-span-7" id="gc-drives"></div><div class="qk-span-5" id="gc-epa"></div></div>';
     if ((g.plays || []).length) g.plays = g.plays.slice().sort(function (x, y) { return Math.abs(y.wpa || 0) - Math.abs(x.wpa || 0); });
-    if ((g.plays || []).length) html += U.card('Highest-leverage plays', 'The plays that moved the win probability most (win probability added, home side).', '<ol class="cc-plays">' + g.plays.slice(0, 8).map(function (x) {
+    if ((g.plays || []).length) html += U.card('Highest-leverage plays', 'The plays that moved our win chance most (win chance added for the home side, in points).', '<ol class="cc-plays">' + g.plays.slice(0, 8).map(function (x) {
       return '<li><span class="t">' + esc(perLabel(L, g.season, x.period) + ' ' + (isNum(x.clock) ? fmtClock(x.clock / 60) : (x.clock || ''))) + '</span><span class="tx">' + (x.team ? QK.teamMark(CC.team(L, x.team) || {}, 'sm') : '') + esc(x.text || '') + '</span><b class="' + CC.cls(x.wpa) + '">' + (isNum(x.wpa) ? QK.fmt.pp(x.wpa) : '') + '</b></li>'; }).join('') + '</ol>');
     html += '<div class="qk-grid cc-grid"><div class="qk-span-8">' + (fb ? boxFootball(L, g) : boxHoops(L, g)) + '</div><div class="qk-span-4"><div class="qk-stack">' + leadersBlock(L, g) + teamStats(L, g) + '</div></div></div>';
     el.innerHTML = html;
@@ -295,7 +357,7 @@ CC.route('game', function (el, p) {
     var hasWp = wp && ((wp.model && wp.model.length > 2) || (wp.espn && wp.espn.length > 2));
     var hasFlow = flow && flow.length > 2;
     if (hasWp || hasFlow) {
-      wpNode.innerHTML = U.card(hasWp ? 'Win probability' : 'Score flow', hasWp ? 'Chance the home side wins after each play' + (wp.espn && wp.espn.length && wp.model && wp.model.length ? '; dashed: ESPN.' : '.') : 'Home lead through the game.',
+      wpNode.innerHTML = U.card(hasWp ? 'Win chance through the game' : 'Score flow', hasWp ? 'Our chance the home side wins, after each play' + (wp.espn && wp.espn.length && wp.model && wp.model.length ? '; dashed: ESPN’s, for reference.' : '.') : 'Home lead through the game.',
         (hasWp ? U.chart('gc-wp', 280, 'Win probability through the game') : '') + (hasFlow ? '<div class="cc-mini-h">Score margin (home minus away)</div>' + U.chart('gc-flow', 180, 'Score margin through the game') : ''));
       var home = CC.team(L, g.home) || {}, away = CC.team(L, g.away) || {};
       if (hasWp) {
@@ -306,7 +368,7 @@ CC.route('game', function (el, p) {
           compare: cmp ? { name: 'ESPN', t: cmp.map(function (x) { return x[0]; }), p: cmp.map(function (x) { return x[1]; }) } : null, step: true });
       }
       if (hasFlow) QKC.line('#gc-flow', { xType: 'value', xName: 'Game time', yName: 'Lead (pts)', series: [{ name: 'Home lead', data: flow, area: true, color: CC.tcol(L, g.home) }], step: 'end', yFmt: function (v) { return CC.signed(v, 0); }, xFmt: function (v) { return Math.round(v) + '′'; }, xLabel: function (v) { return clockLabel(L, g.season, v); }, ref: { y: 0 }, endLabels: false });
-    } else wpNode.innerHTML = U.card('Win probability', '', QK.empty(st === 'pre' ? 'Not started' : 'No play-by-play', st === 'pre' ? 'The live curve appears once the game starts.' : 'ESPN has no play-by-play for this game.'));
+    } else wpNode.innerHTML = st === 'pre' ? '' : U.card('Win chance through the game', '', QK.empty('No play-by-play', 'ESPN has no play-by-play for this game.'));
     if (fb && (g.drives || g.epa)) {
       var dn = QK.$('#gc-drives', el);
       var dr = g.drives || [];
@@ -320,8 +382,7 @@ CC.route('game', function (el, p) {
           return [k[1], { v: E[g.away][k[0]], html: f(E[g.away][k[0]]) }, { v: E[g.home][k[0]], html: f(E[g.home][k[0]]) }];
         }), { sticky: false }));
         U.wire(en);
-        var cols2 = [CC.tcol(L, g.away), CC.tcol(L, g.home)];
-        if (QK.color.contrast(cols2[0], cols2[1]) < 1.6) cols2 = [QK.cssVar('--c-2'), QK.cssVar('--c-1')];
+        var cols2 = CC.pair(L, g.away, g.home);
         QKC.bar('#gc-epa-ch', { cats: ['EPA/play', 'Pass', 'Rush'], legend: true, valName: 'EPA per play', fmt: function (v) { return CC.signed(v, 2); },
           series: [{ name: CC.tabbr(L, g.away), data: [E[g.away].epa_play, E[g.away].pass_epa, E[g.away].rush_epa], color: cols2[0] }, { name: CC.tabbr(L, g.home), data: [E[g.home].epa_play, E[g.home].pass_epa, E[g.home].rush_epa], color: cols2[1] }] });
       }

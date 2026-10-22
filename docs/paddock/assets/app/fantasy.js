@@ -1,7 +1,7 @@
 /* The Quant Paddock — Fantasy (#/fantasy).
  * Our own fantasy-style points table with every projection from the race simulation: the next weekend
  * with a floor and a ceiling (10th / 90th percentiles), the rest of the season, tiers, value against
- * our form line (a price proxy: no official F1 Fantasy data is used), the picks with their reasons,
+ * our form line (a cost proxy: no official F1 Fantasy data is used), the picks with their reasons,
  * where the points come from, the schedule ahead, the season so far and the walk-forward backtest.
  * Reads <y>/fantasy.json (current season), fantasy_backtest.json. */
 (function (PD) {
@@ -36,7 +36,7 @@ function render(el) {
     T.forEach(function (r) { tById[r.id] = r; });
     var nx = F.next || {};
     var live = D.filter(function (r) { return isNum(r.next); });
-    var sub = el.querySelector('.pd-head .qk-sub');
+    var sub = el.querySelector('.pd-head .qk-sh-sub');
     var subText = F.projection_ok ? 'Next: ' + esc(nx.name || 'round ' + nx.round) + ' (round ' + esc(nx.round) + ')' + (nx.sprint ? ', a sprint weekend' : '') + (nx.quali_known ? ' · qualifying is in: its points are actual' : ' · projected before qualifying') : esc(F.reason || 'No rounds left to project');
     if (sub) sub.innerHTML = subText; else { var hl = el.querySelector('.pd-head-l'); if (hl) hl.insertAdjacentHTML('beforeend', '<p class="qk-sub">' + subText + '</p>'); }
     var top = live.slice().sort(function (a, b) { return b.next - a.next; })[0];
@@ -49,9 +49,9 @@ function render(el) {
       PD.kpi('Backtest MAE', bd.model ? PD.num(bd.model.mae, 2) : '—', bd.std ? 'season average ' + PD.num(bd.std.mae, 2) : ''),
       PD.kpi('Rank correlation', bd.model ? PD.num(bd.model.spearman, 2) : '—', bd.std ? 'season average ' + PD.num(bd.std.spearman, 2) : '')
     ]);
-    if (F.label) h += PD.note(esc(F.label));
+    if (F.label) h += PD.note(esc(PD.v2.copy(F.label)));
     if (F.picks && Object.keys(F.picks).length) {
-      h += '<section class="qk-section pd-sec"><div class="qk-section-head"><div><h2>Our picks</h2><div class="qk-sub">Model suggestions from our projections, with the reasons the numbers give. Not the official game’s prices or ownership.</div></div></div><div class="qk-auto pd-picks" style="--min:260px">' +
+      h += '<section class="qk-section pd-sec">' + PD.secHead('Fantasy', 'Our picks', 'Suggestions from our projections, with the reasons the numbers give. Not the official game’s player costs or ownership.') + '<div class="qk-auto pd-picks" style="--min:260px">' +
         PICKS.map(function (g) {
           var list = F.picks[g[0]];
           list = Array.isArray(list) ? list : (list ? [list] : []);
@@ -65,7 +65,7 @@ function render(el) {
     }
     h += PD.grid(
       PD.card('Where the points come from', 'Expected points by item next weekend; the diamond is the total.', PD.chartBox('ft-break', Math.max(360, live.length * 22 + 90)), { span: 7 }) +
-      PD.card('Projection v form', 'Above the diagonal: we expect more than the form line (our price proxy) says.', PD.chartBox('ft-val', 420), { span: 5 }) +
+      PD.card('Projection v form', 'Above the diagonal: we expect more than the form line (our cost proxy) says.', PD.chartBox('ft-val', 420), { span: 5 }) +
       PD.card('Drivers', 'Projections from ' + (F.n ? PD.int(F.n) + ' ' : '') + 'simulated seasons; floor and ceiling are the 10th and 90th percentiles (a retirement costs 20).', '<div id="ft-d"></div>', { span: 12, flush: true, right: PD.seg('ft-v', [['next', 'Next weekend'], ['ros', 'Rest of season']], 'next', 'Horizon') }) +
       PD.card('Constructors', 'Both drivers plus qualifying progression and pit-stop bands.', '<div id="ft-t"></div>', { span: 12, flush: true }) +
       PD.card('The schedule ahead', 'Expected points per remaining round, against the round’s median (blue above). S = sprint weekend.', '<div id="ft-s"></div>', { span: 7, flush: true, right: PD.seg('ft-sk', [['drivers', 'Drivers'], ['teams', 'Constructors']], 'drivers', 'Schedule') }) +
@@ -110,7 +110,7 @@ function render(el) {
         { key: 'next', label: 'Projected', num: true, fmt: function (v) { return '<b>' + pts(v) + '</b>'; } },
         { key: 'p10', label: 'Floor – ceiling', sort: false, fmt: function (v, r) { return bar(r.p10, r.next, r.p90); } },
         { key: 'p_q3', label: 'Q3', num: true, fmt: pc }, { key: 'p_front', label: 'Front rows', num: true, fmt: pc }, { key: 'p_dnf', label: 'DNF', num: true, fmt: pc }, { key: 'p_fl', label: 'Fastest lap', num: true, fmt: pc },
-        { key: 'price', label: 'Form line', num: true, tip: 'Our price proxy: (n × form + 3 × last season) / (n + 3)', fmt: function (v) { return pts(v); } },
+        { key: 'price', label: 'Form line', num: true, tip: 'Our cost proxy: (n × form + 3 × last season) / (n + 3)', fmt: function (v) { return pts(v); } },
         { key: 'value', label: 'Value', num: true, fmt: function (v) { return PD.deltaHTML(v, 1); } }
       ], live, { sort: { key: 'next', dir: 'desc' }, rank: true });
       else PD.table('ft-d', [
@@ -168,7 +168,7 @@ function backtest(F, BT) {
   if (dc.model && dc.std) read = 'Over ' + (dc.model.races || 0) + ' weekends (' + esc(span) + '), projected before qualifying with only the data before each weekend, our projection misses a driver’s weekend score by ' + PD.num(dc.model.mae, 1) + ' points on average against ' + PD.num(dc.std.mae, 1) +
     ' for the season-to-date average (' + PD.num(100 * (1 - dc.model.mae / dc.std.mae), 0) + '% smaller), ' + PD.num((dc.prev || {}).mae, 1) + ' for the previous weekend and ' + PD.num((dc.last || {}).mae, 1) + ' for last season’s average; rank correlation ' + PD.num(dc.model.spearman, 2) + ' against ' + PD.num(dc.std.spearman, 2) + '.';
   var groups = [['drivers_core', 'Drivers, core scoring'], ['drivers_full', 'Drivers, full scoring (' + ((B && B.full_from) || 2024) + ' on)'], ['teams_core', 'Constructors, core scoring'], ['teams_full', 'Constructors, full scoring']].filter(function (g) { return M[g[0]] && M[g[0]].model; });
-  PD.set('ft-bt', '<section class="qk-section pd-sec"><div class="qk-section-head"><div><h2>Does it work?</h2><div class="qk-sub">The walk-forward backtest: every weekend ' + esc(span) + ' projected before qualifying with only the data before it.</div></div></div>' +
+  PD.set('ft-bt', '<section class="qk-section pd-sec">' + PD.secHead('Backtest', 'Does it work?', 'The walk-forward backtest: every weekend ' + esc(span) + ' projected before qualifying with only the data before it.') +
     (read ? PD.note(read) : '') + PD.grid((B && (B.per_race || []).length ? PD.card('Error through time', 'Mean absolute error per weekend, 10-weekend rolling mean.', PD.chartBox('ft-bt-ch', 300), { span: 12 }) : '') +
     groups.map(function (g, i) { return PD.card(esc(g[1]), PD.int((M[g[0]].model || {}).n) + ' weekends scored', '<div id="ft-bt-' + i + '"></div>', { span: 6, flush: true }); }).join(''), 'pd-mt') + '</section>');
   groups.forEach(function (g, i) {
@@ -198,7 +198,7 @@ function backtest(F, BT) {
 function scoring(F) {
   if (!(F.scoring || []).length) return;
   PD.set('ft-sc', PD.card('Our scoring table', 'Ours, in the usual shape of F1 fantasy games; computed from Jolpica results and OpenF1 records.', '<div id="ft-sc-t"></div>' +
-    ((F.excluded || []).length ? '<div class="pd-pad pd-prose"><p><b>Left out, and why:</b></p><ul>' + F.excluded.map(function (r) { return '<li><b>' + esc(r[0]) + '.</b> ' + esc(r[1]) + '</li>'; }).join('') + '</ul></div>' : ''), { flush: true, cls: 'pd-mt' }));
+    ((F.excluded || []).length ? '<div class="pd-pad pd-prose"><p><b>Left out, and why:</b></p><ul>' + F.excluded.map(function (r) { return '<li><b>' + esc(PD.v2.copy(r[0])) + '.</b> ' + esc(PD.v2.copy(r[1])) + '</li>'; }).join('') + '</ul></div>' : ''), { flush: true, cls: 'pd-mt' }));
   PD.table('ft-sc-t', [{ key: 'a', label: 'Part', sort: false, fmt: function (v) { return '<b>' + esc(v) + '</b>'; } }, { key: 'b', label: 'Item', sort: false }, { key: 'c', label: 'Points', sort: false, fmt: function (v) { return '<span class="pd-num">' + esc(v) + '</span>'; } }, { key: 'd', label: 'Notes', sort: false, fmt: function (v) { return '<span class="qk-muted">' + esc(v) + '</span>'; } }],
     F.scoring.map(function (r) { return { a: r[0], b: r[1], c: r[2], d: r[3] }; }));
 }

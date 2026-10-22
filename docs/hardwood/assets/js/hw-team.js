@@ -1,15 +1,16 @@
-/* The Quant Hardwood — the team page (#/<L>/team/<tid>).
+/* The Quant Hardwood — the team page (#/<L>/team/<tid>), on Design System 2.0.
  *
- * Overview tab: a header in the team colour with the headline numbers; the net rating over time (±1 se, game
- * results marked); the season odds against the market and the seed distribution; strengths and needs with the
- * best trade targets (current season); the current roster; the schedule (next games with the model line and the
- * team's availability term, recent results); moves (this team's transactions and rated trades).
+ * Overview tab: a team card header in the team colour (record, net rating, projection); stat tiles (our playoff
+ * and title chances first, projected wins with the simulation's 90% range, the ratings); the net rating through the
+ * season (±1 standard error shaded, results marked); our season chances and the final-seed distribution; strengths
+ * and needs with the best trade targets (current season); the current roster as a leaderboard; the schedule (next
+ * games with our win chance and the team's availability line, recent results); moves.
  * Detail tab (?tab=detail): the pre-redesign team page in full (four factors, shot profiles, lineups, on/off,
  * rotation, the whole catalogue in percentiles, the trade ledger).
  *
  * Current roster: <L>/<S>/valuation.json (built each run from the latest ESPN rosters: every player whose team is
  * this one, with injury status), joined with the season's numbers from players.json. A past season shows everyone
- * who played for the team (teams.json roster). */
+ * who played for the team (teams.json roster). The market is not shown here (game pages and the Model page only). */
 (function (HW) {
 'use strict';
 
@@ -29,7 +30,7 @@ function avNote(g, home) {
   if (!av || !isNum(av[0]) || !isNum(av[1])) return '';
   const v = home ? av[0] : av[1];
   if (Math.abs(v) < 0.05) return '';
-  return '<span class="s" style="white-space:nowrap" data-tip="Availability for the next game: points of margin from who is expected to play (injury report applied), against what the rating already reflects">avail. ' + U.sgnHTML(v, 1) + '</span>';
+  return '<span class="s" style="white-space:nowrap" data-tip="Availability for the next game: points of margin from who is expected to play (injury report applied), against what the rating already reflects">availability ' + U.sgnHTML(v, 1) + ' pts</span>';
 }
 
 function render(el, params) {
@@ -40,11 +41,11 @@ function render(el, params) {
   const opt = (cond, p) => (cond ? HW.load(p) : Promise.resolve(null));
   return Promise.all([HW.load(HW.path('season.json', L, S)), HW.load(HW.path('teams.json', L, S)), HW.load(HW.path('players.json', L, S)),
     opt(isCur, HW.path('needs/' + tid + '.json', L, S)), opt(isCur, HW.path('valuation.json', L, S)), opt(isCur, HW.path('transactions.json', L, S)),
-    opt(isCur, HW.path('deals.json', L, S)), opt(isCur, HW.path('schedule.json', L, S)), opt(isCur, HW.lpath('markets.json', L))]).then(a => {
+    opt(isCur, HW.path('deals.json', L, S)), opt(isCur, HW.path('schedule.json', L, S)), isCur ? U.movement(L) : Promise.resolve(null)]).then(a => {
     if (!U.alive(el)) return;
     const season = U.ok(a[0]) ? a[0] : null, teams = U.ok(a[1]) ? a[1] : null, cat = U.ok(a[2]) ? a[2] : null;
+    const mv = a[8] || null;
     const needs = U.ok(a[3]) ? a[3] : null, val = U.ok(a[4]) ? a[4] : null, tx = U.ok(a[5]) ? a[5] : null, deals = U.ok(a[6]) ? a[6] : null, sched = U.ok(a[7]) ? a[7] : null;
-    const markets = U.ok(a[8]) ? a[8] : null;
     const T = (teams && teams.teams && teams.teams[tid]) || {};
     const r = ((season && season.ratings) || {})[tid] || {};
     const sim = HW.simTeams(season)[tid] || {};
@@ -55,17 +56,21 @@ function render(el, params) {
     document.title = name + ' · ' + HW.leagueName(L) + ' · The Quant Hardwood';
     const open = isNum(sim.w_p05) && sim.w_p95 > sim.w_p05;
     const stats = [
-      ['Record', isNum(s.w) ? HW.record(s.w, s.l) : '—', isNum(s.seed) ? HW.ordinal(s.seed) + ' in the ' + (s.conf || 'league') : ''],
-      ['Net rating', U.signed(r.net, 1), isNum(r.rank) ? HW.ordinal(r.rank) + ' · ± ' + U.f(r.se_net, 1) : ''],
-      ['Offence', U.f(r.off, 1), 'pts per 100'], ['Defence', U.f(r.def, 1), 'allowed per 100']
+      { label: 'Record', value: isNum(s.w) ? HW.record(s.w, s.l) : '—', sub: isNum(s.seed) && (s.w || s.l) ? HW.ordinal(s.seed) + ' in the ' + (s.conf || 'league') : (isCur ? 'no games yet' : '') },
+      { label: 'Net rating', value: U.signed(r.net, 1), sub: isNum(r.rank) ? HW.ordinal(r.rank) + ' of ' + Object.keys((season && season.ratings) || {}).length : '' }
     ];
-    if (open) stats.push(['Projected', U.f(sim.exp_w, 1) + ' W', U.f(sim.w_p05, 0) + '–' + U.f(sim.w_p95, 0)]);
-    if (isNum(sim.p_playoffs)) stats.push(['Playoffs', U.pct(sim.p_playoffs), 'title ' + U.pct(sim.p_title)]);
-    let h = '<div class="qk-hero" style="--tc:' + esc(col) + '"><div class="hw-teamhead">' + QK.teamMark(U.team(L, tid), 'lg') + '<div><div class="qk-kicker">' + esc(U.kicker(L, S)) + '</div><h1>' + esc(name) + '</h1>' +
-      '<div class="qk-hero-meta">' + [info.conference || s.conf, info.division].filter(Boolean).map(x => '<span>' + esc(x) + '</span>').join('') + (isNum(HW.simTeams(season)[tid] && sim.rating) ? '' : '') + '</div></div>' +
-      '<div class="qk-hero-stats">' + stats.map(x => '<div class="qk-hero-stat"><div class="l">' + esc(x[0]) + '</div><div class="v">' + esc(x[1]) + '</div>' + (x[2] ? '<div class="hw-quiet">' + esc(x[2]) + '</div>' : '') + '</div>').join('') + '</div></div></div>';
+    if (open) stats.push({ label: 'Projected wins', value: U.f(sim.exp_w, 1), sub: U.f(sim.w_p05, 0) + '–' + U.f(sim.w_p95, 0) });
+    let h = '<div class="qk-kicker" style="margin-bottom:10px"><a href="' + esc(HW.href(L, 'teams', S)) + '">← Teams</a></div>' +
+      QK.playerHeader({ name: name, split: false, kicker: U.kicker(L, S), team: { name: [info.conference || s.conf, info.division].filter(Boolean).join(' · ') || HW.leagueName(L), abbr: HW.teamAbbr(L, tid), colour: HW.teamColourRaw(L, tid) },
+        meta: [isNum(r.off) ? ['Offence', U.f(r.off, 1) + ' per 100'] : null, isNum(r.def) ? ['Defence', U.f(r.def, 1) + ' allowed'] : null, isNum(r.pace) ? ['Pace', U.f(r.pace, 1)] : null], stats: stats });
+    const tiles = [];
+    if (isCur && isNum(sim.p_playoffs)) tiles.push({ label: 'Our playoff chance', value: U.pct(sim.p_playoffs), signal: true, sub: 'from ' + Number(((season.sim || {}).n_sims) || 20000).toLocaleString('en-GB') + ' simulated seasons', tip: 'Our chance of a playoff place (play-in excluded)' });
+    if (isCur && isNum(sim.p_title)) tiles.push({ label: 'Our title chance', value: U.pct(sim.p_title), signal: true, sub: isNum(sim.p_conf) ? 'conference ' + U.pct(sim.p_conf) : '' });
+    if (open) tiles.push({ label: 'Projected wins', value: U.f(sim.exp_w, 1), sub: '90% range ' + U.f(sim.w_p05, 0) + ' to ' + U.f(sim.w_p95, 0), tip: 'Mean of the simulated seasons; the range holds nine seasons in ten' });
+    if (isNum(r.net)) tiles.push({ label: 'Net rating', value: U.signed(r.net, 1), sub: 'per 100 possessions' + (isNum(r.se_net) ? ' ± ' + U.f(r.se_net, 1) : '') + (isNum(r.rank) ? ' · ' + HW.ordinal(r.rank) : ''), tip: 'Our opponent-adjusted net rating (Kalman filter); ± one standard error' });
+    if (isNum(r.off)) tiles.push({ label: 'Offence · defence', value: U.f(r.off, 1) + ' · ' + U.f(r.def, 1), sub: 'points scored and allowed per 100' });
     const base = HW.teamHref(L, tid, S);
-    h += U.tabsHTML([{ key: 'overview', label: 'Overview', href: base }, { key: 'detail', label: 'Shots, lineups and the full catalogue', href: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'tab=detail' }], tab);
+    h += '<div style="margin-top:var(--sp-4)"></div>' + U.tabsHTML([{ key: 'overview', label: 'Overview', href: base }, { key: 'detail', label: 'Shots, lineups and the full catalogue', href: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'tab=detail' }], tab);
     if (tab === 'detail') {
       el.innerHTML = h + '<div class="hw-sub"></div>';
       return U.legacy('team', el.querySelector('.hw-sub'), params);
@@ -73,31 +78,42 @@ function render(el, params) {
     if (!season && !teams) { el.innerHTML = h + U.empty('Not in this season', name + ' has no data for ' + HW.seasonLabel(L, S) + '.'); return; }
     const path = ((season && season.rating_paths) || {})[tid] || [];
     const log = (T.log || []).slice().sort((x, y) => String(x.date).localeCompare(String(y.date)));
-    const mk = (T.odds || {}).market || {};
-    const mkTitle = HW.titleProbs(markets && markets.futures && markets.futures.champion);
-    const wt = ((markets && markets.win_totals) || {})[tid];
+    h += tiles.length ? '<div class="hw-kpis">' + QK.stats(tiles) + '</div>' : '';
     h += '<div class="qk-grid hw-sec">';
-    if (path.length > 1) h += U.card2('Rating over time', 'Net rating per 100 after each game (Kalman filter), shaded ±1 standard error' + (log.length ? '; dots are results' : ''), U.chart('tp-path', 300, 'Net rating over time'), { cls: 'qk-span-8' });
-    const oddsRows = [['Playoffs', sim.p_playoffs, mk.p_playoffs], ['Top-six seed', sim.p_top6, mk.p_top6], ['Conference', sim.p_conf, mk.p_conf], ['Title', sim.p_title, isNum(mkTitle[tid]) ? mkTitle[tid] : mk.p_title]].filter(x => isNum(x[1]) && (x[1] > 0 || isNum(x[2])));
-    if (oddsRows.length && isCur) h += U.card2('Season odds', 'Model' + (oddsRows.some(x => isNum(x[2])) ? ' against the market' : '') + (wt && isNum(wt.line) ? ' · win total ' + U.f(wt.line, 1) + ': over ' + U.pct(wt.p_over_model) + ' (market ' + U.pct(wt.p_over_market) + ')' : ''),
-      '<ul class="hw-list">' + oddsRows.map(x => '<li><span class="nm" style="flex:1">' + esc(x[0]) + '</span>' + HW.ui.probBar(x[1], col) + '<span class="s">' + (isNum(x[2]) ? 'market ' + U.pct(x[2]) : '') + '</span></li>').join('') + '</ul>' +
-      ((sim.seed_dist || []).length && open ? U.chart('tp-seed', 160, 'Seed distribution') + '<div class="hw-chartcap">Share of simulated seasons finishing in each seed</div>' : ''), { cls: path.length > 1 ? 'qk-span-4' : 'qk-span-12' });
+    if (path.length > 1) h += U.card2('Net rating through the season', 'Our rating per 100 possessions after each game (Kalman filter), shaded ±1 standard error' + (log.length ? '; dots are results (green won, red lost)' : ''), U.chart('tp-path', 300, 'Net rating through the season'), { cls: 'qk-span-8' });
+    const oddsRows = [['Playoffs', sim.p_playoffs], ['Top-six seed', sim.p_top6], ['Conference', sim.p_conf], ['Title', sim.p_title]].filter(x => isNum(x[1]) && x[1] > 0);
+    if (oddsRows.length && isCur) h += U.card2('Season chances', 'Our chances from the season simulation',
+      QK.chances(oddsRows.map(x => ({ label: x[0], p: x[1], color: HW.teamColourRaw(L, tid) })), { sort: false, max: 1, key: false }) +
+      ((sim.seed_dist || []).length && open ? U.chart('tp-seed', 190, 'Chance of each final seed') : ''), { cls: path.length > 1 ? 'qk-span-4' : 'qk-span-12' });
     h += '</div>';
     // strengths and needs
     if (needs && needs.grades) {
-      h += '<section class="qk-section"><div class="qk-section-head"><div><h2>Strengths and needs</h2><div class="qk-sub">Each position group and unit graded against the league on projected value (WAR over a full season); the best trade targets for each weak spot.</div></div></div><div class="qk-grid">' +
+      h += '<section class="qk-section">' + U.head({ kicker: 'Roster construction', title: 'Strengths and needs', sub: 'Each position group and unit graded against the league on projected value (WAR over a full season); the best trade targets for each weak spot.' }) + '<div class="qk-grid">' +
         U.card2('Grades', '', '<div id="tp-grades"></div>', { cls: 'qk-span-5', flush: true }) +
         U.card2('Where to improve', 'Ranked by wins added in this rotation', '<div id="tp-targets"></div>', { cls: 'qk-span-7', flush: true }) + '</div></section>';
     }
-    h += '<section class="qk-section"><div class="qk-section-head"><div><h2>' + (isCur ? 'Current roster' : 'Roster') + '</h2><div class="qk-sub">' + (isCur && val ? 'From the latest rosters and injury report (rebuilt every run). HPM is the projected rest-of-season rate per 100; WAR the projected wins above replacement.' : 'Everyone who played, by minutes.') + '</div></div></div>' +
+    const mvT = mv ? (mv.m.teams || {})[tid] : null;
+    if (mv && mvT) {
+      const ST = { contending: 'contending', 'in the middle': 'in the middle', rebuilding: 'rebuilding' };
+      const cuts = mv.m.status_cuts || {};
+      const tl = [];
+      if (mv.pub.next && isNum(mvT.exp_departures)) tl.push({ label: 'Expected departures', value: U.f(mvT.exp_departures, 1), signal: true, sub: U.mvHorizon(mv), tip: 'The sum of every rostered player\'s chance of leaving' });
+      const most = mv.pub.next ? (mv.m.players || []).map(r => mv.by[String(r[0])]).filter(x => x && String(x.team) === tid && isNum(x.p_next)).sort((x, y) => y.p_next - x.p_next)[0] : null;
+      if (most) tl.push({ label: 'Most likely to move', value: most.name, text: true, href: HW.playerHref(L, most.pid, S), sub: U.pctMv(most.p_next) + (most.why ? ' · ' + most.why : '') });
+      const lines = (mv.pub.next ? '' : U.mvBaseLine(mv, 'next')) + (mv.pub.deadline ? '' : U.mvBaseLine(mv, 'deadline'));
+      h += '<section class="qk-section">' + U.head({ kicker: 'Who moves next', title: 'Outlook', sub: 'Our chance that each player has left ' + esc(U.mvHorizon(mv)) + ', how, and the team\'s expected departures. No contract data is used: see the Model page.',
+        actions: mvT.status ? '<span data-tip="' + esc('From our standings: contending above ' + U.pct(cuts.contending) + ' projected win %, rebuilding below ' + U.pct(cuts.rebuilding)) + '" tabindex="0">' + QK.tag(ST[mvT.status] || mvT.status, mvT.status === 'contending' ? 'signal' : '') + '</span>' : '' }) +
+        (tl.length ? '<div class="hw-kpis">' + QK.stats(tl) + '</div>' : '') + lines + '</section>';
+    }
+    h += '<section class="qk-section">' + U.head({ kicker: 'Players', title: isCur ? 'Current roster' : 'Roster', sub: isCur && val ? 'From the latest rosters and injury report (rebuilt every run). HPM is our projected rest-of-season impact per 100; WAR the projected wins above replacement.' : 'Everyone who played, by minutes.' }) +
       '<div class="qk-card"><div id="tp-roster"></div></div></section>';
     // schedule + moves
-    const upcoming = sched ? (sched.games || []).filter(g => (String(g.home) === tid || String(g.away) === tid) && HW.gameState(g) !== 'post').sort((x, y) => String(x.date).localeCompare(String(y.date))).slice(0, 8) : [];
+    const upcoming = sched ? (sched.games || []).filter(g => (String(g.home) === tid || String(g.away) === tid) && HW.gameState(g) !== 'post' && U.fresh(g)).sort((x, y) => String(x.date).localeCompare(String(y.date))).slice(0, 8) : [];
     const recent = log.slice(-8).reverse();
     const txRows = tx ? U.rowsOf(tx).filter(x => String(x.team) === tid) : [];
     const seen = {}, txs = txRows.filter(x => { const k = x.date + x.text; if (seen[k]) return false; seen[k] = 1; return true; }).sort((x, y) => String(y.date).localeCompare(String(x.date))).slice(0, 10);
     const dl = deals && deals.teams ? deals.teams[tid] : null;
-    h += '<div class="qk-grid hw-sec">' + U.card2('Schedule', upcoming.length ? 'Next games with the model’s win probability' : 'Results', '<div id="tp-sched"></div>', { cls: 'qk-span-6', flush: true });
+    h += '<div class="qk-grid hw-sec">' + U.card2('Schedule', upcoming.length ? 'Next games with our win chance' : 'Results', '<div id="tp-sched"></div>', { cls: 'qk-span-6', flush: true });
     if (txs.length || dl) h += U.card2('Moves', dl ? dl.n + ' rated trade' + (dl.n === 1 ? '' : 's') + ' in 12 months · net ' + U.signed(dl.net_now, 1) + ' WAR in today’s view' : 'Transactions in the last 12 months',
       '<div>' + txs.map(x => '<div class="hw-tx"><span class="d">' + esc(HW.fmtDate(x.date, { year: 'auto', weekday: false })) + '</span><span>' + esc(x.text) + '</span></div>').join('') + '</div>',
       { cls: 'qk-span-6', flush: true, foot: U.link(HW.href(L, 'value') + '?tab=moves&team=' + encodeURIComponent(tid), 'Trade grades and the full feed') });
@@ -114,7 +130,7 @@ function render(el, params) {
         return {
           grid: { left: 8, right: 16, top: 32, bottom: 30, containLabel: true },
           xAxis: QKC.axis(Tk, { type: 'category', data: xs.map(d => HW.fmtDate(d, { year: false, weekday: false })), split: false, line: true, boundaryGap: false, name: 'Date', nameLocation: 'middle', nameGap: 26 }),
-          yAxis: QKC.axis(Tk, { fmt: v => U.signed(v, 0), scale: true, name: 'Net rating per 100', nameAlign: 'left' }),
+          yAxis: QKC.axis(Tk, { fmt: v => U.signed(v, 0), scale: true, name: 'Net rating (points per 100 possessions)', nameAlign: 'left' }),
           tooltip: QKC.tooltip(Tk, { trigger: 'axis', formatter: ps => { const i = ps[0].dataIndex, p = path[i], g = byGame[p.game];
             return '<div style="color:' + Tk.ink3 + ';font-size:11px">' + esc(HW.fmtDate(p.date, { year: false })) + '</div>' + QKC.tipRow(col, 'Net', U.signed(p.net, 1) + ' ± ' + U.f(p.se, 1)) +
               (g ? '<div style="margin-top:4px">' + esc((g.home ? 'v ' : '@ ') + HW.teamAbbr(L, g.opp) + ' ' + (g.res || '') + ' ' + g.pts + '-' + g.opp_pts) + '</div>' : ''); } }),
@@ -130,7 +146,7 @@ function render(el, params) {
     }
     if (document.getElementById('tp-seed')) {
       const sd = sim.seed_dist;
-      QKC.bar('#tp-seed', { cats: sd.map((v, i) => String(i + 1)), series: [{ name: 'Seed', data: sd.map(v => Math.round(v * 1000) / 1000) }], colors: sd.map(() => col), fmt: v => U.pct(v), valName: 'Probability', catName: 'Seed' });
+      QKC.bar('#tp-seed', { cats: sd.map((v, i) => String(i + 1)), series: [{ name: 'Chance', data: sd.map(v => Math.round(v * 1000) / 1000) }], colors: sd.map(() => col), fmt: v => U.pct(v), valName: 'Our chance', catName: 'Final seed' });
     }
     if (needs && needs.grades) {
       QK.table(document.getElementById('tp-grades'), { dense: true, rows: needs.grades, columns: [
@@ -153,15 +169,19 @@ function render(el, params) {
     if (isCur && vrows.length) {
       const rows = vrows.map(x => { const p = P[x.id] || {}, v = p.values || {}; return Object.assign({}, x, { gp: p.gp, ppg: v.pts_g, rpg: v.reb_g, apg: v.ast_g }); }).sort((x, y) => (y.mpg || 0) - (x.mpg || 0));
       const anyGp = rows.some(x => isNum(x.gp));
-      QK.table(rosterNode, { dense: true, rows: rows, columns: [
-        { key: 'name', label: 'Player', sticky: true, fmt: (v, x) => U.playerEnt(L, x.id, x.name, null, null, S) + (x.inj ? ' <span class="hw-inj" data-tip="' + esc(x.inj) + '">' + esc(String(x.inj).split(' ')[0]) + '</span>' : '') },
-        { key: 'pos', label: 'Pos', fmt: (v, x) => U.pos(v) + ' <span class="hw-quiet">' + esc(U.ROLE1[x.role] || '') + '</span>' },
-        { key: 'age', label: 'Age', num: true, fmt: v => (isNum(v) ? String(Math.floor(v)) : '—') },
+      const mvOn = mv && mv.pub.next;
+      rows.forEach(x => { const mr = mvOn ? mv.by[String(x.id)] : null; x.p_next = mr ? mr.p_next : null; x.p_dl = mr ? mr.p_dl : null; x.mr = mr;
+        x.sub = [x.pos, U.ROLE1[x.role] || '', isNum(x.age) ? String(Math.floor(x.age)) : ''].filter(Boolean).join(' · ') + (x.inj ? ' · ' + String(x.inj).split(' ')[0] : '') + (mr && mr.why ? ' · ' + mr.why : ''); });
+      if (mvOn) rosterNode.insertAdjacentHTML('beforebegin', '<div class="hw-mvline" style="padding:10px 16px 0"><span class="qk-muted">Chance of moving, split by how:</span>' + U.mvKeys(mv) + '</div>');
+      QK.leaderboard(rosterNode, { dense: true, rows: rows, sort: mvOn ? { key: 'p_next', dir: 'desc' } : undefined, rowHref: x => HW.playerHref(L, x.id, S), columns: [
+        { key: 'name', label: 'Player', type: 'entity', sub: 'sub', href: x => HW.playerHref(L, x.id, S) },
         { key: 'mpg', label: 'Proj min', num: true, fmt: v => U.f(v, 1), tip: 'Projected minutes a game' }]
         .concat(anyGp ? [{ key: 'gp', label: 'GP', num: true }, { key: 'ppg', label: 'PPG', num: true, fmt: v => U.f(v, 1) }, { key: 'rpg', label: 'RPG', num: true, fmt: v => U.f(v, 1) }, { key: 'apg', label: 'APG', num: true, fmt: v => U.f(v, 1) }] : [])
-        .concat([{ key: 'rate', label: 'HPM', num: true, fmt: v => U.sgnHTML(v, 1), tip: 'Projected rest-of-season impact per 100 possessions' },
-          { key: 'w0', label: 'WAR', num: true, fmt: v => U.f(v, 1), tip: 'Projected wins above replacement, rest of season' },
-          { key: 'v', label: '4-yr value', num: true, fmt: v => U.f(v, 1), tip: 'Discounted WAR over four seasons' }]) });
+        .concat([{ key: 'rate', label: 'HPM', num: true, fmt: v => U.sgnHTML(v, 1), tip: 'Our projected rest-of-season impact per 100 possessions' },
+          { key: 'w0', label: 'WAR', type: 'bar', fmt: v => U.f(v, 1), tip: 'Projected wins above replacement, rest of season' },
+          { key: 'v', label: '4-yr value', num: true, fmt: v => U.f(v, 1), tip: 'Discounted WAR over four seasons' }])
+        .concat(mvOn ? [{ key: 'p_next', label: 'Chance of moving', num: true, fmt: (v, x) => U.mvBar(mv, x.mr), tip: 'Our chance he has left ' + U.mvHorizon(mv) + '. ' + ((mv.m.notes || [])[0] || '') }] : [])
+        .concat(mvOn && mv.pub.deadline ? [{ key: 'p_dl', label: 'Deadline', num: true, fmt: v => U.pctMv(v), tip: 'Our chance he is ' + (mv.m.deadline_label || 'traded or claimed') + ' before the trade deadline (' + HW.fmtDate(String((mv.m.horizons || {}).deadline || ''), { weekday: false }) + ')' }] : []) });
     } else {
       const ro = (T.roster || []).slice().sort((x, y) => (y.min || 0) - (x.min || 0)).map(x => Object.assign({}, x, { mpg: x.mpg || (x.gp ? x.min / x.gp : null) }));
       if (!ro.length) rosterNode.innerHTML = U.empty('No roster yet', 'The roster appears once the team plays.');

@@ -1,6 +1,6 @@
-/* The Quant Gridiron — Teams (#/teams): every club at a glance as cards (record, rating, playoff and
- * Super Bowl odds, rating trend), the EPA map (offence v defence per play) and one sortable table with
- * views for ratings, tendencies, fourth downs and odds. Exports GI.TM (teams.json readers) for the team
+/* The Quant Gridiron — Teams (#/teams), on Design System 2.0: every club at a glance as cards (record, rating, our
+ * playoff and Super Bowl chances, rating trend), the EPA map (offence v defence per play) and one sortable table with
+ * views for ratings, tendencies, fourth downs and our chances. Exports GI.TM (teams.json readers) for the team
  * page and compare. Reads <S>/teams.json and <S>/season.json. */
 (function (GI) {
 'use strict';
@@ -31,7 +31,7 @@ function tcard(t, x, r, S) {
   const sim = (x || {}).sim || {};
   return '<a class="qk-card is-link gi-tcard" href="' + GI.teamHref(t, S) + '" style="--tc:' + esc(GI.tc(t)) + '">' +
     '<div class="gi-tcard-top">' + GI.mark(t) + '<div class="gi-tcard-n"><b>' + esc(GI.teamName(t)) + '</b><span class="qk-sub">' + esc(GI.teamInfo(t).division || '') + ' · ' + esc(GI.record(first(r.w, rec.w), first(r.l, rec.l), first(r.t, rec.t))) + '</span></div>' +
-    '<span class="gi-tcard-r" title="Team rating">' + (isNum(v.rating) ? GI.signed(v.rating, 1) : '—') + '</span></div>' +
+    '<span class="gi-tcard-r gi-disp" title="Our team rating, points a game">' + (isNum(v.rating) ? GI.signed(v.rating, 1) : '—') + '</span></div>' +
     (h.length > 1 ? QK.spark(h, { color: GI.tc(t), w: 220, h: 30, base: 0, label: 'Rating by week' }) : '') +
     '<div class="gi-tcard-stats"><div><span>Playoffs</span><b>' + GI.pct(first(r.p_playoffs, sim.p_playoffs), 0) + '</b></div><div><span>Division</span><b>' + GI.pct(first(r.p_div, sim.p_div), 0) + '</b></div>' +
     '<div><span>Super Bowl</span><b>' + GI.pct(first(r.p_sb, sim.p_sb), 1) + '</b></div><div><span>Proj. wins</span><b>' + GI.num(first(r.mean_wins, sim.mean_wins), 1) + '</b></div></div></a>';
@@ -45,16 +45,16 @@ GI.route('teams', function (el, params) {
     const rowsL = GI.ok(res[1]) ? GI.seasonRows(res[1]) : [];
     const rows = {};
     rowsL.forEach(r => { rows[r.team] = r; });
-    const head = GI.pageHead('Teams · ' + S, 'The 32 teams', 'Ratings in points per game against an average team on a neutral field; odds from the season simulation. Tap a team for its page: ratings over time, strengths and needs, the current roster, schedule and moves.');
+    const head = GI.pageHead('Teams · ' + S, 'The 32 teams', 'Ratings in points per game against an average team on a neutral field; chances from 20,000 simulated seasons. Tap a team for its page: ratings over time, strengths and needs, the current roster, schedule and moves.');
     if (!cat) { el.innerHTML = head + GI.notBuilt('The ' + S + ' team pages', res[0]); return; }
     const T = cat.teams;
     const ids = Object.keys(T).filter(t => /^[A-Z]{2,3}$/.test(t)).sort((a, b) => ((T[b].values || {}).rating || -99) - ((T[a].values || {}).rating || -99));
     el.innerHTML = head +
       '<div class="gi-toolbar">' + GI.seg('tm-conf', [['', 'All'], ['AFC', 'AFC'], ['NFC', 'NFC']], ST.conf, 'Conference') + '</div>' +
       '<div class="qk-auto gi-tcards" id="tm-cards" style="--min:250px"></div>' +
-      GI.grid(GI.card('Offence v defence per play', 'opponent-adjusted EPA per play; up and right is better (less EPA allowed is up); dot size: playoff odds', GI.chartBox('tm-map', 460, 'Offence EPA against defence EPA'), { span: 12 })) +
-      GI.card('Every team, every metric', 'click a header to sort · percentile chips: 100 = best (↓ metrics flipped); tendencies are not good or bad, so they carry ranks',
-        '<div class="gi-toolbar">' + GI.seg('tm-view', [['units', 'Ratings'], ['style', 'Tendencies'], ['fourth', '4th downs'], ['odds', 'Odds']], ST.view, 'View') + '</div><div id="tm-table"></div>');
+      GI.grid(GI.card('Offence v defence per play', 'Opponent-adjusted EPA per play; up and right is better (less EPA allowed is up); dot size: our playoff chance', GI.chartBox('tm-map', 460, 'Offence EPA against defence EPA'), { span: 12 })) +
+      GI.card('Every team, every metric', 'Click a header to sort · percentile chips against the 32 teams: 100 = best (↓ metrics flipped); tendencies are not good or bad, so they carry ranks',
+        '<div class="gi-toolbar">' + GI.seg('tm-view', [['units', 'Ratings'], ['style', 'Tendencies'], ['fourth', '4th downs'], ['odds', 'Chances']], ST.view, 'View') + '</div><div id="tm-table"></div>');
     const draw = () => {
       const list = ids.filter(t => !ST.conf || GI.teamInfo(t).conference === ST.conf);
       GI.set('tm-cards', list.map(t => tcard(t, T[t], rows[t] || {}, S)).join(''));

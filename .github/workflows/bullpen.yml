@@ -112,6 +112,7 @@ jobs:
           uv run --frozen python scripts/mlb_fetch.py --level aaa --refresh-current --budget 300
 
       - name: 'Build'
+        id: build
         timeout-minutes: 80
         run: |
           uv run --frozen python scripts/build_bullpen.py --game-page-seasons 1
@@ -171,18 +172,18 @@ jobs:
         run: |
           uv run --frozen python scripts/ci_site.py prunecaches --prefix bullpen-raw-v1- --keep "${{ steps.rawkey.outputs.key }}"
 
-      - name: 'Save model caches (once a day, and after a seed)'
-        if: ${{ !cancelled() && (!startsWith(steps.model.outputs.cache-matched-key, format('bullpen-model-v1-{0}', steps.ctx.outputs.today)) || steps.seed.outputs.seeded == 'true') }}
+      - name: 'Save model caches (once a day, after a seed, and after a failed or partial-cache build)'
+        if: ${{ !cancelled() && (!startsWith(steps.model.outputs.cache-matched-key, format('bullpen-model-v1-{0}', steps.ctx.outputs.today)) || steps.seed.outputs.seeded == 'true' || steps.build.outcome == 'failure' || contains(steps.model.outputs.cache-matched-key, '-partial-')) }}
         id: modelsave
         uses: actions/cache/save@v4
         with:
           path: |
             data/baseball/cache
-          key: bullpen-model-v1-${{ steps.ctx.outputs.today }}${{ steps.seed.outputs.seeded == 'true' && format('-seed-{0}', github.run_id) || '' }}
+          key: bullpen-model-v1-${{ steps.ctx.outputs.today }}${{ steps.seed.outputs.seeded == 'true' && format('-seed-{0}', github.run_id) || (steps.build.outcome == 'failure' && format('-partial-{0}', github.run_id) || (contains(steps.model.outputs.cache-matched-key, '-partial-') && format('-r{0}', github.run_id) || '')) }}
 
       - name: 'Delete superseded model caches'
         if: ${{ !cancelled() && (steps.modelsave.outcome == 'success' || steps.model.outputs.cache-matched-key != '') }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          uv run --frozen python scripts/ci_site.py prunecaches --prefix bullpen-model-v1- --keep "${{ steps.modelsave.outcome == 'success' && format('bullpen-model-v1-{0}{1}', steps.ctx.outputs.today, steps.seed.outputs.seeded == 'true' && format('-seed-{0}', github.run_id) || '') || steps.model.outputs.cache-matched-key }}"
+          uv run --frozen python scripts/ci_site.py prunecaches --prefix bullpen-model-v1- --keep "${{ steps.modelsave.outcome == 'success' && format('bullpen-model-v1-{0}{1}', steps.ctx.outputs.today, steps.seed.outputs.seeded == 'true' && format('-seed-{0}', github.run_id) || (steps.build.outcome == 'failure' && format('-partial-{0}', github.run_id) || (contains(steps.model.outputs.cache-matched-key, '-partial-') && format('-r{0}', github.run_id) || ''))) || steps.model.outputs.cache-matched-key }}"

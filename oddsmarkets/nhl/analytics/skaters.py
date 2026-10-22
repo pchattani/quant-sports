@@ -204,9 +204,11 @@ METRICS = [
     M("gar_shooting", "GAR shooting", "Value", "1", desc="Finishing component."),
     M("gar_pen", "GAR penalties", "Value", "1", desc="Penalty component (drawn minus taken)."),
     # projections
-    M("proj_pts", "Projected points", "Projection", "1", pct=False, desc="Rest-of-season projection: points so far plus remaining games "
-      "times a points rate regressed toward the position average by the rate's stabilisation constant."),
-    M("proj_g", "Projected goals", "Projection", "1", pct=False, desc="Goals so far plus remaining games times a regressed goal rate."),
+    M("proj_pts", "Projected points", "Projection", "1", pct=False, desc="Full-season projection: points so far plus his club's "
+      "remaining games (times his share of its games so far) at a per-game rate that blends this season with the two before "
+      "(weights 1, 0.8, 0.6 a game) and 30 games at the position average."),
+    M("proj_g", "Projected goals", "Projection", "1", pct=False, desc="Full-season projection: goals so far plus remaining games "
+      "at a goal rate built the same way (45 games at the position average)."),
     M("proj_xgf_pct", "Projected xGF%", "Projection", "pct", pct=False, desc="5v5 xGF% regressed toward 50 % by its stabilisation constant."),
 ]
 KEYS = [m["key"] for m in METRICS]
@@ -409,9 +411,48 @@ def build(ctx: SeasonContext) -> dict | None:
             "model_errors": dict(ctx.model_errors)}
 
 
-def _projections(ctx, rows: dict, reference: list[str], n_season: int, tg_n: int) -> None:
-    """Rest-of-season projections: rates regressed toward the position-group mean of the qualified pool."""
-    left = max(0, n_season - tg_n)
+PRIOR_W = (0.8, 0.6)                 # per-game weight of the previous two seasons against this one (Marcel 5/4/3)
+
+
+def prior_totals(season: int) -> list[dict[str, tuple[float, float, float]]]:
+    """{pid: (points, goals, games)} of the two previous regular seasons from the NHL stats reports on disk (no fetch)."""
+    import gzip
+    import json as _json
+    out = []
+    for back in (1, 2):
+        s = int(season) - 10001 * back
+        rows = None
+        try:
+            with gzip.open(an.raw_root() / "stats" / str(s) / "skater_summary_2.json.gz", "rt", encoding="utf-8") as fh:
+                rows = _json.load(fh)
+        except (OSError, ValueError, EOFError):
+            rows = None
+        out.append({an.sid(r.get("playerId")): (float(r.get("points") or 0), float(r.get("goals") or 0),
+                                                 float(r.get("gamesPlayed") or 0)) for r in rows or [] if r.get("playerId")})
+    return out
+
+
+def _club_games(ctx) -> dict[str, int]:
+    n: dict[str, int] = {}
+    for g in (getattr(ctx, "games", None) or {}).values():
+        if g.get("gtype") == "REG" and g.get("status") == "final":
+            for t in (g.get("home"), g.get("away")):
+                n[t] = n.get(t, 0) + 1
+    return n
+
+
+def _projections(ctx, rows: dict, reference: list[str], n_season: int, tg_n: int, priors=None) -> None:
+    """Full-season projections (accuracy audit, 22 Oct 2026). The rate blends this season with the two before (weights
+    1, 0.8, 0.6 a game, the Marcel scheme) and k games at the position-group mean of the qualified pool; the games left
+    are his club's. The old rate (this season and the position mean only) put McDavid at 84 points after 26 in 9 games;
+    backtest over 2021-26 at checkpoints of 5/10/20/41 team games, final points MAE 10.2 -> 8.3 (players who ended on
+    70+: 30.9 -> 16.7 at 10 games), better in every season and checkpoint (scratchpad acc/nhl2/proj_bt.py)."""
+    if priors is None:
+        try:
+            priors = prior_totals(ctx.season)
+        except Exception:                                        # noqa: BLE001
+            priors = [{}, {}]
+    club = _club_games(ctx)
     by_grp: dict[str, list] = {}
     for p in reference:
         r = rows[p]
@@ -420,13 +461,20 @@ def _projections(ctx, rows: dict, reference: list[str], n_season: int, tg_n: int
     for grp, rs in by_grp.items():
         gp = sum(x["gp"] for x in rs) or 1
         means[grp] = {"p_gp": sum(x["values"]["p"] for x in rs) / gp, "g_gp": sum(x["values"]["g"] for x in rs) / gp}
-    for r in rows.values():
+    for pid, r in rows.items():
         v, gp = r["values"], r["gp"]
         mu = means.get(r["group"]) or {"p_gp": 0.5, "g_gp": 0.2}
         kp, kg = 30.0, 45.0                                    # games at which a per-game rate is half signal
-        p_rate = (v["p"] + kp * mu["p_gp"]) / (gp + kp)
-        g_rate = (v["g"] + kg * mu["g_gp"]) / (gp + kg)
-        share = min(1.0, gp / max(tg_n, 1)) if tg_n else 0.0
+        pp = pg_ = gg = 0.0
+        for w, pr in zip(PRIOR_W, priors or []):
+            a = pr.get(pid)
+            if a:
+                pp, pg_, gg = pp + w * a[0], pg_ + w * a[1], gg + w * a[2]
+        p_rate = (v["p"] + pp + kp * mu["p_gp"]) / (gp + gg + kp)
+        g_rate = (v["g"] + pg_ + kg * mu["g_gp"]) / (gp + gg + kg)
+        played = club.get(r.get("team")) or tg_n
+        left = max(0, n_season - played)
+        share = min(1.0, gp / max(played, 1)) if played else 0.0
         v["proj_pts"] = v["p"] + left * share * p_rate if gp else None
         v["proj_g"] = v["g"] + left * share * g_rate if gp else None
         toi5 = r["n"]["toi5"]

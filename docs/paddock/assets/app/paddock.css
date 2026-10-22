@@ -27,11 +27,9 @@
 .pd-links { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* page head, sub-navigation, pager */
-.pd-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-4); flex-wrap: wrap; }
-.pd-head h1 { font-size: clamp(1.5rem, 3.4vw, 2.1rem); font-weight: 800; letter-spacing: -0.03em; margin: 4px 0 0; }
-.pd-head .qk-sub { margin: 6px 0 0; max-width: 80ch; }
-.pd-head .qk-sub:empty { display: none; }
-.pd-head .qk-sub a { color: var(--accent); }
+.pd-head { margin-bottom: var(--sp-2); }
+.pd-head .qk-sh-sub:empty { display: none; }
+.pd-head .qk-sh-sub a, .qk-sh-sub a { color: var(--accent); }
 .pd-pager { display: flex; gap: 6px; flex-wrap: wrap; }
 .pd-subnav .qk-tabs { margin-bottom: 0; }
 .pd-subnav a.qk-tab { text-decoration: none; }
@@ -53,12 +51,13 @@
 .pd-cardlink { padding: 10px 14px; font-size: var(--fs-xs); border-top: 1px solid var(--line-1); }
 .pd-note { margin: 0; }
 .pd-note b { color: var(--ink-1); }
-.pd-kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-.pd-kpis .qk-kpi-value a { color: inherit; }
-.pd-kpis .qk-kpi-value .pd-link { font-weight: 700; }
+.pd-kpis .qk-stat-v a { color: inherit; }
+.pd-kpis .qk-stat-v .pd-link { font-weight: 800; }
+.pd-kpis .qk-stat-v.text { font-size: var(--fs-lg); }
 .pd-kpis-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .pd-kpis-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .pd-kpis-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 10px; }
+@media (max-width: 720px) { .pd-kpis-3, .pd-kpis-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .qk-kpi-sub .qk-truncate { white-space: nowrap; }
 .pd-toolbar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; padding: var(--sp-3) var(--sp-4); }
 .qk-card-body > .pd-toolbar { padding: 0 0 var(--sp-3); }
@@ -141,7 +140,7 @@
 .pd-rc-win { display: flex; align-items: center; gap: 10px; margin-top: 4px; font-size: var(--fs-sm); }
 .pd-rc-win > span:last-child { display: grid; }
 .pd-rc-win .qk-sub { font-size: var(--fs-2xs); }
-.pd-rc-p { font: 700 var(--fs-lg) var(--font-num); color: var(--c-1); min-width: 44px; }
+.pd-rc-p { font: 800 var(--fs-lg) var(--font-display); font-stretch: var(--stretch-display); color: var(--signal); min-width: 44px; }
 .pd-rcl { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow: auto; }
 .pd-rcl li { display: grid; grid-template-columns: 56px auto 1fr; gap: 10px; align-items: center; padding: 8px 14px; border-bottom: 1px solid var(--line-1); font-size: var(--fs-xs); }
 .pd-rcl-lap { font-family: var(--font-num); color: var(--ink-3); }
@@ -294,3 +293,11 @@
 .pd-prose { overflow-wrap: anywhere; }
 @media (max-width: 720px) { .pd-racebar .pd-pager .qk-btn { max-width: 48%; } }
 .pd-note > * { min-width: 0; } .pd-note p { margin: 0 0 6px; } .pd-note p:last-child { margin: 0; }
+
+/* Design System 2.0 (overview weekend card, distributions, compare) */
+.pd-wk { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: var(--sp-4); align-items: start; }
+@media (max-width: 720px) { .pd-wk { grid-template-columns: 1fr; } }
+#ov-kpis { margin-top: var(--sp-2); }
+.pd-dist-seg { margin-bottom: 10px; max-width: 100%; overflow-x: auto; }
+.pd-back { margin-bottom: 10px; } .pd-back a { color: var(--ink-2); } .pd-back a:hover { color: var(--signal); }
+.pd-ours { color: var(--signal); }

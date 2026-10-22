@@ -117,6 +117,24 @@ var FALLBACK = {
     '- **Players**: a box-score value above replacement scaled so a team’s players add up to its margin; transfers inferred; fantasy points and 9-category projections.\n'
 };
 
+/* Builder notes in the v2 voice (the payload text is shared; the wording is changed for display only). */
+function noteV2(n) {
+  return String(n || '').replace(/where both prices are stored/g, 'where both sides are stored').replace(/put the price \(-110\)/g, 'put the -110 vig')
+    .replace(/\bprices?\b/gi, 'numbers').replace(/\bpriced\b/gi, 'posted').replace(/\bedge\b/gi, 'advantage');
+}
+/* Glossary in the v2 voice (the payload is shared with the builder; these entries are reworded here, betting terms
+ * the site no longer shows are dropped). */
+var GLOSS_DROP = { edge: 1 };
+var GLOSS_V2 = {
+  p_home: { label: 'Our win chance', desc: 'Our pre-game chance the home side wins, from the two ratings, home field and rest.' },
+  spread_fair: { label: 'Our margin', desc: 'Our expected winning margin in points ("OSU by 7.5").' },
+  market: { label: 'Market (reference)', desc: 'The market’s chance (Kalshi or Polymarket, de-vigged; else the sportsbook closing line ESPN shows), shown beside ours on game pages and the Model page as a reference.' },
+  ats: { label: 'Our side v the closing spread', desc: 'On the Model page: how often our margin landed on the right side of the market’s closing line; 50% means no better than the market.' },
+  p_cfp: { label: 'Playoff chance' },
+  upset: { label: 'Upset chance', desc: 'Our chance the lower seed wins a game.' },
+  wp: { label: 'Win chance chart', desc: 'Our chance of winning after each play; the steepest swings are the game’s highest-leverage moments.' }
+};
+
 /* The market-informed model (calibration.json "informed"): status, dev and sealed-test numbers, v the market. */
 function informedCard(L, inf) {
   if (!inf || !(inf.test || inf.dev)) return '';
@@ -137,24 +155,24 @@ function informedCard(L, inf) {
   var ps = inf.per_season ? Object.keys(inf.per_season).sort().map(function (k) { var r = inf.per_season[k]; return [{ v: Number(k), html: esc(CC.seasonLabel(L, Number(k))) }, r.n, ci(r.d_ll)]; }) : [];
   var per = ps.length ? U.table([{ label: 'Test season', align: 'right' }, { label: 'Games', align: 'right' }, { label: 'Log-loss difference [95% CI]', align: 'right' }], ps, { sticky: false }) : '';
   var lab = { promoted: 'Published', trial: 'On trial', 'not promoted': 'Not promoted' }[inf.status] || inf.status;
-  return U.card('Market-informed model · ' + esc(lab), esc(inf.text || '') + ' Ratings learned from earlier games’ closing lines (and, where it helped, what the market says beyond our ratings) are stacked with the ratings model; every number is walk-forward and the promotion rule (a paired log-loss interval below zero, Brier and calibration no worse) was fixed before the test.',
+  return U.card('Market-informed model · ' + esc(lab), esc(noteV2(inf.text || '')) + ' Ratings learned from earlier games’ closing lines (and, where it helped, what the market says beyond our ratings) are stacked with the ratings model; every number is walk-forward and the promotion rule (a paired log-loss interval below zero, Brier and calibration no worse) was fixed before the test.',
     '<div class="qk-stack">' + tbl + mkt + per + '</div>');
 }
 
 function calibration(node, L, d) {
   if (!CC.ok(d)) { node.innerHTML = U.missing('The backtest', d); return; }
   var s = d.summary || {}, m = s.model || {}, c = s.close || {}, vc = s.vs_close || {}, el0 = s.elo || {};
-  var html = '<div class="qk-kpis cc-kpis">' +
-    QK.kpi({ label: 'Games tested', value: isNum(d.n_games) ? QK.fmt.num(d.n_games) : '—', sub: (d.seasons || []).length ? d.seasons[0] + '–' + d.seasons[d.seasons.length - 1] : '' }) +
-    QK.kpi({ label: 'Margin error, model', value: CC.f(vc.mae_model, 2), sub: 'closing line ' + CC.f(vc.mae_close, 2) + ' (same games)', tip: 'Mean absolute error of the predicted margin, points' }) +
-    QK.kpi({ label: 'Against the spread', value: CC.pct(vc.ats_hit, 1), sub: (isNum(vc.ats_n) ? QK.fmt.num(vc.ats_n) + ' games' : '') + (isNum(vc.ats_se) ? ' · ± ' + CC.pct(vc.ats_se, 1) : ''), tip: 'Share of games in which the model’s side beat the closing spread; 52.4% is the break-even at a −110 price' }) +
-    QK.kpi({ label: 'Brier score', value: CC.f(m.brier, 3), sub: 'closing moneyline ' + CC.f(c.brier, 3) + ' · Elo ' + CC.f(el0.brier, 3), tip: 'Mean squared error of the win probability; lower is better' }) +
-    (isNum(vc.total_mae_model) ? QK.kpi({ label: 'Total error', value: CC.f(vc.total_mae_model, 2), sub: 'closing total ' + CC.f(vc.total_mae_close, 2) }) : '') + '</div>';
+  var html = U.stats([
+    { label: 'Brier score, ours', value: CC.f(m.brier, 3), signal: true, sub: 'market (closing moneyline) ' + CC.f(c.brier, 3) + ' · Elo ' + CC.f(el0.brier, 3), tip: 'Mean squared error of our win chance; lower is better; 0.250 is a coin flip' },
+    { label: 'Margin error, ours', value: CC.f(vc.mae_model, 2), unit: 'pts', sub: 'market (closing line) ' + CC.f(vc.mae_close, 2) + ' on the same games', tip: 'Mean absolute error of the predicted margin, points' },
+    { label: 'Games tested', value: isNum(d.n_games) ? QK.fmt.num(d.n_games) : '—', sub: (d.seasons || []).length ? CC.seasonLabel(L, d.seasons[0]) + ' to ' + CC.seasonLabel(L, d.seasons[d.seasons.length - 1]) + ', walk-forward' : '' },
+    { label: 'Our side v the closing spread', value: CC.pct(vc.ats_hit, 1), sub: (isNum(vc.ats_n) ? QK.fmt.num(vc.ats_n) + ' games' : '') + (isNum(vc.ats_se) ? ' · ± ' + CC.pct(vc.ats_se, 1) : ''), tip: 'Share of games in which our margin landed on the right side of the closing line; 50% means no better than the market' },
+    isNum(vc.total_mae_model) ? { label: 'Total error, ours', value: CC.f(vc.total_mae_model, 2), unit: 'pts', sub: 'market (closing total) ' + CC.f(vc.total_mae_close, 2) } : null]);
   html += '<p class="cc-note">Walk-forward: every game is predicted with ratings fitted only on games before its date, and nothing is tuned on the season being tested. The closing line is the hardest benchmark there is; matching it is good, beating it is rare.</p>';
   html += informedCard(L, d.informed);
-  html += '<div class="qk-grid cc-grid"><div class="qk-span-6">' + U.card('Calibration', 'When the model says 70%, does the team win about 70% of the time? Points on the diagonal are well calibrated.', U.chart('cal-rel', 320, 'Reliability diagram')) + '</div>' +
-    '<div class="qk-span-6">' + U.card('Margin error by season', 'Mean absolute error of the predicted margin, model against the closing line.', U.chart('cal-ps', 320, 'Margin error by season')) + '</div></div>';
-  var summ = [['Model', m], ['Closing line', c], ['Elo baseline', el0]].concat(s.espn_predictor ? [['ESPN predictor', s.espn_predictor]] : []);
+  html += '<div class="qk-grid cc-grid"><div class="qk-span-6">' + U.card('Calibration', 'When we say 70%, does the team win about 70% of the time? Points on the diagonal are well calibrated; dot size is the number of games.', U.chart('cal-rel', 320, 'Reliability diagram')) + '</div>' +
+    '<div class="qk-span-6">' + U.card('Margin error by season', 'Mean absolute error of the predicted margin: ours (violet) and the closing line (grey, the market reference).', U.chart('cal-ps', 320, 'Margin error by season')) + '</div></div>';
+  var summ = [['Ours', m], ['Market (closing line)', c], ['Elo baseline', el0]].concat(s.espn_predictor ? [['ESPN predictor', s.espn_predictor]] : []);
   html += '<div class="qk-grid cc-grid"><div class="qk-span-6">' + U.card('Summary', '', U.table(['', { label: 'Games', align: 'right' }, { label: 'Brier', align: 'right' }, { label: 'Log loss', align: 'right' }, { label: 'Winner right', align: 'right' }, { label: 'Margin MAE', align: 'right' }],
     summ.map(function (r) { var x = r[1] || {}; return [r[0], isNum(x.n) ? QK.fmt.num(x.n) : '—', CC.f(x.brier, 4), CC.f(x.logloss, 4), CC.pct(x.acc, 1), CC.f(x.mae, 2)]; }), { sticky: false })) + '</div>' +
     '<div class="qk-span-6">' + U.card('By size of the spread', '', U.table([{ label: 'Spread', align: 'right' }, { label: 'Games', align: 'right' }, { label: 'MAE model', align: 'right' }, { label: 'MAE close', align: 'right' }, { label: 'ATS', align: 'right' }], (d.by_spread || []).map(function (r) {
@@ -169,27 +187,48 @@ function calibration(node, L, d) {
     Object.keys(d.sim).forEach(function (k) {
       var v = d.sim[k];
       if (isNum(v)) srows.push([k, v]);
-      else if (typeof v === 'string') snotes.push(v);
-      else if (v && typeof v === 'object' && !Array.isArray(v)) Object.keys(v).forEach(function (k2) { if (isNum(v[k2])) srows.push([k + ' · ' + k2, v[k2]]); else if (typeof v[k2] === 'string') snotes.push(v[k2]); });
+      else if (typeof v === 'string') snotes.push(noteV2(v));
+      else if (v && typeof v === 'object' && !Array.isArray(v)) Object.keys(v).forEach(function (k2) { if (isNum(v[k2])) srows.push([k + ' · ' + k2, v[k2]]); else if (typeof v[k2] === 'string') snotes.push(noteV2(v[k2])); });
     });
     if (srows.length) html += U.card('Season simulation backtest', snotes.map(esc).join(' '), U.table(['Measure', { label: 'Value', align: 'right' }], srows.map(function (r) {
       return [esc(r[0].replace(/_/g, ' ')), { v: r[1], html: Math.round(r[1]) === r[1] ? String(r[1]) : CC.f(r[1], 3) }]; }), { sticky: false }));
   }
-  if ((d.notes || []).length) html += '<ul class="cc-notes">' + d.notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul>';
+  if ((d.notes || []).length) html += '<ul class="cc-notes">' + d.notes.map(function (n) { return '<li>' + esc(noteV2(n)) + '</li>'; }).join('') + '</ul>';
   node.innerHTML = html;
   U.wire(node);
   var cal = (d.calibration || []).filter(function (r) { return isNum(r.p_mean) && isNum(r.y_mean); });
   if (cal.length) QKC.scatter('#cal-rel', { points: cal.map(function (r) { return { x: r.p_mean, y: r.y_mean, name: CC.pct(r.lo, 0) + '–' + CC.pct(r.hi, 0) + ' (' + r.n + ' games)', size: Math.max(7, Math.min(22, Math.sqrt(r.n) / 2)) }; }),
     xName: 'Predicted', yName: 'Observed', xMin: 0, xMax: 1, yMin: 0, yMax: 1, diagonal: { label: 'perfect' }, xFmt: function (v) { return CC.pct(v, 0); }, yFmt: function (v) { return CC.pct(v, 0); } });
   var ps = (d.per_season || []).filter(function (r) { return r.model && isNum(r.model.mae); });
-  if (ps.length) QKC.line('#cal-ps', { x: ps.map(function (r) { return CC.seasonLabel(L, r.season); }), series: [{ name: 'Model', data: ps.map(function (r) { return r.model.mae; }), color: QK.cssVar('--c-1'), symbols: true }, { name: 'Closing line', data: ps.map(function (r) { return r.close && isNum(r.close.mae) ? r.close.mae : null; }), color: QK.cssVar('--c-2'), symbols: true }], yScale: true, yFmt: function (v) { return CC.f(v, 1); }, legend: true, xName: 'Season', yName: 'MAE (pts)' });
+  if (ps.length) QKC.line('#cal-ps', { x: ps.map(function (r) { return CC.seasonLabel(L, r.season); }), series: [{ name: 'Ours', data: ps.map(function (r) { return r.model.mae; }), color: QK.cssVar('--signal'), symbols: true }, { name: 'Closing line', data: ps.map(function (r) { return r.close && isNum(r.close.mae) ? r.close.mae : null; }), color: QK.cssVar('--c-market'), symbols: true }], yScale: true, yFmt: function (v) { return CC.f(v, 1); }, legend: true, xName: 'Season', yName: 'MAE (pts)' });
+}
+
+/* Who moves next (MOVES_VIEWS.md): movement.json's method and its pre-registered validation, once published. The
+ * top-rated team's page says whether it is (its `movement` key), so nothing is fetched before it exists. */
+function movesMethod(L, node) {
+  var S = CC.cur(L), top = (CC.info(L).model_top || [])[0];
+  if (!node || !S || !top) return;
+  CC.load(CC.path(L, S, 'teams/' + top.team + '.json')).then(function (tp) {
+    return CC.ok(tp) && tp.movement ? CC.load(CC.path(L, S, 'movement.json')) : null;
+  }).then(function (mv) {
+    if (!mv || !U.alive(node)) return;
+    var meta = mv.meta || {}, val = meta.validation || {};
+    if (!CC.ok(mv)) { node.innerHTML = U.card('Who moves next', QK.tag('Inferred from box scores, not the official transfer portal'), QK.empty('Not published yet', mv.reason || '')); return; }
+    var rows = Object.keys(val).filter(function (k) { return val[k] && typeof val[k] === 'object'; }).map(function (k) {
+      var v = val[k], ci = v.ci || v.d_ci || null;
+      var num = function (x) { return isNum(x) ? CC.f(x, 4) : '—'; };
+      return [esc(k), num(v.model !== undefined ? v.model : v.ll1), num(v.base !== undefined ? v.base : v.ll0), Array.isArray(ci) ? '[' + num(ci[0]) + ', ' + num(ci[1]) + ']' : '—', v.passed === true ? 'passed' : v.passed === false ? 'did not pass' : '—'];
+    });
+    node.innerHTML = '<div class="qk-card cc-prose" style="margin-top:var(--sp-4)"><h3>Who moves next</h3>' + QK.tag('Inferred from box scores, not the official transfer portal') +
+      (meta.method ? CC.md(String(meta.method)) : '') + (rows.length ? U.table(['Test', { label: 'Model', align: 'right' }, { label: 'Base', align: 'right' }, { label: '95% CI', align: 'right' }, 'Result'], rows, { sticky: false }) : '') + '</div>';
+  });
 }
 
 CC.route('model', function (el, p) {
   var L = p.L, S = p.S, fb = CC.fb(L);
   var list = [['method', 'Methodology'], ['calibration', 'Calibration'], ['glossary', 'Glossary'], ['terms', 'Terms']];
   var tab = U.tab(p, ['method', 'calibration', 'glossary', 'terms'], 'method');
-  el.innerHTML = U.head('Model', 'How the numbers are made, how well they have done against the closing line, and what every term means.', CC.LNAME[L]) + U.tabs(L, 'model', list, null, tab) + '<div id="mb">' + QK.skeleton('lines', 8) + '</div>';
+  el.innerHTML = U.head('Model', 'How our numbers are made, how well they have done (with the market’s closing numbers as the benchmark), and what every term means.', U.kicker(L, S)) + U.tabs(L, 'model', list, null, tab) + '<div id="mb">' + QK.skeleton('lines', 8) + '</div>';
   var body = QK.$('#mb', el);
   if (tab === 'terms') { var t = document.getElementById('disclaimer-template'); body.innerHTML = t ? t.innerHTML : ''; return null; }
   if (tab === 'calibration') return CC.load(CC.lpath(L, 'calibration.json')).then(function (d) { if (U.alive(el)) calibration(body, L, d); });
@@ -197,7 +236,7 @@ CC.route('model', function (el, p) {
     if (!U.alive(el)) return;
     if (!CC.ok(g)) { body.innerHTML = U.missing('The glossary', g); return; }
     body.innerHTML = '<div class="cc-gloss">' + (g.groups || []).map(function (gr) {
-      return U.card(gr.name, '', '<dl class="cc-dl">' + (gr.entries || []).map(function (e) { return '<dt id="g-' + esc(e.key) + '">' + esc(e.label) + '</dt><dd>' + esc(e.desc) + '</dd>'; }).join('') + '</dl>');
+      return U.card(gr.name, '', '<dl class="cc-dl">' + (gr.entries || []).filter(function (e) { return !GLOSS_DROP[e.key]; }).map(function (e) { var o = GLOSS_V2[e.key] || {}; return '<dt id="g-' + esc(e.key) + '">' + esc(o.label || e.label) + '</dt><dd>' + esc(o.desc || e.desc) + '</dd>'; }).join('') + '</dl>');
     }).join('') + '</div>';
   });
   var file = fb ? 'MODELS_CFB.md' : 'MODELS_HOOPS.md';
@@ -206,8 +245,9 @@ CC.route('model', function (el, p) {
   }).then(function (txt) {
     if (!U.alive(el)) return;
     body.innerHTML = '<div class="qk-card cc-prose">' + (txt ? CC.md(txt) : CC.md(fb ? FALLBACK.cfb : FALLBACK.bb) + '<p class="qk-muted">The full methodology document is published with the next build.</p>') +
-      '<h3>Data</h3><p>Schedules, scores, box scores, plays, rankings, rosters and betting lines come from ESPN’s public data; prediction-market prices from Kalshi and Polymarket where listed. Sources whose terms forbid reuse are left out: no Sports-Reference, KenPom, Barttorvik, 247Sports, On3, Rivals, Massey or NCAA.com data. ' +
-      'Recruiting rankings and the official transfer portal are not used; transfers here are inferred from rosters and box scores.</p></div>';
+      '<h3>Data</h3><p>Schedules, scores, box scores, plays, rankings, rosters and betting lines come from ESPN’s public data; prediction-market probabilities from Kalshi and Polymarket where listed. Sources whose terms forbid reuse are left out: no Sports-Reference, KenPom, Barttorvik, 247Sports, On3, Rivals, Massey or NCAA.com data. ' +
+      'Recruiting rankings and the official transfer portal are not used; transfers here are inferred from rosters and box scores.</p></div><div id="mb-moves"></div>';
+    movesMethod(L, QK.$('#mb-moves', el));
   });
 });
 

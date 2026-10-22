@@ -40,9 +40,10 @@ TELEMETRY = ROOT / "data" / "f1" / "telemetry"
 
 
 class Client:
-    """Paced GET with retries; `budget` caps calls per run."""
+    """Paced GET with retries; `budget` caps calls per run. OpenF1 documents 30 requests a minute for the free tier,
+    so calls are spaced 2.1 s apart (about 28 a minute); 0.35 s (about 170 a minute) was over it."""
 
-    def __init__(self, budget: int = 2000, interval: float = 0.35):
+    def __init__(self, budget: int = 2000, interval: float = 2.1):
         self.budget, self.interval, self.used, self._last = budget, interval, 0, 0.0
 
     def get(self, endpoint: str, **params) -> list[dict] | None:

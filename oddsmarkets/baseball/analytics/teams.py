@@ -38,6 +38,14 @@ METRICS = [
     M("pythag", "Pythagorean win%", "Record", "3", desc="RS^1.83 / (RS^1.83 + RA^1.83)."),
     M("pythag_w", "Pythagorean wins", "Record", "1", desc="Pythagorean win% x games."),
     M("luck", "Wins over Pythagorean", "Record", "1", desc="W minus Pythagorean wins."),
+    M("baseruns_rs", "BaseRuns scored", "Record", "1",
+      desc="Runs the team's batting events were worth by BaseRuns (A x B / (B + C) + HR), whatever order they came in; "
+      "scaled so the league's BaseRuns equal its runs."),
+    M("baseruns_ra", "BaseRuns allowed", "Record", "1", lower=True, desc="BaseRuns of the events the team's pitchers allowed (same scale)."),
+    M("baseruns_pct", "BaseRuns win%", "Record", "3",
+      desc="BaseRuns scored^1.83 / (scored^1.83 + allowed^1.83): the record the team's events deserved, with sequencing removed. "
+      "Predicts second-half win% better than Pythagorean or actual win% (MLB 2015-2026)."),
+    M("baseruns_w", "BaseRuns wins", "Record", "1", desc="BaseRuns win% x games."),
     M("home_pct", "Home win%", "Record", "3", desc="Win% at home."),
     M("away_pct", "Road win%", "Record", "3", desc="Win% on the road."),
     M("one_run_pct", "One-run win%", "Record", "3", desc="Win% in one-run games."),
@@ -158,6 +166,7 @@ def build(ctx: SeasonContext, hitters: dict | None, pitchers: dict | None, sim: 
         lg_ip += float(r["values"].get("ip") or 0)
     lg_ra9 = 9 * lg_runs / lg_ip if lg_ip else 4.4
     rows: dict[str, dict] = {}
+    raw_bsr: dict[str, tuple] = {}
     for t in teams:
         v: dict[str, Any] = {}
         r = rec.get(t) or {}
@@ -197,6 +206,8 @@ def build(ctx: SeasonContext, hitters: dict | None, pitchers: dict | None, sim: 
             v["pull_air_pct"] = an.div(b["pull_air"], b["spray_n"])
             v["bat_speed"] = an.div(b["bs_sum"], b["bs_n"])
             v["rv100"] = 100 * b["rv"] / b["pitches"] if b["pitches"] else None
+        if b is not None and f is not None and g:
+            raw_bsr[t] = (_baseruns(b), _baseruns(f), g, (r.get("rs") or 0) + (r.get("ra") or 0))
         if f is not None:
             bbs = f["bb"] + f["ibb"]
             v["p_k_pct"] = an.div(f["k"], f["pa"])
@@ -277,6 +288,17 @@ def build(ctx: SeasonContext, hitters: dict | None, pitchers: dict | None, sim: 
         info = an.team_info(ctx.store, t)
         rows[t] = {**info, "values": v, "log": game_log(ctx, t, card_of), "roster": roster(ctx, t, hp, pp), "park": info.get("venue"),
                    "bullpen": pens.get(t), "defence": align.get(t)}
+    # BaseRuns standings: scale both sides so the league's BaseRuns equal its runs, then a Pythagorean record
+    tot_b = sum(x[0] + x[1] for x in raw_bsr.values())
+    tot_r = sum(x[3] for x in raw_bsr.values())
+    mult = tot_r / tot_b if tot_b > 0 and tot_r > 0 else 1.0
+    for t, (bs, ba, g, _) in raw_bsr.items():
+        if t not in rows or bs <= 0 or ba <= 0:
+            continue
+        v = rows[t]["values"]
+        v["baseruns_rs"], v["baseruns_ra"] = bs * mult, ba * mult
+        v["baseruns_pct"] = bs ** PYTH / (bs ** PYTH + ba ** PYTH)
+        v["baseruns_w"] = v["baseruns_pct"] * g
     pct = {}
     for m in METRICS:
         pc = an.percentiles({t: r["values"].get(m["key"]) for t, r in rows.items()}, m["lower"])
@@ -287,6 +309,22 @@ def build(ctx: SeasonContext, hitters: dict | None, pitchers: dict | None, sim: 
         r["pct"] = pct.get(t, {})
     return {**CT.season_meta(ctx), "kind": "team", "metrics": [an.public_metric(m) for m in METRICS], "teams": rows,
             "constants": {"pythag_exponent": PYTH, "lg_ra9": round(lg_ra9, 3)}}
+
+
+def _baseruns(x: pd.Series) -> float:
+    """BaseRuns (Smyth) from a batting or pitching-allowed aggregate row: A x B / (B + C) + D with A = H + BB + IBB + HBP
+    - HR, B = (1.4 TB - 0.6 H - 3 HR + 0.1 (BB + IBB + HBP)) x 1.02, C = AB - H, D = HR. 0 when it cannot be formed."""
+    try:
+        h, hr, tb, ab = float(x["h"]), float(x["hr"]), float(x["tb"]), float(x["ab"])
+        walks = float(x["bb"]) + float(x["ibb"]) + float(x["hbp"])
+    except (KeyError, TypeError, ValueError):
+        return 0.0
+    a = h + walks - hr
+    b = (1.4 * tb - 0.6 * h - 3.0 * hr + 0.1 * walks) * 1.02
+    c = ab - h
+    if not np.isfinite(a + b + c) or b + c <= 0:
+        return 0.0
+    return max(a * b / (b + c) + hr, 0.0)
 
 
 def _sum_rows(tab: pd.DataFrame | None, abbrs) -> pd.Series | None:

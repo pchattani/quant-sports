@@ -1,31 +1,26 @@
-/* The Quant Footballer — Overview layout (fb-ov- prefix). */
-.fb-ov-hero { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--sp-4); align-items: stretch; }
-.fb-ov-hero-main { position: relative; padding: var(--sp-6); border-radius: var(--r-4); border: 1px solid var(--line-1); overflow: hidden;
-  background: radial-gradient(560px 280px at 0% 0%, color-mix(in srgb, var(--a-football) 20%, transparent), transparent 70%), radial-gradient(420px 260px at 100% 100%, color-mix(in srgb, var(--c-1) 12%, transparent), transparent 70%), var(--s-1); }
-.fb-ov-hero-main::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.45;
-  background-image: repeating-linear-gradient(90deg, var(--line-1) 0 1px, transparent 1px 28px), repeating-linear-gradient(0deg, var(--line-1) 0 1px, transparent 1px 28px);
-  mask-image: linear-gradient(120deg, transparent 35%, #000 100%); -webkit-mask-image: linear-gradient(120deg, transparent 35%, #000 100%); }
-.fb-ov-hero-main > * { position: relative; z-index: 1; }
-.fb-ov-title { font-size: clamp(1.7rem, 4.4vw, 2.8rem); font-weight: 900; letter-spacing: -0.04em; line-height: 1.02; margin: 8px 0 8px; }
-.fb-ov-sub { color: var(--ink-2); font-size: var(--fs-sm); max-width: 62ch; }
-.fb-ov-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--sp-4); }
+/* The Quant Footballer — Overview layout (fb-ov- prefix), Design System 2.0. */
+.fb-ov-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--sp-3); }
 .fb-ov-quick .qk-chip { text-decoration: none; }
-.fb-ov-hero-side { display: grid; min-width: 0; }
-.fb-ov-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); height: 100%; }
-.fb-ov-kpis .qk-kpi { display: flex; flex-direction: column; justify-content: space-between; }
-.fb-ov-live { color: var(--live); }
-@media (max-width: 900px) { .fb-ov-hero { grid-template-columns: 1fr; } }
-@media (max-width: 720px) { .fb-ov-hero-main { padding: var(--sp-4); } .fb-ov-kpis .qk-kpi-value { font-size: var(--fs-xl); } }
+.fb-ov-ticker { margin-top: var(--sp-4); border: 1px solid var(--line-1); border-radius: var(--r-3); }
+.fb-ov-ticker[hidden] { display: none; }
+.fb-ov-kpis { margin-top: var(--sp-4); }
+.fb-ov-livetile .qk-stat-v { color: var(--live); }
+.fb-ov-sig { color: var(--signal); }
 #ov-fam { margin-bottom: 0; }
-.fb-ov-stack { display: grid; gap: var(--sp-4); align-content: start; }
-.fb-ov-rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.fb-ov-rank li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto auto; gap: 8px; align-items: center; padding: 4px 0; font-size: var(--fs-sm); border-bottom: 1px solid var(--line-1); }
-.fb-ov-rank li:last-child { border-bottom: 0; }
-.fb-ov-rank .r { font: 600 var(--fs-xs) var(--font-num); color: var(--ink-3); }
-.fb-ov-c { font-size: var(--fs-2xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
-@media (max-width: 720px) { .fb-ov-rank .fb-rowbar { display: none; } }
+#ov-days .qk-seg { max-width: 100%; overflow-x: auto; }
+.fb-ov-lead { list-style: none; margin: 0; padding: 0; }
+.fb-ov-lead li { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--line-1); min-width: 0; font-size: var(--fs-sm); }
+.fb-ov-lead li:last-child { border-bottom: 0; }
+.fb-ov-lead .n { color: var(--ink-3); font: 500 var(--fs-xs) var(--font-num); width: 18px; text-align: right; flex: none; }
+.fb-ov-lead .who { display: grid; min-width: 0; flex: 1 1 auto; }
+.fb-ov-lead .who .fb-ent { max-width: 100%; }
+.fb-ov-lead .s { color: var(--ink-3); font-size: var(--fs-2xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fb-ov-lead .v { margin-left: auto; flex: none; font: 800 var(--fs-md) var(--font-display); font-stretch: var(--stretch-display); font-variant-numeric: tabular-nums; }
+.fb-ov-lead li:first-child .v { color: var(--signal); }
+#ov-races .qk-chance-lab small { color: var(--ink-3); }
 .fb-ov-last { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
 .fb-ov-lastc { display: grid; gap: 4px; padding: 12px 14px; border-radius: var(--r-3); border: 1px solid var(--line-1); background: var(--s-2); }
 .fb-ov-lastc:hover { border-color: var(--line-3); }
 .fb-ov-lastc b { font-size: var(--fs-sm); }
 .fb-ov-won { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--ink-2); }
+@media (max-width: 720px) { .fb-ov-quick { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; } .fb-ov-quick::-webkit-scrollbar { display: none; } .fb-ov-quick .qk-chip { flex: none; } }

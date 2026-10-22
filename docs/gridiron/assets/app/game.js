@@ -1,7 +1,10 @@
-/* The Quant Gridiron — the game centre (#/game/<game_id>).
- * Header: teams, score, clock, possession on a field strip, live win probability, the linescore.
- * Tabs: Preview (model v market v line, projected score, margin and total distributions, unit matchups,
- * injuries, venue and weather) · Game flow (win probability ours v ESPN with every 4th down graded,
+/* The Quant Gridiron — the game centre (#/game/<game_id>), on Design System 2.0 (the Rink game page is the reference).
+ * Hero: teams, score in display numbers, clock, possession on a field strip, our win-chance bar in team colours (the
+ * market a quiet tick before kickoff), the linescore; stat tiles (our chance, live chance, projected score, EPA per
+ * play, the biggest swing).
+ * Tabs: Preview (our forecast with the market as a reference column, projected score, margin and points
+ * distributions, tale of the tape, unit matchups, injuries with their impact, the week's status changes and the
+ * starters out, venue and weather) · Game flow (win probability ours v ESPN with every 4th down graded,
  * scoring and key plays; the drive chart; 4th-down decisions; awards) · Play-by-play (filters, search) ·
  * Box score (with EPA and Next Gen Stats columns). Reads <S>/games/<game_id>.json; every block is optional. */
 (function (GI) {
@@ -112,34 +115,61 @@ function header(g, pre, plays) {
   const w = isNum(g.week) ? Number(g.week) : GI.gameWeek(g.game_id);
   const hs = isNum(g.hs) ? Number(g.hs) : null, as = isNum(g.as) ? Number(g.as) : null;
   const m = (pre && pre.model) || g.model || {};
+  const mk = (pre && pre.market) || g.market || {};
   const pre0 = isNum(m.p_home) ? Number(m.p_home) : null;
   const pNow = live && isNum(g.wp_home) ? Number(g.wp_home) : pre0;
   const coaches = g.coaches || {};
   const qbs = g.qbs || {};
   const qbOf = side => { const q = (g.qb_status || {})[side] || qbs[side]; return q ? GI.qbText(q) : ''; };
+  const cols = GI.pair(g.away, g.home);
   const side = (t, s, score, lost) => {
-    const p = pNow === null ? null : (s === 'home' ? pNow : 1 - pNow);
     const sub = [s === 'home' ? 'Home' : 'Away', qbOf(s) ? 'QB ' + qbOf(s) : '', coaches[s] ? 'HC ' + GI.coachLink(coaches[s]) : ''].filter(Boolean).join(' · ');
     return '<div class="gi-score-team ' + s + (fin && lost ? ' lost' : '') + '">' + GI.mark(t, 'lg') +
-      '<div style="min-width:0"><a class="nm gi-link" href="' + GI.teamHref(t, S) + '">' + esc(GI.teamName(t)) + '</a>' + (live && String(g.possession) === String(t) ? ' <span class="gi-poss" title="Possession" style="color:var(--brand)">●</span>' : '') +
-      '<div class="rec">' + sub + '</div>' + (p !== null ? '<div class="rec">' + (fin ? 'pre-game ' : live ? 'live ' : '') + 'win <b style="color:var(--ink-1);font-family:var(--font-num)">' + GI.pct(fin ? (s === 'home' ? pre0 : 1 - pre0) : p, 0) + '</b></div>' : '') + '</div>' +
-      '<span class="sc">' + (score === null || st === 'pre' ? '' : esc(score)) + '</span></div>';
+      '<div style="min-width:0"><a class="nm gi-link" href="' + GI.teamHref(t, S) + '">' + esc(GI.teamName(t)) + '</a>' + (live && String(g.possession) === String(t) ? ' <span class="gi-poss" title="Possession">●</span>' : '') +
+      '<div class="rec">' + sub + '</div></div>' +
+      '<span class="sc gi-disp">' + (score === null || st === 'pre' ? '' : esc(score)) + '</span></div>';
   };
   let mid;
   if (live) {
     const sit = g.down ? GI.downDist(g.down, g.dist, g.yl100) + (isNum(g.yl100) ? ' at ' + GI.fieldPos(g.yl100, g.possession, GI.otherTeam(g, g.possession)) : '') : '';
     mid = '<span class="qk-badge live">' + esc(st === 'half' ? 'Halftime' : (GI.clockText(g.qtr, g.clock) || 'Live')) + '</span>' + (sit ? '<span>' + esc(GI.teamAbbr(g.possession)) + ' ball · ' + esc(sit) + '</span>' : '');
   } else if (fin) mid = '<span class="qk-badge final">Final' + (GI.isOT(g) ? '/OT' : '') + '</span>';
-  else mid = '<span class="qk-badge">' + esc(GI.fmtDate(g.kickoff || g.date, { year: false })) + ' ' + esc(GI.fmtTime(g.kickoff)) + '</span>' + (GI.countdown(g.kickoff) ? '<span>kickoff in ' + esc(GI.countdown(g.kickoff)) + '</span>' : '');
-  const T = t => ({ name: GI.teamName(t), abbr: GI.teamAbbr(t), colour: GI.teamInfo(t).colour });
-  const meta = [GI.weekLink(S, w), g.gtype && String(g.gtype).toUpperCase() !== 'REG' ? esc(GI.gtypeLabel(g.gtype)) : '', g.stadium_name || g.stadium ? esc(g.stadium_name || g.stadium) : '',
+  else mid = '<span class="gi-disp gi-ko">' + esc(GI.fmtTime(g.kickoff) || 'TBD') + '</span><span>' + esc(GI.fmtDate(g.kickoff || g.date, { year: false })) + '</span>' + (GI.countdown(g.kickoff) ? '<span>kickoff in ' + esc(GI.countdown(g.kickoff)) + '</span>' : '');
+  const A = { name: GI.teamShort(g.away), abbr: GI.teamAbbr(g.away), colour: cols[0] }, H = { name: GI.teamShort(g.home), abbr: GI.teamAbbr(g.home), colour: cols[1] };
+  const pBar = fin ? pre0 : pNow;
+  const showMk = st === 'pre' && isNum(mk.p_home);
+  const bar = isNum(pBar) ? '<div class="gi-hero-bar"><div class="qk-kicker">' + (live ? 'Our live win chance' : fin ? 'Our pre-game win chance' : 'Our win chance') + '</div>' +
+    QK.wpBar(1 - pBar, null, pBar, A, H, { colors: cols, size: 'lg', market: showMk ? 1 - mk.p_home : null, label: live ? 'Our live win chance' : 'Our win chance' }) +
+    (showMk ? '<div class="gi-hero-mkt"><span class="qk-mkt" data-tip="The prediction-market probability, shown as a reference next to ours">Market (' + esc((mk.sources || []).map(GI.titleCase).join(' / ') || 'Kalshi / Polymarket') + ') <b>' + esc(GI.teamAbbr(g.home)) + ' ' + GI.pct(mk.p_home, 0) + '</b></span></div>' : '') + '</div>' : '';
+  const meta = [GI.weekLink(S, w), g.gtype && String(g.gtype).toUpperCase() !== 'REG' && GI.gtypeLabel(g.gtype) !== GI.weekLabel(w, S) ? esc(GI.gtypeLabel(g.gtype)) : '', g.stadium_name || g.stadium ? esc(g.stadium_name || g.stadium) : '',
     GI.weatherText(g.weather, g.roof) ? esc(GI.weatherText(g.weather, g.roof)) : '', g.referee ? 'Referee ' + esc(g.referee) : ''].filter(Boolean);
   const qs = GI.ch.quartersOf(g);
-  return '<section class="qk-hero gi-hero-ent" style="--tc:' + esc(GI.tc(g.home)) + '"><div class="qk-hero-in" style="display:block">' +
-    '<div class="qk-kicker">' + meta.join(' · ') + '</div>' +
+  return '<section class="qk-hero gi-hero-ent gi-gh" style="--tc:' + esc(cols[1]) + '"><div class="qk-hero-in" style="display:block">' +
+    '<div class="qk-kicker">NFL · ' + meta.join(' · ') + '</div>' +
     '<div class="gi-score" style="margin-top:14px">' + side(g.away, 'away', as, fin && as !== null && hs !== null && as < hs) + '<div class="gi-score-mid">' + mid + '</div>' + side(g.home, 'home', hs, fin && as !== null && hs !== null && hs < as) + '</div>' +
-    (!fin && pNow !== null ? '<div style="margin-top:14px">' + QK.probBar(1 - pNow, null, pNow, T(g.away), T(g.home)) + '</div>' : '') +
-    (live ? fieldStrip(g) : '') + (qs.length ? '<div style="margin-top:14px;max-width:560px">' + GI.ch.linescore(g) + '</div>' : '') + '</div></section>';
+    bar + (live ? fieldStrip(g) : '') + (qs.length ? '<div class="gi-hero-ls">' + GI.ch.linescore(g) + '</div>' : '') + '</div></section>';
+}
+/* Stat tiles under the hero: ours first (the signal), then what the game produced. */
+function tiles(g, pre, plays) {
+  const st = GI.gameState(g), live = st === 'live' || st === 'half', fin = st === 'final';
+  const m = (pre && pre.model) || {};
+  const out = [];
+  if (isNum(m.p_home)) {
+    const fav = m.p_home >= 0.5 ? g.home : g.away;
+    out.push({ label: st === 'pre' ? 'Our win chance' : 'Our pre-game call', value: GI.teamAbbr(fav) + ' ' + GI.pct(Math.max(m.p_home, 1 - m.p_home), 0), signal: true,
+      sub: isNum(GI.homeLine(m)) && Math.abs(GI.homeLine(m)) >= 0.5 ? 'by ' + GI.num(Math.abs(GI.homeLine(m)), 1) + ' points on average' : 'a toss-up on the margin', tip: 'Our pre-game win chance from the game model (team ratings, quarterbacks, starters out, rest, weather and home field)' });
+  }
+  if (live && isNum(g.wp_home)) { const f = g.wp_home >= 0.5 ? g.home : g.away; out.push({ label: 'Live win chance', value: GI.teamAbbr(f) + ' ' + GI.pct(Math.max(g.wp_home, 1 - g.wp_home), 0), signal: true, sub: 'our live model, every play' }); }
+  if (st === 'pre' && isNum(m.home_pts) && isNum(m.away_pts)) out.push({ label: 'Projected score', value: GI.num(m.away_pts, 0) + '–' + GI.num(m.home_pts, 0), sub: GI.teamAbbr(g.away) + ' – ' + GI.teamAbbr(g.home) + ', average of our simulations' });
+  if (st === 'pre' && isNum(m.total)) out.push({ label: 'Points expected', value: GI.num(m.total, 1), sub: 'both teams, our game simulations' });
+  const epa = { home: [0, 0], away: [0, 0] };
+  plays.forEach(p => { if (!isNum(p.epa) || !p.team || /^(special|other)$/.test(kindOf(p))) return; const sd = String(p.team) === String(g.home) ? 'home' : String(p.team) === String(g.away) ? 'away' : null; if (sd) { epa[sd][0] += Number(p.epa); epa[sd][1]++; } });
+  if (st !== 'pre' && epa.home[1] > 10 && epa.away[1] > 10) out.push({ label: 'EPA per play', value: GI.signed(epa.away[0] / epa.away[1], 2) + ' / ' + GI.signed(epa.home[0] / epa.home[1], 2), sub: GI.teamAbbr(g.away) + ' / ' + GI.teamAbbr(g.home) + ', runs and passes', tip: 'Expected points added per offensive play, our expected-points model' });
+  if (fin || live) {
+    const big = plays.filter(p => isNum(p.wpa)).sort((a, b) => Math.abs(b.wpa) - Math.abs(a.wpa))[0];
+    if (big) out.push({ label: 'Biggest swing', value: GI.signed(Math.abs(big.wpa) * 100, 0) + ' pts', sub: GI.clockText(big.qtr, big.clock) + ' · ' + (big.team ? GI.teamAbbr(big.team) + ' ball' : ''), tip: String(big.desc || '').slice(0, 160) });
+  }
+  return out.length ? '<div class="gi-stats">' + QK.stats(out) + '</div>' : '';
 }
 
 // ── preview ───────────────────────────────────────────────────────────────
@@ -165,47 +195,70 @@ function withDists(m0, ln) {
   if (!isNum(m.p_over) && isNum(m.total) && isNum(m.sigma_total) && ln && isNum(ln.total)) m.p_over = 1 - normCdf((Number(ln.total) - m.total) / Number(m.sigma_total));
   return m;
 }
-function mvmBlock(g, pre) {
+function forecastBlock(g, pre) {
   const m = pre.model || {}, mk = pre.market || g.market || {}, ln = pre.line || g.line || {};
   const H = GI.teamAbbr(g.home), A = GI.teamAbbr(g.away);
-  const mLine = GI.homeLine(m), kLine = GI.homeLine(mk), lLine = GI.homeLine(ln.close && GI.isFinal(g) ? ln.close : ln), oLine = ln.open ? GI.homeLine(ln.open) : null;
-  const lTot = ln.close && GI.isFinal(g) && isNum(ln.close.total) ? ln.close.total : ln.total;
+  const fin = GI.isFinal(g);
+  const lLine = GI.homeLine(ln.close && fin ? ln.close : ln);
+  const lTot = ln.close && fin && isNum(ln.close.total) ? ln.close.total : ln.total;
   const mlP = isNum(ln.ml_home) && isNum(ln.ml_away) ? GI.devigAm([ln.ml_home, ln.ml_away]) : null;
-  const lean = GI.lineLean(g, mLine, lLine);
-  const strips = [];
-  if (isNum(m.p_home) && isNum(mk.p_home)) strips.push(QK.mvm(m.p_home, mk.p_home, H + ' win · market'));
-  if (isNum(m.p_home) && isNum(mlP)) strips.push(QK.mvm(m.p_home, mlP, H + ' win · moneyline'));
+  const mg = GI.homeLine(m);
+  const srcs = (mk.sources || []).map(GI.titleCase).join(' / ');
+  const mkCell = isNum(mk.p_home) ? H + ' ' + GI.pct(mk.p_home, 0) + ' (' + (srcs || 'Kalshi / Polymarket') + ')' : (isNum(mlP) ? H + ' ' + GI.pct(mlP, 0) + ' (no-vig line, ' + (((ln.close || ln.open || {}).src) || 'sportsbook') + ' via ESPN)' : '—');
+  const rows = [['Who wins', isNum(m.p_home) ? H + ' ' + GI.pct(m.p_home, 0) + ' · ' + A + ' ' + GI.pct(1 - m.p_home - (isNum(m.p_tie) ? m.p_tie : 0), 0) + (isNum(m.p_tie) && m.p_tie >= 0.001 ? ' · tie ' + GI.pct(m.p_tie, 1) : '') : '—', mkCell]];
+  if (isNum(mg)) rows.push(['Projected margin', Math.abs(mg) < 0.5 ? 'even' : GI.teamAbbr(mg < 0 ? g.home : g.away) + ' by ' + GI.num(Math.abs(mg), 1) + ' points', '']);
+  if (isNum(m.p_cover_home) && isNum(lLine) && Math.abs(lLine) >= 1) {
+    const fav = lLine < 0 ? 'home' : 'away', need = Math.ceil(Math.abs(lLine));
+    const p = fav === 'home' ? m.p_cover_home : 1 - m.p_cover_home;
+    rows.push([GI.teamAbbr(g[fav]) + ' wins by ' + need + ' or more', GI.pct(p, 0), '']);
+  }
+  if (isNum(m.total)) rows.push(['Total points', GI.num(m.total, 1) + ' expected' + (isNum(m.p_over) && isNum(lTot) ? ' · ' + Math.ceil(Number(lTot)) + ' or more: ' + GI.pct(m.p_over, 0) : ''), '']);
+  if (isNum(m.home_pts) && isNum(m.away_pts)) rows.push(['Projected score', A + ' ' + GI.num(m.away_pts, 1) + ' – ' + GI.num(m.home_pts, 1) + ' ' + H, '']);
+  return '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Question</th><th>Our forecast</th><th><span data-tip="The prediction-market probability or the no-vig sportsbook line, shown as a reference">Market (reference)</span></th></tr></thead><tbody>' +
+    rows.map(r => '<tr><td>' + esc(r[0]) + '</td><td class="num gi-ours-cell">' + esc(r[1]) + '</td><td class="num qk-muted" style="text-align:left">' + esc(r[2]) + '</td></tr>').join('') + '</tbody></table></div>';
+}
+/* Tale of the tape: the two teams' season profile from the team-strength ratings (season.json ratings[team].values). */
+function tape(season, g) {
+  const R = (season && season.ratings) || {};
+  const a = (R[g.away] || {}).values || {}, h = (R[g.home] || {}).values || {};
   const rows = [
-    [{ html: '<b>Win (' + esc(H) + ')</b>' }, { html: '<b>' + GI.pct(m.p_home) + '</b>' }, { html: GI.pct(mk.p_home) + (mk.sources ? '<span class="gi-sub-line">' + esc(mk.sources.join(' · ')) + '</span>' : '') },
-      { html: isNum(ln.ml_home) ? esc(H) + ' ' + GI.fmtOdds(ln.ml_home) + ' / ' + esc(A) + ' ' + GI.fmtOdds(ln.ml_away) + (mlP !== null ? '<span class="gi-sub-line">no-vig ' + GI.pct(mlP) + '</span>' : '') : '—' },
-      { html: GI.gapHTML(m.p_home, isNum(mk.p_home) ? mk.p_home : mlP) }],
-    [{ html: '<b>Spread</b>' }, { html: '<b>' + esc(GI.spreadText(g.home, g.away, mLine)) + '</b>' + (isNum(m.p_cover_home) && isNum(lLine) ? '<span class="gi-sub-line">' + esc(H) + ' covers ' + esc(GI.fmtLine(lLine)) + ': ' + GI.pct(m.p_cover_home, 0) + '</span>' : '') },
-      { html: esc(GI.spreadText(g.home, g.away, kLine)) }, { html: esc(GI.spreadText(g.home, g.away, lLine)) + (isNum(oLine) ? '<span class="gi-sub-line">open ' + esc(GI.spreadText(g.home, g.away, oLine)) + '</span>' : '') },
-      { html: lean ? (lean.team ? esc(GI.teamAbbr(lean.team)) + ' by ' + GI.num(lean.pts, 1) : 'none') : '—' }],
-    [{ html: '<b>Total</b>' }, { html: '<b>' + GI.num(m.total, 1) + '</b>' + (isNum(m.p_over) && isNum(lTot) ? '<span class="gi-sub-line">over ' + GI.num(lTot, 1) + ': ' + GI.pct(m.p_over, 0) + '</span>' : '') },
-      { html: GI.num(mk.total, 1) }, { html: GI.num(lTot, 1) + (ln.open && isNum(ln.open.total) ? '<span class="gi-sub-line">open ' + GI.num(ln.open.total, 1) + '</span>' : '') },
-      { html: isNum(m.total) && isNum(lTot) ? GI.gapPts(m.total - lTot) : '—' }]
+    { label: 'Team rating (points a game)', a: a.rating, b: h.rating, fmt: v => GI.signed(v, 1), tip: 'Our rating: points a game better than an average team on a neutral field' },
+    { label: 'Offence rating', a: a.off_rating, b: h.off_rating, fmt: v => GI.signed(v, 1) },
+    { label: 'Defence rating', a: a.def_rating, b: h.def_rating, fmt: v => GI.signed(v, 1) },
+    { label: 'Pass offence (EPA per dropback)', a: a.off_pass_epa, b: h.off_pass_epa, fmt: v => GI.signed(v, 3) },
+    { label: 'Rush offence (EPA per carry)', a: a.off_rush_epa, b: h.off_rush_epa, fmt: v => GI.signed(v, 3) },
+    { label: 'Pass defence (EPA per dropback allowed)', a: a.def_pass_epa, b: h.def_pass_epa, fmt: v => GI.signed(v, 3), better: 'low' },
+    { label: 'Rush defence (EPA per carry allowed)', a: a.def_rush_epa, b: h.def_rush_epa, fmt: v => GI.signed(v, 3), better: 'low' },
+    { label: 'Special teams (EPA a game)', a: a.st_epa_g, b: h.st_epa_g, fmt: v => GI.signed(v, 2) }
   ];
-  return (strips.length ? '<div class="gi-mvm-rows" style="margin-bottom:12px">' + strips.join('') + '</div>' : '') +
-    GI.tableHTML([{ label: '', sortable: false }, { label: 'Model', sortable: false }, { label: 'Market', sortable: false }, { label: 'Line', sortable: false }, { label: 'Model − line', sortable: false, title: 'A disagreement, not a recommendation' }], rows);
+  if (!rows.some(r => isNum(r.a) && isNum(r.b))) return '';
+  const cols = GI.pair(g.away, g.home);
+  const A = { name: GI.teamShort(g.away), abbr: GI.teamAbbr(g.away), colour: cols[0] }, H = { name: GI.teamShort(g.home), abbr: GI.teamAbbr(g.home), colour: cols[1] };
+  return QK.matchupBar({ left: A, right: H, rows: rows, colors: cols });
 }
 function projBlock(g, m) {
   let hp = m.home_pts, ap = m.away_pts;
   const ml = GI.homeLine(m);
   if ((!isNum(hp) || !isNum(ap)) && isNum(m.total) && isNum(ml)) { hp = (Number(m.total) - ml) / 2; ap = (Number(m.total) + ml) / 2; }
   if (!isNum(hp) || !isNum(ap)) return '';
-  const t = (team, pts) => '<a class="gi-vs-team" href="' + GI.teamHref(team) + '">' + GI.mark(team, 'lg') + '<span class="p" style="color:' + esc(GI.tc(team)) + '">' + GI.num(pts, 1) + '</span><span class="qk-sub">' + esc(GI.teamShort(team)) + '</span></a>';
-  return '<div class="gi-vs">' + t(g.away, ap) + '<div class="gi-vs-mid"><span>projected</span><span class="sc">–</span></div>' + t(g.home, hp) + '</div>';
+  const cols = GI.pair(g.away, g.home);
+  const t = (team, pts, c) => '<a class="gi-vs-team" href="' + GI.teamHref(team) + '">' + GI.mark(team, 'lg') + '<span class="p gi-disp" style="color:' + esc(c) + '">' + GI.num(pts, 1) + '</span><span class="qk-sub">' + esc(GI.teamShort(team)) + '</span></a>';
+  return '<div class="gi-vs">' + t(g.away, ap, cols[0]) + '<div class="gi-vs-mid"><span>our projection</span><span class="sc">–</span></div>' + t(g.home, hp, cols[1]) + '</div>';
 }
 function injuriesBlock(g) {
-  const inj = g.injuries || {};
+  let inj = g.injuries || {};
+  /* ESPN's lists keyed by team ({KC: [...]}): read them as home and away (the builder does this from 22 Oct 2026) */
+  if (!inj.home && !inj.away && (inj[g.home] || inj[g.away])) {
+    const keep = rows => R(rows).filter(x => String(x.status || '').toLowerCase() !== 'active');
+    inj = { home: keep(inj[g.home]), away: keep(inj[g.away]), source: 'ESPN' };
+  }
   const qb = g.qb_status || {};
   const av = g.availability || null;
   if (!R(inj.home).length && !R(inj.away).length && !qb.home && !qb.away && !av && !g.injury_changes) return '';
   const soLine = s => {
     const a = av && av[s];
     if (!a || (!a.off && !a.def)) return av ? '<p class="gi-cap">Starters out: none, so no adjustment.</p>' : '';
-    return '<p class="gi-cap">Starters out: <b>' + GI.num(a.off, 2) + '</b> offence · <b>' + GI.num(a.def, 2) + '</b> defence (expected, depth-chart starters) → ' + GI.ptsEdge(a.pts, 1) + ' in our price</p>';
+    return '<p class="gi-cap">Starters out: <b>' + GI.num(a.off, 2) + '</b> offence · <b>' + GI.num(a.def, 2) + '</b> defence (expected, depth-chart starters) → ' + GI.ptsEdge(a.pts, 1) + ' points in our forecast</p>';
   };
   const side = s => {
     const list = R(inj[s]).slice();
@@ -216,8 +269,8 @@ function injuriesBlock(g) {
       if (x.pid && !seen[x.pid]) list.push({ pid: x.pid, pos: x.grp, status: x.by === 'inactives' ? 'Inactive' : 'Out', detail: x.by === 'inactives' ? 'game-day inactive' : 'not on this list', impact: x.pts });
     });
     return '<div><h4 class="gi-inj-h">' + GI.teamLink(g[s]) + '</h4>' + (q ? '<p class="gi-cap">QB: ' + GI.qbText(q) + (q.status ? ' · ' + esc(q.status) : '') + (isNum(q.value) ? ' · value ' + GI.signed(q.value, 3) + ' EPA/play' : '') + '</p>' : '') + soLine(s) +
-      (list.length ? GI.tableHTML([{ label: 'Player' }, { label: 'Pos' }, { label: 'Status' }, { label: 'Detail' }, { label: 'Impact', align: 'right', title: 'Model points of margin (negative hurts this team)' }],
-        list.map(x => [{ html: x.pid ? GI.playerLink(x.pid, x.name ? { name: x.name } : null) : esc(x.name || '—'), v: x.name || GI.playerName(x.pid) }, x.pos || GI.player(x.pid).pos || '—',
+      (list.length ? GI.tableHTML([{ label: 'Player' }, { label: 'Pos' }, { label: 'Status' }, { label: 'Detail' }, { label: 'Impact', align: 'right', title: 'Points of margin in our forecast (negative hurts this team)' }],
+        list.map(x => [{ html: x.pid ? GI.playerLink(x.pid, x.name ? { name: x.name } : null) : esc(x.name || '—'), v: x.name || GI.playerName(x.pid) }, GI.posLabel(x.pos || GI.player(x.pid).pos || '—'),
           { html: GI.pill(x.status || '—', /out|ir|doubt/i.test(x.status || '') ? GI.BAD : /quest/i.test(x.status || '') ? GI.CLOSE : 'var(--ink-3)'), v: x.status }, x.detail || x.injury || '—',
           { html: isNum(x.impact) ? GI.ptsEdge(x.impact, 1) : '—', v: x.impact }])) : GI.muted('No injuries reported.')) + changes(s) + '</div>';
   };
@@ -236,11 +289,11 @@ function injuriesBlock(g) {
   if (av) {
     const H = esc(GI.teamAbbr(g.home));
     foot = '<p class="gi-cap">Net starters-out effect on the ' + H + ' margin: <b>' + GI.ptsEdge(av.net_home, 1) + '</b>. ' +
-      (av.src === 'inactives' ? 'From the game-day inactives (an inactive starter counts 1).' : 'From the injury report (Out 1, Doubtful 0.85, Questionable 0.15 of a starter); the game-day inactives replace it about 90 minutes before kickoff, and the price moves with them.') +
-      ' Each offensive starter out costs ' + GI.num(-av.coef.off, 2) + ' points and each defensive one ' + GI.num(-av.coef.def, 2) + '. QBs are priced separately. A player costs 0 if he was not a starter on the depth chart for his team\'s previous game: a backup, or a starter who already missed that game, whose absence is already in the team ratings and earlier prices. <a href="#/methodology">How →</a></p>';
+      (av.src === 'inactives' ? 'From the game-day inactives (an inactive starter counts 1).' : 'From the injury report (Out 1, Doubtful 0.85, Questionable 0.15 of a starter); the game-day inactives replace it about 90 minutes before kickoff, and our forecast moves with them.') +
+      ' Each offensive starter out costs ' + GI.num(-av.coef.off, 2) + ' points and each defensive one ' + GI.num(-av.coef.def, 2) + '. Quarterbacks are modelled separately. A player costs 0 if he was not a starter on the depth chart for his team\'s previous game: a backup, or a starter who already missed that game, whose absence is already in the team ratings and earlier forecasts. <a href="#/methodology">How →</a></p>';
   }
   if (ch) foot += '<p class="gi-cap">Changes: ESPN’s injury list for each team, checked every hour since 22 October 2026; each change is dated by the first check that saw it (last check ' + esc(GI.fmtDate(ch.as_of, { year: false }) + ' ' + GI.fmtTime(ch.as_of)) + '). ESPN keeps no history of its own.</p>';
-  return GI.card('Injuries and QB status', 'from ' + src + '; impact = points of margin in our price (negative hurts the team)', '<div class="qk-grid"><div class="qk-span-6">' + side('away') + '</div><div class="qk-span-6">' + side('home') + '</div></div>' + foot);
+  return GI.card('Injuries and QB status', 'From ' + src + '; impact = points of margin in our forecast (negative hurts the team)', '<div class="qk-grid"><div class="qk-span-6">' + side('away') + '</div><div class="qk-span-6">' + side('home') + '</div></div>' + foot);
 }
 function contextBlock(g) {
   const w = g.weather || {}, c = g.coaches || {};
@@ -278,9 +331,9 @@ function drawUnits(root) {
       grid: { left: 8, right: 16, top: 28, bottom: 30, containLabel: true },
       legend: GI.ch.legend(T, { data: ['Offence percentile', 'Defence percentile'] }),
       xAxis: GI.ch.ax(T, { min: 0, max: 100, fmt: v => v + 'th', name: 'Percentile among teams', nameLocation: 'middle', nameGap: 26 }), yAxis: ya,
-      tooltip: GI.ch.tip(T, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: ps => { const r = rows[ps[0].dataIndex]; return GI.ch.thead(esc(r.label)) + GI.ch.trow(T.model, GI.teamAbbr(r.t) + ' offence', GI.signed(r.off, 3) + ' · ' + GI.ordinal(r.offR)) + GI.ch.trow(T.market, GI.teamAbbr(r.o) + ' defence', GI.signed(r.def, 3) + ' · ' + GI.ordinal(r.defR)); } }),
+      tooltip: GI.ch.tip(T, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: ps => { const r = rows[ps[0].dataIndex]; return GI.ch.thead(esc(r.label)) + GI.ch.trow(T.model, GI.teamAbbr(r.t) + ' offence', GI.signed(r.off, 3) + ' · ' + GI.ordinal(r.offR)) + GI.ch.trow(T.cat[1], GI.teamAbbr(r.o) + ' defence', GI.signed(r.def, 3) + ' · ' + GI.ordinal(r.defR)); } }),
       series: [{ type: 'bar', name: 'Offence percentile', data: rows.map(r => rankPct(r.offR)), barMaxWidth: 12, itemStyle: { color: T.model, borderRadius: [0, 3, 3, 0] } },
-        { type: 'bar', name: 'Defence percentile', data: rows.map(r => rankPct(r.defR)), barMaxWidth: 12, itemStyle: { color: T.market, borderRadius: [0, 3, 3, 0] } }]
+        { type: 'bar', name: 'Defence percentile', data: rows.map(r => rankPct(r.defR)), barMaxWidth: 12, itemStyle: { color: T.cat[1], borderRadius: [0, 3, 3, 0] } }]
     };
   }, 'Unit matchups');
 }
@@ -288,24 +341,30 @@ function previewTab(g, pre0) {
   const pre = Object.assign({}, pre0, { model: withDists(pre0.model || {}, pre0.line || g.line) });
   const m = pre.model;
   const hasModel = isNum(m.p_home) || isNum(m.total) || isNum(GI.homeLine(m));
+  const when = pre.priced_at || m.priced_at;
   let h = '';
   if (hasModel) {
-    h += GI.grid(GI.card('Model v market v line', (pre.priced_at || m.priced_at ? 'priced ' + esc(GI.fmtStamp(pre.priced_at || m.priced_at)) : '') + (GI.isPre(g) ? '' : ' · frozen at kickoff'), mvmBlock(g, pre) +
-      '<p class="gi-cap">Spreads are shown for the favourite (negative = favoured). The market is the de-vigged prediction-market price; the line is the sportsbook line as ESPN shows it. For information only.</p>', { span: 7 }) +
-      GI.card('Projected score', 'model mean', projBlock(g, m) || GI.muted('No projection.'), { span: 5 }));
+    h += GI.grid(GI.card(GI.isPre(g) ? 'Our forecast' : 'Our pre-game forecast', (when ? 'made ' + esc(GI.fmtStamp(when)) : '') + (GI.isPre(g) ? '' : ' · frozen at kickoff') + ' · the market column is a reference', forecastBlock(g, pre) +
+      '<p class="gi-cap">Our chances come from the game model: team ratings, the quarterbacks, starters out, rest, weather and home field. How it scores over many seasons is on the <a href="#/calibration">Model page</a>.</p>', { span: 7 }) +
+      GI.card('Projected score', 'The average of our game simulations', projBlock(g, m) || GI.muted('No projection.'), { span: 5 }));
     if (m.margin_dist || m.total_dist) {
-      h += GI.grid(GI.card('Margin', esc(GI.teamAbbr(g.home)) + ' points minus ' + esc(GI.teamAbbr(g.away)) + (m.approx ? ' · normal approximation' : ''), GI.chartBox('gm-md', 240, 'Margin distribution'), { span: 6 }) +
-        GI.card('Total points', 'dashed: the line and our mean', GI.chartBox('gm-td', 240, 'Total points distribution'), { span: 6 }));
+      h += GI.grid(GI.card('Margin', 'Our chance of each final margin, ' + esc(GI.teamAbbr(g.home)) + ' points minus ' + esc(GI.teamAbbr(g.away)) + (m.approx ? ' · normal approximation' : ''), GI.chartBox('gm-md', 240, 'Margin distribution'), { span: 6 }) +
+        GI.card('Total points', 'Our chance of each total, both teams; dashed: our mean' + (GI.isFinal(g) ? ' · white: the result' : ''), GI.chartBox('gm-td', 240, 'Total points distribution'), { span: 6 }));
     }
-  } else h += GI.card('Model v market v line', '', GI.muted('The pre-game price is not available for this game.'));
-  h += matchupsBlock(g) + injuriesBlock(g) + contextBlock(g);
+  } else h += GI.card('Our forecast', '', GI.muted('Our pre-game forecast is not available for this game.'));
+  h += '<div id="gm-tape"></div>' + matchupsBlock(g) + injuriesBlock(g) + contextBlock(g);
   return { html: h, after: root => {
-    const ln = pre.line || g.line || {};
-    const lLine = GI.homeLine(ln);
     if (m.margin_dist && root.querySelector('#gm-md')) GI.ch.distBars('gm-md', m.margin_dist, { signed: true, split: 0, colours: [GI.teamColour(g.home), GI.teamColour(g.away)],
-      line: isNum(lLine) ? -lLine : null, exp: isNum(GI.homeLine(m)) ? -GI.homeLine(m) : null, actual: GI.isFinal(g) && isNum(g.hs) ? g.hs - g.as : null, unit: 'pts', xName: GI.teamAbbr(g.home) + ' margin (pts)' });
-    if (m.total_dist && root.querySelector('#gm-td')) GI.ch.distBars('gm-td', m.total_dist, { line: ln.total, exp: m.total, actual: GI.isFinal(g) && isNum(g.hs) ? Number(g.hs) + Number(g.as) : null, unit: 'pts', xName: 'Total points' });
+      exp: isNum(GI.homeLine(m)) ? -GI.homeLine(m) : null, actual: GI.isFinal(g) && isNum(g.hs) ? g.hs - g.as : null, unit: 'pts', xName: GI.teamAbbr(g.home) + ' margin (pts)', yName: 'Chance' });
+    if (m.total_dist && root.querySelector('#gm-td')) GI.ch.distBars('gm-td', m.total_dist, { exp: m.total, actual: GI.isFinal(g) && isNum(g.hs) ? Number(g.hs) + Number(g.as) : null, unit: 'pts', xName: 'Total points', yName: 'Chance' });
     drawUnits(root);
+    /* tale of the tape: the season ratings, loaded after the first paint */
+    GI.loadYear('season.json', GI.gameSeason(g.game_id)).then(season => {
+      const n = root.querySelector('#gm-tape');
+      if (!n || !n.isConnected || !GI.ok(season)) return;
+      const tp = tape(season, g);
+      if (tp) n.innerHTML = GI.card('Tale of the tape', 'Season so far, opponent-adjusted: the stronger side of each bar is solid', tp);
+    });
   } };
 }
 
@@ -326,7 +385,7 @@ function fourthTable(g, fd) {
       { html: '<span class="gi-play-desc">' + esc(String(f.desc || '').slice(0, 180)) + '</span>' }];
   });
   return GI.card('Fourth downs', fd.length + ' decision' + (fd.length === 1 ? '' : 's') + ' · graded by win probability lost against the best option · <a href="' + GI.ghref('fourth-downs', GI.gameSeason(g.game_id)) + '">every 4th down this season →</a>',
-    GI.tableHTML([{ label: 'When' }, { label: 'Team' }, { label: 'Situation' }, { label: 'Call' }, { label: 'Model' }, { label: 'WP go · punt · FG', sortable: false, title: 'Our win probability for the team on fourth down, by option' },
+    GI.tableHTML([{ label: 'When' }, { label: 'Team' }, { label: 'Situation' }, { label: 'Call' }, { label: 'Our call', title: 'What our fourth-down model recommends' }, { label: 'WP go · punt · FG', sortable: false, title: 'Our win probability for the team on fourth down, by option' },
       { label: 'WP lost', align: 'right', title: 'Win probability given up against the best option, percentage points' }, { label: 'Grade' }, { label: 'Play', sortable: false }], rows) +
     '<div class="gi-legend" style="margin-top:10px"><span><i style="background:' + GI.GOOD + '"></i>Right call (≤ 1.5 pts lost)</span><span><i style="background:' + GI.CLOSE + '"></i>Close call (1.5–3)</span><span><i style="background:' + GI.BAD + '"></i>Mistake (&gt; 3)</span></div>');
 }
@@ -363,15 +422,15 @@ function driveTable(g, drives) {
 }
 /* Pages built from ESPN's record while nflverse has not published the week: say so where the nflverse-only parts are missing. */
 function espnNote(g) {
-  return g.source === 'espn' ? GI.muted('Provisional: built from ESPN’s play-by-play and box score until nflverse publishes this week (usually within a day). Win probability and EPA are our models on ESPN’s play states (score before the snap, timeouts from the play log), so they can differ slightly from the final version; fourth-down grades, game balls and the advanced box columns fill in then.') : '';
+  return g.source === 'espn' ? GI.note('<b>Provisional.</b> Built from ESPN’s play-by-play and box score until nflverse publishes this week (usually within a day). Win probability and EPA are our models on ESPN’s play states (score before the snap, timeouts from the play log), so they can differ slightly from the final version; fourth-down grades, game balls and the advanced box columns fill in then.') : '';
 }
 function flowTab(g, pre, plays) {
   const fd = fourthOf(g, plays), sc = scoringOf(g, plays), kp = keyPlaysOf(g, plays), wp = wpSeries(g, plays, pre);
   const hasWp = wp.ours.length >= 2 || wp.espn.length >= 2;
   const hasDrives = GI.ch.driveRows(g.drives).length > 0;
-  let h = espnNote(g) + GI.card('Win probability', esc(GI.teamAbbr(g.home)) + ' (home) · ' + (wp.name === 'Our model' ? 'our model' : esc(wp.name)) + ' solid' + (wp.espn.length ? ', ESPN dotted' : '') + ' · ◆ 4th downs by grade · ● scores · numbers: key plays' +
+  let h = espnNote(g) + GI.card('Win chance through the game', esc(GI.teamAbbr(g.home)) + ' (home) · ' + (wp.name === 'Our model' ? 'our model' : esc(wp.name)) + ' solid' + (wp.espn.length ? ', ESPN dotted' : '') + ' · ◆ 4th downs by grade · ● scores · numbers: key plays' +
     (wp.name !== 'Our model' ? ' · our WP model is not fitted for this game, so nflfastR\'s published WP is shown' : ''),
-    hasWp ? GI.chartBox('gm-wp', 360, 'Win probability through the game') : GI.muted(GI.isPre(g) ? 'The win-probability chart starts at kickoff.' : 'No win-probability path for this game yet.'));
+    hasWp ? (wp.espn.length && wp.ours.length >= 2 ? QK.keys([{ name: wp.name === 'Our model' ? 'Our model' : wp.name, color: 'var(--ink-1)' }, { name: 'ESPN', color: 'var(--ink-3)', kind: 'line' }]) : '') + GI.chartBox('gm-wp', 360, 'Win probability through the game') : GI.muted(GI.isPre(g) ? 'The win-probability chart starts at kickoff.' : 'No win-probability path for this game yet.'));
   h += GI.card('Drive chart', 'every drive from where it started to where it ended, own goal line on the left; colour is the result', hasDrives ? GI.chartBox('gm-drives', 400, 'Drive chart') +
     '<details style="margin-top:10px"><summary class="qk-sub">Drive table</summary>' + driveTable(g, g.drives) + '</details>' : GI.muted(GI.isPre(g) ? 'Drives appear at kickoff.' : 'No drives yet.'));
   h += fourthTable(g, fd) + keyPlaysBlock(g, kp) + awardsBlock(g);
@@ -529,11 +588,11 @@ GI.route('game', function (el, params) {
     const plays = playsOf(g);
     const st = GI.gameState(g);
     const live = st === 'live' || st === 'half';
-    const tabs = [['preview', 'Preview'], ['flow', 'Game flow'], ['plays', 'Play-by-play'], ['box', 'Box score']];
+    const tabs = [['preview', st === 'pre' ? 'Preview' : 'Forecast and matchup'], ['flow', 'Game flow'], ['plays', 'Play-by-play'], ['box', 'Box score']];
     const q = (params.query || {}).tab;
     let tab = TAB[id] || (tabs.some(t => t[0] === q) ? q : (st === 'pre' ? 'preview' : 'flow'));
     document.title = GI.teamAbbr(g.away) + ' @ ' + GI.teamAbbr(g.home) + ' · ' + GI.SITE;
-    el.innerHTML = header(g, pre, plays) +
+    el.innerHTML = header(g, pre, plays) + tiles(g, pre, plays) +
       '<div class="qk-tabs" role="tablist" aria-label="Game centre">' + tabs.map(t => '<button type="button" class="qk-tab" role="tab" data-tab="' + t[0] + '" aria-selected="' + (t[0] === tab) + '">' + esc(t[1]) + '</button>').join('') + '</div><div id="gm-body" class="gi-page"></div>';
     const body = el.querySelector('#gm-body');
     const show = k => {

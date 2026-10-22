@@ -1,5 +1,5 @@
-/* The Quant Gridiron — Leaders (#/leaders?g=&m=): the top five on the headline metrics of every position
- * group at a glance, then any catalogue metric as a ranked bar chart and table, qualified players only (or
+/* The Quant Gridiron — Leaders (#/leaders?g=&m=), on Design System 2.0: the top five on the headline metrics of every
+ * position group at a glance, then any catalogue metric as a ranked bar chart and table, qualified players only (or
  * above a sample floor), best or worst, one team or all. Reads <S>/players.json (leaders.json as a fallback). */
 (function (GI) {
 'use strict';
@@ -15,7 +15,7 @@ GI.route('leaders', function (el, params) {
   if (qy.m) ST.metric = String(qy.m);
   return GI.load(GI.ypath('players.json', S)).then(raw => {
     if (!el.isConnected) return;
-    const head = GI.pageHead('Players · ' + S, 'Leaders', 'Qualified players only unless you say otherwise; percentiles after shrinking small samples towards the group mean.') + GI.sectionNav('players', 'leaders');
+    const head = GI.pageHead('Players · ' + S, 'Leaders', 'Qualified players only unless you say otherwise; percentiles against each player\'s peer group (QB, RB, WR/TE, DL and outside rushers, LB, DB, K, P) after shrinking small samples towards the group mean.') + GI.sectionNav('players', 'leaders');
     const X = GI.cat.prepare(raw);
     if (!X) {
       return GI.load(GI.ypath('leaders.json', S)).then(d => {
@@ -34,7 +34,7 @@ GI.route('leaders', function (el, params) {
       if (!ids.length) return;
       GI.headline(GI.metricsFor(cat, g), GI.PREFS[g] || [], g === 'QB' || g === 'WR' ? 2 : 1).forEach(m => {
         const top = ids.filter(id => isNum((P[id].values || {})[m.key])).sort((a, b) => { const d = P[b].values[m.key] - P[a].values[m.key]; return m.lower ? -d : d; }).slice(0, 5);
-        if (top.length) glance.push(GI.card('<a class="gi-link" href="' + GI.ghref('leaders', S, { g: g, m: m.key }) + '">' + esc(g + ' · ' + m.label) + '</a>', '', '<ol class="gi-ldl">' + top.map(id => '<li>' + GI.mark(P[id].team) + GI.playerLink(id, { name: P[id].name, season: S }) + '<b class="gi-num">' + GI.fmtVal(P[id].values[m.key], m.fmt) + '</b></li>').join('') + '</ol>'));
+        if (top.length) glance.push(GI.card('<a class="gi-link" href="' + GI.ghref('leaders', S, { g: g, m: m.key }) + '">' + esc(g + ' · ' + m.label) + '</a>', '', '<ol class="gi-ldl gi-lead">' + top.map(id => '<li>' + GI.mark(P[id].team) + GI.playerLink(id, { name: P[id].name, season: S }) + '<b class="gi-num">' + GI.fmtVal(P[id].values[m.key], m.fmt) + '</b></li>').join('') + '</ol>'));
       });
     });
     el.innerHTML = head + '<div class="qk-auto" style="--min:250px">' + glance.join('') + '</div>' +
@@ -64,12 +64,14 @@ GI.route('leaders', function (el, params) {
       const top = ids.slice(0, 15);
       const ch = $('ld-chart');
       if (ch) ch.style.setProperty('--h', Math.max(220, top.length * 26 + 30) + 'px');
-      if (top.length) GI.ch.bar('ld-chart', { cats: top.map(id => P[id].name + ' · ' + GI.teamAbbr(P[id].team)), series: [{ name: m.label, data: top.map(id => P[id].values[m.key]) }], horizontal: true, labels: true, colors: top.map(id => GI.teamColour(P[id].team)), hrefs: top.map(id => GI.playerHref(id, S)), fmt: v => GI.fmtVal(v, m.fmt), labelWidth: 170 });
+      if (top.length) GI.ch.bar('ld-chart', { cats: top.map(id => P[id].name + ' · ' + GI.teamAbbr(P[id].team)), series: [{ name: m.label, data: top.map(id => P[id].values[m.key]) }], horizontal: true, labels: true, colors: top.map(id => QK.pctHex(GI.peerPct(P[id], ST.group)[m.key])), hrefs: top.map(id => GI.playerHref(id, S)), fmt: v => GI.fmtVal(v, m.fmt), labelWidth: 170, valName: m.label, catName: 'Player' });
       else GI.ch.none('ld-chart', 'Nobody with this metric matches.');
-      GI.set('ld-table', ids.length ? GI.tableHTML([{ label: '#', align: 'right', sortable: false }, { label: 'Player' }, { label: 'Team' }, { label: 'Pos' }, { label: 'G', align: 'right' }, { label: sk[1], align: 'right' }, { label: m.label + (m.lower ? ' ↓' : ''), align: 'right', title: m.desc || '' }, { label: 'Pct', align: 'right' }],
-        ids.map((id, i) => { const p = P[id], v = p.values[m.key]; return { _href: GI.playerHref(id, S), cells: [i + 1, { html: GI.playerLink(id, { name: p.name, season: S }) + (p.qualified === false ? ' <span class="gi-tag">small sample</span>' : ''), v: p.name }, { html: GI.teamChip(p.team, S), v: p.team }, { v: p.pos || '' },
-          { v: p.games }, { v: GI.sampleOf(p, sk[0]), html: GI.int(GI.sampleOf(p, sk[0])) }, { v: v, html: '<b>' + GI.fmtVal(v, m.fmt) + '</b>' }, { v: (p.pct || {})[m.key], html: QK.pctlChip((p.pct || {})[m.key]) || '—' }] }; }), { sticky: true, maxHeight: 640 }) : GI.muted('Nobody with this metric matches.'));
-      GI.sortable($('ld-table'));
+      const lrows = ids.map(id => { const p = P[id], pc = GI.peerPct(p, ST.group); return { id: id, name: p.name, team: p.team, sub: GI.posLabel(p.pos || '') + ' · ' + GI.teamAbbr(p.team) + (p.qualified === false ? ' · small sample' : ''), games: p.games, n: GI.sampleOf(p, sk[0]), v: p.values[m.key], p: isNum(pc[m.key]) ? pc[m.key] : null }; });
+      if (lrows.length) QK.leaderboard($('ld-table'), { dense: true, rank: true, maxHeight: 640, rowHref: r => GI.playerHref(r.id, S), rows: lrows,
+        columns: [{ key: 'name', label: 'Player', type: 'entity', sub: 'sub', mark: r => ({ name: GI.teamName(r.team), abbr: GI.teamAbbr(r.team), colour: GI.teamInfo(r.team).colour }), href: r => GI.playerHref(r.id, S), sort: false },
+          { key: 'games', label: 'G', num: true, sort: false }, { key: 'n', label: sk[1], num: true, sort: false }, { key: 'v', label: m.label + (m.lower ? ' ↓' : ''), type: 'pctl', pctl: 'p', fmt: v => '<b>' + GI.fmtVal(v, m.fmt) + '</b>', tip: GI.copyText(m.desc || ''), sort: false },
+          { key: 'p', label: 'Percentile', type: 'bar', max: 100, fmt: v => (isNum(v) ? String(Math.round(v)) : '—'), tip: 'Against his peer group, qualified players (100 = best)', sort: false }] });
+      else GI.set('ld-table', GI.muted('Nobody with this metric matches.'));
       GI.set('ld-sub', (ST.dir === 'worst' ? 'Bottom ' : 'Top ') + Math.min(ST.n, total) + ' of ' + total + ' ' + esc((GI.GROUP_NAME[ST.group] || '').toLowerCase()) + ' · ' + S);
       const qn = (cat.qualification || {})[ST.group];
       GI.set('ld-note', '<b>' + esc(m.label) + '</b>: ' + esc(m.desc || '') + (isNum(m.stabilises_at) ? ' Stabilises at about ' + GI.int(m.stabilises_at) + ' ' + esc(sk[1].toLowerCase()) + '.' : '') + (qn ? ' Qualified: ' + esc(qn) + '.' : '') +

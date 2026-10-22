@@ -79,6 +79,23 @@ def test_season_files(built):
     assert s["fmt"] == B.FORMAT and sch["compact"] is True
     assert is_packed(raw(d / "schedule.json")["games"]) and is_packed(raw(d / "players.json")["players"])
     assert isinstance(load(d / "players.json")["players"], dict)
+    # metrics spec (docs/_design/metrics/college.json): rate fields and the guard / wing / big role on every player
+    cat = load(d / "players.json")
+    assert set(cat["roles"]) == {"G", "W", "B"} and cat["role_rule"]["threshold"] is not None
+    keys = {m["key"] for m in cat["metrics"]}
+    assert keys >= set(B.PL.RATE_KEYS)
+    pl = list(cat["players"].values())
+    assert all(p["role"] in ("G", "W", "B") for p in pl)
+    assert all(p["role"] == "G" for p in pl if p["pos"] == "G") and all(p["role"] == "B" for p in pl if p["pos"] == "C")
+    v = [p["values"] for p in pl if p["qualified"]]
+    for k in ("ast_pct", "trb_pct", "stl_pct", "blk_pct", "tov_pct", "efg"):
+        xs = [x[k] for x in v if x.get(k) is not None]
+        assert xs and all(0 <= x <= 1.5 for x in xs), k
+    assert all(x["pts100"] > 0 for x in v if x.get("pts100") is not None)
+    cur = load(out / "mbb" / "2027" / "players.json") if (out / "mbb" / "2027" / "players.json").exists() else None
+    if cur and cur.get("ok") and cur.get("players"):
+        q = [p for p in cur["players"].values() if p["qualified"]]
+        assert any(p.get("pct_role") for p in q)
     gp = list((d / "games").glob("*.json"))
     assert gp                                   # previous season's postseason pages
     g = load(gp[0])

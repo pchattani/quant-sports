@@ -425,22 +425,27 @@ function card(title, sub, body, opts) {
 }
 function grid(html, cls) { return '<div class="qk-grid' + (cls ? ' ' + cls : '') + '">' + html + '</div>'; }
 function chartBox(id, h, label) { return '<div id="' + esc(id) + '" class="pd-chart" style="--h:' + (h || 300) + 'px"' + (label ? ' role="img" aria-label="' + esc(label) + '"' : '') + '></div>'; }
-/* A KPI tile; value is HTML (links allowed). */
+/* A stat tile (Design System 2.0, QK.statTile); value and sub are HTML (links allowed).
+ * o: {text (a word or a name, not a number), signal (ours: the forecast or rating), pctl, tip, trend: [..], trendColor, href, unit, cls} */
 function kpi(label, value, sub, o) {
   o = o || {};
-  return QK.kpi({ label: label, value: value, sub: sub, html: true, cls: o.cls, accent: o.accent, tip: o.tip, text: o.text, spark: o.spark || undefined });
+  return QK.statTile({ label: label, value: value, sub: sub, html: true, cls: o.cls, tip: o.tip, text: o.text, signal: o.signal, pctl: o.pctl, trend: o.trend, trendColor: o.trendColor, trendLabel: o.trendLabel, href: o.href, unit: o.unit });
 }
-function kpis(list, cls) { return '<div class="qk-kpis pd-kpis' + (cls ? ' ' + cls : '') + '">' + list.join('') + '</div>'; }
+function kpis(list, cls) { return '<div class="qk-stats pd-kpis' + (cls ? ' ' + cls : '') + '">' + list.join('') + '</div>'; }
 function chip(text, kind) { return '<span class="qk-badge' + (kind ? ' ' + kind : '') + '">' + esc(text) + '</span>'; }
 function muted(text) { return '<p class="pd-muted">' + text + '</p>'; }
 function empty(title, text) { return QK.empty(title, text); }
 function note(html) { return '<div class="qk-note pd-note">' + html + '</div>'; }
 function notBuilt(what, d) { return empty(what + ' is not available', d && d.reason ? String(d.reason) : 'The payload is rebuilt after each session.'); }
-/* Page head: kicker, title, sub line, right-hand HTML (links, seg). */
+/* Page head (Design System 2.0 section head, large, h1): kicker ("F1 · ..."), title, sub line (HTML; always present so a
+ * page can fill it later through .qk-sh-sub), right-hand HTML (links, a pager). */
 function pageHead(kicker, title, sub, right) {
-  return '<header class="pd-head"><div class="pd-head-l">' + (kicker ? '<div class="qk-kicker">' + kicker + '</div>' : '') + '<h1>' + esc(title) + '</h1><p class="qk-sub">' + (sub || '') + '</p></div>' +
-    (right ? '<div class="pd-head-r">' + right + '</div>' : '') + '</header>';
+  var k = kicker ? (/^F1/.test(String(kicker)) ? String(kicker) : 'F1 · ' + kicker) : 'F1';
+  return '<header class="qk-sh lg pd-head"><div class="qk-sh-main"><div class="qk-sh-kicker">' + k + '</div><h1 class="qk-sh-title">' + esc(title) + '</h1><p class="qk-sh-sub">' + (sub || '') + '</p></div>' +
+    (right ? '<div class="qk-sh-actions">' + right + '</div>' : '') + '</header>';
 }
+/* A section head inside a page (v2): kicker, title, sub (HTML), actions (HTML). */
+function secHead(kicker, title, sub, actions) { return QK.sectionHead({ kicker: kicker, title: title, sub: sub, actions: actions, html: true }); }
 /* Sub-navigation inside a section: [[href, label, key]], active key. */
 function subnav(items, active, label) {
   return '<nav class="pd-subnav" aria-label="' + esc(label || 'Views') + '"><div class="qk-tabs" role="tablist">' + items.map(function (i) {
@@ -562,7 +567,7 @@ function searchRows() {
     Object.keys(circ).forEach(function (id) { var c = circ[id]; if (c && c.name) add('c:' + id, c.name, 'Circuit · ' + (c.country || '') + ((c.history || []).length ? ' · ' + c.history.length + ' races' : ''), '#/circuit/' + id); });
     var s = arr[2];
     if (ok(s)) (s.calendar || []).forEach(function (c) { add('r:' + c.round, s.year + ' ' + c.name, 'Race · round ' + c.round + ' · ' + fmtDate(c.date, { weekday: false }), raceHref(s.year, c.round)); });
-    [['Standings', '#/standings'], ['Title odds v market', '#/standings?tab=odds'], ['Driver value', '#/value'], ['Driver-swap simulator', '#/value?tab=swap'], ['Fantasy', '#/fantasy'], ['Driver lab', '#/lab'], ['Compare drivers', '#/compare'], ['Methodology', '#/methodology'], ['Calibration', '#/calibration'], ['Glossary', '#/glossary']]
+    [['Standings', '#/standings'], ['Title chances', '#/standings?tab=odds'], ['Driver value', '#/value'], ['Driver-swap simulator', '#/value?tab=swap'], ['Fantasy', '#/fantasy'], ['Driver lab', '#/lab'], ['Compare drivers', '#/compare'], ['Methodology', '#/methodology'], ['Calibration', '#/calibration'], ['Glossary', '#/glossary']]
       .forEach(function (p) { add('p:' + p[0], p[0], 'Page', p[1]); });
     return rows;
   });
@@ -615,7 +620,7 @@ return {
   teamColour: teamColour, tc: tc, driverTeam: driverTeam, driverColour: driverColour, compoundColour: compoundColour, COMPOUNDS: COMPOUNDS, PALETTE: PALETTE,
   teamDot: teamDot, driverLink: driverLink, teamLink: teamLink, circuitLink: circuitLink, raceLink: raceLink, raceHref: raceHref, driverHref: driverHref, teamHref: teamHref, mark: mark,
   card: card, grid: grid, chartBox: chartBox, kpi: kpi, kpis: kpis, chip: chip, muted: muted, empty: empty, note: note, notBuilt: notBuilt,
-  pageHead: pageHead, subnav: subnav, seg: seg, wireSeg: wireSeg, yearPager: yearPager, table: table, set: set, alive: alive, pctl: pctl,
+  pageHead: pageHead, secHead: secHead, subnav: subnav, seg: seg, wireSeg: wireSeg, yearPager: yearPager, table: table, set: set, alive: alive, pctl: pctl,
   probBar: probBar, deltaHTML: deltaHTML, posHTML: posHTML, heatTable: heatTable
 };
 })();

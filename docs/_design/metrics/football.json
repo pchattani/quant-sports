@@ -1,0 +1,3996 @@
+{
+  "sport": "football",
+  "site": "footballer",
+  "schema_version": 1,
+  "generated": "2026-10-22",
+  "leagues": [
+    "premier-league",
+    "la-liga",
+    "serie-a",
+    "bundesliga",
+    "ligue-1",
+    "eredivisie",
+    "primeira-liga",
+    "belgian-pro-league",
+    "saudi-pro-league",
+    "brasileirao",
+    "mls",
+    "liga-mx",
+    "liga-argentina"
+  ],
+  "payloads": {
+    "players": "data/<slug>/players_live.json -> players[] (one competition); data/lab/<window>/<scope>.json -> rows with `fields` (one row per person, cross-competition)",
+    "roles_and_value": "data/value/lines.json -> rows [id, comp, tid, min, apps, gar90, gar, par, pct, role, prev90, rt, c]; data/value/players.json -> rows (fields incl. role, gar90, min)",
+    "teams": "data/<slug>/analytics.json -> teams[<name>].profile[<key>] = {v, pct}; catalogue team_metrics"
+  },
+  "league_strength": {
+    "competition_pages": "percentiles within competition and season, by fine role",
+    "cross_competition": "pooled over the view's competitions; rates in ADJUSTED_KEYS (goals, npG, assists, xG, npxG, xA, xGOT, shots, key passes, big chances per 90) multiplied by the row's `factor` (pool.json factor_att, minutes-weighted) before ranking; gar90 is already on the pooled scale; other rates unadjusted",
+    "evidence": "144 players who changed league between seasons (12 pooled leagues): the factor-adjusted rate correlates better with next season's in every attacking metric tested (npxG+xA/90 0.68 -> 0.73, shots+key passes 0.75 -> 0.82, value/90 0.53 -> 0.70) and the absolute error falls 5-20%; the log change regresses on the log factor ratio with slope 1.1-1.7, so the factor if anything under-corrects"
+  },
+  "groups": [
+    {
+      "id": "cb",
+      "entity": "player",
+      "display": "Centre-backs",
+      "peer_group": "role in {CB} (formation role, the one he starts in most); within competition and season on competition pages, pooled across the view's competitions with attacking rates league-adjusted in cross-competition views",
+      "position_field": "role",
+      "position_codes": [
+        "CB"
+      ],
+      "position_source": "data/value/lines.json `role` (per competition line) or data/value/players.json `role` (12 months), joined on player id. A coarse role (DF, MF, FW) means no formation start (substitute appearances only): such players are almost never over the minimum (none of 5,150 league lines with 900+ minutes lacked a fine role), so show no percentile card for them; list them under Sofascore's letter `position` (G, D, M, F). Do not map letters to fine groups: 40% of D-lettered regulars are full-backs, 45% of M-lettered are AM/W or wing-backs, 32% of F-lettered are wingers",
+      "minimum": {
+        "field": "minutes",
+        "value": 450,
+        "unit": "minutes",
+        "note": "and over the view's floor (players_live minutes_floor = 30% of the season's minutes; lab rows' floor). Flag 'small sample' under 900 minutes."
+      },
+      "basis": "per 90 minutes (ratios from summed numerators and denominators)",
+      "metrics": [
+        {
+          "id": "gar90",
+          "display": "Value added (GAR/90)",
+          "unit": "goals per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 1,
+          "basis": "rate",
+          "explanation": "Goals of expected goal difference a player adds per 90 minutes over a replacement-level player in his role, from the site's player value model (box score plus match rating).",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.59,
+            "split_half_r": 0.74,
+            "n_pairs": 365,
+            "m50": 660,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.59,
+            "r_team_controlled": 0.41
+          },
+          "payload": "data/value/lines.json rows (per competition line, join on id + comp) and data/value/players.json rows (last 365 days, join on id); numbers measured on the model's gross value per 90, whose order within a role and competition is the same"
+        },
+        {
+          "id": "rating",
+          "display": "Match rating",
+          "unit": "rating",
+          "direction": "higher",
+          "set": "headline",
+          "order": 2,
+          "basis": "rate",
+          "explanation": "Sofascore's 1-10 match rating, averaged over his matches and weighted by minutes.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.44,
+            "split_half_r": 0.61,
+            "n_pairs": 365,
+            "m50": 1190,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.47,
+            "n_pairs_full_seasons": 374
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.49,
+            "r_team_controlled": 0.33
+          }
+        },
+        {
+          "id": "aerials_won_90",
+          "display": "Aerial duels won",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 3,
+          "basis": "rate",
+          "explanation": "Headers won against an opponent per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.59,
+            "split_half_r": 0.74,
+            "n_pairs": 365,
+            "m50": 650,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.72,
+            "n_pairs_full_seasons": 374
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.22,
+            "r_team_controlled": 0.2
+          }
+        },
+        {
+          "id": "aerial_pct",
+          "display": "Aerial duel success",
+          "unit": "%",
+          "direction": "higher",
+          "set": "headline",
+          "order": 4,
+          "basis": "rate",
+          "explanation": "Share of his aerial duels that he wins.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.33,
+            "split_half_r": 0.47,
+            "n_pairs": 365,
+            "m50": 2130,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.41,
+            "n_pairs_full_seasons": 374
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.15,
+            "r_team_controlled": 0.17
+          }
+        },
+        {
+          "id": "padj_tkl_int_90",
+          "display": "Tackles + interceptions (possession-adjusted)",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 5,
+          "basis": "rate",
+          "explanation": "Tackles plus interceptions per 90, scaled up for players whose team has the ball a lot (fewer chances to defend) and down for those who defend all game.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.49,
+            "split_half_r": 0.72,
+            "n_pairs": 365,
+            "m50": 710,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.31,
+            "r_team_controlled": 0.16
+          }
+        },
+        {
+          "id": "opp_half_passes_90",
+          "display": "Passes in the opposition half",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 6,
+          "basis": "rate",
+          "explanation": "Completed passes in the opponent's half per 90: how much of his team's play in the attacking half goes through him.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.74,
+            "split_half_r": 0.86,
+            "n_pairs": 365,
+            "m50": 310,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.76,
+            "n_pairs_full_seasons": 374
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.5,
+            "r_team_controlled": 0.27
+          }
+        },
+        {
+          "id": "pass_pct",
+          "display": "Pass completion",
+          "unit": "%",
+          "direction": "higher",
+          "set": "headline",
+          "order": 7,
+          "basis": "rate",
+          "explanation": "Share of his passes that find a team-mate. It also reflects how risky his passes are.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.68,
+            "split_half_r": 0.89,
+            "n_pairs": 365,
+            "m50": 240,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.75,
+            "n_pairs_full_seasons": 374
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.24,
+            "r_team_controlled": 0.07
+          }
+        },
+        {
+          "id": "long_ball_pct",
+          "display": "Long-ball accuracy",
+          "unit": "%",
+          "direction": "higher",
+          "set": "headline",
+          "order": 8,
+          "basis": "rate",
+          "explanation": "Share of his long passes that find a team-mate.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.45,
+            "split_half_r": 0.62,
+            "n_pairs": 365,
+            "m50": 1130,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.61,
+            "n_pairs_full_seasons": 374
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.2,
+            "r_team_controlled": 0.12
+          }
+        },
+        {
+          "id": "duels_won_90",
+          "display": "Duels won",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 1,
+          "basis": "rate",
+          "explanation": "Ground and aerial duels won per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.52,
+            "split_half_r": 0.73,
+            "n_pairs": 365,
+            "m50": 670,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.67,
+            "n_pairs_full_seasons": 374
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.24,
+            "r_team_controlled": 0.21
+          }
+        },
+        {
+          "id": "duel_pct",
+          "display": "Duel success",
+          "unit": "%",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 2,
+          "basis": "rate",
+          "explanation": "Share of his ground and aerial duels that he wins.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.3,
+            "split_half_r": 0.45,
+            "n_pairs": 365,
+            "m50": 2320,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.39,
+            "n_pairs_full_seasons": 374
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.14,
+            "r_team_controlled": 0.12
+          }
+        },
+        {
+          "id": "recoveries_90",
+          "display": "Ball recoveries",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 3,
+          "basis": "rate",
+          "explanation": "Loose balls he wins back for his team, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.57,
+            "split_half_r": 0.7,
+            "n_pairs": 365,
+            "m50": 810,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.57,
+            "n_pairs_full_seasons": 239
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.27,
+            "r_team_controlled": 0.12
+          }
+        },
+        {
+          "id": "interceptions_90",
+          "display": "Interceptions",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 4,
+          "basis": "rate",
+          "explanation": "Opponent passes cut out per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.31,
+            "split_half_r": 0.59,
+            "n_pairs": 365,
+            "m50": 1310,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.52,
+            "n_pairs_full_seasons": 374
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.08,
+            "r_team_controlled": 0.09
+          }
+        },
+        {
+          "id": "clearances_90",
+          "display": "Clearances",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 5,
+          "basis": "rate",
+          "explanation": "Clearances per 90. Mostly says how much his team is under pressure, not how good he is.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.54,
+            "split_half_r": 0.74,
+            "n_pairs": 365,
+            "m50": 650,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.69,
+            "n_pairs_full_seasons": 374
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": -0.2,
+            "r_team_controlled": 0.01
+          }
+        },
+        {
+          "id": "blocks_90",
+          "display": "Blocks",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 6,
+          "basis": "rate",
+          "explanation": "Shots and passes blocked per 90. Mostly a sign of how much his team defends.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.38,
+            "split_half_r": 0.48,
+            "n_pairs": 365,
+            "m50": 2000,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.37,
+            "n_pairs_full_seasons": 26
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": -0.21,
+            "r_team_controlled": -0.04
+          }
+        },
+        {
+          "id": "long_balls_90",
+          "display": "Accurate long balls",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 7,
+          "basis": "rate",
+          "explanation": "Long passes that find a team-mate, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.61,
+            "split_half_r": 0.84,
+            "n_pairs": 365,
+            "m50": 360,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.65,
+            "n_pairs_full_seasons": 374
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.13,
+            "r_team_controlled": 0.12
+          }
+        },
+        {
+          "id": "prog_carries_90",
+          "display": "Progressive carries",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 8,
+          "basis": "rate",
+          "explanation": "Carries that move the ball well upfield, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.43,
+            "split_half_r": 0.65,
+            "n_pairs": 365,
+            "m50": 1000,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.2,
+            "r_team_controlled": 0.07
+          }
+        },
+        {
+          "id": "loss_per_100",
+          "display": "Possession lost per 100 touches",
+          "unit": "per 100 touches",
+          "direction": "lower",
+          "set": "secondary",
+          "order": 9,
+          "basis": "rate",
+          "explanation": "How often he gives the ball away for every 100 touches: ball security, whatever his volume.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.7,
+            "split_half_r": 0.9,
+            "n_pairs": 365,
+            "m50": 220,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.73,
+            "n_pairs_full_seasons": 374
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.2,
+            "r_team_controlled": 0.05
+          }
+        },
+        {
+          "id": "shot_creation_90",
+          "display": "Shots + key passes",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 10,
+          "basis": "rate",
+          "explanation": "Shots taken plus passes that led to a team-mate's shot, per 90: how often he ends or sets up an attack.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.54,
+            "split_half_r": 0.64,
+            "n_pairs": 365,
+            "m50": 1030,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.68,
+            "n_pairs_full_seasons": 374
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.39,
+            "r_team_controlled": 0.33
+          }
+        },
+        {
+          "id": "npxg_xa_90",
+          "display": "npxG + xA",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 11,
+          "basis": "rate",
+          "explanation": "Non-penalty expected goals plus expected assists per 90: the quality of the chances he takes and sets up.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.38,
+            "split_half_r": 0.43,
+            "n_pairs": 365,
+            "m50": 2510,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.5,
+            "n_pairs_full_seasons": 254
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.36,
+            "r_team_controlled": 0.27
+          }
+        },
+        {
+          "id": "on_npxgd_90",
+          "display": "Team xG difference with him on the pitch",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 12,
+          "basis": "rate",
+          "explanation": "His team's non-penalty xG minus the opponent's while he is on the pitch, per 90. Mostly measures his team, not him.",
+          "in_payload": false,
+          "reliability": {
+            "yoy_r": 0.55,
+            "split_half_r": 0.63,
+            "n_pairs": 313,
+            "m50": 1110,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.51,
+            "r_team_controlled": 0.06
+          },
+          "payload": "not in any payload (store-derived; see payload_changes)"
+        },
+        {
+          "id": "prog_dist_90",
+          "display": "Progressive distance",
+          "unit": "metres per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 13,
+          "basis": "rate",
+          "explanation": "Metres he moves the ball towards goal by passing and carrying, per 90 (Sofascore's total progression).",
+          "in_payload": false,
+          "reliability": {
+            "yoy_r": 0.48,
+            "split_half_r": 0.68,
+            "n_pairs": 365,
+            "m50": 890,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.26,
+            "r_team_controlled": 0.13
+          },
+          "payload": "not in any payload (store-derived; see payload_changes)"
+        }
+      ],
+      "similar": {
+        "features": [
+          "gar90",
+          "aerials_won_90",
+          "aerial_pct",
+          "padj_tkl_int_90",
+          "opp_half_passes_90",
+          "pass_pct",
+          "long_ball_pct",
+          "long_balls_90",
+          "clearances_90"
+        ],
+        "standardise": "z-score within group and season in the view (attacking rates in ADJUSTED_KEYS multiplied by the row's league factor first)",
+        "weights": "yoy_r floored at 0.2",
+        "weight_values": {
+          "gar90": 0.59,
+          "aerials_won_90": 0.59,
+          "aerial_pct": 0.33,
+          "padj_tkl_int_90": 0.49,
+          "opp_half_passes_90": 0.74,
+          "pass_pct": 0.68,
+          "long_ball_pct": 0.45,
+          "long_balls_90": 0.61,
+          "clearances_90": 0.54
+        },
+        "distance": "weighted euclidean",
+        "k": 5,
+        "constraints": "same group; candidates over the same minimum; one row per person; the player himself excluded"
+      }
+    },
+    {
+      "id": "fb",
+      "entity": "player",
+      "display": "Full-backs and wing-backs",
+      "peer_group": "role in {FB} (formation role, the one he starts in most); within competition and season on competition pages, pooled across the view's competitions with attacking rates league-adjusted in cross-competition views",
+      "position_field": "role",
+      "position_codes": [
+        "FB"
+      ],
+      "position_source": "data/value/lines.json `role` (per competition line) or data/value/players.json `role` (12 months), joined on player id. A coarse role (DF, MF, FW) means no formation start (substitute appearances only): such players are almost never over the minimum (none of 5,150 league lines with 900+ minutes lacked a fine role), so show no percentile card for them; list them under Sofascore's letter `position` (G, D, M, F). Do not map letters to fine groups: 40% of D-lettered regulars are full-backs, 45% of M-lettered are AM/W or wing-backs, 32% of F-lettered are wingers",
+      "minimum": {
+        "field": "minutes",
+        "value": 450,
+        "unit": "minutes",
+        "note": "and over the view's floor (players_live minutes_floor = 30% of the season's minutes; lab rows' floor). Flag 'small sample' under 900 minutes."
+      },
+      "basis": "per 90 minutes (ratios from summed numerators and denominators)",
+      "metrics": [
+        {
+          "id": "gar90",
+          "display": "Value added (GAR/90)",
+          "unit": "goals per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 1,
+          "basis": "rate",
+          "explanation": "Goals of expected goal difference a player adds per 90 minutes over a replacement-level player in his role, from the site's player value model (box score plus match rating).",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.62,
+            "split_half_r": 0.78,
+            "n_pairs": 311,
+            "m50": 520,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.62,
+            "r_team_controlled": 0.5
+          },
+          "payload": "data/value/lines.json rows (per competition line, join on id + comp) and data/value/players.json rows (last 365 days, join on id); numbers measured on the model's gross value per 90, whose order within a role and competition is the same"
+        },
+        {
+          "id": "rating",
+          "display": "Match rating",
+          "unit": "rating",
+          "direction": "higher",
+          "set": "headline",
+          "order": 2,
+          "basis": "rate",
+          "explanation": "Sofascore's 1-10 match rating, averaged over his matches and weighted by minutes.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.47,
+            "split_half_r": 0.55,
+            "n_pairs": 311,
+            "m50": 1480,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.5,
+            "n_pairs_full_seasons": 210
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.53,
+            "r_team_controlled": 0.41
+          }
+        },
+        {
+          "id": "npxg_xa_90",
+          "display": "npxG + xA",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 3,
+          "basis": "rate",
+          "explanation": "Non-penalty expected goals plus expected assists per 90: the quality of the chances he takes and sets up.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.6,
+            "split_half_r": 0.75,
+            "n_pairs": 311,
+            "m50": 610,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.57,
+            "n_pairs_full_seasons": 152
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.52,
+            "r_team_controlled": 0.42
+          }
+        },
+        {
+          "id": "key_passes_90",
+          "display": "Key passes",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 4,
+          "basis": "rate",
+          "explanation": "Passes that lead directly to a team-mate's shot, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.51,
+            "split_half_r": 0.74,
+            "n_pairs": 311,
+            "m50": 620,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.56,
+            "n_pairs_full_seasons": 210
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.37,
+            "r_team_controlled": 0.3
+          }
+        },
+        {
+          "id": "crosses_90",
+          "display": "Accurate crosses",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 5,
+          "basis": "rate",
+          "explanation": "Crosses that reach a team-mate, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.56,
+            "split_half_r": 0.82,
+            "n_pairs": 311,
+            "m50": 410,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.68,
+            "n_pairs_full_seasons": 210
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.18,
+            "r_team_controlled": 0.2
+          }
+        },
+        {
+          "id": "prog_actions_90",
+          "display": "Progressive carries + dribbles",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 6,
+          "basis": "rate",
+          "explanation": "Carries that move the ball well upfield plus successful take-ons, per 90: how much he moves the team forward with the ball at his feet.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.66,
+            "split_half_r": 0.86,
+            "n_pairs": 311,
+            "m50": 290,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.27,
+            "r_team_controlled": 0.22
+          }
+        },
+        {
+          "id": "opp_half_passes_90",
+          "display": "Passes in the opposition half",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 7,
+          "basis": "rate",
+          "explanation": "Completed passes in the opponent's half per 90: how much of his team's play in the attacking half goes through him.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.75,
+            "split_half_r": 0.88,
+            "n_pairs": 311,
+            "m50": 250,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.7,
+            "n_pairs_full_seasons": 210
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.39,
+            "r_team_controlled": 0.24
+          }
+        },
+        {
+          "id": "padj_tkl_int_90",
+          "display": "Tackles + interceptions (possession-adjusted)",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 8,
+          "basis": "rate",
+          "explanation": "Tackles plus interceptions per 90, scaled up for players whose team has the ball a lot (fewer chances to defend) and down for those who defend all game.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.49,
+            "split_half_r": 0.72,
+            "n_pairs": 311,
+            "m50": 710,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.29,
+            "r_team_controlled": 0.23
+          }
+        },
+        {
+          "id": "recoveries_90",
+          "display": "Ball recoveries",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 9,
+          "basis": "rate",
+          "explanation": "Loose balls he wins back for his team, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.6,
+            "split_half_r": 0.69,
+            "n_pairs": 311,
+            "m50": 820,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.57,
+            "n_pairs_full_seasons": 142
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.33,
+            "r_team_controlled": 0.29
+          }
+        },
+        {
+          "id": "xa_90",
+          "display": "Expected assists (xA)",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 1,
+          "basis": "rate",
+          "explanation": "The chance that each of his passes is turned into a goal, added up per 90: chances created, whatever the finish.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.52,
+            "split_half_r": 0.71,
+            "n_pairs": 311,
+            "m50": 750,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.53,
+            "n_pairs_full_seasons": 152
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.5,
+            "r_team_controlled": 0.41
+          }
+        },
+        {
+          "id": "shot_creation_90",
+          "display": "Shots + key passes",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 2,
+          "basis": "rate",
+          "explanation": "Shots taken plus passes that led to a team-mate's shot, per 90: how often he ends or sets up an attack.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.62,
+            "split_half_r": 0.8,
+            "n_pairs": 311,
+            "m50": 440,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.7,
+            "n_pairs_full_seasons": 210
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.47,
+            "r_team_controlled": 0.39
+          }
+        },
+        {
+          "id": "dribbles_90",
+          "display": "Dribbles completed",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 3,
+          "basis": "rate",
+          "explanation": "Successful take-ons per 90: beating a defender with the ball.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.58,
+            "split_half_r": 0.79,
+            "n_pairs": 311,
+            "m50": 480,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.72,
+            "n_pairs_full_seasons": 210
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.2,
+            "r_team_controlled": 0.17
+          }
+        },
+        {
+          "id": "prog_carries_90",
+          "display": "Progressive carries",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 4,
+          "basis": "rate",
+          "explanation": "Carries that move the ball well upfield, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.44,
+            "split_half_r": 0.76,
+            "n_pairs": 311,
+            "m50": 560,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.27,
+            "r_team_controlled": 0.2
+          }
+        },
+        {
+          "id": "pass_pct",
+          "display": "Pass completion",
+          "unit": "%",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 5,
+          "basis": "rate",
+          "explanation": "Share of his passes that find a team-mate. It also reflects how risky his passes are.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.73,
+            "split_half_r": 0.85,
+            "n_pairs": 311,
+            "m50": 310,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.68,
+            "n_pairs_full_seasons": 210
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.14,
+            "r_team_controlled": 0.05
+          }
+        },
+        {
+          "id": "duels_won_90",
+          "display": "Duels won",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 6,
+          "basis": "rate",
+          "explanation": "Ground and aerial duels won per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.63,
+            "split_half_r": 0.8,
+            "n_pairs": 311,
+            "m50": 450,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.74,
+            "n_pairs_full_seasons": 210
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.22,
+            "r_team_controlled": 0.22
+          }
+        },
+        {
+          "id": "duel_pct",
+          "display": "Duel success",
+          "unit": "%",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 7,
+          "basis": "rate",
+          "explanation": "Share of his ground and aerial duels that he wins.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.4,
+            "split_half_r": 0.45,
+            "n_pairs": 311,
+            "m50": 2210,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.53,
+            "n_pairs_full_seasons": 210
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.12,
+            "r_team_controlled": 0.08
+          }
+        },
+        {
+          "id": "aerials_won_90",
+          "display": "Aerial duels won",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 8,
+          "basis": "rate",
+          "explanation": "Headers won against an opponent per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.65,
+            "split_half_r": 0.81,
+            "n_pairs": 311,
+            "m50": 430,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.73,
+            "n_pairs_full_seasons": 210
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.15,
+            "r_team_controlled": 0.11
+          }
+        },
+        {
+          "id": "interceptions_90",
+          "display": "Interceptions",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 9,
+          "basis": "rate",
+          "explanation": "Opponent passes cut out per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.34,
+            "split_half_r": 0.54,
+            "n_pairs": 311,
+            "m50": 1520,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.44,
+            "n_pairs_full_seasons": 210
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.11,
+            "r_team_controlled": 0.15
+          }
+        },
+        {
+          "id": "loss_per_100",
+          "display": "Possession lost per 100 touches",
+          "unit": "per 100 touches",
+          "direction": "lower",
+          "set": "secondary",
+          "order": 10,
+          "basis": "rate",
+          "explanation": "How often he gives the ball away for every 100 touches: ball security, whatever his volume.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.74,
+            "split_half_r": 0.91,
+            "n_pairs": 311,
+            "m50": 180,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.73,
+            "n_pairs_full_seasons": 210
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.09,
+            "r_team_controlled": -0.02
+          }
+        },
+        {
+          "id": "hsr_km_90",
+          "display": "High-speed running",
+          "unit": "km per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 11,
+          "basis": "rate",
+          "explanation": "Distance covered at high speed and sprinting per 90 (not every league has tracking data).",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.52,
+            "split_half_r": 0.82,
+            "n_pairs": 253,
+            "m50": 400,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.2,
+            "r_team_controlled": 0.14
+          }
+        },
+        {
+          "id": "on_npxgd_90",
+          "display": "Team xG difference with him on the pitch",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 12,
+          "basis": "rate",
+          "explanation": "His team's non-penalty xG minus the opponent's while he is on the pitch, per 90. Mostly measures his team, not him.",
+          "in_payload": false,
+          "reliability": {
+            "yoy_r": 0.5,
+            "split_half_r": 0.65,
+            "n_pairs": 265,
+            "m50": 970,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.43,
+            "r_team_controlled": 0.1
+          },
+          "payload": "not in any payload (store-derived; see payload_changes)"
+        },
+        {
+          "id": "prog_dist_90",
+          "display": "Progressive distance",
+          "unit": "metres per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 13,
+          "basis": "rate",
+          "explanation": "Metres he moves the ball towards goal by passing and carrying, per 90 (Sofascore's total progression).",
+          "in_payload": false,
+          "reliability": {
+            "yoy_r": 0.4,
+            "split_half_r": 0.66,
+            "n_pairs": 311,
+            "m50": 940,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.28,
+            "r_team_controlled": 0.21
+          },
+          "payload": "not in any payload (store-derived; see payload_changes)"
+        }
+      ],
+      "similar": {
+        "features": [
+          "gar90",
+          "npxg_xa_90",
+          "key_passes_90",
+          "crosses_90",
+          "prog_actions_90",
+          "opp_half_passes_90",
+          "padj_tkl_int_90",
+          "recoveries_90",
+          "dribbles_90"
+        ],
+        "standardise": "z-score within group and season in the view (attacking rates in ADJUSTED_KEYS multiplied by the row's league factor first)",
+        "weights": "yoy_r floored at 0.2",
+        "weight_values": {
+          "gar90": 0.62,
+          "npxg_xa_90": 0.6,
+          "key_passes_90": 0.51,
+          "crosses_90": 0.56,
+          "prog_actions_90": 0.66,
+          "opp_half_passes_90": 0.75,
+          "padj_tkl_int_90": 0.49,
+          "recoveries_90": 0.6,
+          "dribbles_90": 0.58
+        },
+        "distance": "weighted euclidean",
+        "k": 5,
+        "constraints": "same group; candidates over the same minimum; one row per person; the player himself excluded"
+      }
+    },
+    {
+      "id": "dm_cm",
+      "entity": "player",
+      "display": "Defensive and central midfielders",
+      "peer_group": "role in {DM, CM} (formation role, the one he starts in most); within competition and season on competition pages, pooled across the view's competitions with attacking rates league-adjusted in cross-competition views",
+      "position_field": "role",
+      "position_codes": [
+        "DM",
+        "CM"
+      ],
+      "position_source": "data/value/lines.json `role` (per competition line) or data/value/players.json `role` (12 months), joined on player id. A coarse role (DF, MF, FW) means no formation start (substitute appearances only): such players are almost never over the minimum (none of 5,150 league lines with 900+ minutes lacked a fine role), so show no percentile card for them; list them under Sofascore's letter `position` (G, D, M, F). Do not map letters to fine groups: 40% of D-lettered regulars are full-backs, 45% of M-lettered are AM/W or wing-backs, 32% of F-lettered are wingers",
+      "minimum": {
+        "field": "minutes",
+        "value": 450,
+        "unit": "minutes",
+        "note": "and over the view's floor (players_live minutes_floor = 30% of the season's minutes; lab rows' floor). Flag 'small sample' under 900 minutes."
+      },
+      "basis": "per 90 minutes (ratios from summed numerators and denominators)",
+      "metrics": [
+        {
+          "id": "gar90",
+          "display": "Value added (GAR/90)",
+          "unit": "goals per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 1,
+          "basis": "rate",
+          "explanation": "Goals of expected goal difference a player adds per 90 minutes over a replacement-level player in his role, from the site's player value model (box score plus match rating).",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.72,
+            "split_half_r": 0.79,
+            "n_pairs": 345,
+            "m50": 460,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.72,
+            "r_team_controlled": 0.61
+          },
+          "payload": "data/value/lines.json rows (per competition line, join on id + comp) and data/value/players.json rows (last 365 days, join on id); numbers measured on the model's gross value per 90, whose order within a role and competition is the same"
+        },
+        {
+          "id": "rating",
+          "display": "Match rating",
+          "unit": "rating",
+          "direction": "higher",
+          "set": "headline",
+          "order": 2,
+          "basis": "rate",
+          "explanation": "Sofascore's 1-10 match rating, averaged over his matches and weighted by minutes.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.63,
+            "split_half_r": 0.73,
+            "n_pairs": 345,
+            "m50": 650,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.59,
+            "n_pairs_full_seasons": 378
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.65,
+            "r_team_controlled": 0.53
+          }
+        },
+        {
+          "id": "opp_half_passes_90",
+          "display": "Passes in the opposition half",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 3,
+          "basis": "rate",
+          "explanation": "Completed passes in the opponent's half per 90: how much of his team's play in the attacking half goes through him.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.8,
+            "split_half_r": 0.88,
+            "n_pairs": 345,
+            "m50": 240,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.81,
+            "n_pairs_full_seasons": 378
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.61,
+            "r_team_controlled": 0.49
+          }
+        },
+        {
+          "id": "long_balls_90",
+          "display": "Accurate long balls",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 4,
+          "basis": "rate",
+          "explanation": "Long passes that find a team-mate, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.77,
+            "split_half_r": 0.87,
+            "n_pairs": 345,
+            "m50": 270,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.73,
+            "n_pairs_full_seasons": 378
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.44,
+            "r_team_controlled": 0.41
+          }
+        },
+        {
+          "id": "npxg_xa_90",
+          "display": "npxG + xA",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 5,
+          "basis": "rate",
+          "explanation": "Non-penalty expected goals plus expected assists per 90: the quality of the chances he takes and sets up.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.74,
+            "split_half_r": 0.8,
+            "n_pairs": 345,
+            "m50": 450,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.83,
+            "n_pairs_full_seasons": 251
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.53,
+            "r_team_controlled": 0.42
+          }
+        },
+        {
+          "id": "key_passes_90",
+          "display": "Key passes",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 6,
+          "basis": "rate",
+          "explanation": "Passes that lead directly to a team-mate's shot, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.68,
+            "split_half_r": 0.8,
+            "n_pairs": 345,
+            "m50": 430,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.77,
+            "n_pairs_full_seasons": 378
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.59,
+            "r_team_controlled": 0.53
+          }
+        },
+        {
+          "id": "prog_actions_90",
+          "display": "Progressive carries + dribbles",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 7,
+          "basis": "rate",
+          "explanation": "Carries that move the ball well upfield plus successful take-ons, per 90: how much he moves the team forward with the ball at his feet.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.69,
+            "split_half_r": 0.82,
+            "n_pairs": 345,
+            "m50": 380,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.34,
+            "r_team_controlled": 0.31
+          }
+        },
+        {
+          "id": "padj_tkl_int_90",
+          "display": "Tackles + interceptions (possession-adjusted)",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 8,
+          "basis": "rate",
+          "explanation": "Tackles plus interceptions per 90, scaled up for players whose team has the ball a lot (fewer chances to defend) and down for those who defend all game.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.56,
+            "split_half_r": 0.78,
+            "n_pairs": 345,
+            "m50": 520,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.11,
+            "r_team_controlled": -0.05
+          }
+        },
+        {
+          "id": "recoveries_90",
+          "display": "Ball recoveries",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 9,
+          "basis": "rate",
+          "explanation": "Loose balls he wins back for his team, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.49,
+            "split_half_r": 0.7,
+            "n_pairs": 345,
+            "m50": 750,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.57,
+            "n_pairs_full_seasons": 239
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.28,
+            "r_team_controlled": 0.24
+          }
+        },
+        {
+          "id": "xa_90",
+          "display": "Expected assists (xA)",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 1,
+          "basis": "rate",
+          "explanation": "The chance that each of his passes is turned into a goal, added up per 90: chances created, whatever the finish.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.71,
+            "split_half_r": 0.78,
+            "n_pairs": 345,
+            "m50": 490,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.81,
+            "n_pairs_full_seasons": 251
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.64,
+            "r_team_controlled": 0.56
+          }
+        },
+        {
+          "id": "shot_creation_90",
+          "display": "Shots + key passes",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 2,
+          "basis": "rate",
+          "explanation": "Shots taken plus passes that led to a team-mate's shot, per 90: how often he ends or sets up an attack.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.75,
+            "split_half_r": 0.85,
+            "n_pairs": 345,
+            "m50": 320,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.8,
+            "n_pairs_full_seasons": 378
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.56,
+            "r_team_controlled": 0.49
+          }
+        },
+        {
+          "id": "passes_90",
+          "display": "Passes",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 3,
+          "basis": "rate",
+          "explanation": "Passes attempted per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.8,
+            "split_half_r": 0.93,
+            "n_pairs": 345,
+            "m50": 140,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.77,
+            "n_pairs_full_seasons": 378
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.55,
+            "r_team_controlled": 0.43
+          }
+        },
+        {
+          "id": "pass_pct",
+          "display": "Pass completion",
+          "unit": "%",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 4,
+          "basis": "rate",
+          "explanation": "Share of his passes that find a team-mate. It also reflects how risky his passes are.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.66,
+            "split_half_r": 0.87,
+            "n_pairs": 345,
+            "m50": 270,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.71,
+            "n_pairs_full_seasons": 378
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.11,
+            "r_team_controlled": 0.0
+          }
+        },
+        {
+          "id": "loss_per_100",
+          "display": "Possession lost per 100 touches",
+          "unit": "per 100 touches",
+          "direction": "lower",
+          "set": "secondary",
+          "order": 5,
+          "basis": "rate",
+          "explanation": "How often he gives the ball away for every 100 touches: ball security, whatever his volume.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.74,
+            "split_half_r": 0.91,
+            "n_pairs": 345,
+            "m50": 180,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.73,
+            "n_pairs_full_seasons": 378
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": -0.05,
+            "r_team_controlled": -0.15
+          }
+        },
+        {
+          "id": "carries_90",
+          "display": "Carries",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 6,
+          "basis": "rate",
+          "explanation": "Times he moves with the ball per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.6,
+            "split_half_r": 0.85,
+            "n_pairs": 345,
+            "m50": 320,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.46,
+            "r_team_controlled": 0.35
+          }
+        },
+        {
+          "id": "ball_wins_90",
+          "display": "Ball wins",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 7,
+          "basis": "rate",
+          "explanation": "Tackles won, interceptions and recoveries per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.52,
+            "split_half_r": 0.74,
+            "n_pairs": 345,
+            "m50": 620,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.63,
+            "n_pairs_full_seasons": 239
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.16,
+            "r_team_controlled": 0.13
+          }
+        },
+        {
+          "id": "interceptions_90",
+          "display": "Interceptions",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 8,
+          "basis": "rate",
+          "explanation": "Opponent passes cut out per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.52,
+            "split_half_r": 0.65,
+            "n_pairs": 345,
+            "m50": 970,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.56,
+            "n_pairs_full_seasons": 378
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": -0.13,
+            "r_team_controlled": -0.11
+          }
+        },
+        {
+          "id": "duels_won_90",
+          "display": "Duels won",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 9,
+          "basis": "rate",
+          "explanation": "Ground and aerial duels won per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.64,
+            "split_half_r": 0.79,
+            "n_pairs": 345,
+            "m50": 480,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.76,
+            "n_pairs_full_seasons": 378
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.08,
+            "r_team_controlled": 0.07
+          }
+        },
+        {
+          "id": "duel_pct",
+          "display": "Duel success",
+          "unit": "%",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 10,
+          "basis": "rate",
+          "explanation": "Share of his ground and aerial duels that he wins.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.31,
+            "split_half_r": 0.55,
+            "n_pairs": 345,
+            "m50": 1440,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.56,
+            "n_pairs_full_seasons": 378
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.06,
+            "r_team_controlled": -0.0
+          }
+        },
+        {
+          "id": "aerials_won_90",
+          "display": "Aerial duels won",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 11,
+          "basis": "rate",
+          "explanation": "Headers won against an opponent per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.59,
+            "split_half_r": 0.82,
+            "n_pairs": 345,
+            "m50": 380,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.8,
+            "n_pairs_full_seasons": 378
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": -0.07,
+            "r_team_controlled": -0.1
+          }
+        },
+        {
+          "id": "dribbles_90",
+          "display": "Dribbles completed",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 12,
+          "basis": "rate",
+          "explanation": "Successful take-ons per 90: beating a defender with the ball.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.62,
+            "split_half_r": 0.74,
+            "n_pairs": 345,
+            "m50": 630,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.65,
+            "n_pairs_full_seasons": 378
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.26,
+            "r_team_controlled": 0.26
+          }
+        },
+        {
+          "id": "on_npxgd_90",
+          "display": "Team xG difference with him on the pitch",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 13,
+          "basis": "rate",
+          "explanation": "His team's non-penalty xG minus the opponent's while he is on the pitch, per 90. Mostly measures his team, not him.",
+          "in_payload": false,
+          "reliability": {
+            "yoy_r": 0.54,
+            "split_half_r": 0.61,
+            "n_pairs": 286,
+            "m50": 1150,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.48,
+            "r_team_controlled": 0.13
+          },
+          "payload": "not in any payload (store-derived; see payload_changes)"
+        },
+        {
+          "id": "prog_dist_90",
+          "display": "Progressive distance",
+          "unit": "metres per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 14,
+          "basis": "rate",
+          "explanation": "Metres he moves the ball towards goal by passing and carrying, per 90 (Sofascore's total progression).",
+          "in_payload": false,
+          "reliability": {
+            "yoy_r": 0.51,
+            "split_half_r": 0.72,
+            "n_pairs": 345,
+            "m50": 690,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season value per 90 (the site's player value model)",
+            "r": 0.37,
+            "r_team_controlled": 0.32
+          },
+          "payload": "not in any payload (store-derived; see payload_changes)"
+        }
+      ],
+      "similar": {
+        "features": [
+          "gar90",
+          "opp_half_passes_90",
+          "long_balls_90",
+          "npxg_xa_90",
+          "key_passes_90",
+          "prog_actions_90",
+          "padj_tkl_int_90",
+          "recoveries_90",
+          "pass_pct",
+          "aerials_won_90"
+        ],
+        "standardise": "z-score within group and season in the view (attacking rates in ADJUSTED_KEYS multiplied by the row's league factor first)",
+        "weights": "yoy_r floored at 0.2",
+        "weight_values": {
+          "gar90": 0.72,
+          "opp_half_passes_90": 0.8,
+          "long_balls_90": 0.77,
+          "npxg_xa_90": 0.74,
+          "key_passes_90": 0.68,
+          "prog_actions_90": 0.69,
+          "padj_tkl_int_90": 0.56,
+          "recoveries_90": 0.49,
+          "pass_pct": 0.66,
+          "aerials_won_90": 0.59
+        },
+        "distance": "weighted euclidean",
+        "k": 5,
+        "constraints": "same group; candidates over the same minimum; one row per person; the player himself excluded"
+      }
+    },
+    {
+      "id": "am_w",
+      "entity": "player",
+      "display": "Attacking midfielders and wingers",
+      "peer_group": "role in {AM, W} (formation role, the one he starts in most); within competition and season on competition pages, pooled across the view's competitions with attacking rates league-adjusted in cross-competition views",
+      "position_field": "role",
+      "position_codes": [
+        "AM",
+        "W"
+      ],
+      "position_source": "data/value/lines.json `role` (per competition line) or data/value/players.json `role` (12 months), joined on player id. A coarse role (DF, MF, FW) means no formation start (substitute appearances only): such players are almost never over the minimum (none of 5,150 league lines with 900+ minutes lacked a fine role), so show no percentile card for them; list them under Sofascore's letter `position` (G, D, M, F). Do not map letters to fine groups: 40% of D-lettered regulars are full-backs, 45% of M-lettered are AM/W or wing-backs, 32% of F-lettered are wingers",
+      "minimum": {
+        "field": "minutes",
+        "value": 450,
+        "unit": "minutes",
+        "note": "and over the view's floor (players_live minutes_floor = 30% of the season's minutes; lab rows' floor). Flag 'small sample' under 900 minutes."
+      },
+      "basis": "per 90 minutes (ratios from summed numerators and denominators)",
+      "metrics": [
+        {
+          "id": "npxg_xa_90",
+          "display": "npxG + xA",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 1,
+          "basis": "rate",
+          "explanation": "Non-penalty expected goals plus expected assists per 90: the quality of the chances he takes and sets up.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.48,
+            "split_half_r": 0.67,
+            "n_pairs": 293,
+            "m50": 850,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.64,
+            "n_pairs_full_seasons": 247
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.48,
+            "r_team_controlled": 0.32
+          }
+        },
+        {
+          "id": "gar90",
+          "display": "Value added (GAR/90)",
+          "unit": "goals per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 2,
+          "basis": "rate",
+          "explanation": "Goals of expected goal difference a player adds per 90 minutes over a replacement-level player in his role, from the site's player value model (box score plus match rating).",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.64,
+            "split_half_r": 0.77,
+            "n_pairs": 293,
+            "m50": 520,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.5,
+            "r_team_controlled": 0.33
+          },
+          "payload": "data/value/lines.json rows (per competition line, join on id + comp) and data/value/players.json rows (last 365 days, join on id); numbers measured on the model's gross value per 90, whose order within a role and competition is the same"
+        },
+        {
+          "id": "rating",
+          "display": "Match rating",
+          "unit": "rating",
+          "direction": "higher",
+          "set": "headline",
+          "order": 3,
+          "basis": "rate",
+          "explanation": "Sofascore's 1-10 match rating, averaged over his matches and weighted by minutes.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.51,
+            "split_half_r": 0.68,
+            "n_pairs": 293,
+            "m50": 800,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.57,
+            "n_pairs_full_seasons": 356
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.41,
+            "r_team_controlled": 0.24
+          }
+        },
+        {
+          "id": "npxg_90",
+          "display": "Non-penalty xG",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 4,
+          "basis": "rate",
+          "explanation": "Expected goals from his own shots per 90, penalties left out: how good his chances are, and how many he gets.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.45,
+            "split_half_r": 0.61,
+            "n_pairs": 293,
+            "m50": 1080,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.61,
+            "n_pairs_full_seasons": 247
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.37,
+            "r_team_controlled": 0.26
+          }
+        },
+        {
+          "id": "xa_90",
+          "display": "Expected assists (xA)",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 5,
+          "basis": "rate",
+          "explanation": "The chance that each of his passes is turned into a goal, added up per 90: chances created, whatever the finish.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.42,
+            "split_half_r": 0.71,
+            "n_pairs": 293,
+            "m50": 700,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.57,
+            "n_pairs_full_seasons": 247
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.35,
+            "r_team_controlled": 0.17
+          }
+        },
+        {
+          "id": "shot_creation_90",
+          "display": "Shots + key passes",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 6,
+          "basis": "rate",
+          "explanation": "Shots taken plus passes that led to a team-mate's shot, per 90: how often he ends or sets up an attack.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.67,
+            "split_half_r": 0.76,
+            "n_pairs": 293,
+            "m50": 530,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.68,
+            "n_pairs_full_seasons": 356
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.53,
+            "r_team_controlled": 0.4
+          }
+        },
+        {
+          "id": "dribbles_90",
+          "display": "Dribbles completed",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 7,
+          "basis": "rate",
+          "explanation": "Successful take-ons per 90: beating a defender with the ball.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.68,
+            "split_half_r": 0.81,
+            "n_pairs": 293,
+            "m50": 400,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.76,
+            "n_pairs_full_seasons": 356
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.24,
+            "r_team_controlled": 0.18
+          }
+        },
+        {
+          "id": "opp_half_passes_90",
+          "display": "Passes in the opposition half",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 8,
+          "basis": "rate",
+          "explanation": "Completed passes in the opponent's half per 90: how much of his team's play in the attacking half goes through him.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.79,
+            "split_half_r": 0.93,
+            "n_pairs": 293,
+            "m50": 130,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.79,
+            "n_pairs_full_seasons": 356
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.37,
+            "r_team_controlled": 0.25
+          }
+        },
+        {
+          "id": "key_passes_90",
+          "display": "Key passes",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 1,
+          "basis": "rate",
+          "explanation": "Passes that lead directly to a team-mate's shot, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.57,
+            "split_half_r": 0.76,
+            "n_pairs": 293,
+            "m50": 550,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.59,
+            "n_pairs_full_seasons": 356
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.39,
+            "r_team_controlled": 0.25
+          }
+        },
+        {
+          "id": "big_chances_90",
+          "display": "Big chances created",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 2,
+          "basis": "rate",
+          "explanation": "Passes that set up a chance a player would be expected to score, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.22,
+            "split_half_r": 0.45,
+            "n_pairs": 293,
+            "m50": 2110,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.43,
+            "n_pairs_full_seasons": 356
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.26,
+            "r_team_controlled": 0.11
+          }
+        },
+        {
+          "id": "shots_90",
+          "display": "Shots",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 3,
+          "basis": "rate",
+          "explanation": "Shots of any kind per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.63,
+            "split_half_r": 0.74,
+            "n_pairs": 293,
+            "m50": 580,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.68,
+            "n_pairs_full_seasons": 356
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.44,
+            "r_team_controlled": 0.33
+          }
+        },
+        {
+          "id": "ga_90",
+          "display": "Goals + assists",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 4,
+          "basis": "rate",
+          "explanation": "Goals plus assists per 90 minutes, penalties included.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.29,
+            "split_half_r": 0.43,
+            "n_pairs": 293,
+            "m50": 2200,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.45,
+            "n_pairs_full_seasons": 356
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.41,
+            "r_team_controlled": 0.3
+          }
+        },
+        {
+          "id": "prog_actions_90",
+          "display": "Progressive carries + dribbles",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 5,
+          "basis": "rate",
+          "explanation": "Carries that move the ball well upfield plus successful take-ons, per 90: how much he moves the team forward with the ball at his feet.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.73,
+            "split_half_r": 0.88,
+            "n_pairs": 293,
+            "m50": 240,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.22,
+            "r_team_controlled": 0.14
+          }
+        },
+        {
+          "id": "crosses_90",
+          "display": "Accurate crosses",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 6,
+          "basis": "rate",
+          "explanation": "Crosses that reach a team-mate, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.66,
+            "split_half_r": 0.84,
+            "n_pairs": 293,
+            "m50": 320,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.58,
+            "n_pairs_full_seasons": 356
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.14,
+            "r_team_controlled": 0.05
+          }
+        },
+        {
+          "id": "dribble_pct",
+          "display": "Dribble success",
+          "unit": "%",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 7,
+          "basis": "rate",
+          "explanation": "Share of his take-ons that succeed. Too noisy in one season to rank on.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.12,
+            "split_half_r": 0.23,
+            "n_pairs": 293,
+            "m50": 5500,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.27,
+            "n_pairs_full_seasons": 356
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.16,
+            "r_team_controlled": 0.12
+          }
+        },
+        {
+          "id": "touches_90",
+          "display": "Touches",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 8,
+          "basis": "rate",
+          "explanation": "Touches of the ball per 90: how involved he is.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.79,
+            "split_half_r": 0.93,
+            "n_pairs": 293,
+            "m50": 120,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.77,
+            "n_pairs_full_seasons": 356
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.37,
+            "r_team_controlled": 0.25
+          }
+        },
+        {
+          "id": "recoveries_90",
+          "display": "Ball recoveries",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 9,
+          "basis": "rate",
+          "explanation": "Loose balls he wins back for his team, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.42,
+            "split_half_r": 0.65,
+            "n_pairs": 293,
+            "m50": 910,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.59,
+            "n_pairs_full_seasons": 227
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": -0.05,
+            "r_team_controlled": -0.0
+          }
+        },
+        {
+          "id": "padj_tkl_int_90",
+          "display": "Tackles + interceptions (possession-adjusted)",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 10,
+          "basis": "rate",
+          "explanation": "Tackles plus interceptions per 90, scaled up for players whose team has the ball a lot (fewer chances to defend) and down for those who defend all game.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.54,
+            "split_half_r": 0.76,
+            "n_pairs": 293,
+            "m50": 540,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": -0.01,
+            "r_team_controlled": -0.05
+          }
+        },
+        {
+          "id": "loss_per_100",
+          "display": "Possession lost per 100 touches",
+          "unit": "per 100 touches",
+          "direction": "lower",
+          "set": "secondary",
+          "order": 11,
+          "basis": "rate",
+          "explanation": "How often he gives the ball away for every 100 touches: ball security, whatever his volume.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.71,
+            "split_half_r": 0.88,
+            "n_pairs": 293,
+            "m50": 230,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.8,
+            "n_pairs_full_seasons": 356
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.1,
+            "r_team_controlled": 0.05
+          }
+        },
+        {
+          "id": "finishing",
+          "display": "Finishing (npG - npxG per shot)",
+          "unit": "goals per shot",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 12,
+          "basis": "rate",
+          "explanation": "Non-penalty goals minus non-penalty xG, per shot. Fun to look at, but in one season it is almost all luck: it does not carry over to the next.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": -0.04,
+            "split_half_r": 0.09,
+            "n_pairs": 293,
+            "m50": 17630,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.08,
+            "n_pairs_full_seasons": 247
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.04,
+            "r_team_controlled": 0.03
+          }
+        },
+        {
+          "id": "on_npxgd_90",
+          "display": "Team xG difference with him on the pitch",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 13,
+          "basis": "rate",
+          "explanation": "His team's non-penalty xG minus the opponent's while he is on the pitch, per 90. Mostly measures his team, not him.",
+          "in_payload": false,
+          "reliability": {
+            "yoy_r": 0.55,
+            "split_half_r": 0.64,
+            "n_pairs": 243,
+            "m50": 970,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.36,
+            "r_team_controlled": 0.03
+          },
+          "payload": "not in any payload (store-derived; see payload_changes)"
+        }
+      ],
+      "similar": {
+        "features": [
+          "npxg_xa_90",
+          "gar90",
+          "npxg_90",
+          "xa_90",
+          "shot_creation_90",
+          "dribbles_90",
+          "opp_half_passes_90",
+          "crosses_90",
+          "prog_actions_90"
+        ],
+        "standardise": "z-score within group and season in the view (attacking rates in ADJUSTED_KEYS multiplied by the row's league factor first)",
+        "weights": "yoy_r floored at 0.2",
+        "weight_values": {
+          "npxg_xa_90": 0.48,
+          "gar90": 0.64,
+          "npxg_90": 0.45,
+          "xa_90": 0.42,
+          "shot_creation_90": 0.67,
+          "dribbles_90": 0.68,
+          "opp_half_passes_90": 0.79,
+          "crosses_90": 0.66,
+          "prog_actions_90": 0.73
+        },
+        "distance": "weighted euclidean",
+        "k": 5,
+        "constraints": "same group; candidates over the same minimum; one row per person; the player himself excluded"
+      }
+    },
+    {
+      "id": "st",
+      "entity": "player",
+      "display": "Strikers",
+      "peer_group": "role in {ST} (formation role, the one he starts in most); within competition and season on competition pages, pooled across the view's competitions with attacking rates league-adjusted in cross-competition views",
+      "position_field": "role",
+      "position_codes": [
+        "ST"
+      ],
+      "position_source": "data/value/lines.json `role` (per competition line) or data/value/players.json `role` (12 months), joined on player id. A coarse role (DF, MF, FW) means no formation start (substitute appearances only): such players are almost never over the minimum (none of 5,150 league lines with 900+ minutes lacked a fine role), so show no percentile card for them; list them under Sofascore's letter `position` (G, D, M, F). Do not map letters to fine groups: 40% of D-lettered regulars are full-backs, 45% of M-lettered are AM/W or wing-backs, 32% of F-lettered are wingers",
+      "minimum": {
+        "field": "minutes",
+        "value": 450,
+        "unit": "minutes",
+        "note": "and over the view's floor (players_live minutes_floor = 30% of the season's minutes; lab rows' floor). Flag 'small sample' under 900 minutes."
+      },
+      "basis": "per 90 minutes (ratios from summed numerators and denominators)",
+      "metrics": [
+        {
+          "id": "npxg_xa_90",
+          "display": "npxG + xA",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 1,
+          "basis": "rate",
+          "explanation": "Non-penalty expected goals plus expected assists per 90: the quality of the chances he takes and sets up.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.52,
+            "split_half_r": 0.6,
+            "n_pairs": 143,
+            "m50": 1110,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.62,
+            "n_pairs_full_seasons": 97
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.52,
+            "r_team_controlled": 0.42
+          }
+        },
+        {
+          "id": "ga_90",
+          "display": "Goals + assists",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 2,
+          "basis": "rate",
+          "explanation": "Goals plus assists per 90 minutes, penalties included.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.45,
+            "split_half_r": 0.51,
+            "n_pairs": 143,
+            "m50": 1570,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.48,
+            "n_pairs_full_seasons": 139
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.55,
+            "r_team_controlled": 0.48
+          }
+        },
+        {
+          "id": "sot_90",
+          "display": "Shots on target",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 3,
+          "basis": "rate",
+          "explanation": "Shots that would have gone in without the goalkeeper, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.45,
+            "split_half_r": 0.59,
+            "n_pairs": 143,
+            "m50": 1160,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.45,
+            "n_pairs_full_seasons": 139
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.56,
+            "r_team_controlled": 0.49
+          }
+        },
+        {
+          "id": "shot_creation_90",
+          "display": "Shots + key passes",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 4,
+          "basis": "rate",
+          "explanation": "Shots taken plus passes that led to a team-mate's shot, per 90: how often he ends or sets up an attack.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.55,
+            "split_half_r": 0.72,
+            "n_pairs": 143,
+            "m50": 650,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.71,
+            "n_pairs_full_seasons": 139
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.49,
+            "r_team_controlled": 0.36
+          }
+        },
+        {
+          "id": "xa_90",
+          "display": "Expected assists (xA)",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 5,
+          "basis": "rate",
+          "explanation": "The chance that each of his passes is turned into a goal, added up per 90: chances created, whatever the finish.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.51,
+            "split_half_r": 0.67,
+            "n_pairs": 143,
+            "m50": 830,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.8,
+            "n_pairs_full_seasons": 97
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.33,
+            "r_team_controlled": 0.18
+          }
+        },
+        {
+          "id": "xg_per_shot",
+          "display": "xG per shot",
+          "unit": "xG",
+          "direction": "higher",
+          "set": "headline",
+          "order": 6,
+          "basis": "rate",
+          "explanation": "The average quality of his shots: high means he shoots from good positions.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.38,
+            "split_half_r": 0.51,
+            "n_pairs": 143,
+            "m50": 1620,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.47,
+            "n_pairs_full_seasons": 97
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.18,
+            "r_team_controlled": 0.15
+          }
+        },
+        {
+          "id": "gar90",
+          "display": "Value added (GAR/90)",
+          "unit": "goals per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 7,
+          "basis": "rate",
+          "explanation": "Goals of expected goal difference a player adds per 90 minutes over a replacement-level player in his role, from the site's player value model (box score plus match rating).",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.52,
+            "split_half_r": 0.71,
+            "n_pairs": 143,
+            "m50": 690,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.39,
+            "r_team_controlled": 0.22
+          },
+          "payload": "data/value/lines.json rows (per competition line, join on id + comp) and data/value/players.json rows (last 365 days, join on id); numbers measured on the model's gross value per 90, whose order within a role and competition is the same"
+        },
+        {
+          "id": "rating",
+          "display": "Match rating",
+          "unit": "rating",
+          "direction": "higher",
+          "set": "headline",
+          "order": 8,
+          "basis": "rate",
+          "explanation": "Sofascore's 1-10 match rating, averaged over his matches and weighted by minutes.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.42,
+            "split_half_r": 0.63,
+            "n_pairs": 143,
+            "m50": 960,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.61,
+            "n_pairs_full_seasons": 139
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.41,
+            "r_team_controlled": 0.31
+          }
+        },
+        {
+          "id": "npxg_90",
+          "display": "Non-penalty xG",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 1,
+          "basis": "rate",
+          "explanation": "Expected goals from his own shots per 90, penalties left out: how good his chances are, and how many he gets.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.48,
+            "split_half_r": 0.59,
+            "n_pairs": 143,
+            "m50": 1150,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.54,
+            "n_pairs_full_seasons": 97
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.47,
+            "r_team_controlled": 0.39
+          }
+        },
+        {
+          "id": "xgot_90",
+          "display": "xG on target (xGOT)",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 2,
+          "basis": "rate",
+          "explanation": "Expected goals of his shots on target, judged after the shot from where it was placed, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.48,
+            "split_half_r": 0.57,
+            "n_pairs": 143,
+            "m50": 1270,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.54,
+            "r_team_controlled": 0.46
+          }
+        },
+        {
+          "id": "goals_90",
+          "display": "Goals",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 3,
+          "basis": "rate",
+          "explanation": "Goals per 90, penalties included.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.42,
+            "split_half_r": 0.48,
+            "n_pairs": 143,
+            "m50": 1810,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.42,
+            "n_pairs_full_seasons": 139
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.51,
+            "r_team_controlled": 0.43
+          }
+        },
+        {
+          "id": "shots_90",
+          "display": "Shots",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 4,
+          "basis": "rate",
+          "explanation": "Shots of any kind per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.53,
+            "split_half_r": 0.68,
+            "n_pairs": 143,
+            "m50": 790,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.64,
+            "n_pairs_full_seasons": 139
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.48,
+            "r_team_controlled": 0.36
+          }
+        },
+        {
+          "id": "big_chances_90",
+          "display": "Big chances created",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 5,
+          "basis": "rate",
+          "explanation": "Passes that set up a chance a player would be expected to score, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.39,
+            "split_half_r": 0.42,
+            "n_pairs": 143,
+            "m50": 2320,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.54,
+            "n_pairs_full_seasons": 139
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.29,
+            "r_team_controlled": 0.14
+          }
+        },
+        {
+          "id": "key_passes_90",
+          "display": "Key passes",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 6,
+          "basis": "rate",
+          "explanation": "Passes that lead directly to a team-mate's shot, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.4,
+            "split_half_r": 0.69,
+            "n_pairs": 143,
+            "m50": 730,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.76,
+            "n_pairs_full_seasons": 139
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.23,
+            "r_team_controlled": 0.1
+          }
+        },
+        {
+          "id": "aerials_won_90",
+          "display": "Aerial duels won",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 7,
+          "basis": "rate",
+          "explanation": "Headers won against an opponent per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.69,
+            "split_half_r": 0.91,
+            "n_pairs": 143,
+            "m50": 170,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.81,
+            "n_pairs_full_seasons": 139
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": -0.27,
+            "r_team_controlled": -0.28
+          }
+        },
+        {
+          "id": "aerial_pct",
+          "display": "Aerial duel success",
+          "unit": "%",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 8,
+          "basis": "rate",
+          "explanation": "Share of his aerial duels that he wins.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.4,
+            "split_half_r": 0.51,
+            "n_pairs": 143,
+            "m50": 1570,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.44,
+            "n_pairs_full_seasons": 139
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.05,
+            "r_team_controlled": -0.11
+          }
+        },
+        {
+          "id": "duels_won_90",
+          "display": "Duels won",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 9,
+          "basis": "rate",
+          "explanation": "Ground and aerial duels won per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.67,
+            "split_half_r": 0.87,
+            "n_pairs": 143,
+            "m50": 260,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.74,
+            "n_pairs_full_seasons": 139
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": -0.26,
+            "r_team_controlled": -0.26
+          }
+        },
+        {
+          "id": "fouled_90",
+          "display": "Fouls won",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 10,
+          "basis": "rate",
+          "explanation": "Times he is fouled per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.54,
+            "split_half_r": 0.77,
+            "n_pairs": 143,
+            "m50": 510,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.65,
+            "n_pairs_full_seasons": 139
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": -0.18,
+            "r_team_controlled": -0.14
+          }
+        },
+        {
+          "id": "touches_90",
+          "display": "Touches",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 11,
+          "basis": "rate",
+          "explanation": "Touches of the ball per 90: how involved he is.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.76,
+            "split_half_r": 0.94,
+            "n_pairs": 143,
+            "m50": 120,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.88,
+            "n_pairs_full_seasons": 139
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.09,
+            "r_team_controlled": 0.0
+          }
+        },
+        {
+          "id": "finishing",
+          "display": "Finishing (npG - npxG per shot)",
+          "unit": "goals per shot",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 12,
+          "basis": "rate",
+          "explanation": "Non-penalty goals minus non-penalty xG, per shot. Fun to look at, but in one season it is almost all luck: it does not carry over to the next.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.07,
+            "split_half_r": 0.01,
+            "n_pairs": 143,
+            "m50": null,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.04,
+            "n_pairs_full_seasons": 97
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.15,
+            "r_team_controlled": 0.16
+          }
+        },
+        {
+          "id": "g_minus_xg",
+          "display": "Goals - xG",
+          "unit": "goals",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 13,
+          "basis": "count",
+          "explanation": "Goals minus expected goals. Mostly luck in one season.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.01,
+            "split_half_r": 0.14,
+            "n_pairs": 143,
+            "m50": 10670,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.2,
+            "r_team_controlled": 0.17
+          }
+        },
+        {
+          "id": "on_npxgd_90",
+          "display": "Team xG difference with him on the pitch",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 14,
+          "basis": "rate",
+          "explanation": "His team's non-penalty xG minus the opponent's while he is on the pitch, per 90. Mostly measures his team, not him.",
+          "in_payload": false,
+          "reliability": {
+            "yoy_r": 0.49,
+            "split_half_r": 0.62,
+            "n_pairs": 117,
+            "m50": 1020,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season npxG + xA per 90",
+            "r": 0.47,
+            "r_team_controlled": 0.2
+          },
+          "payload": "not in any payload (store-derived; see payload_changes)"
+        }
+      ],
+      "similar": {
+        "features": [
+          "npxg_xa_90",
+          "ga_90",
+          "sot_90",
+          "shot_creation_90",
+          "xa_90",
+          "xg_per_shot",
+          "gar90",
+          "aerials_won_90",
+          "touches_90"
+        ],
+        "standardise": "z-score within group and season in the view (attacking rates in ADJUSTED_KEYS multiplied by the row's league factor first)",
+        "weights": "yoy_r floored at 0.2",
+        "weight_values": {
+          "npxg_xa_90": 0.52,
+          "ga_90": 0.45,
+          "sot_90": 0.45,
+          "shot_creation_90": 0.55,
+          "xa_90": 0.51,
+          "xg_per_shot": 0.38,
+          "gar90": 0.52,
+          "aerials_won_90": 0.69,
+          "touches_90": 0.76
+        },
+        "distance": "weighted euclidean",
+        "k": 5,
+        "constraints": "same group; candidates over the same minimum; one row per person; the player himself excluded"
+      }
+    },
+    {
+      "id": "gk",
+      "entity": "player",
+      "display": "Goalkeepers",
+      "peer_group": "role in {GK} (formation role, the one he starts in most); within competition and season on competition pages, pooled across the view's competitions with attacking rates league-adjusted in cross-competition views",
+      "position_field": "role",
+      "position_codes": [
+        "GK"
+      ],
+      "position_source": "data/value/lines.json `role` (per competition line) or data/value/players.json `role` (12 months), joined on player id. A coarse role (DF, MF, FW) means no formation start (substitute appearances only): such players are almost never over the minimum (none of 5,150 league lines with 900+ minutes lacked a fine role), so show no percentile card for them; list them under Sofascore's letter `position` (G, D, M, F). Do not map letters to fine groups: 40% of D-lettered regulars are full-backs, 45% of M-lettered are AM/W or wing-backs, 32% of F-lettered are wingers",
+      "minimum": {
+        "field": "minutes",
+        "value": 900,
+        "unit": "minutes",
+        "note": "and over the view's floor (players_live minutes_floor, lab floor). Shot-stopping (goals prevented, save %) needs far more: show those on the last-365-days window and flag under 1,800 minutes."
+      },
+      "basis": "per 90 minutes (ratios from summed numerators and denominators)",
+      "metrics": [
+        {
+          "id": "goals_prevented_90",
+          "display": "Goals prevented",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 1,
+          "basis": "rate",
+          "explanation": "Expected goals on target faced minus goals conceded, per 90: shot-stopping above or below an average keeper. Takes several seasons to separate skill from luck.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.06,
+            "split_half_r": 0.09,
+            "n_pairs": 171,
+            "m50": null,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season goals prevented per 90",
+            "r": 0.06,
+            "r_team_controlled": 0.07
+          }
+        },
+        {
+          "id": "save_pct",
+          "display": "Save percentage",
+          "unit": "%",
+          "direction": "higher",
+          "set": "headline",
+          "order": 2,
+          "basis": "rate",
+          "explanation": "Share of shots on target he saves. Depends on the shots he faces; noisy within a season.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.05,
+            "split_half_r": -0.0,
+            "n_pairs": 171,
+            "m50": null,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.09,
+            "n_pairs_full_seasons": 248
+          },
+          "predictive": {
+            "target": "next-season goals prevented per 90",
+            "r": 0.06,
+            "r_team_controlled": 0.04
+          }
+        },
+        {
+          "id": "high_claims_90",
+          "display": "High claims",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 3,
+          "basis": "rate",
+          "explanation": "Crosses and high balls caught or punched clear per 90: commanding the box.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.45,
+            "split_half_r": 0.58,
+            "n_pairs": 171,
+            "m50": 1570,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.55,
+            "n_pairs_full_seasons": 248
+          },
+          "predictive": {
+            "target": "next-season goals prevented per 90",
+            "r": -0.02,
+            "r_team_controlled": -0.03
+          }
+        },
+        {
+          "id": "sweeper_90",
+          "display": "Sweeper actions",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 4,
+          "basis": "rate",
+          "explanation": "Times he comes off his line to deal with a ball behind the defence, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.51,
+            "split_half_r": 0.62,
+            "n_pairs": 171,
+            "m50": 1330,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.23,
+            "n_pairs_full_seasons": 248
+          },
+          "predictive": {
+            "target": "next-season goals prevented per 90",
+            "r": 0.05,
+            "r_team_controlled": 0.01
+          }
+        },
+        {
+          "id": "pass_pct",
+          "display": "Pass completion",
+          "unit": "%",
+          "direction": "higher",
+          "set": "headline",
+          "order": 5,
+          "basis": "rate",
+          "explanation": "Share of his passes that find a team-mate. It also reflects how risky his passes are.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.6,
+            "split_half_r": 0.87,
+            "n_pairs": 171,
+            "m50": 320,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.68,
+            "n_pairs_full_seasons": 248
+          },
+          "predictive": {
+            "target": "next-season goals prevented per 90",
+            "r": 0.06,
+            "r_team_controlled": 0.04
+          }
+        },
+        {
+          "id": "long_ball_pct",
+          "display": "Long-ball accuracy",
+          "unit": "%",
+          "direction": "higher",
+          "set": "headline",
+          "order": 6,
+          "basis": "rate",
+          "explanation": "Share of his long passes that find a team-mate.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.35,
+            "split_half_r": 0.7,
+            "n_pairs": 171,
+            "m50": 940,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.58,
+            "n_pairs_full_seasons": 248
+          },
+          "predictive": {
+            "target": "next-season goals prevented per 90",
+            "r": 0.1,
+            "r_team_controlled": 0.1
+          }
+        },
+        {
+          "id": "passes_90",
+          "display": "Passes",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 7,
+          "basis": "rate",
+          "explanation": "Passes attempted per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.59,
+            "split_half_r": 0.89,
+            "n_pairs": 171,
+            "m50": 260,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.52,
+            "n_pairs_full_seasons": 248
+          },
+          "predictive": {
+            "target": "next-season goals prevented per 90",
+            "r": 0.06,
+            "r_team_controlled": 0.11
+          }
+        },
+        {
+          "id": "gar90",
+          "display": "Value added (GAR/90)",
+          "unit": "goals per 90",
+          "direction": "higher",
+          "set": "headline",
+          "order": 8,
+          "basis": "rate",
+          "explanation": "Goals of expected goal difference a player adds per 90 minutes over a replacement-level player in his role, from the site's player value model (box score plus match rating).",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.11,
+            "split_half_r": 0.2,
+            "n_pairs": 171,
+            "m50": 8690,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": null,
+            "n_pairs_full_seasons": null
+          },
+          "predictive": {
+            "target": "next-season goals prevented per 90",
+            "r": 0.12,
+            "r_team_controlled": 0.12
+          },
+          "payload": "data/value/lines.json rows (per competition line, join on id + comp) and data/value/players.json rows (last 365 days, join on id); numbers measured on the model's gross value per 90, whose order within a role and competition is the same"
+        },
+        {
+          "id": "saves_90",
+          "display": "Saves",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 1,
+          "basis": "rate",
+          "explanation": "Saves per 90. Mostly says how busy his defence leaves him.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.29,
+            "split_half_r": 0.48,
+            "n_pairs": 171,
+            "m50": 2380,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.34,
+            "n_pairs_full_seasons": 248
+          },
+          "predictive": {
+            "target": "next-season goals prevented per 90",
+            "r": -0.08,
+            "r_team_controlled": -0.06
+          }
+        },
+        {
+          "id": "conceded_90",
+          "display": "Goals conceded",
+          "unit": "per 90",
+          "direction": "lower",
+          "set": "secondary",
+          "order": 2,
+          "basis": "rate",
+          "explanation": "Goals conceded per 90. Mostly about the team in front of him.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.35,
+            "split_half_r": 0.45,
+            "n_pairs": 171,
+            "m50": 2720,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.37,
+            "n_pairs_full_seasons": 250
+          },
+          "predictive": {
+            "target": "next-season goals prevented per 90",
+            "r": 0.11,
+            "r_team_controlled": 0.07
+          }
+        },
+        {
+          "id": "long_balls_90",
+          "display": "Accurate long balls",
+          "unit": "per 90",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 3,
+          "basis": "rate",
+          "explanation": "Long passes that find a team-mate, per 90.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.63,
+            "split_half_r": 0.84,
+            "n_pairs": 171,
+            "m50": 430,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.56,
+            "n_pairs_full_seasons": 248
+          },
+          "predictive": {
+            "target": "next-season goals prevented per 90",
+            "r": 0.06,
+            "r_team_controlled": 0.12
+          }
+        },
+        {
+          "id": "rating",
+          "display": "Match rating",
+          "unit": "rating",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 4,
+          "basis": "rate",
+          "explanation": "Sofascore's 1-10 match rating, averaged over his matches and weighted by minutes.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.05,
+            "split_half_r": 0.13,
+            "n_pairs": 171,
+            "m50": 14820,
+            "m50_unit": "minutes",
+            "yoy_r_full_seasons": 0.13,
+            "n_pairs_full_seasons": 248
+          },
+          "predictive": {
+            "target": "next-season goals prevented per 90",
+            "r": 0.11,
+            "r_team_controlled": 0.13
+          }
+        }
+      ],
+      "similar": {
+        "features": [
+          "goals_prevented_90",
+          "save_pct",
+          "high_claims_90",
+          "sweeper_90",
+          "pass_pct",
+          "long_ball_pct",
+          "passes_90",
+          "gar90",
+          "long_balls_90"
+        ],
+        "standardise": "z-score within group and season in the view (attacking rates in ADJUSTED_KEYS multiplied by the row's league factor first)",
+        "weights": "yoy_r floored at 0.2",
+        "weight_values": {
+          "goals_prevented_90": 0.2,
+          "save_pct": 0.2,
+          "high_claims_90": 0.45,
+          "sweeper_90": 0.51,
+          "pass_pct": 0.6,
+          "long_ball_pct": 0.35,
+          "passes_90": 0.59,
+          "gar90": 0.2,
+          "long_balls_90": 0.63
+        },
+        "distance": "weighted euclidean",
+        "k": 5,
+        "constraints": "same group; candidates over the same minimum; one row per person; the player himself excluded"
+      }
+    },
+    {
+      "id": "clubs",
+      "entity": "team",
+      "display": "Clubs",
+      "peer_group": "clubs of the same competition and season (league stage)",
+      "position_field": null,
+      "position_codes": [],
+      "minimum": {
+        "field": "played",
+        "value": 5,
+        "unit": "matches",
+        "note": "flag under 10 matches: xG difference reaches r = 0.5 between halves after about 9 matches"
+      },
+      "basis": "per match (ratios from summed numerators and denominators)",
+      "metrics": [
+        {
+          "id": "xg_diff",
+          "display": "xG difference",
+          "unit": "per match",
+          "direction": "higher",
+          "set": "headline",
+          "order": 1,
+          "basis": "rate",
+          "explanation": "Expected goals for minus against per match: the underlying margin, the best single guide to future results.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.67,
+            "split_half_r": 0.66,
+            "n_pairs": 310,
+            "m50": 8.7,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.57,
+            "r_second_half_goal_diff": 0.62,
+            "r_next_season_ppg": 0.6
+          }
+        },
+        {
+          "id": "xg_for",
+          "display": "xG for",
+          "unit": "per match",
+          "direction": "higher",
+          "set": "headline",
+          "order": 2,
+          "basis": "rate",
+          "explanation": "Expected goals created per match.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.58,
+            "split_half_r": 0.61,
+            "n_pairs": 310,
+            "m50": 10.9,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.51,
+            "r_second_half_goal_diff": 0.54,
+            "r_next_season_ppg": 0.55
+          }
+        },
+        {
+          "id": "xg_against",
+          "display": "xG against",
+          "unit": "per match",
+          "direction": "lower",
+          "set": "headline",
+          "order": 3,
+          "basis": "rate",
+          "explanation": "Expected goals conceded per match.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.49,
+            "split_half_r": 0.51,
+            "n_pairs": 310,
+            "m50": 16.6,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.51,
+            "r_second_half_goal_diff": 0.56,
+            "r_next_season_ppg": 0.52
+          }
+        },
+        {
+          "id": "sot_diff",
+          "display": "Shots on target difference",
+          "unit": "per match",
+          "direction": "higher",
+          "set": "headline",
+          "order": 4,
+          "basis": "rate",
+          "explanation": "Shots on target for minus against per match: as stable as xG difference and about as predictive, with no model behind it.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.71,
+            "split_half_r": 0.68,
+            "n_pairs": 332,
+            "m50": 8.0,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.56,
+            "r_second_half_goal_diff": 0.62,
+            "r_next_season_ppg": 0.6
+          }
+        },
+        {
+          "id": "field_tilt",
+          "display": "Field tilt",
+          "unit": "%",
+          "direction": "higher",
+          "set": "headline",
+          "order": 5,
+          "basis": "rate",
+          "explanation": "Touches in the opponent's box as a share of touches in both boxes: which end the game is played in.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.71,
+            "split_half_r": 0.7,
+            "n_pairs": 332,
+            "m50": 7.3,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.54,
+            "r_second_half_goal_diff": 0.59,
+            "r_next_season_ppg": 0.57
+          }
+        },
+        {
+          "id": "big_chances",
+          "display": "Big chances",
+          "unit": "per match",
+          "direction": "higher",
+          "set": "headline",
+          "order": 6,
+          "basis": "rate",
+          "explanation": "Chances a player would be expected to score, created per match.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.51,
+            "split_half_r": 0.56,
+            "n_pairs": 332,
+            "m50": 13.2,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.51,
+            "r_second_half_goal_diff": 0.54,
+            "r_next_season_ppg": 0.48
+          }
+        },
+        {
+          "id": "possession",
+          "display": "Possession",
+          "unit": "%",
+          "direction": "higher",
+          "set": "headline",
+          "order": 7,
+          "basis": "rate",
+          "explanation": "Share of the ball. A style marker more than a quality one, but stable.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.76,
+            "split_half_r": 0.8,
+            "n_pairs": 332,
+            "m50": 4.1,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.48,
+            "r_second_half_goal_diff": 0.52,
+            "r_next_season_ppg": 0.47
+          }
+        },
+        {
+          "id": "ppda",
+          "display": "PPDA (pressing)",
+          "unit": "passes",
+          "direction": "lower",
+          "set": "headline",
+          "order": 8,
+          "basis": "rate",
+          "explanation": "Opponent passes per tackle, interception or foul: low means the team presses high.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.52,
+            "split_half_r": 0.6,
+            "n_pairs": 332,
+            "m50": 11.1,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.28,
+            "r_second_half_goal_diff": 0.32,
+            "r_next_season_ppg": 0.25
+          }
+        },
+        {
+          "id": "xpts_per_match",
+          "display": "Expected points",
+          "unit": "per match",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 1,
+          "basis": "rate",
+          "explanation": "Points per match the team's chances were worth. Nearly identical to xG difference.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.68,
+            "split_half_r": 0.66,
+            "n_pairs": 310,
+            "m50": 8.8,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.58,
+            "r_second_half_goal_diff": 0.63,
+            "r_next_season_ppg": 0.6
+          }
+        },
+        {
+          "id": "goals_for",
+          "display": "Goals for",
+          "unit": "per match",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 2,
+          "basis": "rate",
+          "explanation": "Goals scored per match.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.6,
+            "split_half_r": 0.58,
+            "n_pairs": 332,
+            "m50": 12.4,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.56,
+            "r_second_half_goal_diff": 0.57,
+            "r_next_season_ppg": 0.54
+          }
+        },
+        {
+          "id": "goals_against",
+          "display": "Goals against",
+          "unit": "per match",
+          "direction": "lower",
+          "set": "secondary",
+          "order": 3,
+          "basis": "rate",
+          "explanation": "Goals conceded per match.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.38,
+            "split_half_r": 0.41,
+            "n_pairs": 332,
+            "m50": 24.8,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.44,
+            "r_second_half_goal_diff": 0.48,
+            "r_next_season_ppg": 0.48
+          }
+        },
+        {
+          "id": "shots",
+          "display": "Shots",
+          "unit": "per match",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 4,
+          "basis": "rate",
+          "explanation": "Shots per match.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.62,
+            "split_half_r": 0.62,
+            "n_pairs": 332,
+            "m50": 10.3,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.49,
+            "r_second_half_goal_diff": 0.53,
+            "r_next_season_ppg": 0.51
+          }
+        },
+        {
+          "id": "shots_against",
+          "display": "Shots against",
+          "unit": "per match",
+          "direction": "lower",
+          "set": "secondary",
+          "order": 5,
+          "basis": "rate",
+          "explanation": "Shots faced per match.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.52,
+            "split_half_r": 0.57,
+            "n_pairs": 332,
+            "m50": 12.7,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.49,
+            "r_second_half_goal_diff": 0.53,
+            "r_next_season_ppg": 0.49
+          }
+        },
+        {
+          "id": "shot_quality",
+          "display": "Shot quality",
+          "unit": "xG per shot",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 6,
+          "basis": "rate",
+          "explanation": "Average xG of the team's shots.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.31,
+            "split_half_r": 0.36,
+            "n_pairs": 310,
+            "m50": 29.8,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.23,
+            "r_second_half_goal_diff": 0.23,
+            "r_next_season_ppg": 0.28
+          }
+        },
+        {
+          "id": "shot_quality_against",
+          "display": "Shot quality against",
+          "unit": "xG per shot",
+          "direction": "lower",
+          "set": "secondary",
+          "order": 7,
+          "basis": "rate",
+          "explanation": "Average xG of the shots the team allows.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.22,
+            "split_half_r": 0.19,
+            "n_pairs": 310,
+            "m50": 70.7,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.15,
+            "r_second_half_goal_diff": 0.2,
+            "r_next_season_ppg": 0.19
+          }
+        },
+        {
+          "id": "sot_pct",
+          "display": "Shots on target %",
+          "unit": "%",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 8,
+          "basis": "rate",
+          "explanation": "Share of shots on target.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.21,
+            "split_half_r": 0.25,
+            "n_pairs": 332,
+            "m50": 50.1,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.2,
+            "r_second_half_goal_diff": 0.2,
+            "r_next_season_ppg": 0.25
+          }
+        },
+        {
+          "id": "corners",
+          "display": "Corners",
+          "unit": "per match",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 9,
+          "basis": "rate",
+          "explanation": "Corners won per match.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.46,
+            "split_half_r": 0.48,
+            "n_pairs": 332,
+            "m50": 18.4,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.4,
+            "r_second_half_goal_diff": 0.42,
+            "r_next_season_ppg": 0.48
+          }
+        },
+        {
+          "id": "passes",
+          "display": "Passes",
+          "unit": "per match",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 10,
+          "basis": "rate",
+          "explanation": "Passes per match.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.8,
+            "split_half_r": 0.85,
+            "n_pairs": 332,
+            "m50": 2.9,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.47,
+            "r_second_half_goal_diff": 0.51,
+            "r_next_season_ppg": 0.48
+          }
+        },
+        {
+          "id": "finishing",
+          "display": "Finishing",
+          "unit": "goals per match",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 11,
+          "basis": "rate",
+          "explanation": "Goals minus xG per match. Barely carries over from one half of a season to the next.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.05,
+            "split_half_r": 0.17,
+            "n_pairs": 310,
+            "m50": 80.6,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.26,
+            "r_second_half_goal_diff": 0.25,
+            "r_next_season_ppg": 0.25
+          }
+        },
+        {
+          "id": "keeping",
+          "display": "Keeping",
+          "unit": "goals per match",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 12,
+          "basis": "rate",
+          "explanation": "xG against minus goals conceded per match. Does not carry over at all within a season.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": -0.05,
+            "split_half_r": -0.0,
+            "n_pairs": 310,
+            "m50": null,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.15,
+            "r_second_half_goal_diff": 0.15,
+            "r_next_season_ppg": 0.09
+          }
+        },
+        {
+          "id": "luck",
+          "display": "Points above expected",
+          "unit": "points per match",
+          "direction": "higher",
+          "set": "secondary",
+          "order": 13,
+          "basis": "rate",
+          "explanation": "Points minus expected points per match. Mostly luck; it tends to even out.",
+          "in_payload": true,
+          "reliability": {
+            "yoy_r": 0.2,
+            "split_half_r": 0.2,
+            "n_pairs": 310,
+            "m50": 66.7,
+            "m50_unit": "matches",
+            "split_half_note": "first half v second half of the same season, uncorrected",
+            "yoy_n_pairs": 224
+          },
+          "predictive": {
+            "target": "second-half points per game (from the first half)",
+            "r": 0.36,
+            "r_second_half_goal_diff": 0.39,
+            "r_next_season_ppg": 0.35
+          }
+        }
+      ],
+      "similar": {
+        "features": [
+          "xg_for",
+          "xg_against",
+          "field_tilt",
+          "possession",
+          "ppda",
+          "shot_quality",
+          "sot_diff"
+        ],
+        "standardise": "z-score within competition and season",
+        "weights": "split-half r floored at 0.2",
+        "weight_values": {
+          "xg_for": 0.61,
+          "xg_against": 0.51,
+          "field_tilt": 0.7,
+          "possession": 0.8,
+          "ppda": 0.6,
+          "shot_quality": 0.36,
+          "sot_diff": 0.68
+        },
+        "distance": "weighted euclidean",
+        "k": 5,
+        "constraints": "any club of the pooled leagues in the same season (style twins across leagues)"
+      }
+    }
+  ],
+  "payload_changes": [
+    {
+      "field": "sot_diff",
+      "builder": "oddsmarkets/football/analytics/insights.py:team_metric_values (+ glossary.py TEAM_METRICS)",
+      "status": "done",
+      "note": "analytics.json teams[].profile.sot_diff (shots on target for minus against per match) and its glossary entry; tests/test_insights.py and tests/test_glossary.py updated. Appears on the next build."
+    },
+    {
+      "field": "role",
+      "builder": "oddsmarkets/football/analytics/players.py:aggregate_players and analytics/people_lines.py:PeopleLines (rows, ID_FIELDS)",
+      "status": "needed",
+      "note": "the formation role (GK, CB, FB, DM, CM, AM, W, ST; DF/MF/FW without a formation start) the player starts in most, by minutes, from value.assign_roles over lineup_extras formations; additive field on players_live.json players[] and lab/<window>/<scope>.json rows. players.py has another agent's uncommitted edits, so not done. Until then the front end joins value/lines.json `role` (id + comp) or value/players.json `role` (id)."
+    },
+    {
+      "field": "gar90",
+      "builder": "scripts/build_site_all.py:build_value_layer (write into players_live rows and lab rows after the value model)",
+      "status": "needed",
+      "note": "the value model runs after the unified step, so lab rows lack it; the front end can join value/lines.json `gar90` (id + comp, this season) and value/players.json `gar90` (12 months) meanwhile."
+    },
+    {
+      "field": "npxg (missed penalties)",
+      "builder": "oddsmarkets/football/analytics/players.py:finalize_player",
+      "status": "needed",
+      "note": "npxg subtracts 0.79 x penalty goals only; a missed penalty's xG stays in npxG (value.py subtracts both). Use pens + penaltyMiss. Small in aggregate but wrong for penalty takers who miss. File has another agent's uncommitted edits."
+    },
+    {
+      "field": "on_npxgd_90",
+      "builder": "oddsmarkets/football/analytics/players.py:aggregate_players (shots with time + substitution incidents)",
+      "status": "needed",
+      "note": "secondary only: team non-penalty xG difference per 90 with the player on the pitch. Within-league r with the team's own xG difference is 0.9, so it is a team measure; the on-minus-team version has zero year-to-year r and should not be shown."
+    },
+    {
+      "field": "prog_dist_90",
+      "builder": "oddsmarkets/football/analytics/players.py:finalize_player (totalProgression is already summed in SUM_KEYS)",
+      "status": "needed",
+      "note": "optional secondary: metres of progression per 90; reliable (split-half 0.66-0.75) but adds little over existing progression metrics."
+    }
+  ]
+}

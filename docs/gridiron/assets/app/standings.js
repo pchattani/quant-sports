@@ -1,6 +1,7 @@
-/* The Quant Gridiron — Standings (#/standings[/<S>]?v=table|ratings|wins|draft).
+/* The Quant Gridiron — Standings (#/standings[/<S>]?v=table|ratings|wins|draft), on Design System 2.0.
+ *   head and stat tiles (best record, top-rated team, Super Bowl favourite, the tightest division race);
  *   table    divisions (or the conference seeding race): record, points, rating, schedule strength,
- *            simulated playoff, division, bye and Super Bowl odds, magic numbers, clinch marks;
+ *            our simulated playoff, division, bye and Super Bowl chances, magic numbers, clinch marks;
  *   ratings  power ratings: offence v defence map, unit heat table, rating by week per division;
  *   wins     simulated final win totals: mean and 90% range chart, full distribution heat table;
  *   draft    draft order odds. Reads <S>/season.json. GI.seasonRows is shared with playoffs.js. */
@@ -69,16 +70,16 @@ function oddsCell(p, colour) {
   return { html: GI.probBar(p, colour), v: p };
 }
 function divTable(rows, S) {
-  return GI.tableHTML([{ label: 'Team' }, { label: 'W-L', align: 'right' }, { label: 'PF', align: 'right' }, { label: 'PA', align: 'right' }, { label: 'Diff', align: 'right' },
+  return GI.tableHTML([{ label: 'Team' }, { label: 'W-L', align: 'right' }, { label: 'Diff', align: 'right', title: 'Points for minus points against' },
     { label: 'Rating', align: 'right', title: 'Our team rating: points better than an average team on a neutral field' },
-    { label: 'SOS', align: 'right', title: 'Strength of schedule played (average opponent rating)' }, { label: 'Rem SOS', align: 'right', title: 'Strength of the remaining schedule' },
-    { label: 'Playoffs', align: 'right', title: 'Simulated probability of making the playoffs' }, { label: 'Div', align: 'right', title: 'Win the division' }, { label: 'Bye', align: 'right', title: 'The No. 1 seed and the bye' },
-    { label: 'SB', align: 'right', title: 'Win the Super Bowl' }, { label: 'Magic', align: 'right', title: 'Magic numbers: P to clinch a playoff place, D to win the division' }],
+    { label: 'Rem SOS', align: 'right', title: 'Strength of the remaining schedule (average opponent rating; played so far in the tooltip)' },
+    { label: 'Playoffs', align: 'right', title: 'Our chance of making the playoffs (season simulation)' }, { label: 'Div', align: 'right', title: 'Our chance of winning the division' }, { label: 'Bye', align: 'right', title: 'Our chance of the No. 1 seed and the bye' },
+    { label: 'SB', align: 'right', title: 'Our chance of winning the Super Bowl' }, { label: 'Magic', align: 'right', title: 'Magic numbers: P to clinch a playoff place, D to win the division' }],
   rows.map(r => ({ _href: GI.teamHref(r.team, S), cells: [
     { html: GI.teamLink(r.team, { short: true, season: S }) + clinchTag(r), v: r.team },
-    { html: GI.record(r.w, r.l, r.t), v: pctW(r) }, { v: r.pf }, { v: r.pa },
-    { html: GI.deltaHTML(r.diff, 0), v: r.diff }, { html: isNum(r.rating) ? GI.signed(r.rating, 1) : '—', v: r.rating },
-    { html: isNum(r.sos) ? GI.signed(r.sos, 1) : '—', v: r.sos }, { html: isNum(r.sos_rem) ? GI.signed(r.sos_rem, 1) : '—', v: r.sos_rem },
+    { html: GI.record(r.w, r.l, r.t), v: pctW(r) },
+    { html: '<span title="' + esc((isNum(r.pf) ? r.pf + ' for, ' + r.pa + ' against' : '')) + '">' + GI.deltaHTML(r.diff, 0) + '</span>', v: r.diff }, { html: isNum(r.rating) ? GI.signed(r.rating, 1) : '—', v: r.rating },
+    { html: '<span title="' + esc(isNum(r.sos) ? 'played so far ' + GI.signed(r.sos, 1) : '') + '">' + (isNum(r.sos_rem) ? GI.signed(r.sos_rem, 1) : '—') + '</span>', v: r.sos_rem },
     oddsCell(r.p_playoffs, GI.tc(r.team)), { html: GI.pct(r.p_div, 0), v: r.p_div }, { html: GI.pct(r.p_bye, 0), v: r.p_bye },
     { html: GI.pct(r.p_sb, 1), v: r.p_sb }, magicCell(r)] })), { sticky: true });
 }
@@ -86,7 +87,7 @@ function divisionsView(rows, S) {
   return GI.grid(GI.DIVISIONS.map(div => {
     const list = rows.filter(r => r.division === div).sort((a, b) => (isNum(a.div_rank) && isNum(b.div_rank) ? a.div_rank - b.div_rank : pctW(b) - pctW(a) || (b.p_div || 0) - (a.p_div || 0)));
     return list.length ? GI.card(div, '', divTable(list, S), { span: 6, flush: true }) : '';
-  }).join('')) + '<p class="gi-cap">x clinched a playoff place · y the division · z the bye · e eliminated. Odds from our season simulation of the remaining schedule with the NFL tiebreakers.</p>';
+  }).join('')) + '<p class="gi-cap">x clinched a playoff place · y the division · z the bye · e eliminated. Chances from our season simulation of the remaining schedule with the NFL tiebreakers.</p>';
 }
 function conferencesView(rows, S) {
   return GI.grid(GI.CONFERENCES.map(conf => {
@@ -146,8 +147,8 @@ function winsView(rows, S) {
   const ks = [];
   for (let k = 0; k <= maxW; k++) ks.push(k);
   const val = (wd, k) => (Array.isArray(wd) ? wd[k] : wd[String(k)]);
-  return GI.card('Projected wins', 'mean simulated wins (dot) and the middle 90% of simulations (bar); grey tick: wins so far', GI.chartBox('wn-range', Math.max(420, list.length * 22 + 40), 'Projected win totals')) +
-    GI.card('Win distribution', '% of simulations ending on each win total · each row sums to 100% · compare with the win-total markets on <a href="#/futures">Futures</a>', GI.heatTable({
+  return GI.card('Projected wins', 'Our mean simulated wins (dot) and the middle 90% of simulations (bar); grey tick: wins so far', GI.chartBox('wn-range', Math.max(420, list.length * 22 + 40), 'Projected win totals')) +
+    GI.card('Win distribution', '% of simulations ending on each win total · each row sums to 100% · more on <a href="#/futures">Season forecasts</a>', GI.heatTable({
       cols: ks.map(String).concat(['Mean']), corner: 'Wins', center: 0, max: 0.3,
       rows: list.map(r => ({ label: GI.teamLink(r.team, { abbr: true, season: S }) + ' <span class="qk-muted">' + GI.record(r.w, r.l, r.t) + '</span>', values: ks.map(k => val(r.win_dist, k)).concat([r.proj_w]),
         fmts: ks.map(() => (v => (v >= 0.005 ? String(Math.round(v * 100)) : '·'))).concat([v => '<b>' + GI.num(v, 1) + '</b>']),
@@ -186,6 +187,22 @@ function draftView(d, rows, S) {
         { html: GI.num(x.exp_pick, 1), v: x.exp_pick }, { html: GI.probBar(x.p_first, GI.tc(x.team)), v: x.p_first }, { html: GI.pct(x.p_top5, 0), v: x.p_top5 }, { html: GI.pct(x.p_top10, 0), v: x.p_top10 }] })), { maxHeight: 620, sticky: true }), { span: 7, flush: true }));
 }
 
+/* Stat tiles over the table: the best record, the top-rated team, our Super Bowl favourite, the tightest division race. */
+function tiles(rows, S) {
+  if (!rows.length) return '';
+  const best = rows.slice().sort((a, b) => pctW(b) - pctW(a) || (num(b.diff) || 0) - (num(a.diff) || 0))[0];
+  const top = rows.filter(r => isNum(r.rating)).sort((a, b) => b.rating - a.rating)[0];
+  const fav = rows.filter(r => isNum(r.p_sb)).sort((a, b) => b.p_sb - a.p_sb)[0];
+  let race = null;
+  GI.DIVISIONS.forEach(dv => { const l = rows.filter(r => r.division === dv && isNum(r.p_div)).sort((a, b) => b.p_div - a.p_div); if (l.length > 1 && (!race || l[0].p_div < race[0].p_div)) race = l; });
+  return GI.kpis([
+    GI.kpi('Best record', best ? esc(GI.teamAbbr(best.team)) + ' ' + GI.record(best.w, best.l, best.t) : '—', best ? (isNum(best.diff) ? GI.signed(best.diff, 0) + ' point difference' : '') : '', { href: best ? GI.teamHref(best.team, S) : null }),
+    GI.kpi('Top-rated team', top ? esc(GI.teamAbbr(top.team)) + ' ' + GI.signed(top.rating, 1) : '—', 'points a game better than an average team', { href: top ? GI.teamHref(top.team, S) : null, tip: 'Our team-strength rating on a neutral field' }),
+    GI.kpi('Super Bowl favourite', fav ? esc(GI.teamAbbr(fav.team)) + ' ' + GI.pct(fav.p_sb, 0) : '—', 'our chance, from the season simulation', { signal: true, href: fav ? GI.teamHref(fav.team, S) : null }),
+    GI.kpi('Tightest division', race ? esc(race[0].division) : '—', race ? esc(GI.teamAbbr(race[0].team)) + ' ' + GI.pct(race[0].p_div, 0) + ' · ' + esc(GI.teamAbbr(race[1].team)) + ' ' + GI.pct(race[1].p_div, 0) : '', { text: true, tip: 'The division whose favourite has the lowest chance of winning it' })
+  ]);
+}
+
 GI.route('standings', function (el, params) {
   const S = Number(params.season);
   const v = String((params.query || {}).v || (params.query || {}).view || 'table');
@@ -201,7 +218,7 @@ GI.route('standings', function (el, params) {
     const nsim = isNum(sim.sims) ? sim.sims : sim.n;
     const sub = [isNum(d.week) ? 'through week ' + d.week : '', isNum(nsim) ? GI.int(nsim) + ' season simulations' : '', d.updated_at ? 'updated ' + GI.fmtStamp(d.updated_at) : ''].filter(Boolean).join(' · ');
     const title = { table: S + ' standings', ratings: S + ' power ratings', wins: S + ' win totals', draft: (S + 1) + ' draft order' }[view];
-    el.innerHTML = GI.pageHead('Standings', title, esc(sub), pager) + nav + '<div id="std-body"></div>';
+    el.innerHTML = GI.pageHead('Standings · ' + S, title, esc(sub), pager) + nav + (view === 'table' ? tiles(rows, S) : '') + '<div id="std-body"></div>';
     const body = el.querySelector('#std-body');
     if (view === 'table') {
       const draw = () => { body.innerHTML = '<div class="gi-toolbar" style="margin-bottom:12px">' + GI.seg('std-tv', [['div', 'Divisions'], ['conf', 'Conferences']], TV, 'Group by') + '</div>' + (TV === 'conf' ? conferencesView(rows, S) : divisionsView(rows, S)); GI.sortable(body); GI.wireSeg(body, 'std-tv', x => { TV = x; draw(); }); };

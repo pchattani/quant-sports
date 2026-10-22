@@ -269,6 +269,20 @@ def value_pages(b: Build, ctx, cfg: dict, cat: dict | None, tms: dict | None, si
             val = b.write_or_fail(d + "valuation.json", f"valuation {season}", lambda: valuation_payload(season, vc), season=season)
             if not cfg.get("no_transactions"):
                 transactions_pages(b, season, cfg, vc, val if (val or {}).get("ok") else None)
+            if not cfg.get("no_transactions"):
+                b.step(f"movement {season}", lambda: movement_page(b, season, cfg))
+
+
+def movement_page(b: Build, season: int, cfg: dict) -> None:
+    """<S>/movement.json (analytics/movement.py: chance of moving, outlook, targets), refreshed once a day."""
+    from oddsmarkets.nfl.analytics import movement as MVN
+    rel = f"{season}/movement.json"
+    old = an.read_json(b.data / rel) if (b.data / rel).exists() else None
+    if old and old.get("snapshot") == cfg["today"].isoformat() and old.get("version") == MVN.VERSION:
+        return
+    pay = MVN.build(cfg["today"])
+    if pay and pay.get("season") == season:
+        b.write(rel, pay)
 
 
 def fantasy_pages(b: Build, ctx) -> None:

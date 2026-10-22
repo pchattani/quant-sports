@@ -1,14 +1,15 @@
 /* The Quant Hardwood — section pages: Standings, Teams (list), Players (list), Lab and Model.
  *
- *   Standings (#/<L>/standings): Table (new: records, projected wins with the 90% range, playoff / play-in /
- *     title odds, clinching), Odds & ratings (seed distribution, win totals v market, rating paths, schedule
- *     difficulty: the pre-redesign season page), Bracket, Futures v market, History (champions).
+ *   Standings (#/<L>/standings): Table (records, projected wins with the 90% range, our playoff / play-in /
+ *     title chances, clinching), Chances & ratings (seed distribution, win totals, rating paths, schedule
+ *     difficulty: the pre-redesign season page), Bracket, History (champions). Our forecasts against the market
+ *     moved to the Model section (#/<L>/model?tab=markets), the one place the market sits beside ours.
  *   Teams (#/<L>/teams): tiles by conference with record, net rating and odds; offence v defence; Team stats tab
  *     (the full team catalogue).
- *   Players (#/<L>/players): Leaders (new: search, impact at both ends, boards with sample floors), Catalogue,
+ *   Players (#/<L>/players): Leaders (search, a leaderboard with role-percentile heat cells, impact at both ends), Catalogue,
  *     Awards, All leaderboards.
  *   Lab (#/<L>/lab): Chart builder and Compare (#/<L>/compare/... opens here).
- *   Model (#/<L>/model): Methodology, Calibration, Glossary, Terms (#/glossary/<key>, #/methodology/<part> and
+ *   Model (#/<L>/model): Methodology, Calibration, Our forecasts v the market, Glossary, Terms (#/glossary/<key>, #/methodology/<part> and
  *     #/disclaimer open here). */
 (function (HW) {
 'use strict';
@@ -39,11 +40,11 @@ function standingsTable(node, L, S, rows, sim, fmt, league) {
   const data = rows.map((r, i) => {
     const s = sim[r.team] || {};
     return Object.assign({}, r, { seedN: pre ? i + 1 : (r.seed || i + 1), exp: s.exp_w, pp: s.p_playoffs, pin: s.p_playin, pc: s.p_conf, pt: s.p_title, s: s,
-      home_w: (r.home || [])[0], away_w: (r.away || [])[0], l10_w: (r.l10 || [])[0] });
+      home_w: (r.home || [])[0], away_w: (r.away || [])[0], l10_w: (r.l10 || [])[0], nm: HW.teamShort(L, r.team) });
   });
   const cols = [
     { key: 'seedN', label: '#', num: true },
-    { key: 'team', label: 'Team', sticky: true, fmt: v => U.teamEnt(L, v, { season: S }) },
+    { key: 'nm', label: 'Team', type: 'entity', mark: r => U.team(L, r.team), href: r => HW.teamHref(L, r.team, S) },
     { key: 'w', label: 'W-L', num: true, fmt: (v, r) => HW.record(r.w, r.l) },
     { key: 'pct', label: 'Pct', num: true, fmt: v => (isNum(v) ? HW.fmtVal(v, '3') : '—') },
     { key: 'gb', label: 'GB', num: true, fmt: v => (isNum(v) ? (v === 0 ? '—' : U.f(v, 1)) : esc(v || '—')) },
@@ -54,14 +55,14 @@ function standingsTable(node, L, S, rows, sim, fmt, league) {
     { key: 'pd', label: 'Diff', num: true, fmt: v => U.sgnHTML(v, 0), tip: 'Points differential' }
   ];
   if (live) {
-    cols.push({ key: 'exp', label: 'Proj W', num: true, tip: 'Projected wins (mean of the simulations) with the 90% range', fmt: (v, r) => (isNum(v) ? '<span data-tip="' + esc(U.f(r.s.w_p05, 0) + '–' + U.f(r.s.w_p95, 0) + ' (90% range)') + '">' + U.f(v, 1) + '</span>' : '—') });
-    cols.push({ key: 'pp', label: 'Playoffs', num: true, fmt: (v, r) => HW.ui.probBar(v, U.tcol(L, r.team)), tip: 'Reach the playoffs proper' });
-    if (hasPin) cols.push({ key: 'pin', label: 'Play-in', num: true, fmt: v => U.pct(v), tip: 'Finish in the play-in places' });
-    if (!league) cols.push({ key: 'pc', label: 'Conf', num: true, fmt: v => U.pct(v), tip: 'Win the conference' });
+    cols.push({ key: 'exp', label: 'Proj W', num: true, tip: 'Projected wins (mean of our simulations) with the 90% range', fmt: (v, r) => (isNum(v) ? '<span data-tip="' + esc(U.f(r.s.w_p05, 0) + '–' + U.f(r.s.w_p95, 0) + ' (90% range)') + '">' + U.f(v, 1) + '</span>' : '—') });
+    cols.push({ key: 'pp', label: 'Playoffs', type: 'bar', max: 1, fmt: v => U.pct(v), tip: 'Our chance of reaching the playoffs proper' });
+    if (hasPin) cols.push({ key: 'pin', label: 'Play-in', num: true, fmt: v => U.pct(v), tip: 'Our chance of finishing in the play-in places' });
+    if (!league) cols.push({ key: 'pc', label: 'Conf', num: true, fmt: v => U.pct(v), tip: 'Our chance of winning the conference' });
     cols.push({ key: 'pt', label: 'Title', num: true, fmt: v => '<b>' + U.pct(v) + '</b>' });
     cols.push({ key: 'mg', label: 'Clinch', sort: false, fmt: (v, r) => magic(r.s) });
   }
-  QK.table(node, { columns: cols, rows: data, dense: true });
+  QK.leaderboard(node, { columns: cols, rows: data, dense: true, rowHref: r => HW.teamHref(L, r.team, S) });
   // playoff and play-in cut lines (in seed order only)
   const trs = node.querySelectorAll('tbody tr');
   if (trs[direct]) trs[direct].classList.add('hw-cut');
@@ -86,14 +87,14 @@ function standingsTab(node, L, S, params) {
     const open = Object.keys(sim).some(t => isNum(sim[t].w_p05) && sim[t].w_p95 > sim[t].w_p05);
     let h = '';
     if (row && row.champion && !open) {
-      h += '<div class="qk-kpis hw-kpis">' + QK.kpi({ label: 'Champion', value: HW.teamName(L, row.champion), text: true, sub: row.runner_up ? 'beat ' + HW.teamName(L, row.runner_up) : '' }) +
-        (row.mvp ? QK.kpi({ label: 'MVP', value: String(HW.NAMES[L].players[String(row.mvp)] ? HW.playerName(L, row.mvp) : row.mvp), text: true }) : '') +
-        (row.best_record ? QK.kpi({ label: 'Best record', value: HW.teamAbbr(L, row.best_record[0]) + ' ' + HW.record(row.best_record[1], row.best_record[2]), sub: HW.teamName(L, row.best_record[0]) }) : '') + '</div>';
+      h += '<div class="hw-kpis">' + QK.stats([{ label: 'Champion', value: HW.teamName(L, row.champion), text: true, signal: true, sub: row.runner_up ? 'beat ' + HW.teamName(L, row.runner_up) : '' },
+        row.mvp ? { label: 'MVP', value: String(HW.NAMES[L].players[String(row.mvp)] ? HW.playerName(L, row.mvp) : row.mvp), text: true } : null,
+        row.best_record ? { label: 'Best record', value: HW.teamAbbr(L, row.best_record[0]) + ' ' + HW.record(row.best_record[1], row.best_record[2]), sub: HW.teamName(L, row.best_record[0]) } : null]) + '</div>';
     }
-    h += U.card2(open ? 'Standings and odds' : 'Standings', open && season.sim ? HW.num(season.sim.n_sims, 0) + ' simulations of the rest of the season. Dashed lines: the playoff' + (fmt.playin ? ' and play-in' : '') + ' cuts.' : 'Records and seeds.',
+    h += U.card2(open ? 'Standings and our chances' : 'Standings', open && season.sim ? Number(season.sim.n_sims).toLocaleString('en-GB') + ' simulations of the rest of the season. Dashed lines: the playoff' + (fmt.playin ? ' and play-in' : '') + ' cuts.' : 'Records and seeds.',
       (views.length > 1 ? '<div class="qk-seg" id="st-seg" role="group" aria-label="Group" style="margin:0 16px 12px">' + views.map(v => '<button type="button" data-value="' + esc(v[0]) + '" aria-pressed="' + (v[0] === first) + '">' + esc(v[1]) + '</button>').join('') + '</div>' : '') + '<div id="st-table"></div>', { flush: true });
     if (open) {
-      h += '<div class="qk-grid hw-sec">' + confs.map((c, i) => U.card2(c + ': playoff odds', fmt.playin ? 'A top-six seed goes straight through; seeds 7-10 play in' : 'Chance of a playoff place', U.chart('st-odds-' + i, 22 * (st[c] || []).length + 50, c + ' playoff odds'), { cls: confs.length > 1 ? 'qk-span-6' : 'qk-span-12' })).join('') + '</div>';
+      h += '<div class="qk-grid hw-sec">' + confs.map((c, i) => U.card2(c + ': who makes the playoffs', fmt.playin ? 'Our chance: a top-six seed goes straight through; seeds 7-10 play in' : 'Our chance of a playoff place', U.chart('st-odds-' + i, 22 * (st[c] || []).length + 70, c + ' playoff chances'), { cls: confs.length > 1 ? 'qk-span-6' : 'qk-span-12' })).join('') + '</div>';
     }
     node.innerHTML = h;
     const draw = k => standingsTable(document.getElementById('st-table'), L, S, k === '__all' ? all() : (st[k] || []), sim, fmt, k === '__all');
@@ -105,7 +106,7 @@ function standingsTab(node, L, S, params) {
       const series = fmt.playin
         ? [{ name: 'Top-six seed', data: ids.map(t => r3((sim[t] || {}).p_top6)) }, { name: 'Via the play-in', data: ids.map(t => r3(Math.max(0, ((sim[t] || {}).p_playoffs || 0) - ((sim[t] || {}).p_top6 || 0)))) }]
         : [{ name: 'Playoffs', data: ids.map(t => r3((sim[t] || {}).p_playoffs)) }];
-      QKC.bar('#st-odds-' + i, { cats: ids.map(t => HW.teamAbbr(L, t)), series: series, horizontal: true, stack: true, legend: series.length > 1, fmt: v => U.pct(v), max: 1, hrefs: ids.map(t => HW.teamHref(L, t, S)), labelWidth: 46, valName: 'Playoff probability' });
+      QKC.bar('#st-odds-' + i, { cats: ids.map(t => HW.teamAbbr(L, t)), series: series, horizontal: true, stack: true, legend: series.length > 1, fmt: v => U.pct(v), max: 1, hrefs: ids.map(t => HW.teamHref(L, t, S)), labelWidth: 46, valName: 'Our playoff chance', catName: 'Team' });
     });
     if (!live) HW.setMeta('');
   });
@@ -136,12 +137,14 @@ function historyTab(node, L) {
 
 function renderStandings(el, params) {
   const L = U.L(params), S = U.S(params);
-  const tab = U.tab(params, ['table', 'odds', 'bracket', 'markets', 'history'], 'table');
-  const body = U.section(el, { title: 'Standings', kicker: U.kicker(L, S), sub: 'Records, playoff and title odds from the season simulation, the bracket and the market.',
-    tabs: U.tabs(L, 'standings', [['table', 'Table'], ['odds', 'Odds & ratings'], ['bracket', 'Bracket'], ['markets', 'Futures v market'], ['history', 'History', false]], S), active: tab });
+  // the market comparison lives on the Model page now; old links land there
+  if (((params.query || {}).tab) === 'markets') { HW.go(HW.href(L, 'model', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=markets'); return null; }
+  const tab = U.tab(params, ['table', 'odds', 'bracket', 'history'], 'table');
+  const body = U.section(el, { title: 'Standings', kicker: U.kicker(L, S), sub: 'Records, our playoff and title chances from the season simulation, and the bracket.',
+    tabs: U.tabs(L, 'standings', [['table', 'Table'], ['odds', 'Chances & ratings'], ['bracket', 'Bracket'], ['history', 'History', false]], S), active: tab });
   if (tab === 'table') return standingsTab(body, L, S, params);
   if (tab === 'history') return historyTab(body, L);
-  const v = { odds: 'season', bracket: 'playoffs', markets: 'markets' }[tab];
+  const v = { odds: 'season', bracket: 'playoffs' }[tab];
   return U.legacy(v, body, params);
 }
 
@@ -150,7 +153,7 @@ function renderStandings(el, params) {
 function renderTeams(el, params) {
   const L = U.L(params), S = U.S(params);
   const tab = U.tab(params, ['teams', 'stats'], 'teams');
-  const body = U.section(el, { title: 'Teams', kicker: U.kicker(L, S), sub: 'Every team’s record, rating and odds. Open a team for its ratings over time, strengths and needs, current roster, schedule and moves.',
+  const body = U.section(el, { title: 'Teams', kicker: U.kicker(L, S), sub: 'Every team’s record, rating and our chances. Open a team for its ratings over time, strengths and needs, current roster, schedule and moves.',
     tabs: U.tabs(L, 'teams', [['teams', 'Teams'], ['stats', 'Team stats']], S), active: tab });
   if (tab === 'stats') return U.legacy('teams', body, params);
   return HW.load(HW.path('season.json', L, S)).then(season => {
@@ -166,7 +169,7 @@ function renderTeams(el, params) {
       const net = isNum(r.net) ? r.net : null;
       return '<a class="hw-teamtile" href="' + esc(HW.teamHref(L, t, S)) + '" style="--tc:' + esc(U.tcol(L, t)) + '"><div class="top">' + QK.teamMark(U.team(L, t), 'sm') + '<span class="nm">' + esc(HW.teamName(L, t)) + '</span><span class="rec">' + (isNum(x.w) ? HW.record(x.w, x.l) : '') + '</span></div>' +
         '<div class="row"><span>Net rating' + (isNum(r.rank) ? ' · ' + HW.ordinal(r.rank) : '') + '</span><b>' + U.signed(net, 1) + '</b></div><div class="hw-bar"><span style="width:' + (net === null ? 0 : Math.max(2, 50 + 50 * net / maxNet)).toFixed(1) + '%"></span></div>' +
-        (isNum(s.p_playoffs) ? '<div class="row"><span>' + (isNum(s.exp_w) && s.w_p95 > s.w_p05 ? 'Proj ' + U.f(s.exp_w, 1) + ' W · ' : '') + 'Playoffs</span><b>' + U.pct(s.p_playoffs) + '</b></div><div class="row"><span>Title</span><b>' + U.pct(s.p_title) + '</b></div>' : '') + '</a>';
+        (isNum(s.p_playoffs) ? '<div class="row"><span>' + (isNum(s.exp_w) && s.w_p95 > s.w_p05 ? 'Proj ' + U.f(s.exp_w, 1) + ' W · ' : '') + 'Playoffs</span><b>' + U.pct(s.p_playoffs) + '</b></div><div class="row"><span>Title chance</span><b>' + U.pct(s.p_title) + '</b></div>' : '') + '</a>';
     };
     const groups = confs.length ? confs.map(c => [c, (st[c] || []).map(r => r.team).filter(t => ids.indexOf(t) >= 0).sort((a, b) => ((R[b] || {}).net || -99) - ((R[a] || {}).net || -99))]) : [['', ids]];
     const withR = ids.filter(t => isNum((R[t] || {}).off) && isNum((R[t] || {}).def));
@@ -180,8 +183,8 @@ function renderTeams(el, params) {
       const mx = withR.reduce((s, t) => s + R[t].off, 0) / withR.length, my = withR.reduce((s, t) => s + R[t].def, 0) / withR.length;
       QKC.mount('#tm-od', T => ({
         grid: { left: 8, right: 24, top: 34, bottom: 30, containLabel: true },
-        xAxis: QKC.axis(T, { name: 'Offensive rating', nameLocation: 'middle', nameGap: 28, scale: true }),
-        yAxis: QKC.axis(T, { name: 'Defensive rating (reversed)', scale: true, inverse: true, nameLocation: 'start', nameAlign: 'left' }),
+        xAxis: QKC.axis(T, { name: 'Offensive rating (points per 100)', nameLocation: 'middle', nameGap: 28, scale: true }),
+        yAxis: QKC.axis(T, { name: 'Defensive rating (allowed per 100, reversed)', scale: true, inverse: true, nameLocation: 'start', nameAlign: 'left' }),
         tooltip: QKC.tooltip(T, { formatter: p => { const t = withR[p.dataIndex]; return '<div style="font-weight:600;margin-bottom:4px">' + esc(HW.teamName(L, t)) + '</div>' + QKC.tipRow(p.color, 'Offence', U.f(R[t].off, 1)) + QKC.tipRow(p.color, 'Defence', U.f(R[t].def, 1)) + QKC.tipRow(p.color, 'Net', U.signed(R[t].net, 1) + (isNum(R[t].se_net) ? ' ± ' + U.f(R[t].se_net, 1) : '')); } }),
         series: [{ type: 'scatter', symbolSize: 13, data: withR.map(t => ({ value: [R[t].off, R[t].def], href: HW.teamHref(L, t, S), itemStyle: { color: U.tcol(L, t), borderColor: T.s1, borderWidth: 1.5 },
           label: { show: true, formatter: HW.teamAbbr(L, t), position: 'top', color: T.ink2, fontSize: 10, fontWeight: 600, fontFamily: T.fontUI } })), labelLayout: { hideOverlap: true },
@@ -193,7 +196,7 @@ function renderTeams(el, params) {
         const dates = Array.from(new Set([].concat.apply([], top.map(t => paths[t].map(p => p.date))))).sort();
         const show = top.slice(0, 5).concat(top.slice(-3));
         QKC.line('#tm-paths', { x: dates.map(d => HW.fmtDate(d, { year: false, weekday: false })), series: show.map(t => { const m = {}; paths[t].forEach(p => { m[p.date] = p.net; });
-          let last = null; return { name: HW.teamAbbr(L, t), color: U.tcol(L, t), data: dates.map(d => { if (isNum(m[d])) last = Math.round(m[d] * 10) / 10; return last; }) }; }), yFmt: v => U.signed(v, 1), ref: { y: 0 }, xName: 'Date', yName: 'Net rating' });
+          let last = null; return { name: HW.teamAbbr(L, t), color: U.tcol(L, t), data: dates.map(d => { if (isNum(m[d])) last = Math.round(m[d] * 10) / 10; return last; }) }; }), yFmt: v => U.signed(v, 1), ref: { y: 0 }, xName: 'Date', yName: 'Net rating (points per 100 possessions)', label: 'Net rating through the season' });
       } else document.getElementById('tm-paths').innerHTML = U.empty('No games yet', 'Rating paths start with the first games.');
     }
   });
@@ -201,51 +204,72 @@ function renderTeams(el, params) {
 
 // ── Players ────────────────────────────────────────────────────────────────
 
-const BOARDS = [['pts_g', 'Points a game'], ['reb_g', 'Rebounds a game'], ['ast_g', 'Assists a game'], ['tpm_g', 'Threes a game'], ['stl_g', 'Steals a game'], ['blk_g', 'Blocks a game'],
-  ['ts', 'True shooting'], ['hpm', 'Impact (HPM)'], ['pox100', 'Shot-making (pts over exp. / 100)'], ['wpa', 'Win probability added'], ['on_off', 'On/off (net per 100)'], ['gmsc', 'Game score']];
+/* The leaderboard's metrics: counting boards (everyone who qualifies ranks), then the role metric set. */
+const COUNT = [['pts_g', 'Points a game', '1'], ['reb_g', 'Rebounds a game', '1'], ['ast_g', 'Assists a game', '1'], ['tpm_g', 'Threes a game', '1'], ['stl_g', 'Steals a game', '1'], ['blk_g', 'Blocks a game', '1']];
 
 function leadersTab(node, L, S) {
-  return U.catalogue(L, S).then(r => {
+  return Promise.all([U.catalogue(L, S), U.roles(L, S)]).then(res => {
     if (!U.alive(node)) return;
-    const cat = r.cat;
+    const r = res[0], cat = r.cat;
     if (!U.ok(cat) || !Object.keys(cat.players || {}).length) { node.innerHTML = U.empty('No player numbers yet', 'The catalogue fills in once games are played.'); return; }
-    const P = cat.players, meta = {};
-    (cat.metrics || []).forEach(m => { meta[m.key] = m; });
-    const fl = U.floor(cat);
-    const ok = id => (P[id].min || 0) >= fl.min && (P[id].gp || 0) >= fl.gp;
-    const ids = Object.keys(P).filter(ok);
     const SS = r.S;
-    let h = r.fallback ? '<div class="qk-note" style="margin-bottom:14px">No ' + esc(HW.seasonLabel(L, S)) + ' regular-season games yet: these are the final ' + esc(HW.seasonLabel(L, SS)) + ' numbers.</div>' : '';
-    h += '<div class="hw-flex" style="margin-bottom:14px"><input class="qk-input hw-search" id="pl-q" type="search" placeholder="Find a player…" aria-label="Find a player" autocomplete="off"><span class="hw-quiet">Floors: ' + fl.min + '+ minutes and ' + fl.gp + '+ games (' + ids.length + ' players qualify). Counting boards and rates use the same floor.</span></div><div id="pl-hits"></div>';
-    h += '<div class="qk-grid">' + U.card2('Impact at both ends', 'HPM per 100 possessions, offence against defence; qualified players, size is minutes', U.chart('pl-sc', 440, 'Impact at both ends'), { cls: 'qk-span-12' }) + '</div>';
-    h += '<div class="hw-leaders hw-sec">' + BOARDS.filter(b => meta[b[0]]).map(b => {
-      const m = meta[b[0]];
-      const list = ids.filter(id => isNum((P[id].values || {})[b[0]])).sort((a, c) => (m.lower ? 1 : -1) * ((P[a].values[b[0]]) - (P[c].values[b[0]]))).slice(0, 8);
-      return '<div class="qk-card"><div class="qk-card-head"><div class="qk-card-title">' + esc(b[1]) + '</div></div><ul class="hw-list">' + list.map((id, i) =>
-        '<li><span class="n">' + (i + 1) + '</span>' + U.playerEnt(L, id, P[id].name, P[id].team, null, SS) + '<span class="v">' + HW.fmtVal(P[id].values[b[0]], m.fmt) + '</span></li>').join('') + '</ul></div>';
-    }).join('') + '</div>';
-    node.innerHTML = h;
-    const q = document.getElementById('pl-q'), hits = document.getElementById('pl-hits');
-    const all = Object.keys(P).sort((a, b) => (P[b].min || 0) - (P[a].min || 0));
-    q.addEventListener('input', () => {
-      const s = q.value.trim().toLowerCase();
-      if (s.length < 2) { hits.innerHTML = ''; return; }
-      const found = all.filter(id => String(P[id].name || '').toLowerCase().indexOf(s) >= 0 || HW.teamName(L, P[id].team).toLowerCase().indexOf(s) >= 0).slice(0, 12);
-      hits.innerHTML = '<div class="qk-card" style="margin-bottom:14px"><ul class="hw-list">' + (found.length ? found.map(id => '<li>' + U.playerEnt(L, id, P[id].name, P[id].team, (P[id].pos || '') + ' · ' + HW.teamAbbr(L, P[id].team), SS) +
-        '<span class="v">' + U.f((P[id].values || {}).pts_g, 1) + ' ppg</span></li>').join('') : '<li class="hw-quiet">No player matches.</li>') + '</ul></div>';
-    });
-    const pts = ids.filter(id => isNum((P[id].values || {}).hpm_o) && isNum((P[id].values || {}).hpm_d));
-    const maxMin = Math.max.apply(null, pts.map(id => P[id].min || 0).concat([1]));
-    QKC.scatter('#pl-sc', { points: pts.map(id => ({ x: P[id].values.hpm_o, y: P[id].values.hpm_d, name: P[id].name + ' · ' + HW.teamAbbr(L, P[id].team), label: (P[id].name || '').split(' ').slice(-1)[0],
-      color: U.tcol(L, P[id].team), size: 5 + 11 * Math.sqrt((P[id].min || 0) / maxMin), href: HW.playerHref(L, id, SS) })), xName: 'Offensive HPM', yName: 'Defensive HPM', xFmt: v => U.signed(v, 1), yFmt: v => U.signed(v, 1),
-      refX: 0, refY: 0, labelTop: 14, quadrants: ['Defence first', 'Both ends', 'Below average', 'Offence first'] });
+    const roles = r.fallback ? {} : res[1];
+    const finish = rl => {
+      const P = cat.players;
+      const ids = Object.keys(P).filter(id => P[id].qualified);
+      const keys = COUNT.map(x => x[0]).concat(['hpm', 'hpm_o', 'hpm_d', 'pts100', 'ts_add', 'pox100', 'ast_pct', 'drb_pct', 'stl_pct', 'blk_pct', 'ts']).filter(k => ids.some(id => isNum((P[id].values || {})[k])));
+      const lab = k => { const c = COUNT.find(x => x[0] === k); return c ? c[1] : U.mMeta(k).label; };
+      const fmtK = (k, v) => { const c = COUNT.find(x => x[0] === k); return c ? U.f(v, 1) : U.fmtM(k, v); };
+      let h = r.fallback ? '<div class="qk-note" style="margin-bottom:14px">No ' + esc(HW.seasonLabel(L, S)) + ' regular-season games yet: these are the final ' + esc(HW.seasonLabel(L, SS)) + ' numbers.</div>' : '';
+      h += '<div class="hw-flex" style="margin-bottom:14px"><input class="qk-input hw-search" id="pl-q" type="search" placeholder="Find a player…" aria-label="Find a player" autocomplete="off"><span class="hw-quiet">Qualified: ' + Number(cat.min_floor || 0).toLocaleString('en-GB') + '+ minutes (' + ids.length + ' players). Heat cells: percentile within the player’s role (guards, wings, bigs).</span></div><div id="pl-hits"></div>';
+      h += U.card2('Leaderboard', 'Pick a metric and a role. Every cell is coloured by the percentile within the role, cold to hot.',
+        '<div class="hw-flex" style="margin-bottom:12px"><select class="qk-select" id="pl-k" aria-label="Metric">' + keys.map(k => '<option value="' + k + '">' + esc(lab(k)) + '</option>').join('') + '</select>' +
+        '<div class="qk-seg" id="pl-r" role="group" aria-label="Role"><button type="button" data-value="" aria-pressed="true">All</button><button type="button" data-value="G" aria-pressed="false">Guards</button><button type="button" data-value="W" aria-pressed="false">Wings</button><button type="button" data-value="B" aria-pressed="false">Bigs</button></div></div><div id="pl-lb"></div>', { flush: false });
+      h += '<div class="qk-grid hw-sec"><div class="qk-span-12">' + U.card2('Impact at both ends', 'HPM per 100 possessions, offence against defence; qualified players, size is minutes', U.chart('pl-sc', 440, 'Impact at both ends')) + '</div></div>';
+      node.innerHTML = h;
+      const st = { k: keys[0], r: '' };
+      const drawLb = () => {
+        const k = st.k, low = U.mMeta(k).better === 'low' && !COUNT.find(x => x[0] === k);
+        const list = ids.filter(id => isNum((P[id].values || {})[k]) && (!st.r || U.roleOf(P[id], id, rl) === st.r)).sort((a, b) => (low ? 1 : -1) * (P[a].values[k] - P[b].values[k])).slice(0, 25);
+        const rows = list.map(id => { const p = P[id], v = p.values || {}, role = U.roleOf(p, id, rl);
+          return { id: id, name: p.name, team: p.team, sub: [HW.teamAbbr(L, p.team), (U.ROLE1 || {})[role] || p.pos].filter(Boolean).join(' · '), val: v[k], val_p: U.rolePctl(cat, rl, id, k),
+            hpm: v.hpm, hpm_p: U.rolePctl(cat, rl, id, 'hpm'), ts: v.ts, ts_p: U.rolePctl(cat, rl, id, 'ts'), min: p.min, gp: p.gp }; });
+        QK.leaderboard(document.getElementById('pl-lb'), { dense: true, rank: true, rows: rows, rowHref: x => HW.playerHref(L, x.id, SS), columns: [
+          { key: 'name', label: 'Player', type: 'entity', sub: 'sub', mark: x => U.team(L, x.team), href: x => HW.playerHref(L, x.id, SS) },
+          { key: 'val', label: lab(k), type: 'pctl', pctl: 'val_p', fmt: v => fmtK(k, v) },
+          { key: 'hpm', label: 'HPM', type: 'pctl', pctl: 'hpm_p', fmt: v => U.signed(v, 1), tip: 'Total impact per 100 possessions' },
+          { key: 'ts', label: 'TS%', type: 'pctl', pctl: 'ts_p', fmt: v => HW.fmtVal(v, 'pct') },
+          { key: 'gp', label: 'GP', num: true }, { key: 'min', label: 'Min', type: 'bar', fmt: v => Number(Math.round(v || 0)).toLocaleString('en-GB') }] });
+      };
+      drawLb();
+      document.getElementById('pl-k').addEventListener('change', e => { st.k = e.target.value; drawLb(); });
+      QK.seg(document.getElementById('pl-r'), v => { st.r = v; drawLb(); });
+      const q = document.getElementById('pl-q'), hits = document.getElementById('pl-hits');
+      const all = Object.keys(P).sort((a, b) => (P[b].min || 0) - (P[a].min || 0));
+      q.addEventListener('input', () => {
+        const s = q.value.trim().toLowerCase();
+        if (s.length < 2) { hits.innerHTML = ''; return; }
+        const found = all.filter(id => String(P[id].name || '').toLowerCase().indexOf(s) >= 0 || HW.teamName(L, P[id].team).toLowerCase().indexOf(s) >= 0).slice(0, 12);
+        hits.innerHTML = '<div class="qk-card" style="margin-bottom:14px"><ul class="hw-list">' + (found.length ? found.map(id => '<li>' + U.playerEnt(L, id, P[id].name, P[id].team, (P[id].pos || '') + ' · ' + HW.teamAbbr(L, P[id].team), SS) +
+          '<span class="v">' + U.f((P[id].values || {}).pts_g, 1) + ' ppg</span></li>').join('') : '<li class="hw-quiet">No player matches.</li>') + '</ul></div>';
+      });
+      const pts = ids.filter(id => isNum((P[id].values || {}).hpm_o) && isNum((P[id].values || {}).hpm_d));
+      const maxMin = Math.max.apply(null, pts.map(id => P[id].min || 0).concat([1]));
+      QKC.scatter('#pl-sc', { points: pts.map(id => ({ x: P[id].values.hpm_o, y: P[id].values.hpm_d, name: P[id].name + ' · ' + HW.teamAbbr(L, P[id].team), label: (P[id].name || '').split(' ').slice(-1)[0],
+        color: U.tcol(L, P[id].team), size: 5 + 11 * Math.sqrt((P[id].min || 0) / maxMin), href: HW.playerHref(L, id, SS) })), xName: 'Offensive impact (HPM per 100)', yName: 'Defensive impact (HPM per 100)', xFmt: v => U.signed(v, 1), yFmt: v => U.signed(v, 1),
+        refX: 0, refY: 0, labelTop: 14, quadrants: ['Defence first', 'Both ends', 'Below average', 'Offence first'], label: 'Impact at both ends' });
+      HW.setMeta('');
+    };
+    if (r.fallback) return U.roles(L, SS).then(rl => { if (U.alive(node)) finish(rl); });
+    finish(roles);
+    return null;
   });
 }
 
 function renderPlayers(el, params) {
   const L = U.L(params), S = U.S(params);
   const tab = U.tab(params, ['leaders', 'catalogue', 'awards', 'boards'], 'leaders');
-  const body = U.section(el, { title: 'Players', kicker: U.kicker(L, S), sub: 'Leaders with sample floors, the full catalogue of 125 metrics with percentiles, and the award races. Open a player for his season by season, splits and value.',
+  const body = U.section(el, { title: 'Players', kicker: U.kicker(L, S), sub: 'Leaderboards against each player’s role, the full catalogue of 125 metrics with percentiles, and the award races. Open a player for his season by season, splits and value.',
     tabs: U.tabs(L, 'players', [['leaders', 'Leaders'], ['catalogue', 'Catalogue'], ['awards', 'Awards'], ['boards', 'Any metric']], S), active: tab });
   if (tab === 'leaders') return leadersTab(body, L, S);
   return U.legacy({ catalogue: 'players', awards: 'awards', boards: 'leaders' }[tab], body, params);
@@ -258,6 +282,8 @@ function renderLab(el, params, state) {
   const r = state.route;
   const compare = r === 'compare' || r === 'compare-players' || r === 'compare-teams' || U.tab(params, ['lab', 'compare'], 'lab') === 'compare';
   const tab = compare ? 'compare' : 'lab';
+  // players compare (Design System 2.0, hw-compare.js); ?view=all and teams keep the classic every-metric view
+  if (compare && r !== 'compare-teams' && ((params.query || {}).view) !== 'all' && HW.compareV2) return HW.compareV2(el, params);
   const body = U.section(el, { title: 'Lab', kicker: U.kicker(L, S), sub: 'Build your own chart from any two player metrics, or put two players or two teams side by side.',
     tabs: U.tabs(L, 'lab', [['lab', 'Chart builder'], ['compare', 'Compare']], S), active: tab });
   if (!compare) return U.legacy('lab', body, params);
@@ -265,13 +291,45 @@ function renderLab(el, params, state) {
   return U.legacy(name, body, params);
 }
 
+/* Who moves next, on the Model page: the method notes verbatim, the held-out validation of each block (published
+ * or not, and why) and the calibration deciles of the chance of leaving. */
+function movesModel(body, L) {
+  body.innerHTML = QK.skeleton('lines', 6);
+  return U.movement(L).then(mv => {
+    if (!U.alive(body)) return;
+    if (!mv) { body.innerHTML = U.empty('Not built yet', 'The movement model has not run for this league.'); return; }
+    const m = mv.m, V = m.validation || {}, sp = m.split || {};
+    const NAME = { next: 'Leaves by next season', deadline: 'Traded or claimed before the deadline', type: 'How he leaves (type split)', arrivals: 'Arrivals by position', targets: 'Targets' };
+    const ci = a => (Array.isArray(a) ? (a[0] >= 0 ? '+' : '') + U.f(a[0] * 1000, 1) + ' (' + U.f(a[1] * 1000, 1) + ' to ' + U.f(a[2] * 1000, 1) + ')' : '—');
+    const rows = Object.keys(NAME).filter(k => V[k]).map(k => {
+      const t = V[k].test || {};
+      return { block: NAME[k], n: t.n || t.team_seasons, rate: t.rate, ll: t.logloss, llb: t.logloss_base, gain: t.ll_gain, slope: t.cal_slope, pub: !!(m.published || {})[k], why: (m.reasons || {})[k] || '' };
+    });
+    body.innerHTML = '<div class="qk-grid"><div class="qk-span-7">' + U.card2('How it works', 'The model notes, as published with the payload', '<div class="prose-dark">' + (m.notes || []).map(x => '<p>' + esc(x) + '</p>').join('') + '</div>') + '</div>' +
+      '<div class="qk-span-5">' + U.card2('Calibration: chance of leaving', 'Sealed seasons ' + esc((sp.test || []).join(', ')) + ': our chance (decile mean) against the share who left', U.chart('mv-dec', 300, 'Predicted against observed, by decile')) + '</div></div>' +
+      '<section class="qk-section">' + U.card2('Validation on the sealed seasons', 'Each block is published only when it beats the base rate with confidence and stays calibrated; otherwise the page shows the base rate or nothing',
+        '<div id="mv-val"></div>', { flush: true }) + '</section>';
+    QK.table(document.getElementById('mv-val'), { dense: true, rows: rows, columns: [
+      { key: 'block', label: 'Block', sort: false }, { key: 'n', label: 'n', num: true }, { key: 'rate', label: 'Rate', num: true, fmt: v => U.pct(v, 1) },
+      { key: 'll', label: 'Log-loss', num: true, fmt: v => U.f(v, 3), tip: 'Lower is better' }, { key: 'llb', label: 'Base rate', num: true, fmt: v => U.f(v, 3), tip: 'Log-loss of the base rate' },
+      { key: 'gain', label: 'Gain ×1000 (95% CI)', num: true, fmt: v => ci(v), tip: 'Log-loss improvement over the base rate, with its 95% interval (team-clustered)' },
+      { key: 'slope', label: 'Cal. slope', num: true, fmt: v => U.f(v, 2), tip: 'Calibration slope; 1 is ideal' },
+      { key: 'pub', label: 'Published', fmt: (v, r) => (v ? QK.tag('yes', 'signal') : '<span data-tip="' + esc(r.why) + '" tabindex="0">' + QK.tag('no: base rate') + '</span>') }] });
+    const dec = ((V.next || {}).test || {}).deciles || [];
+    if (dec.length) QKC.scatter('#mv-dec', { points: dec.map((d, i) => ({ x: d[0], y: d[1], name: 'Decile ' + (i + 1) + ' · ' + d[2] + ' players', size: 10 })), diagonal: { label: 'perfect' }, xMin: 0, xMax: 1, yMin: 0, yMax: 1,
+      xName: 'Our chance (decile mean)', yName: 'Share who left', xFmt: v => Math.round(v * 100) + '%', yFmt: v => Math.round(v * 100) + '%', label: 'Calibration of the chance of leaving' });
+    else document.getElementById('mv-dec').innerHTML = U.empty('No deciles', '');
+  });
+}
+
 function renderModel(el, params, state) {
   const L = U.L(params);
   const r = state.route;
-  let tab = r === 'glossary' ? 'glossary' : r === 'methodology' ? 'methodology' : r === 'disclaimer' ? 'terms' : U.tab(params, ['methodology', 'calibration', 'glossary', 'terms'], 'methodology');
+  let tab = r === 'glossary' ? 'glossary' : r === 'methodology' ? 'methodology' : r === 'disclaimer' ? 'terms' : U.tab(params, ['methodology', 'calibration', 'markets', 'moves', 'glossary', 'terms'], 'methodology');
   const body = U.section(el, { title: 'Model', kicker: HW.leagueName(L) + ' · how it works', sub: 'How the models are built, how well they have done, and what every number means.',
-    tabs: U.tabs(L, 'model', [['methodology', 'Methodology'], ['calibration', 'Calibration'], ['glossary', 'Glossary'], ['terms', 'Terms']], null), active: tab });
-  const v = { methodology: 'methodology', calibration: 'calibration', glossary: 'glossary', terms: 'disclaimer' }[tab];
+    tabs: U.tabs(L, 'model', [['methodology', 'Methodology'], ['calibration', 'Calibration'], ['markets', 'Our forecasts v the market'], ['moves', 'Who moves next'], ['glossary', 'Glossary'], ['terms', 'Terms']], null), active: tab });
+  if (tab === 'moves') return movesModel(body, L);
+  const v = { methodology: 'methodology', calibration: 'calibration', markets: 'markets', glossary: 'glossary', terms: 'disclaimer' }[tab];
   return U.legacy(v, body, params);
 }
 

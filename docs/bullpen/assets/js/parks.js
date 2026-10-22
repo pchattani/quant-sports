@@ -174,7 +174,7 @@ function weather(host, wx, eff, info) {
   const w = eff && eff.weather;
   if (w && (w.carry_ft || w.hr_prob)) {
     const c = w.carry_ft || {}, r = w.hr_prob || {};
-    h += '<div class="pg-note gq-note">League-wide, a hard-hit air ball carries ' + k.signed(c.per_10F, 1) + ' ft per 10 °F warmer and ' + k.signed(c.per_mph_out, 2) + ' ft per mph of wind blowing out; its home-run probability moves ' + k.signed(100 * (r.per_10F || 0), 2) + ' and ' + k.signed(100 * (r.per_mph_out || 0), 2) + ' percentage points. The game model prices weather separately: about 1.1% more home-run odds per °F above 70 and 1.8% per mph straight out (out to left or right 0.8), neutral under a closed roof.</div>';
+    h += '<div class="pg-note gq-note">League-wide, a hard-hit air ball carries ' + k.signed(c.per_10F, 1) + ' ft per 10 °F warmer and ' + k.signed(c.per_mph_out, 2) + ' ft per mph of wind blowing out; its home-run probability moves ' + k.signed(100 * (r.per_10F || 0), 2) + ' and ' + k.signed(100 * (r.per_mph_out || 0), 2) + ' percentage points. The game model handles weather separately: about 1.1% more home-run odds per °F above 70 and 1.8% per mph straight out (out to left or right 0.8), neutral under a closed roof.</div>';
   }
   host.innerHTML = h || k.muted('No weather effects published for this park yet.');
 }

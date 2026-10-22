@@ -98,7 +98,7 @@ td .cc-num + .qk-pctl { margin-left: 6px; }
 .cc-grade[data-g="D"] { background: color-mix(in srgb, var(--div-neg) 30%, var(--s-1)); }
 .cc-grade[data-g="F"] { background: color-mix(in srgb, var(--div-neg) 60%, var(--s-1)); color: #fff; }
 .cc-pbar { display: inline-block; width: 64px; height: 6px; border-radius: 3px; background: var(--s-3); overflow: hidden; vertical-align: middle; }
-.cc-pbar > span { display: block; height: 100%; background: var(--c-1); border-radius: 3px; }
+.cc-pbar > span { display: block; height: 100%; background: var(--signal); border-radius: 3px; }
 .cc-data { margin-top: var(--sp-3); font-size: var(--fs-xs); }
 .cc-data > summary { cursor: pointer; color: var(--ink-3); font-weight: 600; }
 .cc-data > summary:hover { color: var(--ink-1); }
@@ -179,7 +179,7 @@ a.cc-bt:hover .nm { color: var(--accent); }
 .cc-prose p, .cc-prose ul, .cc-prose ol { margin: 0 0 var(--sp-3); }
 .cc-prose ul, .cc-prose ol { padding-left: 20px; }
 .cc-prose a { color: var(--accent); }
-.cc-prose code { font-family: var(--font-num); background: var(--s-2); padding: 1px 5px; border-radius: 4px; font-size: 0.92em; }
+.cc-prose code { font-family: var(--font-num); background: var(--s-2); padding: 1px 5px; border-radius: 4px; font-size: 0.92em; overflow-wrap: anywhere; word-break: break-word; }
 .cc-prose .qk-table-wrap { margin: 0 0 var(--sp-3); border: 1px solid var(--line-1); border-radius: var(--r-2); }
 .cc-pre { background: var(--s-2); border-radius: var(--r-2); padding: 12px; overflow-x: auto; font: 12px/1.5 var(--font-num); color: var(--ink-1); }
 .cc-dl { margin: 0; }
@@ -214,3 +214,43 @@ a.cc-bt:hover .nm { color: var(--accent); }
   .cc-ctx .qk-select { flex: 1 1 auto; }
 }
 @media print { .cc-fv, .cc-legal { display: none; } }
+
+/* ═════════════════════════════════ Design System 2.0 (after the Rink reference pages) */
+.cc-sh { margin-bottom: var(--sp-4); }
+.cc-kpis .qk-stats { margin-bottom: 0; }
+.qk-card-body.flush > .cc-list li { padding: 9px 16px; }
+.cc-list .n { color: var(--ink-3); font: 500 var(--fs-xs) var(--font-num); width: 18px; text-align: right; flex: none; }
+.cc-lead li { flex-wrap: nowrap; }
+.cc-lead .v { font: 800 var(--fs-md) var(--font-display); font-stretch: var(--stretch-display); font-variant-numeric: tabular-nums; }
+.cc-lead li:first-child .v { color: var(--signal); }
+.cc-games { grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); }
+.cc-lb { min-width: 0; }
+
+/* game centre hero (v2, after the Rink game page) */
+.cc-hero2 { margin-bottom: 0; }
+.cc-g2 { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--sp-4); position: relative; }
+.cc-g2 .side { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.cc-g2 .side.home { justify-content: flex-end; text-align: right; }
+.cc-g2 .side .nm { font: 800 clamp(1rem, 2.4vw, 1.5rem)/1.15 var(--font-display); font-stretch: var(--stretch-display); overflow-wrap: anywhere; }
+.cc-g2 .side .nm:hover { color: var(--signal); }
+.cc-g2 .side .sb { color: var(--ink-3); font-size: var(--fs-xs); margin-top: 3px; font-family: var(--font-num); }
+.cc-g2 .mid { text-align: center; }
+.cc-g2 .mid .qk-badge { margin-top: 8px; }
+.cc-score { font: 900 clamp(2rem, 6vw, 3.4rem)/1 var(--font-display); font-stretch: var(--stretch-display); font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 14px; justify-content: center; }
+.cc-score .dash { color: var(--ink-4); font-weight: 500; }
+.cc-score.pre { font-size: clamp(1.4rem, 3.5vw, 2rem); color: var(--ink-2); }
+.cc-hero-bar { position: relative; max-width: 720px; margin: var(--sp-5) auto 0; display: grid; gap: 8px; }
+.cc-hero-bar > .qk-kicker { text-align: center; }
+.cc-hero-mkt { display: flex; justify-content: center; font-size: var(--fs-xs); }
+.cc-hero-meta { position: relative; margin-top: var(--sp-4); display: flex; gap: 6px 18px; flex-wrap: wrap; color: var(--ink-2); font-size: var(--fs-sm); justify-content: center; }
+.cc-hero2 .cc-gh-top { justify-content: center; }
+@media (max-width: 720px) {
+  .cc-g2 { gap: 8px; }
+  .cc-g2 .side { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .cc-g2 .side.home { align-items: flex-end; }
+}
+.cc-lbh { padding: 10px 16px; font-size: var(--fs-xs); color: var(--ink-3); border-bottom: 1px solid var(--line-1); }
+.cc-lbh b { color: var(--ink-1); }
+.cc-split { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--s-3); margin: var(--sp-3) 0 var(--sp-2); }
+.cc-split > span { display: block; height: 100%; }
+.cc-empty-act { display: flex; justify-content: center; margin: calc(-1 * var(--sp-3)) 0 var(--sp-5); }

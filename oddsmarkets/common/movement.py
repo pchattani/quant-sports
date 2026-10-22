@@ -316,12 +316,12 @@ def _season_rows(df: pd.DataFrame, seasons: Iterable[int]) -> pd.DataFrame:
 
 
 def wf_binary(panel: pd.DataFrame, label: str, feats: list[str], quad: list[str], eval_seasons: list[int],
-              l2: float, min_train: int = 2) -> pd.DataFrame:
+              l2: float, min_train: int = 2, gap: int = 0) -> pd.DataFrame:
     """Walk-forward predictions for eval_seasons: season s is fitted on every labelled season before s. Returns the eval
     rows with columns p (model) and p0 (training base rate)."""
     out = []
     for s in eval_seasons:
-        tr = panel[(panel["season"] < s) & panel[label].notna()]
+        tr = panel[(panel["season"] < s - gap) & panel[label].notna()]
         te = panel[(panel["season"] == s) & panel[label].notna()]
         if tr["season"].nunique() < min_train or not len(te):
             continue
@@ -334,21 +334,22 @@ def wf_binary(panel: pd.DataFrame, label: str, feats: list[str], quad: list[str]
     return pd.concat(out) if out else pd.DataFrame()
 
 
-def choose_l2(panel: pd.DataFrame, label: str, feats: list[str], quad: list[str], dev: list[int], grid=L2_GRID) -> tuple[float, dict]:
+def choose_l2(panel: pd.DataFrame, label: str, feats: list[str], quad: list[str], dev: list[int], grid=L2_GRID,
+              gap: int = 0) -> tuple[float, dict]:
     res = {}
     for l2 in grid:
-        r = wf_binary(panel, label, feats, quad, dev, l2)
+        r = wf_binary(panel, label, feats, quad, dev, l2, gap=gap)
         res[l2] = float(logloss_rows(r[label].to_numpy(float), r["p"].to_numpy()).mean()) if len(r) else float("inf")
     best = min(res, key=res.get)
     return best, {str(k): round(v, 5) for k, v in res.items()}
 
 
 def evaluate_binary(panel: pd.DataFrame, label: str, feats: list[str], quad: list[str], dev: list[int], test: list[int],
-                    cluster_cols=("season", "tid")) -> dict:
-    l2, grid = choose_l2(panel, label, feats, quad, dev)
-    out = {"label": label, "l2": l2, "l2_dev": grid, "dev": dev, "test": test}
+                    cluster_cols=("season", "tid"), gap: int = 0) -> dict:
+    l2, grid = choose_l2(panel, label, feats, quad, dev, gap=gap)
+    out = {"label": label, "l2": l2, "l2_dev": grid, "dev": dev, "test": test, "gap": gap}
     for name, ss in (("dev_eval", dev), ("test_eval", test)):
-        r = wf_binary(panel, label, feats, quad, ss, l2)
+        r = wf_binary(panel, label, feats, quad, ss, l2, gap=gap)
         if not len(r):
             out[name] = None
             continue
@@ -376,12 +377,13 @@ def coef_table(d: Design, b: np.ndarray) -> list[list]:
 
 # ---------------------------------------------------------------------------------------------- departure type
 
-def wf_type(panel: pd.DataFrame, feats: list[str], quad: list[str], eval_seasons: list[int], l2: float, K: int = 3) -> pd.DataFrame:
+def wf_type(panel: pd.DataFrame, feats: list[str], quad: list[str], eval_seasons: list[int], l2: float, K: int = 3,
+            gap: int = 0) -> pd.DataFrame:
     """Among leavers with a known type: multinomial predictions (P0 = training shares) for eval seasons."""
     lv = panel[(panel["y_next"] == 1) & (panel["y_type"] >= 0)]
     out = []
     for s in eval_seasons:
-        tr, te = lv[lv["season"] < s], lv[lv["season"] == s]
+        tr, te = lv[lv["season"] < s - gap], lv[lv["season"] == s]
         if tr["season"].nunique() < 2 or not len(te) or tr["y_type"].nunique() < K:
             continue
         d = Design(list(feats), list(quad)).fit(tr)
@@ -396,10 +398,11 @@ def wf_type(panel: pd.DataFrame, feats: list[str], quad: list[str], eval_seasons
     return pd.concat(out) if out else pd.DataFrame()
 
 
-def evaluate_type(panel: pd.DataFrame, feats: list[str], quad: list[str], dev: list[int], test: list[int], K: int = 3) -> dict:
+def evaluate_type(panel: pd.DataFrame, feats: list[str], quad: list[str], dev: list[int], test: list[int], K: int = 3,
+                  gap: int = 0) -> dict:
     best, grid = None, {}
     for l2 in L2_GRID:
-        r = wf_type(panel, feats, quad, dev, l2, K)
+        r = wf_type(panel, feats, quad, dev, l2, K, gap)
         if not len(r):
             continue
         P = r[[f"q{k}" for k in range(K)]].to_numpy()
@@ -411,7 +414,7 @@ def evaluate_type(panel: pd.DataFrame, feats: list[str], quad: list[str], dev: l
     if best is None:
         return {**out, "test_eval": None, "dev_eval": None}
     for name, ss in (("dev_eval", dev), ("test_eval", test)):
-        r = wf_type(panel, feats, quad, ss, best, K)
+        r = wf_type(panel, feats, quad, ss, best, K, gap)
         if not len(r):
             out[name] = None
             continue
@@ -431,14 +434,14 @@ def fit_final_type(panel: pd.DataFrame, feats: list[str], quad: list[str], l2: f
 
 # ---------------------------------------------------------------------------------------------- arrivals by position
 
-def wf_poisson(rows: pd.DataFrame, feats: list[str], eval_seasons: list[int], l2: float) -> pd.DataFrame:
+def wf_poisson(rows: pd.DataFrame, feats: list[str], eval_seasons: list[int], l2: float, gap: int = 0) -> pd.DataFrame:
     """rows: one per (season, tid, pos) with y (arrivals); base = the training mean at that position."""
     out = []
     pos_d = pd.get_dummies(rows["pos"], prefix="pos", dtype=float)
     R = pd.concat([rows, pos_d], axis=1)
     fx = list(feats) + list(pos_d.columns[1:])
     for s in eval_seasons:
-        tr, te = R[R["season"] < s], R[R["season"] == s]
+        tr, te = R[R["season"] < s - gap], R[R["season"] == s]
         if tr["season"].nunique() < 2 or not len(te):
             continue
         d = Design(fx).fit(tr)
@@ -451,10 +454,10 @@ def wf_poisson(rows: pd.DataFrame, feats: list[str], eval_seasons: list[int], l2
     return pd.concat(out) if out else pd.DataFrame()
 
 
-def evaluate_arrivals(rows: pd.DataFrame, feats: list[str], dev: list[int], test: list[int]) -> dict:
+def evaluate_arrivals(rows: pd.DataFrame, feats: list[str], dev: list[int], test: list[int], gap: int = 0) -> dict:
     grid, best = {}, None
     for l2 in L2_GRID:
-        r = wf_poisson(rows, feats, dev, l2)
+        r = wf_poisson(rows, feats, dev, l2, gap)
         if not len(r):
             continue
         y1 = (r["y"] > 0).to_numpy(float)
@@ -464,14 +467,14 @@ def evaluate_arrivals(rows: pd.DataFrame, feats: list[str], dev: list[int], test
             best = l2
     out = {"l2": best, "l2_dev": grid}
     for name, ss in (("dev_eval", dev), ("test_eval", test)):
-        r = wf_poisson(rows, feats, ss, best) if best is not None else pd.DataFrame()
+        r = wf_poisson(rows, feats, ss, best, gap) if best is not None else pd.DataFrame()
         if not len(r):
             out[name] = None
             continue
         y1 = (r["y"] > 0).to_numpy(float)
         cl = r[["season", "tid"]].astype(str).agg("|".join, axis=1).to_numpy()
         m = binary_metrics(y1, 1 - np.exp(-r["lam"].to_numpy()), 1 - np.exp(-r["lam0"].to_numpy()), cl)
-        lam, lam0, y = r["lam"].to_numpy(), r["lam0"].to_numpy(), r["y"].to_numpy(float)
+        lam, lam0, y = np.maximum(r["lam"].to_numpy(), 1e-6), np.maximum(r["lam0"].to_numpy(), 1e-6), r["y"].to_numpy(float)
         dev_m = 2 * np.sum(np.where(y > 0, y * np.log(np.maximum(y, 1e-9) / lam), 0) - (y - lam))
         dev_b = 2 * np.sum(np.where(y > 0, y * np.log(np.maximum(y, 1e-9) / lam0), 0) - (y - lam0))
         m["poisson_deviance"] = [round(float(dev_m / len(y)), 4), round(float(dev_b / len(y)), 4)]
@@ -578,6 +581,21 @@ class Config:
     walk_from: int | None = None              # years in the league from which a target reads "at or near free agency"
     k: int = 10
     deadline_label: str = "traded"            # "traded" (typed history) or "traded or claimed" (box-score history)
+    # In season, the previous season's "left by next season" label is only settled once the current season is over
+    # (a player who opens elsewhere in December, or never plays): fit on seasons < s - 1 then, and live on seasons up
+    # to two back. After the season every label of the previous season is settled at the snapshot (gap 0).
+    inseason_gap: int = 1
+    # the horizon of the team blocks (outlook, targets): None = before the deadline in season and by next season after
+    # it; "next" = by next season always (the NFL, where in-season moves are rare)
+    team_horizon: str | None = None
+
+
+def gap_of(cfg: "Config", phase: str) -> int:
+    return int(cfg.inseason_gap) if phase == "inseason" else 0
+
+
+def dest_col_of(cfg: "Config", phase: str) -> str:
+    return "dest" if (cfg.team_horizon == "next" or (cfg.team_horizon is None and phase == "offseason")) else "dest_dl"
 
 
 def team_pos_table(df: pd.DataFrame, slots: dict) -> pd.DataFrame:
@@ -621,6 +639,12 @@ def arrivals_rows(df: pd.DataFrame, tp: pd.DataFrame, dest_col: str) -> pd.DataF
                                              team_turn=("team_turn", "first")).reset_index()
     R = tp.merge(team, on=["season", "tid"], how="left")
     R["y"] = [int(arr.get((s, t, p), 0)) for s, t, p in zip(R["season"], R["tid"], R["pos"])]
+    # last season's arrivals there and the league's mean at the position (settled before the snapshot; used when a
+    # sport's Config lists them)
+    own = {(s, t, p): y for s, t, p, y in zip(R["season"], R["tid"], R["pos"], R["y"])}
+    lg = R.groupby(["season", "pos"])["y"].mean().to_dict()
+    R["arr_prev"] = [own.get((s - 1, t, p), np.nan) for s, t, p in zip(R["season"], R["tid"], R["pos"])]
+    R["lg_prev"] = [lg.get((s - 1, p), np.nan) for s, p in zip(R["season"], R["pos"])]
     return R
 
 
@@ -708,13 +732,13 @@ def rank_targets(df_s: pd.DataFrame, tp_s: pd.DataFrame, league: dict, dfit: dic
     return out
 
 
-def oof_next(df: pd.DataFrame, cfg: Config, l2: float) -> pd.Series:
+def oof_next(df: pd.DataFrame, cfg: Config, l2: float, gap: int = 0) -> pd.Series:
     """P(leaves by next season) for every labelled row: walk-forward from the first dev season; earlier seasons from a fit
     on themselves (only ever a training input of the destination and arrival models, never scored)."""
     first = cfg.dev[0]
     p = pd.Series(np.nan, index=df.index)
     lab = sorted(df.loc[df["y_next"].notna(), "season"].unique())
-    r = wf_binary(df, "y_next", cfg.feats, cfg.quad, [s for s in lab if s >= first], l2)
+    r = wf_binary(df, "y_next", cfg.feats, cfg.quad, [s for s in lab if s >= first], l2, gap=gap)
     if len(r):
         p.loc[r.index] = r["p"]
     early = df[(df["season"] < first) & df["y_next"].notna()]
@@ -734,19 +758,21 @@ def research(df: pd.DataFrame, cfg: Config, league: dict, phase: str, dev: list[
     test = cfg.test if test is None else test
     df = df.copy()
     out: dict[str, Any] = {"version": cfg.version, "engine": VERSION, "phase": phase, "dev": dev, "test": test, "n_rows": int(len(df))}
-    out["next"] = evaluate_binary(df, "y_next", cfg.feats, cfg.quad, dev, test)
-    out["deadline"] = evaluate_binary(df, "y_dl", cfg.dl_feats, cfg.quad, dev, test)
-    out["type"] = evaluate_type(df, cfg.type_feats, [], dev, test, K=len(cfg.types))
-    df["p_next"] = oof_next(df, cfg, out["next"]["l2"])
-    dest_col = "dest" if phase == "offseason" else "dest_dl"
+    gap = gap_of(cfg, phase)
+    out["gap"] = gap
+    out["next"] = evaluate_binary(df, "y_next", cfg.feats, cfg.quad, dev, test, gap=gap)
+    out["deadline"] = evaluate_binary(df, "y_dl", cfg.dl_feats, cfg.quad, dev, test, gap=gap)
+    out["type"] = evaluate_type(df, cfg.type_feats, [], dev, test, K=len(cfg.types), gap=gap)
+    df["p_next"] = oof_next(df, cfg, out["next"]["l2"], gap)
+    dest_col = dest_col_of(cfg, phase)
     lab = df[df["season"] <= max(test or dev)]
     tp = fill_grid(team_pos_table(lab, cfg.slots), lab, sorted(df["pos"].dropna().unique()))
-    out["arrivals"] = evaluate_arrivals(arrivals_rows(lab, tp, dest_col), cfg.arr_feats, dev, test)
+    out["arrivals"] = evaluate_arrivals(arrivals_rows(lab, tp, dest_col), cfg.arr_feats, dev, test, gap)
     groups: dict[str, list] = {"dev_eval": [], "test_eval": []}
     seasons = sorted(lab["season"].unique())
     for name, ss in (("dev_eval", dev), ("test_eval", test)):
         for s in ss:
-            fit = fit_dest(lab, tp, league, [q for q in seasons if q < s], dest_col, cfg.age_pivot)
+            fit = fit_dest(lab, tp, league, [q for q in seasons if q < s - gap], dest_col, cfg.age_pivot)
             ds = lab[lab["season"] == s]
             ranks = rank_targets(ds, tp[tp["season"] == s], league, fit, cfg.age_pivot)
             for t, r in ranks.items():
@@ -843,9 +869,10 @@ def summary(ev: dict | None) -> dict | None:
 def predict_current(df: pd.DataFrame, cfg: Config, league: dict, res: dict, phase: str, cur: int) -> dict:
     """Final fits on every labelled season; predictions for the current season's rows."""
     df = df.copy()
-    lab_last = int(df.loc[df["y_next"].notna(), "season"].max())
+    gap = gap_of(cfg, phase)
+    lab_last = min(int(df.loc[df["y_next"].notna(), "season"].max()), cur - 1 - gap)
     dl_rows = df.loc[df["y_dl"].notna(), "season"]
-    dl_last = int(dl_rows.max()) if len(dl_rows) else lab_last
+    dl_last = min(int(dl_rows.max()), cur - 1 - gap) if len(dl_rows) else lab_last
     now = df[df["season"] == cur].copy()
     d, b, base_next = fit_final_binary(df, "y_next", cfg.feats, cfg.quad, res["next"]["l2"], lab_last)
     Xn = d.X(now)
@@ -865,20 +892,21 @@ def predict_current(df: pd.DataFrame, cfg: Config, league: dict, res: dict, phas
         Q = np.tile(shares, (len(now), 1))
     for k, nm in enumerate(cfg.types):
         now["p_" + nm] = now["p_next"].to_numpy() * Q[:, k]
-    df["p_next"] = oof_next(df, cfg, res["next"]["l2"])
+    df["p_next"] = oof_next(df, cfg, res["next"]["l2"], gap)
     df.loc[now.index, "p_next"] = now["p_next"]
-    dest_col = "dest" if phase == "offseason" else "dest_dl"
+    dest_col = dest_col_of(cfg, phase)
     tp = fill_grid(team_pos_table(df, cfg.slots), df, sorted(df["pos"].dropna().unique()))
-    R = arrivals_rows(df[df["season"] <= lab_last], tp[tp["season"] <= lab_last], dest_col)
+    R_all = arrivals_rows(df, tp, dest_col)           # the current season's rows carry last season's arrivals too
+    R = R_all[R_all["season"] <= lab_last]
     da, ba, pos_cols = fit_final_poisson(R, cfg.arr_feats, (res.get("arrivals") or {}).get("l2") or 1.0, lab_last)
-    team_now = now.groupby("tid").agg(team_wp=("team_wp", "first"), team_traj=("team_traj", "first"),
-                                      team_turn=("team_turn", "first")).reset_index()
-    Rn = tp[tp["season"] == cur].merge(team_now, on="tid", how="left")
+    Rn = R_all[R_all["season"] == cur].copy()
     Rn["lam"] = predict_poisson_rows(da, ba, pos_cols, Rn)
     seasons = [s for s in sorted(df["season"].unique()) if s <= lab_last]
     fit = fit_dest(df[df["season"] <= lab_last], tp, league, seasons, dest_col, cfg.age_pivot)
     ranks = rank_targets(now, tp[tp["season"] == cur], league, fit, cfg.age_pivot)
+    base_arr = {str(pos): [_rr(float((g["y"] > 0).mean())), _rr(float(g["y"].mean()), 2)] for pos, g in R.groupby("pos")}
     return {"now": now, "tp": tp[tp["season"] == cur], "arr": Rn, "ranks": ranks, "base_next": base_next, "base_dl": base_dl,
+            "base_arrivals": base_arr,
             "shares": shares, "coef_next": coef_table(d, b), "coef_dl": coef_table(dd, bd), "dest": fit, "lab_last": lab_last}
 
 
@@ -930,9 +958,11 @@ def payload(df: pd.DataFrame, cfg: Config, league: dict, res: dict, phase: str, 
         reasons["targets"] = "The target ranking did not beat both the need x value ranking and chance on the sealed seasons."
     out = {"ok": True, "level": cfg.level, "season": cur, "version": cfg.version, "engine": VERSION, "phase": phase, "snapshot": snapshot,
            "horizons": horizons, "deadline_label": cfg.deadline_label, "unit": cfg.unit,
+           "team_horizon": "next" if dest_col_of(cfg, phase) == "dest" else "deadline",
            "types": list(cfg.types), "type_labels": cfg.type_label, "published": pub, "reasons": reasons,
            "base_rates": {"next": _rr(P["base_next"]), "deadline": _rr(P["base_dl"]),
                           "types": {t: _rr(v) for t, v in zip(cfg.types, P["shares"])}},
+           "base_arrivals": P["base_arrivals"], "base_arrivals_fields": ["p_add", "mean_arrivals"],
            "player_fields": ["pid", "name", "team", "pos", "age", "yrs", "value", "p_next"] + ["p_" + t for t in cfg.types] + ["p_dl", "why"],
            "players": players,
            "team_fields": {"outlook": ["pos", "p_add", "exp_arrivals", "need", "exp_departures", "players"],

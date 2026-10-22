@@ -583,6 +583,14 @@ def team_metric_values(rows: list[dict], opp_of: Callable[[dict], dict | None]) 
         pair("sq", xg, shots)
         pair("sqa", xga, shots_ag)
         pair("sot", r.get("sot"), shots)
+        # Shots on target for minus against: as reliable half to half as xG difference and as predictive of
+        # the points that follow (docs/METRICS_SPEC.md, football clubs), with no shot model behind it.
+        sot_for = _num(r.get("sot"))
+        sot_ag = _num(r.get("sot_ag"))
+        if sot_ag is None:
+            sot_ag = _num(opp.get("sot"))
+        if sot_for is not None and sot_ag is not None:
+            add("sotd", sot_for - sot_ag)
         add("big_chances", r.get("big_chances"))
         add("big_chances_missed", r.get("big_chances_missed"))
         add("corners", r.get("corners"))
@@ -614,7 +622,7 @@ def team_metric_values(rows: list[dict], opp_of: Callable[[dict], dict | None]) 
         "xpts_per_match": mean("xpts"), "luck": mean("luck"), "possession": mean("poss"),
         "field_tilt": ratio("tilt", 100.0), "ppda": ratio("ppda"),
         "shots": mean("shots"), "shots_against": mean("shots_ag"), "shot_quality": ratio("sq"), "shot_quality_against": ratio("sqa"),
-        "sot_pct": ratio("sot", 100.0), "big_chances": mean("big_chances"), "big_chances_missed": mean("big_chances_missed"),
+        "sot_pct": ratio("sot", 100.0), "sot_diff": mean("sotd"), "big_chances": mean("big_chances"), "big_chances_missed": mean("big_chances_missed"),
         "corners": mean("corners"), "aerial_pct": ratio("aerial", 100.0), "ground_duel_pct": ratio("ground", 100.0),
         "passes": mean("passes"), "pass_pct": ratio("pass", 100.0), "long_ball_share": ratio("long", 100.0),
         "crosses": mean("crosses"), "dribbles": mean("dribbles"), "fouls": mean("fouls"), "cards": mean("cards"),

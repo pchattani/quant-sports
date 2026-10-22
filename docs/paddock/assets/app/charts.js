@@ -199,7 +199,7 @@ function lines(x, series, o) {
     });
     var named = list.filter(function (s) { return !s.faint; }).map(function (s) { return s.name; });
     return {
-      grid: { left: 6, right: o.endLabels ? 70 : 16, top: (o.legend !== false && named.length > 1 ? 30 : 12) + (o.yName ? 10 : 0), bottom: o.xName ? 30 : 8, containLabel: true },
+      grid: { left: 6, right: o.endLabels ? 70 : 16, top: (o.legend !== false && named.length > 1 && !o.endLabels ? 30 : 12) + (o.yName ? 22 : 0), bottom: o.xName ? 30 : 8, containLabel: true },
       legend: o.legend !== false && named.length > 1 && !o.endLabels ? legend(T, { data: named }) : undefined,
       xAxis: ax(T, { type: xType, data: o.xs, line: true, split: false, boundaryGap: xType === 'category' ? false : undefined, fmt: o.xFmt, min: o.xMin, max: o.xMax, name: o.xName, nameLocation: 'middle', nameGap: 26, scale: xType === 'value' }),
       yAxis: ax(T, { name: o.yName, nameAlign: 'left', nameLocation: o.inverse ? 'start' : 'end', fmt: o.yFmt, inverse: !!o.inverse, scale: o.yScale !== false, min: o.yMin, max: o.yMax }),
@@ -471,9 +471,10 @@ function telemetry(x, A, B, delta, names, corners) {
   var len = Math.min(A.d.length, B.d.length);
   var d = A.d.slice(0, len);
   var panels = [['delta', 'Delta (s)', 1.1], ['speed', 'Speed', 2.2], ['throttle', 'Throttle %', 1], ['brake', 'Brake', 0.6], ['gear', 'Gear', 0.9], ['rpm', 'RPM', 1], ['drs', 'DRS', 0.6]];
+  var host = node(x);
   return mount(x, function (T) {
     var tot = panels.reduce(function (s, p) { return s + p[2]; }, 0);
-    var top = 34, avail = (node(x).clientHeight || 900) - top - 34, gap = 10, grids = [], xA = [], yA = [], ser = [];
+    var top = 34, avail = ((host && host.clientHeight) || 900) - top - 34, gap = 10, grids = [], xA = [], yA = [], ser = [];
     var unit = (avail - gap * (panels.length - 1)) / tot;
     panels.forEach(function (p, i) {
       var h = unit * p[2];
@@ -610,7 +611,7 @@ function reliability(x, models) {
         symbolSize: function (v) { return 5 + 14 * Math.sqrt(v[2] / maxN); }, lineStyle: { width: 1.6, color: T.cat[i % 8] }, itemStyle: { color: T.cat[i % 8] } });
     });
     return {
-      grid: { left: 8, right: 16, top: 34, bottom: 34, containLabel: true },
+      grid: { left: 8, right: 16, top: 54, bottom: 34, containLabel: true },
       legend: legend(T, { data: list.map(function (m) { return m.name; }) }),
       xAxis: ax(T, { min: 0, max: 1, name: 'Forecast probability', nameLocation: 'middle', nameGap: 26, fmt: function (v) { return Math.round(v * 100) + '%'; } }),
       yAxis: ax(T, { min: 0, max: 1, name: 'Observed', fmt: function (v) { return Math.round(v * 100) + '%'; } }),

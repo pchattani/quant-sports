@@ -1,7 +1,8 @@
-/* The Quant Paddock — Overview (#/): the next race with a live countdown, who wins it (model against
- * the market), the title fight, the fastest cars and drivers right now, how the favourites have fared,
- * last race and the fantasy picks. Charts first, words second.
- * Reads index.json, <y>/season.json, <y>/races/<next>.json, markets.json, <y>/value.json, <y>/fantasy.json. */
+/* The Quant Paddock — Overview (#/), on Design System 2.0: the section head and stat tiles (our next-race favourite and
+ * title chance first), the race weekend (countdown, schedule, our win chance as chance bars), the title race (points
+ * so far and our projection, 538 style; title chances; the season-end points range; standings with trends), car
+ * against driver, how our favourite has fared, the last race and the fantasy projections. No market on this page.
+ * Reads index.json, <y>/season.json, <y>/races/<next>.json, <y>/value.json, <y>/fantasy.json. */
 (function (PD) {
 'use strict';
 
@@ -41,41 +42,53 @@ function weekendClock(list, cdId, schedId) {
 }
 PD.weekendClock = weekendClock;
 
-function titleRows(season, markets, kind) {
+function titleRows(season, kind) {
   var ch = PD.ok(season) && season.championship ? season.championship[kind] || {} : {};
-  var mk = (markets || {})[kind === 'drivers' ? 'drivers_title' : 'constructors_title'] || {};
-  var prices = mk.available ? (mk.prices || {}) : {};
-  return Object.keys(ch).filter(function (id) { return (ch[id].p_title || 0) >= 0.0005 || (prices[id] || 0) >= 0.001; })
-    .sort(function (a, b) { return (ch[b].p_title - ch[a].p_title) || ((prices[b] || 0) - (prices[a] || 0)); })
-    .map(function (id) { return { id: id, model: ch[id].p_title, market: prices[id], c: ch[id] }; });
+  return Object.keys(ch).filter(function (id) { return !ch[id].eliminated && isNum(ch[id].p_title); })
+    .sort(function (a, b) { return (ch[b].p_title - ch[a].p_title) || ((ch[b].exp_points || 0) - (ch[a].exp_points || 0)); })
+    .map(function (id) { return { id: id, model: ch[id].p_title, c: ch[id] }; });
+}
+function nextSim(race) {
+  var f = PD.ok(race) && race.forecast ? race.forecast : null;
+  var post = f && f.post_quali && f.post_quali.drivers && Object.keys(f.post_quali.drivers).length ? f.post_quali : null;
+  var sim = post || (f && f.pre_quali);
+  return sim && sim.drivers ? { sim: sim, post: !!post } : null;
 }
 
 function render(el) {
   var idx = PD.index() || {};
   var y = idx.current_season || PD.currentSeason();
   var next = idx.next, last = idx.last;
-  el.innerHTML = '<section class="pd-hero" id="ov-hero">' + PD.empty('Loading', '') + '</section>' +
-    '<div class="qk-grid pd-ov">' +
-      PD.card('<span id="ov-who-t">Who wins next?</span>', '<span id="ov-who-s">Model win probability against the de-vigged market.</span>', PD.chartBox('ov-who', 420), { span: 8, id: 'ov-who-card' }) +
-      PD.card('Race forecast', '<span id="ov-fc-s"></span>', '<div id="ov-fc"></div>', { span: 4, flush: true }) +
-      PD.card('The title fight', 'Points after each round, top six.', PD.chartBox('ov-prog', 340), { span: 8 }) +
-      PD.card('Standings', '', '<div id="ov-std"></div>', { span: 4, flush: true, right: PD.seg('ov-std-k', [['drivers', 'Drivers'], ['constructors', 'Teams']], 'drivers', 'Standings') }) +
-      PD.card('Championship odds', '<span id="ov-odds-s">Share of simulated seasons won; orange tick = market.</span>', PD.chartBox('ov-odds', 300), { span: 6, right: PD.seg('ov-odds-k', [['drivers', 'Drivers'], ['constructors', 'Teams']], 'drivers', 'Title') }) +
-      PD.card('Fastest cars right now', 'Car race pace at the latest round, % of a lap against the field (right = faster), ±1 se.', PD.chartBox('ov-cars', 300), { span: 6 }) +
-      PD.card('Best drivers this season', 'Race pace above the team-mate, % of a lap (the driver alone), ±1 se; 5+ races.', PD.chartBox('ov-drv', 300), { span: 6 }) +
-      PD.card('How the favourite fared', 'The model’s pre-race favourite each round: its win probability, filled when it won.', PD.chartBox('ov-fav', 300), { span: 6 }) +
-      PD.card('Last race', '', '<div id="ov-last"></div>', { span: 6 }) +
-      PD.card('Fantasy: top projections', 'Expected points next weekend with our scoring table.', PD.chartBox('ov-fan', 300), { span: 6, foot: '<a href="#/fantasy">All picks, value and the schedule →</a>' }) +
-    '</div>';
+  var meta = (idx.seasons_meta || {})[String(y)] || {};
+  var kick = 'F1 · ' + y + (next ? ' · round ' + next.round + ' next' : ' · season complete');
+  var kseg = function (id) { return PD.seg(id, [['drivers', 'Drivers'], ['constructors', 'Constructors']], 'drivers', 'Championship'); };
+  el.innerHTML = QK.sectionHead({ kicker: kick, title: 'Every Grand Prix, by the numbers.', size: 'lg', tag: 'h1',
+    sub: 'Our chance for every race and both championships from simulated seasons, car pace against driver skill, and the drivers behind it all.',
+    actions: (next ? '<a class="qk-btn primary" href="' + PD.raceHref(next.year, next.round) + '">Race centre</a>' : '') + '<a class="qk-btn" href="#/standings">Standings</a><a class="qk-btn" href="#/races">Calendar</a>' }) +
+    '<div id="ov-kpis">' + QK.skeleton('lines', 2) + '</div>' +
+    '<section class="qk-section pd-sec" id="ov-wk"></section>' +
+    '<section class="qk-section pd-sec">' + PD.secHead('Season simulation', 'Who wins the title', 'Our chances from 20,000 simulated seasons. The lines are points so far, then our expected points for every round still to run.', kseg('ov-k')) +
+    PD.grid(
+      PD.card('The title race', 'Championship points by round; past the Today line, our projection.', PD.chartBox('ov-prog', 380, 'Championship points with our projection'), { span: 8 }) +
+      PD.card('Title chances', '<span id="ov-odds-s">Our chance of winning the title.</span>', '<div id="ov-odds"></div>', { span: 4, foot: '<span></span><a href="#/standings?tab=odds">Every title chance →</a>' }) +
+      PD.card('Where the points land', 'Season-end points: the bar spans the 5th to 95th percentile of the simulated seasons, the dot is our expectation.', PD.chartBox('ov-range', 360, 'Season-end points range'), { span: 6 }) +
+      PD.card('Standings', 'Points so far and the trend after every round.', '<div id="ov-std"></div>', { span: 6, flush: true, foot: '<span></span><a href="#/standings">Full standings and magic numbers →</a>' })) + '</section>' +
+    '<section class="qk-section pd-sec">' + PD.secHead('Car and driver', 'Who is fast right now', 'The lap-time model splits pace into the car and the driver. Bars are our estimates with one standard error either side.', '<a class="qk-btn" href="#/value">Driver value →</a>') +
+    PD.grid(
+      PD.card('Fastest cars right now', 'Car race pace at the latest round, % of a lap against the field (right is faster), ±1 standard error.', PD.chartBox('ov-cars', 320), { span: 6 }) +
+      PD.card('Best drivers this season', 'Race pace above the team-mate, % of a lap (the driver alone), ±1 standard error; 5+ races.', PD.chartBox('ov-drv', 320), { span: 6 })) + '</section>' +
+    '<section class="qk-section pd-sec">' + PD.secHead('Track record', 'How our forecasts have done', 'Our pre-race favourite every round, and the last Grand Prix.', '<a class="qk-btn" href="#/model">Calibration →</a>') +
+    PD.grid(
+      PD.card('How our favourite fared', 'Our pre-race favourite each round: its win chance, filled in the team colour when it won.', PD.chartBox('ov-fav', 300), { span: 7 }) +
+      PD.card('Last race', '', '<div id="ov-last"></div>', { span: 5 }) +
+      PD.card('Fantasy: top projections', 'Expected points next weekend with our scoring table; whiskers run from the 10th to the 90th percentile.', PD.chartBox('ov-fan', 300), { span: 12, foot: '<span></span><a href="#/fantasy">All picks and the schedule →</a>' })) + '</section>';
   var raceP = next ? PD.load(next.year + '/races/' + next.round + '.json') : Promise.resolve(null);
-  return Promise.all([PD.load(y + '/season.json'), PD.load('markets.json'), raceP, PD.load(y + '/value.json'), PD.load(y + '/fantasy.json')]).then(function (arr) {
+  return Promise.all([PD.load(y + '/season.json'), raceP, PD.load(y + '/value.json'), PD.load(y + '/fantasy.json')]).then(function (arr) {
     if (!PD.alive(el)) return;
-    var season = arr[0], markets = arr[1], race = arr[2], value = arr[3], fan = arr[4];
-    hero(idx, season, markets);
-    whoWins(next, race, markets);
-    progression(season);
-    standings(season);
-    odds(season, markets);
+    var season = arr[0], race = arr[1], value = arr[2], fan = arr[3];
+    tiles(idx, season, race, value, meta);
+    weekend(next, race, season);
+    title(season);
     cars(value);
     bestDrivers(value);
     favourites(season);
@@ -84,118 +97,82 @@ function render(el) {
   });
 }
 
-function hero(idx, season, markets) {
-  var next = idx.next, y = idx.current_season;
+function tiles(idx, season, race, value, meta) {
+  var next = idx.next;
   var st = PD.ok(season) ? (season.standings || {}).drivers || [] : [];
   var ct = PD.ok(season) ? (season.standings || {}).constructors || [] : [];
   var lead = st[0], second = st[1];
-  var dr = titleRows(season, markets, 'drivers');
-  var fav = dr[0];
-  var left;
-  if (next) {
-    var circ = next.circuit || {};
-    left = '<div class="pd-hero-main"><div class="qk-kicker">Next up · ' + esc(next.year) + ' round ' + esc(next.round) + ' of ' + esc((season || {}).rounds_total || '') + '</div>' +
-      '<h1 class="pd-hero-title"><a href="' + PD.raceHref(next.year, next.round) + '">' + esc(next.name) + '</a></h1>' +
-      '<div class="pd-hero-sub">' + PD.circuitLink(circ.id, circ.name) + (circ.locality ? ' · ' + esc(circ.locality) : '') + (circ.country ? ', ' + esc(circ.country) : '') + ' · ' + esc(PD.fmtDate(next.date, { year: false })) + '</div>' +
-      '<div class="pd-hero-clock"><div class="pd-cd" id="ov-cd"></div><ul class="pd-sched" id="ov-sched" aria-label="Weekend schedule in ' + esc(tzName()) + ' time"></ul></div>' +
-      '<div class="pd-hero-links"><a class="qk-btn primary" href="' + PD.raceHref(next.year, next.round) + '">Race centre</a><a class="qk-btn" href="#/races">Calendar</a></div></div>';
-  } else {
-    var meta = (idx.seasons_meta || {})[String(y)] || {};
-    left = '<div class="pd-hero-main"><div class="qk-kicker">' + esc(y) + ' season complete</div><h1 class="pd-hero-title">' + (meta.champion ? esc(PD.driverName(meta.champion)) + ' is champion' : 'The season is over') + '</h1>' +
-      '<div class="pd-hero-sub">' + (meta.constructors_champion ? 'Constructors: ' + PD.teamLink(meta.constructors_champion) : '') + '</div>' +
-      '<div class="pd-hero-links"><a class="qk-btn primary" href="#/standings">Final standings</a></div></div>';
-  }
+  var dr = titleRows(season, 'drivers'), cr = titleRows(season, 'constructors');
+  var ns = nextSim(race);
+  var fav = ns ? Object.keys(ns.sim.drivers).sort(function (a, b) { return ns.sim.drivers[b].p_win - ns.sim.drivers[a].p_win; })[0] : null;
   var prog = PD.ok(season) && lead ? ((season.progression || {}).drivers || {})[lead.driver] : null;
-  var tiles = [
-    PD.kpi('Championship leader', lead ? PD.driverLink(lead.driver, { team: lead.team }) : '—', lead ? PD.pts(lead.points) + ' pts' + (second ? ' · ' + PD.pts(lead.points - second.points) + ' clear of ' + esc(PD.driverCode(second.driver)) : '') : '', { text: true, spark: prog ? window.QK.spark(prog, { color: PD.tc(lead.team), w: 120, h: 30 }) : '' }),
-    PD.kpi('Title favourite', fav ? esc(PD.pct(fav.model, fav.model > 0.99 ? 2 : 1)) : '—', fav ? esc(PD.driverName(fav.id)) + (isNum(fav.market) ? ' · market ' + PD.pct(fav.market) : '') : (season && !season.championship ? 'season decided' : '')),
-    PD.kpi('Constructors', ct[0] ? PD.teamLink(ct[0].team) : '—', ct[0] ? PD.pts(ct[0].points) + ' pts' + (ct[1] ? ' · ' + PD.pts(ct[0].points - ct[1].points) + ' clear' : '') : '', { text: true }),
-    PD.kpi('Rounds run', PD.ok(season) ? season.rounds_done + ' / ' + season.rounds_total : '—', PD.ok(season) ? (season.calendar || []).filter(function (c) { return c.sprint; }).length + ' sprint weekends' : '')
-  ];
-  PD.set('ov-hero', left + '<div class="pd-hero-side">' + PD.kpis(tiles, 'pd-kpis-2') + '</div>');
-  if (next) weekendClock(sessionsOf(next), 'ov-cd', 'ov-sched');
+  var T = PD.ok(value) && value.teams ? PD.rowsOf(value.team_cols, value.teams).filter(function (r) { return isNum(r.car); }).sort(function (a, b) { return b.car - a.car; }) : [];
+  var list = [];
+  if (next) list.push(PD.kpi(PD.shortRace(next.name) + ' favourite', fav ? esc(PD.driverCode(fav)) + ' ' + PD.pct(ns.sim.drivers[fav].p_win, 0) : '—', fav ? 'our win chance · ' + (ns.post ? 'after qualifying' : 'before qualifying') : 'forecast not built yet', { signal: true, href: PD.raceHref(next.year, next.round), tip: 'Our chance of winning the next Grand Prix, from 20,000 simulated races' }));
+  if (dr[0]) list.push(PD.kpi('Drivers’ title', esc(PD.driverCode(dr[0].id)) + ' ' + PD.pct(dr[0].model, dr[0].model > 0.99 ? 2 : 1), 'our chance · from simulated seasons', { signal: true, href: PD.driverHref(dr[0].id), tip: 'Our chance of winning the drivers’ championship' }));
+  else if (meta.champion) list.push(PD.kpi('Champion', esc(PD.driverName(meta.champion)), 'drivers’ title', { text: true, href: PD.driverHref(meta.champion) }));
+  list.push(PD.kpi('Leader', lead ? esc(PD.driverCode(lead.driver)) + ' ' + PD.pts(lead.points) : '—', lead ? (second ? PD.pts(lead.points - second.points) + ' clear of ' + esc(PD.driverCode(second.driver)) : 'points') : '', { href: lead ? PD.driverHref(lead.driver) : null, trend: prog && prog.length > 1 ? prog : null, trendColor: lead ? PD.tc(lead.team) : null, trendLabel: 'Points after each round' }));
+  list.push(PD.kpi('Constructors', ct[0] ? esc(PD.teamAbbr(ct[0].team)) + ' ' + PD.pts(ct[0].points) : '—', ct[0] ? esc(PD.teamName(ct[0].team)) + (cr[0] ? ' · our title chance ' + PD.pct(cr[0].model, cr[0].model > 0.99 ? 2 : 1) : '') : '', { href: ct[0] ? PD.teamHref(ct[0].team) : null }));
+  list.push(PD.kpi('Fastest car', T[0] ? esc(PD.teamAbbr(T[0].id)) + ' ' + PD.signed(T[0].car, 2) + '%' : '—', T[0] ? 'of a lap faster than the field, latest round' : 'needs lap data', { href: T[0] ? PD.teamHref(T[0].id) : null, tip: 'Our car-pace estimate from the lap-time model' }));
+  list.push(PD.kpi('Rounds run', PD.ok(season) ? season.rounds_done + '/' + season.rounds_total : '—', PD.ok(season) ? (season.calendar || []).filter(function (c) { return c.sprint; }).length + ' sprint weekends' : ''));
+  PD.set('ov-kpis', PD.kpis(list));
 }
 
-function whoWins(next, race, markets) {
-  if (!next) { PD.set('ov-who-t', 'The season is over'); PD.ch.none('ov-who', 'No race left this season.'); PD.set('ov-fc', PD.muted('No race left this season.')); return; }
-  PD.set('ov-who-t', 'Who wins the ' + esc(next.name) + '?');
-  var f = PD.ok(race) && race.forecast ? race.forecast : null;
-  var post = f && f.post_quali && f.post_quali.drivers && Object.keys(f.post_quali.drivers).length ? f.post_quali : null;
-  var sim = post || (f && f.pre_quali);
-  if (!sim || !sim.drivers) { PD.ch.none('ov-who', 'The forecast for ' + next.name + ' is not built yet.'); PD.set('ov-fc', PD.muted('Not built yet.')); return; }
-  var nr = (markets || {}).next_race || {};
-  var mkt = nr.year === next.year && nr.round === next.round && nr.prices && Object.keys(nr.prices).length ? nr.prices : null;
-  var ds = sim.drivers;
-  var ids = Object.keys(ds).sort(function (a, b) { return ds[b].p_win - ds[a].p_win; });
-  PD.set('ov-who-s', (post ? 'After qualifying' : 'Before qualifying') + (isNum(sim.p_sc) ? ' · P(safety car) ' + PD.pct(sim.p_sc, 0) : '') + (mkt ? ' · blue model, orange market' : ' · no market price yet'));
-  PD.set('ov-fc-s', (sim.n ? Number(sim.n).toLocaleString('en-GB') + ' simulated races' : ''));
-  if (mkt) {
-    var top = ids.concat(Object.keys(mkt).filter(function (k) { return ids.indexOf(k) < 0; })).filter(function (id) { return (ds[id] || {}).p_win >= 0.01 || (mkt[id] || 0) >= 0.02; })
-      .sort(function (a, b) { return Math.max((ds[b] || {}).p_win || 0, mkt[b] || 0) - Math.max((ds[a] || {}).p_win || 0, mkt[a] || 0); }).slice(0, 10);
-    window.QKC.dumbbell(document.getElementById('ov-who'), { rows: top.map(function (id) { return { label: PD.driverName(id), a: (ds[id] || {}).p_win || 0, b: mkt[id] || 0, href: PD.driverHref(id), sub: PD.teamName(PD.driverTeam(id)) }; }),
-      aName: 'Model', bName: 'Market', max: Math.min(1, Math.max.apply(null, top.map(function (id) { return Math.max((ds[id] || {}).p_win || 0, mkt[id] || 0); })) * 1.15 + 0.02), labelWidth: 130, valName: 'Win probability' });
-  } else {
-    PD.ch.hbars('ov-who', ids.slice(0, 10).map(function (id) { return { label: PD.driverName(id), value: ds[id].p_win, colour: PD.teamColour(PD.driverTeam(id)), href: PD.driverHref(id) }; }), { fmt: function (v) { return PD.pct(v); }, name: 'P(win)' });
-  }
-  var host = document.getElementById('ov-fc');
-  if (host) PD.table(host, [
-    { key: 'name', label: 'Driver', sticky: true, fmt: function (v, r) { return PD.driverLink(r.id, { code: true }); } },
-    { key: 'p_win', label: 'Win', num: true, fmt: function (v) { return PD.pct(v); } },
-    { key: 'p_podium', label: 'Podium', num: true, fmt: function (v) { return PD.pct(v, 0); } }
-  ].concat(mkt ? [{ key: 'mkt', label: 'Market', num: true, fmt: function (v) { return isNum(v) ? PD.pct(v) : '—'; } }] : []),
-  ids.slice(0, 10).map(function (id) { return { id: id, name: PD.driverName(id), p_win: ds[id].p_win, p_podium: ds[id].p_podium, mkt: mkt ? mkt[id] : null }; }), { sort: { key: 'p_win', dir: 'desc' } });
-  if (host) host.insertAdjacentHTML('beforeend', '<div class="pd-cardlink"><a href="' + PD.raceHref(next.year, next.round) + '">Full forecast and position odds →</a></div>');
+function weekend(next, race, season) {
+  var host = document.getElementById('ov-wk');
+  if (!host) return;
+  if (!next) { host.innerHTML = PD.secHead('Season complete', 'No race left this season', 'The final standings and every race centre stay below.', '<a class="qk-btn" href="#/races">Every race</a>'); return; }
+  var circ = next.circuit || {};
+  var ns = nextSim(race);
+  host.innerHTML = PD.secHead('Next up · round ' + next.round + ' of ' + ((season || {}).rounds_total || ''), esc(next.name), PD.circuitLink(circ.id, circ.name) + (circ.locality ? ' · ' + esc(circ.locality) : '') + (circ.country ? ', ' + esc(circ.country) : '') + ' · ' + esc(PD.fmtDate(next.date, { year: false })),
+    '<a class="qk-btn primary" href="' + PD.raceHref(next.year, next.round) + '">Race centre</a>') +
+    PD.grid(
+      PD.card('Race weekend', 'Times in your time zone (' + esc(tzName()) + ').', '<div class="pd-wk"><div class="pd-cd" id="ov-cd"></div><ul class="pd-sched" id="ov-sched" aria-label="Weekend schedule"></ul></div>', { span: 5 }) +
+      PD.card('Who wins the ' + esc(PD.shortRace(next.name)) + ' Grand Prix', ns ? (ns.post ? 'After qualifying' : 'Before qualifying') + ' · our chance from ' + (ns.sim.n ? Number(ns.sim.n).toLocaleString('en-GB') : '20,000') + ' simulated races' + (isNum(ns.sim.p_sc) ? ' · safety car ' + PD.pct(ns.sim.p_sc, 0) : '') : 'The forecast is built once the weekend is near.',
+        '<div id="ov-who"></div>', { span: 7, foot: '<span>Podium chance beside each name</span><a href="' + PD.raceHref(next.year, next.round) + '">Every driver and position →</a>' }));
+  weekendClock(sessionsOf(next), 'ov-cd', 'ov-sched');
+  if (!ns) { PD.set('ov-who', PD.empty('No forecast yet', 'The forecast for ' + next.name + ' is not built yet.')); return; }
+  var ds = ns.sim.drivers;
+  var ids = Object.keys(ds).sort(function (a, b) { return ds[b].p_win - ds[a].p_win; }).slice(0, 10);
+  var rows = PD.v2.chanceRows(ids, function (id) { return ds[id].p_win; }, true, null);
+  rows.forEach(function (r, i) { r.sub = 'podium ' + PD.pct(ds[ids[i]].p_podium, 0); });
+  PD.set('ov-who', QK.chances(rows, { oursName: 'Our win chance' }));
 }
 
-function progression(season) {
-  if (!PD.ok(season)) return PD.ch.none('ov-prog', 'Standings not built yet.');
-  var prog = (season.progression || {}).drivers || {};
-  var order = ((season.standings || {}).drivers || []).map(function (r) { return r.driver; }).filter(function (id) { return prog[id]; }).slice(0, 6);
-  var done = (season.calendar || []).filter(function (c) { return c.status === 'done'; }).sort(function (a, b) { return a.round - b.round; });
-  var teams = {};
-  ((season.standings || {}).drivers || []).forEach(function (r) { teams[r.driver] = r.team; });
-  var st = PD.ch.styleMap(order, teams);
-  var xs = done.map(function (c) { return 'R' + c.round; });
-  PD.ch.lines('ov-prog', order.map(function (id) { return { name: PD.driverName(id), short: PD.driverCode(id), data: prog[id], colour: st[id].colour, dash: st[id].dash }; }),
-    { xs: xs, endLabels: true, legend: false, xName: 'Round', yName: 'Points', yScale: false, xLabel: function (v) { var c = done[xs.indexOf(v)]; return c ? v + ' · ' + c.name : v; }, yFmt: function (v) { return PD.pts(v); }, label: 'Points progression' });
-}
-
-function standings(season) {
+function title(season) {
   var draw = function (kind) {
-    var host = document.getElementById('ov-std');
+    PD.v2.pointsForecast('ov-prog', season, kind, 6);
+    PD.v2.rangeChart('ov-range', season, kind, 10);
+    standings(season, kind);
+    var host = document.getElementById('ov-odds');
     if (!host) return;
-    if (!PD.ok(season)) { host.innerHTML = PD.muted('Standings not built yet.'); return; }
+    if (!PD.ok(season) || !season.championship) { PD.set('ov-odds-s', 'The championship is decided.'); host.innerHTML = PD.muted('No simulation for a finished season.'); return; }
+    var rows = titleRows(season, kind).slice(0, 8);
     var isD = kind === 'drivers';
-    var list = ((season.standings || {})[kind] || []).slice(0, 10);
-    var prog = ((season.progression || {})[kind]) || {};
-    var leadPts = list.length ? list[0].points : 0;
-    PD.table(host, [
-      { key: 'pos', label: '#', num: true, sort: false },
-      { key: 'name', label: isD ? 'Driver' : 'Constructor', sticky: true, sort: false, fmt: function (v, r) { return isD ? PD.driverLink(r.id, { team: r.team }) : PD.teamLink(r.id); } },
-      { key: 'trend', label: 'Trend', sort: false, fmt: function (v, r) { return window.QK.spark(prog[r.id] || [], { color: PD.tc(r.team), w: 70, h: 20, dot: false, area: false }); } },
-      { key: 'points', label: 'Pts', num: true, sort: false, fmt: function (v) { return '<b>' + PD.pts(v) + '</b>'; } },
-      { key: 'gap', label: 'Gap', num: true, sort: false, fmt: function (v) { return v ? '−' + PD.pts(v) : '<span class="qk-muted">—</span>'; } }
-    ], list.map(function (r) { var id = isD ? r.driver : r.team; return { pos: r.pos, id: id, team: r.team, name: id, points: r.points, gap: leadPts - r.points }; }));
-    host.insertAdjacentHTML('beforeend', '<div class="pd-cardlink"><a href="#/standings">Full standings, magic numbers and odds →</a></div>');
+    PD.set('ov-odds-s', 'Our chance of the ' + (isD ? 'drivers’' : 'constructors’') + ' title' + (rows[0] && rows[0].model > 0.995 ? ': ' + esc(isD ? PD.driverName(rows[0].id) : PD.teamName(rows[0].id)) + ' wins ' + PD.pct(rows[0].model, 2) + ' of simulated seasons' : ''));
+    var cr = PD.v2.chanceRows(rows.map(function (r) { return r.id; }), function (id) { return season.championship[kind][id].p_title; }, isD, null);
+    cr.forEach(function (r, i) { r.sub = 'exp. ' + PD.num(rows[i].c.exp_points, 0) + ' pts'; });
+    host.innerHTML = QK.chances(cr, { max: 1, oursName: 'Our title chance' });
   };
   draw('drivers');
-  PD.wireSeg(document, 'ov-std-k', draw);
+  PD.wireSeg(document, 'ov-k', draw);
 }
 
-function odds(season, markets) {
-  var draw = function (kind) {
-    if (!PD.ok(season) || !season.championship) { PD.set('ov-odds-s', 'The championship is decided.'); return PD.ch.none('ov-odds', 'No simulation for a finished season.'); }
-    var rows = titleRows(season, markets, kind).slice(0, 8);
-    var decided = rows[0] && rows[0].model > 0.995;
-    PD.set('ov-odds-s', decided ? esc(kind === 'drivers' ? PD.driverName(rows[0].id) : PD.teamName(rows[0].id)) + ' wins ' + PD.pct(rows[0].model, 2) + ' of simulated seasons; orange tick = market.' : 'Share of simulated seasons won; orange tick = market.');
-    PD.ch.hbars('ov-odds', rows.map(function (r) {
-      var isD = kind === 'drivers';
-      return { label: isD ? PD.driverName(r.id) : PD.teamName(r.id), value: r.model, mark: r.market, colour: PD.teamColour(isD ? (r.c.team || PD.driverTeam(r.id)) : r.id), href: isD ? PD.driverHref(r.id) : PD.teamHref(r.id),
-        sub: 'Expected ' + PD.num(r.c.exp_points, 0) + ' pts (' + PD.num(r.c.p05, 0) + '–' + PD.num(r.c.p95, 0) + ')' };
-    }), { fmt: function (v) { return PD.pct(v, v > 0.99 ? 2 : 1); }, name: 'Model', markName: 'Market', min: 0, max: 1, label: 'Championship probability' });
-  };
-  draw('drivers');
-  PD.wireSeg(document, 'ov-odds-k', draw);
+function standings(season, kind) {
+  var host = document.getElementById('ov-std');
+  if (!host) return;
+  if (!PD.ok(season)) { host.innerHTML = PD.muted('Standings not built yet.'); return; }
+  var isD = kind === 'drivers';
+  var list = ((season.standings || {})[kind] || []).slice(0, 10);
+  var prog = ((season.progression || {})[kind]) || {};
+  var leadPts = list.length ? list[0].points : 0;
+  QK.leaderboard(host, { dense: true, rowHref: function (r) { return isD ? PD.driverHref(r.id) : PD.teamHref(r.id); }, columns: [
+    { key: 'pos', label: 'Pos', num: true },
+    { key: 'name', label: isD ? 'Driver' : 'Constructor', type: 'entity', sub: 'sub', mark: function (r) { return { name: PD.teamName(r.team), abbr: PD.teamAbbr(r.team), colour: PD.teamColour(r.team) }; }, href: function (r) { return isD ? PD.driverHref(r.id) : PD.teamHref(r.id); } },
+    { key: 'trend', label: 'Trend', type: 'spark' },
+    { key: 'points', label: 'Pts', num: true, fmt: function (v) { return '<b>' + PD.pts(v) + '</b>'; } },
+    { key: 'gap', label: 'Gap', num: true, fmt: function (v) { return v ? '−' + PD.pts(v) : '—'; } }
+  ], rows: list.map(function (r) { var id = isD ? r.driver : r.team; return { pos: r.pos, id: id, team: r.team, name: isD ? PD.driverName(id) : PD.teamName(id), sub: isD ? PD.teamAbbr(r.team) : '', trend: prog[id] || [], points: r.points, gap: leadPts - r.points }; }) });
 }
 
 function cars(value) {
@@ -219,12 +196,12 @@ function favourites(season) {
   if (!done.length) return PD.ch.none('ov-fav', 'No forecasts stored for this season.');
   var won = done.filter(function (c) { return c.winner === c.p_win_top[0][0]; }).length;
   var mean = PD.mean(done.map(function (c) { return c.p_win_top[0][1]; }));
-  PD.ch.columns('ov-fav', { cats: done.map(function (c) { return 'R' + c.round; }), label: 'Favourite win probability by round',
-    series: [{ name: 'Favourite’s win probability', data: done.map(function (c) { return c.p_win_top[0][1]; }), colours: done.map(function (c) { return c.winner === c.p_win_top[0][0] ? PD.teamColour(c.winner_team || PD.driverTeam(c.winner)) : '#5a6270'; }), fmt: function (v) { return PD.pct(v); } }],
-    fmt: function (v) { return Math.round(v * 100) + '%'; }, yMin: 0, xName: 'Round', yName: 'Favourite’s win probability',
+  PD.ch.columns('ov-fav', { cats: done.map(function (c) { return 'R' + c.round; }), label: 'Our favourite win chance by round',
+    series: [{ name: 'Our favourite’s win chance', data: done.map(function (c) { return c.p_win_top[0][1]; }), colours: done.map(function (c) { return c.winner === c.p_win_top[0][0] ? PD.teamColour(c.winner_team || PD.driverTeam(c.winner)) : '#5a6270'; }), fmt: function (v) { return PD.pct(v); } }],
+    fmt: function (v) { return Math.round(v * 100) + '%'; }, yMin: 0, xName: 'Round', yName: 'Our favourite’s win chance',
     tipLabel: function (i) { var c = done[i]; return 'R' + c.round + ' ' + c.name + ': ' + PD.driverName(c.p_win_top[0][0]) + (c.winner === c.p_win_top[0][0] ? ' won' : ' (winner ' + PD.driverName(c.winner) + ')'); } });
   var n = document.getElementById('ov-fav');
-  if (n) n.insertAdjacentHTML('afterend', '<p class="pd-cap">The favourite won <b>' + won + ' of ' + done.length + '</b> races; its average win probability was ' + PD.pct(mean, 0) + ', so about ' + PD.num(mean * done.length, 1) + ' wins were expected.</p>');
+  if (n) n.insertAdjacentHTML('afterend', '<p class="pd-cap">Our favourite won <b>' + won + ' of ' + done.length + '</b> races; its average win chance was ' + PD.pct(mean, 0) + ', so about ' + PD.num(mean * done.length, 1) + ' wins were expected.</p>');
 }
 
 function lastRace(last, season) {
@@ -235,7 +212,7 @@ function lastRace(last, season) {
   PD.set('ov-last', '<div class="pd-last" style="--tc:' + esc(PD.tc(team)) + '"><div class="qk-kicker">' + esc(last.name) + ' · ' + esc(PD.fmtDate(last.date, { year: false })) + '</div>' +
     '<div class="pd-last-win">' + PD.mark(team, 'lg') + '<div><div class="pd-last-name">' + PD.driverLink(last.winner, { dot: false }) + '</div><div class="qk-sub">' + esc(PD.teamName(team)) + ' · winner</div></div></div>' +
     PD.kpis([PD.kpi('Pole', c.pole ? PD.driverLink(c.pole, { code: true }) : '—', '', { text: true }), PD.kpi('Fastest lap', c.fastest ? PD.driverLink(c.fastest, { code: true }) : '—', '', { text: true }),
-      PD.kpi('Model favourite', fav ? PD.driverLink(fav[0], { code: true }) : '—', fav ? PD.pct(fav[1]) + (fav[0] === last.winner ? ' · won' : '') : '', { text: true })], 'pd-kpis-3') +
+      PD.kpi('Our favourite', fav ? PD.driverLink(fav[0], { code: true }) : '—', fav ? PD.pct(fav[1]) + ' to win' + (fav[0] === last.winner ? ' · won' : '') : '', { text: true, signal: true })], 'pd-kpis-3') +
     '<div class="pd-cardlink"><a href="' + PD.raceHref(last.year, last.round) + '">Race centre: laps, strategy, awards →</a></div></div>');
 }
 

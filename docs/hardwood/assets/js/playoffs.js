@@ -72,7 +72,7 @@ function render(el, params) {
   const L = params.league, S = params.season;
   const info = HW.leagueInfo(L);
   const isCurrent = S === HW.currentSeason(L);
-  el.innerHTML = HW.pageHead(HW.leagueName(L) + ' ' + HW.seasonLabel(L, S) + ' playoffs', 'Bracket, series odds and each team’s path',
+  el.innerHTML = HW.pageHead(HW.leagueName(L) + ' ' + HW.seasonLabel(L, S) + ' playoffs', 'Bracket, our series chances and each team’s path',
     '<a href="' + HW.seasonHref(L, S) + '">Season</a><a href="' + HW.href(L, 'markets', S) + '">Markets</a>') + '<div id="po-body"><div class="muted">Loading…</div></div>';
   return HW.loadAll([HW.path('season.json', L, S), HW.lpath('history.json', L)]).then(arr => {
     if (!el.isConnected) return;

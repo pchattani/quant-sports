@@ -1,7 +1,7 @@
 /* The Quant Footballer — Lab and Compare (fb-lb- prefix). Side A is the model blue (--c-1), side B the orange (--c-2). */
 .fb-lb-ctl .fb-toolbar .qk-select { max-width: 260px; }
 .fb-lb-range { display: inline-flex; align-items: center; gap: 8px; height: 34px; }
-.fb-lb-range input { width: 150px; accent-color: var(--accent); }
+.fb-lb-range input { width: 150px; accent-color: var(--signal); }
 .fb-lb-range b { min-width: 44px; color: var(--ink-1); font-size: var(--fs-sm); }
 .fb-lb-swap { padding: 0 12px; align-self: flex-end; }
 .fb-lb-checks { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: var(--sp-3); }
@@ -19,7 +19,7 @@
 
 /* side markers */
 .fb-lb-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; flex: none; }
-.fb-lb-dot.a { background: var(--c-1); } .fb-lb-dot.b { background: var(--c-2); }
+.fb-lb-dot.a { background: var(--c-1); } .fb-lb-dot.b { background: var(--c-2); } .fb-lb-dot.c { background: var(--c-3); }
 
 /* pickers */
 .fb-lb-pick .fb-toolbar { align-items: flex-end; }
@@ -41,12 +41,12 @@
 .fb-lb-hero { display: grid; gap: var(--sp-4); }
 .fb-lb-hero.a { --tc: var(--c-1); } .fb-lb-hero.b { --tc: var(--c-2); }
 .fb-lb-hero h2 { font-size: clamp(1.3rem, 3vw, 1.8rem); margin: 4px 0 0; letter-spacing: -0.025em; }
-.fb-lb-hero h2 a:hover { color: var(--accent); }
+.fb-lb-hero h2 a:hover { color: var(--signal); }
 .fb-lb-hero-t { min-width: 0; }
 .fb-lb-hero .qk-kicker { display: flex; align-items: center; gap: 4px; }
 .fb-lb-hero .qk-kicker .fb-ent { text-transform: none; letter-spacing: 0; font-size: var(--fs-xs); }
 .fb-lb-kpis { position: relative; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
-.fb-lb-kpis .qk-kpi-value { font-size: var(--fs-xl); }
+.fb-lb-kpis .qk-stat-v { font-size: var(--fs-xl); }
 
 /* verdict */
 .fb-lb-verdict { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, 260px) minmax(0, 1fr); gap: var(--sp-4); align-items: center; }
@@ -91,3 +91,8 @@
 .fb-lb-price-g b { font-size: var(--fs-lg); }
 .fb-lb-price-g small { font: 500 var(--fs-2xs) var(--font-num); color: var(--ink-3); }
 .fb-lb-price .fb-p3 { min-width: 0; }
+
+/* v2 compare (QK.compareView) and the clubs' chances */
+.fb-lb-distseg { margin-bottom: 10px; max-width: 100%; overflow-x: auto; }
+.fb-lb-distseg .qk-seg { flex-wrap: nowrap; }
+.fb-lb-price .qk-wpbar { margin: 8px 0 6px; }

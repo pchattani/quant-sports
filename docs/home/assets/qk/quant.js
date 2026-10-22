@@ -743,14 +743,15 @@ QK.pctlChip = function (p) {
 };
 /* Savant-style percentile bars: rows [{label, pctl, value}] */
 /* v2: the knob and fill take the percentile scale (cold -> hot); r.tip explains the metric, r.early marks a value
- * below the sample where the metric stabilises (dashed knob, a dot after the label). */
+ * below the sample where the metric stabilises (dashed knob, a dot after the label); r.style marks a metric that
+ * describes how a player plays rather than how well (METRICS_SPEC "style": usage, pace): drawn in neutral grey. */
 QK.pctlBars = function (rows) {
   return '<div class="qk-pbars">' + rows.filter(function (r) { return r && isNum(r.pctl); }).map(function (r) {
-    var p = Math.max(0, Math.min(100, r.pctl)), c = QK.pctColor(p);
+    var p = Math.max(0, Math.min(100, r.pctl)), c = r.style ? 'var(--ink-3)' : QK.pctColor(p);
     var tip = r.tip ? ' data-tip="' + esc(r.tip) + '" tabindex="0"' : ' title="' + esc(r.label) + '"';
     return '<div class="qk-pbar' + (r.early ? ' early' : '') + '"><span class="qk-pbar-label"' + tip + '>' + esc(r.label) + '</span>' +
       '<span class="qk-pbar-track" role="img" aria-label="' + esc(r.label) + ': ' + esc(QK.ordinal(Math.round(p))) + ' percentile' + (r.early ? ', early sample' : '') + '"><span class="qk-pbar-fill" style="width:' + p + '%;background:' + c + '"></span>' +
-      '<span class="qk-pbar-knob" style="left:' + p + '%;background:' + c + ';color:' + QK.pctInk(p) + '">' + Math.round(p) + '</span></span>' +
+      '<span class="qk-pbar-knob" style="left:' + p + '%;background:' + c + ';color:' + (r.style ? 'var(--s-1)' : QK.pctInk(p)) + '">' + Math.round(p) + '</span></span>' +
       '<span class="qk-pbar-val">' + esc(r.value === undefined ? '' : r.value) + '</span></div>';
   }).join('') + '</div>';
 };
@@ -1184,7 +1185,7 @@ QK.pctCard = function (o) {
 /* ─────────────────────────────────────── leaderboard */
 /* QK.leaderboard(el, spec): QK.table with column types —
  *   { type: 'entity', key, sub: 'key', mark: fn(row) -> team, href: fn(row) }   name, team mark, sub-line (pinned)
- *   { type: 'pctl', key, pctl: 'pct_key', fmt, d }                                value on a percentile heat cell
+ *   { type: 'pctl', key, pctl: 'pct_key', fmt, d, style }                         value on a percentile heat cell (style: neutral)
  *   { type: 'bar', key, fmt, max }                                                value with an inline bar
  *   { type: 'spark', key }                                                        an array as a sparkline (not sortable)
  * plus spec.rowClass(row) and spec.rowHref(row) (both also work on QK.table). Returns the QK.table handle. */
@@ -1206,7 +1207,7 @@ QK.leaderboard = function (el, spec) {
       d.num = true; d.pctl = null;
       d.fmt = function (v, r) {
         var p = r[c.pctl], t = txt(v, r);
-        return isNum(p) ? '<span class="qk-pcell" style="background:' + QK.pctColor(p) + ';color:' + QK.pctInk(p) + '" title="' + esc(QK.ordinal(p)) + ' percentile">' + t + '</span>' : t;
+        return isNum(p) ? '<span class="qk-pcell" style="background:' + (c.style ? 'var(--s-3)' : QK.pctColor(p)) + ';color:' + (c.style ? 'var(--ink-1)' : QK.pctInk(p)) + '" title="' + esc(QK.ordinal(p)) + ' percentile' + (c.style ? ' (style: neither better nor worse)' : '') + '">' + t + '</span>' : t;
       };
     } else if (c.type === 'bar') {
       d.num = true;

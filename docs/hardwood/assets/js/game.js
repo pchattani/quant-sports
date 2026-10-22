@@ -97,7 +97,7 @@ function pregameHTML(L, g) {
   } else if (HW.isNum(pre.elo_p_home)) {
     html += '<div class="section-note">Elo alone: ' + esc(H) + ' ' + HW.pct(pre.elo_p_home, 0) + '</div>';
   }
-  if (mk && mk.sources && mk.sources.length) html += '<div class="section-note">Market: ' + mk.sources.map(s => '<span class="src-chip">' + esc(s) + '</span>').join('') + ', de-vigged.</div>';
+  if (mk && mk.sources && mk.sources.length) html += '<div class="section-note">Market: ' + HW.ui.srcLabel(mk.sources).split(' / ').map(s => '<span class="src-chip">' + esc(s) + '</span>').join('') + ', de-vigged.</div>';
   const inj = pre.injuries || {};
   const injT = teamsOf(g).filter(t => (inj[t] || []).length);
   if (injT.length) {
@@ -254,19 +254,22 @@ function renderGame(el, params) {
     document.title = HW.teamAbbr(L, A) + ' @ ' + HW.teamAbbr(L, H) + ' · ' + HW.leagueName(L) + ' · The Quant Hardwood';
     const hasBox = Object.keys(g.box || {}).some(t => ((g.box[t] || {}).players || []).length);
     const pbp = !!(g.flow && g.flow.length);
-    let html = headHTML(L, g, S) + pregameHTML(L, g) + awardsHTML(L, g);
-    if (hasBox) {
+    // Inside the redesigned game centre (?tab=detail) the summary already shows the head, forecast, awards, box
+    // score, four factors, flow and win chance: the detail view adds shot modes, lineups, rotations and plays.
+    const embed = ((params.query || {}).embed) === 'detail';
+    let html = embed ? '' : headHTML(L, g, S) + pregameHTML(L, g) + awardsHTML(L, g);
+    if (hasBox && !embed) {
       html += HW.card('Box score', 'advanced columns where play-by-play exists', '<div class="toggle-row" id="gm-box-tabs">' + HW.toggles([{ key: A, label: HW.teamName(L, A) }, { key: H, label: HW.teamName(L, H) }], A, 'data-bx') + '</div><div id="gm-box"></div>');
     }
-    const ff = fourFactorsHTML(L, g);
-    if (pbp || ff) {
+    const ff = embed ? '' : fourFactorsHTML(L, g);
+    if (!embed && (pbp || ff)) {
       html += '<div class="grid-2">' + (pbp ? HW.card('Game flow', 'margin from ' + esc(HW.teamAbbr(L, H)) + '’s side, by game time', '<div id="gm-flow"></div>') : '') +
         (ff ? HW.card('Four factors', '', ff) : '') + '</div>';
     }
-    if (g.wp) html += HW.card('Win probability', 'our live model against ESPN’s; numbered points are the biggest swings', '<div id="gm-wp"></div>');
+    if (g.wp && !embed) html += HW.card('Win probability', 'our live model against ESPN’s; numbered points are the biggest swings', '<div id="gm-wp"></div>');
     const shots = g.shots ? HW.charts.shotRows(g.shots) : [];
     if (shots.length) {
-      html += HW.card('Shot charts', 'every field-goal attempt; xPTS = expected points from shot quality',
+      html += HW.card('Shot charts', 'every field-goal attempt; xPTS = expected points from shot quality; hexagons and zones against the league',
         '<div class="toggle-row" id="gm-shot-mode">' + HW.toggles([{ key: 'dots', label: 'Make / miss' }, { key: 'xpts', label: 'xPTS' }, { key: 'hex', label: 'Hex v league' }, { key: 'zone', label: 'Zones' }], 'dots', 'data-sm') + '</div>' +
         '<div class="grid-2" style="gap:0"><div><div class="day-head">' + HW.teamBar(L, A) + esc(HW.teamName(L, A)) + '</div><div id="gm-shot-a"></div></div>' +
         '<div><div class="day-head">' + HW.teamBar(L, H) + esc(HW.teamName(L, H)) + '</div><div id="gm-shot-h"></div></div></div>' +
@@ -285,13 +288,13 @@ function renderGame(el, params) {
       '<a href="' + HW.teamHref(L, A, S) + '">' + esc(HW.teamName(L, A)) + '</a><a href="' + HW.teamHref(L, H, S) + '">' + esc(HW.teamName(L, H)) + '</a></div>';
     el.innerHTML = html;
 
-    if (hasBox) {
+    if (hasBox && !embed) {
       const drawBox = t => { const n = document.getElementById('gm-box'); n.innerHTML = boxTable(L, g, t); HW.sortable(n); };
       drawBox(A);
       HW.wireToggles(document.getElementById('gm-box-tabs'), 'data-bx', drawBox);
     }
-    if (pbp) HW.charts.flowChart('gm-flow', g.flow, { league: L, home: H, away: A });
-    if (g.wp) HW.charts.wpChart('gm-wp', g.wp, { league: L, home: H, away: A, plays: g.plays || [] });
+    if (pbp && !embed) HW.charts.flowChart('gm-flow', g.flow, { league: L, home: H, away: A });
+    if (g.wp && !embed) HW.charts.wpChart('gm-wp', g.wp, { league: L, home: H, away: A, plays: g.plays || [] });
     if (shots.length) {
       HW.load(HW.path('shots_league.json', L, S)).then(grid => {
         if (!el.isConnected) return;

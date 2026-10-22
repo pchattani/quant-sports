@@ -242,8 +242,10 @@ K.short = s => K.fmtDate(s, { year: false, weekday: false });
 
 K.card = (title, sub, body, id, ctl) => '<div class="card"' + (id ? ' id="' + K.esc(id) + '"' : '') + '>' +
   (title ? '<div class="card-header">' + K.esc(title) + (sub ? ' <span class="card-sub">' + sub + '</span>' : '') + (ctl ? '<span class="gq-ctl">' + ctl + '</span>' : '') + '</div>' : '') + (body || '') + '</div>';
-K.tile = (label, value, sub, cls) => '<div class="kpi' + (cls ? ' ' + cls : '') + '"><div class="kpi-label">' + K.esc(label) + '</div><div class="kpi-value">' + (value === undefined || value === null ? '—' : value) + '</div>' + (sub ? '<div class="kpi-sub">' + sub + '</div>' : '') + '</div>';
-K.tiles = list => '<div class="kpi-grid gq-tiles">' + list.join('') + '</div>';
+/* v2 stat tiles (QK.statTile): value and sub are HTML. */
+K.tile = (label, value, sub, cls) => (window.QK && QK.statTile ? QK.statTile({ label: label, value: value === undefined || value === null ? '—' : value, sub: sub || '', html: true, cls: cls || '' })
+  : '<div class="kpi' + (cls ? ' ' + cls : '') + '"><div class="kpi-label">' + K.esc(label) + '</div><div class="kpi-value">' + (value === undefined || value === null ? '—' : value) + '</div>' + (sub ? '<div class="kpi-sub">' + sub + '</div>' : '') + '</div>');
+K.tiles = list => '<div class="qk-stats gq-tiles">' + list.join('') + '</div>';
 K.toggle = (id, opts, cur) => '<span class="gq-toggle" id="' + K.esc(id) + '">' + opts.map(o => '<button type="button" data-v="' + K.esc(o[0]) + '"' + (String(o[0]) === String(cur) ? ' class="on"' : '') + '>' + K.esc(o[1]) + '</button>').join('') + '</span>';
 K.wireToggle = (root, id, fn) => {
   const t = (root || document).querySelector('#' + id);
@@ -773,11 +775,30 @@ K.head = (title, sub, right, badge, colour) => '<div class="gq-head"' + (colour 
 // Catalogue page shared by hitters and pitchers
 // ════════════════════════════════════════════════════════════════════════════
 
-const HIT_PREFS = ['xwoba_plus', 'xwoba_savant', 'woba', 'war', 'dv', 'decision_value', 'bat_speed_adj', 'barrel_pct', 'chase_pct', 'k_pct', 'bb_pct'];
-const PIT_PREFS = ['pitching_plus', 'stuff_plus', 'location_plus', 'war', 'k_bb_pct', 'xwoba_plus', 'ra9', 'fip', 'csw_pct', 'whiff_pct'];
+/* headline lists from the metrics spec (BP.ui.SETS: all hitters, starters), else the old preferences */
+const HIT_PREFS = BP.ui && BP.ui.flat && BP.ui.flat('ALL', 'head').length ? BP.ui.flat('ALL', 'head').map(x => x[0]) : ['xwoba_plus', 'xwoba_savant', 'woba', 'war', 'dv', 'decision_value', 'bat_speed_adj', 'barrel_pct', 'chase_pct', 'k_pct', 'bb_pct'];
+const PIT_PREFS = BP.ui && BP.ui.flat && BP.ui.flat('SP', 'head').length ? BP.ui.flat('SP', 'head').map(x => x[0]) : ['pitching_plus', 'stuff_plus', 'location_plus', 'war', 'k_bb_pct', 'xwoba_plus', 'ra9', 'fip', 'csw_pct', 'whiff_pct'];
 K.HIT_PREFS = HIT_PREFS; K.PIT_PREFS = PIT_PREFS;
-const STATE = { hitter: { q: '', team: '', pos: '', role: '', floor: null, basis: 'all', extra: [], level: '', season: null, sort: null },
-  pitcher: { q: '', team: '', pos: '', role: '', floor: null, basis: 'all', extra: [], level: '', season: null, sort: null } };
+const STATE = { hitter: { q: '', team: '', pos: '', role: '', floor: null, basis: 'role', extra: [], level: '', season: null, sort: null },
+  pitcher: { q: '', team: '', pos: '', role: '', floor: null, basis: 'role', extra: [], level: '', season: null, sort: null } };
+/* The spec's metric set for the filter in force (BP.ui.SETS, docs/METRICS_SPEC.md): a position's set when a position is
+   picked, the starters' or relievers' set by role, else all hitters / starters. Falls back to the old preferences. */
+function specKey(kind, st) {
+  const U = BP.ui;
+  if (!U || !U.SETS) return null;
+  if (kind === 'pitcher') return st.role === 'RP' ? 'RP' : 'SP';
+  return st.pos ? (U.ROLE_OF_POS[String(st.pos).toUpperCase()] || 'ALL') : 'ALL';
+}
+function specPrefs(kind, st) {
+  const k = specKey(kind, st);
+  const list = k && BP.ui.flat ? BP.ui.flat(k, 'head').map(x => x[0]) : [];
+  return list.length ? list : (kind === 'pitcher' ? PIT_PREFS : HIT_PREFS);
+}
+function specFloor(kind, st, cat) {
+  const k = specKey(kind, st);
+  const f = k && BP.ui.floorOf ? BP.ui.floorOf(kind === 'pitcher' && !st.role ? 'RP' : k, cat.team_games) : null;
+  return f ? f.value : null;
+}
 
 K.renderCatalogue = function (el, params, state, kind) {
   const L = K.L(params, state);
@@ -790,7 +811,7 @@ K.renderCatalogue = function (el, params, state, kind) {
     (pit ? '<label>Role<select id="cat-role"><option value="">Starters and relievers</option><option value="SP">Starters</option><option value="RP">Relievers</option></select></label>'
       : '<label>Position<select id="cat-pos"><option value="">All positions</option></select></label>') +
     '<label>Min ' + (pit ? 'batters faced' : 'PA') + ' <span id="cat-floor-v"></span><input id="cat-floor" type="range" min="0" max="700" step="5"></label>' +
-    '<label>Percentiles<select id="cat-basis"><option value="all">against ' + K.LN(L) + '</option><option value="role">against ' + (pit ? 'role (SP / RP)' : 'position') + '</option></select></label>' +
+    '<label>Percentiles<select id="cat-basis"><option value="role">against ' + (pit ? 'his role (starters or relievers)' : 'his position') + '</option><option value="all">against all ' + K.LN(L) + ' ' + (pit ? 'pitchers' : 'hitters') + '</option></select></label>' +
     '<label>Add a metric<select id="cat-extra"><option value="">—</option></select></label>' +
     '<label>&nbsp;<button type="button" id="cat-clear" class="gq-btn">Clear added</button></label>' +
     '</div><div id="cat-chips" class="gq-chips"></div><div id="cat-table">' + K.muted('Loading…') + '</div><div class="pg-note gq-note" id="cat-note"></div></div>';
@@ -810,7 +831,8 @@ K.renderCatalogue = function (el, params, state, kind) {
     const maxN = Math.max.apply(null, ids.map(id => K.sampleOf(P[id], kind)).concat([50]));
     const floorDef = [cat.floor, cat.min_pa, cat.min_bf, cat.qualified_at].find(isNum);
     $('cat-floor').max = String(Math.ceil(maxN / 10) * 10);
-    if (st.floor === null || st.floor > maxN) st.floor = isNum(floorDef) ? Math.min(floorDef, maxN) : Math.min(pit ? 100 : 150, Math.round(maxN * 0.25));
+    const specF = specFloor(kind, st, cat);
+    if (st.floor === null || st.floor > maxN) st.floor = isNum(specF) ? Math.min(specF, maxN) : isNum(floorDef) ? Math.min(floorDef, maxN) : Math.min(pit ? 100 : 150, Math.round(maxN * 0.25));
     $('cat-floor').value = st.floor; $('cat-floor-v').textContent = st.floor;
     const teams = {};
     ids.forEach(id => { const t = P[id].team; if (t) teams[t] = (teams[t] || 0) + 1; });
@@ -824,22 +846,24 @@ K.renderCatalogue = function (el, params, state, kind) {
     $('cat-q').value = st.q; $('cat-basis').value = st.basis;
     $('cat-extra').innerHTML = '<option value="">—</option>' + K.groups(metrics).map(g => '<optgroup label="' + K.esc(g.name) + '">' + g.items.map(m => '<option value="' + K.esc(m.key) + '">' + K.esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>').join('');
     st.extra = st.extra.filter(k => meta[k]);
-    const heads = K.headline(metrics, pit ? PIT_PREFS : HIT_PREFS, 7);
-    const draw = () => drawCatalogue(L, S, kind, cat, heads);
+    const headsFor = () => K.headline(metrics, specPrefs(kind, st), 10);
+    const draw = () => drawCatalogue(L, S, kind, cat, headsFor());
+    const refloor = () => { const f = specFloor(kind, st, cat); if (isNum(f)) { st.floor = Math.min(f, maxN); $('cat-floor').value = st.floor; $('cat-floor-v').textContent = st.floor; } };
     let t = null;
     $('cat-q').oninput = e => { st.q = e.target.value; clearTimeout(t); t = setTimeout(draw, 150); };
     $('cat-team').onchange = e => { st.team = e.target.value; draw(); };
-    if (pit) $('cat-role').onchange = e => { st.role = e.target.value; draw(); };
-    else $('cat-pos').onchange = e => { st.pos = e.target.value; draw(); };
+    if (pit) $('cat-role').onchange = e => { st.role = e.target.value; refloor(); draw(); };
+    else $('cat-pos').onchange = e => { st.pos = e.target.value; refloor(); draw(); };
     $('cat-basis').onchange = e => { st.basis = e.target.value; draw(); };
     $('cat-floor').oninput = e => { st.floor = Number(e.target.value); $('cat-floor-v').textContent = st.floor; };
     $('cat-floor').onchange = draw;
-    $('cat-extra').onchange = e => { const k = e.target.value; if (k && st.extra.indexOf(k) < 0 && heads.every(m => m.key !== k)) st.extra.push(k); e.target.value = ''; draw(); };
+    $('cat-extra').onchange = e => { const k = e.target.value; if (k && st.extra.indexOf(k) < 0 && headsFor().every(m => m.key !== k)) st.extra.push(k); e.target.value = ''; draw(); };
     $('cat-clear').onclick = () => { st.extra = []; draw(); };
     $('cat-chips').onclick = ev => { const b = ev.target.closest('[data-rm]'); if (!b) return; st.extra = st.extra.filter(k => k !== b.dataset.rm); draw(); };
     draw();
-    $('cat-note').innerHTML = K.LN(L) + ' ' + S + (cat.updated_at ? ', updated ' + K.esc(K.fmtDate(cat.updated_at, { year: false })) : '') + '. Pills are percentiles (100 = best; ↓ metrics are already flipped so that red is always good) against every qualified ' + K.LN(L) + ' ' + (pit ? 'pitcher' : 'hitter') + ', or with the second option against the same ' + (pit ? 'role (starters or relievers)' : 'position') + '. ' +
-      'Players below the sample floor show raw values only. Every metric is shrunk towards the league by its stabilisation point before ranking (see the <a href="#/glossary">glossary</a>). Headline columns: ' + heads.map(m => K.glossLink(m.key, K.esc(m.label))).join(' · ') + '. All ' + metrics.length + ' metrics are on every player page, the <a href="' + K.href(L, 'leaders', S) + '">leaders</a> page and in the <a href="' + K.href(L, 'lab', S) + '">lab</a>.';
+    $('cat-note').innerHTML = K.LN(L) + ' ' + S + (cat.updated_at ? ', updated ' + K.esc(K.fmtDate(cat.updated_at, { year: false })) : '') + '. Pills are percentiles (100 = best; ↓ metrics are already flipped so that red is always good) against the same ' + (pit ? 'role (starters or relievers)' : 'position') + ', or with the second option against every qualified ' + K.LN(L) + ' ' + (pit ? 'pitcher' : 'hitter') + '. ' +
+      'The columns are the metrics that are stable from year to year and predict next season for ' + (pit ? 'the role picked' : 'the position picked') + '; the floor starts at ' + (pit ? '300 batters faced for starters and 120 for relievers' : '200 plate appearances') + ' over a full season, prorated in season. ' +
+      'Players below the sample floor show raw values only. Every metric is shrunk towards the league by its stabilisation point before ranking (see the <a href="#/glossary">glossary</a>). Columns now: ' + headsFor().map(m => K.glossLink(m.key, K.esc(m.label))).join(' · ') + '. All ' + metrics.length + ' metrics are on every player page, the <a href="' + K.href(L, 'leaders', S) + '">leaders</a> page and in the <a href="' + K.href(L, 'lab', S) + '">lab</a>.';
   });
 };
 
@@ -864,18 +888,19 @@ function drawCatalogue(L, S, kind, cat, heads) {
     const d = (isNum(vb) ? vb : -1e9) - (isNum(va) ? va : -1e9);
     return (sortLower ? -d : d) || K.sampleOf(P[b], kind) - K.sampleOf(P[a], kind);
   });
-  const src = p => (st.basis === 'role' ? (p.pct_role || p.pct_pos || {}) : (p.pct || {}));
+  const ok = p => (BP.ui && BP.ui.meets ? BP.ui.meets(p, BP.ui.setFor(kind, p), cat.team_games) : p.qualified !== false);
+  const src = p => (!ok(p) ? {} : st.basis === 'role' ? (p.pct_role || p.pct_pos || {}) : (p.pct || {}));
   const rows = ids.map((id, i) => {
     const p = P[id];
     return { _href: pit ? K.pitcherHref(L, id, S) : K.hitterHref(L, id, S), cells: [
       { v: i + 1, cls: 'pos-cell' },
-      { v: p.name || K.name(id), html: '<a class="ply-link" href="' + (pit ? K.pitcherHref(L, id, S) : K.hitterHref(L, id, S)) + '">' + K.esc(p.name || K.name(id)) + '</a>' + (p.qualified === false ? ' <span class="gq-tag" title="Below the sample floor: no percentiles">small sample</span>' : '') },
+      { v: p.name || K.name(id), html: '<a class="ply-link" href="' + (pit ? K.pitcherHref(L, id, S) : K.hitterHref(L, id, S)) + '">' + K.esc(p.name || K.name(id)) + '</a>' + (!ok(p) ? ' <span class="gq-tag" title="Below the sample floor for his position or role: no percentiles">small sample</span>' : '') },
       { v: K.teamAbbr(p.team), html: K.teamChip(L, p.team, S) },
       { v: pit ? K.roleOf(p) : (p.pos || ''), html: K.esc(pit ? K.roleOf(p) : (p.pos || '—')) },
       { v: p.age, html: isNum(p.age) ? K.num(p.age, 0) : '—', align: 'right' },
       { v: K.sampleOf(p, kind), html: K.int(K.sampleOf(p, kind)), align: 'right' }
     ].concat(cols.map(m => {
-      const v = (p.values || {})[m.key], pc = src(p)[m.key];
+      const v = (p.values || {})[m.key], pc = BP.ui && BP.ui.metricOk && !BP.ui.metricOk(p, m.key, st.basis === 'role' ? BP.ui.setFor(kind, p) : 'ALL', cat.team_games) ? null : src(p)[m.key];
       return { v: isNum(v) ? (m.lower ? -v : v) : -1e9, html: '<span class="gq-val">' + K.fmt(m, v) + '</span> ' + K.pill(pc), align: 'right' };
     })) };
   });

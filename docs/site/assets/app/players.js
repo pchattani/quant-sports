@@ -7,9 +7,12 @@
  *                                 competition, this season, last season or a calendar window (data/lab/, UNIFIED_PAYLOADS
  *                                 14), raw and league-adjusted rates, percentiles
  *   #/player/<pid>[?tab=overview|seasons|matches|shots|transfers&scope=club|intl&c=<slug>&e=<era>]
- *                                 the player: hero, this season, season by season (years, each season's competitions
- *                                 nested, coverage chips), charts, value, the match log with form, percentiles and the
- *                                 shot map per competition, transfers. Filters live in the query.
+ *                                 the player (Design System 2.0): the player card header, this season's stat tiles,
+ *                                 the Savant-style percentile card against his position in his main competition (peer
+ *                                 group and sample stated, small samples dashed), where he sits in that peer group,
+ *                                 season by season (years, each season's competitions nested, coverage chips), charts,
+ *                                 value (loaded only when its card scrolls into view), the match log with form, every
+ *                                 percentile and the shot map per competition, transfers. Filters live in the query.
  *
  * Reads people/<pid>.json (docs/site/UNIFIED_PAYLOADS.md 2, 9-14), people_index.json, data/lab/, value/players.json,
  * value/lines.json, value/transfers.json and, per live competition, players_live.json and shots.json. */
@@ -29,6 +32,30 @@ var RADAR_GK = [
   ['saves_90', 'Saves/90'], ['save_pct', 'Save %'], ['goals_prevented_90', 'Goals prevented/90'], ['conceded_90', 'Conceded/90'], ['sweeper_90', 'Sweeper/90'],
   ['high_claims_90', 'High claims/90'], ['pass_pct', 'Pass %'], ['long_ball_pct', 'Long-ball %'], ['rating', 'Rating']
 ];
+
+/* ── The comparison metric sets: ONE place for the player card's percentiles, "Where he sits" and the compare page
+   (lab.js reads FB.PLAYER_SETS). Until docs/METRICS_SPEC.md is committed the peer group is the position letter the
+   payloads rank by (players_live / lab rows `position`: G, D, M, F) over each view's minutes floor, and the metrics
+   are stable, predictive rates from the draft spec (docs/_design/metrics/football.json) that every payload already
+   carries. The role sets (CB, FB, DM/CM, AM/W, ST, GK) replace these four once the spec and the role field land.
+   PLAYER_SETS[letter] = [[group label, [metric keys]]]; PLAYER_DIST[letter] = the "Where he sits" choices. */
+var PLAYER_SETS = {
+  F: [['Shooting', ['npxg_90', 'shots_90', 'xg_per_shot', 'goals_90']], ['Creating', ['npxg_xa_90', 'xa_90', 'key_passes_90', 'shot_creation_90']],
+    ['On the ball', ['dribbles_90', 'prog_actions_90', 'opp_half_passes_90', 'loss_per_100']], ['Overall', ['rating']]],
+  M: [['Passing and progression', ['opp_half_passes_90', 'long_balls_90', 'pass_pct', 'prog_actions_90']], ['Creating', ['npxg_xa_90', 'xa_90', 'key_passes_90', 'shot_creation_90']],
+    ['Defending', ['padj_tkl_int_90', 'recoveries_90', 'ball_wins_90', 'duel_pct']], ['Overall', ['rating']]],
+  D: [['Defending', ['padj_tkl_int_90', 'aerials_won_90', 'aerial_pct', 'clearances_90', 'recoveries_90']], ['On the ball', ['opp_half_passes_90', 'pass_pct', 'long_ball_pct', 'prog_carries_90']],
+    ['Attacking', ['npxg_xa_90', 'crosses_90', 'key_passes_90']], ['Overall', ['rating']]],
+  G: [['Shot stopping', ['goals_prevented_90', 'save_pct', 'saves_90']], ['Command of the area', ['high_claims_90', 'sweeper_90']],
+    ['Distribution', ['pass_pct', 'long_ball_pct', 'passes_90']], ['Overall', ['rating']]]
+};
+var PLAYER_DIST = { F: ['npxg_xa_90', 'npxg_90', 'shot_creation_90', 'rating'], M: ['npxg_xa_90', 'padj_tkl_int_90', 'opp_half_passes_90', 'rating'],
+  D: ['padj_tkl_int_90', 'aerials_won_90', 'opp_half_passes_90', 'rating'], G: ['goals_prevented_90', 'save_pct', 'high_claims_90', 'rating'] };
+var PEER_NAME = { G: 'goalkeepers', D: 'defenders', M: 'midfielders', F: 'forwards' };
+/* A percentile is drawn as early (dashed) below these minutes: the draft spec flags a small sample under 900 minutes,
+   and shot stopping needs 1,800. */
+function earlyMin(letter, key) { return letter === 'G' && (key === 'goals_prevented_90' || key === 'save_pct' || key === 'saves_90') ? 1800 : 900; }
+FB.PLAYER_SETS = PLAYER_SETS; FB.PLAYER_DIST = PLAYER_DIST; FB.PEER_NAME = PEER_NAME; FB.playerEarlyMin = earlyMin;
 
 // ── small helpers ─────────────────────────────────────────────────────────
 
@@ -86,6 +113,17 @@ function resClass(res) { var w = String(res || '').charAt(0); return w === 'W' ?
 function posLabel(p) { return FB.POS_LABEL[p] || 'Player'; }
 function nn(v, d) { return isNum(v) ? num(v, d) : '—'; }
 function chartEmpty(el, title, text) { if (!el) return; el.style.height = 'auto'; el.innerHTML = FB.empty(title, text); }
+/* Run fn once node is near the viewport (heavy payloads such as value/players.json load only when their card is seen). */
+function whenVisible(node, fn) {
+  if (!node) return;
+  if (!('IntersectionObserver' in window)) { fn(); return; }
+  var io = new IntersectionObserver(function (es) {
+    if (es.some(function (e) { return e.isIntersecting; })) { io.disconnect(); fn(); }
+  }, { rootMargin: '240px' });
+  io.observe(node);
+}
+function metaMap(list) { var m = {}; (list || []).forEach(function (x) { if (x && x.key) m[x.key] = x; }); return m; }
+function cap1(t) { t = String(t || ''); return t.charAt(0).toUpperCase() + t.slice(1); }
 
 // ── the person file, normalised ───────────────────────────────────────────
 
@@ -224,22 +262,22 @@ function drawFinder(el, list, q0) {
       return true;
     });
     return out.slice(0, 300).map(function (r) {
-      return { id: r.id, name: r.name, pos: r.pos, age: FB.ageOf(r.dob), nat: r.nat, club: r.club, club_tid: r.club_tid, nt: r.nt, nt_tid: r.nt_tid, season: r.season, min: r.min || 0, mv: r.mv, nc: (r.comps || []).length, _n: out.length };
+      return { id: r.id, name: r.name, pos: r.pos, posName: posLabel(r.pos), age: FB.ageOf(r.dob), nat: r.nat, club: r.club, club_tid: r.club_tid, nt: r.nt, nt_tid: r.nt_tid, season: r.season, min: r.min || 0, mv: r.mv, nc: (r.comps || []).length, _n: out.length };
     });
   }
   function draw() {
     var rows = rowsNow();
     FB.set('pl-count', (rows.length ? int(rows[0]._n) : '0') + ' players match' + (rows.length && rows[0]._n > 300 ? ' (the 300 with most minutes this season shown)' : '') + ' · ' + int(list.length) + ' in the registry · minutes are each player’s own season (a calendar 2026 is near its end, a 2026/27 is weeks old)');
     var cols = [
-      { key: 'name', label: 'Player', sticky: true, fmt: function (v, r) { return '<span class="fb-pl-who">' + FB.playerLink(r.id, v) + ' ' + FB.posBadge(r.pos) + '</span>'; } },
+      { key: 'name', label: 'Player', type: 'entity', sub: 'posName', href: function (r) { return FB.href.player(r.id); } },
       { key: 'age', label: 'Age', num: true },
       { key: 'club', label: 'Club', fmt: function (v, r) { return v ? teamA(r.club_tid, v) : '<span class="qk-muted">—</span>'; } },
       { key: 'nt', label: 'National team', fmt: function (v, r) { return v ? teamA(r.nt_tid, v) : '<span class="qk-muted">' + esc(r.nat || '—') + '</span>'; } },
       { key: 'min', label: 'Minutes', num: true, tip: 'Minutes in the player\'s current season (his own frame: 2026/27 for a European, 2026 for a Brazilian), every competition.', fmt: function (v, r) { return int(v) + ' <span class="qk-muted fb-pl-era">' + esc(r.season || '') + '</span>'; } },
-      { key: 'mv', label: 'Value', num: true, tip: 'Sofascore\'s market value, reference only.', fmt: function (v) { return isNum(v) ? FB.money(v) : '—'; } },
+      { key: 'mv', label: 'Market value', num: true, tip: 'Sofascore\'s market value, reference only.', fmt: function (v) { return isNum(v) ? FB.money(v) : '—'; } },
       { key: 'nc', label: 'Comps', num: true, tip: 'Competitions he has played in across the stores.' }
     ];
-    if (handle) handle.setRows(rows); else handle = FB.table(el.querySelector('#pl-table'), cols, rows, { sort: { key: 'min', dir: 'desc' }, maxHeight: 620, caption: 'Players' });
+    if (handle) handle.setRows(rows); else handle = QK.leaderboard(el.querySelector('#pl-table'), { columns: cols, rows: rows, sort: { key: 'min', dir: 'desc' }, dense: true, maxHeight: 620, caption: 'Players' });
   }
   draw();
   var input = el.querySelector('#pl-q');
@@ -270,7 +308,7 @@ function drawGar(el, v) {
   QKC.bar(box, {
     horizontal: true, labels: true, labelWidth: 150, fmt: function (x) { return num(x, 1); }, valName: 'Goals above replacement',
     cats: rows.map(function (r) { return r.name + ' · ' + (r.club || ''); }),
-    series: [{ name: 'Goals above replacement', data: rows.map(function (r) { return Math.round(r.gar * 10) / 10; }), color: QK.cssVar('--accent') }],
+    series: [{ name: 'Goals above replacement', data: rows.map(function (r) { return Math.round(r.gar * 10) / 10; }), color: 'model' }],
     hrefs: rows.map(function (r) { return FB.href.player(r.id); }), label: 'Goals above replacement, last 12 months'
   });
 }
@@ -279,7 +317,9 @@ function drawGar(el, v) {
 
 /* One row per player (data/lab/<window>/<scope>.json): every competition, club football, national-team football or
    one competition, this season, last season or a calendar window. Attacking rates can be league-adjusted (the row's
-   minutes-weighted scoring factor); percentiles are against the same position in the view, over its floor. */
+   minutes-weighted scoring factor). Percentiles are against his formation-role group (FB.MSET: CB, FB, DM/CM, AM/W, ST,
+   GK) in the view, over max(the group's minimum, the minutes shown); the position letters when the role payload is
+   missing. */
 var LD_WIN = [['season', 'This season'], ['last', 'Last season'], ['365', 'Last 12 months'], ['ytd', 'Calendar year so far']];
 function renderLeaders(el, p) {
   var q = p.query || {};
@@ -296,7 +336,9 @@ function renderLeaders(el, p) {
     var metrics = ix.metrics || [], adjusted = ix.adjusted_keys || [];
     body.innerHTML = FB.card('<span id="ld-title">Leaders</span>', '<span id="ld-sub"></span>',
       '<div id="ld-tools"></div>' + FB.chartBox('ld-chart', 420, 'Top 15 on the chosen metric') + '<div id="ld-table" class="fb-mt"></div>');
-    var V = null;
+    var V = null, R = null;
+    var ROLE_SEG = [['', 'All']].concat(FB.MSET.groups.map(function (g) { return [g.id, { gk: 'GK', cb: 'CB', fb: 'FB', dm_cm: 'DM/CM', am_w: 'AM/W', st: 'ST' }[g.id] || g.short]; }));
+    function rolesOn() { return !!(R && R.ok); }
     function single() { return !FB.LAB_SCOPES[st.scope]; }
     function metricOpts(scope) {
       var groups = [];
@@ -309,7 +351,9 @@ function renderLeaders(el, p) {
       return groups;
     }
     function tools() {
-      var scope = st.pos === 'G' ? 'gk' : st.pos ? 'out' : 'all';
+      if (rolesOn() && st.pos && !FB.MSET.groups.some(function (g) { return g.id === st.pos; })) st.pos = { G: 'gk', D: 'cb', M: 'dm_cm', F: 'st' }[st.pos] || '';
+      if (!rolesOn() && st.pos && ['G', 'D', 'M', 'F'].indexOf(st.pos) < 0) st.pos = '';
+      var scope = st.pos === 'G' || st.pos === 'gk' ? 'gk' : st.pos ? 'out' : 'all';
       var groups = metricOpts(scope);
       var keys = [];
       groups.forEach(function (gr) { gr.items.forEach(function (i) { keys.push(i[0]); }); });
@@ -318,7 +362,7 @@ function renderLeaders(el, p) {
         FB.field('Season', FB.select('ld-w', LD_WIN.filter(function (w) { return ix.scopes[w[0]]; }), st.win, 'Season or window')),
         FB.field('Competitions', FB.select('ld-c', FB.labScopeOptions(ix, st.win), st.scope, 'Which competitions count', 'fb-pl-wide')),
         FB.field('Metric', FB.select('ld-m', groups, st.key, 'Metric', 'fb-pl-wide')),
-        FB.field('Position', FB.seg('ld-pos', [['', 'All'], ['G', 'GK'], ['D', 'DEF'], ['M', 'MID'], ['F', 'FWD']], st.pos, 'Position')),
+        rolesOn() ? FB.field('Role', FB.seg('ld-pos', ROLE_SEG, st.pos, 'Formation role group')) : FB.field('Position', FB.seg('ld-pos', [['', 'All'], ['G', 'GK'], ['D', 'DEF'], ['M', 'MID'], ['F', 'FWD']], st.pos, 'Position')),
         FB.field('Min. minutes', '<input class="qk-input fb-pl-num" id="ld-min" type="number" min="0" step="90" value="' + st.min + '">')
       ]);
       el.querySelector('#ld-w').addEventListener('change', function (e) { st.win = e.target.value; st.min = null; load(); });
@@ -332,9 +376,11 @@ function renderLeaders(el, p) {
       var have = ix.scopes[st.win] || {};
       if (!have[st.scope]) st.scope = 'all';
       FB.set('ld-table', FB.loading('lines', 8));
-      return FB.labView(st.win, st.scope).then(function (v) {
+      return FB.labView(st.win, st.scope).then(function (v0) {
+        return FB.rolesFor(!!(v0 && v0.idx.role !== undefined)).then(function (R0) { return [v0, R0]; });
+      }).then(function (arr) {
         if (!FB.alive(el)) return;
-        V = v;
+        V = arr[0]; R = arr[1];
         if (!V) { FB.set('ld-table', FB.empty('No board for this view', 'Try another season or set of competitions.')); return; }
         if (st.min === null) st.min = Math.max(90, single() ? V.floor : Math.min(V.floor, 450));
         tools(); sync(); draw();
@@ -345,41 +391,60 @@ function renderLeaders(el, p) {
       var I = V.idx, key = st.key, base = key.replace(/_adj$/, ''), adj = /_adj$/.test(key);
       var metric = metrics.filter(function (m) { return m.key === base; })[0] || { fmt: '2', label: key };
       var value = function (r) { var v = I[base] === undefined ? null : r[I[base]]; return isNum(v) ? (adj ? v * (r[I.factor] || 1) : v) : null; };
-      var inPos = function (r) { return !st.pos || r[I.position] === st.pos; };
+      /* his role group this season (in this competition for a one-competition view) */
+      var roleR = function (r) { return FB.rowRole(R, I.role === undefined ? null : r[I.role], r[I.player_id], single() ? st.scope : null); };
+      var grpOf = function (r) { return rolesOn() ? FB.peerGroup(roleR(r)) : null; };
+      var inPos = function (r) { if (!st.pos) return true; if (!rolesOn()) return r[I.position] === st.pos; var g = grpOf(r); return !!g && g.id === st.pos; };
       var floorRows = V.rows.filter(function (r) { return (r[I.minutes] || 0) >= st.min && inPos(r) && isNum(value(r)); });
-      var sorted = floorRows.map(value).sort(function (a, b) { return a - b; });
-      var pctOf = function (v) {
+      /* the percentile: against his role group among the rows over max(the group's minimum, the minutes shown); with no
+         role payload, against the rows shown (the same position when one is picked) */
+      var SORT = {};
+      var sortedFor = function (gid) {
+        if (SORT[gid]) return SORT[gid];
+        var g = gid === '_all' ? null : FB.MSET.groups.filter(function (x) { return x.id === gid; })[0];
+        var mn = g ? FB.peerMin(g, st.min) : st.min;
+        SORT[gid] = V.rows.filter(function (r) { var gg = grpOf(r); return (gid === '_all' ? inPos(r) : (gg && gg.id === gid)) && (r[I.minutes] || 0) >= mn && isNum(value(r)); }).map(value).sort(function (a, b) { return a - b; });
+        SORT[gid].min = mn;
+        return SORT[gid];
+      };
+      var pctOf = function (v, r) {
+        var gid = '_all';
+        if (rolesOn()) { var g = grpOf(r); if (!g || (r[I.minutes] || 0) < FB.peerMin(g, st.min)) return null; gid = g.id; }
+        var sorted = sortedFor(gid);
+        if (sorted.length < 5) return null;
         var lo = 0, hi = sorted.length; while (lo < hi) { var mid = (lo + hi) >> 1; if (sorted[mid] < v) lo = mid + 1; else hi = mid; }
         var up = lo; while (up < sorted.length && sorted[up] === v) up++;
-        var rank = sorted.length ? (lo + 0.5 * (up - lo)) / sorted.length : null;
-        return rank === null ? null : Math.round(100 * (metric.lower ? 1 - rank : rank));
+        var rank = (lo + 0.5 * (up - lo)) / sorted.length;
+        return Math.round(100 * (metric.lower ? 1 - rank : rank));
       };
       var rows = floorRows.slice().sort(function (a, b) { return metric.lower ? value(a) - value(b) : value(b) - value(a); }).slice(0, 100);
       var per = function (r, k) { var v = r[I[k]]; return isNum(v) ? Math.round(v * (r[I.minutes] || 0) / 90) : null; };
       var data = rows.map(function (r, i) {
         var v = value(r);
-        return { i: i + 1, id: r[I.player_id], name: r[I.name], team: r[I.team], tid: r[I.tid], comp: r[I.comp], mix: r[I.mix], pos: r[I.position], age: r[I.age], min: r[I.minutes],
-          v: v, raw: r[I[base]], f: r[I.factor], pct: pctOf(v), g: per(r, 'goals_90'), a: per(r, 'assists_90'), rt: r[I.rating] };
+        var gg = grpOf(r), role = rolesOn() ? roleR(r) : null;
+        return { i: i + 1, id: r[I.player_id], name: r[I.name], posName: role ? role + (gg ? '' : ' (no formation start)') : posLabel(r[I.position]), team: r[I.team], tid: r[I.tid], comp: r[I.comp], mix: r[I.mix], pos: r[I.position], age: r[I.age], min: r[I.minutes],
+          v: v, raw: r[I[base]], f: r[I.factor], pct: pctOf(v, r), g: per(r, 'goals_90'), a: per(r, 'assists_90'), rt: r[I.rating] };
       });
       var lab = (metric.label || key) + (adj ? ' (adj.)' : '');
       var W = (ix.windows || []).filter(function (w) { return w.key === st.win; })[0];
       FB.set('ld-title', esc(lab) + ': ' + esc(FB.labScopeName(st.scope, ix).toLowerCase()));
       FB.set('ld-sub', FB.int(floorRows.length) + ' players over ' + st.min + ' minutes · ' + esc(FB.labWindowText(W)) + ' · one row per player' +
         (single() ? '' : ', his minutes summed across ' + (st.scope === 'intl' ? 'national-team football' : st.scope === 'club' ? 'club competitions' : 'every competition')) +
-        '. Percentiles are against the players shown (the same position when one is picked).');
+        (rolesOn() ? '. Heat and Pctl: percentile v his role group (CBs, full-backs, DMs and CMs, AMs and wingers, strikers, goalkeepers; his formation role this season) in this view, ' + FB.int(Math.max(450, st.min)) + '+ min (goalkeepers ' + FB.int(Math.max(900, st.min)) + '+); none for a player under it or without a formation start.'
+          : '. Percentiles are against the players shown (the same position when one is picked).'));
       var personQ = single() ? { c: st.scope } : st.scope === 'club' ? { scope: 'club' } : st.scope === 'intl' ? { scope: 'intl' } : null;
-      FB.table(el.querySelector('#ld-table'), [
+      QK.leaderboard(el.querySelector('#ld-table'), { dense: true, maxHeight: 640, caption: 'Leaders', columns: [
         { key: 'i', label: '#', num: true },
-        { key: 'name', label: 'Player', sticky: true, fmt: function (v, r) { return '<span class="fb-pl-who"><a class="fb-link" href="' + esc(FB.href.player(r.id, personQ)) + '">' + esc(v) + '</a> ' + FB.posBadge(r.pos) + '</span>'; } },
+        { key: 'name', label: 'Player', type: 'entity', sub: 'posName', href: function (r) { return FB.href.player(r.id, personQ); } },
         { key: 'team', label: st.scope === 'intl' ? 'National team' : 'Club', fmt: function (v, r) { return teamA(r.tid, v); } },
         { key: 'mix', label: single() ? 'Competition' : 'Competitions (minutes)', fmt: function (v, r) { return single() ? FB.compLink(st.scope, { short: true }) : '<span class="qk-muted fb-lb-mix">' + esc(v || '') + '</span>'; } },
         { key: 'age', label: 'Age', num: true }, { key: 'min', label: 'Min', num: true },
-        { key: 'v', label: lab, num: true, fmt: function (v) { return '<b>' + FB.fmtMetric(v, metric.fmt) + '</b>'; } },
+        { key: 'v', label: lab, type: 'pctl', pctl: 'pct', tip: rolesOn() ? 'Coloured by his percentile against his role group (blue low, red high)' : 'Coloured by his percentile among the players shown (blue low, red high)', fmt: function (v) { return '<b>' + FB.fmtMetric(v, metric.fmt) + '</b>'; } },
         { key: 'raw', label: 'Raw', num: true, tip: 'Before the league adjustment', fmt: function (v) { return adj ? FB.fmtMetric(v, metric.fmt) : '—'; } },
         { key: 'f', label: 'Factor', num: true, tip: 'The scoring factor (pooled model), minutes-weighted over the competitions he played', fmt: function (v) { return nn(v, 2); } },
-        { key: 'pct', label: 'Pctl', num: true, tip: 'Percentile among the players shown', fmt: function (v) { return isNum(v) ? FB.pctl(v) : '—'; } },
+        { key: 'pct', label: 'Pctl', num: true, tip: rolesOn() ? 'Percentile against his role group in this view' : 'Percentile among the players shown', fmt: function (v) { return isNum(v) ? FB.pctl(v) : '—'; } },
         { key: 'g', label: 'G', num: true }, { key: 'a', label: 'A', num: true }, { key: 'rt', label: 'Rating', num: true, fmt: function (v) { return nn(v, 2); } }
-      ], data, { maxHeight: 640, caption: 'Leaders' });
+      ], rows: data });
       var top = data.slice(0, 15);
       var box = el.querySelector('#ld-chart');
       if (!top.length) { chartEmpty(box, 'No player clears the filters'); return; }
@@ -429,29 +494,23 @@ function drawPerson(el, doc, q) {
   var cur = (doc.years || [])[0] || null;
   var curEra = cur ? cur.era : null;
 
-  // hero
-  var meta = [];
-  if (doc.nat) meta.push('<span>' + esc(doc.nat) + '</span>');
-  if (age) meta.push('<span>Age <b>' + age + '</b></span>');
-  if (doc.height) meta.push('<span><b>' + doc.height + '</b> cm</span>');
-  if (doc.foot) meta.push('<span>' + esc(doc.foot) + ' foot</span>');
-  if (doc.shirt) meta.push('<span>Shirt <b>#' + esc(doc.shirt) + '</b></span>');
-  if (doc.until) meta.push('<span data-tip="Contract end, as Sofascore lists it">Contract <b>' + esc(String(doc.until).slice(0, 7)) + '</b></span>');
-  var clubLine = cc && cc.name
-    ? monoLink(cc.tid, cc.name) + (cc.source === 'appearances' ? ' <span class="qk-muted" data-tip="From his latest club appearance, not a squad list">(latest appearance)</span>' : cc.source === 'profile' ? ' <span class="qk-muted" data-tip="From his Sofascore profile">(profile)</span>' : '')
-    : '<span class="qk-muted">No current club on record</span>';
-  var ntLine = nt && nt.name ? monoLink(nt.tid, nt.name) : '';
+  // the player card header (kit v2): club band, shirt number, position, club, the season; facts as Sofascore lists them
+  var untilTxt = '';
+  if (doc.until) { var ud = FB.parseDate(doc.until); untilTxt = ud ? FB.MONTHS[ud.getMonth()] + ' ' + ud.getFullYear() + ' (Sofascore)' : String(doc.until).slice(0, 7); }
+  var tags = [];
+  if (nt && nt.name) tags.push(nt.tid && FB.clubRow(nt.tid) ? '<a class="qk-tag" href="' + esc(FB.href.club(nt.tid)) + '">' + esc(nt.name) + ' · national team</a>' : QK.tag(nt.name + ' · national team'));
+  if (cc && cc.source === 'appearances') tags.push('<span class="qk-tag" data-tip="From his latest club appearance, not a squad list">Club from his latest appearance</span>');
+  else if (cc && cc.as_of) tags.push('<span class="qk-tag" data-tip="The squad list this club is read from">Squad as of ' + esc(FB.fmtDate(cc.as_of, true)) + '</span>');
+  if (!cc || !cc.name) tags.push(QK.tag('No current club on record'));
   var stats = [];
-  if (isNum(doc.mv)) stats.push(['Market value', FB.money(doc.mv, doc.mvc)]);
-  if (cur) { stats.push([curEra + ' goals', int(cur.g || 0)]); stats.push(['Assists', int(cur.a || 0)]); stats.push(['Minutes', int(cur.min || 0)]); }
-  var hero = '<section class="qk-hero fb-pl-hero"><div class="qk-hero-in">' +
-    '<div class="qk-avatar fb-pl-av">' + esc(FB.initials(doc.name)) + '</div>' +
-    '<div class="fb-pl-hero-main"><div class="qk-kicker">' + esc(posLabel(doc.pos)) + (cc && cc.as_of ? ' · squad as of ' + esc(FB.fmtDate(cc.as_of, true)) : '') + '</div>' +
-    '<h1>' + esc(doc.name || 'Player ' + doc.id) + '</h1>' +
-    '<div class="fb-pl-clubs">' + clubLine + (ntLine ? '<span class="fb-pl-sep">·</span>' + ntLine + ' <span class="fb-kind" style="--k:' + FB.kindColor('international') + '">National team</span>' : '') + '</div>' +
-    '<div class="qk-hero-meta">' + meta.join('') + '</div></div>' +
-    (stats.length ? '<div class="qk-hero-stats">' + stats.map(function (s) { return '<div class="qk-hero-stat"><div class="v">' + esc(s[1]) + '</div><div class="l">' + esc(s[0]) + '</div></div>'; }).join('') + '</div>' : '') +
-    '</div></section>';
+  if (cur) { stats.push({ label: 'Goals', value: int(cur.g || 0), sub: curEra }); stats.push({ label: 'Assists', value: int(cur.a || 0), sub: curEra }); stats.push({ label: 'Minutes', value: int(cur.min || 0), sub: (cur.apps || 0) + ' apps' }); }
+  if (isNum(doc.mv)) stats.push({ label: 'Market value', value: FB.money(doc.mv, doc.mvc), sub: 'Sofascore' });
+  var hero = '<div class="qk-kicker fb-pl-back"><a href="#/players">← Players</a></div>' + QK.playerHeader({
+    name: doc.name || 'Player ' + doc.id, number: doc.shirt, pos: posLabel(doc.pos), kicker: curEra || '',
+    team: cc && cc.name ? { name: cc.name, logo: cc.tid ? FB.crestUrl(cc.tid) : null, href: cc.tid && FB.clubRow(cc.tid) ? FB.href.club(cc.tid) : null } : null,
+    meta: [age ? ['Age', String(age)] : null, doc.nat ? ['Nationality', doc.nat] : null, doc.height ? ['Height', doc.height + ' cm'] : null, doc.foot ? ['Foot', doc.foot] : null,
+      untilTxt ? ['Contract to', untilTxt] : null],
+    stats: stats, tags: tags });
 
   var base = '#/player/' + FB.enc(doc.id);
   var keepQs = function (t) { return base + FB.qs({ tab: t === 'overview' ? null : t, scope: q.scope, c: q.c, e: q.e }); };
@@ -529,6 +588,8 @@ function byYear(rows) {
       era: y.era, rows: rr.sort(function (a, b) { return (KIND_ORDER[a.kind] - KIND_ORDER[b.kind]) || (b.min || 0) - (a.min || 0); }),
       apps: sum(rr, 'apps'), starts: sum(rr, 'starts'), min: sum(rr, 'min'), g: sum(rr, 'g'), a: sum(rr, 'a'),
       xg: xgRows.length ? sum(xgRows, 'xg') : null, xa: rr.some(function (r) { return isNum(r.xa); }) ? sum(rr.filter(function (r) { return isNum(r.xa); }), 'xa') : null,
+      /* goals and minutes in the rows that carry xG, so goals against xG compares the same matches (ACCURACY_AUDIT 4) */
+      xg_g: xgRows.length ? sum(xgRows, 'g') : null, xg_min: xgRows.length ? sum(xgRows, 'min') : null,
       rt: wavg(rr, 'rt'), intlMin: sum(intl, 'min'), clubMin: sum(rr, 'min') - sum(intl, 'min'),
       partial: rr.some(function (r) { return r.coverage === 'partial' || r.coverage === 'none'; }), totals: rr.some(function (r) { return r.coverage === 'totals'; })
     };
@@ -546,35 +607,165 @@ function drawOverview(el, body, doc, R, q) {
   var cy = Y.filter(function (y) { return y.era === curEra; })[0] || null;
   var label = filterLabel(q, doc.comps);
   var tiles = cy ? [
-    FB.kpi('Appearances', int(cy.apps) + (cy.starts ? ' <span class="fb-pl-dim">' + cy.starts + ' st</span>' : ''), { sub: int(cy.min) + ' minutes' }),
-    FB.kpi('Goals', int(cy.g), { sub: isNum(cy.xg) ? 'xG ' + num(cy.xg, 1) : '' }),
-    FB.kpi('Assists', int(cy.a), { sub: isNum(cy.xa) ? 'xA ' + num(cy.xa, 1) : '' }),
-    FB.kpi('G+A per 90', nn(per90(cy.g + cy.a, cy.min), 2), { sub: nn(per90(cy.g, cy.min), 2) + ' goals per 90' }),
-    FB.kpi('Rating', nn(cy.rt, 2), { sub: 'minutes-weighted' }),
-    FB.kpi('Club / international', int(cy.clubMin) + ' <span class="fb-pl-dim">/ ' + int(cy.intlMin) + '</span>', { sub: 'minutes · ' + cy.rows.length + ' competition' + (cy.rows.length === 1 ? '' : 's') })
+    FB.kpi('Appearances', int(cy.apps), { sub: (cy.starts ? cy.starts + ' starts · ' : '') + int(cy.min) + ' minutes', text: false }),
+    FB.kpi('Goals', int(cy.g), { sub: isNum(cy.xg) ? 'xG ' + num(cy.xg, 1) : '', text: false }),
+    FB.kpi('Assists', int(cy.a), { sub: isNum(cy.xa) ? 'xA ' + num(cy.xa, 1) : '', text: false }),
+    FB.kpi('G+A per 90', nn(per90(cy.g + cy.a, cy.min), 2), { sub: nn(per90(cy.g, cy.min), 2) + ' goals per 90', text: false }),
+    FB.kpi('Rating', nn(cy.rt, 2), { sub: 'Sofascore, minutes-weighted', text: false }),
+    FB.kpi('Club / international', int(cy.clubMin) + ' / ' + int(cy.intlMin), { sub: 'minutes · ' + cy.rows.length + ' competition' + (cy.rows.length === 1 ? '' : 's'), text: false })
   ] : [];
   body.innerHTML =
     '<div class="fb-pl-kpihead"><h2 class="fb-pl-h2">' + esc(curEra || 'This season') + '</h2><span class="qk-muted">' + esc(label) + (cy && (cy.partial || cy.totals) ? ' · ' : '') + (cy && cy.partial ? '<span class="fb-cov partial" data-tip="At least one competition this season is a lower bound: line-ups are missing for some of his team\'s matches.">Partial</span>' : '') + '</span></div>' +
     (tiles.length ? FB.kpis(tiles) : FB.empty('No season in the filter', 'Clear the filters to see his career.')) +
+    '<div class="qk-grid fb-mt"><div class="qk-span-5" id="pl-pcard">' + QK.skeleton('lines', 8) + '</div>' +
+      '<div class="qk-span-7 fb-pl-stack">' +
+        FB.card('Where he sits', '<span id="pl-dist-sub">His peer group in his main competition this season, with him and the median marked.</span>',
+          '<div id="pl-dist-seg" class="fb-pl-distseg"></div>' + FB.chartBox('pl-dist', 250, 'Where he sits among his peers'), { id: 'pl-distcard' }) +
+        FB.card('Goals against xG', '<span id="pl-xg-sub">Per season, where the stores carry xG (archive seasons are totals without xG).</span>', FB.chartBox('pl-xg', 250, 'Goals and xG by season')) +
+      '</div></div>' +
     FB.grid(
-      FB.card('Goals and assists by season', 'Stacked by competition kind' + (filtered ? ', in the filter' : '') + '.', FB.chartBox('pl-ga', 300, 'Goals and assists by season'), { span: 6 }) +
-      FB.card('Minutes by season', 'Where the minutes came from: league, continental, cups, international.', FB.chartBox('pl-min', 300, 'Minutes by season'), { span: 6 }) +
-      FB.card('Goals against xG', 'Per season, where the stores carry xG (archive seasons are totals without xG).', FB.chartBox('pl-xg', 280, 'Goals and xG by season'), { span: 6 }) +
-      FB.card('Rating by season', 'Minutes-weighted Sofascore rating across the season\'s competitions.', FB.chartBox('pl-rt', 280, 'Rating by season'), { span: 6 })
+      FB.card('Goals and assists by season', 'Stacked by competition kind' + (filtered ? ', in the filter' : '') + '.', FB.chartBox('pl-ga', 280, 'Goals and assists by season'), { span: 4 }) +
+      FB.card('Minutes by season', 'Where the minutes came from: league, continental, cups, international.', FB.chartBox('pl-min', 280, 'Minutes by season'), { span: 4 }) +
+      FB.card('Rating by season', 'Minutes-weighted Sofascore rating across the season\'s competitions.', FB.chartBox('pl-rt', 280, 'Rating by season'), { span: 4 })
     ) +
     FB.card('Season by season', 'Every competition he played, summed per season' + (doc.frame === 'calendar' ? ' (calendar years, as his club football runs)' : ' (July to June; international matches count in the season they are played in)') +
       '. Open a season for its competitions. <a href="' + esc('#/player/' + FB.enc(doc.id) + FB.qs({ tab: 'seasons', scope: q.scope, c: q.c, e: q.e })) + '">Full career table →</a>', '<div id="pl-years"></div>', { flush: true }) +
-    FB.grid(
-      FB.card('Value', 'From the site\'s value model, last 12 months of club football. <a href="#/value">How it works →</a>', '<div id="pl-value">' + FB.loading('lines', 4) + '</div>', { span: 6 }) +
-      FB.card('Profile', '<span id="pl-prof-sub">Percentiles against positional peers in his main competition this season.</span>', '<div id="pl-prof">' + FB.loading('chart', 1) + '</div>', { span: 6 })
-    );
+    '<div id="pl-move" class="fb-pl-move"></div>' +
+    FB.card('Value added', 'Our player value model: goals above a replacement-level player in his role, last 12 months of club football. <a href="#/value">How it works →</a>', '<div id="pl-value">' + FB.loading('lines', 4) + '</div>');
   yearsTable(body.querySelector('#pl-years'), Y, doc, 2);
   seasonCharts(body, Y);
-  drawValue(body, doc);
+  /* value/players.json and value/lines.json are about 2 MB: they load only when the card is near the screen */
+  whenVisible(body.querySelector('#pl-value'), function () { drawValue(body, doc); });
+  /* who moves next (value.js, MOVES_VIEWS.md 4): the card draws only when his club's file has a movement block and the
+     payload has a row for him; otherwise the slot stays empty. Loaded when it nears the screen. */
+  var mv = body.querySelector('#pl-move'), cc = doc.current_club || {};
+  /* the empty slot has no box to observe: it loads with the value card just below it */
+  if (mv && FB.movementCard && cc.tid && !((FB.clubRow(cc.tid) || {}).national)) whenVisible(body.querySelector('#pl-value'), function () { FB.movementCard(mv, doc.id, { tid: cc.tid, until: doc.until }); });
   var main = R.seasons.filter(function (s) { return s.source === 'live' && compOk(s.comp) && FB.hasFile(s.comp, 'players_live'); }).sort(function (a, b) { return (b.min || 0) - (a.min || 0); });
   var pick = q.c ? main.filter(function (s) { return s.comp === q.c; })[0] : main[0];
-  if (pick) profileCard(el, body.querySelector('#pl-prof'), doc, pick.comp, true);
-  else body.querySelector('#pl-prof').innerHTML = FB.muted('No line in a competition with percentiles this season.');
+  pctPanel(body, doc, pick ? pick.comp : null);
+}
+
+/* The Savant-style percentile card and "Where he sits" for one live competition (players_live.json), against his
+   formation-role group in that competition (FB.MSET, the metrics spec: centre-backs, full-backs, DM/CM, AM/W,
+   strikers, goalkeepers) over max(the group's minimum, the competition's floor), on the group's headline and
+   secondary sets; the peer group and sample always stated, metrics short of their m50 drawn early. Without the role
+   payload (value/lines.json) it falls back to the position letter (pctPanelLetter). */
+function pctPanel(body, doc, slug) {
+  var cardBox = body.querySelector('#pl-pcard'), distCard = body.querySelector('#pl-distcard');
+  if (!slug || !FB.roles) return pctPanelLetter(body, doc, slug);
+  /* the rows' own role and gar90 when the payload carries them (no extra file); else the value/lines.json join */
+  return FB.compFile(slug, 'players_live').then(function (lv) {
+    return FB.rolesFor(((lv || {}).players || []).some(function (x) { return x.role !== undefined; })).then(function (R0) { return [lv, R0]; });
+  }).then(function (arr) {
+    if (!cardBox.isConnected) return;
+    var live = arr[0] || {}, R = arr[1];
+    var players = live.players || [];
+    var p = players.filter(function (x) { return String(x.player_id) === String(doc.id); })[0];
+    if (!R || !R.ok || !p) return pctPanelLetter(body, doc, slug);
+    var role = FB.rowRole(R, p.role, doc.id, slug), g = FB.peerGroup(role);
+    var c = FB.comp(slug);
+    var where = FB.compName(slug) + ' ' + (FB.currentSeason(c).season || '');
+    if (!g) {
+      cardBox.innerHTML = QK.pctCard({ title: 'Percentile rankings', groups: [], emptyTitle: 'No peer group yet',
+        emptyText: role ? 'He has no start in a formation role in ' + where + ' (substitute appearances only), so there is no position group to rank him in.' : 'No formation role for him in ' + where + ' yet.' });
+      if (distCard) distCard.hidden = true;
+      return;
+    }
+    var meta = metaMap(live.metrics);
+    var PP = FB.peerPct({ rows: players, minutes: function (r) { return r.minutes; }, role: function (r) { return FB.rowRole(R, r.role, r.player_id, slug); },
+      val: function (r, k) { return k === 'gar90' ? FB.rowGar(R, r.gar90, r.player_id, slug) : r[k]; }, floor: live.minutes_floor });
+    var min = PP.min(g), pc = PP.pct(p), peers = PP.peers(g);
+    var val = function (k) { return k === 'gar90' ? FB.rowGar(R, p.gar90, p.player_id, slug) : p[k]; };
+    var row = function (k) {
+      var info = FB.metricInfo(k) || {}, m = meta[k] || {};
+      if (!pc || !isNum(pc[k])) return null;
+      return { label: info.label || m.label || k, pctl: pc[k], value: FB.fmtSet(k, val(k), m.fmt), tip: info.tip || m.desc || '', early: FB.isEarly(g, k, p.minutes) };
+    };
+    var groups = [{ label: 'Headline', rows: FB.groupKeys(g, 'headline').map(row).filter(Boolean) }, { label: 'More', rows: FB.groupKeys(g, 'more').map(row).filter(Boolean) }];
+    var small = (p.minutes || 0) < g.small;
+    var sample = int(p.minutes) + ' min · ' + (p.matches || 0) + ' apps · ' + peers.length + ' ' + g.short + ' over ' + int(min) + ' min' + (small ? ' · small sample' : '');
+    var shotsHref = '#/player/' + FB.enc(doc.id) + FB.qs({ tab: 'shots', c: slug });
+    cardBox.innerHTML = QK.pctCard({ title: 'Percentile rankings', peer: cap1(g.name) + ' · ' + where, sample: sample, groups: groups,
+      emptyTitle: 'Not enough minutes yet', emptyText: 'Percentiles appear once he passes ' + int(min) + ' minutes as one of the ' + g.name + ' in ' + where + ' (' + int(p.minutes) + ' so far).',
+      note: FB.peerLine(g, where, min) + ' (his formation role this season: ' + role + '). 100 is the best; where less is better the scale is already turned round. Value added is our player value model; the rest are per-90 rates from the competition line.',
+      foot: '<span>' + esc(FB.compName(slug, true)) + '</span><a href="' + esc(shotsHref) + '">Every percentile and the shot map →</a>' });
+    // where he sits: his role group's distribution of one headline metric
+    var keys = FB.groupKeys(g, 'headline').filter(function (k) { return PP.values(g, k).length >= 8; }).slice(0, 4);
+    var seg = body.querySelector('#pl-dist-seg');
+    if (!distCard || !keys.length || peers.length < 8) { if (distCard) distCard.hidden = true; return; }
+    distCard.hidden = false;
+    seg.innerHTML = FB.seg('pl-dist-m', keys.map(function (k) { return [k, (FB.metricInfo(k) || {}).label || (meta[k] || {}).label || k]; }), keys[0], 'Metric');
+    FB.set('pl-dist-sub', esc(cap1(g.name)) + ' in ' + esc(where) + ' over ' + int(min) + ' minutes (' + peers.length + '), with him and the median marked; bars coloured by percentile.');
+    var draw = function (key) {
+      var info = FB.metricInfo(key) || {}, m = meta[key] || {};
+      var vals = PP.values(g, key);
+      var box = body.querySelector('#pl-dist');
+      if (!box || vals.length < 8) { chartEmpty(box, 'Too few peers with this metric'); return; }
+      var mine = val(key);
+      QKC.distribution(box, { values: vals, binCount: 20, lowerBetter: !!info.lower, fmt: function (v) { return FB.fmtSet(key, v, m.fmt); },
+        xName: (info.label || m.label || key) + ' · ' + vals.length + ' ' + g.short, yName: 'Players',
+        marks: (isNum(mine) ? [{ x: mine, label: FB.surname(doc.name) }] : []).concat([{ x: FB.median(vals), label: 'Median' }]), label: 'Distribution of ' + (info.label || key) });
+    };
+    draw(keys[0]);
+    FB.wireSeg(seg, 'pl-dist-m', draw);
+  });
+}
+/* The same card against the position letter (G, D, M, F) the payloads rank by: the fallback when the role payload
+   is missing. */
+function pctPanelLetter(body, doc, slug) {
+  var cardBox = body.querySelector('#pl-pcard'), distCard = body.querySelector('#pl-distcard');
+  var noLine = function (txt) {
+    cardBox.innerHTML = QK.pctCard({ title: 'Percentile rankings', groups: [], emptyTitle: 'No percentiles this season', emptyText: txt });
+    if (distCard) distCard.hidden = true;
+  };
+  if (!slug) { noLine('He has no line this season in a competition with player percentiles.'); return Promise.resolve(); }
+  return FB.compFile(slug, 'players_live').then(function (live) {
+    if (!cardBox.isConnected) return;
+    var players = (live || {}).players || [];
+    var p = players.filter(function (x) { return String(x.player_id) === String(doc.id); })[0];
+    var c = FB.comp(slug);
+    var where = FB.compName(slug) + ' ' + (FB.currentSeason(c).season || '');
+    if (!p) { noLine('No line for him in ' + where + '.'); return; }
+    var L = p.is_gk ? 'G' : (PLAYER_SETS[p.position] ? p.position : (PLAYER_SETS[doc.pos] ? doc.pos : 'M'));
+    var floor = (live || {}).minutes_floor || 0;
+    var meta = metaMap(live.metrics);
+    var pc = p.pct || {};
+    var peer = PEER_NAME[L] + ' · ' + where;
+    var sample = int(p.minutes) + ' min · ' + (p.matches || 0) + ' apps · peers need ' + int(floor) + '+ min';
+    var groups = PLAYER_SETS[L].map(function (g) {
+      return { label: g[0], rows: g[1].map(function (k) {
+        var m = meta[k];
+        if (!m || !isNum(pc[k])) return null;
+        return { label: m.label || k, pctl: pc[k], value: FB.fmtMetric(p[k], m.fmt), tip: m.desc || '', early: (p.minutes || 0) < earlyMin(L, k) };
+      }).filter(Boolean) };
+    });
+    var shotsHref = '#/player/' + FB.enc(doc.id) + FB.qs({ tab: 'shots', c: slug });
+    cardBox.innerHTML = QK.pctCard({ title: 'Percentile rankings', peer: peer, sample: sample, groups: groups,
+      emptyTitle: 'Not enough minutes yet', emptyText: 'Percentiles appear once he passes ' + int(floor) + ' minutes in ' + where + ' (' + int(p.minutes) + ' so far).',
+      note: 'Against ' + PEER_NAME[L] + ' in ' + where + ' with ' + int(floor) + '+ minutes; 100 is the best. Where less is better the scale is already turned round.',
+      foot: '<span>' + esc(FB.compName(slug, true)) + '</span><a href="' + esc(shotsHref) + '">Every percentile and the shot map →</a>' });
+    // where he sits: his peer group's distribution of one metric
+    var peers = players.filter(function (x) { return (L === 'G' ? x.is_gk : (!x.is_gk && x.position === L)) && (x.qualified || (x.minutes || 0) >= floor); });
+    var keys = (PLAYER_DIST[L] || []).filter(function (k) { return meta[k]; });
+    var seg = body.querySelector('#pl-dist-seg');
+    if (!distCard || !keys.length || peers.length < 8) { if (distCard) distCard.hidden = true; return; }
+    seg.innerHTML = FB.seg('pl-dist-m', keys.map(function (k) { return [k, meta[k].label || k]; }), keys[0], 'Metric');
+    FB.set('pl-dist-sub', esc(cap1(PEER_NAME[L])) + ' in ' + esc(where) + ' over ' + int(floor) + ' minutes (' + peers.length + '), with him and the median marked; bars coloured by percentile.');
+    var draw = function (key) {
+      var m = meta[key] || {};
+      var vals = peers.map(function (x) { return x[key]; }).filter(isNum).sort(function (a, b) { return a - b; });
+      var box = body.querySelector('#pl-dist');
+      if (!box || vals.length < 8) { chartEmpty(box, 'Too few peers with this metric'); return; }
+      var med = FB.median(vals);
+      var mine = p[key];
+      QKC.distribution(box, { values: vals, binCount: 20, lowerBetter: !!m.lower, fmt: function (v) { return FB.fmtMetric(v, m.fmt); },
+        xName: (m.label || key) + ' · ' + vals.length + ' ' + PEER_NAME[L], yName: 'Players',
+        marks: (isNum(mine) ? [{ x: mine, label: FB.surname(doc.name) }] : []).concat([{ x: med, label: 'Median' }]), label: 'Distribution of ' + (m.label || key) });
+    };
+    draw(keys[0]);
+    FB.wireSeg(seg, 'pl-dist-m', draw);
+  });
 }
 
 function yearsTable(box, Y, doc, open) {
@@ -629,8 +820,13 @@ function seasonCharts(body, Y) {
   QKC.bar(boxes[1], { cats: eras, stack: true, legend: true, fmt: function (v) { return int(v); }, catName: 'Season', valName: 'Minutes', label: 'Minutes by season',
     series: kinds.map(function (k) { return { name: KIND_LABEL[k], color: FB.kindColorHex(k), data: perKind(k, function (rr) { return sum(rr, 'min'); }) }; }) });
   var xgOk = ys.some(function (y) { return isNum(y.xg); });
+  /* where xG covers only part of a season's minutes (xg_min < min), the goals scored in those same matches (xg_g) */
+  var partXg = function (y) { return isNum(y.xg) && isNum(y.xg_g) && isNum(y.xg_min) && isNum(y.min) && y.xg_min < y.min; };
+  var anyPart = ys.some(partXg);
+  var xgSub = body.querySelector('#pl-xg-sub');
+  if (xgSub && anyPart) xgSub.textContent = 'Per season, where the stores carry xG. Where xG covers only some of his matches, goals count those matches only, so the two compare like with like.';
   QKC.line(boxes[2], { x: eras, legend: true, endLabels: false, yMin: 0, yFmt: function (v) { return num(v, 0); }, xName: 'Season', yName: 'Goals and xG', label: 'Goals against xG by season',
-    series: [{ name: 'Goals', color: QK.cssVar('--accent'), data: ys.map(function (y) { return y.g; }) }].concat(xgOk ? [{ name: 'xG', color: QK.cssVar('--c-1'), dash: true, data: ys.map(function (y) { return isNum(y.xg) ? Math.round(y.xg * 10) / 10 : null; }) }] : []) });
+    series: [{ name: anyPart ? 'Goals (in matches with xG)' : 'Goals', color: QK.cssVar('--c-2'), data: ys.map(function (y) { return partXg(y) ? y.xg_g : y.g; }) }].concat(xgOk ? [{ name: 'xG', color: QK.cssVar('--c-1'), dash: true, data: ys.map(function (y) { return isNum(y.xg) ? Math.round(y.xg * 10) / 10 : null; }) }] : []) });
   var rts = ys.map(function (y) { return isNum(y.rt) ? Math.round(y.rt * 100) / 100 : null; });
   if (!rts.some(isNum)) chartEmpty(boxes[3], 'No ratings', 'No rated season in the filter.');
   else QKC.line(boxes[3], { x: eras, endLabels: false, yScale: true, yFmt: function (v) { return num(v, 2); }, xName: 'Season', yName: 'Sofascore rating', label: 'Rating by season', series: [{ name: 'Rating', color: QK.cssVar('--c-3'), data: rts, area: true }] });
@@ -650,7 +846,7 @@ function drawValue(body, doc) {
     var html = '';
     if (row) {
       html += FB.kpis([
-        FB.kpi('GAR / 90', FB.signed(row.gar90, 2), { tip: 'Goals above replacement per 90 minutes, last 12 months of club football', sub: isNum(row.pct) ? FB.ordinal(row.pct) + ' percentile among ' + esc(roles[row.role] || row.role || '') + 's' : esc(roles[row.role] || row.role || '') }),
+        FB.kpi('Value added (GAR/90)', FB.signed(row.gar90, 2), { signal: true, pctl: isNum(row.pct) ? row.pct : null, tip: 'Goals above replacement per 90 minutes, last 12 months of club football, our value model', sub: isNum(row.pct) ? FB.ordinal(row.pct) + ' percentile among ' + esc(roles[row.role] || row.role || '') + 's' : esc(roles[row.role] || row.role || '') }),
         FB.kpi('GAR', FB.signed(row.gar, 1), { sub: int(row.min) + ' min · PAR ' + FB.signed(row.par, 1) + ' pts' }),
         FB.kpi('Fair value', isNum(row.v2) ? num(row.v2, 1) : '—', { tip: 'Valuation v2: expected points above replacement over four seasons (10-90% band)', sub: isNum(row.v2lo) ? num(row.v2lo, 1) + '–' + num(row.v2hi, 1) + ' pts' : '' }),
         FB.kpi('Fair fee', isNum(row.fee) ? FB.money(row.fee) : '—', { tip: 'Fair fee to a buyer like his own club (fee model)', sub: isNum(row.feelo) ? FB.money(row.feelo) + '–' + FB.money(row.feehi) : (isNum(row.mv) ? 'market value ' + FB.money(row.mv) : '') })
@@ -683,6 +879,7 @@ function profileCard(el, box, doc, slug, compact) {
     var pos = (live.positions || {})[p.position] || (p.is_gk ? 'Goalkeeper' : 'Outfield player');
     var hasP = p.pct && Object.keys(p.pct).length;
     var sub = esc(FB.compName(slug)) + ' ' + esc(FB.currentSeason(FB.comp(slug)).season || '') + ' · against ' + esc(String(pos).toLowerCase()) + 's with ' + (live.minutes_floor || 0) + '+ minutes';
+    var L = p.is_gk ? 'G' : (PLAYER_SETS[p.position] ? p.position : 'M');
     if (!hasP) { box.innerHTML = '<p class="fb-cap">' + sub + '</p>' + FB.empty('Not enough minutes yet', 'Percentiles appear once he passes ' + (live.minutes_floor || 0) + ' minutes in this competition (' + int(p.minutes) + ' so far).'); return; }
     var radarAxes = (p.is_gk ? RADAR_GK : RADAR_OUT).filter(function (a) { return isNum(p.pct[a[0]]); });
     if (compact) {
@@ -696,12 +893,13 @@ function profileCard(el, box, doc, slug, compact) {
       if (!isNum(p.pct[m.key])) return;
       var g = groups.filter(function (x) { return x.name === m.group; })[0];
       if (!g) { g = { name: m.group, items: [] }; groups.push(g); }
-      g.items.push({ label: m.label + (m.lower ? ' ↓' : ''), pctl: p.pct[m.key], value: FB.fmtMetric(p[m.key], m.fmt) });
+      g.items.push({ label: m.label + (m.lower ? ' ↓' : ''), pctl: p.pct[m.key], value: FB.fmtMetric(p[m.key], m.fmt), early: (p.minutes || 0) < earlyMin(L, m.key) });
     });
-    box.innerHTML = '<p class="fb-cap fb-pl-cap0">' + sub + '. Higher is better; ↓ marks counts where fewer is better (already turned round).</p>' +
-      '<div class="fb-pl-prof">' + '<div class="fb-pl-radarwrap">' + FB.chartBox('pl-radar', 360, 'Percentile profile') + '</div>' +
-      '<div class="fb-pl-groups">' + groups.map(function (g) { return '<div class="fb-pl-group"><div class="qk-kicker">' + esc(g.name) + '</div>' + QK.pctlBars(g.items) + '</div>'; }).join('') + '</div></div>';
-    if (radarAxes.length >= 3) FB.charts.radar(box.querySelector('#pl-radar'), { axes: radarAxes.map(function (a) { return { name: a[1], max: 100 }; }), series: [{ name: doc.name, values: radarAxes.map(function (a) { return p.pct[a[0]]; }), color: QK.cssVar('--accent') }], label: 'Percentile radar, ' + FB.compName(slug) });
+    box.innerHTML = '<div class="fb-pl-prof">' + '<div class="fb-pl-radarwrap">' + FB.chartBox('pl-radar', 360, 'Percentile profile') + '</div>' +
+      QK.pctCard({ title: 'Every percentile', peer: String(pos).toLowerCase() + 's · ' + FB.compName(slug) + ' ' + (FB.currentSeason(FB.comp(slug)).season || ''),
+        sample: int(p.minutes) + ' min · peers need ' + int(live.minutes_floor || 0) + '+ min', cls: 'fb-pl-allpct',
+        groups: groups.map(function (g) { return { label: g.name, rows: g.items }; }), note: 'Higher is better; ↓ marks counts where fewer is better (already turned round).' }) + '</div>';
+    if (radarAxes.length >= 3) FB.charts.radar(box.querySelector('#pl-radar'), { axes: radarAxes.map(function (a) { return { name: a[1], max: 100 }; }), series: [{ name: doc.name, values: radarAxes.map(function (a) { return p.pct[a[0]]; }), color: QK.cssVar('--signal') }], label: 'Percentile radar, ' + FB.compName(slug) });
     else box.querySelector('#pl-radar').style.display = 'none';
   });
 }
@@ -797,8 +995,8 @@ function drawMatches(el, body, doc, R, q) {
       yAxis: QKC.axis(T, { min: 0, fmt: function (v) { return num(v, 1); }, name: 'xG and goals', nameAlign: 'left' }),
       tooltip: QKC.tooltip(T, { trigger: 'axis', formatter: function (ps) { var i = ps[0].dataIndex; return '<div style="font-weight:600;margin-bottom:4px">' + esc(tip(i)) + '</div>' + ps.map(function (p) { return QKC.tipRow(p.color, p.seriesName, isNum(p.value) ? num(p.value, 2) : '—'); }).join(''); } }),
       series: [
-        { type: 'bar', name: 'xG', barMaxWidth: 14, data: chron.map(function (r) { return isNum(r.xg) ? r.xg : 0; }), itemStyle: { color: T.model, borderRadius: [3, 3, 0, 0] } },
-        { type: 'scatter', name: 'Goals', symbolSize: 9, data: chron.map(function (r) { return r.g ? r.g : null; }), itemStyle: { color: T.accent, borderColor: T.s1, borderWidth: 1.5 } }
+        { type: 'bar', name: 'xG', barMaxWidth: 14, data: chron.map(function (r) { return isNum(r.xg) ? r.xg : 0; }), itemStyle: { color: T.cat[0], borderRadius: [3, 3, 0, 0] } },
+        { type: 'scatter', name: 'Goals', symbolSize: 9, data: chron.map(function (r) { return r.g ? r.g : null; }), itemStyle: { color: T.cat[1], borderColor: T.s1, borderWidth: 1.5 } }
       ]
     };
   }, { label: 'xG and goals per appearance' });
@@ -813,7 +1011,7 @@ function drawShots(el, body, doc, R, q) {
   if (!lives.length) { body.innerHTML = FB.empty('No current competition line', 'Percentiles and shot maps come from this season\'s competitions; he has no line in one this season.'); return; }
   var slug = q.c && lives.indexOf(q.c) >= 0 ? q.c : lives[0];
   body.innerHTML = '<div class="fb-pl-filter">' + (lives.length > 1 ? FB.seg('pl-live', lives.map(function (s) { return [s, FB.compName(s, true)]; }), slug, 'Competition') : '<span class="qk-muted">' + esc(FB.compName(slug)) + ' this season</span>') + '</div>' +
-    FB.card('Percentile profile', 'Against positional peers in the competition.', '<div id="pl-prof2">' + FB.loading('chart', 1) + '</div>') +
+    FB.card('Percentile profile', 'Against his position in the competition this season: the radar on a dozen headline rates, the card on every metric.', '<div id="pl-prof2">' + FB.loading('chart', 1) + '</div>') +
     FB.grid(FB.card('Shot map', '<span id="pl-shot-sub">Every shot this season in the competition; size by xG.</span>', '<div id="pl-shotmap" class="fb-pl-shotmap"></div>', { span: 7 }) +
       FB.card('Shots by outcome', 'Count and xG by result.', '<div id="pl-shotsum"></div>', { span: 5 }));
   var segBox = body.querySelector('.fb-pl-filter');

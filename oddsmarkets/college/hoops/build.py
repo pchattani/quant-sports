@@ -970,7 +970,10 @@ TEAM_METRICS = [("rating", "Rating", "Ratings", "signed2", False, "Adjusted effi
                 ("orb_rate", "OReb%", "Rebounding", "3", False, "Offensive rebound percentage (box scores)"),
                 ("drb_rate", "DReb%", "Rebounding", "3", False, "Defensive rebound percentage (box scores)"),
                 ("opp_tov_rate", "Forced TO rate", "Defense", "3", False, "Opponent turnovers per possession (box scores)"),
-                ("blk_rate", "Block rate", "Defense", "3", False, "Blocks per opponent two-point attempt (box scores)")]
+                ("blk_rate", "Block rate", "Defense", "3", False, "Blocks per opponent two-point attempt (box scores)"),
+                # already in `values`; listed so the catalogue labels them (the defensive four factors: metrics spec)
+                ("opp_ftr", "Opp FT rate", "Defense", "3", True, "Opponents' free-throw attempts per field-goal attempt"),
+                ("stl_rate", "Steal rate", "Defense", "3", False, "Steals per opponent possession (box scores)")]
 
 
 def _metric(k, label, group, fmt, lower, desc):
@@ -1145,7 +1148,26 @@ PLAYER_METRICS = [("value", "Value", "Value", "1", False, "Points above replacem
                   ("tp_pct", "3P%", "Shooting", "3", False, "Three-point percentage"), ("ft_pct", "FT%", "Shooting", "3", False, "Free-throw percentage"),
                   ("ts", "TS%", "Shooting", "3", False, "True shooting: PTS / (2 (FGA + 0.475 FTA))"),
                   ("usg", "USG%", "Usage", "1", False, "Share of team possessions used on the floor"),
-                  ("ortg", "Pts/100 used", "Usage", "1", False, "Points per 100 possessions used (FGA + 0.475 FTA + TOV)")]
+                  ("ortg", "Pts/100 used", "Usage", "1", False, "Points per 100 possessions used (FGA + 0.475 FTA + TOV)"),
+                  # rates (docs/_design/metrics/college.json): per 100 possessions on the floor, shares as 0-1 fractions
+                  ("pts100", "PTS/100", "Rates", "1", False, "Points per 100 team possessions on the floor"),
+                  ("ts_add", "Scoring added /100", "Rates", "signed2", False,
+                   "Points per 100 possessions gained by shooting above the D-I true-shooting rate on his volume"),
+                  ("efg", "eFG%", "Shooting", "pct", False, "Effective field-goal percentage (a three counts 1.5 field goals)"),
+                  ("tpar", "3PA rate", "Shooting", "pct", False, "Three-point attempts per field-goal attempt (style)"),
+                  ("ftr", "FT rate", "Shooting", "3", False, "Free-throw attempts per field-goal attempt"),
+                  ("fta100", "FTA/100", "Rates", "1", False, "Free-throw attempts per 100 possessions on the floor"),
+                  ("ast_pct", "AST%", "Rates", "pct", False, "Share of team-mates' baskets assisted while on the floor"),
+                  ("tov_pct", "TOV%", "Rates", "pct", True, "Turnovers per possession used (FGA + 0.475 FTA + TOV)"),
+                  ("ast_tov", "AST/TOV", "Rates", "2", False, "Assists per turnover"),
+                  ("orb_pct", "OREB%", "Rates", "pct", False, "Share of available offensive rebounds grabbed while on the floor"),
+                  ("drb_pct", "DREB%", "Rates", "pct", False, "Share of available defensive rebounds grabbed while on the floor"),
+                  ("trb_pct", "REB%", "Rates", "pct", False, "Share of all available rebounds grabbed while on the floor"),
+                  ("stl_pct", "STL%", "Rates", "pct", False, "Steals per opponent possession while on the floor"),
+                  ("blk_pct", "BLK%", "Rates", "pct", False, "Share of opponent two-point attempts blocked while on the floor"),
+                  ("pf100", "PF/100", "Rates", "1", True, "Personal fouls per 100 possessions on the floor")]
+# percentiles within the role use rates only (counting stats per game mix in minutes)
+ROLE_PCT_KEYS = ["r", "value_pg", "fg_pct", "tp_pct", "ft_pct", "ts", "usg", "ortg"] + list(PL.RATE_KEYS)
 
 
 def player_line(r: dict) -> dict:
@@ -1163,37 +1185,46 @@ def players_payload(ctx, s) -> dict:
     floor = {"gp": max(5, int(0.4 * maxgp)), "mpg": 10.0}
     lines = {p: player_line(r) for p, r in rows.items()}
     qual = {p for p, r in rows.items() if r["gp"] >= floor["gp"] and r["min"] / max(r["gp"], 1) >= floor["mpg"]}
-    pcts, pcts_pos = defaultdict(dict), defaultdict(dict)
+    role_of, role_thr = PL.classify_roles(rows, qual)
+    pcts, pcts_pos, pcts_role = defaultdict(dict), defaultdict(dict), defaultdict(dict)
+
+    def _rank(sub, k, lower, dest):
+        if len(sub) < 10:
+            return
+        arr = np.array(sorted(sub.values()))
+        for p, x in sub.items():
+            q = 100.0 * np.searchsorted(arr, x, side="right") / len(arr)
+            dest[p][k] = round(100 - q + 100 / len(arr) if lower else q, 1)
     for k, *_r in PLAYER_METRICS:
         lower = _r[3]
         xs = {p: lines[p][k] for p in qual if lines[p].get(k) is not None}
         if len(xs) < 10:
             continue
-        arr = np.array(sorted(xs.values()))
-        for p, x in xs.items():
-            q = 100.0 * np.searchsorted(arr, x, side="right") / len(arr)
-            pcts[p][k] = round(100 - q + 100 / len(arr) if lower else q, 1)
+        _rank(xs, k, lower, pcts)
         for pos in ("G", "F", "C"):
-            sub = {p: x for p, x in xs.items() if rows[p]["pos"] == pos}
-            if len(sub) < 10:
-                continue
-            arr = np.array(sorted(sub.values()))
-            for p, x in sub.items():
-                q = 100.0 * np.searchsorted(arr, x, side="right") / len(arr)
-                pcts_pos[p][k] = round(100 - q + 100 / len(arr) if lower else q, 1)
+            _rank({p: x for p, x in xs.items() if rows[p]["pos"] == pos}, k, lower, pcts_pos)
+        if k in ROLE_PCT_KEYS:                         # within the role (guards / wings / bigs): the spec's peer group
+            for role in ("G", "W", "B"):
+                _rank({p: x for p, x in xs.items() if role_of.get(p) == role}, k, lower, pcts_role)
     out = {}
     old = archive(ctx, s)                              # archive seasons: qualified players only (size budget)
     for p, r in rows.items():
         if r["gp"] < 5 or (old and p not in qual):
             continue
-        out[p] = {"name": r["name"], "team": r["team"], "pos": r["pos"], "class": r.get("class"), "gp": r["gp"],
+        out[p] = {"name": r["name"], "team": r["team"], "pos": r["pos"], "role": role_of.get(p), "class": r.get("class"), "gp": r["gp"],
                   "qualified": p in qual, "values": {k: lines[p].get(k) for k, *_ in PLAYER_METRICS if lines[p].get(k) is not None},
-                  "pct": {} if old else pcts.get(p, {}), "pct_pos": {} if old else pcts_pos.get(p, {})}
+                  "pct": {} if old else pcts.get(p, {}), "pct_pos": {} if old else pcts_pos.get(p, {}),
+                  "pct_role": {} if old else pcts_role.get(p, {})}
     posn = Counter(v["pos"] for v in out.values())
+    rolen = Counter(v["role"] for v in out.values())
     return {"ok": True, "level": ctx["level"], "season": s, "updated_at": now_iso(),
             "metrics": [_metric(*m) for m in PLAYER_METRICS],
             "positions": {"G": {"label": "Guards", "n": posn.get("G", 0)}, "F": {"label": "Forwards", "n": posn.get("F", 0)},
                           "C": {"label": "Centers", "n": posn.get("C", 0)}},
+            "roles": {k: {"label": PL.ROLE_LABEL[k], "n": rolen.get(k, 0)} for k in ("G", "W", "B")},
+            "role_rule": {"threshold": role_thr, "rule": "G = listed G; B = listed C, or a listed F (150+ minutes) whose "
+                          "z(REB/100) + z(BLK/100) - z(3PA rate) - z(AST/100) is above the midpoint of the guards' and centres' means; "
+                          "other F = W"},
             "min_floor": floor, "params": pr["params"], "players": PK.pack_keyed(out), "compact": old}
 
 

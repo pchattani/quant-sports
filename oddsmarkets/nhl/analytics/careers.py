@@ -197,6 +197,7 @@ def current_blocks(ctx, sk: dict | None, gk: dict | None) -> dict[str, dict]:
             gm_w = PL.player_table(ctx.season)
         except Exception as exc:    # noqa: BLE001
             ctx.model_errors["players"] = f"{type(exc).__name__}: {exc}"
+    peers = peer_blocks(sk, gk)
     for p, r in SP.items():
         b = out.setdefault(p, {"season": ctx.season, "kind": "skater"})
         v = r.get("values") or {}
@@ -214,10 +215,12 @@ def current_blocks(ctx, sk: dict | None, gk: dict | None) -> dict[str, dict]:
         if e:
             b["edge"] = e
         b["pct"] = pc
+        b.update(peers.get(p) or {})
     for p, r in ((gk or {}).get("players") or {}).items():
         b = out.setdefault(p, {"season": ctx.season, "kind": "goalie"})
         b["goalie"] = r.get("values")
         b["pct"] = r.get("pct")
+        b.update(peers.get(p) or {})
         e = edge.player_block(ctx.season, p)
         if e:
             b["edge"] = e
@@ -237,6 +240,28 @@ def current_blocks(ctx, sk: dict | None, gk: dict | None) -> dict[str, dict]:
             if p in out:
                 top = sorted(d.items(), key=lambda x: -x[1])[:8]
                 out[p]["linemates"] = [[q, names.get(q) or ctx.player_name(q) or q, round(t / 60, 1)] for q, t in top]
+    return out
+
+
+def peer_blocks(sk: dict | None, gk: dict | None) -> dict[str, dict]:
+    """{pid: {"pct_pos", "peer"}} for the current season's player files (accuracy audit, 22 Oct 2026): the percentiles
+    against the same position group (F / D / G) and who that group is (its qualified size and the qualification floor),
+    so a player page can show "v N forwards" without loading the 2.7 MB catalogue. "pct" stays the whole-pool rank."""
+    out: dict[str, dict] = {}
+    for cat, kind in ((sk, "skater"), (gk, "goalie")):
+        P = (cat or {}).get("players") or {}
+        ref = (cat or {}).get("reference") or {}
+        n: dict = {}
+        for r in P.values():
+            if r.get("qualified"):
+                g = r.get("group") if kind == "skater" else "G"
+                n[g] = n.get(g, 0) + 1
+        floor = {"min_toi5": ref.get("min_toi5")} if kind == "skater" else {"min_toi": ref.get("min_toi")}
+        floor["min_gp"] = (ref.get("floors") or {}).get("gp")
+        for pid, r in P.items():
+            g = r.get("group") if kind == "skater" else "G"
+            out[pid] = {"pct_pos": r.get("pct_pos") or (r.get("pct") if kind == "goalie" else None) or {},
+                        "peer": {"group": g, "n": n.get(g, 0), "qualified": bool(r.get("qualified")), **floor}}
     return out
 
 

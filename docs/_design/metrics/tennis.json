@@ -1,0 +1,4362 @@
+{
+ "sport": "tennis",
+ "site": "ace",
+ "schema_version": 1,
+ "generated": "2026-10-22",
+ "leagues": [
+  "atp",
+  "wta"
+ ],
+ "payloads": {
+  "players": "docs/ace/data/<tour>/<year>/players.json -> players{pid}.values / .pct (all surfaces); .values_surface.<surface> / .pct_surface.<surface> (surface groups); data/<tour>/players.json = current year",
+  "teams": null
+ },
+ "teams": null,
+ "compare": {
+  "default": "headline set of the tour group (pct); with a surface picked, the surface group's headline (pct_surface, values_surface)",
+  "head_to_head": "career files players/<pid>.json h2h and results_all give the record; show the two players' headline percentiles side by side for the surface of the next or last meeting"
+ },
+ "groups": [
+  {
+   "id": "atp_all",
+   "entity": "player",
+   "display": "ATP, all surfaces",
+   "peer_group": "ATP players with a tour-level catalogue row in the season; percentiles among the season's qualified players",
+   "position_field": null,
+   "position_codes": [],
+   "tour": "atp",
+   "surface": null,
+   "minimum": {
+    "field": "qualified",
+    "value": true,
+    "unit": "matches",
+    "note": "payload `qualified` = tour-level main-draw matches >= `floor` (20 scaled to the share of the season played, min 8)"
+   },
+   "basis": "per match / per point rates over the season (tour-level main draws); ratings at the season's end",
+   "metrics": [
+    {
+     "id": "elo",
+     "display": "Elo rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rating",
+     "explanation": "Overall strength rating from every result, adjusted for the opponent's rating.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.808,
+      "split_half_r": null,
+      "n_pairs": 1913,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.708,
+      "partial_r_given_elo": null,
+      "r_next_games_won_pct": 0.727
+     }
+    },
+    {
+     "id": "games_won_pct",
+     "display": "Games won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Share of all games won in completed sets; steadier than win % because every game counts.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.719,
+      "split_half_r": 0.789,
+      "n_pairs": 1913,
+      "m50": 11.7,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.689,
+      "partial_r_given_elo": 0.156,
+      "r_next_games_won_pct": 0.719,
+      "match_loglik_change_x1000": -0.43,
+      "match_loglik_se_x1000": 0.18
+     }
+    },
+    {
+     "id": "hold",
+     "display": "Hold",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "How often the player holds serve against an average tour returner, inferred from set scores.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.924,
+      "split_half_r": null,
+      "n_pairs": 1913,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.505,
+      "partial_r_given_elo": 0.075,
+      "r_next_games_won_pct": 0.517,
+      "match_loglik_change_x1000": -0.24,
+      "match_loglik_se_x1000": 0.23
+     }
+    },
+    {
+     "id": "brk",
+     "display": "Break",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "How often the player breaks an average tour server, inferred from set scores.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.901,
+      "split_half_r": null,
+      "n_pairs": 1913,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.389,
+      "partial_r_given_elo": 0.051,
+      "r_next_games_won_pct": 0.422,
+      "match_loglik_change_x1000": 0.11,
+      "match_loglik_se_x1000": 0.05
+     }
+    },
+    {
+     "id": "win_v_top50",
+     "display": "Win % v top 50",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of matches won against opponents ranked in the top 50.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.552,
+      "split_half_r": 0.622,
+      "n_pairs": 1913,
+      "m50": 26.7,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.601,
+      "partial_r_given_elo": 0.036,
+      "r_next_games_won_pct": 0.616,
+      "match_loglik_change_x1000": -0.0,
+      "match_loglik_se_x1000": 0.08
+     }
+    },
+    {
+     "id": "elo_clay",
+     "display": "Clay Elo",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rating",
+     "explanation": "Strength rating from matches on clay only.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.881,
+      "split_half_r": null,
+      "n_pairs": 1913,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.565,
+      "partial_r_given_elo": 0.124,
+      "r_next_games_won_pct": 0.579
+     }
+    },
+    {
+     "id": "elo_grass",
+     "display": "Grass Elo",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rating",
+     "explanation": "Strength rating from matches on grass only.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.901,
+      "split_half_r": null,
+      "n_pairs": 1913,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.478,
+      "partial_r_given_elo": -0.004,
+      "r_next_games_won_pct": 0.504
+     }
+    },
+    {
+     "id": "hold_plus_break",
+     "display": "Hold + break",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Hold % plus break %; above 100 % wins more service and return games combined than an average player.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.927,
+      "split_half_r": null,
+      "n_pairs": 1913,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.718,
+      "partial_r_given_elo": 0.225,
+      "r_next_games_won_pct": 0.753,
+      "match_loglik_change_x1000": -0.91,
+      "match_loglik_se_x1000": 0.29
+     }
+    },
+    {
+     "id": "serve_rating",
+     "display": "Serve rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rating",
+     "explanation": "Serve strength inferred from scores, on a log-odds scale (0 = tour average).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.933,
+      "split_half_r": null,
+      "n_pairs": 1913,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.524,
+      "partial_r_given_elo": 0.104,
+      "r_next_games_won_pct": 0.53,
+      "match_loglik_change_x1000": -0.31,
+      "match_loglik_se_x1000": 0.23
+     }
+    },
+    {
+     "id": "return_rating",
+     "display": "Return rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rating",
+     "explanation": "Return strength inferred from scores, on a log-odds scale (0 = tour average).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.91,
+      "split_half_r": null,
+      "n_pairs": 1913,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.397,
+      "partial_r_given_elo": 0.026,
+      "r_next_games_won_pct": 0.432,
+      "match_loglik_change_x1000": 0.08,
+      "match_loglik_se_x1000": 0.04
+     }
+    },
+    {
+     "id": "win_pct",
+     "display": "Win %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Share of tour-level main-draw matches won (walkovers excluded).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.667,
+      "split_half_r": 0.731,
+      "n_pairs": 1913,
+      "m50": 16.2,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.667,
+      "partial_r_given_elo": 0.011,
+      "r_next_games_won_pct": 0.68,
+      "match_loglik_change_x1000": 0.0,
+      "match_loglik_se_x1000": 0.01
+     }
+    },
+    {
+     "id": "sets_won_pct",
+     "display": "Sets won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of completed sets won.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.706,
+      "split_half_r": 0.771,
+      "n_pairs": 1913,
+      "m50": 13.0,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.687,
+      "partial_r_given_elo": 0.113,
+      "r_next_games_won_pct": 0.706,
+      "match_loglik_change_x1000": -0.17,
+      "match_loglik_se_x1000": 0.11
+     }
+    },
+    {
+     "id": "elo_hard",
+     "display": "Hard-court Elo",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rating",
+     "explanation": "Strength rating from matches on hard courts only.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.846,
+      "split_half_r": null,
+      "n_pairs": 1913,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.668,
+      "partial_r_given_elo": 0.003,
+      "r_next_games_won_pct": 0.686
+     }
+    },
+    {
+     "id": "elo_peak",
+     "display": "Peak Elo in the season",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rating",
+     "explanation": "Highest overall Elo reached during the season.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.859,
+      "split_half_r": null,
+      "n_pairs": 1913,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.714,
+      "partial_r_given_elo": 0.204,
+      "r_next_games_won_pct": 0.732,
+      "match_loglik_change_x1000": -0.38,
+      "match_loglik_se_x1000": 0.16
+     }
+    },
+    {
+     "id": "avg_opp_elo",
+     "display": "Average opponent Elo",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rating",
+     "explanation": "Mean Elo of the opponents faced.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.595,
+      "split_half_r": null,
+      "n_pairs": 1913,
+      "m50": null,
+      "m50_unit": null
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.595,
+      "partial_r_given_elo": 0.045,
+      "r_next_games_won_pct": 0.615,
+      "match_loglik_change_x1000": -0.31,
+      "match_loglik_se_x1000": 0.2
+     }
+    },
+    {
+     "id": "win_v_top10",
+     "display": "Win % v top 10",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Share of matches won against top-10 opponents.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.247,
+      "split_half_r": null,
+      "n_pairs": 1825,
+      "m50": null,
+      "m50_unit": null
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.349,
+      "partial_r_given_elo": 0.01,
+      "r_next_games_won_pct": 0.366
+     }
+    },
+    {
+     "id": "win_v_top20",
+     "display": "Win % v top 20",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Share of matches won against top-20 opponents.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.361,
+      "split_half_r": null,
+      "n_pairs": 1906,
+      "m50": null,
+      "m50_unit": null
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.476,
+      "partial_r_given_elo": 0.029,
+      "r_next_games_won_pct": 0.493
+     }
+    },
+    {
+     "id": "tb_per_set",
+     "display": "Tiebreaks per set",
+     "unit": "per set",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "explanation": "How often a set reaches a tiebreak: a serve-dominance style marker.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.566,
+      "split_half_r": 0.523,
+      "n_pairs": 1913,
+      "m50": 40.1,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.01,
+      "partial_r_given_elo": 0.01,
+      "r_next_games_won_pct": -0.0
+     }
+    },
+    {
+     "id": "games_per_set",
+     "display": "Games per set",
+     "unit": "per set",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "explanation": "Average games per set: higher for serve-dominated players.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.609,
+      "split_half_r": 0.6,
+      "n_pairs": 1913,
+      "m50": 29.3,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": -0.012,
+      "partial_r_given_elo": -0.001,
+      "r_next_games_won_pct": -0.024
+     }
+    },
+    {
+     "id": "tb_pct",
+     "display": "Tiebreaks won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "Share of tiebreaks won (mostly luck over one season).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.127,
+      "split_half_r": 0.128,
+      "n_pairs": 1913,
+      "m50": 300.3,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.229,
+      "partial_r_given_elo": -0.064,
+      "r_next_games_won_pct": 0.226,
+      "match_loglik_change_x1000": -0.12,
+      "match_loglik_se_x1000": 0.12
+     }
+    },
+    {
+     "id": "dec_pct",
+     "display": "Deciding sets won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "explanation": "Share of deciding sets won (mostly luck over one season).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.183,
+      "split_half_r": null,
+      "n_pairs": 1912,
+      "m50": null,
+      "m50_unit": null
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.29,
+      "partial_r_given_elo": -0.087,
+      "r_next_games_won_pct": 0.281,
+      "match_loglik_change_x1000": -0.32,
+      "match_loglik_se_x1000": 0.14
+     }
+    },
+    {
+     "id": "close_sets_pct",
+     "display": "Close sets won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rate",
+     "explanation": "Share of 7-5 / 7-6 sets won.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.241,
+      "split_half_r": null,
+      "n_pairs": 1913,
+      "m50": null,
+      "m50_unit": null
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.339,
+      "partial_r_given_elo": -0.066,
+      "r_next_games_won_pct": 0.336,
+      "match_loglik_change_x1000": -0.11,
+      "match_loglik_se_x1000": 0.09
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "elo",
+     "hold",
+     "brk",
+     "elo_clay",
+     "elo_grass",
+     "games_won_pct",
+     "tb_per_set"
+    ],
+    "standardise": "z within tour and season among qualified players; elo_clay and elo_grass enter as (surface Elo - elo) so they describe the surface profile, not the level again",
+    "weights": "reliability (yoy r; for the surface profile, the yoy r of surface Elo minus Elo), floored at 0.2 and capped at 0.8 for rating and fit metrics whose yoy r is inflated by memory",
+    "weight_values": {
+     "elo": 0.8,
+     "hold": 0.8,
+     "brk": 0.8,
+     "elo_clay": 0.74,
+     "elo_grass": 0.68,
+     "games_won_pct": 0.72,
+     "tb_per_set": 0.57
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraints": "same tour and season, qualified players only; a WTA statistic missing for either player is dropped and the remaining weights renormalised"
+   }
+  },
+  {
+   "id": "wta_all",
+   "entity": "player",
+   "display": "WTA, all surfaces",
+   "peer_group": "WTA players with a tour-level catalogue row in the season; percentiles among the season's qualified players",
+   "position_field": null,
+   "position_codes": [],
+   "tour": "wta",
+   "surface": null,
+   "minimum": {
+    "field": "qualified",
+    "value": true,
+    "unit": "matches",
+    "note": "payload `qualified` = tour-level main-draw matches >= `floor` (20 scaled to the share of the season played, min 8)"
+   },
+   "basis": "per match / per point rates over the season (tour-level main draws); ratings at the season's end",
+   "metrics": [
+    {
+     "id": "elo",
+     "display": "Elo rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rating",
+     "explanation": "Overall strength rating from every result, adjusted for the opponent's rating.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.753,
+      "split_half_r": null,
+      "n_pairs": 1213,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.628,
+      "partial_r_given_elo": null,
+      "r_next_games_won_pct": 0.653
+     }
+    },
+    {
+     "id": "games_won_pct",
+     "display": "Games won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Share of all games won in completed sets; steadier than win % because every game counts.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.622,
+      "split_half_r": 0.752,
+      "n_pairs": 1213,
+      "m50": 13.3,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.587,
+      "partial_r_given_elo": 0.09,
+      "r_next_games_won_pct": 0.622,
+      "match_loglik_change_x1000": -0.06,
+      "match_loglik_se_x1000": 0.08
+     }
+    },
+    {
+     "id": "hold",
+     "display": "Hold",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "How often the player holds serve against an average tour returner, inferred from set scores.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.864,
+      "split_half_r": null,
+      "n_pairs": 1213,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.6,
+      "partial_r_given_elo": 0.167,
+      "r_next_games_won_pct": 0.629,
+      "match_loglik_change_x1000": -0.01,
+      "match_loglik_se_x1000": 0.28
+     }
+    },
+    {
+     "id": "brk",
+     "display": "Break",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "How often the player breaks an average tour server, inferred from set scores.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.853,
+      "split_half_r": null,
+      "n_pairs": 1213,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.531,
+      "partial_r_given_elo": 0.1,
+      "r_next_games_won_pct": 0.563,
+      "match_loglik_change_x1000": -0.0,
+      "match_loglik_se_x1000": 0.02
+     }
+    },
+    {
+     "id": "dominance",
+     "display": "Dominance ratio",
+     "unit": "ratio",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Return points won % divided by serve points lost %; above 1.0 wins more return points than it concedes on serve. WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.479,
+      "split_half_r": 0.61,
+      "n_pairs": 572,
+      "m50": 17.8,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 1284
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.452,
+      "partial_r_given_elo": 0.091,
+      "r_next_games_won_pct": 0.483,
+      "match_loglik_change_x1000": -0.02,
+      "match_loglik_se_x1000": 0.3
+     }
+    },
+    {
+     "id": "ace_pct",
+     "display": "Ace rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Aces per serve point. WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.856,
+      "split_half_r": 0.9,
+      "n_pairs": 572,
+      "m50": 3.1,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 223
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.28,
+      "partial_r_given_elo": 0.117,
+      "r_next_games_won_pct": 0.296,
+      "match_loglik_change_x1000": 0.5,
+      "match_loglik_se_x1000": 0.59
+     }
+    },
+    {
+     "id": "win_v_top50",
+     "display": "Win % v top 50",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Share of matches won against opponents ranked in the top 50.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.504,
+      "split_half_r": 0.587,
+      "n_pairs": 1213,
+      "m50": 28.5,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.525,
+      "partial_r_given_elo": 0.028,
+      "r_next_games_won_pct": 0.551,
+      "match_loglik_change_x1000": 0.03,
+      "match_loglik_se_x1000": 0.03
+     }
+    },
+    {
+     "id": "elo_clay",
+     "display": "Clay Elo",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "headline",
+     "order": 8,
+     "basis": "rating",
+     "explanation": "Strength rating from matches on clay only.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.836,
+      "split_half_r": null,
+      "n_pairs": 1213,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.488,
+      "partial_r_given_elo": 0.067,
+      "r_next_games_won_pct": 0.503
+     }
+    },
+    {
+     "id": "elo_grass",
+     "display": "Grass Elo",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "headline",
+     "order": 9,
+     "basis": "rating",
+     "explanation": "Strength rating from matches on grass only.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.887,
+      "split_half_r": null,
+      "n_pairs": 1213,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.474,
+      "partial_r_given_elo": 0.08,
+      "r_next_games_won_pct": 0.487
+     }
+    },
+    {
+     "id": "hold_plus_break",
+     "display": "Hold + break",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Hold % plus break %; above 100 % wins more service and return games combined than an average player.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.869,
+      "split_half_r": null,
+      "n_pairs": 1213,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.654,
+      "partial_r_given_elo": 0.239,
+      "r_next_games_won_pct": 0.689,
+      "match_loglik_change_x1000": -0.32,
+      "match_loglik_se_x1000": 0.18
+     }
+    },
+    {
+     "id": "serve_rating",
+     "display": "Serve rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rating",
+     "explanation": "Serve strength inferred from scores, on a log-odds scale (0 = tour average).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.869,
+      "split_half_r": null,
+      "n_pairs": 1213,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.603,
+      "partial_r_given_elo": 0.171,
+      "r_next_games_won_pct": 0.633,
+      "match_loglik_change_x1000": -0.03,
+      "match_loglik_se_x1000": 0.29
+     }
+    },
+    {
+     "id": "return_rating",
+     "display": "Return rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rating",
+     "explanation": "Return strength inferred from scores, on a log-odds scale (0 = tour average).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.857,
+      "split_half_r": null,
+      "n_pairs": 1213,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.541,
+      "partial_r_given_elo": 0.107,
+      "r_next_games_won_pct": 0.572,
+      "match_loglik_change_x1000": -0.01,
+      "match_loglik_se_x1000": 0.04
+     }
+    },
+    {
+     "id": "win_pct",
+     "display": "Win %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Share of tour-level main-draw matches won (walkovers excluded).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.552,
+      "split_half_r": 0.677,
+      "n_pairs": 1213,
+      "m50": 19.3,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.552,
+      "partial_r_given_elo": -0.064,
+      "r_next_games_won_pct": 0.573,
+      "match_loglik_change_x1000": 0.41,
+      "match_loglik_se_x1000": 0.31
+     }
+    },
+    {
+     "id": "spw_real",
+     "display": "Serve points won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of serve points won (WTA statistics). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.596,
+      "split_half_r": 0.678,
+      "n_pairs": 572,
+      "m50": 13.2,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 956
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.373,
+      "partial_r_given_elo": 0.081,
+      "r_next_games_won_pct": 0.395,
+      "match_loglik_change_x1000": -0.04,
+      "match_loglik_se_x1000": 0.3
+     }
+    },
+    {
+     "id": "rpw_real",
+     "display": "Return points won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of return points won (WTA statistics). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.514,
+      "split_half_r": 0.588,
+      "n_pairs": 572,
+      "m50": 19.5,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 1408
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.161,
+      "partial_r_given_elo": 0.009,
+      "r_next_games_won_pct": 0.177,
+      "match_loglik_change_x1000": 0.01,
+      "match_loglik_se_x1000": 0.03
+     }
+    },
+    {
+     "id": "tpw",
+     "display": "Total points won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Share of all points won (WTA statistics). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.45,
+      "split_half_r": 0.594,
+      "n_pairs": 572,
+      "m50": 19.0,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 1375
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.43,
+      "partial_r_given_elo": 0.072,
+      "r_next_games_won_pct": 0.46,
+      "match_loglik_change_x1000": -0.01,
+      "match_loglik_se_x1000": 0.23
+     }
+    },
+    {
+     "id": "hold_real",
+     "display": "Hold (actual)",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Service games held (WTA statistics). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.533,
+      "split_half_r": 0.479,
+      "n_pairs": 572,
+      "m50": 30.3,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 2191
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.333,
+      "partial_r_given_elo": 0.054,
+      "r_next_games_won_pct": 0.35,
+      "match_loglik_change_x1000": 0.24,
+      "match_loglik_se_x1000": 0.33
+     }
+    },
+    {
+     "id": "brk_real",
+     "display": "Break (actual)",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Return games broken (WTA statistics). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.444,
+      "split_half_r": 0.295,
+      "n_pairs": 572,
+      "m50": 66.5,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 4809
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.143,
+      "partial_r_given_elo": 0.02,
+      "r_next_games_won_pct": 0.146,
+      "match_loglik_change_x1000": 0.01,
+      "match_loglik_se_x1000": 0.02
+     }
+    },
+    {
+     "id": "first_in",
+     "display": "First serves in",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "First serves in per serve point (WTA statistics). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.784,
+      "split_half_r": 0.893,
+      "n_pairs": 572,
+      "m50": 3.3,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 241
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": -0.117,
+      "partial_r_given_elo": -0.12,
+      "r_next_games_won_pct": -0.121,
+      "match_loglik_change_x1000": -0.6,
+      "match_loglik_se_x1000": 0.48
+     }
+    },
+    {
+     "id": "first_won",
+     "display": "First-serve points won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "explanation": "Points won when the first serve lands (WTA statistics). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.727,
+      "split_half_r": 0.787,
+      "n_pairs": 572,
+      "m50": 7.5,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 545
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.366,
+      "partial_r_given_elo": 0.132,
+      "r_next_games_won_pct": 0.378,
+      "match_loglik_change_x1000": 0.01,
+      "match_loglik_se_x1000": 0.47
+     }
+    },
+    {
+     "id": "second_won",
+     "display": "Second-serve points won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "explanation": "Points won on the second serve (WTA statistics). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.315,
+      "split_half_r": 0.429,
+      "n_pairs": 572,
+      "m50": 37.0,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 2677
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.163,
+      "partial_r_given_elo": -0.023,
+      "r_next_games_won_pct": 0.192,
+      "match_loglik_change_x1000": -0.01,
+      "match_loglik_se_x1000": 0.02
+     }
+    },
+    {
+     "id": "df_pct",
+     "display": "Double-fault rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "Double faults per serve point (WTA statistics). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.706,
+      "split_half_r": 0.876,
+      "n_pairs": 572,
+      "m50": 4.0,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 286
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.063,
+      "partial_r_given_elo": 0.079,
+      "r_next_games_won_pct": 0.05,
+      "match_loglik_change_x1000": 0.07,
+      "match_loglik_se_x1000": 0.25
+     }
+    },
+    {
+     "id": "elo_hard",
+     "display": "Hard-court Elo",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rating",
+     "explanation": "Strength rating from matches on hard courts only.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.8,
+      "split_half_r": null,
+      "n_pairs": 1213,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.629,
+      "partial_r_given_elo": 0.127,
+      "r_next_games_won_pct": 0.654
+     }
+    },
+    {
+     "id": "elo_peak",
+     "display": "Peak Elo in the season",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rating",
+     "explanation": "Highest overall Elo reached during the season.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.819,
+      "split_half_r": null,
+      "n_pairs": 1213,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.627,
+      "partial_r_given_elo": 0.145,
+      "r_next_games_won_pct": 0.653,
+      "match_loglik_change_x1000": 0.22,
+      "match_loglik_se_x1000": 0.15
+     }
+    },
+    {
+     "id": "avg_opp_elo",
+     "display": "Average opponent Elo",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 16,
+     "basis": "rating",
+     "explanation": "Mean Elo of the opponents faced.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.604,
+      "split_half_r": null,
+      "n_pairs": 1213,
+      "m50": null,
+      "m50_unit": null
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.578,
+      "partial_r_given_elo": 0.16,
+      "r_next_games_won_pct": 0.598,
+      "match_loglik_change_x1000": -0.37,
+      "match_loglik_se_x1000": 0.14
+     }
+    },
+    {
+     "id": "tb_pct",
+     "display": "Tiebreaks won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 17,
+     "basis": "rate",
+     "explanation": "Share of tiebreaks won (mostly luck over one season).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.023,
+      "split_half_r": 0.048,
+      "n_pairs": 1208,
+      "m50": 807.4,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.097,
+      "partial_r_given_elo": -0.052,
+      "r_next_games_won_pct": 0.088,
+      "match_loglik_change_x1000": 0.71,
+      "match_loglik_se_x1000": 0.3
+     }
+    },
+    {
+     "id": "dec_pct",
+     "display": "Deciding sets won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 18,
+     "basis": "rate",
+     "explanation": "Share of deciding sets won (mostly luck over one season).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.124,
+      "split_half_r": null,
+      "n_pairs": 1213,
+      "m50": null,
+      "m50_unit": null
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.173,
+      "partial_r_given_elo": -0.152,
+      "r_next_games_won_pct": 0.169,
+      "match_loglik_change_x1000": 0.59,
+      "match_loglik_se_x1000": 0.57
+     }
+    },
+    {
+     "id": "bp_saved_pct",
+     "display": "Break points saved",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 19,
+     "basis": "rate",
+     "explanation": "Share of break points faced that were saved (WTA statistics; mostly noise). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.242,
+      "split_half_r": 0.245,
+      "n_pairs": 572,
+      "m50": 85.9,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 6212
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.217,
+      "partial_r_given_elo": 0.028,
+      "r_next_games_won_pct": 0.216,
+      "match_loglik_change_x1000": 0.02,
+      "match_loglik_se_x1000": 0.02
+     }
+    },
+    {
+     "id": "bp_conv_pct",
+     "display": "Break points converted",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 20,
+     "basis": "rate",
+     "explanation": "Share of break points won on return (WTA statistics; mostly noise). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.183,
+      "split_half_r": 0.236,
+      "n_pairs": 572,
+      "m50": 90.1,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 6515
+     },
+     "predictive": {
+      "target": "next-season win %",
+      "r": 0.093,
+      "partial_r_given_elo": 0.049,
+      "r_next_games_won_pct": 0.076,
+      "match_loglik_change_x1000": 0.01,
+      "match_loglik_se_x1000": 0.04
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "elo",
+     "hold",
+     "brk",
+     "elo_clay",
+     "elo_grass",
+     "games_won_pct",
+     "ace_pct",
+     "first_in"
+    ],
+    "standardise": "z within tour and season among qualified players; elo_clay and elo_grass enter as (surface Elo - elo) so they describe the surface profile, not the level again",
+    "weights": "reliability (yoy r; for the surface profile, the yoy r of surface Elo minus Elo), floored at 0.2 and capped at 0.8 for rating and fit metrics whose yoy r is inflated by memory",
+    "weight_values": {
+     "elo": 0.75,
+     "hold": 0.8,
+     "brk": 0.8,
+     "elo_clay": 0.64,
+     "elo_grass": 0.65,
+     "games_won_pct": 0.62,
+     "ace_pct": 0.8,
+     "first_in": 0.78
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraints": "same tour and season, qualified players only; a WTA statistic missing for either player is dropped and the remaining weights renormalised"
+   }
+  },
+  {
+   "id": "atp_hard",
+   "entity": "player",
+   "display": "ATP, hard",
+   "peer_group": "ATP players with at least 10 tour-level matches on hard in the season (payload surface_floor)",
+   "position_field": null,
+   "position_codes": [],
+   "tour": "atp",
+   "surface": "hard",
+   "minimum": {
+    "field": "values_surface.hard.matches",
+    "value": 10,
+    "unit": "matches",
+    "note": "payload `surface_floor`; values_surface / pct_surface are written from half the floor, so check the floor before ranking"
+   },
+   "basis": "per match / per point rates over the season (tour-level main draws); ratings at the season's end",
+   "metrics": [
+    {
+     "id": "elo_hard",
+     "display": "Hard-court Elo",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rating",
+     "explanation": "Strength rating from matches on hard courts only.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.831,
+      "split_half_r": null,
+      "n_pairs": 1964,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.665,
+      "partial_r_given_elo": null,
+      "r_next_games_won_pct": 0.691
+     }
+    },
+    {
+     "id": "games_won_pct",
+     "display": "Games won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Share of all games won in completed sets; steadier than win % because every game counts.",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.649,
+      "split_half_r": 0.679,
+      "n_pairs": 1964,
+      "m50": 11.9,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.615,
+      "partial_r_given_elo": 0.101,
+      "r_next_games_won_pct": 0.649,
+      "match_loglik_change_x1000": -0.53,
+      "match_loglik_se_x1000": 0.31
+     }
+    },
+    {
+     "id": "hold",
+     "display": "Hold",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "How often the player holds serve against an average tour returner, inferred from set scores.",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.923,
+      "split_half_r": null,
+      "n_pairs": 1964,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.504,
+      "partial_r_given_elo": 0.104,
+      "r_next_games_won_pct": 0.526,
+      "match_loglik_change_x1000": -0.24,
+      "match_loglik_se_x1000": 0.3
+     }
+    },
+    {
+     "id": "brk",
+     "display": "Break",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "How often the player breaks an average tour server, inferred from set scores.",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.91,
+      "split_half_r": null,
+      "n_pairs": 1964,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.404,
+      "partial_r_given_elo": 0.039,
+      "r_next_games_won_pct": 0.435,
+      "match_loglik_change_x1000": -0.09,
+      "match_loglik_se_x1000": 0.05
+     }
+    },
+    {
+     "id": "win_pct",
+     "display": "Win % on hard",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of hard-court tour-level matches won.",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.589,
+      "split_half_r": 0.569,
+      "n_pairs": 1964,
+      "m50": 19.1,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.589,
+      "partial_r_given_elo": -0.026,
+      "r_next_games_won_pct": 0.604,
+      "match_loglik_change_x1000": 0.14,
+      "match_loglik_se_x1000": 0.15
+     }
+    },
+    {
+     "id": "win_v_top50",
+     "display": "Win % v top 50",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of matches won against opponents ranked in the top 50.",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.48,
+      "split_half_r": 0.492,
+      "n_pairs": 1964,
+      "m50": 26.1,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.533,
+      "partial_r_given_elo": 0.041,
+      "r_next_games_won_pct": 0.546
+     }
+    },
+    {
+     "id": "elo",
+     "display": "Elo rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rating",
+     "explanation": "Overall strength rating from every result, adjusted for the opponent's rating.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.805,
+      "split_half_r": null,
+      "n_pairs": 1964,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.661,
+      "partial_r_given_elo": 0.125,
+      "r_next_games_won_pct": 0.686
+     }
+    },
+    {
+     "id": "hold_plus_break",
+     "display": "Hold + break",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Hold % plus break %; above 100 % wins more service and return games combined than an average player.",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.923,
+      "split_half_r": null,
+      "n_pairs": 1964,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.683,
+      "partial_r_given_elo": 0.232,
+      "r_next_games_won_pct": 0.724,
+      "match_loglik_change_x1000": -1.13,
+      "match_loglik_se_x1000": 0.46
+     }
+    },
+    {
+     "id": "serve_rating",
+     "display": "Serve rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rating",
+     "explanation": "Serve strength inferred from scores, on a log-odds scale (0 = tour average).",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.931,
+      "split_half_r": null,
+      "n_pairs": 1964,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.501,
+      "partial_r_given_elo": 0.104,
+      "r_next_games_won_pct": 0.518
+     }
+    },
+    {
+     "id": "return_rating",
+     "display": "Return rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rating",
+     "explanation": "Return strength inferred from scores, on a log-odds scale (0 = tour average).",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.912,
+      "split_half_r": null,
+      "n_pairs": 1964,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.373,
+      "partial_r_given_elo": 0.028,
+      "r_next_games_won_pct": 0.402
+     }
+    },
+    {
+     "id": "tb_per_set",
+     "display": "Tiebreaks per set",
+     "unit": "per set",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "How often a set reaches a tiebreak: a serve-dominance style marker.",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.439,
+      "split_half_r": 0.391,
+      "n_pairs": 1964,
+      "m50": 39.4,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.031,
+      "partial_r_given_elo": 0.029,
+      "r_next_games_won_pct": 0.029
+     }
+    },
+    {
+     "id": "tb_pct",
+     "display": "Tiebreaks won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of tiebreaks won (mostly luck over one season).",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.08,
+      "split_half_r": 0.041,
+      "n_pairs": 1960,
+      "m50": 598.2,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.174,
+      "partial_r_given_elo": -0.065,
+      "r_next_games_won_pct": 0.155
+     }
+    },
+    {
+     "id": "dec_pct",
+     "display": "Deciding sets won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Share of deciding sets won (mostly luck over one season).",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.141,
+      "split_half_r": null,
+      "n_pairs": 1949,
+      "m50": null,
+      "m50_unit": null
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.224,
+      "partial_r_given_elo": -0.067,
+      "r_next_games_won_pct": 0.214
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "elo_hard",
+     "hold",
+     "brk",
+     "games_won_pct"
+    ],
+    "standardise": "z within tour, season and the hard pool",
+    "weights": "yoy r floored at 0.2, capped at 0.8 for rating and fit metrics",
+    "weight_values": {
+     "elo_hard": 0.8,
+     "hold": 0.8,
+     "brk": 0.8,
+     "games_won_pct": 0.65
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraints": "same tour and season, players meeting the hard floor"
+   }
+  },
+  {
+   "id": "atp_clay",
+   "entity": "player",
+   "display": "ATP, clay",
+   "peer_group": "ATP players with at least 8 tour-level matches on clay in the season (payload surface_floor)",
+   "position_field": null,
+   "position_codes": [],
+   "tour": "atp",
+   "surface": "clay",
+   "minimum": {
+    "field": "values_surface.clay.matches",
+    "value": 8,
+    "unit": "matches",
+    "note": "payload `surface_floor`; values_surface / pct_surface are written from half the floor, so check the floor before ranking"
+   },
+   "basis": "per match / per point rates over the season (tour-level main draws); ratings at the season's end",
+   "metrics": [
+    {
+     "id": "elo_clay",
+     "display": "Clay Elo",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rating",
+     "explanation": "Strength rating from matches on clay only.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.84,
+      "split_half_r": null,
+      "n_pairs": 1440,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.551,
+      "partial_r_given_elo": null,
+      "r_next_games_won_pct": 0.588
+     }
+    },
+    {
+     "id": "elo",
+     "display": "Elo rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rating",
+     "explanation": "Overall strength rating from every result, adjusted for the opponent's rating.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.836,
+      "split_half_r": null,
+      "n_pairs": 1440,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.558,
+      "partial_r_given_elo": 0.235,
+      "r_next_games_won_pct": 0.583
+     }
+    },
+    {
+     "id": "games_won_pct",
+     "display": "Games won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Share of all games won in completed sets; steadier than win % because every game counts.",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.523,
+      "split_half_r": 0.539,
+      "n_pairs": 1440,
+      "m50": 13.9,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.484,
+      "partial_r_given_elo": 0.061,
+      "r_next_games_won_pct": 0.523,
+      "match_loglik_change_x1000": -0.53,
+      "match_loglik_se_x1000": 0.31
+     }
+    },
+    {
+     "id": "hold",
+     "display": "Hold",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "How often the player holds serve against an average tour returner, inferred from set scores.",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.906,
+      "split_half_r": null,
+      "n_pairs": 1440,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.427,
+      "partial_r_given_elo": 0.105,
+      "r_next_games_won_pct": 0.449,
+      "match_loglik_change_x1000": -0.24,
+      "match_loglik_se_x1000": 0.3
+     }
+    },
+    {
+     "id": "brk",
+     "display": "Break",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "How often the player breaks an average tour server, inferred from set scores.",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.881,
+      "split_half_r": null,
+      "n_pairs": 1440,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.411,
+      "partial_r_given_elo": 0.067,
+      "r_next_games_won_pct": 0.455,
+      "match_loglik_change_x1000": -0.09,
+      "match_loglik_se_x1000": 0.05
+     }
+    },
+    {
+     "id": "win_pct",
+     "display": "Win % on clay",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of clay-court tour-level matches won.",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.466,
+      "split_half_r": 0.432,
+      "n_pairs": 1440,
+      "m50": 21.4,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.466,
+      "partial_r_given_elo": -0.007,
+      "r_next_games_won_pct": 0.482,
+      "match_loglik_change_x1000": 0.14,
+      "match_loglik_se_x1000": 0.15
+     }
+    },
+    {
+     "id": "hold_plus_break",
+     "display": "Hold + break",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Hold % plus break %; above 100 % wins more service and return games combined than an average player.",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.911,
+      "split_half_r": null,
+      "n_pairs": 1440,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.577,
+      "partial_r_given_elo": 0.219,
+      "r_next_games_won_pct": 0.623,
+      "match_loglik_change_x1000": -1.13,
+      "match_loglik_se_x1000": 0.46
+     }
+    },
+    {
+     "id": "serve_rating",
+     "display": "Serve rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rating",
+     "explanation": "Serve strength inferred from scores, on a log-odds scale (0 = tour average).",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.913,
+      "split_half_r": null,
+      "n_pairs": 1440,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.43,
+      "partial_r_given_elo": 0.107,
+      "r_next_games_won_pct": 0.451
+     }
+    },
+    {
+     "id": "return_rating",
+     "display": "Return rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rating",
+     "explanation": "Return strength inferred from scores, on a log-odds scale (0 = tour average).",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.879,
+      "split_half_r": null,
+      "n_pairs": 1440,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.4,
+      "partial_r_given_elo": 0.061,
+      "r_next_games_won_pct": 0.442
+     }
+    },
+    {
+     "id": "win_v_top50",
+     "display": "Win % v top 50",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Share of matches won against opponents ranked in the top 50.",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.312,
+      "split_half_r": 0.314,
+      "n_pairs": 1428,
+      "m50": 35.5,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.364,
+      "partial_r_given_elo": -0.002,
+      "r_next_games_won_pct": 0.381
+     }
+    },
+    {
+     "id": "tb_pct",
+     "display": "Tiebreaks won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of tiebreaks won (mostly luck over one season).",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.081,
+      "split_half_r": 0.042,
+      "n_pairs": 1418,
+      "m50": 371.9,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.122,
+      "partial_r_given_elo": -0.016,
+      "r_next_games_won_pct": 0.128
+     }
+    },
+    {
+     "id": "dec_pct",
+     "display": "Deciding sets won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of deciding sets won (mostly luck over one season).",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.077,
+      "split_half_r": null,
+      "n_pairs": 1416,
+      "m50": null,
+      "m50_unit": null
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.225,
+      "partial_r_given_elo": 0.025,
+      "r_next_games_won_pct": 0.21
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "elo_clay",
+     "hold",
+     "brk",
+     "games_won_pct"
+    ],
+    "standardise": "z within tour, season and the clay pool",
+    "weights": "yoy r floored at 0.2, capped at 0.8 for rating and fit metrics",
+    "weight_values": {
+     "elo_clay": 0.8,
+     "hold": 0.8,
+     "brk": 0.8,
+     "games_won_pct": 0.52
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraints": "same tour and season, players meeting the clay floor"
+   }
+  },
+  {
+   "id": "atp_grass",
+   "entity": "player",
+   "display": "ATP, grass",
+   "peer_group": "ATP players with at least 5 tour-level matches on grass in the season (payload surface_floor)",
+   "position_field": null,
+   "position_codes": [],
+   "tour": "atp",
+   "surface": "grass",
+   "minimum": {
+    "field": "values_surface.grass.matches",
+    "value": 5,
+    "unit": "matches",
+    "note": "payload `surface_floor`; values_surface / pct_surface are written from half the floor, so check the floor before ranking"
+   },
+   "basis": "per match / per point rates over the season (tour-level main draws); ratings at the season's end",
+   "metrics": [
+    {
+     "id": "elo_grass",
+     "display": "Grass Elo",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rating",
+     "explanation": "Strength rating from matches on grass only.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.879,
+      "split_half_r": null,
+      "n_pairs": 692,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.486,
+      "partial_r_given_elo": null,
+      "r_next_games_won_pct": 0.53
+     }
+    },
+    {
+     "id": "elo",
+     "display": "Elo rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rating",
+     "explanation": "Overall strength rating from every result, adjusted for the opponent's rating.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.839,
+      "split_half_r": null,
+      "n_pairs": 692,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.599,
+      "partial_r_given_elo": 0.404,
+      "r_next_games_won_pct": 0.618
+     }
+    },
+    {
+     "id": "games_won_pct",
+     "display": "Games won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Share of all games won in completed sets; steadier than win % because every game counts.",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.459,
+      "split_half_r": 0.076,
+      "n_pairs": 692,
+      "m50": 88.7,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.396,
+      "partial_r_given_elo": 0.074,
+      "r_next_games_won_pct": 0.459,
+      "match_loglik_change_x1000": -0.53,
+      "match_loglik_se_x1000": 0.31
+     }
+    },
+    {
+     "id": "hold",
+     "display": "Hold",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "How often the player holds serve against an average tour returner, inferred from set scores.",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.917,
+      "split_half_r": null,
+      "n_pairs": 692,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.479,
+      "partial_r_given_elo": 0.233,
+      "r_next_games_won_pct": 0.472,
+      "match_loglik_change_x1000": -0.24,
+      "match_loglik_se_x1000": 0.3
+     }
+    },
+    {
+     "id": "brk",
+     "display": "Break",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "How often the player breaks an average tour server, inferred from set scores.",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.911,
+      "split_half_r": null,
+      "n_pairs": 692,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.327,
+      "partial_r_given_elo": 0.11,
+      "r_next_games_won_pct": 0.4,
+      "match_loglik_change_x1000": -0.09,
+      "match_loglik_se_x1000": 0.05
+     }
+    },
+    {
+     "id": "win_pct",
+     "display": "Win % on grass",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of grass-court tour-level matches won.",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.357,
+      "split_half_r": -0.105,
+      "n_pairs": 692,
+      "m50": null,
+      "m50_unit": null
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.357,
+      "partial_r_given_elo": -0.015,
+      "r_next_games_won_pct": 0.397,
+      "match_loglik_change_x1000": 0.14,
+      "match_loglik_se_x1000": 0.15
+     }
+    },
+    {
+     "id": "hold_plus_break",
+     "display": "Hold + break",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Hold % plus break %; above 100 % wins more service and return games combined than an average player.",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.92,
+      "split_half_r": null,
+      "n_pairs": 692,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.588,
+      "partial_r_given_elo": 0.382,
+      "r_next_games_won_pct": 0.635,
+      "match_loglik_change_x1000": -1.13,
+      "match_loglik_se_x1000": 0.46
+     }
+    },
+    {
+     "id": "serve_rating",
+     "display": "Serve rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rating",
+     "explanation": "Serve strength inferred from scores, on a log-odds scale (0 = tour average).",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.929,
+      "split_half_r": null,
+      "n_pairs": 692,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.477,
+      "partial_r_given_elo": 0.228,
+      "r_next_games_won_pct": 0.465
+     }
+    },
+    {
+     "id": "return_rating",
+     "display": "Return rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rating",
+     "explanation": "Return strength inferred from scores, on a log-odds scale (0 = tour average).",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.911,
+      "split_half_r": null,
+      "n_pairs": 692,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.295,
+      "partial_r_given_elo": 0.091,
+      "r_next_games_won_pct": 0.368
+     }
+    },
+    {
+     "id": "win_v_top50",
+     "display": "Win % v top 50",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Share of matches won against opponents ranked in the top 50.",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.147,
+      "split_half_r": 0.079,
+      "n_pairs": 675,
+      "m50": 85.0,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.223,
+      "partial_r_given_elo": -0.036,
+      "r_next_games_won_pct": 0.278
+     }
+    },
+    {
+     "id": "tb_per_set",
+     "display": "Tiebreaks per set",
+     "unit": "per set",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "How often a set reaches a tiebreak: a serve-dominance style marker.",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.236,
+      "split_half_r": 0.164,
+      "n_pairs": 692,
+      "m50": 36.9,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": -0.02,
+      "partial_r_given_elo": -0.039,
+      "r_next_games_won_pct": -0.029
+     }
+    },
+    {
+     "id": "tb_pct",
+     "display": "Tiebreaks won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of tiebreaks won (mostly luck over one season).",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.071,
+      "split_half_r": -0.062,
+      "n_pairs": 666,
+      "m50": null,
+      "m50_unit": null
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.079,
+      "partial_r_given_elo": -0.016,
+      "r_next_games_won_pct": 0.058
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "elo_grass",
+     "hold",
+     "brk",
+     "games_won_pct"
+    ],
+    "standardise": "z within tour, season and the grass pool",
+    "weights": "yoy r floored at 0.2, capped at 0.8 for rating and fit metrics",
+    "weight_values": {
+     "elo_grass": 0.8,
+     "hold": 0.8,
+     "brk": 0.8,
+     "games_won_pct": 0.46
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraints": "same tour and season, players meeting the grass floor"
+   }
+  },
+  {
+   "id": "wta_hard",
+   "entity": "player",
+   "display": "WTA, hard",
+   "peer_group": "WTA players with at least 10 tour-level matches on hard in the season (payload surface_floor)",
+   "position_field": null,
+   "position_codes": [],
+   "tour": "wta",
+   "surface": "hard",
+   "minimum": {
+    "field": "values_surface.hard.matches",
+    "value": 10,
+    "unit": "matches",
+    "note": "payload `surface_floor`; values_surface / pct_surface are written from half the floor, so check the floor before ranking"
+   },
+   "basis": "per match / per point rates over the season (tour-level main draws); ratings at the season's end",
+   "metrics": [
+    {
+     "id": "elo_hard",
+     "display": "Hard-court Elo",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rating",
+     "explanation": "Strength rating from matches on hard courts only.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.795,
+      "split_half_r": null,
+      "n_pairs": 1428,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.59,
+      "partial_r_given_elo": null,
+      "r_next_games_won_pct": 0.617
+     }
+    },
+    {
+     "id": "games_won_pct",
+     "display": "Games won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Share of all games won in completed sets; steadier than win % because every game counts.",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.549,
+      "split_half_r": 0.579,
+      "n_pairs": 1428,
+      "m50": 17.6,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.505,
+      "partial_r_given_elo": 0.043,
+      "r_next_games_won_pct": 0.549,
+      "match_loglik_change_x1000": 0.04,
+      "match_loglik_se_x1000": 0.26
+     }
+    },
+    {
+     "id": "hold",
+     "display": "Hold",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "How often the player holds serve against an average tour returner, inferred from set scores.",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.864,
+      "split_half_r": null,
+      "n_pairs": 1428,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.544,
+      "partial_r_given_elo": 0.113,
+      "r_next_games_won_pct": 0.588,
+      "match_loglik_change_x1000": -0.12,
+      "match_loglik_se_x1000": 0.46
+     }
+    },
+    {
+     "id": "brk",
+     "display": "Break",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "How often the player breaks an average tour server, inferred from set scores.",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.85,
+      "split_half_r": null,
+      "n_pairs": 1428,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.507,
+      "partial_r_given_elo": 0.095,
+      "r_next_games_won_pct": 0.528,
+      "match_loglik_change_x1000": 0.1,
+      "match_loglik_se_x1000": 0.17
+     }
+    },
+    {
+     "id": "win_pct",
+     "display": "Win % on hard",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of hard-court tour-level matches won.",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.471,
+      "split_half_r": 0.506,
+      "n_pairs": 1428,
+      "m50": 23.7,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.471,
+      "partial_r_given_elo": -0.082,
+      "r_next_games_won_pct": 0.499,
+      "match_loglik_change_x1000": -0.03,
+      "match_loglik_se_x1000": 0.09
+     }
+    },
+    {
+     "id": "dominance",
+     "display": "Dominance ratio",
+     "unit": "ratio",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Return points won % divided by serve points lost %; above 1.0 wins more return points than it concedes on serve. WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.38,
+      "split_half_r": 0.476,
+      "n_pairs": 704,
+      "m50": 20.5,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 1455
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.36,
+      "partial_r_given_elo": 0.023,
+      "r_next_games_won_pct": 0.396,
+      "match_loglik_change_x1000": -0.21,
+      "match_loglik_se_x1000": 0.2
+     }
+    },
+    {
+     "id": "ace_pct",
+     "display": "Ace rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Aces per serve point. WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.798,
+      "split_half_r": 0.843,
+      "n_pairs": 704,
+      "m50": 3.5,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 246
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.251,
+      "partial_r_given_elo": 0.079,
+      "r_next_games_won_pct": 0.295
+     }
+    },
+    {
+     "id": "elo",
+     "display": "Elo rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rating",
+     "explanation": "Overall strength rating from every result, adjusted for the opponent's rating.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.759,
+      "split_half_r": null,
+      "n_pairs": 1428,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.575,
+      "partial_r_given_elo": 0.046,
+      "r_next_games_won_pct": 0.6
+     }
+    },
+    {
+     "id": "hold_plus_break",
+     "display": "Hold + break",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Hold % plus break %; above 100 % wins more service and return games combined than an average player.",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.865,
+      "split_half_r": null,
+      "n_pairs": 1428,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.601,
+      "partial_r_given_elo": 0.171,
+      "r_next_games_won_pct": 0.639,
+      "match_loglik_change_x1000": -0.65,
+      "match_loglik_se_x1000": 0.34
+     }
+    },
+    {
+     "id": "serve_rating",
+     "display": "Serve rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rating",
+     "explanation": "Serve strength inferred from scores, on a log-odds scale (0 = tour average).",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.868,
+      "split_half_r": null,
+      "n_pairs": 1428,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.549,
+      "partial_r_given_elo": 0.12,
+      "r_next_games_won_pct": 0.592
+     }
+    },
+    {
+     "id": "return_rating",
+     "display": "Return rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rating",
+     "explanation": "Return strength inferred from scores, on a log-odds scale (0 = tour average).",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.849,
+      "split_half_r": null,
+      "n_pairs": 1428,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.508,
+      "partial_r_given_elo": 0.098,
+      "r_next_games_won_pct": 0.529
+     }
+    },
+    {
+     "id": "win_v_top50",
+     "display": "Win % v top 50",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of matches won against opponents ranked in the top 50.",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.392,
+      "split_half_r": 0.442,
+      "n_pairs": 1426,
+      "m50": 30.6,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.416,
+      "partial_r_given_elo": -0.037,
+      "r_next_games_won_pct": 0.446
+     }
+    },
+    {
+     "id": "spw_real",
+     "display": "Serve points won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of serve points won (WTA statistics). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.498,
+      "split_half_r": 0.585,
+      "n_pairs": 704,
+      "m50": 13.1,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 935
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.28,
+      "partial_r_given_elo": 0.006,
+      "r_next_games_won_pct": 0.327,
+      "match_loglik_change_x1000": -0.23,
+      "match_loglik_se_x1000": 0.4
+     }
+    },
+    {
+     "id": "rpw_real",
+     "display": "Return points won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Share of return points won (WTA statistics). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.386,
+      "split_half_r": 0.469,
+      "n_pairs": 704,
+      "m50": 21.0,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 1496
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.181,
+      "partial_r_given_elo": 0.01,
+      "r_next_games_won_pct": 0.178,
+      "match_loglik_change_x1000": 0.05,
+      "match_loglik_se_x1000": 0.15
+     }
+    },
+    {
+     "id": "first_won",
+     "display": "First-serve points won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Points won when the first serve lands (WTA statistics). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.614,
+      "split_half_r": 0.72,
+      "n_pairs": 704,
+      "m50": 7.2,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 513
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.308,
+      "partial_r_given_elo": 0.083,
+      "r_next_games_won_pct": 0.334
+     }
+    },
+    {
+     "id": "tb_pct",
+     "display": "Tiebreaks won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Share of tiebreaks won (mostly luck over one season).",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.015,
+      "split_half_r": 0.07,
+      "n_pairs": 1374,
+      "m50": 322.5,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.063,
+      "partial_r_given_elo": -0.065,
+      "r_next_games_won_pct": 0.069
+     }
+    },
+    {
+     "id": "bp_saved_pct",
+     "display": "Break points saved",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Share of break points faced that were saved (WTA statistics; mostly noise). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.138,
+      "split_half_r": 0.2,
+      "n_pairs": 704,
+      "m50": 74.1,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 5269
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.171,
+      "partial_r_given_elo": 0.009,
+      "r_next_games_won_pct": 0.184
+     }
+    },
+    {
+     "id": "bp_conv_pct",
+     "display": "Break points converted",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "explanation": "Share of break points won on return (WTA statistics; mostly noise). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values_surface.hard",
+     "percentile_from": "pct_surface.hard",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.087,
+      "split_half_r": 0.1,
+      "n_pairs": 704,
+      "m50": 167.5,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 11915
+     },
+     "predictive": {
+      "target": "next-season win % on hard",
+      "r": 0.103,
+      "partial_r_given_elo": 0.051,
+      "r_next_games_won_pct": 0.071
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "elo_hard",
+     "hold",
+     "brk",
+     "games_won_pct",
+     "ace_pct"
+    ],
+    "standardise": "z within tour, season and the hard pool",
+    "weights": "yoy r floored at 0.2, capped at 0.8 for rating and fit metrics",
+    "weight_values": {
+     "elo_hard": 0.8,
+     "hold": 0.8,
+     "brk": 0.8,
+     "games_won_pct": 0.55,
+     "ace_pct": 0.8
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraints": "same tour and season, players meeting the hard floor"
+   }
+  },
+  {
+   "id": "wta_clay",
+   "entity": "player",
+   "display": "WTA, clay",
+   "peer_group": "WTA players with at least 8 tour-level matches on clay in the season (payload surface_floor)",
+   "position_field": null,
+   "position_codes": [],
+   "tour": "wta",
+   "surface": "clay",
+   "minimum": {
+    "field": "values_surface.clay.matches",
+    "value": 8,
+    "unit": "matches",
+    "note": "payload `surface_floor`; values_surface / pct_surface are written from half the floor, so check the floor before ranking"
+   },
+   "basis": "per match / per point rates over the season (tour-level main draws); ratings at the season's end",
+   "metrics": [
+    {
+     "id": "elo_clay",
+     "display": "Clay Elo",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rating",
+     "explanation": "Strength rating from matches on clay only.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.818,
+      "split_half_r": null,
+      "n_pairs": 799,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.451,
+      "partial_r_given_elo": null,
+      "r_next_games_won_pct": 0.488
+     }
+    },
+    {
+     "id": "elo",
+     "display": "Elo rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rating",
+     "explanation": "Overall strength rating from every result, adjusted for the opponent's rating.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.806,
+      "split_half_r": null,
+      "n_pairs": 799,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.513,
+      "partial_r_given_elo": 0.294,
+      "r_next_games_won_pct": 0.532
+     }
+    },
+    {
+     "id": "games_won_pct",
+     "display": "Games won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Share of all games won in completed sets; steadier than win % because every game counts.",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.467,
+      "split_half_r": 0.327,
+      "n_pairs": 799,
+      "m50": 26.2,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.425,
+      "partial_r_given_elo": 0.148,
+      "r_next_games_won_pct": 0.467,
+      "match_loglik_change_x1000": 0.04,
+      "match_loglik_se_x1000": 0.26
+     }
+    },
+    {
+     "id": "hold",
+     "display": "Hold",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "How often the player holds serve against an average tour returner, inferred from set scores.",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.855,
+      "split_half_r": null,
+      "n_pairs": 799,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.48,
+      "partial_r_given_elo": 0.228,
+      "r_next_games_won_pct": 0.504,
+      "match_loglik_change_x1000": -0.12,
+      "match_loglik_se_x1000": 0.46
+     }
+    },
+    {
+     "id": "brk",
+     "display": "Break",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "How often the player breaks an average tour server, inferred from set scores.",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.849,
+      "split_half_r": null,
+      "n_pairs": 799,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.437,
+      "partial_r_given_elo": 0.174,
+      "r_next_games_won_pct": 0.484,
+      "match_loglik_change_x1000": 0.1,
+      "match_loglik_se_x1000": 0.17
+     }
+    },
+    {
+     "id": "win_pct",
+     "display": "Win % on clay",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of clay-court tour-level matches won.",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.38,
+      "split_half_r": 0.201,
+      "n_pairs": 799,
+      "m50": 50.3,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.38,
+      "partial_r_given_elo": 0.049,
+      "r_next_games_won_pct": 0.399,
+      "match_loglik_change_x1000": -0.03,
+      "match_loglik_se_x1000": 0.09
+     }
+    },
+    {
+     "id": "dominance",
+     "display": "Dominance ratio",
+     "unit": "ratio",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Return points won % divided by serve points lost %; above 1.0 wins more return points than it concedes on serve. WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.35,
+      "split_half_r": 0.287,
+      "n_pairs": 347,
+      "m50": 22.6,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 1694
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.325,
+      "partial_r_given_elo": 0.164,
+      "r_next_games_won_pct": 0.352,
+      "match_loglik_change_x1000": -0.21,
+      "match_loglik_se_x1000": 0.2
+     }
+    },
+    {
+     "id": "ace_pct",
+     "display": "Ace rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Aces per serve point. WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.738,
+      "split_half_r": 0.729,
+      "n_pairs": 347,
+      "m50": 3.4,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 254
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.204,
+      "partial_r_given_elo": 0.139,
+      "r_next_games_won_pct": 0.171
+     }
+    },
+    {
+     "id": "hold_plus_break",
+     "display": "Hold + break",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Hold % plus break %; above 100 % wins more service and return games combined than an average player.",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.861,
+      "split_half_r": null,
+      "n_pairs": 799,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.528,
+      "partial_r_given_elo": 0.308,
+      "r_next_games_won_pct": 0.567,
+      "match_loglik_change_x1000": -0.65,
+      "match_loglik_se_x1000": 0.34
+     }
+    },
+    {
+     "id": "serve_rating",
+     "display": "Serve rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rating",
+     "explanation": "Serve strength inferred from scores, on a log-odds scale (0 = tour average).",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.859,
+      "split_half_r": null,
+      "n_pairs": 799,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.482,
+      "partial_r_given_elo": 0.232,
+      "r_next_games_won_pct": 0.508
+     }
+    },
+    {
+     "id": "return_rating",
+     "display": "Return rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rating",
+     "explanation": "Return strength inferred from scores, on a log-odds scale (0 = tour average).",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.849,
+      "split_half_r": null,
+      "n_pairs": 799,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.436,
+      "partial_r_given_elo": 0.174,
+      "r_next_games_won_pct": 0.483
+     }
+    },
+    {
+     "id": "win_v_top50",
+     "display": "Win % v top 50",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Share of matches won against opponents ranked in the top 50.",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.272,
+      "split_half_r": 0.291,
+      "n_pairs": 787,
+      "m50": 30.9,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.314,
+      "partial_r_given_elo": 0.06,
+      "r_next_games_won_pct": 0.323
+     }
+    },
+    {
+     "id": "spw_real",
+     "display": "Serve points won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of serve points won (WTA statistics). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.452,
+      "split_half_r": 0.481,
+      "n_pairs": 347,
+      "m50": 9.8,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 737
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.288,
+      "partial_r_given_elo": 0.126,
+      "r_next_games_won_pct": 0.303,
+      "match_loglik_change_x1000": -0.23,
+      "match_loglik_se_x1000": 0.4
+     }
+    },
+    {
+     "id": "rpw_real",
+     "display": "Return points won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of return points won (WTA statistics). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.346,
+      "split_half_r": 0.203,
+      "n_pairs": 347,
+      "m50": 35.8,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 2680
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.128,
+      "partial_r_given_elo": 0.089,
+      "r_next_games_won_pct": 0.133,
+      "match_loglik_change_x1000": 0.05,
+      "match_loglik_se_x1000": 0.15
+     }
+    },
+    {
+     "id": "first_won",
+     "display": "First-serve points won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Points won when the first serve lands (WTA statistics). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.513,
+      "split_half_r": 0.59,
+      "n_pairs": 347,
+      "m50": 6.3,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 475
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.239,
+      "partial_r_given_elo": 0.119,
+      "r_next_games_won_pct": 0.241
+     }
+    },
+    {
+     "id": "tb_pct",
+     "display": "Tiebreaks won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Share of tiebreaks won (mostly luck over one season).",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": -0.093,
+      "split_half_r": 0.023,
+      "n_pairs": 698,
+      "m50": 543.7,
+      "m50_unit": "matches"
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.004,
+      "partial_r_given_elo": -0.053,
+      "r_next_games_won_pct": 0.023
+     }
+    },
+    {
+     "id": "bp_saved_pct",
+     "display": "Break points saved",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Share of break points faced that were saved (WTA statistics; mostly noise). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.126,
+      "split_half_r": 0.165,
+      "n_pairs": 347,
+      "m50": 46.1,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 3453
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.183,
+      "partial_r_given_elo": 0.058,
+      "r_next_games_won_pct": 0.186
+     }
+    },
+    {
+     "id": "bp_conv_pct",
+     "display": "Break points converted",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Share of break points won on return (WTA statistics; mostly noise). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values_surface.clay",
+     "percentile_from": "pct_surface.clay",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.179,
+      "split_half_r": 0.167,
+      "n_pairs": 346,
+      "m50": 45.5,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 3406
+     },
+     "predictive": {
+      "target": "next-season win % on clay",
+      "r": 0.07,
+      "partial_r_given_elo": 0.07,
+      "r_next_games_won_pct": 0.082
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "elo_clay",
+     "hold",
+     "brk",
+     "games_won_pct",
+     "ace_pct"
+    ],
+    "standardise": "z within tour, season and the clay pool",
+    "weights": "yoy r floored at 0.2, capped at 0.8 for rating and fit metrics",
+    "weight_values": {
+     "elo_clay": 0.8,
+     "hold": 0.8,
+     "brk": 0.8,
+     "games_won_pct": 0.47,
+     "ace_pct": 0.74
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraints": "same tour and season, players meeting the clay floor"
+   }
+  },
+  {
+   "id": "wta_grass",
+   "entity": "player",
+   "display": "WTA, grass",
+   "peer_group": "WTA players with at least 5 tour-level matches on grass in the season (payload surface_floor)",
+   "position_field": null,
+   "position_codes": [],
+   "tour": "wta",
+   "surface": "grass",
+   "minimum": {
+    "field": "values_surface.grass.matches",
+    "value": 5,
+    "unit": "matches",
+    "note": "payload `surface_floor`; values_surface / pct_surface are written from half the floor, so check the floor before ranking"
+   },
+   "basis": "per match / per point rates over the season (tour-level main draws); ratings at the season's end",
+   "metrics": [
+    {
+     "id": "elo_grass",
+     "display": "Grass Elo",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rating",
+     "explanation": "Strength rating from matches on grass only.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.824,
+      "split_half_r": null,
+      "n_pairs": 373,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.354,
+      "partial_r_given_elo": null,
+      "r_next_games_won_pct": 0.438
+     }
+    },
+    {
+     "id": "elo",
+     "display": "Elo rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rating",
+     "explanation": "Overall strength rating from every result, adjusted for the opponent's rating.",
+     "in_payload": true,
+     "payload_path": "values",
+     "percentile_from": "pct",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.711,
+      "split_half_r": null,
+      "n_pairs": 373,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.421,
+      "partial_r_given_elo": 0.267,
+      "r_next_games_won_pct": 0.491
+     }
+    },
+    {
+     "id": "games_won_pct",
+     "display": "Games won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Share of all games won in completed sets; steadier than win % because every game counts.",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.343,
+      "split_half_r": -0.009,
+      "n_pairs": 373,
+      "m50": null,
+      "m50_unit": null
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.274,
+      "partial_r_given_elo": 0.064,
+      "r_next_games_won_pct": 0.343,
+      "match_loglik_change_x1000": 0.04,
+      "match_loglik_se_x1000": 0.26
+     }
+    },
+    {
+     "id": "hold",
+     "display": "Hold",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "How often the player holds serve against an average tour returner, inferred from set scores.",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.822,
+      "split_half_r": null,
+      "n_pairs": 373,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.396,
+      "partial_r_given_elo": 0.223,
+      "r_next_games_won_pct": 0.448,
+      "match_loglik_change_x1000": -0.12,
+      "match_loglik_se_x1000": 0.46
+     }
+    },
+    {
+     "id": "brk",
+     "display": "Break",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "How often the player breaks an average tour server, inferred from set scores.",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.813,
+      "split_half_r": null,
+      "n_pairs": 373,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.323,
+      "partial_r_given_elo": 0.155,
+      "r_next_games_won_pct": 0.4,
+      "match_loglik_change_x1000": 0.1,
+      "match_loglik_se_x1000": 0.17
+     }
+    },
+    {
+     "id": "win_pct",
+     "display": "Win % on grass",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of grass-court tour-level matches won.",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.277,
+      "split_half_r": -0.359,
+      "n_pairs": 373,
+      "m50": null,
+      "m50_unit": null
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.277,
+      "partial_r_given_elo": 0.042,
+      "r_next_games_won_pct": 0.323,
+      "match_loglik_change_x1000": -0.03,
+      "match_loglik_se_x1000": 0.09
+     }
+    },
+    {
+     "id": "ace_pct",
+     "display": "Ace rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Aces per serve point. WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.586,
+      "split_half_r": 0.752,
+      "n_pairs": 164,
+      "m50": 2.0,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 149
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.193,
+      "partial_r_given_elo": 0.121,
+      "r_next_games_won_pct": 0.228
+     }
+    },
+    {
+     "id": "hold_plus_break",
+     "display": "Hold + break",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Hold % plus break %; above 100 % wins more service and return games combined than an average player.",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.81,
+      "split_half_r": null,
+      "n_pairs": 373,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.423,
+      "partial_r_given_elo": 0.253,
+      "r_next_games_won_pct": 0.503,
+      "match_loglik_change_x1000": -0.65,
+      "match_loglik_se_x1000": 0.34
+     }
+    },
+    {
+     "id": "serve_rating",
+     "display": "Serve rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rating",
+     "explanation": "Serve strength inferred from scores, on a log-odds scale (0 = tour average).",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.825,
+      "split_half_r": null,
+      "n_pairs": 373,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.398,
+      "partial_r_given_elo": 0.226,
+      "r_next_games_won_pct": 0.449
+     }
+    },
+    {
+     "id": "return_rating",
+     "display": "Return rating",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rating",
+     "explanation": "Return strength inferred from scores, on a log-odds scale (0 = tour average).",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.811,
+      "split_half_r": null,
+      "n_pairs": 373,
+      "m50": null,
+      "m50_unit": null,
+      "note": "yoy_r overstates reliability: the season value is a rating or a 4-year serve/return fit that also carries earlier seasons; no split-half possible"
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.326,
+      "partial_r_given_elo": 0.159,
+      "r_next_games_won_pct": 0.403
+     }
+    },
+    {
+     "id": "dominance",
+     "display": "Dominance ratio",
+     "unit": "ratio",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Return points won % divided by serve points lost %; above 1.0 wins more return points than it concedes on serve. WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.196,
+      "split_half_r": 0.14,
+      "n_pairs": 164,
+      "m50": 37.3,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 2760
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.199,
+      "partial_r_given_elo": 0.099,
+      "r_next_games_won_pct": 0.232,
+      "match_loglik_change_x1000": -0.21,
+      "match_loglik_se_x1000": 0.2
+     }
+    },
+    {
+     "id": "spw_real",
+     "display": "Serve points won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of serve points won (WTA statistics). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.188,
+      "split_half_r": 0.193,
+      "n_pairs": 164,
+      "m50": 25.5,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 1888
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.174,
+      "partial_r_given_elo": 0.094,
+      "r_next_games_won_pct": 0.155,
+      "match_loglik_change_x1000": -0.23,
+      "match_loglik_se_x1000": 0.4
+     }
+    },
+    {
+     "id": "rpw_real",
+     "display": "Return points won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of return points won (WTA statistics). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.204,
+      "split_half_r": 0.158,
+      "n_pairs": 164,
+      "m50": 32.6,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 2413
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.09,
+      "partial_r_given_elo": 0.034,
+      "r_next_games_won_pct": 0.15,
+      "match_loglik_change_x1000": 0.05,
+      "match_loglik_se_x1000": 0.15
+     }
+    },
+    {
+     "id": "first_won",
+     "display": "First-serve points won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Points won when the first serve lands (WTA statistics). WTA matches with statistics, 2016 on (not the Slams).",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "wta_stats",
+     "reliability": {
+      "yoy_r": 0.308,
+      "split_half_r": 0.514,
+      "n_pairs": 164,
+      "m50": 5.8,
+      "m50_unit": "matches with WTA statistics",
+      "m50_points": 427
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": 0.181,
+      "partial_r_given_elo": 0.1,
+      "r_next_games_won_pct": 0.129
+     }
+    },
+    {
+     "id": "tb_pct",
+     "display": "Tiebreaks won",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Share of tiebreaks won (mostly luck over one season).",
+     "in_payload": true,
+     "payload_path": "values_surface.grass",
+     "percentile_from": "pct_surface.grass",
+     "scope": "all",
+     "reliability": {
+      "yoy_r": 0.003,
+      "split_half_r": -0.226,
+      "n_pairs": 288,
+      "m50": null,
+      "m50_unit": null
+     },
+     "predictive": {
+      "target": "next-season win % on grass",
+      "r": -0.005,
+      "partial_r_given_elo": -0.043,
+      "r_next_games_won_pct": 0.01
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "elo_grass",
+     "hold",
+     "brk",
+     "games_won_pct",
+     "ace_pct"
+    ],
+    "standardise": "z within tour, season and the grass pool",
+    "weights": "yoy r floored at 0.2, capped at 0.8 for rating and fit metrics",
+    "weight_values": {
+     "elo_grass": 0.8,
+     "hold": 0.8,
+     "brk": 0.8,
+     "games_won_pct": 0.34,
+     "ace_pct": 0.59
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraints": "same tour and season, players meeting the grass floor"
+   }
+  }
+ ],
+ "payload_changes": [
+  {
+   "field": "values_surface.<s>.elo_surface / pct_surface.<s>.elo_surface",
+   "builder": "oddsmarkets/tennis/analytics/players.py:build",
+   "status": "needed",
+   "note": "the surface Elo (values.elo_<s>) is only ranked in the tour pool (pct); a surface-pool percentile needs it added to SURFACE_KEYS / surf_vals. Not done: players.py has uncommitted changes from another agent. Until then the front end can rank values.elo_<s> client-side among the players listed in values_surface.<s>."
+  },
+  {
+   "field": "SHRINK pseudo-counts (no new field)",
+   "builder": "oddsmarkets/tennis/analytics/players.py:SHRINK",
+   "status": "needed",
+   "note": "percentile shrinkage is lighter than the measured stabilisation: win_pct uses 10 pseudo-matches (M50 about 16-19 tour, 19-24 hard), win_v_top50 6 top-50 matches, tb_pct 8 tiebreaks (M50 300+ matches). Suggest win_pct 20, games_won_pct 12, and drop tb_pct, dec_pct from percentile cards."
+  }
+ ]
+}

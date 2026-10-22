@@ -13,6 +13,8 @@ step is logged with its traceback and its payloads are written as {"ok": false, 
      for mbb and wbb: build_level(...) for the per-level files, then build(...) for each season, newest first.
      Game pages (full=True) only for the newest --game-page-seasons seasons (default 2: the current season and the
      previous one, whose postseason pages the site links to)
+     Then, for the current season, who moves next (oddsmarkets/college/movement.py: <S>/movement.json and the team
+     pages' `movement`)
   3. site-wide payloads: oddsmarkets/college/site.py (index.json, glossary.json, search.json)
   4. a size report by folder; exits non-zero over the 800 MB budget (PAYLOADS.md)
 
@@ -152,6 +154,10 @@ def build_level(level: str, data: Path, seasons: list[int], a, report: dict, lev
                                (report.get(name) or {}).get("reason") or f"not built for {level} {s}")
         if missing:
             log.warning("%s: wrote ok:false for %s", name, ", ".join(missing))
+    # who moves next (oddsmarkets/college/movement.py): <S>/movement.json and `movement` on the team pages just written
+    if cur in seasons:
+        from oddsmarkets.college import movement
+        step(f"{level}:movement", lambda: movement.write_movement(level, data, cur), report)
     # seasons not rebuilt here (CI: restored from the live site) are upgraded to the builder's payload format
     if hasattr(mod, "migrate"):
         built = set(seasons)

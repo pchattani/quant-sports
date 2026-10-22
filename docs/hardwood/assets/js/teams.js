@@ -39,7 +39,7 @@ function renderTeams(el, params, state) {
       if (!ids.length) { document.getElementById('tm-cards').innerHTML = fx.card('Teams ' + fx.seasonLabel(L, S), '', fx.notBuilt('The ' + fx.seasonLabel(L, S) + ' team catalogue', teams)); return; }
       const net = id => (fx.isNum((R[id] || {}).net) ? R[id].net : fx.isNum(((T[id] || {}).values || {}).net) ? T[id].values.net : -99);
       ids.sort((a, b) => net(b) - net(a));
-      document.getElementById('tm-cards').innerHTML = '<div class="card"><div class="card-header">Teams ' + fx.esc(fx.seasonLabel(L, S)) + ' <span class="card-sub">Ordered by net rating. Odds from the season simulation' + (fx.isNum(((season || {}).sim || {}).n_sims) ? ' (' + Number(season.sim.n_sims).toLocaleString() + ' runs)' : '') + '.</span></div>' +
+      document.getElementById('tm-cards').innerHTML = '<div class="card"><div class="card-header">Teams ' + fx.esc(fx.seasonLabel(L, S)) + ' <span class="card-sub">Ordered by net rating. Chances from the season simulation' + (fx.isNum(((season || {}).sim || {}).n_sims) ? ' (' + Number(season.sim.n_sims).toLocaleString() + ' runs)' : '') + '.</span></div>' +
         '<div class="pg-grid-cards hf-cards">' + ids.map((id, i) => {
           const t = T[id] || {}, r = R[id] || {}, s = ST[id] || {}, sim = SIM[id] || {};
           return '<a class="pg-card" href="' + fx.teamHref(L, id) + '" style="--team:' + fx.esc(fx.teamColour(L, id)) + '"><div class="pg-card-name">' + (i + 1) + '. ' + fx.esc(t.name || fx.teamName(L, id)) + '</div>' +
@@ -51,23 +51,17 @@ function renderTeams(el, params, state) {
       const withR = ids.filter(id => fx.isNum((R[id] || {}).off) && fx.isNum((R[id] || {}).def));
       if (withR.length) {
         const xs = withR.map(id => R[id].off), ys = withR.map(id => R[id].def);
-        const lo = Math.min.apply(null, xs.concat(ys)) - 2, hi = Math.max.apply(null, xs.concat(ys)) + 2;
-        const diag = [];
-        for (let k = -15; k <= 15; k += 5) diag.push({ type: 'line', x0: lo, x1: hi, y0: lo - k, y1: hi - k, line: { color: k === 0 ? '#3d444d' : '#21262d', width: 1, dash: k === 0 ? 'solid' : 'dot' }, layer: 'below' });
-        fx.plot('tm-od', [{ type: 'scatter', mode: 'markers+text', x: xs, y: ys, text: withR.map(id => fx.teamAbbr(L, id)), textposition: 'top center', textfont: { size: 9, color: fx.C.text2 },
-          customdata: withR.map(id => fx.teamName(L, id) + ': net ' + fx.signed(R[id].net, 1) + (fx.isNum(R[id].se_net) ? ' ± ' + fx.num(R[id].se_net, 1) : '')),
-          marker: { size: 13, color: withR.map(id => fx.teamColour(L, id)), line: { color: '#0d1117', width: 1 } }, hovertemplate: '%{customdata}<br>ORtg %{x:.1f} · DRtg %{y:.1f}<extra></extra>' }],
-        fx.layout({ shapes: diag, margin: { l: 55, r: 15, t: 10, b: 45 }, xaxis: { title: 'Offensive rating', range: [lo, hi] }, yaxis: { title: 'Defensive rating (reversed)', range: [hi, lo] } }));
-        const node = document.getElementById('tm-od');
-        if (node && node.on) node.on('plotly_click', ev => { const pt = ev.points && ev.points[0]; if (pt) location.hash = fx.teamHref(L, withR[pt.pointIndex]); });
+        QKC.scatter('#tm-od', { points: withR.map(id => ({ x: R[id].off, y: R[id].def, name: fx.teamName(L, id) + ': net ' + fx.signed(R[id].net, 1) + (fx.isNum(R[id].se_net) ? ' ± ' + fx.num(R[id].se_net, 1) : ''),
+          label: fx.teamAbbr(L, id), color: fx.teamColour(L, id), href: fx.teamHref(L, id), size: 13 })), labelAll: true, yInverse: true, diagonal: true,
+          xName: 'Offensive rating (points per 100)', yName: 'Defensive rating (allowed per 100; better is higher)', xFmt: v => fx.num(v, 0), yFmt: v => fx.num(v, 0), label: 'Offence against defence' });
       } else document.getElementById('tm-od').innerHTML = fx.muted('No ratings yet.');
       const paths = (season || {}).rating_paths || {};
-      const ptr = ids.filter(id => (paths[id] || []).length).map(id => ({ type: 'scatter', mode: 'lines', name: fx.teamAbbr(L, id), x: paths[id].map(r => r.date), y: paths[id].map(r => r.net),
-        line: { color: fx.teamColour(L, id), width: 1.6 }, hovertemplate: fx.esc(fx.teamName(L, id)) + ' %{x|%d %b}: %{y:+.1f}<extra></extra>' }));
-      if (ptr.length) fx.plot('tm-paths', ptr, fx.layout({ showlegend: true, legend: { font: { size: 9, color: fx.C.text2 } }, margin: { l: 45, r: 10, t: 10, b: 40 }, xaxis: { title: 'Date' }, yaxis: { title: 'Net rating per 100', zeroline: true, zerolinecolor: '#6e7681' } }));
+      const ptr = ids.filter(id => (paths[id] || []).length);
+      if (ptr.length) QKC.line('#tm-paths', { xType: 'time', series: ptr.map(id => ({ name: fx.teamAbbr(L, id), color: fx.teamColour(L, id), width: 1.6, data: paths[id].map(r => [Date.parse(r.date), r.net]) })),
+        xName: 'Date', yName: 'Net rating (points per 100 possessions)', xFmt: fx.dateFmt, xLabel: fx.dateFmt, yFmt: v => fx.signed(v, 1), ref: { y: 0 }, endLabels: ptr.length <= 16, label: 'Net rating through the season' });
       else document.getElementById('tm-paths').innerHTML = fx.muted('No rating paths yet: they start with the first games.');
       // Metric table.
-      const metrics = (teams && teams.metrics) || [];
+      const metrics = ((teams && teams.metrics) || []).filter(m => !HW.ui.HIDE_TEAM[m.key]);
       const heads = fx.headline(metrics, HEAD_PREFS, 9, true);
       if (Object.keys(T).length && heads.length) {
         document.getElementById('tm-table').innerHTML = fx.card('Team metrics', 'Value and league percentile (100 = best; ↓ metrics already flipped) on headline metrics. The full catalogue of ' + metrics.length + ' metrics is on each team page.',
@@ -96,7 +90,7 @@ function drawTeam(el, L, S, tid, cat, teams, season) {
   const fx = FX(), C = fx.C;
   const T = (fx.ok(teams) && teams.teams) || {};
   const t = T[tid] || null;
-  const metrics = (teams || {}).metrics || [];
+  const metrics = ((teams || {}).metrics || []).filter(m => !HW.ui.HIDE_TEAM[m.key]);
   const name = (t && t.name) || fx.teamName(L, tid);
   const colour = fx.teamColour(L, tid);
   const info = fx.team(L, tid) || {};
@@ -124,14 +118,14 @@ function drawTeam(el, L, S, tid, cat, teams, season) {
     fx.tile('Offence', fx.num(r.off, 1), 'points per 100, adjusted'),
     fx.tile('Defence', fx.num(r.def, 1), 'allowed per 100, adjusted'),
     fx.tile('Pace', fx.num(pace, 1), 'possessions per 48' + (L === 'wnba' ? ' (40 in the WNBA)' : '')),
-    fx.tile('Title', fx.pct(fx.has(sim.p_title) ? sim.p_title : odds.p_title), 'playoffs ' + fx.pct(fx.has(sim.p_playoffs) ? sim.p_playoffs : odds.p_playoffs, 0) + (fx.isNum(mk.p_title) ? ' · market ' + fx.pct(mk.p_title) : ''))
+    fx.tile('Title', fx.pct(fx.has(sim.p_title) ? sim.p_title : odds.p_title), 'playoffs ' + fx.pct(fx.has(sim.p_playoffs) ? sim.p_playoffs : odds.p_playoffs, 0))
   ].join('') + '</div>';
   const curS = fx.current(L);
   h += '<div class="card"><div class="card-header">Strengths and needs <span class="card-sub">' + (Number(S) === Number(curS) ? 'Each position group and unit graded against the league on projected value (rest-of-season HPM × projected minutes, in WAR over a full season); the three strongest and weakest, with ranked trade targets for each weakness.' : 'Built for the current season (' + fx.esc(fx.seasonLabel(L, curS)) + ') only.') + '</span></div><div id="tp-needs">' + fx.muted(Number(S) === Number(curS) ? 'Loading…' : '<a href="' + fx.teamHref(L, tid, curS) + '">' + fx.esc(name) + ' in ' + fx.esc(fx.seasonLabel(L, curS)) + ' →</a>') + '</div></div>';
   if (Number(S) === Number(curS)) h += '<div class="card"><div class="card-header">Ledger <span class="card-sub">This team\'s trades in the last 12 months, rated on four-season value (at the time, realised since, today\'s view), and every transaction ESPN lists.</span></div><div id="tp-ledger">' + fx.muted('Loading…') + '</div></div>';
   h += '<div class="card"><div class="card-header">Rating path <span class="card-sub">Net rating per 100 after each game from the Kalman filter, ±1 standard error shaded; dots are game results (green won, red lost).</span></div><div id="tp-path" style="height:320px"></div></div>';
   h += '<div class="grid-2"><div class="card"><div class="card-header">Four factors <span class="card-sub">Both ends, with league percentile and the league median.</span></div><div id="tp-ff"></div></div>' +
-    '<div class="card"><div class="card-header">Odds against the market <span class="card-sub">Season simulation against prediction markets where they trade.</span></div><div id="tp-odds"></div></div></div>';
+    '<div class="card"><div class="card-header">Season chances <span class="card-sub">Our chances from the season simulation.</span></div><div id="tp-odds"></div></div></div>';
   h += '<div class="card"><div class="card-header">Shot profile <span class="card-sub">Share of shots and points per shot by zone, coloured against the league average (red better for the side shown). Left: their shots. Right: what they allow.</span></div>' +
     '<div class="grid-2"><div><div id="tp-sp-for" class="hf-court"></div><div id="tp-sp-for-t"></div></div><div><div id="tp-sp-ag" class="hf-court"></div><div id="tp-sp-ag-t"></div></div></div></div>';
   h += '<div class="card"><div class="card-header">Roster <span class="card-sub">Everyone who played, by minutes. HPM per 100 possessions, offence and defence.</span></div><div id="tp-roster"></div></div>';
@@ -150,14 +144,7 @@ function drawTeam(el, L, S, tid, cat, teams, season) {
   const path = (((season || {}).rating_paths) || {})[tid] || [];
   const log = ((t && t.log) || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
   if (path.length) {
-    const tr = fx.band(path.map(p => ({ x: p.date, y: p.net, se: p.se, text: fx.fmtDate(p.date, { year: false }) })), colour, 'Net rating', { hover: '%{text}: %{y:+.1f} ± %{customdata:.1f}<extra></extra>' });
-    if (log.length) {
-      const byGame = {}; path.forEach(p => { byGame[p.game] = p; });
-      const pts = log.filter(g => byGame[g.game]);
-      tr.push({ type: 'scatter', mode: 'markers', x: pts.map(g => byGame[g.game].date), y: pts.map(g => byGame[g.game].net), text: pts.map(g => (g.home ? 'v ' : '@ ') + fx.teamAbbr(L, g.opp) + ' ' + (g.res || '') + ' ' + (g.pts || 0) + '-' + (g.opp_pts || 0)),
-        marker: { size: 6, color: pts.map(g => (String(g.res).charAt(0) === 'W' ? C.green : C.red)) }, hovertemplate: '%{text}<extra></extra>' });
-    }
-    fx.plot('tp-path', tr, fx.layout({ margin: { l: 45, r: 10, t: 10, b: 40 }, xaxis: { title: 'Date' }, yaxis: { title: 'Net per 100', zeroline: true, zerolinecolor: '#6e7681' } }));
+    fx.pathChart('tp-path', [{ name: 'Net rating', colour: colour, rows: path.map(p => ({ x: p.date, y: p.net, se: p.se })) }], { label: 'Net rating through the season, ± one standard error' });
   } else document.getElementById('tp-path').innerHTML = fx.muted('No rating path yet.');
 
   // Four factors.
@@ -173,10 +160,7 @@ function drawTeam(el, L, S, tid, cat, teams, season) {
   const oddsRows = [['Make the playoffs', 'p_playoffs'], ['Play-in', 'p_playin'], ['Top six seed', 'p_top6'], ['Win the division', 'p_div'], ['Reach the Finals', 'p_conf'], ['Win the title', 'p_title']]
     .map(x => [x[0], fx.has(sim[x[1]]) ? sim[x[1]] : odds[x[1]], mk[x[1]]]).filter(x => fx.isNum(x[1]) || fx.isNum(x[2]));
   const wt = (((season || {}).win_totals) || {})[tid];
-  let oh = oddsRows.length ? HW.tableHTML([{ label: '' }, { label: 'Model', align: 'right' }, { label: 'Market', align: 'right' }, { label: 'Edge', align: 'right', title: 'Model minus market, percentage points' }],
-    oddsRows.map(x => [x[0], { v: x[1], html: HW.probCell ? HW.probCell(x[1], colour) : fx.pct(x[1]) }, { v: x[2], html: fx.pct(x[2]) }, { v: fx.isNum(x[1]) && fx.isNum(x[2]) ? x[1] - x[2] : null,
-      html: fx.isNum(x[1]) && fx.isNum(x[2]) ? '<span class="' + (x[1] > x[2] ? 'pg-edge-pos' : 'pg-edge-neg') + '">' + fx.signed(100 * (x[1] - x[2]), 1) + ' pp</span>' : '—' }]), { compact: true }) : fx.muted('No simulation yet.');
-  if (wt && fx.isNum(wt.line)) oh += '<div class="mk-line"><strong>Win total ' + fx.num(wt.line, 1) + '</strong>: over ' + fx.pct(wt.p_over_model) + ' in the model' + (fx.isNum(wt.p_over_market) ? ', ' + fx.pct(wt.p_over_market) + ' in the market' : '') + '.</div>';
+  let oh = oddsRows.filter(x => fx.isNum(x[1])).length ? QK.chances(oddsRows.filter(x => fx.isNum(x[1])).map(x => ({ label: x[0], p: x[1], color: colour })), { sort: false, max: 1, key: false }) : fx.muted('No simulation yet.');
   const sd = (((season || {}).schedule_difficulty) || {})[tid];
   if (sd) oh += '<div class="mk-line"><strong>Schedule</strong>: opponents so far average ' + fx.signed(sd.played, 1) + ' net, the rest ' + fx.signed(sd.remaining, 1) + '.</div>';
   const elo = eloOf(season, tid);
@@ -226,11 +210,11 @@ function drawTeam(el, L, S, tid, cat, teams, season) {
     const order = rp.map((p, i) => i).sort((a, b) => z[b].reduce((s, v) => s + (v || 0), 0) - z[a].reduce((s, v) => s + (v || 0), 0));
     const gameLab = rg.map((g, j) => { const lg = log.find(x => String(x.game) === String(g)); return lg ? fx.fmtDate(lg.date, { year: false, weekday: false }) + ' ' + (lg.home ? 'v ' : '@ ') + fx.teamAbbr(L, lg.opp) : 'G' + (j + 1); });
     const node = document.getElementById('tp-rot');
-    node.style.height = Math.max(260, 22 * order.length + 90) + 'px';
-    fx.plot(node, [{ type: 'heatmap', z: order.map(i => z[i].map(v => (fx.isNum(v) && v > 0 ? v : null))), x: rg.map((g, j) => j + 1), y: order.map(i => nm(rp[i])), text: order.map(() => gameLab), zmin: 0, zmax: L === 'wnba' ? 40 : 48,
-      colorscale: [[0, '#161b22'], [0.25, '#1f3b5c'], [0.6, '#2f6fb5'], [1, '#79c0ff']], hoverongaps: false, xgap: 1, ygap: 1, colorbar: { title: { text: 'min', side: 'right' }, thickness: 8, tickfont: { size: 9, color: C.text2 } },
-      hovertemplate: '%{y} · %{text}: %{z:.0f} min<extra></extra>' }],
-    fx.layout({ margin: { l: 110, r: 10, t: 10, b: 35 }, xaxis: { title: 'Game', showgrid: false }, yaxis: { autorange: 'reversed', showgrid: false, tickfont: { size: 10 } } }));
+    node.style.height = ''; node.style.setProperty('--h', Math.max(280, 22 * order.length + 120) + 'px');
+    const data = [];
+    order.forEach((i, yi) => z[i].forEach((v, xi) => { if (fx.isNum(v) && v > 0) data.push([xi, yi, v]); }));
+    QKC.heatmap(node, { x: rg.map((g, j) => String(j + 1)), y: order.map(i => nm(rp[i])), data: data, min: 0, max: L === 'wnba' ? 40 : 48, fmt: v => fx.num(v, 0), cellLabels: false,
+      xName: 'Game of the season', yName: 'Player', label: 'Minutes per player per game' });
   } else document.getElementById('tp-rot').innerHTML = fx.muted('No rotation data yet.');
 
   // Schedule log.
@@ -245,8 +229,8 @@ function drawTeam(el, L, S, tid, cat, teams, season) {
 
   // Seed distribution.
   const seeds = sim.seed_dist || [];
-  if (seeds.length) fx.plot('tp-seed', [{ type: 'bar', x: seeds.map((v, i) => i + 1), y: seeds, marker: { color: colour }, hovertemplate: 'seed %{x}: %{y:.1%}<extra></extra>' }],
-    fx.layout({ margin: { l: 45, r: 10, t: 10, b: 35 }, xaxis: { title: 'Seed', dtick: 1 }, yaxis: { title: 'Probability', tickformat: '.1%' } }));
+  if (seeds.length) QKC.bar('#tp-seed', { cats: seeds.map((v, i) => String(i + 1)), series: [{ name: 'Chance', color: 'model', data: seeds }], fmt: v => fx.pct(v, v < 0.1 ? 1 : 0),
+    catName: 'Final seed', valName: 'Our chance', label: 'Chance of each final seed' });
   else document.getElementById('tp-seed').innerHTML = fx.muted('No simulation yet.');
 
   // Injuries.
@@ -286,7 +270,7 @@ function drawNeeds(L, S, tid, nd) {
     }).join('') + '</div>'
       : fx.muted('No player on another team would add value here.')) + '</div>';
   });
-  h += '<div class="pg-note">' + fx.esc(nd.note || '') + ' Free agents: ' + fx.esc(nd.free_agents || 'not identified.') + ' Targets are ranked by what each would add in the team\'s rotation (displacing its lowest-rated minutes at that position); "attainable" marks a seller out of contention or with depth at the position, and not one of its two most valuable players. ' + (full ? 'Wins are over a full season (no season simulation now).' : 'Wins and playoff odds come from the season simulation\'s sensitivity curves.') + '</div>';
+  h += '<div class="pg-note">' + fx.esc(nd.note || '') + ' Free agents: ' + fx.esc(nd.free_agents || 'not identified.') + ' Targets are ranked by what each would add in the team\'s rotation (displacing its lowest-rated minutes at that position); "attainable" marks a seller out of contention or with depth at the position, and not one of its two most valuable players. ' + (full ? 'Wins are over a full season (no season simulation now).' : 'Wins and playoff chances come from the season simulation\'s sensitivity curves.') + '</div>';
   box.innerHTML = h;
   HW.sortable(box);
 }

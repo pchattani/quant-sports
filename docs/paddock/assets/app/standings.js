@@ -1,10 +1,11 @@
 /* The Quant Paddock — Standings (#/standings[/<y>][?tab=championship|odds|pace]).
  *   Championship: the tables with the title simulation (P(title), expected points and the 90% range,
  *     magic numbers, clinched / eliminated), points progression, the finishing-position distribution.
- *   Title odds v market (was #/markets): the season simulation against de-vigged Kalshi and Polymarket
- *     prices for both titles and the next race, what the next rounds mean for the leader, head to heads.
+ *   Title chances (was #/markets): our chances from the season simulation, the points race with our projection
+ *     (538 style), the season-end points range and what the next rounds mean for the leader. The market
+ *     reference for the titles is on the Model page.
  *   Car v driver: car pace by round, driver effects, the car/driver split of points, Elo.
- * A finished season shows final standings without the simulation. Reads <y>/season.json, markets.json. */
+ * A finished season shows final standings without the simulation. Reads <y>/season.json. */
 (function (PD) {
 'use strict';
 
@@ -19,14 +20,14 @@ function render(el, params) {
   var tab = ['championship', 'odds', 'pace'].indexOf(q.tab) >= 0 ? q.tab : 'championship';
   var base = '#/standings' + (y !== PD.currentSeason() ? '/' + y : '');
   el.innerHTML = PD.pageHead('Season ' + y, 'Standings', '', PD.yearPager('standings', y)) +
-    PD.subnav([[base, 'Championship', 'championship'], [base + '?tab=odds', 'Title odds v market', 'odds'], [base + '?tab=pace', 'Car v driver', 'pace']], tab, 'Standings views') + '<div id="st-body">' + PD.empty('Loading', '') + '</div>';
-  return Promise.all([PD.load(y + '/season.json'), PD.load('markets.json')]).then(function (arr) {
+    PD.subnav([[base, 'Championship', 'championship'], [base + '?tab=odds', 'Title chances', 'odds'], [base + '?tab=pace', 'Car v driver', 'pace']], tab, 'Standings views') + '<div id="st-body">' + PD.empty('Loading', '') + '</div>';
+  return Promise.all([PD.load(y + '/season.json')]).then(function (arr) {
     if (!PD.alive(el)) return;
-    var season = arr[0], markets = arr[1];
+    var season = arr[0], markets = null;
     if (!PD.ok(season)) { PD.set('st-body', PD.notBuilt('The ' + y + ' season', season)); return; }
     var ch = season.championship;
-    var sub = el.querySelector('.pd-head .qk-sub');
-    if (sub) sub.innerHTML = season.rounds_done + ' of ' + season.rounds_total + ' rounds run' + (ch ? ' · title odds from ' + (ch.n_sims ? PD.int(ch.n_sims) + ' ' : '') + 'simulated seasons' : ' · final standings') + (season.updated_at ? ' · updated ' + esc(PD.fmtStamp(season.updated_at)) : '');
+    var sub = el.querySelector('.pd-head .qk-sh-sub');
+    if (sub) sub.innerHTML = season.rounds_done + ' of ' + season.rounds_total + ' rounds run' + (ch ? ' · title chances from ' + (ch.n_sims ? PD.int(ch.n_sims) + ' ' : '') + 'simulated seasons' : ' · final standings') + (season.updated_at ? ' · updated ' + esc(PD.fmtStamp(season.updated_at)) : '');
     if (tab === 'odds') return odds(season, markets, y);
     if (tab === 'pace') return pace(season);
     return championship(season, markets);
@@ -42,30 +43,18 @@ function championship(season) {
   var h = PD.kpis([
     PD.kpi(finished ? 'Champion' : 'Leader', sd[0] ? PD.driverLink(sd[0].driver, { team: sd[0].team }) : '—', sd[0] ? PD.pts(sd[0].points) + ' pts' + (sd[1] ? ' · ' + PD.pts(sd[0].points - sd[1].points) + ' clear' : '') : '', { text: true }),
     PD.kpi(finished ? 'Constructors’ champion' : 'Constructors’ leader', sc[0] ? PD.teamLink(sc[0].team) : '—', sc[0] ? PD.pts(sc[0].points) + ' pts' : '', { text: true }),
-    fav ? PD.kpi('Title favourite', PD.driverLink(fav), PD.pct(ch.drivers[fav].p_title, 2) + ' to win the title', { text: true }) : PD.kpi('Champion’s wins', sd[0] ? String(sd[0].wins) : '—', sd[0] ? sd[0].podiums + ' podiums' : ''),
+    fav ? PD.kpi('Drivers’ title', esc(PD.driverCode(fav)) + ' ' + PD.pct(ch.drivers[fav].p_title, ch.drivers[fav].p_title > 0.99 ? 2 : 1), esc(PD.driverName(fav)) + ' · our chance', { signal: true, href: PD.driverHref(fav) }) : PD.kpi('Champion’s wins', sd[0] ? String(sd[0].wins) : '—', sd[0] ? sd[0].podiums + ' podiums' : ''),
     PD.kpi('Rounds', season.rounds_done + ' / ' + season.rounds_total, (season.calendar || []).filter(function (c) { return c.sprint; }).length + ' sprint weekends')
   ]);
   h += PD.grid(
-    PD.card('Drivers’ championship', finished ? 'Final standings.' : 'P(title), expected final points with the middle 90% of simulated outcomes (bar), magic number to clinch.', '<div id="st-d"></div>', { span: 12, flush: true }) +
-    PD.card('Points progression', '', PD.chartBox('st-prog', 400), { span: 8, right: PD.seg('st-prog-k', [['drivers', 'Drivers'], ['constructors', 'Constructors']], 'drivers', 'Progression') }) +
+    PD.card('Drivers’ championship', finished ? 'Final standings.' : 'Our title chance, our expected final points with the middle 90% of simulated outcomes (bar), and the magic number to clinch.', '<div id="st-d"></div>', { span: 12, flush: true }) +
+    PD.card('The title race', 'Points after every round, then our expected points to the last round (shaded).', PD.chartBox('st-prog', 400, 'Championship points with our projection'), { span: 8, right: PD.seg('st-prog-k', [['drivers', 'Drivers'], ['constructors', 'Constructors']], 'drivers', 'Progression') }) +
     PD.card('Constructors’ championship', '', '<div id="st-c"></div>', { span: 4, flush: true }) +
-    (finished ? '' : PD.card('Where they finish', 'Share of simulated seasons ending in each place.', PD.chartBox('st-pd', 500), { span: 12, right: PD.seg('st-pd-k', [['drivers', 'Drivers'], ['constructors', 'Constructors']], 'drivers', 'Distribution') })), 'pd-mt');
+    (finished ? '' : PD.card('Where they finish', 'Our chance of each championship position: the share of simulated seasons ending in each place.', PD.chartBox('st-pd', 500), { span: 12, right: PD.seg('st-pd-k', [['drivers', 'Drivers'], ['constructors', 'Constructors']], 'drivers', 'Distribution') })), 'pd-mt');
   PD.set('st-body', h);
   standingsTable('st-d', season, 'drivers');
   standingsTable('st-c', season, 'constructors', true);
-  var prog = function (kind) {
-    var P = ((season.progression || {})[kind]) || {};
-    var order = ((season.standings || {})[kind] || []).map(function (r) { return kind === 'drivers' ? r.driver : r.team; }).filter(function (id) { return P[id]; }).slice(0, kind === 'drivers' ? 10 : 11);
-    var done = (season.calendar || []).filter(function (c) { return c.status === 'done'; }).sort(function (a, b) { return a.round - b.round; });
-    var teamOf = {};
-    ((season.standings || {}).drivers || []).forEach(function (r) { teamOf[r.driver] = r.team; });
-    var st = kind === 'drivers' ? PD.ch.styleMap(order, teamOf) : null;
-    var n = Math.max.apply(null, order.map(function (id) { return P[id].length; }).concat([0]));
-    var xs = []; for (var i = 0; i < n; i++) xs.push(done[i] ? 'R' + done[i].round : 'R' + (i + 1));
-    PD.ch.lines('st-prog', order.map(function (id) {
-      return { name: kind === 'drivers' ? PD.driverName(id) : PD.teamName(id), short: kind === 'drivers' ? PD.driverCode(id) : PD.teamAbbr(id), data: P[id], colour: kind === 'drivers' ? st[id].colour : PD.teamColour(id), dash: kind === 'drivers' ? st[id].dash : false };
-    }), { xs: xs, endLabels: true, legend: false, xName: 'Round', yName: 'Points', yScale: false, yFmt: function (v) { return PD.pts(v); }, xLabel: function (v) { var c = done[xs.indexOf(v)]; return c ? v + ' · ' + c.name : v; }, label: 'Points progression' });
-  };
+  var prog = function (kind) { PD.v2.pointsForecast('st-prog', season, kind, kind === 'drivers' ? 10 : 11); };
   prog('drivers');
   PD.wireSeg(document, 'st-prog-k', prog);
   if (!finished) {
@@ -100,7 +89,7 @@ function standingsTable(id, season, kind, compact) {
   cols.push({ key: 'wins', label: 'Wins', num: true });
   if (isD && !compact) { cols.push({ key: 'podiums', label: 'Podiums', num: true }); cols.push({ key: 'poles', label: 'Poles', num: true }); }
   if (ch) {
-    cols.push({ key: 'p', label: 'Title', num: true, tip: 'Share of simulated seasons won', fmt: function (v, r) { return r.elim ? '<span class="qk-muted">out</span>' : PD.probBar(v, PD.tc(isD ? r.team : r.id)); } });
+    cols.push({ key: 'p', label: 'Title', num: true, tip: 'Our title chance: the share of simulated seasons won', fmt: function (v, r) { return r.elim ? '<span class="qk-muted">out</span>' : PD.probBar(v, PD.tc(isD ? r.team : r.id)); } });
     if (!compact) {
       cols.push({ key: 'exp', label: 'Exp. pts', num: true, fmt: function (v) { return PD.num(v, 0); } });
       cols.push({ key: 'lo', label: '90% range', sort: false, tip: 'The middle 90% of simulated final points; the tick is the expectation', fmt: function (v, r) { return rangeBar(r.lo, r.exp, r.hi, maxE); } });
@@ -116,67 +105,44 @@ function rangeBar(lo, mid, hi, max) {
 }
 PD.rangeBar = rangeBar;
 
-// ── odds v market ─────────────────────────────────────────────────────────
-
-function edgeHTML(e) { return isNum(e) ? '<span class="' + (e > 0 ? 'pd-up' : 'pd-down') + '">' + PD.signed(100 * e, 0) + '%</span>' : '<span class="qk-muted">—</span>'; }
-function sourceNames(src) { if (!src) return []; if (Array.isArray(src)) return src.map(function (s) { return typeof s === 'string' ? s : s.name || s.source || ''; }); return Object.keys(src); }
+// ── title chances (was "title odds v market"; the market reference now sits on the Model page) ───────────
 
 function odds(season, markets, y) {
-  var cur = y === PD.currentSeason();
   var ch = season.championship;
-  if (!ch) { PD.set('st-body', PD.empty('The ' + y + ' championship is decided', 'Title odds and market prices exist only for a season still running.')); return; }
-  var mk = cur && markets && markets.ok !== false ? markets : {};
-  var h = PD.note('<b>De-vig:</b> each price is the midpoint of a live two-sided quote (spread at most 0.12), averaged across sources, then divided by the field’s total so the probabilities sum to one. A field market is shown only when at least max(4, half the field) runners are accounted for and the implied total is between 0.8 and 1.3. Edge = model / market − 1.' + (mk.updated_at ? ' Prices fetched ' + esc(PD.fmtStamp(mk.updated_at)) + '.' : ''));
-  h += PD.grid(
-    PD.card('Drivers’ title', '<span id="od-d-s"></span>', PD.chartBox('od-d', 340) + '<div id="od-d-t"></div>', { span: 6 }) +
-    PD.card('Constructors’ title', '<span id="od-c-s"></span>', PD.chartBox('od-c', 340) + '<div id="od-c-t"></div>', { span: 6 }) +
-    PD.card('Next race winner', '<span id="od-n-s"></span>', PD.chartBox('od-n', 420), { span: 7 }) +
-    PD.card('What the next rounds mean', 'For the championship leader: the chance of winning each remaining round and the title if he does or does not.', '<div id="od-cond"></div>', { span: 5, flush: true }) +
-    PD.card('Head to head', 'Who finishes ahead: open race and season matchups.', '<div id="od-h2h"></div>', { span: 12, flush: true }), 'pd-mt');
-  PD.set('st-body', h);
-  ['drivers', 'constructors'].forEach(function (kind) {
-    var T = mk[kind === 'drivers' ? 'drivers_title' : 'constructors_title'] || {};
-    var model = {};
-    Object.keys(ch[kind] || {}).forEach(function (id) { model[id] = ch[kind][id].p_title; });
-    var prices = T.available ? (T.prices || {}) : {};
-    var elim = {};
-    (T.eliminated || []).forEach(function (id) { elim[id] = 1; });
-    var ids = Object.keys(model).concat(Object.keys(prices).filter(function (k) { return !(k in model); })).filter(function (id) { return !elim[id] && ((model[id] || 0) > 0.0005 || (prices[id] || 0) > 0); })
-      .sort(function (a, b) { return ((model[b] || 0) + (prices[b] || 0)) - ((model[a] || 0) + (prices[a] || 0)); });
-    var isD = kind === 'drivers', pre = isD ? 'od-d' : 'od-c';
-    var srcs = sourceNames(T.sources);
-    PD.set(pre + '-s', (T.available ? 'Market from ' + esc(srcs.join(', ') || 'prediction markets') + (isNum(T.implied_total) ? ' · implied total ' + PD.num(T.implied_total, 3) : '') : 'No market published' + (T.reason ? ': ' + esc(T.reason) : '')) + ' · model ' + PD.int(ch.n_sims) + ' simulated seasons');
-    if (T.available && ids.length) window.QKC.dumbbell(document.getElementById(pre), { rows: ids.slice(0, 8).map(function (id) { return { label: isD ? PD.driverName(id) : PD.teamName(id), a: model[id] || 0, b: prices[id] || 0, href: isD ? PD.driverHref(id) : PD.teamHref(id) }; }), labelWidth: 120, valName: 'Title probability' });
-    else PD.ch.hbars(pre, ids.slice(0, 8).map(function (id) { return { label: isD ? PD.driverName(id) : PD.teamName(id), value: model[id] || 0, colour: PD.teamColour(isD ? PD.driverTeam(id) : id) }; }), { fmt: function (v) { return PD.pct(v); }, name: 'Model' });
-    PD.table(pre + '-t', [
-      { key: 'name', label: isD ? 'Driver' : 'Team', sticky: true, fmt: function (v, r) { return isD ? PD.driverLink(r.id) : PD.teamLink(r.id); } },
-      { key: 'model', label: 'Model', num: true, fmt: function (v) { return PD.pct(v); } },
-      { key: 'market', label: 'Market', num: true, fmt: function (v) { return isNum(v) ? PD.pct(v) : '—'; } },
-      { key: 'edge', label: 'Edge', num: true, fmt: edgeHTML },
-      { key: 'fair', label: 'Fair odds', num: true, tip: 'Decimal odds from the de-vigged market', fmt: function (v) { return isNum(v) ? PD.num(v, 2) : '—'; } }
-    ], ids.map(function (id) { var m = model[id], p = prices[id]; var e = isNum((T.edge || {})[id]) ? T.edge[id] : (isNum(p) && p > 0 && isNum(m) ? m / p - 1 : null);
-      return { id: id, name: isD ? PD.driverName(id) : PD.teamName(id), model: m, market: p, edge: e, fair: isNum(p) && p > 0 ? 1 / p : null }; }), { sort: { key: 'model', dir: 'desc' } });
-    var host = document.getElementById(pre + '-t');
-    if (host && Object.keys(elim).length) host.insertAdjacentHTML('beforeend', '<p class="pd-cap">Eliminated (settled no; probability 0): ' + Object.keys(elim).map(function (id) { return isD ? PD.driverLink(id, { dot: false }) : PD.teamLink(id, { dot: false }); }).join(', ') + '.</p>');
-  });
-  // next race
-  var idx = PD.index() || {}, nx = idx.next || {}, nr = mk.next_race || {};
-  var ry = nr.year || nx.year, rr = nr.round || nx.round;
-  if (!cur || !rr) { PD.ch.none('od-n', 'No race left.'); }
-  else {
-    PD.set('od-n-s', PD.raceLink(ry, rr, ry + ' round ' + rr + (nx.name && nx.round === rr ? ': ' + nx.name : '')) + ' · blue model, orange market');
-    var drawN = function (model, prices) {
-      var ids = Object.keys(model).concat(Object.keys(prices).filter(function (k) { return !(k in model); })).sort(function (a, b) { return Math.max(model[b] || 0, prices[b] || 0) - Math.max(model[a] || 0, prices[a] || 0); }).slice(0, 12);
-      if (!ids.length) return PD.ch.none('od-n', 'No forecast or market for the next race yet; race-winner markets list about a week out.');
-      if (!Object.keys(prices).length) return PD.ch.hbars('od-n', ids.map(function (id) { return { label: PD.driverName(id), value: model[id] || 0, colour: PD.teamColour(PD.driverTeam(id)), href: PD.driverHref(id) }; }), { fmt: function (v) { return PD.pct(v); }, name: 'Model' });
-      window.QKC.dumbbell(document.getElementById('od-n'), { rows: ids.map(function (id) { return { label: PD.driverName(id), a: model[id] || 0, b: prices[id] || 0, href: PD.driverHref(id) }; }), labelWidth: 120, valName: 'Win probability',
-        max: Math.min(1, Math.max.apply(null, ids.map(function (id) { return Math.max(model[id] || 0, prices[id] || 0); })) * 1.15 + 0.02) });
-    };
-    if (Object.keys(nr.model || {}).length) drawN(nr.model, nr.prices || {});
-    else PD.load(ry + '/races/' + rr + '.json').then(function (r) { var f = (r || {}).forecast || {}; var sim = f.post_quali || f.pre_quali; var m = {}; Object.keys((sim || {}).drivers || {}).forEach(function (id) { m[id] = sim.drivers[id].p_win; }); drawN(m, nr.prices || {}); });
-  }
-  // conditional
+  if (!ch) { PD.set('st-body', PD.empty('The ' + y + ' championship is decided', 'Title chances exist only for a season still running.')); return; }
+  var top = function (kind) {
+    var c = ch[kind] || {};
+    return Object.keys(c).filter(function (id) { return !c[id].eliminated && isNum(c[id].p_title); }).sort(function (a, b) { return (c[b].p_title - c[a].p_title) || ((c[b].exp_points || 0) - (c[a].exp_points || 0)); });
+  };
+  var dTop = top('drivers'), cTop = top('constructors');
+  var fav = dTop[0], cfav = cTop[0];
   var cond = (ch.conditional || {}).leader;
+  var h = PD.kpis([
+    PD.kpi('Drivers’ title', fav ? esc(PD.driverCode(fav)) + ' ' + PD.pct(ch.drivers[fav].p_title, ch.drivers[fav].p_title > 0.99 ? 2 : 1) : '—', fav ? esc(PD.driverName(fav)) + ' · our chance' : '', { signal: true, href: fav ? PD.driverHref(fav) : null }),
+    PD.kpi('Constructors’ title', cfav ? esc(PD.teamAbbr(cfav)) + ' ' + PD.pct(ch.constructors[cfav].p_title, ch.constructors[cfav].p_title > 0.99 ? 2 : 1) : '—', cfav ? esc(PD.teamName(cfav)) + ' · our chance' : '', { signal: true, href: cfav ? PD.teamHref(cfav) : null }),
+    PD.kpi('Still in it', String(dTop.filter(function (id) { return ch.drivers[id].p_title >= 0.0005; }).length), 'drivers with at least a 0.05% chance'),
+    PD.kpi('Rounds left', String((ch.remaining || []).length), isNum((ch.max_points_left || {}).driver) ? (ch.max_points_left.driver) + ' points still to win' : ''),
+    PD.kpi('Simulated seasons', PD.int(ch.n_sims), 'each remaining round raced again')
+  ]);
+  h += '<section class="qk-section pd-sec">' + PD.secHead('Season simulation', 'The title race', 'Points so far, then our expected points for every round still to run (the shaded projection).', PD.seg('od-k', [['drivers', 'Drivers'], ['constructors', 'Constructors']], 'drivers', 'Championship')) +
+    PD.grid(
+      PD.card('Points, with our projection', 'Each line is labelled at its end with our expected final points.', PD.chartBox('od-fc', 400, 'Championship points with our projection'), { span: 8 }) +
+      PD.card('Title chances', '<span id="od-t-s"></span>', '<div id="od-t"></div>', { span: 4 }) +
+      PD.card('Where the points land', 'The bar spans the 5th to 95th percentile of simulated season-end points; the dot is our expectation.', PD.chartBox('od-range', 400, 'Season-end points range'), { span: 6 }) +
+      PD.card('What the next rounds mean', cond ? 'For the leader, ' + PD.driverLink(cond.driver, { dot: false }) + ': our chance of winning each remaining round, and of the title if he does or does not.' : 'Conditional chances for the championship leader.', '<div id="od-cond"></div>', { span: 6, flush: true })) + '</section>';
+  PD.set('st-body', h);
+  var draw = function (kind) {
+    var isD = kind === 'drivers';
+    var ids = (isD ? dTop : cTop).slice(0, 10);
+    PD.v2.pointsForecast('od-fc', season, kind, isD ? 8 : 6);
+    PD.v2.rangeChart('od-range', season, kind, 10);
+    PD.set('od-t-s', 'Our chance of the ' + (isD ? 'drivers’' : 'constructors’') + ' title from ' + PD.int(ch.n_sims) + ' simulated seasons.');
+    var rows = PD.v2.chanceRows(ids, function (id) { return ch[kind][id].p_title; }, isD, null);
+    rows.forEach(function (r, i) { var c = ch[kind][ids[i]]; r.sub = 'exp. ' + PD.num(c.exp_points, 0) + ' pts'; });
+    PD.set('od-t', QK.chances(rows, { max: 1, oursName: 'Our title chance' }) + (Object.keys(ch[kind] || {}).some(function (id) { return ch[kind][id].eliminated; }) ? '<p class="pd-cap">Out of contention: ' + Object.keys(ch[kind]).filter(function (id) { return ch[kind][id].eliminated; }).map(function (id) { return isD ? PD.driverLink(id, { dot: false }) : PD.teamLink(id, { dot: false }); }).join(', ') + '.</p>' : ''));
+  };
+  draw('drivers');
+  PD.wireSeg(document, 'od-k', draw);
   if (cond && cond.by_round) {
     var rounds = Object.keys(cond.by_round).sort(function (a, b) { return a - b; });
     var calBy = {};
@@ -184,25 +150,11 @@ function odds(season, markets, y) {
     PD.table('od-cond', [
       { key: 'round', label: 'Rd', num: true },
       { key: 'name', label: 'Race', sticky: true, fmt: function (v, r) { return PD.raceLink(season.year, r.round, PD.shortRace(v)); } },
-      { key: 'pw', label: 'Wins it', num: true, fmt: function (v) { return PD.pct(v, 0); } },
-      { key: 'iw', label: 'Title if win', num: true, fmt: function (v) { return PD.pct(v, 1); } },
+      { key: 'pw', label: 'Wins it', num: true, tip: 'Our chance he wins this round', fmt: function (v) { return PD.pct(v, 0); } },
+      { key: 'iw', label: 'Title if he wins', num: true, fmt: function (v) { return PD.pct(v, 1); } },
       { key: 'inw', label: 'If not', num: true, fmt: function (v) { return PD.pct(v, 1); } }
     ], rounds.map(function (k) { var b = cond.by_round[k]; return { round: +k, name: (calBy[k] || {}).name || 'Round ' + k, pw: b.p_win_round, iw: b.p_title_if_win, inw: b.p_title_if_not_win }; }), { sort: { key: 'round', dir: 'asc' } });
-    var hc = document.getElementById('od-cond');
-    if (hc) hc.insertAdjacentHTML('afterbegin', '<p class="pd-cap pd-pad">Leader: ' + PD.driverLink(cond.driver) + '.</p>');
-  } else PD.set('od-cond', PD.muted('No conditional odds for this season.'));
-  // h2h
-  var H = mk.h2h || [];
-  var list = Array.isArray(H) ? H.map(function (x) { return Object.assign({ scope: x.scope || (x.round ? 'race' : 'season') }, x); }) : (H.race || []).map(function (x) { return Object.assign({ scope: 'race' }, x); }).concat((H.season || []).map(function (x) { return Object.assign({ scope: 'season' }, x); }));
-  if (!list.length) PD.set('od-h2h', PD.muted('No head-to-head market is open. Kalshi lists race matchups and Polymarket race and season head-to-heads around race week.'));
-  else PD.table('od-h2h', [
-    { key: 'scope', label: 'Scope', fmt: function (v, r) { return v === 'race' ? (r.round ? PD.raceLink(ry, r.round, 'Race R' + r.round) : 'Race') : 'Season'; } },
-    { key: 'a', label: 'A', sticky: true, fmt: function (v) { return PD.driverLink(v); } },
-    { key: 'b', label: 'B', fmt: function (v) { return PD.driverLink(v); } },
-    { key: 'p_a', label: 'Market P(A ahead)', num: true, fmt: function (v) { return PD.pct(v); } },
-    { key: 'pm', label: 'Model', num: true, fmt: function (v) { return isNum(v) ? PD.pct(v) : '—'; } },
-    { key: 'edge', label: 'Edge on A', num: true, fmt: edgeHTML }
-  ], list.map(function (x) { var pm = isNum(x.model_a) ? x.model_a : isNum(x.model) ? x.model : null; return Object.assign({}, x, { pm: pm, edge: isNum(pm) && x.p_a ? pm / x.p_a - 1 : null }); }));
+  } else PD.set('od-cond', PD.muted('No conditional chances for this season.'));
 }
 
 // ── car v driver ──────────────────────────────────────────────────────────

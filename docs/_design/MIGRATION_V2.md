@@ -124,3 +124,22 @@ responsible-gambling links in the terms.
   must switch to `T.cat[1]`. Rink player charts were switched; grep each site for `T.market`.
 - **Kit files are copied, not linked.** After any kit change run `design_kit.py` for all nine sites and run the checker
   on each overview at least.
+
+## Metrics files
+
+Each site ships its sport's metrics spec (the machine-readable `docs/METRICS_SPEC.md`: peer groups, headline metric
+sets, minimums, year-to-year r, predictive r) next to the kit, copied by `scripts/design_kit.py` (commit 4e78840e):
+
+| Site | File (relative to the site root) | Source |
+|---|---|---|
+| Footballer `docs/site` | `assets/qk/metrics/football.json` | `docs/_design/metrics/football.json` |
+| Paddock `docs/paddock` | `assets/qk/metrics/f1.json` | `docs/_design/metrics/f1.json` |
+| Hardwood `docs/hardwood` | `assets/qk/metrics/basketball.json` | `docs/_design/metrics/basketball.json` |
+| Ace `docs/ace` | `assets/qk/metrics/tennis.json` | `docs/_design/metrics/tennis.json` |
+| Bullpen `docs/bullpen` | `assets/qk/metrics/baseball.json` | `docs/_design/metrics/baseball.json` |
+| Gridiron `docs/gridiron` | `assets/qk/metrics/nfl.json` | `docs/_design/metrics/nfl.json` |
+| Rink `docs/rink` | `assets/qk/metrics/hockey.json` | `docs/_design/metrics/hockey.json` |
+| Campus `docs/campus` | `assets/qk/metrics/college.json` | `docs/_design/metrics/college.json` |
+
+Read it in the browser with a relative fetch, e.g. `fetch("assets/qk/metrics/hockey.json")`. Never edit a site's
+copy: edit `docs/_design/metrics/<sport>.json` and rerun `design_kit.py` for the site. The home page gets none.

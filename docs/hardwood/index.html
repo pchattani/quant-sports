@@ -5,18 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Quant Hardwood</title>
 <meta name="color-scheme" content="dark light">
-<meta name="theme-color" content="#07090c">
+<meta name="theme-color" content="#08090d">
 <meta property="og:site_name" content="The Quant Hardwood">
 <meta property="og:title" content="The Quant Hardwood">
-<meta property="og:description" content="The NBA and WNBA through a quant's lens: game, season and title forecasts against the market, team ratings with uncertainty, player impact and value, shot quality, win probability, trades and fantasy.">
+<meta property="og:description" content="A basketball analytics hub for the NBA and WNBA: our win chance for every game, playoff and title chances, team ratings with uncertainty, player impact and percentiles against their role, shot quality, trades and fantasy.">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary">
-<meta name="description" content="The NBA and WNBA through a quant's lens: game, season and title forecasts against the market, team ratings with uncertainty, player impact and value, shot quality, win probability, trades and fantasy.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ffb020'/%3E%3Cpath d='M6 23l7-9 5 4 8-11' stroke='%231a1203' stroke-width='3.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta name="description" content="A basketball analytics hub for the NBA and WNBA: our win chance for every game, playoff and title chances, team ratings with uncertainty, player impact and percentiles against their role, shot quality, trades and fantasy.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%239384ff'/%3E%3Cpath d='M6 23l7-9 5 4 8-11' stroke='%230c0820' stroke-width='3.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <script>try{var t=/[?&]theme=(light|dark)/.exec(location.search);t=t?t[1]:localStorage.getItem('qk-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="assets/base.css">
 <link rel="stylesheet" href="assets/hardwood.css">
 <link rel="stylesheet" href="assets/pages.css">
@@ -42,11 +42,11 @@
 
       <h5>1. Not betting, financial or professional advice</h5>
       <p>Everything on this site &mdash; game, series, season and title probabilities, projected margins and totals,
-      &ldquo;fair odds&rdquo;, win totals, award odds, ratings, player impact estimates, market comparisons and commentary
+      win totals, award chances, ratings, player impact estimates, market comparisons and commentary
       &mdash; is provided for <strong>information, education and entertainment only</strong>. None of it is betting,
       gambling, financial, investment or any other professional advice, and none of it is a recommendation to place any
-      wager or trade. Model probabilities carry no margin; they are not prices offered by anyone and cannot be bet on
-      here. The site does not accept bets, take payments or link to bookmakers for commercial gain.</p>
+      wager or trade. Model probabilities carry no margin; they are not odds offered by anyone, and no bets can be
+      placed here. The site does not accept bets, take payments or link to bookmakers for commercial gain.</p>
 
       <h5>2. Gambling responsibly</h5>
       <p>If you choose to gamble elsewhere, you do so entirely at your own risk and responsibility. Only gamble where
@@ -62,7 +62,7 @@
       things no model sees coming &mdash; late injury news, rest decisions, rotations, foul trouble, ejections and
       plain shooting variance &mdash; and the forecasts here are frequently wrong, sometimes by a wide margin. Past
       performance does not predict future results. Scores, box scores, play-by-play, shot locations, injury reports and
-      market prices may be delayed, incomplete, provisional, mislabelled or out of date, and pages can show errors. The
+      market numbers may be delayed, incomplete, provisional, mislabelled or out of date, and pages can show errors. The
       site and all content are provided <strong>&ldquo;as is&rdquo; and &ldquo;as available&rdquo;, without warranties of
       any kind</strong>, express or implied, including accuracy, completeness, timeliness, fitness for a particular
       purpose and non-infringement.</p>
@@ -83,7 +83,7 @@
 
       <h5>6. Data sources</h5>
       <p>Schedules, scores, box scores, play-by-play, shot locations, injury reports and ESPN&rsquo;s own win probability
-      come from ESPN&rsquo;s public site data; market prices from public prediction-market and sportsbook data where shown.
+      come from ESPN&rsquo;s public site data; market probabilities from public prediction-market and sportsbook data where shown.
       Those sources own their data and are not responsible for this site or its models. Statistics shown here are
       derived and transformed (possessions, lineups and on-floor intervals are reconstructed from play-by-play) and may
       differ from official statistics.</p>
@@ -111,7 +111,7 @@
 
 <div class="hw-legal">
   <div class="hw-legal-in">
-    <p>Schedules, scores, box scores, play-by-play, shot locations, injury reports and transactions from ESPN&rsquo;s public site data; market prices from public prediction markets and sportsbooks where shown. Possessions, lineups and on-floor intervals are reconstructed from play-by-play and may differ from official statistics.</p>
+    <p>Schedules, scores, box scores, play-by-play, shot locations, injury reports and transactions from ESPN&rsquo;s public site data; market probabilities from public prediction markets and sportsbooks where shown. Possessions, lineups and on-floor intervals are reconstructed from play-by-play and may differ from official statistics.</p>
     <p>For information and entertainment only &mdash; not betting, financial or professional advice. Probabilities are model estimates and can be wrong; no bets are offered. Unofficial: not affiliated with or endorsed by the NBA, the WNBA, any team, player, ESPN or bookmaker; no logos are used and names belong to their owners. 18+. Gamble responsibly. <a href="#/disclaimer">Disclaimer &amp; terms</a></p>
   </div>
 </div>
@@ -161,11 +161,13 @@
 <script src="assets/js/calibration.js"></script>
 <script src="assets/js/docs.js"></script>
 <script src="assets/js/hw-ui.js"></script>
+<script src="assets/js/hw-metrics.js"></script>
 <script src="assets/js/hw-overview.js"></script>
 <script src="assets/js/hw-games.js"></script>
 <script src="assets/js/hw-sections.js"></script>
 <script src="assets/js/hw-team.js"></script>
 <script src="assets/js/hw-player.js"></script>
+<script src="assets/js/hw-compare.js"></script>
 <script src="assets/js/hw-value.js"></script>
 <script src="assets/js/hw-fantasy.js"></script>
 <script>

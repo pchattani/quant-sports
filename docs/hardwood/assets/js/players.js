@@ -3,8 +3,8 @@
  *
  * Data: data/<L>/<S>/players.json (catalogue: values, league and position-pool
  * percentiles), data/<L>/players/<pid>.json (career, game log, shots, on/off, lineups,
- * clutch, projection, award odds, similar players), data/<L>/<S>/teams.json (team names
- * on lineups), data/<L>/<S>/awards.json (award odds when the career file has none). */
+ * clutch, projection, award chances, similar players), data/<L>/<S>/teams.json (team names
+ * on lineups), data/<L>/<S>/awards.json (award chances when the career file has none). */
 (function (HW) {
 'use strict';
 
@@ -183,7 +183,7 @@ function drawPlayer(el, L, S, pid, seasonRes, career, askedS) {
     fx.tile('Box impact', fx.signed(box, 1), 'box-score estimate of impact'),
     fx.tile('WPA', fx.signed(wpa, 2), fx.has(wpa) ? 'win probability added, season' : 'needs play-by-play'),
     fx.tile('Minutes', fx.num(mpg, 1) + ' <span class="hf-se">mpg</span>', (p.gp || 0) + ' games · ' + fx.num(p.min, 0) + ' min'),
-    fx.tile('Award odds', bestAward ? fx.pct(fx.pOf(awardsP[bestAward])) : '—', bestAward ? fx.esc(fx.awardName(bestAward, L)) + ' · <a href="#/' + L + '/awards">races →</a>' : 'not in a race')
+    fx.tile('Award chances', bestAward ? fx.pct(fx.pOf(awardsP[bestAward])) : '—', bestAward ? fx.esc(fx.awardName(bestAward, L)) + ' · <a href="#/' + L + '/awards">races →</a>' : 'not in a race')
   ].join('') + '</div>';
 
   h += '<div class="card"><div class="card-header">Percentiles <span class="card-sub">The whole catalogue, ' + metrics.length + ' metrics. League: against every qualified player. Position pool: only against ' + fx.esc(pool === 'G' ? 'guards' : pool === 'F' ? 'forwards' : pool === 'C' ? 'centres' : 'the same pool') + '.</span>' +
@@ -263,9 +263,8 @@ function drawPlayer(el, L, S, pid, seasonRes, career, askedS) {
 
   // Game log.
   if (log.length) {
-    fx.plot('pp-gs', [{ type: 'bar', x: log.map((r, i) => i + 1), y: log.map(r => r.game_score), text: log.map(r => fx.fmtDate(r.date, { year: false }) + ' ' + (r.home ? 'v ' : '@ ') + fx.teamAbbr(L, r.opp) + ': ' + (r.pts || 0) + ' pts, +/- ' + fx.signed(r.pm, 0)),
-      textposition: 'none', marker: { color: log.map(r => (r.pm > 0 ? C.green : r.pm < 0 ? C.red : C.text3)) }, hovertemplate: '%{text}<br>game score %{y:.1f}<extra></extra>' }],
-    fx.layout({ margin: { l: 40, r: 10, t: 10, b: 30 }, xaxis: { title: 'Game', dtick: log.length > 40 ? 10 : 5 }, yaxis: { title: 'Game score' }, bargap: 0.15 }));
+    QKC.bar('#pp-gs', { cats: log.map((r, i) => String(i + 1)), series: [{ name: 'Game score', data: log.map(r => r.game_score) }], colors: log.map(r => (r.pm > 0 ? C.green : r.pm < 0 ? C.red : C.text3)),
+      fmt: v => fx.num(v, 1), catName: 'Game of the season', valName: 'Game score (green: his team won his minutes)', label: 'Game score, game by game' });
     document.getElementById('pp-log').innerHTML = HW.tableHTML([{ label: 'Date' }, { label: 'Opp' }, { label: 'Min', align: 'right' }, { label: 'Pts', align: 'right' }, { label: 'Reb', align: 'right' }, { label: 'Ast', align: 'right' }, { label: 'Stl', align: 'right' }, { label: 'Blk', align: 'right' }, { label: 'TO', align: 'right' },
       { label: 'FG', align: 'right' }, { label: '3P', align: 'right' }, { label: 'FT', align: 'right' }, { label: '+/-', align: 'right' }, { label: 'GmSc', align: 'right' }, { label: 'WPA', align: 'right' }],
       log.slice().reverse().map(r => ({ _href: r.game ? fx.gameHref(L, r.game) : undefined, cells: [{ v: r.date, html: fx.fmtDate(r.date, { year: false }) }, { v: fx.teamAbbr(L, r.opp), html: (r.home ? 'v ' : '@ ') + fx.teamLink(L, r.opp, { abbr: true }) },
@@ -303,13 +302,10 @@ function drawCareer(L, pid, career) {
   HW.sortable(host);
   const asc = seasons.slice().reverse().filter(s => fx.isNum(s.hpm));
   if (asc.length) {
-    const x = asc.map(s => s.season);
-    fx.plot('pp-hpm-path', [
-      { type: 'scatter', mode: 'lines+markers', name: 'HPM', x: x, y: asc.map(s => s.hpm), line: { color: C.blue, width: 2.5 }, marker: { size: 7 }, hovertemplate: '%{x}: HPM %{y:+.1f}<extra></extra>' },
-      { type: 'scatter', mode: 'lines', name: 'Offence', x: x, y: asc.map(s => s.o), line: { color: C.green, width: 1.4, dash: 'dot' }, hovertemplate: '%{x}: O %{y:+.1f}<extra></extra>' },
-      { type: 'scatter', mode: 'lines', name: 'Defence', x: x, y: asc.map(s => s.d), line: { color: C.orange, width: 1.4, dash: 'dot' }, hovertemplate: '%{x}: D %{y:+.1f}<extra></extra>' }
-    ].concat(asc.some(s => fx.isNum(s.rapm)) ? [{ type: 'scatter', mode: 'markers', name: 'RAPM', x: x, y: asc.map(s => s.rapm), marker: { color: C.purple, size: 7, symbol: 'diamond' }, hovertemplate: '%{x}: RAPM %{y:+.1f}<extra></extra>' }] : []),
-    fx.layout({ showlegend: true, legend: { orientation: 'h', y: 1.12, font: { color: C.text2 } }, margin: { l: 45, r: 10, t: 30, b: 40 }, xaxis: { title: 'Season', tickformat: 'd', dtick: asc.length > 10 ? 2 : 1 }, yaxis: { title: 'Per 100 possessions', zeroline: true, zerolinecolor: '#6e7681' } }));
+    const sx = (k) => asc.filter(s => fx.isNum(s[k])).map(s => [s.season, s[k]]);
+    QKC.line('#pp-hpm-path', { xType: 'value', series: [{ name: 'HPM', color: C.blue, width: 2.5, symbols: true, data: sx('hpm') }, { name: 'Offence', color: C.green, width: 1.4, dash: true, data: sx('o') }, { name: 'Defence', color: QKC.tokens().cat[1], width: 1.4, dash: true, data: sx('d') }]
+      .concat(asc.some(s => fx.isNum(s.rapm)) ? [{ name: 'RAPM', color: C.purple, width: 1.2, symbols: true, data: sx('rapm') }] : []),
+      xName: 'Season', yName: 'Impact (points per 100 possessions)', xFmt: v => String(Math.round(v)), yFmt: v => fx.signed(v, 1), ref: { y: 0 }, label: 'Impact by season' });
   } else document.getElementById('pp-hpm-path').innerHTML = fx.muted('No HPM history.');
   const sim = career.similar || [];
   document.getElementById('pp-similar').innerHTML = sim.length ? '<div class="hf-similar">' + sim.map(s => '<a class="hf-sim" href="' + fx.playerHref(L, s.id) + '"><strong>' + fx.esc(s.name || fx.playerName(L, s.id)) + '</strong><span>' + fx.esc(fx.seasonLabel(L, s.season)) + ' · distance ' + fx.num(s.distance, 2) + '</span></a>').join('') + '</div>' : fx.muted('No similar players computed.');

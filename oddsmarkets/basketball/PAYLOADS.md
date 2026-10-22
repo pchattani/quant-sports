@@ -113,6 +113,10 @@ Values with fmt "pct" are **0-1 fractions** (0.573 = 57.3 %), "prob" likewise (4
 qualified players); also `"groups"`, `"n_qualified"`, `"league_ts"`, `"has_pbp"`. `pct` (league) and `pct_pool` place every player
 against the qualified players (100 = best, direction-aware); `rank` is set for qualified players only. Season stats are regular-season
 only (the NBA Cup final does not count). `age` is null where ESPN gives no date of birth.
+Role peer groups (22 Oct 2026, docs/_design/metrics/basketball.json): each row also carries `"role"` G | W | B (guards, wings,
+bigs; `value.classify_roles`, the same rule and values as value.json) and `"pct_role": {key: 0-100}` against the qualified
+players of that role for `players.ROLE_PCT_KEYS` (the spec's headline and secondary metrics); the catalogue adds
+`"roles": {"G"|"W"|"B": {"label","n"}}` and `"role_rule": {"threshold","features"}`.
 
 `players/<pid>.json` (per league, not per season: `data/<L>/players/<pid>.json`)
 ```

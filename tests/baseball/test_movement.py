@@ -134,3 +134,11 @@ def test_published_flags_follow_the_rule():
     pub = MV.published(res)
     assert pub == {"next": True, "deadline": False, "type": True, "arrivals": True, "targets": True}
     assert "calibration rule" in MV.reason(bad["test_eval"])
+
+
+def test_inseason_gap_leaves_out_the_unsettled_season():
+    df = _synthetic()
+    df.loc[df["season"] == 2016, "y"] = 1.0                 # the season before: unsettled at an in-season snapshot
+    r = MV.wf_binary(df, "y", ["x"], [], [2017], 1.0, gap=1)
+    assert abs(r["p0"].iloc[0] - df.loc[df["season"] < 2016, "y"].mean()) < 1e-12
+    assert MV.gap_of(BM.CFG, "inseason") == 1 and MV.gap_of(BM.CFG, "offseason") == 0

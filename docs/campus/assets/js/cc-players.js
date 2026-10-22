@@ -1,11 +1,69 @@
-/* The Quant Campus — Players (#/<L>/players) and the player page (#/<L>/player/<pid>).
- * Catalogue: every player with the payload's metrics and percentiles (all players or within the position),
- * position chips, team search, the qualified-only floor. Player page: season-by-season, this season's game log with a
- * value-per-game chart, percentile bars, value row, inferred moves and similar players.
- * Reads <L>/<S>/players.json, <L>/players/<pid>.json (career). */
+/* The Quant Campus — Players (#/<L>/players) and the player page (#/<L>/player/<pid>), Design System 2.0.
+ * Catalogue: a leaderboard with heat cells on the percentile against the position group (the payload's position
+ * pools; or all qualified players), position chips, search and the qualified-only floor.
+ * Player page: player card header (team band), stat tiles (our value first, with its percentile), a Savant-style
+ * percentile card against his position group with the sample and the floor named, where he sits in the position's
+ * distribution, this season game by game, season by season, who moves next (movement.json, when published), inferred
+ * moves and similar players.
+ * Percentiles: the payload's pct_pos (position pool) and pct (all qualified). Where a payload carries none (basketball
+ * catalogues are compact), they are computed here from the same catalogue: qualified players at his position, the
+ * payload's own floor (min_floor), lower-is-better metrics flipped.
+ * Reads <L>/<S>/players.json, <L>/players/<pid>.json (career), then <L>/<S>/movement.json (lazy). */
 (function (CC) {
 'use strict';
 var U = CC.ui, esc = CC.esc, isNum = CC.isNum;
+
+/* Percentiles within the position pool when the payload has none: the share of qualified peers at or below, 0-100. */
+function fillPct(cat) {
+  var P = cat.players || {}, ids = Object.keys(P), mets = cat.metrics || [];
+  var any = ids.some(function (k) { var x = P[k]; return x && x.pct_pos && Object.keys(x.pct_pos).length; });
+  if (any || !ids.length) return false;
+  var byPos = {};
+  ids.forEach(function (k) { var x = P[k]; if (x && x.qualified !== false && x.pos) (byPos[x.pos] = byPos[x.pos] || []).push(x); });
+  mets.forEach(function (m) {
+    Object.keys(byPos).forEach(function (ps) {
+      var vals = byPos[ps].map(function (x) { return (x.values || {})[m.key]; }).filter(isNum).sort(function (a, b) { return a - b; });
+      if (vals.length < 10) return;
+      byPos[ps].forEach(function (x) {
+        var v = (x.values || {})[m.key];
+        if (!isNum(v)) return;
+        var lo = 0, hi = vals.length;
+        while (lo < hi) { var mid = (lo + hi) >> 1; if (vals[mid] <= v) lo = mid + 1; else hi = mid; }
+        var p = 100 * (lo - 0.5) / vals.length;
+        x.pct_pos = x.pct_pos || {};
+        x.pct_pos[m.key] = Math.round(m.lower ? 100 - p : p);
+      });
+    });
+  });
+  return true;
+}
+/* Catalogue hygiene before any percentile is shown: ESPN team rows (negative ids, name "Team") are not players, and
+ * a lower-is-better metric whose published percentile rises with the value (cfb pass_int ranks ascending today) is
+ * turned round so 100 is always best. The check is on the data, so a fixed payload is left as it is. */
+function clean(cat) {
+  if (!cat || cat._clean) return;
+  cat._clean = true;
+  var P = cat.players || {};
+  Object.keys(P).forEach(function (k) { var nm = String((P[k] || {}).name || '').trim(); if (!nm || /^team$/i.test(nm) || Number(k) < 0) delete P[k]; });
+  (cat.metrics || []).filter(function (m) { return m.lower; }).forEach(function (m) {
+    ['pct', 'pct_pos'].forEach(function (pk) {
+      var xs = [], ys = [];
+      Object.keys(P).forEach(function (k) { var x = P[k], v = (x.values || {})[m.key], q = (x[pk] || {})[m.key]; if (isNum(v) && isNum(q)) { xs.push(v); ys.push(q); } });
+      if (xs.length < 20) return;
+      var mx = xs.reduce(function (a0, b0) { return a0 + b0; }, 0) / xs.length, my = ys.reduce(function (a0, b0) { return a0 + b0; }, 0) / ys.length, c = 0;
+      for (var i = 0; i < xs.length; i++) c += (xs[i] - mx) * (ys[i] - my);
+      if (c > 0) Object.keys(P).forEach(function (k) { var q = P[k][pk]; if (q && isNum(q[m.key])) q[m.key] = 100 - q[m.key]; });
+    });
+  });
+}
+/* The qualifying floor in words, from the payload's min_floor. */
+function floorText(L, cat, pos) {
+  var f = (cat && cat.min_floor) || {};
+  if (f.games && isNum(f.games[pos])) return f.games[pos] + '+ games';
+  if (isNum(f.gp)) return f.gp + '+ games' + (isNum(f.mpg) ? ', ' + f.mpg + '+ min a game' : '');
+  return '';
+}
+function posLabel(cat, pos) { var x = ((cat && cat.positions) || {})[pos]; return x && x.label ? x.label : pos; }
 
 CC.route('players', function (el, p) {
   var L = p.L, S = p.S, fb = CC.fb(L), q0 = p.query || {};
@@ -13,18 +71,22 @@ CC.route('players', function (el, p) {
   return Promise.all([CC.load(CC.path(L, S, 'players.json')), CC.season(L, S)]).then(function (a) {
     if (!U.alive(el)) return;
     var cat = a[0];
-    if (!CC.ok(cat) || !Object.keys(cat.players || {}).length) { el.innerHTML = U.head('Players', '', U.kicker(L, S)) + (CC.ok(cat) ? QK.empty('No player stats yet', 'Player numbers appear once games have been played this season. Try last season with the season picker.') : U.missing('The player catalogue', cat)); return; }
+    if (!CC.ok(cat) || !Object.keys(cat.players || {}).length) {
+      el.innerHTML = U.head('Players', '', U.kicker(L, S)) + (CC.ok(cat) ? QK.empty('No player numbers yet', 'They appear once games have been played this season. Pick last season in the season menu above.') : U.missing('The player catalogue', cat));
+      return;
+    }
+    clean(cat);
     CC.addPlayers(L, cat.players);
-    Object.keys(cat.players).forEach(function (k) { var nm = String(cat.players[k].name || '').trim(); if (!nm || nm === 'Team' || nm === 'TEAM') delete cat.players[k]; });
+    var computed = fillPct(cat);
     var mets = (cat.metrics || []).slice(0, 9), P = cat.players, ids = Object.keys(P);
     var pos = Object.keys(cat.positions || {}).sort(function (x, y) { return ((cat.positions[y] || {}).n || 0) - ((cat.positions[x] || {}).n || 0); });
-    var st = { pos: q0.pos || 'all', q: '', qual: true, within: false, sort: mets[0] ? mets[0].key : null };
-    el.innerHTML = U.head('Players', 'Season numbers with percentiles against qualified players (or within the position). ' + esc(Object.keys(P).length + ' players') + '.', U.kicker(L, S)) +
+    var st = { pos: q0.pos || 'all', q: '', qual: true, within: true, sort: mets[0] ? mets[0].key : null };
+    el.innerHTML = U.head('Players', 'Season numbers, each cell coloured by its percentile against qualified players at the same position (blue low, red high; flipped where lower is better). ' + esc(QK.fmt.num(ids.length) + ' players') + '.', U.kicker(L, S)) +
       '<div class="cc-toolbar"><input class="qk-input" type="search" id="pl-q" placeholder="Find a player or team" aria-label="Find a player or team">' +
-      '<label class="cc-check"><input type="checkbox" id="pl-qual" checked> Qualified only</label><label class="cc-check"><input type="checkbox" id="pl-within"> Percentiles within position</label></div>' +
+      '<label class="cc-check"><input type="checkbox" id="pl-qual" checked> Qualified only</label><label class="cc-check"><input type="checkbox" id="pl-within" checked> Percentiles within the position</label></div>' +
       '<div class="qk-chips scroll cc-filters" id="pl-pos" role="group" aria-label="Position">' + ['all'].concat(pos).map(function (k) {
-        return '<button type="button" class="qk-chip" style="--ca:var(--accent)" data-value="' + esc(k) + '" aria-pressed="' + (k === st.pos) + '">' + esc(k === 'all' ? 'All' : ((cat.positions[k] || {}).label || k)) + (k !== 'all' ? ' <span class="n">' + ((cat.positions[k] || {}).n || '') + '</span>' : '') + '</button>'; }).join('') + '</div>' +
-      '<div id="pl-table"></div>';
+        return '<button type="button" class="qk-chip" style="--ca:var(--signal)" data-value="' + esc(k) + '" aria-pressed="' + (k === st.pos) + '">' + esc(k === 'all' ? 'All' : posLabel(cat, k)) + (k !== 'all' ? ' <span class="n">' + ((cat.positions[k] || {}).n || '') + '</span>' : '') + '</button>'; }).join('') + '</div>' +
+      U.card('', '', '<div class="cc-lbh" id="pl-n"></div>' + U.lb('pl-table'), { flush: true });
     function paint() {
       var q = st.q.toLowerCase();
       var rs = ids.filter(function (k) {
@@ -37,15 +99,18 @@ CC.route('players', function (el, p) {
       var k0 = st.sort;
       rs.sort(function (x, y) { var vx = (P[x].values || {})[k0], vy = (P[y].values || {})[k0]; return (isNum(vy) ? vy : -1e9) - (isNum(vx) ? vx : -1e9); });
       var shown = rs.slice(0, 400);
-      var cols = ['Player', 'Team', 'Pos', 'Class', { label: 'GP', align: 'right' }].concat(mets.map(function (m) { return { label: m.label, align: 'right', title: m.desc || '' }; }));
-      QK.$('#pl-table', el).innerHTML = U.card(rs.length + ' players', rs.length > shown.length ? 'Showing the top 400 by ' + esc((mets[0] || {}).label || 'value') + '; search to find anyone.' : '', U.table(cols, shown.map(function (k) {
+      var peer = st.within ? (st.pos === 'all' ? 'his position' : posLabel(cat, st.pos).toLowerCase()) : 'all qualified players';
+      QK.$('#pl-n', el).innerHTML = '<b>' + esc(QK.fmt.num(rs.length)) + ' players</b> · percentiles v ' + esc(peer) + (computed ? ' (computed from this catalogue)' : '') + (rs.length > shown.length ? ' · showing the top 400 by ' + esc((mets[0] || {}).label || 'value') + '; search to find anyone' : '');
+      var rows = shown.map(function (k) {
         var x = P[k], pc = st.within ? (x.pct_pos || {}) : (x.pct || {});
-        return { cells: [{ html: '<a href="' + esc(CC.playerHref(L, k, S)) + '">' + esc(x.name) + '</a>', v: x.name }, { html: U.teamEnt(L, x.team, { season: S, abbr: true }), v: CC.tname(L, x.team) }, esc(x.pos || '—'), esc(x['class'] || '—'), isNum(x.gp) ? x.gp : '—'].concat(mets.map(function (m) {
-          var v = (x.values || {})[m.key];
-          return { v: isNum(v) ? v : null, html: '<span class="cc-num">' + CC.fmtMetric(m, v) + '</span>' + (isNum(pc[m.key]) ? QK.pctlChip(pc[m.key]) : '') };
-        })), _href: CC.playerHref(L, k, S) };
-      }), { maxHeight: 760 }));
-      U.wire(QK.$('#pl-table', el));
+        var o = { id: k, name: x.name, team: x.team, sub: [CC.tabbr(L, x.team), x.pos, x['class']].filter(Boolean).join(' · '), gp: x.gp };
+        mets.forEach(function (m) { o[m.key] = (x.values || {})[m.key]; o['p_' + m.key] = pc[m.key]; });
+        return o;
+      });
+      QK.leaderboard(QK.$('#pl-table', el), { dense: true, maxHeight: 760, rowHref: function (r) { return CC.playerHref(L, r.id, S); }, columns: [
+        { key: 'name', label: 'Player', type: 'entity', sub: 'sub', mark: function (r) { return U.mark(L, r.team); }, href: function (r) { return CC.playerHref(L, r.id, S); } },
+        { key: 'gp', label: 'GP', num: true }
+      ].concat(mets.map(function (m) { return { key: m.key, label: m.label, type: 'pctl', pctl: 'p_' + m.key, tip: (m.desc || m.label) + (m.lower ? ' (lower is better; the colour is flipped)' : ''), fmt: function (v) { return CC.fmtMetric(m, v); } }; })), rows: rows });
     }
     QK.$('#pl-q', el).addEventListener('input', function (e) { st.q = e.target.value || ''; paint(); });
     QK.$('#pl-qual', el).addEventListener('change', function (e) { st.qual = e.target.checked; paint(); });
@@ -79,79 +144,137 @@ function flat(r) {
   });
   return o;
 }
+/* Headline numbers by position for the card header. */
+var HEAD = {
+  QB: [['pass_yds', 'Pass yds'], ['pass_td', 'Pass TD'], ['rush_yds', 'Rush yds']], RB: [['rush_yds', 'Rush yds'], ['rush_td', 'Rush TD'], ['rec_yds', 'Rec yds']],
+  WR: [['rec', 'Rec'], ['rec_yds', 'Rec yds'], ['rec_td', 'Rec TD']], TE: [['rec', 'Rec'], ['rec_yds', 'Rec yds'], ['rec_td', 'Rec TD']],
+  DL: [['tkl', 'Tackles'], ['tfl', 'TFL'], ['sacks', 'Sacks']], LB: [['tkl', 'Tackles'], ['tfl', 'TFL'], ['sacks', 'Sacks']], DB: [['tkl', 'Tackles'], ['pd', 'PD'], ['def_int', 'INT']],
+  bb: [['pts', 'PTS'], ['reb', 'REB'], ['ast', 'AST']]
+};
+
+/* Who moves next: the player-page Movement card (MOVES_VIEWS.md, college), from movement.json when published. */
+function movementCard(L, S, pid, team, node) {
+  if (!node || !team || !CC.isCur(L, S)) return;
+  /* the team page says whether the movement payload is published (its `movement` key), so nothing is fetched before */
+  CC.load(CC.path(L, S, 'teams/' + team + '.json')).then(function (tp) {
+    if (!CC.ok(tp) || !tp.movement) return null;
+    return CC.load(CC.path(L, S, 'movement.json'));
+  }).then(function (mvj) {
+    if (!mvj || !U.alive(node) || !CC.ok(mvj)) return;
+    var me = ((mvj.players || []).filter ? (mvj.players || []).filter(function (x) { return String(x.id) === String(pid); })[0] : null);
+    if (!me || !isNum(me.p)) return;
+    var meta = mvj.meta || {}, nx = meta.next_season ? CC.seasonLabel(L, meta.next_season) : 'next season';
+    var pt = isNum(me.p_transfer) ? me.p_transfer : 0, pg = isNum(me.p_gone) ? me.p_gone : Math.max(0, me.p - pt);
+    var ctx = [isNum(me.exp) ? (me.exp >= 4 ? '4+' : me.exp) + ' earlier season' + (me.exp === 1 ? '' : 's') + ' in our box scores' : '', me['class'] ? 'class: ' + me['class'] : '', me.new_in ? 'transferred in this season' : ''].filter(Boolean).join(' · ');
+    node.innerHTML = U.card('Movement: before ' + nx, QK.tag('Inferred from box scores, not the official transfer portal'),
+      U.stats([{ label: 'Chance of leaving', value: CC.pct(me.p), signal: true, sub: ctx, tip: 'Our chance he is not with this team next season: an inferred transfer or no box-score line. ' + (meta.method ? String(meta.method).slice(0, 220) : '') }]) +
+      '<div class="cc-split" role="img" aria-label="' + esc('Transfer ' + CC.pct(pt) + ', no line next season ' + CC.pct(pg)) + '"><span style="flex:' + pt + ';background:var(--signal)"></span><span style="flex:' + pg + ';background:var(--c-3)"></span><span style="flex:' + Math.max(0, 1 - pt - pg) + '"></span></div>' +
+      QK.keys([{ name: 'Transfer ' + CC.pct(pt), color: 'var(--signal)', kind: 'dot' }, { name: 'No box-score line next season ' + CC.pct(pg) + ' (graduation, the pros, a lower division, injury or not playing)', color: 'var(--c-3)', kind: 'dot' }]));
+  });
+}
 
 CC.route('player', function (el, p) {
   var L = p.L, S = p.S, pid = p.id, fb = CC.fb(L);
-  el.innerHTML = QK.skeleton('lines', 8);
+  el.innerHTML = QK.skeleton('card', 1) + QK.skeleton('lines', 6);
   return Promise.all([CC.load(CC.lpath(L, 'players/' + pid + '.json')), CC.load(CC.path(L, S, 'players.json')), CC.season(L, S)]).then(function (a) {
     if (!U.alive(el)) return;
     var d = CC.ok(a[0]) ? a[0] : null, cat = CC.ok(a[1]) ? a[1] : null;
+    if (cat) { clean(cat); fillPct(cat); }
     var cp = cat && cat.players ? cat.players[pid] : null;
     if (!d && !cp) { el.innerHTML = U.head('Player', '', U.kicker(L, S)) + QK.empty('Player not found', 'No career file for this player (careers are kept for players with a game in the last two seasons).'); return; }
     var cur = (d && d.current) || {};
     var team = cur.team || (cp && cp.team) || null;
     var t = team ? CC.team(L, team) : null;
     var name = (d && d.name) || (cp && cp.name) || ('Player ' + pid);
+    var pos = (cp && cp.pos) || (d && d.pos) || '';
     var hgt = d && isNum(d.height_in) ? Math.floor(d.height_in / 12) + '′' + (d.height_in % 12) + '″' : null;
-    var meta = [(d && d.pos) || (cp && cp.pos), (d && d['class']) || (cp && cp['class']), hgt, d && isNum(d.weight_lb) ? d.weight_lb + ' lb' : null, d && d.hometown ? d.hometown : null].filter(Boolean);
     var vr = cur.value || null;
-    var html = '<section class="qk-hero cc-hero"' + (t && QK.color.parse(t.colour) ? ' style="--tc:' + esc(t.colour) + '"' : '') + '><div class="qk-hero-in"><span class="qk-avatar cc-avatar" aria-hidden="true">' + esc(QK.fmt.initials(name)) + '</span><div class="cc-hero-id"><div class="qk-kicker">' + esc(CC.LNAME[L]) + '</div><h1>' + esc(name) + '</h1>' +
-      '<div class="qk-hero-meta">' + (team ? '<span>' + U.teamEnt(L, team, { season: cur.season || S }) + '</span>' : '') + meta.map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('') + '</div></div>' +
-      (vr ? '<div class="qk-hero-stats"><div class="qk-hero-stat"><div class="v">' + CC.f(vr.value, fb ? 1 : 2) + '</div><div class="l">' + (fb ? 'EPA above repl.' : 'Value') + '</div></div><div class="qk-hero-stat"><div class="v">' + (isNum(vr.pctl) ? Math.round(vr.pctl) : '—') + '</div><div class="l">Percentile</div></div><div class="qk-hero-stat"><div class="v">' + (isNum(vr.gp) ? vr.gp : '—') + '</div><div class="l">Games</div></div></div>' : '') + '</div></section>';
-    if (vr && vr.why) html += '<p class="cc-note">' + esc(vr.why) + '</p>';
-    if (!d) {
-      html += '<p class="cc-note">Career pages are kept for players with a game in the last two seasons; this season’s catalogue numbers are shown.</p>';
-      if (cp && cat.metrics) html += U.card(CC.seasonLabel(L, S) + ' season', (isNum(cp.gp) ? cp.gp + ' games' : '') + (cp.qualified === false ? ' · below the qualifying floor' : ''),
-        U.table(['Stat', { label: 'Value', align: 'right' }, { label: 'Pctl', align: 'right' }], cat.metrics.filter(function (m) { return isNum((cp.values || {})[m.key]); }).map(function (m) {
-          var pc = (cp.pct || {})[m.key];
-          return [{ html: esc(m.label) + (m.desc ? ' <span class="qk-muted">' + esc(m.desc) + '</span>' : ''), v: m.label }, { v: cp.values[m.key], html: CC.fmtMetric(m, cp.values[m.key]) }, isNum(pc) ? { v: pc, html: QK.pctlChip(pc) } : '—'];
-        }), { sticky: false }));
-    }
-    // percentiles from the catalogue
-    var hasPct = cp && cp.pct && Object.keys(cp.pct).length;
-    if (cp && cat.metrics && hasPct) {
-      var bars = cat.metrics.filter(function (m) { return isNum((cp.pct || {})[m.key]); }).map(function (m) { return { label: m.label, pctl: cp.pct[m.key], value: CC.fmtMetric(m, (cp.values || {})[m.key]) }; });
-      var barsPos = cat.metrics.filter(function (m) { return isNum((cp.pct_pos || {})[m.key]); }).map(function (m) { return { label: m.label, pctl: cp.pct_pos[m.key], value: CC.fmtMetric(m, (cp.values || {})[m.key]) }; });
-      html += '<div class="qk-grid cc-grid"><div class="qk-span-6">' + U.card('Percentiles', 'Against qualified players' + (cp.qualified === false ? ' (below the qualifying floor: read with care)' : '') + '.', bars.length ? QK.pctlBars(bars) : QK.empty('No percentiles', '')) + '</div>' +
-        '<div class="qk-span-6">' + U.card('Within the position', esc(cp.pos || ''), barsPos.length ? QK.pctlBars(barsPos) : QK.empty('No position percentiles', '')) + '</div></div>';
-    }
+    var vals = (cp && cp.values) || {}, pp = (cp && (cp.pct_pos || cp.pct)) || {};
+    document.title = name + ' · The Quant Campus';
+    var hstats = (fb ? (HEAD[pos] || []) : HEAD.bb).filter(function (h0) { return isNum(vals[h0[0]]); }).map(function (h0) { return { label: h0[1], value: fb ? fmtInt(vals[h0[0]]) : CC.f(vals[h0[0]], 1) }; });
+    if (cp && isNum(cp.gp)) hstats.unshift({ label: 'GP', value: String(cp.gp) });
+    var html = '<div class="qk-kicker" style="margin-bottom:10px"><a href="' + esc(CC.href(L, 'players', null, S)) + '">← Players</a></div>' +
+      QK.playerHeader({ name: name, pos: posLabel(cat, pos) || pos, kicker: CC.LNAME[L] + ' · ' + CC.seasonLabel(L, cur.season || S),
+        team: t ? { name: t.short || t.name, abbr: t.abbr, colour: t.colour, href: CC.teamHref(L, team, cur.season || S) } : null,
+        meta: [(d && d['class']) || (cp && cp['class']) ? ['Class', (d && d['class']) || cp['class']] : null, hgt ? ['Height', hgt + (d && isNum(d.weight_lb) ? ' · ' + d.weight_lb + ' lb' : '')] : null, d && d.hometown ? ['From', d.hometown] : null],
+        stats: hstats.slice(0, 4), tags: cp && cp.qualified !== false ? [QK.tag('Qualified for percentiles', 'signal')] : [] });
+    // stat tiles: ours first
+    var k = [];
+    if (vr) k.push({ label: fb ? 'Value (EPA above replacement)' : 'Value above replacement', value: CC.f(vr.value, fb ? 1 : 1), signal: true, pctl: isNum(pp.value) ? pp.value : (isNum(vr.pctl) ? vr.pctl : null), sub: isNum(vr.gp) ? vr.gp + ' games · ' + CC.f(vr.value_pg, 2) + ' a game' : '', tip: 'Our value model this season; the chip is the percentile against his position' });
+    if (isNum(vals.epa_play)) k.push({ label: 'EPA per play', value: CC.signed(vals.epa_play, 3), pctl: pp.epa_play, sub: 'expected points added per credited play' });
+    if (!fb && isNum(vals.ts)) k.push({ label: 'True shooting', value: CC.pct(vals.ts, 1), pctl: pp.ts, sub: 'points per shooting chance' });
+    if (!fb && isNum(vals.r)) k.push({ label: 'Rating per 100', value: CC.signed(vals.r, 1), pctl: pp.r, sub: 'his on-court margin per 100 possessions v average' });
+    if (vr && isNum(vr.pctl)) k.push({ label: 'Value percentile', value: QK.ordinal(vr.pctl), text: true, sub: 'against every qualified player' });
+    if (cur.fantasy && isNum(cur.fantasy.proj)) k.push({ label: 'Fantasy projection', value: CC.f(cur.fantasy.proj, 1), sub: 'points next ' + (fb ? 'week' : 'period') });
+    html += '<div style="margin-top:var(--sp-4)">' + (k.length ? U.stats(k) : '') + '</div>';
+    if (vr && vr.why) html += '<p class="cc-note"><b>Why:</b> ' + esc(vr.why) + '</p>';
+    // percentile card + where he sits
+    var mets = (cat && cat.metrics) || [];
+    var fl = floorText(L, cat, pos);
+    var peerN = cat ? Object.keys(cat.players).filter(function (k0) { var x = cat.players[k0]; return x && x.pos === pos && x.qualified !== false; }).length : 0;
+    var rowsPc = mets.filter(function (m) { return isNum(pp[m.key]); }).map(function (m) { return { label: m.label, pctl: pp[m.key], value: CC.fmtMetric(m, vals[m.key]), tip: (m.desc || '') + (m.lower ? ' Lower is better; the bar is flipped.' : '') }; });
+    var vk = rowsPc.slice(0, 7), ok2 = rowsPc.slice(7);
+    var pcard = QK.pctCard({ title: 'Percentile rankings', peer: (posLabel(cat, pos) || 'his position') + (fl ? ', ' + fl : ''), sample: (cp && isNum(cp.gp) ? cp.gp + ' games' : '') + (peerN ? ' · ' + peerN + ' qualified peers' : '') + ' · ' + CC.seasonLabel(L, S),
+      groups: [{ label: 'Value and efficiency', rows: vk }, { label: 'Production', rows: ok2 }],
+      note: cp && cp.qualified === false ? 'He is below the qualifying floor: read these as early.' : '', emptyText: cp ? 'No percentiles for this season yet.' : 'No current-season profile yet.' });
+    html += '<div class="qk-grid cc-grid"><div class="qk-span-5">' + pcard + '</div><div class="qk-span-7"><div class="qk-stack">' +
+      (cp && peerN >= 10 ? U.card('Where he sits', 'Every qualified ' + esc((posLabel(cat, pos) || 'player').toLowerCase()) + ' this season, coloured by percentile', '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('pp-dist', 240, 'Distribution of the position group')) : '') +
+      '<div id="pp-log-card"></div><div id="pp-move"></div></div></div></div>';
+    if (!d) html += '<p class="cc-note">Career pages are kept for players with a game in the last two seasons; this season’s catalogue numbers are shown.</p>';
     var log = cur.log || [];
+    var vkLog = null, LOGK = { value: 'Value', epa: 'EPA', pts: 'Points', pass_yds: 'Passing yards', rush_yds: 'Rushing yards', rec_yds: 'Receiving yards', tkl: 'Tackles', sacks: 'Sacks', fgm: 'Field goals' }, lk = [];
     if (log.length) {
-      var lk = [];
-      log.forEach(function (g) { Object.keys(g).forEach(function (k) { if (lk.indexOf(k) < 0 && ['game', 'date', 'opp', 'home', 'res'].indexOf(k) < 0 && isNum(g[k])) lk.push(k); }); });
+      log.forEach(function (g) { Object.keys(g).forEach(function (k2) { if (lk.indexOf(k2) < 0 && ['game', 'date', 'opp', 'home', 'res'].indexOf(k2) < 0 && isNum(g[k2])) lk.push(k2); }); });
       lk = lk.slice(0, 10);
-      var LOGK = { value: 'Value', epa: 'EPA', pts: 'Points', pass_yds: 'Passing yards', rush_yds: 'Rushing yards', rec_yds: 'Receiving yards', tkl: 'Tackles', sacks: 'Sacks', fgm: 'Field goals' };
-      var tot = function (k) { return log.reduce(function (a, g) { return a + (isNum(g[k]) ? Math.abs(g[k]) : 0); }, 0); };
-      var vk = ['value', 'epa', 'pts', 'pass_yds', 'rush_yds', 'rec_yds', 'tkl', 'sacks', 'fgm'].filter(function (k) { return lk.indexOf(k) >= 0 && tot(k) > 0; })[0] || null;
-      html += '<div class="qk-grid cc-grid"><div class="qk-span-5">' + U.card(vk ? LOGK[vk] + ' game by game' : 'Game by game', CC.seasonLabel(L, cur.season || S), vk ? U.chart('pp-log', 240, (LOGK[vk] || vk) + ' per game this season') : QK.empty('No per-game numbers', '')) + '</div><div class="qk-span-7">' +
-        U.card('Game log', '', U.table(['Date', 'Opp', 'Result'].concat(lk.map(function (k) { return { label: k.replace(/_/g, ' ').toUpperCase(), align: 'right' }; })), log.slice().reverse().map(function (g) {
-          return { cells: [{ v: g.date, html: esc(CC.date(g.date)) }, { html: (g.home ? '' : '@ ') + U.teamEnt(L, g.opp, { season: cur.season || S, abbr: true }), v: CC.tname(L, g.opp) }, { html: '<a href="' + esc(CC.gameHref(L, g.game, cur.season || S)) + '">' + esc(g.res || '') + '</a>', v: g.res }].concat(lk.map(function (k) { return isNum(g[k]) ? (Math.round(g[k] * 100) / 100) : '—'; })), _href: CC.gameHref(L, g.game, cur.season || S) };
-        }), { maxHeight: 420 })) + '</div></div>';
+      var tot = function (k2) { return log.reduce(function (a0, g) { return a0 + (isNum(g[k2]) ? Math.abs(g[k2]) : 0); }, 0); };
+      vkLog = ['value', 'epa', 'pts', 'pass_yds', 'rush_yds', 'rec_yds', 'tkl', 'sacks', 'fgm'].filter(function (k2) { return lk.indexOf(k2) >= 0 && tot(k2) > 0; })[0] || null;
+      html += U.section('Game log', CC.seasonLabel(L, cur.season || S) + ', newest first.', U.card('', '', U.table(['Date', 'Opp', 'Result'].concat(lk.map(function (k2) { return { label: k2.replace(/_/g, ' ').toUpperCase(), align: 'right' }; })), log.slice().reverse().map(function (g) {
+        return { cells: [{ v: g.date, html: esc(CC.date(g.date)) }, { html: (g.home ? '' : '@ ') + U.teamEnt(L, g.opp, { season: cur.season || S, abbr: true }), v: CC.tname(L, g.opp) }, { html: '<a href="' + esc(CC.gameHref(L, g.game, cur.season || S)) + '">' + esc(g.res || '') + '</a>', v: g.res }].concat(lk.map(function (k2) { return isNum(g[k2]) ? (Math.round(g[k2] * 100) / 100) : '—'; })), _href: CC.gameHref(L, g.game, cur.season || S) };
+      }), { maxHeight: 420 })), '', 'This season');
     }
     var seasons = ((d && d.seasons) || []).map(flat);
     if (seasons.length) {
       var C = (fb ? SEASON_COLS.cfb : SEASON_COLS.bb).filter(function (c) { return seasons.some(function (r) { return isNum(r[c[0]]); }); });
-      html += U.card('Season by season', '', U.table([{ label: 'Season', align: 'right' }, 'Team'].concat(C.map(function (c) { return { label: c[1], align: 'right' }; })), seasons.slice().sort(function (x, y) { return y.season - x.season; }).map(function (r) {
+      html += U.section('Season by season', '', U.card('', '', U.table([{ label: 'Season', align: 'right' }, 'Team'].concat(C.map(function (c) { return { label: c[1], align: 'right' }; })), seasons.slice().sort(function (x, y) { return y.season - x.season; }).map(function (r) {
         return [{ v: r.season, html: esc(CC.seasonLabel(L, r.season)) }, { html: U.teamEnt(L, r.team, { season: r.season, abbr: true }), v: CC.tname(L, r.team) }].concat(C.map(function (c) {
           var v = r[c[0]];
           return !isNum(v) ? '—' : (c[2] === 'pct' ? { v: v, html: CC.pct(v, 1) } : (Math.round(v) === v ? v : { v: v, html: CC.f(v, c[0] === 'epa_play' || c[0] === 'value_pg' ? 3 : 1) }));
         }));
-      })));
+      }))), '', 'Career');
     }
     var mv = (d && d.moves) || [];
     var sim = (d && d.similar) || [];
     if (mv.length || sim.length) {
-      html += '<div class="qk-grid cc-grid">' + (mv.length ? '<div class="qk-span-6">' + U.card('Moves', 'Inferred from box scores and rosters; not the official transfer portal.', U.table([{ label: 'Season', align: 'right' }, 'From', 'To', { label: 'Value before', align: 'right' }, { label: 'After', align: 'right' }], mv.map(function (m) {
+      html += '<div class="qk-grid cc-grid">' + (mv.length ? '<div class="qk-span-6">' + U.card('Moves', QK.tag('Inferred from box scores, not the official transfer portal'), U.table([{ label: 'Season', align: 'right' }, 'From', 'To', { label: 'Value before', align: 'right' }, { label: 'After', align: 'right' }], mv.map(function (m) {
         return [{ v: m.season, html: m.season ? esc(CC.seasonLabel(L, m.season)) : '—' }, { html: U.teamEnt(L, m.from, { abbr: true }), v: CC.tname(L, m.from) }, { html: U.teamEnt(L, m.to, { abbr: true }), v: CC.tname(L, m.to) }, CC.f(m.value_before, 1), CC.f(m.value_after, 1)];
-      }), { sticky: false })) + '</div>' : '') + (sim.length ? '<div class="qk-span-6">' + U.card('Similar players', 'Closest statistical profiles.', '<ul class="cc-list">' + sim.map(function (s) {
-        return '<li><a href="' + esc(CC.playerHref(L, s.id, s.season)) + '">' + esc(s.name || CC.pname(L, s.id)) + '</a><span class="s">' + esc(CC.seasonLabel(L, s.season)) + '</span><span class="v">' + CC.f(s.distance, 2) + '</span></li>'; }).join('') + '</ul>') + '</div>' : '') + '</div>';
+      }), { sticky: false })) + '</div>' : '') + (sim.length ? '<div class="qk-span-6">' + U.card('Most similar', 'Closest statistical profiles (smaller distance is closer).', '<ul class="cc-list">' + sim.map(function (s0) {
+        return '<li><a href="' + esc(CC.playerHref(L, s0.id, s0.season)) + '">' + esc(s0.name || CC.pname(L, s0.id)) + '</a><span class="s">' + esc(CC.seasonLabel(L, s0.season)) + '</span><span class="v">' + CC.f(s0.distance, 2) + '</span></li>'; }).join('') + '</ul>', { flush: true }) + '</div>' : '') + '</div>';
     }
     el.innerHTML = html;
     U.wire(el);
-    if (log.length && QK.$('#pp-log', el)) {
-      if (vk) QKC.bar('#pp-log', { cats: log.map(function (g) { return CC.tabbr(L, g.opp); }), series: [{ name: LOGK[vk] || vk, data: log.map(function (g) { return isNum(g[vk]) ? g[vk] : 0; }) }], diverging: vk === 'value' || vk === 'epa', valName: LOGK[vk] || vk, fmt: function (v) { return CC.f(v, 1); }, hrefs: log.map(function (g) { return CC.gameHref(L, g.game, cur.season || S); }) });
+    // where he sits
+    if (cp && QK.$('#pp-dist', el)) {
+      var peers = Object.keys(cat.players).map(function (k0) { return cat.players[k0]; }).filter(function (x) { return x && x.pos === pos && x.qualified !== false; });
+      var opts = mets.filter(function (m) { return isNum(vals[m.key]); }).slice(0, 4);
+      var segEl = QK.$('#pp-dist-m', el);
+      segEl.innerHTML = opts.map(function (o, i) { return '<button type="button" aria-pressed="' + (i === 0) + '" data-value="' + esc(o.key) + '">' + esc(o.label) + '</button>'; }).join('');
+      var drawDist = function (key) {
+        var mm = opts.filter(function (o) { return o.key === key; })[0] || {};
+        var vs = peers.map(function (x) { return (x.values || {})[key]; }).filter(isNum).sort(function (x, y) { return x - y; });
+        if (vs.length < 10) { QK.$('#pp-dist', el).innerHTML = QK.empty('Too few qualified peers yet', 'The distribution appears with ten or more.'); return; }
+        var med = vs[Math.floor(vs.length / 2)];
+        QKC.distribution('#pp-dist', { values: vs, binCount: 22, lowerBetter: !!mm.lower, fmt: function (v) { return CC.fmtMetric(mm, v); }, xName: (mm.label || key) + ' · ' + vs.length + ' qualified peers', yName: 'Players',
+          marks: (isNum(vals[key]) ? [{ x: vals[key], label: String(name).split(' ').slice(-1)[0] }] : []).concat([{ x: med, label: 'Median' }]), label: 'Distribution of ' + (mm.label || key) });
+      };
+      if (opts.length) { drawDist(opts[0].key); QK.seg(segEl, drawDist); }
     }
+    if (log.length && vkLog) {
+      QK.$('#pp-log-card', el).innerHTML = U.card(LOGK[vkLog] + ' game by game', CC.seasonLabel(L, cur.season || S), U.chart('pp-log', 220, (LOGK[vkLog] || vkLog) + ' per game this season'));
+      QKC.bar('#pp-log', { cats: log.map(function (g) { return CC.tabbr(L, g.opp); }), series: [{ name: LOGK[vkLog] || vkLog, color: 'model', data: log.map(function (g) { return isNum(g[vkLog]) ? g[vkLog] : 0; }) }], diverging: vkLog === 'value' || vkLog === 'epa', valName: LOGK[vkLog] || vkLog, catName: 'Opponent', fmt: function (v) { return CC.f(v, 1); }, hrefs: log.map(function (g) { return CC.gameHref(L, g.game, cur.season || S); }) });
+    }
+    movementCard(L, S, pid, team, QK.$('#pp-move', el));
   });
 });
+function fmtInt(v) { return isNum(v) ? String(Math.round(v)) : '—'; }
 
 })(window.CC);

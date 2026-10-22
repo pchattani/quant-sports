@@ -1,14 +1,14 @@
-/* The Quant Gridiron — Players (#/players?g=QB|RB|WR|TE|K|P|DEF): the season catalogue by position group.
- * A chart of the group's headline metric (top 15), then the table: headline metrics with percentile chips,
- * search, team and position filters, a sample floor (qualified only by default), percentile basis, and
- * extra metrics on demand. Also exports GI.cat (catalogue helpers) for leaders and the lab.
+/* The Quant Gridiron — Players (#/players?g=QB|RB|WR|TE|K|P|DEF): the season catalogue by position group, on Design
+ * System 2.0. A chart of the group's headline metric (top 15), then a leaderboard: the group's metric set as heat cells
+ * on the cold-to-hot percentile scale against the player's peer group (QB, RB, WR/TE, DL and outside rushers, LB, DB,
+ * K, P), search, team and position filters, a sample floor (qualified only by default) and extra metrics on demand. Also exports GI.cat (catalogue helpers) for leaders and the lab.
  * Reads <S>/players.json. */
 (function (GI) {
 'use strict';
 
 const QK = window.QK;
 const esc = GI.esc, isNum = GI.isNum, first = GI.first;
-const ST = { group: 'QB', q: '', team: '', pos: '', floor: null, basis: 'pct', qual: true, extra: [], season: null };
+const ST = { group: 'QB', q: '', team: '', pos: '', floor: null, qual: true, extra: [], season: null };
 
 /* players.json -> {cat, by: {group: [ids]}} */
 function prepare(raw) {
@@ -26,7 +26,7 @@ GI.route('players', function (el, params) {
   if (qy.g && GI.GROUPS.indexOf(String(qy.g).toUpperCase()) >= 0) ST.group = String(qy.g).toUpperCase();
   return GI.load(GI.ypath('players.json', S)).then(raw => {
     if (!el.isConnected) return;
-    const head = GI.pageHead('Players · ' + S, 'Player catalogue', 'Every player of the season by position group, with percentiles against qualified players (100 = best). Search the whole league with <kbd>/</kbd>.') + GI.sectionNav('players', 'players');
+    const head = GI.pageHead('Players · ' + S, 'Player catalogue', 'Every player of the season by position group; each cell is coloured by his percentile against qualified players in his peer group (100 = best). Search the whole league with <kbd>/</kbd>.') + GI.sectionNav('players', 'players');
     const X = prepare(raw);
     if (!X) { el.innerHTML = head + GI.notBuilt('The ' + S + ' player catalogue', raw); return; }
     const P = X.P, by = X.by, cat = X.cat;
@@ -38,7 +38,6 @@ GI.route('players', function (el, params) {
       GI.card('', '', '<div class="gi-toolbar" style="margin-bottom:12px">' +
         GI.field('Search', '<input id="cat-q" class="qk-input" type="search" placeholder="Name or team">') +
         GI.field('Team', '<select id="cat-team" class="qk-select"></select>') + GI.field('Position', '<select id="cat-pos" class="qk-select"></select>') +
-        GI.field('Percentiles', GI.select('cat-basis', [['pct', 'v the group'], ['pct_pos', 'v the position']], ST.basis, 'Percentile basis')) +
         GI.field('Add a metric', '<select id="cat-extra" class="qk-select"></select>') +
         '<label class="gi-field"><span>Min <span id="cat-floor-u"></span> <b id="cat-floor-v"></b></span><input id="cat-floor" type="range" min="0" max="700" step="1"></label>' +
         '<label class="gi-check"><input id="cat-qual" type="checkbox"' + (ST.qual ? ' checked' : '') + '> qualified only</label></div>' +
@@ -63,7 +62,7 @@ GI.route('players', function (el, params) {
       $('cat-pos').innerHTML = '<option value="">All positions</option>' + Object.keys(pos).sort().map(x => '<option value="' + esc(x) + '"' + (x === ST.pos ? ' selected' : '') + '>' + esc(x) + ' (' + pos[x] + ')</option>').join('');
       $('cat-extra').innerHTML = '<option value="">—</option>' + GI.metricGroups(metrics).map(gr => '<optgroup label="' + esc(gr.name) + '">' + gr.items.map(m => '<option value="' + esc(m.key) + '">' + esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>').join('');
       ST.extra = ST.extra.filter(x => meta[x]);
-      ctx = { g: g, ids: ids, metrics: metrics, meta: meta, sk: sk, heads: GI.headline(metrics, GI.PREFS[g] || [], 6) };
+      ctx = { g: g, ids: ids, metrics: metrics, meta: meta, sk: sk, heads: [].concat.apply([], GI.playerSet(g, metrics, 7).map(x => x[1])).map(k => meta[k]).filter(Boolean) };
     };
     const draw = () => {
       const g = ctx.g, q = GI.fold(ST.q.trim()), sk = ctx.sk[0];
@@ -74,24 +73,27 @@ GI.route('players', function (el, params) {
           (!q || GI.fold(String(p.name || GI.playerName(id)) + ' ' + (p.team || '') + ' ' + GI.teamName(p.team)).indexOf(q) >= 0); });
       const m0 = ctx.heads[0] || {};
       ids.sort((a, b) => { const va = (P[a].values || {})[m0.key], vb = (P[b].values || {})[m0.key]; const d = (isNum(vb) ? vb : -1e9) - (isNum(va) ? va : -1e9); return m0.lower ? -d : d; });
-      const src = p => (ST.basis === 'pct_pos' ? (p.pct_pos || p.pct || {}) : (p.pct || {}));
-      const rows = ids.slice(0, 400).map(id => { const p = P[id];
-        return { _href: GI.playerHref(id, S), cells: [{ html: GI.playerLink(id, { name: p.name, season: S }) + (p.qualified === false ? ' <span class="gi-tag" data-tip="Below the sample floor: no percentiles">small sample</span>' : ''), v: p.name },
-          { html: GI.teamChip(p.team, S), v: p.team || '' }, { v: p.pos || '' }, { html: isNum(p.age) ? GI.num(p.age, 0) : '—', v: p.age }, { html: GI.int(first(p.games, p.g)), v: first(p.games, p.g) },
-          { html: GI.int(GI.sampleOf(p, sk)), v: GI.sampleOf(p, sk) }].concat(cols.map(m => { const v = (p.values || {})[m.key], pc = src(p)[m.key];
-          return { v: isNum(v) ? (m.lower ? -v : v) : -1e9, html: '<span class="gi-num">' + GI.fmtVal(v, m.fmt) + '</span>' + (isNum(pc) ? ' ' + QK.pctlChip(pc) : '') }; })) }; });
-      GI.set('cat-table', rows.length ? GI.tableHTML([{ label: GI.titleCase(GI.GROUP_ONE[g] || 'player') }, { label: 'Team' }, { label: 'Pos' }, { label: 'Age', align: 'right' }, { label: 'G', align: 'right' }, { label: ctx.sk[1], align: 'right' }]
-        .concat(cols.map(m => ({ label: GI.shortLabel(m.label) + (m.lower ? ' ↓' : ''), align: 'right', title: (m.desc || m.label) + (isNum(m.stabilises_at) ? ' · stabilises at about ' + GI.int(m.stabilises_at) : '') }))), rows, { sticky: true, maxHeight: 720 }) : GI.muted('No ' + (GI.GROUP_ONE[g] || 'player') + ' matches these filters.'));
-      GI.sortable($('cat-table'));
+      const rows = ids.slice(0, 400).map(id => { const p = P[id], pc = GI.peerPct(p, g);
+        const o = { id: id, name: p.name || GI.playerName(id), team: p.team, sub: GI.posLabel(p.pos || '') + ' · ' + GI.teamAbbr(p.team) + (p.qualified === false ? ' · small sample' : ''), age: isNum(p.age) ? Math.round(p.age) : null, games: first(p.games, p.g), n: GI.sampleOf(p, sk) };
+        cols.forEach(m => { o['v_' + m.key] = (p.values || {})[m.key]; o['p_' + m.key] = isNum(pc[m.key]) ? pc[m.key] : null; });
+        return o; });
+      const tbl = $('cat-table');
+      if (rows.length) QK.leaderboard(tbl, { dense: true, rank: true, maxHeight: 720, rowHref: r => GI.playerHref(r.id, S), sort: { key: 'p_' + (m0.key || ''), dir: 'desc' },
+        columns: [{ key: 'name', label: GI.titleCase(GI.GROUP_ONE[g] || 'player'), type: 'entity', sub: 'sub', mark: r => ({ name: GI.teamName(r.team), abbr: GI.teamAbbr(r.team), colour: GI.teamInfo(r.team).colour }), href: r => GI.playerHref(r.id, S) },
+          { key: 'age', label: 'Age', num: true }, { key: 'games', label: 'G', num: true }, { key: 'n', label: ctx.sk[1], num: true }]
+          .concat(cols.map(m => ({ key: 'p_' + m.key, label: GI.shortLabel(m.label) + (m.lower ? ' ↓' : ''), type: 'pctl', pctl: 'p_' + m.key, fmt: (v, r) => GI.fmtVal(r['v_' + m.key], m.fmt),
+            tip: GI.copyText(m.desc || m.label) + (isNum(m.stabilises_at) ? ' · stabilises at about ' + GI.int(m.stabilises_at) : '') + ' · sorted by percentile' }))),
+        rows: rows });
+      else GI.set('cat-table', GI.muted('No ' + (GI.GROUP_ONE[g] || 'player') + ' matches these filters.'));
       GI.set('cat-chips', extras.length ? 'Added: ' + extras.map(m => '<button type="button" class="qk-chip" aria-pressed="true" data-rm="' + esc(m.key) + '">' + esc(m.label) + ' ×</button>').join(' ') : '');
-      GI.set('cat-note', ids.length + ' of ' + ctx.ids.length + ' ' + esc((GI.GROUP_NAME[g] || g).toLowerCase()) + (ids.length > 400 ? ' (first 400 shown)' : '') + '. Rates are shrunk towards the group mean by their stabilisation point before ranking; ↓ metrics are flipped so a high percentile is always good. ' +
+      GI.set('cat-note', ids.length + ' of ' + ctx.ids.length + ' ' + esc((GI.GROUP_NAME[g] || g).toLowerCase()) + (ids.length > 400 ? ' (first 400 shown)' : '') + '. Peers: ' + esc(g === 'DEF' ? 'each defender against his own line (DL and outside rushers, linebackers or defensive backs)' : GI.peerOf({}, g).name.replace(/^NFL /, '')) + ', qualified (' + esc((cat.qualification || {})[g] || 'the sample floor') + '). Rates are shrunk towards the group mean by their stabilisation point before ranking; ↓ metrics are flipped so a high percentile is always good. ' +
         'Every metric is on each player page, the <a href="' + GI.ghref('leaders', S, { g: g }) + '">leaders</a> and the <a href="' + GI.ghref('lab', S, { g: g }) + '">lab</a>.' +
         (g === 'DEF' ? ' Defenders are rated on what the public data records (pass rush, tackles, takeaways); there is no in-season coverage charting.' : ''));
       GI.set('cat-ct', esc(m0.label || 'Top of the group') + (m0.lower ? ' (lower is better)' : ''));
-      GI.set('cat-cs', 'top 15 ' + esc((GI.GROUP_NAME[g] || g).toLowerCase()) + ' on the current filters · bar colour: team');
+      GI.set('cat-cs', 'Top 15 ' + esc((GI.GROUP_NAME[g] || g).toLowerCase()) + ' on the current filters · bars coloured by percentile against their peers');
       const top = ids.filter(id => isNum((P[id].values || {})[m0.key])).slice(0, 15);
       if (top.length) GI.ch.bar('cat-chart', { cats: top.map(id => (P[id].name || GI.playerName(id)) + ' · ' + GI.teamAbbr(P[id].team)), series: [{ name: m0.label, data: top.map(id => P[id].values[m0.key]) }], horizontal: true, labels: true,
-        colors: top.map(id => GI.teamColour(P[id].team)), hrefs: top.map(id => GI.playerHref(id, S)), fmt: v => GI.fmtVal(v, m0.fmt), labelWidth: 170 });
+        colors: top.map(id => QK.pctHex(GI.peerPct(P[id], g)[m0.key])), hrefs: top.map(id => GI.playerHref(id, S)), fmt: v => GI.fmtVal(v, m0.fmt), labelWidth: 170, valName: m0.label, catName: 'Player' });
       else GI.ch.none('cat-chart', 'Nobody on these filters has this metric.');
       try { history.replaceState(null, '', GI.ghref('players', S, { g: g })); } catch (e) { /* ok */ }
     };
@@ -101,7 +103,6 @@ GI.route('players', function (el, params) {
     $('cat-q').addEventListener('input', e => { ST.q = e.target.value; clearTimeout(t); t = setTimeout(draw, 150); });
     $('cat-team').addEventListener('change', e => { ST.team = e.target.value; draw(); });
     $('cat-pos').addEventListener('change', e => { ST.pos = e.target.value; draw(); });
-    $('cat-basis').addEventListener('change', e => { ST.basis = e.target.value; draw(); });
     $('cat-qual').addEventListener('change', e => { ST.qual = e.target.checked; draw(); });
     $('cat-floor').addEventListener('input', e => { ST.floor = Number(e.target.value); $('cat-floor-v').textContent = ST.floor; });
     $('cat-floor').addEventListener('change', draw);

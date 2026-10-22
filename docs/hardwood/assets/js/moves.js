@@ -36,7 +36,7 @@ function dealCard(L, dl, basis, focus) {
   const win = basis === 'now' ? dl.winner_now : dl.winner;
   let h = '<div class="mv-deal"><div class="mv-deal-h"><strong>' + fx.esc(fx.fmtDate(dl.date)) + '</strong> · ' +
     (dl.sides || []).map(s => fx.teamLink(L, s.team, { abbr: true })).join(' ⇄ ') +
-    ' <span class="muted-inline">' + fx.num(basis === 'now' ? dl.total_now : dl.total, 1) + ' WAR moved' + (win ? ' · edge ' + fx.esc(fx.teamAbbr(L, win)) : '') + '</span></div>';
+    ' <span class="muted-inline">' + fx.num(basis === 'now' ? dl.total_now : dl.total, 1) + ' WAR moved' + (win ? ' · better for ' + fx.esc(fx.teamAbbr(L, win)) : '') + '</span></div>';
   h += '<div class="mv-sides">' + (dl.sides || []).map(s => {
     const g = basis === 'now' ? s.grade_now : s.grade;
     const sh = basis === 'now' ? s.share_now : s.share;
@@ -99,7 +99,7 @@ function body(L, S, dp, tx, rated) {
         { v: r.x.net_time, html: signedCls(r.x.net_time) }, { v: r.x.net_real, html: signedCls(r.x.net_real) }, { v: r.x.net_now, html: '<strong>' + signedCls(r.x.net_now) + '</strong>' }]), { compact: true, sticky: true }) + '</div>';
   const lop = d => Math.max.apply(null, (d.sides || []).map(s => Math.abs((now ? s.now_in - s.now_out : s.v_in - s.v_out) || 0)).concat([0]));
   const top = rated.slice().sort((a, b) => lop(b) - lop(a)).slice(0, 6);
-  h += fx.card('Most lopsided deals', (now ? 'Today\'s view' : 'At the time') + ': the biggest gap between what a side gave and got.', '<div class="pad">' + top.map(d => dealCard(L, d, ST.basis)).join('') + '</div>');
+  h += fx.card('Most lopsided deals', (now ? 'Today\'s view' : 'At the time') + ': the widest difference between what a side gave and got.', '<div class="pad">' + top.map(d => dealCard(L, d, ST.basis)).join('') + '</div>');
   const teamOpts = Array.from(new Set(rated.reduce((a, d) => a.concat(d.teams || []), []))).sort((a, b) => String(fx.teamName(L, a)).localeCompare(String(fx.teamName(L, b))));
   h += '<div class="card"><div class="card-header">Every trade <span class="card-sub" id="mv-n"></span></div><div class="lab-controls hf-controls"><label>Team<select id="mv-team"><option value="all">All teams</option>' +
     teamOpts.map(t => '<option value="' + fx.esc(t) + '"' + (ST.team === t ? ' selected' : '') + '>' + fx.esc(fx.teamName(L, t)) + '</option>').join('') + '</select></label></div><div class="pad" id="mv-all"></div></div>';
@@ -154,9 +154,9 @@ function picks(L, dp, box) {
     Object.keys(rounds).map(k => 'round ' + k + ': ' + fx.num(rounds[k], 2)).join(', ') + '), discounted 0.9 a season until it first plays. Pick swaps, draft and cash considerations count zero.</span></div><div id="mv-pc" style="height:360px"></div>' +
     HW.tableHTML([{ label: 'Pick', align: 'right' }, { label: 'Curve', align: 'right' }, { label: 'Raw mean', align: 'right' }, { label: 'Drafts', align: 'right' }],
       (pc.raw || []).filter(r => r[0] <= 10 || r[0] % 5 === 0).map(r => { const c = (pc.picks || []).filter(p => p[0] === r[0])[0]; return [r[0], { v: c ? c[1] : null, html: fx.num(c ? c[1] : null, 2) }, { v: r[1], html: fx.num(r[1], 2) }, r[2]]; }), { compact: true }) + '</div>';
-  fx.plot('mv-pc', [{ type: 'scatter', mode: 'markers', name: 'Mean by pick', x: (pc.raw || []).map(r => r[0]), y: (pc.raw || []).map(r => r[1]), marker: { color: '#6e7681', size: 5 }, hovertemplate: 'Pick %{x}: %{y:.2f} WAR<extra></extra>' },
-    { type: 'scatter', mode: 'lines', name: 'Curve', x: pc.picks.map(p => p[0]), y: pc.picks.map(p => p[1]), line: { color: '#f0883e', width: 3 }, hovertemplate: 'Pick %{x}: %{y:.2f} WAR<extra></extra>' }],
-  fx.layout({ margin: { l: 50, r: 10, t: 20, b: 45 }, legend: { orientation: 'h', y: 1.1, font: { size: 10 } }, xaxis: { title: 'Overall pick' }, yaxis: { title: 'WAR, first four seasons (discounted)', rangemode: 'tozero' } }));
+  QKC.line('#mv-pc', { xType: 'value', series: [{ name: 'Mean by pick', color: QKC.tokens().ink3, width: 0.01, symbols: true, data: (pc.raw || []).map(r => [r[0], r[1]]) },
+    { name: 'Curve', color: 'model', width: 3, data: pc.picks.map(p => [p[0], p[1]]) }].map(x => (x.color === 'model' ? Object.assign(x, { color: QKC.tokens().model }) : x)),
+    xName: 'Overall pick', yName: 'WAR, first four seasons (discounted)', xFmt: v => String(Math.round(v)), yFmt: v => fx.num(v, 1), yMin: 0, legend: true, endLabels: false, label: 'Pick-value curve' });
 }
 
 function syncUrl(L) {

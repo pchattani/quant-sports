@@ -1,10 +1,10 @@
 /* The Quant Campus — Standings (#/<L>/standings?tab=...).
- *   Conferences: every conference table (conference and overall record, rating, AP rank, title odds).
+ *   Conferences: every conference as a leaderboard (conference and overall record, our rating and rank, our chance to win it).
  *   Polls: AP, Coaches and (cfb) CFP rankings beside our power ranking.
  *   Playoff (cfb): the 12-team CFP bracket (actual, or projected from the committee proxy), P(reach round) heat table,
- *     committee proxy, conference title games.   Bowls (cfb): bowl eligibility odds and announced bowl games.
+ *     committee proxy, conference title games.   Bowls (cfb): bowl eligibility chances and announced bowl games.
  *   Bracket (basketball): the 68-team NCAA bracket drawn by region (actual or projected), P(reach round) heat table,
- *     first-round upset odds, bracketology, First Four, last in / first out.   Conference tournaments (basketball).
+ *     first-round upset chances, bracketology, First Four, last in / first out.   Conference tournaments (basketball).
  * Reads <L>/<S>/season.json, <L>/<S>/cfp.json | bracket.json. */
 (function (CC) {
 'use strict';
@@ -16,7 +16,7 @@ CC.route('standings', function (el, p) {
   var list = fb ? [['conferences', 'Conferences'], ['polls', 'Polls'], ['playoff', 'Playoff'], ['bowls', 'Bowls']] : [['conferences', 'Conferences'], ['polls', 'Polls'], ['bracket', 'Bracket'], ['conftourneys', 'Conference tournaments']];
   var tab = U.tab(p, list.map(function (x) { return x[0]; }), 'conferences');
   var sub = { conferences: 'Conference and overall records with our rating and the chance to win the conference.', polls: 'The voters next to the model.', playoff: 'The 12-team College Football Playoff: the bracket, everyone’s chance to reach each round, and how the committee may rank them.',
-    bowls: 'Who reaches six wins, and the bowl games announced so far.', bracket: 'The NCAA tournament: the bracket by region, each team’s chance to reach each round, and first-round upset odds.', conftourneys: 'Conference tournament title odds (formats approximated where no bracket is published).' }[tab];
+    bowls: 'Who reaches six wins, and the bowl games announced so far.', bracket: 'The NCAA tournament: the bracket by region, each team’s chance to reach each round, and our first-round upset chances.', conftourneys: 'Our chance to win each conference tournament (formats approximated where no bracket is published).' }[tab];
   el.innerHTML = U.head('Standings', sub, U.kicker(L, S)) + U.tabs(L, 'standings', list, S, tab) + '<div id="st-body">' + QK.skeleton('lines', 6) + '</div>';
   var body = QK.$('#st-body', el);
   return Promise.all([CC.season(L, S), (tab === 'playoff' || tab === 'bowls' || tab === 'bracket' || tab === 'conftourneys') ? CC.load(CC.path(L, S, fb ? 'cfp.json' : 'bracket.json')) : Promise.resolve(null)]).then(function (a) {
@@ -46,22 +46,34 @@ function confOrder(L, season) {
 function conferences(node, L, S, season) {
   var fb = CC.fb(L), sim = (season.sim && season.sim.teams) || {}, R = season.ratings || {};
   var cs = confOrder(L, season);
+  var cur = CC.isCur(L, S);
   var chips = '<div class="qk-chips scroll cc-filters" id="cf-chips" role="group" aria-label="Conference">' + ['all'].concat(cs).map(function (c, i) {
-    return '<button type="button" class="qk-chip" style="--ca:var(--accent)" data-value="' + esc(c) + '" aria-pressed="' + (i === 0) + '">' + esc(c === 'all' ? 'All' : CC.cname(L, c)) + '</button>'; }).join('') + '</div>';
-  var cards = cs.map(function (c) {
+    return '<button type="button" class="qk-chip" style="--ca:var(--signal)" data-value="' + esc(c) + '" aria-pressed="' + (i === 0) + '">' + esc(c === 'all' ? 'All' : CC.cname(L, c)) + '</button>'; }).join('') + '</div>';
+  var cards = cs.map(function (c, k) {
     var rows = season.standings[c] || [];
     var hasDiv = rows.some(function (r) { return r.division; });
-    var cols = [{ label: '#', align: 'right' }, 'Team', { label: 'Conf', align: 'right', title: 'Conference record' }, { label: 'Overall', align: 'right' }, { label: 'Rating', align: 'right', title: fb ? 'Points v an average FBS team' : 'Adjusted margin per 100' },
-      { label: 'Rk', align: 'right', title: 'Our national rank' }, { label: 'Streak', align: 'right' }, { label: fb ? 'Conf title' : 'Reg. title', align: 'right', title: 'Chance to win the conference' }];
-    var body = rows.map(function (r) {
-      var t = String(r.team), s = sim[t] || {}, rt = R[t] || {};
-      var pc = fb ? s.p_conf : (isNum(s.p_conf_reg) ? s.p_conf_reg : s.p_conf_tourney);
-      return [r.conf_rank || '—', { html: U.teamEnt(L, t, { season: S, sub: isNum(r.rank) ? '#' + r.rank : '' }), v: CC.tname(L, t) }, { v: (r.conf_w || 0) - (r.conf_l || 0), html: CC.record(r.conf_w, r.conf_l) },
-        { v: (r.w || 0) - (r.l || 0), html: CC.record(r.w, r.l) }, { v: rt.rating, html: CC.signed(rt.rating, 1) }, isNum(r.rating_rank) ? r.rating_rank : '—', r.streak || '—', U.heat(pc)];
-    });
-    return '<div class="cc-conf" data-conf="' + esc(c) + '">' + U.card(CC.conf(L, c) ? (CC.conf(L, c).name || CC.cname(L, c)) : CC.cname(L, c), rows.length + ' teams' + (hasDiv ? ' · divisions' : ''), U.table(cols, body)) + '</div>';
+    return '<div class="cc-conf" data-conf="' + esc(c) + '">' + U.card(CC.conf(L, c) ? (CC.conf(L, c).name || CC.cname(L, c)) : CC.cname(L, c), rows.length + ' teams' + (hasDiv ? ' · divisions' : '') + (cur ? ' · the bar is our chance to win the ' + (fb ? 'conference' : 'regular-season title') : ''), U.lb('cf-' + k), { flush: true }) + '</div>';
   }).join('');
   node.innerHTML = chips + '<div class="cc-confs">' + cards + '</div>';
+  cs.forEach(function (c, k) {
+    var rows = (season.standings[c] || []).map(function (r) {
+      var t = String(r.team), s0 = sim[t] || {}, rt = R[t] || {};
+      return { team: t, name: CC.tshort(L, t), sub: isNum(r.rank) ? '#' + r.rank + ' AP' : '', conf_rank: r.conf_rank, conf: CC.record(r.conf_w, r.conf_l), cdiff: (r.conf_w || 0) - (r.conf_l || 0),
+        overall: CC.record(r.w, r.l), odiff: (r.w || 0) - (r.l || 0), rating: rt.rating, rating_rank: r.rating_rank, streak: r.streak || '—',
+        pc: fb ? s0.p_conf : (isNum(s0.p_conf_reg) ? s0.p_conf_reg : s0.p_conf_tourney) };
+    });
+    var cols = [
+      { key: 'conf_rank', label: '#', num: true },
+      { key: 'name', label: 'Team', type: 'entity', sub: 'sub', mark: function (r) { return U.mark(L, r.team); }, href: function (r) { return CC.teamHref(L, r.team, S); } },
+      { key: 'cdiff', label: 'Conf', num: true, fmt: function (v, r) { return esc(r.conf); }, tip: 'Conference record' },
+      { key: 'odiff', label: 'Overall', num: true, fmt: function (v, r) { return esc(r.overall); } },
+      { key: 'rating', label: 'Rating', num: true, fmt: function (v) { return CC.signed(v, 1); }, tip: fb ? 'Our rating: points better than an average FBS team' : 'Our rating: adjusted margin per 100 possessions' },
+      { key: 'rating_rank', label: 'Rk', num: true, tip: 'Our national rank' },
+      { key: 'streak', label: 'Strk' }
+    ];
+    if (cur && rows.some(function (r) { return isNum(r.pc); })) cols.push({ key: 'pc', label: fb ? 'Conf title' : 'Reg. title', type: 'bar', max: 1, fmt: function (v) { return CC.pct(v); }, tip: 'Our chance to win the conference, from simulating the rest of the season' });
+    QK.leaderboard(QK.$('#cf-' + k, node), { dense: true, columns: cols, rows: rows, rowHref: function (r) { return CC.teamHref(L, r.team, S); } });
+  });
   QK.chips(QK.$('#cf-chips', node), function (v) {
     var c = v[0] || 'all';
     QK.$$('.cc-conf', node).forEach(function (x) { x.hidden = c !== 'all' && x.getAttribute('data-conf') !== c; });
@@ -176,7 +188,7 @@ function playoff(node, L, S, season, cfp) {
     return [r.rank, { html: U.teamEnt(L, r.team, { season: S }), v: CC.tname(L, r.team) }, r.record || '—', CC.f(r.score, 2), U.heat(r.p_top12), U.heat(r.conf_champ_p), isNum(r.sos_rank) ? r.sos_rank : '—'];
   }), { maxHeight: 620 }) : QK.empty('No committee proxy', '');
   var actualRk = cfp.actual && cfp.actual.rankings && cfp.actual.rankings.length ? U.table([{ label: '#', align: 'right' }, 'Team'], cfp.actual.rankings.slice(0, 25).map(function (r) { return [r.rank, { html: U.teamEnt(L, r.team, { season: S }), v: CC.tname(L, r.team) }]; }), { maxHeight: 620 }) : '';
-  html += '<div class="qk-grid cc-grid"><div class="qk-span-7">' + U.card('Chance to reach each round', 'Share of simulated seasons. Darker is likelier.', heat) + '</div><div class="qk-span-5">' +
+  html += '<div class="qk-grid cc-grid"><div class="qk-span-7">' + U.card('Chance to reach each round', 'Our chances: the share of simulated seasons. Darker violet is likelier.', heat) + '</div><div class="qk-span-5">' +
     U.card('Committee proxy', 'How the committee may rank teams, fitted on its past rankings' + (pf.n_seasons ? ' (' + pf.n_seasons + ' seasons; out of sample Spearman ' + CC.f(pf.spearman, 2) + ', ' + (isNum(pf.top12_overlap) && pf.top12_overlap <= 1 ? CC.pct(pf.top12_overlap, 0) + ' of the top 12' : CC.f(pf.top12_overlap, 1) + ' of the top 12') + ' matched)' : '') + '. An estimate, not the committee.', px) +
     (actualRk ? U.card('Final CFP ranking', '', actualRk) : '') + '</div></div>';
   var ctg = cfp.conf_title_games || {};
@@ -198,7 +210,7 @@ function bowls(node, L, S, season, cfp) {
   var locked = Object.keys(el).filter(function (t) { return el[t] >= 0.95; }).length;
   var out = Object.keys(el).filter(function (t) { return el[t] <= 0.05; }).length;
   var games = (cfp.bowls && cfp.bowls.games) || [];
-  var html = '<div class="qk-kpis cc-kpis">' + QK.kpi({ label: 'Bowl eligible (95%+)', value: String(locked) }) + QK.kpi({ label: 'On the bubble', value: String(bubble.length), sub: '5% to 95% to reach six wins' }) + QK.kpi({ label: 'Out (under 5%)', value: String(out) }) + '</div>';
+  var html = U.stats([{ label: 'Bowl eligible', value: String(locked), unit: 'teams', signal: true, sub: 'our chance of six wins is 95% or more' }, { label: 'On the bubble', value: String(bubble.length), unit: 'teams', sub: '5% to 95% to reach six wins' }, { label: 'Out', value: String(out), unit: 'teams', sub: 'under 5% to reach six wins' }]);
   html += '<div class="qk-grid cc-grid"><div class="qk-span-6">' + U.card('The bubble', 'Chance to reach six wins (bowl eligibility; the 5-7 exception is ignored).', bubble.length ? U.table(['Team', { label: 'Rec.', align: 'right' }, { label: 'Six wins', align: 'right' }, ''], bubble.map(function (t) {
     var r = rec[t] || {};
     return [{ html: U.teamEnt(L, t, { season: S }), v: CC.tname(L, t) }, CC.record(r.w, r.l), { v: el[t], html: CC.pct(el[t]) }, { html: U.bar(el[t]), v: el[t] }];
@@ -341,16 +353,16 @@ function bracket(node, L, S, season, br) {
     return [{ html: U.teamEnt(L, t, { season: S }), v: CC.tname(L, t) }, isNum(o.seed) ? o.seed : (D.seedOf[t] || '—'), esc(o.region || D.regOf[t] || '—')].concat(rounds.map(function (r) { return U.heat(o.p_round[r]); }));
   }), { maxHeight: 640 });
   var ups = (br.upsets || []).slice().sort(function (a, b) { return (b.p_upset || 0) - (a.p_upset || 0); });
-  var upT = ups.length ? U.table(['Matchup', { label: 'Upset', align: 'right' }, { label: 'Market', align: 'right' }], ups.slice(0, 32).map(function (u) {
-    return [{ html: '<span class="cc-ups">(' + u.seed_dog + ') ' + U.teamEnt(L, u.dog, { season: S, abbr: true }) + ' <span class="qk-muted">over</span> (' + u.seed_fav + ') ' + U.teamEnt(L, u.fav, { season: S, abbr: true }) + '</span>', v: u.seed_dog }, U.heat(u.p_upset), { v: isNum(u.market_p) ? u.market_p : -1, html: CC.pct(u.market_p) }];
-  }), { maxHeight: 560 }) : QK.empty('No upset odds', '');
-  html += '<div class="qk-grid cc-grid"><div class="qk-span-8">' + U.card('Chance to reach each round', (D.actual ? 'Our pre-tournament probabilities. ' : '') + 'Darker is likelier.', heat) + '</div><div class="qk-span-4">' + U.card('First-round upset odds', 'Chance the lower seed wins.', upT) + '</div></div>';
+  var upT = ups.length ? U.table(['Matchup', { label: 'Upset', align: 'right', title: 'Our chance the lower seed wins' }], ups.slice(0, 32).map(function (u) {
+    return [{ html: '<span class="cc-ups">(' + u.seed_dog + ') ' + U.teamEnt(L, u.dog, { season: S, abbr: true }) + ' <span class="qk-muted">over</span> (' + u.seed_fav + ') ' + U.teamEnt(L, u.fav, { season: S, abbr: true }) + '</span>', v: u.seed_dog }, U.heat(u.p_upset)];
+  }), { maxHeight: 560 }) : QK.empty('No first-round games yet', 'Upset chances appear once the first round is set.');
+  html += '<div class="qk-grid cc-grid"><div class="qk-span-8">' + U.card('Chance to reach each round', (D.actual ? 'Our pre-tournament chances. ' : 'Our chances. ') + 'Darker violet is likelier.', heat) + '</div><div class="qk-span-4">' + U.card('First-round upset chances', 'Our chance the lower seed wins.', upT) + '</div></div>';
   // bracketology
   var bo = (br.bracketology || []).slice().sort(function (x, y) { return (isNum(x.seed_mean) ? x.seed_mean : 99) - (isNum(y.seed_mean) ? y.seed_mean : 99) || (y.p_ncaa || 0) - (x.p_ncaa || 0); });
   if (bo.length) {
     var sf = br.selection_fit || {};
     var li = (br.projected && br.projected.last_in) || [], fo = (br.projected && br.projected.first_out) || [];
-    html += '<div class="qk-grid cc-grid"><div class="qk-span-8">' + U.card('Bracketology', 'Projected seeds and selection odds' + (sf.n_seasons ? ' (selection model fitted on ' + sf.n_seasons + ' past fields; out of sample ' + CC.pct(sf.at_large_acc, 0) + ' of at-large picks right, seeds off by ' + CC.f(sf.seed_mae, 2) + ' on average)' : '') + '.',
+    html += '<div class="qk-grid cc-grid"><div class="qk-span-8">' + U.card('Bracketology', 'Projected seeds and our selection chances' + (sf.n_seasons ? ' (selection model fitted on ' + sf.n_seasons + ' past fields; out of sample ' + CC.pct(sf.at_large_acc, 0) + ' of at-large picks right, seeds off by ' + CC.f(sf.seed_mae, 2) + ' on average)' : '') + '.',
       U.table(['Team', 'Conf.', { label: 'Rec.', align: 'right' }, { label: 'Seed', align: 'right' }, { label: 'Mode', align: 'right' }, { label: 'In field', align: 'right' }, { label: 'Auto', align: 'right' }, { label: 'At-large', align: 'right' }, { label: 'Rk', align: 'right' }], bo.map(function (r) {
         return [{ html: U.teamEnt(L, r.team, { season: S }), v: CC.tname(L, r.team) }, esc(CC.cname(L, r.conf)), r.record || '—', { v: r.seed_mean, html: CC.f(r.seed_mean, 1) }, isNum(r.seed_mode) ? r.seed_mode : '—', U.heat(r.p_ncaa), U.heat(r.p_auto), U.heat(r.p_at_large), isNum(r.rating_rank) ? r.rating_rank : '—'];
       }), { maxHeight: 620 })) + '</div><div class="qk-span-4">' +

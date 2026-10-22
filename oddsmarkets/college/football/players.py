@@ -282,16 +282,43 @@ def st_points(df: pd.DataFrame) -> pd.Series:
     return k + p + r
 
 
+# per-play flags behind the play-credit rates (metrics spec): sacks, completions, yards; explosive = 20+ through the air,
+# 10+ on the ground; a stuff = a carry for no gain or a loss
+CREDIT_FLAGS = {"db": ("sack", "cmp", "expl", "yds"), "ru": ("expl", "stuff", "yds"), "tg": ("cmp", "expl", "yds")}
+_CMP_T = {24, 67, 29}                 # Pass Reception, Passing Touchdown, a reception that was then fumbled
+
+
+def play_flags(s: pd.DataFrame) -> pd.DataFrame:
+    """sack, cmp (a completed pass), yds (yards credited to the play: a completion's yards, a sack's loss, a run's
+    yards; 0 for an incompletion or interception) and expl / stuff for each pass or rush snap of a plays frame."""
+    text = s["text"].fillna("").astype(str).str.lower() if "text" in s else pd.Series("", index=s.index)
+    tp = pd.to_numeric(s["type_id"], errors="coerce") if "type_id" in s else pd.Series(np.nan, index=s.index)
+    yards = pd.to_numeric(s["yards"], errors="coerce").fillna(0.0) if "yards" in s else pd.Series(0.0, index=s.index)
+    is_pass = (s["kind"] == "pass").to_numpy()
+    sack = is_pass & text.str.contains("sacked").to_numpy()
+    cmp_ = is_pass & ~sack & (tp.isin(list(_CMP_T)).to_numpy()
+                              | (text.str.contains(r"pass complete|yd pass from") & ~text.str.contains("incomplete")).to_numpy())
+    yds = np.where(is_pass, np.where(cmp_ | sack, yards.to_numpy(float), 0.0), yards.to_numpy(float))
+    expl = np.where(is_pass, cmp_ & (yds >= 20), yds >= 10)
+    stuff = ~is_pass & (yds <= 0)
+    return pd.DataFrame({"sack": sack.astype(float), "cmp": cmp_.astype(float), "yds": yds, "expl": expl.astype(float),
+                         "stuff": stuff.astype(float)}, index=s.index)
+
+
 def play_credit(pa: pd.DataFrame) -> pd.DataFrame:
-    """Per (gid, pid): dropbacks, dropback EPA, rushes, rush EPA, targets, target EPA (garbage time excluded)."""
+    """Per (gid, pid): dropbacks, dropback EPA and successes, rushes, rush EPA, targets, target EPA (garbage time
+    excluded), plus the CREDIT_FLAGS counts per role (db_sack, db_cmp, db_expl, db_yds, ru_expl, ru_stuff, ru_yds,
+    tg_cmp, tg_expl, tg_yds)."""
     s = pa[pa["scrim"] & ~pa["garbage"] & np.isfinite(pa["epa"].to_numpy(float))]
+    s = pd.concat([s, play_flags(s)], axis=1) if len(s) else s
     parts = []
     for col, kind, pre in (("passer_id", "pass", "db"), ("rusher_id", "rush", "ru"), ("target_id", "pass", "tg")):
         x = s[(s["kind"] == kind) & s[col].notna()]
         if not len(x):
             continue
         g = x.groupby(["gid", col]).agg(**{f"{pre}_n": ("epa", "size"), f"{pre}_epa": ("epa", "sum"),
-                                           f"{pre}_succ": ("success", "sum")}).reset_index()
+                                           f"{pre}_succ": ("success", "sum")},
+                                        **{f"{pre}_{f}": (f, "sum") for f in CREDIT_FLAGS[pre]}).reset_index()
         parts.append(g.rename(columns={col: "pid"}))
     if not parts:
         return pd.DataFrame(columns=["gid", "pid"])
@@ -304,20 +331,24 @@ def play_credit(pa: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+CREDIT_COLS = ["db_n", "db_epa", "ru_n", "ru_epa", "tg_n", "tg_epa", "db_succ", "ru_succ", "tg_succ"] + [
+    f"{pre}_{f}" for pre, fs in CREDIT_FLAGS.items() for f in fs]
+
+
 def season_value(season: int, box: pd.DataFrame, credit: pd.DataFrame, pos_map: dict[str, str], st: dict) -> pd.DataFrame:
     """One row per (pid, main team) for the season: stats, position, value, value per game, percentile, why."""
     if not len(box):
         return pd.DataFrame()
     g = box.merge(credit, on=["gid", "pid"], how="left") if len(credit) else box.copy()
-    for c in ("db_n", "db_epa", "ru_n", "ru_epa", "tg_n", "tg_epa", "db_succ", "ru_succ", "tg_succ"):
+    for c in CREDIT_COLS:
         if c not in g:
             g[c] = 0.0
         g[c] = g[c].fillna(0.0)
     g["defp"] = def_points(g)
     g["stp"] = st_points(g)
     team_main = g.groupby(["pid", "team"]).size().reset_index(name="n").sort_values("n").drop_duplicates("pid", keep="last")
-    agg = g.groupby("pid").agg(gp=("gid", "nunique"), **{c: (c, "sum") for c in STAT_COLS + [
-        "db_n", "db_epa", "ru_n", "ru_epa", "tg_n", "tg_epa", "db_succ", "ru_succ", "tg_succ", "defp", "stp"]}).reset_index()
+    agg = g.groupby("pid").agg(gp=("gid", "nunique"), **{c: (c, "sum") for c in STAT_COLS + CREDIT_COLS + ["defp", "stp"]}).reset_index()
+    agg["fg_long"] = agg["pid"].map(g.groupby("pid")["fg_long"].max()).fillna(0.0).to_numpy(float)   # a season's longest, not a sum
     agg = agg.merge(team_main[["pid", "team"]], on="pid", how="left")
     agg["tgt"] = agg["tg_n"]
     pos = []
@@ -365,6 +396,7 @@ def season_value(season: int, box: pd.DataFrame, credit: pd.DataFrame, pos_map: 
     agg["value_pg"] = agg["value"] / agg["gp"].clip(lower=1)
     agg["epa"] = agg["db_epa"] + agg["ru_epa"] + agg["tg_epa"]
     agg["epa_play"] = np.where(agg["skill_n"] > 0, agg["skill_epa"] / agg["skill_n"].clip(lower=1), np.nan)
+    _rate_fields(agg, g)
     agg["pctl"] = 0.0
     for p in POS_ORDER:
         m = agg["pos"] == p
@@ -374,6 +406,99 @@ def season_value(season: int, box: pd.DataFrame, credit: pd.DataFrame, pos_map: 
     agg["season"] = int(season)
     agg.attrs["replacement"] = repl
     return agg
+
+
+# rate fields by position (players.json `values`; docs/_design/metrics/college.json). Play-credit rates exclude garbage
+# time (as value); completion, yards and touchdown rates come from the box score; shares are of the team's credited
+# plays (targets, carries) in the games the player appeared in; yards per team attempt from the box score.
+RATE_FIELDS = {
+    "QB": ["db", "epa_db", "sr_db", "cmp_pct", "ypa", "td_rate", "int_rate", "rush_pg", "sack_rate", "expl_pass", "ypd",
+           "qb_rush_epa"],
+    "RB": ["epa_rush", "sr_rush", "ypc", "rush_share", "tgt_share", "expl_rush", "stuff_rate"],
+    "WR": ["epa_tgt", "sr_tgt", "tgt_share", "yptpa", "ypr", "ypt", "catch_rate", "expl_tgt"],
+    "TE": ["epa_tgt", "sr_tgt", "tgt_share", "yptpa", "ypr", "ypt", "catch_rate", "expl_tgt"],
+    "DL": ["tkl_pg", "tfl_pg", "sacks_pg", "hurries_pg", "pd_pg", "def_int_pg", "havoc_pg"],
+    "LB": ["tkl_pg", "tfl_pg", "sacks_pg", "hurries_pg", "pd_pg", "def_int_pg", "havoc_pg"],
+    "DB": ["tkl_pg", "tfl_pg", "sacks_pg", "hurries_pg", "pd_pg", "def_int_pg", "havoc_pg"],
+    "K": ["fg_pct", "xp_pct", "fga_pg", "fg_long"],
+    "P": ["gross", "in20_rate", "tb_rate"],
+}
+# volume needed for rate percentiles, per team game (prorated through a season): QB dropbacks, RB credited rushes,
+# WR / TE targets, defenders games (share of the team's games), K field-goal attempts, P punts
+RATE_MIN = {"QB": ("db_n", 12.5), "RB": ("ru_n", 6.25), "WR": ("tg_n", 2.5), "TE": ("tg_n", 1.67), "DL": ("gp", 0.6),
+            "LB": ("gp", 0.6), "DB": ("gp", 0.6), "K": ("fga", 0.67), "P": ("punts", 1.67)}
+
+
+def _rate_fields(agg: pd.DataFrame, g: pd.DataFrame) -> None:
+    """Adds the RATE_FIELDS columns (NaN where the denominator is empty) and the team-game context `team_games`
+    (the most games any player of his main team has) to the season frame, in place."""
+    def div(a, b):
+        a = np.asarray(a, float)
+        b = np.asarray(b, float)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            return np.where(b > 0, a / b, np.nan)
+    tt = g.groupby(["gid", "team"]).agg(t_tg=("tg_n", "sum"), t_ru=("ru_n", "sum"), t_att=("pass_att", "sum")).reset_index()
+    x = g[["gid", "team", "pid"]].merge(tt, on=["gid", "team"], how="left")
+    ctx = x.groupby("pid")[["t_tg", "t_ru", "t_att"]].sum()
+    for c in ("t_tg", "t_ru", "t_att"):
+        agg[c] = agg["pid"].map(ctx[c]).fillna(0.0).to_numpy(float)
+    gp = agg["gp"].clip(lower=1)
+    agg["db"] = agg["db_n"]
+    agg["epa_db"] = div(agg["db_epa"], agg["db_n"])
+    agg["sr_db"] = div(agg["db_succ"], agg["db_n"])
+    agg["cmp_pct"] = div(agg["pass_cmp"], agg["pass_att"])
+    agg["ypa"] = div(agg["pass_yds"], agg["pass_att"])
+    agg["td_rate"] = div(agg["pass_td"], agg["pass_att"])
+    agg["int_rate"] = div(agg["pass_int"], agg["pass_att"])
+    agg["rush_pg"] = agg["ru_n"] / gp
+    agg["epa_rush"] = div(agg["ru_epa"], agg["ru_n"])
+    agg["sr_rush"] = div(agg["ru_succ"], agg["ru_n"])
+    agg["ypc"] = div(agg["rush_yds"], agg["rush_car"])
+    agg["rush_share"] = div(agg["ru_n"], agg["t_ru"])
+    agg["tgt_share"] = div(agg["tg_n"], agg["t_tg"])
+    agg["epa_tgt"] = div(agg["tg_epa"], agg["tg_n"])
+    agg["sr_tgt"] = div(agg["tg_succ"], agg["tg_n"])
+    agg["yptpa"] = div(agg["rec_yds"], agg["t_att"])
+    agg["ypr"] = div(agg["rec_yds"], agg["rec"])
+    for c in ("tkl", "tfl", "sacks", "hurries", "pd", "def_int"):
+        agg[c + "_pg"] = agg[c] / gp
+    agg["havoc_pg"] = (agg["tfl"] + agg["pd"] + agg["def_int"] + agg["hurries"]) / gp
+    # play-credit rates (play_credit's per-role flags; 0 where the cached credit predates them)
+    for c in CREDIT_COLS:
+        if c not in agg:
+            agg[c] = 0.0
+    agg["sack_rate"] = div(agg["db_sack"], agg["db_n"])
+    agg["expl_pass"] = div(agg["db_expl"], agg["db_n"])
+    agg["ypd"] = div(agg["db_yds"], agg["db_n"])
+    agg["qb_rush_epa"] = div(agg["ru_epa"], agg["ru_n"])
+    agg["expl_rush"] = div(agg["ru_expl"], agg["ru_n"])
+    agg["stuff_rate"] = div(agg["ru_stuff"], agg["ru_n"])
+    agg["ypt"] = div(agg["tg_yds"], agg["tg_n"])
+    agg["catch_rate"] = div(agg["tg_cmp"], agg["tg_n"])
+    agg["expl_tgt"] = div(agg["tg_expl"], agg["tg_n"])
+    agg["fga_pg"] = agg["fga"] / gp
+    agg["fg_long"] = np.where(agg["fgm"] > 0, agg["fg_long"], np.nan)
+    agg["fg_pct"] = div(agg["fgm"], agg["fga"])
+    agg["xp_pct"] = div(agg["xpm"], agg["xpa"])
+    agg["gross"] = div(agg["punt_yds"], agg["punts"])
+    agg["in20_rate"] = div(agg["punt_in20"], agg["punts"])
+    agg["tb_rate"] = div(agg["punt_tb"], agg["punts"])
+    agg["team_games"] = agg.groupby("team")["gp"].transform("max").fillna(agg["gp"]).to_numpy(float)
+
+
+def rate_qualified(r: dict) -> bool:
+    """Enough volume for the position's rate percentiles (RATE_MIN, prorated by the team's games so far)."""
+    m = RATE_MIN.get(r.get("pos"))
+    if not m:
+        return False
+    col, per = m
+    tg = float(r.get("team_games") or r.get("gp") or 0)
+    need = per * tg
+    if r.get("pos") in DEF:
+        need = max(4.0, need)
+    if r.get("pos") == "K" and float(r.get("gp") or 0) < 0.6 * tg:
+        return False
+    return float(r.get(col) or 0) >= need and float(r.get(col) or 0) > 0
 
 
 def why(r: dict) -> str:

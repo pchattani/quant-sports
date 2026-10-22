@@ -41,6 +41,7 @@ from . import (
     game,
     market_informed,
     players,
+    ratings,
     sim,
 )
 
@@ -160,7 +161,7 @@ def season_players(ctx: dict, season: int) -> dict:
     if season in ctx["values"]:
         return ctx["values"][season]
     st = data.load_store(season)
-    key = f"{players.__name__}|v6|{season}|{data.results_key(season, st)}|{data.file_md5(store.plays_path(season))}|{ep_fit(ctx).get('key')}"
+    key = f"{players.__name__}|v7|{season}|{data.results_key(season, st)}|{data.file_md5(store.plays_path(season))}|{ep_fit(ctx).get('key')}"
     import hashlib
     k = hashlib.md5(key.encode()).hexdigest()[:16]
     c = data.cache_get(f"players_{season}", k)
@@ -712,6 +713,10 @@ TEAM_METRICS = [
     ("pass_epa", "Pass EPA/play", "Efficiency", "3", False, "Raw EPA per dropback"),
     ("rush_epa", "Rush EPA/play", "Efficiency", "3", False, "Raw EPA per rush"),
     ("explosive", "Explosive rate", "Efficiency", "pct", False, "Rushes of 15+ and passes of 20+ yards per play"),
+    ("off_pass_epa", "Adj pass EPA", "Efficiency", "3", False, "Opponent-adjusted EPA per dropback on offense (non-garbage)"),
+    ("def_pass_epa", "Adj pass EPA allowed", "Efficiency", "3", True, "Opponent-adjusted EPA per dropback allowed"),
+    ("off_rush_epa", "Adj rush EPA", "Efficiency", "3", False, "Opponent-adjusted EPA per rush on offense (non-garbage)"),
+    ("def_rush_epa", "Adj rush EPA allowed", "Efficiency", "3", True, "Opponent-adjusted EPA per rush allowed"),
 ]
 
 
@@ -760,6 +765,16 @@ def team_stats(ctx: dict, season: int) -> dict[str, dict]:
             raw[t] = {"pass_epa": float(np.average(g["pass_epa"], weights=g["n_pass"].clip(lower=1))),
                       "rush_epa": float(np.average(g["rush_epa"], weights=g["n_rush"].clip(lower=1))),
                       "explosive": float(np.average(g["expl"], weights=w))}
+    # opponent-adjusted pass and rush EPA per play, offence and defence (the EPA ridge split by play type)
+    fits = {}
+    for c, nc in (("pass_epa", "n_pass"), ("rush_epa", "n_rush")):
+        try:
+            fits[c] = ratings.split_adjusted(season, S["gf"], st, pl_stats, c, nc) if pl_stats is not None else None
+        except Exception as exc:                                     # noqa: BLE001
+            logger.warning("cfb %s adjusted %s: %s", season, c, exc)
+            fits[c] = None
+    adj_keys = {"off_pass_epa": (fits["pass_epa"], "off"), "def_pass_epa": (fits["pass_epa"], "def"),
+                "off_rush_epa": (fits["rush_epa"], "off"), "def_rush_epa": (fits["rush_epa"], "def")}
     for t in S["mem"]:
         x, R = acc[t], S["ratings"].get(t) or {}
         g = max(x["g"], 1)
@@ -770,6 +785,8 @@ def team_stats(ctx: dict, season: int) -> dict[str, dict]:
                   "to_margin": r2((x["tk"] - x["gv"]) / g, 2) if x["plays"] else None,
                   "third_pct": r2(x["c3"] / x["a3"], 3) if x["a3"] else None})
         v.update({k: r2(raw.get(t, {}).get(k), 3) for k in ("pass_epa", "rush_epa", "explosive")})
+        for k, (fit, side) in adj_keys.items():
+            v[k] = r2((fit or {}).get(side, {}).get(t), 3) if fit else None
         out[t] = v
     return out
 
@@ -916,7 +933,59 @@ PLAYER_METRICS = [
     ("def_int", "INT", "Defense", "int", False, "Interceptions"),
     ("fgm", "FGM", "Kicking", "int", False, "Field goals made"),
     ("fga", "FGA", "Kicking", "int", False, "Field goals attempted"),
+    # rates (docs/_design/metrics/college.json); percentiles within the position need `qualified_rate` volume
+    ("db", "Dropbacks", "Passing", "int", False, "Dropbacks credited from the play-by-play (garbage time excluded)"),
+    ("epa_db", "EPA/dropback", "Passing", "3", False, "Expected points added per dropback, sacks and interceptions included"),
+    ("sr_db", "Dropback success", "Passing", "pct", False, "Share of dropbacks that gain expected points"),
+    ("cmp_pct", "Comp%", "Passing", "pct", False, "Completions per pass attempt"),
+    ("ypa", "Yds/att", "Passing", "2", False, "Passing yards per attempt"),
+    ("td_rate", "TD rate", "Passing", "pct", False, "Touchdown passes per attempt"),
+    ("int_rate", "INT rate", "Passing", "pct", True, "Interceptions per pass attempt"),
+    ("rush_pg", "Runs/game", "Rushing", "2", False, "Designed runs and scrambles per game (style)"),
+    ("epa_rush", "EPA/carry", "Rushing", "3", False, "Expected points added per carry"),
+    ("sr_rush", "Rush success", "Rushing", "pct", False, "Share of carries that gain expected points"),
+    ("ypc", "Yds/carry", "Rushing", "2", False, "Rushing yards per carry"),
+    ("rush_share", "Rush share", "Rushing", "pct", False, "Share of the team's carries in his games"),
+    ("tgt_share", "Target share", "Receiving", "pct", False, "Share of the team's targets thrown his way in his games"),
+    ("epa_tgt", "EPA/target", "Receiving", "3", False, "Expected points added per target"),
+    ("sr_tgt", "Target success", "Receiving", "pct", False, "Share of targets that gain expected points"),
+    ("yptpa", "Yds/team att", "Receiving", "2", False, "Receiving yards per team pass attempt in his games"),
+    ("ypr", "Yds/rec", "Receiving", "2", False, "Receiving yards per reception"),
+    ("tkl_pg", "Tackles/game", "Defense", "2", False, "Total tackles per game"),
+    ("tfl_pg", "TFL/game", "Defense", "2", False, "Tackles for loss per game"),
+    ("sacks_pg", "Sacks/game", "Defense", "2", False, "Sacks per game"),
+    ("hurries_pg", "Hurries/game", "Defense", "2", False, "Quarterback hurries per game"),
+    ("pd_pg", "PD/game", "Defense", "2", False, "Passes defended per game"),
+    ("def_int_pg", "INT/game", "Defense", "3", False, "Interceptions per game"),
+    ("havoc_pg", "Havoc/game", "Defense", "2", False, "Tackles for loss, passes defended, interceptions and hurries per game"),
+    ("fg_pct", "FG%", "Kicking", "pct", False, "Field goals made per attempt"),
+    ("xp_pct", "XP%", "Kicking", "pct", False, "Extra points made per attempt"),
+    ("gross", "Gross avg", "Punting", "1", False, "Average punt distance"),
+    ("in20_rate", "Inside 20", "Punting", "pct", False, "Share of punts downed inside the 20"),
+    ("tb_rate", "Touchback rate", "Punting", "pct", True, "Touchbacks per punt"),
+    # play-credit rates (per-play yards and flags from the play-by-play, garbage time excluded)
+    ("sack_rate", "Sack rate", "Passing", "pct", True, "Sacks per dropback: the most quarterback-driven part of protection"),
+    ("expl_pass", "Explosive passes", "Passing", "pct", False, "Completions of 20+ yards per dropback"),
+    ("ypd", "Yds/dropback", "Passing", "2", False, "Yards per dropback after sack losses"),
+    ("qb_rush_epa", "QB rush EPA", "Rushing", "3", False, "Expected points added per quarterback run (designed runs and scrambles)"),
+    ("expl_rush", "Explosive runs", "Rushing", "pct", False, "Share of carries gaining 10+ yards"),
+    ("stuff_rate", "Stuff rate", "Rushing", "pct", True, "Share of carries stopped for no gain or a loss"),
+    ("ypt", "Yds/target", "Receiving", "2", False, "Receiving yards per target"),
+    ("catch_rate", "Catch rate", "Receiving", "pct", False, "Catches per target"),
+    ("expl_tgt", "Explosive targets", "Receiving", "pct", False, "Targets that gain 20+ yards"),
+    ("fga_pg", "FGA/game", "Kicking", "2", False, "Field-goal attempts per game (how much his coach uses him)"),
+    ("fg_long", "Long FG", "Kicking", "int", False, "Longest made field goal of the season"),
 ]
+RATE_KEYS = sorted({k for ks in players.RATE_FIELDS.values() for k in ks})
+_DP = {"epa_play": 3, "epa_db": 3, "epa_rush": 3, "epa_tgt": 3, "sr_db": 3, "sr_rush": 3, "sr_tgt": 3, "cmp_pct": 3, "td_rate": 3,
+       "int_rate": 3, "rush_share": 3, "tgt_share": 3, "def_int_pg": 3, "fg_pct": 3, "xp_pct": 3, "in20_rate": 3, "tb_rate": 3,
+       "ypa": 2, "ypc": 2, "yptpa": 2, "ypr": 2, "rush_pg": 2, "tkl_pg": 2, "tfl_pg": 2, "sacks_pg": 2, "hurries_pg": 2,
+       "pd_pg": 2, "havoc_pg": 2, "sack_rate": 3, "expl_pass": 3, "ypd": 2, "qb_rush_epa": 3, "expl_rush": 3, "stuff_rate": 3,
+       "ypt": 2, "catch_rate": 3, "expl_tgt": 3, "fga_pg": 2, "fg_long": 0}
+
+
+def _round(k, x):
+    return r2(x, _DP.get(k, 1)) if isinstance(x, float) or k in _DP else x
 POS_KEYS = {"QB": ["value", "value_pg", "epa", "epa_play", "pass_yds", "pass_td", "pass_int", "rush_car", "rush_yds", "rush_td"],
             "RB": ["value", "value_pg", "epa", "epa_play", "rush_car", "rush_yds", "rush_td", "rec", "tgt", "rec_yds", "rec_td"],
             "WR": ["value", "value_pg", "epa", "epa_play", "rec", "tgt", "rec_yds", "rec_td", "rush_yds"],
@@ -924,6 +993,9 @@ POS_KEYS = {"QB": ["value", "value_pg", "epa", "epa_play", "pass_yds", "pass_td"
             "DL": ["value", "value_pg", "tkl", "tfl", "sacks", "pd", "def_int"], "LB": ["value", "value_pg", "tkl", "tfl", "sacks", "pd", "def_int"],
             "DB": ["value", "value_pg", "tkl", "tfl", "sacks", "pd", "def_int"], "K": ["value", "value_pg", "fgm", "fga"],
             "P": ["value", "value_pg"], "OL": ["value"]}
+POS_KEYS_BOX = {p: list(ks) for p, ks in POS_KEYS.items()}       # the season totals (careers' similar players)
+for _p, _ks in players.RATE_FIELDS.items():
+    POS_KEYS[_p] = POS_KEYS[_p] + [k for k in _ks if k not in POS_KEYS[_p]]
 MIN_FLOOR = {"QB": 5, "RB": 4, "WR": 4, "TE": 4, "DL": 4, "LB": 4, "DB": 4, "K": 4, "P": 4, "OL": 4}
 
 
@@ -942,20 +1014,35 @@ def players_payload(season: int, val: pd.DataFrame, mem: list[str], light: bool 
     out = {}
     pos_n = {}
     if len(v):
-        for k, *_ in PLAYER_METRICS:
-            v[f"_p_{k}"] = (v[k].rank(pct=True) * 100).round(0)
-            v[f"_pp_{k}"] = (v.groupby("pos")[k].rank(pct=True) * 100).round(0)
+        v["_qr"] = [players.rate_qualified(r) for r in v.to_dict("records")]
+        cols = {}
+        for k, *_r in PLAYER_METRICS:
+            if k in RATE_KEYS:
+                # rates: percentile within the position among players with the volume for it (qualified_rate),
+                # oriented so that 100 = best (lower-is-better rates reversed); no pooled `pct`
+                lower = _r[3]
+                q = v[v["_qr"]]
+                pp = q.groupby("pos")[k].rank(pct=True, ascending=not lower) * 100
+                cols[f"_p_{k}"] = pd.Series(np.nan, index=v.index)
+                cols[f"_pp_{k}"] = pp.reindex(v.index).round(0)
+                continue
+            # box counts: 100 = best too (pass_int was ranked ascending, so the most interceptions read 99th)
+            lower = _r[3]
+            cols[f"_p_{k}"] = (v[k].rank(pct=True, ascending=not lower) * 100).round(0)
+            cols[f"_pp_{k}"] = (v.groupby("pos")[k].rank(pct=True, ascending=not lower) * 100).round(0)
+        v = pd.concat([v, pd.DataFrame(cols, index=v.index)], axis=1)
         for r in v.to_dict("records"):
             keys = POS_KEYS.get(r["pos"], ["value"])
-            vals = {k: (r2(r[k], 3) if k in ("epa_play",) else (r2(r[k], 1) if isinstance(r[k], float) else r[k])) for k in keys}
+            vals = {k: _round(k, r[k]) for k in keys}
             out[r["pid"]] = {"name": r.get("name"), "team": r["team"], "pos": r["pos"], "class": r.get("class"), "gp": int(r["gp"]),
-                             "qualified": bool(r["gp"] >= MIN_FLOOR.get(r["pos"], 4)), "values": vals,
+                             "qualified": bool(r["gp"] >= MIN_FLOOR.get(r["pos"], 4)), "qualified_rate": bool(r["_qr"]), "values": vals,
                              "pct": {k: r[f"_p_{k}"] for k in keys if pd.notna(r[f"_p_{k}"])},
                              "pct_pos": {k: r[f"_pp_{k}"] for k in keys if pd.notna(r[f"_pp_{k}"])}}
             pos_n[r["pos"]] = pos_n.get(r["pos"], 0) + 1
     return {"ok": True, "level": LEVEL, "season": season, "updated_at": data.now_iso(), "metrics": metric_list(PLAYER_METRICS),
             "positions": {p: {"label": players.POS_LABEL.get(p, p), "n": n} for p, n in pos_n.items()},
-            "min_floor": {"games": MIN_FLOOR}, "players": out}
+            "min_floor": {"games": MIN_FLOOR, "rate": {p: {"field": c, "per_team_game": x} for p, (c, x) in players.RATE_MIN.items()}},
+            "players": out}
 
 
 def value_row(r: dict) -> dict:
@@ -1141,7 +1228,7 @@ def lab_players(season: int, val: pd.DataFrame, mem: list[str], light: bool = Fa
     rows = []
     for r in (v.to_dict("records") if len(v) else []):
         rows.append([r["pid"], r.get("name"), r["team"], r["pos"], r.get("class"), int(r["gp"])] +
-                    [r2(r[k], 3 if k == "epa_play" else 1) for k in keys])
+                    [r2(r[k], _DP.get(k, 1)) for k in keys])
     return {"ok": True, "kind": "player", "season": season, "fields": fields, "metrics": metric_list(PLAYER_METRICS), "rows": rows}
 
 
@@ -1591,7 +1678,7 @@ def career_files(ctx: dict, out: Path, current: int, sizes: dict) -> int:
     sim_map: dict[str, list] = {}
     if current in vals:
         v = vals[current]
-        for p, keys in POS_KEYS.items():
+        for p, keys in POS_KEYS_BOX.items():
             x = v[(v["pos"] == p) & (v["gp"] >= 3)]
             if len(x) < 5:
                 continue

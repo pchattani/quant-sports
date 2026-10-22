@@ -52,9 +52,9 @@ const C = {
   text: 'var(--ink-1)', text2: 'var(--ink-2)', text3: 'var(--ink-3)',
   blue: 'var(--c-1)', green: 'var(--up)', red: 'var(--down)', orange: 'var(--c-2)',
   purple: 'var(--c-7)', yellow: 'var(--c-4)', teal: 'var(--c-3)',
-  clay: 'var(--c-1)', clay2: 'var(--c-1)', navy: 'var(--s-3)', navy2: 'var(--s-3)',
-  bp: 'var(--c-1)', p1: 'var(--c-1)', p2: 'var(--c-2)', home: 'var(--c-1)', away: 'var(--c-2)',
-  espn: 'var(--ink-3)', market: 'var(--c-2)', accent: 'var(--accent)'
+  clay: 'var(--signal)', clay2: 'var(--signal)', navy: 'var(--s-3)', navy2: 'var(--s-3)',
+  bp: 'var(--signal)', p1: 'var(--signal)', p2: 'var(--c-2)', home: 'var(--c-1)', away: 'var(--c-2)',
+  espn: 'var(--ink-3)', market: 'var(--c-market)', model: 'var(--signal)', accent: 'var(--signal)'
 };
 const PALETTE = ['var(--c-1)', 'var(--c-2)', 'var(--c-3)', 'var(--c-4)', 'var(--c-5)', 'var(--c-6)', 'var(--c-7)', 'var(--c-8)'];
 /* A colour at alpha a: hex -> rgba(); a token or any CSS colour -> color-mix() (resolved by the browser or the chart shim). */
@@ -221,7 +221,7 @@ const TITLES = {
   hub: 'Overview', games: 'Games', game: 'Game centre', standings: 'Standings', postseason: 'Postseason', hitters: 'Hitters', pitchers: 'Pitchers',
   hitter: 'Hitter', pitcher: 'Pitcher', player: 'Player', teams: 'Teams', team: 'Team', leaders: 'Leaders', umpires: 'Umpires', umpire: 'Umpire',
   parks: 'Parks', park: 'Park', prospects: 'Prospects', history: 'History', awards: 'Awards', lab: 'Lab', compare: 'Compare', value: 'Value', trade: 'Trade simulator', moves: 'Moves', fantasy: 'Fantasy',
-  markets: 'Odds board', calibration: 'Calibration', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
+  markets: 'Forecast board', calibration: 'Calibration', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
 };
 /* The nine sections (QK.sections('baseball')) and the routes each one holds. */
 const SECTION_OF = { hub: 'overview', games: 'fixtures', game: 'fixtures', markets: 'fixtures', standings: 'standings', postseason: 'standings', awards: 'standings',
@@ -230,7 +230,7 @@ const SECTION_OF = { hub: 'overview', games: 'fixtures', game: 'fixtures', marke
   park: 'lab', umpires: 'lab', umpire: 'lab', methodology: 'model', calibration: 'model', glossary: 'model', disclaimer: 'model' };
 /* Tabs per section: [route, label, scope] with scope 'g' (a global route), 'mlb' (MLB only) or '' (per level). */
 const SECTION_TABS = {
-  fixtures: [['games', 'Scoreboard', ''], ['markets', 'Odds board', 'g']],
+  fixtures: [['games', 'Scoreboard', ''], ['markets', 'Forecast board', 'g']],
   standings: [['standings', 'Standings', ''], ['postseason', 'Postseason', 'g'], ['awards', 'Award races', 'g'], ['history', 'All-time', 'g']],
   teams: [['teams', 'All teams', '']],
   players: [['hitters', 'Hitters', ''], ['pitchers', 'Pitchers', ''], ['leaders', 'Leaderboards', ''], ['prospects', 'Prospects', 'g']],
@@ -241,14 +241,14 @@ const SECTION_TABS = {
 };
 const SECTION_LABEL = { overview: 'Overview', fixtures: 'Games', standings: 'Standings', teams: 'Teams', players: 'Players', value: 'Value & Moves', fantasy: 'Fantasy', lab: 'Lab', model: 'Model' };
 const SECTION_BLURB = {
-  fixtures: 'Every game priced by the plate-appearance model, against the market and the DraftKings line.',
-  standings: 'Divisions, wild cards, the postseason bracket and title odds from the season simulation.',
+  fixtures: 'Every game, by the numbers: our win chance from a plate-appearance simulation with the lineups and starters, live while games are on.',
+  standings: 'Divisions, wild cards, the postseason bracket and title chances from the season simulation.',
   teams: 'Ratings, rosters, schedules, strengths and needs for every club.',
-  players: 'Statcast percentiles, expected stats, arsenals and projections for every player.',
+  players: 'Percentiles against each player\'s position or role, expected stats, arsenals and projections.',
   value: 'What every player is worth now and over the next five seasons, trades rated and simulated.',
   fantasy: 'Rotisserie and points rankings, dynasty values, picks, closers, steals and the weekly streamers.',
   lab: 'Build your own charts: any two metrics, head-to-head comparisons, parks and umpires.',
-  model: 'How the models work, how well they have done against the closing lines, and every metric defined.'
+  model: 'How the models work, how well they have done, and every metric defined.'
 };
 /* Detail pages: the list they belong to (the back link in the section bar). */
 const DETAIL_OF = { game: 'games', team: 'teams', hitter: 'hitters', pitcher: 'pitchers', player: 'hitters', park: 'parks', umpire: 'umpires' };
@@ -353,6 +353,7 @@ function render(opts) {
   const y0 = window.scrollY;
   runCleanups();
   closeSearch();
+  setRecords({}); setForms({});
   const r = parseHash();
   const prevLevel = state.level, prevSeason = state.season;
   if (r.level) setLevelState(r.level);
@@ -442,9 +443,10 @@ function sectionBar(r) {
     back = '<a class="bp-back" href="' + tabHref(t, L) + '"><span aria-hidden="true">←</span> ' + esc(SECTION_LABEL[sec] === t[1] ? t[1] : SECTION_LABEL[sec] + ' · ' + t[1]) + '</a>';
   }
   bar.classList.toggle('is-detail', !!detail);
-  bar.innerHTML = '<div class="bp-secbar-in"><div class="bp-sec-title"><div class="qk-kicker">' + esc(kicker) + '</div>' +
-    (detail ? back : '<h1>' + esc(SECTION_LABEL[sec]) + '</h1><p class="bp-blurb">' + esc(SECTION_BLURB[sec] || '') + '</p>') + '</div>' +
-    '<div class="bp-meta" id="meta-line"></div></div>' +
+  const head = detail ? '<div class="bp-sec-title"><div class="qk-kicker">' + esc(kicker) + '</div>' + back + '</div>'
+    : (window.QK && QK.sectionHead ? QK.sectionHead({ kicker: kicker, title: SECTION_LABEL[sec], sub: SECTION_BLURB[sec] || '', size: 'lg', tag: 'h1', cls: 'bp-sh' })
+      : '<div class="bp-sec-title"><div class="qk-kicker">' + esc(kicker) + '</div><h1>' + esc(SECTION_LABEL[sec]) + '</h1></div>');
+  bar.innerHTML = '<div class="bp-secbar-in">' + head + '<div class="bp-meta" id="meta-line"></div></div>' +
     (tabs.length > 1 && !detail ? '<nav class="qk-tabs bp-tabs" aria-label="' + esc(SECTION_LABEL[sec]) + ' pages">' + tabs.map(t =>
       '<a class="qk-tab" href="' + tabHref(t, L) + '"' + (t[0] === r.name ? ' aria-selected="true" aria-current="page"' : ' aria-selected="false"') + '>' + esc(t[1]) +
       (t[2] === 'mlb' && L !== 'mlb' ? ' <span class="bp-tab-tag">MLB</span>' : '') + '</a>').join('') + '</nav>' : '');
@@ -463,13 +465,26 @@ function go(hash) {
 
 /* Cached fetch of data/<path>. Resolves to the parsed JSON, or null when the file is
  * missing or broken. A payload written with "ok": false resolves as written: test with BP.ok(d). */
+/* Display-only metric labels: payload labels that read as betting words on this site (Statcast's "Edge%" is the shadow
+   zone; the copy rules in docs/_design/STYLE_GUIDE.md keep "edge" out of labels). Applied to every catalogue and the glossary. */
+const RELABEL = { edge_pct: ['Shadow%', 'Pitches in the shadow zone: the band just inside and just outside the border of the strike zone.'] };
+/* per catalogue kind (ACCURACY_AUDIT.md: pitcher R is runs while on the mound; BB is unintentional walks; G counts games with a PA) */
+const RELABEL_KIND = { pitcher: { r: ['R (on the mound)', 'Runs scored while he was on the mound: inherited runners are not reassigned to the pitcher who put them on, and these are not earned runs.'], bb: ['uBB', 'Unintentional walks.'] },
+  hitter: { g: ['G (with a PA)', 'Games with a plate appearance (defensive replacements and pinch runners without a PA are not counted).'], bb: ['uBB', 'Unintentional walks.'] } };
+function relabel(d) {
+  if (!d || typeof d !== 'object') return;
+  const K2 = RELABEL_KIND[d.kind] || null;
+  const fix = m => { const r = m && (RELABEL[m.key] || (K2 && K2[m.key])); if (r) { m.label = r[0]; if (m.desc !== undefined) m.desc = r[1]; } };
+  if (Array.isArray(d.metrics)) d.metrics.forEach(fix);
+  if (Array.isArray(d.groups)) d.groups.forEach(g => (g && Array.isArray(g.entries) ? g.entries.forEach(fix) : null));
+}
 function load(p0) {
   const p = String(p0).replace(/^\/+/, '').replace(/^data\//, '');
   if (Object.prototype.hasOwnProperty.call(CACHE, p)) return Promise.resolve(CACHE[p]);
   if (PENDING[p]) return PENDING[p];
   PENDING[p] = fetch('data/' + p, { cache: 'no-cache' })
     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(d => { learn(p, d); return d; })
+    .then(d => { relabel(d); learn(p, d); return d; })
     .catch(err => { console.warn('payload missing:', p, err.message); return null; })
     .then(d => { if (d !== null) CACHE[p] = d; delete PENDING[p]; return d; });
   return PENDING[p];
@@ -947,55 +962,48 @@ function parkLink(vid, name) {
 function compareHref(a, b) { return '#/compare' + (a ? '/' + encodeURIComponent(a) : '') + (b ? '/' + encodeURIComponent(b) : ''); }
 function glossHref(key) { return '#/glossary' + (key ? '/' + encodeURIComponent(key) : ''); }
 
-/* A GAME_CARD as the kit's game card (index.json today/recent/upcoming, schedule.json), linking to the game centre:
- * the two clubs with the model's (or, live, the in-game) win probability, the probable starters, the score, the
- * probability bar, the model-v-market strip before the first pitch, and a line with the model total, the DraftKings
- * line and the edge. opts {level, season, date: true (show the date), compact, series: true (default)}. */
+/* A GAME_CARD as the kit's v2 game card (QK.gameCard; index.json today/recent/upcoming, schedule.json), linking to the
+ * game centre: the two clubs with our (or, live, the in-game) win chance, the favourite in the signal colour, the
+ * win-probability bar, records (BP.records, filled by pages that load season.json), recent form (BP.forms), the
+ * probable starters, our expected total runs, and the market as a quiet grey reference before the first pitch.
+ * opts {level, season, date: true (show the date), compact, series: true (default), market: false}. */
+const RECORDS = {}, FORMS = {};
+/* A postseason game that was never needed (series decided; Stats API status cancelled / not_needed): hidden everywhere. */
+function notNeeded(g) { return !!g && (g.not_needed === true || (String(g.status || '').toLowerCase() === 'cancelled' && g.gtype && g.gtype !== 'R')); }
+function setRecords(map) { Object.keys(RECORDS).forEach(k => { delete RECORDS[k]; }); Object.keys(map || {}).forEach(k => { RECORDS[k] = map[k]; }); }
+function setForms(map) { Object.keys(FORMS).forEach(k => { delete FORMS[k]; }); Object.keys(map || {}).forEach(k => { FORMS[k] = map[k]; }); }
 function gameCard(g, opts) {
   const o = opts || {};
   const L = o.level || state.level;
   if (!g) return '';
   const st = gameState(g);
-  const m = g.model || {}, mk = g.market || null, ln = g.line || null;
-  const pH = isNum(m.p_home) ? Number(m.p_home) : null;
-  const live = st === 'live', fin = st === 'final';
-  const hs = isNum(g.hs) ? g.hs : null, as = isNum(g.as) ? g.as : null;
-  const pShow = live && isNum(g.wp_home) ? Number(g.wp_home) : pH;
-  const winH = fin && hs !== null && as !== null && hs > as, winA = fin && hs !== null && as !== null && as > hs;
-  const prob = (g.probables || {});
-  const row = (tid, score, p, lost, side) =>
-    '<div class="qk-match-row' + (lost ? ' lost' : '') + '">' + teamMark(tid, 'sm') +
-    '<span class="nm">' + esc(teamShort(tid)) + (st === 'pre' && prob[side] ? ' <small class="bp-sp" title="Probable starter">' + esc(playerSurname(prob[side])) + '</small>' : '') + '</span>' +
-    '<span class="p" title="' + (live && isNum(g.wp_home) ? 'Live' : 'Model pre-game') + ' win probability">' + (p === null || fin ? '' : pct(p, 0)) + '</span>' +
-    '<span class="sc">' + (st === 'pre' || score === null ? '' : esc(score)) + '</span></div>';
-  let badge;
-  if (live) badge = '<span class="qk-badge live">' + esc(isNum(g.inning) ? inningLabel(g.inning, g.half, true) : 'Live') + '</span>';
-  else if (fin) { const n = g.innings && g.innings.length ? g.innings.length : (isNum(g.inning) ? g.inning : 9); badge = '<span class="qk-badge final">Final' + (n > 9 || (n < 9 && n >= 5) ? '/' + n : '') + '</span>'; }
-  else if (st === 'pre') badge = '<span class="qk-badge">' + esc((o.date ? fmtDate(g.date, { year: false, weekday: false }) + ' ' : '') + (fmtTime(g.start || g.date) || 'TBD')) + '</span>';
-  else badge = '<span class="qk-badge warn">' + esc(titleCase(st)) + '</span>';
+  const live = st === 'live', fin = st === 'final', pre = !live && !fin;
+  const m = g.model || {}, mk = g.market || null;
+  const k = kitGame(g, L);
+  if (o.season) k.href = gameHref(g.gpk || g.id, L, o.season);
   const tag = o.series === false ? '' : (g.series ? seriesText(g.series, true) : (g.gtype && g.gtype !== 'R' ? roundLabel(g.gtype) : ''));
-  const lg = [o.date && st !== 'pre' ? fmtDate(g.date, { year: false }) : '', tag || (L === 'aaa' ? 'Triple-A' : 'MLB')].filter(Boolean).join(' · ');
-  const away = teamObj(g.away, L), home = teamObj(g.home, L);
-  const bar = !fin && pShow !== null && window.QK ? QK.probBar(1 - pShow, null, pShow, away, home) : '';
-  const mvm = st === 'pre' && mk && isNum(mk.p_home) && pH !== null && window.QK ? QK.mvm(pH, Number(mk.p_home), teamAbbr(g.home) + ' win') : '';
-  const bits = [];
-  if (isNum(m.total)) bits.push('<span title="Model expected total runs">' + num(m.total, 1) + ' runs</span>');
-  if (ln && (ln.ml || ln.total)) {
-    const ml = Array.isArray(ln.ml) ? ln.ml : null;
-    const tot = ln.total && typeof ln.total === 'object' ? ln.total.line : ln.total;
-    bits.push('<span title="' + esc(ln.src || 'Line') + '">' + esc(ln.src === 'ESPN' || !ln.src ? 'DK' : ln.src) + ' ' + (ml ? esc(teamAbbr(g.home)) + ' ' + fmtOdds(ml[0]) : '') + (isNum(tot) ? ' · O/U ' + num(tot, 1) : '') + '</span>');
+  k.league = [o.date ? fmtDate(g.date, { year: false }) : '', tag || (L === 'aaa' ? 'Triple-A' : 'MLB')].filter(Boolean).join(' · ');
+  const prob = g.probables || {};
+  const sub = side => {
+    const bits = [];
+    if (RECORDS[String(g[side])]) bits.push(RECORDS[String(g[side])]);
+    return bits.join(' · ');
+  };
+  k.away.record = sub('away'); k.home.record = sub('home');
+  if (FORMS[String(g.away)]) k.away.form = FORMS[String(g.away)];
+  if (FORMS[String(g.home)]) k.home.form = FORMS[String(g.home)];
+  if (o.market === false || !mk) k.market_home = null;
+  let html = window.QK && QK.gameCard ? QK.gameCard(k, { sport: false, marketLabel: 'Market', marketTip: 'The prediction-market or no-vig line probability for the home side, shown as a reference next to ours' }) : '';
+  const extra = [];
+  if (isNum(m.total) && !fin) extra.push('<span data-tip="Our expected total runs from the plate-appearance simulation">' + num(m.total, 1) + ' runs expected</span>');
+  if (live && isNum(g.outs)) extra.push('<span>' + esc(outsText(g.outs)) + '</span>');
+  if (pre && (prob.home || prob.away)) extra.push('<span class="bp-gc-sp" title="Probable starters">SP ' + esc(prob.away ? playerSurname(prob.away) : 'TBD') + ' v ' + esc(prob.home ? playerSurname(prob.home) : 'TBD') + '</span>');
+  if (extra.length) {
+    const i = html.lastIndexOf('</a>');
+    if (i > 0) html = html.slice(0, i) + '<div class="bp-gc-extra">' + extra.join('') + '</div>' + html.slice(i);
   }
-  if (live && isNum(g.outs)) bits.push('<span>' + esc(outsText(g.outs)) + '</span>');
-  let edge = '';
-  if (st === 'pre' && mk && isNum(mk.p_home) && pH !== null && Math.abs(pH - mk.p_home) >= 0.05) {
-    const side = pH > mk.p_home ? g.home : g.away, gap = Math.abs(pH - mk.p_home);
-    edge = '<span class="qk-badge edge" data-tip="The model gives ' + esc(teamShort(side)) + ' ' + Math.round(gap * 100) + ' points more than the de-vigged market' + (mk.sources && mk.sources.length ? ' (' + esc(mk.sources.map(function (x) { var k = typeof x === 'string' ? x : ((x && x.source) || ''); return ({ kalshi: 'Kalshi', polymarket: 'Polymarket', draftkings_ml: 'DraftKings', draftkings: 'DraftKings' })[k] || k; }).join(', ')) + ')' : '') + '">Edge ' + esc(teamAbbr(side)) + ' +' + Math.round(gap * 100) + '</span>';
-  }
-  const foot = bits.length || edge ? '<div class="qk-match-foot"><span class="bp-gc-bits">' + bits.join('') + '</span>' + edge + '</div>' : '';
-  return '<a class="qk-match bp-gc' + (live ? ' is-live' : '') + (o.compact ? ' gc-compact' : '') + '" href="' + gameHref(g.gpk || g.id, L, o.season) + '" style="--sa:var(--a-baseball)">' +
-    '<div class="qk-match-top"><span class="lg">' + esc(lg) + '</span>' + badge + '</div>' +
-    '<div class="qk-match-teams">' + row(g.away, as, pShow === null ? null : 1 - pShow, winH, 'away') + row(g.home, hs, pShow, winA, 'home') + '</div>' +
-    (bar || mvm ? '<div class="qk-stack" style="--g:6px">' + bar + (mvm ? '<div style="margin-top:6px">' + mvm + '</div>' : '') + '</div>' : '') + foot + '</a>';
+  if (o.compact) html = html.replace('class="qk-gc', 'class="qk-gc gc-compact');
+  return html;
 }
 /* A GAME_CARD in the kit's shared game shape (QK.matchCard, QK.tick). */
 function kitGame(g, L) {
@@ -1068,7 +1076,8 @@ function tableHTML(cols, rows, opts) {
     const row = Array.isArray(r) ? { cells: r } : r;
     h += '<tr' + (row._class ? ' class="' + row._class + '"' : '') + (row._href ? ' data-href="' + esc(row._href) + '"' : '') + (row._style ? ' style="' + esc(row._style) + '"' : '') + '>';
     row.cells.forEach((c0, i) => {
-      const c = (c0 !== null && typeof c0 === 'object') ? c0 : { v: c0 };
+      /* a string with tags is HTML (as the kit's QK.tableHTML treats it); other primitives are text */
+      const c = (c0 !== null && typeof c0 === 'object') ? c0 : (typeof c0 === 'string' && /<[a-z]/i.test(c0) ? { html: c0 } : { v: c0 });
       const col = typeof cols[i] === 'object' ? cols[i] : {};
       const align = c.align || col.align;
       const cls = [c.cls, col.cls].filter(Boolean).join(' ');
@@ -1118,18 +1127,15 @@ function sortable(el) {
   });
 }
 function lerp(a, b, t) { return a + (b - a) * t; }
-/* Percentiles on the kit's diverging scale, the same on every site: red (poor) through the neutral to blue (great); p is 0-100. */
+/* Percentiles on the kit's v2 scale, the same on every site: cold blue (worst in the peer group) through grey to hot
+ * red (best); p is 0-100 and already oriented (lower-is-better metrics flipped in the payloads). */
 function tokenOf(n, dflt) { const v = window.QK ? QK.cssVar(n) : ''; return v || dflt; }
 function pctColor(p) {
   if (!isNum(p)) return 'var(--s-3)';
-  const t = Math.max(0, Math.min(100, p)) / 100;
-  const neg = tokenOf('--div-neg', '#e66767'), mid = tokenOf('--div-mid', '#383835'), pos = tokenOf('--div-pos', '#3987e5');
-  if (!window.QK) return t < 0.5 ? neg : pos;
-  /* the neutral band is narrow so mid-table players still read as a colour */
-  return t < 0.5 ? QK.color.mix(neg, mid, Math.min(1, t / 0.5) * 0.88) : QK.color.mix(mid, pos, 0.12 + Math.min(1, (t - 0.5) / 0.5) * 0.88);
+  return window.QK && QK.pctHex ? QK.pctHex(p) : 'var(--pc-50)';
 }
 /* Ink for text on a percentile colour. */
-function pctInk(p) { if (!isNum(p) || !window.QK) return 'var(--ink-1)'; const c = pctColor(p); return QK.color.parse(c) ? QK.color.ink(c) : '#fff'; }
+function pctInk(p) { if (!isNum(p) || !window.QK) return 'var(--ink-1)'; return QK.pctInk ? QK.pctInk(p) : '#fff'; }
 function pctPill(p) {
   if (!isNum(p)) return '<span class="pct-pill empty">—</span>';
   return '<span class="pct-pill" style="background:' + pctColor(p) + ';color:' + pctInk(p) + '">' + Math.round(p) + '</span>';
@@ -1145,8 +1151,9 @@ function pctRow(label, p, valueText, title) {
       : '<span class="pct-none">not enough data</span>') +
     '</div><span class="pct-val">' + (valueText === undefined ? '' : valueText) + '</span></div>';
 }
-/* A kit KPI tile; value and sub are HTML. */
+/* A v2 stat tile (QK.statTile); value and sub are HTML. */
 function statTile(label, value, sub, cls) {
+  if (window.QK && QK.statTile) return QK.statTile({ label: label, value: value === undefined || value === null ? '—' : value, sub: sub || '', html: true, cls: cls || '' });
   return '<div class="qk-kpi kpi' + (cls ? ' ' + cls : '') + '"><div class="qk-kpi-label kpi-label">' + esc(label) + '</div>' +
     '<div class="qk-kpi-value kpi-value">' + (value === undefined || value === null ? '—' : value) + '</div>' + (sub ? '<div class="qk-kpi-sub kpi-sub">' + sub + '</div>' : '') + '</div>';
 }
@@ -1196,7 +1203,9 @@ function wireToggles(root, attr, fn) {
     fn(b.getAttribute(a));
   }));
 }
+/* A page head inside a section: the kit's v2 section head (title, sub-line and the links at the right). */
 function pageHead(title, sub, right) {
+  if (window.QK && QK.sectionHead) return QK.sectionHead({ title: esc(title), sub: sub || '', actions: right ? '<div class="bp-ph-links">' + right + '</div>' : '', html: true });
   return '<div class="page-head"><div><h2>' + esc(title) + '</h2>' + (sub ? '<div class="ph-sub">' + sub + '</div>' : '') + '</div>' +
     (right ? '<div class="ph-nav">' + right + '</div>' : '') + '</div>';
 }
@@ -1390,7 +1399,7 @@ return {
   halfOf: halfOf, inningLabel: inningLabel, countText: countText, outsText: outsText, basesOf: basesOf, basesHTML: basesHTML, baseOutText: baseOutText,
   pitchName: pitchName, pitchColour: pitchColour, pitchChip: pitchChip, callInfo: callInfo, eventLabel: eventLabel, isHit: isHit,
   roundLabel: roundLabel, roundKey: roundKey, gameState: gameState, isFinal: isFinal, isLive: isLive, statusChip: statusChip, seriesText: seriesText,
-  gameCard: gameCard, titleProbs: titleProbs,
+  gameCard: gameCard, titleProbs: titleProbs, notNeeded: notNeeded, setRecords: setRecords, setForms: setForms, RECORDS: RECORDS, FORMS: FORMS,
   // names and links
   player: player, playerInfo: playerInfo, playerName: playerName, playerShort: playerShort, playerSurname: playerSurname, isPitcher: isPitcher,
   playerColour: playerColour, playerLink: playerLink, playerHref: playerHref,

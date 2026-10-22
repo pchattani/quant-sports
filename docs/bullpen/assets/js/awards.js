@@ -33,7 +33,8 @@ function probsOf(x) {
 function render(el, params, state) {
   const k = K();
   const L = 'mlb';   // the award models are MLB only
-  el.innerHTML = '<div class="card"><div class="card-header">Award races <span class="card-sub" id="aw-sub">Loading…</span></div><div class="pg-note gq-note">The model prices each race from the season so far: a conditional logit on value and the features voters reward, fitted on the 2015–2025 winners. Markets are Kalshi and Polymarket midpoints, de-vigged across the field when the field is complete enough. The edge is model minus market in percentage points; it says where the two disagree, not what will happen. 18+; for information only.</div></div><div id="aw-body"></div>';
+  el.innerHTML = QK.sectionHead({ kicker: 'Award races · MLB', title: 'Who wins the awards', sub: 'Our chance for every candidate from the season so far: a conditional logit on value and the features voters reward, fitted on the 2015–2025 winners. The grey tick is the Kalshi / Polymarket number, de-vigged across the field, for reference.' }) +
+    '<p class="bp-note" id="aw-sub"></p><div id="aw-body"></div>';
   return k.ready().then(() => {
     const S = k.S(params, state);
     return Promise.all([k.loadY(L, S, 'awards.json'), k.loadNames()]).then(res => ({ S: S, d: res[0] }));
@@ -46,7 +47,7 @@ function render(el, params, state) {
     keys.sort((a, b) => (ORDER.indexOf(a) < 0 ? 99 : ORDER.indexOf(a)) - (ORDER.indexOf(b) < 0 ? 99 : ORDER.indexOf(b)));
     document.getElementById('aw-sub').textContent = keys.length + ' races · ' + S + (d.updated_at ? ' · updated ' + k.fmtDate(d.updated_at, { year: false }) : '');
     let h = '<div class="grid-2 gq-awards">';
-    keys.forEach((key, i) => { h += '<div class="card"><div class="card-header">' + k.esc(awardLabel(key, A[key])) + ' <span class="card-sub" id="aw-s-' + i + '"></span></div><div id="aw-c-' + i + '" style="height:240px"></div><div id="aw-t-' + i + '"></div></div>'; });
+    keys.forEach((key, i) => { h += '<div class="qk-card"><div class="qk-card-head"><div><div class="qk-card-title">' + k.esc(awardLabel(key, A[key])) + '</div><div class="qk-card-sub" id="aw-s-' + i + '"></div></div></div><div class="qk-card-body"><div id="aw-c-' + i + '"></div><div id="aw-t-' + i + '" style="margin-top:12px"></div></div></div>'; });
     body.innerHTML = h + '</div>';
     keys.forEach((key, i) => race(L, S, A[key], i));
   });
@@ -64,24 +65,20 @@ function race(L, S, a, i) {
   const top = ids.slice(0, 12);
   const fkeys = Array.from(new Set([].concat.apply([], top.map(pid => Object.keys(feats[pid] || {}).filter(f => k.isNum(feats[pid][f]) && !/^(z_|p$|rank|pid|league|team$)/.test(f)))))).slice(0, 5);
   const pitch = /cy/i.test(a.label || '') || fkeys.some(f => /^(ip|ra9|era)$/.test(f));
-  document.getElementById('aw-t-' + i).innerHTML = top.length ? k.table([{ label: 'Candidate' }, { label: 'Model', align: 'right' }, { label: 'Market', align: 'right' }, { label: 'Edge', align: 'right', title: 'Model minus market, percentage points' }]
+  document.getElementById('aw-t-' + i).innerHTML = top.length ? k.table([{ label: 'Candidate' }, { label: 'Our chance', align: 'right' }, { label: 'Market', align: 'right', title: 'Kalshi / Polymarket, de-vigged: a reference' }]
     .concat(fkeys.map(f => ({ label: FEAT[f] || k.titleCase(f), align: 'right' }))),
   top.map(pid => { const f = feats[pid] || {}, m = model[pid], mk = market[pid];
-    const e = k.isNum(m) && k.isNum(mk) ? 100 * (m - mk) : null;
-    return [{ v: k.name(pid), html: k.playerLink(L, pid, (f.name || null), S, pitch ? 'pitcher' : null) + (f.team ? ' ' + k.teamChip(L, f.team, S) : '') }, { v: m, html: k.isNum(m) ? '<strong>' + k.pct(m, 1) + '</strong>' : '—' }, { v: mk, html: k.isNum(mk) ? k.pct(mk, 1) : '—' },
-      { v: e, html: k.isNum(e) ? '<span class="' + (e > 0.5 ? 'gq-ok' : e < -0.5 ? 'gq-no' : '') + '">' + k.signed(e, 1) + '</span>' : '—' }]
+    return [{ v: k.name(pid), html: k.playerLink(L, pid, (f.name || null), S, pitch ? 'pitcher' : null) + (f.team ? ' ' + k.teamChip(L, f.team, S) : '') }, { v: m, html: k.isNum(m) ? '<strong>' + k.pct(m, 1) + '</strong>' : '—' }, { v: mk, html: k.isNum(mk) ? '<span class="qk-muted">' + k.pct(mk, 1) + '</span>' : '—' }]
       .concat(fkeys.map(fk => ({ v: f[fk], html: k.isNum(f[fk]) ? (/win|wpct/.test(fk) ? k.rate3(f[fk]) : /woba/.test(fk) ? k.rate3(f[fk]) : /ra9|era|fip/.test(fk) ? k.num(f[fk], 2) : /value|war/.test(fk) ? k.num(f[fk], 1) : /^ip$/.test(fk) ? k.fmtV(f[fk], 'ip') : k.int(f[fk])) : '—' }))); }), { compact: true })
     : k.muted('No candidates yet.');
   const s = document.getElementById('aw-s-' + i);
   const FN = { value: 'value (WAR)', hr: 'home runs', team: 'team win %', woba: 'wOBA', k: 'strikeouts', ip: 'innings', ra9: 'RA9', pa_ip: 'playing time' };
-  if (s) s.innerHTML = (Object.keys(market).length ? 'model v market' : 'model only' + (a.market && a.market.reason ? ' (' + k.esc(a.market.reason) + ')' : ': no complete market')) + ' · ' + ids.length + ' candidates' +
+  if (s) s.innerHTML = (Object.keys(market).length ? 'our chance, the market a grey tick' : 'our chance' + (a.market && a.market.reason ? ' (no market: ' + k.esc(a.market.reason) + ')' : '')) + ' · ' + ids.length + ' candidates' +
     (Array.isArray(a.features) ? ' · weighs ' + a.features.map(f => FN[f] || f).join(', ') : '') + (a.reason ? ' · ' + k.esc(a.reason) : '');
   const node = document.getElementById('aw-c-' + i);
-  const bars = top.slice(0, 8).reverse();
+  const bars = top.slice(0, 8);
   if (!bars.length) { node.style.display = 'none'; return; }
-  const tr = [{ type: 'bar', orientation: 'h', name: 'Model', y: bars.map(pid => k.surname(k.name(pid))), x: bars.map(pid => model[pid] || 0), marker: { color: '#f97316' }, hovertemplate: '%{y}: %{x:.1%}<extra>model</extra>' }];
-  if (Object.keys(market).length) tr.push({ type: 'bar', orientation: 'h', name: 'Market', y: bars.map(pid => k.surname(k.name(pid))), x: bars.map(pid => market[pid] || 0), marker: { color: '#58a6ff' }, hovertemplate: '%{y}: %{x:.1%}<extra>market</extra>' });
-  k.plot(node, tr, k.layout(Object.assign({ barmode: 'group', margin: { l: 96, r: 10, t: 24, b: 28 }, xaxis: { title: 'Chance of winning', tickformat: '.0%', range: [0, 1] }, yaxis: { type: 'category', automargin: true } }, k.legendTop())));
+  node.innerHTML = QK.chances(bars.map(pid => ({ label: k.name(pid), p: model[pid] || 0, market: k.isNum(market[pid]) ? market[pid] : null, href: BP.playerHref(pid, { level: L, role: pitch ? 'pitcher' : null }) })), { marketName: 'Market (Kalshi / Polymarket)' });
 }
 
 if (typeof BP.route === 'function') { BP.route('awards', render); try { BP.route('#/awards', render); } catch (e) { /* bound */ } }

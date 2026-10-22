@@ -48,10 +48,11 @@ const ST = { extra: [], league: '', sort: null };
 function renderTeams(el, params, state) {
   const k = K();
   const L = k.L(params, state);
-  el.innerHTML = '<div class="card"><div class="card-header">' + k.LN(L) + ' teams <span class="card-sub" id="tm-sub">Loading…</span></div>' +
+  el.innerHTML = QK.sectionHead({ kicker: 'Teams · ' + k.LN(L), title: 'Every club', sub: 'Records, our ratings and chances, and each club’s percentile on the team metrics; add any metric as a column.' }) +
+    '<div class="card"><div class="card-header">' + k.LN(L) + ' teams <span class="card-sub" id="tm-sub">Loading…</span></div>' +
     '<div class="lab-controls gq-controls"><label>League<select id="tm-lg"><option value="">Both leagues</option></select></label><label>Add a metric<select id="tm-extra"><option value="">—</option></select></label><label>&nbsp;<button type="button" class="gq-btn" id="tm-clear">Clear added</button></label></div>' +
     '<div id="tm-chips" class="gq-chips"></div><div id="tm-table">' + k.muted('Loading…') + '</div><div class="pg-note gq-note" id="tm-note"></div></div>' +
-    '<div class="card"><div class="card-header">Run prevention against run scoring <span class="card-sub">Our team ratings in runs per game against an average team: offence from batting and baserunning runs, prevention from pitching (expected runs from xwOBA+ against) plus fielding and framing. Marker size is postseason odds.</span></div><div id="tm-chart" style="height:440px"></div></div>';
+    '<div class="card"><div class="card-header">Run prevention against run scoring <span class="card-sub">Our team ratings in runs per game against an average team: offence from batting and baserunning runs, prevention from pitching (expected runs from xwOBA+ against) plus fielding and framing. Marker size is our postseason chance.</span></div><div id="tm-chart" style="height:440px"></div></div>';
   return k.ready().then(() => {
     const S = k.S(params, state);
     return Promise.all([k.loadY(L, S, 'teams.json'), k.loadY(L, S, 'season.json')]).then(res => ({ S: S, res: res }));
@@ -99,7 +100,7 @@ function renderTeams(el, params, state) {
     $('tm-clear').onclick = () => { ST.extra = []; draw(); };
     $('tm-chips').onclick = ev => { const b = ev.target.closest('[data-rm]'); if (b) { ST.extra = ST.extra.filter(x => x !== b.dataset.rm); draw(); } };
     draw();
-    $('tm-note').innerHTML = 'Pills are percentiles among the ' + ids.length + ' teams (100 = best). Playoff and title odds come from the season simulation; expected records from our team ratings. The team catalogue has ' + metrics.length + ' metrics; every one is on each team page and in <a href="#/compare">compare</a>.';
+    $('tm-note').innerHTML = 'Pills are percentiles among the ' + ids.length + ' teams (100 = best). Our playoff and title chances come from the season simulation; expected records from our team ratings. The team catalogue has ' + metrics.length + ' metrics; every one is on each team page and in <a href="#/compare">compare</a>.';
   });
 }
 
@@ -129,67 +130,105 @@ function chart(L, S, list, T, rows) {
 
 function renderTeam(el, params, state) {
   const k = K();
+  const U = BP.ui;
   const L = k.L(params, state);
   const tid = String(params.id || (params.rest || [])[0] || '');
-  el.innerHTML = k.muted('Loading…');
+  el.innerHTML = QK.skeleton('card', 2);
   return k.ready().then(() => {
     const S = k.S(params, state);
-    return Promise.all([k.loadY(L, S, 'teams.json'), k.loadY(L, S, 'season.json'), k.loadY(L, S, 'parks.json'), k.loadY(L, S, 'hitters.json'), k.loadY(L, S, 'pitchers.json'), k.loadNames(), k.loadY(L, S, 'schedule.json')])
+    /* first load: teams.json, season.json and parks.json; the 11 MB player catalogues load only for the detailed lineup and
+       rotation (button), the schedule is not needed (the team log carries our pre-game chance). */
+    return Promise.all([k.loadY(L, S, 'teams.json'), k.loadY(L, S, 'season.json'), k.loadY(L, S, 'parks.json'), k.loadNames(), U.gloss()])
       .then(res => ({ S: S, res: res }));
   }).then(o => {
     if (!k.alive(el)) return;
-    const S = o.S, res = o.res;
+    const S = o.S, res = o.res, gl = res[4];
     const cat = teamsOf(res[0]), rows = seasonRows(res[1]);
     const T = (cat && cat.teams) || {};
     Object.keys(T).forEach(t => k.learnTeam(t, T[t]));
     const tm = T[tid] || null, r = rows[tid] || {};
     if (!tm && !rows[tid]) { el.innerHTML = k.card('Team', '', k.notBuilt('The page for ' + k.teamName(tid), res[0]) + '<div class="pg-note gq-note"><a href="' + k.href(L, 'teams', S) + '">All teams →</a></div>'); return; }
-    const hcat = k.catOf(res[3], 'hitters'), pcat = k.catOf(res[4], 'pitchers');
-    [hcat, pcat].forEach(cc => { if (cc) k.learnCat(cc); });
+    if (BP.setRecords) BP.setRecords(U.records(res[1] || {}));
     const t = tm || {}, v = t.values || {}, pc = t.pct || {}, meta = k.metaOf((cat || {}).metrics);
     const od = oddsOf(Object.assign({}, v, t.odds || {}, r));
     const w = [r.w, v.w].find(k.isNum), l = [r.l, v.l].find(k.isNum);
     const rd = [r.rd, v.rd].find(k.isNum);
     const info = k.team(tid);
-    const sub = [info.league ? '<span class="chip">' + k.esc(info.league) + '</span>' : '', info.division ? '<span>' + k.esc(info.division) + '</span>' : '', k.isNum(w) ? '<strong>' + w + '–' + l + '</strong>' : '',
-      k.isNum(r.div_rank) ? '<span>' + k.ordinal(r.div_rank) + ' in division</span>' : '', '<span class="chip">' + k.LN(L) + ' ' + S + '</span>'].filter(Boolean).join(' ');
     const vid = t.park || info.venue;
-    const links = ['<a href="' + k.compareHref('t' + tid, '') + '">Compare →</a>', vid ? '<a href="' + k.parkHref(vid) + '">' + k.esc(k.parkName(vid)) + ' →</a>' : '', '<a href="' + k.href(L, 'teams', S) + '">All teams →</a>'].filter(Boolean).join('');
-    let h = k.head(k.esc(k.teamName(tid)), sub, links, k.esc(k.teamAbbr(tid)), k.teamColour(tid));
     const xw = [r.exp_w, v.exp_w].find(k.isNum), xl = k.isNum(xw) && k.isNum(w) ? w + l - xw : null, pw = [r.pythag_w, v.pythag_w].find(k.isNum);
     const rt = { off: [r.off, v.off_rpg].find(k.isNum), def: [r.def, v.def_rpg].find(k.isNum), pit: [r.pit, v.pit_rpg].find(k.isNum), tot: [r.rating, v.rating].find(k.isNum) };
-    h += k.tiles([
-      k.tile('Record', k.isNum(w) ? w + '–' + l : '—', k.isNum(rd) ? 'run differential ' + k.signed(rd, 0) : ''),
-      k.tile('Expected', k.isNum(xw) ? k.num(xw, 0) + '–' + k.num(xl, 0) : '—', (k.isNum(pw) ? 'Pythagorean ' + k.num(pw, 0) + ' wins · ' : '') + 'from our ratings'),
-      k.tile('Rating', k.isNum(rt.tot) ? k.signed(rt.tot, 2) : '—', 'runs per game v average: offence ' + k.signed(rt.off, 2) + ' · pitching ' + k.signed(rt.pit, 2) + ' · fielding ' + k.signed(rt.def, 2)),
-      k.tile('Playoffs', k.isNum(od.p_playoffs) ? k.pct(od.p_playoffs, 1) : '—', k.isNum(od.p_division) ? 'division ' + k.pct(od.p_division, 1) : (r.clinched ? 'clinched ' + k.esc(r.clinched) : '')),
-      k.tile('World Series', k.isNum(od.p_ws) ? k.pct(od.p_ws, 1) : '—', k.isNum(od.p_pennant) ? 'pennant ' + k.pct(od.p_pennant, 1) : 'season simulation'),
-      k.tile('Roster WAR', k.isNum(v.war) ? k.signed(v.war, 1) : '—', k.isNum(pc.war) ? k.ordinal(pc.war) + ' percentile' : 'Bullpen WAR, hitters and pitchers')
-    ]);
-    if (Object.keys(od).length > 1) h += '<div class="card"><div class="card-header">Playoff odds <span class="card-sub">Season simulation: the share of runs in which the team reaches each stage.' + (k.isNum(r.magic) ? ' Magic number ' + k.esc(r.magic) + '.' : '') + '</span></div><div class="gq-odds">' +
-      ODDS.filter(x => k.isNum(od[x[0]])).map(x => '<div class="gq-odd"><span>' + k.esc(x[1]) + '</span><div class="gq-odd-bar"><i style="width:' + (100 * od[x[0]]).toFixed(1) + '%;background:' + k.teamColour(tid) + '"></i></div><strong>' + k.pct(od[x[0]], 1) + '</strong></div>').join('') + '</div></div>';
-    h += '<div class="card"><div class="card-header">Team profile <span class="card-sub">Percentiles among ' + k.LN(L) + ' teams on the team catalogue.</span></div><div class="gq-pad">' + (cat && cat.metrics ? k.sliders(cat.metrics, v, pc, {}) : k.muted('The team catalogue is not available yet.')) + '</div></div>';
-    h += '<div class="card"><div class="card-header">Roster value <span class="card-sub">Bullpen WAR this season for everyone who played for the team (latest team), plus the 40-man roster and injured list where the fetch recorded them. Click a player for his page.</span></div><div class="grid-2"><div id="tm-roster"></div><div id="tm-war" style="height:360px"></div></div></div>';
-    h += '<div id="tm-value"></div>';
+    document.title = k.teamName(tid) + ' · ' + BP.SITE;
+    const hero = QK.playerHeader({ name: k.teamName(tid), split: false, pos: [info.league, info.division].filter(Boolean).join(' · '), kicker: k.LN(L) + ' ' + S + (k.isNum(r.div_rank) ? ' · ' + k.ordinal(r.div_rank) + ' in the division' : ''),
+      team: { name: k.teamAbbr(tid), abbr: k.teamAbbr(tid), colour: (BP.teamInfo(tid) || {}).colour },
+      meta: [vid ? ['Home park', k.parkName(vid)] : null, k.isNum(pw) ? ['Pythagorean', k.num(pw, 0) + ' wins'] : null],
+      stats: [{ label: 'Record', value: k.isNum(w) ? w + '-' + l : '—' }, { label: 'Run diff', value: k.isNum(rd) ? k.signed(rd, 0) : '—' }, { label: 'Rating', value: k.isNum(rt.tot) ? k.signed(rt.tot, 2) : '—' }] });
+    const tiles = [];
+    if (k.isNum(od.p_ws)) tiles.push({ label: 'World Series chance', value: k.pct(od.p_ws, 1), signal: true, sub: k.isNum(od.p_pennant) ? 'pennant ' + k.pct(od.p_pennant, 1) : 'season simulation', tip: 'Our chance from simulating the rest of the season and the bracket' });
+    if (k.isNum(od.p_playoffs)) tiles.push({ label: 'Postseason chance', value: k.pct(od.p_playoffs, 1), signal: !k.isNum(od.p_ws), sub: k.isNum(od.p_division) ? 'division ' + k.pct(od.p_division, 1) : (r.clinched ? 'clinched' : '') });
+    tiles.push({ label: 'Team rating', value: k.isNum(rt.tot) ? k.signed(rt.tot, 2) : '—', pctl: pc.rating, sub: 'offence ' + k.signed(rt.off, 2) + ' · pitching ' + k.signed(rt.pit, 2) + ' · fielding ' + k.signed(rt.def, 2), tip: 'Runs a game better than an average club' });
+    tiles.push({ label: 'Expected record', value: k.isNum(xw) ? k.num(xw, 0) + '-' + k.num(xl, 0) : '—', sub: 'from our ratings' });
+    if (k.isNum(v.war)) tiles.push({ label: 'Roster WAR', value: k.signed(v.war, 1), pctl: pc.war, sub: 'Bullpen WAR, hitters and pitchers' });
+    const stages = [['p_playoffs', 'Postseason'], ['p_division', 'Win the division'], ['p_bye', 'A first-round bye'], ['p_pennant', 'Win the pennant'], ['p_ws', 'Win the World Series']].filter(x => k.isNum(od[x[0]]));
+    const tGroups = U.pctGroups({ values: v, pct_role: pc, n: { g: v.g } }, 'team', 'TEAM', gl, 'head');
+    const links = '<a class="qk-btn" href="' + k.compareHref('t' + tid, '') + '?view=classic">Compare</a>' + (vid ? '<a class="qk-btn" href="' + k.parkHref(vid) + '">' + k.esc(k.parkName(vid)) + '</a>' : '') + '<a class="qk-btn" href="' + k.href(L, 'teams', S) + '">All teams</a>';
+    let h = '<div class="qk-kicker" style="margin-bottom:10px"><a href="' + k.href(L, 'teams', S) + '">← Teams</a></div>' + hero + '<div class="bp-flexrow" style="justify-content:flex-end">' + links + '</div>' +
+      '<div class="bp-kpis" style="margin-top:var(--sp-5)">' + QK.stats(tiles) + '</div>';
+    h += '<div class="qk-grid"><div class="qk-span-5"><div class="bp-stack">' +
+      (stages.length ? U.card2('Season simulation', 'Our chance of reaching each stage' + (k.isNum(r.magic) ? ' · magic number ' + k.esc(r.magic) : ''), QK.chances(stages.map(x => ({ label: x[1], p: od[x[0]], color: (BP.teamInfo(tid) || {}).colour })), { sort: false, max: 1, key: false })) : '') +
+      QK.pctCard({ title: 'Team profile', peer: 'MLB clubs', sample: k.isNum(v.g) ? v.g + ' games' : '', groups: tGroups, foot: '<span>Percentiles among the ' + Object.keys(T).length + ' clubs; 100 = best</span><a href="' + k.compareHref('t' + tid, '') + '?view=classic">Every metric →</a>' }) +
+      '</div></div><div class="qk-span-7">' + U.card2('Roster value', 'Bullpen WAR this season for everyone who played for the club (latest team), with the 40-man roster and injured list where recorded', '' + BP.ui.chart('tm-war', 330, 'Roster WAR') + '<div id="tm-roster" style="margin-top:12px"></div>') + '</div></div>';
+    h += '<div id="tm-mv"></div><div id="tm-value"></div>';
     h += '<div id="tm-moves"></div>';
-    h += '<div class="grid-2"><div class="card"><div class="card-header">Projected lineup <span class="card-sub">The regulars (most plate appearances) ordered by projected wOBA, with their wOBA against each pitcher hand this season. The game model itself uses the posted lineup, else the latest one against a starter of the same hand.</span></div><div id="tm-lineup"></div></div>' +
-      '<div class="card"><div class="card-header">Rotation <span class="card-sub">Starters by starts, with expected RA9 from xwOBA+ against and the pitch-model scores.</span></div><div id="tm-rot"></div></div></div>';
-    h += '<div class="grid-2"><div class="card"><div class="card-header">Bullpen <span class="card-sub">Relievers by appearances, with their leverage (gmLI) and quality. On game day the model makes a reliever unavailable after 30+ pitches the day before or pitching on both of the last two days, and half-available after pitching yesterday; the game centre shows that day\'s availability.</span></div><div id="tm-pen"></div></div>' +
-      '<div class="card"><div class="card-header">Defence <span class="card-sub">Our fielding runs and outs above expected against Savant\'s OAA, and framing.</span></div><div id="tm-def"></div></div></div>';
+    h += '<div class="qk-grid" style="margin-top:var(--sp-4)"><div class="qk-span-6">' + U.card2('Regular lineup', 'The nine with the most plate appearances, by xwOBA+ (our expected wOBA); our game forecast uses the posted lineup', '<div id="tm-lineup"></div>') + '</div>' +
+      '<div class="qk-span-6">' + U.card2('Rotation', 'Starters by innings, with runs allowed per nine and Stuff+', '<div id="tm-rot"></div>') + '</div></div>' +
+      '<p class="bp-note"><button type="button" class="qk-btn" id="tm-more">Load splits and pitch-model columns</button> Platoon splits, projections and Pitching+ come from the season catalogues (about 11 MB).</p>';
+    h += '<div class="grid-2"><div class="card"><div class="card-header">Bullpen <span class="card-sub">Relievers by appearances, with their leverage (gmLI) and quality. On game day our forecast makes a reliever unavailable after 30+ pitches the day before or pitching on both of the last two days, and half-available after pitching yesterday; the game centre shows that day\'s availability.</span></div><div id="tm-pen"></div></div>' +
+      '<div class="card"><div class="card-header">Defence <span class="card-sub">Our fielding runs and outs above expected beside Savant\'s OAA, and framing.</span></div><div id="tm-def"></div></div></div>';
     h += '<div class="card"><div class="card-header">Home park <span class="card-sub">Our park factors (100 = neutral) by batter hand and batted-ball type.</span></div><div id="tm-park"></div></div>';
-    h += '<div class="card"><div class="card-header">Schedule and results against the model <span class="card-sub">Every game with the model\'s pre-game win probability and the market\'s; the line is wins minus the model\'s expected wins.</span></div><div id="tm-logc" style="height:260px"></div><div id="tm-log"></div></div>';
+    h += U.card2('Schedule and results', 'Every game with our pre-game win chance; the line is wins minus the wins we expected', U.chart('tm-logc', 260, 'Wins minus expected wins') + '<div id="tm-log"></div>');
     el.innerHTML = h;
     roster(L, S, t, tid, meta);
-    lineup(L, S, t, tid, hcat);
-    rotation(L, S, t, tid, pcat);
-    bullpen(L, S, t, tid, pcat);
+    lineupLite(L, S, t);
+    bullpen(L, S, t, tid, null);
     defence(t, meta);
     park(res[2], vid);
-    logTable(L, S, t, tid, res[6]);
+    logTable(L, S, t, tid);
+    const more = document.getElementById('tm-more');
+    if (more) more.onclick = () => {
+      more.disabled = true; more.textContent = 'Loading…';
+      Promise.all([k.loadY(L, S, 'hitters.json'), k.loadY(L, S, 'pitchers.json')]).then(cs => {
+        if (!k.alive(el)) return;
+        const hcat = k.catOf(cs[0], 'hitters'), pcat = k.catOf(cs[1], 'pitchers');
+        [hcat, pcat].forEach(cc => { if (cc) k.learnCat(cc); });
+        lineup(L, S, t, tid, hcat);
+        rotation(L, S, t, tid, pcat);
+        if (!(t.bullpen || t.pen)) bullpen(L, S, t, tid, pcat);
+        more.parentNode.style.display = 'none';
+      });
+    };
     if (typeof BP.valueTeam === 'function') BP.valueTeam(document.getElementById('tm-value'), L, S, tid);   // value.js: strengths and needs
     if (typeof BP.movesTeam === 'function') BP.movesTeam(document.getElementById('tm-moves'), L, S, tid);   // moves.js: trades and moves
+    if (BP.moves) BP.moves.teamCards(document.getElementById('tm-mv'), tid, L, S);   // bp-moves.js: outlook and targets
     if (typeof BP.setMeta === 'function') { try { BP.setMeta(k.esc(k.teamName(tid))); } catch (e) { /* optional */ } }
   });
+}
+/* Lineup and rotation from the team's roster rows (teams.json): no catalogue needed. */
+function lineupLite(L, S, t) {
+  const k = K();
+  const rows = rosterRows(t);
+  const hit = rows.filter(r => r.kind === 'hitter' && k.isNum(r.pa)).sort((a, b) => b.pa - a.pa).slice(0, 9).sort((a, b) => (b.xwoba_plus || 0) - (a.xwoba_plus || 0));
+  const pit = rows.filter(r => r.kind === 'pitcher' && String(r.pos).toUpperCase() === 'SP' && k.isNum(r.ip)).sort((a, b) => b.ip - a.ip).slice(0, 6);
+  const lu = document.getElementById('tm-lineup'), ro = document.getElementById('tm-rot');
+  if (lu) QK.leaderboard(lu, { dense: true, rank: true, columns: [
+    { key: 'name', label: 'Hitter', type: 'entity', sub: 'pos', href: x => k.hitterHref(L, x.pid, S) },
+    { key: 'pa', label: 'PA', num: true }, { key: 'woba', label: 'wOBA', num: true, fmt: x => k.rate3(x) }, { key: 'xwoba_plus', label: 'xwOBA+', num: true, fmt: x => k.rate3(x) },
+    { key: 'war', label: 'WAR', type: 'bar', fmt: x => (k.isNum(x) ? k.signed(x, 1) : '—') }], rows: hit.map(x => Object.assign({ name: x.name || k.name(x.pid) }, x)), sort: { key: 'xwoba_plus', dir: 'desc' } });
+  if (lu && !hit.length) lu.innerHTML = QK.empty('No lineup yet');
+  if (ro) QK.leaderboard(ro, { dense: true, columns: [
+    { key: 'name', label: 'Starter', type: 'entity', href: x => k.pitcherHref(L, x.pid, S) },
+    { key: 'ip', label: 'IP', num: true, fmt: x => k.num(x, 1) }, { key: 'ra9', label: 'RA9', num: true, fmt: x => k.num(x, 2) }, { key: 'stuff_plus', label: 'Stuff+', num: true, fmt: x => k.fmtV(x, 'plus') },
+    { key: 'war', label: 'WAR', type: 'bar', fmt: x => (k.isNum(x) ? k.signed(x, 1) : '—') }], rows: pit.map(x => Object.assign({ name: x.name || k.name(x.pid) }, x)), sort: { key: 'ip', dir: 'desc' } });
+  if (ro && !pit.length) ro.innerHTML = QK.empty('No starters yet');
 }
 
 function rosterRows(t) {
@@ -202,7 +241,7 @@ function roster(L, S, t, tid, meta) {
   const k = K();
   const rows = rosterRows(t);
   const host = document.getElementById('tm-roster');
-  if (!rows.length) { host.innerHTML = k.muted('The roster is not available yet.'); document.getElementById('tm-war').style.display = 'none'; return; }
+  if (!rows.length) { host.innerHTML = QK.empty('No roster yet', 'The roster is not available yet.'); document.getElementById('tm-war').style.display = 'none'; return; }
   rows.forEach(r => { if (r.name) k.learn(r.pid, { name: r.name, pos: r.pos }); });
   const war = r => k.val(r, ['war']);
   const role = r => (r.kind === 'pitcher' ? 'pitcher' : r.kind === 'hitter' ? 'hitter' : null);
@@ -210,15 +249,28 @@ function roster(L, S, t, tid, meta) {
     : r.kind === 'hitter' ? (k.isNum(r.woba) ? k.rate3(r.woba) + ' wOBA' : '') + (k.isNum(r.xwoba_plus) ? ' · ' + k.rate3(r.xwoba_plus) + ' xwOBA+' : '') : '');
   const inj = r => (Array.isArray(r.injured) && r.injured.length ? r.injured.filter(Boolean).join(': ') : (typeof r.injured === 'string' ? r.injured : ''));
   rows.sort((a, b) => (war(b) === null ? -99 : war(b)) - (war(a) === null ? -99 : war(a)));
-  host.innerHTML = k.table([{ label: 'Player' }, { label: 'Pos' }, { label: 'PA / IP', align: 'right' }, { label: 'WAR', align: 'right' }, { label: 'Line' }, { label: 'Status' }],
-    rows.map(r => ({ _href: role(r) ? (role(r) === 'pitcher' ? k.pitcherHref(L, r.pid, S) : k.hitterHref(L, r.pid, S)) : '', cells: [{ v: r.name || k.name(r.pid), html: role(r) ? k.playerLink(L, r.pid, r.name, S, role(r)) : k.esc(r.name || k.name(r.pid)) },
-      { v: r.pos || '', html: k.esc(r.pos || '—') }, { v: k.val(r, ['pa', 'ip']), html: k.isNum(r.pa) ? k.int(r.pa) : k.isNum(r.ip) ? k.num(r.ip, 1) : '—' },
-      { v: war(r), html: k.isNum(war(r)) ? k.signed(war(r), 1) : '—' }, { v: '', html: '<span class="muted-inline">' + stat(r) + '</span>' },
-      { v: inj(r), html: inj(r) ? '<span class="chip warn">' + k.esc(inj(r)) + '</span>' : (r.kind === '40man' ? '<span class="muted-inline">40-man</span>' : '') }] })), { compact: true, sticky: true });
-  k.sortable(host);
-  const top = rows.filter(r => k.isNum(war(r))).slice(0, 16).reverse();
-  if (top.length) k.plot('tm-war', [{ type: 'bar', orientation: 'h', y: top.map(r => k.surname(r.name || k.name(r.pid))), x: top.map(war), marker: { color: top.map(r => (r.kind === 'pitcher' ? '#58a6ff' : k.teamColour(tid))) },
-    hovertemplate: '%{y}: %{x:+.1f} WAR<extra></extra>' }], k.layout({ margin: { l: 100, r: 10, t: 10, b: 30 }, xaxis: { title: 'Bullpen WAR (pitchers in blue)' }, yaxis: { type: 'category', automargin: true } }));
+  const drawRoster = mv => QK.leaderboard(host.querySelector('.bp-roster-t') || host, { dense: true, maxHeight: 420, sort: mv ? { key: 'p_move', dir: 'desc' } : null, columns: [
+    { key: 'name', label: 'Player', type: 'entity', sub: 'pos', href: r => (role(r) ? (role(r) === 'pitcher' ? k.pitcherHref(L, r.pid, S) : k.hitterHref(L, r.pid, S)) : null) },
+    { key: 'pa_ip', label: 'PA / IP', num: true, fmt: (x, r) => (k.isNum(r.pa) ? k.int(r.pa) : k.isNum(r.ip) ? k.num(r.ip, 1) : '—') },
+    { key: 'war', label: 'WAR', type: 'bar', fmt: x => (k.isNum(x) ? k.signed(x, 1) : '—') },
+    { key: 'line', label: 'Line', sort: false, fmt: (x, r) => '<span class="qk-muted">' + stat(r) + '</span>' },
+    { key: 'status', label: 'Status', fmt: (x, r) => (inj(r) ? QK.tag(inj(r)) : (r.kind === '40man' ? '<span class="qk-muted">40-man</span>' : '')) }].concat(mv ? [mv.col] : []),
+    rows: rows.map(r => Object.assign({ name: r.name || k.name(r.pid), pa_ip: k.isNum(r.pa) ? r.pa : r.ip, status: inj(r) }, r, mv ? { _mv: mv.rowOf(r.pid), p_move: mv.pOf(r.pid) } : {})) });
+  host.innerHTML = '<div class="bp-roster-l"></div><div class="bp-roster-t"></div>';
+  drawRoster(null);
+  /* who moves next (bp-moves.js): the roster gets a "Chance of moving" column once mlb/movement.json is in */
+  if (L === 'mlb' && Number(S) === BP.currentSeason('mlb') && BP.moves) BP.moves.load().then(m => {
+    if (!m || !host.isConnected) return;
+    const mv = BP.moves.rosterColumn(m);
+    if (!mv) return;
+    host.querySelector('.bp-roster-l').innerHTML = mv.legend;
+    drawRoster(mv);
+  });
+  const top = rows.filter(r => k.isNum(war(r))).slice(0, 12);
+  if (top.length) QKC.bar('#tm-war', { cats: top.map(r => k.surname(r.name || k.name(r.pid))), series: [{ name: 'Bullpen WAR', data: top.map(war) }], horizontal: true, labels: true, fmt: x => k.signed(x, 1),
+    colors: top.map(r => (r.kind === 'pitcher' ? QK.cssVar('--c-3') : (BP.teamInfo(tid) || {}).colour)), hrefs: top.map(r => (role(r) === 'pitcher' ? k.pitcherHref(L, r.pid, S) : k.hitterHref(L, r.pid, S))), labelWidth: 110,
+    valName: 'Bullpen WAR this season', catName: 'Player', legendItems: [{ name: 'Hitters', color: (BP.teamInfo(tid) || {}).colour || QK.cssVar('--c-1') }, { name: 'Pitchers', color: QK.cssVar('--c-3') }], label: 'Roster WAR' });
+  else document.getElementById('tm-war').style.display = 'none';
 }
 
 function listOf(x) { return Array.isArray(x) ? x : (x && typeof x === 'object' ? Object.keys(x).map(p => Object.assign({ pid: p }, x[p])) : []); }
@@ -306,37 +358,28 @@ function park(parks, vid) {
 }
 /* E's log rows [gpk, date, gtype, opp, home (1/0), runs for, runs against, "W"|"L"|status]; the model's pre-game
  * probability and the market's come from schedule.json (GAME_CARD model.p_home / market.p_home). */
-function logTable(L, S, t, tid, sched) {
+function logTable(L, S, t, tid) {
   const k = K();
-  const cards = {};
-  ((sched && (sched.games || sched)) || []).forEach(g => { if (g && g.gpk) cards[String(g.gpk)] = g; });
-  const log = (t.log || []).map(r => (Array.isArray(r) ? { gpk: String(r[0]), date: r[1], gtype: r[2], opp: r[3], home: !!r[4], rs: r[5], ra: r[6], res: r[7] } : r));
+  const log = (t.log || []).map(r => (Array.isArray(r) ? { gpk: String(r[0]), date: r[1], gtype: r[2], opp: r[3], home: !!r[4], rs: r[5], ra: r[6], res: r[7], p: r[8] } : r));
   const host = document.getElementById('tm-log'), ch = document.getElementById('tm-logc');
-  if (!log.length) { host.innerHTML = k.muted('The schedule log is not available yet.'); ch.style.display = 'none'; return; }
-  const side = (r, p) => (k.isNum(p) ? (r.home ? p : 1 - p) : null);
-  const pOf = r => { const c = cards[r.gpk] || {}; return side(r, [(c.model || {}).p_home, (c.prices || {}).p_home].find(k.isNum)); };
-  const mOf = r => { const c = cards[r.gpk] || {}; return side(r, [(c.market || {}).p_home].find(k.isNum)); };
+  if (!log.length) { host.innerHTML = QK.empty('No games yet', 'The schedule log is not available yet.'); ch.style.display = 'none'; return; }
+  const pOf = r => (k.isNum(r.p) ? Number(r.p) : null);
   const res = r => (r.res === 'W' ? 1 : r.res === 'L' ? 0 : null);
   let cw = 0, ce = 0;
   const xs = [], ys = [];
-  log.filter(r => r.gtype === 'R' || !r.gtype).forEach(r => { const w = res(r), p = pOf(r); if (w === null || !k.isNum(p)) return; cw += w; ce += p; xs.push(r.date); ys.push(cw - ce); });
-  if (xs.length) k.plot(ch, [{ type: 'scatter', mode: 'lines', x: xs, y: ys, line: { color: k.teamColour(tid), width: 2 }, fill: 'tozeroy', fillcolor: k.alpha('#58a6ff', 0.08), hovertemplate: '%{x}: %{y:+.1f} wins v model<extra></extra>' }],
-    k.layout({ margin: { l: 44, r: 10, t: 10, b: 30 }, xaxis: { title: 'Date' }, yaxis: { title: 'Wins − expected', zeroline: true } }));
+  log.filter(r => r.gtype === 'R' || !r.gtype).forEach(r => { const w = res(r), p = pOf(r); if (w === null || !k.isNum(p)) return; cw += w; ce += p; xs.push(r.date); ys.push(Math.round((cw - ce) * 10) / 10); });
+  if (xs.length) QKC.line('#tm-logc', { x: xs, xType: 'time', series: [{ name: 'Wins minus expected', data: ys, color: (BP.teamInfo(tid) || {}).colour, area: true }], yFmt: x => k.signed(x, 0), yName: 'Wins minus our expected wins', xName: 'Date', ref: { y: 0, label: '' }, endLabels: true, label: 'Wins minus expected wins' });
   else ch.style.display = 'none';
   const ll = log.filter(r => res(r) !== null && k.isNum(pOf(r)));
-  const lossOf = (rs, f) => (rs.length ? -rs.reduce((s0, r) => { const p = Math.min(0.999, Math.max(0.001, f(r))); return s0 + (res(r) ? Math.log(p) : Math.log(1 - p)); }, 0) / rs.length : null);
-  const both = ll.filter(r => k.isNum(mOf(r)));
+  const lossOf = rs => (rs.length ? -rs.reduce((s0, r) => { const p = Math.min(0.999, Math.max(0.001, pOf(r))); return s0 + (res(r) ? Math.log(p) : Math.log(1 - p)); }, 0) / rs.length : null);
   const GT = { R: '', F: 'WC', D: 'DS', L: 'LCS', W: 'WS', C: 'Champ' };
-  host.innerHTML = (ll.length ? '<div class="pg-note gq-note">' + ll.length + ' finished games with a model price: ' + ll.filter(r => res(r)).length + ' wins against ' + k.num(ll.reduce((s0, r) => s0 + pOf(r), 0), 1) + ' expected. Model log-loss ' + k.num(lossOf(ll, pOf), 3) +
-    (both.length ? '; on the ' + both.length + ' games with a market price, model ' + k.num(lossOf(both, pOf), 3) + ' against market ' + k.num(lossOf(both, mOf), 3) : '') + ' (a coin scores 0.693). Past games carry the walk-forward backtest price.</div>' : '<div class="pg-note gq-note">Model prices for past games appear once the schedule payload carries them.</div>') +
-    k.table([{ label: 'Date' }, { label: 'Opponent' }, { label: 'Result' }, { label: 'Model', align: 'right', title: 'Pre-game win probability' }, { label: 'Market', align: 'right' }, { label: '' }],
-      log.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).map(r => {
-        const w = res(r);
-        return { _href: r.gpk ? k.href(L, 'game/' + r.gpk, S) : '', cells: [{ v: r.date, html: k.esc(k.short(r.date)) }, { v: k.teamAbbr(r.opp), html: (r.home ? 'v ' : '@ ') + k.teamChip(L, r.opp, S) },
-          { v: w, html: w === null ? '<span class="muted-inline">' + k.esc(r.res || 'scheduled') + '</span>' : '<span class="' + (w ? 'gq-ok' : 'gq-no') + '">' + (w ? 'W' : 'L') + ' ' + r.rs + '–' + r.ra + '</span>' },
-          { v: pOf(r), html: k.isNum(pOf(r)) ? k.pct(pOf(r), 0) : '—' }, { v: mOf(r), html: k.isNum(mOf(r)) ? k.pct(mOf(r), 0) : '—' }, { v: r.gtype, html: GT[r.gtype] ? '<span class="chip">' + GT[r.gtype] + '</span>' : '' }] };
-      }), { compact: true, sticky: true });
-  k.sortable(host);
+  host.innerHTML = (ll.length ? '<p class="bp-note">' + ll.length + ' finished games with our forecast: ' + ll.filter(r => res(r)).length + ' wins against ' + k.num(ll.reduce((s0, r) => s0 + pOf(r), 0), 1) + ' expected; log loss ' + k.num(lossOf(ll), 3) + ' (a coin flip scores 0.693). Past games carry the walk-forward backtest forecast.</p>' : '') + '<div id="tm-log-t"></div>';
+  QK.table(document.getElementById('tm-log-t'), { dense: true, maxHeight: 420, sort: { key: 'date', dir: 'desc' }, rowHref: r => (r.gpk ? k.href(L, 'game/' + r.gpk, S) : null), columns: [
+    { key: 'date', label: 'Date', fmt: x => k.esc(k.short(x)) }, { key: 'oppn', label: 'Opponent', fmt: (x, r) => (r.home ? 'v ' : '@ ') + k.teamChip(L, r.opp, S) },
+    { key: 'w', label: 'Result', fmt: (x, r) => (x === null ? '<span class="qk-muted">' + k.esc(r.res || 'scheduled') + '</span>' : '<span class="' + (x ? 'gq-ok' : 'gq-no') + '">' + (x ? 'W' : 'L') + ' ' + r.rs + '–' + r.ra + '</span>') },
+    { key: 'p', label: 'Our chance', num: true, fmt: x => (k.isNum(x) ? k.pct(x, 0) : '—'), tip: 'Our pre-game win chance for this club' },
+    { key: 'gt', label: '', sort: false, fmt: (x, r) => (GT[r.gtype] ? '<span class="chip">' + GT[r.gtype] + '</span>' : '') }],
+    rows: log.filter(r => !(r.gtype && r.gtype !== 'R' && String(r.res || '').toLowerCase() === 'cancelled')).map(r => Object.assign({ oppn: k.teamAbbr(r.opp), w: res(r), gt: r.gtype }, r)) });
 }
 
 if (typeof BP.route === 'function') {

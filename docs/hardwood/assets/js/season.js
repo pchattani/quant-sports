@@ -1,10 +1,10 @@
 /* The Quant Hardwood — the season page (#/<L>/season/<S>).
  *
  *   champion banner (finished seasons, from history.json / index champions);
- *   standings per conference with projected wins, playoff / play-in / title odds and magic numbers;
+ *   standings per conference with projected wins, playoff / play-in / title chances and magic numbers;
  *   seed distribution heatmap; team ratings (offence, defence, net ± se, pace, Elo);
  *   power-rating paths (Kalman filter, ± one standard error band for the picked team);
- *   win totals: the simulated distribution against the market line;
+ *   win totals: our simulated distribution and range (the market's line is on the Model page);
  *   schedule difficulty; statistical leaders.
  *
  * Reads <L>/<S>/season.json, <L>/<S>/players.json (names), <L>/history.json. */
@@ -146,14 +146,10 @@ function drawWinTotal(el, L, season, sim, tid) {
   const line = HW.isNum(wt.line) ? wt.line : null;
   const colour = HW.teamColour(L, tid);
   const lo = wd.findIndex(p => p > 0.001), hi = wd.length - 1 - wd.slice().reverse().findIndex(p => p > 0.001);
-  HW.plot(el, [{ type: 'bar', x: x, y: y, marker: { color: x.map(w => (line !== null && w > line ? colour : HW.charts.hexA(colour, 0.45))) },
-    hovertemplate: '%{x} wins: %{y:.1%}<extra></extra>' }], HW.layout({
-    height: 260, bargap: 0.08,
-    shapes: line !== null ? [{ type: 'line', x0: line, x1: line, yref: 'paper', y0: 0, y1: 1, line: { color: HW.C.text, width: 2, dash: 'dash' } }] : [],
-    annotations: line !== null ? [{ x: line, yref: 'paper', y: 1, text: 'Line ' + line, showarrow: false, yanchor: 'bottom', font: { size: 10, color: HW.C.text } }] : [],
-    xaxis: { title: 'Wins', range: [Math.max(0, lo - 1) - 0.5, hi + 1.5], fixedrange: true }, yaxis: { title: 'Probability', tickformat: '.1%', fixedrange: true },
-    margin: { l: 45, r: 10, t: 20, b: 40 }
-  }));
+  const xs = x.slice(Math.max(0, lo - 1), hi + 2);
+  el.style.setProperty('--h', '260px');
+  QKC.bar(el, { cats: xs.map(String), series: [{ name: 'Chance', color: colour, data: xs.map(w => y[w]) }], fmt: v => HW.pct(v, 1), catName: 'Wins at season end', valName: 'Our chance',
+    label: 'Our chance of each final win total' });
 }
 
 function winTotalsTable(L, season, sim) {
@@ -167,15 +163,11 @@ function winTotalsTable(L, season, sim) {
       { v: HW.teamName(L, t), html: HW.teamLink(L, t) },
       { v: s.exp_w, html: HW.num(s.exp_w, 1) },
       { v: s.w_p05, html: HW.isNum(s.w_p05) ? HW.num(s.w_p05, 0) + '–' + HW.num(s.w_p95, 0) : '—' },
-      { v: w.line, html: HW.isNum(w.line) ? HW.num(w.line, 1) : '<span class="muted-inline">no line</span>' },
-      { v: w.p_over_model, html: HW.isNum(w.p_over_model) ? HW.pct(w.p_over_model, 0) : '—' },
-      { v: w.p_over_market, html: HW.isNum(w.p_over_market) ? HW.pct(w.p_over_market, 0) : '—' },
-      pre ? { v: null, html: '<span class="muted-inline">hidden</span>' }
-        : { v: HW.isNum(w.p_over_model) && HW.isNum(w.p_over_market) ? w.p_over_model - w.p_over_market : null, html: HW.edgeHTML(w.p_over_model, w.p_over_market) }
+      { v: s.p_playoffs, html: HW.isNum(s.p_playoffs) ? HW.pct(s.p_playoffs, 0) : '—' }
     ], _class: 'wt-row', _style: '' };
   }).sort((a, b) => (b.cells[1].v || 0) - (a.cells[1].v || 0));
-  return HW.tableHTML([{ label: 'Team' }, { label: 'Proj W', align: 'right' }, { label: '90% range', align: 'right' }, { label: 'Line', align: 'right' },
-    { label: 'Over (model)', align: 'right' }, { label: 'Over (market)', align: 'right' }, { label: 'Edge', align: 'right', title: 'Model minus market, percentage points' }], rows, { compact: true }) + (pre ? '<div class="section-note">Edges are hidden in the preseason: the preseason ratings are last season carried forward plus a roster term that counts rookies at replacement level, so model-against-market gaps would partly measure what that term misses. They appear once games are played.</div>' : '');
+  return HW.tableHTML([{ label: 'Team' }, { label: 'Proj W', align: 'right' }, { label: '90% range', align: 'right' }, { label: 'Playoffs', align: 'right', title: 'Our playoff chance' }], rows, { compact: true }) +
+    (pre ? '<div class="section-note">Preseason projections are last season carried forward plus a roster term that counts rookies at replacement level.</div>' : '');
 }
 
 function scheduleTable(L, season) {
@@ -204,7 +196,7 @@ function render(el, params) {
   const L = params.league, S = params.season;
   const info = HW.leagueInfo(L);
   const isCurrent = S === HW.currentSeason(L);
-  el.innerHTML = HW.pageHead(HW.leagueName(L) + ' ' + HW.seasonLabel(L, S), 'Standings, odds and ratings',
+  el.innerHTML = HW.pageHead(HW.leagueName(L) + ' ' + HW.seasonLabel(L, S), 'Standings, our chances and ratings',
     '<a href="' + HW.href(L, 'playoffs', S) + '">Playoffs</a><a href="' + HW.href(L, 'games', S) + '">Games</a><a href="' + HW.href(L, 'markets', S) + '">Markets</a>') +
     '<div id="sn-body"><div class="muted">Loading the season…</div></div>';
   return HW.loadAll([HW.path('season.json', L, S), HW.lpath('history.json', L), HW.path('players.json', L, S), HW.lpath('markets.json', L)]).then(arr => {
@@ -231,8 +223,8 @@ function render(el, params) {
     const open = Object.keys(sim).some(t => HW.isNum(sim[t].w_p05) && sim[t].w_p95 > sim[t].w_p05);
     if (Object.keys(sim).length && open) {
       html += '<div class="grid-2">' + HW.card('Seed distribution', 'share of simulations finishing in each seed', (confs.length > 1 && !leagueWide ? '<div class="toggle-row" id="sn-seed-tabs">' + HW.toggles(confs.map(c => ({ key: c, label: c })), confs[0], 'data-sd') + '</div>' : '') + '<div id="sn-seed"></div>') +
-        HW.card('Win totals', 'simulated wins against the market line', '<div class="toggle-row"><label>Team <select id="sn-wt-team"></select></label></div><div id="sn-wt"></div>') + '</div>';
-      html += HW.card('Win totals against the market', 'over probability from the model and from the market', winTotalsTable(L, season, sim) || HW.muted('No win-total markets.'));
+        HW.card('Win totals', 'our chance of each final win total', '<div class="toggle-row"><label>Team <select id="sn-wt-team"></select></label></div><div id="sn-wt"></div>') + '</div>';
+      html += HW.card('Projected wins', 'the mean of our simulated seasons, the range nine in ten land in, and our playoff chance', winTotalsTable(L, season, sim) || HW.muted('No simulation yet.'));
     }
     html += HW.card('Power-rating paths', 'net rating after each game (Kalman filter); pick a team for its ±1 se band',
       '<div class="toggle-row">' + (confs.length > 1 ? HW.toggles(confs.map(c => ({ key: c, label: c })).concat([{ key: '__all', label: 'All' }]), confs[0], 'data-rp') : '') +

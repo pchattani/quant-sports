@@ -250,8 +250,8 @@ function movesTeam(host, L, S, tid) {
       (mv.fields || []).forEach((f, i) => { F[f] = i; });
       const N = mv.names || {};
       const recent = (mv.rows || []).filter(r => r[F.from] === tid || r[F.to] === tid).slice(0, 10);
-      if (recent.length) h += BP.tableHTML([{ label: 'Date' }, { label: 'Move' }, { label: 'Player' }, { label: 'Detail' }], recent.map(r => [esc(BP.fmtDate(r[F.date])), esc((mv.kinds || {})[r[F.kind]] || r[F.kind]),
-        plink(r[F.pid], N[r[F.pid]]), '<span class="muted-inline">' + esc(r[F.detail] || (r[F.from] === tid && r[F.to] ? 'to ' + BP.teamAbbr(r[F.to]) : r[F.to] === tid && r[F.from] ? 'from ' + BP.teamAbbr(r[F.from]) : '')) + '</span>']), { compact: true });
+      if (recent.length) h += BP.tableHTML([{ label: 'Date' }, { label: 'Move' }, { label: 'Player' }, { label: 'Detail' }], recent.map(r => [{ v: r[F.date], html: esc(BP.fmtDate(r[F.date])) }, { v: (mv.kinds || {})[r[F.kind]] || r[F.kind], html: esc((mv.kinds || {})[r[F.kind]] || r[F.kind]) },
+        { v: N[r[F.pid]] || BP.playerName(r[F.pid]), html: plink(r[F.pid], N[r[F.pid]]) }, { v: r[F.detail] || '', html: '<span class="muted-inline">' + esc(r[F.detail] || (r[F.from] === tid && r[F.to] ? 'to ' + BP.teamAbbr(r[F.to]) : r[F.to] === tid && r[F.from] ? 'from ' + BP.teamAbbr(r[F.from]) : '')) + '</span>' }]), { compact: true });
     }
     host.innerHTML = BP.card('Moves', '<a href="#/mlb/moves?tab=trades&team=' + encodeURIComponent(tid) + '">All trades and moves →</a>', h);
     BP.sortable(host);

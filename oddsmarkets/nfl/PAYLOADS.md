@@ -275,3 +275,23 @@ PRIOR_G, MAE]], params, sd, backtest {seasons, formats {ppr|half|std: {QB|RB|WR|
 season_to_date, last_season, rho, rho_std}}}, n_weeks, band_coverage}, current {season, weeks, ppr} (this season so far),
 credits}`. The fitted part is `oddsmarkets/nfl/models/fitted/fantasy.json` (written by `scripts/nfl_fantasy_fit.py`).
 Frames cache: `<cache>/analytics/fantasy/pw_<S>_<sig>.parquet`, `tw_<S>_<sig>.parquet`.
+
+## Movement (`data/<S>/movement.json`, the current season; added 22 October 2026)
+
+Written once a day by `scripts/build_gridiron.py` `movement_page` from `analytics/movement.py` on the shared engine
+(`oddsmarkets/common/movement.py` `payload()`); method and validation in `docs/research/moves_model.md` and
+`docs/research/moves_gridiron.md`. About 260 KB (2,000 rostered players).
+
+`{ok, level "nfl", season, version, engine, phase "inseason", snapshot (date), horizons {deadline, deadline_estimated,
+next, snapshot_week}, deadline_label "traded or claimed", unit "points", team_horizon "next", types [trade, release,
+other], type_labels, published {next, deadline, type, arrivals, targets}, reasons {block: text}, base_rates {next,
+deadline, types {type: share}}, base_arrivals {pos: [p_add, mean]}, base_arrivals_fields, player_fields, players
+[[pid, name, team, pos, age, yrs, value, p_next, p_trade, p_release, p_other, p_dl, why]], team_fields {outlook,
+targets}, teams {abbr: {wp, status, traj, exp_departures, exp_arrivals, outlook [[pos, p_add, exp_arrivals, need,
+exp_departures, players]], targets [[pid, name, team, pos, age, value, gain, p_move, p_join, why]]}}, status_cuts,
+drivers {next, deadline: [[feature, coefficient per SD]]}, validation {next, deadline, type, arrivals: {test, dev, l2},
+targets: {k, test, dev}}, split {dev, test}, notes, updated_at}`.
+
+A block that failed its pre-registered test carries `null` probabilities / empty lists and a `reasons` entry; on
+22 Oct 2026 `next` and `deadline` are published, the type split shows the base shares, arrivals and targets are
+not published. `p_<type>` sum to `p_next`. Positions are the value page's plus OL and LS (never targets: not valued).

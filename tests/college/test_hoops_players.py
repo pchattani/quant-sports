@@ -44,6 +44,20 @@ def test_team_constraint_and_moves(roots):
         five = sum(r["r"] * r["min"] / (tm / 5) for r in rs)
         assert five == pytest.approx(ratings[t]["rating"], abs=1e-6)
     assert all(r["pos"] in ("G", "F", "C") for r in rows.values())
+    # rate fields: on-floor denominators from the game's two team totals
+    r0 = max(rows.values(), key=lambda r: r["min"])
+    rt = r0["rates"]
+    t = r0["tot"]
+    assert rt["pts100"] > 0 and 0 < rt["trb_pct"] < 1 and 0 <= rt["stl_pct"] < 0.2 and 0 <= rt["ast_pct"] < 1
+    assert rt["efg"] == pytest.approx((t["fgm"] + 0.5 * t["tpm"]) / t["fga"])
+    lo, hi = sorted((rt["orb_pct"], rt["drb_pct"]))
+    assert lo - 1e-12 <= rt["trb_pct"] <= hi + 1e-12          # the mediant of the two rebound rates
+    ln = PL.per_game_line(r0)
+    assert set(PL.RATE_KEYS) <= set(ln)
+    qual = {p for p, r in rows.items() if r["min"] >= 150}
+    role, thr = PL.classify_roles(rows, qual)
+    assert set(role) == set(rows) and set(role.values()) <= {"G", "W", "B"}
+    assert all(role[p] == "G" for p, r in rows.items() if r["pos"] == "G")
     # a move: the same id on a different team the next season
     prev = {"p1": {**next(iter(rows.values())), "team": "100", "value": 50.0, "pctl": 95.0, "name": "X"}}
     mv = PL.inferred_moves(prev, {"p1": "101"}, None, {})

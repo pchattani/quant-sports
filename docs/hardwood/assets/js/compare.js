@@ -2,7 +2,7 @@
  * (#/<L>/compare/teams/<a>/<b>); #/<L>/compare alone shows the pickers.
  *
  * Players: identity cards, a verdict strip (who wins more of the percentile metrics and
- * the biggest gaps each way), a radar, the full catalogue with gap bars and percentile
+ * the widest differences each way), a radar, the full catalogue with gap bars and percentile
  * pills, shot charts side by side, career HPM overlaid, and the head to head when they
  * met. Teams: the same furniture over the team catalogue, plus rating paths, four
  * factors, shot profiles at both ends, lineups and the season series. */
@@ -143,7 +143,7 @@ function buildPlayers(L, S, ids, ss, careers) {
   const B = Object.assign({}, ss[1].p || {}, { pct: usePool ? (ss[1].p || {}).pct_pool : (ss[1].p || {}).pct });
   const t = verdictAndTables(metrics, A, B, short[0], short[1], same ? (usePool ? 'position-pool percentiles, ' : 'league percentiles, ') + fx.seasonLabel(L, ss[0].season) : 'different seasons (' + fx.seasonLabel(L, ss[0].season) + ' v ' + fx.seasonLabel(L, ss[1].season) + '): each percentile is against its own season');
   let h = '<div class="cmp-ids">' + card(0) + card(1) + '</div>';
-  h += fx.card('Verdict', 'Who wins each catalogue metric on percentile' + (usePool ? ' within their shared position pool' : '') + ', and the three biggest gaps each way.', t.verdict);
+  h += fx.card('Verdict', 'Who wins each catalogue metric on percentile' + (usePool ? ' within their shared position pool' : '') + ', and the three widest differences each way.', t.verdict);
   h += '<div class="grid-2"><div class="card"><div class="card-header">Profile <span class="card-sub">Ten headline metrics, percentiles.</span></div><div id="cmp-radar" style="height:420px"></div></div>' +
     '<div class="card"><div class="card-header">Head to head <span class="card-sub" id="cmp-h2h-sub">Games where both played, from the two game logs.</span></div><div id="cmp-h2h"></div></div></div>';
   h += METRIC_CARD('The whole player catalogue: value, percentile and the gap in percentile points. Bold marks the better raw figure.');
@@ -181,15 +181,15 @@ function buildPlayers(L, S, ids, ss, careers) {
   fx.wireToggle(document.getElementById('cmp-body'), 'cmp-shot-kind', drawShots);
 
   // Careers.
-  const tr = [];
+  const cser = [];
   careers.forEach((c, i) => {
     const s = ((c || {}).seasons || []).slice().sort((x, y) => x.season - y.season).filter(r => fx.isNum(r.hpm));
     if (!s.length) return;
-    tr.push({ type: 'scatter', mode: 'lines+markers', name: names[i] + ' HPM', x: s.map(r => r.season), y: s.map(r => r.hpm), line: { color: i ? CB : CA, width: 2.5 }, marker: { size: 6 }, hovertemplate: '%{x}: HPM %{y:+.1f}<extra>' + fx.esc(short[i]) + '</extra>' });
+    cser.push({ name: short[i] + ' HPM', color: i ? CB : CA, width: 2.5, symbols: true, data: s.map(r => [r.season, r.hpm]) });
     const rp = s.filter(r => fx.isNum(r.rapm));
-    if (rp.length) tr.push({ type: 'scatter', mode: 'markers', name: names[i] + ' RAPM', x: rp.map(r => r.season), y: rp.map(r => r.rapm), marker: { color: i ? CB : CA, size: 8, symbol: 'diamond-open' }, hovertemplate: '%{x}: RAPM %{y:+.1f}<extra>' + fx.esc(short[i]) + '</extra>' });
+    if (rp.length) cser.push({ name: short[i] + ' RAPM', color: i ? CB : CA, dash: true, width: 1.4, symbols: true, data: rp.map(r => [r.season, r.rapm]) });
   });
-  if (tr.length) fx.plot('cmp-career', tr, fx.layout({ showlegend: true, legend: { orientation: 'h', y: 1.12, font: { color: C.text2 } }, margin: { l: 50, r: 15, t: 30, b: 40 }, xaxis: { title: 'Season', tickformat: 'd', dtick: 1 }, yaxis: { title: 'Per 100 possessions', zeroline: true, zerolinecolor: '#6e7681' } }));
+  if (cser.length) QKC.line('#cmp-career', { xType: 'value', series: cser, xName: 'Season', yName: 'Impact (points per 100 possessions)', xFmt: v => String(Math.round(v)), yFmt: v => fx.signed(v, 1), ref: { y: 0 }, label: 'Career impact by season' });
   else document.getElementById('cmp-career').innerHTML = fx.muted('No career HPM for either player.');
   const tot = c => { const s = (c || {}).seasons || []; const g = s.reduce((x, r) => x + (r.gp || 0), 0); const w = k => (g ? s.reduce((x, r) => x + (fx.isNum(r[k]) ? r[k] * (r.gp || 0) : 0), 0) / g : null);
     return { seasons: s.length, gp: g, pts: w('pts'), reb: w('reb'), ast: w('ast'), hpm: w('hpm'), awards: ((c || {}).career_awards || []).length }; };
@@ -231,7 +231,7 @@ function buildTeams(L, S, ids, T, teams, season, cat) {
   const fx = FX(), C = fx.C;
   const names = ids.map(id => (T[id] || {}).name || fx.teamName(L, id));
   const abbr = ids.map(id => fx.teamAbbr(L, id));
-  const metrics = (teams || {}).metrics || [];
+  const metrics = ((teams || {}).metrics || []).filter(m => !HW.ui.HIDE_TEAM[m.key]);
   const R = ((season || {}).ratings) || {};
   const simAll = ((season || {}).sim || {}).teams || (season || {}).sim || {};
   const stand = {};
@@ -243,7 +243,7 @@ function buildTeams(L, S, ids, T, teams, season, cat) {
   };
   const t = verdictAndTables(metrics, T[ids[0]] || {}, T[ids[1]] || {}, abbr[0], abbr[1], 'league percentiles, ' + fx.seasonLabel(L, S));
   let h = '<div class="cmp-ids">' + card(0) + card(1) + '</div>';
-  h += fx.card('Verdict', 'Who wins each team metric on league percentile, and the three biggest gaps each way.', t.verdict);
+  h += fx.card('Verdict', 'Who wins each team metric on league percentile, and the three widest differences each way.', t.verdict);
   h += '<div class="card"><div class="card-header">Ratings <span class="card-sub">Net rating per 100 after each game, ±1 standard error shaded.</span></div><div id="cmp-paths" style="height:340px"></div></div>';
   h += '<div class="grid-2"><div class="card"><div class="card-header">Profile <span class="card-sub">Headline team metrics, percentiles.</span></div><div id="cmp-radar" style="height:400px"></div></div>' +
     '<div class="card"><div class="card-header">Four factors <span class="card-sub">Both ends.</span></div><div id="cmp-ff"></div></div></div>';
@@ -257,9 +257,8 @@ function buildTeams(L, S, ids, T, teams, season, cat) {
   const axes = fx.headline(metrics, RADAR_T, 9, true).map(m => ({ key: m.key, label: fx.shortLabel(m.label) }));
   fx.radar('cmp-radar', axes, [{ name: names[0], pct: (T[ids[0]] || {}).pct, colour: CA }, { name: names[1], pct: (T[ids[1]] || {}).pct, colour: CB }]);
   const paths = ((season || {}).rating_paths) || {};
-  const tr = [];
-  ids.forEach((id, i) => { const p = paths[id] || []; if (p.length) tr.push.apply(tr, fx.band(p.map(x => ({ x: x.date, y: x.net, se: x.se, text: fx.fmtDate(x.date, { year: false }) })), i ? CB : CA, abbr[i], { hover: abbr[i] + ' %{text}: %{y:+.1f} ± %{customdata:.1f}<extra></extra>' })); });
-  if (tr.length) fx.plot('cmp-paths', tr, fx.layout({ showlegend: true, legend: { orientation: 'h', y: 1.12, font: { color: C.text2 } }, margin: { l: 45, r: 10, t: 30, b: 40 }, xaxis: { title: 'Date' }, yaxis: { title: 'Net per 100', zeroline: true, zerolinecolor: '#6e7681' } }));
+  const pl = ids.map((id, i) => ({ name: abbr[i], colour: i ? CB : CA, rows: (paths[id] || []).map(x => ({ x: x.date, y: x.net, se: x.se })) })).filter(x => x.rows.length);
+  if (pl.length) fx.pathChart('cmp-paths', pl, { label: 'Net rating through the season, ± one standard error' });
   else document.getElementById('cmp-paths').innerHTML = fx.muted('No rating paths yet.');
   const ff0 = metrics.filter(m => /four/i.test(m.group || ''));
   const ff = ff0.length ? ff0 : metrics.filter(m => /(^|_)(efg|tov|orb|drb|ftr|ft_rate)/.test(m.key));

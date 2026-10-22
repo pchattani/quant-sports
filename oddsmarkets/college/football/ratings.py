@@ -354,6 +354,37 @@ def run_season(season: int, gf: pd.DataFrame, st: dict, prev: dict | None, tgs: 
     return SeasonRun(season, teams, fcs, pre, snaps, final)
 
 
+def split_adjusted(season: int, gf: pd.DataFrame, st: dict, tgs: pd.DataFrame | None, col: str, ncol: str,
+                   p: Params = DEFAULT) -> dict | None:
+    """Opponent-adjusted EPA per play of one play type (`col` = "pass_epa" / "rush_epa", weighted by its plays `ncol`),
+    offence and defence, at the end of the season's finished games: the EPA model's ridge (FCS group and conference
+    levels, home field, the same decay) with a fresh prior (FBS teams 0, no carry-over from last season, so a team's
+    split says only what this season's plays say). Returns {"mu", "off": {t: EPA/play for}, "def": {t: EPA/play
+    allowed}} with the league mean added back (allowed = mu - def deviation), or None without plays."""
+    if tgs is None or not len(tgs) or col not in tgs or ncol not in tgs:
+        return None
+    gf = gf.copy()
+    gf["dayn"] = _days(gf["day"])
+    teams, fcs = season_teams(gf, st)
+    fin = gf[gf["final"]].reset_index(drop=True)
+    g = tgs.merge(fin[["gid", "home", "neutral", "dayn"]], on="gid", how="inner")
+    g = g[np.isfinite(g[col].to_numpy(float)) & (g[ncol].to_numpy(float) > 0) & g["team"].isin(teams) & g["opp"].isin(teams)]
+    if not len(g):
+        return None
+    pri = priors(season, teams, fcs, st, None, p, "epa")
+    m = _model("epa", teams, fcs, pri, p)
+    home = np.where(g["neutral"].to_numpy(bool), 0.0, np.where(g["team"].to_numpy() == g["home"].to_numpy(), 0.5, -0.5))
+    I, C = m.rows(list(g["team"]), list(g["opp"]), home)
+    n = g[ncol].to_numpy(float)
+    d = g["dayn"].to_numpy(float)
+    ln2 = np.log(2.0) / max(p.half_life, 1.0)
+    w = n / max(float(n.mean()), 1.0) * np.exp(-ln2 * (d.max() + 1 - d))
+    u = m.unpack(m.solve(I, C, g[col].to_numpy(float), w))
+    mu = u["mu"]
+    return {"mu": mu, "off": {t: float(mu + u["off"][i]) for i, t in enumerate(teams)},
+            "def": {t: float(mu - u["def"][i]) for i, t in enumerate(teams)}}
+
+
 def run_seasons(seasons: list[int], p: Params = DEFAULT, team_stats=None, snapshots: bool = False,
                 kinds=("pts", "epa", "sr")) -> dict[int, SeasonRun]:
     """Chained walk-forward over consecutive seasons (priors from the previous season's final ratings).

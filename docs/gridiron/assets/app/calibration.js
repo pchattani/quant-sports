@@ -86,7 +86,7 @@ function scoreTable(S, opts) {
 function gamesSection(d, out, read) {
   const k = K();
   const G = get(d, ['game_model', 'games', 'backtest']);
-  if (!G || typeof G !== 'object' || !(G.metrics || G.pooled)) { out.push(k.card('The game model against the closing line', '', k.muted('The walk-forward backtest (every game from 2006 priced with only what was known before it, against the closing spread and moneyline) has not been published yet.'))); return; }
+  if (!G || typeof G !== 'object' || !(G.metrics || G.pooled)) { out.push(k.card('The game model against the closing line', '', k.muted('The walk-forward backtest (every game from 2006 forecast with only what was known before it, against the closing spread and moneyline) has not been published yet.'))); return; }
   const ALL = scorers(G.metrics || (G.pooled || {}).win || G.pooled), VM = scorers(G.metrics_vs_market || {});
   const seasons = (G.seasons || Object.keys(G.per_season || {})).map(String).filter(s => /^\d{4}$/.test(s)).sort();
   const m = VM.model || ALL.model, mk = VM.market_ml || ALL.market_ml;
@@ -169,7 +169,7 @@ function side(id, cid, A, what, read, title, textOnly) {
   }
   read.push('<p><strong>' + title + '.</strong> Against the closing ' + (what === 'covers' ? 'spread' : 'total') + ', the model\'s probability scores ' + k.num(A.logloss, 4) + ' against a coin\'s ' + k.num(coin, 4) + ' over ' + k.int(A.n) + ' games: ' +
     (v === 'tie' ? 'a tie with a coin, which is what a closing line should allow. ' : v === 'win' ? 'better than a coin. ' : 'worse than a coin: the model adds noise to the closing number here. ') +
-    (k.isNum(pk.win_rate) ? 'Where it leans 55% or more, its side ' + (what === 'covers' ? 'covered' : 'won') + ' ' + k.pct(pk.win_rate, 1) + ' of ' + k.int(pk.n) + (se ? ' (±' + k.num(200 * se, 1) + ' points)' : '') + ': ' + (pv === 'tie' ? 'a tie with 50%.' : pv === 'win' ? (pk.win_rate < 0.524 ? 'above 50% but below the 52.4% that −110 prices need.' : 'above the 52.4% break-even; treat as provisional.') : 'below 50%.') : '') + '</p>');
+    (k.isNum(pk.win_rate) ? 'Where it leans 55% or more, its side ' + (what === 'covers' ? 'covered' : 'won') + ' ' + k.pct(pk.win_rate, 1) + ' of ' + k.int(pk.n) + (se ? ' (±' + k.num(200 * se, 1) + ' points)' : '') + ': ' + (pv === 'tie' ? 'a tie with 50%.' : pv === 'win' ? (pk.win_rate < 0.524 ? 'above 50% but below 52.4% (the break-even at standard −110 lines).' : 'above the 52.4% break-even; treat as provisional.') : 'below 50%.') : '') + '</p>');
 }
 
 /* Season odds (calibration.json "season_sim": {metrics: {playoffs, div, bye, conf, sb: score + by_week}, n_sims, check_weeks}). */
@@ -177,18 +177,18 @@ function seasonOdds(d, out, read) {
   const k = K();
   const X = get(d, ['season_sim', 'season_odds']);
   const M = X && (X.metrics || X);
-  if (!M || typeof M !== 'object' || !Object.keys(M).some(x => isScorer(M[x]))) { out.push(k.card('Season odds', '', k.muted('Season-odds calibration (playoff, division, bye, conference and Super Bowl odds at fixed weeks of past seasons, against what happened) is not published yet.'))); return; }
+  if (!M || typeof M !== 'object' || !Object.keys(M).some(x => isScorer(M[x]))) { out.push(k.card('Season chances', '', k.muted('Season-chance calibration (playoff, division, bye, conference and Super Bowl odds at fixed weeks of past seasons, against what happened) is not published yet.'))); return; }
   const NAME = { playoffs: 'Make the playoffs', div: 'Win the division', bye: 'Earn the bye (1 seed)', conf: 'Reach the Super Bowl', sb: 'Win the Super Bowl' };
   const rows = {};
   Object.keys(M).forEach(x => { if (isScorer(M[x])) rows[x] = scorers({ x: M[x] }).x; });
-  let h = '<div class="qk-card gi-ocard"><div class="gi-ohead">Season odds <span class="qk-card-sub">' + (X.n_sims ? k.int(X.n_sims) + ' simulations' : 'Simulations') + ' run before weeks ' + (X.check_weeks || [1, 5, 10, 14]).join(', ') + ' of each completed season with ratings and coefficients fitted strictly before, scored against what happened. Base-rate log-loss (always forecasting the league share) is the bar to beat.</span></div><div class="gq-pad">';
+  let h = '<div class="qk-card gi-ocard"><div class="gi-ohead">Season chances <span class="qk-card-sub">' + (X.n_sims ? k.int(X.n_sims) + ' simulations' : 'Simulations') + ' run before weeks ' + (X.check_weeks || [1, 5, 10, 14]).join(', ') + ' of each completed season with ratings and coefficients fitted strictly before, scored against what happened. Base-rate log-loss (always forecasting the league share) is the bar to beat.</span></div><div class="gq-pad">';
   h += k.table([{ label: 'Market' }, { label: 'Team-checkpoints', align: 'right' }, { label: 'Log-loss', align: 'right' }, { label: 'Base rate', align: 'right', title: 'Log-loss of always forecasting the share that happened' }, { label: 'Brier', align: 'right' }, { label: 'v base rate', sortable: false }].concat((X.check_weeks || []).map(w => ({ label: 'Week ' + w, align: 'right' }))),
     Object.keys(rows).map(x => { const r = M[x], b = r.base_rate, H = k.isNum(b) && b > 0 && b < 1 ? -(b * Math.log(b) + (1 - b) * Math.log(1 - b)) : null;
       return [{ v: x, html: '<strong>' + k.esc(NAME[x] || lab(x)) + '</strong>' }, { v: r.n, html: k.int(r.n) }, { v: r.logloss, html: k.num(r.logloss, 4) }, { v: H, html: k.num(H, 4) }, { v: r.brier, html: k.num(r.brier, 4) }, { v: '', html: H ? vchip(verdict(r.logloss, H, true)) : '' }]
         .concat((X.check_weeks || []).map(w => ({ v: ((r.by_week || {})[String(w)] || {}).logloss, html: k.num(((r.by_week || {})[String(w)] || {}).logloss, 4) }))); }), { compact: true }) + '</div><div id="cal-so" class="gi-chart"></div></div>';
   out.push(h);
   const pl = M.playoffs;
-  if (pl && k.isNum(pl.logloss) && k.isNum(pl.base_rate)) { const b = pl.base_rate, H = -(b * Math.log(b) + (1 - b) * Math.log(1 - b)); read.push('<p><strong>Season odds.</strong> Playoff odds score ' + k.num(pl.logloss, 4) + ' against ' + k.num(H, 4) + ' for the base rate over ' + k.int(pl.n) + ' team-checkpoints (' + ({ tie: 'a tie', win: 'better', lose: 'worse' })[verdict(pl.logloss, H, true)] + '); the gain grows as the season goes on and the standings fill in.</p>'); }
+  if (pl && k.isNum(pl.logloss) && k.isNum(pl.base_rate)) { const b = pl.base_rate, H = -(b * Math.log(b) + (1 - b) * Math.log(1 - b)); read.push('<p><strong>Season chances.</strong> Playoff chances score ' + k.num(pl.logloss, 4) + ' against ' + k.num(H, 4) + ' for the base rate over ' + k.int(pl.n) + ' team-checkpoints (' + ({ tie: 'a tie', win: 'better', lose: 'worse' })[verdict(pl.logloss, H, true)] + '); the gain grows as the season goes on and the standings fill in.</p>'); }
   setTimeout(() => {
     const ser = Object.keys(rows).filter(x => rows[x].bins.length).slice(0, 5).map((x, i) => ({ name: NAME[x] || x, colour: k.PALETTE[i], bins: rows[x].bins }));
     if (ser.length) k.reliability('cal-so', ser, { minN: 10 }); else { const n = k.$('cal-so'); if (n) n.style.display = 'none'; }

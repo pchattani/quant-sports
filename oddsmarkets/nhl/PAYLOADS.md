@@ -187,3 +187,25 @@ Names above are kept; additions and the exact shapes the front end reads:
 - **fantasy_backtest.json** (site-wide; ~6 KB; computed by scripts/nhl_fantasy_backtest.py and cached; the hourly build only
   copies the cache): {ok, version, updated_at, seasons, checkpoints, step_days 7, cols [kind, horizon, cat, who (model | std |
   last), mae, spearman, games], rows, season_cols, by_season, baselines {std, last}, units, points, seconds, stale?}.
+
+## Movement (`data/<S>/movement.json`, the current season; added 22 October 2026)
+
+Player movement from `analytics/movement.py` on the shared engine (`oddsmarkets/common/movement.py`), written by
+`build_rink.extras_all` once a day. Method and validation: `docs/research/moves_model.md`, `docs/research/moves_rink.md`.
+Uniform across the US-sport sites:
+`{ok, level: "nhl", season, version, engine, phase ("inseason"|"offseason"), snapshot (date), horizons {deadline (date),
+deadline_estimated (bool: not yet announced), next (text)}, deadline_label ("traded or claimed": the box scores cannot
+tell a trade from a waiver claim), unit ("WAR"), types ["trade","release","other"], type_labels, published {next, deadline,
+type, arrivals, targets} (false = failed the pre-registered rule: the block's numbers are null / [] and reasons[block]
+says why), reasons, base_rates {next, deadline, types {trade, release, other}}, base_arrivals {pos: [P(adds >= 1),
+mean arrivals]} (the base rate shown when the arrivals block is unpublished), player_fields, players [[pid, name, team,
+pos (C|LW|RW|D|G), age, yrs (years since the draft; 10 for older undrafted), value (Rink WAR, last two completed seasons
+3:2), p_next, p_trade, p_release, p_other, p_dl, why]], team_fields {outlook: [pos, p_add, exp_arrivals, need,
+exp_departures, players], targets: [pid, name, team, pos, age, value, gain, p_move, p_join, why]}, teams {abbr: {wp
+(points share, shrunk to last season), status (contending >= 0.60 | rebuilding <= 0.50 | in the middle), traj,
+exp_departures, exp_arrivals, outlook, targets}}, status_cuts, drivers {next, deadline: [[feature, coefficient per SD]]},
+validation {next|deadline|type|arrivals: {test, dev, l2}, targets: {k, test, dev}}, split {dev, test}, label_check
+{season: {moves, espn_trade, espn_waiver_claim, no_espn_row}} (games-based moves against ESPN's rows), notes, updated_at}`.
+p_next is the chance he is not in this club's NHL lineup next season; p_trade + p_release + p_other = p_next (the split is
+the 2024-25 shares, a base rate). As built 22 Oct 2026: next published; deadline, arrivals and targets not (reasons in
+the file); ~96 KB.

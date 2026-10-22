@@ -43,7 +43,7 @@ function reading(d) {
   const seasons = Object.keys(G.seasons || {}).sort();
   const ll = (o, m) => (o[m] || {}).logloss;
   if (P.n_games) {
-    out.push('<p><strong>Coverage.</strong> ' + k.int(P.n_games) + ' games ' + (seasons.length > 1 ? 'from ' + seasons[0] + ' to ' + seasons[seasons.length - 1] : 'in ' + seasons[0]) + ' were priced walk-forward, each with projections refitted from games strictly before it. ' +
+    out.push('<p><strong>Coverage.</strong> ' + k.int(P.n_games) + ' games ' + (seasons.length > 1 ? 'from ' + seasons[0] + ' to ' + seasons[seasons.length - 1] : 'in ' + seasons[0]) + ' were forecast walk-forward, each with projections refitted from games strictly before it. ' +
       k.int((V.market || {}).n) + ' of them (' + k.num(100 * ((V.market || {}).n || 0) / P.n_games, 0) + '%) have an ESPN closing moneyline to compare with.</p>');
   }
   const SP = (G.sim || {}).pooled || {};
@@ -63,7 +63,7 @@ function reading(d) {
     out.push('<p><strong>Against the closing line.</strong> On the ' + k.int((V.market || {}).n) + ' games with a close, the model scores ' + k.num(ll(V, 'model'), 4) + ' and the de-vigged closing moneyline ' + k.num(ll(V, 'market'), 4) + '. ' +
       (gap > 0 ? 'The market is sharper by ' + k.num(gap, 4) + ' nats a game, the expected order: the close knows the lineups, the bullpen, injuries and money that the model reads late or not at all. ' + (share !== null ? 'Measured from the starter-and-record baseline, the model closes ' + k.num(100 * share, 0) + '% of the distance to the market. ' : '')
         : 'The model is at least as sharp as the close here, which would be extraordinary: treat it as a bug until it survives more seasons. ') +
-      (k.isNum(ll(V, 'blend_50')) ? (ll(V, 'blend_50') < ll(V, 'market') ? 'A 50/50 blend of model and market scores ' + k.num(ll(V, 'blend_50'), 4) + ', better than the market alone, so the model carries some information the close does not.' : 'A 50/50 blend scores ' + k.num(ll(V, 'blend_50'), 4) + ', no better than the market alone, so the model adds nothing the close does not already price.') : '') + '</p>');
+      (k.isNum(ll(V, 'blend_50')) ? (ll(V, 'blend_50') < ll(V, 'market') ? 'A 50/50 blend of model and market scores ' + k.num(ll(V, 'blend_50'), 4) + ', better than the market alone, so the model carries some information the close does not.' : 'A 50/50 blend scores ' + k.num(ll(V, 'blend_50'), 4) + ', no better than the market alone, so the model adds nothing the close does not already carry.') : '') + '</p>');
   }
   const bins = (((P.model || {}).reliability) || []).filter(b => b.n >= 100);
   if (bins.length) {
@@ -131,7 +131,7 @@ function render(el, params, state) {
       '<div class="pg-note gq-note">Team ratings: run differential regressed to a prior of 50 games, 0.40 logit per run, plus 0.12 logit home field. Starter and record: a logistic regression on the log5 of regressed win percentages, the starters\' regressed RA9 difference and home field, refitted as games accumulate. The closing line is ESPN\'s DraftKings close (else the current line), de-vigged multiplicatively.</div></div>';
     h += '<div class="grid-2"><div class="card"><div class="card-header">Reliability: who wins <span class="card-sub">Ten equal-width bins of P(home win); marker size by games.</span>' + k.toggle('cal-rel', [['all', 'All games'], ['mkt', 'v closing line']], 'mkt') + '</div><div id="cal-rel-c" style="height:420px"></div></div>' +
       '<div class="card"><div class="card-header">Log-loss by season</div><div id="cal-years" style="height:420px"></div></div></div>';
-    h += '<div class="grid-2"><div class="card"><div class="card-header">Totals <span class="card-sub">P(over the closing total), pushes excluded: the model\'s simulated distribution against the market\'s de-vigged over price.</span></div><div id="cal-tot" style="height:340px"></div><div id="cal-tot-t"></div></div>' +
+    h += '<div class="grid-2"><div class="card"><div class="card-header">Totals <span class="card-sub">P(over the closing total), pushes excluded: the model\'s simulated distribution against the market\'s de-vigged over probability.</span></div><div id="cal-tot" style="height:340px"></div><div id="cal-tot-t"></div></div>' +
       '<div class="card"><div class="card-header">Run line <span class="card-sub">P(home covers the closing run line).</span></div><div id="cal-rl" style="height:340px"></div><div id="cal-rl-t"></div></div></div>';
     h += '<div class="grid-2"><div class="card"><div class="card-header">xwOBA+ against Savant\'s xwOBA <span class="card-sub">Pearson r with the next period\'s wOBA (first half → second half, and second half → next first half), hitters with 200+ PA then 100+ PA.</span></div><div id="cal-xw" style="height:300px"></div><div id="cal-xw-t"></div></div>' +
       '<div class="card"><div class="card-header">Stuff validity <span class="card-sub">Does this season\'s Stuff+ predict next season? Pitchers with 300+ batters faced in both.</span></div><div id="cal-stuff"></div></div></div>';

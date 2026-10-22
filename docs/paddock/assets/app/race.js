@@ -1,5 +1,5 @@
 /* The Quant Paddock — the race centre (#/race/<y>/<r>[/laps|strategy|quali|telemetry]).
- * Upcoming: the forecast before and after qualifying (and the sprint), model against market, the
+ * Upcoming: our forecast before and after qualifying (and the sprint), the market a grey reference tick, the
  * finishing-position distribution and the weekend schedule. Finished: awards, the result against the
  * forecast; Laps (positions, gaps, lap times, corrected pace, overtakes, race control); Strategy
  * (stints, pit stops, degradation, weather); Qualifying; Telemetry (two laps overlaid, telemetry.js).
@@ -29,24 +29,10 @@ function head(race, season, tab, teams) {
   var circ = race.circuit || row.circuit || {};
   var res = (race.results || []).slice().sort(function (a, b) { return (a.pos || 99) - (b.pos || 99); });
   var win = race.status === 'done' && res[0] ? res[0] : null;
-  var tcol = win ? PD.tc(teams[win.driver]) : 'var(--a-f1)';
-  var stats = '';
-  if (win) {
-    var pole = (race.qualifying || []).slice().sort(function (a, b) { return a.pos - b.pos; })[0];
-    stats = '<div class="qk-hero-stat"><div class="v">' + esc(PD.driverCode(win.driver)) + '</div><div class="l">Winner</div></div>' + (pole ? '<div class="qk-hero-stat"><div class="v">' + esc(PD.driverCode(pole.driver)) + '</div><div class="l">Pole</div></div>' : '') +
-      (isNum(win.time_ms) ? '<div class="qk-hero-stat"><div class="v">' + PD.fmtMs(win.time_ms, 0) + '</div><div class="l">Race time</div></div>' : '');
-  } else {
-    var f = race.forecast || {};
-    var sim = (f.post_quali && has(f.post_quali.drivers)) ? f.post_quali : f.pre_quali;
-    var ds = (sim || {}).drivers || {};
-    var fav = Object.keys(ds).sort(function (a, b) { return ds[b].p_win - ds[a].p_win; })[0];
-    if (fav) stats = '<div class="qk-hero-stat"><div class="v">' + PD.pct(ds[fav].p_win, 0) + '</div><div class="l">' + esc(PD.driverCode(fav)) + ' to win</div></div>' + (isNum(sim.p_sc) ? '<div class="qk-hero-stat"><div class="v">' + PD.pct(sim.p_sc, 0) + '</div><div class="l">Safety car</div></div>' : '');
-  }
   var status = race.status === 'done' ? '<span class="qk-badge final">Result</span>' : row.status === 'next' ? '<span class="qk-badge accent">Next race</span>' : '<span class="qk-badge">Upcoming</span>';
-  var h = '<section class="qk-hero pd-hero-ent" style="--tc:' + esc(tcol) + '"><div class="qk-hero-in">' + (win ? PD.mark(teams[win.driver], 'lg') : '<span class="qk-team-mark lg" style="--tc:var(--a-f1);--ti:#fff">R' + r + '</span>') +
-    '<div><div class="qk-kicker">' + esc(y) + ' · Round ' + esc(r) + (row.sprint || race.sprint ? ' · sprint weekend' : '') + ' ' + status + '</div><h1>' + esc(race.name || row.name || 'Round ' + r) + '</h1>' +
-    '<div class="qk-hero-meta">' + (circ.id ? '<span>' + PD.circuitLink(circ.id, circ.name) + '</span>' : '') + (circ.locality ? '<span>' + esc(circ.locality) + (circ.country ? ', ' + esc(circ.country) : '') + '</span>' : '') + '<span>' + esc(PD.fmtDate(race.date || row.date)) + '</span></div></div>' +
-    '<div class="qk-hero-stats">' + stats + '</div></div></section>';
+  var sub = [circ.id ? PD.circuitLink(circ.id, circ.name) : '', circ.locality ? esc(circ.locality) + (circ.country ? ', ' + esc(circ.country) : '') : '', esc(PD.fmtDate(race.date || row.date))].filter(Boolean).join(' · ');
+  var h = QK.sectionHead({ kicker: 'F1 · ' + y + ' · Round ' + r + (row.sprint || (race.sprint && race.sprint.length) ? ' · sprint weekend' : ''), title: esc(race.name || row.name || 'Round ' + r), size: 'lg', tag: 'h1', html: true, cls: 'pd-head',
+    sub: sub, actions: status });
   h += '<div class="pd-racebar">' + PD.subnav(TABS.map(function (t) { return [PD.raceHref(y, r, t[0]), t[1], t[0]]; }), tab || '', 'Race views') +
     '<div class="pd-pager">' + (prev ? '<a class="qk-btn" href="' + PD.raceHref(y, prev.round, tab) + '" title="' + esc(prev.name) + '">← ' + esc(PD.shortRace(prev.name)) + '</a>' : '') +
     (nxt ? '<a class="qk-btn" href="' + PD.raceHref(y, nxt.round, tab) + '" title="' + esc(nxt.name) + '">' + esc(PD.shortRace(nxt.name)) + ' →</a>' : '') + '</div></div>';
@@ -98,24 +84,19 @@ function forecastBlock(hostId, views, teams, title, startKey, market) {
   if (!views.length) { host.innerHTML = PD.card(title, '', PD.muted('No forecast was built for this race.')); return; }
   var start = views.filter(function (v) { return v[0] === startKey; })[0] || views[views.length - 1];
   host.innerHTML = PD.grid(
-    PD.card(esc(title), '<span id="' + hostId + '-s"></span>', PD.chartBox(hostId + '-ch', 420), { span: 7, right: views.length > 1 ? PD.seg(hostId + '-k', views.map(function (v) { return [v[0], v[1]]; }), start[0], 'Forecast') : '' }) +
-    PD.card('Finishing position odds', 'Share of simulated races ending in each place.', PD.chartBox(hostId + '-heat', 520), { span: 5 }) +
+    PD.card(esc(title), '<span id="' + hostId + '-s"></span>', '<div id="' + hostId + '-ch"></div>', { span: 7, right: views.length > 1 ? PD.seg(hostId + '-k', views.map(function (v) { return [v[0], v[1]]; }), start[0], 'Forecast') : '' }) +
+    PD.card('Where they finish', 'Our chance of each finishing position: the share of simulated races ending in each place.', PD.chartBox(hostId + '-heat', 520), { span: 5 }) +
     PD.card('Every driver', '', '<div id="' + hostId + '-t"></div>', { span: 12, flush: true }));
   var draw = function (key) {
     var v = views.filter(function (x) { return x[0] === key; })[0] || start;
     var sim = v[2], ds = sim.drivers;
     var ids = Object.keys(ds).sort(function (a, b) { return (ds[b].p_win - ds[a].p_win) || (ds[a].exp_pos - ds[b].exp_pos); });
     var mk = v[0] !== 'sprint' && market ? market : null;
-    PD.set(hostId + '-s', esc(v[1]) + (isNum(sim.p_sc) ? ' · P(safety car) ' + PD.pct(sim.p_sc, 0) : '') + (isNum(sim.p_vsc) ? ' · P(VSC) ' + PD.pct(sim.p_vsc, 0) : '') + (isNum(sim.p_wet) && sim.p_wet > 0.005 ? ' · P(wet) ' + PD.pct(sim.p_wet, 0) : '') + (mk ? ' · blue model, orange market' : ''));
-    if (mk) {
-      var top = ids.concat(Object.keys(mk).filter(function (k) { return ids.indexOf(k) < 0; })).filter(function (id) { return ((ds[id] || {}).p_win || 0) >= 0.005 || (mk[id] || 0) >= 0.01; })
-        .sort(function (a, b) { return Math.max((ds[b] || {}).p_win || 0, mk[b] || 0) - Math.max((ds[a] || {}).p_win || 0, mk[a] || 0); }).slice(0, 12);
-      window.QKC.dumbbell(document.getElementById(hostId + '-ch'), { rows: top.map(function (id) { return { label: PD.driverName(id), a: (ds[id] || {}).p_win || 0, b: mk[id] || 0, href: PD.driverHref(id) }; }),
-        max: Math.min(1, Math.max.apply(null, top.map(function (id) { return Math.max((ds[id] || {}).p_win || 0, mk[id] || 0); })) * 1.15 + 0.02), labelWidth: 120, valName: 'Win probability' });
-    } else {
-      PD.ch.hbars(hostId + '-ch', ids.slice(0, 12).map(function (id) { var t = teams[id] || PD.driverTeam(id); return { label: PD.driverName(id), value: ds[id].p_win, mark: null, colour: PD.teamColour(t), href: PD.driverHref(id), sub: 'Podium ' + PD.pct(ds[id].p_podium, 0) + ' · points ' + PD.pct(ds[id].p_points, 0) }; }),
-        { fmt: function (x) { return PD.pct(x); }, name: 'P(win)', label: 'Win probability' });
-    }
+    PD.set(hostId + '-s', esc(v[1]) + (isNum(sim.p_sc) ? ' · P(safety car) ' + PD.pct(sim.p_sc, 0) : '') + (isNum(sim.p_vsc) ? ' · P(VSC) ' + PD.pct(sim.p_vsc, 0) : '') + (isNum(sim.p_wet) && sim.p_wet > 0.005 ? ' · P(wet) ' + PD.pct(sim.p_wet, 0) : '') + ' · our win chance' + (mk ? '; the grey tick is the Kalshi / Polymarket number, for reference' : ''));
+    var top = ids.slice(0, 12);
+    var rows = PD.v2.chanceRows(top, function (id) { return (ds[id] || {}).p_win || 0; }, true, mk);
+    rows.forEach(function (r0, i) { var d0 = ds[top[i]] || {}; r0.sub = 'podium ' + PD.pct(d0.p_podium, 0); });
+    PD.set(hostId + '-ch', QK.chances(rows, { oursName: 'Our win chance', marketName: 'Market (Kalshi / Polymarket), for reference' }));
     var order = ids.slice().sort(function (a, b) { return ds[a].exp_pos - ds[b].exp_pos; });
     PD.ch.posHeat(hostId + '-heat', order.map(function (id) { return { label: PD.driverName(id), dist: ds[id].pos_dist || [] }; }), { zmax: 0.6, yName: 'Driver' });
     var hasPts = ids.some(function (id) { return isNum(ds[id].exp_points); });
@@ -127,7 +108,7 @@ function forecastBlock(hostId, views, teams, title, startKey, market) {
       { key: 'p_points', label: 'Points', num: true, fmt: function (x) { return PD.pct(x); } },
       { key: 'p_dnf', label: 'DNF', num: true, fmt: function (x) { return PD.pct(x); } },
       { key: 'exp_pos', label: 'Exp. pos', num: true, fmt: function (x) { return PD.num(x, 1); } }
-    ].concat(hasPts ? [{ key: 'exp_points', label: 'Exp. pts', num: true, fmt: function (x) { return PD.num(x, 1); } }] : []).concat(mk ? [{ key: 'mkt', label: 'Market', num: true, fmt: function (x) { return isNum(x) ? PD.pct(x) : '—'; } }] : []),
+    ].concat(hasPts ? [{ key: 'exp_points', label: 'Exp. pts', num: true, fmt: function (x) { return PD.num(x, 1); } }] : []).concat(mk ? [{ key: 'mkt', label: 'Market (ref.)', num: true, tip: 'Kalshi / Polymarket win probability, shown as a reference next to ours', fmt: function (x) { return isNum(x) ? '<span class="qk-muted">' + PD.pct(x) + '</span>' : '—'; } }] : []),
     ids.map(function (id) { var d = ds[id]; return { id: id, name: PD.driverName(id), team: teams[id] || PD.driverTeam(id), p_win: d.p_win, p_podium: d.p_podium, p_points: d.p_points, p_dnf: d.p_dnf, exp_pos: d.exp_pos, exp_points: d.exp_points, mkt: mk ? mk[id] : null }; }),
     { sort: { key: 'exp_pos', dir: 'asc' } });
   };
@@ -153,14 +134,14 @@ function overviewUpcoming(host, race, season, teams, markets) {
   var mk = nr.year === race.year && nr.round === race.round && nr.prices && Object.keys(nr.prices).length ? nr.prices : null;
   var raceS = sessions.filter(function (s) { return s.key === 'race'; })[0];
   host.innerHTML = PD.kpis([
-    PD.kpi('Favourite', fav ? PD.driverLink(fav, { team: teams[fav] }) : '—', fav ? PD.pct(ds[fav].p_win) + ' to win' + (mk && isNum(mk[fav]) ? ' · market ' + PD.pct(mk[fav]) : '') : '', { text: true }),
-    PD.kpi('Safety car', main && isNum(main[2].p_sc) ? PD.pct(main[2].p_sc, 0) : '—', main && isNum(main[2].p_vsc) ? 'VSC ' + PD.pct(main[2].p_vsc, 0) : 'at least one deployment'),
+    PD.kpi('Our favourite', fav ? esc(PD.driverCode(fav)) + ' ' + PD.pct(ds[fav].p_win, 0) : '—', fav ? esc(PD.driverName(fav)) + ' · our win chance' + (mk && isNum(mk[fav]) ? ' · market ' + PD.pct(mk[fav]) + ' (reference)' : '') : '', { signal: true, href: fav ? PD.driverHref(fav) : null }),
+    PD.kpi('Safety car', main && isNum(main[2].p_sc) ? PD.pct(main[2].p_sc, 0) : '—', 'our chance of at least one' + (main && isNum(main[2].p_vsc) ? ' · VSC ' + PD.pct(main[2].p_vsc, 0) : '')),
     PD.kpi('Grid', post ? 'Set' : 'Not yet', post ? 'forecast updated after qualifying' : 'forecast before qualifying', { text: true }),
     PD.kpi('Race start', raceS ? esc(PD.fmtTime(raceS.iso)) : esc(PD.fmtDate(race.date, { year: false })), raceS ? esc(PD.fmtDate(raceS.iso, { year: false })) + ', your time' : '')
-  ]) + (sessions.length ? PD.grid(PD.card('Weekend', 'Times in your timezone.', '<div class="pd-hero-clock"><div class="pd-cd" id="rc-cd"></div><ul class="pd-sched" id="rc-sched"></ul></div>', { span: 12 }), 'pd-mt') : '') +
+  ]) + (sessions.length ? PD.grid(PD.card('Weekend', 'Times in your time zone.', '<div class="pd-wk"><div class="pd-cd" id="rc-cd"></div><ul class="pd-sched" id="rc-sched"></ul></div>', { span: 12 }), 'pd-mt') : '') +
     '<div id="rc-fc" class="pd-mt"></div>' + (race.forecast && race.forecast.generated_at ? '<p class="pd-cap">Forecast generated ' + esc(PD.fmtStamp(race.forecast.generated_at)) + '.</p>' : '');
   if (sessions.length) PD.weekendClock(sessions, 'rc-cd', 'rc-sched');
-  forecastBlock('rc-fc', views, teams, 'Who wins?', post ? 'post' : 'pre', mk);
+  forecastBlock('rc-fc', views, teams, 'Who wins? Our chance', post ? 'post' : 'pre', mk);
 }
 
 // ── finished race: overview ───────────────────────────────────────────────
@@ -217,16 +198,16 @@ function overviewDone(host, race, season, teams) {
       (x.label ? '<div class="pd-award-v">' + esc(x.label) + '</div>' : '') + (x.why ? '<div class="pd-award-why">' + esc(x.why) + '</div>' : '') + '</div>';
   });
   host.innerHTML = PD.kpis([
-    PD.kpi('Winner', winner ? PD.driverLink(winner.driver, { team: teams[winner.driver] }) : '—', winner ? (winner.grid ? 'from P' + winner.grid : '') + (isNum(winnerP) ? ' · model gave ' + PD.pct(winnerP) : '') : '', { text: true }),
+    PD.kpi('Winner', winner ? PD.driverLink(winner.driver, { team: teams[winner.driver] }) : '—', winner ? (winner.grid ? 'from P' + winner.grid : '') + (isNum(winnerP) ? ' · our chance was ' + PD.pct(winnerP) : '') : '', { text: true }),
     PD.kpi('Pole', q ? PD.driverLink(q.driver, { team: teams[q.driver] }) : '—', q ? PD.fmtMs(q.q3 || q.q2 || q.q1) : '', { text: true }),
     PD.kpi('Fastest lap', fl ? PD.driverLink(fl.driver, { team: teams[fl.driver] }) : '—', fl ? PD.fmtMs(fl.fastest_ms) : '', { text: true }),
     PD.kpi('Neutralisations', has(race.control) ? String(sc + vsc + red) : '—', has(race.control) ? [sc + ' SC', vsc + ' VSC'].concat(red ? [red + ' red'] : []).join(' · ') : 'no race control data'),
-    PD.kpi('Forecast favourite', fav ? PD.driverLink(fav, { team: teams[fav] }) : '—', fav ? PD.pct(pre[fav].p_win) + ' · finished ' + (favRes ? (PD.finished(favRes.status) ? 'P' + favRes.pos : 'DNF') : '—') : 'no pre-race forecast', { text: true })
+    PD.kpi('Our favourite', fav ? PD.driverLink(fav, { team: teams[fav] }) : '—', fav ? PD.pct(pre[fav].p_win) + ' to win · finished ' + (favRes ? (PD.finished(favRes.status) ? 'P' + favRes.pos : 'DNF') : '—') : 'no pre-race forecast', { text: true })
   ]) +
-  (cards.length ? '<section class="qk-section pd-sec"><div class="qk-section-head"><h2>Awards</h2><div class="qk-sub">The model’s picks of the race.</div></div><div class="pd-awards">' + cards.join('') + '</div></section>' : '') +
+  (cards.length ? '<section class="qk-section pd-sec">' + PD.secHead('Awards', 'The race in numbers', 'Our picks of the race, each with the number behind it.') + '<div class="pd-awards">' + cards.join('') + '</div></section>' : '') +
   PD.grid(
     PD.card('Result', race.sprint && race.sprint.length ? 'Sprint result below.' : '', '<div id="rc-res"></div>', { span: 7, flush: true }) +
-    PD.card('Forecast v result', 'Where the model expected each driver (blue) against where they finished (orange).', PD.chartBox('rc-eva', 560), { span: 5 }) +
+    PD.card('Forecast v result', 'Where we expected each driver to finish (violet) against where they did (ring).', PD.chartBox('rc-eva', 560), { span: 5 }) +
     PD.card('Positions lap by lap', 'Team colours; a team’s second driver is dashed. Bands: safety car (amber), red flag.', PD.chartBox('rc-pos-mini', 420), { span: 12, foot: '<a href="' + PD.raceHref(race.year, race.round, 'laps') + '">Gaps, lap times, overtakes and race control →</a>' }) +
     (race.sprint && race.sprint.length ? PD.card('Sprint result', '', '<div id="rc-sprint"></div>', { span: 12, flush: true }) : ''), 'pd-mt') +
   '<div id="rc-prefc" class="pd-mt"></div>';
@@ -236,7 +217,7 @@ function overviewDone(host, race, season, teams) {
   var order = res.map(function (x) { return x.driver; }).filter(function (id) { return eva[id] && isNum(eva[id].exp_pos) && isNum(eva[id].actual); });
   if (order.length) window.QKC.dumbbell(document.getElementById('rc-eva'), { rows: order.map(function (id) { var e = eva[id]; var pc = isNum(e.pctile_of_actual) ? (e.pctile_of_actual <= 1 ? e.pctile_of_actual * 100 : e.pctile_of_actual) : null;
     return { label: PD.driverCode(id), a: e.exp_pos, b: e.actual, href: PD.driverHref(id), sub: PD.driverName(id) + (pc !== null ? ' · ' + PD.ordinal(Math.round(pc)) + ' percentile of the forecast' : '') }; }),
-    aName: 'Expected', bName: 'Finished', min: 0, max: Math.max(20, order.length + 1), labelWidth: 44, valName: 'Finishing position', fmt: function (v, d) { return isNum(v) ? 'P' + (d === 0 ? Math.round(v) : PD.num(v, 1)) : '—'; } });
+    aName: 'Our expectation', bName: 'Finished', min: 0, max: Math.max(20, order.length + 1), labelWidth: 44, valName: 'Finishing position', fmt: function (v, d) { return isNum(v) ? 'P' + (d === 0 ? Math.round(v) : PD.num(v, 1)) : '—'; } });
   else PD.ch.none('rc-eva', 'No forecast to compare with.');
   positionChart('rc-pos-mini', race, res, teams, nLaps);
   var views = forecastViews(race);

@@ -99,7 +99,7 @@ CC.tcol = function (L, tid) { var t = CC.team(L, tid); return t && QK.color.pars
 /* Season payload: season.json for (L, S) with its teams and conferences registered. */
 CC.season = function (L, S) {
   return CC.load(CC.path(L, S, 'season.json')).then(function (d) {
-    if (CC.ok(d)) { CC.addTeams(L, d.teams); CC.addConfs(L, d.conferences); }
+    if (CC.ok(d)) { CC.addTeams(L, d.teams); CC.addConfs(L, d.conferences); CC.addRecords(L, S, d.standings); }
     return d;
   });
 };
@@ -203,12 +203,31 @@ CC.game = function (c, L) {
     note: '', period: per, clock: c.clock, href: CC.gameHref(L, c.id, c.season)
   };
 };
+/* Records (W-L) for the game cards, registered from each season's standings. */
+var RECS = { cfb: {}, mbb: {}, wbb: {} };
+CC.addRecords = function (L, S, standings) {
+  var k = String(S);
+  RECS[L][k] = RECS[L][k] || {};
+  Object.keys(standings || {}).forEach(function (c) { (standings[c] || []).forEach(function (r) { if (r && isNum(r.w) && isNum(r.l)) RECS[L][k][String(r.team)] = r.w + '-' + r.l; }); });
+};
+CC.rec = function (L, S, tid) { var m = RECS[L][String(S)]; return (m && m[String(tid)]) || ''; };
+var MK_SRC = { kalshi: 'Kalshi', polymarket: 'Polymarket', espn_close: 'ESPN closing line', espn: 'ESPN line' };
+CC.mkSource = function (mk) { return mk && mk.source ? (MK_SRC[mk.source] || mk.source) : ''; };
+/* A v2 game card (Design System 2.0): our chance per team, the favourite in the signal colour, records, the market a
+ * quiet ring and tick with its source named. */
 CC.card = function (c, L) {
-  var g = CC.game(c, L), h = QK.matchCard(g, { sport: false });
+  var g = CC.game(c, L), S = c.season || (CC.state && CC.state.S);
+  g.home.record = CC.rec(L, S, c.home); g.away.record = CC.rec(L, S, c.away);
+  var src = CC.mkSource(c.market);
+  var h = QK.gameCard(g, { sport: false, marketLabel: 'Market', marketTip: 'The market’s chance for the home side' + (src ? ' (' + src + ')' : '') + ', shown as a reference next to ours' });
   /* the kit's badge prints the start time: a TBA game shows its day and "TBA" instead of the midnight placeholder */
   if (g.tba) h = h.replace(QK.statusBadge(g), '<span class="qk-badge">' + esc(fmt.relDay(g.start)) + ' · TBA</span>');
   return h;
 };
+/* Unit names for display: the football defensive front is written "DL/edge" in the payloads. */
+CC.unit = function (s) { return String(s || '').replace(/DL\/edge/gi, 'Defensive front'); };
+/* Payload copy in the v2 voice (headlines written by the builder): "title odds" -> "title chances". */
+CC.copy = function (s) { return String(s || '').replace(/\btitle odds\b/gi, 'title chances').replace(/\bodds\b/gi, 'chances'); };
 
 /* ── UI pieces ───────────────────────────────────────────────────────── */
 var U = CC.ui = {};
@@ -224,22 +243,27 @@ U.kicker = function (L, S) {
   var ph = CC.isCur(L, S) ? i.phase : null;
   return CC.LNAME[L] + ' · ' + CC.seasonLabel(L, S) + (ph ? ' · ' + (P[ph] || ph) : '') + (CC.isCur(L, S) && CC.fb(L) && i.week && ph === 'regular' ? ' · Week ' + i.week : '');
 };
+/* Page head (v2): QK.sectionHead, large, h1. sub is HTML (callers escape payload text). */
 U.head = function (title, sub, kicker, right) {
-  return '<header class="cc-head"><div>' + (kicker ? '<div class="qk-kicker">' + esc(kicker) + '</div>' : '') + '<h1>' + esc(title) + '</h1>' +
-    (sub ? '<div class="qk-sub">' + sub + '</div>' : '') + '</div>' + (right || '') + '</header>';
+  return QK.sectionHead({ kicker: kicker || '', title: esc(title), sub: sub || '', actions: right || '', size: 'lg', tag: 'h1', html: true, cls: 'cc-sh' });
 };
+/* Stat tiles (v2): ours first with signal: true. */
+U.stats = function (list) { return '<div class="cc-kpis">' + QK.stats(list) + '</div>'; };
+/* A leaderboard into a fresh node, returned as HTML with an id to mount after the page is written. */
+U.lb = function (id) { return '<div id="' + esc(id) + '" class="cc-lb"></div>'; };
+U.mark = function (L, tid) { var t = CC.team(L, tid) || { name: tid ? 'Team ' + tid : '?' }; return { name: t.name, abbr: t.abbr, colour: t.colour }; };
 U.tabs = function (L, sec, list, S, active) {
   return U.tabsHTML(list.map(function (x, i) { return { key: x[0], label: x[1], href: CC.href(L, sec, null, S, i ? 'tab=' + x[0] : '') }; }), active);
 };
 U.tab = function (params, keys, dflt) { var t = (params.query || {}).tab; return keys.indexOf(t) >= 0 ? t : dflt; };
 U.card = function (title, sub, body, o) {
   o = o || {};
-  return '<section class="qk-card cc-card' + (o.cls ? ' ' + o.cls : '') + '"' + (o.id ? ' id="' + esc(o.id) + '"' : '') + '><div class="qk-card-head"><div><h2 class="qk-card-title">' + esc(title) + '</h2>' +
-    (sub ? '<div class="qk-card-sub">' + sub + '</div>' : '') + '</div>' + (o.right || '') + '</div><div class="qk-card-body' + (o.flush ? ' flush' : '') + '">' + body + '</div>' +
+  var head = title || sub || o.right ? '<div class="qk-card-head"><div><h2 class="qk-card-title">' + esc(title) + '</h2>' + (sub ? '<div class="qk-card-sub">' + sub + '</div>' : '') + '</div>' + (o.right || '') + '</div>' : '';
+  return '<section class="qk-card cc-card' + (o.cls ? ' ' + o.cls : '') + '"' + (o.id ? ' id="' + esc(o.id) + '"' : '') + '>' + head + '<div class="qk-card-body' + (o.flush ? ' flush' : '') + '">' + body + '</div>' +
     (o.foot ? '<div class="qk-card-foot">' + o.foot + '</div>' : '') + '</section>';
 };
-U.section = function (title, sub, body, right) {
-  return '<section class="qk-section cc-sec"><div class="qk-section-head"><div><h2>' + esc(title) + '</h2>' + (sub ? '<div class="qk-sub">' + sub + '</div>' : '') + '</div>' + (right || '') + '</div>' + body + '</section>';
+U.section = function (title, sub, body, right, kicker) {
+  return '<section class="qk-section cc-sec">' + QK.sectionHead({ kicker: kicker || '', title: esc(title), sub: sub || '', actions: right || '', html: true }) + body + '</section>';
 };
 U.chart = function (id, h, label) { return '<div id="' + esc(id) + '" class="qk-chart" style="--h:' + (h || 280) + 'px"' + (label ? ' role="img" aria-label="' + esc(label) + '"' : '') + '></div>'; };
 U.link = function (href, text) { return '<a class="cc-link" href="' + esc(href) + '">' + esc(text) + ' →</a>'; };
@@ -257,14 +281,21 @@ U.playerEnt = function (L, pid, name, tid, sub, S) {
 };
 U.grade = function (g) { return g ? '<span class="cc-grade" data-g="' + esc(String(g).charAt(0).toUpperCase()) + '">' + esc(g) + '</span>' : '—'; };
 U.empty = function (t, s) { return QK.empty(t, s); };
+/* A payload that is not there yet. Before a season's first games the builder writes {ok: false, reason}: say so in
+ * plain words and offer last season (the same section), rather than an error. */
 U.missing = function (what, d) {
-  return QK.empty(what + ' not available yet', d && d.reason && !d.missing ? d.reason : 'This payload has not been built for the season shown.');
+  var st = CC.state || {}, L = st.L, S = st.S;
+  var prev = L ? CC.seasons(L).filter(function (s) { return s < Number(S); })[0] : null;
+  var sec = { games: 'games', game: 'games', team: 'teams', player: 'players' }[st.sec] || st.sec;
+  var link = prev && sec ? '<div class="cc-empty-act"><a class="qk-btn" href="' + esc(CC.href(L, sec, st.sec === 'team' || st.sec === 'player' ? st.id : null, prev)) + '">See ' + esc(CC.seasonLabel(L, prev)) + '</a></div>' : '';
+  if (d && d.ok === false && !d.missing) return QK.empty(what + ' starts once games are played', L && CC.isCur(L, S) ? 'Nothing has been played in ' + CC.seasonLabel(L, S) + ' yet; the numbers appear after the first games.' : (d.reason ? 'For ' + CC.seasonLabel(L, S) + ': ' + d.reason + '.' : 'Nothing was played this season.')) + link;
+  return QK.empty(what + ' is not published for this season', 'It has not been built for the season shown.') + link;
 };
 /* A probability cell shaded by its value (tokens only): heat tables of P(reach round) and the like. */
 U.heat = function (p, d) {
   if (!isNum(p)) return { v: -1, html: '<span class="qk-muted">—</span>' };
-  var a = Math.round(Math.min(1, Math.max(0, p)) * 70);
-  return { v: p, html: CC.pct(p, d), style: 'background:color-mix(in srgb, var(--c-1) ' + a + '%, transparent)' + (a > 42 ? ';color:var(--ink-1);font-weight:600' : '') };
+  var a = Math.round(Math.min(1, Math.max(0, p)) * 60);
+  return { v: p, html: CC.pct(p, d), style: 'background:color-mix(in srgb, var(--signal) ' + a + '%, transparent)' + (a > 42 ? ';color:var(--ink-1);font-weight:600' : '') };
 };
 U.bar = function (p, col) { return '<span class="cc-pbar" role="img" aria-label="' + CC.pct(p) + '"><span style="width:' + (isNum(p) ? Math.max(1, Math.min(100, p * 100)) : 0) + '%;' + (col ? 'background:' + col : '') + '"></span></span>'; };
 U.alive = function (el) { return !!el && el.isConnected; };

@@ -1,0 +1,4629 @@
+{
+ "sport": "hockey",
+ "site": "rink",
+ "schema_version": 1,
+ "generated": "2026-10-22",
+ "leagues": [
+  "nhl"
+ ],
+ "payloads": {
+  "players": "docs/rink/data/<season>/skaters.json -> players{pid}.values{id} (pct_pos{id} = percentile v forwards or defencemen; pct{id} v all skaters); goalies.json -> players{pid}.values{id}, pct{id}",
+  "player_pages": "docs/rink/data/players/<pid>.json -> seasons[].values{id}, current.onice, current.rapm, similar[[pid, name, team, distance]]",
+  "teams": "docs/rink/data/<season>/teams.json -> teams{abbr}.units{id} (pct{off5, def5, pp, pk, goalie, rating}); points % = season.json -> standings.rows[].p_pct",
+  "leaderboards": "docs/rink/data/<season>/leaders.json -> skaters{id}, goalies{id}, teams{id}"
+ },
+ "method": {
+  "seasons": "2010-11 to 2025-26 regular seasons (16 seasons, 15 season pairs); 2009-10 payloads not built; 2026-27 in progress, excluded",
+  "yoy": "Pearson r between seasons t and t+1, values z-scored within season and peer group, both seasons qualified",
+  "split_half": "odd v even games within season (uncorrected r, Fisher-averaged across seasons; split_half_r_sb = Spearman-Brown 2r/(1+r)); game-level data from data/nhl/cache/player_games, xg_shots, c/tg_<S>",
+  "m50": "n_bar x (1 - r) / r with r the uncorrected split-half r at mean half-season sample n_bar; year-to-year r at the mean season sample where no game-level split exists (an upper bound: it includes real change in talent)",
+  "predictive": "Pearson r of the metric in season t with the target in season t+1 (same peer group, both qualified); sign oriented so a positive r means the better direction (per 'direction') goes with more future value. Skater target: next-season GAR/60 (the site's own value model, a single-season measure); also next-season points/60 and 5v5 on-ice xG differential/60. Goalie target: next-season GSAx/100 unblocked attempts. Team target: second-half points % from first-half metrics (also second-half goal differential/game and next-season points %).",
+  "benchmarks": {
+   "skaters_F": "GAR/60 autocorrelation 0.572; points/60 0.718; on-ice xGD/60 0.478",
+   "skaters_D": "GAR/60 0.493; points/60 0.682; on-ice xGD/60 0.414",
+   "goalies": "GSAx/100 autocorrelation 0.101 (n 635 pairs)",
+   "teams": "first-half points % -> second-half points % 0.512; first-half goal differential/game -> second-half points % 0.528"
+  }
+ },
+ "groups": [
+  {
+   "id": "forwards",
+   "entity": "player",
+   "display": "Forwards",
+   "peer_group": "group == 'F' (pos C, L, R); compared within season (pct_pos)",
+   "position_field": "group",
+   "position_codes": [
+    "F"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": 250,
+    "unit": "5v5 minutes",
+    "note": "payload flag: 250 5v5 minutes x (team games / 82); percentiles also need the metric's own floor (reference.floors) and Value metrics 200 minutes all situations"
+   },
+   "basis": "per 60 (5v5 for on-ice and RAPM, all situations for points, individual xG and value)",
+   "metrics": [
+    {
+     "id": "gar_60",
+     "display": "Rink value per 60",
+     "unit": "GAR/60",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Goals above a replacement-level player per 60 minutes, from our value model (even-strength impact, power play, penalty kill, finishing, penalties).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.572,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 722,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.572,
+      "also": {
+       "next-season points/60": 0.499,
+       "next-season 5v5 on-ice xGD/60": 0.391
+      }
+     },
+     "redundant_with": {
+      "with": "gar",
+      "r": 0.914
+     }
+    },
+    {
+     "id": "p60",
+     "display": "Points per 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Goals plus assists per 60 minutes, all situations.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.718,
+      "split_half_r": 0.635,
+      "split_half_r_sb": 0.777,
+      "n_pairs": 5349,
+      "m50": 277,
+      "m50_unit": "minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.442,
+      "also": {
+       "next-season points/60": 0.718,
+       "next-season 5v5 on-ice xGD/60": 0.334
+      }
+     },
+     "redundant_with": {
+      "with": "pts_pace",
+      "r": 0.962
+     }
+    },
+    {
+     "id": "ixg60_all",
+     "display": "Individual xG per 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Expected goals from his own shots per 60 minutes, all situations: how much scoring chance he creates for himself.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.744,
+      "split_half_r": 0.683,
+      "split_half_r_sb": 0.812,
+      "n_pairs": 5349,
+      "m50": 224,
+      "m50_unit": "minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.425,
+      "also": {
+       "next-season points/60": 0.552,
+       "next-season 5v5 on-ice xGD/60": 0.349
+      }
+     },
+     "redundant_with": {
+      "with": "ixg60",
+      "r": 0.876
+     }
+    },
+    {
+     "id": "icf60",
+     "display": "Shot attempts per 60 (5v5)",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "His own shot attempts (on goal, missed or blocked) per 60 minutes at 5-on-5: the steadiest individual stat in hockey.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.797,
+      "split_half_r": 0.779,
+      "split_half_r_sb": 0.876,
+      "n_pairs": 5349,
+      "m50": 109,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.346,
+      "also": {
+       "next-season points/60": 0.37,
+       "next-season 5v5 on-ice xGD/60": 0.272
+      }
+     },
+     "redundant_with": {
+      "with": "iff60",
+      "r": 0.973
+     }
+    },
+    {
+     "id": "adj_xgf_pct",
+     "display": "On-ice xG share (5v5)",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of 5-on-5 expected goals his team gets with him on the ice, adjusted for score and venue.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.49,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 803,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.374,
+      "also": {
+       "next-season points/60": 0.344,
+       "next-season 5v5 on-ice xGD/60": 0.487
+      }
+     },
+     "redundant_with": {
+      "with": "xgf_pct",
+      "r": 0.988
+     }
+    },
+    {
+     "id": "xgf60_rel",
+     "display": "xG for per 60, relative to team (5v5)",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "How many more expected goals per 60 his team creates at 5-on-5 with him on the ice than without him.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.612,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 489,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.423,
+      "also": {
+       "next-season points/60": 0.573,
+       "next-season 5v5 on-ice xGD/60": 0.339
+      }
+     },
+     "redundant_with": {
+      "with": "cf60_rel",
+      "r": 0.871
+     }
+    },
+    {
+     "id": "rapm_net",
+     "display": "Isolated impact (RAPM)",
+     "unit": "xG per 60",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "His 5-on-5 expected-goal differential per 60 after accounting for team-mates, opponents, zone starts and score.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.772,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 228,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.423,
+      "also": {
+       "next-season points/60": 0.366,
+       "next-season 5v5 on-ice xGD/60": 0.444
+      }
+     },
+     "redundant_with": {
+      "with": "proj_xgf_pct",
+      "r": 0.802
+     }
+    },
+    {
+     "id": "pen_diff60",
+     "display": "Penalty differential per 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Penalties drawn minus penalties taken per 60 minutes; each one is a power play for or against.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.45,
+      "split_half_r": 0.314,
+      "split_half_r_sb": 0.478,
+      "n_pairs": 5349,
+      "m50": 1052,
+      "m50_unit": "minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.369,
+      "also": {
+       "next-season points/60": 0.191,
+       "next-season 5v5 on-ice xGD/60": 0.114
+      }
+     },
+     "redundant_with": {
+      "with": "pen_net",
+      "r": 0.907
+     }
+    },
+    {
+     "id": "toi_gp",
+     "display": "Ice time per game",
+     "unit": "min",
+     "direction": "higher",
+     "set": "headline",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Minutes per game in all situations: how much the coach trusts him.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.848,
+      "split_half_r": 0.986,
+      "split_half_r_sb": 0.993,
+      "n_pairs": 5349,
+      "m50": 0.5,
+      "m50_unit": "games",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.401,
+      "also": {
+       "next-season points/60": 0.634,
+       "next-season 5v5 on-ice xGD/60": 0.269
+      }
+     },
+     "redundant_with": {
+      "with": "shifts_gp",
+      "r": 0.956
+     }
+    },
+    {
+     "id": "g60",
+     "display": "Goals / 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Goals per 60, all situations.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.56,
+      "split_half_r": 0.438,
+      "split_half_r_sb": 0.609,
+      "n_pairs": 5349,
+      "m50": 618,
+      "m50_unit": "minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.383,
+      "also": {
+       "next-season points/60": 0.57,
+       "next-season 5v5 on-ice xGD/60": 0.279
+      }
+     },
+     "redundant_with": {
+      "with": "g60_5v5",
+      "r": 0.889
+     }
+    },
+    {
+     "id": "p1_60",
+     "display": "Primary points / 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Goals and first assists per 60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.671,
+      "split_half_r": 0.571,
+      "split_half_r_sb": 0.727,
+      "n_pairs": 5349,
+      "m50": 363,
+      "m50_unit": "minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.435,
+      "also": {
+       "next-season points/60": 0.693,
+       "next-season 5v5 on-ice xGD/60": 0.321
+      }
+     },
+     "redundant_with": {
+      "with": "p60",
+      "r": 0.961
+     }
+    },
+    {
+     "id": "p60_5v5",
+     "display": "5v5 points / 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Points per 60 at 5v5.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.509,
+      "split_half_r": 0.394,
+      "split_half_r_sb": 0.566,
+      "n_pairs": 5349,
+      "m50": 592,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.407,
+      "also": {
+       "next-season points/60": 0.593,
+       "next-season 5v5 on-ice xGD/60": 0.314
+      }
+     },
+     "redundant_with": {
+      "with": "p60",
+      "r": 0.908
+     }
+    },
+    {
+     "id": "ixg60",
+     "display": "ixG / 60 (5v5)",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Individual xG per 60 at 5v5.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.622,
+      "split_half_r": 0.506,
+      "split_half_r_sb": 0.672,
+      "n_pairs": 5349,
+      "m50": 377,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.381,
+      "also": {
+       "next-season points/60": 0.373,
+       "next-season 5v5 on-ice xGD/60": 0.332
+      }
+     },
+     "redundant_with": {
+      "with": "ixg60_all",
+      "r": 0.876
+     }
+    },
+    {
+     "id": "sog60",
+     "display": "Shots / 60 (5v5)",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Shots on goal per 60 at 5v5.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.738,
+      "split_half_r": 0.657,
+      "split_half_r_sb": 0.793,
+      "n_pairs": 5349,
+      "m50": 202,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.332,
+      "also": {
+       "next-season points/60": 0.344,
+       "next-season 5v5 on-ice xGD/60": 0.27
+      }
+     },
+     "redundant_with": {
+      "with": "iff60",
+      "r": 0.963
+     }
+    },
+    {
+     "id": "iff60",
+     "display": "Unblocked / 60 (5v5)",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Individual unblocked attempts per 60 at 5v5.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.769,
+      "split_half_r": 0.724,
+      "split_half_r_sb": 0.84,
+      "n_pairs": 5349,
+      "m50": 147,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.34,
+      "also": {
+       "next-season points/60": 0.35,
+       "next-season 5v5 on-ice xGD/60": 0.277
+      }
+     },
+     "redundant_with": {
+      "with": "icf60",
+      "r": 0.973
+     }
+    },
+    {
+     "id": "sh_pct",
+     "display": "Shooting %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Goals per shot on goal.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.314,
+      "split_half_r": 0.203,
+      "split_half_r_sb": 0.337,
+      "n_pairs": 5349,
+      "m50": 230,
+      "m50_unit": "shots on goal",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.185,
+      "also": {
+       "next-season points/60": 0.338,
+       "next-season 5v5 on-ice xGD/60": 0.135
+      }
+     },
+     "redundant_with": {
+      "with": "fsh_pct",
+      "r": 0.984
+     }
+    },
+    {
+     "id": "xfsh_pct",
+     "display": "Expected Fenwick sh%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "ixG per unblocked attempt: shot quality.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.543,
+      "split_half_r": 0.458,
+      "split_half_r_sb": 0.628,
+      "n_pairs": 5349,
+      "m50": 96,
+      "m50_unit": "unblocked attempts",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.159,
+      "also": {
+       "next-season points/60": 0.212,
+       "next-season 5v5 on-ice xGD/60": 0.164
+      }
+     },
+     "redundant_with": {
+      "with": "hd_att60",
+      "r": 0.663
+     }
+    },
+    {
+     "id": "shot_dist",
+     "display": "Avg shot distance",
+     "unit": "ft",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Mean distance (ft) of unblocked attempts.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.645,
+      "split_half_r": 0.581,
+      "split_half_r_sb": 0.735,
+      "n_pairs": 5349,
+      "m50": 58,
+      "m50_unit": "unblocked attempts",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.08,
+      "also": {
+       "next-season points/60": 0.031,
+       "next-season 5v5 on-ice xGD/60": 0.109
+      }
+     },
+     "redundant_with": {
+      "with": "xfsh_pct",
+      "r": -0.627
+     }
+    },
+    {
+     "id": "hd_att60",
+     "display": "High-danger attempts / 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Unblocked attempts with xG of 0.20 or more, per 60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.42,
+      "split_half_r": 0.305,
+      "split_half_r_sb": 0.468,
+      "n_pairs": 5349,
+      "m50": 1098,
+      "m50_unit": "minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.265,
+      "also": {
+       "next-season points/60": 0.311,
+       "next-season 5v5 on-ice xGD/60": 0.248
+      }
+     },
+     "redundant_with": {
+      "with": "ixg60_all",
+      "r": 0.774
+     }
+    },
+    {
+     "id": "shooting_talent",
+     "display": "Shooting talent",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "count",
+     "explanation": "Shrunk finishing: goals above xG on a manned net regressed toward the league by the stabilisation constant of finishing, gax x attempts / (attempts + k).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.298,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 2272,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.171,
+      "also": {
+       "next-season points/60": 0.308,
+       "next-season 5v5 on-ice xGD/60": 0.063
+      }
+     },
+     "redundant_with": {
+      "with": "gar_shooting",
+      "r": 1.0
+     }
+    },
+    {
+     "id": "xgf_pct",
+     "display": "xGF%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "explanation": "On-ice share of expected goals.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.476,
+      "split_half_r": 0.471,
+      "split_half_r_sb": 0.64,
+      "n_pairs": 5349,
+      "m50": 434,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.368,
+      "also": {
+       "next-season points/60": 0.332,
+       "next-season 5v5 on-ice xGD/60": 0.475
+      }
+     },
+     "redundant_with": {
+      "with": "xgd60",
+      "r": 0.993
+     }
+    },
+    {
+     "id": "cf_pct",
+     "display": "CF%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "On-ice share of shot attempts at 5v5.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.593,
+      "split_half_r": 0.682,
+      "split_half_r_sb": 0.811,
+      "n_pairs": 5349,
+      "m50": 180,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.363,
+      "also": {
+       "next-season points/60": 0.36,
+       "next-season 5v5 on-ice xGD/60": 0.482
+      }
+     },
+     "redundant_with": {
+      "with": "ff_pct",
+      "r": 0.965
+     }
+    },
+    {
+     "id": "cf_pct_rel",
+     "display": "CF% rel",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "explanation": "CF% on ice minus the team's CF% without him (in his games).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.57,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 582,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.386,
+      "also": {
+       "next-season points/60": 0.44,
+       "next-season 5v5 on-ice xGD/60": 0.362
+      }
+     },
+     "redundant_with": {
+      "with": "cf60_rel",
+      "r": 0.878
+     }
+    },
+    {
+     "id": "adj_xgf60",
+     "display": "Adj. xGF / 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rate",
+     "explanation": "Score- and venue-adjusted on-ice xGF/60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.626,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 461,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.439,
+      "also": {
+       "next-season points/60": 0.554,
+       "next-season 5v5 on-ice xGD/60": 0.441
+      }
+     },
+     "redundant_with": {
+      "with": "xgf60",
+      "r": 0.991
+     }
+    },
+    {
+     "id": "adj_xga60",
+     "display": "Adj. xGA / 60",
+     "unit": "per 60",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 16,
+     "basis": "rate",
+     "explanation": "Score- and venue-adjusted on-ice xGA/60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.431,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 1019,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.027,
+      "also": {
+       "next-season points/60": -0.166,
+       "next-season 5v5 on-ice xGD/60": 0.194
+      }
+     },
+     "redundant_with": {
+      "with": "xga60",
+      "r": 0.987
+     }
+    },
+    {
+     "id": "xga60_rel",
+     "display": "xGA/60 rel",
+     "unit": "per 60",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 17,
+     "basis": "rate",
+     "explanation": "xGA/60 on minus off ice.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.333,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 1546,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": -0.057,
+      "also": {
+       "next-season points/60": -0.282,
+       "next-season 5v5 on-ice xGD/60": -0.002
+      }
+     },
+     "redundant_with": {
+      "with": "rapm_def",
+      "r": -0.729
+     }
+    },
+    {
+     "id": "rapm_off",
+     "display": "RAPM offence",
+     "unit": "2",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 18,
+     "basis": "rate",
+     "explanation": "Regularised adjusted plus-minus: the player's isolated effect on his team's 5v5 xG for per 60 (teammates, opponents, zone starts and score controlled; ridge with multi-season priors).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.839,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 148,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.464,
+      "also": {
+       "next-season points/60": 0.579,
+       "next-season 5v5 on-ice xGD/60": 0.41
+      }
+     },
+     "redundant_with": {
+      "with": "gar_ev_off",
+      "r": 0.894
+     }
+    },
+    {
+     "id": "rapm_def",
+     "display": "RAPM defence",
+     "unit": "2",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 19,
+     "basis": "rate",
+     "explanation": "Isolated effect on xG against per 60, signed so that higher is better (fewer chances allowed).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.756,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 249,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.046,
+      "also": {
+       "next-season points/60": -0.193,
+       "next-season 5v5 on-ice xGD/60": 0.15
+      }
+     },
+     "redundant_with": {
+      "with": "gar_ev_def",
+      "r": 0.873
+     }
+    },
+    {
+     "id": "gar_ev_off",
+     "display": "GAR EV offence",
+     "unit": "1",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 20,
+     "basis": "count",
+     "explanation": "Even-strength offence component.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.66,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 497,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.484,
+      "also": {
+       "next-season points/60": 0.586,
+       "next-season 5v5 on-ice xGD/60": 0.401
+      }
+     },
+     "redundant_with": {
+      "with": "rapm_off",
+      "r": 0.894
+     }
+    },
+    {
+     "id": "gar_ev_def",
+     "display": "GAR EV defence",
+     "unit": "1",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 21,
+     "basis": "count",
+     "explanation": "Even-strength defence component.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.462,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 1123,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.025,
+      "also": {
+       "next-season points/60": -0.22,
+       "next-season 5v5 on-ice xGD/60": 0.128
+      }
+     },
+     "redundant_with": {
+      "with": "rapm_def",
+      "r": 0.873
+     }
+    },
+    {
+     "id": "gar_pp",
+     "display": "GAR power play",
+     "unit": "1",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 22,
+     "basis": "count",
+     "explanation": "Power-play component.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.618,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 596,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.266,
+      "also": {
+       "next-season points/60": 0.384,
+       "next-season 5v5 on-ice xGD/60": 0.216
+      }
+     },
+     "redundant_with": {
+      "with": "pp_p",
+      "r": 0.587
+     }
+    },
+    {
+     "id": "pp_p60",
+     "display": "PP points / 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 23,
+     "basis": "rate",
+     "explanation": "Power-play points per 60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.336,
+      "split_half_r": 0.307,
+      "split_half_r_sb": 0.47,
+      "n_pairs": 2974,
+      "m50": 184,
+      "m50_unit": "PP minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.228,
+      "also": {
+       "next-season points/60": 0.4,
+       "next-season 5v5 on-ice xGD/60": 0.145
+      }
+     },
+     "redundant_with": {
+      "with": "pp_p",
+      "r": 0.571
+     }
+    },
+    {
+     "id": "pp_ixg60",
+     "display": "PP ixG / 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 24,
+     "basis": "rate",
+     "explanation": "Power-play individual xG per 60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.526,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2974,
+      "m50": 90,
+      "m50_unit": "PP minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.168,
+      "also": {
+       "next-season points/60": 0.179,
+       "next-season 5v5 on-ice xGD/60": 0.12
+      }
+     },
+     "redundant_with": {
+      "with": "pp_xgf60",
+      "r": 0.626
+     }
+    },
+    {
+     "id": "pp_xgf60",
+     "display": "PP xGF / 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 25,
+     "basis": "rate",
+     "explanation": "On-ice power-play xG for per 60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.484,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2974,
+      "m50": 106,
+      "m50_unit": "PP minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.24,
+      "also": {
+       "next-season points/60": 0.36,
+       "next-season 5v5 on-ice xGD/60": 0.207
+      }
+     },
+     "redundant_with": {
+      "with": "pp_cf60",
+      "r": 0.832
+     }
+    },
+    {
+     "id": "toi_pp_gp",
+     "display": "PP TOI / GP",
+     "unit": "min",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 26,
+     "basis": "rate",
+     "explanation": "Power-play minutes per game.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.878,
+      "split_half_r": 0.912,
+      "split_half_r_sb": 0.954,
+      "n_pairs": 5349,
+      "m50": 3.3,
+      "m50_unit": "games",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.364,
+      "also": {
+       "next-season points/60": 0.699,
+       "next-season 5v5 on-ice xGD/60": 0.266
+      }
+     },
+     "redundant_with": {
+      "with": "pp_p",
+      "r": 0.864
+     }
+    },
+    {
+     "id": "toi_sh_gp",
+     "display": "PK TOI / GP",
+     "unit": "min",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 27,
+     "basis": "rate",
+     "explanation": "Penalty-kill minutes per game.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.793,
+      "split_half_r": 0.974,
+      "split_half_r_sb": 0.987,
+      "n_pairs": 5349,
+      "m50": 0.9,
+      "m50_unit": "games",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": -0.052,
+      "also": {
+       "next-season points/60": -0.248,
+       "next-season 5v5 on-ice xGD/60": -0.067
+      }
+     },
+     "redundant_with": {
+      "with": "sh_p",
+      "r": 0.555
+     }
+    },
+    {
+     "id": "pk_xga60",
+     "display": "PK xGA / 60",
+     "unit": "per 60",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 28,
+     "basis": "rate",
+     "explanation": "On-ice penalty-kill xG against per 60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.296,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 1775,
+      "m50": 2294,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.077,
+      "also": {
+       "next-season points/60": 0.075,
+       "next-season 5v5 on-ice xGD/60": 0.12
+      }
+     },
+     "redundant_with": {
+      "with": "pk_ca60",
+      "r": 0.741
+     }
+    },
+    {
+     "id": "fo_pct",
+     "display": "Faceoff %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 29,
+     "basis": "rate",
+     "explanation": "Faceoffs won per faceoff taken.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.722,
+      "split_half_r": 0.677,
+      "split_half_r_sb": 0.807,
+      "n_pairs": 1998,
+      "m50": 177,
+      "m50_unit": "faceoffs",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.054,
+      "also": {
+       "next-season points/60": -0.047,
+       "next-season 5v5 on-ice xGD/60": 0.066
+      }
+     },
+     "redundant_with": {
+      "with": "fo_pct_oz",
+      "r": 0.835
+     },
+     "style": true
+    },
+    {
+     "id": "take60",
+     "display": "Takeaways / 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 30,
+     "basis": "rate",
+     "explanation": "Takeaways per 60 (scorer-recorded).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.542,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 815,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.271,
+      "also": {
+       "next-season points/60": 0.242,
+       "next-season 5v5 on-ice xGD/60": 0.18
+      }
+     },
+     "redundant_with": {
+      "with": "gar_60",
+      "r": 0.293
+     }
+    },
+    {
+     "id": "give60",
+     "display": "Giveaways / 60",
+     "unit": "per 60",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 31,
+     "basis": "rate",
+     "explanation": "Giveaways per 60 (scorer-recorded).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.633,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 559,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": -0.209,
+      "also": {
+       "next-season points/60": -0.415,
+       "next-season 5v5 on-ice xGD/60": -0.162
+      }
+     },
+     "redundant_with": {
+      "with": "pts_pace",
+      "r": 0.435
+     }
+    },
+    {
+     "id": "hits60",
+     "display": "Hits / 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 32,
+     "basis": "rate",
+     "explanation": "Hits delivered per 60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.91,
+      "split_half_r": 0.945,
+      "split_half_r_sb": 0.972,
+      "n_pairs": 5349,
+      "m50": 28,
+      "m50_unit": "minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": -0.321,
+      "also": {
+       "next-season points/60": -0.45,
+       "next-season 5v5 on-ice xGD/60": -0.178
+      }
+     },
+     "redundant_with": {
+      "with": "hits",
+      "r": 0.769
+     },
+     "style": true
+    },
+    {
+     "id": "blocks60",
+     "display": "Blocks / 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 33,
+     "basis": "rate",
+     "explanation": "Shots blocked per 60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.742,
+      "split_half_r": 0.654,
+      "split_half_r_sb": 0.791,
+      "n_pairs": 5349,
+      "m50": 255,
+      "m50_unit": "minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": -0.148,
+      "also": {
+       "next-season points/60": -0.38,
+       "next-season 5v5 on-ice xGD/60": -0.16
+      }
+     },
+     "redundant_with": {
+      "with": "blocks",
+      "r": 0.652
+     },
+     "style": true
+    },
+    {
+     "id": "ozs_pct",
+     "display": "OZ start %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 34,
+     "basis": "rate",
+     "explanation": "Offensive-zone share of the 5v5 faceoffs (O + D) taken with the player on ice.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.642,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 538,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.234,
+      "also": {
+       "next-season points/60": 0.445,
+       "next-season 5v5 on-ice xGD/60": 0.252
+      }
+     },
+     "redundant_with": {
+      "with": "dzs_share",
+      "r": -0.952
+     }
+    },
+    {
+     "id": "qoc_toi",
+     "display": "QoC (TOI)",
+     "unit": "min",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 35,
+     "basis": "rate",
+     "explanation": "TOI-weighted mean 5v5 TOI per game of the opponents faced.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.729,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 358,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.384,
+      "also": {
+       "next-season points/60": 0.556,
+       "next-season 5v5 on-ice xGD/60": 0.269
+      }
+     },
+     "redundant_with": {
+      "with": "toi_gp",
+      "r": 0.87
+     }
+    },
+    {
+     "id": "qot_toi",
+     "display": "QoT (TOI)",
+     "unit": "min",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 36,
+     "basis": "rate",
+     "explanation": "TOI-weighted mean 5v5 TOI per game of the team-mates on ice.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.68,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 454,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.322,
+      "also": {
+       "next-season points/60": 0.521,
+       "next-season 5v5 on-ice xGD/60": 0.243
+      }
+     },
+     "redundant_with": {
+      "with": "toi5_gp",
+      "r": 0.841
+     }
+    },
+    {
+     "id": "pdo",
+     "display": "PDO",
+     "unit": "3",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 37,
+     "basis": "rate",
+     "explanation": "On-ice sh% + sv% (luck indicator; 1.000 = average).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.126,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 6689,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.139,
+      "also": {
+       "next-season points/60": 0.235,
+       "next-season 5v5 on-ice xGD/60": 0.099
+      }
+     },
+     "redundant_with": {
+      "with": "gf_pct",
+      "r": 0.877
+     }
+    },
+    {
+     "id": "on_sh_pct",
+     "display": "On-ice sh%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 38,
+     "basis": "rate",
+     "explanation": "Team shooting % with the player on ice.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.29,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 1889,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.227,
+      "also": {
+       "next-season points/60": 0.396,
+       "next-season 5v5 on-ice xGD/60": 0.147
+      }
+     },
+     "redundant_with": {
+      "with": "gf60",
+      "r": 0.908
+     }
+    },
+    {
+     "id": "war",
+     "display": "Rink value (WAR)",
+     "unit": "2",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 39,
+     "basis": "count",
+     "explanation": "GAR in wins (goals per win from the season's scoring).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.629,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 569,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.574,
+      "also": {
+       "next-season points/60": 0.561,
+       "next-season 5v5 on-ice xGD/60": 0.403
+      }
+     },
+     "redundant_with": {
+      "with": "gar",
+      "r": 1.0
+     }
+    },
+    {
+     "id": "gar",
+     "display": "Rink value (GAR)",
+     "unit": "1",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 40,
+     "basis": "count",
+     "explanation": "Goals above replacement: RAPM offence and defence at 5v5, power play, penalty kill, shooting talent, penalties and faceoffs, against a replacement-level skater.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.629,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 5349,
+      "m50": 569,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.573,
+      "also": {
+       "next-season points/60": 0.561,
+       "next-season 5v5 on-ice xGD/60": 0.403
+      }
+     },
+     "redundant_with": {
+      "with": "war",
+      "r": 1.0
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "gar_60",
+     "p60",
+     "ixg60_all",
+     "icf60",
+     "adj_xgf_pct",
+     "xgf60_rel",
+     "rapm_net",
+     "pen_diff60",
+     "toi_gp",
+     "hits60",
+     "shot_dist"
+    ],
+    "standardise": "z within group (F) and season, qualified players only",
+    "weights": "yoy_r floored at 0.2",
+    "weight_values": {
+     "gar_60": 0.572,
+     "p60": 0.718,
+     "ixg60_all": 0.744,
+     "icf60": 0.797,
+     "adj_xgf_pct": 0.49,
+     "xgf60_rel": 0.612,
+     "rapm_net": 0.772,
+     "pen_diff60": 0.45,
+     "toi_gp": 0.848,
+     "hits60": 0.91,
+     "shot_dist": 0.645
+    },
+    "distance": "weighted euclidean",
+    "k": 6,
+    "constraints": "same season, same group, both qualified; missing feature -> 0 (the group mean)"
+   }
+  },
+  {
+   "id": "defence",
+   "entity": "player",
+   "display": "Defence",
+   "peer_group": "group == 'D' (pos D); compared within season (pct_pos)",
+   "position_field": "group",
+   "position_codes": [
+    "D"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": 250,
+    "unit": "5v5 minutes",
+    "note": "as forwards"
+   },
+   "basis": "per 60 (5v5 for on-ice and RAPM, all situations for points, individual xG and value)",
+   "metrics": [
+    {
+     "id": "gar_60",
+     "display": "Rink value per 60",
+     "unit": "GAR/60",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Goals above a replacement-level defenceman per 60 minutes, from our value model.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.493,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 1186,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.493,
+      "also": {
+       "next-season points/60": 0.386,
+       "next-season 5v5 on-ice xGD/60": 0.315
+      }
+     },
+     "redundant_with": {
+      "with": "war",
+      "r": 0.913
+     }
+    },
+    {
+     "id": "adj_xgf_pct",
+     "display": "On-ice xG share (5v5)",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Share of 5-on-5 expected goals his team gets with him on the ice, adjusted for score and venue.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.413,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 1338,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.322,
+      "also": {
+       "next-season points/60": 0.203,
+       "next-season 5v5 on-ice xGD/60": 0.419
+      }
+     },
+     "redundant_with": {
+      "with": "xgf_pct",
+      "r": 0.987
+     }
+    },
+    {
+     "id": "rapm_def",
+     "display": "Isolated defence (RAPM)",
+     "unit": "xGA per 60 prevented",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Expected goals against per 60 he prevents at 5-on-5 after accounting for team-mates, opponents, zone starts and score.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.749,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 315,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.228,
+      "also": {
+       "next-season points/60": -0.085,
+       "next-season 5v5 on-ice xGD/60": 0.276
+      }
+     },
+     "redundant_with": {
+      "with": "gar_ev_def",
+      "r": 0.865
+     }
+    },
+    {
+     "id": "rapm_off",
+     "display": "Isolated offence (RAPM)",
+     "unit": "xGF per 60",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Expected goals for per 60 he adds at 5-on-5 after accounting for team-mates, opponents, zone starts and score.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.724,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 359,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.316,
+      "also": {
+       "next-season points/60": 0.472,
+       "next-season 5v5 on-ice xGD/60": 0.234
+      }
+     },
+     "redundant_with": {
+      "with": "gar_ev_off",
+      "r": 0.86
+     }
+    },
+    {
+     "id": "adj_xga60",
+     "display": "On-ice xG against per 60 (5v5)",
+     "unit": "per 60",
+     "direction": "lower",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Expected goals his team allows per 60 at 5-on-5 with him on the ice, adjusted for score and venue (lower is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.421,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 1295,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.203,
+      "also": {
+       "next-season points/60": -0.021,
+       "next-season 5v5 on-ice xGD/60": 0.32
+      }
+     },
+     "redundant_with": {
+      "with": "xga60",
+      "r": 0.987
+     }
+    },
+    {
+     "id": "p60",
+     "display": "Points per 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Goals plus assists per 60 minutes, all situations.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.682,
+      "split_half_r": 0.575,
+      "split_half_r_sb": 0.73,
+      "n_pairs": 2964,
+      "m50": 426,
+      "m50_unit": "minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.351,
+      "also": {
+       "next-season points/60": 0.682,
+       "next-season 5v5 on-ice xGD/60": 0.2
+      }
+     },
+     "redundant_with": {
+      "with": "pts_pace",
+      "r": 0.958
+     }
+    },
+    {
+     "id": "ixg60_all",
+     "display": "Individual xG per 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Expected goals from his own shots per 60 minutes, all situations.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.782,
+      "split_half_r": 0.748,
+      "split_half_r_sb": 0.856,
+      "n_pairs": 2964,
+      "m50": 194,
+      "m50_unit": "minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.338,
+      "also": {
+       "next-season points/60": 0.65,
+       "next-season 5v5 on-ice xGD/60": 0.207
+      }
+     },
+     "redundant_with": {
+      "with": "ixg60",
+      "r": 0.877
+     }
+    },
+    {
+     "id": "toi_gp",
+     "display": "Ice time per game",
+     "unit": "min",
+     "direction": "higher",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Minutes per game in all situations: how much the coach trusts him.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.806,
+      "split_half_r": 0.98,
+      "split_half_r_sb": 0.99,
+      "n_pairs": 2964,
+      "m50": 0.6,
+      "m50_unit": "games",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.302,
+      "also": {
+       "next-season points/60": 0.477,
+       "next-season 5v5 on-ice xGD/60": 0.152
+      }
+     },
+     "redundant_with": {
+      "with": "shifts_gp",
+      "r": 0.947
+     }
+    },
+    {
+     "id": "pen_diff60",
+     "display": "Penalty differential per 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "headline",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Penalties drawn minus penalties taken per 60 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.447,
+      "split_half_r": 0.302,
+      "split_half_r_sb": 0.464,
+      "n_pairs": 2964,
+      "m50": 1333,
+      "m50_unit": "minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.323,
+      "also": {
+       "next-season points/60": 0.202,
+       "next-season 5v5 on-ice xGD/60": 0.061
+      }
+     },
+     "redundant_with": {
+      "with": "pen_net",
+      "r": 0.832
+     }
+    },
+    {
+     "id": "rapm_net",
+     "display": "RAPM net",
+     "unit": "2",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Offence plus defence: isolated xG differential per 60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.72,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 366,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.391,
+      "also": {
+       "next-season points/60": 0.266,
+       "next-season 5v5 on-ice xGD/60": 0.369
+      }
+     },
+     "redundant_with": {
+      "with": "proj_xgf_pct",
+      "r": 0.785
+     }
+    },
+    {
+     "id": "xgf_pct",
+     "display": "xGF%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "On-ice share of expected goals.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.408,
+      "split_half_r": 0.428,
+      "split_half_r_sb": 0.6,
+      "n_pairs": 2964,
+      "m50": 628,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.319,
+      "also": {
+       "next-season points/60": 0.199,
+       "next-season 5v5 on-ice xGD/60": 0.411
+      }
+     },
+     "redundant_with": {
+      "with": "xgd60",
+      "r": 0.996
+     }
+    },
+    {
+     "id": "cf_pct",
+     "display": "CF%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "On-ice share of shot attempts at 5v5.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.496,
+      "split_half_r": 0.662,
+      "split_half_r_sb": 0.796,
+      "n_pairs": 2964,
+      "m50": 241,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.324,
+      "also": {
+       "next-season points/60": 0.294,
+       "next-season 5v5 on-ice xGD/60": 0.405
+      }
+     },
+     "redundant_with": {
+      "with": "ff_pct",
+      "r": 0.961
+     }
+    },
+    {
+     "id": "cf_pct_rel",
+     "display": "CF% rel",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "CF% on ice minus the team's CF% without him (in his games).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.442,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 1188,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.311,
+      "also": {
+       "next-season points/60": 0.375,
+       "next-season 5v5 on-ice xGD/60": 0.226
+      }
+     },
+     "redundant_with": {
+      "with": "cf60_rel",
+      "r": 0.82
+     }
+    },
+    {
+     "id": "xgf60_rel",
+     "display": "xGF/60 rel",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "xGF/60 on minus off ice.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.341,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 1819,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.258,
+      "also": {
+       "next-season points/60": 0.398,
+       "next-season 5v5 on-ice xGD/60": 0.147
+      }
+     },
+     "redundant_with": {
+      "with": "cf60_rel",
+      "r": 0.785
+     }
+    },
+    {
+     "id": "xga60_rel",
+     "display": "xGA/60 rel",
+     "unit": "per 60",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "xGA/60 on minus off ice.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.299,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 2207,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.122,
+      "also": {
+       "next-season points/60": -0.096,
+       "next-season 5v5 on-ice xGD/60": 0.126
+      }
+     },
+     "redundant_with": {
+      "with": "rapm_def",
+      "r": -0.689
+     }
+    },
+    {
+     "id": "adj_xgf60",
+     "display": "Adj. xGF / 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Score- and venue-adjusted on-ice xGF/60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.415,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 1327,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.265,
+      "also": {
+       "next-season points/60": 0.334,
+       "next-season 5v5 on-ice xGD/60": 0.292
+      }
+     },
+     "redundant_with": {
+      "with": "xgf60",
+      "r": 0.986
+     }
+    },
+    {
+     "id": "adj_cf60",
+     "display": "Adj. CF / 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Score- and venue-adjusted CF/60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.533,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 825,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.291,
+      "also": {
+       "next-season points/60": 0.383,
+       "next-season 5v5 on-ice xGD/60": 0.332
+      }
+     },
+     "redundant_with": {
+      "with": "cf60",
+      "r": 0.984
+     }
+    },
+    {
+     "id": "adj_ca60",
+     "display": "Adj. CA / 60",
+     "unit": "per 60",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Score- and venue-adjusted CA/60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.478,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 1028,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.228,
+      "also": {
+       "next-season points/60": 0.083,
+       "next-season 5v5 on-ice xGD/60": 0.354
+      }
+     },
+     "redundant_with": {
+      "with": "ca60",
+      "r": 0.981
+     }
+    },
+    {
+     "id": "icf60",
+     "display": "Attempts / 60 (5v5)",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Individual shot attempts per 60 at 5v5.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.738,
+      "split_half_r": 0.765,
+      "split_half_r_sb": 0.867,
+      "n_pairs": 2964,
+      "m50": 145,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.233,
+      "also": {
+       "next-season points/60": 0.434,
+       "next-season 5v5 on-ice xGD/60": 0.191
+      }
+     },
+     "redundant_with": {
+      "with": "iff60",
+      "r": 0.953
+     }
+    },
+    {
+     "id": "sog60",
+     "display": "Shots / 60 (5v5)",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "explanation": "Shots on goal per 60 at 5v5.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.692,
+      "split_half_r": 0.641,
+      "split_half_r_sb": 0.781,
+      "n_pairs": 2964,
+      "m50": 263,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.236,
+      "also": {
+       "next-season points/60": 0.446,
+       "next-season 5v5 on-ice xGD/60": 0.183
+      }
+     },
+     "redundant_with": {
+      "with": "iff60",
+      "r": 0.953
+     }
+    },
+    {
+     "id": "shot_dist",
+     "display": "Avg shot distance",
+     "unit": "ft",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "explanation": "Mean distance (ft) of unblocked attempts.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.568,
+      "split_half_r": 0.527,
+      "split_half_r_sb": 0.69,
+      "n_pairs": 2964,
+      "m50": 54,
+      "m50_unit": "unblocked attempts",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.238,
+      "also": {
+       "next-season points/60": 0.317,
+       "next-season 5v5 on-ice xGD/60": 0.122
+      }
+     },
+     "redundant_with": {
+      "with": "xfsh_pct",
+      "r": -0.66
+     }
+    },
+    {
+     "id": "p1_60",
+     "display": "Primary points / 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "Goals and first assists per 60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.65,
+      "split_half_r": 0.476,
+      "split_half_r_sb": 0.645,
+      "n_pairs": 2964,
+      "m50": 634,
+      "m50_unit": "minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.343,
+      "also": {
+       "next-season points/60": 0.664,
+       "next-season 5v5 on-ice xGD/60": 0.196
+      }
+     },
+     "redundant_with": {
+      "with": "p60",
+      "r": 0.917
+     }
+    },
+    {
+     "id": "p60_5v5",
+     "display": "5v5 points / 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "explanation": "Points per 60 at 5v5.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.361,
+      "split_half_r": 0.266,
+      "split_half_r_sb": 0.42,
+      "n_pairs": 2964,
+      "m50": 1299,
+      "m50_unit": "5v5 minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.284,
+      "also": {
+       "next-season points/60": 0.47,
+       "next-season 5v5 on-ice xGD/60": 0.187
+      }
+     },
+     "redundant_with": {
+      "with": "p60",
+      "r": 0.84
+     }
+    },
+    {
+     "id": "gar_ev_off",
+     "display": "GAR EV offence",
+     "unit": "1",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 15,
+     "basis": "count",
+     "explanation": "Even-strength offence component.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.538,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 991,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.34,
+      "also": {
+       "next-season points/60": 0.535,
+       "next-season 5v5 on-ice xGD/60": 0.23
+      }
+     },
+     "redundant_with": {
+      "with": "rapm_off",
+      "r": 0.86
+     }
+    },
+    {
+     "id": "gar_ev_def",
+     "display": "GAR EV defence",
+     "unit": "1",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 16,
+     "basis": "count",
+     "explanation": "Even-strength defence component.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.44,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 1468,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.177,
+      "also": {
+       "next-season points/60": -0.118,
+       "next-season 5v5 on-ice xGD/60": 0.236
+      }
+     },
+     "redundant_with": {
+      "with": "rapm_def",
+      "r": 0.865
+     }
+    },
+    {
+     "id": "gar_pp",
+     "display": "GAR power play",
+     "unit": "1",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 17,
+     "basis": "count",
+     "explanation": "Power-play component.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.446,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 1433,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.12,
+      "also": {
+       "next-season points/60": 0.217,
+       "next-season 5v5 on-ice xGD/60": 0.095
+      }
+     },
+     "redundant_with": {
+      "with": "pp_p",
+      "r": 0.371
+     }
+    },
+    {
+     "id": "gar_pk",
+     "display": "GAR penalty kill",
+     "unit": "1",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 18,
+     "basis": "count",
+     "explanation": "Penalty-kill component.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.221,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 4066,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.133,
+      "also": {
+       "next-season points/60": 0.053,
+       "next-season 5v5 on-ice xGD/60": 0.144
+      }
+     },
+     "redundant_with": {
+      "with": "pk_xga60",
+      "r": -0.384
+     }
+    },
+    {
+     "id": "pp_p60",
+     "display": "PP points / 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 19,
+     "basis": "rate",
+     "explanation": "Power-play points per 60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.21,
+      "split_half_r": 0.145,
+      "split_half_r_sb": 0.253,
+      "n_pairs": 1046,
+      "m50": 466,
+      "m50_unit": "PP minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.09,
+      "also": {
+       "next-season points/60": 0.303,
+       "next-season 5v5 on-ice xGD/60": 0.021
+      }
+     },
+     "redundant_with": {
+      "with": "pp_p",
+      "r": 0.458
+     }
+    },
+    {
+     "id": "toi_pp_gp",
+     "display": "PP TOI / GP",
+     "unit": "min",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 20,
+     "basis": "rate",
+     "explanation": "Power-play minutes per game.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.887,
+      "split_half_r": 0.92,
+      "split_half_r_sb": 0.958,
+      "n_pairs": 2964,
+      "m50": 3.0,
+      "m50_unit": "games",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.333,
+      "also": {
+       "next-season points/60": 0.707,
+       "next-season 5v5 on-ice xGD/60": 0.152
+      }
+     },
+     "redundant_with": {
+      "with": "pp_p",
+      "r": 0.89
+     }
+    },
+    {
+     "id": "toi_sh_gp",
+     "display": "PK TOI / GP",
+     "unit": "min",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 21,
+     "basis": "rate",
+     "explanation": "Penalty-kill minutes per game.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.728,
+      "split_half_r": 0.955,
+      "split_half_r_sb": 0.977,
+      "n_pairs": 2964,
+      "m50": 1.4,
+      "m50_unit": "games",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": -0.024,
+      "also": {
+       "next-season points/60": -0.16,
+       "next-season 5v5 on-ice xGD/60": 0.004
+      }
+     },
+     "redundant_with": {
+      "with": "blocks",
+      "r": 0.63
+     }
+    },
+    {
+     "id": "pk_xga60",
+     "display": "PK xGA / 60",
+     "unit": "per 60",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 22,
+     "basis": "rate",
+     "explanation": "On-ice penalty-kill xG against per 60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.227,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 1725,
+      "m50": 3928,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.164,
+      "also": {
+       "next-season points/60": 0.068,
+       "next-season 5v5 on-ice xGD/60": 0.18
+      }
+     },
+     "redundant_with": {
+      "with": "pk_ca60",
+      "r": 0.786
+     }
+    },
+    {
+     "id": "pen_taken60",
+     "display": "Penalties taken / 60",
+     "unit": "per 60",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 23,
+     "basis": "rate",
+     "explanation": "Minor penalties taken per 60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.602,
+      "split_half_r": 0.428,
+      "split_half_r_sb": 0.599,
+      "n_pairs": 2964,
+      "m50": 771,
+      "m50_unit": "minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.288,
+      "also": {
+       "next-season points/60": 0.171,
+       "next-season 5v5 on-ice xGD/60": 0.051
+      }
+     },
+     "redundant_with": {
+      "with": "pen_diff60",
+      "r": -0.772
+     }
+    },
+    {
+     "id": "take60",
+     "display": "Takeaways / 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 24,
+     "basis": "rate",
+     "explanation": "Takeaways per 60 (scorer-recorded).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.593,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 792,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.316,
+      "also": {
+       "next-season points/60": 0.332,
+       "next-season 5v5 on-ice xGD/60": 0.182
+      }
+     },
+     "redundant_with": {
+      "with": "ixg",
+      "r": 0.361
+     }
+    },
+    {
+     "id": "give60",
+     "display": "Giveaways / 60",
+     "unit": "per 60",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 25,
+     "basis": "rate",
+     "explanation": "Giveaways per 60 (scorer-recorded).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.533,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 1011,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": -0.041,
+      "also": {
+       "next-season points/60": -0.169,
+       "next-season 5v5 on-ice xGD/60": 0.001
+      }
+     },
+     "redundant_with": {
+      "with": "take60",
+      "r": 0.206
+     }
+    },
+    {
+     "id": "hits60",
+     "display": "Hits / 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 26,
+     "basis": "rate",
+     "explanation": "Hits delivered per 60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.878,
+      "split_half_r": 0.909,
+      "split_half_r_sb": 0.952,
+      "n_pairs": 2964,
+      "m50": 58,
+      "m50_unit": "minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": -0.344,
+      "also": {
+       "next-season points/60": -0.37,
+       "next-season 5v5 on-ice xGD/60": -0.163
+      }
+     },
+     "redundant_with": {
+      "with": "hits",
+      "r": 0.713
+     },
+     "style": true
+    },
+    {
+     "id": "blocks60",
+     "display": "Blocks / 60",
+     "unit": "per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 27,
+     "basis": "rate",
+     "explanation": "Shots blocked per 60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.7,
+      "split_half_r": 0.669,
+      "split_half_r_sb": 0.802,
+      "n_pairs": 2964,
+      "m50": 285,
+      "m50_unit": "minutes",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": -0.134,
+      "also": {
+       "next-season points/60": -0.325,
+       "next-season 5v5 on-ice xGD/60": -0.108
+      }
+     },
+     "redundant_with": {
+      "with": "blocks",
+      "r": 0.523
+     },
+     "style": true
+    },
+    {
+     "id": "ozs_pct",
+     "display": "OZ start %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 28,
+     "basis": "rate",
+     "explanation": "Offensive-zone share of the 5v5 faceoffs (O + D) taken with the player on ice.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.488,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 1210,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.15,
+      "also": {
+       "next-season points/60": 0.297,
+       "next-season 5v5 on-ice xGD/60": 0.164
+      }
+     },
+     "redundant_with": {
+      "with": "dzs_share",
+      "r": -0.944
+     }
+    },
+    {
+     "id": "qoc_toi",
+     "display": "QoC (TOI)",
+     "unit": "min",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 29,
+     "basis": "rate",
+     "explanation": "TOI-weighted mean 5v5 TOI per game of the opponents faced.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.62,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 707,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.201,
+      "also": {
+       "next-season points/60": 0.223,
+       "next-season 5v5 on-ice xGD/60": 0.111
+      }
+     },
+     "redundant_with": {
+      "with": "toi_gp",
+      "r": 0.8
+     }
+    },
+    {
+     "id": "pdo",
+     "display": "PDO",
+     "unit": "3",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 30,
+     "basis": "rate",
+     "explanation": "On-ice sh% + sv% (luck indicator; 1.000 = average).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.088,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 11955,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.033,
+      "also": {
+       "next-season points/60": 0.06,
+       "next-season 5v5 on-ice xGD/60": 0.036
+      }
+     },
+     "redundant_with": {
+      "with": "gf_pct",
+      "r": 0.862
+     }
+    },
+    {
+     "id": "war",
+     "display": "Rink value (WAR)",
+     "unit": "2",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 31,
+     "basis": "count",
+     "explanation": "GAR in wins (goals per win from the season's scoring).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.546,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 959,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.499,
+      "also": {
+       "next-season points/60": 0.445,
+       "next-season 5v5 on-ice xGD/60": 0.332
+      }
+     },
+     "redundant_with": {
+      "with": "gar",
+      "r": 1.0
+     }
+    },
+    {
+     "id": "gar",
+     "display": "Rink value (GAR)",
+     "unit": "1",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 32,
+     "basis": "count",
+     "explanation": "Goals above replacement: RAPM offence and defence at 5v5, power play, penalty kill, shooting talent, penalties and faceoffs, against a replacement-level skater.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.546,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 2964,
+      "m50": 959,
+      "m50_unit": "minutes",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GAR/60",
+      "r": 0.499,
+      "also": {
+       "next-season points/60": 0.445,
+       "next-season 5v5 on-ice xGD/60": 0.331
+      }
+     },
+     "redundant_with": {
+      "with": "war",
+      "r": 1.0
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "gar_60",
+     "adj_xgf_pct",
+     "rapm_def",
+     "rapm_off",
+     "adj_xga60",
+     "p60",
+     "ixg60_all",
+     "toi_gp",
+     "pen_diff60",
+     "hits60",
+     "blocks60"
+    ],
+    "standardise": "z within group (D) and season, qualified players only",
+    "weights": "yoy_r floored at 0.2",
+    "weight_values": {
+     "gar_60": 0.493,
+     "adj_xgf_pct": 0.413,
+     "rapm_def": 0.749,
+     "rapm_off": 0.724,
+     "adj_xga60": 0.421,
+     "p60": 0.682,
+     "ixg60_all": 0.782,
+     "toi_gp": 0.806,
+     "pen_diff60": 0.447,
+     "hits60": 0.878,
+     "blocks60": 0.7
+    },
+    "distance": "weighted euclidean",
+    "k": 6,
+    "constraints": "same season, same group, both qualified"
+   }
+  },
+  {
+   "id": "goalies",
+   "entity": "player",
+   "display": "Goaltenders",
+   "peer_group": "every goalie (group 'G'); compared within season (pct)",
+   "position_field": "group",
+   "position_codes": [
+    "G"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": 1230,
+    "unit": "minutes in net",
+    "note": "payload flag: a quarter of the team's minutes (0.25 x team games x 60); percentiles also need 100 unblocked attempts faced"
+   },
+   "basis": "per 100 unblocked attempts faced; save rates per shot",
+   "metrics": [
+    {
+     "id": "gsax100",
+     "display": "Goals saved above expected per 100 shots",
+     "unit": "per 100 unblocked attempts",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Goals he stopped beyond what an average goalie would on the same shots (by our expected-goals model), per 100 unblocked shots faced.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.101,
+      "split_half_r": 0.105,
+      "split_half_r_sb": 0.19,
+      "n_pairs": 635,
+      "m50": 7022,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.101,
+      "also": {
+       "next-season save %": 0.061,
+       "next-season GAR": 0.157
+      }
+     },
+     "redundant_with": {
+      "with": "dfsv_pct",
+      "r": 0.999
+     }
+    },
+    {
+     "id": "gsax",
+     "display": "Goals saved above expected",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "count",
+     "explanation": "Season total of goals saved beyond an average goalie facing the same shots.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.131,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 635,
+      "m50": null,
+      "m50_unit": null,
+      "m50_source": "not defined for a season total"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.12,
+      "also": {
+       "next-season save %": 0.081,
+       "next-season GAR": 0.192
+      }
+     },
+     "redundant_with": {
+      "with": "gsax_m",
+      "r": 0.972
+     }
+    },
+    {
+     "id": "sv_pct",
+     "display": "Save percentage",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Saves per shot on goal, all situations.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.112,
+      "split_half_r": 0.163,
+      "split_half_r_sb": 0.28,
+      "n_pairs": 635,
+      "m50": 4234,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.08,
+      "also": {
+       "next-season save %": 0.112,
+       "next-season GAR": 0.153
+      }
+     },
+     "redundant_with": {
+      "with": "gsax100",
+      "r": 0.891
+     }
+    },
+    {
+     "id": "sv_pct_high",
+     "display": "High-danger save %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Save rate on high-danger chances (expected-goal value 0.20 or more).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.009,
+      "split_half_r": 0.08,
+      "split_half_r_sb": 0.148,
+      "n_pairs": 635,
+      "m50": 512,
+      "m50_unit": "high-danger unblocked attempts faced",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.048,
+      "also": {
+       "next-season save %": 0.007,
+       "next-season GAR": 0.046
+      }
+     },
+     "redundant_with": {
+      "with": "gsax_high",
+      "r": 0.88
+     }
+    },
+    {
+     "id": "sv_pct_med",
+     "display": "Medium-danger save %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Save rate on medium-danger chances (expected-goal value 0.08 to 0.20).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.074,
+      "split_half_r": 0.061,
+      "split_half_r_sb": 0.115,
+      "n_pairs": 635,
+      "m50": 2696,
+      "m50_unit": "medium-danger unblocked attempts faced",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.082,
+      "also": {
+       "next-season save %": 0.052,
+       "next-season GAR": 0.115
+      }
+     },
+     "redundant_with": {
+      "with": "gsax_med",
+      "r": 0.914
+     }
+    },
+    {
+     "id": "sv_pct_low",
+     "display": "Low-danger save %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Save rate on low-danger chances (expected-goal value under 0.08).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.114,
+      "split_half_r": 0.084,
+      "split_half_r_sb": 0.155,
+      "n_pairs": 635,
+      "m50": 6580,
+      "m50_unit": "low-danger unblocked attempts faced",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.046,
+      "also": {
+       "next-season save %": 0.075,
+       "next-season GAR": 0.104
+      }
+     },
+     "redundant_with": {
+      "with": "gsax_low",
+      "r": 0.908
+     }
+    },
+    {
+     "id": "qs_pct",
+     "display": "Quality start %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Share of his starts with a save percentage above league average (or .885 on 20 shots or fewer).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.126,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 635,
+      "m50": 288,
+      "m50_unit": "games",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.065,
+      "also": {
+       "next-season save %": 0.087,
+       "next-season GAR": 0.121
+      }
+     },
+     "redundant_with": {
+      "with": "sv_pct",
+      "r": 0.829
+     }
+    },
+    {
+     "id": "gsax60",
+     "display": "GSAx / 60",
+     "unit": "3",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "GSAx per 60 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.102,
+      "split_half_r": 0.098,
+      "split_half_r_sb": 0.179,
+      "n_pairs": 635,
+      "m50": 7566,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.098,
+      "also": {
+       "next-season save %": 0.058,
+       "next-season GAR": 0.155
+      }
+     },
+     "redundant_with": {
+      "with": "gsax100",
+      "r": 0.998
+     }
+    },
+    {
+     "id": "dfsv_pct",
+     "display": "dFSv%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Unblocked save % minus expected unblocked save %.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.1,
+      "split_half_r": 0.105,
+      "split_half_r_sb": 0.19,
+      "n_pairs": 635,
+      "m50": 7022,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.101,
+      "also": {
+       "next-season save %": 0.062,
+       "next-season GAR": 0.157
+      }
+     },
+     "redundant_with": {
+      "with": "gsax100",
+      "r": 0.999
+     }
+    },
+    {
+     "id": "gsax_shrunk",
+     "display": "GSAx (shrunk)",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "count",
+     "explanation": "GSAx regressed toward zero by its stabilisation constant.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.179,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 635,
+      "m50": 7568,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.139,
+      "also": {
+       "next-season save %": 0.108,
+       "next-season GAR": 0.236
+      }
+     },
+     "redundant_with": {
+      "with": "gsax_m",
+      "r": 0.983
+     }
+    },
+    {
+     "id": "sv_pct_5v5",
+     "display": "5v5 sv%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Save % at 5v5.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.117,
+      "split_half_r": 0.107,
+      "split_half_r_sb": 0.193,
+      "n_pairs": 635,
+      "m50": 6881,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.057,
+      "also": {
+       "next-season save %": 0.11,
+       "next-season GAR": 0.128
+      }
+     },
+     "redundant_with": {
+      "with": "sv_pct",
+      "r": 0.886
+     }
+    },
+    {
+     "id": "sv_pct_sh",
+     "display": "PK sv%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Save % short-handed.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.014,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 635,
+      "m50": 116207,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.032,
+      "also": {
+       "next-season save %": 0.008,
+       "next-season GAR": 0.04
+      }
+     },
+     "redundant_with": {
+      "with": "gsax_sh",
+      "r": 0.865
+     }
+    },
+    {
+     "id": "gaa",
+     "display": "GAA",
+     "unit": "2",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Goals against per 60.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.239,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 635,
+      "m50": 5254,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.044,
+      "also": {
+       "next-season save %": 0.091,
+       "next-season GAR": 0.12
+      }
+     },
+     "redundant_with": {
+      "with": "sv_pct",
+      "r": -0.852
+     }
+    },
+    {
+     "id": "reb_rate",
+     "display": "Rebound rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Saves followed within 3 s by another attempt by the shooting team, per save.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.303,
+      "split_half_r": 0.291,
+      "split_half_r_sb": 0.451,
+      "n_pairs": 635,
+      "m50": 2006,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.031,
+      "also": {
+       "next-season save %": 0.074,
+       "next-season GAR": 0.058
+      }
+     },
+     "redundant_with": {
+      "with": "hd_share",
+      "r": 0.417
+     }
+    },
+    {
+     "id": "xg_per_shot",
+     "display": "xG per attempt",
+     "unit": "3",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Mean xG of the unblocked attempts faced.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.338,
+      "split_half_r": 0.417,
+      "split_half_r_sb": 0.588,
+      "n_pairs": 635,
+      "m50": 1153,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "split-half"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.056,
+      "also": {
+       "next-season save %": -0.074,
+       "next-season GAR": 0.017
+      }
+     },
+     "redundant_with": {
+      "with": "xfsv_pct",
+      "r": -1.0
+     }
+    },
+    {
+     "id": "hd_share",
+     "display": "High-danger share",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Share of unblocked attempts faced that were high danger.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.172,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 635,
+      "m50": 7943,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.026,
+      "also": {
+       "next-season save %": -0.06,
+       "next-season GAR": -0.007
+      }
+     },
+     "redundant_with": {
+      "with": "xfsv_pct",
+      "r": -0.799
+     }
+    },
+    {
+     "id": "start_share",
+     "display": "Start share",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Share of the team's games started.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.497,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 635,
+      "m50": 1670,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": -0.019,
+      "also": {
+       "next-season save %": -0.005,
+       "next-season GAR": 0.147
+      }
+     },
+     "redundant_with": {
+      "with": "gs",
+      "r": 1.0
+     }
+    },
+    {
+     "id": "gsax_low",
+     "display": "GSAx low danger",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "count",
+     "explanation": "GSAx on attempts with xG under 0.08.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.153,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 635,
+      "m50": 9134,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.084,
+      "also": {
+       "next-season save %": 0.086,
+       "next-season GAR": 0.15
+      }
+     },
+     "redundant_with": {
+      "with": "sv_pct_low",
+      "r": 0.908
+     }
+    },
+    {
+     "id": "gsax_med",
+     "display": "GSAx medium danger",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "count",
+     "explanation": "GSAx on attempts with xG 0.08-0.20.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.042,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 635,
+      "m50": 37636,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.078,
+      "also": {
+       "next-season save %": 0.044,
+       "next-season GAR": 0.118
+      }
+     },
+     "redundant_with": {
+      "with": "sv_pct_med",
+      "r": 0.914
+     }
+    },
+    {
+     "id": "gsax_high",
+     "display": "GSAx high danger",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "count",
+     "explanation": "GSAx on attempts with xG 0.20 or more.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.04,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 635,
+      "m50": 39600,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.033,
+      "also": {
+       "next-season save %": -0.003,
+       "next-season GAR": 0.053
+      }
+     },
+     "redundant_with": {
+      "with": "sv_pct_high",
+      "r": 0.88
+     }
+    },
+    {
+     "id": "gsax_5v5",
+     "display": "GSAx 5v5",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "count",
+     "explanation": "GSAx at 5v5.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.103,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 635,
+      "m50": 14369,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.091,
+      "also": {
+       "next-season save %": 0.079,
+       "next-season GAR": 0.168
+      }
+     },
+     "redundant_with": {
+      "with": "gsax",
+      "r": 0.877
+     }
+    },
+    {
+     "id": "gsax_wrist",
+     "display": "GSAx wrist / snap",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 15,
+     "basis": "count",
+     "explanation": "GSAx on wrist and snap shots.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.024,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 635,
+      "m50": 67100,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.051,
+      "also": {
+       "next-season save %": 0.023,
+       "next-season GAR": 0.106
+      }
+     },
+     "redundant_with": {
+      "with": "gsax",
+      "r": 0.85
+     }
+    },
+    {
+     "id": "gsax_slap",
+     "display": "GSAx slap",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 16,
+     "basis": "count",
+     "explanation": "GSAx on slap shots.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.171,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 635,
+      "m50": 7999,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.113,
+      "also": {
+       "next-season save %": 0.117,
+       "next-season GAR": 0.147
+      }
+     },
+     "redundant_with": {
+      "with": "gsax_low",
+      "r": 0.468
+     }
+    },
+    {
+     "id": "gsax_tip",
+     "display": "GSAx tips",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 17,
+     "basis": "count",
+     "explanation": "GSAx on tips and deflections.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.079,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 635,
+      "m50": 19236,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.069,
+      "also": {
+       "next-season save %": 0.037,
+       "next-season GAR": 0.083
+      }
+     },
+     "redundant_with": {
+      "with": "gsax",
+      "r": 0.418
+     }
+    },
+    {
+     "id": "gsax_back",
+     "display": "GSAx backhand",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 18,
+     "basis": "count",
+     "explanation": "GSAx on backhands.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.109,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 635,
+      "m50": 13488,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.088,
+      "also": {
+       "next-season save %": 0.059,
+       "next-season GAR": 0.124
+      }
+     },
+     "redundant_with": {
+      "with": "edge_hd_sv_pct",
+      "r": 0.408
+     }
+    },
+    {
+     "id": "war",
+     "display": "Rink value (WAR)",
+     "unit": "2",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 19,
+     "basis": "count",
+     "explanation": "GAR in wins.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.236,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 635,
+      "m50": 5342,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.107,
+      "also": {
+       "next-season save %": 0.079,
+       "next-season GAR": 0.236
+      }
+     },
+     "redundant_with": {
+      "with": "gar",
+      "r": 1.0
+     }
+    },
+    {
+     "id": "gar",
+     "display": "Rink value (GAR)",
+     "unit": "1",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 20,
+     "basis": "count",
+     "explanation": "Goals above a replacement-level goalie.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.236,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 635,
+      "m50": 5342,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.107,
+      "also": {
+       "next-season save %": 0.079,
+       "next-season GAR": 0.236
+      }
+     },
+     "redundant_with": {
+      "with": "war",
+      "r": 1.0
+     }
+    },
+    {
+     "id": "edge_hd_sv_pct",
+     "display": "Tracked high-danger sv%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 21,
+     "basis": "rate",
+     "explanation": "Save % from NHL puck and player tracking, from high-danger areas.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.177,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 182,
+      "m50": 7672,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.124,
+      "also": {
+       "next-season save %": 0.199,
+       "next-season GAR": 0.183
+      }
+     },
+     "redundant_with": {
+      "with": "sv_pct",
+      "r": 0.721
+     }
+    },
+    {
+     "id": "edge_md_sv_pct",
+     "display": "Tracked mid-range sv%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 22,
+     "basis": "rate",
+     "explanation": "Save % from NHL puck and player tracking, from mid-range.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.118,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 182,
+      "m50": 12333,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": -0.021,
+      "also": {
+       "next-season save %": 0.005,
+       "next-season GAR": 0.076
+      }
+     },
+     "redundant_with": {
+      "with": "gsax100",
+      "r": 0.623
+     }
+    },
+    {
+     "id": "edge_ld_sv_pct",
+     "display": "Tracked long-range sv%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 23,
+     "basis": "rate",
+     "explanation": "Save % from NHL puck and player tracking, from long range.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.175,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 182,
+      "m50": 7779,
+      "m50_unit": "unblocked attempts faced",
+      "m50_source": "year-to-year (upper bound)"
+     },
+     "predictive": {
+      "target": "next-season GSAx/100 attempts",
+      "r": 0.08,
+      "also": {
+       "next-season save %": 0.137,
+       "next-season GAR": 0.127
+      }
+     },
+     "redundant_with": {
+      "with": "sv_pct_low",
+      "r": 0.503
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "gsax100",
+     "sv_pct_high",
+     "sv_pct_med",
+     "sv_pct_low",
+     "reb_rate",
+     "xg_per_shot",
+     "start_share"
+    ],
+    "standardise": "z within season, qualified goalies only",
+    "weights": "yoy_r floored at 0.2",
+    "weight_values": {
+     "gsax100": 0.2,
+     "sv_pct_high": 0.2,
+     "sv_pct_med": 0.2,
+     "sv_pct_low": 0.2,
+     "reb_rate": 0.303,
+     "xg_per_shot": 0.338,
+     "start_share": 0.497
+    },
+    "distance": "weighted euclidean",
+    "k": 6,
+    "constraints": "same season, both qualified; the skill metrics sit at the 0.2 floor, so similarity mostly reflects style and workload"
+   }
+  },
+  {
+   "id": "teams",
+   "entity": "team",
+   "display": "Teams",
+   "peer_group": "all 32 clubs, within season",
+   "position_field": null,
+   "position_codes": [],
+   "minimum": {
+    "field": "gp",
+    "value": 10,
+    "unit": "games",
+    "note": "early-season ranks are noise: about 13 games for 5v5 xG share to reach r 0.5"
+   },
+   "basis": "per 60 (5v5, PP, PK) and per game",
+   "metrics": [
+    {
+     "id": "rating",
+     "payload_id": "rating",
+     "display": "Team rating",
+     "unit": "goals per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Our team-strength model: expected goal differential per game against an average team, all situations.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.678,
+      "split_half_r": null,
+      "n_pairs": 459,
+      "m50": null,
+      "m50_unit": null,
+      "m50_source": null,
+      "note": "full-season payload value only: no half-season split possible offline"
+     },
+     "predictive": {
+      "target": "next-season points %",
+      "r": 0.564,
+      "also": {}
+     },
+     "redundant_with": {
+      "with": null,
+      "r": null
+     }
+    },
+    {
+     "id": "xgf_pct5",
+     "payload_id": "xgf_pct5",
+     "display": "Expected-goal share (5v5)",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Share of 5-on-5 expected goals the team gets.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.636,
+      "split_half_r": 0.754,
+      "split_half_r_sb": 0.86,
+      "first_to_second_half_r": 0.693,
+      "n_pairs": 494,
+      "m50": 13.0,
+      "m50_unit": "games",
+      "m50_source": "split-half (odd v even games)"
+     },
+     "predictive": {
+      "target": "second-half points % (from first half)",
+      "r": 0.488,
+      "also": {
+       "second-half goal differential/game": 0.497,
+       "next-season points % (full season, payload units)": 0.535
+      }
+     },
+     "redundant_with": {
+      "with": "xgd5_60",
+      "r": 0.999
+     }
+    },
+    {
+     "id": "cf_pct5",
+     "payload_id": "cf_pct5",
+     "display": "Shot-attempt share (5v5)",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Share of 5-on-5 shot attempts the team gets: puck possession.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.679,
+      "split_half_r": 0.861,
+      "split_half_r_sb": 0.926,
+      "first_to_second_half_r": 0.769,
+      "n_pairs": 494,
+      "m50": 7.0,
+      "m50_unit": "games",
+      "m50_source": "split-half (odd v even games)"
+     },
+     "predictive": {
+      "target": "second-half points % (from first half)",
+      "r": 0.434,
+      "also": {
+       "second-half goal differential/game": 0.463,
+       "next-season points % (full season, payload units)": 0.452
+      }
+     },
+     "redundant_with": {
+      "with": "ff_pct5",
+      "r": 0.963
+     }
+    },
+    {
+     "id": "off5",
+     "payload_id": "off5",
+     "display": "5v5 offence",
+     "unit": "xGF per 60",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Expected goals created per 60 minutes at 5-on-5.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.577,
+      "split_half_r": 0.705,
+      "split_half_r_sb": 0.827,
+      "first_to_second_half_r": 0.64,
+      "n_pairs": 494,
+      "m50": 17.0,
+      "m50_unit": "games",
+      "m50_source": "split-half (odd v even games)"
+     },
+     "predictive": {
+      "target": "second-half points % (from first half)",
+      "r": 0.361,
+      "also": {
+       "second-half goal differential/game": 0.374,
+       "next-season points % (full season, payload units)": 0.357
+      }
+     },
+     "redundant_with": {
+      "with": "xgd5_60",
+      "r": 0.76
+     }
+    },
+    {
+     "id": "def5",
+     "payload_id": "def5",
+     "display": "5v5 defence",
+     "unit": "xGA per 60",
+     "direction": "lower",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Expected goals allowed per 60 minutes at 5-on-5 (lower is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.569,
+      "split_half_r": 0.708,
+      "split_half_r_sb": 0.829,
+      "first_to_second_half_r": 0.666,
+      "n_pairs": 494,
+      "m50": 17.0,
+      "m50_unit": "games",
+      "m50_source": "split-half (odd v even games)"
+     },
+     "predictive": {
+      "target": "second-half points % (from first half)",
+      "r": 0.382,
+      "also": {
+       "second-half goal differential/game": 0.384,
+       "next-season points % (full season, payload units)": 0.373
+      }
+     },
+     "redundant_with": {
+      "with": "xgf_pct5",
+      "r": -0.797
+     }
+    },
+    {
+     "id": "pp",
+     "payload_id": "pp",
+     "display": "Power play",
+     "unit": "xGF per 60",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Expected goals created per 60 minutes on the power play.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.651,
+      "split_half_r": 0.598,
+      "split_half_r_sb": 0.749,
+      "first_to_second_half_r": 0.502,
+      "n_pairs": 494,
+      "m50": 28.0,
+      "m50_unit": "games",
+      "m50_source": "split-half (odd v even games)"
+     },
+     "predictive": {
+      "target": "second-half points % (from first half)",
+      "r": 0.314,
+      "also": {
+       "second-half goal differential/game": 0.328,
+       "next-season points % (full season, payload units)": 0.284
+      }
+     },
+     "redundant_with": {
+      "with": "pp_gf60",
+      "r": 0.614
+     }
+    },
+    {
+     "id": "pk",
+     "payload_id": "pk",
+     "display": "Penalty kill",
+     "unit": "xGA per 60",
+     "direction": "lower",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Expected goals allowed per 60 minutes short-handed (lower is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.585,
+      "split_half_r": 0.441,
+      "split_half_r_sb": 0.613,
+      "first_to_second_half_r": 0.366,
+      "n_pairs": 494,
+      "m50": 52.0,
+      "m50_unit": "games",
+      "m50_source": "split-half (odd v even games)"
+     },
+     "predictive": {
+      "target": "second-half points % (from first half)",
+      "r": 0.255,
+      "also": {
+       "second-half goal differential/game": 0.263,
+       "next-season points % (full season, payload units)": 0.246
+      }
+     },
+     "redundant_with": {
+      "with": "pk_ga60",
+      "r": 0.582
+     }
+    },
+    {
+     "id": "goalie",
+     "payload_id": "goalie",
+     "display": "Goaltending",
+     "unit": "GSAx per 60",
+     "direction": "higher",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Goals the team's goalies saved above expected per 60 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.222,
+      "split_half_r": 0.275,
+      "split_half_r_sb": 0.432,
+      "first_to_second_half_r": 0.232,
+      "n_pairs": 494,
+      "m50": 108.0,
+      "m50_unit": "games",
+      "m50_source": "split-half (odd v even games)"
+     },
+     "predictive": {
+      "target": "second-half points % (from first half)",
+      "r": 0.171,
+      "also": {
+       "second-half goal differential/game": 0.188,
+       "next-season points % (full season, payload units)": 0.136
+      }
+     },
+     "redundant_with": {
+      "with": "ga_g",
+      "r": -0.67
+     }
+    },
+    {
+     "id": "gd_g",
+     "payload_id": null,
+     "display": "Goal differential per game",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Goals for minus goals against per game (shootout winners excluded).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.556,
+      "split_half_r": 0.59,
+      "split_half_r_sb": 0.742,
+      "first_to_second_half_r": 0.538,
+      "n_pairs": 494,
+      "m50": 28.0,
+      "m50_unit": "games",
+      "m50_source": "split-half (odd v even games)"
+     },
+     "predictive": {
+      "target": "second-half points % (from first half)",
+      "r": 0.528,
+      "also": {
+       "second-half goal differential/game": 0.538,
+       "next-season points % (full season, payload units)": 0.55
+      }
+     },
+     "redundant_with": {
+      "with": "pts_pct",
+      "r": 0.96
+     }
+    },
+    {
+     "id": "pts_pct",
+     "payload_id": "p_pct (season.json standings.rows)",
+     "display": "Points %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Standings points taken as a share of the points available.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.518,
+      "split_half_r": 0.55,
+      "split_half_r_sb": 0.71,
+      "first_to_second_half_r": 0.512,
+      "n_pairs": 494,
+      "m50": 34.0,
+      "m50_unit": "games",
+      "m50_source": "split-half (odd v even games)"
+     },
+     "predictive": {
+      "target": "second-half points % (from first half)",
+      "r": 0.512,
+      "also": {
+       "second-half goal differential/game": 0.526,
+       "next-season points % (full season, payload units)": 0.518
+      }
+     },
+     "redundant_with": {
+      "with": "gd_g",
+      "r": 0.96
+     }
+    },
+    {
+     "id": "gf_g",
+     "display": "Goals for per game",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.587,
+      "split_half_r": 0.463,
+      "first_to_second_half_r": 0.437
+     },
+     "predictive": {
+      "target": "second-half points % (from first half)",
+      "r": 0.43
+     },
+     "unit": "per game",
+     "explanation": "Goals scored per game, all situations."
+    },
+    {
+     "id": "ga_g",
+     "display": "Goals against per game",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.548,
+      "split_half_r": 0.523,
+      "first_to_second_half_r": 0.525
+     },
+     "predictive": {
+      "target": "second-half points % (from first half)",
+      "r": 0.44
+     },
+     "unit": "per game",
+     "explanation": "Goals allowed per game, all situations. Lower is better."
+    },
+    {
+     "id": "xgf_g",
+     "display": "xG for per game",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.662,
+      "split_half_r": null,
+      "first_to_second_half_r": null
+     },
+     "predictive": {
+      "target": "next-season points %",
+      "r": 0.372
+     },
+     "unit": "per game",
+     "explanation": "Expected goals created per game from shot quality, all situations."
+    },
+    {
+     "id": "xga_g",
+     "display": "xG against per game",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.632,
+      "split_half_r": null,
+      "first_to_second_half_r": null
+     },
+     "predictive": {
+      "target": "next-season points %",
+      "r": 0.38
+     },
+     "unit": "per game",
+     "explanation": "Expected goals allowed per game from shot quality, all situations. Lower is better."
+    },
+    {
+     "id": "pp_pct",
+     "display": "Power-play %",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.39,
+      "split_half_r": null,
+      "first_to_second_half_r": null
+     },
+     "predictive": {
+      "target": "next-season points %",
+      "r": 0.266
+     },
+     "unit": "%",
+     "explanation": "Share of power plays that produce a goal."
+    },
+    {
+     "id": "pk_pct",
+     "display": "Penalty-kill %",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.295,
+      "split_half_r": null,
+      "first_to_second_half_r": null
+     },
+     "predictive": {
+      "target": "next-season points %",
+      "r": 0.222
+     },
+     "unit": "%",
+     "explanation": "Share of opponent power plays killed without conceding."
+    },
+    {
+     "id": "gsax",
+     "display": "Team GSAx",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.21,
+      "split_half_r": null,
+      "first_to_second_half_r": null
+     },
+     "predictive": {
+      "target": "next-season points %",
+      "r": 0.127
+     },
+     "unit": "goals",
+     "explanation": "Goals the team's goalies saved above what the shots they faced would predict."
+    },
+    {
+     "id": "pp_gf60",
+     "display": "Power-play goals per 60",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.259,
+      "first_to_second_half_r": 0.253
+     },
+     "predictive": {
+      "target": "second-half points % (from first half)",
+      "r": 0.377
+     },
+     "unit": "per 60",
+     "explanation": "Power-play goals scored per 60 minutes of power-play time."
+    },
+    {
+     "id": "pk_ga60",
+     "display": "Penalty-kill goals against per 60",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.179,
+      "first_to_second_half_r": 0.205
+     },
+     "predictive": {
+      "target": "second-half points % (from first half)",
+      "r": 0.243
+     },
+     "unit": "per 60",
+     "explanation": "Goals allowed per 60 minutes of penalty-kill time. Lower is better."
+    },
+    {
+     "id": "ff_pct5",
+     "display": "Unblocked-attempt share (5v5)",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.879,
+      "first_to_second_half_r": 0.763
+     },
+     "predictive": {
+      "target": "second-half points % (from first half)",
+      "r": 0.489
+     },
+     "unit": "%",
+     "explanation": "Share of unblocked shot attempts at 5v5 taken by this team."
+    },
+    {
+     "id": "gf_pct5",
+     "display": "Goal share (5v5)",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.471,
+      "first_to_second_half_r": 0.438
+     },
+     "predictive": {
+      "target": "second-half points % (from first half)",
+      "r": 0.438
+     },
+     "unit": "%",
+     "explanation": "Share of 5v5 goals scored by this team."
+    }
+   ],
+   "similar": null
+  }
+ ],
+ "payload_changes": [
+  {
+   "field": "teams.json units.gd_g",
+   "builder": "oddsmarkets/nhl/analytics/teams.py:unit_ratings",
+   "status": "needed",
+   "note": "goal differential per game; trivially gf_g - ga_g, so the front end may derive it instead"
+  },
+  {
+   "field": "careers.py SIMILAR_S / SIMILAR_G and weights",
+   "builder": "oddsmarkets/nhl/analytics/careers.py:similar",
+   "status": "needed",
+   "note": "switch the feature lists to the 'similar' blocks here and weight each z by yoy_r floored at 0.2 (changes existing similar[] values, so not done in this pass)"
+  },
+  {
+   "field": "past-season skaters.json reb60, rush60",
+   "builder": "oddsmarkets/nhl/analytics/box.py:rebound_rush (fixed in 743aebf4, 21 Oct)",
+   "status": "needed",
+   "note": "null in every built season 2010-11 to 2025-26; a rebuild of past seasons fills them; not in the headline set"
+  },
+  {
+   "field": "goalies.json gsax100_2y (two-season GSAx/100)",
+   "builder": "oddsmarkets/nhl/analytics/goalies.py:build",
+   "status": "needed",
+   "note": "optional: pooling seasons t-1 and t lifts r with next-season GSAx/100 from 0.111 to 0.149 (486 goalies); one season is too little sample"
+  },
+  {
+   "field": "teams.json units.ff_pct5",
+   "builder": "oddsmarkets/nhl/analytics/teams.py:unit_ratings",
+   "status": "needed",
+   "note": "optional: 5v5 unblocked-attempt share predicts second-half points % slightly better than CF% (0.489 v 0.434)"
+  }
+ ]
+}

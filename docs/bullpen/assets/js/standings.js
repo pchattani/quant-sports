@@ -133,8 +133,8 @@ function divisionTable(list, L, S) {
     { label: 'RS', align: 'right', cls: 'hide-sm' }, { label: 'RA', align: 'right', cls: 'hide-sm' }, { label: 'Diff', align: 'right' },
     { label: 'Pythag', align: 'right', cls: 'hide-sm', title: 'Pythagorean record from runs scored and allowed (exponent 1.83); the figure is wins above it' },
     { label: 'Expected', align: 'right', cls: 'hide-sm', title: 'Our expected record from the team ratings' },
-    { label: 'Playoffs', align: 'right', title: 'Probability of a postseason place (season simulation)' }, { label: 'Division', align: 'right', cls: 'hide-sm' },
-    { label: 'Bye', align: 'right', cls: 'hide-sm', title: 'A top-two seed: straight to the Division Series' }, { label: 'WS', align: 'right', title: 'World Series probability' },
+    { label: 'Playoffs', align: 'right', title: 'Our chance of a postseason place (season simulation)' }, { label: 'Division', align: 'right', cls: 'hide-sm' },
+    { label: 'Bye', align: 'right', cls: 'hide-sm', title: 'A top-two seed: straight to the Division Series' }, { label: 'WS', align: 'right', title: 'Our World Series chance' },
     { label: 'Magic', align: 'right', cls: 'hide-sm', title: 'Division magic number: wins plus rival losses to clinch' }], rows, { compact: true, cls: 'std-table' });
 }
 function wildcardTable(list, L, S) {
@@ -188,8 +188,8 @@ function ratingsPanel(el, all, L, S) {
 
 function render(el, params) {
   const L = params.level, S = params.season;
-  el.innerHTML = BP.pageHead(BP.levelName(L) + ' standings ' + S, 'Records, run differential, Pythagorean and expected records, and the season simulation’s odds',
-    '<a href="' + BP.ghref('postseason') + '">Postseason</a><a href="' + BP.href('teams', L, S) + '">Teams</a>') + '<div id="std-body"><div class="muted">Loading…</div></div>';
+  el.innerHTML = QK.sectionHead({ kicker: 'Standings · ' + BP.levelName(L) + ' ' + S, title: 'The table', sub: 'Records, run differential, Pythagorean and expected records, and our chances from the season simulation.',
+    actions: '<a class="qk-btn" href="' + BP.ghref('postseason') + '">Postseason</a><a class="qk-btn" href="' + BP.href('teams', L, S) + '">Teams</a>' }) + '<div id="std-body">' + QK.skeleton('card', 2) + '</div>';
   return BP.loadYear('season.json', L, S).then(d => {
     if (!el.isConnected) return null;
     if (BP.ok(d) && (d.standings || d.sim)) return { d: d, rows: rowsOf(d) };
@@ -221,10 +221,19 @@ function render(el, params) {
       }
       BP.sortable(box);
     };
-    body.innerHTML = '<div class="toggle-row std-tabs" id="std-tabs">' + BP.toggles([{ key: 'div', label: 'Divisions' }, { key: 'wc', label: 'Wild card' }, { key: 'rt', label: 'Ratings and luck' }], VIEW, 'data-v') + '</div>' +
+    const best = all.slice().sort((a, b) => (b.pct || 0) - (a.pct || 0))[0];
+    const rdb = all.filter(r => isNum(r.rd)).sort((a, b) => b.rd - a.rd)[0];
+    const lk = all.filter(r => isNum(r.pythag_w)).map(r => ({ r: r, v: r.w - r.pythag_w })).sort((a, b) => b.v - a.v)[0];
+    const wsf = all.filter(r => r.sim && isNum(r.sim.p_ws)).sort((a, b) => b.sim.p_ws - a.sim.p_ws)[0];
+    const tiles = [];
+    if (wsf && wsf.sim.p_ws > 0) tiles.push({ label: 'World Series favourite', value: BP.teamAbbr(wsf.tid) + ' ' + BP.ui.pct(wsf.sim.p_ws), signal: true, sub: 'our chance, season simulation', href: BP.teamHref(wsf.tid, L, S) });
+    if (best) tiles.push({ label: 'Best record', value: BP.teamAbbr(best.tid) + ' ' + best.w + '-' + best.l, sub: BP.fmtAvg(best.pct), href: BP.teamHref(best.tid, L, S) });
+    if (rdb) tiles.push({ label: 'Best run differential', value: BP.teamAbbr(rdb.tid) + ' ' + BP.ui.signed(rdb.rd, 0), sub: rdb.rs + ' scored, ' + rdb.ra + ' allowed', href: BP.teamHref(rdb.tid, L, S) });
+    if (lk) tiles.push({ label: 'Luckiest', value: BP.teamAbbr(lk.r.tid) + ' ' + BP.ui.signed(lk.v, 1), sub: 'wins above the Pythagorean record', href: BP.teamHref(lk.r.tid, L, S) });
+    body.innerHTML = (tiles.length ? '<div class="bp-kpis">' + QK.stats(tiles) + '</div>' : '') + '<div class="toggle-row std-tabs" id="std-tabs">' + BP.toggles([{ key: 'div', label: 'Divisions' }, { key: 'wc', label: 'Wild card' }, { key: 'rt', label: 'Ratings and luck' }], VIEW, 'data-v') + '</div>' +
       '<div id="std-view"></div>' +
-      '<div class="section-note">' + (res.fallback ? 'Computed from the final regular-season games while the season payload is built; odds and expected records arrive with it. ' : '') +
-      'Odds: ' + (d.sim && (d.sim.n_sims || d.sim.sims) ? BP.int(d.sim.n_sims || d.sim.sims) + ' ' : '') + 'simulations of the rest of the season and the bracket from our team ratings (x: clinched a place, y: the division, z: the division and a bye, e: eliminated). ' +
+      '<div class="section-note">' + (res.fallback ? 'Computed from the final regular-season games while the season payload is built; our chances and expected records arrive with it. ' : '') +
+      'Chances: ' + (d.sim && (d.sim.n_sims || d.sim.sims) ? BP.int(d.sim.n_sims || d.sim.sims) + ' ' : '') + 'simulations of the rest of the season and the bracket from our team ratings (x: clinched a place, y: the division, z: the division and a bye, e: eliminated). ' +
       'Pythagorean records use exponent 1.83. Magic numbers count wins plus division-rival losses to clinch.</div>';
     BP.wireToggles(document.getElementById('std-tabs'), 'data-v', k => { VIEW = k; draw(); });
     draw();

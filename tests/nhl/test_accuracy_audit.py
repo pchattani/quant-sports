@@ -142,3 +142,45 @@ def test_game_page_rebuilds_when_the_shift_charts_fill_in():
     s0 = games.page_sig(g, 300, {"v": 1})
     assert games.page_sig(g, 300, {"v": 1}, None) == s0                 # past seasons keep their signatures
     assert games.page_sig(g, 300, {"v": 1}, 2964) != games.page_sig(g, 300, {"v": 1}, 3733)
+
+
+# --------------------------------------------------------------------------- 22 Oct 2026, design-lead follow-ups
+def _sk_row(team, grp, gp, p, g, qualified=True):
+    return {"team": team, "group": grp, "gp": gp, "qualified": qualified,
+            "values": {"p": p, "g": g}, "n": {"toi5": 0.0}}
+
+
+def test_projection_uses_the_two_previous_seasons_and_the_clubs_games_left():
+    from oddsmarkets.nhl.analytics import skaters as SK
+    games = {str(i): {"gtype": "REG", "status": "final", "home": "EDM", "away": "XXX"} for i in range(9)}
+    games.update({str(100 + i): {"gtype": "REG", "status": "final", "home": "YYY", "away": "ZZZ"} for i in range(12)})
+    ctx = SimpleNamespace(season=20262027, games=games)
+    rows = {"97": _sk_row("EDM", "F", 9, 26, 6)}
+    rows.update({str(i): _sk_row("YYY", "F", 12, 4, 2) for i in range(200, 220)})
+    ref = list(rows)
+    priors = [{"97": (130.0, 45.0, 82.0)}, {"97": (100.0, 30.0, 67.0)}]
+    SK._projections(ctx, rows, ref, 84, 12, priors=priors)
+    v = rows["97"]["values"]
+    # his club has played 9 of 84: 75 left at about 1.4 points a game (the old rule: 72 left x share 0.75 at ~1.1)
+    assert 120 < v["proj_pts"] < 140
+    assert 30 < v["proj_g"] < 50
+    with_history = v["proj_pts"]
+    # no history: the position mean pulls the rate as before
+    SK._projections(ctx, rows, ref, 84, 12, priors=[{}, {}])
+    assert rows["97"]["values"]["proj_pts"] < with_history - 20
+
+
+def test_player_files_carry_position_percentiles_and_their_peer_group():
+    from oddsmarkets.nhl.analytics import careers
+    sk = {"reference": {"min_toi5": 37.0, "floors": {"gp": 5.0}},
+          "players": {"1": {"group": "F", "qualified": True, "pct": {"p": 99}, "pct_pos": {"p": 98}},
+                      "2": {"group": "F", "qualified": True, "pct": {"p": 50}, "pct_pos": {"p": 40}},
+                      "3": {"group": "D", "qualified": True, "pct": {"p": 70}, "pct_pos": {"p": 95}},
+                      "4": {"group": "D", "qualified": False, "pct": {}, "pct_pos": {}}}}
+    gk = {"reference": {"min_toi": 180, "floors": {"gp": 3.0}},
+          "players": {"30": {"group": "G", "qualified": True, "pct": {"sv_pct": 80}}}}
+    pb = careers.peer_blocks(sk, gk)
+    assert pb["3"] == {"pct_pos": {"p": 95}, "peer": {"group": "D", "n": 1, "qualified": True, "min_toi5": 37.0, "min_gp": 5.0}}
+    assert pb["1"]["peer"]["n"] == 2
+    assert pb["4"]["peer"]["qualified"] is False
+    assert pb["30"]["pct_pos"] == {"sv_pct": 80} and pb["30"]["peer"]["min_toi"] == 180

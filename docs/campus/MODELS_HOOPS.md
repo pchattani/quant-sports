@@ -28,8 +28,8 @@ lines for every season ESPN has them).
 - **Closing lines** (`data.clean_odds`): ESPN core odds as stored by the fetch (consensus 2013; median of five to
   nine offshore books 2014-2016; median of the last lines of several US books 2017-2022; ESPN BET's close block
   2023-2025; DraftKings' close block 2026). Sanity rules: |spread| <= 60, totals inside 95-215 (men) / 80-200
-  (women), American moneylines with |price| >= 100. This drops the 304 ESPN BET men's games of 2023 whose spread
-  and total fields hold the price (-110). Moneylines are de-vigged proportionally.
+  (women), American moneylines of size 100 or more. This drops the 304 ESPN BET men's games of 2023 whose spread
+  and total fields hold the -110 vig instead of the line. Moneylines are de-vigged proportionally.
 - **Neutral sites.** ESPN's flag from 2008 (men) / 2011 (women). Before, inferred from the venue (a game is neutral
   when its venue differs from the home team's usual home venue); without a venue, NCAA and conference tournament
   games are neutral (women's games before 2011 have no venues, so their regular-season neutral games count as
@@ -161,7 +161,7 @@ and on log loss; the 50.9% ATS is about four standard errors above 50% but well 
 not a true close. Women: the model is ahead of the stored lines on every measure (MAE 9.73 v 9.88, 55% ATS on
 11,857 games, 55.5% on explicit closes, better Brier than the de-vigged moneyline). Women's college lines are thin
 markets with low limits, ESPN shows lines for only a third to a half of games, and the earliest seasons' "closes"
-may be stale; treat it as evidence that the market is soft, not as a proven betting edge. ESPN's matchup predictor
+may be stale; treat it as evidence that the market is soft, not as a proven betting advantage. ESPN's matchup predictor
 is not stored for any backfilled game (it is captured only before tip-off), so there is no comparison yet.
 
 ## 4b. Market-informed line (men: on trial; women: not promoted)
@@ -286,12 +286,12 @@ Carolina +59.3, LSU +54.1; the proxy field matched all 68.
 | Nebraska | 31.5 | 4.0% | 0.6% | | Minnesota | 42.2 | 2.0% | 0.0% |
 | Duke | 30.1 | 3.1% | 14.1% | | Illinois | 41.4 | 1.4% | - |
 
-Where the model and the market disagree most, the market is pricing what the prior cannot see: freshmen (Duke men,
+Where the model and the market disagree most, the market sees what the prior cannot: freshmen (Duke men,
 the title favourite at 14%), players returning from a season lost to injury (USC women, 16.6% on Kalshi and 0.1%
 here: their star missed 2026, so she has no 2026 value) and coaching changes. The preseason title probabilities
 are also more concentrated than the market's (our top four men 51%, Kalshi's top four 37%); the preseason simulation has not
 been backtested against past preseason futures, so read the leaders as "strongest returning rosters", not as a
-price. Inferred 2026 -> 2027 moves: men 1,440 (311 teams receiving; biggest net gains Cincinnati, Louisville,
+forecast to trade on. Inferred 2026 -> 2027 moves: men 1,440 (311 teams receiving; biggest net gains Cincinnati, Louisville,
 Tennessee, Miami, Houston), women 881 (252; Ole Miss, Texas Tech, UCLA, West Virginia, Baylor).
 
 **Player value and fantasy (2026).** Value leaders: men Cameron Boozer (Duke) 459 points above replacement, AJ

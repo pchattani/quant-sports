@@ -70,7 +70,8 @@ function shotMap(el, shots, o) {
   el.style.setProperty('--ar', surface === 'half' ? '68 / 54.5' : '105 / 68');
   return QKC.mount(el, function (T) {
     el.style.backgroundImage = surfaceBg(surface, T);
-    var colour = { goal: T.market, save: T.model, post: T.cat[3], block: T.ink3, miss: T.ink4 };
+    /* categorical slots, never the signal (ours) or the market grey: goal orange, save blue, as the match page's goal mouth */
+    var colour = { goal: T.cat[1], save: T.cat[0], post: T.cat[3], block: T.ink3, miss: T.ink4 };
     var series = OUTCOMES.map(function (k) {
       var pts = list.filter(function (s) { return outcomeOf(s) === k[0]; });
       return {

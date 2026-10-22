@@ -2,9 +2,9 @@
  *
  *   header: teams, score, status, series, park, umpire; live state (inning, count, bases, outs,
  *           at bat) and win probability; the linescore once the game has started;
- *   Preview: model v market v DraftKings for win, run line, total and first five (with the
- *            total-runs distribution); starters; lineups with matchup projections; weather,
- *            park and umpire;
+ *   Preview: our forecast (win, by two or more, total runs, the first five; the market a quiet reference column),
+ *            the total-runs distribution, the probable pitchers, lineups (posted time, strength) with matchup
+ *            projections, the lineup adjustment, the tale of the tape, weather, park and umpire;
  *   Game:    win probability (ours v ESPN) with the top WPA plays; spray chart with xwOBA+ v
  *            Savant xwOBA and the batted-ball table;
  *   Pitches: pitch-by-pitch with filters (pitcher, batter, inning, pitch type, result) and the
@@ -200,119 +200,112 @@ function normalise(raw, P) {
 // ── header ─────────────────────────────────────────────────────────────────
 
 function header(g, L, S) {
+  const U = BP.ui;
   const st = BP.gameState(g);
   const pre = preOf(g);
   const pH = isNum(pre.model.p_home) ? Number(pre.model.p_home) : null;
-  const live = st === 'live', fin = st === 'final';
+  const live = st === 'live', fin = st === 'final', started = live || fin;
   const wpH = live && isNum(g.wp_home) ? Number(g.wp_home) : null;
-  const started = live || fin;
-  const winH = fin && g.hs > g.as, winA = fin && g.as > g.hs;
-  const side = (tid, score, isHome) => {
-    const won = isHome ? winH : winA, lost = isHome ? winA : winH;
+  const pair = U.pair(g.away, g.home);
+  const ent = (tid, isHome) => {
     const sp = (g.probables || {})[isHome ? 'home' : 'away'];
-    const p = live ? (wpH === null ? null : (isHome ? wpH : 1 - wpH)) : (pH === null ? null : (isHome ? pH : 1 - pH));
-    return '<div class="gm-team' + (won ? ' won' : '') + (lost ? ' lost' : '') + '">' +
-      '<span class="gm-sw" style="background:' + BP.teamColour(tid) + '"></span>' +
-      '<div class="gm-tn"><div class="gm-name">' + BP.teamLink(tid, { bar: false, level: L }) + '</div>' +
-      '<div class="gm-tsub">' + (isHome ? 'Home' : 'Away') + (sp && !started ? ' · ' + BP.playerLink(sp, { role: 'pitcher', level: L }) : '') + '</div></div>' +
-      (started ? '<span class="gm-score">' + esc(isNum(score) ? score : '') + '</span>' : '') +
-      '<span class="gm-p" title="' + (live ? 'Live win probability (our model)' : 'Model pre-game win probability') + '">' + (p === null ? '' : BP.pct(p, 0) + '<small>' + (live ? 'live' : 'pre-game') + '</small>') + '</span></div>';
+    const mark = BP.teamMark(tid, 'lg');
+    const rec = BP.RECORDS[String(tid)];
+    return '<div class="side ' + (isHome ? 'home' : 'away') + '">' + (isHome ? '' : mark) + '<div style="min-width:0"><a class="nm" href="' + esc(BP.teamHref(tid, L, S)) + '">' + esc(BP.teamName(tid)) + '</a>' +
+      '<div class="sb">' + (isHome ? 'Home' : 'Away') + (rec ? ' · ' + esc(rec) : '') + (sp && !started ? ' · SP ' + BP.playerLink(sp, { role: 'pitcher', level: L, surname: true }) : '') + '</div></div>' + (isHome ? mark : '') + '</div>';
   };
+  const score = started ? '<div class="bp-score"><span>' + (isNum(g.as) ? g.as : '–') + '</span><span class="dash">–</span><span>' + (isNum(g.hs) ? g.hs : '–') + '</span></div>'
+    : '<div class="bp-score bp-score-pre"><span>' + esc(BP.fmtTime(g.start || g.date) || 'TBD') + '</span></div>';
+  const p = live && wpH !== null ? wpH : pH;
+  const mk = pre.market || {};
+  const A = U.team(g.away, L, S), H = U.team(g.home, L, S);
+  A.colour = pair[0]; H.colour = pair[1];
+  const bar = isNum(p) ? '<div class="bp-hero-bar"><div class="qk-kicker">' + (live ? 'Our live win chance' : fin ? 'Our pre-game win chance' : 'Our win chance') + '</div>' +
+    QK.wpBar(1 - p, null, p, A, H, { colors: pair, size: 'lg', market: !started && isNum(mk.p_home) ? 1 - mk.p_home : null, label: live ? 'Live win chance' : 'Our win chance' }) +
+    (!started && isNum(mk.p_home) ? '<div class="bp-hero-mkt"><span class="qk-mkt" data-tip="The de-vigged prediction-market number for the home side, a reference next to ours">Market (' + esc(U.srcName(mk.sources) || 'reference') + ') <b>' + esc(BP.teamAbbr(g.home)) + ' ' + U.pct(mk.p_home) + '</b></span></div>' : '') + '</div>' : '';
   const ump = g._ump || {};
-  const kick = [BP.statusChip(g)];
-  if (g.series) kick.push('<span>' + esc(BP.seriesText(g.series)) + '</span>');
-  else if (g.gtype && g.gtype !== 'R') kick.push('<span>' + esc(BP.roundLabel(g.gtype)) + '</span>');
-  kick.push('<span>' + esc(BP.fmtDate(g.start || g.date, { time: true })) + '</span>');
-  const vid = g._vid;
-  if (vid) kick.push(BP.parkLink(vid, g._park.name));
+  const meta = [];
+  if (g.series) meta.push(esc(BP.seriesText(g.series)));
+  else if (g.gtype && g.gtype !== 'R') meta.push(esc(BP.roundLabel(g.gtype)));
+  meta.push(esc(BP.fmtDate(g.start || g.date, { time: !started })));
+  if (g._vid) meta.push(BP.parkLink(g._vid, g._park.name));
+  if (ump.id || ump.name) meta.push('Plate umpire ' + BP.umpireLink(ump.id, ump.name));
+  if (g.weather && (g.weather.temp || g.weather.cond)) meta.push(esc([isNum(g.weather.temp) ? g.weather.temp + '°F' : '', g.weather.cond, g.weather.wind].filter(Boolean).join(', ')));
+  if (fin && g.decisions) {
+    const d = g.decisions;
+    if (d.w) meta.push('W ' + BP.playerLink(d.w, { short: true, role: 'pitcher', level: L }));
+    if (d.l) meta.push('L ' + BP.playerLink(d.l, { short: true, role: 'pitcher', level: L }));
+    if (d.s) meta.push('S ' + BP.playerLink(d.s, { short: true, role: 'pitcher', level: L }));
+  }
   let liveBox = '';
   if (live) {
     const ab = g.at_bat || {};
     liveBox = '<div class="gm-live"><span class="gm-inn">' + esc(BP.inningLabel(g.inning, g.half)) + '</span>' +
       (isNum(g.balls) ? '<span class="gm-count">' + BP.countText(g.balls, g.strikes) + '</span>' : '') +
       BP.basesHTML(g.bases, g.outs) +
-      (ab.batter ? '<span class="gm-ab">' + BP.playerLink(ab.batter, { short: true, level: L }) + (ab.pitcher ? ' <span class="muted-inline">v</span> ' + BP.playerLink(ab.pitcher, { short: true, role: 'pitcher', level: L }) : '') + '</span>' : '') +
-      (wpH !== null ? '<span class="gm-wp">' + esc(BP.teamAbbr(wpH >= 0.5 ? g.home : g.away)) + ' ' + BP.pct(Math.max(wpH, 1 - wpH), 0) + ' to win</span>' : '') + '</div>';
+      (ab.batter ? '<span class="gm-ab">' + BP.playerLink(ab.batter, { short: true, level: L }) + (ab.pitcher ? ' <span class="muted-inline">v</span> ' + BP.playerLink(ab.pitcher, { short: true, role: 'pitcher', level: L }) : '') + '</span>' : '') + '</div>';
   }
-  const sub = [];
-  if (fin && g.decisions) {
-    const d = g.decisions;
-    if (d.w) sub.push('W ' + BP.playerLink(d.w, { short: true, role: 'pitcher', level: L }));
-    if (d.l) sub.push('L ' + BP.playerLink(d.l, { short: true, role: 'pitcher', level: L }));
-    if (d.s) sub.push('S ' + BP.playerLink(d.s, { short: true, role: 'pitcher', level: L }));
-  }
-  if (ump.id || ump.name) sub.push('Plate umpire ' + BP.umpireLink(ump.id, ump.name));
-  if (g.weather && (g.weather.temp || g.weather.cond)) sub.push(esc([isNum(g.weather.temp) ? g.weather.temp + '°F' : '', g.weather.cond, g.weather.wind].filter(Boolean).join(', ')));
-  return '<div class="gm-head"><div class="gm-kicker">' + kick.join('') + '</div>' +
-    '<div class="gm-board">' + side(g.away, g.as, false) + side(g.home, g.hs, true) + '</div>' + liveBox +
-    (started ? '<div class="gm-ls">' + CH().linescore(g, { level: L }) + '</div>' : '') +
-    (sub.length ? '<div class="gm-sub">' + sub.map(x => '<span>' + x + '</span>').join('<span class="dot">·</span>') + '</div>' : '') + '</div>';
+  const badge = QK.statusBadge(Object.assign({}, BP.kitGame(g, L), { period: live && isNum(g.inning) ? g.inning : null }));
+  return '<section class="qk-hero bp-hero" style="--tc:' + esc(pair[1]) + '"><div class="bp-gh">' + ent(g.away, false) + '<div class="mid">' + score + badge + '</div>' + ent(g.home, true) + '</div>' +
+    bar + liveBox + (started ? '<div class="gm-ls">' + CH().linescore(g, { level: L }) + '</div>' : '') +
+    '<div class="bp-hero-meta">' + meta.map(x => '<span>' + x + '</span>').join('') + '</div></section>';
+}
+/* Stat tiles under the hero: ours first. */
+function kpiStrip(g) {
+  const U = BP.ui;
+  const pre = preOf(g);
+  const m = pre.model || {};
+  const st = BP.gameState(g);
+  const H = BP.teamAbbr(g.home), A = BP.teamAbbr(g.away);
+  const out = [];
+  if (isNum(m.p_home)) { const fh = m.p_home >= 0.5; out.push({ label: st === 'pre' ? 'Our win chance' : 'Our pre-game call', value: (fh ? H : A) + ' ' + U.pct(fh ? m.p_home : 1 - m.p_home), signal: true, sub: isNum(m.extra_innings) ? 'extra innings ' + U.pct(m.extra_innings) : 'from our plate-appearance simulation', tip: 'Our pre-game win chance from simulating the game plate appearance by plate appearance with these lineups and starters' }); }
+  if (st === 'live' && isNum(g.wp_home)) { const f = g.wp_home >= 0.5; out.push({ label: 'Live win chance', value: (f ? H : A) + ' ' + U.pct(f ? g.wp_home : 1 - g.wp_home), signal: true, sub: 'our live model, every pitch' }); }
+  const r = m.runs || {};
+  if (isNum(r.home) && isNum(r.away)) out.push({ label: 'Projected score', value: U.f(r.away, 1) + '–' + U.f(r.home, 1), sub: A + ' – ' + H + ', the average of our simulations' });
+  if (isNum(m.total) || isNum(r.total)) out.push({ label: 'Runs expected', value: U.f(isNum(r.total) ? r.total : m.total, 1), sub: 'both teams, nine innings or more' });
+  const f5 = m.f5 || {};
+  if (isNum(f5.home) && isNum(f5.away)) { const fh = f5.home >= f5.away; out.push({ label: 'Leads after five', value: (fh ? H : A) + ' ' + U.pct(fh ? f5.home : f5.away), sub: 'level after five ' + U.pct(f5.tie) }); }
+  return out.length ? '<div class="bp-kpis">' + QK.stats(out) + '</div>' : '';
 }
 
 // ── preview ────────────────────────────────────────────────────────────────
 
-function priceRows(g) {
+function forecastRows(g) {
   const pre = preOf(g);
-  const m = pre.model || {}, k = pre.market || {}, ln = pre.line || {};
+  const m = pre.model || {}, k = pre.market || {};
   const H = BP.teamAbbr(g.home), A = BP.teamAbbr(g.away);
   const rows = [];
-  const dk = ln.close || ln;
-  // win
-  const mlP = Array.isArray(dk.ml) ? BP.devigAm(dk.ml) : null;
-  rows.push({ label: H + ' to win', model: m.p_home, market: k.p_home, line: mlP, lineTxt: Array.isArray(dk.ml) ? H + ' ' + BP.fmtOdds(dk.ml[0]) + ' / ' + A + ' ' + BP.fmtOdds(dk.ml[1]) : '' });
-  // run line
-  const rl = dk.rl && typeof dk.rl === 'object' ? dk.rl : null;
-  const pt = rl && isNum(rl.home) ? Number(rl.home) : -1.5;
+  if (isNum(m.p_home)) rows.push({ q: 'Wins the game', ours: H + ' ' + BP.pct(m.p_home, 0) + ' · ' + A + ' ' + BP.pct(1 - m.p_home, 0), mk: isNum(k.p_home) ? H + ' ' + BP.pct(k.p_home, 0) : '' });
   const rlm = m.runline || {};
-  const key = 'home_' + (pt > 0 ? '+' : '') + pt.toFixed(1);
-  const rlModel = isNum(rlm[key]) ? rlm[key] : (pt === -1.5 && isNum(m.rl_home) ? m.rl_home : null);
-  rows.push({ label: H + ' ' + BP.fmtLine(pt), model: rlModel, market: isNum(k.rl_home) ? k.rl_home : null,
-    line: rl && Array.isArray(rl.price) ? BP.devigAm(rl.price) : null, lineTxt: rl && Array.isArray(rl.price) ? BP.fmtOdds(rl.price[0]) + ' / ' + BP.fmtOdds(rl.price[1]) : '' });
-  // total
-  const tot = dk.total && typeof dk.total === 'object' ? dk.total : (isNum(dk.total) ? { line: dk.total } : null);
-  const tl = tot && isNum(tot.line) ? Number(tot.line) : (isNum(k.total) ? Number(k.total) : null);
-  if (tl !== null) {
-    let pOver = (m.over || {})[tl.toFixed(1)];
-    if (!isNum(pOver) && Array.isArray(m.total_dist)) {
-      let win = 0, lose = 0;
-      m.total_dist.forEach((p, n) => { if (n > tl) win += p; else if (n < tl) lose += p; });
-      pOver = win + lose > 0 ? win / (win + lose) : null;
+  const by2h = isNum(rlm['home_-1.5']) ? rlm['home_-1.5'] : (isNum(m.rl_home) ? m.rl_home : null);
+  const by2a = isNum(rlm['away_-1.5']) ? rlm['away_-1.5'] : null;
+  if (isNum(by2h)) rows.push({ q: 'Wins by two or more', ours: H + ' ' + BP.pct(by2h, 0) + (isNum(by2a) ? ' · ' + A + ' ' + BP.pct(by2a, 0) : ''), mk: '' });
+  const tot = isNum((m.runs || {}).total) ? m.runs.total : m.total;
+  if (isNum(tot)) {
+    let t = '';
+    if (Array.isArray(m.total_dist)) {
+      const n = Math.round(tot);
+      let pAt = 0; m.total_dist.forEach((p, x) => { if (x >= n) pAt += p; });
+      t = ' · ' + n + ' or more: ' + BP.pct(pAt, 0);
     }
-    rows.push({ label: 'Over ' + BP.num(tl, 1) + ' runs', model: pOver, market: isNum(k.p_over) && (!isNum(k.total) || Number(k.total) === tl) ? k.p_over : null,
-      line: isNum(tot && tot.over) && isNum(tot.under) ? BP.devigAm([tot.over, tot.under]) : null, lineTxt: tot && isNum(tot.over) ? 'O ' + BP.fmtOdds(tot.over) + ' / U ' + BP.fmtOdds(tot.under) : '',
-      extra: isNum((m.runs || {}).total) ? 'model expects ' + BP.num(m.runs.total, 1) : '' });
+    rows.push({ q: 'Total runs', ours: BP.num(tot, 1) + ' expected' + t, mk: '' });
   }
-  // first five
+  const r = m.runs || {};
+  if (isNum(r.home) && isNum(r.away)) rows.push({ q: 'Projected score', ours: A + ' ' + BP.num(r.away, 1) + ' – ' + BP.num(r.home, 1) + ' ' + H, mk: '' });
   const f5 = m.f5 || {};
-  if (isNum(f5.home)) {
-    const noTie = isNum(f5.away) && f5.home + f5.away > 0 ? f5.home / (f5.home + f5.away) : null;
-    rows.push({ label: H + ' first five', model: noTie, market: isNum(k.f5_home) ? k.f5_home : null, line: null, lineTxt: '',
-      extra: 'tie ' + pctOr(f5.tie, 0) + ' (pushed) · ' + BP.num(f5.total, 1) + ' runs' });
-  }
+  if (isNum(f5.home)) rows.push({ q: 'Leads after five innings', ours: H + ' ' + BP.pct(f5.home, 0) + ' · ' + A + ' ' + BP.pct(f5.away, 0) + ' · level ' + BP.pct(f5.tie, 0), mk: isNum(k.f5_home) ? H + ' ' + BP.pct(k.f5_home, 0) + ' (no tie)' : '' });
+  if (isNum(m.extra_innings)) rows.push({ q: 'Goes to extra innings', ours: BP.pct(m.extra_innings, 0), mk: '' });
   return rows;
 }
-function priceTable(g) {
-  const rows = priceRows(g);
+function forecastTable(g) {
   const pre = preOf(g);
-  // sources come as names (the schedule) or as {source, p_home, market} records (the game page)
-  const SRC_NAMES = { kalshi: 'Kalshi', polymarket: 'Polymarket', draftkings_ml: 'DraftKings', draftkings: 'DraftKings', espn: 'ESPN BET' };
-  const src = ((pre.market && pre.market.sources) || []).map(x => {
-    const k = typeof x === 'string' ? x : ((x && x.source) || '');
-    return SRC_NAMES[k] || k;
-  }).filter(Boolean).filter((x, i, a) => a.indexOf(x) === i);
-  const t = BP.tableHTML([{ label: 'Bet' }, { label: 'Model', align: 'right' }, { label: 'Market', align: 'right', title: 'De-vigged prediction-market probability' },
-    { label: 'Gap', align: 'right', title: 'Model minus market, points' }, { label: (pre.line && pre.line.src) || 'DraftKings', align: 'right', title: 'De-vigged line probability' },
-    { label: 'Fair odds', align: 'right', cls: 'hide-sm', title: 'Model probability as American odds' }],
-  rows.map(r => [
-    { v: r.label, html: '<b>' + esc(r.label) + '</b>' + (r.extra ? '<div class="sub-line">' + esc(r.extra) + '</div>' : '') },
-    { v: r.model, html: isNum(r.model) ? '<b class="clay">' + BP.pct(r.model, 1) + '</b>' : '—' },
-    { v: r.market, html: pctOr(r.market) },
-    { v: isNum(r.model) && isNum(r.market) ? r.model - r.market : null, html: BP.edgeHTML(r.model, r.market) },
-    { v: r.line, html: isNum(r.line) ? BP.pct(r.line, 1) + (r.lineTxt ? '<div class="sub-line">' + esc(r.lineTxt) + '</div>' : '') : '—' },
-    { v: r.model, html: BP.american(r.model) }
-  ]), { compact: true });
-  return t + '<div class="section-note">Model: ' + (isNum((pre.model || {}).sims) ? BP.int(pre.model.sims) + ' ' : '') + 'plate-appearance simulations with the lineups, starters, bullpens, park, weather and umpire. Market: ' +
-    (src.length ? esc(src.join(' and ')) : 'prediction markets') + ', de-vigged. The first five is shown without the tie (a tie pushes). 18+.</div>';
+  const rows = forecastRows(g);
+  if (!rows.length) return BP.muted('Our forecast appears once the probable starters are known.');
+  const src = BP.ui.srcName((pre.market && pre.market.sources) || []);
+  const anyM = rows.some(r => r.mk);
+  return '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Question</th><th>Our forecast</th>' + (anyM ? '<th><span data-tip="The de-vigged prediction-market number, shown as a reference">Market' + (src ? ' (' + esc(src) + ')' : '') + '</span></th>' : '') + '</tr></thead><tbody>' +
+    rows.map(r => '<tr><td>' + esc(r.q) + '</td><td class="num" style="text-align:left;color:var(--ink-1);font-weight:600">' + esc(r.ours) + '</td>' + (anyM ? '<td class="num qk-muted" style="text-align:left">' + esc(r.mk || '—') + '</td>' : '') + '</tr>').join('') + '</tbody></table></div>' +
+    '<div class="bp-note">Ours: ' + (isNum((pre.model || {}).sims) ? BP.int(pre.model.sims) + ' ' : '') + 'plate-appearance simulations with the lineups, starters, bullpens, park, weather and umpire.' + (anyM ? ' Market: the de-vigged prediction-market number, for reference.' : '') + '</div>';
 }
 function lineupTable(list, L, side, g) {
   const rows = (list || []).map(x => {
@@ -333,8 +326,8 @@ function lineupTable(list, L, side, g) {
     { label: 'K%', align: 'right', cls: 'hide-sm' }, { label: 'BB%', align: 'right', cls: 'hide-sm' }, { label: 'HR%', align: 'right' }, { label: 'v SP', align: 'right', cls: 'hide-sm' }], rows, { compact: true }) +
     (opp ? '<div class="section-note">Projections per plate appearance against ' + esc(BP.playerName(opp)) + ' and the bullpen behind him.</div>' : '');
 }
-/* The probable-pitcher matchup: each starter with his hand, his record of starts (the cases the market rates below the
-   simulation are flagged: a debut, the first few starts, a return after 60+ days) and the model's projection. */
+/* The probable-pitcher matchup: each starter with his hand, his record of starts (a debut, the first few starts and a
+   return after 60+ days are flagged) and our projection. */
 const SP_FLAG = { debut: ['MLB debut', 'warn'], 'new': ['no start in 3 seasons', 'warn'], few: ['first starts', 'warn'], back: ['back from a layoff', 'warn'] };
 function matchupCard(g, L) {
   const pre = preOf(g);
@@ -344,7 +337,7 @@ function matchupCard(g, L) {
   const one = side => {
     const pid = ((st[side] || {}).pid) || (g.probables || {})[side];
     const tm = BP.teamAbbr(g[side]);
-    if (!pid) return '<div class="kpi"><div class="kpi-label">' + esc(tm) + ' starter</div><div class="kpi-value">TBD</div><div class="kpi-sub">not announced</div></div>';
+    if (!pid) return '<div class="bp-spc" style="--tc:' + esc(BP.ui.tcol(g[side])) + '"><div class="k">' + esc(tm) + ' starter</div><div class="nm">TBD</div><div class="rec">not announced</div></div>';
     const s = ss[side] || {};
     const p = (st[side] || {}).proj || {};
     const hand = s.throws || BP.player(pid).throws;
@@ -354,11 +347,11 @@ function matchupCard(g, L) {
       rec = s.starts === 0 ? 'no MLB start in the last three seasons' : s.starts + ' MLB start' + (s.starts === 1 ? '' : 's') + ' this season and the last three';
       if (s.last) rec += ' · last ' + BP.fmtDate(s.last, { year: false }) + (isNum(s.days_since) ? ' (' + s.days_since + ' days ago)' : '');
     }
-    const proj = [isNum(p.ip) ? BP.num(p.ip, 1) + ' IP' : '', isNum(p.k) ? BP.num(p.k, 1) + ' K' : '', isNum(p.er) ? BP.num(p.er, 1) + ' ER' : '',
-      isNum(p.pitches) ? p.pitches + ' pitches' : '', isNum(p.stuff) ? 'Stuff+ ' + Math.round(p.stuff) : ''].filter(Boolean).join(' · ');
-    return '<div class="kpi"><div class="kpi-label">' + esc(tm) + (started ? ' starter' : ' probable') + (hand ? ' · ' + esc(hand) + 'HP' : '') + '</div>' +
-      '<div class="kpi-value">' + BP.playerLink(pid, { role: 'pitcher', level: L }) + (fl ? ' ' + BP.chip(fl[0], fl[1]) : '') + '</div>' +
-      (proj ? '<div class="kpi-sub">Model: ' + proj + '</div>' : '') + (rec ? '<div class="kpi-sub">' + esc(rec) + '</div>' : '') + '</div>';
+    const proj = [isNum(p.ip) ? '<span><b>' + BP.num(p.ip, 1) + '</b> IP</span>' : '', isNum(p.k) ? '<span><b>' + BP.num(p.k, 1) + '</b> K</span>' : '', isNum(p.er) ? '<span><b>' + BP.num(p.er, 1) + '</b> ER</span>' : '',
+      isNum(p.pitches) ? '<span><b>' + p.pitches + '</b> pitches</span>' : '', isNum(p.stuff) ? '<span>Stuff+ <b>' + Math.round(p.stuff) + '</b></span>' : ''].filter(Boolean).join('');
+    return '<div class="bp-spc" style="--tc:' + esc(BP.ui.tcol(g[side])) + '"><div class="k">' + esc(tm) + (started ? ' starter' : ' probable') + (hand ? ' · ' + esc(hand) + 'HP' : '') + '</div>' +
+      '<div class="nm">' + BP.playerLink(pid, { role: 'pitcher', level: L }) + (fl ? ' ' + QK.tag(fl[0]) : '') + '</div>' +
+      (proj ? '<div class="proj"><span class="qk-kicker" style="margin:0">Our projection</span>' + proj + '</div>' : '') + (rec ? '<div class="rec">' + esc(rec) + '</div>' : '') + '</div>';
   };
   const log = Array.isArray(pre.probables_log) ? pre.probables_log : [];
   let note = '';
@@ -368,14 +361,14 @@ function matchupCard(g, L) {
       const who = [];
       if (log[i][2] !== log[i - 1][2]) who.push(BP.teamAbbr(g.away) + ' ' + BP.playerName(log[i][2]));
       if (log[i][1] !== log[i - 1][1]) who.push(BP.teamAbbr(g.home) + ' ' + BP.playerName(log[i][1]));
-      changes.push(BP.fmtStamp(log[i][0]) + ' (' + who.join(', ') + ')');
+      if (who.length) changes.push(BP.fmtStamp(log[i][0]) + ' (' + who.join(', ') + ')');
     }
     note = 'Probables listed since ' + esc(BP.fmtStamp(log[0][0])) + (changes.length ? '; changed ' + esc(changes.join('; ')) : '') + '. ';
   }
   const flagged = ['home', 'away'].some(sd => (ss[sd] || {}).flag);
-  return '<div class="kpi-grid two pad">' + one('away') + one('home') + '</div>' +
-    '<div class="section-note">' + note + (flagged ? 'On average the closing line rates a starter on debut, in his first few starts or back after 60+ days below our simulation (by 0.03 to 0.07 on the log-odds scale, 2017-2026); the published model does not adjust for it. ' : '') +
-    'The simulation prices the listed probables; a scratch changes the price at the next hourly build.</div>';
+  return '<div class="bp-sp2">' + one('away') + one('home') + '</div>' +
+    '<div class="bp-note">' + note + (flagged ? 'Starters on debut, in their first few starts or back after 60+ days have done worse than our simulation expects (by 0.03 to 0.07 on the log-odds scale, measured against the closing line, 2017-2026); the published model does not adjust for it. ' : '') +
+    'Our forecast uses the listed probables; a scratch changes it at the next hourly build.</div>';
 }
 /* Lineup strength against the team's usual lineup (models/lineup_strength.py), in wOBA points. */
 function strengthNote(g, side) {
@@ -383,28 +376,28 @@ function strengthNote(g, side) {
   if (!s || !isNum(s.delta)) return '';
   const d = s.delta;
   const word = Math.abs(d) < 0.002 ? 'about its usual strength' : (d > 0 ? 'stronger than usual' : 'weaker than usual');
-  return '<div class="section-note">Lineup strength ' + BP.fmtAvg(s.strength) + ' against a usual ' + BP.fmtAvg(s.typical) + ' (its last 15 lineups): ' +
-    (d >= 0 ? '+' : '−') + BP.fmtAvg(Math.abs(d)) + ' wOBA, ' + word + '.</div>';
+  return '<div class="bp-lu-meta"><span>Lineup strength <b>' + BP.fmtAvg(s.strength) + '</b></span><span>usual <b>' + BP.fmtAvg(s.typical) + '</b> (last 15 lineups)</span>' +
+    QK.tag((d >= 0 ? '+' : '−') + BP.fmtAvg(Math.abs(d)) + ' wOBA · ' + word, Math.abs(d) < 0.002 ? '' : 'signal') + '</div>';
 }
-/* The model's lineup adjustment: the simulation's average response to the two lineups, on the home side's win probability. */
+/* Our lineup adjustment: the simulation's average response to the two lineups, on the home side's win chance. */
 function lineupNote(g) {
   const pre = preOf(g);
   const s = pre.strength || {};
   if (!isNum(s.effect_home)) return '';
   const H = BP.teamAbbr(g.home);
   const e = s.effect_home * 100;
-  const body = Math.abs(e) < 0.05 ? 'Both lineups are about as strong as usual: no material effect on the price.' :
-    'Against each team’s usual lineup, today’s lineups move ' + esc(H) + '’s win probability by about ' + (e > 0 ? '+' : '−') + BP.num(Math.abs(e), 1) +
-    ' pts in the simulation (its average response; the closing line moves about two thirds as much).';
-  return BP.card('Lineup adjustment', 'posted (or projected) lineups against the usual ones', '<div class="section-note">' + body + ' The model prices the ' +
-    (pre.projected ? 'projected' : 'posted') + ' lineups directly; it adds no separate lineup term.</div>');
+  const body = Math.abs(e) < 0.05 ? 'Both lineups are about as strong as usual: no material effect on our forecast.' :
+    'Against each team’s usual lineup, today’s lineups move ' + esc(H) + '’s win chance by about ' + (e > 0 ? '+' : '−') + BP.num(Math.abs(e), 1) +
+    ' points in our simulation (its average response; the closing line moves about two thirds as much).';
+  return BP.ui.card2('Lineup adjustment', 'posted (or projected) lineups against the usual ones', '<div class="bp-adj"><span class="big">' + (Math.abs(e) < 0.05 ? '±0.0' : (e > 0 ? '+' : '−') + BP.num(Math.abs(e), 1)) + '</span><span class="qk-kicker" style="margin:0">points on ' + esc(H) + '’s win chance</span></div>' +
+    '<div class="bp-note">' + body + ' Our forecast uses the ' + (pre.projected ? 'projected' : 'posted') + ' lineups directly; it adds no separate lineup term.</div>');
 }
 function lineupSub(g, side) {
   const pre = preOf(g);
   const src = (pre.sources || {})[side];
   const proj = src ? src === 'projected' : pre.projected;
   const at = (pre.lineups_at || {})[String(g[side])];
-  return proj ? 'projected lineup (not posted yet)' : 'posted lineup' + (at ? ' · seen ' + BP.fmtStamp(at) : '');
+  return proj ? 'Projected lineup (not posted yet)' : 'Posted lineup' + (at ? ' · first seen ' + BP.fmtStamp(at) : '');
 }
 function contextCard(g, L) {
   const w = g.weather || {}, pk = g._park || {}, u = g._ump || {};
@@ -427,23 +420,41 @@ function contextCard(g, L) {
       kv('Accuracy', isNum(u.accuracy) ? BP.pct(u.accuracy, 1) + (isNum(u.x_accuracy) ? ' <span class="muted-inline">v ' + BP.pct(u.x_accuracy, 1) + ' expected</span>' : '') : '—') +
       kv('Run impact / game', isNum(u.run_impact_pg) ? BP.num(u.run_impact_pg, 2) : '—') + (u.zone ? kv('Zone', esc(u.zone)) : '') + (isNum(u.games) ? kv('Games', u.games) : '') + '</div></div>';
 }
-function previewPanel(el, g, L) {
+/* Tale of the tape from the season ratings and standings (season.json). */
+function tape(g, season) {
+  if (!season) return '';
+  const rows = BP.standingsRows ? BP.standingsRows(season) : {};
+  const a = rows[String(g.away)] || {}, h = rows[String(g.home)] || {};
+  const ra = a.rating || {}, rh = h.rating || {};
+  const pg = (r, k) => (isNum(r[k]) && (r.w || 0) + (r.l || 0) > 0 ? r[k] / ((r.w || 0) + (r.l || 0)) : null);
+  const list = [
+    { label: 'Team rating (runs a game)', a: ra.net, b: rh.net, fmt: v => BP.ui.signed(v, 2), tip: 'Our rating: runs a game better than an average club' },
+    { label: 'Offence (runs a game)', a: ra.off, b: rh.off, fmt: v => BP.ui.signed(v, 2) },
+    { label: 'Pitching (runs a game)', a: ra.pitch, b: rh.pitch, fmt: v => BP.ui.signed(v, 2) },
+    { label: 'Defence (runs a game)', a: ra.def, b: rh.def, fmt: v => BP.ui.signed(v, 2) },
+    { label: 'Runs scored a game', a: pg(a, 'rs'), b: pg(h, 'rs'), fmt: v => BP.num(v, 2) },
+    { label: 'Runs allowed a game', a: pg(a, 'ra'), b: pg(h, 'ra'), fmt: v => BP.num(v, 2), better: 'low' }
+  ];
+  if (!list.some(r => isNum(r.a) && isNum(r.b))) return '';
+  const pair = BP.ui.pair(g.away, g.home);
+  const A = BP.ui.team(g.away), H = BP.ui.team(g.home); A.colour = pair[0]; H.colour = pair[1];
+  return QK.matchupBar({ left: A, right: H, rows: list, colors: pair });
+}
+function previewPanel(el, g, L, season) {
   const pre = preOf(g);
   const m = pre.model || {};
-  el.innerHTML = '<div class="grid-32">' +
-    BP.card('Model v market v line', 'win · run line · total · first five', priceTable(g)) +
-    BP.card('Total runs', 'model distribution · dashed: the line', '<div id="gm-tot" class="chart-box"></div>' +
-      (isNum((m.runs || {}).home) ? '<div class="section-note">Expected runs: ' + esc(BP.teamAbbr(g.away)) + ' ' + BP.num(m.runs.away, 2) + ', ' + esc(BP.teamAbbr(g.home)) + ' ' + BP.num(m.runs.home, 2) +
-        (isNum(m.extra_innings) ? ' · extra innings ' + BP.pct(m.extra_innings, 0) : '') + '</div>' : '')) + '</div>' +
-    BP.card('Probable pitchers', BP.teamAbbr(g.away) + ' v ' + BP.teamAbbr(g.home) + ' · the matchup the model prices', matchupCard(g, L)) +
-    '<div class="grid-2">' +
-      BP.card(BP.teamName(g.away), lineupSub(g, 'away'), lineupTable((pre.lineups || {}).away, L, 'away', g) + strengthNote(g, 'away')) +
-      BP.card(BP.teamName(g.home), lineupSub(g, 'home'), lineupTable((pre.lineups || {}).home, L, 'home', g) + strengthNote(g, 'home')) + '</div>' + lineupNote(g) +
-    BP.card('Weather, park and umpire', 'the context the model prices in', contextCard(g, L));
-  const ln = pre.line || {};
-  const dk = ln.close || ln;
-  const tl = dk.total && typeof dk.total === 'object' ? dk.total.line : dk.total;
-  if (Array.isArray(m.total_dist)) CH().distBars('gm-tot', m.total_dist, { line: tl, exp: (m.runs || {}).total, xTitle: 'Total runs', height: 240, split: isNum(tl) ? tl : undefined, colour: BP.C.clay });
+  const tp = tape(g, season);
+  el.innerHTML = '<div class="qk-grid"><div class="qk-span-7">' + BP.ui.card2('Our forecast', 'the questions our simulation answers', forecastTable(g)) + '</div>' +
+    '<div class="qk-span-5">' + BP.ui.card2('Total runs', 'our distribution of the total; the dashed line is the expected total', '<div id="gm-tot" class="chart-box"></div>' +
+      (isNum((m.runs || {}).home) ? '<div class="bp-note">Expected runs: ' + esc(BP.teamAbbr(g.away)) + ' ' + BP.num(m.runs.away, 2) + ', ' + esc(BP.teamAbbr(g.home)) + ' ' + BP.num(m.runs.home, 2) +
+        (isNum(m.extra_innings) ? ' · extra innings ' + BP.pct(m.extra_innings, 0) : '') + '</div>' : '')) + '</div></div>' +
+    '<div class="bp-stack" style="margin-top:var(--sp-4)">' +
+    BP.ui.card2('Probable pitchers', esc(BP.teamAbbr(g.away)) + ' v ' + esc(BP.teamAbbr(g.home)) + ' · the matchup our forecast uses', matchupCard(g, L)) +
+    '<div class="qk-grid"><div class="qk-span-6">' + BP.ui.card2(BP.teamName(g.away), lineupSub(g, 'away'), strengthNote(g, 'away') + lineupTable((pre.lineups || {}).away, L, 'away', g), { flush: false }) + '</div>' +
+      '<div class="qk-span-6">' + BP.ui.card2(BP.teamName(g.home), lineupSub(g, 'home'), strengthNote(g, 'home') + lineupTable((pre.lineups || {}).home, L, 'home', g)) + '</div></div>' + lineupNote(g) +
+    (tp ? BP.ui.card2('Tale of the tape', 'the two clubs this season, from our ratings; the better side is solid', tp) : '') +
+    BP.ui.card2('Weather, park and umpire', 'the context our simulation takes in', contextCard(g, L)) + '</div>';
+  if (Array.isArray(m.total_dist)) CH().distBars('gm-tot', m.total_dist, { exp: (m.runs || {}).total, xTitle: 'Total runs', height: 240, colour: BP.C.model });
   else document.getElementById('gm-tot').innerHTML = BP.muted('No total distribution yet.');
   BP.sortable(el);
 }
@@ -460,8 +471,8 @@ function gamePanel(el, g, P, L) {
         '<span class="wpa-d">' + esc(t.desc || '') + '</span><span class="wpa-v ' + ((t.wpa || 0) > 0 ? 'edge-pos' : 'edge-neg') + '" title="Home win probability added">' + BP.signed((t.wpa || 0) * 100, 1) + '</span></div>').join('') +
         '<div class="section-note">Win probability added for ' + esc(BP.teamName(g.home)) + ', in points.</div></div>' : '')) +
     '<div class="grid-23">' + BP.card('Spray chart', 'colour: expected wOBA on contact · filled: hits', '<div class="toggle-row" id="sp-ctl"></div><div id="gm-spray" class="chart-box"></div>') +
-      BP.card('Batted balls', 'xwOBA+ (our model: launch, hang time, park and sprint speed) v Savant xwOBA', '<div id="gm-bb"></div>') + '</div>';
-  CH().wpChart('gm-wp', wp.ours || [], { espn: wp.espn, top: top, home: g.home, away: g.away, height: 330, market: isNum((preOf(g).market || {}).p_home) ? preOf(g).market.p_home : undefined });
+      BP.card('Batted balls', 'xwOBA+ (our model: launch, hang time, park and sprint speed) beside Savant xwOBA', '<div id="gm-bb"></div>') + '</div>';
+  CH().wpChart('gm-wp', wp.ours || [], { espn: wp.espn, top: top, home: g.home, away: g.away, height: 330 });
   let team = 'all', metric = 'xwoba_plus';
   const draw = () => {
     const list = team === 'all' ? balls : balls.filter(b => battingTeam(g, b.half) === team);
@@ -624,7 +635,7 @@ function umpirePanel(el, g, P, L) {
   el.innerHTML = BP.card('Umpire scorecard', (ump.id || ump.name ? BP.umpireLink(ump.id, ump.name) + ' · ' : '') + 'called pitches against the rulebook zone', tiles +
       '<div class="grid-23 pad0"><div><div id="gm-uz" class="chart-box"></div><div class="chart-note">Every called pitch, catcher\'s view; ringed: missed calls.</div></div><div>' +
       (mrows.length ? BP.tableHTML([{ label: 'Inn' }, { label: 'Matchup', cls: 'hide-sm' }, { label: 'Count' }, { label: 'Call' }, { label: 'Miss by', cls: 'hide-sm' }, { label: 'Runs', align: 'right', title: 'Run-expectancy cost of the missed call' }, { label: 'Helped' }], mrows, { compact: true }) : BP.muted(missed ? 'No missed calls recorded.' : 'The scorecard arrives after the game.')) +
-      '</div></div><div class="section-note">A call is missed when the ball\'s edge is wholly outside the zone on a called strike, or touches it on a ball (zone from each batter\'s Statcast top and bottom). Run cost is the run-expectancy swing between the call made and the right call.</div>') +
+      '</div></div><div class="section-note">A call is missed when the whole ball is outside the zone on a called strike, or touches it on a ball (zone from each batter\'s Statcast top and bottom). Run cost is the run-expectancy swing between the call made and the right call.</div>') +
     BP.card('ABS challenges', 'the automated ball-strike challenge system (2026)', '<div class="abs-sum">' + absSum + '</div>' +
       (chRows.length ? '<div class="grid-23 pad0"><div id="gm-abs" class="chart-box"></div><div>' + BP.tableHTML([{ label: 'Inn' }, { label: 'Team' }, { label: 'By' }, { label: 'Count', cls: 'hide-sm' }, { label: 'Call' }, { label: 'Result' }, { label: 'Runs', align: 'right', title: 'Run expectancy gained by the challenging team' }], chRows, { compact: true }) + '</div></div>'
         : BP.muted('No challenges in this game.')));
@@ -689,8 +700,12 @@ function arsenalPanel(el, g, P, L) {
 
 function render(el, params) {
   const L = params.level, S = params.season, gpk = params.id;
-  el.innerHTML = '<div class="muted">Loading the game…</div>';
-  return BP.loadGame(gpk, L, S).then(d => {
+  el.innerHTML = QK.skeleton('card', 2);
+  let season = null;
+  return Promise.all([BP.loadGame(gpk, L, S), BP.loadYear('season.json', L, S)]).then(res0 => {
+    const d = res0[0];
+    season = BP.ok(res0[1]) ? res0[1] : null;
+    if (season) BP.setRecords(BP.ui.records(season));
     if (!el.isConnected) return null;
     if (BP.ok(d)) return { g: d, full: true };
     return findCard(L, S, gpk).then(c => ({ g: c, full: false, raw: d }));
@@ -707,7 +722,7 @@ function render(el, params) {
     const tabs = [];
     if (res.full || g.model) tabs.push({ key: 'preview', label: 'Preview' });
     if (started && res.full) {
-      tabs.push({ key: 'game', label: 'Win probability · spray' });
+      tabs.push({ key: 'game', label: 'Win chance · spray' });
       tabs.push({ key: 'pitches', label: 'Pitch by pitch' });
       tabs.push({ key: 'box', label: 'Box score' });
       tabs.push({ key: 'umpire', label: 'Umpire · ABS' });
@@ -717,8 +732,8 @@ function render(el, params) {
     if (params.query && params.query.tab && tabs.some(t => t.key === params.query.tab)) tab = params.query.tab;
     el.innerHTML = '<div class="ph-nav gm-nav"><a href="' + BP.href('games/' + g.date, L, S) + '">‹ ' + esc(BP.fmtDate(g.date, { year: false })) + ' games</a>' +
       (g.series ? '<a href="' + BP.ghref('postseason') + '">Postseason</a>' : '<a href="' + BP.href('standings', L, S) + '">Standings</a>') + '</div>' +
-      header(g, L, S) +
-      (tabs.length > 1 ? '<div class="seg-tabs" id="gm-tabs">' + tabs.map(t => '<a href="javascript:void(0)" data-tab="' + t.key + '"' + (t.key === tab ? ' class="active"' : '') + '>' + esc(t.label) + '</a>').join('') + '</div>' : '') +
+      header(g, L, S) + '<div style="margin-top:var(--sp-5)"></div>' + kpiStrip(g) +
+      (tabs.length > 1 ? '<nav class="qk-tabs bp-tabs2" id="gm-tabs" aria-label="Game views">' + tabs.map(t => '<a class="qk-tab" href="javascript:void(0)" data-tab="' + t.key + '" aria-selected="' + (t.key === tab ? 'true' : 'false') + '">' + esc(t.label) + '</a>').join('') + '</nav>' : '') +
       '<div id="gm-panel"></div>' + (res.full ? '' : '<div class="section-note">' + (Number(S || BP.currentSeason(L)) < Number(BP.currentSeason(L)) ?
         'Pitch-by-pitch game centres are kept on the site for the current season only; this is the schedule card. Stats, tables and careers for the season are complete.' :
         'The full game centre for this game is not built yet; this is the schedule card.') + '</div>');
@@ -729,7 +744,7 @@ function render(el, params) {
       const box = document.createElement('div');
       panel.appendChild(box);
       if (k === 'preview') {
-        if (res.full) previewPanel(box, g, L);
+        if (res.full) previewPanel(box, g, L, season);
         else box.innerHTML = '<div class="pad0">' + BP.gameCard(g, { level: L, season: S }) + '</div>';
       } else if (k === 'game') gamePanel(box, g, P, L);
       else if (k === 'pitches') pitchesPanel(box, g, P, L);
@@ -739,7 +754,7 @@ function render(el, params) {
     };
     document.querySelectorAll('#gm-tabs a[data-tab]').forEach(a => a.addEventListener('click', ev => {
       ev.preventDefault();
-      document.querySelectorAll('#gm-tabs a').forEach(x => x.classList.toggle('active', x === a));
+      document.querySelectorAll('#gm-tabs a').forEach(x => x.setAttribute('aria-selected', x === a ? 'true' : 'false'));
       show(a.dataset.tab);
     }));
     show(tab);

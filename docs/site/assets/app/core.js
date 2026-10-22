@@ -4,13 +4,13 @@
  * nullish coalescing (checked with esprima before shipping).
  *
  * Routes (hash). The section lit in the nav is in brackets.
- *   #/                                          overview: today, live, model v market, title races  [overview]
+ *   #/                                          overview: today, live, our forecasts, title races    [overview]
  *   #/matches[?d=YYYY-MM-DD&c=<slug>&f=…]        every competition's matches by day                    [fixtures]
  *   #/match/<slug>/<id>                          the match centre                                      [fixtures]
  *   #/competitions[?f=<family>]                  every competition, by family                          [standings]
  *   #/competition/<slug>[/<tab>][?s=<sid>&view=…] one competition: overview, table, fixtures, bracket,
  *                                                odds, power, players, analytics, clubs, seasons       [standings]
- *   #/clubs[/<tab>]                              clubs on one scale, national teams, the match pricer   [teams]
+ *   #/clubs[/<tab>]                              clubs on one scale, national teams, "If they met"     [teams]
  *   #/club/<tid>[?c=<slug>&e=<era>&tab=…]        ONE club page across every competition                [teams]
  *   #/players[/<tab>]                            search, leaders across competitions                   [players]
  *   #/player/<pid>[?c=<slug>&scope=club|intl&e=<era>&tab=…]  ONE player page across every competition [players]
@@ -380,6 +380,189 @@ function peopleIndex() {
 /* The person id of a player id (a merged duplicate id -> the person's). */
 function personId(pid) { var a = PEOPLE ? PEOPLE.aliases[String(pid)] : null; return a ? String(a) : String(pid); }
 
+// ── comparison metric sets and peer groups (METRICS_SPEC; STYLE_GUIDE 9) ───────────────────────
+
+/* generated from docs/_design/metrics/football.json (schema 1, 2026-10-22; committed with docs/METRICS_SPEC.md in 5fdf8870,
+   and shipped as assets/qk/metrics/football.json) by the phase-2 front-end pass. groups[]: peer group (formation role), minimum minutes, the minutes under
+   which the sample is flagged small, and its metrics as [id, m50] (m50: minutes where the metric is half signal;
+   null: not measured, see `early` below). metrics{}: display name, unit, lower-is-better, the spec's explanation. */
+var MSET = {
+  groups: [
+    {"id": "cb", "name": "centre-backs", "short": "CBs", "codes": ["CB"], "min": 450, "small": 900, "headline": [["gar90", 660], ["rating", 1190], ["aerials_won_90", 650], ["aerial_pct", 2130], ["padj_tkl_int_90", 710], ["opp_half_passes_90", 310], ["pass_pct", 240], ["long_ball_pct", 1130]], "more": [["duels_won_90", 670], ["duel_pct", 2320], ["recoveries_90", 810], ["interceptions_90", 1310], ["clearances_90", 650], ["blocks_90", 2000], ["long_balls_90", 360], ["prog_carries_90", 1000], ["loss_per_100", 220], ["shot_creation_90", 1030], ["npxg_xa_90", 2510]]},
+    {"id": "fb", "name": "full-backs and wing-backs", "short": "full-backs", "codes": ["FB"], "min": 450, "small": 900, "headline": [["gar90", 520], ["rating", 1480], ["npxg_xa_90", 610], ["key_passes_90", 620], ["crosses_90", 410], ["prog_actions_90", 290], ["opp_half_passes_90", 250], ["padj_tkl_int_90", 710], ["recoveries_90", 820]], "more": [["xa_90", 750], ["shot_creation_90", 440], ["dribbles_90", 480], ["prog_carries_90", 560], ["pass_pct", 310], ["duels_won_90", 450], ["duel_pct", 2210], ["aerials_won_90", 430], ["interceptions_90", 1520], ["loss_per_100", 180], ["hsr_km_90", 400]]},
+    {"id": "dm_cm", "name": "defensive and central midfielders", "short": "DMs and CMs", "codes": ["DM", "CM"], "min": 450, "small": 900, "headline": [["gar90", 460], ["rating", 650], ["opp_half_passes_90", 240], ["long_balls_90", 270], ["npxg_xa_90", 450], ["key_passes_90", 430], ["prog_actions_90", 380], ["padj_tkl_int_90", 520], ["recoveries_90", 750]], "more": [["xa_90", 490], ["shot_creation_90", 320], ["passes_90", 140], ["pass_pct", 270], ["loss_per_100", 180], ["carries_90", 320], ["ball_wins_90", 620], ["interceptions_90", 970], ["duels_won_90", 480], ["duel_pct", 1440], ["aerials_won_90", 380], ["dribbles_90", 630]]},
+    {"id": "am_w", "name": "attacking midfielders and wingers", "short": "AMs and wingers", "codes": ["AM", "W"], "min": 450, "small": 900, "headline": [["npxg_xa_90", 850], ["gar90", 520], ["rating", 800], ["npxg_90", 1080], ["xa_90", 700], ["shot_creation_90", 530], ["dribbles_90", 400], ["opp_half_passes_90", 130]], "more": [["key_passes_90", 550], ["big_chances_90", 2110], ["shots_90", 580], ["ga_90", 2200], ["prog_actions_90", 240], ["crosses_90", 320], ["dribble_pct", 5500], ["touches_90", 120], ["recoveries_90", 910], ["padj_tkl_int_90", 540], ["loss_per_100", 230], ["finishing", 17630]]},
+    {"id": "st", "name": "strikers", "short": "strikers", "codes": ["ST"], "min": 450, "small": 900, "headline": [["npxg_xa_90", 1110], ["ga_90", 1570], ["sot_90", 1160], ["shot_creation_90", 650], ["xa_90", 830], ["xg_per_shot", 1620], ["gar90", 690], ["rating", 960]], "more": [["npxg_90", 1150], ["xgot_90", 1270], ["goals_90", 1810], ["shots_90", 790], ["big_chances_90", 2320], ["key_passes_90", 730], ["aerials_won_90", 170], ["aerial_pct", 1570], ["duels_won_90", 260], ["fouled_90", 510], ["touches_90", 120], ["finishing", null], ["g_minus_xg", 10670]]},
+    {"id": "gk", "name": "goalkeepers", "short": "goalkeepers", "codes": ["GK"], "min": 900, "small": 1800, "headline": [["goals_prevented_90", null], ["save_pct", null], ["high_claims_90", 1570], ["sweeper_90", 1330], ["pass_pct", 320], ["long_ball_pct", 940], ["passes_90", 260], ["gar90", 8690]], "more": [["saves_90", 2380], ["conceded_90", 2720], ["long_balls_90", 430], ["rating", 14820]]}
+  ],
+  metrics: {
+    "gar90": {"label": "Value added (GAR/90)", "unit": "goals per 90", "lower": false, "tip": "Goals of expected goal difference a player adds per 90 minutes over a replacement-level player in his role, from the site's player value model (box score plus match rating)."},
+    "rating": {"label": "Match rating", "unit": "rating", "lower": false, "tip": "Sofascore's 1-10 match rating, averaged over his matches and weighted by minutes."},
+    "aerials_won_90": {"label": "Aerial duels won", "unit": "per 90", "lower": false, "tip": "Headers won against an opponent per 90."},
+    "aerial_pct": {"label": "Aerial duel success", "unit": "%", "lower": false, "tip": "Share of his aerial duels that he wins."},
+    "padj_tkl_int_90": {"label": "Tackles + interceptions (possession-adjusted)", "unit": "per 90", "lower": false, "tip": "Tackles plus interceptions per 90, scaled up for players whose team has the ball a lot (fewer chances to defend) and down for those who defend all game."},
+    "opp_half_passes_90": {"label": "Passes in the opposition half", "unit": "per 90", "lower": false, "tip": "Completed passes in the opponent's half per 90: how much of his team's play in the attacking half goes through him."},
+    "pass_pct": {"label": "Pass completion", "unit": "%", "lower": false, "tip": "Share of his passes that find a team-mate. It also reflects how risky his passes are."},
+    "long_ball_pct": {"label": "Long-ball accuracy", "unit": "%", "lower": false, "tip": "Share of his long passes that find a team-mate."},
+    "duels_won_90": {"label": "Duels won", "unit": "per 90", "lower": false, "tip": "Ground and aerial duels won per 90."},
+    "duel_pct": {"label": "Duel success", "unit": "%", "lower": false, "tip": "Share of his ground and aerial duels that he wins."},
+    "recoveries_90": {"label": "Ball recoveries", "unit": "per 90", "lower": false, "tip": "Loose balls he wins back for his team, per 90."},
+    "interceptions_90": {"label": "Interceptions", "unit": "per 90", "lower": false, "tip": "Opponent passes cut out per 90."},
+    "clearances_90": {"label": "Clearances", "unit": "per 90", "lower": false, "tip": "Clearances per 90. Mostly says how much his team is under pressure, not how good he is."},
+    "blocks_90": {"label": "Blocks", "unit": "per 90", "lower": false, "tip": "Shots and passes blocked per 90. Mostly a sign of how much his team defends."},
+    "long_balls_90": {"label": "Accurate long balls", "unit": "per 90", "lower": false, "tip": "Long passes that find a team-mate, per 90."},
+    "prog_carries_90": {"label": "Progressive carries", "unit": "per 90", "lower": false, "tip": "Carries that move the ball well upfield, per 90."},
+    "loss_per_100": {"label": "Possession lost per 100 touches", "unit": "per 100 touches", "lower": true, "tip": "How often he gives the ball away for every 100 touches: ball security, whatever his volume."},
+    "shot_creation_90": {"label": "Shots + key passes", "unit": "per 90", "lower": false, "tip": "Shots taken plus passes that led to a team-mate's shot, per 90: how often he ends or sets up an attack."},
+    "npxg_xa_90": {"label": "npxG + xA", "unit": "per 90", "lower": false, "tip": "Non-penalty expected goals plus expected assists per 90: the quality of the chances he takes and sets up."},
+    "key_passes_90": {"label": "Key passes", "unit": "per 90", "lower": false, "tip": "Passes that lead directly to a team-mate's shot, per 90."},
+    "crosses_90": {"label": "Accurate crosses", "unit": "per 90", "lower": false, "tip": "Crosses that reach a team-mate, per 90."},
+    "prog_actions_90": {"label": "Progressive carries + dribbles", "unit": "per 90", "lower": false, "tip": "Carries that move the ball well upfield plus successful take-ons, per 90: how much he moves the team forward with the ball at his feet."},
+    "xa_90": {"label": "Expected assists (xA)", "unit": "per 90", "lower": false, "tip": "The chance that each of his passes is turned into a goal, added up per 90: chances created, whatever the finish."},
+    "dribbles_90": {"label": "Dribbles completed", "unit": "per 90", "lower": false, "tip": "Successful take-ons per 90: beating a defender with the ball."},
+    "hsr_km_90": {"label": "High-speed running", "unit": "km per 90", "lower": false, "tip": "Distance covered at high speed and sprinting per 90 (not every league has tracking data)."},
+    "passes_90": {"label": "Passes", "unit": "per 90", "lower": false, "tip": "Passes attempted per 90."},
+    "carries_90": {"label": "Carries", "unit": "per 90", "lower": false, "tip": "Times he moves with the ball per 90."},
+    "ball_wins_90": {"label": "Ball wins", "unit": "per 90", "lower": false, "tip": "Tackles won, interceptions and recoveries per 90."},
+    "npxg_90": {"label": "Non-penalty xG", "unit": "per 90", "lower": false, "tip": "Expected goals from his own shots per 90, penalties left out: how good his chances are, and how many he gets."},
+    "big_chances_90": {"label": "Big chances created", "unit": "per 90", "lower": false, "tip": "Passes that set up a chance a player would be expected to score, per 90."},
+    "shots_90": {"label": "Shots", "unit": "per 90", "lower": false, "tip": "Shots of any kind per 90."},
+    "ga_90": {"label": "Goals + assists", "unit": "per 90", "lower": false, "tip": "Goals plus assists per 90 minutes, penalties included."},
+    "dribble_pct": {"label": "Dribble success", "unit": "%", "lower": false, "tip": "Share of his take-ons that succeed. Too noisy in one season to rank on."},
+    "touches_90": {"label": "Touches", "unit": "per 90", "lower": false, "tip": "Touches of the ball per 90: how involved he is."},
+    "finishing": {"label": "Finishing (npG - npxG per shot)", "unit": "goals per shot", "lower": false, "tip": "Non-penalty goals minus non-penalty xG, per shot. Fun to look at, but in one season it is almost all luck: it does not carry over to the next."},
+    "sot_90": {"label": "Shots on target", "unit": "per 90", "lower": false, "tip": "Shots that would have gone in without the goalkeeper, per 90."},
+    "xg_per_shot": {"label": "xG per shot", "unit": "xG", "lower": false, "tip": "The average quality of his shots: high means he shoots from good positions."},
+    "xgot_90": {"label": "xG on target (xGOT)", "unit": "per 90", "lower": false, "tip": "Expected goals of his shots on target, judged after the shot from where it was placed, per 90."},
+    "goals_90": {"label": "Goals", "unit": "per 90", "lower": false, "tip": "Goals per 90, penalties included."},
+    "fouled_90": {"label": "Fouls won", "unit": "per 90", "lower": false, "tip": "Times he is fouled per 90."},
+    "g_minus_xg": {"label": "Goals - xG", "unit": "goals", "lower": false, "tip": "Goals minus expected goals. Mostly luck in one season."},
+    "goals_prevented_90": {"label": "Goals prevented", "unit": "per 90", "lower": false, "tip": "Expected goals on target faced minus goals conceded, per 90: shot-stopping above or below an average keeper. Takes several seasons to separate skill from luck."},
+    "save_pct": {"label": "Save percentage", "unit": "%", "lower": false, "tip": "Share of shots on target he saves. Depends on the shots he faces; noisy within a season."},
+    "high_claims_90": {"label": "High claims", "unit": "per 90", "lower": false, "tip": "Crosses and high balls caught or punched clear per 90: commanding the box."},
+    "sweeper_90": {"label": "Sweeper actions", "unit": "per 90", "lower": false, "tip": "Times he comes off his line to deal with a ball behind the defence, per 90."},
+    "saves_90": {"label": "Saves", "unit": "per 90", "lower": false, "tip": "Saves per 90. Mostly says how busy his defence leaves him."},
+    "conceded_90": {"label": "Goals conceded", "unit": "per 90", "lower": true, "tip": "Goals conceded per 90. Mostly about the team in front of him."}
+  },
+  generated: "2026-10-22"
+};
+var MSET_GROUP = {}, MSET_ROLE = {};
+MSET.groups.forEach(function (g) { MSET_GROUP[g.id] = g; g.codes.forEach(function (c) { MSET_ROLE[c] = g.id; }); });
+/* Composite attacking rates built from league-adjusted parts are adjusted too (the spec's evidence adjusts them). */
+var ADJ_EXTRA = ['npxg_xa_90', 'ga_90', 'shot_creation_90'];
+/* The peer group of a formation role (CB, FB, DM, CM, AM, W, ST, GK), or null: a coarse role (DF, MF, FW: substitute
+   appearances only) has no peer group and no percentile card (the spec). */
+function peerGroup(role) { var id = MSET_ROLE[String(role || '')]; return id ? MSET_GROUP[id] : null; }
+/* A group's metric ids: which 'headline' | 'more' | 'all'. */
+function groupKeys(g, which) {
+  if (!g) return [];
+  var a = which === 'more' ? g.more : which === 'all' ? g.headline.concat(g.more) : g.headline;
+  return a.map(function (x) { return x[0]; });
+}
+function metricInfo(key) { return MSET.metrics[key] || null; }
+/* Early (drawn dashed): his minutes are short of where the metric is half signal (m50); goalkeeper shot stopping,
+   which the spec could not measure, needs 1,800 minutes. */
+function isEarly(g, key, minutes) {
+  if (!g || !isNum(minutes)) return false;
+  var e = g.headline.concat(g.more).filter(function (x) { return x[0] === key; })[0];
+  var m50 = e ? e[1] : null;
+  if (!isNum(m50)) return g.id === 'gk' && minutes < 1800;
+  return minutes < m50;
+}
+/* "v CBs in the Premier League 26/27, 450+ min" */
+function peerLine(g, where, min) { return g ? 'v ' + g.short + (where ? ' in ' + where : '') + (isNum(min) ? ', ' + int(min) + '+ min' : '') : ''; }
+/* The minutes a percentile needs in a view: the group's minimum and the view's own floor. */
+function peerMin(g, floor) { return Math.max(g ? g.min : 450, isNum(floor) ? floor : 0); }
+/* Formation roles this season, by competition: value/lines.json (one row per player and competition, 90+ minutes),
+   read only when a percentile card needs it (about 0.66 MB compressed) until the role field reaches the lab and
+   players_live rows (payload change listed in docs/_design/metrics/football.json). { ok, line: {"id|comp": role},
+   best: {id: the role he played most minutes in}, gar: {"id|comp": gar90}, lines: {id: [[comp, min, gar]]} } */
+var ROLES = null, ROLES_P = null;
+function roles() {
+  if (ROLES) return Promise.resolve(ROLES);
+  if (ROLES_P) return ROLES_P;
+  ROLES_P = load('value/lines.json').then(function (d) {
+    var R = { ok: false, line: {}, best: {}, gar: {}, lines: {} };
+    if (d && d.fields) {
+      var I = {};
+      d.fields.forEach(function (f, i) { I[f] = i; });
+      var mins = {};
+      (d.rows || []).forEach(function (r) {
+        var id = String(r[I.id]), comp = r[I.comp], role = r[I.role], m = r[I.min] || 0, k = id + '|' + comp;
+        if (role) R.line[k] = role;
+        if (isNum(r[I.gar90])) R.gar[k] = r[I.gar90];
+        (R.lines[id] = R.lines[id] || []).push([comp, m, r[I.gar]]);
+        if (MSET_ROLE[role]) { var mm = mins[id] = mins[id] || {}; mm[role] = (mm[role] || 0) + m; }
+      });
+      Object.keys(mins).forEach(function (id) { var mm = mins[id]; R.best[id] = Object.keys(mm).sort(function (a, b) { return mm[b] - mm[a]; })[0]; });
+      R.ok = true;
+    }
+    ROLES = R;
+    return R;
+  });
+  return ROLES_P;
+}
+/* The roles source for a set of rows: when the rows carry `role` (players_live / lab rows, payload change in the
+   spec), no file is read; otherwise value/lines.json (roles()). */
+var ROWS_R = { ok: true, fromRows: true, line: {}, best: {}, gar: {}, lines: {} };
+function rolesFor(hasRoleField) { return hasRoleField ? Promise.resolve(ROWS_R) : roles(); }
+/* A row's role and value added per 90: its own fields when the payload has them, else the value/lines.json join. */
+function rowRole(R, rowRoleValue, id, comp) { return rowRoleValue !== undefined && rowRoleValue !== null && rowRoleValue !== '' ? rowRoleValue : roleOf(R, id, comp); }
+function rowGar(R, rowGarValue, id, comp) { return isNum(rowGarValue) ? rowGarValue : (R && R.gar ? R.gar[String(id) + '|' + comp] : null); }
+/* His role in one competition this season (else the role he played most this season). */
+function roleOf(R, id, comp) { if (!R) return null; var k = String(id); return (comp && R.line[k + '|' + comp]) || R.best[k] || null; }
+/* Value added per 90 this season over the competitions a test accepts (comp -> bool): summed GAR over summed minutes. */
+function garOver(R, id, test) {
+  var ls = (R && R.lines[String(id)]) || [], g = 0, m = 0;
+  ls.forEach(function (l) { if (isNum(l[2]) && (!test || test(l[0]))) { g += l[2]; m += l[1] || 0; } });
+  return m > 0 ? 90 * g / m : null;
+}
+/* Percentiles against the peer group. o: { rows, minutes(row), role(row) -> role code, val(row, key) -> number,
+   floor (the view's own floor) }. Returns { group(row), min(group), peers(group), pct(row) -> {key: 0-100} | null }:
+   null when he has no peer group or is under the minimum. Mid-rank percentiles, turned round where less is better. */
+function peerPct(o) {
+  var cache = {}, peerCache = {};
+  var grp = function (r) { return peerGroup(o.role(r)); };
+  var minOf = function (g) { return peerMin(g, o.floor); };
+  var peersOf = function (g) {
+    if (!peerCache[g.id]) peerCache[g.id] = o.rows.filter(function (r) { return grp(r) === g && (o.minutes(r) || 0) >= minOf(g); });
+    return peerCache[g.id];
+  };
+  var sorted = function (g, key) {
+    var k = g.id + '|' + key;
+    if (!cache[k]) cache[k] = peersOf(g).map(function (r) { return o.val(r, key); }).filter(isNum).sort(function (a, b) { return a - b; });
+    return cache[k];
+  };
+  return {
+    group: grp, min: minOf, peers: peersOf, values: sorted,
+    pct: function (r) {
+      var g = grp(r);
+      if (!g || (o.minutes(r) || 0) < minOf(g)) return null;
+      var out = {};
+      groupKeys(g, 'all').forEach(function (key) {
+        var v = o.val(r, key), vals = sorted(g, key);
+        if (!isNum(v) || vals.length < 5) return;
+        var lo = 0, hi = vals.length;
+        while (lo < hi) { var mid = (lo + hi) >> 1; if (vals[mid] < v) lo = mid + 1; else hi = mid; }
+        var up = lo; while (up < vals.length && vals[up] === v) up++;
+        var rank = (lo + 0.5 * (up - lo)) / vals.length;
+        out[key] = Math.round(100 * (((MSET.metrics[key] || {}).lower) ? 1 - rank : rank));
+      });
+      return out;
+    }
+  };
+}
+/* Format a metric for the comparison views: the competition catalogue's fmt when known, else by its unit. */
+function fmtSet(key, v, fmt) {
+  if (!isNum(v)) return '—';
+  if (key === 'gar90') return signed(v, 2);
+  if (fmt) return fmtMetric(v, fmt);
+  var u = (MSET.metrics[key] || {}).unit || '';
+  if (u === '%') return Number(v).toFixed(1) + '%';
+  if (u === 'rating') return Number(v).toFixed(2);
+  return Number(v).toFixed(2);
+}
+
 // ── one row per person: data/lab/ (UNIFIED_PAYLOADS 14) ─────────────────────
 
 var LABV = {};
@@ -664,34 +847,59 @@ function compLink(slug, opts) {
 
 /* A fixture (fixtures.json / hub.json / clubs matches) -> the kit's game shape for QK.matchCard and QK.tick.
  * f: {id, date, home, away, home_id, away_id, crests:[h, a], hs, as, status, model:{h,d,a}, xg, round, stage, detail}. */
+/* A cached snapshot can keep a match "live" long after it ended (MIGRATION_V2: the home page drops games still live
+   12 hours after kick-off): such a match is never shown as live. */
+function staleLive(f) {
+  var t = parseDate(f && f.date);
+  return !!t && (f.status === 'live' || f.status === 'inprogress') && Date.now() - t.getTime() > 12 * 3600e3;
+}
 function toGame(f, slug, extra) {
   var s = slug || f.comp;
   var hid = f.home_id || tidFromCrest(f.crests && f.crests[0]);
   var aid = f.away_id || tidFromCrest(f.crests && f.crests[1]);
-  var st = f.status === 'finished' ? 'final' : f.status === 'live' || f.status === 'inprogress' ? 'live' : 'pre';
+  var stale = staleLive(f);
+  var st = f.status === 'finished' || stale ? 'final' : f.status === 'live' || f.status === 'inprogress' ? 'live' : 'pre';
   var g = {
     sport: 'football', league: (extra && extra.league) || compName(s, true), id: f.id, start: f.date, status: st,
     home: { name: f.home, logo: hid ? crestUrl(hid) : null }, away: { name: f.away, logo: aid ? crestUrl(aid) : null },
-    hs: f.hs, as: f.as, note: roundText(f, s, true) + (f.result_missing ? ' · result not reported' : f.status === 'postponed' ? ' · postponed' : f.status === 'cancelled' ? ' · cancelled' : ''),
+    hs: f.hs, as: f.as, note: roundText(f, s, true) + (f.result_missing || (stale && !isNum(f.hs)) ? ' · result not reported' : f.status === 'postponed' ? ' · postponed' : f.status === 'cancelled' ? ' · cancelled' : ''),
     href: f.detail ? href.match(s, f.id) : (extra && extra.href) || href.match(s, f.id)
   };
-  if (f.model && st !== 'final') { g.p_home = f.model.h; g.p_draw = f.model.d; g.p_away = f.model.a; }
-  if (extra && isNum(extra.market_home)) g.market_home = extra.market_home;
+  /* our pre-match chance before kick-off and, after the whistle, as the card's "pre-game" line; never while live (it is not a live model) */
+  if (f.model && st !== 'live') { g.p_home = f.model.h; g.p_draw = f.model.d; g.p_away = f.model.a; }
+  if (extra && extra.home_form) g.home.form = extra.home_form;
+  if (extra && extra.away_form) g.away.form = extra.away_form;
+  if (extra && extra.home_record) g.home.record = extra.home_record;
+  if (extra && extra.away_record) g.away.record = extra.away_record;
   if (f.xg && st !== 'pre') g.xg = f.xg;
   return g;
 }
+/* A v2 game card (kit QK.gameCard): our chance per side before kick-off (the favourite in the signal colour), the
+   home / draw / away bar, the score and xG after it. The market is never on a card: it is a quiet reference on the
+   match page only. extra: {league, href, home_form, away_form ('WDLWW', oldest first), home_record, away_record}. */
 function matchCard(f, slug, extra) {
   var g = toGame(f, slug, extra);
-  var html = QK.matchCard(g, { sport: false });
-  if (f.status === 'postponed' || f.status === 'cancelled') html = html.replace('class="qk-match', 'class="qk-match fb-void');
+  var html = QK.gameCard(g, { sport: false, market: false });
+  if (f.status === 'postponed' || f.status === 'cancelled') html = html.replace('class="qk-gc', 'class="qk-gc fb-void');
   return html;
+}
+/* The match page's win-chance bar: our home / draw / away chance, away on the left as on the cards. m: {h, d, a}. */
+function wpBar(m, home, away, opts) {
+  if (!m || !isNum(m.h)) return '';
+  var o = opts || {};
+  return QK.wpBar(m.a, m.d, m.h, { name: away || 'Away' }, { name: home || 'Home' }, { size: o.size || 'lg', label: o.label || 'Our win chance' });
 }
 /* Home/draw/away bar with labels: model {h, d, a}. */
 function probBar3(m, opts) {
   if (!m || !isNum(m.h)) return '<span class="qk-muted">—</span>';
   var o = opts || {};
-  var seg = function (k, cls, lab) { return '<span class="' + cls + '" style="flex:' + Math.max(0.0001, m[k]) + '" title="' + lab + ' ' + pct(m[k]) + '">' + (m[k] >= 0.14 && !o.bare ? pct(m[k]) : '') + '</span>'; };
-  return '<span class="fb-p3' + (o.small ? ' sm' : '') + '" role="img" aria-label="Home ' + pct(m.h) + ', draw ' + pct(m.d) + ', away ' + pct(m.a) + '">' + seg('h', 'h', 'Home') + seg('d', 'd', 'Draw') + seg('a', 'a', 'Away') + '</span>';
+  var seg = function (k, cls, lab) { return '<span class="' + cls + '" style="flex:' + Math.max(0.0001, m[k]) + '" title="' + lab + ' ' + pct(m[k]) + '">' + (m[k] >= 0.14 && !o.bare && !o.small ? pct(m[k]) : '') + '</span>'; };
+  var bar = '<span class="fb-p3' + (o.small ? ' sm' : '') + '" role="img" aria-label="Our chance: home ' + pct(m.h) + ', draw ' + pct(m.d) + ', away ' + pct(m.a) + '">' + seg('h', 'h', 'Home') + seg('d', 'd', 'Draw') + seg('a', 'a', 'Away') + '</span>';
+  if (!o.small || o.bare) return bar;
+  /* the small bar is too thin to carry its numbers: they sit underneath, home / draw / away, the favourite in the signal colour */
+  var fav = m.h >= m.a && m.h >= m.d ? 'h' : m.a >= m.d ? 'a' : 'd';
+  var n = function (k) { return '<span' + (k === fav ? ' class="fav"' : '') + '>' + pct(m[k]) + '</span>'; };
+  return '<span class="fb-p3-w">' + bar + '<span class="fb-p3-n" aria-hidden="true">' + n('h') + n('d') + n('a') + '</span></span>';
 }
 function scoreText(f) {
   var done = f.status === 'finished' || f.status === 'live';
@@ -732,22 +940,37 @@ function card(title, sub, body, opts) {
 }
 function grid(html, cls) { return '<div class="qk-grid' + (cls ? ' ' + cls : '') + '">' + html + '</div>'; }
 function chartBox(id, h, label) { return '<div id="' + esc(id) + '" class="fb-chart" style="--h:' + (h || 300) + 'px"' + (label ? ' role="img" aria-label="' + esc(label) + '"' : '') + '></div>'; }
-/* A KPI tile; value is HTML. o: {sub (HTML), tip, text, cls, accent, spark (HTML)} */
+/* A v2 stat tile (kit QK.statTile); value and sub are HTML. o: {sub (HTML), tip, text (a word, not a number: set
+   automatically for long text), signal (ours: the number in the signal colour), pctl, href, unit, trend: [..],
+   delta, cls, spark (HTML, drawn under the sub-line)}. */
 function kpi(label, value, o) {
   o = o || {};
-  return QK.kpi({ label: label, value: value, sub: o.sub, html: true, cls: o.cls, accent: o.accent, tip: o.tip, text: o.text, spark: o.spark || undefined });
+  var plain = String(value === null || value === undefined ? '' : value).replace(/<[^>]*>/g, '').replace(/&[a-z#0-9]+;/gi, 'x');
+  var text = o.text !== undefined ? !!o.text : (plain.length > 9 && /[A-Za-z]{3}/.test(plain));
+  var sub = o.sub === undefined || o.sub === null ? '' : String(o.sub);
+  return QK.statTile({ label: label, value: value, sub: sub + (o.spark ? '<span class="fb-stat-spark">' + o.spark + '</span>' : ''), html: true, cls: o.cls, tip: o.tip, text: text,
+    signal: !!o.signal, pctl: isNum(o.pctl) ? o.pctl : null, href: o.href || null, unit: o.unit, trend: o.trend, delta: o.delta, deltaFmt: o.deltaFmt });
 }
-function kpis(list, cls) { return '<div class="qk-kpis fb-kpis' + (cls ? ' ' + cls : '') + '">' + list.join('') + '</div>'; }
+function kpis(list, cls) { return '<div class="qk-stats fb-kpis' + (cls ? ' ' + cls : '') + '">' + list.join('') + '</div>'; }
 function badge(text, kind, tip) { return '<span class="qk-badge' + (kind ? ' ' + kind : '') + '"' + (tip ? ' data-tip="' + esc(tip) + '"' : '') + '>' + esc(text) + '</span>'; }
 function muted(text) { return '<p class="fb-muted">' + text + '</p>'; }
 function empty(title, text) { return QK.empty(title, text); }
 function note(html) { return '<div class="qk-note fb-note"><div>' + html + '</div></div>'; }
 function loading(kind, n) { return QK.skeleton(kind || 'lines', n || 4); }
-/* Page head: kicker (HTML), title, sub line (HTML), right-hand HTML. */
+/* Page head (Design System 2.0 large section head, the page's h1): kicker (HTML), title, sub line (HTML),
+   right-hand actions (HTML). */
 function pageHead(kicker, title, sub, right) {
-  return '<header class="fb-head"><div class="fb-head-l">' + (kicker ? '<div class="qk-kicker">' + kicker + '</div>' : '') + '<h1>' + esc(title) + '</h1>' + (sub ? '<p class="qk-sub">' + sub + '</p>' : '') + '</div>' +
-    (right ? '<div class="fb-head-r">' + right + '</div>' : '') + '</header>';
+  return '<header class="qk-sh lg fb-head"><div class="qk-sh-main">' + (kicker ? '<div class="qk-sh-kicker">' + kicker + '</div>' : '') +
+    '<h1 class="qk-sh-title">' + esc(title) + '</h1>' + (sub ? '<p class="qk-sh-sub">' + sub + '</p>' : '') + '</div>' +
+    (right ? '<div class="qk-sh-actions">' + right + '</div>' : '') + '</header>';
 }
+/* A section head inside a page (v2): title, sub (HTML), actions (HTML), kicker (text). */
+function secHead(title, sub, actions, kicker, id) {
+  return QK.sectionHead({ kicker: kicker || '', title: title, sub: sub || '', actions: actions || '', html: true, id: id });
+}
+/* Our chances as 538-style bars (kit QK.chances): rows [{label, p, href, sub, mark, color}], opts {limit, max, oursName}.
+   Football has no club colours in its payloads, so the bars are the signal colour. */
+function chances(rows, opts) { return QK.chances(rows, opts || {}); }
 /* Link tabs inside a page: items [[href, label, key, count?]], the active key. */
 function subnav(items, active, label) {
   return '<nav class="fb-subnav" aria-label="' + esc(label || 'Views') + '"><div class="qk-tabs" role="tablist">' + items.map(function (i) {
@@ -857,7 +1080,7 @@ function bootShell() {
 function hubLive(h) {
   var live = false;
   var days = (h || {}).days || {};
-  Object.keys(days).forEach(function (k) { (days[k] || []).forEach(function (m) { if (m.status === 'live') live = true; }); });
+  Object.keys(days).forEach(function (k) { (days[k] || []).forEach(function (m) { if (m.status === 'live' && !staleLive(m)) live = true; }); });
   if (SHELL) SHELL.setLive({ football: live });
   return live;
 }
@@ -903,6 +1126,8 @@ return {
   comps: comps, comp: comp, familyOf: familyOf, compName: compName, hasFile: hasFile, compFile: compFile, compFiles: compFiles,
   currentSeason: currentSeason, isLastEdition: isLastEdition, shortSeason: shortSeason, seasonsOf: seasonsOf, loadPastSeason: loadPastSeason,
   clubsIndex: clubsIndex, hasCrest: hasCrest, clubRow: clubRow, clubName: clubName, peopleIndex: peopleIndex, crestUrl: crestUrl, tidFromCrest: tidFromCrest,
+  MSET: MSET, ADJ_EXTRA: ADJ_EXTRA, peerGroup: peerGroup, groupKeys: groupKeys, metricInfo: metricInfo, isEarly: isEarly, peerLine: peerLine, peerMin: peerMin,
+  roles: roles, rolesFor: rolesFor, rowRole: rowRole, rowGar: rowGar, roleOf: roleOf, garOver: garOver, peerPct: peerPct, fmtSet: fmtSet,
   personId: personId, labIndex: labIndex, labView: labView, labScopeName: labScopeName, labScopeOptions: labScopeOptions, labWindowText: labWindowText, labPct: labPct, LAB_SCOPES: LAB_SCOPES,
   isNum: isNum, esc: esc, num: num, int: int, pct: pct, signed: signed, money: money, fmtMetric: fmtMetric, parseDate: parseDate,
   fmtDate: fmtDate, fmtTime: fmtTime, fmtStamp: fmtStamp, localDay: localDay, today: today, relDay: relDay, ordinal: ordinal, ageOf: ageOf,
@@ -911,9 +1136,9 @@ return {
   POS_LABEL: POS_LABEL, POS_GROUP: POS_GROUP, posBadge: posBadge, ROUND_LABELS: ROUND_LABELS, STAGE_LABELS: STAGE_LABELS,
   stageLabel: stageLabel, roundText: roundText, stageText: stageText, coverageChip: coverageChip, formChips: formChips,
   href: href, crest: crest, clubLink: clubLink, playerLink: playerLink, compLink: compLink,
-  toGame: toGame, matchCard: matchCard, probBar3: probBar3, scoreText: scoreText, fixtureRow: fixtureRow,
+  toGame: toGame, matchCard: matchCard, gameCard: matchCard, wpBar: wpBar, staleLive: staleLive, probBar3: probBar3, scoreText: scoreText, fixtureRow: fixtureRow,
   card: card, grid: grid, chartBox: chartBox, kpi: kpi, kpis: kpis, badge: badge, muted: muted, empty: empty, note: note, loading: loading,
-  pageHead: pageHead, subnav: subnav, seg: seg, wireSeg: wireSeg, select: select, toolbar: toolbar, field: field, table: table, set: set,
+  pageHead: pageHead, secHead: secHead, chances: chances, subnav: subnav, seg: seg, wireSeg: wireSeg, select: select, toolbar: toolbar, field: field, table: table, set: set,
   pctl: pctl, probBar: probBar, deltaHTML: deltaHTML, heatColour: heatColour, setCompPicker: setCompPicker, hubLive: hubLive
 };
 })();

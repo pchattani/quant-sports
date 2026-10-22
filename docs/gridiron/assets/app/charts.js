@@ -152,7 +152,7 @@ function driveChart(x, drives, o) {
     const qLines = [];
     D.forEach((d, i) => { if (isNum(d.qtr) && prevQ !== null && Number(d.qtr) !== prevQ) qLines.push({ yAxis: i - 0.5 }); if (isNum(d.qtr)) prevQ = Number(d.qtr); });
     series[0].markLine = qLines.length ? { silent: true, symbol: 'none', lineStyle: { color: T.axis, type: [2, 3] }, label: { show: false }, data: qLines } : undefined;
-    series[0].markArea = { silent: true, data: [[{ xAxis: -10, itemStyle: { color: hexA(T.model, 0.08) } }, { xAxis: 0 }], [{ xAxis: 100, itemStyle: { color: hexA(T.market, 0.1) } }, { xAxis: 110 }]] };
+    series[0].markArea = { silent: true, data: [[{ xAxis: -10, itemStyle: { color: hexA(T.model, 0.08) } }, { xAxis: 0 }], [{ xAxis: 100, itemStyle: { color: hexA(T.cat[1], 0.1) } }, { xAxis: 110 }]] };
     const yA = ax(T, { type: 'category', data: cats, split: false, inverse: true });
     yA.axisLabel.fontSize = 9.5;
     const xA = ax(T, { type: 'value', min: -10, max: 110, interval: 10, fmt: v => (v < 0 || v > 100 ? '' : FIELD_LABEL(v)) });
@@ -204,8 +204,8 @@ function wpChart(x, ours, o) {
   const idxOf = i => { let b = 0; for (let k = 0; k < xs.length; k++) if (xs[k] <= i) b = k; return b; };
   const hn = o.home ? GI.teamAbbr(o.home) : 'Home', an = o.away ? GI.teamAbbr(o.away) : 'Away';
   return mount(x, T => {
-    let hc = o.home ? lift(GI.teamColour(o.home), T) : T.model, ac = o.away ? lift(GI.teamColour(o.away), T) : T.market;
-    if (QK.color.contrast(hc, ac) < 1.6) ac = T.market;
+    let hc = o.home ? lift(GI.teamColour(o.home), T) : T.model, ac = o.away ? lift(GI.teamColour(o.away), T) : T.cat[1];
+    if (!(QK.color.distinct ? QK.color.distinct(hc, ac) : QK.color.contrast(hc, ac) >= 1.6)) ac = QK.cssVar('--wp-b') || T.cat[1];
     const p = main.map(r => r.p);
     const qMarks = [];
     let prevQ = null;
@@ -252,7 +252,6 @@ function wpChart(x, ours, o) {
     if (yN) { ya.name = yN; ya.nameLocation = 'middle'; ya.nameRotate = 90; ya.nameGap = 16 + 6.4 * (Math.max(hn.length, an.length) + 5); }
     return {
       grid: { left: yN ? 24 : 8, right: 14, top: 26, bottom: gB, containLabel: true },
-      legend: R.length >= 2 && E.length >= 2 ? legend(T, { right: 0, left: 'auto', data: ['Our model', 'ESPN'] }) : undefined,
       xAxis: xa,
       yAxis: ya,
       tooltip: tip(T, { trigger: 'item', formatter: q => {
@@ -330,28 +329,29 @@ function distBars(x, dist, o) {
   else entries = Object.keys(dist || {}).map(k => [Number(k), dist[k]]);
   entries = entries.filter(e => isNum(e[0]) && isNum(e[1]) && e[1] > 0.0005).sort((a, b) => a[0] - b[0]);
   if (!entries.length) return none(x, o.emptyText || 'No distribution.');
+  const pmax = Math.max.apply(null, entries.map(e => Number(e[1])));
   return mount(x, T => {
     const col = o.colour ? lift(o.colour, T) : T.model;
-    const ca = o.colours ? lift(o.colours[0], T) : T.model, cb = o.colours ? lift(o.colours[1], T) : T.market;
+    const ca = o.colours ? lift(o.colours[0], T) : T.model, cb = o.colours ? lift(o.colours[1], T) : T.cat[1];
     const colourOf = k => {
       if (isNum(o.actual) && Number(k) === Number(o.actual)) return T.ink1;
       if (o.split !== undefined && o.split !== null) return k > o.split ? ca : (k < o.split ? cb : T.ink3);
       return col;
     };
     const ml = [];
-    if (isNum(o.line)) ml.push({ xAxis: o.line, label: { formatter: 'line ' + (o.signed ? GI.signed(o.line, 1) : o.line) } });
-    if (isNum(o.exp)) ml.push({ xAxis: o.exp, label: { formatter: 'model ' + (o.signed ? GI.signed(o.exp, 1) : GI.num(o.exp, 1)) } });
+    if (isNum(o.line)) ml.push({ xAxis: o.line, label: { formatter: (o.lineName || 'market') + ' ' + (o.signed ? GI.signed(o.line, 1) : o.line) } });
+    if (isNum(o.exp)) ml.push({ xAxis: o.exp, label: { formatter: (o.expName || 'ours') + ' ' + (o.signed ? GI.signed(o.exp, 1) : GI.num(o.exp, 1)) } });
     return {
       grid: { left: 8, right: 14, top: 22 + (o.yName === '' ? 0 : 12), bottom: o.xName ? 26 : 8, containLabel: true },
       xAxis: ax(T, { type: 'value', name: o.xName, nameLocation: 'middle', nameGap: 26, split: false, line: true, scale: true, fmt: v => (o.signed && v > 0 ? '+' : '') + v }),
-      yAxis: (a => { a.axisLine.onZero = false; return a; })(ax(T, { name: o.yName === undefined ? 'Probability' : o.yName, nameAlign: 'left', fmt: v => Math.round(v * 100) + '%' })),
+      yAxis: (a => { a.axisLine.onZero = false; return a; })(ax(T, { name: o.yName === undefined ? 'Probability' : o.yName, nameAlign: 'left', fmt: v => (pmax < 0.1 ? (v * 100).toFixed(1) : Math.round(v * 100)) + '%' })),
       tooltip: tip(T, { formatter: q => thead((o.signed && q.value[0] > 0 ? '+' : '') + q.value[0] + ' ' + esc(o.unit || 'pts')) + trow(q.color, 'Chance', GI.pct(q.value[1], 1)) }),
       series: [{ type: 'bar', barWidth: '80%', data: entries.map(e => ({ value: e, itemStyle: { color: colourOf(e[0]), borderRadius: [2, 2, 0, 0] } })),
         markLine: ml.length ? { silent: true, symbol: 'none', lineStyle: { color: T.ink2, type: [4, 3] }, label: { color: T.ink2, fontSize: 10, position: 'insideEndTop' }, data: ml } : undefined }]
     };
   }, o.label || 'Distribution');
 }
-/* Horizontal probability bars with the market as a tick. items [{label, p, colour, market, href}];
+/* Horizontal probability bars (ours) with the market as a quiet grey tick (reference). items [{label, p, colour, market, href}];
  * o.valName titles the value axis ('Probability' unless given). */
 function probBars(x, items, o) {
   o = o || {};
@@ -366,18 +366,18 @@ function probBars(x, items, o) {
     ya.axisLabel.color = T.ink2; ya.axisLabel.width = o.labelWidth || 120; ya.axisLabel.overflow = 'truncate'; ya.axisLabel.fontSize = 11;
     const xa = ax(T, { min: 0, max: Math.min(1, mx * 1.18 + 0.02), fmt: v => Math.round(v * 100) + '%' });
     const gB = 6 + QKC.nameAxis(xa, o.valName === undefined ? 'Probability' : o.valName, 'bottom');
-    const series = [{ type: 'bar', name: o.modelName || 'Model', barMaxWidth: 16, cursor: 'pointer',
+    const series = [{ type: 'bar', name: o.modelName || 'Our chance', barMaxWidth: 16, cursor: 'pointer',
       data: list.map(i => ({ value: i.p, href: i.href, itemStyle: { color: i.colour ? lift(i.colour, T) : T.model, borderRadius: [0, 4, 4, 0] } })),
       label: { show: true, position: 'right', color: T.ink2, fontFamily: T.fontNum, fontSize: 10.5, formatter: q => GI.pct(q.value, q.value < 0.1 ? 1 : 0) } }];
-    if (list.some(i => isNum(i.market))) series.push({ type: 'scatter', name: o.marketName || 'Market', symbol: 'rect', symbolSize: [3, 18], z: 5,
+    if (list.some(i => isNum(i.market))) series.push({ type: 'scatter', name: o.marketName || 'Market (reference)', symbol: 'rect', symbolSize: [3, 18], z: 5,
       itemStyle: { color: T.market }, data: list.map((i, k) => (isNum(i.market) ? [i.market, k] : null)).filter(Boolean) });
     return {
       grid: { left: 8, right: 44, top: series.length > 1 ? 26 : 6, bottom: gB, containLabel: true },
-      legend: series.length > 1 ? legend(T, { data: [o.modelName || 'Model', o.marketName || 'Market'] }) : undefined,
+      legend: series.length > 1 ? legend(T, { data: [o.modelName || 'Our chance', o.marketName || 'Market (reference)'] }) : undefined,
       xAxis: xa, yAxis: ya,
       tooltip: tip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: hexA(T.ink1, 0.04) } }, formatter: ps => {
         const it = list[ps[0].dataIndex]; if (!it) return '';
-        return thead(esc(it.label)) + trow(T.model, o.modelName || 'Model', GI.pct(it.p, 1)) + (isNum(it.market) ? trow(T.market, o.marketName || 'Market', GI.pct(it.market, 1)) + trow(T.other, 'Gap', GI.signed((it.p - it.market) * 100, 1) + ' pts') : '');
+        return thead(esc(it.label)) + trow(T.model, o.modelName || 'Our chance', GI.pct(it.p, 1)) + (isNum(it.market) ? trow(T.market, o.marketName || 'Market (reference)', GI.pct(it.market, 1)) : '');
       } }),
       series: series
     };

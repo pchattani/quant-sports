@@ -56,3 +56,28 @@ tr.fb-va-gone td { opacity: 0.55; }
   .fb-page-value .fb-field .qk-select, .fb-page-value .fb-field .qk-input { width: 100%; max-width: 100%; }
   .fb-page-value .qk-seg { max-width: 100%; flex-wrap: wrap; }
 }
+
+/* who moves next (FB.moves, FB.movementCard): 0-100% bars split by how a player leaves, base-rate chips */
+.fb-mv-cell { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; white-space: nowrap; }
+.fb-mv-track { position: relative; display: inline-flex; width: 72px; height: 7px; border-radius: 4px; background: var(--s-3); overflow: hidden; flex: none; }
+.fb-mv-track.lg { width: 100%; height: 12px; border-radius: 6px; }
+.fb-mv-track i { display: block; height: 100%; }
+.fb-mv-cell b { min-width: 34px; text-align: right; }
+.fb-mv-band { color: var(--ink-3); font-size: var(--fs-2xs); }
+.fb-mv-loan, .fb-mv-need { font-size: 10px; }
+.fb-mv-base { font-size: 10px; color: var(--ink-2); border-color: var(--line-2); cursor: help; }
+.fb-mv-key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: var(--sp-3); font-size: var(--fs-xs); color: var(--ink-2); }
+.fb-mv-key-t { font-weight: 700; color: var(--ink-1); }
+.fb-mv-key .qk-keys { margin: 0; }
+.fb-mv-kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.fb-mv-join { color: var(--signal); }
+.fb-mv-fit { display: inline-grid; justify-items: end; gap: 1px; }
+.fb-mv-fit small { font-family: var(--font-ui); font-size: var(--fs-2xs); color: var(--ink-3); white-space: nowrap; }
+.fb-mv-why { display: inline-block; min-width: 220px; white-space: normal; color: var(--ink-2); font-size: var(--fs-xs); line-height: 1.35; }
+.fb-mv-if { margin-top: var(--sp-4); display: grid; gap: 6px; }
+.fb-mv-mix { display: grid; gap: 6px; }
+.fb-mv-mixlab { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--fs-xs); color: var(--ink-2); }
+.fb-mv-mixlab span { display: inline-flex; align-items: center; gap: 5px; }
+.fb-mv-mixlab i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+.fb-mv-mixlab b { color: var(--ink-1); font-family: var(--font-num); }
+@media (max-width: 720px) { .fb-mv-track { width: 44px; } .fb-mv-band { display: none; } .fb-mv-why { min-width: 160px; } }

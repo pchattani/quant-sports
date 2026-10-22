@@ -1,0 +1,5979 @@
+{
+ "sport": "basketball",
+ "site": "hardwood",
+ "schema_version": 1,
+ "generated": "2026-10-22",
+ "leagues": [
+  "nba",
+  "wnba"
+ ],
+ "payloads": {
+  "players": "docs/hardwood/data/<league>/<season>/players.json -> players{pid}.values / pct / pct_pool / role / pct_role",
+  "teams": "docs/hardwood/data/<league>/<season>/teams.json -> teams{tid}.values / pct",
+  "value": "docs/hardwood/data/<league>/<season>/value.json -> rows (cols incl. role, hpm, war, pct_role)"
+ },
+ "notes": [
+  "fmt 'pct' values are 0-1 fractions in the payload (0.573 = 57.3 %).",
+  "scope 'pbp' metrics exist only in seasons with play-by-play (NBA 2002 on, WNBA 2003 on); treat as missing earlier.",
+  "style: true marks descriptive metrics (shot diet, pace): colour them neutrally, they are not better or worse.",
+  "WNBA HPM is almost entirely its box component (r(HPM, box impact) = 1.00 within role): WNBA RAPM carries little weight."
+ ],
+ "groups": [
+  {
+   "id": "nba_guards",
+   "entity": "player",
+   "league": "nba",
+   "role": "G",
+   "display": "Guards",
+   "peer_group": "role G (players.json `role`, = value.json role): listed position G; compared within league and season",
+   "position_field": "role",
+   "position_codes": [
+    "G"
+   ],
+   "listed_position_field": "pool",
+   "listed_position_codes": [
+    "G"
+   ],
+   "minimum": {
+    "field": "min",
+    "value": 590,
+    "unit": "minutes",
+    "note": "the payload's `qualified` flag: min >= players.json `min_floor` = round(0.2 x the season's most minutes); value is the typical full-season floor (NBA 510-700, WNBA 150-300), so it scales through a season"
+   },
+   "basis": "per 100 possessions on the floor and shooting / share rates; HPM per 100 possessions",
+   "benchmark": {
+    "target": "next-season HPM",
+    "autocorr_r": 0.72,
+    "n_pairs": 3049
+   },
+   "metrics": [
+    {
+     "id": "hpm",
+     "display": "Total impact (HPM)",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Points per 100 possessions he adds to his team's margin over an average player: play-by-play on/off blended with the box score.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.73,
+      "split_half_r": null,
+      "n_pairs": 3049,
+      "m50": 679.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.71,
+      "r_next_on_off": 0.35
+     }
+    },
+    {
+     "id": "hpm_o",
+     "display": "Offensive impact",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "The offensive half of HPM: points per 100 possessions added at the scoring end.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.76,
+      "split_half_r": null,
+      "n_pairs": 3049,
+      "m50": 587.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.59,
+      "r_next_on_off": 0.31
+     }
+    },
+    {
+     "id": "hpm_d",
+     "display": "Defensive impact",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "The defensive half of HPM: points per 100 possessions taken off opponents.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.66,
+      "split_half_r": null,
+      "n_pairs": 3049,
+      "m50": 938.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.37,
+      "r_next_on_off": 0.17
+     }
+    },
+    {
+     "id": "pts100",
+     "display": "Points per 100",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Points scored per 100 team possessions while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.83,
+      "split_half_r": 0.96,
+      "n_pairs": 3049,
+      "m50": 69.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.33,
+      "r_next_on_off": 0.21
+     }
+    },
+    {
+     "id": "ts_add",
+     "display": "Scoring efficiency added",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Points per 100 possessions gained by shooting above the league's true-shooting rate on his volume.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.56,
+      "split_half_r": 0.67,
+      "n_pairs": 3049,
+      "m50": 764.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.37,
+      "r_next_on_off": 0.22
+     }
+    },
+    {
+     "id": "pox100",
+     "display": "Shot-making",
+     "unit": "per 100 shots",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Points above what an average shooter would score on the same shots (location and type), per 100 shots.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.82,
+      "split_half_r": null,
+      "n_pairs": 2607,
+      "m50": 403.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.35,
+      "r_next_on_off": 0.19
+     }
+    },
+    {
+     "id": "ast_pct",
+     "display": "Assist rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Share of team-mates' baskets he assisted while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.88,
+      "split_half_r": 0.98,
+      "n_pairs": 3049,
+      "m50": 35.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.36,
+      "r_next_on_off": 0.2
+     }
+    },
+    {
+     "id": "ast_tov",
+     "display": "Assist-to-turnover",
+     "unit": "ratio",
+     "direction": "higher",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Assists per turnover: creation against giveaways.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.76,
+      "split_half_r": 0.78,
+      "n_pairs": 3049,
+      "m50": 441.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.23,
+      "r_next_on_off": 0.1
+     }
+    },
+    {
+     "id": "fta100",
+     "display": "Free throws drawn per 100",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Free-throw attempts per 100 possessions: pressure on the rim and fouls drawn.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.84,
+      "split_half_r": 0.95,
+      "n_pairs": 3049,
+      "m50": 77.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.33,
+      "r_next_on_off": 0.2
+     }
+    },
+    {
+     "id": "stl_pct",
+     "display": "Steal rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Share of opponent possessions ended by his steal while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.74,
+      "split_half_r": 0.81,
+      "n_pairs": 3049,
+      "m50": 371.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.28,
+      "r_next_on_off": 0.18
+     }
+    },
+    {
+     "id": "ts",
+     "display": "True shooting",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Points per shooting attempt, counting threes and free throws.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.52,
+      "split_half_r": 0.63,
+      "n_pairs": 3049,
+      "m50": 387.0,
+      "m50_unit": "TSA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.34,
+      "r_next_on_off": 0.2
+     }
+    },
+    {
+     "id": "usg",
+     "display": "Usage",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Share of team possessions he finished with a shot, free throws or a turnover.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.85,
+      "split_half_r": 0.98,
+      "n_pairs": 3049,
+      "m50": 27.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.27,
+      "r_next_on_off": 0.17
+     }
+    },
+    {
+     "id": "efg",
+     "display": "Effective FG",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Field-goal percentage with threes worth 1.5 makes.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.49,
+      "split_half_r": 0.59,
+      "n_pairs": 3049,
+      "m50": 412.0,
+      "m50_unit": "FGA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.24,
+      "r_next_on_off": 0.13
+     }
+    },
+    {
+     "id": "fg3",
+     "display": "3-point FG",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Share of three-point attempts made (slow to settle: needs hundreds of attempts).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.44,
+      "split_half_r": 0.47,
+      "n_pairs": 3049,
+      "m50": 282.0,
+      "m50_unit": "3PA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.12,
+      "r_next_on_off": 0.08
+     }
+    },
+    {
+     "id": "ft",
+     "display": "Free-throw %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of free throws made.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.61,
+      "split_half_r": 0.64,
+      "n_pairs": 3049,
+      "m50": 80.0,
+      "m50_unit": "FTA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.14,
+      "r_next_on_off": 0.1
+     }
+    },
+    {
+     "id": "ftr",
+     "display": "Free-throw rate",
+     "unit": "ratio",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Free-throw attempts per field-goal attempt.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "3",
+     "reliability": {
+      "yoy_r": 0.78,
+      "split_half_r": 0.9,
+      "n_pairs": 3049,
+      "m50": 176.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.25,
+      "r_next_on_off": 0.17
+     }
+    },
+    {
+     "id": "tpar",
+     "display": "3-point attempt rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Share of his shots taken from three: a style marker, not a skill score.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.86,
+      "split_half_r": 0.98,
+      "n_pairs": 3049,
+      "m50": 29.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.0,
+      "r_next_on_off": 0.0
+     }
+    },
+    {
+     "id": "unassisted_share",
+     "display": "Self-created makes",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Share of his made baskets that nobody assisted.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.88,
+      "split_half_r": 0.96,
+      "n_pairs": 2607,
+      "m50": 61.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.24,
+      "r_next_on_off": 0.13
+     }
+    },
+    {
+     "id": "ast100",
+     "display": "Assists per 100",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Assists per 100 possessions on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.89,
+      "split_half_r": 0.97,
+      "n_pairs": 3049,
+      "m50": 42.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.34,
+      "r_next_on_off": 0.18
+     }
+    },
+    {
+     "id": "tov_pct",
+     "display": "Turnover rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Turnovers per play he used (shots, free-throw trips and turnovers).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.77,
+      "split_half_r": 0.86,
+      "n_pairs": 3049,
+      "m50": 250.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": -0.05,
+      "r_next_on_off": -0.02
+     }
+    },
+    {
+     "id": "trb_pct",
+     "display": "Rebound rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "explanation": "Share of all available rebounds he grabbed while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.8,
+      "split_half_r": 0.92,
+      "n_pairs": 3049,
+      "m50": 137.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.19,
+      "r_next_on_off": 0.09
+     }
+    },
+    {
+     "id": "blk_pct",
+     "display": "Block rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "explanation": "Share of opponent two-point attempts he blocked while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.73,
+      "split_half_r": 0.82,
+      "n_pairs": 3049,
+      "m50": 341.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.12,
+      "r_next_on_off": 0.08
+     }
+    },
+    {
+     "id": "pf100",
+     "display": "Fouls per 100",
+     "unit": "per 100",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "Personal fouls per 100 possessions (fewer is better).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.75,
+      "split_half_r": 0.86,
+      "n_pairs": 3049,
+      "m50": 254.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.12,
+      "r_next_on_off": 0.05
+     }
+    },
+    {
+     "id": "rapm",
+     "display": "RAPM",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "explanation": "Regularised adjusted plus-minus: the play-by-play half of HPM on its own.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.78,
+      "split_half_r": null,
+      "n_pairs": 2607,
+      "m50": 502.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.71,
+      "r_next_on_off": 0.37
+     }
+    },
+    {
+     "id": "box_impact",
+     "display": "Box impact",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rate",
+     "explanation": "The box-score half of HPM: impact estimated from his stat line.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.72,
+      "split_half_r": null,
+      "n_pairs": 3049,
+      "m50": 698.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.62,
+      "r_next_on_off": 0.34
+     }
+    },
+    {
+     "id": "on_off",
+     "display": "On/off",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 16,
+     "basis": "rate",
+     "explanation": "Team net rating with him on the floor minus with him off: noisy, needs several seasons.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.33,
+      "split_half_r": null,
+      "n_pairs": 2607,
+      "m50": 3636.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.53,
+      "r_next_on_off": 0.33
+     }
+    },
+    {
+     "id": "and1_100",
+     "display": "And-ones per 100",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 17,
+     "basis": "rate",
+     "explanation": "Baskets made through contact, per 100 possessions.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.74,
+      "split_half_r": null,
+      "n_pairs": 2607,
+      "m50": 655.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.29,
+      "r_next_on_off": 0.16
+     }
+    },
+    {
+     "id": "rim_freq",
+     "display": "Rim frequency",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 18,
+     "basis": "rate",
+     "explanation": "Share of his shots taken within 4 feet of the rim: a style marker.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.86,
+      "split_half_r": 0.96,
+      "n_pairs": 2607,
+      "m50": 57.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.05,
+      "r_next_on_off": 0.02
+     }
+    },
+    {
+     "id": "avg_dist",
+     "display": "Average shot distance",
+     "unit": "ft",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 19,
+     "basis": "rate",
+     "explanation": "Average distance of his shots: a style marker.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "1",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.88,
+      "split_half_r": 0.98,
+      "n_pairs": 2607,
+      "m50": 31.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": -0.03,
+      "r_next_on_off": -0.0
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "hpm_o",
+     "hpm_d",
+     "pts100",
+     "ts_add",
+     "pox100",
+     "ast_pct",
+     "ast_tov",
+     "fta100",
+     "stl_pct",
+     "usg",
+     "tpar",
+     "rim_freq",
+     "trb_pct"
+    ],
+    "standardise": "z-score within league, role and season over qualified players",
+    "weights": {
+     "hpm_o": 0.76,
+     "hpm_d": 0.66,
+     "pts100": 0.83,
+     "ts_add": 0.56,
+     "pox100": 0.82,
+     "ast_pct": 0.88,
+     "ast_tov": 0.76,
+     "fta100": 0.84,
+     "stl_pct": 0.74,
+     "usg": 0.85,
+     "tpar": 0.86,
+     "rim_freq": 0.86,
+     "trb_pct": 0.8
+    },
+    "weights_rule": "yoy_r in this group, floored at 0.2",
+    "distance": "weighted euclidean over the features both player-seasons have (pbp-only features dropped pairwise before NBA 2002), divided by the square root of the summed weights",
+    "k": 5,
+    "constraints": "same league and role, qualified player-seasons, any season, not the player himself"
+   }
+  },
+  {
+   "id": "nba_wings",
+   "entity": "player",
+   "league": "nba",
+   "role": "W",
+   "display": "Wings",
+   "peer_group": "role W (players.json `role`, = value.json role): listed F whose box profile is closer to the guards' than the centres' (or under 150 minutes); compared within league and season",
+   "position_field": "role",
+   "position_codes": [
+    "W"
+   ],
+   "listed_position_field": "pool",
+   "listed_position_codes": [
+    "F"
+   ],
+   "minimum": {
+    "field": "min",
+    "value": 590,
+    "unit": "minutes",
+    "note": "the payload's `qualified` flag: min >= players.json `min_floor` = round(0.2 x the season's most minutes); value is the typical full-season floor (NBA 510-700, WNBA 150-300), so it scales through a season"
+   },
+   "basis": "per 100 possessions on the floor and shooting / share rates; HPM per 100 possessions",
+   "benchmark": {
+    "target": "next-season HPM",
+    "autocorr_r": 0.76,
+    "n_pairs": 1668
+   },
+   "metrics": [
+    {
+     "id": "hpm",
+     "display": "Total impact (HPM)",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Points per 100 possessions he adds to his team's margin over an average player: play-by-play on/off blended with the box score.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.76,
+      "split_half_r": null,
+      "n_pairs": 1668,
+      "m50": 585.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.73,
+      "r_next_on_off": 0.42
+     }
+    },
+    {
+     "id": "hpm_o",
+     "display": "Offensive impact",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "The offensive half of HPM: points per 100 possessions added at the scoring end.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.77,
+      "split_half_r": null,
+      "n_pairs": 1668,
+      "m50": 555.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.6,
+      "r_next_on_off": 0.36
+     }
+    },
+    {
+     "id": "hpm_d",
+     "display": "Defensive impact",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "The defensive half of HPM: points per 100 possessions taken off opponents.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.68,
+      "split_half_r": null,
+      "n_pairs": 1668,
+      "m50": 864.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.47,
+      "r_next_on_off": 0.26
+     }
+    },
+    {
+     "id": "pts100",
+     "display": "Points per 100",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Points scored per 100 team possessions while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.86,
+      "split_half_r": 0.96,
+      "n_pairs": 1668,
+      "m50": 60.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.42,
+      "r_next_on_off": 0.3
+     }
+    },
+    {
+     "id": "ts_add",
+     "display": "Scoring efficiency added",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Points per 100 possessions gained by shooting above the league's true-shooting rate on his volume.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.54,
+      "split_half_r": 0.66,
+      "n_pairs": 1668,
+      "m50": 825.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.38,
+      "r_next_on_off": 0.25
+     }
+    },
+    {
+     "id": "pox100",
+     "display": "Shot-making",
+     "unit": "per 100 shots",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Points above what an average shooter would score on the same shots (location and type), per 100 shots.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.82,
+      "split_half_r": null,
+      "n_pairs": 1451,
+      "m50": 408.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.42,
+      "r_next_on_off": 0.28
+     }
+    },
+    {
+     "id": "fta100",
+     "display": "Free throws drawn per 100",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Free-throw attempts per 100 possessions: pressure on the rim and fouls drawn.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.86,
+      "split_half_r": 0.95,
+      "n_pairs": 1668,
+      "m50": 81.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.37,
+      "r_next_on_off": 0.26
+     }
+    },
+    {
+     "id": "ast_pct",
+     "display": "Assist rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Share of team-mates' baskets he assisted while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.86,
+      "split_half_r": 0.97,
+      "n_pairs": 1668,
+      "m50": 47.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.44,
+      "r_next_on_off": 0.31
+     }
+    },
+    {
+     "id": "drb_pct",
+     "display": "Defensive rebound rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Share of available defensive rebounds he grabbed while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.78,
+      "split_half_r": 0.93,
+      "n_pairs": 1668,
+      "m50": 127.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.27,
+      "r_next_on_off": 0.19
+     }
+    },
+    {
+     "id": "stl_pct",
+     "display": "Steal rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Share of opponent possessions ended by his steal while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.75,
+      "split_half_r": 0.8,
+      "n_pairs": 1668,
+      "m50": 404.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.29,
+      "r_next_on_off": 0.23
+     }
+    },
+    {
+     "id": "ts",
+     "display": "True shooting",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Points per shooting attempt, counting threes and free throws.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.47,
+      "split_half_r": 0.58,
+      "n_pairs": 1668,
+      "m50": 434.0,
+      "m50_unit": "TSA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.33,
+      "r_next_on_off": 0.21
+     }
+    },
+    {
+     "id": "usg",
+     "display": "Usage",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Share of team possessions he finished with a shot, free throws or a turnover.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.87,
+      "split_half_r": 0.98,
+      "n_pairs": 1668,
+      "m50": 24.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.36,
+      "r_next_on_off": 0.26
+     }
+    },
+    {
+     "id": "efg",
+     "display": "Effective FG",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Field-goal percentage with threes worth 1.5 makes.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.42,
+      "split_half_r": 0.55,
+      "n_pairs": 1668,
+      "m50": 453.0,
+      "m50_unit": "FGA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.23,
+      "r_next_on_off": 0.14
+     }
+    },
+    {
+     "id": "fg3",
+     "display": "3-point FG",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Share of three-point attempts made (slow to settle: needs hundreds of attempts).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.38,
+      "split_half_r": 0.37,
+      "n_pairs": 1665,
+      "m50": 395.0,
+      "m50_unit": "3PA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.13,
+      "r_next_on_off": 0.1
+     }
+    },
+    {
+     "id": "ft",
+     "display": "Free-throw %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of free throws made.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.59,
+      "split_half_r": 0.61,
+      "n_pairs": 1668,
+      "m50": 86.0,
+      "m50_unit": "FTA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.14,
+      "r_next_on_off": 0.1
+     }
+    },
+    {
+     "id": "tpar",
+     "display": "3-point attempt rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of his shots taken from three: a style marker, not a skill score.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.84,
+      "split_half_r": 0.98,
+      "n_pairs": 1668,
+      "m50": 34.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": -0.07,
+      "r_next_on_off": -0.07
+     }
+    },
+    {
+     "id": "unassisted_share",
+     "display": "Self-created makes",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Share of his made baskets that nobody assisted.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.86,
+      "split_half_r": 0.95,
+      "n_pairs": 1451,
+      "m50": 84.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.3,
+      "r_next_on_off": 0.21
+     }
+    },
+    {
+     "id": "ast_tov",
+     "display": "Assist-to-turnover",
+     "unit": "ratio",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Assists per turnover: creation against giveaways.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.65,
+      "split_half_r": 0.72,
+      "n_pairs": 1668,
+      "m50": 611.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.21,
+      "r_next_on_off": 0.13
+     }
+    },
+    {
+     "id": "tov_pct",
+     "display": "Turnover rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Turnovers per play he used (shots, free-throw trips and turnovers).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.72,
+      "split_half_r": 0.81,
+      "n_pairs": 1668,
+      "m50": 360.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": -0.01,
+      "r_next_on_off": -0.01
+     }
+    },
+    {
+     "id": "trb_pct",
+     "display": "Rebound rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Share of all available rebounds he grabbed while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.78,
+      "split_half_r": 0.93,
+      "n_pairs": 1668,
+      "m50": 111.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.25,
+      "r_next_on_off": 0.18
+     }
+    },
+    {
+     "id": "orb_pct",
+     "display": "Offensive rebound rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "explanation": "Share of available offensive rebounds he grabbed while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.72,
+      "split_half_r": 0.88,
+      "n_pairs": 1668,
+      "m50": 217.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.02,
+      "r_next_on_off": 0.04
+     }
+    },
+    {
+     "id": "blk_pct",
+     "display": "Block rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "explanation": "Share of opponent two-point attempts he blocked while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.72,
+      "split_half_r": 0.84,
+      "n_pairs": 1668,
+      "m50": 291.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.17,
+      "r_next_on_off": 0.15
+     }
+    },
+    {
+     "id": "pf100",
+     "display": "Fouls per 100",
+     "unit": "per 100",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "Personal fouls per 100 possessions (fewer is better).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.78,
+      "split_half_r": 0.88,
+      "n_pairs": 1668,
+      "m50": 212.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.23,
+      "r_next_on_off": 0.15
+     }
+    },
+    {
+     "id": "rapm",
+     "display": "RAPM",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "explanation": "Regularised adjusted plus-minus: the play-by-play half of HPM on its own.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.81,
+      "split_half_r": null,
+      "n_pairs": 1451,
+      "m50": 443.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.75,
+      "r_next_on_off": 0.43
+     }
+    },
+    {
+     "id": "box_impact",
+     "display": "Box impact",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rate",
+     "explanation": "The box-score half of HPM: impact estimated from his stat line.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.73,
+      "split_half_r": null,
+      "n_pairs": 1668,
+      "m50": 685.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.64,
+      "r_next_on_off": 0.41
+     }
+    },
+    {
+     "id": "on_off",
+     "display": "On/off",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 16,
+     "basis": "rate",
+     "explanation": "Team net rating with him on the floor minus with him off: noisy, needs several seasons.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.35,
+      "split_half_r": null,
+      "n_pairs": 1451,
+      "m50": 3355.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.57,
+      "r_next_on_off": 0.35
+     }
+    },
+    {
+     "id": "rim_freq",
+     "display": "Rim frequency",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 17,
+     "basis": "rate",
+     "explanation": "Share of his shots taken within 4 feet of the rim: a style marker.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.76,
+      "split_half_r": 0.95,
+      "n_pairs": 1451,
+      "m50": 74.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.03,
+      "r_next_on_off": 0.03
+     }
+    },
+    {
+     "id": "avg_dist",
+     "display": "Average shot distance",
+     "unit": "ft",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 18,
+     "basis": "rate",
+     "explanation": "Average distance of his shots: a style marker.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "1",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.8,
+      "split_half_r": 0.97,
+      "n_pairs": 1451,
+      "m50": 45.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": -0.07,
+      "r_next_on_off": -0.06
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "hpm_o",
+     "hpm_d",
+     "pts100",
+     "ts_add",
+     "pox100",
+     "fta100",
+     "ast_pct",
+     "drb_pct",
+     "stl_pct",
+     "blk_pct",
+     "usg",
+     "tpar",
+     "rim_freq"
+    ],
+    "standardise": "z-score within league, role and season over qualified players",
+    "weights": {
+     "hpm_o": 0.77,
+     "hpm_d": 0.68,
+     "pts100": 0.86,
+     "ts_add": 0.54,
+     "pox100": 0.82,
+     "fta100": 0.86,
+     "ast_pct": 0.86,
+     "drb_pct": 0.78,
+     "stl_pct": 0.75,
+     "blk_pct": 0.72,
+     "usg": 0.87,
+     "tpar": 0.84,
+     "rim_freq": 0.76
+    },
+    "weights_rule": "yoy_r in this group, floored at 0.2",
+    "distance": "weighted euclidean over the features both player-seasons have (pbp-only features dropped pairwise before NBA 2002), divided by the square root of the summed weights",
+    "k": 5,
+    "constraints": "same league and role, qualified player-seasons, any season, not the player himself"
+   }
+  },
+  {
+   "id": "nba_bigs",
+   "entity": "player",
+   "league": "nba",
+   "role": "B",
+   "display": "Bigs",
+   "peer_group": "role B (players.json `role`, = value.json role): listed C, or listed F whose box profile is closer to the centres' (150+ minutes); compared within league and season",
+   "position_field": "role",
+   "position_codes": [
+    "B"
+   ],
+   "listed_position_field": "pool",
+   "listed_position_codes": [
+    "C",
+    "F"
+   ],
+   "minimum": {
+    "field": "min",
+    "value": 590,
+    "unit": "minutes",
+    "note": "the payload's `qualified` flag: min >= players.json `min_floor` = round(0.2 x the season's most minutes); value is the typical full-season floor (NBA 510-700, WNBA 150-300), so it scales through a season"
+   },
+   "basis": "per 100 possessions on the floor and shooting / share rates; HPM per 100 possessions",
+   "benchmark": {
+    "target": "next-season HPM",
+    "autocorr_r": 0.77,
+    "n_pairs": 2407
+   },
+   "metrics": [
+    {
+     "id": "hpm",
+     "display": "Total impact (HPM)",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Points per 100 possessions he adds to his team's margin over an average player: play-by-play on/off blended with the box score.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.74,
+      "split_half_r": null,
+      "n_pairs": 2407,
+      "m50": 584.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.7,
+      "r_next_on_off": 0.38
+     }
+    },
+    {
+     "id": "hpm_o",
+     "display": "Offensive impact",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "The offensive half of HPM: points per 100 possessions added at the scoring end.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.72,
+      "split_half_r": null,
+      "n_pairs": 2407,
+      "m50": 651.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.54,
+      "r_next_on_off": 0.28
+     }
+    },
+    {
+     "id": "hpm_d",
+     "display": "Defensive impact",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "The defensive half of HPM: points per 100 possessions taken off opponents.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.71,
+      "split_half_r": null,
+      "n_pairs": 2407,
+      "m50": 679.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.49,
+      "r_next_on_off": 0.28
+     }
+    },
+    {
+     "id": "pts100",
+     "display": "Points per 100",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Points scored per 100 team possessions while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.86,
+      "split_half_r": 0.96,
+      "n_pairs": 2407,
+      "m50": 62.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.3,
+      "r_next_on_off": 0.14
+     }
+    },
+    {
+     "id": "ts_add",
+     "display": "Scoring efficiency added",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Points per 100 possessions gained by shooting above the league's true-shooting rate on his volume.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.56,
+      "split_half_r": 0.74,
+      "n_pairs": 2407,
+      "m50": 509.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.29,
+      "r_next_on_off": 0.18
+     }
+    },
+    {
+     "id": "drb_pct",
+     "display": "Defensive rebound rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of available defensive rebounds he grabbed while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.81,
+      "split_half_r": 0.94,
+      "n_pairs": 2407,
+      "m50": 95.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.24,
+      "r_next_on_off": 0.1
+     }
+    },
+    {
+     "id": "orb_pct",
+     "display": "Offensive rebound rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Share of available offensive rebounds he grabbed while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.77,
+      "split_half_r": 0.91,
+      "n_pairs": 2407,
+      "m50": 137.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.01,
+      "r_next_on_off": 0.0
+     }
+    },
+    {
+     "id": "blk_pct",
+     "display": "Block rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Share of opponent two-point attempts he blocked while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.84,
+      "split_half_r": 0.92,
+      "n_pairs": 2407,
+      "m50": 126.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.16,
+      "r_next_on_off": 0.1
+     }
+    },
+    {
+     "id": "ast_pct",
+     "display": "Assist rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Share of team-mates' baskets he assisted while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.82,
+      "split_half_r": 0.96,
+      "n_pairs": 2407,
+      "m50": 62.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.4,
+      "r_next_on_off": 0.24
+     }
+    },
+    {
+     "id": "fta100",
+     "display": "Free throws drawn per 100",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Free-throw attempts per 100 possessions: pressure on the rim and fouls drawn.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.84,
+      "split_half_r": 0.93,
+      "n_pairs": 2407,
+      "m50": 107.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.31,
+      "r_next_on_off": 0.18
+     }
+    },
+    {
+     "id": "ts",
+     "display": "True shooting",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Points per shooting attempt, counting threes and free throws.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.55,
+      "split_half_r": 0.73,
+      "n_pairs": 2407,
+      "m50": 197.0,
+      "m50_unit": "TSA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.22,
+      "r_next_on_off": 0.13
+     }
+    },
+    {
+     "id": "usg",
+     "display": "Usage",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Share of team possessions he finished with a shot, free throws or a turnover.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.87,
+      "split_half_r": 0.98,
+      "n_pairs": 2407,
+      "m50": 28.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.24,
+      "r_next_on_off": 0.1
+     }
+    },
+    {
+     "id": "efg",
+     "display": "Effective FG",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Field-goal percentage with threes worth 1.5 makes.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.56,
+      "split_half_r": 0.74,
+      "n_pairs": 2407,
+      "m50": 163.0,
+      "m50_unit": "FGA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.17,
+      "r_next_on_off": 0.1
+     }
+    },
+    {
+     "id": "fg2",
+     "display": "2-point FG",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Share of two-point attempts made.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.55,
+      "split_half_r": 0.74,
+      "n_pairs": 2407,
+      "m50": 165.0,
+      "m50_unit": "FGA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.16,
+      "r_next_on_off": 0.11
+     }
+    },
+    {
+     "id": "ft",
+     "display": "Free-throw %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of free throws made.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.74,
+      "split_half_r": 0.81,
+      "n_pairs": 2407,
+      "m50": 38.0,
+      "m50_unit": "FTA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.06,
+      "r_next_on_off": 0.0
+     }
+    },
+    {
+     "id": "ftr",
+     "display": "Free-throw rate",
+     "unit": "ratio",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Free-throw attempts per field-goal attempt.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "3",
+     "reliability": {
+      "yoy_r": 0.8,
+      "split_half_r": 0.88,
+      "n_pairs": 2407,
+      "m50": 195.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.17,
+      "r_next_on_off": 0.13
+     }
+    },
+    {
+     "id": "rim_fg",
+     "display": "Rim FG",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Share of shots within 4 feet made.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.51,
+      "split_half_r": 0.55,
+      "n_pairs": 1938,
+      "m50": 1175.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.22,
+      "r_next_on_off": 0.15
+     }
+    },
+    {
+     "id": "opp_rim_fg_on",
+     "display": "Opponent rim FG with him on",
+     "unit": "%",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Opponents' make rate at the rim while he is on the floor (lower is better).",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.51,
+      "split_half_r": null,
+      "n_pairs": 1938,
+      "m50": 1650.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.2,
+      "r_next_on_off": 0.12
+     }
+    },
+    {
+     "id": "stl_pct",
+     "display": "Steal rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Share of opponent possessions ended by his steal while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.74,
+      "split_half_r": 0.79,
+      "n_pairs": 2407,
+      "m50": 383.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.18,
+      "r_next_on_off": 0.11
+     }
+    },
+    {
+     "id": "tov_pct",
+     "display": "Turnover rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Turnovers per play he used (shots, free-throw trips and turnovers).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.7,
+      "split_half_r": 0.79,
+      "n_pairs": 2407,
+      "m50": 389.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.07,
+      "r_next_on_off": 0.02
+     }
+    },
+    {
+     "id": "trb_pct",
+     "display": "Rebound rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "explanation": "Share of all available rebounds he grabbed while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.82,
+      "split_half_r": 0.95,
+      "n_pairs": 2407,
+      "m50": 77.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.2,
+      "r_next_on_off": 0.08
+     }
+    },
+    {
+     "id": "pf100",
+     "display": "Fouls per 100",
+     "unit": "per 100",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "explanation": "Personal fouls per 100 possessions (fewer is better).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.75,
+      "split_half_r": 0.9,
+      "n_pairs": 2407,
+      "m50": 162.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.24,
+      "r_next_on_off": 0.17
+     }
+    },
+    {
+     "id": "rapm",
+     "display": "RAPM",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "Regularised adjusted plus-minus: the play-by-play half of HPM on its own.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.8,
+      "split_half_r": null,
+      "n_pairs": 1939,
+      "m50": 420.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.71,
+      "r_next_on_off": 0.39
+     }
+    },
+    {
+     "id": "box_impact",
+     "display": "Box impact",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "explanation": "The box-score half of HPM: impact estimated from his stat line.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.7,
+      "split_half_r": null,
+      "n_pairs": 2407,
+      "m50": 729.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.59,
+      "r_next_on_off": 0.32
+     }
+    },
+    {
+     "id": "on_off",
+     "display": "On/off",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rate",
+     "explanation": "Team net rating with him on the floor minus with him off: noisy, needs several seasons.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.34,
+      "split_half_r": null,
+      "n_pairs": 1939,
+      "m50": 3253.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.54,
+      "r_next_on_off": 0.34
+     }
+    },
+    {
+     "id": "rim_freq",
+     "display": "Rim frequency",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 16,
+     "basis": "rate",
+     "explanation": "Share of his shots taken within 4 feet of the rim: a style marker.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.86,
+      "split_half_r": 0.98,
+      "n_pairs": 1939,
+      "m50": 33.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": -0.01,
+      "r_next_on_off": 0.03
+     }
+    },
+    {
+     "id": "tpar",
+     "display": "3-point attempt rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 17,
+     "basis": "rate",
+     "explanation": "Share of his shots taken from three: a style marker, not a skill score.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.82,
+      "split_half_r": 0.99,
+      "n_pairs": 2407,
+      "m50": 14.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.05,
+      "r_next_on_off": 0.02
+     }
+    },
+    {
+     "id": "putback100",
+     "display": "Putbacks per 100",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 18,
+     "basis": "rate",
+     "explanation": "Putback makes per 100 possessions.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.69,
+      "split_half_r": null,
+      "n_pairs": 1939,
+      "m50": 748.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.07,
+      "r_next_on_off": 0.03
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "hpm_o",
+     "hpm_d",
+     "pts100",
+     "ts_add",
+     "drb_pct",
+     "orb_pct",
+     "blk_pct",
+     "ast_pct",
+     "fta100",
+     "stl_pct",
+     "usg",
+     "tpar",
+     "rim_freq"
+    ],
+    "standardise": "z-score within league, role and season over qualified players",
+    "weights": {
+     "hpm_o": 0.72,
+     "hpm_d": 0.71,
+     "pts100": 0.86,
+     "ts_add": 0.56,
+     "drb_pct": 0.81,
+     "orb_pct": 0.77,
+     "blk_pct": 0.84,
+     "ast_pct": 0.82,
+     "fta100": 0.84,
+     "stl_pct": 0.74,
+     "usg": 0.87,
+     "tpar": 0.82,
+     "rim_freq": 0.86
+    },
+    "weights_rule": "yoy_r in this group, floored at 0.2",
+    "distance": "weighted euclidean over the features both player-seasons have (pbp-only features dropped pairwise before NBA 2002), divided by the square root of the summed weights",
+    "k": 5,
+    "constraints": "same league and role, qualified player-seasons, any season, not the player himself"
+   }
+  },
+  {
+   "id": "wnba_guards",
+   "entity": "player",
+   "league": "wnba",
+   "role": "G",
+   "display": "Guards",
+   "peer_group": "role G (players.json `role`, = value.json role): listed position G; compared within league and season",
+   "position_field": "role",
+   "position_codes": [
+    "G"
+   ],
+   "listed_position_field": "pool",
+   "listed_position_codes": [
+    "G"
+   ],
+   "minimum": {
+    "field": "min",
+    "value": 295,
+    "unit": "minutes",
+    "note": "the payload's `qualified` flag: min >= players.json `min_floor` = round(0.2 x the season's most minutes); value is the typical full-season floor (NBA 510-700, WNBA 150-300), so it scales through a season"
+   },
+   "basis": "per 100 possessions on the floor and shooting / share rates; HPM per 100 possessions",
+   "benchmark": {
+    "target": "next-season HPM",
+    "autocorr_r": 0.59,
+    "n_pairs": 849
+   },
+   "metrics": [
+    {
+     "id": "hpm",
+     "display": "Total impact (HPM)",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Points per 100 possessions he adds to his team's margin over an average player: play-by-play on/off blended with the box score.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.58,
+      "split_half_r": null,
+      "n_pairs": 849,
+      "m50": 547.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.57,
+      "r_next_on_off": 0.29
+     }
+    },
+    {
+     "id": "hpm_o",
+     "display": "Offensive impact",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "The offensive half of HPM: points per 100 possessions added at the scoring end.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.67,
+      "split_half_r": null,
+      "n_pairs": 849,
+      "m50": 381.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.53,
+      "r_next_on_off": 0.28
+     }
+    },
+    {
+     "id": "hpm_d",
+     "display": "Defensive impact",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "The defensive half of HPM: points per 100 possessions taken off opponents.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.59,
+      "split_half_r": null,
+      "n_pairs": 849,
+      "m50": 533.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.13,
+      "r_next_on_off": 0.02
+     }
+    },
+    {
+     "id": "pts100",
+     "display": "Points per 100",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Points scored per 100 team possessions while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.77,
+      "split_half_r": 0.89,
+      "n_pairs": 849,
+      "m50": 87.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.33,
+      "r_next_on_off": 0.16
+     }
+    },
+    {
+     "id": "ts_add",
+     "display": "Scoring efficiency added",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Points per 100 possessions gained by shooting above the league's true-shooting rate on his volume.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.41,
+      "split_half_r": 0.52,
+      "n_pairs": 849,
+      "m50": 653.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.27,
+      "r_next_on_off": 0.21
+     }
+    },
+    {
+     "id": "pox100",
+     "display": "Shot-making",
+     "unit": "per 100 shots",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Points above what an average shooter would score on the same shots (location and type), per 100 shots.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.6,
+      "split_half_r": null,
+      "n_pairs": 281,
+      "m50": 518.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.36,
+      "r_next_on_off": 0.25
+     }
+    },
+    {
+     "id": "ast_pct",
+     "display": "Assist rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Share of team-mates' baskets he assisted while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.8,
+      "split_half_r": 0.92,
+      "n_pairs": 849,
+      "m50": 59.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.38,
+      "r_next_on_off": 0.2
+     }
+    },
+    {
+     "id": "ast_tov",
+     "display": "Assist-to-turnover",
+     "unit": "ratio",
+     "direction": "higher",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Assists per turnover: creation against giveaways.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.64,
+      "split_half_r": 0.58,
+      "n_pairs": 849,
+      "m50": 526.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.32,
+      "r_next_on_off": 0.17
+     }
+    },
+    {
+     "id": "fta100",
+     "display": "Free throws drawn per 100",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Free-throw attempts per 100 possessions: pressure on the rim and fouls drawn.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.73,
+      "split_half_r": 0.85,
+      "n_pairs": 849,
+      "m50": 122.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.2,
+      "r_next_on_off": 0.1
+     }
+    },
+    {
+     "id": "stl_pct",
+     "display": "Steal rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Share of opponent possessions ended by his steal while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.55,
+      "split_half_r": 0.62,
+      "n_pairs": 849,
+      "m50": 442.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.14,
+      "r_next_on_off": 0.06
+     }
+    },
+    {
+     "id": "ts",
+     "display": "True shooting",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Points per shooting attempt, counting threes and free throws.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.37,
+      "split_half_r": 0.53,
+      "n_pairs": 849,
+      "m50": 245.0,
+      "m50_unit": "TSA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.26,
+      "r_next_on_off": 0.19
+     }
+    },
+    {
+     "id": "usg",
+     "display": "Usage",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Share of team possessions he finished with a shot, free throws or a turnover.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.77,
+      "split_half_r": 0.94,
+      "n_pairs": 849,
+      "m50": 43.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.26,
+      "r_next_on_off": 0.1
+     }
+    },
+    {
+     "id": "efg",
+     "display": "Effective FG",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Field-goal percentage with threes worth 1.5 makes.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.39,
+      "split_half_r": 0.51,
+      "n_pairs": 849,
+      "m50": 239.0,
+      "m50_unit": "FGA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.19,
+      "r_next_on_off": 0.16
+     }
+    },
+    {
+     "id": "fg3",
+     "display": "3-point FG",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Share of three-point attempts made (slow to settle: needs hundreds of attempts).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.38,
+      "split_half_r": 0.41,
+      "n_pairs": 844,
+      "m50": 136.0,
+      "m50_unit": "3PA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.09,
+      "r_next_on_off": 0.04
+     }
+    },
+    {
+     "id": "ft",
+     "display": "Free-throw %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of free throws made.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.41,
+      "split_half_r": 0.41,
+      "n_pairs": 849,
+      "m50": 91.0,
+      "m50_unit": "FTA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.2,
+      "r_next_on_off": 0.05
+     }
+    },
+    {
+     "id": "ftr",
+     "display": "Free-throw rate",
+     "unit": "ratio",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Free-throw attempts per field-goal attempt.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "3",
+     "reliability": {
+      "yoy_r": 0.66,
+      "split_half_r": 0.74,
+      "n_pairs": 849,
+      "m50": 252.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.1,
+      "r_next_on_off": 0.06
+     }
+    },
+    {
+     "id": "tpar",
+     "display": "3-point attempt rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Share of his shots taken from three: a style marker, not a skill score.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.86,
+      "split_half_r": 0.95,
+      "n_pairs": 849,
+      "m50": 35.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.01,
+      "r_next_on_off": -0.03
+     }
+    },
+    {
+     "id": "unassisted_share",
+     "display": "Self-created makes",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Share of his made baskets that nobody assisted.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.77,
+      "split_half_r": 0.88,
+      "n_pairs": 281,
+      "m50": 103.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.24,
+      "r_next_on_off": 0.15
+     }
+    },
+    {
+     "id": "ast100",
+     "display": "Assists per 100",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Assists per 100 possessions on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.82,
+      "split_half_r": 0.92,
+      "n_pairs": 849,
+      "m50": 64.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.35,
+      "r_next_on_off": 0.19
+     }
+    },
+    {
+     "id": "tov_pct",
+     "display": "Turnover rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Turnovers per play he used (shots, free-throw trips and turnovers).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.67,
+      "split_half_r": 0.77,
+      "n_pairs": 849,
+      "m50": 221.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.1,
+      "r_next_on_off": 0.02
+     }
+    },
+    {
+     "id": "trb_pct",
+     "display": "Rebound rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "explanation": "Share of all available rebounds he grabbed while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.7,
+      "split_half_r": 0.84,
+      "n_pairs": 849,
+      "m50": 134.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": -0.05,
+      "r_next_on_off": 0.0
+     }
+    },
+    {
+     "id": "blk_pct",
+     "display": "Block rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "explanation": "Share of opponent two-point attempts he blocked while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.66,
+      "split_half_r": 0.67,
+      "n_pairs": 849,
+      "m50": 348.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.01,
+      "r_next_on_off": 0.05
+     }
+    },
+    {
+     "id": "pf100",
+     "display": "Fouls per 100",
+     "unit": "per 100",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "Personal fouls per 100 possessions (fewer is better).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.7,
+      "split_half_r": 0.78,
+      "n_pairs": 849,
+      "m50": 204.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.26,
+      "r_next_on_off": 0.1
+     }
+    },
+    {
+     "id": "rapm",
+     "display": "RAPM",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "explanation": "Regularised adjusted plus-minus: the play-by-play half of HPM on its own.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.71,
+      "split_half_r": null,
+      "n_pairs": 849,
+      "m50": 308.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.39,
+      "r_next_on_off": 0.23
+     }
+    },
+    {
+     "id": "box_impact",
+     "display": "Box impact",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rate",
+     "explanation": "The box-score half of HPM: impact estimated from his stat line.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.57,
+      "split_half_r": null,
+      "n_pairs": 849,
+      "m50": 573.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.57,
+      "r_next_on_off": 0.29
+     }
+    },
+    {
+     "id": "on_off",
+     "display": "On/off",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 16,
+     "basis": "rate",
+     "explanation": "Team net rating with him on the floor minus with him off: noisy, needs several seasons.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.23,
+      "split_half_r": null,
+      "n_pairs": 849,
+      "m50": 2573.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.28,
+      "r_next_on_off": 0.2
+     }
+    },
+    {
+     "id": "and1_100",
+     "display": "And-ones per 100",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 17,
+     "basis": "rate",
+     "explanation": "Baskets made through contact, per 100 possessions.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.58,
+      "split_half_r": null,
+      "n_pairs": 281,
+      "m50": 554.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.27,
+      "r_next_on_off": 0.19
+     }
+    },
+    {
+     "id": "rim_freq",
+     "display": "Rim frequency",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 18,
+     "basis": "rate",
+     "explanation": "Share of his shots taken within 4 feet of the rim: a style marker.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.82,
+      "split_half_r": 0.91,
+      "n_pairs": 281,
+      "m50": 70.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": -0.08,
+      "r_next_on_off": -0.01
+     }
+    },
+    {
+     "id": "avg_dist",
+     "display": "Average shot distance",
+     "unit": "ft",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 19,
+     "basis": "rate",
+     "explanation": "Average distance of his shots: a style marker.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "1",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.89,
+      "split_half_r": 0.94,
+      "n_pairs": 281,
+      "m50": 42.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.01,
+      "r_next_on_off": -0.04
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "hpm_o",
+     "hpm_d",
+     "pts100",
+     "ts_add",
+     "pox100",
+     "ast_pct",
+     "ast_tov",
+     "fta100",
+     "stl_pct",
+     "usg",
+     "tpar",
+     "rim_freq",
+     "trb_pct"
+    ],
+    "standardise": "z-score within league, role and season over qualified players",
+    "weights": {
+     "hpm_o": 0.67,
+     "hpm_d": 0.59,
+     "pts100": 0.77,
+     "ts_add": 0.41,
+     "pox100": 0.6,
+     "ast_pct": 0.8,
+     "ast_tov": 0.64,
+     "fta100": 0.73,
+     "stl_pct": 0.55,
+     "usg": 0.77,
+     "tpar": 0.86,
+     "rim_freq": 0.82,
+     "trb_pct": 0.7
+    },
+    "weights_rule": "yoy_r in this group, floored at 0.2",
+    "distance": "weighted euclidean over the features both player-seasons have (pbp-only features dropped pairwise before NBA 2002), divided by the square root of the summed weights",
+    "k": 5,
+    "constraints": "same league and role, qualified player-seasons, any season, not the player himself"
+   }
+  },
+  {
+   "id": "wnba_wings",
+   "entity": "player",
+   "league": "wnba",
+   "role": "W",
+   "display": "Wings",
+   "peer_group": "role W (players.json `role`, = value.json role): listed F whose box profile is closer to the guards' than the centres' (or under 150 minutes); compared within league and season",
+   "position_field": "role",
+   "position_codes": [
+    "W"
+   ],
+   "listed_position_field": "pool",
+   "listed_position_codes": [
+    "F"
+   ],
+   "minimum": {
+    "field": "min",
+    "value": 295,
+    "unit": "minutes",
+    "note": "the payload's `qualified` flag: min >= players.json `min_floor` = round(0.2 x the season's most minutes); value is the typical full-season floor (NBA 510-700, WNBA 150-300), so it scales through a season"
+   },
+   "basis": "per 100 possessions on the floor and shooting / share rates; HPM per 100 possessions",
+   "benchmark": {
+    "target": "next-season HPM",
+    "autocorr_r": 0.69,
+    "n_pairs": 396
+   },
+   "metrics": [
+    {
+     "id": "hpm",
+     "display": "Total impact (HPM)",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Points per 100 possessions he adds to his team's margin over an average player: play-by-play on/off blended with the box score.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.65,
+      "split_half_r": null,
+      "n_pairs": 396,
+      "m50": 375.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.65,
+      "r_next_on_off": 0.38
+     }
+    },
+    {
+     "id": "hpm_o",
+     "display": "Offensive impact",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "The offensive half of HPM: points per 100 possessions added at the scoring end.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.62,
+      "split_half_r": null,
+      "n_pairs": 396,
+      "m50": 431.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.55,
+      "r_next_on_off": 0.36
+     }
+    },
+    {
+     "id": "hpm_d",
+     "display": "Defensive impact",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "The defensive half of HPM: points per 100 possessions taken off opponents.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.59,
+      "split_half_r": null,
+      "n_pairs": 396,
+      "m50": 488.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.39,
+      "r_next_on_off": 0.15
+     }
+    },
+    {
+     "id": "pts100",
+     "display": "Points per 100",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Points scored per 100 team possessions while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.74,
+      "split_half_r": 0.89,
+      "n_pairs": 396,
+      "m50": 83.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.48,
+      "r_next_on_off": 0.33
+     }
+    },
+    {
+     "id": "ts_add",
+     "display": "Scoring efficiency added",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Points per 100 possessions gained by shooting above the league's true-shooting rate on his volume.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.33,
+      "split_half_r": 0.46,
+      "n_pairs": 396,
+      "m50": 801.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.29,
+      "r_next_on_off": 0.32
+     }
+    },
+    {
+     "id": "pox100",
+     "display": "Shot-making",
+     "unit": "per 100 shots",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Points above what an average shooter would score on the same shots (location and type), per 100 shots.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.4,
+      "split_half_r": null,
+      "n_pairs": 57,
+      "m50": 1044.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.46,
+      "r_next_on_off": 0.16
+     }
+    },
+    {
+     "id": "fta100",
+     "display": "Free throws drawn per 100",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Free-throw attempts per 100 possessions: pressure on the rim and fouls drawn.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.73,
+      "split_half_r": 0.87,
+      "n_pairs": 396,
+      "m50": 105.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.45,
+      "r_next_on_off": 0.27
+     }
+    },
+    {
+     "id": "ast_pct",
+     "display": "Assist rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Share of team-mates' baskets he assisted while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.67,
+      "split_half_r": 0.9,
+      "n_pairs": 396,
+      "m50": 81.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.42,
+      "r_next_on_off": 0.16
+     }
+    },
+    {
+     "id": "drb_pct",
+     "display": "Defensive rebound rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Share of available defensive rebounds he grabbed while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.61,
+      "split_half_r": 0.83,
+      "n_pairs": 396,
+      "m50": 142.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.31,
+      "r_next_on_off": 0.23
+     }
+    },
+    {
+     "id": "stl_pct",
+     "display": "Steal rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Share of opponent possessions ended by his steal while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.6,
+      "split_half_r": 0.73,
+      "n_pairs": 396,
+      "m50": 255.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.51,
+      "r_next_on_off": 0.24
+     }
+    },
+    {
+     "id": "ts",
+     "display": "True shooting",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Points per shooting attempt, counting threes and free throws.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.31,
+      "split_half_r": 0.39,
+      "n_pairs": 396,
+      "m50": 383.0,
+      "m50_unit": "TSA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.24,
+      "r_next_on_off": 0.29
+     }
+    },
+    {
+     "id": "usg",
+     "display": "Usage",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Share of team possessions he finished with a shot, free throws or a turnover.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.77,
+      "split_half_r": 0.96,
+      "n_pairs": 396,
+      "m50": 26.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.44,
+      "r_next_on_off": 0.24
+     }
+    },
+    {
+     "id": "efg",
+     "display": "Effective FG",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Field-goal percentage with threes worth 1.5 makes.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.29,
+      "split_half_r": 0.35,
+      "n_pairs": 396,
+      "m50": 423.0,
+      "m50_unit": "FGA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.11,
+      "r_next_on_off": 0.2
+     }
+    },
+    {
+     "id": "fg3",
+     "display": "3-point FG",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Share of three-point attempts made (slow to settle: needs hundreds of attempts).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.28,
+      "split_half_r": 0.2,
+      "n_pairs": 391,
+      "m50": 348.0,
+      "m50_unit": "3PA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.09,
+      "r_next_on_off": 0.17
+     }
+    },
+    {
+     "id": "ft",
+     "display": "Free-throw %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of free throws made.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.3,
+      "split_half_r": 0.31,
+      "n_pairs": 395,
+      "m50": 130.0,
+      "m50_unit": "FTA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.18,
+      "r_next_on_off": 0.16
+     }
+    },
+    {
+     "id": "tpar",
+     "display": "3-point attempt rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of his shots taken from three: a style marker, not a skill score.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.86,
+      "split_half_r": 0.95,
+      "n_pairs": 396,
+      "m50": 33.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": -0.16,
+      "r_next_on_off": -0.02
+     }
+    },
+    {
+     "id": "unassisted_share",
+     "display": "Self-created makes",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Share of his made baskets that nobody assisted.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.6,
+      "split_half_r": 0.82,
+      "n_pairs": 57,
+      "m50": 153.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.43,
+      "r_next_on_off": 0.19
+     }
+    },
+    {
+     "id": "ast_tov",
+     "display": "Assist-to-turnover",
+     "unit": "ratio",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Assists per turnover: creation against giveaways.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.41,
+      "split_half_r": 0.53,
+      "n_pairs": 396,
+      "m50": 611.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.21,
+      "r_next_on_off": 0.1
+     }
+    },
+    {
+     "id": "tov_pct",
+     "display": "Turnover rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Turnovers per play he used (shots, free-throw trips and turnovers).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.64,
+      "split_half_r": 0.74,
+      "n_pairs": 396,
+      "m50": 244.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.16,
+      "r_next_on_off": 0.17
+     }
+    },
+    {
+     "id": "trb_pct",
+     "display": "Rebound rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Share of all available rebounds he grabbed while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.7,
+      "split_half_r": 0.84,
+      "n_pairs": 396,
+      "m50": 126.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.35,
+      "r_next_on_off": 0.24
+     }
+    },
+    {
+     "id": "orb_pct",
+     "display": "Offensive rebound rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "explanation": "Share of available offensive rebounds he grabbed while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.66,
+      "split_half_r": 0.76,
+      "n_pairs": 396,
+      "m50": 219.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.22,
+      "r_next_on_off": 0.14
+     }
+    },
+    {
+     "id": "blk_pct",
+     "display": "Block rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "explanation": "Share of opponent two-point attempts he blocked while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.56,
+      "split_half_r": 0.62,
+      "n_pairs": 396,
+      "m50": 413.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.24,
+      "r_next_on_off": 0.25
+     }
+    },
+    {
+     "id": "pf100",
+     "display": "Fouls per 100",
+     "unit": "per 100",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "Personal fouls per 100 possessions (fewer is better).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.67,
+      "split_half_r": 0.8,
+      "n_pairs": 396,
+      "m50": 172.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.22,
+      "r_next_on_off": 0.08
+     }
+    },
+    {
+     "id": "rapm",
+     "display": "RAPM",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "explanation": "Regularised adjusted plus-minus: the play-by-play half of HPM on its own.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.74,
+      "split_half_r": null,
+      "n_pairs": 396,
+      "m50": 247.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.49,
+      "r_next_on_off": 0.34
+     }
+    },
+    {
+     "id": "box_impact",
+     "display": "Box impact",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rate",
+     "explanation": "The box-score half of HPM: impact estimated from his stat line.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.64,
+      "split_half_r": null,
+      "n_pairs": 396,
+      "m50": 386.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.65,
+      "r_next_on_off": 0.38
+     }
+    },
+    {
+     "id": "on_off",
+     "display": "On/off",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 16,
+     "basis": "rate",
+     "explanation": "Team net rating with him on the floor minus with him off: noisy, needs several seasons.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.3,
+      "split_half_r": null,
+      "n_pairs": 396,
+      "m50": 1585.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.34,
+      "r_next_on_off": 0.31
+     }
+    },
+    {
+     "id": "rim_freq",
+     "display": "Rim frequency",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 17,
+     "basis": "rate",
+     "explanation": "Share of his shots taken within 4 feet of the rim: a style marker.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.75,
+      "split_half_r": 0.83,
+      "n_pairs": 57,
+      "m50": 141.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.06,
+      "r_next_on_off": 0.03
+     }
+    },
+    {
+     "id": "avg_dist",
+     "display": "Average shot distance",
+     "unit": "ft",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 18,
+     "basis": "rate",
+     "explanation": "Average distance of his shots: a style marker.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "1",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.82,
+      "split_half_r": 0.94,
+      "n_pairs": 57,
+      "m50": 46.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": -0.23,
+      "r_next_on_off": -0.09
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "hpm_o",
+     "hpm_d",
+     "pts100",
+     "ts_add",
+     "pox100",
+     "fta100",
+     "ast_pct",
+     "drb_pct",
+     "stl_pct",
+     "blk_pct",
+     "usg",
+     "tpar",
+     "rim_freq"
+    ],
+    "standardise": "z-score within league, role and season over qualified players",
+    "weights": {
+     "hpm_o": 0.62,
+     "hpm_d": 0.59,
+     "pts100": 0.74,
+     "ts_add": 0.33,
+     "pox100": 0.4,
+     "fta100": 0.73,
+     "ast_pct": 0.67,
+     "drb_pct": 0.61,
+     "stl_pct": 0.6,
+     "blk_pct": 0.56,
+     "usg": 0.77,
+     "tpar": 0.86,
+     "rim_freq": 0.75
+    },
+    "weights_rule": "yoy_r in this group, floored at 0.2",
+    "distance": "weighted euclidean over the features both player-seasons have (pbp-only features dropped pairwise before NBA 2002), divided by the square root of the summed weights",
+    "k": 5,
+    "constraints": "same league and role, qualified player-seasons, any season, not the player himself"
+   }
+  },
+  {
+   "id": "wnba_bigs",
+   "entity": "player",
+   "league": "wnba",
+   "role": "B",
+   "display": "Bigs",
+   "peer_group": "role B (players.json `role`, = value.json role): listed C, or listed F whose box profile is closer to the centres' (150+ minutes); compared within league and season",
+   "position_field": "role",
+   "position_codes": [
+    "B"
+   ],
+   "listed_position_field": "pool",
+   "listed_position_codes": [
+    "C",
+    "F"
+   ],
+   "minimum": {
+    "field": "min",
+    "value": 295,
+    "unit": "minutes",
+    "note": "the payload's `qualified` flag: min >= players.json `min_floor` = round(0.2 x the season's most minutes); value is the typical full-season floor (NBA 510-700, WNBA 150-300), so it scales through a season"
+   },
+   "basis": "per 100 possessions on the floor and shooting / share rates; HPM per 100 possessions",
+   "benchmark": {
+    "target": "next-season HPM",
+    "autocorr_r": 0.74,
+    "n_pairs": 755
+   },
+   "metrics": [
+    {
+     "id": "hpm",
+     "display": "Total impact (HPM)",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Points per 100 possessions he adds to his team's margin over an average player: play-by-play on/off blended with the box score.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.72,
+      "split_half_r": null,
+      "n_pairs": 755,
+      "m50": 275.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.71,
+      "r_next_on_off": 0.36
+     }
+    },
+    {
+     "id": "hpm_o",
+     "display": "Offensive impact",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "The offensive half of HPM: points per 100 possessions added at the scoring end.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.72,
+      "split_half_r": null,
+      "n_pairs": 755,
+      "m50": 266.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.65,
+      "r_next_on_off": 0.31
+     }
+    },
+    {
+     "id": "hpm_d",
+     "display": "Defensive impact",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "The defensive half of HPM: points per 100 possessions taken off opponents.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.57,
+      "split_half_r": null,
+      "n_pairs": 755,
+      "m50": 525.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.25,
+      "r_next_on_off": 0.15
+     }
+    },
+    {
+     "id": "pts100",
+     "display": "Points per 100",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Points scored per 100 team possessions while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.79,
+      "split_half_r": 0.92,
+      "n_pairs": 755,
+      "m50": 59.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.57,
+      "r_next_on_off": 0.24
+     }
+    },
+    {
+     "id": "ts_add",
+     "display": "Scoring efficiency added",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Points per 100 possessions gained by shooting above the league's true-shooting rate on his volume.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.52,
+      "split_half_r": 0.64,
+      "n_pairs": 755,
+      "m50": 371.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.39,
+      "r_next_on_off": 0.19
+     }
+    },
+    {
+     "id": "drb_pct",
+     "display": "Defensive rebound rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of available defensive rebounds he grabbed while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.66,
+      "split_half_r": 0.81,
+      "n_pairs": 755,
+      "m50": 156.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.22,
+      "r_next_on_off": 0.1
+     }
+    },
+    {
+     "id": "orb_pct",
+     "display": "Offensive rebound rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Share of available offensive rebounds he grabbed while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.69,
+      "split_half_r": 0.77,
+      "n_pairs": 755,
+      "m50": 202.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": -0.09,
+      "r_next_on_off": -0.06
+     }
+    },
+    {
+     "id": "blk_pct",
+     "display": "Block rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Share of opponent two-point attempts he blocked while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.78,
+      "split_half_r": 0.83,
+      "n_pairs": 755,
+      "m50": 133.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.13,
+      "r_next_on_off": 0.07
+     }
+    },
+    {
+     "id": "ast_pct",
+     "display": "Assist rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Share of team-mates' baskets he assisted while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.69,
+      "split_half_r": 0.86,
+      "n_pairs": 755,
+      "m50": 105.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.39,
+      "r_next_on_off": 0.24
+     }
+    },
+    {
+     "id": "fta100",
+     "display": "Free throws drawn per 100",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Free-throw attempts per 100 possessions: pressure on the rim and fouls drawn.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.75,
+      "split_half_r": 0.85,
+      "n_pairs": 755,
+      "m50": 114.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.46,
+      "r_next_on_off": 0.21
+     }
+    },
+    {
+     "id": "ts",
+     "display": "True shooting",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Points per shooting attempt, counting threes and free throws.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.49,
+      "split_half_r": 0.56,
+      "n_pairs": 755,
+      "m50": 202.0,
+      "m50_unit": "TSA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.32,
+      "r_next_on_off": 0.15
+     }
+    },
+    {
+     "id": "usg",
+     "display": "Usage",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Share of team possessions he finished with a shot, free throws or a turnover.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.8,
+      "split_half_r": 0.95,
+      "n_pairs": 755,
+      "m50": 37.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.48,
+      "r_next_on_off": 0.19
+     }
+    },
+    {
+     "id": "efg",
+     "display": "Effective FG",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Field-goal percentage with threes worth 1.5 makes.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.43,
+      "split_half_r": 0.52,
+      "n_pairs": 755,
+      "m50": 205.0,
+      "m50_unit": "FGA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.23,
+      "r_next_on_off": 0.1
+     }
+    },
+    {
+     "id": "fg2",
+     "display": "2-point FG",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Share of two-point attempts made.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.44,
+      "split_half_r": 0.49,
+      "n_pairs": 755,
+      "m50": 237.0,
+      "m50_unit": "FGA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.21,
+      "r_next_on_off": 0.08
+     }
+    },
+    {
+     "id": "ft",
+     "display": "Free-throw %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of free throws made.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.58,
+      "split_half_r": 0.56,
+      "n_pairs": 753,
+      "m50": 55.0,
+      "m50_unit": "FTA"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.25,
+      "r_next_on_off": 0.17
+     }
+    },
+    {
+     "id": "ftr",
+     "display": "Free-throw rate",
+     "unit": "ratio",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Free-throw attempts per field-goal attempt.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "3",
+     "reliability": {
+      "yoy_r": 0.67,
+      "split_half_r": 0.71,
+      "n_pairs": 755,
+      "m50": 271.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.17,
+      "r_next_on_off": 0.1
+     }
+    },
+    {
+     "id": "rim_fg",
+     "display": "Rim FG",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Share of shots within 4 feet made.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.42,
+      "split_half_r": 0.34,
+      "n_pairs": 190,
+      "m50": 1295.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.2,
+      "r_next_on_off": 0.12
+     }
+    },
+    {
+     "id": "opp_rim_fg_on",
+     "display": "Opponent rim FG with him on",
+     "unit": "%",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Opponents' make rate at the rim while he is on the floor (lower is better).",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.14,
+      "split_half_r": null,
+      "n_pairs": 190,
+      "m50": 4229.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.01,
+      "r_next_on_off": -0.04
+     }
+    },
+    {
+     "id": "stl_pct",
+     "display": "Steal rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Share of opponent possessions ended by his steal while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.65,
+      "split_half_r": 0.68,
+      "n_pairs": 755,
+      "m50": 322.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.39,
+      "r_next_on_off": 0.23
+     }
+    },
+    {
+     "id": "tov_pct",
+     "display": "Turnover rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Turnovers per play he used (shots, free-throw trips and turnovers).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.58,
+      "split_half_r": 0.69,
+      "n_pairs": 755,
+      "m50": 301.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.37,
+      "r_next_on_off": 0.17
+     }
+    },
+    {
+     "id": "trb_pct",
+     "display": "Rebound rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "explanation": "Share of all available rebounds he grabbed while on the floor.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": 0.69,
+      "split_half_r": 0.82,
+      "n_pairs": 755,
+      "m50": 147.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.14,
+      "r_next_on_off": 0.05
+     }
+    },
+    {
+     "id": "pf100",
+     "display": "Fouls per 100",
+     "unit": "per 100",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "explanation": "Personal fouls per 100 possessions (fewer is better).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.72,
+      "split_half_r": 0.84,
+      "n_pairs": 755,
+      "m50": 129.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.38,
+      "r_next_on_off": 0.15
+     }
+    },
+    {
+     "id": "rapm",
+     "display": "RAPM",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "Regularised adjusted plus-minus: the play-by-play half of HPM on its own.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.76,
+      "split_half_r": null,
+      "n_pairs": 755,
+      "m50": 222.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.52,
+      "r_next_on_off": 0.31
+     }
+    },
+    {
+     "id": "box_impact",
+     "display": "Box impact",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "explanation": "The box-score half of HPM: impact estimated from his stat line.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.71,
+      "split_half_r": null,
+      "n_pairs": 755,
+      "m50": 286.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.71,
+      "r_next_on_off": 0.36
+     }
+    },
+    {
+     "id": "on_off",
+     "display": "On/off",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rate",
+     "explanation": "Team net rating with him on the floor minus with him off: noisy, needs several seasons.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": 0.31,
+      "split_half_r": null,
+      "n_pairs": 755,
+      "m50": 1572.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.39,
+      "r_next_on_off": 0.29
+     }
+    },
+    {
+     "id": "rim_freq",
+     "display": "Rim frequency",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 16,
+     "basis": "rate",
+     "explanation": "Share of his shots taken within 4 feet of the rim: a style marker.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.8,
+      "split_half_r": 0.93,
+      "n_pairs": 190,
+      "m50": 52.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.03,
+      "r_next_on_off": 0.03
+     }
+    },
+    {
+     "id": "tpar",
+     "display": "3-point attempt rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 17,
+     "basis": "rate",
+     "explanation": "Share of his shots taken from three: a style marker, not a skill score.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.81,
+      "split_half_r": 0.97,
+      "n_pairs": 755,
+      "m50": 18.0,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.15,
+      "r_next_on_off": 0.15
+     }
+    },
+    {
+     "id": "putback100",
+     "display": "Putbacks per 100",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 18,
+     "basis": "rate",
+     "explanation": "Putback makes per 100 possessions.",
+     "in_payload": true,
+     "scope": "pbp",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": 0.67,
+      "split_half_r": null,
+      "n_pairs": 190,
+      "m50": 347.0,
+      "m50_unit": "minutes (from year-to-year r; upper bound)"
+     },
+     "predictive": {
+      "target": "next-season HPM",
+      "r": 0.26,
+      "r_next_on_off": 0.18
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "hpm_o",
+     "hpm_d",
+     "pts100",
+     "ts_add",
+     "drb_pct",
+     "orb_pct",
+     "blk_pct",
+     "ast_pct",
+     "fta100",
+     "stl_pct",
+     "usg",
+     "tpar",
+     "rim_freq"
+    ],
+    "standardise": "z-score within league, role and season over qualified players",
+    "weights": {
+     "hpm_o": 0.72,
+     "hpm_d": 0.57,
+     "pts100": 0.79,
+     "ts_add": 0.52,
+     "drb_pct": 0.66,
+     "orb_pct": 0.69,
+     "blk_pct": 0.78,
+     "ast_pct": 0.69,
+     "fta100": 0.75,
+     "stl_pct": 0.65,
+     "usg": 0.8,
+     "tpar": 0.81,
+     "rim_freq": 0.8
+    },
+    "weights_rule": "yoy_r in this group, floored at 0.2",
+    "distance": "weighted euclidean over the features both player-seasons have (pbp-only features dropped pairwise before NBA 2002), divided by the square root of the summed weights",
+    "k": 5,
+    "constraints": "same league and role, qualified player-seasons, any season, not the player himself"
+   }
+  },
+  {
+   "id": "nba_teams",
+   "entity": "team",
+   "league": "nba",
+   "role": null,
+   "display": "Teams",
+   "peer_group": "all teams in the league and season",
+   "position_field": null,
+   "position_codes": [],
+   "minimum": {
+    "field": "values.w + values.l",
+    "value": 10,
+    "unit": "games",
+    "note": "percentiles are shown from 10 games"
+   },
+   "basis": "per 100 possessions, four factors as rates",
+   "metrics": [
+    {
+     "id": "model_net",
+     "display": "Adjusted net rating",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "The model's points per 100 possessions better than average, adjusted for opponents and home court.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.78,
+      "n_pairs": 892,
+      "m50": 11.1,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.76,
+      "r_h2_margin": 0.77
+     },
+     "measured_as": "adj_net (reliability), model_net path at the half (prediction)"
+    },
+    {
+     "id": "model_off",
+     "display": "Adjusted offence",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "The model's points scored per 100 possessions, adjusted for opponents' defences.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.67,
+      "n_pairs": 892,
+      "m50": 19.4,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.56,
+      "r_h2_margin": 0.58
+     },
+     "measured_as": "adj_off"
+    },
+    {
+     "id": "model_def",
+     "display": "Adjusted defence",
+     "unit": "per 100",
+     "direction": "lower",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "The model's points allowed per 100 possessions, adjusted for opponents' offences (lower is better).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.66,
+      "n_pairs": 892,
+      "m50": 20.7,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.53,
+      "r_h2_margin": 0.54
+     },
+     "measured_as": "adj_def"
+    },
+    {
+     "id": "pace",
+     "display": "Pace",
+     "unit": "per 48 (NBA) / 40 (WNBA)",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Possessions per game: a style marker, not a strength.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "style": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.79,
+      "n_pairs": 892,
+      "m50": 10.5,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": -0.09,
+      "r_h2_margin": -0.07
+     }
+    },
+    {
+     "id": "efg",
+     "display": "Effective FG",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Shooting with threes worth 1.5 makes: the biggest of the four factors.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.67,
+      "n_pairs": 880,
+      "m50": 19.4,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.53,
+      "r_h2_margin": 0.54
+     }
+    },
+    {
+     "id": "opp_efg",
+     "display": "Opponent effective FG",
+     "unit": "%",
+     "direction": "lower",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "The same for opponents: shooting defence.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.58,
+      "n_pairs": 880,
+      "m50": 28.9,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.52,
+      "r_h2_margin": 0.52
+     }
+    },
+    {
+     "id": "tov_pct",
+     "display": "Turnover rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Turnovers per possession (lower is better).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.65,
+      "n_pairs": 880,
+      "m50": 21.9,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.29,
+      "r_h2_margin": 0.28
+     }
+    },
+    {
+     "id": "opp_tov_pct",
+     "display": "Forced turnover rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Opponent turnovers per possession.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.64,
+      "n_pairs": 880,
+      "m50": 22.2,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.07,
+      "r_h2_margin": 0.07
+     }
+    },
+    {
+     "id": "orb_pct",
+     "display": "Offensive rebound rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Share of its own misses the team gets back.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.63,
+      "n_pairs": 880,
+      "m50": 23.3,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": -0.02,
+      "r_h2_margin": -0.03
+     }
+    },
+    {
+     "id": "drb_pct",
+     "display": "Defensive rebound rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Share of opponents' misses the team secures.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.57,
+      "n_pairs": 880,
+      "m50": 29.5,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.29,
+      "r_h2_margin": 0.3
+     }
+    },
+    {
+     "id": "net",
+     "display": "Net rating",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Raw points per 100 possessions better than opponents, not schedule-adjusted.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.76,
+      "n_pairs": 892,
+      "m50": 12.5,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.75,
+      "r_h2_margin": 0.76
+     }
+    },
+    {
+     "id": "ortg",
+     "display": "Offensive rating",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Raw points scored per 100 possessions.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.67,
+      "n_pairs": 892,
+      "m50": 19.5,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.57,
+      "r_h2_margin": 0.59
+     }
+    },
+    {
+     "id": "drtg",
+     "display": "Defensive rating",
+     "unit": "per 100",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Raw points allowed per 100 possessions.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.65,
+      "n_pairs": 892,
+      "m50": 21.5,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.54,
+      "r_h2_margin": 0.55
+     }
+    },
+    {
+     "id": "ftr",
+     "display": "Free-throw rate",
+     "unit": "ratio",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Free throws made per field-goal attempt.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "3",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.6,
+      "n_pairs": 880,
+      "m50": 26.4,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.14,
+      "r_h2_margin": 0.15
+     }
+    },
+    {
+     "id": "opp_ftr",
+     "display": "Opponent free-throw rate",
+     "unit": "ratio",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Opponents' free throws made per field-goal attempt (lower is better).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "3",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.68,
+      "n_pairs": 880,
+      "m50": 19.0,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.2,
+      "r_h2_margin": 0.18
+     }
+    },
+    {
+     "id": "fg3",
+     "display": "3-point %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of threes made.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.4,
+      "n_pairs": 880,
+      "m50": 60.3,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.35,
+      "r_h2_margin": 0.37
+     }
+    },
+    {
+     "id": "tpar",
+     "display": "3-point attempt rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Share of shots from three: a style marker.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.82,
+      "n_pairs": 880,
+      "m50": 8.5,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.18,
+      "r_h2_margin": 0.21
+     }
+    },
+    {
+     "id": "opp_fg3",
+     "display": "Opponent 3-point %",
+     "unit": "%",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Opponents' three-point percentage: mostly luck over half a season.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.11,
+      "n_pairs": 880,
+      "m50": 334.6,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.3,
+      "r_h2_margin": 0.3
+     }
+    },
+    {
+     "id": "win_pct",
+     "display": "Win %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Share of games won.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.73,
+      "n_pairs": 892,
+      "m50": 14.4,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.73,
+      "r_h2_margin": 0.74
+     }
+    },
+    {
+     "id": "mov",
+     "display": "Average margin",
+     "unit": "points",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Average points margin per game.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.76,
+      "n_pairs": 892,
+      "m50": 12.5,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.75,
+      "r_h2_margin": 0.76
+     }
+    },
+    {
+     "id": "pyth_wins",
+     "display": "Pythagorean wins",
+     "unit": "wins",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "count",
+     "explanation": "Wins expected from points scored and allowed.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.77,
+      "n_pairs": 892,
+      "m50": 12.2,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.75,
+      "r_h2_margin": 0.76
+     },
+     "measured_as": "pyth_pct"
+    },
+    {
+     "id": "luck",
+     "display": "Wins above Pythagorean",
+     "unit": "wins",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "count",
+     "explanation": "Actual wins minus Pythagorean wins: mostly close-game luck.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": null,
+      "n_pairs": null,
+      "m50": null,
+      "m50_unit": null,
+      "note": "not measured; close_win_pct (its driver) has first v second half r 0.13"
+     },
+     "predictive": {
+      "target": null,
+      "r": null,
+      "note": "not measured"
+     }
+    },
+    {
+     "id": "close_win_pct",
+     "display": "Close-game win %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "Win % in games within 5 points: does not repeat.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.13,
+      "n_pairs": 892,
+      "m50": 259.0,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.29,
+      "r_h2_margin": 0.29
+     }
+    }
+   ],
+   "benchmark": {
+    "target": "second-half win %",
+    "first_half_win_pct_r": 0.73
+   }
+  },
+  {
+   "id": "wnba_teams",
+   "entity": "team",
+   "league": "wnba",
+   "role": null,
+   "display": "Teams",
+   "peer_group": "all teams in the league and season",
+   "position_field": null,
+   "position_codes": [],
+   "minimum": {
+    "field": "values.w + values.l",
+    "value": 10,
+    "unit": "games",
+    "note": "percentiles are shown from 10 games"
+   },
+   "basis": "per 100 possessions, four factors as rates",
+   "metrics": [
+    {
+     "id": "model_net",
+     "display": "Adjusted net rating",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "The model's points per 100 possessions better than average, adjusted for opponents and home court.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "2",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.63,
+      "n_pairs": 302,
+      "m50": 10.3,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.62,
+      "r_h2_margin": 0.66
+     },
+     "measured_as": "adj_net (reliability), model_net path at the half (prediction)"
+    },
+    {
+     "id": "model_off",
+     "display": "Adjusted offence",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "The model's points scored per 100 possessions, adjusted for opponents' defences.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.56,
+      "n_pairs": 302,
+      "m50": 13.4,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.45,
+      "r_h2_margin": 0.48
+     },
+     "measured_as": "adj_off"
+    },
+    {
+     "id": "model_def",
+     "display": "Adjusted defence",
+     "unit": "per 100",
+     "direction": "lower",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "The model's points allowed per 100 possessions, adjusted for opponents' offences (lower is better).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.48,
+      "n_pairs": 302,
+      "m50": 18.5,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.41,
+      "r_h2_margin": 0.43
+     },
+     "measured_as": "adj_def"
+    },
+    {
+     "id": "pace",
+     "display": "Pace",
+     "unit": "per 48 (NBA) / 40 (WNBA)",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Possessions per game: a style marker, not a strength.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "style": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.66,
+      "n_pairs": 302,
+      "m50": 8.9,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.07,
+      "r_h2_margin": 0.04
+     }
+    },
+    {
+     "id": "efg",
+     "display": "Effective FG",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Shooting with threes worth 1.5 makes: the biggest of the four factors.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.57,
+      "n_pairs": 302,
+      "m50": 13.2,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.39,
+      "r_h2_margin": 0.4
+     }
+    },
+    {
+     "id": "opp_efg",
+     "display": "Opponent effective FG",
+     "unit": "%",
+     "direction": "lower",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "The same for opponents: shooting defence.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.4,
+      "n_pairs": 302,
+      "m50": 25.7,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.38,
+      "r_h2_margin": 0.36
+     }
+    },
+    {
+     "id": "tov_pct",
+     "display": "Turnover rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Turnovers per possession (lower is better).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.58,
+      "n_pairs": 302,
+      "m50": 12.6,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.24,
+      "r_h2_margin": 0.27
+     }
+    },
+    {
+     "id": "opp_tov_pct",
+     "display": "Forced turnover rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Opponent turnovers per possession.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.6,
+      "n_pairs": 302,
+      "m50": 11.5,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.01,
+      "r_h2_margin": 0.04
+     }
+    },
+    {
+     "id": "orb_pct",
+     "display": "Offensive rebound rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Share of its own misses the team gets back.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.64,
+      "n_pairs": 302,
+      "m50": 9.7,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.04,
+      "r_h2_margin": 0.05
+     }
+    },
+    {
+     "id": "drb_pct",
+     "display": "Defensive rebound rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Share of opponents' misses the team secures.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.47,
+      "n_pairs": 302,
+      "m50": 19.2,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.32,
+      "r_h2_margin": 0.32
+     }
+    },
+    {
+     "id": "net",
+     "display": "Net rating",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Raw points per 100 possessions better than opponents, not schedule-adjusted.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.62,
+      "n_pairs": 302,
+      "m50": 10.6,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.58,
+      "r_h2_margin": 0.62
+     }
+    },
+    {
+     "id": "ortg",
+     "display": "Offensive rating",
+     "unit": "per 100",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Raw points scored per 100 possessions.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.58,
+      "n_pairs": 302,
+      "m50": 12.5,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.47,
+      "r_h2_margin": 0.5
+     }
+    },
+    {
+     "id": "drtg",
+     "display": "Defensive rating",
+     "unit": "per 100",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Raw points allowed per 100 possessions.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.53,
+      "n_pairs": 302,
+      "m50": 15.7,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.42,
+      "r_h2_margin": 0.44
+     }
+    },
+    {
+     "id": "ftr",
+     "display": "Free-throw rate",
+     "unit": "ratio",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Free throws made per field-goal attempt.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "3",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.42,
+      "n_pairs": 302,
+      "m50": 23.6,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.14,
+      "r_h2_margin": 0.14
+     }
+    },
+    {
+     "id": "opp_ftr",
+     "display": "Opponent free-throw rate",
+     "unit": "ratio",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Opponents' free throws made per field-goal attempt (lower is better).",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "3",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.48,
+      "n_pairs": 302,
+      "m50": 19.0,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.25,
+      "r_h2_margin": 0.27
+     }
+    },
+    {
+     "id": "fg3",
+     "display": "3-point %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of threes made.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.21,
+      "n_pairs": 302,
+      "m50": 66.1,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.15,
+      "r_h2_margin": 0.13
+     }
+    },
+    {
+     "id": "tpar",
+     "display": "3-point attempt rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Share of shots from three: a style marker.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "style": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.85,
+      "n_pairs": 302,
+      "m50": 3.0,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.01,
+      "r_h2_margin": 0.06
+     }
+    },
+    {
+     "id": "opp_fg3",
+     "display": "Opponent 3-point %",
+     "unit": "%",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Opponents' three-point percentage: mostly luck over half a season.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.03,
+      "n_pairs": 302,
+      "m50": 594.2,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.18,
+      "r_h2_margin": 0.2
+     }
+    },
+    {
+     "id": "win_pct",
+     "display": "Win %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Share of games won.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.58,
+      "n_pairs": 302,
+      "m50": 12.6,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.58,
+      "r_h2_margin": 0.61
+     }
+    },
+    {
+     "id": "mov",
+     "display": "Average margin",
+     "unit": "points",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Average points margin per game.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.62,
+      "n_pairs": 302,
+      "m50": 10.6,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.58,
+      "r_h2_margin": 0.62
+     }
+    },
+    {
+     "id": "pyth_wins",
+     "display": "Pythagorean wins",
+     "unit": "wins",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "count",
+     "explanation": "Wins expected from points scored and allowed.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.62,
+      "n_pairs": 302,
+      "m50": 10.7,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.58,
+      "r_h2_margin": 0.62
+     },
+     "measured_as": "pyth_pct"
+    },
+    {
+     "id": "luck",
+     "display": "Wins above Pythagorean",
+     "unit": "wins",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "count",
+     "explanation": "Actual wins minus Pythagorean wins: mostly close-game luck.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "1",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": null,
+      "n_pairs": null,
+      "m50": null,
+      "m50_unit": null,
+      "note": "not measured; close_win_pct (its driver) has first v second half r 0.0"
+     },
+     "predictive": {
+      "target": null,
+      "r": null,
+      "note": "not measured"
+     }
+    },
+    {
+     "id": "close_win_pct",
+     "display": "Close-game win %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "Win % in games within 5 points: does not repeat.",
+     "in_payload": true,
+     "scope": "all",
+     "fmt": "pct",
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": 0.0,
+      "n_pairs": 256,
+      "m50": 45349167.5,
+      "m50_unit": "games",
+      "kind": "first half v second half of the season, r uncorrected"
+     },
+     "predictive": {
+      "target": "second-half win %",
+      "r": 0.21,
+      "r_h2_margin": 0.23
+     }
+    }
+   ],
+   "benchmark": {
+    "target": "second-half win %",
+    "first_half_win_pct_r": 0.58
+   }
+  }
+ ],
+ "payload_changes": [
+  {
+   "field": "players.json players{pid}.role (G|W|B), catalogue roles / role_rule",
+   "builder": "oddsmarkets/basketball/analytics/players.py:build",
+   "status": "done",
+   "note": "code and test done 22 Oct 2026 (value.classify_roles, identical to value.json role: 100% agreement on NBA 2026, WNBA 2026, NBA 2000); appears in the payloads at the next build; not rebuilt locally. Until then the role is in value.json rows (col 'role')."
+  },
+  {
+   "field": "players.json players{pid}.pct_role {key: 0-100}",
+   "builder": "oddsmarkets/basketball/analytics/players.py:role_percentiles",
+   "status": "done",
+   "note": "percentile within role among qualified players for players.ROLE_PCT_KEYS (35 keys: every headline and secondary metric here); about +7% on players.json (NBA 2026 3.76 MB -> 4.02 MB; ~10 MB over all seasons of both leagues)."
+  },
+  {
+   "field": "players/<pid>.json similar_role [{id,name,season,distance}]",
+   "builder": "oddsmarkets/basketball/analytics/players.py:similar_index/similar (called from scripts/build_hardwood.py careers)",
+   "status": "needed",
+   "note": "the spec's similarity (role features, z within league-role-season, yoy-weighted euclidean, same role, k=5) as a new field beside the existing `similar` (which uses 20 league-percentile keys, all positions, RMS); front end switches to it once present."
+  },
+  {
+   "field": "teams.json values.model_off / model_def reliability",
+   "builder": "n/a",
+   "status": "needed",
+   "note": "no measurement change needed in the payload; the spec measured them through an equivalent opponent-adjusted offence/defence fit on half-seasons (adj_off / adj_def). The rating path (log.net_rating_after) has net only."
+  }
+ ]
+}

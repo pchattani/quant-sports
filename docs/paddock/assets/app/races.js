@@ -25,18 +25,18 @@ function renderRaces(el, params) {
     var favRounds = done.filter(function (c) { return (c.p_win_top || []).length; });
     var favWon = favRounds.filter(function (c) { return c.winner === c.p_win_top[0][0]; }).length;
     var poleWon = done.filter(function (c) { return c.pole && c.pole === c.winner; }).length;
-    var head = el.querySelector('.pd-head .qk-sub');
+    var head = el.querySelector('.pd-head .qk-sh-sub');
     if (head) head.innerHTML = season.rounds_done + ' of ' + season.rounds_total + ' rounds run' + (nxt ? ' · next: <a href="' + PD.raceHref(y, nxt.round) + '">' + esc(nxt.name) + '</a>, ' + esc(PD.fmtDate(nxt.date, { year: false })) : '');
     var h = PD.kpis([
       PD.kpi('Rounds', season.rounds_done + ' / ' + season.rounds_total, cal.filter(function (c) { return c.sprint; }).length + ' sprint weekends'),
       PD.kpi('Different winners', String(Object.keys(winners).length), done.length ? 'in ' + done.length + ' races' : ''),
       PD.kpi('Won from pole', done.length ? PD.pct(poleWon / done.length, 0) : '—', poleWon + ' of ' + done.length),
-      PD.kpi('Favourite won', favRounds.length ? favWon + ' / ' + favRounds.length : '—', favRounds.length ? 'the model’s pre-race pick' : 'no stored forecasts')
+      PD.kpi('Our favourite won', favRounds.length ? favWon + '/' + favRounds.length : '—', favRounds.length ? 'our pre-race pick to win' : 'no stored forecasts', { signal: true })
     ]);
     h += '<div class="qk-auto pd-cal" style="--min:230px">' + cal.map(function (c) { return raceCard(y, c); }).join('') + '</div>';
     h += PD.grid(
       PD.card('Wins', 'Grand Prix wins this season by driver.', PD.chartBox('rc-wins', Math.max(160, Object.keys(winners).length * 28 + 30)), { span: 6 }) +
-      PD.card('Every round', 'Winner, pole, fastest lap and the model’s favourite; ✓ when it won.', '<div id="rc-table"></div>', { span: 6, flush: true }), 'pd-mt');
+      PD.card('Every round', 'Winner, pole, fastest lap and our pre-race favourite with its win chance; ✓ when it won.', '<div id="rc-table"></div>', { span: 6, flush: true }), 'pd-mt');
     PD.set('rc-body', h);
     var wins = Object.keys(winners).sort(function (a, b) { return winners[b] - winners[a]; });
     var teamOf = {};
@@ -49,7 +49,7 @@ function renderRaces(el, params) {
       { key: 'winner', label: 'Winner', fmt: function (v, r) { return v ? PD.driverLink(v, { code: true, team: r.winner_team }) : '<span class="qk-muted">' + (r.status === 'next' ? 'next' : '—') + '</span>'; } },
       { key: 'pole', label: 'Pole', fmt: function (v) { return v ? PD.driverLink(v, { code: true }) : '—'; } },
       { key: 'fastest', label: 'FL', tip: 'Fastest lap', fmt: function (v) { return v ? PD.driverLink(v, { code: true }) : '—'; } },
-      { key: 'favp', label: 'Favourite', num: true, fmt: function (v, r) { var f = (r.p_win_top || [])[0]; return f ? PD.driverLink(f[0], { code: true }) + ' ' + PD.pct(f[1], 0) + (r.winner === f[0] ? ' ✓' : '') : '—'; } }
+      { key: 'favp', label: 'Our favourite', num: true, fmt: function (v, r) { var f = (r.p_win_top || [])[0]; return f ? PD.driverLink(f[0], { code: true }) + ' ' + PD.pct(f[1], 0) + (r.winner === f[0] ? ' ✓' : '') : '—'; } }
     ], cal.map(function (c) { return Object.assign({}, c, { favp: (c.p_win_top || [])[0] ? c.p_win_top[0][1] : null }); }), { sort: { key: 'round', dir: 'asc' }, maxHeight: 560 });
   });
 }
@@ -60,7 +60,7 @@ function raceCard(y, c) {
   var status = c.status === 'done' ? '<span class="qk-badge final">Result</span>' : c.status === 'next' ? '<span class="qk-badge accent">Next</span>' : '<span class="qk-badge">' + esc(PD.fmtDate(c.date, { year: false, weekday: false })) + '</span>';
   var body;
   if (c.status === 'done' && c.winner) body = '<div class="pd-rc-win">' + PD.mark(team) + '<span><b>' + esc(PD.driverName(c.winner)) + '</b><span class="qk-sub">' + esc(PD.teamName(team)) + '</span></span></div>';
-  else if (fav) body = '<div class="pd-rc-win"><span class="pd-rc-p">' + PD.pct(fav[1], 0) + '</span><span><b>' + esc(PD.driverName(fav[0])) + '</b><span class="qk-sub">model favourite</span></span></div>';
+  else if (fav) body = '<div class="pd-rc-win"><span class="pd-rc-p">' + PD.pct(fav[1], 0) + '</span><span><b>' + esc(PD.driverName(fav[0])) + '</b><span class="qk-sub">our favourite</span></span></div>';
   else body = '<div class="pd-rc-win qk-muted">' + esc(c.status === 'done' ? 'Result pending' : 'Forecast after the previous race') + '</div>';
   return '<a class="qk-card is-link pd-rc' + (c.status === 'next' ? ' is-next' : '') + '" href="' + PD.raceHref(y, c.round) + '" style="--tc:' + esc(team ? PD.tc(team) : 'var(--line-2)') + '">' +
     '<div class="pd-rc-top"><span class="pd-rc-n">R' + c.round + '</span>' + status + '</div>' +
@@ -161,10 +161,9 @@ function renderCircuit(el, params) {
     var hist = (c.history || []).slice().sort(function (a, b) { return b.year - a.year; });
     var yrs = hist.map(function (x) { return x.year; });
     var s = (p || {}).samples || {};
-    var h = '<section class="qk-hero pd-hero-ent" style="--tc:var(--a-f1)"><div class="qk-hero-in"><span class="qk-team-mark lg" style="--tc:var(--a-f1);--ti:#fff">' + esc(String(c.country || id).slice(0, 3).toUpperCase()) + '</span>' +
-      '<div><div class="qk-kicker">' + esc([c.locality, c.country].filter(Boolean).join(', ')) + '</div><h1>' + esc(c.name || PD.circuitName(id)) + '</h1><div class="qk-hero-meta">' +
-      (hist.length ? '<span><b>' + hist.length + '</b> world championship races</span><span>' + Math.min.apply(null, yrs) + '–' + Math.max.apply(null, yrs) + '</span>' : '') + (p && isNum(p.length_km) ? '<span><b>' + PD.num(p.length_km, 3) + '</b> km lap</span>' : '') + '</div></div>' +
-      '<div class="qk-hero-stats">' + (p ? '<div class="qk-hero-stat"><div class="v">' + PD.pct(p.p_sc_race, 0) + '</div><div class="l">Safety car</div></div><div class="qk-hero-stat"><div class="v">' + PD.num(100 * (p.overtake_difficulty || 0), 0) + '</div><div class="l">Overtaking difficulty</div></div><div class="qk-hero-stat"><div class="v">' + PD.num(p.pit_loss_s, 1) + 's</div><div class="l">Pit loss</div></div>' : '') + '</div></div></section>';
+    var h = PD.pageHead('Circuit · ' + esc([c.locality, c.country].filter(Boolean).join(', ')), c.name || PD.circuitName(id),
+      [hist.length ? '<b>' + hist.length + '</b> world championship races, ' + Math.min.apply(null, yrs) + '–' + Math.max.apply(null, yrs) : '', p && isNum(p.length_km) ? '<b>' + PD.num(p.length_km, 3) + '</b> km lap' : ''].filter(Boolean).join(' · '),
+      '<a class="qk-btn" href="#/circuits">All circuits</a>');
     h += racesNav('circuits');
     if (p) {
       var scRace = isNum(p.sc_rate_per_lap) && isNum(p.laps) ? p.sc_rate_per_lap * p.laps : null;

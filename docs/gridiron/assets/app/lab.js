@@ -99,7 +99,7 @@ function draw(S) {
     const cv = colourMetric ? rows.map(r => val(r, colourMetric)).filter(isNum) : [];
     const colourOf = r => {
       if (S0.color === 'team') return GI.ch.lift(GI.teamColour(tm(r)), T);
-      if (S0.color === 'conf') return GI.teamInfo(tm(r)).conference === 'AFC' ? T.market : T.model;
+      if (S0.color === 'conf') return GI.teamInfo(tm(r)).conference === 'AFC' ? T.cat[1] : T.model;
       if (S0.color === 'pos') { const p = String(raw(r, 'pos') || '—'); if (!posCol[p]) posCol[p] = T.cat[Object.keys(posCol).length % 8]; return posCol[p]; }
       return T.model;
     };

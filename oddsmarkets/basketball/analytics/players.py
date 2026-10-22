@@ -41,6 +41,7 @@ import pandas as pd
 
 from oddsmarkets.basketball import analytics as an
 from oddsmarkets.basketball.analytics import lineups as LU
+from oddsmarkets.basketball.analytics import value as VAL
 from oddsmarkets.basketball.analytics.context import SeasonContext
 from oddsmarkets.basketball.models import _io
 
@@ -194,6 +195,14 @@ PBP_KEYS = [m["key"] for m in METRICS if m["scope"] == "pbp"]
 
 SIMILAR_KEYS = ["pts100", "ts", "usg", "tpar", "ftr", "ast_pct", "tov_pct", "orb_pct", "drb_pct", "stl_pct", "blk_pct", "hpm_o",
                 "hpm_d", "rim_freq", "ab3_freq", "c3_freq", "smid_freq", "lmid_freq", "assisted_share", "avg_dist"]
+
+# Role peer groups (docs/_design/metrics/basketball.json, METRICS_SPEC.md): each row carries `role` G / W / B
+# (analytics/value.classify_roles, the same rule as value.json) and `pct_role`, its percentile among the qualified
+# players of that role, for the spec's headline and secondary player metrics.
+ROLE_PCT_KEYS = ["hpm", "hpm_o", "hpm_d", "pts100", "ts_add", "pox100", "ast_pct", "ast_tov", "fta100", "stl_pct", "drb_pct",
+                 "orb_pct", "blk_pct", "ts", "usg", "efg", "fg2", "fg3", "ft", "ftr", "tpar", "unassisted_share", "ast100", "tov_pct",
+                 "trb_pct", "pf100", "rapm", "box_impact", "on_off", "and1_100", "rim_freq", "avg_dist", "rim_fg", "opp_rim_fg_on",
+                 "putback100"]
 
 
 # ---------------------------------------------------------------------------------------------- box aggregation
@@ -587,12 +596,39 @@ def build(ctx: SeasonContext, history: dict | None = None, lineup_tables: dict |
     an.add_percentiles(rows, METRICS, qual, {p: r["pool"] for p, r in rows.items()})
     for pl in an.POOLS:
         meta["pools"][pl]["n"] = sum(1 for p in qual if rows[p]["pool"] == pl)
+    roles, rinfo = VAL.classify_roles({"players": rows})
+    for p, r in rows.items():
+        r["role"] = roles.get(p, "W")
+    role_percentiles(rows, qual)
+    meta["roles"] = {k: {"label": VAL.ROLE_LABELS[k], "n": sum(1 for p in qual if rows[p]["role"] == k)} for k in VAL.ROLES}
+    meta["role_rule"] = rinfo
     meta["min_floor"] = floor
     meta["n_qualified"] = len(qual)
     meta["league_ts"] = round(lg_ts, 4)
     meta["has_pbp"] = bool(shots) or bool(ev)
     meta["players"] = rows
     return meta
+
+
+def role_percentiles(rows: dict[str, dict], qualified: list[str], keys: list[str] = ROLE_PCT_KEYS, min_role: int = 3) -> None:
+    """Write `pct_role` {key: 0-100} onto every row in place: placed against the qualified players of the row's `role`
+    (100 = best, direction-aware, the catalogue's mid-rank convention); no entry when the role has fewer than `min_role`
+    qualified players with a value."""
+    lower = {m["key"]: bool(m["lower"]) for m in METRICS}
+    by_role: dict[str, list[str]] = {}
+    for p in qualified:
+        by_role.setdefault(rows[p].get("role") or "W", []).append(p)
+    for r in rows.values():
+        r["pct_role"] = {}
+    for k in keys:
+        if k not in lower:
+            continue
+        ref = {rl: sorted(v for v in (an.fnum(rows[p]["values"].get(k)) for p in mem) if v is not None) for rl, mem in by_role.items()}
+        for r in rows.values():
+            v = an.fnum(r["values"].get(k))
+            rv = ref.get(r.get("role") or "W") or []
+            if v is not None and len(rv) >= min_role:
+                r["pct_role"][k] = an._place(rv, v, lower[k])
 
 
 # ---------------------------------------------------------------------------------------------- the current-season block

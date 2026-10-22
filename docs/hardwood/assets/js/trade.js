@@ -1,5 +1,5 @@
 /* The Quant Hardwood — trade simulator (#/<L>/trade): pick two or three teams and the players moving,
- * and see each team's depth chart, rating, wins and odds change.
+ * and see each team's depth chart, rating, wins and chances change.
  *
  * Data: data/<L>/<S>/trade.json for the league's current season (analytics/value.py trade_payload):
  * players {cols, rows} with each player's rest-of-season HPM (rate, o, d), projected minutes, position
@@ -8,7 +8,7 @@
  * rating shifted; params (game minutes, cap, per-player cap, replacement, pace, points per win).
  *
  * The depth chart (applyMoves) follows analytics/value.py apply_moves exactly; the odds are the
- * team's curve at the change in its net rating (linear between grid points, the edge beyond it),
+ * team's curve at the change in its net rating (linear between grid points, the end value beyond it),
  * added to the full simulation's baseline. State lives in the URL hash:
  *   #/<L>/trade?t=<tid>,<tid>[,<tid>]&m=<pid>-<to tid>.<pid>-<to tid>
  * No salaries: the cap is not checked. */
@@ -181,7 +181,7 @@ function page(el, L, S, d, query, shown) {
   if (shown && shown !== S) h += '<div class="pad">' + fx.muted('The trade simulator always uses the current season (' + fx.esc(fx.seasonLabel(L, S)) + ').') + '</div>';
   if (noSim) h += '<div class="pad">' + fx.muted('No season simulation right now (' + fx.esc(d.phase || 'offseason') + '): the page shows the rating change and wins over a full season from the game model\'s conversion, without odds.') + '</div>';
   h += '<div class="tr-pick" id="tr-pick"></div></div><div class="grid-' + (st.teams.length === 3 ? '3' : '2') + '" id="tr-rosters"></div><div id="tr-out"></div>';
-  h += '<div class="card"><div class="pad pg-note">How to read it: the rating change is the team\'s net points per 100 possessions after the depth chart is rebuilt (impact of every player × minutes, replacement level ' + fx.signed(P.repl, 1) + ' for unfilled minutes, each player capped at ' + fx.num(P.max_min, 1) + ' minutes). Each team\'s odds are read off its own sensitivity curve with every other team at its rating, so the effect of the two trading teams meeting each other is left out (small). Beyond the curve\'s range (±' + fx.num(curves ? Math.max.apply(null, curves.shifts.map(Math.abs)) : 6, 0) + ') the edge value is used. Next season applies the aging curve to each player\'s rate over a full season at current minutes. Model suggestions based on on-field value; not considering the salary cap, contracts, fit or availability.</div></div>';
+  h += '<div class="card"><div class="pad pg-note">How to read it: the rating change is the team\'s net points per 100 possessions after the depth chart is rebuilt (impact of every player × minutes, replacement level ' + fx.signed(P.repl, 1) + ' for unfilled minutes, each player capped at ' + fx.num(P.max_min, 1) + ' minutes). Each team\'s chances are read off its own sensitivity curve with every other team at its rating, so the effect of the two trading teams meeting each other is left out (small). Beyond the curve\'s range (±' + fx.num(curves ? Math.max.apply(null, curves.shifts.map(Math.abs)) : 6, 0) + ') the end value is used. Next season applies the aging curve to each player\'s rate over a full season at current minutes. Model suggestions based on on-field value; not considering the salary cap, contracts, fit or availability.</div></div>';
   el.innerHTML = h;
 
   function teamSelect(i) {
@@ -257,7 +257,7 @@ function page(el, L, S, d, query, shown) {
     let dW = curves ? curveDelta(curves, t, 'exp_w', res.delta) : null;
     if (dW === null) dW = res.delta * P.pace / 100 * left / P.ppw;
     const range = curves ? Math.max.apply(null, curves.shifts.map(Math.abs)) : null;
-    const nowTxt = left > 0 ? (dW >= 0.5 ? 'wins now' : dW <= -0.5 ? 'weakens now' : 'about even now') : (curves && Math.abs(curveDelta(curves, t, 'p_title', res.delta) || 0) >= 0.005 ? ((curveDelta(curves, t, 'p_title', res.delta) > 0) ? 'better title odds now' : 'worse title odds now') : 'no change this season');
+    const nowTxt = left > 0 ? (dW >= 0.5 ? 'wins now' : dW <= -0.5 ? 'weakens now' : 'about even now') : (curves && Math.abs(curveDelta(curves, t, 'p_title', res.delta) || 0) >= 0.005 ? ((curveDelta(curves, t, 'p_title', res.delta) > 0) ? 'better title chances now' : 'worse title chances now') : 'no change this season');
     const dNext = nextIn - nextOut;
     const longTxt = dNext >= 0.5 ? 'long-term gain' : dNext <= -0.5 ? 'long-term cost' : 'about even next season';
     const nm = pid => (byId[pid] || {}).name || fx.playerName(L, pid);
@@ -276,7 +276,7 @@ function page(el, L, S, d, query, shown) {
         const after = fx.isNum(dd) ? Math.max(0, Math.min(1, T[o[0]] + dd)) : null;
         return [o[1], { v: T[o[0]], html: fx.pct(T[o[0]]) }, { v: after, html: fx.pct(after) }, { v: fx.isNum(after) ? after - T[o[0]] : null, html: fx.isNum(after) ? '<span class="' + (after - T[o[0]] > 0.0005 ? (o[0] === 'p_top4' ? 'pg-down' : 'pg-up') : after - T[o[0]] < -0.0005 ? (o[0] === 'p_top4' ? 'pg-up' : 'pg-down') : '') + '">' + fx.signed(100 * (after - T[o[0]]), 1) + ' pp</span>' : '—' }];
       });
-      h += rows.length ? HW.tableHTML([{ label: 'Season odds' }, { label: 'Now', align: 'right' }, { label: 'After', align: 'right' }, { label: 'Change', align: 'right' }], rows, { compact: true }) : '';
+      h += rows.length ? HW.tableHTML([{ label: 'Season chances' }, { label: 'Now', align: 'right' }, { label: 'After', align: 'right' }, { label: 'Change', align: 'right' }], rows, { compact: true }) : '';
     }
     const mn = x => fx.num(x, x < 1 ? 1 : 0);
     const disp = res.displaced.map(x => fx.esc(nm(x[0])) + ' −' + mn(x[1]));

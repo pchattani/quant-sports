@@ -241,6 +241,7 @@ def test_team_metrics_use_the_opponent_row_and_summed_ratios() -> None:
     assert v["sot_pct"] == pytest.approx(50.0) and v["aerial_pct"] == pytest.approx(50.0) and v["ground_duel_pct"] == pytest.approx(60.0)
     assert v["pass_pct"] == pytest.approx(90.0) and v["long_ball_share"] == pytest.approx(10.0)
     assert v["cards"] == 2 and v["crosses"] == 20
+    assert v["sot_diff"] == pytest.approx(8 - 2)                     # own 8 on target, the opponent row's 2
     xp = ins.expected_points(2.4, 0.6)["xpts"]
     assert v["xpts_per_match"] == pytest.approx(xp) and v["luck"] == pytest.approx(3 - xp)
     away = ins.team_metric_values(by_team["Away"], lambda r: by_team["Home"][0])
@@ -248,6 +249,7 @@ def test_team_metrics_use_the_opponent_row_and_summed_ratios() -> None:
     # A row without a sheet still yields the xG-based metrics and nothing else.
     bare = ins.team_metric_values([{"gid": "9", "gf": 1, "ga": 1, "res": "D", "xg": 1.1, "xga": 0.9}], lambda r: None)
     assert bare["xg_diff"] == pytest.approx(0.2) and bare["possession"] is None and bare["ppda"] is None
+    assert bare["sot_diff"] is None
 
 
 def test_percentiles_are_direction_aware_and_span_0_to_100() -> None:

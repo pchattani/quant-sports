@@ -1,0 +1,6085 @@
+{
+ "sport": "nfl",
+ "site": "gridiron",
+ "schema_version": 1,
+ "generated": "2026-10-22",
+ "leagues": [
+  "nfl"
+ ],
+ "payloads": {
+  "players": "docs/gridiron/data/<season>/players.json -> players{pid}.values{id}, pct{id} (v group; WR and TE pooled), pct_pos{id} (v WR or TE; v DL/LB/DB for defence), group, pos, games, qualified",
+  "value": "docs/gridiron/data/<season>/value.json -> cols [pid, name, team, pos, age, games, opp, gv, gvar, gvar_pg, pct, trend, q, why]; pos = EDGE|DL|LB|CB|S role for defenders; gvar_pg and its pct",
+  "player_pages": "docs/gridiron/data/players/<pid>.json -> seasons[].values, current.values/pct/pct_pos, similar[[pid, name, team, similarity]]",
+  "teams": "docs/gridiron/data/<season>/teams.json -> teams{abbr}.values{id}, rank{id}, pct{id}, record{w,l,t,pf,pa,diff}",
+  "leaderboards": "docs/gridiron/data/<season>/leaders.json -> players{group}{id}, teams{id}; lab.json for tables"
+ },
+ "method": {
+  "seasons": "2006-2025 regular seasons (20 seasons, 19 season pairs); per-snap and per-route rates 2016-2025 (nflverse participation); FTN fields 2022-2025; NGS 2016-2025; 2026 in progress, excluded",
+  "yoy": "Pearson r between seasons t and t+1 of the published payload value (players.json / value.json), z-scored within season and peer group, qualified in both seasons; play-level recomputation where the field is not in the payload",
+  "split_half": "odd v even games of the player's season (uncorrected r on within-season z-scores, pooled over seasons; split_half_r_sb = 2r/(1+r)); recomputed from nflverse play-by-play with our out-of-fold RYOE and xYAC and nflfastR cp (our completion model is not stored per play)",
+  "m50": "n_bar x (1 - r) / r with r the uncorrected split-half r at the mean half-season sample n_bar; where no split exists, the year-to-year r at the mean season sample (an upper bound). Counting stats and model composites have no m50.",
+  "predictive": "Pearson r of the metric in season t with the target in season t+1, same peer group, both qualified, sign oriented so positive = the metric's better direction goes with a better future target. QB: next-season EPA per dropback (r2: next-season Gridiron Value per game). RB: next-season RYOE per carry (r2: next-season EPA per carry). WR/TE: next-season EPA per target (r2: next-season yards per route run, 2016-2025). EDGE/IDL: next-season sacks + QB hits per pass snap (r2: Splash EPA per snap). LB: next-season splash plays per snap. CB/S: next-season passes defensed + INT per pass snap. K: next-season FG over expected per attempt (distance curve). P: next-season EPA per punt (r2: net average). Teams: first-half metric v second-half win% and point differential per game; season t v t+1 win% and point differential (payload values).",
+  "peer_groups": "WR and TE are separate (Cohen's d WR v TE: aDOT 1.58, air share 1.62, yards per team attempt 0.93, target share 0.91; 45% of qualified TEs fall below the pooled 25th percentile of yards per team attempt). Defence uses five roles (EDGE, IDL, LB, CB, S) from value.json pos: in the payload's DL/LB/DB scheme 523 of 1,051 snap-qualified edge rushers sit in LB, where their sacks + hits per pass snap (5.1%) is four times an off-ball linebacker's (1.2%).",
+  "benchmarks": {
+   "qb": "next-season EPA/dropback autocorrelation 0.409 (447 pairs); QB composite predicts it at 0.458",
+   "rb": "RYOE/carry autocorrelation 0.182 (549 pairs); EPA/carry 0.182",
+   "wr": "EPA/target autocorrelation 0.205 (1,134 pairs); yards per route run 0.523 (523 pairs)",
+   "te": "EPA/target autocorrelation 0.218 (547 pairs); yards per route run 0.551 (245 pairs)",
+   "edge": "sacks + hits per pass snap autocorrelation 0.428 (681 pairs)",
+   "idl": "0.483 (663 pairs)",
+   "lb": "splash plays per snap 0.221 (506 pairs)",
+   "cb": "PD + INT per pass snap 0.255 (673 pairs)",
+   "s": "0.132 (640 pairs)",
+   "k": "FG over expected per attempt 0.039 (507 pairs)",
+   "p": "EPA per punt 0.288 (332 pairs)",
+   "teams": "first-half point differential/game -> second-half win% 0.465, point diff 0.516; net EPA/play -> 0.453 / 0.513 (640 team-halves)"
+  }
+ },
+ "groups": [
+  {
+   "id": "qb",
+   "entity": "player",
+   "display": "Quarterbacks",
+   "peer_group": "group == QB (players.json); compared within season",
+   "position_field": "group",
+   "position_codes": [
+    "QB"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": true,
+    "unit": "pass attempts",
+    "note": "14 attempts per team game (238 over 17 games); percentiles also need 50 dropbacks (the payload's sample floor)"
+   },
+   "basis": "per dropback / per attempt",
+   "metrics": [
+    {
+     "id": "composite",
+     "display": "QB composite",
+     "unit": "rating (100 = average, 10 = 1 SD)",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Our all-round passing grade: EPA per dropback, accuracy, sack avoidance and turnovers blended into a forecast of next season's EPA per dropback.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.611,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 447,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": 0.458,
+      "target2": "next-season gvar_pg",
+      "r2": 0.422
+     },
+     "redundancy": {
+      "with": "composite_epa",
+      "r": 1.0
+     }
+    },
+    {
+     "id": "epa_db",
+     "display": "EPA per dropback",
+     "unit": "EPA/dropback",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Expected points added per dropback, counting sacks and scrambles.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.399,
+      "split_half_r": 0.492,
+      "split_half_r_sb": 0.659,
+      "n_pairs": 447,
+      "m50": 252.0,
+      "m50_unit": "dropbacks",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": 0.403,
+      "target2": "next-season gvar_pg",
+      "r2": 0.392
+     },
+     "redundancy": {
+      "with": "epa_play",
+      "r": 0.994
+     }
+    },
+    {
+     "id": "success",
+     "display": "Success rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Share of dropbacks that gain expected points (r 0.88 with EPA per dropback).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.45,
+      "split_half_r": 0.52,
+      "split_half_r_sb": 0.684,
+      "n_pairs": 447,
+      "m50": 224.0,
+      "m50_unit": "dropbacks",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": 0.412,
+      "target2": "next-season gvar_pg",
+      "r2": 0.365
+     },
+     "redundancy": {
+      "with": "epa_db",
+      "r": 0.88
+     }
+    },
+    {
+     "id": "cpoe",
+     "display": "CPOE",
+     "unit": "pp",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Completion percentage over expected: completions above what our model expects for those throws.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.518,
+      "split_half_r": 0.427,
+      "split_half_r_sb": 0.598,
+      "n_pairs": 447,
+      "m50": 307.0,
+      "m50_unit": "attempts",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": 0.373,
+      "target2": "next-season gvar_pg",
+      "r2": 0.313
+     },
+     "redundancy": {
+      "with": "comp_pct",
+      "r": 0.851
+     }
+    },
+    {
+     "id": "sack_rate",
+     "display": "Sack rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Sacks per dropback; the most quarterback-driven part of pass protection.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.443,
+      "split_half_r": 0.474,
+      "split_half_r_sb": 0.644,
+      "n_pairs": 447,
+      "m50": 269.0,
+      "m50_unit": "dropbacks",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": 0.216,
+      "target2": "next-season gvar_pg",
+      "r2": 0.184
+     },
+     "redundancy": {
+      "with": "composite",
+      "r": -0.534
+     }
+    },
+    {
+     "id": "int_rate",
+     "display": "Interception rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Interceptions per pass attempt. Very noisy year to year: read it with the sample size.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.128,
+      "split_half_r": 0.115,
+      "split_half_r_sb": 0.206,
+      "n_pairs": 447,
+      "m50": 1757.0,
+      "m50_unit": "attempts",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": 0.159,
+      "target2": "next-season gvar_pg",
+      "r2": 0.145
+     },
+     "redundancy": {
+      "with": "twp_rate",
+      "r": 0.628
+     }
+    },
+    {
+     "id": "pressure_rate",
+     "display": "Pressure rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of dropbacks under pressure (line, play design and the quarterback's own hold time).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.467,
+      "split_half_r": 0.492,
+      "split_half_r_sb": 0.66,
+      "n_pairs": 219,
+      "m50": 255.0,
+      "m50_unit": "dropbacks",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": 0.081,
+      "target2": "next-season gvar_pg",
+      "r2": 0.059
+     },
+     "redundancy": {
+      "with": "sack_rate",
+      "r": 0.367
+     }
+    },
+    {
+     "id": "adot",
+     "display": "Average depth of target",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Air yards per attempt: how far downfield he throws (style, not quality).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.422,
+      "split_half_r": 0.527,
+      "split_half_r_sb": 0.69,
+      "n_pairs": 447,
+      "m50": 205.0,
+      "m50_unit": "attempts",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": -0.053,
+      "target2": "next-season gvar_pg",
+      "r2": 0.003
+     },
+     "redundancy": {
+      "with": "deep_rate",
+      "r": 0.8
+     },
+     "style": true
+    },
+    {
+     "id": "ttt",
+     "display": "Time to throw",
+     "unit": "sec",
+     "direction": "lower",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Next Gen Stats average time from snap to throw (2016 onward).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.659,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 219,
+      "m50": 251.0,
+      "m50_unit": "dropbacks",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": 0.053,
+      "target2": "next-season gvar_pg",
+      "r2": -0.08
+     },
+     "redundancy": {
+      "with": "scramble_rate",
+      "r": 0.555
+     },
+     "style": true
+    },
+    {
+     "id": "scramble_rate",
+     "display": "Scramble rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Scrambles per dropback: how often he escapes and runs (style).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.826,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 447,
+      "m50": 102.0,
+      "m50_unit": "dropbacks",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": -0.091,
+      "target2": "next-season gvar_pg",
+      "r2": 0.075
+     },
+     "redundancy": {
+      "with": "ttt",
+      "r": 0.555
+     },
+     "style": true
+    },
+    {
+     "id": "anya",
+     "display": "ANY/A",
+     "unit": "yds/dropback",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Adjusted net yards per attempt (touchdowns, interceptions and sacks included).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.335,
+      "split_half_r": 0.47,
+      "split_half_r_sb": 0.639,
+      "n_pairs": 447,
+      "m50": 275.0,
+      "m50_unit": "dropbacks",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": 0.379,
+      "target2": "next-season gvar_pg",
+      "r2": 0.325
+     },
+     "redundancy": {
+      "with": "epa_db",
+      "r": 0.932
+     }
+    },
+    {
+     "id": "gvar_pg",
+     "display": "Value per game",
+     "unit": "points/game",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Gridiron Value above a replacement quarterback per game (value.json).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.471,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 447,
+      "m50": 16.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": 0.405,
+      "target2": "next-season gvar_pg",
+      "r2": 0.471
+     },
+     "redundancy": {
+      "with": "value",
+      "r": 0.988
+     },
+     "payload_file": "value.json"
+    },
+    {
+     "id": "comp_pct",
+     "display": "Completion %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Completions per attempt.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.525,
+      "split_half_r": 0.427,
+      "split_half_r_sb": 0.598,
+      "n_pairs": 447,
+      "m50": 307.0,
+      "m50_unit": "attempts",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": 0.401,
+      "target2": "next-season gvar_pg",
+      "r2": 0.299
+     },
+     "redundancy": {
+      "with": "cpoe",
+      "r": 0.851
+     }
+    },
+    {
+     "id": "deep_rate",
+     "display": "Deep rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of attempts 20+ air yards downfield.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.354,
+      "split_half_r": 0.406,
+      "split_half_r_sb": 0.577,
+      "n_pairs": 447,
+      "m50": 334.0,
+      "m50_unit": "attempts",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": -0.017,
+      "target2": "next-season gvar_pg",
+      "r2": 0.069
+     },
+     "redundancy": {
+      "with": "adot",
+      "r": 0.8
+     },
+     "style": true
+    },
+    {
+     "id": "aggressiveness",
+     "display": "Aggressiveness",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Next Gen Stats share of throws into tight windows.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.443,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 219,
+      "m50": 612.0,
+      "m50_unit": "dropbacks",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": -0.128,
+      "target2": "next-season gvar_pg",
+      "r2": -0.228
+     },
+     "redundancy": {
+      "with": "adot",
+      "r": 0.252
+     },
+     "style": true
+    },
+    {
+     "id": "twp_rate",
+     "display": "Turnover-worthy throw rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "FTN-charted interception-worthy throws per attempt (2022 onward).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.095,
+      "split_half_r": 0.17,
+      "split_half_r_sb": 0.291,
+      "n_pairs": 72,
+      "m50": 1074.0,
+      "m50_unit": "attempts",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": 0.155,
+      "target2": "next-season gvar_pg",
+      "r2": 0.164
+     },
+     "redundancy": {
+      "with": "int_rate",
+      "r": 0.628
+     }
+    },
+    {
+     "id": "epa_pressure",
+     "display": "EPA under pressure",
+     "unit": "EPA/dropback",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "EPA per dropback when pressured.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.177,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 219,
+      "m50": 2269.0,
+      "m50_unit": "dropbacks",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": 0.308,
+      "target2": "next-season gvar_pg",
+      "r2": 0.357
+     },
+     "redundancy": {
+      "with": "epa_db",
+      "r": 0.658
+     }
+    },
+    {
+     "id": "epa_clean",
+     "display": "EPA from a clean pocket",
+     "unit": "EPA/dropback",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "EPA per dropback when not pressured.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.325,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 219,
+      "m50": 1010.0,
+      "m50_unit": "dropbacks",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": 0.333,
+      "target2": "next-season gvar_pg",
+      "r2": 0.288
+     },
+     "redundancy": {
+      "with": "epa_db",
+      "r": 0.862
+     }
+    },
+    {
+     "id": "pa_rate",
+     "display": "Play-action rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Share of dropbacks with play action (FTN, 2022 onward).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.223,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 72,
+      "m50": 1691.0,
+      "m50_unit": "dropbacks",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": 0.155,
+      "target2": "next-season gvar_pg",
+      "r2": -0.019
+     },
+     "redundancy": {
+      "with": "adot",
+      "r": 0.312
+     },
+     "style": true
+    },
+    {
+     "id": "epa_play",
+     "display": "EPA per play",
+     "unit": "EPA/play",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "explanation": "EPA per dropback or designed run (r 0.99 with EPA per dropback).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.402,
+      "split_half_r": 0.502,
+      "split_half_r_sb": 0.668,
+      "n_pairs": 447,
+      "m50": 242.0,
+      "m50_unit": "plays",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": 0.405,
+      "target2": "next-season gvar_pg",
+      "r2": 0.399
+     },
+     "redundancy": {
+      "with": "epa_db",
+      "r": 0.994
+     }
+    },
+    {
+     "id": "value",
+     "display": "Gridiron Value",
+     "unit": "EPA",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "count",
+     "explanation": "Season total of expected points credited to him, adjusted for opponent and cast.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.448,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 447,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season epa_db",
+      "r": 0.393,
+      "target2": "next-season gvar_pg",
+      "r2": 0.459
+     },
+     "redundancy": {
+      "with": "gvar_pg",
+      "r": 0.988
+     }
+    },
+    {
+     "id": "pass_yds",
+     "display": "Passing yards",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "count",
+     "explanation": "Season passing yards (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": null,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null,
+      "note": "not measured"
+     },
+     "predictive": {
+      "target": null,
+      "r": null,
+      "target2": null,
+      "r2": null
+     }
+    },
+    {
+     "id": "pass_td",
+     "display": "Passing TD",
+     "unit": "TD",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "count",
+     "explanation": "Season passing touchdowns (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": null,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null,
+      "note": "not measured"
+     },
+     "predictive": {
+      "target": null,
+      "r": null,
+      "target2": null,
+      "r2": null
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "epa_db",
+     "cpoe",
+     "sack_rate",
+     "int_rate",
+     "pressure_rate",
+     "adot",
+     "ttt",
+     "scramble_rate"
+    ],
+    "standardise": "z within group and season (qualified players)",
+    "weights": "yoy_r floored at 0.2",
+    "weight_values": {
+     "epa_db": 0.4,
+     "cpoe": 0.52,
+     "sack_rate": 0.44,
+     "int_rate": 0.2,
+     "pressure_rate": 0.47,
+     "adot": 0.42,
+     "ttt": 0.66,
+     "scramble_rate": 0.83
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraint": "same season, qualified; value.json gvar_pg read from value.json"
+   },
+   "benchmark": {
+    "target": "next-season epa_db",
+    "autocorr": 0.409,
+    "target2": "next-season gvar_pg",
+    "autocorr2": 0.471
+   }
+  },
+  {
+   "id": "rb",
+   "entity": "player",
+   "display": "Running backs",
+   "peer_group": "group == RB (pos RB, FB, HB); compared within season",
+   "position_field": "group",
+   "position_codes": [
+    "RB"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": true,
+    "unit": "carries",
+    "note": "6.25 carries per team game (106 over 17)"
+   },
+   "basis": "per carry / per target",
+   "metrics": [
+    {
+     "id": "gvar_pg",
+     "display": "Value per game",
+     "unit": "points/game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Gridiron Value above a replacement back per game: rushing and receiving combined (value.json).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.271,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 549,
+      "m50": 39.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season ryoe",
+      "r": 0.157,
+      "target2": "next-season rush_epa",
+      "r2": 0.167
+     },
+     "redundancy": {
+      "with": "value",
+      "r": 0.972
+     },
+     "payload_file": "value.json"
+    },
+    {
+     "id": "ryoe",
+     "display": "Rush yards over expected",
+     "unit": "yds/carry",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Yards per carry beyond what our model expects from the blocking, box and down and distance.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.183,
+      "split_half_r": 0.215,
+      "split_half_r_sb": 0.354,
+      "n_pairs": 549,
+      "m50": 354.0,
+      "m50_unit": "carries",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season ryoe",
+      "r": 0.184,
+      "target2": "next-season rush_epa",
+      "r2": 0.129
+     },
+     "redundancy": {
+      "with": "ypc",
+      "r": 0.953
+     }
+    },
+    {
+     "id": "rush_success",
+     "display": "Rush success rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Share of carries that gain expected points.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.225,
+      "split_half_r": 0.237,
+      "split_half_r_sb": 0.384,
+      "n_pairs": 549,
+      "m50": 311.0,
+      "m50_unit": "carries",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season ryoe",
+      "r": 0.101,
+      "target2": "next-season rush_epa",
+      "r2": 0.164
+     },
+     "redundancy": {
+      "with": "rush_epa",
+      "r": 0.75
+     }
+    },
+    {
+     "id": "explosive",
+     "display": "Explosive run rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Share of carries gaining 10+ yards; the most stable rushing efficiency number.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.263,
+      "split_half_r": 0.273,
+      "split_half_r_sb": 0.429,
+      "n_pairs": 549,
+      "m50": 258.0,
+      "m50_unit": "carries",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season ryoe",
+      "r": 0.153,
+      "target2": "next-season rush_epa",
+      "r2": 0.095
+     },
+     "redundancy": {
+      "with": "ypc",
+      "r": 0.81
+     }
+    },
+    {
+     "id": "rush_epa",
+     "display": "EPA per carry",
+     "unit": "EPA/carry",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Expected points added per designed run.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.183,
+      "split_half_r": 0.206,
+      "split_half_r_sb": 0.342,
+      "n_pairs": 549,
+      "m50": 373.0,
+      "m50_unit": "carries",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season ryoe",
+      "r": 0.163,
+      "target2": "next-season rush_epa",
+      "r2": 0.182
+     },
+     "redundancy": {
+      "with": "epa_opp",
+      "r": 0.885
+     }
+    },
+    {
+     "id": "stuff_rate",
+     "display": "Stuff rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of carries stopped for no gain or a loss.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.216,
+      "split_half_r": 0.211,
+      "split_half_r_sb": 0.349,
+      "n_pairs": 549,
+      "m50": 362.0,
+      "m50_unit": "carries",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season ryoe",
+      "r": 0.071,
+      "target2": "next-season rush_epa",
+      "r2": 0.11
+     },
+     "redundancy": {
+      "with": "rush_epa",
+      "r": -0.486
+     }
+    },
+    {
+     "id": "target_share",
+     "display": "Target share",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Share of his team's pass attempts thrown his way in his games: his role in the passing game.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.661,
+      "split_half_r": 0.732,
+      "split_half_r_sb": 0.845,
+      "n_pairs": 549,
+      "m50": 7.0,
+      "m50_unit": "targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season ryoe",
+      "r": 0.047,
+      "target2": "next-season rush_epa",
+      "r2": 0.038
+     },
+     "redundancy": {
+      "with": "tprr",
+      "r": 0.713
+     }
+    },
+    {
+     "id": "ypc",
+     "display": "Yards per carry",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Rushing yards per carry (r 0.95 with RYOE).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.23,
+      "split_half_r": 0.234,
+      "split_half_r_sb": 0.38,
+      "n_pairs": 549,
+      "m50": 317.0,
+      "m50_unit": "carries",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season ryoe",
+      "r": 0.193,
+      "target2": "next-season rush_epa",
+      "r2": 0.141
+     },
+     "redundancy": {
+      "with": "ryoe",
+      "r": 0.953
+     }
+    },
+    {
+     "id": "rec_epa_tgt",
+     "display": "EPA per target",
+     "unit": "EPA/target",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "EPA per target. Close to pure noise for backs year to year (r 0.03).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.03,
+      "split_half_r": 0.089,
+      "split_half_r_sb": 0.164,
+      "n_pairs": 549,
+      "m50": 209.0,
+      "m50_unit": "targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season ryoe",
+      "r": 0.035,
+      "target2": "next-season rush_epa",
+      "r2": 0.041
+     },
+     "redundancy": {
+      "with": "yprr",
+      "r": 0.518
+     }
+    },
+    {
+     "id": "box8",
+     "display": "8+ in the box",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Next Gen Stats share of carries against eight or more in the box (context). Null in every payload today (NGS loader bug).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 0,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season ryoe",
+      "r": null,
+      "target2": "next-season rush_epa",
+      "r2": null
+     },
+     "style": true
+    },
+    {
+     "id": "rush_yds",
+     "display": "Rushing yards",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "count",
+     "explanation": "Season rushing yards (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": null,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null,
+      "note": "not measured"
+     },
+     "predictive": {
+      "target": null,
+      "r": null,
+      "target2": null,
+      "r2": null
+     }
+    },
+    {
+     "id": "rush_td",
+     "display": "Rushing TD",
+     "unit": "TD",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "count",
+     "explanation": "Season rushing touchdowns (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": null,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null,
+      "note": "not measured"
+     },
+     "predictive": {
+      "target": null,
+      "r": null,
+      "target2": null,
+      "r2": null
+     }
+    },
+    {
+     "id": "rec_yds",
+     "display": "Receiving yards",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "count",
+     "explanation": "Season receiving yards (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": null,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null,
+      "note": "not measured"
+     },
+     "predictive": {
+      "target": null,
+      "r": null,
+      "target2": null,
+      "r2": null
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "gvar_pg",
+     "ryoe",
+     "rush_success",
+     "explosive",
+     "rush_epa",
+     "stuff_rate",
+     "target_share"
+    ],
+    "standardise": "z within group and season (qualified players)",
+    "weights": "yoy_r floored at 0.2",
+    "weight_values": {
+     "gvar_pg": 0.27,
+     "ryoe": 0.2,
+     "rush_success": 0.23,
+     "explosive": 0.26,
+     "rush_epa": 0.2,
+     "stuff_rate": 0.22,
+     "target_share": 0.66
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraint": "same season, qualified; value.json gvar_pg read from value.json"
+   },
+   "benchmark": {
+    "target": "next-season ryoe",
+    "autocorr": 0.182,
+    "target2": "next-season rush_epa",
+    "autocorr2": 0.181
+   }
+  },
+  {
+   "id": "wr",
+   "entity": "player",
+   "display": "Wide receivers",
+   "peer_group": "group == WR; compared within WR only (use pct_pos, not the WR+TE pool pct)",
+   "position_field": "group",
+   "position_codes": [
+    "WR"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": true,
+    "unit": "targets",
+    "note": "3 targets per team game (51 over 17)"
+   },
+   "basis": "per target / per team pass attempt",
+   "metrics": [
+    {
+     "id": "gvar_pg",
+     "display": "Value per game",
+     "unit": "points/game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Gridiron Value above a replacement receiver at his position per game (value.json).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.372,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 1134,
+      "m50": 24.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.177,
+      "target2": "next-season yprr",
+      "r2": 0.415
+     },
+     "redundancy": {
+      "with": "value",
+      "r": 0.973
+     },
+     "payload_file": "value.json"
+    },
+    {
+     "id": "yptpa",
+     "display": "Yards per team pass attempt",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Receiving yards per team pass attempt in his games: a route-free stand-in for yards per route run.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.543,
+      "split_half_r": 0.643,
+      "split_half_r_sb": 0.783,
+      "n_pairs": 1134,
+      "m50": 25.0,
+      "m50_unit": "targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.123,
+      "target2": "next-season yprr",
+      "r2": 0.498
+     },
+     "redundancy": {
+      "with": "yprr",
+      "r": 0.895
+     }
+    },
+    {
+     "id": "target_share",
+     "display": "Target share",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Share of his team's pass attempts thrown his way in his games: how often he earns the ball.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.664,
+      "split_half_r": 0.767,
+      "split_half_r_sb": 0.868,
+      "n_pairs": 1134,
+      "m50": 13.0,
+      "m50_unit": "targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.042,
+      "target2": "next-season yprr",
+      "r2": 0.445
+     },
+     "redundancy": {
+      "with": "wopr",
+      "r": 0.963
+     }
+    },
+    {
+     "id": "rec_epa_tgt",
+     "display": "EPA per target",
+     "unit": "EPA/target",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Expected points added per target: what the offence gains when he is the target.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.188,
+      "split_half_r": 0.195,
+      "split_half_r_sb": 0.327,
+      "n_pairs": 1134,
+      "m50": 183.0,
+      "m50_unit": "targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.177,
+      "target2": "next-season yprr",
+      "r2": 0.222
+     },
+     "redundancy": {
+      "with": "epa_route",
+      "r": 0.95
+     }
+    },
+    {
+     "id": "croe",
+     "display": "Catch rate over expected",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Catches above what our completion model expects for his targets (depth, coverage, pressure).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.257,
+      "split_half_r": 0.262,
+      "split_half_r_sb": 0.415,
+      "n_pairs": 1134,
+      "m50": 125.0,
+      "m50_unit": "targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.122,
+      "target2": "next-season yprr",
+      "r2": 0.199
+     },
+     "redundancy": {
+      "with": "catch_rate",
+      "r": 0.816
+     }
+    },
+    {
+     "id": "yac_rec",
+     "display": "YAC per reception",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Yards after the catch per reception.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.398,
+      "split_half_r": 0.33,
+      "split_half_r_sb": 0.496,
+      "n_pairs": 1134,
+      "m50": 58.0,
+      "m50_unit": "receptions",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": -0.002,
+      "target2": "next-season yprr",
+      "r2": 0.06
+     },
+     "redundancy": {
+      "with": "yacoe",
+      "r": 0.888
+     }
+    },
+    {
+     "id": "adot",
+     "display": "Average depth of target",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Air yards per target: how far downfield he is used (role and style).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.696,
+      "split_half_r": 0.646,
+      "split_half_r_sb": 0.785,
+      "n_pairs": 1134,
+      "m50": 24.0,
+      "m50_unit": "targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.109,
+      "target2": "next-season yprr",
+      "r2": -0.001
+     },
+     "redundancy": {
+      "with": "catch_rate",
+      "r": -0.563
+     },
+     "style": true
+    },
+    {
+     "id": "yacoe",
+     "display": "YAC over expected",
+     "unit": "yds/reception",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Yards after the catch beyond our expected-YAC model (r 0.89 with YAC per reception, less stable).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.301,
+      "split_half_r": 0.22,
+      "split_half_r_sb": 0.361,
+      "n_pairs": 1134,
+      "m50": 101.0,
+      "m50_unit": "receptions",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.02,
+      "target2": "next-season yprr",
+      "r2": 0.082
+     },
+     "redundancy": {
+      "with": "yac_rec",
+      "r": 0.888
+     }
+    },
+    {
+     "id": "air_share",
+     "display": "Air-yards share",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Share of the team's intended air yards in his games.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.69,
+      "split_half_r": 0.737,
+      "split_half_r_sb": 0.849,
+      "n_pairs": 1134,
+      "m50": 16.0,
+      "m50_unit": "targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.098,
+      "target2": "next-season yprr",
+      "r2": 0.375
+     },
+     "redundancy": {
+      "with": "wopr",
+      "r": 0.925
+     }
+    },
+    {
+     "id": "wopr",
+     "display": "WOPR",
+     "unit": "index",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "1.5 x target share + 0.7 x air-yards share (r 0.96 with target share).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.67,
+      "split_half_r": 0.765,
+      "split_half_r_sb": 0.867,
+      "n_pairs": 1134,
+      "m50": 14.0,
+      "m50_unit": "targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.07,
+      "target2": "next-season yprr",
+      "r2": 0.448
+     },
+     "redundancy": {
+      "with": "target_share",
+      "r": 0.963
+     }
+    },
+    {
+     "id": "catch_rate",
+     "display": "Catch rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Receptions per target (driven by depth of target; CROE adjusts for it).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.442,
+      "split_half_r": 0.316,
+      "split_half_r_sb": 0.481,
+      "n_pairs": 1134,
+      "m50": 96.0,
+      "m50_unit": "targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.062,
+      "target2": "next-season yprr",
+      "r2": 0.193
+     },
+     "redundancy": {
+      "with": "croe",
+      "r": 0.816
+     }
+    },
+    {
+     "id": "drop_rate",
+     "display": "Drop rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "FTN drops per catchable target (2022 onward). Unstable (r 0.15).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.163,
+      "split_half_r": -0.042,
+      "split_half_r_sb": -0.089,
+      "n_pairs": 172,
+      "m50": 352.0,
+      "m50_unit": "catchable targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.093,
+      "target2": "next-season yprr",
+      "r2": 0.117
+     },
+     "redundancy": {
+      "with": "catch_rate",
+      "r": -0.294
+     }
+    },
+    {
+     "id": "contested_rate",
+     "display": "Contested catch rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "FTN contested targets caught (2022 onward). Unstable (r 0.07).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.106,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 172,
+      "m50": 744.0,
+      "m50_unit": "targets",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.048,
+      "target2": "next-season yprr",
+      "r2": 0.031
+     },
+     "redundancy": {
+      "with": "croe",
+      "r": 0.331
+     }
+    },
+    {
+     "id": "separation",
+     "display": "Separation",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Next Gen Stats separation at the catch point. Null in every payload today (NGS loader bug).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 0,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": null,
+      "target2": "next-season yprr",
+      "r2": null
+     }
+    },
+    {
+     "id": "cushion",
+     "display": "Cushion",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Next Gen Stats cushion at the snap. Null in every payload today (NGS loader bug).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 0,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": null,
+      "target2": "next-season yprr",
+      "r2": null
+     },
+     "style": true
+    },
+    {
+     "id": "yprr",
+     "display": "Yards per route run",
+     "unit": "yds/route",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Receiving yards per dropback he was on the field for (participation, 2016-2025 only; not available in-season).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.523,
+      "split_half_r": 0.523,
+      "split_half_r_sb": 0.686,
+      "n_pairs": 523,
+      "m50": 208.0,
+      "m50_unit": "routes (dropbacks on field)",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.176,
+      "target2": "next-season yprr",
+      "r2": 0.523
+     },
+     "redundancy": {
+      "with": "yptpa",
+      "r": 0.895
+     }
+    },
+    {
+     "id": "tprr",
+     "display": "Targets per route run",
+     "unit": "targets/route",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Targets per dropback on the field (participation, 2016-2025 only).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.632,
+      "split_half_r": 0.656,
+      "split_half_r_sb": 0.792,
+      "n_pairs": 523,
+      "m50": 119.0,
+      "m50_unit": "routes (dropbacks on field)",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.064,
+      "target2": "next-season yprr",
+      "r2": 0.476
+     },
+     "redundancy": {
+      "with": "target_share",
+      "r": 0.825
+     }
+    },
+    {
+     "id": "rec_yds",
+     "display": "Receiving yards",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "count",
+     "explanation": "Season receiving yards (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": null,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null,
+      "note": "not measured"
+     },
+     "predictive": {
+      "target": null,
+      "r": null,
+      "target2": null,
+      "r2": null
+     }
+    },
+    {
+     "id": "rec_td",
+     "display": "Receiving TD",
+     "unit": "TD",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "count",
+     "explanation": "Season receiving touchdowns (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": null,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null,
+      "note": "not measured"
+     },
+     "predictive": {
+      "target": null,
+      "r": null,
+      "target2": null,
+      "r2": null
+     }
+    },
+    {
+     "id": "rec_epa",
+     "display": "Receiving EPA",
+     "unit": "EPA",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "count",
+     "explanation": "Season total receiving EPA (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.292,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 1134,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.18,
+      "target2": "next-season yprr",
+      "r2": 0.385
+     },
+     "redundancy": {
+      "with": "epa_route",
+      "r": 0.938
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "gvar_pg",
+     "yptpa",
+     "target_share",
+     "rec_epa_tgt",
+     "croe",
+     "yac_rec",
+     "adot"
+    ],
+    "standardise": "z within group and season (qualified players)",
+    "weights": "yoy_r floored at 0.2",
+    "weight_values": {
+     "gvar_pg": 0.37,
+     "yptpa": 0.54,
+     "target_share": 0.66,
+     "rec_epa_tgt": 0.2,
+     "croe": 0.26,
+     "yac_rec": 0.4,
+     "adot": 0.7
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraint": "same season, qualified; value.json gvar_pg read from value.json"
+   },
+   "benchmark": {
+    "target": "next-season rec_epa_tgt",
+    "autocorr": 0.205,
+    "target2": "next-season yprr",
+    "autocorr2": 0.523
+   }
+  },
+  {
+   "id": "te",
+   "entity": "player",
+   "display": "Tight ends",
+   "peer_group": "group == TE; compared within TE only (use pct_pos)",
+   "position_field": "group",
+   "position_codes": [
+    "TE"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": true,
+    "unit": "targets",
+    "note": "2 targets per team game (34 over 17)"
+   },
+   "basis": "per target / per team pass attempt",
+   "metrics": [
+    {
+     "id": "gvar_pg",
+     "display": "Value per game",
+     "unit": "points/game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Gridiron Value above a replacement receiver at his position per game (value.json).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.505,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 547,
+      "m50": 14.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.286,
+      "target2": "next-season yprr",
+      "r2": 0.436
+     },
+     "redundancy": {
+      "with": "value",
+      "r": 0.968
+     },
+     "payload_file": "value.json"
+    },
+    {
+     "id": "yptpa",
+     "display": "Yards per team pass attempt",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Receiving yards per team pass attempt in his games: a route-free stand-in for yards per route run.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.663,
+      "split_half_r": 0.678,
+      "split_half_r_sb": 0.808,
+      "n_pairs": 547,
+      "m50": 15.0,
+      "m50_unit": "targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.265,
+      "target2": "next-season yprr",
+      "r2": 0.544
+     },
+     "redundancy": {
+      "with": "wopr",
+      "r": 0.905
+     }
+    },
+    {
+     "id": "target_share",
+     "display": "Target share",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Share of his team's pass attempts thrown his way in his games: how often he earns the ball.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.631,
+      "split_half_r": 0.771,
+      "split_half_r_sb": 0.871,
+      "n_pairs": 547,
+      "m50": 10.0,
+      "m50_unit": "targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.145,
+      "target2": "next-season yprr",
+      "r2": 0.403
+     },
+     "redundancy": {
+      "with": "wopr",
+      "r": 0.985
+     }
+    },
+    {
+     "id": "rec_epa_tgt",
+     "display": "EPA per target",
+     "unit": "EPA/target",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Expected points added per target: what the offence gains when he is the target.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.218,
+      "split_half_r": 0.216,
+      "split_half_r_sb": 0.356,
+      "n_pairs": 547,
+      "m50": 118.0,
+      "m50_unit": "targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.212,
+      "target2": "next-season yprr",
+      "r2": 0.329
+     },
+     "redundancy": {
+      "with": "epa_route",
+      "r": 0.956
+     }
+    },
+    {
+     "id": "croe",
+     "display": "Catch rate over expected",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Catches above what our completion model expects for his targets (depth, coverage, pressure).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.212,
+      "split_half_r": 0.189,
+      "split_half_r_sb": 0.317,
+      "n_pairs": 547,
+      "m50": 140.0,
+      "m50_unit": "targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.184,
+      "target2": "next-season yprr",
+      "r2": 0.144
+     },
+     "redundancy": {
+      "with": "catch_rate",
+      "r": 0.861
+     }
+    },
+    {
+     "id": "yac_rec",
+     "display": "YAC per reception",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Yards after the catch per reception.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.42,
+      "split_half_r": 0.297,
+      "split_half_r_sb": 0.459,
+      "n_pairs": 547,
+      "m50": 54.0,
+      "m50_unit": "receptions",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.086,
+      "target2": "next-season yprr",
+      "r2": 0.331
+     },
+     "redundancy": {
+      "with": "yacoe",
+      "r": 0.893
+     }
+    },
+    {
+     "id": "adot",
+     "display": "Average depth of target",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Air yards per target: how far downfield he is used (role and style).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.503,
+      "split_half_r": 0.497,
+      "split_half_r_sb": 0.664,
+      "n_pairs": 547,
+      "m50": 33.0,
+      "m50_unit": "targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.148,
+      "target2": "next-season yprr",
+      "r2": 0.2
+     },
+     "redundancy": {
+      "with": "air_share",
+      "r": 0.586
+     },
+     "style": true
+    },
+    {
+     "id": "yacoe",
+     "display": "YAC over expected",
+     "unit": "yds/reception",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Yards after the catch beyond our expected-YAC model (r 0.89 with YAC per reception, less stable).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.355,
+      "split_half_r": 0.188,
+      "split_half_r_sb": 0.317,
+      "n_pairs": 547,
+      "m50": 98.0,
+      "m50_unit": "receptions",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.125,
+      "target2": "next-season yprr",
+      "r2": 0.368
+     },
+     "redundancy": {
+      "with": "yac_rec",
+      "r": 0.893
+     }
+    },
+    {
+     "id": "air_share",
+     "display": "Air-yards share",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Share of the team's intended air yards in his games.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.665,
+      "split_half_r": 0.741,
+      "split_half_r_sb": 0.851,
+      "n_pairs": 547,
+      "m50": 11.0,
+      "m50_unit": "targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.21,
+      "target2": "next-season yprr",
+      "r2": 0.436
+     },
+     "redundancy": {
+      "with": "wopr",
+      "r": 0.946
+     }
+    },
+    {
+     "id": "wopr",
+     "display": "WOPR",
+     "unit": "index",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "1.5 x target share + 0.7 x air-yards share (r 0.96 with target share).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.651,
+      "split_half_r": 0.78,
+      "split_half_r_sb": 0.876,
+      "n_pairs": 547,
+      "m50": 9.0,
+      "m50_unit": "targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.171,
+      "target2": "next-season yprr",
+      "r2": 0.427
+     },
+     "redundancy": {
+      "with": "target_share",
+      "r": 0.985
+     }
+    },
+    {
+     "id": "catch_rate",
+     "display": "Catch rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Receptions per target (driven by depth of target; CROE adjusts for it).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.23,
+      "split_half_r": 0.183,
+      "split_half_r_sb": 0.31,
+      "n_pairs": 547,
+      "m50": 145.0,
+      "m50_unit": "targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.126,
+      "target2": "next-season yprr",
+      "r2": 0.074
+     },
+     "redundancy": {
+      "with": "croe",
+      "r": 0.861
+     }
+    },
+    {
+     "id": "drop_rate",
+     "display": "Drop rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "FTN drops per catchable target (2022 onward). Unstable (r 0.15).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.125,
+      "split_half_r": 0.075,
+      "split_half_r_sb": 0.14,
+      "n_pairs": 90,
+      "m50": 334.0,
+      "m50_unit": "catchable targets",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.056,
+      "target2": "next-season yprr",
+      "r2": 0.145
+     },
+     "redundancy": {
+      "with": "croe",
+      "r": -0.386
+     }
+    },
+    {
+     "id": "contested_rate",
+     "display": "Contested catch rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "FTN contested targets caught (2022 onward). Unstable (r 0.07).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": -0.0,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 90,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": -0.098,
+      "target2": "next-season yprr",
+      "r2": -0.127
+     },
+     "redundancy": {
+      "with": "croe",
+      "r": 0.264
+     }
+    },
+    {
+     "id": "separation",
+     "display": "Separation",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Next Gen Stats separation at the catch point. Null in every payload today (NGS loader bug).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 0,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": null,
+      "target2": "next-season yprr",
+      "r2": null
+     }
+    },
+    {
+     "id": "cushion",
+     "display": "Cushion",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Next Gen Stats cushion at the snap. Null in every payload today (NGS loader bug).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 0,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": null,
+      "target2": "next-season yprr",
+      "r2": null
+     },
+     "style": true
+    },
+    {
+     "id": "yprr",
+     "display": "Yards per route run",
+     "unit": "yds/route",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Receiving yards per dropback he was on the field for (participation, 2016-2025 only; not available in-season).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.551,
+      "split_half_r": 0.489,
+      "split_half_r_sb": 0.657,
+      "n_pairs": 245,
+      "m50": 200.0,
+      "m50_unit": "routes (dropbacks on field)",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.256,
+      "target2": "next-season yprr",
+      "r2": 0.551
+     },
+     "redundancy": {
+      "with": "yptpa",
+      "r": 0.823
+     }
+    },
+    {
+     "id": "tprr",
+     "display": "Targets per route run",
+     "unit": "targets/route",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Targets per dropback on the field (participation, 2016-2025 only).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.519,
+      "split_half_r": 0.552,
+      "split_half_r_sb": 0.711,
+      "n_pairs": 245,
+      "m50": 156.0,
+      "m50_unit": "routes (dropbacks on field)",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.062,
+      "target2": "next-season yprr",
+      "r2": 0.39
+     },
+     "redundancy": {
+      "with": "yprr",
+      "r": 0.773
+     }
+    },
+    {
+     "id": "rec_yds",
+     "display": "Receiving yards",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "count",
+     "explanation": "Season receiving yards (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": null,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null,
+      "note": "not measured"
+     },
+     "predictive": {
+      "target": null,
+      "r": null,
+      "target2": null,
+      "r2": null
+     }
+    },
+    {
+     "id": "rec_td",
+     "display": "Receiving TD",
+     "unit": "TD",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "count",
+     "explanation": "Season receiving touchdowns (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": null,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null,
+      "note": "not measured"
+     },
+     "predictive": {
+      "target": null,
+      "r": null,
+      "target2": null,
+      "r2": null
+     }
+    },
+    {
+     "id": "rec_epa",
+     "display": "Receiving EPA",
+     "unit": "EPA",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "count",
+     "explanation": "Season total receiving EPA (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.426,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 547,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season rec_epa_tgt",
+      "r": 0.288,
+      "target2": "next-season yprr",
+      "r2": 0.453
+     },
+     "redundancy": {
+      "with": "gvar_pg",
+      "r": 0.912
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "gvar_pg",
+     "yptpa",
+     "target_share",
+     "rec_epa_tgt",
+     "croe",
+     "yac_rec",
+     "adot"
+    ],
+    "standardise": "z within group and season (qualified players)",
+    "weights": "yoy_r floored at 0.2",
+    "weight_values": {
+     "gvar_pg": 0.51,
+     "yptpa": 0.66,
+     "target_share": 0.63,
+     "rec_epa_tgt": 0.22,
+     "croe": 0.21,
+     "yac_rec": 0.42,
+     "adot": 0.5
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraint": "same season, qualified; value.json gvar_pg read from value.json"
+   },
+   "benchmark": {
+    "target": "next-season rec_epa_tgt",
+    "autocorr": 0.218,
+    "target2": "next-season yprr",
+    "autocorr2": 0.551
+   }
+  },
+  {
+   "id": "edge",
+   "entity": "player",
+   "display": "Outside pass rushers",
+   "peer_group": "role == EDGE (value.json pos; DE and 3-4 outside linebackers); compared within season",
+   "position_field": "role",
+   "position_codes": [
+    "EDGE"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": true,
+    "unit": "games",
+    "note": "payload: half the team's games and 2.5 tackles-equivalent per team game; measured on players with 300+ defensive snaps (175+ pass snaps for EDGE/IDL), prorated to 17 games"
+   },
+   "basis": "per game (per snap 2016-2025)",
+   "metrics": [
+    {
+     "id": "gvar_pg",
+     "display": "Value per game",
+     "unit": "points/game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Splash EPA above a replacement outside pass rusher per game (value.json): the expected points his sacks, takeaways, pass break-ups and tackles for loss saved.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.441,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 681,
+      "m50": 17.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.288,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.338
+     },
+     "redundancy": {
+      "with": "def_value_pg",
+      "r": 0.996
+     },
+     "payload_file": "value.json"
+    },
+    {
+     "id": "pressures_pg",
+     "display": "Sacks + QB hits per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Sacks and quarterback hits per game: the steadiest individual pass-rush number in the data.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.557,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 681,
+      "m50": 10.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.441,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.33
+     },
+     "redundancy": {
+      "with": "qb_hits_pg",
+      "r": 0.972
+     }
+    },
+    {
+     "id": "tfl_pg",
+     "display": "Tackles for loss per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Tackles behind the line per game.",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.424,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 681,
+      "m50": 18.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.308,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.305
+     },
+     "redundancy": {
+      "with": "tfl",
+      "r": 0.936
+     },
+     "fallback_id": "tfl",
+     "derive": "values.tfl / games"
+    },
+    {
+     "id": "splash_pg",
+     "display": "Splash plays per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Sacks, takeaways, forced fumbles, pass break-ups and tackles for loss per game.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.507,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 681,
+      "m50": 13.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.291,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.336
+     },
+     "redundancy": {
+      "with": "tfl_pg",
+      "r": 0.875
+     }
+    },
+    {
+     "id": "tackles_pg",
+     "display": "Tackles per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Solo and assisted tackles per game (involvement, not quality).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.519,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 681,
+      "m50": 12.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.054,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.132
+     },
+     "redundancy": {
+      "with": "tackles",
+      "r": 0.899
+     },
+     "fallback_id": "tackles",
+     "derive": "values.tackles / games"
+    },
+    {
+     "id": "ff_pg",
+     "display": "Forced fumbles per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Forced fumbles per game. Unstable (r about 0.2).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.204,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 681,
+      "m50": 51.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.13,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.222
+     },
+     "redundancy": {
+      "with": "ff",
+      "r": 0.957
+     },
+     "fallback_id": "ff",
+     "derive": "values.ff / games"
+    },
+    {
+     "id": "sacks_pg",
+     "display": "Sacks per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Sacks per game (r 0.86-0.88 with sacks + hits per game, less stable).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.404,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 681,
+      "m50": 19.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.322,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.286
+     },
+     "redundancy": {
+      "with": "sacks",
+      "r": 0.931
+     },
+     "fallback_id": "sacks",
+     "derive": "values.sacks / games"
+    },
+    {
+     "id": "pd_pg",
+     "display": "Passes defensed per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Passes broken up or intercepted per game (batted balls for linemen).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.389,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 681,
+      "m50": 21.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.049,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.182
+     },
+     "redundancy": {
+      "with": "pd",
+      "r": 0.963
+     },
+     "fallback_id": "pd",
+     "derive": "values.pd / games"
+    },
+    {
+     "id": "pass_rush_rate",
+     "display": "Sacks + hits per pass snap",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Sacks and QB hits per opponent dropback on the field (participation, 2016-2025 only).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.428,
+      "split_half_r": 0.277,
+      "split_half_r_sb": 0.434,
+      "n_pairs": 681,
+      "m50": 457.0,
+      "m50_unit": "pass snaps",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.428,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.31
+     },
+     "redundancy": {
+      "with": "pressures_pg",
+      "r": 0.878
+     }
+    },
+    {
+     "id": "tfl_run",
+     "display": "TFL per run snap",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Tackles for loss per opponent run on the field (participation, 2016-2025 only).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.266,
+      "split_half_r": 0.162,
+      "split_half_r_sb": 0.279,
+      "n_pairs": 681,
+      "m50": 522.0,
+      "m50_unit": "run snaps",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.226,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.252
+     },
+     "redundancy": {
+      "with": "splash_snap",
+      "r": 0.741
+     }
+    },
+    {
+     "id": "sacks",
+     "display": "Sacks",
+     "unit": "sacks",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "count",
+     "explanation": "Season sacks (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.422,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 681,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.331,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.297
+     },
+     "redundancy": {
+      "with": "sacks_pg",
+      "r": 0.931
+     }
+    },
+    {
+     "id": "qb_hits",
+     "display": "QB hits",
+     "unit": "hits",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "count",
+     "explanation": "Season QB hits (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.526,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 681,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.439,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.326
+     },
+     "redundancy": {
+      "with": "qb_hits_pg",
+      "r": 0.922
+     }
+    },
+    {
+     "id": "def_value",
+     "display": "Splash EPA",
+     "unit": "EPA",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "count",
+     "explanation": "Season Splash EPA (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.441,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 681,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.293,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.337
+     },
+     "redundancy": {
+      "with": "gvar_pg",
+      "r": 0.936
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "gvar_pg",
+     "pressures_pg",
+     "tfl_pg",
+     "tackles_pg",
+     "ff_pg",
+     "pd_pg"
+    ],
+    "standardise": "z within group and season (qualified players)",
+    "weights": "yoy_r floored at 0.2",
+    "weight_values": {
+     "gvar_pg": 0.44,
+     "pressures_pg": 0.56,
+     "tfl_pg": 0.42,
+     "tackles_pg": 0.52,
+     "ff_pg": 0.2,
+     "pd_pg": 0.39
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraint": "same season, qualified; value.json gvar_pg read from value.json"
+   },
+   "position_fallback": {
+    "field": "pos",
+    "codes": [
+     "DE",
+     "EDGE"
+    ],
+    "note": "until players.json carries role: read value.json pos (cols index 3) by pid; the roster pos alone puts 3-4 outside linebackers (half of all edge rushers) with LB"
+   },
+   "benchmark": {
+    "target": "next-season pass_rush_rate",
+    "autocorr": 0.428,
+    "target2": "next-season splash_epa_snap",
+    "autocorr2": 0.323
+   },
+   "display_short": "DE/OLB"
+  },
+  {
+   "id": "idl",
+   "entity": "player",
+   "display": "Interior linemen",
+   "peer_group": "role == DL (value.json pos; DT, NT and 3-4 ends); compared within season",
+   "position_field": "role",
+   "position_codes": [
+    "DL"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": true,
+    "unit": "games",
+    "note": "as EDGE; the payload minimum leaves out 52% of snap-regular interior linemen (see payload changes)"
+   },
+   "basis": "per game (per snap 2016-2025)",
+   "metrics": [
+    {
+     "id": "gvar_pg",
+     "display": "Value per game",
+     "unit": "points/game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Splash EPA above a replacement interior lineman per game (value.json): the expected points his sacks, takeaways, pass break-ups and tackles for loss saved.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.518,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 663,
+      "m50": 12.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.421,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.423
+     },
+     "redundancy": {
+      "with": "def_value_pg",
+      "r": 0.997
+     },
+     "payload_file": "value.json"
+    },
+    {
+     "id": "pressures_pg",
+     "display": "Sacks + QB hits per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Sacks and quarterback hits per game: the steadiest individual pass-rush number in the data.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.646,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 663,
+      "m50": 7.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.539,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.388
+     },
+     "redundancy": {
+      "with": "qb_hits_pg",
+      "r": 0.981
+     }
+    },
+    {
+     "id": "tfl_pg",
+     "display": "Tackles for loss per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Tackles behind the line per game.",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.436,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 663,
+      "m50": 17.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.362,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.368
+     },
+     "redundancy": {
+      "with": "tfl",
+      "r": 0.956
+     },
+     "fallback_id": "tfl",
+     "derive": "values.tfl / games"
+    },
+    {
+     "id": "splash_pg",
+     "display": "Splash plays per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Sacks, takeaways, forced fumbles, pass break-ups and tackles for loss per game.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.57,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 663,
+      "m50": 10.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.446,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.451
+     },
+     "redundancy": {
+      "with": "splash_snap",
+      "r": 0.92
+     }
+    },
+    {
+     "id": "tackles_pg",
+     "display": "Tackles per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Solo and assisted tackles per game (involvement, not quality).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.557,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 663,
+      "m50": 11.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.142,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.112
+     },
+     "redundancy": {
+      "with": "tackles",
+      "r": 0.906
+     },
+     "fallback_id": "tackles",
+     "derive": "values.tackles / games"
+    },
+    {
+     "id": "ff_pg",
+     "display": "Forced fumbles per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Forced fumbles per game. Unstable (r about 0.2).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.168,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 663,
+      "m50": 66.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.239,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.242
+     },
+     "redundancy": {
+      "with": "ff",
+      "r": 0.974
+     },
+     "fallback_id": "ff",
+     "derive": "values.ff / games"
+    },
+    {
+     "id": "sacks_pg",
+     "display": "Sacks per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Sacks per game (r 0.86-0.88 with sacks + hits per game, less stable).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.485,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 663,
+      "m50": 14.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.435,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.369
+     },
+     "redundancy": {
+      "with": "sacks",
+      "r": 0.965
+     },
+     "fallback_id": "sacks",
+     "derive": "values.sacks / games"
+    },
+    {
+     "id": "pd_pg",
+     "display": "Passes defensed per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Passes broken up or intercepted per game (batted balls for linemen).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.338,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 663,
+      "m50": 26.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.236,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.323
+     },
+     "redundancy": {
+      "with": "pd",
+      "r": 0.965
+     },
+     "fallback_id": "pd",
+     "derive": "values.pd / games"
+    },
+    {
+     "id": "pass_rush_rate",
+     "display": "Sacks + hits per pass snap",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Sacks and QB hits per opponent dropback on the field (participation, 2016-2025 only).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.483,
+      "split_half_r": 0.368,
+      "split_half_r_sb": 0.538,
+      "n_pairs": 663,
+      "m50": 270.0,
+      "m50_unit": "pass snaps",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.483,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.34
+     },
+     "redundancy": {
+      "with": "pressures_pg",
+      "r": 0.931
+     }
+    },
+    {
+     "id": "tfl_run",
+     "display": "TFL per run snap",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Tackles for loss per opponent run on the field (participation, 2016-2025 only).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.414,
+      "split_half_r": 0.256,
+      "split_half_r_sb": 0.408,
+      "n_pairs": 663,
+      "m50": 324.0,
+      "m50_unit": "run snaps",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.339,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.375
+     },
+     "redundancy": {
+      "with": "tfl_pg",
+      "r": 0.912
+     }
+    },
+    {
+     "id": "sacks",
+     "display": "Sacks",
+     "unit": "sacks",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "count",
+     "explanation": "Season sacks (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.492,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 663,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.449,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.374
+     },
+     "redundancy": {
+      "with": "sacks_pg",
+      "r": 0.965
+     }
+    },
+    {
+     "id": "qb_hits",
+     "display": "QB hits",
+     "unit": "hits",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "count",
+     "explanation": "Season QB hits (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.66,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 663,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.553,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.371
+     },
+     "redundancy": {
+      "with": "qb_hits_pg",
+      "r": 0.958
+     }
+    },
+    {
+     "id": "def_value",
+     "display": "Splash EPA",
+     "unit": "EPA",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "count",
+     "explanation": "Season Splash EPA (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.509,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 663,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season pass_rush_rate",
+      "r": 0.432,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.414
+     },
+     "redundancy": {
+      "with": "gvar_pg",
+      "r": 0.956
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "gvar_pg",
+     "pressures_pg",
+     "tfl_pg",
+     "tackles_pg",
+     "ff_pg",
+     "pd_pg"
+    ],
+    "standardise": "z within group and season (qualified players)",
+    "weights": "yoy_r floored at 0.2",
+    "weight_values": {
+     "gvar_pg": 0.52,
+     "pressures_pg": 0.65,
+     "tfl_pg": 0.44,
+     "tackles_pg": 0.56,
+     "ff_pg": 0.2,
+     "pd_pg": 0.34
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraint": "same season, qualified; value.json gvar_pg read from value.json"
+   },
+   "position_fallback": {
+    "field": "pos",
+    "codes": [
+     "DT",
+     "NT",
+     "DL"
+    ],
+    "note": "until players.json carries role: read value.json pos (cols index 3) by pid; the roster pos alone puts 3-4 outside linebackers (half of all edge rushers) with LB"
+   },
+   "benchmark": {
+    "target": "next-season pass_rush_rate",
+    "autocorr": 0.483,
+    "target2": "next-season splash_epa_snap",
+    "autocorr2": 0.394
+   }
+  },
+  {
+   "id": "lb",
+   "entity": "player",
+   "display": "Linebackers",
+   "peer_group": "role == LB (value.json pos; off-ball ILB/MLB/WLB/SLB)",
+   "position_field": "role",
+   "position_codes": [
+    "LB"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": true,
+    "unit": "games",
+    "note": "as EDGE (300+ defensive snaps when measured)"
+   },
+   "basis": "per game (per snap 2016-2025)",
+   "metrics": [
+    {
+     "id": "gvar_pg",
+     "display": "Value per game",
+     "unit": "points/game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Splash EPA above a replacement linebacker per game (value.json).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.274,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 506,
+      "m50": 36.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season splash_snap",
+      "r": 0.146,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.162
+     },
+     "redundancy": {
+      "with": "def_value_pg",
+      "r": 0.997
+     },
+     "payload_file": "value.json"
+    },
+    {
+     "id": "tackles_pg",
+     "display": "Tackles per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Solo and assisted tackles per game: the linebacker's workload and range.",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.476,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 506,
+      "m50": 15.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season splash_snap",
+      "r": 0.044,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.074
+     },
+     "redundancy": {
+      "with": "tackles",
+      "r": 0.852
+     },
+     "fallback_id": "tackles",
+     "derive": "values.tackles / games"
+    },
+    {
+     "id": "tfl_pg",
+     "display": "Tackles for loss per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Tackles behind the line per game.",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.288,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 506,
+      "m50": 34.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season splash_snap",
+      "r": 0.201,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.182
+     },
+     "redundancy": {
+      "with": "tfl",
+      "r": 0.93
+     },
+     "fallback_id": "tfl",
+     "derive": "values.tfl / games"
+    },
+    {
+     "id": "pressures_pg",
+     "display": "Sacks + QB hits per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Sacks and quarterback hits per game (blitzing).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.421,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 506,
+      "m50": 19.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season splash_snap",
+      "r": 0.151,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.102
+     },
+     "redundancy": {
+      "with": "qb_hits_pg",
+      "r": 0.971
+     }
+    },
+    {
+     "id": "pd_pg",
+     "display": "Passes defensed per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Passes broken up or intercepted per game: the only coverage credit in the data.",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.293,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 506,
+      "m50": 33.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season splash_snap",
+      "r": 0.053,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.121
+     },
+     "redundancy": {
+      "with": "pd",
+      "r": 0.936
+     },
+     "fallback_id": "pd",
+     "derive": "values.pd / games"
+    },
+    {
+     "id": "splash_pg",
+     "display": "Splash plays per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Sacks, takeaways, forced fumbles, pass break-ups and tackles for loss per game.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.337,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 506,
+      "m50": 27.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season splash_snap",
+      "r": 0.198,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.219
+     },
+     "redundancy": {
+      "with": "splash_snap",
+      "r": 0.849
+     }
+    },
+    {
+     "id": "ints_pg",
+     "display": "Interceptions per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Interceptions per game. Close to noise (r 0.10).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.098,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 506,
+      "m50": 127.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season splash_snap",
+      "r": 0.028,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.078
+     },
+     "redundancy": {
+      "with": "ints",
+      "r": 0.97
+     },
+     "fallback_id": "ints",
+     "derive": "values.ints / games"
+    },
+    {
+     "id": "ff_pg",
+     "display": "Forced fumbles per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Forced fumbles per game.",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.219,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 506,
+      "m50": 49.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season splash_snap",
+      "r": 0.089,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.083
+     },
+     "redundancy": {
+      "with": "ff",
+      "r": 0.954
+     },
+     "fallback_id": "ff",
+     "derive": "values.ff / games"
+    },
+    {
+     "id": "tackle_snap",
+     "display": "Tackles per snap",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Tackles per defensive snap (participation, 2016-2025 only).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.439,
+      "split_half_r": 0.442,
+      "split_half_r_sb": 0.613,
+      "n_pairs": 506,
+      "m50": 430.0,
+      "m50_unit": "snaps",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season splash_snap",
+      "r": 0.046,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.085
+     },
+     "redundancy": {
+      "with": "tackles_pg",
+      "r": 0.582
+     }
+    },
+    {
+     "id": "tackles",
+     "display": "Tackles",
+     "unit": "tackles",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "count",
+     "explanation": "Season tackles (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.449,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 506,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season splash_snap",
+      "r": 0.071,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.094
+     },
+     "redundancy": {
+      "with": "tackles_pg",
+      "r": 0.852
+     }
+    },
+    {
+     "id": "sacks",
+     "display": "Sacks",
+     "unit": "sacks",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "count",
+     "explanation": "Season sacks (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.347,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 506,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season splash_snap",
+      "r": 0.128,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.114
+     },
+     "redundancy": {
+      "with": "sacks_pg",
+      "r": 0.963
+     }
+    },
+    {
+     "id": "def_value",
+     "display": "Splash EPA",
+     "unit": "EPA",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "count",
+     "explanation": "Season Splash EPA (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.318,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 506,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season splash_snap",
+      "r": 0.163,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.183
+     },
+     "redundancy": {
+      "with": "gvar_pg",
+      "r": 0.94
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "gvar_pg",
+     "tackles_pg",
+     "tfl_pg",
+     "pressures_pg",
+     "pd_pg",
+     "splash_pg"
+    ],
+    "standardise": "z within group and season (qualified players)",
+    "weights": "yoy_r floored at 0.2",
+    "weight_values": {
+     "gvar_pg": 0.27,
+     "tackles_pg": 0.48,
+     "tfl_pg": 0.29,
+     "pressures_pg": 0.42,
+     "pd_pg": 0.29,
+     "splash_pg": 0.34
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraint": "same season, qualified; value.json gvar_pg read from value.json"
+   },
+   "position_fallback": {
+    "field": "pos",
+    "codes": [
+     "ILB",
+     "MLB",
+     "LB",
+     "OLB"
+    ],
+    "note": "until players.json carries role: read value.json pos (cols index 3) by pid; the roster pos alone puts 3-4 outside linebackers (half of all edge rushers) with LB"
+   },
+   "benchmark": {
+    "target": "next-season splash_snap",
+    "autocorr": 0.221,
+    "target2": "next-season splash_epa_snap",
+    "autocorr2": 0.175
+   }
+  },
+  {
+   "id": "cb",
+   "entity": "player",
+   "display": "Cornerbacks",
+   "peer_group": "role == CB (value.json pos; CB, slot CB, DB)",
+   "position_field": "role",
+   "position_codes": [
+    "CB"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": true,
+    "unit": "games",
+    "note": "as LB"
+   },
+   "basis": "per game (per snap 2016-2025)",
+   "metrics": [
+    {
+     "id": "gvar_pg",
+     "display": "Value per game",
+     "unit": "points/game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Splash EPA above a replacement cornerback per game (value.json).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.221,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 673,
+      "m50": 45.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": 0.151,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.151
+     },
+     "redundancy": {
+      "with": "def_value_pg",
+      "r": 0.995
+     },
+     "payload_file": "value.json"
+    },
+    {
+     "id": "pd_pg",
+     "display": "Passes defensed per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Passes broken up or intercepted per game: the best coverage signal in public data, and still weak.",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.301,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 673,
+      "m50": 29.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": 0.251,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.103
+     },
+     "redundancy": {
+      "with": "ball_cov",
+      "r": 0.9
+     },
+     "fallback_id": "pd",
+     "derive": "values.pd / games"
+    },
+    {
+     "id": "ints_pg",
+     "display": "Interceptions per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Interceptions per game. Mostly luck from one season to the next.",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.193,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 673,
+      "m50": 53.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": 0.147,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.133
+     },
+     "redundancy": {
+      "with": "int_cov",
+      "r": 0.978
+     },
+     "fallback_id": "ints",
+     "derive": "values.ints / games"
+    },
+    {
+     "id": "splash_pg",
+     "display": "Splash plays per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Sacks, takeaways, forced fumbles, pass break-ups and tackles for loss per game.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.242,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 673,
+      "m50": 39.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": 0.193,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.142
+     },
+     "redundancy": {
+      "with": "pd_pg",
+      "r": 0.875
+     }
+    },
+    {
+     "id": "tackles_pg",
+     "display": "Tackles per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Solo and assisted tackles per game (for corners, partly a sign of being thrown at).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.354,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 673,
+      "m50": 23.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": 0.027,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.044
+     },
+     "redundancy": {
+      "with": "tackles",
+      "r": 0.684
+     },
+     "fallback_id": "tackles",
+     "derive": "values.tackles / games"
+    },
+    {
+     "id": "tfl_pg",
+     "display": "Tackles for loss per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Tackles behind the line per game (run support and blitzes).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.252,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 673,
+      "m50": 37.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": -0.08,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.057
+     },
+     "redundancy": {
+      "with": "tfl",
+      "r": 0.939
+     },
+     "fallback_id": "tfl",
+     "derive": "values.tfl / games"
+    },
+    {
+     "id": "ff_pg",
+     "display": "Forced fumbles per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Forced fumbles per game.",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.12,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 673,
+      "m50": 93.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": -0.052,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.035
+     },
+     "redundancy": {
+      "with": "ff",
+      "r": 0.969
+     },
+     "fallback_id": "ff",
+     "derive": "values.ff / games"
+    },
+    {
+     "id": "pressures_pg",
+     "display": "Sacks + QB hits per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Sacks and quarterback hits per game (blitzing).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.349,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 673,
+      "m50": 24.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": -0.088,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.083
+     },
+     "redundancy": {
+      "with": "pass_rush_rate",
+      "r": 0.981
+     }
+    },
+    {
+     "id": "ball_cov",
+     "display": "Passes defensed per pass snap",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Passes defensed and interceptions per opponent dropback on the field (participation, 2016-2025 only).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.255,
+      "split_half_r": 0.152,
+      "split_half_r_sb": 0.264,
+      "n_pairs": 673,
+      "m50": 1157.0,
+      "m50_unit": "pass snaps",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": 0.255,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.144
+     },
+     "redundancy": {
+      "with": "pd_pg",
+      "r": 0.9
+     }
+    },
+    {
+     "id": "ints",
+     "display": "Interceptions",
+     "unit": "INT",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "count",
+     "explanation": "Season interceptions (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.202,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 673,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": 0.129,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.114
+     },
+     "redundancy": {
+      "with": "ints_pg",
+      "r": 0.955
+     }
+    },
+    {
+     "id": "pd",
+     "display": "Passes defensed",
+     "unit": "PD",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "count",
+     "explanation": "Season passes defensed (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.278,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 673,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": 0.193,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.065
+     },
+     "redundancy": {
+      "with": "pd_pg",
+      "r": 0.881
+     }
+    },
+    {
+     "id": "def_value",
+     "display": "Splash EPA",
+     "unit": "EPA",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "count",
+     "explanation": "Season Splash EPA (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.232,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 673,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": 0.12,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.119
+     },
+     "redundancy": {
+      "with": "gvar_pg",
+      "r": 0.924
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "gvar_pg",
+     "pd_pg",
+     "ints_pg",
+     "tackles_pg",
+     "tfl_pg",
+     "ff_pg"
+    ],
+    "standardise": "z within group and season (qualified players)",
+    "weights": "yoy_r floored at 0.2",
+    "weight_values": {
+     "gvar_pg": 0.22,
+     "pd_pg": 0.3,
+     "ints_pg": 0.2,
+     "tackles_pg": 0.35,
+     "tfl_pg": 0.25,
+     "ff_pg": 0.2
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraint": "same season, qualified; value.json gvar_pg read from value.json"
+   },
+   "position_fallback": {
+    "field": "pos",
+    "codes": [
+     "CB",
+     "DB"
+    ],
+    "note": "until players.json carries role: read value.json pos (cols index 3) by pid; the roster pos alone puts 3-4 outside linebackers (half of all edge rushers) with LB"
+   },
+   "benchmark": {
+    "target": "next-season ball_cov",
+    "autocorr": 0.255,
+    "target2": "next-season splash_epa_snap",
+    "autocorr2": 0.159
+   }
+  },
+  {
+   "id": "s",
+   "entity": "player",
+   "display": "Safeties",
+   "peer_group": "role == S (value.json pos; FS, SS, SAF)",
+   "position_field": "role",
+   "position_codes": [
+    "S"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": true,
+    "unit": "games",
+    "note": "as LB"
+   },
+   "basis": "per game (per snap 2016-2025)",
+   "metrics": [
+    {
+     "id": "gvar_pg",
+     "display": "Value per game",
+     "unit": "points/game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Splash EPA above a replacement safety per game (value.json).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.137,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 640,
+      "m50": 84.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": 0.084,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.09
+     },
+     "redundancy": {
+      "with": "def_value_pg",
+      "r": 0.995
+     },
+     "payload_file": "value.json"
+    },
+    {
+     "id": "tackles_pg",
+     "display": "Tackles per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Solo and assisted tackles per game: run support and last-line tackling.",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.402,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 640,
+      "m50": 20.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": -0.027,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.077
+     },
+     "redundancy": {
+      "with": "tackles",
+      "r": 0.81
+     },
+     "fallback_id": "tackles",
+     "derive": "values.tackles / games"
+    },
+    {
+     "id": "pd_pg",
+     "display": "Passes defensed per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Passes broken up or intercepted per game: the best coverage signal in public data, and still weak.",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.277,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 640,
+      "m50": 35.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": 0.187,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.119
+     },
+     "redundancy": {
+      "with": "pd",
+      "r": 0.929
+     },
+     "fallback_id": "pd",
+     "derive": "values.pd / games"
+    },
+    {
+     "id": "ints_pg",
+     "display": "Interceptions per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Interceptions per game. Mostly luck from one season to the next.",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.156,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 640,
+      "m50": 73.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": 0.074,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.005
+     },
+     "redundancy": {
+      "with": "ints",
+      "r": 0.959
+     },
+     "fallback_id": "ints",
+     "derive": "values.ints / games"
+    },
+    {
+     "id": "tfl_pg",
+     "display": "Tackles for loss per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Tackles behind the line per game (run support and blitzes).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.328,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 640,
+      "m50": 28.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": -0.054,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.117
+     },
+     "redundancy": {
+      "with": "tfl",
+      "r": 0.95
+     },
+     "fallback_id": "tfl",
+     "derive": "values.tfl / games"
+    },
+    {
+     "id": "splash_pg",
+     "display": "Splash plays per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Sacks, takeaways, forced fumbles, pass break-ups and tackles for loss per game.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.288,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 640,
+      "m50": 33.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": 0.104,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.171
+     },
+     "redundancy": {
+      "with": "splash_snap",
+      "r": 0.895
+     }
+    },
+    {
+     "id": "ff_pg",
+     "display": "Forced fumbles per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Forced fumbles per game.",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.148,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 640,
+      "m50": 78.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": -0.036,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.056
+     },
+     "redundancy": {
+      "with": "ff",
+      "r": 0.963
+     },
+     "fallback_id": "ff",
+     "derive": "values.ff / games"
+    },
+    {
+     "id": "pressures_pg",
+     "display": "Sacks + QB hits per game",
+     "unit": "per game",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Sacks and quarterback hits per game (blitzing).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.395,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 640,
+      "m50": 21.0,
+      "m50_unit": "games",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": -0.032,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.106
+     },
+     "redundancy": {
+      "with": "pass_rush_rate",
+      "r": 0.973
+     }
+    },
+    {
+     "id": "ball_cov",
+     "display": "Passes defensed per pass snap",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Passes defensed and interceptions per opponent dropback on the field (participation, 2016-2025 only).",
+     "in_payload": false,
+     "reliability": {
+      "yoy_r": 0.132,
+      "split_half_r": 0.099,
+      "split_half_r_sb": 0.18,
+      "n_pairs": 640,
+      "m50": 2061.0,
+      "m50_unit": "pass snaps",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": 0.132,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.073
+     },
+     "redundancy": {
+      "with": "pd_pg",
+      "r": 0.869
+     }
+    },
+    {
+     "id": "ints",
+     "display": "Interceptions",
+     "unit": "INT",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "count",
+     "explanation": "Season interceptions (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.212,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 640,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": 0.086,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.022
+     },
+     "redundancy": {
+      "with": "ints_pg",
+      "r": 0.959
+     }
+    },
+    {
+     "id": "pd",
+     "display": "Passes defensed",
+     "unit": "PD",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "count",
+     "explanation": "Season passes defensed (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.303,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 640,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": 0.207,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.139
+     },
+     "redundancy": {
+      "with": "pd_pg",
+      "r": 0.929
+     }
+    },
+    {
+     "id": "def_value",
+     "display": "Splash EPA",
+     "unit": "EPA",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "count",
+     "explanation": "Season Splash EPA (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.196,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 640,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season ball_cov",
+      "r": 0.104,
+      "target2": "next-season splash_epa_snap",
+      "r2": 0.108
+     },
+     "redundancy": {
+      "with": "gvar_pg",
+      "r": 0.938
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "gvar_pg",
+     "tackles_pg",
+     "pd_pg",
+     "ints_pg",
+     "tfl_pg",
+     "splash_pg"
+    ],
+    "standardise": "z within group and season (qualified players)",
+    "weights": "yoy_r floored at 0.2",
+    "weight_values": {
+     "gvar_pg": 0.2,
+     "tackles_pg": 0.4,
+     "pd_pg": 0.28,
+     "ints_pg": 0.2,
+     "tfl_pg": 0.33,
+     "splash_pg": 0.29
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraint": "same season, qualified; value.json gvar_pg read from value.json"
+   },
+   "position_fallback": {
+    "field": "pos",
+    "codes": [
+     "S",
+     "SAF",
+     "FS",
+     "SS"
+    ],
+    "note": "until players.json carries role: read value.json pos (cols index 3) by pid; the roster pos alone puts 3-4 outside linebackers (half of all edge rushers) with LB"
+   },
+   "benchmark": {
+    "target": "next-season ball_cov",
+    "autocorr": 0.132,
+    "target2": "next-season splash_epa_snap",
+    "autocorr2": 0.085
+   }
+  },
+  {
+   "id": "k",
+   "entity": "player",
+   "display": "Kickers",
+   "peer_group": "group == K",
+   "position_field": "group",
+   "position_codes": [
+    "K"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": true,
+    "unit": "FGA",
+    "note": "0.8 field-goal attempts per team game (14 over 17)"
+   },
+   "basis": "per attempt",
+   "metrics": [
+    {
+     "id": "fg_oe",
+     "display": "Field goals over expected",
+     "unit": "FG",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "count",
+     "explanation": "Field goals made minus what our model expects from the distances and conditions he faced (season total).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.084,
+      "split_half_r": 0.125,
+      "split_half_r_sb": 0.221,
+      "n_pairs": 507,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season fg_oe",
+      "r": 0.046,
+      "target2": null,
+      "r2": null
+     },
+     "redundancy": {
+      "with": "pts_oe",
+      "r": 0.983
+     }
+    },
+    {
+     "id": "fg_pct",
+     "display": "Field goal %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Field goals made per attempt (ignores distance; r 0.86 with FG over expected, less stable).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.015,
+      "split_half_r": 0.069,
+      "split_half_r_sb": 0.128,
+      "n_pairs": 507,
+      "m50": 198.0,
+      "m50_unit": "FGA",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season fg_oe",
+      "r": 0.019,
+      "target2": null,
+      "r2": null
+     },
+     "redundancy": {
+      "with": "fg_oe",
+      "r": 0.863
+     }
+    },
+    {
+     "id": "fg_50_pct",
+     "display": "50+ yard %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Field goals of 50+ yards made per attempt.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.059,
+      "split_half_r": 0.015,
+      "split_half_r_sb": 0.029,
+      "n_pairs": 474,
+      "m50": 74.0,
+      "m50_unit": "50+ FGA",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season fg_oe",
+      "r": 0.034,
+      "target2": null,
+      "r2": null
+     },
+     "redundancy": {
+      "with": "fg_50",
+      "r": 0.538
+     }
+    },
+    {
+     "id": "xp_pct",
+     "display": "Extra point %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Extra points made per attempt.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.096,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 507,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season fg_oe",
+      "r": 0.084,
+      "target2": null,
+      "r2": null
+     },
+     "redundancy": {
+      "with": "pts_oe",
+      "r": 0.255
+     }
+    },
+    {
+     "id": "avg_dist",
+     "display": "Average attempt distance",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Average distance of his field-goal tries (how far his coach trusts him).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.119,
+      "split_half_r": 0.115,
+      "split_half_r_sb": 0.207,
+      "n_pairs": 507,
+      "m50": 112.0,
+      "m50_unit": "FGA",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season fg_oe",
+      "r": 0.044,
+      "target2": null,
+      "r2": null
+     },
+     "redundancy": {
+      "with": "fg_50",
+      "r": 0.518
+     },
+     "style": true
+    },
+    {
+     "id": "fg_50",
+     "display": "50+ yard makes",
+     "unit": "FG",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "count",
+     "explanation": "Field goals of 50+ yards made.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.202,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 507,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season fg_oe",
+      "r": 0.043,
+      "target2": null,
+      "r2": null
+     },
+     "redundancy": {
+      "with": "fg_50_pct",
+      "r": 0.538
+     }
+    },
+    {
+     "id": "pts_oe",
+     "display": "Points over expected",
+     "unit": "pts",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "count",
+     "explanation": "3 x field goals over expected + extra points over expected (r 0.98 with FG over expected).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.102,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 507,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season fg_oe",
+      "r": 0.06,
+      "target2": null,
+      "r2": null
+     },
+     "redundancy": {
+      "with": "fg_oe",
+      "r": 0.983
+     }
+    },
+    {
+     "id": "fga",
+     "display": "Field-goal attempts",
+     "unit": "FGA",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "count",
+     "explanation": "Season attempts (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": null,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null,
+      "note": "not measured"
+     },
+     "predictive": {
+      "target": null,
+      "r": null,
+      "target2": null,
+      "r2": null
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "fg_50_pct",
+     "xp_pct",
+     "avg_dist"
+    ],
+    "standardise": "z within group and season (qualified players)",
+    "weights": "yoy_r floored at 0.2",
+    "weight_values": {
+     "fg_50_pct": 0.2,
+     "xp_pct": 0.2,
+     "avg_dist": 0.2
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraint": "same season, qualified; value.json gvar_pg read from value.json"
+   },
+   "benchmark": {
+    "target": "next-season fg_oe",
+    "autocorr": 0.039,
+    "target2": null,
+    "autocorr2": null
+   }
+  },
+  {
+   "id": "p",
+   "entity": "player",
+   "display": "Punters",
+   "peer_group": "group == P",
+   "position_field": "group",
+   "position_codes": [
+    "P"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": true,
+    "unit": "punts",
+    "note": "2 punts per team game (34 over 17)"
+   },
+   "basis": "per punt",
+   "metrics": [
+    {
+     "id": "epa_punt",
+     "display": "EPA per punt",
+     "unit": "EPA/punt",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Expected points gained for the punting team per punt (field position flipped, returns included).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.288,
+      "split_half_r": 0.251,
+      "split_half_r_sb": 0.401,
+      "n_pairs": 332,
+      "m50": 104.0,
+      "m50_unit": "punts",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season epa_punt",
+      "r": 0.288,
+      "target2": "next-season net",
+      "r2": 0.215
+     },
+     "redundancy": {
+      "with": "net_oe",
+      "r": -0.761
+     }
+    },
+    {
+     "id": "net",
+     "display": "Net average",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Punt distance less return yards and 20 yards for each touchback.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.379,
+      "split_half_r": 0.322,
+      "split_half_r_sb": 0.487,
+      "n_pairs": 332,
+      "m50": 73.0,
+      "m50_unit": "punts",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season epa_punt",
+      "r": 0.27,
+      "target2": "next-season net",
+      "r2": 0.379
+     },
+     "redundancy": {
+      "with": "net_oe",
+      "r": -0.948
+     }
+    },
+    {
+     "id": "gross",
+     "display": "Gross average",
+     "unit": "yds",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Average punt distance (the most stable punting number).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.428,
+      "split_half_r": 0.477,
+      "split_half_r_sb": 0.646,
+      "n_pairs": 332,
+      "m50": 38.0,
+      "m50_unit": "punts",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season epa_punt",
+      "r": 0.192,
+      "target2": "next-season net",
+      "r2": 0.282
+     },
+     "redundancy": {
+      "with": "net",
+      "r": 0.697
+     }
+    },
+    {
+     "id": "inside20",
+     "display": "Inside the 20",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Share of punts downed or returned inside the 20.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.108,
+      "split_half_r": 0.169,
+      "split_half_r_sb": 0.289,
+      "n_pairs": 332,
+      "m50": 170.0,
+      "m50_unit": "punts",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season epa_punt",
+      "r": 0.186,
+      "target2": "next-season net",
+      "r2": 0.151
+     },
+     "redundancy": {
+      "with": "net_oe",
+      "r": -0.54
+     }
+    },
+    {
+     "id": "touchback_rate",
+     "display": "Touchback rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Touchbacks per punt.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.059,
+      "split_half_r": -0.027,
+      "split_half_r_sb": -0.055,
+      "n_pairs": 332,
+      "m50": 1104.0,
+      "m50_unit": "punts",
+      "m50_basis": "split-half"
+     },
+     "predictive": {
+      "target": "next-season epa_punt",
+      "r": -0.07,
+      "target2": "next-season net",
+      "r2": -0.032
+     },
+     "redundancy": {
+      "with": "gross",
+      "r": 0.291
+     }
+    },
+    {
+     "id": "net_oe",
+     "display": "Net over expected",
+     "unit": "yds/punt",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Field position over expected per punt from our punt model. Sign is inverted in today's payload (higher = worse); hide until fixed.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.388,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": 332,
+      "m50": 109.0,
+      "m50_unit": "punts",
+      "m50_basis": "year-to-year"
+     },
+     "predictive": {
+      "target": "next-season epa_punt",
+      "r": -0.292,
+      "target2": "next-season net",
+      "r2": -0.379
+     },
+     "redundancy": {
+      "with": "net",
+      "r": -0.948
+     }
+    },
+    {
+     "id": "punts",
+     "display": "Punts",
+     "unit": "punts",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "count",
+     "explanation": "Season punts (leaderboards).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "n_pairs": null,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null,
+      "note": "not measured"
+     },
+     "predictive": {
+      "target": null,
+      "r": null,
+      "target2": null,
+      "r2": null
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "epa_punt",
+     "net",
+     "gross",
+     "inside20",
+     "touchback_rate"
+    ],
+    "standardise": "z within group and season (qualified players)",
+    "weights": "yoy_r floored at 0.2",
+    "weight_values": {
+     "epa_punt": 0.29,
+     "net": 0.38,
+     "gross": 0.43,
+     "inside20": 0.2,
+     "touchback_rate": 0.2
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraint": "same season, qualified; value.json gvar_pg read from value.json"
+   },
+   "benchmark": {
+    "target": "next-season epa_punt",
+    "autocorr": 0.288,
+    "target2": "next-season net",
+    "autocorr2": 0.379
+   }
+  },
+  {
+   "id": "team",
+   "entity": "team",
+   "display": "Teams: overall",
+   "peer_group": "all 32 teams, same season",
+   "position_field": null,
+   "position_codes": [],
+   "minimum": {
+    "field": null,
+    "value": null,
+    "unit": "games",
+    "note": "none; early-season values are noisy (offence EPA reaches r 0.5 between halves after about 6 games, defence after about 16)"
+   },
+   "basis": "per play / per dropback / per carry",
+   "metrics": [
+    {
+     "id": "rating",
+     "display": "Team rating",
+     "unit": "points/game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Points per game better than an average team on a neutral field (our team-strength model).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.579,
+      "split_half_r": null,
+      "n_pairs": 605,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season win%",
+      "r": 0.393,
+      "target2": "next-season win%",
+      "r2": 0.393,
+      "second_half_point_diff_r": null,
+      "next_season_point_diff_r": 0.412
+     }
+    },
+    {
+     "id": "off_rating",
+     "display": "Offence rating",
+     "unit": "points/game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Offensive points per game above average.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.58,
+      "split_half_r": null,
+      "n_pairs": 605,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season win%",
+      "r": 0.364,
+      "target2": "next-season win%",
+      "r2": 0.364,
+      "second_half_point_diff_r": null,
+      "next_season_point_diff_r": 0.374
+     }
+    },
+    {
+     "id": "def_rating",
+     "display": "Defence rating",
+     "unit": "points/game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Defensive points per game above average (positive = better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.55,
+      "split_half_r": null,
+      "n_pairs": 605,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season win%",
+      "r": 0.185,
+      "target2": "next-season win%",
+      "r2": 0.185,
+      "second_half_point_diff_r": null,
+      "next_season_point_diff_r": 0.198
+     }
+    },
+    {
+     "id": "off_epa",
+     "display": "Offence EPA per play",
+     "unit": "EPA/play",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Opponent-adjusted expected points added per offensive play.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.444,
+      "split_half_r": 0.571,
+      "n_pairs": 605,
+      "m50": 6.4,
+      "m50_unit": "games",
+      "m50_basis": "first v second half (raw rate)"
+     },
+     "predictive": {
+      "target": "second-half win% (first-half metric, raw rate)",
+      "r": 0.414,
+      "target2": "next-season win%",
+      "r2": 0.36,
+      "second_half_point_diff_r": 0.47,
+      "next_season_point_diff_r": 0.379
+     }
+    },
+    {
+     "id": "def_epa",
+     "display": "Defence EPA per play",
+     "unit": "EPA/play",
+     "direction": "lower",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Opponent-adjusted expected points allowed per play.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.297,
+      "split_half_r": 0.35,
+      "n_pairs": 605,
+      "m50": 15.8,
+      "m50_unit": "games",
+      "m50_basis": "first v second half (raw rate)"
+     },
+     "predictive": {
+      "target": "second-half win% (first-half metric, raw rate)",
+      "r": 0.24,
+      "target2": "next-season win%",
+      "r2": 0.174,
+      "second_half_point_diff_r": 0.268,
+      "next_season_point_diff_r": 0.197
+     }
+    },
+    {
+     "id": "st_epa_g",
+     "display": "Special teams EPA per game",
+     "unit": "EPA/game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Net expected points per game on kicks, punts and returns.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.298,
+      "split_half_r": null,
+      "n_pairs": 605,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season win%",
+      "r": 0.076,
+      "target2": "next-season win%",
+      "r2": 0.076,
+      "second_half_point_diff_r": null,
+      "next_season_point_diff_r": 0.074
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "rating",
+     "off_rating",
+     "def_rating",
+     "off_epa",
+     "def_epa",
+     "st_epa_g"
+    ],
+    "standardise": "z within season",
+    "weights": "yoy_r floored at 0.2",
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraint": "same season"
+   }
+  },
+  {
+   "id": "team_offence",
+   "entity": "team",
+   "display": "Teams: offence",
+   "peer_group": "all 32 teams, same season",
+   "position_field": null,
+   "position_codes": [],
+   "minimum": {
+    "field": null,
+    "value": null,
+    "unit": "games",
+    "note": "none; early-season values are noisy (offence EPA reaches r 0.5 between halves after about 6 games, defence after about 16)"
+   },
+   "basis": "per play / per dropback / per carry",
+   "metrics": [
+    {
+     "id": "off_epa",
+     "display": "EPA per play",
+     "unit": "EPA/play",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Opponent-adjusted expected points added per play.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.444,
+      "split_half_r": 0.571,
+      "n_pairs": 605,
+      "m50": 6.4,
+      "m50_unit": "games",
+      "m50_basis": "first v second half (raw rate)"
+     },
+     "predictive": {
+      "target": "second-half win% (first-half metric, raw rate)",
+      "r": 0.414,
+      "target2": "next-season win%",
+      "r2": 0.36,
+      "second_half_point_diff_r": 0.47,
+      "next_season_point_diff_r": 0.379
+     }
+    },
+    {
+     "id": "off_pass_epa",
+     "display": "Pass EPA per dropback",
+     "unit": "EPA/dropback",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Opponent-adjusted EPA per dropback: the most stable and predictive unit number.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.439,
+      "split_half_r": 0.532,
+      "n_pairs": 605,
+      "m50": 7.5,
+      "m50_unit": "games",
+      "m50_basis": "first v second half (raw rate)"
+     },
+     "predictive": {
+      "target": "second-half win% (first-half metric, raw rate)",
+      "r": 0.419,
+      "target2": "next-season win%",
+      "r2": 0.347,
+      "second_half_point_diff_r": 0.469,
+      "next_season_point_diff_r": 0.361
+     }
+    },
+    {
+     "id": "off_rush_epa",
+     "display": "Rush EPA per carry",
+     "unit": "EPA/carry",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Opponent-adjusted EPA per designed run.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.255,
+      "split_half_r": 0.305,
+      "n_pairs": 605,
+      "m50": 19.4,
+      "m50_unit": "games",
+      "m50_basis": "first v second half (raw rate)"
+     },
+     "predictive": {
+      "target": "second-half win% (first-half metric, raw rate)",
+      "r": 0.193,
+      "target2": "next-season win%",
+      "r2": 0.232,
+      "second_half_point_diff_r": 0.241,
+      "next_season_point_diff_r": 0.254
+     }
+    },
+    {
+     "id": "off_success",
+     "display": "Success rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Share of plays that gain expected points.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.446,
+      "split_half_r": 0.551,
+      "n_pairs": 605,
+      "m50": 6.9,
+      "m50_unit": "games",
+      "m50_basis": "first v second half (raw rate)"
+     },
+     "predictive": {
+      "target": "second-half win% (first-half metric, raw rate)",
+      "r": 0.346,
+      "target2": "next-season win%",
+      "r2": 0.328,
+      "second_half_point_diff_r": 0.408,
+      "next_season_point_diff_r": 0.353
+     }
+    },
+    {
+     "id": "pressure_allowed",
+     "display": "Pressure rate allowed",
+     "unit": "%",
+     "direction": "lower",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of dropbacks under pressure (the offensive line and quarterback together).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.294,
+      "split_half_r": 0.508,
+      "n_pairs": 283,
+      "m50": 8.2,
+      "m50_unit": "games",
+      "m50_basis": "first v second half (raw rate)"
+     },
+     "predictive": {
+      "target": "second-half win% (first-half metric, raw rate)",
+      "r": 0.217,
+      "target2": "next-season win%",
+      "r2": 0.125,
+      "second_half_point_diff_r": 0.247,
+      "next_season_point_diff_r": 0.118
+     }
+    },
+    {
+     "id": "off_rating",
+     "display": "Offence rating",
+     "unit": "points/game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Offensive points per game above average (team-strength model).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.58,
+      "split_half_r": null,
+      "n_pairs": 605,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season win%",
+      "r": 0.364,
+      "target2": "next-season win%",
+      "r2": 0.364,
+      "second_half_point_diff_r": null,
+      "next_season_point_diff_r": 0.374
+     }
+    },
+    {
+     "id": "proe_neutral",
+     "display": "Pass rate over expected (neutral)",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "How much more often they pass than expected on early downs in close games (style).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.401,
+      "split_half_r": null,
+      "n_pairs": 605,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season win%",
+      "r": 0.121,
+      "target2": "next-season win%",
+      "r2": 0.121,
+      "second_half_point_diff_r": null,
+      "next_season_point_diff_r": 0.132
+     },
+     "style": true
+    },
+    {
+     "id": "sec_per_play_neutral",
+     "display": "Seconds per play (neutral)",
+     "unit": "sec",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Pace in neutral situations (style).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.479,
+      "split_half_r": null,
+      "n_pairs": 605,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season win%",
+      "r": -0.003,
+      "target2": "next-season win%",
+      "r2": -0.003,
+      "second_half_point_diff_r": null,
+      "next_season_point_diff_r": -0.005
+     },
+     "style": true
+    },
+    {
+     "id": "plays_pg",
+     "display": "Plays per game",
+     "unit": "plays",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Offensive snaps per game (style).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.321,
+      "split_half_r": null,
+      "n_pairs": 605,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season win%",
+      "r": 0.112,
+      "target2": "next-season win%",
+      "r2": 0.112,
+      "second_half_point_diff_r": null,
+      "next_season_point_diff_r": 0.147
+     },
+     "style": true
+    },
+    {
+     "id": "motion_rate",
+     "display": "Motion rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Pre-snap motion per play (FTN, 2022 onward; style).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.711,
+      "split_half_r": null,
+      "n_pairs": 96,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season win%",
+      "r": 0.173,
+      "target2": "next-season win%",
+      "r2": 0.173,
+      "second_half_point_diff_r": null,
+      "next_season_point_diff_r": 0.184
+     },
+     "style": true
+    },
+    {
+     "id": "go_rate_rec",
+     "display": "Go when advised",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of fourth downs our model says to go for where they went.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.201,
+      "split_half_r": null,
+      "n_pairs": 605,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season win%",
+      "r": 0.026,
+      "target2": "next-season win%",
+      "r2": 0.026,
+      "second_half_point_diff_r": null,
+      "next_season_point_diff_r": 0.02
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "off_epa",
+     "off_pass_epa",
+     "off_rush_epa",
+     "off_success",
+     "pressure_allowed",
+     "off_rating"
+    ],
+    "standardise": "z within season",
+    "weights": "yoy_r floored at 0.2",
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraint": "same season"
+   }
+  },
+  {
+   "id": "team_defence",
+   "entity": "team",
+   "display": "Teams: defence",
+   "peer_group": "all 32 teams, same season",
+   "position_field": null,
+   "position_codes": [],
+   "minimum": {
+    "field": null,
+    "value": null,
+    "unit": "games",
+    "note": "none; early-season values are noisy (offence EPA reaches r 0.5 between halves after about 6 games, defence after about 16)"
+   },
+   "basis": "per play / per dropback / per carry",
+   "metrics": [
+    {
+     "id": "def_epa",
+     "display": "EPA per play allowed",
+     "unit": "EPA/play",
+     "direction": "lower",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Opponent-adjusted expected points allowed per play.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.297,
+      "split_half_r": 0.35,
+      "n_pairs": 605,
+      "m50": 15.8,
+      "m50_unit": "games",
+      "m50_basis": "first v second half (raw rate)"
+     },
+     "predictive": {
+      "target": "second-half win% (first-half metric, raw rate)",
+      "r": 0.24,
+      "target2": "next-season win%",
+      "r2": 0.174,
+      "second_half_point_diff_r": 0.268,
+      "next_season_point_diff_r": 0.197
+     }
+    },
+    {
+     "id": "def_pass_epa",
+     "display": "Pass EPA allowed",
+     "unit": "EPA/dropback",
+     "direction": "lower",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Opponent-adjusted EPA allowed per dropback.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.269,
+      "split_half_r": 0.269,
+      "n_pairs": 605,
+      "m50": 23.1,
+      "m50_unit": "games",
+      "m50_basis": "first v second half (raw rate)"
+     },
+     "predictive": {
+      "target": "second-half win% (first-half metric, raw rate)",
+      "r": 0.236,
+      "target2": "next-season win%",
+      "r2": 0.178,
+      "second_half_point_diff_r": 0.265,
+      "next_season_point_diff_r": 0.186
+     }
+    },
+    {
+     "id": "def_rush_epa",
+     "display": "Rush EPA allowed",
+     "unit": "EPA/carry",
+     "direction": "lower",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Opponent-adjusted EPA allowed per designed run.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.275,
+      "split_half_r": 0.249,
+      "n_pairs": 605,
+      "m50": 25.6,
+      "m50_unit": "games",
+      "m50_basis": "first v second half (raw rate)"
+     },
+     "predictive": {
+      "target": "second-half win% (first-half metric, raw rate)",
+      "r": 0.153,
+      "target2": "next-season win%",
+      "r2": 0.112,
+      "second_half_point_diff_r": 0.167,
+      "next_season_point_diff_r": 0.152
+     }
+    },
+    {
+     "id": "def_success",
+     "display": "Success rate allowed",
+     "unit": "%",
+     "direction": "lower",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Share of opponent plays that gain expected points.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.358,
+      "split_half_r": 0.343,
+      "n_pairs": 605,
+      "m50": 16.3,
+      "m50_unit": "games",
+      "m50_basis": "first v second half (raw rate)"
+     },
+     "predictive": {
+      "target": "second-half win% (first-half metric, raw rate)",
+      "r": 0.123,
+      "target2": "next-season win%",
+      "r2": 0.137,
+      "second_half_point_diff_r": 0.128,
+      "next_season_point_diff_r": 0.149
+     }
+    },
+    {
+     "id": "pressure_rate_def",
+     "display": "Pressure rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of opponent dropbacks pressured.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.297,
+      "split_half_r": 0.28,
+      "n_pairs": 283,
+      "m50": 21.9,
+      "m50_unit": "games",
+      "m50_basis": "first v second half (raw rate)"
+     },
+     "predictive": {
+      "target": "second-half win% (first-half metric, raw rate)",
+      "r": 0.065,
+      "target2": "next-season win%",
+      "r2": 0.106,
+      "second_half_point_diff_r": 0.063,
+      "next_season_point_diff_r": 0.082
+     }
+    },
+    {
+     "id": "def_rating",
+     "display": "Defence rating",
+     "unit": "points/game",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Defensive points per game above average (team-strength model).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.55,
+      "split_half_r": null,
+      "n_pairs": 605,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season win%",
+      "r": 0.185,
+      "target2": "next-season win%",
+      "r2": 0.185,
+      "second_half_point_diff_r": null,
+      "next_season_point_diff_r": 0.198
+     }
+    },
+    {
+     "id": "blitz_rate",
+     "display": "Blitz rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Dropbacks with five or more rushers or any blitzer (FTN, 2022 onward; style).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.637,
+      "split_half_r": null,
+      "n_pairs": 96,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season win%",
+      "r": -0.06,
+      "target2": "next-season win%",
+      "r2": -0.06,
+      "second_half_point_diff_r": null,
+      "next_season_point_diff_r": -0.088
+     },
+     "style": true
+    },
+    {
+     "id": "man_rate",
+     "display": "Man coverage rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Man coverage per dropback (participation 2016-2025; style).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.509,
+      "split_half_r": null,
+      "n_pairs": 223,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season win%",
+      "r": 0.058,
+      "target2": "next-season win%",
+      "r2": 0.058,
+      "second_half_point_diff_r": null,
+      "next_season_point_diff_r": 0.063
+     },
+     "style": true
+    },
+    {
+     "id": "box_avg",
+     "display": "Box count",
+     "unit": "defenders",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Average defenders in the box (style).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.414,
+      "split_half_r": null,
+      "n_pairs": 223,
+      "m50": null,
+      "m50_unit": null,
+      "m50_basis": null
+     },
+     "predictive": {
+      "target": "next-season win%",
+      "r": -0.075,
+      "target2": "next-season win%",
+      "r2": -0.075,
+      "second_half_point_diff_r": null,
+      "next_season_point_diff_r": -0.07
+     },
+     "style": true
+    }
+   ],
+   "similar": {
+    "features": [
+     "def_epa",
+     "def_pass_epa",
+     "def_rush_epa",
+     "def_success",
+     "pressure_rate_def",
+     "def_rating"
+    ],
+    "standardise": "z within season",
+    "weights": "yoy_r floored at 0.2",
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraint": "same season"
+   }
+  }
+ ],
+ "payload_changes": [
+  {
+   "field": "players.json values.separation, values.cushion (WR/TE), values.box8 (RB), NGS RYOE fallback",
+   "builder": "oddsmarkets/nfl/analytics/context.py:load_release (and SeasonContext.ngs)",
+   "status": "needed",
+   "note": "bug: load_release('nextgen_stats', S, None, kind) returns the passing file for kind='receiving' and 'rushing' (nflverse.load answers first and ignores kind), so these fields are null in every season. Apply the kind filter to the loader's answer, or read raw/nextgen_stats/ngs_<kind>.parquet. context.py has another agent's uncommitted edits, so not changed here."
+  },
+  {
+   "field": "players.json values.net_oe (P)",
+   "builder": "oddsmarkets/nfl/analytics/adapters.py:player_tables (net_oe from models/kicking.py:punter_value)",
+   "status": "needed",
+   "note": "bug: per_punt = expected - actual receiving-team spot, so positive = worse; r = -0.95 with net average, while the metric is published as higher-is-better. Flip the sign in the adapter (_put(..., scale=-1)) or define oe = actual - expected. Data accuracy, not an addition, so left to the data-accuracy owner."
+  },
+  {
+   "field": "players.json role (EDGE|DL|LB|CB|S) and pct_role{id}",
+   "builder": "oddsmarkets/nfl/analytics/players.py:build (value.py:def_position for the role)",
+   "status": "needed",
+   "note": "five defensive peer groups; interim: the front end reads value.json pos by pid. players.py has another agent's uncommitted edits."
+  },
+  {
+   "field": "players.json values.tfl_pg, tackles_pg, pd_pg, ints_pg, ff_pg, sacks_pg (DEF)",
+   "builder": "oddsmarkets/nfl/analytics/players.py:def_rows + DEF_METRICS",
+   "status": "needed",
+   "note": "per-game rates with percentiles; interim: values.<count> / games (fallback_id in nfl.json). Note games for defenders counts games with a credited stat."
+  },
+  {
+   "field": "players.json DEF qualified",
+   "builder": "oddsmarkets/nfl/analytics/players.py:build (q for DEF)",
+   "status": "needed",
+   "note": "the tackles-equivalent condition qualifies only 48% of snap-regular interior linemen and 62% of edge rushers (83-89% of LB/CB/S); qualify defenders on games (>= half the team's games) and, 2016-2025, 300 defensive snaps."
+  },
+  {
+   "field": "players.json values.fg_oe_att (K)",
+   "builder": "oddsmarkets/nfl/analytics/players.py:kick_rows",
+   "status": "needed",
+   "note": "fg_oe is a season total but is shrunk as a rate; a per-attempt version is the right percentile basis. Kicking is close to noise either way (YoY 0.08 total, 0.01 per attempt)."
+  },
+  {
+   "field": "players.json values.yprr, tprr, routes (WR/TE/RB); values.pass_rush_rate, tackle_snap, ball_cov, def_snaps (DEF)",
+   "builder": "oddsmarkets/nfl/analytics/players.py:rec_rows / def_rows (participation offense_players / defense_players via SeasonContext.plays)",
+   "status": "needed",
+   "note": "optional: 2016-2025 only (no participation for the current season), so secondary; yprr YoY 0.52 WR / 0.55 TE."
+  },
+  {
+   "field": "careers.similar_players features",
+   "builder": "oddsmarkets/nfl/analytics/careers.py:similar_players",
+   "status": "needed",
+   "note": "today: unweighted distance on the percentile vector of every group metric (counts included). Spec: z-scores of the headline rates within group and season, weights = YoY r floored at 0.2, weighted Euclidean, k 5; defenders by role. careers.py has another agent's uncommitted edits."
+  },
+  {
+   "field": "teams.json early-down EPA",
+   "builder": "oddsmarkets/nfl/analytics/teams.py:epa_units",
+   "status": "not needed",
+   "note": "measured: early-down EPA/play is less stable (first v second half 0.47 v 0.57) and less predictive of second-half win% (0.35 v 0.41) than all-down EPA/play."
+  }
+ ]
+}

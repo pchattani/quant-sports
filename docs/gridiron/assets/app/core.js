@@ -129,6 +129,7 @@ addRoute('lab', 'lab', 'lab');
 addRoute('compare', 'compare', 'lab');
 addRoute('compare/:a', 'compare', 'lab');
 addRoute('compare/:a/:b', 'compare', 'lab');
+addRoute('compare/:a/:b/:c', 'compare', 'lab');
 addRoute('fourth-downs', 'fourth', 'lab');
 addRoute('coaches', 'coaches', 'lab');
 addRoute('coach/:id', 'coach', 'lab');
@@ -154,7 +155,7 @@ const ROUTE_MAP = [
 ];
 
 const TITLES = {
-  overview: '', games: 'Games', game: 'Game centre', standings: 'Standings', playoffs: 'Playoff picture', futures: 'Futures v market',
+  overview: '', games: 'Games', game: 'Game centre', standings: 'Standings', playoffs: 'Playoff picture', futures: 'Season forecasts',
   teams: 'Teams', team: 'Team', players: 'Players', player: 'Player', leaders: 'Leaders', history: 'All-time',
   value: 'Player value', trade: 'Trade simulator', transactions: 'Transactions', fantasy: 'Fantasy',
   lab: 'Lab', compare: 'Compare', fourth: 'Fourth downs', coaches: 'Coaches', coach: 'Coach',
@@ -606,6 +607,12 @@ function gameState(g) {
 function isFinal(g) { return gameState(g) === 'final'; }
 function isLive(g) { const s = gameState(g); return s === 'live' || s === 'half'; }
 function isPre(g) { return gameState(g) === 'pre'; }
+/* A game still marked upcoming (or live) 12 hours after kickoff is a stale snapshot (the hourly build has not caught up):
+ * lists of what is on now leave it out (the Home page applies the same guard). */
+function isStale(g) {
+  const d = parseDate(g && g.kickoff);
+  return !!d && !isFinal(g) && Date.now() - d.getTime() > 12 * 3600 * 1000;
+}
 function isOT(g) { return !!(g && (g.overtime || (isNum(g.qtr) && Number(g.qtr) >= 5) || (Array.isArray(g.quarters) && g.quarters.length > 4))); }
 /* The home betting line: negative = home favoured. */
 function homeLine(o) {
@@ -673,7 +680,7 @@ function playerLink(pid, opts) {
   const o = typeof opts === 'string' ? { name: opts } : (opts || {});
   const label = o.name || (o.surname ? playerSurname(pid) : o.short ? playerShort(pid) : playerName(pid));
   const x = player(pid);
-  const tail = (o.pos && x.pos ? ' <span class="gi-tag">' + esc(x.pos) + '</span>' : '') + (o.team && x.team ? ' <span class="gi-tag">' + esc(teamAbbr(x.team)) + '</span>' : '');
+  const tail = (o.pos && x.pos ? ' <span class="gi-tag">' + esc(posLabel(x.pos)) + '</span>' : '') + (o.team && x.team ? ' <span class="gi-tag">' + esc(teamAbbr(x.team)) + '</span>' : '');
   return '<a class="gi-link" href="' + playerHref(pid, o.season) + '">' + esc(label) + '</a>' + tail;
 }
 function teamInfo(t) { return TEAMS[canonTeam(t)] || {}; }
@@ -692,6 +699,20 @@ function teamColour(t) {
 function tc(t) { return QK.color.team(teamColour(t)); }
 function teamHref(t, S) { return '#/team/' + encodeURIComponent(teamAbbr(t)) + (S && Number(S) !== currentSeason() ? '?s=' + S : ''); }
 function mark(t, size) { const x = teamInfo(t); return QK.teamMark({ name: x.name || t, abbr: teamAbbr(t), colour: x.colour }, size || 'sm'); }
+/* Two clubs' colours that can sit side by side (kit rule QK.color.distinct): the second falls back to its alternate
+ * colour, then the win-probability orange, then blue. Pass the pair to QK.wpBar / QK.matchupBar so bars and charts agree. */
+function pair(a, b) {
+  const ca = tc(a);
+  let cb = tc(b);
+  const ok = (x, y) => (QK.color.distinct ? QK.color.distinct(x, y) : QK.color.contrast(x, y) >= 1.6);
+  if (!ok(ca, cb)) {
+    const alt = teamInfo(b).alt;
+    const alt2 = QK.color.parse(alt) ? QK.color.team(alt) : null;
+    cb = alt2 && ok(ca, alt2) ? alt2 : QK.cssVar('--wp-b');
+    if (!ok(ca, cb)) cb = QK.cssVar('--wp-a');
+  }
+  return [ca, cb];
+}
 /* <a> to the team page. opts {abbr, short, name, season, mark: true (default) | false, dot}. */
 function teamLink(t, opts) {
   if (!t) return '<span class="qk-muted">—</span>';
@@ -715,7 +736,7 @@ function coachLink(name, S) { return name ? '<a class="gi-link" href="' + coachH
 function weekHref(S, w) { const s = S || state.season || currentSeason(); return '#/games/' + s + '/' + (isNum(w) ? w : (s === currentSeason() ? currentWeek() : 1)); }
 function standingsHref(S, v) { const s = S || state.season; return '#/standings' + (s && Number(s) !== currentSeason() ? '/' + s : '') + (v ? '?v=' + v : ''); }
 function playoffsHref(S) { const s = S || state.season; return '#/playoffs' + (s && Number(s) !== currentSeason() ? '/' + s : ''); }
-function compareHref(a, b) { return '#/compare' + (a ? '/' + encodeURIComponent(a) : '') + (b ? '/' + encodeURIComponent(b) : ''); }
+function compareHref(a, b, c) { return '#/compare' + (a ? '/' + encodeURIComponent(a) : '') + (b ? '/' + encodeURIComponent(b) : '') + (b && c ? '/' + encodeURIComponent(c) : ''); }
 function glossHref(key) { return '#/glossary' + (key ? '/' + encodeURIComponent(key) : ''); }
 
 // ── catalogue helpers (players.json, teams.json, lab.json) ────────────────
@@ -821,6 +842,34 @@ const PREFS = {
   DEF: ['def_value', 'splash_pg', 'sacks', 'pressures_pg', 'qb_hits', 'tfl', 'ints', 'pd', 'tackles']
 };
 PREFS.TE = PREFS.WR;
+/* ── comparisons (Design System 2.0): the peer group and the metric set, defined once for the percentile card, the
+ * compare page, the leaderboards and the distribution. Peer groups follow the brief's NFL positions: QB, RB, WR/TE
+ * (one pool), DL and outside rushers (ED), LB, DB, K, P. players.json carries pct (against the group; WR and TE pooled) and
+ * pct_pos (within the position: DL, LB or DB for defenders). docs/METRICS_SPEC.md is the source of truth for the sets
+ * and floors: change them there first, then here. */
+const DEF_POS = { DE: 'DL', DT: 'DL', NT: 'DL', DL: 'DL', EDGE: 'DL', ED: 'DL', LB: 'LB', ILB: 'LB', OLB: 'LB', MLB: 'LB', CB: 'DB', S: 'DB', FS: 'DB', SS: 'DB', DB: 'DB', SAF: 'DB' };
+const PEER_NAME = { QB: 'NFL quarterbacks', RB: 'NFL running backs', WR: 'NFL wide receivers and tight ends', TE: 'NFL wide receivers and tight ends', K: 'NFL kickers', P: 'NFL punters',
+  DL: 'NFL defensive linemen and outside rushers', LB: 'NFL linebackers', DB: 'NFL defensive backs' };
+/* {key: 'pct' | 'pct_pos', id, name} for a catalogue player (players.json row or a player file's current block). */
+function peerOf(p, group) {
+  const g = groupOf((p || {}).pos, group || (p || {}).group);
+  if (g === 'DEF') { const d = DEF_POS[String((p || {}).pos || '').toUpperCase()] || 'DB'; return { key: 'pct_pos', id: d, name: PEER_NAME[d] }; }
+  return { key: 'pct', id: g === 'TE' ? 'WR' : g, name: PEER_NAME[g] || 'NFL players at his position' };
+}
+function peerPct(p, group) { const pr = peerOf(p, group); const o = (p || {})[pr.key]; return o && typeof o === 'object' ? o : ((p || {}).pct || {}); }
+/* The metric set of a group, in card groups: [[label, [keys]]]. Until the metrics spec is committed this is the site's
+ * headline metrics for the group (PREFS order), grouped by family. */
+function playerSet(group, metrics, n) {
+  const heads = headline((metrics || []).filter(m => scopeOk(m, group)), PREFS[group] || [], n || 10);
+  return metricGroups(heads.map(m => Object.assign({}, m, { group: m.family || m.group }))).map(g => [g.name, g.items.map(m => m.key)]);
+}
+/* The sample line under a percentile card: games, the group's sample and the qualification rule. */
+function sampleLine(p, group, qual) {
+  const sk = (SAMPLE[group] || []).find(c => isNum(((p || {}).values || {})[c[0]]));
+  const g = isNum((p || {}).games) ? p.games : null;
+  return [isNum(g) ? g + ' G' : '', sk ? int(p.values[sk[0]]) + ' ' + sk[1].toLowerCase() : '', qual ? 'qualified: ' + qual : ''].filter(Boolean).join(' · ');
+}
+
 function shortLabel(s) { return String(s || '').replace(/percentage/i, '%').replace(/ over expected/i, ' OE').replace(/ per play/i, '/play').replace(/^Expected /, 'x').slice(0, 24); }
 function cleanDesc(t) { return String(t || '').replace(/\(?builder [A-Z]'s ([a-z_ ]+?) model; /gi, '(').replace(/builder [A-Z]'s /gi, 'our ').replace(/\s+\(\)/g, '').replace(/player_value/g, 'player-value model').replace(/team_strength/g, 'team-strength model'); }
 function cleanMetrics(list) { (Array.isArray(list) ? list : []).forEach(m => { if (m && m.desc && !m._c) { m.desc = cleanDesc(m.desc); m._c = 1; } }); return list; }
@@ -847,21 +896,26 @@ function card(title, sub, body, opts) {
 }
 function grid(html, cls) { return '<div class="qk-grid' + (cls ? ' ' + cls : '') + '">' + html + '</div>'; }
 function chartBox(id, h, label) { return '<div id="' + esc(id) + '" class="gi-chart" style="--h:' + (h || 300) + 'px"' + (label ? ' role="img" aria-label="' + esc(label) + '"' : '') + '></div>'; }
-/* A KPI tile; value is HTML (links allowed). o: {cls, accent, tip, text, spark} */
+/* A stat tile (Design System 2.0); value and sub are HTML (links allowed).
+ * o: {cls, tip, text, spark|trend: [..], signal (ours: the number in the signal colour), pctl, unit, href, delta} */
 function kpi(label, value, sub, o) {
   o = o || {};
-  return QK.kpi({ label: label, value: value, sub: sub, html: true, cls: o.cls, accent: o.accent, tip: o.tip, text: o.text, spark: o.spark || undefined });
+  const tr = Array.isArray(o.trend) ? o.trend : (Array.isArray(o.spark) ? o.spark : null);
+  return QK.statTile({ label: label, value: value, sub: sub, html: true, cls: o.cls, tip: o.tip, text: o.text, trend: tr || undefined, signal: !!o.signal, pctl: o.pctl, unit: o.unit, href: o.href, delta: o.delta });
 }
-function kpis(list, cls) { return '<div class="qk-kpis gi-kpis' + (cls ? ' ' + cls : '') + '">' + list.filter(Boolean).join('') + '</div>'; }
+function kpis(list, cls) { return '<div class="gi-stats' + (cls ? ' ' + cls : '') + '">' + QK.stats(list.filter(Boolean)) + '</div>'; }
 function chip(text, kind) { return '<span class="qk-badge' + (kind ? ' ' + kind : '') + '">' + esc(text) + '</span>'; }
 function muted(text) { return '<p class="gi-muted">' + text + '</p>'; }
 function empty(title, text) { return QK.empty(title, text); }
 function note(html) { return '<div class="qk-note gi-note">' + html + '</div>'; }
 function notBuilt(what, d) { return empty(what + ' is not available yet', d && d.reason ? String(d.reason) : 'The payloads are rebuilt every hour.'); }
+/* The page head (Design System 2.0 section head, h1): kicker as text, title as text, sub and actions as HTML. */
 function pageHead(kicker, title, sub, right) {
-  return '<header class="gi-head"><div class="gi-head-l">' + (kicker ? '<div class="qk-kicker">' + kicker + '</div>' : '') + '<h1>' + esc(title) + '</h1>' + (sub ? '<p class="qk-sub">' + sub + '</p>' : '') + '</div>' +
-    (right ? '<div class="gi-head-r">' + right + '</div>' : '') + '</header>';
+  const k = String(kicker || '').replace(/<[^>]*>/g, '').replace(/&amp;/g, '&');
+  return QK.sectionHead({ kicker: k ? 'NFL · ' + k.replace(/^NFL( · )?/, '') : 'NFL', title: esc(title), sub: sub || '', actions: right || '', size: 'lg', tag: 'h1', html: true, cls: 'gi-head' });
 }
+/* A section head inside a page (v2): opts {kicker, title, sub (HTML), actions (HTML), id} */
+function secHead(o) { return QK.sectionHead({ kicker: o.kicker, title: o.html ? o.title : esc(o.title), sub: o.sub || '', actions: o.actions || '', id: o.id, html: true }); }
 /* Sub-navigation inside a section: [[href, label, key]], active key. */
 function subnav(items, active, label) {
   return '<nav class="gi-subnav" aria-label="' + esc(label || 'Views') + '"><div class="qk-tabs" role="tablist">' + items.map(i =>
@@ -872,7 +926,7 @@ function sectionNav(key, active) {
   const S = state.season;
   const L = {
     standings: [[standingsHref(S), 'Standings', 'table'], [standingsHref(S, 'ratings'), 'Power ratings', 'ratings'], [playoffsHref(S), 'Playoff picture', 'playoffs'],
-      [standingsHref(S, 'wins'), 'Win totals', 'wins'], [standingsHref(S, 'draft'), 'Draft order', 'draft'], ['#/futures', 'Futures v market', 'futures']],
+      [standingsHref(S, 'wins'), 'Win totals', 'wins'], [standingsHref(S, 'draft'), 'Draft order', 'draft'], ['#/futures', 'Season forecasts', 'futures']],
     players: [[ghref('players', S), 'Players', 'players'], [ghref('leaders', S), 'Leaders', 'leaders'], ['#/history', 'All-time', 'history']],
     value: [[ghref('value', S), 'Player value', 'value'], ['#/trade', 'Trade simulator', 'trade'], ['#/transactions', 'Transactions', 'transactions']],
     lab: [[ghref('lab', S), 'Scatter lab', 'lab'], ['#/compare', 'Compare', 'compare'], [ghref('fourth-downs', S), 'Fourth downs', 'fourth'], [ghref('coaches', S), 'Coaches', 'coaches']],
@@ -945,12 +999,24 @@ function pctl(p) { return QK.pctlChip(p); }
 function probBar(p, colour, max) {
   if (!isNum(p)) return '<span class="qk-muted">—</span>';
   const w = Math.max(0, Math.min(1, p / (max || 1))) * 100;
-  return '<span class="gi-pbar"><span class="gi-pbar-t"><span style="width:' + w.toFixed(1) + '%;background:' + esc(colour || 'var(--c-1)') + '"></span></span><span class="gi-pbar-v">' + pct(p, p < 0.1 ? 1 : 0) + '</span></span>';
+  return '<span class="gi-pbar"><span class="gi-pbar-t"><span style="width:' + w.toFixed(1) + '%;background:' + esc(colour || 'var(--signal)') + '"></span></span><span class="gi-pbar-v">' + pct(p, p < 0.1 ? 1 : 0) + '</span></span>';
 }
 /* Model minus market, percentage points: neutral (a disagreement, not a recommendation). */
 function gapHTML(model, market, d) {
   if (!isNum(model) || !isNum(market)) return '<span class="qk-muted">—</span>';
   return '<span class="gi-gap">' + signed((model - market) * 100, d === undefined ? 1 : d) + '</span>';
+}
+/* The NFL roles for display: the edge-rusher code shows as ED (the common charting abbreviation), so the page copy keeps
+ * clear of betting vocabulary; the tooltip says what it is. */
+const POS_SHOW = { EDGE: 'ED' };
+const POS_LONG = { QB: 'Quarterback', RB: 'Running back', WR: 'Wide receiver', TE: 'Tight end', EDGE: 'Edge rusher', ED: 'Edge rusher', DL: 'Interior lineman', IDL: 'Interior lineman', LB: 'Linebacker', CB: 'Cornerback', S: 'Safety', DB: 'Defensive back', K: 'Kicker', P: 'Punter', OL: 'Offensive lineman', FB: 'Fullback' };
+function posLabel(p) { const k = String(p || '').toUpperCase(); return POS_SHOW[k] || String(p || ''); }
+function posLong(p) { const k = String(p || '').toUpperCase(); return POS_LONG[k] || String(p || ''); }
+/* Payload prose (glossary, method notes) in the site's v2 copy: the edge-rusher code as ED, betting words as forecast words. */
+function copyText(t) {
+  return String(t === null || t === undefined ? '' : t).replace(/\bEDGE\b/g, 'ED')
+    .replace(/\b([Ee])dge(s?)\b(?=[ -](rush|and interior|or interior|role|defender|player))/g, (m, e, pl) => (e === 'E' ? 'Outside' : 'outside') + (pl ? 's' : ''))
+    .replace(/\bpriced\b/gi, 'forecast').replace(/\bpricing\b/gi, 'forecast').replace(/\bprices\b/gi, 'numbers').replace(/\bprice\b/gi, 'number');
 }
 function deltaHTML(v, d) { return !isNum(v) ? '<span class="qk-muted">—</span>' : '<span class="' + (v > 0 ? 'gi-up' : v < 0 ? 'gi-down' : '') + '">' + signed(v, d === undefined ? 1 : d) + '</span>'; }
 /* Percentile bars (kit): items [{label, p, value, href, tip}]; grouped when items carry .group. */
@@ -997,59 +1063,44 @@ function heatTable(spec) {
   return h + '</tbody></table></div>';
 }
 
-/* A game card on the kit's match-card markup, with the NFL lines (model, market, spread, QBs).
- * opts: {date: true (weekday + date in the top line), week: true, compact} */
+/* A game card (Design System 2.0: QK.gameCard): our chance per team (the favourite in the signal colour), the
+ * win-probability bar in team colours, records when the page has the standings, the market a quiet ring. Below it the
+ * NFL facts: before kickoff the starting QBs and our projected score; live the clock and the down and distance.
+ * opts: {date: true (date in the top line), week: true (week label in the top line), rows: {team: standings row}, compact} */
 function gameCard(g, opts) {
   const o = opts || {};
   if (!g) return '';
   const st = gameState(g);
   const live = st === 'live' || st === 'half', fin = st === 'final';
-  const m = g.model || {}, mk = g.market || null, ln = g.line || null;
-  const pH = live && isNum(g.wp_home) ? Number(g.wp_home) : (isNum(m.p_home) ? Number(m.p_home) : null);
-  const hs = isNum(g.hs) ? g.hs : null, as = isNum(g.as) ? g.as : null;
-  const winH = fin && hs !== null && as !== null && hs > as, winA = fin && hs !== null && as !== null && as > hs;
-  const qbs = g.qbs || {};
-  const T = t => ({ name: teamName(t), abbr: teamAbbr(t), colour: teamInfo(t).colour });
-  const row = (t, sc, p, lost, side) => '<div class="qk-match-row' + (fin && lost ? ' lost' : '') + '">' + mark(t, 'sm') +
-    '<span class="nm"><b class="gi-abbr">' + esc(teamAbbr(t)) + '</b> <span class="gi-full">' + esc(teamShort(t)) + '</span>' +
-    (live && g.possession && String(g.possession) === String(t) ? ' <span class="gi-poss" title="Possession">●</span>' : '') +
-    (st === 'pre' && qbs[side] ? '<span class="gi-qb">' + qbText(qbs[side], false) + '</span>' : '') + '</span>' +
-    '<span class="p" title="' + (live ? 'Live' : 'Model') + ' win probability">' + (isNum(p) && !fin ? pct(p, 0) : '') + '</span>' +
-    '<span class="sc">' + (fin || live ? (sc === null ? '–' : sc) : '') + '</span></div>';
-  let badge;
-  if (live) badge = '<span class="qk-badge live">' + esc(st === 'half' ? 'Half' : (clockText(g.qtr, g.clock) || 'Live')) + '</span>';
-  else if (fin) badge = '<span class="qk-badge final">Final' + (isOT(g) ? '/OT' : '') + '</span>';
-  else if (st === 'pre') badge = '<span class="qk-badge">' + esc((o.date ? fmtDate(g.kickoff, { year: false }) + ' ' : (parseDate(g.kickoff) ? DAYS[parseDate(g.kickoff).getDay()] + ' ' : '')) + (fmtTime(g.kickoff) || 'TBD')) + '</span>';
-  else badge = '<span class="qk-badge">' + esc(titleCase(st)) + '</span>';
+  const m = g.model || {};
+  const x = qkGame(g, o.rows);
   const gt = String(g.gtype || '').toUpperCase();
-  const tag = gt && gt !== 'REG' ? gtypeLabel(gt) : (o.week && isNum(g.week) ? weekLabel(g.week, gameSeason(g.game_id)) : (fin && o.date ? fmtDate(g.kickoff, { year: false }) : (g.div_game ? 'Division' : '')));
-  const lines = [];
-  const mLine = homeLine(m);
-  if (!fin && (isNum(mLine) || isNum(m.total))) lines.push('<span><i>Model</i> ' + esc(spreadText(g.home, g.away, mLine)) + (isNum(m.total) ? ' · ' + num(m.total, 1) : '') + '</span>');
-  if (ln) {
-    const l = homeLine(ln);
-    if (isNum(l) || isNum(ln.total)) lines.push('<span><i>' + (fin ? 'Close' : 'Line') + '</i> ' + esc(spreadText(g.home, g.away, l)) + (isNum(ln.total) ? ' · ' + num(ln.total, 1) : '') + '</span>');
+  x.league = gt && gt !== 'REG' ? gtypeLabel(gt) : (o.week && isNum(g.week) ? weekLabel(g.week, gameSeason(g.game_id)) : (fin && o.date ? fmtDate(g.kickoff, { year: false }) : (g.div_game ? 'Division game' : 'Regular season')));
+  const extra = [];
+  if (st === 'pre') {
+    const qbs = g.qbs || {};
+    if (qbs.away || qbs.home) extra.push('<span><i>QBs</i> ' + (qbs.away ? qbText(qbs.away, false) : '?') + ' v ' + (qbs.home ? qbText(qbs.home, false) : '?') + '</span>');
+    if (isNum(m.home_pts) && isNum(m.away_pts)) extra.push('<span><i>Projected</i> ' + esc(teamAbbr(g.away)) + ' ' + num(m.away_pts, 0) + '–' + num(m.home_pts, 0) + ' ' + esc(teamAbbr(g.home)) + '</span>');
+  } else if (live) {
+    extra.push('<span><i>' + esc(st === 'half' ? 'Halftime' : (clockText(g.qtr, g.clock) || 'Live')) + '</i>' + (g.down && g.possession ? ' ' + esc(teamAbbr(g.possession)) + ' ' + esc(downDist(g.down, g.dist, g.yl100)) + (isNum(g.yl100) ? ' at ' + esc(fieldPos(g.yl100, g.possession, otherTeam(g, g.possession))) : '') : '') + '</span>');
   }
-  if (live && g.down) lines.push('<span><i>' + esc(teamAbbr(g.possession)) + '</i> ' + esc(downDist(g.down, g.dist, g.yl100)) + (isNum(g.yl100) ? ' at ' + esc(fieldPos(g.yl100, g.possession, otherTeam(g, g.possession))) : '') + '</span>');
-  const pre = st === 'pre';
-  const mvm = pre && mk && isNum(mk.p_home) && isNum(m.p_home) ? QK.mvm(m.p_home, mk.p_home, 'Model v mkt') : '';
-  const edge = pre && mk && isNum(mk.p_home) && isNum(m.p_home) && Math.abs(m.p_home - mk.p_home) >= 0.08 ?
-    '<span class="qk-badge edge" data-tip="Model and market disagree by ' + Math.round(Math.abs(m.p_home - mk.p_home) * 100) + ' points on the home side">Gap ' + QK.fmt.pp(m.p_home - mk.p_home) + '</span>' : '';
-  const bar = !fin && pH !== null ? QK.probBar(1 - pH, null, pH, T(g.away), T(g.home)) : '';
-  return '<a href="' + gameHref(g.game_id || g.id) + '" class="qk-match gi-match' + (live ? ' is-live' : '') + (o.compact ? ' gi-compact' : '') + '">' +
-    '<div class="qk-match-top"><span class="lg">' + esc(tag) + '</span>' + badge + '</div>' +
-    '<div class="qk-match-teams">' + row(g.away, as, pH === null ? null : 1 - pH, winH, 'away') + row(g.home, hs, pH, winA, 'home') + '</div>' +
-    (bar ? '<div class="qk-stack" style="--g:6px">' + bar + (mvm ? '<div style="margin-top:6px">' + mvm + '</div>' : '') + '</div>' : '') +
-    (lines.length || edge ? '<div class="gi-lines">' + lines.join('') + edge + '</div>' : '') + '</a>';
+  let h = QK.gameCard(x, { sport: false, marketLabel: 'Market', marketTip: 'The prediction-market probability for the home side (Kalshi / Polymarket), shown as a reference next to ours' });
+  if (extra.length && !o.compact) h = h.replace(/<\/(a|div)>$/, '<div class="gi-gc-x">' + extra.join('') + '</div></$1>');
+  return h;
 }
-/* The same game in the kit's shared shape (QK.tick, QKC.winProb). */
-function qkGame(g) {
+/* The same game in the kit's shared shape (QK.gameCard, QK.ticker, QKC.winProb); rows {team: standings row} adds records. */
+function qkGame(g, rows) {
   const st = gameState(g);
-  const T = t => ({ name: teamName(t), abbr: teamAbbr(t), colour: teamInfo(t).colour, href: teamHref(t) });
-  return { sport: 'nfl', league: 'NFL', id: g.game_id, start: g.kickoff, status: st === 'half' ? 'live' : (st === 'live' || st === 'final' ? st : 'pre'),
-    home: T(g.home), away: T(g.away), hs: g.hs, as: g.as, p_home: isNum(g.wp_home) && (st === 'live' || st === 'half') ? g.wp_home : (g.model || {}).p_home,
+  const rec = t => { const r = rows && rows[canonTeam(t)]; return r && isNum(r.w) ? record(r.w, r.l, r.t) : ''; };
+  const form = t => { const r = rows && rows[canonTeam(t)]; return r && Array.isArray(r.last5) ? r.last5.join('') : ''; };
+  const T = t => ({ name: teamShort(t), abbr: teamAbbr(t), colour: teamInfo(t).colour, href: teamHref(t), record: rec(t), form: form(t) });
+  const live = st === 'live' || st === 'half';
+  return { sport: 'nfl', league: 'NFL', id: g.game_id, start: g.kickoff, status: live ? 'live' : (st === 'final' ? 'final' : 'pre'),
+    home: T(g.home), away: T(g.away), hs: g.hs, as: g.as, p_home: isNum(g.wp_home) && live ? g.wp_home : (g.model || {}).p_home,
     market_home: (g.market || {}).p_home, period: g.qtr, clock: fmtClock(g.clock), note: isOT(g) ? 'OT' : '', href: gameHref(g.game_id) };
 }
+/* Team -> standings row, from season.json rows (for records on game cards). */
+function rowsByTeam(rows) { const o = {}; (rows || []).forEach(r => { if (r && r.team) o[canonTeam(r.team)] = r; }); return o; }
 function titleProbs(t) { if (!t || t.available === false) return {}; return t.probs || t.prices || t.mid || {}; }
 
 // ── seasons and the shell ─────────────────────────────────────────────────
@@ -1119,7 +1170,7 @@ function searchRows() {
       rows.push({ sport: 'nfl', t: x.name, s: [x.pos, x.team ? teamAbbr(x.team) : '', isNum(x.first) ? (Number(x.first) === last ? String(last) : x.first + '–' + (last >= cur ? '' : last)) : ''].filter(Boolean).join(' · '), href: playerHref(pid), _o: cur - last });
     });
     rows.sort((a, b) => a._o - b._o);
-    [['Games this week', weekHref(cur, currentWeek())], ['Standings', '#/standings'], ['Power ratings', '#/standings?v=ratings'], ['Playoff picture', '#/playoffs'], ['Futures v market', '#/futures'],
+    [['Games this week', weekHref(cur, currentWeek())], ['Standings', '#/standings'], ['Power ratings', '#/standings?v=ratings'], ['Playoff picture', '#/playoffs'], ['Season forecasts', '#/futures'],
       ['Player value', '#/value'], ['Trade simulator', '#/trade'], ['Transactions', '#/transactions'], ['Fantasy', '#/fantasy'], ['Leaders', '#/leaders'], ['All-time leaders', '#/history'],
       ['Scatter lab', '#/lab'], ['Compare players', '#/compare'], ['Fourth downs', '#/fourth-downs'], ['Coaches', '#/coaches'], ['Calibration', '#/calibration'], ['Methodology', '#/methodology'], ['Glossary', '#/glossary']]
       .forEach(p => rows.unshift({ sport: 'nfl', t: p[0], s: 'Page', href: p[1] }));
@@ -1169,16 +1220,16 @@ return {
   titleCase: titleCase, fold: fold, median: median, mean: mean, sum: sum, sd: sd, corr: corr, first: first,
   regWeeks: regWeeks, weekNum: weekNum, weekType: weekType, weekLabel: weekLabel, weeksOf: weeksOf, gtypeLabel: gtypeLabel, parseGameId: parseGameId,
   gameSeason: gameSeason, gameWeek: gameWeek, downText: downText, downDist: downDist, fieldPos: fieldPos, fmtClock: fmtClock, qtrLabel: qtrLabel, clockText: clockText,
-  otherTeam: otherTeam, driveResult: driveResult, gradeOf: gradeOf, choiceLabel: choiceLabel, gameState: gameState, isFinal: isFinal, isLive: isLive, isPre: isPre, isOT: isOT,
+  otherTeam: otherTeam, driveResult: driveResult, gradeOf: gradeOf, choiceLabel: choiceLabel, gameState: gameState, isFinal: isFinal, isLive: isLive, isPre: isPre, isOT: isOT, isStale: isStale,
   homeLine: homeLine, spreadText: spreadText, surnameOf: surnameOf, qbText: qbText, weatherText: weatherText, titleProbs: titleProbs,
   player: player, playerName: playerName, playerShort: playerShort, playerSurname: playerSurname, playerHref: playerHref, playerLink: playerLink, playerColour: playerColour, canonTeam: canonTeam,
-  teamInfo: teamInfo, teamName: teamName, teamShort: teamShort, teamAbbr: teamAbbr, teamColour: teamColour, tc: tc, teamHref: teamHref, teamLink: teamLink, teamChip: teamChip, mark: mark,
+  teamInfo: teamInfo, pair: pair, teamName: teamName, teamShort: teamShort, teamAbbr: teamAbbr, teamColour: teamColour, tc: tc, teamHref: teamHref, teamLink: teamLink, teamChip: teamChip, mark: mark,
   gameHref: gameHref, matchupLink: matchupLink, coachHref: coachHref, coachLink: coachLink, weekHref: weekHref, standingsHref: standingsHref, playoffsHref: playoffsHref,
   compareHref: compareHref, glossHref: glossHref, ghref: ghref, sq: sq,
-  GROUPS: GROUPS, GROUP_NAME: GROUP_NAME, GROUP_ONE: GROUP_ONE, groupOf: groupOf, SAMPLE: SAMPLE, sampleKey: sampleKey, sampleOf: sampleOf, scopeOk: scopeOk, metaOf: metaOf,
+  GROUPS: GROUPS, DEF_POS: DEF_POS, PEER_NAME: PEER_NAME, peerOf: peerOf, peerPct: peerPct, playerSet: playerSet, sampleLine: sampleLine, GROUP_NAME: GROUP_NAME, GROUP_ONE: GROUP_ONE, groupOf: groupOf, SAMPLE: SAMPLE, sampleKey: sampleKey, sampleOf: sampleOf, scopeOk: scopeOk, metaOf: metaOf,
   metricsFor: metricsFor, allMetrics: allMetrics, metricGroups: metricGroups, colRows: colRows, listOf: listOf, pickKey: pickKey, val: val, headline: headline, PREFS: PREFS,
   shortLabel: shortLabel, cleanDesc: cleanDesc, cleanMetrics: cleanMetrics, catOf: catOf, glossLink: glossLink,
-  card: card, grid: grid, chartBox: chartBox, kpi: kpi, kpis: kpis, chip: chip, muted: muted, empty: empty, note: note, notBuilt: notBuilt, pageHead: pageHead,
+  card: card, grid: grid, chartBox: chartBox, kpi: kpi, kpis: kpis, secHead: secHead, posLabel: posLabel, posLong: posLong, copyText: copyText, rowsByTeam: rowsByTeam, chip: chip, muted: muted, empty: empty, note: note, notBuilt: notBuilt, pageHead: pageHead,
   subnav: subnav, sectionNav: sectionNav, seg: seg, wireSeg: wireSeg, select: select, field: field, table: table, wireRows: wireRows, set: set, alive: alive, pctl: pctl, probBar: probBar,
   gapHTML: gapHTML, edgeHTML: gapHTML, deltaHTML: deltaHTML, tableHTML: tableHTML, sortable: sortable, pill: pill, teamBar: teamBar, weekNav: weekNav, weekLink: weekLink,
   devigAm: devigAm, lineLean: lineLean, gapPts: gapPts, ptsEdge: ptsEdge, pctBars: pctBars, gradePill: gradePill, heatTable: heatTable, gameCard: gameCard, qkGame: qkGame

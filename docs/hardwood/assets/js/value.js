@@ -90,12 +90,11 @@ function draw(el, L, S, v, asked) {
   drawTable(L, S, rows);
   HW.sortable(el);
   valuation(L);
-  const col = { G: '#58a6ff', W: '#f0883e', B: '#3fb950' };
+  const T0 = QKC.tokens(), col = { G: T0.cat[0], W: T0.cat[1], B: T0.cat[2] };
   const q = rows.filter(r => r.q && fx.isNum(r.hpm));
-  fx.plot('vl-chart', ['G', 'W', 'B'].map(k => { const s = q.filter(r => r.role === k); return { type: 'scatter', mode: 'markers', name: roles[k] || ROLE[k], x: s.map(r => r.min), y: s.map(r => r.hpm),
-    text: s.map(r => r.name + ' (' + fx.teamAbbr(L, r.team) + ')<br>WAR ' + fx.num(r.war, 1)), marker: { color: col[k], size: s.map(r => 5 + Math.max(0, r.war) * 1.2), opacity: 0.8, line: { color: '#0d1117', width: 1 } },
-    hovertemplate: '%{text}<br>%{x:.0f} min · HPM %{y:+.1f}<extra></extra>' }; }),
-  fx.layout({ showlegend: true, legend: { orientation: 'h', y: 1.08, font: { size: 10 } }, margin: { l: 50, r: 10, t: 20, b: 45 }, xaxis: { title: 'Minutes' }, yaxis: { title: 'HPM per 100', zeroline: true, zerolinecolor: '#6e7681' } }));
+  QKC.scatter('#vl-chart', { points: q.filter(r => col[r.role]).map(r => ({ x: r.min, y: r.hpm, name: r.name + ' (' + fx.teamAbbr(L, r.team) + ') · WAR ' + fx.num(r.war, 1), color: col[r.role], size: 5 + Math.max(0, r.war) * 1.2, href: fx.playerHref(L, r.id) })),
+    legendItems: ['G', 'W', 'B'].map(k => ({ name: roles[k] || ROLE[k], color: col[k] })), refY: 0, labelTop: 6,
+    xName: 'Minutes', yName: 'Total impact (HPM per 100 possessions)', xFmt: v => fx.num(v, 0), yFmt: v => fx.signed(v, 1), label: 'Impact against minutes, by role' });
 }
 
 function drawTable(L, S, rows) {
@@ -175,9 +174,8 @@ function valuation(L) {
     $('v2-n').onchange = e => { V2.n = e.target.value; draw(); };
     draw();
     const ag = f.aging || [], hs = f.aging_handset || [];
-    fx.plot('v2-age', [{ type: 'scatter', mode: 'lines', name: 'Fitted', x: ag.map(a => a[0]), y: ag.map(a => a[1]), line: { color: '#f0883e', width: 3 } },
-      { type: 'scatter', mode: 'lines+markers', name: 'Hand-set (roster prior)', x: hs.map(a => a[0]), y: hs.map(a => a[1]), line: { color: '#6e7681', dash: 'dot' } }],
-    fx.layout({ margin: { l: 50, r: 10, t: 20, b: 45 }, legend: { orientation: 'h', y: 1.12, font: { size: 10 } }, xaxis: { title: 'Age' }, yaxis: { title: 'Change in HPM next season', zeroline: true, zerolinecolor: '#6e7681' } }));
+    QKC.line('#v2-age', { xType: 'value', series: [{ name: 'Fitted', color: QKC.tokens().model, width: 3, data: ag.map(a => [a[0], a[1]]) }, { name: 'Hand-set (roster prior)', color: QKC.tokens().ink3, dash: true, symbols: true, data: hs.map(a => [a[0], a[1]]) }],
+      xName: 'Age', yName: 'Change in HPM next season', xFmt: v => String(Math.round(v)), yFmt: v => fx.signed(v, 1), ref: { y: 0 }, legend: true, endLabels: false, label: 'Ageing curve' });
   });
 }
 

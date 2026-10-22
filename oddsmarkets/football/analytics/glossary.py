@@ -168,6 +168,8 @@ TEAM_METRICS: list[dict[str, Any]] = [
      "desc": "xG per shot faced: the average quality of the chances a team allows. Lower is better."},
     {"key": "sot_pct", "label": "Shots on target %", "fmt": "pct", "lower": False, "group": "Attack",
      "desc": "Shots on target as a percentage of shots attempted (denominator: shots)."},
+    {"key": "sot_diff", "label": "Shots on target difference", "fmt": "2", "lower": False, "group": "Results",
+     "desc": "Shots on target for minus shots on target against, per match: a plain count of who tests the goalkeeper more often. It settles as quickly as xG difference and predicts the points that follow about as well. Higher is better."},
     {"key": "big_chances", "label": "Big chances", "fmt": "2", "lower": False, "group": "Attack",
      "desc": "Big chances created per match: situations where a goal is expected."},
     {"key": "big_chances_missed", "label": "Big chances missed", "fmt": "2", "lower": True, "group": "Attack",

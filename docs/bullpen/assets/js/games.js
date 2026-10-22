@@ -1,9 +1,8 @@
 /* The Quant Bullpen — games of a day (#/<L>/games[/<date>]).
  *
  *   a date picker (input, previous/next game day, a strip of nearby game days);
- *   the day's games as cards (model · market · DraftKings line · live win probability) or as a
- *   table (model against market against the line, the result, and whether the model's
- *   favourite won); a one-line summary of the day for the model.
+ *   the day's games as v2 cards (our win chance, records and form as of that morning, the market a grey tick) or
+ *   as a table (our favourite, expected runs, the result, and whether our favourite won); a one-line summary.
  *
  * Reads <L>/<S>/schedule.json ({"games": [GAME_CARD]}) and, for today, the fresher cards in index.json. */
 (function (BP) {
@@ -36,50 +35,53 @@ function pickDate(dates, want, isCurrent) {
 function summary(list) {
   const fin = list.filter(c => BP.isFinal(c) && isNum((c.model || {}).p_home) && isNum(c.hs) && isNum(c.as) && c.hs !== c.as);
   if (!fin.length) return '';
-  let right = 0, ll = 0, mright = 0, mn = 0;
+  let right = 0, ll = 0;
   fin.forEach(c => {
     const p = c.model.p_home, homeWon = c.hs > c.as;
     if ((p >= 0.5) === homeWon) right++;
     ll += -Math.log(Math.max(1e-6, homeWon ? p : 1 - p));
-    const m = (c.market || {}).p_home;
-    if (isNum(m)) { mn++; if ((m >= 0.5) === homeWon) mright++; }
   });
-  return 'Model favourites won ' + right + ' of ' + fin.length + ' (log loss ' + BP.num(ll / fin.length, 3) + ')' +
-    (mn ? ' · market favourites ' + mright + ' of ' + mn : '') + '.';
+  return 'Our favourites won ' + right + ' of ' + fin.length + ' (log loss ' + BP.num(ll / fin.length, 3) + ')';
+}
+/* Records (regular season) and last-five form for every club from the finals before a day: what was known that morning. */
+function asOf(list, day) {
+  const rec = {}, prior = list.filter(c => c && c.date < day && BP.isFinal(c) && isNum(c.hs) && isNum(c.as) && c.hs !== c.as);
+  prior.filter(c => !c.gtype || c.gtype === 'R').forEach(c => {
+    const hw = c.hs > c.as;
+    [[c.home, hw], [c.away, !hw]].forEach(x => { const r = rec[x[0]] = rec[x[0]] || [0, 0]; r[x[1] ? 0 : 1]++; });
+  });
+  const out = {};
+  Object.keys(rec).forEach(t => { out[t] = rec[t][0] + '-' + rec[t][1]; });
+  BP.setRecords(out);
+  BP.setForms(BP.ui.forms(prior));
 }
 
 function tableView(list, L, S) {
   const rows = list.map(c => {
-    const m = c.model || {}, k = c.market || {}, ln = c.line || {};
-    const ml = Array.isArray(ln.ml) ? ln.ml : null;
-    const pL = ml ? BP.devigAm(ml) : null;
+    const m = c.model || {};
     const fin = BP.isFinal(c);
     const homeWon = fin && c.hs > c.as;
     const fav = isNum(m.p_home) ? (m.p_home >= 0.5 ? 'home' : 'away') : null;
     const hit = fin && fav ? ((fav === 'home') === homeWon) : null;
-    const tot = ln.total && typeof ln.total === 'object' ? ln.total.line : ln.total;
+    const pf = fav ? (fav === 'home' ? m.p_home : 1 - m.p_home) : null;
     return { _href: BP.gameHref(c.gpk, L, S), cells: [
       { v: c.start || c.date, html: BP.statusChip(c), cls: 'hide-sm' },
       { v: BP.teamAbbr(c.away) + ' @ ' + BP.teamAbbr(c.home), html: BP.teamLink(c.away, { abbr: true, level: L }) + ' <span class="muted-inline">@</span> ' + BP.teamLink(c.home, { abbr: true, level: L }) +
         (c.series ? '<div class="sub-line">' + esc(BP.seriesText(c.series, true)) + '</div>' : '') },
       { v: fin || BP.isLive(c) ? (c.as + '-' + c.hs) : '', html: fin || BP.isLive(c) ? '<b>' + esc(c.as) + '-' + esc(c.hs) + '</b>' + (BP.isLive(c) ? ' <span class="live-dot"></span>' : '') : '<span class="muted-inline">—</span>' },
-      { v: m.p_home, html: isNum(m.p_home) ? BP.pct(m.p_home, 0) : '—', align: 'right', title: 'Model home win probability' },
-      { v: k.p_home, html: isNum(k.p_home) ? BP.pct(k.p_home, 0) + ' <span class="rk-sub">' + BP.edgeHTML(m.p_home, k.p_home, 0) + '</span>' : '—', align: 'right' },
-      { v: pL, html: ml ? BP.fmtOdds(ml[0]) + ' <span class="muted-inline">(' + BP.pct(pL, 0) + ')</span>' : '—', align: 'right', cls: 'hide-sm' },
-      { v: m.total, html: isNum(m.total) ? BP.num(m.total, 1) + (isNum(tot) ? ' <span class="muted-inline">v ' + BP.num(tot, 1) + '</span>' : '') : '—', align: 'right', cls: 'hide-sm' },
-      { v: hit === null ? '' : (hit ? 1 : 0), html: hit === null ? '' : (hit ? '<span class="edge-pos">✓</span>' : '<span class="edge-neg">✗</span>'), align: 'center', title: "Did the model's favourite win?" }
+      { v: pf, html: fav ? '<b class="bp-ours">' + esc(BP.teamAbbr(c[fav])) + ' ' + BP.pct(pf, 0) + '</b>' : '—', align: 'right', title: 'Our pre-game favourite and its win chance' },
+      { v: m.total, html: isNum(m.total) ? BP.num(m.total, 1) : '—', align: 'right', cls: 'hide-sm' },
+      { v: hit === null ? '' : (hit ? 1 : 0), html: hit === null ? '' : (hit ? '<span class="edge-pos">✓</span>' : '<span class="edge-neg">✗</span>'), align: 'center', title: 'Did our favourite win?' }
     ] };
   });
-  return BP.tableHTML([{ label: 'Status', cls: 'hide-sm' }, { label: 'Game' }, { label: 'Score' }, { label: 'Model home', align: 'right' },
-    { label: 'Market', align: 'right', title: 'De-vigged market home probability and the gap to the model (points)' },
-    { label: 'DK home', align: 'right', cls: 'hide-sm', title: 'DraftKings moneyline for the home team (de-vigged probability)' },
-    { label: 'Total', align: 'right', cls: 'hide-sm', title: 'Model expected total runs v the line' }, { label: 'Fav', align: 'center' }], rows, { compact: true });
+  return BP.tableHTML([{ label: 'Status', cls: 'hide-sm' }, { label: 'Game' }, { label: 'Score' }, { label: 'Our favourite', align: 'right' },
+    { label: 'Runs expected', align: 'right', cls: 'hide-sm', title: 'Our expected total runs' }, { label: 'Won?', align: 'center' }], rows, { compact: true });
 }
 
 function render(el, params) {
   const L = params.level, S = params.season;
   const isCurrent = S === BP.currentSeason(L);
-  el.innerHTML = BP.pageHead(BP.levelName(L) + ' games', 'Every game priced by the model against the market and the DraftKings line', '') + '<div id="gm-body"><div class="muted">Loading…</div></div>';
+  el.innerHTML = '<div id="gm-body">' + QK.skeleton('card', 3) + '</div>';
   return BP.loadYear('schedule.json', L, S).then(d => {
     if (!el.isConnected) return;
     const body = document.getElementById('gm-body');
@@ -93,6 +95,7 @@ function render(el, params) {
       list = list.map(c => fresh[c.gpk] || c);
       Object.keys(fresh).forEach(k => { if (!list.find(c => c.gpk === k)) list.push(fresh[k]); });
     }
+    list = list.filter(c => !BP.notNeeded(c));
     if (!list.length) { body.innerHTML = BP.card('Games', '', BP.notBuilt('The ' + S + ' schedule', d)); return; }
     const byDate = {};
     list.forEach(c => { if (c && c.date) (byDate[c.date] = byDate[c.date] || []).push(c); });
@@ -101,6 +104,7 @@ function render(el, params) {
     const i = dates.indexOf(day);
     const prev = i > 0 ? dates[i - 1] : null, next = i >= 0 && i + 1 < dates.length ? dates[i + 1] : null;
     const strip = dates.slice(Math.max(0, i - 3), Math.min(dates.length, i + 4));
+    asOf(list, day);
     const games = (byDate[day] || []).slice().sort((a, b) => String(a.start || '').localeCompare(String(b.start || '')));
     const nav = '<div class="gd-nav">' +
       (prev ? '<a class="gd-arrow" href="' + BP.href('games/' + prev, L, S) + '" title="Previous game day">‹</a>' : '<span class="gd-arrow off">‹</span>') +
@@ -111,9 +115,9 @@ function render(el, params) {
       (isCurrent && dates.indexOf(BP.todayISO()) >= 0 && day !== BP.todayISO() ? '<a class="gd-today" href="' + BP.href('games/' + BP.todayISO(), L, S) + '">Today</a>' : '') +
       '<span class="pg-toggle gd-view" id="gd-view"><button type="button" data-v="cards"' + (VIEW === 'cards' ? ' class="on"' : '') + '>Cards</button><button type="button" data-v="table"' + (VIEW === 'table' ? ' class="on"' : '') + '>Table</button></span></div>';
     const sum = summary(games);
-    body.innerHTML = '<div class="card">' + nav + '<div class="card-header">' + esc(BP.fmtDate(day)) + ' <span class="card-sub">' + games.length + ' game' + (games.length === 1 ? '' : 's') +
-      (sum ? ' · ' + esc(sum) : '') + '</span></div><div id="gd-list"></div></div>' +
-      '<div class="section-note">Model: the plate-appearance simulation with the probable starters (home win %, expected total, home -1.5). Market: Kalshi and Polymarket, de-vigged; the figure in brackets is the model minus the market in points. DraftKings lines as ESPN shows them. 18+.</div>';
+    body.innerHTML = QK.sectionHead({ kicker: 'Scoreboard · ' + BP.levelName(L), title: BP.fmtDate(day), sub: games.length + ' game' + (games.length === 1 ? '' : 's') + (sum ? ' · ' + sum : '') }) +
+      '<div class="qk-card bp-daynav">' + nav + '</div><div id="gd-list"></div>' +
+      '<p class="bp-note">Our chance comes from the plate-appearance simulation with the probable starters and the posted (or projected) lineups. Records and form are as they stood that morning. A grey tick on a card marks the market (Kalshi and Polymarket), for reference.</p>';
     const draw = () => {
       const box = document.getElementById('gd-list');
       if (!box) return;
@@ -121,7 +125,7 @@ function render(el, params) {
       if (VIEW === 'table') { box.innerHTML = tableView(games, L, S); BP.sortable(box); return; }
       const live = games.filter(BP.isLive), pre = games.filter(c => BP.gameState(c) === 'pre'), fin = games.filter(BP.isFinal);
       const other = games.filter(c => live.indexOf(c) < 0 && pre.indexOf(c) < 0 && fin.indexOf(c) < 0);
-      const block = (t, l) => (l.length ? '<div class="day-head">' + esc(t) + '</div><div class="gc-grid">' + l.map(c => BP.gameCard(c, { level: L, season: S })).join('') + '</div>' : '');
+      const block = (t, l) => (l.length ? '<div class="day-head">' + esc(t) + '</div><div class="bp-gc-grid">' + l.map(c => BP.gameCard(c, { level: L, season: S })).join('') + '</div>' : '');
       box.innerHTML = block('Live', live) + block('Still to play', pre) + block('Final', fin) + block('Postponed or suspended', other);
     };
     draw();

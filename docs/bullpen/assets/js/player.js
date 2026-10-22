@@ -24,7 +24,7 @@ BP.RETRO_NOTICE = BP.RETRO_NOTICE || RETRO_NOTICE;
 
 const LABEL = {
   season: 'Season', level: 'Level', team: 'Team', age: 'Age', g: 'G', gs: 'GS', pa: 'PA', ab: 'AB', h: 'H', '1b': '1B', '2b': '2B', '3b': '3B', hr: 'HR', r: 'R', rbi: 'RBI',
-  sb: 'SB', cs: 'CS', bb: 'BB', ibb: 'IBB', so: 'SO', k: 'SO', hbp: 'HBP', sf: 'SF', avg: 'AVG', obp: 'OBP', slg: 'SLG', ops: 'OPS', iso: 'ISO', babip: 'BABIP',
+  sb: 'SB', cs: 'CS', bb: 'uBB', ibb: 'IBB', so: 'SO', k: 'SO', hbp: 'HBP', sf: 'SF', avg: 'AVG', obp: 'OBP', slg: 'SLG', ops: 'OPS', iso: 'ISO', babip: 'BABIP',
   woba: 'wOBA', xwoba_plus: 'xwOBA+', xwoba_savant: 'Savant xwOBA', xwoba: 'xwOBA', xba: 'xBA', xslg: 'xSLG', wrc_plus: 'wRC+', war: 'WAR', bwar: 'Bullpen WAR',
   ip: 'IP', w: 'W', l: 'L', sv: 'SV', hld: 'HLD', bf: 'BF', tbf: 'BF', er: 'ER', era: 'ERA', fip: 'FIP', xfip: 'xFIP', whip: 'WHIP', k_pct: 'K%', bb_pct: 'BB%', k_bb_pct: 'K−BB%',
   hr9: 'HR/9', k9: 'K/9', bb9: 'BB/9', ra9: 'RA9', stuff_plus: 'Stuff+', location_plus: 'Location+', pitching_plus: 'Pitching+', batting_runs: 'Batting runs', lw_runs: 'Linear-weights runs',
@@ -225,7 +225,8 @@ function careerTable(rows, cols, L, meta) {
   if (!rows.length) return '';
   const present = cols.filter(c => rows.some(r => r[c] !== undefined && r[c] !== null));
   const tot = {};
-  return k.table(present.map(c => ({ label: label(c), align: /season|level|team/.test(c) ? 'left' : 'right' })),
+  const TT = { g: 'Games with a plate appearance (hitters) or games pitched (pitchers)', bb: 'Unintentional walks (intentional walks are IBB)', r: 'For a pitcher, runs scored while he was on the mound (inherited runners are not reassigned; not earned runs)' };
+  return k.table(present.map(c => ({ label: label(c), align: /season|level|team/.test(c) ? 'left' : 'right', title: TT[c] || '' })),
     rows.slice().sort((a, b) => (a.season - b.season) || String(a.level).localeCompare(String(b.level))).map(r => present.map(c => {
       const v = r[c];
       if (c === 'team') return { v: k.teamAbbr(v), html: v ? (k.TEAMS[String(v)] ? k.teamChip(r.level || L, v, r.season) : k.esc(v)) : '—' };

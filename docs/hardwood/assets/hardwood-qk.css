@@ -275,3 +275,37 @@ body.qk { font-size: var(--fs-md); }
 .hw-av .hw-list .hw-inj { flex: none; }
 .hw-av .hw-list .v { margin-left: 0; min-width: 2.5em; text-align: right; }
 .hw-inj.q { color: var(--st-warn); }
+
+/* ═════════════════════════════════ 7. Design System 2.0 (overview, games, game, team, player, compare) */
+.hw-head2 { margin-bottom: var(--sp-4); }
+.hw-tabs { margin-top: calc(-1 * var(--sp-1)); }
+.hw-ticker { margin: calc(-1 * var(--sp-5)) calc(-1 * var(--gutter)) var(--sp-5); border-top: 0; }
+.hw-games.hw-gc, .hw-gc { grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); }
+.hw-kpis .qk-stats { margin-bottom: var(--sp-2); }
+.hw-lead .v { font: 800 var(--fs-md) var(--font-display); font-stretch: var(--stretch-display); font-variant-numeric: tabular-nums; }
+.hw-lead li:first-child .v { color: var(--signal); }
+.hw-score2 { font-family: var(--font-display); font-weight: 900; font-stretch: var(--stretch-display); font-variant-numeric: tabular-nums; letter-spacing: 0; font-size: var(--fs-d2); line-height: 1; display: flex; align-items: center; gap: 14px; }
+.hw-score2 .dash { color: var(--ink-4); font-weight: 500; }
+.hw-score2 .lost { color: var(--ink-3); }
+.hw-score-pre { font-size: clamp(1.3rem, 3.2vw, 1.9rem); color: var(--ink-2); }
+.hw-gh .side .nm { font-family: var(--font-display); font-stretch: var(--stretch-display); font-weight: 800; letter-spacing: 0; }
+.hw-hero2 .hw-hero-bar { position: relative; max-width: 720px; margin: var(--sp-5) auto 0; display: grid; gap: 8px; }
+.hw-hero2 .hw-hero-bar > .qk-kicker { text-align: center; }
+.hw-hero-mkt { display: flex; justify-content: center; font-size: var(--fs-xs); }
+.hw-stack2 > * + * { margin-top: var(--sp-4); }
+.hw-cmp-pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); }
+.hw-cmp-slot { display: grid; gap: 6px; padding-left: 10px; border-left: 3px solid var(--ec); min-width: 0; }
+.hw-cmp-slot .qk-input { width: 100%; min-width: 0; }
+@media (max-width: 720px) { .hw-cmp-pick { grid-template-columns: 1fr; } .hw-score2 { font-size: clamp(1.8rem, 9vw, 2.4rem); gap: 8px; } }
+.hw-chartkey { color: var(--ink-3); font-size: var(--fs-xs); margin: 6px 0 4px; line-height: 1.45; }
+.hw-chartkey b { color: var(--ink-2); }
+.hw-legacy .qk-surface, .hw-court-max { max-width: 520px; margin-left: auto; margin-right: auto; }
+/* Who moves next */
+.hw-mv { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.hw-mvbar { display: inline-flex; width: 72px; height: 7px; border-radius: 4px; background: var(--s-3); overflow: hidden; }
+.hw-mvbar i { display: block; height: 100%; }
+.hw-mv b { font: 600 var(--fs-sm) var(--font-num); min-width: 34px; text-align: right; }
+.hw-mvline { margin: 0 0 10px; color: var(--ink-2); font-size: var(--fs-sm); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.hw-mvcard .hw-mvbar { width: 100%; height: 10px; }
+.hw-mvcard .hw-mv { width: 100%; }
+.hw-mvctx { color: var(--ink-3); font-size: var(--fs-xs); margin-top: 8px; }

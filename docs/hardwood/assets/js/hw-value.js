@@ -31,24 +31,24 @@ function board(node, L) {
     const txr = tx ? U.rowsOf(tx) : [];
     const seen = {}, latest = txr.filter(x => { const k = x.date + x.text; if (seen[k]) return false; seen[k] = 1; return true; }).sort((x, y) => String(y.date).localeCompare(String(x.date))).slice(0, 14);
     const kp = [];
-    if (top[0]) kp.push(QK.kpi({ label: 'Most valuable', value: top[0].name, text: true, sub: U.f(top[0].v, 1) + ' WAR over four seasons · ' + HW.teamAbbr(L, top[0].team) }));
+    if (top[0]) kp.push(({ label: 'Most valuable', value: top[0].name, text: true, signal: true, href: HW.playerHref(L, top[0].id), sub: U.f(top[0].v, 1) + ' WAR over four seasons · ' + HW.teamAbbr(L, top[0].team) }));
     const young = rows.filter(r => isNum(r.age) && r.age < 23).sort((x, y) => y.v - x.v)[0];
-    if (young) kp.push(QK.kpi({ label: 'Best under 23', value: young.name, text: true, sub: U.f(young.v, 1) + ' WAR · age ' + Math.floor(young.age) }));
-    if (byNet[0]) kp.push(QK.kpi({ label: 'Won the trade market', value: HW.teamAbbr(L, byNet[0]) + ' ' + U.signed(T[byNet[0]].net_now, 1), sub: 'net WAR from ' + T[byNet[0]].n + ' trades, today’s view' }));
-    kp.push(QK.kpi({ label: 'Trades rated', value: String(dl.length), sub: latest.length ? txr.length + ' transactions in 12 months' : '' }));
-    let h = '<div class="qk-kpis hw-kpis">' + kp.join('') + '</div><div class="qk-grid hw-sec">' +
+    if (young) kp.push(({ label: 'Best under 23', value: young.name, text: true, sub: U.f(young.v, 1) + ' WAR · age ' + Math.floor(young.age) }));
+    if (byNet[0]) kp.push(({ label: 'Won the trade market', value: HW.teamAbbr(L, byNet[0]) + ' ' + U.signed(T[byNet[0]].net_now, 1), sub: 'net WAR from ' + T[byNet[0]].n + ' trades, today’s view' }));
+    kp.push(({ label: 'Trades rated', value: String(dl.length), sub: latest.length ? txr.length + ' transactions in 12 months' : '' }));
+    let h = '<div class="hw-kpis">' + QK.stats(kp) + '</div><div class="qk-grid hw-sec">' +
       U.card2('Most valuable players', 'Wins above replacement over four seasons (discounted 10% a season); the bar is the 80% band', U.chart('vb-top', 26 * top.length + 50, 'Most valuable players'), { cls: 'qk-span-7' }) +
       U.card2('Value against age', 'Four-season WAR (up) against age, every rostered player above half a win', U.chart('vb-age', 26 * top.length + 50, 'Value against age'), { cls: 'qk-span-5' }) + '</div>';
-    h += '<section class="qk-section"><div class="qk-section-head"><div><h2>Best by position</h2><div class="qk-sub">Guards, wings and bigs by four-season value; value over the position’s replacement level in brackets.</div></div>' + U.link(HW.href(L, 'value') + '?tab=war', 'Season value for any year') + '</div><div class="qk-grid">' +
+    h += '<section class="qk-section">' + U.head({ title: 'Best by position', sub: 'Guards, wings and bigs by four-season value; value over the position’s replacement level in brackets.', actions: U.btnLink(HW.href(L, 'value') + '?tab=war', 'Season value for any year') }) + '<div class="qk-grid">' +
       ['G', 'W', 'B'].map(k => U.card2(U.ROLE[k], '', '<ul class="hw-list">' + rows.filter(r => r.role === k).sort((x, y) => y.v - x.v).slice(0, 8).map((r, i) =>
         '<li><span class="n">' + (i + 1) + '</span>' + U.playerEnt(L, r.id, r.name, r.team, isNum(r.age) ? 'age ' + Math.floor(r.age) : '') + '<span class="v">' + U.f(r.v, 1) + ' <span class="hw-quiet">(' + U.signed(r.vorp, 1) + ')</span></span></li>').join('') + '</ul>', { cls: 'qk-span-4', flush: true })).join('') + '</div></section>';
     if (tIds.length || bigDeals.length) {
-      h += '<section class="qk-section"><div class="qk-section-head"><div><h2>Trades</h2><div class="qk-sub">Every trade of the last 12 months rated on four-season value: at the time (no hindsight) and in today’s view (realised since plus what is left).</div></div>' + U.link(HW.href(L, 'value') + '?tab=moves', 'All trades and the feed') + '</div><div class="qk-grid">' +
+      h += '<section class="qk-section">' + U.head({ title: 'Trades', sub: 'Every trade of the last 12 months rated on four-season value: at the time (no hindsight) and in today’s view (realised since plus what is left).', actions: U.btnLink(HW.href(L, 'value') + '?tab=moves', 'All trades and the feed') }) + '<div class="qk-grid">' +
         (tIds.length ? U.card2('Net trade value by team', 'WAR in minus WAR out, today’s view', U.chart('vb-net', 20 * tIds.length + 30, 'Net trade value'), { cls: 'qk-span-5' }) : '') +
         (bigDeals.length ? U.card2('Biggest deals', 'Grade = share of the value each side received (A 65%+, F under 35%)', '<div>' + bigDeals.map(d => '<div class="hw-deal"><div class="hw-quiet">' + esc(HW.fmtDate(d.date, { year: false })) + ' · ' + U.f(d.total_now || d.total, 1) + ' WAR moved</div>' +
           (d.sides || []).map(sd => '<div class="side">' + U.grade(sd.grade_now || sd.grade) + U.teamEnt(L, sd.team, { abbr: true }) + '<span class="items">gets ' + esc(itemsTxt(L, sd['in'])) + '</span></div>').join('') + '</div>').join('') + '</div>', { cls: tIds.length ? 'qk-span-7' : 'qk-span-12', flush: true }) : '') + '</div></section>';
     }
-    if (latest.length) h += '<section class="qk-section"><div class="qk-section-head"><div><h2>Latest moves</h2><div class="qk-sub">Signings, trades, waivers and injury-list moves from ESPN’s transaction feed.</div></div>' + U.link(HW.href(L, 'value') + '?tab=moves&mt=feed', 'The full feed') + '</div>' +
+    if (latest.length) h += '<section class="qk-section">' + U.head({ title: 'Latest moves', sub: 'Signings, trades, waivers and injury-list moves from ESPN’s transaction feed.', actions: U.btnLink(HW.href(L, 'value') + '?tab=moves&mt=feed', 'The full feed') }) + '' +
       '<div class="qk-card">' + latest.map(x => '<div class="hw-tx"><span class="d">' + esc(HW.fmtDate(x.date, { year: 'auto', weekday: false })) + '</span><span>' + (x.team ? U.teamEnt(L, x.team, { abbr: true }) + ' ' : '') + esc(x.text) + '</span></div>').join('') + '</div></section>';
     node.innerHTML = h;
     QKC.mount('#vb-top', Tk => {

@@ -64,7 +64,7 @@ F.table = (host, plays, S, opts) => {
   const model = F.hasModel(plays), hasExp = plays.some(p => isNum(p.go_exp));
   const cols = [{ label: 'Wk', align: 'right' }].concat(o.team === false ? [] : [{ label: 'Team' }]).concat([{ label: 'Opp' }, { label: 'Situation' }, { label: 'Down' }, { label: 'Choice' }])
     .concat(hasExp ? [{ label: 'League goes', align: 'right', title: 'How often teams go for it in this situation' }] : []).concat([{ label: 'Result' }])
-    .concat(model ? [{ label: 'Model' }, { label: 'Go', align: 'right', title: 'Win probability if they go for it' }, { label: 'Punt', align: 'right' }, { label: 'FG', align: 'right' }, { label: 'WP lost', align: 'right', title: 'Win probability given up against the best choice, points' }, { label: 'Grade' }] : []);
+    .concat(model ? [{ label: 'Our call', title: 'What our fourth-down model recommends' }, { label: 'Go', align: 'right', title: 'Win probability if they go for it' }, { label: 'Punt', align: 'right' }, { label: 'FG', align: 'right' }, { label: 'WP lost', align: 'right', title: 'Win probability given up against the best choice, points' }, { label: 'Grade' }] : []);
   host.innerHTML = GI.tableHTML(cols, list.map((p, i) => ({ _attrs: ' data-i="' + i + '"', cells: [{ v: p.week, html: p.gid ? '<a class="gi-link" href="' + GI.gameHref(p.gid) + '">' + esc(p.week === null ? '—' : p.week) + '</a>' : esc(p.week) }]
     .concat(o.team === false ? [] : [{ v: p.team, html: GI.teamChip(p.team, S) }])
     .concat([{ v: p.opp || '', html: p.opp ? GI.teamChip(p.opp, S) : '—' }, { v: (p.qtr || 0) * 1000, html: esc(F.sit(p)) },
@@ -103,7 +103,7 @@ F.coachTable = (host, rows, S) => {
   const hasModel = rows.some(r => isNum(r.should) || isNum(r.lost));
   host.innerHTML = GI.tableHTML([{ label: 'Coach' }, { label: 'Team' }, { label: '4th downs', align: 'right' }, { label: 'Went', align: 'right' }, { label: 'Go rate', align: 'right' },
     { label: 'League would', align: 'right', title: 'Expected go rate in the same situations from a league model' }, { label: 'GOE', align: 'right', title: 'Go rate over expected, points: aggressiveness against the league' }]
-    .concat(hasModel ? [{ label: 'Model said go', align: 'right' }, { label: 'Went when it did', align: 'right' }, { label: 'Agree', align: 'right' }, { label: 'WP lost', align: 'right', title: 'Summed, points' }, { label: 'Per call', align: 'right' }] : []),
+    .concat(hasModel ? [{ label: 'Our model said go', align: 'right' }, { label: 'Went when it did', align: 'right' }, { label: 'Agree', align: 'right' }, { label: 'WP lost', align: 'right', title: 'Summed, points' }, { label: 'Per call', align: 'right' }] : []),
   rows.slice().sort((a, b) => (isNum(b.goe) ? b.goe : -9) - (isNum(a.goe) ? a.goe : -9)).map(r => ({ _href: r.coach ? GI.coachHref(r.coach, S) : null, cells: [
     { v: r.coach || '', html: r.coach ? GI.coachLink(r.coach, S) : '<span class="qk-muted">unknown</span>' }, { v: r.team || '', html: String(r.team || '').split('/').filter(Boolean).map(t => GI.teamChip(t, S)).join(' ') || '—' },
     { v: r.n, html: GI.int(r.n) }, { v: r.go, html: GI.int(r.go) }, { v: r.go_rate, html: GI.pct(r.go_rate, 0) }, { v: r.go_exp, html: GI.pct(r.go_exp, 0) },
@@ -143,13 +143,13 @@ GI.route('fourth', function (el, params) {
       GI.card('Filters', '', '<div class="gi-toolbar">' + GI.field('Team', GI.select('fd-team', [['', 'All teams']].concat(teams.map(t => [t, t + ' · ' + GI.teamName(t)])), ST.team, 'Team')) +
         GI.field('Week', GI.select('fd-week', [['', 'All weeks']].concat(weeks.map(w => [String(w), GI.weekLabel(w, S)])), ST.week, 'Week')) +
         GI.field('Choice', GI.select('fd-choice', [['', 'Any'], ['go', 'Went for it'], ['punt', 'Punted'], ['fg', 'Kicked a field goal']], ST.choice, 'Choice')) +
-        (model ? GI.field('Model said', GI.select('fd-rec', [['', 'Any'], ['go', 'Go for it'], ['punt', 'Punt'], ['fg', 'Field goal']], ST.rec, 'Model said')) +
+        (model ? GI.field('Our model said', GI.select('fd-rec', [['', 'Any'], ['go', 'Go for it'], ['punt', 'Punt'], ['fg', 'Field goal']], ST.rec, 'Model said')) +
           GI.field('Grade', GI.select('fd-grade', [['', 'Any'], ['good', 'Right call'], ['close', 'Close call'], ['bad', 'Mistake'], ['disagree', 'Disagreed with the model']], ST.grade, 'Grade')) : '') + '</div>') +
       GI.grid(GI.card('The field', 'every fourth down by field position and distance · colour: ' + (model ? 'the model\'s call' : 'the choice') + ' · ringed: mistakes', GI.chartBox('fd-map', 380, 'Fourth downs on the field'), { span: 7 }) +
         GI.card('Win probability by option', 'the selected play · ★ the model\'s pick', GI.chartBox('fd-opt', 220, 'Options for the selected play') + '<p class="gi-cap" id="fd-opt-n"></p>', { span: 5 })) +
       GI.card('Every decision', '<span id="fd-tsub"></span>', '<div id="fd-table"></div>', { flush: true }) +
       GI.card('Coach aggressiveness', 'go rate against the league (GOE) and against the model · <a href="' + GI.ghref('coaches', S) + '">coach pages →</a>', '<div id="fd-coaches"></div>', { flush: true }) +
-      GI.note('<p>For every fourth down (kneels and the last seconds of a half excluded) the model prices <b>go for it</b> (conversion probability, then the win probability after a conversion or a turnover on downs), <b>punt</b> (expected net distance) and <b>field goal</b> (our make probability by distance, kicker, weather and roof), each valued with our win-probability model. <b>WP lost</b> is the best option minus the chosen one: up to 1.5 points is a right call, up to 3 a close call (the model\'s own uncertainty is about that size), beyond that a mistake. <a href="#/methodology/fourth">Methodology →</a></p>');
+      GI.note('<p>For every fourth down (kneels and the last seconds of a half excluded) our model values <b>go for it</b> (conversion probability, then the win probability after a conversion or a turnover on downs), <b>punt</b> (expected net distance) and <b>field goal</b> (our make probability by distance, kicker, weather and roof), each valued with our win-probability model. <b>WP lost</b> is the best option minus the chosen one: up to 1.5 points is a right call, up to 3 a close call (the model\'s own uncertainty is about that size), beyond that a mistake. <a href="#/methodology/fourth">Methodology →</a></p>');
     const filt = () => plays.filter(p => (!ST.team || p.team === ST.team) && (!ST.week || String(p.week) === ST.week) && (!ST.choice || p.choice === ST.choice) && (!ST.rec || p.rec === ST.rec) &&
       (!ST.grade || (ST.grade === 'disagree' ? p.rec && p.choice !== p.rec : F.grade(p).key === ST.grade)));
     const pick = p => {

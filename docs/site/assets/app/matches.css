@@ -4,7 +4,7 @@
 .fb-mx-days { margin-top: var(--sp-4); }
 .fb-mx-strip { padding-bottom: 4px; }
 .fb-mx-day { position: relative; }
-.fb-mx-day.is-today { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.fb-mx-day.is-today { border-color: color-mix(in srgb, var(--signal) 55%, transparent); }
 .fb-mx-livedot { width: 6px; height: 6px; border-radius: 50%; background: var(--live); display: inline-block; animation: qk-pulse 1.4s infinite; }
 .fb-mx-filters { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-top: var(--sp-3); }
 .fb-mx-filters .qk-chips { flex: 1 1 auto; min-width: 0; }
@@ -20,52 +20,59 @@
 .fb-mx-ghead .fb-comp { font-weight: 700; }
 .fb-mx-ghead .qk-muted { font-size: var(--fs-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fb-mx-more { margin-left: auto; font-size: var(--fs-xs); font-weight: 600; color: var(--ink-3); white-space: nowrap; }
-.fb-mx-more:hover { color: var(--accent); }
+.fb-mx-more:hover { color: var(--signal); }
 .fb-fx-r { white-space: nowrap; }
 
-/* hero */
-.fb-mx-hero { padding: var(--sp-5) var(--sp-6); --tc: var(--accent); }
+/* hero (v2 scoreboard) */
+.fb-mx-hero { padding: var(--sp-5) var(--sp-6); --tc: var(--signal); }
 .fb-mx-hero-in { position: relative; display: grid; gap: var(--sp-4); }
 .fb-mx-meta { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; justify-content: center; text-align: center; }
 .fb-mx-meta .fb-comp { color: var(--ink-1); }
 .fb-mx-board { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--sp-4); }
-.fb-mx-team { display: grid; justify-items: center; gap: 8px; text-align: center; font-weight: 800; font-size: var(--fs-lg); letter-spacing: -0.02em; color: var(--ink-1); min-width: 0; }
-.fb-mx-team span { overflow-wrap: anywhere; }
-a.fb-mx-team[href]:hover span { color: var(--accent); }
-.fb-mx-team .qk-team-mark.lg { width: 72px; height: 72px; }
-.fb-mx-score { display: grid; justify-items: center; gap: 6px; }
-.fb-mx-big { font: 700 clamp(2.2rem, 7vw, 3.6rem)/1 var(--font-num); letter-spacing: -0.04em; display: inline-flex; gap: 10px; }
+.fb-mx-team { display: grid; justify-items: center; gap: 4px; text-align: center; color: var(--ink-1); min-width: 0; }
+.fb-mx-team .nm { font: 800 var(--fs-xl)/1.1 var(--font-display); font-stretch: var(--stretch-display); overflow-wrap: anywhere; }
+.fb-mx-team .sb { font: 700 var(--fs-2xs) var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-3); }
+.fb-mx-team .qk-team-mark.lg { width: 72px; height: 72px; margin-bottom: 4px; }
+a.fb-mx-team[href]:hover .nm { color: var(--signal); }
+.fb-mx-score { display: grid; justify-items: center; gap: 8px; }
+.fb-mx-big { font: 900 clamp(2.6rem, 8vw, 4.4rem)/1 var(--font-display); font-stretch: var(--stretch-display); font-variant-numeric: tabular-nums; display: inline-flex; gap: 12px; }
 .fb-mx-big i { font-style: normal; color: var(--ink-3); }
-.fb-mx-big.vs { color: var(--ink-3); font-size: 2rem; }
-.fb-mx-xg { font: 500 var(--fs-sm) var(--font-num); color: var(--ink-2); }
+.fb-mx-big.pre { font-size: clamp(1.6rem, 4vw, 2.2rem); color: var(--ink-2); }
+.fb-mx-bar { max-width: 720px; width: 100%; margin: 0 auto; display: grid; gap: 8px; }
+.fb-mx-bar > .qk-kicker { text-align: center; }
+.fb-mx-hmeta { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; font-size: var(--fs-xs); color: var(--ink-3); }
 @media (max-width: 720px) {
   .fb-mx-hero { padding: var(--sp-4) var(--sp-3); }
   .fb-mx-board { gap: var(--sp-2); }
-  .fb-mx-team { font-size: var(--fs-sm); }
-  .fb-mx-team .qk-team-mark.lg { width: 48px; height: 48px; }
+  .fb-mx-team .nm { font-size: var(--fs-md); }
+  .fb-mx-team .qk-team-mark.lg { width: 44px; height: 44px; }
 }
 
-/* model line */
-.fb-mx-p3l { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: var(--fs-xs); color: var(--ink-2); }
-.fb-mx-p3l span:nth-child(2) { color: var(--ink-3); }
+/* our forecast, the tale of the tape */
+.fb-mx-fc td.ours { color: var(--ink-1); font-weight: 700; font-family: var(--font-num); font-variant-numeric: tabular-nums; white-space: normal; }
+.fb-mx-fc th.mk, .fb-mx-fc td.mk { color: var(--c-market, var(--ink-3)); font-family: var(--font-num); font-weight: 500; white-space: normal; }
+.fb-mx-fc td:first-child { white-space: normal; min-width: 7em; }
+.fb-mx-tform { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: var(--sp-3); font-size: var(--fs-2xs); }
+.fb-mx-ktiles { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+@media (max-width: 720px) { .fb-mx-ktiles, .fb-mx-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* line-up change */
 .fb-mx-mkt { margin-top: var(--sp-4); display: grid; gap: 8px; }
-.fb-mx-mkt .qk-mvm { grid-template-columns: minmax(90px, 30%) 1fr auto; }
-.fb-mx-mkt .qk-mvm > span:first-child { overflow: hidden; text-overflow: ellipsis; }
 .fb-mx-kpis { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
-.fb-mx-kpis .qk-kpi-value { font-size: var(--fs-xl); }
+.fb-mx-kpis .qk-stat-v { font-size: var(--fs-xl); }
 .fb-mx-stack { display: grid; gap: var(--sp-4); align-content: start; }
 
 /* timeline */
 .fb-mx-tl { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .fb-mx-tl li { display: grid; grid-template-columns: 44px 22px minmax(0, 1fr); gap: 8px; align-items: center; padding: 6px 8px; border-radius: 6px; font-size: var(--fs-sm); }
-.fb-mx-tl li.h { border-left: 3px solid var(--c-1); }
-.fb-mx-tl li.a { border-left: 3px solid var(--c-2); }
+.fb-mx-tl li.h { border-left: 3px solid var(--wp-b); }
+.fb-mx-tl li.a { border-left: 3px solid var(--wp-a); }
 .fb-mx-tl li.k-goal { background: var(--s-2); }
 .fb-mx-min { font: 600 var(--fs-xs) var(--font-num); color: var(--ink-3); }
 .fb-mx-ev { min-width: 0; overflow-wrap: anywhere; }
 .fb-mx-evteam { display: block; font-size: var(--fs-2xs); color: var(--ink-3); }
 .fb-mx-ico { font-style: normal; display: inline-grid; place-items: center; width: 18px; height: 18px; font-size: 12px; color: var(--ink-2); }
-.fb-mx-ico.goal { color: var(--accent); }
+.fb-mx-ico.goal { color: var(--ink-1); }
 .fb-mx-ico.card { width: 11px; height: 15px; border-radius: 2px; margin-left: 3px; }
 .fb-mx-ico.card.yellow { background: var(--st-warn); }
 .fb-mx-ico.card.red { background: var(--st-crit); }
@@ -98,13 +105,13 @@ a.fb-mx-team[href]:hover span { color: var(--accent); }
 .fb-mx-duel .bars > span { flex: 1; background: var(--s-3); border-radius: 3px; overflow: hidden; display: flex; }
 .fb-mx-duel .bh { justify-content: flex-end; }
 .fb-mx-duel .bars i { display: block; height: 100%; border-radius: 3px; }
-.fb-mx-duel .bh i { background: var(--c-1); } .fb-mx-duel .ba i { background: var(--c-2); }
+.fb-mx-duel .bh i { background: var(--wp-b); } .fb-mx-duel .ba i { background: var(--wp-a); }
 
 /* preview */
 .fb-mx-formhead .fb-form { margin-right: 8px; }
 #mx-shots .fb-pitch-chart, #mx-pitch { max-width: 940px; margin: 0 auto; }
 .fb-mx-tl { max-height: 560px; overflow-y: auto; scrollbar-width: thin; }
-/* Model v market and line-up tables; the confirmed XIs (xiCard). */
+/* The line-up change table; the confirmed XIs (xiCard). */
 .fb-mx-cmp td:first-child { white-space: normal; min-width: 7em; }
 .fb-cxi { list-style: none; margin: var(--sp-3) 0 0; padding: 0; display: grid; gap: 2px; }
 .fb-cxi-p { display: grid; grid-template-columns: 2.2em 1fr auto auto; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line-1); font-size: var(--fs-sm); min-width: 0; }

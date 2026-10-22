@@ -1,15 +1,17 @@
-/* The Quant Gridiron — the player page (#/player/<pid>), position-aware.
- * Hero (team, position, age, college, draft) with headline numbers · percentiles (against the group or
- * the exact position) with a radar of the headline metrics · value (projected points above replacement,
+/* The Quant Gridiron — the player page (#/player/<pid>), position-aware, on Design System 2.0 (the Rink player page is
+ * the reference). Player card header (team band, position, age, size, college, draft, headline numbers) · stat tiles
+ * with percentile chips · the Savant-style percentile card against his peer group (QB, RB, WR/TE, DL and outside rushers,
+ * LB, DB, K, P; the sample and the qualification rule shown) beside where he sits in the peer distribution (players.json,
+ * loaded after the first paint) · value (projected points above replacement,
  * with its band and by-season projection, current season) · similar players · position charts (QB pass
  * grid and EPA by game; RB RYOE by game; WR/TE depth profile; K field goals by distance; defenders'
  * splash plays by game) · season by season (value and EPA chart, table with era-adjusted + columns) ·
  * game log · Next Gen Stats and FTN splits. Reads players/<pid>.json, glossary.json (metric labels) and,
- * for the current season, <S>/valuation.json. */
+ * for the current season, <S>/valuation.json; <S>/players.json for the peer distribution. */
 (function (GI) {
 'use strict';
 
-const QK = window.QK;
+const QK = window.QK, QKC = window.QKC;
 const esc = GI.esc, isNum = GI.isNum, first = GI.first;
 
 const LABEL = {
@@ -73,7 +75,7 @@ const CAREER = {
   DEF: ['season', 'team', 'games', 'tackles', 'tfl', 'sacks', 'qb_hits', 'ints', 'pd', 'ff', 'def_value', 'value']
 };
 CAREER.TE = CAREER.WR;
-const ST = { basis: 'pct', grid: 'epa' };
+const ST = { grid: 'epa', dist: null };
 const DEPTH_RANK = ['behind', 'behind los', '<0', 'short', '0-9', 'intermediate', '10-19', 'deep', '20+'];
 const dRank = d => { const i = DEPTH_RANK.indexOf(String(d).toLowerCase()); return i < 0 ? 50 : i; };
 const dLabel = d => ({ behind: 'Behind LOS', short: 'Short (0–9)', intermediate: 'Intermediate (10–19)', deep: 'Deep (20+)' })[String(d).toLowerCase()] || GI.titleCase(d);
@@ -112,32 +114,42 @@ GI.route('player', function (el, params) {
     const valn = cur && GI.ok(res[2]) ? (() => { const cols = res[2].cols || []; const r = (res[2].rows || []).find(x => x[cols.indexOf('pid')] === pid); if (!r) return null; const o = {}; cols.forEach((k, i) => { o[k] = r[i]; }); return o; })() : null;
     const age = first(valn && valn.age, isNum(viewSeason.age) ? viewSeason.age : null);
     document.title = (c.name || pid) + ' · ' + GI.SITE;
-    const col = team ? GI.tc(team) : 'var(--accent)';
+    const col = team ? GI.tc(team) : 'var(--signal)';
     const dr = c.draft || {};
     const draftTxt = dr.year || dr.season ? (dr.round ? 'Round ' + dr.round + (dr.pick ? ', pick ' + dr.pick : '') + ', ' : '') + (dr.year || dr.season) + (dr.team ? ' (' + dr.team + ')' : '') : '';
     const ht = isNum(c.height) && c.height > 50 ? Math.floor(c.height / 12) + '′' + (c.height % 12) + '″' : '';
-    const meta = [team ? GI.teamLink(team, { season: S }) : '', pos ? esc(pos) : '', isNum(age) ? 'Age ' + GI.num(age, 0) : '', c.college ? esc(c.college) : '', draftTxt ? 'Draft ' + esc(draftTxt) : '', [ht, c.weight ? c.weight + ' lb' : ''].filter(Boolean).join(', '),
-      seasons.length ? seasons[0].season + '–' + last.season : ''].filter(Boolean);
-    const P = pctS ? ((ST.basis === 'pct_pos' ? pctS.pct_pos : pctS.pct) || {}) : {};
+    const peerRow = pctS ? { pos: pos, group: group, values: pctS.values || {}, pct: pctS.pct || {}, pct_pos: pctS.pct_pos || {}, games: viewSeason.games, qualified: viewSeason.qualified } : null;
+    const peer = GI.peerOf({ pos: pos }, group);
+    const P = peerRow ? GI.peerPct(peerRow, group) : {};
     const tiles = (TILES[group] || []).map(t => { const key = GI.pickKey(vals, t[1]); return key && isNum(vals[key]) ? { label: t[0], key: key, v: vals[key], sub: t[2] } : null; }).filter(Boolean);
-    const stat = t => '<div class="qk-hero-stat"><div class="v">' + fv(t.key, t.v) + '</div><div class="l">' + esc(t.label) + (isNum(P[t.key]) ? ' · ' + Math.round(P[t.key]) + 'th' : '') + '</div></div>';
-    let h = '<section class="qk-hero gi-hero-ent" style="--tc:' + esc(col) + '"><div class="qk-hero-in"><div class="qk-avatar" style="--tc:' + esc(col) + '">' + esc(QK.fmt.initials(c.name)) + '</div>' +
-      '<div><div class="qk-kicker">' + esc(GI.GROUP_ONE[group] ? GI.titleCase(GI.GROUP_ONE[group]) : pos) + (valn && valn.status && valn.status !== 'ACT' ? ' · <span class="qk-badge">' + esc({ RES: 'Injured reserve', DEV: 'Practice squad', INA: 'Inactive', FA: 'Free agent' }[valn.status] || valn.status) + '</span>' : '') + '</div><h1>' + esc(c.name) + '</h1>' +
-      '<div class="qk-hero-meta">' + meta.map(m => '<span>' + m + '</span>').join('') + '</div></div><div class="qk-hero-stats">' + tiles.slice(0, 3).map(stat).join('') + '</div></div></section>';
-    h += '<div class="gi-toolbar" style="margin-top:12px"><a class="qk-btn" href="' + GI.compareHref(pid) + '">Compare</a><a class="qk-btn" href="' + GI.ghref('players', S, { g: group }) + '">All ' + esc((GI.GROUP_NAME[group] || 'players').toLowerCase()) + '</a>' +
+    const status = valn && valn.status && valn.status !== 'ACT' ? ({ RES: 'Injured reserve', DEV: 'Practice squad', INA: 'Inactive', FA: 'Free agent' }[valn.status] || valn.status) : '';
+    const tags = [];
+    if (pctS && viewSeason.qualified) tags.push(QK.tag('Qualified for percentiles', 'signal'));
+    if (status) tags.push(QK.tag(status));
+    let h = QK.playerHeader({ name: c.name, pos: GI.posLong(pos) || pos, kicker: (pctS ? S : (last.season || S)) + ' season',
+      team: team ? { name: GI.teamName(team), abbr: GI.teamAbbr(team), colour: GI.teamInfo(team).colour, href: GI.teamHref(team, S) } : null,
+      meta: [isNum(age) ? ['Age', GI.num(age, 0)] : null, ht ? ['Size', ht + (c.weight ? ' · ' + c.weight + ' lb' : '')] : null, c.college ? ['College', c.college] : null, draftTxt ? ['Draft', draftTxt] : null,
+        seasons.length ? ['Seasons', seasons[0].season + '–' + last.season] : null],
+      stats: tiles.slice(0, 4).map(t => ({ label: t.label, value: fv(t.key, t.v) })), tags: tags });
+    h += '<div class="gi-toolbar" style="margin-top:12px"><a class="qk-btn primary" href="' + GI.compareHref(pid) + '">Compare</a><a class="qk-btn" href="' + GI.ghref('players', S, { g: group }) + '">All ' + esc((GI.GROUP_NAME[group] || 'players').toLowerCase()) + '</a>' +
       (team ? '<a class="qk-btn" href="' + GI.teamHref(team, S) + '">' + esc(GI.teamShort(team)) + '</a>' : '') + '</div>';
-    if (tiles.length) h += GI.kpis(tiles.map(t => GI.kpi(t.label, fv(t.key, t.v), (isNum(P[t.key]) ? QK.pctlChip(P[t.key]) + ' ' : '') + esc(t.sub), { tip: (META[t.key] || {}).desc })));
+    const tl = [];
+    if (valn) tl.push(GI.kpi('Projected value', GI.num(valn.value, 0), 'points above replacement, this season and the next three · likely range ' + GI.num(valn.lo, 0) + '–' + GI.num(valn.hi, 0), { signal: true, tip: 'Our player-value model: projected points above a replacement player, discounted 10% a season; the range is the 10th to 90th percentile' }));
+    tiles.slice(0, valn ? 4 : 5).forEach(t => tl.push(GI.kpi(t.label, fv(t.key, t.v), esc(t.sub), { pctl: isNum(P[t.key]) ? P[t.key] : null, tip: (META[t.key] || {}).desc })));
+    if (tl.length) h += GI.kpis(tl);
     if (group === 'OL') h += GI.note('Offensive linemen have no individual metrics in the public data. The team page carries the line\'s unit ratings.');
     const metrics = Object.keys(META).map(k => META[k]).filter(m => GI.scopeOk(m, group) && isNum((pctS ? pctS.values : vals)[m.key]));
+    const setG = GI.playerSet(group, metrics);
     if (pctS && metrics.length) {
-      h += GI.grid(GI.card('Percentiles', S + ' · against every qualified ' + esc(GI.GROUP_ONE[group] || 'player') + ' (100 = best; lower-is-better metrics flipped)' + (Object.keys(pctS.pct || {}).length ? '' : ' · below the sample floor: values only'),
-        '<div class="gi-toolbar" style="margin-bottom:10px">' + GI.seg('pp-basis', [['pct', 'v group'], ['pct_pos', 'v position']], ST.basis, 'Percentile basis') + '</div><div id="pp-pct"></div>', { span: 7 }) +
-        GI.card('Profile', 'headline percentiles', GI.chartBox('pp-radar', 360, 'Percentile radar'), { span: 5 }));
-    }
-    if (valn || (c.similar || []).length) {
-      h += GI.grid((valn ? GI.card('Value', 'projected points above a replacement player: rest of this season and the next three, discounted 10% a season · band 10th–90th percentile', '<div id="pp-val"></div>' + GI.chartBox('pp-valc', 220, 'Projected value by season'), { span: 7 }) : '') +
-        ((c.similar || []).length ? GI.card('Similar players', 'nearest on this season\'s percentile profile (100 = identical)', '<div id="pp-sim"></div>', { span: valn ? 5 : 12 }) : ''));
-    }
+      const groups = setG.map(g => ({ label: g[0], rows: g[1].map(k => { const m = META[k] || {}; return isNum(P[k]) ? { label: (m.label || label(k)) + (m.lower ? ' ↓' : ''), pctl: P[k], value: fv(k, pctS.values[k]), tip: GI.copyText(m.desc || '') } : null; }).filter(Boolean) }));
+      h += GI.grid('<div class="qk-span-5">' + QK.pctCard({ title: 'Percentile rankings', peer: peer.name + ', qualified', sample: GI.sampleLine(peerRow, group, ''), groups: groups,
+          note: '100 = best in the peer group; ↓ metrics are flipped so a high percentile is always good. Rates are shrunk towards the group mean by their stabilisation point before ranking.',
+          emptyText: 'He is short of the sample floor for percentiles this season.', foot: '<span>' + esc(S) + ' · every metric on the <a href="' + GI.ghref('players', S, { g: group }) + '">catalogue</a></span><a href="' + GI.compareHref(pid) + '">Compare →</a>' }) + '</div>' +
+        '<div class="qk-span-7"><div class="gi-stack">' + GI.card('Where he sits', 'Every qualified player in his peer group (' + esc(peer.name.replace(/^NFL /, '')) + ') this season; bars coloured by percentile',
+          '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + GI.chartBox('pp-dist', 250, 'Distribution of the peer group')) +
+        ((c.similar || []).length ? GI.card('Most similar', 'Nearest on this season\'s percentile profile (100 = identical)', '<div id="pp-sim"></div>', { flush: true }) : '') + '</div></div>');
+    } else if ((c.similar || []).length) h += GI.card('Most similar', 'Nearest on this season\'s percentile profile (100 = identical)', '<div id="pp-sim"></div>', { flush: true });
+    if (valn) h += GI.card('Value', 'Projected points above a replacement player: rest of this season and the next three, discounted 10% a season · band 10th–90th percentile', '<div id="pp-val"></div>' + GI.chartBox('pp-valc', 220, 'Projected value by season'));
     const ch = now.charts || {};
     h += '<div id="pp-pos"></div>';
     h += GI.card('Season by season', 'every season on file since 1999 · value is Gridiron Value; columns ending + are era-adjusted (100 = average for that season, 10 = one SD)', (seasons.length > 1 ? GI.chartBox('pp-car-c', 260, 'Value and EPA by season') : '') + '<div id="pp-car"></div>', { id: 'career' });
@@ -146,22 +158,41 @@ GI.route('player', function (el, params) {
       GI.card('FTN charting', 'FTN Data via nflverse (CC BY-SA 4.0)', factsTable(now.ftn, 'No FTN charting this season.'), { span: 6 }));
     el.innerHTML = h;
 
-    // percentiles + radar
-    if (pctS && metrics.length) {
-      const drawP = () => {
-        const pc = (ST.basis === 'pct_pos' ? (pctS.pct_pos || pctS.pct) : pctS.pct) || {};
-        const groups = GI.metricGroups(metrics.map(m => Object.assign({}, m, { group: m.family || m.group })));
-        GI.set('pp-pct', '<div class="gi-pct-cols">' + groups.map(g => { const items = g.items.filter(m => isNum(pc[m.key])); return items.length ? '<div class="gi-pct-group"><h4>' + esc(g.name) + '</h4>' + GI.pctBars(items.map(m => ({ label: m.label + (m.lower ? ' ↓' : ''), p: pc[m.key], value: fv(m.key, pctS.values[m.key]) }))) + '</div>' : ''; }).join('') + '</div>' || GI.muted('Below the sample floor for percentiles.'));
-        const heads = GI.headline(metrics.filter(m => isNum(pc[m.key])), GI.PREFS[group] || [], 7);
-        if (heads.length >= 3) GI.ch.radar('pp-radar', [{ name: c.name, values: heads.map(m => pc[m.key]), colour: team ? GI.teamColour(team) : null }], { labels: heads.map(m => GI.shortLabel(m.label)) });
-        else GI.ch.none('pp-radar', 'Not enough percentiles for a profile yet.');
-      };
-      drawP();
-      GI.wireSeg(el, 'pp-basis', v => { ST.basis = v; drawP(); });
+    // where he sits: the peer distribution of one metric (players.json, after the first paint), him and the median marked
+    if (pctS && document.getElementById('pp-dist')) {
+      const keys = [].concat.apply([], setG.map(g => g[1])).filter(k => isNum((pctS.values || {})[k])).slice(0, 4);
+      const segEl = el.querySelector('#pp-dist-m');
+      if (!keys.length) GI.ch.none('pp-dist', 'No metric to place him on yet.');
+      else {
+        if (!ST.dist || keys.indexOf(ST.dist) < 0) ST.dist = keys[0];
+        segEl.innerHTML = keys.map(k => '<button type="button" aria-pressed="' + (k === ST.dist) + '" data-value="' + esc(k) + '">' + esc(GI.shortLabel((META[k] || {}).label || label(k))) + '</button>').join('');
+        GI.ch.none('pp-dist', 'Loading the peer group…');
+        GI.load(GI.ypath('players.json', S)).then(raw => {
+          const cat = GI.catOf(raw);
+          if (!el.isConnected || !cat) { if (el.isConnected) GI.ch.none('pp-dist', 'The season catalogue is not built yet.'); return; }
+          const peers = Object.keys(cat.players).map(id => cat.players[id]).filter(x => x && x.qualified !== false && GI.peerOf(x).id === peer.id);
+          const drawDist = key => {
+            ST.dist = key;
+            const m = META[key] || GI.metaOf(cat.metrics || [])[key] || {};
+            const vs = peers.map(x => (x.values || {})[key]).filter(isNum).sort((a, b) => a - b);
+            const mine = (pctS.values || {})[key];
+            if (vs.length < 5) { GI.ch.none('pp-dist', 'Too few qualified peers yet.'); return; }
+            const med = vs[Math.floor(vs.length / 2)];
+            const n = document.getElementById('pp-dist');
+            if (!n) return;
+            n.classList.remove('gi-chart-empty'); n.innerHTML = '';
+            const c2 = QKC.distribution(n, { values: vs, binCount: 22, lowerBetter: !!m.lower, fmt: v => fv(key, v), xName: (m.label || label(key)) + ' · ' + vs.length + ' qualified peers', yName: 'Players',
+              marks: (isNum(mine) ? [{ x: mine, label: GI.surnameOf(c.name) }] : []).concat([{ x: med, label: 'Median' }]), label: 'Distribution of ' + (m.label || key) });
+            if (c2) GI.onLeave(() => { try { c2.dispose(); } catch (e) { /* gone */ } });
+          };
+          drawDist(ST.dist);
+          QK.seg(segEl, drawDist);
+        });
+      }
     }
     // value
     if (valn) {
-      GI.set('pp-val', GI.kpis([GI.kpi('Projected value', GI.num(valn.value, 0), 'band ' + GI.num(valn.lo, 0) + '–' + GI.num(valn.hi, 0)), GI.kpi('Wins', GI.signed(valn.wins, 2), 'the value in wins'),
+      GI.set('pp-val', GI.kpis([GI.kpi('Wins', GI.signed(valn.wins, 2), 'the projected value in wins', { signal: true }),
         GI.kpi('This season, per game', GI.signed(valn.now_pg, 2), 'points above replacement'), GI.kpi('Level now', GI.signed(valn.lvl, 2), 'per game, this season\'s form')], 'gi-kpis-4'));
       const seasonsV = (res[2].seasons || []).slice(0, (valn.proj || []).length);
       if ((valn.proj || []).length) GI.ch.bar('pp-valc', { cats: seasonsV.map(String), series: [{ name: 'Per game', data: valn.proj }, { name: 'Expected games', data: valn.games || [] }], legend: true, fmt: v => GI.num(v, 1), catName: 'Season', valName: 'Value per game; games', label: 'Projected value per game and games by season' });
@@ -169,7 +200,8 @@ GI.route('player', function (el, params) {
     if ((c.similar || []).length) {
       const sim = c.similar.map(r => (Array.isArray(r) ? { pid: String(r[0]), name: r[1], team: r[2], s: r[3] } : { pid: String(r.pid), name: r.name, team: r.team, s: first(r.sim, r.score) }));
       GI.set('pp-sim', GI.tableHTML([{ label: 'Player', sortable: false }, { label: 'Team', sortable: false }, { label: 'Similarity', align: 'right', sortable: false }, { label: '', sortable: false }],
-        sim.slice(0, 10).map(r => [{ html: GI.playerLink(r.pid, r.name) }, { html: r.team ? GI.teamChip(r.team) : '' }, { html: isNum(r.s) ? '<span class="gi-pbar"><span class="gi-pbar-t"><span style="width:' + Math.max(0, Math.min(100, r.s)) + '%;background:' + esc(col) + '"></span></span><span class="gi-pbar-v">' + GI.num(r.s, 0) + '</span></span>' : '—', v: r.s }, { html: '<a class="gi-more" href="' + GI.compareHref(pid, r.pid) + '">compare</a>' }])));
+        sim.slice(0, 8).map(r => [{ html: GI.playerLink(r.pid, r.name) }, { html: r.team ? GI.teamChip(r.team) : '' }, { html: isNum(r.s) ? '<span class="gi-pbar"><span class="gi-pbar-t"><span style="width:' + Math.max(0, Math.min(100, r.s)) + '%;background:var(--signal)"></span></span><span class="gi-pbar-v">' + GI.num(r.s, 0) + '</span></span>' : '—', v: r.s }, { html: '<a class="gi-more" href="' + GI.compareHref(pid, r.pid) + '">Compare</a>' }])) +
+        (sim.length > 1 ? '<div class="qk-card-foot"><span></span><a href="' + GI.compareHref(pid, sim[0].pid, sim[1].pid) + '">Compare the top two →</a></div>' : ''));
     }
     // position panels
     const log = GI.listOf(now.log).slice().sort((a, b) => (a.week || 0) - (b.week || 0));
@@ -207,9 +239,9 @@ GI.route('player', function (el, params) {
         legend: GI.ch.legend(T, { data: ['Targets', 'EPA per target'] }),
         xAxis: GI.ch.ax(T, { type: 'category', data: r.map(x => dLabel(x.depth)), split: false, line: true, name: 'Air yards', nameLocation: 'middle', nameGap: 26 }),
         yAxis: [GI.ch.ax(T, { name: 'Targets', nameAlign: 'left' }), Object.assign(GI.ch.ax(T, { name: 'EPA per target', nameAlign: 'right', fmt: v => GI.signed(v, 1), split: false }), { position: 'right' })],
-        tooltip: GI.ch.tip(T, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: ps => { const x = r[ps[0].dataIndex]; return GI.ch.thead(esc(dLabel(x.depth))) + GI.ch.trow(T.model, 'Targets', String(first(x.tgt, x.targets))) + GI.ch.trow(T.market, 'EPA per target', GI.signed(x.epa, 2)) + (isNum(x.catch) ? GI.ch.trow(T.ink3, 'Caught', GI.pct(x.catch, 0)) : ''); } }),
+        tooltip: GI.ch.tip(T, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: ps => { const x = r[ps[0].dataIndex]; return GI.ch.thead(esc(dLabel(x.depth))) + GI.ch.trow(T.model, 'Targets', String(first(x.tgt, x.targets))) + GI.ch.trow(T.cat[1], 'EPA per target', GI.signed(x.epa, 2)) + (isNum(x.catch) ? GI.ch.trow(T.ink3, 'Caught', GI.pct(x.catch, 0)) : ''); } }),
         series: [{ type: 'bar', name: 'Targets', data: r.map(x => first(x.tgt, x.targets)), barMaxWidth: 36, itemStyle: { color: T.model, borderRadius: [4, 4, 0, 0] } },
-          { type: 'line', name: 'EPA per target', yAxisIndex: 1, data: r.map(x => x.epa), symbolSize: 8, lineStyle: { color: T.market, width: 2 }, itemStyle: { color: T.market } }]
+          { type: 'line', name: 'EPA per target', yAxisIndex: 1, data: r.map(x => x.epa), symbolSize: 8, lineStyle: { color: T.cat[1], width: 2 }, itemStyle: { color: T.cat[1] } }]
       }), 'Targets by depth');
     }
     if (document.getElementById('pp-fg')) {
@@ -235,9 +267,9 @@ GI.route('player', function (el, params) {
         legend: GI.ch.legend(T, { data: ['Value', 'EPA'] }),
         xAxis: GI.ch.ax(T, { type: 'category', data: seasons.map(r => String(r.season)), split: false, line: true, name: 'Season', nameLocation: 'middle', nameGap: 26 }),
         yAxis: [GI.ch.ax(T, { name: 'Value', nameAlign: 'left' }), Object.assign(GI.ch.ax(T, { name: 'EPA', nameAlign: 'right', split: false }), { position: 'right' })],
-        tooltip: GI.ch.tip(T, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: ps => { const r = seasons[ps[0].dataIndex]; return GI.ch.thead(r.season + ' · ' + esc(GI.teamAbbr(r.team))) + GI.ch.trow(T.model, 'Value', GI.signed(r.value, 1)) + GI.ch.trow(T.market, 'EPA', GI.signed(r.epa, 1)) + GI.ch.trow(T.ink3, 'Games', String(r.games || '—')); } }),
+        tooltip: GI.ch.tip(T, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: ps => { const r = seasons[ps[0].dataIndex]; return GI.ch.thead(r.season + ' · ' + esc(GI.teamAbbr(r.team))) + GI.ch.trow(T.model, 'Value', GI.signed(r.value, 1)) + GI.ch.trow(T.cat[1], 'EPA', GI.signed(r.epa, 1)) + GI.ch.trow(T.ink3, 'Games', String(r.games || '—')); } }),
         series: [{ type: 'bar', name: 'Value', data: seasons.map(r => ({ value: r.value, itemStyle: { color: GI.ch.lift(GI.teamColour(r.team), T), borderRadius: [3, 3, 0, 0] } })), barMaxWidth: 26 },
-          { type: 'line', name: 'EPA', yAxisIndex: 1, data: seasons.map(r => r.epa), symbolSize: 6, lineStyle: { color: T.market, width: 2 }, itemStyle: { color: T.market } }]
+          { type: 'line', name: 'EPA', yAxisIndex: 1, data: seasons.map(r => r.epa), symbolSize: 6, lineStyle: { color: T.cat[1], width: 2 }, itemStyle: { color: T.cat[1] } }]
       }), 'Value and EPA by season');
     } else GI.set('pp-car', GI.muted('No season lines on file yet.'));
     // game log

@@ -373,6 +373,7 @@ def layers_current(b: Build, ctx, cat, prev_cat, res: dict, refresh: bool) -> No
         b.step(f"write {d}{name}.json", lambda: b.write(f"{d}{name}.json", payload))
     if mv:
         logger.info("%s %s moves: %s", league, season, mv.get("info"))
+    b.step(f"movement {league}", lambda: movement_current(b, league, ctx.today))
     rest = b.step(f"fantasy rest factors {league}", lambda: FN.cached_rest(league, season), None)
     prev2 = an.read_json(b.data / league / str(season - 2) / "players.json")
     bt = an.read_json(b.data / league / "fantasy_backtest.json")
@@ -380,6 +381,18 @@ def layers_current(b: Build, ctx, cat, prev_cat, res: dict, refresh: bool) -> No
     b.write_or_fail(d + "fantasy.json", f"fantasy {league} {season}", lambda: FN.build(
         ctx, cat, prev_cat, res["proj"], res["prm"], val if (val or {}).get("ok") else None, res["injuries"], prev2_cat=prev2,
         rest=rest, backtest=summary), league=league, season=season)
+
+
+def movement_current(b: Build, league: str, today) -> None:
+    """<league>/movement.json (analytics/movement.py: chance of moving, outlook, targets), refreshed once a day."""
+    from oddsmarkets.basketball.analytics import movement as MOV
+    rel = f"{league}/movement.json"
+    old = an.read_json(b.data / rel) if (b.data / rel).exists() else None
+    if old and old.get("snapshot") == today.isoformat() and old.get("version") == MOV.VERSION:
+        return
+    pay = MOV.build(league, today)
+    if pay:
+        b.write_if_changed(rel, pay)
 
 
 def value_seasons(b: Build, league: str, seasons: list[int], cats: dict[int, dict], ctx) -> int:

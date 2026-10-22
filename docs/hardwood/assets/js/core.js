@@ -133,7 +133,7 @@ const ALIASES = {
  * #/methodology/<part>, #/<L>/compare/players/<a>/<b>) still render where they are, inside their section. */
 const REDIRECTS = {
   season: ['standings', null], leaders: ['players', 'leaders'], awards: ['players', 'awards'],
-  playoffs: ['standings', 'bracket'], bracket: ['standings', 'bracket'], markets: ['standings', 'markets'],
+  playoffs: ['standings', 'bracket'], bracket: ['standings', 'bracket'], markets: ['model', 'markets'],
   trade: ['value', 'trade'], moves: ['value', 'moves'], calibration: ['model', 'calibration'],
   glossary: ['model', 'glossary'], methodology: ['model', 'methodology'], docs: ['model', 'methodology'],
   hub: ['', null], overview: ['', null], schedule: ['games', null], scores: ['games', null]
@@ -172,7 +172,7 @@ const TITLES = {
   markets: 'Markets', calibration: 'Calibration', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
 };
 /* Which kit section (QK.SECTIONS key) each route belongs to. */
-const SECTION_OF = { hub: 'overview', season: 'standings', standings: 'standings', playoffs: 'standings', markets: 'standings',
+const SECTION_OF = { hub: 'overview', season: 'standings', standings: 'standings', playoffs: 'standings', markets: 'model',
   games: 'fixtures', game: 'fixtures', team: 'teams', teams: 'teams',
   player: 'players', players: 'players', leaders: 'players', awards: 'players',
   value: 'value', trade: 'value', moves: 'value', fantasy: 'fantasy',
@@ -1007,7 +1007,7 @@ function retheme() {
   const T = QKC.tokens();
   C.bg = T.bg; C.bg2 = T.s1; C.bg3 = T.s2; C.border = T.s4;
   C.text = T.ink1; C.text2 = T.ink2; C.text3 = T.ink3;
-  C.blue = T.model; C.orange = T.market; C.green = T.up; C.red = T.down;
+  C.blue = T.model; C.orange = T.cat[1]; C.green = T.up; C.red = T.down;   // T.market is a quiet grey in v2: never a generic second colour
   DARK_LAYOUT.font = { color: T.ink2, family: T.fontUI, size: 11 };
   DARK_LAYOUT.xaxis = { gridcolor: T.grid, zerolinecolor: T.axis, linecolor: T.axis, tickfont: { family: T.fontNum, color: T.ink3 } };
   DARK_LAYOUT.yaxis = { gridcolor: T.grid, zerolinecolor: T.axis, linecolor: T.axis, tickfont: { family: T.fontNum, color: T.ink3 } };

@@ -69,6 +69,7 @@ function calibration(el) {
         right: '<select class="qk-select" id="cal-season" aria-label="Season"><option value="">All seasons</option>' + Object.keys(d.per_season || {}).sort().reverse().map(function (y) { return '<option value="' + esc(y) + '">' + esc(y) + '</option>'; }).join('') + '</select>' }) +
       PD.card('Reliability bins', 'The numbers behind the diagrams, with ±2 binomial standard errors.', '<div id="cal-b"></div>', { span: 12, flush: true,
         right: '<div class="pd-toolbar pd-tight"><select class="qk-select" id="cal-bm" aria-label="Model">' + pre.concat(post).map(function (k) { return '<option value="' + esc(k) + '">' + esc(label(k)) + '</option>'; }).join('') + '</select><select class="qk-select" id="cal-be" aria-label="Event">' + EVENTS.map(function (e) { return '<option value="' + e[0] + '">' + e[1] + '</option>'; }).join('') + '</select></div>' }) +
+      PD.card('Title chances: ours and the market', 'For reference only: our chance from the season simulation beside the Kalshi / Polymarket number (two-sided mids averaged across sources, then de-vigged). Both titles, top eight by our chance.', '<div id="cal-mk"></div>', { span: 12, flush: true }) +
       PD.card('Baselines', 'What the simulator has to beat.', '<div class="pd-prose"><ul><li><b>Grid order</b> (after qualifying): p = sigmoid(a + b × grid slot), fitted by maximum likelihood on previous seasons, rescaled so the field sums to 1 / 3 / 10 for win / podium / points.</li>' +
         '<li><b>Previous results</b>: each driver’s frequency of the event in his last 5 starts, shrunk to the field base rate with 2 pseudo-starts.</li><li><b>Field Elo</b>: Elo before the race as Plackett-Luce log-strengths θ = Elo × ln 10 / 400.</li>' +
         '<li><b>Plackett-Luce</b>: strengths fitted to earlier finishing orders (this season weight 1, last season 0.35, two back 0.12).</li></ul><p>Details in the <a href="#/methodology">methodology</a>.</p></div>', { span: 12 }), 'pd-mt'));
@@ -113,6 +114,32 @@ function calibration(el) {
     };
     document.getElementById('cal-bm').onchange = drawB; document.getElementById('cal-be').onchange = drawB;
     drawB();
+    marketRef();
+  });
+}
+
+/* The market as a named, muted reference column beside our title chance (STYLE_GUIDE §8: allowed on the Model page). */
+function marketRef() {
+  var y = PD.currentSeason();
+  return Promise.all([PD.load('markets.json'), PD.load(y + '/season.json')]).then(function (arr) {
+    var host = document.getElementById('cal-mk');
+    if (!host) return;
+    var mk = arr[0] || {}, season = arr[1], ch = PD.ok(season) ? season.championship : null;
+    if (!ch) { host.innerHTML = PD.muted('No season simulation is running, so there is nothing to set beside the market.'); return; }
+    var rows = [];
+    [['drivers', 'drivers_title', 'Drivers'], ['constructors', 'constructors_title', 'Constructors']].forEach(function (k) {
+      var c = ch[k[0]] || {}, m = mk[k[1]] || {}, q = m.available ? (m.prices || {}) : {};
+      Object.keys(c).sort(function (a, b) { return c[b].p_title - c[a].p_title; }).slice(0, 8).forEach(function (id) {
+        rows.push({ kind: k[2], id: id, isD: k[0] === 'drivers', ours: c[id].p_title, mkt: isNum(q[id]) ? q[id] : null, src: (m.sources || []).join(' / ') });
+      });
+    });
+    PD.table(host, [
+      { key: 'kind', label: 'Title' },
+      { key: 'name', label: 'Driver or team', sticky: true, fmt: function (v, r) { return r.isD ? PD.driverLink(r.id) : PD.teamLink(r.id); } },
+      { key: 'ours', label: 'Our chance', num: true, fmt: function (v) { return '<b class="pd-ours">' + PD.pct(v, v > 0.99 ? 2 : 1) + '</b>'; } },
+      { key: 'mkt', label: 'Market (Kalshi / Polymarket)', num: true, tip: 'The prediction-market number, de-vigged; a reference, not a forecast of ours', fmt: function (v) { return isNum(v) ? '<span class="qk-muted">' + PD.pct(v, 1) + '</span>' : '<span class="qk-muted">—</span>'; } }
+    ], rows.map(function (r) { return Object.assign({ name: r.isD ? PD.driverName(r.id) : PD.teamName(r.id) }, r); }), { sort: null });
+    host.insertAdjacentHTML('beforeend', '<p class="pd-cap pd-pad">' + (mk.updated_at ? 'Market numbers fetched ' + esc(PD.fmtStamp(mk.updated_at)) + '. ' : '') + 'A dash means no two-sided market was published for that runner.</p>');
   });
 }
 
@@ -140,6 +167,14 @@ function methodology(el, params) {
 // ── glossary ──────────────────────────────────────────────────────────────
 
 function slug(s) { return String(s || 'group').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+/* Display-only copy for builder glossary text (STYLE_GUIDE §8): the betting term "edge" is no longer used on the site;
+ * two market terms are reworded; anything else goes through PD.v2.copy. */
+var DROP = { edge: 1 };
+var REWORD = {
+  de_vig: 'Market probabilities quoted across a field add up to more than 100% (the market’s margin). De-vigging rescales them so they sum to one: p_i = q_i / the sum of every q.',
+  midpoint: 'The number used from a prediction market: the mid of the best bid and best ask, only when both exist and the spread is at most 12 cents. A last trade is never used.'
+};
+function v2entry(e) { var o = Object.assign({}, e); o.desc = REWORD[o.key] || PD.v2.copy(o.desc); return o; }
 function glossary(el, params) {
   var key = params.key || '';
   el.innerHTML = PD.pageHead('Every metric and model term', 'Glossary', 'How each is computed is in the methodology.') + nav('glossary') + '<div id="gl-body">' + PD.empty('Loading the glossary', '') + '</div>';
@@ -152,9 +187,9 @@ function glossary(el, params) {
     });
     return ready.then(function (G) {
       if (!PD.alive(el)) return;
-      var groups = (G.groups || []).map(function (x) { return { name: x.name, sl: slug(x.name), entries: x.entries || [], model: false }; });
+      var groups = (G.groups || []).map(function (x) { return { name: x.name, sl: slug(x.name), entries: (x.entries || []).map(v2entry), model: false }; });
       var mg = [];
-      (G.model || []).forEach(function (t) { var n = t.group || 'Model'; var grp = mg.filter(function (x) { return x.name === n; })[0]; if (!grp) { grp = { name: n, sl: 'model-' + slug(n), entries: [], model: true }; mg.push(grp); } grp.entries.push(t); });
+      (G.model || []).filter(function (t) { return t && !DROP[t.key]; }).map(v2entry).forEach(function (t) { var n = t.group || 'Model'; var grp = mg.filter(function (x) { return x.name === n; })[0]; if (!grp) { grp = { name: n, sl: 'model-' + slug(n), entries: [], model: true }; mg.push(grp); } grp.entries.push(t); });
       var all = groups.concat(mg.map(function (x) { return Object.assign(x, { name: 'Model terms: ' + x.name }); }));
       var total = all.reduce(function (s, x) { return s + x.entries.length; }, 0);
       var tag = function (e) { var t = []; if (e.fmt === 'pct') t.push('%'); else if (e.fmt === 'prob') t.push('probability'); else if (e.fmt === 'int') t.push('count'); else if (e.fmt === 'ms' || e.fmt === 'gap') t.push('time'); if (e.lower) t.push('lower is better'); if (e.scope) t.push(String(e.scope)); return t.map(function (x) { return '<span class="qk-badge">' + esc(x) + '</span>'; }).join(''); };

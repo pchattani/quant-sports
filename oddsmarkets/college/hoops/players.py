@@ -88,6 +88,105 @@ def box_rows(level: str, season: int, st: dict | None = None) -> dict:
             "starter": np.array(starter, bool), "X": np.array(X, float).reshape(n, len(STATS)), "team_tot": tt}
 
 
+FLOOR_TERMS = ("poss", "ast_den", "orb_av", "drb_av", "opp2pa")
+# rate fields (players.json `values`, docs/_design/metrics/college.json): per 100 possessions on the floor and shares
+RATE_KEYS = ("pts100", "ts_add", "efg", "tpar", "ftr", "fta100", "ast_pct", "tov_pct", "ast_tov", "orb_pct", "drb_pct",
+             "trb_pct", "stl_pct", "blk_pct", "pf100")
+ROLE_FEATURES = (("trb100", 1.0), ("blk100", 1.0), ("tpar", -1.0), ("ast100", -1.0))
+ROLE_LABEL = {"G": "Guards", "W": "Wings", "B": "Bigs"}
+
+
+def floor_terms(br: dict) -> np.ndarray:
+    """(n, len(FLOOR_TERMS)) on-floor denominators per player-game row of `box_rows`, from the game's two team totals
+    (every row of the game, so before any Division I filter). With f = seconds / (team seconds / 5), the player's
+    share of the team's floor time: poss = f x game possessions (mean of the two teams' FGA - OREB + TOV + 0.475 FTA,
+    team turnovers included), ast_den = f x team FGM - own FGM, orb_av = f x (team OREB + opponent DREB), drb_av =
+    f x (team DREB + opponent OREB), opp2pa = f x opponent two-point attempts (the Basketball-Reference rate forms)."""
+    n = len(br["pid"])
+    out = np.zeros((n, len(FLOOR_TERMS)))
+    if not n:
+        return out
+    ix: dict = {}
+    kid = np.array([ix.setdefault((g, t), len(ix)) for g, t in zip(br["gid"], br["tid"])], int)
+    T = np.zeros((len(ix), len(STATS)))
+    np.add.at(T, kid, br["X"])
+    keys = list(ix)
+    s = {k: i for i, k in enumerate(STATS)}
+    tov = np.array([max(T[i, s["tov"]], float((br["team_tot"].get(k) or {}).get("tov") or 0.0)) for i, k in enumerate(keys)])
+    opp = np.full(len(keys), -1)
+    by_game = defaultdict(list)
+    for i, (g, _t) in enumerate(keys):
+        by_game[g].append(i)
+    for ids in by_game.values():
+        if len(ids) == 2:
+            opp[ids[0]], opp[ids[1]] = ids[1], ids[0]
+    ok = opp >= 0
+    O = np.where(ok[:, None], T[np.where(ok, opp, 0)], np.nan)
+    tov_o = np.where(ok, tov[np.where(ok, opp, 0)], np.nan)
+    poss = 0.5 * ((T[:, s["fga"]] - T[:, s["oreb"]] + tov + 0.475 * T[:, s["fta"]])
+                  + (O[:, s["fga"]] - O[:, s["oreb"]] + tov_o + 0.475 * O[:, s["fta"]]))
+    tsec = T[:, s["sec"]]
+    X = br["X"]
+    f = np.where(tsec[kid] > 0, X[:, s["sec"]] / (tsec[kid] / 5.0), 0.0)
+    out[:, 0] = f * poss[kid]
+    out[:, 1] = f * T[kid, s["fgm"]] - X[:, s["fgm"]]
+    out[:, 2] = f * (T[kid, s["oreb"]] + O[kid, s["dreb"]])
+    out[:, 3] = f * (T[kid, s["dreb"]] + O[kid, s["oreb"]])
+    out[:, 4] = f * (O[kid, s["fga"]] - O[kid, s["tpa"]])
+    return np.nan_to_num(out, nan=0.0)
+
+
+def rates(sx: dict, fl: dict, lg_ts: float) -> dict:
+    """Rate fields (RATE_KEYS) from a player's summed box line `sx` (STATS keys) and summed floor terms `fl`
+    (FLOOR_TERMS keys); None where the denominator is empty."""
+    def d(a, b, k=1.0):
+        return k * a / b if b and b > 0 else None
+    tsa = sx["fga"] + 0.475 * sx["fta"]
+    reb = sx["oreb"] + sx["dreb"]
+    return {"pts100": d(sx["pts"], fl["poss"], 100.0), "ts_add": d(sx["pts"] - lg_ts * 2 * tsa, fl["poss"], 100.0),
+            "efg": d(sx["fgm"] + 0.5 * sx["tpm"], sx["fga"]), "tpar": d(sx["tpa"], sx["fga"]), "ftr": d(sx["fta"], sx["fga"]),
+            "fta100": d(sx["fta"], fl["poss"], 100.0), "ast_pct": d(sx["ast"], fl["ast_den"]),
+            "tov_pct": d(sx["tov"], tsa + sx["tov"]), "ast_tov": d(sx["ast"], sx["tov"]),
+            "orb_pct": d(sx["oreb"], fl["orb_av"]), "drb_pct": d(sx["dreb"], fl["drb_av"]),
+            "trb_pct": d(reb, fl["orb_av"] + fl["drb_av"]), "stl_pct": d(sx["stl"], fl["poss"]), "blk_pct": d(sx["blk"], fl["opp2pa"]),
+            "pf100": d(sx["pf"], fl["poss"], 100.0),
+            # role features only (not published)
+            "trb100": d(reb, fl["poss"], 100.0), "blk100": d(sx["blk"], fl["poss"], 100.0), "ast100": d(sx["ast"], fl["poss"], 100.0)}
+
+
+def classify_roles(rows: dict, qual: set) -> tuple[dict[str, str], float | None]:
+    """({pid: "G"|"W"|"B"}, threshold): the Hardwood rule (basketball value.classify_roles) on college box rates, without
+    rim frequency (no shot locations in college box scores). G = listed G; B = listed C, or a listed F (150+ minutes)
+    whose profile z(rebounds/100) + z(blocks/100) - z(3PA rate) - z(assists/100), standardised over qualified players,
+    is above the midpoint of the qualified guards' and centres' means; every other F is a wing."""
+    def feat(r, k):
+        v = (r.get("rates") or {}).get(k)
+        return float(v) if v is not None and math.isfinite(v) else None
+    st = {}
+    for k, _sg in ROLE_FEATURES:
+        xs = [x for x in (feat(rows[p], k) for p in qual if p in rows) if x is not None]
+        if len(xs) >= 10:
+            sd = float(np.std(xs))
+            st[k] = (float(np.mean(xs)), sd if sd > 0 else 1.0)
+
+    def score(r):
+        v = [sg * (feat(r, k) - st[k][0]) / st[k][1] for k, sg in ROLE_FEATURES if k in st and feat(r, k) is not None]
+        return sum(v) if v else None
+    gs = [x for x in (score(rows[p]) for p in qual if p in rows and rows[p]["pos"] == "G") if x is not None]
+    cs = [x for x in (score(rows[p]) for p in qual if p in rows and rows[p]["pos"] == "C") if x is not None]
+    thr = (float(np.mean(gs)) + float(np.mean(cs))) / 2.0 if gs and cs else None
+    out = {}
+    for p, r in rows.items():
+        if r["pos"] == "G":
+            out[p] = "G"
+        elif r["pos"] == "C":
+            out[p] = "B"
+        else:
+            sc = score(r) if thr is not None and r["min"] >= 150 else None
+            out[p] = "B" if sc is not None and sc > thr else "W"
+    return out, (None if thr is None else round(thr, 3))
+
+
 def position(level: str, pinfo: dict | None, per40: dict | None = None) -> str:
     p = canon.pool(level, (pinfo or {}).get("pos")) or (pinfo or {}).get("pool")
     if p in ("G", "F", "C"):
@@ -106,11 +205,13 @@ def season_players(level: str, season: int, ratings: dict[str, dict], br: dict |
     `ratings`: {tid: {"rating","tempo"}} season-end team ratings. Returns {"rows": {pid: ROW}, "params": {...}}."""
     st = st if st is not None else D.load(level, season)
     br = br if br is not None else box_rows(level, season, st)
+    FL = floor_terms(br)                                # every row of each game (opponent totals), before the filter
     if len(br["pid"]):
         # Division I players only: rows of non-member opponents (D-II, NAIA ... on a D-I schedule) are dropped
         keep = np.array([t in ratings for t in br["tid"]], bool)
         if not keep.all():
             br = {k: (v[keep] if isinstance(v, np.ndarray) else v) for k, v in br.items()}
+            FL = FL[keep]
     if not len(br["pid"]):
         return {"rows": {}, "params": None}
     keys = defaultdict(list)
@@ -176,10 +277,14 @@ def season_players(level: str, season: int, ratings: dict[str, dict], br: dict |
         tot[t][1] += v["fta"]
         tot[t][2] += v["tov"]
         tot[t][3] += v["sec"]
+    Xall = br["X"]
+    lg_tsa = float(Xall[:, STATS.index("fga")].sum() + 0.475 * Xall[:, STATS.index("fta")].sum())
+    lg_ts = float(Xall[:, STATS.index("pts")].sum()) / (2.0 * lg_tsa) if lg_tsa > 0 else 0.5
     for p, lst in per_p.items():
         lst.sort(key=lambda x: -x[1]["min"])
         t0 = lst[0][0]
         X = sum(s["X"] for _, s in lst)
+        fl = dict(zip(FLOOR_TERMS, sum(FL[s["games"]].sum(0) for _, s in lst)))
         mins = X[0] / 60.0
         gp = sum(s["gp"] for _, s in lst)
         var = 0.0
@@ -199,12 +304,13 @@ def season_players(level: str, season: int, ratings: dict[str, dict], br: dict |
                    "pos": position(level, pi, per40), "class": pi.get("class"), "gp": gp, "gs": sum(s["gs_starts"] for _, s in lst),
                    "min": mins, "tot": sx, "r": r_p, "value": var, "value_pg": var / max(gp, 1),
                    "usg": usg, "ts": sx["pts"] / (2 * (sx["fga"] + 0.475 * sx["fta"])) if (sx["fga"] + sx["fta"]) > 0 else None,
-                   "ortg": 100.0 * sx["pts"] / used if used > 0 else None}
+                   "ortg": 100.0 * sx["pts"] / used if used > 0 else None,
+                   "rates": rates(sx, fl, lg_ts)}
     vals = sorted(r["value"] for r in rows.values())
     for r in rows.values():
         r["pctl"] = round(100.0 * np.searchsorted(vals, r["value"], side="right") / len(vals), 1)
     return {"rows": rows, "params": {"a": round(a, 4), "league_g": round(lg_g, 3), "repl": round(repl, 3), "k_min": K_MIN,
-                                     "n_players": len(rows)}}
+                                     "n_players": len(rows), "league_ts": round(lg_ts, 4)}}
 
 
 def per_game_line(r: dict) -> dict:
@@ -218,7 +324,17 @@ def per_game_line(r: dict) -> dict:
             "ft_pct": round(t["ftm"] / t["fta"], 3) if t["fta"] else None,
             "ts": round(r["ts"], 3) if r.get("ts") is not None else None,
             "usg": round(r["usg"], 1) if r.get("usg") is not None else None,
-            "ortg": round(r["ortg"], 1) if r.get("ortg") is not None else None}
+            "ortg": round(r["ortg"], 1) if r.get("ortg") is not None else None,
+            **rate_line(r)}
+
+
+RATE_DP = {"pts100": 1, "ts_add": 2, "fta100": 1, "pf100": 1, "ast_tov": 2}
+
+
+def rate_line(r: dict) -> dict:
+    """The published rate fields (RATE_KEYS) of a player row, rounded (fractions 3 dp, per 100 1 dp, ratios 2 dp)."""
+    rt = r.get("rates") or {}
+    return {k: (round(rt[k], RATE_DP.get(k, 3)) if rt.get(k) is not None and math.isfinite(rt[k]) else None) for k in RATE_KEYS}
 
 
 def why(r: dict, params: dict) -> str:

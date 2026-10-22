@@ -1,0 +1,1931 @@
+{
+ "sport": "f1",
+ "site": "paddock",
+ "schema_version": 1,
+ "generated": "2026-10-22",
+ "leagues": [
+  "f1"
+ ],
+ "payloads": {
+  "drivers": "data/<year>/drivers.json -> drivers{driverId}.values (pct, pct_teammate alongside)",
+  "teams": "data/<year>/teams.json -> teams{constructorId}.values (pct alongside)"
+ },
+ "method": {
+  "seasons": "1996-2026 (2026 to round 17); OpenF1 and telemetry metrics 2023 on",
+  "standardise": "z within season among the qualifying peer group, then pooled",
+  "yoy": "season t v t+1, drivers with 8+ starts in both; constructors mapped through renames",
+  "split_half": "drivers and constructors: odd v even rounds, Spearman-Brown corrected; the decomposition refitted on each half",
+  "orientation": "predictive r is oriented: positive = better now goes with better next season",
+  "benchmarks": {
+   "next-season race driver rating autocorrelation": {
+    "r": 0.405,
+    "n": 500,
+    "r_changers": 0.068,
+    "n_changers": 117
+   },
+   "next-season qualifying driver rating autocorrelation": {
+    "r": 0.361,
+    "n": 500,
+    "r_changers": 0.194,
+    "n_changers": 117
+   },
+   "next-season team points share autocorrelation": {
+    "r": 0.342,
+    "n": 457,
+    "r_changers": 0.085,
+    "n_changers": 97
+   },
+   "next-season points per race autocorrelation": {
+    "r": 0.74,
+    "n": 500,
+    "r_changers": 0.338,
+    "n_changers": 117
+   },
+   "constructors second-half points per race from first half": 0.93,
+   "constructors next-season points per race": 0.8
+  }
+ },
+ "groups": [
+  {
+   "id": "drivers",
+   "entity": "driver",
+   "display": "Drivers",
+   "peer_group": "every race driver in the season with the minimum starts; team-mate percentiles (pct_teammate) compare only drivers who shared the car",
+   "position_field": null,
+   "position_codes": [],
+   "minimum": {
+    "field": "races",
+    "value": 8,
+    "unit": "starts",
+    "note": "in an unfinished season: max(3, min(8, ceil(0.35 x rounds completed))). Percentiles are computed among qualifying drivers from values (the payload pct includes one-race stand-ins)"
+   },
+   "basis": "per start (rates) and per lap (pace)",
+   "metrics": [
+    {
+     "id": "driver_effect",
+     "display": "Race driver rating",
+     "unit": "% of lap",
+     "direction": "lower",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "The driver's own share of race pace once the car is taken out: how much faster or slower than his team-mate, per lap. Negative is faster.",
+     "in_payload": true,
+     "team_mate_relative": true,
+     "reliability": {
+      "yoy_r": 0.41,
+      "yoy_r_team_changers": 0.07,
+      "yoy_r_stayers": 0.52,
+      "split_half_r": 0.79,
+      "n_pairs": 500,
+      "m50": 4.9,
+      "m50_unit": "races",
+      "m50_yoy": 26.6,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season race driver rating (team-mate relative)",
+      "r": 0.41,
+      "n": 500,
+      "r_team_changers": 0.07,
+      "n_team_changers": 117,
+      "r_next_team_points_share": 0.28,
+      "r_next_points_per_race": 0.18
+     },
+     "redundant_with": {
+      "id": "race_pace_tm_delta",
+      "r": 0.95
+     }
+    },
+    {
+     "id": "quali_driver_effect",
+     "display": "Qualifying driver rating",
+     "unit": "% of lap",
+     "direction": "lower",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "The same split for one-lap pace: the driver's qualifying speed with the car removed. Negative is faster.",
+     "in_payload": true,
+     "team_mate_relative": true,
+     "reliability": {
+      "yoy_r": 0.36,
+      "yoy_r_team_changers": 0.19,
+      "yoy_r_stayers": 0.41,
+      "split_half_r": 0.8,
+      "n_pairs": 500,
+      "m50": 4.4,
+      "m50_unit": "races",
+      "m50_yoy": 32.1,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season race driver rating (team-mate relative)",
+      "r": 0.39,
+      "n": 500,
+      "r_team_changers": 0.13,
+      "n_team_changers": 117,
+      "r_next_team_points_share": 0.38,
+      "r_next_points_per_race": 0.17
+     },
+     "redundant_with": {
+      "id": "quali_gap_tm_pct",
+      "r": 0.87
+     }
+    },
+    {
+     "id": "race_h2h",
+     "display": "Race head-to-head",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Share of races he finished ahead of his team-mate, the one rival in identical machinery.",
+     "in_payload": true,
+     "team_mate_relative": true,
+     "reliability": {
+      "yoy_r": 0.38,
+      "yoy_r_team_changers": -0.1,
+      "yoy_r_stayers": 0.5,
+      "split_half_r": 0.55,
+      "n_pairs": 500,
+      "m50": 15.0,
+      "m50_unit": "races",
+      "m50_yoy": 30.1,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season race driver rating (team-mate relative)",
+      "r": 0.34,
+      "n": 500,
+      "r_team_changers": -0.06,
+      "n_team_changers": 117,
+      "r_next_team_points_share": 0.34,
+      "r_next_points_per_race": 0.18
+     },
+     "redundant_with": {
+      "id": "race_pace_h2h",
+      "r": 0.69
+     }
+    },
+    {
+     "id": "team_points_share",
+     "display": "Share of team points",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "His share of everything the team scored: how much of the car's haul he turned into points.",
+     "in_payload": true,
+     "team_mate_relative": true,
+     "reliability": {
+      "yoy_r": 0.34,
+      "yoy_r_team_changers": 0.09,
+      "yoy_r_stayers": 0.43,
+      "split_half_r": 0.6,
+      "n_pairs": 457,
+      "m50": 12.1,
+      "m50_unit": "races",
+      "m50_yoy": 34.9,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season race driver rating (team-mate relative)",
+      "r": 0.31,
+      "n": 475,
+      "r_team_changers": 0.11,
+      "n_team_changers": 110,
+      "r_next_team_points_share": 0.34,
+      "r_next_points_per_race": 0.14
+     },
+     "redundant_with": {
+      "id": "race_h2h",
+      "r": 0.65
+     }
+    },
+    {
+     "id": "race_pace",
+     "display": "Race pace v field",
+     "unit": "s/lap",
+     "direction": "lower",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Fuel- and tyre-corrected lap time against the field average. Car and driver together. Negative is faster.",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.73,
+      "yoy_r_team_changers": 0.34,
+      "yoy_r_stayers": 0.82,
+      "split_half_r": 0.97,
+      "n_pairs": 500,
+      "m50": 0.5,
+      "m50_unit": "races",
+      "m50_yoy": 6.6,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": 0.68,
+      "n": 500,
+      "r_team_changers": 0.34,
+      "n_team_changers": 117,
+      "r_next_driver_rating": 0.16
+     },
+     "redundant_with": {
+      "id": "race_pace_pct",
+      "r": 1.0
+     }
+    },
+    {
+     "id": "points_per_race",
+     "display": "Points per race",
+     "unit": "pts",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Championship points per start, sprints included. The bottom line, car and driver together.",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.74,
+      "yoy_r_team_changers": 0.34,
+      "yoy_r_stayers": 0.79,
+      "split_half_r": 0.95,
+      "n_pairs": 500,
+      "m50": 1.0,
+      "m50_unit": "races",
+      "m50_yoy": 6.4,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": 0.74,
+      "n": 500,
+      "r_team_changers": 0.34,
+      "n_team_changers": 117,
+      "r_next_driver_rating": 0.19
+     },
+     "redundant_with": {
+      "id": "points",
+      "r": 1.0
+     }
+    },
+    {
+     "id": "elo_teammate",
+     "display": "Team-mate Elo",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "A career rating built only from head-to-heads with team-mates, so a fast car cannot lift it.",
+     "in_payload": true,
+     "team_mate_relative": true,
+     "reliability": {
+      "yoy_r": 0.84,
+      "yoy_r_team_changers": 0.79,
+      "yoy_r_stayers": 0.85,
+      "split_half_r": null,
+      "n_pairs": 500,
+      "m50": null,
+      "m50_unit": "races",
+      "m50_yoy": null,
+      "first_season": 1996,
+      "note": "Season-end rating carried over from previous seasons, so its YoY r is inflated by construction; no split-half."
+     },
+     "predictive": {
+      "target": "next-season race driver rating (team-mate relative)",
+      "r": 0.33,
+      "n": 500,
+      "r_team_changers": 0.08,
+      "n_team_changers": 117,
+      "r_next_team_points_share": 0.3,
+      "r_next_points_per_race": 0.48
+     },
+     "redundant_with": {
+      "id": "race_h2h",
+      "r": 0.67
+     }
+    },
+    {
+     "id": "lap1_gain",
+     "display": "Lap-1 gain",
+     "unit": "places",
+     "direction": "higher",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Places gained from the grid to the end of lap one: starts and first-lap racecraft.",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.32,
+      "yoy_r_team_changers": 0.27,
+      "yoy_r_stayers": 0.34,
+      "split_half_r": 0.47,
+      "n_pairs": 500,
+      "m50": 20.2,
+      "m50_unit": "races",
+      "m50_yoy": 38.5,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": -0.28,
+      "n": 500,
+      "r_team_changers": -0.18,
+      "n_team_changers": 117,
+      "r_next_driver_rating": -0.03
+     },
+     "redundant_with": {
+      "id": "pos_gained",
+      "r": 0.6
+     }
+    },
+    {
+     "id": "quali_h2h",
+     "display": "Qualifying head-to-head",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Share of qualifying sessions he beat his team-mate.",
+     "in_payload": true,
+     "team_mate_relative": true,
+     "reliability": {
+      "yoy_r": 0.4,
+      "yoy_r_team_changers": 0.02,
+      "yoy_r_stayers": 0.51,
+      "split_half_r": 0.79,
+      "n_pairs": 500,
+      "m50": 4.9,
+      "m50_unit": "races",
+      "m50_yoy": 27.5,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season race driver rating (team-mate relative)",
+      "r": 0.34,
+      "n": 500,
+      "r_team_changers": 0.01,
+      "n_team_changers": 117,
+      "r_next_team_points_share": 0.32,
+      "r_next_points_per_race": 0.14
+     },
+     "redundant_with": {
+      "id": "quali_gap_tm_pct",
+      "r": -0.92
+     }
+    },
+    {
+     "id": "quali_gap_tm_pct",
+     "display": "Qualifying gap to team-mate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Median gap to the team-mate's best lap in the same segment, % of the lap. Negative is faster.",
+     "in_payload": true,
+     "team_mate_relative": true,
+     "reliability": {
+      "yoy_r": 0.36,
+      "yoy_r_team_changers": 0.06,
+      "yoy_r_stayers": 0.46,
+      "split_half_r": 0.82,
+      "n_pairs": 500,
+      "m50": 4.1,
+      "m50_unit": "races",
+      "m50_yoy": 32.8,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season race driver rating (team-mate relative)",
+      "r": 0.36,
+      "n": 500,
+      "r_team_changers": 0.09,
+      "n_team_changers": 117,
+      "r_next_team_points_share": 0.35,
+      "r_next_points_per_race": 0.13
+     },
+     "redundant_with": {
+      "id": "quali_gap_tm_ms",
+      "r": 1.0
+     }
+    },
+    {
+     "id": "race_pace_tm_delta",
+     "display": "Race pace v team-mate",
+     "unit": "s/lap",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Corrected race pace minus the team-mate's in the same race.",
+     "in_payload": true,
+     "team_mate_relative": true,
+     "reliability": {
+      "yoy_r": 0.4,
+      "yoy_r_team_changers": 0.01,
+      "yoy_r_stayers": 0.54,
+      "split_half_r": 0.77,
+      "n_pairs": 500,
+      "m50": 5.3,
+      "m50_unit": "races",
+      "m50_yoy": 27.2,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season race driver rating (team-mate relative)",
+      "r": 0.4,
+      "n": 500,
+      "r_team_changers": 0.03,
+      "n_team_changers": 117,
+      "r_next_team_points_share": 0.29,
+      "r_next_points_per_race": 0.16
+     },
+     "redundant_with": {
+      "id": "driver_effect",
+      "r": 0.95
+     }
+    },
+    {
+     "id": "race_pace_h2h",
+     "display": "Race-pace head-to-head",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Share of races his corrected pace beat his team-mate's.",
+     "in_payload": true,
+     "team_mate_relative": true,
+     "reliability": {
+      "yoy_r": 0.4,
+      "yoy_r_team_changers": 0.06,
+      "yoy_r_stayers": 0.51,
+      "split_half_r": 0.73,
+      "n_pairs": 500,
+      "m50": 6.7,
+      "m50_unit": "races",
+      "m50_yoy": 27.3,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season race driver rating (team-mate relative)",
+      "r": 0.38,
+      "n": 500,
+      "r_team_changers": 0.01,
+      "n_team_changers": 117,
+      "r_next_team_points_share": 0.32,
+      "r_next_points_per_race": 0.16
+     },
+     "redundant_with": {
+      "id": "race_pace_tm_delta",
+      "r": -0.9
+     }
+    },
+    {
+     "id": "quali_pace",
+     "display": "Qualifying pace v field",
+     "unit": "% of lap",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Corrected one-lap pace against the field mean. Negative is faster.",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.71,
+      "yoy_r_team_changers": 0.39,
+      "yoy_r_stayers": 0.78,
+      "split_half_r": 0.97,
+      "n_pairs": 500,
+      "m50": 0.6,
+      "m50_unit": "races",
+      "m50_yoy": 7.5,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": 0.67,
+      "n": 500,
+      "r_team_changers": 0.38,
+      "n_team_changers": 117,
+      "r_next_driver_rating": 0.16
+     },
+     "redundant_with": {
+      "id": "quali_pace_rank",
+      "r": 0.98
+     }
+    },
+    {
+     "id": "avg_grid",
+     "display": "Average grid",
+     "unit": "position",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Mean starting slot.",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.75,
+      "yoy_r_team_changers": 0.47,
+      "yoy_r_stayers": 0.81,
+      "split_half_r": 0.97,
+      "n_pairs": 500,
+      "m50": 0.6,
+      "m50_unit": "races",
+      "m50_yoy": 5.9,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": 0.7,
+      "n": 500,
+      "r_team_changers": 0.41,
+      "n_team_changers": 117,
+      "r_next_driver_rating": 0.16
+     },
+     "redundant_with": {
+      "id": "avg_quali",
+      "r": 0.99
+     }
+    },
+    {
+     "id": "avg_finish",
+     "display": "Average finish",
+     "unit": "position",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Mean finishing position over classified finishes.",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.74,
+      "yoy_r_team_changers": 0.4,
+      "yoy_r_stayers": 0.81,
+      "split_half_r": 0.95,
+      "n_pairs": 500,
+      "m50": 1.0,
+      "m50_unit": "races",
+      "m50_yoy": 6.4,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": 0.71,
+      "n": 500,
+      "r_team_changers": 0.39,
+      "n_team_changers": 117,
+      "r_next_driver_rating": 0.16
+     },
+     "redundant_with": {
+      "id": "median_finish",
+      "r": 0.99
+     }
+    },
+    {
+     "id": "podium_rate",
+     "display": "Podium rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Top-three finishes per start.",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.69,
+      "yoy_r_team_changers": 0.22,
+      "yoy_r_stayers": 0.74,
+      "split_half_r": 0.92,
+      "n_pairs": 500,
+      "m50": 1.5,
+      "m50_unit": "races",
+      "m50_yoy": 8.2,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": 0.71,
+      "n": 500,
+      "r_team_changers": 0.27,
+      "n_team_changers": 117,
+      "r_next_driver_rating": 0.2
+     },
+     "redundant_with": {
+      "id": "podiums",
+      "r": 1.0
+     }
+    },
+    {
+     "id": "win_rate",
+     "display": "Win rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Wins per start.",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.65,
+      "yoy_r_team_changers": null,
+      "yoy_r_stayers": null,
+      "split_half_r": 0.88,
+      "n_pairs": 500,
+      "m50": 2.5,
+      "m50_unit": "races",
+      "m50_yoy": 9.8,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": 0.62,
+      "n": 500,
+      "r_team_changers": 0.25,
+      "n_team_changers": 117,
+      "r_next_driver_rating": 0.22
+     },
+     "redundant_with": {
+      "id": "wins",
+      "r": 1.0
+     }
+    },
+    {
+     "id": "points_rate",
+     "display": "Points-finish rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Share of starts that scored.",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.68,
+      "yoy_r_team_changers": 0.38,
+      "yoy_r_stayers": 0.75,
+      "split_half_r": 0.91,
+      "n_pairs": 500,
+      "m50": 1.8,
+      "m50_unit": "races",
+      "m50_yoy": 8.6,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": 0.67,
+      "n": 500,
+      "r_team_changers": 0.4,
+      "n_team_changers": 117,
+      "r_next_driver_rating": 0.14
+     },
+     "redundant_with": {
+      "id": "sector_rank",
+      "r": -0.95
+     }
+    },
+    {
+     "id": "q3_rate",
+     "display": "Q3 rate",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "explanation": "Share of qualifying sessions reaching Q3 (2006 on).",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.72,
+      "yoy_r_team_changers": 0.49,
+      "yoy_r_stayers": 0.77,
+      "split_half_r": 0.95,
+      "n_pairs": 337,
+      "m50": 0.9,
+      "m50_unit": "races",
+      "m50_yoy": 6.9,
+      "first_season": 2006
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": 0.68,
+      "n": 337,
+      "r_team_changers": 0.42,
+      "n_team_changers": 67,
+      "r_next_driver_rating": 0.18
+     },
+     "redundant_with": {
+      "id": "avg_quali",
+      "r": -0.96
+     }
+    },
+    {
+     "id": "elo",
+     "display": "Field Elo",
+     "unit": "rating",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "explanation": "Rating of finishing order against the whole field, car included.",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.9,
+      "yoy_r_team_changers": 0.75,
+      "yoy_r_stayers": 0.92,
+      "split_half_r": null,
+      "n_pairs": 500,
+      "m50": null,
+      "m50_unit": "races",
+      "m50_yoy": null,
+      "first_season": 1996,
+      "note": "Season-end rating carried over from previous seasons, so its YoY r is inflated by construction; no split-half."
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": 0.72,
+      "n": 500,
+      "r_team_changers": 0.4,
+      "n_team_changers": 117,
+      "r_next_driver_rating": 0.2
+     },
+     "redundant_with": {
+      "id": "sector_rank",
+      "r": -0.94
+     }
+    },
+    {
+     "id": "pos_gained",
+     "display": "Positions gained",
+     "unit": "places",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "Grid slot minus finishing position over classified finishes.",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.3,
+      "yoy_r_team_changers": 0.1,
+      "yoy_r_stayers": 0.36,
+      "split_half_r": 0.58,
+      "n_pairs": 500,
+      "m50": 12.8,
+      "m50_unit": "races",
+      "m50_yoy": 42.5,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": -0.33,
+      "n": 500,
+      "r_team_changers": -0.28,
+      "n_team_changers": 117,
+      "r_next_driver_rating": -0.04
+     },
+     "redundant_with": {
+      "id": "late_gain",
+      "r": 0.76
+     }
+    },
+    {
+     "id": "dnf_rate",
+     "display": "DNF rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "explanation": "Share of starts that ended unclassified.",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.21,
+      "yoy_r_team_changers": 0.14,
+      "yoy_r_stayers": 0.23,
+      "split_half_r": 0.38,
+      "n_pairs": 500,
+      "m50": 29.7,
+      "m50_unit": "races",
+      "m50_yoy": 67.7,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": 0.38,
+      "n": 500,
+      "r_team_changers": 0.22,
+      "n_team_changers": 117,
+      "r_next_driver_rating": 0.02
+     },
+     "redundant_with": {
+      "id": "finish_rate",
+      "r": -1.0
+     }
+    },
+    {
+     "id": "dnf_driver",
+     "display": "Driver-caused DNFs",
+     "unit": "count",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 15,
+     "basis": "count",
+     "explanation": "Retirements recorded as accident, collision or spin.",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.13,
+      "yoy_r_team_changers": null,
+      "yoy_r_stayers": null,
+      "split_half_r": 0.26,
+      "n_pairs": 447,
+      "m50": 51.1,
+      "m50_unit": "races",
+      "m50_yoy": 122.3,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": 0.22,
+      "n": 466,
+      "r_team_changers": 0.17,
+      "n_team_changers": 110,
+      "r_next_driver_rating": 0.05
+     },
+     "redundant_with": {
+      "id": "laps_share",
+      "r": -0.57
+     }
+    },
+    {
+     "id": "dnf_mech",
+     "display": "Mechanical DNFs",
+     "unit": "count",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 16,
+     "basis": "count",
+     "explanation": "Retirements recorded as mechanical.",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.14,
+      "yoy_r_team_changers": null,
+      "yoy_r_stayers": null,
+      "split_half_r": 0.28,
+      "n_pairs": 447,
+      "m50": 46.7,
+      "m50_unit": "races",
+      "m50_yoy": 113.2,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": 0.23,
+      "n": 466,
+      "r_team_changers": 0.07,
+      "n_team_changers": 110,
+      "r_next_driver_rating": -0.03
+     },
+     "redundant_with": {
+      "id": "finish_rate",
+      "r": -0.7
+     }
+    },
+    {
+     "id": "consistency",
+     "display": "Lap-time scatter",
+     "unit": "s",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 17,
+     "basis": "rate",
+     "explanation": "Spread of clean corrected laps. Lower is steadier.",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.31,
+      "yoy_r_team_changers": 0.19,
+      "yoy_r_stayers": 0.34,
+      "split_half_r": 0.56,
+      "n_pairs": 500,
+      "m50": 14.2,
+      "m50_unit": "races",
+      "m50_yoy": 40.5,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": 0.4,
+      "n": 500,
+      "r_team_changers": 0.38,
+      "n_team_changers": 117,
+      "r_next_driver_rating": 0.11
+     },
+     "redundant_with": {
+      "id": "sector_rank",
+      "r": 0.74
+     }
+    },
+    {
+     "id": "avg_fastest_rank",
+     "display": "Average fastest-lap rank",
+     "unit": "rank",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 18,
+     "basis": "rate",
+     "explanation": "Mean rank of his fastest lap in each race (2004 on).",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.71,
+      "yoy_r_team_changers": 0.33,
+      "yoy_r_stayers": 0.79,
+      "split_half_r": 0.95,
+      "n_pairs": 370,
+      "m50": 1.0,
+      "m50_unit": "races",
+      "m50_yoy": 7.5,
+      "first_season": 2004
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": 0.7,
+      "n": 370,
+      "r_team_changers": 0.35,
+      "n_team_changers": 79,
+      "r_next_driver_rating": 0.17
+     },
+     "redundant_with": {
+      "id": "sector_rank",
+      "r": 0.97
+     }
+    },
+    {
+     "id": "sector_rank",
+     "display": "Personal-best sector rank",
+     "unit": "rank",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 19,
+     "basis": "rate",
+     "explanation": "Mean rank of his best sector times (OpenF1, 2023 on).",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.82,
+      "yoy_r_team_changers": null,
+      "yoy_r_stayers": 0.83,
+      "split_half_r": 0.97,
+      "n_pairs": 53,
+      "m50": 0.6,
+      "m50_unit": "races",
+      "m50_yoy": 3.9,
+      "first_season": 2023
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": 0.82,
+      "n": 53,
+      "r_team_changers": null,
+      "n_team_changers": 7,
+      "r_next_driver_rating": 0.43
+     },
+     "redundant_with": {
+      "id": "quali_pace_rank",
+      "r": 0.98
+     }
+    },
+    {
+     "id": "corner_speed_delta",
+     "display": "Minimum corner speed v field",
+     "unit": "km/h",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 20,
+     "basis": "rate",
+     "explanation": "Median slowest speed through corners against the field (telemetry, 2023 on); mostly the car.",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.77,
+      "yoy_r_team_changers": null,
+      "yoy_r_stayers": 0.8,
+      "split_half_r": 0.85,
+      "n_pairs": 53,
+      "m50": 3.7,
+      "m50_unit": "races",
+      "m50_yoy": 5.4,
+      "first_season": 2023
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": 0.79,
+      "n": 53,
+      "r_team_changers": null,
+      "n_team_changers": 7,
+      "r_next_driver_rating": 0.4
+     },
+     "redundant_with": {
+      "id": "sector_rank",
+      "r": -0.89
+     }
+    },
+    {
+     "id": "overtakes_made",
+     "display": "Overtakes per race",
+     "unit": "per race",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 21,
+     "basis": "rate",
+     "explanation": "On-track passes made per race (OpenF1, 2023 on).",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.16,
+      "yoy_r_team_changers": null,
+      "yoy_r_stayers": 0.13,
+      "split_half_r": 0.35,
+      "n_pairs": 53,
+      "m50": 39.0,
+      "m50_unit": "races",
+      "m50_yoy": 95.1,
+      "first_season": 2023
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": -0.13,
+      "n": 53,
+      "r_team_changers": null,
+      "n_team_changers": 7,
+      "r_next_driver_rating": -0.24
+     },
+     "redundant_with": {
+      "id": "speed_trap_rank",
+      "r": -0.42
+     }
+    },
+    {
+     "id": "net_overtakes",
+     "display": "Net overtakes per race",
+     "unit": "per race",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 22,
+     "basis": "rate",
+     "explanation": "Passes made minus passes suffered, per race (2023 on).",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.24,
+      "yoy_r_team_changers": null,
+      "yoy_r_stayers": 0.3,
+      "split_half_r": 0.66,
+      "n_pairs": 53,
+      "m50": 10.6,
+      "m50_unit": "races",
+      "m50_yoy": 58.0,
+      "first_season": 2023
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": 0.44,
+      "n": 53,
+      "r_team_changers": null,
+      "n_team_changers": 7,
+      "r_next_driver_rating": 0.26
+     },
+     "redundant_with": {
+      "id": "overtakes_suffered",
+      "r": -0.74
+     }
+    },
+    {
+     "id": "tyre_mgmt",
+     "display": "Tyre management index",
+     "unit": "index",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 23,
+     "basis": "rate",
+     "explanation": "Degradation against the field on the same compound.",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.15,
+      "yoy_r_team_changers": -0.06,
+      "yoy_r_stayers": 0.22,
+      "split_half_r": 0.47,
+      "n_pairs": 500,
+      "m50": 20.3,
+      "m50_unit": "races",
+      "m50_yoy": 100.3,
+      "first_season": 1996
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": -0.08,
+      "n": 500,
+      "r_team_changers": 0.19,
+      "n_team_changers": 117,
+      "r_next_driver_rating": 0.01
+     },
+     "redundant_with": {
+      "id": "deg_hard",
+      "r": -0.56
+     }
+    },
+    {
+     "id": "points_v_expected",
+     "display": "Points v expected",
+     "unit": "pts",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 24,
+     "basis": "rate",
+     "explanation": "Points minus the forecast's expected points at lights-out (2025 on).",
+     "in_payload": true,
+     "team_mate_relative": false,
+     "reliability": {
+      "yoy_r": 0.03,
+      "yoy_r_team_changers": null,
+      "yoy_r_stayers": null,
+      "split_half_r": 0.58,
+      "n_pairs": 19,
+      "m50": 14.3,
+      "m50_unit": "races",
+      "m50_yoy": 706.6,
+      "first_season": 2025
+     },
+     "predictive": {
+      "target": "next-season points per race",
+      "r": 0.41,
+      "n": 19,
+      "r_team_changers": null,
+      "n_team_changers": 1,
+      "r_next_driver_rating": 0.51
+     },
+     "redundant_with": {
+      "id": "points_v_expected_pre",
+      "r": 0.97
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "driver_effect",
+     "quali_driver_effect",
+     "race_h2h",
+     "team_points_share",
+     "race_pace",
+     "points_per_race",
+     "elo_teammate",
+     "lap1_gain"
+    ],
+    "standardise": "z within season among qualifying drivers",
+    "weights": "yoy_r floored at 0.2",
+    "weight_values": {
+     "driver_effect": 0.41,
+     "quali_driver_effect": 0.36,
+     "race_h2h": 0.38,
+     "team_points_share": 0.34,
+     "race_pace": 0.73,
+     "points_per_race": 0.74,
+     "elo_teammate": 0.84,
+     "lap1_gain": 0.32
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraint": "driver-seasons 1996 on with all eight features; exclude the driver's own seasons"
+   }
+  },
+  {
+   "id": "constructors",
+   "entity": "constructor",
+   "display": "Constructors",
+   "peer_group": "every constructor in the season that entered at least half the completed rounds",
+   "position_field": null,
+   "position_codes": [],
+   "minimum": {
+    "field": "log",
+    "value": 0.5,
+    "unit": "share of completed rounds entered (len(log) / rounds done)",
+    "note": "renamed entries (Toro Rosso > AlphaTauri > RB, Sauber > Alfa Romeo > Sauber > Audi ...) are the same team for season-to-season views"
+   },
+   "basis": "per round (rates) and per lap (pace)",
+   "metrics": [
+    {
+     "id": "car_race_pace",
+     "display": "Car race pace",
+     "unit": "% of lap",
+     "direction": "lower",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "The car's share of race pace with the drivers taken out, against the field average. Negative is faster.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.82,
+      "split_half_r": 0.99,
+      "h1_h2_r": 0.94,
+      "n_pairs": 310,
+      "m50": 0.3,
+      "m50_unit": "rounds",
+      "m50_yoy": 4.2
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": 0.83,
+      "n": 328,
+      "r_next_season_points_per_race": 0.73
+     },
+     "redundant_with": {
+      "id": "car_pace_latest",
+      "r": 1.0
+     }
+    },
+    {
+     "id": "points_per_race",
+     "display": "Points per race",
+     "unit": "pts",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Constructors' points per round, both cars and sprints included.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.8,
+      "split_half_r": 0.98,
+      "h1_h2_r": 0.93,
+      "n_pairs": 310,
+      "m50": 0.5,
+      "m50_unit": "rounds",
+      "m50_yoy": 4.7
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": 0.93,
+      "n": 328,
+      "r_next_season_points_per_race": 0.8
+     },
+     "redundant_with": {
+      "id": "points",
+      "r": 1.0
+     }
+    },
+    {
+     "id": "dnf_rate",
+     "display": "DNF rate",
+     "unit": "%",
+     "direction": "lower",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Share of the team's starts that ended unclassified: reliability and incidents.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.37,
+      "split_half_r": 0.53,
+      "h1_h2_r": 0.42,
+      "n_pairs": 310,
+      "m50": 16.9,
+      "m50_unit": "rounds",
+      "m50_yoy": 31.8
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": 0.49,
+      "n": 328,
+      "r_next_season_points_per_race": 0.49
+     },
+     "redundant_with": {
+      "id": "finish_rate",
+      "r": -1.0
+     }
+    },
+    {
+     "id": "pit_lane_v_field",
+     "display": "Pit-lane time v field",
+     "unit": "ms",
+     "direction": "lower",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Median time through the pit lane against the race's median, so the circuit's lane length cancels (2011 on).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.77,
+      "split_half_r": 0.88,
+      "h1_h2_r": 0.77,
+      "n_pairs": 154,
+      "m50": 2.7,
+      "m50_unit": "rounds",
+      "m50_yoy": 5.7
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": 0.58,
+      "n": 168,
+      "r_next_season_points_per_race": 0.63
+     },
+     "redundant_with": {
+      "id": "pit_lane_ms",
+      "r": 0.84
+     }
+    },
+    {
+     "id": "pit_under_2500",
+     "display": "Stops under 2.5 s",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Share of stationary times under 2.5 seconds (OpenF1, 2023 on).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.72,
+      "split_half_r": 0.75,
+      "h1_h2_r": 0.69,
+      "n_pairs": 20,
+      "m50": 7.0,
+      "m50_unit": "rounds",
+      "m50_yoy": 7.5
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": 0.75,
+      "n": 21,
+      "r_next_season_points_per_race": 0.8
+     },
+     "redundant_with": {
+      "id": "points",
+      "r": 0.77
+     }
+    },
+    {
+     "id": "strategy_gain",
+     "display": "Places gained through stops",
+     "unit": "places",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Places gained or lost around pit stops against the race's norm, per car-race (2011 on).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.46,
+      "split_half_r": 0.85,
+      "h1_h2_r": 0.67,
+      "n_pairs": 154,
+      "m50": 3.6,
+      "m50_unit": "rounds",
+      "m50_yoy": 22.0
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": 0.21,
+      "n": 168,
+      "r_next_season_points_per_race": 0.29
+     },
+     "redundant_with": {
+      "id": "wins",
+      "r": 0.42
+     }
+    },
+    {
+     "id": "car_quali_pace",
+     "display": "Car qualifying pace",
+     "unit": "% of lap",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "The car's share of one-lap pace. Negative is faster.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.8,
+      "split_half_r": 0.98,
+      "h1_h2_r": 0.94,
+      "n_pairs": 310,
+      "m50": 0.4,
+      "m50_unit": "rounds",
+      "m50_yoy": 4.8
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": 0.81,
+      "n": 317,
+      "r_next_season_points_per_race": 0.72
+     },
+     "redundant_with": {
+      "id": "avg_best_grid",
+      "r": 0.96
+     }
+    },
+    {
+     "id": "car_pace_latest",
+     "display": "Car race pace, latest",
+     "unit": "% of lap",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "The car's race-pace state at the latest round.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.82,
+      "split_half_r": 0.98,
+      "h1_h2_r": 0.95,
+      "n_pairs": 310,
+      "m50": 0.3,
+      "m50_unit": "rounds",
+      "m50_yoy": 4.0
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": 0.83,
+      "n": 328,
+      "r_next_season_points_per_race": 0.74
+     },
+     "redundant_with": {
+      "id": "car_race_pace",
+      "r": 1.0
+     }
+    },
+    {
+     "id": "car_pace_trend",
+     "display": "Car development",
+     "unit": "% of lap",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Car pace over the last third of rounds minus the first third. Negative is improvement.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": -0.01,
+      "split_half_r": 0.49,
+      "h1_h2_r": 0.04,
+      "n_pairs": 310,
+      "m50": 19.2,
+      "m50_unit": "rounds",
+      "m50_yoy": null
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": 0.02,
+      "n": 328,
+      "r_next_season_points_per_race": 0.03
+     },
+     "redundant_with": {
+      "id": "pit_under_2500",
+      "r": 0.39
+     }
+    },
+    {
+     "id": "avg_best_finish",
+     "display": "Average best-car finish",
+     "unit": "position",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Mean finish of the better-placed car.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.84,
+      "split_half_r": 0.97,
+      "h1_h2_r": 0.92,
+      "n_pairs": 310,
+      "m50": 0.5,
+      "m50_unit": "rounds",
+      "m50_yoy": 3.7
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": 0.85,
+      "n": 328,
+      "r_next_season_points_per_race": 0.76
+     },
+     "redundant_with": {
+      "id": "avg_best_grid",
+      "r": 0.97
+     }
+    },
+    {
+     "id": "avg_best_grid",
+     "display": "Average best-car grid",
+     "unit": "position",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Mean grid slot of the better-placed car.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.82,
+      "split_half_r": 0.99,
+      "h1_h2_r": 0.94,
+      "n_pairs": 310,
+      "m50": 0.3,
+      "m50_unit": "rounds",
+      "m50_yoy": 4.0
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": 0.82,
+      "n": 328,
+      "r_next_season_points_per_race": 0.74
+     },
+     "redundant_with": {
+      "id": "avg_best_finish",
+      "r": 0.97
+     }
+    },
+    {
+     "id": "both_points_rate",
+     "display": "Both cars in the points",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Share of rounds in which both cars scored.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.74,
+      "split_half_r": 0.91,
+      "h1_h2_r": 0.83,
+      "n_pairs": 310,
+      "m50": 2.0,
+      "m50_unit": "rounds",
+      "m50_yoy": 6.6
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": 0.84,
+      "n": 328,
+      "r_next_season_points_per_race": 0.75
+     },
+     "redundant_with": {
+      "id": "points",
+      "r": 0.94
+     }
+    },
+    {
+     "id": "wins",
+     "display": "Wins",
+     "unit": "count",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "count",
+     "explanation": "Grand Prix wins.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.71,
+      "split_half_r": 0.94,
+      "h1_h2_r": 0.84,
+      "n_pairs": 310,
+      "m50": 1.3,
+      "m50_unit": "rounds",
+      "m50_yoy": 7.7
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": 0.82,
+      "n": 328,
+      "r_next_season_points_per_race": 0.7
+     },
+     "redundant_with": {
+      "id": "poles",
+      "r": 0.93
+     }
+    },
+    {
+     "id": "podiums",
+     "display": "Podiums",
+     "unit": "count",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "count",
+     "explanation": "Podium finishes by either car.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.76,
+      "split_half_r": 0.97,
+      "h1_h2_r": 0.89,
+      "n_pairs": 310,
+      "m50": 0.6,
+      "m50_unit": "rounds",
+      "m50_yoy": 6.0
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": 0.89,
+      "n": 328,
+      "r_next_season_points_per_race": 0.77
+     },
+     "redundant_with": {
+      "id": "points",
+      "r": 0.97
+     }
+    },
+    {
+     "id": "pit_stop_ms",
+     "display": "Median pit stop",
+     "unit": "ms",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Median stationary time (OpenF1, 2023 on).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.6,
+      "split_half_r": 0.32,
+      "h1_h2_r": 0.56,
+      "n_pairs": 20,
+      "m50": 46.7,
+      "m50_unit": "rounds",
+      "m50_yoy": 12.8
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": 0.58,
+      "n": 21,
+      "r_next_season_points_per_race": 0.68
+     },
+     "redundant_with": {
+      "id": "pit_under_2500",
+      "r": -0.76
+     }
+    },
+    {
+     "id": "pit_best_ms",
+     "display": "Best pit stop",
+     "unit": "ms",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Fastest stationary time of the season.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.54,
+      "split_half_r": 0.92,
+      "h1_h2_r": 0.7,
+      "n_pairs": 20,
+      "m50": 2.0,
+      "m50_unit": "rounds",
+      "m50_yoy": 16.4
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": 0.47,
+      "n": 21,
+      "r_next_season_points_per_race": 0.52
+     },
+     "redundant_with": {
+      "id": "pit_stop_ms",
+      "r": 0.73
+     }
+    },
+    {
+     "id": "dnf_mech",
+     "display": "Mechanical DNFs",
+     "unit": "count",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 11,
+     "basis": "count",
+     "explanation": "Retirements recorded as mechanical.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.36,
+      "split_half_r": 0.51,
+      "h1_h2_r": 0.32,
+      "n_pairs": 280,
+      "m50": 17.8,
+      "m50_unit": "rounds",
+      "m50_yoy": 33.2
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": 0.35,
+      "n": 287,
+      "r_next_season_points_per_race": 0.36
+     },
+     "redundant_with": {
+      "id": "dnfs",
+      "r": 0.76
+     }
+    },
+    {
+     "id": "corner_speed",
+     "display": "Minimum corner speed v field",
+     "unit": "km/h",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "explanation": "Drivers' mean minimum corner speed against the field (2023 on).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.81,
+      "split_half_r": 0.87,
+      "h1_h2_r": 0.8,
+      "n_pairs": 30,
+      "m50": 3.1,
+      "m50_unit": "rounds",
+      "m50_yoy": 4.3
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": 0.82,
+      "n": 41,
+      "r_next_season_points_per_race": 0.85
+     },
+     "redundant_with": {
+      "id": "car_race_pace",
+      "r": -0.93
+     }
+    },
+    {
+     "id": "top_speed",
+     "display": "Top speed",
+     "unit": "km/h",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "Mean speed-trap reading (2023 on). Unstable season to season.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": -0.27,
+      "split_half_r": 0.27,
+      "h1_h2_r": 0.21,
+      "n_pairs": 30,
+      "m50": 57.3,
+      "m50_unit": "rounds",
+      "m50_yoy": null
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": 0.27,
+      "n": 41,
+      "r_next_season_points_per_race": 0.28
+     },
+     "redundant_with": {
+      "id": "speed_trap_rank",
+      "r": -0.6
+     }
+    },
+    {
+     "id": "tyre_mgmt",
+     "display": "Tyre management index",
+     "unit": "index",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "explanation": "Mean of the drivers' degradation against the field.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.29,
+      "split_half_r": 0.47,
+      "h1_h2_r": 0.34,
+      "n_pairs": 310,
+      "m50": 21.4,
+      "m50_unit": "rounds",
+      "m50_yoy": 46.4
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": -0.11,
+      "n": 328,
+      "r_next_season_points_per_race": -0.08
+     },
+     "redundant_with": {
+      "id": "deg_hard",
+      "r": -0.74
+     }
+    },
+    {
+     "id": "lead_driver_share",
+     "display": "Lead driver's share of points",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rate",
+     "explanation": "How the points split between the cars (0.5 = even).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.15,
+      "split_half_r": 0.39,
+      "h1_h2_r": 0.27,
+      "n_pairs": 274,
+      "m50": 29.3,
+      "m50_unit": "rounds",
+      "m50_yoy": 107.3
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": -0.45,
+      "n": 285,
+      "r_next_season_points_per_race": -0.35
+     },
+     "redundant_with": {
+      "id": "car_race_rank",
+      "r": 0.55
+     }
+    },
+    {
+     "id": "car_share",
+     "display": "Car share of points",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 16,
+     "basis": "rate",
+     "explanation": "Share of model-expected points the car explains (Shapley split).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.31,
+      "split_half_r": null,
+      "h1_h2_r": null,
+      "n_pairs": 310,
+      "m50": null,
+      "m50_unit": "rounds",
+      "m50_yoy": 41.8
+     },
+     "predictive": {
+      "target": "second-half points per race (from first-half value)",
+      "r": null,
+      "n": 0,
+      "r_next_season_points_per_race": 0.32
+     },
+     "redundant_with": {
+      "id": "podiums",
+      "r": 0.41
+     }
+    }
+   ],
+   "similar": {
+    "features": [
+     "car_race_pace",
+     "points_per_race",
+     "dnf_rate",
+     "pit_lane_v_field",
+     "strategy_gain"
+    ],
+    "standardise": "z within season among qualifying constructors",
+    "weights": "yoy_r floored at 0.2",
+    "weight_values": {
+     "car_race_pace": 0.82,
+     "points_per_race": 0.8,
+     "dnf_rate": 0.37,
+     "pit_lane_v_field": 0.77,
+     "strategy_gain": 0.46
+    },
+    "distance": "weighted euclidean",
+    "k": 5,
+    "constraint": "constructor-seasons 2011 on (pit-lane and strategy need stops); before 2011 drop those two features"
+   }
+  }
+ ],
+ "payload_changes": [
+  {
+   "field": "drivers.json drivers{id}.pct_peer (optional)",
+   "builder": "oddsmarkets/f1/analytics/drivers.py:build",
+   "status": "needed",
+   "note": "Optional: field percentiles among qualifying drivers only (the current pct ranks every entrant, one-race stand-ins included). The front end can compute the same thing from values with the analytics.percentiles formula; not implemented. No chosen metric is missing from the payloads."
+  }
+ ]
+}

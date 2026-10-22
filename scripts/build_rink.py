@@ -463,6 +463,18 @@ def extras_all(b: Build, seasons: list[int], current: int, res: dict, vres: dict
         for name in ("transactions", "deals"):
             b.step(f"write {current}/{name}.json", lambda name=name: b.write(f"{current}/{name}.json", {
                 "ok": False, "season": current, "reason": "transactions could not be built (see the build log)"}))
+
+    # player movement: chance of moving, outlook by position, targets (analytics/movement.py), once a day
+    def movement():
+        from oddsmarkets.nhl.analytics import movement as MO
+        old = an.read_json(b.data / str(current) / "movement.json")
+        if old and old.get("snapshot") == today.isoformat() and old.get("version") == MO.VERSION:
+            return None
+        return MO.build(today)
+    mov = b.step("movement", movement, None)
+    if mov and mov.get("season") == current:
+        b.step(f"write {current}/movement.json", lambda: b.write(f"{current}/movement.json", mov))
+        out["movement"] = len(mov.get("players") or [])
     # fantasy
     bt_seasons = [an.season_id(an.start_year(current) - k) for k in range(FA.BT_SEASONS, 0, -1)]
     bt = b.step("fantasy backtest (cached)", lambda: FA.backtest_cached(bt_seasons, compute=False), None)

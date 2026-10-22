@@ -171,7 +171,7 @@ function needs(el) {
     ids.forEach(function (t) { (d.teams[t].best_swaps || []).forEach(function (s) { moves.push(Object.assign({ to: t }, s)); }); });
     PD.set('vl-body', PD.note(esc(d.label || '')) + PD.grid(
       PD.card('Every team, graded', 'Percentile against the other teams in each area (100 = best).', PD.chartBox('nd-heat', 420), { span: 12 }) +
-      PD.card('The moves market', 'The driver swaps that would add the most expected constructors’ points to the receiving team, across the grid.', '<div id="nd-moves"></div>', { span: 12, flush: true }), 'pd-mt'));
+      PD.card('The best moves', 'The driver swaps that would add the most expected constructors’ points to the receiving team, across the grid.', '<div id="nd-moves"></div>', { span: 12, flush: true }), 'pd-mt'));
     PD.ch.heat('nd-heat', { xs: areas.map(function (a) { return a.label.replace(/ \(.*\)$/, '').replace('Development through the season', 'Development'); }), ys: ids.map(function (t) { return d.teams[t].name || PD.teamName(t); }), xName: 'Area', yName: 'Constructor', data: data, hrefs: ids.map(PD.teamHref),
       fmt: function (v) { return PD.num(v, 0); }, diverging: true, mid: 50, label: 'Team needs heatmap' });
     PD.table('nd-moves', [

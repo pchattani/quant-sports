@@ -544,7 +544,7 @@ a.qk-stat:hover { border-color: var(--line-3); }
 .qk-pcell { display: inline-flex; justify-content: flex-end; align-items: center; gap: 6px; min-width: 64px; padding: 2px 6px; border-radius: 4px; font-variant-numeric: tabular-nums; }
 .qk-pcell .p { font: 600 10px var(--font-num); opacity: 0.8; }
 .qk-barcell { display: inline-grid; grid-template-columns: 54px auto; gap: 8px; align-items: center; }
-.qk-barcell i { display: block; height: 6px; border-radius: 3px; background: var(--s-3); position: relative; overflow: hidden; }
+.qk-barcell i { display: block; width: 56px; height: 6px; border-radius: 3px; background: var(--s-3); position: relative; overflow: hidden; }
 .qk-barcell i b { position: absolute; left: 0; top: 0; bottom: 0; background: var(--signal); border-radius: 3px; }
 .qk-sparkcell .qk-spark { width: 80px; height: 22px; display: inline-block; vertical-align: middle; }
 .qk-table tr.is-me td { background: var(--signal-soft); }

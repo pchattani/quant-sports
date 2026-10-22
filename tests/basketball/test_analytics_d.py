@@ -288,6 +288,27 @@ def test_player_and_team_catalogues(synth_root):
     assert wins == losses
 
 
+def test_player_catalogue_role_percentiles(synth_root):
+    """Rows carry the value.json role (G / W / B) and `pct_role` against qualified players of the same role."""
+    from oddsmarkets.basketball.analytics import value as VAL
+    ctx = CX.SeasonContext("nba", 2031, current=2031, full=True, sims=300, today=date(2031, 3, 1))
+    cat = PL.build(ctx)
+    rows = cat["players"]
+    roles, _ = VAL.classify_roles(cat)
+    assert all(r["role"] == roles[p] for p, r in rows.items())
+    assert set(cat["roles"]) == {"G", "W", "B"} and sum(v["n"] for v in cat["roles"].values()) == cat["n_qualified"]
+    assert all(set(r["pct_role"]) <= set(PL.ROLE_PCT_KEYS) for r in rows.values())
+    for role in ("G", "W", "B"):
+        q = [p for p, r in rows.items() if r["qualified"] and r["role"] == role and r["values"].get("pts100") is not None]
+        if len(q) < 3:
+            continue
+        best = max(q, key=lambda p: rows[p]["values"]["pts100"])
+        worst_tov = max(q, key=lambda p: rows[p]["values"]["tov_pct"])
+        assert rows[best]["pct_role"]["pts100"] == max(rows[p]["pct_role"]["pts100"] for p in q)
+        assert rows[worst_tov]["pct_role"]["tov_pct"] == min(rows[p]["pct_role"]["tov_pct"] for p in q)  # lower is better
+    json.dumps(cat, allow_nan=False, default=float)
+
+
 def PAYLOAD_OK(p: dict, keys: set) -> bool:
     missing = keys - set(p)
     assert not missing, missing

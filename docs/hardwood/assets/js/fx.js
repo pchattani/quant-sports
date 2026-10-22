@@ -257,42 +257,29 @@ FX.pairColours = (ca, cb) => (!ca || !cb || String(ca).toLowerCase() !== String(
 
 // ── charts ─────────────────────────────────────────────────────────────────
 
-FX.layout = extra => (HW.layout ? HW.layout(extra) : extra);
-FX.plot = (el, traces, lay, conf) => HW.plot(el, traces, lay, conf);
-
+/* Charts draw with the kit's ECharts layer (QKC) through HW.charts; the Plotly helpers are gone. */
 FX.radar = (el, axes, rows) => {
   const node = typeof el === 'string' ? document.getElementById(el) : el;
   if (!node) return;
   axes = axes.filter(a => rows.some(r => r && r.pct && isNum(r.pct[a.key])));
   const usable = rows.filter(r => r && r.pct && axes.some(a => isNum(r.pct[a.key])));
   if (!usable.length || axes.length < 3) { node.innerHTML = FX.muted('No percentiles to draw yet.'); return; }
-  const narrow = (node.clientWidth || 600) < 520;
-  const wrap = s => (narrow && s.length > 12 ? s.replace(/^(.{6,14}?)\s+/, '$1<br>') : s);
-  const ax = axes.map(a => Object.assign({}, a, { label: wrap(a.label) }));
-  FX.plot(node, usable.map((r, i) => ({
-    type: 'scatterpolar', fill: 'toself', name: r.name,
-    r: ax.map(a => (isNum(r.pct[a.key]) ? r.pct[a.key] : 0)).concat([isNum(r.pct[ax[0].key]) ? r.pct[ax[0].key] : 0]),
-    theta: ax.map(a => a.label).concat([ax[0].label]),
-    line: { color: r.colour || (i ? FX.CB : FX.CA), width: 2 }, fillcolor: FX.alpha(r.colour || (i ? FX.CB : FX.CA), 0.18),
-    hovertemplate: '%{theta}: %{r:.0f}th percentile<extra>' + esc(r.name) + '</extra>'
-  })), FX.layout({
-    showlegend: usable.length > 1, legend: { orientation: 'h', y: -0.1, font: { color: FX.C.text2 } },
-    polar: { bgcolor: 'rgba(0,0,0,0)', radialaxis: { visible: true, range: [0, 100], gridcolor: '#21262d', tickfont: { size: 9 }, tickvals: [25, 50, 75, 100] }, angularaxis: { gridcolor: '#21262d', tickfont: { size: narrow ? 8 : 10 } } },
-    margin: narrow ? { l: 46, r: 46, t: 24, b: 40 } : { l: 64, r: 64, t: 20, b: 40 }
-  }));
+  HW.charts.radar(node, usable.map((r, i) => ({ name: r.name, colour: r.colour || (i ? FX.CB : FX.CA), values: axes.map(a => (isNum(r.pct[a.key]) ? r.pct[a.key] : null)) })), { labels: axes.map(a => a.label), height: node.clientHeight || 400 });
 };
-
-/* Line with a ±se band: rows [{x, y, se}] */
-FX.band = (rows, colour, name, opts) => {
+/* A net-rating path with its ±1 standard error band, for QKC.line: rows [{x: date, y, se}] -> a series. */
+FX.bandSeries = (rows, colour, name) => {
+  const ok = rows.filter(r => isNum(r.y));
+  return { name: name, color: colour, data: ok.map(r => [Date.parse(r.x), r.y]),
+    band: ok.some(r => isNum(r.se)) ? { lo: ok.map(r => r.y - (r.se || 0)), hi: ok.map(r => r.y + (r.se || 0)), x: ok.map(r => Date.parse(r.x)) } : undefined };
+};
+FX.dateFmt = v => FX.fmtDate(new Date(v).toISOString().slice(0, 10), { year: false });
+/* Net rating over the season (±1 standard error shaded) for one or more teams: list [{name, colour, rows}]. */
+FX.pathChart = (el, list, opts) => {
+  const node = typeof el === 'string' ? document.getElementById(el) : el;
+  if (!node) return;
   const o = opts || {};
-  const x = rows.map(r => r.x), out = [];
-  if (o.band !== false && rows.some(r => isNum(r.se))) {
-    out.push({ type: 'scatter', mode: 'lines', x: x, y: rows.map(r => r.y + (r.se || 0)), line: { width: 0 }, hoverinfo: 'skip', showlegend: false });
-    out.push({ type: 'scatter', mode: 'lines', x: x, y: rows.map(r => r.y - (r.se || 0)), line: { width: 0 }, fill: 'tonexty', fillcolor: FX.alpha(colour, 0.16), hoverinfo: 'skip', showlegend: false });
-  }
-  out.push({ type: 'scatter', mode: o.mode || 'lines', name: name, x: x, y: rows.map(r => r.y), text: rows.map(r => r.text || ''), customdata: rows.map(r => (isNum(r.se) ? r.se : 0)),
-    line: { color: colour, width: o.width || 2, dash: o.dash || 'solid' }, hovertemplate: o.hover || ('%{text} ' + esc(name) + ': %{y:+.2f} ± %{customdata:.2f}<extra></extra>') });
-  return out;
+  QKC.line(node, { xType: 'time', series: list.map(x => FX.bandSeries(x.rows, x.colour, x.name)), xName: 'Date', yName: o.yName || 'Net rating (points per 100 possessions)',
+    xFmt: FX.dateFmt, xLabel: FX.dateFmt, yFmt: v => FX.signed(v, 1), ref: { y: 0 }, label: o.label || 'Net rating through the season' });
 };
 
 // ── the court and shot charts (feet, rim at 0,0; PAYLOADS.md front-end contract) ─
@@ -304,47 +291,21 @@ FX.COURT = {
 FX.YMAX = 35;
 FX.arcY = L => { const c = FX.COURT[L] || FX.COURT.nba; return Math.sqrt(Math.max(0, c.arc * c.arc - c.corner * c.corner)); };
 const arcPts = (r, a0, a1, n, cx, cy) => { const out = []; for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; out.push([(cx || 0) + r * Math.cos(a), (cy || 0) + r * Math.sin(a)]); } return out; };
-const pathOf = (pts, close) => pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(2) + ',' + p[1].toFixed(2)).join(' ') + (close ? ' Z' : '');
-/* Court lines as Plotly shapes; the charts module's version when it has one. */
-FX.courtShapes = L => {
-  if (HW.charts && typeof HW.charts.court === 'function') {
-    try { const s = HW.charts.court(L); if (Array.isArray(s)) return s; if (s && Array.isArray(s.shapes)) return s.shapes; } catch (e) { /* local */ }
-  }
-  const c = FX.COURT[L] || FX.COURT.nba, yb = FX.arcY(L), b = c.base, ln = { color: '#3d444d', width: 1.2 };
-  const a0 = Math.atan2(yb, c.corner), a1 = Math.PI - a0;
-  const ftY = b + c.ft;
-  return [
-    { type: 'path', path: pathOf([[-25, b], [25, b], [25, FX.YMAX], [-25, FX.YMAX]], true), line: ln, layer: 'below' },
-    { type: 'path', path: pathOf([[-c.lane, b], [-c.lane, ftY], [c.lane, ftY], [c.lane, b]], false), line: ln, layer: 'below' },
-    { type: 'path', path: pathOf(arcPts(6, 0, Math.PI, 30, 0, ftY), false), line: ln, layer: 'below' },
-    { type: 'path', path: pathOf(arcPts(c.ra, 0, Math.PI, 24, 0, 0), false), line: ln, layer: 'below' },
-    { type: 'circle', x0: -c.rim, x1: c.rim, y0: -c.rim, y1: c.rim, line: { color: '#f97316', width: 1.5 }, layer: 'below' },
-    { type: 'line', x0: -3, x1: 3, y0: -1.25, y1: -1.25, line: { color: '#6e7681', width: 2 }, layer: 'below' },
-    { type: 'path', path: pathOf([[-c.corner, b], [-c.corner, yb]].concat(arcPts(c.arc, a1, a0, 50)).concat([[c.corner, yb], [c.corner, b]]), false), line: ln, layer: 'below' }
-  ];
-};
-FX.courtAxes = () => ({
-  xaxis: { range: [-25.5, 25.5], visible: false, fixedrange: true },
-  yaxis: { range: [-6, FX.YMAX + 0.5], visible: false, fixedrange: true, scaleanchor: 'x', scaleratio: 1 }
-});
 /* Zone polygons for the shot-profile map: rim, paint, mid, corner3 (left and right), ab3. */
-FX.zonePaths = L => {
+FX.zonePolys = L => {
   const c = FX.COURT[L] || FX.COURT.nba, yb = FX.arcY(L), b = c.base, ftY = b + c.ft;
   const a0 = Math.atan2(yb, c.corner), a1 = Math.PI - a0;
   const arc = arcPts(c.arc, a0, a1, 60);              // right to left over the top
-  // the restricted circle, traversed the other way to cut a hole into the paint
-  const rimHole = arcPts(c.ra, -Math.PI / 2, 1.5 * Math.PI, 40);
   return {
-    paint: { path: pathOf([[0, b], [-c.lane, b], [-c.lane, ftY], [c.lane, ftY], [c.lane, b], [0, b], [0, -c.ra]].concat(rimHole).concat([[0, b]]), true), at: [0, 9.2] },
-    rim: { path: pathOf(arcPts(c.ra, 0, 2 * Math.PI, 40), true), at: [0, 0.6] },
-    mid: { path: pathOf([[c.corner, b], [c.corner, yb]].concat(arc).concat([[-c.corner, b], [-c.lane, b], [-c.lane, ftY], [c.lane, ftY], [c.lane, b]]), true), at: [-14.5, 10] },
-    corner3: { path: pathOf([[-25, b], [-c.corner, b], [-c.corner, yb], [-25, yb]], true) + ' ' + pathOf([[25, b], [c.corner, b], [c.corner, yb], [25, yb]], true), at: [-23.5, 0.5] },
-    ab3: { path: pathOf([[-25, yb], [-c.corner, yb]].concat(arc.slice().reverse()).concat([[c.corner, yb], [25, yb], [25, FX.YMAX], [-25, FX.YMAX]]), true), at: [0, 28.5] }
+    ab3: { polys: [[[-25, yb], [-c.corner, yb]].concat(arc.slice().reverse()).concat([[c.corner, yb], [25, yb], [25, FX.YMAX], [-25, FX.YMAX]])], at: [0, 28.5] },
+    corner3: { polys: [[[-25, b], [-c.corner, b], [-c.corner, yb], [-25, yb]], [[25, b], [c.corner, b], [c.corner, yb], [25, yb]]], at: [-23.5, 1.5], at2: [23.5, 1.5] },
+    mid: { polys: [[[c.corner, b], [c.corner, yb]].concat(arc).concat([[-c.corner, b], [-c.lane, b], [-c.lane, ftY], [c.lane, ftY], [c.lane, b]])], at: [-14.5, 10] },
+    paint: { polys: [[[-c.lane, b], [-c.lane, ftY], [c.lane, ftY], [c.lane, b]]], at: [0, 9.2] },
+    rim: { polys: [arcPts(c.ra, 0, 2 * Math.PI, 40)], at: [0, 0.6] }
   };
 };
 FX.ZONE_LABEL = { rim: 'At the rim (<4 ft)', paint: 'Paint (non-rim)', mid: 'Mid-range', corner3: 'Corner 3', ab3: 'Above-the-break 3', heave: 'Heave (>40 ft)' };
 FX.ZONE_ORDER = ['rim', 'paint', 'mid', 'corner3', 'ab3', 'heave'];
-const DIV_SCALE = [[0, '#2563eb'], [0.25, '#60a5fa'], [0.5, '#6b7280'], [0.75, '#f87171'], [1, '#dc2626']];
 FX.divRGB = (v, max) => {
   if (!isNum(v)) return 'rgba(110,118,129,0.35)';
   const t = Math.max(-1, Math.min(1, v / (max || 0.3)));
@@ -352,65 +313,38 @@ FX.divRGB = (v, max) => {
   const a = mid, b = t < 0 ? lo : hi, u = Math.abs(t);
   return 'rgb(' + [0, 1, 2].map(i => Math.round(a[i] + (b[i] - a[i]) * u)).join(',') + ')';
 };
-/* Zone map: ZONES {zone: {freq, fg, pps, league_pps}} coloured by pps against the league. */
+/* Zone map: ZONES {zone: {freq, fg, pps, league_pps}}, each zone filled by points per shot against the league
+ * (cold to hot) and labelled with its share of shots, FG% and the difference. */
 FX.zoneMap = (el, L, zones, opts) => {
   const node = typeof el === 'string' ? document.getElementById(el) : el;
   if (!node) return;
   const Z = zones || {};
   if (!Object.keys(Z).length) { node.innerHTML = FX.muted('No shot profile.'); return; }
-  const P = FX.zonePaths(L), o = opts || {};
+  const P = FX.zonePolys(L), o = opts || {};
+  const keys = Object.keys(P);
+  const diffOf = k => { const z = Z[k] || {}; return isNum(z.pps) && isNum(z.league_pps) ? z.pps - z.league_pps : null; };
+  const col = d => QK.pctHex(isNum(d) ? Math.max(0, Math.min(100, 50 + 50 * d / 0.25)) : 50);
   const shapes = [];
-  const ann = [];
-  Object.keys(P).forEach(k => {
-    const z = Z[k] || {};
-    const diff = isNum(z.pps) && isNum(z.league_pps) ? z.pps - z.league_pps : null;
-    const fill = diff === null ? 'rgba(110,118,129,0.25)' : FX.divRGB(diff, 0.25).replace('rgb', 'rgba').replace(')', ',0.62)');
-    shapes.push({ type: 'path', path: P[k].path, fillcolor: fill, line: { color: '#0d1117', width: 1.5 }, layer: 'below' });
-    if (z.freq !== undefined || z.pps !== undefined) {
-      ann.push({ x: P[k].at[0], y: P[k].at[1], showarrow: false, font: { size: o.small ? 9 : 10, color: '#e6edf3' }, align: 'center',
-        text: '<b>' + FX.fmtV(z.freq, 'pct') + '</b><br>' + (isNum(z.fg) ? FX.fmtV(z.fg, 'pct') + ' FG' : '') + (diff !== null ? '<br>' + FX.signed(diff, 2) + ' pps' : '') });
-      if (k === 'corner3') ann.push(Object.assign({}, ann[ann.length - 1], { x: -P[k].at[0] }));
-    }
-  });
-  // invisible hover points
-  const hx = [], hy = [], ht = [];
-  Object.keys(P).forEach(k => { const z = Z[k]; if (!z) return; hx.push(P[k].at[0]); hy.push(P[k].at[1]);
-    ht.push('<b>' + esc(FX.ZONE_LABEL[k] || k) + '</b><br>share ' + FX.fmtV(z.freq, 'pct') + ' · FG ' + FX.fmtV(z.fg, 'pct') + '<br>' + FX.num(z.pps, 2) + ' pts/shot v league ' + FX.num(z.league_pps, 2)); });
-  FX.plot(node, [{ type: 'scatter', mode: 'markers', x: hx, y: hy, text: ht, hovertemplate: '%{text}<extra></extra>', marker: { size: 26, color: 'rgba(0,0,0,0)' } }],
-    FX.layout(Object.assign({ margin: { l: 4, r: 4, t: o.title ? 24 : 4, b: 4 }, shapes: shapes.concat(FX.courtShapes(L)), annotations: ann,
-      title: o.title ? { text: o.title, font: { size: 12, color: FX.C.text2 }, y: 0.99 } : undefined }, FX.courtAxes())));
+  keys.forEach(k => P[k].polys.forEach(poly => shapes.push({ k: k, poly: poly })));
+  const labs = [];
+  keys.forEach(k => { const z = Z[k]; if (!z || (z.freq === undefined && z.pps === undefined)) return; labs.push({ k: k, at: P[k].at }); if (P[k].at2) labs.push({ k: k, at: P[k].at2 }); });
+  HW.charts.courtMount(node, T => ({
+    tooltip: QKC.tooltip(T, { formatter: p => { const k = p.data.k, z = Z[k] || {}, d = diffOf(k);
+      return '<div style="font-weight:600">' + esc(FX.ZONE_LABEL[k] || k) + '</div>' + QKC.tipRow(col(d), 'Share of shots', FX.fmtV(z.freq, 'pct')) + QKC.tipRow(col(d), 'FG%', FX.fmtV(z.fg, 'pct')) +
+        QKC.tipRow(col(d), 'Points per shot', FX.num(z.pps, 2) + (isNum(z.league_pps) ? ' (league ' + FX.num(z.league_pps, 2) + ')' : '')); } }),
+    series: [{ type: 'custom', data: shapes.map(x => ({ value: x.poly[0], k: x.k })), encode: { x: 0, y: 1 }, z: 1,
+      renderItem: (params, api) => { const x = shapes[params.dataIndex]; const d = diffOf(x.k);
+        return { type: 'polygon', shape: { points: x.poly.map(q => api.coord(q)) }, style: { fill: isNum(d) ? QKC.hexA(col(d), 0.55) : QKC.hexA(T.ink3, 0.18), stroke: T.s1, lineWidth: 1.5 } }; } },
+    { type: 'scatter', z: 3, symbolSize: 1, itemStyle: { color: 'transparent' }, data: labs.map(x => { const z = Z[x.k] || {}, d = diffOf(x.k);
+      return { value: x.at, k: x.k, label: { show: true, color: T.ink1, fontFamily: T.fontNum, fontSize: o.small ? 9.5 : 10.5, lineHeight: o.small ? 12 : 13, textBorderColor: T.s1, textBorderWidth: 2,
+        formatter: '{b|' + FX.fmtV(z.freq, 'pct') + '}' + (isNum(z.fg) ? '\n' + FX.fmtV(z.fg, 'pct') + ' FG' : '') + (d !== null ? '\n' + FX.signed(d, 2) + ' pps' : ''), rich: { b: { fontWeight: 700, color: T.ink1, fontFamily: T.fontNum } } } }; }) }]
+  }), o.title || 'Shot profile by zone');
+  HW.charts.chartKey(node, (o.title ? '<b>' + esc(o.title) + '</b> · ' : '') + 'Each zone: share of shots, FG% and points per shot against the league (blue below, red above).');
 };
-/* Hex/square cell chart: cells [{x, y, n, fg, pps, pps_diff|lg_pps}] sized by volume, coloured by pps v league. */
-FX.cellChart = (el, L, cells, opts) => {
-  const node = typeof el === 'string' ? document.getElementById(el) : el;
-  if (!node) return;
-  const o = opts || {};
-  const rows = FX.rowsOf(cells).filter(c => isNum(c.x) && isNum(c.y) && c.y <= FX.YMAX);
-  if (!rows.length) { node.innerHTML = FX.muted('No located shots.'); return; }
-  const diffOf = c => (isNum(c.pps_diff) ? c.pps_diff : isNum(c.pps) && isNum(c.lg_pps) ? c.pps - c.lg_pps : isNum(c.pps) && isNum(c.league_pps) ? c.pps - c.league_pps : null);
-  const maxN = Math.max.apply(null, rows.map(c => c.n || 1));
-  const narrow = (node.clientWidth || 600) < 420;
-  const size = c => Math.max(5, (narrow ? 15 : 24) * Math.sqrt((c.n || 1) / maxN));
-  const diffs = rows.map(diffOf);
-  FX.plot(node, [{
-    type: 'scatter', mode: 'markers', x: rows.map(c => c.x), y: rows.map(c => c.y),
-    text: rows.map((c, i) => (c.n || 0) + ' shots · FG ' + FX.fmtV(c.fg, 'pct') + '<br>' + FX.num(c.pps, 2) + ' pts/shot' + (isNum(diffs[i]) ? ' (' + FX.signed(diffs[i], 2) + ' v league)' : '')),
-    hovertemplate: '%{text}<extra></extra>',
-    marker: { symbol: o.square ? 'square' : 'hexagon', size: rows.map(size), color: diffs.map(d => (isNum(d) ? d : 0)), cmin: -0.4, cmax: 0.4, colorscale: DIV_SCALE,
-      line: { width: 0 }, colorbar: o.colorbar === false ? undefined : { title: { text: 'pts/shot<br>v league', side: 'right', font: { size: 10 } }, thickness: 8, len: 0.6, tickfont: { size: 9, color: FX.C.text2 } } }
-  }], FX.layout(Object.assign({ margin: { l: 4, r: o.colorbar === false ? 4 : 10, t: o.title ? 24 : 4, b: 4 }, shapes: FX.courtShapes(L),
-    title: o.title ? { text: o.title, font: { size: 12, color: FX.C.text2 }, y: 0.99 } : undefined }, FX.courtAxes())));
-};
+/* League-relative cells: cells [{x, y, n, fg, pps, pps_diff|lg_pps}] as hexagons sized by volume. */
+FX.cellChart = (el, L, cells, opts) => HW.charts.cellChart(el, L, FX.rowsOf(cells), opts);
 /* Raw made/missed dots: shots [{x, y, made}] */
-FX.dotChart = (el, L, shots, opts) => {
-  const o = opts || {};
-  const rows = (shots || []).filter(s => isNum(s.x) && isNum(s.y) && s.y <= FX.YMAX);
-  if (!rows.length) { (typeof el === 'string' ? document.getElementById(el) : el).innerHTML = FX.muted('No located shots.'); return; }
-  const tr = (made, colour, sym) => ({ type: 'scatter', mode: 'markers', name: made ? 'Made' : 'Missed', x: rows.filter(s => !!s.made === made).map(s => s.x), y: rows.filter(s => !!s.made === made).map(s => s.y),
-    marker: { size: 5, color: colour, symbol: sym, opacity: 0.75, line: { width: made ? 0 : 1, color: colour } }, hoverinfo: 'skip' });
-  FX.plot(el, [tr(false, '#f85149', 'x-thin-open'), tr(true, '#3fb950', 'circle')], FX.layout(Object.assign({ margin: { l: 4, r: 4, t: o.title ? 24 : 4, b: 4 }, shapes: FX.courtShapes(L), showlegend: false,
-    title: o.title ? { text: o.title, font: { size: 12, color: FX.C.text2 } } : undefined }, FX.courtAxes())));
-};
+FX.dotChart = (el, L, shots, opts) => HW.charts.shotChart(el, shots, Object.assign({ league: L, mode: 'dots' }, opts || {}));
 /* Zone table HTML from ZONES. */
 FX.zoneTable = zones => {
   const Z = zones || {};

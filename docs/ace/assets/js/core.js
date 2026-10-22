@@ -141,7 +141,7 @@ const ALIASES = {
 const TITLES = {
   hub: 'Overview', event: 'Tournament', match: 'Match centre', player: 'Player', players: 'Players', rankings: 'Rankings',
   race: 'Race', elo: 'Elo', calendar: 'Calendar', h2h: 'Head to head', lab: 'Lab', compare: 'Compare',
-  markets: 'Markets', calibration: 'Calibration', value: 'Value', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
+  markets: 'Forecasts', calibration: 'Calibration', value: 'Value', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
 };
 const NAV_OF = { hub: 'hub', event: 'calendar', calendar: 'calendar', match: 'hub', player: 'players', players: 'players',
   rankings: 'rankings', race: 'race', elo: 'elo', h2h: 'h2h', lab: 'lab', compare: 'compare', markets: 'markets',
@@ -152,7 +152,7 @@ const SECTION_OF = { hub: 'overview', calendar: 'fixtures', event: 'fixtures', m
   calibration: 'model', glossary: 'model', disclaimer: 'model' };
 /* Tabs per section: [route, label, scope] with scope 'g' (a global route) or '' (per tour). */
 const SECTION_TABS = {
-  fixtures: [['calendar', 'Tournaments', ''], ['markets', 'Odds board', '']],
+  fixtures: [['calendar', 'Tournaments', ''], ['markets', 'Forecasts', '']],
   standings: [['rankings', 'Rankings', ''], ['race', 'Race to the Finals', ''], ['elo', 'Elo ratings', '']],
   players: [['players', 'All players', ''], ['h2h', 'Head to head', '']],
   value: [['value', 'Player value', '']],
@@ -161,12 +161,26 @@ const SECTION_TABS = {
 };
 const SECTION_LABEL = { overview: 'Overview', fixtures: 'Draws', standings: 'Rankings', players: 'Players', value: 'Value', lab: 'Lab', model: 'Model' };
 const SECTION_BLURB = {
-  fixtures: 'Every tournament with its draw, the model’s title odds from simulating the draw, and every match priced against the market.',
-  standings: 'The official rankings, the race to the year-end Finals with qualification odds, and our surface Elo ratings.',
-  players: 'Serve and return ratings, surface Elo, form and results for every player, and any two head to head.',
+  fixtures: 'Every tournament with its draw, our title chances from simulating the rest of it, and our win chance for every match.',
+  standings: 'The official rankings, the race to the year-end Finals with our chance of qualifying, and our surface Elo ratings.',
+  players: 'Serve and return ratings, surface Elo, form and results for every player, ranked against their tour, and any two head to head.',
   value: 'Who is breaking out, who has been lucky, and whose ranking runs ahead of or behind their level.',
-  lab: 'Build your own charts: any two metrics for any group of players, and side-by-side comparisons.',
-  model: 'How the models work, how well they have done against the closing lines, and every metric defined.'
+  lab: 'Build your own charts from any two metrics, and put two or three players side by side on the metrics that predict.',
+  model: 'How the models work, how well they have done, and every metric defined.'
+};
+/* v2 page heads: route -> [title, sub-line] (the section blurb when the sub-line is empty). */
+const PAGE_HEAD = {
+  calendar: ['Tournaments', 'Every tournament of the year with its level, surface and champion; open one for the draw and our title chances.'],
+  markets: ['Forecasts', 'Our win chance for every open match and our title chance in every tournament in play, from the same models as the match centre.'],
+  rankings: ['Rankings', 'The official ranking points, beside our Elo for every player.'],
+  race: ['Race to the Finals', 'Points in this year’s race and our chance of qualifying, from simulating the rest of the season.'],
+  elo: ['Elo ratings', 'Our strength ratings from every tour-level result, overall and by surface.'],
+  players: ['Players', ''], h2h: ['Head to head', 'Any two players: their record, how they match up on each surface and our chance if they met today.'],
+  value: ['Player value', ''], lab: ['Scatter lab', 'Any two metrics for any group of players.'],
+  compare: ['Compare', 'Two or three players side by side on the metrics that best describe and predict their tennis, ranked against their own tour.'],
+  methodology: ['How the models work', 'The ratings, the match model, the simulations and how well each has done.'],
+  calibration: ['Calibration', 'How often our chances came true, and how they compare with the closing market as a reference.'],
+  glossary: ['Glossary', 'Every metric on the site, defined.'], disclaimer: ['Disclaimer and terms', '']
 };
 const DETAIL_OF = { event: 'calendar', match: 'calendar', player: 'players' };
 // Where a page lands when the tour is switched (id pages fall back to their list).
@@ -323,9 +337,10 @@ function sectionBar(r) {
     back = '<a class="ta-back" href="' + tabHref(t, T, Y) + '"><span aria-hidden="true">←</span> ' + esc(SECTION_LABEL[sec] + ' · ' + t[1]) + '</a>';
   }
   bar.classList.toggle('is-detail', !!detail);
-  bar.innerHTML = '<div class="ta-secbar-in"><div class="ta-sec-title"><div class="qk-kicker">' + esc(kicker) + '</div>' +
-    (detail ? back : '<h1>' + esc(SECTION_LABEL[sec]) + '</h1><p class="ta-blurb">' + esc(SECTION_BLURB[sec] || '') + '</p>') + '</div>' +
-    '<div class="ta-meta" id="meta-line"></div></div>' +
+  const ph = PAGE_HEAD[r.name] || [SECTION_LABEL[sec], ''];
+  bar.innerHTML = (detail ? '<div class="ta-secbar-in"><div class="ta-sec-title"><div class="qk-kicker">' + esc(kicker) + '</div>' + back + '</div><div class="ta-meta" id="meta-line"></div></div>'
+    : (window.QK && QK.sectionHead ? QK.sectionHead({ kicker: kicker + ' · ' + SECTION_LABEL[sec], title: ph[0], sub: ph[1] || SECTION_BLURB[sec] || '', size: 'lg', tag: 'h1', cls: 'ta-sh' }) + '<div class="ta-meta" id="meta-line"></div>'
+      : '<h1>' + esc(ph[0]) + '</h1><div class="ta-meta" id="meta-line"></div>')) +
     (tabs.length > 1 && !detail ? '<nav class="qk-tabs ta-tabs" aria-label="' + esc(SECTION_LABEL[sec]) + ' pages">' + tabs.map(t =>
       '<a class="qk-tab" href="' + tabHref(t, T, Y) + '"' + (t[0] === r.name ? ' aria-selected="true" aria-current="page"' : ' aria-selected="false"') + '>' + esc(t[1]) + '</a>').join('') + '</nav>' : '');
   return bar;
@@ -787,8 +802,8 @@ function matchLink(T, id, label) {
 }
 
 /* A MATCH_CARD as the kit's game card (index.json live/today/recent/upcoming, schedule, draws), linking to the match
- * centre: both players with rank, set scores and the model's (live: in-match) win probability, the probability bar, the
- * model-v-market strip before the first ball, and a line with the likeliest scores and the edge.
+ * centre (Design System 2.0 game card): both players with rank and set scores, our win chance before the first ball (the
+ * favourite in the signal colour), sets won once it starts, our win-chance bar, and the likeliest score and expected games.
  * opts {tour, date: true (show the date), event: true (show the event name), compact, round: true}. */
 function playerObj(T, pid) { const x = NAMES[T][String(pid)] || {}; return { name: playerShort(T, pid), abbr: (x.country || '').slice(0, 3) || fmtInitials(playerName(T, pid)), href: playerHref(T, pid) }; }
 function fmtInitials(n) { const p = String(n || '?').split(' '); return (p.length > 1 ? p[0][0] + p[p.length - 1][0] : p[0].slice(0, 2)).toUpperCase(); }
@@ -797,13 +812,15 @@ function matchCard(c, opts) {
   const T = o.tour || state.tour;
   if (!c) return '';
   const st = matchState(c);
-  const m = c.model || {}, mk = c.market || null;
+  const m = c.model || {};
   const p1 = isNum(m.p1) ? Number(m.p1) : null;
-  const live = st === 'live', fin = isFinished(c);
+  const live = st === 'live', fin = isFinished(c), pre = !live && !fin;
   const pShow = live && isNum(c.wp_now) ? Number(c.wp_now) : p1;
   const sets = c.sets || [];
   const lv = c.live || null;
   const nSets = Math.max(sets.length + (live && lv && lv.games && sets.length < (lv.set || 0) ? 1 : 0), 0);
+  const won = setsWon(c);
+  const fav1 = isNum(pShow) && pShow >= 0.5;
   const row = (pid, side, p) => {
     const win = fin && c.winner === pid;
     let cells = '';
@@ -818,34 +835,46 @@ function matchCard(c, opts) {
       cells += '<span class="' + cls + '">' + (isNum(g) ? g : '') + tb + '</span>';
     }
     const rk = playerRank(T, pid);
-    return '<div class="qk-match-row ta-mrow' + (fin && c.winner && !win ? ' lost' : '') + '">' +
+    const cc = playerCountry(T, pid);
+    const v = pre ? '<span class="qk-gc-v pct" title="Our win chance">' + (isNum(p) ? pct(p, 0) : '') + '</span>'
+      : '<span class="qk-gc-v" title="Sets won">' + (sets.length || live ? won[side] : '–') + '</span>';
+    return '<div class="qk-gc-row ta-gcrow' + (fin && c.winner && !win ? ' lost' : '') + (pre && (side === 0) === fav1 && isNum(p) ? ' fav' : '') + '">' +
       '<span class="ta-rank" title="Ranking">' + (isNum(rk) ? rk : '') + '</span>' +
-      '<span class="nm">' + esc(playerShort(T, pid)) + (playerCountry(T, pid) ? ' <small class="ta-cc">' + esc(playerCountry(T, pid)) + '</small>' : '') + '</span>' +
-      '<span class="p" title="' + (live && isNum(c.wp_now) ? 'Live' : 'Model pre-match') + ' win probability">' + (p === null || fin ? '' : pct(p, 0)) + '</span>' +
-      '<span class="ta-sets">' + cells + '</span></div>';
+      '<span class="qk-gc-nm">' + esc(playerShort(T, pid)) + (cc ? '<small>' + esc(cc) + '</small>' : '') + (win ? ' <span class="ta-win" aria-label="winner">✓</span>' : '') + '</span>' +
+      '<span class="ta-sets">' + cells + '</span>' + v + '</div>';
   };
   let badge;
   if (live) badge = '<span class="qk-badge live">Live' + (lv && lv.set ? ' · Set ' + lv.set : '') + '</span>';
   else if (fin) badge = '<span class="qk-badge final">' + (st === 'ret' ? 'Ret.' : st === 'wo' ? 'W/O' : 'Final') + '</span>';
-  else badge = '<span class="qk-badge">' + esc((o.date !== false ? fmtDate(c.date, { year: false, weekday: false }) + ' ' : '') + (fmtTime(c.date) || (c.tba || (c.date && String(c.date).length <= 10) ? 'TBA' : ''))) + '</span>';
+  else {
+    const tba = c.tba || (c.date && String(c.date).length <= 10);
+    badge = '<span class="qk-badge"' + (tba ? ' title="Start time to be announced"' : '') + '>' + esc((o.date !== false ? fmtDate(c.date, { year: false, weekday: false }) + ' ' : '') + (tba ? 'TBA' : (fmtTime(c.date) || 'TBA'))) + '</span>';
+  }
   const tag = (o.event !== false ? eventName(T, c.event) + ' · ' : '') + roundLabel(c.round, true);
   const A = playerObj(T, c.p1), B = playerObj(T, c.p2);
-  const bar = !fin && pShow !== null && window.QK ? QK.probBar(pShow, null, 1 - pShow, A, B) : '';
-  const mvm = st !== 'live' && !fin && mk && isNum(mk.p1) && p1 !== null && window.QK ? QK.mvm(p1, Number(mk.p1), playerSurname(T, c.p1)) : '';
+  const bar = !fin && pShow !== null && window.QK ? QK.wpBar(pShow, null, 1 - pShow, A, B, { label: live ? 'Live win chance' : 'Our win chance' }) : '';
   const bits = [];
-  const top2 = (m.sets_dist_top || []).slice(0, 2).map(x => esc(x[0]) + ' ' + pct(x[1], 0)).join(' · ');
-  if (top2 && !fin) bits.push('<span title="Likeliest scores">' + top2 + '</span>');
-  if (isNum(m.exp_games) && !fin) bits.push('<span title="Expected games">' + num(m.exp_games, 1) + ' g</span>');
-  let edge = '';
-  if (!fin && !live && mk && isNum(mk.p1) && p1 !== null && Math.abs(p1 - mk.p1) >= 0.05) {
-    const side = p1 > mk.p1 ? c.p1 : c.p2, gap = Math.abs(p1 - mk.p1);
-    edge = '<span class="qk-badge edge" data-tip="The model gives ' + esc(playerShort(T, side)) + ' ' + Math.round(gap * 100) + ' points more than the de-vigged market' + (mk.sources && mk.sources.length ? ' (' + esc(sourceNames(mk.sources).join(', ')) + ')' : '') + '">Edge ' + esc(playerSurname(T, side)) + ' +' + Math.round(gap * 100) + '</span>';
-  }
-  const foot = bits.length || edge ? '<div class="qk-match-foot"><span class="ta-mc-bits">' + bits.join('') + '</span>' + edge + '</div>' : '';
-  return '<a class="qk-match ta-mc' + (live ? ' is-live' : '') + (o.compact ? ' gc-compact' : '') + '" href="' + matchHref(T, c.id) + '" style="--sa:var(--a-tennis)">' +
-    '<div class="qk-match-top"><span class="lg">' + esc(tag) + '</span>' + badge + '</div>' +
-    '<div class="qk-match-teams">' + row(c.p1, 0, pShow) + row(c.p2, 1, pShow === null ? null : 1 - pShow) + '</div>' +
-    (bar || mvm ? '<div class="qk-stack" style="--g:6px">' + bar + (mvm ? '<div style="margin-top:6px">' + mvm + '</div>' : '') + '</div>' : '') + foot + '</a>';
+  if (pre && isNum(p1)) bits.push('<span class="ours">Our chance</span>');
+  else if (live && isNum(c.wp_now)) bits.push('<span class="ours">Live chance</span>');
+  else if (fin && isNum(p1)) bits.push('<span>Before: <b>' + esc(playerSurname(T, p1 >= 0.5 ? c.p1 : c.p2)) + ' ' + pct(Math.max(p1, 1 - p1), 0) + '</b></span>');
+  const top1 = (m.sets_dist_top || [])[0];
+  if (top1 && pre) bits.push('<span title="Likeliest score in sets">Likeliest <b>' + esc(top1[0]) + '</b> ' + pct(top1[1], 0) + '</span>');
+  if (isNum(m.exp_games) && pre) bits.push('<span title="Expected games in the match">Games <b>' + num(m.exp_games, 1) + '</b></span>');
+  return '<a class="qk-gc ta-mc' + (live ? ' is-live' : fin ? ' is-final' : '') + (o.compact ? ' gc-compact' : '') + '" href="' + matchHref(T, c.id) + '" style="--sa:var(--a-tennis)">' +
+    '<div class="qk-gc-top"><span class="qk-gc-lg">' + esc(tag) + '</span>' + badge + '</div>' +
+    '<div class="qk-gc-rows">' + row(c.p1, 0, pShow) + row(c.p2, 1, pShow === null ? null : 1 - pShow) + '</div>' + bar +
+    (bits.length ? '<div class="qk-gc-foot">' + bits.join('') + '</div>' : '') + '</a>';
+}
+/* Before the first ball a card is "upcoming"; a snapshot can keep a match live or upcoming long after it was played.
+ * Cards still live or upcoming 12 hours after their start are dropped (the Home page applies the same guard). */
+function fresh(list) {
+  const cut = Date.now() - 12 * 3600e3;
+  return (list || []).filter(c => {
+    if (!c) return false;
+    if (isFinished(c)) return true;
+    const d = parseDate(c.date);
+    return !d || d.getTime() >= cut;
+  });
 }
 
 // ── tours and years ────────────────────────────────────────────────────────
@@ -969,9 +998,15 @@ function pctRow(label, p, valueText, title) {
       : '<span class="pct-none">not enough data</span>') +
     '</div><span class="pct-val">' + (valueText === undefined ? '' : valueText) + '</span></div>';
 }
+/* A v2 stat tile (kit .qk-stat). statTile(label, valueHTML, subHTML, cls), or statTile({ QK.statTile options }). A value
+ * that is a number reads in the display face; a name or a list reads as text. */
 function statTile(label, value, sub, cls) {
-  return '<div class="qk-kpi kpi' + (cls ? ' ' + cls : '') + '"><div class="qk-kpi-label kpi-label">' + esc(label) + '</div>' +
-    '<div class="qk-kpi-value kpi-value">' + (value === undefined || value === null ? '—' : value) + '</div>' + (sub ? '<div class="qk-kpi-sub kpi-sub">' + sub + '</div>' : '') + '</div>';
+  if (label && typeof label === 'object') return window.QK ? QK.statTile(label) : '';
+  const v = value === undefined || value === null || value === '' ? '—' : String(value);
+  const plain = v.replace(/<[^>]*>/g, '').trim();
+  const numeric = /^[−+\-–]?[\d.,]+\s?(%|pts?|×)?$/.test(plain) || /^[\d.]+ v [\d.]+$/.test(plain);
+  return '<div class="qk-stat kpi' + (cls ? ' ' + cls : '') + '"><div class="qk-stat-label"><span>' + esc(label) + '</span></div>' +
+    '<div class="qk-stat-v' + (numeric ? '' : ' text') + '">' + v + '</div>' + (sub ? '<div class="qk-stat-sub"><span>' + sub + '</span></div>' : '') + '</div>';
 }
 /* A probability with an inline bar (0-1); colour optional; max scales the bar. */
 function probCell(p, colour, max) {
@@ -1018,7 +1053,9 @@ function wireToggles(root, attr, fn) {
     fn(b.getAttribute(a));
   }));
 }
-function pageHead(title, sub, right) {
+/* A v2 section head inside a page: title, an HTML sub-line, links or controls on the right. */
+function pageHead(title, sub, right, kicker) {
+  if (window.QK && QK.sectionHead) return QK.sectionHead({ kicker: kicker || '', title: esc(title), sub: sub || '', actions: right ? '<div class="ph-nav">' + right + '</div>' : '', html: true, cls: 'page-head' });
   return '<div class="page-head"><div><h2>' + esc(title) + '</h2>' + (sub ? '<div class="ph-sub">' + sub + '</div>' : '') + '</div>' +
     (right ? '<div class="ph-nav">' + right + '</div>' : '') + '</div>';
 }
@@ -1200,7 +1237,7 @@ return {
   surfaceColour: surfaceColour, surfaceLabel: surfaceLabel, surfaceDot: surfaceDot, surfaceChip: surfaceChip,
   levelLabel: levelLabel, levelShort: levelShort, levelChip: levelChip, levelRank: levelRank, roundLabel: roundLabel, roundIndex: roundIndex,
   matchState: matchState, isFinished: isFinished, fmtScore: fmtScore, setsWon: setsWon, totalGames: totalGames, statusChip: statusChip,
-  matchCard: matchCard, titleProbs: titleProbs, awardValue: awardValue, playersOf: playersOf, eventsOf: eventsOf,
+  matchCard: matchCard, fresh: fresh, titleProbs: titleProbs, awardValue: awardValue, playersOf: playersOf, eventsOf: eventsOf,
   // names and links
   player: player, playerName: playerName, playerShort: playerShort, playerSurname: playerSurname, playerCountry: playerCountry,
   playerRank: playerRank, playerColour: playerColour, playerLink: playerLink, playerHref: playerHref,

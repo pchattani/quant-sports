@@ -114,6 +114,8 @@ builder B/C/D model that was not available, so the page can say why a column is 
 "bullpen": [{pid, name, throws, available 1|0.5|0, pitches_3d, rest (days), bf_30d}] (current season only, else null),
 "defence": {"if": {alignment: share}, "of": {...}, "if_by_stand": {"L"|"R": {...}}, "of_by_stand": {...}}}}, "constants"}`.
 Ratings (`values.off_rpg/def_rpg/pit_rpg/rating`) are runs per game above an average team.
+BaseRuns standings (`values.baseruns_rs/baseruns_ra/baseruns_pct/baseruns_w`): BaseRuns of the team's batting events and of
+the events its pitchers allowed, scaled so the league's BaseRuns equal its runs, and the Pythagorean (1.83) record from them.
 
 ### season.json
 `{"standings": {division: [{tid, name, abbr, short, league, division, w, l, pct, gb, rs, ra, rd, pythag_w, exp_w, exp_pct, rating,

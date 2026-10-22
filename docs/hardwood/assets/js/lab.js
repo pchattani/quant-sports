@@ -143,40 +143,43 @@ function draw() {
   const hover = r => '<b>' + fx.esc(nm(r)) + '</b> · ' + fx.esc(fx.teamAbbr(L, raw(r, 'team'))) + ' · ' + fx.esc(fx.seasonLabel(L, raw(r, 'season'))) + ' · ' + (raw(r, 'pool') || '') + ' · ' + fx.num(raw(r, 'min'), 0) + ' min' +
     '<br>' + fx.esc(label(S.x)) + ': ' + fmt(S.x, val(r, S.x)) + ' (pct ' + Math.round(pOf(sortedX, val(r, S.x), dirx)) + ')' +
     '<br>' + fx.esc(label(S.y)) + ': ' + fmt(S.y, val(r, S.y)) + ' (pct ' + Math.round(pOf(sortedY, val(r, S.y), diry)) + ')' +
-    (S.shrink && (shrinkable(S.x) || shrinkable(S.y)) ? '<br><span style="color:#8b949e">unshrunk: ' + fmt(S.x, raw(r, S.x)) + ' · ' + fmt(S.y, raw(r, S.y)) + '</span>' : '');
-  const trace = (pts, name, color, extra) => Object.assign({
-    type: 'scatter', mode: 'markers', name: name, x: pts.map(r => val(r, S.x)), y: pts.map(r => val(r, S.y)),
-    text: pts.map(hover), hovertemplate: '%{text}<extra></extra>', customdata: pts.map(r => raw(r, 'id') + '|' + raw(r, 'season')),
-    marker: { size: pts.map(size), color: color, opacity: 0.82, line: { color: '#0d1117', width: 0.7 } }
-  }, extra || {});
-  const traces = [];
-  const POOLC = { G: '#58a6ff', F: '#3fb950', C: '#f0883e' };
-  if (S.color === 'team') {
-    Array.from(new Set(rows.map(r => raw(r, 'team')))).forEach(t => traces.push(trace(rows.filter(r => raw(r, 'team') === t), fx.teamAbbr(L, t), fx.teamColour(L, t))));
-  } else if (S.color === 'pool') {
-    ['G', 'F', 'C'].forEach(pl => { const pts = rows.filter(r => raw(r, 'pool') === pl); if (pts.length) traces.push(trace(pts, pl === 'G' ? 'Guards' : pl === 'F' ? 'Forwards' : 'Centres', POOLC[pl])); });
+    (S.shrink && (shrinkable(S.x) || shrinkable(S.y)) ? '<br><span style="opacity:.7">unshrunk: ' + fmt(S.x, raw(r, S.x)) + ' · ' + fmt(S.y, raw(r, S.y)) + '</span>' : '');
+  // Groups (one series each, so the legend names them) and the colour of every point.
+  const groups = [];
+  const POOLN = { G: 'Guards', F: 'Forwards', C: 'Centres' };
+  if (S.color === 'team') Array.from(new Set(rows.map(r => raw(r, 'team')))).forEach(t => groups.push({ name: fx.teamAbbr(L, t), colour: fx.teamColour(L, t), pts: rows.filter(r => raw(r, 'team') === t) }));
+  else if (S.color === 'pool') {
+    ['G', 'F', 'C'].forEach((pl, i) => { const pts = rows.filter(r => raw(r, 'pool') === pl); if (pts.length) groups.push({ name: POOLN[pl], cat: i, pts: pts }); });
     const other = rows.filter(r => ['G', 'F', 'C'].indexOf(raw(r, 'pool')) < 0);
-    if (other.length) traces.push(trace(other, 'Other', C.text3));
-  } else if (S.color === 'season') {
-    Array.from(new Set(rows.map(r => raw(r, 'season')))).sort().forEach((y, i) => traces.push(trace(rows.filter(r => raw(r, 'season') === y), fx.seasonLabel(L, y), fx.PALETTE[i % fx.PALETTE.length])));
-  } else if (S.color) {
-    const cv = rows.map(r => val(r, S.color));
-    traces.push(trace(rows, label(S.color), cv, { marker: { size: rows.map(size), color: cv, colorscale: 'RdBu', reversescale: !lower(S.color), opacity: 0.85,
-      colorbar: { title: { text: label(S.color), side: 'right' }, thickness: 10, tickfont: { color: C.text2 } }, line: { color: '#0d1117', width: 0.7 } } }));
-  } else traces.push(trace(rows, 'Players', C.blue));
-  if (hits.length) traces.push(Object.assign(trace(hits, 'Search', '#ffffff'), { marker: { size: 20, color: 'rgba(0,0,0,0)', symbol: 'star-open', line: { color: '#ffffff', width: 2 } }, showlegend: false }));
-  const ann = Array.from(labelled).map(r => ({ x: val(r, S.x), y: val(r, S.y), text: fx.esc(fx.surname(nm(r))) + (multi ? ' ' + String(raw(r, 'season')).slice(2) : ''), showarrow: false, yshift: 11, font: { size: 10, color: hits.indexOf(r) >= 0 ? '#ffffff' : '#c9d1d9' } }));
-  fx.plot('lab-chart', traces, fx.layout({
-    showlegend: S.color === 'pool' || S.color === 'season' || (S.color === 'team' && traces.length <= 32), legend: { orientation: 'h', y: -0.16, font: { color: C.text2, size: 10 } }, margin: { l: 70, r: 20, t: 20, b: 80 }, annotations: ann, hovermode: 'closest',
-    xaxis: { title: label(S.x), zeroline: false, autorange: lower(S.x) ? 'reversed' : true },
-    yaxis: { title: label(S.y), zeroline: false, autorange: lower(S.y) ? 'reversed' : true },
-    shapes: [
-      { type: 'line', x0: mx, x1: mx, yref: 'paper', y0: 0, y1: 1, line: { color: '#3d444d', dash: 'dot', width: 1 } },
-      { type: 'line', y0: my, y1: my, xref: 'paper', x0: 0, x1: 1, line: { color: '#3d444d', dash: 'dot', width: 1 } }
-    ]
-  }));
+    if (other.length) groups.push({ name: 'Other', ink: true, pts: other });
+  } else if (S.color === 'season') Array.from(new Set(rows.map(r => raw(r, 'season')))).sort().forEach((y, i) => groups.push({ name: fx.seasonLabel(L, y), cat: i, pts: rows.filter(r => raw(r, 'season') === y) }));
+  else if (S.color) {
+    const cv = rows.map(r => val(r, S.color)).filter(fx.isNum).sort((a2, b2) => a2 - b2);
+    const dirc = lower(S.color) ? -1 : 1;
+    groups.push({ name: label(S.color), byPct: v => pOf(cv, v, dirc), key: S.color, pts: rows });
+  } else groups.push({ name: 'Players', model: true, pts: rows });
+  const showLegend = S.color === 'pool' || S.color === 'season' || (S.color === 'team' && groups.length <= 32);
   const node = document.getElementById('lab-chart');
-  if (node && node.on) node.on('plotly_click', ev => { const d = ev.points && ev.points[0] && ev.points[0].customdata; if (d && typeof d === 'string') { const parts = d.split('|'); location.hash = fx.playerHref(L, parts[0], Number(parts[1])); } });
+  node.style.height = ''; node.style.setProperty('--h', (node.clientWidth < 520 ? 420 : 520) + 'px');
+  QKC.mount(node, T => {
+    const colOf = (g, r) => (g.byPct ? QK.pctHex(g.byPct(val(r, g.key))) : g.colour ? QK.color.ensure(g.colour, T.s1, 3) : g.ink ? T.ink3 : g.model ? T.model : T.cat[g.cat % 8]);
+    const series = groups.map(g => ({
+      type: 'scatter', name: g.name, z: 3, itemStyle: { color: g.byPct ? T.model : colOf(g, g.pts[0]) },
+      data: g.pts.map(r => ({ value: [val(r, S.x), val(r, S.y)], r: r, symbolSize: size(r), itemStyle: { color: colOf(g, r), opacity: 0.85, borderColor: T.s1, borderWidth: 0.7 },
+        label: labelled.has(r) ? { show: true, position: 'top', distance: 4, color: hits.indexOf(r) >= 0 ? T.ink1 : T.ink2, fontSize: 10, fontWeight: hits.indexOf(r) >= 0 ? 700 : 500, fontFamily: T.fontUI,
+          formatter: fx.surname(nm(r)) + (multi ? ' ' + String(raw(r, 'season')).slice(2) : '') } : undefined }))
+    }));
+    if (hits.length) series.push({ type: 'scatter', name: '_search', z: 4, silent: true, symbol: 'circle', data: hits.map(r => ({ value: [val(r, S.x), val(r, S.y)], symbolSize: size(r) + 10 })), itemStyle: { color: 'transparent', borderColor: T.ink1, borderWidth: 2 } });
+    series[0].markLine = { silent: true, symbol: 'none', label: { show: false }, lineStyle: { color: T.axis, type: [3, 3], width: 1 }, data: [{ xAxis: mx }, { yAxis: my }] };
+    return {
+      grid: { left: 10, right: 20, top: 34, bottom: showLegend ? 64 : 34, containLabel: true },
+      legend: showLegend ? { bottom: 0, left: 'center', type: 'scroll', icon: 'circle', itemWidth: 9, itemHeight: 9, textStyle: { color: T.ink2, fontSize: 10.5 }, data: groups.map(g => g.name) } : { show: false },
+      xAxis: QKC.axis(T, { scale: true, inverse: lower(S.x), name: label(S.x) + (lower(S.x) ? ' (reversed: less is better)' : ''), nameLocation: 'middle', nameGap: 28, fmt: v => fmt(S.x, v) }),
+      yAxis: QKC.axis(T, { scale: true, inverse: lower(S.y), name: label(S.y) + (lower(S.y) ? ' (reversed: less is better)' : ''), nameLocation: lower(S.y) ? 'start' : 'end', nameAlign: 'left', fmt: v => fmt(S.y, v) }),
+      tooltip: QKC.tooltip(T, { formatter: p => (p.data && p.data.r ? hover(p.data.r) : '') }),
+      series: series
+    };
+  }, { label: label(S.y) + ' against ' + label(S.x), onClick: p => { const r = p.data && p.data.r; if (r) location.hash = fx.playerHref(L, raw(r, 'id'), Number(raw(r, 'season'))); } });
   const mX = LAB.meta[S.x] || {}, mY = LAB.meta[S.y] || {};
   set('lab-note', 'Dotted lines are the medians of the players on screen. ' + (lower(S.x) || lower(S.y) ? 'Axes where less is better are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
     'Labelled: the eight players furthest into that corner and the four furthest from it (sum of standard scores on both axes)' + (hits.length ? ', and your search' : '') + '. Marker size is minutes. Click a dot to open the player in that season.' +

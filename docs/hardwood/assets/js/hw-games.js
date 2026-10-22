@@ -1,14 +1,17 @@
-/* The Quant Hardwood — Games (#/<L>/games[/<date>]) and the game centre (#/<L>/game/<gid>).
+/* The Quant Hardwood — Games (#/<L>/games[/<date>]) and the game centre (#/<L>/game/<gid>), on Design System 2.0
+ * (the Rink games and game pages are the reference).
  *
- * Games: a strip of game days around the chosen one, a date picker and month jump, the day's games as kit
- * match cards, the model against the market for the day's upcoming games, and how the model did on the
- * day's finished games.
- * Game centre (Summary tab): scoreboard, line score, model v market before tip-off (win %, spread, total) and
- * the margin broken into its parts; availability before tip-off (the injury report and each team's availability
- * term); win probability (model, with the biggest swings marked), the margin
- * flow, both teams' shot charts on the half court, four factors, game awards and the box score.
+ * Games: a strip of game days around the chosen one, a date picker and month jump, the day's games as v2 game
+ * cards (our chance first, the market a quiet tick), our chance for every home side, and how our forecasts did on
+ * the day's finished games.
+ * Game centre (Summary tab): scoreboard hero with our win-chance bar, stat tiles (our chance, the projected margin
+ * and total, the live chance), the line score, what goes into our forecast, availability before tip-off (the injury
+ * report and each team's availability term), our pre-game forecast with the market as a reference column, the tale
+ * of the tape, win chance through the game, the margin flow, both teams' shot charts on the half court, four
+ * factors, game awards and the box score.
  * Detail tab (?tab=detail): the full pre-redesign game centre (lineups, rotations, key plays, shot modes).
- * Data: <L>/<S>/games/<gid>.json, <L>/<S>/schedule.json, teams.json logs, index.json cards (game.js helpers). */
+ * Data: <L>/<S>/games/<gid>.json, <L>/<S>/schedule.json, <L>/<S>/season.json (records, the tale of the tape),
+ * teams.json logs, index.json cards (game.js helpers). */
 (function (HW) {
 'use strict';
 
@@ -19,9 +22,10 @@ const GC = () => HW.gameCentre;
 
 function renderGames(el, params) {
   const L = U.L(params), S = U.S(params);
-  el.innerHTML = U.secHead('Games', 'Scores, model lines and the market for every game of the season. Pick a day.', null, null, U.kicker(L, S)) + QK.skeleton('card', 6);
-  return GC().seasonGames(L, S).then(list => {
+  el.innerHTML = U.secHead('Games', 'Every game with our win chance; tap a game for the game centre.', null, null, U.kicker(L, S)) + QK.skeleton('card', 6);
+  return Promise.all([GC().seasonGames(L, S), HW.load(HW.path('season.json', L, S))]).then(res => {
     if (!U.alive(el)) return;
+    const list = res[0] || [], recs = U.records(U.ok(res[1]) ? res[1] : null);
     const byDay = {};
     list.forEach(g => { const d = HW.localDay(g.date); (byDay[d] || (byDay[d] = [])).push(g); });
     const days = Object.keys(byDay).sort();
@@ -39,34 +43,34 @@ function renderGames(el, params) {
     const months = {};
     days.forEach(x => { const m = x.slice(0, 7); if (!months[m]) months[m] = x; });
     const dl = d => HW.href(L, 'games/' + d, S);
-    let h = U.secHead('Games', HW.leagueName(L) + ' ' + esc(HW.seasonLabel(L, S)) + ' · ' + list.length + ' games. Cards show the model’s win probability; blue and orange dots compare it with the market before tip-off.', null, null, U.kicker(L, S));
+    let h = U.secHead('Games', HW.leagueName(L) + ' ' + esc(HW.seasonLabel(L, S)) + ' · ' + list.length + ' games. Every card carries our win chance, the favourite in violet; a grey tick marks the market, for reference.', null, null, U.kicker(L, S));
     h += '<div class="hw-flex" style="margin-bottom:12px">' + (days[i - 1] ? '<a class="qk-btn" href="' + esc(dl(days[i - 1])) + '" aria-label="Previous game day">←</a>' : '') +
       '<nav class="hw-strip" aria-label="Game days">' + strip.map(d => '<a href="' + esc(dl(d)) + '"' + (d === day ? ' aria-current="page"' : '') + '><span>' + esc(HW.fmtDate(d, { year: false }).split(' ')[0]) + '</span><b>' + esc(d.slice(8)) + '</b><span class="n">' + byDay[d].length + '</span></a>').join('') + '</nav>' +
       (days[i + 1] ? '<a class="qk-btn" href="' + esc(dl(days[i + 1])) + '" aria-label="Next game day">→</a>' : '') +
       '<input type="date" class="qk-input" id="gl-date" aria-label="Pick a date" value="' + esc(day) + '" min="' + esc(days[0]) + '" max="' + esc(days[days.length - 1]) + '">' +
       '<select class="qk-select" id="gl-month" aria-label="Jump to month"><option value="">Jump to month…</option>' + Object.keys(months).map(m => '<option value="' + months[m] + '">' + esc(HW.fmtDate(m + '-15', { weekday: false }).replace(/^\d+ /, '')) + '</option>').join('') + '</select></div>';
-    h += '<div class="hw-day"><b>' + esc(HW.fmtDate(day)) + '</b> · ' + games.length + ' game' + (games.length === 1 ? '' : 's') + '</div><div class="hw-games">' + games.map(g => U.card(g, L, { season: S })).join('') + '</div>';
+    h += '<div class="hw-day"><b>' + esc(HW.fmtDate(day)) + '</b> · ' + games.length + ' game' + (games.length === 1 ? '' : 's') + '</div><div class="hw-games hw-gc">' + games.map(g => U.card(g, L, { season: S, records: recs })).join('') + '</div>';
     if (mm.length || fin.length) {
       h += '<div class="qk-grid hw-sec">';
-      if (mm.length) h += U.card2('Model v market', 'Home win probability: <b style="color:var(--c-model)">model</b> and the de-vigged <b style="color:var(--c-market)">market</b>', U.chart('gl-mm', 34 * mm.length + 50, 'Model against market'), { cls: fin.length ? 'qk-span-7' : 'qk-span-12' });
+      if (mm.length) h += U.card2('Our chance for every home side', 'Violet: our win chance. Grey ring: the market (no vig), for reference', U.chart('gl-mm', 34 * mm.length + 60, 'Our home win chance, with the market for reference'), { cls: fin.length ? 'qk-span-7' : 'qk-span-12' });
       if (fin.length) {
         const scored = fin.filter(g => isNum((g.model || {}).p_home) && isNum(g.hs) && isNum(g.as));
         const right = scored.filter(g => (g.model.p_home >= 0.5) === (g.hs > g.as)).length;
         const brier = scored.length ? scored.reduce((s, g) => s + Math.pow(g.model.p_home - (g.hs > g.as ? 1 : 0), 2), 0) / scored.length : null;
-        h += U.card2('How the model did', scored.length ? right + ' of ' + scored.length + ' favourites won' + (isNum(brier) ? ' · Brier ' + brier.toFixed(3) + ' (0.25 = a coin flip)' : '') : 'Results of the day',
+        h += U.card2('How our forecasts did', scored.length ? right + ' of ' + scored.length + ' of our favourites won' + (isNum(brier) ? ' · Brier score ' + brier.toFixed(3) + ' (0.25 = a coin flip; lower is better)' : '') : 'Results of the day',
           '<ul class="hw-list">' + fin.map(g => {
             const p = (g.model || {}).p_home, hw = g.hs > g.as;
             const fav = isNum(p) ? (p >= 0.5 ? g.home : g.away) : null, pf = isNum(p) ? Math.max(p, 1 - p) : null;
             const ok = fav !== null && ((fav === g.home) === hw);
             return '<li><a class="hw-ent" href="' + esc(HW.gameHref(L, g.id, S)) + '"><span class="nm">' + esc(HW.teamAbbr(L, g.away) + ' ' + g.as + ' – ' + g.hs + ' ' + HW.teamAbbr(L, g.home)) + '</span></a>' +
-              '<span class="s">' + (fav ? 'model: ' + esc(HW.teamAbbr(L, fav)) + ' ' + U.pct(pf) : '') + '</span><span class="v ' + (fav === null ? '' : ok ? 'pos' : 'neg') + '">' + (fav === null ? '' : ok ? '✓' : '✗') + '</span></li>';
+              '<span class="s">' + (fav ? 'ours: ' + esc(HW.teamAbbr(L, fav)) + ' ' + U.pct(pf) : '') + '</span><span class="v ' + (fav === null ? '' : ok ? 'pos' : 'neg') + '">' + (fav === null ? '' : ok ? '✓' : '✗') + '</span></li>';
           }).join('') + '</ul>', { cls: mm.length ? 'qk-span-5' : 'qk-span-12', flush: true });
       }
       h += '</div>';
     }
     el.innerHTML = h;
     if (mm.length) {
-      QKC.dumbbell('#gl-mm', { rows: mm.map(g => ({ label: HW.teamAbbr(L, g.away) + ' @ ' + HW.teamName(L, g.home), a: g.model.p_home, b: g.market.p_home, href: HW.gameHref(L, g.id, S), sub: (g.market.sources || []).join(', ') })), aName: 'Model', bName: 'Market', labelWidth: 170, valName: 'Home win probability' });
+      QKC.dumbbell('#gl-mm', { rows: mm.map(g => ({ label: HW.teamAbbr(L, g.away) + ' @ ' + HW.teamName(L, g.home), a: g.model.p_home, b: g.market.p_home, href: HW.gameHref(L, g.id, S), sub: 'Market: ' + srcLabel(g.market.sources) })), aName: 'Our chance', bName: 'Market (reference)', labelWidth: 170, valName: 'Home win chance', catName: 'Game' });
     }
     const go = v => { if (v) HW.go(dl(v)); };
     document.getElementById('gl-date').addEventListener('change', e => go(e.target.value));
@@ -80,6 +84,13 @@ function renderGames(el, params) {
 // ── game centre ────────────────────────────────────────────────────────────
 
 const PERIOD_S = L => (L === 'wnba' ? 600 : 720);
+const srcLabel = src => U.srcLabel(src);
+/* Standard normal CDF (Abramowitz and Stegun 7.1.26): our margin forecast is normal with the model's sd. */
+function phi(z) {
+  const t = 1 / (1 + 0.3275911 * Math.abs(z) / Math.SQRT2);
+  const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-z * z / 2);
+  return z >= 0 ? (1 + y) / 2 : (1 - y) / 2;
+}
 function tLabel(L, t) {
   const n = PERIOD_S(L), reg = 4 * n;
   if (t < reg) { const p = Math.floor(t / n) + 1; const left = n - (t - (p - 1) * n); return 'Q' + p + ' ' + Math.floor(left / 60) + ':' + ('0' + Math.round(left % 60)).slice(-2); }
@@ -117,34 +128,91 @@ function boxTable(node, L, g, tid, S) {
 
 function headHTML(L, g, S) {
   const st = U.status(g);
-  const fin = st === 'final';
+  const fin = st === 'final', live = st === 'live', pre = st === 'pre';
+  const pc = U.pair(L, g.away, g.home), ca = pc[0], ch = pc[1];
   const side = (tid, home) => {
     const t = U.team(L, tid);
-    return '<div class="side' + (home ? ' home' : '') + '">' + (home ? '' : QK.teamMark(t, 'lg')) + '<div><a class="nm" href="' + esc(HW.teamHref(L, tid, S)) + '">' + esc(HW.teamName(L, tid)) + '</a><div class="sb">' + (home ? 'Home' : 'Away') + '</div></div>' + (home ? QK.teamMark(t, 'lg') : '') + '</div>';
+    return '<div class="side' + (home ? ' home' : '') + '">' + (home ? '' : QK.teamMark(t, 'lg')) + '<div style="min-width:0"><a class="nm" href="' + esc(HW.teamHref(L, tid, S)) + '">' + esc(HW.teamName(L, tid)) + '</a><div class="sb">' + (home ? 'Home' : 'Away') + '</div></div>' + (home ? QK.teamMark(t, 'lg') : '') + '</div>';
   };
-  const sc = st === 'pre' ? '<div class="hw-quiet">' + esc(HW.fmtDate(g.date, { time: true })) + '</div>' :
-    '<div class="hw-score"><span class="' + (fin && g.as < g.hs ? 'lost' : '') + '">' + (isNum(g.as) ? g.as : '–') + '</span><span class="dash">–</span><span class="' + (fin && g.hs < g.as ? 'lost' : '') + '">' + (isNum(g.hs) ? g.hs : '–') + '</span></div>';
+  const sc = pre ? '<div class="hw-score2 hw-score-pre"><span>' + esc(HW.fmtTime(g.date) || 'TBD') + '</span></div>' :
+    '<div class="hw-score2"><span class="' + (fin && g.as < g.hs ? 'lost' : '') + '">' + (isNum(g.as) ? g.as : '–') + '</span><span class="dash">–</span><span class="' + (fin && g.hs < g.as ? 'lost' : '') + '">' + (isNum(g.hs) ? g.hs : '–') + '</span></div>';
   const badge = QK.statusBadge({ status: st, start: g.date, period: g.periods || g.period, sport: 'basketball', note: fin && Number(g.periods) > 4 ? 'OT' : '' });
   const meta = [HW.stypeLabel(g.stype), g.series && (g.series.summary || g.series.round) ? (g.series.summary || g.series.round) : '',
-    st !== 'pre' ? HW.fmtDate(g.date, { time: true }) : '', g.venue ? (typeof g.venue === 'object' ? [g.venue.name, g.venue.city].filter(Boolean).join(', ') : g.venue) : '',
+    HW.fmtDate(g.date, { time: true }), g.venue ? (typeof g.venue === 'object' ? [g.venue.name, g.venue.city].filter(Boolean).join(', ') : g.venue) : '',
     isNum(g.attendance) && g.attendance > 0 ? Number(g.attendance).toLocaleString('en-GB') + ' fans' : ''].filter(Boolean);
-  return '<div class="qk-hero" style="--tc:' + esc(U.tcol(L, g.home)) + '"><div class="hw-gh">' + side(g.away, false) + '<div class="mid">' + sc + badge + '</div>' + side(g.home, true) + '</div>' +
-    '<div class="hw-hero-meta">' + meta.map(m => '<span>' + esc(m) + '</span>').join('') + '</div></div>';
+  // the bar: live, our live chance; before the game, ours with the market's split as a quiet tick; after it, our pre-game call
+  const m = (g.pregame || {}).model || {}, mk = (g.pregame || {}).market || {};
+  const wpl = ((g.wp || {}).model || []);
+  const pLive = live && wpl.length ? wpl[wpl.length - 1][1] : null;
+  const pH = live && isNum(pLive) ? Number(pLive) : (isNum(m.p_home) ? Number(m.p_home) : null);
+  const A = U.team(L, g.away), H = U.team(L, g.home);
+  A.colour = ca; H.colour = ch;
+  const bar = isNum(pH) ? '<div class="hw-hero-bar"><div class="qk-kicker">' + (live ? 'Our live win chance' : fin ? 'Our pre-game win chance' : 'Our win chance') + '</div>' +
+    QK.wpBar(1 - pH, null, pH, A, H, { colors: [ca, ch], size: 'lg', market: pre && isNum(mk.p_home) ? 1 - mk.p_home : null, label: live ? 'Live win chance' : 'Our win chance' }) +
+    (pre && isNum(mk.p_home) ? '<div class="hw-hero-mkt"><span class="qk-mkt" data-tip="The market probability with the bookmaker margin removed, shown as a reference next to ours">Market (' + esc(srcLabel(mk.sources)) + ') <b>' + esc(HW.teamAbbr(L, g.home)) + ' ' + U.pct(mk.p_home) + '</b></span></div>' : '') + '</div>' : '';
+  return '<section class="qk-hero hw-hero2" style="--tc:' + esc(ch) + '"><div class="hw-gh">' + side(g.away, false) + '<div class="mid">' + sc + badge + '</div>' + side(g.home, true) + '</div>' + bar +
+    '<div class="hw-hero-meta">' + meta.map(x => '<span>' + esc(x) + '</span>').join('') + '</div></section>';
 }
 
 function pregameKpis(L, g) {
-  const pre = g.pregame || {}, m = pre.model || {}, mk = pre.market || null;
-  if (!isNum(m.p_home)) return '';
-  const H = HW.teamAbbr(L, g.home);
-  const spread = isNum(m.spread_fair) ? m.spread_fair : (isNum(m.margin) ? -m.margin : null);
-  const out = [
-    QK.kpi({ label: H + ' win · model', value: U.pct(m.p_home), sub: 'fair ' + HW.american(m.p_home) + (mk && isNum(mk.p_home) ? ' · market ' + U.pct(mk.p_home) : ''), tip: 'Pregame model; the market is de-vigged' }),
-    QK.kpi({ label: 'Spread · ' + H, value: HW.fmtSpread(spread), sub: 'margin ' + U.signed(m.margin, 1) + (isNum(m.sd) ? ' ± ' + U.f(m.sd, 1) : '') + (mk && isNum(mk.spread_home) ? ' · market ' + HW.fmtSpread(mk.spread_home) : '') }),
-    QK.kpi({ label: 'Total', value: U.f(m.total, 1), sub: (isNum(m.pts_home) ? H + ' ' + U.f(m.pts_home, 0) + ' · ' + HW.teamAbbr(L, g.away) + ' ' + U.f(m.pts_away, 0) : '') + (mk && isNum(mk.total) ? ' · market ' + U.f(mk.total, 1) : '') })
-  ];
-  if (isNum(pre.elo_p_home)) out.push(QK.kpi({ label: 'Elo alone', value: U.pct(pre.elo_p_home), sub: H + ' win probability' }));
-  return '<div class="qk-kpis hw-kpis">' + out.join('') + '</div>';
+  const pre = g.pregame || {}, m = pre.model || {};
+  const st = U.status(g);
+  const out = [];
+  const H = HW.teamAbbr(L, g.home), A = HW.teamAbbr(L, g.away);
+  if (isNum(m.p_home)) {
+    const fav = m.p_home >= 0.5 ? H : A;
+    out.push({ label: st === 'pre' ? 'Our win chance' : 'Our pre-game call', value: fav + ' ' + U.pct(Math.max(m.p_home, 1 - m.p_home)), signal: true, sub: 'our pre-game model, overtime included', tip: 'Our pre-game chance that the favourite wins' });
+  }
+  if (st === 'live') {
+    const wpl = ((g.wp || {}).model || []);
+    const p = wpl.length ? wpl[wpl.length - 1][1] : null;
+    if (isNum(p)) out.push({ label: 'Live win chance', value: (p >= 0.5 ? H : A) + ' ' + U.pct(Math.max(p, 1 - p)), signal: true, sub: 'our live model, every possession' });
+  }
+  if (isNum(m.margin)) out.push({ label: 'Projected margin', value: (m.margin >= 0 ? H : A) + ' by ' + U.f(Math.abs(m.margin), 1), sub: isNum(m.sd) ? '± ' + U.f(m.sd, 1) + ' points (one standard deviation)' : '', tip: 'Our expected winning margin; games vary around it by the standard deviation shown' });
+  if (isNum(m.total)) out.push({ label: 'Projected total', value: U.f(m.total, 1), unit: 'pts', sub: isNum(m.pts_home) ? A + ' ' + U.f(m.pts_away, 0) + ' · ' + H + ' ' + U.f(m.pts_home, 0) : '' });
+  if (isNum(pre.elo_p_home)) out.push({ label: 'Elo alone', value: (pre.elo_p_home >= 0.5 ? H : A) + ' ' + U.pct(Math.max(pre.elo_p_home, 1 - pre.elo_p_home)), sub: 'a simpler rating, for comparison', tip: 'The win chance from our Elo ratings alone (results only, no box score or availability)' });
+  return out.length ? '<div class="hw-kpis">' + QK.stats(out) + '</div>' : '';
 }
+
+/* Our pre-game forecast with the market as a reference column (the game detail page may show it). */
+function forecastTable(L, g) {
+  const pre = g.pregame || {}, m = pre.model || {}, mk = pre.market || {};
+  if (!isNum(m.p_home)) return '';
+  const H = HW.teamAbbr(L, g.home), A = HW.teamAbbr(L, g.away);
+  const by = (t, n) => (isNum(m.margin) && isNum(m.sd) && m.sd > 0 ? U.pct(t === 'h' ? 1 - phi((n - 0.5 - m.margin) / m.sd) : phi((-(n - 0.5) - m.margin) / m.sd)) : '—');
+  const mkSp = isNum(mk.spread_home) ? (mk.spread_home <= 0 ? H + ' by ' + U.f(-mk.spread_home, 1) : A + ' by ' + U.f(mk.spread_home, 1)) : '';
+  const rows = [
+    ['Win (overtime included)', H + ' ' + U.pct(m.p_home) + ' · ' + A + ' ' + U.pct(1 - m.p_home), isNum(mk.p_home) ? H + ' ' + U.pct(mk.p_home) : '—'],
+    ['Projected margin', isNum(m.margin) ? (m.margin >= 0 ? H : A) + ' by ' + U.f(Math.abs(m.margin), 1) + (isNum(m.sd) ? ' (± ' + U.f(m.sd, 1) + ')' : '') : '—', mkSp || '—'],
+    [H + ' wins by 6 or more', by('h', 6), ''],
+    [A + ' wins by 6 or more', by('a', 6), ''],
+    ['Total points', isNum(m.total) ? U.f(m.total, 1) + ' expected' : '—', isNum(mk.total) ? U.f(mk.total, 1) : '—'],
+    ['Projected score', isNum(m.pts_home) ? A + ' ' + U.f(m.pts_away, 0) + ' – ' + U.f(m.pts_home, 0) + ' ' + H : '—', '']
+  ];
+  return '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Question</th><th>Our forecast</th><th><span data-tip="The prediction-market or sportsbook number with the margin removed, shown as a reference">Market (' + esc(srcLabel(mk.sources)) + ')</span></th></tr></thead><tbody>' +
+    rows.map(r => '<tr><td>' + esc(r[0]) + '</td><td class="num" style="text-align:left;color:var(--ink-1);font-weight:600">' + esc(r[1]) + '</td><td class="num qk-muted" style="text-align:left">' + esc(r[2]) + '</td></tr>').join('') + '</tbody></table></div>';
+}
+
+/* Tale of the tape: the two teams' season profile (season.json ratings and standings). */
+function tape(L, g, season) {
+  const R = (season && season.ratings) || {};
+  const a = R[String(g.away)] || {}, h = R[String(g.home)] || {};
+  const st = {}; const sd = (season && season.standings) || {};
+  Object.keys(sd).forEach(c => (sd[c] || []).forEach(r => { st[String(r.team)] = r; }));
+  const sa = st[String(g.away)] || {}, sh = st[String(g.home)] || {};
+  const rows = [
+    { label: 'Net rating (per 100 possessions)', a: a.net, b: h.net, fmt: v => U.signed(v, 1), tip: 'Our opponent-adjusted net rating: points per 100 possessions better than an average team' },
+    { label: 'Offensive rating', a: a.off, b: h.off, fmt: v => U.f(v, 1), tip: 'Points scored per 100 possessions, opponent-adjusted' },
+    { label: 'Defensive rating', a: a.def, b: h.def, fmt: v => U.f(v, 1), better: 'low', tip: 'Points allowed per 100 possessions, opponent-adjusted (lower is better)' },
+    { label: 'Win %', a: sa.w + sa.l > 0 ? sa.pct : null, b: sh.w + sh.l > 0 ? sh.pct : null, fmt: v => U.pct(v, 1) },
+    { label: 'Point differential', a: sa.w + sa.l > 0 ? sa.pd : null, b: sh.w + sh.l > 0 ? sh.pd : null, fmt: v => U.signed(v, 0) }
+  ];
+  if (!rows.some(r => isNum(r.a) && isNum(r.b))) return '';
+  const pc = U.pair(L, g.away, g.home);
+  const A = U.team(L, g.away), H = U.team(L, g.home); A.colour = pc[0]; H.colour = pc[1];
+  return QK.matchupBar({ left: A, right: H, rows: rows, colors: pc });
+}
+
 // Pre-game availability: ESPN's injury report as of the last fetch before tip-off, and (NBA informed model) each
 // team's availability term in points of its own margin. Out = counted as not playing; Day-To-Day and the rest keep
 // the rate implied by recent games played.
@@ -195,7 +263,7 @@ function renderGame(el, params) {
   const L = U.L(params), gid = params.id;
   const tab = U.tab(params, ['summary', 'detail'], 'summary');
   el.innerHTML = QK.skeleton('lines', 6);
-  return GC().loadGame(L, params.season, gid).then(res => {
+  return GC().loadGame(L, params.season, gid).then(res => (res && U.ok(res.d) ? HW.load(HW.path('season.json', L, res.s)).then(sn => { res.season = U.ok(sn) ? sn : null; return res; }) : res)).then(res => {
     if (!U.alive(el)) return;
     if (!res || !U.ok(res.d)) { el.innerHTML = U.secHead('Game', '', null, null, U.kicker(L, U.S(params))) + U.empty('Game not available', 'This game page has not been built yet.') + '<p>' + U.link(HW.href(L, 'games'), 'All games') + '</p>'; return; }
     const g = res.d, S = res.s;
@@ -207,7 +275,7 @@ function renderGame(el, params) {
     let h = headHTML(L, g, S) + U.tabsHTML(tabs, tab);
     if (tab === 'detail') {
       el.innerHTML = h + '<div class="hw-sub"></div>';
-      return U.legacy('game', el.querySelector('.hw-sub'), params);
+      return U.legacy('game', el.querySelector('.hw-sub'), params, null, { embed: 'detail' });
     }
     const ln = g.line || {};
     const la = ln.away || [], lh = ln.home || [];
@@ -220,8 +288,8 @@ function renderGame(el, params) {
     if (la.length || lh.length) {
       h += U.card2('Line score', '', '<div id="gm-ls"></div>', { cls: 'qk-span-' + (parts.length ? '7' : '12'), flush: true });
     }
-    if (parts.length) h += U.card2('How the model built the line', 'Points of ' + esc(HW.teamAbbr(L, H)) + ' margin from each part', U.chart('gm-parts', 30 * parts.length + 30, 'Margin parts'), { cls: 'qk-span-' + (la.length || lh.length ? '5' : '12') });
-    if (g.wp && (g.wp.model || []).length) h += U.card2('Win probability', 'Our live model for ' + esc(HW.teamName(L, H)) + '; the numbered dots are the biggest swings' + ((g.wp.espn || []).length ? ' (ESPN’s line dotted)' : ''), U.chart('gm-wp', 300, 'Win probability'), { cls: 'qk-span-12' });
+    if (parts.length) h += U.card2('What goes into our forecast', 'Points of ' + esc(HW.teamAbbr(L, H)) + ' margin from each part', U.chart('gm-parts', 30 * parts.length + 60, 'What goes into our forecast'), { cls: 'qk-span-' + (la.length || lh.length ? '5' : '12') });
+    if (g.wp && (g.wp.model || []).length) h += U.card2('Win chance through the game', 'Our live model for ' + esc(HW.teamName(L, H)) + ' after every possession; the numbered dots are the biggest swings' + ((g.wp.espn || []).length ? ' (ESPN’s own number dotted)' : ''), U.chart('gm-wp', 300, 'Win chance through the game'), { cls: 'qk-span-12' });
     if (g.flow && g.flow.length) h += U.card2('Margin', esc(HW.teamAbbr(L, H)) + ' lead through the game', U.chart('gm-flow', 220, 'Margin flow'), { cls: 'qk-span-7' });
     const ff = g.four_factors || {};
     if (ff[A] && ff[H]) h += U.card2('Four factors', 'Shooting, turnovers (lower is better), offensive rebounds, free throws', U.chart('gm-ff', 220, 'Four factors'), { cls: 'qk-span-5' });
@@ -232,12 +300,15 @@ function renderGame(el, params) {
         U.card2(HW.teamName(L, H) + ' shots', esc(sqTxt(H)) + (sqTxt(H) ? ' · ' : '') + 'size is expected points', '<div id="gm-sh-h"></div>', { cls: 'qk-span-6' });
     }
     h += availabilityHTML(L, g, S);
+    const fc = forecastTable(L, g), tp = tape(L, g, res.season);
+    if (fc) h += U.card2(st === 'pre' ? 'Our forecast' : 'Our pre-game forecast', 'Chances from our game model; the market column is a reference', fc, { cls: 'qk-span-' + (tp ? 7 : 12), flush: true });
+    if (tp) h += U.card2('Tale of the tape', 'Season so far: the stronger side of each bar is solid', tp, { cls: 'qk-span-' + (fc ? 5 : 12) });
     h += awardsHTML(L, g, S);
     if (hasBox) {
       h += U.card2('Box score', 'Advanced columns where play-by-play exists. Sort any column.', '<div class="qk-seg hw-boxtabs" id="gm-bx-seg" role="group" aria-label="Team">' +
         [A, H].map((t, i) => '<button type="button" data-value="' + esc(t) + '" aria-pressed="' + (i === 0) + '">' + esc(HW.teamName(L, t)) + '</button>').join('') + '</div><div id="gm-box"></div>', { cls: 'qk-span-' + (awardsHTML(L, g, S) ? '7' : '12') });
     }
-    if (st === 'pre' && !parts.length && !isNum(((g.pregame || {}).model || {}).p_home)) h += U.card2('Preview', '', U.empty('Line not ready', 'The model line appears once the game is inside the build window.'), { cls: 'qk-span-12' });
+    if (st === 'pre' && !parts.length && !isNum(((g.pregame || {}).model || {}).p_home)) h += U.card2('Preview', '', U.empty('Forecast not ready', 'Our forecast appears once the game is inside the build window.'), { cls: 'qk-span-12' });
     h += '</div>';
     if (st !== 'pre' && !(g.flow && g.flow.length) && hasBox) h += '<p class="hw-note">No play-by-play for this game: win probability, shots, lineups and rotations need it (seasons before about 2017 are box score only).</p>';
     h += '<p class="hw-flex">' + U.link(HW.href(L, 'games/' + HW.localDay(g.date), S), 'Games that day') + U.link(HW.teamHref(L, A, S), HW.teamName(L, A)) + U.link(HW.teamHref(L, H, S), HW.teamName(L, H)) + '</p>';
@@ -253,7 +324,7 @@ function renderGame(el, params) {
     }
     if (document.getElementById('gm-parts')) {
       const LBL = { rating: 'Team ratings', hca: 'Home court', rest: 'Rest', b2b: 'Back-to-back', travel: 'Travel', tz: 'Time zones', altitude: 'Altitude', injury: 'Injuries' };
-      QKC.bar('#gm-parts', { cats: parts.map(k => LBL[k]), series: [{ name: 'Points', data: parts.map(k => Math.round(det[k] * 10) / 10) }], horizontal: true, labels: true, diverging: true, fmt: v => U.signed(v, 1), labelWidth: 100, valName: 'Margin (points)' });
+      QKC.bar('#gm-parts', { cats: parts.map(k => LBL[k]), series: [{ name: 'Points', data: parts.map(k => Math.round(det[k] * 10) / 10) }], horizontal: true, labels: true, diverging: true, fmt: v => U.signed(v, 1), labelWidth: 100, valName: HW.teamAbbr(L, H) + ' margin (points)', catName: 'Part' });
     }
     if (document.getElementById('gm-wp')) {
       const pts = g.wp.model, espn = g.wp.espn || [];
@@ -286,7 +357,7 @@ function renderGame(el, params) {
     }
     if (document.getElementById('gm-ff')) {
       const K = [['efg', 'eFG%'], ['tov', 'TOV%'], ['orb', 'ORB%'], ['ftr', 'FT rate']];
-      QKC.bar('#gm-ff', { cats: K.map(k => k[1]), series: [{ name: HW.teamAbbr(L, A), data: K.map(k => Math.round(ff[A][k[0]] * 1000) / 10) }, { name: HW.teamAbbr(L, H), data: K.map(k => Math.round(ff[H][k[0]] * 1000) / 10) }], labels: true, fmt: v => U.f(v, 1), legend: true, valName: 'Rate (%)',
+      QKC.bar('#gm-ff', { catName: 'Factor', cats: K.map(k => k[1]), series: [{ name: HW.teamAbbr(L, A), data: K.map(k => Math.round(ff[A][k[0]] * 1000) / 10) }, { name: HW.teamAbbr(L, H), data: K.map(k => Math.round(ff[H][k[0]] * 1000) / 10) }], labels: true, fmt: v => U.f(v, 1), legend: true, valName: 'Rate (%)',
         max: v => Math.min(100, Math.ceil(v.max * 1.2 / 10) * 10) });
     }
     if (shots.length) {
