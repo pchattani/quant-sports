@@ -62,25 +62,36 @@ CLV_MIN_SHARE = 0.5      # CLV is the primary test only when at least this share
 CLOSE_MOVED_MIN = 0.2    # ... and more than this share of those closes differs from the price taken
 
 
+def _count(u: dict, key: str) -> int:
+    """A count from a summary row; missing, None or NaN (a sport whose rows lack the column) count as 0."""
+    v = u.get(key)
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return 0
+    return int(v) if np.isfinite(v) else 0
+
+
 def clv_usable(u: dict) -> bool:
     """CLV is a test of the bets only when most of them have a close for the line bet and the close is not, for
     most of them, the very price taken (bets placed at the close have CLV = minus the margin by construction)."""
-    n = u.get("n", 0) or 0
-    return (u.get("n_clv", 0) or 0) >= CLV_MIN_SHARE * max(n, 1) and (u.get("close_differs") or 0) > CLOSE_MOVED_MIN
+    cd = u.get("close_differs")
+    cd = float(cd) if isinstance(cd, (int, float)) and np.isfinite(cd) else 0.0
+    return _count(u, "n_clv") >= CLV_MIN_SHARE * max(_count(u, "n"), 1) and cd > CLOSE_MOVED_MIN
 
 
 def clv_basis(u: dict) -> str:
     """What the CLV figure rests on, for the table: bets with a same-line close, and spreads/totals voided because
     their line moved."""
-    n, k = int(u.get("n", 0) or 0), int(u.get("n_clv", 0) or 0)
-    lm = int(u.get("n_line_moved", 0) or 0)
+    n, k = _count(u, "n"), _count(u, "n_clv")
+    lm = _count(u, "n_line_moved")
     return f"{k:,} of {n:,}" + (f"; {lm:,} line moved" if lm else "")
 
 
 def no_clv_reason(u: dict) -> str:
     """Why the CLV in the table is not the test (the verdict's wording when `clv_usable` is False)."""
-    n, k = int(u.get("n", 0) or 0), int(u.get("n_clv", 0) or 0)
-    lm, nc = int(u.get("n_line_moved", 0) or 0), int(u.get("n_no_close", 0) or 0)
+    n, k = _count(u, "n"), _count(u, "n_clv")
+    lm, nc = _count(u, "n_line_moved"), _count(u, "n_no_close")
     why = []
     if lm:
         why.append(f"{lm:,} are spreads/totals whose line moved before the close, and the portfolio layer gives those "
@@ -94,7 +105,7 @@ def no_clv_reason(u: dict) -> str:
     if k < CLV_MIN_SHARE * max(n, 1):
         return (f"CLV not used as the test: only {k:,} of the {n:,} bets ({k / n:.0%}) have a closing price for the "
                 f"line bet" + (f"; {'; '.join(why)}" if why else "") + f". {clv} rests on those {k:,} bets only.")
-    same, noprice = int(u.get("n_close_same", 0) or 0), int(u.get("n_close_noprice", 0) or 0)
+    same, noprice = _count(u, "n_close_same"), _count(u, "n_close_noprice")
     how = []
     if same:
         how.append(f"{same:,} of the {k:,} bets with a close were taken at the closing price itself, so their CLV is "
@@ -125,7 +136,7 @@ def verdict(u: dict, p_holm: float, min_bets: int = 50) -> tuple[str, str]:
     luck = " The positive ROI without CLV is treated as luck." if roi_sig else ""
     if clv_ok:
         c = f"CLV {u['clv']:+.2%} [{u['clv_lo']:+.2%}, {u['clv_hi']:+.2%}]"
-        lm = int(u.get("n_line_moved", 0) or 0)
+        lm = _count(u, "n_line_moved")
         part = (f" CLV rests on {int(u['n_clv']):,} of the {n:,} bets: {lm:,} spreads/totals get none because their "
                 f"line moved before the close." if lm else "")
         r = f"ROI {u['roi']:+.2%} [{u['roi_lo']:+.2%}, {u['roi_hi']:+.2%}]"

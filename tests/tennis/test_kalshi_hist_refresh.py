@@ -38,3 +38,14 @@ def test_index_refresh_picks_up_new_settlements(tmp_path, monkeypatch):
     assert meta["complete"] == {"hist": True, "live": True}
     calls.clear()
     assert len(KH.index("KXATPMATCH")) == 8 and not calls                     # fresh: served from the cache
+
+
+def test_candle_quotes_read_both_kalshi_field_formats():
+    """Kalshi renamed the candle fields in August 2026 (close -> close_dollars, volume -> volume_fp); the old reader
+    dropped every match from then on."""
+    from oddsmarkets.tennis.research import kalshi_edge as KE
+    old = {"end_period_ts": 100, "yes_bid": {"close": "0.4500"}, "yes_ask": {"close": "0.4700"}, "volume": "12.00"}
+    new = {"end_period_ts": 200, "yes_bid": {"close_dollars": "0.5300"}, "yes_ask": {"close_dollars": "0.5500"},
+           "volume_fp": "3.00"}
+    wide = {"end_period_ts": 300, "yes_bid": {"close_dollars": "0.1000"}, "yes_ask": {"close_dollars": "0.9900"}}
+    assert KE._quotes([old, new, wide]) == [(100.0, 0.45, 0.47, 12.0), (200.0, 0.53, 0.55, 3.0)]

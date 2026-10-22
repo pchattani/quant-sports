@@ -715,3 +715,31 @@ def test_season_absent_player_returns_with_probability():
     r = SS.simulate_season(st, n=20000, seed=3)
     assert r["points"]["p0"]["added_mean"] == pytest.approx(0.5 * 250, rel=0.05)      # wins it whenever he returns
     assert r["year_end_no1"]["p0"] == pytest.approx(0.5, abs=0.02)
+
+
+def test_year_end_no1_follows_the_race_not_the_official_ranking():
+    """21 Oct 2026 (reported as a bug, it is not one): Sinner led the official ranking on 10,950 points against
+    Zverev's 10,070, but 3,000 of Sinner's were last season's Vienna, Paris and Finals, which drop before the
+    year-end ranking; the 2026 Race had Zverev ahead, 9,110 to 7,950. With Paris (1000) and the Finals left and
+    Sinner out since Wimbledon, Zverev is the clear favourite (Kalshi 98.5%, Polymarket 99%), and Sinner, the
+    ranking leader, is projected second. The site's 17% for Sinner is the absence rule's 50% chance he returns."""
+    pids = ["zverev", "sinner"] + [f"x{i}" for i in range(6)]
+    s = np.array([0.6, 1.0] + [0.0] * 6)
+    st = {"tour": "atp", "players": pids, "rank_pts": {"sinner": 10950, "zverev": 10070},
+          "race_pts": {"zverev": 9110, "sinner": 7950, **{f"x{i}": 3000 - 100 * i for i in range(6)}},
+          "drops": {"sinner": 3000, "zverev": 960}, "earned_since_snapshot": {}, "use_snapshot": True,
+          "events": [{"id": "paris-2026", "level": "m1000", "draw_size": 8, "accept": 1.0, "surface": "hard",
+                      "best_of": 3, "start": "2026-10-26", "entry": {p: 1.0 for p in pids},
+                      "points": {"W": 1000, "F": 650, "QF": 200}}],
+          "logit": lambda a, b: SS._field_logit(s[:, None] - s[None, :], 0, 8), "slam_winners": [],
+          "finals": {"points": {"RR_win": 200, "SF_win": 400, "F_win": 500}},
+          "absent": {"sinner": {"last_match": "2026-07-12", "missed_big": 4}}, "as_of": "2026-10-21"}
+    r = SS.simulate_season(st, n=6000, seed=1)
+    no1 = r["year_end_no1"]
+    assert no1["zverev"] > 0.7 > no1.get("sinner", 0.0)
+    assert r["rank_dist"]["sinner"][1] > r["rank_dist"]["sinner"][0]           # projected second
+    # the official-ranking route agrees once last season's points drop: 10,950 - 3,000 = the Race's 7,950
+    assert r["points"]["sinner"]["via_snapshot_mean"] == pytest.approx(r["points"]["sinner"]["mean"], abs=1e-6)
+    # without the absence rule he still needs to outscore Zverev by 1,160 in Paris and the Finals
+    r2 = SS.simulate_season(dict(st, absent={}), n=6000, seed=1)
+    assert no1["sinner"] < r2["year_end_no1"]["sinner"] < 0.5

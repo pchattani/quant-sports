@@ -124,7 +124,7 @@ the dev years 2012–2017 only, over the grid K ∈ {0.06, 0.12, 0.24} × w ∈ 
 adding it to the blend cut log-loss by 0.0024 (ATP) and 0.0046 (WTA), with 95 % CIs excluding zero. `history(tour)` is
 cached under `ACE_CACHE/gelo/` (the build's `TourData.gelo` under `ace_gelo`); about 3 s per tour.
 
-### 2.2 Market rating: `mrating.py` (added 21 October 2026; in the ATP price, WTA pending its refit)
+### 2.2 Market rating: `mrating.py` (added 21 October 2026; in the ATP price, the WTA's since 22 October)
 
 Each player's strength as the betting market priced it, learnt from the **closing prices of matches already
 played** (tennis-data's Pinnacle, else Betfair exchange, else market average, Bet365, Max; power de-vig; a book whose
@@ -141,12 +141,10 @@ idle days:  P += q per day, Q += q_s per day (capped at the priors)
 new player: R = -c1 (ln rank - ln 100) (the MATCH row's rank, `unranked` without one), P = p0, D = 0, Q = ps0
 ```
 
-Every match of a day is priced from the states at the end of the day before. The WTA stores hold some matches twice
-on one date under two events: the same match as a WTA 125 ("ch") row and a tour-level row, or in two seasons' stores
-across New Year (`shenzhen-2018-R32-...` and `shenzhen-2019-R32-...`, both 30 December 2018). A strictly sequential
-pass lets the twin's result into the price (WTA test years, the 4 % of matches with a same-day earlier match: 0.556
-log-loss against Pinnacle's 0.608). Elo, the game-share Elo and the serve/return fits run sequentially and carry the
-same leak on those rows (section 13, item 10).
+Every match of a day is priced from the states at the end of the day before. Until 22 October 2026 the WTA stores
+held some matches twice (a WTA 125 "ch" row beside a tour-level row, or in two seasons' stores across New Year), and a
+strictly sequential pass let the twin's result into the price; the stores now hold one row per match (section 13,
+item 10), and the sequential and day-lagged versions score the same (WTA test years: −0.0060 and −0.0059 against P0).
 
 | Constant | ATP | WTA |
 |---|---|---|
@@ -411,8 +409,8 @@ match). Everything is exact, not simulated.
 |---|---|---|---|---|---|
 | `DEFAULT_BLEND` ATP | 0.55 | 0.45 | 0 | 0.03 | – |
 | `DEFAULT_BLEND` WTA | 0.6 | 0.4 | 0 | 0.03 | – |
-| `predict_atp.json` (21 Oct 2026) | −0.0294 | 0.0269 | 0.4552 | 0.04 | plus **w_mr 0.8400**; 41,601 matches 2010–2026, log-loss 0.5838 (the 3-term fit before: 0.4924 / 0.2110 / 1.0511, 0.5945; kept as "fundamental": 0.4929 / 0.2113 / 1.0492) |
-| `predict_wta.json` | 0.4661 | 0.2896 | 0.7204 | 0.04 | 39,238 matches 2010–2026, log-loss 0.6011 (was 0.7041 / 0.2985 / –, 0.6049); no w_mr yet (switch-on pending, docs/research/tennis_edge.md 10.6) |
+| `predict_atp.json` (22 Oct 2026) | −0.0300 | 0.0291 | 0.4461 | 0.04 | plus **w_mr 0.8402**; 41,573 matches 2010–2026 (deduplicated stores), log-loss 0.5838 (21 Oct: −0.0294 / 0.0269 / 0.4552, w_mr 0.8400; "fundamental": 0.4920 / 0.2141 / 1.0405) |
+| `predict_wta.json` (22 Oct 2026) | −0.1031 | 0.0990 | 0.4119 | 0.04 | plus **w_mr 0.8262**; 39,014 matches 2010–2026 (deduplicated stores), log-loss 0.5951 (2 Oct, no w_mr: 0.4661 / 0.2896 / 0.7204, 0.6011; "fundamental": 0.4371 / 0.3284 / 0.6766) |
 
 With the market rating (ATP) Elo's and serve/return's weights fall to about zero: the market rating carries the
 strength signal they carried; serve/return still sets the scoreline distributions through the chain. The
@@ -525,6 +523,17 @@ top `N_PLAYERS` = 120:
   year-end window is this season's events only; `basis` "race + new + Finals"); the
   snapshot route (official points − drops + points since + new) is reported per
   player as a check (`via_snapshot_mean`).
+- **Checked 21 October 2026 (reported as a bug; it is not one).** Sinner led the official
+  ranking (10,950 against Zverev's 10,070 and Alcaraz's 5,610) and the site gave him 14-17 %
+  for year-end No. 1, projected second. 3,000 of his ranking points are last season's
+  Vienna, Paris and Finals, which drop before the year-end ranking; the 2026 Race is Zverev
+  9,110, Sinner 7,950 (official minus drops: 10,950 − 3,000 = 7,950 and 10,070 − 930 =
+  9,140, so the stores' results agree with the official totals). Sinner has not played
+  since Wimbledon (absence rule: returns with probability 0.5); Kalshi (KXATP1RANK-26DEC31)
+  and Polymarket priced Zverev at 98.5 % and 99 %, Sinner 0.3 %. Even with Sinner certain
+  to play, the model gives him 33 %. The model is, if anything, generous to him; the
+  absence rule's 0.5 is generic, not news. Regression test:
+  `test_year_end_no1_follows_the_race_not_the_official_ranking`.
 
 Outputs: `year_end_no1`, `finals_qual`, `finals_title`, `rank_dist` (ranks 1–20 and
 21+), `points` and `race` {mean, p05, p95, now}, `events`, `simplifications`,
@@ -602,7 +611,8 @@ sigma="fit")`:
 Output: `ACE_CACHE/backtest_<tour>.json` and `docs/ace/data/<tour>/calibration.json`
 (`page_copy`); with `export_blend`, `fitted/predict_<tour>.json` (the blend on every
 scored year and σ). Run by `scripts/tn_fit.py --backtest` or
-`scripts/_tn_backtest_c.py`; runtimes 1,662 s (ATP) and 2,676 s (WTA).
+`scripts/_tn_backtest_c.py`; runtimes 1,662 s (ATP) and 2,676 s (WTA) on 2 October; 4,041 s and 3,972 s with the
+market rating on 22 October (both tours at once).
 
 ### 10.2 Results (committed `calibration.json`, regenerated 2 October 2026 with the game-share term)
 
@@ -610,6 +620,13 @@ scored year and σ). Run by `scripts/tn_fit.py --backtest` or
 log-loss / 0.2006 Brier over all, 0.5831 on the Pinnacle subset; the same blend without the market rating
 (`model_fund`) 0.5948 / 0.5940; Pinnacle 0.5703. Tournament title log-loss before the draw 0.0765 (0.0787 before).
 The WTA tables below are still the 2 October run. The ATP table below is the 2 October run, kept for comparison.
+
+**Both tours, regenerated 22 October 2026 on the deduplicated stores (WTA switched on):** WTA 39,014 matches
+(39,238 before; 36,325 with Pinnacle): model 0.5955 / 0.2052 over all, **0.5964** on the Pinnacle subset; without
+the market rating 0.6028 / 0.6041; Pinnacle 0.5829 (the gap falls from 0.0212 to 0.0135); title log-loss before the
+draw 0.0829 (0.0835 on 2 October). Weights w_elo −0.1031, w_sr 0.0990, w_gelo 0.4119, w_mr 0.8262 (fundamental
+0.4371 / 0.3284 / 0.6766). ATP 41,573 matches: 0.5831 on the Pinnacle subset (unchanged), title log-loss 0.0764;
+weights w_elo −0.0300, w_sr 0.0291, w_gelo 0.4461, w_mr 0.8402.
 
 **ATP, 2010–2026, 41,491 matches (39,012 with Pinnacle, 40,442 with an average price)**
 
@@ -752,16 +769,21 @@ recursive closures, but over small lists of ids, not arrays.
    players, and is a career profile, not a season one.
 9. **The market beats the model**, as it should. Since 21 October 2026 the price carries the market rating
    (section 2.2), which cut the walk-forward gap to Pinnacle's close on the 2018–2025 test years from 0.026 to 0.014
-   (ATP) and, in the research run, from 0.017 to 0.012 (WTA; its switch-on is pending) nats per match; the rest is largely news and lower-level results the stores do
-   not have (docs/research/tennis_edge.md).
-10. **Same-day duplicates in the WTA stores.** Some matches are stored twice on one date under two events: as a
-   WTA 125 ("ch") row and a tour-level row, or in two seasons' stores across New Year. In the test years 2018–2025
-   about 250 scored WTA matches (1.4 %) have such a twin earlier in the (date, round, id) order, another 500 a genuine
-   same-day earlier match (double rounds, qualifying and main draw on one date). Elo, the game-share Elo and the
-   serve/return fits run sequentially and see the twin's result before pricing the scored row, which flatters the
-   WTA backtest on those rows (Elo 0.48 log-loss against Pinnacle's 0.58-0.59 there; about 0.002 nats on the whole
-   WTA test set). The market rating prices each day from the states at the end of the day before and does not
-   leak. The fix belongs in the store merge (one row per match); ATP shows no such effect.
+   (ATP) and from 0.018 to 0.012 (WTA, live since 22 October) nats per match; the rest is largely news and
+   lower-level results the stores do not have (docs/research/tennis_edge.md).
+10. **Same-day duplicates in the stores (fixed 22 October 2026).** `store.event_for` made a new event when a
+   record's candidate events tied (two events in one city in overlapping weeks: Adelaide 1 and 2, Melbourne Summer
+   Set 1 and 2, Chicago's WTA 125 and 250; an ESPN event with the wrong dates), so one match sat under an ESPN "ch"
+   event and the WTA's and tennis-data's tour-level events; and ESPN files a late-December event under that year
+   while tennis-data and the WTA use the next season. Elo, the game-share Elo and serve/return saw the twin's result
+   (Elo 0.48 log-loss against Pinnacle's 0.58 on those rows). Now `store.dedupe` merges events that hold the same
+   matches (same two players within a day, same games; tennis-data's event survives with every source's id, so the
+   next fetch lands on it) and folds same-match rows under two round labels, and `store.dedupe_seasons` moves New
+   Year copies to the later season; `tn_fetch` runs both on every save (`--dedupe` repairs the stores on disk).
+   Removed: WTA 1,548 twin pairs (1,100 in 2018–2025), ATP 64 (24). Left: WTA 12 and ATP 7 same-pair pairs within
+   a day, genuine (lucky-loser rematches, ATP Finals round robin then final) or ESPN partial scores. Effect on the
+   WTA research run: P0's gap to the close 0.0170 → 0.0184; production backtest P0 0.6034 → 0.6041 (Pinnacle
+   subset); ATP unchanged.
 
 ---
 

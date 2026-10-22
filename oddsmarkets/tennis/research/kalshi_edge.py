@@ -53,15 +53,26 @@ def _f(x):
         return None
 
 
+def _close(q: dict | None) -> float | None:
+    """A candle's closing quote. Kalshi renamed the fields in August 2026 (`close` -> `close_dollars`, `volume` ->
+    `volume_fp`); until 22 Oct 2026 only the old names were read, so every match from August on was dropped."""
+    q = q or {}
+    return _f(q.get("close_dollars", q.get("close")))
+
+
+def _volume(c: dict) -> float:
+    return _f(c.get("volume_fp", c.get("volume"))) or 0.0
+
+
 def _quotes(cs: list) -> list[tuple[float, float, float, float]]:
     """[(end_ts, bid, ask, volume)] with a valid two-sided quote at the candle's close."""
     out = []
     for c in cs or []:
-        b = _f((c.get("yes_bid") or {}).get("close"))
-        a = _f((c.get("yes_ask") or {}).get("close"))
+        b = _close(c.get("yes_bid"))
+        a = _close(c.get("yes_ask"))
         if b is None or a is None or not (0 < b <= a < 1) or a - b > SPREAD_MAX:
             continue
-        out.append((float(c["end_period_ts"]), b, a, _f(c.get("volume")) or 0.0))
+        out.append((float(c["end_period_ts"]), b, a, _volume(c)))
     return out
 
 
@@ -152,7 +163,7 @@ def load(tour: str) -> pd.DataFrame:
             continue
         hit = min(hits, key=lambda mm: abs((_io.day(mm["date"]) - ed).days))
         cs = json.loads(f.read_text(encoding="utf-8"))
-        vol = sum(_f(c.get("volume")) or 0.0 for c in cs)
+        vol = sum(_volume(c) for c in cs)
         for dname, (ts, b, a, v) in decisions(m, cs, _sched(hit)).items():
             rows.append({"id": hit["id"], "date": str(hit["date"])[:10], "decision": dname, "ts": ts, "x_pid": x,
                          "bid": b, "ask": a, "close_ts": _ts(m.get("close_time")), "ticker": m["ticker"],
