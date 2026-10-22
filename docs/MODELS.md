@@ -162,6 +162,41 @@ Every one of 35 leagues improved. The model still trails the snapshot, the close
 - Why: in the walk-forward backtest (2019/20 onwards, production parameters, all twelve leagues, 30,854 matches) it cut the 1X2 log-loss by 0.0079 (95% CI 0.0065 to 0.0092) and improved every league. See `docs/research/football_edge.md`.
 - Data: `data/football/odds/raw/` (git-ignored). The build refreshes the current season's files at most once a day (`market_rates.refresh`, skipped with `--no-market`). Without the files the module adds nothing, so CI or a fresh clone builds exactly the goals/xG model. `--no-market-rates` turns it off.
 
+### 2.6 The line-up term (since 22 October 2026)
+
+`oddsmarkets/football/analytics/lineup_strength.py`. Clubs announce their XIs about an hour before kick-off, after the model's ratings were fitted. For a league fixture whose confirmed XIs are in its store, the build values each XI against the club's usual XI and tilts the score matrix:
+
+```
+v_p(day)   = a * (beta . p's prior per-90 rates) + b * (p's prior rating)      section 11b: earlier days only,
+                                                                               shrunk 450 minutes toward his letter's mean
+X          = sum of v_p over the XI;   U = mean over the club's last 10 line-ups (earlier days, any club
+             competition) of the same sum at today's values;   delta = X - U    (goals of xG difference a match)
+d          = delta_home - delta_away;   t = c * d / (lam_h + lam_a),   c = 0.75
+M'[i, j]   ∝ M[i, j] e^(t i) e^(-t j)                                          (lam_h e^t, lam_a e^-t for Poisson sides)
+```
+
+- **Inputs.** `store["prematch"][gid]`, written by `scripts/fetch_sofascore_leagues.py` (phase 1b): one `/event/{id}/lineups` call per league match kicking off within 100 minutes, from the run's single call budget, at most 12 a run, repeated until Sofascore marks the line-ups `confirmed`. It keeps the time read (`at`), the formation, the eleven starters `[id, name, G/D/M/F, shirt]` and Sofascore's missing list.
+- **Values.** The weights are those of section 11b, refitted in the build on every club store's line-ups (`fit_weights`). This is skipped when no fixture has posted XIs, so an ordinary hourly build pays nothing.
+- **Applied when.** The XIs are confirmed, the fixture kicks off within 3 hours either side of the build, and both clubs have at least 5 earlier XIs in the stores. Otherwise the XIs are published without changing the line (`applied: false`). It covers the 12 leagues only: Argentina's fetcher has no pre-match step, and cups and national teams were not tested.
+- **Payload.** In `fixtures.json` a posted fixture carries `xi` (`at`, `c`, `n_usual`, `applied`, `d`, and per side `f`, `xi[] {id, n, pos, no, v, share}`, `out[]` usual starters left out, `missing[]`, `delta`, `n_usual`) and `model_pre` (the line before the term). `model` is the line after it, with `lineups: true`. `market_odds.json` compares the market with the line after the term (`lineups: true` on that fixture).
+- **Constants.** `model_params.json` `lineup_term` (c 0.75, n_usual 10, min_history 5; c 0 turns it off).
+
+**Validation** (`scripts/football_lineups.py`, pre-registered; `docs/research/football_edge.md` 3.1-3.2):
+- The baseline is the production walk-forward model. c and N were chosen on kick-offs in 2025 (n 1,837) with value weights fitted only on matches before 2026.
+- Test, 1 January to 20 October 2026, 12 leagues, n 3,230:
+  - log-loss -0.0034 (95% CI -0.0063 to -0.0008);
+  - H/D/A ECE 0.0125 to 0.0107, slope 0.977 to 0.994;
+  - gap to the close (any source) +0.0102 to +0.0068;
+  - gap to Kalshi at kick-off - 60 min +0.0050 to +0.0023.
+- The XIs in the test are the starters recorded after the match. They equal the announced XIs except for warm-up changes.
+
+**Limits.**
+- Goalkeepers and defenders are valued weakly (section 11b).
+- A debutant with no club minutes sits at his letter's mean.
+- The usual XI is a plain mean of the last 10, so a long-term injury drops out of it slowly.
+- The term does not touch the season simulations, which price the remaining fixtures at full-strength ratings.
+- Timing: the hourly fetch runs at about :00-:10 and a build takes about 40 minutes. So a match's adjusted line is on the site before kick-off only when its XIs were confirmed at fetch time and it starts 75 to 110 minutes later. Otherwise the line appears after kick-off.
+
 ---
 
 ## 3. Elo

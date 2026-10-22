@@ -98,13 +98,15 @@ def build_match_markets(
     rows: list[dict],
     model,
     min_edge: float = MIN_EDGE,
+    adjust: dict[str, dict[str, float]] | None = None,
 ) -> dict:
     """
     Compare model match probabilities against de-vigged bookmaker consensus.
 
     `rows` are per-fixture records shaped as The Odds API returns them once grouped:
     `{match_id, home, away, commence, books: {book_key: {home, draw, away}}}` with
-    decimal odds.
+    decimal odds. `adjust` (match_id -> {home, draw, away}) replaces the model's line
+    for those fixtures: the line after the confirmed line-ups (docs/MODELS.md 2.6).
     """
     fixtures = []
     for row in rows:
@@ -125,6 +127,9 @@ def build_match_markets(
         model_probs = {
             "home": probs.home_win, "draw": probs.draw, "away": probs.away_win,
         }
+        adj = (adjust or {}).get(str(row.get("match_id")))
+        if adj:
+            model_probs = {o: float(adj[o]) for o in OUTCOMES}
         total = sum(model_probs.values())
         if total <= 0:
             continue
@@ -150,6 +155,7 @@ def build_match_markets(
             "best_outcome": best,
             "best_edge": edges.get(best, 0.0) if best else 0.0,
             "actionable": bool(best and edges[best] >= min_edge),
+            **({"lineups": True} if adj else {}),
         })
 
     fixtures.sort(key=lambda f: -f["best_edge"])

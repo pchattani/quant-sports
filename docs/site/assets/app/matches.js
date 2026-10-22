@@ -7,7 +7,9 @@
  *   hub.json is re-read every minute while anything is in play.
  *
  * #/match/<slug>/<id>
- *   Header (crests, score, xG, status, round), the model line before kick-off with the market where priced, and,
+ *   Header (crests, score, xG, status, round), the model line before kick-off with the market where priced (a
+ *   model / market / gap table and the bars), the confirmed XIs once posted (fixtures[].xi, about an hour before
+ *   kick-off) with the line before and after the line-up term (model_pre, model), and,
  *   when the match has a page (fixtures[].detail): summary tiles, the expected result (every shot replayed at its
  *   xG), the xG race, the shot map (team / situation / result filters), where the shots went (goal mouth), the
  *   timeline and momentum, who made the chances, the team statistics, the line-ups on the pitch with benches and
@@ -208,6 +210,7 @@ FB.route('match', function (el, p) {
       var m = r[0];
       var mk = null;
       (((r[1] || {}).matches || {}).fixtures || []).forEach(function (x) { if (String(x.match_id) === String(f.id) && x.market && x.model) mk = x; });
+      if (mk) { mk._src = (r[1] || {}).sources || []; mk._at = (r[1] || {}).updated_at; }
       renderMatch(el, c, f, m, mk, hit);
     });
   });
@@ -226,6 +229,7 @@ function noDetailReason(f) {
 function renderMatch(el, c, f, m, mk, hit) {
   var html = hero(c, f, m, hit);
   if (f.status !== 'finished' && f.model) html += modelCard(f, mk);
+  if (f.status !== 'finished' && f.xi) html += xiCard(f);
   if (m && (m.shots || m.lineups || m.team_stats)) {
     html += '<div id="mx-detail"></div>';
   } else {
@@ -267,14 +271,69 @@ function modelCard(f, mk) {
   if (isNum(md.lh)) tiles.push(FB.kpi('Expected goals', num(md.lh, 2) + ' – ' + num(md.la, 2), { sub: md.score ? 'most likely ' + esc(md.score) + (isNum(md.p_score) ? ' (' + pct(md.p_score) + ')' : '') : '' }));
   if (isNum(md.o25)) tiles.push(FB.kpi('Over 2.5 goals', pct(md.o25), { sub: 'under ' + pct(1 - md.o25) }));
   if (isNum(md.btts)) tiles.push(FB.kpi('Both score', pct(md.btts), { tip: 'Probability that both sides score at least once.' }));
+  var outs = [['home', f.home + ' win', 'h'], ['draw', 'Draw', 'd'], ['away', f.away + ' win', 'a']];
+  var shift = '';
+  if (f.model_pre && md.lineups) {
+    shift = '<div class="fb-mx-mkt"><div class="qk-kicker">What the confirmed line-ups changed</div>' +
+      '<div class="qk-table-wrap"><table class="qk-table dense fb-mx-cmp"><thead><tr><th scope="col">Outcome</th><th class="num" scope="col">Before</th><th class="num" scope="col">With XIs</th><th class="num" scope="col">Change (pts)</th></tr></thead><tbody>' +
+      outs.map(function (o) {
+        var a = f.model_pre[o[2]], b = md[o[2]];
+        return '<tr><td>' + esc(o[1]) + '</td><td class="num">' + pct(a, 1) + '</td><td class="num">' + pct(b, 1) + '</td><td class="num">' + pts(b - a) + '</td></tr>';
+      }).join('') + '</tbody></table></div></div>';
+  }
   var market = '';
   if (mk) {
-    market = '<div class="fb-mx-mkt"><div class="qk-kicker">Model v market' + (mk.books ? ' · ' + mk.books + ' price' + (mk.books > 1 ? 's' : '') : '') + '</div>' +
-      [['home', f.home + ' win'], ['draw', 'Draw'], ['away', f.away + ' win']].map(function (o) { return QK.mvm(mk.model[o[0]], mk.market[o[0]], o[1]); }).join('') +
-      '<p class="fb-cap">Blue: the model. Orange: the prediction market\'s price with the margin removed. A gap is a difference of opinion, not advice.</p></div>';
+    var src = (mk._src || []).map(function (k) { return k === 'kalshi' ? 'Kalshi' : k === 'polymarket' ? 'Polymarket' : k; });
+    market = '<div class="fb-mx-mkt"><div class="qk-kicker">Model v market</div>' +
+      '<div class="qk-table-wrap"><table class="qk-table dense fb-mx-cmp"><thead><tr><th scope="col">Outcome</th><th class="num" scope="col">Model' + (mk.lineups ? ' (XIs)' : '') + '</th><th class="num" scope="col">Market</th><th class="num" scope="col">Gap (pts)</th></tr></thead><tbody>' +
+      outs.map(function (o) {
+        var a = mk.model[o[0]], b = mk.market[o[0]];
+        return '<tr><td>' + esc(o[1]) + '</td><td class="num">' + pct(a, 1) + '</td><td class="num">' + pct(b, 1) + '</td><td class="num">' + pts(a - b) + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      outs.map(function (o) { return QK.mvm(mk.model[o[0]], mk.market[o[0]], o[1]); }).join('') +
+      '<p class="fb-cap">Market: ' + (src.length ? esc(src.join(' and ')) + ' ' : '') + (mk.books > 1 ? '(the average of ' + mk.books + ' prices)' : '(one price)') +
+      ' with the margin removed' + (mk._at ? ', read ' + esc(FB.fmtStamp(mk._at)) : '') + '. Gap: model minus market, in percentage points. ' +
+      'Blue dot: the model; orange: the market. On past matches the closing price has been the more accurate of the two ' +
+      '(<a href="#/model/methodology">methodology</a>), so a gap is a difference of opinion, not advice.</p></div>';
+  } else {
+    market = '<p class="fb-cap">No prediction-market price for this match yet.</p>';
   }
-  return '<div class="fb-mt">' + FB.card('The model\'s line', 'Dixon-Coles and Elo; fair odds carry no margin.',
-    FB.probBar3(md) + '<div class="fb-mx-p3l"><span>' + esc(f.home) + '</span><span>Draw</span><span>' + esc(f.away) + '</span></div>' + FB.kpis(tiles, 'fb-mt') + market) + '</div>';
+  return '<div class="fb-mt">' + FB.card('The model\'s line', (md.lineups ? 'After the confirmed line-ups. ' : '') + 'Dixon-Coles on goals, xG and past closing prices; fair odds carry no margin.',
+    FB.probBar3(md) + '<div class="fb-mx-p3l"><span>' + esc(f.home) + '</span><span>Draw</span><span>' + esc(f.away) + '</span></div>' + FB.kpis(tiles, 'fb-mt') + shift + market) + '</div>';
+}
+
+// Percentage points, signed: 0.034 -> "+3.4" (the column header says pts).
+function pts(v) { return isNum(v) ? FB.signed(v * 100, 1) : '—'; }
+
+// ── the confirmed XIs (fixtures[].xi: lineup_strength.live_terms) ─────────────
+
+function xiCard(f) {
+  var x = f.xi || {};
+  function side(key, name) {
+    var s = x[key] || {};
+    var list = (s.xi || []).map(function (p) {
+      var isNew = isNum(p.share) && p.share < 0.5;
+      return '<li class="fb-cxi-p' + (isNew ? ' new' : '') + '"><span class="fb-cxi-no">' + esc(p.no || '') + '</span>' +
+        FB.playerLink(p.id, p.n) + '<span class="fb-cxi-pos">' + esc(p.pos || '') + '</span>' +
+        (isNew ? '<span class="qk-badge" data-tip="Started ' + Math.round(p.share * 100) + '% of the club\'s last ' + (s.n_usual || x.n_usual) + ' matches">In</span>' : '') + '</li>';
+    }).join('');
+    var out = (s.out || []).map(function (p) {
+      return '<li>' + FB.playerLink(p.id, p.n || ('#' + p.id)) + ' <span class="qk-muted">started ' + Math.round(p.share * 100) + '% of the last ' + (s.n_usual || x.n_usual) + '</span></li>';
+    }).join('');
+    var miss = (s.missing || []).map(function (p) { return esc(p.n); }).join(', ');
+    var head = isNum(s.delta)
+      ? FB.kpi('Against the usual XI', FB.signed(s.delta, 2), { sub: 'goals of expected goal difference a match', tip: 'The XI\'s player values minus the club\'s usual XI (its last ' + (s.n_usual || x.n_usual) + ' line-ups), both at today\'s values.' })
+      : FB.kpi('Against the usual XI', '—', { sub: 'too few earlier line-ups to compare' });
+    return FB.card(FB.clubLink(key === 'home' ? f.home_id : f.away_id, name), (s.f ? 'Formation ' + esc(s.f) : 'Starting XI'),
+      FB.kpis([head]) + '<ol class="fb-cxi">' + list + '</ol>' +
+      (out ? '<div class="qk-kicker fb-mt">Usual starters not in the XI</div><ul class="fb-cxi-out">' + out + '</ul>' : '') +
+      (miss ? '<p class="fb-cap">Listed as missing (injured or suspended): ' + miss + '.</p>' : ''), { span: 6 });
+  }
+  var lead = x.applied
+    ? 'The line above includes them: each XI is valued against the club\'s usual XI and the difference (' + FB.signed(x.d, 2) + ' goals a match, home minus away) tilts the expected goals.'
+    : 'Shown for information: the line is not adjusted because a club has too few earlier line-ups to define its usual XI.';
+  return '<div class="fb-mt">' + FB.note('<b>Confirmed line-ups</b>' + (x.at ? ' (read ' + esc(FB.fmtStamp(x.at)) + ')' : '') + '. ' + lead +
+    ' <a href="#/model/methodology">How the line-up term works</a>.') + FB.grid(side('home', f.home) + side('away', f.away), 'fb-mt') + '</div>';
 }
 
 // ── the preview (no match page) ───────────────────────────────────────────

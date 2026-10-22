@@ -182,7 +182,9 @@ function normalise(raw, P) {
     });
   }
   g._pre = { model: pr.model || g.model || {}, market: pr.market || g.market || pr.store_market || null, line: pr.line || g.lines || g.line || null,
-    lineups: lineups, projected: projected, starters: pr.starters || g.starters || null, priced_at: pr.priced_at || null };
+    lineups: lineups, projected: projected, starters: pr.starters || g.starters || null, priced_at: pr.priced_at || null,
+    sources: L0 && !Array.isArray(L0.home) ? { home: (L0.home || {}).source || null, away: (L0.away || {}).source || null } : {},
+    strength: g.lineup_strength || null, status: g.starters_status || null, lineups_at: g.lineups_at || null, probables_log: g.probables_log || null };
   // linescore
   if (Array.isArray(g.linescore)) g.linescore = { innings: g.linescore };
   if (!g.linescore && Array.isArray(g.innings)) g.linescore = { innings: g.innings };
@@ -292,7 +294,12 @@ function priceRows(g) {
 function priceTable(g) {
   const rows = priceRows(g);
   const pre = preOf(g);
-  const src = (pre.market && pre.market.sources) || [];
+  // sources come as names (the schedule) or as {source, p_home, market} records (the game page)
+  const SRC_NAMES = { kalshi: 'Kalshi', polymarket: 'Polymarket', draftkings_ml: 'DraftKings', draftkings: 'DraftKings', espn: 'ESPN BET' };
+  const src = ((pre.market && pre.market.sources) || []).map(x => {
+    const k = typeof x === 'string' ? x : ((x && x.source) || '');
+    return SRC_NAMES[k] || k;
+  }).filter(Boolean).filter((x, i, a) => a.indexOf(x) === i);
   const t = BP.tableHTML([{ label: 'Bet' }, { label: 'Model', align: 'right' }, { label: 'Market', align: 'right', title: 'De-vigged prediction-market probability' },
     { label: 'Gap', align: 'right', title: 'Model minus market, points' }, { label: (pre.line && pre.line.src) || 'DraftKings', align: 'right', title: 'De-vigged line probability' },
     { label: 'Fair odds', align: 'right', cls: 'hide-sm', title: 'Model probability as American odds' }],
@@ -326,14 +333,78 @@ function lineupTable(list, L, side, g) {
     { label: 'K%', align: 'right', cls: 'hide-sm' }, { label: 'BB%', align: 'right', cls: 'hide-sm' }, { label: 'HR%', align: 'right' }, { label: 'v SP', align: 'right', cls: 'hide-sm' }], rows, { compact: true }) +
     (opp ? '<div class="section-note">Projections per plate appearance against ' + esc(BP.playerName(opp)) + ' and the bullpen behind him.</div>' : '');
 }
-function starterTiles(st, L) {
-  const one = (s, label) => {
-    if (!s || !s.pid) return BP.statTile(label, 'TBD', 'not announced');
-    const p = s.proj || {};
-    return '<div class="kpi"><div class="kpi-label">' + esc(label) + '</div><div class="kpi-value">' + BP.playerLink(s.pid, { role: 'pitcher', level: L }) + '</div>' +
-      '<div class="kpi-sub">' + [isNum(p.ip) ? BP.num(p.ip, 1) + ' IP' : '', isNum(p.k) ? BP.num(p.k, 1) + ' K' : '', isNum(p.er) ? BP.num(p.er, 1) + ' ER' : '', isNum(p.pitches) ? p.pitches + ' pitches' : '', isNum(p.stuff) ? 'Stuff+ ' + Math.round(p.stuff) : ''].filter(Boolean).join(' · ') + '</div></div>';
+/* The probable-pitcher matchup: each starter with his hand, his record of starts (the cases the market rates below the
+   simulation are flagged: a debut, the first few starts, a return after 60+ days) and the model's projection. */
+const SP_FLAG = { debut: ['MLB debut', 'warn'], 'new': ['no start in 3 seasons', 'warn'], few: ['first starts', 'warn'], back: ['back from a layoff', 'warn'] };
+function matchupCard(g, L) {
+  const pre = preOf(g);
+  const st = pre.starters || {};
+  const ss = pre.status || {};
+  const started = BP.gameState(g) === 'live' || BP.gameState(g) === 'final';
+  const one = side => {
+    const pid = ((st[side] || {}).pid) || (g.probables || {})[side];
+    const tm = BP.teamAbbr(g[side]);
+    if (!pid) return '<div class="kpi"><div class="kpi-label">' + esc(tm) + ' starter</div><div class="kpi-value">TBD</div><div class="kpi-sub">not announced</div></div>';
+    const s = ss[side] || {};
+    const p = (st[side] || {}).proj || {};
+    const hand = s.throws || BP.player(pid).throws;
+    const fl = s.flag && SP_FLAG[s.flag] ? SP_FLAG[s.flag] : null;
+    let rec = '';
+    if (isNum(s.starts)) {
+      rec = s.starts === 0 ? 'no MLB start in the last three seasons' : s.starts + ' MLB start' + (s.starts === 1 ? '' : 's') + ' this season and the last three';
+      if (s.last) rec += ' · last ' + BP.fmtDate(s.last, { year: false }) + (isNum(s.days_since) ? ' (' + s.days_since + ' days ago)' : '');
+    }
+    const proj = [isNum(p.ip) ? BP.num(p.ip, 1) + ' IP' : '', isNum(p.k) ? BP.num(p.k, 1) + ' K' : '', isNum(p.er) ? BP.num(p.er, 1) + ' ER' : '',
+      isNum(p.pitches) ? p.pitches + ' pitches' : '', isNum(p.stuff) ? 'Stuff+ ' + Math.round(p.stuff) : ''].filter(Boolean).join(' · ');
+    return '<div class="kpi"><div class="kpi-label">' + esc(tm) + (started ? ' starter' : ' probable') + (hand ? ' · ' + esc(hand) + 'HP' : '') + '</div>' +
+      '<div class="kpi-value">' + BP.playerLink(pid, { role: 'pitcher', level: L }) + (fl ? ' ' + BP.chip(fl[0], fl[1]) : '') + '</div>' +
+      (proj ? '<div class="kpi-sub">Model: ' + proj + '</div>' : '') + (rec ? '<div class="kpi-sub">' + esc(rec) + '</div>' : '') + '</div>';
   };
-  return '<div class="kpi-grid two pad">' + one((st || {}).away, 'Away starter (projected)') + one((st || {}).home, 'Home starter (projected)') + '</div>';
+  const log = Array.isArray(pre.probables_log) ? pre.probables_log : [];
+  let note = '';
+  if (log.length) {
+    const changes = [];
+    for (let i = 1; i < log.length; i++) {
+      const who = [];
+      if (log[i][2] !== log[i - 1][2]) who.push(BP.teamAbbr(g.away) + ' ' + BP.playerName(log[i][2]));
+      if (log[i][1] !== log[i - 1][1]) who.push(BP.teamAbbr(g.home) + ' ' + BP.playerName(log[i][1]));
+      changes.push(BP.fmtStamp(log[i][0]) + ' (' + who.join(', ') + ')');
+    }
+    note = 'Probables listed since ' + esc(BP.fmtStamp(log[0][0])) + (changes.length ? '; changed ' + esc(changes.join('; ')) : '') + '. ';
+  }
+  const flagged = ['home', 'away'].some(sd => (ss[sd] || {}).flag);
+  return '<div class="kpi-grid two pad">' + one('away') + one('home') + '</div>' +
+    '<div class="section-note">' + note + (flagged ? 'On average the closing line rates a starter on debut, in his first few starts or back after 60+ days below our simulation (by 0.03 to 0.07 on the log-odds scale, 2017-2026); the published model does not adjust for it. ' : '') +
+    'The simulation prices the listed probables; a scratch changes the price at the next hourly build.</div>';
+}
+/* Lineup strength against the team's usual lineup (models/lineup_strength.py), in wOBA points. */
+function strengthNote(g, side) {
+  const s = ((preOf(g).strength || {})[side]) || null;
+  if (!s || !isNum(s.delta)) return '';
+  const d = s.delta;
+  const word = Math.abs(d) < 0.002 ? 'about its usual strength' : (d > 0 ? 'stronger than usual' : 'weaker than usual');
+  return '<div class="section-note">Lineup strength ' + BP.fmtAvg(s.strength) + ' against a usual ' + BP.fmtAvg(s.typical) + ' (its last 15 lineups): ' +
+    (d >= 0 ? '+' : '−') + BP.fmtAvg(Math.abs(d)) + ' wOBA, ' + word + '.</div>';
+}
+/* The model's lineup adjustment: the simulation's average response to the two lineups, on the home side's win probability. */
+function lineupNote(g) {
+  const pre = preOf(g);
+  const s = pre.strength || {};
+  if (!isNum(s.effect_home)) return '';
+  const H = BP.teamAbbr(g.home);
+  const e = s.effect_home * 100;
+  const body = Math.abs(e) < 0.05 ? 'Both lineups are about as strong as usual: no material effect on the price.' :
+    'Against each team’s usual lineup, today’s lineups move ' + esc(H) + '’s win probability by about ' + (e > 0 ? '+' : '−') + BP.num(Math.abs(e), 1) +
+    ' pts in the simulation (its average response; the closing line moves about two thirds as much).';
+  return BP.card('Lineup adjustment', 'posted (or projected) lineups against the usual ones', '<div class="section-note">' + body + ' The model prices the ' +
+    (pre.projected ? 'projected' : 'posted') + ' lineups directly; it adds no separate lineup term.</div>');
+}
+function lineupSub(g, side) {
+  const pre = preOf(g);
+  const src = (pre.sources || {})[side];
+  const proj = src ? src === 'projected' : pre.projected;
+  const at = (pre.lineups_at || {})[String(g[side])];
+  return proj ? 'projected lineup (not posted yet)' : 'posted lineup' + (at ? ' · seen ' + BP.fmtStamp(at) : '');
 }
 function contextCard(g, L) {
   const w = g.weather || {}, pk = g._park || {}, u = g._ump || {};
@@ -364,10 +435,10 @@ function previewPanel(el, g, L) {
     BP.card('Total runs', 'model distribution · dashed: the line', '<div id="gm-tot" class="chart-box"></div>' +
       (isNum((m.runs || {}).home) ? '<div class="section-note">Expected runs: ' + esc(BP.teamAbbr(g.away)) + ' ' + BP.num(m.runs.away, 2) + ', ' + esc(BP.teamAbbr(g.home)) + ' ' + BP.num(m.runs.home, 2) +
         (isNum(m.extra_innings) ? ' · extra innings ' + BP.pct(m.extra_innings, 0) : '') + '</div>' : '')) + '</div>' +
-    BP.card('Starters', 'projections for today', starterTiles(pre.starters || { home: { pid: (g.probables || {}).home }, away: { pid: (g.probables || {}).away } }, L)) +
+    BP.card('Probable pitchers', BP.teamAbbr(g.away) + ' v ' + BP.teamAbbr(g.home) + ' · the matchup the model prices', matchupCard(g, L)) +
     '<div class="grid-2">' +
-      BP.card(BP.teamName(g.away), pre.projected ? 'projected lineup' : 'lineup', lineupTable((pre.lineups || {}).away, L, 'away', g)) +
-      BP.card(BP.teamName(g.home), pre.projected ? 'projected lineup' : 'lineup', lineupTable((pre.lineups || {}).home, L, 'home', g)) + '</div>' +
+      BP.card(BP.teamName(g.away), lineupSub(g, 'away'), lineupTable((pre.lineups || {}).away, L, 'away', g) + strengthNote(g, 'away')) +
+      BP.card(BP.teamName(g.home), lineupSub(g, 'home'), lineupTable((pre.lineups || {}).home, L, 'home', g) + strengthNote(g, 'home')) + '</div>' + lineupNote(g) +
     BP.card('Weather, park and umpire', 'the context the model prices in', contextCard(g, L));
   const ln = pre.line || {};
   const dk = ln.close || ln;

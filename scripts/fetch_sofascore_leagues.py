@@ -26,6 +26,11 @@ reach that by itself on a busy weekend; the default budget keeps a run to thirty
 full matches (or fifty past ones: a backfilled match is three calls, without the shot
 map and the momentum graph).
 
+Before the detail queue, the same budget pays for one call per league match kicking off within
+PREMATCH_LEAD_MIN minutes (at most PREMATCH_MAX a run): its line-ups, kept under the store's `prematch`
+with the time read until Sofascore marks them confirmed. The build applies the line-up term to those
+fixtures (docs/MODELS.md 2.6).
+
 A match Sofascore has no line-ups for (404, or line-ups without player statistics)
 is recorded under the store's `detail_missing` {gid: {at, n, why}} and asked again
 after RETRY_DAYS[n]; after len(RETRY_DAYS) answers like that it is `final` and never
@@ -287,6 +292,38 @@ def record_miss(store: dict, gid: str, why: str | None, now: datetime | None = N
         missing[gid]["final"] = True
 
 
+# Pre-match line-ups (football_edge.md "Round 3"): one call per league match kicking off within the next
+# PREMATCH_LEAD_MIN minutes, until Sofascore marks its line-ups confirmed (announced about an hour before
+# kick-off). Paid from the run's ONE call budget, before the detail queue, and capped per run, so the hourly
+# task makes no more calls than before; the build applies the line-up term to those fixtures.
+PREMATCH_LEAD_MIN = 100
+PREMATCH_MAX = 12
+
+
+def prematch_queue(store: dict, now: datetime | None = None, lead_min: int = PREMATCH_LEAD_MIN) -> list[tuple[str, dict]]:
+    """League matches not yet started whose kick-off is within `lead_min` minutes and whose line-ups are not
+    stored as confirmed, soonest first."""
+    now = now or datetime.now(timezone.utc)
+    have = store.get("prematch") or {}
+    out = []
+    for gid, m in (store.get("matches") or {}).items():
+        if m.get("status") in (sofascore.STATUS_FINISHED, sofascore.STATUS_LIVE) or m.get("superseded_by"):
+            continue
+        try:
+            ko = datetime.fromisoformat(str(m.get("date") or "").replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if ko.tzinfo is None:
+            ko = ko.replace(tzinfo=timezone.utc)
+        if not (now - timedelta(minutes=5) <= ko <= now + timedelta(minutes=lead_min)):
+            continue
+        if (have.get(str(gid)) or {}).get("confirmed"):
+            continue
+        out.append((str(gid), m))
+    out.sort(key=lambda kv: str(kv[1].get("date") or ""))
+    return out
+
+
 # Tiers of the detail queue, spent in this order (round-robin across competitions inside each).
 TIER_NEW, TIER_REFRESH, TIER_LEAGUE_PAST, TIER_CUP_PAST, TIER_OTHER_PAST = range(5)
 
@@ -453,6 +490,24 @@ def main() -> int:
                       "stamp_before": stamp_before,
                       "status": status, "queue": queue, "canon": canon})
 
+    # Phase 1b: line-ups of league matches about to start (one call each, from the same budget, capped).
+    pre = [(c, gid, m) for c in comps if c["slug"] in LEAGUES for gid, m in prematch_queue(c["store"])]
+    pre.sort(key=lambda x: str(x[2].get("date") or ""))
+    n_pre = 0
+    for c, gid, m in pre[:PREMATCH_MAX]:
+        if budget.left < 1 or sofascore.is_blocked():
+            break
+        try:
+            ok = sofascore.fetch_prematch(c["store"], gid, m, budget=budget)
+        except sofascore.BudgetExhausted:
+            break
+        if ok:
+            c["status"]["prematch"] = c["status"].get("prematch", 0) + 1
+            n_pre += 1
+    if pre:
+        logger.info("pre-match line-ups: %d of %d matches kicking off within %d min (%d calls)", n_pre, len(pre),
+                    PREMATCH_LEAD_MIN, min(len(pre), PREMATCH_MAX))
+
     # Phase two: detail, in tiers and round-robin across competitions until the budget is spent.
     by_slug = {c["slug"]: c for c in comps}
     order = interleave({c["slug"]: c["queue"] for c in comps if c["queue"]})
@@ -497,7 +552,8 @@ def main() -> int:
         store, path, slug = c["store"], c["path"], c["slug"]
         # A store that only differs by live scores is not worth a commit: the hourly
         # task would otherwise push every league every hour of every match day.
-        if not args.force and path.exists() and store_signature(store) == c["signature"] and not c["status"].get("missing"):
+        if not args.force and path.exists() and store_signature(store) == c["signature"] and not c["status"].get("missing") \
+                and not c["status"].get("prematch"):
             if c["status"].get("dormant") or not needs_heartbeat(c.get("stamp_before")):
                 logger.info("%s: nothing but live scores changed — store not rewritten", slug)
                 continue

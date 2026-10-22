@@ -744,6 +744,60 @@ def fetch_match_detail(
     return True
 
 
+def parse_prematch(payload: dict, side_map: dict[str, str]) -> dict | None:
+    """
+    A pre-match `/event/{id}/lineups` answer, compact: whether Sofascore marks it
+    confirmed (the clubs' announced XIs, about an hour before kick-off; before that
+    it may serve predicted line-ups), and per side the formation, the eleven
+    starters [player id, name, G/D/M/F, shirt] in Sofascore's order, and the
+    missing players. None when a side has no eleven starters.
+    """
+    out: dict[str, Any] = {"confirmed": bool(payload.get("confirmed"))}
+    for side in ("home", "away"):
+        block = payload.get(side) or {}
+        xi = []
+        for entry in block.get("players") or []:
+            pl = entry.get("player") or {}
+            if pl.get("id") is None or entry.get("substitute"):
+                continue
+            shirt = entry.get("shirtNumber") or entry.get("jerseyNumber")
+            xi.append([int(pl["id"]), str(pl.get("name") or ""), str(entry.get("position") or pl.get("position") or ""),
+                       str(shirt) if shirt is not None else ""])
+        if len(xi) != 11:
+            return None
+        rec: dict[str, Any] = {"team": side_map.get(side, side), "xi": xi}
+        if block.get("formation"):
+            rec["f"] = str(block["formation"])
+        missing = [[m.get("player", {}).get("id"), m["player"]["name"], m.get("type"), m.get("reason")]
+                   for m in block.get("missingPlayers") or [] if (m.get("player") or {}).get("name")]
+        if missing:
+            rec["missing"] = missing
+        out[side] = rec
+    return out
+
+
+def fetch_prematch(store: dict, gid: str, meta: dict, budget: CallBudget | None = None,
+                   now: datetime | None = None) -> bool:
+    """
+    One call: the line-ups of a match about to start, into store["prematch"][gid]
+    with the time they were fetched (`at`), so the build can apply the line-up term
+    and a later study knows what was known when. Returns whether eleven starters a
+    side came back (confirmed or not).
+    """
+    if budget is not None and not budget.take():
+        raise BudgetExhausted(f"/event/{gid}/lineups")
+    payload = get_json(f"/event/{gid}/lineups", quiet=True)
+    time.sleep(DETAIL_PAUSE_S)
+    if not payload:
+        return False
+    rec = parse_prematch(payload, {"home": meta.get("home", "home"), "away": meta.get("away", "away")})
+    if rec is None:
+        return False
+    rec["at"] = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    store.setdefault("prematch", {})[str(gid)] = rec
+    return True
+
+
 def _budgeted(path: str, budget=None, quiet: bool = True):
     """A direct call charged to a budget; BudgetExhausted when there is none left."""
     if budget is not None and not budget.take():

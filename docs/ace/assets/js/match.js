@@ -180,7 +180,7 @@ function preBoxes(T, d) {
   const ps = cl ? TA.devig2(cl.ps) : null, avg = cl ? (TA.devig2(cl.avg) || (isNum(cl.p1) ? cl.p1 : null)) : null;
   const box = (k, v, s, bar) => '<div class="pre-box"><div class="pre-k">' + esc(k) + '</div><div class="pre-v">' + v + '</div><div class="pre-s">' + s + '</div>' + (bar || '') + '</div>';
   let h = box('Model', isNum(p1) ? TA.pct(pf(p1), 0) : '—', esc(TA.playerSurname(T, fav)) + ' to win · fair ' + TA.decimal(pf(p1)), TA.splitBar(p1, { market: mk && isNum(mk.p1) ? mk.p1 : null }));
-  h += box('Market', mk && isNum(mk.p1) ? TA.pct(pf(mk.p1), 0) : '—', mk && isNum(mk.p1) ? 'de-vigged · ' + esc((mk.sources || []).join(', ')) + ' · edge ' + TA.edgeHTML(pf(p1), pf(mk.p1)) : 'no live market price');
+  h += box('Market', mk && isNum(mk.p1) ? TA.pct(pf(mk.p1), 0) : '—', mk && isNum(mk.p1) ? 'de-vigged · ' + esc(TA.sourceNames(mk.sources).join(', ')) + ' · edge ' + TA.edgeHTML(pf(p1), pf(mk.p1)) : 'no live market price');
   h += box('Closing odds', isNum(ps) ? TA.pct(pf(ps), 0) : (isNum(avg) ? TA.pct(pf(avg), 0) : '—'),
     isNum(ps) ? 'Pinnacle ' + esc((cl.ps || []).join(' / ')) + (isNum(avg) ? ' · average ' + TA.pct(pf(avg), 0) : '') : (isNum(avg) ? 'bookmaker average' : 'after the match, from tennis-data.co.uk'));
   h += box('Components', isNum(m.elo_p) ? TA.pct(pf(m.elo_p), 0) + ' <span class="muted-inline">/</span> ' + TA.pct(pf(m.sr_p), 0) : '—',

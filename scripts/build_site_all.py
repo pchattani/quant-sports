@@ -119,6 +119,7 @@ from oddsmarkets.football.core import (  # noqa: E402
 from oddsmarkets.football.sources.teams import normalize_team_name  # noqa: E402
 from oddsmarkets.football.sources import market_rates  # noqa: E402
 from oddsmarkets.football.competitions.league import fitting  # noqa: E402
+from oddsmarkets.football.analytics import lineup_strength  # noqa: E402
 from oddsmarkets.football.analytics.archive import load_archive  # noqa: E402
 from oddsmarkets.football.analytics.sensitivity import league_sensitivity, liga_sensitivity  # noqa: E402
 from oddsmarkets.football.analytics.pool import block_bridges, connections_from_frames, dc_score_matrix, outcome_probs  # noqa: E402
@@ -142,6 +143,14 @@ POOL_BRIDGES: dict[str, int] = {}
 # Per-club sensitivity curves for the transfer simulator (off with --no-sensitivity), with
 # a time budget per league so a slow machine never stretches the hourly build.
 USE_SENSITIVITY = True
+# slug -> gid -> line-up term of fixtures whose confirmed XIs are posted (main(), lineup_strength.live_terms).
+LINEUP_TERMS: dict[str, dict[str, dict]] = {}
+
+
+def lineup_lines(fixtures: list[dict]) -> dict[str, dict[str, float]]:
+    """match id -> the H/D/A after the line-up term, for the model-v-market comparison."""
+    return {str(r["id"]): {"home": r["model"]["h"], "draw": r["model"]["d"], "away": r["model"]["a"]}
+            for r in fixtures if (r.get("model") or {}).get("lineups")}
 SENS_BUDGET_S = 90.0
 
 # Model constants used when a league has no tuned entry in model_params.json —
@@ -437,11 +446,13 @@ def _odds(p: float) -> float | None:
     return round(1.0 / p, 2) if p > 0.005 else None
 
 
-def predict_fixture(model, home: str, away: str, neutral: bool = False) -> dict | None:
+def predict_fixture(model, home: str, away: str, neutral: bool = False, lineup: dict | None = None) -> dict | None:
     """
     The model's line on one match: win/draw/loss, expected goals, over 2.5, both
     to score, the most likely score, and the fair decimal odds (1/p, no margin).
     None when the model cannot price the pair (a club it has never seen).
+    `lineup` (an applied line-up term, lineup_strength.live_terms) tilts the score
+    matrix by the confirmed XIs (docs/MODELS.md 2.6).
     """
     if model is None:
         return None
@@ -452,12 +463,19 @@ def predict_fixture(model, home: str, away: str, neutral: bool = False) -> dict 
     m = np.asarray(p.score_matrix, dtype=float)
     if m.size == 0 or not np.isfinite(m).all():
         return None
+    lam_h, lam_a = float(p.lambda_home), float(p.lambda_away)
+    h, d, a = float(p.home_win), float(p.draw), float(p.away_win)
+    if lineup and lineup.get("applied") and lineup.get("d") is not None:
+        m = lineup_strength.tilt_matrix(m / m.sum(), lam_h, lam_a, float(lineup["d"]), float(lineup["c"]))
+        i_, j_ = np.indices(m.shape)
+        h, d, a = float(m[i_ > j_].sum()), float(m[i_ == j_].sum()), float(m[i_ < j_].sum())
+        lam_h = float((m.sum(1) * np.arange(m.shape[0])).sum())
+        lam_a = float((m.sum(0) * np.arange(m.shape[1])).sum())
     goals = np.add.outer(np.arange(m.shape[0]), np.arange(m.shape[1]))
     i, j = np.unravel_index(int(m.argmax()), m.shape)
-    h, d, a = float(p.home_win), float(p.draw), float(p.away_win)
     return {
         "h": round(h, 4), "d": round(d, 4), "a": round(a, 4),
-        "lh": round(float(p.lambda_home), 2), "la": round(float(p.lambda_away), 2),
+        "lh": round(lam_h, 2), "la": round(lam_a, 2),
         "o25": round(float(m[goals >= 3].sum()), 4), "btts": round(float(m[1:, 1:].sum()), 4),
         "score": f"{int(i)}-{int(j)}", "p_score": round(float(m[i, j]), 4),
         "fair": [_odds(h), _odds(d), _odds(a)],
@@ -1057,12 +1075,13 @@ def prune_stale_markets(prev: dict, now: datetime | None = None) -> dict:
     return {**prev, "ok": False, "checked_at": _now(), "matches": m, "outrights": out}
 
 
-def write_market_odds(out_dir: Path, raw: dict | None, model, title_model: dict[str, float] | None = None) -> None:
+def write_market_odds(out_dir: Path, raw: dict | None, model, title_model: dict[str, float] | None = None,
+                      adjust: dict[str, dict[str, float]] | None = None) -> None:
     """market_odds.json: match lines and the title market against the model. When nothing came back, the previous file
     is kept with ok:false but only for what is still current (prune_stale_markets): lines of fixtures not yet kicked
     off and a title market from the last MARKET_KEEP_HOURS."""
     path = out_dir / "market_odds.json"
-    matches = build_match_markets(raw["h2h"], model) if raw and raw.get("h2h") and model is not None else {"fixtures": []}
+    matches = build_match_markets(raw["h2h"], model, adjust=adjust) if raw and raw.get("h2h") and model is not None else {"fixtures": []}
     outrights = build_outright_markets(raw["outright"], title_model or {}) if raw and raw.get("outright") and title_model else {"available": False, "teams": []}
     if matches.get("fixtures") or outrights.get("available"):
         _write(out_dir, "market_odds.json", {
@@ -1083,12 +1102,15 @@ def write_market_odds(out_dir: Path, raw: dict | None, model, title_model: dict[
 
 # ── analytics payloads (shared by leagues, cups and Argentina) ───────────────
 
-def build_fixtures_json(store: dict, norm, model, season_filter, xg_map: dict, neutral_when=None) -> dict:
+def build_fixtures_json(store: dict, norm, model, season_filter, xg_map: dict, neutral_when=None,
+                        lineup_terms: dict[str, dict] | None = None) -> dict:
     """
     Every match the season filter admits, in kickoff order, with its status,
     score, xG where the detail exists, and the model's line where it is still
     to be played. Matches of every stage are listed (a cup's qualifying rounds
-    included) so the scoreboard is complete.
+    included) so the scoreboard is complete. A fixture in `lineup_terms` (its
+    confirmed XIs are posted) carries them as `xi`, its line before them as
+    `model_pre`, and `model` after the line-up term where it applies.
     """
     lineups = store.get("lineups") or {}
     rows = []
@@ -1130,6 +1152,14 @@ def build_fixtures_json(store: dict, norm, model, season_filter, xg_map: dict, n
         if status not in ("finished", "cancelled") and model is not None:
             neutral = bool(raw.get("neutral")) or bool(neutral_when and neutral_when(raw))
             pred = predict_fixture(model, home, away, neutral=neutral)
+            term = (lineup_terms or {}).get(str(gid))
+            if pred and term:
+                row["xi"] = term
+                if term.get("applied"):
+                    after = predict_fixture(model, home, away, neutral=neutral, lineup=term)
+                    if after:
+                        row["model_pre"] = {k: pred[k] for k in ("h", "d", "a", "lh", "la")}
+                        pred = {**after, "lineups": True}
             if pred:
                 row["model"] = pred
         rows.append(row)
@@ -1216,7 +1246,8 @@ def build_team_stats_json(by_team: dict[str, list[dict]]) -> dict:
 
 def write_analytics(out_dir: Path, store: dict, registry, model, season_filter, players: list[dict],
                     logs: dict, by_team: dict, details: dict, neutral_when=None,
-                    floor: int | None = None, season: str | None = None, round_labels: dict | None = None) -> dict:
+                    floor: int | None = None, season: str | None = None, round_labels: dict | None = None,
+                    lineup_terms: dict[str, dict] | None = None) -> dict:
     """
     The analytics payloads every competition gets; returns the fixtures payload
     for the hub. `floor` is the competition's minutes floor (the one its
@@ -1225,7 +1256,7 @@ def write_analytics(out_dir: Path, store: dict, registry, model, season_filter, 
     """
     xg_map = _liga.team_xg_map(store, registry=registry)
     norm = lambda name: normalize_team_name(name, registry)  # noqa: E731
-    fixtures = build_fixtures_json(store, norm, model, season_filter, xg_map, neutral_when)
+    fixtures = build_fixtures_json(store, norm, model, season_filter, xg_map, neutral_when, lineup_terms=lineup_terms)
     _write(out_dir, "fixtures.json", fixtures)
     write_match_pages(out_dir, details, fixtures["matches"])
     write_player_shards(out_dir, logs, players)
@@ -1392,11 +1423,11 @@ def build_league(cfg: LeagueConfig, entry: dict, args, sims: int | None,
     fixtures = write_analytics(
         out_dir, store, cfg.registry, model, _season_filter(season_id), players,
         player_match_logs(_season_view(store), cfg), team_match_stats(_season_view(store), cfg), match_details(store, cfg),
-        floor=floor, season=state.season_name,
+        floor=floor, season=state.season_name, lineup_terms=LINEUP_TERMS.get(cfg.slug),
     )
     title_model = dict(results.p_cup if cfg.playoff else results.p_title)
     write_market_odds(out_dir, None if args.no_market else fetch_markets_safe(cfg, fixtures["matches"], title_model.keys(), state.season_name),
-                      model, title_model)
+                      model, title_model, adjust=lineup_lines(fixtures["matches"]))
 
     last = last_finished_date(state)
     season_stale = bool(last and (datetime.now(timezone.utc) - last).days > SEASON_STALE_DAYS)
@@ -1854,6 +1885,8 @@ def build_hub(entries: list[dict], now: datetime | None = None) -> dict:
             }
             if r.get("model"):
                 item["model"] = {k: r["model"][k] for k in ("h", "d", "a")}
+                if r["model"].get("lineups"):
+                    item["model"]["lineups"] = True
             if r.get("xg"):
                 item["xg"] = r["xg"]
             if bucket == "window":
@@ -2062,6 +2095,19 @@ def main() -> int:
         cup_stores = {k: v for k, v in cup_stores.items() if v.get("matches")}
         pooled_params = _read_json(MODEL_PARAMS_PATH, {}).get("pooled") or DEFAULT_PARAMS
         pooled = fit_pooled(stores, pooled_params, cup_stores)
+
+    # Line-up term (docs/MODELS.md 2.6): fixtures whose confirmed XIs the fetcher stored in the last hour.
+    global LINEUP_TERMS
+    try:
+        have = bool(pooled_slugs or cup_slugs)
+        lg_stores = stores if have else {s: load_store(DATA_DIR / s / "store.json") for s in LEAGUES}
+        LINEUP_TERMS = lineup_strength.live_terms(
+            {k: v for k, v in lg_stores.items() if not args.only or k in args.only}, cup_stores if have else {})
+        if LINEUP_TERMS:
+            logger.info("line-ups posted: %s", {k: len(v) for k, v in LINEUP_TERMS.items()})
+    except Exception as exc:  # noqa: BLE001 - the term is an extra; the lines without it stand
+        logger.error("line-up term failed: %s\n%s", exc, traceback.format_exc())
+        LINEUP_TERMS = {}
 
     competitions = []
     for slug, cfg in LEAGUES.items():

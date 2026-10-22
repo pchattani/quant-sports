@@ -250,6 +250,7 @@ def merge_game(store: dict[str, Any], game: dict[str, Any]) -> dict[str, Any]:
     gpk = str(game["gpk"])
     old = store["games"].get(gpk)
     if not old:
+        _stamp_pregame(None, game)
         store["games"][gpk] = game
         return game
     new = dict(old)
@@ -261,8 +262,34 @@ def merge_game(store: dict[str, Any], game: dict[str, Any]) -> dict[str, Any]:
         if k == "has_statcast" and not v and old.get(k):
             continue
         new[k] = v
+    _stamp_pregame(old, new)
     store["games"][gpk] = new
     return new
+
+
+def _stamp_pregame(old: dict | None, new: dict, at: str | None = None) -> None:
+    """Timestamps of what was known before first pitch, recorded as the fetches see it (from 22 October 2026; the
+    hourly schedule fetch, so to the hour): `lineups_at` {tid: when the current posted lineup was first seen}, and
+    `probables_log` [[time, home, away], ...] (a row each time the listed probables change). Only while the game has not
+    started: a rescan of past games never stamps them."""
+    if str(new.get("status") or "") != "pre":
+        return
+    at = at or now()
+    lu = new.get("lineups") or {}
+    seen = dict((old or {}).get("lineups_at") or {})
+    old_lu = (old or {}).get("lineups") or {}
+    for tid, lst in lu.items():
+        if lst and (tid not in seen or old_lu.get(tid) != lst):
+            seen[str(tid)] = at
+    if seen:
+        new["lineups_at"] = seen
+    pr = new.get("probables") or {}
+    cur = [pr.get("home"), pr.get("away")]
+    log = [list(x) for x in ((old or {}).get("probables_log") or [])]
+    if any(cur) and (not log or log[-1][1:] != cur):
+        log.append([at] + cur)
+    if log:
+        new["probables_log"] = log
 
 
 def mark(store: dict[str, Any], gpk: str, what: str = "fetched") -> None:

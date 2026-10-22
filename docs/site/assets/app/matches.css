@@ -104,3 +104,17 @@ a.fb-mx-team[href]:hover span { color: var(--accent); }
 .fb-mx-formhead .fb-form { margin-right: 8px; }
 #mx-shots .fb-pitch-chart, #mx-pitch { max-width: 940px; margin: 0 auto; }
 .fb-mx-tl { max-height: 560px; overflow-y: auto; scrollbar-width: thin; }
+/* Model v market and line-up tables; the confirmed XIs (xiCard). */
+.fb-mx-cmp td:first-child { white-space: normal; min-width: 7em; }
+.fb-cxi { list-style: none; margin: var(--sp-3) 0 0; padding: 0; display: grid; gap: 2px; }
+.fb-cxi-p { display: grid; grid-template-columns: 2.2em 1fr auto auto; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line-1); font-size: var(--fs-sm); min-width: 0; }
+.fb-cxi-p:last-child { border-bottom: 0; }
+.fb-cxi-p .fb-link { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-cxi-no { color: var(--ink-3); font: 500 var(--fs-xs) var(--font-num); text-align: right; }
+.fb-cxi-pos { color: var(--ink-3); font-size: var(--fs-xs); }
+.fb-cxi-p.new .fb-link { font-weight: 600; }
+.fb-cxi-out { margin: 6px 0 0; padding-left: 1.2em; font-size: var(--fs-sm); }
+.fb-cxi-out li { margin: 2px 0; }
+.fb-fx-xi { margin-right: 6px; font-size: 10px; padding: 1px 5px; }
+.fb-mx-cmp th, .fb-mx-cmp td { padding-left: 8px; padding-right: 8px; }
+.fb-mx-cmp thead th { white-space: normal; vertical-align: bottom; }

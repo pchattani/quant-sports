@@ -9,6 +9,15 @@
     "fitted_at": "2026-10-22",
     "source": "scripts/football_models_oct.py rhofit"
   },
+  "lineup_term": {
+    "c": 0.75,
+    "n_usual": 10,
+    "min_history": 5,
+    "rule": "starting-XI value minus the club's usual XI (mean of its last n_usual line-ups, today's prior values; docs/MODELS.md 2.6); goal rates tilted by t = c d / (lam_h + lam_a); applied only to fixtures whose line-ups Sofascore marks confirmed",
+    "chosen_on": "kick-offs 2025 to 31 Dec 2025 (dev, n 1,837)",
+    "test": "1 Jan to 20 Oct 2026, n 3,230: log-loss -0.0034 (95% CI -0.0063 to -0.0008); promoted 2026-10-22",
+    "source": "scripts/football_lineups.py"
+  },
   "tuned_at": "2026-10-22T04:50:14Z",
   "folds": 6,
   "min_train": 200,

@@ -287,6 +287,14 @@ def build_page(ctx: SeasonContext, g: dict, gp: pd.DataFrame | None, card_: dict
                             "linescore": g.get("innings"), "lines": g.get("lines")}
     page["pregame"] = pregame or (old or {}).get("pregame")
     page["lineups"] = _lineups(ctx, g)
+    if g.get("status") != "final" or (old or {}).get("lineup_strength") is None:
+        page["lineup_strength"] = _lineup_strength(ctx, g, page["lineups"], ((page.get("pregame") or {}).get("model") or {}).get("p_home"))
+    else:
+        page["lineup_strength"] = old.get("lineup_strength")
+    page["starters_status"] = _starters_status(ctx, g)
+    for k in ("lineups_at", "probables_log"):
+        if g.get(k):
+            page[k] = g.get(k)
     has = gp is not None and len(gp) > 0
     page["has_statcast"] = bool(has)
     if not has:
@@ -361,6 +369,100 @@ def _lineups(ctx: SeasonContext, g: dict) -> dict | None:
             rows.append({"slot": i + 1, "pid": pid, "name": ctx.name(pid), "pos": (ctx.players.get(pid) or {}).get("pos"),
                          "bats": (ctx.players.get(pid) or {}).get("bats"), "matchup": _matchup(gc, pid, sp)})
         out[side] = {"source": src, "batters": rows, "opp_starter": sp, "opp_starter_name": ctx.name(sp) if sp else None}
+    return out
+
+
+def _lineup_inputs(ctx: SeasonContext):
+    """(player values on the context's dates, team lineup history) for models/lineup_strength.py, built once per context;
+    None for Triple-A or when the plate-appearance tables are missing."""
+    if "_lineup_inputs" not in ctx.__dict__:
+        val = None
+        if ctx.level == "mlb":
+            try:
+                from oddsmarkets.baseball.models import _dio
+                from oddsmarkets.baseball.models import lineup_strength as LS
+                val = (LS.Values(ctx.level, ctx.season), LS.history_lineups([_dio.load_store(ctx.level, ctx.season - 1), ctx.store]))
+            except Exception as exc:                             # noqa: BLE001
+                logger.info("lineup strength unavailable: %s", exc)
+        ctx.__dict__["_lineup_inputs"] = val
+    return ctx.__dict__["_lineup_inputs"]
+
+
+def _lineup_strength(ctx: SeasonContext, g: dict, lineups: dict | None, p_home: float | None) -> dict | None:
+    """Each side's lineup (posted, else projected) against the team's usual one, in wOBA points, and the simulation's
+    average response to the pair (models/lineup_strength.game_block)."""
+    inp = _lineup_inputs(ctx)
+    if inp is None or not lineups:
+        return None
+    try:
+        from oddsmarkets.baseball.models import lineup_strength as LS
+        V, hist = inp
+        d = str(g.get("date"))[:10]
+        lus = {side: [b["pid"] for b in ((lineups.get(side) or {}).get("batters") or [])] for side in ("home", "away")}
+        out = LS.game_block(str(g.get("home")), str(g.get("away")), d, lus, hist, V.on(d), an.fnum(p_home))
+        if out:
+            for side in ("home", "away"):
+                out[side]["source"] = (lineups.get(side) or {}).get("source")
+        return out
+    except Exception as exc:                                     # noqa: BLE001
+        logger.info("lineup strength %s failed: %s", g.get("gpk"), exc)
+        return None
+
+
+def _starter_starts(ctx: SeasonContext) -> dict[str, list[str]]:
+    """{pid: sorted start dates} over the context's season and the three before (the stores' probables of final games)."""
+    if "_starter_starts" not in ctx.__dict__:
+        out: dict[str, list[str]] = {}
+        try:
+            from oddsmarkets.baseball.models import _dio
+            stores = [_dio.load_store(ctx.level, s) for s in range(ctx.season - 3, ctx.season)] + [ctx.store]
+        except Exception:                                        # noqa: BLE001
+            stores = [ctx.store]
+        for st in stores:
+            for x in ((st or {}).get("games") or {}).values():
+                if x.get("status") == "final":
+                    for sp in (x.get("probables") or {}).values():
+                        if sp:
+                            out.setdefault(str(sp), []).append(str(x.get("date"))[:10])
+        ctx.__dict__["_starter_starts"] = {k: sorted(v) for k, v in out.items()}
+    return ctx.__dict__["_starter_starts"]
+
+
+def _starters_status(ctx: SeasonContext, g: dict) -> dict | None:
+    """Per side: the probable starter, his hand, MLB starts in this season and the three before (before the game's date),
+    days since his last start and a flag ("debut": no MLB start on record and no debut before the date; "new": none in
+    the window; "few": 1-4; "back": 60+ days since the last) - the cases the market rates below the simulation
+    (docs/research/mlb_edge.md, round 3)."""
+    if ctx.level != "mlb":
+        return None
+    starts = _starter_starts(ctx)
+    d = str(g.get("date"))[:10]
+    out = {}
+    for side in ("home", "away"):
+        sp = (g.get("probables") or {}).get(side)
+        if not sp:
+            out[side] = None
+            continue
+        prev = [x for x in starts.get(str(sp), []) if x < d]
+        n = len(prev)
+        gap = None
+        if prev:
+            try:
+                gap = (date.fromisoformat(d) - date.fromisoformat(prev[-1])).days
+            except ValueError:
+                gap = None
+        pl = ctx.players.get(str(sp)) or {}
+        if n == 0:
+            debut = pl.get("debut")
+            flag = "debut" if not debut or str(debut)[:10] >= d else "new"
+        elif n < 5:
+            flag = "few"
+        elif gap is not None and gap > 60:
+            flag = "back"
+        else:
+            flag = None
+        out[side] = {"pid": str(sp), "throws": pl.get("throws"), "starts": n, "last": prev[-1] if prev else None,
+                     "days_since": gap, "flag": flag}
     return out
 
 

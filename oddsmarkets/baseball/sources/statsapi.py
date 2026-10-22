@@ -240,6 +240,59 @@ def feed_extras(f: dict) -> dict:
     return out
 
 
+# ── pre-game snapshots (timecoded feed) ─────────────────────────────────────
+#
+# /api/v1.1/game/{pk}/feed/live/timestamps lists the times (UTC, YYYYMMDD_HHMMSS) the feed changed;
+# /feed/live?timecode=T returns the feed as it stood at the latest change at or before T, and the first change when
+# T is earlier than all of them. The first change is the switch to "Pre-Game" (measured 22 Oct 2026: about 1 h
+# before first pitch in 2018-2024, about 3 h in 2026; 2016-2017 feeds start at first pitch). Asking for a time
+# well before first pitch therefore returns the earliest state the archive holds, stamped (metaData.timeStamp)
+# with the time it was published: the batting orders and probable pitchers known then.
+
+SNAP_FIELDS = ("metaData,timeStamp,gameData,status,detailedState,abstractGameState,probablePitchers,away,home,id,datetime,"
+               "dateTime,liveData,boxscore,teams,battingOrder,team")
+
+
+def pregame_snapshot(c: Client, gpk: str, start: str, lead_hours: float = 6.0) -> dict | None:
+    """The game's earliest archived feed state (see above), compacted (`compact_snapshot`); None on failure."""
+    from datetime import datetime, timezone
+    try:
+        t0 = datetime.fromisoformat(str(start).replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError:
+        return None
+    tc = (t0 - timedelta(hours=lead_hours)).strftime("%Y%m%d_%H%M%S")
+    f = c.get(f"{API}/v1.1/game/{gpk}/feed/live", {"timecode": tc, "fields": SNAP_FIELDS})
+    if f is None:
+        return None
+    return compact_snapshot(f, start)
+
+
+def compact_snapshot(f: dict, start: str | None = None) -> dict:
+    """{"ts": ISO UTC of the snapshot, "lead_min": minutes before the scheduled first pitch (positive = before),
+    "state": detailed status, "lineups": {"home": [...], "away": [...]} (empty lists when not posted),
+    "probables": {"home", "away"}}."""
+    from datetime import datetime, timezone
+    md = f.get("metaData") or {}
+    gd = f.get("gameData") or {}
+    ts = md.get("timeStamp")
+    iso, lead = None, None
+    if ts:
+        try:
+            t = datetime.strptime(str(ts), "%Y%m%d_%H%M%S").replace(tzinfo=timezone.utc)
+            iso = t.strftime("%Y-%m-%dT%H:%M:%SZ")
+            s0 = start or ((gd.get("datetime") or {}).get("dateTime"))
+            if s0:
+                t0 = datetime.fromisoformat(str(s0).replace("Z", "+00:00")).astimezone(timezone.utc)
+                lead = round((t0 - t).total_seconds() / 60, 1)
+        except ValueError:
+            pass
+    box = ((f.get("liveData") or {}).get("boxscore") or {}).get("teams") or {}
+    pp = gd.get("probablePitchers") or {}
+    return {"ts": iso, "lead_min": lead, "state": (gd.get("status") or {}).get("detailedState"),
+            "lineups": {s: [str(x) for x in ((box.get(s) or {}).get("battingOrder") or [])] for s in ("home", "away")},
+            "probables": {s: _pid(pp.get(s)) for s in ("home", "away")}}
+
+
 # ── people, standings, rosters, transactions ────────────────────────────────
 
 def people(c: Client, ids: Iterable[str]) -> dict[str, dict]:

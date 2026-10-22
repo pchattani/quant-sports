@@ -35,6 +35,12 @@ GAME = `{"gpk","date","gtype":"R|F|D|L|W|C|S|E","series": {"desc","game","of"}|n
 "innings","lines": {"ml":[home,away],"rl":{...},"total":{...},"open":{...},"close":{...},"books":[...]}|null,
 "abs": {"home":{...},"away":{...}}|null,"has_statcast": bool}`
 
+Pre-game timestamps (from 22 October 2026, written by `store.merge_game` while a game is still "pre"; hourly
+resolution): `"lineups_at": {tid: ISO time the current posted lineup was first seen}` and
+`"probables_log": [[ISO time, home pid, away pid], ...]` (one row per change of the listed probables). Past games have
+neither; their earliest archived pre-game lineups and probables come from the timecoded live feed
+(scripts/mlb_lineup_snapshots.py, cache only).
+
 ### Retrosheet (git-ignored raw; compact PA table): `<raw>/retro/pa/<season>.parquet`
 one row per event — plate appearances (`pa` = True) and the running events between them (`pa` = False: sb, cs, po,
 poe, wp, pb, bk, di, oa, foul_err), so runs reconcile with the game logs: game_id, date, season, gtype (R|F|D|L|W),

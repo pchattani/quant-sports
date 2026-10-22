@@ -710,6 +710,7 @@ function fixtureRow(f, opts) {
     : '<span class="fb-fx-t">' + esc(fmtTime(f.date) || 'TBD') + '</span>';
   var link = f.detail || !done ? href.match(s, f.id) : null;
   var extra = done ? (f.xg && isNum(f.xg[0]) ? '<span class="fb-fx-xg">xG ' + num(f.xg[0], 1) + '–' + num(f.xg[1], 1) + '</span>' : '') : (f.model ? probBar3(f.model, { small: true }) : '');
+  if (!done && f.model && f.model.lineups) extra = '<span class="qk-badge accent fb-fx-xi" data-tip="Confirmed line-ups are in; the line includes them">XI</span>' + extra;
   return '<div class="fb-fx' + (f.status === 'live' ? ' live' : '') + (f.status === 'postponed' || f.status === 'cancelled' ? ' void' : '') + '">' +
     '<div class="fb-fx-when">' + (o.date ? '<span class="fb-fx-d">' + esc(fmtDate(f.date)) + '</span>' : '') + when +
     (o.comp ? '<span class="fb-fx-c">' + compLink(s, { short: true }) + '</span>' : '') + (o.round && f.round ? '<span class="fb-fx-r">' + esc(roundText(f, s, true)) + '</span>' : '') + '</div>' +

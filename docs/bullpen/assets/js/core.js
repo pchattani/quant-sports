@@ -989,7 +989,7 @@ function gameCard(g, opts) {
   let edge = '';
   if (st === 'pre' && mk && isNum(mk.p_home) && pH !== null && Math.abs(pH - mk.p_home) >= 0.05) {
     const side = pH > mk.p_home ? g.home : g.away, gap = Math.abs(pH - mk.p_home);
-    edge = '<span class="qk-badge edge" data-tip="The model gives ' + esc(teamShort(side)) + ' ' + Math.round(gap * 100) + ' points more than the de-vigged market' + (mk.sources ? ' (' + esc(mk.sources.join(', ')) + ')' : '') + '">Edge ' + esc(teamAbbr(side)) + ' +' + Math.round(gap * 100) + '</span>';
+    edge = '<span class="qk-badge edge" data-tip="The model gives ' + esc(teamShort(side)) + ' ' + Math.round(gap * 100) + ' points more than the de-vigged market' + (mk.sources && mk.sources.length ? ' (' + esc(mk.sources.map(function (x) { var k = typeof x === 'string' ? x : ((x && x.source) || ''); return ({ kalshi: 'Kalshi', polymarket: 'Polymarket', draftkings_ml: 'DraftKings', draftkings: 'DraftKings' })[k] || k; }).join(', ')) + ')' : '') + '">Edge ' + esc(teamAbbr(side)) + ' +' + Math.round(gap * 100) + '</span>';
   }
   const foot = bits.length || edge ? '<div class="qk-match-foot"><span class="bp-gc-bits">' + bits.join('') + '</span>' + edge + '</div>' : '';
   return '<a class="qk-match bp-gc' + (live ? ' is-live' : '') + (o.compact ? ' gc-compact' : '') + '" href="' + gameHref(g.gpk || g.id, L, o.season) + '" style="--sa:var(--a-baseball)">' +

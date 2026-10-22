@@ -572,6 +572,13 @@ function american(p) {
 }
 /* Fair decimal odds: 0.4 -> "2.50". */
 function decimal(p) { return isNum(p) && p > 0 ? (1 / p).toFixed(p > 0.1 ? 2 : 1) : '—'; }
+/* Market sources come as names ('kalshi') or as records ({source, p1, ...}); either way, display names. */
+function sourceNames(list) {
+  var N = { kalshi: 'Kalshi', polymarket: 'Polymarket', pinnacle: 'Pinnacle', betfair: 'Betfair', avg: 'Bookmaker average', b365: 'Bet365' };
+  var out = [];
+  (list || []).forEach(function (x) { var k = typeof x === 'string' ? x : ((x && (x.source || x.name)) || ''); var n = N[k] || k; if (n && out.indexOf(n) < 0) out.push(n); });
+  return out;
+}
 /* Two-way decimal odds [o1, o2] -> de-vigged p1 (null when missing). */
 function devig2(o) {
   if (!o || !isNum(o[0]) || !isNum(o[1]) || o[0] <= 1 || o[1] <= 1) return null;
@@ -831,7 +838,7 @@ function matchCard(c, opts) {
   let edge = '';
   if (!fin && !live && mk && isNum(mk.p1) && p1 !== null && Math.abs(p1 - mk.p1) >= 0.05) {
     const side = p1 > mk.p1 ? c.p1 : c.p2, gap = Math.abs(p1 - mk.p1);
-    edge = '<span class="qk-badge edge" data-tip="The model gives ' + esc(playerShort(T, side)) + ' ' + Math.round(gap * 100) + ' points more than the de-vigged market' + (mk.sources ? ' (' + esc(mk.sources.join(', ')) + ')' : '') + '">Edge ' + esc(playerSurname(T, side)) + ' +' + Math.round(gap * 100) + '</span>';
+    edge = '<span class="qk-badge edge" data-tip="The model gives ' + esc(playerShort(T, side)) + ' ' + Math.round(gap * 100) + ' points more than the de-vigged market' + (mk.sources && mk.sources.length ? ' (' + esc(sourceNames(mk.sources).join(', ')) + ')' : '') + '">Edge ' + esc(playerSurname(T, side)) + ' +' + Math.round(gap * 100) + '</span>';
   }
   const foot = bits.length || edge ? '<div class="qk-match-foot"><span class="ta-mc-bits">' + bits.join('') + '</span>' + edge + '</div>' : '';
   return '<a class="qk-match ta-mc' + (live ? ' is-live' : '') + (o.compact ? ' gc-compact' : '') + '" href="' + matchHref(T, c.id) + '" style="--sa:var(--a-tennis)">' +
@@ -1186,7 +1193,7 @@ return {
   // formatting
   esc: esc, num: num, pct: pct, signed: signed, pp: pp, fmtSec: fmtSec, fmtDuration: fmtDuration, fmtDate: fmtDate, fmtTime: fmtTime,
   fmtStamp: fmtStamp, fmtRange: fmtRange, localDay: localDay, todayISO: todayISO, countdown: countdown, ordinal: ordinal, fmtVal: fmtVal,
-  metric: metric, record: record, american: american, decimal: decimal, devig2: devig2, parseDate: parseDate, isNum: isNum, titleCase: titleCase,
+  metric: metric, record: record, american: american, decimal: decimal, devig2: devig2, sourceNames: sourceNames, parseDate: parseDate, isNum: isNum, titleCase: titleCase,
   // tennis
   SURFACES: SURFACES, LEVELS: LEVELS, ROUND_ORDER: ROUND_ORDER, MAIN_ROUNDS: MAIN_ROUNDS,
   surfaceColour: surfaceColour, surfaceLabel: surfaceLabel, surfaceDot: surfaceDot, surfaceChip: surfaceChip,
