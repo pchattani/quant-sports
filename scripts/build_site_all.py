@@ -120,6 +120,7 @@ from oddsmarkets.football.sources.teams import normalize_team_name  # noqa: E402
 from oddsmarkets.football.sources import market_rates  # noqa: E402
 from oddsmarkets.football.competitions.league import fitting  # noqa: E402
 from oddsmarkets.football.analytics import lineup_strength  # noqa: E402
+from oddsmarkets.football.sources import kalshi_rates  # noqa: E402
 from oddsmarkets.football.analytics.archive import load_archive  # noqa: E402
 from oddsmarkets.football.analytics.sensitivity import league_sensitivity, liga_sensitivity  # noqa: E402
 from oddsmarkets.football.analytics.pool import block_bridges, connections_from_frames, dc_score_matrix, outcome_probs  # noqa: E402
@@ -333,6 +334,9 @@ def pooled_training_frame(stores: dict[str, dict], cup_stores: dict[str, dict] |
         df = cup_store.training_frame(store)
         if not len(df):
             continue
+        # Kalshi market rows for the UEFA cups (kalshi_rates; off unless switched on), matched on plain names.
+        kx = (kalshi_rates.rows(df, slug, xi_fit=xi)
+              if USE_MARKET_RATES and kalshi_rates.on() and slug in kalshi_rates.CUP_SLUGS else None)
 
         def prefixed(name, country):
             league = COUNTRY_LEAGUE.get(str(country or ""))
@@ -346,6 +350,12 @@ def pooled_training_frame(stores: dict[str, dict], cup_stores: dict[str, dict] |
         )
         parts.append(df[["game_id", "home_team", "away_team", "home_goals", "away_goals", "match_date", "weight"]
                         + [c for c in ("home_xg", "away_xg") if c in df.columns]])
+        if kx is not None and len(kx):
+            kx = kx.assign(home_team=[prefixed(n, c) for n, c in zip(kx["home_team"], kx["home_country"])],
+                           away_team=[prefixed(n, c) for n, c in zip(kx["away_team"], kx["away_country"])])
+            parts.append(kx[["game_id", "home_team", "away_team", "home_goals", "away_goals", "match_date", "weight",
+                             "home_xg", "away_xg"]])
+            logger.info("%s: %d Kalshi market-rate rows added to the pooled fit", slug, len(kx))
         cup_frames[slug] = df
     POOL_CONNECTIONS.clear()
     POOL_CONNECTIONS.update(connections_from_frames(cup_frames, list(stores)))
@@ -2087,6 +2097,8 @@ def main() -> int:
         os.environ["NO_MARKET_RATES"] = "1"  # read by the Argentine build
     if USE_MARKET_RATES and not args.no_market:
         market_rates.refresh()  # at most once a day per file; cached under data/football/odds/raw
+        if kalshi_rates.on():
+            kalshi_rates.refresh()  # Kalshi listings and new games' candles, paced and capped; data/football/odds/kalshi
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     # The shared design kit (docs/_design -> docs/site/assets/qk): the front end is built on it (docs/REDESIGN.md).

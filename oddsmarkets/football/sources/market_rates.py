@@ -170,6 +170,11 @@ def market_rows(train_df: pd.DataFrame, slug: str, weight: float | None = None, 
     weight = W_MKT if weight is None else weight
     xi_mkt = XI_MKT if xi_mkt is None else xi_mkt
     xi_fit = fit_xi(slug) if xi_fit is None else xi_fit
+    if slug not in SITE_FILES and train_df is not None and len(train_df) and "game_id" in train_df:
+        # No football-data file: Kalshi's closing prices where switched on (kalshi_rates; off by default).
+        from oddsmarkets.football.sources import kalshi_rates
+        if kalshi_rates.on() and slug in kalshi_rates.LEAGUE_SLUGS:
+            return kalshi_rates.rows(train_df, slug, weight, xi_fit, xi_mkt, now)
     if slug not in SITE_FILES or train_df is None or not len(train_df) or "game_id" not in train_df:
         return train_df.iloc[0:0] if train_df is not None else pd.DataFrame()
     try:

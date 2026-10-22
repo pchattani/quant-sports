@@ -26,6 +26,7 @@ Releases (verified 1 Oct 2026; column names kept as nflverse publishes them):
   stats_player       stats_player_week_<season>     1999->
   stats_team         stats_team_week_<season>       1999->
   contracts          historical_contracts           all      OverTheCap contracts (optional: not in "all"; see below)
+  officials          officials                      2015->   game officials by position (optional: research only, fetched by name)
 
 Licence: nflverse data CC-BY 4.0; FTN charting CC-BY-SA 4.0; NGS redistributed NFL data (credit, non-commercial).
 The contracts release is OverTheCap's data, whose terms do not allow republishing it on a website without OTC's consent:
@@ -70,6 +71,7 @@ RELEASES: dict[str, dict] = {
     "stats_player": {"tpl": "stats_player_week_{season}", "from": canon.FIRST_SEASON},
     "stats_team": {"tpl": "stats_team_week_{season}", "from": canon.FIRST_SEASON},
     "contracts": {"tpl": "historical_contracts", "from": None, "optional": True},
+    "officials": {"tpl": "officials", "from": None, "optional": True},      # research only (nfl_edge.md section 11)
 }
 
 # nflverse releases left out for their source's terms (module docstring); never fetched.

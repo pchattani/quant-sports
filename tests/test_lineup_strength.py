@@ -246,3 +246,26 @@ def test_tier_prior_puts_weak_cup_only_clubs_below_league_clubs_and_unseen_ones_
     assert strength(tier, "fa-cup:Never Seen") < lg_mean            # an unseen lower club: its tier, below the league
     assert plain.team_params("fa-cup:Never Seen") == (0.0, 0.0)
     assert fitting.pooled_tier("premier-league:Arsenal") is None and fitting.pooled_tier("champions-league:Celtic") == "continental"
+
+
+def test_kalshi_newer_titles_resolve_home_and_away_from_the_tickers() -> None:
+    from oddsmarkets.football.research import pm_prices as pmp
+    ms = [{"ticker": "KXSAUDIPLGAME-26OCT18FATKHA-TIE", "yes_sub_title": "Tie"},
+          {"ticker": "KXSAUDIPLGAME-26OCT18FATKHA-KHA", "yes_sub_title": "Al-Khaleej"},
+          {"ticker": "KXSAUDIPLGAME-26OCT18FATKHA-FAT", "yes_sub_title": "Al-Fateh"}]
+    assert pmp.home_away_from_tickers("KXSAUDIPLGAME-26OCT18FATKHA", ms) == ("Al-Fateh", "Al-Khaleej")
+    assert pmp.home_away_from_tickers("KXSAUDIPLGAME-26OCT18FATKHA", ms[:2]) is None
+
+
+def test_kalshi_rows_are_off_by_default_and_never_touch_football_data_leagues(monkeypatch) -> None:
+    import pandas as pd
+
+    from oddsmarkets.football.sources import kalshi_rates, market_rates
+    monkeypatch.delenv("FOOTBALL_KALSHI_ROWS", raising=False)
+    kalshi_rates.on.cache_clear()
+    df = pd.DataFrame({"game_id": ["1"], "home_team": ["Al-Hilal"], "away_team": ["Al-Nassr"], "home_goals": [1],
+                       "away_goals": [0], "match_date": [pd.Timestamp("2026-10-01", tz="UTC")], "weight": [1.0]})
+    if not kalshi_rates.on():                                   # model_params.json kalshi_market_rows.on is false
+        assert len(market_rates.market_rows(df, "saudi-pro-league", xi_fit=0.0035)) == 0
+    assert len(kalshi_rates.rows(df, "premier-league", xi_fit=0.0035)) == 0      # not a Kalshi-rows competition
+    kalshi_rates.on.cache_clear()

@@ -28,6 +28,9 @@ from oddsmarkets.tennis import canon
 from oddsmarkets.tennis.models import _io
 
 RANK_DAYS = 120
+# a player first seen on a Challenger row without a rank enters Elo and the market rating at this rank (chosen on the
+# dev years over the unranked prior: tennis_edge.md 11.0, C2b)
+RANK_NEW = 250.0
 ROUND_ORDER = ("R64", "R32", "R16", "QF", "SF", "F")
 
 
@@ -270,13 +273,18 @@ def merge_into_stores(tour: str = "atp", years: Iterable[int] | None = None, ran
         if y not in _io.years_on_disk(t):
             continue
         s = ST.load(t, y)
-        for mid in [k for k, m in s["matches"].items() if "wikipedia" in (m.get("sources") or [])]:
+        # replace the Wikipedia rows of the seasons read (all of them without `years`); a season's first week can
+        # date into the year before, so a partial run removes only the events it re-read
+        mine = (lambda eid: True) if years is None else (lambda eid: eid in meta["events"])
+        for mid in [k for k, m in s["matches"].items() if "wikipedia" in (m.get("sources") or []) and mine(m.get("event"))]:
             s["matches"].pop(mid)
-        for eid in [k for k, e in s["events"].items() if e.get("source") == "wikipedia"]:
+        for eid in [k for k, e in s["events"].items() if e.get("source") == "wikipedia" and mine(k)]:
             s["events"].pop(eid)
         ST.drop_index(s)
         for r in by_year.get(y, []):
-            r = {k: v for k, v in r.items() if v is not None or k in ("winner",)}
+            # compact rows (the models default best of 3, tb7, outdoor): about 200 bytes each
+            r = {k: v for k, v in r.items() if v is not None and k not in DROP and not (k == "indoor" and not v)}
+            r["id"] = ST.match_id(r["event"], r["round"], r["p1"], r["p2"])
             s["matches"][r["id"]] = r
             if r["event"] not in s["events"]:
                 ev = meta["events"].get(r["event"]) or {}
@@ -303,6 +311,7 @@ def merge_into_stores(tour: str = "atp", years: Iterable[int] | None = None, ran
     return out
 
 
+DROP = ("best_of", "final_set_rule", "pts1", "pts2", "odds", "stats", "live")
 LICENSE_NOTE = {"name": "Wikipedia", "license": "CC BY-SA 4.0", "url": "https://en.wikipedia.org/",
                 "attribution": "ATP Challenger main-draw results: Wikipedia contributors (CC BY-SA 4.0)",
                 "use": "Challenger rows (level ch): ratings and features only, never priced or scored"}

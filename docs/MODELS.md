@@ -162,6 +162,14 @@ Every one of 35 leagues improved. The model still trails the snapshot, the close
 - Why: in the walk-forward backtest (2019/20 onwards, production parameters, all twelve leagues, 30,854 matches) it cut the 1X2 log-loss by 0.0079 (95% CI 0.0065 to 0.0092) and improved every league. See `docs/research/football_edge.md`.
 - Data: `data/football/odds/raw/` (git-ignored). The build refreshes the current season's files at most once a day (`market_rates.refresh`, skipped with `--no-market`). Without the files the module adds nothing, so CI or a fresh clone builds exactly the goals/xG model. `--no-market-rates` turns it off.
 
+**Kalshi rows for the Saudi Pro League and the UEFA cups (built 22 October 2026, off).**
+- What: `oddsmarkets/football/sources/kalshi_rates.py` makes the same rows from Kalshi's last two-sided quote before kick-off, for competitions without a football-data file.
+- Where they enter:
+  - Saudi: through `market_rates.market_rows`, so the build, the pooled fit and the tuner all get them.
+  - The UEFA cups: through `pooled_training_frame`.
+- Switch and cache: they are used only when `model_params.json` `kalshi_market_rows.on` is true. In that case the build also refreshes the Kalshi cache (`data/football/odds/kalshi`, in CI's raw-data cache): the listings incrementally, then at most 150 candle calls a run, every 6 h at most.
+- Why off: the walk-forward test cut log-loss by 0.030 for each but failed the pre-registered calibration clause. A forward test from 23 October 2026 decides (`docs/research/football_edge.md` 3.3b, 3.6, 3.7).
+
 ### 2.6 The line-up term (since 22 October 2026)
 
 `oddsmarkets/football/analytics/lineup_strength.py`. Clubs announce their XIs about an hour before kick-off, after the model's ratings were fitted. For a league fixture whose confirmed XIs are in its store, the build values each XI against the club's usual XI and tilts the score matrix:
@@ -422,7 +430,11 @@ Cup matches between clubs of different leagues are the only edges connecting the
 - A club under a cup's prefix is shrunk toward attack = defence = 0, about an average top-flight club in the pool, and a club the fit never saw is exactly that.
 - A lower-division side meets mostly other lower-division sides, so the ridge, not the data, sets its level: O Elvas CAD, SC Vianense and Waltham Abbey ranked 7th to 10th in the world.
 - `DixonColesModel(prior_group=fitting.pooled_tier)` shrinks each such club toward its tier's own fitted offsets ("domestic": national cups and super cups; "continental": continental cups), and gives an unseen club its tier.
-- In the pre-registered test (`docs/research/football_edge.md` 3.5b) it cut log-loss on 1,569 cup matches by 0.0285 (95% CI 0.0123 to 0.0462), with the slope moving toward 1. It missed the ECE tolerance by 0.0002, so it is off (`model_params.json` `pooled_tier_prior.on`) pending the user's decision.
+- In the pre-registered test (`docs/research/football_edge.md` 3.5b) it cut log-loss on 1,569 cup matches by 0.0285 (95% CI 0.0123 to 0.0462), with the slope moving toward 1. It missed the ECE tolerance by 0.0002 (ECE +0.0012; bootstrap CI of the difference -0.008 to +0.009).
+- **On since 22 October 2026, by the user's decision** overriding that tolerance (`model_params.json` `pooled_tier_prior.on`).
+- On the 22 October stores the domestic tier sits at attack -0.53, defence +0.77, and the continental tier at -0.14, +0.23. O Elvas CAD moves from 7th to 239th of 1,742 clubs, SC Vianense from 8th to 303rd, Waltham Abbey from 13th to 301st (3.5c).
+- The offsets are fitted inside the pooled fit from the stores alone, so CI needs nothing new.
+- Caveat: the domestic tier mixes professional lower-division clubs (League One and Two, Segunda RFEF) with amateurs. A professional side with few cup matches is priced near the tier (Fleetwood Town v Arsenal: home win 0.09 before, 0.01 after). A per-level tier needs those clubs' league data, which is not followed.
 
 ### 6.1 Read-back: `oddsmarkets/football/analytics/pool.py`
 

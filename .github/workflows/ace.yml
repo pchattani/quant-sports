@@ -63,6 +63,7 @@ jobs:
             data/tennis/td
             data/tennis/wta
             data/tennis/charting
+            data/tennis/wiki
           key: ace-raw-v1-none
           restore-keys: ace-raw-v1-
 
@@ -119,6 +120,12 @@ jobs:
         run: |
           uv run --frozen python scripts/tn_fetch.py --tour wta --refresh-current --budget 400 --interval 0.5
 
+      - name: 'Fetch ATP Challengers (Wikipedia)'
+        continue-on-error: true
+        timeout-minutes: 15
+        run: |
+          uv run --frozen python scripts/tn_wiki.py --years ${{ steps.ctx.outputs.year }} --refresh --max-age-h 24 --merge --budget 400
+
       - name: 'Build'
         timeout-minutes: 40
         env:
@@ -162,7 +169,7 @@ jobs:
         if: ${{ !cancelled() }}
         id: rawkey
         run: |
-          uv run --frozen python scripts/ci_site.py cachekey --name ace-raw-v1 --paths data/tennis/td data/tennis/wta data/tennis/charting | tee -a "$GITHUB_OUTPUT"
+          uv run --frozen python scripts/ci_site.py cachekey --name ace-raw-v1 --paths data/tennis/td data/tennis/wta data/tennis/charting data/tennis/wiki | tee -a "$GITHUB_OUTPUT"
 
       - name: 'Save raw data (only when it changed)'
         if: ${{ !cancelled() && steps.rawkey.outputs.files != '0' && steps.rawkey.outputs.key != steps.raw.outputs.cache-matched-key }}
@@ -173,6 +180,7 @@ jobs:
             data/tennis/td
             data/tennis/wta
             data/tennis/charting
+            data/tennis/wiki
           key: ${{ steps.rawkey.outputs.key }}
 
       - name: 'Delete superseded raw-data caches'

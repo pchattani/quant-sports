@@ -97,6 +97,7 @@ jobs:
         with:
           path: |
             data/football/odds/raw
+            data/football/odds/kalshi
           key: football-raw-v1-none
           restore-keys: football-raw-v1-
 
@@ -156,7 +157,7 @@ jobs:
         if: ${{ !cancelled() }}
         id: rawkey
         run: |
-          uv run --frozen python scripts/ci_site.py cachekey --name football-raw-v1 --paths data/football/odds/raw | tee -a "$GITHUB_OUTPUT"
+          uv run --frozen python scripts/ci_site.py cachekey --name football-raw-v1 --paths data/football/odds/raw data/football/odds/kalshi | tee -a "$GITHUB_OUTPUT"
 
       - name: 'Save raw data (only when it changed)'
         if: ${{ !cancelled() && steps.rawkey.outputs.files != '0' && steps.rawkey.outputs.key != steps.raw.outputs.cache-matched-key }}
@@ -165,6 +166,7 @@ jobs:
         with:
           path: |
             data/football/odds/raw
+            data/football/odds/kalshi
           key: ${{ steps.rawkey.outputs.key }}
 
       - name: 'Delete superseded raw-data caches'

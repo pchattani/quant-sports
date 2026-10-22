@@ -19,9 +19,21 @@
     "source": "scripts/football_lineups.py"
   },
   "pooled_tier_prior": {
-    "on": false,
+    "on": true,
     "rule": "clubs under a cup prefix (outside the followed leagues) shrink toward their tier's fitted offsets (domestic: national cups and super cups; continental: continental cups) instead of toward an average top-flight club; unseen clubs take their tier (fitting.pooled_tier, DixonColesModel prior_group)",
-    "test": "pre-registered (football_edge.md 3.5), 1 Dec 2025 to 20 Oct 2026, every club-cup match n 1,569: log-loss -0.0285 (95% CI -0.0462 to -0.0123), slope 1.088 -> 1.032, ECE 0.0166 -> 0.0178 (+0.0012 > the 0.001 tolerance): not promoted; off pending the user's decision"
+    "test": "pre-registered (football_edge.md 3.5), 1 Dec 2025 to 20 Oct 2026, every club-cup match n 1,569: log-loss -0.0285 (95% CI -0.0462 to -0.0123), slope 1.088 -> 1.032, ECE 0.0166 -> 0.0178 (+0.0012 > the 0.001 tolerance): not promoted; off pending the user's decision",
+    "decision": "switched on 22 Oct 2026 by the user's decision, overriding the pre-registered 0.001 ECE tolerance: log-loss -0.0285, ECE +0.0012 (block-bootstrap CI of the ECE difference -0.008 to +0.009)"
+  },
+  "kalshi_market_rows": {
+    "on": false,
+    "slugs": [
+      "saudi-pro-league",
+      "champions-league",
+      "europa-league",
+      "conference-league"
+    ],
+    "rule": "market-rate rows from Kalshi's last two-sided quote before kick-off (oddsmarkets/football/sources/kalshi_rates.py), weight and decay as market_rates; the build refreshes the Kalshi cache when on",
+    "status": "off: the 3.3b test failed the calibration clause; forward test pre-registered 22 Oct 2026 (football_edge.md 3.6): UEFA cups on or after 15 Dec 2026, Saudi on or after 20 Apr 2027"
   },
   "tuned_at": "2026-10-22T04:50:14Z",
   "folds": 6,
