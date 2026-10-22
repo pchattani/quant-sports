@@ -229,7 +229,7 @@ def event_for(s: dict, meta: dict, src: str, create: bool = True) -> str | None:
     sid = meta.get(src) if src in ("td", "espn", "wta") else None
     if sid:
         for eid, ev in evs.items():
-            if str(ev.get(f"_{src}") or "") == str(sid):
+            if str(ev.get(f"_{src}") or "") == str(sid) or f"{src}:{sid}" in (ev.get("_alias") or ()):
                 _fill_event(ev, meta, src, tour)
                 return eid
     city = canon.city_key(meta.get("city"))
@@ -555,6 +555,254 @@ def merge_record(s: dict, rec: dict, eid: str, pa: str, pb: str) -> str:
 
 def drop_index(s: dict) -> None:
     s.pop("_pairs", None)
+
+
+# ── one row per real match ──────────────────────────────────────────────────
+#
+# The three sources name events differently, and `event_for` creates a new event when a record's
+# candidates tie (two events in one city in overlapping weeks: Adelaide 1 and 2, Melbourne Summer Set
+# 1 and 2, Chicago's WTA 125 and 250; an ESPN event with the wrong dates). The same real match then
+# sat under two or three events (a WTA 125 "ch" row from ESPN beside the WTA's and tennis-data's
+# tour-level rows), and the models rated it twice. ESPN also files an event that starts in late
+# December under that year while tennis-data and the WTA file it under the next season, so a match
+# could sit in two seasons' stores. Event names and dates cannot settle identity; the matches can:
+# two rows with the same two players within a day of each other and the same games are one match.
+# `dedupe` merges events whose matches are the same matches, then folds same-match rows within an
+# event; `dedupe_seasons` does the same across two adjacent seasons' stores. tn_fetch runs both on
+# every save, so a store heals whichever way a duplicate arrived.
+
+SRC_RANK = {"wta": 3, "espn": 2, "td": 1}                # whose round label is explicit (the WTA's draw first)
+
+
+def _date(d: Any) -> date | None:
+    try:
+        return date.fromisoformat(str(d)[:10])
+    except (TypeError, ValueError):
+        return None
+
+
+def _played_games(m: dict, flip: bool = False) -> list:
+    out = [[x[0], x[1]] for x in m.get("sets") or [] if (x[0] or 0) + (x[1] or 0) > 0]
+    return [[b, a] for a, b in out] if flip else out
+
+
+def same_match(a: dict, b: dict, days: int = 1) -> bool:
+    """Two rows are one real match: the same two players, dates within `days`, and the same games
+    when both have games (a row without games, upcoming or a walkover, needs the same qualifying /
+    main-draw side, so a lucky loser's qualifying match and main-draw match stay two)."""
+    if not a.get("p1") or not a.get("p2") or {a["p1"], a["p2"]} != {b.get("p1"), b.get("p2")}:
+        return False
+    da, db = _date(a.get("date")), _date(b.get("date"))
+    if da is None or db is None or abs((da - db).days) > days:
+        return False
+    ga, gb = _played_games(a), _played_games(b, flip=a["p1"] != b["p1"])
+    if ga and gb:
+        return ga == gb
+    return canon.is_qual(a.get("round")) == canon.is_qual(b.get("round"))
+
+
+def _label_rank(m: dict) -> int:
+    return max((SRC_RANK.get(x, 0) for x in m.get("sources") or []), default=0)
+
+
+def fold_rows(keep: dict, drop: dict, conflicts: list | None = None) -> dict:
+    """`drop` (another row of the same real match) folded into `keep`; keeps `keep`'s event. The round
+    label of the row with the more explicit source wins (WTA draw, then ESPN, then tennis-data's inference)."""
+    rnd = drop.get("round") if _label_rank(drop) > _label_rank(keep) else keep.get("round")
+    merged = _merge_match(keep, drop, conflicts)
+    merged["event"] = keep["event"]
+    merged["round"] = rnd
+    if canon.is_qual(rnd):
+        merged["level"] = "q"
+    elif merged.get("level") == "q":
+        merged["level"] = keep.get("level") if keep.get("level") != "q" else drop.get("level")
+    merged["id"] = match_id(merged["event"], rnd, merged["p1"], merged["p2"])
+    return merged
+
+
+def _put(s: dict, m: dict, conflicts: list | None) -> str:
+    """Insert a row, folding it into a row already under its id."""
+    mid = m["id"]
+    if mid in s["matches"] and s["matches"][mid] is not m:
+        m = fold_rows(s["matches"][mid], m, conflicts)
+        if m["id"] != mid:
+            s["matches"].pop(mid)
+            return _put(s, m, conflicts)
+    s["matches"][mid] = m
+    return mid
+
+
+def _absorb_event(s: dict, keep: str, gone: str) -> None:
+    """Event `gone` (the same tournament as `keep`, from another source) folded into `keep`."""
+    ek, eg = s["events"][keep], s["events"].pop(gone)
+    alias = list(ek.get("_alias") or [])
+    for src in ("td", "espn", "wta"):
+        v = eg.get(f"_{src}")
+        if v and not ek.get(f"_{src}"):
+            ek[f"_{src}"] = v
+        elif v and str(v) != str(ek[f"_{src}"]) and f"{src}:{v}" not in alias:
+            alias.append(f"{src}:{v}")
+    alias += [a for a in eg.get("_alias") or [] if a not in alias]
+    if alias:
+        ek["_alias"] = alias
+    for k in ("espn", "wta"):
+        if not ek.get(k) and eg.get(k):
+            ek[k] = eg[k]
+    strong_k = bool(ek.get("_td") or ek.get("_wta"))
+    if not ek.get("_lv_level") and eg.get("_lv_level"):        # tennis-data's / the WTA's grading beats ESPN's
+        for k in ("level", "surface", "indoor"):
+            if eg.get(k) is not None:
+                ek[k] = eg[k]
+            if eg.get(f"_lv_{k}"):
+                ek[f"_lv_{k}"] = eg[f"_lv_{k}"]
+    for k in ("level", "surface", "indoor", "draw_size", "city", "country", "name"):
+        if ek.get(k) is None and eg.get(k) is not None:
+            ek[k] = eg[k]
+    if not strong_k:                                           # ESPN's dates are sometimes a week or two out
+        if eg.get("_td") or eg.get("_wta"):
+            ek["start"], ek["end"] = eg.get("start") or ek.get("start"), eg.get("end") or ek.get("end")
+        else:
+            ek["start"] = min(x for x in (ek.get("start"), eg.get("start"), "9999") if x)
+            ek["end"] = max(x for x in (ek.get("end"), eg.get("end"), "") if x is not None) or None
+            if ek["start"] == "9999":
+                ek["start"] = None
+    if eg.get("_tid_src") == "td":
+        ek["_tid_src"] = "td"
+    dg, dk = eg.get("draw") or {}, ek.get("draw") or {}
+    if dg.get("source") == "wta" and dk.get("source") != "wta":
+        ek["draw"] = eg["draw"]
+    conflicts = s["meta"].setdefault("conflicts", [])
+    for mid in [k for k, m in s["matches"].items() if m.get("event") == gone]:
+        m = s["matches"].pop(mid)
+        m["event"] = keep
+        if m.get("level") != "q" and ek.get("level"):
+            m["level"] = ek["level"]
+        m["id"] = match_id(keep, m.get("round"), m["p1"], m["p2"])
+        _put(s, m, conflicts)
+
+
+def _event_rank(ev: dict, n: int) -> tuple:
+    return (bool(ev.get("_td")), bool(ev.get("_wta")), bool(ev.get("_espn")), n)
+
+
+def dedupe(s: dict) -> dict:
+    """Merge events that hold the same matches, then fold rows of one real match inside an event.
+    Returns counts {"events": merged, "matches": rows removed}."""
+    n0 = len(s["matches"])
+    by_pair: dict[frozenset, list[dict]] = {}
+    for m in s["matches"].values():
+        if m.get("p1") and m.get("p2"):
+            by_pair.setdefault(frozenset((m["p1"], m["p2"])), []).append(m)
+    n_ev: dict[str, int] = {}
+    for m in s["matches"].values():
+        n_ev[m.get("event")] = n_ev.get(m.get("event"), 0) + 1
+    shared: dict[tuple, set] = {}
+    for rows in by_pair.values():
+        if len(rows) < 2:
+            continue
+        for i in range(len(rows)):
+            for j in range(i + 1, len(rows)):
+                a, b = rows[i], rows[j]
+                if a["event"] != b["event"] and same_match(a, b):
+                    k = tuple(sorted((a["event"], b["event"])))
+                    shared.setdefault(k, set()).update([a["id"], b["id"]])
+    # union the events whose overlap is most of the smaller one's matches
+    parent: dict[str, str] = {}
+
+    def find(x: str) -> str:
+        while parent.get(x, x) != x:
+            x = parent[x]
+        return x
+
+    for (ea, eb), ids in shared.items():
+        if ea not in s["events"] or eb not in s["events"]:
+            continue
+        na, nb = n_ev.get(ea, 0), n_ev.get(eb, 0)
+        twins_a = sum(1 for i in ids if s["matches"].get(i, {}).get("event") == ea)
+        twins_b = sum(1 for i in ids if s["matches"].get(i, {}).get("event") == eb)
+        small = min(na, nb)
+        t = min(twins_a, twins_b)
+        if t >= 0.5 * small and (t >= 2 or t == small):
+            ra, rb = find(ea), find(eb)
+            if ra != rb:
+                parent[ra] = rb
+    groups: dict[str, list[str]] = {}
+    for e in list(parent):
+        groups.setdefault(find(e), []).append(e)
+    merged_events = 0
+    for root, members in groups.items():
+        allm = sorted(set(members) | {root})
+        keep = max(allm, key=lambda e: _event_rank(s["events"][e], n_ev.get(e, 0)))
+        for e in allm:
+            if e != keep:
+                _absorb_event(s, keep, e)
+                merged_events += 1
+    # rows of one match inside an event under two round labels (a qualifying / main-draw or a finals-week mix-up)
+    conflicts = s["meta"].setdefault("conflicts", [])
+    by_key: dict[tuple, list[str]] = {}
+    for mid, m in s["matches"].items():
+        if m.get("p1") and m.get("p2"):
+            by_key.setdefault((m["event"], frozenset((m["p1"], m["p2"]))), []).append(mid)
+    for mids in by_key.values():
+        alive = list(mids)
+        changed = True
+        while changed and len(alive) > 1:
+            changed = False
+            for i in range(len(alive)):
+                for j in range(i + 1, len(alive)):
+                    a, b = s["matches"].get(alive[i]), s["matches"].get(alive[j])
+                    if a is None or b is None or not same_match(a, b):
+                        continue
+                    keep, drop = (a, b) if (_label_rank(a), len(a.get("sources") or [])) >= (
+                        _label_rank(b), len(b.get("sources") or [])) else (b, a)
+                    s["matches"].pop(keep["id"], None)
+                    s["matches"].pop(drop["id"], None)
+                    new = _put(s, fold_rows(keep, drop, conflicts), conflicts)
+                    alive = [x for x in alive if x not in (a["id"], b["id"])] + [new]
+                    changed = True
+                    break
+                if changed:
+                    break
+    drop_index(s)
+    return {"events": merged_events, "matches": n0 - len(s["matches"])}
+
+
+def dedupe_seasons(prev: dict, cur: dict) -> int:
+    """Rows of the store `prev` (season Y-1) that are the same match as a row of `cur` (season Y), around
+    New Year: folded into `cur`'s row (the season tennis-data and the WTA file the event under) and removed
+    from `prev`, with any of `prev`'s events left empty. Returns rows removed from `prev`."""
+    y = int(cur["year"])
+    lo, hi = f"{y - 1}-12-01", f"{y}-01-31"
+    idx: dict[frozenset, list[str]] = {}
+    for mid, m in cur["matches"].items():
+        if m.get("p1") and m.get("p2") and str(m.get("date") or "")[:10] <= hi:
+            idx.setdefault(frozenset((m["p1"], m["p2"])), []).append(mid)
+    if not idx:
+        return 0
+    conflicts = cur["meta"].setdefault("conflicts", [])
+    touched, n = set(), 0
+    for mid, m in list(prev["matches"].items()):
+        if str(m.get("date") or "")[:10] < lo or not m.get("p1") or not m.get("p2"):
+            continue
+        for cid in idx.get(frozenset((m["p1"], m["p2"])), []):
+            c = cur["matches"].get(cid)
+            if c is None or not same_match(c, m):
+                continue
+            merged = fold_rows(c, m, conflicts)
+            cur["matches"].pop(cid)
+            new = _put(cur, merged, conflicts)
+            idx[frozenset((m["p1"], m["p2"]))] = [x for x in idx[frozenset((m["p1"], m["p2"]))] if x != cid] + [new]
+            prev["matches"].pop(mid)
+            touched.add(m.get("event"))
+            n += 1
+            break
+    left = {m.get("event") for m in prev["matches"].values()}
+    for eid in touched:
+        if eid not in left:
+            prev["events"].pop(eid, None)
+    drop_index(prev)
+    drop_index(cur)
+    return n
 
 
 # ── event roll-ups ──────────────────────────────────────────────────────────

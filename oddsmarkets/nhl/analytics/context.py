@@ -46,6 +46,9 @@ CANDS: dict[str, list[str]] = {
     "game_id": ["game_id", "gameId", "game"],
     # the same preference as builder B's _io.ALIASES["idx"], so the per-game event index matches B's (xG joins on it)
     "event_id": ["idx", "event_idx", "sort_order", "sortorder", "event_index", "order", "seq", "event_id", "eventid"],
+    # the feed's order within a second (builder B's _io.ALIASES["ord"]): the xG model's rebound / rush flags read the
+    # previous event in this order
+    "ord": ["sort", "sort_order", "sortorder"],
     "period": ["period", "period_number", "periodNumber", "per"],
     "sec": ["sec", "game_sec", "game_seconds", "elapsed", "t", "time_elapsed", "seconds"],
     "period_sec": ["period_sec", "time_in_period", "timeinperiod", "period_seconds"],
@@ -189,7 +192,7 @@ def normalise_events(raw: pd.DataFrame, games: dict[str, dict] | None = None) ->
         raise ValueError("events table has no game_id column")
     out["game_id"] = out["game_id"].map(an.sid)
     out["type"] = out["type"].map(norm_type) if "type" in out else ""
-    for k in ("period", "sec", "x", "y", "score_home", "score_away", "xg", "dist", "angle", "pen_min", "speed", "event_id"):
+    for k in ("period", "sec", "x", "y", "score_home", "score_away", "xg", "dist", "angle", "pen_min", "speed", "event_id", "ord"):
         if k in out:
             out[k] = pd.to_numeric(out[k], errors="coerce")
     if "sec" not in out and "period_sec" in out and "period" in out:
@@ -402,7 +405,7 @@ def normalise_stints(raw: pd.DataFrame, games: dict[str, dict] | None = None) ->
 
 
 # builder A's event columns this layer never reads (left on disk to bound memory)
-EV_SKIP = ("x_raw", "y_raw", "zone_raw", "t", "ptype", "pen_desc", "onice_ok", "onice_strict", "stint", "gtype", "season", "sort",
+EV_SKIP = ("x_raw", "y_raw", "zone_raw", "t", "ptype", "pen_desc", "onice_ok", "onice_strict", "stint", "gtype", "season",
            "home_sk", "away_sk", "home_gin", "away_gin", "n_home_sk", "n_away_sk", "penalty_shot", "state", "strength")
 
 

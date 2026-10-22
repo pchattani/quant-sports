@@ -358,3 +358,58 @@ def test_careers_name_prefers_a_real_name_over_the_id():
     written = {}
     idx = careers.write_careers(lambda rel, d: written.__setitem__(rel, d), rows, {}, lambda p: None, 20252026, {})
     assert idx["8499999"][0] == "Called Up"
+
+
+def test_box_rebound_rush_flags_from_the_sequence():
+    """reb60 / rush60 were 0 for everyone: the events table has no rebound / rush columns (only the xG model built
+    them). box derives them with the model's rule, reading the feed's order within a second (`sort`)."""
+    from oddsmarkets.nhl.analytics import box
+    from oddsmarkets.nhl.analytics.context import normalise_events
+    base = {"game_id": 2025020001, "period": 1, "sit": "1551", "home_g": 1, "away_g": 2, "y": 0.0}
+    for i in range(5):
+        base[f"home_s{i + 1}"] = 11 + i
+        base[f"away_s{i + 1}"] = 21 + i
+    rows = [
+        # faceoff won in the neutral zone, shot 2 s later: a rush attempt
+        {"event_id": 1, "sort": 1, "sec": 10.0, "type": "faceoff", "team": "BOS", "zone": "N", "x": 0.0, "player1": 11, "player2": 21},
+        {"event_id": 2, "sort": 2, "sec": 12.0, "type": "shot-on-goal", "team": "BOS", "zone": "O", "x": 60.0, "player1": 12},
+        # a second BOS attempt 2 s after the first: a rebound (not a rush: the previous event is in the offensive zone)
+        {"event_id": 3, "sort": 3, "sec": 14.0, "type": "missed-shot", "team": "BOS", "zone": "O", "x": 70.0, "player1": 13},
+        # TOR attempt 1 s after a BOS one: not a rebound (the other team's attempt), but a rush: BOS's offensive zone
+        # is TOR's defensive zone
+        {"event_id": 4, "sort": 4, "sec": 15.0, "type": "shot-on-goal", "team": "TOR", "zone": "O", "x": 60.0, "player1": 22},
+        # feed order within a second: event_id 6 comes first in the feed (sort 5), so the shot (event_id 5, sort 6)
+        # follows BOS's blocked attempt and is a rebound
+        {"event_id": 6, "sort": 5, "sec": 40.0, "type": "blocked-shot", "team": "BOS", "zone": "O", "x": 50.0, "player1": 14, "player2": 23},
+        {"event_id": 5, "sort": 6, "sec": 40.0, "type": "shot-on-goal", "team": "BOS", "zone": "O", "x": 65.0, "player1": 15},
+    ]
+    raw = pd.DataFrame([{**base, **r} for r in rows])
+    ev = normalise_events(raw, {"2025020001": {"home": "BOS", "away": "TOR"}})
+    reb, rush = box.rebound_rush(ev)
+    by = dict(zip(ev["event_id"].astype(int), zip(reb, rush)))
+    assert by[2] == (0.0, 1.0)
+    assert by[3] == (1.0, 0.0)
+    assert by[4] == (0.0, 1.0)
+    assert by[5] == (1.0, 0.0)
+    ind = box.individual(ev).set_index("pid")
+    assert ind.loc[12.0, "rush_att"] == 1 and ind.loc[13.0, "reb_att"] == 1 and ind.loc[15.0, "reb_att"] == 1
+    # a table that carries its own flags keeps them
+    r2, u2 = box.rebound_rush(ev.assign(rebound=0.0, rush=0.0))
+    assert r2.sum() == 0 and u2.sum() == 0
+
+
+def test_box_rebound_rush_match_the_xg_features(rink):
+    """On a whole synthetic season the box flags equal the xG model's own rebound / rush features shot for shot."""
+    from oddsmarkets.nhl.analytics import box, context
+    from oddsmarkets.nhl.models import _io, xg
+    s = 20252026
+    raw = context.read_parquet(an.events_path(s), exclude=context.EV_SKIP)
+    ev = box.playable(context.normalise_events(raw, None))
+    reb, rush = box.rebound_rush(ev)
+    att, _ = xg.attempts(_io.events(s), s)
+    k = pd.DataFrame({"game_id": ev["game_id"].astype("int64").to_numpy(), "idx": ev["idx"].to_numpy(), "reb_box": reb,
+                      "rush_box": rush})
+    m = att[["game_id", "idx", "rebound", "rush"]].merge(k, on=["game_id", "idx"], how="inner")
+    assert len(m) == len(att) > 500
+    assert m["rebound"].sum() > 0 and m["rush"].sum() > 0
+    assert (m["reb_box"] == m["rebound"]).all() and (m["rush_box"] == m["rush"]).all()

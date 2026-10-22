@@ -93,6 +93,32 @@ def danger(xg: np.ndarray) -> np.ndarray:
 
 # ---------------------------------------------------------------------------------------------- individual
 
+def rebound_rush(ev: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+    """Rebound and rush flags (1.0 / 0.0) per event: the table's own columns when it carries them, else derived from
+    the event sequence by the xG model's rule (models.xg.sequence_flags), so reb60 / rush60 count what the model
+    calls a rebound or a rush. Like the model's canonical events, the sequence is read in the feed's order within a
+    second (`ord`, when the table has it) and an event without a zone reads as "N" (stoppages, period starts)."""
+    n = len(ev)
+    have = [c for c in ("rebound", "rush") if c in ev and ev[c].notna().any()]
+    if len(have) == 2:
+        return ev["rebound"].fillna(0).to_numpy(float), ev["rush"].fillna(0).to_numpy(float)
+    from oddsmarkets.nhl.models.xg import sequence_flags
+    keys = [c for c in ("game_id", "period", "sec", "ord", "idx") if c in ev]
+    order = np.arange(n) if n == 0 else (ev[keys].reset_index(drop=True).sort_values(keys, kind="mergesort").index.to_numpy())
+    zone = (ev["zone"].to_numpy(object) if "zone" in ev else np.full(n, None, dtype=object))[order]
+    zone = np.array(["N" if (v is None or v != v) else str(v)[:1].upper() for v in zone], dtype=object)
+    r, u = sequence_flags(ev["game_id"].to_numpy(object)[order], ev["period"].to_numpy(float)[order],
+                          ev["team"].to_numpy(object)[order], np.isin(ev["type"].to_numpy(object), CORSI)[order],
+                          ev["sec"].to_numpy(float)[order], zone)
+    reb, rush = np.zeros(n), np.zeros(n)
+    reb[order], rush[order] = r, u
+    if "rebound" in have:
+        reb = ev["rebound"].fillna(0).to_numpy(float)
+    if "rush" in have:
+        rush = ev["rush"].fillna(0).to_numpy(float)
+    return reb, rush
+
+
 def individual(ev: pd.DataFrame) -> pd.DataFrame:
     cols = ["game_id", "pid", "team"]
     if not len(ev):
@@ -126,8 +152,7 @@ def individual(ev: pd.DataFrame) -> pd.DataFrame:
         ev_cols[f"icf_{s}"] = (cor & ms)
     dist = ev["dist"].to_numpy(float) if "dist" in ev else np.full(len(ev), np.nan)
     st_l = ev["shot_type"].astype(str).str.lower().to_numpy(object) if "shot_type" in ev else np.full(len(ev), "", dtype=object)
-    reb = ev["rebound"].fillna(0).to_numpy(float) if "rebound" in ev else np.zeros(len(ev))
-    rush = ev["rush"].fillna(0).to_numpy(float) if "rush" in ev else np.zeros(len(ev))
+    reb, rush = rebound_rush(ev)
     shooter = cor
     add(shooter, "p1", "team", g=is_goal, sog=sog, iff=fen, icf=cor, ixg=np.where(fen, xg0, 0.0), miss=(t == MISS), blocked_by=(t == BLOCK),
         sdist=np.where(fen, np.nan_to_num(dist), 0.0), ndist=(fen & ~np.isnan(dist)),

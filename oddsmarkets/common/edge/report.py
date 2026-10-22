@@ -58,12 +58,66 @@ def selected(d: pd.DataFrame, cfg: SizingConfig) -> pd.Series:
     return candidates(d, cfg) & ~d["warmup"].astype(bool)
 
 
+CLV_MIN_SHARE = 0.5      # CLV is the primary test only when at least this share of the bets has a same-line close
+CLOSE_MOVED_MIN = 0.2    # ... and more than this share of those closes differs from the price taken
+
+
+def clv_usable(u: dict) -> bool:
+    """CLV is a test of the bets only when most of them have a close for the line bet and the close is not, for
+    most of them, the very price taken (bets placed at the close have CLV = minus the margin by construction)."""
+    n = u.get("n", 0) or 0
+    return (u.get("n_clv", 0) or 0) >= CLV_MIN_SHARE * max(n, 1) and (u.get("close_differs") or 0) > CLOSE_MOVED_MIN
+
+
+def clv_basis(u: dict) -> str:
+    """What the CLV figure rests on, for the table: bets with a same-line close, and spreads/totals voided because
+    their line moved."""
+    n, k = int(u.get("n", 0) or 0), int(u.get("n_clv", 0) or 0)
+    lm = int(u.get("n_line_moved", 0) or 0)
+    return f"{k:,} of {n:,}" + (f"; {lm:,} line moved" if lm else "")
+
+
+def no_clv_reason(u: dict) -> str:
+    """Why the CLV in the table is not the test (the verdict's wording when `clv_usable` is False)."""
+    n, k = int(u.get("n", 0) or 0), int(u.get("n_clv", 0) or 0)
+    lm, nc = int(u.get("n_line_moved", 0) or 0), int(u.get("n_no_close", 0) or 0)
+    why = []
+    if lm:
+        why.append(f"{lm:,} are spreads/totals whose line moved before the close, and the portfolio layer gives those "
+                   f"no CLV (their closing price is for another line)")
+    if nc:
+        why.append(f"{nc:,} have no closing price")
+    if k == 0:
+        return "No CLV: no bet has a closing price for the line bet" + (f" ({'; '.join(why)})" if why else "") + "."
+    clv = (f"The table's CLV ({u['clv']:+.2%})" if isinstance(u.get("clv"), float) and np.isfinite(u["clv"])
+           else "The table's CLV")
+    if k < CLV_MIN_SHARE * max(n, 1):
+        return (f"CLV not used as the test: only {k:,} of the {n:,} bets ({k / n:.0%}) have a closing price for the "
+                f"line bet" + (f"; {'; '.join(why)}" if why else "") + f". {clv} rests on those {k:,} bets only.")
+    same, noprice = int(u.get("n_close_same", 0) or 0), int(u.get("n_close_noprice", 0) or 0)
+    how = []
+    if same:
+        how.append(f"{same:,} of the {k:,} bets with a close were taken at the closing price itself, so their CLV is "
+                   f"just minus the bookmaker's margin")
+    if noprice:
+        how.append(f"{noprice:,} of the {k:,} closes are a supplied closing probability without a closing price, so "
+                   f"whether the price moved cannot be checked")
+    cd = u.get("close_differs")
+    pct = ("under 1%" if isinstance(cd, float) and 0 < cd < 0.005 else f"{cd:.0%}") if isinstance(cd, float) else ""
+    moved = (f" (the closing price differs from the price taken for {pct} of the {k:,} bets with a close)"
+             if isinstance(cd, float) and np.isfinite(cd) and same > noprice else "")
+    what = ("is mostly the margin, not a test of the model" if same >= noprice
+            else "cannot be read as a test of the model")
+    return (f"CLV not used as the test{moved}: {'; '.join(how)}. {clv} {what}."
+            + (f" {lm:,} spread/total bets get no CLV because their line moved before the close." if lm else ""))
+
+
 def verdict(u: dict, p_holm: float, min_bets: int = 50) -> tuple[str, str]:
     """(code, sentence). Codes: EDGE, LIKELY, NONE, NEGATIVE, THIN."""
     n = u.get("n", 0)
     if n < min_bets:
         return "THIN", f"Too few bets ({n}) to judge."
-    clv_ok = u.get("n_clv", 0) >= 0.5 * n and (u.get("close_differs") or 0) > 0.2
+    clv_ok = clv_usable(u)
     roi_sig = (u.get("roi_lo", -1) or -1) > 0
     holm_txt = "" if not np.isfinite(p_holm) else (" Survives the Holm multiple-testing correction."
                                                   if p_holm < 0.05 else
@@ -71,23 +125,27 @@ def verdict(u: dict, p_holm: float, min_bets: int = 50) -> tuple[str, str]:
     luck = " The positive ROI without CLV is treated as luck." if roi_sig else ""
     if clv_ok:
         c = f"CLV {u['clv']:+.2%} [{u['clv_lo']:+.2%}, {u['clv_hi']:+.2%}]"
+        lm = int(u.get("n_line_moved", 0) or 0)
+        part = (f" CLV rests on {int(u['n_clv']):,} of the {n:,} bets: {lm:,} spreads/totals get none because their "
+                f"line moved before the close." if lm else "")
         r = f"ROI {u['roi']:+.2%} [{u['roi_lo']:+.2%}, {u['roi_hi']:+.2%}]"
         if u["clv_lo"] > 0 and roi_sig:
-            return "EDGE", f"Edge: beats the closing line ({c}) and is profitable ({r}).{holm_txt}"
+            return "EDGE", f"Edge: beats the closing line ({c}) and is profitable ({r}).{holm_txt}{part}"
         if u["clv_lo"] > 0:
             return "LIKELY", (f"Likely edge: beats the closing line ({c}); P&L not yet significant ({r}, "
-                              f"{n} bets).{holm_txt}")
+                              f"{n} bets).{holm_txt}{part}")
         if u["clv_hi"] < 0:
-            return "NEGATIVE", f"No edge: the bets lose to the closing line ({c}); {r}.{luck}"
-        return "NONE", f"No evidence of edge: CLV indistinguishable from zero ({c}); {r}.{luck}"
+            return "NEGATIVE", f"No edge: the bets lose to the closing line ({c}); {r}.{luck}{part}"
+        return "NONE", f"No evidence of edge: CLV indistinguishable from zero ({c}); {r}.{luck}{part}"
     r = f"ROI {u['roi']:+.2%} [{u['roi_lo']:+.2%}, {u['roi_hi']:+.2%}]"
     pn = u.get("p_null_dec", np.nan)
+    why = no_clv_reason(u)
     if roi_sig and np.isfinite(pn) and pn < 0.05:
         return "LIKELY", (f"Profitable against the decision-time market ({r}, market-null p={pn:.3f}), but no "
-                          f"moving closing line to confirm it with CLV.{holm_txt}")
+                          f"usable CLV to confirm it.{holm_txt} {why}")
     if u["roi_hi"] < 0:
-        return "NEGATIVE", f"No edge: loses money ({r}); no usable closing line for CLV."
-    return "NONE", f"No evidence of edge ({r}); no usable closing line for CLV."
+        return "NEGATIVE", f"No edge: loses money ({r}). {why}"
+    return "NONE", f"No evidence of edge ({r}). {why}"
 
 
 def plausibility_flags(r: dict, cal: pd.DataFrame) -> list[str]:
@@ -231,7 +289,7 @@ def analyse(df: pd.DataFrame, opts: Options, log=print) -> dict:
     if len(seg):
         seg["flags"] = [plausibility_flags(r, res["calibration"]) for r in seg.to_dict("records")]
         def primary(r):
-            if r.get("n_clv", 0) >= 0.5 * max(r["n"], 1) and (r.get("close_differs") or 0) > 0.2:
+            if clv_usable(r):
                 return r.get("p_clv", np.nan)
             return r.get("p_null_dec", np.nan)
         seg["p_primary"] = seg.apply(primary, axis=1)
@@ -530,7 +588,9 @@ def write_markdown(res: dict, reports, path: Path, charts: dict | None = None, r
       "redrawn from the de-vigged decision / closing market, jointly per market: does the realised ROI beat what "
       "the market itself implies? *p(perm)*: model edges shuffled within slate and market, bets re-selected: "
       "does the model pick better than random picks from the same slates? *Holm* adjusts the primary p "
-      "(CLV when a moving close exists, else the decision-market null) across all sport/market tests.")
+      f"(CLV when it is usable: a same-line close for at least {CLV_MIN_SHARE:.0%} of the bets, moved from the price "
+      f"taken for more than {CLOSE_MOVED_MIN:.0%} of them; else the decision-market null) across all sport/market "
+      "tests.")
     A("- A positive ROI without positive CLV is treated as luck (protocol section 1).\n")
 
     A("## Data\n")
@@ -561,10 +621,19 @@ def write_markdown(res: dict, reports, path: Path, charts: dict | None = None, r
 
     A("## Edge tests (unit stakes, shrunk model)\n")
     if len(seg):
-        A(_table(["sport", "market", "bets", "avg price", "mean CLV [95% CI]", "beat close", "ROI [95% CI]",
+        A("*CLV on* = bets with a closing price for the line bet, of all bets (spreads/totals whose line moved "
+          "before the close get no CLV); *close moved* = share of those closes that differ from the price taken. CLV "
+          f"is the test (*CLV used*) only when it covers at least {CLV_MIN_SHARE:.0%} of the bets and more than "
+          f"{CLOSE_MOVED_MIN:.0%} of those closes moved. Otherwise the CLV shown rests on a minority of the bets or, "
+          "for bets taken at the closing price, is just minus the margin, and the verdict rests on the "
+          "decision-market null.\n")
+        A(_table(["sport", "market", "bets", "avg price", "mean CLV [95% CI]", "CLV on", "close moved", "CLV used",
+                  "beat close", "ROI [95% CI]",
                   "p(CLV)", "p(ROI)", "p(null dec)", "p(null close)", "p(perm)", "Holm p", "model weight c"],
                  [[r["sport"], r["market"], _f(r["n"], "int"), _f(r.get("avg_price"), "num", 2),
-                   _ci(r.get("clv"), r.get("clv_lo"), r.get("clv_hi")), _f(r.get("beat_close"), "pct0", 0),
+                   _ci(r.get("clv"), r.get("clv_lo"), r.get("clv_hi")), clv_basis(r),
+                   _f(r.get("close_differs"), "pct0", 0), "yes" if clv_usable(r) else "no",
+                   _f(r.get("beat_close"), "pct0", 0),
                    _ci(r.get("roi"), r.get("roi_lo"), r.get("roi_hi")), _f(r.get("p_clv"), "p"),
                    _f(r.get("p_roi"), "p"), _f(r.get("p_null_dec"), "p"), _f(r.get("p_null_close"), "p"),
                    _f(r.get("p_perm"), "p"), _f(r.get("p_holm"), "p"), _f(r.get("trust_c"), "num", 2)]

@@ -27,6 +27,20 @@ def _offline(monkeypatch):
     monkeypatch.setenv("BULLPEN_OFFLINE", "1")
 
 
+@pytest.fixture(autouse=True)
+def _process_state_isolated():
+    """Undo process-wide state a test may leave behind. scripts/build_bullpen.py's main() (run in-process by
+    test_build_bullpen.py) installs analytics/fallbacks.py, which patches projections.season_aggregates to read the
+    committed real-player aggregates (models/fitted/proj_agg_*) for any season without a pitch table; left in place,
+    a later synthetic projection (test_models_d.py, no 2023 table) pulled real players in (KeyError '408234').
+    projections._births is memoised per level only, not per data root, so it is cleared too."""
+    yield
+    from oddsmarkets.baseball.analytics import fallbacks
+    from oddsmarkets.baseball.models import projections as PJ
+    fallbacks.uninstall()
+    PJ._births.cache_clear()
+
+
 @pytest.fixture
 def bullpen_roots(tmp_path, monkeypatch):
     """Point BULLPEN_DATA / BULLPEN_RAW / BULLPEN_CACHE at a temporary directory."""

@@ -149,6 +149,35 @@ def _flip_zone(z: np.ndarray) -> np.ndarray:
     return np.where(z == "O", "D", np.where(z == "D", "O", z))
 
 
+def sequence_flags(game, period, team, attempt, sec, zone) -> tuple[np.ndarray, np.ndarray]:
+    """Rebound and rush flags (bool) of every row of a time-ordered event sequence, read off the previous row of the
+    same game and period:
+      rebound  that row is a shot attempt (blocked included) by the same team at most REBOUND_S seconds earlier;
+      rush     that row's zone, seen from this row's team (flipped when the other team owned it), is the neutral or
+               the defensive zone, at most RUSH_S seconds earlier.
+    `attempt` is a bool array (the row is a goal, shot, miss or blocked shot); `zone` holds "O" / "D" / "N" from
+    the owning team's side. Shared by the xG features (`attempts`) and the box score (analytics.box), so the
+    rebound / rush counts on the site are the flags the model uses."""
+    g = np.asarray(game)
+    per = np.asarray(period, dtype=float)
+    team = np.asarray(team, dtype=object)
+    att = np.asarray(attempt, dtype=bool)
+    sec = np.asarray(sec, dtype=float)
+    z = np.asarray(zone, dtype=object)
+    n = len(g)
+    if n == 0:
+        return np.zeros(0, bool), np.zeros(0, bool)
+    same = np.r_[False, (g[1:] == g[:-1]) & (per[1:] == per[:-1])]
+    sameteam = same & np.r_[False, team[1:] == team[:-1]]
+    dt = np.where(same, sec - np.r_[np.nan, sec[:-1]], np.nan)
+    with np.errstate(invalid="ignore"):
+        reb = sameteam & np.r_[False, att[:-1]] & (dt <= REBOUND_S)
+        pz = np.r_[z[:1], z[:-1]]
+        pz = np.where(same, np.where(sameteam, pz, _flip_zone(pz)), None)
+        rush = np.isin(pz.astype(str), ["N", "D"]) & (dt <= RUSH_S)
+    return reb, rush
+
+
 def attempts(ev: pd.DataFrame, season: int | None = None, adjust: bool | None = None) -> tuple[pd.DataFrame, dict]:
     """Model rows (unblocked attempts) with features, label `goal` and keys (game_id, idx), from one season's
     canonical events. Returns (frame, arena info)."""
@@ -169,8 +198,6 @@ def attempts(ev: pd.DataFrame, season: int | None = None, adjust: bool | None = 
     py = prev(e["y"].to_numpy(float))
     px = np.where(same, np.where(sameteam, px, -px), np.nan)
     py = np.where(same, np.where(sameteam, py, -py), np.nan)
-    pz = prev(e["zone"].to_numpy(object))
-    pz = np.where(same, np.where(sameteam, pz, _flip_zone(pz)), None)
     m = e["type"].isin(_io.UNBLOCKED).to_numpy() & np.isfinite(e["x"].to_numpy(float)) & np.isfinite(e["y"].to_numpy(float))
     ih = e["is_home"].to_numpy(float)
     skf = np.where(ih == 1, e["sk_h"], e["sk_a"]).astype(float)
@@ -191,13 +218,14 @@ def attempts(ev: pd.DataFrame, season: int | None = None, adjust: bool | None = 
     X["shot_type_code"] = sh["shot_type"].map(lambda v: stc.get(v, len(stc)) if v is not None else np.nan).astype(float)
     dt = sh["sec"].to_numpy(float) - psec[idx]
     pt = ptype[idx]
-    is_att = np.isin(pt.astype(str), list(_io.ATTEMPTS))
-    reb = sameteam[idx] & is_att & (dt <= REBOUND_S)
+    reb_all, rush_all = sequence_flags(g, per, team, e["type"].isin(_io.ATTEMPTS).to_numpy(), e["sec"].to_numpy(float),
+                                       e["zone"].to_numpy(object))
+    reb = reb_all[idx]
     X["rebound"] = reb.astype(float)
     ang_now = np.degrees(np.arctan2(sh["y"].to_numpy(float), _io.GOAL_X - sh["x"].to_numpy(float)))
     ang_prev = np.degrees(np.arctan2(py[idx], _io.GOAL_X - px[idx]))
     X["rebound_angle"] = np.where(reb, np.abs(ang_now - ang_prev), 0.0)
-    X["rush"] = (np.isin(pz[idx].astype(str), ["N", "D"]) & (dt <= RUSH_S)).astype(float)
+    X["rush"] = rush_all[idx].astype(float)
     X["dt_prev"] = dt
     dp = np.hypot(sh["x"].to_numpy(float) - px[idx], sh["y"].to_numpy(float) - py[idx])
     X["dist_prev"] = dp

@@ -58,7 +58,10 @@ equals the expected expiration, not kickoff).
 
 Cache: data/nfl/cache/edge/kalshi/<group>/<key>.json.gz, one file per request. Every request is served from the
 cache when present, so a rerun makes zero requests; `refresh_live=True` refetches live listings and candle chunks
-that were incomplete when fetched (market still open).
+that were incomplete when fetched (market still open). Settled and historical listings (which only grow, at their
+newest page) are kept whole in <group>/<key>.snapshot.json.gz; `refresh_live=True` refreshes them incrementally
+(common/kalshi_listing.py: the newest pages again until a page holds only known rows closed more than 14 days ago).
+Until 21 Oct 2026 settled pages were cached for good, so new games never appeared without moving the cache aside.
 """
 from __future__ import annotations
 
@@ -75,6 +78,8 @@ from pathlib import Path
 from typing import Any, Iterator
 
 import requests as _rq
+
+from oddsmarkets.common import kalshi_listing
 
 logger = logging.getLogger(__name__)
 
@@ -252,6 +257,65 @@ class Fetcher:
         self.failures += 1
         return None, 0
 
+    def snapshot_path(self, group: str, path: str, params: dict) -> Path:
+        p = self.key_path(group, path, params)
+        return p.with_name(p.name[: -len(".json.gz")] + ".snapshot.json.gz")
+
+    def _write_snapshot(self, p: Path, rows: list[dict], complete: bool) -> None:
+        env = {"rows": rows, "complete": complete,
+               "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_suffix(".tmp")
+        with gzip.open(tmp, "wt", encoding="utf-8") as f:
+            json.dump(env, f, separators=(",", ":"))
+        tmp.replace(p)
+
+    def listing(self, group: str, path: str, params: dict, key: str) -> list[dict]:
+        """A whole settled or historical listing (newest first; it only grows at its newest page). Served from its
+        snapshot; without one, from the per-request page cache (zero requests once cached). Under refresh_live
+        (online) it is refreshed incrementally: the newest pages are fetched again until a page holds only rows
+        the snapshot has, closed more than kalshi_listing.GROW_DAYS days ago; older pages are kept."""
+        sp = self.snapshot_path(group, path, params)
+        snap = self.read(sp) if sp.exists() else None
+        refresh = self.refresh_live and not self.offline
+        if snap is not None and not refresh:
+            self.hits += 1
+            return snap.get("rows") or []
+        if snap is None:
+            rows: list[dict] = []
+            complete = False
+            cursor = None
+            for _ in range(500):
+                q = dict(params)
+                if cursor:
+                    q["cursor"] = cursor
+                body = self.get(group, path, q)
+                if not body:
+                    break
+                items = body.get(key) or []
+                rows += items
+                cursor = body.get("cursor")
+                if not cursor or not items:
+                    complete = True
+                    break
+            if not refresh:
+                if complete:
+                    self._write_snapshot(sp, rows, complete)
+                return rows
+            snap = {"rows": rows, "complete": complete}
+
+        def fetch(cursor):
+            q = dict(params)
+            if cursor:
+                q["cursor"] = cursor
+            return self.get(group, path, q, stale=lambda env: True)
+
+        rows, complete, n = kalshi_listing.refresh(fetch, key, snap.get("rows"), bool(snap.get("complete")))
+        logger.info("kalshi %s %s: %d rows, %d page(s) fetched, complete=%s", path, params.get("series_ticker"),
+                    len(rows), n, complete)
+        self._write_snapshot(sp, rows, complete)
+        return rows
+
     def pages(self, group: str, path: str, params: dict, key: str, *, live: bool = False) -> Iterator[dict]:
         cursor = None
         for _ in range(500):
@@ -271,14 +335,16 @@ class Fetcher:
 # ── listings ─────────────────────────────────────────────────────────────────
 
 def historical_markets(f: Fetcher, series: str) -> list[dict]:
-    return list(f.pages("lists", "/historical/markets", {"series_ticker": series, "limit": 1000}, "markets"))
+    return f.listing("lists", "/historical/markets", {"series_ticker": series, "limit": 1000}, "markets")
 
 
 def live_markets(f: Fetcher, series: str, statuses: tuple[str, ...]) -> list[dict]:
     out = []
     for st in statuses:
         params = {"series_ticker": series, "status": st, "with_nested_markets": "true", "limit": 200}
-        for ev in f.pages("lists", "/events", params, "events", live=(st != "settled")):
+        evs = (f.listing("lists", "/events", params, "events") if st == "settled"
+               else f.pages("lists", "/events", params, "events", live=True))
+        for ev in evs:
             for m in ev.get("markets") or []:
                 m = dict(m)
                 m.setdefault("event_ticker", ev.get("event_ticker"))

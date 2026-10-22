@@ -9,8 +9,12 @@ little between the two (`yes_ask.close` against `yes_ask.close_dollars`).
 
 Everything is cached under data/football/odds/kalshi/ (git-ignored):
     markets/<SERIES>.json       every settled market of the series (both endpoints)
+    markets/<SERIES>.meta       when the listing was last refreshed, and whether each walk was complete
     candles/<EVENT>.json        hourly candles of the event's markets, open to expiry
-A cached event is never re-fetched. Requests go one at a time with a pause.
+A cached event is never re-fetched. The listing is refreshed once it is older than LIST_MAX_AGE_H, incrementally
+(common/kalshi_listing.py): the newest pages of each endpoint again until a page holds only known markets closed
+more than 14 days ago; older pages stay cached. (Until 21 Oct 2026 the listing was cached for good, so new games
+never appeared.) Requests go one at a time with a pause.
 """
 from __future__ import annotations
 
@@ -23,6 +27,7 @@ from pathlib import Path
 import pandas as pd
 import requests
 
+from oddsmarkets.common import kalshi_listing
 from oddsmarkets.football.sources.prediction_markets import KALSHI, MARKETS
 
 logger = logging.getLogger(__name__)
@@ -31,6 +36,7 @@ CACHE = ROOT / "data" / "football" / "odds" / "kalshi"
 HEADERS = {"User-Agent": "The Quant Footballer research (+https://pchattani.github.io/the-quant-footballer/)"}
 PAUSE_S = 1.0
 TIMEOUT = 30
+LIST_MAX_AGE_H = 12.0
 
 
 def game_series() -> dict[str, str]:
@@ -60,37 +66,54 @@ def _get(path: str, params: dict | None = None, tries: int = 6) -> dict | None:
     raise RateLimited(path)
 
 
-def _list(path: str, series: str) -> list[dict]:
-    out, cursor = [], None
-    while True:
-        params = {"series_ticker": series, "limit": 1000}
-        if path == "/markets":
-            params["status"] = "settled"
-        if cursor:
-            params["cursor"] = cursor
-        d = _get(path, params)
-        if not d:
-            break
-        out.extend(d.get("markets") or [])
-        cursor = d.get("cursor")
-        if not cursor or not d.get("markets"):
-            break
-    return out
+def _page(path: str, series: str, cursor: str | None) -> dict | None:
+    params = {"series_ticker": series, "limit": 1000}
+    if path == "/markets":
+        params["status"] = "settled"
+    if cursor:
+        params["cursor"] = cursor
+    return _get(path, params)
 
 
-def settled_markets(series: str, *, refresh: bool = False) -> list[dict]:
+def settled_markets(series: str, *, refresh: bool | None = None, max_age_h: float = LIST_MAX_AGE_H) -> list[dict]:
+    """Every settled market of the series (historical endpoint first, then the live one). Served from
+    markets/<SERIES>.json while it is younger than `max_age_h`, else refreshed incrementally; `refresh=True` forces
+    the refresh, `refresh=False` never refreshes. A listing cached before the .meta file existed came from full
+    walks, so it counts as complete (only its newest pages are fetched again)."""
     p = CACHE / "markets" / f"{series}.json"
-    if p.exists() and not refresh:
-        return json.loads(p.read_text(encoding="utf-8"))
-    hist = _list("/historical/markets", series)
+    mp = CACHE / "markets" / f"{series}.meta"            # not .json: readers glob markets/*.json
+    cached = json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+    meta = json.loads(mp.read_text(encoding="utf-8")) if mp.exists() else {}
+    if cached is not None and refresh is not True:
+        at = meta.get("refreshed_at")
+        age_h = ((datetime.now(timezone.utc) - datetime.fromisoformat(at)).total_seconds() / 3600 if at
+                 else float("inf"))
+        if refresh is False or age_h < max_age_h:
+            return cached
+    done = meta.get("complete") or {"hist": cached is not None, "live": cached is not None}
+    prev = cached or []
+    try:
+        hist, ok_h, n_h = kalshi_listing.refresh(lambda c: _page("/historical/markets", series, c), "markets",
+                                                 [m for m in prev if m.get("_historical")], bool(done.get("hist")))
+        live, ok_l, n_l = kalshi_listing.refresh(lambda c: _page("/markets", series, c), "markets",
+                                                 [m for m in prev if not m.get("_historical")], bool(done.get("live")))
+    except RateLimited:
+        if cached is not None:
+            logger.warning("kalshi %s: rate limited while refreshing the listing; the cached one is used", series)
+            return cached
+        raise
     for m in hist:
         m["_historical"] = True
-    live = _list("/markets", series)
     seen = {m["ticker"] for m in hist}
     allm = hist + [m for m in live if m["ticker"] not in seen]
     keep = [{k: v for k, v in m.items() if not k.startswith("rules")} for m in allm]
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(keep), encoding="utf-8")
+    mp.write_text(json.dumps({"refreshed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                              "complete": {"hist": ok_h, "live": ok_l}, "pages": {"hist": n_h, "live": n_l}}),
+                  encoding="utf-8")
+    logger.info("kalshi %s: %d markets (%d new), %d + %d listing pages fetched", series, len(keep),
+                len(keep) - len(prev), n_h, n_l)
     return keep
 
 

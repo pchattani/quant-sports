@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from oddsmarkets.basketball.models._io import cache_root, data_root  # noqa: F401  (re-exported)
+from oddsmarkets.basketball.models._io import content_digest
 
 COUNTED = ("reg", "cup", "playin", "post")      # stypes that are real competitive games
 STANDINGS = ("reg",)                           # stypes that count in the standings ("cup" = the Cup final only)
@@ -42,14 +43,13 @@ def seasons_on_disk(league: str) -> list[int]:
 
 
 def signature(league: str, seasons: Iterable[int]) -> list:
+    """[[season, size, content digest]] of the season stores: path- and mtime-independent, so a cache written on the
+    PC still matches on a CI runner (fresh checkout, restored caches)."""
     out = []
     for s in seasons:
         p = store_path(league, s)
-        try:
-            st = p.stat()
-            out.append([int(s), st.st_size, int(st.st_mtime)])
-        except OSError:
-            out.append([int(s), None, None])
+        d = content_digest(p)
+        out.append([int(s), p.stat().st_size, d] if d is not None else [int(s), None, None])
     return out
 
 

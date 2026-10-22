@@ -26,6 +26,10 @@ picks up where it left off: per-source "fetched" marks in each store's meta.
     python scripts/tn_fetch.py --tour wta --from 2007 --to 2025 --budget 60000 --log logs/tn_backfill_wta.log
     python scripts/tn_fetch.py --tour atp --refresh-current --budget 300
     python scripts/tn_fetch.py --tour wta --report --from 2016 --to 2026
+    python scripts/tn_fetch.py --tour wta --dedupe --from 2007 --to 2026     # repair duplicates, no fetching
+
+Every save merges events that hold the same matches and folds rows of one real match (store.dedupe), and
+folds copies of a match filed in two seasons' stores across New Year (store.dedupe_seasons).
 """
 from __future__ import annotations
 
@@ -423,6 +427,58 @@ def phase_rankings(ce: Client, cw: Client | None, tour: str, s: dict, reg: canon
         logger.info("%s rankings: %d rows as of %s (%s)", tour, len(best["rows"]), best["date"], best["source"])
 
 
+# ── one row per real match ──────────────────────────────────────────────────
+
+def _near_new_year(s: dict) -> tuple[bool, bool]:
+    """(has rows in its first January weeks, has rows in its last December weeks)."""
+    y = int(s["year"])
+    ds = [str(m.get("date") or "")[:10] for m in s["matches"].values()]
+    return any(d <= f"{y}-01-31" for d in ds if d), any(d >= f"{y}-12-01" for d in ds if d)
+
+
+def neighbours(tour: str, s: dict, reg: canon.Registry, today: date) -> int:
+    """Fold the rows a neighbouring season's store holds of the same matches across New Year (store.dedupe_seasons):
+    season Y-1's December copies go into Y, Y's into Y+1. A neighbour that changed is finalized and saved."""
+    jan, dec = _near_new_year(s)
+    n = 0
+    for other_year, prev_is_other in ((int(s["year"]) - 1, True), (int(s["year"]) + 1, False)):
+        if (prev_is_other and not jan) or (not prev_is_other and not dec):
+            continue
+        if not st.store_path(tour, other_year).exists():
+            continue
+        o = st.load(tour, other_year, reg)
+        k = st.dedupe_seasons(o, s) if prev_is_other else st.dedupe_seasons(s, o)
+        if k:
+            st.finalize_events(o, today)
+            st.set_players(o, reg)
+            o["meta"]["sources"]["coverage"] = coverage(o)
+            st.save(o)
+            logger.info("%s %d: %d rows of one match folded across New Year with %d", tour, s["year"], k, other_year)
+        n += k
+    return n
+
+
+def repair(tour: str, years: list[int], today: date) -> None:
+    """Dedupe the stores on disk (no fetching): events holding the same matches merged, same-match rows folded,
+    New Year copies moved to the later season."""
+    reg = canon.Registry.load(tour)
+    for y in sorted(years):
+        if not st.store_path(tour, y).exists():
+            continue
+        s = st.load(tour, y, reg)
+        n0 = len(s["matches"])
+        dd = st.dedupe(s)
+        k = neighbours(tour, s, reg, today)
+        if not (dd["events"] or dd["matches"] or k):
+            continue                                      # untouched: not rewritten
+        st.finalize_events(s, today)
+        st.set_players(s, reg)
+        s["meta"]["sources"]["coverage"] = coverage(s)
+        st.save(s)
+        logger.info("%s %d repair: %d events merged, %d rows folded, %d New Year rows; %d -> %d matches",
+                    tour, y, dd["events"], dd["matches"], k, n0, len(s["matches"]))
+
+
 # ── coverage ────────────────────────────────────────────────────────────────
 
 def coverage(s: dict) -> dict:
@@ -472,6 +528,8 @@ def main() -> int:
     ap.add_argument("--force-td", action="store_true", help="re-merge tennis-data even when unchanged")
     ap.add_argument("--log", default=None, help="log file (default logs/tn_fetch_<tour>.log)")
     ap.add_argument("--report", action="store_true", help="print coverage of the stores on disk and exit")
+    ap.add_argument("--dedupe", action="store_true", help="merge duplicate events / rows of one match in the stores on "
+                    "disk (no fetching) and exit")
     args = ap.parse_args()
     tour = args.tour
     today = datetime.now(timezone.utc).date()
@@ -480,6 +538,10 @@ def main() -> int:
     years = list(range(end, start - 1, -1))
     if args.report:
         report(tour, years)
+        return 0
+    if args.dedupe:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+        repair(tour, years, today)
         return 0
     log = Path(args.log) if args.log else ROOT / "logs" / f"tn_fetch_{tour}.log"
     log.parent.mkdir(parents=True, exist_ok=True)
@@ -521,6 +583,11 @@ def main() -> int:
             finally:
                 if s["matches"] or s["events"]:
                     st.drop_index(s)
+                    dd = st.dedupe(s)
+                    if dd["events"] or dd["matches"]:
+                        ing.counts["dedupe_events"] += dd["events"]
+                        ing.counts["dedupe_rows"] += dd["matches"]
+                    ing.counts["dedupe_seasons"] += neighbours(tour, s, reg, today)
                     st.fill_from_history(s)
                     st.finalize_events(s, today)
                     st.set_players(s, reg)

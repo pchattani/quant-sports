@@ -704,17 +704,16 @@ def _payload(league, season, target, players, team_rows, week_days, rest, opp, p
 
 
 def cached_rest(league: str, season: int) -> dict:
-    """rest_factors over the REST_SEASONS completed seasons before `season`, cached on those stores' sizes and times."""
+    """rest_factors over the REST_SEASONS completed seasons before `season`, cached on those stores' sizes and content
+    digests (path- and mtime-independent)."""
     from oddsmarkets.basketball import store as stmod
     from oddsmarkets.basketball.models import _io
     seasons = [s for s in an.seasons_on_disk(league) if s < season][-REST_SEASONS:]
     sig = []
     for s in seasons:
-        try:
-            st = stmod.season_path(league, s).stat()
-            sig.append([s, st.st_size, st.st_mtime_ns])
-        except OSError:
-            sig.append([s, None, None])
+        p = stmod.season_path(league, s)
+        d = _io.content_digest(p)
+        sig.append([s, p.stat().st_size, d] if d is not None else [s, None, None])
     path = an.cache_root() / "value" / f"fantasy_rest_{league}.json"
     c = an.read_json(path)
     if isinstance(c, dict) and c.get("key") == [VERSION, sig] and c.get("rest"):

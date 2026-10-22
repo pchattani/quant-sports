@@ -113,20 +113,13 @@ def season_rows(league: str, seasons: Iterable[int], data=None) -> dict[int, lis
 
 
 def _sig(league: str, seasons: list[int]) -> str:
+    # path-independent (relative path, size, content digest), so the cache travels between the PC and CI
+    from oddsmarkets.basketball.models import _io as _bio
     h = hashlib.sha1()
     root = an.data_root() / league
     for s in seasons:
-        p = root / str(s) / "value.json"
-        try:
-            st = p.stat()
-            h.update(f"{s}:{st.st_size}:{st.st_mtime_ns}".encode())
-        except OSError:
-            h.update(f"{s}:missing".encode())
-    try:
-        st = BIO.bio_path(league).stat()
-        h.update(f"bio:{st.st_size}:{st.st_mtime_ns}".encode())
-    except OSError:
-        h.update(b"bio:missing")
+        h.update(f"{s}:{_bio.path_sig(root / str(s) / 'value.json')}".encode())
+    h.update(f"bio:{_bio.path_sig(BIO.bio_path(league))}".encode())
     return h.hexdigest()
 
 

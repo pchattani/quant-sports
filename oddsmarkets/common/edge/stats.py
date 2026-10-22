@@ -180,6 +180,14 @@ def unit_test(rows: pd.DataFrame, full: pd.DataFrame | None = None, B: int = 200
     out["n_clv"] = int(has_close.sum())
     moved = (rows["price_close"].notna() & (np.abs(rows["price_close"] - rows["price_dec"]) > 1e-9))
     out["close_differs"] = float(moved[has_close].mean()) if has_close.any() else np.nan
+    # what the CLV rests on: bets whose spread/total line moved before the close get no CLV (calibrate.prepare); of
+    # those with a close, how many were taken at the closing price itself (CLV = minus the margin) or have only a
+    # supplied closing probability (no closing price, so movement cannot be checked)
+    lm = rows["line_moved"].fillna(False).astype(bool) if "line_moved" in rows else pd.Series(False, index=rows.index)
+    out["n_line_moved"] = int(lm.sum())
+    out["n_no_close"] = int((~has_close & ~lm).sum())
+    out["n_close_same"] = int((has_close & rows["price_close"].notna() & ~moved).sum())
+    out["n_close_noprice"] = int((has_close & rows["price_close"].isna()).sum())
     if has_close.any():
         clv = ratio_bootstrap(rows["clv"].to_numpy(float), one, codes, ns, B, seed + 1)
         out.update({"clv": clv["est"], "clv_lo": clv["lo"], "clv_hi": clv["hi"], "p_clv": clv["p"]})

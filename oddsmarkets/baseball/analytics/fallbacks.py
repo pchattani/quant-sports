@@ -18,6 +18,7 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 FITTED = Path(__file__).resolve().parents[1] / "models" / "fitted"
 _INSTALLED = {"proj": False}
+_ORIGINAL: dict = {}                 # what install() replaced, for uninstall()
 
 
 def agg_paths(level: str, season: int) -> tuple[Path, Path]:
@@ -44,6 +45,7 @@ def install() -> bool:
     except Exception:                                            # noqa: BLE001
         return False
     orig = PJ.season_aggregates
+    _ORIGINAL["season_aggregates"] = orig
 
     @functools.wraps(orig)
     def season_aggregates(level: str, season: int, use_cache: bool = True):
@@ -56,6 +58,19 @@ def install() -> bool:
     PJ.season_aggregates = season_aggregates
     _INSTALLED["proj"] = True
     return True
+
+
+def uninstall() -> None:
+    """Undo `install()` (projections.season_aggregates back to the model's own). The build installs the fallback for
+    the whole process; tests that run the build in-process call this afterwards, or a later synthetic test without
+    a 2023 pitch table would read the committed real-player aggregates (tests/baseball/conftest.py)."""
+    if not _INSTALLED["proj"]:
+        return
+    from oddsmarkets.baseball.models import projections as PJ
+    orig = _ORIGINAL.pop("season_aggregates", None)
+    if orig is not None and getattr(PJ.season_aggregates, "__wrapped_fallback__", False):
+        PJ.season_aggregates = orig
+    _INSTALLED["proj"] = False
 
 
 def export_aggregates(level: str, seasons: list[int]) -> list[str]:
