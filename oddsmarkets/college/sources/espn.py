@@ -507,6 +507,9 @@ def compact_event(level: str, ev: dict, header: dict | None = None) -> dict:
         "predictor": None,
         "venue": {"name": venue.get("fullName"), "city": addr.get("city"), "state": addr.get("state")} if venue.get("fullName") else None,
         "attendance": _int(comp.get("attendance")) or None, "has_pbp": False, "summary": False,
+        # ESPN's timeValid: false = start time not set (the date then carries a midnight-Eastern placeholder);
+        # left out when ESPN does not say, so a summary header never clears a scoreboard's flag (store.merge_game)
+        **({"tba": comp.get("timeValid") is False} if comp.get("timeValid") is not None else {}),
     }
 
 

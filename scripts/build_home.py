@@ -10,6 +10,7 @@ normalised file written here from the sport sites' already-built data trees:
     docs/bullpen/data   MLB        (index.json, players_index.json)
     docs/gridiron/data  NFL        (index.json, <season>/season.json, players_index.json)
     docs/rink/data      NHL        (index.json, <season>/season.json, players_index.json)
+    docs/campus/data    college    (index.json, search.json)
 
 Nothing is fetched from the network. Every sport is optional: a missing or broken tree is
 logged and skipped, so the home page still builds with the sports that are present.
@@ -817,9 +818,16 @@ def build_hockey(ctx: Ctx, base: str, out: dict):
             "updated_at": idx.get("updated_at")}
 
 
-# ───────────────────────────────────────────────────────────── college (pending launch)
+# ───────────────────────────────────────────────────────────── college
+COLLEGE_TITLE = {"cfb": "College football national title", "mbb": "Men's college basketball title",
+                 "wbb": "Women's college basketball title"}
+
+
 def build_college(ctx: Ctx, base: str, out: dict):
-    """The Quant Campus: docs/campus/data/index.json (oddsmarkets/college/site.py) and its search.json."""
+    """The Quant Campus: docs/campus/data/index.json (oddsmarkets/college/site.py) and its search.json.
+
+    Futures: one entry per level, like hardwood's two leagues: `college` (CFB), `college_mbb`, `college_wbb`
+    (home.js shows them as the CFB, MBB and WBB tabs)."""
     d = DOCS / "campus" / "data"
     idx = load(d / "index.json")
     if not idx or not idx.get("levels"):
@@ -844,8 +852,8 @@ def build_college(ctx: Ctx, base: str, out: dict):
 
         seen, games = set(), []
         for g in (lg.get("today") or []) + (lg.get("next_games") or []) + (lg.get("last_games") or []):
-            if g.get("id") in seen:
-                continue
+            if g.get("id") in seen or (g.get("tba") and norm_status(g.get("status")) == "pre"):
+                continue                       # a game whose start time is not set (TBA) has no slot on the home page
             seen.add(g.get("id"))
             m, mk = g.get("model") or {}, g.get("market") or {}
             note = g.get("round") if g.get("stype") in ("cfp", "ncaa", "bowl") else None
@@ -863,7 +871,7 @@ def build_college(ctx: Ctx, base: str, out: dict):
         rows = [r for r in (lg.get("title_odds") or []) if r.get("p")][:8]
         if rows:
             out["futures"]["college" if L == "cfb" else "college_" + L] = {
-                "title": f"{LU} national title", "rows": [
+                "title": COLLEGE_TITLE[L], "rows": [
                     {"name": (teams.get(r["team"]) or {}).get("name") or r["team"], "abbr": (teams.get(r["team"]) or {}).get("abbr"),
                      "p": r4(r["p"]), "market": r4(r.get("market")), "colour": (teams.get(r["team"]) or {}).get("colour"),
                      "href": base + "#/" + L + "/team/" + r["team"]} for r in rows]}

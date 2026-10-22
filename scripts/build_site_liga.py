@@ -162,13 +162,14 @@ def build_model(train_df, teams: list[str], prev_rank: dict[str, int] | None):
                 tournament_type="league", neutral=False,
             )
 
-    dc = DixonColesModel(xi=DC_XI, ridge=DC_RIDGE, analytic_grad=True)
+    from oddsmarkets.football.competitions.league import fitting
+    dc = fitting.new_dc(DC_XI, DC_RIDGE)
     if train_df is not None and len(train_df) >= 50:
         try:
             # Market-implied rates of past matches (oddsmarkets/football/sources/market_rates.py):
-            # extra Dixon-Coles rows only; a no-op without the football-data files.
-            from oddsmarkets.football.sources import market_rates
-            fit_df = train_df if os.environ.get("NO_MARKET_RATES") else market_rates.with_market_rows(train_df, "liga-argentina")
+            # extra Dixon-Coles rows only; a no-op without the football-data files. The same
+            # frame and fit as the tuner (league/fitting.py).
+            fit_df = fitting.dc_frame(train_df, "liga-argentina", DC_XI, market=not os.environ.get("NO_MARKET_RATES"))
             dc.fit(fit_df)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Dixon-Coles fit failed (%s) — falling back to Elo only", exc)

@@ -118,6 +118,7 @@ from oddsmarkets.football.core import (  # noqa: E402
 )
 from oddsmarkets.football.sources.teams import normalize_team_name  # noqa: E402
 from oddsmarkets.football.sources import market_rates  # noqa: E402
+from oddsmarkets.football.competitions.league import fitting  # noqa: E402
 from oddsmarkets.football.analytics.archive import load_archive  # noqa: E402
 from oddsmarkets.football.analytics.sensitivity import league_sensitivity, liga_sensitivity  # noqa: E402
 from oddsmarkets.football.analytics.pool import block_bridges, connections_from_frames, dc_score_matrix, outcome_probs  # noqa: E402
@@ -277,12 +278,14 @@ class LeagueView:
                                       neutral=neutral, max_goals=max_goals)
 
 
-def pooled_training_frame(stores: dict[str, dict], cup_stores: dict[str, dict] | None = None):
+def pooled_training_frame(stores: dict[str, dict], cup_stores: dict[str, dict] | None = None,
+                          xi: float | None = None):
     """
     Every league's matches under its own prefix, plus every cup's with each club
     under the prefix of the league it plays in — which is what connects the
     leagues into one graph. A cup entrant from a league the site does not follow
-    keeps the cup's prefix.
+    keeps the cup's prefix. `xi` is the pooled fit's decay (default: the `pooled`
+    block of model_params.json), against which the market rows' own decay is set.
     """
     import pandas as pd
 
@@ -291,13 +294,13 @@ def pooled_training_frame(stores: dict[str, dict], cup_stores: dict[str, dict] |
     parts = []
     cup_frames: dict[str, Any] = {}
     league_teams: dict[str, set] = {}
+    if xi is None:
+        xi = float((_read_json(MODEL_PARAMS_PATH, {}).get("pooled") or {}).get("xi", DEFAULT_PARAMS["xi"]))
     for slug, store in stores.items():
         df = training_frame(store, LEAGUES[slug])
         if len(df):
             league_teams[slug] = set(df["home_team"]) | set(df["away_team"])
-            fit_df = market_rates.with_market_rows(df, slug) if USE_MARKET_RATES else df
-            parts.append(fit_df.assign(home_team=slug + ":" + fit_df["home_team"],
-                                       away_team=slug + ":" + fit_df["away_team"]))
+            parts.append(fitting.pooled_part(df, slug, xi, market=USE_MARKET_RATES))
     for slug, store in (cup_stores or {}).items():
         df = cup_store.training_frame(store)
         if not len(df):
@@ -366,10 +369,10 @@ class CupView:
 
 def fit_pooled(stores: dict[str, dict], params: dict, cup_stores: dict[str, dict] | None = None) -> DixonColesModel | None:
     """The pooled fit, once per build: the leagues whose tuned choice was `pooled`, and every cup."""
-    df = pooled_training_frame(stores, cup_stores)
+    df = pooled_training_frame(stores, cup_stores, xi=float(params["xi"]))
     if df is None or len(df) < 50:
         return None
-    dc = DixonColesModel(xi=float(params["xi"]), ridge=float(params["ridge"]), analytic_grad=True)
+    dc = fitting.new_dc(params["xi"], params["ridge"])
     try:
         dc.fit(df)
     except Exception as exc:  # noqa: BLE001
@@ -408,12 +411,12 @@ def build_model(train_df, teams: list[str], previous_rank: dict[str, int], cfg: 
     if pooled is not None:
         dc = LeagueView(pooled, cfg.slug)
     else:
-        dc = DixonColesModel(xi=float(params["xi"]), ridge=float(params["ridge"]), analytic_grad=True)
+        dc = fitting.new_dc(params["xi"], params["ridge"])
         if train_df is not None and len(train_df) >= 50:
             try:
                 # Market rows feed the Dixon-Coles fit only; Elo and the calibration above
-                # read the plain frame, one row per match.
-                dc.fit(market_rates.with_market_rows(train_df, cfg.slug) if USE_MARKET_RATES else train_df)
+                # read the plain frame, one row per match. The tuner builds the same frame.
+                dc.fit(fitting.dc_frame(train_df, cfg.slug, params["xi"], market=USE_MARKET_RATES))
             except Exception as exc:  # noqa: BLE001
                 logger.warning("%s: Dixon-Coles fit failed (%s) — Elo only", cfg.slug, exc)
         else:

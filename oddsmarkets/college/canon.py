@@ -67,6 +67,29 @@ def current_season(level: str, today: date | None = None) -> int:
     return d.year + 1 if d.month >= 5 else d.year
 
 
+def time_tba(game: dict) -> bool:
+    """A game not yet played whose start time is not set: ESPN's `timeValid: false` (stored as "tba") or its
+    placeholder time, midnight US Eastern (05:00Z in winter, 04:00Z in summer). Real late games are not caught:
+    ESPN writes a 7 pm Hawaii tip-off as 04:59Z, never on the placeholder."""
+    if (game or {}).get("status") not in ("pre", None):
+        return False
+    if game.get("tba"):
+        return True
+    d = str(game.get("date") or "")
+    if len(d) < 16:
+        return False
+    try:
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        t = datetime.fromisoformat(d.replace("Z", "+00:00"))
+        if t.tzinfo is None:
+            return False
+        et = t.astimezone(ZoneInfo("America/New_York"))
+    except (ValueError, KeyError, ImportError):
+        return d[10:16] in ("T05:00", "T04:00")
+    return et.hour == 0 and et.minute == 0 and et.second == 0
+
+
 def in_season(level: str, today: date | None = None, pad_days: int = 14) -> bool:
     from datetime import timedelta
     d = today or date.today()

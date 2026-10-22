@@ -142,6 +142,14 @@ QUALI_PACE_SD_MULT = 1.0
 # Prix from 2014, scripts/f1_tune.py wintemp) and "latest" (all races to date) for rounds not in the table.
 # Empty = off. Only p_win changes: positions, podium, points and the championship are the simulator's own.
 WIN_TEMP_POST: dict = {}
+# Post-qualifying strength scale (22 October 2026; docs/research/f1_edge.md 9.6; tested and OFF: no pre-registered
+# memory rule beat s = 1 on 2014-2022, so the fitted file has no table). After this round's
+# qualifying-pace blend, the field-centred pace means of a Grand Prix with its grid known are multiplied by s,
+# mu_d = mean + s (mu_d - mean). How strongly pace gaps decide a race differs by season (a dominant car's margin is
+# not expressed by rank-based scores), so s is learned walk-forward from earlier races (scripts/f1_tune.py spread):
+# ``PACE_SPREAD_POST`` holds {"YYYY_R": s} fitted only on races before that one, plus "latest". Empty = off (s = 1).
+# Pace sd, pre-qualifying forecasts and sprints are unchanged; every simulated output follows from the scaled pace.
+PACE_SPREAD_POST: dict = {}
 
 # Constants fitted by the walk-forward backtest (scripts/f1_tune.py) override the defaults above.
 FITTED_PATH = Path(__file__).resolve().parent / "fitted" / "race_params.json"
@@ -612,6 +620,11 @@ def inputs_from_components(comp: dict) -> RaceInputs:
         mu_p = _blend_toward(mu_p, comp["quali_pace"], QUALI_PACE_W)
         sd_p = {d: v * (QUALI_PACE_SD_MULT if d in comp["quali_pace"] else 1.0) for d, v in sd_p.items()}
         source += f"+quali_pace(w={QUALI_PACE_W:g})"
+    if comp.get("grid") and session == "race":
+        s = pace_spread_post(year, rnd)
+        if s != 1.0:
+            mu_p = spread_pace(mu_p, s)
+            source += f"+spread({s:g})"
     mu = {d: k * v for d, v in mu_p.items()}
     sd = {d: k * v for d, v in sd_p.items()}
     laps = int(circuit.get("sprint_laps") if session == "sprint" else circuit.get("laps") or 57)
@@ -643,6 +656,28 @@ def win_temp_post(year: int, rnd: int) -> float:
     except (TypeError, ValueError):
         return 1.0
     return t if math.isfinite(t) and 0.2 <= t <= 5.0 else 1.0
+
+
+def pace_spread_post(year: int, rnd: int) -> float:
+    """The post-qualifying strength scale s for (year, round): its walk-forward entry in ``PACE_SPREAD_POST``, else
+    the "latest" fit, else 1 (off)."""
+    tab = PACE_SPREAD_POST or {}
+    s = tab.get(f"{int(year)}_{int(rnd)}")
+    if s is None:
+        s = tab.get("latest", 1.0)
+    try:
+        s = float(s)
+    except (TypeError, ValueError):
+        return 1.0
+    return s if math.isfinite(s) and 0.25 <= s <= 5.0 else 1.0
+
+
+def spread_pace(mu: dict[str, float], s: float) -> dict[str, float]:
+    """Scale the field's pace deviations about their mean by s (``mean + s (x - mean)``); s = 1 returns a copy."""
+    if not mu or s == 1.0:
+        return dict(mu)
+    m = float(np.mean(list(mu.values())))
+    return {d: m + s * (v - m) for d, v in mu.items()}
 
 
 def temper_win(drivers: dict[str, dict], T: float) -> dict[str, dict]:

@@ -1,13 +1,31 @@
 {
-  "tuned_at": "2026-09-22T17:02:20Z",
+  "oct2026_market_rows": "21 Oct 2026: with the market-rate rows at weight 96 and their own decay 0.03 (oddsmarkets/football/sources/market_rates.py), every own-fit league uses the pooled xi 0.0035 / ridge 1.0 and dc_weight 1.0; the earlier tuned values are kept under params_before_oct2026. Chosen walk-forward on 2014-2018 football-data seasons (docs/research/football_edge.md, Model-improvement programme, Oct 2026). Since 22 Oct scripts/tune_league_models.py fits the same rows and rho as the build and keeps these values unless a new choice beats them with a paired 95% CI excluding zero; its 22 Oct re-run kept every one (each league's `challenger` records what it would have picked).",
+  "dixon_coles_rho": {
+    "rho": -0.0454,
+    "n_matches": 132114,
+    "seasons": "2014-2025",
+    "leagues": 35,
+    "rule": "maximum-likelihood rho of the Dixon-Coles low-score correction over every match of every football-data league in the seasons before the current one, given the walk-forward model's goal rates (held at rho -0.1 in the fits); every club fit holds it (league/fitting.py)",
+    "fitted_at": "2026-10-22",
+    "source": "scripts/football_models_oct.py rhofit"
+  },
+  "tuned_at": "2026-10-22T04:50:14Z",
   "folds": 6,
   "min_train": 200,
   "margin": 0.002,
+  "fit": {
+    "market_rows": true,
+    "w_mkt": 96.0,
+    "xi_mkt": 0.03,
+    "rho": -0.0454,
+    "incumbent_rule": true,
+    "pooled_kept": true
+  },
   "global": {
-    "xi": 0.002,
+    "xi": 0.008,
     "ridge": 2.0,
     "elo_home_advantage": 50.0,
-    "k_league": 30,
+    "k_league": 15,
     "dc_weight": 1.0
   },
   "pooled": {
@@ -27,24 +45,29 @@
         "k_league": 30,
         "dc_weight": 1.0
       },
-      "log_loss": 1.05075,
-      "baseline_log_loss": 1.09861,
+      "log_loss": 1.03189,
+      "baseline_log_loss": 1.09818,
       "scores": {
-        "default": 1.07175,
-        "global": 1.06563,
-        "per-league": 1.06212,
-        "pooled": 1.05075
+        "default": 1.04759,
+        "global": 1.04082,
+        "per-league": 1.04095,
+        "pooled": 1.03189
       },
-      "n_eval": 230,
+      "n_eval": 250,
       "per_league_params": {
-        "xi": 0.008,
-        "ridge": 0.5,
+        "xi": 0.001,
+        "ridge": 2.0,
         "elo_home_advantage": 30.0,
         "k_league": 15,
         "dc_weight": 1.0
       }
     },
     "la-liga": {
+      "params_before_oct2026": {
+        "xi": 0.002,
+        "ridge": 2.0,
+        "dc_weight": 1.0
+      },
       "method": "global",
       "params": {
         "xi": 0.0035,
@@ -53,29 +76,44 @@
         "k_league": 30,
         "dc_weight": 1.0
       },
-      "log_loss": 0.99241,
-      "baseline_log_loss": 1.04412,
+      "log_loss": 0.97468,
+      "baseline_log_loss": 1.04878,
       "scores": {
-        "default": 0.99872,
-        "global": 0.99241,
-        "per-league": 0.9913,
-        "pooled": 0.99791
+        "default": 0.97963,
+        "global": 0.97449,
+        "per-league": 0.97455,
+        "pooled": 0.96426
       },
-      "n_eval": 249,
+      "n_eval": 269,
       "per_league_params": {
-        "xi": 0.0035,
-        "ridge": 2.0,
+        "xi": 0.008,
+        "ridge": 0.25,
         "elo_home_advantage": 70.0,
         "k_league": 20,
-        "dc_weight": 0.9
-      },
-      "params_before_oct2026": {
-        "xi": 0.002,
-        "ridge": 2.0,
         "dc_weight": 1.0
-      }
+      },
+      "challenger": {
+        "method": "pooled",
+        "params": {
+          "xi": 0.0035,
+          "ridge": 1.0,
+          "elo_home_advantage": 50.0,
+          "k_league": 30,
+          "dc_weight": 1.0
+        },
+        "d_ll": 0.00249,
+        "lo": -0.00714,
+        "hi": 0.01227,
+        "n": 269
+      },
+      "kept": "the parameters on file: the new choice does not beat them beyond noise"
     },
     "serie-a": {
+      "params_before_oct2026": {
+        "xi": 0.001,
+        "ridge": 1.0,
+        "dc_weight": 0.65
+      },
       "method": "per-league",
       "params": {
         "xi": 0.0035,
@@ -84,27 +122,37 @@
         "k_league": 15,
         "dc_weight": 1.0
       },
-      "log_loss": 0.97039,
-      "baseline_log_loss": 1.07924,
+      "log_loss": 0.975,
+      "baseline_log_loss": 1.07754,
       "scores": {
-        "default": 0.97392,
-        "global": 0.97863,
-        "per-league": 0.97039,
-        "pooled": 1.00002
+        "default": 0.96898,
+        "global": 0.97444,
+        "per-league": 0.96634,
+        "pooled": 0.97758
       },
-      "n_eval": 230,
+      "n_eval": 250,
       "per_league_params": {
-        "xi": 0.001,
-        "ridge": 1.0,
+        "xi": 0.008,
+        "ridge": 2.0,
         "elo_home_advantage": 30.0,
         "k_league": 15,
         "dc_weight": 0.65
       },
-      "params_before_oct2026": {
-        "xi": 0.001,
-        "ridge": 1.0,
-        "dc_weight": 0.65
-      }
+      "challenger": {
+        "method": "per-league",
+        "params": {
+          "xi": 0.008,
+          "ridge": 2.0,
+          "elo_home_advantage": 30.0,
+          "k_league": 15,
+          "dc_weight": 0.65
+        },
+        "d_ll": -0.00866,
+        "lo": -0.02202,
+        "hi": 0.00417,
+        "n": 250
+      },
+      "kept": "the parameters on file: the new choice does not beat them beyond noise"
     },
     "bundesliga": {
       "method": "pooled",
@@ -115,22 +163,37 @@
         "k_league": 30,
         "dc_weight": 1.0
       },
-      "log_loss": 0.98656,
-      "baseline_log_loss": 1.07937,
+      "log_loss": 0.98213,
+      "baseline_log_loss": 1.0749,
       "scores": {
-        "default": 1.02383,
-        "global": 1.00729,
-        "per-league": 1.00706,
-        "pooled": 0.98656
+        "default": 0.99455,
+        "global": 0.98268,
+        "per-league": 0.98219,
+        "pooled": 0.98213
       },
-      "n_eval": 144,
+      "n_eval": 164,
       "per_league_params": {
-        "xi": 0.0035,
+        "xi": 0.001,
         "ridge": 2.0,
-        "elo_home_advantage": 30.0,
+        "elo_home_advantage": 50.0,
         "k_league": 15,
         "dc_weight": 1.0
-      }
+      },
+      "challenger": {
+        "method": "global",
+        "params": {
+          "xi": 0.008,
+          "ridge": 2.0,
+          "elo_home_advantage": 50.0,
+          "k_league": 15,
+          "dc_weight": 1.0
+        },
+        "d_ll": -0.01045,
+        "lo": -0.0302,
+        "hi": 0.0096,
+        "n": 164
+      },
+      "kept": "the parameters on file: the new choice does not beat them beyond noise"
     },
     "ligue-1": {
       "method": "pooled",
@@ -141,24 +204,29 @@
         "k_league": 30,
         "dc_weight": 1.0
       },
-      "log_loss": 1.03116,
-      "baseline_log_loss": 1.09861,
+      "log_loss": 0.988,
+      "baseline_log_loss": 1.09811,
       "scores": {
-        "default": 1.07009,
-        "global": 1.05268,
-        "per-league": 1.05204,
-        "pooled": 1.03116
+        "default": 1.02095,
+        "global": 1.00804,
+        "per-league": 1.00578,
+        "pooled": 0.988
       },
-      "n_eval": 154,
+      "n_eval": 173,
       "per_league_params": {
-        "xi": 0.0035,
-        "ridge": 2.0,
+        "xi": 0.008,
+        "ridge": 0.25,
         "elo_home_advantage": 30.0,
         "k_league": 15,
         "dc_weight": 1.0
       }
     },
     "eredivisie": {
+      "params_before_oct2026": {
+        "xi": 0.001,
+        "ridge": 0.25,
+        "dc_weight": 1.0
+      },
       "method": "per-league",
       "params": {
         "xi": 0.0035,
@@ -167,27 +235,37 @@
         "k_league": 15,
         "dc_weight": 1.0
       },
-      "log_loss": 0.99686,
-      "baseline_log_loss": 1.08738,
+      "log_loss": 1.00604,
+      "baseline_log_loss": 1.08874,
       "scores": {
-        "default": 1.01601,
-        "global": 1.00429,
-        "per-league": 0.99686,
-        "pooled": 1.02471
+        "default": 1.0242,
+        "global": 1.00695,
+        "per-league": 1.00549,
+        "pooled": 1.02202
       },
-      "n_eval": 184,
+      "n_eval": 203,
       "per_league_params": {
         "xi": 0.001,
-        "ridge": 0.25,
+        "ridge": 2.0,
         "elo_home_advantage": 30.0,
         "k_league": 15,
         "dc_weight": 1.0
       },
-      "params_before_oct2026": {
-        "xi": 0.001,
-        "ridge": 0.25,
-        "dc_weight": 1.0
-      }
+      "challenger": {
+        "method": "global",
+        "params": {
+          "xi": 0.008,
+          "ridge": 2.0,
+          "elo_home_advantage": 50.0,
+          "k_league": 15,
+          "dc_weight": 1.0
+        },
+        "d_ll": 0.00091,
+        "lo": -0.00037,
+        "hi": 0.00217,
+        "n": 203
+      },
+      "kept": "the parameters on file: the new choice does not beat them beyond noise"
     },
     "primeira-liga": {
       "method": "pooled",
@@ -198,15 +276,15 @@
         "k_league": 30,
         "dc_weight": 1.0
       },
-      "log_loss": 0.95242,
-      "baseline_log_loss": 1.09688,
+      "log_loss": 0.92274,
+      "baseline_log_loss": 1.09556,
       "scores": {
-        "default": 0.99785,
-        "global": 0.97952,
-        "per-league": 0.97921,
-        "pooled": 0.95242
+        "default": 0.97777,
+        "global": 0.95653,
+        "per-league": 0.95531,
+        "pooled": 0.92274
       },
-      "n_eval": 170,
+      "n_eval": 181,
       "per_league_params": {
         "xi": 0.001,
         "ridge": 2.0,
@@ -216,6 +294,11 @@
       }
     },
     "brasileirao": {
+      "params_before_oct2026": {
+        "xi": 0.002,
+        "ridge": 2.0,
+        "dc_weight": 1.0
+      },
       "method": "global",
       "params": {
         "xi": 0.0035,
@@ -224,27 +307,37 @@
         "k_league": 30,
         "dc_weight": 1.0
       },
-      "log_loss": 1.01356,
-      "baseline_log_loss": 1.05355,
+      "log_loss": 1.00937,
+      "baseline_log_loss": 1.05273,
       "scores": {
-        "default": 1.01994,
-        "global": 1.01356,
-        "per-league": 1.01418,
-        "pooled": 1.02009
+        "default": 1.01299,
+        "global": 1.00892,
+        "per-league": 1.01044,
+        "pooled": 1.01623
       },
-      "n_eval": 370,
+      "n_eval": 392,
       "per_league_params": {
-        "xi": 0.002,
+        "xi": 0.005,
         "ridge": 2.0,
-        "elo_home_advantage": 90.0,
+        "elo_home_advantage": 110.0,
         "k_league": 15,
-        "dc_weight": 1.0
+        "dc_weight": 0.9
       },
-      "params_before_oct2026": {
-        "xi": 0.002,
-        "ridge": 2.0,
-        "dc_weight": 1.0
-      }
+      "challenger": {
+        "method": "global",
+        "params": {
+          "xi": 0.008,
+          "ridge": 2.0,
+          "elo_home_advantage": 50.0,
+          "k_league": 15,
+          "dc_weight": 1.0
+        },
+        "d_ll": -0.00046,
+        "lo": -0.00116,
+        "hi": 0.00019,
+        "n": 392
+      },
+      "kept": "the parameters on file: the new choice does not beat them beyond noise"
     },
     "mls": {
       "method": "pooled",
@@ -255,21 +348,21 @@
         "k_league": 30,
         "dc_weight": 1.0
       },
-      "log_loss": 1.05445,
-      "baseline_log_loss": 1.06665,
+      "log_loss": 1.05089,
+      "baseline_log_loss": 1.06592,
       "scores": {
-        "default": 1.06546,
-        "global": 1.05817,
-        "per-league": 1.05939,
-        "pooled": 1.05445
+        "default": 1.06462,
+        "global": 1.06539,
+        "per-league": 1.0645,
+        "pooled": 1.05089
       },
-      "n_eval": 414,
+      "n_eval": 471,
       "per_league_params": {
-        "xi": 0.002,
-        "ridge": 2.0,
-        "elo_home_advantage": 50.0,
+        "xi": 0.001,
+        "ridge": 0.25,
+        "elo_home_advantage": 70.0,
         "k_league": 30,
-        "dc_weight": 0.9
+        "dc_weight": 0.8
       }
     },
     "saudi-pro-league": {
@@ -281,24 +374,44 @@
         "k_league": 30,
         "dc_weight": 1.0
       },
-      "log_loss": 0.94208,
-      "baseline_log_loss": 1.08036,
+      "log_loss": 0.95183,
+      "baseline_log_loss": 1.08023,
       "scores": {
-        "default": 0.95109,
-        "global": 0.95105,
-        "per-league": 0.94899,
-        "pooled": 0.94208
+        "default": 0.93426,
+        "global": 0.93092,
+        "per-league": 0.9285,
+        "pooled": 0.95183
       },
-      "n_eval": 169,
+      "n_eval": 193,
       "per_league_params": {
-        "xi": 0.005,
+        "xi": 0.008,
         "ridge": 1.0,
         "elo_home_advantage": 50.0,
-        "k_league": 15,
-        "dc_weight": 0.9
-      }
+        "k_league": 20,
+        "dc_weight": 1.0
+      },
+      "challenger": {
+        "method": "per-league",
+        "params": {
+          "xi": 0.008,
+          "ridge": 1.0,
+          "elo_home_advantage": 50.0,
+          "k_league": 20,
+          "dc_weight": 1.0
+        },
+        "d_ll": -0.02036,
+        "lo": -0.05201,
+        "hi": 0.01454,
+        "n": 193
+      },
+      "kept": "the parameters on file: the new choice does not beat them beyond noise"
     },
     "liga-argentina": {
+      "params_before_oct2026": {
+        "xi": 0.008,
+        "ridge": 2.0,
+        "dc_weight": 0.8
+      },
       "method": "per-league",
       "params": {
         "xi": 0.0035,
@@ -307,28 +420,43 @@
         "k_league": 30,
         "dc_weight": 1.0
       },
-      "log_loss": 1.06549,
-      "baseline_log_loss": 1.08061,
+      "log_loss": 1.06498,
+      "baseline_log_loss": 1.08854,
       "scores": {
-        "default": 1.09014,
-        "global": 1.08561,
-        "per-league": 1.06549
+        "default": 1.05994,
+        "global": 1.06017,
+        "per-league": 1.05535
       },
-      "n_eval": 190,
+      "n_eval": 251,
       "per_league_params": {
         "xi": 0.008,
         "ridge": 2.0,
-        "elo_home_advantage": 70.0,
+        "elo_home_advantage": 50.0,
         "k_league": 30,
         "dc_weight": 0.8
       },
-      "params_before_oct2026": {
-        "xi": 0.008,
-        "ridge": 2.0,
-        "dc_weight": 0.8
-      }
+      "challenger": {
+        "method": "per-league",
+        "params": {
+          "xi": 0.008,
+          "ridge": 2.0,
+          "elo_home_advantage": 50.0,
+          "k_league": 30,
+          "dc_weight": 0.8
+        },
+        "d_ll": -0.00963,
+        "lo": -0.02461,
+        "hi": 0.00499,
+        "n": 251
+      },
+      "kept": "the parameters on file: the new choice does not beat them beyond noise"
     },
     "liga-mx": {
+      "params_before_oct2026": {
+        "xi": 0.005,
+        "ridge": 2.0,
+        "dc_weight": 0.8
+      },
       "method": "per-league",
       "params": {
         "xi": 0.0035,
@@ -337,28 +465,44 @@
         "k_league": 15,
         "dc_weight": 1.0
       },
-      "log_loss": 1.04789,
-      "baseline_log_loss": 1.0687,
+      "log_loss": 1.05109,
+      "baseline_log_loss": 1.07868,
       "scores": {
-        "default": 1.05951,
-        "global": 1.05588,
-        "per-league": 1.04789
+        "default": 1.0542,
+        "global": 1.05069,
+        "per-league": 1.05069,
+        "pooled": 1.04694
       },
-      "n_eval": 216,
+      "n_eval": 253,
       "per_league_params": {
-        "xi": 0.005,
+        "xi": 0.008,
         "ridge": 2.0,
         "elo_home_advantage": 50.0,
         "k_league": 15,
-        "dc_weight": 0.8
+        "dc_weight": 1.0
       },
-      "params_before_oct2026": {
-        "xi": 0.005,
-        "ridge": 2.0,
-        "dc_weight": 0.8
-      }
+      "challenger": {
+        "method": "pooled",
+        "params": {
+          "xi": 0.0035,
+          "ridge": 1.0,
+          "elo_home_advantage": 50.0,
+          "k_league": 30,
+          "dc_weight": 1.0
+        },
+        "d_ll": 0.00696,
+        "lo": -0.01276,
+        "hi": 0.02389,
+        "n": 253
+      },
+      "kept": "the parameters on file: the new choice does not beat them beyond noise"
     },
     "belgian-pro-league": {
+      "params_before_oct2026": {
+        "xi": 0.001,
+        "ridge": 0.25,
+        "dc_weight": 0.8
+      },
       "method": "per-league",
       "params": {
         "xi": 0.0035,
@@ -367,27 +511,37 @@
         "k_league": 20,
         "dc_weight": 1.0
       },
-      "log_loss": 0.96908,
-      "baseline_log_loss": 1.06616,
+      "log_loss": 0.96494,
+      "baseline_log_loss": 1.0664,
       "scores": {
-        "default": 0.97121,
-        "global": 0.98117,
-        "per-league": 0.96908
+        "default": 0.96278,
+        "global": 0.96445,
+        "per-league": 0.96212,
+        "pooled": 1.00897
       },
-      "n_eval": 184,
+      "n_eval": 193,
       "per_league_params": {
-        "xi": 0.001,
+        "xi": 0.008,
         "ridge": 0.25,
         "elo_home_advantage": 30.0,
         "k_league": 20,
         "dc_weight": 0.8
       },
-      "params_before_oct2026": {
-        "xi": 0.001,
-        "ridge": 0.25,
-        "dc_weight": 0.8
-      }
+      "challenger": {
+        "method": "per-league",
+        "params": {
+          "xi": 0.008,
+          "ridge": 0.25,
+          "elo_home_advantage": 30.0,
+          "k_league": 20,
+          "dc_weight": 0.8
+        },
+        "d_ll": -0.00281,
+        "lo": -0.01504,
+        "hi": 0.00936,
+        "n": 193
+      },
+      "kept": "the parameters on file: the new choice does not beat them beyond noise"
     }
-  },
-  "oct2026_market_rows": "21 Oct 2026: with the market-rate rows at weight 96 and their own decay 0.03 (oddsmarkets/football/sources/market_rates.py), every own-fit league uses the pooled xi 0.0035 / ridge 1.0 and dc_weight 1.0; the earlier tuned values are kept under params_before_oct2026. Chosen walk-forward on 2014-2018 football-data seasons (docs/research/football_edge.md, Model-improvement programme, Oct 2026). Re-running scripts/tune_league_models.py would overwrite this: its folds do not include the market rows."
+  }
 }

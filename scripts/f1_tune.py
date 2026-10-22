@@ -23,6 +23,16 @@ Walk-forward tuning of the race simulator's constants (oddsmarkets/f1/models/rac
 
 4. ``wintemp``: the post-qualifying win temperature table (``race_sim.WIN_TEMP_POST``): per race, T fitted on every
    earlier race of the grid's configuration (walk-forward), plus "latest" over all races.
+5. ``spread``: the post-qualifying strength scale table (``race_sim.PACE_SPREAD_POST``) from a grid of fixed scales
+   (configs ``{"id": "s1.3", "PACE_SPREAD_POST": {"latest": 1.3}}``, post only): per race, s minimising a weighted
+   sum of the earlier races' winner log-loss (interpolated in log s between the grid's scales); the memory rule
+   (``SPREAD_RULES``) is chosen on the dev seasons (``--report``) and written with ``--rule <name> --write``.
+
+    python scripts/f1_tune.py spread --grid spread_grid.json --report
+    python scripts/f1_tune.py spread --grid spread_grid.json --rule <name> --write
+
+The refit order after any model change: ``spread`` (when the scale grid is rerun), ``grid`` with the production
+configuration, ``wintemp``, then the official backtest.
 """
 from __future__ import annotations
 
@@ -104,7 +114,9 @@ def score_race(res_drivers: dict, oc: dict) -> dict:
     N = len(drivers)
     pw = np.array([float((res_drivers.get(d) or {}).get("p_win", 1.0 / N)) for d in drivers])
     winner = next((i for i, d in enumerate(drivers) if oc[d]["win"]), None)
-    out = {"ll": {}, "pw": [round(float(x), 5) for x in pw], "win": [oc[d]["win"] for d in drivers]}
+    out = {"ll": {}, "pw": [round(float(x), 5) for x in pw], "win": [oc[d]["win"] for d in drivers],
+           "pp": [round(float((res_drivers.get(d) or {}).get("p_podium", 0.0)), 5) for d in drivers],
+           "pod": [int(oc[d]["podium"]) for d in drivers]}
     s = pw.sum()
     out["wll"] = -math.log(max(pw[winner] / s if s > 0 else 0.0, EPS)) if winner is not None else None
     for e, key in (("win", "p_win"), ("podium", "p_podium"), ("points", "p_points"), ("dnf", "p_dnf")):
@@ -200,6 +212,76 @@ def win_temp_table(grid: dict, cid: str, variant: str = "post", min_races: int =
     return out
 
 
+# ----------------------------------------------------------------------------------------------- spread
+
+# Memory rules for the walk-forward strength scale, pre-registered 21 Oct 2026 (round 2 of the model program): weights
+# on the earlier races (``hl``: half-life in races; ``scope``: "all", "reg" = same regulation set, "season") plus K
+# pseudo-races of the expanding-window mean curve (shrinkage toward the all-history fit).
+SPREAD_RULES = {
+    "expanding": {"scope": "all", "hl": None, "K": 0},
+    **{f"hl{h}_K{k}": {"scope": "all", "hl": h, "K": k} for h in (6, 12, 24) for k in (5, 20)},
+    **{f"reg_K{k}": {"scope": "reg", "hl": None, "K": k} for k in (5, 20)},
+    **{f"season_K{k}": {"scope": "season", "hl": None, "K": k} for k in (5, 20)},
+}
+SPREAD_FINE = np.round(np.arange(0.8, 2.8001, 0.01), 2)
+SPREAD_MIN_RACES = 20
+
+
+def _reg_set(year: int) -> int:
+    from oddsmarkets.f1.models import race_sim as rs
+    starts = [y for y in rs.REG_RESET if y <= int(year)]
+    return max(starts) if starts else 0
+
+
+def spread_curves(grid: dict, variant: str = "post") -> tuple[list[str], np.ndarray]:
+    """Races (chronological) and their winner log-loss on SPREAD_FINE, interpolated in log s from the grid's
+    fixed-scale configurations (every config must carry PACE_SPREAD_POST {"latest": s})."""
+    scales = {}
+    for cid, vv in grid["grid"].items():
+        cfg = next(c for c in grid["configs"] if c["id"] == cid)
+        scales[float(cfg["PACE_SPREAD_POST"]["latest"])] = vv.get(variant) or {}
+    ss = sorted(scales)
+    keys = sorted(set.intersection(*[{k for k, v in scales[s].items() if v.get("wll") is not None and sum(v["win"]) == 1}
+                                     for s in ss]), key=lambda k: tuple(int(x) for x in k.split("_")))
+    L = np.array([[scales[s][k]["wll"] for s in ss] for k in keys])
+    Lf = np.array([np.interp(np.log(SPREAD_FINE), np.log(ss), row) for row in L])
+    return keys, Lf
+
+
+def spread_table(keys: list[str], Lf: np.ndarray, rule: dict) -> dict:
+    """Walk-forward scale per race under ``rule`` (1.0 while fewer than SPREAD_MIN_RACES earlier races), plus
+    "latest" (every race, for rounds after the fit)."""
+    yrs = np.array([int(k.split("_")[0]) for k in keys])
+    regs = np.array([_reg_set(y) for y in yrs])
+
+    def pick(k: int, year: int) -> float:
+        if k < SPREAD_MIN_RACES:
+            return 1.0
+        prev = Lf[:k]
+        if rule["scope"] == "season":
+            w = (yrs[:k] == year).astype(float)
+        elif rule["scope"] == "reg":
+            w = (regs[:k] == _reg_set(year)).astype(float)
+        else:
+            w = np.ones(k)
+        if rule.get("hl"):
+            w = w * 0.5 ** ((k - 1 - np.arange(k)) / float(rule["hl"]))
+        obj = w @ prev + float(rule.get("K") or 0) * prev.mean(0)
+        if not np.any(obj):
+            return 1.0
+        return float(SPREAD_FINE[int(np.argmin(obj))])
+    out = {k: pick(i, int(yrs[i])) for i, k in enumerate(keys)}
+    out["latest"] = pick(len(keys), int(yrs[-1]))
+    return out
+
+
+def spread_score(keys: list[str], Lf: np.ndarray, tab: dict, seasons) -> float:
+    """Mean interpolated winner log-loss over ``seasons`` with each race at its table scale."""
+    idx = {float(s): i for i, s in enumerate(SPREAD_FINE)}
+    v = [Lf[i, idx[round(tab[k], 2)]] for i, k in enumerate(keys) if int(k.split("_")[0]) in seasons]
+    return float(np.mean(v)) if v else float("nan")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -224,6 +306,12 @@ def main() -> int:
     p4.add_argument("--grid", required=True)
     p4.add_argument("--config", required=True)
     p4.add_argument("--write", action="store_true")
+    p5 = sub.add_parser("spread", help="walk-forward post-qualifying strength scale table -> race_params.json")
+    p5.add_argument("--grid", required=True)
+    p5.add_argument("--report", action="store_true", help="dev-season score of every memory rule")
+    p5.add_argument("--dev", default="2014-2022")
+    p5.add_argument("--rule", default=None)
+    p5.add_argument("--write", action="store_true")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     if args.cmd == "prep":
@@ -242,6 +330,33 @@ def main() -> int:
         return 0
     d = json.loads(Path(args.grid).read_text(encoding="utf-8"))
     g, configs = d["grid"], {c["id"]: c for c in d["configs"]}
+    if args.cmd == "spread":
+        keys, Lf = spread_curves(d)
+        a, b = (int(x) for x in args.dev.split("-"))
+        dev = range(a, b + 1)
+        if args.report:
+            print(f"dev {a}-{b}: s = 1 everywhere {spread_score(keys, Lf, {k: 1.0 for k in keys}, dev):.4f}")
+            for name, rule in SPREAD_RULES.items():
+                tab = spread_table(keys, Lf, rule)
+                dv = [tab[k] for k in keys if int(k.split("_")[0]) in dev]
+                print(f"{name:12s} dev {spread_score(keys, Lf, tab, dev):.4f}  s mean {np.mean(dv):.2f} "
+                      f"[{min(dv):.2f}, {max(dv):.2f}]")
+        if args.rule:
+            tab = spread_table(keys, Lf, SPREAD_RULES[args.rule])
+            if args.write:
+                out = ROOT / "oddsmarkets" / "f1" / "models" / "fitted" / "race_params.json"
+                fitted = json.loads(out.read_text(encoding="utf-8"))
+                fitted.setdefault("params", {})["PACE_SPREAD_POST"] = {k: v for k, v in tab.items()
+                                                                       if k == "latest" or int(k[:4]) >= 2014}
+                fitted["pace_spread_post"] = {
+                    "fitted_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "grid": Path(args.grid).name,
+                    "rule": args.rule, **SPREAD_RULES[args.rule], "sims": d.get("sims"), "races": len(keys),
+                    "method": "per race, s minimising sum_j w_j LL_j(s) + K mean_j LL_j(s) over earlier races j "
+                              "(winner log-loss interpolated in log s between fixed-scale simulations; 1.0 for the "
+                              "first 20); rule chosen on 2014-2022; latest = all races"}
+                out.write_text(json.dumps(fitted, indent=1), encoding="utf-8")
+                print("wrote", out)
+        return 0
     if args.cmd == "wintemp":
         tab = win_temp_table(g, args.config)
         print(json.dumps({k: v for k, v in tab.items() if k == "latest" or k.startswith("2026")}))

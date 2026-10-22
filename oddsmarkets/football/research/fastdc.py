@@ -89,8 +89,11 @@ def _tau(hg, ag, lh, la, rho):
 
 def fit(data: FitData, n: int, ridge: float, *, att_prior: np.ndarray | None = None,
         def_prior: np.ndarray | None = None, x0: np.ndarray | None = None,
-        fit_rho: bool = True, rho_bounds=(-0.99, 0.0), maxiter: int = 500) -> np.ndarray:
-    """Return the parameter vector [att(n), def(n), home, rho]."""
+        fit_rho: bool = True, rho_bounds=(-0.99, 0.0), maxiter: int = 500,
+        rho_fixed: float | None = None) -> np.ndarray:
+    """Return the parameter vector [att(n), def(n), home, rho]. `rho_fixed` holds rho at that value."""
+    if rho_fixed is not None:
+        fit_rho = False
     hi, ai = data.hi, data.ai
     hfa = data.hfa if data.hfa is not None else np.ones(len(hi))
     g_ok = np.isfinite(data.hg) & np.isfinite(data.ag) & (data.wg > 0)
@@ -156,6 +159,8 @@ def fit(data: FitData, n: int, ridge: float, *, att_prior: np.ndarray | None = N
         x0[2 * n], x0[2 * n + 1] = 0.1, -0.1 if fit_rho else 0.0
     x0 = x0.copy()
     x0[n] = 0.0
+    if rho_fixed is not None:
+        x0[2 * n + 1] = float(rho_fixed)
     bounds = [(None, None)] * n + [(0.0, 0.0)] + [(None, None)] * (n - 1) + [(None, None)]
     bounds.append(rho_bounds if fit_rho else (x0[2 * n + 1], x0[2 * n + 1]))
     x0[2 * n + 1] = float(np.clip(x0[2 * n + 1], *bounds[-1]))

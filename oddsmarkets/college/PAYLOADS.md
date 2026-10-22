@@ -8,8 +8,17 @@ Every payload carries `"ok": true, "level", "season" (where per season), "update
 
 **Size budget** (GitHub Pages 1 GB per site; this one is kept under 800 MB): game pages only for the current season
 (every game involving an FBS / D-I team) and the previous season's postseason; career files only for players with a
-game in the last two seasons; everything else per season. `build_campus.py` prints a size report and exits non-zero
-over 800 MB.
+game in the last two seasons; everything else per season. `build_campus.py` prints a size report (per level against
+a 250 MB level budget, and the site) and exits non-zero over 800 MB.
+
+**Packed lists** (`oddsmarkets/college/packing.py`, basketball from payload format 2): a list of records may be
+written as `{"$cols": [key...], "$rows": [[value...]...]}` and a map of records as the same plus `"$keys": [id...]`;
+one level of fixed-key nesting is a dotted column (`"model.p_home"`) and a null value is an absent key. The front end
+(`CC.unpack` in `cc-core.js`, on every load) and `site.py` (`packing.unpack`) expand them, so every shape below is
+what a reader sees after expansion. Packed in basketball: `schedule.json` `games`, `players.json` `players` (keyed),
+team pages' `schedule` and `roster`, careers' `seasons` and `current.log`. `season.json` `fmt` is the payload format
+(basketball 2); `hoops.build.migrate` upgrades a season folder written in an older format without the models, and
+`build_campus.py` runs it on every season it does not rebuild (CI restores those from the live site).
 
 ## Shared shapes
 
@@ -25,15 +34,21 @@ CARD (a game in any list):
  "market": {"p_home","spread_home","total","source"} | null,     # source: kalshi|polymarket|espn_close|espn
  "result": {"cover": "home|away|push"|null, "model_correct": bool|null} | null}   # finals only
 ```
-`model` is pregame (ratings fitted on games before the game day for played games).
+`model` is pregame (ratings fitted on games before the game day for played games). `"tba": true` (games not yet
+played) = the start time is not set: ESPN's `timeValid: false` or its placeholder, midnight US Eastern
+(`canon.time_tba`); the front end shows the day and "TBA" (and files the game under its Eastern date).
 (C, basketball) To keep the size budget, basketball CARDs omit keys whose value is null and `neutral` / `conf_game`
 when false (read a missing key as null / false);
-seasons older than the previous one ("archive" seasons) carry compact CARDs in `schedule.json` (flag `"compact": true`)
+past seasons (every season before the current one; from 1 May the current season is the coming one: "archive"
+seasons) carry compact CARDs in `schedule.json` (flag `"compact": true`)
 (`id, season, date, status, stype, round, region, home, away, hs, as, hr, ar, hseed, aseed, neutral, conf_game`,
-`model.p_home`, `market.spread_home`, `result`) and on team pages (the same without `season`, `hr`, `ar`, `result`:
-the page's season applies); their `players.json` holds qualified players only (without `pct` / `pct_pos`),
-`lab_players.json` qualified players with 15+ minutes a game, team pages the top 12 of the roster by minutes, no
-`suggestions` and no `rating_path` (read `season.json` `rating_paths`).
+`model.p_home`, `market.spread_home`, `result`); their team pages carry no `schedule` (the page filters
+`schedule.json`) and no `rating_path` (read `season.json` `rating_paths`), the top 12 of the roster by minutes and no
+`suggestions`; their `players.json` holds qualified players only (without `pct` / `pct_pos`), `lab_players.json`
+qualified players with 15+ minutes a game. The previous season's postseason game pages are still written.
+Basketball game pages: `box[tid].players` rows are arrays in `store.BOX_COLS` order with `box[tid].names`
+{pid: name}, `dnp` rows `[pid, name, reason]`, `team_stats` empty when the box has team totals, ESPN's win
+probability thinned to moves of 0.01 or more.
 Basketball player payloads are Division I players only (non-D-I opponents' box rows are dropped).
 
 METRIC: `{"key","label","group","fmt":"int|1|2|3|pct|prob|signed1|signed2","lower": bool,"desc"}`.
@@ -132,7 +147,8 @@ BRACKET (cfb): `{"seeds": [{"seed","team","auto": bool}], "games": [{"round","sl
 `bracket.json` (mbb, wbb)
 ```
 {"ok","season","updated_at","field": n,"format": {...},
- "actual": {"regions": {name: [{"seed","team"}]}, "games": [CARD], "first_four": [...]} | null,
+ "actual": {"regions": {name: [{"seed","team"}]}, "games": [CARD], "first_four": [...],
+            "sites": {name: host city} (women: numbered regions' cities from 2023, host-named regions 2005-2022)} | null,
  "bracketology": [{"team","seed_mean","seed_mode","p_ncaa","p_auto","p_at_large","conf","record","rating_rank"}] (top 80),
  "projected": {"regions": {name: [{"seed","team","p"}]}, "first_four": [[tid, tid]], "last_in": [tid], "first_out": [tid]},
  "rounds": ["R64","R32","S16","E8","F4","Final","Champion"],
@@ -183,7 +199,7 @@ MOVE `{"player","name","pos","from","to","value_before","value_after"|null,"clas
  "flow": [[t, margin_home]] | null, "wp": {"model": [[t, p]], "espn": [[t, p]]} | null,
  "drives" (cfb): [{"team","period","start","plays","yards","result","epa"}] | null,
  "epa" (cfb): {tid: {"epa_play","sr","pass_epa","rush_epa","explosive"}} | null,
- "plays": top-leverage plays [{"t","period","clock","team","text","wpa"}] | null,
+ "plays": top-leverage plays, largest |wpa| first [{"t","period","clock","team","text","wpa"}] | null,
  "leaders": {tid: [{"id","name","line"}]}}
 ```
 

@@ -74,6 +74,14 @@ CC.route('team', function (el, p) {
   var L = p.L, S = p.S, tid = p.id, fb = CC.fb(L);
   el.innerHTML = QK.skeleton('lines', 8);
   return Promise.all([CC.load(CC.path(L, S, 'teams/' + tid + '.json')), CC.season(L, S), CC.load(CC.path(L, S, 'teams.json'))]).then(function (a) {
+    /* archive team pages carry no schedule (size budget): the team's games come from the season's schedule.json */
+    var d0 = CC.ok(a[0]) ? a[0] : null;
+    if (!d0 || d0.schedule) return a;
+    return CC.load(CC.path(L, S, 'schedule.json')).then(function (sch) {
+      if (CC.ok(sch)) d0.schedule = (sch.games || []).filter(function (c) { return String(c.home) === String(tid) || String(c.away) === String(tid); });
+      return a;
+    });
+  }).then(function (a) {
     if (!U.alive(el)) return;
     var d = CC.ok(a[0]) ? a[0] : null, season = CC.ok(a[1]) ? a[1] : null;
     if (d && d.team) { var m = {}; m[tid] = d.team; CC.addTeams(L, m); }
@@ -112,7 +120,7 @@ CC.route('team', function (el, p) {
         var res = '—';
         if (c.status === 'post' && isNum(c.hs)) { var my = home ? c.hs : c.as, op = home ? c.as : c.hs; res = '<b class="' + (my > op ? 'pos' : 'neg') + '">' + (my > op ? 'W' : 'L') + '</b> ' + my + '–' + op; }
         var tag = CC.roundLabel(c);
-        return { cells: [{ v: c.date, html: esc(CC.date(c.date)) }, { html: '<span class="qk-muted">' + (c.neutral ? 'v' : home ? 'v' : '@') + '</span> ' + U.teamEnt(L, opp, { season: S, sub: tag || (c.conf_game ? 'conf' : '') }), v: CC.tname(L, opp) },
+        return { cells: [{ v: c.date, html: esc(CC.date(CC.gameDate(c))) + (CC.tba(c) ? ' <span class="qk-muted">TBA</span>' : '') }, { html: '<span class="qk-muted">' + (c.neutral ? 'v' : home ? 'v' : '@') + '</span> ' + U.teamEnt(L, opp, { season: S, sub: tag || (c.conf_game ? 'conf' : '') }), v: CC.tname(L, opp) },
           { v: pw, html: pw === null ? '—' : CC.pct(pw) + ' ' + U.bar(pw) }, { v: line, html: CC.spread(line) }, { html: res, v: res }, { html: '<a class="cc-link" href="' + esc(CC.gameHref(L, c.id, S)) + '">Game</a>', sortable: false }], _href: CC.gameHref(L, c.id, S) };
       }), { maxHeight: 640 }));
     }

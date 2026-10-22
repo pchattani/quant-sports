@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from . import canon
+from .packing import unpack
 
 LEVELS = ("cfb", "mbb", "wbb")
 NAMES = {"cfb": "College Football", "mbb": "Men's College Basketball", "wbb": "Women's College Basketball"}
@@ -38,9 +39,10 @@ def _now_iso(now: datetime) -> str:
 
 
 def load(p: Path) -> Any:
+    """A payload with its packed lists expanded (oddsmarkets/college/packing.py), or None."""
     try:
         with open(p, encoding="utf-8") as fh:
-            return json.load(fh)
+            return unpack(json.load(fh))
     except (OSError, ValueError):
         return None
 

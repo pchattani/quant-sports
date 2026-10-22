@@ -28,10 +28,40 @@ CC.DATA = 'data/';
   if (m && QK.localBase()) CC.DATA = decodeURIComponent(m[1]).replace(/\/?$/, '/');
 })();
 var CACHE = {};
+/* Packed lists (oddsmarkets/college/packing.py): {$cols: [key], $rows: [[v]]} is a list of records, and with
+ * $keys: [id] a map id -> record; a dotted column ("model.p_home") is one level of nesting; a null value is an absent
+ * key. unpack(payload) expands every packed list in place, so the pages read packed and plain payloads alike. */
+function unpackRows(o) {
+  var cols = o.$cols, keys = Array.isArray(o.$keys) ? o.$keys : null, out = keys ? {} : [];
+  var split = cols.map(function (k) { var i = String(k).indexOf('.'); return i > 0 ? [k.slice(0, i), k.slice(i + 1)] : null; });
+  o.$rows.forEach(function (row, j) {
+    var r = {};
+    for (var i = 0; i < cols.length; i++) {
+      var v = row[i];
+      if (v === null || v === undefined) continue;
+      if (v && typeof v === 'object') v = CC.unpack(v);
+      var sp = split[i];
+      if (sp) { if (!r[sp[0]] || typeof r[sp[0]] !== 'object') r[sp[0]] = {}; r[sp[0]][sp[1]] = v; } else r[cols[i]] = v;
+    }
+    if (keys) out[keys[j]] = r; else out.push(r);
+  });
+  return out;
+}
+CC.unpack = function (o) {
+  if (!o || typeof o !== 'object') return o;
+  if (Array.isArray(o)) {
+    for (var i = 0; i < o.length; i++) if (o[i] && typeof o[i] === 'object') o[i] = CC.unpack(o[i]);
+    return o;
+  }
+  if (Array.isArray(o.$cols) && Array.isArray(o.$rows)) return unpackRows(o);
+  Object.keys(o).forEach(function (k) { if (o[k] && typeof o[k] === 'object') o[k] = CC.unpack(o[k]); });
+  return o;
+};
 /* load(path) -> Promise of the payload; a missing or broken file resolves to {ok: false, reason} (never rejects). */
 CC.load = function (path) {
   if (CACHE[path]) return CACHE[path];
   var p = QK.fetchJSON(CC.DATA + path, { timeout: 20000 }).then(function (j) {
+    j = CC.unpack(j);
     if (j && typeof j === 'object' && !Array.isArray(j) && j.ok === undefined) j.ok = true;
     return j;
   }, function (e) { delete CACHE[path]; return { ok: false, reason: String((e && e.message) || e), missing: true }; });
@@ -108,6 +138,35 @@ CC.date = function (iso, withTime) {
   var s = d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
   return withTime ? s + ' ' + fmt.time(iso) : s;
 };
+/* Start time not set (TBA): the payload's `tba` flag, else ESPN's placeholder time, midnight US Eastern, on a game not
+ * yet played (oddsmarkets/college/canon.py time_tba; ESPN writes real late Hawaii tip-offs as 04:59Z). */
+var ETF = null;
+function etParts(d) {
+  try {
+    if (!ETF) ETF = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+    var o = {};
+    ETF.formatToParts(d).forEach(function (x) { o[x.type] = x.value; });
+    return o;
+  } catch (e) { return null; }
+}
+CC.tba = function (c) {
+  if (!c || (c.status && c.status !== 'pre')) return false;
+  if (c.tba) return true;
+  var d = c.date ? new Date(c.date) : null;
+  if (!d || isNaN(d)) return false;
+  var p = etParts(d);
+  if (!p) return /T0[45]:00(:00)?(\.0+)?Z$/.test(String(c.date));
+  return (p.hour === '00' || p.hour === '24') && p.minute === '00' && p.second === '00';
+};
+/* The instant a list files a game under: for a TBA game noon UTC of its US Eastern date, so the day reads right in
+ * every US time zone (the placeholder midnight Eastern is the evening before on the west coast). */
+CC.gameDate = function (c) {
+  if (!CC.tba(c)) return c.date;
+  var p = etParts(new Date(c.date));
+  return (p && p.year ? p.year + '-' + p.month + '-' + p.day : String(c.date).slice(0, 10)) + 'T12:00:00Z';
+};
+/* "Sat 28 Nov 7:30 PM", or "Sat 28 Nov · time TBA" */
+CC.when = function (c) { return CC.tba(c) ? CC.date(CC.gameDate(c)) + ' · time TBA' : CC.date(c.date, true); };
 CC.cls = function (v) { return isNum(v) ? (v > 0 ? 'pos' : v < 0 ? 'neg' : '') : ''; };
 CC.p = function (x) { return isNum(x) ? Number(x) : null; };
 
@@ -137,14 +196,19 @@ CC.game = function (c, L) {
   var tag = CC.roundLabel(c);
   var per = isNum(c.period) ? (CC.fb(L) ? (c.period > 4 ? 'OT' : 'Q' + c.period) : (L === 'mbb' || Number(c.season) < 2016 ? (c.period > 2 ? 'OT' : 'H' + c.period) : (c.period > 4 ? 'OT' : 'Q' + c.period))) : null;
   return {
-    sport: 'college', id: c.id, start: c.date, status: st,
+    sport: 'college', id: c.id, start: CC.gameDate(c), status: st, tba: CC.tba(c),
     league: CC.LSHORT[L] + (tag ? ' · ' + tag : (c.conf_game ? ' · Conference' : '')) + (c.neutral && !tag ? ' · Neutral' : ''),
     home: CC.side(L, c, 'home'), away: CC.side(L, c, 'away'), hs: isNum(c.hs) ? c.hs : null, as: isNum(c.as) ? c.as : null,
     p_home: isNum(m.p_home) ? m.p_home : null, market_home: mk && isNum(mk.p_home) ? mk.p_home : null,
     note: '', period: per, clock: c.clock, href: CC.gameHref(L, c.id, c.season)
   };
 };
-CC.card = function (c, L) { return QK.matchCard(CC.game(c, L), { sport: false }); };
+CC.card = function (c, L) {
+  var g = CC.game(c, L), h = QK.matchCard(g, { sport: false });
+  /* the kit's badge prints the start time: a TBA game shows its day and "TBA" instead of the midnight placeholder */
+  if (g.tba) h = h.replace(QK.statusBadge(g), '<span class="qk-badge">' + esc(fmt.relDay(g.start)) + ' · TBA</span>');
+  return h;
+};
 
 /* ── UI pieces ───────────────────────────────────────────────────────── */
 var U = CC.ui = {};

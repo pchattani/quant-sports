@@ -39,6 +39,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 DOCS = ROOT / "docs"
 SITE = DOCS / "campus"
 BUDGET_MB = 800
+LEVEL_BUDGET_MB = 250          # per level (PAYLOADS.md size budget); reported, the build fails only over BUDGET_MB
 LEVELS = ("cfb", "mbb", "wbb")
 MODULE = {"cfb": "oddsmarkets.college.football.build", "mbb": "oddsmarkets.college.hoops.build",
           "wbb": "oddsmarkets.college.hoops.build"}
@@ -151,6 +152,20 @@ def build_level(level: str, data: Path, seasons: list[int], a, report: dict, lev
                                (report.get(name) or {}).get("reason") or f"not built for {level} {s}")
         if missing:
             log.warning("%s: wrote ok:false for %s", name, ", ".join(missing))
+    # seasons not rebuilt here (CI: restored from the live site) are upgraded to the builder's payload format
+    if hasattr(mod, "migrate"):
+        built = set(seasons)
+        others = sorted(int(p.name) for p in (data / level).glob("*") if p.is_dir() and p.name.isdigit() and int(p.name) not in built)
+
+        def _migrate():
+            n = {s: call(mod.migrate, level, data, s) for s in others}
+            done = {s: k for s, k in n.items() if k}
+            if done:
+                log.info("%s: migrated %d season folders to the current payload format (%d files)", level, len(done),
+                         sum(done.values()))
+            return {"ok": True, "migrated": done}
+        if others:
+            step(f"{level}:migrate", _migrate, report)
 
 
 # ───────────────────────────────────────────────────────────── size report
@@ -177,13 +192,19 @@ def size_report(site: Path, budget_mb: float = BUDGET_MB) -> dict:
                 key = "(root)"
             rows[key] = rows.get(key, 0) + n
     mb = total / 1e6
-    return {"total_mb": round(mb, 1), "budget_mb": budget_mb, "over": mb > budget_mb,
+    levels = {L: round(sum(v for k, v in rows.items() if k.startswith(f"data/{L}/") or k == f"data/{L} (level files)") / 1e6, 1)
+              for L in LEVELS}
+    return {"total_mb": round(mb, 1), "budget_mb": budget_mb, "over": mb > budget_mb, "levels": levels,
+            "level_budget_mb": LEVEL_BUDGET_MB, "levels_over": [L for L, v in levels.items() if v > LEVEL_BUDGET_MB],
             "folders": {k: round(v / 1e6, 2) for k, v in sorted(rows.items(), key=lambda kv: -kv[1])}}
 
 
 def print_size(rep: dict) -> None:
     print(f"\nSize report (docs/campus): {rep['total_mb']:.1f} MB of a {rep['budget_mb']} MB budget"
           + ("  ** OVER BUDGET **" if rep["over"] else ""))
+    for L, v in (rep.get("levels") or {}).items():
+        print(f"  {v:9.1f} MB  {L} (all files; budget {rep.get('level_budget_mb')} MB)"
+              + ("  ** OVER THE LEVEL BUDGET **" if L in (rep.get("levels_over") or []) else ""))
     for k, v in rep["folders"].items():
         print(f"  {v:9.2f} MB  {k}")
 

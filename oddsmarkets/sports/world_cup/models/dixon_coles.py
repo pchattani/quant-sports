@@ -21,13 +21,48 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-from scipy.optimize import minimize
+from scipy.optimize import minimize, minimize_scalar
 from scipy.special import gammaln
 from scipy.stats import poisson
 
 logger = logging.getLogger(__name__)
 
 GLOBAL_MEAN_GOALS = 1.15  # FIFA WC historical average goals per team per match
+RHO_BOUNDS = (-0.99, 0.0)
+
+
+def estimate_rho(home_goals, away_goals, lam_h, lam_a, weights, bounds=RHO_BOUNDS) -> float:
+    """
+    Weighted maximum-likelihood rho of the Dixon-Coles low-score correction, given each
+    match's goal rates.
+
+    The correction tau(x, y) leaves every row and column sum of the score matrix
+    unchanged, so with the rates held fixed the only part of the scoreline likelihood
+    that depends on rho is sum_i w_i log tau(hg_i, ag_i; lam_h_i, lam_a_i, rho): a
+    one-dimensional, smooth problem on a bounded interval. Only 0-0, 1-0, 0-1 and 1-1
+    scorelines carry information.
+    """
+    hg = np.asarray(home_goals, float)
+    ag = np.asarray(away_goals, float)
+    lh = np.asarray(lam_h, float)
+    la = np.asarray(lam_a, float)
+    w = np.asarray(weights, float)
+    low = (hg <= 1) & (ag <= 1) & (w > 0) & np.isfinite(lh) & np.isfinite(la)
+    if not low.any():
+        return float("nan")
+    hg, ag, lh, la, w = hg[low], ag[low], lh[low], la[low], w[low]
+    m00 = (hg == 0) & (ag == 0)
+    m10 = (hg == 1) & (ag == 0)
+    m01 = (hg == 0) & (ag == 1)
+    m11 = (hg == 1) & (ag == 1)
+
+    def nll(rho: float) -> float:
+        tau = np.where(m00, 1 - lh * la * rho, np.where(m10, 1 + la * rho, np.where(m01, 1 + lh * rho,
+                       np.where(m11, 1 - rho, 1.0))))
+        return -float(np.dot(w, np.log(np.maximum(tau, 1e-10))))
+
+    res = minimize_scalar(nll, bounds=bounds, method="bounded", options={"xatol": 1e-6})
+    return float(res.x)
 
 
 @dataclass
@@ -46,13 +81,23 @@ class DixonColesModel:
     All World Cup matches are treated as neutral-site (home_adv=0 in prediction).
     """
 
-    def __init__(self, xi: float = 0.0018, ridge: float = 1.0, analytic_grad: bool = False) -> None:
+    def __init__(self, xi: float = 0.0018, ridge: float = 1.0, analytic_grad: bool = False,
+                 fixed_rho: float | None = None) -> None:
         self.xi = xi       # daily decay constant
         self.ridge = ridge  # L2 regularization on attack/defense (stabilises sparse WC-only fits)
         # Opt-in: hand L-BFGS-B the exact gradient instead of finite differences. Same
         # objective and optimum, tens of times faster on the large pooled fits. Off by
         # default so the World Cup path (and its golden test) is unchanged.
         self.analytic_grad = analytic_grad
+        # Opt-in: hold rho at this value instead of fitting it. rho is identified only by
+        # goals rows (an xG or market-rate row is fitted on its rates, with no tau), so on a
+        # frame where nearly every match carries xG it stays at its starting value of -0.1,
+        # or two or three goals rows push it to a bound (at -0.99 EnsembleModel drops the
+        # Dixon-Coles side). The club fits pass a rho estimated separately, from many
+        # leagues' scorelines (oddsmarkets/football/competitions/league/fitting.py,
+        # `estimate_rho`). None (the default) fits rho as before, so the World Cup path and
+        # its golden test are unchanged.
+        self.fixed_rho = fixed_rho
         self.params_: dict[str, float] = {}
         self.teams_: list[str] = []
         self.fitted_at_: Optional[datetime] = None
@@ -109,6 +154,8 @@ class DixonColesModel:
         x0 = np.zeros(2 * n + 2)
         x0[-2] = 0.1  # home_adv initial guess
         x0[-1] = -0.1  # rho initial guess
+        if self.fixed_rho is not None:
+            x0[-1] = float(self.fixed_rho)
 
         bounds = []
         for i in range(n):
@@ -119,7 +166,8 @@ class DixonColesModel:
             else:
                 bounds.append((None, None))
         bounds.append((None, None))   # home_adv
-        bounds.append((-0.99, 0.0))   # rho must be negative or zero
+        bounds.append((-0.99, 0.0) if self.fixed_rho is None   # rho must be negative or zero
+                      else (float(self.fixed_rho), float(self.fixed_rho)))
 
         home_teams = np.array([team_idx[t] for t in df["home_team"]])
         away_teams = np.array([team_idx[t] for t in df["away_team"]])

@@ -349,7 +349,8 @@ def card(g: dict, season: int, pred: pd.Series | None, live_prices: dict | None 
             "hr": (g.get("ranks") or {}).get("home"), "ar": (g.get("ranks") or {}).get("away"),
             "hseed": sd_.get("home"), "aseed": sd_.get("away"), "neutral": bool(g.get("neutral")),
             "conf_game": bool(g.get("conf_game")), "period": g.get("periods") if g.get("status") == "in" else None,
-            "clock": None, "model": model, "market": mk, "result": res}
+            "clock": None, "model": model, "market": mk, "result": res,
+            **({"tba": True} if canon.time_tba(g) else {})}           # start time not set yet (shown as TBA)
 
 
 def season_cards(ctx: dict, season: int, live_prices: dict | None = None) -> list[dict]:
@@ -1132,6 +1133,74 @@ def wp_model(margin_home: float, t: float, pregame_margin: float, sd: float = 15
     return float(norm.cdf(mu / (sd * math.sqrt(rem) + 0.5)))
 
 
+# rows that are not plays (timeouts, end of a period): kept in the WP series, never listed as a play
+_ADMIN = ("timeout", "end of ", "end quarter", "end half", "end game", "start of ", "official timeout")
+
+
+def _despike(w: np.ndarray, pts: np.ndarray, jump: float = 0.10, back: float = 0.03) -> np.ndarray:
+    """ESPN's feed carries isolated bad WP values (a penalty row or a mis-clocked snap jumps 0.2 and the next row
+    returns to where it was). A non-scoring row that moves >= `jump` and is undone to within `back` by the next
+    row takes the previous row's value."""
+    w = w.copy()
+    for i in range(1, len(w) - 1):
+        a, b = w[i] - w[i - 1], w[i + 1] - w[i]
+        if pts[i] <= 0 and abs(a) >= jump and abs(b) >= jump and a * b < 0 and abs(w[i + 1] - w[i - 1]) <= back:
+            w[i] = w[i - 1]
+    return w
+
+
+def play_wpa(wp_espn: np.ndarray, pts: np.ndarray, wp_pre: np.ndarray, final: float | None = None) -> np.ndarray:
+    """Home win probability added by each row (feed order, which is ESPN's sequence; clocks are sometimes wrong,
+    so rows are never re-sorted by time).
+
+    ESPN's `wp_home` (0-1) is the home WP *after* the play: when a game has it on most rows, a row's WPA is its value
+    less the previous row's (missing values carry the last known WP forward, isolated spikes are removed; the first
+    row's baseline is its own value, so the pregame-to-ESPN gap is not credited to the opening kickoff, unless that
+    row scored, when our pregame WP is the baseline). Otherwise `wp_pre` (our model's WP *before* each play) is used:
+    a row's WPA is the next row's pre-play WP less its own, and the last row's is the result (`final`, 1/0/0.5) less
+    its own."""
+    n = len(pts)
+    if not n:
+        return np.zeros(0)
+    e = np.asarray(wp_espn, float)
+    pts = np.nan_to_num(np.asarray(pts, float))
+    wp_pre = np.asarray(wp_pre, float)
+    if np.isfinite(e).mean() > 0.5:
+        w = pd.Series(e).ffill().bfill().to_numpy(float)
+        w = _despike(w, pts)
+        base = w[0] if pts[0] <= 0 else wp_pre[0]
+        return np.diff(np.concatenate([[base], w]))
+    end = wp_pre[-1] if final is None else float(final)
+    return np.diff(np.concatenate([wp_pre, [end]]))
+
+
+def top_plays(x: pd.DataFrame, wpa: np.ndarray, k: int = 10) -> list[dict]:
+    """The k rows with the largest |WPA| (admin rows excluded), largest first, in the payload's play shape."""
+    if not len(x):
+        return []
+    y = x.assign(wpa=np.asarray(wpa, float))
+    txt = y["text"].fillna("").astype(str).str.strip().str.lower()
+    ok = (txt != "") & ~txt.str.startswith(_ADMIN) & np.isfinite(y["wpa"].to_numpy(float))
+    y = y[ok.to_numpy()]
+    y = y.assign(aw=y["wpa"].abs()).sort_values("aw", ascending=False, kind="stable").head(k)
+
+    def clock(c):
+        try:
+            c = float(c)
+        except (TypeError, ValueError):
+            return None
+        return f"{int(c // 60)}:{int(c % 60):02d}" if np.isfinite(c) else None
+
+    out = []
+    for r in y.to_dict("records"):
+        t = r.get("t")
+        out.append({"t": int(t) if t is not None and np.isfinite(float(t)) else None,
+                    "period": int(r["period"]) if np.isfinite(float(r["period"])) else None,
+                    "clock": clock(r.get("clock_s")), "team": r.get("offense"), "text": str(r.get("text") or "")[:200],
+                    "wpa": r2(r["wpa"], 3)})
+    return out
+
+
 def game_page(ctx: dict, season: int, g: dict, cardd: dict, pl: pd.DataFrame | None, tgs: pd.DataFrame | None,
               names: dict, plays_raw: dict | None) -> dict:
     S = season_state(ctx, season)
@@ -1203,16 +1272,12 @@ def game_page(ctx: dict, season: int, g: dict, cardd: dict, pl: pd.DataFrame | N
             ts = [t for t in x["t"] if t is not None]
             espn = [[int(t), r2(w, 3)] for t, w in zip(x["t"], x["wp_home"]) if t is not None and np.isfinite(w)]
             out["wp"] = {"model": [[int(t), r2(w, 3)] for t, w in list(zip(ts, wpm))[::3]], "espn": espn[::3] if espn else []}
-            # leverage plays: ESPN wp change where present, else ours
-            wser = x["wp_home"].to_numpy(float) if np.isfinite(x["wp_home"].to_numpy(float)).mean() > 0.5 else np.array(
-                [wp_model(m, t or 0, pm, sd, e) for m, t, e in zip(mpre, x["t"], ep_h)])
-            wpa = np.diff(np.concatenate([[float(norm.cdf(pm / sd))], np.nan_to_num(wser, nan=0.5)]))
-            x["wpa"] = wpa
-            top = x[x["scrim"] | (x["pts"] > 0)].assign(aw=lambda d: d["wpa"].abs()).sort_values("aw", ascending=False).head(10)
-            out["plays"] = [{"t": int(r["t"]) if r["t"] is not None else None, "period": int(r["period"]),
-                             "clock": f"{int(r['clock_s'] // 60)}:{int(r['clock_s'] % 60):02d}" if np.isfinite(r["clock_s"]) else None,
-                             "team": r["offense"], "text": r["text"][:200], "wpa": r2(r["wpa"], 3)}
-                            for r in top.sort_values("t").to_dict("records")]
+            # leverage plays: the top 10 by |home WPA| (ESPN's WP where the game has it, else ours), largest first
+            wpre = np.array([wp_model(m, t or 0, pm, sd, e) for m, t, e in zip(mpre, x["t"], ep_h)])
+            fin = None
+            if g.get("status") == "post" and g.get("hs") is not None and g.get("as") is not None:
+                fin = 1.0 if g["hs"] > g["as"] else (0.0 if g["hs"] < g["as"] else 0.5)
+            out["plays"] = top_plays(x, play_wpa(x["wp_home"].to_numpy(float), x["pts"].to_numpy(float), wpre, fin), 10)
             ep_by_drive = x.groupby("drive")["epa"].sum().to_dict() if "drive" in x else {}
             gp_ = (plays_raw or {}).get("games", {}).get(gid) or {}
             dr = []

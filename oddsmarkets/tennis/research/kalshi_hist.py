@@ -2,7 +2,10 @@
 Kalshi tennis match-market history for the earlier-decision-time test (docs/research/tennis_edge.md).
 
 * `index(series)`: every settled market of a series, from the live API (settled after Kalshi's historical
-  cutoff) and the historical API (before it), paged by cursor; cached as one JSON per series.
+  cutoff) and the historical API (before it), paged by cursor; cached as one JSON per series and refreshed
+  incrementally once it is older than INDEX_MAX_AGE_H (oddsmarkets/common/kalshi_listing.py: the newest pages
+  again until a page holds only known markets closed more than 14 days ago; older pages come from the cache).
+  Until 22 Oct 2026 the listing was cached for good, so no match settled after the first fetch (2 Oct) was seen.
 * `candles(market)`: hourly candlesticks (yes bid/ask OHLC, traded price, volume) over the market's life,
   one JSON per ticker under data/edge/cache/kalshi/ (fetched once; a settled market never changes).
 
@@ -13,11 +16,12 @@ from __future__ import annotations
 import json
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
 
+from oddsmarkets.common import kalshi_listing
 from oddsmarkets.tennis.models import _io
 
 API = "https://api.elections.kalshi.com/trade-api/v2"
@@ -65,26 +69,57 @@ KEEP = ("ticker", "event_ticker", "title", "open_time", "close_time", "occurrenc
         "settlement_ts", "result", "volume_fp", "rules_primary", "custom_strike", "no_sub_title", "status")
 
 
-def index(series: str, refresh: bool = False) -> list[dict]:
+INDEX_MAX_AGE_H = 12.0
+
+
+def _page(path: str, series: str, cursor: str | None) -> dict | None:
+    prm = {"series_ticker": series, "limit": 1000}
+    if path == "/markets":
+        prm["status"] = "settled"
+    if cursor:
+        prm["cursor"] = cursor
+    return _get(path, prm)
+
+
+def _newest_first(rows: list[dict]) -> list[dict]:
+    return sorted(rows, key=lambda m: kalshi_listing.row_time(m) or 0.0, reverse=True)
+
+
+def index(series: str, refresh: bool | None = None, max_age_h: float = INDEX_MAX_AGE_H) -> list[dict]:
+    """Every settled market of the series (oldest first). Served from index_<SERIES>.json while it is younger than
+    `max_age_h`, else refreshed incrementally; `refresh=True` forces the refresh, `refresh=False` never refreshes.
+    A listing cached before its .meta file existed came from full walks, so it counts as complete (only its newest
+    pages are fetched again)."""
     CACHE.mkdir(parents=True, exist_ok=True)
     p = CACHE / f"index_{series}.json"
-    if p.exists() and not refresh:
-        return json.loads(p.read_text(encoding="utf-8"))
+    mp = CACHE / f"index_{series}.meta"                  # not .json: nothing globs it as an index
+    cached = json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+    meta = json.loads(mp.read_text(encoding="utf-8")) if mp.exists() else {}
+    if cached is not None and refresh is not True:
+        at = meta.get("refreshed_at")
+        age_h = ((datetime.now(timezone.utc) - datetime.fromisoformat(at)).total_seconds() / 3600 if at
+                 else float("inf"))
+        if refresh is False or age_h < max_age_h:
+            return cached
+    done = meta.get("complete") or {"hist": cached is not None, "live": cached is not None}
+    prev = cached or []
+    keep = lambda m, hist: {k: m.get(k) for k in KEEP} | {"_hist": hist}  # noqa: E731
+    hist, ok_h, n_h = kalshi_listing.refresh(lambda c: _page("/historical/markets", series, c), "markets",
+                                             _newest_first([m for m in prev if m.get("_hist")]), bool(done.get("hist")))
+    live, ok_l, n_l = kalshi_listing.refresh(lambda c: _page("/markets", series, c), "markets",
+                                             _newest_first([m for m in prev if not m.get("_hist")]), bool(done.get("live")))
     out: dict = {}
-    for path, extra in (("/markets", {"status": "settled"}), ("/historical/markets", {})):
-        cur = None
-        while True:
-            prm = {"series_ticker": series, "limit": 1000, **extra}
-            if cur:
-                prm["cursor"] = cur
-            d = _get(path, prm) or {}
-            for m in d.get("markets") or []:
-                out[m["ticker"]] = {k: m.get(k) for k in KEEP} | {"_hist": path.startswith("/historical")}
-            cur = d.get("cursor")
-            if not cur or not d.get("markets"):
-                break
+    for m in live:
+        out[m["ticker"]] = keep(m, False)
+    for m in hist:                                        # a market past the historical cutoff: the historical copy
+        out[m["ticker"]] = keep(m, True)
     rows = sorted(out.values(), key=lambda m: m.get("open_time") or "")
     p.write_text(json.dumps(rows), encoding="utf-8")
+    mp.write_text(json.dumps({"refreshed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                              "complete": {"hist": ok_h, "live": ok_l}, "pages": {"hist": n_h, "live": n_l}}),
+                  encoding="utf-8")
+    print(f"kalshi {series}: {len(rows)} markets ({len(rows) - len(prev):+d}), {n_h} + {n_l} listing pages fetched",
+          flush=True)
     return rows
 
 

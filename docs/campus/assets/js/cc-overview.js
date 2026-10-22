@@ -38,7 +38,7 @@ function kpis(L, S, d) {
     var live = (info.today || []).filter(function (g) { return g.status === 'in'; });
     var nx = (info.today || []).concat(info.next_games || []).filter(function (g) { return g.status === 'pre'; }).sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); })[0];
     if (live.length) out.push(QK.kpi({ label: 'Live now', value: live.length + ' game' + (live.length > 1 ? 's' : ''), sub: live.slice(0, 3).map(function (g) { return CC.tabbr(L, g.away) + '–' + CC.tabbr(L, g.home); }).join(' · ') }));
-    else if (nx) out.push(QK.kpi({ label: CC.fb(L) ? 'Next kick-off' : 'Next tip-off', value: QK.whenShort(nx.date), sub: CC.tabbr(L, nx.away) + ' @ ' + CC.tabbr(L, nx.home) + ' · ' + CC.date(nx.date) }));
+    else if (nx) out.push(QK.kpi({ label: CC.fb(L) ? 'Next kick-off' : 'Next tip-off', value: CC.tba(nx) ? 'TBA' : QK.whenShort(nx.date), sub: CC.tabbr(L, nx.away) + ' @ ' + CC.tabbr(L, nx.home) + ' · ' + CC.date(CC.gameDate(nx)) }));
     var best = null;
     (info.today || []).concat(info.next_games || []).forEach(function (g) {
       if (g.status !== 'pre' || !g.model || !g.market || !isNum(g.model.p_home) || !isNum(g.market.p_home)) return;

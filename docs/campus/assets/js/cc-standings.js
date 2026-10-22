@@ -219,7 +219,14 @@ function regionData(L, S, br) {
   var seedOf = {}, regOf = {};
   names.forEach(function (r) { (regs[r] || []).forEach(function (x) { seedOf[String(x.team)] = x.seed; regOf[String(x.team)] = r; }); });
   var games = actual ? (actual.games || []) : [];
-  return { actual: actual, regs: regs, names: names, seedOf: seedOf, regOf: regOf, games: games };
+  return { actual: actual, regs: regs, names: names, seedOf: seedOf, regOf: regOf, games: games, sites: (actual && actual.sites) || {} };
+}
+/* A region heading: women's regions named for their host city (2005-2022) read "Albany Regional"; numbered ones
+ * (2023 on) add the city ("Regional 1 · Albany"); compass regions as they are. */
+function regionTitle(D, rname) {
+  var site = D.sites[rname];
+  if (!site) return rname;
+  return site === rname ? rname + ' Regional' : rname + ' · ' + site;
 }
 function regionHTML(L, S, br, D, rname) {
   var odds = br.odds || {};
@@ -268,7 +275,7 @@ function regionHTML(L, S, br, D, rname) {
     }
     cols += '</div>';
   });
-  return U.card(rname, D.actual ? 'Scores as played; tap a game for its page.' : 'Projected: first-round pairs from the projected seeds, later rounds show the likeliest team and its chance to advance.', '<div class="cc-bscroll" tabindex="0" role="region" aria-label="' + esc(rname) + ' region bracket"><div class="cc-bracket ncaa">' + cols + '</div></div>', { cls: 'cc-region' });
+  return U.card(regionTitle(D, rname), D.actual ? 'Scores as played; tap a game for its page.' : 'Projected: first-round pairs from the projected seeds, later rounds show the likeliest team and its chance to advance.', '<div class="cc-bscroll" tabindex="0" role="region" aria-label="' + esc(rname) + ' region bracket"><div class="cc-bracket ncaa">' + cols + '</div></div>', { cls: 'cc-region' });
 }
 function finalFour(L, S, br, D) {
   var odds = br.odds || {};

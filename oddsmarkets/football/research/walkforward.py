@@ -171,6 +171,16 @@ class Spec:
     xi_shots: float | None = None  # own daily decay for the shots rows (None: xi)
     ah: bool = True              # compute the Asian-handicap columns (off for fast tuning runs)
     elo_out: bool = False        # also return the production Elo's H/D/A (p_elo_*) for stacking
+    # Rho (Oct 2026, round 2). "joint": fitted with the goals rows (the default above);
+    # "fixed": held at rho_fixed (production before the fix: -0.1 where every row has xG);
+    # "profile": the rates are fitted with rho held at rho_fixed (so they equal the "fixed" run's),
+    # then rho is re-estimated from every training scoreline given those rates (dixon_coles.estimate_rho),
+    # weighted exp(-rho_decay * age) (None: the goals decay xi). Tested 22 Oct 2026 and not promoted:
+    # production holds one rho for every club fit (league/fitting.py), the "fixed" mode with rho_by_season.
+    rho_mode: str = "joint"
+    rho_fixed: float = -0.1
+    rho_decay: float | None = None
+    rho_by_season: dict | None = None   # "fixed" mode: the rho of each season (keyed by start year), else rho_fixed
 
 
 class Elo:
@@ -298,7 +308,18 @@ def run_league(L: pd.DataFrame, spec: Spec, first_season: int | None = None, las
         present[ai[tr]] = True
         ap = np.where(present, 0.0, spec.promo_att)
         dp = np.where(present, 0.0, spec.promo_def)
-        x = fastdc.fit(data, n, spec.ridge, att_prior=ap, def_prior=dp, x0=x_prev, fit_rho=spec.fit_rho)
+        x = fastdc.fit(data, n, spec.ridge, att_prior=ap, def_prior=dp, x0=x_prev, fit_rho=spec.fit_rho,
+                       rho_fixed=(spec.rho_by_season or {}).get(int(sy[rows[0]]), spec.rho_fixed)
+                       if spec.rho_mode in ("fixed", "profile") else None)
+        if spec.rho_mode == "profile":
+            from oddsmarkets.sports.world_cup.models.dixon_coles import estimate_rho
+            th, ta = hi[tr], ai[tr]
+            lh_t = np.exp(x[th] + x[n + ta] + x[2 * n])
+            la_t = np.exp(x[ta] + x[n + th])
+            rd = spec.xi if spec.rho_decay is None else spec.rho_decay
+            r = estimate_rho(hg[tr], ag[tr], lh_t, la_t, np.exp(-rd * age))
+            if np.isfinite(r):
+                x[2 * n + 1] = r
         # Teams without data: reset to their prior (the warm start must not carry stale values)
         x[:n] = np.where(present, x[:n], ap)
         x[n:2 * n] = np.where(present, x[n:2 * n], dp)

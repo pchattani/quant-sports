@@ -492,6 +492,19 @@ Not changed (tested): wider pace spread (helps 2023–2026, hurts 2014–2022: a
 pick up honestly), smaller pace sd, harder overtaking (worse everywhere), a market-informed prior from earlier
 races' prices (no gain), a rolling 44-race temperature (−0.055 [−0.130, +0.033], too noisy).
 
+**Post-qualifying strength scale (22 October 2026; tested, off).** `race_sim.PACE_SPREAD_POST` (fitted-file key, empty =
+off) holds a walk-forward scale s per Grand Prix. After the qualifying-pace blend, `inputs_from_components` applies
+`mu_d = mean + s (mu_d − mean)` to the field-centred pace (`spread_pace`, `pace_spread_post`; Grand Prix with a grid
+only; pace sd unchanged). The forecast signature includes s when it is not 1, and `scripts/f1_edge.py` configs take
+`"spread_table": true`. `scripts/f1_tune.py spread` builds the table from a grid of fixed scales (0.8–2.8). For each
+race, s minimises the earlier races' weighted winner log-loss under one of 11 pre-registered memory rules:
+expanding; half-life 6, 12 or 24 races; the same regulation set; or the same season, each shrunk toward the
+all-history curve with K = 5 or 20 pseudo-races. On 2014–2022 every rule lost to s = 1 (1.2733; best, expanding,
+1.2800, +0.0068 [−0.0026, +0.0204]), so nothing went to the test and the table stays empty. The best scale per
+season is 0.8–1.2 on 2014–2022 with no carry-over between seasons, and 1.0–2.8 on 2023–2026
+(docs/research/f1_edge.md 9.6, which also gives the exploratory test numbers). Also worse on 2014–2022: `A_BLEND_K` 20
+or 10 instead of 40 (after qualifying +0.010 and +0.024, before +0.020 and +0.031).
+
 ## 7. Championship simulator: `models/championship.py`
 
 `simulate_championship(year, n=20000, seed)`: current points summed from the
@@ -524,6 +537,21 @@ Each race is then simulated with `draw_param=False` (no fresh parameter draw).
 
 The build runs it with `--sims` (default 20,000) and `seed=year` for the current
 season only, and not once the season is finished (`season.finished`).
+
+**Title-odds backtest (22 October 2026).** Seasons 2014–2025, five cutoffs each (pre-season, 1/4, 1/2, 3/4 of the
+rounds, 3 left). At each cutoff the store is truncated, circuit profiles are cut and practice is off. 4,000
+simulations with common random numbers, run before (driver day sd 0.10, lap-1 tail 10%) and after (0.05, 2%) the 21
+October constants. Log-loss of the actual champion over the 60 cutoffs:
+
+| Title | Old → new | Difference [95% CI, by season] | Brier old → new |
+|---|---|---|---|
+| drivers | 0.4435 → 0.4439 | +0.0004 [−0.0018, +0.0032] | 0.2612 → 0.2626 |
+| constructors | 0.3823 → 0.3872 | +0.0050 [−0.0020, +0.0178] | 0.1755 → 0.1752 |
+
+The constants do not change the title odds measurably. Pre-season the drivers' log-loss is 0.98; it falls to 0.43
+after a quarter of the season and to 0.07 with three rounds left. In-season favourites are slightly under-confident:
+drivers 0.82 forecast against 88% won, constructors 0.93 against 94%, over 48 cutoffs each. The one miss is McLaren's
+2024 constructors' title, given 0.2% after six rounds.
 
 ---
 
@@ -788,7 +816,10 @@ forecast). Written to `data/f1/cache/backtest.json`, which the build turns into
 every race with common random numbers; `select` picks, for each season Y from 2014, the
 configuration best on the seasons before Y. Only the constants without a direct data
 check were tuned this way: `PACE_PER_Z_PCT`, `A_BLEND_K`, `PRE_GRID` (the walk-forward
-pick after qualifying was `PACE_PER_Z_PCT = 0.9, A_BLEND_K = 40` in every season).
+pick after qualifying was `PACE_PER_Z_PCT = 0.9, A_BLEND_K = 40` in every season). `wintemp` builds the
+post-qualifying win temperature table and `spread` the strength-scale table (section 6.3; `--report` scores the
+memory rules on the dev seasons). After any model change the order is `grid` with the production configuration, then
+`wintemp`, then the official backtest.
 
 ### 12.2 Results (October 2026)
 

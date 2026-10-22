@@ -31,13 +31,15 @@ QK.fetchJSON('data/home.json', { cache: 'no-cache' }).then(function (j) {
 
 function renderAll() {
   var today = new Date();
-  $('#hero-date').textContent = today.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }) + ' · seven sports';
+  $('#hero-date').textContent = today.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }) + ' · ' + sportCount();
   renderTicker(); renderHeroKpis(); renderFeature(); renderStats(); renderTiles(); renderChips(); renderGames();
   renderGaps(); renderFutures(); renderCharts(); renderLeaders();
   $('#updated').textContent = 'Data built ' + fmt.ago(D.updated_at) + ' (' + new Date(D.updated_at).toLocaleString() + '). Live scores refresh every minute while games are on.';
   QK.seg($('#when'), function (v) { state.when = v; state.shown = PAGE; renderGames(); });
 }
 
+var NUMS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+function sportCount() { var n = D.sports.length; return (NUMS[n] || String(n)) + (n === 1 ? ' sport' : ' sports'); }
 function liveMap() { var m = {}; D.games.forEach(function (g) { if (g.status === 'live') m[g.sport] = true; }); return m; }
 
 /* ───────────────────────────── ticker */
@@ -211,10 +213,12 @@ function renderFutures() {
   var tabs = [];
   var ft = D.charts.football_titles || [];
   if (ft.length) tabs.push({ id: 'football', label: 'Football', sport: 'football' });
-  [['nfl', 'NFL'], ['basketball', null], ['basketball_2', null], ['baseball', 'MLB'], ['hockey', 'NHL'], ['f1', 'F1']].forEach(function (x) {
-    if (F[x[0]]) tabs.push({ id: x[0], label: x[1] || F[x[0]].title.replace(' title', ''), sport: x[0].replace('_2', '') });
+  /* A multi-league site writes one entry per league: <sport>, <sport>_2 (hardwood) or <sport>_<level> (campus). */
+  [['nfl', 'NFL'], ['basketball', null], ['basketball_2', null], ['baseball', 'MLB'], ['hockey', 'NHL'], ['f1', 'F1'],
+   ['college', 'CFB'], ['college_mbb', 'MBB'], ['college_wbb', 'WBB']].forEach(function (x) {
+    if (F[x[0]]) tabs.push({ id: x[0], label: x[1] || F[x[0]].title.replace(' title', ''), sport: x[0].split('_')[0], title: F[x[0]].title });
   });
-  $('#fut-tabs').innerHTML = tabs.map(function (t, i) { return '<button class="qk-tab" role="tab" id="ft-' + t.id + '" aria-controls="fp-' + t.id + '" aria-selected="' + (i === 0) + '">' + esc(t.label) + '</button>'; }).join('');
+  $('#fut-tabs').innerHTML = tabs.map(function (t, i) { return '<button class="qk-tab" role="tab" id="ft-' + t.id + '" aria-controls="fp-' + t.id + '" aria-selected="' + (i === 0) + '"' + (t.title ? ' title="' + esc(t.title) + '"' : '') + '>' + esc(t.label) + '</button>'; }).join('');
   $('#fut-panels').innerHTML = tabs.map(function (t) { return '<div class="qk-tabpanel" role="tabpanel" id="fp-' + t.id + '" aria-labelledby="ft-' + t.id + '"></div>'; }).join('');
   var done = {};
   QK.tabs($('#fut-tabs'), function (pid) {
@@ -222,7 +226,7 @@ function renderFutures() {
     if (done[id]) return; done[id] = 1;
     var p = document.getElementById(pid);
     if (id === 'football') return footballFutures(p, ft);
-    futuresPanel(p, F[id], id.replace('_2', ''));
+    futuresPanel(p, F[id], id.split('_')[0]);
   });
 }
 function futuresPanel(p, f, sport) {
@@ -341,6 +345,7 @@ var ADAPT = {
   baseball: ['index.json', function (j) { return [].concat(j.today || [], j.recent || [], j.upcoming || []).map(function (g) { return { id: g.gpk, status: g.status, hs: g.hs, as: g.as, period: g.inning }; }); }],
   nfl: ['index.json', function (j) { return [].concat(j.live || [], j.games || [], j.recent || []).map(function (g) { return { id: g.game_id, status: g.status, hs: g.hs, as: g.as, period: g.qtr, clock: g.clock }; }); }],
   hockey: ['index.json', function (j) { return [].concat(j.live || [], j.today || [], j.recent || [], j.upcoming || []).map(function (g) { return { id: g.game_id, status: g.status, hs: g.hs, as: g.as, period: g.period, clock: g.clock }; }); }],
+  college: ['index.json', function (j) { var out = []; Object.keys(j.levels || {}).forEach(function (L) { var l = j.levels[L] || {}; ['today', 'next_games', 'last_games'].forEach(function (k) { (l[k] || []).forEach(function (g) { out.push({ id: g.id, status: g.status, hs: g.hs, as: g.as, period: g.period, clock: g.clock }); }); }); }); return out; }],
   tennis: ['index.json', function (j) { var out = []; Object.keys(j.tours || {}).forEach(function (T) { var t = j.tours[T]; [].concat(t.live || [], t.today || [], t.recent || []).forEach(function (m) { var s = m.sets || [], a = 0, b = 0; s.forEach(function (x) { if (isNum(x[0]) && isNum(x[1])) { if (x[0] > x[1]) a++; else if (x[1] > x[0]) b++; } }); out.push({ id: m.id, status: m.status, hs: s.length ? a : null, as: s.length ? b : null }); }); }); return out; }]
 };
 function needsLive(sport) {

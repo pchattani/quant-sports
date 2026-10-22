@@ -33,7 +33,7 @@ CC.route('games', function (el, p) {
     if (!CC.ok(sch)) { el.innerHTML = U.head('Games', '', U.kicker(L, S)) + U.missing('The schedule', sch); return; }
     var cards = (sch.games || []).slice().sort(function (x, y) { return String(x.date).localeCompare(String(y.date)); });
     var keys = [], byKey = {};
-    cards.forEach(function (c) { var k = fb ? weekKey(c) : dayKey(c.date); if (!byKey[k]) { byKey[k] = []; keys.push(k); } byKey[k].push(c); });
+    cards.forEach(function (c) { var k = fb ? weekKey(c) : dayKey(CC.gameDate(c)); if (!byKey[k]) { byKey[k] = []; keys.push(k); } byKey[k].push(c); });
     if (fb) {
       var ord = function (k) { return k.charAt(0) === 'w' ? Number(k.slice(1)) : { champ: 100, bowls: 101, cfp: 102, other: 103 }[k]; };
       keys.sort(function (x, y) { return ord(x) - ord(y); });
@@ -82,8 +82,8 @@ CC.route('games', function (el, p) {
       if (!list.length) { QK.$('#g-list', el).innerHTML = QK.empty('No games match', 'Clear a filter or pick another ' + (fb ? 'week' : 'day') + '.'); return; }
       var html = '', last = null;
       list.forEach(function (c) {
-        var d = dayKey(c.date);
-        if (d !== last) { if (last !== null) html += '</div>'; html += '<div class="cc-day">' + esc(CC.date(c.date)) + '</div><div class="cc-games">'; last = d; }
+        var d = dayKey(CC.gameDate(c));
+        if (d !== last) { if (last !== null) html += '</div>'; html += '<div class="cc-day">' + esc(CC.date(CC.gameDate(c))) + '</div><div class="cc-games">'; last = d; }
         html += CC.card(c, L);
       });
       QK.$('#g-list', el).innerHTML = html + '</div>';
@@ -134,12 +134,12 @@ function hero(L, g) {
   }
   var hw = isNum(g.hs) && isNum(g.as) ? g.hs > g.as : false;
   var rk = function (side0) { var s = side0 === 'home' ? g.hseed : g.aseed, r = side0 === 'home' ? g.hr : g.ar; return isNum(s) && (g.stype === 'ncaa' || g.stype === 'cfp') ? '(' + s + ') ' : (isNum(r) && r <= 25 ? '#' + r + ' ' : ''); };
-  var badge = st === 'live' ? '<span class="qk-badge live">Live</span>' : fin ? '<span class="qk-badge final">Final' + (isNum(g.periods) && g.periods > (CC.fb(L) ? 4 : (L === 'mbb' ? 2 : 4)) ? '/OT' : '') + '</span>' : '<span class="qk-badge">' + esc(CC.date(g.date, true)) + '</span>';
+  var badge = st === 'live' ? '<span class="qk-badge live">Live</span>' : fin ? '<span class="qk-badge final">Final' + (isNum(g.periods) && g.periods > (CC.fb(L) ? 4 : (L === 'mbb' ? 2 : 4)) ? '/OT' : '') + '</span>' : '<span class="qk-badge">' + esc(CC.when(g)) + '</span>';
   var venue = g.venue && g.venue.name ? g.venue.name + (g.venue.city ? ', ' + g.venue.city : '') + (g.venue.state ? ', ' + g.venue.state : '') : '';
   return '<section class="qk-hero cc-gh" style="--tc:' + esc(QK.color.parse(h.colour) ? h.colour : 'var(--accent)') + '"><div class="cc-gh-top"><span class="qk-kicker">' + esc(CC.LSHORT[L] + ' · ' + CC.seasonLabel(L, g.season) + ' · ' + tag + (isNum(g.week) && g.stype === 'reg' ? ' · Week ' + g.week : '')) + '</span>' + badge + '</div>' +
     '<div class="cc-gh-teams">' + side(a, g.away, g.as, !hw, rk('away')) + '<span class="cc-gh-at">' + (g.neutral ? 'v' : '@') + '</span>' + side(h, g.home, g.hs, hw, rk('home')) + '</div>' +
     '<div class="qk-hero-meta">' + (venue ? '<span>' + esc(venue) + (g.neutral ? ' (neutral)' : '') + '</span>' : '') + (isNum(g.attendance) ? '<span>Attendance <b>' + QK.fmt.num(g.attendance) + '</b></span>' : '') +
-    (g.note && g.stype === 'reg' ? '<span>' + esc(g.note) + '</span>' : '') + '<span>' + esc(CC.date(g.date, true)) + '</span></div></section>';
+    (g.note && g.stype === 'reg' ? '<span>' + esc(g.note) + '</span>' : '') + '<span>' + esc(CC.when(g)) + '</span></div></section>';
 }
 
 function pregame(L, g) {
@@ -211,13 +211,15 @@ function boxHoops(L, g) {
   var tabs = [g.away, g.home].filter(function (t) { return bx[t] && bx[t].players && bx[t].players.length; });
   if (!tabs.length) return '';
   var C = ['player_id', 'starter', 'sec', 'pts', 'fgm', 'fga', 'tpm', 'tpa', 'ftm', 'fta', 'oreb', 'dreb', 'ast', 'stl', 'blk', 'tov', 'pf'];
-  function obj(r) {
+  function obj(r, names) {
     if (!Array.isArray(r)) { if (r && r.id === undefined) r.id = r.player_id; if (r && !isNum(r.min) && isNum(r.sec)) r.min = Math.round(r.sec / 60); return r; }
-    var o = {}; C.forEach(function (k, i) { o[k] = r[i]; }); o.id = o.player_id; o.min = isNum(o.sec) ? Math.round(o.sec / 60) : null; return o;
+    var o = {}; C.forEach(function (k, i) { o[k] = r[i]; }); o.id = o.player_id; o.min = isNum(o.sec) ? Math.round(o.sec / 60) : null;
+    o.name = (names || {})[String(o.player_id)] || null;
+    return o;
   }
   var html = '<div class="qk-tabs" role="tablist">' + tabs.map(function (t, i) { return '<button class="qk-tab" role="tab" aria-selected="' + (i === 0) + '" aria-controls="box-' + t + '">' + esc(CC.tshort(L, t)) + '</button>'; }).join('') + '</div>';
   tabs.forEach(function (t, i) {
-    var rows = bx[t].players.map(obj);
+    var rows = bx[t].players.map(function (r) { return obj(r, bx[t].names); });
     var cols = [{ label: 'Player' }, { label: 'MIN', align: 'right' }, { label: 'PTS', align: 'right' }, { label: 'FG', align: 'right' }, { label: '3PT', align: 'right' }, { label: 'FT', align: 'right' }, { label: 'REB', align: 'right' }, { label: 'AST', align: 'right' }, { label: 'STL', align: 'right' }, { label: 'BLK', align: 'right' }, { label: 'TO', align: 'right' }, { label: 'PF', align: 'right' }];
     var body = rows.map(function (o) {
       var nm = o.name || CC.pname(L, o.id), reb = isNum(o.reb) ? o.reb : (isNum(o.oreb) && isNum(o.dreb) ? o.oreb + o.dreb : null);

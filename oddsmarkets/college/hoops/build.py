@@ -6,8 +6,9 @@ Basketball payload writer for The Quant Campus (PAYLOADS.md, CONTRACT.md section
         players.json, value.json, moves.json, fantasy.json, lab_players.json, lab_teams.json and games/<gid>.json
         (finished and live games of the current season; the previous season's postseason: NCAA, NIT, WBIT, other
         postseason and conference tournament games). `full=False` skips the game pages only (scripts/build_campus.py
-        passes full=True for the newest --game-page-seasons); seasons before the previous one are written compactly
-        (`archive`).
+        passes full=True for the newest --game-page-seasons); past seasons are written compactly (`is_archive`), and
+        lists are column-packed (FORMAT, oddsmarkets/college/packing.py).
+    migrate(level, out_dir, season) -> files rewritten: upgrades a season folder written in an older FORMAT.
     build_level(level, out_dir, seasons, current, *, sims=10000, markets=True, full=True) -> summary dict
         writes out_dir/<L>/: calibration.json, history.json, markets.json, players/<pid>.json (players with a game in
         the last two seasons that have box scores), then calls build() for each season.
@@ -23,6 +24,7 @@ import json
 import logging
 import math
 import os
+import re
 import time
 import traceback
 from collections import Counter, defaultdict
@@ -34,6 +36,7 @@ import numpy as np
 from scipy.stats import norm
 
 from oddsmarkets.college import canon
+from oddsmarkets.college import packing as PK
 from oddsmarkets.college import store as ST
 from oddsmarkets.college.hoops import backtest as BT
 from oddsmarkets.college.hoops import data as D
@@ -46,6 +49,10 @@ from oddsmarkets.college.hoops import tourney as TT
 
 logger = logging.getLogger(__name__)
 VERSION = 1
+# Payload format (season.json "fmt"): 2 = packed lists (oddsmarkets/college/packing.py) in schedule.json, players.json,
+# team pages, careers and game pages; archive team pages without a schedule. migrate() upgrades older season folders
+# (scripts/build_campus.py runs it on the seasons CI restores from the live site instead of rebuilding).
+FORMAT = 2
 REGION_NAMES = {"mbb": ["East", "West", "South", "Midwest"], "wbb": ["Regional 1", "Regional 2", "Regional 3", "Regional 4"]}
 POST_PAGES = ("ncaa", "nit", "wbit", "post", "conf")
 SPREAD_SD = {"mbb": 10.5, "wbb": 11.0}
@@ -254,16 +261,6 @@ COMPACT_KEYS = ("id", "season", "date", "status", "stype", "round", "region", "h
                 "hseed", "aseed", "neutral", "conf_game", "model", "market", "result")
 
 
-TEAM_PAGE_KEYS = ("id", "date", "status", "stype", "round", "region", "home", "away", "hs", "as", "hseed", "aseed",
-                  "neutral", "conf_game", "model", "market")
-
-
-def team_card(c: dict) -> dict:
-    """Archive team-page schedule row: the compact CARD without what the team page does not read (season = the page's,
-    ranks, result)."""
-    return {k: v for k, v in slim(c, compact=True).items() if k in TEAM_PAGE_KEYS}
-
-
 def slim(c: dict, compact: bool = False) -> dict:
     """A CARD without its null-valued keys and false `neutral` / `conf_game` (PAYLOADS: a missing CARD key reads as
     null, i.e. false for the flags); `compact` keeps only the
@@ -307,13 +304,20 @@ def card(ctx: dict, s: int, g: dict) -> dict:
             "hr": rk.get("home"), "ar": rk.get("away"), "hseed": sd.get("home"), "aseed": sd.get("away"),
             "neutral": bool(g.get("neutral")), "conf_game": bool(g.get("conf_game")),
             "period": g.get("periods") if live else None, "clock": g.get("clock") if live else None,
-            "model": {k: mdl[k] for k in ("p_home", "margin", "total")} if mdl else None, "market": mk, "result": res}
+            "model": {k: mdl[k] for k in ("p_home", "margin", "total")} if mdl else None, "market": mk, "result": res,
+            "tba": True if canon.time_tba(g) else None}           # start time not set yet (shown as TBA)
+
+
+def is_archive(level: str, s: int) -> bool:
+    """Past seasons (every season before the current one: from 1 May the site's current season is the coming one) are
+    written compactly (size budget, PAYLOADS.md): compact CARDs in schedules, team pages without a schedule (the page
+    reads schedule.json), qualified players only in the player catalogue and lab, the top 12 of each team roster, no
+    suggestions. The previous season's postseason game pages are still written (game_pages)."""
+    return s < current_season(level)
 
 
 def archive(ctx: dict, s: int) -> bool:
-    """Seasons before the previous one are written compactly (size budget, PAYLOADS.md): compact CARDs in schedules
-    and team pages, qualified players only in the player catalogue and lab, the top 12 of each team roster."""
-    return s < current_season(ctx["level"]) - 1
+    return is_archive(ctx["level"], s)
 
 
 # ── season bundle ───────────────────────────────────────────────────────────
@@ -658,7 +662,7 @@ def season_payload(ctx: dict, s: int, sims: int) -> dict:
             "conferences": confs, "teams": teams, "standings": b["standings"], "ratings": b["ratings"],
             "rating_paths": b["paths"], "polls": polls_payload(st), "power": power,
             "sim": {"n_sims": sim["n"], "teams": sim["teams"], "notes": sim["notes"]} if sim else None,
-            "leaders": leaders, "model": {"hca_pts": r2(b["fit"]["hca_pts"]), "league_ortg": r2(b["fit"]["L"]),
+            "leaders": leaders, "fmt": FORMAT, "model": {"hca_pts": r2(b["fit"]["hca_pts"]), "league_ortg": r2(b["fit"]["L"]),
                                           "league_pace": r2(b["fit"]["league_pace"]), "games": int(b["fit"]["n"])}}
 
 
@@ -671,7 +675,7 @@ def schedule_payload(ctx: dict, s: int) -> dict:
         if not ((teams.get(str(g.get("home"))) or {}).get("member") or (teams.get(str(g.get("away"))) or {}).get("member")):
             continue
         cards.append(slim(card(ctx, s, g), compact=archive(ctx, s)))
-    return {"ok": True, "level": ctx["level"], "season": s, "updated_at": now_iso(), "games": cards,
+    return {"ok": True, "level": ctx["level"], "season": s, "updated_at": now_iso(), "games": PK.pack(cards),
             "compact": archive(ctx, s)}
 
 
@@ -686,6 +690,34 @@ def _regions_payload(regs: list[dict], names: list[str], teams: list[str], p_of:
                     row["p"] = r4(p_of.get(teams[t]))
                 rows.append(row)
         out[names[k] if k < len(names) else f"Region {k + 1}"] = rows
+    return out
+
+
+_SITE_PATTERNS = (re.compile(r"regional\s+(\d)\s+in\s+([A-Za-z .'-]+?)\s*(?:-|$)", re.I),        # 2024-: Regional 1 in Albany
+                  re.compile(r"-\s*([A-Za-z .'-]+?)\s+regional\s+(\d)\b", re.I))                  # 2023: Greenville Regional 1
+
+
+def region_sites(ncaa: list[dict], names: list[str]) -> dict[str, str]:
+    """{region: host city} for the bracket's region headings. Numbered women's regions (2023 on) take the city from
+    ESPN's headline ("Regional 1 in Albany", "Greenville Regional 1"); a region already named for its host city
+    (women 2005-2022, when the NCAA named regionals that way, after canon.ncaa_regions has moved first-weekend sites
+    to their regional) is its own site; compass regions (East, Midwest, ...) have none."""
+    out: dict[str, str] = {}
+    for g in ncaa:
+        reg, note = g.get("region"), str(g.get("note") or "")
+        if not reg or reg in out or g.get("round") not in ("Sweet 16", "Elite 8"):
+            continue
+        for k, pat in enumerate(_SITE_PATTERNS):
+            m = pat.search(note)
+            if m:
+                num, city = (m.group(1), m.group(2)) if k == 0 else (m.group(2), m.group(1))
+                if reg == f"Regional {num}":
+                    out[reg] = city.strip().title()
+                break
+    compass = {"East", "West", "South", "Midwest", "Mideast", "Southeast", "Southwest"}
+    for n in names:
+        if n not in out and n not in compass and not re.match(r"^Regional \d$", str(n)):
+            out[n] = n
     return out
 
 
@@ -709,7 +741,7 @@ def bracket_payload(ctx: dict, s: int, sims: int) -> dict:
         regs = sim["regs"]
         ncaa = sorted((g for g in (st.get("games") or {}).values() if g.get("stype") == "ncaa"), key=lambda g: g.get("date") or "")
         actual = {"regions": _regions_payload(regs, af["regions"], teams), "games": [slim(card(ctx, s, g)) for g in ncaa],
-                  "first_four": af["first_four"], "champion": af["champion"]}
+                  "first_four": af["first_four"], "champion": af["champion"], "sites": region_sites(ncaa, af["regions"])}
         reach = sim["reach"]
         odds = {}
         for t, v in af["teams"].items():
@@ -1060,7 +1092,8 @@ def team_pages(ctx, s, sdir: Path, sims: int) -> int:
             page = {"ok": True, "id": t, "level": lv, "season": s, "team": team_rec(st, t),
                     "record": {k: stand.get(k) for k in ("w", "l", "conf_w", "conf_l", "home", "away", "neutral", "streak", "pf", "pa", "conf_rank")},
                     "rating": rt, "rating_path": b["paths"].get(t, []), "rank_history": rh,
-                    "schedule": [team_card(card(ctx, s, g)) if archive(ctx, s) else slim(card(ctx, s, g)) for g in by_t_games.get(t, [])], "stats": stats, "roster": roster,
+                    "schedule": None if archive(ctx, s) else PK.pack(slim(card(ctx, s, g)) for g in by_t_games.get(t, [])),
+                    "stats": stats, "roster": PK.pack(roster),
                     "roster_basis": basis, "units": us, "strengths": strengths, "needs": needs,
                     "moves": {"in": mv_in.get(t, []), "out": mv_out.get(t, [])},
                     "odds": (sim or {}).get("teams", {}).get(t) if sim else None, "suggestions": sugg,
@@ -1068,6 +1101,7 @@ def team_pages(ctx, s, sdir: Path, sims: int) -> int:
                                         "the transfer portal's actual entries, NIL, fit or availability."}
             if archive(ctx, s):
                 page.pop("rating_path")                # the page falls back to season.json rating_paths (size budget)
+                page.pop("schedule")                   # and to schedule.json for the team's games
             write(tdir / f"{t}.json", page)
             n += 1
         except Exception as exc:  # noqa: BLE001
@@ -1136,7 +1170,7 @@ def players_payload(ctx, s) -> dict:
             "metrics": [_metric(*m) for m in PLAYER_METRICS],
             "positions": {"G": {"label": "Guards", "n": posn.get("G", 0)}, "F": {"label": "Forwards", "n": posn.get("F", 0)},
                           "C": {"label": "Centers", "n": posn.get("C", 0)}},
-            "min_floor": floor, "params": pr["params"], "players": out, "compact": old}
+            "min_floor": floor, "params": pr["params"], "players": PK.pack_keyed(out), "compact": old}
 
 
 def value_row(r: dict, params: dict | None) -> dict:
@@ -1303,6 +1337,23 @@ def wp_model(margin: float, t: float, reg_s: float, mu: float, sd: float, ot_len
     return float(norm.cdf((margin + mu * f) / (sd * math.sqrt(f))))
 
 
+def thin_wp(series: list, eps: float = 0.01, cap: int = 300) -> list:
+    """A step series [[t, p]] without the points that move less than `eps` from the last one kept (first and last
+    always kept), at most `cap` points: ESPN's per-play curve drawn as the comparison line (size budget)."""
+    if len(series) <= 2:
+        return series
+    out = [series[0]]
+    for x in series[1:-1]:
+        if x[1] is not None and out[-1][1] is not None and abs(x[1] - out[-1][1]) < eps:
+            continue
+        out.append(x)
+    out.append(series[-1])
+    if len(out) > cap:
+        step = len(out) // cap + 1
+        out = out[:-1:step] + [out[-1]]
+    return out
+
+
 def game_page(ctx: dict, s: int, g: dict) -> dict:
     lv = ctx["level"]
     st = D.load(lv, s)
@@ -1319,8 +1370,11 @@ def game_page(ctx: dict, s: int, g: dict) -> dict:
             o["name"] = (players.get(str(row[0])) or {}).get("name")
             o["min"] = round((row[2] or 0) / 60.0, 1)
             rows.append(o)
-        box[t] = {"players": rows, "team": v.get("team"),
-                  "dnp": [{"player_id": d[0], "name": (players.get(str(d[0])) or {}).get("name"), "reason": d[1] if len(d) > 1 else None}
+        # box rows as arrays in store.BOX_COLS order with a names map, DNP rows as [id, name, reason] (size budget;
+        # the front end reads either form)
+        box[t] = {"players": [list(row[:len(ST.BOX_COLS)]) for row in v.get("players") or []],
+                  "names": {str(r["player_id"]): r["name"] for r in rows if r.get("name")}, "team": v.get("team"),
+                  "dnp": [[d[0], (players.get(str(d[0])) or {}).get("name"), d[1] if len(d) > 1 else None]
                           for d in v.get("dnp") or []]}
         top = sorted(rows, key=lambda r: -((r.get("pts") or 0) + 1.2 * ((r.get("oreb") or 0) + (r.get("dreb") or 0)) + 1.5 * (r.get("ast") or 0)))[:3]
         leaders[t] = [{"id": str(r["player_id"]), "name": r["name"],
@@ -1356,12 +1410,13 @@ def game_page(ctx: dict, s: int, g: dict) -> dict:
             ew = espn_wp.get(str(row[0]))
             if ew is not None:
                 we.append([round(t), r3(ew)])
-        if len(we) > 300:
-            step = len(we) // 300 + 1
-            we = we[::step] + [we[-1]]
+        we = thin_wp(we)
         flow = flow or None
         wp = {"model": wm, "espn": we or []}
-        plays = sorted(cand, key=lambda x: -abs(x["wpa"] or 0))[:12]
+        plays = sorted(cand, key=lambda x: -abs(x["wpa"] or 0))[:10]
+        for x in plays:
+            if isinstance(x.get("text"), str) and len(x["text"]) > 140:
+                x["text"] = x["text"][:139].rstrip() + "…"
     o = g.get("odds") or {}
     el = None
     tab = ctx["state"]["tabs"].get(s)
@@ -1375,7 +1430,8 @@ def game_page(ctx: dict, s: int, g: dict) -> dict:
             "pregame": {"model": mdl, "market": {**(game_market(lv, g) or {}), "ml_home": o.get("ml_home"), "ml_away": o.get("ml_away"),
                                                  "open_spread_home": o.get("open_spread_home"), "provider": o.get("provider")} if o else None,
                         "espn_predictor": pred, "elo_p_home": el},
-            "box": box, "team_stats": g.get("team_stats") or {}, "flow": flow, "wp": wp, "plays": plays, "leaders": leaders}
+            "box": box, "team_stats": {} if box and all((v.get("team") for v in box.values())) else (g.get("team_stats") or {}),
+            "flow": flow, "wp": wp, "plays": plays, "leaders": leaders}
 
 
 def game_pages(ctx, s, sdir: Path) -> int:
@@ -1411,6 +1467,70 @@ def game_pages(ctx, s, sdir: Path) -> int:
                 except OSError:
                     pass
     return n
+
+
+# ── format migration (seasons restored from the live site) ─────────────────
+
+def _read(p: Path) -> Any:
+    try:
+        with open(p, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return None
+
+
+def migrate(level: str, out_dir: Path | str, season: int) -> int:
+    """Upgrade an already written season folder to FORMAT in place, without the models: pack schedule.json,
+    players.json and the team pages' lists, drop archive team pages' schedules (and rating paths). CI rebuilds only the
+    newest seasons and restores the rest from the live site, so scripts/build_campus.py calls this on the others.
+    Returns the number of files rewritten (0 when the folder is already current or has no readable season.json)."""
+    lv = D.level_of(level)
+    s = int(season)
+    sdir = Path(out_dir) / lv / str(s)
+    sea = _read(sdir / "season.json")
+    if not isinstance(sea, dict) or sea.get("ok") is False or int(sea.get("fmt") or 1) >= FORMAT:
+        return 0
+    old = is_archive(lv, s)
+    n = 0
+    sch = _read(sdir / "schedule.json")
+    if isinstance(sch, dict) and isinstance(sch.get("games"), list):
+        sch["games"] = PK.pack(sch["games"])
+        write(sdir / "schedule.json", sch)
+        n += 1
+    pl = _read(sdir / "players.json")
+    if isinstance(pl, dict) and isinstance(pl.get("players"), dict) and not PK.is_packed(pl["players"]):
+        pl["players"] = PK.pack_keyed(pl["players"])
+        write(sdir / "players.json", pl)
+        n += 1
+    for f in sorted((sdir / "teams").glob("*.json")):
+        d = _read(f)
+        if not isinstance(d, dict) or d.get("ok") is False:
+            continue
+        if old:
+            d.pop("schedule", None)
+            d.pop("rating_path", None)
+        elif isinstance(d.get("schedule"), list):
+            d["schedule"] = PK.pack(d["schedule"])
+        if isinstance(d.get("roster"), list):
+            d["roster"] = PK.pack(d["roster"])
+        write(f, d)
+        n += 1
+    n += bracket_sites(sdir)
+    sea["fmt"] = FORMAT
+    write(sdir / "season.json", sea)
+    return n + 1
+
+
+def bracket_sites(sdir: Path) -> int:
+    """Add `actual.sites` (region_sites, from the bracket's own game notes) to a bracket.json written before it
+    existed; 1 when the file was rewritten."""
+    br = _read(sdir / "bracket.json")
+    act = (br or {}).get("actual") if isinstance(br, dict) else None
+    if not isinstance(act, dict) or "sites" in act or not act.get("regions"):
+        return 0
+    act["sites"] = region_sites(PK.unpack(act.get("games") or []), list(act["regions"]))
+    write(sdir / "bracket.json", br)
+    return 1
 
 
 # ── public: build one season ────────────────────────────────────────────────
@@ -1565,16 +1685,8 @@ def markets_payload(ctx: dict, season: int, markets: bool, sims: int) -> dict:
         except Exception as exc:  # noqa: BLE001
             logger.info("futures failed: %s", exc)
             fut = None
-        ch = (fut or {}).get("champion") if isinstance(fut, dict) else None
-        ks = ((ch or {}).get("by_source") or {}).get("kalshi") or {}
-        if isinstance(ch, dict) and not ch.get("available") and len(ks) >= 20:
-            # the pooled book is "thin" when Polymarket's overround pushes the implied total past the assembler's limit
-            # (21 Oct 2026: 1.40); Kalshi alone, normalised, is then the market line
-            tot = sum(v for v in ks.values() if isinstance(v, (int, float)))
-            if tot > 0:
-                ch["probs"] = {t: round(v / tot, 5) for t, v in ks.items() if isinstance(v, (int, float))}
-                ch["available"] = True
-                ch["fallback"] = f"Kalshi only, normalised from an implied total of {tot:.2f} ({ch.get('reason')})"
+        # each venue's book is judged on its own (sources/markets.py assemble): an overround Polymarket book no longer
+        # sinks a complete Kalshi one, so the champion line needs no Kalshi-only fallback here
     sim = season_sim(ctx, season, sims)
     model = {"champion": {}, "conference": {}, "ncaa": {}}
     if sim:
@@ -1691,8 +1803,8 @@ def career_files(ctx: dict, out: Path, current: int) -> int:
                     similar.append({"id": q, "name": rows_by[last][q]["name"], "season": last, "distance": r3(dvec[j])})
             page = {"ok": True, "id": p, "name": r["name"], "pos": r["pos"], "level": lv, "updated_at": now_iso(),
                     "class": info.get("class"), "height_in": info.get("height_in"), "weight_lb": info.get("weight_lb"),
-                    "hometown": info.get("hometown"), "seasons": seasons_rows,
-                    "current": {"season": ls, "team": r["team"], "log": log, "value": value_row(r, player_rows(ctx, ls)["params"]),
+                    "hometown": info.get("hometown"), "seasons": PK.pack(seasons_rows),
+                    "current": {"season": ls, "team": r["team"], "log": PK.pack(log), "value": value_row(r, player_rows(ctx, ls)["params"]),
                                 "fantasy": None},
                     "moves": mv_of.get(p, []), "similar": similar}
             write(pdir / f"{p}.json", page)

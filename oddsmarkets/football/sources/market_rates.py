@@ -160,12 +160,13 @@ def decay_factor(match_date: pd.Series, xi_fit: float | None, xi_mkt: float | No
 
 
 def market_rows(train_df: pd.DataFrame, slug: str, weight: float | None = None, xi_fit: float | None = None,
-                xi_mkt: float | None = None) -> pd.DataFrame:
+                xi_mkt: float | None = None, now: pd.Timestamp | None = None) -> pd.DataFrame:
     """Extra training rows (same columns as `train_df`) for the matches with a closing line.
 
     `xi_fit` is the decay of the Dixon-Coles fit the rows go into and `xi_mkt` the decay the
     market rows should have (see `decay_factor`). Defaults: `W_MKT`, `XI_MKT` and the fit's decay
-    from model_params.json (`fit_xi`)."""
+    from model_params.json (`fit_xi`). `now` is the time the decay is measured from (default: the
+    clock), and must be the same as the fit's `as_of` in a backtest."""
     weight = W_MKT if weight is None else weight
     xi_mkt = XI_MKT if xi_mkt is None else xi_mkt
     xi_fit = fit_xi(slug) if xi_fit is None else xi_fit
@@ -188,15 +189,19 @@ def market_rows(train_df: pd.DataFrame, slug: str, weight: float | None = None, 
     r = rates.loc[gid[hit]]
     extra["home_xg"] = r["mkt_h"].to_numpy()
     extra["away_xg"] = r["mkt_a"].to_numpy()
-    extra["weight"] = extra.get("weight", 1.0) * weight * decay_factor(extra["match_date"], xi_fit, xi_mkt)
+    extra["weight"] = extra.get("weight", 1.0) * weight * decay_factor(extra["match_date"], xi_fit, xi_mkt, now)
     extra["game_id"] = extra["game_id"].astype(str) + ":mkt"
     return extra
 
 
 def with_market_rows(train_df: pd.DataFrame, slug: str, weight: float | None = None, xi_fit: float | None = None,
-                     xi_mkt: float | None = None) -> pd.DataFrame:
-    """`train_df` plus its market rows (for the Dixon-Coles fit only, never for Elo or calibration)."""
-    extra = market_rows(train_df, slug, weight, xi_fit, xi_mkt)
+                     xi_mkt: float | None = None, now: pd.Timestamp | None = None) -> pd.DataFrame:
+    """`train_df` plus its market rows (for the Dixon-Coles fit only, never for Elo or calibration).
+
+    The build (`scripts/build_site_all.py`, `scripts/build_site_liga.py`) and the tuner
+    (`scripts/tune_league_models.py`) both build their Dixon-Coles frames through this function
+    (via `oddsmarkets.football.competitions.league.fitting`), so they cannot drift apart."""
+    extra = market_rows(train_df, slug, weight, xi_fit, xi_mkt, now)
     if not len(extra):
         return train_df
     logger.info("%s: %d market-rate rows added to the Dixon-Coles fit (%d matches)", slug, len(extra), len(train_df))

@@ -35,10 +35,23 @@ Polymarket tags "cfb" (365 open events), "cbb" (1), "ncaa" (5); no women's baske
     Kalshi  KXWMARMAD-27 champion (35 markets); KXWMARMADROUND-27{R32,R16,QF,SEMI}; KXNCAAWBWINS-26<TEAM>;
             KXNCAAWBGAME per game. Polymarket: nothing listed.
 
-Prices and the thin-market rule are Hardwood's (basketball/sources/markets.py, itself F1's): a price is the
-midpoint of a live two-sided quote; sources averaged per runner; a field market is published only when at least
-max(4, half the field) runners are accounted for and the implied total is within 0.8-1.3, then de-vigged. For a
-college champion market the field is the runners the markets list (not every FBS / D-I team).
+Prices are Hardwood's (basketball/sources/markets.py, itself F1's): a price is the midpoint of a live two-sided
+quote (spread at most 0.12); a runner with no bid and an ask of 2c or less is a floor runner (priced at about 0).
+The thin rule is college's own (`assemble`), one venue's book at a time, because college fields are long and
+mostly unquoted and the two venues quote very different subsets (21 Oct 2026, men's champion: Kalshi 56 runners
+quoted, implied total 1.02; Polymarket 33 quoted, 1.48, its tail mids sitting on 0.001-0.107 quotes):
+  * a book is usable when it accounts for (quotes, floors or has settled) at least max(4, half the field) runners
+    and its implied total is within BOOK_TOTAL (0.8-1.3). Below 0.8 runners are missing (a mostly unquoted
+    conference book sums to 0.1-0.7) and normalising would hand their mass to the quoted ones; up to 1.3 the
+    excess is overround and is removed by de-vigging; above, the book is not a price: Polymarket's 1.48 men's book
+    of 21 Oct 2026 put a de-vigged 0.231 on the ten runners Kalshi prices under 1% (Kalshi 0.052, a median 4.8
+    times Kalshi), noise in wide tail quotes rather than margin, and pooling it moved the second favourite from
+    13.2% to 11.0%;
+  * each usable book is de-vigged on its own: power when overround (the margin sits on the longshots, as with
+    these wide tail quotes), proportional when underround (the missing mass is the floor runners');
+  * the pooled price of a runner is the mean of its fair probabilities over the usable books that quote it,
+    renormalised to 1; a thin book never enters the pool (it stays in `by_source` and `books`).
+For a college champion market the field is the runners the markets list (not every FBS / D-I team).
 
 Names: Kalshi labels ("Ohio St.", "Miami (FL)", "Hawai'i") and Polymarket outcomes are matched to the store's
 member teams by folded location / short name / full name (with "St." -> "State"), then by the ticker's team code
@@ -55,6 +68,7 @@ from typing import Any
 
 from oddsmarkets.basketball.sources import markets as hwm
 from oddsmarkets.common import prediction_markets as cpm
+from oddsmarkets.common.edge import devig as dv
 
 from .. import canon
 
@@ -286,6 +300,134 @@ def _poly_find(events: list[dict], pattern: str, level: str, season: int) -> dic
     return None
 
 
+# ── field books (the thin rule) ─────────────────────────────────────────────
+
+BOOK_TOTAL = (0.8, 1.3)      # a usable book's implied total (sum of mids): below = runners missing, above = not a price
+BOOK_COMPLETE = 0.9          # a book this full is complete by mass, however few of the field it lists
+BOOK_MIN_RUNNERS = 4         # always at least this many runners accounted for; else max(this, half the field) or complete
+
+
+def book_check(src: dict, field: int) -> dict:
+    """One venue's book (its mids already limited to the field): {"quoted","accounted","implied_total","need",
+    "usable","reason"}. Usable = live quotes, an implied total within BOOK_TOTAL, and either max(4, half the field)
+    runners accounted for (quoted, floor or settled) or at least 4 with a total of BOOK_COMPLETE or more (Kalshi lists
+    only the live runners of a conference: 6 of 17 ACC teams on 21 Oct 2026, summing to 0.98)."""
+    elim = set(src.get("eliminated") or ())
+    mid = {r: p for r, p in (src.get("mid") or {}).items() if r not in elim}
+    accounted = set(mid) | set(src.get("floor") or ()) | elim
+    total = sum(mid.values())
+    need = max(BOOK_MIN_RUNNERS, field // 2)
+    lo, hi = BOOK_TOTAL
+    reason = None
+    if not mid:
+        reason = "no live quotes"
+    elif total < lo:
+        reason = f"implied total {total:.2f} with {len(mid)} of {field} runners quoted (below {lo}: runners missing)"
+    elif total > hi:
+        reason = f"implied total {total:.2f} (above {hi}: not a price)"
+    elif len(accounted) < BOOK_MIN_RUNNERS or (len(accounted) < need and total < BOOK_COMPLETE):
+        reason = f"{len(accounted)} of {field} runners accounted for (need {need}, or {BOOK_MIN_RUNNERS} with a total of {BOOK_COMPLETE})"
+    return {"quoted": len(mid), "accounted": len(accounted), "implied_total": round(total, 4), "need": need,
+            "usable": reason is None, "reason": reason}
+
+
+def book_fair(mid: dict[str, float]) -> dict[str, float]:
+    """De-vig one book: power when overround (the margin sits on the longshots), proportional when underround."""
+    ids = [r for r, p in mid.items() if p and 0 < p < 1]
+    if not ids:
+        return {}
+    q = [mid[r] for r in ids]
+    method = "power" if sum(q) > 1.0 else "multiplicative"
+    fair = dv.devig([1.0 / x for x in q], method)
+    return {r: float(f) for r, f in zip(ids, fair)}
+
+
+def pool_books(fairs: list[dict[str, float]], iters: int = 200, tol: float = 1e-10) -> dict[str, float]:
+    """Pool de-vigged books that quote different subsets of the field. A book's prices say how its own runners split
+    the mass it covers; the mass of the runners it does not quote comes from the pool. Fixed point of
+    p(r) = mean over books of [f_b(r) * (1 - sum of p over the runners b does not quote)] if b quotes r, else p(r).
+    One book = itself; books quoting the same runners = the plain mean."""
+    fairs = [f for f in fairs if f]
+    if not fairs:
+        return {}
+    runners = sorted({r for f in fairs for r in f})
+    p = {r: sum(f[r] for f in fairs if r in f) / sum(1 for f in fairs if r in f) for r in runners}
+    z = sum(p.values())
+    p = {r: v / z for r, v in p.items()}
+    for _ in range(iters):
+        new = dict.fromkeys(runners, 0.0)
+        for f in fairs:
+            out = sum(p[r] for r in runners if r not in f)
+            for r in runners:
+                new[r] += (f[r] * (1.0 - out) if r in f else p[r]) / len(fairs)
+        z = sum(new.values())
+        new = {r: v / z for r, v in new.items()}
+        done = max(abs(new[r] - p[r]) for r in runners) < tol
+        p = new
+        if done:
+            break
+    return p
+
+
+def assemble(sources: dict[str, dict], ids=None, kind: str = "", markets: dict | None = None) -> dict:
+    """
+    TITLE (Hardwood's shape): {"available","reason","probs","mid","odds","sources","by_source","floor","eliminated",
+    "unmatched","field","quoted","accounted","implied_total","overround","markets","kind"} plus
+    "books": {venue: book_check(...)}, "used": [venues pooled] and, when a venue was left out, "note".
+    `ids` None = the field is every runner any venue lists. Each venue is judged on its own; only usable books are
+    de-vigged and pooled (module docstring). `quoted` / `accounted` / `implied_total` / `mid` describe the pooled
+    usable books (every book when none is usable).
+    """
+    floor, elim, unmatched, winner = set(), set(), [], None
+    for src in sources.values():
+        floor |= set(src.get("floor") or ())
+        elim |= set(src.get("eliminated") or ())
+        unmatched += list(src.get("unmatched") or [])
+        winner = winner or src.get("winner")
+    if ids is None:
+        ids = sorted({r for v in sources.values() for r in v.get("mid") or {}} | floor | elim)
+    ids = list(ids)
+    keep = set(ids)
+    floor &= keep
+    elim &= keep
+    # each venue's book on the field only (a conference market can list a non-member)
+    books_in = {k: {"mid": {r: p for r, p in (v.get("mid") or {}).items() if r in keep and r not in elim},
+                    "floor": set(v.get("floor") or ()) & keep, "eliminated": set(v.get("eliminated") or ()) & keep}
+                for k, v in sources.items()}
+    books = {k: book_check(v, len(ids)) for k, v in books_in.items()}
+    used = sorted(k for k, b in books.items() if b["usable"])
+    raw: dict[str, list[float]] = {}
+    for k in used or sorted(sources):
+        for r, p in books_in[k]["mid"].items():
+            raw.setdefault(r, []).append(p)
+    mid = {r: sum(ps) / len(ps) for r, ps in raw.items()}
+    floor = floor - set(mid)
+    total = sum(mid.values())
+    accounted = set(mid) | floor | elim
+    by_source = {k: {r: round(p, 4) for r, p in (v.get("mid") or {}).items()} for k, v in sources.items()}
+    base = {"kind": kind, "markets": markets or {}, "field": len(ids), "quoted": len(mid), "accounted": len(accounted),
+            "implied_total": round(total, 4), "overround": round(total - 1.0, 4), "unmatched": sorted(set(unmatched)),
+            "sources": sorted(sources), "by_source": by_source, "eliminated": sorted(elim), "floor": sorted(floor),
+            "books": books, "used": used}
+    mid_out = {k: round(v, 4) for k, v in mid.items()}
+    if winner:
+        return {**base, "available": False, "reason": f"settled: {winner} won", "probs": {}, "mid": {}, "winner": winner}
+    if not used:
+        why = "; ".join(f"{k} {b['reason']}" for k, b in sorted(books.items())) or "no books"
+        return {**base, "available": False, "reason": f"thin: {why}", "probs": {}, "mid": mid_out}
+    pooled = pool_books([book_fair(books_in[k]["mid"]) for k in used])
+    probs = {r: round(f, 5) for r, f in pooled.items()}
+    for r in floor | elim:
+        probs.setdefault(r, 0.0)
+    probs = dict(sorted(probs.items(), key=lambda kv: -kv[1]))
+    out = {**base, "available": bool(pooled), "reason": None if pooled else "no quoted runner in the field",
+           "probs": probs, "mid": mid_out, "odds": {r: round(1.0 / p, 4) for r, p in mid.items() if p > 0}}
+    left = [k for k in sorted(books) if k not in used]
+    if left:
+        out["note"] = "thin book left out: " + "; ".join(f"{k} {books[k]['reason']}" for k in left)
+    return out
+
+
 # ── public ──────────────────────────────────────────────────────────────────
 
 def _title(level, season, series, pattern, ids, mapper, kind, poly_events, suffix="", ykind="champion") -> dict:
@@ -301,8 +443,8 @@ def _title(level, season, series, pattern, ids, mapper, kind, poly_events, suffi
             mk["polymarket"] = pev.get("slug")
         if not sources:
             return {"kind": kind, "available": False, "reason": "no market listed", "probs": {}, "sources": [], "by_source": {},
-                    "implied_total": None}
-        return _clean_unmatched(hwm.assemble(sources, ids, kind, mk))
+                    "implied_total": None, "books": {}, "used": []}
+        return _clean_unmatched(assemble(sources, ids, kind, mk))
     except Exception as exc:  # noqa: BLE001
         logger.info("college title %s %s failed: %s", level, kind, exc)
         return {"kind": kind, "available": False, "reason": f"error: {exc}", "probs": {}}

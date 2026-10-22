@@ -338,11 +338,13 @@ selection + bracket), `players.py` (value, positions, transfers, units, suggesti
 - Caches: `data/college/cache/hoops/{fits,walk}/` keyed on store content (sha1 of the bytes) and model versions,
   no paths. A full both-level build takes about 25 minutes on one core per level (walks 3-5 minutes per level when
   the stores change).
-- Payload sizes (21 Oct 2026 build): mbb 243 MB, wbb 204 MB (budget 250 each). `write` retries `os.replace` on a
+- Payload sizes (21 Oct 2026 build): mbb 243 MB, wbb 204 MB (budget 250 each); 22 Oct 2026, format 2: 136 and 114. `write` retries `os.replace` on a
   Windows sharing lock (a reader holding a payload made one build fail once).
-- `markets.json`: when `sources/markets.py` flags the pooled champion book thin (men, 21 Oct: Polymarket's overround
-  gives an implied total of 1.40), the payload fills `champion.probs` from Kalshi alone, normalised, and says so in
-  `champion.fallback` (builder A may want to revisit the thin rule for college futures).
+- `markets.json`: `sources/markets.py` judges each venue's field book on its own (usable = implied total 0.8-1.3
+  and max(4, half the field) runners accounted for, or 4 or more at a total of 0.9 or more), de-vigs each usable
+  book and pools only those; TITLE gains `books`, `used` and `note` (22 Oct 2026; the Kalshi-only fallback is gone).
+- Size (22 Oct 2026): past seasons compact (`is_archive`: every season before the current one), packed lists and
+  slimmer game pages (payload format 2, PAYLOADS.md "Packed lists"); `migrate` upgrades restored seasons.
 
 ## 4. Site and build (builder D)
 

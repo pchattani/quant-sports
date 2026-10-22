@@ -117,7 +117,7 @@ minimise  -sum_i w_i * ll_i  +  ridge * (sum att^2 + sum def^2)
 
 The ridge is not scaled by the number of matches and does not apply to `home_adv` or `rho`. Because the time weights shrink as the data ages while the ridge stays fixed, the effective regularisation strengthens with wall-clock time. Section 14 covers the consequence.
 
-**Fitting.** `scipy.optimize.minimize(method="L-BFGS-B")` with numerical gradients (no `jac` is supplied). Options: `maxiter=5000`, `maxfun=max(50000, 200*n_params)`, `ftol=1e-8`. Starting point: all team parameters 0, `home_adv=0.1`, `rho=-0.1`. Bounds: `rho` in [-0.99, 0], `home_adv` free. A non-converged fit logs a warning and is still used.
+**Fitting.** `scipy.optimize.minimize(method="L-BFGS-B")` with numerical gradients (no `jac` is supplied). Options: `maxiter=5000`, `maxfun=max(50000, 200*n_params)`, `ftol=1e-8`. Starting point: all team parameters 0, `home_adv=0.1`, `rho=-0.1`. Bounds: `rho` in [-0.99, 0], `home_adv` free. A non-converged fit logs a warning and is still used. With `fixed_rho=r` (opt-in, since 22 October 2026) rho starts at `r` and its bounds are `[r, r]`, so it is held there; every club fit passes it (section 2.4).
 
 ### 2.3 Prediction
 
@@ -130,13 +130,14 @@ The ridge is not scaled by the number of matches and does not apply to `home_adv
 | `xi` (daily decay) | 0.0018 | `model_params.json`: 0.0035 in every league since 21 October 2026 (it was 0.001 to 0.008 per league); pooled 0.0035; own-fit cups 0.0035; international 0.002 |
 | `ridge` | 1.0 | 1.0 in every league since 21 October 2026 (it was 0.25 to 2.0); pooled 1.0; cups 1.0; international 1.0 |
 | `max_goals` | 8 | `LeagueConfig`, `CupConfig`, `LigaConfig` all 8 |
-| rho bounds | [-0.99, 0] | fixed |
+| rho | fitted in [-0.99, 0] | club fits (leagues' own, pooled, Argentina) hold `dixon_coles_rho` from `model_params.json` since 22 October 2026: -0.0454; World Cup, international and cups' own fits still fit it |
 | minimum rows to fit | 50 (league, cup own fit, Liga, pooled); 30 (international) | build code |
 
 With xi = 0.0035 the half-life is ln 2 / 0.0035, about 198 days. With xi = 0.008 it is about 87 days.
 
 **Caveats.**
 - `rho` is identified only by goals rows. When every row carries xG, rho stays at its starting value. The current `nations.json` reports `rho = -0.1` exactly, which fits this pattern.
+- **Club fits until 22 October 2026.** Nearly every league match in a store now carries Sofascore xG (Premier League, LaLiga: 0 of 450-469 rows without it; Bundesliga and Liga MX 2; Belgium 4; Eredivisie 12), and the market-rate rows are xG-path rows too. So rho was never estimated: it sat at the starting -0.1 (LaLiga, Serie A, Brasileirão), or a handful of goals rows pushed it to a bound (Liga MX 0; Belgium -0.99, where `EnsembleModel._adaptive_dc_weight` drops the Dixon-Coles side, so Belgium was priced by Elo alone), or the matches without xG set it (Eredivisie, 12 matches: -0.005; Argentina, 228: -0.18); the pooled fit, with cup goals rows, gave -0.0136. The optimiser was not at fault: with xG stripped the same frames give rho -0.03 to -0.19, identical with the analytic and numeric gradients. Since 22 October the club fits hold one rho estimated separately (`oddsmarkets/football/competitions/league/fitting.py`, `club_rho`): the maximum-likelihood rho of the low-score correction (`dixon_coles.estimate_rho`) over every match of the 35 football-data leagues in seasons 2014-2025 (132,114 matches), given the walk-forward model's goal rates; `scripts/football_models_oct.py rhofit` writes it. Chosen on 2014-2018 against rho -0.1, 0, per-league estimates and an in-fit estimate; on the 2019/20+ test seasons it beat production's rho values of 21 October by 0.00044 nats (95% CI 0.00008 to 0.00082; draw log-loss and draw ECE better). It did not beat a plain -0.1 (`docs/research/football_edge.md`, "Round 2").
 - The fit has no neutral-venue term. Neutral matches (tournament finals, neutral cup rounds, the international tournaments) are fitted with `home_adv` credited to whichever side the feed lists as home. Neutrality is honoured only at prediction time and in the Elo replay.
 - For about 530 clubs the pooled fit has roughly 1,060 parameters. With finite-difference gradients it was the slowest step of the build (about ten minutes on this PC). Since 2 October 2026 the build's fits (pooled, the leagues' own fits and Argentina) pass `analytic_grad=True`, which hands L-BFGS-B the exact gradient of the same objective: the pooled fit takes about a second and lands on the same optimum (parameters within about 1e-4). The class default is still the finite-difference path, so the World Cup build and the golden test are unchanged.
 
@@ -153,9 +154,9 @@ With xi = 0.0035 the half-life is ln 2 / 0.0035, about 198 days. With xi = 0.008
 | 20 football-data divisions, gap to the snapshot (n 46,398) | +0.0115 | +0.0047 (0.0037 to 0.0057) |
 | paired change, site's 12 (n 31,127) | | log-loss -0.0075 (-0.0087 to -0.0064), Brier -0.0049 (-0.0057 to -0.0042) |
 
-Every one of 35 leagues improved. The model still trails the snapshot, the close and the Kalshi/Polymarket prices; a walk-forward recalibration and a stack with a goals-only fit were tested and not adopted (no significant gain; the totals recalibration lost on the test seasons). **Caution:** `scripts/tune_league_models.py` does not include the market rows in its folds; re-running it would put back the long decays and Elo shares that lose with the rows in.
+Every one of 35 leagues improved. The model still trails the snapshot, the close and the Kalshi/Polymarket prices; a walk-forward recalibration and a stack with a goals-only fit were tested and not adopted (no significant gain; the totals recalibration lost on the test seasons). Since 22 October 2026 `scripts/tune_league_models.py` fits the same rows in its folds (section 5.1); before, a re-run would have put back the long decays and Elo shares that lose with the rows in.
 
-- Where: `pooled_training_frame` (league parts) and `build_model`'s own fit in `scripts/build_site_all.py`, and the Argentine fit in `scripts/build_site_liga.py`. The rows go to the Dixon-Coles fit only; Elo, `empirical_calibration` and the seeding read the plain one-row-per-match frame.
+- Where: `pooled_training_frame` (league parts) and `build_model`'s own fit in `scripts/build_site_all.py`, and the Argentine fit in `scripts/build_site_liga.py`, all through `oddsmarkets/football/competitions/league/fitting.py` (`dc_frame`, `pooled_part`, `new_dc`), which passes the fit's own xi as `xi_fit` (equal to `fit_xi`). The rows go to the Dixon-Coles fit only; Elo, `empirical_calibration` and the seeding read the plain one-row-per-match frame.
 - Leagues: the twelve with a football-data file (not the Saudi Pro League); fixtures are matched to Sofascore events by day and score (`football_data.map_to_sofascore`).
 - No leakage: only closing prices of matches already played enter a fit.
 - Why: in the walk-forward backtest (2019/20 onwards, production parameters, all twelve leagues, 30,854 matches) it cut the 1X2 log-loss by 0.0079 (95% CI 0.0065 to 0.0092) and improved every league. See `docs/research/football_edge.md`.
@@ -288,6 +289,10 @@ A fixture is priced as neutral if the raw match has `neutral` set, or if the com
 
 **Metric:** walk-forward three-way log-loss on each league's own matches. The Brier score is also reported. Walk-forward means expanding-window folds: `min_train=200` and `folds=6`, with fold step `(n - 200) // 6`. Each fold fits DC and replays Elo on `df.iloc[:s]` and scores `df.iloc[s:e]`. Elo in folds is seeded by points per game over the training window, the closest stand-in for last season's table.
 
+**Same model as the build (since 22 October 2026).** Every fold's Dixon-Coles frame and fit come from `oddsmarkets/football/competitions/league/fitting.py`, the module the build uses (`dc_frame`, `pooled_part`, `new_dc`, `fit_dc`): the market-rate rows at `W_MKT` with their own decay `XI_MKT`, measured against the candidate xi; the analytic gradient; rho held at `club_rho()` (section 2.4). No look-ahead inside a fold: a fold starts at 00:00 UTC of a day (`_day_folds`), its training rows are the matches of earlier days, the decay of goals and market rows alike is measured from that instant (`as_of`/`now`), and the draw rate and goal scale come from the training rows (before, `empirical_calibration` read the whole frame and the decay ran from the wall clock, which in a backtest would shrink a fold's market rows against its goals rows by exp(-0.0265 x the days between the fold and today)). `--no-market-rates` reproduces the old plain-frame folds. `tests/test_tuner_production.py` pins all of this (the fold frame equals `market_rates.with_market_rows(..., xi_fit=xi, now=as_of)`, the constants are read live, the build's fits go through the same functions, folds see nothing from the scored day).
+
+**Incumbent rule (since 22 October 2026).** A re-run keeps the parameters on file, per league and for the `pooled` block, unless its new choice beats them on the same matches with a paired 95% CI (block bootstrap by week) that excludes zero; `--no-incumbent` chooses afresh. Each entry records the new choice as `challenger` with its gain and CI. Reason: two seasons of one league (250-400 scored matches) cannot overturn settings chosen and tested on a decade of football-data history. The 22 October re-run (market rows in, rho -0.0454) kept every league's parameters and the pooled block: the fresh choices sit on the grid edges (xi 0.001 or 0.008, dc_weight 0.65-0.8), and none beats the file beyond noise (for example Serie A -0.0087, CI -0.0220 to +0.0042; Bundesliga -0.0104, -0.0302 to +0.0096; pooled xi 0.002 v 0.0035: -0.00003, -0.00011 to +0.00005). Scored in the walk-forward harness, those fresh choices lose to the file's: +0.0019 nats (95% CI 0.0007 to 0.0032, 2015-2018, n 9,926) and +0.0028 (0.0019 to 0.0038, 2019/20 on, n 20,049); Serie A's Elo share costs +0.016 on the test seasons (`docs/research/football_edge.md`, "Round 2").
+
 **Staged grid search.** Stage A fits DC alone (xi x ridge at dc_weight 1). Stage B fits Elo alone (HA x K at dc_weight 0). Stage C searches the blend weight. The staging ignores interactions between the stages.
 
 | Grid | Values |
@@ -309,7 +314,7 @@ Where the pooled fit ran, all methods are re-scored on the pooled test rows so t
 
 **Selection.** `global` is the reference. `pooled`, then `per-league`, replaces the current choice only if it beats that choice by `margin = 0.002` log-loss. The winner must also beat the better of two baselines: uniform (ln 3 = 1.0986) and a home-advantage-only prior (H/D/A frequencies over the first 200 rows). Otherwise `method = "default"` with `DEFAULTS`.
 
-**Output.** `oddsmarkets/football/competitions/league/data/model_params.json` (tuned 2026-09-22; on 21 October 2026 the own-fit leagues' xi, ridge and dc_weight were set by hand to 0.0035 / 1.0 / 1.0, section 2.5; the table shows the tuner's values, kept in the file as `params_before_oct2026`):
+**Output.** `oddsmarkets/football/competitions/league/data/model_params.json`, with a `fit` block recording the market-row constants, rho and the incumbent rule of the run (re-run 2026-10-22, every league kept; on 21 October 2026 the own-fit leagues' xi, ridge and dc_weight had been set to 0.0035 / 1.0 / 1.0, section 2.5). The table shows the 22 September tuner's values, kept in the file as `params_before_oct2026`:
 
 | League | Method | xi | ridge | Elo HA | K | dc_weight | log-loss | best baseline | n_eval |
 |---|---|---|---|---|---|---|---|---|---|
@@ -327,13 +332,13 @@ Where the pooled fit ran, all methods are re-scored on the pooled test rows so t
 | liga-mx | per-league | 0.005 | 2.0 | 50 | 15 | 0.8 | 1.04789 | 1.0687 | 216 |
 | belgian-pro-league | per-league | 0.001 | 0.25 | 30 | 20 | 0.8 | 0.96908 | 1.06616 | 184 |
 
-The file's `global` set is xi 0.002, ridge 2.0, HA 50, K 30, dc_weight 1.0. Its `pooled` set is xi 0.0035, ridge 1.0, HA 50, K 30, dc_weight 1.0.
+The file's `pooled` set is xi 0.0035, ridge 1.0, HA 50, K 30, dc_weight 1.0. Its `global` set (the reference for a partial `--league` run only; no league uses it) is the 22 October re-run's fresh choice, xi 0.008, ridge 2.0, HA 50, K 15, dc_weight 1.0. The file also holds `dixon_coles_rho` (section 2.4).
 
 **How the build reads it.** `model_params_for(slug)` in `scripts/build_site_all.py` returns `{**DEFAULT_PARAMS, **tuned["params"]}` and the method, or `DEFAULT_PARAMS` with `"default"`. `DEFAULT_PARAMS = {elo_home_advantage 65.0, k_league 20, dc_weight 0.80, ridge 0.5, xi 0.0035}`, the same as the tuner's `DEFAULTS`.
 
 A league whose method is `pooled` uses `LeagueView` over the build's pooled fit, whose xi and ridge come from the file's `pooled` block. If that fit is unavailable, the league falls back to its own fit with the same params and reports `"pooled (fit unavailable; own fit)"`.
 
-`scripts/build_site_liga.py` starts from its own constants (`ELO_HOME_ADVANTAGE 70`, `ELO_K_LEAGUE 20`, `DC_WEIGHT 0.80`, `DC_RIDGE 0.5`, `DC_XI 0.0035`) and overrides them with the `liga-argentina` entry when present. The effective Argentine model is therefore xi 0.008, ridge 2.0, HA 70, K 30, dc_weight 0.8.
+`scripts/build_site_liga.py` starts from its own constants (`ELO_HOME_ADVANTAGE 70`, `ELO_K_LEAGUE 20`, `DC_WEIGHT 0.80`, `DC_RIDGE 0.5`, `DC_XI 0.0035`) and overrides them with the `liga-argentina` entry when present. The effective Argentine model is therefore xi 0.0035, ridge 1.0, HA 70, K 30, dc_weight 1.0 (since 21 October 2026; xi 0.008, ridge 2.0, dc_weight 0.8 before), with rho held at `dixon_coles_rho`.
 
 ### 5.2 `scripts/tune_liga_model.py` (Argentina, older standalone tuner)
 
@@ -355,7 +360,7 @@ Tables are derived from the match dump and checked for points conservation (`che
 
 ### 5.4 Tests
 
-`tests/test_backfill_and_tuning.py` covers the offline pieces of `backfill_liga_history.py` and `tune_liga_model.py`: points tables, the consistency check, promedio accumulation, the log-loss and Brier edge cases (uniform = ln 3, finite at p = 0), outcome encoding and baselines. `tune_league_models.py` has no direct tests.
+`tests/test_backfill_and_tuning.py` covers the offline pieces of `backfill_liga_history.py` and `tune_liga_model.py`: points tables, the consistency check, promedio accumulation, the log-loss and Brier edge cases (uniform = ln 3, finite at p = 0), outcome encoding and baselines. `tests/test_tuner_production.py` guards `tune_league_models.py` against drifting from the build (section 5.1) and covers `estimate_rho` and `fixed_rho`.
 
 ---
 

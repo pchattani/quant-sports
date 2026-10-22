@@ -81,6 +81,9 @@ def signature(year: int, rnd: int, kind: str, n: int) -> str:
         try:
             from oddsmarkets.f1.models import race_sim as _rsm
             h.update(f"T{_rsm.win_temp_post(year, rnd):.4f}".encode())
+            s = _rsm.pace_spread_post(year, rnd)                 # strength scale (off unless the fitted file has one)
+            if s != 1.0:
+                h.update(f"S{s:.4f}".encode())
         except Exception:                                        # pragma: no cover - defensive
             pass
         h.update(json.dumps([(r.get("driver"), r.get("position")) for r in race.get("qualifying") or []] +
