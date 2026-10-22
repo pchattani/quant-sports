@@ -7,11 +7,13 @@ priced through the exact match chain (`match_chain.py`).
    probabilities p_i = point_prob_from_hold(h_i) feed the chain, giving sr_p = P(player 1 wins).
 2. Elo: elo_p = elo.p_win(r1, r2, surface, best_of, params).
 3. Blend at the win-probability logit with fitted weights (no intercept; the model is symmetric):
-       logit p = w_elo * logit(elo_p) + w_sr * logit(sr_p) + w_gelo * gelo_diff + w_mr * mr_diff
+       logit p = w_elo * logit(elo_p) + w_sr * logit(sr_p) + w_gelo * gelo_diff + w_mr * mr_diff + sum_k w_k x_k
    where gelo_diff is the game-share Elo difference (gelo.py, a margin-of-victory rating; 0 when either player
    has never been rated) and mr_diff the market-rating difference on the match's logit scale (mrating.py: the
    players' strengths learnt from earlier matches' closing prices and results; a player never seen takes the
-   unranked prior). w_gelo / w_mr are 0 (the term off) unless the committed fit carries them.
+   unranked prior), and x the schedule and form terms of sched.py (rest, matches in 30 days, ranking points,
+   form, retirement in the last match, head to head; weights "w_x"). w_gelo / w_mr / w_x are 0 (the term off)
+   unless the committed fit carries them.
    `blend_w` = w_elo / (w_elo + w_sr) is the Elo share and w_elo + w_sr the sharpness. The weights are
    fitted by maximum likelihood on walk-forward predictions (backtest.py) and committed per tour in
    models/fitted/predict_<tour>.json; DEFAULT_BLEND applies until then.
@@ -95,25 +97,31 @@ def blend_params(tour: str) -> dict:
     if isinstance(f, dict) and "w_elo" in f and "w_sr" in f:
         return {"w_elo": float(f["w_elo"]), "w_sr": float(f["w_sr"]), "w_gelo": float(f.get("w_gelo") or 0.0),
                 "w_mr": float(f.get("w_mr") or 0.0),
+                "w_x": {k: float(v) for k, v in (f.get("w_x") or {}).items()},
                 "sigma": float(f["sigma"]) if f.get("sigma") is not None else DEFAULT_BLEND[t]["sigma"],
                 "version": f.get("version", VERSION), "fitted": True}
     return {**DEFAULT_BLEND[t], "version": VERSION, "fitted": False}
 
 
-def blend(elo_p, sr_p, w_elo: float, w_sr: float, gdiff=None, w_gelo: float = 0.0, mdiff=None, w_mr: float = 0.0):
+def blend(elo_p, sr_p, w_elo: float, w_sr: float, gdiff=None, w_gelo: float = 0.0, mdiff=None, w_mr: float = 0.0,
+          xdot=None):
+    """`xdot` = sum_k w_k x_k of the schedule and form terms (sched.dot), already weighted."""
     z = w_elo * logit(elo_p) + w_sr * logit(sr_p)
     if gdiff is not None and w_gelo:
         z = z + w_gelo * np.asarray(gdiff, float)
     if mdiff is not None and w_mr:
         z = z + w_mr * np.asarray(mdiff, float)
+    if xdot is not None:
+        z = z + np.asarray(xdot, float)
     return sigmoid(z)
 
 
 def fit_blend(elo_p: Iterable[float], sr_p: Iterable[float], y: Iterable[int], ridge: float = 1e-3,
-              gdiff: Iterable[float] | None = None, mdiff: Iterable[float] | None = None) -> dict:
-    """Max-likelihood (w_elo, w_sr[, w_gelo][, w_mr]) for logit p = w_elo logit(elo) + w_sr logit(sr)
-    [+ w_gelo gdiff] [+ w_mr mdiff] (Newton, tiny ridge). Without `gdiff` / `mdiff` the result has no "w_gelo" /
-    "w_mr" key."""
+              gdiff: Iterable[float] | None = None, mdiff: Iterable[float] | None = None,
+              xmat: Iterable[Iterable[float]] | None = None, x_ridge: float = 1.0) -> dict:
+    """Max-likelihood (w_elo, w_sr[, w_gelo][, w_mr][, w_x]) for logit p = w_elo logit(elo) + w_sr logit(sr)
+    [+ w_gelo gdiff] [+ w_mr mdiff] [+ sum_k w_k x_k] (Newton; tiny ridge, `x_ridge` on the schedule terms as in the
+    research spec R4). Without `gdiff` / `mdiff` / `xmat` the result has no "w_gelo" / "w_mr" / "w_x" key."""
     cols = [logit(list(elo_p)), logit(list(sr_p))]
     names = ["w_elo", "w_sr"]
     if gdiff is not None:
@@ -122,16 +130,27 @@ def fit_blend(elo_p: Iterable[float], sr_p: Iterable[float], y: Iterable[int], r
     if mdiff is not None:
         cols.append(np.asarray(list(mdiff), float))
         names.append("w_mr")
+    nx = 0
+    if xmat is not None:
+        from oddsmarkets.tennis.models import sched as SC
+        xm = np.asarray([list(r) for r in xmat], float).reshape(-1, len(SC.FEATS))
+        nx = xm.shape[1]
+        for j in range(nx):
+            cols.append(xm[:, j])
+            names.append("x:" + SC.FEATS[j])
     X = np.column_stack(cols)
     k = X.shape[1]
+    rv = np.full(k, ridge)
+    if nx:
+        rv[k - nx:] = x_ridge
     yy = np.asarray(list(y), float)
     if len(yy) < 50:
         return {"w_elo": None, "w_sr": None, "n": int(len(yy))}
     w = np.array([0.5, 0.5] + [0.0] * (k - 2))
     for _ in range(50):
         p = sigmoid(X @ w)
-        g = X.T @ (yy - p) - ridge * w
-        Hm = -(X.T * (p * (1 - p))) @ X - ridge * np.eye(k)
+        g = X.T @ (yy - p) - rv * w
+        Hm = -(X.T * (p * (1 - p))) @ X - np.diag(rv)
         step = np.linalg.solve(Hm, g)
         w = w - step
         if np.max(np.abs(step)) < 1e-9:
@@ -140,7 +159,10 @@ def fit_blend(elo_p: Iterable[float], sr_p: Iterable[float], y: Iterable[int], r
     ll = float(-np.mean(yy * np.log(p) + (1 - yy) * np.log(1 - p)))
     out = {"w_elo": float(w[0]), "w_sr": float(w[1]), "n": int(len(yy)), "logloss": round(ll, 5)}
     for nm, v in zip(names[2:], w[2:]):
-        out[nm] = float(v)
+        if nm.startswith("x:"):
+            out.setdefault("w_x", {})[nm[2:]] = float(v)
+        else:
+            out[nm] = float(v)
     return out
 
 
@@ -170,7 +192,8 @@ class Context:
     def __init__(self, tour: str, when: Any = None, elo_ratings: dict | None = None, elo_params: dict | None = None,
                  elo_mod=None, sr_model: dict | None = None, sr_mod=None, blend: dict | None = None,
                  p_srv_fn=None, elo_fn=None, gelo_ratings: dict | None = None, gelo_params: dict | None = None,
-                 gelo_fn=None, mr_states: dict | None = None, mr_params: dict | None = None, mr_fn=None):
+                 gelo_fn=None, mr_states: dict | None = None, mr_params: dict | None = None, mr_fn=None,
+                 sched: dict | None = None, x_fn=None, assumed: bool = False):
         self.tour = _io.tour_key(tour)
         self.date = _io.day(when)
         self.elo_ratings = elo_ratings
@@ -187,6 +210,25 @@ class Context:
         self.mr_states = mr_states
         self.mr_params = mr_params
         self.mr_fn = mr_fn
+        self.sched = sched              # sched.history(): "current" states and "h2h" tallies
+        self.x_fn = x_fn
+        self.assumed = assumed          # simulators: future rounds on an assumed schedule (sched.py)
+
+    # schedule and form terms (sched.py), for player 1; zeros when unavailable
+    def x_vec(self, p1: str, p2: str, when: Any = None, pts1: Any = None, pts2: Any = None,
+              assumed: bool | None = None) -> list[float]:
+        if self.x_fn is not None:
+            v = self.x_fn(p1, p2, when)
+            if v is not None:
+                return list(v)
+        if not self.sched:
+            return [0.0] * 6
+        from oddsmarkets.tennis.models import sched as SC
+        cur = self.sched.get("current") or {}
+        h12, h21 = SC.h2h_counts(self.sched, p1, p2)
+        d = _io.day(when) or self.date
+        asm = self.assumed if assumed is None else assumed
+        return SC.features(cur.get(p1), cur.get(p2), h12, h21, d.toordinal() if d else None, pts1, pts2, assumed=asm)
 
     # market rating, on the match's logit scale (0 when unavailable: the blend then has no market term)
     def mr_diff(self, p1: str, p2: str, surface: str, best_of: int) -> float:
@@ -280,6 +322,16 @@ def _mr_state(tour: str) -> tuple:
         return None, None
 
 
+def _sched_state(tour: str) -> dict | None:
+    """sched.history() of every row on disk (current states and head-to-head tallies); None when unavailable."""
+    try:
+        from oddsmarkets.tennis.models import sched as SC
+        return SC.history(tour)
+    except Exception as exc:  # noqa: BLE001
+        logger.info("tennis predict: schedule terms failed (%s)", exc)
+        return None
+
+
 def _gelo_state(tour: str, when) -> tuple:
     """(ratings before `when`, params) of the game-share Elo; (None, None) when unavailable."""
     try:
@@ -308,6 +360,8 @@ def context(tour: str, when: Any = None, **kw) -> Context:
         gk["gelo_ratings"], gk["gelo_params"] = _gelo_state(t, d)
     if "mr_states" not in kw and "mr_fn" not in kw and blend_params(t).get("w_mr"):
         gk["mr_states"], gk["mr_params"] = _mr_state(t)
+    if "sched" not in kw and "x_fn" not in kw and blend_params(t).get("w_x"):
+        gk["sched"] = _sched_state(t)
     ctx = Context(t, d, elo_ratings=rt, elo_params=prm, elo_mod=E, sr_model=srm, sr_mod=S, **gk, **kw)
     if not kw:
         _CTX[key] = ctx
@@ -335,6 +389,15 @@ def predict_many(ctx: Context, rows: list[dict], with_dist: bool = True, shift: 
     w_m = float(ctx.blend.get("w_mr") or 0.0)
     md = (np.array([ctx.mr_diff(r["p1"], r["p2"], r.get("surface"), 5 if int(r.get("best_of") or 3) == 5 else 3)
                     for r in rows]) if w_m else np.zeros(n))
+    w_x = ctx.blend.get("w_x") or {}
+    xv = [None] * n
+    xd = np.zeros(n)
+    if w_x:
+        from oddsmarkets.tennis.models import sched as SC
+        for i, r in enumerate(rows):
+            xv[i] = r.get("x") if r.get("x") is not None else ctx.x_vec(r["p1"], r["p2"], r.get("date"), r.get("pts1"),
+                                                                        r.get("pts2"), r.get("assumed"))
+            xd[i] = SC.dot(xv[i], w_x)
     has_sr = np.zeros(n, bool)
     for i, r in enumerate(rows):
         bo = 5 if int(r.get("best_of") or 3) == 5 else 3
@@ -360,7 +423,7 @@ def predict_many(ctx: Context, rows: list[dict], with_dist: bool = True, shift: 
         e = elo[ix]
         hs = has_sr[ix]
         he = np.isfinite(e)
-        p = np.where(he & hs, blend(np.where(he, e, 0.5), sr_p, w_elo, w_sr, gd[ix], w_g, md[ix], w_m),
+        p = np.where(he & hs, blend(np.where(he, e, 0.5), sr_p, w_elo, w_sr, gd[ix], w_g, md[ix], w_m, xd[ix]),
                      np.where(he, np.where(he, e, 0.5), np.where(hs, sr_p, 0.5)))
         # the serve-point edge that reproduces the blended P(win) (skipped when only probabilities are wanted)
         delta = mc.solve_shift(p, pa[ix], pb[ix], bo, rule) if (shift or with_dist) else np.zeros(len(ix))
@@ -381,8 +444,10 @@ def predict_many(ctx: Context, rows: list[dict], with_dist: bool = True, shift: 
                       "p_srv_sr": [float(pa[i]), float(pb[i])] if has_sr[i] else None,
                       "elo_p": float(e[k]) if he[k] else None, "sr_p": float(sr_p[k]) if hs[k] else None,
                       "blend_w": round(w_elo / (w_elo + w_sr), 4) if (w_elo + w_sr) else None,
-                      "blend": {"w_elo": w_elo, "w_sr": w_sr, "w_gelo": w_g, "w_mr": w_m}, "gelo_diff": float(gd[i]),
-                      "mr_diff": float(md[i]), "basis": "blend" if (he[k] and hs[k]) else
+                      "blend": {"w_elo": w_elo, "w_sr": w_sr, "w_gelo": w_g, "w_mr": w_m, "w_x": w_x},
+                      "gelo_diff": float(gd[i]),
+                      "mr_diff": float(md[i]), "x": ([round(float(v), 4) for v in xv[i]] if xv[i] is not None else None),
+                      "x_dot": float(xd[i]), "basis": "blend" if (he[k] and hs[k]) else
                       ("elo" if he[k] else ("serve_return" if hs[k] else "none")),
                       "best_of": bo, "final_set_rule": rule, "dist": d, "version": VERSION}
     return out  # type: ignore[return-value]
@@ -407,8 +472,9 @@ def prob_matrix(ctx: Context, pids: list[str], surface: str, best_of: int, level
     if n < 2:
         return P
     iu, ju = np.triu_indices(n, 1)
+    # simulated rounds have no known day: the schedule terms take the assumed schedule (sched.py)
     rows = [{"p1": pids[i], "p2": pids[j], "surface": surface, "best_of": best_of, "level": level,
-             "final_set_rule": final_set_rule, "indoor": bool(indoor)} for i, j in zip(iu, ju)]
+             "final_set_rule": final_set_rule, "indoor": bool(indoor), "assumed": True} for i, j in zip(iu, ju)]
     res = predict_many(ctx, rows, with_dist=False, shift=False)
     pw = np.array([r["p1_win"] for r in res])
     P[iu, ju] = pw

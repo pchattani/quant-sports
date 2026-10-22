@@ -11,6 +11,8 @@ game order within sets is reconstructed (the path says so) unless the source giv
 """
 from __future__ import annotations
 
+import math
+
 import logging
 from collections import defaultdict
 from datetime import date, timedelta
@@ -73,9 +75,11 @@ def predictions(td: an.TourData, matches: list[dict], with_dist: bool = False) -
         if exact_m:
             kw["exact_mr"] = exact_m
         ctx = td.context(cp, exact_elo=exact or None, **kw)
+        use_x = hasattr(td, "x_pre")
         rows = [{"p1": m["p1"], "p2": m["p2"], "surface": m.get("surface") or "hard", "best_of": int(m.get("best_of") or 3),
                  "level": m.get("level") or "250", "indoor": bool(m.get("indoor")), "final_set_rule": an.chain_rule(m),
-                 "date": m.get("date"),
+                 "date": m.get("date"), "pts1": m.get("pts1"), "pts2": m.get("pts2"),
+                 "x": td.x_pre(m) if use_x else None,       # exact schedule / form terms (sched.py) when on
                  "tid": (m.get("event") or "").rsplit("-", 1)[0]} for m in ms]
         try:
             res = P.predict_many(ctx, rows, with_dist=with_dist)
@@ -113,7 +117,9 @@ def card(td: an.TourData, m: dict, pred: dict | None = None, market: dict | None
               ([market.get("basis")] if market.get("basis") else []), "basis": market.get("basis")}
     return {"id": m["id"], "event": m.get("event"), "round": m.get("round"), "date": m.get("date"), "status": m.get("status"),
             "p1": m.get("p1"), "p2": m.get("p2"), "n": [td.short(m.get("p1")), td.short(m.get("p2"))], "winner": m.get("winner"),
-            "sets": m.get("sets") or [], "live": m.get("live"), "model": model, "market": mk, "wp_now": an.prob(wp_now)}
+            "sets": m.get("sets") or [], "live": m.get("live"), "model": model, "market": mk, "wp_now": an.prob(wp_now),
+            # the day is known, the start time is not (no order of play yet): the design kit shows "TBA"
+            **({"tba": True} if m.get("status") in ("upcoming", None) and len(str(m.get("date") or "")) <= 10 else {})}
 
 
 def wp_path(m: dict, pred: dict | None) -> dict | None:
@@ -198,6 +204,11 @@ def build_match(td: an.TourData, m: dict, pred: dict | None, market: dict | None
         pre["model"] = {"p1_win": an.prob(pred.get("p1_win")), "p_srv": [an.rnd(x, 4) for x in pred.get("p_srv") or []],
                         "elo_p": an.prob(pred.get("elo_p")), "sr_p": an.prob(pred.get("sr_p")), "blend_w": pred.get("blend_w"),
                         "basis": pred.get("basis"), "as_of": pred.get("_ctx_date"), "version": pred.get("version"),
+                        # the market rating alone (its own logistic) and the schedule / form terms' log-odds shift
+                        "mr_p": (an.prob(1.0 / (1.0 + math.exp(-float(pred["mr_diff"]))))
+                                 if (pred.get("blend") or {}).get("w_mr") and pred.get("mr_diff") is not None else None),
+                        "x_dot": an.rnd(pred.get("x_dot"), 4) if (pred.get("blend") or {}).get("w_x") else None,
+                        "x": pred.get("x") if (pred.get("blend") or {}).get("w_x") else None,
                         "dist": _dist_out(pred.get("dist"))}
     pth = wp_path(m, pred)
     wp = None
@@ -206,6 +217,10 @@ def build_match(td: an.TourData, m: dict, pred: dict | None, market: dict | None
               for s in pth.get("steps") or []]
     awards = match_awards(m, pred, pth)
     st = m.get("stats") if isinstance(m.get("stats"), dict) else None
+    st_src = "wta" if st else None
+    ch = td.charted_for(m["id"]) if hasattr(td, "charted_for") else None
+    if st is None and ch and ch.get("stats"):
+        st, st_src = ch["stats"], "charting"          # charted point by point (Match Charting Project)
     return {"ok": True, "tour": td.tour, "id": m["id"], "event": m.get("event"), "event_name": ev.get("name"), "level": m.get("level"),
             "round": m.get("round"), "date": m.get("date"), "surface": surf, "indoor": bool(m.get("indoor")),
             "best_of": int(m.get("best_of") or 3), "final_set_rule": an.chain_rule(m), "status": m.get("status"),
@@ -214,8 +229,9 @@ def build_match(td: an.TourData, m: dict, pred: dict | None, market: dict | None
             "duration_min": m.get("duration_min"), "pre": pre, "wp": wp,
             "wp_reconstructed": (pth or {}).get("reconstructed"),
             "swings": (pth or {}).get("swings") or [], "excitement": an.rnd((pth or {}).get("excitement"), 3),
-            "comeback": (pth or {}).get("comeback"), "stats": st, "inferred": {"hold": holds, "spw": spw},
-            "charting": None, "style_charted": [p1 in td.style, p2 in td.style], "awards": awards,
+            "comeback": (pth or {}).get("comeback"), "stats": st, "stats_source": st_src,
+            "inferred": {"hold": holds, "spw": spw},
+            "charting": (ch or {}).get("charting"), "style_charted": [p1 in td.style, p2 in td.style], "awards": awards,
             "sources": m.get("sources") or [], "updated_at": an.now()}
 
 

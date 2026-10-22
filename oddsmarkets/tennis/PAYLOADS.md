@@ -83,7 +83,8 @@ of the last `--match-page-years` (2) years. Event pages: tour-level events of th
 A thin field is `available: false` with the reason and still lists `by_source` mids. **BINARY** (per-player yes markets:
 `finals_qual`, `top10`, `slams_<next season>`): `{"available","probs": {pid: mean mid, not de-vigged},"by_source","implied_total",...}`.
 
-**MATCH_CARD** adds `"n": [short1, short2]`; `market` = `{"p1","sources": [names],"basis"}` | null. Schedule cards are light
+**MATCH_CARD** adds `"n": [short1, short2]`; `market` = `{"p1","sources": [names],"basis"}` | null; `"tba": true` on an
+upcoming match whose date carries no start time (the design kit shows "TBA"). Schedule cards are light
 (`model` = `{"p1"}`; before the page window the p is Elo's). Cards in an event page's `draw.matches` add
 `"node": [round_index, node_index]` (round 0 = `draw.rounds[0]`; node k of round r covers first-round slots
 k·2^(r+1) … (k+1)·2^(r+1)−1, 0-based).
@@ -108,7 +109,9 @@ from last season's calendar carry last season's name and start + 364 days); `mar
 "year_end_no1": TITLE, "finals_winner": TITLE, "top10": BINARY}` (each may be null).
 
 **elo.json**: `history` rows are `[date, all, surface]` (surface = the match's surface string), last 5 years, top 100 current
-players; adds `"params"` (Elo constants), `"as_of"`, `"history_from"`.
+players; adds `"params"` (Elo constants), `"as_of"`, `"history_from"`. `current[pid]` adds `"g"` (game-share Elo [all, hard,
+clay, grass]) and, when the tour's price carries the market rating, `"m"` = the market rating R + D_surface for [hard, clay,
+grass] (models/mrating.py; the H2H page prices with it, weights in `model.json` "market").
 
 **players.json** (also `data/<T>/<year>/players.json` per year; `data/<T>/players.json` = the current year): top level adds
 `"floor"` (matches to be `qualified`, scaled to the share of the season played, min 8) and `"surface_floor"`
@@ -137,7 +140,8 @@ validation block.
 
 **Match centre** adds `names {pid: name}`, `event_name`, `level`, `indoor`, `final_set_rule`, `ranks [r1, r2]`, `score`,
 `live`, `wp_reconstructed`, `style_charted [bool, bool]`, `sources`. `pre.model` = `{"p1_win","p_srv","elo_p","sr_p","blend_w",
-"basis","as_of" (the fit's checkpoint date),"version","dist": {"p1_win","sets": {"2-0": p},"games": {n: p},"handicap": {k: p},
+"basis","as_of" (the fit's checkpoint date),"version","mr_p" (the market rating alone, when the price carries it),"x_dot"
+(the schedule and form terms' log-odds shift, models/sched.py, when on),"x" ([rest, m30, pts, form, ret, h2h] for p1),"dist": {"p1_win","sets": {"2-0": p},"games": {n: p},"handicap": {k: p},
 "p_tiebreak","p_straight","exp_games","best_of","final_set_rule"}}`; `pre.elo` = `{"p","p1": {"all","surface"},"p2": {...},
 "surface"}` (ratings before the match); `pre.sr` = `{"p_srv": [..],"hold": [calibrated],"spw": [calibrated]}`; `pre.h2h` =
 `{"w","l","last": [[date, event, round, winner_pid, score from p1's view]]}` (before this match, newest first, 5);
@@ -145,8 +149,11 @@ validation block.
 `wp` rows `[game_index, set, games_p1, games_p2, p1_wp]` (game_index 0 = pre-match; the last row of a finished match is 0/1);
 `swings` = `[{"i","set","sets","games","kind","winner": 0|1,"delta"}]`; `comeback` = `{"winner": 0|1,"min_p","at","sets","games"}`;
 `awards` = `{"upset": {"winner","p"},"comeback": {"winner","min_p","sets","games"},"dominant": {"winner","games_share"},
-"tiebreaks": [{"set","winner","p1_exp"}]}` (each key only when it applies); `charting` null (per-match charting is not
-published; the career `style` profile is).
+"tiebreaks": [{"set","winner","p1_exp"}]}` (each key only when it applies). `stats` (STATS per side and `by_set`) comes from
+the WTA API (`stats_source` "wta"), else, for a match the Match Charting Project charted (the last two seasons, both tours),
+from its points (`stats_source` "charting"; analytics/charted.py); `charting` = `{"points","serve_dir": {"p1"|"p2": {"wide",
+"body","t"} shares of first serves},"rally": {"p1"|"p2": {"1-3","4-6","7-9","10+": share of those points won}},"outcomes":
+{"p1"|"p2": {"winners","ufe","fe","aces"}},"net": {"p1"|"p2": [net points, won]}}` for a charted match, else null.
 
 **Event page** adds `"qualifying": [cards]`, `"names": {pid: short}`; `event` adds `id`, `runner_up`, `round_now`; `draw` adds
 `size`, `source` ("wta" | "reconstructed" | "results"), `complete`; draw slots whose player the source left out (seeds with

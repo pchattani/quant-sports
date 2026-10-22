@@ -138,6 +138,20 @@ def build_elo(td: an.TourData, history_top: int = 100, history_years: int = 5) -
                 current[p]["g"] = [round(float(g[k]), 4) for k in ("all", "hard", "clay", "grass")]
     except Exception:  # noqa: BLE001
         pass
+    # market rating by surface [hard, clay, grass] = R + D_surface (models/mrating.py; the site's match price adds
+    # w_mr s_b (M1 - M2), and the H2H page prices with it when both players carry "m")
+    try:
+        from oddsmarkets.tennis.models import mrating as MRt
+        from oddsmarkets.tennis.models import predict as P
+        if P.blend_params(td.tour).get("w_mr"):
+            mh = td.mrating
+            ms, mp = mh.get("current") or {}, mh.get("params")
+            for p in order:
+                st = ms.get(p)
+                if st:
+                    current[p]["m"] = [round(MRt.rating(st, s, mp), 3) for s in ("hard", "clay", "grass")]
+    except Exception:  # noqa: BLE001
+        pass
     # all-time peaks: each player's best rating (post-match) on each scale, with at least 20 rated matches
     best: dict[str, dict[str, tuple]] = {k: {} for k in ("all", "hard", "clay", "grass")}
     for g in td.elo.get("rows") or []:

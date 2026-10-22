@@ -213,8 +213,9 @@ def test_careers_and_elo_payloads(ace_world):
     e = RK.build_elo(td)
     assert set(e) >= {"current", "peaks", "history"} and set(e["peaks"]) == {"all", "hard", "clay", "grass"}
     top = next(iter(e["current"].values()))
-    assert set(top) - {"g"} == {"all", "hard", "clay", "grass", "n", "rank"}
+    assert set(top) - {"g", "m"} == {"all", "hard", "clay", "grass", "n", "rank"}
     assert "g" not in top or len(top["g"]) == 4                  # game-share Elo [all, hard, clay, grass]
+    assert "m" not in top or len(top["m"]) == 3                  # market rating [hard, clay, grass]
 
 
 # ── draws with null seeded slots, implausible source dates (fixes found on real data) ───────────────

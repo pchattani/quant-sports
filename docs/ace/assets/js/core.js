@@ -693,8 +693,9 @@ function awardValue(a) {
   if (isNum(a.p) && a.p < 1) return 'won from ' + pct(a.p, 0) + ' pre-match';
   if (isNum(a.wins_over_exp)) return signed(a.wins_over_exp, 2) + ' wins over expected';
   if (isNum(a.tb_w) && isNum(a.tb_l)) return a.tb_w + '-' + a.tb_l + ' in tiebreaks';
+  if (isNum(a.games_share)) return pct(a.games_share, 0) + ' of the games';
   if (isNum(a.value)) return num(a.value, 2);
-  const k = Object.keys(a).find(x => isNum(a[x]) && x !== 'set');
+  const k = Object.keys(a).find(x => isNum(a[x]) && x !== 'set' && x !== 'winner' && x !== 'pid');
   return k ? titleCase(k) + ' ' + (Math.abs(a[k]) <= 1 && !Number.isInteger(a[k]) ? pct(a[k], 0) : num(a[k], Number.isInteger(a[k]) ? 0 : 2)) : '';
 }
 /* A market TITLE dict -> {pid: p} (de-vigged "probs", else "prices", else the raw "mid"); {} when unavailable. */
@@ -826,7 +827,7 @@ function matchCard(c, opts) {
   let badge;
   if (live) badge = '<span class="qk-badge live">Live' + (lv && lv.set ? ' · Set ' + lv.set : '') + '</span>';
   else if (fin) badge = '<span class="qk-badge final">' + (st === 'ret' ? 'Ret.' : st === 'wo' ? 'W/O' : 'Final') + '</span>';
-  else badge = '<span class="qk-badge">' + esc((o.date !== false ? fmtDate(c.date, { year: false, weekday: false }) + ' ' : '') + (fmtTime(c.date) || '')) + '</span>';
+  else badge = '<span class="qk-badge">' + esc((o.date !== false ? fmtDate(c.date, { year: false, weekday: false }) + ' ' : '') + (fmtTime(c.date) || (c.tba || (c.date && String(c.date).length <= 10) ? 'TBA' : ''))) + '</span>';
   const tag = (o.event !== false ? eventName(T, c.event) + ' · ' : '') + roundLabel(c.round, true);
   const A = playerObj(T, c.p1), B = playerObj(T, c.p2);
   const bar = !fin && pShow !== null && window.QK ? QK.probBar(pShow, null, 1 - pShow, A, B) : '';

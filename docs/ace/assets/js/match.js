@@ -89,7 +89,7 @@ function inferredBlock(T, d) {
     (d.sets && d.sets.length ? vsRow('Sets', won[0], won[1], 'int') + vsRow('Games', games[0], games[1], 'int') : '') + '</div>' +
     '<div class="label-note"><span class="scope-tag inferred">inferred</span> ' + (d.stats && d.stats.p1
       ? 'The model’s pre-match expectations, inferred from game and set scores across each player’s matches. The real point-by-point numbers for this match are below.'
-      : 'No point-by-point statistics exist for this match' + (TA.state.tour === 'atp' ? ' (the ATP publishes none we can use)' : '') +
+      : 'No point-by-point statistics exist for this match' + (TA.state.tour === 'atp' ? ' (the ATP publishes none we can use; ATP matches the Match Charting Project has charted show its numbers)' : '') +
         '. These numbers are the model’s serve and return strengths, inferred from game and set scores across each player’s matches — estimates, not measurements.') + '</div>';
 }
 
@@ -183,8 +183,14 @@ function preBoxes(T, d) {
   h += box('Market', mk && isNum(mk.p1) ? TA.pct(pf(mk.p1), 0) : '—', mk && isNum(mk.p1) ? 'de-vigged · ' + esc(TA.sourceNames(mk.sources).join(', ')) + ' · edge ' + TA.edgeHTML(pf(p1), pf(mk.p1)) : 'no live market price');
   h += box('Closing odds', isNum(ps) ? TA.pct(pf(ps), 0) : (isNum(avg) ? TA.pct(pf(avg), 0) : '—'),
     isNum(ps) ? 'Pinnacle ' + esc((cl.ps || []).join(' / ')) + (isNum(avg) ? ' · average ' + TA.pct(pf(avg), 0) : '') : (isNum(avg) ? 'bookmaker average' : 'after the match, from tennis-data.co.uk'));
-  h += box('Components', isNum(m.elo_p) ? TA.pct(pf(m.elo_p), 0) + ' <span class="muted-inline">/</span> ' + TA.pct(pf(m.sr_p), 0) : '—',
-    'Elo only / serve-return only, for ' + esc(TA.playerSurname(T, fav)) + (isNum(m.blend_w) ? ' · blend weight on Elo ' + TA.num(m.blend_w, 2) : ''));
+  const sl = ' <span class="muted-inline">/</span> ';
+  // schedule and form (rest, recent load, ranking points, form, a retirement last time, head to head): the price
+  // with them minus the price without them, for the favourite
+  const xs = isNum(m.x_dot) && isNum(p1) && m.x_dot !== 0 ? pf(p1) - pf(1 / (1 + Math.exp(-(Math.log(p1 / (1 - p1)) - m.x_dot)))) : null;
+  h += box('Components', isNum(m.elo_p) ? TA.pct(pf(m.elo_p), 0) + sl + TA.pct(pf(m.sr_p), 0) + (isNum(m.mr_p) ? sl + TA.pct(pf(m.mr_p), 0) : '') : '—',
+    (isNum(m.mr_p) ? 'Elo / serve-return / market rating alone' : 'Elo only / serve-return only') + ', for ' + esc(TA.playerSurname(T, fav)) +
+    (isNum(xs) ? ' · schedule and form ' + TA.signed(100 * xs, 1) + ' pts' : '') +
+    (!isNum(m.mr_p) && isNum(m.blend_w) ? ' · blend weight on Elo ' + TA.num(m.blend_w, 2) : ''));
   return '<div class="pre-grid">' + h + '</div>';
 }
 
@@ -255,7 +261,9 @@ function render(el, params) {
     // ── stats
     if (d.stats && d.stats.p1) {
       const sets = (d.stats.by_set || []).map(x => x.set);
-      html += TA.card('Match statistics', '<span class="scope-tag real">real</span> point by point, from the WTA',
+      html += TA.card('Match statistics', d.stats_source === 'charting' ?
+        '<span class="scope-tag charted">charted</span> point by point, from the <a href="https://github.com/JeffSackmann/tennis_MatchChartingProject" target="_blank" rel="noopener">Match Charting Project</a> (CC BY-NC-SA 4.0)' :
+        '<span class="scope-tag real">real</span> point by point, from the WTA',
         (sets.length ? '<div class="toggle-row" id="mt-st">' + TA.toggles([{ key: 'all', label: 'Match' }].concat(sets.map(s => ({ key: String(s), label: 'Set ' + s }))), 'all', 'data-st') + '</div>' : '') + '<div id="mt-stats"></div>');
     }
     html += chartingBlock(T, d);

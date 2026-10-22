@@ -44,7 +44,12 @@ function modelConsts(mj) {
   SURFS.forEach(s => { surfOff[s] = term[s] - mean; });
   const ref = (b.ref || {}).all || {};
   const h0 = k.isNum(b.mu) ? k.sigmoid(b.mu + mean + num(ref.s, 0) - num(ref.r, 0) + num(b.k_hold, 0)) : null;
-  return { w_surf: e.w_surf, bo5: e.bo5, blend: { w_elo: bl.w_elo, w_sr: bl.w_sr, w_gelo: num(bl.w_gelo, 0), gelo_w_surf: num(bl.gelo_w_surf, 0), sigma: num(bl.sigma, 0), fitted: !!bl.fitted, version: bl.version },
+  // The site's match price adds the market rating (model.json "market": its own weights for all four terms, and the
+  // best-of-5 scale s5); used when both players carry a market rating in elo.json ("m": hard, clay, grass).
+  const mk = mj.market || {}, mp = mk.params || {};
+  const market = (k.isNum(mk.w_mr) && k.isNum(mk.w_elo) && k.isNum(mk.w_sr)) ?
+    { w_elo: mk.w_elo, w_sr: mk.w_sr, w_gelo: num(mk.w_gelo, 0), w_mr: mk.w_mr, s5: num(mp.s5, 1) } : null;
+  return { w_surf: e.w_surf, bo5: e.bo5, blend: { w_elo: bl.w_elo, w_sr: bl.w_sr, w_gelo: num(bl.w_gelo, 0), gelo_w_surf: num(bl.gelo_w_surf, 0), sigma: num(bl.sigma, 0), fitted: !!bl.fitted, version: bl.version }, market: market,
     surfOff: surfOff, hold_bo5: num(b.bo5, 0), k_hold: num(b.k_hold, 0), base_spw: mj.base_spw || {}, h0: h0,
     through: (mj.serve_return || {}).through, as_of: mj.as_of };
 }
@@ -99,7 +104,15 @@ function matchupModel(T, ctx, A, B, surface, bestOf, rule) {
   const gA = eA && eA.g, gB = eB && eB.g, si = { hard: 1, clay: 2, grass: 3 }[surface] || 1;
   const gm = g => bl.gelo_w_surf * g[si] + (1 - bl.gelo_w_surf) * g[0];
   out.gelo_diff = (bl.w_gelo && gA && gB) ? gm(gA) - gm(gB) : 0;
-  if (k.isNum(out.elo_p) && k.isNum(out.sr_p)) { out.p = k.sigmoid(bl.w_elo * k.logit(out.elo_p) + bl.w_sr * k.logit(out.sr_p) + bl.w_gelo * out.gelo_diff); out.basis = 'blend'; }
+  // Market rating (models/mrating.py; elo.json current 'm' = [hard, clay, grass], R + D_surface), on the match's
+  // logit scale (s5 for best of five).
+  const mA = eA && eA.m, mB = eB && eB.m, mi = { hard: 0, clay: 1, grass: 2 }[surface] || 0, mk = M.market;
+  if (mk && mA && mB && k.isNum(mA[mi]) && k.isNum(mB[mi])) out.mr_diff = (bestOf === 5 ? mk.s5 : 1) * (mA[mi] - mB[mi]);
+  if (k.isNum(out.elo_p) && k.isNum(out.sr_p) && k.isNum(out.mr_diff)) {
+    out.p = k.sigmoid(mk.w_elo * k.logit(out.elo_p) + mk.w_sr * k.logit(out.sr_p) + mk.w_gelo * out.gelo_diff + mk.w_mr * out.mr_diff);
+    out.basis = 'market'; out.mr_p = k.sigmoid(out.mr_diff);
+  }
+  else if (k.isNum(out.elo_p) && k.isNum(out.sr_p)) { out.p = k.sigmoid(bl.w_elo * k.logit(out.elo_p) + bl.w_sr * k.logit(out.sr_p) + bl.w_gelo * out.gelo_diff); out.basis = 'blend'; }
   else if (k.isNum(out.elo_p)) { out.p = out.elo_p; out.basis = 'elo'; }
   else if (k.isNum(out.sr_p)) { out.p = out.sr_p; out.basis = 'serve/return'; }
   if (k.isNum(out.p)) {
@@ -236,17 +249,19 @@ function build(T, a, b, res, body) {
     });
     host.innerHTML = '<div class="af-odds">' + ms.map(m => '<div class="af-odds-col" style="--sc:' + k.surfColour(m.surface) + '"><div class="af-odds-h">' + k.SURF_LABEL[m.surface] + '</div>' +
       (k.isNum(m.p) ? '<div class="af-odds-p"><span class="a">' + k.pct(m.p, 0) + '</span><span class="b">' + k.pct(1 - m.p, 0) + '</span></div><div class="cmp-wins"><span class="a" style="width:' + (100 * m.p).toFixed(1) + '%"></span><span class="b" style="width:' + (100 * (1 - m.p)).toFixed(1) + '%"></span></div>' +
-        '<div class="af-odds-sub">Elo ' + k.pct(m.elo_p, 0) + ' · serve/return ' + k.pct(m.sr_p, 0) + '</div>' +
+        '<div class="af-odds-sub">Elo ' + k.pct(m.elo_p, 0) + ' · serve/return ' + k.pct(m.sr_p, 0) + (m.basis === 'market' ? ' · market rating ' + k.pct(m.mr_p, 0) : '') + '</div>' +
         (m.dist ? '<div class="af-odds-sub">straight sets ' + k.pct(m.dist.straight, 0) + ' · ' + k.num(m.dist.games, 1) + ' games</div>' : '') : k.muted('No price.')) + '</div>').join('') + '</div>' +
       '<div id="h2-sets" style="height:300px"></div>' +
       k.table([{ label: 'Set score (' + sA + ' first)' }].concat(ms.map(m => ({ label: k.SURF_LABEL[m.surface], align: 'right' }))),
         keys.map(s => [{ v: s, html: '<strong>' + k.esc(s) + '</strong> <span class="muted-inline">' + (Number(s.split('-')[0]) > Number(s.split('-')[1]) ? sA : sB) + '</span>' }].concat(ms.map(m => ({ v: m.dist ? m.dist.sets[s] : null, html: m.dist ? k.pct(m.dist.sets[s], 1) : '—' })))), { compact: true }) +
       '<div class="pg-note">Computed in the browser with the model\'s recipe and the ' + k.TN(T) + '\'s fitted constants (data/' + T + '/model.json' + (M.as_of ? ', ' + k.esc(M.as_of) : '') + '): Elo on the surface-blended ratings (surface weight ' + k.num(M.w_surf, 3) + (bo === 5 ? ', best-of-5 stretch ' + k.num(M.bo5, 3) : '') + '), the serve/return chain fed with each player\'s hold against this opponent (chain scale' + (M.k_hold ? ', k<sub>hold</sub> ' + k.signed(M.k_hold, 3) : '') + (bo === 5 ? ', best-of-5 term ' + k.signed(M.hold_bo5, 3) : '') + '), ' +
-      'blended as logit p = ' + k.num(M.blend.w_elo, 3) + ' × logit(Elo) + ' + k.num(M.blend.w_sr, 3) + ' × logit(serve/return)' + (M.blend.w_gelo ? ' + ' + k.num(M.blend.w_gelo, 3) + ' × the game-share Elo difference' : '') + ', then the serve-point probabilities shifted so the chain reproduces that price; the set scores come from the chain averaged over a per-match edge with σ = ' + k.num(M.blend.sigma, 2) + ', the first server a coin toss. ' +
+      (ms.some(m => m.basis === 'market') ?
+        'blended as the match centre does, logit p = ' + k.num(M.market.w_elo, 3) + ' × logit(Elo) + ' + k.num(M.market.w_sr, 3) + ' × logit(serve/return) + ' + k.num(M.market.w_gelo, 3) + ' × the game-share Elo difference + ' + k.num(M.market.w_mr, 3) + ' × the market-rating difference (each player’s strength as earlier matches’ closing prices rated it' + (bo === 5 ? ', × ' + k.num(M.market.s5, 2) + ' for best of five' : '') + '; <a href="#/methodology/models">market rating</a>)' :
+        'blended as logit p = ' + k.num(M.blend.w_elo, 3) + ' × logit(Elo) + ' + k.num(M.blend.w_sr, 3) + ' × logit(serve/return)' + (M.blend.w_gelo ? ' + ' + k.num(M.blend.w_gelo, 3) + ' × the game-share Elo difference' : '') + (M.market ? ' (the fundamental weights: one of the two has no market rating yet)' : '')) + ', then the serve-point probabilities shifted so the chain reproduces that price; the set scores come from the chain averaged over a per-match edge with σ = ' + k.num(M.blend.sigma, 2) + ', the first server a coin toss. ' +
       'It uses the latest published hold and break per surface, so it can differ by a point or two from a match-centre price. <a href="#/methodology/match-chain">How the chain works →</a></div>';
     if (keys.length) {
       k.plot('h2-sets', ms.filter(m => m.dist).map(m => ({ type: 'bar', name: k.SURF_LABEL[m.surface], x: keys, y: keys.map(s => m.dist.sets[s]), marker: { color: k.surfColour(m.surface) }, hovertemplate: k.SURF_LABEL[m.surface] + ' %{x}: %{y:.1%}<extra></extra>' })),
-        k.layout(Object.assign(k.legendTop(), { barmode: 'group', margin: { l: 44, r: 10, t: 30, b: 40 }, xaxis: { type: 'category', title: 'Sets (' + sA + '–' + sB + ')' }, yaxis: { tickformat: '.0%' } })));
+        k.layout(Object.assign(k.legendTop(), { barmode: 'group', margin: { l: 44, r: 10, t: 30, b: 40 }, xaxis: { type: 'category', title: 'Sets (' + sA + '–' + sB + ')' }, yaxis: { title: 'Probability', tickformat: '.0%' } })));
     }
     drawSR(ms);
   };

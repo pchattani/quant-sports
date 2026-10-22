@@ -240,6 +240,8 @@ def predictions(tour: str, matches: list[dict], years: Iterable[int], refit_days
     mpre = MRt.pre_match(mh)
     mprm = mh.get("params") or MRt.params(t)
     pre = E.pre_match(hist) if E is not None else {}
+    from oddsmarkets.tennis.models import sched as SC
+    xpre = SC.history(t, matches=matches, elo_pre=pre)["pre"] if SC.on(t) else {}
     consts = S.constants(t) if (S is not None and hasattr(S, "constants")) else {}
     rated = [m for m in matches if m.get("status") in _io.RATED_STATUS]
     rated_days = sorted(_io.day(m["date"]).toordinal() for m in rated if _io.day(m.get("date")))
@@ -312,6 +314,7 @@ def predictions(tour: str, matches: list[dict], years: Iterable[int], refit_days
                    "elo": e, "sr": float(srp[j]) if math.isfinite(srp[j]) else None,
                    "gelo": float(gpre.get(m["id"]) or 0.0),
                    "mr": MRt.scale(m.get("best_of"), mprm) * float(mpre.get(m["id"]) or 0.0),
+                   **({"x": xpre.get(m["id"])} if xpre else {}),
                    "pa": float(pa[j]) if has[j] else None, "pb": float(pb[j]) if has[j] else None,
                    "rank_x": rx, "books": {k_: v for k_, v in books.items() if v is not None},
                    "obs": observed(m), "flip": fl, "p1": m["p1"], "p2": m["p2"],
@@ -334,6 +337,12 @@ def _morient(r: dict) -> float:
     """The row's market-rating difference in its random orientation."""
     g = float(r.get("mr") or 0.0)
     return -g if r["flip"] else g
+
+
+def _xorient(r: dict) -> list:
+    """The row's schedule / form terms (sched.py) in its random orientation (all antisymmetric)."""
+    x = [float(v) for v in (r.get("x") or [0.0] * 6)]
+    return [-v for v in x] if r["flip"] else x
 
 
 def evaluate(rows: list[dict], years: Iterable[int], seed: int = 0, tour: str = "atp", mr: bool = True) -> dict:
@@ -360,12 +369,22 @@ def evaluate(rows: list[dict], years: Iterable[int], seed: int = 0, tour: str = 
         bf = {"w_elo": None}
         use_g = bool(both) and all("gelo" in r for r in both)
         use_m = use_g and mr and all("mr" in r for r in both)
+        use_x = use_m and all(r.get("x") is not None for r in both)
+        wn = None
         if both:
             # fit on the oriented targets (p1 is the winner in the stores, so unoriented y would be all ones)
             bf = PR.fit_blend([_orient(r["elo"], r["flip"]) for r in both], [_orient(r["sr"], r["flip"]) for r in both],
                               [0 if r["flip"] else 1 for r in both],
                               gdiff=[_gorient(r) for r in both] if use_g else None,
-                              mdiff=[_morient(r) for r in both] if use_m else None)
+                              mdiff=[_morient(r) for r in both] if use_m else None,
+                              xmat=[_xorient(r) for r in both] if use_x else None)
+            if use_x:
+                # the same blend without the schedule / form terms ("model_nox": the 21 October price)
+                bn = PR.fit_blend([_orient(r["elo"], r["flip"]) for r in both], [_orient(r["sr"], r["flip"]) for r in both],
+                                  [0 if r["flip"] else 1 for r in both], gdiff=[_gorient(r) for r in both],
+                                  mdiff=[_morient(r) for r in both])
+                if bn.get("w_elo") is not None:
+                    wn = (bn["w_elo"], bn["w_sr"], float(bn.get("w_gelo") or 0.0), float(bn.get("w_mr") or 0.0))
         wf = None
         if both and use_m:
             bf3 = PR.fit_blend([_orient(r["elo"], r["flip"]) for r in both], [_orient(r["sr"], r["flip"]) for r in both],
@@ -373,12 +392,13 @@ def evaluate(rows: list[dict], years: Iterable[int], seed: int = 0, tour: str = 
             if bf3.get("w_elo") is not None:
                 wf = (bf3["w_elo"], bf3["w_sr"], float(bf3.get("w_gelo") or 0.0))
         if bf.get("w_elo") is not None:
-            w = (bf["w_elo"], bf["w_sr"], float(bf.get("w_gelo") or 0.0), float(bf.get("w_mr") or 0.0))
+            w = (bf["w_elo"], bf["w_sr"], float(bf.get("w_gelo") or 0.0), float(bf.get("w_mr") or 0.0), bf.get("w_x") or {})
         else:
             w = (float(own["w_elo"]), float(own["w_sr"]), float(own.get("w_gelo") or 0.0),
-                 float(own.get("w_mr") or 0.0) if mr else 0.0)
+                 float(own.get("w_mr") or 0.0) if mr else 0.0, (own.get("w_x") or {}) if mr else {})
         blend_by_year[str(Y)] = {"w_elo": round(w[0], 4), "w_sr": round(w[1], 4), "w_gelo": round(w[2], 4),
-                                 "w_mr": round(w[3], 4), "n_fit": bf.get("n", 0), "fitted": bf.get("w_elo") is not None}
+                                 "w_mr": round(w[3], 4), "n_fit": bf.get("n", 0), "fitted": bf.get("w_elo") is not None,
+                                 **({"w_x": {k: round(v, 4) for k, v in w[4].items()}} if w[4] else {})}
         rk = [r for r in early]
         x = np.array([(-r["rank_x"] if r["flip"] else r["rank_x"]) for r in rk])
         yv = np.array([0 if r["flip"] else 1 for r in rk], float)
@@ -392,8 +412,15 @@ def evaluate(rows: list[dict], years: Iterable[int], seed: int = 0, tour: str = 
             if r["sr"] is not None:
                 preds["serve_return"] = r["sr"]
             if r["elo"] is not None and r["sr"] is not None:
+                xd = None
+                if w[4] and r.get("x") is not None:
+                    from oddsmarkets.tennis.models import sched as SC
+                    xd = SC.dot(r["x"], w[4])
                 preds["model"] = float(PR.blend(r["elo"], r["sr"], w[0], w[1], r.get("gelo") or 0.0, w[2],
-                                                r.get("mr") or 0.0, w[3]))
+                                                r.get("mr") or 0.0, w[3], xd))
+                if wn is not None:
+                    preds["model_nox"] = float(PR.blend(r["elo"], r["sr"], wn[0], wn[1], r.get("gelo") or 0.0, wn[2],
+                                                        r.get("mr") or 0.0, wn[3]))
             elif r["elo"] is not None:
                 preds["model"] = r["elo"]
             if wf is not None and r["elo"] is not None and r["sr"] is not None:
@@ -615,6 +642,17 @@ def tournaments(tour: str, matches: list[dict], events: dict, years: Iterable[in
                         str(p) for m in byev.get(eid_, []) for p in (m.get("p1"), m.get("p2")) if p)
         msnap = MRt.snapshots(MRt.prepare(sorted(matches, key=_io.match_key), max_margin=mparams["max_margin"]),
                               mparams, wants)
+    xsnap = {}
+    if w and len(w) > 4 and w[4]:
+        from oddsmarkets.tennis.models import sched as SC
+        wants_x: dict = {}
+        for eid_, ev_ in (events or {}).items():
+            if str(ev_.get("level")) in ("slam", "m1000", "500", "250") and int(ev_.get("year") or 0) in years:
+                d0 = _io.day(ev_.get("start"))
+                if d0 is not None:
+                    wants_x.setdefault(d0.toordinal(), set()).update(
+                        str(p) for m in byev.get(eid_, []) for p in (m.get("p1"), m.get("p2")) if p)
+        xsnap = SC.snapshots(sorted(matches, key=_io.match_key), elo_hist, wants_x)
     fit_keys = sorted(fits)
     loaded: list = [None, None]                    # the one fit in memory (fits are cache paths)
     acc = {"pre": {"title": [], "final": [], "sf": []}, "qf": {"title": [], "final": [], "sf": []}}
@@ -658,9 +696,10 @@ def tournaments(tour: str, matches: list[dict], events: dict, years: Iterable[in
         d0 = _io.day(ev.get("start"))
         ctx = PR.Context(t, start, elo_ratings=ratings, elo_params=params, elo_mod=E, sr_model=mdl, sr_mod=S if mdl else None,
                          blend={"w_elo": w[0], "w_sr": w[1], "w_gelo": (w[2] if len(w) > 2 else 0.0),
-                                "w_mr": (w[3] if len(w) > 3 else 0.0)} if w else None,
+                                "w_mr": (w[3] if len(w) > 3 else 0.0), "w_x": (w[4] if len(w) > 4 else {})} if w else None,
                          gelo_ratings=gratings if gparams else None, gelo_params=gparams,
-                         mr_states=(msnap.get(d0.toordinal()) or {}) if (mparams and d0) else None, mr_params=mparams)
+                         mr_states=(msnap.get(d0.toordinal()) or {}) if (mparams and d0) else None, mr_params=mparams,
+                         sched=(xsnap.get(d0.toordinal()) or {}) if (xsnap and d0) else None, assumed=True)
 
         memo: dict = {}
 
@@ -799,7 +838,8 @@ def backtest(tour: str, years: Iterable[int] | None = None, matches: list[dict] 
     if tournament_sims and events:
         try:
             tourn = tournaments(t, matches, events, years, fits, hist, tournament_sims, seed, sr_mod, elo_mod,
-                                (last_w["w_elo"], last_w["w_sr"], last_w.get("w_gelo", 0.0), last_w.get("w_mr", 0.0))
+                                (last_w["w_elo"], last_w["w_sr"], last_w.get("w_gelo", 0.0), last_w.get("w_mr", 0.0),
+                                 last_w.get("w_x") or {})
                                 if last_w else None,
                                 tournament_events, log)
         except Exception as exc:  # noqa: BLE001
@@ -816,10 +856,13 @@ def backtest(tour: str, years: Iterable[int] | None = None, matches: list[dict] 
     both = [r for r in scored if r["elo"] is not None and r["sr"] is not None]
     if both:
         has_g = all("gelo" in r for r in both)
+        has_m = has_g and all("mr" in r for r in both)
+        has_x = has_m and all(r.get("x") is not None for r in both)
         blend_all = PR.fit_blend([_orient(r["elo"], r["flip"]) for r in both], [_orient(r["sr"], r["flip"]) for r in both],
                                  [0 if r["flip"] else 1 for r in both],
                                  gdiff=[_gorient(r) for r in both] if has_g else None,
-                                 mdiff=[_morient(r) for r in both] if has_g and all("mr" in r for r in both) else None)
+                                 mdiff=[_morient(r) for r in both] if has_m else None,
+                                 xmat=[_xorient(r) for r in both] if has_x else None)
         if blend_all.get("w_mr") is not None:
             # the fundamental blend (no market term) for the Value section's model rating (analytics/value.py)
             bf3 = PR.fit_blend([_orient(r["elo"], r["flip"]) for r in both], [_orient(r["sr"], r["flip"]) for r in both],
@@ -848,6 +891,7 @@ def backtest(tour: str, years: Iterable[int] | None = None, matches: list[dict] 
                            {"version": PR.VERSION, "w_elo": round(blend_all["w_elo"], 5), "w_sr": round(blend_all["w_sr"], 5),
                             **({"w_gelo": round(blend_all["w_gelo"], 5)} if blend_all.get("w_gelo") is not None else {}),
                             **({"w_mr": round(blend_all["w_mr"], 5)} if blend_all.get("w_mr") is not None else {}),
+                            **({"w_x": {k: round(v, 5) for k, v in blend_all["w_x"].items()}} if blend_all.get("w_x") else {}),
                             **({"fundamental": blend_all["fundamental"]} if blend_all.get("fundamental") else {}),
                             "sigma": dist.get("sigma_all_years"),
                             "n": blend_all["n"], "logloss": blend_all.get("logloss"), "years": [years[0], years[-1]],

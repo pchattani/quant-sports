@@ -648,6 +648,44 @@ class TourData:
             self._mrating = _io.cached("ace_mrating", self.tour, key, lambda: MRt.history(self.tour, matches=rated))
         return self._mrating
 
+    # schedule and form terms (models/sched.py): exact features of every row on disk, current states, head to head
+    @property
+    def sched(self) -> dict:
+        if getattr(self, "_sched", None) is None:
+            from oddsmarkets.tennis.models import _io
+            from oddsmarkets.tennis.models import sched as SC
+            ms = self.all_matches() if hasattr(self, "all_matches") else _io.load_matches(self.tour, statuses=None)
+            key = digest(SC.VERSION, len(ms), hashlib.sha1("".join(
+                f"{m.get('id')}{m.get('p1')}{m.get('p2')}{m.get('status')}{m.get('winner')}{m.get('date')}"
+                f"{m.get('pts1')}{m.get('pts2')}{m.get('round')}" for m in ms).encode()).hexdigest())
+            elo_pre = {g[0]: g[12] for g in (self.elo.get("rows") or [])}
+            self._sched = _io.cached("ace_sched", self.tour, key, lambda: SC.history(self.tour, matches=ms, elo_pre=elo_pre))
+        return self._sched
+
+    def charted_for(self, mid: str) -> dict | None:
+        """{"stats", "charting"} of a match the Match Charting Project charted (the last two seasons;
+        analytics/charted.py), or None."""
+        if getattr(self, "_charted", None) is None:
+            try:
+                from oddsmarkets.tennis.analytics import charted as CHD
+                self._charted = CHD.build(self, [y for y in (self.current - 1, self.current) if y in self.years])
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("%s charted match statistics failed: %s", self.tour, exc)
+                self._charted = {}
+        return self._charted.get(str(mid))
+
+    def x_pre(self, m: dict) -> list | None:
+        """The schedule and form terms of a MATCH row for its p1 (exact, from the pass over every row on disk), or
+        None when the row is not in it or the terms are off."""
+        from oddsmarkets.tennis.models import predict as P
+        if not P.blend_params(self.tour).get("w_x"):
+            return None
+        try:
+            return (self.sched.get("pre") or {}).get(str(m.get("id")))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("%s schedule terms failed: %s", self.tour, exc)
+            return None
+
     def mr_pre(self, m: dict) -> float | None:
         """Market-rating term for m.p1 on the match's logit scale: the exact pre-match value for a rated match,
         else today's states (a player never rated takes the prior from the row's rank, as the sequential pass
@@ -708,6 +746,27 @@ class TourData:
             out.sort(key=_io.match_key)
             self._rated = out
         return self._rated
+
+    def all_matches(self) -> list[dict]:
+        """Every MATCH row with two players (all statuses: walkovers and upcoming matches too), dated as
+        rated_matches dates them, sorted as the models sort them (the schedule terms' pass, models/sched.py)."""
+        if getattr(self, "_all_rows", None) is None:
+            from oddsmarkets.tennis.models import _io
+            out = []
+            for y in self.years:
+                evs = self.events(y)
+                for m in self.matches(y).values():
+                    if not m.get("p1") or not m.get("p2"):
+                        continue
+                    d = day(m.get("date"))
+                    if d is None or abs(d.year - y) > 1:
+                        d = day((evs.get(m.get("event")) or {}).get("start"))
+                        if d is None or abs(d.year - y) > 1:
+                            continue
+                    out.append(m if str(m.get("date") or "")[:10] == d.isoformat() else dict(m, date=d.isoformat()))
+            out.sort(key=_io.match_key)
+            self._all_rows = out
+        return self._all_rows
 
     def sr_fit(self, through: date) -> dict | None:
         """B's serve/return model fitted on matches dated <= `through` (window and constants per tour),
@@ -808,9 +867,15 @@ class TourData:
                     mst, mpr = self.mrating.get("current") or {}, self.mrating.get("params")
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("%s market rating at %s failed: %s", self.tour, when, exc)
+            xs = None
+            if P.blend_params(self.tour).get("w_x") and when >= self.today - timedelta(days=1):
+                try:
+                    xs = self.sched
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("%s schedule terms at %s failed: %s", self.tour, when, exc)
             base = P.Context(self.tour, when, elo_ratings=self.elo_at(when), elo_params=self.elo_params(), elo_mod=E,
                              sr_model=sr, sr_mod=SR if sr else None, gelo_ratings=gr, gelo_params=gp,
-                             mr_states=mst, mr_params=mpr)
+                             mr_states=mst, mr_params=mpr, sched=xs)
             self._ctx[key] = base
         if not exact_elo and not exact_gelo and not exact_mr:
             return base
@@ -846,7 +911,7 @@ class TourData:
         return P.Context(self.tour, when, elo_ratings=base.elo_ratings, elo_params=base.elo_params, elo_mod=E,
                          sr_model=base.sr_model, sr_mod=base.sr_mod, elo_fn=elo_fn, gelo_fn=gelo_fn,
                          gelo_ratings=base.gelo_ratings, gelo_params=base.gelo_params, mr_fn=mr_fn,
-                         mr_states=base.mr_states, mr_params=base.mr_params)
+                         mr_states=base.mr_states, mr_params=base.mr_params, sched=base.sched)
 
     def gelo_pre(self, m: dict) -> float | None:
         """Game-share Elo difference for m.p1 before the match (gelo history), None when it has no row."""

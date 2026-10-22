@@ -284,7 +284,7 @@ def iter_points(path: Path) -> Iterator[dict]:
             g = lambda k: row[ix[k]] if k in ix and ix[k] < len(row) else ""   # noqa: E731
             yield {"match_id": g("match_id"), "pt": g("Pt"), "svr": g("Svr"), "first": g("1st"), "second": g("2nd"),
                    "winner": g("PtWinner"), "pts": g("Pts"), "tb": (row[i_tb] if i_tb is not None and i_tb < len(row) else ""),
-                   "gm1": g("Gm1"), "gm2": g("Gm2")}
+                   "gm1": g("Gm1"), "gm2": g("Gm2"), "set1": g("Set1"), "set2": g("Set2")}
 
 
 def _is_tb(row: dict) -> bool | None:
