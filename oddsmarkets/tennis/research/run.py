@@ -257,7 +257,8 @@ def tour_tables(tour: str, log=print) -> tuple[dict, pd.DataFrame]:
             for val, bb in b.groupby(g):
                 res["strata"].append({"strategy": label, "by": gname, "value": str(val), **summarise(bb)})
     df["_p_fund"] = preds[BEST_FUND]
-    df["_p_site"] = preds[SITE]
+    from oddsmarkets.tennis.models import sched as SC
+    df["_p_site"] = preds[BEST_FUND] if SC.on(tour) else preds[SITE]      # the ATP price adds the schedule terms (R4)
     df["_p_P0"] = preds[P0]
     df["_p_mkt"] = preds[BEST_MKT]
     df["_p_flb"] = preds[FLB]

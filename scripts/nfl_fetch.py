@@ -16,7 +16,10 @@ Phases:
   live       (with --espn --refresh-current) the week's scoreboard, then the ESPN summary for games in progress,
              kicking off within 24 h, or final within 36 h without a final summary: the compact live record
              (drives, plays, win probability, DraftKings open/close, predictor, injuries) goes to
-             data/nfl/cache/espn/summary/<season>/<game_id>.json and a small `live` block onto the GAME.
+             data/nfl/cache/espn/summary/<season>/<game_id>.json and a small `live` block onto the GAME. A final
+             record is also kept under data/nfl/raw/espn_summary/ (CI saves the raw root whenever it changes), and a
+             final game with no record at all is fetched up to 10 days after kickoff. Then one call for ESPN's league
+             injury lists: each team's change is appended, stamped, to docs/gridiron/data/<season>/injury_log.json.gz.
 
 --refresh-current (the scheduled job) limits everything to the current season (and season-less files).
 
@@ -197,6 +200,7 @@ def espn_odds(c: Client, s: dict, refresh: bool, now: datetime, save_every: int 
 
 # ── ESPN live ───────────────────────────────────────────────────────────────
 
+KEEP_DAYS = 10            # a final game with no ESPN record kept is (re)fetched up to this long after kickoff
 LIVE_KEYS = ("status", "detail", "period", "clock", "possession", "down", "distance", "yardline_100", "home_score",
              "away_score", "wp_home")
 
@@ -230,11 +234,13 @@ def espn_live(c: Client, s: dict, now: datetime) -> None:
         ref = states.get(gid) or {}
         in_play = ref.get("state") == "in"
         soon = now <= ko <= now + timedelta(hours=24)
-        cached = st.read_json(st.espn_summary_path(season, gid)) or {}
+        cached = st.read_espn_summary(season, gid) or {}
         # a final record is fetched once, again if it predates the box score (the game page's fallback until nflverse
-        # publishes the week's play-by-play)
-        just_final = (ref.get("state") == "post" or g.get("status") == "final") and now - ko < timedelta(hours=36) \
-            and (cached.get("status") != "final" or "box" not in cached)
+        # publishes the week's play-by-play). Kept under the raw root (round 4), and a final game with no record at
+        # all (the day's cache lost it) is fetched up to KEEP_DAYS after kickoff.
+        final = ref.get("state") == "post" or g.get("status") == "final"
+        just_final = final and ((now - ko < timedelta(hours=36) and (cached.get("status") != "final" or "box" not in cached))
+                                or (now - ko < timedelta(days=KEEP_DAYS) and not cached))
         if not (in_play or soon or just_final):
             continue
         raw = espn.summary(c, g["espn_id"])
@@ -242,6 +248,8 @@ def espn_live(c: Client, s: dict, now: datetime) -> None:
         if not rec:
             continue
         st.write_json(st.espn_summary_path(season, gid), rec)
+        if rec.get("status") == "final":
+            st.write_json_gz(st.espn_summary_keep_path(season, gid), rec)
         live = {k: rec.get(k) for k in LIVE_KEYS}
         live["at"] = st.now()
         if rec.get("odds"):
@@ -253,6 +261,22 @@ def espn_live(c: Client, s: dict, now: datetime) -> None:
         n += 1
     s["meta"]["live_at"] = st.now()
     logger.info("%d live: %d scoreboard weeks, %d summaries", season, len(weeks), n)
+
+
+def espn_injuries(c: Client, season: int) -> int:
+    """One call: ESPN's league injury lists, appended to <season>/injury_log.json.gz for every team whose list changed
+    since its last snapshot (a timestamped pre-game history: ESPN keeps none). Returns the teams appended."""
+    raw = espn.injuries(c)
+    rows = espn.league_injury_rows(raw, season)
+    if not rows:
+        return 0
+    log = st.load_injury_log(season)
+    at = st.now()
+    n = sum(st.append_injury_log(log, team, at, r) for team, r in sorted(rows.items()))
+    if n or not st.injury_log_path(season).exists():
+        st.save_injury_log(season, log)
+    logger.info("%d injuries: %d teams listed, %d changed since the last snapshot", season, len(rows), n)
+    return n
 
 
 # ── report ──────────────────────────────────────────────────────────────────
@@ -359,6 +383,7 @@ def main() -> int:
                     ran.append("live")
                     espn_live(c, s, now)
                     st.save_owned(s, ["live"])
+                    espn_injuries(c, season)
             finally:
                 if s["games"] and ran:
                     st.save_owned(s, ran)

@@ -201,7 +201,7 @@ function injuriesBlock(g) {
   const inj = g.injuries || {};
   const qb = g.qb_status || {};
   const av = g.availability || null;
-  if (!R(inj.home).length && !R(inj.away).length && !qb.home && !qb.away && !av) return '';
+  if (!R(inj.home).length && !R(inj.away).length && !qb.home && !qb.away && !av && !g.injury_changes) return '';
   const soLine = s => {
     const a = av && av[s];
     if (!a || (!a.off && !a.def)) return av ? '<p class="gi-cap">Starters out: none, so no adjustment.</p>' : '';
@@ -219,7 +219,17 @@ function injuriesBlock(g) {
       (list.length ? GI.tableHTML([{ label: 'Player' }, { label: 'Pos' }, { label: 'Status' }, { label: 'Detail' }, { label: 'Impact', align: 'right', title: 'Model points of margin (negative hurts this team)' }],
         list.map(x => [{ html: x.pid ? GI.playerLink(x.pid, x.name ? { name: x.name } : null) : esc(x.name || '—'), v: x.name || GI.playerName(x.pid) }, x.pos || GI.player(x.pid).pos || '—',
           { html: GI.pill(x.status || '—', /out|ir|doubt/i.test(x.status || '') ? GI.BAD : /quest/i.test(x.status || '') ? GI.CLOSE : 'var(--ink-3)'), v: x.status }, x.detail || x.injury || '—',
-          { html: isNum(x.impact) ? GI.ptsEdge(x.impact, 1) : '—', v: x.impact }])) : GI.muted('No injuries reported.')) + '</div>';
+          { html: isNum(x.impact) ? GI.ptsEdge(x.impact, 1) : '—', v: x.impact }])) : GI.muted('No injuries reported.')) + changes(s) + '</div>';
+  };
+  const ch = g.injury_changes || null;
+  const changes = s => {
+    const rows = R(ch && ch[s]);
+    if (!ch) return '';
+    if (!rows.length) return '<p class="gi-cap">No status changes on ESPN\'s list this week (checked hourly).</p>';
+    return '<h4 class="gi-inj-h">Changes this week</h4>' + GI.tableHTML([{ label: 'First seen' }, { label: 'Player and change' }],
+      rows.slice().reverse().map(x => [{ html: esc(GI.fmtDate(x.at, { year: false }) + ' ' + GI.fmtTime(x.at)), v: x.at },
+        { html: (x.pid ? GI.playerLink(x.pid) : esc('ESPN #' + x.espn)) + '<br><span class="qk-sub">' + esc(x.from) + ' → ' + esc(x.to) + '</span>',
+          v: x.pid ? GI.playerName(x.pid) : x.espn }]));
   };
   const src = inj.source ? esc(inj.source) : 'the injury report';
   let foot = '';
@@ -229,6 +239,7 @@ function injuriesBlock(g) {
       (av.src === 'inactives' ? 'From the game-day inactives (an inactive starter counts 1).' : 'From the injury report (Out 1, Doubtful 0.85, Questionable 0.15 of a starter); the game-day inactives replace it about 90 minutes before kickoff, and the price moves with them.') +
       ' Each offensive starter out costs ' + GI.num(-av.coef.off, 2) + ' points and each defensive one ' + GI.num(-av.coef.def, 2) + '. QBs are priced separately. A player costs 0 if he was not a starter on the depth chart for his team\'s previous game: a backup, or a starter who already missed that game, whose absence is already in the team ratings and earlier prices. <a href="#/methodology">How →</a></p>';
   }
+  if (ch) foot += '<p class="gi-cap">Changes: ESPN’s injury list for each team, checked every hour since 22 October 2026; each change is dated by the first check that saw it (last check ' + esc(GI.fmtDate(ch.as_of, { year: false }) + ' ' + GI.fmtTime(ch.as_of)) + '). ESPN keeps no history of its own.</p>';
   return GI.card('Injuries and QB status', 'from ' + src + '; impact = points of margin in our price (negative hurts the team)', '<div class="qk-grid"><div class="qk-span-6">' + side('away') + '</div><div class="qk-span-6">' + side('home') + '</div></div>' + foot);
 }
 function contextBlock(g) {

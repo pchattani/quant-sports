@@ -108,6 +108,37 @@ def summary(c: Client, event_id: str) -> dict | None:
     return c.get(f"{SITE}/summary", {"event": str(event_id)})
 
 
+def injuries(c: Client) -> dict | None:
+    """The league's current injury lists (every team; each entry carries ESPN's time of its last update)."""
+    return c.get(f"{SITE}/injuries")
+
+
+def league_injury_rows(raw: dict | None, season: int) -> dict[str, list[list]]:
+    """{nflverse abbr: [[espn_athlete_id, status, date, type, location, return_date, pos]]} from `injuries()`; structured
+    fields only (ESPN's comment text is not kept)."""
+    out: dict[str, list[list]] = {}
+    for t in (raw or {}).get("injuries") or []:
+        ab = canon.abbr_from_espn(str(t.get("id") or ""), season)
+        if not ab:
+            continue
+        rows = out.setdefault(ab, [])
+        for x in t.get("injuries") or []:
+            ath = x.get("athlete") or {}
+            aid = str(ath.get("id") or "") or None
+            if aid is None:
+                for ln in ath.get("links") or []:
+                    href = str(ln.get("href") or "")
+                    if "/id/" in href:
+                        aid = href.split("/id/")[1].split("/")[0]
+                        break
+            if not aid:
+                continue
+            det = x.get("details") or {}
+            rows.append([aid, x.get("status"), x.get("date"), det.get("type"), det.get("location"), det.get("returnDate"),
+                         (ath.get("position") or {}).get("abbreviation")])
+    return out
+
+
 def odds(c: Client, event_id: str) -> dict | None:
     return c.get(f"{CORE}/events/{event_id}/competitions/{event_id}/odds", {"limit": 100})
 

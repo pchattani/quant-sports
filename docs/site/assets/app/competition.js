@@ -248,6 +248,7 @@ function dirCard(c) {
   if (c.unsimulated) chips.push(FB.badge('Not simulated', '', 'National-team competitions show tables and ties as played; fixtures carry the international model\'s line.'));
   var fav = last
     ? '<div class="fb-co-fav"><span class="qk-kicker">Last edition · ' + esc(cs.season) + '</span><b>' + (won ? FB.crest(won.tid, won.team, 'sm') + ' ' + esc(won.team) : '<span class="qk-muted">no winner on record</span>') + '</b></div>'
+    : c.field_partial ? '<div class="fb-co-fav"><span class="qk-muted">Winner chances once the top flight enters</span></div>'
     : c.favourite ? '<div class="fb-co-fav"><span class="qk-kicker">' + esc(c.favourite_label || 'Title') + ' favourite</span><b>' + esc(c.favourite) + ' <span class="fb-num">' + pct(c.p_favourite) + '</span></b>' +
       '<span class="fb-co-bar"><i style="width:' + ((c.p_favourite || 0) * 100).toFixed(1) + '%"></i></span></div>'
     : '<div class="fb-co-fav"><span class="qk-muted">' + esc(c.unsimulated ? 'Tables as played' : 'No simulation yet') + '</span></div>';
@@ -404,6 +405,7 @@ LIVE.overview = function (el, body, c, d0, q, seasons) {
     var kp = [
       FB.kpi(leadLabel, leadHTML, { text: true, sub: esc(leadSub) }),
       last ? FB.kpi('Winner', champ ? ctx.club(champ, c.winner && c.winner.tid) : '—', { text: true, sub: 'last edition, ' + esc(FB.currentSeason(c).season) })
+        : m.field_partial ? FB.kpi('Winner favourite', '—', { text: true, sub: 'shown once the top-flight clubs enter', tip: 'The clubs in the draw so far are from the lower divisions; the top flight joins in a later round.' })
         : FB.kpi((c.favourite_label || 'Title') + ' favourite', fav && (fav[fk] || fav.p_title) ? ctx.club(fav.team) : '—', { text: true, sub: fav && (fav[fk] || fav.p_title) ? '<b>' + pct(fav[fk] || fav.p_title) + '</b> of ' + FB.int(m.n_sims || 0) + ' simulations' : (m.unsimulated ? 'not simulated' : '') }),
       FB.kpi('Top scorer', scorer && scorer.goals ? FB.playerLink(scorer.player_id, scorer.name) : '—', { text: true, sub: scorer && scorer.goals ? scorer.goals + ' goals · xG ' + num(scorer.xg, 1) + ' · ' + esc(scorer.team) : '' }),
       FB.kpi('Season', '<span class="fb-num">' + gp + '<span class="qk-muted">/' + gt + '</span></span>', { sub: (m.detail_matches || 0) + ' with full match data', spark: gt ? '<span class="fb-co-kbar"><i style="width:' + Math.round(100 * gp / gt) + '%"></i></span>' : '' })
@@ -796,7 +798,8 @@ LIVE.bracket = function (el, body, c, d0) {
     if (!alive.length) alive = teams;
     alive.sort(function (x, y) { return ((b.p_cup || {})[y] || 0) - ((b.p_cup || {})[x] || 0); });
     html += '<div class="fb-mt">' + FB.grid(
-      FB.card('Who wins it', 'Chance of winning, from the simulations.', FB.chartBox('co-bwin', 360, 'Chance of winning'), { span: 5 }) +
+      (b.field_partial ? FB.card('Who wins it', 'Not yet: the top-flight clubs enter in a later round.', cardMsg('Winner chances appear once the top flight is in the draw.'), { span: 5 })
+        : FB.card('Who wins it', 'Chance of winning, from the simulations.', FB.chartBox('co-bwin', 360, 'Chance of winning'), { span: 5 })) +
       FB.card('Reaching each round', alive.length + ' club' + (alive.length === 1 ? '' : 's') + ' still able to go through' + (alive.length < teams.length ? ' (of ' + teams.length + ')' : '') + '.', '<div id="co-reach"></div>', { span: 7, flush: true })
     ) + '</div>';
     body.innerHTML = html;
@@ -812,7 +815,7 @@ LIVE.bracket = function (el, body, c, d0) {
     var wb = $(el, 'co-bwin');
     if (top.length) QKC.bar(wb, { horizontal: true, labels: true, labelWidth: 120, fmt: function (v) { return pct(v, v < 0.1 ? 1 : 0); }, valName: 'Chance of winning', cats: top, series: [{ name: cupLabel, data: top.map(function (t) { return b.p_cup[t]; }) }],
       hrefs: top.map(function (t) { var id = ctx.tidOf(t); return id ? FB.href.club(id, { c: c.slug }) : null; }), label: 'Chance of winning' });
-    else { wb.style.height = 'auto'; wb.innerHTML = cardMsg('Decided, or not simulated.'); }
+    else if (wb) { wb.style.height = 'auto'; wb.innerHTML = cardMsg('Decided, or not simulated.'); }
     var cols = [{ key: 'team', label: 'Club', sticky: true, fmt: function (v) { return ctx.club(v); } }];
     if (k === 'conference' || k === 'playoff') cols.push({ key: '_po', label: k === 'playoff' ? 'Liguilla' : 'Playoffs', num: true, fmt: function (v) { return heatPct(v, 'var(--c-3)'); } });
     b.rounds.forEach(function (r) { cols.push({ key: '_r_' + r, label: labels[r] || r, num: true, fmt: function (v) { return heatPct(v); } }); });
@@ -894,7 +897,7 @@ LIVE.odds = function (el, body, c, d0, q) {
     }
     var list = teams.map(function (t) { var o = FB.merge(t, {}); ((p.bands || [])).forEach(function (bd) { o['_b_' + bd.key] = (t.bands || {})[bd.key]; }); return o; });
     var downs = (p.bands || []).filter(function (bd) { return bd.kind === 'down'; });
-    ob.innerHTML = FB.grid(
+    ob.innerHTML = (p.field_partial ? FB.note('The top-flight clubs have not entered this edition yet, so winner and final chances are not shown; they appear once the top flight is in the draw.') : '') + FB.grid(
       FB.card('Chance of ' + esc(winnerWord(c)), 'The top ten in the simulations.', FB.chartBox('co-oc1', 340, 'Chance of winning'), { span: 6 }) +
       FB.card(downs.length ? 'Relegation risk' : (k === 'cup' ? 'Reaching the final' : 'Reaching the play-offs'), downs.length ? downs.map(function (bd) { return bd.label; }).join(' + ') : 'From the simulations.', FB.chartBox('co-oc2', 340, 'Second probability'), { span: 6 })
     ) + '<div class="fb-mt">' + FB.card('Every club', 'Probabilities from the simulated seasons; sortable.', '<div id="co-ot"></div>', { flush: true }) + '</div>';

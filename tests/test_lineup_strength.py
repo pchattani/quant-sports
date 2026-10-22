@@ -269,3 +269,16 @@ def test_kalshi_rows_are_off_by_default_and_never_touch_football_data_leagues(mo
         assert len(market_rates.market_rows(df, "saudi-pro-league", xi_fit=0.0035)) == 0
     assert len(kalshi_rates.rows(df, "premier-league", xi_fit=0.0035)) == 0      # not a Kalshi-rows competition
     kalshi_rates.on.cache_clear()
+
+
+def test_a_national_cup_without_its_top_flight_withholds_winner_chances() -> None:
+    from types import SimpleNamespace
+
+    import build_site_all as B
+    dom = SimpleNamespace(family="domestic")
+    early = SimpleNamespace(teams=["Waltham Abbey", "Bury FC"], team_league={})
+    later = SimpleNamespace(teams=["Waltham Abbey", "Arsenal"], team_league={"Arsenal": "premier-league"})
+    assert B.cup_field_partial(dom, early) is True
+    assert B.cup_field_partial(dom, later) is False
+    assert B.cup_field_partial(SimpleNamespace(family="cup"), early) is False        # continental cups unaffected
+    assert B.cup_field_partial(dom, SimpleNamespace(teams=[], team_league={})) is False

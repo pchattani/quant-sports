@@ -34,17 +34,23 @@ def _ridge(X, y, lam):
 
 def wf_predict(rows: pd.DataFrame, mfeats=MFEATS, tfeats=TFEATS, start: int = 2006, lam: float = 1.0,
                fit_from: int = 1999, extra_fit_mask: pd.Series | None = None, total_keys: bool = True,
-               margin_keys: bool = True, warmup: int = 0) -> pd.DataFrame:
+               margin_keys: bool = True, warmup: int = 0, warmup_exempt: tuple = ()) -> pd.DataFrame:
     """rows: one decision mode. Returns rows (season >= start) with mu, sigma, mu_t, sigma_t, season keys index.
     warmup > 0 (added 21 Oct 2026): a feature enters a week's prediction only once at least `warmup` training rows
     have a non-zero value of it (else its value is set to 0 for that week), so a feature whose data starts late (the
-    injury report in 2009) is not driven by a coefficient fitted on a handful of games."""
+    injury report in 2009) is not driven by a coefficient fitted on a handful of games. `warmup_exempt` (round 4):
+    features left out of that rule (late-season stakes are non-zero in only ~16 games a season from 2006)."""
     rows = rows.sort_values(["season", "week", "date", "game_id"]).reset_index(drop=True)
     fitmask = rows["played"].astype(bool) & rows["margin"].notna() & (rows["n_games_rated"] > 0) & (rows["season"] >= fit_from)
     if extra_fit_mask is not None:
         fitmask &= extra_fit_mask.reindex(rows.index).fillna(False).astype(bool)
     for c in list(mfeats) + list(tfeats):
         rows[c] = pd.to_numeric(rows[c], errors="coerce").fillna(0.0)
+    # round 4 (22 Oct 2026): a column `<feature>__pred` holds the value known at the decision (a weather forecast) for
+    # the predicted week, while `<feature>` holds the realised value used when the row trains later weeks
+    pred_cols = [c for c in list(mfeats) + list(tfeats) if f"{c}__pred" in rows.columns]
+    for c in pred_cols:
+        rows[f"{c}__pred"] = pd.to_numeric(rows[f"{c}__pred"], errors="coerce").fillna(0.0)
     out = []
     keys_by, tkeys_by = {}, {}
     for s in sorted(rows.loc[rows["season"] >= start, "season"].unique()):
@@ -77,8 +83,13 @@ def wf_predict(rows: pd.DataFrame, mfeats=MFEATS, tfeats=TFEATS, start: int = 20
             bt = _ridge(Xt, yt, np.concatenate([np.full(len(tfeats), lam), [1e-6]]))
             sig_t = float(np.sqrt(np.sum((yt - Xt @ bt) ** 2) / max(len(tr) - len(tfeats) - 1, 1)))
             gw = rows[(rows["season"] == s) & (rows["week"] == w)]
+            if pred_cols:
+                gw = gw.copy()
+                for c in pred_cols:
+                    gw[c] = gw[f"{c}__pred"]
             if warmup > 0:
-                cold = [c for c in list(mfeats) + list(tfeats) if (tr[c].to_numpy(float) != 0).sum() < warmup]
+                cold = [c for c in list(mfeats) + list(tfeats)
+                        if c not in warmup_exempt and (tr[c].to_numpy(float) != 0).sum() < warmup]
                 if cold:
                     gw = gw.copy()
                     gw[cold] = 0.0

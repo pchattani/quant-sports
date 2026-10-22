@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from datetime import datetime, timedelta
 from typing import Any
 
 import numpy as np
@@ -159,7 +160,12 @@ def espn_summary(g: dict) -> dict | None:
     gid, season = g.get("game_id"), g.get("season")
     if not gid or not season:
         return None
-    return an.read_json(an.cache_root() / "espn" / "summary" / str(season) / f"{gid}.json")
+    rec = an.read_json(an.cache_root() / "espn" / "summary" / str(season) / f"{gid}.json")
+    if rec:
+        return rec
+    from oddsmarkets.nfl import store as _st                 # the kept final copy under the raw root (round 4)
+    p = _st.espn_summary_keep_path(season, gid)
+    return _st.read_json_gz(p) if p.exists() else None
 
 
 def espn_plays(g: dict) -> list | None:
@@ -498,6 +504,54 @@ def availability_by_game(ctx: SeasonContext) -> dict[str, dict]:
     return out
 
 
+_INJ_LOGS: dict[int, dict] = {}
+
+
+def injury_changes(season: int, g: dict, days: int = 7, cap: int = 25) -> dict | None:
+    """Status changes on ESPN's injury lists for the two teams in the week before kickoff, each stamped with the first
+    hourly snapshot that saw it (injury_log.json.gz, scripts/nfl_fetch.py; from 22 Oct 2026). {"as_of", "since",
+    "home": [{"at", "pid", "espn", "from", "to"}], "away": [...]}; None when no snapshot covers the game."""
+    from oddsmarkets.nfl import store as _st
+    if season not in _INJ_LOGS:
+        p = an.store_path(season).parent / _st.INJURY_LOG
+        d = _st.read_json_gz(p) if p.exists() else None
+        _INJ_LOGS[season] = d if isinstance(d, dict) else {}
+    teams = (_INJ_LOGS[season] or {}).get("teams") or {}
+    ko = g.get("kickoff")
+    if not teams or not ko:
+        return None
+    try:
+        kt = datetime.fromisoformat(str(ko).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    since = (kt - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    end = kt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    from oddsmarkets.nfl.analytics import people as _pp
+    xw = _pp.espn_xwalk()
+    out: dict = {"since": since, "as_of": None}
+    for side in ("home", "away"):
+        snaps = [s for s in teams.get(str(g.get(side))) or [] if s[0] <= end]
+        if not snaps or snaps[-1][0] < since:
+            out[side] = []
+            continue
+        base = [s for s in snaps if s[0] < since]
+        prev = {r[0]: r[1] for r in (base[-1][1] if base else [])}
+        seeded = bool(base)                                # the log's first snapshot is a baseline, not news
+        rows = []
+        for at, lst in (s for s in snaps if s[0] >= since):
+            cur = {r[0]: r[1] for r in lst}
+            if seeded:
+                for aid in sorted(set(prev) | set(cur)):
+                    a, b = prev.get(aid), cur.get(aid)
+                    if a != b:
+                        rows.append({"at": at, "espn": aid, "pid": xw.get(str(aid)), "from": a or "not listed",
+                                     "to": b or "off the list"})
+            prev, seeded = cur, True
+        out[side] = rows[-cap:]
+        out["as_of"] = max(out["as_of"] or "", snaps[-1][0])
+    return out if out.get("as_of") else None
+
+
 def _norm_injuries(inj: dict | None, g: dict) -> dict | None:
     """ESPN's summary keys its injury lists by team ({"KC": [...], "LAC": [...]}); the page reads {"home", "away"}
     (until 22 Oct 2026 an upcoming game's ESPN list was published under the team keys and never shown). Players
@@ -553,6 +607,7 @@ def build_page(ctx: SeasonContext, g: dict, G: pd.DataFrame | None, crd: dict, p
     av = (availability or {}).get(g["game_id"]) if availability is not None else None
     out["availability"] = av if availability else (old or {}).get("availability")
     out["injuries"] = _injury_impacts(_norm_injuries(out["injuries"], g), out["availability"])
+    out["injury_changes"] = injury_changes(ctx.season, g) or (old or {}).get("injury_changes")
     out["espn_predictor"] = (sm or {}).get("predictor") or (old or {}).get("espn_predictor")
     ep = espn_plays(g) if G is None or not len(G) else None
     if G is not None and len(G):

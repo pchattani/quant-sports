@@ -167,6 +167,23 @@ def rho_hold(df) -> float | None:
     return None if n >= MIN_GOALS_ROWS_FOR_RHO else fitting.club_rho()
 
 
+PARTIAL_FIELD_NOTE = ("The top-flight clubs have not entered this edition yet (they join in a later round), so the "
+                      "simulation knows only the clubs already in the draw. Winner and final chances are not shown until "
+                      "they enter; the round-by-round chances count only today's field.")
+
+
+def cup_field_partial(cfg, state) -> bool:
+    """
+    A national cup whose current field has no club of the country's followed top league yet (the FA Cup and the
+    Coupe de France before the top flight enters): the simulated winner would be the best of the clubs already in
+    the draw, a lower-division side (Waltham Abbey 10% to win the FA Cup, 22 Oct 2026).
+    """
+    if getattr(cfg, "family", "") != "domestic":
+        return False
+    field = [t for t in getattr(state, "teams", []) if t != AVERAGE]
+    return bool(field) and not any((getattr(state, "team_league", {}) or {}).get(t) for t in field)
+
+
 def lineup_lines(fixtures: list[dict]) -> dict[str, dict[str, float]]:
     """match id -> the H/D/A after the line-up term, for the model-v-market comparison."""
     return {str(r["id"]): {"home": r["model"]["h"], "draw": r["model"]["d"], "away": r["model"]["a"]}
@@ -410,7 +427,7 @@ def fit_pooled(stores: dict[str, dict], params: dict, cup_stores: dict[str, dict
     df = pooled_training_frame(stores, cup_stores, xi=float(params["xi"]))
     if df is None or len(df) < 50:
         return None
-    dc = fitting.new_dc(params["xi"], params["ridge"], prior_group=fitting.pooled_tier if fitting.tier_prior_on() else None)
+    dc = fitting.new_dc(params["xi"], params["ridge"], prior_group=fitting.tier_function() if fitting.tier_prior_on() else None)
     try:
         dc.fit(df)
     except Exception as exc:  # noqa: BLE001
@@ -1606,6 +1623,10 @@ def build_cup(cfg: CupConfig, entry: dict, args, sims: int | None, pooled: Dixon
     external = {k: v for k, v in champions.items() if k in wanted}
     results = CupSimulator(model, state, cfg=cfg, seed=args.seed, external_champions=external).run()
     winner_dist = {t: p for t, p in results.p_win.items() if p > 0 and t != AVERAGE}
+    partial = cup_field_partial(cfg, state)
+    if partial:
+        logger.info("%s: the top flight has not entered yet; winner chances withheld", cfg.slug)
+        winner_dist = {}
 
     teams_payload = {
         "teams": {t: {"slug": _slug(t), "conference": state.zone_of(t), "team_id": state.team_ids.get(t),
@@ -1657,7 +1678,8 @@ def build_cup(cfg: CupConfig, entry: dict, args, sims: int | None, pooled: Dixon
         # row reads as "any of the outside sides".
         "reach": {t: {r: round(p, 5) for r, p in reach.items()} for t, reach in results.p_reach.items()
                   if t != AVERAGE or results.p_win.get(t, 0.0) > 0},
-        "p_playoffs": {}, "p_cup": {t: round(p, 5) for t, p in results.p_win.items() if t != AVERAGE or p > 0},
+        "p_playoffs": {}, "p_cup": {} if partial else {t: round(p, 5) for t, p in results.p_win.items() if t != AVERAGE or p > 0},
+        "field_partial": partial,
         "note": {
             "swiss": "Top eight go straight to the Round of 16; 9-24 play a two-legged play-off with the higher "
                      "finisher at home in the second leg. From the Round of 16 the bracket is fixed and two-legged; "
@@ -1681,6 +1703,8 @@ def build_cup(cfg: CupConfig, entry: dict, args, sims: int | None, pooled: Dixon
         }[cfg.kind],
         "updated_at": _now(),
     }
+    if partial:
+        bracket_payload["note"] = PARTIAL_FIELD_NOTE
     _write(out_dir, "bracket.json", bracket_payload)
     probs = []
     for team in results.teams:
@@ -1693,7 +1717,11 @@ def build_cup(cfg: CupConfig, entry: dict, args, sims: int | None, pooled: Dixon
             "p_conference": round(results.p_reach.get(team, {}).get("final", 0.0), 5),
         })
     probs.sort(key=lambda t: -t["p_cup"])
-    _write(out_dir, "probs.json", {"teams": probs, "bands": _band_list(cfg), "has_playoff": True, "updated_at": _now()})
+    if partial:
+        for row in probs:
+            row["p_title"] = row["p_cup"] = row["p_conference"] = None
+    _write(out_dir, "probs.json", {"teams": probs, "bands": _band_list(cfg), "has_playoff": True, "field_partial": partial,
+                                   "updated_at": _now()})
 
     players = cup_store.aggregate_players(_season_view(store)) if cfg.kind != "fixed" else []
     floor = add_percentiles(players) if players else 0
@@ -1722,7 +1750,7 @@ def build_cup(cfg: CupConfig, entry: dict, args, sims: int | None, pooled: Dixon
         neutral_when=lambda raw: raw.get("stage") == "playoff" and str(raw.get("round")) in neutral_rounds,
         floor=floor, season=state.season_name, round_labels=labels,
     )
-    title_model = {t: p for t, p in results.p_win.items() if t != AVERAGE and p > 0}
+    title_model = {} if partial else {t: p for t, p in results.p_win.items() if t != AVERAGE and p > 0}
     write_market_odds(out_dir, None if args.no_market else fetch_markets_safe(cfg, fixtures["matches"], title_model.keys(), state.season_name),
                       model, title_model)
 
@@ -1740,7 +1768,7 @@ def build_cup(cfg: CupConfig, entry: dict, args, sims: int | None, pooled: Dixon
                   "dc_xi": getattr(dc, "xi", None), "dc_ridge": getattr(dc, "ridge", None),
                   "dc_fitted": dc.is_fitted, "params_method": method},
         "h2h_tiebreak": False, "source": "Sofascore", "cup_kind": cfg.kind,
-        "forced_ties": len(state.playoff_results), "cup_complete": complete,
+        "forced_ties": len(state.playoff_results), "cup_complete": complete, "field_partial": partial,
         "detail_matches": len(store.get("lineups") or {}), "sheet_matches": len(store.get("team_stats") or {}),
     }
     _write(out_dir, "meta.json", meta)
@@ -1750,7 +1778,7 @@ def build_cup(cfg: CupConfig, entry: dict, args, sims: int | None, pooled: Dixon
         "games_played": state.games_played, "games_total": state.total_league_games,
         "synthetic": synthetic, "store_fresh": store_fresh, "season_stale": meta["season_stale"],
         "favourite": favourite, "p_favourite": round(winner_dist.get(favourite, 0.0), 4) if favourite else None,
-        "favourite_label": "Champion" if complete else "Winner", "complete": complete,
+        "favourite_label": "Champion" if complete else "Winner", "complete": complete, "field_partial": partial,
         **index_extras(fixtures["matches"], players, standings if table.get("standings") else None),
         "_fixtures": fixtures["matches"], "_players": players, "_teams": teams_payload["teams"],
         "_strength": strength_rows, "_bracket": {"p_cup": bracket_payload["p_cup"], "reach": bracket_payload["reach"]},

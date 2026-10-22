@@ -71,6 +71,44 @@ def pooled_tier(team: str) -> str | None:
     return {"domestic": "domestic", "super": "domestic", "cup": "continental"}.get(cfg.family)
 
 
+LEVELS_PATH = Path(__file__).resolve().parents[1] / "cup" / "club_levels.json"
+
+
+@cache
+def _club_levels() -> tuple[dict, dict]:
+    try:
+        doc = json.loads(LEVELS_PATH.read_text(encoding="utf-8"))
+        return doc.get("levels") or {}, doc.get("region_country") or {}
+    except Exception:  # noqa: BLE001
+        return {}, {}
+
+
+def pooled_tier_levels(team: str) -> str | None:
+    """
+    `pooled_tier`, with a national cup's professional lower-division clubs in a tier per level ("domestic-2" ..
+    "domestic-5": their division in football-data's files, `club_levels.json`, scripts/football_club_levels.py);
+    other domestic clubs stay "domestic" (docs/research/football_edge.md 3.8).
+    """
+    tier = pooled_tier(team)
+    if tier != "domestic":
+        return tier
+    from oddsmarkets.football.competitions.cup.config import CUPS
+    prefix, name = team.split(":", 1)
+    levels, region_country = _club_levels()
+    cty = region_country.get(getattr(CUPS.get(prefix), "region", None) or "")
+    lvl = (levels.get(cty) or {}).get(name) if cty else None
+    return f"domestic-{int(lvl)}" if lvl else tier
+
+
+def tier_function():
+    """The tier map the build's pooled fit uses: per level when `pooled_tier_prior.levels` is true."""
+    try:
+        block = json.loads(PARAMS_PATH.read_text(encoding="utf-8")).get("pooled_tier_prior") or {}
+    except Exception:  # noqa: BLE001
+        block = {}
+    return pooled_tier_levels if block.get("levels") else pooled_tier
+
+
 @cache
 def tier_prior_on() -> bool:
     """Whether the pooled fit uses the tier prior (model_params.json `pooled_tier_prior.on`)."""

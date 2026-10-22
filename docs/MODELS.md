@@ -434,7 +434,9 @@ Cup matches between clubs of different leagues are the only edges connecting the
 - **On since 22 October 2026, by the user's decision** overriding that tolerance (`model_params.json` `pooled_tier_prior.on`).
 - On the 22 October stores the domestic tier sits at attack -0.53, defence +0.77, and the continental tier at -0.14, +0.23. O Elvas CAD moves from 7th to 239th of 1,742 clubs, SC Vianense from 8th to 303rd, Waltham Abbey from 13th to 301st (3.5c).
 - The offsets are fitted inside the pooled fit from the stores alone, so CI needs nothing new.
-- Caveat: the domestic tier mixes professional lower-division clubs (League One and Two, Segunda RFEF) with amateurs. A professional side with few cup matches is priced near the tier (Fleetwood Town v Arsenal: home win 0.09 before, 0.01 after). A per-level tier needs those clubs' league data, which is not followed.
+- Since 22 October 2026 the national-cup clubs found in football-data's lower-division files (E1, E2, E3, EC, D2, I2, SP2, F2, SC1) have a tier per level: "domestic-2" to "domestic-5" (`fitting.pooled_tier_levels`, `cup/club_levels.json`, built by `scripts/football_club_levels.py`). The rest stay "domestic". Fitted on the 22 October stores (attack / defence): level 2 -0.14/+0.36, level 3 -0.29/+0.32, level 4 -0.62/+0.69, level 5 -0.54/+0.82, amateur -0.65/+0.90.
+- This was adopted under a pre-registered fallback, not as a pass: -0.0035 (CI -0.0094 to +0.0018) on 1,569 cup matches; `docs/research/football_edge.md` 3.8b.
+- Portugal, the Netherlands and Belgium have no lower-division file, so their professional second-tier clubs stay in the amateur tier.
 
 ### 6.1 Read-back: `oddsmarkets/football/analytics/pool.py`
 

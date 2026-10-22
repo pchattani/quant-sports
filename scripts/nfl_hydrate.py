@@ -7,7 +7,8 @@ fetches
 
     https://pchattani.github.io/the-quant-gridiron/data/<S>/store.json
 
-and keeps whichever store is newer (by its "updated_at"). A 404 (the first deploy, or a season not yet published) is
+and keeps whichever store is newer (by its "updated_at"); likewise the timestamped ESPN injury snapshots
+(<S>/injury_log.json.gz). A 404 (the first deploy, or a season not yet published) is
 not an error. Play-by-play is not hydrated: CI restores data/nfl/raw from the Actions cache and the timestamp-gated
 nflverse fetch tops it up.
 
@@ -78,6 +79,31 @@ def hydrate(season: int, base: str = BASE, fetcher=fetch) -> dict:
     return {"store": "remote", "bytes": len(remote)}
 
 
+def hydrate_injury_log(season: int, base: str = BASE, fetcher=fetch) -> str:
+    """The timestamped ESPN injury snapshots (injury_log.json.gz, scripts/nfl_fetch.py): ESPN keeps no history, so the
+    deployed copy is the record. Kept when the checkout has none or an older one (by its updated_at)."""
+    import gzip
+    from oddsmarkets.nfl import store as st
+    remote = fetcher(f"{base}/{season}/{st.INJURY_LOG}")
+    if remote is None:
+        return "missing"
+    try:
+        r = json.loads(gzip.decompress(remote).decode("utf-8"))
+    except (OSError, ValueError):
+        logger.warning("%d: deployed injury log unreadable; kept the checkout", season)
+        return "bad"
+    p = st.injury_log_path(season)
+    local = st.load_injury_log(season) if p.exists() else None
+    if local is not None and str(local.get("updated_at") or "") >= str(r.get("updated_at") or ""):
+        return "local"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_name(p.name + ".hydrate.tmp")
+    tmp.write_bytes(remote)
+    tmp.replace(p)
+    logger.info("%d: injury log hydrated from the site (%d teams)", season, len(r.get("teams") or {}))
+    return "remote"
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--season", type=int, default=None, help="season (default: the current one)")
@@ -87,7 +113,9 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     if args.data:
         an.set_data_root(args.data)
-    hydrate(args.season or an.current_season(), args.base)
+    season = args.season or an.current_season()
+    hydrate(season, args.base)
+    hydrate_injury_log(season, args.base)
     return 0
 
 

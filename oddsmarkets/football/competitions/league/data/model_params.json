@@ -22,7 +22,9 @@
     "on": true,
     "rule": "clubs under a cup prefix (outside the followed leagues) shrink toward their tier's fitted offsets (domestic: national cups and super cups; continental: continental cups) instead of toward an average top-flight club; unseen clubs take their tier (fitting.pooled_tier, DixonColesModel prior_group)",
     "test": "pre-registered (football_edge.md 3.5), 1 Dec 2025 to 20 Oct 2026, every club-cup match n 1,569: log-loss -0.0285 (95% CI -0.0462 to -0.0123), slope 1.088 -> 1.032, ECE 0.0166 -> 0.0178 (+0.0012 > the 0.001 tolerance): not promoted; off pending the user's decision",
-    "decision": "switched on 22 Oct 2026 by the user's decision, overriding the pre-registered 0.001 ECE tolerance: log-loss -0.0285, ECE +0.0012 (block-bootstrap CI of the ECE difference -0.008 to +0.009)"
+    "decision": "switched on 22 Oct 2026 by the user's decision, overriding the pre-registered 0.001 ECE tolerance: log-loss -0.0285, ECE +0.0012 (block-bootstrap CI of the ECE difference -0.008 to +0.009)",
+    "levels": true,
+    "levels_note": "22 Oct 2026: national-cup clubs found in football-data's lower-division files get a tier per level (domestic-2 .. domestic-5; club_levels.json). Test 3.8: -0.0035 (-0.0094, +0.0018) on 1,569 cup matches, not a pass; adopted under the pre-registered fallback (a mislabelling corrected, point estimate not worse)"
   },
   "kalshi_market_rows": {
     "on": false,

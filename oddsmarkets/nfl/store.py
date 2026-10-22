@@ -87,6 +87,54 @@ def espn_odds_raw_path(season: int, game_id: str) -> Path:
     return cache_root() / "espn" / "odds" / str(int(season)) / f"{game_id}.json.gz"
 
 
+def espn_summary_keep_path(season: int, game_id: str) -> Path:
+    """A final game's compact ESPN record, kept beyond the day's model cache (round 4, 22 Oct 2026): under the raw
+    root, which CI saves whenever it changes, so a game that finishes after the day's cache save still has an ESPN
+    fallback until nflverse publishes its play-by-play."""
+    return raw_root() / "raw" / "espn_summary" / str(int(season)) / f"{game_id}.json.gz"
+
+
+def read_espn_summary(season: int, game_id: str) -> dict | None:
+    """The compact ESPN record of a game: the day's cache, else the kept final copy."""
+    rec = read_json(espn_summary_path(season, game_id))
+    if rec:
+        return rec
+    p = espn_summary_keep_path(season, game_id)
+    return read_json_gz(p) if p.exists() else None
+
+
+# ── timestamped injury snapshots (ESPN keeps no history) ────────────────────
+
+INJURY_LOG = "injury_log.json.gz"
+
+
+def injury_log_path(season: int) -> Path:
+    return season_dir(season) / INJURY_LOG
+
+
+def load_injury_log(season: int) -> dict:
+    """{"teams": {abbr: [[fetched_at, [[espn_athlete_id, status, espn_date, type, location, return_date, pos], ...]], ...]},
+    "updated_at"}: every change of a team's ESPN injury list, stamped with the first fetch that saw it."""
+    p = injury_log_path(season)
+    d = read_json_gz(p) if p.exists() else None
+    return d if isinstance(d, dict) and isinstance(d.get("teams"), dict) else {"teams": {}, "updated_at": None}
+
+
+def append_injury_log(log: dict, team: str, at: str, rows: list[list]) -> bool:
+    """Append one team's snapshot only when it differs from that team's last one. Returns whether it was appended."""
+    snaps = log["teams"].setdefault(str(team), [])
+    norm = sorted([str(r[0])] + [None if v is None else str(v) for v in r[1:]] for r in rows)
+    if snaps and snaps[-1][1] == norm:
+        return False
+    snaps.append([at, norm])
+    return True
+
+
+def save_injury_log(season: int, log: dict) -> Path:
+    log["updated_at"] = now()
+    return write_json_gz(injury_log_path(season), log)
+
+
 # ── JSON helpers ────────────────────────────────────────────────────────────
 
 def write_json(p: Path, obj: Any, indent: int | None = None) -> Path:
