@@ -442,7 +442,7 @@ BP.routeNpb('game', function (el, params) {
       BP.plot('npb-runs', [{ x: xs, y: m.runs_away, type: 'bar', name: BP.teamAbbr(away), marker: { color: BP.teamColour(away) } },
         { x: xs, y: m.runs_home, type: 'bar', name: BP.teamAbbr(home), marker: { color: BP.teamColour(home) } }],
       { barmode: 'group', height: 240, margin: { l: 44, r: 10, t: 10, b: 36 }, showlegend: true, legend: { orientation: 'h', y: 1.15 },
-        xaxis: { title: 'Runs in nine innings', dtick: 1 }, yaxis: { tickformat: '.0%' } });
+        xaxis: { title: 'Runs in nine innings', dtick: 1 }, yaxis: { title: 'Probability', tickformat: '.0%' } });
     }
   });
 });
@@ -596,7 +596,7 @@ BP.routeNpb('team', function (el, params) {
     BP.sortable(el);
     if (typeof BP.valueTeam === 'function') BP.valueTeam(document.getElementById('npb-value'), L, S, tid);   // value.js: strengths and needs
     if (track && track.length > 5) BP.plot('npb-track', [{ x: track.map(r => r[0]), y: track.map(r => r[1]), type: 'scatter', mode: 'lines', line: { color: BP.teamColour(tid), width: 2 } }],
-      { height: 240, margin: { l: 50, r: 10, t: 10, b: 36 }, yaxis: { zeroline: true } });
+      { height: 240, margin: { l: 50, r: 10, t: 10, b: 36 }, yaxis: { title: 'Rating (log runs)', zeroline: true } });
   });
 });
 

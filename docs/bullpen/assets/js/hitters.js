@@ -458,8 +458,8 @@ K.zoneHeat = (el, grid, opts) => {
     showscale: o.colorbar !== false && !narrow, colorbar: { thickness: 8, len: 0.8, tickfont: { size: 9, color: K.C.text2 } }, connectgaps: false
   }], K.layout({
     margin: { l: 30, r: narrow ? 8 : 10, t: o.title ? 26 : 8, b: 26 }, title: o.title ? { text: o.title, font: { size: 12, color: K.C.text } } : undefined,
-    xaxis: { range: [-1.75, 1.75], zeroline: false, showgrid: false, title: '', tickvals: [-1, 0, 1], scaleanchor: 'y', scaleratio: 1 },
-    yaxis: { range: [0.3, 4.4], zeroline: false, showgrid: false, title: '', tickvals: [1, 2, 3, 4] },
+    xaxis: { range: [-1.75, 1.75], zeroline: false, showgrid: false, title: 'Horizontal location (ft)', tickvals: [-1, 0, 1], scaleanchor: 'y', scaleratio: 1 },
+    yaxis: { range: [0.3, 4.4], zeroline: false, showgrid: false, title: 'Height (ft)', tickvals: [1, 2, 3, 4] },
     shapes: K.zoneShapes(o.top, o.bot)
   }));
 };

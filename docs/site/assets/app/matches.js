@@ -496,7 +496,7 @@ function drawExpected(el, m, hasShots) {
     '<div class="qk-kicker fb-mt">Score grid · ' + esc(m.home) + ' goals down, ' + esc(m.away) + ' across</div>' + FB.chartBox('mx-grid', 240, 'Chance of each scoreline');
   var data = [];
   for (var i = 0; i < 6; i++) for (var j = 0; j < 6; j++) data.push([j, i, Math.round(sim.grid[i][j] * 1000) / 10]);
-  QKC.heatmap(box.querySelector('#mx-grid'), { x: ['0', '1', '2', '3', '4', '5+'], y: ['0', '1', '2', '3', '4', '5+'], data: data, min: 0, fmt: function (v) { return v >= 0.5 ? Math.round(v) + '%' : ''; }, label: 'Scoreline probabilities' });
+  QKC.heatmap(box.querySelector('#mx-grid'), { x: ['0', '1', '2', '3', '4', '5+'], y: ['0', '1', '2', '3', '4', '5+'], data: data, min: 0, fmt: function (v) { return v >= 0.5 ? Math.round(v) + '%' : ''; }, xName: m.away + ' goals', yName: m.home + ' goals', label: 'Scoreline probabilities' });
 }
 
 function drawRace(el, m, hasShots) {
@@ -526,7 +526,7 @@ function drawRace(el, m, hasShots) {
     return {
       grid: { left: 8, right: 110, top: 16, bottom: 26, containLabel: true },
       xAxis: QKC.axis(T, { type: 'category', data: x.map(String), split: false, line: true, boundaryGap: false, name: 'Minute', nameLocation: 'middle', nameGap: 26 }),
-      yAxis: QKC.axis(T, { name: 'xG' }),
+      yAxis: QKC.axis(T, { name: 'Cumulative xG' }),
       tooltip: QKC.tooltip(T, { trigger: 'axis', formatter: function (ps) {
         var mm = ps[0].axisValue;
         return '<div style="color:' + T.ink3 + ';font-size:11px">Minute ' + esc(mm) + '</div>' + ps.filter(function (q) { return q.seriesType === 'line'; }).map(function (q) { return QKC.tipRow(q.color, q.seriesName, Number(q.value).toFixed(2)); }).join('');
@@ -608,9 +608,9 @@ function drawMomentum(el, m) {
   if (!mom.length) { box.style.height = 'auto'; box.innerHTML = FB.muted('No momentum data.'); return; }
   QKC.mount(box, function (T) {
     return {
-      grid: { left: 8, right: 8, top: 10, bottom: 6, containLabel: true },
-      xAxis: QKC.axis(T, { type: 'category', data: mom.map(function (x) { return String(x.minute); }), split: false }),
-      yAxis: QKC.axis(T, { fmt: function () { return ''; } }),
+      grid: { left: 8, right: 8, top: 26, bottom: 28, containLabel: true },
+      xAxis: QKC.axis(T, { type: 'category', data: mom.map(function (x) { return String(x.minute); }), split: false, name: 'Minute', nameLocation: 'middle', nameGap: 26 }),
+      yAxis: QKC.axis(T, { fmt: function () { return ''; }, name: 'Pressure, ' + m.home + ' up', nameAlign: 'left' }),
       tooltip: QKC.tooltip(T, { trigger: 'axis', formatter: function (ps) { var v = ps[0].value; return 'Minute ' + esc(ps[0].name) + '<br><b>' + esc(v >= 0 ? m.home : m.away) + '</b> ' + Math.abs(v); } }),
       series: [{ type: 'bar', barCategoryGap: '15%', data: mom.map(function (x) { return { value: x.value, itemStyle: { color: x.value >= 0 ? T.model : T.market } }; }) }]
     };
@@ -633,7 +633,7 @@ function drawContrib(el, m) {
   box.innerHTML = FB.chartBox('mx-contrib-c', Math.max(200, 44 + top.length * 26), 'xG and xA by player');
   var tag = function (r) { return r.side === 'home' ? '●' : '○'; };
   QKC.bar(box.querySelector('#mx-contrib-c'), {
-    horizontal: true, stack: true, legend: true, labelWidth: 140, fmt: function (v) { return num(v, 2); },
+    horizontal: true, stack: true, legend: true, labelWidth: 140, fmt: function (v) { return num(v, 2); }, valName: 'xG plus xA',
     cats: top.map(function (r) { return tag(r) + ' ' + r.e.n + (r.e.g ? ' (' + r.e.g + 'G)' : '') + (r.e.a ? ' (' + r.e.a + 'A)' : ''); }),
     series: [{ name: 'xG (shots taken)', data: top.map(function (r) { return Math.round((r.e.xg || 0) * 100) / 100; }), color: cHex(1) }, { name: 'xA (chances created)', data: top.map(function (r) { return Math.round((r.e.xa || 0) * 100) / 100; }), color: cHex(3) }],
     hrefs: top.map(function (r) { return r.e.id ? FB.href.player(r.e.id) : null; }), label: 'Who made the chances'

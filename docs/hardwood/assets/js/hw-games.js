@@ -4,7 +4,8 @@
  * match cards, the model against the market for the day's upcoming games, and how the model did on the
  * day's finished games.
  * Game centre (Summary tab): scoreboard, line score, model v market before tip-off (win %, spread, total) and
- * the margin broken into its parts; win probability (model, with the biggest swings marked), the margin
+ * the margin broken into its parts; availability before tip-off (the injury report and each team's availability
+ * term); win probability (model, with the biggest swings marked), the margin
  * flow, both teams' shot charts on the half court, four factors, game awards and the box score.
  * Detail tab (?tab=detail): the full pre-redesign game centre (lineups, rotations, key plays, shot modes).
  * Data: <L>/<S>/games/<gid>.json, <L>/<S>/schedule.json, teams.json logs, index.json cards (game.js helpers). */
@@ -65,7 +66,7 @@ function renderGames(el, params) {
     }
     el.innerHTML = h;
     if (mm.length) {
-      QKC.dumbbell('#gl-mm', { rows: mm.map(g => ({ label: HW.teamAbbr(L, g.away) + ' @ ' + HW.teamName(L, g.home), a: g.model.p_home, b: g.market.p_home, href: HW.gameHref(L, g.id, S), sub: (g.market.sources || []).join(', ') })), aName: 'Model', bName: 'Market', labelWidth: 170 });
+      QKC.dumbbell('#gl-mm', { rows: mm.map(g => ({ label: HW.teamAbbr(L, g.away) + ' @ ' + HW.teamName(L, g.home), a: g.model.p_home, b: g.market.p_home, href: HW.gameHref(L, g.id, S), sub: (g.market.sources || []).join(', ') })), aName: 'Model', bName: 'Market', labelWidth: 170, valName: 'Home win probability' });
     }
     const go = v => { if (v) HW.go(dl(v)); };
     document.getElementById('gl-date').addEventListener('change', e => go(e.target.value));
@@ -144,6 +145,37 @@ function pregameKpis(L, g) {
   if (isNum(pre.elo_p_home)) out.push(QK.kpi({ label: 'Elo alone', value: U.pct(pre.elo_p_home), sub: H + ' win probability' }));
   return '<div class="qk-kpis hw-kpis">' + out.join('') + '</div>';
 }
+// Pre-game availability: ESPN's injury report as of the last fetch before tip-off, and (NBA informed model) each
+// team's availability term in points of its own margin. Out = counted as not playing; Day-To-Day and the rest keep
+// the rate implied by recent games played.
+function availabilityHTML(L, g, S) {
+  const pre = g.pregame || {}, inj = pre.injuries || {}, m = pre.model || {}, det = m.detail || {};
+  const H = String(g.home), A = String(g.away);
+  const informed = m.model === 'informed' && isNum(det.injury_home) && isNum(det.injury_away);
+  const own = { };
+  if (informed) { own[H] = det.injury_home; own[A] = -det.injury_away; }
+  const listed = [A, H].filter(t => (inj[t] || []).length);
+  if (!listed.length && !informed) return '';
+  const order = s => { const x = String(s || '').toLowerCase(); return x === 'out' ? 0 : x.indexOf('day') === 0 || x === 'questionable' ? 1 : 2; };
+  const block = t => {
+    const rows = (inj[t] || []).slice().sort((x, y) => order(x.status) - order(y.status) || (isNum(y.impact) ? y.impact : -1) - (isNum(x.impact) ? x.impact : -1));
+    const head = '<div class="hw-av-head">' + U.teamEnt(L, t, { season: S }) + (informed ? '<span class="v" data-tip="Points of ' + esc(HW.teamAbbr(L, t)) + ' margin from who is expected to play, against what its rating already reflects">' + U.sgnHTML(own[t], 1) + ' pts</span>' : '') + '</div>';
+    const items = rows.map(r => {
+      const o = order(r.status) === 0;
+      return '<li><div class="hw-av-p">' + U.playerEnt(L, r.player, r.name, null, null, S) + (r.detail ? '<div class="s">' + esc(r.detail) + '</div>' : '') + '</div>' +
+        '<span class="hw-inj' + (o ? '' : ' q') + '">' + esc(r.status || '—') + '</span>' +
+        '<span class="v" data-tip="Points per 100 possessions the team loses without him (projected rate above replacement x minutes)">' + (isNum(r.impact) ? U.f(r.impact, 1) : '—') + '</span></li>';
+    });
+    return '<div>' + head + (items.length ? '<ul class="hw-list">' + items.join('') + '</ul>' : '<p class="hw-quiet" style="padding:8px 16px">Nobody listed.</p>') + '</div>';
+  };
+  const st = U.status(g);
+  const sub = (st === 'pre' ? 'ESPN’s injury report, updated every run until tip-off.' : 'ESPN’s injury report as last fetched for this game.') +
+    ' The model counts players listed Out as not playing; Day-To-Day players keep the rate their recent games imply.' +
+    (informed ? ' Each team’s figure is its availability term: points of its own margin from the expected rotation against what its rating already reflects (net ' + U.signed(det.injury, 1) + ' for ' + esc(HW.teamAbbr(L, H)) + ').' : '') +
+    ' The right-hand column is the points per 100 possessions each player is worth to his team.';
+  return U.card2('Availability before tip-off', sub, '<div class="grid-2 hw-av">' + [A, H].map(block).join('') + '</div>', { flush: true, cls: 'qk-span-12' });
+}
+
 function awardsHTML(L, g, S) {
   const a = g.awards || {};
   const defs = [['player_of_game', 'Player of the game'], ['biggest_swing', 'Biggest swing'], ['shot_maker', 'Shot maker'], ['stopper', 'Stopper'], ['unluckiest', 'Unluckiest']];
@@ -199,6 +231,7 @@ function renderGame(el, params) {
       h += U.card2(HW.teamName(L, A) + ' shots', esc(sqTxt(A)) + (sqTxt(A) ? ' · ' : '') + 'size is expected points', '<div id="gm-sh-a"></div>', { cls: 'qk-span-6' }) +
         U.card2(HW.teamName(L, H) + ' shots', esc(sqTxt(H)) + (sqTxt(H) ? ' · ' : '') + 'size is expected points', '<div id="gm-sh-h"></div>', { cls: 'qk-span-6' });
     }
+    h += availabilityHTML(L, g, S);
     h += awardsHTML(L, g, S);
     if (hasBox) {
       h += U.card2('Box score', 'Advanced columns where play-by-play exists. Sort any column.', '<div class="qk-seg hw-boxtabs" id="gm-bx-seg" role="group" aria-label="Team">' +
@@ -220,7 +253,7 @@ function renderGame(el, params) {
     }
     if (document.getElementById('gm-parts')) {
       const LBL = { rating: 'Team ratings', hca: 'Home court', rest: 'Rest', b2b: 'Back-to-back', travel: 'Travel', tz: 'Time zones', altitude: 'Altitude', injury: 'Injuries' };
-      QKC.bar('#gm-parts', { cats: parts.map(k => LBL[k]), series: [{ name: 'Points', data: parts.map(k => Math.round(det[k] * 10) / 10) }], horizontal: true, labels: true, diverging: true, fmt: v => U.signed(v, 1), labelWidth: 100 });
+      QKC.bar('#gm-parts', { cats: parts.map(k => LBL[k]), series: [{ name: 'Points', data: parts.map(k => Math.round(det[k] * 10) / 10) }], horizontal: true, labels: true, diverging: true, fmt: v => U.signed(v, 1), labelWidth: 100, valName: 'Margin (points)' });
     }
     if (document.getElementById('gm-wp')) {
       const pts = g.wp.model, espn = g.wp.espn || [];
@@ -241,9 +274,9 @@ function renderGame(el, params) {
       QKC.mount('#gm-flow', T => {
         const hc = U.pair(L, H, A);
         return {
-          grid: { left: 8, right: 16, top: 14, bottom: 8, containLabel: true },
-          xAxis: QKC.axis(T, { type: 'value', min: 0, max: fl[fl.length - 1][0], split: false, line: true, fmt: v => (v % PERIOD_S(L) === 0 && v <= 4 * PERIOD_S(L) ? 'Q' + (v / PERIOD_S(L) + 1) : ''), interval: PERIOD_S(L) }),
-          yAxis: QKC.axis(T, { fmt: v => (v > 0 ? '+' : '') + v }),
+          grid: { left: 8, right: 16, top: 30, bottom: 30, containLabel: true },
+          xAxis: QKC.axis(T, { name: 'Game time', nameLocation: 'middle', nameGap: 26, type: 'value', min: 0, max: fl[fl.length - 1][0], split: false, line: true, fmt: v => (v % PERIOD_S(L) === 0 && v <= 4 * PERIOD_S(L) ? 'Q' + (v / PERIOD_S(L) + 1) : ''), interval: PERIOD_S(L) }),
+          yAxis: QKC.axis(T, { fmt: v => (v > 0 ? '+' : '') + v, name: HW.teamAbbr(L, H) + ' lead (points)', nameAlign: 'left' }),
           tooltip: QKC.tooltip(T, { trigger: 'axis', formatter: ps => { const m = (ps[0].value[1] || 0) + ((ps[1] || { value: [0, 0] }).value[1] || 0); return '<div style="color:' + T.ink3 + ';font-size:11px">' + esc(tLabel(L, ps[0].value[0])) + '</div>' + (m === 0 ? 'Tied' : QKC.tipRow(m > 0 ? hc[0] : hc[1], (m > 0 ? HW.teamAbbr(L, H) : HW.teamAbbr(L, A)) + ' lead', String(Math.abs(m)))); } }),
           series: [0, 1].map(k => ({ type: 'line', step: 'end', showSymbol: false, name: k ? HW.teamAbbr(L, A) : HW.teamAbbr(L, H),
             data: fl.map(x => [x[0], k ? Math.min(0, x[1]) : Math.max(0, x[1])]), lineStyle: { width: 1.6, color: hc[k] }, itemStyle: { color: hc[k] }, areaStyle: { color: QKC.hexA(hc[k], 0.2) },
@@ -253,7 +286,8 @@ function renderGame(el, params) {
     }
     if (document.getElementById('gm-ff')) {
       const K = [['efg', 'eFG%'], ['tov', 'TOV%'], ['orb', 'ORB%'], ['ftr', 'FT rate']];
-      QKC.bar('#gm-ff', { cats: K.map(k => k[1]), series: [{ name: HW.teamAbbr(L, A), data: K.map(k => Math.round(ff[A][k[0]] * 1000) / 10) }, { name: HW.teamAbbr(L, H), data: K.map(k => Math.round(ff[H][k[0]] * 1000) / 10) }], labels: true, fmt: v => U.f(v, 1), legend: true });
+      QKC.bar('#gm-ff', { cats: K.map(k => k[1]), series: [{ name: HW.teamAbbr(L, A), data: K.map(k => Math.round(ff[A][k[0]] * 1000) / 10) }, { name: HW.teamAbbr(L, H), data: K.map(k => Math.round(ff[H][k[0]] * 1000) / 10) }], labels: true, fmt: v => U.f(v, 1), legend: true, valName: 'Rate (%)',
+        max: v => Math.min(100, Math.ceil(v.max * 1.2 / 10) * 10) });
     }
     if (shots.length) {
       [[A, 'gm-sh-a'], [H, 'gm-sh-h']].forEach(x => {

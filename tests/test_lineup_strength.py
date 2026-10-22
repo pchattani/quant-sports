@@ -197,3 +197,52 @@ def test_live_terms_price_a_posted_weaker_xi() -> None:
     t = out["premier-league"]["2000"]
     assert t["applied"] and t["d"] < 0 and t["home"]["delta"] < 0 and abs(t["away"]["delta"]) < 1e-6
     assert [o["id"] for o in t["home"]["out"]] == [105]
+
+
+def test_rho_is_held_at_the_club_value_only_when_a_frame_cannot_identify_it() -> None:
+    import pandas as pd
+
+    import build_site_all as B
+    from oddsmarkets.football.competitions.league import fitting
+    n = B.MIN_GOALS_ROWS_FOR_RHO
+    all_xg = pd.DataFrame({"home_xg": np.ones(n + 50), "away_xg": np.ones(n + 50)})
+    assert B.rho_hold(all_xg) == fitting.club_rho()
+    goals = all_xg.copy()
+    goals.loc[: n - 1, "home_xg"] = np.nan
+    assert B.rho_hold(goals) is None
+    assert B.rho_hold(pd.DataFrame({"home_goals": [1] * (n - 1)})) == fitting.club_rho()
+    assert B.rho_hold(None) == fitting.club_rho()
+
+
+def test_tier_prior_puts_weak_cup_only_clubs_below_league_clubs_and_unseen_ones_at_their_tier() -> None:
+    import pandas as pd
+
+    from oddsmarkets.football.competitions.league import fitting
+    from oddsmarkets.football.core import DixonColesModel
+    rng = np.random.default_rng(4)
+    lg = [f"premier-league:T{i}" for i in range(8)]
+    low = [f"fa-cup:L{i}" for i in range(8)]
+    d0 = pd.Timestamp("2026-01-01", tz="UTC")
+    rows = []
+    for k in range(300):                         # league clubs among themselves
+        h, a = rng.choice(lg, 2, replace=False)
+        rows.append((h, a, rng.poisson(1.4), rng.poisson(1.1)))
+    for k in range(120):                         # lower clubs thrash each other ...
+        h, a = rng.choice(low, 2, replace=False)
+        rows.append((h, a, rng.poisson(2.5), rng.poisson(0.4)))
+    for k in range(60):                          # ... and lose to league clubs in the cup
+        rows.append((rng.choice(lg), rng.choice(low), rng.poisson(3.0), rng.poisson(0.3)))
+    df = pd.DataFrame(rows, columns=["home_team", "away_team", "home_goals", "away_goals"]).assign(match_date=d0, weight=1.0)
+    plain = DixonColesModel(xi=0.0, ridge=1.0, analytic_grad=True, fixed_rho=-0.05)
+    plain.fit(df, as_of=d0)
+    tier = DixonColesModel(xi=0.0, ridge=1.0, analytic_grad=True, fixed_rho=-0.05, prior_group=fitting.pooled_tier)
+    tier.fit(df, as_of=d0)
+
+    def strength(m, team):
+        return m.team_params(team)[0] - m.team_params(team)[1]
+    lg_mean = np.mean([strength(tier, t) for t in lg])
+    assert np.mean([strength(tier, t) for t in low]) < lg_mean
+    assert np.mean([strength(tier, t) for t in low]) < np.mean([strength(plain, t) for t in low])
+    assert strength(tier, "fa-cup:Never Seen") < lg_mean            # an unseen lower club: its tier, below the league
+    assert plain.team_params("fa-cup:Never Seen") == (0.0, 0.0)
+    assert fitting.pooled_tier("premier-league:Arsenal") is None and fitting.pooled_tier("champions-league:Celtic") == "continental"

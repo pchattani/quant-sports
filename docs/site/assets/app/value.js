@@ -335,7 +335,7 @@ function drawPlayersBody(el, q) {
     if (mvRows.length < 3) { c2.style.height = 'auto'; c2.innerHTML = FB.muted(season ? 'Market values are compared on the last-12-months view.' : 'Too few market values under these filters.'); }
     else QKC.scatter(c2, {
       points: mvRows.map(function (r) { return { x: Math.log10(r.mv), y: r.v2, name: r.name + ' · ' + money(r.mv), color: roleHex(r.role), size: 9, href: FB.href.player(r.id), label: FB.surname(r.name) }; }),
-      xName: 'Market value', yName: 'Value v2 (pts)', xFmt: function (v) { return money(Math.pow(10, v)); }, yFmt: function (v) { return num(v, 1); }, labelTop: 8,
+      xName: 'Market value (log scale)', yName: 'Value v2 (pts)', xFmt: function (v) { return money(Math.pow(10, v)); }, yFmt: function (v) { return num(v, 1); }, labelTop: 8,
       quadrants: ['Underrated', 'Stars', '', 'Priced high'], label: 'Value against market value'
     });
   }
@@ -376,7 +376,7 @@ function drawPositions(el, body, q) {
       if (!pool.length) { box.style.height = 'auto'; box.innerHTML = FB.muted('Nobody clears the filters.'); return; }
       box.style.height = '';
       QKC.bar(box, {
-        horizontal: true, labels: true, labelWidth: 140, fmt: function (v) { return signed(v, 2); },
+        horizontal: true, labels: true, labelWidth: 140, fmt: function (v) { return signed(v, 2); }, valName: 'GAR per 90',
         cats: pool.map(function (x) { return x.name + ' · ' + (x.club || ''); }), series: [{ name: 'GAR/90', data: pool.map(function (x) { return Math.round(x.gar90 * 1000) / 1000; }) }],
         colors: pool.map(function () { return roleHex(role); }), hrefs: pool.map(function (x) { return FB.href.player(x.id); }), label: 'Top fifteen ' + roleLabel(role)
       });
@@ -470,7 +470,7 @@ function drawFeed(el, box, TR, q) {
   if (top.length) {
     var mx = Math.max.apply(null, top.map(function (d) { return Math.max(d.fee, d.fair); }));
     QKC.dumbbell(cbox, { rows: top.map(function (d) { return { label: d.name + ' · ' + (d.to_name || ''), a: d.fair, b: d.fee, href: FB.href.player(d.pid), sub: (d.from_name || '') + ' → ' + (d.to_name || '') + ' · ' + d.date }; }),
-      aName: 'Fair fee', bName: 'Fee paid', fmt: function (v) { return money(v); }, min: 0, max: mx * 1.05, labelWidth: 180, label: 'Biggest fees against fair fees' });
+      aName: 'Fair fee', bName: 'Fee paid', valName: 'Transfer fee', fmt: function (v) { return money(v); }, min: 0, max: mx * 1.05, labelWidth: 180, label: 'Biggest fees against fair fees' });
   } else { cbox.style.height = 'auto'; cbox.innerHTML = FB.muted('No published fee with a fair fee in the last 12 months.'); }
   var draw = function () {
     var qn = q.q ? norm(q.q) : '';
@@ -505,7 +505,7 @@ function drawDeals(el, box, TR) {
   var rows = best.slice(0, 10).concat(worst.slice(0, 10)).filter(function (d) { return has(d.b_score); }).sort(function (a, b) { return b.b_score - a.b_score; });
   var c = el.querySelector('#va-deal-chart');
   if (rows.length) QKC.bar(c, { horizontal: true, diverging: true, labels: true, labelWidth: 170, fmt: function (v) { return signed(v, 2); },
-    cats: rows.map(function (d) { return d.name + ' → ' + (d.to_name || ''); }), series: [{ name: 'Buyer score', data: rows.map(function (d) { return Math.round(d.b_score * 100) / 100; }) }],
+    cats: rows.map(function (d) { return d.name + ' → ' + (d.to_name || ''); }), valName: 'Buyer score', series: [{ name: 'Buyer score', data: rows.map(function (d) { return Math.round(d.b_score * 100) / 100; }) }],
     hrefs: rows.map(function (d) { return FB.href.player(d.pid); }), label: 'Buyer scores' });
   else { c.style.height = 'auto'; c.innerHTML = FB.muted('No graded deals yet.'); }
 }
@@ -528,7 +528,7 @@ function drawWindows(el, box, TR, q) {
   var s = el.querySelector('#tw-lg');
   if (s) s.addEventListener('change', function () { FB.setQuery({ lg: s.value }, true); });
   QKC.bar(el.querySelector('#tw-chart'), {
-    cats: keys.map(function (k) { return ws[k].label || k; }), legend: true, fmt: function (v) { return money(v); },
+    cats: keys.map(function (k) { return ws[k].label || k; }), legend: true, fmt: function (v) { return money(v); }, valName: 'Transfer fees', catName: 'Transfer window',
     series: [{ name: 'Spent', data: keys.map(function (k) { return ws[k].spend || 0; }) }, { name: 'Sold', data: keys.map(function (k) { return ws[k].income || 0; }) }],
     label: 'Spending and sales by window'
   });
@@ -538,7 +538,7 @@ function drawWindows(el, box, TR, q) {
   var nk = Object.keys(net).sort(function (a, b) { return net[b] - net[a]; });
   var nb = el.querySelector('#tw-net');
   if (nk.length) QKC.bar(nb, { horizontal: true, diverging: true, labels: true, labelWidth: 120, fmt: function (v) { return netText(v); },
-    cats: nk.map(function (t) { return FB.clubName(t, '#' + t); }), series: [{ name: 'Net spend', data: nk.map(function (t) { return net[t]; }) }], hrefs: nk.map(function (t) { return FB.href.club(t); }), label: 'Net spend by club' });
+    cats: nk.map(function (t) { return FB.clubName(t, '#' + t); }), valName: 'Net spend', series: [{ name: 'Net spend', data: nk.map(function (t) { return net[t]; }) }], hrefs: nk.map(function (t) { return FB.href.club(t); }), label: 'Net spend by club' });
   else { nb.style.height = 'auto'; nb.innerHTML = FB.muted('No published fees in the latest window.'); }
   var rows = keys.slice().reverse().map(function (k) { var x = ws[k]; return FB.merge(x, { key: k }); });
   FB.table('tw-table', [
@@ -815,7 +815,7 @@ function drawSimResult(el, tb, P, B, S, sens, probs, q) {
     if (!c) return;
     var rows = o ? o.rows.filter(function (r) { return !r.pts; }) : [];
     if (!rows.length) { c.remove(); return; }
-    QKC.bar(c, { horizontal: true, labelWidth: 120, fmt: function (v) { return pct(v, 1); },
+    QKC.bar(c, { horizontal: true, labelWidth: 120, fmt: function (v) { return pct(v, 1); }, valName: 'Season probability',
       cats: rows.map(function (r) { return r.label; }), series: [{ name: 'Now', data: rows.map(function (r) { return r.base; }), color: QK.cssVar('--ink-4') }, { name: 'After', data: rows.map(function (r) { return r.after; }), color: QK.cssVar('--c-1') }] });
   };
   oddsChart('tr-odds-b', oB);
@@ -871,7 +871,7 @@ function ledgerTables(el, d, prefix) {
   var wc = el.querySelector('#' + prefix + '-win');
   if (wc && ws.length) {
     var o = ws.slice().sort(function (a, b) { return String(a.window).localeCompare(String(b.window)); });
-    QKC.bar(wc, { legend: true, fmt: function (v) { return money(v); }, cats: o.map(function (w) { return w.label + (w.complete ? '' : ' *'); }),
+    QKC.bar(wc, { legend: true, fmt: function (v) { return money(v); }, valName: 'Transfer fees', catName: 'Transfer window', cats: o.map(function (w) { return w.label + (w.complete ? '' : ' *'); }),
       series: [{ name: 'Spent', data: o.map(function (w) { return w.spend || 0; }) }, { name: 'Sold', data: o.map(function (w) { return w.income || 0; }) }], label: 'Spending and sales by window' });
   } else if (wc) { wc.style.height = 'auto'; wc.innerHTML = FB.muted('No windows on record.'); }
 }
@@ -920,10 +920,10 @@ function drawBudgets(el, body, q) {
     var nk = Object.keys(net).sort(function (a, b2) { return net[b2] - net[a]; });
     var nb = el.querySelector('#bu-net');
     if (nk.length) QKC.bar(nb, { horizontal: true, diverging: true, labels: true, labelWidth: 120, fmt: function (v) { return netText(v); }, cats: nk.map(function (t) { return FB.clubName(t, '#' + t); }),
-      series: [{ name: 'Net spend', data: nk.map(function (t) { return net[t]; }) }], hrefs: nk.map(function (t) { return '#/value/budgets?lg=' + lg + '&club=' + t; }), label: 'Net spend by club' });
+      valName: 'Net spend', series: [{ name: 'Net spend', data: nk.map(function (t) { return net[t]; }) }], hrefs: nk.map(function (t) { return '#/value/budgets?lg=' + lg + '&club=' + t; }), label: 'Net spend by club' });
     else { nb.style.height = 'auto'; nb.innerHTML = FB.muted('No published fees in the latest window.'); }
     var lb = el.querySelector('#bu-lgwin');
-    if (keys.length) QKC.bar(lb, { legend: true, fmt: function (v) { return money(v); }, cats: keys.map(function (k) { return W[k].label || k; }),
+    if (keys.length) QKC.bar(lb, { legend: true, fmt: function (v) { return money(v); }, valName: 'Transfer fees', catName: 'Transfer window', cats: keys.map(function (k) { return W[k].label || k; }),
       series: [{ name: 'Spent', data: keys.map(function (k) { return W[k].spend || 0; }) }, { name: 'Sold', data: keys.map(function (k) { return W[k].income || 0; }) }] });
     else { lb.style.height = 'auto'; lb.innerHTML = FB.muted('No windows on record.'); }
     var cb = el.querySelector('#bu-club-body');
@@ -958,11 +958,11 @@ function drawMethod(el, body) {
       '<p>The fair fee is a ridge regression of log published fees on the player\'s four-season value, projection, age, position, minutes and both clubs\' strength; budgets model a club\'s window spend from its previous window, its league, its strength and its squad\'s market value. ' + esc(HONEST) + ' <a href="#/model/methodology/value">Full methodology →</a></p></div>') + '</div>';
   var ws = w.slice().sort(function (a, b) { return (b.weight || 0) - (a.weight || 0); });
   if (ws.length) QKC.bar(el.querySelector('#me-w'), { horizontal: true, diverging: true, labels: true, labelWidth: 170, fmt: function (x) { return signed(x, 3); },
-    cats: ws.map(function (x) { return x.label + (x.padj ? ' (p-adj)' : ''); }), series: [{ name: 'Goals per action', data: ws.map(function (x) { return x.weight || 0; }) }], label: 'Weights by action' });
+    cats: ws.map(function (x) { return x.label + (x.padj ? ' (p-adj)' : ''); }), valName: 'Goals per action', series: [{ name: 'Goals per action', data: ws.map(function (x) { return x.weight || 0; }) }], label: 'Weights by action' });
   if (v.xgd) {
     var lbl = { rating: 'Sofascore rating', team: 'Team\'s own form', box: 'Box score alone', value: 'Player value' };
     var ks = ['rating', 'team', 'box', 'value'];
-    QKC.bar(el.querySelector('#me-r2'), { horizontal: true, legend: true, labelWidth: 120, fmt: function (x) { return pct(x, 1); }, cats: ks.map(function (k) { return lbl[k]; }),
+    QKC.bar(el.querySelector('#me-r2'), { horizontal: true, legend: true, labelWidth: 120, fmt: function (x) { return pct(x, 1); }, valName: 'Held-out R²', cats: ks.map(function (k) { return lbl[k]; }),
       series: [{ name: 'xG difference', data: ks.map(function (k) { return v.xgd[k]; }) }, { name: 'Goal difference', data: ks.map(function (k) { return (v.gd || {})[k]; }) }] });
   } else FB.set('me-r2', FB.muted('No validation this build.'));
   var rep = m.replacement || {};
@@ -1017,7 +1017,7 @@ FB.valueNeeds = function (el, tid) {
       '<div class="fb-va-sw fb-mt">Transfer budget and ledger</div>' + budgetLedgerHTML(d) + '<div class="fb-mt">' + ledgerShell(pfx) + '</div>' +
       '<p class="fb-cap">' + esc(HONEST) + ' <a href="#/value?club=' + esc(d.tid) + '">The squad on the value table →</a> · <a href="#/value/simulator?to=' + esc(d.tid) + '">Transfer simulator →</a></p>');
     QKC.bar(el.querySelector('#' + pfx + '-units'), { horizontal: true, labels: true, labelWidth: 150, max: 100, fmt: function (x) { return num(x, 0); },
-      cats: d.units.map(function (u) { return u.label + ' (' + (u.grade || '—') + ')'; }), series: [{ name: 'Percentile in the league', data: d.units.map(function (u) { return u.pct; }) }],
+      cats: d.units.map(function (u) { return u.label + ' (' + (u.grade || '—') + ')'; }), valName: 'Percentile in the league', series: [{ name: 'Percentile in the league', data: d.units.map(function (u) { return u.pct; }) }],
       colors: d.units.map(function (u) { return u.pct >= 60 ? QK.cssVar('--st-good') : u.pct >= 40 ? QK.cssVar('--st-warn') : QK.cssVar('--st-crit'); }) });
     FB.table(pfx + '-tbl', [
       { key: 'label', label: 'Unit', sticky: true },

@@ -429,7 +429,7 @@ LIVE.overview = function (el, body, c, d0, q, seasons) {
     var rb = $(el, 'co-race');
     if (last) { rb.style.height = 'auto'; rb.innerHTML = cardMsg('This edition is over' + (champ ? ': ' + esc(champ) + ' won it' : '') + '. The next edition is not in the data yet, so there is nothing to simulate.'); }
     else if (race.length) {
-      QKC.bar(rb, { horizontal: true, labels: true, labelWidth: 130, max: Math.min(1, Math.max(0.2, race[0].p * 1.15)), fmt: function (v) { return pct(v, v < 0.1 ? 1 : 0); },
+      QKC.bar(rb, { horizontal: true, labels: true, labelWidth: 130, max: Math.min(1, Math.max(0.2, race[0].p * 1.15)), valName: 'Chance of winning', fmt: function (v) { return pct(v, v < 0.1 ? 1 : 0); },
         cats: race.map(function (r) { return r.team; }), series: [{ name: 'Chance', data: race.map(function (r) { return r.p; }) }],
         hrefs: race.map(function (r) { var id = ctx.tidOf(r.team); return id ? FB.href.club(id, { c: c.slug }) : null; }), label: 'Chance of winning' });
     } else { rb.style.height = 'auto'; rb.innerHTML = cardMsg(m.unsimulated ? 'National-team competitions are not simulated.' : 'No simulation for this competition yet.'); }
@@ -447,12 +447,12 @@ LIVE.overview = function (el, body, c, d0, q, seasons) {
     var snaps = ((d.history || {}).snapshots || []).filter(function (s) { return s.title; });
     if (snaps.length >= 2 && !last) {
       $(el, 'co-hist-wrap').innerHTML = '<div class="fb-mt">' + FB.card('The race, run by run', 'Chance of winning ' + esc(winnerWord(c)) + ' after each hourly model run.', FB.chartBox('co-hist', 280, 'Title odds over time'), { foot: '<span></span><a href="' + esc(FB.href.comp(c.slug, 'odds', { view: 'history' })) + '">Every series →</a>' }) + '</div>';
-      historyChart($(el, 'co-hist'), snaps, 'title', 6);
+      historyChart($(el, 'co-hist'), snaps, 'title', 6, 'Chance of winning');
     }
   });
 };
 
-function historyChart(box, snaps, key, n) {
+function historyChart(box, snaps, key, n, yName) {
   var lastS = snaps[snaps.length - 1][key] || {};
   var teams = Object.keys(lastS).sort(function (a, b) { return lastS[b] - lastS[a]; }).filter(function (t) { return lastS[t] > 0.003; }).slice(0, n || 8);
   if (!teams.length) teams = Object.keys(lastS).slice(0, 3);
@@ -460,7 +460,7 @@ function historyChart(box, snaps, key, n) {
   QKC.line(box, {
     x: snaps.map(function (s) { return s.ts; }), xLabel: function (v) { return FB.fmtStamp(v); },
     xFmt: function (v) { var dd = FB.parseDate(v); return dd ? dd.getDate() + ' ' + FB.MONTHS[dd.getMonth()] : ''; },
-    yFmt: function (v) { return pct(v); }, yMin: 0, label: 'Probabilities by model run',
+    yFmt: function (v) { return pct(v); }, yMin: 0, xName: 'Model run', yName: yName || 'Probability', label: 'Probabilities by model run',
     series: teams.map(function (t) { return { name: t, data: snaps.map(function (s) { return isNum((s[key] || {})[t]) ? s[key][t] : 0; }) }; })
   });
 }
@@ -596,7 +596,7 @@ function posHeat(box, rows, get, bands) {
   var xs = []; for (var i = 1; i <= n; i++) xs.push(String(i));
   box.classList.add('fb-chart');
   box.style.setProperty('--h', Math.max(220, teams.length * (teams.length > 24 ? 19 : 24) + 90) + 'px');
-  QKC.heatmap(box, { x: xs, y: teams, data: data, min: 0, max: 1, fmt: function (v) { return pct(v, v < 0.1 ? 1 : 0); }, cellLabels: n <= 20, label: 'Finishing-position distribution' });
+  QKC.heatmap(box, { x: xs, y: teams, data: data, min: 0, max: 1, fmt: function (v) { return pct(v, v < 0.1 ? 1 : 0); }, cellLabels: n <= 20, xName: 'Finishing position', yName: 'Team', label: 'Finishing-position distribution' });
 }
 function upcomingTable(box, ctx, list) {
   if (!list.length) { box.innerHTML = '<div class="qk-card-body">' + cardMsg('No matches left to play.') + '</div>'; return; }
@@ -682,7 +682,7 @@ function ligaReleg(el, b, ctx, r) {
   var risky = r.rows.filter(function (x) { return x.p_any > 0.001; }).sort(function (a, b2) { return b2.p_any - a.p_any; }).slice(0, 14);
   var box = $(el, 'co-relc');
   if (!risky.length) { box.style.height = 'auto'; box.innerHTML = cardMsg('No club at appreciable risk.'); return; }
-  QKC.bar(box, { horizontal: true, stack: true, legend: true, labelWidth: 120, fmt: function (v) { return pct(v); },
+  QKC.bar(box, { horizontal: true, stack: true, legend: true, labelWidth: 120, fmt: function (v) { return pct(v); }, valName: 'Relegation chance',
     cats: risky.map(function (x) { return x.team; }), series: [{ name: 'Via promedio', data: risky.map(function (x) { return x.p_promedio; }), color: hexOf('var(--c-2)') }, { name: 'Via Tabla Anual', data: risky.map(function (x) { return x.p_anual; }), color: hexOf('var(--c-7)') }],
     label: 'Relegation risk by route' });
 }
@@ -810,7 +810,7 @@ LIVE.bracket = function (el, body, c, d0) {
     });
     var top = alive.slice(0, 12).filter(function (t) { return ((b.p_cup || {})[t] || 0) > 0; });
     var wb = $(el, 'co-bwin');
-    if (top.length) QKC.bar(wb, { horizontal: true, labels: true, labelWidth: 120, fmt: function (v) { return pct(v, v < 0.1 ? 1 : 0); }, cats: top, series: [{ name: cupLabel, data: top.map(function (t) { return b.p_cup[t]; }) }],
+    if (top.length) QKC.bar(wb, { horizontal: true, labels: true, labelWidth: 120, fmt: function (v) { return pct(v, v < 0.1 ? 1 : 0); }, valName: 'Chance of winning', cats: top, series: [{ name: cupLabel, data: top.map(function (t) { return b.p_cup[t]; }) }],
       hrefs: top.map(function (t) { var id = ctx.tidOf(t); return id ? FB.href.club(id, { c: c.slug }) : null; }), label: 'Chance of winning' });
     else { wb.style.height = 'auto'; wb.innerHTML = cardMsg('Decided, or not simulated.'); }
     var cols = [{ key: 'team', label: 'Club', sticky: true, fmt: function (v) { return ctx.club(v); } }];
@@ -899,16 +899,16 @@ LIVE.odds = function (el, body, c, d0, q) {
       FB.card(downs.length ? 'Relegation risk' : (k === 'cup' ? 'Reaching the final' : 'Reaching the play-offs'), downs.length ? downs.map(function (bd) { return bd.label; }).join(' + ') : 'From the simulations.', FB.chartBox('co-oc2', 340, 'Second probability'), { span: 6 })
     ) + '<div class="fb-mt">' + FB.card('Every club', 'Probabilities from the simulated seasons; sortable.', '<div id="co-ot"></div>', { flush: true }) + '</div>';
     FB.table($(el, 'co-ot'), cols, list, { sort: { key: has(teams[0][fk]) ? fk : 'p_title', dir: 'desc' }, caption: 'Probabilities' });
-    var bar = function (box, key, rowsIn, colour, getter) {
+    var bar = function (box, key, rowsIn, colour, getter, vName) {
       var g = getter || function (t) { return t[key]; };
       var r = rowsIn.filter(function (t) { return (g(t) || 0) > 0; }).sort(function (a, b2) { return g(b2) - g(a); }).slice(0, 10);
       if (!r.length) { box.style.height = 'auto'; box.innerHTML = cardMsg('Nothing to show yet.'); return; }
-      QKC.bar(box, { horizontal: true, labels: true, labelWidth: 120, fmt: function (v) { return pct(v, v < 0.1 ? 1 : 0); }, cats: r.map(function (t) { return t.team; }), series: [{ name: 'Chance', data: r.map(g), color: colour }],
+      QKC.bar(box, { horizontal: true, labels: true, labelWidth: 120, fmt: function (v) { return pct(v, v < 0.1 ? 1 : 0); }, valName: vName, cats: r.map(function (t) { return t.team; }), series: [{ name: 'Chance', data: r.map(g), color: colour }],
         hrefs: r.map(function (t) { var id = ctx.tidOf(t.team); return id ? FB.href.club(id, { c: c.slug }) : null; }) });
     };
-    bar($(el, 'co-oc1'), has(teams[0][fk]) ? fk : 'p_title', teams);
-    if (downs.length) bar($(el, 'co-oc2'), null, teams, hexOf('var(--c-8)'), function (t) { return downs.reduce(function (s, bd) { return s + ((t.bands || {})[bd.key] || 0); }, 0); });
-    else bar($(el, 'co-oc2'), k === 'cup' ? 'p_conference' : 'p_playoffs', teams, hexOf('var(--c-3)'));
+    bar($(el, 'co-oc1'), has(teams[0][fk]) ? fk : 'p_title', teams, null, null, 'Chance of winning');
+    if (downs.length) bar($(el, 'co-oc2'), null, teams, hexOf('var(--c-8)'), function (t) { return downs.reduce(function (s, bd) { return s + ((t.bands || {})[bd.key] || 0); }, 0); }, 'Relegation chance');
+    else bar($(el, 'co-oc2'), k === 'cup' ? 'p_conference' : 'p_playoffs', teams, hexOf('var(--c-3)'), null, k === 'cup' ? 'Chance of reaching the final' : 'Play-off chance');
   });
 };
 function oddsMarket(el, ob, c, d0) {
@@ -935,7 +935,7 @@ function oddsMarket(el, ob, c, d0) {
           FB.card('Outright prices', null, '<div id="co-outt"></div>', { span: 5, flush: true }))
         : FB.card('Outright winner', null, cardMsg('No outright market for this competition.'))) + '</div>';
     if (fx.length) {
-      QKC.dumbbell($(el, 'co-mvm'), { rows: rowsM, labelWidth: 230 });
+      QKC.dumbbell($(el, 'co-mvm'), { rows: rowsM, labelWidth: 230, valName: 'Outcome probability' });
       var trio = function (o) { return ['home', 'draw', 'away'].map(function (k) { return pct(o[k]); }).join(' / '); };
       FB.table($(el, 'co-mt'), [
         { key: 'commence', label: 'Kick-off', fmt: function (v) { return esc(FB.fmtDate(v, { time: true })); } },
@@ -949,7 +949,7 @@ function oddsMarket(el, ob, c, d0) {
     }
     if (out.available && (out.teams || []).length) {
       var ot = out.teams.slice().sort(function (a, b) { return b.model - a.model; });
-      QKC.dumbbell($(el, 'co-out'), { rows: ot.map(function (t) { var id = ctx.tidOf(t.team); return { label: t.team, a: t.model, b: t.market, href: id ? FB.href.club(id, { c: c.slug }) : null }; }), labelWidth: 140 });
+      QKC.dumbbell($(el, 'co-out'), { rows: ot.map(function (t) { var id = ctx.tidOf(t.team); return { label: t.team, a: t.model, b: t.market, href: id ? FB.href.club(id, { c: c.slug }) : null }; }), labelWidth: 140, valName: 'Chance of winning' });
       FB.table($(el, 'co-outt'), [
         { key: 'team', label: 'Club', fmt: function (v) { return ctx.club(v); } },
         { key: 'model', label: 'Model', num: true, fmt: function (v) { return pctCell(v); } }, { key: 'market', label: 'Market', num: true, fmt: function (v) { return pctCell(v); } },
@@ -975,7 +975,7 @@ function oddsHistory(el, ob, c, d0) {
     var key = opts[0][0];
     ob.innerHTML = FB.card('How the probabilities moved', 'Each point is one hourly model run (' + snaps.length + ' runs, from ' + esc(FB.fmtDate(snaps[0].ts)) + ').',
       '<div class="fb-toolbar">' + FB.seg('co-hs', opts, key, 'Series') + '</div>' + FB.chartBox('co-hc', 420, 'Probabilities by run'));
-    var draw = function () { historyChart($(el, 'co-hc'), snaps, key, 8); };
+    var draw = function () { historyChart($(el, 'co-hc'), snaps, key, 8, key === 'title' ? 'Chance of winning' : key === 'relegation' ? 'Relegation chance' : key === 'anual' ? 'Chance of topping the Anual' : key === 'shield' ? 'Supporters\' Shield chance' : key === 'band' && firstUp ? firstUp.label + ' chance' : 'Probability'); };
     FB.wireSeg(ob, 'co-hs', function (v) { key = v; draw(); });
     draw();
   });
@@ -1018,19 +1018,19 @@ LIVE.power = function (el, body, c, d0) {
     var lb = $(el, 'co-luck');
     if (hasXg) {
       var byLuck = played.slice().sort(function (a, b) { return b.luck - a.luck; });
-      QKC.bar(lb, { horizontal: true, diverging: true, labelWidth: 120, fmt: function (v) { return signed(v, 1); }, cats: byLuck.map(function (r) { return r.team; }), series: [{ name: 'Points v xPts', data: byLuck.map(function (r) { return Math.round(r.luck * 100) / 100; }) }], label: 'Luck' });
+      QKC.bar(lb, { horizontal: true, diverging: true, labelWidth: 120, fmt: function (v) { return signed(v, 1); }, valName: 'Points minus xPts', cats: byLuck.map(function (r) { return r.team; }), series: [{ name: 'Points v xPts', data: byLuck.map(function (r) { return Math.round(r.luck * 100) / 100; }) }], label: 'Luck' });
     } else { lb.style.height = 'auto'; lb.innerHTML = cardMsg('No xG coverage for this season yet.'); }
     var bySos = played.slice().sort(function (a, b) { return b.sos_delta - a.sos_delta; });
     QKC.bar($(el, 'co-sos'), { horizontal: true, legend: true, labelWidth: 120, fmt: function (v) { return num(v, 2); }, cats: bySos.map(function (r) { return r.team; }),
-      series: [{ name: 'Played', data: bySos.map(function (r) { return r.sos_played; }), color: hexOf('var(--ink-4)') }, { name: 'To play', data: bySos.map(function (r) { return r.sos_remaining; }), color: hexOf('var(--c-1)') }], min: 0, label: 'Schedule' });
+      series: [{ name: 'Played', data: bySos.map(function (r) { return r.sos_played; }), color: hexOf('var(--ink-4)') }, { name: 'To play', data: bySos.map(function (r) { return r.sos_remaining; }), color: hexOf('var(--c-1)') }], min: 0, valName: 'Mean opponent strength', label: 'Schedule' });
     var hist = st.elo_history || {};
     var top = rowsSorted(rows, 'strength_ppg').slice(0, 8).filter(function (r) { return (hist[r.team] || []).length > 1; });
     var eb = $(el, 'co-elo');
     if (top.length) {
       QKC.mount(eb, function (T) {
         return {
-          grid: { left: 8, right: 110, top: 14, bottom: 8, containLabel: true },
-          xAxis: QKC.axis(T, { type: 'time', split: false, line: true }), yAxis: QKC.axis(T, { scale: true }),
+          grid: { left: 8, right: 110, top: 30, bottom: 30, containLabel: true },
+          xAxis: QKC.axis(T, { type: 'time', split: false, line: true, name: 'Date', nameLocation: 'middle', nameGap: 26 }), yAxis: QKC.axis(T, { scale: true, name: 'Elo rating', nameAlign: 'left' }),
           tooltip: QKC.tooltip(T, { trigger: 'axis' }),
           series: top.map(function (r, i) {
             var col = T.cat[i % 8];
@@ -1113,7 +1113,7 @@ LIVE.players = function (el, body, c, d0) {
     // race
     if (race.length) {
       var rr = race.slice().sort(function (a, b) { return b.model - a.model; }).slice(0, 12);
-      QKC.bar($(el, 'co-race'), { horizontal: true, labels: true, labelWidth: 130, fmt: function (v) { return pct(v, v < 0.1 ? 1 : 0); },
+      QKC.bar($(el, 'co-race'), { horizontal: true, labels: true, labelWidth: 130, fmt: function (v) { return pct(v, v < 0.1 ? 1 : 0); }, valName: 'Chance of top scorer',
         cats: rr.map(function (r) { return r.name + ' · ' + r.goals; }), series: [{ name: 'Top scorer', data: rr.map(function (r) { return r.model; }) }], hrefs: rr.map(function (r) { return FB.href.player(r.id); }), label: 'Top-scorer race' });
     }
     // scatter
@@ -1272,7 +1272,7 @@ LIVE.analytics = function (el, body, c, d0) {
       box.style.setProperty('--h', Math.max(240, rs.length * 22 + 40) + 'px');
       var good = function (p) { if (!isNum(p)) return 50; return goodnessFlip(pt, key) ? 100 - p : p; };
       QKC.bar(box, { horizontal: true, labels: true, labelWidth: 120, fmt: function (v) { return FB.fmtMetric(v, r.fmt); }, cats: rs.map(function (x) { return x.team; }),
-        series: [{ name: r.label || key, data: rs.map(function (x) { return x.value; }) }],
+        valName: r.label || dd.label || key, series: [{ name: r.label || key, data: rs.map(function (x) { return x.value; }) }],
         colors: rs.map(function (x) { var g = good(x.pct); return g >= 66 ? hexOf('var(--c-3)') : g <= 33 ? hexOf('var(--c-8)') : hexOf('var(--ink-4)'); }),
         hrefs: rs.map(function (x) { var id = ctx.tidOf(x.team); return id ? FB.href.club(id, { c: c.slug }) : null; }), label: 'Team ranking' });
     };
@@ -1359,7 +1359,7 @@ function xptsChart(box, an, table) {
   if (!teams.length) { box.style.height = 'auto'; box.innerHTML = cardMsg('No expected points yet.'); return; }
   teams.sort(function (a, b) { return (pts[b].pts - pts[b].xpts) - (pts[a].pts - pts[a].xpts); });
   box.style.setProperty('--h', Math.max(300, teams.length * 22 + 60) + 'px');
-  QKC.bar(box, { horizontal: true, legend: true, labelWidth: 120, fmt: function (v) { return num(v, 1); }, cats: teams,
+  QKC.bar(box, { horizontal: true, legend: true, labelWidth: 120, fmt: function (v) { return num(v, 1); }, valName: 'Points', cats: teams,
     series: [{ name: 'Points', data: teams.map(function (t) { return pts[t].pts; }), color: hexOf('var(--accent)') }, { name: 'xPts', data: teams.map(function (t) { return Math.round(pts[t].xpts * 10) / 10; }), color: hexOf('var(--c-1)') }],
     label: 'Points against expected points' });
 }
@@ -1456,7 +1456,7 @@ function seasonsTable(el, body, c, seasons, activeSid) {
       return v + chip;
     } }
   ], seasons.map(function (s) { return FB.merge(s, { _ch: s.champion ? s.champion.team : '' }); }), { caption: 'Every edition' });
-  if (most.length) QKC.bar($(el, 'co-swin'), { horizontal: true, labels: true, labelWidth: 120, fmt: function (v) { return String(v); }, cats: most.map(function (m) { return m.team; }), series: [{ name: 'Titles', data: most.map(function (m) { return m.n; }) }],
+  if (most.length) QKC.bar($(el, 'co-swin'), { horizontal: true, labels: true, labelWidth: 120, fmt: function (v) { return String(v); }, cats: most.map(function (m) { return m.team; }), valName: 'Titles', series: [{ name: 'Titles', data: most.map(function (m) { return m.n; }) }],
     hrefs: most.map(function (m) { return m.tid ? FB.href.club(m.tid, { c: c.slug }) : null; }), label: 'Titles on record' });
 }
 

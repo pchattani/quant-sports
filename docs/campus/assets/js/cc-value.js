@@ -112,7 +112,7 @@ CC.route('fantasy', function (el, p) {
       }), { maxHeight: 640 }));
       U.wire(QK.$('#ff-tbl', el));
       var top = rs.slice(0, 25);
-      QKC.range('#ff-rng', { rows: top.map(function (r) { return { label: (r.name || '').replace(/^(\S)\S*\s/, '$1. ') + ' ' + (r.pos || ''), lo: r.proj_lo, hi: r.proj_hi, mid: r.proj, href: CC.playerHref(L, r.id, S) }; }), loName: 'Floor', hiName: 'Ceiling', midName: 'Projection', fmt: function (v) { return CC.f(v, 1); } });
+      QKC.range('#ff-rng', { rows: top.map(function (r) { return { label: (r.name || '').replace(/^(\S)\S*\s/, '$1. ') + ' ' + (r.pos || ''), lo: r.proj_lo, hi: r.proj_hi, mid: r.proj, href: CC.playerHref(L, r.id, S) }; }), loName: 'Floor', hiName: 'Ceiling', midName: 'Projection', valName: 'Fantasy points', fmt: function (v) { return CC.f(v, 1); } });
     }
     if (fmts.length) QK.seg(QK.$('#ff-fmt', el), function (v) { st.fmt = v; paint(); });
     QK.chips(QK.$('#ff-pos', el), function (v) { st.pos = v[0] || 'all'; paint(); });

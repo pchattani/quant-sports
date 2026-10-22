@@ -75,6 +75,7 @@ function axis(T, o) {
     name: o.name || '', nameLocation: o.nameLocation || 'end', nameGap: o.nameGap || 10,
     inverse: !!o.inverse, scale: !!o.scale
   };
+  if (o.nameAlign) a.nameTextStyle.align = o.nameAlign;
   /* only pass keys that are set: an explicit undefined overrides ECharts defaults (boundaryGap, min…) */
   ['min', 'max', 'interval', 'data', 'boundaryGap', 'position'].forEach(function (k) { if (o[k] !== undefined) a[k] = o[k]; });
   if (o.data) a.axisLabel.fontFamily = T.fontUI;
@@ -108,6 +109,25 @@ function fitTicks(opt) {
   });
 }
 QKC.fitTicks = fitTicks;
+/* Category labels on narrow charts: a 170 px name column leaves a phone's plot area ~120 px wide. The label
+ * column takes at most ~40% of the chart's width (never under 64 px); wider charts keep the width asked for. */
+function labelW(el, want) {
+  var w = el && el.clientWidth ? el.clientWidth : 0;
+  return w ? Math.max(64, Math.min(want, Math.round(w * 0.4))) : want;
+}
+QKC.labelW = labelW;
+/* Axis titles: every axis says what it measures. A value axis across the bottom takes its title centred under
+ * the ticks; one up the side takes it at the top end, as line and scatter do. Returns the grid room it needs. */
+function nameAxis(a, name, where) {
+  if (!name) return 0;
+  var hidden = a.axisLabel && a.axisLabel.show === false;
+  a.name = name;
+  if (where === 'bottom') { a.nameLocation = 'middle'; a.nameGap = hidden ? 8 : 26; return hidden ? 14 : 22; }
+  /* left-aligned from the axis line, so a long title runs over the plot instead of off the card's edge */
+  a.nameLocation = a.inverse ? 'start' : 'end'; a.nameGap = 8; a.nameTextStyle.align = 'left';
+  return 16;
+}
+QKC.nameAxis = nameAxis;
 /* Legend entries that carry their own colour (per-point or per-bar colours, made v missed shots ...):
  * items [{ name, color, icon: 'roundRect' | 'circle' | 'line' }] -> empty series the legend can show. */
 QKC.legendSeries = function (T, items) {
@@ -145,7 +165,7 @@ QKC.mount = function (el, build, o) {
   var entry = { el: el, build: build, chart: chart, o: o };
   function paint() {
     var T = QKC.tokens();
-    var opt = build(T, entry);
+    var opt = entry.build(T, entry);   /* entry.build: a page may wrap the build after drawing */
     var b = base(T);
     Object.keys(opt).forEach(function (k) { b[k] = opt[k]; });
     fitTicks(b);
@@ -155,7 +175,8 @@ QKC.mount = function (el, build, o) {
   paint();
   if (o.onClick) chart.on('click', o.onClick);
   else chart.on('click', function (p) { var d = p.data || {}; if (d && d.href) root.location.href = d.href; });
-  if (root.ResizeObserver) { entry.ro = new ResizeObserver(function () { chart.resize(); }); entry.ro.observe(el); }
+  var bucket = function () { var w = el.clientWidth || 0; return w < 420 ? 0 : w < 720 ? 1 : 2; }, lastB = bucket();
+  if (root.ResizeObserver) { entry.ro = new ResizeObserver(function () { var b = bucket(); if (b !== lastB) { lastB = b; paint(); } chart.resize(); }); entry.ro.observe(el); }
   else root.addEventListener('resize', function () { chart.resize(); });
   el.__qkc = entry; REG.push(entry);
   return chart;
@@ -203,7 +224,7 @@ QKC.line = function (el, s) {
     var below = extra.filter(function (e) { return e._band; }), above = extra.filter(function (e) { return !e._band; });
     var extraBefore = below.length;
     var xa = axis(T, { type: s.xType || 'category', data: numX ? undefined : s.x, split: false, line: true, fmt: s.xFmt, boundaryGap: numX ? undefined : false, min: s.xMin !== undefined ? s.xMin : (numX ? 'dataMin' : undefined), max: s.xMax !== undefined ? s.xMax : (numX ? 'dataMax' : undefined), name: s.xName, nameLocation: 'middle', nameGap: 28, ticks: s.xTicks });
-    var ya = axis(T, { fmt: s.yFmt, min: s.yMin, max: s.yMax, name: s.yName, scale: s.yScale, inverse: !!s.yInverse, ticks: s.yTicks, interval: s.yInterval, nameLocation: s.yInverse ? 'start' : 'end' });
+    var ya = axis(T, { fmt: s.yFmt, min: s.yMin, max: s.yMax, name: s.yName, scale: s.yScale, inverse: !!s.yInverse, ticks: s.yTicks, interval: s.yInterval, nameLocation: s.yInverse ? 'start' : 'end', nameAlign: 'left' });
     return {
       grid: { left: 8, right: s.series.length > 1 && s.endLabels !== false ? 92 : 16, top: s.yName ? 30 : 14, bottom: s.xName ? 30 : 8, containLabel: true },
       legend: s.legend ? legendOpt(T, { right: 0, left: 'auto', itemWidth: 12, itemHeight: 3, data: s.series.map(function (x) { return x.name; }) }) : undefined,
@@ -286,9 +307,10 @@ QKC.hexA = hexA;
 /* spec: { cats: [...], series: [{ name, data, color, lo: [..], hi: [..] (whiskers), market: [..] (market tick) }],
  *         horizontal, stack, fmt, colors: [per-bar], hrefs: [...], labels: true (value at bar end), max, min,
  *         diverging (colour by sign), legend: true, legendItems: [{ name, color }] (entries for per-bar colours),
- *         marketName: 'Market', labelWidth, valTicks: { values, labels } } */
+ *         marketName: 'Market', labelWidth, valTicks: { values, labels },
+ *         valName / catName (axis titles; or xName / yName by position) } */
 QKC.bar = function (el, s) {
-  return QKC.mount(el, function (T) {
+  return QKC.mount(el, function (T, ent) {
     var hz = !!s.horizontal;
     var nS = s.series.length;
     var ser = s.series.map(function (x, i) {
@@ -343,12 +365,17 @@ QKC.bar = function (el, s) {
     var legendItems = (s.legendItems || []).slice();
     if (anyMarket && (s.legend || legendItems.length)) legendItems.push({ name: s.marketName || 'Market', color: T.market, icon: 'line' });
     var catAx = axis(T, { type: 'category', data: s.cats, split: false, line: !hz, inverse: hz });
-    catAx.axisLabel.color = T.ink2; catAx.axisLabel.fontSize = 11; catAx.axisLabel.width = s.labelWidth || 110; catAx.axisLabel.overflow = 'truncate';
+    catAx.axisLabel.color = T.ink2; catAx.axisLabel.fontSize = 11; catAx.axisLabel.width = hz ? labelW(ent.el, s.labelWidth || 110) : (s.labelWidth || 110); catAx.axisLabel.overflow = 'truncate';
     var valAx = axis(T, { fmt: s.fmt, max: s.max, min: s.min, ticks: s.valTicks });
     if (s.labels && hz) { valAx.axisLabel.show = false; valAx.splitLine.show = false; }
     var showLegend = !!s.legend || legendItems.length > 0;
+    /* axis titles: valName / catName, or xName / yName by position. The bottom axis takes its title under the
+     * ticks; the side axis at its top end, below the legend when there is one. */
+    var vN = s.valName || (hz ? s.xName : s.yName), cN = s.catName || (hz ? s.yName : s.xName);
+    var gB = 6 + nameAxis(hz ? valAx : catAx, hz ? vN : cN, 'bottom');
+    var gT = (showLegend ? 30 : 10) + nameAxis(hz ? catAx : valAx, hz ? cN : vN, 'side');
     return {
-      grid: { left: 8, right: s.labels && hz ? 52 : 12, top: showLegend ? 30 : 10, bottom: 6, containLabel: true },
+      grid: { left: 8, right: s.labels && hz ? 52 : (hz ? 26 : 12), top: gT, bottom: gB, containLabel: true },
       legend: showLegend ? legendOpt(T, { data: (s.legend ? s.series.map(function (x) { return x.name; }) : []).concat(legendItems.map(function (it) { return it.name; })) }, legendItems) : undefined,
       xAxis: hz ? valAx : catAx, yAxis: hz ? catAx : valAx,
       tooltip: tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: hexA(T.ink1, T.dark ? 0.05 : 0.04) } },
@@ -370,18 +397,25 @@ QKC.bar = function (el, s) {
 };
 
 /* ─────────────────────────────────────── dumbbell: model v market (or any A v B on one scale) */
-/* spec: { rows: [{ label, a, b, href, sub }], aName: 'Model', bName: 'Market', fmt: QK.fmt.pct, min: 0, max: 1 } */
+/* spec: { rows: [{ label, a, b, href, sub }], aName: 'Model', bName: 'Market', fmt: QK.fmt.pct, min: 0, max: 1,
+ *         valName (axis title; 'Probability' by default when fmt is a percentage) } */
 QKC.dumbbell = function (el, s) {
   var rows = s.rows;
-  return QKC.mount(el, function (T) {
+  return QKC.mount(el, function (T, ent) {
     var cats = rows.map(function (r) { return r.label; });
     var aN = s.aName || 'Model', bN = s.bName || 'Market';
     var f = s.fmt || fmt.pct;
+    /* the value axis says what it measures: a probability unless the caller names it (valName / xName) */
+    var vName = s.valName || s.xName || (!s.fmt || s.fmt === fmt.pct ? 'Probability' : '');
+    var xa = axis(T, { min: isNum(s.min) ? s.min : 0, max: isNum(s.max) ? s.max : 1, fmt: function (v) { return f(v, 0); } });
+    var ya = axis(T, { type: 'category', data: cats, split: false, inverse: true });
+    ya.axisLabel.color = T.ink2; ya.axisLabel.width = labelW(ent.el, s.labelWidth || 170); ya.axisLabel.overflow = 'truncate'; ya.axisLabel.fontSize = 11;
+    var gB = 6 + nameAxis(xa, vName, 'bottom');
     return {
-      grid: { left: 8, right: 20, top: 26, bottom: 6, containLabel: true },
+      grid: { left: 8, right: 20, top: 26, bottom: gB, containLabel: true },
       legend: { top: 0, left: 0, icon: 'circle', itemWidth: 9, itemHeight: 9, textStyle: { color: T.ink2 }, data: [aN, bN] },
-      xAxis: axis(T, { min: isNum(s.min) ? s.min : 0, max: isNum(s.max) ? s.max : 1, fmt: function (v) { return f(v, 0); } }),
-      yAxis: (function () { var a = axis(T, { type: 'category', data: cats, split: false, inverse: true }); a.axisLabel.color = T.ink2; a.axisLabel.width = s.labelWidth || 170; a.axisLabel.overflow = 'truncate'; a.axisLabel.fontSize = 11; return a; })(),
+      xAxis: xa,
+      yAxis: ya,
       tooltip: tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: hexA(T.ink1, 0.04) } },
         formatter: function (ps) {
           var r = rows[ps[0].dataIndex];
@@ -433,7 +467,7 @@ QKC.scatter = function (el, s) {
       grid: gr,
       legend: legendItems.length ? legendOpt(T, { icon: 'circle', left: 'auto', right: 0, data: legendItems.map(function (it) { return it.name; }) }) : undefined,
       xAxis: axis(T, { fmt: s.xFmt, name: s.xName, nameLocation: 'middle', nameGap: 30, scale: true, min: s.xMin, max: s.xMax, inverse: !!s.xInverse, ticks: s.xTicks }),
-      yAxis: axis(T, { fmt: s.yFmt, name: s.yName, scale: true, min: s.yMin, max: s.yMax, inverse: !!s.yInverse, ticks: s.yTicks, nameLocation: s.yInverse ? 'start' : 'end' }),
+      yAxis: axis(T, { fmt: s.yFmt, name: s.yName, scale: true, min: s.yMin, max: s.yMax, inverse: !!s.yInverse, ticks: s.yTicks, nameLocation: s.yInverse ? 'start' : 'end', nameAlign: 'left' }),
       tooltip: tooltip(T, { formatter: function (p) { if (p.seriesIndex !== 0 || p.componentType !== 'series') return ''; var d = pts[p.dataIndex]; return '<div style="font-weight:600;margin-bottom:4px">' + esc(d.name) + '</div>' + tipRow(p.color, s.xName || 'x', s.xFmt ? s.xFmt(d.x) : fmt.num(d.x, 2)) + tipRow(p.color, s.yName || 'y', s.yFmt ? s.yFmt(d.y) : fmt.num(d.y, 2)); } }),
       graphic: s.quadrants ? quadrantLabels(T, s.quadrants) : undefined,
       series: [{
@@ -465,7 +499,7 @@ function quadrantLabels(T, q) {
 /* ─────────────────────────────────────── heatmap */
 /* spec: { x: [...], y: [...], data: [[xi, yi, v], ...], diverging: true, mid: 0, min, max, fmt, cellLabels: true,
  *         labelMin: n (label only cells at least n from the midpoint, or n and above on a sequential scale),
- *         labelIf: fn(v) -> bool }  Label ink is black or white, whichever reads on that cell's colour. */
+ *         labelIf: fn(v) -> bool, xName, yName (axis titles) }  Label ink is black or white, whichever reads on that cell's colour. */
 QKC.heatmap = function (el, s) {
   return QKC.mount(el, function (T) {
     var vals = s.data.map(function (d) { return d[2]; }).filter(isNum);
@@ -473,6 +507,8 @@ QKC.heatmap = function (el, s) {
     if (s.diverging) { var m = Math.max(Math.abs(lo - (s.mid || 0)), Math.abs(hi - (s.mid || 0))); lo = (s.mid || 0) - m; hi = (s.mid || 0) + m; }
     var xa = axis(T, { type: 'category', data: s.x, split: false }); xa.splitArea = { show: false }; xa.axisLabel.color = T.ink2; xa.position = 'top';
     var ya = axis(T, { type: 'category', data: s.y, split: false, inverse: true }); ya.axisLabel.color = T.ink2;
+    if (s.xName) { xa.name = s.xName; xa.nameLocation = 'middle'; xa.nameGap = 24; }
+    if (s.yName) { ya.name = s.yName; ya.nameLocation = 'middle'; ya.nameRotate = 90; ya.nameGap = Math.min(90, 14 + 6.4 * Math.max.apply(null, (s.y || ['']).map(function (v) { return String(v).length; }))); }
     var ramp = s.diverging ? [T.neg, T.mid, T.pos] : T.seq;
     function cellColour(v) {
       var t = hi > lo ? Math.max(0, Math.min(1, (v - lo) / (hi - lo))) : 0.5, k = t * (ramp.length - 1), i0 = Math.min(ramp.length - 2, Math.floor(k));
@@ -489,7 +525,7 @@ QKC.heatmap = function (el, s) {
       return { value: d, label: { show: labelled(v), color: isNum(v) ? QK.color.ink(cellColour(v)) : T.ink1 } };
     });
     return {
-      grid: { left: 8, right: 8, top: 26, bottom: 44, containLabel: true },
+      grid: { left: s.yName ? 24 : 8, right: 8, top: s.xName ? 44 : 26, bottom: 44, containLabel: true },
       xAxis: xa, yAxis: ya,
       visualMap: { min: lo, max: hi, calculable: false, orient: 'horizontal', left: 'center', bottom: 0, itemWidth: 10, itemHeight: 160,
         textStyle: { color: T.ink3, fontFamily: T.fontNum, fontSize: 10 }, formatter: function (v) { return s.fmt ? s.fmt(v) : fmt.num(v, 1); },
@@ -507,7 +543,8 @@ QKC.heatmap = function (el, s) {
  *         away: {…}, events: [{ t, p (optional), label }], periods: [t of each break], tMin, tMax,
  *         tFmt (axis labels), tLabel (tooltip head; defaults to tFmt), interval (axis step in t units),
  *         xType: 'value' (default) | 'time', step: true (hold each value until the next play),
- *         compare: { name, t, p } (a second, dashed curve: another model or the market) }
+ *         compare: { name, t, p } (a second, dashed curve: another model or the market),
+ *         tName (x title, default 'Game time'), yName (default '<home> win probability'; '' for none) }
  * The x axis is numeric, so uneven play times sit where they happened. The line is ink; the fill above 50%
  * takes the home colour and below the away colour (two area series with origin 0.5; no piecewise
  * visualMap, which errors on line series in ECharts 5.5.1). Non-numeric t falls back to the play index. */
@@ -531,10 +568,13 @@ QKC.winProb = function (el, s) {
     var hN = (s.home || {}).name || 'Home', aN = (s.away || {}).name || 'Away';
     var xa = axis(T, { type: s.xType === 'time' ? 'time' : 'value', split: false, line: true, fmt: tf, interval: s.interval,
       min: isNum(s.tMin) ? s.tMin : (pts.length ? pts[0][0] : undefined), max: isNum(s.tMax) ? s.tMax : (pts.length ? pts[pts.length - 1][0] : undefined), ticks: s.tTicks });
+    var tName = s.tName === undefined ? 'Game time' : s.tName;
+    var gB = 8 + nameAxis(xa, tName, 'bottom');
+    var yN = s.yName === undefined ? (s.home ? (s.home.abbr || s.home.name) + ' win probability' : 'Win probability') : s.yName;
     return {
-      grid: { left: 8, right: 28, top: 22, bottom: 8, containLabel: true },
+      grid: { left: 8, right: 28, top: yN ? 28 : 22, bottom: gB, containLabel: true },
       xAxis: xa,
-      yAxis: axis(T, { min: 0, max: 1, interval: 0.25, fmt: function (v) { return v === 0.5 ? '50%' : v === 1 ? (s.home ? (s.home.abbr || QK.fmt.initials(s.home.name)) : '100%') : v === 0 ? (s.away ? (s.away.abbr || QK.fmt.initials(s.away.name)) : '0%') : ''; } }),
+      yAxis: axis(T, { name: yN, nameGap: 10, nameAlign: 'left', min: 0, max: 1, interval: 0.25, fmt: function (v) { return v === 0.5 ? '50%' : v === 1 ? (s.home ? (s.home.abbr || QK.fmt.initials(s.home.name)) : '100%') : v === 0 ? (s.away ? (s.away.abbr || QK.fmt.initials(s.away.name)) : '0%') : ''; } }),
       tooltip: tooltip(T, { trigger: 'axis', formatter: function (ps) {
         var t = ps[0].axisValue, p = pAt(t);
         var head = '<div style="color:' + T.ink3 + ';font-size:11px">' + esc(s.tLabel ? s.tLabel(t) : tf(t)) + '</div>';
@@ -644,18 +684,20 @@ QKC.shotMap = function (el, s) {
 
 /* ─────────────────────────────────────── range: floor to ceiling, with a projection dot */
 /* spec: { rows: [{ label, lo, hi, mid, href, sub, color }], fmt, min, max, loName: 'Floor', hiName: 'Ceiling',
- *         midName: 'Projection', labelWidth, ref: { x, label } } — horizontal, one row per player / team. */
+ *         midName: 'Projection', labelWidth, ref: { x, label }, valName (axis title) } — horizontal, one row per player / team. */
 QKC.range = function (el, s) {
   var rows = s.rows || [];
-  return QKC.mount(el, function (T) {
+  return QKC.mount(el, function (T, ent) {
     var f = s.fmt || function (v) { return fmt.num(v, 1); };
     var mN = s.midName || 'Projection', loN = s.loName || 'Floor', hiN = s.hiName || 'Ceiling';
     var ya = axis(T, { type: 'category', data: rows.map(function (r) { return r.label; }), split: false, inverse: true });
-    ya.axisLabel.color = T.ink2; ya.axisLabel.width = s.labelWidth || 150; ya.axisLabel.overflow = 'truncate'; ya.axisLabel.fontSize = 11;
+    ya.axisLabel.color = T.ink2; ya.axisLabel.width = labelW(ent.el, s.labelWidth || 150); ya.axisLabel.overflow = 'truncate'; ya.axisLabel.fontSize = 11;
+    var xa = axis(T, { fmt: f, min: s.min, max: s.max, scale: !isNum(s.min) });
+    var gB = 6 + nameAxis(xa, s.valName || s.xName, 'bottom');
     return {
-      grid: { left: 8, right: 20, top: 26, bottom: 6, containLabel: true },
+      grid: { left: 8, right: 20, top: 26, bottom: gB, containLabel: true },
       legend: legendOpt(T, { icon: 'roundRect', data: [loN + '–' + hiN, mN] }),
-      xAxis: axis(T, { fmt: f, min: s.min, max: s.max, scale: !isNum(s.min) }),
+      xAxis: xa,
       yAxis: ya,
       tooltip: tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: hexA(T.ink1, 0.04) } },
         formatter: function (ps) {
@@ -680,10 +722,10 @@ QKC.range = function (el, s) {
 };
 
 /* ─────────────────────────────────────── butterfly: two measures back to back on one category list */
-/* spec: { cats: [...], left: { name, data, color }, right: { name, data, color }, fmt, labels: true, labelWidth, hrefs }
+/* spec: { cats: [...], left: { name, data, color }, right: { name, data, color }, fmt, labels: true, labelWidth, hrefs, valName }
  * e.g. offence v defence, home v away, for v against. Values are drawn outward from the middle. */
 QKC.butterfly = function (el, s) {
-  return QKC.mount(el, function (T) {
+  return QKC.mount(el, function (T, ent) {
     var f = s.fmt || function (v) { return fmt.num(v, 1); };
     var lc = s.left.color ? QK.color.ensure(s.left.color, T.s1, 3) : T.model, rc = s.right.color ? QK.color.ensure(s.right.color, T.s1, 3) : T.market;
     function side(x, c, neg) {
@@ -694,11 +736,12 @@ QKC.butterfly = function (el, s) {
     }
     var all = s.left.data.concat(s.right.data).filter(isNum).map(Math.abs), m = all.length ? Math.max.apply(null, all) : 1;
     var ya = axis(T, { type: 'category', data: s.cats, split: false, inverse: true });
-    ya.axisLabel.color = T.ink2; ya.axisLabel.width = s.labelWidth || 110; ya.axisLabel.overflow = 'truncate'; ya.axisLabel.fontSize = 11;
+    ya.axisLabel.color = T.ink2; ya.axisLabel.width = labelW(ent.el, s.labelWidth || 110); ya.axisLabel.overflow = 'truncate'; ya.axisLabel.fontSize = 11;
     var xa = axis(T, { min: -m * 1.18, max: m * 1.18, fmt: function (v) { return f(Math.abs(v)); } });
     if (s.labels !== false) { xa.axisLabel.show = false; xa.splitLine.show = false; }
+    var gB = 6 + nameAxis(xa, s.valName || s.xName, 'bottom');
     return {
-      grid: { left: 8, right: 12, top: 30, bottom: 6, containLabel: true },
+      grid: { left: 8, right: 12, top: 30, bottom: gB, containLabel: true },
       legend: legendOpt(T, { data: [s.left.name, s.right.name] }),
       xAxis: xa, yAxis: ya,
       tooltip: tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: hexA(T.ink1, 0.04) } },

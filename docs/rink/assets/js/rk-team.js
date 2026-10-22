@@ -14,6 +14,16 @@
 'use strict';
 
 const U = RK.ui, esc = RK.esc, isNum = RK.isNum;
+/* QKC.line centres its y title on the axis; left-align it so a long title runs over the plot, not off the card
+ * (re-applied after the kit repaints on a theme change or a width-bucket resize). */
+function yTitleLeft(node) {
+  if (!node || !node.__qkc) return;
+  const e = node.__qkc, p0 = e.paint;
+  const fix = () => { try { e.chart.setOption({ yAxis: { nameTextStyle: { align: 'left' } } }); } catch (err) { /* disposed */ } };
+  e.paint = () => { p0(); fix(); };
+  if (window.ResizeObserver) new ResizeObserver(() => setTimeout(fix, 0)).observe(node);
+  fix();
+}
 
 function heroHTML(abbr, S, x, row, sim) {
   const rec = x.record || {};
@@ -107,7 +117,8 @@ function render(el, params, state) {
     const roll = x.rolling || [];
     if (roll.length > 1) {
       QKC.line('#tp-form', { x: roll.map(r => r[0]), series: [{ name: 'xGF%', data: roll.map(r => r[2]), color: U.tcol(abbr), width: 3 }, { name: 'GF%', data: roll.map(r => r[3]), dash: true }, { name: 'CF%', data: roll.map(r => r[4]) }],
-        yFmt: v => Math.round(v * 100) + '%', ref: { y: 0.5 }, yScale: true, xName: 'Game', xLabel: v => 'Game ' + v + (roll[v - 1] ? ' · ' + RK.fmtDate(roll[v - 1][1], { year: false }) : '') });
+        yFmt: v => Math.round(v * 100) + '%', ref: { y: 0.5 }, yScale: true, xName: 'Game', yName: 'Rolling 10-game share', xLabel: v => 'Game ' + v + (roll[v - 1] ? ' · ' + RK.fmtDate(roll[v - 1][1], { year: false }) : '') });
+      yTitleLeft(body.querySelector('#tp-form'));
     } else body.querySelector('#tp-form').innerHTML = QK.empty('Not enough games', 'The rolling form starts after the first games.');
     // cumulative goal and xG difference
     const played = done.filter(g => isNum(g.gf) && isNum(g.ga));
@@ -115,8 +126,9 @@ function render(el, params, state) {
       let a = 0, b = 0;
       const gd = [], xd = [];
       played.forEach(g => { a += g.gf - g.ga; b += (isNum(g.xgf) && isNum(g.xga) ? g.xgf - g.xga : 0); gd.push(a); xd.push(Math.round(b * 100) / 100); });
-      QKC.line('#tp-cum', { x: played.map((g, i) => i + 1), series: [{ name: 'Goal diff', data: gd, color: U.tcol(abbr), width: 3 }, { name: 'xG diff', data: xd, dash: true }], ref: { y: 0 }, yFmt: v => (v > 0 ? '+' : '') + Number(v).toFixed(0),
+      QKC.line('#tp-cum', { x: played.map((g, i) => i + 1), series: [{ name: 'Goal diff', data: gd, color: U.tcol(abbr), width: 3 }, { name: 'xG diff', data: xd, dash: true }], ref: { y: 0 }, yFmt: v => (v > 0 ? '+' : '') + Number(v).toFixed(0), xName: 'Game', yName: 'Cumulative goal difference',
         xLabel: v => { const g = played[v - 1]; return g ? 'Game ' + v + ' · ' + (g.home ? 'v ' : '@ ') + g.opp + ' ' + g.result + ' ' + g.gf + '–' + g.ga : ''; } });
+      yTitleLeft(body.querySelector('#tp-cum'));
     } else body.querySelector('#tp-cum').innerHTML = QK.empty('Not enough games');
 
     // roster table

@@ -97,7 +97,7 @@ function lapLines(x, series, o) {
     return {
       grid: { left: 6, right: o.endLabels === false ? 14 : 44, top: o.yName ? 26 : 12, bottom: 24, containLabel: true },
       xAxis: ax(T, { type: 'value', min: 1, max: n, line: true, split: false, name: 'Lap', nameLocation: 'middle', nameGap: 26, fmt: function (v) { return Math.round(v); } }),
-      yAxis: ax(T, { inverse: !!o.invert, min: o.yMin, max: o.yMax, name: o.yName, interval: o.interval, fmt: o.yFmt }),
+      yAxis: ax(T, { inverse: !!o.invert, min: o.yMin, max: o.yMax, name: o.yName, nameAlign: 'left', nameLocation: o.invert ? 'start' : 'end', interval: o.interval, fmt: o.yFmt }),
       tooltip: tip(T, { trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: T.axis } },
         formatter: function (ps) {
           var lap = ps[0] ? Math.round(ps[0].value[0]) : '';
@@ -113,7 +113,8 @@ function lapLines(x, series, o) {
 
 // ── horizontal bars with optional whiskers and market ticks ───────────────
 
-/* rows: [{label, value, colour, href, lo, hi, mark (second value, e.g. market), sub}]; o: {fmt, name, markName, diverging, ref, min, max, labelWidth, label} */
+/* rows: [{label, value, colour, href, lo, hi, mark (second value, e.g. market), sub}]; o: {fmt, name, markName, diverging, ref, min, max, labelWidth, label,
+ * xName (value-axis title; shows the axis when bar labels would hide it)} */
 function hbars(x, rows, o) {
   o = o || {};
   var list = (rows || []).filter(function (r) { return isNum(r.value); });
@@ -146,7 +147,7 @@ function hbars(x, rows, o) {
     if (hasMark) series.push({ type: 'scatter', name: o.markName || 'Market', z: 4, symbol: 'rect', symbolSize: [3, 16], itemStyle: { color: T.market },
       data: list.map(function (r, i) { return isNum(r.mark) ? [r.mark, i] : null; }).filter(Boolean) });
     return {
-      grid: { left: 6, right: hasErr ? 16 : 48, top: hasMark ? 26 : 8, bottom: 8, containLabel: true },
+      grid: { left: 6, right: hasErr ? 16 : 48, top: hasMark ? 26 : 8, bottom: o.xName ? 30 : 8, containLabel: true },
       legend: hasMark ? legend(T, { data: [o.name || 'Model', o.markName || 'Market'], icon: 'roundRect', itemWidth: 10, itemHeight: 10 }) : undefined,
       xAxis: (function () { var a = ax(T, { min: o.min, max: o.max, fmt: o.axisFmt || f, name: o.xName, nameLocation: 'middle', nameGap: 24 }); if (o.labels !== false && !hasErr && !o.xName) { a.axisLabel.show = !!o.axisLabels; } return a; })(),
       yAxis: ya,
@@ -201,7 +202,7 @@ function lines(x, series, o) {
       grid: { left: 6, right: o.endLabels ? 70 : 16, top: (o.legend !== false && named.length > 1 ? 30 : 12) + (o.yName ? 10 : 0), bottom: o.xName ? 30 : 8, containLabel: true },
       legend: o.legend !== false && named.length > 1 && !o.endLabels ? legend(T, { data: named }) : undefined,
       xAxis: ax(T, { type: xType, data: o.xs, line: true, split: false, boundaryGap: xType === 'category' ? false : undefined, fmt: o.xFmt, min: o.xMin, max: o.xMax, name: o.xName, nameLocation: 'middle', nameGap: 26, scale: xType === 'value' }),
-      yAxis: ax(T, { name: o.yName, fmt: o.yFmt, inverse: !!o.inverse, scale: o.yScale !== false, min: o.yMin, max: o.yMax }),
+      yAxis: ax(T, { name: o.yName, nameAlign: 'left', nameLocation: o.inverse ? 'start' : 'end', fmt: o.yFmt, inverse: !!o.inverse, scale: o.yScale !== false, min: o.yMin, max: o.yMax }),
       tooltip: tip(T, { trigger: 'axis',
         formatter: function (ps) {
           var vis = ps.filter(function (p) { return !/ band$/.test(p.seriesName); });
@@ -234,12 +235,12 @@ function columns(x, o) {
       }), label: s.labels ? { show: true, position: 'top', color: T.ink2, fontSize: 10, fontFamily: T.fontNum, formatter: function (p) { return s.fmt ? s.fmt(p.value) : PD.num(p.value, 0); } } : undefined,
         markLine: isNum(s.ref) ? { silent: true, symbol: 'none', lineStyle: { color: T.market, type: [4, 3] }, label: { formatter: s.refLabel || '', color: T.ink3, fontSize: 10 }, data: [{ xAxis: s.ref }] } : undefined });
     });
-    var ya = [ax(T, { name: o.yName, fmt: o.fmt, min: o.yMin, max: o.yMax })];
-    if (two) { var a2 = ax(T, { name: o.y2Name, fmt: o.y2Fmt, min: o.y2Inverse ? 1 : 0, max: o.y2Max, split: false, inverse: !!o.y2Inverse }); a2.position = 'right'; ya.push(a2); }
+    var ya = [ax(T, { name: o.yName, nameAlign: 'left', fmt: o.fmt, min: o.yMin, max: o.yMax })];
+    if (two) { var a2 = ax(T, { name: o.y2Name, nameAlign: 'right', nameLocation: o.y2Inverse ? 'start' : 'end', fmt: o.y2Fmt, min: o.y2Inverse ? 1 : 0, max: o.y2Max, split: false, inverse: !!o.y2Inverse }); a2.position = 'right'; ya.push(a2); }
     var xa = ax(T, { type: 'category', data: o.cats, split: false, line: true, name: o.xName, nameLocation: 'middle', nameGap: 26 });
     if (o.rotate) xa.axisLabel.rotate = o.rotate;
     return {
-      grid: { left: 6, right: two ? 10 : 14, top: (o.series.length > 1 ? 30 : 10) + (o.yName ? 18 : 0), bottom: o.xName ? 30 : 6, containLabel: true },
+      grid: { left: 6, right: two ? 10 : 14, top: (o.series.length > 1 ? 30 : 10) + (o.yName || o.y2Name ? 18 : 0), bottom: o.xName ? 30 : 6, containLabel: true },
       legend: o.series.length > 1 ? legend(T) : undefined,
       xAxis: xa, yAxis: ya,
       tooltip: tip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: QKC.hexA(T.ink1, 0.04) } },
@@ -251,7 +252,7 @@ function columns(x, o) {
 
 // ── heatmaps ──────────────────────────────────────────────────────────────
 
-/* Position distribution: rows [{label, dist: [p per place], href}]. o: {zmax, labels} */
+/* Position distribution: rows [{label, dist: [p per place], href}]. o: {zmax, labels, xName ('Finishing position'), yName} */
 function posHeat(x, rows, o) {
   o = o || {};
   var list = (rows || []).filter(function (r) { return (r.dist || []).length; });
@@ -265,8 +266,9 @@ function posHeat(x, rows, o) {
   return mount(x, function (T) {
     var xa = ax(T, { type: 'category', data: xs, split: false }); xa.position = 'top'; xa.axisLabel.color = T.ink2; xa.axisLabel.fontFamily = T.fontNum; xa.axisLabel.interval = 0; xa.axisLabel.fontSize = 9.5;
     var ya = ax(T, { type: 'category', data: list.map(function (r) { return r.label; }), split: false, inverse: true }); ya.axisLabel.color = T.ink2; ya.axisLabel.width = narrow(x) ? 70 : 120; ya.axisLabel.overflow = 'truncate';
+    var titled = heatTitles(xa, ya, o.xName === undefined ? 'Finishing position' : o.xName, o.yName);
     return {
-      grid: { left: 6, right: 8, top: 22, bottom: 4, containLabel: true },
+      grid: { left: 6, right: 8, top: 22 + titled, bottom: 4, containLabel: true },
       xAxis: xa, yAxis: ya,
       visualMap: { show: false, min: 0, max: o.zmax || Math.max.apply(null, data.map(function (d) { return d[2] || 0; })), inRange: { color: [QKC.hexA(T.seq[0], 0.35), T.seq[1], T.seq[2], T.seq[3], T.seq[4]] } },
       tooltip: tip(T, { formatter: function (p) { return head(list[p.value[1]].label, T) + row(p.color, xs[p.value[0]], PD.pct(p.value[2])); } }),
@@ -276,7 +278,14 @@ function posHeat(x, rows, o) {
   }, o.label || 'Finishing-position distribution');
 }
 
-/* A grid heatmap with blanks: o: {xs, ys, data: [[xi, yi, v]], diverging, mid, fmt, hrefs (per row), cell (show labels), invert} */
+/* Axis titles for the heatmaps (category axes, x along the top): x centred over the columns, y over the row labels.
+ * Returns the extra room above the grid. */
+function heatTitles(xa, ya, xName, yName) {
+  if (xName) { xa.name = xName; xa.nameLocation = 'middle'; xa.nameGap = 24; }
+  if (yName) { ya.name = yName; ya.nameLocation = 'start'; ya.nameGap = 24; ya.nameTextStyle.align = 'right'; }
+  return xName || yName ? 20 : 0;
+}
+/* A grid heatmap with blanks: o: {xs, ys, data: [[xi, yi, v]], diverging, mid, fmt, hrefs (per row), cell (show labels), invert, xName, yName} */
 function heat(x, o) {
   if (!o.ys || !o.ys.length) return none(x, o.emptyText || 'No data yet.');
   var n2 = node(x);
@@ -288,8 +297,9 @@ function heat(x, o) {
     var xa = ax(T, { type: 'category', data: o.xs, split: false }); xa.position = 'top'; xa.axisLabel.color = T.ink2; xa.axisLabel.fontSize = 10;
     var ya = ax(T, { type: 'category', data: o.ys, split: false, inverse: true }); ya.axisLabel.color = T.ink2; ya.axisLabel.width = narrow(x) ? 76 : 130; ya.axisLabel.overflow = 'truncate';
     var range = o.diverging ? (o.invert ? [T.pos, T.mid, T.neg] : [T.neg, T.mid, T.pos]) : [QKC.hexA(T.seq[0], 0.4), T.seq[2], T.seq[4]];
+    var titled = heatTitles(xa, ya, o.xName, o.yName);
     return {
-      grid: { left: 6, right: 8, top: 24, bottom: o.legend === false ? 4 : 40, containLabel: true },
+      grid: { left: 6, right: 8, top: 24 + titled, bottom: o.legend === false ? 4 : 40, containLabel: true },
       xAxis: xa, yAxis: ya,
       visualMap: { show: o.legend !== false, min: lo, max: hi, orient: 'horizontal', left: 'center', bottom: 0, itemWidth: 10, itemHeight: 140, calculable: false,
         textStyle: { color: T.ink3, fontFamily: T.fontNum, fontSize: 10 }, formatter: function (v) { return o.fmt ? o.fmt(v) : PD.num(v, 1); }, inRange: { color: range } },
@@ -319,7 +329,7 @@ function boxes(x, groups, o) {
     if (list.length > 12) xa.axisLabel.rotate = 90;
     return {
       grid: { left: 6, right: 12, top: o.yName ? 26 : 12, bottom: 6, containLabel: true },
-      xAxis: xa, yAxis: ax(T, { name: o.yName, scale: true, fmt: o.fmt }),
+      xAxis: xa, yAxis: ax(T, { name: o.yName, nameAlign: 'left', scale: true, fmt: o.fmt }),
       tooltip: tip(T, { formatter: function (p) {
         var g = list[p.dataIndex]; var q = quantiles(g.values); var f = o.fmt || function (v) { return PD.num(v, 3); };
         return head(g.sub || g.label, T) + row(p.color, 'Median', f(q[2])) + row(p.color, 'Middle half', f(q[1]) + ' to ' + f(q[3])) + row(p.color, 'Range', f(q[0]) + ' to ' + f(q[4])) + row(T.ink3, 'Laps', String(g.values.length));
@@ -573,8 +583,8 @@ function waterfall(x, steps, o) {
   return mount(x, function (T) {
     var xa = ax(T, { type: 'category', data: steps.map(function (s) { return s.label; }), split: false, line: true }); xa.axisLabel.interval = 0; xa.axisLabel.color = T.ink2;
     return {
-      grid: { left: 6, right: 10, top: 22, bottom: 6, containLabel: true },
-      xAxis: xa, yAxis: ax(T, { name: o.yName }),
+      grid: { left: 6, right: 10, top: o.yName ? 28 : 22, bottom: 6, containLabel: true },
+      xAxis: xa, yAxis: ax(T, { name: o.yName, nameAlign: 'left' }),
       tooltip: tip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: QKC.hexA(T.ink1, 0.04) } }, formatter: function (ps) { var s = steps[ps[0].dataIndex]; return head(s.label, T) + row(T.ink2, s.total || ps[0].dataIndex === 0 ? 'Points' : 'Adds', (s.total || ps[0].dataIndex === 0 ? '' : (s.value >= 0 ? '+' : '')) + PD.num(s.value, 1)); } }),
       series: [
         { type: 'bar', stack: 'w', data: base, itemStyle: { color: 'transparent' }, silent: true, tooltip: { show: false } },

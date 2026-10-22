@@ -32,7 +32,7 @@ from oddsmarkets.basketball import store as st  # noqa: E402
 
 logger = logging.getLogger("bb_hydrate")
 BASE = "https://pchattani.github.io/the-quant-hardwood/data"
-DERIVED = ("recon.json", "shots.json.gz", "stints.json.gz")
+DERIVED = ("recon.json", "shots.json.gz", "stints.json.gz", "injury_log.json.gz")
 
 
 def fetch(url: str, timeout: float = 60.0) -> bytes | None:

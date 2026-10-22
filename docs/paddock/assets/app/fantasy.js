@@ -83,9 +83,9 @@ function render(el) {
       window.QKC.mount(document.getElementById('ft-break'), function (Tk) {
         var ya = window.QKC.axis(Tk, { type: 'category', data: labels, split: false, inverse: true }); ya.axisLabel.fontFamily = Tk.fontNum; ya.axisLabel.color = Tk.ink2; ya.axisLabel.interval = 0;
         return {
-          grid: { left: 6, right: 16, top: 50, bottom: 8, containLabel: true },
+          grid: { left: 6, right: 16, top: 50, bottom: 30, containLabel: true },
           legend: { top: 0, left: 0, type: 'scroll', icon: 'roundRect', itemWidth: 10, itemHeight: 10, textStyle: { color: Tk.ink2, fontSize: 11 }, pageTextStyle: { color: Tk.ink3 } },
-          xAxis: window.QKC.axis(Tk, { fmt: function (v) { return PD.num(v, 0); } }), yAxis: ya,
+          xAxis: window.QKC.axis(Tk, { fmt: function (v) { return PD.num(v, 0); }, name: 'Projected fantasy points', nameLocation: 'middle', nameGap: 26 }), yAxis: ya,
           tooltip: window.QKC.tooltip(Tk, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: function (ps) { var r = rows[ps[0].dataIndex]; return '<b>' + esc(r.name) + '</b> · ' + pts(r.next) + ' pts<br>' + ps.filter(function (p) { return p.seriesType === 'bar' && Math.abs(p.value) > 0.05; }).map(function (p) { return window.QKC.tipRow(p.color, p.seriesName, PD.num(p.value, 1)); }).join(''); } }),
           series: keys.map(function (k) { return { type: 'bar', name: COMP[k][0], stack: 'c', barMaxWidth: 14, itemStyle: { color: COMP[k][1] }, data: rows.map(function (r) { return F.comp[r.id][ci[k]] || 0; }) }; })
             .concat([{ type: 'scatter', name: 'Total', symbol: 'diamond', symbolSize: 9, itemStyle: { color: Tk.ink1 }, data: rows.map(function (r) { return r.next; }), z: 5 }])
@@ -191,7 +191,7 @@ function backtest(F, BT) {
     var roll = function (arr) { return arr.map(function (v, i) { var s = arr.slice(Math.max(0, i - 9), i + 1).filter(isNum); return s.length ? s.reduce(function (a, b) { return a + b; }, 0) / s.length : null; }); };
     var xs = pr.map(function (r) { return r[0] + ' R' + r[1]; });
     PD.ch.lines('ft-bt-ch', [{ name: 'Our projection', data: roll(pr.map(function (r) { return r[2]; })), colour: '#3987e5' }, { name: 'Season-to-date average', data: roll(pr.map(function (r) { return r[3]; })), colour: '#e8833a' }],
-      { xs: xs, yName: 'MAE, points', yFmt: function (v) { return PD.num(v, 1); }, label: 'Backtest error through time' });
+      { xs: xs, xName: 'Race', yName: 'MAE, points', yFmt: function (v) { return PD.num(v, 1); }, label: 'Backtest error through time' });
   }
 }
 

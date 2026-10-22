@@ -523,7 +523,7 @@ function rolling(id, raw, names, colours, fmt) {
     tr.push({ type: 'scatter', mode: 'lines', name: nm[j - 1], x: rows.map(r => r[0]), y: rows.map(r => (k.isNum(r[j]) ? r[j] : null)), line: { color: col[j - 1], width: j === 1 ? 2.5 : 1.8, dash: j > 2 ? 'dot' : 'solid' }, connectgaps: true,
       hovertemplate: '%{x}: %{y:' + (fmt === '3' ? '.3f' : '.1f') + '}<extra>' + nm[j - 1] + '</extra>' });
   }
-  k.plot(node, tr, k.layout(Object.assign({ margin: { l: 50, r: 12, t: 26, b: 36 }, yaxis: { tickformat: fmt === '3' ? '.3f' : '' }, xaxis: {} }, k.legendTop())));
+  k.plot(node, tr, k.layout(Object.assign({ margin: { l: 50, r: 12, t: 26, b: 36 }, yaxis: { title: 'Rolling wOBA (100 PA)', tickformat: fmt === '3' ? '.3f' : '' }, xaxis: { title: 'Date' } }, k.legendTop())));
 }
 
 // ── pitcher ────────────────────────────────────────────────────────────────
@@ -641,7 +641,7 @@ function usage(u, ars) {
   if (!ars.length || sits.length < 2) { node.innerHTML = k.muted('Usage splits are not available yet.'); node.style.height = 'auto'; return; }
   const lbl = sits.map(x => x[1]);
   k.plot(node, ars.map(r => ({ type: 'bar', orientation: 'h', name: r.pt, y: lbl, x: sits.map(x => r[x[0]] || 0), marker: { color: k.pitchColour(r.pt) },
-    hovertemplate: k.esc(k.pitchName(r.pt)) + ' %{y}: %{x:.1%}<extra></extra>' })), k.layout(Object.assign({ barmode: 'stack', margin: { l: 80, r: 10, t: 28, b: 30 }, xaxis: { tickformat: '.0%', range: [0, 1] }, yaxis: { autorange: 'reversed', type: 'category' } }, k.legendTop())));
+    hovertemplate: k.esc(k.pitchName(r.pt)) + ' %{y}: %{x:.1%}<extra></extra>' })), k.layout(Object.assign({ barmode: 'stack', margin: { l: 80, r: 10, t: 28, b: 30 }, xaxis: { title: 'Share of pitches', tickformat: '.0%', range: [0, 1] }, yaxis: { autorange: 'reversed', type: 'category' } }, k.legendTop())));
 }
 
 /* Fatigue (models/fatigue.py per pitcher): baselines, last-three-game changes, within-game slopes per 100 pitches,
@@ -667,14 +667,14 @@ function fatigue(f, ctx) {
     const tr = [{ type: 'scatter', mode: 'lines+markers', name: 'Velo (mph)', x: games.map(r => r.date), y: games.map(r => r.velo), line: { color: '#f85149', width: 2 }, marker: { size: 5 } }];
     if (games.some(r => k.isNum(r.spin))) tr.push({ type: 'scatter', mode: 'lines', name: 'Spin (rpm)', x: games.map(r => r.date), y: games.map(r => r.spin), yaxis: 'y2', line: { color: '#58a6ff', width: 1.5, dash: 'dot' } });
     const base = k.isNum(f.velo_base) ? f.velo_base : null;
-    k.plot('fat-g', tr, k.layout(Object.assign({ margin: { l: 44, r: 50, t: 28, b: 32 }, yaxis: { title: 'mph' }, yaxis2: { title: 'rpm', overlaying: 'y', side: 'right', showgrid: false },
+    k.plot('fat-g', tr, k.layout(Object.assign({ margin: { l: 44, r: 50, t: 28, b: 32 }, xaxis: { title: 'Date' }, yaxis: { title: 'Fastball velocity (mph)' }, yaxis2: { title: 'Spin rate (rpm)', overlaying: 'y', side: 'right', showgrid: false },
       shapes: base ? [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: base, y1: base, line: { color: '#6e7681', dash: 'dash', width: 1 } }] : [] }, k.legendTop())));
   } else document.getElementById('fat-g').innerHTML = k.muted('No game-by-game fastball velocity yet.');
   const pr = (ctx.cur.pitching_rolling || []).map(r => (Array.isArray(r) ? r : [r.date, r.n, r.stuff, r.location, r.pitching, r.roll]));
   if (pr.length) {
     const ser = [[2, 'Stuff+', '#f97316'], [3, 'Location+', '#58a6ff'], [4, 'Pitching+', '#3fb950']].filter(x => pr.some(r => k.isNum(r[x[0]])));
     k.plot('fat-w', ser.map(x => ({ type: 'scatter', mode: 'lines', name: x[1], x: pr.map(r => r[0]), y: pr.map(r => r[x[0]]), line: { color: x[2], width: 2 } })),
-      k.layout(Object.assign({ margin: { l: 40, r: 10, t: 28, b: 32 }, yaxis: { title: '100 = average' },
+      k.layout(Object.assign({ margin: { l: 40, r: 10, t: 28, b: 32 }, xaxis: { title: 'Date' }, yaxis: { title: 'Score (100 = average)' },
         shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 100, y1: 100, line: { color: '#6e7681', dash: 'dot', width: 1 } }] }, k.legendTop())));
   } else document.getElementById('fat-w').innerHTML = k.muted('No rolling pitch-model series yet.');
 }

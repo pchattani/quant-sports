@@ -53,7 +53,7 @@ function value(el, y) {
       return { x: r.pace_tm, y: r.pace_field, name: r.name, short: PD.driverSurname(r.id), colour: PD.teamColour(r.team), href: PD.driverHref(r.id), label: true, size: 12, sub: PD.teamName(r.team) + ' · ' + r.races + ' races' };
     }), { xName: 'Pace above team-mate (% of a lap)', yName: 'Pace above the field', xFmt: function (v) { return PD.signed(v, 2); }, yFmt: function (v) { return PD.signed(v, 2); }, refX: 0, refY: 0, label: 'Driver against package' });
     PD.ch.hbars('vl-cars', T.slice().sort(function (a, b) { return b.car - a.car; }).map(function (r) { return { label: r.name || PD.teamName(r.id), value: r.car, lo: r.car - (r.car_se || 0), hi: r.car + (r.car_se || 0), colour: PD.teamColour(r.id), href: PD.teamHref(r.id), sub: 'Season mean ' + pl(r.car_mean, 2) + ' · last five rounds ' + PD.signed(r.trend, 3) }; }),
-      { fmt: function (v) { return PD.signed(v, 2); }, name: 'Car pace', errName: '±1 se', label: 'Car pace' });
+      { fmt: function (v) { return PD.signed(v, 2); }, name: 'Car pace', errName: '±1 se', xName: 'Car pace (% of a lap)', label: 'Car pace' });
     PD.table('vl-d', [
       { key: 'name', label: 'Driver', sticky: true, fmt: function (v, r) { return PD.driverLink(r.id, { name: v, team: r.team }) + (r.races < minR ? ' <span class="qk-muted">(few races)</span>' : ''); } },
       { key: 'team', label: 'Team', fmt: function (v) { return PD.teamLink(v, { dot: false }); } },
@@ -172,7 +172,7 @@ function needs(el) {
     PD.set('vl-body', PD.note(esc(d.label || '')) + PD.grid(
       PD.card('Every team, graded', 'Percentile against the other teams in each area (100 = best).', PD.chartBox('nd-heat', 420), { span: 12 }) +
       PD.card('The moves market', 'The driver swaps that would add the most expected constructors’ points to the receiving team, across the grid.', '<div id="nd-moves"></div>', { span: 12, flush: true }), 'pd-mt'));
-    PD.ch.heat('nd-heat', { xs: areas.map(function (a) { return a.label.replace(/ \(.*\)$/, '').replace('Development through the season', 'Development'); }), ys: ids.map(function (t) { return d.teams[t].name || PD.teamName(t); }), data: data, hrefs: ids.map(PD.teamHref),
+    PD.ch.heat('nd-heat', { xs: areas.map(function (a) { return a.label.replace(/ \(.*\)$/, '').replace('Development through the season', 'Development'); }), ys: ids.map(function (t) { return d.teams[t].name || PD.teamName(t); }), xName: 'Area', yName: 'Constructor', data: data, hrefs: ids.map(PD.teamHref),
       fmt: function (v) { return PD.num(v, 0); }, diverging: true, mid: 50, label: 'Team needs heatmap' });
     PD.table('nd-moves', [
       { key: 'to', label: 'Team', sticky: true, fmt: function (v) { return PD.teamLink(v); } },

@@ -149,7 +149,7 @@ CC.route('player', function (el, p) {
     el.innerHTML = html;
     U.wire(el);
     if (log.length && QK.$('#pp-log', el)) {
-      if (vk) QKC.bar('#pp-log', { cats: log.map(function (g) { return CC.tabbr(L, g.opp); }), series: [{ name: LOGK[vk] || vk, data: log.map(function (g) { return isNum(g[vk]) ? g[vk] : 0; }) }], diverging: vk === 'value' || vk === 'epa', fmt: function (v) { return CC.f(v, 1); }, hrefs: log.map(function (g) { return CC.gameHref(L, g.game, cur.season || S); }) });
+      if (vk) QKC.bar('#pp-log', { cats: log.map(function (g) { return CC.tabbr(L, g.opp); }), series: [{ name: LOGK[vk] || vk, data: log.map(function (g) { return isNum(g[vk]) ? g[vk] : 0; }) }], diverging: vk === 'value' || vk === 'epa', valName: LOGK[vk] || vk, fmt: function (v) { return CC.f(v, 1); }, hrefs: log.map(function (g) { return CC.gameHref(L, g.game, cur.season || S); }) });
     }
   });
 });

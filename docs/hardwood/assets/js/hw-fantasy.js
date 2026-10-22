@@ -55,13 +55,13 @@ function board(node, L) {
       { key: 'pg_pts', label: 'Pts', num: true, fmt: x => U.f(x, 1) }, { key: 'pg_reb', label: 'Reb', num: true, fmt: x => U.f(x, 1) }, { key: 'pg_ast', label: 'Ast', num: true, fmt: x => U.f(x, 1) },
       { key: 'pg_stl', label: 'Stl', num: true, fmt: x => U.f(x, 1) }, { key: 'pg_blk', label: 'Blk', num: true, fmt: x => U.f(x, 1) }, { key: 'pg_tpm', label: '3PM', num: true, fmt: x => U.f(x, 1) },
       { key: 'pg_tov', label: 'TO', num: true, fmt: x => U.f(x, 1) }, { key: 'xgp', label: 'Games', num: true, fmt: x => U.f(x, 0), tip: 'Projected games for the rest of the season' }] });
-    QKC.bar('#fb-pts', { cats: topP.map(r => r.name), series: [{ name: 'Fantasy points', data: topP.map(r => Math.round(r.fp * 10) / 10) }], horizontal: true, labels: true, fmt: x => U.f(x, 1), colors: topP.map(r => U.tcol(L, r.team)), hrefs: topP.map(r => HW.playerHref(L, r.id)), labelWidth: 140 });
+    QKC.bar('#fb-pts', { cats: topP.map(r => r.name), series: [{ name: 'Fantasy points', data: topP.map(r => Math.round(r.fp * 10) / 10) }], horizontal: true, labels: true, fmt: x => U.f(x, 1), colors: topP.map(r => U.tcol(L, r.team)), hrefs: topP.map(r => HW.playerHref(L, r.id)), labelWidth: 140, valName: 'Fantasy points a game' });
     if (document.getElementById('fb-wk')) {
       const nW = Math.min(wk.length, (tw[tids[0]].weeks || []).length);
       const order = tids.slice().sort((a1, b1) => tw[b1].weeks.slice(0, nW).reduce((s, w) => s + (w[0] || 0), 0) - tw[a1].weeks.slice(0, nW).reduce((s, w) => s + (w[0] || 0), 0));
       const data = [];
       order.forEach((t, yi) => tw[t].weeks.slice(0, nW).forEach((w, xi) => data.push([xi, yi, w[0] || 0])));
-      QKC.heatmap('#fb-wk', { x: wk.slice(0, nW).map(w => HW.fmtDate(w[0], { year: false, weekday: false })), y: order.map(t => HW.teamAbbr(L, t)), data: data, fmt: x => String(Math.round(x)) });
+      QKC.heatmap('#fb-wk', { x: wk.slice(0, nW).map(w => HW.fmtDate(w[0], { year: false, weekday: false })), y: order.map(t => HW.teamAbbr(L, t)), data: data, fmt: x => String(Math.round(x)), xName: 'Week starting', yName: 'Team' });
     }
     HW.setMeta(d.updated_at ? 'Projections ' + esc(HW.fmtStamp(d.updated_at)) : '');
   });

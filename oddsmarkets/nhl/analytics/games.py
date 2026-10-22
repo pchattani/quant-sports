@@ -79,13 +79,36 @@ def _compact_line(x: Any) -> dict | None:
 
 
 def starters(g: dict) -> dict:
-    """{"home": pid, "away": pid} from GAME.goalies ({"home": {"starter", "used", "decision"}} or plain ids)."""
+    """{"home": pid, "away": pid} from GAME.goalies ({"home": {"starter", "used", "decision"}} or plain ids). Before the
+    start, with no starter recorded, the probable starters instead (`probable_goalies`)."""
     gl = g.get("goalies") or {}
     out = {}
     for side in ("home", "away"):
         v = gl.get(side)
         out[side] = an.sid(v.get("starter") or v.get("id")) if isinstance(v, dict) else an.sid(v)
+    if not out.get("home") and not out.get("away"):
+        pb = probable_goalies(g)
+        if pb:
+            return {side: pb.get(side) for side in ("home", "away")}
     return out
+
+
+def probable_goalies(g: dict) -> dict | None:
+    """{"home"|"away": {"pid", "name", "status" ("confirmed" | "projected"), "at" (when it was first seen with that
+    status), "src": "ESPN"}} from GAME.probables for a game that has not started; None otherwise."""
+    pb = g.get("probables")
+    if not isinstance(pb, dict) or g.get("status") not in (None, "scheduled"):
+        return None
+    out = {}
+    for side in ("home", "away"):
+        r = pb.get(side)
+        if not isinstance(r, dict) or not r.get("name"):
+            continue
+        conf = r.get("status") == "confirmed"
+        out[side] = {"pid": an.sid(r.get("id")) if r.get("id") else None, "name": r.get("name"),
+                     "status": "confirmed" if conf else "projected",
+                     "at": (r.get("confirmed_at") if conf else None) or r.get("since"), "src": "ESPN"}
+    return out or None
 
 
 def market_from_line(line: dict | None) -> dict | None:
@@ -188,6 +211,8 @@ def wp_series(evg: pd.DataFrame, g: dict, pre: dict | None) -> dict:
 
 def page_sig(g: dict, n_events: int, mv: dict) -> str:
     keys = {k: g.get(k) for k in ("status", "hs", "as", "period", "clock", "ot", "so", "goalies", "lines", "attendance", "start")}
+    if g.get("probables"):                      # only games that have them: other pages keep their signatures
+        keys["probables"] = g.get("probables")
     keys["n"] = n_events
     keys["mv"] = mv
     return hashlib.sha1(json.dumps(an.clean(keys), sort_keys=True, default=str).encode()).hexdigest()[:16]

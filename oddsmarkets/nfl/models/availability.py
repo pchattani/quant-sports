@@ -96,8 +96,23 @@ def depth_starters(season: int, sched: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["week", "team", "gsis_id", "grp"])
 
 
-def starters_out(season: int, use_inactives: bool = True) -> pd.DataFrame:
-    """(season, week, team, out_<grp>, src): expected depth-chart starters missing the game, by position group."""
+def _kickoffs(season: int) -> pd.DataFrame:
+    """(week, team, ko): each team's kickoff (UTC) by week, from the schedules (gameday + gametime, US Eastern)."""
+    from oddsmarkets.nfl.sources.nflverse import kickoff_utc
+    s = pd.read_parquet(D.schedules_path(), columns=["season", "week", "gameday", "gametime", "home_team", "away_team"])
+    s = s[s["season"] == season]
+    ko = pd.to_datetime([kickoff_utc(a, b) for a, b in zip(s["gameday"], s["gametime"])], utc=True)
+    rows = [pd.DataFrame({"week": s["week"].astype(int).to_numpy(), "team": s[c].map(lambda x: team_alias(x, season)).to_numpy(),
+                          "ko": ko}) for c in ("home_team", "away_team")]
+    return pd.concat(rows, ignore_index=True).drop_duplicates(["week", "team"])
+
+
+def starter_rows(season: int, use_inactives: bool = True, report_cutoff_h: float | None = None) -> pd.DataFrame:
+    """(week, team, gsis_id, grp, pm, src, by_inactives): each depth-chart starter and his chance of missing the game
+    (by_inactives: read from the game-day inactives rather than the injury report).
+    report_cutoff_h (research, 22 Oct 2026): count an injury-report row only if its `date_modified` is at least that
+    many hours before the team's kickoff (a later-modified row counts 0); seasons without `date_modified` (2009,
+    2025 on) count every row. Use with use_inactives=False for a decision a day out."""
     sched = pd.read_parquet(D.schedules_path(), columns=["season", "week", "gameday", "home_team", "away_team"])
     ST = depth_starters(season, sched)
     if ST.empty:
@@ -111,9 +126,16 @@ def starters_out(season: int, use_inactives: bool = True) -> pd.DataFrame:
         inj = inj[inj["report_status"].isin(list(P_MISS)) & inj["gsis_id"].notna() & inj["week"].notna()]
         inj = inj.assign(team=inj["team"].map(lambda x: team_alias(x, season)), week=inj["week"].astype(int),
                          pm=inj["report_status"].map(P_MISS))
+        if report_cutoff_h is not None and "date_modified" in inj.columns:
+            dm = pd.to_datetime(inj["date_modified"], utc=True, errors="coerce")
+            if dm.notna().any():
+                k = inj[["week", "team"]].merge(_kickoffs(season), on=["week", "team"], how="left")["ko"].to_numpy()
+                late = (dm.to_numpy() > (pd.DatetimeIndex(k) - pd.Timedelta(hours=report_cutoff_h)).to_numpy())
+                inj = inj.assign(pm=np.where(late, 0.0, inj["pm"].to_numpy(float)))
         miss = inj.groupby(["week", "team", "gsis_id"])["pm"].max()
         pm = miss.reindex(key).fillna(0.0).to_numpy()
     src = "report" if has_rep else "none"
+    known = np.zeros(len(ST), dtype=bool)
     rp = D.raw_root() / "raw" / "weekly_rosters" / f"roster_weekly_{season}.parquet"
     if use_inactives and rp.exists():
         r = pd.read_parquet(rp, columns=["week", "team", "gsis_id", "status"])
@@ -134,7 +156,19 @@ def starters_out(season: int, use_inactives: bool = True) -> pd.DataFrame:
             actual = np.array(st.isin(MISSING_STATUS).to_numpy(), dtype=float) * (was_act | on_rep)
             pm = np.where(known, actual, pm)
             src = "inactives"
-    ST = ST.assign(pm=pm)
+    return ST.assign(pm=pm, src=src, by_inactives=known)
+
+
+def starters_out(season: int, use_inactives: bool = True, report_cutoff_h: float | None = None,
+                 weights=None) -> pd.DataFrame:
+    """(season, week, team, out_<grp>, src): expected depth-chart starters missing the game, by position group.
+    weights (research): a function of the starter rows returning one weight per starter (default 1 each)."""
+    ST = starter_rows(season, use_inactives, report_cutoff_h)
+    if ST.empty:
+        return pd.DataFrame()
+    src = ST["src"].iloc[0]
+    if weights is not None:
+        ST = ST.assign(pm=ST["pm"].to_numpy(float) * np.asarray(weights(season, ST), float))
     out = ST.pivot_table(index=["week", "team"], columns="grp", values="pm", aggfunc="sum").reset_index()
     for gname in GROUPS:
         if gname not in out:

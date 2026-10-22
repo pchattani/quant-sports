@@ -124,16 +124,16 @@ GI.route('team', function (el, params) {
     if (stages.length) GI.ch.probBars('tp-stages', stages.map(s => ({ label: s[1], p: sim[s[0]], colour: GI.teamColour(abbr) })), { keepHeight: true, labelWidth: 110 });
     if (Array.isArray(sim.seed_dist)) {
       const sd = sim.seed_dist.slice(0, 7), out = Math.max(0, 1 - sd.reduce((a, b) => a + (b || 0), 0));
-      GI.ch.bar('tp-seed', { cats: ['1', '2', '3', '4', '5', '6', '7', 'Out'], series: [{ name: 'Chance', data: sd.concat([out]) }], colors: sd.map(() => GI.teamColour(abbr)).concat(['#7d8590']), fmt: v2 => GI.pct(v2, 0), labels: true });
+      GI.ch.bar('tp-seed', { cats: ['1', '2', '3', '4', '5', '6', '7', 'Out'], series: [{ name: 'Chance', data: sd.concat([out]) }], colors: sd.map(() => GI.teamColour(abbr)).concat(['#7d8590']), fmt: v2 => GI.pct(v2, 0), labels: true, catName: 'Final seed', valName: 'Probability' });
     }
     if (Array.isArray(sim.win_dist)) GI.ch.distBars('tp-wins', sim.win_dist.map((p, k) => [k, p]), { colour: GI.teamColour(abbr), unit: 'wins', xName: 'Wins', exp: sim.mean_wins });
     if (hist.length > 1) GI.ch.lines('tp-hist', [{ name: 'Overall', x: hist.map(z => z.week), y: hist.map(z => z.net), colour: GI.teamColour(abbr), width: 3, symbol: true }, { name: 'Offence', x: hist.map(z => z.week), y: hist.map(z => z.off), dash: true }, { name: 'Defence', x: hist.map(z => z.week), y: hist.map(z => z.def), dash: true }],
-      { xName: 'Week', yFmt: y => GI.signed(y, 1), ref: { y: 0 }, xLabel: w => 'Week ' + w });
+      { xName: 'Week', yName: 'Rating (pts/g v average)', yFmt: y => GI.signed(y, 1), ref: { y: 0 }, xLabel: w => 'Week ' + w });
     const done = games.filter(g => GI.isFinal(g) && isNum((g.model || {}).p_home));
     if (done.length > 1) {
       let cw = 0, ce = 0;
       const pts = done.map(g => { const home = g.home === abbr; const p = home ? g.model.p_home : 1 - g.model.p_home; const pf = home ? g.hs : g.as, pa = home ? g.as : g.hs; cw += pf > pa ? 1 : pf === pa ? 0.5 : 0; ce += p; return [g.week, cw - ce]; });
-      GI.ch.lines('tp-woe', [{ name: 'Wins − expected', x: pts.map(p => p[0]), y: pts.map(p => p[1]), colour: GI.teamColour(abbr), step: true, area: true, symbol: true }], { xName: 'Week', yFmt: y => GI.signed(y, 2), ref: { y: 0 }, legend: false, xLabel: w => 'Week ' + w });
+      GI.ch.lines('tp-woe', [{ name: 'Wins − expected', x: pts.map(p => p[0]), y: pts.map(p => p[1]), colour: GI.teamColour(abbr), step: true, area: true, symbol: true }], { xName: 'Week', yName: 'Wins minus expected', yFmt: y => GI.signed(y, 2), ref: { y: 0 }, legend: false, xLabel: w => 'Week ' + w });
     } else GI.ch.none('tp-woe', 'Needs two finished games.');
     if (games.length) {
       GI.set('tp-sched-t', GI.tableHTML([{ label: 'Wk', align: 'right' }, { label: 'Opponent' }, { label: 'Model', align: 'right', title: 'Our pre-game win probability' }, { label: 'Model line', align: 'right', title: 'Our spread for this team' }, { label: 'Close', align: 'right', title: 'Closing spread for this team' }, { label: 'Result' }, { label: 'v close', align: 'right', title: 'Margin against the closing spread' }],

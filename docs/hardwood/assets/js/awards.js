@@ -101,7 +101,7 @@ function drawRace(L, S, key, A, P, aw) {
   const top = ids.slice(0, 14).reverse();
   const tr = [{ type: 'bar', orientation: 'h', name: 'Model', y: top.map(name), x: top.map(id => fx.pOf(M[id])), marker: { color: top.map(id => fx.teamColour(L, team(id))) }, hovertemplate: '%{y}: model %{x:.1%}<extra></extra>' }];
   if (mkOn) tr.push({ type: 'scatter', mode: 'markers', name: 'Market', y: top.map(name), x: top.map(id => marketP(mk, id, name(id))), marker: { symbol: 'diamond', size: 11, color: '#ffffff', line: { color: '#0d1117', width: 1 } }, hovertemplate: '%{y}: market %{x:.1%}<extra></extra>' });
-  fx.plot('aw-chart', tr, fx.layout({ showlegend: !!mkOn, legend: { orientation: 'h', y: 1.06, font: { color: C.text2 } }, margin: { l: 140, r: 20, t: 20, b: 35 }, xaxis: { tickformat: '.0%', rangemode: 'tozero' }, yaxis: { automargin: true } }));
+  fx.plot('aw-chart', tr, fx.layout({ showlegend: !!mkOn, legend: { orientation: 'h', y: 1.06, font: { color: C.text2 } }, margin: { l: 140, r: 20, t: 20, b: 35 }, xaxis: { title: 'Award probability', tickformat: '.0%', rangemode: 'tozero' }, yaxis: { automargin: true } }));
 
   const cols = [{ label: '#', align: 'right' }, { label: 'Player' }, { label: 'Team' }, { label: 'Model', align: 'right' }]
     .concat(ids.some(id => fx.isNum(top3(id))) ? [{ label: 'Top 3', align: 'right', title: 'Probability of finishing in the top three' }] : [])

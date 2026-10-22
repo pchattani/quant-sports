@@ -164,13 +164,13 @@ CC.route('team', function (el, p) {
     el.innerHTML = html;
     U.wire(el);
     var col = tc ? QK.color.team(tc) : null;
-    if (path.length > 1) QKC.line('#tp-path', { xType: 'time', series: [{ name: 'Rating', data: path.map(function (x) { return [new Date(x[0] + (String(x[0]).length === 10 ? 'T12:00:00Z' : '')).getTime(), x[1]]; }), color: col, area: true, symbols: path.length < 25 }],
+    if (path.length > 1) QKC.line('#tp-path', { xType: 'time', xName: 'Date', yName: fb ? 'Rating (pts)' : 'Pts per 100 poss.', series: [{ name: 'Rating', data: path.map(function (x) { return [new Date(x[0] + (String(x[0]).length === 10 ? 'T12:00:00Z' : '')).getTime(), x[1]]; }), color: col, area: true, symbols: path.length < 25 }],
       yFmt: function (v) { return CC.signed(v, 1); }, xFmt: function (v) { return new Date(v).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); }, xLabel: function (v) { return CC.date(new Date(v).toISOString()); }, ref: { y: 0 }, endLabels: false });
     if (rh.length > 1) QKC.line('#tp-rank', { x: rh.map(function (r) { return String(r[0]) === 'pre' ? 'Pre' : (String(r[0]) === 'final' ? 'Final' : 'Wk ' + r[0]); }), series: [{ name: 'AP', data: rh.map(function (r) { return isNum(r[1]) ? r[1] : null; }), color: QK.cssVar('--c-2'), symbols: true }, { name: 'Model', data: rh.map(function (r) { return isNum(r[2]) ? r[2] : null; }), color: QK.cssVar('--c-1'), symbols: true }],
       yInverse: true, yMin: 1, yInterval: (function () { var v = []; rh.forEach(function (r) { if (isNum(r[1])) v.push(r[1]); if (isNum(r[2])) v.push(r[2]); }); var span = v.length ? Math.max.apply(null, v) - 1 : 5; return Math.max(1, Math.ceil(span / 6)); })(),
-      yFmt: function (v) { return '#' + Math.round(v); }, legend: true, endLabels: false });
-    if (CC.isCur(L, S) && sim && sim.w_dist && QK.$('#tp-wd', el)) QKC.bar('#tp-wd', { cats: sim.w_dist.map(function (x, i) { return String(i); }), series: [{ name: 'Share', data: sim.w_dist }], fmt: function (v) { return CC.pct(v); }, colors: sim.w_dist.map(function () { return col || QK.cssVar('--c-1'); }) });
-    if (CC.isCur(L, S) && sim && sim.seed_dist && QK.$('#tp-sd', el)) { var ks = Object.keys(sim.seed_dist).sort(function (x, y) { return x - y; }); QKC.bar('#tp-sd', { cats: ks.map(function (k) { return 'Seed ' + k; }), series: [{ name: 'Share', data: ks.map(function (k) { return sim.seed_dist[k]; }) }], fmt: function (v) { return CC.pct(v); } }); }
+      yFmt: function (v) { return '#' + Math.round(v); }, legend: true, endLabels: false, xName: 'Week', yName: 'Rank' });
+    if (CC.isCur(L, S) && sim && sim.w_dist && QK.$('#tp-wd', el)) QKC.bar('#tp-wd', { cats: sim.w_dist.map(function (x, i) { return String(i); }), series: [{ name: 'Share', data: sim.w_dist }], catName: 'Regular-season wins', valName: 'Share of seasons', fmt: function (v) { return CC.pct(v); }, colors: sim.w_dist.map(function () { return col || QK.cssVar('--c-1'); }) });
+    if (CC.isCur(L, S) && sim && sim.seed_dist && QK.$('#tp-sd', el)) { var ks = Object.keys(sim.seed_dist).sort(function (x, y) { return x - y; }); QKC.bar('#tp-sd', { cats: ks.map(function (k) { return 'Seed ' + k; }), series: [{ name: 'Share', data: ks.map(function (k) { return sim.seed_dist[k]; }) }], catName: 'Seed', valName: 'Share of seasons', fmt: function (v) { return CC.pct(v); } }); }
   });
 });
 function swList(d) {

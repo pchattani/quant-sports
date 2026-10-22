@@ -157,7 +157,7 @@ function calibration(node, L, d) {
   if (cal.length) QKC.scatter('#cal-rel', { points: cal.map(function (r) { return { x: r.p_mean, y: r.y_mean, name: CC.pct(r.lo, 0) + '–' + CC.pct(r.hi, 0) + ' (' + r.n + ' games)', size: Math.max(7, Math.min(22, Math.sqrt(r.n) / 2)) }; }),
     xName: 'Predicted', yName: 'Observed', xMin: 0, xMax: 1, yMin: 0, yMax: 1, diagonal: { label: 'perfect' }, xFmt: function (v) { return CC.pct(v, 0); }, yFmt: function (v) { return CC.pct(v, 0); } });
   var ps = (d.per_season || []).filter(function (r) { return r.model && isNum(r.model.mae); });
-  if (ps.length) QKC.line('#cal-ps', { x: ps.map(function (r) { return CC.seasonLabel(L, r.season); }), series: [{ name: 'Model', data: ps.map(function (r) { return r.model.mae; }), color: QK.cssVar('--c-1'), symbols: true }, { name: 'Closing line', data: ps.map(function (r) { return r.close && isNum(r.close.mae) ? r.close.mae : null; }), color: QK.cssVar('--c-2'), symbols: true }], yScale: true, yFmt: function (v) { return CC.f(v, 1); }, legend: true });
+  if (ps.length) QKC.line('#cal-ps', { x: ps.map(function (r) { return CC.seasonLabel(L, r.season); }), series: [{ name: 'Model', data: ps.map(function (r) { return r.model.mae; }), color: QK.cssVar('--c-1'), symbols: true }, { name: 'Closing line', data: ps.map(function (r) { return r.close && isNum(r.close.mae) ? r.close.mae : null; }), color: QK.cssVar('--c-2'), symbols: true }], yScale: true, yFmt: function (v) { return CC.f(v, 1); }, legend: true, xName: 'Season', yName: 'MAE (pts)' });
 }
 
 CC.route('model', function (el, p) {

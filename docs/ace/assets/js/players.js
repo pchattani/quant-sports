@@ -780,7 +780,7 @@ function drawEloHistory(T, c, root) {
       type: 'scatter', mode: 'lines', name: s[0], x: x, y: rs.map(r => r[s[1]]), line: { color: K.surfColour(s[2]), width: s[3], shape: 'hv' },
       hovertemplate: '%{x}: ' + s[0] + ' %{y:.0f}<extra></extra>'
     }));
-    K.plot(node, tr, K.layout(Object.assign(K.legendTop(), { margin: { l: 50, r: 10, t: 30, b: 36 }, yaxis: { title: 'Elo' }, xaxis: { type: 'date' } })));
+    K.plot(node, tr, K.layout(Object.assign(K.legendTop(), { margin: { l: 50, r: 10, t: 30, b: 36 }, yaxis: { title: 'Elo' }, xaxis: { type: 'date', title: 'Date' } })));
   };
   draw('all');
   K.wireToggle(root, 'pp-elo-win', draw);
@@ -806,11 +806,11 @@ function drawServeReturn(c, root) {
         K.band(rs.map(r => ({ x: r[0], y: r[3], se: r[7], text: r[0] })), col, lab + ' return', { dash: 'dot', yaxis: 'y2' }).forEach(t => tr.push(t));
       }
     });
-    const lay = K.layout(Object.assign(K.legendTop(), { margin: { l: 50, r: 10, t: 34, b: 36 }, xaxis: { type: 'date' },
+    const lay = K.layout(Object.assign(K.legendTop(), { margin: { l: 50, r: 10, t: 34, b: 36 }, xaxis: { type: 'date', title: 'Date' },
       grid: { rows: 2, columns: 1, pattern: 'independent', roworder: 'top to bottom' },
-      yaxis: { title: kind === 'rates' ? 'Hold %' : 'Serve s', domain: [0.54, 1], tickformat: kind === 'rates' ? '.0%' : '' },
-      yaxis2: { title: kind === 'rates' ? 'Break %' : 'Return r', domain: [0, 0.44], tickformat: kind === 'rates' ? '.0%' : '', gridcolor: '#21262d', zerolinecolor: '#30363d' },
-      xaxis2: { type: 'date', anchor: 'y2', gridcolor: '#21262d' } }));
+      yaxis: { title: kind === 'rates' ? 'Hold %' : 'Serve rating', domain: [0.54, 1], tickformat: kind === 'rates' ? '.0%' : '' },
+      yaxis2: { title: kind === 'rates' ? 'Break %' : 'Return rating', domain: [0, 0.44], tickformat: kind === 'rates' ? '.0%' : '', gridcolor: '#21262d', zerolinecolor: '#30363d' },
+      xaxis2: { type: 'date', anchor: 'y2', gridcolor: '#21262d', title: 'Date' } }));
     tr.forEach(t => { if (t.yaxis === 'y2') t.xaxis = 'x2'; });
     K.plot(node, tr, lay);
     if (note) note.innerHTML = kind === 'rates' ? 'Hold and break against the average tour-level opponent on that surface, from the same fits. Solid: hold (top). Dotted: break (bottom).' :
@@ -826,7 +826,7 @@ function drawRanks(c) {
   const rs = (c.ranks || []).filter(r => Array.isArray(r) && isNum(r[1]));
   if (!rs.length) { node.innerHTML = K.muted('No ranking history.'); return; }
   K.plot(node, [{ type: 'scatter', mode: 'lines', x: rs.map(r => r[0]), y: rs.map(r => r[1]), line: { color: K.C.yellow, width: 2, shape: 'hv' }, hovertemplate: '%{x}: No. %{y}<extra></extra>' }],
-    K.layout({ margin: { l: 44, r: 10, t: 10, b: 36 }, xaxis: { type: 'date' }, yaxis: { type: 'log', autorange: 'reversed', title: 'Rank', tickvals: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000] } }));
+    K.layout({ margin: { l: 44, r: 10, t: 10, b: 36 }, xaxis: { type: 'date', title: 'Date' }, yaxis: { type: 'log', autorange: 'reversed', title: 'Rank', tickvals: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000] } }));
 }
 
 function drawDefend(T, c, ranks, pid) {
@@ -877,7 +877,7 @@ function drawResults(T, c) {
     const ys = asc.map(r => (cum += (r.won ? 1 : 0) - r.p_pre));
     K.plot(chart, [{ type: 'scatter', mode: 'lines', x: asc.map(r => r.date), y: ys, line: { color: K.C.blue, width: 2 }, fill: 'tozeroy', fillcolor: K.alpha(K.C.blue, 0.12),
       text: asc.map(r => (r.won ? 'W ' : 'L ') + K.name(T, r.opp) + ' · ' + K.eventName(T, r.event) + ' ' + (r.round || '') + ' · model ' + K.pct(r.p_pre, 0)), hovertemplate: '%{x}<br>%{text}<br>running total %{y:+.1f}<extra></extra>' }],
-      K.layout({ margin: { l: 46, r: 10, t: 8, b: 30 }, xaxis: { type: 'date' }, yaxis: { title: 'Wins − expected', zeroline: true, zerolinecolor: '#6e7681' } }));
+      K.layout({ margin: { l: 46, r: 10, t: 8, b: 30 }, xaxis: { type: 'date', title: 'Date' }, yaxis: { title: 'Wins − expected', zeroline: true, zerolinecolor: '#6e7681' } }));
     host.innerHTML = K.table([{ label: 'Date' }, { label: 'Event' }, { label: 'Rd' }, { label: 'Opponent' }, { label: 'Result' }, { label: 'Score' }, { label: 'Model', align: 'right', title: 'The model\'s pre-match probability for this player' },
       { label: 'Market', align: 'right', title: 'Closing market probability (de-vigged) for this player' }, { label: 'Surprise', align: 'right', title: 'Outcome minus the model probability: +0.8 is a win the model gave 20%' }],
       rs.slice(0, showAll ? rs.length : 40).map(r => ({ _href: r.match ? K.matchHref(T, r.match) : undefined, cells: [
@@ -971,7 +971,7 @@ K.styleBlock = (host, T, st, opts) => {
     K.plot(id + '-dir', [['wide', 'Wide', '#58a6ff'], ['body', 'Body', '#8b949e'], ['t', 'T', '#f97316']].map(z => ({
       type: 'bar', orientation: 'h', name: z[1], y: sides.map(s => s[1] + ' (' + K.int(dir[s[0]].n) + ')'), x: sides.map(s => dir[s[0]][z[0]]), marker: { color: z[2] },
       hovertemplate: '%{y}: ' + z[1] + ' %{x:.0%}<extra></extra>', text: sides.map(s => Math.round(100 * (dir[s[0]][z[0]] || 0)) + '%'), textposition: 'inside', insidetextanchor: 'middle'
-    })), K.layout(Object.assign(K.legendTop(), { barmode: 'stack', margin: { l: 110, r: 10, t: 28, b: 24 }, xaxis: { tickformat: '.0%', range: [0, 1] }, yaxis: { autorange: 'reversed' } })));
+    })), K.layout(Object.assign(K.legendTop(), { barmode: 'stack', margin: { l: 110, r: 10, t: 28, b: 24 }, xaxis: { title: 'Share of serves', tickformat: '.0%', range: [0, 1] }, yaxis: { autorange: 'reversed' } })));
   } else document.getElementById(id + '-dir').innerHTML = K.muted('No serve direction.');
   const ra = st.rally || {};
   const bk = Object.keys(ra.dist || {});
@@ -979,8 +979,8 @@ K.styleBlock = (host, T, st, opts) => {
     K.plot(id + '-rally', [
       { type: 'bar', name: 'Share of points', x: bk, y: bk.map(k => ra.dist[k]), marker: { color: K.alpha('#58a6ff', 0.75) }, hovertemplate: '%{x} shots: %{y:.0%} of points<extra></extra>' },
       { type: 'scatter', mode: 'lines+markers', name: 'Points won', x: bk, y: bk.map(k => (ra.won || {})[k]), yaxis: 'y2', line: { color: '#f97316', width: 2 }, hovertemplate: '%{x} shots: won %{y:.0%}<extra></extra>' }
-    ], K.layout(Object.assign(K.legendTop(), { margin: { l: 44, r: 44, t: 28, b: 30 }, xaxis: { title: 'Shots in the rally', type: 'category' }, yaxis: { tickformat: '.0%' },
-      yaxis2: { overlaying: 'y', side: 'right', tickformat: '.0%', range: [0.3, 0.7], gridcolor: 'rgba(0,0,0,0)' } })));
+    ], K.layout(Object.assign(K.legendTop(), { margin: { l: 44, r: 44, t: 28, b: 30 }, xaxis: { title: 'Shots in the rally', type: 'category' }, yaxis: { title: 'Share of points', tickformat: '.0%' },
+      yaxis2: { title: 'Points won', overlaying: 'y', side: 'right', tickformat: '.0%', range: [0.3, 0.7], gridcolor: 'rgba(0,0,0,0)' } })));
   } else document.getElementById(id + '-rally').innerHTML = K.muted('No rally lengths.');
   return styleMedians(T).then(M => {
     const tab = document.getElementById(id + '-tab');

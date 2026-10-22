@@ -197,7 +197,7 @@ function renderOne(el, params, state) {
       k.plot('u-trend', [{ type: 'scatter', mode: 'lines+markers', name: 'Accuracy', x: srt.map(r => r.date), y: srt.map(r => k.val(r, ['accuracy', 'acc'])), line: { color: '#58a6ff' }, hovertemplate: '%{x}: %{y:.1%}<extra>accuracy</extra>' },
         { type: 'scatter', mode: 'lines', name: 'Expected', x: srt.map(r => r.date), y: srt.map(r => k.val(r, ['x_accuracy'])), line: { color: '#8b949e', dash: 'dot', width: 1.2 }, hovertemplate: '%{x}: %{y:.1%}<extra>expected</extra>' },
         { type: 'bar', name: 'Run impact', x: srt.map(r => r.date), y: srt.map(imp), yaxis: 'y2', marker: { color: 'rgba(248,81,73,0.45)' }, hovertemplate: '%{x}: %{y:.2f} runs<extra></extra>' }],
-      k.layout(Object.assign({ margin: { l: 48, r: 48, t: 28, b: 32 }, yaxis: { title: 'Accuracy', tickformat: '.0%' }, yaxis2: { title: 'Runs', overlaying: 'y', side: 'right', showgrid: false } }, k.legendTop())));
+      k.layout(Object.assign({ margin: { l: 48, r: 48, t: 28, b: 32 }, xaxis: { title: 'Game date' }, yaxis: { title: 'Accuracy', tickformat: '.0%' }, yaxis2: { title: 'Run impact (runs)', overlaying: 'y', side: 'right', showgrid: false } }, k.legendTop())));
       document.getElementById('u-cards').innerHTML = k.table([{ label: 'Date' }, { label: 'Game' }, { label: 'Called', align: 'right' }, { label: 'Accuracy', align: 'right' }, { label: 'Expected', align: 'right' }, { label: 'Missed', align: 'right' }, { label: 'Run impact', align: 'right' }, { label: 'Favoured', align: 'right' }],
         cards.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).map(r => {
           const fav = r.favoured || r.favored || r.fav;

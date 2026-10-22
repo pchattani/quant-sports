@@ -275,7 +275,7 @@ function drawRatings(el, d) {
   const series = Object.keys(rt).filter(t => RK.teamDiv(t) === RDIV && Array.isArray((rt[t] || {}).history) && rt[t].history.length).map(t => ({
     name: RK.teamAbbr(t), x: rt[t].history.map(h => h[0]), y: rt[t].history.map(h => h[1]), colour: RK.teamColour(t), hover: esc(RK.teamAbbr(t)) + ' %{x}: %{y:+.2f}<extra></extra>' }));
   RK.purge(box);
-  RK.charts.lines(box, series, { height: 340, yTitle: 'Rating', emptyText: 'No rating history yet.' });
+  RK.charts.lines(box, series, { height: 340, xTitle: 'Date', yTitle: 'Goals per game above average', emptyText: 'No rating history yet.' });
 }
 function lotteryView(d, rows, S) {
   let L = d.lottery || d.draft || null;

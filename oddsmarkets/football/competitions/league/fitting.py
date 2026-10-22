@@ -48,9 +48,36 @@ def club_rho() -> float:
         return RHO_FALLBACK
 
 
-def new_dc(xi: float, ridge: float) -> DixonColesModel:
-    """An unfitted club Dixon-Coles model with the build's settings."""
-    return DixonColesModel(xi=float(xi), ridge=float(ridge), analytic_grad=True, fixed_rho=club_rho())
+def new_dc(xi: float, ridge: float, prior_group=None) -> DixonColesModel:
+    """An unfitted club Dixon-Coles model with the build's settings (`prior_group`: see `pooled_tier`)."""
+    return DixonColesModel(xi=float(xi), ridge=float(ridge), analytic_grad=True, fixed_rho=club_rho(),
+                           prior_group=prior_group)
+
+
+def pooled_tier(team: str) -> str | None:
+    """
+    The prior tier of a club in the pooled fit (docs/research/football_edge.md 3.5): a club under a national
+    cup's or super cup's prefix (outside the followed leagues: lower divisions, mostly) is "domestic"; under a
+    continental cup's prefix (a foreign club) "continental"; a league club None (shrunk toward 0 as before).
+    """
+    from oddsmarkets.football.competitions.cup.config import CUPS
+    from oddsmarkets.football.competitions.league.config import LEAGUES
+    prefix = team.split(":", 1)[0] if ":" in team else None
+    if not prefix or prefix in LEAGUES:
+        return None
+    cfg = CUPS.get(prefix)
+    if cfg is None:
+        return None
+    return {"domestic": "domestic", "super": "domestic", "cup": "continental"}.get(cfg.family)
+
+
+@cache
+def tier_prior_on() -> bool:
+    """Whether the pooled fit uses the tier prior (model_params.json `pooled_tier_prior.on`)."""
+    try:
+        return bool((json.loads(PARAMS_PATH.read_text(encoding="utf-8")).get("pooled_tier_prior") or {}).get("on"))
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def dc_frame(train_df: pd.DataFrame, slug: str, xi: float, *, market: bool = True,
@@ -77,8 +104,9 @@ def pooled_part(train_df: pd.DataFrame, slug: str, xi: float, *, market: bool = 
     return fit_df.assign(home_team=slug + ":" + fit_df["home_team"], away_team=slug + ":" + fit_df["away_team"])
 
 
-def fit_dc(fit_df: pd.DataFrame, xi: float, ridge: float, *, as_of: datetime | None = None) -> DixonColesModel:
+def fit_dc(fit_df: pd.DataFrame, xi: float, ridge: float, *, as_of: datetime | None = None,
+           prior_group=None) -> DixonColesModel:
     """Fit `new_dc(xi, ridge)` on a frame from `dc_frame` / `pooled_part` (raises as `DixonColesModel.fit`)."""
-    dc = new_dc(xi, ridge)
+    dc = new_dc(xi, ridge, prior_group=prior_group)
     dc.fit(fit_df, as_of=as_of)
     return dc

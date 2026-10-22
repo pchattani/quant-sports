@@ -64,7 +64,7 @@ function championship(season) {
     var xs = []; for (var i = 0; i < n; i++) xs.push(done[i] ? 'R' + done[i].round : 'R' + (i + 1));
     PD.ch.lines('st-prog', order.map(function (id) {
       return { name: kind === 'drivers' ? PD.driverName(id) : PD.teamName(id), short: kind === 'drivers' ? PD.driverCode(id) : PD.teamAbbr(id), data: P[id], colour: kind === 'drivers' ? st[id].colour : PD.teamColour(id), dash: kind === 'drivers' ? st[id].dash : false };
-    }), { xs: xs, endLabels: true, legend: false, yName: 'Points', yScale: false, yFmt: function (v) { return PD.pts(v); }, xLabel: function (v) { var c = done[xs.indexOf(v)]; return c ? v + ' · ' + c.name : v; }, label: 'Points progression' });
+    }), { xs: xs, endLabels: true, legend: false, xName: 'Round', yName: 'Points', yScale: false, yFmt: function (v) { return PD.pts(v); }, xLabel: function (v) { var c = done[xs.indexOf(v)]; return c ? v + ' · ' + c.name : v; }, label: 'Points progression' });
   };
   prog('drivers');
   PD.wireSeg(document, 'st-prog-k', prog);
@@ -73,7 +73,7 @@ function championship(season) {
       var c = ch[kind] || {};
       var order = ((season.standings || {})[kind] || []).map(function (r) { return kind === 'drivers' ? r.driver : r.team; }).filter(function (id) { return c[id]; });
       Object.keys(c).forEach(function (id) { if (order.indexOf(id) < 0) order.push(id); });
-      PD.ch.posHeat('st-pd', order.map(function (id) { return { label: kind === 'drivers' ? PD.driverName(id) : PD.teamName(id), dist: c[id].pos_dist || [] }; }));
+      PD.ch.posHeat('st-pd', order.map(function (id) { return { label: kind === 'drivers' ? PD.driverName(id) : PD.teamName(id), dist: c[id].pos_dist || [] }; }), { xName: 'Championship position', yName: kind === 'drivers' ? 'Driver' : 'Constructor' });
     };
     pd('drivers');
     PD.wireSeg(document, 'st-pd-k', pd);
@@ -146,7 +146,7 @@ function odds(season, markets, y) {
     var isD = kind === 'drivers', pre = isD ? 'od-d' : 'od-c';
     var srcs = sourceNames(T.sources);
     PD.set(pre + '-s', (T.available ? 'Market from ' + esc(srcs.join(', ') || 'prediction markets') + (isNum(T.implied_total) ? ' · implied total ' + PD.num(T.implied_total, 3) : '') : 'No market published' + (T.reason ? ': ' + esc(T.reason) : '')) + ' · model ' + PD.int(ch.n_sims) + ' simulated seasons');
-    if (T.available && ids.length) window.QKC.dumbbell(document.getElementById(pre), { rows: ids.slice(0, 8).map(function (id) { return { label: isD ? PD.driverName(id) : PD.teamName(id), a: model[id] || 0, b: prices[id] || 0, href: isD ? PD.driverHref(id) : PD.teamHref(id) }; }), labelWidth: 120 });
+    if (T.available && ids.length) window.QKC.dumbbell(document.getElementById(pre), { rows: ids.slice(0, 8).map(function (id) { return { label: isD ? PD.driverName(id) : PD.teamName(id), a: model[id] || 0, b: prices[id] || 0, href: isD ? PD.driverHref(id) : PD.teamHref(id) }; }), labelWidth: 120, valName: 'Title probability' });
     else PD.ch.hbars(pre, ids.slice(0, 8).map(function (id) { return { label: isD ? PD.driverName(id) : PD.teamName(id), value: model[id] || 0, colour: PD.teamColour(isD ? PD.driverTeam(id) : id) }; }), { fmt: function (v) { return PD.pct(v); }, name: 'Model' });
     PD.table(pre + '-t', [
       { key: 'name', label: isD ? 'Driver' : 'Team', sticky: true, fmt: function (v, r) { return isD ? PD.driverLink(r.id) : PD.teamLink(r.id); } },
@@ -169,7 +169,7 @@ function odds(season, markets, y) {
       var ids = Object.keys(model).concat(Object.keys(prices).filter(function (k) { return !(k in model); })).sort(function (a, b) { return Math.max(model[b] || 0, prices[b] || 0) - Math.max(model[a] || 0, prices[a] || 0); }).slice(0, 12);
       if (!ids.length) return PD.ch.none('od-n', 'No forecast or market for the next race yet; race-winner markets list about a week out.');
       if (!Object.keys(prices).length) return PD.ch.hbars('od-n', ids.map(function (id) { return { label: PD.driverName(id), value: model[id] || 0, colour: PD.teamColour(PD.driverTeam(id)), href: PD.driverHref(id) }; }), { fmt: function (v) { return PD.pct(v); }, name: 'Model' });
-      window.QKC.dumbbell(document.getElementById('od-n'), { rows: ids.map(function (id) { return { label: PD.driverName(id), a: model[id] || 0, b: prices[id] || 0, href: PD.driverHref(id) }; }), labelWidth: 120,
+      window.QKC.dumbbell(document.getElementById('od-n'), { rows: ids.map(function (id) { return { label: PD.driverName(id), a: model[id] || 0, b: prices[id] || 0, href: PD.driverHref(id) }; }), labelWidth: 120, valName: 'Win probability',
         max: Math.min(1, Math.max.apply(null, ids.map(function (id) { return Math.max(model[id] || 0, prices[id] || 0); })) * 1.15 + 0.02) });
     };
     if (Object.keys(nr.model || {}).length) drawN(nr.model, nr.prices || {});
@@ -230,7 +230,7 @@ function pace(season) {
     teams.sort(function (a, b) { return meanOf(a) - meanOf(b); });
     var data = [];
     teams.forEach(function (t, yi) { C[t].forEach(function (e) { data.push([rounds.indexOf(e.round), yi, e.effect]); }); });
-    PD.ch.heat('cp-heat', { xs: rounds.map(function (r) { return 'R' + r; }), ys: teams.map(PD.teamName), data: data, diverging: true, invert: true, fmt: function (v) { return PD.signed(v, 2); },
+    PD.ch.heat('cp-heat', { xs: rounds.map(function (r) { return 'R' + r; }), ys: teams.map(PD.teamName), xName: 'Round', yName: 'Constructor', data: data, diverging: true, invert: true, fmt: function (v) { return PD.signed(v, 2); },
       tipFmt: function (v) { var t = teams[v[1]], r = rounds[v[0]]; var e = C[t].filter(function (z) { return z.round === r; })[0] || {}; return (cal[r] ? cal[r].name + ': ' : '') + PD.signed(v[2], 3) + '% ± ' + PD.num(e.se, 3); }, label: 'Car pace by race' });
     PD.ch.lines('cp-lines', teams.map(function (t) { return { name: PD.teamName(t), short: PD.teamAbbr(t), colour: PD.teamColour(t), data: C[t].slice().sort(function (a, b) { return a.round - b.round; }).map(function (e) { return [e.round, -e.effect]; }) }; }),
       { xName: 'Round', endLabels: true, legend: false, yName: '% of a lap faster than the field', yFmt: function (v) { return PD.signed(v, 2); }, xFmt: function (v) { return 'R' + v; }, xLabel: function (v) { return 'Round ' + v + (cal[v] ? ' · ' + cal[v].name : ''); }, label: 'Car pace lines' });
@@ -243,7 +243,7 @@ function pace(season) {
     var eff = ((season.driver_effects || {})[kind]) || {};
     var ids = Object.keys(eff).filter(function (id) { return isNum(eff[id].effect); }).sort(function (a, b) { return eff[a].effect - eff[b].effect; });
     PD.ch.hbars('cp-eff', ids.map(function (id) { var e = eff[id]; return { label: PD.driverName(id), value: e.effect, lo: e.effect - 1.96 * (e.se || 0), hi: e.effect + 1.96 * (e.se || 0), colour: PD.teamColour(teamOf[id] || PD.driverTeam(id)), href: PD.driverHref(id), sub: (e.races || 0) + ' races' }; }),
-      { fmt: function (v) { return PD.signed(v, 3) + '%'; }, name: 'Driver effect', errName: '95% interval', labels: false, axisLabels: true, emptyText: 'Driver effects need lap data (2018 on).', label: 'Driver effects' });
+      { fmt: function (v) { return PD.signed(v, 3) + '%'; }, name: 'Driver effect', errName: '95% interval', labels: false, axisLabels: true, xName: 'Driver effect (% of a lap)', emptyText: 'Driver effects need lap data (2018 on).', label: 'Driver effects' });
   };
   drawE('race');
   PD.wireSeg(document, 'cp-ek', drawE);

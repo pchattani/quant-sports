@@ -17,12 +17,15 @@ League `L` is `nba` or `wnba`; season `S` is the ESPN year (NBA 2026-27 = 2027).
                  "champions": [[season, tid|name]] (1947→ for nba, 1997→ wnba, from history)}}}
 ```
 GAME_CARD = `{"id","season","date","status","stype","home","away","hs","as","period","clock",
- "model": {"p_home","margin","total"}, "market": {"p_home","spread_home","total","sources":[...]} | null,
+ "model": {"p_home","margin","total","av"?}, "market": {"p_home","spread_home","total","sources":[...]} | null,
  "wp_home": live model WP | null, "espn_wp": | null, "series": {...} | null}`
 
 GAME_CARD notes: `period` = periods played (final) or the current period (live), `clock` "m:ss" (live only); `model` is the
 pregame model (ratings fitted on games before the game day for played games); `market` is the prediction-market price where
-fetched, else the DraftKings moneyline (de-vigged) or spread.
+fetched, else the DraftKings moneyline (de-vigged) or spread. `model.av` = [home, away] (NBA informed model only): each
+team's availability term in points of its own margin (expected rotation against what its rating reflects; injury-report
+Outs applied for upcoming games). The game payload's `pregame.model.detail` carries the same split as `injury_home` and
+`injury_away` (both in points of home margin).
 
 `data/glossary.json`  `{"groups":[{"name","entries":[{key,label,desc,fmt,lower,scope,kind:"player|team|lineup"}]}],"model":[{key,label,group,desc}]}`
 `data/<L>/calibration.json` the backtest (`models/backtest.py`: metrics, metrics_vs_market, margin_rmse, per_season, season_sim, params_by_season,

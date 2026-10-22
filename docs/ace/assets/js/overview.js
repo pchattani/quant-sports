@@ -162,8 +162,8 @@ function render(el, params) {
 
     if (titleRows.length) {
       const top = Math.max.apply(null, titleRows.map(r => Math.max(r.p, r.m || 0)));
-      if (titleRows.some(r => isNum(r.m))) QKC.dumbbell('#ov-title', { rows: titleRows.map(r => ({ label: TA.playerShort(T, r.pid), a: r.p, b: isNum(r.m) ? r.m : r.p, href: TA.playerHref(T, r.pid) })), aName: 'Model', bName: 'Market', labelWidth: 120, max: Math.min(1, Math.ceil(top * 10 + 0.5) / 10) });
-      else QKC.bar('#ov-title', { cats: titleRows.map(r => TA.playerShort(T, r.pid)), series: [{ name: 'Title', data: titleRows.map(r => r.p) }], horizontal: true, labels: true, fmt: v => TA.pct(v, 0), hrefs: titleRows.map(r => TA.playerHref(T, r.pid)), labelWidth: 120 });
+      if (titleRows.some(r => isNum(r.m))) QKC.dumbbell('#ov-title', { rows: titleRows.map(r => ({ label: TA.playerShort(T, r.pid), a: r.p, b: isNum(r.m) ? r.m : r.p, href: TA.playerHref(T, r.pid) })), aName: 'Model', bName: 'Market', valName: 'Title probability', labelWidth: 120, max: Math.min(1, Math.ceil(top * 10 + 0.5) / 10) });
+      else QKC.bar('#ov-title', { cats: titleRows.map(r => TA.playerShort(T, r.pid)), series: [{ name: 'Title', data: titleRows.map(r => r.p) }], horizontal: true, labels: true, fmt: v => TA.pct(v, 0), hrefs: titleRows.map(r => TA.playerHref(T, r.pid)), labelWidth: 120, valName: 'Title probability' });
     }
     if (eloKeys.length) {
       const draw = k => {
@@ -171,14 +171,14 @@ function render(el, params) {
         const lo = Math.min.apply(null, rows.map(r => r[1]));
         QKC.bar('#ov-elo', { cats: rows.map(r => TA.playerShort(T, r[0]) + (isNum(TA.playerRank(T, r[0])) ? ' · No. ' + TA.playerRank(T, r[0]) : '')), series: [{ name: (k === 'all' ? 'Overall' : TA.surfaceLabel(k)) + ' Elo', data: rows.map(r => Math.round(r[1])) }],
           horizontal: true, labels: true, fmt: v => TA.num(v, 0), min: Math.floor((lo - 120) / 50) * 50, colors: rows.map(() => k === 'all' ? null : TA.surfaceColour(k)).map(c => c || undefined),
-          hrefs: rows.map(r => TA.playerHref(T, r[0])), labelWidth: 150, label: 'Elo top 10' });
+          hrefs: rows.map(r => TA.playerHref(T, r[0])), labelWidth: 150, label: 'Elo top 10', valName: (k === 'all' ? 'Overall' : TA.surfaceLabel(k)) + ' Elo' });
       };
       draw(eloKeys[0]);
       QK.chips(document.getElementById('ov-sf'), v => { if (v && v[0]) draw(v[0]); });
     }
     if (isCurrent && raceRows.length) {
-      if (Object.keys(raceMk).length) QKC.dumbbell('#ov-race', { rows: raceRows.map(r => ({ label: TA.playerShort(T, r[0]) + ' · ' + TA.num(r[3], 0) + ' pts', a: r[1], b: isNum(raceMk[r[0]]) ? raceMk[r[0]] : r[1], href: TA.playerHref(T, r[0]) })), aName: 'Model', bName: 'Market', labelWidth: 170 });
-      else QKC.bar('#ov-race', { cats: raceRows.map(r => TA.playerShort(T, r[0])), series: [{ name: 'Qualify', data: raceRows.map(r => r[1]) }], horizontal: true, labels: true, fmt: v => TA.pct(v, 0), max: 1, hrefs: raceRows.map(r => TA.playerHref(T, r[0])), labelWidth: 130 });
+      if (Object.keys(raceMk).length) QKC.dumbbell('#ov-race', { rows: raceRows.map(r => ({ label: TA.playerShort(T, r[0]) + ' · ' + TA.num(r[3], 0) + ' pts', a: r[1], b: isNum(raceMk[r[0]]) ? raceMk[r[0]] : r[1], href: TA.playerHref(T, r[0]) })), aName: 'Model', bName: 'Market', valName: 'Chance to qualify', labelWidth: 170 });
+      else QKC.bar('#ov-race', { cats: raceRows.map(r => TA.playerShort(T, r[0])), series: [{ name: 'Qualify', data: raceRows.map(r => r[1]) }], horizontal: true, labels: true, fmt: v => TA.pct(v, 0), max: 1, hrefs: raceRows.map(r => TA.playerHref(T, r[0])), labelWidth: 130, valName: 'Chance to qualify' });
     }
     if (gaps.length) QKC.dumbbell('#ov-gaps', { rows: gaps.map(g => ({ label: g.label, a: g.a, b: g.b, sub: g.sub, href: g.href })), aName: 'Model', bName: 'Market', labelWidth: 210 });
     if (live.length) TA.interval(() => { if (document.visibilityState === 'visible') TA.go(location.hash || '#/' + T); }, 90000);

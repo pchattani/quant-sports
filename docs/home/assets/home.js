@@ -62,7 +62,7 @@ function renderHeroKpis() {
     QK.kpi({ label: 'Live now', value: String(live), sub: live ? 'games in play' : 'nothing in play' }),
     QK.kpi({ label: 'Featured today', value: String(today), sub: 'games on this page' }),
     QK.kpi({ label: 'Priced games', value: String(priced), sub: 'model v market' }),
-    QK.kpi({ label: 'Biggest gap', value: big ? fmt.pp(big.diff).replace(' pts', '') : '—', sub: big ? big.label : '', tip: 'Model probability minus market probability, in percentage points' })
+    QK.kpi({ label: 'Biggest gap', value: big ? fmt.pp(big.diff) : '—', sub: big ? big.label : '', tip: 'Model probability minus market probability, in percentage points' })
   ].join('');
 }
 
@@ -146,7 +146,8 @@ function renderTiles() {
   $('#tiles').innerHTML = QK.SPORTS.map(function (q) {
     var s = byKey[q.key] || {};
     var url = QK.sportUrl(q.key);
-    var kp = (s.kpis || []).slice(0, 3);
+    /* a tile figure with no value (a dash, nothing behind it) says nothing: leave it out */
+    var kp = (s.kpis || []).filter(function (k) { var v = k && k.value; return v !== null && v !== undefined && v !== '' && v !== '—' && v !== '-'; }).slice(0, 3);
     return '<a class="hm-tile" href="' + esc(url) + '" style="--sa:' + q.accent + '"><svg class="hm-tile-go" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>' +
       '<div class="hm-tile-top"><span class="hm-tile-ic">' + QK.ICON[q.key] + '</span><div><div class="hm-tile-name">' + esc(q.label) + '</div><div class="hm-tile-site">' + esc(q.site) + '</div></div></div>' +
       '<div class="hm-tile-status">' + (lm[q.key] ? '<span class="qk-badge live">Live</span>' : '') + '<span class="qk-truncate">' + esc(s.ok === false ? 'Data unavailable' : (s.status || q.leagues)) + '</span></div>' +
@@ -238,7 +239,7 @@ function futuresPanel(p, f, sport) {
     (rows[1] ? QK.kpi({ label: 'Field v favourite', value: fmt.pct(1 - lead.p), sub: 'chance someone else wins' }) : '') +
     '<a class="qk-btn" href="' + esc(QK.sportUrl(sport)) + '">Full odds on ' + esc(sportOf(sport).site) + ' →</a></div></div>';
   var el = $('.fut-ch', p);
-  if (hasMkt) QKC.dumbbell(el, { rows: rows.map(function (r) { return { label: r.name, a: r.p, b: isNum(r.market) ? r.market : r.p, href: r.href }; }), max: niceMax(rows), labelWidth: 150 });
+  if (hasMkt) QKC.dumbbell(el, { rows: rows.map(function (r) { return { label: r.name, a: r.p, b: isNum(r.market) ? r.market : r.p, href: r.href }; }), max: niceMax(rows), labelWidth: 150, valName: 'Title probability' });
   else QKC.bar(el, { horizontal: true, cats: rows.map(function (r) { return r.name; }), series: [{ name: f.title, data: rows.map(function (r) { return r.p; }) }], colors: rows.map(function (r) { return r.colour; }), hrefs: rows.map(function (r) { return r.href; }), labels: true, fmt: function (v) { return fmt.pct(v, 1); }, labelWidth: 150 });
 }
 function niceMax(rows) { var m = Math.max.apply(null, rows.map(function (r) { return Math.max(r.p || 0, r.market || 0); })); return m > 0.6 ? 1 : Math.ceil(m * 10 + 0.5) / 10; }
@@ -263,17 +264,17 @@ function renderCharts() {
   var tr = C.f1_title_race;
   if (tr && tr.series && tr.series.length) {
     out.push(card('qk-span-8', 'F1 title race', 'Drivers’ points after every round of ' + tr.year, 'f1', tr.href, '<div id="c-f1" style="--h:300px"></div>'));
-    jobs.push(function () { QKC.line('#c-f1', { x: tr.rounds, xLabel: function (r) { return 'Round ' + r; }, label: 'F1 drivers championship points by round', series: tr.series.map(function (s) { return { name: s.code || s.name, label: s.code, color: s.colour, dash: s.dash, data: s.points }; }) }); });
+    jobs.push(function () { QKC.line('#c-f1', { x: tr.rounds, xName: 'Round', yName: 'Points', xLabel: function (r) { return 'Round ' + r; }, label: 'F1 drivers championship points by round', series: tr.series.map(function (s) { return { name: s.code || s.name, label: s.code, color: s.colour, dash: s.dash, data: s.points }; }) }); });
   }
   var nr = C.f1_next_race;
   if (nr && nr.field && nr.field.length) {
     out.push(card('qk-span-4', nr.name, 'Win probability: model v market', 'f1', nr.href, '<div id="c-f1n" style="--h:300px"></div>'));
-    jobs.push(function () { QKC.dumbbell('#c-f1n', { rows: nr.field.slice(0, 7).map(function (d) { return { label: d.code || d.name, a: d.p || 0, b: isNum(d.market) ? d.market : (d.p || 0), href: d.href, sub: d.name }; }), max: 0.5, labelWidth: 50 }); });
+    jobs.push(function () { QKC.dumbbell('#c-f1n', { rows: nr.field.slice(0, 7).map(function (d) { return { label: d.code || d.name, a: d.p || 0, b: isNum(d.market) ? d.market : (d.p || 0), href: d.href, sub: d.name }; }), max: 0.5, labelWidth: 50, valName: 'Win probability' }); });
   }
   var mv = C.nfl_movers;
   if (mv && mv.series && mv.series.length) {
     out.push(card('qk-span-6', 'NFL: who has moved', 'Net rating by week, the six biggest changes since week 1 (points v an average team)', 'nfl', mv.href, '<div id="c-nfl" style="--h:300px"></div>'));
-    jobs.push(function () { QKC.line('#c-nfl', { x: mv.series[0].weeks.map(function (w) { return 'W' + w; }), ref: { y: 0, label: 'average' }, yFmt: function (v) { return fmt.signed(v, 1); }, label: 'NFL net rating movers', series: mv.series.map(function (s) { return { name: s.abbr, label: s.abbr + ' ' + fmt.signed(s.delta, 1), data: s.net }; }) }); });
+    jobs.push(function () { QKC.line('#c-nfl', { x: mv.series[0].weeks.map(function (w) { return 'W' + w; }), xName: 'Week', yName: 'Rating (pts)', ref: { y: 0, label: 'average' }, yFmt: function (v) { return fmt.signed(v, 1); }, label: 'NFL net rating movers', series: mv.series.map(function (s) { return { name: s.abbr, label: s.abbr + ' ' + fmt.signed(s.delta, 1), data: s.net }; }) }); });
   }
   var xg = C.nhl_xg;
   if (xg && xg.points && xg.points.length) {
@@ -299,7 +300,7 @@ function renderCharts() {
   if (np && np.rows && np.rows.length) {
     var r = np.rows.slice(0, 8).concat(np.rows.slice(-4));
     out.push(card('qk-span-12', 'NBA: preseason power', 'Net rating (points per 100 possessions v average): the top eight and the bottom four', 'basketball', QK.sportUrl('basketball'), '<div id="c-nba" style="--h:260px"></div>'));
-    jobs.push(function () { QKC.bar('#c-nba', { cats: r.map(function (x) { return x.abbr; }), series: [{ name: 'Net rating', data: r.map(function (x) { return x.value; }) }], diverging: true, hrefs: r.map(function (x) { return x.href; }), labels: true, fmt: function (v) { return fmt.signed(v, 1); } }); });
+    jobs.push(function () { QKC.bar('#c-nba', { cats: r.map(function (x) { return x.abbr; }), series: [{ name: 'Net rating', data: r.map(function (x) { return x.value; }) }], diverging: true, hrefs: r.map(function (x) { return x.href; }), labels: true, valName: 'Net rating (pts per 100 poss.)', fmt: function (v) { return fmt.signed(v, 1); } }); });
   }
   $('#chart-grid').innerHTML = out.join('');
   jobs.forEach(function (f) { try { f(); } catch (e) { if (window.console) console.error(e); } });

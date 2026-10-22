@@ -96,8 +96,8 @@ GI.route('value', function (el, params) {
         GI.field('How many', GI.select('gv-pn', [['25', '25'], ['50', '50'], ['100', '100'], ['9999', 'All']], String(PV.n), 'How many')) + '</div><div id="gv-ptable"></div>' +
         '<p class="gi-cap">' + esc((v.notes || {}).value || '') + ' ' + esc((v.notes || {}).qb || '') + ' ' + esc((v.notes || {}).availability || '') + ' Wins = value × ' + GI.num(v.k_resp, 2) + ' × ' + GI.num(v.wins_per_point, 4) + ' wins per point of margin.</p>') + '</section>');
     const scP = Object.keys(sc).sort((a, b) => sc[b].index - sc[a].index);
-    GI.ch.bar('gv-sc', { cats: scP, series: [{ name: 'Scarcity index', data: scP.map(p => sc[p].index) }], labels: true, fmt: x => GI.num(x, 1) });
-    if (pc.ok && (pc.picks || []).length) GI.ch.lines('gv-pc', [{ name: 'Pick value', x: pc.picks.map((_, i) => i + 1), y: pc.picks, area: true }], { legend: false, xName: 'Pick', xLabel: x => 'Pick ' + x, yFmt: y => GI.num(y, 0) });
+    GI.ch.bar('gv-sc', { cats: scP, series: [{ name: 'Scarcity index', data: scP.map(p => sc[p].index) }], labels: true, fmt: x => GI.num(x, 1), valName: 'Scarcity index' });
+    if (pc.ok && (pc.picks || []).length) GI.ch.lines('gv-pc', [{ name: 'Pick value', x: pc.picks.map((_, i) => i + 1), y: pc.picks, area: true }], { legend: false, xName: 'Pick', yName: 'Value (pts, four seasons)', xLabel: x => 'Pick ' + x, yFmt: y => GI.num(y, 0) });
     const drawP = () => {
       let list = vr.filter(r => !PV.pos || r.pos === PV.pos);
       list.sort((a, b) => (isNum(b[PV.sort]) ? b[PV.sort] : -1e9) - (isNum(a[PV.sort]) ? a[PV.sort] : -1e9));

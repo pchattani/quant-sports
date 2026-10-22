@@ -268,7 +268,7 @@ function drawGar(el, v) {
   var rows = FB.rows(v).filter(function (r) { return isNum(r.gar) && (r.min || 0) >= 900; }).sort(function (a, b) { return b.gar - a.gar; }).slice(0, 15);
   if (!rows.length) { chartEmpty(box, 'No value model yet', 'The value layer is rebuilt with the site.'); return; }
   QKC.bar(box, {
-    horizontal: true, labels: true, labelWidth: 150, fmt: function (x) { return num(x, 1); },
+    horizontal: true, labels: true, labelWidth: 150, fmt: function (x) { return num(x, 1); }, valName: 'Goals above replacement',
     cats: rows.map(function (r) { return r.name + ' · ' + (r.club || ''); }),
     series: [{ name: 'Goals above replacement', data: rows.map(function (r) { return Math.round(r.gar * 10) / 10; }), color: QK.cssVar('--accent') }],
     hrefs: rows.map(function (r) { return FB.href.player(r.id); }), label: 'Goals above replacement, last 12 months'
@@ -385,7 +385,7 @@ function renderLeaders(el, p) {
       if (!top.length) { chartEmpty(box, 'No player clears the filters'); return; }
       box.style.height = '420px';
       QKC.bar(box, {
-        horizontal: true, labels: true, labelWidth: 150, fmt: function (x) { return FB.fmtMetric(x, metric.fmt); },
+        horizontal: true, labels: true, labelWidth: 150, fmt: function (x) { return FB.fmtMetric(x, metric.fmt); }, valName: lab,
         cats: top.map(function (r) { return r.name + ' · ' + (r.team || FB.compName(r.comp, true)); }),
         series: [{ name: lab, data: top.map(function (r) { return r.v; }) }],
         colors: top.map(function (r) { return FB.kindColorHex(FB.kindOf(r.comp)); }),
@@ -624,16 +624,16 @@ function seasonCharts(body, Y) {
   var kinds = Object.keys(KIND_ORDER).filter(function (k) { return ys.some(function (y) { return y.rows.some(function (r) { return r.kind === k; }); }); })
     .sort(function (a, b) { return KIND_ORDER[a] - KIND_ORDER[b]; });
   var perKind = function (k, f) { return ys.map(function (y) { var rr = y.rows.filter(function (r) { return r.kind === k; }); return f(rr); }); };
-  QKC.bar(boxes[0], { cats: eras, stack: true, legend: true, fmt: function (v) { return int(v); }, label: 'Goals and assists by season',
+  QKC.bar(boxes[0], { cats: eras, stack: true, legend: true, fmt: function (v) { return int(v); }, catName: 'Season', valName: 'Goals plus assists', label: 'Goals and assists by season',
     series: kinds.map(function (k) { return { name: KIND_LABEL[k], color: FB.kindColorHex(k), data: perKind(k, function (rr) { return sum(rr, 'g') + sum(rr, 'a'); }) }; }) });
-  QKC.bar(boxes[1], { cats: eras, stack: true, legend: true, fmt: function (v) { return int(v); }, label: 'Minutes by season',
+  QKC.bar(boxes[1], { cats: eras, stack: true, legend: true, fmt: function (v) { return int(v); }, catName: 'Season', valName: 'Minutes', label: 'Minutes by season',
     series: kinds.map(function (k) { return { name: KIND_LABEL[k], color: FB.kindColorHex(k), data: perKind(k, function (rr) { return sum(rr, 'min'); }) }; }) });
   var xgOk = ys.some(function (y) { return isNum(y.xg); });
-  QKC.line(boxes[2], { x: eras, legend: true, endLabels: false, yMin: 0, yFmt: function (v) { return num(v, 0); }, label: 'Goals against xG by season',
+  QKC.line(boxes[2], { x: eras, legend: true, endLabels: false, yMin: 0, yFmt: function (v) { return num(v, 0); }, xName: 'Season', yName: 'Goals and xG', label: 'Goals against xG by season',
     series: [{ name: 'Goals', color: QK.cssVar('--accent'), data: ys.map(function (y) { return y.g; }) }].concat(xgOk ? [{ name: 'xG', color: QK.cssVar('--c-1'), dash: true, data: ys.map(function (y) { return isNum(y.xg) ? Math.round(y.xg * 10) / 10 : null; }) }] : []) });
   var rts = ys.map(function (y) { return isNum(y.rt) ? Math.round(y.rt * 100) / 100 : null; });
   if (!rts.some(isNum)) chartEmpty(boxes[3], 'No ratings', 'No rated season in the filter.');
-  else QKC.line(boxes[3], { x: eras, endLabels: false, yScale: true, yFmt: function (v) { return num(v, 2); }, label: 'Rating by season', series: [{ name: 'Rating', color: QK.cssVar('--c-3'), data: rts, area: true }] });
+  else QKC.line(boxes[3], { x: eras, endLabels: false, yScale: true, yFmt: function (v) { return num(v, 2); }, xName: 'Season', yName: 'Sofascore rating', label: 'Rating by season', series: [{ name: 'Rating', color: QK.cssVar('--c-3'), data: rts, area: true }] });
 }
 
 function drawValue(body, doc) {
@@ -778,10 +778,10 @@ function drawMatches(el, body, doc, R, q) {
   var tip = function (i) { var r = chron[i]; return FB.fmtDate(r.date, true) + ' · ' + compShort(r.comp, names) + ' · ' + (r.home ? 'v ' : '@ ') + (r.opp || '') + ' ' + (r.res || ''); };
   QKC.mount(body.querySelector('#pl-form'), function (T) {
     return {
-      grid: { left: 8, right: 12, top: 26, bottom: 8, containLabel: true },
+      grid: { left: 8, right: 12, top: 42, bottom: 30, containLabel: true },
       legend: { top: 0, left: 0, icon: 'roundRect', itemWidth: 12, itemHeight: 4, textStyle: { color: T.ink2 }, data: ['Rating', 'Rolling 5'] },
-      xAxis: QKC.axis(T, { type: 'category', data: xs, split: false, line: true }),
-      yAxis: QKC.axis(T, { min: 5, max: 10, fmt: function (v) { return num(v, 0); } }),
+      xAxis: QKC.axis(T, { type: 'category', data: xs, split: false, line: true, name: 'Match date', nameLocation: 'middle', nameGap: 26 }),
+      yAxis: QKC.axis(T, { min: 5, max: 10, fmt: function (v) { return num(v, 0); }, name: 'Sofascore rating', nameAlign: 'left' }),
       tooltip: QKC.tooltip(T, { trigger: 'axis', formatter: function (ps) { var i = ps[0].dataIndex; return '<div style="font-weight:600;margin-bottom:4px">' + esc(tip(i)) + '</div>' + ps.map(function (p) { return QKC.tipRow(p.color, p.seriesName, isNum(p.value) ? num(p.value, 2) : '—'); }).join(''); } }),
       series: [
         { type: 'bar', name: 'Rating', barMaxWidth: 14, data: rts.map(function (v) { return { value: v, itemStyle: { color: FB.charts.ratingColor(v), borderRadius: [3, 3, 0, 0] } }; }) },
@@ -791,10 +791,10 @@ function drawMatches(el, body, doc, R, q) {
   }, { label: 'Rating per appearance and the rolling five-match mean' });
   QKC.mount(body.querySelector('#pl-formxg'), function (T) {
     return {
-      grid: { left: 8, right: 12, top: 26, bottom: 8, containLabel: true },
+      grid: { left: 8, right: 12, top: 42, bottom: 30, containLabel: true },
       legend: { top: 0, left: 0, icon: 'roundRect', itemWidth: 10, itemHeight: 10, textStyle: { color: T.ink2 } },
-      xAxis: QKC.axis(T, { type: 'category', data: xs, split: false, line: true }),
-      yAxis: QKC.axis(T, { min: 0, fmt: function (v) { return num(v, 1); } }),
+      xAxis: QKC.axis(T, { type: 'category', data: xs, split: false, line: true, name: 'Match date', nameLocation: 'middle', nameGap: 26 }),
+      yAxis: QKC.axis(T, { min: 0, fmt: function (v) { return num(v, 1); }, name: 'xG and goals', nameAlign: 'left' }),
       tooltip: QKC.tooltip(T, { trigger: 'axis', formatter: function (ps) { var i = ps[0].dataIndex; return '<div style="font-weight:600;margin-bottom:4px">' + esc(tip(i)) + '</div>' + ps.map(function (p) { return QKC.tipRow(p.color, p.seriesName, isNum(p.value) ? num(p.value, 2) : '—'); }).join(''); } }),
       series: [
         { type: 'bar', name: 'xG', barMaxWidth: 14, data: chron.map(function (r) { return isNum(r.xg) ? r.xg : 0; }), itemStyle: { color: T.model, borderRadius: [3, 3, 0, 0] } },
@@ -837,7 +837,7 @@ function drawShots(el, body, doc, R, q) {
     sumBox.innerHTML = FB.kpis([FB.kpi('Shots', String(shots.length)), FB.kpi('Goals', String(goals), { sub: 'xG ' + num(tot, 1) }), FB.kpi('xG per shot', num(tot / shots.length, 2))]) + '<div class="fb-mt" id="pl-shotbars"></div>';
     var sb = sumBox.querySelector('#pl-shotbars');
     sb.style.height = '220px';
-    QKC.bar(sb, { horizontal: true, labels: true, cats: by.map(function (x) { return x.o; }), series: [{ name: 'Shots', data: by.map(function (x) { return x.n; }) }], fmt: function (v) { return int(v); }, label: 'Shots by outcome' });
+    QKC.bar(sb, { horizontal: true, labels: true, cats: by.map(function (x) { return x.o; }), valName: 'Shots', series: [{ name: 'Shots', data: by.map(function (x) { return x.n; }) }], fmt: function (v) { return int(v); }, label: 'Shots by outcome' });
   });
 }
 

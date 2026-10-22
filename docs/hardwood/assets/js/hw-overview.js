@@ -210,14 +210,14 @@ function render(el, params) {
       if (Object.keys(mkTitle).length) {
         const mx = Math.max.apply(null, tTeams.map(t => Math.max(sim[t].p_title, mkTitle[t] || 0)));
         QKC.dumbbell('#ov-title', { rows: tTeams.map(t => ({ label: HW.teamName(L, t), a: sim[t].p_title, b: isNum(mkTitle[t]) ? mkTitle[t] : sim[t].p_title, href: HW.teamHref(L, t), sub: isNum(mkTitle[t]) ? '' : 'no market price' })),
-          aName: 'Model', bName: 'Market', min: 0, max: Math.min(1, Math.ceil(mx * 20) / 20 + 0.05), labelWidth: 140 });
+          aName: 'Model', bName: 'Market', min: 0, max: Math.min(1, Math.ceil(mx * 20) / 20 + 0.05), labelWidth: 140, valName: 'Title probability' });
       } else {
-        QKC.bar('#ov-title', { cats: tTeams.map(t => HW.teamName(L, t)), series: [{ name: 'Title', data: tTeams.map(t => sim[t].p_title) }], horizontal: true, labels: true, fmt: v => U.pct(v), colors: tTeams.map(t => U.tcol(L, t)), hrefs: tTeams.map(t => HW.teamHref(L, t)), labelWidth: 140 });
+        QKC.bar('#ov-title', { cats: tTeams.map(t => HW.teamName(L, t)), series: [{ name: 'Title', data: tTeams.map(t => sim[t].p_title) }], horizontal: true, labels: true, fmt: v => U.pct(v), colors: tTeams.map(t => U.tcol(L, t)), hrefs: tTeams.map(t => HW.teamHref(L, t)), labelWidth: 140, valName: 'Title probability' });
       }
     }
     if (document.getElementById('ov-power')) {
       QKC.bar('#ov-power', { cats: power.map(r => HW.teamAbbr(L, r.tid)), series: [{ name: 'Net rating', data: power.map(r => Math.round(r.net * 10) / 10) }], horizontal: true, labels: true, fmt: v => U.signed(v, 1),
-        colors: power.map(r => U.tcol(L, r.tid)), hrefs: power.map(r => HW.teamHref(L, r.tid, S)), labelWidth: 46 });
+        colors: power.map(r => U.tcol(L, r.tid)), hrefs: power.map(r => HW.teamHref(L, r.tid, S)), labelWidth: 46, valName: 'Net rating (pts per 100 possessions)' });
     }
     if (document.getElementById('ov-wins')) {
       const wt = (markets && markets.win_totals) || {};
@@ -232,10 +232,10 @@ function render(el, params) {
         const hasMk = ids.some(id => isNum(mk[id]));
         if (hasMk) {
           const mx = Math.max.apply(null, ids.map(id => Math.max(a.model[id] || 0, mk[id] || 0)));
-          QKC.dumbbell('#ov-aw', { rows: ids.map(id => ({ label: HW.playerName(L, id), a: a.model[id] || 0, b: isNum(mk[id]) ? mk[id] : (a.model[id] || 0), href: HW.playerHref(L, id), sub: isNum(mk[id]) ? '' : 'no market price' })), aName: 'Model', bName: 'Market', min: 0, max: Math.min(1, Math.ceil(mx * 20) / 20 + 0.05), labelWidth: 130 });
+          QKC.dumbbell('#ov-aw', { rows: ids.map(id => ({ label: HW.playerName(L, id), a: a.model[id] || 0, b: isNum(mk[id]) ? mk[id] : (a.model[id] || 0), href: HW.playerHref(L, id), sub: isNum(mk[id]) ? '' : 'no market price' })), aName: 'Model', bName: 'Market', min: 0, max: Math.min(1, Math.ceil(mx * 20) / 20 + 0.05), labelWidth: 130, valName: 'Award probability' });
         } else {
           QKC.bar('#ov-aw', { cats: ids.map(id => HW.playerName(L, id)), series: [{ name: AWN[k] || k, data: ids.map(id => a.model[id] || 0) }], horizontal: true, labels: true, fmt: v => U.pct(v),
-            colors: ids.map(id => U.tcol(L, (HW.NAMES[L].players[String(id)] || {}).team)), hrefs: ids.map(id => HW.playerHref(L, id)), labelWidth: 130 });
+            colors: ids.map(id => U.tcol(L, (HW.NAMES[L].players[String(id)] || {}).team)), hrefs: ids.map(id => HW.playerHref(L, id)), labelWidth: 130, valName: 'Award probability' });
         }
       };
       drawAw(awKeys[0]);
@@ -258,7 +258,7 @@ function render(el, params) {
     });
     if (document.getElementById('ov-war')) {
       QKC.bar('#ov-war', { cats: vrows.map(r => r.name), series: [{ name: 'WAR', data: vrows.map(r => Math.round(r.w0 * 10) / 10) }], horizontal: true, labels: true, fmt: v => U.f(v, 1),
-        colors: vrows.map(r => U.tcol(L, r.team)), hrefs: vrows.map(r => HW.playerHref(L, r.id)), labelWidth: 150 });
+        colors: vrows.map(r => U.tcol(L, r.team)), hrefs: vrows.map(r => HW.playerHref(L, r.id)), labelWidth: 150, valName: seasonWar ? 'Wins above replacement' : 'Projected WAR, rest of season' });
     }
     const first = upcoming[0];
     if (first && !today.some(g => HW.gameState(g) === 'in')) HW.interval(() => { const n = document.getElementById('ov-cd'); if (n) n.innerHTML = cdHTML(L, first); }, 30000);

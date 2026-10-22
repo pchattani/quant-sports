@@ -334,12 +334,18 @@ class Rotation:
         if pid not in self.st[t]:
             self.st[t][pid] = {"mpg": float(prev["mpg"] if prev else mpg), "streak": streak}
 
-    def expected(self, t: str, out: set[str] | None = None) -> np.ndarray:
+    def expected(self, t: str, out: set[str] | None = None, p_over: dict[str, float] | None = None) -> np.ndarray:
+        """S of team t's expected rotation; `out` players get P(plays) = 0, `p_over` sets P(plays) per player
+        (e.g. from pre-game market listings) in place of the participation-streak rate."""
         tot = np.zeros(3)
         mins = 0.0
         contrib = []
         for pid, s in (self.st.get(t) or {}).items():
-            a = 0.0 if out and pid in out else self.av[min(s["streak"], len(self.av) - 1)]
+            a = self.av[min(s["streak"], len(self.av) - 1)]
+            if p_over and pid in p_over:
+                a = float(p_over[pid])
+            if out and pid in out:
+                a = 0.0
             m = a * s["mpg"]
             if m <= 0:
                 continue
@@ -461,8 +467,9 @@ def rotation_for(league: str, season: int, store: dict, vals: dict | None = None
 
 # ── per-day inputs for a season ──────────────────────────────────────────────
 
-def _team_av(rot: Rotation, t: str, d: date, out: set[str] | None = None) -> list[float]:
-    se = rot.expected(t, out)
+def _team_av(rot: Rotation, t: str, d: date, out: set[str] | None = None,
+             p_over: dict[str, float] | None = None) -> list[float]:
+    se = rot.expected(t, out, p_over)
     sr, ps = rot.reference(t, d)
     ds = se - sr
     return [float(ds[0] * (1 - ps)), float(ds[1] - ds[2])]
@@ -551,7 +558,10 @@ def predict(inp: dict, f: dict, th: dict, ta: dict, L: float, P: float, neutral:
     terms = {c: float(cs.get(c, 0.0)) * x[c] for c in SPREAD_FEATS}
     mu = float(cs.get("const", 0.0)) + sum(terms.values()) + float(fit["cal_c0"])
     sd = float(fit["cal_sd"])
-    out = {"margin": mu, "sd": sd, "p_home": float(norm.cdf(mu / sd)), "x": x, "terms": terms}
+    b_av = float(cs.get("x_av", 0.0))
+    out = {"margin": mu, "sd": sd, "p_home": float(norm.cdf(mu / sd)), "x": x, "terms": terms,
+           # the availability term split by team, in points of home margin (home + away = terms["x_av"])
+           "av_parts": {"home": b_av * inp["av_h"] * k, "away": -b_av * inp["av_a"] * k}}
     ct = fit.get("total")
     if ct and inp.get("mk_tot") is not None:
         L_, base = float(L), (float(th["off"]) + float(ta["def"]) - L + float(ta["off"]) + float(th["def"]) - L) * k

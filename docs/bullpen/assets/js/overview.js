@@ -197,8 +197,8 @@ function render(el, params) {
     // ── draw the charts
     if (titles.length) {
       const hasM = titles.some(r => isNum(r.m));
-      if (hasM) QKC.dumbbell('#ov-title', { rows: titles.map(r => ({ label: BP.teamShort(r.t), a: r.p, b: isNum(r.m) ? r.m : r.p, href: BP.teamHref(r.t, L, S) })), aName: 'Model', bName: 'Market', labelWidth: 110, max: Math.min(1, Math.ceil(Math.max.apply(null, titles.map(r => Math.max(r.p, r.m || 0))) * 10 + 0.5) / 10) });
-      else QKC.bar('#ov-title', { cats: titles.map(r => BP.teamShort(r.t)), series: [{ name: 'World Series', data: titles.map(r => r.p) }], horizontal: true, labels: true, fmt: v => BP.pct(v, 0), colors: titles.map(r => BP.teamInfo(r.t).colour), hrefs: titles.map(r => BP.teamHref(r.t, L, S)), labelWidth: 110 });
+      if (hasM) QKC.dumbbell('#ov-title', { rows: titles.map(r => ({ label: BP.teamShort(r.t), a: r.p, b: isNum(r.m) ? r.m : r.p, href: BP.teamHref(r.t, L, S) })), aName: 'Model', bName: 'Market', valName: 'World Series probability', labelWidth: 110, max: Math.min(1, Math.ceil(Math.max.apply(null, titles.map(r => Math.max(r.p, r.m || 0))) * 10 + 0.5) / 10) });
+      else QKC.bar('#ov-title', { cats: titles.map(r => BP.teamShort(r.t)), series: [{ name: 'World Series', data: titles.map(r => r.p) }], horizontal: true, labels: true, fmt: v => BP.pct(v, 0), colors: titles.map(r => BP.teamInfo(r.t).colour), hrefs: titles.map(r => BP.teamHref(r.t, L, S)), labelWidth: 110, valName: 'World Series probability' });
     }
     if (inPost && BP.charts && BP.charts.mlbBracket) BP.charts.mlbBracket(document.getElementById('ov-bk'), post, { level: L, narrow: true });
     if (haveRatings) {
@@ -214,9 +214,9 @@ function render(el, params) {
       const lk = Object.keys(rows).filter(t => isNum(rows[t].pythag_w) && isNum(rows[t].w)).map(t => ({ t: t, v: rows[t].w - rows[t].pythag_w })).sort((a, b) => b.v - a.v);
       const pick = lk.length > 16 ? lk.slice(0, 8).concat(lk.slice(-8)) : lk;
       QKC.bar('#ov-luck', { cats: pick.map(r => BP.teamAbbr(r.t)), series: [{ name: 'Wins above Pythagorean', data: pick.map(r => Math.round(r.v * 10) / 10) }], horizontal: true, diverging: true, labels: true,
-        fmt: v => BP.signed(v, 1), hrefs: pick.map(r => BP.teamHref(r.t, L, S)), labelWidth: 46, label: 'Wins above the Pythagorean record' });
+        fmt: v => BP.signed(v, 1), hrefs: pick.map(r => BP.teamHref(r.t, L, S)), labelWidth: 46, label: 'Wins above the Pythagorean record', valName: 'Wins above Pythagorean' });
     }
-    if (gaps.length) QKC.dumbbell('#ov-gaps', { rows: gaps.map(g => ({ label: g.label, a: g.a, b: g.b, sub: g.sub, href: g.href })), aName: 'Model', bName: 'Market', labelWidth: 210 });
+    if (gaps.length) QKC.dumbbell('#ov-gaps', { rows: gaps.map(g => ({ label: g.label, a: g.a, b: g.b, sub: g.sub, href: g.href })), aName: 'Model', bName: 'Market', valName: 'Win probability', labelWidth: 210 });
     if (lkeys.length) {
       const draw = k => {
         const rowsL = (lead[k] || []).slice(0, 10);
@@ -224,7 +224,7 @@ function render(el, params) {
         const fmt = v => BP.fmtVal(v, meta[2]);
         QKC.bar('#ov-lead', { cats: rowsL.map(r => BP.playerName(r[0]) + (BP.player(r[0]).team ? ' · ' + BP.teamAbbr(BP.player(r[0]).team) : '')), series: [{ name: meta[0], data: rowsL.map(r => Number(r[1])) }],
           horizontal: true, labels: true, fmt: fmt, hrefs: rowsL.map(r => BP.playerHref(r[0], { level: L })), labelWidth: 150, min: LOWER[k] ? undefined : undefined,
-          colors: rowsL.map(r => BP.teamInfo(BP.player(r[0]).team).colour), label: meta[0] + ' leaders' });
+          colors: rowsL.map(r => BP.teamInfo(BP.player(r[0]).team).colour), label: meta[0] + ' leaders', valName: meta[0] + ({ h_bat_speed_adj: ' (mph)', h_sprint_speed: ' (ft/s)', p_fb_velo: ' (mph)' }[k] || '') });
       };
       draw(lkeys[0]);
       QK.chips(document.getElementById('ov-lchips'), v => { if (v && v[0]) draw(v[0]); });

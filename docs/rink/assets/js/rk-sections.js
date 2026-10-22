@@ -232,7 +232,7 @@ function awardsPage(node, S) {
     list.forEach(w => {
       const r = (races[w.key] || []).slice(0, 8);
       if (!r.length) return;
-      QKC.bar('#aw-' + w.key, { cats: r.map(x => x.name), series: [{ name: 'Probability', data: r.map(x => x.p) }], horizontal: true, labels: true, fmt: v => U.pct(v, 1),
+      QKC.bar('#aw-' + w.key, { cats: r.map(x => x.name), series: [{ name: 'Probability', data: r.map(x => x.p) }], horizontal: true, labels: true, fmt: v => U.pct(v, 1), valName: 'Chance of winning',
         colors: r.map(x => RK.teamColourRaw(RK.player(x.id).team)), hrefs: r.map(x => RK.playerHref(x.id)), labelWidth: 130 });
     });
   });

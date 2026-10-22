@@ -135,7 +135,7 @@ function gamesSection(d, out, read) {
     if (node && seasons.length > 1) {
       const names = Object.keys(ALL);
       GI.ch.lines(node, names.map(x => ({ name: lab(x), x: seasons.map(Number), y: seasons.map(s => ((PS[s] || {})[x] || {}).logloss), colour: COL[x] || null, dash: /market/.test(x), symbol: true }))
-        .concat([{ name: 'Coin', x: seasons.map(Number), y: seasons.map(() => Math.LN2), colour: '#7d8590', dash: true }]), { yFmt: v => GI.num(v, 3), xFmt: String, xLabel: String, yName: 'Log-loss' });
+        .concat([{ name: 'Coin', x: seasons.map(Number), y: seasons.map(() => Math.LN2), colour: '#7d8590', dash: true }]), { yFmt: v => GI.num(v, 3), xFmt: String, xLabel: String, xName: 'Season', yName: 'Log-loss' });
     } else if (node) { node.innerHTML = k.muted('One season only.'); node.style.height = 'auto'; }
     if (Object.keys(books).length) {
       k.set('cal-books', k.table([{ label: 'Book' }, { label: 'Games', align: 'right' }, { label: 'Book log-loss', align: 'right' }, { label: 'Model, same games', align: 'right' }, { label: 'Model v book', sortable: false }],
@@ -144,7 +144,7 @@ function gamesSection(d, out, read) {
     }
     side('cal-ats', 'cal-ats-c', G.ats, 'covers', [], 'Against the spread');
     side('cal-tot', 'cal-tot-c', G.totals, 'overs', [], 'Totals');
-    if (G.hfa_by_season && k.$('cal-hfa')) { const xs = Object.keys(G.hfa_by_season).sort(); GI.ch.lines('cal-hfa', [{ name: 'Home-field advantage', x: xs.map(Number), y: xs.map(s => G.hfa_by_season[s]), symbol: true, area: true }], { legend: false, yFmt: v => GI.num(v, 1) + ' pts', xFmt: String, xLabel: String, yMin: 0 }); }
+    if (G.hfa_by_season && k.$('cal-hfa')) { const xs = Object.keys(G.hfa_by_season).sort(); GI.ch.lines('cal-hfa', [{ name: 'Home-field advantage', x: xs.map(Number), y: xs.map(s => G.hfa_by_season[s]), symbol: true, area: true }], { legend: false, yFmt: v => GI.num(v, 1) + ' pts', xFmt: String, xLabel: String, yMin: 0, xName: 'Season', yName: 'Home-field advantage (pts)' }); }
   }, 0);
 }
 function note(x) { return x && x.note ? '<div class="pg-note gq-note">' + K().esc(x.note) + '</div>' : ''; }
@@ -245,7 +245,7 @@ function playModels(d, out, read) {
       const tr = [];
       [[eb, 'Ours', '#3987e5'], [enf, 'nflfastR', '#e8833a']].forEach(z => { if (z[0] && (z[0].bins || []).length) { const p = pts(z[0]); tr.push({ name: z[1], x: p.map(r => r.x), y: p.map(r => r.y), colour: z[2], symbol: true }); } });
       tr.push({ name: 'Perfect', x: [lo, hi], y: [lo, hi], colour: '#7d8590', dash: true, width: 1 });
-      GI.ch.lines('cal-ep-rel', tr, { xMin: lo, xMax: hi, yMin: lo, yMax: hi, xName: 'Predicted EP', yFmt: v => GI.num(v, 1), xFmt: v => GI.num(v, 0) });
+      GI.ch.lines('cal-ep-rel', tr, { xMin: lo, xMax: hi, yMin: lo, yMax: hi, xName: 'Predicted EP', yName: 'Realised next score (pts)', yFmt: v => GI.num(v, 1), xFmt: v => GI.num(v, 0) });
     } else k.set('cal-ep-rel', k.muted('Not published.'));
   }, 0);
 }
@@ -259,7 +259,7 @@ function bySeries(id, obj, isSeason) {
   const names = [];
   xs.forEach(x => Object.keys(obj[x] || {}).forEach(m => { if (m !== 'n' && k.isNum(obj[x][m]) && names.indexOf(m) < 0) names.push(m); }));
   GI.ch.lines(node, names.map(m => ({ name: lab(m), x: xs.map(Number), y: xs.map(x => (obj[x] || {})[m]), colour: COL[m] || null, dash: m === 'wp', symbol: true })),
-    { yFmt: v => GI.num(v, 3), xFmt: x => (isSeason ? String(x) : (Number(x) > 4 ? 'OT' : 'Q' + x)), xLabel: x => (isSeason ? String(x) : (Number(x) > 4 ? 'OT' : 'Q' + x)), yName: 'Log-loss' });
+    { yFmt: v => GI.num(v, 3), xFmt: x => (isSeason ? String(x) : (Number(x) > 4 ? 'OT' : 'Q' + x)), xLabel: x => (isSeason ? String(x) : (Number(x) > 4 ? 'OT' : 'Q' + x)), xName: isSeason ? 'Season' : 'Quarter', yName: 'Log-loss' });
 }
 
 function fourthSection(d, out, read) {

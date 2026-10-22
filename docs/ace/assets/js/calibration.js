@@ -176,7 +176,7 @@ function render(el, params, state) {
     const PY = d.per_year || {}, ys = Object.keys(PY).sort();
     if (ys.length) k.plot('cal-years', ['model', 'elo', 'rank', 'pinnacle', 'avg'].filter(x => ys.some(y => (PY[y][x] || {}).n)).map(x => ({
       type: 'scatter', mode: 'lines+markers', name: label(x), x: ys, y: ys.map(y => (PY[y][x] || {}).logloss), line: { color: COL[x], width: x === 'model' ? 2.6 : 1.5, dash: BOOK[x] ? 'dot' : 'solid' }, marker: { size: 5 },
-      hovertemplate: '%{x}: ' + label(x) + ' %{y:.4f}<extra></extra>' })), k.layout(Object.assign(k.legendTop(), { margin: { l: 55, r: 10, t: 34, b: 36 }, xaxis: { type: 'category' }, yaxis: { title: 'Log-loss' } })));
+      hovertemplate: '%{x}: ' + label(x) + ' %{y:.4f}<extra></extra>' })), k.layout(Object.assign(k.legendTop(), { margin: { l: 55, r: 10, t: 34, b: 36 }, xaxis: { type: 'category', title: 'Year' }, yaxis: { title: 'Log-loss' } })));
     else document.getElementById('cal-years').innerHTML = k.muted('No per-year scores.');
 
     const drawBins = () => {
@@ -202,7 +202,7 @@ function render(el, params, state) {
       k.plot('cal-sets', [
         { type: 'bar', name: 'Forecast', x: keys, y: keys.map(s => S[s].pred), marker: { color: '#d9f24f' }, hovertemplate: '%{x}: forecast %{y:.1%}<extra></extra>' },
         { type: 'bar', name: 'Observed', x: keys, y: keys.map(s => S[s].obs), marker: { color: '#58a6ff' }, hovertemplate: '%{x}: observed %{y:.1%}<extra></extra>' }
-      ], k.layout(Object.assign(k.legendTop(), { barmode: 'group', margin: { l: 44, r: 10, t: 30, b: 34 }, xaxis: { type: 'category' }, yaxis: { tickformat: '.0%' } })));
+      ], k.layout(Object.assign(k.legendTop(), { barmode: 'group', margin: { l: 44, r: 10, t: 30, b: 34 }, xaxis: { type: 'category', title: 'Set score' }, yaxis: { title: 'Share of matches', tickformat: '.0%' } })));
       document.getElementById('cal-sets-t').innerHTML = k.table([{ label: 'Sets' }, { label: 'Forecast', align: 'right' }, { label: 'Observed', align: 'right' }, { label: 'Gap', align: 'right' }],
         keys.map(s => [s, { v: S[s].pred, html: k.pct(S[s].pred, 1) }, { v: S[s].obs, html: k.pct(S[s].obs, 1) }, { v: S[s].obs - S[s].pred, html: k.signed(100 * (S[s].obs - S[s].pred), 1) + ' pts' }]), { compact: true });
     };
@@ -219,7 +219,7 @@ function render(el, params, state) {
       '<div class="pg-note">Mean total games: ' + Object.keys(TG.mean || {}).map(b => 'best of ' + b + ' ' + k.num(TG.mean[b].pred, 1) + ' forecast v ' + k.num(TG.mean[b].obs, 1) + ' played').join('; ') + (k.isNum(D.handicap_logloss) ? '. Game-handicap log-loss ' + k.num(D.handicap_logloss, 3) : '') + '.</div>' : k.muted('No total-games lines.');
     const PIT = TG.pit_hist || {};
     if (Object.keys(PIT).length) k.plot('cal-pit', Object.keys(PIT).map((b, i) => { const tot = PIT[b].reduce((s, x) => s + x, 0) || 1; return { type: 'bar', name: 'Best of ' + b, x: PIT[b].map((_, j) => (j + 0.5) / PIT[b].length), y: PIT[b].map(x => x / tot), marker: { color: i ? '#58a6ff' : '#d9f24f' }, opacity: 0.8, hovertemplate: 'PIT %{x:.2f}: %{y:.1%}<extra>Best of ' + b + '</extra>' }; }),
-      k.layout(Object.assign(k.legendTop(), { barmode: 'group', margin: { l: 44, r: 10, t: 30, b: 36 }, xaxis: { title: 'PIT of total games (flat = calibrated; a slope means a biased mean)', range: [0, 1] }, yaxis: { tickformat: '.0%' },
+      k.layout(Object.assign(k.legendTop(), { barmode: 'group', margin: { l: 44, r: 10, t: 30, b: 36 }, xaxis: { title: 'PIT of total games (flat = calibrated; a slope means a biased mean)', range: [0, 1] }, yaxis: { title: 'Share of matches', tickformat: '.0%' },
         shapes: [{ type: 'line', x0: 0, x1: 1, y0: 0.1, y1: 0.1, line: { color: '#6e7681', dash: 'dot', width: 1 } }] })));
 
     // Tournaments.
@@ -245,7 +245,7 @@ function render(el, params, state) {
       { type: 'scatter', mode: 'lines+markers', name: 'w Elo', x: by, y: by.map(y => BY[y].w_elo), line: { color: '#bc8cff', width: 2 }, hovertemplate: '%{x}: w Elo %{y:.3f}<extra></extra>' },
       { type: 'scatter', mode: 'lines+markers', name: 'w serve/return', x: by, y: by.map(y => BY[y].w_sr), line: { color: '#39d0d8', width: 2 }, hovertemplate: '%{x}: w SR %{y:.3f}<extra></extra>' },
       { type: 'scatter', mode: 'lines', name: 'Rank slope b', x: by, y: by.map(y => RS[y]), line: { color: '#8b949e', width: 1.5, dash: 'dot' }, hovertemplate: '%{x}: b %{y:.3f}<extra></extra>' }
-    ], k.layout(Object.assign(k.legendTop(), { margin: { l: 44, r: 10, t: 34, b: 36 }, xaxis: { type: 'category' }, yaxis: { title: 'Weight', rangemode: 'tozero' } })));
+    ], k.layout(Object.assign(k.legendTop(), { margin: { l: 44, r: 10, t: 34, b: 36 }, xaxis: { type: 'category', title: 'Year' }, yaxis: { title: 'Weight', rangemode: 'tozero' } })));
     else document.getElementById('cal-blend').innerHTML = k.muted('No blend history.');
 
     // Validation.

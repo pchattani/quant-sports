@@ -421,6 +421,17 @@ def _safe(fn, default=None):
 
 # ---------------------------------------------------------------------------------------------- cards
 
+def _av_card(m: dict) -> dict:
+    """{"av": [home, away]}: the informed model's availability term for each team, in points of that team's OWN
+    margin (expected rotation against what its rating already reflects, injury-report Outs applied); {} for the
+    base model."""
+    det = m.get("detail") or {}
+    h, a = det.get("injury_home"), det.get("injury_away")
+    if m.get("model") != "informed" or h is None or a is None:
+        return {}
+    return {"av": [an.rnd(h, 2), an.rnd(-a, 2)]}
+
+
 def card(ctx: SeasonContext, g: dict, live: dict | None = None) -> dict:
     m = _safe(lambda: model_line(ctx, g)) or {}
     mk = _safe(lambda: market_line(ctx, g))
@@ -429,7 +440,8 @@ def card(ctx: SeasonContext, g: dict, live: dict | None = None) -> dict:
     return {"id": str(g.get("id")), "season": ctx.season, "date": g.get("date"), "status": g.get("status"), "stype": g.get("stype"), "home": str(g.get("home")),
             "away": str(g.get("away")), "hs": g.get("hs"), "as": g.get("as"), "period": period if g.get("status") == "in" else
             (g.get("periods") if g.get("status") == "post" else None), "clock": (live or {}).get("clock"),
-            "model": {"p_home": m.get("p_home"), "margin": an.rnd(m.get("margin"), 2), "total": an.rnd(m.get("total"), 1)} if m else None,
+            "model": {"p_home": m.get("p_home"), "margin": an.rnd(m.get("margin"), 2), "total": an.rnd(m.get("total"), 1),
+                      **_av_card(m)} if m else None,
             "market": {k: mk.get(k) for k in ("p_home", "spread_home", "total", "sources")} if mk else None,
             "wp_home": (live or {}).get("wp_home"), "espn_wp": (live or {}).get("espn_wp"), "series": g.get("series")}
 

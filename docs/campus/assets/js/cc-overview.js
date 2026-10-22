@@ -122,14 +122,14 @@ CC.route('overview', function (el, p) {
     el.innerHTML = html;
     U.wire(el);
     if (title.length) {
-      if (hasMk) QKC.dumbbell('#ov-title', { rows: title.map(function (r) { return { label: CC.tshort(L, r.team), a: r.p, b: isNum(r.market) ? r.market : r.p, href: CC.teamHref(L, r.team) }; }), aName: 'Model', bName: 'Market', max: Math.min(1, Math.max.apply(null, title.map(function (r) { return Math.max(r.p, r.market || 0); })) * 1.15 + 0.02), labelWidth: 110 });
+      if (hasMk) QKC.dumbbell('#ov-title', { rows: title.map(function (r) { return { label: CC.tshort(L, r.team), a: r.p, b: isNum(r.market) ? r.market : r.p, href: CC.teamHref(L, r.team) }; }), aName: 'Model', bName: 'Market', max: Math.min(1, Math.max.apply(null, title.map(function (r) { return Math.max(r.p, r.market || 0); })) * 1.15 + 0.02), labelWidth: 110, valName: 'Title probability' });
       else QKC.bar('#ov-title', { cats: title.map(function (r) { return CC.tshort(L, r.team); }), series: [{ name: 'Title', data: title.map(function (r) { return r.p; }) }], horizontal: true, labels: true, fmt: function (v) { return CC.pct(v); }, colors: title.map(function (r) { return CC.tcol(L, r.team); }), hrefs: title.map(function (r) { return CC.teamHref(L, r.team); }) });
     }
     if (top.length) QKC.bar('#ov-power', { cats: top.map(function (r) { return CC.tshort(L, r.team); }), horizontal: true, fmt: function (v) { return CC.signed(v, 1); },
       series: [{ name: 'Rating', data: top.map(function (r) { return r.rating; }), lo: top.map(function (r) { var R = ratings[String(r.team)] || {}; return isNum(R.se) ? r.rating - R.se : null; }), hi: top.map(function (r) { var R = ratings[String(r.team)] || {}; return isNum(R.se) ? r.rating + R.se : null; }) }],
-      colors: top.map(function (r) { return CC.tcol(L, r.team); }), hrefs: top.map(function (r) { return CC.teamHref(L, r.team, S); }), labelWidth: 96 });
+      colors: top.map(function (r) { return CC.tcol(L, r.team); }), hrefs: top.map(function (r) { return CC.teamHref(L, r.team, S); }), labelWidth: 96, valName: fb ? 'Rating (pts v average)' : 'Margin per 100 possessions' });
     if (d.apPts && d.apPts.length) QKC.scatter('#ov-ap', { points: d.apPts.map(function (r) { return { x: r.rank, y: d.mrank[String(r.team)], name: CC.tname(L, r.team), label: CC.tabbr(L, r.team), color: CC.tcol(L, r.team), href: CC.teamHref(L, r.team, S) }; }),
-      xName: 'AP rank', yName: '', xInverse: false, yInverse: true, diagonal: { label: 'agree' }, labelTop: 10, xMin: 0, yMin: 1 });
+      xName: 'AP rank', yName: 'Our rank', xInverse: false, yInverse: true, diagonal: { label: 'agree' }, labelTop: 10, xMin: 0, yMin: 1 });
     postSnapshot(L, S, post, sim, QK.$('#ov-post', el));
   });
 });
@@ -147,7 +147,7 @@ function postSnapshot(L, S, post, sim, node) {
       '<details class="cc-data"><summary>Show the numbers as a table</summary>' + U.table(['Team', { label: 'In', align: 'right' }, { label: 'Bye', align: 'right' }, { label: 'Title', align: 'right' }], rows.map(function (t) {
         return [{ html: U.teamEnt(L, t, { season: S }), v: CC.tname(L, t) }, U.heat(odds[t].p_in), U.heat(odds[t].p_bye), U.heat(odds[t].p_title)]; })) + '</details>', { foot: U.link(CC.href(L, 'standings', null, S, 'tab=playoff'), 'Projected bracket and committee proxy') });
     U.wire(node);
-    QKC.bar('#ov-cfp', { cats: rows.map(function (t) { return CC.tshort(L, t); }), horizontal: true, legend: true, fmt: function (v) { return CC.pct(v); }, max: 1,
+    QKC.bar('#ov-cfp', { cats: rows.map(function (t) { return CC.tshort(L, t); }), horizontal: true, legend: true, valName: 'Probability', fmt: function (v) { return CC.pct(v); }, max: 1,
       series: [{ name: 'Make the playoff', data: rows.map(function (t) { return odds[t].p_in; }) }, { name: 'Win the title', data: rows.map(function (t) { return odds[t].p_title || 0; }) }], hrefs: rows.map(function (t) { return CC.teamHref(L, t, S); }), labelWidth: 96 });
     return;
   }

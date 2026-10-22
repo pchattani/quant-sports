@@ -67,6 +67,9 @@ edge,moneypuck,espn}.py`, `scripts/nhl_fetch.py`, `scripts/nhl_backfill.ps1`. Te
   1.00-1.15 or a total >= 1 goal off the median) are `suspect` and never the main line. Upcoming games: ESPN pickcenter
   (DraftKings, open/close), else NHL partner odds (`partner-game/US/now`: the one "now" URL, it has no dated form).
   `attendance` from ESPN scoreboards (2019-20 ->).
+  `probables` (from 22 Oct 2026; ESPN scoreboard, recorded before the start only) = {home|away: {id (NHL pid when the
+  name maps, else null), espn, name, status "projected"|"confirmed", since, confirmed_at, log: [[at, id or name,
+  status]] (one entry per change, last 12)}, at (last read)}.
 - store.json top level: season, updated_at, teams (canon.teams: abbr -> {name, id, conference, division, colour, alt, franchise}),
   games, standings {date, season, rows: [{team, conference, division, gp, w, l, otl, pts, pct, rw, row, gf, ga, sow, sol, streak,
   l10, seq {league, conference, division, wildcard}, clinch}]} (last regular-season day for past seasons), players {pid: {name,

@@ -359,7 +359,7 @@ function xgRace(el, data, opts) {
   RK.plot(el, traces, RK.layout({
     height: o.height || 280, shapes: shapes, showlegend: true,
     legend: { orientation: 'h', x: 0, y: 1.12, font: { size: 11, color: C.text2 } },
-    xaxis: { range: [0, end / 60], tickvals: tk.vals, ticktext: tk.text, showgrid: false, zeroline: false, fixedrange: true },
+    xaxis: { range: [0, end / 60], tickvals: tk.vals, ticktext: tk.text, showgrid: false, zeroline: false, fixedrange: true, title: { text: 'Game time', font: { size: 10 } } },
     yaxis: { title: { text: 'Cumulative xG', font: { size: 10 } }, rangemode: 'tozero', fixedrange: true, zeroline: false },
     margin: { l: 50, r: 12, t: 26, b: 30 }
   }));
@@ -413,8 +413,8 @@ function wpChart(el, data, opts) {
   const tk = periodTicks(end, o.playoff);
   RK.plot(el, traces, RK.layout({
     height: o.height || 300, shapes: shapes,
-    xaxis: { showgrid: false, fixedrange: true, zeroline: false, range: [-0.8, end / 60 + 0.5], tickvals: tk.vals, ticktext: tk.text },
-    yaxis: { range: [0, 1], tickvals: [0, 0.25, 0.5, 0.75, 1], ticktext: [an + ' 100%', '75%', '50%', '75%', hn + ' 100%'], fixedrange: true, automargin: true },
+    xaxis: { showgrid: false, fixedrange: true, zeroline: false, range: [-0.8, end / 60 + 0.5], tickvals: tk.vals, ticktext: tk.text, title: { text: 'Game time', font: { size: 10 } } },
+    yaxis: { range: [0, 1], tickvals: [0, 0.25, 0.5, 0.75, 1], ticktext: [an + ' 100%', '75%', '50%', '75%', hn + ' 100%'], fixedrange: true, automargin: true, title: { text: 'Win probability', font: { size: 10 } } },
     showlegend: (o.others || []).length > 0, legend: { orientation: 'h', y: -0.12, x: 1, xanchor: 'right', font: { size: 10, color: C.text2 } },
     margin: { l: 70, r: 10, t: 12, b: 30 }
   }));
@@ -664,7 +664,7 @@ function distBars(el, dist, opts) {
     hovertemplate: (o.signed ? '%{x:+d}' : '%{x}') + ' ' + esc(o.unit || 'goals') + ': %{y:.1%}<extra></extra>' }], RK.layout({
     height: o.height || 220, bargap: 0.12, shapes: shapes,
     xaxis: { title: o.xTitle || '', fixedrange: true, dtick: ks.length > 40 ? 7 : (ks.length > 24 ? 4 : (ks.length > 14 ? 2 : 1)), tickformat: o.signed ? '+d' : 'd' },
-    yaxis: { tickformat: '.0%', fixedrange: true },
+    yaxis: { tickformat: Math.max.apply(null, entries.map(e => e[1])) < 0.1 ? '.1%' : '.0%', fixedrange: true, title: o.yTitle || 'Probability' },
     margin: { l: 44, r: 10, t: 10, b: o.xTitle ? 42 : 28 }
   }));
 }
@@ -716,7 +716,7 @@ function probBars(el, items, opts) {
   }
   RK.plot(el, traces, RK.layout({
     height: o.height || Math.max(220, list.length * 28 + 50), bargap: 0.3,
-    xaxis: { tickformat: '.0%', range: [0, Math.min(1.08, max * 1.25 + 0.02)], fixedrange: true },
+    xaxis: { tickformat: '.0%', range: [0, Math.min(1.08, max * 1.25 + 0.02)], fixedrange: true, title: o.xTitle || 'Probability' },
     yaxis: { automargin: true, fixedrange: true, tickfont: { size: 11 } },
     showlegend: traces.length > 1, legend: { orientation: 'h', y: -0.12, font: { color: C.text2 } },
     margin: { l: 110, r: 50, t: 10, b: 35 }

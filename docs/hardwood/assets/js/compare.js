@@ -259,7 +259,7 @@ function buildTeams(L, S, ids, T, teams, season, cat) {
   const paths = ((season || {}).rating_paths) || {};
   const tr = [];
   ids.forEach((id, i) => { const p = paths[id] || []; if (p.length) tr.push.apply(tr, fx.band(p.map(x => ({ x: x.date, y: x.net, se: x.se, text: fx.fmtDate(x.date, { year: false }) })), i ? CB : CA, abbr[i], { hover: abbr[i] + ' %{text}: %{y:+.1f} ± %{customdata:.1f}<extra></extra>' })); });
-  if (tr.length) fx.plot('cmp-paths', tr, fx.layout({ showlegend: true, legend: { orientation: 'h', y: 1.12, font: { color: C.text2 } }, margin: { l: 45, r: 10, t: 30, b: 40 }, yaxis: { title: 'Net per 100', zeroline: true, zerolinecolor: '#6e7681' } }));
+  if (tr.length) fx.plot('cmp-paths', tr, fx.layout({ showlegend: true, legend: { orientation: 'h', y: 1.12, font: { color: C.text2 } }, margin: { l: 45, r: 10, t: 30, b: 40 }, xaxis: { title: 'Date' }, yaxis: { title: 'Net per 100', zeroline: true, zerolinecolor: '#6e7681' } }));
   else document.getElementById('cmp-paths').innerHTML = fx.muted('No rating paths yet.');
   const ff0 = metrics.filter(m => /four/i.test(m.group || ''));
   const ff = ff0.length ? ff0 : metrics.filter(m => /(^|_)(efg|tov|orb|drb|ftr|ft_rate)/.test(m.key));

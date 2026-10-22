@@ -76,7 +76,7 @@ function calibration(el) {
     if (pr.length) {
       var xs = pr.map(function (r) { return r.year + ' R' + r.round; });
       PD.ch.lines('cal-races', ['model_pre', 'model_post', 'grid_order', 'elo'].filter(function (k) { return M[k]; }).map(function (k, i) { return { name: label(k), data: pr.map(function (r) { return (r.p_winner || {})[k]; }), width: k.indexOf('model') === 0 ? 2 : 1.2, colour: ['#3987e5', '#2fb37b', '#e8833a', '#c95ac9'][i] }; }),
-        { xs: xs, yFmt: function (v) { return Math.round(v * 100) + '%'; }, xLabel: function (v) { var r = pr[xs.indexOf(v)]; return r ? v + ' ' + (r.name || '') + ': ' + PD.driverName(r.winner) : v; }, yMin: 0, label: 'Winner probability by race' });
+        { xs: xs, xName: 'Race', yName: 'Winner’s probability', yFmt: function (v) { return Math.round(v * 100) + '%'; }, xLabel: function (v) { var r = pr[xs.indexOf(v)]; return r ? v + ' ' + (r.name || '') + ': ' + PD.driverName(r.winner) : v; }, yMin: 0, label: 'Winner probability by race' });
     } else PD.ch.none('cal-races', 'No per-race records.');
     var rel = ['model_pre', 'model_post', 'grid_order', 'previous_results'].filter(function (k) { return M[k]; });
     PD.ch.reliability('cal-rw', rel.map(function (k) { return { name: label(k), bins: (((M[k] || {}).win) || {}).reliability || [] }; }));

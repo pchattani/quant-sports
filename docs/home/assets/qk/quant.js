@@ -415,7 +415,124 @@ QK.tooltips = function () {
   document.addEventListener('focusout', hide);
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
   root.addEventListener('scroll', hide, { passive: true });
+  glossWatch();
 };
+
+/* ─────────────────────────────────────── column abbreviations: a tooltip on every known header */
+/* Table headers are short (GP, OTL, xGA, wOBA ...). Any header cell (th) whose text is a known abbreviation for
+ * the page's sport and that carries no tooltip of its own gets one: hover, or tap / focus the sort button, to
+ * read it. Runs on every table the page draws, kit-made or not (a MutationObserver started by QK.tooltips).
+ * A site can add or override entries: QK.GLOSS.extend('hockey', { CF: 'Corsi for ...' }). */
+var GL_ALL = {
+  GP: 'Games played', W: 'Wins', L: 'Losses', T: 'Ties', 'W-L': 'Wins and losses', 'W–L': 'Wins and losses',
+  L10: 'Record in the last 10 games', Strk: 'Current streak (W = winning, L = losing)', Opp: 'Opponent', Wk: 'Week',
+  Rd: 'Round', 'O/U': 'Over/under: the total points line', Elo: 'Elo rating: higher is stronger; it moves with every result',
+  Rk: 'Rank', Pts: 'Points', PTS: 'Points', Min: 'Minutes played', Apps: 'Appearances', Avg: 'Average', 'Δ': 'Change',
+  Pctl: 'Percentile (100 = best)', Mkt: 'Market probability (de-vigged)', n: 'Number of cases', N: 'Number of cases',
+  Proj: 'Projection', WAR: 'Wins above replacement', PPG: 'Points per game', Pos: 'Position', Tier: 'Tier: players of similar projected value'
+};
+var GL_SPORT = {
+  football: { P: 'Played', D: 'Draws', GF: 'Goals for', GA: 'Goals against', GD: 'Goal difference', G: 'Goals', A: 'Assists',
+    xG: 'Expected goals: the chance quality of the shots taken', xA: 'Expected assists: the expected goals of the shots a player set up',
+    xGA: 'Expected goals against', xGD: 'Expected goal difference (xG for minus against)', npxG: 'Non-penalty expected goals',
+    Att: 'Attack rating: above zero scores more than an average side would', Def: 'Defence rating: above zero concedes less than an average side would',
+    PPG: 'Points per game', CS: 'Clean sheets', 'xG/90': 'Expected goals per 90 minutes', 'G/90': 'Goals per 90 minutes', Form: 'Recent results, oldest first' },
+  hockey: { OTL: 'Overtime and shootout losses (one point each)', 'P%': 'Points percentage: points won out of points available',
+    'Pts%': 'Points percentage: points won out of points available', GF: 'Goals for', GA: 'Goals against', Diff: 'Goal difference (for minus against)',
+    G: 'Goals', A: 'Assists', P: 'Points (goals plus assists)', '+/-': 'Plus-minus: goals for minus against while on the ice at even strength',
+    PIM: 'Penalty minutes', TOI: 'Time on ice', 'TOI/GP': 'Time on ice per game', SOG: 'Shots on goal', 'SV%': 'Save percentage',
+    GAA: 'Goals against per 60 minutes', GSAx: 'Goals saved above expected (from shot quality)', xG: 'Expected goals: the chance quality of the shots taken',
+    xGF: 'Expected goals for', xGA: 'Expected goals against', 'xGF%': 'Share of expected goals at 5-on-5', 'CF%': 'Share of shot attempts at 5-on-5 (Corsi)',
+    PP: 'Power play', PK: 'Penalty kill', 'PP%': 'Power-play success rate', 'PK%': 'Penalty-kill success rate', 'FO%': 'Faceoffs won',
+    ROW: 'Regulation and overtime wins', RW: 'Regulation wins', Cup: 'Chance of winning the Stanley Cup (season simulation)', GS: 'Games started' },
+  basketball: { MIN: 'Minutes', PTS: 'Points', REB: 'Rebounds', AST: 'Assists', STL: 'Steals', BLK: 'Blocks', TOV: 'Turnovers',
+    'FG%': 'Field-goal percentage', '3P%': 'Three-point percentage', '3PA': 'Three-point attempts', 'FT%': 'Free-throw percentage',
+    'TS%': 'True shooting: points per shot, counting threes and free throws', 'eFG%': 'Effective field-goal percentage (a three counts 1.5)',
+    'USG%': 'Usage: share of team plays a player finishes while on court', ORtg: 'Offensive rating: points scored per 100 possessions',
+    DRtg: 'Defensive rating: points allowed per 100 possessions', Net: 'Net rating: points per 100 possessions better than the opponent',
+    NRtg: 'Net rating: points per 100 possessions better than the opponent', BPM: 'Box plus-minus: points per 100 possessions above an average player',
+    '+/-': 'Plus-minus: points for minus against while on court', GB: 'Games behind the leader', Diff: 'Point difference per game',
+    PF: 'Points for', PA: 'Points against', GS: 'Games started', MPG: 'Minutes per game', RPG: 'Rebounds per game', APG: 'Assists per game', Pace: 'Possessions per 48 minutes',
+    Reb: 'Rebounds', Ast: 'Assists', Stl: 'Steals', Blk: 'Blocks', TO: 'Turnovers', '3PM': 'Three-pointers made', Pct: 'Winning percentage',
+    HPM: 'Hardwood Plus-Minus: box score and RAPM combined, points per 100 possessions above average',
+    RAPM: 'Regularised adjusted plus-minus: points per 100 possessions above average, from who was on court',
+    WPA: 'Win probability added', Home: 'Home record', Away: 'Away record' },
+  baseball: { G: 'Games', GS: 'Games started', PA: 'Plate appearances', AB: 'At-bats', H: 'Hits', R: 'Runs', RBI: 'Runs batted in',
+    '1B': 'Singles', '2B': 'Doubles', '3B': 'Triples', HR: 'Home runs', BB: 'Walks', SO: 'Strikeouts', K: 'Strikeouts', HBP: 'Hit by pitch',
+    SB: 'Stolen bases', CS: 'Caught stealing', AVG: 'Batting average', OBP: 'On-base percentage', SLG: 'Slugging percentage',
+    OPS: 'On-base plus slugging', ISO: 'Isolated power (slugging minus average)', BABIP: 'Batting average on balls in play',
+    wOBA: 'Weighted on-base average: each way of reaching base weighted by its run value', xwOBA: 'Expected wOBA from the quality of contact',
+    'wRC+': 'Runs created, park- and league-adjusted (100 = average)', 'K%': 'Strikeout rate', 'BB%': 'Walk rate', 'HR%': 'Home-run rate',
+    GO: 'Ground-ball outs', AO: 'Fly-ball and line-drive outs', IP: 'Innings pitched', BF: 'Batters faced', SV: 'Saves', ERA: 'Earned runs per nine innings',
+    RA9: 'Runs allowed per nine innings', FIP: 'Fielding-independent pitching: runs from strikeouts, walks and homers, on the ERA scale',
+    xFIP: 'FIP with a league-average home-run rate on fly balls', WHIP: 'Walks plus hits per inning', OAA: 'Outs above average (fielding)',
+    GB: 'Games behind the division leader', RS: 'Runs scored', RA: 'Runs allowed', Diff: 'Run difference (scored minus allowed)', 'v SP': 'Against the opposing starting pitcher', Pct: 'Winning percentage' },
+  nfl: { G: 'Games', GS: 'Games started', PF: 'Points for', PA: 'Points against', Diff: 'Point difference (for minus against)',
+    Att: 'Attempts', Cmp: 'Completions', Yds: 'Yards', TD: 'Touchdowns', INT: 'Interceptions', Int: 'Interceptions', Car: 'Carries', Rec: 'Receptions',
+    Tgt: 'Targets', 'Y/A': 'Yards per attempt', YPA: 'Yards per attempt', EPA: 'Expected points added', 'EPA/play': 'Expected points added per play',
+    CPOE: 'Completion percentage over expected', RYOE: 'Rushing yards over expected', FG: 'Field goal', Sk: 'Sacks', Sacks: 'Sacks', Fum: 'Fumbles',
+    'Comp%': 'Completion percentage', Rate: 'Passer rating', QBR: 'Total quarterback rating', Punt: 'Punt', Down: 'Down and distance' },
+  f1: { Pod: 'Podiums (top-three finishes)', DNF: 'Did not finish', Q3: 'Reached the final part of qualifying (top ten)', Pole: 'Pole position (fastest in qualifying)',
+    Grid: 'Starting position', Laps: 'Laps completed', Win: 'Chance of winning', Pts: 'Championship points', FL: 'Fastest lap', Bias: 'Average error: projected minus actual points' },
+  tennis: { Rk: 'Ranking', Elo: 'Elo rating: higher is stronger; it moves with every match', DF: 'Double faults', BP: 'Break points',
+    'BP%': 'Break points converted', '1st%': 'First serves in', '1stW%': 'Points won on first serve', '2ndW%': 'Points won on second serve',
+    'Hold%': 'Service games held', 'Brk%': 'Return games won (breaks)', SP: 'Service points won', RP: 'Return points won' },
+  college: { PF: 'Points for', PA: 'Points against', Diff: 'Point difference (for minus against)', Conf: 'Conference record', SOS: 'Strength of schedule',
+    'TS%': 'True shooting: points per shot, counting threes and free throws', ORtg: 'Points scored per 100 possessions', DRtg: 'Points allowed per 100 possessions',
+    Net: 'Net rating: points per 100 possessions better than the opponent', EPA: 'Expected points added', Seed: 'Tournament seed',
+    GP: 'Games played', C: 'Completions', ATT: 'Attempts', Att: 'Attempts', Cmp: 'Completions', YDS: 'Yards', Yds: 'Yards', AVG: 'Average', TD: 'Touchdowns',
+    INT: 'Interceptions', QBR: 'Total quarterback rating', CAR: 'Carries', Car: 'Carries', REC: 'Receptions', Rec: 'Receptions', LONG: 'Longest',
+    TOT: 'Total tackles', SOLO: 'Solo tackles', Tkl: 'Tackles', TFL: 'Tackles for loss', PD: 'Passes defended', SACKS: 'Sacks',
+    FGM: 'Field goals made', FGA: 'Field goals attempted', XPM: 'Extra points made', XPA: 'Extra points attempted', PCT: 'Percentage',
+    REB: 'Rebounds', OREB: 'Offensive rebounds', DREB: 'Defensive rebounds', AST: 'Assists', STL: 'Steals', BLK: 'Blocks', TO: 'Turnovers',
+    MIN: 'Minutes', PTS: 'Points', FG: 'Field goals made-attempted', '3PT': 'Three-pointers made-attempted', FT: 'Free throws made-attempted',
+    ATS: 'Against the spread: games where the model side covered the line', AP: 'AP poll rank', Ours: 'Our rank', Prev: 'Previous AP rank',
+    In: 'Chance of making the playoff', Bye: 'Chance of a first-round bye', Line: 'The market line', Opp: 'Opponent', Q: 'Quarter' }
+};
+QK.GLOSS = {
+  lookup: function (label, sport) {
+    var sp = GL_SPORT[sport] || {};
+    if (Object.prototype.hasOwnProperty.call(sp, label)) return sp[label];
+    return Object.prototype.hasOwnProperty.call(GL_ALL, label) ? GL_ALL[label] : null;
+  },
+  extend: function (sport, map) { var t = sport ? (GL_SPORT[sport] = GL_SPORT[sport] || {}) : GL_ALL; Object.keys(map || {}).forEach(function (k) { t[k] = map[k]; }); }
+};
+/* Explain the headers under el (default the whole page). Idempotent: a header is looked at once. */
+QK.explainHeaders = function (el) {
+  var sport = document.documentElement.getAttribute('data-sport') || '';
+  $$('th:not([data-qk-gl])', el || document).forEach(function (th) {
+    th.setAttribute('data-qk-gl', '1');
+    if (th.hasAttribute('data-tip') || th.hasAttribute('title') || th.querySelector('[data-tip],[title]')) return;
+    var txt = (th.textContent || '').replace(/[\u2191\u2193\u2195\u25b2\u25bc\u25b4\u25be\u21c5]/g, '').trim();
+    if (!txt || txt.length > 9) return;
+    var def = QK.GLOSS.lookup(txt, sport);
+    if ((txt === 'PF' || txt === 'TO') && (sport === 'basketball' || sport === 'college')) {
+      var row = th.parentNode ? [].map.call(th.parentNode.children, function (c) { return (c.textContent || '').trim(); }).join(' ') : '';
+      if (/\b(REB|Reb|AST|Ast|STL|Stl|BLK|Blk|FGM|3PT)\b/.test(row)) def = txt === 'PF' ? 'Personal fouls' : 'Turnovers';
+    }
+    if (!def) return;
+    var tgt = th.querySelector('button') || th;
+    tgt.setAttribute('data-tip', def);
+    if (!tgt.getAttribute('aria-label')) tgt.setAttribute('aria-label', txt + ': ' + def);
+  });
+};
+var glossObs = null;
+function glossWatch() {
+  if (glossObs || !root.MutationObserver || !document.body) return;
+  var queued = false;
+  QK.explainHeaders();
+  glossObs = new MutationObserver(function (muts) {
+    if (queued) return;
+    for (var i = 0; i < muts.length; i++) {
+      if (muts[i].addedNodes && muts[i].addedNodes.length) {
+        queued = true;
+        (root.requestAnimationFrame || setTimeout)(function () { queued = false; QK.explainHeaders(); });
+        return;
+      }
+    }
+  });
+  glossObs.observe(document.body, { childList: true, subtree: true });
+}
 
 /* ─────────────────────────────────────── tabs, segmented controls, chips */
 /* <div class="qk-tabs" role="tablist"><button class="qk-tab" role="tab" aria-controls="p1">…</button></div>
@@ -656,10 +773,12 @@ QK.mvm = function (model, market, label) {
 /* ─────────────────────────────────────── game card + ticker item */
 /* Game shape (home.json and every site's adapters):
  * { sport, league, id, start, status: pre|live|final, home:{name,abbr,colour,logo}, away:{…}, hs, as,
- *   p_home, p_draw, p_away, market_home, note, clock, period, href } */
+ *   p_home, p_draw, p_away, market_home, note, clock, period, href, tba (day known, start time not) } */
 QK.statusBadge = function (g) {
   if (g.status === 'live') return '<span class="qk-badge live">Live' + (g.period ? ' · ' + esc(QK.periodLabel(g)) : '') + '</span>';
   if (g.status === 'final') return '<span class="qk-badge final">Final' + (g.note === 'OT' ? '/OT' : '') + '</span>';
+  /* tba: the day is known, the start time is not (tennis order of play, college TBA kick-offs) */
+  if (g.tba) return '<span class="qk-badge" title="Start time to be announced">' + esc(fmt.relDay(g.start)) + ' · TBA</span>';
   return '<span class="qk-badge">' + esc(fmt.relDay(g.start)) + ' ' + esc(fmt.time(g.start)) + '</span>';
 };
 QK.periodLabel = function (g) {
@@ -698,11 +817,12 @@ QK.matchCard = function (g, opts) {
     '</' + tag + '>';
 };
 /* 'Today 18:30' → '18:30'; another day → 'Sat 18:30' */
-QK.whenShort = function (iso) {
+QK.whenShort = function (iso, tba) {
   var r = fmt.relDay(iso);
-  if (r === 'Today') return fmt.time(iso);
+  if (r === 'Today') return tba ? 'Today' : fmt.time(iso);
   var d = new Date(iso);
-  return (isNaN(d) ? '' : d.toLocaleDateString(undefined, { weekday: 'short' })) + ' ' + fmt.time(iso);
+  var day = isNaN(d) ? '' : d.toLocaleDateString(undefined, { weekday: 'short' });
+  return tba ? day : day + ' ' + fmt.time(iso);
 };
 QK.tick = function (g) {
   var fin = g.status === 'final', live = g.status === 'live';
@@ -712,7 +832,7 @@ QK.tick = function (g) {
   var a = Object.assign({}, g.away, { _p: isNum(g.p_away) ? g.p_away : (isNum(g.p_home) && !isNum(g.p_draw) ? 1 - g.p_home : null) });
   var hm = Object.assign({}, g.home, { _p: g.p_home });
   return '<a class="qk-tick" href="' + esc(g.href || '#') + '" style="--sa:' + (s.accent || '') + '"><div class="qk-tick-top"><span class="qk-sportpill">' + esc(s.label || '') + '</span><span class="st' + (live ? ' live' : '') + '">' +
-    (live ? '● ' + esc(QK.periodLabel(g) || 'Live') : fin ? 'Final' : esc(QK.whenShort(g.start))) + '</span></div>' + r(a, g.as, hw > 0) + r(hm, g.hs, hw < 0) + '</a>';
+    (live ? '● ' + esc(QK.periodLabel(g) || 'Live') : fin ? 'Final' : esc(QK.whenShort(g.start, g.tba))) + '</span></div>' + r(a, g.as, hw > 0) + r(hm, g.hs, hw < 0) + '</a>';
 };
 
 /* ─────────────────────────────────────── sparkline (inline SVG, theme-aware via currentColor) */

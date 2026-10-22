@@ -163,7 +163,7 @@ function render(el, params) {
         TA.card('Round by round', 'probability of reaching each round, against the market for the title', oddsTable(T, sim, mk, draw.rounds || []));
       const items = Object.keys(sim).filter(p => (sim[p].p_title || 0) > 0).sort((a, b) => sim[b].p_title - sim[a].p_title).slice(0, 12)
         .map(p => ({ label: TA.playerSurname(T, p), p: sim[p].p_title, market: TA.isNum(mk[p]) ? mk[p] : null }));
-      TA.charts.probBars('ev-bars', items, { top: 12, emptyText: champ ? 'The tournament is over.' : 'No title odds yet.' });
+      TA.charts.probBars('ev-bars', items, { top: 12, xTitle: 'Title probability', emptyText: champ ? 'The tournament is over.' : 'No title odds yet.' });
     } else {
       const cs = sim[champ] || {};
       oddsEl.innerHTML = TA.card('Title odds', champ ? 'the tournament is over' : '', champ ? '<div class="pad">' + TA.playerLink(T, champ) + ' won the title' +

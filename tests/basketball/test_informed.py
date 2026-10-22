@@ -102,6 +102,12 @@ def test_availability_falls_when_a_good_player_misses_games_and_outs_apply_only_
     assert out["av_h"] < inp["av_h"]
     same = INF.inputs_for_game(si, d0 + timedelta(days=4), "1", "2", out={"1": {"a1"}}, upcoming=False)
     assert same["av_h"] == pytest.approx(inp["av_h"])
+    # a P(plays) override (pre-game market listing) moves the expected rotation; Out still wins over it
+    rot = si["live"]
+    base_s = rot.expected("1")[0]
+    assert rot.expected("1", p_over={"a1": 0.97})[0] > base_s                  # listed: back to near-certain
+    assert rot.expected("1", p_over={"a1": 0.0})[0] < base_s
+    assert rot.expected("1", out={"a1"}, p_over={"a1": 0.97})[0] == pytest.approx(rot.expected("1", out={"a1"})[0])
 
 
 def test_fallbacks_no_lines_and_thin_lines():
@@ -136,6 +142,9 @@ def test_predict_uses_the_informed_terms_and_the_parts_sum_to_the_margin():
     assert sum(r["detail"][p] for p in parts) == pytest.approx(r["margin"], abs=1e-9)
     assert r["pts_home"] + r["pts_away"] == pytest.approx(r["total"])
     assert r["base"]["p_home"] == pytest.approx(base["p_home"])
+    # the availability term split by team (points of home margin) sums to the term
+    assert r["detail"]["injury_home"] + r["detail"]["injury_away"] == pytest.approx(r["detail"]["injury"], abs=1e-9)
+    assert r["detail"]["injury_home"] == pytest.approx(FIT["spread"]["x_av"] * -1.5 * k)
     # WNBA: not enabled, the informed inputs are ignored
     w = GM.predict("1", "2", "2026-06-10", {"league": "wnba", "ratings": rt, "informed": inp})
     assert w["model"] == "base"

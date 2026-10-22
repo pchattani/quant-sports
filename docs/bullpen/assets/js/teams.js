@@ -321,7 +321,7 @@ function logTable(L, S, t, tid, sched) {
   const xs = [], ys = [];
   log.filter(r => r.gtype === 'R' || !r.gtype).forEach(r => { const w = res(r), p = pOf(r); if (w === null || !k.isNum(p)) return; cw += w; ce += p; xs.push(r.date); ys.push(cw - ce); });
   if (xs.length) k.plot(ch, [{ type: 'scatter', mode: 'lines', x: xs, y: ys, line: { color: k.teamColour(tid), width: 2 }, fill: 'tozeroy', fillcolor: k.alpha('#58a6ff', 0.08), hovertemplate: '%{x}: %{y:+.1f} wins v model<extra></extra>' }],
-    k.layout({ margin: { l: 44, r: 10, t: 10, b: 30 }, yaxis: { title: 'Wins − expected', zeroline: true } }));
+    k.layout({ margin: { l: 44, r: 10, t: 10, b: 30 }, xaxis: { title: 'Date' }, yaxis: { title: 'Wins − expected', zeroline: true } }));
   else ch.style.display = 'none';
   const ll = log.filter(r => res(r) !== null && k.isNum(pOf(r)));
   const lossOf = (rs, f) => (rs.length ? -rs.reduce((s0, r) => { const p = Math.min(0.999, Math.max(0.001, f(r))); return s0 + (res(r) ? Math.log(p) : Math.log(1 - p)); }, 0) / rs.length : null);

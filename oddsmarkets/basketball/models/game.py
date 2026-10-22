@@ -281,7 +281,8 @@ def _informed(base: dict, r: dict, inp: dict, fit: dict, neutral: bool) -> dict:
     det.update({"rating": t["rating"] + t["mk_mu"] - mk_home,
                 "hca": t["hca"] + mk_home + float(fit["spread"].get("const", 0.0)) + float(fit["cal_c0"]),
                 "b2b": t["b2b"], "rest": t["rest"], "travel": t["travel_1000km"], "tz": t["tz"], "altitude": t["altitude"],
-                "injury": t["x_av"], "injury_home": None, "injury_away": None,
+                "injury": t["x_av"], "injury_home": (r.get("av_parts") or {}).get("home"),
+                "injury_away": (r.get("av_parts") or {}).get("away"),
                 "market_rating": t["mk_mu"], "team_rating": t["rating"], "availability": t["x_av"],
                 "n_lines": inp.get("n_lines")})
     mu, sd = r["margin"], r["sd"]

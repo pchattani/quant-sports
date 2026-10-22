@@ -107,8 +107,9 @@ def kalman_mov(df: pd.DataFrame, q: float = 0.02, carry: float = 0.6, cap: float
     return out
 
 
-def add_mk(p: pd.DataFrame, df: pd.DataFrame, hl: float, ridge: float, carry: float = 0.6, name: str = "mk_mu") -> pd.DataFrame:
-    mk = MR.fit(X._close_cols(df), half_life=hl, ridge=ridge, carry=carry, lag=1).set_index("event_id")
+def add_mk(p: pd.DataFrame, df: pd.DataFrame, hl: float, ridge: float, carry: float = 0.6, name: str = "mk_mu",
+           lag: int = 1) -> pd.DataFrame:
+    mk = MR.fit(X._close_cols(df), half_life=hl, ridge=ridge, carry=carry, lag=lag).set_index("event_id")
     p = p.copy()
     p[name] = p.event_id.map(mk.mk_mu)
     p[name.replace("_mu", "_tot")] = p.event_id.map(mk.mk_tot)
@@ -219,11 +220,13 @@ def calib(pv, y) -> dict:
 # ── the candidate table ──────────────────────────────────────────────────────
 
 def candidates(league: str, roster: bool = True, mk_hl: float = MK_HL, mk_ridge: float = MK_RIDGE,
-               kalman: dict | None = None) -> pd.DataFrame:
-    df = X.table(league, 1, roster=roster)
+               kalman: dict | None = None, lag: int = 1) -> pd.DataFrame:
+    """The candidate table; `lag` = days between the inputs' last US day and the game's (1: through last night, the
+    08:00 ET decision; 3: an early snapshot valid about two days before tip-off, for Kalshi's listing quote)."""
+    df = X.table(league, lag, roster=roster)
     sig_m, sig_t = X.sigmas(df, league)
-    p = X.build_predictions(df, league, 1)
-    p = add_mk(p.drop(columns=["mk_mu", "mk_tot"]), df, mk_hl, mk_ridge)
+    p = X.build_predictions(df, league, lag)
+    p = add_mk(p.drop(columns=["mk_mu", "mk_tot"]), df, mk_hl, mk_ridge, lag=lag)
     p = M.add_market_means(p, sig_m, sig_t)
     p["sig_m"], p["sig_t"] = sig_m, sig_t
     p["y"] = (p.margin > 0).astype(float)

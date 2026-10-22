@@ -213,9 +213,10 @@ class Lock:
 
 
 # Fields each fetch phase owns. The schedule phase owns the GAME core (and teams, standings, players);
-# box owns goalies (pbp fills them only for a game without a boxscore); espn owns lines, espn_id and attendance; pbp / shifts / derive own nothing in the GAME
+# box owns goalies (pbp fills them only for a game without a boxscore); espn owns lines, espn_id, attendance and
+# probables (pre-game starting goalies with capture times); pbp / shifts / derive own nothing in the GAME
 # (their state lives in meta); edge owns meta.edge.
-OWNED_GAME = {"schedule": (), "box": ("goalies",), "espn": ("lines", "espn_id", "attendance"),
+OWNED_GAME = {"schedule": (), "box": ("goalies",), "espn": ("lines", "espn_id", "attendance", "probables"),
               "pbp": ("goalies",), "shifts": (), "edge": (), "moneypuck": ()}
 OWNED_META = {"schedule": ("weeks", "complete_through", "sources", "season_dates", "rosters_at"),
               "pbp": ("pbp",), "shifts": ("shifts", "html_retry"), "box": ("box", "reports"),
@@ -269,7 +270,7 @@ def save_owned(store: dict[str, Any], phases: Iterable[str]) -> Path:
     return out
 
 
-_KEEP_IF_EMPTY = ("lines", "goalies", "attendance", "espn_id", "venue", "start", "hs", "as")
+_KEEP_IF_EMPTY = ("lines", "goalies", "attendance", "espn_id", "venue", "start", "hs", "as", "probables")
 
 
 def merge_game(store: dict[str, Any], game: dict[str, Any]) -> dict[str, Any]:

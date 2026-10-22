@@ -48,13 +48,13 @@ function board(node, S) {
         '<div class="qk-span-6">' + U.card2('The best-graded deals', 'Largest value moved, graded for each side (A ≥ 65% of the value)', '<div id="vb-deals"></div>', { flush: true }) + '</div></div></section>';
     }
     node.innerHTML = h;
-    QKC.bar('#vb-top', { cats: top.map(r => r.name), series: [{ name: 'WAR', data: top.map(r => r.war) }], horizontal: true, labels: true, fmt: x => U.f(x, 2), colors: top.map(r => RK.teamColourRaw(r.team)), hrefs: top.map(r => RK.playerHref(r.id)), labelWidth: 140 });
+    QKC.bar('#vb-top', { cats: top.map(r => r.name), series: [{ name: 'WAR', data: top.map(r => r.war) }], horizontal: true, labels: true, fmt: x => U.f(x, 2), colors: top.map(r => RK.teamColourRaw(r.team)), hrefs: top.map(r => RK.playerHref(r.id)), labelWidth: 140, valName: 'Wins above replacement' });
     const sc = q.filter(r => isNum(r.toi) && isNum(r.gar) && r.kind !== 'G');
     QKC.scatter('#vb-sc', { points: sc.map(r => ({ x: r.toi, y: r.gar, name: r.name + ' · ' + RK.teamAbbr(r.team), label: RK.surnameOf(r.name), color: RK.teamColourRaw(r.team), href: RK.playerHref(r.id), size: 8 })), xName: 'Minutes', yName: 'GAR', xFmt: x => x.toFixed(0), yFmt: x => x.toFixed(1), labelTop: 8, refY: 0 });
     if (dl) {
       const T0 = dl.teams || {};
       const tl = Object.keys(T0).map(t => ({ t: t, v: T0[t].net_now })).filter(x => isNum(x.v)).sort((a, b) => b.v - a.v);
-      QKC.bar('#vb-net', { cats: tl.map(x => RK.teamName(x.t)), series: [{ name: 'Net WAR', data: tl.map(x => x.v) }], horizontal: true, diverging: true, labels: true, fmt: x => U.signed(x, 2), hrefs: tl.map(x => RK.teamHref(x.t)), labelWidth: 140 });
+      QKC.bar('#vb-net', { cats: tl.map(x => RK.teamName(x.t)), series: [{ name: 'Net WAR', data: tl.map(x => x.v) }], horizontal: true, diverging: true, labels: true, fmt: x => U.signed(x, 2), hrefs: tl.map(x => RK.teamHref(x.t)), labelWidth: 140, valName: 'Net WAR from trades' });
       const deals = (dl.deals || []);
       const best = (dl.best || []).map(id => deals.find(d => d.id === id)).filter(Boolean).slice(0, 6);
       node.querySelector('#vb-deals').innerHTML = best.length ? '<ul class="rk-list">' + best.map(d => {

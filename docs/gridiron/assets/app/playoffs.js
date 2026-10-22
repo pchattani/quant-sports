@@ -117,8 +117,8 @@ GI.route('playoffs', function (el, params) {
           { html: q === null ? '—' : GI.pct(q, 1), v: q }, { html: GI.gapHTML(r.p_sb, q), v: q === null ? null : r.p_sb - q }] }; }), { sticky: true }), { flush: true });
     GI.sortable(el);
     const dm = list.filter(r => isNum(sbMk[r.team])).slice(0, 14);
-    if (dm.length) GI.ch.dumbbell('po-sb', { rows: dm.map(r => ({ label: GI.teamName(r.team), a: r.p_sb, b: sbMk[r.team], href: GI.teamHref(r.team) })), max: Math.min(1, Math.max.apply(null, dm.map(r => Math.max(r.p_sb, sbMk[r.team]))) * 1.15), labelWidth: 150 });
-    else GI.ch.probBars('po-sb', list.slice(0, 14).map(r => ({ label: GI.teamName(r.team), p: r.p_sb, colour: GI.teamColour(r.team), href: GI.teamHref(r.team) })), { keepHeight: true });
+    if (dm.length) GI.ch.dumbbell('po-sb', { rows: dm.map(r => ({ label: GI.teamName(r.team), a: r.p_sb, b: sbMk[r.team], href: GI.teamHref(r.team) })), max: Math.min(1, Math.max.apply(null, dm.map(r => Math.max(r.p_sb, sbMk[r.team]))) * 1.15), labelWidth: 150, valName: 'Super Bowl probability' });
+    else GI.ch.probBars('po-sb', list.slice(0, 14).map(r => ({ label: GI.teamName(r.team), p: r.p_sb, colour: GI.teamColour(r.team), href: GI.teamHref(r.team) })), { keepHeight: true, valName: 'Super Bowl probability' });
     if (sbm.length) GI.ch.bar('po-sbm', { cats: sbm.map(x => GI.teamAbbr(x.afc) + ' v ' + GI.teamAbbr(x.nfc)), series: [{ name: 'Chance', data: sbm.map(x => x.p) }], horizontal: true, labels: true, fmt: v => GI.pct(v, 1), labelWidth: 80 });
   });
 });

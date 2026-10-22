@@ -331,8 +331,8 @@ function flowChart(el, flow, opts) {
   ], HW.layout({
     height: o.height || 280,
     shapes: periodShapes(tk),
-    xaxis: { tickvals: tk.vals, ticktext: tk.text, range: [0, Math.max(tMax, tk.end)], showgrid: false, fixedrange: true },
-    yaxis: { range: [-lim, lim], title: '', zeroline: true, zerolinecolor: '#8b949e', fixedrange: true, tickformat: '+d' },
+    xaxis: { title: 'Game time', tickvals: tk.vals, ticktext: tk.text, range: [0, Math.max(tMax, tk.end)], showgrid: false, fixedrange: true },
+    yaxis: { range: [-lim, lim], title: 'Margin (points)', zeroline: true, zerolinecolor: '#8b949e', fixedrange: true, tickformat: '+d' },
     annotations: [
       { xref: 'paper', yref: 'paper', x: 0.005, y: 0.98, text: hn + ' ahead', showarrow: false, xanchor: 'left', font: { size: 10, color: hc } },
       { xref: 'paper', yref: 'paper', x: 0.005, y: 0.02, text: an + ' ahead', showarrow: false, xanchor: 'left', font: { size: 10, color: ac } }
@@ -368,8 +368,8 @@ function wpChart(el, wp, opts) {
   HW.plot(el, traces, HW.layout({
     height: o.height || 300,
     shapes: periodShapes(tk).concat([{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 0.5, y1: 0.5, line: { color: '#30363d', width: 1 } }]),
-    xaxis: { tickvals: tk.vals, ticktext: tk.text, range: [0, Math.max(tMax, tk.end)], showgrid: false, fixedrange: true },
-    yaxis: { range: [0, 1], tickvals: [0, 0.25, 0.5, 0.75, 1], ticktext: [an + ' 100%', '75%', '50%', '75%', hn + ' 100%'], fixedrange: true, automargin: true },
+    xaxis: { title: 'Game time', tickvals: tk.vals, ticktext: tk.text, range: [0, Math.max(tMax, tk.end)], showgrid: false, fixedrange: true },
+    yaxis: { title: 'Win probability', range: [0, 1], tickvals: [0, 0.25, 0.5, 0.75, 1], ticktext: [an + ' 100%', '75%', '50%', '75%', hn + ' 100%'], fixedrange: true, automargin: true },
     showlegend: true, legend: { orientation: 'h', y: -0.16, font: { size: 10, color: C.text2 } },
     margin: { l: 70, r: 10, t: 10, b: 40 }
   }));
@@ -399,7 +399,7 @@ function rotationChart(el, rotation, opts) {
     text: txt, hovertemplate: '%{text}<extra></extra>', textposition: 'none' }], HW.layout({
     height: o.height || Math.max(220, ids.length * 22 + 50), bargap: 0.25, barmode: 'overlay',
     shapes: periodShapes(tk),
-    xaxis: { tickvals: tk.vals, ticktext: tk.text, range: [0, Math.max(tMax, tk.end)], showgrid: false, fixedrange: true },
+    xaxis: { title: 'Game time', tickvals: tk.vals, ticktext: tk.text, range: [0, Math.max(tMax, tk.end)], showgrid: false, fixedrange: true },
     yaxis: { autorange: 'reversed', automargin: true, fixedrange: true, tickfont: { size: 10 }, categoryorder: 'array', categoryarray: labels },
     margin: { l: 120, r: 10, t: 6, b: 28 }
   }));
@@ -452,7 +452,7 @@ function posHeatmap(el, rows, opts) {
     hovertemplate: '%{y} · ' + HW.esc(o.xName || 'seed') + ' %{x}: %{z:.1%}<extra></extra>', xgap: 1, ygap: 1, showscale: false
   }], HW.layout({
     height: o.height || Math.max(240, list.length * 22 + 60),
-    xaxis: { side: 'top', tickfont: { size: 10 }, fixedrange: true, type: 'category' }, yaxis: { autorange: 'reversed', tickfont: { size: 10 }, fixedrange: true, automargin: true, type: 'category' },
+    xaxis: { title: o.xTitle || 'Seed', side: 'top', tickfont: { size: 10 }, fixedrange: true, type: 'category' }, yaxis: { title: o.yTitle || 'Team', autorange: 'reversed', tickfont: { size: 10 }, fixedrange: true, automargin: true, type: 'category' },
     margin: { l: 110, r: 10, t: 30, b: 10 }
   }));
 }
@@ -475,7 +475,7 @@ function probBars(el, items, opts) {
   }
   HW.plot(el, traces, HW.layout({
     height: o.height || Math.max(220, list.length * 28 + 50), bargap: 0.3,
-    xaxis: { tickformat: '.0%', range: [0, Math.min(1.08, max * 1.25 + 0.02)], fixedrange: true },
+    xaxis: { title: o.xTitle || 'Probability', tickformat: '.0%', range: [0, Math.min(1.08, max * 1.25 + 0.02)], fixedrange: true },
     yaxis: { automargin: true, fixedrange: true, tickfont: { size: 11 } },
     showlegend: traces.length > 1, legend: { orientation: 'h', y: -0.12, font: { color: C.text2 } },
     margin: { l: 110, r: 50, t: 10, b: 35 }

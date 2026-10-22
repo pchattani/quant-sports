@@ -521,7 +521,8 @@ def build_tennis(ctx: Ctx, base: str, out: dict):
                      team(n[1], href=base + "#/" + T + "/player/" + str(m.get("p2"))),
                      hs, as_, p_home=r4(mod.get("p1")), market_home=r4(mk.get("p1")),
                      sets=[[s[0], s[1]] for s in sets if s[0] is not None] if sets else None,
-                     note=m.get("round"), href=base + "#/" + T + "/match/" + str(m["id"]), players=True)
+                     note=m.get("round"), href=base + "#/" + T + "/match/" + str(m["id"]), players=True,
+                     tba=True if (m.get("tba") or (start and len(start) == 10)) else None)   # date-only start
             games.append(g)
             if norm_status(m.get("status")) == "pre":
                 gr = gap_row("tennis", f"{n[0]} v {n[1]} ({TU} {m.get('round')})", mod.get("p1"), mk.get("p1"),

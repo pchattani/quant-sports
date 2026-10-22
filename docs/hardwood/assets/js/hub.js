@@ -95,7 +95,7 @@ function awardRace(el, L, awards) {
     const mk = HW.titleProbs(a.market);
     const items = Object.keys(a.model).map(pid => ({ label: HW.playerShort(L, pid), p: a.model[pid], market: HW.isNum(mk[pid]) ? mk[pid] : null,
       colour: HW.teamColour(L, (HW.NAMES[L].players[pid] || {}).team) })).sort((x, y) => y.p - x.p).slice(0, 6);
-    HW.charts.probBars(el.querySelector('.aw-chart'), items, { height: 230, top: 6 });
+    HW.charts.probBars(el.querySelector('.aw-chart'), items, { height: 230, top: 6, xTitle: 'Award probability' });
   };
   el.innerHTML = '<div class="toggle-row">' + HW.toggles(have.map(k => ({ key: k, label: names[k] })), active, 'data-aw') + '</div><div class="aw-chart"></div>' +
     '<a class="more-link" href="' + HW.href(L, 'awards') + '">All award races with the reasoning →</a>';
@@ -217,7 +217,7 @@ function render(el, params) {
       HW.card(preseason ? 'Projected standings' : 'Standings', preseason ? 'by projected wins' : 'with playoff odds', standingsSnapshot(L, season, sim, preseason));
     const mkt = HW.titleProbs(markets && markets.futures && markets.futures.champion);
     const items = tTeams.slice(0, 10).map(t => ({ label: HW.teamAbbr(L, t), p: sim[t].p_title, market: HW.isNum(mkt[t]) ? mkt[t] : null, colour: HW.teamColour(L, t) }));
-    if (items.length) HW.charts.probBars('hub-title', items, { top: 10 });
+    if (items.length) HW.charts.probBars('hub-title', items, { top: 10, xTitle: 'Title probability' });
     else document.getElementById('hub-title').innerHTML = !season ? HW.notBuilt('The season model', arr[0]) : HW.muted('No title odds for this season.');
     awardRace(document.getElementById('hub-aw'), L, awards);
     HW.sortable(el);

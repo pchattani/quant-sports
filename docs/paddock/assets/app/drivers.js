@@ -178,14 +178,14 @@ function season_(d, id, y, metrics, D, mate, ms, tcol, team) {
     PD.ch.lines('dv-pos', [
       { name: 'Grid', data: log.map(function (r) { return [r.round, isNum(r.grid) && r.grid > 0 ? r.grid : null]; }), colour: '#7d8590', dash: true, symbols: true },
       { name: 'Finish', data: log.map(function (r) { return [r.round, PD.finished(r.status) ? r.pos : null]; }), colour: PD.teamColour(team), symbols: true, width: 2.5 }
-    ], { inverse: true, yMin: 1, yScale: false, xName: 'Round', xFmt: function (v) { return 'R' + v; }, xLabel: function (v) { var r = log.filter(function (z) { return z.round === +v; })[0]; return r ? 'R' + v + ' ' + PD.shortRace(r.name) + (PD.finished(r.status) ? '' : ' · ' + r.status) : v; }, yFmt: function (v) { return 'P' + Math.round(v); }, label: 'Grid and finish' });
+    ], { inverse: true, yMin: 1, yScale: false, xName: 'Round', yName: 'Position', xFmt: function (v) { return 'R' + v; }, xLabel: function (v) { var r = log.filter(function (z) { return z.round === +v; })[0]; return r ? 'R' + v + ' ' + PD.shortRace(r.name) + (PD.finished(r.status) ? '' : ' · ' + r.status) : v; }, yFmt: function (v) { return 'P' + Math.round(v); }, label: 'Grid and finish' });
     var cp = 0, ce = 0, any = false;
     var actual = [], exp = [];
     log.forEach(function (r) { cp += r.points || 0; actual.push([r.round, cp]); if (isNum(r.exp_points)) { any = true; ce += r.exp_points; exp.push([r.round, ce]); } });
     PD.ch.lines('dv-pts', [{ name: 'Points', data: actual, colour: PD.teamColour(team), width: 2.5, area: true }].concat(any ? [{ name: 'Expected', data: exp, colour: '#7d8590', dash: true }] : []),
-      { xName: 'Round', xFmt: function (v) { return 'R' + v; }, xLabel: function (v) { return 'After round ' + v; }, yFmt: function (v) { return PD.num(v, 0); }, yScale: false, label: 'Points against expected' });
+      { xName: 'Round', yName: 'Points, cumulative', xFmt: function (v) { return 'R' + v; }, xLabel: function (v) { return 'After round ' + v; }, yFmt: function (v) { return PD.num(v, 0); }, yScale: false, label: 'Points against expected' });
     PD.ch.lines('dv-pace', [{ name: 'Pace rank', data: log.map(function (r) { return [r.round, isNum(r.pace_rank) ? r.pace_rank : null]; }), colour: PD.teamColour(team), symbols: true, width: 2 }],
-      { inverse: true, yMin: 1, yScale: false, xName: 'Round', xFmt: function (v) { return 'R' + v; }, xLabel: function (v) { var r = log.filter(function (z) { return z.round === +v; })[0]; return r ? 'R' + v + ' ' + PD.shortRace(r.name) + (isNum(r.pace) ? ' · ' + PD.signed(r.pace, 3) + ' s/lap' : '') : v; }, yFmt: function (v) { return 'P' + Math.round(v); }, label: 'Race pace rank by round' });
+      { inverse: true, yMin: 1, yScale: false, xName: 'Round', yName: 'Race pace rank', xFmt: function (v) { return 'R' + v; }, xLabel: function (v) { var r = log.filter(function (z) { return z.round === +v; })[0]; return r ? 'R' + v + ' ' + PD.shortRace(r.name) + (isNum(r.pace) ? ' · ' + PD.signed(r.pace, 3) + ' s/lap' : '') : v; }, yFmt: function (v) { return 'P' + Math.round(v); }, label: 'Race pace rank by round' });
   } else ['dv-pos', 'dv-pts', 'dv-pace'].forEach(function (k) { PD.ch.none(k, 'No races yet.'); });
   var drawPct = function (src) { PD.set('dv-pct', PD.pctPanel(metrics, d.values, src === 'teammate' ? d.pct_teammate : d.pct, { note: src === 'teammate' ? 'Team-mate percentile: 100 is the best figure among drivers sharing the car; with two drivers it sits near 0 or 100.' : 'Field percentile, 100 = best. ↓ marks metrics where lower is better; the bar already accounts for it.' })); };
   drawPct('field');
@@ -246,7 +246,7 @@ function careerBlock(id, career) {
     PD.card('Elo through the career', 'Field Elo after every race, and Elo against the team-mate.', PD.chartBox('dc-elo', 300), { span: 5 }) +
     PD.card('Seasons', '', '<div id="dc-t"></div>', { span: 7, flush: true }) +
     PD.card('Team-mates', 'Qualifying and race head to head with every team-mate.', '<div id="dc-m"></div>', { span: 5, flush: true }), 'pd-mt');
-  if (seasons.length) PD.ch.columns('dc-seasons', { cats: seasons.map(function (s) { return String(s.year); }), y2Name: 'Position', y2Inverse: true, y2Max: Math.max.apply(null, seasons.map(function (s) { return s.pos || 0; }).concat([5])),
+  if (seasons.length) PD.ch.columns('dc-seasons', { cats: seasons.map(function (s) { return String(s.year); }), xName: 'Season', y2Name: 'Position', y2Inverse: true, y2Max: Math.max.apply(null, seasons.map(function (s) { return s.pos || 0; }).concat([5])),
     series: [{ name: 'Points', data: seasons.map(function (s) { return s.points || 0; }), colours: seasons.map(function (s) { return PD.teamColour(s.team); }), fmt: function (v) { return PD.pts(v); } },
       { name: 'Championship position', type: 'line', axis: 1, data: seasons.map(function (s) { return s.pos || null; }), colour: '#e3b341', fmt: function (v) { return 'P' + v; } }],
     yName: 'Points', fmt: function (v) { return PD.num(v, 0); }, tipLabel: function (i) { var s = seasons[i]; return s.year + ' · ' + PD.teamName(s.team) + ' · ' + s.races + ' races, ' + s.wins + ' wins'; }, rotate: seasons.length > 14 ? 45 : 0, label: 'Season by season' });
@@ -255,7 +255,7 @@ function careerBlock(id, career) {
   if (e.length) {
     var xs = e.map(function (r) { return r[0] + (r[1] - 1) / 25; });
     PD.ch.lines('dc-elo', [{ name: 'Field', data: e.map(function (r, i) { return [xs[i], r[2]]; }), colour: '#3987e5' }, { name: 'v team-mate', data: e.map(function (r, i) { return [xs[i], r[3]]; }), colour: '#e8833a' }],
-      { xFmt: function (v) { return String(Math.floor(v)); }, xLabel: function (v) { var y0 = Math.floor(v); return y0 + ' R' + (Math.round((v - y0) * 25) + 1); }, yFmt: function (v) { return PD.num(v, 0); }, label: 'Elo history' });
+      { xName: 'Season', yName: 'Elo rating', xFmt: function (v) { return String(Math.floor(v)); }, xLabel: function (v) { var y0 = Math.floor(v); return y0 + ' R' + (Math.round((v - y0) * 25) + 1); }, yFmt: function (v) { return PD.num(v, 0); }, label: 'Elo history' });
   } else PD.ch.none('dc-elo', 'No Elo history.');
   PD.table('dc-t', [
     { key: 'year', label: 'Year', num: true, fmt: function (v) { return '<a class="pd-link" href="#/standings/' + v + '">' + v + '</a>'; } },

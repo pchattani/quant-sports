@@ -449,8 +449,97 @@ def injuries_by_game(ctx: SeasonContext) -> dict[str, dict]:
     return out
 
 
+SO_GROUP_LABEL = {"ol": "OL", "rec": "WR/TE", "rb": "RB", "dl": "DL", "lb": "LB", "db": "DB"}
+
+
+def availability_by_game(ctx: SeasonContext) -> dict[str, dict]:
+    """{game_id: the starters-out term of our price}: per side the depth-chart starters (as of the team's previous
+    game; QBs and specialists aside) expected to miss the game, each with his chance of missing (injury report: Out 1,
+    Doubtful 0.85, Questionable 0.15; game-day inactives 1 once known) and the points it costs in the model
+    (b_so_off / b_so_def per starter, models/availability.py and game_params.json), the side's total and the net
+    effect on the home margin. Empty without the models."""
+    if not ctx.use_models:
+        return {}
+    try:
+        from oddsmarkets.nfl.models import availability as AV
+        from oddsmarkets.nfl.models import game as GMOD
+        p = GMOD.params()
+        b = {"off": float(p.get("so_off") or 0.0), "def": float(p.get("so_def") or 0.0)}
+        if not b["off"] and not b["def"]:
+            return {}
+        ST = AV.starter_rows(ctx.season)
+    except Exception as exc:  # noqa: BLE001 - optional block
+        ctx.model_errors["availability"] = f"{type(exc).__name__}: {exc}"
+        return {}
+    if ST is None or not len(ST):
+        return {}
+    ST = ST[ST["pm"] > 0]
+    by: dict[tuple, list] = {}
+    for r in ST.to_dict("records"):
+        side = "off" if r["grp"] in ("ol", "rec", "rb") else "def"
+        by.setdefault((int(r["week"]), r["team"]), []).append(
+            {"pid": an.sid(r["gsis_id"]), "grp": SO_GROUP_LABEL.get(r["grp"], r["grp"]), "side": side, "p_miss": an.rnd(r["pm"], 2),
+             "pts": an.rnd(b[side] * float(r["pm"]), 2), "by": "inactives" if r.get("by_inactives") else "report"})
+    out = {}
+    for gid, g in ctx.games.items():
+        w = an.inum(g.get("week"))
+        sides = {}
+        for s in ("home", "away"):
+            t = AV.team_alias(str(g.get(s)), ctx.season)
+            pl = sorted(by.get((w, t)) or [], key=lambda x: x["pts"] or 0)
+            sides[s] = {"players": pl, "off": an.rnd(sum(x["p_miss"] for x in pl if x["side"] == "off"), 2),
+                        "def": an.rnd(sum(x["p_miss"] for x in pl if x["side"] == "def"), 2),
+                        "pts": an.rnd(sum(x["pts"] or 0 for x in pl), 2)}
+        if not sides["home"]["players"] and not sides["away"]["players"]:
+            continue
+        src = "inactives" if any(x["by"] == "inactives" for s in sides.values() for x in s["players"]) else "report"
+        out[gid] = {**sides, "net_home": an.rnd(sides["home"]["pts"] - sides["away"]["pts"], 2), "src": src,
+                    "coef": {"off": an.rnd(b["off"], 3), "def": an.rnd(b["def"], 3)}}
+    return out
+
+
+def _norm_injuries(inj: dict | None, g: dict) -> dict | None:
+    """ESPN's summary keys its injury lists by team ({"KC": [...], "LAC": [...]}); the page reads {"home", "away"}
+    (until 22 Oct 2026 an upcoming game's ESPN list was published under the team keys and never shown). Players
+    ESPN lists as Active are left out."""
+    if not isinstance(inj, dict) or "home" in inj or "away" in inj:
+        return inj
+    h, a = g.get("home"), g.get("away")
+    if h not in inj and a not in inj:
+        return inj
+    keep = lambda rows: [x for x in rows or [] if not (isinstance(x, dict) and str(x.get("status") or "").lower() == "active")]  # noqa: E731
+    return {"home": keep(inj.get(h)), "away": keep(inj.get(a)), "source": "ESPN"}
+
+
+def _injury_impacts(inj: dict | None, av: dict | None) -> dict | None:
+    """Fills each injury-list entry's `impact` (points of margin for his team, negative hurts) from the starters-out
+    term: a depth-chart starter's cost, 0 for anyone else on the list. ESPN entries are matched by the ESPN id."""
+    if not inj or not av:
+        return inj
+    xw = None
+    out = dict(inj)
+    for s in ("home", "away"):
+        cost = {x["pid"]: x["pts"] for x in (av.get(s) or {}).get("players") or []}
+        rows = []
+        for x in inj.get(s) or []:
+            if not isinstance(x, dict):
+                rows.append(x)
+                continue
+            pid = x.get("pid")
+            if not pid and x.get("espn_athlete"):
+                if xw is None:
+                    from oddsmarkets.nfl.analytics import people
+                    xw = people.espn_xwalk()
+                pid = xw.get(str(x["espn_athlete"]))
+            rows.append({**x, "pid": pid or x.get("pid"), "impact": cost.get(pid, 0.0) if pid else None,
+                         "starter": pid in cost if pid else None})
+        out[s] = rows
+    return out
+
+
 def build_page(ctx: SeasonContext, g: dict, G: pd.DataFrame | None, crd: dict, pregame: dict | None, old: dict | None,
-               names: dict, ngs_w: dict, matchups: dict | None, injuries: dict | None = None) -> dict:
+               names: dict, ngs_w: dict, matchups: dict | None, injuries: dict | None = None,
+               availability: dict | None = None) -> dict:
     out = {"ok": True, "game_id": g["game_id"], "season": ctx.season, "updated_at": an.now(), "card": crd,
            "game": {**{k: g.get(k) for k in ("stadium", "roof", "surface", "temp", "wind", "referee", "home_coach", "away_coach",
                                             "home_rest", "away_rest", "div_game", "overtime", "espn_id", "date", "neutral")},
@@ -458,7 +547,12 @@ def build_page(ctx: SeasonContext, g: dict, G: pd.DataFrame | None, crd: dict, p
            "pregame": pregame or (old or {}).get("pregame"), "matchups": matchups,
            "credits": [an.NFLVERSE_CREDIT] + ([an.FTN_CREDIT] if ctx.season >= 2022 else []) + ([an.NGS_CREDIT] if ctx.season >= 2016 else [])}
     sm = espn_summary(g) if g.get("status") != "final" or not (old or {}).get("injuries") else None
-    out["injuries"] = g.get("injuries") or (sm or {}).get("injuries") or (injuries or {}).get(g["game_id"]) or (old or {}).get("injuries")
+    # the NFL's report via nflverse first once it has this week (complete, with gsis ids); ESPN's list before that
+    # (since 22 Oct 2026; ESPN's summary lists about five players a team)
+    out["injuries"] = (injuries or {}).get(g["game_id"]) or g.get("injuries") or (sm or {}).get("injuries") or (old or {}).get("injuries")
+    av = (availability or {}).get(g["game_id"]) if availability is not None else None
+    out["availability"] = av if availability else (old or {}).get("availability")
+    out["injuries"] = _injury_impacts(_norm_injuries(out["injuries"], g), out["availability"])
     out["espn_predictor"] = (sm or {}).get("predictor") or (old or {}).get("espn_predictor")
     ep = espn_plays(g) if G is None or not len(G) else None
     if G is not None and len(G):
@@ -476,8 +570,10 @@ def build_page(ctx: SeasonContext, g: dict, G: pd.DataFrame | None, crd: dict, p
         if ep:
             from oddsmarkets.nfl.analytics import adapters
             pre = (pregame or {}).get("model") or (crd or {}).get("model")
-            ser = adapters.live_series(ctx, g, {"plays": ep}, pre)
-            out.update(espn_blocks(g, ep, espn_summary(g) or {}, ser))
+            rec = {"plays": ep, "status": g.get("status"), "away": g.get("away")}
+            ser = adapters.live_series(ctx, g, rec, pre)
+            eps = adapters.live_epa(ctx, g, rec)
+            out.update(espn_blocks(g, ep, espn_summary(g) or {}, ser, eps))
     return out
 
 
@@ -554,23 +650,42 @@ def espn_box(g: dict, sm: dict, xwalk: dict | None = None) -> dict | None:
     return out if any((out.get(s) or {}).get("passing") for s in ("home", "away")) else None
 
 
-def espn_blocks(g: dict, ep: list, sm: dict, ser: list | None = None) -> dict:
-    """The play-level blocks of a game page from ESPN's record, in the nflverse blocks' shapes (EPA, fourth-down
-    grades and game balls need nflverse and stay empty)."""
+def espn_blocks(g: dict, ep: list, sm: dict, ser: list | None = None, eps: list | None = None) -> dict:
+    """The play-level blocks of a game page from ESPN's record, in the nflverse blocks' shapes. Our WP is the pre-snap
+    value on ESPN's states (models/live.wp_series) and WPA its change to the next play; EPA and EP from our EP model
+    on the same states (live.epa_series; 22 Oct 2026), provisional until nflverse publishes. Fourth-down grades and
+    game balls need nflverse and stay empty."""
     home = g.get("home")
     ours = {an.inum(r[0]): an.fnum(r[1]) for r in ser or [] if isinstance(r, (list, tuple)) and len(r) >= 2}
+    has_state = {an.inum(r[0]): bool(r[3]) for r in ser or [] if isinstance(r, (list, tuple)) and len(r) >= 4}
+    epd = {an.inum(r[0]): (an.fnum(r[1]), an.fnum(r[2])) for r in eps or [] if isinstance(r, (list, tuple)) and len(r) >= 3}
     P = [p for p in ep if isinstance(p, (list, tuple)) and len(p) >= 12]
     rows, wps = [], []
     for i, p in enumerate(P):
         seq, qtr, clk, team, down, dist, yl, typ, text, hsc, asc, w = p[:12]
-        w_prev = an.fnum(P[i - 1][11]) if i else None
-        dw = (an.fnum(w) - w_prev) if an.fnum(w) is not None and w_prev is not None else None
+        o = ours.get(an.inum(seq))
+        # WPA: from this play's state to the next play that has one (timeouts and ends of quarters carry the value
+        # and get none, so a swing is credited to the play that made it)
+        nxt = next((P[j] for j in range(i + 1, len(P)) if has_state.get(an.inum(P[j][0]), True)), None)
+        o_next = ours.get(an.inum(nxt[0])) if nxt is not None else (o if g.get("status") != "final" else
+                                                                     (1.0 if (an.fnum(hsc) or 0) > (an.fnum(asc) or 0) else 0.0 if (an.fnum(hsc) or 0) < (an.fnum(asc) or 0) else 0.5))
+        if has_state and not has_state.get(an.inum(seq), True):
+            o_next = None
+            dw = None
+        elif o is not None and o_next is not None:
+            dw = o_next - o                                         # ours: WP before the next snap - before this one
+        else:
+            w_prev = an.fnum(P[i - 1][11]) if i else None
+            dw = (an.fnum(w) - w_prev) if an.fnum(w) is not None and w_prev is not None else None
         wpa = None if dw is None or not team else (dw if team == home else -dw)
         gs = _game_seconds(qtr, clk)
-        o = ours.get(an.inum(seq))
-        rows.append([an.inum(qtr), _clock(clk), team, an.inum(down) or None, an.inum(dist), an.inum(yl), typ, text, None, an.rnd(wpa, 4),
-                     an.rnd(o, 4), an.rnd(w, 4), None, None, [], an.inum(seq), gs, None, None, an.inum(hsc), an.inum(asc)])
-        wps.append([gs, an.rnd(o, 4), None, an.rnd(w, 4), i])
+        w_pre = an.fnum(P[i - 1][11]) if i else None             # ESPN's WP is after its play: before the snap = the last play's
+        e_b, e_a = epd.get(an.inum(seq), (None, None))
+        rows.append([an.inum(qtr), _clock(clk), team, an.inum(down) or None, an.inum(dist), an.inum(yl), typ, text, an.rnd(e_a, 3),
+                     an.rnd(wpa, 4), an.rnd(o, 4), an.rnd(w_pre, 4), an.rnd(e_b, 3),
+                     an.rnd(e_b + e_a, 3) if e_b is not None and e_a is not None else None, [], an.inum(seq), gs, None,
+                     (1 if e_a > 0 else 0) if e_a is not None else None, an.inum(hsc), an.inum(asc)])
+        wps.append([gs, an.rnd(o, 4), None, an.rnd(w_pre, 4), i])
     drives = []
     for n, d in enumerate(sm.get("drives") or [], start=1):
         res = str(d.get("result") or "").strip()
@@ -591,11 +706,29 @@ def espn_blocks(g: dict, ep: list, sm: dict, ser: list | None = None) -> dict:
             score["away"].append(a - pa)
             ph, pa = h, a
     kp = sorted((r for r in rows if r[9] is not None), key=lambda r: -abs(r[9]))[:8]
-    key = [{"play_id": r[15], "qtr": r[0], "clock": r[1], "team": r[2], "desc": r[7], "wpa": r[9], "epa": None,
-            "wp_home_before": None, "wp_home_after": r[11]} for r in kp]
+    key = [{"play_id": r[15], "qtr": r[0], "clock": r[1], "team": r[2], "desc": r[7], "wpa": r[9], "epa": r[8],
+            "wp_home_before": r[10], "wp_home_after": (r[10] + r[9] * (1 if r[2] == home else -1)) if r[10] is not None and r[9] is not None else None}
+           for r in kp]
     from oddsmarkets.nfl.analytics import people
+    box = espn_box(g, sm, people.espn_xwalk())
+    if box and epd:                                              # team EPA lines from our EPA on ESPN's plays
+        for side in ("home", "away"):
+            t = g.get(side)
+            sc = [r for r in rows if r[2] == t and r[8] is not None and not str(r[6]).startswith(("Punt", "Field Goal", "Penalty"))]
+            if not sc or not (box.get(side) or {}).get("team"):
+                continue
+            e = np.array([r[8] for r in sc], float)
+            db = np.array([bool(re_pass(str(r[6]))) for r in sc])
+            box[side]["team"].update({"epa": an.rnd(e.sum(), 2), "epa_play": an.rnd(e.mean(), 3), "success": an.rnd((e > 0).mean(), 3),
+                                      "pass_epa": an.rnd(e[db].mean(), 3) if db.any() else None,
+                                      "rush_epa": an.rnd(e[~db].mean(), 3) if (~db).any() else None})
     return {"plays": {"cols": PLAY_COLS + EXTRA_PLAY_COLS, "rows": rows},
             "wp": {"cols": ["game_seconds_remaining", "wp_home_ours", "wp_home_nflfastr", "wp_home_espn", "play_index"], "rows": wps,
                    "source": "espn"},
             "drives": {"cols": DRIVE_COLS, "rows": drives}, "score": score, "fourth_downs": [], "key_plays": key,
-            "box": espn_box(g, sm, people.espn_xwalk()), "awards": None, "source": "espn"}
+            "box": box, "awards": None, "source": "espn", "epa_source": "ours on ESPN states" if epd else None}
+
+
+def re_pass(typ: str) -> bool:
+    """ESPN play types that are dropbacks (passes, sacks, interceptions)."""
+    return any(k in typ for k in ("Pass", "Sack", "Interception"))

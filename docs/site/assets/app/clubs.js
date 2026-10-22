@@ -87,7 +87,7 @@ function drawScoreGrid(el, id, home, away, model, neutral) {
   for (var i = 0; i < n; i++) for (var j = 0; j < n; j++) data.push([j, i, Math.round(r.m[i][j] * 1000) / 10]);
   var box = el.querySelector('#' + id);
   if (!box) return;
-  QKC.heatmap(box, { x: ['0', '1', '2', '3', '4', '5'], y: ['0', '1', '2', '3', '4', '5'], data: data, min: 0, fmt: function (v) { return num(v, 1) + '%'; }, label: 'Score probabilities' });
+  QKC.heatmap(box, { x: ['0', '1', '2', '3', '4', '5'], y: ['0', '1', '2', '3', '4', '5'], data: data, min: 0, fmt: function (v) { return num(v, 1) + '%'; }, xName: away.team + ' goals', yName: home.team + ' goals', label: 'Score probabilities' });
 }
 
 // ── directory ─────────────────────────────────────────────────────────────
@@ -175,9 +175,10 @@ function drawPool(box, pool, q) {
   ['cl-lg', 'cl-bl'].forEach(function (id) { box.querySelector('#' + id).addEventListener('change', draw); });
   box.querySelector('#cl-q').addEventListener('input', draw);
   draw();
-  var top = clubs.slice(0, 25);
+  /* the chart ranks measured clubs: cup entrants with no matches yet carry the prior */
+  var top = clubs.filter(function (c) { return c.in_league || (c.played || 0) > 0; }).slice(0, 25);
   QKC.bar(box.querySelector('#cl-top'), {
-    horizontal: true, labels: true, labelWidth: 170, fmt: function (v) { return num(v, 2); }, min: 1.4,
+    horizontal: true, labels: true, labelWidth: 170, fmt: function (v) { return num(v, 2); }, min: 1.4, valName: 'Expected points per game',
     cats: top.map(function (c) { return c.team + ' · ' + (c.comp_name || ''); }), series: [{ name: 'Strength', data: top.map(function (c) { return c.strength; }) }],
     colors: top.map(function () { return QK.cssVar('--accent'); }), hrefs: top.map(function (c) { return FB.href.club(c.team_id); }), label: 'Strongest 25 clubs on the pooled scale'
   });
@@ -213,7 +214,7 @@ function drawLeagues(box, pool) {
     { key: 'connection', label: 'Bridge', num: true, fmt: function (v) { return v + (v < 20 ? ' ' + FB.badge('weak', '', 'Few cup matches connect this league to the rest: a less certain scale') : ''); }, tip: 'Cup matches connecting this league to the pool' }
   ], rows, { caption: 'Leagues on one scale' });
   QKC.bar(box.querySelector('#cl-lgbar'), {
-    horizontal: true, labels: true, labelWidth: 140, fmt: function (v) { return num(v, 2); }, min: 0.8,
+    horizontal: true, labels: true, labelWidth: 140, fmt: function (v) { return num(v, 2); }, min: 0.8, valName: 'Expected points per game',
     cats: rows.map(function (r) { return r.name; }), series: [{ name: 'Strength', data: rows.map(function (r) { return r.strength; }) }],
     hrefs: rows.map(function (r) { return FB.comp(r.slug) ? FB.href.comp(r.slug) : undefined; }), label: 'League strength on the pooled scale'
   });
@@ -286,7 +287,7 @@ function drawNations(el, q) {
     draw();
     var top = teams.slice(0, 25);
     QKC.bar(box.querySelector('#cn-top'), {
-      horizontal: true, labels: true, labelWidth: 120, min: 1.4, fmt: function (v) { return num(v, 2); },
+      horizontal: true, labels: true, labelWidth: 120, min: 1.4, valName: 'Expected points per game', fmt: function (v) { return num(v, 2); },
       cats: top.map(function (t) { return t.team; }), series: [{ name: 'Strength', data: top.map(function (t) { return t.strength; }) }],
       colors: top.map(function () { return QK.cssVar('--c-2'); }), hrefs: top.map(function (t) { return tidOf[t.team] ? FB.href.club(tidOf[t.team]) : undefined; }), label: 'Strongest national teams'
     });
@@ -530,11 +531,14 @@ function drawYears(body, C, q) {
       var cats = asc.map(function (y) { return y.era; });
       var bar = function (name, k, c) { return { type: 'bar', name: name, stack: 'r', barMaxWidth: 34, data: asc.map(function (y) { return y[k]; }), itemStyle: { color: c } }; };
       var ya = QKC.axis(T, {}), yb = QKC.axis(T, { min: 0, max: 3, split: false });
+      var xa = QKC.axis(T, { type: 'category', data: cats, split: false, line: true });
+      var gB = 6 + QKC.nameAxis(xa, 'Season', 'bottom'), gT = 34 + QKC.nameAxis(ya, 'Matches', 'side');
+      yb.name = 'Points per game'; yb.nameLocation = 'end'; yb.nameGap = 8; yb.nameTextStyle.align = 'right';
       return {
-        grid: { left: 8, right: 8, top: 34, bottom: 6, containLabel: true },
+        grid: { left: 8, right: 8, top: gT, bottom: gB, containLabel: true },
         legend: { top: 0, right: 0, icon: 'roundRect', itemWidth: 10, itemHeight: 10, textStyle: { color: T.ink2 } },
         tooltip: QKC.tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: QKC.hexA(T.ink1, 0.04) } } }),
-        xAxis: QKC.axis(T, { type: 'category', data: cats, split: false, line: true }),
+        xAxis: xa,
         yAxis: [ya, yb],
         series: [bar('Won', 'w', good), bar('Drawn', 'd', QKC.hexA(T.ink3, 0.6)), bar('Lost', 'l', bad),
           { type: 'line', name: 'Points per game', yAxisIndex: 1, data: asc.map(function (y) { return Math.round(ppgOf(y) * 100) / 100; }), symbol: 'circle', symbolSize: 7, lineStyle: { width: 2, color: T.accent }, itemStyle: { color: T.accent, borderColor: T.s1, borderWidth: 2 } }]
@@ -572,7 +576,7 @@ function drawRatings(body, C) {
   var strRows = C.live.filter(function (s) { return s.rating && isNum(s.rating.strength_ppg); });
   var sbox = body.querySelector('#cl-str');
   if (strRows.length) {
-    QKC.bar(sbox, { horizontal: true, labels: true, labelWidth: 120, fmt: function (v) { return num(v, 2); }, min: 0,
+    QKC.bar(sbox, { horizontal: true, labels: true, labelWidth: 120, fmt: function (v) { return num(v, 2); }, min: 0, valName: 'Expected points per game',
       cats: strRows.map(function (s) { return s.cshort; }), series: [{ name: 'Strength', data: strRows.map(function (s) { return s.rating.strength_ppg; }) }],
       colors: strRows.map(function (s) { return FB.kindColorHex(s.kind); }), hrefs: strRows.map(function (s) { return FB.href.comp(s.comp); }), label: 'Strength by competition' });
   } else { sbox.style.height = 'auto'; sbox.innerHTML = FB.empty('No current rating', 'The model rates clubs in competitions under way.'); }
@@ -589,7 +593,7 @@ function drawRatings(body, C) {
     var avg = all.length ? all.reduce(function (a, b) { return a + b; }, 0) / all.length : null;
     QKC.line(ebox, { x: hist.map(function (h) { return h.date; }), xFmt: function (v) { return FB.fmtDate(v, { weekday: false }); }, xLabel: function (v) { return FB.fmtDate(v, { year: true }); },
       series: [{ name: 'Elo', data: hist.map(function (h) { return h.elo; }), color: QK.cssVar('--accent'), area: true }], yScale: true,
-      ref: isNum(avg) ? { y: Math.round(avg), label: 'league avg' } : undefined, yFmt: function (v) { return num(v, 0); }, endLabels: false, label: 'Elo through the season' });
+      ref: isNum(avg) ? { y: Math.round(avg), label: 'league avg' } : undefined, yFmt: function (v) { return num(v, 0); }, endLabels: false, xName: 'Date', yName: 'Elo rating', label: 'Elo through the season' });
   });
 }
 
@@ -647,7 +651,7 @@ function drawDossier(box, C, slug) {
       '<div class="fb-mt">' + FB.card('Players in ' + esc(c.name), players.length + ' players this season; percentile chips against positional peers in the competition.', '<div id="cl-dos-p"></div>', { flush: true }) + '</div>';
     var ms = (ts.matches || []).slice().reverse().filter(function (m) { return isNum(m.xg); });
     var xbox = b.querySelector('#cl-dos-xg');
-    if (ms.length) QKC.bar(xbox, { legend: true, fmt: function (v) { return num(v, 2); }, cats: ms.map(function (m) { return (m.ha === 'H' ? 'v ' : '@ ') + m.opp + ' ' + m.gf + '-' + m.ga; }),
+    if (ms.length) QKC.bar(xbox, { legend: true, fmt: function (v) { return num(v, 2); }, valName: 'Expected goals (xG)', cats: ms.map(function (m) { return (m.ha === 'H' ? 'v ' : '@ ') + m.opp + ' ' + m.gf + '-' + m.ga; }),
       series: [{ name: 'xG for', data: ms.map(function (m) { return m.xg; }), color: QK.cssVar('--c-1') }, { name: 'xG against', data: ms.map(function (m) { return isNum(m.xga) ? m.xga : null; }), color: QK.cssVar('--c-2') }], label: 'xG by match' });
     else { xbox.style.height = 'auto'; xbox.innerHTML = FB.empty('No xG yet'); }
     var pc = function (key, fmt) { return { key: key, label: '', num: true, fmt: function (v, r) { return FB.fmtMetric(v, fmt); }, pctl: '_p_' + key }; };
@@ -699,7 +703,7 @@ function drawSeasons(body, C, q) {
   var compsIn = Array.from(new Set(done.map(function (m) { return m.comp; })));
   var pbox = body.querySelector('#cl-ppg');
   if (asc.length && compsIn.length) {
-    QKC.bar(pbox, { legend: true, max: 3, fmt: function (v) { return num(v, 2); }, cats: asc,
+    QKC.bar(pbox, { legend: true, max: 3, valName: 'Points per game', catName: 'Season', fmt: function (v) { return num(v, 2); }, cats: asc,
       series: compsIn.map(function (s) {
         return { name: FB.compName(s, true), color: FB.kindColorHex(FB.kindOf(s)), data: asc.map(function (e) {
           var g = done.filter(function (m) { return m.comp === s && m.era === e; });
@@ -774,12 +778,12 @@ function drawSquad(body, C) {
   var ctb = body.querySelector('#cl-sq-ct');
   if (doc.national) {
     QKC.bar(ctb, { labels: true, fmt: function (v) { return num(v, 0); }, cats: POS_ORDER.map(function (p) { return FB.POS_GROUP[p]; }),
-      series: [{ name: 'Players', data: POS_ORDER.map(function (p) { return sq.filter(function (x) { return x.pos === p; }).length; }) }], colors: POS_ORDER.map(posSlotHex), label: 'Players by position' });
+      series: [{ name: 'Players', data: POS_ORDER.map(function (p) { return sq.filter(function (x) { return x.pos === p; }).length; }) }], colors: POS_ORDER.map(posSlotHex), valName: 'Players', label: 'Players by position' });
   } else {
     var by = {};
     sq.forEach(function (x) { var y = x.until ? String(x.until).slice(0, 4) : null; if (y) by[y] = (by[y] || 0) + 1; });
     var ys = Object.keys(by).sort();
-    if (ys.length) QKC.bar(ctb, { labels: true, fmt: function (v) { return num(v, 0); }, cats: ys, series: [{ name: 'Contracts ending', data: ys.map(function (y) { return by[y]; }) }], label: 'Contracts by year of expiry' });
+    if (ys.length) QKC.bar(ctb, { labels: true, fmt: function (v) { return num(v, 0); }, cats: ys, series: [{ name: 'Contracts ending', data: ys.map(function (y) { return by[y]; }) }], valName: 'Contracts ending', catName: 'Year of expiry', label: 'Contracts by year of expiry' });
     else { ctb.style.height = 'auto'; ctb.innerHTML = FB.empty('No contract dates on record'); }
   }
 }
@@ -814,9 +818,9 @@ function drawMatches(body, C, q) {
   if (xs.length >= 2) {
     QKC.mount(xb, function (T) {
       return {
-        grid: { left: 8, right: 8, top: 10, bottom: 6, containLabel: true },
-        xAxis: QKC.axis(T, { type: 'category', data: xs.map(function (m, i) { return i + 1; }), split: false, line: true }),
-        yAxis: QKC.axis(T, { fmt: function (v) { return signed(v, 1); } }),
+        grid: { left: 8, right: 8, top: 26, bottom: 28, containLabel: true },
+        xAxis: QKC.axis(T, { type: 'category', data: xs.map(function (m, i) { return i + 1; }), split: false, line: true, name: 'Match, oldest first', nameLocation: 'middle', nameGap: 26 }),
+        yAxis: QKC.axis(T, { fmt: function (v) { return signed(v, 1); }, name: 'xG difference', nameAlign: 'left' }),
         tooltip: QKC.tooltip(T, { formatter: function (p) { var m = xs[p.dataIndex]; return '<div style="font-weight:600">' + esc(FB.fmtDate(m.date, true)) + ' · ' + esc(FB.compName(m.comp, true)) + '</div>' + esc((m.home ? 'v ' : '@ ') + m.opp + ' ' + m.gf + '-' + m.ga) + QKC.tipRow(p.color, 'xG difference', signed(m.xg[0] - m.xg[1], 2)); } }),
         series: [{ type: 'bar', barMaxWidth: 14, data: xs.map(function (m) { return { value: Math.round((m.xg[0] - m.xg[1]) * 100) / 100, href: m.detail ? FB.href.match(m.comp, m.id) : undefined, itemStyle: { color: FB.kindColorHex(m.kind) } }; }) }]
       };
@@ -840,7 +844,7 @@ function drawNeedsMini(box, C, d) {
   unitChart(box.querySelector('#cl-units'), units);
 }
 function unitChart(el, units) {
-  QKC.bar(el, { horizontal: true, labels: true, labelWidth: 170, max: 100, min: 0, fmt: function (v) { return num(v, 0); },
+  QKC.bar(el, { horizontal: true, labels: true, labelWidth: 170, max: 100, min: 0, fmt: function (v) { return num(v, 0); }, valName: 'Percentile in the league',
     cats: units.map(function (u) { return u.label + ' · ' + (u.grade || ''); }), series: [{ name: 'Percentile in the league', data: units.map(function (u) { return u.pct; }) }],
     colors: units.map(function (u) { return u.pct >= 50 ? QK.cssVar('--div-pos') : QK.cssVar('--div-neg'); }), label: 'Unit percentiles in the league' });
 }
@@ -920,7 +924,7 @@ function drawBudget(box, d) {
   var ws = (L.windows || []).slice();
   if (ws.length) {
     var asc = ws.slice().reverse();
-    QKC.bar(box.querySelector('#cl-win'), { legend: true, fmt: function (v) { return FB.money(v * 1e6); }, cats: asc.map(function (w) { return w.label; }),
+    QKC.bar(box.querySelector('#cl-win'), { legend: true, valName: 'Transfer fees', catName: 'Transfer window', fmt: function (v) { return FB.money(v * 1e6); }, cats: asc.map(function (w) { return w.label; }),
       series: [{ name: 'Spent', data: asc.map(function (w) { return Math.round((w.spend || 0) / 1e5) / 10; }), color: QK.cssVar('--c-2') }, { name: 'Received', data: asc.map(function (w) { return Math.round((w.income || 0) / 1e5) / 10; }), color: QK.cssVar('--c-1') }], label: 'Spend and income by window' });
     FB.table(box.querySelector('#cl-wint'), [
       { key: 'label', label: 'Window', fmt: function (v, r) { return esc(v) + (r.complete ? '' : ' <span class="qk-muted" data-tip="From players\' transfer histories, still filling in">(partial)</span>'); } },

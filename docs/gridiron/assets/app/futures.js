@@ -51,7 +51,7 @@ function view(el, key, f) {
       '<p class="gi-cap">Full distributions: <a href="' + GI.standingsHref(null, 'wins') + '">Standings → Win totals</a>.</p>';
     GI.sortable(el);
     const dm = rows.filter(r => isNum(r.mo) && isNum(r.ko));
-    if (dm.length) GI.ch.dumbbell('fu-chart', { rows: dm.map(r => ({ label: GI.teamName(r.team) + ' o' + GI.num(r.line, 1), a: r.mo, b: r.ko, href: GI.teamHref(r.team) })), labelWidth: 170 });
+    if (dm.length) GI.ch.dumbbell('fu-chart', { rows: dm.map(r => ({ label: GI.teamName(r.team) + ' o' + GI.num(r.line, 1), a: r.mo, b: r.ko, href: GI.teamHref(r.team) })), labelWidth: 170, valName: 'Chance of the over' });
     return;
   }
   const player = !!AWARD[key];

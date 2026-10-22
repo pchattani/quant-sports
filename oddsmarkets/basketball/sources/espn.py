@@ -287,6 +287,19 @@ def _athlete_id(a: dict) -> str | None:
     return None
 
 
+def summary_injury_rows(raw: dict) -> dict[str, list[list]]:
+    """{team_id: [[player_id, status, date]]} from a summary's injury list as of the fetch; `date` is ESPN's time of
+    the entry's last update (e.g. "2026-10-22T04:56Z"). For the timestamped injury log (store.append_injury_log)."""
+    out: dict[str, list[list]] = {}
+    for t in raw.get("injuries") or []:
+        tid = str((t.get("team") or {}).get("id") or "")
+        for x in t.get("injuries") or []:
+            pid = _athlete_id(x.get("athlete") or {})
+            if tid and pid:
+                out.setdefault(tid, []).append([pid, x.get("status"), x.get("date")])
+    return out
+
+
 def _injury_detail(x: dict) -> str | None:
     det = x.get("details") or {}
     parts = [det.get("type"), det.get("location"), det.get("detail"), det.get("side")]

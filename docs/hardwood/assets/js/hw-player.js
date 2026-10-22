@@ -147,13 +147,13 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params) {
     QKC.line('#pp-career', { x: cs.map(x => HW.seasonLabel(L, x.season)), series: [
       { name: 'Total', data: cs.map(x => (isNum(x.hpm) ? Math.round(x.hpm * 10) / 10 : null)), color: col, width: 3 },
       { name: 'Offence', data: cs.map(x => (isNum(x.o) ? Math.round(x.o * 10) / 10 : null)), dash: true },
-      { name: 'Defence', data: cs.map(x => (isNum(x.d) ? Math.round(x.d * 10) / 10 : null)), dash: true }], yFmt: v2 => U.signed(v2, 1), ref: { y: 0 } });
+      { name: 'Defence', data: cs.map(x => (isNum(x.d) ? Math.round(x.d * 10) / 10 : null)), dash: true }], yFmt: v2 => U.signed(v2, 1), ref: { y: 0 }, xName: 'Season', yName: 'HPM per 100' });
   }
   if (log.length) {
     QKC.mount('#pp-log', T => ({
-      grid: { left: 8, right: 12, top: 12, bottom: 8, containLabel: true },
-      xAxis: QKC.axis(T, { type: 'category', data: log.map(r => HW.fmtDate(r.date, { year: false, weekday: false })), split: false, line: true }),
-      yAxis: QKC.axis(T, {}),
+      grid: { left: 8, right: 12, top: 28, bottom: 30, containLabel: true },
+      xAxis: QKC.axis(T, { type: 'category', data: log.map(r => HW.fmtDate(r.date, { year: false, weekday: false })), split: false, line: true, name: 'Game date', nameLocation: 'middle', nameGap: 26 }),
+      yAxis: QKC.axis(T, { name: 'Game score', nameAlign: 'left' }),
       tooltip: QKC.tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: ps => { const r = log[ps[0].dataIndex];
         return '<div style="font-weight:600">' + esc(HW.fmtDate(r.date, { year: false }) + ' ' + (r.home ? 'v ' : '@ ') + HW.teamAbbr(L, r.opp)) + '</div>' + QKC.tipRow(ps[0].color, 'Game score', U.f(r.game_score, 1)) +
           QKC.tipRow(T.other, 'Line', (r.pts || 0) + ' pts · ' + (r.reb || 0) + ' reb · ' + (r.ast || 0) + ' ast') + QKC.tipRow(T.other, '+/-', U.signed(r.pm, 0)); } }),
@@ -166,7 +166,8 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params) {
   if (cells.length) hexMap(document.getElementById('pp-shots'), cells);
   if (vrow) {
     const slots = val && Array.isArray(val.slots) && val.slots.length === 4 ? val.slots.map(x => String(x).replace(/^rest of /, 'Rest of ')) : ['Rest of season', '+1', '+2', '+3'];
-    QKC.bar('#pp-val', { cats: slots, series: [{ name: 'WAR', data: [vrow.w0, vrow.w1, vrow.w2, vrow.w3].map(x => (isNum(x) ? Math.round(x * 10) / 10 : 0)) }], labels: true, fmt: x => U.f(x, 1), colors: [col, col, col, col] });
+    QKC.bar('#pp-val', { cats: slots, series: [{ name: 'WAR', data: [vrow.w0, vrow.w1, vrow.w2, vrow.w3].map(x => (isNum(x) ? Math.round(x * 10) / 10 : 0)) }], labels: true, fmt: x => U.f(x, 1), colors: [col, col, col, col], valName: 'Projected WAR', catName: 'Season',
+      max: v => (v.max > 0 ? Math.ceil(v.max * 12) / 10 : 0) });
   }
   const ct = document.getElementById('pp-ctab');
   if (cs.length) {

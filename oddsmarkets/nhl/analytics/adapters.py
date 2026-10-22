@@ -383,8 +383,15 @@ def _ratings(ctx) -> dict | None:
 
 
 def _starter(g: dict, side: str) -> str | None:
+    """The starter of a game: the recorded one, else (before the start) the probable starter ESPN lists, confirmed or
+    projected, when its name maps to an NHL id; None = the model's usual starter for the team."""
     v = (g.get("goalies") or {}).get(side)
-    return an.sid(v.get("starter") if isinstance(v, dict) else v)
+    sid = an.sid(v.get("starter") if isinstance(v, dict) else v)
+    if sid:
+        return sid
+    pb = g.get("probables") if g.get("status") in (None, "scheduled") else None
+    r = (pb or {}).get(side) if isinstance(pb, dict) else None
+    return an.sid(r.get("id")) if isinstance(r, dict) and r.get("id") else None
 
 
 def game_prices(ctx, games: list[dict]) -> dict[str, dict]:
@@ -424,6 +431,22 @@ def game_prices(ctx, games: list[dict]) -> dict[str, dict]:
             tl.append(an.fnum(t.get("line") if isinstance(t, dict) else t))
         sub["total_line"] = [np.nan if v is None else v for v in tl]
         pf = GMm.predict_frame(sub, rd)
+        # the probable starters' effect: the same games priced with each team's usual starter
+        usual: dict = {}
+        has_pb = (sub["goalie_h"].notna() | sub["goalie_a"].notna()).to_numpy() & np.array(
+            [bool((gmap.get(str(x)) or {}).get("probables")) and (gmap.get(str(x)) or {}).get("status") in (None, "scheduled")
+             for x in sub["game_id"]])
+        if has_pb.any():
+            su = sub[has_pb].copy()
+            su["goalie_h"], su["goalie_a"] = None, None
+            try:
+                for r in GMm.predict_frame(su, rd).to_dict("records"):
+                    th = (rd.get("teams") or {}).get(r.get("home")) or {}
+                    ta = (rd.get("teams") or {}).get(r.get("away")) or {}
+                    usual[an.sid(r["game_id"])] = {"p_home": an.fnum(r.get("p_home")), "total": an.fnum(r.get("exp_total")),
+                                                   "goalies": {"home": an.sid(th.get("goalie")), "away": an.sid(ta.get("goalie"))}}
+            except Exception as exc:                             # noqa: BLE001
+                ctx.model_errors["game usual starters"] = f"{type(exc).__name__}: {exc}"
         for r in pf.to_dict("records"):
             gid = an.sid(r["game_id"])
             pmf = r.get("_total_pmf")
@@ -435,6 +458,9 @@ def game_prices(ctx, games: list[dict]) -> dict[str, dict]:
                         "total_line": an.fnum(r.get("total_line")), "home_goals": an.fnum(r.get("mu_h")),
                         "away_goals": an.fnum(r.get("mu_a")), "goalies": {"home": r.get("goalie_h"), "away": r.get("goalie_a")},
                         "total_dist": [round(float(v), 5) for v in pmf][:16] if pmf is not None else None, "source": "game"}
+            if gid in usual:
+                out[gid]["goalie_effect"] = {"usual": usual[gid]["goalies"], "p_home_usual": usual[gid]["p_home"],
+                                             "total_usual": usual[gid]["total"]}
     # the final-score matrix (game.predict) for the games just priced
     pred = getattr(GMm, "predict", None)
     for gid, pr in out.items():
@@ -458,7 +484,7 @@ def norm_price(r: dict) -> dict:
     for k, cs in PRICE_KEYS.items():
         v = next((r[c] for c in cs if r.get(c) is not None and not isinstance(r.get(c), (dict, list))), None)
         out[k] = an.fnum(v)
-    for k in ("score_dist", "scores", "dist", "goalies", "inputs", "source", "score_matrix", "total_dist"):
+    for k in ("score_dist", "scores", "dist", "goalies", "inputs", "source", "score_matrix", "total_dist", "goalie_effect"):
         if r.get(k) is not None:
             out[k] = r[k]
     return out

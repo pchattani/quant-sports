@@ -82,7 +82,7 @@ class DixonColesModel:
     """
 
     def __init__(self, xi: float = 0.0018, ridge: float = 1.0, analytic_grad: bool = False,
-                 fixed_rho: float | None = None) -> None:
+                 fixed_rho: float | None = None, prior_group=None) -> None:
         self.xi = xi       # daily decay constant
         self.ridge = ridge  # L2 regularization on attack/defense (stabilises sparse WC-only fits)
         # Opt-in: hand L-BFGS-B the exact gradient instead of finite differences. Same
@@ -98,6 +98,12 @@ class DixonColesModel:
         # `estimate_rho`). None (the default) fits rho as before, so the World Cup path and
         # its golden test are unchanged.
         self.fixed_rho = fixed_rho
+        # Opt-in (analytic gradient only): a hierarchical prior. `prior_group(team)` names the
+        # team's tier (or None); a tier's teams are shrunk toward its own attack and defence
+        # offsets (free parameters, stored as tier_attack_<g> / tier_defense_<g>), not toward 0,
+        # and a team the fit never saw takes its tier's offsets. The pooled club fit passes
+        # the cup tiers (docs/research/football_edge.md 3.5); None keeps every fit as before.
+        self.prior_group = prior_group
         self.params_: dict[str, float] = {}
         self.teams_: list[str] = []
         self.fitted_at_: Optional[datetime] = None
@@ -151,7 +157,12 @@ class DixonColesModel:
         #   [attack_0..attack_{n-1}, defense_0..defense_{n-1}, home_adv, rho]
         # Constraint: defense[anchor] = 0 (fixed via bounds)
         anchor_idx = team_idx[self._anchor_team]
-        x0 = np.zeros(2 * n + 2)
+        groups = [self.prior_group(t) if self.prior_group is not None else None for t in self.teams_]
+        tiers = sorted({g for g in groups if g})
+        G = len(tiers) if self.analytic_grad else 0
+        tier_of = np.array([tiers.index(g) if (G and g) else -1 for g in groups], dtype=int)
+        in_tier = tier_of >= 0
+        x0 = np.zeros(2 * n + 2 * G + 2)
         x0[-2] = 0.1  # home_adv initial guess
         x0[-1] = -0.1  # rho initial guess
         if self.fixed_rho is not None:
@@ -165,6 +176,7 @@ class DixonColesModel:
                 bounds.append((0.0, 0.0))  # defense anchor fixed to 0
             else:
                 bounds.append((None, None))
+        bounds += [(None, None)] * (2 * G)   # tier offsets
         bounds.append((None, None))   # home_adv
         bounds.append((-0.99, 0.0) if self.fixed_rho is None   # rho must be negative or zero
                       else (float(self.fixed_rho), float(self.fixed_rho)))
@@ -254,6 +266,9 @@ class DixonColesModel:
 
             def objective(x: np.ndarray):
                 attack, defense, home_adv, rho = x[:n], x[n:2 * n], x[-2], x[-1]
+                ta, td = x[2 * n:2 * n + G], x[2 * n + G:2 * n + 2 * G]
+                ca = attack - np.where(in_tier, ta[tier_of] if G else 0.0, 0.0)
+                cd = defense - np.where(in_tier, td[tier_of] if G else 0.0, 0.0)
                 eh = attack[home_teams] + defense[away_teams] + home_adv
                 ea = attack[away_teams] + defense[home_teams]
                 lh, la = np.exp(eh), np.exp(ea)
@@ -291,10 +306,13 @@ class DixonColesModel:
                 g[n:2 * n] = np.bincount(away_teams, w * gh, n) + np.bincount(home_teams, w * ga, n)
                 g[-2] = np.dot(w, gh)
                 g[-1] = np.dot(w, grho)
-                val = -np.dot(w, ll) + ridge * (np.dot(attack, attack) + np.dot(defense, defense))
+                val = -np.dot(w, ll) + ridge * (np.dot(ca, ca) + np.dot(cd, cd))
                 grad = -g
-                grad[:n] += 2 * ridge * attack
-                grad[n:2 * n] += 2 * ridge * defense
+                grad[:n] += 2 * ridge * ca
+                grad[n:2 * n] += 2 * ridge * cd
+                if G:
+                    grad[2 * n:2 * n + G] -= 2 * ridge * np.bincount(tier_of[in_tier], ca[in_tier], G)
+                    grad[2 * n + G:2 * n + 2 * G] -= 2 * ridge * np.bincount(tier_of[in_tier], cd[in_tier], G)
                 return val, grad
 
             result = minimize(
@@ -328,6 +346,9 @@ class DixonColesModel:
         self.params_.update({f"defense_{t}": float(defense[i]) for i, t in enumerate(self.teams_)})
         self.params_["home_adv"] = float(home_adv)
         self.params_["rho"] = float(rho)
+        for k, g in enumerate(tiers[:G]):
+            self.params_[f"tier_attack_{g}"] = float(x[2 * n + k])
+            self.params_[f"tier_defense_{g}"] = float(x[2 * n + G + k])
         self.fitted_at_ = datetime.now(timezone.utc)
         logger.info(
             "Dixon-Coles fitted on %d matches (%d teams), rho=%.4f, home_adv=%.4f",
@@ -341,6 +362,15 @@ class DixonColesModel:
     # ------------------------------------------------------------------
     # Prediction
     # ------------------------------------------------------------------
+
+    def team_params(self, team: str) -> tuple[float, float]:
+        """(attack, defence) of a team; one the fit never saw takes its tier's offsets (prior_group), else 0."""
+        if f"attack_{team}" in self.params_:
+            return self.params_[f"attack_{team}"], self.params_.get(f"defense_{team}", 0.0)
+        g = self.prior_group(team) if self.prior_group is not None else None
+        if g and f"tier_attack_{g}" in self.params_:
+            return self.params_[f"tier_attack_{g}"], self.params_[f"tier_defense_{g}"]
+        return 0.0, 0.0
 
     def predict_match(
         self,
@@ -356,10 +386,8 @@ class DixonColesModel:
         if not self.params_:
             raise RuntimeError("Model has not been fitted yet. Call fit() first.")
 
-        att_h = self.params_.get(f"attack_{home}", 0.0)
-        def_h = self.params_.get(f"defense_{home}", 0.0)
-        att_a = self.params_.get(f"attack_{away}", 0.0)
-        def_a = self.params_.get(f"defense_{away}", 0.0)
+        att_h, def_h = self.team_params(home)
+        att_a, def_a = self.team_params(away)
         home_adv = 0.0 if neutral else self.params_.get("home_adv", 0.0)
         rho = self.params_.get("rho", 0.0)
 

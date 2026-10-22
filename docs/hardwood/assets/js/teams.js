@@ -64,7 +64,7 @@ function renderTeams(el, params, state) {
       const paths = (season || {}).rating_paths || {};
       const ptr = ids.filter(id => (paths[id] || []).length).map(id => ({ type: 'scatter', mode: 'lines', name: fx.teamAbbr(L, id), x: paths[id].map(r => r.date), y: paths[id].map(r => r.net),
         line: { color: fx.teamColour(L, id), width: 1.6 }, hovertemplate: fx.esc(fx.teamName(L, id)) + ' %{x|%d %b}: %{y:+.1f}<extra></extra>' }));
-      if (ptr.length) fx.plot('tm-paths', ptr, fx.layout({ showlegend: true, legend: { font: { size: 9, color: fx.C.text2 } }, margin: { l: 45, r: 10, t: 10, b: 40 }, yaxis: { title: 'Net rating per 100', zeroline: true, zerolinecolor: '#6e7681' } }));
+      if (ptr.length) fx.plot('tm-paths', ptr, fx.layout({ showlegend: true, legend: { font: { size: 9, color: fx.C.text2 } }, margin: { l: 45, r: 10, t: 10, b: 40 }, xaxis: { title: 'Date' }, yaxis: { title: 'Net rating per 100', zeroline: true, zerolinecolor: '#6e7681' } }));
       else document.getElementById('tm-paths').innerHTML = fx.muted('No rating paths yet: they start with the first games.');
       // Metric table.
       const metrics = (teams && teams.metrics) || [];
@@ -157,7 +157,7 @@ function drawTeam(el, L, S, tid, cat, teams, season) {
       tr.push({ type: 'scatter', mode: 'markers', x: pts.map(g => byGame[g.game].date), y: pts.map(g => byGame[g.game].net), text: pts.map(g => (g.home ? 'v ' : '@ ') + fx.teamAbbr(L, g.opp) + ' ' + (g.res || '') + ' ' + (g.pts || 0) + '-' + (g.opp_pts || 0)),
         marker: { size: 6, color: pts.map(g => (String(g.res).charAt(0) === 'W' ? C.green : C.red)) }, hovertemplate: '%{text}<extra></extra>' });
     }
-    fx.plot('tp-path', tr, fx.layout({ margin: { l: 45, r: 10, t: 10, b: 40 }, yaxis: { title: 'Net per 100', zeroline: true, zerolinecolor: '#6e7681' } }));
+    fx.plot('tp-path', tr, fx.layout({ margin: { l: 45, r: 10, t: 10, b: 40 }, xaxis: { title: 'Date' }, yaxis: { title: 'Net per 100', zeroline: true, zerolinecolor: '#6e7681' } }));
   } else document.getElementById('tp-path').innerHTML = fx.muted('No rating path yet.');
 
   // Four factors.
@@ -246,7 +246,7 @@ function drawTeam(el, L, S, tid, cat, teams, season) {
   // Seed distribution.
   const seeds = sim.seed_dist || [];
   if (seeds.length) fx.plot('tp-seed', [{ type: 'bar', x: seeds.map((v, i) => i + 1), y: seeds, marker: { color: colour }, hovertemplate: 'seed %{x}: %{y:.1%}<extra></extra>' }],
-    fx.layout({ margin: { l: 45, r: 10, t: 10, b: 35 }, xaxis: { title: 'Seed', dtick: 1 }, yaxis: { tickformat: '.0%' } }));
+    fx.layout({ margin: { l: 45, r: 10, t: 10, b: 35 }, xaxis: { title: 'Seed', dtick: 1 }, yaxis: { title: 'Probability', tickformat: '.1%' } }));
   else document.getElementById('tp-seed').innerHTML = fx.muted('No simulation yet.');
 
   // Injuries.

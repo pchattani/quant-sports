@@ -368,12 +368,37 @@ function load(p0) {
   if (PENDING[p]) return PENDING[p];
   PENDING[p] = fetch('data/' + p, { cache: 'no-cache' })
     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(d => { learn(p, d); return d; })
+    .then(d => { lateMetrics(p, d); learn(p, d); return d; })
     .catch(err => { console.warn('payload missing:', p, err.message); return null; })
     .then(d => { if (d !== null) CACHE[p] = d; delete PENDING[p]; return d; });
   return PENDING[p];
 }
 function loadAll(paths) { return Promise.all(paths.map(load)); }
+/* Metrics fixed after a season's payload was built: rebound and rush attempts (reb60 / rush60) were 0 for every
+   skater until 22 Oct 2026, and a season keeps its payload until it is rebuilt. When every skater of a season has 0,
+   the values and percentiles are dropped (shown as missing, not as a 0 at the 50th percentile) and the metric says
+   why. Seasons rebuilt since carry real values and are left alone. */
+const LATE_METRICS = ['reb60', 'rush60'];
+function lateMetrics(p, d) {
+  if (!d || typeof d !== 'object') return;
+  try {
+    if (/^\d{8}\/skaters\.json$/.test(p) && d.players && typeof d.players === 'object') {
+      const ids = Object.keys(d.players);
+      if (!ids.length) return;
+      LATE_METRICS.forEach(m => {
+        const zero = ids.every(id => { const v = ((d.players[id] || {}).values || {})[m]; return v === 0 || v === null || v === undefined; });
+        if (!zero) return;
+        ids.forEach(id => { const x = d.players[id] || {}; [x.values, x.pct, x.pct_pos].forEach(o => { if (o && typeof o === 'object') delete o[m]; }); });
+        (d.metrics || []).forEach(x => { if (x && x.key === m) { x.unavailable = true; x.desc = (x.desc ? x.desc + ' ' : '') + 'Not available for this season yet (its payload predates the 22 Oct 2026 fix).'; } });
+      });
+    } else if (/^\d{8}\/lab\.json$/.test(p) && d.skaters && d.skaters.data) {
+      LATE_METRICS.forEach(m => {
+        const col = d.skaters.data[m];
+        if (Array.isArray(col) && col.length && col.every(v => v === 0 || v === null)) d.skaters.data[m] = col.map(() => null);
+      });
+    }
+  } catch (e) { /* a payload this does not understand is left as it is */ }
+}
 /* Forget cached payloads so the next load fetches them again (live refresh). */
 function uncache(paths) { (Array.isArray(paths) ? paths : [paths]).forEach(p0 => { const p = String(p0).replace(/^\/+/, '').replace(/^data\//, ''); delete CACHE[p]; }); }
 /* Re-fetch index.json (fresh live cards), then resolve with it. */

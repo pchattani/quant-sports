@@ -776,6 +776,37 @@ def parse_prematch(payload: dict, side_map: dict[str, str]) -> dict | None:
     return out
 
 
+# Pre-match line-ups (docs/MODELS.md 2.6): asked for league matches kicking off within this many minutes, until
+# Sofascore marks them confirmed, at most PREMATCH_MAX a run, from the run's one call budget.
+PREMATCH_LEAD_MIN = 100
+PREMATCH_MAX = 12
+
+
+def prematch_queue(store: dict, now: datetime | None = None, lead_min: int = PREMATCH_LEAD_MIN) -> list[tuple[str, dict]]:
+    """Matches not yet started whose kick-off is within `lead_min` minutes and whose line-ups are not stored as
+    confirmed, soonest first."""
+    from datetime import timedelta
+    now = now or datetime.now(timezone.utc)
+    have = store.get("prematch") or {}
+    out = []
+    for gid, m in (store.get("matches") or {}).items():
+        if not isinstance(m, dict) or m.get("status") in (STATUS_FINISHED, STATUS_LIVE) or m.get("superseded_by"):
+            continue
+        try:
+            ko = datetime.fromisoformat(str(m.get("date") or "").replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if ko.tzinfo is None:
+            ko = ko.replace(tzinfo=timezone.utc)
+        if not (now - timedelta(minutes=5) <= ko <= now + timedelta(minutes=lead_min)):
+            continue
+        if (have.get(str(gid)) or {}).get("confirmed"):
+            continue
+        out.append((str(gid), m))
+    out.sort(key=lambda kv: str(kv[1].get("date") or ""))
+    return out
+
+
 def fetch_prematch(store: dict, gid: str, meta: dict, budget: CallBudget | None = None,
                    now: datetime | None = None) -> bool:
     """

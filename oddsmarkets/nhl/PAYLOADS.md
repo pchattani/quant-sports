@@ -48,7 +48,8 @@ key `qr-notice-v1`.
 ## As built (builder D, `scripts/build_rink.py`, `oddsmarkets/nhl/analytics/`)
 Names above are kept; additions and the exact shapes the front end reads:
 - **GAME_CARD** also carries `ot`, `so`, `type` ("REG"/"PO"), `series` (playoff {round, series, game}). `goalies` = starter
-  pids (strings). `model` = {p_home, p_reg_home, p_ot, total, puck_line_home, source: "game" (live pricing) | "frozen" (last
+  pids (strings); before the start, with no starter recorded, ESPN's probable starters instead: {home|away: {pid (or null when
+  the name does not map), name, status "projected"|"confirmed", at, src "ESPN"}}. `model` = {p_home, p_reg_home, p_ot, total, puck_line_home, source: "game" (live pricing) | "frozen" (last
   pre-game price) | "walk_forward" (builder C's weekly-refitted ratings, completed games)}. `line` = {ml_home, ml_away,
   puck_line (home), total, src, open, close} with open/close {ml_home, ml_away, puck_line, total} | null. `market` is
   {p_home, sources} from Kalshi/Polymarket when quoted, else de-vigged from the store's moneylines with sources ["line"].
@@ -66,7 +67,9 @@ Names above are kept; additions and the exact shapes the front end reads:
   `pregame` = {model, source, market, market_detail (Kalshi/Polymarket spread/total/OT ladders), line, goalies,
   priced_at}; `model` = {p_home, p_reg_home, p_reg_away, p_ot, p_so, p_ot_home, puck_line_home (P(home -1.5 covers)),
   puck_line_away, total (expected), fair_total, p_over, total_line, home_goals, away_goals, total_dist [P(total = 0..15)],
-  score_dist {rows "home goals 0-6", cols "away goals 0-6", p 7x7 final-score matrix}, goalies, source}. Walk-forward and
+  score_dist {rows "home goals 0-6", cols "away goals 0-6", p 7x7 final-score matrix}, goalies, source, goalie_effect
+  (upcoming games priced with ESPN's probable starters: {usual {home, away pids}, p_home_usual, total_usual}, the same game
+  priced with each team's usual starter)}. Walk-forward and
   frozen prices carry the same keys minus score_dist when it was not computed.
 - **LINE** = {ids [pid], names, toi (min), games, xgf, xga, xgf_pct, cf_pct, gf, ga, xgf60, xga60} (+ team in lines.json).
 - **skaters.json / goalies.json**: METRIC also has `unit` (the stabilises_at unit: "5v5 minutes", "minutes", "shots",

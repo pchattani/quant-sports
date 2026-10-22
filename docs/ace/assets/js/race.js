@@ -27,7 +27,7 @@ function rankHeat(el, T, race, ids) {
     colorscale: [[0, '#1b2108'], [0.15, '#45520f'], [0.4, '#8fa22a'], [0.7, '#c4dc45'], [1, '#ecff9a']], zmin: 0,
     hovertemplate: '%{y} · finishes No. %{x}: %{z:.1%}<extra></extra>', xgap: 1, ygap: 1, showscale: false }], TA.layout({
     height: Math.max(260, list.length * 22 + 60),
-    xaxis: { side: 'top', type: 'category', fixedrange: true, tickfont: { size: narrow ? 8 : 10 }, title: '' },
+    xaxis: { side: 'top', type: 'category', fixedrange: true, tickfont: { size: narrow ? 8 : 10 }, title: 'Year-end rank' },
     yaxis: { autorange: 'reversed', type: 'category', fixedrange: true, automargin: true, tickfont: { size: 10 } },
     margin: { l: 90, r: 8, t: 26, b: 8 }
   }));
@@ -105,7 +105,7 @@ function render(el, params) {
     body.innerHTML = html;
     const items = Object.keys(no1).concat(Object.keys(m1).filter(p => !(p in no1))).sort((a, b) => (no1[b] || 0) - (no1[a] || 0)).slice(0, 8)
       .filter(p => (no1[p] || 0) >= 0.001 || (TA.isNum(m1[p]) && m1[p] >= 0.01)).map(p => ({ label: TA.playerSurname(T, p), p: no1[p] || 0, market: TA.isNum(m1[p]) ? m1[p] : null }));
-    TA.charts.probBars('rc-no1', items, { top: 8, emptyText: 'No year-end No. 1 odds.' });
+    TA.charts.probBars('rc-no1', items, { top: 8, xTitle: 'Year-end No. 1 probability', emptyText: 'No year-end No. 1 odds.' });
     rankHeat(document.getElementById('rc-heat'), T, race, ids.length ? ids : Object.keys(race.rank_dist || {}));
     TA.sortable(el);
     TA.setMeta((TA.isNum(race.n_sims) ? TA.num(race.n_sims, 0) + ' season simulations' : ''));

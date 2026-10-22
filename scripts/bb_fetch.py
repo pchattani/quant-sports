@@ -15,7 +15,8 @@ Games already fetched as final are skipped, and so are days already scanned in p
 seasons, so a stopped run picks up where it left off. `--refresh-current` re-scans the
 current season's days from two days ago to a week ahead, refetches games that finished in
 the last two days (late stat corrections) and fetches summaries for games in the next 36
-hours (lines and injuries), for the hourly job; it also reads the current rosters (one call per
+hours (lines and injuries; every change of a game's pre-game injury list is appended, with the fetch
+time, to <season>/injury_log.json.gz), for the hourly job; it also reads the current rosters (one call per
 team, at most every 20 hours) for players' dates of birth and positions (`--rosters` forces it).
 
     python scripts/bb_fetch.py --league nba --from 1997 --to 2027 --budget 60000
@@ -168,6 +169,8 @@ def games(c: espn.Client, league: str, s: dict, refresh: bool, now: datetime) ->
             todo.append((gid, g))
     todo.sort(key=lambda kv: kv[1].get("date") or "", reverse=True)
     n_pbp = 0
+    inj_log = st.load_injury_log(league, season) if current else None
+    n_inj = 0
     t0 = time.monotonic()
     for k, (gid, g) in enumerate(todo, 1):
         raw = espn.summary(c, league, gid)
@@ -178,6 +181,10 @@ def games(c: espn.Client, league: str, s: dict, refresh: bool, now: datetime) ->
             s["games"].pop(gid, None)
             continue
         st.merge_game(s, rec)
+        if inj_log is not None and rec.get("status") == "pre":
+            # timestamped pre-game injury history (ESPN keeps none): every change, stamped with this fetch
+            n_inj += st.append_injury_log(inj_log, gid, datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                                          espn.summary_injury_rows(raw))
         for tid, trec in espn.teams_from_summary(raw).items():
             old = s["teams"].setdefault(tid, trec)
             for kk, v in trec.items():
@@ -198,6 +205,9 @@ def games(c: espn.Client, league: str, s: dict, refresh: bool, now: datetime) ->
             logger.info("%s %d games: %d/%d (%d with pbp), %.2f s a game, %d calls used",
                         league, season, k, len(todo), n_pbp, rate, c.used)
     _complete_through(s)
+    if n_inj:
+        st.save_injury_log(league, season, inj_log)
+        logger.info("%s %d injury log: %d new snapshot(s)", league, season, n_inj)
     logger.info("%s %d games: %d summaries this run (%d with pbp), %d calls used", league, season, len(todo), n_pbp, c.used)
 
 

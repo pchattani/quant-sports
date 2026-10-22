@@ -144,7 +144,7 @@ function drawLines(T, E) {
         text: rows.map(r => (r[2] ? r[2] : '')), hovertemplate: '%{x}: %{y:.0f}' + (surf === 'all' ? ' (%{text})' : '') + '<extra>' + k.esc(k.surname(k.name(T, pid))) + '</extra>' });
     });
     if (!traces.length) { node.innerHTML = k.muted('No Elo history for these players.'); return; }
-    k.plot(node, traces, k.layout(Object.assign(k.legendTop(), { margin: { l: 50, r: 10, t: 36, b: 36 }, xaxis: { type: 'date' }, yaxis: { title: (surf === 'all' ? 'Overall' : k.SURF_LABEL[surf]) + ' Elo' } })));
+    k.plot(node, traces, k.layout(Object.assign(k.legendTop(), { margin: { l: 50, r: 10, t: 36, b: 36 }, xaxis: { type: 'date', title: 'Date' }, yaxis: { title: (surf === 'all' ? 'Overall' : k.SURF_LABEL[surf]) + ' Elo' } })));
     document.getElementById('el-chart-note').innerHTML = (surf === 'all' ? 'Overall Elo after each match; hover shows the surface the match was on. ' : k.SURF_LABEL[surf] + ' Elo from the career files (it moves only on ' + surf + ' matches, so it is flat between them). ') +
       (missing.length ? 'No history on file for ' + missing.map(p => k.esc(k.name(T, p))).join(', ') + '. ' : '') + 'Click a name above the chart to remove it.';
   });

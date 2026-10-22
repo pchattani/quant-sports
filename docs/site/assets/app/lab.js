@@ -639,8 +639,8 @@ function buildPlayers(el, P) {
       var rts = chron.map(function (r) { return isNum(r.rt) ? r.rt : null; });
       rser.push({ name: nm, color: c, data: rts.map(function (v, j) { var w = rts.slice(Math.max(0, j - 4), j + 1).filter(isNum); return w.length ? Math.round(mean(w) * 100) / 100 : null; }) });
     });
-    QKC.line(el.querySelector('#lb-evo'), { x: xs, xLabel: function (v) { return 'Match ' + v; }, series: ser, yFmt: function (v) { return num(v, 1); }, yMin: 0, label: 'Cumulative goals and xG' });
-    QKC.line(el.querySelector('#lb-rt'), { x: xs, xLabel: function (v) { return 'Match ' + v; }, series: rser, yFmt: function (v) { return num(v, 2); }, yScale: true, label: 'Five-match rolling rating' });
+    QKC.line(el.querySelector('#lb-evo'), { x: xs, xLabel: function (v) { return 'Match ' + v; }, series: ser, yFmt: function (v) { return num(v, 1); }, yMin: 0, xName: 'Match', yName: 'Cumulative goals and xG', label: 'Cumulative goals and xG' });
+    QKC.line(el.querySelector('#lb-rt'), { x: xs, xLabel: function (v) { return 'Match ' + v; }, series: rser, yFmt: function (v) { return num(v, 2); }, yScale: true, xName: 'Match', yName: 'Rating, 5-match average', label: 'Five-match rolling rating' });
   } else { FB.set('lb-evo', FB.muted('No match logs this season.')); FB.set('lb-rt', ''); }
 
   // shots
@@ -657,7 +657,7 @@ function buildPlayers(el, P) {
   eras = eras.slice(-10);
   if (eras.length) {
     var yv = function (x, e, k) { var y = (x.doc.years || []).filter(function (r) { return r.era === e; })[0]; return y ? (y[k] || 0) : null; };
-    QKC.bar(el.querySelector('#lb-years'), { legend: true, cats: eras, fmt: function (v) { return num(v, 0); },
+    QKC.bar(el.querySelector('#lb-years'), { legend: true, cats: eras, catName: 'Season', valName: 'Goals plus assists', fmt: function (v) { return num(v, 0); },
       series: [{ name: short(A) + ' G+A', color: QK.cssVar('--c-1'), data: eras.map(function (e) { var g = yv(A, e, 'g'); return g === null ? null : g + yv(A, e, 'a'); }) },
         { name: short(B) + ' G+A', color: QK.cssVar('--c-2'), data: eras.map(function (e) { var g = yv(B, e, 'g'); return g === null ? null : g + yv(B, e, 'a'); }) }], label: 'Goals plus assists by season' });
   } else FB.set('lb-years', FB.muted('No season history.'));
@@ -960,7 +960,7 @@ function buildClubs(el, K, pool) {
     var cp = 0, cx = 0;
     var c = QK.cssVar(i ? '--c-2' : '--c-1');
     QKC.line(box, { x: series.map(function (r) { return r.label; }), yMin: 0, yFmt: function (v) { return num(v, 0); },
-      series: [{ name: 'Points', color: c, data: series.map(function (r) { cp += r.pts || 0; return cp; }) }, { name: 'xPts', color: c, dash: true, data: series.map(function (r) { cx += r.xpts || 0; return Math.round(cx * 10) / 10; }) }], label: 'Points against xPts' });
+      series: [{ name: 'Points', color: c, data: series.map(function (r) { cp += r.pts || 0; return cp; }) }, { name: 'xPts', color: c, dash: true, data: series.map(function (r) { cx += r.xpts || 0; return Math.round(cx * 10) / 10; }) }], xName: rs && rs.length ? 'Round' : 'Match', yName: 'Cumulative points', label: 'Points against xPts' });
   });
   if (bandsRows.length && !unsim) FB.table(el.querySelector('#lb-bands'), [
     { key: 'label', label: 'Outcome', sort: false },

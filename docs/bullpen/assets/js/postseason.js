@@ -130,7 +130,7 @@ function render(el, params) {
     drawSel();
     const pt = post.teams || {};
     const items = Object.keys(pt).map(t => ({ label: BP.teamAbbr(t), p: pt[t].p_ws, market: ws.probs[t], colour: BP.teamColour(t) })).sort((a, b) => b.p - a.p);
-    BP.charts.probBars('ps-ws', items, { modelName: 'Model', marketName: 'Market', top: 12 });
+    BP.charts.probBars('ps-ws', items, { modelName: 'Model', marketName: 'Market', top: 12, xTitle: 'World Series probability' });
     BP.sortable(body);
     BP.setMeta(post.sims ? BP.int(post.sims) + ' bracket simulations' : '');
   });

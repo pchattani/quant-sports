@@ -503,3 +503,21 @@ def test_action_logged_before_same_clock_sub_out(builder):
     assert ev.lineup_fixes == 0
     st = pbp.stints(g, ev)
     assert "a6" in st[-1]["away"] and "a2" not in st[-1]["away"]
+
+
+def test_injury_log_appends_changes_only(tmp_path, monkeypatch):
+    monkeypatch.setenv("HARDWOOD_DATA", str(tmp_path))
+    raw = {"injuries": [{"team": {"id": "13"}, "injuries": [
+        {"status": "Out", "date": "2026-10-22T04:56Z", "athlete": {"id": "5060631"}},
+        {"status": "Day-To-Day", "date": "2026-10-21T18:00Z", "athlete": {"links": [{"href": "https://x/id/42/y"}]}}]}]}
+    rows = espn.summary_injury_rows(raw)
+    assert rows == {"13": [["5060631", "Out", "2026-10-22T04:56Z"], ["42", "Day-To-Day", "2026-10-21T18:00Z"]]}
+    log = store.load_injury_log("nba", 2027)
+    assert log == {}
+    assert store.append_injury_log(log, "401", "2026-10-22T10:00:00Z", rows)
+    assert not store.append_injury_log(log, "401", "2026-10-22T11:00:00Z", rows)        # unchanged: not stored
+    rows["13"][1][1] = "Out"
+    assert store.append_injury_log(log, "401", "2026-10-22T12:00:00Z", rows)
+    assert [s[0] for s in log["401"]] == ["2026-10-22T10:00:00Z", "2026-10-22T12:00:00Z"]
+    store.save_injury_log("nba", 2027, log)
+    assert store.load_injury_log("nba", 2027) == log

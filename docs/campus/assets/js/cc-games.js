@@ -290,7 +290,7 @@ CC.route('game', function (el, p) {
           periods: breaks(L, g.season, tMax), tMin: 0, tMax: Math.max(tMax, fb ? 60 : (L === 'mbb' ? 40 : 40)), tFmt: function (v) { return Math.round(v) + '′'; }, tLabel: function (v) { return clockLabel(L, g.season, v); },
           compare: cmp ? { name: 'ESPN', t: cmp.map(function (x) { return x[0]; }), p: cmp.map(function (x) { return x[1]; }) } : null, step: true });
       }
-      if (hasFlow) QKC.line('#gc-flow', { xType: 'value', series: [{ name: 'Home lead', data: flow, area: true, color: CC.tcol(L, g.home) }], step: 'end', yFmt: function (v) { return CC.signed(v, 0); }, xFmt: function (v) { return Math.round(v) + '′'; }, xLabel: function (v) { return clockLabel(L, g.season, v); }, ref: { y: 0 }, endLabels: false });
+      if (hasFlow) QKC.line('#gc-flow', { xType: 'value', xName: 'Game time', yName: 'Lead (pts)', series: [{ name: 'Home lead', data: flow, area: true, color: CC.tcol(L, g.home) }], step: 'end', yFmt: function (v) { return CC.signed(v, 0); }, xFmt: function (v) { return Math.round(v) + '′'; }, xLabel: function (v) { return clockLabel(L, g.season, v); }, ref: { y: 0 }, endLabels: false });
     } else wpNode.innerHTML = U.card('Win probability', '', QK.empty(st === 'pre' ? 'Not started' : 'No play-by-play', st === 'pre' ? 'The live curve appears once the game starts.' : 'ESPN has no play-by-play for this game.'));
     if (fb && (g.drives || g.epa)) {
       var dn = QK.$('#gc-drives', el);
@@ -307,7 +307,7 @@ CC.route('game', function (el, p) {
         U.wire(en);
         var cols2 = [CC.tcol(L, g.away), CC.tcol(L, g.home)];
         if (QK.color.contrast(cols2[0], cols2[1]) < 1.6) cols2 = [QK.cssVar('--c-2'), QK.cssVar('--c-1')];
-        QKC.bar('#gc-epa-ch', { cats: ['EPA/play', 'Pass', 'Rush'], legend: true, fmt: function (v) { return CC.signed(v, 2); },
+        QKC.bar('#gc-epa-ch', { cats: ['EPA/play', 'Pass', 'Rush'], legend: true, valName: 'EPA per play', fmt: function (v) { return CC.signed(v, 2); },
           series: [{ name: CC.tabbr(L, g.away), data: [E[g.away].epa_play, E[g.away].pass_epa, E[g.away].rush_epa], color: cols2[0] }, { name: CC.tabbr(L, g.home), data: [E[g.home].epa_play, E[g.home].pass_epa, E[g.home].rush_epa], color: cols2[1] }] });
       }
       U.wire(dn);

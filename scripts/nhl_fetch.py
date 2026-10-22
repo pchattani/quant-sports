@@ -466,6 +466,13 @@ def espn_phase(c: Client, s: dict, refresh: bool, now: datetime) -> int:
                 g["espn_id"] = r["id"]
                 if r.get("attendance"):
                     g["attendance"] = r["attendance"]
+                # probable starting goalies with the capture time, before the start only (ESPN rewrites them to the
+                # actual starters afterwards); no extra call: the scoreboard carries them
+                stt = _dt(g.get("start"))
+                if (r.get("probables") and r.get("state") == "pre" and g.get("status") == "scheduled"
+                        and stt is not None and now < stt):
+                    g["probables"] = espn.update_probables(g.get("probables"), r["probables"], st.now(), s.get("players"),
+                                                           {"home": g.get("home"), "away": g.get("away")})
             days_meta[day] = {"at": st.now(), "events": len(refs), "matched": len(m)}
         for gid in games:
             g = s["games"][gid]                   # fresh: save_owned replaces the game dicts

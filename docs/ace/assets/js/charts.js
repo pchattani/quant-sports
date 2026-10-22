@@ -288,8 +288,8 @@ function wpChart(el, wp, opts) {
   if (TA.isNum(o.market)) shapes.push({ type: 'line', x0: rows[0][0] - 0.4, x1: rows[0][0] + 0.4, y0: o.market, y1: o.market, line: { color: C.text, width: 3 } });
   TA.plot(el, traces, TA.layout({
     height: o.height || 300, shapes: shapes, annotations: ann,
-    xaxis: { title: '', showgrid: false, fixedrange: true, zeroline: false, tickfont: { size: 9 } },
-    yaxis: { range: [0, 1], tickvals: [0, 0.25, 0.5, 0.75, 1], ticktext: [n2 + ' 100%', '75%', '50%', '75%', n1 + ' 100%'], fixedrange: true, automargin: true },
+    xaxis: { title: 'Game', showgrid: false, fixedrange: true, zeroline: false, tickfont: { size: 9 } },
+    yaxis: { title: 'Win probability', range: [0, 1], tickvals: [0, 0.25, 0.5, 0.75, 1], ticktext: [n2 + ' 100%', '75%', '50%', '75%', n1 + ' 100%'], fixedrange: true, automargin: true },
     margin: { l: 80, r: 10, t: 22, b: 30 }
   }));
 }
@@ -317,8 +317,8 @@ function setDist(el, sets, opts) {
       line: { width: keys.map(k => (k === o.actual ? 3 : 0)), color: C.text } },
     hovertemplate: '%{x}: %{y:.1%}<extra></extra>' }], TA.layout({
     height: o.height || 230, bargap: 0.25,
-    xaxis: { type: 'category', fixedrange: true, tickfont: { size: 10 } },
-    yaxis: { tickformat: '.0%', fixedrange: true, range: [0, Math.max.apply(null, keys.map(k => sets[k])) * 1.25] },
+    xaxis: { title: 'Set score', type: 'category', fixedrange: true, tickfont: { size: 10 } },
+    yaxis: { title: 'Probability', tickformat: '.0%', fixedrange: true, range: [0, Math.max.apply(null, keys.map(k => sets[k])) * 1.25] },
     margin: { l: 44, r: 10, t: 14, b: 40 }
   }));
 }
@@ -335,7 +335,7 @@ function gamesDist(el, dist, opts) {
     hovertemplate: (o.signed ? '%{x:+d}' : '%{x}') + ' ' + esc(o.unit || 'games') + ': %{y:.1%}<extra></extra>' }], TA.layout({
     height: o.height || 220, bargap: 0.12, shapes: shapes,
     xaxis: { title: o.xTitle || '', fixedrange: true, dtick: ks.length > 24 ? 4 : 2, tickformat: o.signed ? '+d' : 'd' },
-    yaxis: { tickformat: '.0%', fixedrange: true },
+    yaxis: { title: o.yTitle || 'Probability', tickformat: '.0%', fixedrange: true },
     margin: { l: 44, r: 10, t: 10, b: o.xTitle ? 42 : 28 }
   }));
 }
@@ -353,7 +353,7 @@ function eloLines(el, series, opts) {
       hovertemplate: esc(s.name || '') + ' · %{x|%d %b %Y}: %{y:.0f}<extra></extra>' };
   }), TA.layout({
     height: o.height || 320, showlegend: list.length > 1, legend: { orientation: 'h', y: -0.18, font: { size: 10, color: C.text2 } },
-    xaxis: { type: 'date', fixedrange: false }, yaxis: { title: o.yTitle || 'Elo', fixedrange: true },
+    xaxis: { type: 'date', fixedrange: false, title: 'Date' }, yaxis: { title: o.yTitle || 'Elo', fixedrange: true },
     margin: { l: 55, r: 15, t: 10, b: 45 }
   }));
 }
@@ -430,7 +430,7 @@ function probBars(el, items, opts) {
   }
   TA.plot(el, traces, TA.layout({
     height: o.height || Math.max(220, list.length * 28 + 50), bargap: 0.3,
-    xaxis: { tickformat: '.0%', range: [0, Math.min(1.08, max * 1.25 + 0.02)], fixedrange: true },
+    xaxis: { title: o.xTitle || 'Probability', tickformat: '.0%', range: [0, Math.min(1.08, max * 1.25 + 0.02)], fixedrange: true },
     yaxis: { automargin: true, fixedrange: true, tickfont: { size: 11 } },
     showlegend: traces.length > 1, legend: { orientation: 'h', y: -0.12, font: { color: C.text2 } },
     margin: { l: 110, r: 50, t: 10, b: 35 }

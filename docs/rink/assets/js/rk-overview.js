@@ -93,15 +93,15 @@ function render(el, params) {
     if (hasMk) {
       const dr = cupRows.map(r => ({ label: RK.teamName(r.team), a: r.model, b: isNum(r.market) ? r.market : r.model, href: RK.teamHref(r.team), sub: isNum(r.market) ? 'Gap ' + QK.fmt.pp(r.model - r.market) : 'no market price' }));
       const mx = Math.max.apply(null, dr.map(r => Math.max(r.a, r.b)));
-      QKC.dumbbell('#ov-cup', { rows: dr, aName: 'Model', bName: 'Market', min: 0, max: Math.min(1, Math.ceil(mx * 20) / 20 + 0.02), labelWidth: 150 });
+      QKC.dumbbell('#ov-cup', { rows: dr, aName: 'Model', bName: 'Market', min: 0, max: Math.min(1, Math.ceil(mx * 20) / 20 + 0.02), labelWidth: 150, valName: 'Chance of winning the Cup' });
     } else {
-      QKC.bar('#ov-cup', { cats: cupRows.map(r => RK.teamName(r.team)), series: [{ name: 'Model', data: cupRows.map(r => r.model) }], horizontal: true, labels: true, fmt: v => U.pct(v), colors: cupRows.map(r => RK.teamColourRaw(r.team)), hrefs: cupRows.map(r => RK.teamHref(r.team)) });
+      QKC.bar('#ov-cup', { cats: cupRows.map(r => RK.teamName(r.team)), series: [{ name: 'Model', data: cupRows.map(r => r.model) }], horizontal: true, labels: true, fmt: v => U.pct(v), colors: cupRows.map(r => RK.teamColourRaw(r.team)), hrefs: cupRows.map(r => RK.teamHref(r.team)), valName: 'Chance of winning the Cup' });
     }
 
     // power
     const pw = rows.filter(r => isNum(r.rating)).sort((a, b) => b.rating - a.rating);
     if (pw.length) {
-      QKC.bar('#ov-power', { cats: pw.map(r => r.team), series: [{ name: 'Rating', data: pw.map(r => r.rating) }], horizontal: true, diverging: true, fmt: v => U.signed(v, 2), hrefs: pw.map(r => RK.teamHref(r.team)), labelWidth: 44 });
+      QKC.bar('#ov-power', { cats: pw.map(r => r.team), series: [{ name: 'Rating', data: pw.map(r => r.rating) }], horizontal: true, diverging: true, fmt: v => U.signed(v, 2), hrefs: pw.map(r => RK.teamHref(r.team)), labelWidth: 44, valName: 'Expected goal difference a game' });
     } else el.querySelector('#ov-power').innerHTML = QK.empty('No ratings yet', 'Ratings arrive with the first games.');
 
     // results v process
@@ -114,7 +114,7 @@ function render(el, params) {
     const pre = (idx.today || []).concat(idx.upcoming || []).filter(g => U.status(g) === 'pre' && g.model && isNum(g.model.p_home) && g.market && isNum(g.market.p_home)).slice(0, 10);
     if (pre.length) {
       el.querySelector('#ov-mvm').innerHTML = U.chart('ov-mvm-c', Math.max(220, 34 * pre.length + 50), 'Home win probability, model against market');
-      QKC.dumbbell('#ov-mvm-c', { rows: pre.map(g => ({ label: RK.teamAbbr(g.away) + ' @ ' + RK.teamAbbr(g.home), a: g.model.p_home, b: g.market.p_home, href: RK.gameHref(g.game_id), sub: RK.fmtDate(g.start || g.date, { year: false, time: true }) + ' · ' + RK.srcLabel(g.market.sources) })), aName: 'Model', bName: 'Market', labelWidth: 90 });
+      QKC.dumbbell('#ov-mvm-c', { rows: pre.map(g => ({ label: RK.teamAbbr(g.away) + ' @ ' + RK.teamAbbr(g.home), a: g.model.p_home, b: g.market.p_home, href: RK.gameHref(g.game_id), sub: RK.fmtDate(g.start || g.date, { year: false, time: true }) + ' · ' + RK.srcLabel(g.market.sources) })), aName: 'Model', bName: 'Market', labelWidth: 90, valName: 'Home win probability' });
     } else el.querySelector('#ov-mvm').innerHTML = QK.empty('No pre-game prices', 'Model-v-market appears for games that have not started.');
 
     // playoff race + standings snapshot
@@ -122,8 +122,8 @@ function render(el, params) {
     const drawConf = c => {
       const rs = conf(c).filter(r => isNum(r.p_playoffs)).sort((a, b) => b.p_playoffs - a.p_playoffs);
       QKC.mount('#ov-po', T => ({
-        grid: { left: 8, right: 46, top: 8, bottom: 8, containLabel: true },
-        xAxis: QKC.axis(T, { min: 0, max: 1, fmt: v => Math.round(v * 100) + '%' }),
+        grid: { left: 8, right: 46, top: 8, bottom: 30, containLabel: true },
+        xAxis: QKC.axis(T, { min: 0, max: 1, fmt: v => Math.round(v * 100) + '%', name: 'Playoff probability', nameLocation: 'middle', nameGap: 26 }),
         yAxis: (function () { const a = QKC.axis(T, { type: 'category', data: rs.map(r => RK.teamName(r.team)), split: false, inverse: true }); a.axisLabel.color = T.ink2; a.axisLabel.width = 150; a.axisLabel.overflow = 'truncate'; return a; })(),
         tooltip: QKC.tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: ps => '<b>' + esc(ps[0].name) + '</b>' + QKC.tipRow(ps[0].color, 'Playoffs', U.pct(ps[0].value)) }),
         series: [{ type: 'bar', barMaxWidth: 14, data: rs.map(r => ({ value: r.p_playoffs, href: RK.teamHref(r.team), itemStyle: { color: QK.color.ensure(RK.teamColourRaw(r.team) || T.model, T.s1, 3), borderRadius: [0, 4, 4, 0] } })),

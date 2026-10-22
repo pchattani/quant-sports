@@ -120,20 +120,20 @@ function render(el, params, state) {
     if (seasons.length) {
       if (goalie) {
         QKC.mount('#pp-seasons', T => ({
-          grid: { left: 8, right: 8, top: 30, bottom: 8, containLabel: true },
+          grid: { left: 8, right: 8, top: 48, bottom: 30, containLabel: true },
           legend: { top: 0, left: 0, textStyle: { color: T.ink2 }, itemWidth: 12, itemHeight: 8 },
-          xAxis: QKC.axis(T, { type: 'category', data: sx, split: false, line: true }),
-          yAxis: [QKC.axis(T, { fmt: v => v.toFixed(0) }), QKC.axis(T, { fmt: v => v.toFixed(3), split: false, scale: true })],
+          xAxis: QKC.axis(T, { type: 'category', data: sx, split: false, line: true, name: 'Season', nameLocation: 'middle', nameGap: 26 }),
+          yAxis: [QKC.axis(T, { fmt: v => v.toFixed(0), name: 'Goals saved above expected', nameAlign: 'left' }), QKC.axis(T, { fmt: v => v.toFixed(3), split: false, scale: true, name: 'Save %', nameAlign: 'right' })],
           tooltip: QKC.tooltip(T, { trigger: 'axis' }),
           series: [{ type: 'bar', name: 'GSAx', data: seasons.map(s => ({ value: (s.values || {}).gsax, itemStyle: { color: (s.values || {}).gsax >= 0 ? T.pos : T.neg, borderRadius: 3 } })), barMaxWidth: 26 },
             { type: 'line', name: 'Save %', yAxisIndex: 1, data: seasons.map(s => (s.values || {}).sv_pct), lineStyle: { color: T.market, width: 2 }, itemStyle: { color: T.market }, symbolSize: 6 }]
         }), { label: 'Goalie seasons' });
       } else {
         QKC.mount('#pp-seasons', T => ({
-          grid: { left: 8, right: 8, top: 30, bottom: 8, containLabel: true },
+          grid: { left: 8, right: 8, top: 48, bottom: 30, containLabel: true },
           legend: { top: 0, left: 0, textStyle: { color: T.ink2 }, itemWidth: 12, itemHeight: 8 },
-          xAxis: QKC.axis(T, { type: 'category', data: sx, split: false, line: true }),
-          yAxis: [QKC.axis(T, { fmt: v => v.toFixed(0) }), QKC.axis(T, { split: false, scale: true })],
+          xAxis: QKC.axis(T, { type: 'category', data: sx, split: false, line: true, name: 'Season', nameLocation: 'middle', nameGap: 26 }),
+          yAxis: [QKC.axis(T, { fmt: v => v.toFixed(0), name: 'Points', nameAlign: 'left' }), QKC.axis(T, { split: false, scale: true, name: 'Index (100 = average)', nameAlign: 'right' })],
           tooltip: QKC.tooltip(T, { trigger: 'axis' }),
           series: [{ type: 'bar', name: 'Points', barMaxWidth: 26, data: seasons.map(s => ({ value: (s.values || {}).p, itemStyle: { color: QK.color.ensure(RK.teamColourRaw(s.team) || T.model, T.s1, 3), borderRadius: [3, 3, 0, 0] } })) },
             { type: 'line', name: 'Points/60 index', yAxisIndex: 1, data: seasons.map(s => (s.plus || {}).p60), lineStyle: { color: T.market, width: 2 }, itemStyle: { color: T.market }, symbolSize: 6, connectNulls: true },
@@ -147,9 +147,9 @@ function render(el, params, state) {
     if (lg.length && body.querySelector('#pp-log')) {
       const lx = lg.map(r => RK.fmtDate(r.date, { year: false, weekday: false }));
       QKC.mount('#pp-log', T => ({
-        grid: { left: 8, right: 8, top: 12, bottom: 8, containLabel: true },
-        xAxis: QKC.axis(T, { type: 'category', data: lx, split: false, line: true }),
-        yAxis: QKC.axis(T, { fmt: v => v.toFixed(1) }),
+        grid: { left: 8, right: 8, top: 28, bottom: 30, containLabel: true },
+        xAxis: QKC.axis(T, { type: 'category', data: lx, split: false, line: true, name: 'Game date', nameLocation: 'middle', nameGap: 26 }),
+        yAxis: QKC.axis(T, { fmt: v => v.toFixed(1), name: goalie ? 'Goals saved above expected' : 'Game score and ixG', nameAlign: 'left' }),
         tooltip: QKC.tooltip(T, { trigger: 'axis', formatter: ps => { const r = lg[ps[0].dataIndex]; return '<b>' + esc((r.home ? 'v ' : '@ ') + r.opp) + ' · ' + esc(r.result || '') + '</b>' + ps.map(q => QKC.tipRow(q.color, q.seriesName, U.f(q.value, 2))).join('') + (goalie ? QKC.tipRow(T.other, 'Saves', (r.sa - r.ga) + '/' + r.sa) : QKC.tipRow(T.other, 'G-A', r.g + '-' + r.a)); } }),
         series: goalie ? [{ type: 'bar', name: 'GSAx', data: lg.map(r => ({ value: r.gsax, itemStyle: { color: r.gsax >= 0 ? T.pos : T.neg, borderRadius: 3 } })), barMaxWidth: 18 }]
           : [{ type: 'bar', name: 'Game score', data: lg.map(r => ({ value: r.gs, itemStyle: { color: QKC.hexA(tc.charAt(0) === '#' ? tc : T.model, 0.85), borderRadius: 3 } })), barMaxWidth: 18 },

@@ -265,3 +265,13 @@ body.qk { font-size: var(--fs-md); }
 .hw-tx:last-child { border-bottom: 0; }
 .hw-tx .d { color: var(--ink-3); font: 500 var(--fs-xs) var(--font-num); }
 @media (max-width: 720px) { .hw-tx { grid-template-columns: 56px minmax(0, 1fr); } }
+
+/* Game centre: availability before tip-off (hw-games.js availabilityHTML) */
+.hw-av { gap: 0; }
+.hw-av-head { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line-1); background: var(--s-2); }
+.hw-av-head .v { margin-left: auto; font: 600 var(--fs-sm) var(--font-num); white-space: nowrap; }
+.hw-av-p { min-width: 0; flex: 1 1 auto; }
+.hw-av-p .s { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hw-av .hw-list .hw-inj { flex: none; }
+.hw-av .hw-list .v { margin-left: 0; min-width: 2.5em; text-align: right; }
+.hw-inj.q { color: var(--st-warn); }

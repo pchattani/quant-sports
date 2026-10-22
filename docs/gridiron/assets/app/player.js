@@ -164,7 +164,7 @@ GI.route('player', function (el, params) {
       GI.set('pp-val', GI.kpis([GI.kpi('Projected value', GI.num(valn.value, 0), 'band ' + GI.num(valn.lo, 0) + '–' + GI.num(valn.hi, 0)), GI.kpi('Wins', GI.signed(valn.wins, 2), 'the value in wins'),
         GI.kpi('This season, per game', GI.signed(valn.now_pg, 2), 'points above replacement'), GI.kpi('Level now', GI.signed(valn.lvl, 2), 'per game, this season\'s form')], 'gi-kpis-4'));
       const seasonsV = (res[2].seasons || []).slice(0, (valn.proj || []).length);
-      if ((valn.proj || []).length) GI.ch.bar('pp-valc', { cats: seasonsV.map(String), series: [{ name: 'Per game', data: valn.proj }, { name: 'Expected games', data: valn.games || [] }], legend: true, fmt: v => GI.num(v, 1), label: 'Projected value per game and games by season' });
+      if ((valn.proj || []).length) GI.ch.bar('pp-valc', { cats: seasonsV.map(String), series: [{ name: 'Per game', data: valn.proj }, { name: 'Expected games', data: valn.games || [] }], legend: true, fmt: v => GI.num(v, 1), catName: 'Season', valName: 'Value per game; games', label: 'Projected value per game and games by season' });
     }
     if ((c.similar || []).length) {
       const sim = c.similar.map(r => (Array.isArray(r) ? { pid: String(r[0]), name: r[1], team: r[2], s: r[3] } : { pid: String(r.pid), name: r.name, team: r.team, s: first(r.sim, r.score) }));
@@ -192,21 +192,21 @@ GI.route('player', function (el, params) {
     }
     if (document.getElementById('pp-trend')) {
       const r = log.filter(x => isNum(x.p_epa) && x.p_db);
-      GI.ch.bar('pp-trend', { cats: r.map(x => 'W' + x.week + ' ' + (x.opp || '')), series: [{ name: 'EPA per dropback', data: r.map(x => Math.round(x.p_epa / x.p_db * 1000) / 1000) }], diverging: true, labels: true, fmt: v => GI.signed(v, 2) });
+      GI.ch.bar('pp-trend', { cats: r.map(x => 'W' + x.week + ' ' + (x.opp || '')), series: [{ name: 'EPA per dropback', data: r.map(x => Math.round(x.p_epa / x.p_db * 1000) / 1000) }], diverging: true, labels: true, fmt: v => GI.signed(v, 2), catName: 'Week and opponent', valName: 'EPA per dropback' });
     }
     if (document.getElementById('pp-ryoe')) {
       const car = {};
       log.forEach(x => { car[x.week] = x.r_car; });
       const r = ch.ryoe_by_game.map(x => ({ w: x[0], t: x[1], n: car[x[0]] }));
-      GI.ch.bar('pp-ryoe', { cats: r.map(x => 'W' + x.w), series: [{ name: 'RYOE (total)', data: r.map(x => x.t) }], diverging: true, labels: true, fmt: v => GI.signed(v, 1), label: 'RYOE by game' });
+      GI.ch.bar('pp-ryoe', { cats: r.map(x => 'W' + x.w), series: [{ name: 'RYOE (total)', data: r.map(x => x.t) }], diverging: true, labels: true, fmt: v => GI.signed(v, 1), catName: 'Week', valName: 'Rush yards over expected', label: 'RYOE by game' });
     }
     if (document.getElementById('pp-depth')) {
       const r = ch.depth_profile.slice().sort((a, b) => dRank(a.depth) - dRank(b.depth));
       GI.ch.mount('pp-depth', T => ({
-        grid: { left: 8, right: 8, top: 30, bottom: 8, containLabel: true },
+        grid: { left: 8, right: 8, top: 44, bottom: 30, containLabel: true },
         legend: GI.ch.legend(T, { data: ['Targets', 'EPA per target'] }),
-        xAxis: GI.ch.ax(T, { type: 'category', data: r.map(x => dLabel(x.depth)), split: false, line: true }),
-        yAxis: [GI.ch.ax(T, { name: 'Targets' }), Object.assign(GI.ch.ax(T, { name: 'EPA/tgt', fmt: v => GI.signed(v, 1), split: false }), { position: 'right' })],
+        xAxis: GI.ch.ax(T, { type: 'category', data: r.map(x => dLabel(x.depth)), split: false, line: true, name: 'Air yards', nameLocation: 'middle', nameGap: 26 }),
+        yAxis: [GI.ch.ax(T, { name: 'Targets', nameAlign: 'left' }), Object.assign(GI.ch.ax(T, { name: 'EPA per target', nameAlign: 'right', fmt: v => GI.signed(v, 1), split: false }), { position: 'right' })],
         tooltip: GI.ch.tip(T, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: ps => { const x = r[ps[0].dataIndex]; return GI.ch.thead(esc(dLabel(x.depth))) + GI.ch.trow(T.model, 'Targets', String(first(x.tgt, x.targets))) + GI.ch.trow(T.market, 'EPA per target', GI.signed(x.epa, 2)) + (isNum(x.catch) ? GI.ch.trow(T.ink3, 'Caught', GI.pct(x.catch, 0)) : ''); } }),
         series: [{ type: 'bar', name: 'Targets', data: r.map(x => first(x.tgt, x.targets)), barMaxWidth: 36, itemStyle: { color: T.model, borderRadius: [4, 4, 0, 0] } },
           { type: 'line', name: 'EPA per target', yAxisIndex: 1, data: r.map(x => x.epa), symbolSize: 8, lineStyle: { color: T.market, width: 2 }, itemStyle: { color: T.market } }]
@@ -214,12 +214,12 @@ GI.route('player', function (el, params) {
     }
     if (document.getElementById('pp-fg')) {
       const b = ch.fg.filter(x => x.att);
-      GI.ch.bar('pp-fg', { cats: b.map(x => x.lo + '–' + (x.hi >= 60 ? '' : x.hi) + ' yds'), series: [{ name: 'Made', data: b.map(x => x.made) }, { name: 'Expected', data: b.map(x => Math.round(x.exp * 10) / 10) }], legend: true, labels: true, fmt: v => GI.num(v, 1) });
+      GI.ch.bar('pp-fg', { cats: b.map(x => x.lo + '–' + (x.hi >= 60 ? '' : x.hi) + ' yds'), series: [{ name: 'Made', data: b.map(x => x.made) }, { name: 'Expected', data: b.map(x => Math.round(x.exp * 10) / 10) }], legend: true, labels: true, fmt: v => GI.num(v, 1), catName: 'Kick distance', valName: 'Field goals' });
     }
     if (document.getElementById('pp-splash')) {
       const cols = ch.splash_cols || ['week', 'tackles', 'sacks', 'qb_hits', 'int_pd'];
       const rows = GI.colRows({ cols: cols, rows: ch.splash_by_game });
-      GI.ch.bar('pp-splash', { cats: rows.map(x => 'W' + x.week), series: cols.slice(1).map(k => ({ name: label(k === 'int_pd' ? 'pd' : k).replace('PD', 'INT + PD'), data: rows.map(x => x[k]) })), stack: true, legend: true, fmt: v => GI.num(v, 1) });
+      GI.ch.bar('pp-splash', { cats: rows.map(x => 'W' + x.week), series: cols.slice(1).map(k => ({ name: label(k === 'int_pd' ? 'pd' : k).replace('PD', 'INT + PD'), data: rows.map(x => x[k]) })), stack: true, legend: true, fmt: v => GI.num(v, 1), catName: 'Week', valName: 'Plays' });
     }
     // career
     if (seasons.length) {
@@ -231,10 +231,10 @@ GI.route('player', function (el, params) {
       GI.set('pp-car', GI.tableHTML(all.map(k => ({ label: label(k), align: /^(season|team)$/.test(k) ? null : 'right', title: (META[k] || {}).desc })),
         seasons.slice().reverse().map(r => all.map(k => (k === 'team' ? { html: r.team ? GI.teamChip(r.team, r.season) : '—', v: r.team } : k === 'season' ? { html: '<b>' + r.season + '</b>', v: r.season } : { html: fv(k, r[k]), v: r[k] }))), { sticky: true }));
       if (seasons.length > 1) GI.ch.mount('pp-car-c', T => ({
-        grid: { left: 8, right: 8, top: 30, bottom: 8, containLabel: true },
+        grid: { left: 8, right: 8, top: 44, bottom: 30, containLabel: true },
         legend: GI.ch.legend(T, { data: ['Value', 'EPA'] }),
-        xAxis: GI.ch.ax(T, { type: 'category', data: seasons.map(r => String(r.season)), split: false, line: true }),
-        yAxis: [GI.ch.ax(T, { name: 'Value' }), Object.assign(GI.ch.ax(T, { name: 'EPA', split: false }), { position: 'right' })],
+        xAxis: GI.ch.ax(T, { type: 'category', data: seasons.map(r => String(r.season)), split: false, line: true, name: 'Season', nameLocation: 'middle', nameGap: 26 }),
+        yAxis: [GI.ch.ax(T, { name: 'Value', nameAlign: 'left' }), Object.assign(GI.ch.ax(T, { name: 'EPA', nameAlign: 'right', split: false }), { position: 'right' })],
         tooltip: GI.ch.tip(T, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: ps => { const r = seasons[ps[0].dataIndex]; return GI.ch.thead(r.season + ' · ' + esc(GI.teamAbbr(r.team))) + GI.ch.trow(T.model, 'Value', GI.signed(r.value, 1)) + GI.ch.trow(T.market, 'EPA', GI.signed(r.epa, 1)) + GI.ch.trow(T.ink3, 'Games', String(r.games || '—')); } }),
         series: [{ type: 'bar', name: 'Value', data: seasons.map(r => ({ value: r.value, itemStyle: { color: GI.ch.lift(GI.teamColour(r.team), T), borderRadius: [3, 3, 0, 0] } })), barMaxWidth: 26 },
           { type: 'line', name: 'EPA', yAxisIndex: 1, data: seasons.map(r => r.epa), symbolSize: 6, lineStyle: { color: T.market, width: 2 }, itemStyle: { color: T.market } }]

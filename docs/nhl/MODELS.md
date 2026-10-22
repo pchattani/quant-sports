@@ -866,6 +866,26 @@ worse by 0.0009 a game.
 closing line (all markets CLV −2.80% [−4.53, −1.91], ROI −6.67% [−13.91, −1.12], 439 bets; the moneyline has 19 bets
 because the fitted weight on the model is negative).
 
+### 14.6 Round 3: starting goalies and totals (22 October 2026)
+
+Write-up: `docs/research/nhl_edge.md`, "Round 3" (code `scripts/nhl_edge_r3.py`; sources `docs/research/data_sources.md`).
+
+- **Probable starters, captured from now on.** ESPN's scoreboard lists each team's probable starting goalie
+  ("Expected", then "Confirmed"); `nhl_fetch.py`'s ESPN phase keeps every pre-game read in `GAME.probables` (goalie,
+  NHL id when the name maps, first seen, first confirmed, each change with its time). No historical timestamped source
+  exists (NHL api-web has no starter before puck drop; Daily Faceoff and NHL.com forbid scraping; ESPN rewrites the
+  field after the game). Upcoming games are now priced with the listed starter (`adapters._starter`), and the game page
+  shows it and its effect against each team's usual starter (`pregame.model.goalie_effect`). On 256 archived pre-game
+  scoreboards ESPN's "Expected" starter was right 78% of the time and "Confirmed" 98%, against 61% for the previous
+  default (the most frequent recent starter).
+- **Goalie terms: nothing promoted.** A walk-forward starter model (mixture or its pick) changes test log-loss by
+  -0.0002 / +0.0000; even the actual starters, known at 08:00, gain only -0.0001 [-0.0006, +0.0004]: the gap to the
+  close is not the starter as this model values goalies.
+- **Totals: nothing promoted.** Fitted on the final totals, the score model needs no extra game-level variance
+  (sigma -> 0) and a 4-11% narrower spread of expected totals; that improves P(over) on the test seasons by -0.0005
+  [-0.0011, +0.0001], slope 0.29 -> 0.32: not significant. The P(over) slope problem comes from the closing line
+  holding information the model lacks, not from the score distribution.
+
 ---
 
 ## 15. Known limitations

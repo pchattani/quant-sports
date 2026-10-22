@@ -110,7 +110,7 @@ function renderList(el, params) {
         PD.card('Team metrics', 'Value and field percentile on the headline metrics; every metric is on each team page.', '<div id="cl-t"></div>', { span: 12, flush: true }), 'pd-mt'));
     var drawPace = function (kind) {
       PD.ch.lines('cl-pace', ids.map(function (id) { return { name: PD.teamName(id), short: PD.teamAbbr(id), colour: PD.teamColour(id), data: series(season, kind, id).map(function (e) { return [e.round, -e.effect]; }) }; }),
-        { xName: 'Round', endLabels: true, legend: false, yFmt: function (v) { return PD.signed(v, 2); }, xFmt: function (v) { return 'R' + v; }, xLabel: function (v) { return 'Round ' + v; }, emptyText: 'No car-pace series for this season.', label: 'Car pace by team' });
+        { xName: 'Round', yName: 'Car pace (% of a lap)', endLabels: true, legend: false, yFmt: function (v) { return PD.signed(v, 2); }, xFmt: function (v) { return 'R' + v; }, xLabel: function (v) { return 'Round ' + v; }, emptyText: 'No car-pace series for this season.', label: 'Car pace by team' });
     };
     drawPace('race');
     PD.wireSeg(document, 'cl-pk', drawPace);
@@ -202,7 +202,7 @@ function renderTeam(el, params, state) {
       var mine = series(season, kind, id);
       PD.ch.lines('tm-pace', others.map(function (o) { return { name: PD.teamName(o), faint: true, colour: PD.teamColour(o), data: series(season, kind, o).map(function (e) { return [e.round, -e.effect]; }) }; })
         .concat([{ name: name, colour: PD.teamColour(id), width: 3, symbols: true, data: mine.map(function (e) { return [e.round, -e.effect]; }), band: mine.map(function (e) { return [e.round, -e.effect - (e.se || 0), -e.effect + (e.se || 0)]; }) }]),
-        { xName: 'Round', legend: false, yFmt: function (v) { return PD.signed(v, 2); }, xFmt: function (v) { return 'R' + v; }, xLabel: function (v) { return 'Round ' + v; }, faintTip: false, emptyText: 'No ' + kind + ' car-pace series yet.', label: 'Car pace by race' });
+        { xName: 'Round', yName: 'Car pace (% of a lap)', legend: false, yFmt: function (v) { return PD.signed(v, 2); }, xFmt: function (v) { return 'R' + v; }, xLabel: function (v) { return 'Round ' + v; }, faintTip: false, emptyText: 'No ' + kind + ' car-pace series yet.', label: 'Car pace by race' });
     };
     drawPace('race');
     PD.wireSeg(document, 'tm-pk', drawPace);
@@ -215,12 +215,12 @@ function renderTeam(el, params, state) {
       PD.kpi('Market', isNum(price) && mk.available ? PD.pct(price) : '—', mk.available ? 'de-vigged' : 'no market'),
       PD.kpi('Magic number', ch && isNum(ch.magic) ? PD.num(ch.magic, 0) : '—', 'points to clinch')
     ], 'pd-kpis-3'));
-    if (ch && (ch.pos_dist || []).length) PD.ch.columns('tm-pd', { cats: ch.pos_dist.map(function (p, i) { return 'P' + (i + 1); }), series: [{ name: 'Share of seasons', data: ch.pos_dist, colour: PD.teamColour(id), fmt: function (v) { return PD.pct(v); } }], fmt: function (v) { return Math.round(v * 100) + '%'; }, label: 'Final position distribution' });
+    if (ch && (ch.pos_dist || []).length) PD.ch.columns('tm-pd', { cats: ch.pos_dist.map(function (p, i) { return 'P' + (i + 1); }), series: [{ name: 'Share of seasons', data: ch.pos_dist, colour: PD.teamColour(id), fmt: function (v) { return PD.pct(v); } }], fmt: function (v) { return Math.round(v * 100) + '%'; }, xName: 'Championship position', yName: 'Share of seasons', label: 'Final position distribution' });
     else PD.ch.none('tm-pd', season && season.championship === null ? 'The season is over.' : 'No simulation for this season.');
 
     // points and DNFs
     var lg = ((t && t.log) || []).slice().sort(function (a, b) { return a.round - b.round; });
-    if (lg.length) PD.ch.columns('tm-rel', { cats: lg.map(function (r) { return 'R' + r.round; }), yName: 'Points', y2Name: 'DNFs', y2Max: 2,
+    if (lg.length) PD.ch.columns('tm-rel', { cats: lg.map(function (r) { return 'R' + r.round; }), xName: 'Round', yName: 'Points', y2Name: 'DNFs', y2Max: 2,
       series: [{ name: 'Points', data: lg.map(function (r) { return r.points || 0; }), colour: PD.teamColour(id), fmt: function (v) { return PD.pts(v); } },
         { name: 'Retirements', type: 'scatter', axis: 1, symbol: 'triangle', size: 11, colour: '#e05d5d', data: lg.map(function (r) { return r.dnfs ? r.dnfs : null; }), fmt: function (v) { return String(v); } }], label: 'Points by round' });
     else PD.ch.none('tm-rel', 'No rounds logged yet.');
@@ -233,7 +233,7 @@ function renderTeam(el, params, state) {
     var calBy = {};
     ((season || {}).calendar || []).forEach(function (c) { calBy[c.round] = c; });
     if (rk.length) PD.ch.columns('tm-runin', { cats: rk.map(function (k) { return PD.shortRace((calBy[k] || {}).name || 'R' + k); }), series: [{ name: 'Expected points', data: rk.map(function (k) { return rounds[k]; }), colour: PD.teamColour(id), labels: true, fmt: function (v) { return PD.num(v, 1); } }],
-      fmt: function (v) { return PD.num(v, 0); }, rotate: rk.length > 8 ? 30 : 0, label: 'Expected points per remaining round' });
+      fmt: function (v) { return PD.num(v, 0); }, yName: 'Expected points', rotate: rk.length > 8 ? 30 : 0, label: 'Expected points per remaining round' });
     else PD.ch.none('tm-runin', season && season.championship ? 'No per-round expectations in the simulation.' : 'No rounds left this season.');
 
     // split
@@ -251,7 +251,7 @@ function renderTeam(el, params, state) {
       PD.kpi('Under 2.5 s', isNum(pit.p_under_2500) ? PD.pct(pit.p_under_2500, 0) : '—'), PD.kpi('Stops', isNum(pit.stops) ? String(pit.stops) : (Array.isArray(pit.stops) ? String(pit.stops.length) : '—'))], 'pd-kpis-4'));
     var stops = Array.isArray(pit.stop_ms) ? pit.stop_ms : (Array.isArray(pit.stops) ? pit.stops : []);
     var sv = stops.filter(function (v) { return isNum(v) && v > 0 && v < 15000; }).map(function (v) { return v / 1000; });
-    if (sv.length) PD.ch.hist('tm-pit', sv, { bin: 0.2, xName: 'Stationary time (s)', colour: PD.teamColour(id), fmt: function (v) { return PD.num(v, 1); }, unit: ' s', name: 'Stops', label: 'Pit stop times' });
+    if (sv.length) PD.ch.hist('tm-pit', sv, { bin: 0.2, xName: 'Stationary time (s)', yName: 'Stops', colour: PD.teamColour(id), fmt: function (v) { return PD.num(v, 1); }, unit: ' s', name: 'Stops', label: 'Pit stop times' });
     else PD.ch.none('tm-pit', 'No stationary times recorded (OpenF1, 2023 on).');
 
     // drivers side by side

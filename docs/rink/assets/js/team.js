@@ -146,7 +146,7 @@ function playoffPaths(x, r, od, colour) {
     const line = k.first((x.market || {}).points_line, (x.markets || {}).season_points, r.points_line, sim.kalshi_points);
     const band = k.isNum(sim.pts_p05) ? ' (90% range ' + sim.pts_p05 + '–' + sim.pts_p95 + ')' : '';
     k.plot(pNode, [{ type: 'bar', x: pv.map(z => z[0]), y: pv.map(z => z[1]), marker: { color: k.alpha(colour, 0.75) }, hovertemplate: '%{x} points: %{y:.1%}<extra></extra>' }],
-      k.layout({ margin: { l: 44, r: 10, t: 24, b: 30 }, title: { text: 'Final points' + band + (k.isNum(line) ? ' (dashed: market line ' + line + ')' : ''), font: { size: 11, color: k.C.text2 }, x: 0.02 }, yaxis: { tickformat: '.0%' },
+      k.layout({ margin: { l: 44, r: 10, t: 24, b: 30 }, title: { text: 'Final points' + band + (k.isNum(line) ? ' (dashed: market line ' + line + ')' : ''), font: { size: 11, color: k.C.text2 }, x: 0.02 }, yaxis: { tickformat: Math.max.apply(null, pv.map(z => z[1])) < 0.1 ? '.1%' : '.0%', title: 'Probability' }, xaxis: { title: 'Final points' },
         shapes: k.isNum(line) ? [{ type: 'line', x0: line, x1: line, yref: 'paper', y0: 0, y1: 1, line: { color: '#e6edf3', dash: 'dash', width: 1 } }] : [] }));
   } else pNode.style.display = 'none';
   const sNode = k.$('tp-seed');
@@ -154,11 +154,11 @@ function playoffPaths(x, r, od, colour) {
   const sd = sim.seed_dist || sim.seeds || r.seed_dist;
   if (Array.isArray(dr) && dr.some(k.isNum)) {
     k.plot(sNode, [{ type: 'bar', x: dr.map((_, i) => k.ordinal(i + 1)), y: dr, marker: { color: colour }, hovertemplate: '%{x} in the division: %{y:.1%}<extra></extra>' }],
-      k.layout({ margin: { l: 44, r: 10, t: 24, b: 30 }, title: { text: 'Finish in the division', font: { size: 11, color: k.C.text2 }, x: 0.02 }, yaxis: { tickformat: '.0%' }, xaxis: { type: 'category' } }));
+      k.layout({ margin: { l: 44, r: 10, t: 24, b: 30 }, title: { text: 'Finish in the division', font: { size: 11, color: k.C.text2 }, x: 0.02 }, yaxis: { tickformat: '.0%', title: 'Probability' }, xaxis: { type: 'category', title: 'Division finish' } }));
   } else if (distOf(sd).length) {
     const sv = distOf(sd).filter(z => k.isNum(z[1]));
     k.plot(sNode, [{ type: 'bar', x: sv.map(z => (/^(0|out|none|miss)$/i.test(String(z[0])) ? 'Out' : String(z[0]).toUpperCase())), y: sv.map(z => z[1]), marker: { color: colour }, hovertemplate: '%{x}: %{y:.1%}<extra></extra>' }],
-      k.layout({ margin: { l: 44, r: 10, t: 24, b: 30 }, title: { text: 'Playoff seed', font: { size: 11, color: k.C.text2 }, x: 0.02 }, yaxis: { tickformat: '.0%' }, xaxis: { type: 'category' } }));
+      k.layout({ margin: { l: 44, r: 10, t: 24, b: 30 }, title: { text: 'Playoff seed', font: { size: 11, color: k.C.text2 }, x: 0.02 }, yaxis: { tickformat: '.0%', title: 'Probability' }, xaxis: { type: 'category', title: 'Playoff seed' } }));
   } else sNode.style.display = 'none';
 }
 
@@ -194,7 +194,7 @@ function unitHistory(x, r, colour) {
   const draw = s => {
     const us = sets[s].filter(u => rows.some(z => k.isNum(z[u])));
     k.plot(node, us.map(u => ({ type: 'scatter', mode: 'lines', name: (t.UNITS.find(z => z[0] === u) || [u, u])[1], x: rows.map(z => z.x), y: rows.map(z => z[u]), line: { color: COL[u], width: 2, dash: u === 'def' || u === 'pk' ? 'dot' : 'solid' }, hovertemplate: '%{x}: %{y:+.2f}<extra>%{fullData.name}</extra>' })),
-      k.layout(Object.assign({ margin: { l: 50, r: 10, t: 30, b: 36 }, yaxis: { title: 'Goals per game v average', zeroline: true, zerolinecolor: '#6e7681' } }, k.legendTop())));
+      k.layout(Object.assign({ margin: { l: 50, r: 10, t: 30, b: 36 }, xaxis: { title: 'Date' }, yaxis: { title: 'Goals per game v average', zeroline: true, zerolinecolor: '#6e7681' } }, k.legendTop())));
   };
   draw(avail[0]);
   k.wireToggle(document, 'tp-hist-t', draw);
@@ -323,7 +323,7 @@ function schedule(abbr, x, sch, S, colour) {
   const xs = [], ys = [], ts = [];
   done.forEach(z => { if (!k.isNum(z.pot)) assumed++; const pot = k.isNum(z.pot) ? z.pot : 0.23; cp += z.gf > z.ga ? 2 : z.ot ? 1 : 0; ce += 2 * z.p + pot * 0.5; xs.push(z.date); ys.push(cp - ce); ts.push((z.home ? 'v ' : '@ ') + z.opp + ': ' + res(z) + ' · model ' + k.pct(z.p, 0)); });
   k.plot(cnode, [{ type: 'scatter', mode: 'lines+markers', x: xs, y: ys, text: ts, hovertemplate: '%{x}<br>%{text}<br>points over expected %{y:+.1f}<extra></extra>', line: { color: colour, width: 2, shape: 'hv' }, marker: { size: 4 }, fill: 'tozeroy', fillcolor: k.alpha(colour, 0.12) }],
-    k.layout({ margin: { l: 50, r: 10, t: 10, b: 34 }, xaxis: { type: 'category', nticks: 12 }, yaxis: { title: 'Points − expected', zeroline: true, zerolinecolor: '#6e7681' } }));
+    k.layout({ margin: { l: 50, r: 10, t: 10, b: 34 }, xaxis: { type: 'category', nticks: 12, title: 'Date' }, yaxis: { title: 'Points − expected', zeroline: true, zerolinecolor: '#6e7681' } }));
   if (assumed) host.insertAdjacentHTML('beforeend', '<div class="pg-note gq-note">Expected points = 2·P(win) + P(overtime)/2 (an overtime loss is a point); ' + assumed + ' game' + (assumed > 1 ? 's' : '') + ' without the model\'s overtime probability use the league\'s typical 23%.</div>');
 }
 
@@ -350,7 +350,7 @@ function roster(abbr, skRaw, gkRaw, S, colour) {
   if (!top.length) { cnode.style.display = 'none'; return; }
   k.plot(cnode, [{ type: 'bar', orientation: 'h', y: top.map(z => k.surname(z.p.name || k.name(z.id)) + ' (' + k.posLabel(z.p.pos || z.g) + ')'), x: top.map(z => z.v), customdata: top.map(z => k.playerHref(z.id, S)),
     marker: { color: top.map(z => (z.v >= 0 ? k.alpha(colour, 0.85) : 'rgba(248,81,73,0.8)')) }, hovertemplate: '%{y}: %{x:+.1f}<extra></extra>' }],
-    k.layout({ margin: { l: 130, r: 16, t: 24, b: 34 }, title: { text: 'Top contributors (value)', font: { size: 11, color: k.C.text2 }, x: 0.02 }, yaxis: { autorange: 'reversed', automargin: true }, xaxis: { zeroline: true, zerolinecolor: '#6e7681' } }));
+    k.layout({ margin: { l: 130, r: 16, t: 24, b: 34 }, title: { text: 'Top contributors (value)', font: { size: 11, color: k.C.text2 }, x: 0.02 }, yaxis: { autorange: 'reversed', automargin: true }, xaxis: { zeroline: true, zerolinecolor: '#6e7681', title: 'Goals above replacement' } }));
   k.clickThrough(cnode);
 }
 
@@ -363,7 +363,7 @@ function rolling(x, colour) {
   const xs = R.map(z => z[1] || z[0]);
   const tr = [[2, '5v5 xGF%', colour, 'solid'], [3, 'GF%', '#e6edf3', 'dot'], [4, '5v5 CF%', '#8b949e', 'dash']].filter(c => R.some(z => k.isNum(z[c[0]])))
     .map(c => ({ type: 'scatter', mode: 'lines', name: c[1], x: xs, y: R.map(z => z[c[0]]), line: { color: c[2], width: c[3] === 'solid' ? 2.5 : 1.5, dash: c[3] }, hovertemplate: '%{x}: %{y:.1%}<extra>' + c[1] + '</extra>' }));
-  k.plot(node, tr, k.layout(Object.assign({ margin: { l: 50, r: 10, t: 30, b: 36 }, yaxis: { tickformat: '.0%', title: 'Share (10-game window)' },
+  k.plot(node, tr, k.layout(Object.assign({ margin: { l: 50, r: 10, t: 30, b: 36 }, xaxis: { title: R.every(z => z[1]) ? 'Date' : 'Game' }, yaxis: { tickformat: '.0%', title: 'Share (10-game window)' },
     shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 0.5, y1: 0.5, line: { color: '#6e7681', dash: 'dot', width: 1 } }] }, k.legendTop())));
 }
 

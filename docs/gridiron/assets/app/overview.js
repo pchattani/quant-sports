@@ -172,7 +172,7 @@ GI.route('overview', function (el) {
     ((mkts && mkts.futures && mkts.futures.sb) || []).forEach(r => { if (r && r.team) sbM[r.team] = r.market; });
     const sb = Object.keys(po).map(t => ({ label: GI.teamName(t), p: po[t].p_sb || 0, market: isNum(sbM[t]) ? sbM[t] : null, colour: GI.teamColour(t), href: GI.teamHref(t) }))
       .sort((a, b) => b.p - a.p).slice(0, 12);
-    GI.ch.probBars('ov-sb', sb, { keepHeight: true, labelWidth: 150 });
+    GI.ch.probBars('ov-sb', sb, { keepHeight: true, labelWidth: 150, valName: 'Super Bowl probability' });
     if (gaps.length) GI.ch.dumbbell('ov-gaps', { rows: gaps.map(r => ({ label: r.label, a: r.a, b: r.b, href: r.href, sub: r.sub })), labelWidth: 150 });
     else GI.ch.none('ov-gaps', 'No market prices yet: markets are fetched with the hourly build.');
 
@@ -186,7 +186,7 @@ GI.route('overview', function (el) {
       const weeks = {};
       top.forEach(t => (ratings[t].history || []).forEach(h => { weeks[h[0]] = 1; }));
       const wk = Object.keys(weeks).map(Number).sort((a, b) => a - b);
-      GI.ch.line('ov-trend', { x: wk.map(w => 'W' + w), series: top.map(t => ({ name: t, color: GI.teamColour(t), data: wk.map(w => { const h = (ratings[t].history || []).find(r => r[0] === w); return h ? h[1] : null; }) })), yFmt: v => GI.signed(v, 1), label: 'Team rating by week' });
+      GI.ch.line('ov-trend', { x: wk.map(w => 'W' + w), series: top.map(t => ({ name: t, color: GI.teamColour(t), data: wk.map(w => { const h = (ratings[t].history || []).find(r => r[0] === w); return h ? h[1] : null; }) })), yFmt: v => GI.signed(v, 1), xName: 'Week', yName: 'Rating (pts/g v average)', label: 'Team rating by week' });
     } else { GI.ch.none('ov-power', 'Ratings arrive with the first build.'); GI.ch.none('ov-trend', 'Ratings arrive with the first build.'); }
 
     // playoff race
@@ -195,7 +195,7 @@ GI.route('overview', function (el) {
     GI.CONFERENCES.forEach(c => {
       const list = Object.keys(po).filter(t => GI.teamInfo(t).conference === c).map(t => ({ label: GI.teamName(t), p: po[t].p_playoffs || 0, market: isNum(plM[t]) ? plM[t] : null, colour: GI.teamColour(t), href: GI.teamHref(t) }))
         .sort((a, b) => b.p - a.p);
-      GI.ch.probBars('ov-' + c.toLowerCase(), list, { top: 16, keepHeight: true, labelWidth: 150 });
+      GI.ch.probBars('ov-' + c.toLowerCase(), list, { top: 16, keepHeight: true, labelWidth: 150, valName: 'Playoff probability' });
     });
 
     // leaders

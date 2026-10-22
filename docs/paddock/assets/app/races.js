@@ -197,7 +197,7 @@ function renderCircuit(el, params) {
       document.getElementById('ci-prof').insertAdjacentHTML('beforeend', '<p class="pd-cap">Each figure is shrunk towards the all-circuit profile in proportion to the history behind it: ' +
         [['races', s.races], ['pit samples', s.pit], ['SC laps', s.sc_laps], ['pass opportunities', s.pass_opps], ['stops', s.stops], ['starts', s.starts]].filter(function (x) { return isNum(x[1]); }).map(function (x) { return PD.int(x[1]) + ' ' + x[0]; }).join(', ') + '. <a href="#/methodology/circuits">Method</a>.</p>');
       var mean = p.lap1_mean_by_grid || [], sd = p.lap1_sd_by_grid || [], inc = p.lap1_incident_by_grid || [];
-      if (mean.length) PD.ch.columns('ci-lap1', { cats: mean.map(function (v, i) { return 'P' + (i + 1); }), yName: 'Places gained', y2Name: 'Incident', y2Fmt: function (v) { return Math.round(v * 100) + '%'; },
+      if (mean.length) PD.ch.columns('ci-lap1', { cats: mean.map(function (v, i) { return 'P' + (i + 1); }), xName: 'Grid slot', yName: 'Places gained', y2Name: 'Incident', y2Fmt: function (v) { return Math.round(v * 100) + '%'; },
         series: [{ name: 'Mean places gained', data: mean, colours: mean.map(function (v) { return v >= 0 ? '#2fb37b' : '#e05d5d'; }), fmt: function (v) { return PD.signed(v, 2); } },
           { name: '±1 sd', type: 'scatter', data: sd.map(function (v) { return v * (p.lap1_sd_scale || 1); }), colour: '#7d8590', symbol: 'diamond', size: 7, fmt: function (v) { return PD.num(v, 2) + ' places'; } },
           { name: 'Incident rate', type: 'line', axis: 1, data: inc, colour: '#e3b341', fmt: function (v) { return PD.pct(v); } }], label: 'Opening lap by grid slot' });

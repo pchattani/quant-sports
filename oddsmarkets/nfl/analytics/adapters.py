@@ -457,6 +457,18 @@ def live_series(ctx, g: dict, rec: dict | None, pregame: dict | None) -> list | 
         return None
 
 
+def live_epa(ctx, g: dict, rec: dict | None) -> list | None:
+    """[[seq, ep_before, epa]] for every play of the ESPN record (live.epa_series: our EP model on ESPN's states)."""
+    mod = _module("live")
+    if mod is None or not rec or not ctx.use_models or not hasattr(mod, "epa_series"):
+        return None
+    try:
+        return mod.epa_series(rec, g.get("home"), ctx.season, g.get("roof"))
+    except Exception as exc:                                     # noqa: BLE001
+        ctx.model_errors["live epa"] = f"{type(exc).__name__}: {exc}"
+        return None
+
+
 # ---------------------------------------------------------------------------------------------- season
 
 SIM_KEYS = {"p_playoffs": ["p_playoffs", "playoffs", "p_postseason", "p_make_playoffs"], "p_div": ["p_div", "p_division", "division"],

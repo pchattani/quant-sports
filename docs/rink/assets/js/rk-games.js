@@ -95,7 +95,7 @@ function gamesPage(el, params) {
       h += review(list);
     }
     el.innerHTML = h;
-    if (pre.length) QKC.dumbbell('#gd-mvm', { rows: pre.map(g => ({ label: RK.teamAbbr(g.away) + ' @ ' + RK.teamAbbr(g.home), a: g.model.p_home, b: g.market.p_home, href: RK.gameHref(g.game_id), sub: QK.fmt.time(g.start) })), labelWidth: 90 });
+    if (pre.length) QKC.dumbbell('#gd-mvm', { rows: pre.map(g => ({ label: RK.teamAbbr(g.away) + ' @ ' + RK.teamAbbr(g.home), a: g.model.p_home, b: g.market.p_home, href: RK.gameHref(g.game_id), sub: QK.fmt.time(g.start) })), labelWidth: 90, valName: 'Home win probability' });
     const jump = el.querySelector('#gd-jump');
     if (jump) jump.addEventListener('change', () => { if (/^\d{4}-\d\d-\d\d$/.test(jump.value)) RK.go(RK.gamesHref(jump.value)); });
     const cur = el.querySelector('.rk-strip [aria-current]');
@@ -246,6 +246,38 @@ function pregameCard(d, c) {
     rows.map(r => '<tr><td>' + esc(r[0]) + '</td><td class="num" style="text-align:left">' + esc(r[1]) + '</td><td class="num" style="text-align:left">' + esc(r[2]) + '</td><td class="num" style="text-align:left">' + esc(r[3]) + '</td></tr>').join('') + '</tbody></table></div>';
 }
 
+/* Starting goalies before the game: ESPN's probable starters (projected, then confirmed) with the time each was
+   first seen, and what they do to the model against each team's usual starter (pregame.model.goalie_effect). */
+function goaliesCard(d, c) {
+  const gl = c.goalies || ((d && d.card) || {}).goalies || {};
+  const obj = x => (x && typeof x === 'object' ? x : x ? { pid: String(x) } : null);
+  const h = obj(gl.home), a = obj(gl.away);
+  if (!h && !a) return '';
+  const m = (((d && d.pregame) || {}).model) || c.model || {};
+  const fx = m.goalie_effect || null;
+  const usual = (fx && fx.usual) || {};
+  const row = (side, x) => {
+    const team = side === 'home' ? c.home : c.away;
+    if (!x) return '<tr><td>' + U.teamEnt(team, { abbr: true }) + '</td><td colspan="2" class="rk-note">Not listed yet</td></tr>';
+    const st = String(x.status || '').toLowerCase();
+    const badge = st ? '<span class="qk-badge' + (st === 'confirmed' ? ' accent' : '') + '">' + esc(st) + '</span>' : '';
+    const alt = fx && usual[side] && x.pid && String(usual[side]) !== String(x.pid) ? 'usual starter ' + RK.playerName(String(usual[side])) : '';
+    return '<tr><td>' + U.teamEnt(team, { abbr: true }) + '</td><td>' + (x.pid ? U.playerEnt(x.pid, x.name, null) : esc(x.name || '—')) + ' ' + badge + (alt ? '<div class="rk-note">' + esc(alt) + '</div>' : '') + '</td>' +
+      '<td class="num" style="text-align:left">' + (x.at ? (st === 'confirmed' ? 'confirmed ' : 'listed ') + esc(RK.fmtStamp(x.at)) : '—') + '</td></tr>';
+  };
+  let note = '';
+  if (fx && isNum(fx.p_home_usual) && isNum(m.p_home)) {
+    const H = RK.teamAbbr(c.home);
+    note = 'With these starters the model gives ' + esc(H) + ' ' + U.pct(m.p_home) + '; with each team\'s usual starter ' + U.pct(fx.p_home_usual) +
+      ' (' + U.signed(100 * (m.p_home - fx.p_home_usual), 1) + ' pts)' + (isNum(fx.total_usual) && isNum(m.total) ? '. Total ' + U.f(m.total, 2) + ' v ' + U.f(fx.total_usual, 2) + ' goals.' : '.');
+  } else if (h && h.status || a && a.status) {
+    note = 'The model prices the listed starters; a team with none listed is priced with its usual starter.';
+  }
+  const tbl = '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Team</th><th>Starter</th><th>Since</th></tr></thead><tbody>' +
+    row('away', a) + row('home', h) + '</tbody></table></div>';
+  return U.card2('Starting goalies', 'ESPN\'s probable starters, read every hour (every 15 minutes near game time)', tbl + (note ? '<div class="rk-note" style="padding:var(--sp-3) var(--sp-4)">' + note + '</div>' : ''), { flush: true });
+}
+
 function summary(node, d, c, g) {
   const fin = g.status === 'final', live = g.status === 'live', pre = g.status === 'pre';
   const pl = RK.isPlayoffGame(c);
@@ -268,6 +300,7 @@ function summary(node, d, c, g) {
     '</div></div></div>';
   h += '<div class="qk-grid" style="margin-top:var(--sp-4)"><div class="qk-span-' + (sd && sd.p ? 7 : 12) + '">' + U.card2(pre ? 'Every price' : 'Pre-game prices', 'Our model, the de-vigged market and the sportsbook line', pregameCard(d, c) || QK.empty('No pre-game price'), { flush: true }) + '</div>' +
     (sd && sd.p ? '<div class="qk-span-5">' + U.card2('Exact score', 'Model probability of each final score (rows ' + esc(RK.teamAbbr(c.home)) + ', columns ' + esc(RK.teamAbbr(c.away)) + ')', U.chart('gm-sd', 300, 'Exact score probabilities')) + '</div>' : '') + '</div>';
+  if (pre) { const gk = goaliesCard(d, c); if (gk) h += '<div style="margin-top:var(--sp-4)">' + gk + '</div>'; }
   if (pre && Array.isArray(td) && td.length) h += '<div style="margin-top:var(--sp-4)">' + U.card2('Total goals', 'Model distribution of the total' + (isNum((c.line || {}).total) ? '; the line is ' + c.line.total : ''), U.chart('gm-td', 240, 'Total goals distribution')) + '</div>';
   if (!pre) h += '<div style="margin-top:var(--sp-4)">' + U.card2('Box score', 'Every skater and goalie; sort any column', '<div id="gm-box"></div>') + '</div>';
   node.innerHTML = h;
@@ -289,10 +322,13 @@ function summary(node, d, c, g) {
           data: race.map((r, i) => (r[ci.goal] && String(r[ci.goal]) === String(side === 'home' ? c.home : c.away) ? { coord: [x[i], r[ci[side]]] } : null)).filter(Boolean) },
         endLabel: { show: true, formatter: p => RK.teamAbbr(side === 'home' ? c.home : c.away) + ' ' + U.f(p.value[1], 2), color: T.ink2, fontFamily: T.fontNum, fontSize: 11 }
       });
+      const xa = QKC.axis(T, { type: 'value', min: 0, max: Math.max(60, Math.ceil(x[x.length - 1] / 5) * 5), interval: 20, fmt: v => v + "'", split: false, line: true });
+      const ya = QKC.axis(T, { fmt: v => v.toFixed(1) });
+      const gB = 8 + QKC.nameAxis(xa, 'Game time (minutes)', 'bottom'), gT = 14 + QKC.nameAxis(ya, 'Cumulative expected goals', 'side');
       return {
-        grid: { left: 8, right: 70, top: 14, bottom: 8, containLabel: true },
-        xAxis: QKC.axis(T, { type: 'value', min: 0, max: Math.max(60, Math.ceil(x[x.length - 1] / 5) * 5), interval: 20, fmt: v => v + "'", split: false, line: true }),
-        yAxis: QKC.axis(T, { fmt: v => v.toFixed(1) }),
+        grid: { left: 8, right: 70, top: gT, bottom: gB, containLabel: true },
+        xAxis: xa,
+        yAxis: ya,
         tooltip: QKC.tooltip(T, { trigger: 'axis', formatter: ps => '<div style="color:' + T.ink3 + '">' + esc(U.f(ps[0].value[0], 1)) + "'</div>" + ps.map(p => QKC.tipRow(p.color, p.seriesName, U.f(p.value[1], 2))).join('') }),
         series: [mk('away', ca), mk('home', ch)]
       };
@@ -302,11 +338,12 @@ function summary(node, d, c, g) {
   if (sd && sd.p) {
     const data = [];
     sd.p.forEach((row, i) => row.forEach((v, j) => data.push([j, i, v])));
-    QKC.heatmap('#gm-sd', { x: sd.p[0].map((_, j) => String(j)), y: sd.p.map((_, i) => String(i)), data: data, fmt: v => (v * 100).toFixed(1) + '%', cellLabels: true });
+    QKC.heatmap('#gm-sd', { x: sd.p[0].map((_, j) => String(j)), y: sd.p.map((_, i) => String(i)), data: data, fmt: v => (v * 100).toFixed(1) + '%', cellLabels: true,
+      xName: RK.teamAbbr(c.away) + ' goals', yName: RK.teamAbbr(c.home) + ' goals' });
   }
   if (pre && Array.isArray(td) && td.length) {
     const n = Math.min(td.length, 13);
-    QKC.bar('#gm-td', { cats: td.slice(0, n).map((_, i) => String(i)), series: [{ name: 'P(total)', data: td.slice(0, n) }], fmt: v => (v * 100).toFixed(1) + '%' });
+    QKC.bar('#gm-td', { cats: td.slice(0, n).map((_, i) => String(i)), series: [{ name: 'P(total)', data: td.slice(0, n) }], fmt: v => (v * 100).toFixed(1) + '%', catName: 'Total goals', valName: 'Probability' });
   }
   if (!pre) boxTables(node.querySelector('#gm-box'), d, c);
   if (live) RK.liveRefresh([RK.gamePath(c.game_id)], 30000);

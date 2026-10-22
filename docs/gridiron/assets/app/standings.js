@@ -133,7 +133,7 @@ function drawRatings(el, d) {
     xName: 'Offence (pts/g)', yName: 'Defence (pts/g)', refX: 0, refY: 0, labelAll: true, xFmt: v => GI.signed(v, 0), yFmt: v => GI.signed(v, 0), quadrants: ['Defence carries', 'Contenders', 'Rebuilding', 'Offence carries'] });
   const drawDiv = () => {
     const list = Object.keys(rat).filter(t => GI.teamInfo(t).division === RDIV);
-    GI.ch.lines('rt-chart', list.map(t => ({ name: GI.teamAbbr(t), x: rat[t].history.map(h => h.w), y: rat[t].history.map(h => h.net), colour: GI.teamColour(t), symbol: true })), { xName: 'Week', yFmt: v => GI.signed(v, 1), xLabel: x => 'Week ' + x, ref: { y: 0 } });
+    GI.ch.lines('rt-chart', list.map(t => ({ name: GI.teamAbbr(t), x: rat[t].history.map(h => h.w), y: rat[t].history.map(h => h.net), colour: GI.teamColour(t), symbol: true })), { xName: 'Week', yName: 'Rating (pts/g v average)', yFmt: v => GI.signed(v, 1), xLabel: x => 'Week ' + x, ref: { y: 0 } });
   };
   GI.wireSeg(el, 'rt-div', v => { RDIV = v; drawDiv(); });
   drawDiv();
@@ -211,7 +211,7 @@ GI.route('standings', function (el, params) {
     else {
       body.innerHTML = draftView(d, rows, S); GI.sortable(body);
       const list = (Array.isArray(d.draft) ? d.draft : []).filter(x => isNum(x.p_first_pick) && x.p_first_pick > 0.001).sort((a, b) => b.p_first_pick - a.p_first_pick).slice(0, 10);
-      GI.ch.probBars('dr-first', list.map(x => ({ label: GI.teamName(x.team), p: x.p_first_pick, colour: GI.teamColour(x.team), href: GI.teamHref(x.team) })), { keepHeight: true, labelWidth: 140, emptyText: 'No team has a real chance at the first pick yet.' });
+      GI.ch.probBars('dr-first', list.map(x => ({ label: GI.teamName(x.team), p: x.p_first_pick, colour: GI.teamColour(x.team), href: GI.teamHref(x.team) })), { keepHeight: true, labelWidth: 140, valName: 'First-pick probability', emptyText: 'No team has a real chance at the first pick yet.' });
     }
   });
 });

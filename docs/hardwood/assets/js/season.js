@@ -134,7 +134,7 @@ function drawPaths(el, L, season, teams, focus) {
   });
   // Draw the focus team last so it sits on top.
   series.sort((a, b) => (a.band ? 1 : 0) - (b.band ? 1 : 0));
-  HW.charts.lines(el, series, { height: 380, yTitle: 'Net rating', xaxis: { type: 'date' }, yaxis: { zeroline: true } });
+  HW.charts.lines(el, series, { height: 380, xTitle: 'Date', yTitle: 'Net rating', xaxis: { type: 'date' }, yaxis: { zeroline: true } });
 }
 
 function drawWinTotal(el, L, season, sim, tid) {
@@ -151,7 +151,7 @@ function drawWinTotal(el, L, season, sim, tid) {
     height: 260, bargap: 0.08,
     shapes: line !== null ? [{ type: 'line', x0: line, x1: line, yref: 'paper', y0: 0, y1: 1, line: { color: HW.C.text, width: 2, dash: 'dash' } }] : [],
     annotations: line !== null ? [{ x: line, yref: 'paper', y: 1, text: 'Line ' + line, showarrow: false, yanchor: 'bottom', font: { size: 10, color: HW.C.text } }] : [],
-    xaxis: { title: 'Wins', range: [Math.max(0, lo - 1) - 0.5, hi + 1.5], fixedrange: true }, yaxis: { tickformat: '.0%', fixedrange: true },
+    xaxis: { title: 'Wins', range: [Math.max(0, lo - 1) - 0.5, hi + 1.5], fixedrange: true }, yaxis: { title: 'Probability', tickformat: '.1%', fixedrange: true },
     margin: { l: 45, r: 10, t: 20, b: 40 }
   }));
 }

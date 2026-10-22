@@ -187,7 +187,7 @@ function drawMvm(el, mk, h) {
     FB.set('ov-mvm-list', FB.empty('No market prices', 'No coming fixture has a prediction-market price right now.'));
     return;
   }
-  QKC.dumbbell(el.querySelector('#ov-mvm'), { rows: top.map(function (r) { return { label: r.label, a: r.a, b: r.b, href: FB.href.match(r.slug, r.id), sub: FB.compName(r.slug) + ' · ' + FB.fmtDate(r.f.commence, { time: true }) }; }), labelWidth: 210 });
+  QKC.dumbbell(el.querySelector('#ov-mvm'), { rows: top.map(function (r) { return { label: r.label, a: r.a, b: r.b, href: FB.href.match(r.slug, r.id), sub: FB.compName(r.slug) + ' · ' + FB.fmtDate(r.f.commence, { time: true }) }; }), labelWidth: 210, valName: 'Outcome probability' });
   FB.set('ov-mvm-list', '<p class="fb-cap">' + rowsAll.length + ' priced fixtures in the next week. A gap is a difference of opinion, not a bet: the model is wrong often. <a href="#/model/methodology">How the model is checked →</a></p>');
 }
 
@@ -199,7 +199,7 @@ function drawRaces(el) {
   if (!rows.length) { box.style.height = 'auto'; box.innerHTML = FB.empty('No open races', 'Every competition followed is decided or between editions.'); return; }
   rows.sort(function (a, b) { return b.p_favourite - a.p_favourite; });
   QKC.bar(box, {
-    horizontal: true, labels: true, labelWidth: 150, fmt: function (v) { return pct(v); }, max: 1,
+    horizontal: true, labels: true, labelWidth: 150, fmt: function (v) { return pct(v); }, max: 1, valName: 'Chance to win',
     cats: rows.map(function (c) { return c.favourite + ' · ' + (c.short_name || c.name); }),
     series: [{ name: 'Chance to win', data: rows.map(function (c) { return c.p_favourite; }) }],
     colors: rows.map(function (c) { return FB.kindColorHex(FB.kindOf(c.slug)); }),
@@ -226,7 +226,7 @@ function drawRaceHistory(el) {
       var x = snaps.map(function (s) { return s.ts; });
       QKC.line(box, {
         x: x, xLabel: function (v) { return FB.fmtStamp(v); }, xFmt: function (v) { var dd = FB.parseDate(v); return dd ? dd.getDate() + ' ' + FB.MONTHS[dd.getMonth()] : ''; },
-        yFmt: function (v) { return pct(v); }, yMin: 0, label: 'Title odds by model run, ' + FB.compName(slug),
+        yFmt: function (v) { return pct(v); }, yMin: 0, xName: 'Model run', yName: 'Title chance', label: 'Title odds by model run, ' + FB.compName(slug),
         series: teams.map(function (t) { return { name: t, data: snaps.map(function (s) { return isNum(s.title[t]) ? s.title[t] : 0; }) }; })
       });
     });
@@ -242,7 +242,7 @@ function drawLeaders(el, h) {
   var top = L.slice(0, 10);
   if (!top.length) { box.style.height = 'auto'; box.innerHTML = FB.empty('No player data yet'); return; }
   QKC.bar(box, {
-    horizontal: true, legend: true, labelWidth: 130, fmt: function (v) { return num(v, 0); },
+    horizontal: true, legend: true, labelWidth: 130, fmt: function (v) { return num(v, 0); }, valName: 'Goals and xG',
     cats: top.map(function (p) { return p.name + ' (' + (p.comp_name || FB.compName(p.comp, true)) + ')'; }),
     series: [{ name: 'Goals', data: top.map(function (p) { return p.value; }) }, { name: 'xG', data: top.map(function (p) { return isNum(p.xg) ? Math.round(p.xg * 10) / 10 : null; }) }],
     hrefs: top.map(function (p) { return FB.href.player(p.id); }), label: 'Top scorers: goals and xG'
@@ -266,7 +266,8 @@ function drawLeagues(el) {
 
 function drawPool(el, pool) {
   var box = el.querySelector('#ov-pool');
-  var clubs = ((pool || {}).clubs || []).slice().sort(function (a, b) { return b.strength - a.strength; }).slice(0, 8);
+  /* clubs with no rated matches yet (cup entrants seen only in a draw) carry the prior, not a measured strength */
+  var clubs = ((pool || {}).clubs || []).filter(function (c) { return c.in_league || (c.played || 0) > 0; }).sort(function (a, b) { return b.strength - a.strength; }).slice(0, 8);
   if (!clubs.length) { box.innerHTML = FB.muted('The pooled fit is not available.'); return; }
   var max = clubs[0].strength;
   box.innerHTML = '<ol class="fb-ov-rank">' + clubs.map(function (c, i) {

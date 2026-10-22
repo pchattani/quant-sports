@@ -42,11 +42,11 @@ function board(node) {
         ['All', 'C', 'L', 'R', 'D', 'G'].map((p, i) => '<button type="button" class="qk-chip" aria-pressed="' + (i === 0) + '" data-value="' + p + '">' + p + '</button>').join('') + '</div><div id="fy-tab"></div>') + '</div></div></section>' +
       (f.note ? '<p class="rk-note">' + esc(f.note) + '</p>' : '');
     const t20 = top.slice(0, 20);
-    QKC.bar('#fy-top', { cats: t20.map(r => r.name + ' (' + r.pos + ')'), series: [{ name: 'Points', data: t20.map(r => r.ros) }], horizontal: true, labels: true, fmt: x => U.f(x, 0), colors: t20.map(r => RK.teamColourRaw(r.team)), hrefs: t20.map(r => RK.playerHref(r.id)), labelWidth: 150 });
+    QKC.bar('#fy-top', { cats: t20.map(r => r.name + ' (' + r.pos + ')'), series: [{ name: 'Points', data: t20.map(r => r.ros) }], horizontal: true, labels: true, fmt: x => U.f(x, 0), colors: t20.map(r => RK.teamColourRaw(r.team)), hrefs: t20.map(r => RK.playerHref(r.id)), labelWidth: 150, valName: 'Projected fantasy points' });
     if (teams.length && wk.length) {
       const data = [];
       teams.forEach((t, yi) => ((f.teams[t] || {}).weeks || []).forEach((w, xi) => data.push([xi, yi, w[0] || 0])));
-      QKC.heatmap('#fy-wk', { x: weekCols, y: teams, data: data, fmt: v => String(Math.round(v)) });
+      QKC.heatmap('#fy-wk', { x: weekCols, y: teams, data: data, fmt: v => String(Math.round(v)), xName: 'Week', yName: 'Club' });
     }
     const draw = sel => {
       const p = (sel && sel[0]) || 'All';

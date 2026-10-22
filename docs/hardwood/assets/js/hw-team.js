@@ -2,8 +2,8 @@
  *
  * Overview tab: a header in the team colour with the headline numbers; the net rating over time (±1 se, game
  * results marked); the season odds against the market and the seed distribution; strengths and needs with the
- * best trade targets (current season); the current roster; the schedule (next games with the model line, recent
- * results); moves (this team's transactions and rated trades).
+ * best trade targets (current season); the current roster; the schedule (next games with the model line and the
+ * team's availability term, recent results); moves (this team's transactions and rated trades).
  * Detail tab (?tab=detail): the pre-redesign team page in full (four factors, shot profiles, lineups, on/off,
  * rotation, the whole catalogue in percentiles, the trade ledger).
  *
@@ -20,6 +20,16 @@ function standRow(season, tid) {
   const st = (season && season.standings) || {};
   Object.keys(st).forEach(c => (st[c] || []).forEach(r => { if (String(r.team) === String(tid)) out = Object.assign({ conf: c }, r); }));
   return out || {};
+}
+
+// The informed model's availability term for this team in its next game (GAME_CARD model.av: points of the
+// team's own margin from who is expected to play, injury-report Outs applied).
+function avNote(g, home) {
+  const av = (g.model || {}).av;
+  if (!av || !isNum(av[0]) || !isNum(av[1])) return '';
+  const v = home ? av[0] : av[1];
+  if (Math.abs(v) < 0.05) return '';
+  return '<span class="s" style="white-space:nowrap" data-tip="Availability for the next game: points of margin from who is expected to play (injury report applied), against what the rating already reflects">avail. ' + U.sgnHTML(v, 1) + '</span>';
 }
 
 function render(el, params) {
@@ -102,9 +112,9 @@ function render(el, params) {
         const lo = path.map(p => Math.round((p.net - (p.se || 0)) * 10) / 10), band = path.map(p => Math.round(2 * (p.se || 0) * 10) / 10);
         const res = path.map((p, i) => { const g = byGame[p.game]; return g ? { value: [i, p.net], res: g, itemStyle: { color: String(g.res).charAt(0) === 'W' ? Tk.up : Tk.down } } : null; }).filter(Boolean);
         return {
-          grid: { left: 8, right: 16, top: 16, bottom: 8, containLabel: true },
-          xAxis: QKC.axis(Tk, { type: 'category', data: xs.map(d => HW.fmtDate(d, { year: false, weekday: false })), split: false, line: true, boundaryGap: false }),
-          yAxis: QKC.axis(Tk, { fmt: v => U.signed(v, 0), scale: true }),
+          grid: { left: 8, right: 16, top: 32, bottom: 30, containLabel: true },
+          xAxis: QKC.axis(Tk, { type: 'category', data: xs.map(d => HW.fmtDate(d, { year: false, weekday: false })), split: false, line: true, boundaryGap: false, name: 'Date', nameLocation: 'middle', nameGap: 26 }),
+          yAxis: QKC.axis(Tk, { fmt: v => U.signed(v, 0), scale: true, name: 'Net rating per 100', nameAlign: 'left' }),
           tooltip: QKC.tooltip(Tk, { trigger: 'axis', formatter: ps => { const i = ps[0].dataIndex, p = path[i], g = byGame[p.game];
             return '<div style="color:' + Tk.ink3 + ';font-size:11px">' + esc(HW.fmtDate(p.date, { year: false })) + '</div>' + QKC.tipRow(col, 'Net', U.signed(p.net, 1) + ' ± ' + U.f(p.se, 1)) +
               (g ? '<div style="margin-top:4px">' + esc((g.home ? 'v ' : '@ ') + HW.teamAbbr(L, g.opp) + ' ' + (g.res || '') + ' ' + g.pts + '-' + g.opp_pts) + '</div>' : ''); } }),
@@ -120,7 +130,7 @@ function render(el, params) {
     }
     if (document.getElementById('tp-seed')) {
       const sd = sim.seed_dist;
-      QKC.bar('#tp-seed', { cats: sd.map((v, i) => String(i + 1)), series: [{ name: 'Seed', data: sd.map(v => Math.round(v * 1000) / 1000) }], colors: sd.map(() => col), fmt: v => U.pct(v) });
+      QKC.bar('#tp-seed', { cats: sd.map((v, i) => String(i + 1)), series: [{ name: 'Seed', data: sd.map(v => Math.round(v * 1000) / 1000) }], colors: sd.map(() => col), fmt: v => U.pct(v), valName: 'Probability', catName: 'Seed' });
     }
     if (needs && needs.grades) {
       QK.table(document.getElementById('tp-grades'), { dense: true, rows: needs.grades, columns: [
@@ -164,7 +174,7 @@ function render(el, params) {
     const sn = document.getElementById('tp-sched');
     const lines = [];
     upcoming.forEach(g => { const home = String(g.home) === tid, opp = home ? g.away : g.home, p = (g.model || {}).p_home; const pt = isNum(p) ? (home ? p : 1 - p) : null;
-      lines.push('<li><span class="n" style="width:auto">' + esc(HW.fmtDate(g.date, { year: false })) + '</span><a class="hw-ent" href="' + esc(HW.gameHref(L, g.id, S)) + '"><span class="nm">' + (home ? 'v ' : '@ ') + esc(HW.teamName(L, opp)) + '</span></a><span class="v">' + (pt === null ? HW.fmtTime(g.date) : U.pct(pt) + ' win') + '</span></li>'); });
+      lines.push('<li><span class="n" style="width:auto">' + esc(HW.fmtDate(g.date, { year: false })) + '</span><a class="hw-ent" href="' + esc(HW.gameHref(L, g.id, S)) + '"><span class="nm">' + (home ? 'v ' : '@ ') + esc(HW.teamName(L, opp)) + '</span></a>' + (g === upcoming[0] ? avNote(g, home) : '') + '<span class="v">' + (pt === null ? HW.fmtTime(g.date) : U.pct(pt) + ' win') + '</span></li>'); });
     if (recent.length) lines.push('<li class="hw-quiet" style="padding-top:12px">Recent results</li>');
     recent.forEach(g => lines.push('<li><span class="n" style="width:auto">' + esc(HW.fmtDate(g.date, { year: false })) + '</span><a class="hw-ent" href="' + esc(HW.gameHref(L, g.game, S)) + '"><span class="nm">' + (g.home ? 'v ' : '@ ') + esc(HW.teamName(L, g.opp)) + '</span></a>' +
       '<span class="v ' + (String(g.res).charAt(0) === 'W' ? 'pos' : 'neg') + '">' + esc((g.res || '') + ' ' + g.pts + '-' + g.opp_pts) + '</span></li>'));

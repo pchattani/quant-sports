@@ -133,7 +133,7 @@ function whoWins(next, race, markets) {
     var top = ids.concat(Object.keys(mkt).filter(function (k) { return ids.indexOf(k) < 0; })).filter(function (id) { return (ds[id] || {}).p_win >= 0.01 || (mkt[id] || 0) >= 0.02; })
       .sort(function (a, b) { return Math.max((ds[b] || {}).p_win || 0, mkt[b] || 0) - Math.max((ds[a] || {}).p_win || 0, mkt[a] || 0); }).slice(0, 10);
     window.QKC.dumbbell(document.getElementById('ov-who'), { rows: top.map(function (id) { return { label: PD.driverName(id), a: (ds[id] || {}).p_win || 0, b: mkt[id] || 0, href: PD.driverHref(id), sub: PD.teamName(PD.driverTeam(id)) }; }),
-      aName: 'Model', bName: 'Market', max: Math.min(1, Math.max.apply(null, top.map(function (id) { return Math.max((ds[id] || {}).p_win || 0, mkt[id] || 0); })) * 1.15 + 0.02), labelWidth: 130 });
+      aName: 'Model', bName: 'Market', max: Math.min(1, Math.max.apply(null, top.map(function (id) { return Math.max((ds[id] || {}).p_win || 0, mkt[id] || 0); })) * 1.15 + 0.02), labelWidth: 130, valName: 'Win probability' });
   } else {
     PD.ch.hbars('ov-who', ids.slice(0, 10).map(function (id) { return { label: PD.driverName(id), value: ds[id].p_win, colour: PD.teamColour(PD.driverTeam(id)), href: PD.driverHref(id) }; }), { fmt: function (v) { return PD.pct(v); }, name: 'P(win)' });
   }
@@ -157,7 +157,7 @@ function progression(season) {
   var st = PD.ch.styleMap(order, teams);
   var xs = done.map(function (c) { return 'R' + c.round; });
   PD.ch.lines('ov-prog', order.map(function (id) { return { name: PD.driverName(id), short: PD.driverCode(id), data: prog[id], colour: st[id].colour, dash: st[id].dash }; }),
-    { xs: xs, endLabels: true, legend: false, yName: 'Points', yScale: false, xLabel: function (v) { var c = done[xs.indexOf(v)]; return c ? v + ' · ' + c.name : v; }, yFmt: function (v) { return PD.pts(v); }, label: 'Points progression' });
+    { xs: xs, endLabels: true, legend: false, xName: 'Round', yName: 'Points', yScale: false, xLabel: function (v) { var c = done[xs.indexOf(v)]; return c ? v + ' · ' + c.name : v; }, yFmt: function (v) { return PD.pts(v); }, label: 'Points progression' });
 }
 
 function standings(season) {
@@ -202,7 +202,7 @@ function cars(value) {
   if (!PD.ok(value) || !value.teams) return PD.ch.none('ov-cars', 'Car pace is estimated once a race has lap data.');
   var T = PD.rowsOf(value.team_cols, value.teams).filter(function (r) { return isNum(r.car); }).sort(function (a, b) { return b.car - a.car; });
   PD.ch.hbars('ov-cars', T.map(function (r) { return { label: PD.teamName(r.id), value: r.car, lo: r.car - (r.car_se || 0), hi: r.car + (r.car_se || 0), colour: PD.teamColour(r.id), href: PD.teamHref(r.id),
-    sub: 'Season mean ' + PD.signed(r.car_mean, 2) + '% · last five rounds ' + PD.signed(r.trend, 2) }; }), { fmt: function (v) { return PD.signed(v, 2) + '%'; }, name: 'Car pace', errName: '±1 se', label: 'Car pace by team' });
+    sub: 'Season mean ' + PD.signed(r.car_mean, 2) + '% · last five rounds ' + PD.signed(r.trend, 2) }; }), { fmt: function (v) { return PD.signed(v, 2) + '%'; }, name: 'Car pace', errName: '±1 se', xName: 'Car pace (% of a lap)', label: 'Car pace by team' });
 }
 
 function bestDrivers(value) {
@@ -210,7 +210,7 @@ function bestDrivers(value) {
   var minR = value.min_races || 5;
   var D = PD.rowsOf(value.driver_cols, value.drivers).filter(function (r) { return isNum(r.pace_tm) && (r.races || 0) >= minR; }).sort(function (a, b) { return b.pace_tm - a.pace_tm; }).slice(0, 10);
   PD.ch.hbars('ov-drv', D.map(function (r) { return { label: r.name, value: r.pace_tm, lo: r.pace_tm - (r.pace_tm_se || 0), hi: r.pace_tm + (r.pace_tm_se || 0), colour: PD.teamColour(r.team), href: PD.driverHref(r.id), sub: PD.teamName(r.team) + ' · ' + r.races + ' races' }; }),
-    { fmt: function (v) { return PD.signed(v, 2) + '%'; }, name: 'Above team-mate', errName: '±1 se', label: 'Pace above the team-mate' });
+    { fmt: function (v) { return PD.signed(v, 2) + '%'; }, name: 'Above team-mate', errName: '±1 se', xName: 'Pace above team-mate (%)', label: 'Pace above the team-mate' });
 }
 
 function favourites(season) {
@@ -221,7 +221,7 @@ function favourites(season) {
   var mean = PD.mean(done.map(function (c) { return c.p_win_top[0][1]; }));
   PD.ch.columns('ov-fav', { cats: done.map(function (c) { return 'R' + c.round; }), label: 'Favourite win probability by round',
     series: [{ name: 'Favourite’s win probability', data: done.map(function (c) { return c.p_win_top[0][1]; }), colours: done.map(function (c) { return c.winner === c.p_win_top[0][0] ? PD.teamColour(c.winner_team || PD.driverTeam(c.winner)) : '#5a6270'; }), fmt: function (v) { return PD.pct(v); } }],
-    fmt: function (v) { return Math.round(v * 100) + '%'; }, yMin: 0,
+    fmt: function (v) { return Math.round(v * 100) + '%'; }, yMin: 0, xName: 'Round', yName: 'Favourite’s win probability',
     tipLabel: function (i) { var c = done[i]; return 'R' + c.round + ' ' + c.name + ': ' + PD.driverName(c.p_win_top[0][0]) + (c.winner === c.p_win_top[0][0] ? ' won' : ' (winner ' + PD.driverName(c.winner) + ')'); } });
   var n = document.getElementById('ov-fav');
   if (n) n.insertAdjacentHTML('afterend', '<p class="pd-cap">The favourite won <b>' + won + ' of ' + done.length + '</b> races; its average win probability was ' + PD.pct(mean, 0) + ', so about ' + PD.num(mean * done.length, 1) + ' wins were expected.</p>');
@@ -243,7 +243,7 @@ function fantasy(F) {
   if (!PD.ok(F) || !F.drivers || !F.projection_ok) return PD.ch.none('ov-fan', F && F.reason ? F.reason : 'No fantasy projection right now.');
   var D = PD.rowsOf(F.driver_cols, F.drivers).filter(function (r) { return isNum(r.next); }).sort(function (a, b) { return b.next - a.next; }).slice(0, 8);
   PD.ch.hbars('ov-fan', D.map(function (r) { return { label: r.name, value: r.next, lo: r.p10, hi: r.p90, colour: PD.teamColour(r.team), href: PD.driverHref(r.id), sub: 'Floor ' + PD.num(r.p10, 0) + ', ceiling ' + PD.num(r.p90, 0) + ' · value ' + PD.signed(r.value, 1) }; }),
-    { fmt: function (v) { return PD.num(v, 1); }, name: 'Projected points', errName: '10th–90th pct', label: 'Fantasy projections' });
+    { fmt: function (v) { return PD.num(v, 1); }, name: 'Projected points', errName: '10th–90th pct', xName: 'Projected fantasy points', label: 'Fantasy projections' });
 }
 
 PD.route('overview', render);

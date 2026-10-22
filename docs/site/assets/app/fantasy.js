@@ -156,7 +156,7 @@ function drawGW(el, body, doc, rows, byId) {
   var t15 = top.slice(0, 15);
   var shownParts = parts.map(function (p, i) { return [p, i]; }).filter(function (x) { return t15.some(function (r) { return Math.abs(((r.next_parts || [])[x[1]]) || 0) >= 0.05; }); });
   if (t15.length && shownParts.length) QKC.bar(el.querySelector('#fa-gw-chart'), {
-    horizontal: true, stack: true, legend: true, labelWidth: 130, fmt: function (v) { return num(v, 2); },
+    horizontal: true, stack: true, legend: true, labelWidth: 130, fmt: function (v) { return num(v, 2); }, valName: 'Expected points',
     cats: t15.map(function (r) { return r.name; }),
     series: shownParts.map(function (x) { return { name: PART_LABEL[x[0]] || x[0], data: t15.map(function (r) { return Math.round((((r.next_parts || [])[x[1]]) || 0) * 100) / 100; }) }; }),
     hrefs: t15.map(function (r) { return FB.href.player(r.id); }), label: 'Expected points by component'
@@ -197,7 +197,7 @@ function drawFDR(el, body, doc, q) {
     '<div class="fb-mt">' + FB.card(mode === 'att' ? 'Expected goals over six gameweeks' : 'Expected clean sheets over six gameweeks', 'Every club, from the same projections.', FB.chartBox('fa-fdr-chart', Math.max(320, fdr.length * 20), 'Six-gameweek totals by club')) + '</div>';
   FB.wireSeg(el, 'fa-fd', function (v) { FB.setQuery({ v: 'fdr', fd: v === 'def' ? 'def' : null }, true); });
   if (fdr.length) QKC.bar(el.querySelector('#fa-fdr-chart'), {
-    horizontal: true, labels: true, labelWidth: 130, fmt: function (v) { return num(v, 1); },
+    horizontal: true, labels: true, labelWidth: 130, fmt: function (v) { return num(v, 1); }, valName: mode === 'att' ? 'Expected goals for' : 'Expected clean sheets',
     cats: fdr.map(function (c) { return c.club; }), series: [{ name: mode === 'att' ? 'xG for' : 'Expected clean sheets', data: fdr.map(function (c) { return Math.round((mode === 'att' ? c.xg_for : c.cs_sum) * 10) / 10; }) }],
     hrefs: fdr.map(function (c) { return c.tid ? FB.href.club(c.tid) : null; }), label: 'Six-gameweek totals'
   });
@@ -286,13 +286,13 @@ function drawMethod(el, body, meta) {
       '<li>Defensive contribution: ' + esc(sc.defensive_contribution || '') + '.</li><li>Bonus: ' + esc(sc.bonus || '') + '.</li><li>Not scored: ' + esc(sc.not_scored || '') + '.</li></ul>' +
       '<p>Projection per player and fixture: expected minutes and the chances of playing and of 60+ minutes from his recent share of his club\'s league minutes (60-day half-weight); per-90 rates (180-day weighting, shrunk to the position) of goals and assists (70% expected, 30% actual), saves, cards, bonus and defensive-contribution hits; scaled by the fixture: attacking rates by the team\'s expected goals in the fixture against its average over its remaining fixtures, the clean sheet as exp(−expected goals against), goals conceded and saves from Poisson expectations.</p>' +
       '<p>Prices: our own proxy, each player\'s expected points above replacement next season from the value model, ranked within the league and position and mapped onto FPL-like ranges (goalkeepers £4.0-6.0, defenders £4.0-7.5, midfielders £4.5-13.0, forwards £4.5-14.5). ' + esc(meta.official_data || '') + '</p></div>') + '</div>';
-  if (keys.length) QKC.bar(el.querySelector('#fa-m-top'), { horizontal: true, labels: true, labelWidth: 150, fmt: function (v) { return num(v, 2); },
+  if (keys.length) QKC.bar(el.querySelector('#fa-m-top'), { horizontal: true, labels: true, labelWidth: 150, fmt: function (v) { return num(v, 2); }, valName: 'Actual points per round',
     cats: keys.map(function (k) { return ms[k].label; }), series: [{ name: 'Top-20 actual points', data: keys.map(function (k) { return ms[k].top20_actual_mean; }) }],
     colors: keys.map(function (k) { return k === 'model' ? QK.cssVar('--c-1') : QK.cssVar('--ink-4'); }) });
   var bp = (ms.model || {}).by_position || {};
   var ps = POS.filter(function (p) { return bp[p]; });
   if (ps.length) QKC.bar(el.querySelector('#fa-m-pos'), { labels: true, fmt: function (v) { return num(v, 2); }, cats: ps.map(function (p) { return POS_LABEL[p] + 's'; }),
-    series: [{ name: 'MAE', data: ps.map(function (p) { return bp[p].mae; }) }], colors: ps.map(posHex) });
+    valName: 'MAE (points per round)', series: [{ name: 'MAE', data: ps.map(function (p) { return bp[p].mae; }) }], colors: ps.map(posHex) });
   else FB.set('fa-m-pos', FB.muted('No breakdown this build.'));
   if (bt.ok) FB.table('fa-m-tbl', [
     { key: 'label', label: 'Projection', sticky: true, fmt: function (v, r) { return r.k === 'model' ? '<b>' + esc(v) + '</b>' : esc(v); } },

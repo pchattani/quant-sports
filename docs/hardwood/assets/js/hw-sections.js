@@ -105,7 +105,7 @@ function standingsTab(node, L, S, params) {
       const series = fmt.playin
         ? [{ name: 'Top-six seed', data: ids.map(t => r3((sim[t] || {}).p_top6)) }, { name: 'Via the play-in', data: ids.map(t => r3(Math.max(0, ((sim[t] || {}).p_playoffs || 0) - ((sim[t] || {}).p_top6 || 0)))) }]
         : [{ name: 'Playoffs', data: ids.map(t => r3((sim[t] || {}).p_playoffs)) }];
-      QKC.bar('#st-odds-' + i, { cats: ids.map(t => HW.teamAbbr(L, t)), series: series, horizontal: true, stack: true, legend: series.length > 1, fmt: v => U.pct(v), max: 1, hrefs: ids.map(t => HW.teamHref(L, t, S)), labelWidth: 46 });
+      QKC.bar('#st-odds-' + i, { cats: ids.map(t => HW.teamAbbr(L, t)), series: series, horizontal: true, stack: true, legend: series.length > 1, fmt: v => U.pct(v), max: 1, hrefs: ids.map(t => HW.teamHref(L, t, S)), labelWidth: 46, valName: 'Playoff probability' });
     });
     if (!live) HW.setMeta('');
   });
@@ -123,7 +123,7 @@ function historyTab(node, L) {
     const tn = id => (hist.team_names || {})[id] || HW.teamName(L, id);
     node.innerHTML = '<div class="qk-grid">' + U.card2('Titles since ' + (hist.first_season || ''), 'Championships by team in the data', U.chart('hs-ch', 26 * top.length + 30, 'Titles by team'), { cls: 'qk-span-5' }) +
       U.card2('Champions', 'Season by season', '<div id="hs-t"></div>', { cls: 'qk-span-7', flush: true }) + '</div>';
-    QKC.bar('#hs-ch', { cats: top.map(tn), series: [{ name: 'Titles', data: top.map(t => cnt[t]) }], horizontal: true, labels: true, fmt: v => String(v), colors: top.map(t => U.tcol(L, t)), labelWidth: 140 });
+    QKC.bar('#hs-ch', { cats: top.map(tn), series: [{ name: 'Titles', data: top.map(t => cnt[t]) }], horizontal: true, labels: true, fmt: v => String(v), colors: top.map(t => U.tcol(L, t)), labelWidth: 140, valName: 'Championships' });
     QK.table(document.getElementById('hs-t'), { dense: true, maxHeight: 560, rows: rows.map(r => Object.assign({}, r, { bw: r.best_record ? r.best_record[1] : null })), columns: [
       { key: 'season', label: 'Season', num: true, fmt: v => '<a class="hw-link" href="' + esc(HW.href(L, 'standings', v)) + '">' + esc(HW.seasonLabel(L, v)) + '</a>' },
       { key: 'champion', label: 'Champion', fmt: v => (v ? U.teamEnt(L, v, { name: tn(v) }) : '—') },
@@ -179,9 +179,9 @@ function renderTeams(el, params) {
     if (withR.length) {
       const mx = withR.reduce((s, t) => s + R[t].off, 0) / withR.length, my = withR.reduce((s, t) => s + R[t].def, 0) / withR.length;
       QKC.mount('#tm-od', T => ({
-        grid: { left: 8, right: 24, top: 20, bottom: 30, containLabel: true },
+        grid: { left: 8, right: 24, top: 34, bottom: 30, containLabel: true },
         xAxis: QKC.axis(T, { name: 'Offensive rating', nameLocation: 'middle', nameGap: 28, scale: true }),
-        yAxis: QKC.axis(T, { name: 'Defensive rating (reversed)', scale: true, inverse: true }),
+        yAxis: QKC.axis(T, { name: 'Defensive rating (reversed)', scale: true, inverse: true, nameLocation: 'start', nameAlign: 'left' }),
         tooltip: QKC.tooltip(T, { formatter: p => { const t = withR[p.dataIndex]; return '<div style="font-weight:600;margin-bottom:4px">' + esc(HW.teamName(L, t)) + '</div>' + QKC.tipRow(p.color, 'Offence', U.f(R[t].off, 1)) + QKC.tipRow(p.color, 'Defence', U.f(R[t].def, 1)) + QKC.tipRow(p.color, 'Net', U.signed(R[t].net, 1) + (isNum(R[t].se_net) ? ' ± ' + U.f(R[t].se_net, 1) : '')); } }),
         series: [{ type: 'scatter', symbolSize: 13, data: withR.map(t => ({ value: [R[t].off, R[t].def], href: HW.teamHref(L, t, S), itemStyle: { color: U.tcol(L, t), borderColor: T.s1, borderWidth: 1.5 },
           label: { show: true, formatter: HW.teamAbbr(L, t), position: 'top', color: T.ink2, fontSize: 10, fontWeight: 600, fontFamily: T.fontUI } })), labelLayout: { hideOverlap: true },
@@ -193,7 +193,7 @@ function renderTeams(el, params) {
         const dates = Array.from(new Set([].concat.apply([], top.map(t => paths[t].map(p => p.date))))).sort();
         const show = top.slice(0, 5).concat(top.slice(-3));
         QKC.line('#tm-paths', { x: dates.map(d => HW.fmtDate(d, { year: false, weekday: false })), series: show.map(t => { const m = {}; paths[t].forEach(p => { m[p.date] = p.net; });
-          let last = null; return { name: HW.teamAbbr(L, t), color: U.tcol(L, t), data: dates.map(d => { if (isNum(m[d])) last = Math.round(m[d] * 10) / 10; return last; }) }; }), yFmt: v => U.signed(v, 1), ref: { y: 0 } });
+          let last = null; return { name: HW.teamAbbr(L, t), color: U.tcol(L, t), data: dates.map(d => { if (isNum(m[d])) last = Math.round(m[d] * 10) / 10; return last; }) }; }), yFmt: v => U.signed(v, 1), ref: { y: 0 }, xName: 'Date', yName: 'Net rating' });
       } else document.getElementById('tm-paths').innerHTML = U.empty('No games yet', 'Rating paths start with the first games.');
     }
   });

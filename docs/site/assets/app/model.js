@@ -228,7 +228,7 @@ ${formula('w_i = exp(−xi × days_ago_i) × weight_i')}
 ${formula('ll_i = log Pois(hg; lam_h) + log Pois(ag; lam_a) + log tau\n\ntau(0,0) = 1 − lam_h × lam_a × rho     tau(1,0) = 1 + lam_a × rho\ntau(0,1) = 1 + lam_h × rho             tau(1,1) = 1 − rho\ntau(x,y) = 1 otherwise')}
 <p><strong>xG rows</strong> (current-season matches with line-ups, where team xG is the sum of the players' Sofascore expected goals) replace the goals entirely with a continuous Poisson likelihood on the two xG totals, with no tau:</p>
 ${formula('ll_i = hx × log(lam_h) − lam_h − lgamma(hx + 1) + ax × log(lam_a) − lam_a − lgamma(ax + 1)')}
-<p>This is a substitution, not a blend: a match with xG contributes only its xG, a match without contributes only its goals, and club xG is used raw (Sofascore's sums, not rescaled to goals). Because rho appears only in goals rows, it is identified only by matches without xG, and almost every club match in the stores has xG. So club fits hold rho fixed at one value (−0.045), estimated by maximum likelihood on the goals of 132,114 matches in 35 leagues, 2014–2025; international and cup fits still fit their own. The objective adds a ${G('ridge')} penalty on the team parameters, not on home advantage or rho:</p>
+<p>This is a substitution, not a blend: a match with xG contributes only its xG, a match without contributes only its goals, and club xG is used raw (Sofascore's sums, not rescaled to goals). Because rho appears only in goals rows, it is identified only by matches without xG, and almost every club match in the stores has xG. So club fits hold rho fixed at one value (−0.045), estimated by maximum likelihood on the goals of 132,114 matches in 35 leagues, 2014–2025. The national-team fit, whose earlier editions carry no xG (about 3,500 goals-only matches), fits its own (−0.03; its 95% interval, −0.11 to −0.02, contains the club value); a fit with fewer than 300 goals-only matches holds the club value instead. The objective adds a ${G('ridge')} penalty on the team parameters, not on home advantage or rho:</p>
 ${formula('minimise   −Σ w_i × ll_i  +  ridge × (Σ att² + Σ def²)')}
 <p>The ridge is not scaled by the number of matches. As the data ages every weight shrinks by the same factor while the ridge stays fixed, so the effective regularisation strengthens with wall-clock time and parameters drift very slowly towards zero even with no new matches (about 3 × 10⁻⁵ on a home-win probability per day). The fit is <code>scipy</code>'s L-BFGS-B with numerical gradients, starting from all team parameters at 0, home advantage 0.1 and rho −0.1; rho is bounded in [−0.99, 0]. A fit needs at least 50 matches (30 for the international fit).</p>
 <h5>Market-rate rows</h5>
@@ -238,7 +238,7 @@ ${formula('w_market = 96 × exp(−0.03 × days_ago)      w_goals = exp(−xi ×
 <h5>Line-ups (since 22 October 2026)</h5>
 <p>Clubs announce their starting XIs about an hour before kick-off. For a league match, the hourly fetch asks Sofascore for the line-ups of every match starting within the next 100 minutes (one call each, inside the same call budget) until Sofascore marks them confirmed; the time they were read is kept. Each XI is then valued with the player-value model described under “Player value and transfers” (every player's box score and rating per 90 from his earlier matches only) and compared with the club's usual XI, the average of its last ten line-ups valued the same way on the same day, so a player's form does not count, only who plays:</p>
 ${formula('delta_side = value(today\'s XI) − mean value(the last 10 XIs)      goals of expected goal difference a match\nd = delta_home − delta_away;   t = 0.75 × d / (lam_h + lam_a)\nlam_h → lam_h × e^t,   lam_a → lam_a × e^−t')}
-<p>The 0.75 and the ten line-ups were chosen on 2025 matches, then tested once on 3,230 league matches from 1 January to 20 October 2026, a test registered before it was run: the line-ups cut the home/draw/away log-loss by 0.0034 (95% CI 0.0008 to 0.0063) and improved calibration, and the gap to the closing price, which already knows the line-ups, fell from 0.010 to 0.007. The model still trails the close. The term needs both clubs to have five earlier line-ups in the stores; otherwise the XIs are shown without changing the line. It applies to the twelve leagues (not Argentina's, whose fetch is separate, nor the cups or national teams), and the line is adjusted only when a build runs after the XIs are read, so near kick-off the page can still show the line without them.</p>
+<p>The 0.75 and the ten line-ups were chosen on 2025 matches, then tested once on 3,230 league matches from 1 January to 20 October 2026, a test registered before it was run: the line-ups cut the home/draw/away log-loss by 0.0034 (95% CI 0.0008 to 0.0063) and improved calibration, and the gap to the closing price, which already knows the line-ups, fell from 0.010 to 0.007. The model still trails the close. The term needs both clubs to have five earlier line-ups in the stores; otherwise the XIs are shown without changing the line. It applies to the league matches (the twelve leagues and Argentina's; not the cups or national teams, where it was not tested), and the line is adjusted only when a build runs after the XIs are read, so near kick-off the page can still show the line without them.</p>
 <h5>Prediction</h5>
 <p>For any pairing the model builds a 9 × 9 matrix of <code>Pois(i; lam_h) × Pois(j; lam_a) × tau(i, j)</code> (goals 0 to 8 each way), clamps negative cells to zero and renormalises, which discards the mass above eight goals. Home win, draw and away win are the lower triangle, the trace and the upper triangle. A team missing from the fit gets attack = defence = 0, the centre of the ridge prior. Negative "scores" that Sofascore uses for voided or awarded matches are dropped before fitting, and a non-finite likelihood aborts the fit rather than silently freezing every club at average.</p>
 <h5>Parameters</h5>
@@ -742,7 +742,7 @@ function calibration(el) {
     ) + (B.calibration_note ? FB.note(esc('Scale: ' + num(B.calibration, 3) + ' — ' + B.calibration_note)) : '') + '</section>';
     FB.set('md-cal', html || FB.empty('No checks published', 'The model checks appear after the next build.'));
     if (rowsC.length) {
-      QKC.bar(el.querySelector('#md-cal-c'), { horizontal: true, legend: true, labelWidth: 120, fmt: function (v) { return pct(v); }, cats: rowsC.map(function (r) { return r.name; }),
+      QKC.bar(el.querySelector('#md-cal-c'), { horizontal: true, legend: true, labelWidth: 120, fmt: function (v) { return pct(v); }, valName: 'Share of matches', cats: rowsC.map(function (r) { return r.name; }),
         series: [{ name: 'Draws', color: QK.cssVar('--c-3'), data: rowsC.map(function (r) { return r.draw; }) }, { name: 'Home wins', color: QK.cssVar('--c-4'), data: rowsC.map(function (r) { return r.home; }) }], label: 'Draw and home-win rates by league' });
       FB.table(el.querySelector('#md-cal-t'), [
         { key: 'name', label: 'League', sticky: true, fmt: function (v, r) { return FB.compLink(r.slug, { short: true, q: null }); } },
@@ -754,7 +754,7 @@ function calibration(el) {
     }
     if (V.ok) {
       var meth = [['rating', 'Rating only'], ['team', 'Team strength'], ['box', 'Box score'], ['value', 'Our value']];
-      QKC.bar(el.querySelector('#md-cal-v'), { legend: true, fmt: function (v) { return num(v, 2); }, cats: meth.map(function (m) { return m[1]; }),
+      QKC.bar(el.querySelector('#md-cal-v'), { legend: true, fmt: function (v) { return num(v, 2); }, valName: 'R², out of sample', cats: meth.map(function (m) { return m[1]; }),
         series: [{ name: 'R² on later xGD', color: QK.cssVar('--c-3'), data: meth.map(function (m) { return (r2.xgd || {})[m[0]]; }) }, { name: 'R² on later GD', color: QK.cssVar('--c-7'), data: meth.map(function (m) { return (r2.gd || {})[m[0]]; }) }], label: 'Value model R squared' });
       var rel = vm.reliability || {};
       FB.set('md-cal-r', QK.pctlBars([
@@ -765,7 +765,7 @@ function calibration(el) {
     }
     if (fv.cv) {
       var fm3 = [['model', 'Fee model'], ['value_age_only', 'Value and age only'], ['baseline_median', 'Median fee']].filter(function (x) { return fv.cv[x[0]]; });
-      QKC.bar(el.querySelector('#md-cal-f'), { horizontal: true, legend: true, labelWidth: 120, fmt: function (v) { return num(v, 2); }, max: 1, cats: fm3.map(function (x) { return x[1]; }),
+      QKC.bar(el.querySelector('#md-cal-f'), { horizontal: true, legend: true, labelWidth: 120, fmt: function (v) { return num(v, 2); }, max: 1, valName: 'Share or correlation', cats: fm3.map(function (x) { return x[1]; }),
         series: [{ name: 'Within 50%', color: QK.cssVar('--c-3'), data: fm3.map(function (x) { return fv.cv[x[0]].within_50pct; }) }, { name: 'Rank correlation', color: QK.cssVar('--c-7'), data: fm3.map(function (x) { return fv.cv[x[0]].spearman; }) }], label: 'Fee model checks' });
       FB.set('md-cal-ft', '<p class="fb-cap">Typical miss: a factor of ' + num(fv.cv.model.error_factor, 1) + ' either way (median ' + FB.money(fv.cv.model.median_abs_eur) + ').' +
         (fv.time_split && fv.time_split.model ? ' Trained up to ' + esc(fv.time_split.train_until) + ' and tested after: ' + pct(fv.time_split.model.within_50pct) + ' within 50%.' : '') + '</p>');
@@ -774,10 +774,10 @@ function calibration(el) {
       var ms = B.methods || {};
       var keys = Object.keys(ms);
       QKC.bar(el.querySelector('#md-cal-b'), { horizontal: true, labels: true, labelWidth: 170, fmt: function (v) { return num(v, 2); }, cats: keys.map(function (k) { return ms[k].label || k; }),
-        series: [{ name: 'MAE', data: keys.map(function (k) { return ms[k].mae; }) }], colors: keys.map(function (k) { return k === 'model' ? QK.cssVar('--c-1') : QK.cssVar('--c-other'); }), label: 'Fantasy backtest MAE' });
+        valName: 'MAE (points per round)', series: [{ name: 'MAE', data: keys.map(function (k) { return ms[k].mae; }) }], colors: keys.map(function (k) { return k === 'model' ? QK.cssVar('--c-1') : QK.cssVar('--c-other'); }), label: 'Fantasy backtest MAE' });
       var bp = (ms.model || {}).by_position || {};
       var pos = ['G', 'D', 'M', 'F'].filter(function (k) { return bp[k]; });
-      QKC.bar(el.querySelector('#md-cal-bp'), { labels: true, fmt: function (v) { return num(v, 2); }, cats: pos.map(function (k) { return FB.POS_GROUP[k]; }), series: [{ name: 'MAE', data: pos.map(function (k) { return bp[k].mae; }) }], label: 'Fantasy MAE by position' });
+      QKC.bar(el.querySelector('#md-cal-bp'), { labels: true, fmt: function (v) { return num(v, 2); }, cats: pos.map(function (k) { return FB.POS_GROUP[k]; }), valName: 'MAE (points per round)', series: [{ name: 'MAE', data: pos.map(function (k) { return bp[k].mae; }) }], label: 'Fantasy MAE by position' });
     }
   });
 }

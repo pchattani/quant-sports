@@ -87,10 +87,10 @@ function lines(x, series, o) {
         data: xs.map((v, k) => [v, s.y[k], s.err[k]]) });
     });
     return {
-      grid: { left: 8, right: 16, top: o.legend === false || list.length < 2 ? 18 : 34, bottom: o.xName ? 26 : 8, containLabel: true },
+      grid: { left: 8, right: 16, top: (o.legend === false || list.length < 2 ? 18 : 34) + (o.yName ? 12 : 0), bottom: o.xName ? 26 : 8, containLabel: true },
       legend: o.legend === false || list.length < 2 ? undefined : legend(T, { data: list.map(s => s.name) }),
       xAxis: Object.assign(ax(T, { type: 'value', name: o.xName, nameLocation: 'middle', nameGap: 26, min: o.xMin, max: o.xMax, fmt: o.xFmt, split: false, line: true, scale: true }), intX ? { minInterval: 1 } : {}),
-      yAxis: ax(T, { name: o.yName, min: o.yMin, max: o.yMax, fmt: o.yFmt, scale: o.yMin === undefined, inverse: !!o.inverse }),
+      yAxis: (a => { a.axisLine.onZero = false; return a; })(ax(T, { name: o.yName, nameAlign: 'left', nameLocation: o.inverse ? 'start' : 'end', min: o.yMin, max: o.yMax, fmt: o.yFmt, scale: o.yMin === undefined, inverse: !!o.inverse })),
       tooltip: tip(T, { trigger: 'axis', formatter: ps => {
         const real = ps.filter(p => p.seriesName && p.seriesType === 'line' && list.some(s => s.name === p.seriesName));
         if (!real.length) return '';
@@ -157,8 +157,9 @@ function driveChart(x, drives, o) {
     yA.axisLabel.fontSize = 9.5;
     const xA = ax(T, { type: 'value', min: -10, max: 110, interval: 10, fmt: v => (v < 0 || v > 100 ? '' : FIELD_LABEL(v)) });
     xA.position = 'top';
+    xA.name = o.xName || 'Field position (yards)'; xA.nameLocation = 'middle'; xA.nameGap = 22;
     return {
-      grid: { left: 8, right: 10, top: 28, bottom: 30, containLabel: true },
+      grid: { left: 8, right: 10, top: 46, bottom: 30, containLabel: true },
       legend: legend(T, { top: 'auto', bottom: 0, data: Object.keys(groups), icon: 'roundRect', itemHeight: 8, itemWidth: 12 }),
       xAxis: xA, yAxis: yA,
       tooltip: tip(T, { formatter: p => {
@@ -193,7 +194,7 @@ function wpRows(x) {
 }
 /* Home win probability by play: our model (fill above/below 50% in each club's colour), ESPN dotted, every 4th
  * down a diamond coloured by grade, scoring plays dots in the scorer's colour, key plays numbered.
- * o: {espn, fourth, scoring, top, home, away, market} */
+ * o: {espn, fourth, scoring, top, home, away, market, tName, yName (axis titles)} */
 function wpChart(x, ours, o) {
   o = o || {};
   const R = wpRows(ours), E = wpRows(o.espn);
@@ -245,11 +246,15 @@ function wpChart(x, ours, o) {
       data: top.map((s, j) => { const k = idxOf(s.i); return { value: [k, isNum(s.p) ? s.p : p[k]], t: s, k: j + 1, itemStyle: { color: T.s4, borderColor: T.ink2, borderWidth: 1 } }; }) });
     const xa = ax(T, { type: 'value', min: 0, max: Math.max(1, p.length - 1), split: false, line: true });
     xa.axisLabel.show = false;
+    const gB = 8 + QKC.nameAxis(xa, o.tName === undefined ? 'Play' : o.tName, 'bottom');
+    const ya = ax(T, { min: 0, max: 1, interval: 0.25, fmt: v => (v === 1 ? hn + ' 100%' : v === 0 ? an + ' 100%' : v === 0.5 ? '50%' : (v > 0.5 ? Math.round(v * 100) : Math.round((1 - v) * 100)) + '%') });
+    const yN = o.yName === undefined ? 'Win probability' : o.yName;
+    if (yN) { ya.name = yN; ya.nameLocation = 'middle'; ya.nameRotate = 90; ya.nameGap = 16 + 6.4 * (Math.max(hn.length, an.length) + 5); }
     return {
-      grid: { left: 8, right: 14, top: 26, bottom: 8, containLabel: true },
+      grid: { left: yN ? 24 : 8, right: 14, top: 26, bottom: gB, containLabel: true },
       legend: R.length >= 2 && E.length >= 2 ? legend(T, { right: 0, left: 'auto', data: ['Our model', 'ESPN'] }) : undefined,
       xAxis: xa,
-      yAxis: ax(T, { min: 0, max: 1, interval: 0.25, fmt: v => (v === 1 ? hn + ' 100%' : v === 0 ? an + ' 100%' : v === 0.5 ? '50%' : (v > 0.5 ? Math.round(v * 100) : Math.round((1 - v) * 100)) + '%') }),
+      yAxis: ya,
       tooltip: tip(T, { trigger: 'item', formatter: q => {
         if (q.seriesName === 'Score') { const s = q.data.s; return thead(esc(GI.teamAbbr(s.team)) + ' ' + esc(s.kind || 'score')) + esc(String(s.desc || '').slice(0, 140)); }
         if (q.seriesName === '4th down') { const s = q.data.f, g = q.data.g; return thead('4th down · ' + esc(GI.teamAbbr(s.team || '')) + ' ' + esc(GI.choiceLabel(s.choice))) + trow(g.colour, g.label, isNum(s.wp_lost) ? GI.num(Math.abs(s.wp_lost) * 100, 1) + ' pts lost' : '') + (s.rec ? trow(T.ink3, 'Model said', GI.choiceLabel(s.rec)) : '') + (s.desc ? '<div style="max-width:280px;white-space:normal;color:' + T.ink3 + '">' + esc(String(s.desc).slice(0, 140)) + '</div>' : ''); }
@@ -284,7 +289,7 @@ function fieldHeatmap(x, data, o) {
   const lab = c => { const y = Math.round(Number(c)); return y === 50 ? '50' : y < 50 ? 'Own ' + y : 'Opp ' + (100 - y); };
   const n = node(x);
   if (n) n.style.setProperty('--h', (o.height || Math.max(170, 90 + ys.length * 34)) + 'px');
-  return heatmap(x, { x: xs.map(lab), y: ys, data: cells, diverging: o.scale !== 'seq', mid: isNum(o.center) ? o.center : GI.median(cells.map(c => c[2])), fmt: o.fmt ? (q => GI.fmtVal(q, o.fmt)) : (q => GI.num(q, 2)), cellLabels: xs.length <= 12, label: o.label });
+  return heatmap(x, { xName: o.xName || 'Field position', yName: o.yName, x: xs.map(lab), y: ys, data: cells, diverging: o.scale !== 'seq', mid: isNum(o.center) ? o.center : GI.median(cells.map(c => c[2])), fmt: o.fmt ? (q => GI.fmtVal(q, o.fmt)) : (q => GI.num(q, 2)), cellLabels: xs.length <= 12, label: o.label });
 }
 const DEPTHS = ['Behind LOS', '0–9', '10–19', '20+'];
 const LOCS = ['Left', 'Middle', 'Right'];
@@ -312,12 +317,12 @@ function passGrid(x, grid, o) {
   const dep = g.depths.slice().reverse();
   g.v.forEach((r, i) => (r || []).forEach((val, j) => { if (isNum(val)) cells.push([j, g.depths.length - 1 - i, Number(val)]); }));
   if (!cells.length) return none(x, o.emptyText || 'No passing grid yet.');
-  return heatmap(x, { x: g.locs, y: dep, data: cells, diverging: o.scale !== 'seq', mid: isNum(o.center) ? o.center : 0, fmt: o.fmt ? (q => GI.fmtVal(q, o.fmt)) : (q => GI.signed(q, 2)), label: o.label || 'Passing by depth and direction' });
+  return heatmap(x, { xName: o.xName || 'Pass direction', yName: o.yName || 'Air yards', x: g.locs, y: dep, data: cells, diverging: o.scale !== 'seq', mid: isNum(o.center) ? o.center : 0, fmt: o.fmt ? (q => GI.fmtVal(q, o.fmt)) : (q => GI.signed(q, 2)), label: o.label || 'Passing by depth and direction' });
 }
 
 // ── distributions, probability bars, radar, reliability ───────────────────
 
-/* Bars of {k: p} (or [[k, p]]). o: {actual, exp, line, xName, colour, unit, signed, split, colours: [above, below]} */
+/* Bars of {k: p} (or [[k, p]]). o: {actual, exp, line, xName, yName ('Probability'), colour, unit, signed, split, colours: [above, below]} */
 function distBars(x, dist, o) {
   o = o || {};
   let entries;
@@ -337,16 +342,17 @@ function distBars(x, dist, o) {
     if (isNum(o.line)) ml.push({ xAxis: o.line, label: { formatter: 'line ' + (o.signed ? GI.signed(o.line, 1) : o.line) } });
     if (isNum(o.exp)) ml.push({ xAxis: o.exp, label: { formatter: 'model ' + (o.signed ? GI.signed(o.exp, 1) : GI.num(o.exp, 1)) } });
     return {
-      grid: { left: 8, right: 14, top: 22, bottom: o.xName ? 26 : 8, containLabel: true },
+      grid: { left: 8, right: 14, top: 22 + (o.yName === '' ? 0 : 12), bottom: o.xName ? 26 : 8, containLabel: true },
       xAxis: ax(T, { type: 'value', name: o.xName, nameLocation: 'middle', nameGap: 26, split: false, line: true, scale: true, fmt: v => (o.signed && v > 0 ? '+' : '') + v }),
-      yAxis: ax(T, { fmt: v => Math.round(v * 100) + '%' }),
+      yAxis: (a => { a.axisLine.onZero = false; return a; })(ax(T, { name: o.yName === undefined ? 'Probability' : o.yName, nameAlign: 'left', fmt: v => Math.round(v * 100) + '%' })),
       tooltip: tip(T, { formatter: q => thead((o.signed && q.value[0] > 0 ? '+' : '') + q.value[0] + ' ' + esc(o.unit || 'pts')) + trow(q.color, 'Chance', GI.pct(q.value[1], 1)) }),
       series: [{ type: 'bar', barWidth: '80%', data: entries.map(e => ({ value: e, itemStyle: { color: colourOf(e[0]), borderRadius: [2, 2, 0, 0] } })),
         markLine: ml.length ? { silent: true, symbol: 'none', lineStyle: { color: T.ink2, type: [4, 3] }, label: { color: T.ink2, fontSize: 10, position: 'insideEndTop' }, data: ml } : undefined }]
     };
   }, o.label || 'Distribution');
 }
-/* Horizontal probability bars with the market as a tick. items [{label, p, colour, market, href}] */
+/* Horizontal probability bars with the market as a tick. items [{label, p, colour, market, href}];
+ * o.valName titles the value axis ('Probability' unless given). */
 function probBars(x, items, o) {
   o = o || {};
   const list = (items || []).filter(i => isNum(i.p) && (i.p > 0 || isNum(i.market))).slice(0, o.top || 12);
@@ -359,13 +365,14 @@ function probBars(x, items, o) {
     const ya = ax(T, { type: 'category', data: cats, split: false, inverse: true });
     ya.axisLabel.color = T.ink2; ya.axisLabel.width = o.labelWidth || 120; ya.axisLabel.overflow = 'truncate'; ya.axisLabel.fontSize = 11;
     const xa = ax(T, { min: 0, max: Math.min(1, mx * 1.18 + 0.02), fmt: v => Math.round(v * 100) + '%' });
+    const gB = 6 + QKC.nameAxis(xa, o.valName === undefined ? 'Probability' : o.valName, 'bottom');
     const series = [{ type: 'bar', name: o.modelName || 'Model', barMaxWidth: 16, cursor: 'pointer',
       data: list.map(i => ({ value: i.p, href: i.href, itemStyle: { color: i.colour ? lift(i.colour, T) : T.model, borderRadius: [0, 4, 4, 0] } })),
       label: { show: true, position: 'right', color: T.ink2, fontFamily: T.fontNum, fontSize: 10.5, formatter: q => GI.pct(q.value, q.value < 0.1 ? 1 : 0) } }];
     if (list.some(i => isNum(i.market))) series.push({ type: 'scatter', name: o.marketName || 'Market', symbol: 'rect', symbolSize: [3, 18], z: 5,
       itemStyle: { color: T.market }, data: list.map((i, k) => (isNum(i.market) ? [i.market, k] : null)).filter(Boolean) });
     return {
-      grid: { left: 8, right: 44, top: series.length > 1 ? 26 : 6, bottom: 6, containLabel: true },
+      grid: { left: 8, right: 44, top: series.length > 1 ? 26 : 6, bottom: gB, containLabel: true },
       legend: series.length > 1 ? legend(T, { data: [o.modelName || 'Model', o.marketName || 'Market'] }) : undefined,
       xAxis: xa, yAxis: ya,
       tooltip: tip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: hexA(T.ink1, 0.04) } }, formatter: ps => {

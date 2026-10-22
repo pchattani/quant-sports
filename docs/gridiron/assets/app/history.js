@@ -69,7 +69,7 @@ GI.route('history', function (el) {
     const drawEnv = () => {
       const L = (d.league || []).slice().sort((a, b) => a.season - b.season);
       const e = ENV[ST.env] || ['', '3'];
-      GI.ch.lines('hi-envc', [{ name: e[0], x: L.map(r => r.season), y: L.map(r => r[ST.env]), symbol: true, area: true }], { legend: false, yFmt: v => GI.fmtVal(v, e[1]), xFmt: String, xLabel: x => String(x) });
+      GI.ch.lines('hi-envc', [{ name: e[0], x: L.map(r => r.season), y: L.map(r => r[ST.env]), symbol: true, area: true }], { legend: false, yFmt: v => GI.fmtVal(v, e[1]), xFmt: String, xLabel: x => String(x), xName: 'Season', yName: e[0] });
     };
     $('hi-board').addEventListener('change', e => { ST.board = e.target.value; draw(); });
     $('hi-from').addEventListener('change', e => { ST.from = Number(e.target.value); draw(); });

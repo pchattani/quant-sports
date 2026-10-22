@@ -147,6 +147,25 @@ USE_SENSITIVITY = True
 LINEUP_TERMS: dict[str, dict[str, dict]] = {}
 
 
+# A fit identifies rho only from its goals rows (matches without xG on both sides; xG and market-rate rows carry
+# no tau). Below this many it holds the club rho instead of leaving rho at the optimiser's start (-0.1) or a bound
+# (docs/MODELS.md 2.4). On the stores of 22 October 2026 the international frame has about 3,560 goals rows
+# (the backfilled earlier editions) and its own rho is identified: -0.06 by profile likelihood, 95% CI -0.11 to
+# -0.02, which holds the club value -0.045 (docs/research/football_edge.md 3.4).
+MIN_GOALS_ROWS_FOR_RHO = 300
+
+
+def rho_hold(df) -> float | None:
+    """None (fit rho) when `df` has enough goals rows to identify it, else the club rho to hold."""
+    if df is None or not len(df):
+        return fitting.club_rho()
+    if "home_xg" not in df.columns or "away_xg" not in df.columns:
+        n = len(df)
+    else:
+        n = int((~(np.isfinite(df["home_xg"].to_numpy(float)) & np.isfinite(df["away_xg"].to_numpy(float)))).sum())
+    return None if n >= MIN_GOALS_ROWS_FOR_RHO else fitting.club_rho()
+
+
 def lineup_lines(fixtures: list[dict]) -> dict[str, dict[str, float]]:
     """match id -> the H/D/A after the line-up term, for the model-v-market comparison."""
     return {str(r["id"]): {"home": r["model"]["h"], "draw": r["model"]["d"], "away": r["model"]["a"]}
@@ -381,7 +400,7 @@ def fit_pooled(stores: dict[str, dict], params: dict, cup_stores: dict[str, dict
     df = pooled_training_frame(stores, cup_stores, xi=float(params["xi"]))
     if df is None or len(df) < 50:
         return None
-    dc = fitting.new_dc(params["xi"], params["ridge"])
+    dc = fitting.new_dc(params["xi"], params["ridge"], prior_group=fitting.pooled_tier if fitting.tier_prior_on() else None)
     try:
         dc.fit(df)
     except Exception as exc:  # noqa: BLE001
@@ -703,7 +722,7 @@ def fit_international(stores: dict[str, dict]) -> tuple[EnsembleModel | None, di
     cal = empirical_calibration(df)
     if len(df) < 30:
         return None, cal
-    dc = DixonColesModel(xi=0.002, ridge=1.0)
+    dc = DixonColesModel(xi=0.002, ridge=1.0, fixed_rho=rho_hold(df))
     try:
         dc.fit(df[[c for c in df.columns if c != "neutral"]])
     except Exception as exc:  # noqa: BLE001
@@ -1560,7 +1579,7 @@ def build_cup(cfg: CupConfig, entry: dict, args, sims: int | None, pooled: Dixon
         dc = CupView(pooled, cfg.slug, state.team_league)
         method = "pooled"
     else:
-        dc = DixonColesModel(xi=0.0035, ridge=1.0)
+        dc = DixonColesModel(xi=0.0035, ridge=1.0, fixed_rho=rho_hold(train_df))
         method = "own"
         if len(train_df) >= 50:
             try:
@@ -1812,7 +1831,7 @@ def build_liga(args, sims: int | None) -> dict:
         out_dir, store, registry, model, in_season, players,
         _liga.player_match_logs(view, registry=registry), _liga.team_match_stats(view, registry=registry),
         _liga.match_details(store, registry=registry),
-        floor=floor, season=entry["season"] or year,
+        floor=floor, season=entry["season"] or year, lineup_terms=LINEUP_TERMS.get(LIGA_ARGENTINA_SLUG),
     )
     # The Argentine build resolves crests against its own site; the hub keeps
     # every crest under docs/site/assets/crests, so fill them in here.
@@ -2101,8 +2120,10 @@ def main() -> int:
     try:
         have = bool(pooled_slugs or cup_slugs)
         lg_stores = stores if have else {s: load_store(DATA_DIR / s / "store.json") for s in LEAGUES}
-        LINEUP_TERMS = lineup_strength.live_terms(
-            {k: v for k, v in lg_stores.items() if not args.only or k in args.only}, cup_stores if have else {})
+        terms_in = {k: v for k, v in lg_stores.items() if not args.only or k in args.only}
+        if LIGA_STORE.exists() and not args.skip_liga and (not args.only or LIGA_ARGENTINA_SLUG in args.only):
+            terms_in[LIGA_ARGENTINA_SLUG] = load_store(LIGA_STORE)
+        LINEUP_TERMS = lineup_strength.live_terms(terms_in, cup_stores if have else {})
         if LINEUP_TERMS:
             logger.info("line-ups posted: %s", {k: len(v) for k, v in LINEUP_TERMS.items()})
     except Exception as exc:  # noqa: BLE001 - the term is an extra; the lines without it stand

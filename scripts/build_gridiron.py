@@ -417,6 +417,7 @@ def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, cards: li
     tt = (tms or {}).get("teams") or {}
     from oddsmarkets.nfl.analytics import adapters
     inj = b.step(f"injuries {ctx.season}", lambda: GM.injuries_by_game(ctx), {}) or {}
+    avail = b.step(f"availability {ctx.season}", lambda: GM.availability_by_game(ctx), {}) or {}
     mk_games = (markets or {}).get("games") or {}
     groups = {k: v for k, v in P[P["game_id"].isin(set(due))].groupby("game_id")} if len(P) else {}
     written = 0
@@ -437,7 +438,7 @@ def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, cards: li
         def build(g=g, gid=gid, old=old, pregame=pregame, ngs_w=ngs_w):
             G = groups.get(gid)
             return GM.build_page(ctx, g, G, by_card.get(gid) or GM.card(ctx, g), pregame, old, nm, ngs_w,
-                                 SN.matchup(tt.get(g.get("home")), tt.get(g.get("away"))), inj)
+                                 SN.matchup(tt.get(g.get("home")), tt.get(g.get("away"))), inj, avail)
         payload = b.step(f"game {gid}", build)
         if payload is None:
             payload = {"ok": False, "reason": "game page could not be built", "game_id": gid}

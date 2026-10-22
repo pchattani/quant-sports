@@ -111,13 +111,13 @@ function forecastBlock(hostId, views, teams, title, startKey, market) {
       var top = ids.concat(Object.keys(mk).filter(function (k) { return ids.indexOf(k) < 0; })).filter(function (id) { return ((ds[id] || {}).p_win || 0) >= 0.005 || (mk[id] || 0) >= 0.01; })
         .sort(function (a, b) { return Math.max((ds[b] || {}).p_win || 0, mk[b] || 0) - Math.max((ds[a] || {}).p_win || 0, mk[a] || 0); }).slice(0, 12);
       window.QKC.dumbbell(document.getElementById(hostId + '-ch'), { rows: top.map(function (id) { return { label: PD.driverName(id), a: (ds[id] || {}).p_win || 0, b: mk[id] || 0, href: PD.driverHref(id) }; }),
-        max: Math.min(1, Math.max.apply(null, top.map(function (id) { return Math.max((ds[id] || {}).p_win || 0, mk[id] || 0); })) * 1.15 + 0.02), labelWidth: 120 });
+        max: Math.min(1, Math.max.apply(null, top.map(function (id) { return Math.max((ds[id] || {}).p_win || 0, mk[id] || 0); })) * 1.15 + 0.02), labelWidth: 120, valName: 'Win probability' });
     } else {
       PD.ch.hbars(hostId + '-ch', ids.slice(0, 12).map(function (id) { var t = teams[id] || PD.driverTeam(id); return { label: PD.driverName(id), value: ds[id].p_win, mark: null, colour: PD.teamColour(t), href: PD.driverHref(id), sub: 'Podium ' + PD.pct(ds[id].p_podium, 0) + ' · points ' + PD.pct(ds[id].p_points, 0) }; }),
         { fmt: function (x) { return PD.pct(x); }, name: 'P(win)', label: 'Win probability' });
     }
     var order = ids.slice().sort(function (a, b) { return ds[a].exp_pos - ds[b].exp_pos; });
-    PD.ch.posHeat(hostId + '-heat', order.map(function (id) { return { label: PD.driverName(id), dist: ds[id].pos_dist || [] }; }), { zmax: 0.6 });
+    PD.ch.posHeat(hostId + '-heat', order.map(function (id) { return { label: PD.driverName(id), dist: ds[id].pos_dist || [] }; }), { zmax: 0.6, yName: 'Driver' });
     var hasPts = ids.some(function (id) { return isNum(ds[id].exp_points); });
     PD.table(hostId + '-t', [
       { key: 'name', label: 'Driver', sticky: true, fmt: function (x, row) { return PD.driverLink(row.id, { team: teams[row.id] }); } },
@@ -236,7 +236,7 @@ function overviewDone(host, race, season, teams) {
   var order = res.map(function (x) { return x.driver; }).filter(function (id) { return eva[id] && isNum(eva[id].exp_pos) && isNum(eva[id].actual); });
   if (order.length) window.QKC.dumbbell(document.getElementById('rc-eva'), { rows: order.map(function (id) { var e = eva[id]; var pc = isNum(e.pctile_of_actual) ? (e.pctile_of_actual <= 1 ? e.pctile_of_actual * 100 : e.pctile_of_actual) : null;
     return { label: PD.driverCode(id), a: e.exp_pos, b: e.actual, href: PD.driverHref(id), sub: PD.driverName(id) + (pc !== null ? ' · ' + PD.ordinal(Math.round(pc)) + ' percentile of the forecast' : '') }; }),
-    aName: 'Expected', bName: 'Finished', min: 0, max: Math.max(20, order.length + 1), labelWidth: 44, fmt: function (v, d) { return isNum(v) ? 'P' + (d === 0 ? Math.round(v) : PD.num(v, 1)) : '—'; } });
+    aName: 'Expected', bName: 'Finished', min: 0, max: Math.max(20, order.length + 1), labelWidth: 44, valName: 'Finishing position', fmt: function (v, d) { return isNum(v) ? 'P' + (d === 0 ? Math.round(v) : PD.num(v, 1)) : '—'; } });
   else PD.ch.none('rc-eva', 'No forecast to compare with.');
   positionChart('rc-pos-mini', race, res, teams, nLaps);
   var views = forecastViews(race);
@@ -250,7 +250,7 @@ function positionChart(id, race, res, teams, nLaps) {
   Object.keys(laps.positions).forEach(function (d) { fixed[d] = laps.positions[d].slice(); });
   res.forEach(function (x) { var ps = fixed[x.driver]; if (ps && isNum(x.pos) && x.laps && ps.length >= x.laps && x.laps === nLaps) ps[x.laps - 1] = x.pos; });
   var n = Object.keys(fixed).length;
-  PD.ch.lapLines(id, fixed, { order: res.map(function (x) { return x.driver; }), teams: teams, control: race.control, invert: true, yMin: 1, yMax: n, interval: n > 12 ? 2 : 1, fmt: function (v) { return 'P' + v; }, yFmt: function (v) { return 'P' + v; }, label: 'Positions lap by lap' });
+  PD.ch.lapLines(id, fixed, { order: res.map(function (x) { return x.driver; }), teams: teams, control: race.control, invert: true, yMin: 1, yMax: n, interval: n > 12 ? 2 : 1, yName: 'Position', fmt: function (v) { return 'P' + v; }, yFmt: function (v) { return 'P' + v; }, label: 'Positions lap by lap' });
 }
 
 // ── laps ──────────────────────────────────────────────────────────────────
@@ -302,7 +302,7 @@ function laps(host, race, teams) {
     var counts = [], who = {};
     for (var i = 1; i <= n; i++) counts.push(0);
     ov.forEach(function (o) { if (o.lap <= n) { counts[o.lap - 1]++; (who[o.lap] = who[o.lap] || []).push(PD.driverCode(o.by) + ' on ' + PD.driverCode(o.on)); } });
-    PD.ch.columns('rl-ot', { cats: counts.map(function (c, k) { return String(k + 1); }), series: [{ name: 'Overtakes', data: counts, colour: '#3987e5', fmt: function (v) { return String(v); } }], xName: 'Lap', fmt: function (v) { return PD.num(v, 0); },
+    PD.ch.columns('rl-ot', { cats: counts.map(function (c, k) { return String(k + 1); }), series: [{ name: 'Overtakes', data: counts, colour: '#3987e5', fmt: function (v) { return String(v); } }], xName: 'Lap', yName: 'Overtakes', fmt: function (v) { return PD.num(v, 0); },
       tipLabel: function (k) { var w = who[k + 1] || []; return 'Lap ' + (k + 1) + (w.length ? ': ' + w.slice(0, 6).join(', ') + (w.length > 6 ? '…' : '') : ''); }, label: 'Overtakes by lap' });
   } else PD.ch.none('rl-ot', 'No overtake data for this race (tracked from 2023).');
   var key = (race.control || []).filter(function (e) { return e && (e.kind === 'SC' || e.kind === 'VSC' || e.kind === 'RED' || e.kind === 'PENALTY' || /INVESTIGATION|DELETED|DRS (EN|DIS)ABLED|RED FLAG|CHEQUERED/i.test(e.message || '')); });
@@ -355,7 +355,7 @@ function strategy(host, race, teams) {
     { name: 'Track °C', data: w.map(function (r) { return [r.t_ms / 60000, r.track > 0 ? r.track : null]; }), colour: '#e8833a' },
     { name: 'Air °C', data: w.map(function (r) { return [r.t_ms / 60000, r.air]; }), colour: '#3987e5' },
     { name: 'Wind m/s', data: w.map(function (r) { return [r.t_ms / 60000, r.wind]; }), colour: '#7d8590', dash: true }
-  ], { xName: 'Minutes from the start' + (w.some(function (r) { return r.rain; }) ? ' (rain recorded)' : ''), xFmt: function (v) { return Math.round(v); }, xLabel: function (v) { return Math.round(v) + ' min'; }, yFmt: function (v) { return PD.num(v, 1); }, label: 'Weather through the race' });
+  ], { xName: 'Minutes from the start' + (w.some(function (r) { return r.rain; }) ? ' (rain recorded)' : ''), xFmt: function (v) { return Math.round(v); }, xLabel: function (v) { return Math.round(v) + ' min'; }, yName: '°C, or m/s for wind', yFmt: function (v) { return PD.num(v, 1); }, label: 'Weather through the race' });
   else PD.ch.none('rs-wx', 'No weather readings for this race.');
 }
 

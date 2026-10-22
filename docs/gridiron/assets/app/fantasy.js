@@ -84,7 +84,7 @@ function week() {
     const cats = top.map(r => r.name + ' · ' + r.pos);
     const ya = GI.ch.ax(T, { type: 'category', data: cats, split: false, inverse: true });
     ya.axisLabel.color = T.ink2; ya.axisLabel.width = 170; ya.axisLabel.overflow = 'truncate';
-    return { grid: { left: 8, right: 20, top: 8, bottom: 26, containLabel: true }, xAxis: GI.ch.ax(T, { name: 'Points', nameLocation: 'middle', nameGap: 24 }), yAxis: ya,
+    return { grid: { left: 8, right: 20, top: 8, bottom: 26, containLabel: true }, xAxis: GI.ch.ax(T, { name: 'Fantasy points', nameLocation: 'middle', nameGap: 24 }), yAxis: ya,
       tooltip: GI.ch.tip(T, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: ps => { const r = top[ps[0].dataIndex]; return GI.ch.thead(esc(r.name)) + GI.ch.trow(T.model, 'Projection', GI.num(proj(r), 1)) + GI.ch.trow(T.ink3, '10th–90th', GI.num(scaleBand(r, r.floor), 1) + '–' + GI.num(scaleBand(r, r.ceil), 1)) + GI.ch.trow(T.ink3, 'Opponent', r.opp || 'bye'); } }),
       series: [{ type: 'custom', silent: true, renderItem: (p, api) => { const i = api.value(0), a = api.coord([api.value(1), i]), b = api.coord([api.value(2), i]); return { type: 'rect', shape: { x: a[0], y: a[1] - 5, width: Math.max(2, b[0] - a[0]), height: 10, r: 5 }, style: { fill: QKC.hexA(GI.ch.lift(GI.teamColour(top[i].team), T), 0.35) } }; },
         data: top.map((r, i) => [i, scaleBand(r, r.floor), scaleBand(r, r.ceil)]), encode: { x: [1, 2], y: 0 } },
@@ -165,8 +165,8 @@ function backtest() {
         ps.map(p => { const r = fm[p]; return [{ html: '<b>' + p + '</b>' }, { v: r.n }, { html: GI.num(r.model.mae, 2) }, { html: GI.num(r.season_to_date.mae, 2) }, { html: GI.num(r.last_season.mae, 2) }, { html: GI.num(r.model.rho, 3) }, { html: GI.num(r.season_to_date.rho, 3) }, { html: GI.num(r.last_season.rho, 3) }]; })) +
       '<p class="gi-cap">Pool: players fantasy-relevant going in. Actual = 0 when a player did not play, which is where the injury report earns its keep.</p>');
   return { html: h, after: () => {
-    GI.ch.bar('bt-mae', { cats: ps, series: [{ name: 'Model', data: ps.map(p => fm[p].model.mae) }, { name: 'Season to date', data: ps.map(p => fm[p].season_to_date.mae) }, { name: 'Last season', data: ps.map(p => fm[p].last_season.mae) }], legend: true, fmt: v => GI.num(v, 2) });
-    GI.ch.bar('bt-rho', { cats: ps, series: [{ name: 'Model', data: ps.map(p => fm[p].model.rho) }, { name: 'Season to date', data: ps.map(p => fm[p].season_to_date.rho) }, { name: 'Last season', data: ps.map(p => fm[p].last_season.rho) }], legend: true, fmt: v => GI.num(v, 2) });
+    GI.ch.bar('bt-mae', { cats: ps, series: [{ name: 'Model', data: ps.map(p => fm[p].model.mae) }, { name: 'Season to date', data: ps.map(p => fm[p].season_to_date.mae) }, { name: 'Last season', data: ps.map(p => fm[p].last_season.mae) }], legend: true, fmt: v => GI.num(v, 2), valName: 'Mean absolute error (pts)' });
+    GI.ch.bar('bt-rho', { cats: ps, series: [{ name: 'Model', data: ps.map(p => fm[p].model.rho) }, { name: 'Season to date', data: ps.map(p => fm[p].season_to_date.rho) }, { name: 'Last season', data: ps.map(p => fm[p].last_season.rho) }], legend: true, fmt: v => GI.num(v, 2), valName: 'Spearman rank correlation' });
   } };
 }
 

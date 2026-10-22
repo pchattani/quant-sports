@@ -439,7 +439,7 @@ function wpChart(el, ours, opts) {
   BP.plot(el, traces, BP.layout({
     height: o.height || 320, shapes: shapes, annotations: ann,
     xaxis: { showgrid: false, fixedrange: true, zeroline: false, showticklabels: false, title: { text: 'Inning', font: { size: 10, color: C.text3 }, standoff: 4 } },
-    yaxis: { range: [0, 1], tickvals: [0, 0.25, 0.5, 0.75, 1], ticktext: [an + ' 100%', '75%', '50%', '75%', hn + ' 100%'], fixedrange: true, automargin: true },
+    yaxis: { title: 'Win probability', range: [0, 1], tickvals: [0, 0.25, 0.5, 0.75, 1], ticktext: [an + ' 100%', '75%', '50%', '75%', hn + ' 100%'], fixedrange: true, automargin: true },
     showlegend: R.length >= 2 && E.length >= 2, legend: { orientation: 'h', y: -0.12, x: 1, xanchor: 'right', font: { size: 10, color: C.text2 } },
     margin: { l: 70, r: 10, t: 20, b: 34 }
   }));
@@ -702,7 +702,7 @@ function distBars(el, dist, opts) {
     hovertemplate: (o.signed ? '%{x:+d}' : '%{x}') + ' ' + esc(o.unit || 'runs') + ': %{y:.1%}<extra></extra>' }], BP.layout({
     height: o.height || 220, bargap: 0.12, shapes: shapes,
     xaxis: { title: o.xTitle || '', fixedrange: true, dtick: ks.length > 24 ? 4 : (ks.length > 12 ? 2 : 1), tickformat: o.signed ? '+d' : 'd' },
-    yaxis: { tickformat: '.0%', fixedrange: true },
+    yaxis: { title: o.yTitle || 'Probability', tickformat: '.0%', fixedrange: true },
     margin: { l: 44, r: 10, t: 10, b: o.xTitle ? 42 : 28 }
   }));
 }
@@ -754,7 +754,7 @@ function probBars(el, items, opts) {
   }
   BP.plot(el, traces, BP.layout({
     height: o.height || Math.max(220, list.length * 28 + 50), bargap: 0.3,
-    xaxis: { tickformat: '.0%', range: [0, Math.min(1.08, max * 1.25 + 0.02)], fixedrange: true },
+    xaxis: { title: o.xTitle || 'Probability', tickformat: '.0%', range: [0, Math.min(1.08, max * 1.25 + 0.02)], fixedrange: true },
     yaxis: { automargin: true, fixedrange: true, tickfont: { size: 11 } },
     showlegend: traces.length > 1, legend: { orientation: 'h', y: -0.12, font: { color: C.text2 } },
     margin: { l: 110, r: 50, t: 10, b: 35 }

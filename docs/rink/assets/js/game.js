@@ -168,19 +168,34 @@ function projBlock(g, m, ln) {
     '<div class="kpi-grid three pad">' + RK.statTile('Overtime', RK.pct(m.p_ot, 0), 'tied after 60') + RK.statTile('Shootout', RK.pct(m.p_so, 0), isNum(m.p_so) ? '' : 'not modelled') +
     (pc && pc.p !== null ? RK.statTile('Puck line', RK.pct(pc.p, 0), esc(RK.teamAbbr(pc.team)) + ' ' + RK.fmtLine(pc.line) + ' covers') : RK.statTile('Puck line', '—', 'no line yet')) + '</div>';
 }
-function goalieCard(g) {
+function goalieCard(g, pre) {
   const gl = g.goalies || {};
   if (!gl.home && !gl.away) return '';
+  const fx = RK.isPre(g) && pre && pre.model && pre.model.goalie_effect ? pre.model.goalie_effect : null;
+  const usual = (fx && fx.usual) || {};
   const one = side => {
     const x = gl[side];
     if (!x) return '<div class="gk"><div class="gk-t">' + RK.teamBar(g[side], gameColours(g)[side]) + esc(RK.teamAbbr(g[side])) + '</div>' + RK.muted('Not announced.') + '</div>';
     const o = typeof x === 'object' ? x : { pid: x };
     const st = String(o.status || '').toLowerCase();
+    const pid = o.pid ? String(o.pid) : '';
+    const alt = fx && usual[side] && pid && String(usual[side]) !== pid ? 'usual starter: ' + RK.playerLink(String(usual[side]), { surname: true }) : '';
     return '<div class="gk"><div class="gk-t">' + RK.teamBar(g[side], gameColours(g)[side]) + esc(RK.teamAbbr(g[side])) + (st ? ' <span class="rk-pill" style="border-color:' + (st === 'confirmed' ? RK.C.green : RK.C.yellow) + ';color:' + (st === 'confirmed' ? RK.C.green : RK.C.yellow) + '">' + esc(st) + '</span>' : '') + '</div>' +
-      '<div class="gk-name">' + (o.pid ? RK.playerLink(o.pid, o.name ? { name: o.name } : null) : esc(o.name || '—')) + '</div>' +
-      '<div class="gk-stats">' + [isNum(o.gp) ? o.gp + ' GP' : '', isNum(o.sv_pct) ? RK.fmtVal(o.sv_pct, 'svpct') + ' SV%' : '', isNum(o.gsax) ? RK.signed(o.gsax, 1) + ' GSAx' : ''].filter(Boolean).join(' · ') + '</div></div>';
+      '<div class="gk-name">' + (pid ? RK.playerLink(pid, o.name ? { name: o.name } : null) : esc(o.name || '—')) + '</div>' +
+      '<div class="gk-stats">' + [isNum(o.gp) ? o.gp + ' GP' : '', isNum(o.sv_pct) ? RK.fmtVal(o.sv_pct, 'svpct') + ' SV%' : '', isNum(o.gsax) ? RK.signed(o.gsax, 1) + ' GSAx' : '',
+        o.at ? (st === 'confirmed' ? 'confirmed ' : 'listed ') + esc(RK.fmtStamp(o.at)) : '', alt].filter(Boolean).join(' · ') + '</div></div>';
   };
-  return RK.card('Starting goalies', 'confirmed or projected; season to date', '<div class="gk-grid">' + one('away') + one('home') + '</div>');
+  let eff = '';
+  if (fx && isNum(fx.p_home_usual) && pre.model && isNum(pre.model.p_home)) {
+    const d = pre.model.p_home - fx.p_home_usual;
+    const H = esc(RK.teamAbbr(g.home));
+    eff = '<div class="chart-note">Effect on the model: ' + H + ' wins ' + RK.pct(pre.model.p_home, 1) + ' with these starters, ' + RK.pct(fx.p_home_usual, 1) +
+      ' with each team\'s usual starter (' + RK.signed(100 * d, 1) + ' pts)' +
+      (isNum(fx.total_usual) && isNum(pre.model.total) ? '; total ' + RK.num(pre.model.total, 2) + ' v ' + RK.num(fx.total_usual, 2) + ' goals' : '') + '.</div>';
+  }
+  const sub = RK.isPre(g) && (gl.home && typeof gl.home === 'object' || gl.away && typeof gl.away === 'object')
+    ? 'ESPN\'s probable starters, read every hour (every 15 minutes near game time); the model prices these' : 'confirmed or projected; season to date';
+  return RK.card('Starting goalies', sub, '<div class="gk-grid">' + one('away') + one('home') + '</div>' + eff);
 }
 function previewTab(g, pre) {
   const m = pre.model || {};
@@ -189,7 +204,7 @@ function previewTab(g, pre) {
   if (hasModel) {
     h += '<div class="grid-32"><div>' + RK.card('Model v market v line', pre.priced_at ? 'priced ' + esc(RK.fmtStamp(pre.priced_at)) + (RK.isPre(g) ? '' : ' · frozen at puck drop') : '', mvmBig(g, pre) +
       '<div class="chart-note">The puck line is the favourite\'s (negative = favoured by more than a goal). The market is the de-vigged prediction-market price; the line is the sportsbook line as ESPN shows it. For information only.</div>') + '</div>' +
-      '<div>' + RK.card('Projected score', 'expected goals in regulation and overtime', projBlock(g, m, pre.line || g.line) || RK.muted('No projection.')) + goalieCard(g) + '</div></div>';
+      '<div>' + RK.card('Projected score', 'expected goals in regulation and overtime', projBlock(g, m, pre.line || g.line) || RK.muted('No projection.')) + goalieCard(g, pre) + '</div></div>';
     const sd = m.score_dist || m.scores, td = m.total_dist;
     if (sd || td) {
       h += '<div class="grid-2">' +

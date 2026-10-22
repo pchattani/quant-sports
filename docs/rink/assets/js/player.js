@@ -453,7 +453,7 @@ function goalieDanger(ctx) {
   if (!rows.length) { k.empty(node, 'GSAx by danger is not available for this goalie yet.'); return; }
   const COL = b => (/hi|high/i.test(b) ? '#f85149' : /med|mid/i.test(b) ? '#d29922' : '#79c0ff');
   k.plot(node, [{ type: 'bar', x: rows.map(r => k.titleCase(r.band)), y: rows.map(r => r.gsax), marker: { color: rows.map(r => COL(r.band)) }, text: rows.map(r => k.signed(r.gsax, 1)), textposition: 'outside', hovertemplate: '%{x}: %{y:+.2f} GSAx<extra></extra>' }],
-    k.layout({ margin: { l: 50, r: 10, t: 20, b: 34 }, yaxis: { title: 'GSAx', zeroline: true, zerolinecolor: '#8b949e' }, xaxis: { type: 'category' } }));
+    k.layout({ margin: { l: 50, r: 10, t: 20, b: 34 }, yaxis: { title: 'GSAx', zeroline: true, zerolinecolor: '#8b949e' }, xaxis: { type: 'category', title: 'Shot danger' } }));
   if (tab) tab.innerHTML = k.table([{ label: 'Danger' }, { label: 'Shots', align: 'right' }, { label: 'xGA', align: 'right' }, { label: 'GA', align: 'right' }, { label: 'GSAx', align: 'right' }, { label: 'Sv%', align: 'right' }, { label: 'xSv%', align: 'right' }],
     rows.map(r => [{ v: r.band, html: '<strong>' + k.esc(k.titleCase(r.band)) + '</strong>' }, { v: r.shots, html: k.int(r.shots) }, { v: r.xg, html: k.num(r.xg, 1) }, { v: r.ga, html: k.int(r.ga) }, { v: r.gsax, html: '<span class="' + (r.gsax >= 0 ? 'gq-ok' : 'gq-no') + '">' + k.signed(r.gsax, 1) + '</span>' }, { v: r.sv, html: k.svp(r.sv) }, { v: r.xsv, html: k.svp(r.xsv) }]), { compact: true });
   locationGrid(ctx, B);
@@ -491,7 +491,7 @@ function goalieTypes(ctx) {
   if (rows.some(r => k.isNum(r.sv))) tr.push({ type: 'bar', name: 'Save %', x: x, y: rows.map(r => r.sv), marker: { color: k.alpha(K().ACC, 0.8) }, hovertemplate: '%{x}: %{y:.3f}<extra>Save %</extra>' });
   if (rows.some(r => k.isNum(r.xsv))) tr.push({ type: 'scatter', mode: 'markers', name: 'Expected', x: x, y: rows.map(r => r.xsv), marker: { symbol: 'line-ew-open', size: 26, color: '#e6edf3', line: { width: 3, color: '#e6edf3' } }, hovertemplate: '%{x}: %{y:.3f}<extra>Expected</extra>' });
   const ys = rows.map(r => r.sv).concat(rows.map(r => r.xsv)).filter(k.isNum);
-  if (tr.length) k.plot(node, tr, k.layout(Object.assign({ margin: { l: 50, r: 10, t: 30, b: 50 }, xaxis: { type: 'category' }, yaxis: { title: 'Save %', tickformat: '.3f', range: [Math.max(0.5, Math.min.apply(null, ys) - 0.03), Math.min(1, Math.max.apply(null, ys) + 0.015)] } }, k.legendTop())));
+  if (tr.length) k.plot(node, tr, k.layout(Object.assign({ margin: { l: 50, r: 10, t: 30, b: 50 }, xaxis: { type: 'category', title: 'Shot type' }, yaxis: { title: 'Save %', tickformat: '.3f', range: [Math.max(0.5, Math.min.apply(null, ys) - 0.03), Math.min(1, Math.max.apply(null, ys) + 0.015)] } }, k.legendTop())));
   else k.empty(node, 'No save percentages by type.');
   if (tab) tab.innerHTML = k.table([{ label: 'Shot type' }, { label: 'Shots', align: 'right' }, { label: 'Sv%', align: 'right' }, { label: 'xSv%', align: 'right' }, { label: 'GSAx', align: 'right' }],
     rows.map(r => [{ v: r.type, html: '<strong>' + k.esc(k.titleCase(r.type)) + '</strong>' }, { v: r.shots, html: k.int(r.shots) }, { v: r.sv, html: k.svp(r.sv) }, { v: r.xsv, html: k.svp(r.xsv) }, { v: r.gsax, html: k.isNum(r.gsax) ? '<span class="' + (r.gsax >= 0 ? 'gq-ok' : 'gq-no') + '">' + k.signed(r.gsax, 1) + '</span>' : '—' }]), { compact: true });
@@ -514,7 +514,7 @@ function workload(ctx) {
   const cumY = log.map(r => { cum += k.first(r.gsax) || 0; return cum; });
   const tr = [{ type: 'bar', name: 'Shots faced', x: xs, y: log.map(r => k.first(r.sa, r.shots_faced, r.shots)), marker: { color: 'rgba(139,148,158,0.35)' }, yaxis: 'y2', hovertemplate: '%{x}: %{y} shots<extra></extra>' }];
   if (log.some(r => k.isNum(r.gsax))) tr.push({ type: 'scatter', mode: 'lines', name: 'Cumulative GSAx', x: xs, y: cumY, line: { color: K().ACC, width: 2.5 }, hovertemplate: '%{x}: %{y:+.1f} GSAx to date<extra></extra>' });
-  k.plot(node, tr, k.layout(Object.assign({ margin: { l: 50, r: 50, t: 30, b: 40 }, yaxis: { title: 'Cumulative GSAx', zeroline: true, zerolinecolor: '#6e7681' }, yaxis2: { title: 'Shots', overlaying: 'y', side: 'right', showgrid: false, rangemode: 'tozero' } }, k.legendTop())));
+  k.plot(node, tr, k.layout(Object.assign({ margin: { l: 50, r: 50, t: 30, b: 40 }, xaxis: { title: log.every(r => r.date) ? 'Game date' : 'Game' }, yaxis: { title: 'Cumulative GSAx', zeroline: true, zerolinecolor: '#6e7681' }, yaxis2: { title: 'Shots', overlaying: 'y', side: 'right', showgrid: false, rangemode: 'tozero' } }, k.legendTop())));
 }
 
 /* A table of named rows: {rowKey: {metric: v}} or [{name|split|strength, ...}]. */
@@ -595,7 +595,7 @@ function careerPanel(ctx) {
   pts.forEach(p => { if (yk === 'sv_pct') { const w = k.sum(p.sv.map(z => z[1])); p.y = w ? k.sum(p.sv.map(z => z[0] * z[1])) / w : null; } });
   const tr = [{ type: 'bar', name: label(yk, ctx.meta), x: pts.map(p => k.sLabel(p.s)), y: pts.map(p => p.y), marker: { color: pts.map(p => (yk === 'gsax' && p.y < 0 ? 'rgba(248,81,73,0.8)' : k.alpha(K().ACC, 0.85))) }, hovertemplate: '%{x}: %{y' + (yk === 'sv_pct' ? ':.3f' : yk === 'gsax' ? ':+.1f' : '') + '}<extra></extra>' }];
   if (vk) tr.push({ type: 'scatter', mode: 'lines+markers', name: label(vk, ctx.meta), x: pts.map(p => k.sLabel(p.s)), y: pts.map(p => p.v), yaxis: 'y2', line: { color: '#f97316', width: 2 }, hovertemplate: '%{x}: %{y:+.1f}<extra>' + k.esc(label(vk, ctx.meta)) + '</extra>' });
-  k.plot(chart, tr, k.layout(Object.assign({ margin: { l: 48, r: 48, t: 30, b: 40 }, xaxis: { type: 'category' }, yaxis: { title: label(yk, ctx.meta), zeroline: true }, yaxis2: { title: vk ? label(vk, ctx.meta) : '', overlaying: 'y', side: 'right', showgrid: false, zeroline: false } }, k.legendTop())));
+  k.plot(chart, tr, k.layout(Object.assign({ margin: { l: 48, r: 48, t: 30, b: 40 }, xaxis: { type: 'category', title: 'Season' }, yaxis: { title: label(yk, ctx.meta), zeroline: true }, yaxis2: { title: vk ? label(vk, ctx.meta) : '', overlaying: 'y', side: 'right', showgrid: false, zeroline: false } }, k.legendTop())));
 }
 
 function projection(ctx) {

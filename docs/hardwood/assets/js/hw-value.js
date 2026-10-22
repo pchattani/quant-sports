@@ -64,14 +64,14 @@ function board(node, L) {
     const pts = rows.filter(r => isNum(r.age) && r.v > 0.5);
     const RC = { G: 0, W: 2, B: 4 };
     QKC.mount('#vb-age', Tk => ({
-      grid: { left: 8, right: 16, top: 30, bottom: 26, containLabel: true },
+      grid: { left: 8, right: 16, top: 48, bottom: 26, containLabel: true },
       legend: { top: 0, left: 0, icon: 'circle', itemWidth: 9, itemHeight: 9, textStyle: { color: Tk.ink2 } },
-      xAxis: QKC.axis(Tk, { name: 'Age', nameLocation: 'middle', nameGap: 24, scale: true }), yAxis: QKC.axis(Tk, {}),
+      xAxis: QKC.axis(Tk, { name: 'Age', nameLocation: 'middle', nameGap: 24, scale: true }), yAxis: QKC.axis(Tk, { name: 'WAR, four seasons', nameAlign: 'left' }),
       tooltip: QKC.tooltip(Tk, { formatter: p => '<div style="font-weight:600">' + esc(p.data.name) + '</div>' + QKC.tipRow(p.color, 'Value', U.f(p.value[1], 1)) + QKC.tipRow(p.color, 'Age', U.f(p.value[0], 1)) }),
       series: ['G', 'W', 'B'].map(k => ({ type: 'scatter', name: U.ROLE[k], symbolSize: 7, itemStyle: { color: Tk.cat[RC[k]], opacity: 0.8 },
         data: pts.filter(r => r.role === k).map(r => ({ value: [r.age, r.v], name: r.name + ' · ' + HW.teamAbbr(L, r.team), href: HW.playerHref(L, r.id) })) }))
     }), { label: 'Value against age' });
-    if (tIds.length) QKC.bar('#vb-net', { cats: byNet.map(t => HW.teamAbbr(L, t)), series: [{ name: 'Net WAR', data: byNet.map(t => Math.round(T[t].net_now * 10) / 10) }], horizontal: true, labels: true, diverging: true, fmt: x => U.signed(x, 1), hrefs: byNet.map(t => HW.href(L, 'value') + '?tab=moves&team=' + t), labelWidth: 46 });
+    if (tIds.length) QKC.bar('#vb-net', { cats: byNet.map(t => HW.teamAbbr(L, t)), series: [{ name: 'Net WAR', data: byNet.map(t => Math.round(T[t].net_now * 10) / 10) }], horizontal: true, labels: true, diverging: true, fmt: x => U.signed(x, 1), hrefs: byNet.map(t => HW.href(L, 'value') + '?tab=moves&team=' + t), labelWidth: 46, valName: 'Net WAR from trades' });
     HW.setMeta(val.updated_at ? 'Valuation ' + esc(HW.fmtStamp(val.updated_at)) : '');
   });
 }

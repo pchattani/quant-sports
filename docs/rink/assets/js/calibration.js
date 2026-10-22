@@ -83,7 +83,7 @@ function bySeries(id, obj, opts) {
   xs.forEach(x => Object.keys(obj[x] || {}).forEach(m => { if (m !== 'n' && k.isNum(vOf(x, m)) && names.indexOf(m) < 0) names.push(m); }));
   const lx = xs.map(x => (k.sid(x) ? k.sLabel(x) : (/^\d$/.test(x) ? (Number(x) > 3 ? 'OT' : 'P' + x) : x)));
   k.plot(node, names.map(m => ({ type: 'scatter', mode: 'lines+markers', name: lab(m), x: lx, y: xs.map(x => vOf(x, m)), line: { color: COL[m] || '#8b949e', width: 2, dash: /market|close|moneypuck|mp/.test(m) ? 'dot' : 'solid' }, connectgaps: false })),
-    k.layout(Object.assign({ margin: { l: 56, r: 10, t: 30, b: 40 }, yaxis: { title: o.yt || 'Log-loss', tickformat: '.3f' }, xaxis: { type: 'category' } }, k.legendTop())));
+    k.layout(Object.assign({ margin: { l: 56, r: 10, t: 30, b: 40 }, yaxis: { title: o.yt || 'Log-loss', tickformat: '.3f' }, xaxis: { type: 'category', title: xs.every(x => k.sid(x)) ? 'Season' : (xs.every(x => /^\d$/.test(x)) ? 'Period' : '') } }, k.legendTop())));
 }
 
 /* ── sections ──────────────────────────────────────────────────────────── */

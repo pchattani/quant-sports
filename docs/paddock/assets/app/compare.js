@@ -145,11 +145,11 @@ function buildDrivers(ids, ss, careers, elo, season, y) {
     series.push({ name: names[i], data: e.map(function (r) { return [r[0] + (r[1] - 1) / 25, r[2]]; }), colour: col });
     series.push({ name: names[i] + ' v team-mate', data: e.map(function (r) { return [r[0] + (r[1] - 1) / 25, r[3]]; }), colour: col, dash: true, width: 1.3 });
   });
-  PD.ch.lines('cmp-elo', series, { xFmt: function (v) { return String(Math.floor(v)); }, xLabel: function (v) { return String(Math.floor(v)); }, yFmt: function (v) { return PD.num(v, 0); }, emptyText: 'No Elo history for either driver.', label: 'Elo histories' });
+  PD.ch.lines('cmp-elo', series, { xName: 'Season', yName: 'Elo rating', xFmt: function (v) { return String(Math.floor(v)); }, xLabel: function (v) { return String(Math.floor(v)); }, yFmt: function (v) { return PD.num(v, 0); }, emptyText: 'No Elo history for either driver.', label: 'Elo histories' });
   var tot2 = careers.map(function (c) { var s = (c || {}).seasons || [], t = (c || {}).totals || {}; var sum = function (k) { return s.reduce(function (a2, r) { return a2 + (r[k] || 0); }, 0); };
     return { Starts: isNum(t.races) ? t.races : sum('races'), Wins: isNum(t.wins) ? t.wins : sum('wins'), Podiums: isNum(t.podiums) ? t.podiums : sum('podiums'), Poles: isNum(t.poles) ? t.poles : sum('poles'), Titles: isNum(t.titles) ? t.titles : s.filter(function (r) { return r.pos === 1; }).length }; });
   var cats2 = ['Starts', 'Wins', 'Podiums', 'Poles', 'Titles'];
-  PD.ch.columns('cmp-car', { cats: cats2, series: [{ name: names[0], data: cats2.map(function (k) { return tot2[0][k]; }), colour: '#3987e5', labels: true }, { name: names[1], data: cats2.map(function (k) { return tot2[1][k]; }), colour: '#e8833a', labels: true }], fmt: function (v) { return PD.num(v, 0); }, label: 'Career totals' });
+  PD.ch.columns('cmp-car', { cats: cats2, series: [{ name: names[0], data: cats2.map(function (k) { return tot2[0][k]; }), colour: '#3987e5', labels: true }, { name: names[1], data: cats2.map(function (k) { return tot2[1][k]; }), colour: '#e8833a', labels: true }], fmt: function (v) { return PD.num(v, 0); }, yName: 'Career total', label: 'Career totals' });
 }
 
 // ── teams ─────────────────────────────────────────────────────────────────
@@ -189,19 +189,19 @@ function teams(el, a, b, y) {
       PD.ch.lines('cmt-pace', [a, b].map(function (id, i) {
         var rows = ((((season || {}).car_pace || {})[kind] || {})[id] || []).slice().sort(function (p, q) { return p.round - q.round; });
         return { name: names[i], colour: cols[i], symbols: true, data: rows.map(function (e) { return [e.round, -e.effect]; }), band: rows.map(function (e) { return [e.round, -e.effect - (e.se || 0), -e.effect + (e.se || 0)]; }) };
-      }), { xName: 'Round', yFmt: function (v) { return PD.signed(v, 2); }, xFmt: function (v) { return 'R' + v; }, xLabel: function (v) { return 'Round ' + v; }, emptyText: 'No car-pace series.', label: 'Car pace comparison' });
+      }), { xName: 'Round', yName: 'Car pace (% of a lap)', yFmt: function (v) { return PD.signed(v, 2); }, xFmt: function (v) { return 'R' + v; }, xLabel: function (v) { return 'Round ' + v; }, emptyText: 'No car-pace series.', label: 'Car pace comparison' });
     };
     drawPace('race');
     PD.wireSeg(document, 'cmt-pk', drawPace);
     var axes = PD.headline(metrics, ['car_race_pace', 'car_quali_pace', 'top_speed', 'corner_speed', 'tyre_mgmt', 'pit_stop_ms', 'strategy_gain', 'dnf_rate'], 8, true).map(function (m) { return { key: m.key, label: m.label.replace(/ \(.*\)$/, '').slice(0, 22) }; });
     PD.ch.radar('cmt-radar', axes, [{ name: names[0], pct: (T[a] || {}).pct, colour: cols[0] }, { name: names[1], pct: (T[b] || {}).pct, colour: cols[1] }]);
     var prog = (((season || {}).progression || {}).constructors) || {};
-    PD.ch.lines('cmt-pts', [a, b].map(function (id, i) { return { name: names[i], colour: cols[i], data: (prog[id] || []).map(function (v, k) { return [k + 1, v]; }) }; }), { xName: 'Round', yFmt: function (v) { return PD.pts(v); }, xFmt: function (v) { return 'R' + v; }, yScale: false, emptyText: 'No points progression.', label: 'Points comparison' });
+    PD.ch.lines('cmt-pts', [a, b].map(function (id, i) { return { name: names[i], colour: cols[i], data: (prog[id] || []).map(function (v, k) { return [k + 1, v]; }) }; }), { xName: 'Round', yName: 'Points', yFmt: function (v) { return PD.pts(v); }, xFmt: function (v) { return 'R' + v; }, yScale: false, emptyText: 'No points progression.', label: 'Points comparison' });
     var stops = [a, b].map(function (id) { var p = (T[id] || {}).pit || {}; return (Array.isArray(p.stop_ms) ? p.stop_ms : []).filter(function (v) { return isNum(v) && v > 0 && v < 15000; }).map(function (v) { return v / 1000; }); });
-    if (stops[0].length || stops[1].length) PD.ch.hist('cmt-pit', [{ name: names[0], values: stops[0], colour: cols[0] }, { name: names[1], values: stops[1], colour: cols[1] }], { bin: 0.2, xName: 'Stationary time (s)', fmt: function (v) { return PD.num(v, 1); }, unit: ' s', label: 'Pit stop comparison' });
+    if (stops[0].length || stops[1].length) PD.ch.hist('cmt-pit', [{ name: names[0], values: stops[0], colour: cols[0] }, { name: names[1], values: stops[1], colour: cols[1] }], { bin: 0.2, xName: 'Stationary time (s)', yName: 'Stops', fmt: function (v) { return PD.num(v, 1); }, unit: ' s', label: 'Pit stop comparison' });
     else PD.ch.none('cmt-pit', 'No stationary times recorded.');
     PD.ch.lines('cmt-rel', [a, b].map(function (id, i) { var c = 0; return { name: names[i], colour: cols[i], step: 'end', data: ((T[id] || {}).log || []).slice().sort(function (p, q) { return p.round - q.round; }).map(function (r) { c += r.dnfs || 0; return [r.round, c]; }) }; }),
-      { xName: 'Round', step: 'end', yScale: false, yFmt: function (v) { return PD.num(v, 0); }, xFmt: function (v) { return 'R' + v; }, emptyText: 'No per-round log.', label: 'Reliability comparison' });
+      { xName: 'Round', yName: 'Retirements, cumulative', step: 'end', yScale: false, yFmt: function (v) { return PD.num(v, 0); }, xFmt: function (v) { return 'R' + v; }, emptyText: 'No per-round log.', label: 'Reliability comparison' });
     if (metrics.length) metricTable('cmt-m', metrics, T[a] || {}, T[b] || {}, names[0], names[1]); else PD.set('cmt-m', PD.muted('No team catalogue for this season.'));
   });
 }

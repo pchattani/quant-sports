@@ -153,7 +153,7 @@ function envChart(env) {
   else tr.push({ type: 'scatter', mode: 'lines', name: 'Runs per PA × 38', x: rows.map(r => r.s), y: rows.map(r => (k.isNum(r.rpa) ? 38 * r.rpa : null)), line: { color: '#f97316', width: 2 } });
   tr.push({ type: 'scatter', mode: 'lines', name: 'Strikeout rate', x: rows.map(r => r.s), y: rows.map(r => r.kp), yaxis: 'y2', line: { color: '#58a6ff', width: 1.5 } });
   tr.push({ type: 'scatter', mode: 'lines', name: 'HR per PA', x: rows.map(r => r.s), y: rows.map(r => r.hr), yaxis: 'y2', line: { color: '#bc8cff', width: 1.5, dash: 'dot' } });
-  k.plot(node, tr, k.layout(Object.assign({ margin: { l: 44, r: 50, t: 28, b: 32 }, yaxis: { title: 'Runs per 9' }, yaxis2: { overlaying: 'y', side: 'right', showgrid: false, tickformat: '.0%', title: 'Rate per PA' } }, k.legendTop())));
+  k.plot(node, tr, k.layout(Object.assign({ margin: { l: 44, r: 50, t: 28, b: 32 }, xaxis: { title: 'Season' }, yaxis: { title: 'Runs per 9' }, yaxis2: { overlaying: 'y', side: 'right', showgrid: false, tickformat: '.0%', title: 'Rate per PA' } }, k.legendTop())));
 }
 
 if (typeof BP.route === 'function') { BP.route('history', render); try { BP.route('#/history', render); } catch (e) { /* bound */ } }

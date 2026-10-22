@@ -296,32 +296,9 @@ def record_miss(store: dict, gid: str, why: str | None, now: datetime | None = N
 # PREMATCH_LEAD_MIN minutes, until Sofascore marks its line-ups confirmed (announced about an hour before
 # kick-off). Paid from the run's ONE call budget, before the detail queue, and capped per run, so the hourly
 # task makes no more calls than before; the build applies the line-up term to those fixtures.
-PREMATCH_LEAD_MIN = 100
-PREMATCH_MAX = 12
-
-
-def prematch_queue(store: dict, now: datetime | None = None, lead_min: int = PREMATCH_LEAD_MIN) -> list[tuple[str, dict]]:
-    """League matches not yet started whose kick-off is within `lead_min` minutes and whose line-ups are not
-    stored as confirmed, soonest first."""
-    now = now or datetime.now(timezone.utc)
-    have = store.get("prematch") or {}
-    out = []
-    for gid, m in (store.get("matches") or {}).items():
-        if m.get("status") in (sofascore.STATUS_FINISHED, sofascore.STATUS_LIVE) or m.get("superseded_by"):
-            continue
-        try:
-            ko = datetime.fromisoformat(str(m.get("date") or "").replace("Z", "+00:00"))
-        except ValueError:
-            continue
-        if ko.tzinfo is None:
-            ko = ko.replace(tzinfo=timezone.utc)
-        if not (now - timedelta(minutes=5) <= ko <= now + timedelta(minutes=lead_min)):
-            continue
-        if (have.get(str(gid)) or {}).get("confirmed"):
-            continue
-        out.append((str(gid), m))
-    out.sort(key=lambda kv: str(kv[1].get("date") or ""))
-    return out
+PREMATCH_LEAD_MIN = sofascore.PREMATCH_LEAD_MIN
+PREMATCH_MAX = sofascore.PREMATCH_MAX
+prematch_queue = sofascore.prematch_queue
 
 
 # Tiers of the detail queue, spent in this order (round-robin across competitions inside each).

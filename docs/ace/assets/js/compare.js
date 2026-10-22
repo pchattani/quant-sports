@@ -156,7 +156,7 @@ function build(T, ids, cat, careers, E, body) {
       const rs = (((cr || {}).elo) || []).filter(r => Array.isArray(r) && k.isNum(r[c]));
       if (rs.length) tr.push({ type: 'scatter', mode: 'lines', name: names[i], x: rs.map(r => r[0]), y: rs.map(r => r[c]), line: { color: cols[i], width: 2, shape: 'hv' }, hovertemplate: '%{x}: %{y:.0f}<extra>' + k.esc(short[i]) + '</extra>' });
     });
-    if (tr.length) k.plot('cmp-elo', tr, k.layout(Object.assign(k.legendTop(), { margin: { l: 50, r: 10, t: 34, b: 36 }, xaxis: { type: 'date' }, yaxis: { title: ['', 'Overall', 'Hard', 'Clay', 'Grass'][c] + ' Elo' } })));
+    if (tr.length) k.plot('cmp-elo', tr, k.layout(Object.assign(k.legendTop(), { margin: { l: 50, r: 10, t: 34, b: 36 }, xaxis: { type: 'date', title: 'Date' }, yaxis: { title: ['', 'Overall', 'Hard', 'Clay', 'Grass'][c] + ' Elo' } })));
     else document.getElementById('cmp-elo').innerHTML = k.muted('No Elo history in either career file.');
   };
   drawElo('1');
@@ -176,7 +176,7 @@ function build(T, ids, cat, careers, E, body) {
       k.band(rs.map(r => ({ x: r[0], y: r[2], se: r[6], text: r[0] })), cols[i], short[i] + ' serve').forEach(t => tr.push(t));
       k.band(rs.map(r => ({ x: r[0], y: r[3], se: r[7], text: r[0] })), cols[i], short[i] + ' return', { dash: 'dot' }).forEach(t => tr.push(t));
     });
-    if (tr.length) k.plot('cmp-sr', tr, k.layout(Object.assign(k.legendTop(), { margin: { l: 50, r: 10, t: 34, b: 36 }, xaxis: { type: 'date' }, yaxis: { title: 'Rating (log-odds of holding)', zeroline: true, zerolinecolor: '#6e7681' } })));
+    if (tr.length) k.plot('cmp-sr', tr, k.layout(Object.assign(k.legendTop(), { margin: { l: 50, r: 10, t: 34, b: 36 }, xaxis: { type: 'date', title: 'Date' }, yaxis: { title: 'Rating (log-odds of holding)', zeroline: true, zerolinecolor: '#6e7681' } })));
     else document.getElementById('cmp-sr').innerHTML = k.muted('No serve/return path on this surface for either player.');
   };
   drawSR('all');

@@ -18,6 +18,11 @@
     "test": "1 Jan to 20 Oct 2026, n 3,230: log-loss -0.0034 (95% CI -0.0063 to -0.0008); promoted 2026-10-22",
     "source": "scripts/football_lineups.py"
   },
+  "pooled_tier_prior": {
+    "on": false,
+    "rule": "clubs under a cup prefix (outside the followed leagues) shrink toward their tier's fitted offsets (domestic: national cups and super cups; continental: continental cups) instead of toward an average top-flight club; unseen clubs take their tier (fitting.pooled_tier, DixonColesModel prior_group)",
+    "test": "pre-registered (football_edge.md 3.5), 1 Dec 2025 to 20 Oct 2026, every club-cup match n 1,569: log-loss -0.0285 (95% CI -0.0462 to -0.0123), slope 1.088 -> 1.032, ECE 0.0166 -> 0.0178 (+0.0012 > the 0.001 tolerance): not promoted; off pending the user's decision"
+  },
   "tuned_at": "2026-10-22T04:50:14Z",
   "folds": 6,
   "min_train": 200,

@@ -113,7 +113,91 @@ def event_ref(ev: dict, season: int | None = None) -> dict | None:
             "away": canon.abbr_from_espn(ae, at.get("abbreviation"), season),
             "state": st.get("state"), "completed": st.get("completed"), "hs": _int(h.get("score")),
             "as": _int(a.get("score")), "attendance": _int(comp.get("attendance")) or None,
-            "odds": comp.get("odds")}
+            "odds": comp.get("odds"), "probables": probables_of(comp)}
+
+
+# ── probable starting goalies (captured going forward; ESPN rewrites them to the actual starters after the game) ──
+
+PROBABLE_STATUS = {"confirmed": "confirmed", "expected": "projected", "probable": "projected", "projected": "projected"}
+PROBABLE_LOG_MAX = 12
+
+
+def probables_of(comp: dict) -> dict | None:
+    """{"home"|"away": {"espn": athlete id, "name", "status": "confirmed"|"projected"}} from a scoreboard competition's
+    competitors[].probables (name "probableStartingGoalie"; status.name "Expected" / "Confirmed"), or None."""
+    out = {}
+    for x in (comp or {}).get("competitors") or []:
+        side = x.get("homeAway")
+        if side not in ("home", "away"):
+            continue
+        for pr in x.get("probables") or []:
+            if pr.get("name") != "probableStartingGoalie":
+                continue
+            ath = pr.get("athlete") or {}
+            st = str(((pr.get("status") or {}).get("name") or (pr.get("status") or {}).get("type") or "")).strip().lower()
+            nm = ath.get("fullName") or ath.get("displayName")
+            if not nm:
+                continue
+            out[side] = {"espn": str(ath.get("id") or pr.get("playerId") or "") or None, "name": nm,
+                         "status": PROBABLE_STATUS.get(st, "projected")}
+            break
+    return out or None
+
+
+def _norm_name(x: Any) -> str:
+    import unicodedata
+    x = unicodedata.normalize("NFKD", str(x or "")).encode("ascii", "ignore").decode().lower()
+    return "".join(ch for ch in x if ch.isalpha())
+
+
+def nhl_goalie_id(players: dict | None, team: str | None, name: str | None) -> str | None:
+    """The NHL player id of a goalie named `name` (ESPN spelling) from the store's players: same normalised full name
+    (goalies first, the team's first), else the team's only goalie with that last name."""
+    if not name or not players:
+        return None
+    n = _norm_name(name)
+    last = _norm_name(str(name).split(" ")[-1])
+    full, by_last = [], []
+    for pid, rec in players.items():
+        if not isinstance(rec, dict):
+            continue
+        pos_g = str(rec.get("pos") or "").upper() == "G"
+        same_team = team is not None and rec.get("team") == team
+        if _norm_name(rec.get("name")) == n:
+            full.append((not pos_g, not same_team, str(pid)))
+        elif pos_g and same_team and _norm_name(rec.get("last")) == last:
+            by_last.append(str(pid))
+    if full:
+        return sorted(full)[0][2]
+    return by_last[0] if len(by_last) == 1 else None
+
+
+def update_probables(old: dict | None, new: dict | None, at: str, players: dict | None = None,
+                     teams: dict | None = None) -> dict | None:
+    """Merge one pre-game scoreboard read into GAME.probables, keeping the history with capture times:
+    {"home"|"away": {"id" (NHL, when the name maps), "espn", "name", "status", "since" (first seen with this goalie),
+    "confirmed_at" (first seen confirmed), "log": [[at, id or name, status], ...] (one entry per change)}, "at": the
+    last read}. Only call it before the start: after the game ESPN shows the actual starters."""
+    if not new and not old:
+        return None
+    out = {k: (dict(v) if isinstance(v, dict) else v) for k, v in (old or {}).items()}
+    for side in ("home", "away"):
+        n = (new or {}).get(side)
+        if not n:
+            continue
+        o = out.get(side) or {}
+        same = _norm_name(o.get("name")) == _norm_name(n.get("name"))
+        pid = nhl_goalie_id(players, (teams or {}).get(side), n.get("name")) or (o.get("id") if same else None)
+        rec = {"id": pid, "espn": n.get("espn"), "name": n.get("name"), "status": n.get("status"),
+               "since": o.get("since") if same and o.get("since") else at,
+               "confirmed_at": (o.get("confirmed_at") if same else None) or (at if n.get("status") == "confirmed" else None),
+               "log": list(o.get("log") or [])}
+        if not same or o.get("status") != n.get("status"):
+            rec["log"].append([at, pid or n.get("name"), n.get("status")])
+            rec["log"] = rec["log"][-PROBABLE_LOG_MAX:]
+        out[side] = rec
+    out["at"] = at
+    return out
 
 
 def match_events(events: list[dict], games: dict[str, dict], max_hours: float = 30.0,

@@ -156,8 +156,8 @@ GI.route('compare', function (el, params) {
       const cats = ms.map(m => m.label + (m.lower ? ' ↓' : ''));
       const ya = GI.ch.ax(T, { type: 'category', data: cats, split: false, inverse: true });
       ya.axisLabel.color = T.ink2; ya.axisLabel.width = 150; ya.axisLabel.overflow = 'truncate';
-      return { grid: { left: 8, right: 16, top: 26, bottom: 8, containLabel: true }, legend: GI.ch.legend(T, { data: [A.name, B.name] }),
-        xAxis: GI.ch.ax(T, { min: -100, max: 100, fmt: v => String(Math.abs(v)) }), yAxis: ya,
+      return { grid: { left: 8, right: 16, top: 26, bottom: 30, containLabel: true }, legend: GI.ch.legend(T, { data: [A.name, B.name] }),
+        xAxis: GI.ch.ax(T, { min: -100, max: 100, fmt: v => String(Math.abs(v)), name: 'Percentile', nameLocation: 'middle', nameGap: 26 }), yAxis: ya,
         tooltip: GI.ch.tip(T, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: ps => { const m = ms[ps[0].dataIndex]; return GI.ch.thead(esc(m.label)) + GI.ch.trow(T.model, A.name, GI.fmtVal(A.values[m.key], m.fmt) + ' · ' + Math.round(A.pct[m.key]) + 'th') + GI.ch.trow(T.market, B.name, GI.fmtVal(B.values[m.key], m.fmt) + ' · ' + Math.round(B.pct[m.key]) + 'th'); } }),
         series: [{ type: 'bar', name: A.name, stack: 's', data: ms.map(m => -A.pct[m.key]), barMaxWidth: 12, itemStyle: { color: T.model, borderRadius: [3, 0, 0, 3] } },
           { type: 'bar', name: B.name, stack: 's', data: ms.map(m => B.pct[m.key]), barMaxWidth: 12, itemStyle: { color: T.market, borderRadius: [0, 3, 3, 0] } }] };

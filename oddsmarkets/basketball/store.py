@@ -162,6 +162,30 @@ def seasons_on_disk(league: str) -> list[int]:
     return sorted(int(x.name) for x in d.iterdir() if x.is_dir() and x.name.isdigit() and (x / "store.json").exists())
 
 
+INJURY_LOG = "injury_log.json"
+
+
+def load_injury_log(league: str, season: int) -> dict[str, list]:
+    """{game_id: [[fetched_at, {team_id: [[player_id, status, espn_date]]}], ...]}: timestamped snapshots of ESPN's
+    injury list for upcoming games (`append_injury_log`); {} when none."""
+    return load_table(league, season, INJURY_LOG) or {}
+
+
+def append_injury_log(log: dict[str, list], game_id: str, at: str, rows: dict[str, list]) -> bool:
+    """Append one snapshot for a game not yet started, only when it differs from the game's last one (so the log
+    holds every change, each stamped with the first fetch that saw it). Returns whether it was appended."""
+    snaps = log.setdefault(str(game_id), [])
+    norm = {str(t): sorted([str(r[0]), r[1], r[2]] for r in v) for t, v in sorted(rows.items())}
+    if snaps and snaps[-1][1] == norm:
+        return False
+    snaps.append([at, norm])
+    return True
+
+
+def save_injury_log(league: str, season: int, log: dict[str, list]) -> Path:
+    return save_table_gz(league, season, INJURY_LOG, log)
+
+
 def merge_game(store: dict[str, Any], game: dict[str, Any]) -> dict[str, Any]:
     """Insert or update a GAME, keeping richer fields the new record lacks (a scoreboard
     skeleton never wipes a fetched box score; injuries survive the post-game refetch)."""

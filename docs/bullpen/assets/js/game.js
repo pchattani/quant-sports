@@ -678,7 +678,7 @@ function arsenalPanel(el, g, P, L) {
     CH().movementPlot('ar-mv', mine.length ? mine : types.map(t => Object.assign({ pitch_type: t }, pt[t])), { throws: a.throws, armAngle: a.arm_angle, league: norms, height: 360, means: !mine.length });
     const base = {};
     types.forEach(t => { const n = (pt[t] || {}).norm; if (n && isNum(n.velo)) base[t] = n.velo; });
-    CH().pitchTrend('ar-velo', mine.map((p, i) => ({ x: i + 1, pitch_type: p.pitch_type, y: p.velo })), { baseline: base, yTitle: 'mph', xTitle: 'Pitch of the game', height: 360, mode: 'markers' });
+    CH().pitchTrend('ar-velo', mine.map((p, i) => ({ x: i + 1, pitch_type: p.pitch_type, y: p.velo })), { baseline: base, yTitle: 'Velocity (mph)', xTitle: 'Pitch of the game', height: 360, mode: 'markers' });
     BP.sortable(document.getElementById('ar-body'));
   };
   BP.wireToggles(document.getElementById('ar-pick'), 'data-p', k => { cur = k; draw(); });

@@ -81,7 +81,7 @@ function race(L, S, a, i) {
   if (!bars.length) { node.style.display = 'none'; return; }
   const tr = [{ type: 'bar', orientation: 'h', name: 'Model', y: bars.map(pid => k.surname(k.name(pid))), x: bars.map(pid => model[pid] || 0), marker: { color: '#f97316' }, hovertemplate: '%{y}: %{x:.1%}<extra>model</extra>' }];
   if (Object.keys(market).length) tr.push({ type: 'bar', orientation: 'h', name: 'Market', y: bars.map(pid => k.surname(k.name(pid))), x: bars.map(pid => market[pid] || 0), marker: { color: '#58a6ff' }, hovertemplate: '%{y}: %{x:.1%}<extra>market</extra>' });
-  k.plot(node, tr, k.layout(Object.assign({ barmode: 'group', margin: { l: 96, r: 10, t: 24, b: 28 }, xaxis: { tickformat: '.0%', range: [0, 1] }, yaxis: { type: 'category', automargin: true } }, k.legendTop())));
+  k.plot(node, tr, k.layout(Object.assign({ barmode: 'group', margin: { l: 96, r: 10, t: 24, b: 28 }, xaxis: { title: 'Chance of winning', tickformat: '.0%', range: [0, 1] }, yaxis: { type: 'category', automargin: true } }, k.legendTop())));
 }
 
 if (typeof BP.route === 'function') { BP.route('awards', render); try { BP.route('#/awards', render); } catch (e) { /* bound */ } }

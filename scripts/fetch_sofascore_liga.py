@@ -438,7 +438,19 @@ def main() -> int:
         store = {k: (dict(v) if isinstance(v, dict) else v) for k, v in EMPTY_STORE.items()}
     before = len(store.get("lineups", {}))
     budget = sofascore.CallBudget(args.budget if args.budget is not None else (BACKFILL_BUDGET if args.backfill else DEFAULT_BUDGET))
-    status = update_store(store, max_new=budget.limit // sofascore.DETAIL_CALLS, budget=budget, refresh=args.refresh_detail)
+    # Line-ups of matches about to start (docs/MODELS.md 2.6): one call each from the same budget, capped.
+    n_pre = 0
+    for gid, m in sofascore.prematch_queue(store)[:sofascore.PREMATCH_MAX]:
+        if budget.left < 1 or sofascore.is_blocked():
+            break
+        try:
+            n_pre += bool(sofascore.fetch_prematch(store, gid, {**m, "home": _canon(str(m.get("home") or "")),
+                                                                "away": _canon(str(m.get("away") or ""))}, budget=budget))
+        except sofascore.BudgetExhausted:
+            break
+    if n_pre:
+        logger.info("pre-match line-ups: %d matches", n_pre)
+    status = update_store(store, max_new=budget.left // sofascore.DETAIL_CALLS, budget=budget, refresh=args.refresh_detail)
     logger.info("detail calls used: %d of %d", budget.used, budget.limit)
 
     if not status["ok"]:
