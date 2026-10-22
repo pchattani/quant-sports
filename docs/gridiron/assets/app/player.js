@@ -1,7 +1,7 @@
 /* The Quant Gridiron — the player page (#/player/<pid>), position-aware, on Design System 2.0 (the Rink player page is
  * the reference). Player card header (team band, position, age, size, college, draft, headline numbers) · stat tiles
- * with percentile chips · the Savant-style percentile card against his peer group (QB, RB, WR/TE, DL and outside rushers,
- * LB, DB, K, P; the sample and the qualification rule shown) beside where he sits in the peer distribution (players.json,
+ * with percentile chips · the Savant-style percentile card on the metrics spec's headline set against his group (QB, RB,
+ * WR, TE, outside pass rushers, interior linemen, LB, CB, S, K, P; spec.js), with the sample, the minimum and the caveats beside where he sits in the peer distribution (players.json,
  * loaded after the first paint) · value (projected points above replacement,
  * with its band and by-season projection, current season) · similar players · position charts (QB pass
  * grid and EPA by game; RB RYOE by game; WR/TE depth profile; K field goals by distance; defenders'
@@ -118,9 +118,8 @@ GI.route('player', function (el, params) {
     const dr = c.draft || {};
     const draftTxt = dr.year || dr.season ? (dr.round ? 'Round ' + dr.round + (dr.pick ? ', pick ' + dr.pick : '') + ', ' : '') + (dr.year || dr.season) + (dr.team ? ' (' + dr.team + ')' : '') : '';
     const ht = isNum(c.height) && c.height > 50 ? Math.floor(c.height / 12) + '′' + (c.height % 12) + '″' : '';
-    const peerRow = pctS ? { pos: pos, group: group, values: pctS.values || {}, pct: pctS.pct || {}, pct_pos: pctS.pct_pos || {}, games: viewSeason.games, qualified: viewSeason.qualified } : null;
-    const peer = GI.peerOf({ pos: pos }, group);
-    const P = peerRow ? GI.peerPct(peerRow, group) : {};
+    const peerRow = pctS ? { pos: pos, group: group, role: pctS.role, values: pctS.values || {}, pct: pctS.pct || {}, pct_pos: pctS.pct_pos || {}, pct_role: pctS.pct_role, games: viewSeason.games, qualified: viewSeason.qualified } : null;
+    const g0 = GI.SP.groupOf(peerRow || { pos: pos, group: group }, pid, null);
     const tiles = (TILES[group] || []).map(t => { const key = GI.pickKey(vals, t[1]); return key && isNum(vals[key]) ? { label: t[0], key: key, v: vals[key], sub: t[2] } : null; }).filter(Boolean);
     const status = valn && valn.status && valn.status !== 'ACT' ? ({ RES: 'Injured reserve', DEV: 'Practice squad', INA: 'Inactive', FA: 'Free agent' }[valn.status] || valn.status) : '';
     const tags = [];
@@ -131,26 +130,25 @@ GI.route('player', function (el, params) {
       meta: [isNum(age) ? ['Age', GI.num(age, 0)] : null, ht ? ['Size', ht + (c.weight ? ' · ' + c.weight + ' lb' : '')] : null, c.college ? ['College', c.college] : null, draftTxt ? ['Draft', draftTxt] : null,
         seasons.length ? ['Seasons', seasons[0].season + '–' + last.season] : null],
       stats: tiles.slice(0, 4).map(t => ({ label: t.label, value: fv(t.key, t.v) })), tags: tags });
-    h += '<div class="gi-toolbar" style="margin-top:12px"><a class="qk-btn primary" href="' + GI.compareHref(pid) + '">Compare</a><a class="qk-btn" href="' + GI.ghref('players', S, { g: group }) + '">All ' + esc((GI.GROUP_NAME[group] || 'players').toLowerCase()) + '</a>' +
+    h += '<div class="gi-toolbar" style="margin-top:12px"><a class="qk-btn primary" href="' + GI.compareHref(pid) + '">Compare</a><a class="qk-btn" href="' + GI.ghref('players', S, { g: g0 ? g0.code : group }) + '">All ' + esc((g0 ? g0.name : (GI.GROUP_NAME[group] || 'players')).toLowerCase()) + '</a>' +
       (team ? '<a class="qk-btn" href="' + GI.teamHref(team, S) + '">' + esc(GI.teamShort(team)) + '</a>' : '') + '</div>';
     const tl = [];
     if (valn) tl.push(GI.kpi('Projected value', GI.num(valn.value, 0), 'points above replacement, this season and the next three · likely range ' + GI.num(valn.lo, 0) + '–' + GI.num(valn.hi, 0), { signal: true, tip: 'Our player-value model: projected points above a replacement player, discounted 10% a season; the range is the 10th to 90th percentile' }));
-    tiles.slice(0, valn ? 4 : 5).forEach(t => tl.push(GI.kpi(t.label, fv(t.key, t.v), esc(t.sub), { pctl: isNum(P[t.key]) ? P[t.key] : null, tip: (META[t.key] || {}).desc })));
+    tiles.slice(0, valn ? 4 : 5).forEach(t => tl.push(GI.kpi(t.label, fv(t.key, t.v), esc(t.sub), { pctl: GI.SP.pctSync(peerRow, g0, t.key), tip: (META[t.key] || {}).desc })));
     if (tl.length) h += GI.kpis(tl);
     if (group === 'OL') h += GI.note('Offensive linemen have no individual metrics in the public data. The team page carries the line\'s unit ratings.');
-    const metrics = Object.keys(META).map(k => META[k]).filter(m => GI.scopeOk(m, group) && isNum((pctS ? pctS.values : vals)[m.key]));
-    const setG = GI.playerSet(group, metrics);
-    if (pctS && metrics.length) {
-      const groups = setG.map(g => ({ label: g[0], rows: g[1].map(k => { const m = META[k] || {}; return isNum(P[k]) ? { label: (m.label || label(k)) + (m.lower ? ' ↓' : ''), pctl: P[k], value: fv(k, pctS.values[k]), tip: GI.copyText(m.desc || '') } : null; }).filter(Boolean) }));
-      h += GI.grid('<div class="qk-span-5">' + QK.pctCard({ title: 'Percentile rankings', peer: peer.name + ', qualified', sample: GI.sampleLine(peerRow, group, ''), groups: groups,
-          note: '100 = best in the peer group; ↓ metrics are flipped so a high percentile is always good. Rates are shrunk towards the group mean by their stabilisation point before ranking.',
-          emptyText: 'He is short of the sample floor for percentiles this season.', foot: '<span>' + esc(S) + ' · every metric on the <a href="' + GI.ghref('players', S, { g: group }) + '">catalogue</a></span><a href="' + GI.compareHref(pid) + '">Compare →</a>' }) + '</div>' +
-        '<div class="qk-span-7"><div class="gi-stack">' + GI.card('Where he sits', 'Every qualified player in his peer group (' + esc(peer.name.replace(/^NFL /, '')) + ') this season; bars coloured by percentile',
+    if (pctS && g0) {
+      h += GI.grid('<div class="qk-span-5" id="pp-pcard">' + GI.card('Percentile rankings', 'Against ' + esc(g0.peer) + ', loading the peer group…', QK.skeleton('lines', 6)) + '</div>' +
+        '<div class="qk-span-7"><div class="gi-stack">' + GI.card('Where he sits', '<span id="pp-dist-sub">Every qualified player in his peer group (' + esc(g0.peer.replace(/^NFL /, '')) + ') this season; bars coloured by percentile</span>',
           '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + GI.chartBox('pp-dist', 250, 'Distribution of the peer group')) +
-        ((c.similar || []).length ? GI.card('Most similar', 'Nearest on this season\'s percentile profile (100 = identical)', '<div id="pp-sim"></div>', { flush: true }) : '') + '</div></div>');
-    } else if ((c.similar || []).length) h += GI.card('Most similar', 'Nearest on this season\'s percentile profile (100 = identical)', '<div id="pp-sim"></div>', { flush: true });
+        '<div id="pp-style"></div>' + ((c.similar || []).length ? GI.card('Most similar', 'Nearest on this season\'s profile among his peers', '<div id="pp-sim"></div>', { flush: true }) : '') + '</div></div>');
+    } else {
+      if (pctS && !g0 && group !== 'OL') h += GI.note('No comparison group for his position (' + esc(GI.posLong(pos) || pos) + '): percentiles are kept for QB, RB, WR, TE, the five defensive roles, K and P.');
+      if ((c.similar || []).length) h += GI.card('Most similar', 'Nearest on this season\'s profile among his peers', '<div id="pp-sim"></div>', { flush: true });
+    }
     if (valn) h += GI.card('Value', 'Projected points above a replacement player: rest of this season and the next three, discounted 10% a season · band 10th–90th percentile', '<div id="pp-val"></div>' + GI.chartBox('pp-valc', 220, 'Projected value by season'));
     const ch = now.charts || {};
+    if (cur) h += '<div id="pp-moves"></div>';
     h += '<div id="pp-pos"></div>';
     h += GI.card('Season by season', 'every season on file since 1999 · value is Gridiron Value; columns ending + are era-adjusted (100 = average for that season, 10 = one SD)', (seasons.length > 1 ? GI.chartBox('pp-car-c', 260, 'Value and EPA by season') : '') + '<div id="pp-car"></div>', { id: 'career' });
     h += GI.card('Game log', (now.season || S) + ' · every game played', '<div id="pp-log"></div>', { flush: true });
@@ -158,42 +156,55 @@ GI.route('player', function (el, params) {
       GI.card('FTN charting', 'FTN Data via nflverse (CC BY-SA 4.0)', factsTable(now.ftn, 'No FTN charting this season.'), { span: 6 }));
     el.innerHTML = h;
 
-    // where he sits: the peer distribution of one metric (players.json, after the first paint), him and the median marked
-    if (pctS && document.getElementById('pp-dist')) {
-      const keys = [].concat.apply([], setG.map(g => g[1])).filter(k => isNum((pctS.values || {})[k])).slice(0, 4);
-      const segEl = el.querySelector('#pp-dist-m');
-      if (!keys.length) GI.ch.none('pp-dist', 'No metric to place him on yet.');
-      else {
-        if (!ST.dist || keys.indexOf(ST.dist) < 0) ST.dist = keys[0];
-        segEl.innerHTML = keys.map(k => '<button type="button" aria-pressed="' + (k === ST.dist) + '" data-value="' + esc(k) + '">' + esc(GI.shortLabel((META[k] || {}).label || label(k))) + '</button>').join('');
-        GI.ch.none('pp-dist', 'Loading the peer group…');
-        GI.load(GI.ypath('players.json', S)).then(raw => {
-          const cat = GI.catOf(raw);
-          if (!el.isConnected || !cat) { if (el.isConnected) GI.ch.none('pp-dist', 'The season catalogue is not built yet.'); return; }
-          const peers = Object.keys(cat.players).map(id => cat.players[id]).filter(x => x && x.qualified !== false && GI.peerOf(x).id === peer.id);
-          const drawDist = key => {
-            ST.dist = key;
-            const m = META[key] || GI.metaOf(cat.metrics || [])[key] || {};
-            const vs = peers.map(x => (x.values || {})[key]).filter(isNum).sort((a, b) => a - b);
-            const mine = (pctS.values || {})[key];
-            if (vs.length < 5) { GI.ch.none('pp-dist', 'Too few qualified peers yet.'); return; }
-            const med = vs[Math.floor(vs.length / 2)];
-            const n = document.getElementById('pp-dist');
-            if (!n) return;
-            n.classList.remove('gi-chart-empty'); n.innerHTML = '';
-            const c2 = QKC.distribution(n, { values: vs, binCount: 22, lowerBetter: !!m.lower, fmt: v => fv(key, v), xName: (m.label || label(key)) + ' · ' + vs.length + ' qualified peers', yName: 'Players',
-              marks: (isNum(mine) ? [{ x: mine, label: GI.surnameOf(c.name) }] : []).concat([{ x: med, label: 'Median' }]), label: 'Distribution of ' + (m.label || key) });
-            if (c2) GI.onLeave(() => { try { c2.dispose(); } catch (e) { /* gone */ } });
-          };
-          drawDist(ST.dist);
-          QK.seg(segEl, drawDist);
-        });
-      }
+    // percentile card, style and where he sits: the season catalogue and value table (after the first paint), the spec's
+    // group, metric set and peers (spec.js)
+    if (pctS && g0) {
+      GI.ch.none('pp-dist', 'Loading the peer group…');
+      GI.loadAll([GI.ypath('players.json', S), GI.ypath('value.json', S)]).then(res2 => {
+        if (!el.isConnected) return;
+        const cat = GI.catOf(res2[0]);
+        if (!cat) { GI.set('pp-pcard', GI.card('Percentile rankings', '', GI.muted('The season catalogue is not built yet.'))); GI.ch.none('pp-dist', 'The season catalogue is not built yet.'); return; }
+        const cx = GI.SP.ctx(cat, GI.ok(res2[1]) ? res2[1] : null);
+        const row = cat.players[pid] || peerRow;
+        const g = GI.SP.groupOf(row, pid, cx) || g0;
+        const rowsP = GI.SP.headline(g).map(m => { const v = GI.SP.value(row, pid, m, cx); return { label: m[1] + (m[3] ? ' ↓' : ''), pctl: GI.SP.pct(row, pid, g, m, cx), value: isNum(v) ? GI.SP.fmt(m, v, cx) : '—', tip: m[5] }; });
+        const qualified = row.qualified !== false;
+        GI.set('pp-pcard', QK.pctCard({ title: 'Percentile rankings', peer: g.peer + ', qualified', sample: [GI.SP.sample(row, g), 'qualified: ' + GI.SP.minLine(g)].filter(Boolean).join(' · '), groups: [{ label: '', rows: rowsP }],
+          note: (GI.SP.NOTE[g.id] ? GI.SP.NOTE[g.id] + ' ' : '') + '100 = best among his peers; ↓ metrics are flipped so a high percentile is always good.',
+          emptyText: qualified ? 'No percentiles for his group yet.' : 'He is short of the qualifying minimum (' + GI.SP.minLine(g) + '): no percentiles yet.',
+          foot: '<span>' + esc(S) + ' · the metric set from our metrics study</span><a href="' + GI.compareHref(pid) + '">Compare →</a>' }));
+        const st = GI.SP.style(g).map(m => { const v = GI.SP.value(row, pid, m, cx); const r = GI.SP.pct(row, pid, g, [m[0], m[1], m[2], m[3], 0, m[5], m[6]], cx); return isNum(v) ? '<dt data-tip="' + esc(m[5]) + '" tabindex="0">' + esc(m[1]) + '</dt><dd class="gi-num">' + GI.SP.fmt(m, v, cx) + (isNum(r) ? ' <span class="qk-muted">· ' + GI.ordinal(r) + ' of his peers</span>' : '') + '</dd>' : ''; }).join('');
+        GI.set('pp-style', st ? GI.card('How he plays', 'Style, not quality: where he sits among his peers, with no better or worse', '<dl class="gi-dl">' + st + '</dl>') : '');
+        const peers = GI.SP.members(cx, g.id).filter(id => cat.players[id].qualified !== false);
+        GI.set('pp-dist-sub', 'Every qualified player in his peer group (' + esc(g.peer.replace(/^NFL /, '')) + ') this season; bars coloured by percentile');
+        const keys = GI.SP.headline(g).filter(m => isNum(GI.SP.value(row, pid, m, cx))).slice(0, 4);
+        const segEl = el.querySelector('#pp-dist-m');
+        if (!keys.length || !segEl) { GI.ch.none('pp-dist', 'No metric to place him on yet.'); return; }
+        if (!ST.dist || !keys.some(m => m[0] === ST.dist)) ST.dist = keys[0][0];
+        segEl.innerHTML = keys.map(m => '<button type="button" aria-pressed="' + (m[0] === ST.dist) + '" data-value="' + esc(m[0]) + '">' + esc(GI.shortLabel(m[1])) + '</button>').join('');
+        const drawDist = key => {
+          ST.dist = key;
+          const m = g.m.find(x => x[0] === key);
+          const vs = peers.map(id => GI.SP.value(cat.players[id], id, m, cx)).filter(isNum).sort((a, b) => a - b);
+          const mine = GI.SP.value(row, pid, m, cx);
+          if (vs.length < 5) { GI.ch.none('pp-dist', 'Too few qualified peers yet.'); return; }
+          const med = vs[Math.floor(vs.length / 2)];
+          const n = document.getElementById('pp-dist');
+          if (!n) return;
+          n.classList.remove('gi-chart-empty'); n.innerHTML = '';
+          const c2 = QKC.distribution(n, { values: vs, binCount: 22, lowerBetter: !!m[3], fmt: v => GI.SP.fmt(m, v, cx), xName: m[1] + ' · ' + vs.length + ' qualified ' + g.peer.replace(/^NFL /, ''), yName: 'Players',
+            marks: (isNum(mine) ? [{ x: mine, label: GI.surnameOf(c.name) }] : []).concat([{ x: med, label: 'Median' }]), label: 'Distribution of ' + m[1] });
+          if (c2) GI.onLeave(() => { try { c2.dispose(); } catch (e) { /* gone */ } });
+        };
+        drawDist(ST.dist);
+        QK.seg(segEl, drawDist);
+      });
     }
+    if (cur && GI.MV) GI.MV.load().then(md => { const host = document.getElementById('pp-moves'); if (host && el.isConnected) host.innerHTML = GI.MV.playerCard(md, pid); });
     // value
     if (valn) {
-      GI.set('pp-val', GI.kpis([GI.kpi('Wins', GI.signed(valn.wins, 2), 'the projected value in wins', { signal: true }),
-        GI.kpi('This season, per game', GI.signed(valn.now_pg, 2), 'points above replacement'), GI.kpi('Level now', GI.signed(valn.lvl, 2), 'per game, this season\'s form')], 'gi-kpis-4'));
+      GI.set('pp-val', GI.kpis([isNum(valn.wins) ? GI.kpi('Wins', GI.signed(valn.wins, 2), 'the projected value in wins', { signal: true }) : '',
+        isNum(valn.now_pg) ? GI.kpi('This season, per game', GI.signed(valn.now_pg, 2), 'points above replacement') : '', isNum(valn.lvl) ? GI.kpi('Level now', GI.signed(valn.lvl, 2), 'per game, this season\'s form') : '']));
       const seasonsV = (res[2].seasons || []).slice(0, (valn.proj || []).length);
       if ((valn.proj || []).length) GI.ch.bar('pp-valc', { cats: seasonsV.map(String), series: [{ name: 'Per game', data: valn.proj }, { name: 'Expected games', data: valn.games || [] }], legend: true, fmt: v => GI.num(v, 1), catName: 'Season', valName: 'Value per game; games', label: 'Projected value per game and games by season' });
     }

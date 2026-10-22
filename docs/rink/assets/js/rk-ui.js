@@ -24,11 +24,11 @@ U.tabsHTML = (tabs, active) => {
   return '<nav class="qk-tabs rk-tabs" aria-label="Views">' + tabs.map(t =>
     '<a class="qk-tab" href="' + esc(t.href) + '"' + (t.key === active ? ' aria-current="page" aria-selected="true"' : ' aria-selected="false"') + '>' + esc(t.label) + '</a>').join('') + '</nav>';
 };
-U.secHead = (section, title, sub, tabs, active, kicker) => {
+/* v2: the kit's section head (Archivo title, kicker square, signal rule), large, as the page's h1; `sub` is HTML. */
+U.secHead = (section, title, sub, tabs, active, kicker, actions) => {
   const S = RK.state.season || RK.currentSeason();
   const k = kicker !== undefined ? kicker : 'NHL · ' + RK.seasonLabel(S) + (Number(S) === Number(RK.currentSeason()) && RK.phaseLabel() ? ' · ' + RK.phaseLabel() : '');
-  return '<header class="rk-head"><div>' + (k ? '<div class="qk-kicker">' + esc(k) + '</div>' : '') + '<h1>' + esc(title) + '</h1>' +
-    (sub ? '<div class="qk-sub">' + sub + '</div>' : '') + '</div></header>' + U.tabsHTML(tabs, active);
+  return QK.sectionHead({ kicker: k, title: esc(title), sub: sub || '', html: true, size: 'lg', tag: 'h1', cls: 'rk-head', actions: actions || '' }) + U.tabsHTML(tabs, active);
 };
 /* Build tab specs for a section route: base '#/standings' (+ '/S' etc.), keys [[key, label]], extra query. */
 U.tabs = (base, list, S, seasonInPath) => list.map(x => {
@@ -38,7 +38,7 @@ U.tabs = (base, list, S, seasonInPath) => list.map(x => {
   return { key: x[0], label: x[1], href: base + (q.length ? '?' + q.join('&') : '') };
 });
 U.section = (el, o) => {
-  el.innerHTML = U.secHead(o.section, o.title, o.sub, o.tabs, o.active, o.kicker) + '<div class="rk-sub"></div>';
+  el.innerHTML = U.secHead(o.section, o.title, o.sub, o.tabs, o.active, o.kicker, o.actions) + '<div class="rk-sub"></div>';
   return el.querySelector('.rk-sub');
 };
 /* Render a legacy view into `node` with the route params (query overridden by `query`). */
@@ -139,18 +139,99 @@ U.dayKey = iso => RK.localDay(iso);
    stable (year-to-year reliable) and predictive rates first, peer group = same position group (F / D / G) with the
    payload's sample floors (skaters.json / goalies.json "reference"). docs/METRICS_SPEC.md is the source of truth:
    change the set there first, then here. */
-U.SK_SET = [
-  ['Scoring', ['p60', 'p1_60', 'g60', 'ixg60_all', 'gax']],
-  ['Play driving (5v5)', ['xgf_pct', 'xgf_pct_rel', 'cf_pct', 'xga60', 'rapm_off', 'rapm_def']],
-  ['Value', ['gar', 'gar_ev_off', 'gar_ev_def', 'gar_pp']],
-  ['Physical and more', ['hits60', 'blocks60', 'take60', 'pen_diff60', 'fo_pct', 'edge_max_speed']]
-];
-U.G_SET = [
-  ['Results', ['gsax60', 'sv_pct', 'dfsv_pct', 'qs_pct', 'gaa']],
-  ['By danger', ['sv_pct_low', 'sv_pct_med', 'sv_pct_high', 'gsax_high']],
-  ['By situation', ['sv_pct_5v5', 'sv_pct_sh', 'reb_rate']]
-];
+/* The headline sets of docs/METRICS_SPEC.md "Hockey" (docs/_design/metrics/hockey.json, 5fdf8870), in the spec's order,
+   one per peer group: forwards (pct_pos v forwards), defencemen (pct_pos v defencemen), goalies (pct v qualified
+   goalies). Each id carries the sample where the spec measured it to settle (M50: split-half or year-to-year r reaches
+   0.5) and its unit; a player short of it is drawn dashed ("early"). Style and luck metrics (hits, blocks, faceoff %,
+   PDO, shooting %) are kept off the cards by the spec. */
+U.SPEC = {
+  gar_60: { label: 'Rink value per 60', unit: 'GAR/60', tip: 'Goals above a replacement-level player per 60 minutes, from our value model (even-strength impact, power play, penalty kill, finishing, penalties).' },
+  p60: { label: 'Points per 60', unit: 'per 60', tip: 'Goals plus assists per 60 minutes, all situations.' },
+  ixg60_all: { label: 'Individual xG per 60', unit: 'per 60', tip: 'Expected goals from his own shots per 60 minutes, all situations: how much scoring chance he creates for himself.' },
+  icf60: { label: 'Shot attempts per 60 (5v5)', unit: 'per 60', tip: 'His own shot attempts (on goal, missed or blocked) per 60 minutes at 5-on-5: the steadiest individual stat in hockey.' },
+  adj_xgf_pct: { label: 'On-ice xG share (5v5)', unit: '%', tip: 'Share of 5-on-5 expected goals his team gets with him on the ice, adjusted for score and venue.' },
+  xgf60_rel: { label: 'xG for per 60, relative to team (5v5)', unit: 'per 60', tip: 'How many more expected goals per 60 his team creates at 5-on-5 with him on the ice than without him.' },
+  rapm_net: { label: 'Isolated impact (RAPM)', unit: 'xG per 60', tip: 'His 5-on-5 expected-goal differential per 60 after accounting for team-mates, opponents, zone starts and score.' },
+  rapm_def: { label: 'Isolated defence (RAPM)', unit: 'xGA per 60 prevented', tip: 'Expected goals against per 60 he prevents at 5-on-5 after accounting for team-mates, opponents, zone starts and score.' },
+  rapm_off: { label: 'Isolated offence (RAPM)', unit: 'xGF per 60', tip: 'Expected goals for per 60 he adds at 5-on-5 after accounting for team-mates, opponents, zone starts and score.' },
+  adj_xga60: { label: 'On-ice xG against per 60 (5v5)', unit: 'per 60', lower: true, tip: 'Expected goals his team allows per 60 at 5-on-5 with him on the ice, adjusted for score and venue (lower is better).' },
+  pen_diff60: { label: 'Penalty differential per 60', unit: 'per 60', tip: 'Penalties drawn minus penalties taken per 60 minutes; each one is a power play for or against.' },
+  toi_gp: { label: 'Ice time per game', unit: 'min', tip: 'Minutes per game in all situations: how much the coach trusts him.' },
+  gsax100: { label: 'Goals saved above expected per 100 shots', unit: 'per 100 unblocked attempts', tip: 'Goals he stopped beyond what an average goalie would on the same shots (by our expected-goals model), per 100 unblocked shots faced.' },
+  gsax: { label: 'Goals saved above expected', unit: 'goals', tip: 'Season total of goals saved beyond an average goalie facing the same shots.' },
+  sv_pct: { label: 'Save percentage', unit: '%', tip: 'Saves per shot on goal, all situations.' },
+  sv_pct_high: { label: 'High-danger save %', unit: '%', tip: 'Save rate on high-danger chances (expected-goal value 0.20 or more). Pure noise season to season: never rank a goalie on it alone.' },
+  sv_pct_med: { label: 'Medium-danger save %', unit: '%', tip: 'Save rate on medium-danger chances (expected-goal value 0.08 to 0.20).' },
+  sv_pct_low: { label: 'Low-danger save %', unit: '%', tip: 'Save rate on low-danger chances (expected-goal value under 0.08).' },
+  qs_pct: { label: 'Quality start %', unit: '%', tip: 'Share of his starts with a save percentage above league average (or .885 on 20 shots or fewer).' }
+};
+/* [group label, [[id, settles at, sample unit], ...]] */
+U.SETS = {
+  F: [['Value and scoring', [['gar_60', 722, 'minutes'], ['p60', 277, 'minutes'], ['ixg60_all', 224, 'minutes'], ['icf60', 109, '5v5 minutes']]],
+    ['Play driving (5v5)', [['adj_xgf_pct', 803, '5v5 minutes'], ['xgf60_rel', 489, '5v5 minutes'], ['rapm_net', 228, '5v5 minutes']]],
+    ['Discipline and trust', [['pen_diff60', 1052, 'minutes'], ['toi_gp', 1, 'games']]]],
+  D: [['Value', [['gar_60', 1186, 'minutes']]],
+    ['Play driving (5v5)', [['adj_xgf_pct', 1338, '5v5 minutes'], ['rapm_def', 315, '5v5 minutes'], ['rapm_off', 359, '5v5 minutes'], ['adj_xga60', 1295, '5v5 minutes']]],
+    ['Scoring', [['p60', 426, 'minutes'], ['ixg60_all', 194, 'minutes']]],
+    ['Discipline and trust', [['toi_gp', 1, 'games'], ['pen_diff60', 1333, 'minutes']]]],
+  G: [['Shot stopping', [['gsax100', 7022, 'unblocked shots faced'], ['gsax', null, ''], ['sv_pct', 4234, 'unblocked shots faced']]],
+    ['By danger', [['sv_pct_high', null, ''], ['sv_pct_med', null, ''], ['sv_pct_low', null, '']]],
+    ['Starts', [['qs_pct', 288, 'games']]]]
+};
+/* Back-compatible names: the old single skater set is now the forwards' set. */
+U.SK_SET = U.SETS.F.map(g => [g[0], g[1].map(x => x[0])]);
+U.SK_SET_D = U.SETS.D.map(g => [g[0], g[1].map(x => x[0])]);
+U.G_SET = U.SETS.G.map(g => [g[0], g[1].map(x => x[0])]);
+U.setFor = group => (group === 'G' ? U.G_SET : group === 'D' ? U.SK_SET_D : U.SK_SET);
+/* The team headline set (spec "Teams"): 32 clubs, 10 games for a percentile; gd_g derived as gf_g - ga_g. */
+U.TEAM_SET = [['rating', 'Team rating', 'goals a game', 'Our team-strength model: expected goal differential per game against an average team, all situations.'],
+  ['xgf_pct5', 'Expected-goal share (5v5)', '%', 'Share of 5-on-5 expected goals the team gets.'],
+  ['cf_pct5', 'Shot-attempt share (5v5)', '%', 'Share of 5-on-5 shot attempts the team gets: puck possession.'],
+  ['off5', '5v5 offence', 'xGF per 60', 'Expected goals created per 60 minutes at 5-on-5.'],
+  ['def5', '5v5 defence', 'xGA per 60', 'Expected goals allowed per 60 minutes at 5-on-5 (lower is better).', true],
+  ['pp', 'Power play', 'xGF per 60', 'Expected goals created per 60 minutes on the power play.'],
+  ['pk', 'Penalty kill', 'xGA per 60', 'Expected goals allowed per 60 minutes short-handed (lower is better).', true],
+  ['goalie', 'Goaltending', 'GSAx per 60', 'Goals the team’s goalies saved above expected per 60 minutes.'],
+  ['gd_g', 'Goal differential per game', 'goals', 'Goals for minus goals against per game (shootout winners excluded).'],
+  ['pts_pct', 'Points %', '%', 'Standings points taken as a share of the points available.']];
+U.TEAM_MIN_GP = 10;
+/* Where each team metric reaches r 0.5 (spec M50, games): a club short of it is drawn dashed. */
+U.TEAM_SETTLE = { xgf_pct5: 13, cf_pct5: 7, off5: 17, def5: 17, pp: 28, pk: 52, goalie: 108, gd_g: 28, pts_pct: 34 };
+/* The 32 clubs on the team set: { rows: [{ team, gp, v: {id: value}, p: {id: percentile} }], by: {abbr: row} }.
+   tj = teams.json, sj = season.json. Percentiles only from U.TEAM_MIN_GP games (the spec's minimum). */
+U.teamSet = (tj, sj) => {
+  const st = {}; (((sj || {}).standings || {}).rows || []).forEach(r => { st[r.team] = r; });
+  const T = (tj && tj.teams) || {};
+  const rows = Object.keys(T).map(t => {
+    const u = T[t].units || {}, s = st[t] || {}, rec = T[t].record || {};
+    const v = { rating: isNum(u.rating) ? u.rating : s.rating, xgf_pct5: u.xgf_pct5, cf_pct5: u.cf_pct5, off5: u.off5, def5: u.def5, pp: u.pp, pk: u.pk, goalie: u.goalie,
+      gd_g: isNum(u.gd_g) ? u.gd_g : (isNum(u.gf_g) && isNum(u.ga_g) ? u.gf_g - u.ga_g : null), pts_pct: s.p_pct };
+    return { team: t, gp: isNum(s.gp) ? s.gp : (rec.gp || u.gp || 0), v: v, p: {} };
+  });
+  rows.forEach(r => {
+    if (r.gp < U.TEAM_MIN_GP) return;
+    U.TEAM_SET.forEach(m => { r.p[m[0]] = U.rankPct(rows.filter(x => x.gp >= U.TEAM_MIN_GP).map(x => x.v[m[0]]), r.v[m[0]], !!m[4]); });
+  });
+  const by = {}; rows.forEach(r => { by[r.team] = r; });
+  return { rows: rows, by: by };
+};
+U.teamFmt = (k, v) => {
+  if (!isNum(v)) return '—';
+  if (k === 'xgf_pct5' || k === 'cf_pct5' || k === 'pts_pct') return U.pct(v, 1);
+  if (k === 'rating' || k === 'gd_g' || k === 'goalie') return U.signed(v, 2);
+  return Number(v).toFixed(2);
+};
 U.GROUP_NAME = { F: 'NHL forwards', D: 'NHL defencemen', G: 'NHL goalies' };
+U.PEER_SHORT = { F: 'forwards', D: 'defencemen', G: 'goalies' };
+/* Percentiles of one value among a list (100 = best; lower = true flips). */
+U.rankPct = (list, v, lower) => {
+  const xs = list.filter(isNum);
+  if (!isNum(v) || xs.length < 2) return null;
+  let below = 0, eq = 0;
+  xs.forEach(x => { if (x < v) below++; else if (x === v) eq++; });
+  const p = 100 * (below + 0.5 * eq) / xs.length;
+  return lower ? 100 - p : p;
+};
 /* Format a value by its catalogue metadata (glossary or payload "metrics" entry). */
 U.fmtBy = (meta, v) => {
   if (!isNum(v)) return '—';
@@ -172,26 +253,73 @@ U.sampleOf = (p, unit) => {
   if (unit === 'shots') return isNum(v.sog) ? v.sog : null;
   if (unit === 'faceoffs') return isNum(v.fo_taken) ? v.fo_taken : null;
   if (unit === 'games') return isNum(p.gp) ? p.gp : null;
-  if (unit === 'unblocked shots faced') return isNum(v.fa) ? v.fa : null;
+  if (unit === 'unblocked shots faced') return U.faOf(p);
   return null;
+};
+/* Unblocked shots a goalie faced: the payload's fa when present, else from GSAx and GSAx/100 (fa = 100 x GSAx / GSAx100),
+   else shots on goal (a lower bound). */
+U.faOf = p => {
+  const v = (p && p.values) || {};
+  if (isNum(v.fa)) return v.fa;
+  if (isNum(v.gsax) && isNum(v.gsax100) && Math.abs(v.gsax100) > 1e-6 && Math.abs(v.gsax) > 0.05) return Math.round(100 * v.gsax / v.gsax100);
+  return isNum(v.sa) ? v.sa : null;
 };
 /* Percentile-card groups for one player from the catalogue: position-pool percentiles (pct_pos) when present.
    early = the sample is still short of where the metric stabilises (metrics[].stabilises_at). */
-U.pctGroups = (p, meta, sets) => (sets || []).map(g => ({
-  label: g[0],
-  rows: g[1].map(k => {
-    const m = meta[k] || {}, pc = ((p.pct_pos && isNum(p.pct_pos[k])) ? p.pct_pos : (p.pct || {}))[k];
-    if (!isNum(pc) || m.unavailable) return null;
-    const n = isNum(m.stabilises_at) ? U.sampleOf(p, m.unit) : null;
-    return { label: m.label || k, pctl: pc, value: U.fmtBy(m, (p.values || {})[k]), tip: m.desc || '', early: isNum(n) && n < m.stabilises_at };
-  }).filter(Boolean)
-}));
+/* sets: a U.SETS entry (ids with their settling sample) or the older [label, [ids]] lists. pcts: the percentile map
+   to read (the player file's current.pct_pos, else the catalogue row's pct_pos, else pct). */
+U.pctGroups = (p, meta, sets, pcts) => {
+  const src = pcts || (p.pct_pos && Object.keys(p.pct_pos).length ? p.pct_pos : (p.pct || {}));
+  return (sets || []).map(g => ({
+    label: g[0],
+    rows: g[1].map(x => {
+      const k = Array.isArray(x) ? x[0] : x, unit = Array.isArray(x) ? x[2] : '';
+      const m = meta[k] || {}, sp = U.SPEC[k] || {}, pc = src[k];
+      if (!isNum(pc) || m.unavailable) return null;
+      const at = Array.isArray(x) && isNum(x[1]) ? x[1] : (isNum(m.stabilises_at) ? m.stabilises_at : null);
+      const n = isNum(at) ? U.sampleOf(p, unit || m.unit) : null;
+      return { label: sp.label || m.label || k, pctl: pc, value: U.fmtBy(m, (p.values || {})[k]), tip: (sp.tip || m.desc || '') + (isNum(at) && unit ? ' Settles at about ' + QK.fmt.num(at) + ' ' + unit + '.' : ''), early: isNum(n) && n < at };
+    }).filter(Boolean)
+  }));
+};
 U.sampleLine = (p, ref, goalie) => {
   if (!p) return '';
   const fl = (ref && ref.floors) || {};
-  if (goalie) return p.gp + ' GP · ' + U.f(p.toi, 0) + ' min' + (isNum(fl.gp) ? ' · peers need ' + fl.gp + ' GP' : '');
   const v = p.values || {};
-  return p.gp + ' GP · ' + U.f(p.toi, 0) + ' min · ' + U.f(v.toi5, 0) + ' at 5v5' + (isNum(fl.gp) ? ' · peers need ' + fl.gp + ' GP' : '');
+  if (goalie) return p.gp + ' GP · ' + U.f(p.toi, 0) + ' min' + (isNum(U.faOf(p)) ? ' · about ' + QK.fmt.num(U.faOf(p)) + ' unblocked shots faced' : '') + ' · peers: a quarter of the team’s minutes and ' + (isNum(fl.fa) ? fl.fa : 100) + ' shots';
+  return p.gp + ' GP · ' + U.f(p.toi, 0) + ' min · ' + U.f(v.toi5, 0) + ' at 5v5 · peers: 250 5v5 min a full season, prorated' + (isNum(fl.gp) ? ', ' + fl.gp + '+ GP' : '');
+};
+/* The goalie card's honesty line (spec: show that one season is a small sample). */
+U.goalieNote = p => {
+  const fa = U.faOf(p);
+  return 'One season is a small sample for a goalie: goals saved above expected per 100 shots settles at about 7,000 unblocked shots, roughly four seasons' + (isNum(fa) ? '; he has faced about ' + QK.fmt.num(fa) + '.' : '.');
+};
+
+/* ── who moves next (movement.json; docs/_design/MOVES_VIEWS.md, US sports) ───────────────────────────────── */
+/* Loads <S>/movement.json and indexes it: { d, rows (objects), byPid, teams, types, labels, pub }. null when missing. */
+U.moves = S => RK.loadYear('movement.json', S).then(d => {
+  if (!d || d.ok === false || !Array.isArray(d.players) || !Array.isArray(d.player_fields)) return null;
+  const f = d.player_fields;
+  const rows = d.players.map(r => { const o = {}; f.forEach((k, i) => { o[k] = r[i]; }); return o; });
+  const byPid = {}; rows.forEach(r => { byPid[String(r.pid)] = r; });
+  return { d: d, rows: rows, byPid: byPid, teams: d.teams || {}, types: d.types || [], labels: d.type_labels || {}, pub: d.published || {}, horizon: (d.horizons || {}).next || 'next season' };
+});
+const MV_COL = ['var(--c-1)', 'var(--c-4)', 'var(--c-other)', 'var(--c-6)'];
+/* A 0-100% bar of p_next split by type (league base shares when the type model is not published), with the number. */
+U.moveBar = (r, M) => {
+  if (!r || !isNum(r.p_next)) return '<span class="qk-muted" data-tip="Not enough recent games for an estimate">—</span>';
+  const segs = M.types.map((t, i) => { const v = r['p_' + t]; return isNum(v) && v > 0 ? '<span style="width:' + (100 * v).toFixed(1) + '%;background:' + MV_COL[i % MV_COL.length] + '"></span>' : ''; }).join('');
+  return '<span class="rk-mv" role="img" aria-label="' + esc('Chance he is not in the lineup next season: ' + U.pct(r.p_next)) + '"><span class="rk-mv-t">' + segs + '</span><b>' + (r.p_next < 0.01 ? '<1%' : U.pct(r.p_next)) + '</b></span>';
+};
+U.moveKeys = M => QK.keys(M.types.map((t, i) => ({ name: M.labels[t] || t, color: MV_COL[i % MV_COL.length], kind: 'dot' }))) + (M.pub.type ? '' : ' ' + QK.tag('base shares') + '<span class="qk-muted rk-mv-note"> the split is the league’s shares, not the player’s</span>');
+U.MOVE_HEAD = 'Chance he’s not in the lineup next season';
+U.moveTip = M => 'By ' + M.horizon + '. It includes a season in the minors. ' + (((M.d.notes || [])[0]) || '');
+U.deadlineLine = M => {
+  const d = M.d, br = (d.base_rates || {}).deadline;
+  if (M.pub.deadline || !isNum(br)) return '';
+  const dl = (d.horizons || {}).deadline;
+  return '<p class="rk-note rk-mv-line">About <b>' + U.pct(br) + '</b> of players are ' + esc(d.deadline_label || 'traded or claimed') + ' before ' + (dl ? esc(RK.fmtDate(dl, { weekday: false })) + ((d.horizons || {}).deadline_estimated ? ' (estimated deadline)' : '') : 'the deadline') +
+    ' ' + QK.tag('base rate') + ' <span class="rk-info" data-tip="' + esc((d.reasons || {}).deadline || '') + '" tabindex="0">ⓘ</span></p>';
 };
 /* A kit v2 game with records from the standings rows (team -> row). */
 U.gameV2 = (c, o, rows) => {

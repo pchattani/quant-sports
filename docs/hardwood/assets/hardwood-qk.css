@@ -309,3 +309,45 @@ body.qk { font-size: var(--fs-md); }
 .hw-mvcard .hw-mvbar { width: 100%; height: 10px; }
 .hw-mvcard .hw-mv { width: 100%; }
 .hw-mvctx { color: var(--ink-3); font-size: var(--fs-xs); margin-top: 8px; }
+
+/* ═════════════════════════════════ 8. Legacy detail views in the v2 layout (cards, tiles, tables, toggles) */
+.hw-lcard, .qk .card { margin-bottom: var(--sp-4); }
+.qk .card { border-radius: var(--r-3); }
+.qk .card-header { border-bottom: 0; padding: var(--sp-4) var(--sp-4) var(--sp-2); font: 700 var(--fs-md)/1.3 var(--font-ui); letter-spacing: -0.01em; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+.qk .card-header .card-sub { display: block; flex: 1 0 100%; order: 2; font: 500 var(--fs-xs)/1.45 var(--font-ui); color: var(--ink-3); margin-top: 0; }
+.qk .card-header > .pg-toggle, .qk .card-header > .toggle-row, .qk .card-header > select, .qk .card-header > label { order: 3; margin-top: 8px; }
+.hw-lctl { flex: none; }
+.qk .kpi-grid { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); padding: var(--sp-3) var(--sp-4); }
+.qk .kpi-grid .qk-stat { background: var(--s-2); }
+.qk .qk-stat-v .hf-se { font: 500 var(--fs-xs) var(--font-ui); color: var(--ink-3); }
+.qk .toggle-row { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; margin: var(--sp-2) var(--sp-4); background: var(--s-2); border: 1px solid var(--line-1); border-radius: var(--r-2); max-width: calc(100% - 2 * var(--sp-4)); }
+.qk .tbtn { all: unset; cursor: pointer; padding: 5px 11px; border-radius: 6px; font: 600 var(--fs-xs) var(--font-ui); color: var(--ink-3); white-space: nowrap; }
+.qk .tbtn:hover { color: var(--ink-1); }
+.qk .tbtn.active, .qk .tbtn.on { background: var(--s-4); color: var(--ink-1); box-shadow: var(--sh-1); border: 0; }
+.qk .pg-toggle.qk-seg button.on { background: var(--s-4); color: var(--ink-1); box-shadow: var(--sh-1); }
+.hw-pcols { display: grid; gap: var(--sp-2) var(--sp-6); grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); padding: var(--sp-3) var(--sp-4); }
+.hw-pnone { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; font-size: var(--fs-xs); padding: 4px 0; }
+.qk .hw-lcard .pad, .qk .card .pad { padding: var(--sp-3) var(--sp-4); }
+.qk .hw-lcard .section-note, .qk .hw-lcard .pg-note, .qk .card .pg-note, .qk .card .section-note, .qk .hw-lcard .mk-line, .qk .card .mk-line { padding: var(--sp-2) var(--sp-4) var(--sp-3); color: var(--ink-3); font-size: var(--fs-xs); line-height: 1.5; }
+.qk .hw-lcard > .qk-card-body > .qk-table-wrap, .qk .card > .qk-table-wrap { border-top: 1px solid var(--line-1); }
+.qk .day-head { font: 700 var(--fs-2xs)/1.2 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-3); padding: var(--sp-3) var(--sp-4) var(--sp-2); }
+.qk .qk-table.wc-table th.sortable-th { cursor: pointer; }
+.qk .qk-table.wc-table th[data-sort-dir="asc"]::after { content: " ▲"; color: var(--accent); }
+.qk .qk-table.wc-table th[data-sort-dir="desc"]::after { content: " ▼"; color: var(--accent); }
+.qk .qk-table.wc-table tr.row-link { cursor: pointer; }
+.qk .hw-legacy .ph-nav { display: flex; gap: 8px; flex-wrap: wrap; }
+.qk .hw-legacy .ph-nav a { display: inline-flex; align-items: center; padding: 6px 12px; border: 1px solid var(--line-2); border-radius: var(--r-2); font-size: var(--fs-xs); font-weight: 600; }
+.qk .hw-legacy .grid-2 > .hw-lcard, .qk .hw-legacy .grid-2 > .card { margin-bottom: 0; }
+.qk .hw-legacy .grid-2 { margin-bottom: var(--sp-4); }
+.hw-catctl { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+.hw-catctl .hw-search { max-width: 240px; }
+.hw-chk { display: inline-flex; gap: 6px; align-items: center; }
+.qk .card-header, .qk .hw-lcard .qk-card-title { text-transform: none; }
+.hw-style { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 2px; }
+.hw-style li { display: flex; justify-content: space-between; gap: 10px; font-size: var(--fs-xs); padding: 3px 0; border-bottom: 1px dashed var(--line-1); }
+.hw-style b { font: 600 var(--fs-xs) var(--font-num); }
+.hw-tpc { margin-bottom: var(--sp-4); }
+.hw-legacy [hidden] { display: none !important; }
+.qk .hw-legacy .qk-surface, .qk .hw-legacy .hf-court.qk-surface { max-width: 520px !important; margin-left: auto; margin-right: auto; }
+/* a legacy view's own page head repeats the section head above it */
+.hw-legacy > .qk-sh:first-child { display: none; }

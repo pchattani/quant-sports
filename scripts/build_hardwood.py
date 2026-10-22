@@ -520,6 +520,20 @@ def careers(b: Build, league: str, cats: dict[int, dict], blocks: dict[str, dict
     from oddsmarkets.basketball.analytics import awards as AWD
     from oddsmarkets.basketball.analytics import players as PL
     index = PL.similar_index(cats)
+    # role peers for every season's catalogue: seasons built before the role fields (0181c2cc) get role and pct_role here,
+    # in memory, so the player files carry them for every season
+    sim_role: dict[str, list] = {}
+    for s in sorted(cats):
+        P = (cats[s] or {}).get("players") or {}
+        if not P:
+            continue
+        if not all(r.get("role") and "pct_role" in r for r in P.values()):
+            roles = PL._roles_of(P)
+            for pid, r in P.items():
+                r["role"] = roles.get(pid, "W")
+            PL.role_percentiles(P, [p for p, r in P.items() if r.get("qualified")])
+        for pid, nb in PL.role_similar(P, league).items():
+            sim_role.setdefault(pid, []).extend({"season": int(s), **x} for x in nb)
     names: dict[str, str] = {}
     rows: dict[str, list] = {}
     latest: dict[str, tuple[int, dict]] = {}
@@ -544,7 +558,9 @@ def careers(b: Build, league: str, cats: dict[int, dict], blocks: dict[str, dict
             cur = old.get("current")
         payload = {"id": pid, "name": names.get(pid), "pos": info.get("pos") or r.get("pos"), "pool": r.get("pool"),
                    "dob": info.get("dob"), "league": league, "seasons": seasons, "current": cur,
-                   "similar": PL.similar(pid, s, r, index, names), "career_awards": ca.get(pid, []), "updated_at": _now()}
+                   "similar": PL.similar(pid, s, r, index, names), "similar_role": sim_role.get(pid, []),
+                   "role_card": PL.role_card((cats[s] or {}).get("players") or {}, pid, league, s, cats[s]),
+                   "career_awards": ca.get(pid, []), "updated_at": _now()}
         b.write(f"{league}/players/{pid}.json", payload)
         n += 1
     return n

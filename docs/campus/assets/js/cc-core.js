@@ -229,6 +229,63 @@ CC.unit = function (s) { return String(s || '').replace(/DL\/edge/gi, 'Defensive
 /* Payload copy in the v2 voice (headlines written by the builder): "title odds" -> "title chances". */
 CC.copy = function (s) { return String(s || '').replace(/\btitle odds\b/gi, 'title chances').replace(/\bodds\b/gi, 'chances'); };
 
+/* ── comparison metric sets (METRICS_SPEC.md; assets/js/cc-metrics.js, generated from docs/_design/metrics/college.json) ──
+ * Loaded on demand by the pages that compare (players, player, teams, team, lab), so first loads do not grow. */
+var MET_P = null;
+CC.metrics = function () {
+  if (CC.METRICS) return Promise.resolve(CC.METRICS);
+  if (MET_P) return MET_P;
+  MET_P = new Promise(function (resolve) {
+    var s = document.createElement('script');
+    s.src = 'assets/js/cc-metrics.js';
+    s.onload = function () { resolve(CC.METRICS || []); };
+    s.onerror = function () { MET_P = null; resolve([]); };
+    document.head.appendChild(s);
+  });
+  return MET_P;
+};
+/* The peer group of a player row (by the group's payload field: pos for football, role for basketball) or of a team. */
+CC.group = function (L, kind, row) {
+  var gs = CC.METRICS || [];
+  for (var i = 0; i < gs.length; i++) {
+    var g = gs[i];
+    if (g.L !== L || g.e !== kind) continue;
+    if (kind === 'team') return g;
+    if (row && g.pf && (g.pc || []).indexOf(row[g.pf]) >= 0) return g;
+  }
+  return null;
+};
+/* The minimum in words, from the spec's note ("db >= 12.5 per team game (150 over 12 games); ..."). */
+CC.groupFloor = function (g) {
+  var n = ((g && g.min) || {}).n || '';
+  n = n.split(';')[0].replace(/\bdb\b/g, 'dropbacks').replace(/>=/g, '≥').replace(/players\.json `?qualified`?:\s*/i, '');
+  return n.replace(/\s*\([^)]*\)\s*$/, '');
+};
+/* The sample a metric settles in (the spec's m50 unit), for one catalogue row. */
+CC.sampleIn = function (row, unit) {
+  var v = (row && row.values) || {};
+  if (unit === 'games') return isNum(row.gp) ? row.gp : null;
+  if (unit === 'dropbacks') return isNum(v.db) ? v.db : null;
+  if (unit === 'carries') return isNum(v.rush_car) ? v.rush_car : null;
+  if (unit === 'targets') return isNum(v.tgt) ? v.tgt : null;
+  if (unit === 'FGA') return isNum(v.fga) ? v.fga : null;
+  if (unit === 'punts') return isNum(v.punts) ? v.punts : null;
+  if (unit === 'minutes') return isNum(v.min) && isNum(row.gp) ? v.min * row.gp : null;
+  return null;
+};
+/* Spec rows for a catalogue row: [{ m (spec metric), label, pctl, value, tip, early, style }] for the set ('h' | 's'),
+ * only where the payload carries both the value and the group's percentile. meta: payload metrics by key (format). */
+CC.specRows = function (g, row, set, meta) {
+  if (!g || !row) return [];
+  var pc = row[g.pct] || {}, v = row.values || {};
+  return g.m.filter(function (m) { return m.set === set && isNum(v[m.id]) && isNum(pc[m.id]); }).map(function (m) {
+    var n = m.m50 ? CC.sampleIn(row, m.mu) : null;
+    return { m: m, label: m.d, pctl: pc[m.id], value: CC.fmtMetric((meta || {})[m.id] || { fmt: /pct|rate|share/.test(m.id) && v[m.id] <= 1 ? 'pct' : '2' }, v[m.id]),
+      tip: (m.x || m.d) + (m.style ? ' Describes how he plays, not how well: shown in grey.' : '') + (m.m50 ? ' Settles after about ' + Math.round(m.m50) + ' ' + m.mu + '.' : ''),
+      early: isNum(n) && m.m50 && n < m.m50, style: !!m.style };
+  });
+};
+
 /* ── UI pieces ───────────────────────────────────────────────────────── */
 var U = CC.ui = {};
 U.tabsHTML = function (tabs, active) {

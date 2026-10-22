@@ -12,8 +12,7 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 
 function render(el, params) {
   const T = params.tour, Y = params.year;
-  el.innerHTML = TA.pageHead(TA.tourName(T) + ' calendar ' + Y, 'Every tournament of the year: level, surface, status and champion',
-    '<a href="' + TA.href(T, 'rankings') + '">Rankings</a><a href="' + TA.href(T, 'race') + '">Race</a>') + '<div id="cal-body"><div class="muted">Loading…</div></div>';
+  el.innerHTML = '<div id="cal-body">' + QK.skeleton('lines', 6) + '</div>';
   return TA.loadYear('events.json', T, Y).then(raw => {
     if (!el.isConnected) return;
     const evs = TA.ok(raw) ? TA.eventsOf(raw) : raw;
@@ -30,7 +29,7 @@ function render(el, params) {
     const leaders = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 3);
     const slams = all.filter(e => e.level === 'slam');
     const liveNow = all.filter(e => e.status === 'live' && e.level !== 'ch').slice(0, 3);
-    body.innerHTML = '<div class="kpi-grid">' +
+    body.innerHTML = '<div class="kpi-grid ta-kpis">' +
       TA.statTile('Tour-level events', String(all.filter(e => TA.levelRank(e.level) <= 5).length), done.length + ' finished') +
       TA.statTile('Most titles', leaders.length ? leaders.map(p => esc(TA.playerSurname(T, p)) + ' ' + counts[p]).join(' · ') : '—', 'tour-level, this year') +
       TA.statTile('Grand Slams', slams.length ? slams.map(e => e.champion ? esc(TA.playerSurname(T, e.champion)) : '—').join(' · ') : '—', 'champions in calendar order') +

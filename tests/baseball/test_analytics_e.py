@@ -201,3 +201,46 @@ def test_steals_come_from_the_official_line(ctx, monkeypatch):
     assert h["players"][other]["values"]["sb"] == h0["players"][other]["values"]["sb"]
     labels = {m["key"]: m["label"] for m in h["metrics"]}
     assert labels["bb"] == "uBB" and labels["sb"] == "SB"
+
+
+def test_oaa_shrinkage_matches_measured_stabilisation():
+    """OAA / fielding runs / OAA per chance shrink with k = 400 chances (measured M50 about 480 year to year,
+    355-501 odd/even games), not 60, in both the hitters' defence block and the fielders' catalogue."""
+    from oddsmarkets.baseball.analytics import fielders, hitters
+    for ms in (hitters.METRICS, fielders.METRICS):
+        by = {m["key"]: m for m in ms}
+        for k in ("oaa", "fielding_runs", "sra"):
+            assert an.stab_k(by[k]) == 400.0
+            assert an.public_metric(by[k])["stabilises_at"] == round(400 * 0.7 / 0.3)
+    rows = {"big": {"values": {"sra": 0.02}, "n": {"chances": 500}}, "small": {"values": {"sra": 0.04}, "n": {"chances": 40}},
+            "a": {"values": {"sra": 0.0}, "n": {"chances": 300}}, "b": {"values": {"sra": -0.01}, "n": {"chances": 300}}}
+    an.add_percentiles(rows, [m for m in fielders.METRICS if m["key"] == "sra"], list(rows), floors={"chances": 20})
+    assert rows["big"]["pct"]["sra"] > rows["small"]["pct"]["sra"]       # 40 chances of +4% count less than 500 of +2% (k 60 ranked them the other way)
+
+
+def test_similar_players_follow_the_spec():
+    """careers.similar: the spec peer group (hitters by position, pitchers by role), the prorated minimum, z within
+    group and season, weighted distance, k = 5, one season per person, never the player himself."""
+    import numpy as np
+    from oddsmarkets.baseball.analytics import careers as CR
+    rng = np.random.default_rng(3)
+    cats = {}
+    for s in (2023, 2024, 2025):
+        P = {}
+        for i in range(40):
+            pos = "SS" if i < 20 else "C"
+            v = {f: float(rng.normal()) for f in CR.SIMILAR_H}
+            P[f"h{i}"] = {"name": f"H{i}", "team": "1", "pos": pos, "pa": 500 if i != 5 else 50, "values": v}
+        cats[("mlb", s)] = {"players": P, "team_games": 162}
+    cats[("mlb", 2014)] = {"players": {"old": {"name": "Old", "pos": "SS", "pa": 600, "values": {f: 0.0 for f in CR.SIMILAR_H}}},
+                           "team_games": 162}
+    idx = CR.similar_index(cats, "hitter")
+    assert set(idx["groups"]) == {"hitters_SS", "hitters_C"}
+    names = {f"h{i}": f"H{i}" for i in range(40)}
+    sim = CR.similar("h0", 2025, idx, names)
+    assert len(sim) == 5 and all(x["pid"] != "h0" for x in sim)
+    assert len({x["pid"] for x in sim}) == 5                                   # one season per person
+    assert all(x["pid"] in {f"h{i}" for i in range(20)} for x in sim)          # shortstops only
+    assert "old" not in {x["pid"] for x in sim} and "h5" not in {x["pid"] for x in sim}   # pre-2015, under the minimum
+    assert [x["distance"] for x in sim] == sorted(x["distance"] for x in sim)
+    assert CR.similar("h5", 2025, idx, names) == []                            # under the minimum every season

@@ -31,7 +31,7 @@ PLAYER = {
     "pox100": "Shot-making: actual points minus expected points (xPTS) per 100 field-goal attempts. Positive = he makes harder "
               "shots than the league would from the same spots." + PBP,
     "xpps": "Shot quality: average expected points per field-goal attempt from the xPTS model (location, angle, shot type, "
-            "assisted, putback, transition, clock, score). Higher = easier shots." + PBP,
+            "putback, transition, clock, score). Higher = easier shots." + PBP,
     "and1_100": "And-ones per 100 possessions: made field goals followed by a lone free throw by the shooter." + PBP,
     "unassisted_share": "Share of his made field goals without an assist (self-created)." + PBP,
     "rim_freq": "Share of his shots at the rim (under 4 ft)." + PBP,
@@ -225,7 +225,8 @@ MODEL = [
     ("elo", "Elo", "Ratings", "FiveThirtyEight-style game Elo from 1997: K = 20, margin-of-victory multiplier, home advantage "
      "(100 NBA / 90 WNBA) and a 25 % (30 % WNBA) regression to the mean between seasons."),
     ("xpts", "xPTS", "Shots", "A penalised logistic model of make probability on distance and angle splines, zone, shot type, "
-     "assisted, putback, transition, period, clock and margin; xPTS = P(make) x value."),
+     "putback, transition, period, clock and margin (not whether it was assisted: assists exist only on makes); "
+     "xPTS = P(make) x value."),
     ("rapm", "RAPM", "Impact", "Ridge regression of stint scoring per 100 on the ten players (offence and defence), lambda by "
      "cross-validation, centred on last season's estimate x 0.8."),
     ("box_impact", "Box impact", "Impact", "RAPM regressed on box-score rates (and shot profile), applied to every season, with a "

@@ -309,7 +309,8 @@ function shotChart(el, shots, opts) {
   courtMount(el, T => {
     let made = tc ? QK.color.ensure(tc, T.s1, 3) : T.wpB;
     const miss = T.other;
-    if (QK.color.distinct && !QK.color.distinct(made, miss)) made = T.wpB;
+    const rgb = QK.color.parse(made);
+    if ((QK.color.distinct && !QK.color.distinct(made, miss)) || (rgb && Math.max(rgb[0], rgb[1], rgb[2]) - Math.min(rgb[0], rgb[1], rgb[2]) < 48)) made = T.wpB;   // a grey kit would read as a miss
     const sz = s => Math.max(5, Math.sqrt(isN(s.xpts) ? s.xpts / 3 : 0.3) * 18);
     const pts = flag => rows.filter(s => !!s.made === flag).map(s => {
       const c = byX ? heat(s.xpts, 0, 1.5) : (flag ? made : miss);

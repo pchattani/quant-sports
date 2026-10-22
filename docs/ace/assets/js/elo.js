@@ -91,7 +91,7 @@ function drawTable(T, E) {
   const more = document.getElementById('el-more');
   if (more) more.onclick = () => { ES.show = 100000; drawTable(T, E); };
   document.getElementById('el-sub').textContent = ids.length + ' active players rated · ranked by ' + (s === 'all' ? 'overall' : s) + ' Elo; click a header to sort';
-  document.getElementById('el-note').innerHTML = 'Every match from qualifying up moves the ratings; a player\'s surface Elo moves only on that surface. A match is priced on a blend of the two, ' +
+  document.getElementById('el-note').innerHTML = 'Every match from qualifying up moves the ratings; a player\'s surface Elo moves only on that surface. Our match forecast uses a blend of the two, ' +
     'w × surface + (1 − w) × overall, with w fitted (0.46 for the ATP; the WTA uses the code default 0.5 until its own fit is committed). 1500 is the long-run mean of everyone rated, so a top-100 player sits far above it. ' +
     'After 60 days out a rating decays towards 1500. Details in the <a href="#/methodology/elo">methodology</a>.';
 }

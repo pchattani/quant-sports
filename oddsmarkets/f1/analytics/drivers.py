@@ -65,6 +65,7 @@ Definitions (per race unless stated; season value = mean over the races where th
 from __future__ import annotations
 
 import logging
+import math
 from collections import Counter, defaultdict
 from typing import Any
 
@@ -658,6 +659,91 @@ def _round_value(key: str, v: Any) -> Any:
     return round(float(v), 3)
 
 
+# Peer group (docs/METRICS_SPEC.md, Formula 1 "Drivers"): race drivers with the minimum starts. The payload `pct` ranks every
+# entrant (one-race stand-ins included); `pct_peer` ranks only the qualifying drivers, with the same formula.
+PEER_MIN_FULL = 8
+
+
+def peer_floor(year: int) -> int:
+    """Minimum starts for the season's peer group: 8 in a finished season of 16+ rounds; otherwise (an unfinished
+    season, or a short one) max(3, min(8, ceil(0.35 x rounds completed)))."""
+    done = len(canon.completed_rounds(year))
+    total = len(canon.rounds(year))
+    if total and done == total and done >= 16:
+        return PEER_MIN_FULL
+    return max(3, min(PEER_MIN_FULL, math.ceil(0.35 * done)))
+
+
+PEER_RULE = ("Race drivers with at least `peer_floor` starts: 8 in a finished season of 16+ rounds, else max(3, min(8, "
+             "ceil(0.35 x rounds completed))); drivers below it get no peer percentile and are nobody's similar driver.")
+
+# Similar drivers (the spec's recipe): the eight headline metrics, z-scored within each season among its qualifying
+# drivers, weighted by season-to-season r floored at 0.2; weighted Euclidean distance; the 5 nearest driver-seasons from
+# 1996 on, the driver's own seasons excluded. A feature missing for either driver-season (a pointless team has no
+# share of team points) is dropped and the weights renormalised, if at least 6 of the 8 remain.
+SIMILAR_W = {"driver_effect": 0.41, "quali_driver_effect": 0.36, "race_h2h": 0.38, "team_points_share": 0.34, "race_pace": 0.73,
+             "points_per_race": 0.74, "elo_teammate": 0.84, "lap1_gain": 0.32}
+SIMILAR_FROM = 1996
+SIMILAR_K = 5
+SIMILAR_MIN_FEATURES = 6
+
+
+def add_similar(catalogues: dict[int, dict], k: int = SIMILAR_K) -> list[int]:
+    """Add "similar" [{driver, year, name, team, d}] to every qualifying driver of every catalogue from SIMILAR_FROM on (in
+    place) and "similar_method" to each catalogue; returns the years changed. A catalogue without `qualified` flags (built
+    before them) uses races >= peer_floor(year)."""
+    rows: list[tuple[int, str, dict]] = []
+    for y in sorted(catalogues):
+        cat = catalogues[y] or {}
+        if y < SIMILAR_FROM or not cat.get("drivers"):
+            continue
+        fl = cat.get("peer_floor") or peer_floor(y)
+        D = cat["drivers"]
+        q = [d for d, e in D.items() if (e.get("qualified") if "qualified" in e else (e.get("races") or 0) >= fl)]
+        stats = {}
+        for f in SIMILAR_W:
+            xs = [x for x in (fnum((D[d].get("values") or {}).get(f)) for d in q) if x is not None]
+            if len(xs) >= 3:
+                m = sum(xs) / len(xs)
+                sd = math.sqrt(sum((x - m) ** 2 for x in xs) / (len(xs) - 1)) or 1.0
+                stats[f] = (m, sd)
+        for d in q:
+            v = D[d].get("values") or {}
+            z = {}
+            for f, (m, sd) in stats.items():
+                x = fnum(v.get(f))
+                if x is not None:
+                    z[f] = (x - m) / sd
+            if len(z) >= SIMILAR_MIN_FEATURES:
+                rows.append((y, d, z))
+    changed = set()
+    for y, d, za in rows:
+        best = []
+        for y2, d2, zb in rows:
+            if d2 == d:
+                continue
+            fs = [f for f in za if f in zb]
+            if len(fs) < SIMILAR_MIN_FEATURES:
+                continue
+            w = sum(SIMILAR_W[f] for f in fs)
+            best.append((math.sqrt(sum(SIMILAR_W[f] * (za[f] - zb[f]) ** 2 for f in fs) / w), y2, d2))
+        best.sort()
+        out = []
+        for dist, y2, d2 in best[:k]:
+            e = catalogues[y2]["drivers"][d2]
+            out.append({"driver": d2, "year": y2, "name": e.get("name"), "team": e.get("team"), "d": round(dist, 3)})
+        catalogues[y]["drivers"][d]["similar"] = out
+        changed.add(y)
+    for y in changed:
+        catalogues[y]["similar_method"] = (
+            "The 5 nearest driver-seasons from 1996 on (the driver's own seasons excluded) by weighted Euclidean distance on "
+            "the eight headline metrics (race and qualifying driver ratings, race head-to-head, share of team points, race "
+            "pace, points per race, team-mate Elo, lap-1 gain), each z-scored within its season among the qualifying "
+            "drivers and weighted by its season-to-season reliability (floored at 0.2); a feature missing for either "
+            "season is dropped (at least 6 of 8 must remain). d is in standard deviations.")
+    return sorted(changed)
+
+
 def build(year: int, records: dict[str, dict[int, dict]] | None = None, forecasts: dict[int, dict] | None = None,
           effects: dict | None = None, elo: dict | None = None, standings: list[dict] | None = None) -> dict:
     """drivers.json for a season (PAYLOADS: metrics, drivers{name, team, races, values, pct, pct_teammate, log})."""
@@ -695,6 +781,15 @@ def build(year: int, records: dict[str, dict[int, dict]] | None = None, forecast
         p = percentiles({d: v[m["key"]] for d, v in values.items()}, m["lower"])
         for d, x in p.items():
             field_pct[d][m["key"]] = x
+    floor = peer_floor(year)
+    qual = {d for d, v in values.items() if (v.get("races") or 0) >= floor}
+    peer_pct: dict[str, dict[str, int]] = defaultdict(dict)
+    for m in METRICS:
+        if m["key"] in ("races",):
+            continue
+        p = percentiles({d: values[d][m["key"]] for d in qual}, m["lower"])
+        for d, x in p.items():
+            peer_pct[d][m["key"]] = x
     main = {d: main_team(records[d]) for d in values}
     tm_pct: dict[str, dict[str, int]] = defaultdict(dict)
     for t in set(main.values()):
@@ -714,7 +809,9 @@ def build(year: int, records: dict[str, dict[int, dict]] | None = None, forecast
                           "races": v["races"],
                           "values": {k: _round_value(k, x) for k, x in v.items()},
                           "pct": dict(field_pct.get(d, {})), "pct_teammate": dict(tm_pct.get(d, {})),
+                          "qualified": d in qual, "pct_peer": dict(peer_pct.get(d, {})),
                           "log": [_log_row(records[d][r]) for r in sorted(records[d])]}
     metrics = [{**m, "desc": DRIVER_DEFINITIONS.get(m["key"], "")} for m in METRICS]
     return {"ok": True, "year": year, "metrics": metrics, "groups": GROUPS, "drivers": out_drivers,
+            "peer_floor": floor, "peer_rule": PEER_RULE, "peer_count": len(qual),
             "rounds": sorted({r for recs in records.values() for r in recs})}

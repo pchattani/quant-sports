@@ -169,7 +169,7 @@ const TITLES = {
   hub: 'Overview', season: 'Standings', standings: 'Standings', games: 'Games', game: 'Game centre', team: 'Team', player: 'Player',
   players: 'Players', teams: 'Teams', value: 'Value & Moves', trade: 'Trade simulator', moves: 'Moves', fantasy: 'Fantasy', leaders: 'Leaders', awards: 'Awards', playoffs: 'Playoffs', lab: 'Lab',
   compare: 'Compare', 'compare-players': 'Compare players', 'compare-teams': 'Compare teams', model: 'Model',
-  markets: 'Markets', calibration: 'Calibration', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
+  markets: 'Our forecasts v the market', calibration: 'Calibration', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
 };
 /* Which kit section (QK.SECTIONS key) each route belongs to. */
 const SECTION_OF = { hub: 'overview', season: 'standings', standings: 'standings', playoffs: 'standings', markets: 'model',
@@ -307,7 +307,7 @@ function render(opts) {
   const el = document.createElement('div');
   el.className = 'page page-' + r.name.replace(/[^a-z0-9-]/gi, '-') + ' league-' + state.league;
   app.appendChild(el);
-  document.title = (r.name === 'hub' ? LEAGUE_NAME[state.league] + ' odds, models and analytics · ' : (TITLES[r.name] || 'Page') + (r.global ? '' : ' · ' + LEAGUE_NAME[state.league]) + ' · ') + 'The Quant Hardwood';
+  document.title = (r.name === 'hub' ? LEAGUE_NAME[state.league] + ' by the numbers · ' : (TITLES[r.name] || 'Page') + (r.global ? '' : ' · ' + LEAGUE_NAME[state.league]) + ' · ') + 'The Quant Hardwood';
   setMeta('');
   if (!keep) window.scrollTo(0, 0);
   const fn = handlerFor(r.name);
@@ -781,13 +781,14 @@ function stypeLabel(s) { return STYPE[s] || titleCase(s || ''); }
 // ── HTML builders ──────────────────────────────────────────────────────────
 
 /* A card: header with a title and a muted sub-line, then the body. */
+/* A card in the v2 layout (QK card: title, sub-line, body). Legacy bodies carry their own padding. */
 function card(title, sub, bodyHtml, id) {
-  return '<div class="card"' + (id ? ' id="' + esc(id) + '"' : '') + '>' +
-    (title ? '<div class="card-header">' + esc(title) + (sub ? ' <span class="card-sub">' + sub + '</span>' : '') + '</div>' : '') +
-    (bodyHtml || '') + '</div>';
+  return '<section class="qk-card hw-lcard"' + (id ? ' id="' + esc(id) + '"' : '') + '>' +
+    (title ? '<div class="qk-card-head"><div style="min-width:0"><div class="qk-card-title">' + esc(title) + '</div>' + (sub ? '<div class="qk-card-sub">' + sub + '</div>' : '') + '</div></div>' : '') +
+    '<div class="qk-card-body flush">' + (bodyHtml || '') + '</div></section>';
 }
 function muted(text) { return '<div class="muted">' + text + '</div>'; }
-function chip(text, cls) { return '<span class="chip' + (cls ? ' ' + cls : '') + '">' + esc(text) + '</span>'; }
+function chip(text, cls) { return '<span class="qk-tag' + (cls ? ' ' + cls : '') + '">' + esc(text) + '</span>'; }
 /* A muted note for a payload that is missing or written with ok: false. */
 function notBuilt(what, d) { return muted(esc(what) + ' is not available yet' + (d && d.reason ? ' (' + esc(d.reason) + ')' : '') + '.'); }
 
@@ -796,7 +797,7 @@ function notBuilt(what, d) { return muted(esc(what) + ' is not available yet' + 
  * opts: {compact, sticky, cls, id}. Sort keys come from cell.v (numeric when it parses). */
 function tableHTML(cols, rows, opts) {
   const o = opts || {};
-  let h = '<div class="table-wrap' + (o.compact ? ' compact' : '') + '"' + (o.id ? ' id="' + esc(o.id) + '"' : '') + '><table class="wc-table' + (o.sticky ? ' sticky-head' : '') + (o.cls ? ' ' + o.cls : '') + '"><thead><tr>';
+  let h = '<div class="qk-table-wrap table-wrap' + (o.compact ? ' compact' : '') + '"' + (o.id ? ' id="' + esc(o.id) + '"' : '') + '><table class="qk-table dense wc-table' + (o.sticky ? ' sticky-head' : '') + (o.cls ? ' ' + o.cls : '') + '"><thead><tr>';
   cols.forEach(c => {
     const cc = typeof c === 'string' ? { label: c } : c;
     h += '<th class="' + (cc.sortable === false ? '' : 'sortable-th') + (cc.cls ? ' ' + cc.cls : '') + '"' +
@@ -871,33 +872,26 @@ function pctColor(p) {
   const u = t < 0.5 ? t * 2 : (t - 0.5) * 2;
   return 'rgb(' + Math.round(lerp(from[0], to[0], u)) + ',' + Math.round(lerp(from[1], to[1], u)) + ',' + Math.round(lerp(from[2], to[2], u)) + ')';
 }
-/* A Savant-style percentile pill; p is a 0-100 percentile (100 = best). */
+/* A percentile chip on the kit's cold-to-hot scale; p is 0-100 (100 = best). */
 function pctPill(p) {
-  if (!isNum(p)) return '<span class="pct-pill empty">—</span>';
-  return '<span class="pct-pill" style="background:' + pctColor(p) + '">' + Math.round(p) + '</span>';
+  if (!isNum(p)) return '<span class="qk-muted">—</span>';
+  return window.QK ? QK.pctlChip(p) : '<span class="pct-pill">' + Math.round(p) + '</span>';
 }
-/* One slider row: label, a bar with the percentile dot, and the raw value text. */
+/* One percentile slider row in the kit's look (QK.pctlBars). */
 function pctRow(label, p, valueText, title) {
-  const known = isNum(p);
-  const x = known ? Math.max(0, Math.min(100, p)) : 0;
-  return '<div class="pct-row"' + (title ? ' title="' + esc(title) + '"' : '') + '>' +
-    '<span class="pct-label">' + esc(label) + '</span>' +
-    '<div class="pct-bar">' + (known
-      ? '<div class="pct-fill" style="width:' + x + '%;background:' + pctColor(p) + '"></div>' +
-        '<span class="pct-dot" style="left:' + x + '%;background:' + pctColor(p) + '">' + Math.round(p) + '</span>'
-      : '<span class="pct-none">not enough data</span>') +
-    '</div><span class="pct-val">' + (valueText === undefined ? '' : valueText) + '</span></div>';
+  if (!isNum(p)) return '<div class="hw-pnone"><span>' + esc(label) + '</span><span class="qk-muted">not enough data</span><span class="v">' + (valueText === undefined ? '' : valueText) + '</span></div>';
+  return QK.pctlBars([{ label: label, pctl: p, value: valueText === undefined ? '' : String(valueText).replace(/<[^>]*>/g, ''), tip: title || '' }]);
 }
-/* A KPI tile; value is HTML. */
+/* A stat tile in the kit's look (QK.statTile); value and sub are HTML. */
 function statTile(label, value, sub, cls) {
-  return '<div class="kpi' + (cls ? ' ' + cls : '') + '"><div class="kpi-label">' + esc(label) + '</div>' +
-    '<div class="kpi-value">' + (value === undefined || value === null ? '—' : value) + '</div>' + (sub ? '<div class="kpi-sub">' + sub + '</div>' : '') + '</div>';
+  return '<div class="qk-stat' + (cls ? ' ' + cls : '') + '"><div class="qk-stat-label"><span>' + esc(label) + '</span></div>' +
+    '<div class="qk-stat-v">' + (value === undefined || value === null ? '—' : value) + '</div>' + (sub ? '<div class="qk-stat-sub"><span>' + sub + '</span></div>' : '') + '</div>';
 }
 /* A probability with an inline bar (0-1); colour optional. */
 function probCell(p, colour, max) {
   if (!isNum(p)) return '<span class="muted-inline">—</span>';
   const w = Math.max(0, Math.min(1, p / (max || 1))) * 100;
-  return '<span class="pcell"><span class="pcell-bar"><span style="width:' + w.toFixed(1) + '%;background:' + (colour || C.blue) + '"></span></span><span class="pcell-v">' + pct(p) + '</span></span>';
+  return '<span class="qk-barcell">' + pct(p) + '<i aria-hidden="true"><b style="width:' + w.toFixed(1) + '%' + (colour ? ';background:' + colour : '') + '"></b></i></span>';
 }
 /* Model minus market in percentage points, coloured (green = model higher). '' when either is missing. */
 function edgeHTML(model, market, d) {
@@ -905,38 +899,39 @@ function edgeHTML(model, market, d) {
   const e = (model - market) * 100;
   return '<span class="' + (e > 0.05 ? 'edge-pos' : e < -0.05 ? 'edge-neg' : 'muted-inline') + '">' + signed(e, d === undefined ? 1 : d) + '</span>';
 }
-/* Diverging colour for v in [-max, max]: negative green (good when lower = better), positive red. */
+/* Diverging colour for v in [-max, max]: negative is the good side (hot), positive the other (cold); invert flips it. */
 function divColour(v, max, invert) {
   if (!isNum(v) || !max) return 'transparent';
   let t = Math.max(-1, Math.min(1, v / max));
   if (invert) t = -t;
   const a = Math.abs(t);
-  return t < 0 ? 'rgba(63,185,80,' + (0.12 + 0.6 * a).toFixed(3) + ')' : 'rgba(248,81,73,' + (0.12 + 0.6 * a).toFixed(3) + ')';
+  // v2: the percentile scale's ends (hot = the good side, cold = the other), mixed by size
+  return 'color-mix(in srgb, var(' + (t < 0 ? '--pc-100' : '--pc-0') + ') ' + Math.round(14 + 62 * a) + '%, transparent)';
 }
-/* Sequential colour for t in [0,1] (the hardwood orange). */
+/* Sequential colour for t in [0,1] (the signal: ours). */
 function seqColour(t) {
   if (!isNum(t)) return 'transparent';
   const u = Math.max(0, Math.min(1, t));
-  return 'rgba(240,136,62,' + (0.06 + 0.8 * u).toFixed(3) + ')';
+  return 'color-mix(in srgb, var(--signal) ' + Math.round(6 + 70 * u) + '%, transparent)';
 }
 /* A row of segment buttons; returns HTML. items [{key,label}], active key, data attribute name. */
 function toggles(items, active, attr) {
   const a = attr || 'data-k';
-  return items.map(it => '<button type="button" class="tbtn' + (String(it.key) === String(active) ? ' active' : '') + '" ' + a + '="' + esc(it.key) + '">' + esc(it.label) + '</button>').join('');
+  return items.map(it => '<button type="button" class="tbtn' + (String(it.key) === String(active) ? ' active' : '') + '" aria-pressed="' + (String(it.key) === String(active)) + '" ' + a + '="' + esc(it.key) + '">' + esc(it.label) + '</button>').join('');
 }
 /* Wire toggle buttons under root (by attr) to fn(key); marks the active one. */
 function wireToggles(root, attr, fn) {
   if (!root) return;
   const a = attr || 'data-k';
   root.querySelectorAll('[' + a + ']').forEach(b => b.addEventListener('click', () => {
-    root.querySelectorAll('[' + a + ']').forEach(x => x.classList.toggle('active', x === b));
+    root.querySelectorAll('[' + a + ']').forEach(x => { x.classList.toggle('active', x === b); x.setAttribute('aria-pressed', String(x === b)); });
     fn(b.getAttribute(a));
   }));
 }
 /* The page head: a title, a sub-line (HTML) and optional right-side links (HTML). */
 function pageHead(title, sub, right) {
-  return '<div class="page-head"><div><h2>' + esc(title) + '</h2>' + (sub ? '<div class="ph-sub muted-inline">' + sub + '</div>' : '') + '</div>' +
-    (right ? '<div class="ph-nav">' + right + '</div>' : '') + '</div>';
+  return window.QK ? QK.sectionHead({ title: esc(title), sub: sub || '', html: true, actions: right ? '<div class="ph-nav">' + right + '</div>' : '' }) :
+    '<div class="page-head"><div><h2>' + esc(title) + '</h2>' + (sub ? '<div class="ph-sub muted-inline">' + sub + '</div>' : '') + '</div>' + (right ? '<div class="ph-nav">' + right + '</div>' : '') + '</div>';
 }
 
 // ── charts ─────────────────────────────────────────────────────────────────

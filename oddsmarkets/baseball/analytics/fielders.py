@@ -13,13 +13,14 @@ from oddsmarkets.baseball.analytics import catalog as CT
 from oddsmarkets.baseball.analytics.context import SeasonContext
 
 M = an.metric
+OAA_K = an.OAA_K
 FLOORS = {"chances": 20, "called": 500}
 
 METRICS = [
     M("chances", "Chances", "Fielding", "1", desc="Balls credited to him: outs made plus shares of balls not turned into outs."),
-    M("oaa", "OAA", "Fielding", "1", den="chances", k=60, scope="model", desc="Outs above average (our catch-probability model)."),
-    M("fielding_runs", "Fielding runs", "Fielding", "1", den="chances", k=60, scope="model", desc="OAA in runs."),
-    M("sra", "Success rate added", "Fielding", "pct", den="chances", k=60, scope="model", desc="OAA per chance."),
+    M("oaa", "OAA", "Fielding", "1", den="chances", k=OAA_K, scope="model", desc="Outs above average (our catch-probability model)."),
+    M("fielding_runs", "Fielding runs", "Fielding", "1", den="chances", k=OAA_K, scope="model", desc="OAA in runs."),
+    M("sra", "Success rate added", "Fielding", "pct", den="chances", k=OAA_K, scope="model", desc="OAA per chance."),
     M("oaa_back", "OAA back", "Fielding", "1", scope="model", desc="OAA on balls moving away from the plate."),
     M("oaa_in", "OAA in", "Fielding", "1", scope="model", desc="OAA on balls moving in."),
     M("oaa_3b", "OAA toward 3B", "Fielding", "1", scope="model", desc="OAA moving toward the third-base line."),

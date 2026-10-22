@@ -194,6 +194,8 @@ function renderTeam(el, params, state) {
     park(res[2], vid);
     logTable(L, S, t, tid);
     const more = document.getElementById('tm-more');
+    const rr = rosterRows(t);
+    if (more && rr.some(x => k.isNum(x.woba_vl)) && rr.some(x => k.isNum(x.pitching_plus))) more.parentNode.style.display = 'none';
     if (more) more.onclick = () => {
       more.disabled = true; more.textContent = 'Loading…';
       Promise.all([k.loadY(L, S, 'hitters.json'), k.loadY(L, S, 'pitchers.json')]).then(cs => {
@@ -219,15 +221,21 @@ function lineupLite(L, S, t) {
   const hit = rows.filter(r => r.kind === 'hitter' && k.isNum(r.pa)).sort((a, b) => b.pa - a.pa).slice(0, 9).sort((a, b) => (b.xwoba_plus || 0) - (a.xwoba_plus || 0));
   const pit = rows.filter(r => r.kind === 'pitcher' && String(r.pos).toUpperCase() === 'SP' && k.isNum(r.ip)).sort((a, b) => b.ip - a.ip).slice(0, 6);
   const lu = document.getElementById('tm-lineup'), ro = document.getElementById('tm-rot');
+  const has = (list, f) => list.some(x => k.isNum(x[f]));
   if (lu) QK.leaderboard(lu, { dense: true, rank: true, columns: [
     { key: 'name', label: 'Hitter', type: 'entity', sub: 'pos', href: x => k.hitterHref(L, x.pid, S) },
-    { key: 'pa', label: 'PA', num: true }, { key: 'woba', label: 'wOBA', num: true, fmt: x => k.rate3(x) }, { key: 'xwoba_plus', label: 'xwOBA+', num: true, fmt: x => k.rate3(x) },
-    { key: 'war', label: 'WAR', type: 'bar', fmt: x => (k.isNum(x) ? k.signed(x, 1) : '—') }], rows: hit.map(x => Object.assign({ name: x.name || k.name(x.pid) }, x)), sort: { key: 'xwoba_plus', dir: 'desc' } });
+    { key: 'pa', label: 'PA', num: true }, { key: 'woba', label: 'wOBA', num: true, fmt: x => k.rate3(x) }, { key: 'xwoba_plus', label: 'xwOBA+', num: true, fmt: x => k.rate3(x) }]
+    .concat(has(hit, 'woba_vl') ? [{ key: 'woba_vl', label: 'v LHP', num: true, fmt: x => k.rate3(x), tip: 'wOBA against left-handed pitching this season' }, { key: 'woba_vr', label: 'v RHP', num: true, fmt: x => k.rate3(x) }] : [])
+    .concat(has(hit, 'proj_woba') ? [{ key: 'proj_woba', label: 'Proj. wOBA', num: true, fmt: x => k.rate3(x), tip: 'Next-season projection' }] : [])
+    .concat([{ key: 'war', label: 'WAR', type: 'bar', fmt: x => (k.isNum(x) ? k.signed(x, 1) : '—') }]), rows: hit.map(x => Object.assign({ name: x.name || k.name(x.pid) }, x)), sort: { key: 'xwoba_plus', dir: 'desc' } });
   if (lu && !hit.length) lu.innerHTML = QK.empty('No lineup yet');
   if (ro) QK.leaderboard(ro, { dense: true, columns: [
     { key: 'name', label: 'Starter', type: 'entity', href: x => k.pitcherHref(L, x.pid, S) },
-    { key: 'ip', label: 'IP', num: true, fmt: x => k.num(x, 1) }, { key: 'ra9', label: 'RA9', num: true, fmt: x => k.num(x, 2) }, { key: 'stuff_plus', label: 'Stuff+', num: true, fmt: x => k.fmtV(x, 'plus') },
-    { key: 'war', label: 'WAR', type: 'bar', fmt: x => (k.isNum(x) ? k.signed(x, 1) : '—') }], rows: pit.map(x => Object.assign({ name: x.name || k.name(x.pid) }, x)), sort: { key: 'ip', dir: 'desc' } });
+    { key: 'ip', label: 'IP', num: true, fmt: x => k.num(x, 1) }].concat(has(pit, 'gs') ? [{ key: 'gs', label: 'GS', num: true }] : [])
+    .concat([{ key: 'ra9', label: 'RA9', num: true, fmt: x => k.num(x, 2) }]).concat(has(pit, 'xra9') ? [{ key: 'xra9', label: 'xRA9', num: true, fmt: x => k.num(x, 2), tip: 'Expected runs per nine from xwOBA+ against' }] : [])
+    .concat([{ key: 'stuff_plus', label: 'Stuff+', num: true, fmt: x => k.fmtV(x, 'plus') }]).concat(has(pit, 'pitching_plus') ? [{ key: 'pitching_plus', label: 'Pitching+', num: true, fmt: x => k.fmtV(x, 'plus') }] : [])
+    .concat(has(pit, 'p_start') ? [{ key: 'p_start', label: 'Pitches/start', num: true, fmt: x => k.num(x, 0) }] : [])
+    .concat([{ key: 'war', label: 'WAR', type: 'bar', fmt: x => (k.isNum(x) ? k.signed(x, 1) : '—') }]), rows: pit.map(x => Object.assign({ name: x.name || k.name(x.pid) }, x)), sort: { key: 'ip', dir: 'desc' } });
   if (ro && !pit.length) ro.innerHTML = QK.empty('No starters yet');
 }
 

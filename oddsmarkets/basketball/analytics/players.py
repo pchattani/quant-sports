@@ -44,6 +44,7 @@ from oddsmarkets.basketball.analytics import lineups as LU
 from oddsmarkets.basketball.analytics import value as VAL
 from oddsmarkets.basketball.analytics.context import SeasonContext
 from oddsmarkets.basketball.models import _io
+from oddsmarkets.common import similar as SIM
 
 logger = logging.getLogger(__name__)
 MIN_FLOOR_SHARE = 0.2
@@ -600,6 +601,8 @@ def build(ctx: SeasonContext, history: dict | None = None, lineup_tables: dict |
     for p, r in rows.items():
         r["role"] = roles.get(p, "W")
     role_percentiles(rows, qual)
+    for p, nb in role_similar(rows, league).items():
+        rows[p]["similar_role"] = nb
     meta["roles"] = {k: {"label": VAL.ROLE_LABELS[k], "n": sum(1 for p in qual if rows[p]["role"] == k)} for k in VAL.ROLES}
     meta["role_rule"] = rinfo
     meta["min_floor"] = floor
@@ -629,6 +632,60 @@ def role_percentiles(rows: dict[str, dict], qualified: list[str], keys: list[str
             rv = ref.get(r.get("role") or "W") or []
             if v is not None and len(rv) >= min_role:
                 r["pct_role"][k] = an._place(rv, v, lower[k])
+
+
+# Similar players by role (METRICS_SPEC "Similar players"; docs/_design/metrics/basketball.json groups <league>_guards /
+# _wings / _bigs): the group's features z-scored within league, role and season over qualified players, weighted by their
+# year-to-year r floored at 0.2, weighted Euclidean over the features both have (play-by-play features drop out pairwise
+# before NBA 2002), k = 5, same season and role.
+ROLE_GROUP = {"G": "guards", "W": "wings", "B": "bigs"}
+
+
+def _roles_of(rows: dict[str, dict]) -> dict[str, str]:
+    """Each row's role: the catalogue's `role`, else the value.json rule run on the catalogue (seasons built before roles)."""
+    if rows and all(r.get("role") for r in rows.values()):
+        return {p: r["role"] for p, r in rows.items()}
+    roles, _ = VAL.classify_roles({"players": rows})
+    return {p: (r.get("role") or roles.get(p) or "W") for p, r in rows.items()}
+
+
+def role_similar(rows: dict[str, dict], league: str, k: int | None = None) -> dict[str, list[dict]]:
+    """{pid: [{"id", "name", "team", "distance"}, ...]} for every qualified player: the k most similar qualified players of
+    the same role in the same catalogue (season), nearest first. Distance is the weighted RMS z gap (0 = identical)."""
+    roles = _roles_of(rows)
+    qual = [p for p, r in rows.items() if r.get("qualified")]
+    out: dict[str, list[dict]] = {}
+    for role, grp in ROLE_GROUP.items():
+        mem = [p for p in qual if roles.get(p) == role]
+        if len(mem) < 6:
+            continue
+        cfg = SIM.group_config("basketball", f"{league}_{grp}") or SIM.group_config("basketball", f"nba_{grp}")
+        if not cfg:
+            continue
+        feats = cfg["features"]
+        w = np.array([cfg["weights"][f] for f in feats], float)
+        Z = SIM.zscore(SIM.matrix([rows[p] for p in mem], feats))
+        for i, p in enumerate(mem):
+            out[p] = [{"id": mem[j], "name": rows[mem[j]].get("name") or mem[j], "team": rows[mem[j]].get("team"),
+                       "distance": round(d, 2)} for j, d in SIM.nearest(Z, i, w, k or cfg["k"])]
+    return out
+
+
+def role_card(rows: dict[str, dict], pid: str, league: str, season: int, meta: dict | None = None) -> dict | None:
+    """The small per-player copy of the role comparison for players/<pid>.json: {"season", "role", "group", "label",
+    "qualified", "n", "min_floor", "pct_role"}; n = qualified players of the role that season."""
+    r = rows.get(pid)
+    if not r:
+        return None
+    roles = _roles_of(rows) if not r.get("role") else None
+    role = r.get("role") or (roles or {}).get(pid) or "W"
+    n = ((meta or {}).get("roles") or {}).get(role, {}).get("n")
+    if n is None:
+        roles = roles or _roles_of(rows)
+        n = sum(1 for p, x in rows.items() if x.get("qualified") and roles.get(p) == role)
+    return {"season": int(season), "role": role, "group": f"{league}_{ROLE_GROUP.get(role, 'wings')}",
+            "label": VAL.ROLE_LABELS.get(role, role), "qualified": bool(r.get("qualified")), "n": int(n),
+            "min_floor": (meta or {}).get("min_floor"), "pct_role": r.get("pct_role") or {}}
 
 
 # ---------------------------------------------------------------------------------------------- the current-season block

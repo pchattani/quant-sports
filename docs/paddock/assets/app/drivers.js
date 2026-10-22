@@ -154,11 +154,11 @@ function draw(el, id, y, cat, career, elo, askedY) {
     h += '<div class="pd-mt">' + PD.kpis([
       ch && ch.eliminated ? PD.kpi('Title chance', 'Out', 'can no longer catch the leader', { text: true }) : ch ? PD.kpi('Title chance', PD.pct(ch.p_title, ch.p_title > 0.99 ? 2 : 1), 'expected ' + PD.num(ch.exp_points, 0) + ' pts (90%: ' + PD.num(ch.p05, 0) + '–' + PD.num(ch.p95, 0) + ')', { signal: true, tip: 'Our chance of the drivers’ title, from the season simulation' })
         : PD.kpi('Championship', stand.pos ? PD.ordinal(stand.pos) : '—', isNum(stand.points) ? PD.pts(stand.points) + ' points' : ''),
-      PD.kpi('Race driver rating', isNum(dv.driver_effect) ? PD.signed(dv.driver_effect, 3) + '%' : '—', 'of a lap v the team-mate · lower is faster', { pctl: pc.driver_effect, tip: PD.v2.tip(meta, 'driver_effect') }),
-      PD.kpi('Qualifying rating', isNum(dv.quali_driver_effect) ? PD.signed(dv.quali_driver_effect, 3) + '%' : '—', 'of a lap v the team-mate', { pctl: pc.quali_driver_effect, tip: PD.v2.tip(meta, 'quali_driver_effect') }),
+      PD.kpi('Race pace v team-mate', isNum(dv.driver_effect) ? PD.signed(dv.driver_effect, 3) + '%' : '—', 'of a lap v the team-mate · lower is faster', { pctl: pc.driver_effect, tip: PD.v2.tip(meta, 'driver_effect') }),
+      PD.kpi('Qualifying pace v team-mate', isNum(dv.quali_driver_effect) ? PD.signed(dv.quali_driver_effect, 3) + '%' : '—', 'of a lap v the team-mate', { pctl: pc.quali_driver_effect, tip: PD.v2.tip(meta, 'quali_driver_effect') }),
       PD.kpi('Points per race', isNum(dv.points_per_race) ? PD.num(dv.points_per_race, 2) : '—', (stand.wins || 0) + ' wins · ' + (stand.podiums || 0) + ' podiums · ' + (stand.poles || 0) + ' poles', { pctl: pc.points_per_race }),
-      PD.kpi('Race head-to-head', isNum(dv.race_h2h) ? PD.pct(dv.race_h2h, 0) : '—', mate ? 'ahead of ' + esc(PD.driverSurname(mate)) : 'v the team-mate', { pctl: pc.race_h2h }),
-      PD.kpi('Team-mate Elo', isNum(cur.elo_teammate) ? PD.num(cur.elo_teammate, 0) : '—', isNum(cur.elo) ? 'field Elo ' + PD.num(cur.elo, 0) + ' · 1500 is average' : '', { pctl: pc.elo_teammate })
+      PD.kpi('Race head-to-head v team-mate', isNum(dv.race_h2h) ? PD.pct(dv.race_h2h, 0) : '—', mate ? 'ahead of ' + esc(PD.driverSurname(mate)) : 'v the team-mate', { pctl: pc.race_h2h }),
+      PD.kpi('Elo v team-mates', isNum(cur.elo_teammate) ? PD.num(cur.elo_teammate, 0) : '—', isNum(cur.elo) ? 'field Elo ' + PD.num(cur.elo, 0) + ' · 1500 is average' : '', { pctl: pc.elo_teammate })
     ]) + '</div>';
     var distOpts = [['driver_effect', 'Race rating'], ['quali_driver_effect', 'Qualifying'], ['race_h2h', 'Race H2H'], ['points_per_race', 'Points / race'], ['race_pace', 'Race pace']];
     h += PD.grid(

@@ -60,7 +60,7 @@ function render(el, params, state) {
       if (params.rest && params.rest[0] && keys.indexOf(params.rest[0]) >= 0) CUR = params.rest[0];
       const fav = k => { const M = aw[k].model || {}; const ids = Object.keys(M).sort((a, b) => fx.pOf(M[b]) - fx.pOf(M[a])); return ids[0] ? [ids[0], fx.pOf(M[ids[0]])] : null; };
       const won = k => { const W = aw[k].winner; return W && (W.names || []).length ? 'Won: ' + W.names.join(' / ') : ''; };
-      el.innerHTML = '<div class="card"><div class="card-header">Award races ' + fx.esc(fx.seasonLabel(L, S)) + ' <span class="card-sub">The model\'s probability of winning each award, projected to the end of the season, against the prediction markets. Click a race.</span></div>' +
+      el.innerHTML = '<div class="card"><div class="card-header">Award races ' + fx.esc(fx.seasonLabel(L, S)) + ' <span class="card-sub">The model\'s probability of winning each award, projected to the end of the season; the market, where one trades, is a grey reference. Click a race.</span></div>' +
         '<div class="hf-races">' + keys.map(k => { const f = fav(k); const n = f ? ((P[f[0]] || {}).name || ((aw[k].features || {})[f[0]] || {}).name || fx.playerName(L, f[0])) : '—';
           return '<button type="button" class="hf-race' + (k === CUR ? ' on' : '') + '" data-k="' + fx.esc(k) + '"><span class="hf-race-k">' + fx.esc(fx.awardName(k, L)) + '</span><span class="hf-race-n">' + fx.esc(n) + '</span><span class="hf-race-p">' + (f ? fx.pct(f[1]) : '') + '</span>' + (won(k) ? '<span class="hf-race-k">' + fx.esc(won(k)) + '</span>' : '') + '</button>'; }).join('') + '</div></div>' +
         '<div id="aw-body"></div>';

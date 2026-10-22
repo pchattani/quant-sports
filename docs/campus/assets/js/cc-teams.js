@@ -25,11 +25,15 @@ function flatKeys(cat) {
 CC.route('teams', function (el, p) {
   var L = p.L, S = p.S, fb = CC.fb(L);
   el.innerHTML = U.head('Teams', '', U.kicker(L, S)) + QK.skeleton('lines', 8);
-  return Promise.all([CC.load(CC.path(L, S, 'teams.json')), CC.season(L, S)]).then(function (a) {
+  return Promise.all([CC.load(CC.path(L, S, 'teams.json')), CC.season(L, S), CC.metrics()]).then(function (a) {
     if (!U.alive(el)) return;
     var cat = a[0];
     if (!CC.ok(cat)) { el.innerHTML = U.head('Teams', '', U.kicker(L, S)) + U.missing('The team catalogue', cat); return; }
-    var mets = (cat.metrics || []).slice(0, 8);
+    /* the spec's team headline set (METRICS_SPEC.md) where the catalogue lists it; else the catalogue's first eight */
+    var G = CC.group(L, 'team'), byKey = {};
+    (cat.metrics || []).forEach(function (m) { byKey[m.key] = m; });
+    var hs = G ? G.m.filter(function (m) { return m.set === 'h' && byKey[m.id]; }).map(function (m) { return Object.assign({}, byKey[m.id], { label: m.d || byKey[m.id].label, desc: m.x || byKey[m.id].desc, style: !!m.style }); }) : [];
+    var mets = hs.length >= 4 ? hs : (cat.metrics || []).slice(0, 8);
     var T = cat.teams || {};
     var ids = Object.keys(T);
     var confs = {};
@@ -57,7 +61,7 @@ CC.route('teams', function (el, p) {
         { key: 'rank', label: 'Rk', num: true, tip: 'Our national rank' },
         { key: 'name', label: 'Team', type: 'entity', sub: 'conf', mark: function (r) { return U.mark(L, r.team); }, href: function (r) { return CC.teamHref(L, r.team, S); } },
         { key: 'wl', label: 'W–L', num: true, fmt: function (v, r) { return esc(r.rec); } }
-      ].concat(mets.map(function (m) { return { key: m.key, label: m.label, type: 'pctl', pctl: 'p_' + m.key, tip: (m.desc || m.label) + (m.lower ? ' (lower is better; the colour is flipped)' : ''), fmt: function (v) { return CC.fmtMetric(m, v); } }; })), rows: data });
+      ].concat(mets.map(function (m) { return { key: m.key, label: m.label, type: 'pctl', pctl: 'p_' + m.key, style: !!m.style, tip: (m.desc || m.label) + (m.lower ? ' (lower is better; the colour is flipped)' : '') + (m.style ? ' (style: shown in grey)' : ''), fmt: function (v) { return CC.fmtMetric(m, v); } }; })), rows: data });
       if (ox && dx) {
         QK.$('#tm-map', el).innerHTML = U.card('Offense v defense', 'Up and right is better on both sides of the ball.', U.chart('tm-sc', 420, 'Offense against defense, every team shown'));
         QKC.scatter('#tm-sc', { points: rs.map(function (t) { var v = T[t].values || {}; return { x: v.off, y: v.def, name: T[t].name, label: CC.tabbr(L, t), color: CC.tcol(L, t), href: CC.teamHref(L, t, S), size: 9 }; }).filter(function (q) { return isNum(q.x) && isNum(q.y); }),
@@ -135,7 +139,7 @@ function mountTargets(L, S, d, el) {
 CC.route('team', function (el, p) {
   var L = p.L, S = p.S, tid = p.id, fb = CC.fb(L);
   el.innerHTML = QK.skeleton('lines', 8);
-  return Promise.all([CC.load(CC.path(L, S, 'teams/' + tid + '.json')), CC.season(L, S), CC.load(CC.path(L, S, 'teams.json'))]).then(function (a) {
+  return Promise.all([CC.load(CC.path(L, S, 'teams/' + tid + '.json')), CC.season(L, S), CC.load(CC.path(L, S, 'teams.json')), CC.metrics()]).then(function (a) {
     /* archive team pages carry no schedule (size budget): the team's games come from the season's schedule.json */
     var d0 = CC.ok(a[0]) ? a[0] : null;
     if (!d0 || d0.schedule) return a;
@@ -176,7 +180,20 @@ CC.route('team', function (el, p) {
     if (cat && cat.metrics) {
       var off = [], def = [], oth = [];
       var FL = flatKeys(cat);
-      cat.metrics.forEach(function (m0) {
+      var TG = CC.group(L, 'team'), bk = {};
+      cat.metrics.forEach(function (m0) { bk[m0.key] = m0; });
+      if (TG) {
+        var rowOf = function (m) {
+          var m0 = bk[m.id], pp0 = pc(m.id);
+          if (!m0 || FL[m.id] || !isNum(pp0)) return null;
+          var v0 = (stx[m.id] && isNum(stx[m.id].v)) ? stx[m.id].v : ((cat.teams[tid] || {}).values || {})[m.id];
+          return { label: m.d || m0.label, pctl: pp0, value: CC.fmtMetric(m0, v0), tip: (m.x || m0.desc || '') + (m.style ? ' Describes how the team plays, not how well: shown in grey.' : ''), style: !!m.style };
+        };
+        var hRows = TG.m.filter(function (m) { return m.set === 'h'; }).map(rowOf).filter(Boolean);
+        var sRows = TG.m.filter(function (m) { return m.set === 's'; }).map(rowOf).filter(Boolean);
+        if (hRows.length >= 3) groups = [{ label: 'Headline: ratings, then the process that predicts results', rows: hRows }, { label: 'More', rows: sRows }];
+      }
+      if (!groups.length) cat.metrics.forEach(function (m0) {
         if (FL[m0.key]) return;
         var v = (stx[m0.key] && isNum(stx[m0.key].v)) ? stx[m0.key].v : ((cat.teams[tid] || {}).values || {})[m0.key], pp = pc(m0.key);
         if (!isNum(pp)) return;
@@ -184,7 +201,7 @@ CC.route('team', function (el, p) {
         if (/off|ppg|^ypp$|third|pass_epa|rush_epa|explosive|efg|tpar|ftr|orb|ast|^tov_rate|tp_pct|ft_pct/.test(m0.key) && !/allowed|opp_|def/.test(m0.key)) off.push(row);
         else if (/def|allowed|papg|opp_|drb|blk|stl/.test(m0.key)) def.push(row); else oth.push(row);
       });
-      groups = [{ label: 'Offense', rows: off }, { label: 'Defense', rows: def }, { label: 'Overall and schedule', rows: oth }];
+      if (!groups.length) groups = [{ label: 'Offense', rows: off }, { label: 'Defense', rows: def }, { label: 'Overall and schedule', rows: oth }];
     }
     var nTeams = cat && cat.teams ? Object.keys(cat.teams).length : null;
     var pcard = QK.pctCard({ title: 'Percentile rankings', peer: 'all ' + (nTeams ? nTeams + ' ' : '') + peers, sample: (isNum(R.games) && R.games > 0 ? R.games + ' games rated' : 'preseason ratings, no games yet') + ' · ' + CC.seasonLabel(L, S), groups: groups,

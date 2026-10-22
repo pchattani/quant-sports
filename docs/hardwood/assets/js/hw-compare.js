@@ -137,4 +137,5 @@ function draw(body, L, S, E, cat, roles, fellBack) {
 }
 
 HW.compareV2 = render;
+HW.compareTabs = tabs;
 })(window.HW);

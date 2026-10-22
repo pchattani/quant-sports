@@ -27,6 +27,17 @@ p_title, exp_points, p05/p95 (5th/95th percentile of final points), pos_dist, th
 number (points still needed to be sure of the title), clinched, eliminated; finished seasons
 get null.
 
+Title history (`title_history`): one snapshot of the championship simulation per completed round, for a
+chance-over-time chart with a band: {"after_round", "rounds_done", "as_of", "n_sims", "drivers" | "constructors":
+{id: {"p_title", "exp_points", "p05", "p25", "p50", "p75", "p95", "points"}}} (points = actual points when the
+snapshot was taken; p05-p95 = quantiles of simulated final points). The first build after a round's results
+records it; a later build in the same state replaces it only with more simulations (a quick run never locks in
+a point). Each build carries the previous season.json's series forward, so the series starts with the first
+build that wrote it (22 Oct 2026, after round 17 of 2026): earlier rounds were never simulated and stored, and the
+cached walk-forward race forecasts cannot stand in for them (each is one race, made with data up to that race,
+so a title chance built from them would see results after the snapshot). When the season finishes a final
+entry ("final": true) gives the champion 1 and every other entrant 0 at their final points.
+
 Team colours: OpenF1 `team_colour` (2023-; the colour most often attached to the team's cars in
 the season's race sessions), else a fixed colour for well-known constructors, else a
 deterministic palette slot from a hash of the constructorId.
@@ -318,6 +329,45 @@ def _champ_block(sim: dict | None) -> dict | None:
             "max_points_left": sim.get("max_points_left"), "runtime_s": sim.get("runtime_s"), "sources": sim.get("sources")}
 
 
+def _hist_ent(v: dict) -> dict:
+    q = v.get("points_q") or {}
+    return {"p_title": _r(v.get("p_title"), 4), "exp_points": _r(v.get("exp_points"), 1), "p05": _r(q.get("q5"), 1),
+            "p25": _r(q.get("q25"), 1), "p50": _r(q.get("q50"), 1), "p75": _r(q.get("q75"), 1), "p95": _r(q.get("q95"), 1),
+            "points": _r(v.get("current_points"), 1)}
+
+
+def title_history(prev: dict | None, sim: dict | None, stand: dict | None = None, finished_season: bool = False) -> list[dict]:
+    """The previous season.json's "title_history" with this build's snapshot added (module docstring)."""
+    hist = [h for h in ((prev or {}).get("title_history") or []) if isinstance(h, dict) and h.get("after_round") is not None]
+    if finished_season:
+        if hist and not hist[-1].get("final") and stand and stand.get("drivers"):
+            rd = stand.get("rounds_done") or []
+            champ_d = stand["drivers"][0]["driver"]
+            champ_t = (stand.get("constructors") or [{}])[0].get("team")
+
+            def fin(rows, key, champ):
+                return {r[key]: {"p_title": 1.0 if r[key] == champ else 0.0, "points": r.get("points"), "exp_points": r.get("points"),
+                                 "p05": r.get("points"), "p25": r.get("points"), "p50": r.get("points"), "p75": r.get("points"),
+                                 "p95": r.get("points")} for r in rows}
+            hist.append({"after_round": max(rd) if rd else None, "rounds_done": len(rd), "as_of": _now(), "n_sims": None, "final": True,
+                         "drivers": fin(stand["drivers"], "driver", champ_d),
+                         "constructors": fin(stand.get("constructors") or [], "team", champ_t)})
+        return hist
+    if not sim or not sim.get("drivers"):
+        return hist
+    done = sorted(int(r) for r in sim.get("completed") or [])
+    if not done:
+        return hist
+    snap = {"after_round": done[-1], "rounds_done": len(done), "as_of": _now(), "n_sims": sim.get("n"),
+            "drivers": {d: _hist_ent(v) for d, v in sorted(sim["drivers"].items())},
+            "constructors": {t: _hist_ent(v) for t, v in sorted((sim.get("constructors") or {}).items())}}
+    hist = [h for h in hist if not h.get("final")]
+    same = [h for h in hist if h["after_round"] == snap["after_round"]]
+    if same and (same[-1].get("n_sims") or 0) >= (snap["n_sims"] or 0):
+        return hist
+    return sorted([h for h in hist if h["after_round"] != snap["after_round"]] + [snap], key=lambda h: h["after_round"])
+
+
 def season_elo(history: dict | None, year: int) -> dict[str, dict]:
     out: dict[str, dict] = {}
     for race in (history or {}).get("races") or []:
@@ -330,8 +380,8 @@ def season_elo(history: dict | None, year: int) -> dict[str, dict]:
 
 def build_season(year: int, current: int, *, forecasts: dict | None = None, effects: dict | None = None, split: dict | None = None,
                  championship: dict | None = None, elo: dict | None = None, colours: dict | None = None,
-                 stand: dict | None = None) -> dict:
-    """season.json (PAYLOADS)."""
+                 stand: dict | None = None, prev: dict | None = None) -> dict:
+    """season.json (PAYLOADS). `prev` is the season.json on disk: its "title_history" is carried forward."""
     st = canon.season(year)
     rs = _rounds(st)
     if not rs:
@@ -361,6 +411,7 @@ def build_season(year: int, current: int, *, forecasts: dict | None = None, effe
         "elo": season_elo(elo, year),
         "teams": teams,
         "names": {d: driver_name(st, d) for d in (st.get("drivers") or {})},
+        "title_history": title_history(prev, championship, stand, fin),
     }
 
 

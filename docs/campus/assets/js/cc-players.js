@@ -68,7 +68,7 @@ function posLabel(cat, pos) { var x = ((cat && cat.positions) || {})[pos]; retur
 CC.route('players', function (el, p) {
   var L = p.L, S = p.S, fb = CC.fb(L), q0 = p.query || {};
   el.innerHTML = U.head('Players', '', U.kicker(L, S)) + QK.skeleton('lines', 8);
-  return Promise.all([CC.load(CC.path(L, S, 'players.json')), CC.season(L, S)]).then(function (a) {
+  return Promise.all([CC.load(CC.path(L, S, 'players.json')), CC.season(L, S), CC.metrics()]).then(function (a) {
     if (!U.alive(el)) return;
     var cat = a[0];
     if (!CC.ok(cat) || !Object.keys(cat.players || {}).length) {
@@ -99,18 +99,26 @@ CC.route('players', function (el, p) {
       var k0 = st.sort;
       rs.sort(function (x, y) { var vx = (P[x].values || {})[k0], vy = (P[y].values || {})[k0]; return (isNum(vy) ? vy : -1e9) - (isNum(vx) ? vx : -1e9); });
       var shown = rs.slice(0, 400);
-      var peer = st.within ? (st.pos === 'all' ? 'his position' : posLabel(cat, st.pos).toLowerCase()) : 'all qualified players';
+      /* a position picked: the spec's headline set for its peer group, when the payload carries it */
+      var G = null, cols = mets.map(function (m) { return { key: m.key, label: m.label, desc: m.desc, lower: m.lower, meta: m }; }), pk = null;
+      if (st.pos !== 'all' && rs.length) {
+        G = CC.group(L, 'player', P[rs[0]]);
+        var hs = G ? G.m.filter(function (m) { return m.set === 'h' && rs.some(function (k) { return isNum(((P[k] || {}).values || {})[m.id]) && isNum(((P[k] || {})[G.pct] || {})[m.id]); }); }) : [];
+        if (hs.length >= 3) { var mm0 = {}; mets.forEach(function (m) { mm0[m.key] = m; }); cols = hs.map(function (m) { return { key: m.id, label: m.d, desc: m.x, lower: m.low, style: m.style, meta: mm0[m.id] || { fmt: '2' } }; }); pk = G.pct; }
+        else G = null;
+      }
+      var peer = G ? G.d.toLowerCase() + ' (the spec’s headline set)' : st.within ? (st.pos === 'all' ? 'his position' : posLabel(cat, st.pos).toLowerCase()) : 'all qualified players';
       QK.$('#pl-n', el).innerHTML = '<b>' + esc(QK.fmt.num(rs.length)) + ' players</b> · percentiles v ' + esc(peer) + (computed ? ' (computed from this catalogue)' : '') + (rs.length > shown.length ? ' · showing the top 400 by ' + esc((mets[0] || {}).label || 'value') + '; search to find anyone' : '');
       var rows = shown.map(function (k) {
-        var x = P[k], pc = st.within ? (x.pct_pos || {}) : (x.pct || {});
+        var x = P[k], pc = pk ? (x[pk] || {}) : st.within ? (x.pct_pos || {}) : (x.pct || {});
         var o = { id: k, name: x.name, team: x.team, sub: [CC.tabbr(L, x.team), x.pos, x['class']].filter(Boolean).join(' · '), gp: x.gp };
-        mets.forEach(function (m) { o[m.key] = (x.values || {})[m.key]; o['p_' + m.key] = pc[m.key]; });
+        cols.forEach(function (m) { o[m.key] = (x.values || {})[m.key]; o['p_' + m.key] = pc[m.key]; });
         return o;
       });
       QK.leaderboard(QK.$('#pl-table', el), { dense: true, maxHeight: 760, rowHref: function (r) { return CC.playerHref(L, r.id, S); }, columns: [
         { key: 'name', label: 'Player', type: 'entity', sub: 'sub', mark: function (r) { return U.mark(L, r.team); }, href: function (r) { return CC.playerHref(L, r.id, S); } },
         { key: 'gp', label: 'GP', num: true }
-      ].concat(mets.map(function (m) { return { key: m.key, label: m.label, type: 'pctl', pctl: 'p_' + m.key, tip: (m.desc || m.label) + (m.lower ? ' (lower is better; the colour is flipped)' : ''), fmt: function (v) { return CC.fmtMetric(m, v); } }; })), rows: rows });
+      ].concat(cols.map(function (m) { return { key: m.key, label: m.label, type: 'pctl', pctl: 'p_' + m.key, style: !!m.style, tip: (m.desc || m.label) + (m.lower ? ' (lower is better; the colour is flipped)' : '') + (m.style ? ' (style: shown in grey)' : ''), fmt: function (v) { return CC.fmtMetric(m.meta, v); } }; })), rows: rows });
     }
     QK.$('#pl-q', el).addEventListener('input', function (e) { st.q = e.target.value || ''; paint(); });
     QK.$('#pl-qual', el).addEventListener('change', function (e) { st.qual = e.target.checked; paint(); });
@@ -176,7 +184,7 @@ function movementCard(L, S, pid, team, node) {
 CC.route('player', function (el, p) {
   var L = p.L, S = p.S, pid = p.id, fb = CC.fb(L);
   el.innerHTML = QK.skeleton('card', 1) + QK.skeleton('lines', 6);
-  return Promise.all([CC.load(CC.lpath(L, 'players/' + pid + '.json')), CC.load(CC.path(L, S, 'players.json')), CC.season(L, S)]).then(function (a) {
+  return Promise.all([CC.load(CC.lpath(L, 'players/' + pid + '.json')), CC.load(CC.path(L, S, 'players.json')), CC.season(L, S), CC.metrics()]).then(function (a) {
     if (!U.alive(el)) return;
     var d = CC.ok(a[0]) ? a[0] : null, cat = CC.ok(a[1]) ? a[1] : null;
     if (cat) { clean(cat); fillPct(cat); }
@@ -211,14 +219,32 @@ CC.route('player', function (el, p) {
     // percentile card + where he sits
     var mets = (cat && cat.metrics) || [];
     var fl = floorText(L, cat, pos);
-    var peerN = cat ? Object.keys(cat.players).filter(function (k0) { var x = cat.players[k0]; return x && x.pos === pos && x.qualified !== false; }).length : 0;
-    var rowsPc = mets.filter(function (m) { return isNum(pp[m.key]); }).map(function (m) { return { label: m.label, pctl: pp[m.key], value: CC.fmtMetric(m, vals[m.key]), tip: (m.desc || '') + (m.lower ? ' Lower is better; the bar is flipped.' : '') }; });
-    var vk = rowsPc.slice(0, 7), ok2 = rowsPc.slice(7);
-    var pcard = QK.pctCard({ title: 'Percentile rankings', peer: (posLabel(cat, pos) || 'his position') + (fl ? ', ' + fl : ''), sample: (cp && isNum(cp.gp) ? cp.gp + ' games' : '') + (peerN ? ' · ' + peerN + ' qualified peers' : '') + ' · ' + CC.seasonLabel(L, S),
-      groups: [{ label: 'Value and efficiency', rows: vk }, { label: 'Production', rows: ok2 }],
-      note: cp && cp.qualified === false ? 'He is below the qualifying floor: read these as early.' : '', emptyText: cp ? 'No percentiles for this season yet.' : 'No current-season profile yet.' });
+    /* the spec's peer group and headline set (METRICS_SPEC.md) where the payload carries them; else the payload's own
+       position pools and metric list */
+    var meta = {}; mets.forEach(function (m) { meta[m.key] = m; });
+    var G = cp ? CC.group(L, 'player', cp) : null;
+    var qualOf = function (x) { return G && G.min && G.min.f && x[G.min.f] !== undefined ? x[G.min.f] !== false : x.qualified !== false; };
+    var head = G ? CC.specRows(G, cp, 'h', meta) : [];
+    var useSpec = !!G && head.length >= 2;
+    var inPeer = function (x) { return x && (useSpec ? x[G.pf] === cp[G.pf] : x.pos === pos) && qualOf(x); };
+    var peerN = cat ? Object.keys(cat.players).filter(function (k0) { return inPeer(cat.players[k0]); }).length : 0;
+    var groupsPc;
+    if (useSpec) {
+      var used = {}; head.forEach(function (r) { used[r.m.id] = 1; });
+      var sec = CC.specRows(G, cp, 's', meta).filter(function (r) { return !used[r.m.id]; });
+      sec.forEach(function (r) { used[r.m.id] = 1; });
+      /* the spec ranks on rates only: season counts stay in the tables, not in the card */
+      groupsPc = [{ label: 'Headline: the most stable and predictive', rows: head }, { label: 'More', rows: sec.slice(0, 8) }];
+    } else {
+      var rowsPc = mets.filter(function (m) { return isNum(pp[m.key]); }).map(function (m) { return { label: m.label, pctl: pp[m.key], value: CC.fmtMetric(m, vals[m.key]), tip: (m.desc || '') + (m.lower ? ' Lower is better; the bar is flipped.' : '') }; });
+      groupsPc = [{ label: 'Value and efficiency', rows: rowsPc.slice(0, 7) }, { label: 'Production', rows: rowsPc.slice(7) }];
+    }
+    var peerName = useSpec ? G.d + (CC.groupFloor(G) ? ', ' + CC.groupFloor(G) : '') : (posLabel(cat, pos) || 'his position') + (fl ? ', ' + fl : '');
+    var pcard = QK.pctCard({ title: 'Percentile rankings', peer: peerName, sample: (cp && isNum(cp.gp) ? cp.gp + ' games' : '') + (peerN ? ' · ' + peerN + ' qualified peers' : '') + ' · ' + CC.seasonLabel(L, S),
+      groups: groupsPc,
+      note: cp && cp.qualified === false ? 'He is below the qualifying floor: read these as early.' : (useSpec && head.length < G.m.filter(function (m) { return m.set === 'h'; }).length ? 'More of the headline rates (per dropback, carry or target) arrive with the next data build.' : ''), emptyText: cp ? 'No percentiles for this season yet.' : 'No current-season profile yet.' });
     html += '<div class="qk-grid cc-grid"><div class="qk-span-5">' + pcard + '</div><div class="qk-span-7"><div class="qk-stack">' +
-      (cp && peerN >= 10 ? U.card('Where he sits', 'Every qualified ' + esc((posLabel(cat, pos) || 'player').toLowerCase()) + ' this season, coloured by percentile', '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('pp-dist', 240, 'Distribution of the position group')) : '') +
+      (cp && peerN >= 10 ? U.card('Where he sits', 'Every qualified ' + esc((useSpec ? G.d : (posLabel(cat, pos) || 'player')).toLowerCase()) + ' this season, coloured by percentile', '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('pp-dist', 240, 'Distribution of the position group')) : '') +
       '<div id="pp-log-card"></div><div id="pp-move"></div></div></div></div>';
     if (!d) html += '<p class="cc-note">Career pages are kept for players with a game in the last two seasons; this season’s catalogue numbers are shown.</p>';
     var log = cur.log || [];
@@ -248,14 +274,14 @@ CC.route('player', function (el, p) {
       html += '<div class="qk-grid cc-grid">' + (mv.length ? '<div class="qk-span-6">' + U.card('Moves', QK.tag('Inferred from box scores, not the official transfer portal'), U.table([{ label: 'Season', align: 'right' }, 'From', 'To', { label: 'Value before', align: 'right' }, { label: 'After', align: 'right' }], mv.map(function (m) {
         return [{ v: m.season, html: m.season ? esc(CC.seasonLabel(L, m.season)) : '—' }, { html: U.teamEnt(L, m.from, { abbr: true }), v: CC.tname(L, m.from) }, { html: U.teamEnt(L, m.to, { abbr: true }), v: CC.tname(L, m.to) }, CC.f(m.value_before, 1), CC.f(m.value_after, 1)];
       }), { sticky: false })) + '</div>' : '') + (sim.length ? '<div class="qk-span-6">' + U.card('Most similar', 'Closest statistical profiles (smaller distance is closer).', '<ul class="cc-list">' + sim.map(function (s0) {
-        return '<li><a href="' + esc(CC.playerHref(L, s0.id, s0.season)) + '">' + esc(s0.name || CC.pname(L, s0.id)) + '</a><span class="s">' + esc(CC.seasonLabel(L, s0.season)) + '</span><span class="v">' + CC.f(s0.distance, 2) + '</span></li>'; }).join('') + '</ul>', { flush: true }) + '</div>' : '') + '</div>';
+        return '<li><a href="' + esc(CC.playerHref(L, s0.id, s0.season)) + '">' + esc(s0.name || CC.pname(L, s0.id)) + '</a><span class="s">' + esc(CC.seasonLabel(L, s0.season)) + '</span><span class="v">' + CC.f(s0.distance, 2) + '</span></li>'; }).join('') + '</ul>', { flush: true, foot: '<span></span>' + U.link(CC.href(L, 'lab', null, S, 'kind=compare&p=' + [pid].concat(sim.filter(function (s0) { return Number(s0.season) === Number(S); }).slice(0, 2).map(function (s0) { return s0.id; })).join(',')), 'Compare side by side') }) + '</div>' : '') + '</div>';
     }
     el.innerHTML = html;
     U.wire(el);
     // where he sits
     if (cp && QK.$('#pp-dist', el)) {
-      var peers = Object.keys(cat.players).map(function (k0) { return cat.players[k0]; }).filter(function (x) { return x && x.pos === pos && x.qualified !== false; });
-      var opts = mets.filter(function (m) { return isNum(vals[m.key]); }).slice(0, 4);
+      var peers = Object.keys(cat.players).map(function (k0) { return cat.players[k0]; }).filter(inPeer);
+      var opts = useSpec ? head.filter(function (r) { return !r.style; }).map(function (r) { return { key: r.m.id, label: r.m.d, lower: !!r.m.low, fmt: (meta[r.m.id] || {}).fmt }; }).slice(0, 4) : mets.filter(function (m) { return isNum(vals[m.key]); }).slice(0, 4);
       var segEl = QK.$('#pp-dist-m', el);
       segEl.innerHTML = opts.map(function (o, i) { return '<button type="button" aria-pressed="' + (i === 0) + '" data-value="' + esc(o.key) + '">' + esc(o.label) + '</button>'; }).join('');
       var drawDist = function (key) {

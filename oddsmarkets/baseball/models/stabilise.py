@@ -2,9 +2,12 @@
 Stabilisation: the sample at which each metric becomes signal (split-half reliability 0.7).
 
 For a metric measured on events of a unit (PA, ball in play, pitch, swing, called pitch, ...), for each
-sample size n in GRID: take every player with at least 2n events in the season (chronological order),
-split his first 2n events into odd and even halves, and correlate the half means across players (r_n,
-needs MIN_PLAYERS). Under the Spearman-Brown / beta-binomial model the reliability of an n-event mean is
+sample size n in GRID: split every player's season by game parity (his 1st, 3rd, 5th ... games against his 2nd,
+4th ... games, in date order), take players with at least n events in each half, and correlate the means of the
+first n events of each half across players (r_n, needs MIN_PLAYERS). Splitting by game rather than by event keeps
+the shared pitcher, park, umpire and weather of one game out of both halves: the event-parity split (stab-3)
+inflated r_n, so its k were 1.3-2x too small (docs/METRICS_SPEC.md, baseball stabilisation). Event tables without a
+game id fall back to the event-parity split. Under the Spearman-Brown / beta-binomial model the reliability of an n-event mean is
 
     r(n) = n / (n + k)        so k = n (1 - r) / r,   and   n_0.7 = k * 0.7 / 0.3.
 
@@ -22,7 +25,7 @@ import pandas as pd
 
 from oddsmarkets.baseball.models import _c
 
-MODEL_VERSION = "stab-3"
+MODEL_VERSION = "stab-4"
 GRID = [10, 20, 30, 50, 75, 100, 150, 200, 250, 300, 400, 500, 650, 800, 1000, 1300, 1600, 2000]
 MIN_PLAYERS = 25
 TARGET = 0.7
@@ -73,12 +76,13 @@ def event_tables(pitches: pd.DataFrame, bip_x: pd.DataFrame | None = None) -> di
     """Per-unit event frames with columns entity ids (batter, pitcher, catcher), t (order) and metric values."""
     p = pitches.reset_index(drop=True)
     p["t"] = np.arange(len(p))
+    p["g"] = p["game_pk"].to_numpy() if "game_pk" in p else np.nan
     out: dict[str, pd.DataFrame] = {}
     ev = p["events"].astype(object).fillna("").astype(str)
     den = pd.to_numeric(p.get("woba_denom"), errors="coerce").fillna(0.0)
     last = p[(ev != "") & (den > 0)].copy()
     lev = last["events"].astype(str)
-    pa = pd.DataFrame({"batter": last["batter"].map(_sid), "pitcher": last["pitcher"].map(_sid), "t": last["t"]})
+    pa = pd.DataFrame({"batter": last["batter"].map(_sid), "pitcher": last["pitcher"].map(_sid), "t": last["t"], "g": last["g"]})
     pa["k_rate"] = lev.isin(_c.K_EVENTS).astype(float).to_numpy()
     pa["bb_rate"] = lev.isin(_c.BB_EVENTS).astype(float).to_numpy()
     pa["hbp_rate"] = lev.isin(_c.HBP_EVENTS).astype(float).to_numpy()
@@ -97,7 +101,7 @@ def event_tables(pitches: pd.DataFrame, bip_x: pd.DataFrame | None = None) -> di
         pa[f"p_{c}"] = pa[c]
     out["pa"] = pa
     b = last[is_bip & last["launch_speed"].notna().to_numpy()].copy()
-    bb = pd.DataFrame({"batter": b["batter"].map(_sid), "pitcher": b["pitcher"].map(_sid), "t": b["t"]})
+    bb = pd.DataFrame({"batter": b["batter"].map(_sid), "pitcher": b["pitcher"].map(_sid), "t": b["t"], "g": b["g"]})
     ls = b["launch_speed"].astype(float).to_numpy(); la = b["launch_angle"].astype(float).to_numpy()
     bb["ev"] = ls; bb["p_ev"] = ls
     bb["la"] = la
@@ -128,7 +132,7 @@ def event_tables(pitches: pd.DataFrame, bip_x: pd.DataFrame | None = None) -> di
         inz = inz.to_numpy()
     else:
         inz = (zone >= 1) & (zone <= 9)
-    pt = pd.DataFrame({"batter": p["batter"].map(_sid), "pitcher": p["pitcher"].map(_sid), "t": p["t"]})
+    pt = pd.DataFrame({"batter": p["batter"].map(_sid), "pitcher": p["pitcher"].map(_sid), "t": p["t"], "g": p["g"]})
     pt["swing_rate"] = sw.astype(float)
     pt["p_csw"] = (d.isin(WHIFF) | (d == "called_strike")).astype(float).to_numpy()
     pt["p_zone_rate"] = inz.astype(float)
@@ -136,14 +140,14 @@ def event_tables(pitches: pd.DataFrame, bip_x: pd.DataFrame | None = None) -> di
     out["pitch_out"] = pt[~inz].assign(chase_rate=lambda x: x["swing_rate"])
     out["pitch_in"] = pt[inz].assign(zswing_rate=lambda x: x["swing_rate"])
     s = p[sw]
-    swg = pd.DataFrame({"batter": s["batter"].map(_sid), "pitcher": s["pitcher"].map(_sid), "t": s["t"]})
+    swg = pd.DataFrame({"batter": s["batter"].map(_sid), "pitcher": s["pitcher"].map(_sid), "t": s["t"], "g": s["g"]})
     swg["whiff_rate"] = s["description"].astype(str).isin(WHIFF).astype(float).to_numpy()
     swg["p_whiff_rate"] = swg["whiff_rate"]
     swg["bat_speed"] = pd.to_numeric(s.get("bat_speed"), errors="coerce").to_numpy() if "bat_speed" in s else np.nan
     out["swing"] = swg
     if "pitch_type" in p and "release_speed" in p:
         f = p[p["pitch_type"].astype(str) == "FF"]
-        out["pitch_ff"] = pd.DataFrame({"pitcher": f["pitcher"].map(_sid), "t": f["t"],
+        out["pitch_ff"] = pd.DataFrame({"pitcher": f["pitcher"].map(_sid), "t": f["t"], "g": f["g"],
                                         "p_velo": f["release_speed"].astype(float).to_numpy()})
     if "fielder_2" in p and "plate_x" in p:
         c = p[d.isin(_c.CALLED) & p["plate_x"].notna() & p["plate_z"].notna()].copy()
@@ -152,7 +156,7 @@ def event_tables(pitches: pd.DataFrame, bip_x: pd.DataFrame | None = None) -> di
                 + 10000 * c["stand"].astype(str).str.startswith("L").astype(int))
         y = (c["description"].astype(str) == "called_strike").astype(float)
         rate = y.groupby(cell).transform("mean")
-        out["called"] = pd.DataFrame({"catcher": c["fielder_2"].map(_sid), "t": c["t"], "c_frame": (y - rate).to_numpy()})
+        out["called"] = pd.DataFrame({"catcher": c["fielder_2"].map(_sid), "t": c["t"], "g": c["g"], "c_frame": (y - rate).to_numpy()})
     return out
 
 
@@ -174,22 +178,34 @@ def _barrel(ls, la) -> np.ndarray:
 # ============================================================================ split-half
 
 def split_half_curve(ev: pd.DataFrame, entity: str, metric: str, grid: list[int] = GRID,
-                     min_players: int = MIN_PLAYERS) -> list[list[float]]:
-    """[[n, r_n, players], ...] from odd/even halves of each player's first 2n events."""
-    d = ev[[entity, "t", metric]].dropna()
+                     min_players: int = MIN_PLAYERS, by: str = "game") -> list[list[float]]:
+    """[[n, r_n, players], ...]: the mean of the first n events in a player's odd games against the first n in his
+    even games (`by="game"`, the default, when the frame has a game id `g`), else odd against even events of his
+    first 2n (`by="event"`, the stab-3 split)."""
+    use_game = by == "game" and "g" in ev and ev["g"].notna().any()
+    cols = [entity, "t", metric] + (["g"] if use_game else [])
+    d = ev[cols].dropna()
     d = d[d[entity].notna()]
     if not len(d):
         return []
     d = d.sort_values([entity, "t"], kind="mergesort")
-    d["rank"] = d.groupby(entity).cumcount()
-    cnt = d.groupby(entity).size()
+    if use_game:
+        first = d.groupby([entity, "g"], sort=False)["t"].transform("min")
+        d["half"] = d.assign(_f=first).groupby(entity)["_f"].rank(method="dense").astype(int).sub(1) % 2
+        d["rank"] = d.groupby([entity, "half"]).cumcount()
+        cnt = d.groupby([entity, "half"]).size().unstack(fill_value=0)
+        cnt = cnt.min(axis=1) if cnt.shape[1] == 2 else pd.Series(0, index=cnt.index)
+    else:
+        d["half"] = d.groupby(entity).cumcount() % 2
+        d["rank"] = d.groupby(entity).cumcount() // 2
+        cnt = d.groupby(entity).size() // 2
     out = []
     for n in grid:
-        ok = cnt[cnt >= 2 * n].index
+        ok = cnt[cnt >= n].index
         if len(ok) < min_players:
             break
-        s = d[d[entity].isin(ok) & (d["rank"] < 2 * n)]
-        h = s.groupby([entity, s["rank"] % 2])[metric].mean().unstack()
+        s = d[d[entity].isin(ok) & (d["rank"] < n)]
+        h = s.groupby([entity, "half"])[metric].mean().unstack()
         r = _c.pearson(h[0], h[1])
         if r is not None:
             out.append([float(n), float(r), int(len(ok))])
@@ -247,7 +263,7 @@ def for_season(level: str, season: int, use_cache: bool = True) -> dict:
 
     def build():
         from oddsmarkets.baseball.models import xwoba
-        cols = ["batter", "pitcher", "stand", "events", "description", "woba_value", "woba_denom",
+        cols = ["game_pk", "batter", "pitcher", "stand", "events", "description", "woba_value", "woba_denom",
                 "estimated_woba_using_speedangle", "launch_speed", "launch_angle", "launch_speed_angle", "bb_type",
                 "hc_x", "hc_y", "zone", "plate_x", "plate_z", "sz_top", "sz_bot", "bat_speed", "pitch_type",
                 "release_speed", "fielder_2"]
@@ -270,13 +286,18 @@ def table(level: str = "mlb", seasons: list[int] | None = None) -> dict:
     return combine({k: v for k, v in per.items() if v})
 
 
-def _fitted(level: str) -> dict:
-    f = _c.read_fit(f"stabilise_{level}")
-    return (f or {}).get("metrics") or {}
+def _fitted(level: str, kind: str = "game") -> dict:
+    """The committed fit's metrics: "game" (game-parity split, stab-4: the display shrinkage) or "event" (the
+    event-parity stab-3 values, kept frozen in `metrics_event` for the models validated with them: the projection
+    regression constants and WAR's xwOBA blend, until a promotion backtest moves them)."""
+    f = _c.read_fit(f"stabilise_{level}") or {}
+    if kind == "event":
+        return f.get("metrics_event") or f.get("metrics") or {}
+    return f.get("metrics") or {}
 
 
-def shrink_k(metric: str, level: str = "mlb") -> float:
-    m = _fitted(level).get(metric)
+def shrink_k(metric: str, level: str = "mlb", kind: str = "game") -> float:
+    m = _fitted(level, kind).get(metric)
     return float(m["k"]) if m and m.get("k") else DEFAULT_K.get(metric, 200.0)
 
 
@@ -290,6 +311,9 @@ def point(metric: str, level: str = "mlb") -> float:
 
 def export_fits(level: str = "mlb", seasons: list[int] | None = None) -> dict:
     t = table(level, seasons)
-    out = {"version": MODEL_VERSION, "target": TARGET, "metrics": t}
+    old = _c.read_fit(f"stabilise_{level}") or {}
+    # the event-parity values the projections and WAR were validated with: carried over unchanged
+    event = old.get("metrics_event") or (old.get("metrics") if old.get("version") == "stab-3" else None) or {}
+    out = {"version": MODEL_VERSION, "target": TARGET, "split": "game", "metrics": t, "metrics_event": event}
     _c.write_fit(f"stabilise_{level}", out)
     return out

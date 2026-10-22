@@ -73,7 +73,7 @@ function render(el, params) {
     h += '<div style="margin-top:var(--sp-4)"></div>' + U.tabsHTML([{ key: 'overview', label: 'Overview', href: base }, { key: 'detail', label: 'Shots, lineups and the full catalogue', href: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'tab=detail' }], tab);
     if (tab === 'detail') {
       el.innerHTML = h + '<div class="hw-sub"></div>';
-      return U.legacy('team', el.querySelector('.hw-sub'), params);
+      return U.legacy('team', el.querySelector('.hw-sub'), params, null, { embed: 'detail' });
     }
     if (!season && !teams) { el.innerHTML = h + U.empty('Not in this season', name + ' has no data for ' + HW.seasonLabel(L, S) + '.'); return; }
     const path = ((season && season.rating_paths) || {})[tid] || [];
@@ -180,8 +180,8 @@ function render(el, params) {
         .concat([{ key: 'rate', label: 'HPM', num: true, fmt: v => U.sgnHTML(v, 1), tip: 'Our projected rest-of-season impact per 100 possessions' },
           { key: 'w0', label: 'WAR', type: 'bar', fmt: v => U.f(v, 1), tip: 'Projected wins above replacement, rest of season' },
           { key: 'v', label: '4-yr value', num: true, fmt: v => U.f(v, 1), tip: 'Discounted WAR over four seasons' }])
-        .concat(mvOn ? [{ key: 'p_next', label: 'Chance of moving', num: true, fmt: (v, x) => U.mvBar(mv, x.mr), tip: 'Our chance he has left ' + U.mvHorizon(mv) + '. ' + ((mv.m.notes || [])[0] || '') }] : [])
-        .concat(mvOn && mv.pub.deadline ? [{ key: 'p_dl', label: 'Deadline', num: true, fmt: v => U.pctMv(v), tip: 'Our chance he is ' + (mv.m.deadline_label || 'traded or claimed') + ' before the trade deadline (' + HW.fmtDate(String((mv.m.horizons || {}).deadline || ''), { weekday: false }) + ')' }] : []) });
+        .concat(mvOn ? [{ key: 'p_next', label: 'Chance of moving', num: true, fmt: (v, x) => U.mvBar(mv, x.mr), tip: 'Our chance the player has left ' + U.mvHorizon(mv) + '. ' + ((mv.m.notes || [])[0] || '') }] : [])
+        .concat(mvOn && mv.pub.deadline ? [{ key: 'p_dl', label: 'Deadline', num: true, fmt: v => U.pctMv(v), tip: 'Our chance the player is ' + (mv.m.deadline_label || 'traded or claimed') + ' before the trade deadline (' + HW.fmtDate(String((mv.m.horizons || {}).deadline || ''), { weekday: false }) + ')' }] : []) });
     } else {
       const ro = (T.roster || []).slice().sort((x, y) => (y.min || 0) - (x.min || 0)).map(x => Object.assign({}, x, { mpg: x.mpg || (x.gp ? x.min / x.gp : null) }));
       if (!ro.length) rosterNode.innerHTML = U.empty('No roster yet', 'The roster appears once the team plays.');

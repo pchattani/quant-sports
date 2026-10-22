@@ -842,34 +842,6 @@ const PREFS = {
   DEF: ['def_value', 'splash_pg', 'sacks', 'pressures_pg', 'qb_hits', 'tfl', 'ints', 'pd', 'tackles']
 };
 PREFS.TE = PREFS.WR;
-/* ── comparisons (Design System 2.0): the peer group and the metric set, defined once for the percentile card, the
- * compare page, the leaderboards and the distribution. Peer groups follow the brief's NFL positions: QB, RB, WR/TE
- * (one pool), DL and outside rushers (ED), LB, DB, K, P. players.json carries pct (against the group; WR and TE pooled) and
- * pct_pos (within the position: DL, LB or DB for defenders). docs/METRICS_SPEC.md is the source of truth for the sets
- * and floors: change them there first, then here. */
-const DEF_POS = { DE: 'DL', DT: 'DL', NT: 'DL', DL: 'DL', EDGE: 'DL', ED: 'DL', LB: 'LB', ILB: 'LB', OLB: 'LB', MLB: 'LB', CB: 'DB', S: 'DB', FS: 'DB', SS: 'DB', DB: 'DB', SAF: 'DB' };
-const PEER_NAME = { QB: 'NFL quarterbacks', RB: 'NFL running backs', WR: 'NFL wide receivers and tight ends', TE: 'NFL wide receivers and tight ends', K: 'NFL kickers', P: 'NFL punters',
-  DL: 'NFL defensive linemen and outside rushers', LB: 'NFL linebackers', DB: 'NFL defensive backs' };
-/* {key: 'pct' | 'pct_pos', id, name} for a catalogue player (players.json row or a player file's current block). */
-function peerOf(p, group) {
-  const g = groupOf((p || {}).pos, group || (p || {}).group);
-  if (g === 'DEF') { const d = DEF_POS[String((p || {}).pos || '').toUpperCase()] || 'DB'; return { key: 'pct_pos', id: d, name: PEER_NAME[d] }; }
-  return { key: 'pct', id: g === 'TE' ? 'WR' : g, name: PEER_NAME[g] || 'NFL players at his position' };
-}
-function peerPct(p, group) { const pr = peerOf(p, group); const o = (p || {})[pr.key]; return o && typeof o === 'object' ? o : ((p || {}).pct || {}); }
-/* The metric set of a group, in card groups: [[label, [keys]]]. Until the metrics spec is committed this is the site's
- * headline metrics for the group (PREFS order), grouped by family. */
-function playerSet(group, metrics, n) {
-  const heads = headline((metrics || []).filter(m => scopeOk(m, group)), PREFS[group] || [], n || 10);
-  return metricGroups(heads.map(m => Object.assign({}, m, { group: m.family || m.group }))).map(g => [g.name, g.items.map(m => m.key)]);
-}
-/* The sample line under a percentile card: games, the group's sample and the qualification rule. */
-function sampleLine(p, group, qual) {
-  const sk = (SAMPLE[group] || []).find(c => isNum(((p || {}).values || {})[c[0]]));
-  const g = isNum((p || {}).games) ? p.games : null;
-  return [isNum(g) ? g + ' G' : '', sk ? int(p.values[sk[0]]) + ' ' + sk[1].toLowerCase() : '', qual ? 'qualified: ' + qual : ''].filter(Boolean).join(' · ');
-}
-
 function shortLabel(s) { return String(s || '').replace(/percentage/i, '%').replace(/ over expected/i, ' OE').replace(/ per play/i, '/play').replace(/^Expected /, 'x').slice(0, 24); }
 function cleanDesc(t) { return String(t || '').replace(/\(?builder [A-Z]'s ([a-z_ ]+?) model; /gi, '(').replace(/builder [A-Z]'s /gi, 'our ').replace(/\s+\(\)/g, '').replace(/player_value/g, 'player-value model').replace(/team_strength/g, 'team-strength model'); }
 function cleanMetrics(list) { (Array.isArray(list) ? list : []).forEach(m => { if (m && m.desc && !m._c) { m.desc = cleanDesc(m.desc); m._c = 1; } }); return list; }
@@ -1226,7 +1198,7 @@ return {
   teamInfo: teamInfo, pair: pair, teamName: teamName, teamShort: teamShort, teamAbbr: teamAbbr, teamColour: teamColour, tc: tc, teamHref: teamHref, teamLink: teamLink, teamChip: teamChip, mark: mark,
   gameHref: gameHref, matchupLink: matchupLink, coachHref: coachHref, coachLink: coachLink, weekHref: weekHref, standingsHref: standingsHref, playoffsHref: playoffsHref,
   compareHref: compareHref, glossHref: glossHref, ghref: ghref, sq: sq,
-  GROUPS: GROUPS, DEF_POS: DEF_POS, PEER_NAME: PEER_NAME, peerOf: peerOf, peerPct: peerPct, playerSet: playerSet, sampleLine: sampleLine, GROUP_NAME: GROUP_NAME, GROUP_ONE: GROUP_ONE, groupOf: groupOf, SAMPLE: SAMPLE, sampleKey: sampleKey, sampleOf: sampleOf, scopeOk: scopeOk, metaOf: metaOf,
+  GROUPS: GROUPS, GROUP_NAME: GROUP_NAME, GROUP_ONE: GROUP_ONE, groupOf: groupOf, SAMPLE: SAMPLE, sampleKey: sampleKey, sampleOf: sampleOf, scopeOk: scopeOk, metaOf: metaOf,
   metricsFor: metricsFor, allMetrics: allMetrics, metricGroups: metricGroups, colRows: colRows, listOf: listOf, pickKey: pickKey, val: val, headline: headline, PREFS: PREFS,
   shortLabel: shortLabel, cleanDesc: cleanDesc, cleanMetrics: cleanMetrics, catOf: catOf, glossLink: glossLink,
   card: card, grid: grid, chartBox: chartBox, kpi: kpi, kpis: kpis, secHead: secHead, posLabel: posLabel, posLong: posLong, copyText: copyText, rowsByTeam: rowsByTeam, chip: chip, muted: muted, empty: empty, note: note, notBuilt: notBuilt, pageHead: pageHead,

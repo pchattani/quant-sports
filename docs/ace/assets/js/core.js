@@ -176,7 +176,7 @@ const PAGE_HEAD = {
   race: ['Race to the Finals', 'Points in this year’s race and our chance of qualifying, from simulating the rest of the season.'],
   elo: ['Elo ratings', 'Our strength ratings from every tour-level result, overall and by surface.'],
   players: ['Players', ''], h2h: ['Head to head', 'Any two players: their record, how they match up on each surface and our chance if they met today.'],
-  value: ['Player value', ''], lab: ['Scatter lab', 'Any two metrics for any group of players.'],
+  value: ['Player value', 'Who is likely to rise or fall over the next year, how much of a record is luck, and whose ranking runs ahead of or behind our rating.'], lab: ['Scatter lab', 'Any two metrics for any group of players.'],
   compare: ['Compare', 'Two or three players side by side on the metrics that best describe and predict their tennis, ranked against their own tour.'],
   methodology: ['How the models work', 'The ratings, the match model, the simulations and how well each has done.'],
   calibration: ['Calibration', 'How often our chances came true, and how they compare with the closing market as a reference.'],
@@ -851,7 +851,7 @@ function matchCard(c, opts) {
     badge = '<span class="qk-badge"' + (tba ? ' title="Start time to be announced"' : '') + '>' + esc((o.date !== false ? fmtDate(c.date, { year: false, weekday: false }) + ' ' : '') + (tba ? 'TBA' : (fmtTime(c.date) || 'TBA'))) + '</span>';
   }
   const tag = (o.event !== false ? eventName(T, c.event) + ' · ' : '') + roundLabel(c.round, true);
-  const A = playerObj(T, c.p1), B = playerObj(T, c.p2);
+  const A = { name: playerShort(T, c.p1), abbr: playerSurname(T, c.p1) }, B = { name: playerShort(T, c.p2), abbr: playerSurname(T, c.p2) };
   const bar = !fin && pShow !== null && window.QK ? QK.wpBar(pShow, null, 1 - pShow, A, B, { label: live ? 'Live win chance' : 'Our win chance' }) : '';
   const bits = [];
   if (pre && isNum(p1)) bits.push('<span class="ours">Our chance</span>');
@@ -975,14 +975,12 @@ function sortable(el) {
 function lerp(a, b, t) { return a + (b - a) * t; }
 /* Percentiles on the kit's diverging scale, the same on every site: red (poor) through the neutral to blue (great); p is 0-100. */
 function tokenOf(n, dflt) { const v = window.QK ? QK.cssVar(n) : ''; return v || dflt; }
+/* Percentiles on the kit's v2 scale (Savant-like, cold blue = worst in the peer group, hot red = best); p is 0-100. */
 function pctColor(p) {
   if (!isNum(p)) return 'var(--s-3)';
-  const t = Math.max(0, Math.min(100, p)) / 100;
-  const neg = tokenOf('--div-neg', '#e66767'), mid = tokenOf('--div-mid', '#383835'), pos = tokenOf('--div-pos', '#3987e5');
-  if (!window.QK) return t < 0.5 ? neg : pos;
-  return t < 0.5 ? QK.color.mix(neg, mid, Math.min(1, t / 0.5) * 0.88) : QK.color.mix(mid, pos, 0.12 + Math.min(1, (t - 0.5) / 0.5) * 0.88);
+  return window.QK && QK.pctColor ? QK.pctColor(p) : 'var(--pc-50)';
 }
-function pctInk(p) { if (!isNum(p) || !window.QK) return 'var(--ink-1)'; const c = pctColor(p); return QK.color.parse(c) ? QK.color.ink(c) : '#fff'; }
+function pctInk(p) { return isNum(p) && window.QK && QK.pctInk ? QK.pctInk(p) : 'var(--ink-1)'; }
 function pctPill(p) {
   if (!isNum(p)) return '<span class="pct-pill empty">—</span>';
   return '<span class="pct-pill" style="background:' + pctColor(p) + ';color:' + pctInk(p) + '">' + Math.round(p) + '</span>';

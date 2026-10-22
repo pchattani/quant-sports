@@ -463,3 +463,39 @@ def test_espn_predictor_parsed_and_kept():
     store.merge_game(s, g2)
     store.merge_game(s, g)                                                      # a later refetch without it keeps it
     assert s["games"][g["id"]]["predictor"] == {"home": 0.615}
+
+
+def test_role_similar_and_role_card(synth_root):
+    """similar_role: k nearest qualified players of the same role and season on the spec's weighted features; the
+    player file's role_card is the small copy of pct_role and the peer facts."""
+    from oddsmarkets.basketball.analytics import value as VAL
+    from oddsmarkets.common import similar as SIM
+    ctx = CX.SeasonContext("nba", 2031, current=2031, full=True, sims=300, today=date(2031, 3, 1))
+    cat = PL.build(ctx)
+    rows = cat["players"]
+    q = [p for p, r in rows.items() if r["qualified"]]
+    with_sim = [p for p in q if rows[p].get("similar_role")]
+    assert with_sim and all("similar_role" not in r for p, r in rows.items() if not r["qualified"])
+    for p in with_sim:
+        nb = rows[p]["similar_role"]
+        assert 1 <= len(nb) <= 5 and all(x["id"] != p and rows[x["id"]]["qualified"] for x in nb)
+        assert all(rows[x["id"]]["role"] == rows[p]["role"] for x in nb)
+        assert [x["distance"] for x in nb] == sorted(x["distance"] for x in nb)
+        assert set(nb[0]) == {"id", "name", "team", "distance"}
+    # the same answer from the shared recipe directly
+    p = with_sim[0]
+    role = rows[p]["role"]
+    mem = [x for x in q if rows[x]["role"] == role]
+    cfg = SIM.group_config("basketball", "nba_" + PL.ROLE_GROUP[role])
+    Z = SIM.zscore(SIM.matrix([rows[x] for x in mem], cfg["features"]))
+    w = np.array([cfg["weights"][f] for f in cfg["features"]])
+    assert [mem[j] for j, _ in SIM.nearest(Z, mem.index(p), w, 5)] == [x["id"] for x in rows[p]["similar_role"]]
+    # seasons built before the role fields: the role comes from the value.json rule
+    bare = {k: {kk: vv for kk, vv in r.items() if kk not in ("role", "pct_role", "similar_role")} for k, r in rows.items()}
+    ref = VAL.classify_roles({"players": bare})[0]
+    assert PL._roles_of(bare) == {k: ref.get(k, "W") for k in bare}
+    card = PL.role_card(rows, p, "nba", 2031, cat)
+    assert card["role"] == role and card["group"] == "nba_" + PL.ROLE_GROUP[role]
+    assert card["n"] == cat["roles"][role]["n"] and card["min_floor"] == cat["min_floor"] and card["qualified"]
+    assert card["pct_role"] == rows[p]["pct_role"]
+    json.dumps(card, allow_nan=False)

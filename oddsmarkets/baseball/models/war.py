@@ -427,7 +427,7 @@ def for_season(level: str, season: int, use_cache: bool = True) -> dict:
         stab = None
         try:
             from oddsmarkets.baseball.models import stabilise
-            stab = stabilise.shrink_k("xwoba", level)
+            stab = stabilise.shrink_k("xwoba", level, kind="event")      # the validated stab-3 constant
         except Exception:
             stab = None
         xw = xwoba.score_season(p, store, xwoba.sprint_map(season))

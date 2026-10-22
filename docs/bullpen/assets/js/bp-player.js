@@ -118,7 +118,7 @@ function draw(el, c) {
     '<div class="bp-flexrow">' + '<nav class="qk-tabs bp-tabs2" aria-label="Player views">' + tabs.map(t => '<a class="qk-tab" href="' + esc(t[2]) + '" aria-selected="' + (t[0] === 'overview') + '">' + esc(t[1]) + '</a>').join('') + '</nav>' + twoTabs + '</div>' +
     (k.length ? '<div class="bp-kpis">' + QK.stats(k) + '</div>' : '') +
     '<div class="qk-grid"><div class="qk-span-5" id="pp-pwrap">' + pcard('head', groups) + '</div><div class="qk-span-7"><div class="bp-stack">' +
-    U.card2('Where he sits', 'Every ' + peer.replace(/^MLB /, '') + ' past the floor this season; bars coloured by percentile', '<div id="pp-dist-m" style="margin-bottom:10px">' + U.seg('pp-dseg', 'Metric', DIST[kind], '') + '</div><div id="pp-dist">' +
+    U.card2('Among peers', 'Every ' + peer.replace(/^MLB /, '') + ' past the floor this season; bars coloured by percentile', '<div id="pp-dist-m" style="margin-bottom:10px">' + U.seg('pp-dseg', 'Metric', DIST[kind], '') + '</div><div id="pp-dist">' +
       QK.empty('Pick a metric', 'The peer group loads on request (the season catalogue is several megabytes).') + '</div>') +
     (pit ? U.card2('Pitch mix', 'Each pitch type this season: usage, speed, Stuff+ and whiffs; the heat cells are percentiles among pitches of the same type', '<div id="pp-mix"></div>') +
       U.card2('Movement', 'Average induced vertical break against horizontal break towards his arm side, in inches; size is usage', U.chart('pp-mov', 360, 'Pitch movement') + '<div class="bp-note" id="pp-mov-cap"></div>')
@@ -135,8 +135,8 @@ function draw(el, c) {
   h += '<section class="qk-section" id="pp-mv"></section>';
   h += '<section class="qk-section">' + U.card2('Season by season', 'Every ' + (pit ? 'pitching' : 'hitting') + ' season in the data, all levels', '<div id="pp-career"></div>', { flush: true }) + '</section>';
   const sim = (p.similar || []).slice(0, 6);
-  if (sim.length) h += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-6">' + U.card2('Most similar', 'Nearest seasons on his profile (any year)', '<ul class="bp-list">' + sim.map(m =>
-    '<li>' + U.playerEnt(m.pid, L, String(m.season), kind) + '<a class="v bp-link" href="' + esc(BP.compareHref(pid, m.pid)) + '">Compare</a></li>').join('') + '</ul>', { flush: true }) + '</div></div></section>';
+  if (sim.length) h += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-6">' + U.card2('Most similar', 'The nearest player-seasons since 2015 in his ' + (pit ? 'role' : 'position') + ' group, on the spec’s weighted metrics', '<ul class="bp-list">' + sim.map(m =>
+    '<li>' + U.playerEnt(m.pid, L, String(m.season) + (m.team ? ' · ' + BP.teamAbbr(m.team) : ''), kind) + '<a class="v bp-link" href="' + esc(BP.compareHref(pid, m.pid)) + '">Compare</a></li>').join('') + '</ul>', { flush: true }) + '</div></div></section>';
   el.innerHTML = h;
 
   // the percentile card's metric-set switch
@@ -151,15 +151,15 @@ function draw(el, c) {
   QK.seg(dseg, key => {
     const box = el.querySelector('#pp-dist');
     box.innerHTML = QK.skeleton('chart', 1);
-    BP.loadYear(pit ? 'pitchers.json' : 'hitters.json', L, S).then(cat => {
+    const slim = peerValues(blk, cur, key);
+    (slim ? Promise.resolve(null) : BP.loadYear(pit ? 'pitchers.json' : 'hitters.json', L, S)).then(cat => {
       if (!U.alive(el)) return;
-      if (!BP.ok(cat) || !cat.players) { box.innerHTML = QK.empty('Not available', 'The season catalogue did not load.'); return; }
-      const peers = Object.keys(cat.players).map(id => cat.players[id]).filter(x => x && U.setFor(kind, x) === setKey && U.meets(x, setKey, cat.team_games));
+      if (!slim && (!BP.ok(cat) || !cat.players)) { box.innerHTML = QK.empty('Not available', 'The season catalogue did not load.'); return; }
       const m = U.metaOf(kind, key, gl);
-      const vals = peers.map(x => (x.values || {})[key]).filter(isNum).sort((x, y) => x - y);
+      const vals = (slim || Object.keys(cat.players).map(id => cat.players[id]).filter(x => x && U.setFor(kind, x) === setKey && U.meets(x, setKey, cat.team_games)).map(x => (x.values || {})[key])).filter(isNum).sort((x, y) => x - y);
       if (vals.length < 5) { box.innerHTML = QK.empty('Too few peers yet', 'Fewer than five ' + peer + ' have reached the floor.'); return; }
       box.innerHTML = U.chart('pp-dist-c', 240, 'Distribution of ' + m.label);
-      if (pit && cat.league_types) drawMovement(el, Object.keys(cur.arsenal || {}).map(pt => Object.assign({ pt: pt }, cur.arsenal[pt])).filter(r => r.pt !== 'all' && isNum(r.usage) && (r.n || 0) >= MIX_MIN), cat.league_types);
+      if (pit && cat && cat.league_types) drawMovement(el, Object.keys(cur.arsenal || {}).map(pt => Object.assign({ pt: pt }, cur.arsenal[pt])).filter(r => r.pt !== 'all' && isNum(r.usage) && (r.n || 0) >= MIX_MIN), cat.league_types);
       const mine = v[key];
       const med = vals[Math.floor(vals.length / 2)];
       QKC.distribution('#pp-dist-c', { values: vals, binCount: 22, lowerBetter: m.lower, fmt: x => U.fmtBy(m, x).replace(' mph', ''), xName: m.label + ' · ' + vals.length + ' ' + peer,
@@ -176,6 +176,15 @@ function draw(el, c) {
   BP.setMeta(p.updated_at ? 'Player file ' + esc(BP.fmtStamp(p.updated_at)) : '');
 }
 
+/* The peer group's values for one metric from the player file, when the builder writes them (current.peers or the
+   block's peers: {metric: [values]} or {fields: [...], values: [[...]]}); null sends the page to the catalogue. */
+function peerValues(blk, cur, key) {
+  const P = (blk && blk.peers) || (cur && cur.peers) || null;
+  if (!P) return null;
+  if (Array.isArray(P[key])) return P[key];
+  if (Array.isArray(P.fields) && Array.isArray(P.values)) { const i = P.fields.indexOf(key); return i >= 0 ? P.values.map(r => r[i]) : null; }
+  return null;
+}
 const MIX_MIN = 10;
 function pitchMix(el, cur, v) {
   const ars = Object.keys(cur.arsenal || {}).map(pt => Object.assign({ pt: pt }, cur.arsenal[pt])).filter(r => r.pt !== 'all' && isNum(r.usage) && (r.n || 0) >= MIX_MIN).sort((a, b) => b.usage - a.usage);
@@ -191,10 +200,10 @@ function pitchMix(el, cur, v) {
         '<span class="v">' + (isNum(r.xwoba) ? BP.fmtAvg(r.xwoba) : '—') + '</span></div>').join('') + '</div>' +
       '<div class="bp-note">Ten or more of a type this season. Stuff+: 100 = league average for all pitches; heat cells rank him among pitchers throwing that type (100+ thrown).</div>';
   }
-  drawMovement(el, ars, (BP.cached(BP.ypath('pitchers.json')) || {}).league_types || null);
+  drawMovement(el, ars, cur.league_types || (cur.pitching || {}).league_types || (BP.cached(BP.ypath('pitchers.json')) || {}).league_types || null);
 }
 /* Movement: his averages (pitch colours, size = usage); the league's average for each of his types (grey) once the season
-   catalogue is in memory (it carries league_types; it loads with "Where he sits" or the Detail view). */
+   catalogue is in memory (it carries league_types; it loads with "Among peers" or the Detail view). */
 function drawMovement(el, ars, lt) {
   const node = el.querySelector('#pp-mov');
   if (!node) return;
@@ -205,7 +214,7 @@ function drawMovement(el, ars, lt) {
   const pts = mine.map(r => ({ x: r.hb, y: r.ivb, name: BP.pitchName(r.pt) + ' · ' + BP.fmtVal(r.usage, 'pct') + ' · ' + U.f(r.velo, 1) + ' mph', label: r.pt, color: BP.pitchColour(r.pt), size: 10 + 34 * Math.sqrt(r.usage) }));
   QKC.scatter('#pp-mov', { points: lg.concat(pts), xName: 'Horizontal break, arm side + (in)', yName: 'Induced vertical break (in)', xFmt: x => U.f(x, 0), yFmt: x => U.f(x, 0), refX: 0, refY: 0, labelAll: true, label: 'Pitch movement' });
   const cap = el.querySelector('#pp-mov-cap');
-  if (cap) cap.textContent = lg.length ? 'Grey: the league average for each of his pitch types.' : 'Open "Where he sits" to add the league average for each type.';
+  if (cap) cap.textContent = lg.length ? 'Grey: the league average for each of his pitch types.' : 'Open "Among peers" to add the league average for each type.';
 }
 
 function rollingChart(el, cur) {

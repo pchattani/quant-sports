@@ -1,11 +1,12 @@
-/* The Quant Ace — Value (#/<T>/value): who is likely to rise or fall over the next 6-12 months, how much of a record
- * is luck, and where the ranking and the market disagree with the model.
+/* The Quant Ace — Value (#/<T>/value), Design System 2.0: who is likely to rise or fall over the next 6-12 months, how
+ * much of a record is luck, and whose ranking runs ahead of or behind our rating. The market comparison lives on the
+ * Model section's calibration page (TA.value.market), as a reference; ?v=market redirects there.
  *
  *   ?v=breakout     breakout and regression candidates with their reasons, the points calendar, the age curve
  *   ?v=luck         wins above expectation and its components (last 52 weeks or this season), and why it is luck
  *   ?v=over         official rank against the rank the model implies; points at that rank
  *   ?v=surface      surface ratings against the overall rating (specialists)
- *   ?v=market       the closing market and Kalshi against the model's pre-match price (disagreements, not value bets)
+ *   (market)        the closing market and Kalshi against our pre-match chance: drawn on the calibration page
  *   ?v=validation   the walk-forward record of the breakout model and the luck evidence
  *   (?h=12m|6m on breakout and validation, ?w=52w|season on luck, ?s=hard|clay|grass on surface)
  *
@@ -16,8 +17,8 @@
 
 const esc = TA.esc, isNum = TA.isNum;
 const VIEWS = [
-  { key: 'breakout', label: 'Breakouts' }, { key: 'luck', label: 'Luck' }, { key: 'over', label: 'Ranking v model' },
-  { key: 'surface', label: 'Surfaces' }, { key: 'market', label: 'Market v model' }, { key: 'validation', label: 'Validation' }
+  { key: 'breakout', label: 'Breakouts' }, { key: 'luck', label: 'Luck' }, { key: 'over', label: 'Ranking v our rating' },
+  { key: 'surface', label: 'Surfaces' }, { key: 'validation', label: 'Validation' }
 ];
 const H_LABEL = { '12m': '12 months', '6m': '6 months' };
 const FEATURE_LABEL = {
@@ -308,7 +309,7 @@ function over(T, V, Val, body) {
   const under = top200.filter(r => r.gap > 0).sort((a, b) => b.gap - a.gap).slice(0, 15);
   const overr = top200.filter(r => r.gap < 0).sort((a, b) => a.gap - b.gap).slice(0, 15);
   body.innerHTML =
-    '<div class="card"><div class="section-note">The <b>model rating</b> is the match price in one number per player (Elo, the serve/return model and game-share Elo, blended as the site prices matches). ' +
+    '<div class="card"><div class="section-note">The <b>model rating</b> is our match forecast in one number per player (Elo, the serve/return model and game-share Elo, blended as our match forecasts are). ' +
     'Ordering players by it and handing out the official ranks in that order gives the <b>rank the model implies</b>. A player ranked well below it is underrated by the ranking (often back from injury, or winning more than the points show); above it, overrated (points from a hot spell, or luck). ' +
     'Ranks below the ESPN top 150 (ATP) come from the latest match on record. The points column is the official total; "at implied rank" is what the player holding that rank has. ' + glossLink('v_implied_rank', 'Definitions') + '</div>' +
     '<div id="vx-sc" style="height:420px"></div></div>' +
@@ -368,27 +369,26 @@ function market(T, V, Val, body) {
   const loM = rows.filter(r => r.gap < 0).sort((a, b) => a.gap - b.gap).slice(0, 12);
   const src = S.sources || {};
   const srcTxt = Object.keys(src).map(k => ({ ps: 'Pinnacle', bfe: 'Betfair exchange', avg: 'bookmakers\' average' }[k] || k) + ' ' + src[k]).join(', ');
-  const tbl = list => TA.tableHTML([{ label: 'Player' }, { label: 'Matches', align: 'right' }, { label: 'Market v model', align: 'right', title: 'Elo points: + = the market rates the player above the model' },
-    { label: 'Wins', align: 'right' }, { label: 'Model expected', align: 'right', cls: 'hide-sm' }, { label: 'Market expected', align: 'right', cls: 'hide-sm' },
+  const tbl = list => TA.tableHTML([{ label: 'Player' }, { label: 'Matches', align: 'right' }, { label: 'Market v ours', align: 'right', title: 'Elo points: + = the market rates the player above our model' },
+    { label: 'Wins', align: 'right' }, { label: 'We expected', align: 'right', cls: 'hide-sm' }, { label: 'Market expected', align: 'right', cls: 'hide-sm' },
     { label: 'Closer', align: 'right', title: 'Which forecaster had the lower log-loss on these matches' },
-    { label: 'Kalshi', align: 'right', title: 'Kalshi v model, Elo points (matches with a Kalshi quote)', cls: 'hide-sm' }],
+    { label: 'Kalshi', align: 'right', title: 'Kalshi v our model, Elo points (matches with a Kalshi quote)', cls: 'hide-sm' }],
   list.map(r => ({ _href: TA.playerHref(T, r.pid), cells: [
     { v: TA.playerName(T, r.pid), html: TA.playerLink(T, r.pid, { country: true, rank: true }) }, { v: r.n, html: String(r.n) },
     { v: r.gap, html: '<b>' + coloured(r.gap, 0) + '</b>' }, { v: r.w, html: String(r.w) },
     { v: r.x_model, html: isNum(r.x_model) ? TA.num(r.x_model, 1) : '—', cls: 'hide-sm' }, { v: r.x_market, html: isNum(r.x_market) ? TA.num(r.x_market, 1) : '—', cls: 'hide-sm' },
-    { v: isNum(r.ll_model) && isNum(r.ll_market) ? r.ll_model - r.ll_market : null, html: isNum(r.ll_model) && isNum(r.ll_market) ? (r.ll_market < r.ll_model ? 'market' : 'model') : '—' },
+    { v: isNum(r.ll_model) && isNum(r.ll_market) ? r.ll_model - r.ll_market : null, html: isNum(r.ll_model) && isNum(r.ll_market) ? (r.ll_market < r.ll_model ? 'market' : 'ours') : '—' },
     { v: r.k_gap, html: r.k_n ? coloured(r.k_gap, 0) + ' <span class="muted-inline">(' + r.k_n + ')</span>' : '—', cls: 'hide-sm' }] })), { compact: true });
   body.innerHTML =
-    '<div class="card"><div class="card-header">Read this first</div><div class="section-note vx-warn">The market is the better forecaster. In the backtest the closing price beats this model by about 0.02–0.03 in log-loss (ATP and WTA, 2010–2026), the edge study found nothing that closes the gap, and blending the model into Kalshi\'s price made it worse ' +
-    '(<a href="' + TA.href(T, 'calibration') + '">calibration</a>). So a gap below is a <b>disagreement</b>: the market usually knows something the scores do not (injury, form below tour level, motivation). It is not a value bet.</div>' +
+    '<div class="card"><div class="card-header">The market as a reference</div><div class="section-note vx-warn">The market is the sharper forecaster. In the backtest the closing line beats our model by about 0.02–0.03 in log-loss (ATP and WTA, 2010–2026), our research found nothing that closes the gap, and blending our model into Kalshi\'s number made it worse. ' +
+    'So a difference below is a <b>disagreement</b>: the market usually knows something the scores do not (injury, form below tour level, motivation). It is not a recommendation.</div>' +
     '<div class="kpi-grid vx-kpis">' +
-    TA.statTile('Matches compared', isNum(S.n) ? TA.num(S.n, 0) : '—', 'tour-level, last 52 weeks, with a closing price' + (srcTxt ? ' (' + esc(srcTxt) + ')' : '')) +
-    TA.statTile('Log-loss: market v model', isNum(S.ll_market) ? TA.num(S.ll_market, 4) + ' v ' + TA.num(S.ll_model, 4) : '—', 'lower is better; the gap is the market\'s edge') +
-    TA.statTile('Kalshi v model', isNum(S.kalshi_ll_market) ? TA.num(S.kalshi_ll_market, 4) + ' v ' + TA.num(S.kalshi_ll_model, 4) : '—', S.kalshi_n ? S.kalshi_n + ' matches with a Kalshi quote about 4 h before the start' : 'no Kalshi quotes cached') +
-    TA.statTile('Current prices', '<a href="' + TA.href(T, 'markets') + '">Markets →</a>', 'open matches and futures, model against market') + '</div>' +
-    '<div class="section-note">Per player: the mean gap between the market\'s pre-match probability and the model\'s, turned into Elo points (+ = the market rates the player higher), over the player\'s matches with a price in the last 52 weeks (8 or more). "Closer" says which forecaster scored better on those matches. Kalshi quotes come from the research cache (June 2025 – 1 October 2026). ' + glossLink('v_market_gap', 'Definitions') + '</div></div>' +
-    '<div class="grid-2"><div class="card"><div class="card-header">The market rates higher <span class="card-sub">Than the model</span></div>' + tbl(hiM) + '</div>' +
-    '<div class="card"><div class="card-header">The market rates lower <span class="card-sub">Than the model</span></div>' + tbl(loM) + '</div></div>' +
+    TA.statTile('Matches compared', isNum(S.n) ? TA.num(S.n, 0) : '—', 'tour-level, last 52 weeks, with a closing line' + (srcTxt ? ' (' + esc(srcTxt) + ')' : '')) +
+    TA.statTile('Log-loss: market v ours', isNum(S.ll_market) ? TA.num(S.ll_market, 4) + ' v ' + TA.num(S.ll_model, 4) : '—', 'lower is better; the difference is how much sharper the market is') +
+    TA.statTile('Kalshi v ours', isNum(S.kalshi_ll_market) ? TA.num(S.kalshi_ll_market, 4) + ' v ' + TA.num(S.kalshi_ll_model, 4) : '—', S.kalshi_n ? S.kalshi_n + ' matches with a Kalshi quote about 4 h before the start' : 'no Kalshi quotes cached') + '</div>' +
+    '<div class="section-note">Per player: the mean difference between the market\'s pre-match probability and ours, turned into Elo points (+ = the market rates the player higher), over the player\'s matches with a market number in the last 52 weeks (8 or more). "Closer" says which forecaster scored better on those matches. Kalshi quotes come from the research cache (June 2025 – 1 October 2026). ' + glossLink('v_market_gap', 'Definitions') + '</div></div>' +
+    '<div class="grid-2"><div class="card"><div class="card-header">The market rates higher <span class="card-sub">Than we do</span></div>' + tbl(hiM) + '</div>' +
+    '<div class="card"><div class="card-header">The market rates lower <span class="card-sub">Than we do</span></div>' + tbl(loM) + '</div></div>' +
     '<div class="card"><div class="card-header">Every player <span class="card-sub">Sortable</span></div>' + tbl(rows) + '</div>';
   TA.sortable(body);
 }
@@ -471,22 +471,23 @@ function render(el, params) {
   const T = params.tour;
   const q = Object.assign({}, params.query || {});
   let view = q.v;
+  if (view === 'market') { TA.go(TA.href(T, 'calibration') + '?sec=market'); return null; }
   if (!VIEWS.some(v => v.key === view)) view = 'breakout';
-  const tabs = '<div class="seg-tabs">' + VIEWS.map(v => '<a href="#/' + T + '/value?v=' + v.key + '" class="' + (v.key === view ? 'active' : '') + '">' + esc(v.label) + '</a>').join('') + '</div>';
-  el.innerHTML = TA.pageHead(TA.tourName(T) + ' value', 'Breakouts, luck, and where the ranking and the market disagree with the model',
-    '<a href="' + TA.href(T, 'rankings') + '">Rankings</a><a href="#/methodology/m-value">Methodology</a>') + tabs + '<div id="vx-body"><div class="muted">Loading…</div></div>';
+  const tabs = '<nav class="qk-tabs ta-tabs" aria-label="Value views">' + VIEWS.map(v => '<a class="qk-tab" href="#/' + T + '/value?v=' + v.key + '"' + (v.key === view ? ' aria-selected="true" aria-current="page"' : ' aria-selected="false"') + '>' + esc(v.label) + '</a>').join('') +
+    '<a class="qk-tab" href="#/methodology/m-value" aria-selected="false">Method</a></nav>';
+  el.innerHTML = tabs + '<div id="vx-body" style="margin-top:var(--sp-4)">' + QK.skeleton('lines', 6) + '</div>';
   return TA.loadAll([TA.tpath('value.json', T), TA.tpath('value_validation.json', T)]).then(arr => {
     if (!el.isConnected) return;
     const V = arr[0], Val = TA.ok(arr[1]) ? arr[1] : null;
     const body = document.getElementById('vx-body');
     if (!TA.ok(V)) { body.innerHTML = TA.card('Value', '', TA.notBuilt('The Value section', V)); return; }
-    const fn = { breakout: breakout, luck: luck, over: over, surface: surface, market: market, validation: validation }[view];
+    const fn = { breakout: breakout, luck: luck, over: over, surface: surface, validation: validation }[view];
     fn(T, V, Val, body, q);
     TA.setMeta('Value as of ' + esc(TA.fmtDate(V.as_of, { year: false })) + (V.model_asof ? ' · model fitted ' + esc(TA.fmtDate(V.model_asof, { weekday: false })) : ''));
   });
 }
 
-/* The compact card on the player page: breakout forecast, luck, ranking v model, market v model. */
+/* The compact card on the player page: breakout forecast, luck, ranking v our rating. */
 function card(T, pid, el) {
   if (!el) return Promise.resolve();
   return TA.load(TA.tpath('value.json', T)).then(V => {
@@ -506,16 +507,24 @@ function card(T, pid, el) {
     const x = l ? (l['52w'] || l.season) : null;
     tiles.push(TA.statTile('Luck, 52 weeks', x ? coloured(x.total, 1) + ' <span class="vx-sub-inline">wins</span>' : '—',
       x ? 'close matches ' + sgn(x.close, 1) + ' · draws ' + sgn(x.draw, 1) + ' · free ' + sgn(x.free, 1) + ' · <a href="' + link('luck') + '">luck →</a>' : 'fewer than ' + ((V.luck || {}).min_matches || 10) + ' tour-level matches'));
-    tiles.push(TA.statTile('Ranking v model', v && isNum(v.imp) ? 'No. ' + (isNum(v.rank) ? v.rank : '—') + ' v ' + v.imp : (v ? 'model No. ' + v.mrank : '—'),
-      v ? (isNum(v.rank) && isNum(v.imp) ? (v.rank > v.imp ? 'underrated by ' + (v.rank - v.imp) + ' places' : v.rank < v.imp ? 'overrated by ' + (v.imp - v.rank) + ' places' : 'in line') + ' · rating ' + n0(v.R) + ' · ' : '') + '<a href="' + link('over') + '">ranking v model →</a>' : 'not rated (fewer than 10 rated matches or inactive)'));
-    tiles.push(TA.statTile('Market v model', m && isNum(m.gap) ? coloured(m.gap, 0) + ' <span class="vx-sub-inline">Elo</span>' : '—',
-      m && isNum(m.gap) ? (m.gap > 0 ? 'the market rates higher' : 'the market rates lower') + ', ' + m.n + ' matches · <a href="' + link('market') + '">market →</a>' : 'too few priced matches in 52 weeks'));
+    tiles.push(TA.statTile('Ranking v our rating', v && isNum(v.imp) ? 'No. ' + (isNum(v.rank) ? v.rank : '—') + ' v ' + v.imp : (v ? 'model No. ' + v.mrank : '—'),
+      v ? (isNum(v.rank) && isNum(v.imp) ? (v.rank > v.imp ? 'underrated by ' + (v.rank - v.imp) + ' places' : v.rank < v.imp ? 'overrated by ' + (v.imp - v.rank) + ' places' : 'in line') + ' · rating ' + n0(v.R) + ' · ' : '') + '<a href="' + link('over') + '">ranking v our rating →</a>' : 'not rated (fewer than 10 rated matches or inactive)'));
     const why = b && (b.why12m || []).length ? '<div class="vx-card-why">Forecast drivers: ' + reasonsHTML(T, b, '12m', 4) + '</div>' : '';
-    el.innerHTML = '<div class="card vx-card"><div class="card-header">Value <span class="card-sub">Breakout forecast, luck, and where the ranking and the market disagree with the model (' +
+    el.innerHTML = '<div class="card vx-card"><div class="card-header">Value <span class="card-sub">Breakout forecast, luck, and whether the ranking runs ahead of or behind our rating (' +
       '<a href="' + link('validation') + '">how good is this?</a>)</span></div><div class="kpi-grid">' + tiles.join('') + '</div>' + why + '</div>';
   });
 }
 
-TA.value = { card: card };
+/* The market comparison for the Model section (calibration page): the closing market and Kalshi against our chance. */
+function marketView(T, el) {
+  if (!el) return Promise.resolve();
+  return TA.load(TA.tpath('value.json', T)).then(V => {
+    if (!el.isConnected) return;
+    if (!TA.ok(V) || !V.market) { el.innerHTML = ''; return; }
+    market(T, V, null, el);
+  });
+}
+
+TA.value = { card: card, market: marketView };
 TA.route('value', render);
 })(window.TA);

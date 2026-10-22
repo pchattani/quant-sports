@@ -237,3 +237,23 @@ def test_team_adjusted_pass_and_rush_epa(built):
     assert best["pct"]["off_pass_epa"] == 100
     low = min(t["teams"].values(), key=lambda r: r["values"]["def_pass_epa"])
     assert low["pct"]["def_pass_epa"] == 100                     # fewest allowed = best
+
+
+def test_career_similar_players_follow_the_spec(built):
+    """players/<pid>.json similar (CFB): same position, rate-qualified player-seasons, never the player, nearest first."""
+    seen = 0
+    for f in (built["out"] / "players").glob("*.json"):
+        c = _load(f)
+        sim = c.get("similar") or []
+        if not sim:
+            continue
+        seen += 1
+        assert len(sim) <= 5 and all(s["id"] != c["id"] for s in sim)
+        assert all({"id", "name", "team", "season", "distance"} <= set(s) for s in sim)
+        d = [s["distance"] for s in sim]
+        assert d == sorted(d)
+        f2 = built["out"] / str(sim[0]["season"]) / "players.json"
+        nb = _load(f2)["players"].get(sim[0]["id"]) if f2.exists() else None
+        if nb:
+            assert nb["qualified_rate"] and nb["pos"] == c["seasons"][-1].get("pos", nb["pos"])
+    assert seen > 0

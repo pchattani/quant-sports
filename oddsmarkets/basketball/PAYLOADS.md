@@ -116,7 +116,11 @@ only (the NBA Cup final does not count). `age` is null where ESPN gives no date 
 Role peer groups (22 Oct 2026, docs/_design/metrics/basketball.json): each row also carries `"role"` G | W | B (guards, wings,
 bigs; `value.classify_roles`, the same rule and values as value.json) and `"pct_role": {key: 0-100}` against the qualified
 players of that role for `players.ROLE_PCT_KEYS` (the spec's headline and secondary metrics); the catalogue adds
-`"roles": {"G"|"W"|"B": {"label","n"}}` and `"role_rule": {"threshold","features"}`.
+`"roles": {"G"|"W"|"B": {"label","n"}}` and `"role_rule": {"threshold","features"}`. Qualified rows also carry
+`"similar_role": [{"id","name","team","distance"}]` (k = 5, nearest first): the spec's recipe within the same role and season
+(group features of `<league>_guards|_wings|_bigs`, z within league, role and season over qualified players, weights = year-to-year
+r floored at 0.2, weighted RMS z distance over the features both have; `oddsmarkets/common/similar.py`). About +3.5% on the file.
+Shot-making (`xpps`, `pox100`) uses xPTS model `xpts-2` (no `assisted` feature: assists are recorded on makes only).
 
 `players/<pid>.json` (per league, not per season: `data/<L>/players/<pid>.json`)
 ```
@@ -129,7 +133,11 @@ players of that role for `players.ROLE_PCT_KEYS` (the spec's headline and second
              "lineups": [{"players","poss","net","ortg","drtg","shrunk_net","sec"}...top 5], "clutch": {"min","pts","ts","net","wpa","poss"} | null,
              "projection": impact.projections row, "hpm": {"t","o","d","se","se_o","se_d","box_o","box_d","w_rapm_o","w_rapm_d"}, "rapm": {...},
              "awards": {award: p}} | null (null for players not in a season built in full on this machine),
- "similar": [{"id","name","season","distance"}], "career_awards": [[season, award]]}
+ "similar": [{"id","name","season","distance"}],
+ "similar_role": [{"season","id","name","team","distance"}],   // k = 5 per qualified season, same role and season (players.json similar_role)
+ "role_card": {"season","role","group","label","qualified","n","min_floor","pct_role":{key:0-100}} | null,  // the latest season's role
+             // comparison: n = qualified players of the role, min_floor = players.json min_floor (minutes); no catalogue needed
+ "career_awards": [[season, award]]}
 ```
 
 `awards.json`: `{"ok","league","season","updated_at","keys": [award...], "labels": {award: label},

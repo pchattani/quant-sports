@@ -266,12 +266,91 @@ function leadersTab(node, L, S) {
   });
 }
 
+/* The player catalogue (Players ▸ Catalogue), Design System 2.0: every player of the season as a leaderboard on the
+ * spec's shared headline metrics, heat cells by percentile within the role (or the league), a role filter, a team
+ * filter, any extra catalogue column, and the chance of moving where the movement model is published (NBA). */
+const CAT = { q: '', role: '', team: '', basis: 'role', extra: '', all: false };
+const CAT_KEYS = ['hpm', 'hpm_o', 'hpm_d', 'pts100', 'ts_add', 'ast_pct', 'drb_pct', 'stl_pct', 'blk_pct'];
+function catalogueTab(node, L, S) {
+  return Promise.all([U.catalogue(L, S), U.roles(L, S), U.isCur(L, S) ? U.movement(L) : Promise.resolve(null)]).then(res => {
+    if (!U.alive(node)) return null;
+    const r = res[0], cat = r.cat, SS = r.S;
+    if (!U.ok(cat) || !Object.keys(cat.players || {}).length) { node.innerHTML = U.empty('No player numbers yet', 'The catalogue fills in once games are played.'); return null; }
+    const go = rl => draw(rl, res[2] && res[2].pub.next ? res[2] : null);
+    if (r.fallback) return U.roles(L, SS).then(rl => { if (U.alive(node)) go(rl); });
+    go(res[1]);
+    return null;
+    function draw(rl, mv) {
+      const P = cat.players, ids = Object.keys(P);
+      const meta = {}; (cat.metrics || []).forEach(m => { meta[m.key] = m; });
+      const teams = Array.from(new Set(ids.map(id => P[id].team).filter(Boolean))).sort((a, b) => HW.teamName(L, a).localeCompare(HW.teamName(L, b)));
+      const groups = {}; (cat.metrics || []).forEach(m => { (groups[m.group || 'Other'] || (groups[m.group || 'Other'] = [])).push(m); });
+      node.innerHTML = (r.fallback ? '<div class="qk-note" style="margin-bottom:14px">No ' + esc(HW.seasonLabel(L, S)) + ' regular-season games yet: these are the final ' + esc(HW.seasonLabel(L, SS)) + ' numbers.</div>' : '') +
+        U.card2('Every player', 'Heat cells: the percentile within the player’s role (guards, wings, bigs) or the whole league, 100 = best. Percentiles need ' + Number(cat.min_floor || 0).toLocaleString('en-GB') + '+ minutes.' + (mv ? ' Chance of moving: ' + esc(U.mvHorizon(mv)) + '.' : ''),
+          '<div class="hw-catctl"><input class="qk-input hw-search" id="ct-q" type="search" placeholder="Player or team…" aria-label="Find a player" value="' + esc(CAT.q) + '">' +
+          '<div class="qk-seg" id="ct-role" role="group" aria-label="Role">' + [['', 'All'], ['G', 'Guards'], ['W', 'Wings'], ['B', 'Bigs']].map(x => '<button type="button" data-value="' + x[0] + '" aria-pressed="' + (CAT.role === x[0]) + '">' + x[1] + '</button>').join('') + '</div>' +
+          '<div class="qk-seg" id="ct-basis" role="group" aria-label="Percentiles against">' + [['role', 'Against the role'], ['league', 'Against the league']].map(x => '<button type="button" data-value="' + x[0] + '" aria-pressed="' + (CAT.basis === x[0]) + '">' + x[1] + '</button>').join('') + '</div>' +
+          '<select class="qk-select" id="ct-team" aria-label="Team"><option value="">All teams</option>' + teams.map(t => '<option value="' + esc(t) + '"' + (t === CAT.team ? ' selected' : '') + '>' + esc(HW.teamName(L, t)) + '</option>').join('') + '</select>' +
+          '<select class="qk-select" id="ct-extra" aria-label="Add a column"><option value="">Add a column…</option>' + Object.keys(groups).map(g => '<optgroup label="' + esc(g) + '">' + groups[g].map(m => '<option value="' + esc(m.key) + '"' + (m.key === CAT.extra ? ' selected' : '') + '>' + esc(m.label) + '</option>').join('') + '</optgroup>').join('') + '</select>' +
+          '<label class="hw-quiet hw-chk"><input type="checkbox" id="ct-all"' + (CAT.all ? ' checked' : '') + '> include players under the floor</label></div>' +
+          (mv ? '<div class="hw-mvline" style="margin-top:10px"><span class="qk-muted">Chance of moving, split by how:</span>' + U.mvKeys(mv) + '</div>' : '') +
+          '<div id="ct-sub" class="hw-quiet" style="margin:8px 0"></div><div id="ct-table"></div>');
+      const pctOf = (id, k) => (CAT.basis === 'league' ? ((P[id].pct || {})[k]) : U.rolePctl(cat, rl, id, k));
+      const fmtK = (k, v) => (meta[k] && !U.MSET.meta[k] ? HW.fmtVal(v, meta[k].fmt) : U.fmtM(k, v));
+      const lab = k => (U.MSET.meta[k] ? U.mMeta(k).label : (meta[k] || {}).label || k);
+      const drawT = () => {
+        const q = CAT.q.trim().toLowerCase();
+        const keys = CAT_KEYS.concat(CAT.extra && CAT_KEYS.indexOf(CAT.extra) < 0 ? [CAT.extra] : []).filter(k => ids.some(id => isNum((P[id].values || {})[k])));
+        const list = ids.filter(id => { const p = P[id];
+          if (!CAT.all && !p.qualified) return false;
+          if (CAT.role && U.roleOf(p, id, rl) !== CAT.role) return false;
+          if (CAT.team && String(p.team) !== String(CAT.team)) return false;
+          return !q || (String(p.name || '') + ' ' + HW.teamName(L, p.team) + ' ' + HW.teamAbbr(L, p.team)).toLowerCase().indexOf(q) >= 0; });
+        const rows = list.map(id => { const p = P[id], v = p.values || {}, role = U.roleOf(p, id, rl), o = { id: id, name: p.name, team: p.team, gp: p.gp, min: p.min,
+          sub: [HW.teamAbbr(L, p.team), (U.ROLE1 || {})[role] || p.pos, isNum(p.age) ? String(Math.floor(p.age)) : '', p.qualified ? '' : 'under the floor'].filter(Boolean).join(' · ') };
+          keys.forEach(k => { o[k] = v[k]; o[k + '_p'] = p.qualified ? pctOf(id, k) : null; });
+          if (mv) { const mr = mv.by[id]; o.mr = mr; o.p_next = mr ? mr.p_next : null; }
+          return o; });
+        document.getElementById('ct-sub').textContent = rows.length + ' of ' + ids.length + ' players · sorted by total impact; tap a header to sort, a row to open the player';
+        QK.leaderboard(document.getElementById('ct-table'), { dense: true, rows: rows, maxHeight: 720, sort: { key: 'hpm', dir: 'desc' }, rowHref: x => HW.playerHref(L, x.id, SS), columns: [
+          { key: 'name', label: 'Player', type: 'entity', sub: 'sub', mark: x => U.team(L, x.team), href: x => HW.playerHref(L, x.id, SS) },
+          { key: 'gp', label: 'GP', num: true }, { key: 'min', label: 'Min', type: 'bar', fmt: v => Number(Math.round(v || 0)).toLocaleString('en-GB') }]
+          .concat(keys.map(k => ({ key: k, label: lab(k).replace(/ \(HPM\)$/, ''), type: 'pctl', pctl: k + '_p', fmt: v => fmtK(k, v), tip: U.mMeta(k).desc || (meta[k] || {}).desc || '' })))
+          .concat(mv ? [{ key: 'p_next', label: 'Chance of moving', num: true, fmt: (v, x) => U.mvBar(mv, x.mr), tip: 'Our chance the player has left the team ' + U.mvHorizon(mv) }] : []) });
+      };
+      drawT();
+      const qEl = document.getElementById('ct-q');
+      qEl.addEventListener('input', () => { CAT.q = qEl.value; clearTimeout(drawT.t); drawT.t = setTimeout(drawT, 150); });
+      QK.seg(document.getElementById('ct-role'), v => { CAT.role = v; drawT(); });
+      QK.seg(document.getElementById('ct-basis'), v => { CAT.basis = v; drawT(); });
+      document.getElementById('ct-team').addEventListener('change', e => { CAT.team = e.target.value; drawT(); });
+      document.getElementById('ct-extra').addEventListener('change', e => { CAT.extra = e.target.value; drawT(); });
+      document.getElementById('ct-all').addEventListener('change', e => { CAT.all = e.target.checked; drawT(); });
+      HW.setMeta('');
+    }
+  });
+}
+
 function renderPlayers(el, params) {
   const L = U.L(params), S = U.S(params);
   const tab = U.tab(params, ['leaders', 'catalogue', 'awards', 'boards'], 'leaders');
-  const body = U.section(el, { title: 'Players', kicker: U.kicker(L, S), sub: 'Leaderboards against each player’s role, the full catalogue of 125 metrics with percentiles, and the award races. Open a player for his season by season, splits and value.',
+  const body = U.section(el, { title: 'Players', kicker: U.kicker(L, S), sub: 'Leaderboards against each player’s role, the full catalogue of 125 metrics with percentiles, and the award races. Open a player for season by season, splits and value.',
     tabs: U.tabs(L, 'players', [['leaders', 'Leaders'], ['catalogue', 'Catalogue'], ['awards', 'Awards'], ['boards', 'Any metric']], S), active: tab });
   if (tab === 'leaders') return leadersTab(body, L, S);
+  if (tab === 'catalogue') return catalogueTab(body, L, S);
+  // before the first games the boards and award races show last season's final numbers, said so, never empty dashes
+  if (tab === 'boards' || tab === 'awards') {
+    const file = tab === 'awards' ? 'awards.json' : 'players.json';
+    const has = d => (tab === 'awards' ? !!d && Object.keys(d).some(k => d[k] && d[k].model && Object.keys(d[k].model).length) : !!d && Object.keys(d.players || {}).length > 0);
+    return HW.load(HW.path(file, L, S)).then(d => {
+      if (!U.alive(body)) return null;
+      const prev = HW.seasons(L).filter(x => x < S)[0];
+      if (has(U.ok(d) ? d : null) || !prev) return U.legacy(tab === 'awards' ? 'awards' : 'leaders', body, params);
+      body.innerHTML = '<div class="qk-note" style="margin-bottom:14px">No ' + esc(HW.seasonLabel(L, S)) + (tab === 'awards' ? ' award races until the season starts' : ' regular-season games yet') + ': these are the final ' + esc(HW.seasonLabel(L, prev)) + ' numbers.</div><div></div>';
+      const r = U.legacy(tab === 'awards' ? 'awards' : 'leaders', body.lastChild, Object.assign({}, params, { season: prev }));
+      return r;
+    });
+  }
   return U.legacy({ catalogue: 'players', awards: 'awards', boards: 'leaders' }[tab], body, params);
 }
 
@@ -284,6 +363,14 @@ function renderLab(el, params, state) {
   const tab = compare ? 'compare' : 'lab';
   // players compare (Design System 2.0, hw-compare.js); ?view=all and teams keep the classic every-metric view
   if (compare && r !== 'compare-teams' && ((params.query || {}).view) !== 'all' && HW.compareV2) return HW.compareV2(el, params);
+  if (compare && HW.compareTabs) {
+    // the classic every-metric comparison and team compare sit under the same Compare head and tabs
+    const ids = [params.a, params.b].concat(params.rest || []).filter(Boolean).map(String);
+    const team = r === 'compare-teams';
+    const cb = U.section(el, { title: 'Compare', kicker: U.kicker(L, S), sub: team ? 'Two teams side by side: every catalogue metric with league percentiles, rating paths, four factors, shot profiles and lineups.' : 'Every catalogue metric for two players, with the gaps, radar, shot charts and careers.',
+      tabs: HW.compareTabs(L, S, team ? 'teams' : 'all', team ? [] : ids), active: team ? 'teams' : 'all' });
+    return U.legacy(team ? 'compare-teams' : (r === 'compare-players' ? 'compare-players' : 'compare'), cb, params);
+  }
   const body = U.section(el, { title: 'Lab', kicker: U.kicker(L, S), sub: 'Build your own chart from any two player metrics, or put two players or two teams side by side.',
     tabs: U.tabs(L, 'lab', [['lab', 'Chart builder'], ['compare', 'Compare']], S), active: tab });
   if (!compare) return U.legacy('lab', body, params);
@@ -299,11 +386,11 @@ function movesModel(body, L) {
     if (!U.alive(body)) return;
     if (!mv) { body.innerHTML = U.empty('Not built yet', 'The movement model has not run for this league.'); return; }
     const m = mv.m, V = m.validation || {}, sp = m.split || {};
-    const NAME = { next: 'Leaves by next season', deadline: 'Traded or claimed before the deadline', type: 'How he leaves (type split)', arrivals: 'Arrivals by position', targets: 'Targets' };
+    const NAME = { next: 'Leaves by next season', deadline: 'Traded or claimed before the deadline', type: 'How players leave (type split)', arrivals: 'Arrivals by position', targets: 'Targets' };
     const ci = a => (Array.isArray(a) ? (a[0] >= 0 ? '+' : '') + U.f(a[0] * 1000, 1) + ' (' + U.f(a[1] * 1000, 1) + ' to ' + U.f(a[2] * 1000, 1) + ')' : '—');
     const rows = Object.keys(NAME).filter(k => V[k]).map(k => {
       const t = V[k].test || {};
-      return { block: NAME[k], n: t.n || t.team_seasons, rate: t.rate, ll: t.logloss, llb: t.logloss_base, gain: t.ll_gain, slope: t.cal_slope, pub: !!(m.published || {})[k], why: (m.reasons || {})[k] || '' };
+      return { key: k, block: NAME[k], n: t.n || t.team_seasons, rate: t.rate, ll: t.logloss, llb: t.logloss_base, gain: t.ll_gain, slope: t.cal_slope, pub: !!(m.published || {})[k], why: (m.reasons || {})[k] || '' };
     });
     body.innerHTML = '<div class="qk-grid"><div class="qk-span-7">' + U.card2('How it works', 'The model notes, as published with the payload', '<div class="prose-dark">' + (m.notes || []).map(x => '<p>' + esc(x) + '</p>').join('') + '</div>') + '</div>' +
       '<div class="qk-span-5">' + U.card2('Calibration: chance of leaving', 'Sealed seasons ' + esc((sp.test || []).join(', ')) + ': our chance (decile mean) against the share who left', U.chart('mv-dec', 300, 'Predicted against observed, by decile')) + '</div></div>' +
@@ -314,7 +401,7 @@ function movesModel(body, L) {
       { key: 'll', label: 'Log-loss', num: true, fmt: v => U.f(v, 3), tip: 'Lower is better' }, { key: 'llb', label: 'Base rate', num: true, fmt: v => U.f(v, 3), tip: 'Log-loss of the base rate' },
       { key: 'gain', label: 'Gain ×1000 (95% CI)', num: true, fmt: v => ci(v), tip: 'Log-loss improvement over the base rate, with its 95% interval (team-clustered)' },
       { key: 'slope', label: 'Cal. slope', num: true, fmt: v => U.f(v, 2), tip: 'Calibration slope; 1 is ideal' },
-      { key: 'pub', label: 'Published', fmt: (v, r) => (v ? QK.tag('yes', 'signal') : '<span data-tip="' + esc(r.why) + '" tabindex="0">' + QK.tag('no: base rate') + '</span>') }] });
+      { key: 'pub', label: 'Published', fmt: (v, r) => (v ? QK.tag('yes', 'signal') : '<span data-tip="' + esc(r.why) + '" tabindex="0">' + QK.tag(r.key === 'targets' ? 'no: not shown' : 'no: base rate') + '</span>') }] });
     const dec = ((V.next || {}).test || {}).deciles || [];
     if (dec.length) QKC.scatter('#mv-dec', { points: dec.map((d, i) => ({ x: d[0], y: d[1], name: 'Decile ' + (i + 1) + ' · ' + d[2] + ' players', size: 10 })), diagonal: { label: 'perfect' }, xMin: 0, xMax: 1, yMin: 0, yMax: 1,
       xName: 'Our chance (decile mean)', yName: 'Share who left', xFmt: v => Math.round(v * 100) + '%', yFmt: v => Math.round(v * 100) + '%', label: 'Calibration of the chance of leaving' });

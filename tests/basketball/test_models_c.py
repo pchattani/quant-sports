@@ -694,3 +694,20 @@ def test_season_loaders(tmp_path, monkeypatch):
     json.dumps(aw)
     assert shots.for_season("nba", 1990)["ok"] is False
     assert impact.for_season("nba", 1990)["ok"] is False
+
+
+def test_xpts_ignores_assists_which_exist_only_on_makes():
+    """The play-by-play records an assist only on a made shot. As a feature it leaked the outcome: a shooter whose makes
+    were unassisted was judged against misses only (Olivia Miles, WNBA 2026: +26.9 per 100 under xpts-1, +0.9 now)."""
+    df = synth_shots(30000, seed=3)
+    df["assisted"] = np.where(df["made"] == 1, df["assisted"], 0)        # the real tables: assists on makes only
+    m = shots.fit_xpts(df)
+    assert "assisted" not in shots.BINARY and shots.MODEL_VERSION != "xpts-1"
+    x = df.copy()
+    x["assisted"] = 1 - x["assisted"]
+    assert np.allclose(shots.p_make(m, df), shots.p_make(m, x))           # flipping the flag changes nothing
+    sm = shots.shot_making(df, m, "shooter")
+    self_made = df[(df["made"] == 1) & (df["assisted"] == 0)].groupby("shooter").size() / df.groupby("shooter").size()
+    # shot-making no longer tracks the share of unassisted makes among ordinary (unplanted) shooters
+    ordinary = [s for s in sm.index if int(s) >= 10]
+    assert abs(np.corrcoef(sm.loc[ordinary, "pox100"], self_made.loc[ordinary])[0, 1]) < 0.5

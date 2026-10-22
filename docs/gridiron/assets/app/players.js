@@ -1,16 +1,20 @@
-/* The Quant Gridiron — Players (#/players?g=QB|RB|WR|TE|K|P|DEF): the season catalogue by position group, on Design
- * System 2.0. A chart of the group's headline metric (top 15), then a leaderboard: the group's metric set as heat cells
- * on the cold-to-hot percentile scale against the player's peer group (QB, RB, WR/TE, DL and outside rushers, LB, DB,
- * K, P), search, team and position filters, a sample floor (qualified only by default) and extra metrics on demand. Also exports GI.cat (catalogue helpers) for leaders and the lab.
- * Reads <S>/players.json. */
+/* The Quant Gridiron — Players (#/players?g=QB|RB|WR|TE|ED|IDL|LB|CB|S|K|P): the season catalogue by comparison group, on
+ * Design System 2.0 and the metrics spec (spec.js: docs/METRICS_SPEC.md). A chart of the group's first headline metric
+ * (top 15), then a leaderboard: the group's headline set as heat cells on the cold-to-hot percentile scale against the
+ * group's qualified players, style metrics uncoloured, search, team and position filters, a sample floor (qualified only
+ * by default), extra catalogue metrics on demand and, this season, the chance of leaving (Who moves next).
+ * Also exports GI.cat (catalogue helpers) for leaders and the lab. Reads <S>/players.json and <S>/value.json (value per
+ * game and the defensive roles). */
 (function (GI) {
 'use strict';
 
 const QK = window.QK;
 const esc = GI.esc, isNum = GI.isNum, first = GI.first;
-const ST = { group: 'QB', q: '', team: '', pos: '', floor: null, qual: true, extra: [], season: null };
+const ST = { group: 'qb', q: '', team: '', pos: '', floor: null, qual: true, extra: [], season: null };
+const MV = { map: null, d: null };
+const CORE = { qb: 'QB', rb: 'RB', wr: 'WR', te: 'TE', k: 'K', p: 'P', edge: 'DEF', idl: 'DEF', lb: 'DEF', cb: 'DEF', s: 'DEF' };
 
-/* players.json -> {cat, by: {group: [ids]}} */
+/* players.json -> {cat, by: {group: [ids]}} (the payload's own groups, for the lab and the leaders' fallbacks) */
 function prepare(raw) {
   const cat = GI.catOf(raw);
   if (!cat) return null;
@@ -18,22 +22,33 @@ function prepare(raw) {
   Object.keys(P).forEach(id => { const g = GI.groupOf(P[id].pos, P[id].group); (by[g] = by[g] || []).push(id); });
   return { cat: cat, P: P, by: by };
 }
-GI.cat = { prepare: prepare };
+/* A query's group: a spec code (QB, ED, IDL ...) or id, or the old DEF (outside pass rushers first). */
+function groupFromQuery(x) {
+  const k = String(x || '').toUpperCase();
+  if (!k) return null;
+  if (k === 'DEF') return 'edge';
+  const g = GI.SP.PLAYER.find(z => z.code === k || z.id.toUpperCase() === k);
+  return g ? g.id : null;
+}
+GI.cat = { prepare: prepare, groupFromQuery: groupFromQuery, CORE: CORE };
 
 GI.route('players', function (el, params) {
   const S = Number(params.season);
   const qy = params.query || {};
-  if (qy.g && GI.GROUPS.indexOf(String(qy.g).toUpperCase()) >= 0) ST.group = String(qy.g).toUpperCase();
-  return GI.load(GI.ypath('players.json', S)).then(raw => {
+  if (groupFromQuery(qy.g)) ST.group = groupFromQuery(qy.g);
+  return GI.loadAll([GI.ypath('players.json', S), GI.ypath('value.json', S)]).then(res => {
     if (!el.isConnected) return;
-    const head = GI.pageHead('Players · ' + S, 'Player catalogue', 'Every player of the season by position group; each cell is coloured by his percentile against qualified players in his peer group (100 = best). Search the whole league with <kbd>/</kbd>.') + GI.sectionNav('players', 'players');
+    const raw = res[0];
+    const head = GI.pageHead('Players · ' + S, 'Player catalogue', 'Every player of the season by comparison group; each cell is coloured by his percentile among the qualified players of his group (100 = best). Search the whole league with <kbd>/</kbd>.') + GI.sectionNav('players', 'players');
     const X = prepare(raw);
     if (!X) { el.innerHTML = head + GI.notBuilt('The ' + S + ' player catalogue', raw); return; }
-    const P = X.P, by = X.by, cat = X.cat;
+    const P = X.P, cat = X.cat;
+    const cx = GI.SP.ctx(cat, GI.ok(res[1]) ? res[1] : null);
     if (ST.season !== S) { ST.season = S; ST.floor = null; ST.team = ''; ST.pos = ''; }
-    if (!(by[ST.group] || []).length) ST.group = GI.GROUPS.find(g => (by[g] || []).length) || 'QB';
+    const G = GI.SP.PLAYER;
+    if (!GI.SP.members(cx, ST.group).length) ST.group = (G.find(g => GI.SP.members(cx, g.id).length) || G[0]).id;
     el.innerHTML = head +
-      '<div class="gi-toolbar">' + GI.seg('cat-group', GI.GROUPS.map(g => [g, g, !(by[g] || []).length]), ST.group, 'Position group') + '</div>' +
+      '<div class="gi-toolbar">' + GI.seg('cat-group', G.map(g => [g.id, g.code, !GI.SP.members(cx, g.id).length]), ST.group, 'Comparison group') + '</div>' +
       GI.card('<span id="cat-ct"></span>', '<span id="cat-cs"></span>', GI.chartBox('cat-chart', 380, 'Top of the group'), { span: 12 }) +
       GI.card('', '', '<div class="gi-toolbar" style="margin-bottom:12px">' +
         GI.field('Search', '<input id="cat-q" class="qk-input" type="search" placeholder="Name or team">') +
@@ -45,57 +60,61 @@ GI.route('players', function (el, params) {
     const $ = id => document.getElementById(id);
     let ctx = null;
     const setup = () => {
-      const g = ST.group, ids = by[g] || [];
-      const metrics = GI.metricsFor(cat, g), meta = GI.metaOf(metrics);
+      const g = GI.SP.BY[ST.group], core = CORE[g.id], ids = GI.SP.members(cx, g.id);
+      const metrics = GI.metricsFor(cat, core), meta = GI.metaOf(metrics);
       const sub = {}; ids.forEach(id => { sub[id] = P[id]; });
-      const sk = GI.sampleKey(sub, g);
+      const sk = GI.sampleKey(sub, core);
       const maxN = Math.max.apply(null, ids.map(id => GI.sampleOf(P[id], sk[0])).concat([10]));
       $('cat-floor').max = String(Math.ceil(maxN)); $('cat-floor').step = maxN > 200 ? '5' : '1';
       $('cat-floor-u').textContent = sk[1].toLowerCase();
-      const floorDef = [((cat.floors || {})[g]), cat.floor].find(isNum);
-      if (ST.floor === null || ST.floor > maxN) ST.floor = isNum(floorDef) ? Math.min(floorDef, maxN) : 0;
+      if (ST.floor === null || ST.floor > maxN) ST.floor = 0;
       $('cat-floor').value = ST.floor; $('cat-floor-v').textContent = ST.floor;
       const teams = Array.from(new Set(ids.map(id => P[id].team).filter(Boolean))).sort();
       $('cat-team').innerHTML = '<option value="">All teams</option>' + teams.map(t => '<option value="' + esc(t) + '"' + (t === ST.team ? ' selected' : '') + '>' + esc(t + ' · ' + GI.teamName(t)) + '</option>').join('');
       const pos = {};
       ids.forEach(id => { const x = P[id].pos; if (x) pos[x] = (pos[x] || 0) + 1; });
-      $('cat-pos').innerHTML = '<option value="">All positions</option>' + Object.keys(pos).sort().map(x => '<option value="' + esc(x) + '"' + (x === ST.pos ? ' selected' : '') + '>' + esc(x) + ' (' + pos[x] + ')</option>').join('');
-      $('cat-extra').innerHTML = '<option value="">—</option>' + GI.metricGroups(metrics).map(gr => '<optgroup label="' + esc(gr.name) + '">' + gr.items.map(m => '<option value="' + esc(m.key) + '">' + esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>').join('');
+      $('cat-pos').innerHTML = '<option value="">All positions</option>' + Object.keys(pos).sort().map(x => '<option value="' + esc(x) + '"' + (x === ST.pos ? ' selected' : '') + '>' + esc(GI.posLabel(x)) + ' (' + pos[x] + ')</option>').join('');
+      const setIds = g.m.map(m => m[0]);
+      $('cat-extra').innerHTML = '<option value="">—</option>' + GI.metricGroups(metrics.filter(m => setIds.indexOf(m.key) < 0)).map(gr => '<optgroup label="' + esc(gr.name) + '">' + gr.items.map(m => '<option value="' + esc(m.key) + '">' + esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>').join('');
       ST.extra = ST.extra.filter(x => meta[x]);
-      ctx = { g: g, ids: ids, metrics: metrics, meta: meta, sk: sk, heads: [].concat.apply([], GI.playerSet(g, metrics, 7).map(x => x[1])).map(k => meta[k]).filter(Boolean) };
+      ctx = { g: g, core: core, ids: ids, meta: meta, sk: sk };
     };
     const draw = () => {
       const g = ctx.g, q = GI.fold(ST.q.trim()), sk = ctx.sk[0];
       const extras = ST.extra.map(x => ctx.meta[x]).filter(Boolean);
-      const cols = ctx.heads.concat(extras.filter(m => ctx.heads.indexOf(m) < 0));
       const ids = ctx.ids.filter(id => { const p = P[id];
         return GI.sampleOf(p, sk) >= ST.floor && (!ST.qual || p.qualified !== false) && (!ST.team || String(p.team) === ST.team) && (!ST.pos || p.pos === ST.pos) &&
           (!q || GI.fold(String(p.name || GI.playerName(id)) + ' ' + (p.team || '') + ' ' + GI.teamName(p.team)).indexOf(q) >= 0); });
-      const m0 = ctx.heads[0] || {};
-      ids.sort((a, b) => { const va = (P[a].values || {})[m0.key], vb = (P[b].values || {})[m0.key]; const d = (isNum(vb) ? vb : -1e9) - (isNum(va) ? va : -1e9); return m0.lower ? -d : d; });
-      const rows = ids.slice(0, 400).map(id => { const p = P[id], pc = GI.peerPct(p, g);
-        const o = { id: id, name: p.name || GI.playerName(id), team: p.team, sub: GI.posLabel(p.pos || '') + ' · ' + GI.teamAbbr(p.team) + (p.qualified === false ? ' · small sample' : ''), age: isNum(p.age) ? Math.round(p.age) : null, games: first(p.games, p.g), n: GI.sampleOf(p, sk) };
-        cols.forEach(m => { o['v_' + m.key] = (p.values || {})[m.key]; o['p_' + m.key] = isNum(pc[m.key]) ? pc[m.key] : null; });
+      const m0 = GI.SP.headline(g)[0];
+      const v0 = id => GI.SP.value(P[id], id, m0, cx);
+      ids.sort((a, b) => { const va = v0(a), vb = v0(b); const d = (isNum(vb) ? vb : -1e9) - (isNum(va) ? va : -1e9); return m0[3] ? -d : d; });
+      const mvOn = MV.map && S === GI.currentSeason();
+      const rows = ids.slice(0, 400).map(id => { const p = P[id];
+        const o = { id: id, name: p.name || GI.playerName(id), team: p.team, sub: GI.posLabel(p.pos || '') + ' · ' + GI.teamAbbr(p.team) + (p.qualified === false ? ' · below the minimum' : ''), age: isNum(p.age) ? Math.round(p.age) : null, games: first(p.games, p.g), n: GI.sampleOf(p, sk) };
+        g.m.forEach(m => { o['v_' + m[0]] = GI.SP.value(p, id, m, cx); o['p_' + m[0]] = GI.SP.pct(p, id, g, m, cx); });
+        extras.forEach(m => { o['x_' + m.key] = (p.values || {})[m.key]; });
+        if (mvOn) { const mr = MV.map[id]; o.mvRow = mr || null; o.mv = mr && isNum(mr.p_next) ? mr.p_next : null; }
         return o; });
       const tbl = $('cat-table');
-      if (rows.length) QK.leaderboard(tbl, { dense: true, rank: true, maxHeight: 720, rowHref: r => GI.playerHref(r.id, S), sort: { key: 'p_' + (m0.key || ''), dir: 'desc' },
-        columns: [{ key: 'name', label: GI.titleCase(GI.GROUP_ONE[g] || 'player'), type: 'entity', sub: 'sub', mark: r => ({ name: GI.teamName(r.team), abbr: GI.teamAbbr(r.team), colour: GI.teamInfo(r.team).colour }), href: r => GI.playerHref(r.id, S) },
+      if (rows.length) QK.leaderboard(tbl, { dense: true, rank: true, maxHeight: 720, rowHref: r => GI.playerHref(r.id, S), sort: { key: 'p_' + m0[0], dir: 'desc' },
+        columns: [{ key: 'name', label: 'Player', type: 'entity', sub: 'sub', mark: r => ({ name: GI.teamName(r.team), abbr: GI.teamAbbr(r.team), colour: GI.teamInfo(r.team).colour }), href: r => GI.playerHref(r.id, S) },
           { key: 'age', label: 'Age', num: true }, { key: 'games', label: 'G', num: true }, { key: 'n', label: ctx.sk[1], num: true }]
-          .concat(cols.map(m => ({ key: 'p_' + m.key, label: GI.shortLabel(m.label) + (m.lower ? ' ↓' : ''), type: 'pctl', pctl: 'p_' + m.key, fmt: (v, r) => GI.fmtVal(r['v_' + m.key], m.fmt),
-            tip: GI.copyText(m.desc || m.label) + (isNum(m.stabilises_at) ? ' · stabilises at about ' + GI.int(m.stabilises_at) : '') + ' · sorted by percentile' }))),
+          .concat(g.m.map(m => (m[4] ? { key: 'v_' + m[0], label: GI.shortLabel(m[1]), num: true, fmt: v => GI.SP.fmt(m, v, cx), tip: m[5] + ' (style: no better or worse)' }
+            : { key: 'p_' + m[0], label: GI.shortLabel(m[1]) + (m[3] ? ' ↓' : ''), type: 'pctl', pctl: 'p_' + m[0], fmt: (v, r) => GI.SP.fmt(m, r['v_' + m[0]], cx), tip: m[5] + ' · sorted by percentile' })))
+          .concat(extras.map(m => ({ key: 'x_' + m.key, label: GI.shortLabel(m.label) + (m.lower ? ' ↓' : ''), num: true, fmt: v => GI.fmtVal(v, m.fmt), tip: GI.copyText(m.desc || m.label) })))
+          .concat(mvOn ? [{ key: 'mv', label: 'Chance of leaving', num: true, fmt: (v, r) => (r.mvRow ? GI.MV.typeBar(r.mvRow, MV.d) : '—'), tip: 'Our chance he is not with this team at ' + (((MV.d || {}).horizons || {}).next || 'next season') + ' (Who moves next)' }] : []),
         rows: rows });
-      else GI.set('cat-table', GI.muted('No ' + (GI.GROUP_ONE[g] || 'player') + ' matches these filters.'));
+      else GI.set('cat-table', GI.muted('No player matches these filters.'));
       GI.set('cat-chips', extras.length ? 'Added: ' + extras.map(m => '<button type="button" class="qk-chip" aria-pressed="true" data-rm="' + esc(m.key) + '">' + esc(m.label) + ' ×</button>').join(' ') : '');
-      GI.set('cat-note', ids.length + ' of ' + ctx.ids.length + ' ' + esc((GI.GROUP_NAME[g] || g).toLowerCase()) + (ids.length > 400 ? ' (first 400 shown)' : '') + '. Peers: ' + esc(g === 'DEF' ? 'each defender against his own line (DL and outside rushers, linebackers or defensive backs)' : GI.peerOf({}, g).name.replace(/^NFL /, '')) + ', qualified (' + esc((cat.qualification || {})[g] || 'the sample floor') + '). Rates are shrunk towards the group mean by their stabilisation point before ranking; ↓ metrics are flipped so a high percentile is always good. ' +
-        'Every metric is on each player page, the <a href="' + GI.ghref('leaders', S, { g: g }) + '">leaders</a> and the <a href="' + GI.ghref('lab', S, { g: g }) + '">lab</a>.' +
-        (g === 'DEF' ? ' Defenders are rated on what the public data records (pass rush, tackles, takeaways); there is no in-season coverage charting.' : ''));
-      GI.set('cat-ct', esc(m0.label || 'Top of the group') + (m0.lower ? ' (lower is better)' : ''));
-      GI.set('cat-cs', 'Top 15 ' + esc((GI.GROUP_NAME[g] || g).toLowerCase()) + ' on the current filters · bars coloured by percentile against their peers');
-      const top = ids.filter(id => isNum((P[id].values || {})[m0.key])).slice(0, 15);
-      if (top.length) GI.ch.bar('cat-chart', { cats: top.map(id => (P[id].name || GI.playerName(id)) + ' · ' + GI.teamAbbr(P[id].team)), series: [{ name: m0.label, data: top.map(id => P[id].values[m0.key]) }], horizontal: true, labels: true,
-        colors: top.map(id => QK.pctHex(GI.peerPct(P[id], g)[m0.key])), hrefs: top.map(id => GI.playerHref(id, S)), fmt: v => GI.fmtVal(v, m0.fmt), labelWidth: 170, valName: m0.label, catName: 'Player' });
+      GI.set('cat-note', ids.length + ' of ' + ctx.ids.length + ' ' + esc(g.name.toLowerCase()) + (ids.length > 400 ? ' (first 400 shown)' : '') + '. Peers: ' + esc(g.peer.replace(/^NFL /, '')) + ', qualified (' + esc(GI.SP.minLine(g)) + '); ↓ metrics are flipped so a high percentile is always good, and style metrics carry no colour. ' +
+        (GI.SP.NOTE[g.id] ? esc(GI.SP.NOTE[g.id]) + ' ' : '') + 'The metric set comes from our metrics study; every other metric is on each player page, the <a href="' + GI.ghref('leaders', S, { g: g.code }) + '">leaders</a> and the <a href="' + GI.ghref('lab', S, { g: ctx.core }) + '">lab</a>.');
+      GI.set('cat-ct', esc(m0[1]) + (m0[3] ? ' (lower is better)' : ''));
+      GI.set('cat-cs', 'Top 15 ' + esc(g.name.toLowerCase()) + ' on the current filters · bars coloured by percentile against their peers');
+      const top = ids.filter(id => isNum(v0(id))).slice(0, 15);
+      if (top.length) GI.ch.bar('cat-chart', { cats: top.map(id => (P[id].name || GI.playerName(id)) + ' · ' + GI.teamAbbr(P[id].team)), series: [{ name: m0[1], data: top.map(v0) }], horizontal: true, labels: true,
+        colors: top.map(id => QK.pctHex(GI.SP.pct(P[id], id, g, m0, cx))), hrefs: top.map(id => GI.playerHref(id, S)), fmt: v => GI.SP.fmt(m0, v, cx), labelWidth: 170, valName: m0[1], catName: 'Player' });
       else GI.ch.none('cat-chart', 'Nobody on these filters has this metric.');
-      try { history.replaceState(null, '', GI.ghref('players', S, { g: g })); } catch (e) { /* ok */ }
+      try { history.replaceState(null, '', GI.ghref('players', S, { g: g.code })); } catch (e) { /* ok */ }
     };
     setup();
     $('cat-q').value = ST.q;
@@ -110,6 +129,7 @@ GI.route('players', function (el, params) {
     $('cat-chips').addEventListener('click', ev => { const b = ev.target.closest('[data-rm]'); if (b) { ST.extra = ST.extra.filter(x => x !== b.dataset.rm); draw(); } });
     GI.wireSeg(el, 'cat-group', v => { ST.group = v; ST.floor = null; ST.team = ''; ST.pos = ''; ST.extra = []; setup(); draw(); });
     draw();
+    if (S === GI.currentSeason() && GI.MV && !MV.map) GI.MV.load().then(md => { if (!md) return; MV.d = md; MV.map = GI.MV.byPid(md); if (el.isConnected) draw(); });
   });
 });
 

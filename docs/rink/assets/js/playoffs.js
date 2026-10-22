@@ -79,7 +79,7 @@ function seriesBox(s, title) {
     : started ? (s.a.wins === s.b.wins ? 'Tied ' + s.a.wins + '–' + s.b.wins : esc(RK.teamAbbr(s.a.wins > s.b.wins ? s.a.team : s.b.team)) + ' leads ' + Math.max(s.a.wins, s.b.wins) + '–' + Math.min(s.a.wins, s.b.wins)) : '';
   const pa = done ? null : s.p, pb = done || !isNum(s.p) ? null : 1 - s.p;
   const last = (s.games || []).length ? s.games[s.games.length - 1] : null;
-  const inner = '<div class="nb-head">' + esc(title || '') + '<span>' + status + (isNum(s.market) && !done ? ' · mkt ' + RK.pct(s.market, 0) : '') + '</span></div>' +
+  const inner = '<div class="nb-head">' + esc(title || '') + '<span>' + status + '' + '</span></div>' +
     teamLine(s.a, win && win === s.a.team, win && win !== s.a.team, pa, '') + teamLine(s.b, win && win === s.b.team, win && win !== s.b.team, pb, '');
   return last ? '<div class="nb-game' + (done ? ' done' : '') + '" title="Latest game: ' + esc(last) + '">' + inner + '<a class="nb-last" href="' + RK.gameHref(last) + '">latest game →</a></div>'
     : '<div class="nb-game' + (done ? ' done' : '') + (s.a.team ? '' : ' proj') + '">' + inner + '</div>';
@@ -118,22 +118,20 @@ function oddsTable(rows, cupMkt, S) {
   const list = rows.filter(r => isNum(r.p_playoffs) || isNum(r.p_cup)).sort((a, b) => (b.p_cup || 0) - (a.p_cup || 0) || (b.p_playoffs || 0) - (a.p_playoffs || 0));
   if (!list.length) return RK.muted('No playoff simulation in this build.');
   const col = (r, k) => { const v = r[k]; return { html: isNum(v) ? (v >= 0.9995 ? '<span class="odds-done">✓</span>' : RK.pct(v, v < 0.1 ? 1 : 0)) : '—', v: v }; };
-  const hasMk = Object.keys(cupMkt || {}).length > 0;
   const cols = [{ label: 'Team' }, { label: 'Seed', title: 'Today\'s seed in the wild-card standings' }, { label: 'Playoffs' }, { label: 'Round 2', align: 'right', title: 'Win the first round' },
     { label: 'Conf. final', align: 'right' }, { label: 'Final', align: 'right', title: 'Win the conference' }, { label: 'Cup', align: 'right' }]
-    .concat(hasMk ? [{ label: 'Market', align: 'right', title: 'De-vigged Stanley Cup market' }, { label: 'Edge', align: 'right' }] : []);
+;
   return RK.tableHTML(cols, list.map(r => {
-    const mk = hasMk ? RK.fx && RK.fx.pOf ? RK.fx.pOf(cupMkt[r.team]) : cupMkt[r.team] : null;
     return { _href: RK.teamHref(r.team, S), cells: [{ html: RK.teamLink(r.team, { short: true, season: S }), v: r.team }, { html: r.seed ? esc(r.seed) : '<span class="muted-inline" title="Outside a playoff spot today">—</span>', v: r.seed || 'zz' },
       { html: RK.probCell(r.p_playoffs, RK.teamColour(r.team)), v: r.p_playoffs }, col(r, 'p_r2'), col(r, 'p_r3'), col(Object.assign({}, r, { p_final: isNum(r.p_final) ? r.p_final : r.p_conf }), 'p_final'), col(r, 'p_cup')]
-      .concat(hasMk ? [{ html: RK.pct(mk, 1), v: mk }, { html: RK.edgeHTML(r.p_cup, mk), v: isNum(mk) && isNum(r.p_cup) ? r.p_cup - mk : null }] : []) };
+ };
   }), { compact: true, cls: 'std-table' });
 }
 
 RK.route('playoffs', function (el, params) {
   const S = params.season;
   const cur = S === RK.currentSeason();
-  return Promise.all([RK.loadYear('season.json', S), cur ? RK.loadYear('markets.json', S) : Promise.resolve(null)]).then(res => {
+  return Promise.all([RK.loadYear('season.json', S), Promise.resolve(null)]).then(res => {
     if (!el.isConnected) return;
     const d = res[0], mk = res[1];
     const nav = (S > RK.FIRST_SEASON ? '<a href="' + RK.playoffsHref(S - 10001) + '">← ' + esc(RK.seasonLabel(S - 10001)) + '</a>' : '') +
@@ -156,8 +154,8 @@ RK.route('playoffs', function (el, params) {
       RK.card('Bracket', isProj ? 'the first round from today\'s wild-card standings · percentages: our chance to win the series' : 'series score and our chance to win the series',
         b ? bracketHTML(b) : RK.muted('No bracket for this season yet.')) +
       (isProj ? likelyBlock(d) : '') +
-      RK.card('Odds by round', 'from the season simulation' + (Object.keys(cupMkt).length ? ' · against the Stanley Cup market' : ''), oddsTable(rows, cupMkt, S)) +
-      '<div class="chart-note">In each conference the division winner with more points plays the second wild card; the other plays the first. Series odds come from our game model with home ice; "mkt" is the de-vigged series market where one is listed. For information only.</div>';
+      RK.card('Chances by round', 'our chances from the season simulation', oddsTable(rows, cupMkt, S)) +
+      '<div class="chart-note">In each conference the division winner with more points plays the second wild card; the other plays the first. Series chances come from our game model with home ice. For information only.</div>';
     RK.sortable(el);
   });
 });

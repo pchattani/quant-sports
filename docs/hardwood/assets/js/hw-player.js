@@ -4,7 +4,7 @@
  * Overview tab: the player card header (team band, role, age, the season line); stat tiles with percentile chips
  * (impact, WAR, projected WAR, scoring, award chance); the Savant-style percentile card against his role (guards,
  * wings or bigs, qualified players, the sample shown, metrics short of their reliability sample dashed) from the one
- * metric set (HW.ui.MSET); where he sits in the role's distribution; season by season; the game log and splits; the
+ * metric set (HW.ui.MSET); among peers in the role's distribution; season by season; the game log and splits; the
  * shot chart on the half court; value; the career table; similar players (with compare links) and awards.
  * Detail tab (?tab=detail): the pre-redesign player page in full (the whole catalogue, radar, on/off, clutch,
  * projection, lineups, game log table).
@@ -25,6 +25,17 @@ function splits(log) {
     .map(x => Object.assign({ split: x[0] }, agg(x[1]) || {})).filter(x => x.n);
 }
 
+/* A one-player catalogue from the career file's role_card and season row (no season catalogue download). */
+function rcCatalogue(career, rc, pid, S) {
+  const row = ((career && career.seasons) || []).find(x => Number(x.season) === Number(S)) || {};
+  const d = career.dob ? Date.parse(career.dob) : NaN;
+  const p = { name: career.name, team: row.team, pos: career.pos, age: isFinite(d) ? (Date.now() - d) / (365.25 * 864e5) : null, gp: row.gp, min: row.min,
+    qualified: !!rc.qualified, role: rc.role, pct_role: rc.pct_role,
+    values: { hpm: row.hpm, hpm_o: row.o, hpm_d: row.d, ts: row.ts, pts_g: row.pts, reb_g: row.reb, ast_g: row.ast, rapm: row.rapm, box_impact: row.box_impact } };
+  const players = {}; players[pid] = p;
+  return { ok: true, players: players, min_floor: rc.min_floor, metrics: [], __rc: rc };
+}
+
 function render(el, params) {
   const L = U.L(params), pid = String(params.id || '');
   const tab = U.tab(params, ['overview', 'detail'], 'overview');
@@ -38,7 +49,10 @@ function render(el, params) {
     let asked = null;
     if (seasons.length && seasons.indexOf(S) < 0) { const prev = seasons.filter(x => x <= S).sort((a, b) => b - a)[0] || Math.max.apply(null, seasons); if (prev !== S) { asked = S; S = prev; } }
     const isCurS = U.isCur(L, S);
-    return Promise.all([HW.load(HW.path('players.json', L, S)), HW.load(HW.path('value.json', L, S)), HW.load(HW.path('valuation.json', L, curS)), U.movement(L)]).then(a => {
+    // the career file's role_card (players/<pid>.json) carries the role percentiles: then the 3.8 MB season catalogue
+    // is not needed (it loads only if the reader asks for the peer distribution); otherwise the page computes them
+    const rc = career && career.role_card && Number(career.role_card.season) === Number(S) && career.role_card.pct_role ? career.role_card : null;
+    return Promise.all([rc ? Promise.resolve(rcCatalogue(career, rc, pid, S)) : HW.load(HW.path('players.json', L, S)), HW.load(HW.path('value.json', L, S)), HW.load(HW.path('valuation.json', L, curS)), U.movement(L)]).then(a => {
       if (!U.alive(el)) return;
       draw(el, L, S, pid, career, U.ok(a[0]) ? a[0] : null, U.ok(a[1]) ? a[1] : null, U.ok(a[2]) ? a[2] : null, asked, tab, params, a[3]);
     });
@@ -77,13 +91,13 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
       stats: line.concat(lineFallback).map(x => ({ label: x[0], value: HW.fmtVal(x[1], x[2]) })), tags: tags });
   const base = HW.playerHref(L, pid, S);
   h += '<div style="margin-top:var(--sp-4)"></div>' + U.tabsHTML([{ key: 'overview', label: 'Overview', href: base }, { key: 'detail', label: 'Detail: the whole catalogue, on/off and lineups', href: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'tab=detail' }], tab);
-  if (tab === 'detail') { el.innerHTML = h + '<div class="hw-sub"></div>'; U.legacy('player', el.querySelector('.hw-sub'), params); return; }
+  if (tab === 'detail') { el.innerHTML = h + '<div class="hw-sub"></div>'; U.legacy('player', el.querySelector('.hw-sub'), params, null, { embed: 'detail' }); return; }
   // stat tiles: ours first, each with its percentile against his role where there is one
   const k = [];
   const hpm = isNum(v.hpm) ? v.hpm : srow.hpm;
-  if (isNum(hpm)) k.push({ label: 'Total impact (HPM)', value: U.signed(hpm, 1), signal: true, pctl: p ? U.rolePctl(cat, roles, pid, 'hpm') : null, sub: 'offence ' + U.signed(isNum(v.hpm_o) ? v.hpm_o : srow.o, 1) + ' · defence ' + U.signed(isNum(v.hpm_d) ? v.hpm_d : srow.d, 1) + ' per 100', tip: 'Hardwood Plus-Minus: points per 100 possessions he adds to his team’s margin over an average player (play-by-play on/off blended with the box score)' });
+  if (isNum(hpm)) k.push({ label: 'Total impact (HPM)', value: U.signed(hpm, 1), signal: true, pctl: p ? U.rolePctl(cat, roles, pid, 'hpm') : null, sub: 'offence ' + U.signed(isNum(v.hpm_o) ? v.hpm_o : srow.o, 1) + ' · defence ' + U.signed(isNum(v.hpm_d) ? v.hpm_d : srow.d, 1) + ' per 100', tip: 'Hardwood Plus-Minus: points per 100 possessions the player adds to the team’s margin over an average player (play-by-play on/off blended with the box score)' });
   if (swar && isNum(swar.war)) k.push({ label: 'Wins above replacement', value: U.f(swar.war, 1), pctl: isNum(swar.pct_role) ? swar.pct_role : null, sub: HW.seasonLabel(L, S) + (role ? ' · percentile among ' + U.ROLE_NAME[role] : ''), tip: 'Our wins above a replacement-level player this season, from HPM and minutes' });
-  if (vrow) k.push({ label: 'Projected WAR', value: U.f(vrow.w0, 1), sub: 'rest of ' + HW.seasonLabel(L, HW.currentSeason(L)) + (isNum(vrow.p10) ? ' · four seasons ' + U.f(vrow.v, 1) + ' (80%: ' + U.f(vrow.p10, 1) + ' to ' + U.f(vrow.p90, 1) + ')' : ''), tip: 'Our projection of his wins above replacement; the four-season value is discounted, with its 80% range' });
+  if (vrow) k.push({ label: 'Projected WAR', value: U.f(vrow.w0, 1), sub: 'rest of ' + HW.seasonLabel(L, HW.currentSeason(L)) + (isNum(vrow.p10) ? ' · four seasons ' + U.f(vrow.v, 1) + ' (80%: ' + U.f(vrow.p10, 1) + ' to ' + U.f(vrow.p90, 1) + ')' : ''), tip: 'Our projection of the player’s wins above replacement; the four-season value is discounted, with its 80% range' });
   if (isNum(v.pts100)) k.push({ label: 'Points per 100', value: U.f(v.pts100, 1), pctl: p ? U.rolePctl(cat, roles, pid, 'pts100') : null, sub: 'true shooting ' + HW.fmtVal(v.ts, 'pct') });
   const aw = cur.awards || {};
   const best = Object.keys(aw).filter(x => isNum(aw[x]) || (aw[x] && isNum(aw[x].p))).sort((a, b) => (isNum(aw[b]) ? aw[b] : aw[b].p) - (isNum(aw[a]) ? aw[a] : aw[a].p))[0];
@@ -94,23 +108,23 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
   const peer = role ? U.peerName(L, role) : '';
   const set = role && U.MSET ? U.MSET.roles[role] : null;
   const style = set ? set.style.filter(x => isNum(v[x])) : [];
-  const pcard = QK.pctCard({ title: 'Percentile rankings', peer: peer, sample: p ? U.sampleLine(L, cat, p) : '', groups: groups,
+  const pcard = QK.pctCard({ title: 'Percentile rankings', peer: peer, sample: p ? U.sampleLine(L, cat, p) + (cat && cat.__rc && isNum(cat.__rc.n) ? ' · ' + cat.__rc.n + ' qualified ' + (U.ROLE_NAME[role] || 'peers') : '') : '', groups: groups,
     note: style.length ? 'Style, not better or worse: ' + style.map(x => U.mMeta(x).label + ' ' + U.fmtM(x, v[x])).join(' · ') + '.' : '',
-    emptyText: p ? 'No role yet for this player: percentiles appear once he has a role in the value table.' : 'No numbers for this season yet.' });
+    emptyText: p ? 'No role yet for this player: percentiles appear once the player has a role in the value table.' : 'No numbers for this season yet.' });
   const log = (cur.log || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
   const cells = cur.shots && cur.shots.grid ? U.rowsOf(cur.shots.grid).filter(c => isNum(c.x) && isNum(c.y) && c.y <= 41.5) : [];
   h += '<div class="qk-grid"><div class="qk-span-5">' + pcard + '</div><div class="qk-span-7"><div class="hw-stack2">' +
-    (groups.length ? U.card2('Where he sits', 'Every qualified ' + esc(peer.replace(HW.leagueName(L) + ' ', '')) + ' this season; bars coloured by percentile', '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('pp-dist', 240, 'Where he sits among his peers')) : '') +
+    (groups.length ? U.card2('Among peers', 'Every qualified ' + esc(peer.replace(HW.leagueName(L) + ' ', '')) + ' this season; bars coloured by percentile', '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('pp-dist', 240, 'Among peers: the role’s distribution')) : '') +
     (cs.length > 1 ? U.card2('Season by season', 'Impact per 100 possessions: total, offence and defence', U.chart('pp-career', 280, 'Impact by season')) : '') + '</div></div></div>';
   if (log.length) {
-    h += '<div class="qk-grid hw-sec"><div class="qk-span-7">' + U.card2('Game by game', 'Game score per game (Hollinger); green when his team was ahead with him on the floor', U.chart('pp-log', 240, 'Game score per game')) + '</div>' +
+    h += '<div class="qk-grid hw-sec"><div class="qk-span-7">' + U.card2('Game by game', 'Game score per game (Hollinger); green when the team was ahead with this player on the floor', U.chart('pp-log', 240, 'Game score per game')) + '</div>' +
       '<div class="qk-span-5">' + U.card2('Splits', 'Per game', '<div id="pp-splits"></div>', { flush: true }) + '</div></div>';
   }
   // Who moves next: only where the block passed its held-out test (published); never a placeholder
   const mr = mv && mv.pub.next ? mv.by[pid] : null;
   if (mr && isNum(mr.p_next)) {
     const m = mv.m;
-    h += '<div class="qk-grid hw-sec"><div class="qk-span-12">' + U.card2('Movement', 'Our chance he has left his team ' + esc(U.mvHorizon(mv)) + ', and how. No contract data is used (Model page).',
+    h += '<div class="qk-grid hw-sec"><div class="qk-span-12">' + U.card2('Movement', 'Our chance the player has left the team ' + esc(U.mvHorizon(mv)) + ', and how. No contract data is used (Model page).',
       '<div class="hw-mvcard">' + QK.stats([{ label: 'Chance of moving', value: U.pctMv(mr.p_next), signal: true, sub: U.mvHorizon(mv), tip: (m.notes || [])[0] || '' },
         mv.pub.deadline && isNum(mr.p_dl) ? { label: 'Before the deadline', value: U.pctMv(mr.p_dl), sub: (m.deadline_label || 'traded or claimed') + ' by ' + HW.fmtDate(String((m.horizons || {}).deadline || ''), { weekday: false }) } : null]) +
       '<div style="margin-top:12px">' + U.mvBar(mv, mr) + '</div><div style="margin-top:8px">' + U.mvKeys(mv) + '</div>' +
@@ -137,9 +151,26 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
   el.innerHTML = h;
 
   // where he sits: the peer distribution of one metric of his role's set, with him and the median marked
-  if (document.getElementById('pp-dist')) {
+  if (document.getElementById('pp-dist') && cat && cat.__rc) {
+    const holder = document.getElementById('pp-dist');
+    document.getElementById('pp-dist-m').hidden = true;
+    holder.style.setProperty('--h', 'auto');
+    holder.innerHTML = '<div class="hw-flex" style="padding:24px 0"><button type="button" class="qk-btn" id="pp-dist-go">Show the distribution</button><span class="hw-quiet">loads every player of the season (about 4 MB)</span></div>';
+    document.getElementById('pp-dist-go').addEventListener('click', () => {
+      holder.innerHTML = QK.skeleton('chart', 1);
+      HW.load(HW.path('players.json', L, S)).then(full => {
+        if (!U.alive(holder) || !U.ok(full)) return;
+        holder.style.setProperty('--h', '240px'); holder.innerHTML = '';
+        document.getElementById('pp-dist-m').hidden = false;
+        drawAmong(full);
+      });
+    });
+  } else if (document.getElementById('pp-dist')) drawAmong(cat);
+  function drawAmong(cat) {
+    if (!document.getElementById('pp-dist')) return;
+    const pv = ((cat.players || {})[pid] || {}).values || v;
     const peers = U.rolePeers(cat, roles, role);
-    const opts = set.groups.reduce((a, g) => a.concat(g[1]), []).filter(x => isNum(v[x])).slice(0, 6);
+    const opts = set.groups.reduce((a, g) => a.concat(g[1]), []).filter(x => isNum(pv[x])).slice(0, 6);
     const segEl = document.getElementById('pp-dist-m');
     segEl.innerHTML = opts.map((o, i) => '<button type="button" aria-pressed="' + (i === 0) + '" data-value="' + o + '">' + esc(U.mMeta(o).label.replace(/ \(HPM\)$/, '')) + '</button>').join('');
     const drawDist = key => {
@@ -148,7 +179,7 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
       if (vals.length < 5) { document.getElementById('pp-dist').innerHTML = QK.empty('Too few qualified peers yet'); return; }
       const med = vals[Math.floor(vals.length / 2)];
       QKC.distribution('#pp-dist', { values: vals, binCount: 22, lowerBetter: m.better === 'low', fmt: x => U.fmtM(key, x), xName: m.label + ' · ' + vals.length + ' qualified ' + U.ROLE_NAME[role], yName: 'Players',
-        marks: (isNum(v[key]) ? [{ x: v[key], label: name.split(' ').slice(-1)[0] }] : []).concat([{ x: med, label: 'Median' }]), label: 'Distribution of ' + m.label });
+        marks: (isNum(pv[key]) ? [{ x: pv[key], label: name.split(' ').slice(-1)[0] }] : []).concat([{ x: med, label: 'Median' }]), label: 'Distribution of ' + m.label });
     };
     if (opts.length) { drawDist(opts[0]); QK.seg(segEl, drawDist); }
   }

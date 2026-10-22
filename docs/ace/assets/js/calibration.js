@@ -2,9 +2,9 @@
  *
  * Every finished tour-level match of the covered years predicted with only the data before it,
  * by the match model (Elo and the serve/return chain blended), each of its two halves, a
- * ranking baseline, and the closing prices of Pinnacle, Bet365, the market average and the best
+ * ranking baseline, and the closing lines of Pinnacle, Bet365, the market average and the best
  * price. Shows coverage, a plain-words reading written from the numbers, the score table (all
- * matches, matches with a Pinnacle or average price, by year and by level), reliability
+ * matches, matches with a Pinnacle or average line, by year and by level), reliability
  * diagrams, set-score, straight-sets, tiebreak and total-games calibration, live probability
  * at set boundaries, tournament-odds calibration, the blend weights by year, and (WTA) the
  * validation of score-inferred hold and serve points won against the real WTA stats.
@@ -14,9 +14,10 @@
 'use strict';
 
 const K = () => TA.fk;
-const LABELS = { model: 'Match model', model_fund: 'Model without market rating', elo: 'Elo', serve_return: 'Serve/return chain', rank: 'Ranking', pinnacle: 'Pinnacle closing', b365: 'Bet365 closing', avg: 'Average closing', max: 'Best price closing', bt: 'Bradley-Terry' };
+const LABELS = { model: 'Our match model', model_fund: 'Ours without the market rating', elo: 'Elo', serve_return: 'Serve/return chain', rank: 'Ranking', pinnacle: 'Pinnacle closing', b365: 'Bet365 closing', avg: 'Average closing', max: 'Best closing line', bt: 'Bradley-Terry' };
 const ORDER = ['model', 'model_fund', 'elo', 'serve_return', 'rank', 'bt', 'pinnacle', 'b365', 'avg', 'max'];
-const COL = { model: '#d9f24f', model_fund: '#e3b341', elo: '#bc8cff', serve_return: '#39d0d8', rank: '#8b949e', bt: '#79c0ff', pinnacle: '#f97316', b365: '#3fb950', avg: '#58a6ff', max: '#f85149' };
+/* ours in the signal violet, our components and baselines in categorical colours, the market rows in quiet greys */
+const COL = { model: '#9384ff', model_fund: '#e3b341', elo: '#3fb9a8', serve_return: '#39d0d8', rank: '#d2693c', bt: '#79c0ff', pinnacle: '#9aa1ad', b365: '#6f7785', avg: '#b9bec7', max: '#565d6a' };
 const BOOK = { pinnacle: 1, b365: 1, avg: 1, max: 1 };
 const label = k => LABELS[k] || String(k).replace(/_/g, ' ');
 const H = p => (p > 0 && p < 1 ? -(p * Math.log(p) + (1 - p) * Math.log(1 - p)) : null);
@@ -62,23 +63,23 @@ function reading(d, T) {
   const ll = (src, m) => (src[m] || {}).logloss;
   const pctOf = (a, b) => (k.isNum(a) && k.isNum(b) && b ? 100 * a / b : null);
   out.push('<p><strong>Coverage.</strong> ' + k.int(d.n_matches) + ' completed tour-level ' + k.TN(T) + ' matches from ' + (d.years || [])[0] + ' to ' + (d.years || []).slice(-1)[0] + ' were scored, each predicted with ratings fitted on matches strictly before it (the first ' + (d.warmup_years || 0) + ' years before that only warm the ratings up). ' +
-    k.int(d.n_with_pinnacle) + ' of them (' + k.num(pctOf(d.n_with_pinnacle, d.n_matches), 0) + '%) have a Pinnacle closing price and ' + k.int(d.n_with_avg) + ' an average closing price. Retirements, walkovers and defaults are not scored.</p>');
+    k.int(d.n_with_pinnacle) + ' of them (' + k.num(pctOf(d.n_with_pinnacle, d.n_matches), 0) + '%) have a Pinnacle closing line and ' + k.int(d.n_with_avg) + ' an average closing line. Retirements, walkovers and defaults are not scored.</p>');
   if (k.isNum(ll(M, 'model')) && k.isNum(ll(M, 'elo'))) {
     const dE = ll(M, 'elo') - ll(M, 'model'), dR = ll(M, 'rank') - ll(M, 'model');
     out.push('<p><strong>Model against the simple baselines.</strong> Over all scored matches the model\'s log-loss is ' + k.num(ll(M, 'model'), 4) + ', against ' + k.num(ll(M, 'elo'), 4) + ' for Elo alone' +
       (k.isNum(ll(M, 'serve_return')) ? ', ' + k.num(ll(M, 'serve_return'), 4) + ' for the serve/return chain alone' : '') + (k.isNum(ll(M, 'rank')) ? ' and ' + k.num(ll(M, 'rank'), 4) + ' for the ranking baseline' : '') + '. ' +
-      (k.isNum(ll(M, 'model_fund')) ? 'The model beats Elo by ' + k.num(dE, 4) + ' nats a match; without its market rating (the strength of each player learnt from the closing prices and results of earlier matches) it scores ' + k.num(ll(M, 'model_fund'), 4) + ', ' + k.num(ll(M, 'elo') - ll(M, 'model_fund'), 4) + ' better than Elo. ' :
+      (k.isNum(ll(M, 'model_fund')) ? 'The model beats Elo by ' + k.num(dE, 4) + ' nats a match; without its market rating (the strength of each player learnt from the closing lines and results of earlier matches) it scores ' + k.num(ll(M, 'model_fund'), 4) + ', ' + k.num(ll(M, 'elo') - ll(M, 'model_fund'), 4) + ' better than Elo. ' :
         (dE > 0 ? 'Blending the two halves beats Elo by ' + k.num(dE, 4) + ' nats a match: small, because surface Elo already carries most of what the scores say. ' : 'The blend does not beat Elo alone here. ')) +
       (k.isNum(dR) ? (dR > 0 ? 'Against the ranking the gain is ' + k.num(dR, 4) + ' nats, which means the model gives the actual winner about ' + k.num(100 * (Math.exp(dR) - 1), 1) + '% more probability on average (geometric).' : 'The ranking baseline is not beaten, which is a red flag.') : '') + '</p>');
   }
   if (k.isNum(ll(V, 'model')) && k.isNum(ll(V, 'pinnacle'))) {
     const gap = ll(V, 'model') - ll(V, 'pinnacle');
     const share = k.isNum(ll(V, 'rank')) && ll(V, 'rank') > ll(V, 'pinnacle') ? (ll(V, 'rank') - ll(V, 'model')) / (ll(V, 'rank') - ll(V, 'pinnacle')) : null;
-    out.push('<p><strong>Model against Pinnacle.</strong> On the ' + k.int((V.pinnacle || {}).n) + ' matches with a Pinnacle close, the model scores ' + k.num(ll(V, 'model'), 4) + ' and Pinnacle\'s de-vigged closing price ' + k.num(ll(V, 'pinnacle'), 4) +
+    out.push('<p><strong>Model against Pinnacle.</strong> On the ' + k.int((V.pinnacle || {}).n) + ' matches with a Pinnacle close, the model scores ' + k.num(ll(V, 'model'), 4) + ' and Pinnacle\'s de-vigged closing line ' + k.num(ll(V, 'pinnacle'), 4) +
       (k.isNum(ll(V, 'avg')) ? ' (the market average ' + k.num(ll(V, 'avg'), 4) + ', Bet365 ' + k.num(ll(V, 'b365'), 4) + ')' : '') + '. ' +
       (gap > 0 ? 'The closing market is sharper by ' + k.num(gap, 4) + ' nats a match. That is the expected order: the close knows about injuries, fatigue, form within the week and money the model never sees. ' +
         (share !== null ? 'Measured from the ranking baseline, the model closes ' + k.num(100 * share, 0) + '% of the distance to Pinnacle.' : '') +
-        (k.isNum(ll(V, 'model_fund')) && ll(V, 'model_fund') > ll(V, 'pinnacle') ? ' Without the market rating the gap would be ' + k.num(ll(V, 'model_fund') - ll(V, 'pinnacle'), 4) + ' nats: learning from past closing prices closes ' + k.num(100 * (ll(V, 'model_fund') - ll(V, 'model')) / (ll(V, 'model_fund') - ll(V, 'pinnacle')), 0) + '% of it. The market rating uses only matches finished before the day being priced, never the price of the match itself.' : '')
+        (k.isNum(ll(V, 'model_fund')) && ll(V, 'model_fund') > ll(V, 'pinnacle') ? ' Without the market rating the gap would be ' + k.num(ll(V, 'model_fund') - ll(V, 'pinnacle'), 4) + ' nats: learning from past closing lines closes ' + k.num(100 * (ll(V, 'model_fund') - ll(V, 'model')) / (ll(V, 'model_fund') - ll(V, 'pinnacle')), 0) + '% of it. The market rating uses only matches finished before the day being forecast, never the match’s own closing line.' : '')
         : 'The model is at least as sharp as Pinnacle\'s close here, which would be extraordinary: treat it as a bug until proved otherwise.') + '</p>');
   }
   const bins = (((M.model || {}).reliability) || []).filter(b => b.n >= 100);
@@ -123,24 +124,24 @@ function render(el, params, state) {
     const M = d.metrics, D = d.distributions || {}, TT = d.tournaments || {};
     const models = ORDER.filter(x => M[x]).concat(Object.keys(M).filter(x => ORDER.indexOf(x) < 0));
     const yrs = d.years || [];
-    let h = '<div class="card"><div class="card-header">Calibration · ' + k.TN(T) + ' <span class="card-sub">Walk-forward backtest: every match predicted with ratings refitted from matches strictly before it and blend weights fitted on earlier years only, scored against what happened and against the closing market.</span></div>' +
+    let h = '<p class="ta-cap" style="margin:0 0 12px">Walk-forward backtest: every match predicted with ratings refitted from matches strictly before it and blend weights fitted on earlier years only, scored against what happened, with the closing market beside it as a reference.</p>' +
       '<div class="kpi-grid af-tiles">' + [
         k.tile('Matches scored', k.int(d.n_matches), yrs.length ? yrs.length + ' years, ' + yrs[0] + '–' + yrs[yrs.length - 1] : ''),
         k.tile('With Pinnacle', k.int(d.n_with_pinnacle), k.isNum(d.n_matches) ? k.num(100 * d.n_with_pinnacle / d.n_matches, 0) + '% of matches' : ''),
-        k.tile('Model log-loss', k.num((M.model || {}).logloss, 4), 'Elo ' + k.num((M.elo || {}).logloss, 4) + ' · rank ' + k.num((M.rank || {}).logloss, 4)),
-        k.tile('Pinnacle log-loss', k.num(((d.vs_pinnacle || {}).pinnacle || {}).logloss, 4), 'model ' + k.num(((d.vs_pinnacle || {}).model || {}).logloss, 4) + ' on the same matches'),
+        k.tile({ label: 'Our log-loss', value: k.num((M.model || {}).logloss, 4), signal: true, sub: 'Elo ' + k.num((M.elo || {}).logloss, 4) + ' · rank ' + k.num((M.rank || {}).logloss, 4) + ' · lower is better' }),
+        k.tile('Pinnacle log-loss (reference)', k.num(((d.vs_pinnacle || {}).pinnacle || {}).logloss, 4), 'ours ' + k.num(((d.vs_pinnacle || {}).model || {}).logloss, 4) + ' on the same matches'),
         k.tile('Blend', d.blend_all_years && k.isNum(d.blend_all_years.w_elo) ? k.num(d.blend_all_years.w_elo, 2) + ' / ' + k.num(d.blend_all_years.w_sr, 2) : '—', 'Elo / serve-return weights on the log-odds'),
         k.tile('Refit', k.isNum(d.refit_days) ? 'every ' + d.refit_days + ' days' : '—', 'generated ' + k.esc(k.fmtDate(d.generated_at, { weekday: false })) + (k.isNum(d.runtime_s) ? ' · ' + k.num(d.runtime_s / 60, 0) + ' min run' : ''))
-      ].join('') + '</div></div>';
+      ].join('') + '</div>';
     h += '<div class="card"><div class="card-header">What it shows <span class="card-sub">Written from the numbers below.</span></div><div class="cal-read">' + reading(d, T) + '</div></div>';
-    h += '<div class="card"><div class="card-header">Scores <span class="card-sub">Log-loss −mean(y ln p + (1−y) ln(1−p)) with p clipped to [0.0001, 0.9999], and Brier mean((p−y)²); lower is better, green is best in the table. Bookmaker prices are de-vigged multiplicatively.</span>' +
+    h += '<div class="card"><div class="card-header">Scores <span class="card-sub">Log-loss −mean(y ln p + (1−y) ln(1−p)) with p clipped to [0.0001, 0.9999], and Brier mean((p−y)²); lower is better, green is best in the table. Bookmaker lines are de-vigged multiplicatively.</span>' +
       '<span class="pg-ctl">scope <select id="cal-scope"><option value="all">all scored matches</option><option value="pin">matches with a Pinnacle close</option><option value="avg">matches with an average close</option>' +
       Object.keys(d.per_level || {}).map(l => '<option value="l' + k.esc(l) + '">level: ' + k.esc(k.LEVEL_LABEL[l] || l) + '</option>').join('') +
       Object.keys(d.per_year || {}).sort().reverse().map(y => '<option value="y' + k.esc(y) + '">' + k.esc(y) + '</option>').join('') + '</select></span></div><div id="cal-table"></div>' +
-      '<div class="pg-note">The ranking baseline is P = σ(b · (ln rank<sub>2</sub> − ln rank<sub>1</sub>)), unranked = 300, with b fitted on earlier years. The match model blends Elo and the serve/return chain on the log-odds scale with weights fitted on earlier years. Within each scope every forecaster is scored on the matches it has a price for, so the market rows can cover slightly fewer matches.</div></div>';
+      '<div class="pg-note">The ranking baseline is P = σ(b · (ln rank<sub>2</sub> − ln rank<sub>1</sub>)), unranked = 300, with b fitted on earlier years. The match model blends Elo and the serve/return chain on the log-odds scale with weights fitted on earlier years. Within each scope every forecaster is scored on the matches it has a number for, so the market rows can cover slightly fewer matches.</div></div>';
     h += '<div class="grid-2"><div class="card"><div class="card-header">Reliability: match winner <span class="card-sub">Ten equal-width bins; marker size by matches.</span>' +
       k.toggle('cal-rel-set', [['core', 'Model, Elo, rank'], ['book', 'Model v books']], 'core') + '</div><div id="cal-rel" style="height:440px"></div></div>' +
-      '<div class="card"><div class="card-header">Log-loss by year <span class="card-sub">All scored matches each year; the market rows on the matches they priced.</span></div><div id="cal-years" style="height:440px"></div></div></div>';
+      '<div class="card"><div class="card-header">Log-loss by year <span class="card-sub">All scored matches each year; the market rows on the matches they cover.</span></div><div id="cal-years" style="height:440px"></div></div></div>';
     h += '<div class="card"><div class="card-header">Reliability bins <span class="card-sub">The numbers behind the diagrams, with ±2 binomial standard errors at the bin\'s mean forecast.</span>' +
       '<span class="pg-ctl"><select id="cal-bin-model">' + models.map(x => '<option value="' + k.esc(x) + '">' + k.esc(label(x)) + '</option>').join('') + '</select></span></div><div id="cal-bins"></div></div>';
     h += '<div class="card"><div class="card-header">Set scores <span class="card-sub" id="cal-sets-sub"></span>' + k.toggle('cal-bo', [['3', 'Best of 3'], ['5', 'Best of 5']], '3') + '</div><div class="grid-2"><div id="cal-sets" style="height:320px"></div><div id="cal-sets-t"></div></div></div>';
@@ -151,10 +152,15 @@ function render(el, params, state) {
     h += '<div class="card"><div class="card-header">Blend weights by year <span class="card-sub">Fitted on all earlier years and used for the next one: logit p = w<sub>Elo</sub> · logit p<sub>Elo</sub> + w<sub>SR</sub> · logit p<sub>SR</sub>. Also the ranking baseline\'s slope b.</span></div><div id="cal-blend" style="height:300px"></div></div>';
     if (d.validation || T === 'wta') h += '<div class="card"><div class="card-header">Inferred against real <span class="card-sub">Hold % and serve points won inferred from scores alone (the WTA stats switched off) against the WTA\'s real point-level numbers, per player.</span>' +
       k.toggle('cal-val', [['hold', 'Hold %'], ['spw', 'Serve points won %']], 'hold') + '</div><div class="grid-2"><div id="cal-val-chart" style="height:440px"></div><div id="cal-val-t"></div></div></div>';
-    h += '<div class="card"><div class="card-header">Notes <span class="card-sub">From the backtest itself.</span></div><div class="pad doc-body"><ul>' + (d.notes || []).map(n => '<li>' + k.esc(n) + '</li>').join('') +
+    h += '<div class="card"><div class="card-header">Notes <span class="card-sub">From the backtest itself.</span></div><div class="pad doc-body"><ul>' + (d.notes || []).map(n => '<li>' + k.esc(String(n).replace(/closing prices/g, 'closing lines').replace(/closing price/g, 'closing line')) + '</li>').join('') +
       '<li>Each match is oriented to a side picked by a hash of its id, so "player 1" is a coin toss and the base rate sits near 50%.</li><li>Details in the <a href="#/methodology/backtest">methodology</a>.</li></ul>' +
       '<p class="muted-inline">Backtest ' + k.esc(d.version || '') + ', generated ' + k.esc(d.generated_at || '') + '.</p></div></div>';
+    h += '<div id="cal-market"></div>';
     el.innerHTML = h;
+    if (TA.value && TA.value.market) TA.value.market(T, document.getElementById('cal-market')).then(() => {
+      const mk = document.getElementById('cal-market');
+      if (mk && ((params.query || {}).sec === 'market') && mk.scrollIntoView) mk.scrollIntoView();
+    });
 
     // Scores.
     const drawTable = scope => {

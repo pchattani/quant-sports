@@ -162,7 +162,7 @@ def reduce_cat(cat: dict | None, kind: str) -> dict | None:
     for pid, r in cat["players"].items():
         out[pid] = {"name": r.get("name"), "team": r.get("team"), "pos": r.get("pos"), "role": r.get("role"), "pa": r.get("pa"),
                     "bf": r.get("bf"), "values": {k: v for k, v in (r.get("values") or {}).items() if k in keys}}
-    return {"players": out}
+    return {"players": out, "team_games": cat.get("team_games")}
 
 
 def build_season(b: Build, level: str, season: int, full: bool, cfg: dict, shared: dict) -> dict:

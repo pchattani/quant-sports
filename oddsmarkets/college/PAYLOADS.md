@@ -99,8 +99,14 @@ phase: cfb `preseason|regular|conf_champ|bowls|playoff|offseason`; basketball `p
  "seasons": [{"season","team","gp", ...sport stats..., "value","value_pg","pctl"}],
  "current": {"season","team","log":[{"game","date","opp","home","res", ...stats...}], "value": VALUE_ROW,
              "fantasy": {...} | null} | null,
- "moves": [{"season","from","to","value_before","value_after"}], "similar": [{"id","name","season","distance"}]}
+ "moves": [{"season","from","to","value_before","value_after"}], "similar": [{"id","name","team","season","distance"}]}
 ```
+`similar` (23 Oct 2026, docs/METRICS_SPEC.md recipe, `oddsmarkets/common/similar.py`): for a player qualified in the
+current or last season (CFB `qualified_rate`, basketball `qualified`; his latest such season), the 5 nearest
+player-seasons of the same peer group (CFB position, basketball role G/W/B) over the group's features in
+`docs/_design/metrics/college.json`, z-scored within group and season, weighted by year-to-year r (floor 0.2);
+`distance` = weighted RMS z gap (0 = identical, about 1.4 = two random players), nearest first, never the player.
+Pool: CFB the last seven seasons loaded by the careers step, basketball the last ten. Empty below the minimum.
 Football seasons rows: `pos`, passing (cmp, att, yds, td, int), rushing (car, yds, td), receiving (rec, tgt, yds, td),
 defense (tkl, tfl, sacks, int, pd), `epa` (total), `epa_play`; basketball: `min, pts, reb, ast, stl, blk, tov, fg_pct,
 tp_pct, ft_pct, ts, usg, ortg` per game plus `value`.

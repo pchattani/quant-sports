@@ -162,7 +162,7 @@ V.similar = (T, pid, cat, k) => {
 /* ── layout ── */
 V.card = (title, sub, body, o) => {
   o = o || {};
-  return '<section class="qk-card' + (o.cls ? ' ' + o.cls : '') + '"' + (o.id ? ' id="' + esc(o.id) + '"' : '') + '><div class="qk-card-head"><div style="min-width:0"><div class="qk-card-title">' + esc(title) + '</div>' +
+  return '<section class="qk-card' + (o.cls ? ' ' + o.cls : '') + '"' + (o.id ? ' id="' + esc(o.id) + '"' : '') + '><div class="qk-card-head"><div style="min-width:0"><div class="qk-card-title">' + (o.html ? title : esc(title)) + '</div>' +
     (sub ? '<div class="qk-card-sub">' + sub + '</div>' : '') + '</div>' + (o.right || '') + '</div><div class="qk-card-body' + (o.flush ? ' flush' : '') + '">' + body + '</div>' +
     (o.foot ? '<div class="qk-card-foot">' + o.foot + '</div>' : '') + '</section>';
 };

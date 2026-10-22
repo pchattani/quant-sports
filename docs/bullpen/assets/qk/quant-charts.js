@@ -884,6 +884,8 @@ QKC.distribution = function (el, s) {
     var xa = axis(T, { type: 'value', min: bins[0].x0, max: bins[bins.length - 1].x1, fmt: f, split: false, line: true });
     var ya = axis(T, { fmt: function (x) { return fmt.num(x, 0); }, minInterval: 1 });
     ya.minInterval = 1;
+    /* keep the count axis at the left edge when the values run negative (ECharts puts it on x = 0 by default) */
+    ya.axisLine = Object.assign({}, ya.axisLine || {}, { onZero: false });
     var gB = 8 + nameAxis(xa, s.xName || 'Value', 'bottom');
     var gT = 14 + nameAxis(ya, s.yName || 'Players', 'side') + (ml.length ? 16 : 0);
     return {

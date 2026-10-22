@@ -476,6 +476,10 @@ function relabel(d) {
   const K2 = RELABEL_KIND[d.kind] || null;
   const fix = m => { const r = m && (RELABEL[m.key] || (K2 && K2[m.key])); if (r) { m.label = r[0]; if (m.desc !== undefined) m.desc = r[1]; } };
   if (Array.isArray(d.metrics)) d.metrics.forEach(fix);
+  else if (d.metrics && typeof d.metrics === 'object') Object.keys(d.metrics).forEach(kd => {   /* lab.json: {hitter: [...], pitcher: [...]} */
+    const K3 = RELABEL_KIND[kd] || null;
+    if (Array.isArray(d.metrics[kd])) d.metrics[kd].forEach(m => { const r = m && (RELABEL[m.key] || (K3 && K3[m.key])); if (r) { m.label = r[0]; if (m.desc !== undefined) m.desc = r[1]; } });
+  });
   if (Array.isArray(d.groups)) d.groups.forEach(g => (g && Array.isArray(g.entries) ? g.entries.forEach(fix) : null));
 }
 function load(p0) {

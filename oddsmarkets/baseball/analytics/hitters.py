@@ -25,6 +25,7 @@ from oddsmarkets.baseball.analytics import catalog as CT
 from oddsmarkets.baseball.analytics.context import SeasonContext, frame_rows
 
 M = an.metric
+OAA_K = an.OAA_K
 FLOORS = {"pa": 50, "bip": 25, "pitches": 150, "swings": 75, "bat_swings": 50, "oz": 60, "iz": 60, "pa_l": 30, "pa_r": 30,
           "chances": 20, "called": 500, "fb": 60, "br": 40, "os": 30, "v95": 40, "v90": 40, "vlo": 40, "heart": 40,
           "chase": 40, "shadow": 40, "waste": 30, "runs": 1, "games": 10}
@@ -230,10 +231,10 @@ METRICS: list[dict] = [
     M("cs", "CS", "Baserunning", "int", lower=True, scope="model",
       desc="Caught stealing: MLB's official line (Stats API); estimated from the pitch data only when no official line is on file."),
     # defence
-    M("oaa", "OAA", "Defence", "1", den="chances", k=60, scope="model",
+    M("oaa", "OAA", "Defence", "1", den="chances", k=OAA_K, scope="model",
       desc="Outs above average from our catch-probability model (landing spot, hang time, alignment-inferred start)."),
-    M("fielding_runs", "Fielding runs", "Defence", "1", den="chances", k=60, scope="model", desc="OAA converted to runs with the season's linear weights."),
-    M("sra", "Success rate added", "Defence", "pct", den="chances", k=60, scope="model", desc="OAA per chance."),
+    M("fielding_runs", "Fielding runs", "Defence", "1", den="chances", k=OAA_K, scope="model", desc="OAA converted to runs with the season's linear weights."),
+    M("sra", "Success rate added", "Defence", "pct", den="chances", k=OAA_K, scope="model", desc="OAA per chance."),
     M("oaa_back", "OAA going back", "Defence", "1", scope="model", desc="OAA on plays moving back."),
     M("oaa_in", "OAA coming in", "Defence", "1", scope="model", desc="OAA on plays moving in."),
     M("oaa_3b", "OAA toward 3B", "Defence", "1", scope="model", desc="OAA moving toward the third-base line."),

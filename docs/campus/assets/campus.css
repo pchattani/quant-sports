@@ -254,3 +254,8 @@ a.cc-bt:hover .nm { color: var(--accent); }
 .cc-split { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--s-3); margin: var(--sp-3) 0 var(--sp-2); }
 .cc-split > span { display: block; height: 100%; }
 .cc-empty-act { display: flex; justify-content: center; margin: calc(-1 * var(--sp-3)) 0 var(--sp-5); }
+.cc-cmp-pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); }
+.cc-cmp-slot { display: grid; gap: 6px; padding-left: 10px; border-left: 3px solid var(--ec); min-width: 0; }
+.cc-cmp-slot .qk-input { width: 100%; min-width: 0; }
+@media (max-width: 720px) { .cc-cmp-pick { grid-template-columns: 1fr; } }
+.qk-pcard-peer .qk-tag { white-space: normal; text-align: left; }

@@ -8,14 +8,101 @@
 var U = CC.ui, esc = CC.esc, isNum = CC.isNum;
 
 /* ── lab ─────────────────────────────────────────────────────────────── */
+/* ── compare (#/<L>/lab?kind=compare&p=<pid>,<pid>[,<pid>]) ────────────────────────────────────────────────
+ * Two or three players side by side on the spec's headline set for their peer group (METRICS_SPEC.md: football by
+ * position, basketball by role), percentiles against that group, the better value bold, the difference for two; then
+ * where each sits in the group's distribution. Players from different groups, or a group whose rates the payload does
+ * not carry yet, fall back to the catalogue's own metrics against all qualified players, and the page says so. */
+var CMP_COL = ['wpA', 'wpB', 'c3'];
+function labSeg(kind) {
+  return '<div class="qk-seg" id="lab-kind" role="group" aria-label="View">' + [['teams', 'Teams chart'], ['players', 'Players chart'], ['compare', 'Compare players']].map(function (x) {
+    return '<button type="button" data-value="' + x[0] + '" aria-pressed="' + (kind === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>';
+}
+function compare(el, p) {
+  var L = p.L, S = p.S, q = p.query || {};
+  var ids = String(q.p || '').split(',').filter(Boolean).slice(0, 3);
+  var head = function (sub) { return U.head('Compare', sub || 'Two or three players side by side on the metrics that best describe and predict their play, ranked against their own position group.', U.kicker(L, S)) + '<div class="cc-toolbar">' + labSeg('compare') + '</div>'; };
+  el.innerHTML = head() + QK.skeleton('lines', 6);
+  var wireSeg = function () { QK.seg(QK.$('#lab-kind', el), function (v) { CC.go(CC.href(L, 'lab', null, S, 'kind=' + v)); }); };
+  return Promise.all([CC.load(CC.path(L, S, 'players.json')), CC.season(L, S), CC.metrics()]).then(function (a) {
+    if (!U.alive(el)) return;
+    var cat = a[0];
+    if (!CC.ok(cat) || !Object.keys(cat.players || {}).length) { el.innerHTML = head() + U.missing('The player catalogue', cat); wireSeg(); return; }
+    var P = cat.players;
+    Object.keys(P).forEach(function (k) { var nm = String((P[k] || {}).name || '').trim(); if (!nm || /^team$/i.test(nm) || Number(k) < 0) delete P[k]; });
+    var meta = {}; (cat.metrics || []).forEach(function (m) { meta[m.key] = m; });
+    ids = ids.filter(function (id) { return P[id]; });
+    if (!ids.length) {
+      var top = Object.keys(P).filter(function (k) { return P[k].qualified !== false && isNum((P[k].values || {}).value); }).sort(function (x, y) { return P[y].values.value - P[x].values.value; });
+      var first = top[0], second = first ? top.filter(function (k) { return k !== first && P[k].pos === P[first].pos; })[0] : null;
+      ids = [first, second].filter(Boolean);
+    }
+    var opts = Object.keys(P).filter(function (k) { return P[k].qualified !== false; }).map(function (k) { return [k, P[k].name + ' (' + CC.tabbr(L, P[k].team) + ', ' + (P[k].pos || '') + ')']; }).sort(function (x, y) { return x[1].localeCompare(y[1]); });
+    var lab = function (id) { var o = opts.filter(function (x) { return x[0] === id; })[0]; return o ? o[1] : ''; };
+    var picker = '<div class="cc-cmp-pick">' + [0, 1, 2].map(function (i) { return '<label class="cc-cmp-slot" style="--ec:var(--' + ['wp-a', 'wp-b', 'c-3'][i] + ')"><span class="qk-kicker">' + (i === 2 ? 'Third player (optional)' : 'Player ' + (i + 1)) + '</span><input class="qk-input" list="cmp-names" data-i="' + i + '" value="' + esc(ids[i] ? lab(ids[i]) : '') + '" placeholder="Type a name" autocomplete="off"></label>'; }).join('') +
+      '<datalist id="cmp-names">' + opts.map(function (o) { return '<option value="' + esc(o[1]) + '"></option>'; }).join('') + '</datalist></div>';
+    var E = ids.map(function (id) { return { id: id, p: P[id] }; });
+    var html = head() + U.card('Players', 'Qualified players this season; pick two or three', picker);
+    if (E.length < 2) { el.innerHTML = html + QK.empty('Pick at least two players', 'Type a name in each box.'); wire(); wireSeg(); return; }
+    var G = CC.group(L, 'player', E[0].p);
+    var same = G && E.every(function (e) { return CC.group(L, 'player', e.p) === G; });
+    var hs = same ? G.m.filter(function (m) { return m.set === 'h' && E.some(function (e) { return isNum((e.p.values || {})[m.id]) && isNum((e.p[G.pct] || {})[m.id]); }); }) : [];
+    var useSpec = same && hs.length >= 2;
+    var samePos = E.every(function (e) { return e.p.pos === E[0].p.pos; });
+    var peer = useSpec ? G.d : samePos ? ((cat.positions || {})[E[0].p.pos] || {}).label || E[0].p.pos : 'all qualified players';
+    var pcKey = useSpec ? G.pct : samePos ? 'pct_pos' : 'pct';
+    var rowsOf = function (list) {
+      return list.map(function (m) {
+        var mt = meta[m.id || m.key] || { fmt: '2' }, key = m.id || m.key;
+        return { label: m.d || m.label, tip: (m.x || m.desc || '') + (m.style ? ' Describes how he plays, not how well.' : ''), better: (m.low || m.lower) ? 'low' : 'high',
+          values: E.map(function (e) { return (e.p.values || {})[key]; }), pctls: m.style ? E.map(function () { return null; }) : E.map(function (e) { return (e.p[pcKey] || {})[key]; }), fmt: function (v) { return CC.fmtMetric(mt, v); } };
+      });
+    };
+    var groups = useSpec ? [{ label: 'Headline: ' + G.d.toLowerCase(), rows: rowsOf(hs) }, { label: 'More', rows: rowsOf(G.m.filter(function (m) { return m.set === 's' && E.some(function (e) { return isNum((e.p.values || {})[m.id]); }); }).slice(0, 6)) }]
+      : [{ label: 'Season numbers', rows: rowsOf((cat.metrics || []).slice(0, 10)) }];
+    var ents = E.map(function (e) { return { name: e.p.name, href: CC.playerHref(L, e.id, S), colour: null, sub: [CC.tabbr(L, e.p.team), e.p.pos, isNum(e.p.gp) ? e.p.gp + ' GP' : ''].filter(Boolean).join(' · ') }; });
+    html += '<section class="qk-section" style="margin-top:var(--sp-4)">' + U.card('Side by side', 'Value · percentile against ' + esc(peer) + ' (100 = best) · ' + (E.length === 2 ? 'the difference, green when ' + esc(E[0].p.name) + ' is better' : 'the best of three in bold'),
+      QK.compareView({ entities: ents, groups: groups }) +
+      (!useSpec ? '<p class="cc-note">' + (same || samePos ? 'The spec’s headline rates for this group are not in this season’s payload yet, so the catalogue’s own numbers are shown.' : 'Different positions: percentiles are against all qualified players, so position effects stay in. Compare players of one position for the spec’s headline set.') + '</p>' : '')) + '</section>';
+    var dm = useSpec ? hs.filter(function (m) { return !m.style; }).slice(0, 4).map(function (m) { return [m.id, m.d, !!m.low]; }) : (cat.metrics || []).slice(0, 4).map(function (m) { return [m.key, m.label, !!m.lower]; });
+    html += '<section class="qk-section">' + U.card('Where they sit', 'Every qualified ' + esc(peer.toLowerCase()) + ' this season, with each player marked', '<div class="qk-seg" id="cmp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px">' +
+      dm.map(function (o, i) { return '<button type="button" aria-pressed="' + (i === 0) + '" data-value="' + esc(o[0]) + '">' + esc(o[1]) + '</button>'; }).join('') + '</div>' + U.chart('cmp-dist', 260, 'Peer distribution with the players marked')) + '</section>';
+    el.innerHTML = html;
+    wire(); wireSeg();
+    var peers = Object.keys(P).map(function (k) { return P[k]; }).filter(function (x) { return x.qualified !== false && (useSpec ? CC.group(L, 'player', x) === G : !samePos || x.pos === E[0].p.pos); });
+    var dd = function (key) {
+      var o = dm.filter(function (x) { return x[0] === key; })[0] || [key, key, false];
+      var vs = peers.map(function (x) { return (x.values || {})[key]; }).filter(isNum).sort(function (x, y) { return x - y; });
+      if (vs.length < 10) { QK.$('#cmp-dist', el).innerHTML = QK.empty('Too few qualified peers yet', 'The distribution appears with ten or more.'); return; }
+      var mt = meta[key] || { fmt: '2' };
+      QKC.distribution('#cmp-dist', { values: vs, binCount: 22, lowerBetter: o[2], colorBy: 'flat', fmt: function (v) { return CC.fmtMetric(mt, v); }, xName: o[1] + ' · ' + vs.length + ' qualified peers', yName: 'Players',
+        marks: E.map(function (e, i) { return { x: (e.p.values || {})[key], label: String(e.p.name || '').split(' ').slice(-1)[0], color: CMP_COL[i] }; }).filter(function (x) { return isNum(x.x); }), label: 'Distribution of ' + o[1] });
+    };
+    if (dm.length) { dd(dm[0][0]); QK.seg(QK.$('#cmp-dist-m', el), dd); }
+    function wire() {
+      QK.$$('.cc-cmp-pick input', el).forEach(function (inp) {
+        inp.addEventListener('change', function () {
+          var pick = [0, 1, 2].map(function (i) {
+            var v = ((QK.$('.cc-cmp-pick input[data-i="' + i + '"]', el) || {}).value || '').trim();
+            var hit = opts.filter(function (o) { return o[1] === v; })[0] || (v ? opts.filter(function (o) { return o[1].toLowerCase().indexOf(v.toLowerCase()) === 0; })[0] : null);
+            return hit ? hit[0] : null;
+          }).filter(Boolean);
+          if (pick.length) CC.go(CC.href(L, 'lab', null, S, 'kind=compare&p=' + pick.join(',')));
+        });
+      });
+    }
+  });
+}
+
 CC.route('lab', function (el, p) {
   var L = p.L, S = p.S, q = p.query || {};
+  if (q.kind === 'compare') return compare(el, p);
   var kind = q.kind === 'players' ? 'players' : 'teams';
   el.innerHTML = U.head('Lab', 'Pick any two numbers and see every ' + (kind === 'players' ? 'player' : 'team') + ' at once. Click a point to open its page.', U.kicker(L, S)) + QK.skeleton('chart', 1);
   return Promise.all([CC.load(CC.path(L, S, kind === 'players' ? 'lab_players.json' : 'lab_teams.json')), CC.season(L, S)]).then(function (a) {
     if (!U.alive(el)) return;
     var d = a[0];
-    var segHtml = '<div class="qk-seg" id="lab-kind" role="group" aria-label="Rows"><button type="button" data-value="teams" aria-pressed="' + (kind === 'teams') + '">Teams</button><button type="button" data-value="players" aria-pressed="' + (kind === 'players') + '">Players</button></div>';
+    var segHtml = labSeg(kind);
     if (!CC.ok(d) || !(d.rows || []).length) {
       el.innerHTML = U.head('Lab', '', U.kicker(L, S)) + '<div class="cc-toolbar">' + segHtml + '</div>' + (CC.ok(d) ? QK.empty('No rows yet', 'Nothing has been played this season. Try last season.') : U.missing('The lab data', d));
       QK.seg(QK.$('#lab-kind', el), function (v) { CC.go(CC.href(L, 'lab', null, S, 'kind=' + v)); });

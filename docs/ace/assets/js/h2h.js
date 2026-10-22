@@ -1,9 +1,11 @@
 /* The Quant Ace — head to head (#/<T>/h2h/<a>/<b>; #/<T>/h2h alone shows the pickers).
  *
- * History with a surface split, the model's matchup odds on every surface with the set-score
- * distribution, where the rivalry has run against the ratings, and the serve/return matchup.
+ * Design System 2.0: the record and a tale of the tape, our chance on every surface if they met today (the
+ * market-rating term included) with the set-score distribution, the two players' headline percentiles side by side on
+ * the surface of their last meeting (METRICS_SPEC.md), where the rivalry has run against our chances, and the
+ * serve/return matchup.
  *
- * The matchup odds are computed in the browser from the published ratings with the same recipe
+ * The matchup chances are computed in the browser from the published ratings with the same recipe
  * as models/predict.py: an Elo probability from the surface-blended ratings (elo.p_win), a
  * serve/return probability from the exact Markov chain fed with each player's chain-scale hold
  * against this opponent, the two blended on the log-odds scale with the fitted weights, and the
@@ -12,7 +14,7 @@
  * stretch, the blend weights and sigma, the serve/return model's surface, best-of-5 and k_hold terms,
  * the base serve-point rates) comes from data/<T>/model.json, which the build writes per tour from
  * the committed fits; nothing is hard-coded here. It uses each player's latest published hold and
- * break by surface, so it can differ by a point or two from the match-centre price, which uses the
+ * break by surface, so it can differ by a point or two from the match-centre forecast, which uses the
  * full fit.
  *
  * Data: data/<T>/players/<a>.json and <b>.json (results of the last two years, h2h tallies,
@@ -44,7 +46,7 @@ function modelConsts(mj) {
   SURFS.forEach(s => { surfOff[s] = term[s] - mean; });
   const ref = (b.ref || {}).all || {};
   const h0 = k.isNum(b.mu) ? k.sigmoid(b.mu + mean + num(ref.s, 0) - num(ref.r, 0) + num(b.k_hold, 0)) : null;
-  // The site's match price adds the market rating (model.json "market": its own weights for all four terms, and the
+  // The site's match forecast adds the market rating (model.json "market": its own weights for all four terms, and the
   // best-of-5 scale s5); used when both players carry a market rating in elo.json ("m": hard, clay, grass).
   const mk = mj.market || {}, mp = mk.params || {};
   const market = (k.isNum(mk.w_mr) && k.isNum(mk.w_elo) && k.isNum(mk.w_sr)) ?
@@ -154,9 +156,9 @@ K.tourHold = tourHold;
 function render(el, params, state) {
   const k = K(), T = k.T(params, state);
   const a = String(params.a || (params.rest || [])[0] || ''), b = String(params.b || (params.rest || [])[1] || '');
-  el.innerHTML = '<div class="card"><div class="card-header">Head to head · ' + k.TN(T) + ' <span class="card-sub">Pick two players; the address updates so a matchup can be shared.</span></div>' +
-    '<div class="controls af-pickrow"><span class="cmp-pill-a"></span><span id="h2-pa"></span><span class="muted-inline">v</span><span class="cmp-pill-b"></span><span id="h2-pb"></span>' +
-    '<button type="button" id="h2-swap" class="af-btn">⇄ swap</button>' + (a && b ? '<a class="af-btn" href="' + k.compareHref(T, a, b) + '">Compare profiles →</a>' : '') + '</div></div><div id="h2-body"></div>';
+  el.innerHTML = '<div class="ta-cmp-pick ta-h2h-pick"><div class="ta-cmp-slot" style="--ec:var(--wp-a)"><span class="qk-kicker">Player 1</span><span id="h2-pa"></span></div>' +
+    '<div class="ta-cmp-slot" style="--ec:var(--wp-b)"><span class="qk-kicker">Player 2</span><span id="h2-pb"></span></div>' +
+    '<div class="ta-h2h-acts"><button type="button" id="h2-swap" class="qk-btn">⇄ Swap</button>' + (a && b ? '<a class="qk-btn" href="' + k.compareHref(T, a, b) + '">Compare profiles</a>' : '') + '</div></div><div id="h2-body"></div>';
   return k.ready().then(() => k.loadNames(T)).then(() => {
     if (!k.alive(el)) return null;
     const go = (x, y) => { if (x && y && x !== y) location.hash = k.h2hHref(T, x, y); };
@@ -222,15 +224,21 @@ function build(T, a, b, res, body) {
       '<div class="cmp-id-facts">' + [['Elo', k.num(e.all, 0)], ['Hard', k.num(e.hard, 0)], ['Clay', k.num(e.clay, 0)], ['Grass', k.num(e.grass, 0)], ['Hold %', k.fmtV((p.values || {}).hold, 'pct')], ['Break %', k.fmtV((p.values || {}).brk, 'pct')]]
         .map(f => '<div class="cmp-fact"><span>' + f[0] + '</span><strong>' + f[1] + '</strong></div>').join('') + '</div></div></div>';
   };
-  let h = '<div class="af-h2h-top">' + card(a, cA, 0) +
-    '<div class="af-h2h-score"><div class="af-h2h-n"><span class="a">' + (tally.w || 0) + '</span><span class="dash">–</span><span class="b">' + (tally.l || 0) + '</span></div>' +
-    '<div class="cmp-wins"><span class="a" style="width:' + (n ? 100 * tally.w / n : 50) + '%"></span><span class="b" style="width:' + (n ? 100 * tally.l / n : 50) + '%"></span></div>' +
-    '<div class="cmp-score-sub">' + (n ? n + ' tour-level meeting' + (n === 1 ? '' : 's') + (tally.last ? ' · last ' + k.esc(k.fmtDate(tally.last, { weekday: false })) : '') : 'they have not met at tour level') + '</div></div>' +
-    card(b, cB, 1) + '</div>';
-  h += '<div class="card"><div class="card-header">Matchup odds <span class="card-sub">If they met today: the model\'s probability on each surface and the set scores it implies.</span>' +
+  void card;
+  const pa = P[a] || {}, pb = P[b] || {}, eA = ctx.elo[a] || {}, eB = ctx.elo[b] || {};
+  const L = { name: nA, abbr: sA }, R = { name: nB, abbr: sB };
+  const tape = [['Elo', eA.all, eB.all, v => k.num(v, 0)], ['Hard-court Elo', eA.hard, eB.hard, v => k.num(v, 0)], ['Clay Elo', eA.clay, eB.clay, v => k.num(v, 0)], ['Grass Elo', eA.grass, eB.grass, v => k.num(v, 0)],
+    ['Games won', (pa.values || {}).games_won_pct, (pb.values || {}).games_won_pct, v => k.fmtV(v, 'pct')], ['Hold (inferred)', (pa.values || {}).hold, (pb.values || {}).hold, v => k.fmtV(v, 'pct')],
+    ['Break (inferred)', (pa.values || {}).brk, (pb.values || {}).brk, v => k.fmtV(v, 'pct')]].map(r => ({ label: r[0], a: r[1], b: r[2], fmt: r[3], better: 'high' }));
+  const side = (pid, p, nm, cls) => '<div class="ta-h2h-side ' + cls + '"><a class="nm" href="' + k.playerHref(T, pid) + '">' + k.esc(nm) + '</a><span class="sb">' + [p.country || k.country(T, pid), k.isNum(p.rank) ? 'No. ' + p.rank : '', k.isNum(p.age) ? 'age ' + Math.floor(p.age) : ''].filter(Boolean).map(k.esc).join(' · ') + '</span></div>';
+  let h = '<section class="qk-card ta-h2h-hero"><div class="qk-card-body"><div class="ta-h2h-head">' + side(a, pa, nA, 'l') +
+    '<div class="ta-h2h-rec"><div class="n"><span>' + (tally.w || 0) + '</span><span class="dash">–</span><span>' + (tally.l || 0) + '</span></div><div class="s">' + (n ? n + ' tour-level meeting' + (n === 1 ? '' : 's') + (tally.last ? ' · last ' + k.esc(k.fmtDate(tally.last, { weekday: false })) : '') : 'no tour-level meeting yet') + '</div></div>' +
+    side(b, pb, nB, 'r') + '</div>' + QK.matchupBar({ left: L, right: R, rows: tape, colors: ['var(--wp-a)', 'var(--wp-b)'] }) + '</div></section>';
+  h += '<section class="qk-section" id="h2-pct-wrap"></section>';
+  h += '<div class="card"><div class="card-header">If they met today <span class="card-sub">Our chance on each surface and the set scores it implies.</span>' +
     k.toggle('h2-fmt', T === 'atp' ? [['3', 'Best of 3'], ['5', 'Best of 5 (Slam)']] : [['3', 'Tour event'], ['slam', 'Slam (deciding-set tiebreak to 10)']], '3') + '</div><div id="h2-odds"></div></div>';
   h += '<div class="grid-2"><div class="card"><div class="card-header">Serve against return <span class="card-sub">Each player\'s chance of holding against this opponent, against the tour average, from the inferred ratings.</span></div><div id="h2-sr"></div></div>' +
-    '<div class="card"><div class="card-header">Against the ratings <span class="card-sub">Did the rivalry go the way the pre-match prices said?</span></div><div id="h2-dev"></div></div></div>';
+    '<div class="card"><div class="card-header">Against the ratings <span class="card-sub">Did the rivalry go the way our pre-match chances said?</span></div><div id="h2-dev"></div></div></div>';
   h += '<div class="card"><div class="card-header">History <span class="card-sub" id="h2-hist-sub"></span><span class="pg-ctl"><button type="button" class="af-btn" id="h2-full">Load every year</button></span></div>' +
     '<div id="h2-surf"></div><div id="h2-hist"></div></div>';
   if (T === 'wta') h += '<div class="card"><div class="card-header">Real serve and return stats <span class="card-sub">This year\'s point-level figures from the WTA match stats.</span></div><div id="h2-real"></div></div>';
@@ -240,28 +248,28 @@ function build(T, a, b, res, body) {
   const drawOdds = fmt => {
     const host = document.getElementById('h2-odds');
     const bo = fmt === '5' ? 5 : 3, rule = fmt === '5' || fmt === 'slam' ? 'tb10' : 'tb7';
-    if (!M || !k.isNum(ctx.h0)) { host.innerHTML = k.muted('The model\'s constants (data/' + T + '/model.json) are not published yet, so this matchup cannot be priced.'); drawSR([]); return; }
+    if (!M || !k.isNum(ctx.h0)) { host.innerHTML = k.muted('The model\'s constants (data/' + T + '/model.json) are not published yet, so we cannot forecast this matchup.'); drawSR([]); return; }
     const ms = k.SURFACES.map(s => matchupModel(T, ctx, a, b, s, bo, rule));
-    if (!ms.some(m => k.isNum(m.p))) { host.innerHTML = k.muted('Not enough rating data to price this matchup.'); return; }
+    if (!ms.some(m => k.isNum(m.p))) { host.innerHTML = k.muted('Not enough rating data to forecast this matchup.'); return; }
     const keys = Object.keys((ms.find(m => m.dist) || {}).dist ? ms.find(m => m.dist).dist.sets : {}).sort((x, y) => {
       const px = x.split('-').map(Number), py = y.split('-').map(Number);
       return (py[0] - py[1]) - (px[0] - px[1]);
     });
     host.innerHTML = '<div class="af-odds">' + ms.map(m => '<div class="af-odds-col" style="--sc:' + k.surfColour(m.surface) + '"><div class="af-odds-h">' + k.SURF_LABEL[m.surface] + '</div>' +
-      (k.isNum(m.p) ? '<div class="af-odds-p"><span class="a">' + k.pct(m.p, 0) + '</span><span class="b">' + k.pct(1 - m.p, 0) + '</span></div><div class="cmp-wins"><span class="a" style="width:' + (100 * m.p).toFixed(1) + '%"></span><span class="b" style="width:' + (100 * (1 - m.p)).toFixed(1) + '%"></span></div>' +
+      (k.isNum(m.p) ? QK.wpBar(m.p, null, 1 - m.p, { name: nA, abbr: sA }, { name: nB, abbr: sB }, { size: 'lg', label: 'Our chance on ' + m.surface, colors: ['var(--wp-a)', 'var(--wp-b)'] }) +
         '<div class="af-odds-sub">Elo ' + k.pct(m.elo_p, 0) + ' · serve/return ' + k.pct(m.sr_p, 0) + (m.basis === 'market' ? ' · market rating ' + k.pct(m.mr_p, 0) : '') + '</div>' +
-        (m.dist ? '<div class="af-odds-sub">straight sets ' + k.pct(m.dist.straight, 0) + ' · ' + k.num(m.dist.games, 1) + ' games</div>' : '') : k.muted('No price.')) + '</div>').join('') + '</div>' +
+        (m.dist ? '<div class="af-odds-sub">straight sets ' + k.pct(m.dist.straight, 0) + ' · ' + k.num(m.dist.games, 1) + ' games</div>' : '') : k.muted('No forecast.')) + '</div>').join('') + '</div>' +
       '<div id="h2-sets" style="height:300px"></div>' +
       k.table([{ label: 'Set score (' + sA + ' first)' }].concat(ms.map(m => ({ label: k.SURF_LABEL[m.surface], align: 'right' }))),
         keys.map(s => [{ v: s, html: '<strong>' + k.esc(s) + '</strong> <span class="muted-inline">' + (Number(s.split('-')[0]) > Number(s.split('-')[1]) ? sA : sB) + '</span>' }].concat(ms.map(m => ({ v: m.dist ? m.dist.sets[s] : null, html: m.dist ? k.pct(m.dist.sets[s], 1) : '—' })))), { compact: true }) +
-      '<div class="pg-note">Computed in the browser with the model\'s recipe and the ' + k.TN(T) + '\'s fitted constants (data/' + T + '/model.json' + (M.as_of ? ', ' + k.esc(M.as_of) : '') + '): Elo on the surface-blended ratings (surface weight ' + k.num(M.w_surf, 3) + (bo === 5 ? ', best-of-5 stretch ' + k.num(M.bo5, 3) : '') + '), the serve/return chain fed with each player\'s hold against this opponent (chain scale' + (M.k_hold ? ', k<sub>hold</sub> ' + k.signed(M.k_hold, 3) : '') + (bo === 5 ? ', best-of-5 term ' + k.signed(M.hold_bo5, 3) : '') + '), ' +
+      '<div class="pg-note">Computed in the browser with our model\'s recipe and the ' + k.TN(T) + '\'s fitted constants (data/' + T + '/model.json' + (M.as_of ? ', ' + k.esc(M.as_of) : '') + '): Elo on the surface-blended ratings (surface weight ' + k.num(M.w_surf, 3) + (bo === 5 ? ', best-of-5 stretch ' + k.num(M.bo5, 3) : '') + '), the serve/return chain fed with each player\'s hold against this opponent (chain scale' + (M.k_hold ? ', k<sub>hold</sub> ' + k.signed(M.k_hold, 3) : '') + (bo === 5 ? ', best-of-5 term ' + k.signed(M.hold_bo5, 3) : '') + '), ' +
       (ms.some(m => m.basis === 'market') ?
-        'blended with the match centre’s weights (its schedule and form terms need a date and are left out), logit p = ' + k.num(M.market.w_elo, 3) + ' × logit(Elo) + ' + k.num(M.market.w_sr, 3) + ' × logit(serve/return) + ' + k.num(M.market.w_gelo, 3) + ' × the game-share Elo difference + ' + k.num(M.market.w_mr, 3) + ' × the market-rating difference (each player’s strength as earlier matches’ closing prices rated it' + (bo === 5 ? ', × ' + k.num(M.market.s5, 2) + ' for best of five' : '') + '; <a href="#/methodology/models">market rating</a>)' :
-        'blended as logit p = ' + k.num(M.blend.w_elo, 3) + ' × logit(Elo) + ' + k.num(M.blend.w_sr, 3) + ' × logit(serve/return)' + (M.blend.w_gelo ? ' + ' + k.num(M.blend.w_gelo, 3) + ' × the game-share Elo difference' : '') + (M.market ? ' (the fundamental weights: one of the two has no market rating yet)' : '')) + ', then the serve-point probabilities shifted so the chain reproduces that price; the set scores come from the chain averaged over a per-match edge with σ = ' + k.num(M.blend.sigma, 2) + ', the first server a coin toss. ' +
-      'It uses the latest published hold and break per surface, so it can differ by a point or two from a match-centre price. <a href="#/methodology/match-chain">How the chain works →</a></div>';
+        'blended with the match centre’s weights (its schedule and form terms need a date and are left out), logit p = ' + k.num(M.market.w_elo, 3) + ' × logit(Elo) + ' + k.num(M.market.w_sr, 3) + ' × logit(serve/return) + ' + k.num(M.market.w_gelo, 3) + ' × the game-share Elo difference + ' + k.num(M.market.w_mr, 3) + ' × the market-rating difference (each player’s strength as the closing market rated it in earlier matches' + (bo === 5 ? ', × ' + k.num(M.market.s5, 2) + ' for best of five' : '') + '; <a href="#/methodology/models">market rating</a>)' :
+        'blended as logit p = ' + k.num(M.blend.w_elo, 3) + ' × logit(Elo) + ' + k.num(M.blend.w_sr, 3) + ' × logit(serve/return)' + (M.blend.w_gelo ? ' + ' + k.num(M.blend.w_gelo, 3) + ' × the game-share Elo difference' : '') + (M.market ? ' (the fundamental weights: one of the two has no market rating yet)' : '')) + ', then the serve-point probabilities shifted so the chain reproduces that chance; the set scores come from the chain averaged over a per-match swing with σ = ' + k.num(M.blend.sigma, 2) + ', the first server a coin toss. ' +
+      'It uses the latest published hold and break per surface, so it can differ by a point or two from the match-centre forecast. <a href="#/methodology/match-chain">How the chain works →</a></div>';
     if (keys.length) {
       k.plot('h2-sets', ms.filter(m => m.dist).map(m => ({ type: 'bar', name: k.SURF_LABEL[m.surface], x: keys, y: keys.map(s => m.dist.sets[s]), marker: { color: k.surfColour(m.surface) }, hovertemplate: k.SURF_LABEL[m.surface] + ' %{x}: %{y:.1%}<extra></extra>' })),
-        k.layout(Object.assign(k.legendTop(), { barmode: 'group', margin: { l: 44, r: 10, t: 30, b: 40 }, xaxis: { type: 'category', title: 'Sets (' + sA + '–' + sB + ')' }, yaxis: { title: 'Probability', tickformat: '.0%' } })));
+        k.layout(Object.assign(k.legendTop(), { barmode: 'group', margin: { l: 44, r: 10, t: 30, b: 40 }, xaxis: { type: 'category', title: 'Sets (' + sA + '–' + sB + ')' }, yaxis: { title: 'Our chance', tickformat: '.0%' } })));
     }
     drawSR(ms);
   };
@@ -285,19 +293,18 @@ function build(T, a, b, res, body) {
   const drawDev = list => {
     const host = document.getElementById('h2-dev');
     const withP = list.filter(r => k.isNum(r.p_pre));
-    if (!withP.length) { host.innerHTML = k.muted(list.length ? 'No pre-match model prices for these meetings.' : 'No listed meetings to score.'); return; }
+    if (!withP.length) { host.innerHTML = k.muted(list.length ? 'No pre-match chances for these meetings.' : 'No listed meetings to score.'); return; }
     const w = withP.filter(r => r.won).length, ex = withP.reduce((s, r) => s + r.p_pre, 0), v = withP.reduce((s, r) => s + r.p_pre * (1 - r.p_pre), 0);
     const z = v > 0 ? (w - ex) / Math.sqrt(v) : 0;
     const bySurf = {};
     withP.forEach(r => { const s = r.surface || 'hard'; const o = bySurf[s] || (bySurf[s] = { w: 0, n: 0, ex: 0 }); o.n++; o.ex += r.p_pre; if (r.won) o.w++; });
-    const mk = withP.filter(r => k.isNum(r.market_pre));
-    host.innerHTML = '<div class="af-kv">' + [[sA + ' won', w + ' of ' + withP.length], ['Model expected', k.num(ex, 1)], ['Difference', '<span class="' + (w - ex > 0 ? 'pg-up' : w - ex < 0 ? 'pg-down' : '') + '">' + k.signed(w - ex, 1) + '</span>'], ['z-score', k.num(z, 1)]]
+    host.innerHTML = '<div class="af-kv">' + [[sA + ' won', w + ' of ' + withP.length], ['We expected', k.num(ex, 1)], ['Difference', '<span class="' + (w - ex > 0 ? 'pg-up' : w - ex < 0 ? 'pg-down' : '') + '">' + k.signed(w - ex, 1) + '</span>'], ['z-score', k.num(z, 1)]]
       .map(x => '<div class="af-kv-i"><span>' + k.esc(x[0]) + '</span><strong>' + x[1] + '</strong></div>').join('') + '</div>' +
       k.table([{ label: 'Surface' }, { label: 'Meetings', align: 'right' }, { label: sA + ' won', align: 'right' }, { label: 'Expected', align: 'right' }, { label: 'Over', align: 'right' }],
         Object.keys(bySurf).map(s => [{ v: s, html: k.surfChip(s) }, bySurf[s].n, bySurf[s].w, { v: bySurf[s].ex, html: k.num(bySurf[s].ex, 1) }, { v: bySurf[s].w - bySurf[s].ex, html: k.signed(bySurf[s].w - bySurf[s].ex, 1) }]), { compact: true }) +
-      '<div class="pg-note">Expected = the sum of the model\'s pre-match probabilities for ' + k.esc(sA) + ' in the meetings listed below. ' +
-      (Math.abs(z) >= 2 ? 'A gap of ' + k.num(Math.abs(z), 1) + ' standard deviations: the rivalry has run ' + (w > ex ? 'for ' + k.esc(sA) : 'for ' + k.esc(sB)) + ' beyond what the ratings explain, which can be a stylistic edge or chance.' : 'Within two standard deviations of what the ratings predicted, so nothing here a coin could not do.') +
-      (mk.length ? ' The closing market gave ' + k.esc(sA) + ' ' + k.num(mk.reduce((s, r) => s + r.market_pre, 0), 1) + ' expected wins in the ' + mk.length + ' meetings it priced.' : '') + '</div>';
+      '<div class="pg-note">Expected = the sum of our pre-match chances for ' + k.esc(sA) + ' in the meetings listed below. ' +
+      (Math.abs(z) >= 2 ? 'A gap of ' + k.num(Math.abs(z), 1) + ' standard deviations: the rivalry has run ' + (w > ex ? 'for ' + k.esc(sA) : 'for ' + k.esc(sB)) + ' beyond what the ratings explain, which can be a stylistic advantage or chance.' : 'Within two standard deviations of what the ratings predicted, so nothing here a coin could not do.') +
+      '</div>';
   };
 
   // History.
@@ -313,13 +320,28 @@ function build(T, a, b, res, body) {
         '<div class="cmp-wins"><span class="a" style="width:' + (100 * o.w / t) + '%"></span><span class="b" style="width:' + (100 * o.l / t) + '%"></span></div></div>';
     }).join('') + '</div>' : '';
     document.getElementById('h2-hist-sub').innerHTML = list.length ? list.length + ' meeting' + (list.length === 1 ? '' : 's') + ' listed' + (list.length < n ? ' of the ' + n + ' in the tally (' + (note || 'the career files list the last two years; load every year for the rest') + ')' : '') : '';
-    host.innerHTML = list.length ? k.table([{ label: 'Date' }, { label: 'Event' }, { label: 'Rd' }, { label: 'Winner' }, { label: 'Score' }, { label: sA + ' model', align: 'right', title: 'The model\'s pre-match probability for ' + sA }, { label: 'Market', align: 'right' }],
+    host.innerHTML = list.length ? k.table([{ label: 'Date' }, { label: 'Event' }, { label: 'Rd' }, { label: 'Winner' }, { label: 'Score' }, { label: 'Our chance (' + sA + ')', align: 'right', title: 'Our pre-match chance for ' + sA }],
       list.map(r => ({ _href: r.match ? k.matchHref(T, r.match) : undefined, cells: [{ v: r.date, html: k.esc(k.fmtDate(r.date, { weekday: false })) }, { v: k.eventName(T, r.event), html: k.surfChip(r.surface) + ' ' + k.eventLink(T, r.event) },
         { v: k.ROUND_ORDER.indexOf(r.round), html: k.esc(r.round || '') }, { v: r.won ? 1 : 0, html: '<span class="' + (r.won ? 'af-a' : 'af-b') + '">' + k.esc(r.won ? sA : sB) + '</span>' },
-        { v: r.score || '', html: '<span class="pg-mono">' + k.esc(r.score || '') + '</span>' }, { v: r.p_pre, html: k.pct(r.p_pre, 0) }, { v: r.market_pre, html: k.isNum(r.market_pre) ? k.pct(r.market_pre, 0) : '—' }] })), { compact: true })
+        { v: r.score || '', html: '<span class="pg-mono">' + k.esc(r.score || '') + '</span>' }, { v: r.p_pre, html: k.pct(r.p_pre, 0) }] })), { compact: true })
       : k.muted(n ? 'The meetings are older than the two years the career files list. Load every year to see them.' : 'No tour-level meeting on file.');
     k.sortable(host);
     drawDev(list);
+    drawPct(list);
+  };
+  const drawPct = lst => {
+    const V = TA.v2, wrap = document.getElementById('h2-pct-wrap');
+    if (!wrap || !V) return;
+    const last = (lst || [])[0];
+    let sf = last && V.SURF.indexOf(last.surface) >= 0 ? last.surface : '';
+    if (sf && !(V.inPool(P[a], sf, cat) && V.inPool(P[b], sf, cat))) sf = '';
+    const ps = [P[a] || null, P[b] || null];
+    const set = V.set(T, sf).concat(['hold_plus_break']);
+    const G = [['Strength', ['elo', 'elo_hard', 'elo_clay', 'elo_grass']], ['Results', ['games_won_pct', 'win_pct', 'win_v_top50']], ['Serve and return, inferred from scores', ['hold', 'brk', 'hold_plus_break']], ['Serve statistics (WTA)', ['dominance', 'ace_pct']]];
+    const groups = G.map(g => ({ label: g[0], rows: set.filter(x => g[1].indexOf(x) >= 0).map(x => ({ label: V.label(x, sf), tip: (V.META[x] || [])[1], better: 'high', values: ps.map(p => V.value(p, x, sf)),
+      pctls: ps.map(p => (V.inPool(p, sf, cat) ? V.pctl(p, x, sf, cat) : null)), fmt: v => V.fmt(x, v), dfmt: (V.META[x] || [])[2] === 'pct' ? (d => (d > 0 ? '+' : d < 0 ? '−' : '±') + Math.abs(d * 100).toFixed(1) + ' pts') : null })) }));
+    wrap.innerHTML = V.card('On the numbers', 'This season, value · percentile against ' + k.esc(V.peer(T, sf, cat)) + (sf && last ? ', the surface of their last meeting' : '') + ' (100 = best)',
+      QK.compareView({ entities: [{ name: nA, abbr: sA, href: k.playerHref(T, a) }, { name: nB, abbr: sB, href: k.playerHref(T, b) }], groups: groups }), { foot: '<span>Hold and break are inferred from set scores</span><a href="' + k.compareHref(T, a, b) + '">Compare profiles →</a>' });
   };
   drawHist();
   const full = document.getElementById('h2-full');

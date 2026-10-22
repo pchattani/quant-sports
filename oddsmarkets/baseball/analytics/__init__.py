@@ -35,6 +35,9 @@ from typing import Any, Iterable
 
 ROOT = Path(__file__).resolve().parents[3]
 LEVELS = ("mlb", "aaa")
+# OAA shrinkage k in chances (fielding percentiles): our year-to-year M50 is about 480 chances and the odd/even-game
+# M50 355 (outfield) to 501 (infield) (docs/METRICS_SPEC.md, baseball stabilisation); 60 was 6-8x too light
+OAA_K = 400.0
 LEVEL_NAMES = {"mlb": "MLB", "aaa": "Triple-A"}
 RETRO_NOTICE = ('The information used here was obtained free of charge from and is copyrighted by Retrosheet. '
                 'Interested parties may contact Retrosheet at "www.retrosheet.org".')

@@ -82,11 +82,12 @@ function renderTeam(el, params, state) {
   el.innerHTML = fx.muted('Loading…');
   return fx.ready().then(() => {
     const S = fx.S(params, state, L);
-    return fx.season(L, S).then(res => { if (fx.alive(el)) drawTeam(el, L, S, tid, res[0], res[1], res[2]); });
+    const embed = ((params.query || {}).embed) === 'detail';
+    return fx.season(L, S).then(res => { if (fx.alive(el)) drawTeam(el, L, S, tid, res[0], res[1], res[2], embed); });
   });
 }
 
-function drawTeam(el, L, S, tid, cat, teams, season) {
+function drawTeam(el, L, S, tid, cat, teams, season, embed) {
   const fx = FX(), C = fx.C;
   const T = (fx.ok(teams) && teams.teams) || {};
   const t = T[tid] || null;
@@ -135,8 +136,24 @@ function drawTeam(el, L, S, tid, cat, teams, season) {
   h += '<div class="card"><div class="card-header">Schedule and results <span class="card-sub">Every game: score, efficiency at both ends, and the net rating after it.</span></div><div id="tp-log"></div></div>';
   h += '<div class="grid-2"><div class="card"><div class="card-header">Seed distribution <span class="card-sub">Share of simulated seasons finishing in each seed.</span></div><div id="tp-seed" style="height:260px"></div></div>' +
     '<div class="card"><div class="card-header">Injuries <span class="card-sub">From the latest ESPN report; impact is the model\'s estimate of points per game.</span></div><div id="tp-inj"></div></div></div>';
+  // the spec's team comparison (METRICS_SPEC: adjusted ratings, then the four factors at both ends; pace is style)
+  const TS = (HW.ui.MSET && HW.ui.MSET.teams) || null;
+  if (TS && t) {
+    const games = (fx.has(s.w) ? s.w + s.l : 0) || r.games || 0;
+    const mm = {}; metrics.forEach(m => { mm[m.key] = m; });
+    const rowT = k => { const m = HW.ui.mMeta(k), pc = ((t.pct || {})[k]); return fx.isNum(pc) && !m.style ? { label: m.label, pctl: pc, value: String(fx.fmt(mm[k] || { fmt: m.fmt }, vals[k])).replace(/<[^>]*>/g, ''), tip: m.desc, early: games < TS.min_games } : null; };
+    const styleT = TS.headline.concat(TS.more).filter(k => HW.ui.mMeta(k).style && fx.isNum(vals[k]));
+    h += QK.pctCard({ title: 'How they compare', peer: 'every ' + L.toUpperCase() + ' team', sample: games + ' games · percentiles from ' + TS.min_games + ' games',
+      groups: [{ label: 'Headline', rows: TS.headline.map(rowT).filter(Boolean) }, { label: 'More', rows: TS.more.map(rowT).filter(Boolean) }],
+      note: styleT.length ? 'Style, not better or worse: ' + styleT.map(k => HW.ui.mMeta(k).label + ' ' + String(fx.fmt(mm[k] || {}, vals[k])).replace(/<[^>]*>/g, '')).join(' · ') + '.' : '', cls: 'hw-tpc' });
+  }
   h += '<div class="card"><div class="card-header">Percentiles <span class="card-sub">The whole team catalogue, ' + metrics.length + ' metrics, against the league this season.</span></div><div id="tp-pct"></div></div>';
   el.innerHTML = h;
+  if (embed) {
+    // inside the team page's detail tab: the overview already has the header, tiles, needs, rating path, chances, roster and seeds
+    el.querySelectorAll('.pg-head, .kpi-grid').forEach(n => { n.hidden = true; });
+    ['tp-needs', 'tp-path', 'tp-odds', 'tp-roster', 'tp-seed'].forEach(id => { const n = document.getElementById(id); const c = n && n.closest('.card'); if (c) c.hidden = true; });
+  }
   if (Number(S) === Number(curS)) HW.load(fx.path(L, S, 'needs/' + tid + '.json')).then(nd => { if (fx.alive(el)) drawNeeds(L, S, tid, nd); });
   if (Number(S) === Number(curS) && HW.movesLedger) HW.movesLedger(document.getElementById('tp-ledger'), L, S, tid);
 

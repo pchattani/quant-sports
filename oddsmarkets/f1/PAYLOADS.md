@@ -37,6 +37,8 @@ rather than omitted.
  "progression": {"drivers": {driverId: [cumulative points after each done round]}, "constructors": {teamId: [...]}},
  "championship": {"drivers": {driverId: {"p_title","exp_points","p05","p95","pos_dist":[...],"magic","clinched","eliminated"}},
                   "constructors": {teamId: {...same}}, "conditional": {...}, "n_sims"} | null for a finished season,
+ "title_history": [{"after_round","rounds_done","as_of","n_sims","final"?,                 # 22 Oct 2026: one per completed round
+                    "drivers": {driverId: {"p_title","exp_points","p05","p25","p50","p75","p95","points"}}, "constructors": {...same}}],
  "car_pace": {"race": {teamId: [{"round","effect","se"}]}, "quali": {teamId: [...]}},          # % of lap vs field, negative = faster
  "driver_effects": {"race": {driverId: {"effect","se","races"}}, "quali": {...}},
  "car_driver_split": {teamId: {"points","car","drivers": {driverId: pts}}},
@@ -49,6 +51,15 @@ rather than omitted.
  "drivers": {driverId: {"name","team","races","values": {key: v}, "pct": {key: 0-100 field percentile, 100 = best}, "pct_teammate": {key: ...},
                         "log": [{"round","name","grid","pos","status","points","quali_pos","pace","pace_rank","pos_gained","lap1_gain","overtakes","pit_stops","deg"}]}}}
 ```
+Added 22 Oct 2026 (docs/METRICS_SPEC.md, Formula 1): top level `"peer_floor"` (starts to join the peer group: 8 in a finished
+season of 16+ rounds, else max(3, min(8, ceil(0.35 x rounds completed)))), `"peer_rule"`, `"peer_count"`; drivers add
+`"qualified"` (races >= peer_floor) and `"pct_peer"` (the `pct` formula among the qualifying drivers only; empty below the
+floor, so one-race stand-ins neither get nor dilute a percentile). From 1996, `"similar": [{"driver","year","name","team","d"}]`
+on qualifying drivers (the 5 nearest driver-seasons, own seasons excluded, by the spec's weighted recipe on the eight headline
+metrics; `d` in season standard deviations) and top-level `"similar_method"` (the build's post-pass `drivers.add_similar`).
+`season.json` `"title_history"`: the championship simulation's snapshot per completed round (the first build after a
+round records it; a later one replaces it only with more simulations); points quantiles give the band. Recording started
+22 Oct 2026 (after round 17 of 2026): earlier rounds were never stored, and no look-ahead-free backfill exists.
 `teams.json` — `{"metrics": [...], "teams": {teamId: {"name","colour","values","pct","pit": {"median_ms","best_ms","p_under_2500","stops"}, "log": [{"round","points","car_pace","quali_pace","dnfs"}]}}}`
 `races/<round>.json` — the race centre
 ```

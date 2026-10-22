@@ -91,6 +91,12 @@ def test_build_writes_every_payload(root):
     pc = _load(careers[0])
     assert {"id", "name", "pos", "pool", "dob", "seasons", "current", "similar", "career_awards"} <= set(pc)
     assert len(pc["seasons"]) == 2 and pc["current"]["season"] == 2031
+    # role peers (METRICS_SPEC): similar_role per qualified season, the role card for the latest season
+    sims = [x for f in careers for x in _load(f).get("similar_role") or []]
+    assert sims and {x["season"] for x in sims} <= {2030, 2031}
+    assert all(set(x) == {"season", "id", "name", "team", "distance"} for x in sims)
+    rc = pc["role_card"]
+    assert rc["season"] == 2031 and rc["role"] in ("G", "W", "B") and rc["n"] > 0 and isinstance(rc["pct_role"], dict)
     cal = _load(d / "calibration.json")
     assert cal["ok"] is False and "reason" in cal                                  # no cached backtest here
     mk = _load(d / "markets.json")

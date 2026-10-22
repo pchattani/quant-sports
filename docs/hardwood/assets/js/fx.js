@@ -235,23 +235,26 @@ FX.pctPanel = (metrics, vals, pctSrc, opts) => {
   const o = opts || {};
   const groups = FX.groups(metrics);
   if (!groups.length) return FX.muted('No metrics in the catalogue yet.');
-  return '<div class="pg-pct-cols">' + groups.map(g => '<div class="pct-group"><div class="pct-group-head">' + esc(g.name) + '</div>' +
-    g.items.map(m => FX.pctRow(m.label + (m.lower ? ' ↓' : ''), (pctSrc || {})[m.key], FX.fmt(m, (vals || {})[m.key]),
-      (m.desc || '') + (m.lower ? ' (lower is better; the percentile already accounts for it)' : '') + (m.scope === 'pbp' ? ' · play-by-play' : ''))).join('') + '</div>').join('') + '</div>' +
-    (o.note ? '<div class="pg-note">' + o.note + '</div>' : '');
+  return '<div class="pg-pct-cols hw-pcols">' + groups.map(g => {
+    const style = /shot diet|style/i.test(g.name);
+    if (style) return '<div class="qk-pgrp"><div class="qk-pgrp-h">' + esc(g.name) + ' <span class="qk-muted">(style: values, not ranked)</span></div><ul class="hw-style">' + g.items.filter(m => isNum((vals || {})[m.key])).map(m => '<li><span>' + esc(m.label) + '</span><b>' + String(FX.fmt(m, vals[m.key])).replace(/<[^>]*>/g, '') + '</b></li>').join('') + '</ul></div>';
+    const rows = g.items.map(m => ({ label: m.label, pctl: (pctSrc || {})[m.key], value: String(FX.fmt(m, (vals || {})[m.key])).replace(/<[^>]*>/g, ''),
+      tip: (m.desc || '') + (m.lower ? ' (lower is better; the percentile already accounts for it)' : '') + (m.scope === 'pbp' ? ' · play-by-play' : '') })).filter(r => isNum(r.pctl));
+    return rows.length ? '<div class="qk-pgrp"><div class="qk-pgrp-h">' + esc(g.name) + '</div>' + QK.pctlBars(rows) + '</div>' : '';
+  }).join('') + '</div>' + (o.note ? '<div class="pg-note">' + o.note + '</div>' : '');
 };
 FX.tile = (label, value, sub, cls) => (HW.statTile ? HW.statTile(label, value, sub, cls) :
   '<div class="kpi' + (cls ? ' ' + cls : '') + '"><div class="kpi-label">' + esc(label) + '</div><div class="kpi-value">' + (value === undefined || value === null ? '—' : value) + '</div>' + (sub ? '<div class="kpi-sub">' + sub + '</div>' : '') + '</div>');
-FX.toggle = (id, opts, cur) => '<span class="pg-toggle" id="' + esc(id) + '">' + opts.map(o => '<button type="button" data-v="' + esc(o[0]) + '"' + (String(o[0]) === String(cur) ? ' class="on"' : '') + '>' + esc(o[1]) + '</button>').join('') + '</span>';
+FX.toggle = (id, opts, cur) => '<span class="pg-toggle qk-seg" id="' + esc(id) + '">' + opts.map(o => '<button type="button" data-v="' + esc(o[0]) + '" aria-pressed="' + (String(o[0]) === String(cur)) + '"' + (String(o[0]) === String(cur) ? ' class="on"' : '') + '>' + esc(o[1]) + '</button>').join('') + '</span>';
 FX.wireToggle = (root, id, fn) => {
   const t = (root || document).querySelector('#' + id);
   if (!t) return;
   t.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
-    t.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    t.querySelectorAll('button').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
     fn(b.dataset.v);
   }));
 };
-FX.card = (title, sub, body, id, ctl) => '<div class="card"' + (id ? ' id="' + esc(id) + '"' : '') + '>' + (title ? '<div class="card-header">' + esc(title) + (sub ? ' <span class="card-sub">' + sub + '</span>' : '') + (ctl || '') + '</div>' : '') + (body || '') + '</div>';
+FX.card = (title, sub, body, id, ctl) => '<section class="qk-card hw-lcard"' + (id ? ' id="' + esc(id) + '"' : '') + '>' + (title ? '<div class="qk-card-head"><div style="min-width:0"><div class="qk-card-title">' + esc(title) + '</div>' + (sub ? '<div class="qk-card-sub">' + sub + '</div>' : '') + '</div>' + (ctl ? '<div class="hw-lctl">' + ctl + '</div>' : '') + '</div>' : '') + '<div class="qk-card-body flush">' + (body || '') + '</div></section>';
 FX.table = (cols, rows, opts) => HW.tableHTML(cols, rows, opts);
 FX.pairColours = (ca, cb) => (!ca || !cb || String(ca).toLowerCase() !== String(cb).toLowerCase() ? [ca || FX.CA, cb || FX.CB] : [ca, '#e6edf3']);
 
@@ -334,7 +337,7 @@ FX.zoneMap = (el, L, zones, opts) => {
         QKC.tipRow(col(d), 'Points per shot', FX.num(z.pps, 2) + (isNum(z.league_pps) ? ' (league ' + FX.num(z.league_pps, 2) + ')' : '')); } }),
     series: [{ type: 'custom', data: shapes.map(x => ({ value: x.poly[0], k: x.k })), encode: { x: 0, y: 1 }, z: 1,
       renderItem: (params, api) => { const x = shapes[params.dataIndex]; const d = diffOf(x.k);
-        return { type: 'polygon', shape: { points: x.poly.map(q => api.coord(q)) }, style: { fill: isNum(d) ? QKC.hexA(col(d), 0.55) : QKC.hexA(T.ink3, 0.18), stroke: T.s1, lineWidth: 1.5 } }; } },
+        return { type: 'polygon', shape: { points: x.poly.map(q => api.coord(q)) }, style: { fill: isNum(d) ? QKC.hexA(col(d), 0.38) : QKC.hexA(T.ink3, 0.14), stroke: T.s1, lineWidth: 1.5 } }; } },
     { type: 'scatter', z: 3, symbolSize: 1, itemStyle: { color: 'transparent' }, data: labs.map(x => { const z = Z[x.k] || {}, d = diffOf(x.k);
       return { value: x.at, k: x.k, label: { show: true, color: T.ink1, fontFamily: T.fontNum, fontSize: o.small ? 9.5 : 10.5, lineHeight: o.small ? 12 : 13, textBorderColor: T.s1, textBorderWidth: 2,
         formatter: '{b|' + FX.fmtV(z.freq, 'pct') + '}' + (isNum(z.fg) ? '\n' + FX.fmtV(z.fg, 'pct') + ' FG' : '') + (d !== null ? '\n' + FX.signed(d, 2) + ' pps' : ''), rich: { b: { fontWeight: 700, color: T.ink1, fontFamily: T.fontNum } } } }; }) }]

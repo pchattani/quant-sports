@@ -76,8 +76,8 @@ function standingsTable(L, rows, sim, fmt, opts) {
     ];
     if (live) {
       cells.push({ v: s.exp_w, html: HW.isNum(s.exp_w) ? '<span title="' + esc(HW.num(s.w_p05, 0) + '–' + HW.num(s.w_p95, 0) + ' (90% range)') + '">' + HW.num(s.exp_w, 1) + '</span>' : '—' });
-      if (hasTop6) cells.push({ v: s.p_top6, html: HW.probCell(s.p_top6, HW.C.wood) });
-      cells.push({ v: s.p_playoffs, html: HW.probCell(s.p_playoffs, HW.C.green) });
+      if (hasTop6) cells.push({ v: s.p_top6, html: HW.probCell(s.p_top6) });
+      cells.push({ v: s.p_playoffs, html: HW.probCell(s.p_playoffs) });
       if (hasPin) cells.push({ v: s.p_playin, html: HW.isNum(s.p_playin) ? HW.pct(s.p_playin, 0) : '—' });
       if (!o.league) cells.push({ v: s.p_conf, html: HW.isNum(s.p_conf) ? HW.pct(s.p_conf, 1) : '—' });
       cells.push({ v: s.p_title, html: HW.isNum(s.p_title) ? '<b>' + HW.pct(s.p_title, 1) + '</b>' : '—' });

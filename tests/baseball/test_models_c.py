@@ -336,3 +336,22 @@ def test_xwoba_classes_follow_woba_value():
     b = xwoba.batted_balls(p)
     assert b["cls"].tolist() == [1, 1, 0, 1]
     assert xwoba.class_weights(b)[1] == pytest.approx(0.88)       # default kept below five examples
+
+
+def test_stabilise_game_parity_split_ignores_shared_game_effects():
+    """A shock shared by the events of one game (pitcher, park, umpire) lands in both halves of an event-parity
+    split and inflates r_n (k too small); the game-parity split (stab-4) keeps it out and recovers the talent k."""
+    rng = np.random.default_rng(1)
+    n_players, n_games, per_game = 300, 120, 4
+    talent = rng.normal(0.25, 0.03, n_players)
+    shock = rng.normal(0.0, 0.08, (n_players, n_games))                 # one game's shared effect
+    p = np.clip(talent[:, None, None] + shock[:, :, None], 0.01, 0.99)
+    ev_ = rng.random((n_players, n_games, per_game)) < p
+    ev = pd.DataFrame({"batter": np.repeat(np.arange(n_players).astype(str), n_games * per_game),
+                       "g": np.tile(np.repeat(np.arange(n_games), per_game), n_players),
+                       "t": np.tile(np.arange(n_games * per_game), n_players), "k_rate": ev_.ravel().astype(float)})
+    k_game = stabilise.fit_k(stabilise.split_half_curve(ev, "batter", "k_rate"))
+    k_event = stabilise.fit_k(stabilise.split_half_curve(ev, "batter", "k_rate", by="event"))
+    k_true = 0.25 * 0.75 / 0.03 ** 2
+    assert k_event < 0.8 * k_game                                       # the event split understates k
+    assert k_game > 0.8 * k_true

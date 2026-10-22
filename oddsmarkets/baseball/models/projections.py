@@ -139,7 +139,10 @@ def stab(role: str, level: str = "mlb") -> dict:
     mod = _dio.sibling("stabilise")
     if mod is not None:
         try:
-            fitted = mod._fitted(level) or {}
+            try:
+                fitted = mod._fitted(level, "event") or {}      # the validated stab-3 constants
+            except TypeError:
+                fitted = mod._fitted(level) or {}
         except Exception:  # noqa: BLE001
             fitted = {}
         for comp, metric in STAB_C[role].items():

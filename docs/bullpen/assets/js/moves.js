@@ -1,6 +1,7 @@
 /* The Quant Bullpen — transactions and trade ratings (#/mlb/moves) and the team pages' "Moves" card
  * (BP.movesTeam(host, L, S, tid), called by teams.js for MLB clubs).
  *
+ * Design System 2.0: stat tiles, v2 tabs and leaderboards; a "Who leaves next" tab from mlb/movement.json (bp-moves.js).
  * Tabs: Trades (every trade of the last twelve months rated for each club: value at the time, realised since, grades,
  * the winner), Clubs (net value over the window, trades won and lost, the counts of every kind of move), Feed (every
  * move: trades, signings, call-ups, options, injured-list moves, releases ...; filters for club, kind and name), Injured
@@ -33,68 +34,80 @@ function hashOf() {
   if (M.kind) q.push('kind=' + encodeURIComponent(M.kind));
   return '#/mlb/moves?' + q.join('&');
 }
+let AFTER = [];
+function board(id, spec) { AFTER.push(() => { const n = document.getElementById(id); if (n) QK.leaderboard(n, spec); }); return '<div id="' + esc(id) + '"></div>'; }
+const card = (t, s, b, o) => BP.ui.card2(t, s, b, o);
+const ENT = (label, key) => ({ key: key || 'name', label: label || 'Player', type: 'entity', sub: 'sub', mark: o => (o.team ? BP.ui.team(o.team, 'mlb') : null), href: o => (o.pid ? BP.playerHref(o.pid, { level: 'mlb' }) : null) });
+const nameOf = (pid, n) => { const x = BP.player(pid) || {}; return x.name || n || BP.playerName(pid); };
 
 function movesPage(el, params) {
+  const U = BP.ui;
   const qy = params.query || {};
   M.tab = qy.tab || M.tab || 'trades';
   M.team = qy.team !== undefined ? qy.team : M.team;
   M.kind = qy.kind !== undefined ? qy.kind : M.kind;
-  el.innerHTML = BP.muted('Loading…');
+  el.innerHTML = QK.skeleton('card', 2);
   if (params.level && params.level !== 'mlb') {
-    el.innerHTML = BP.pageHead('Moves', 'Transactions and trade ratings') + BP.muted('Transactions and trade ratings cover MLB clubs (Triple-A moves appear as call-ups and options of their parent clubs). <a href="#/mlb/moves">MLB moves →</a>');
+    el.innerHTML = QK.sectionHead({ kicker: 'Moves', title: 'Transactions and trades', sub: 'Transactions and trade ratings cover MLB clubs (Triple-A moves appear as call-ups and options of their parent clubs).', actions: '<a class="qk-btn primary" href="#/mlb/moves">MLB moves</a>' });
     return null;
   }
-  return Promise.all([BP.load('mlb/moves.json'), BP.load('mlb/trades.json')]).then(res => {
+  return Promise.all([BP.load('mlb/moves.json'), BP.load('mlb/trades.json'), BP.moves ? BP.moves.load() : Promise.resolve(null)]).then(res => {
     if (!el.isConnected) return;
-    const mv = BP.ok(res[0]) ? res[0] : null, tr = BP.ok(res[1]) ? res[1] : null;
+    const mv = BP.ok(res[0]) ? res[0] : null, tr = BP.ok(res[1]) ? res[1] : null, mn = res[2];
     learnTeams(mv); learnTeams(tr);
     const win = (tr && tr.window) || (mv && mv.window) || [];
-    const head = BP.pageHead('Moves', 'MLB transactions and trade ratings · ' + (win.length ? esc(BP.fmtDate(win[0])) + ' to ' + esc(BP.fmtDate(win[1])) : 'the last twelve months'),
-      '<a href="' + BP.href('value', 'mlb') + '">Player value →</a>');
-    if (!mv && !tr) { el.innerHTML = head + BP.notBuilt('The transactions files', res[0]); return; }
+    const head = QK.sectionHead({ kicker: 'Moves · MLB', title: 'Transactions and trades', sub: 'Every trade of the last twelve months rated for both clubs, every move in a feed, who is on the injured list' + (mn ? ', and who is likely to leave next' : '') + '. Window: ' + (win.length ? BP.fmtDate(win[0]) + ' to ' + BP.fmtDate(win[1]) : 'the last twelve months') + '.',
+      actions: '<a class="qk-btn" href="' + BP.href('value', 'mlb') + '">Player value</a>' });
+    if (!mv && !tr) { el.innerHTML = head + QK.empty('Not built yet', 'The transactions files are not available.'); return; }
     const teams = Object.keys((tr && tr.teams) || (mv && mv.teams) || {}).sort((a, b) => BP.teamName(a).localeCompare(BP.teamName(b)));
-    const tabs = [{ key: 'trades', label: 'Trades' }, { key: 'clubs', label: 'Clubs' }, { key: 'feed', label: 'Feed' }, { key: 'il', label: 'Injured list' }, { key: 'method', label: 'Method' }];
-    el.innerHTML = head + '<div class="card"><div class="val-controls"><span class="tgl" id="mv-tab">' + BP.toggles(tabs, M.tab) + '</span>' +
-      '<label>Club <select id="mv-team"><option value="">All</option>' + teams.map(t => '<option value="' + esc(t) + '"' + (t === M.team ? ' selected' : '') + '>' + esc(BP.teamName(t)) + '</option>').join('') + '</select></label>' +
-      '<label id="mv-kind-w">Kind <select id="mv-kind"><option value="">All</option>' + Object.keys((mv && mv.kinds) || {}).map(k => '<option value="' + esc(k) + '"' + (k === M.kind ? ' selected' : '') + '>' + esc(mv.kinds[k]) + '</option>').join('') + '</select></label>' +
-      '<label id="mv-q-w">Find <input id="mv-q" type="search" placeholder="player…" value="' + esc(M.q) + '"></label></div></div><div id="mv-body"></div>';
+    const T = (tr && tr.table) || {};
+    const tw = Object.keys(T).sort((a, b) => (T[b].net || 0) - (T[a].net || 0));
+    const big = tr ? (tr.trades || []).slice().sort((a, b) => Math.max.apply(null, b.teams.map(c => Math.abs((b.clubs[c] || {}).net || 0))) - Math.max.apply(null, a.teams.map(c => Math.abs((a.clubs[c] || {}).net || 0))))[0] : null;
+    const tiles = QK.stats([
+      tr ? { label: 'Trades rated', value: BP.int((tr.trades || []).length), sub: 'the last twelve months' } : null,
+      tw.length ? { label: 'Best trader', value: BP.teamAbbr(tw[0]) + ' ' + s2(T[tw[0]].net), signal: true, sub: 'expected WAR in minus out, at the time', href: BP.teamHref(tw[0], 'mlb') } : null,
+      tw.length ? { label: 'Gave the most away', value: BP.teamAbbr(tw[tw.length - 1]) + ' ' + s2(T[tw[tw.length - 1]].net), sub: 'expected WAR in minus out', href: BP.teamHref(tw[tw.length - 1], 'mlb') } : null,
+      mv ? { label: 'On the injured list', value: BP.int((mv.il_now || []).length), sub: 'players right now' } : null,
+      big && big.winner ? { label: 'Most lopsided trade', value: BP.teamAbbr(big.winner) + ' ' + s2((big.clubs[big.winner] || {}).net), sub: BP.fmtDate(big.date) } : null
+    ]);
+    const tabs = [['trades', 'Trades'], ['clubs', 'Clubs']].concat(mn ? [['next', 'Who leaves next']] : []).concat([['feed', 'Feed'], ['il', 'Injured list'], ['method', 'Method']]);
+    el.innerHTML = head + '<div class="bp-kpis">' + tiles + '</div>' +
+      '<nav class="qk-tabs bp-tabs2" id="mv-tab" aria-label="Moves views">' + tabs.map(t => '<a class="qk-tab" href="javascript:void(0)" data-k="' + t[0] + '" aria-selected="' + (t[0] === M.tab) + '">' + esc(t[1]) + '</a>').join('') + '</nav>' +
+      '<section class="qk-card"><div class="qk-card-body"><div class="bp-ctl"><label>Club<select id="mv-team"><option value="">All</option>' + teams.map(t => '<option value="' + esc(t) + '"' + (t === M.team ? ' selected' : '') + '>' + esc(BP.teamName(t)) + '</option>').join('') + '</select></label>' +
+      '<label id="mv-kind-w">Kind<select id="mv-kind"><option value="">All</option>' + Object.keys((mv && mv.kinds) || {}).map(k => '<option value="' + esc(k) + '"' + (k === M.kind ? ' selected' : '') + '>' + esc(mv.kinds[k]) + '</option>').join('') + '</select></label>' +
+      '<label id="mv-q-w">Find<input id="mv-q" type="search" placeholder="player…" value="' + esc(M.q) + '"></label><span id="mv-sort-w"></span></div></div></section><div id="mv-body" style="margin-top:var(--sp-4)"></div>';
     const $ = id => document.getElementById(id);
     const draw = () => {
       $('mv-kind-w').style.display = M.tab === 'feed' ? '' : 'none';
-      $('mv-q-w').style.display = (M.tab === 'feed' || M.tab === 'trades') ? '' : 'none';
+      $('mv-q-w').style.display = (M.tab === 'feed' || M.tab === 'trades' || M.tab === 'next') ? '' : 'none';
+      $('mv-sort-w').innerHTML = M.tab === 'trades' ? U.seg('mv-sort', 'Order', [['big', 'Biggest first'], ['new', 'Newest first']], M.sort) : '';
+      if ($('mv-sort')) QK.seg($('mv-sort'), k => { M.sort = k; draw(); });
       const body = $('mv-body');
-      if (M.tab === 'trades') {
-        body.innerHTML = tr ? tradesHTML(tr) : BP.card('', '', BP.notBuilt('The trade ratings', res[1]));
-        if ($('mv-sort')) BP.wireToggles($('mv-sort'), 'data-k', k => { M.sort = k; draw(); });
-      }
+      AFTER = [];
+      if (M.tab === 'trades') body.innerHTML = tr ? tradesHTML(tr) : QK.empty('Not built yet', 'The trade ratings are not available.');
       else if (M.tab === 'clubs') body.innerHTML = clubsHTML(tr, mv);
-      else if (M.tab === 'feed') body.innerHTML = mv ? feedHTML(mv) : BP.card('', '', BP.notBuilt('The transactions', res[0]));
+      else if (M.tab === 'next') body.innerHTML = nextHTML(mn);
+      else if (M.tab === 'feed') body.innerHTML = mv ? feedHTML(mv) : QK.empty('Not built yet', 'The transactions are not available.');
       else if (M.tab === 'il') body.innerHTML = mv ? ilHTML(mv) : '';
       else body.innerHTML = methodHTML(tr, mv);
+      AFTER.forEach(f => f());
       BP.sortable(body);
     };
-    BP.wireToggles($('mv-tab'), 'data-k', k => { M.tab = k; history.replaceState(null, '', hashOf()); draw(); });
+    $('mv-tab').querySelectorAll('a[data-k]').forEach(a => a.addEventListener('click', ev => {
+      ev.preventDefault();
+      $('mv-tab').querySelectorAll('a').forEach(x => x.setAttribute('aria-selected', x === a ? 'true' : 'false'));
+      M.tab = a.getAttribute('data-k'); history.replaceState(null, '', hashOf()); draw();
+    }));
     $('mv-team').onchange = e => { M.team = e.target.value; history.replaceState(null, '', hashOf()); draw(); };
     $('mv-kind').onchange = e => { M.kind = e.target.value; history.replaceState(null, '', hashOf()); draw(); };
     let timer = null;
     $('mv-q').oninput = e => { M.q = e.target.value; clearTimeout(timer); timer = setTimeout(draw, 200); };
     draw();
+    BP.setMeta(tr && tr.updated_at ? 'Trades ' + esc(BP.fmtStamp(tr.updated_at)) : '');
   });
 }
 
 // ── trades ──────────────────────────────────────────────────────────────────
-
-function pieceRows(tr, t, F) {
-  return t.pieces.map(p => {
-    const typ = p[F.type];
-    return [{ v: p[F.name], html: plink(p[F.pid], p[F.name]) + (p[F.detail] ? '<div class="val-why">' + esc(p[F.detail]) + '</div>' : '') },
-      { v: BP.teamAbbr(p[F.from]), html: tlink(p[F.from]) + ' → ' + tlink(p[F.to]) },
-      { v: p[F.age], html: n1(p[F.age]), align: 'right' }, { v: p[F.service] || '', html: esc(p[F.service] || '—'), align: 'right' },
-      { v: typ, html: '<span class="muted-inline">' + esc(TYPE[typ] || typ || '') + '</span>' },
-      { v: p[F.rest], html: s2(p[F.rest]), align: 'right' }, { v: p[F.next], html: s2(p[F.next]), align: 'right' },
-      { v: p[F.value], html: '<strong>' + s2(p[F.value]) + '</strong>', align: 'right' }, { v: p[F.realised], html: s2(p[F.realised]), align: 'right' }];
-  });
-}
 
 function tradesHTML(tr) {
   const F = {};
@@ -102,31 +115,30 @@ function tradesHTML(tr) {
   const q = M.q.trim().toLowerCase();
   const list = (tr.trades || []).filter(t => (!M.team || t.teams.indexOf(M.team) >= 0) &&
     (!q || t.pieces.some(p => String(p[F.name] || '').toLowerCase().indexOf(q) >= 0)));
-  if (!list.length) return BP.card('Trades', '', BP.muted('No trade matches.'));
+  if (!list.length) return QK.empty('No trade matches', 'Widen the filters.');
   const size = t => Math.max.apply(null, t.teams.map(c => Math.abs((t.clubs[c] || {}).in || 0) + Math.abs((t.clubs[c] || {}).out || 0)));
   if (M.sort === 'big') list.sort((a, b) => size(b) - size(a));
-  const cards = list.map(t => {
+  else list.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const cards = list.slice(0, 60).map((t, i) => {
     const clubs = t.teams.map(c => {
       const x = t.clubs[c] || {};
-      const ex = (x.extras || []).length ? ' <span class="muted-inline">+ ' + esc(x.extras.join(', ')) + '</span>' : '';
-      return '<div class="trd-club' + (t.winner === c ? ' won' : '') + '">' + BP.teamLink(c, { level: 'mlb' }) + ex +
-        '<div class="trd-club-n">' + gradeChip(x.grade) + ' <span title="Value in minus value out, at the time (expected WAR for the club, five seasons, discounted)">net ' + s2(x.net) + '</span>' +
-        ' <span class="muted-inline">in ' + n1(x.in) + ' · out ' + n1(x.out) + '</span></div>' +
-        '<div class="trd-club-r muted-inline">Realised since: ' + gradeChip(x.r_grade) + ' net ' + s2(x.r_net) + ' (in ' + n1(x.r_in) + ', out ' + n1(x.r_out) + ')</div></div>';
+      return '<div class="bp-trd-club' + (t.winner === c ? ' won' : '') + '" style="--tc:' + esc(BP.ui.tcol(c)) + '">' + BP.ui.teamEnt(c, 'mlb') + ((x.extras || []).length ? '<span class="bp-mv-why">+ ' + esc(x.extras.join(', ')) + '</span>' : '') +
+        '<div class="bp-trd-n">' + gradeChip(x.grade) + '<b data-tip="Value in minus value out, at the time (expected WAR for the club, five seasons, discounted)">' + s2(x.net) + '</b><span class="qk-muted">in ' + n1(x.in) + ' · out ' + n1(x.out) + '</span></div>' +
+        '<div class="bp-mv-why">Realised since: ' + gradeChip(x.r_grade) + ' net ' + s2(x.r_net) + ' (in ' + n1(x.r_in) + ', out ' + n1(x.r_out) + ')</div></div>';
     }).join('');
-    const verdict = t.winner ? '<b>' + esc(BP.teamShort(t.winner)) + '</b> won it at the time' : 'about even at the time';
-    const rv = t.r_winner ? '; <b>' + esc(BP.teamShort(t.r_winner)) + '</b> ahead on what has happened since' : '; even on what has happened since';
-    return '<div class="card trd-rated"><div class="card-header">' + esc(BP.fmtDate(t.date)) + ' <span class="card-sub">' + verdict + rv + '.</span></div>' +
-      '<div class="trd-clubs">' + clubs + '</div>' +
-      BP.tableHTML([{ label: 'Player' }, { label: 'Move' }, { label: 'Age', align: 'right' }, { label: 'MLB yrs', align: 'right', title: 'Seasons since his MLB debut (stands in for club control)' },
-        { label: 'Valued by' }, { label: 'Rest', align: 'right', title: 'Expected WAR for the club over the rest of the season (in-season trades)' },
-        { label: 'Next', align: 'right', title: 'Expected WAR next season (if he plays; before the chance he stays)' },
-        { label: 'Value', align: 'right', title: 'Expected WAR for the club over five seasons, each weighted by the chance he is still there, discounted 8% a year' },
-        { label: 'Realised', align: 'right', title: 'WAR produced for the club since the trade' }], pieceRows(tr, t, F), { compact: true }) + '</div>';
+    const verdict = t.winner ? BP.teamShort(t.winner) + ' won it at the time' : 'about even at the time';
+    const rv = t.r_winner ? '; ' + BP.teamShort(t.r_winner) + ' ahead on what has happened since' : '; even on what has happened since';
+    return card(BP.fmtDate(t.date) + ' · ' + t.teams.map(c => BP.teamAbbr(c)).join(' – '), esc(verdict + rv), '<div class="bp-trd-clubs">' + clubs + '</div>' +
+      board('mv-tp' + i, { dense: true, columns: [ENT(), { key: 'move', label: 'Move', sort: false }, { key: 'age', label: 'Age', num: true, fmt: v => n1(v) },
+        { key: 'svc', label: 'MLB yrs', num: true, tip: 'Seasons since his MLB debut (stands in for club control)' }, { key: 'typ', label: 'Valued by', sort: false, fmt: v => '<span class="qk-muted">' + esc(v) + '</span>' },
+        { key: 'rest', label: 'Rest', num: true, fmt: v => s2(v), tip: 'Expected WAR for the club over the rest of the season (in-season trades)' },
+        { key: 'next', label: 'Next', num: true, fmt: v => s2(v), tip: 'Expected WAR next season (if he plays; before the chance he stays)' },
+        { key: 'value', label: 'Value', type: 'bar', fmt: v => s2(v), tip: 'Expected WAR for the club over five seasons, each weighted by the chance he is still there, discounted 8% a year' },
+        { key: 'real', label: 'Realised', num: true, fmt: v => s2(v), tip: 'WAR produced for the club since the trade' }],
+        rows: t.pieces.map(p => ({ pid: p[F.pid], name: nameOf(p[F.pid], p[F.name]), team: p[F.to], sub: p[F.detail] || '', move: BP.teamAbbr(p[F.from]) + ' → ' + BP.teamAbbr(p[F.to]), age: p[F.age], svc: p[F.service] || '—',
+          typ: TYPE[p[F.type]] || p[F.type] || '', rest: p[F.rest], next: p[F.next], value: p[F.value], real: p[F.realised] })) }), { flush: false });
   });
-  const bar = '<div class="val-controls"><span class="tgl" id="mv-sort">' + BP.toggles([{ key: 'big', label: 'Biggest first' }, { key: 'new', label: 'Newest first' }], M.sort) + '</span>' +
-    '<span class="muted-inline">' + list.length + ' trades</span></div>';
-  return bar + cards.join('') + '<div class="npb-note">' + esc((tr.notes || []).join(' ')) + '</div>';
+  return '<p class="bp-note">' + list.length + ' trades' + (list.length > 60 ? ', the first 60 shown' : '') + '. ' + esc((tr.notes || []).join(' ')) + '</p><div class="bp-stack">' + cards.join('') + '</div>';
 }
 
 function clubsHTML(tr, mv) {
@@ -135,19 +147,38 @@ function clubsHTML(tr, mv) {
   const ids = Object.keys(T).length ? Object.keys(T) : Object.keys(L);
   const rows = ids.filter(t => !M.team || t === M.team).map(t => {
     const x = T[t] || {}, l = L[t] || {};
-    return [{ v: BP.teamName(t), html: BP.teamLink(t, { level: 'mlb' }) }, { v: x.n, html: BP.int(x.n), align: 'right' },
-      { v: x.net, html: '<strong>' + s2(x.net) + '</strong>', align: 'right' }, { v: x.in, html: n1(x.in), align: 'right' }, { v: x.out, html: n1(x.out), align: 'right' },
-      { v: x.won, html: BP.int(x.won) + '–' + BP.int(x.lost), align: 'right' }, { v: x.r_net, html: s2(x.r_net), align: 'right' },
-      { v: (l.trade_in || 0) + (l.trade_out || 0), html: BP.int((l.trade_in || 0)) + ' / ' + BP.int(l.trade_out || 0), align: 'right' },
-      { v: l.signing || 0, html: BP.int(l.signing || 0), align: 'right' }, { v: (l.recall || 0) + (l.selected || 0), html: BP.int((l.recall || 0) + (l.selected || 0)), align: 'right' },
-      { v: l.option || 0, html: BP.int(l.option || 0), align: 'right' }, { v: l.il_place || 0, html: BP.int(l.il_place || 0), align: 'right' },
-      { v: (l.dfa || 0) + (l.release || 0), html: BP.int((l.dfa || 0) + (l.release || 0)), align: 'right' }, { v: l.claim || 0, html: BP.int(l.claim || 0), align: 'right' }];
-  }).sort((a, b) => (b[2].v || 0) - (a[2].v || 0));
-  return BP.card('Winners and losers', 'Every club\'s trades of the last twelve months summed: expected WAR in and out at the time (five seasons, retention-weighted, discounted), trades won–lost (a winner needs a net of 0.75 wins), the net realised since; and the counts of its moves.',
-    BP.tableHTML([{ label: 'Club' }, { label: 'Trades', align: 'right' }, { label: 'Net', align: 'right', title: 'Value in minus value out at the time' }, { label: 'In', align: 'right' }, { label: 'Out', align: 'right' },
-      { label: 'Won–lost', align: 'right' }, { label: 'Realised net', align: 'right' }, { label: 'Players in / out', align: 'right' }, { label: 'Signings', align: 'right' },
-      { label: 'Call-ups', align: 'right', title: 'Recalls and contracts selected' }, { label: 'Options', align: 'right' }, { label: 'IL placements', align: 'right' },
-      { label: 'DFA / released', align: 'right' }, { label: 'Claims', align: 'right' }], rows, { compact: true, sticky: true }));
+    return { tid: t, name: BP.teamShort(t), n: x.n, net: x.net, inn: x.in, out: x.out, wl: BP.int(x.won) + '–' + BP.int(x.lost), won: x.won, rnet: x.r_net, io: BP.int(l.trade_in || 0) + ' / ' + BP.int(l.trade_out || 0),
+      sign: l.signing || 0, up: (l.recall || 0) + (l.selected || 0), opt: l.option || 0, il: l.il_place || 0, rel: (l.dfa || 0) + (l.release || 0), claim: l.claim || 0 };
+  }).sort((a, b) => (b.net || 0) - (a.net || 0));
+  const top = rows.filter(r => isNum(r.net));
+  return '<div class="qk-grid"><div class="qk-span-5">' + card('Net value from trades', 'Expected WAR in minus out at the time, five seasons, retention-weighted and discounted', top.length ? BP.ui.chart('mv-clubs', Math.max(300, 18 * top.length + 60), 'Net trade value by club') : QK.empty('No trades')) + '</div>' +
+    '<div class="qk-span-7">' + card('Winners and losers', 'Every club\'s trades summed (a winner needs a net of 0.75 wins), the net realised since, and the counts of its moves', board('mv-clubs-t', { dense: true, rank: true, maxHeight: 640, rowHref: r => BP.teamHref(r.tid, 'mlb'), columns: [
+      { key: 'name', label: 'Club', type: 'entity', mark: r => BP.ui.team(r.tid, 'mlb'), href: r => BP.teamHref(r.tid, 'mlb') }, { key: 'n', label: 'Trades', num: true, fmt: v => BP.int(v) },
+      { key: 'net', label: 'Net', type: 'bar', fmt: v => s2(v), tip: 'Value in minus value out at the time' }, { key: 'won', label: 'Won–lost', num: true, fmt: (v, r) => r.wl },
+      { key: 'rnet', label: 'Realised net', num: true, fmt: v => s2(v) }, { key: 'io', label: 'Players in / out', num: true, sort: false }, { key: 'sign', label: 'Signings', num: true },
+      { key: 'up', label: 'Call-ups', num: true, tip: 'Recalls and contracts selected' }, { key: 'opt', label: 'Options', num: true }, { key: 'il', label: 'IL placements', num: true },
+      { key: 'rel', label: 'DFA / released', num: true }, { key: 'claim', label: 'Claims', num: true }], rows: rows }), { flush: true }) + '</div></div>' +
+    (top.length ? chartAfter(top) : '');
+}
+function chartAfter(top) {
+  AFTER.push(() => { if (document.getElementById('mv-clubs')) QKC.bar('#mv-clubs', { cats: top.map(r => BP.teamAbbr(r.tid)), series: [{ name: 'Net', data: top.map(r => r.net) }], horizontal: true, diverging: true, labels: true, fmt: v => s2(v),
+    hrefs: top.map(r => BP.teamHref(r.tid, 'mlb')), labelWidth: 44, valName: 'Expected WAR in minus out', catName: 'Club', label: 'Net trade value' }); });
+  return '';
+}
+
+/* Who leaves next: every rostered player's chance of leaving by the next horizon (bp-moves.js, mlb/movement.json). */
+function nextHTML(m) {
+  if (!m || !BP.moves) return QK.empty('Not published', 'The movement model is not available.');
+  const d = m.d, F = m.F;
+  if (!d.published || d.published.next === false) return QK.empty('Not published', (d.reasons || {}).next || 'The movement model did not pass its test.');
+  const q = M.q.trim().toLowerCase();
+  const rows = (d.players || []).filter(r => (!M.team || String(r[F.team]) === M.team) && (!q || String(nameOf(r[F.pid], r[F.name])).toLowerCase().indexOf(q) >= 0))
+    .sort((a, b) => (b[F.p_next] || 0) - (a[F.p_next] || 0)).slice(0, 300);
+  const col = BP.moves.rosterColumn(m, 'Chance of leaving');
+  return card('Who leaves next', 'The chance each rostered player is not with his club by ' + esc((d.horizons || {}).next) + ', split by how; ranked from the most likely' + (rows.length === 300 ? ' (the first 300)' : ''),
+    col.legend + (rows.length ? board('mv-next', { dense: true, rank: true, maxHeight: 680, columns: [ENT(), { key: 'age', label: 'Age', num: true, fmt: v => n1(v) }, { key: 'value', label: (d.unit || 'WAR'), num: true, fmt: v => s2(v), tip: 'Value, the last two seasons blended 3:2' }, col.col],
+      rows: rows.map(r => ({ pid: r[F.pid], name: nameOf(r[F.pid], r[F.name]), team: r[F.team], sub: (r[F.pos] || '') + ' · ' + BP.teamAbbr(r[F.team]), age: r[F.age], value: r[F.value], _mv: r, p_move: r[F.p_next] })) }) : QK.empty('Nobody here')),
+    { foot: '<span>' + esc((d.notes || []).slice(0, 2).join(' ')) + '</span><a href="#/methodology#who-moves-next">How →</a>' });
 }
 
 function feedHTML(mv) {
@@ -157,12 +188,11 @@ function feedHTML(mv) {
   const q = M.q.trim().toLowerCase();
   const list = (mv.rows || []).filter(r => (!M.team || r[F.from] === M.team || r[F.to] === M.team) && (!M.kind || r[F.kind] === M.kind) &&
     (!q || String(N[r[F.pid]] || '').toLowerCase().indexOf(q) >= 0));
-  const rows = list.slice(0, 600).map(r => [{ v: r[F.date], html: esc(BP.fmtDate(r[F.date])) }, { v: r[F.kind], html: '<span class="mv-k mv-' + esc(r[F.kind]) + '">' + esc((mv.kinds || {})[r[F.kind]] || r[F.kind]) + '</span>' },
-    { v: N[r[F.pid]] || '', html: plink(r[F.pid], N[r[F.pid]]) }, { v: BP.teamAbbr(r[F.from]), html: r[F.from] ? tlink(r[F.from]) : '' },
-    { v: BP.teamAbbr(r[F.to]), html: r[F.to] ? tlink(r[F.to]) : '' }, { v: r[F.detail] || '', html: '<span class="muted-inline">' + esc(r[F.detail] || '') + '</span>' }]);
-  return BP.card('Feed', list.length + ' moves' + (list.length > 600 ? ' (the latest 600 shown)' : ''),
-    BP.tableHTML([{ label: 'Date' }, { label: 'Move' }, { label: 'Player' }, { label: 'From' }, { label: 'To' }, { label: 'Detail' }], rows, { compact: true, sticky: true }) +
-    '<div class="npb-note">' + esc((mv.notes || []).join(' ')) + '</div>');
+  return card('Feed', list.length + ' moves' + (list.length > 600 ? ' (the latest 600 shown)' : ''), list.length ? board('mv-feed', { dense: true, maxHeight: 700, columns: [
+    { key: 'date', label: 'Date', fmt: v => esc(BP.fmtDate(v)) }, { key: 'kind', label: 'Move', fmt: (v, o) => '<span class="mv-k mv-' + esc(v) + '">' + esc(o.kl) + '</span>' }, ENT(),
+    { key: 'from', label: 'From', fmt: v => (v ? esc(BP.teamAbbr(v)) : '') }, { key: 'to', label: 'To', fmt: v => (v ? esc(BP.teamAbbr(v)) : '') }, { key: 'detail', label: 'Detail', sort: false, fmt: v => '<span class="qk-muted">' + esc(v || '') + '</span>' }],
+    rows: list.slice(0, 600).map(r => ({ date: r[F.date], kind: r[F.kind], kl: (mv.kinds || {})[r[F.kind]] || r[F.kind], pid: r[F.pid], name: nameOf(r[F.pid], N[r[F.pid]]), team: r[F.to] || r[F.from], sub: '', from: r[F.from], to: r[F.to], detail: r[F.detail] })) }) : QK.empty('Nothing here'),
+    { flush: true, foot: '<span>' + esc((mv.notes || []).join(' ')) + '</span>' });
 }
 
 function ilHTML(mv) {
@@ -170,11 +200,18 @@ function ilHTML(mv) {
   (mv.il_fields || []).forEach((f, i) => { F[f] = i; });
   const N = mv.names || {};
   const list = (mv.il_now || []).filter(r => !M.team || r[F.club] === M.team);
-  const rows = list.map(r => [{ v: N[r[F.pid]] || '', html: plink(r[F.pid], N[r[F.pid]]) }, { v: BP.teamAbbr(r[F.club]), html: tlink(r[F.club]) },
-    { v: r[F.list], html: r[F.list] + '-day', align: 'right' }, { v: r[F.start], html: esc(BP.fmtDate(r[F.start])) }, { v: r[F.part] || '', html: esc(PART[r[F.part]] || r[F.part] || '—') },
-    { v: r[F.days], html: BP.int(r[F.days]), align: 'right' }]);
-  return BP.card('On the injured list now', list.length + ' players · placements not yet followed by an activation, release or trade',
-    rows.length ? BP.tableHTML([{ label: 'Player' }, { label: 'Club' }, { label: 'List', align: 'right' }, { label: 'Since' }, { label: 'Body part' }, { label: 'Days', align: 'right' }], rows, { compact: true }) : BP.muted('Nobody.'));
+  const parts = {};
+  list.forEach(r => { const p = PART[r[F.part]] || r[F.part] || 'other'; parts[p] = (parts[p] || 0) + 1; });
+  const pk = Object.keys(parts).sort((a, b) => parts[b] - parts[a]);
+  return '<div class="qk-grid"><div class="qk-span-4">' + card('Where it hurts', 'Players on the list now, by body part', pk.length ? BP.ui.chart('mv-parts', Math.max(240, 22 * pk.length + 60), 'Injured list by body part') : QK.empty('Nobody')) + '</div>' +
+    '<div class="qk-span-8">' + card('On the injured list now', list.length + ' players · placements not yet followed by an activation, release or trade', list.length ? board('mv-il', { dense: true, maxHeight: 640, sort: { key: 'days', dir: 'desc' }, columns: [ENT(),
+      { key: 'list', label: 'List', num: true, fmt: v => v + '-day' }, { key: 'start', label: 'Since', fmt: v => esc(BP.fmtDate(v)) }, { key: 'part', label: 'Body part' }, { key: 'days', label: 'Days', type: 'bar', fmt: v => BP.int(v) }],
+      rows: list.map(r => ({ pid: r[F.pid], name: nameOf(r[F.pid], N[r[F.pid]]), team: r[F.club], sub: BP.teamAbbr(r[F.club]), list: r[F.list], start: r[F.start], part: PART[r[F.part]] || r[F.part] || '—', days: r[F.days] })) }) : QK.empty('Nobody'), { flush: true }) + '</div></div>' +
+    (pk.length ? partsAfter(pk, parts) : '');
+}
+function partsAfter(pk, parts) {
+  AFTER.push(() => { if (document.getElementById('mv-parts')) QKC.bar('#mv-parts', { cats: pk, series: [{ name: 'Players', data: pk.map(p => parts[p]), color: 'model' }], horizontal: true, labels: true, fmt: v => String(v), labelWidth: 110, valName: 'Players on the list', catName: 'Body part', label: 'Injured list by body part' }); });
+  return '';
 }
 
 function vRow(label, x) {
@@ -189,16 +226,16 @@ function methodHTML(tr, mv) {
   if (tr && tr.validation) {
     const v = tr.validation;
     const rows = [vRow('Players with an MLB projection', v.pieces), vRow('Each trade\'s net for its first club', v.nets)].filter(Boolean);
-    h += BP.card('Does the value at the time predict what happened?', 'Trades of ' + esc(v.span || '') + ': the expectation over the rest of the trade\'s season and the next one against the WAR realised for the club over the same span. Naive: the player\'s last season\'s WAR rate over the same playing time.',
+    h += card('Does the value at the time predict what happened?', 'Trades of ' + esc(v.span || '') + ': the expectation over the rest of the trade\'s season and the next one against the WAR realised for the club over the same span. Naive: the player\'s last season\'s WAR rate over the same playing time.',
       BP.tableHTML(['', { label: 'n', align: 'right' }, { label: 'r (model)', align: 'right' }, { label: 'r (naive)', align: 'right' }, { label: 'Rank r (model)', align: 'right' },
-        { label: 'Rank r (naive)', align: 'right' }, { label: 'MAE (model)', align: 'right' }, { label: 'MAE (naive)', align: 'right' }, { label: 'Slope', align: 'right', title: 'Realised on expected, through the origin' }], rows, { compact: true }));
+        { label: 'Rank r (naive)', align: 'right' }, { label: 'MAE (model)', align: 'right' }, { label: 'MAE (naive)', align: 'right' }, { label: 'Slope', align: 'right', title: 'Realised on expected, through the origin' }], rows, { compact: true }), { flush: true });
   }
   if (tr && tr.retention && tr.retention.by) {
     const by = tr.retention.by, ns = tr.retention.n || {};
     const keys = Object.keys(by).filter(k => k.indexOf('none') < 0 && k.indexOf('any') < 0).sort();
     const rows = keys.map(k => { const p = k.split('|'); return [esc(p[0]) + ' MLB seasons, ' + (p[1] === 'in' ? 'in-season trade' : 'between seasons')].concat(by[k].map((x, i) => ({ v: x, html: isNum(x) ? BP.pct(x, 0) + ' <span class="muted-inline">' + BP.int((ns[k] || [])[i]) + '</span>' : '—', align: 'right' }))); });
-    h += BP.card('Retention: the chance a traded player is still with the club', 'Of traded players who played in the majors in a later season, the share who did so mainly for the club that acquired them (2015 on). It stands in for contracts and club control. Columns: the first to fifth season after an in-season trade; the first to fifth season (the trade\'s own first) for one between seasons. Small numbers: players.',
-      BP.tableHTML(['Group', { label: '1', align: 'right' }, { label: '2', align: 'right' }, { label: '3', align: 'right' }, { label: '4', align: 'right' }, { label: '5', align: 'right' }], rows, { compact: true }));
+    h += card('Retention: the chance a traded player is still with the club', 'Of traded players who played in the majors in a later season, the share who did so mainly for the club that acquired them (2015 on). It stands in for contracts and club control. Columns: the first to fifth season after an in-season trade; the first to fifth season (the trade\'s own first) for one between seasons. Small numbers: players.',
+      BP.tableHTML(['Group', { label: '1', align: 'right' }, { label: '2', align: 'right' }, { label: '3', align: 'right' }, { label: '4', align: 'right' }, { label: '5', align: 'right' }], rows, { compact: true }), { flush: true });
   }
   if (tr && tr.prospect_model) {
     const pm = tr.prospect_model;
@@ -206,18 +243,18 @@ function methodHTML(tr, mv) {
       { v: v.spearman_model, html: BP.num(v.spearman_model, 2), align: 'right' }, { v: v.spearman_level_mean, html: BP.num(v.spearman_level_mean, 2), align: 'right' },
       { v: v.mae_model, html: BP.num(v.mae_model, 2), align: 'right' }, { v: v.mae_level_mean, html: BP.num(v.mae_level_mean, 2), align: 'right' },
       { v: v.top5pct_mean_actual, html: BP.num(v.top5pct_mean_pred, 2) + ' → ' + BP.num(v.top5pct_mean_actual, 2), align: 'right' }, { v: v.all_mean_actual, html: BP.num(v.all_mean_actual, 2), align: 'right' }]; });
-    h += BP.card('Prospects: expected MLB WAR from minor-league lines', 'Four seasons after a minor-league season, discounted; fitted on the cohorts to 2019 and scored on 2021–22 (no minor-league season in 2020), against each level\'s mean. Stat lines only — no scouting grades — so the very best prospects are under-rated.',
+    h += card('Prospects: expected MLB WAR from minor-league lines', 'Four seasons after a minor-league season, discounted; fitted on the cohorts to 2019 and scored on 2021–22 (no minor-league season in 2020), against each level\'s mean. Stat lines only, no scouting grades, so the very best prospects are under-rated.',
       BP.tableHTML(['', { label: 'n', align: 'right' }, { label: 'Rank r', align: 'right' }, { label: 'Rank r (level mean)', align: 'right' }, { label: 'MAE', align: 'right' }, { label: 'MAE (level mean)', align: 'right' },
-        { label: 'Top 5%: expected → actual', align: 'right' }, { label: 'Mean actual', align: 'right' }], rows, { compact: true }));
+        { label: 'Top 5%: expected → actual', align: 'right' }, { label: 'Mean actual', align: 'right' }], rows, { compact: true }), { flush: true });
   }
   if (tr && tr.base_rates) {
     const br = tr.base_rates;
-    h += BP.card('Players with no record', 'Traded players with no MLB record and no minor-league line in the two seasons before (amateur signees, players hurt all season): the average of what traded players of the same age band with no MLB record went on to produce (2015–22 trades).',
+    h += card('Players with no record', 'Traded players with no MLB record and no minor-league line in the two seasons before (amateur signees, players hurt all season): the average of what traded players of the same age band with no MLB record went on to produce (2015–22 trades).',
       BP.tableHTML(['Age band', { label: 'Value (4 seasons, disc.)', align: 'right' }, { label: 'Share above 0.5 WAR', align: 'right' }, { label: 'n', align: 'right' }],
-        Object.keys(br).map(k => [esc(k), { v: br[k].value, html: BP.num(br[k].value, 2), align: 'right' }, { v: br[k].share_positive, html: BP.pct(br[k].share_positive, 0), align: 'right' }, { v: br[k].n, html: BP.int(br[k].n), align: 'right' }]), { compact: true }));
+        Object.keys(br).map(k => [esc(k), { v: br[k].value, html: BP.num(br[k].value, 2), align: 'right' }, { v: br[k].share_positive, html: BP.pct(br[k].share_positive, 0), align: 'right' }, { v: br[k].n, html: BP.int(br[k].n), align: 'right' }]), { compact: true }), { flush: true });
   }
-  h += BP.card('Sources and terms', '', '<div class="pad trd-text">' + esc((tr && tr.source) || (mv && mv.source) || '') + '</div>');
-  return h;
+  h += card('Sources and terms', '', '<p class="bp-note" style="margin:0">' + esc((tr && tr.source) || (mv && mv.source) || '') + '</p>');
+  return '<div class="bp-stack">' + h + '</div>';
 }
 
 // ── the team page's card ────────────────────────────────────────────────────

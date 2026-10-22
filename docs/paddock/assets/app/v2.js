@@ -41,11 +41,11 @@ V.MORE_TEAM = [
 ];
 /* Display names and plain-words explanations for the headline metrics (f1.json display / explanation). */
 V.NAMES = {
-  driver_effect: ['Race driver rating', 'His own share of race pace once the car is taken out: how much faster or slower than his team-mate per lap. Lower is faster.'],
-  quali_driver_effect: ['Qualifying driver rating', 'The same in qualifying: one-lap pace against the team-mate, % of a lap. Lower is faster.'],
-  race_h2h: ['Race head-to-head', 'Share of races he finished ahead of his team-mate.'],
-  team_points_share: ['Share of team points', 'His share of the points the car scored.'],
-  elo_teammate: ['Team-mate Elo', 'Elo rating from head-to-heads with team-mates only.'],
+  driver_effect: ['Race pace v team-mate', 'His own share of race pace once the car is taken out: how much faster or slower than his team-mate per lap. Lower is faster.'],
+  quali_driver_effect: ['Qualifying pace v team-mate', 'The same in qualifying: one-lap pace against the team-mate, % of a lap. Lower is faster.'],
+  race_h2h: ['Race head-to-head v team-mate', 'Share of races he finished ahead of his team-mate.'],
+  team_points_share: ['Share of team points v team-mate', 'His share of the points the car scored.'],
+  elo_teammate: ['Elo v team-mates', 'Elo rating from head-to-heads with team-mates only.'],
   race_pace: ['Race pace v field', 'Race pace against the field, seconds a lap (driver and car together). Lower is faster.'],
   points_per_race: ['Points per race', 'Championship points per start.'],
   lap1_gain: ['Lap-1 gain', 'Places gained on the opening lap, per start.'],
@@ -152,15 +152,6 @@ V.distribution = function (el, P, key, marks) {
   QKC.distribution(node, { values: vals, binCount: Math.min(12, Math.max(6, Math.round(vals.length / 2))), lowerBetter: !!m.lower, fmt: f,
     xName: V.label(P.meta, key) + (m.lower ? ' (lower is better)' : '') + ' · ' + vals.length + ' ' + (P.kind === 'teams' ? 'constructors' : 'drivers'), yName: P.kind === 'teams' ? 'Constructors' : 'Drivers',
     marks: (marks || []).filter(function (x) { return isNum(x.x); }).concat([{ x: med, label: 'Median' }]), label: 'Distribution of ' + V.label(P.meta, key) });
-  /* kit 2.0.0: the value axis crosses at x = 0, so with negative values (pace in % of a lap) the y axis and its title
-     land mid-plot; keep it at the left edge (entry.build is the documented wrap point; theme repaints keep it) */
-  var ent = node.__qkc;
-  if (ent && typeof ent.build === 'function' && !ent.build.__pd) {
-    var b0 = ent.build;
-    ent.build = function (T, e) { var o = b0(T, e); if (o && o.yAxis && !Array.isArray(o.yAxis)) o.yAxis.axisLine = Object.assign({}, o.yAxis.axisLine || {}, { onZero: false }); return o; };
-    ent.build.__pd = true;
-    ent.paint();
-  }
 };
 /* A segmented control of metrics for a distribution card: [[key, label]] */
 V.distSeg = function (id, opts) {

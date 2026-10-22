@@ -384,3 +384,17 @@ td.gi-ours-cell { text-align: left; }
 .gi-cmp-slot { display: grid; gap: 6px; padding-left: 10px; border-left: 3px solid var(--ec); min-width: 0; }
 .gi-cmp-slot .gi-picker { min-width: 0; }
 @media (max-width: 720px) { .gi-cmp-pick { grid-template-columns: 1fr; } }
+/* who moves next */
+.gi-mv-bar { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; min-width: 132px; }
+.gi-mv-bar b { min-width: 34px; text-align: right; font: 600 var(--fs-xs) var(--font-num); color: var(--ink-1); }
+.gi-mv-track { display: inline-flex; width: 84px; height: 8px; border-radius: 4px; background: var(--s-3); overflow: hidden; }
+.gi-mv-track.wide { display: flex; width: 100%; height: 12px; border-radius: 6px; margin: 6px 0 8px; }
+.gi-mv-track i { display: block; height: 100%; }
+.gi-mv-chip { margin-left: 4px; font-size: 10px; }
+.gi-mv-big { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.gi-mv-big .gi-disp { font-size: var(--fs-d3); color: var(--signal); line-height: 1; }
+.gi-mv-big span:last-child { color: var(--ink-2); font-size: var(--fs-sm); }
+.gi-mv-split { margin-top: 12px; }
+.gi-mv-dl { margin-top: 10px; font-size: var(--fs-sm); color: var(--ink-2); }
+.gi-mv-dl b { font: 700 var(--fs-md) var(--font-num); color: var(--ink-1); }
+.gi-mv-grid td .gi-pbar { min-width: 96px; }

@@ -73,12 +73,13 @@ function draw(body, E, sk, gk, S) {
   const sameGroup = goalie || E.every(e => e.p.group === E[0].p.group);
   const peer = goalie ? U.GROUP_NAME.G : sameGroup ? U.GROUP_NAME[E[0].p.group] : 'all NHL skaters';
   const pcOf = e => (sameGroup && e.p.pct_pos ? e.p.pct_pos : e.p.pct) || {};
-  const groups = (goalie ? U.G_SET : U.SK_SET).map(g => ({
+  const grp = goalie ? 'G' : sameGroup ? (E[0].p.group || 'F') : 'F';
+  const groups = (U.SETS[grp] || U.SETS.F).map(g => ({
     label: g[0],
-    rows: g[1].filter(k => meta[k] && !meta[k].unavailable).map(k => {
-      const m = meta[k];
+    rows: g[1].map(x => x[0]).filter(k => meta[k] && !meta[k].unavailable).map(k => {
+      const m = meta[k], sp = U.SPEC[k] || {};
       const pctFmt = m.fmt === 'pct';
-      return { label: m.label || k, tip: m.desc, better: m.lower ? 'low' : 'high', values: E.map(e => (e.p.values || {})[k]), pctls: E.map(e => pcOf(e)[k]),
+      return { label: sp.label || m.label || k, tip: sp.tip || m.desc, better: (m.lower || sp.lower) ? 'low' : 'high', values: E.map(e => (e.p.values || {})[k]), pctls: E.map(e => pcOf(e)[k]),
         fmt: v => U.fmtBy(m, v), dfmt: pctFmt ? (v => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v * 100).toFixed(1) + ' pts') : null };
     })
   }));
@@ -93,7 +94,7 @@ function draw(body, E, sk, gk, S) {
     '<section class="qk-section">' + U.card2('Where they sit', 'The qualified ' + esc(peer.replace('NHL ', '')) + ' this season, with each player marked', '<div class="qk-seg" id="cmp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('cmp-dist', 260, 'Peer distribution with the players marked')) + '</section>';
   wire(body, pk, E);
   const peers = Object.keys(cat.players).map(id => cat.players[id]).filter(x => x && x.qualified && (goalie || !sameGroup || x.group === E[0].p.group));
-  const opts = goalie ? [['gsax60', 'GSAx / 60'], ['sv_pct', 'Save %'], ['sv_pct_high', 'High-danger sv%']] : [['p60', 'Points / 60'], ['xgf_pct', '5v5 xGF%'], ['ixg60_all', 'ixG / 60'], ['gar', 'GAR']];
+  const opts = grp === 'G' ? [['gsax100', 'GSAx / 100'], ['sv_pct', 'Save %'], ['qs_pct', 'Quality starts']] : grp === 'D' ? [['gar_60', 'Value / 60'], ['adj_xgf_pct', 'xG share'], ['rapm_def', 'RAPM defence'], ['p60', 'Points / 60']] : [['gar_60', 'Value / 60'], ['p60', 'Points / 60'], ['ixg60_all', 'ixG / 60'], ['adj_xgf_pct', 'xG share']];
   const seg = body.querySelector('#cmp-dist-m');
   seg.innerHTML = opts.map((o, i) => '<button type="button" aria-pressed="' + (i === 0) + '" data-value="' + o[0] + '">' + esc(o[1]) + '</button>').join('');
   const dd = key => {

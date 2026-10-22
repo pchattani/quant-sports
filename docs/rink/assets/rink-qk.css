@@ -102,10 +102,7 @@ body.qk { font-size: var(--fs-md); }
 .qk-secnav-ctx .qk-select { height: 30px; font-size: var(--fs-xs); }
 
 /* ═════════════════════════════════ 4. redesigned pages */
-.rk-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-4); flex-wrap: wrap; margin-bottom: var(--sp-4); }
-.rk-head h1 { font-size: clamp(1.5rem, 3vw, 2.1rem); font-weight: 800; letter-spacing: -0.03em; }
-.rk-head .qk-kicker { margin-bottom: 6px; }
-.rk-head .qk-sub { margin-top: 6px; max-width: 760px; }
+.rk-head { margin-bottom: var(--sp-4); }
 .rk-tabs { margin-bottom: var(--sp-5); }
 .rk-tabs a.qk-tab { display: inline-flex; align-items: center; }
 .rk-sub { min-width: 0; }
@@ -199,7 +196,6 @@ body.qk { font-size: var(--fs-md); }
   .rk-gh .side .sb { display: none; }
   .qk .grid-2, .qk .grid-3 { grid-template-columns: minmax(0, 1fr); }
   .qk .card-header { padding: 10px 12px; }
-  .rk-head h1 { font-size: 1.45rem; }
 }
 
 /* embedded legacy views */
@@ -226,3 +222,25 @@ body.qk { font-size: var(--fs-md); }
 .rk-cmp-slot { display: grid; gap: 6px; padding-left: 10px; border-left: 3px solid var(--ec); min-width: 0; }
 .rk-cmp-slot .qk-input { width: 100%; min-width: 0; }
 @media (max-width: 720px) { .rk-cmp-pick { grid-template-columns: 1fr; } }
+
+/* ═════════════════════════════════ 5. Design System 2.0, phase 2 (standings, teams, team, players, value, fantasy, lab, model) */
+.rk-info { color: var(--ink-3); cursor: help; font-size: var(--fs-xs); }
+.rk-note b { color: var(--ink-1); }
+.rk-mv { display: inline-flex; align-items: center; gap: 8px; min-width: 120px; justify-content: flex-end; }
+.rk-mv-t { display: inline-flex; width: 76px; height: 8px; border-radius: 4px; overflow: hidden; background: var(--s-3); flex: none; }
+.rk-mv-t span { display: block; height: 100%; }
+.rk-mv b { font: 600 var(--fs-sm) var(--font-num); min-width: 3.2ch; text-align: right; }
+.rk-mv-note { font-size: var(--fs-xs); }
+.rk-mv-line { margin: 0 0 var(--sp-3); }
+.rk-keys-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 16px 0; }
+.rk-why { display: block; color: var(--ink-3); font-size: var(--fs-xs); white-space: normal; }
+.rk-board .qk-card-sub { min-height: 0; }
+.rk-board-empty { padding: 14px 16px; font-size: var(--fs-xs); color: var(--ink-3); display: grid; gap: 4px; }
+.rk-board-empty b { color: var(--ink-2); font-size: var(--fs-sm); }
+.rk-teamtile .big { font: 800 var(--fs-lg) var(--font-display); font-stretch: var(--stretch-display); font-variant-numeric: tabular-nums; }
+.rk-ol { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.rk-ol th, .rk-ol td { padding: 7px 10px; border-bottom: 1px solid var(--line-1); text-align: left; }
+.rk-ol th { font: 700 var(--fs-2xs) var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-3); }
+.rk-ol td.num, .rk-ol th.num { text-align: right; font-family: var(--font-num); }
+.rk-ours { color: var(--signal); }
+.rk-teamtile .rec { white-space: nowrap; }

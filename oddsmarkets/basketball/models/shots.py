@@ -11,7 +11,7 @@ For shot i (one row of the contract's SHOT table) a penalised logistic regressio
                     + f_angle(|angle_deg_i|)            smooth: piecewise-linear B-spline on ANGLE_KNOTS
                     + zone + shot_type                  one-hot (rim, paint, mid, corner3, ab3, heave; dunk ... other)
                     + three * 1(value = 3)
-                    + assisted + putback + transition   indicators
+                    + putback + transition              indicators
                     + period bucket (1, 2, 3, 4, OT) + clock bucket (<= 4 s left in the period: "end",
                       <= 24 s: "late", else "normal")
                     + margin bucket (shooting team's margin before the shot: <= -10, -9..-4, -3..3, 4..9, >= 10)
@@ -21,7 +21,10 @@ The smooth terms carry a second-difference (P-spline) penalty LAMBDA_SMOOTH * su
 plus a tiny ridge, the one-hot and indicator terms a ridge LAMBDA_CAT * b² (a N(0, 1/LAMBDA_CAT)
 prior on the log-odds), and the intercept is free. Fitted by Newton/IRLS on a sparse design
 (`_io.logistic_fit`), which makes 220k shots a sub-second fit. Blocked is *not* a feature: it is
-an outcome (a blocked shot is always a miss).
+an outcome (a blocked shot is always a miss). Nor is *assisted*: the play-by-play records an assist only on a made
+shot (every assisted shot in the tables is a make), so it leaked the outcome. With it, a self-creating scorer's
+unassisted makes were judged against misses only and her shot-making read +27 per 100 (xpts-1, Olivia Miles 2026);
+xpts-2 drops it (22 Oct 2026).
 
 Expected points: xPTS_i = P(make_i) * value_i (2 or 3; free throws are outside the shot table, so
 and-ones are not counted). Because the zone and intercept terms are (nearly) unpenalised score
@@ -51,7 +54,7 @@ import scipy.sparse as sp
 
 from oddsmarkets.basketball.models import _io
 
-MODEL_VERSION = "xpts-1"
+MODEL_VERSION = "xpts-2"
 
 DIST_KNOTS = [0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 18, 20, 22, 23, 24, 25, 26, 28, 30, 34, 40, 50, 94]
 ANGLE_KNOTS = [0, 15, 30, 45, 60, 75, 90, 120, 180]
@@ -61,7 +64,7 @@ PERIODS = ["1", "2", "3", "4", "OT"]
 CLOCKS = ["normal", "late", "end"]
 MARGIN_EDGES = [-9.5, -3.5, 3.5, 9.5]          # 5 buckets
 MARGINS = ["m<=-10", "m-9..-4", "m-3..3", "m4..9", "m>=10"]
-BINARY = ["three", "assisted", "putback", "transition"]
+BINARY = ["three", "putback", "transition"]   # no "assisted": it is only recorded on makes
 
 LAMBDA_SMOOTH = 30.0       # second-difference penalty on the distance / angle splines
 LAMBDA_TINY = 1e-3         # ridge on spline coefficients (they sum to the intercept's level)
@@ -127,8 +130,8 @@ def _design(spec: dict, df: pd.DataFrame) -> sp.csr_matrix:
     blocks.append(_io.hat_basis(np.abs(df["angle_deg"].fillna(0).astype(float).to_numpy()), spec["angle_knots"]))
     blocks.append(_onehot(_codes(df["zone"], spec["zones"]), len(spec["zones"])))
     blocks.append(_onehot(_codes(df["shot_type"], spec["types"]), len(spec["types"])))
-    binv = np.column_stack([(df["value"].to_numpy() == 3).astype(float), df["assisted"].to_numpy(float),
-                            df["putback"].to_numpy(float), df["transition"].to_numpy(float)])
+    binv = np.column_stack([(df["value"].to_numpy() == 3).astype(float), df["putback"].to_numpy(float),
+                            df["transition"].to_numpy(float)])
     blocks.append(sp.csr_matrix(binv))
     per = df["period"].fillna(1).astype(int).to_numpy()
     blocks.append(_onehot(_codes(np.where(per > 4, "OT", per.astype(str)), PERIODS), len(PERIODS)))

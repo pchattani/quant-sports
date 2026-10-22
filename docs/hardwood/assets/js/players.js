@@ -117,6 +117,7 @@ function renderPlayer(el, params, state) {
   const fx = FX(), L = fx.L(params, state);
   const pid = String(params.id || params.pid || (params.rest || [])[0] || '');
   el.innerHTML = fx.muted('Loading…');
+  EMBED = ((params.query || {}).embed) === 'detail';
   return fx.ready().then(() => {
     let S = fx.S(params, state, L);
     return Promise.all([fx.season(L, S), HW.load(L + '/players/' + pid + '.json')]).then(res => {
@@ -136,6 +137,7 @@ function renderPlayer(el, params, state) {
   });
 }
 
+let EMBED = false;
 function drawPlayer(el, L, S, pid, seasonRes, career, askedS) {
   const fx = FX(), C = fx.C;
   const cat = seasonRes[0], teams = seasonRes[1];
@@ -162,6 +164,7 @@ function drawPlayer(el, L, S, pid, seasonRes, career, askedS) {
     '<div class="pg-links">' + (mates[0] ? '<a href="#/' + L + '/compare/players/' + encodeURIComponent(pid) + '/' + encodeURIComponent(mates[0]) + '">Compare with ' + fx.esc(fx.surname(P[mates[0]].name)) + ' →</a>' : '') +
     '<a href="#/' + L + '/lab">Lab →</a>' + (team ? '<a href="' + fx.teamHref(L, team) + '">Team →</a>' : '') + '<a href="#/' + L + '/players">All players →</a></div></div>';
 
+  if (EMBED) h = '';
   if (!p) {
     h += fx.card('This season', '', fx.muted(fx.ok(cat) ? fx.esc(name) + ' has no game in ' + fx.esc(fx.seasonLabel(L, S)) + '.' : 'The ' + fx.esc(fx.seasonLabel(L, S)) + ' player catalogue is not built yet.'));
     h += '<div id="pp-career"></div>';
@@ -186,8 +189,8 @@ function drawPlayer(el, L, S, pid, seasonRes, career, askedS) {
     fx.tile('Award chances', bestAward ? fx.pct(fx.pOf(awardsP[bestAward])) : '—', bestAward ? fx.esc(fx.awardName(bestAward, L)) + ' · <a href="#/' + L + '/awards">races →</a>' : 'not in a race')
   ].join('') + '</div>';
 
-  h += '<div class="card"><div class="card-header">Percentiles <span class="card-sub">The whole catalogue, ' + metrics.length + ' metrics. League: against every qualified player. Position pool: only against ' + fx.esc(pool === 'G' ? 'guards' : pool === 'F' ? 'forwards' : pool === 'C' ? 'centres' : 'the same pool') + '.</span>' +
-    fx.toggle('pp-pct-src', [['pool', 'Position pool'], ['league', 'League']], 'pool') + '</div><div id="pp-pct"></div></div>';
+  h += '<div class="card"><div class="card-header">Percentiles <span class="card-sub">The whole catalogue, ' + metrics.length + ' metrics. League: against every qualified player. Role: only against the qualified ' + fx.esc(HW.ui.ROLE_NAME[HW.ui.roleOf(p, pid, null)] || 'players of the same role') + ' (guards, wings or bigs). Shot diet and other style numbers are listed, not ranked.</span>' +
+    fx.toggle('pp-pct-src', [['role', 'Role'], ['league', 'League']], 'role') + '</div><div id="pp-pct"></div></div>';
   h += '<div class="grid-2"><div class="card"><div class="card-header">Profile <span class="card-sub">Ten headline metrics as position-pool percentiles' + (mates[0] ? ', against ' + fx.esc(P[mates[0]].name) : '') + '.</span></div><div id="pp-radar" style="height:400px"></div></div>' +
     '<div class="card"><div class="card-header">Season line <span class="card-sub">Per game, from the game log.</span></div><div id="pp-line"></div></div></div>';
   h += '<div class="card"><div class="card-header">Shot chart <span class="card-sub">Every located shot this season. Colour is points per shot against the league average from the same spot (red above, blue below); size is volume.</span>' +
@@ -201,16 +204,19 @@ function drawPlayer(el, L, S, pid, seasonRes, career, askedS) {
   el.innerHTML = h;
 
   const drawPct = src => {
-    document.getElementById('pp-pct').innerHTML = fx.pctPanel(metrics, vals, src === 'league' ? p.pct : (p.pct_pool || p.pct),
-      { note: (src === 'league' ? 'League percentile' : 'Position-pool percentile') + ', 100 = best. ↓ marks metrics where lower is better; the bar already accounts for it. Play-by-play metrics (shot quality, on/off, RAPM, WPA) exist from about 2017. Hover a row for the definition.' });
+    document.getElementById('pp-pct').innerHTML = fx.pctPanel(metrics, vals, src === 'league' ? p.pct : rolePct(),
+      { note: (src === 'league' ? 'League percentile' : 'Percentile within the role') + ', 100 = best. ↓ marks metrics where lower is better; the bar already accounts for it. Play-by-play metrics (shot quality, on/off, RAPM, WPA) exist from about 2017. Hover a row for the definition.' });
   };
-  drawPct('pool');
+  // percentiles within the role (guards, wings, bigs; the metrics spec): the payload's pct_role, else computed here
+  let ROLES = null, RP = null;
+  const rolePct = () => { if (RP) return RP; if (p.pct_role && Object.keys(p.pct_role).length > 30) return (RP = p.pct_role); RP = {}; metrics.forEach(m => { const v = HW.ui.rolePctl(cat, ROLES, pid, m.key); if (fx.isNum(v)) RP[m.key] = m.lower && !HW.ui.MSET.meta[m.key] ? 100 - v : v; }); return RP; };
+  HW.ui.roles(L, S).then(rl => { if (!fx.alive(el)) return; ROLES = rl; RP = null; drawPct('role');
+    fx.radar('pp-radar', axes, [{ name: name, pct: rolePct(), colour: pc[0] }]); });
   fx.wireToggle(el, 'pp-pct-src', drawPct);
 
   const axes = fx.headline(metrics, RADAR_PREFS, 10, p.pct_pool || p.pct).map(m => ({ key: m.key, label: fx.shortLabel(m.label) }));
   const mrow = mates[0] ? P[mates[0]] : null;
   const pc = fx.pairColours(colour, C.orange);
-  fx.radar('pp-radar', axes, [{ name: name, pct: p.pct_pool || p.pct, colour: pc[0] }].concat(mrow ? [{ name: mrow.name, pct: mrow.pct_pool || mrow.pct, colour: pc[1] }] : []));
 
   // Season line from the log (or the career row).
   const log = (cur.log || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
@@ -297,7 +303,7 @@ function drawCareer(L, pid, career) {
       seasons.map(s => [{ v: s.season, html: fx.esc(fx.seasonLabel(L, s.season)) }, { v: fx.teamName(L, s.team), html: fx.teamLink(L, s.team, { abbr: true }) }, s.gp, { v: s.min, html: fx.num(s.min, 0) }, { v: s.pts, html: fx.num(s.pts, 1) }, { v: s.reb, html: fx.num(s.reb, 1) }, { v: s.ast, html: fx.num(s.ast, 1) },
         { v: s.ts, html: fx.fmtV(s.ts, 'pct') }, { v: s.hpm, html: '<strong>' + fx.signed(s.hpm, 1) + '</strong>' }, { v: s.o, html: fx.signed(s.o, 1) }, { v: s.d, html: fx.signed(s.d, 1) }, { v: s.rapm, html: fx.signed(s.rapm, 1) }, { v: s.box_impact, html: fx.signed(s.box_impact, 1) }, { v: s.wpa, html: fx.signed(s.wpa, 2) }]), { compact: true }) + '</div>' +
     '<div><div id="pp-hpm-path" style="height:340px"></div>' + (awards.length ? '<div class="pct-group-head" style="padding:0 14px">Awards</div><div class="hf-awards">' + awards.map(a => '<span class="chip">' + fx.esc(fx.seasonLabel(L, a[0])) + ' ' + fx.esc(a[1]) + '</span>').join(' ') + '</div>' : '') + '</div></div>' +
-    '<div class="pct-group-head" style="padding:6px 14px 0">Similar players <span class="muted-inline">(nearest neighbours on the percentile vector)</span></div><div id="pp-similar"></div></div>';
+    '<div id="pp-similar" hidden></div></div>';
   host.innerHTML = h;
   HW.sortable(host);
   const asc = seasons.slice().reverse().filter(s => fx.isNum(s.hpm));

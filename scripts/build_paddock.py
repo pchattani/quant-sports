@@ -193,9 +193,12 @@ def build_season(b: Build, year: int, current: int, full: bool, cfg: dict, share
     if full and not ssn.finished(year, current):
         from oddsmarkets.f1.models.championship import simulate_championship
         champ = b.step(f"championship {year}", lambda: simulate_championship(year, n=cfg["sims"], seed=year))
+    sp = b.data / d / "season.json"
+    prev = b.step(f"read {sp}", lambda: json.loads(sp.read_text(encoding="utf-8"))) if sp.exists() else None
     b.write_or_fail(d + "season.json", f"season {year}",
                     lambda: ssn.build_season(year, current, forecasts=forecasts, effects=effects, split=split, championship=champ,
-                                             elo=shared.get("elo"), colours=colours, stand=stand), year=year)
+                                             elo=shared.get("elo"), colours=colours, stand=stand, prev=prev), year=year,
+                    **({"title_history": prev["title_history"]} if (prev or {}).get("title_history") else {}))
     shared.setdefault("effects", {})[year] = effects
     b.step(f"value pages {year}", lambda: value_pages(b, year, current, full, effects, dcat, tcat, champ, cfg, shared))
     if full and year == current:
@@ -325,11 +328,30 @@ def main(argv: list[str] | None = None) -> int:
     b.write_or_fail("elo.json", "elo", lambda: ssn.elo_payload(shared["elo"]))
     cats = {y: o.get("catalogue") for y, o in out.items() if (o or {}).get("catalogue") and o["catalogue"].get("ok", True)}
     for y in years:                                       # seasons not rebuilt this run: reuse their drivers.json on disk
-        if y not in cats and y >= 2018:
+        if y not in cats and y >= 1996:
             p = data / str(y) / "drivers.json"
             if p.exists():
                 cats[y] = b.step(f"read {p}", lambda: json.loads(p.read_text(encoding="utf-8")))
     b.write_or_fail("lab.json", "lab", lambda: ssn.lab_payload({y: c for y, c in cats.items() if c}, current))
+
+    def similar_drivers() -> int:
+        """Similar drivers (drivers.add_similar) need every season's catalogue from 1996: the ones built this run, the
+        rest from disk; each catalogue that gains the field is rewritten."""
+        from oddsmarkets.f1.analytics import drivers as drv
+        allc = {y: c for y, c in cats.items() if c and y >= drv.SIMILAR_FROM}
+        for y in years:
+            if y >= drv.SIMILAR_FROM and y not in allc:
+                p = data / str(y) / "drivers.json"
+                if p.exists():
+                    c = b.step(f"read {p}", lambda: json.loads(p.read_text(encoding="utf-8")))
+                    if c and c.get("ok", True) and c.get("drivers"):
+                        allc[y] = c
+        changed = drv.add_similar(allc)
+        for y in changed:
+            b.write(f"{y}/drivers.json", allc[y])
+        return len(changed)
+    n_sim = b.step("similar drivers", similar_drivers, 0)
+    logger.info("similar drivers: %s seasons", n_sim)
     b.write_or_fail("circuits.json", "circuits site-wide", lambda: shared["circuits"] or None)
 
     b.write_or_fail("calibration.json", "calibration", lambda: pick_calibration(an.data_root() / "calibration.json"))

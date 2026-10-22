@@ -275,3 +275,78 @@ tr.row-link { cursor: pointer; }
 .ta-cap { color: var(--ink-3); font-size: var(--fs-xs); margin: 8px 0 0; }
 .ta-stack > * + * { margin-top: var(--sp-4); }
 .ta-hint { color: var(--ink-3); font-size: var(--fs-xs); }
+/* v2 players and player page */
+.ta-pl-ctl { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: var(--sp-4); }
+.ta-pl-ctl .qk-input { min-width: 0; flex: 1 1 200px; max-width: 320px; }
+.ta-pl-links { display: flex; gap: 8px; flex-wrap: wrap; margin: var(--sp-4) 0; }
+.ta-kpis { margin-bottom: var(--sp-5); }
+.ta-page a.ta-cmp-link { color: var(--signal); font: 600 var(--fs-xs) var(--font-ui); }
+.ta-list a.nm { color: var(--ink-1); }
+.ta-list a.nm:hover { color: var(--signal); }
+#pp-pcard .qk-card-head { flex-wrap: wrap; gap: 8px; }
+.ta-cmp-pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-3); margin-bottom: var(--sp-4); }
+.ta-cmp-slot { display: grid; gap: 6px; padding-left: 10px; border-left: 3px solid var(--ec); min-width: 0; }
+.ta-cmp-slot .af-picker, .ta-cmp-slot input { width: 100%; min-width: 0; }
+@media (max-width: 720px) { .ta-cmp-pick { grid-template-columns: 1fr; } }
+.ta-h2h-pick { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; }
+.ta-h2h-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.ta-h2h-hero .ta-h2h-head { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: var(--sp-4); align-items: center; margin-bottom: var(--sp-4); }
+.ta-h2h-side { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ta-h2h-side.r { text-align: right; align-items: flex-end; }
+.ta-h2h-side .nm { font: 800 clamp(1.1rem, 2.6vw, 1.7rem)/1.1 var(--font-display); font-stretch: var(--stretch-display); color: var(--ink-1) !important; }
+.ta-h2h-side.l .nm { box-shadow: inset 0 -3px 0 var(--wp-a); }
+.ta-h2h-side.r .nm { box-shadow: inset 0 -3px 0 var(--wp-b); }
+.ta-h2h-side .sb { color: var(--ink-3); font-size: var(--fs-xs); }
+.ta-h2h-rec { text-align: center; }
+.ta-h2h-rec .n { font: 900 var(--fs-d2)/1 var(--font-display); font-stretch: var(--stretch-display); font-variant-numeric: tabular-nums; display: flex; gap: 10px; justify-content: center; }
+.ta-h2h-rec .dash { color: var(--ink-4); font-weight: 500; }
+.ta-h2h-rec .s { color: var(--ink-3); font-size: var(--fs-xs); margin-top: 4px; }
+.af-odds-col .qk-wpbar { margin: 8px 0 6px; }
+@media (max-width: 720px) { .ta-h2h-pick { grid-template-columns: 1fr; } .ta-h2h-hero .ta-h2h-head { gap: 8px; } }
+.ta-h2h-hero .qk-mu-head { display: none; }
+/* v2 match centre hero */
+.ta-hero { padding: var(--sp-5) var(--sp-5) var(--sp-4); }
+.ta-gh { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: var(--sp-4); align-items: center; position: relative; }
+.ta-gh .side { display: flex; min-width: 0; }
+.ta-gh .side.r { justify-content: flex-end; text-align: right; }
+.ta-gh .side .nm { font: 800 clamp(1.05rem, 2.6vw, 1.7rem)/1.12 var(--font-display); font-stretch: var(--stretch-display); color: var(--ink-1) !important; }
+.ta-gh .side.lost .nm { color: var(--ink-3) !important; }
+.ta-gh .side .sb { color: var(--ink-3); font-size: var(--fs-xs); margin-top: 4px; }
+.ta-gh .side.l .nm { box-shadow: inset 0 -3px 0 var(--wp-a); }
+.ta-gh .side.r .nm { box-shadow: inset 0 -3px 0 var(--wp-b); }
+.ta-gh .mid { text-align: center; display: grid; gap: 8px; justify-items: center; }
+.ta-score { font: 900 clamp(2rem, 6vw, 3.4rem)/1 var(--font-display); font-stretch: var(--stretch-display); font-variant-numeric: tabular-nums; display: flex; gap: 12px; align-items: center; }
+.ta-score .dash { color: var(--ink-4); font-weight: 500; }
+.ta-score-pre { font-size: clamp(1.4rem, 3.5vw, 2rem); color: var(--ink-2); }
+.ta-hero .mt-board { max-width: 760px; margin: var(--sp-4) auto 0; }
+.ta-hero-bar { max-width: 720px; margin: var(--sp-5) auto 0; display: grid; gap: 8px; }
+.ta-hero-bar > .qk-kicker { text-align: center; }
+.ta-hero-mkt { display: flex; justify-content: center; font-size: var(--fs-xs); }
+.ta-hero-meta { margin-top: var(--sp-4); display: flex; gap: 6px 18px; flex-wrap: wrap; justify-content: center; color: var(--ink-2); font-size: var(--fs-sm); }
+.ta-fc td { white-space: normal; }
+.ta-fc tr.ours td { font-weight: 700; color: var(--signal); }
+.ta-fc tr.comp td:first-child { padding-left: 22px; color: var(--ink-2); }
+.ta-fc tr.mkt td { color: var(--c-market); }
+.ta-fc tr.sep td { font: 700 var(--fs-2xs) var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-3); background: var(--s-2); }
+@media (max-width: 720px) { .ta-gh { gap: 8px; } .ta-hero { padding: var(--sp-4) var(--sp-3); } .ta-hero .mt-board { overflow-x: auto; } }
+/* tournament page head */
+.ta-ev-head .qk-sh { border-left: 3px solid var(--sf, var(--accent)); padding-left: 12px; }
+.ta-ev-head .ev-side { display: grid; gap: 4px; justify-items: end; font-size: var(--fs-sm); }
+.ta-hero { --tc: var(--signal); }
+.ta-hero::before { background: linear-gradient(100deg, color-mix(in srgb, var(--wp-a) 14%, transparent) 0%, transparent 40%, transparent 60%, color-mix(in srgb, var(--wp-b) 14%, transparent) 100%); }
+.ta-hero::after { display: none; }
+.ta-hero > * { position: relative; }
+/* v2 colour roles on the legacy components: ours = the signal; player A / B = the win-probability pair */
+:root, :root[data-theme] { --ace: var(--signal); --ace-ink: var(--signal-ink); --ace2: var(--signal); }
+.cmp-id.a, .cmp-pill-a { border-top-color: var(--wp-a); }
+.cmp-id.b { border-top-color: var(--wp-b); }
+.cmp-pill-a { background: var(--wp-a); } .cmp-pill-b { background: var(--wp-b); }
+.cmp-score .a, .af-h2h-n .a, .af-odds-p .a, .af-ss-n .a, .af-a { color: var(--wp-a); }
+.cmp-score .b, .af-h2h-n .b, .af-odds-p .b, .af-ss-n .b, .af-b { color: var(--wp-b); }
+.cmp-wins .a, .cmp-gap span.a, .cmp-h2h-bar.left > div { background: var(--wp-a); }
+.cmp-wins .b, .cmp-gap span.b { background: var(--wp-b); }
+.br-pl.hl { background: var(--signal-soft); }
+.tbtn.active, .tbtn.on, .tbtn[aria-pressed="true"] { background: var(--signal-soft); border-color: color-mix(in srgb, var(--signal) 55%, transparent); color: var(--ink-1); }
+.pg-toggle button.on { background: var(--signal); color: var(--signal-ink); border-color: var(--signal); }
+.ta-page a.qk-chance, .ta-page a.qk-stat, .ta-page a.ov-x, .ta-page a.ta-evcard { color: var(--ink-1); }
+tr.cut td, .qk-table tr.cut td { border-top: 2px dashed color-mix(in srgb, var(--signal) 55%, transparent) !important; }

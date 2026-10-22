@@ -213,7 +213,7 @@ function oddsView(rows, S) {
       const tot = seeds.reduce((a, k) => a + (isNum(sd[k]) ? sd[k] : 0), 0);
       return { label: RK.teamLink(r.team, { abbr: true, season: S }), values: seeds.map(k => (isNum(sd[k]) ? Number(sd[k]) : null)).concat([Object.keys(sd).length ? Math.max(0, 1 - tot) : null]) };
     }) }) : '';
-  return '<div class="grid-32"><div>' + RK.card('Playoff odds', 'from the season simulation · click a team for its points distribution', tbl) + '</div><div>' +
+  return '<div class="grid-32"><div>' + RK.card('Playoff chances', 'our chances from the season simulation · click a team for its points distribution', tbl) + '</div><div>' +
     RK.card('Final points', '<span id="od-team"></span>', '<div id="od-dist"></div><div class="chart-note">Bars: the simulated distribution of final points; dotted: the mean. The playoff line moves with the conference: about 95 points in an 84-game season.</div>') + '</div></div>' +
     (seedTbl ? RK.card('Seed distribution', 'percent of simulations ending in each seed (A1 = first in the Atlantic; WC = wild card)', seedTbl) : '');
 }
@@ -317,7 +317,7 @@ RK.route('standings', function (el, params) {
     const head = RK.pageHead(RK.seasonLabel(S) + ' standings', 'points: 2 for a win, 1 for an overtime or shootout loss · ' + RK.regGames(S) + ' games', nav);
     if (!RK.ok(d)) { el.innerHTML = head + RK.notBuilt('The ' + RK.seasonLabel(S) + ' standings', d); return; }
     const rows = seasonRows(d);
-    const views = [['wc', 'Wild card'], ['div', 'Divisions'], ['league', 'League'], ['odds', 'Playoff odds'], ['ratings', 'Ratings'], ['lottery', 'Lottery']];
+    const views = [['wc', 'Wild card'], ['div', 'Divisions'], ['league', 'League'], ['odds', 'Playoff chances'], ['ratings', 'Ratings'], ['lottery', 'Lottery']];
     el.innerHTML = head + '<div class="seg-tabs std-tabs">' + views.map(v => '<a data-v="' + v[0] + '"' + (v[0] === VIEW ? ' class="active"' : '') + '>' + esc(v[1]) + '</a>').join('') + '</div><div id="std-body"></div>' +
       '<div class="chart-note">Clinch marks: x playoff spot, y division, z conference, p Presidents\' Trophy, e eliminated. Ties are broken by points %, regulation wins, regulation and overtime wins, then wins. Odds come from simulating the rest of the season with our game model.' + (d.updated_at ? ' Updated ' + esc(RK.fmtStamp(d.updated_at)) + '.' : '') + '</div>';
     const body = el.querySelector('#std-body');

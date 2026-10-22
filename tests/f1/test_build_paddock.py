@@ -66,6 +66,14 @@ def test_quick_build_writes_every_payload(paddock_data):
             assert nxt["status"] == "upcoming" and nxt["forecast"]["pre_quali"]["drivers"] and nxt["forecast"]["post_quali"] is None
             dv = _load(d / "drivers.json")["drivers"]["drv0"]["values"]
             assert dv["points_v_expected"] is not None and dv["exp_points"] is not None
+            # redesign additions (22 Oct 2026): the per-round title history, the peer group and similar drivers
+            th = season["title_history"]
+            assert [h["after_round"] for h in th] == [3] and set(th[0]["drivers"]["drv0"]) >= {"p_title", "p05", "p95", "points"}
+            cat = _load(d / "drivers.json")
+            assert cat["peer_floor"] >= 3 and cat["peer_count"] >= 2
+            q = [e for e in cat["drivers"].values() if e["qualified"]]
+            assert q and all(e["pct_peer"] for e in q) and all(e["similar"] for e in q)
+            assert all(not e["pct_peer"] for e in cat["drivers"].values() if not e["qualified"])
         else:
             assert season["championship"] is None
             assert _load(d / "races" / "1.json")["forecast"]["pre_quali"] is None

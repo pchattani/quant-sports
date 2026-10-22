@@ -300,6 +300,7 @@ function render(el) {
     el.innerHTML = h + (ok ? '<div class="qk-card gi-ocard"><div class="gi-ohead">What it shows <span class="qk-card-sub">Written from the numbers on this page; a gap smaller than the noise is called a tie.</span></div><div class="gq-read" id="cal-read"></div></div>' : '') + out.join('') +
       '<div class="qk-card gi-ocard"><div class="gi-ohead">How to read it</div><div class="gq-read"><p><strong>Log-loss</strong> is −mean(y ln p + (1 − y) ln(1 − p)), lower is better; a coin scores ln 2 = 0.6931. <strong>Brier</strong> is mean((p − y)²). <strong>Reliability</strong> bins forecasts and plots the average forecast against how often the event happened; a calibrated model sits on the diagonal. <strong>MAE</strong> is the mean absolute error in points. A difference is called a <strong>tie</strong> when it is within two standard errors (or 0.1% of the score when no standard error is published). Beating a closing line is rare; being close to it is the realistic goal. See the <a href="#/methodology/backtest">methodology</a>.</p></div></div>';
     if (ok) k.set('cal-read', read.join('') || '<p>Not enough scored games for a reading yet.</p>');
+    if (GI.MV) GI.MV.load().then(md => { if (!md || !k.alive(el)) return; el.insertAdjacentHTML('beforeend', GI.MV.modelSection(md)); GI.MV.drawModel(md); });
   });
 }
 

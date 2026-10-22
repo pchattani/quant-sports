@@ -1,8 +1,11 @@
 /* The Quant Ace — the match centre (#/<T>/match/<mid>).
  *
  *   head: event, round, surface, the score by set (tiebreaks in superscript), status;
- *   before the match: model against the market and the closing odds (Pinnacle and the
- *     average, de-vigged), the Elo-only and serve/return-only probabilities and the blend;
+ *   Design System 2.0 hero: both players, the score in sets (set by set below), our win-chance bar with the market's
+ *     split as a quiet tick before the first ball, stat tiles (our chance, likeliest score, expected games);
+ *   before the match: our forecast and its components (Elo, serve/return, the market-rating term), with the
+ *     prediction markets and the closing line beside it as a named reference (the one place outside the Model pages
+ *     where the market appears);
  *     set-score, total-games and game-handicap distributions from the exact Markov chain;
  *     the serve/return matchup (hold % and serve points won, inferred from scores); head to head;
  *   live and after: win probability game by game with set boundaries and the biggest swings,
@@ -165,9 +168,9 @@ function board(T, d, p1) {
     if (extra) cells += '<span class="mt-set cur">' + lv.games[side] + '</span>';
     const lost = fin && d.winner && d.winner !== pid;
     const cc = TA.playerCountry(T, pid), rk = TA.playerRank(T, pid);
-    return '<div class="mt-pl' + (lost ? ' lost' : '') + '"><span class="mt-sw" style="background:' + (side ? TA.C.p2 : TA.C.p1) + '"></span><span class="mt-name">' +
+    return '<div class="mt-pl' + (lost ? ' lost' : '') + '"><span class="mt-sw" style="background:' + (side ? 'var(--wp-b)' : 'var(--wp-a)') + '"></span><span class="mt-name">' +
       (rk ? '<span class="seed">' + rk + '</span>' : '') + TA.playerLink(T, pid) + (cc ? '<span class="ctry">' + esc(cc) + '</span>' : '') + (fin && d.winner === pid ? ' ✓' : '') + '</span></div>' +
-      '<div class="mt-sets">' + cells + '</div><span class="mt-p" title="Model pre-match win probability">' + (isNum(p) ? TA.pct(p, 0) : '') + '</span>';
+      '<div class="mt-sets">' + cells + '</div><span class="mt-p" title="Our pre-match win chance">' + (isNum(p) ? TA.pct(p, 0) : '') + '</span>';
   };
   return '<div class="mt-board">' + row(d.p1, 0, p1) + row(d.p2, 1, isNum(p1) ? 1 - p1 : null) + '</div>';
 }
@@ -175,23 +178,44 @@ function board(T, d, p1) {
 function preBoxes(T, d) {
   const pre = d.pre || {}, m = pre.model || {}, mk = pre.market || null, cl = pre.closing || null;
   const p1 = isNum(m.p1_win) ? m.p1_win : (m.dist || {}).p1_win;
-  const fav = isNum(p1) && p1 < 0.5 ? d.p2 : d.p1;
-  const pf = v => (isNum(v) ? (fav === d.p1 ? v : 1 - v) : null);
   const ps = cl ? TA.devig2(cl.ps) : null, avg = cl ? (TA.devig2(cl.avg) || (isNum(cl.p1) ? cl.p1 : null)) : null;
-  const box = (k, v, s, bar) => '<div class="pre-box"><div class="pre-k">' + esc(k) + '</div><div class="pre-v">' + v + '</div><div class="pre-s">' + s + '</div>' + (bar || '') + '</div>';
-  let h = box('Model', isNum(p1) ? TA.pct(pf(p1), 0) : '—', esc(TA.playerSurname(T, fav)) + ' to win · fair ' + TA.decimal(pf(p1)), TA.splitBar(p1, { market: mk && isNum(mk.p1) ? mk.p1 : null }));
-  h += box('Market', mk && isNum(mk.p1) ? TA.pct(pf(mk.p1), 0) : '—', mk && isNum(mk.p1) ? 'de-vigged · ' + esc(TA.sourceNames(mk.sources).join(', ')) + ' · edge ' + TA.edgeHTML(pf(p1), pf(mk.p1)) : 'no live market price');
-  h += box('Closing odds', isNum(ps) ? TA.pct(pf(ps), 0) : (isNum(avg) ? TA.pct(pf(avg), 0) : '—'),
-    isNum(ps) ? 'Pinnacle ' + esc((cl.ps || []).join(' / ')) + (isNum(avg) ? ' · average ' + TA.pct(pf(avg), 0) : '') : (isNum(avg) ? 'bookmaker average' : 'after the match, from tennis-data.co.uk'));
-  const sl = ' <span class="muted-inline">/</span> ';
-  // schedule and form (rest, recent load, ranking points, form, a retirement last time, head to head): the price
-  // with them minus the price without them, for the favourite
-  const xs = isNum(m.x_dot) && isNum(p1) && m.x_dot !== 0 ? pf(p1) - pf(1 / (1 + Math.exp(-(Math.log(p1 / (1 - p1)) - m.x_dot)))) : null;
-  h += box('Components', isNum(m.elo_p) ? TA.pct(pf(m.elo_p), 0) + sl + TA.pct(pf(m.sr_p), 0) + (isNum(m.mr_p) ? sl + TA.pct(pf(m.mr_p), 0) : '') : '—',
-    (isNum(m.mr_p) ? 'Elo / serve-return / market rating alone' : 'Elo only / serve-return only') + ', for ' + esc(TA.playerSurname(T, fav)) +
-    (isNum(xs) ? ' · schedule and form ' + TA.signed(100 * xs, 1) + ' pts' : '') +
-    (!isNum(m.mr_p) && isNum(m.blend_w) ? ' · blend weight on Elo ' + TA.num(m.blend_w, 2) : ''));
-  return '<div class="pre-grid">' + h + '</div>';
+  const sA = TA.playerSurname(T, d.p1), sB = TA.playerSurname(T, d.p2);
+  // schedule and form (rest, recent load, ranking points, form, a retirement last time, head to head): our chance
+  // with them minus our chance without them, for the first-named player
+  const xs = isNum(m.x_dot) && isNum(p1) && m.x_dot !== 0 ? p1 - 1 / (1 + Math.exp(-(Math.log(p1 / (1 - p1)) - m.x_dot))) : null;
+  const row = (label, p, cls, tip) => (isNum(p) ? '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td' + (tip ? ' data-tip="' + esc(tip) + '" tabindex="0"' : '') + '>' + label + '</td><td class="num">' + TA.pct(p, 0) + '</td><td class="num">' + TA.pct(1 - p, 0) + '</td></tr>' : '');
+  const ours = row('<b>Our chance</b>', p1, 'ours', 'The blend the match centre publishes') +
+    row('Elo alone', m.elo_p, 'comp', 'Our surface-blended Elo, on its own') + row('Serve and return alone', m.sr_p, 'comp', 'The exact Markov chain fed with the inferred serve and return strengths') +
+    row('Market rating alone', m.mr_p, 'comp', 'A model term: each player\u2019s strength as the closing market rated it in earlier matches, never this match\u2019s own number');
+  const ref = (mk && isNum(mk.p1) ? row('Market (' + esc(TA.sourceNames(mk.sources).join(' / ') || 'prediction markets') + ')', mk.p1, 'mkt', 'De-vigged, shown for reference') : '') +
+    row(isNum(ps) ? 'Closing line (Pinnacle, no-vig)' : 'Closing line (bookmakers\u2019 average, no-vig)', isNum(ps) ? ps : avg, 'mkt', 'From tennis-data.co.uk after the match; shown for reference');
+  return '<div class="qk-table-wrap"><table class="qk-table dense ta-fc"><thead><tr><th></th><th class="num">' + esc(sA) + '</th><th class="num">' + esc(sB) + '</th></tr></thead><tbody>' + ours +
+    (ref ? '<tr class="sep"><td colspan="3">For reference</td></tr>' + ref : '') + '</tbody></table></div>' +
+    (isNum(xs) ? '<div class="section-note">Schedule and form (rest, recent load, ranking points, form, head to head) move ' + esc(sA) + ' by ' + TA.signed(100 * xs, 1) + ' points.</div>' : '') +
+    (!isNum(m.mr_p) && isNum(m.blend_w) ? '<div class="section-note">Blend weight on Elo ' + TA.num(m.blend_w, 2) + '.</div>' : '');
+}
+
+function hero(T, d, p1, ev, surface) {
+  const st = TA.matchState(d), fin = TA.isFinished(d), live = st === 'live', pre = !fin && !live;
+  const won = TA.setsWon(d);
+  const mk = (d.pre || {}).market || null;
+  const side = (pid, cls) => {
+    const cc = TA.playerCountry(T, pid), rk = TA.playerRank(T, pid);
+    return '<div class="side ' + cls + (fin && d.winner && d.winner !== pid ? ' lost' : '') + '"><div style="min-width:0"><a class="nm" href="' + TA.playerHref(T, pid) + '">' + esc(TA.playerName(T, pid)) + '</a>' +
+      '<div class="sb">' + [isNum(rk) ? 'No. ' + rk : '', cc].filter(Boolean).map(esc).join(' · ') + (fin && d.winner === pid ? ' · <span class="ta-win">winner ✓</span>' : '') + '</div></div></div>';
+  };
+  const tba = d.tba || String(d.date || '').length <= 10;
+  const score = pre ? '<div class="ta-score ta-score-pre">' + esc(tba ? 'TBA' : (TA.fmtTime(d.date) || 'TBA')) + '</div>'
+    : '<div class="ta-score"><span>' + won[0] + '</span><span class="dash">–</span><span>' + won[1] + '</span></div>';
+  const pL = live && isNum(d.wp_now) ? d.wp_now : p1;
+  const A = { name: TA.playerShort(T, d.p1), abbr: TA.playerSurname(T, d.p1) }, B = { name: TA.playerShort(T, d.p2), abbr: TA.playerSurname(T, d.p2) };
+  const bar = isNum(pL) ? '<div class="ta-hero-bar"><div class="qk-kicker">' + (live ? 'Our live win chance' : fin ? 'Our pre-match win chance' : 'Our win chance') + '</div>' +
+    QK.wpBar(pL, null, 1 - pL, A, B, { size: 'lg', colors: ['var(--wp-a)', 'var(--wp-b)'], market: pre && mk && isNum(mk.p1) ? mk.p1 : null, label: live ? 'Live win chance' : 'Our win chance' }) +
+    (pre && mk && isNum(mk.p1) ? '<div class="ta-hero-mkt"><span class="qk-mkt">Market (' + esc(TA.sourceNames(mk.sources).join(' / ') || 'reference') + ') <b>' + esc(A.abbr) + ' ' + TA.pct(mk.p1, 0) + '</b></span></div>' : '') + '</div>' : '';
+  const meta = [TA.eventName(T, d.event, true), TA.roundLabel(d.round), TA.surfaceLabel(surface, ev.indoor), ev.level ? TA.levelLabel(ev.level, T) : '', d.best_of ? 'best of ' + d.best_of : '',
+    pre ? TA.fmtDate(d.date, { time: true }) + ' your time' : TA.fmtDate(d.date, { year: false }), isNum(d.duration_min) ? TA.fmtDuration(d.duration_min) : ''].filter(Boolean);
+  return '<section class="qk-hero ta-hero"><div class="ta-gh">' + side(d.p1, 'l') + '<div class="mid">' + score + (pre ? '<span class="chip st-time">' + esc(TA.fmtDate(d.date, { year: false })) + (tba ? ' · time to be announced' : '') + '</span>' : TA.statusChip(d)) + '</div>' + side(d.p2, 'r') + '</div>' +
+    ((d.sets || []).length || live ? board(T, d, p1) : '') + bar + '<div class="ta-hero-meta">' + meta.map(x => '<span>' + esc(x) + '</span>').join('') + '<a href="' + TA.h2hHref(T, d.p1, d.p2) + '">Head to head →</a></div></section>';
 }
 
 function render(el, params) {
@@ -213,7 +237,7 @@ function render(el, params) {
   }).then(d => {
     if (!el.isConnected || !d) return;
     if (!TA.ok(d)) {
-      el.innerHTML = TA.pageHead('Match centre', '', '<a href="' + TA.eventHref(T, eid) + '">' + esc(TA.eventName(T, eid)) + '</a>') + TA.card('Match', '', TA.notBuilt('This match', d));
+      el.innerHTML = QK.sectionHead({ kicker: TA.eventName(T, eid), title: 'Match centre', size: 'lg', tag: 'h1', actions: '<a class="qk-btn" href="' + TA.eventHref(T, eid) + '">' + esc(TA.eventName(T, eid)) + '</a>' }) + TA.card('Match', '', TA.notBuilt('This match', d));
       return;
     }
     const ev = TA.eventInfo(T, d.event || eid);
@@ -226,20 +250,19 @@ function render(el, params) {
     const st = TA.matchState(d);
     const fin = TA.isFinished(d);
 
-    // ── head
-    let sub = TA.statusChip(d);
-    if (st === 'pre') sub += '<span>' + esc(TA.fmtDate(d.date, { time: true })) + ' (your time)</span>';
-    else if (d.date) sub += '<span>' + esc(TA.fmtDate(d.date, { year: false })) + '</span>';
-    if (isNum(d.duration_min)) sub += '<span>' + esc(TA.fmtDuration(d.duration_min)) + '</span>';
-    if (fin && d.winner) sub += '<span>' + TA.playerLink(T, d.winner, { surname: true }) + ' won ' + TA.fmtScore(d, { winner: true }) + '</span>';
-    if (st === 'live' && isNum(d.wp_now)) sub += '<span class="cd-live">Live: ' + esc(TA.playerSurname(T, d.wp_now >= 0.5 ? d.p1 : d.p2)) + ' ' + TA.pct(Math.max(d.wp_now, 1 - d.wp_now), 0) + ' to win</span>';
-    sub += '<a href="' + TA.h2hHref(T, d.p1, d.p2) + '">Head to head →</a>';
-    el.innerHTML = '<div class="mt-head"><div class="mt-kicker">' + TA.eventLink(T, d.event || eid, { surface: true }) + '<span>· ' + esc(TA.roundLabel(d.round)) + '</span>' +
-      (surface ? TA.surfaceChip(surface, ev.indoor) : '') + (ev.level ? TA.levelChip(ev.level, T) : '') + (d.best_of ? '<span>best of ' + esc(d.best_of) + '</span>' : '') + '</div>' +
-      board(T, d, p1) + '<div class="mt-sub">' + sub + '</div></div><div id="mt-body"></div>';
+    // ── hero and stat tiles
+    const live0 = TA.matchState(d) === 'live';
+    const tiles = [];
+    if (isNum(p1)) tiles.push({ label: fin ? 'Our pre-match chance' : 'Our chance', value: TA.playerSurname(T, p1 >= 0.5 ? d.p1 : d.p2) + ' ' + TA.pct(Math.max(p1, 1 - p1), 0), signal: true, sub: 'Elo, serve and return and the market-rating term, blended' });
+    if (live0 && isNum(d.wp_now)) tiles.push({ label: 'Live chance', value: TA.playerSurname(T, d.wp_now >= 0.5 ? d.p1 : d.p2) + ' ' + TA.pct(Math.max(d.wp_now, 1 - d.wp_now), 0), sub: 'updates after every game' });
+    const top = Object.keys(dist.sets || {}).sort((x, y) => dist.sets[y] - dist.sets[x])[0];
+    if (top) tiles.push({ label: 'Likeliest score', value: top, sub: TA.pct(dist.sets[top], 0) + ' · sets, ' + TA.playerSurname(T, d.p1) + ' first' });
+    if (isNum(dist.exp_games)) tiles.push({ label: 'Expected games', value: TA.num(dist.exp_games, 1), sub: isNum(dist.p_tiebreak) ? 'at least one tiebreak ' + TA.pct(dist.p_tiebreak, 0) : '' });
+    if (isNum(dist.p_straight)) tiles.push({ label: 'Straight sets', value: TA.pct(dist.p_straight, 0), sub: 'either player' });
+    el.innerHTML = hero(T, d, p1, ev, surface) + (tiles.length ? '<div class="ta-kpis" style="margin-top:var(--sp-4)">' + QK.stats(tiles) + '</div>' : '') + '<div id="mt-body"></div>';
     const body = document.getElementById('mt-body');
     if (d._card) {
-      body.innerHTML = TA.card('Match centre', '', TA.muted('The full match centre for this match is not built yet; the score and the model’s pre-match number come from the schedule.' +
+      body.innerHTML = TA.card('Match centre', '', TA.muted('The full match centre for this match is not built yet; the score and our pre-match chance come from the schedule.' +
         ((d.model && d.model.sets_dist_top) ? ' Likeliest set scores: ' + d.model.sets_dist_top.map(x => esc(x[0]) + ' ' + TA.pct(x[1], 0)).join(', ') + '.' : '')));
       return;
     }
@@ -252,7 +275,7 @@ function render(el, params) {
         '<div id="mt-wp"></div><div class="grid-2" style="padding:0 12px 12px;gap:12px"><div id="mt-tiles" class="kpi-grid three"></div><div id="mt-swings"></div></div>');
     }
     // ── before the match
-    html += TA.card(fin || st === 'live' ? 'Before the match' : 'The prediction', 'model against the market' + (pre.closing ? ' and the closing odds' : ''), preBoxes(T, d));
+    html += TA.card(fin || st === 'live' ? 'Our forecast before the match' : 'Our forecast', 'our chance and how it is built; the market and the closing line sit underneath as a reference', preBoxes(T, d));
     html += '<div class="grid-2"><div>' + TA.card('Set scores', 'exact Markov chain from the serve-point probabilities' + (fin ? ' · outlined: what happened' : ''), '<div id="mt-sets"></div>' +
       '<div class="section-note">' + (isNum(dist.p_straight) ? 'Straight sets ' + TA.pct(dist.p_straight, 0) : '') + (isNum(dist.p_tiebreak) ? ' · at least one tiebreak ' + TA.pct(dist.p_tiebreak, 0) : '') + '</div>') + '</div><div>' +
       TA.card('Games', '', '<div class="toggle-row" id="mt-gt">' + TA.toggles([{ key: 'games', label: 'Total games' }, { key: 'handicap', label: 'Game handicap' }], 'games', 'data-gt') + '</div><div id="mt-games"></div><div class="section-note" id="mt-games-note"></div>') + '</div></div>';
@@ -275,7 +298,7 @@ function render(el, params) {
       const cb = d.comeback || {};
       document.getElementById('mt-tiles').innerHTML = TA.statTile('Excitement', isNum(d.excitement) ? TA.num(d.excitement, 2) : '—', 'sum of every swing in win probability') +
         TA.statTile('Comeback', isNum(cb.min_p) ? TA.pct(cb.min_p, 0) : '—', isNum(cb.min_p) ? 'the winner’s lowest chance' + (cb.games ? ', at ' + esc(cb.games.join('-')) + ' in set ' + esc(cb.set || ((cb.sets || [0, 0])[0] + (cb.sets || [0, 0])[1] + 1)) : '') : '') +
-        TA.statTile('Pre-match', isNum(p1) ? TA.pct(Math.max(p1, 1 - p1), 0) : '—', isNum(p1) ? esc(TA.playerSurname(T, p1 >= 0.5 ? d.p1 : d.p2)) + ' favoured' : '');
+        TA.statTile('Our pre-match chance', isNum(p1) ? TA.pct(Math.max(p1, 1 - p1), 0) : '—', isNum(p1) ? esc(TA.playerSurname(T, p1 >= 0.5 ? d.p1 : d.p2)) + ' favoured' : '');
       const sw = (d.swings || []).slice(0, 5);
       document.getElementById('mt-swings').innerHTML = sw.length ? '<div class="day-head" style="padding-left:0">Biggest swings</div><div class="swing-list">' + sw.map((s, i) => {
         const who = s.winner === 0 || s.winner === 1 ? (s.winner === 0 ? d.p1 : d.p2) : (s.delta > 0 ? d.p1 : d.p2);

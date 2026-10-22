@@ -1632,6 +1632,55 @@ def markets_payload(ctx: dict, season: int, markets: bool) -> dict:
             "futures": fut, "model": model, "games": games}
 
 
+SIM_GROUP = {"QB": "cfb_qb", "RB": "cfb_rb", "WR": "cfb_wr", "TE": "cfb_te", "DL": "cfb_dl", "LB": "cfb_lb", "DB": "cfb_db",
+             "K": "cfb_k", "P": "cfb_p"}
+
+
+def similar_players(vals: dict[int, pd.DataFrame], current: int, k: int | None = None) -> dict[str, list]:
+    """{pid: [{"id","name","team","season","distance"}]} for players rate-qualified in the current or last season (their
+    latest such season): the spec's weighted nearest player-seasons of the same position among rate-qualified rows of
+    the seasons in `vals`, other players only."""
+    from oddsmarkets.common import similar as SIM
+    out: dict[str, list] = {}
+    for pos, gid in SIM_GROUP.items():
+        cfg = SIM.group_config("college", gid)
+        if not cfg:
+            continue
+        feats = cfg["features"]
+        parts = []
+        for s, v in vals.items():
+            if s > current or s < current - 9 or not len(v):
+                continue
+            x = v[v["pos"] == pos]
+            if not len(x):
+                continue
+            x = x[[players.rate_qualified(r) for r in x.to_dict("records")]]
+            if len(x):
+                parts.append(x.assign(_season=s))
+        if not parts:
+            continue
+        X = pd.concat(parts, ignore_index=True)
+        if len(X) < 6:
+            continue
+        M = np.column_stack([pd.to_numeric(X[f], errors="coerce").to_numpy(float) if f in X else np.full(len(X), np.nan)
+                             for f in feats])
+        M[~np.isfinite(M)] = np.nan
+        Z = SIM.zscore(M, X["_season"].tolist())
+        w = np.array([cfg["weights"][f] for f in feats])
+        pids = X["pid"].astype(str).to_numpy()
+        seas = X["_season"].to_numpy(int)
+        latest: dict[str, int] = {}
+        for i, (pid_, s_) in enumerate(zip(pids, seas)):
+            if s_ >= current - 1 and (pid_ not in latest or s_ > seas[latest[pid_]]):
+                latest[pid_] = i
+        names, teams = X["name"].tolist(), X["team"].tolist()
+        for pid_, i in latest.items():
+            nb = SIM.nearest(Z, i, w, k or cfg["k"], allowed=pids != pid_)
+            out[pid_] = [{"id": pids[j], "name": names[j], "team": teams[j], "season": int(seas[j]), "distance": r2(d, 2)}
+                         for j, d in nb]
+    return out
+
+
 def career_files(ctx: dict, out: Path, current: int, sizes: dict) -> int:
     seasons = [s for s in data.seasons_available() if current - 6 <= s <= current]
     vals = {}
@@ -1674,25 +1723,10 @@ def career_files(ctx: dict, out: Path, current: int, sizes: dict) -> int:
             for m in players.moves(vals[s - 1], vals[s], stores[s]):
                 mv_all.setdefault(m["player"], []).append({"season": s, "from": m["from"], "to": m["to"],
                                                            "value_before": m["value_before"], "value_after": m["value_after"]})
-    # similar players (current season, same position): nearest in standardised position stats
-    sim_map: dict[str, list] = {}
-    if current in vals:
-        v = vals[current]
-        for p, keys in POS_KEYS_BOX.items():
-            x = v[(v["pos"] == p) & (v["gp"] >= 3)]
-            if len(x) < 5:
-                continue
-            ks = [k for k in keys if k not in ("value",)]
-            Z = x[ks].fillna(0).to_numpy(float) / np.maximum(x["gp"].to_numpy(float)[:, None], 1)
-            Z = (Z - Z.mean(0)) / (Z.std(0) + 1e-9)
-            D = ((Z[:, None, :] - Z[None, :, :]) ** 2).sum(-1) ** 0.5 if len(x) <= 1500 else None
-            if D is None:
-                continue
-            ids = x["pid"].tolist()
-            nm = x["name"].tolist()
-            for i, pid in enumerate(ids):
-                o = np.argsort(D[i])[1:6]
-                sim_map[pid] = [{"id": ids[j], "name": nm[j], "season": current, "distance": r2(D[i, j], 2)} for j in o]
+    # similar players (docs/METRICS_SPEC.md): the position group's features and year-to-year weights from
+    # docs/_design/metrics/college.json, z within position and season over rate-qualified player-seasons, weighted
+    # Euclidean (common.similar), k = 5, from the seasons loaded here (the last seven), never the player himself
+    sim_map = similar_players(vals, current)
     pdir = out / "players"
     n = 0
     keep = set()

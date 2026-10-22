@@ -672,10 +672,13 @@ K.catOf = d => {
   return d.players ? Object.assign({ metrics: [] }, d) : null;
 };
 /* Headline metrics (exact keys first, then patterns). */
+/* The headline sets of docs/METRICS_SPEC.md "Hockey" (5fdf8870), in order: stable and predictive rates first (the
+   same lists as RK.ui.SETS). Style and luck metrics (hits, blocks, faceoff %, shooting %, goals above expected) stay in
+   the catalogue but out of the headline. */
 K.PREFS = {
-  F: ['gar', 'value', 'war', /^(rink_)?value/, 'p60', 'pts60', /^p(ts|oints)_?(per_?)?60/, 'ixg60', /^i?xg_?(per_?)?60|ixg/, 'g60', /^goals?_?(per_?)?60/, 'xgf_pct', /xgf_?pct|xgf%/, 'rapm_off', /rapm.*off|off.*rapm/, 'rapm_def', /rapm.*def|def.*rapm/, 'gax', /goals?_above|gax/],
-  D: ['gar', 'value', 'war', /^(rink_)?value/, 'toi_gp', 'xgf_pct', /xgf_?pct/, 'rapm_def', /rapm.*def|def.*rapm/, 'rapm_off', /rapm.*off|off.*rapm/, 'xga60', /xga_?(per_?)?60/, 'p60', 'pts60', /^p(ts|oints)_?(per_?)?60/, /toi.*(gp|game|pg)/],
-  G: ['gsax', /^gsax$/, 'gsax60', /gsax.*60/, 'sv_pct', /^sv_?pct$|save_pct/, 'gsax_high', /gsax.*high|hd_gsax/, 'dfsv_pct', 'qs_pct', /quality/, 'sa', 'shots_faced', /shots?_faced|^sa$/, 'gar']
+  F: ['gar_60', 'p60', 'ixg60_all', 'icf60', 'adj_xgf_pct', 'xgf60_rel', 'rapm_net', 'pen_diff60', 'toi_gp'],
+  D: ['gar_60', 'adj_xgf_pct', 'rapm_def', 'rapm_off', 'adj_xga60', 'p60', 'ixg60_all', 'toi_gp', 'pen_diff60'],
+  G: ['gsax100', 'gsax', 'sv_pct', 'sv_pct_high', 'sv_pct_med', 'sv_pct_low', 'qs_pct']
 };
 
 // ── player picker (typeahead over players_index.json and the catalogues) ───

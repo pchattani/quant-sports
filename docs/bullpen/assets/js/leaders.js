@@ -1,4 +1,5 @@
-/* The Quant Bullpen — leaderboards (#/<L>/leaders).
+/* The Quant Bullpen — leaderboards (#/<L>/leaders), on Design System 2.0: controls, the top 15 as a chart coloured by
+ * percentile, the board as a v2 leaderboard with percentile heat cells, and top-five cards on the spec's headline metrics.
  *
  * Any catalogue metric for hitters or pitchers, or any per-pitch arsenal metric for one pitch
  * type, with a sample floor, a qualified-only switch, a team filter, best or worst first and the
@@ -20,23 +21,25 @@ const LOWER_ARS = { xwoba_plus: true };
 
 function render(el, params, state) {
   const k = K();
+  const U = BP.ui;
   const L = k.L(params, state);
   const q = params.query || {};
   if (q.k && /^(hitter|pitcher|pitch)$/.test(q.k)) S0.kind = q.k;
   if (q.m) S0.metric = q.m;
   if (q.pt) S0.pt = q.pt;
-  el.innerHTML = '<div class="card"><div class="card-header">' + k.LN(L) + ' leaders <span class="card-sub" id="ld-sub">Loading…</span></div>' +
-    '<div class="lab-controls gq-controls">' +
-    '<label>Board' + k.select('ld-kind', [['hitter', 'Hitters'], ['pitcher', 'Pitchers'], ['pitch', 'Pitch types']], S0.kind) + '</label>' +
+  el.innerHTML = QK.sectionHead({ kicker: 'Leaderboards · ' + k.LN(L), title: 'Leaderboards', sub: 'Any metric for hitters, pitchers or one pitch type, best or worst first, with the sample floor in your hands. Percentile cells rank each player against everyone past the floor (100 = best).' }) +
+    '<section class="qk-card"><div class="qk-card-body"><div class="bp-ctl">' +
+    U.seg('ld-kind', 'Board', [['hitter', 'Hitters'], ['pitcher', 'Pitchers'], ['pitch', 'Pitch types']], S0.kind) +
     '<label id="ld-pt-l">Pitch type<select id="ld-pt"></select></label>' +
     '<label>Metric<select id="ld-metric" class="gq-wide"></select></label>' +
-    '<label>Min <span id="ld-floor-u"></span> <span id="ld-floor-v"></span><input id="ld-floor" type="range" min="0" max="700" step="5"></label>' +
-    '<label class="inline"><input type="checkbox" id="ld-qual"> qualified only</label>' +
     '<label>Team<select id="ld-team"><option value="">All teams</option></select></label>' +
     '<label>Order' + k.select('ld-dir', [['best', 'Best first'], ['worst', 'Worst first']], S0.dir) + '</label>' +
     '<label>Show' + k.select('ld-n', [[25, 'Top 25'], [50, 'Top 50'], [100, 'Top 100'], [1000, 'All']], S0.n) + '</label>' +
-    '</div><div id="ld-chart" style="height:420px"></div><div id="ld-table"></div><div class="pg-note gq-note" id="ld-note"></div></div>' +
-    '<div class="card"><div class="card-header">At a glance <span class="card-sub">The top five on the headline metrics, qualified players only.</span></div><div id="ld-glance" class="gq-glance"></div></div>';
+    '<label>Min <span id="ld-floor-u"></span> <b id="ld-floor-v"></b><input id="ld-floor" type="range" min="0" max="700" step="5"></label>' +
+    '<label class="bp-check"><input type="checkbox" id="ld-qual"> past the floor for his position or role</label>' +
+    '</div></div></section>' +
+    '<div class="qk-grid" style="margin-top:var(--sp-4)"><div class="qk-span-5"><div id="ld-chart-card"></div></div><div class="qk-span-7"><div id="ld-board-card"></div></div></div>' +
+    '<section class="qk-section">' + QK.sectionHead({ kicker: 'At a glance', title: 'Top five', sub: 'The headline metrics from the metrics spec, players past the floor for their position or role.' }) + '<div class="qk-grid" id="ld-glance"></div></section>';
   return k.ready().then(() => {
     const S = k.S(params, state);
     return Promise.all([k.loadY(L, S, 'hitters.json'), k.loadY(L, S, 'pitchers.json'), k.loadY(L, S, 'leaders.json'), k.loadNames()]).then(res => ({ S: S, res: res }));
@@ -46,13 +49,13 @@ function render(el, params, state) {
     if (hc) k.learnCat(hc);
     if (pc) k.learnCat(pc);
     const $ = id => document.getElementById(id);
-    if (!hc && !pc) { $('ld-chart').innerHTML = k.notBuilt('The ' + k.LN(L) + ' ' + S + ' catalogues', o.res[0]); $('ld-sub').textContent = ''; $('ld-chart').style.height = 'auto'; glance(L, S, lead, null, null); return; }
+    if (!hc && !pc) { $('ld-board-card').innerHTML = U.card2('Leaderboard', '', QK.empty('Not built yet', 'The ' + k.LN(L) + ' ' + S + ' catalogues are not available.')); glance(L, S, lead, null, null); return; }
     const ars = (pc && pc.arsenal) || {};
     const pts = {};
     Object.keys(ars).forEach(pid => Object.keys(ars[pid] || {}).forEach(pt => { if (pt !== 'all' && pt !== 'ALL') pts[pt] = (pts[pt] || 0) + 1; }));
     const ptList = Object.keys(pts).sort((a, b) => pts[b] - pts[a]);
     $('ld-pt').innerHTML = ptList.map(pt => '<option value="' + k.esc(pt) + '"' + (pt === S0.pt ? ' selected' : '') + '>' + k.esc(k.pitchName(pt)) + ' (' + pts[pt] + ')</option>').join('');
-    if (!ptList.length) $('ld-kind').querySelector('option[value=pitch]').disabled = true;
+    if (!ptList.length) { const b = $('ld-kind').querySelector('button[data-value=pitch]'); if (b) b.style.display = 'none'; }
     const teams = {};
     [hc, pc].forEach(c => { if (c) Object.keys(c.players).forEach(id => { const t = c.players[id].team; if (t) teams[t] = 1; }); });
     $('ld-team').innerHTML = '<option value="">All teams</option>' + Object.keys(teams).sort((a, b) => k.teamAbbr(a).localeCompare(k.teamAbbr(b))).map(t => '<option value="' + k.esc(t) + '">' + k.esc(k.teamAbbr(t)) + '</option>').join('');
@@ -81,7 +84,7 @@ function render(el, params, state) {
       $('ld-qual').parentNode.style.display = kind === 'pitch' ? 'none' : '';
     };
     const draw = () => drawBoard(L, S, hc, pc);
-    $('ld-kind').onchange = e => { S0.kind = e.target.value; S0.floor = null; sync(); draw(); };
+    QK.seg($('ld-kind'), v => { S0.kind = v; S0.floor = null; sync(); draw(); });
     $('ld-pt').onchange = e => { S0.pt = e.target.value; S0.floor = null; sync(); draw(); };
     $('ld-metric').onchange = e => { S0.metric = e.target.value; draw(); };
     $('ld-floor').oninput = e => { S0.floor = Number(e.target.value); $('ld-floor-v').textContent = S0.floor; };
@@ -98,6 +101,7 @@ function render(el, params, state) {
 
 function drawBoard(L, S, hc, pc) {
   const k = K();
+  const U = BP.ui;
   const kind = S0.kind;
   let rows = [], m, lower = false, fmt = '';
   if (kind === 'pitch') {
@@ -112,88 +116,69 @@ function drawBoard(L, S, hc, pc) {
       if (!k.isNum(v) || n < S0.floor) return;
       const p = ((pc || {}).players || {})[pid] || {};
       if (S0.team && String(p.team) !== S0.team) return;
-      rows.push({ pid: pid, v: v, n: n, team: p.team, pct: (r.pct || {})[k.pick(r, ALIAS[def[0]] || [def[0]])], name: p.name, href: k.pitcherHref(L, pid, S) });
+      const key = k.pick(r, ALIAS[def[0]] || [def[0]]);
+      rows.push({ pid: pid, v: v, n: n, team: p.team, pct: key === 'stuff' ? r.stuff_pct : key === 'whiff' ? r.whiff_pct_type : (r.pct || {})[key], name: p.name || k.name(pid), sub: BP.teamAbbr(p.team), href: k.pitcherHref(L, pid, S) });
     });
   } else {
     const cat = kind === 'pitcher' ? pc : hc;
-    if (!cat) { document.getElementById('ld-table').innerHTML = k.notBuilt('This catalogue', null); return; }
+    if (!cat) { document.getElementById('ld-board-card').innerHTML = U.card2('Leaderboard', '', QK.empty('Not built yet')); return; }
     m = k.metaOf(cat.metrics)[S0.metric] || { key: S0.metric, label: S0.metric };
     lower = !!m.lower; fmt = m.fmt;
     Object.keys(cat.players).forEach(pid => {
       const p = cat.players[pid], v = (p.values || {})[m.key], n = k.sampleOf(p, kind);
       if (!k.isNum(v) || n < S0.floor) return;
-      if (S0.qual && p.qualified === false) return;
+      const okp = U.meets(p, U.setFor(kind, p), cat.team_games);
+      if (S0.qual && !okp) return;
       if (S0.team && String(p.team) !== S0.team) return;
-      rows.push({ pid: pid, v: v, n: n, team: p.team, pct: (p.pct || {})[m.key], name: p.name, pos: kind === 'pitcher' ? k.roleOf(p) : p.pos, href: kind === 'pitcher' ? k.pitcherHref(L, pid, S) : k.hitterHref(L, pid, S) });
+      const pc0 = okp && U.metricOk(p, m.key, 'ALL', cat.team_games) ? (p.pct || {})[m.key] : null;
+      rows.push({ pid: pid, v: v, n: n, team: p.team, pct: pc0, name: p.name || k.name(pid), sub: (kind === 'pitcher' ? k.roleOf(p) : (p.pos || '')) + ' · ' + BP.teamAbbr(p.team), href: kind === 'pitcher' ? k.pitcherHref(L, pid, S) : k.hitterHref(L, pid, S) });
     });
   }
   const all = rows.map(r => r.v);
   const good = (S0.dir === 'best') !== lower;
   rows.sort((a, b) => (good ? b.v - a.v : a.v - b.v) || b.n - a.n);
   const shown = rows.slice(0, S0.n);
-  const host = document.getElementById('ld-table');
   const unit = kind === 'pitch' ? 'Pitches' : kind === 'pitcher' ? 'BF' : 'PA';
-  host.innerHTML = shown.length ? k.table([{ label: '#', sortable: false }, { label: kind === 'hitter' ? 'Hitter' : 'Pitcher' }, { label: 'Team' }].concat(kind === 'pitch' ? [] : [{ label: kind === 'pitcher' ? 'Role' : 'Pos' }])
-    .concat([{ label: unit, align: 'right' }, { label: m.label + (lower ? ' ↓' : ''), align: 'right', title: m.desc || '' }, { label: 'Pct', align: 'right', title: 'Percentile (100 = best)' }]),
-  shown.map((r, i) => ({ _href: r.href, cells: [{ v: i + 1, cls: 'pos-cell' }, { v: r.name || k.name(r.pid), html: '<a class="ply-link" href="' + r.href + '">' + k.esc(r.name || k.name(r.pid)) + '</a>' }, { v: k.teamAbbr(r.team), html: k.teamChip(L, r.team, S) }]
-    .concat(kind === 'pitch' ? [] : [{ v: r.pos || '', html: k.esc(r.pos || '—') }]).concat([{ v: r.n, html: k.int(r.n) }, { v: r.v, html: '<strong>' + k.fmtV(r.v, fmt) + '</strong>' }, { v: r.pct, html: k.pill(r.pct) }]) })), { compact: true, sticky: true })
-    : k.muted('Nobody meets these filters. Lower the floor or untick qualified.');
-  k.sortable(host);
-  const sub = document.getElementById('ld-sub');
-  if (sub) sub.textContent = rows.length + ' with a value · ' + (S0.dir === 'best' ? 'best' : 'worst') + ' first · ' + S;
-  // Chart: the distribution as a strip, the leaders on top.
-  const node = document.getElementById('ld-chart');
-  const top = shown.slice(0, 20).slice().reverse();
-  if (!top.length) { node.innerHTML = ''; node.style.height = 'auto'; return; }
-  node.style.height = Math.max(260, 18 * top.length + 70) + 'px';
   const med = k.median(all);
-  k.plot(node, [{ type: 'bar', orientation: 'h', y: top.map(r => k.surname(r.name || k.name(r.pid)) + ' · ' + k.teamAbbr(r.team)), x: top.map(r => r.v), marker: { color: top.map(r => k.pctColor(k.isNum(r.pct) ? r.pct : 50)) },
-    customdata: top.map(r => r.href), text: top.map(r => k.fmtV(r.v, fmt)), textposition: 'outside', cliponaxis: false, hovertemplate: '%{y}: %{text}<extra></extra>' }],
-  k.layout({ margin: { l: 150, r: 40, t: 10, b: 36 }, xaxis: { title: m.label, zeroline: false, range: rangeOf(all, top.map(r => r.v)) }, yaxis: { type: 'category', automargin: true },
-    shapes: k.isNum(med) ? [{ type: 'line', x0: med, x1: med, yref: 'paper', y0: 0, y1: 1, line: { color: '#6e7681', dash: 'dot', width: 1 } }] : [] }));
-  if (node.on) node.on('plotly_click', ev => { const h = ev.points && ev.points[0] && ev.points[0].customdata; if (h) location.hash = h; });
-  const note = document.getElementById('ld-note');
-  if (note) note.innerHTML = 'The dotted line is the median of everyone above the floor (' + k.fmtV(med, fmt) + '). ' + (kind === 'pitch' ? 'Per-pitch boards come from each pitcher\'s arsenal; percentiles are within the pitch type.' : 'Qualified means at or above the catalogue\'s sample floor; unticking it shows everyone with a value, and small samples swing a lot (the glossary gives each metric\'s stabilisation point).') +
-    (m.desc ? ' <strong>' + k.esc(m.label) + '</strong>: ' + k.esc(m.desc) : '');
+  const sub = rows.length + ' with a value · ' + (S0.dir === 'best' ? 'best' : 'worst') + ' first · median ' + k.fmtV(med, fmt) + (lower ? ' · lower is better' : '');
+  document.getElementById('ld-board-card').innerHTML = U.card2(m.label, esc0(sub) + (m.desc ? ' · ' + esc0(m.desc) : ''), '<div id="ld-table"></div>', { flush: true });
+  const host = document.getElementById('ld-table');
+  if (!shown.length) host.innerHTML = QK.empty('Nobody here', 'Lower the floor or untick the position floor.');
+  else QK.leaderboard(host, { dense: true, rank: true, maxHeight: 640, rowHref: r => r.href, columns: [
+    { key: 'name', label: kind === 'hitter' ? 'Hitter' : 'Pitcher', type: 'entity', sub: 'sub', mark: r => U.team(r.team, L, S), href: r => r.href },
+    { key: 'n', label: unit, num: true, fmt: x => k.int(x) },
+    { key: 'v', label: m.label.split(' · ')[0] + (lower ? ' ↓' : ''), type: 'pctl', pctl: 'pct', fmt: x => k.fmtV(x, fmt), tip: (m.desc || '') + ' The cell colour is the percentile (100 = best).' }],
+    rows: shown.slice() });
+  const top = shown.slice(0, 15);
+  document.getElementById('ld-chart-card').innerHTML = U.card2('The top ' + top.length, 'Coloured by percentile; the median past the floor is ' + k.fmtV(med, fmt), top.length ? U.chart('ld-chart', Math.max(260, 22 * top.length + 70), 'Leaders: ' + m.label) : QK.empty('Nobody here'));
+  if (top.length) QKC.bar('#ld-chart', { cats: top.map(r => k.surname(r.name) + ' · ' + k.teamAbbr(r.team)), series: [{ name: m.label, data: top.map(r => r.v) }], horizontal: true, labels: true, fmt: x => k.fmtV(x, fmt),
+    colors: top.map(r => QK.pctHex(k.isNum(r.pct) ? r.pct : 50)), hrefs: top.map(r => r.href), labelWidth: 140, valName: m.label + (lower ? ' (lower is better)' : ''), catName: kind === 'hitter' ? 'Hitter' : 'Pitcher', label: 'Leaders' });
 }
-function rangeOf(all, top) {
-  const k = K();
-  const v = top.concat([k.median(all)]).filter(k.isNum);
-  let lo = Math.min.apply(null, v), hi = Math.max.apply(null, v);
-  if (lo > 0 && hi > 0 && lo / hi > 0.6) { const pad = (hi - lo) * 0.25 || hi * 0.05; return [lo - pad, hi + pad * 0.6]; }
-  return [Math.min(0, lo), hi + (hi - Math.min(0, lo)) * 0.08];
-}
+function esc0(s) { return BP.esc(s); }
 
 /* The builder's boards (leaders.json: {hitters|pitchers: {metric: [[pid, v]]}} or {metric: [[pid, v]]}), else computed. */
 function glance(L, S, lead, hc, pc) {
   const k = K();
+  const U = BP.ui;
   const host = document.getElementById('ld-glance');
   if (!host) return;
   const boards = [];
   const want = kind0 => (kind0 === 'pitcher' ? k.PIT_PREFS : k.HIT_PREFS).filter(x => typeof x === 'string').slice(0, 6);
-  const fromLead = (obj, kind, cat) => want(kind).filter(key => (obj || {})[key]).forEach(key => {
-    const list = obj[key];
-    if (!Array.isArray(list) || !list.length) return;
-    const m = (cat && k.metaOf(cat.metrics)[key]) || { key: key, label: key, fmt: '' };
-    boards.push({ m: m, kind: kind, rows: list.slice(0, 5).map(r => (Array.isArray(r) ? { pid: String(r[0]), v: r[1] } : { pid: String(r.pid || r.id), v: r.value !== undefined ? r.value : r.v })) });
-  });
-  if (lead && lead.ok !== false) {
-    if (lead.hitters || lead.pitchers) { fromLead(lead.hitters, 'hitter', hc); fromLead(lead.pitchers, 'pitcher', pc); }
-    else fromLead(lead.leaders || lead, 'hitter', hc);
-  }
-  if (!boards.length) {
-    [[hc, 'hitter', k.HIT_PREFS], [pc, 'pitcher', k.PIT_PREFS]].forEach(x => {
-      if (!x[0]) return;
-      k.headline(x[0].metrics, x[2], 6).forEach(m => {
-        const rows = Object.keys(x[0].players).filter(pid => x[0].players[pid].qualified !== false && k.isNum((x[0].players[pid].values || {})[m.key]))
-          .map(pid => ({ pid: pid, v: x[0].players[pid].values[m.key] })).sort((a, b) => (m.lower ? a.v - b.v : b.v - a.v)).slice(0, 5);
-        if (rows.length) boards.push({ m: m, kind: x[1], rows: rows });
-      });
+  [[hc, 'hitter'], [pc, 'pitcher']].forEach(x => {
+    if (!x[0]) return;
+    k.headline(x[0].metrics, want(x[1]), 6).forEach(m => {
+      const rows = Object.keys(x[0].players).filter(pid => U.meets(x[0].players[pid], U.setFor(x[1], x[0].players[pid]), x[0].team_games) && k.isNum((x[0].players[pid].values || {})[m.key]))
+        .map(pid => ({ pid: pid, v: x[0].players[pid].values[m.key] })).sort((a, b) => (m.lower ? a.v - b.v : b.v - a.v)).slice(0, 5);
+      if (rows.length) boards.push({ m: m, kind: x[1], rows: rows });
     });
+  });
+  if (!boards.length && lead && lead.ok !== false) {
+    const src = lead.leaders || lead;
+    Object.keys(src).filter(key => Array.isArray(src[key]) && src[key].length).slice(0, 8).forEach(key => boards.push({ m: { key: key, label: key, fmt: '' }, kind: /^p_/.test(key) ? 'pitcher' : 'hitter', rows: src[key].slice(0, 5).map(r => ({ pid: String(r[0]), v: r[1] })) }));
   }
-  host.innerHTML = boards.length ? boards.map(b => '<div class="gq-mini"><div class="gq-mini-h">' + k.esc(b.m.label || b.m.key) + ' <span class="muted-inline">' + (b.kind === 'pitcher' ? 'pitchers' : 'hitters') + '</span></div>' +
-    b.rows.map((r, i) => '<div class="gq-mini-r"><span class="gq-mini-n">' + (i + 1) + '</span>' + k.playerLink(L, r.pid, null, S, b.kind) + '<span class="gq-mini-v">' + k.fmtV(r.v, b.m.fmt) + '</span></div>').join('') + '</div>').join('')
-    : k.muted('No leaderboards yet.');
+  host.innerHTML = boards.length ? boards.map(b => '<div class="qk-span-3">' + U.card2(b.m.label || b.m.key, b.kind === 'pitcher' ? 'Pitchers' : 'Hitters', '<ul class="bp-list bp-lead">' +
+    b.rows.map((r, i) => '<li><span class="n">' + (i + 1) + '</span>' + U.playerEnt(r.pid, L, BP.teamAbbr(BP.player(r.pid).team), b.kind) + '<span class="v">' + k.fmtV(r.v, b.m.fmt) + '</span></li>').join('') + '</ul>', { flush: true }) + '</div>').join('')
+    : '<div class="qk-span-12">' + QK.empty('No leaderboards yet') + '</div>';
 }
 
 if (typeof BP.route === 'function') { BP.route('leaders', render); try { BP.route('#/<L>/leaders', render); } catch (e) { /* bound */ } }

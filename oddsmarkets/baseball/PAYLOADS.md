@@ -204,7 +204,11 @@ people.json maps the Retrosheet id; pre-MLBAM players keep `r:<retroid>` with th
   `analytics/careers.py` SEASON_KEYS_H / SEASON_KEYS_P (both WAR flavours); `history: {"batting": [[...]], "pitching": [[...]],
   "cols": {batting: [season, pa, ab, h, b2, b3, hr, bb, k, woba, wrc_plus, wraa, war], pitching: [season, games, outs, bf, runs, k,
   bb, hr, ra9, ra9_minus, war]}}` (Retrosheet-era seasons, before 2015) with `meta.retrosheet_notice`; `similar: [{pid, season, name,
-  distance}]`.
+  team, distance, for_season}]` (23 Oct 2026, docs/METRICS_SPEC.md recipe via `oddsmarkets/common/similar.py`: the 5 nearest
+  MLB player-seasons from 2015 in the spec peer group (hitters by position, pitchers SP / RP) over its features in
+  docs/_design/metrics/baseball.json, z within group and season, weights = year-to-year r floored at 0.2, distance = weighted
+  RMS z gap over the features both have; minimum 200 PA / 300 BF (SP) / 120 BF (RP) prorated by team games; one season
+  per person; `for_season` = the player's own season matched, his latest qualified MLB season; empty below the minimum).
 - `current`: `{season, level, hitting|pitching: {values, pct, pct_role, n, qualified, pa|bf, team, pos|role, primary, age},
   spray: [[hc_x, hc_y, xwoba (ours, else Savant), ev, la, code 0 out|1 1B|2 2B|3 3B|4 HR|5 ROE]] (last 400), zones: {all|fb|br|os:
   5x5 [[n, swing, whiff, xwoba]]} (rows low -> high, columns catcher's view left -> right, inner 3x3 = the zone in thirds),

@@ -31,7 +31,7 @@ function futuresTable(rows, opts) {
   const max = Math.max.apply(null, list.map(r => Math.max(r.model || 0, r.market || 0))) || 1;
   return HW.tableHTML([{ label: o.who || 'Team' }, { label: 'Model', align: 'right' }, { label: 'Market', align: 'right', title: 'De-vigged market probability' },
     { label: 'Difference', align: 'right', title: 'Ours minus the market, percentage points' }],
-  list.map(r => [{ v: r.sort || r.labelText, html: r.label }, { v: r.model, html: HW.probCell(r.model, r.colour || HW.C.wood, max) },
+  list.map(r => [{ v: r.sort || r.labelText, html: r.label }, { v: r.model, html: HW.probCell(r.model, r.colour || null, max) },
     { v: r.market, html: HW.isNum(r.market) ? HW.pct(r.market, 1) : (r.floor ? '<span class="thin" title="Only a no-bid floor: the market is too thin to read">thin</span>' : '—') },
     { v: HW.isNum(r.model) && HW.isNum(r.market) ? r.model - r.market : null, html: HW.edgeHTML(r.model, r.market) },
     { v: r.model, html: HW.american(r.model) }]), { compact: true });

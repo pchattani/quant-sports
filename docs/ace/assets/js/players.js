@@ -502,96 +502,75 @@ CH.shift = (pa, pb, bestOf, rule, target) => {
 // Catalogue: #/<T>/players
 // ════════════════════════════════════════════════════════════════════════════
 
-const IDX_PREFS = ['elo', /^elo$/, 'win_pct', /win_?pct|^win$/, 'hold', /^hold/, 'brk', 'break', /^br(ea)?k/, 'serve_rating', /serve_?r/, 'return_rating', /return_?r/, 'tb_over', /tb.*(over|exp)/];
-const RADAR_PREFS = ['hold', /^hold$/, 'brk', /^br(ea)?k$/, 'serve_rating', 'return_rating', 'win_pct', 'win_v_top20', 'win_top20', /top_?(10|20)/, 'tb_over', 'dec_over', 'dec_pct', 'deciding_win', /decid/, 'wins_over_exp', 'over_exp', /over_?exp/, 'elo_d90', /elo_d/, 'spw_real', 'rpw_real', 'first_won', 'second_won'];
-let IDXS = { q: '', country: '', floor: null, surface: '', extra: '' };
+/* Players (#/<T>/players), Design System 2.0: a leaderboard on the tour's headline metric set (METRICS_SPEC.md, via
+ * TA.v2), heat cells on the percentile scale against the peer group (the tour, or the players with enough matches on
+ * a surface), sorted by serve + return (the best single predictor beyond Elo). Players below the group's minimum are
+ * left out of the ranked board (they have no percentile) and listed underneath. */
+let IDXS = { q: '', country: '', surface: '' };
+const SHORT = { elo: 'Elo', elo_hard: 'Hard Elo', elo_clay: 'Clay Elo', elo_grass: 'Grass Elo', games_won_pct: 'Games won', hold: 'Hold', brk: 'Break', win_v_top50: 'v top 50',
+  win_pct: 'Win %', dominance: 'Dominance', ace_pct: 'Aces', hold_plus_break: 'Serve + return' };
 
 function renderPlayers(el, params, state) {
   const T = K.T(params, state);
-  el.innerHTML = '<div class="card"><div class="card-header">' + K.TN(T) + ' players <span class="card-sub" id="pl-sub">Loading…</span></div>' +
-    '<div class="lab-controls af-controls">' +
-    '<label>Search<input id="pl-q" class="pg-search" type="search" placeholder="player or country…"></label>' +
-    '<label>Country<select id="pl-country"><option value="">All countries</option></select></label>' +
-    '<label>Min matches <span id="pl-floor-v"></span><input id="pl-floor" type="range" min="0" max="60" step="1"></label>' +
-    '<label>Surface<select id="pl-surf"><option value="">All surfaces (tour percentiles)</option><option value="hard">Hard</option><option value="clay">Clay</option><option value="grass">Grass</option></select></label>' +
-    '<label>Add a column<select id="pl-extra"><option value="">—</option></select></label>' +
-    '</div><div id="pl-table">' + K.muted('Loading…') + '</div><div class="pg-note" id="pl-note"></div></div>';
+  const V = TA.v2;
+  el.innerHTML = QK.skeleton('lines', 8);
   return K.ready().then(() => Promise.all([TA.load(T + '/players.json'), K.loadNames(T)])).then(res => {
     if (!K.alive(el)) return;
     const cat = res[0];
-    const $ = id => document.getElementById(id);
-    if (!K.ok(cat) || !cat.players) { $('pl-table').innerHTML = K.notBuilt('The ' + K.TN(T) + ' player catalogue', cat); $('pl-sub').textContent = ''; return; }
+    if (!K.ok(cat) || !cat.players) { el.innerHTML = V.card('Players', '', K.notBuilt('The ' + K.TN(T) + ' player catalogue', cat)); return; }
     K.learnCat(T, cat);
-    const P = cat.players, metrics = cat.metrics || [];
-    const ids = Object.keys(P);
-    const maxN = Math.max.apply(null, ids.map(id => P[id].matches || 0).concat([10]));
-    $('pl-floor').max = String(maxN);
-    const floor0 = isNum(cat.floor) ? cat.floor : cat.min_matches;
-    if (IDXS.floor === null || IDXS.floor > maxN) IDXS.floor = isNum(floor0) ? Math.min(floor0, maxN) : Math.min(10, maxN);
-    $('pl-floor').value = IDXS.floor; $('pl-floor-v').textContent = IDXS.floor;
+    const P = cat.players;
     const ctry = {};
-    ids.forEach(id => { const c = P[id].country; if (c) ctry[c] = (ctry[c] || 0) + 1; });
-    $('pl-country').innerHTML = '<option value="">All countries</option>' + Object.keys(ctry).sort().map(c => '<option value="' + K.esc(c) + '"' + (c === IDXS.country ? ' selected' : '') + '>' + K.esc(c) + ' (' + ctry[c] + ')</option>').join('');
-    $('pl-q').value = IDXS.q; $('pl-surf').value = IDXS.surface;
-    $('pl-extra').innerHTML = '<option value="">—</option>' + K.groups(metrics).map(g => '<optgroup label="' + K.esc(g.name) + '">' + g.items.map(m => '<option value="' + K.esc(m.key) + '"' + (m.key === IDXS.extra ? ' selected' : '') + '>' + K.esc(m.label) + '</option>').join('') + '</optgroup>').join('');
-    const heads = K.headline(metrics, IDX_PREFS, 7, true);
-    const draw = () => drawIndex(T, cat, heads);
+    Object.keys(P).forEach(id => { const c = P[id].country; if (c) ctry[c] = (ctry[c] || 0) + 1; });
+    el.innerHTML = '<div class="ta-pl-ctl">' + V.seg('pl-surf', [['', 'All surfaces'], ['hard', 'Hard'], ['clay', 'Clay'], ['grass', 'Grass']], IDXS.surface, 'Peer group') +
+      '<input id="pl-q" class="qk-input" type="search" placeholder="Player or country" aria-label="Search players" value="' + K.esc(IDXS.q) + '">' +
+      '<select id="pl-country" class="qk-select" aria-label="Country"><option value="">All countries</option>' + Object.keys(ctry).sort().map(c => '<option value="' + K.esc(c) + '"' + (c === IDXS.country ? ' selected' : '') + '>' + K.esc(c) + ' (' + ctry[c] + ')</option>').join('') + '</select></div>' +
+      V.card('<span id="pl-title"></span>', '<span id="pl-sub"></span>', '<div id="pl-table"></div>', { flush: true, html: true, foot: '<span id="pl-foot"></span><a href="' + K.href(T, 'lab') + '">Every metric in the lab →</a>' }) +
+      '<section class="qk-section">' + V.card('Below the floor', 'Listed with their raw numbers only: too few matches for a percentile', '<div id="pl-below"></div>', { flush: true }) + '</section>';
+    const draw = () => drawIndex(el, T, cat);
     let t = null;
-    $('pl-q').oninput = e => { IDXS.q = e.target.value; clearTimeout(t); t = setTimeout(draw, 150); };
-    $('pl-country').onchange = e => { IDXS.country = e.target.value; draw(); };
-    $('pl-surf').onchange = e => { IDXS.surface = e.target.value; draw(); };
-    $('pl-floor').oninput = e => { IDXS.floor = Number(e.target.value); $('pl-floor-v').textContent = IDXS.floor; };
-    $('pl-floor').onchange = draw;
-    $('pl-extra').onchange = e => { IDXS.extra = e.target.value; draw(); };
+    el.querySelector('#pl-q').oninput = e => { IDXS.q = e.target.value; clearTimeout(t); t = setTimeout(draw, 150); };
+    el.querySelector('#pl-country').onchange = e => { IDXS.country = e.target.value; draw(); };
+    QK.seg(el.querySelector('#pl-surf'), v => { IDXS.surface = v; draw(); });
     draw();
-    $('pl-note').innerHTML = 'Catalogue for ' + K.esc(cat.year || '') + ', tour-level singles. Pills are percentiles (100 = best; ↓ metrics are already flipped) against every qualified ' + K.TN(T) + ' player, or with a surface picked, against the players with enough matches on that surface (and only they are listed). ' +
-      'Percentiles need ' + K.num(isNum(cat.floor) ? cat.floor : cat.min_matches, 0) + '+ matches' + (isNum(cat.surface_floor) ? ' (' + cat.surface_floor + '+ on a surface)' : '') + '; players below show raw values only. Serve and return figures marked inferred come from game and set scores; ' + (T === 'wta' ? 'the WTA rows also carry real point-level stats from the WTA API. ' : 'the ATP has no public point-level stats, so its serve and return figures are all inferred from scores. ') +
-      'Headline columns: ' + heads.map(m => K.glossLink(m.key, K.esc(m.label))).join(' · ') + '. All ' + metrics.length + ' metrics are on every player page and in the <a href="' + K.href(T, 'lab') + '">lab</a>.';
   });
 }
 
-function drawIndex(T, cat, heads) {
-  const P = cat.players, meta = K.metaOf(cat.metrics);
+function drawIndex(el, T, cat) {
+  const V = TA.v2, P = cat.players, sf = IDXS.surface;
   const q = fold(IDXS.q.trim());
-  const extra = IDXS.extra && meta[IDXS.extra] ? meta[IDXS.extra] : null;
-  const cols = heads.concat(extra && heads.indexOf(extra) < 0 ? [extra] : []);
-  const sf = IDXS.surface;
-  const ids = Object.keys(P).filter(id => {
+  const keys = ['hold_plus_break'].concat(V.set(T, sf));
+  const match = id => {
     const p = P[id];
-    if ((p.matches || 0) < IDXS.floor) return false;
     if (IDXS.country && p.country !== IDXS.country) return false;
-    if (sf && !((p.pct_surface || {})[sf])) return false;
     if (q && fold(String(p.name || '') + ' ' + (p.country || '')).indexOf(q) < 0) return false;
     return true;
+  };
+  const ids = Object.keys(P).filter(match);
+  const pool = ids.filter(id => V.inPool(P[id], sf, cat));
+  const below = ids.filter(id => !V.inPool(P[id], sf, cat) && (sf ? ((P[id].values_surface || {})[sf] || {}).matches : P[id].matches));
+  const rows = pool.map(id => {
+    const p = P[id], r = { id: id, name: p.name || K.name(T, id), sub: [p.country, isNum(p.rank) ? 'No. ' + p.rank : ''].filter(Boolean).join(' · '),
+      m: sf ? ((p.values_surface || {})[sf] || {}).matches : p.matches };
+    keys.forEach(k => { r[k] = V.value(p, k, sf); r['p_' + k] = V.pctl(p, k, sf, cat); });
+    return r;
   });
-  const sortKey = (heads[0] || {}).key;
-  ids.sort((a, b) => {
-    const va = (P[a].values || {})[sortKey], vb = (P[b].values || {})[sortKey];
-    return (isNum(vb) ? vb : -1e9) - (isNum(va) ? va : -1e9) || (P[b].matches || 0) - (P[a].matches || 0);
+  QK.leaderboard(el.querySelector('#pl-table'), {
+    dense: true, rank: true, sort: { key: 'hold_plus_break', dir: 'desc' }, rowHref: r => K.playerHref(T, r.id),
+    columns: [{ key: 'name', label: 'Player', type: 'entity', sub: 'sub', href: r => K.playerHref(T, r.id) }, { key: 'm', label: sf ? 'Matches (' + sf + ')' : 'Matches', num: true }]
+      .concat(keys.map(k => ({ key: k, label: SHORT[k] || V.label(k), type: 'pctl', pctl: 'p_' + k, fmt: v => V.fmt(k, v) }))),
+    rows: rows
   });
-  const src = p => (sf ? ((p.pct_surface || {})[sf] || {}) : (p.pct || {}));
-  const rows = ids.map((id, i) => {
-    const p = P[id];
-    return { _href: K.playerHref(T, id), cells: [
-      { v: i + 1, cls: 'pos-cell' },
-      { v: p.name || id, html: K.playerLink(T, id, p.name) + (p.qualified === false ? ' <span class="pg-tag" title="Below the match floor: no percentiles">few matches</span>' : '') },
-      { v: p.country || '', html: K.ctry(p.country) },
-      { v: p.age, html: isNum(p.age) ? K.num(p.age, 0) : '—', align: 'right' },
-      { v: isNum(p.rank) ? p.rank : 9999, html: isNum(p.rank) ? String(p.rank) : '—', align: 'right' },
-      { v: p.matches || 0, html: String(p.matches || 0), align: 'right' }
-    ].concat(cols.map(m => {
-      const v = (sf && (p.values_surface || {})[sf] ? p.values_surface[sf] : (p.values || {}))[m.key], pc = src(p)[m.key];
-      return { v: isNum(v) ? v : -1e9, html: '<span class="af-val">' + K.fmt(m, v) + '</span> ' + K.pill(pc), align: 'right' };
-    })) };
-  });
-  const host = document.getElementById('pl-table');
-  if (!host) return;
-  host.innerHTML = rows.length ? K.table([{ label: '#', sortable: false }, { label: 'Player' }, { label: 'Ctry' }, { label: 'Age', align: 'right' }, { label: 'Rank', align: 'right' }, { label: 'Matches', align: 'right' }]
-    .concat(cols.map(m => ({ label: K.shortLabel(m.label) + (m.lower ? ' ↓' : ''), align: 'right', title: (m.desc || m.label) + (m.lower ? ' (lower is better)' : '') }))), rows, { sticky: true, compact: true })
-    : K.muted('No player matches these filters.');
+  el.querySelector('#pl-title').textContent = K.TN(T) + (sf ? ' on ' + sf : ' players') + ', ' + (cat.year || '');
+  el.querySelector('#pl-sub').innerHTML = 'Peers: ' + K.esc(V.peer(T, sf, cat)) + '. Cells are coloured by percentile against them (blue low, red high); sorted by serve + return. Hold and break are inferred from set scores' + (T === 'wta' ? '; dominance and aces come from WTA match statistics (2016 on, not the Slams)' : '') + '.';
+  el.querySelector('#pl-foot').textContent = pool.length + ' qualified of ' + ids.length + (q || IDXS.country ? ' matching' : '') + ' players';
+  const host = el.querySelector('#pl-below');
+  host.innerHTML = below.length ? K.table([{ label: 'Player' }, { label: 'Ctry' }, { label: 'Rank', align: 'right' }, { label: sf ? 'Matches on ' + sf : 'Matches', align: 'right' }, { label: 'Win %', align: 'right' }],
+    below.sort((a, b) => (P[a].rank || 9999) - (P[b].rank || 9999)).map(id => {
+      const p = P[id], v = sf ? ((p.values_surface || {})[sf] || {}) : (p.values || {});
+      return { _href: K.playerHref(T, id), cells: [{ v: p.name, html: K.playerLink(T, id, p.name) }, p.country || '', { v: isNum(p.rank) ? p.rank : 9999, html: isNum(p.rank) ? String(p.rank) : '—' }, v.matches || 0, { v: v.win_pct, html: K.fmtV(v.win_pct, 'pct') }] };
+    }), { compact: true }) : K.muted('Everyone listed meets the floor.');
   K.sortable(host);
-  const sub = document.getElementById('pl-sub');
-  if (sub) sub.textContent = ids.length + ' of ' + Object.keys(P).length + ' players · sorted by ' + ((heads[0] || {}).label || 'matches') + (sf ? ' · ' + K.SURF_LABEL[sf] + ' percentiles' : '') + '; click a header to sort, a row to open the player';
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -643,69 +622,106 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
     return;
   }
 
-  let h = '<div class="pg-head af-head"><div class="pg-num af-badge">' + K.esc(isNum(rank) ? '#' + rank : K.TN(T)) + '</div><div class="pg-body"><h2>' + K.esc(name) + '</h2>' +
-    '<div class="pg-sub">' + K.ctry(country) + (c.hand ? '<span>' + (c.hand === 'L' ? 'Left-handed' : c.hand === 'R' ? 'Right-handed' : K.esc(c.hand)) + '</span>' : '') +
-    (age !== null ? '<span>age ' + age + '</span>' : '') + (isNum(c.height) ? '<span>' + K.num(c.height, 0) + ' cm</span>' : '') +
-    '<span class="chip">' + K.TN(T) + '</span>' + (p && p.qualified === false ? '<span class="chip warn">below the match floor: no percentiles</span>' : '') + '</div></div>' +
-    '<div class="pg-links">' + (rival ? '<a href="' + K.compareHref(T, pid, rival) + '">Compare with ' + K.esc(K.surname(K.name(T, rival))) + ' →</a>' : '') +
-    (h2hTop ? '<a href="' + K.h2hHref(T, pid, h2hTop) + '">H2H v ' + K.esc(K.surname(K.name(T, h2hTop))) + ' →</a>' : '') +
-    '<a href="' + K.href(T, 'elo') + '">Elo →</a><a href="' + K.href(T, 'lab') + '">Lab →</a><a href="' + K.href(T, 'players') + '">All players →</a></div></div>';
-
-  // Tiles.
-  const surfE = eloCur ? K.SURFACES.map(s => '<span class="af-se" style="color:' + K.surfColour(s) + '">' + s.charAt(0).toUpperCase() + ' ' + K.num(eloCur[s], 0) + '</span>').join(' ') : '';
-  const hold = isNum(val(K_.hold)) ? val(K_.hold) : lastSeason(c, 'hold'), brk = isNum(val(K_.brk)) ? val(K_.brk) : lastSeason(c, 'brk');
+  const V = TA.v2;
   const odds = c.odds || {};
   const fq = isNum(odds.finals_qual) ? odds.finals_qual : ((race || {}).finals_qual || {})[pid];
   const no1 = isNum(odds.year_end_no1) ? odds.year_end_no1 : ((race || {}).year_end_no1 || {})[pid];
   const finalsName = T === 'wta' ? 'WTA Finals' : 'ATP Finals';
-  h += '<div class="kpi-grid af-tiles">' + [
-    K.tile('Elo', K.num(eloCur ? eloCur.all : val(K_.elo), 0), eloCur && isNum(eloCur.rank) ? 'No. ' + eloCur.rank + ' by Elo · ' + K.int(eloCur.n) + ' matches rated' : ''),
-    K.tile('Surface Elo', eloCur ? '<span class="af-tile-surf">' + surfE + '</span>' : '—', 'hard · clay · grass'),
-    K.tile('Ranking', isNum(rank) ? '#' + rank : '—', off ? K.int(off[2]) + ' points' + (isNum(off[3]) && off[3] ? ' · <span class="' + (off[3] > 0 ? 'pg-up' : 'pg-down') + '">' + (off[3] > 0 ? '▲' : '▼') + Math.abs(off[3]) + '</span>' : '') : ''),
-    K.tile('Race', raceIdx >= 0 ? '#' + (raceIdx + 1) : '—', raceIdx >= 0 ? K.int(raceList[raceIdx][1]) + ' points this year' : 'not in the race top 100'),
-    K.tile('Hold %', K.fmtV(hold, 'pct'), 'service games held, inferred' + (p && isNum((p.pct || {}).hold) ? ' · ' + Math.round(p.pct.hold) + 'th pct' : '')),
-    K.tile('Break %', K.fmtV(brk, 'pct'), 'return games won, inferred' + (p && isNum((p.pct || {}).brk) ? ' · ' + Math.round(p.pct.brk) + 'th pct' : '')),
-    K.tile(finalsName, isNum(fq) ? K.pct(fq) : '—', isNum(fq) ? 'qualification odds · <a href="' + K.href(T, 'race') + '">race →</a>' : 'not simulated'),
-    K.tile('Year-end No. 1', isNum(no1) ? K.pct(no1) : '—', isNum(no1) ? 'season simulation' : 'not in contention')
-  ].join('') + '</div>';
-  h += '<div id="pp-value"></div>';
+  const hand = c.hand === 'L' ? 'Left-handed' : c.hand === 'R' ? 'Right-handed' : '';
+  const pc = (p && p.pct) || {};
+  const hero = QK.playerHeader({ name: name, pos: country || K.TN(T), kicker: K.TN(T) + ' · ' + ((cat || {}).year || ''),
+    meta: [age !== null ? ['Age', String(age)] : null, hand ? ['Plays', hand] : null, isNum(c.height) ? ['Height', K.num(c.height, 0) + ' cm'] : null],
+    stats: [{ label: 'Ranking', value: isNum(rank) ? '#' + rank : '—' }, { label: 'Elo', value: K.num(eloCur ? eloCur.all : vals.elo, 0) }, { label: 'Titles ' + ((cat || {}).year || ''), value: isNum(vals.titles) ? vals.titles : '—' }, { label: 'W–L', value: isNum(vals.wins) ? vals.wins + '–' + (vals.losses || 0) : '—' }],
+    tags: [p && p.qualified ? QK.tag('Qualified for percentiles', 'signal') : QK.tag('Below the match floor: no percentiles')] });
+  const links = '<div class="ta-pl-links">' + (rival ? '<a class="qk-btn" href="' + K.compareHref(T, pid, rival) + '">Compare with ' + K.esc(K.surname(K.name(T, rival))) + '</a>' : '') +
+    (h2hTop ? '<a class="qk-btn" href="' + K.h2hHref(T, pid, h2hTop) + '">Head to head v ' + K.esc(K.surname(K.name(T, h2hTop))) + '</a>' : '') +
+    '<a class="qk-btn" href="' + K.href(T, 'players') + '">All players</a></div>';
+  const tiles = [];
+  if (isNum(fq) && fq >= 0.005) tiles.push({ label: finalsName, value: K.pct(fq, fq > 0.995 || fq < 0.01 ? 1 : 0), signal: true, sub: 'our chance of qualifying', href: K.href(T, 'race'), tip: 'From simulating the rest of the season' });
+  if (isNum(no1) && no1 >= 0.005) tiles.push({ label: 'Year-end No. 1', value: K.pct(no1, 0), signal: !(isNum(fq) && fq >= 0.005), sub: 'our chance, season simulation' });
+  tiles.push({ label: 'Elo', value: K.num(eloCur ? eloCur.all : vals.elo, 0), pctl: pc.elo, sub: eloCur && isNum(eloCur.rank) ? 'No. ' + eloCur.rank + ' by Elo' : 'our strength rating', tip: 'Overall strength rating from every result, adjusted for the opponent' });
+  if (isNum(vals.hold_plus_break)) tiles.push({ label: 'Serve + return', value: K.fmtV(vals.hold_plus_break, 'pct'), pctl: pc.hold_plus_break, sub: 'hold ' + K.fmtV(vals.hold, 'pct') + ' · break ' + K.fmtV(vals.brk, 'pct') + ', inferred', tip: 'Hold % plus break %, inferred from set scores: the best single predictor beyond Elo' });
+  tiles.push({ label: 'Ranking', value: isNum(rank) ? '#' + rank : '—', sub: off ? K.int(off[2]) + ' points' + (isNum(off[3]) && off[3] ? ' · ' + (off[3] > 0 ? '▲' : '▼') + Math.abs(off[3]) : '') : '' });
+  tiles.push({ label: 'Race position', value: raceIdx >= 0 ? '#' + (raceIdx + 1) : '—', sub: raceIdx >= 0 ? K.int(raceList[raceIdx][1]) + ' points this year, this week included' : 'outside the race top 100' });
 
-  // Percentiles + radar.
-  const surfOpts = K.SURFACES.filter(s => p && (p.pct_surface || {})[s]);
-  h += '<div class="card"><div class="card-header">Percentiles <span class="card-sub">The whole catalogue, ' + metrics.length + ' metrics' + (cat && cat.year ? ', ' + K.esc(cat.year) : '') + '. Tour: against every qualified ' + K.TN(T) + ' player. Surface: against the players with enough matches on it.</span>' +
-    K.toggle('pp-src', [['tour', 'Tour']].concat(surfOpts.map(s => [s, K.SURF_LABEL[s]])), 'tour') + '</div><div id="pp-pct"></div></div>';
-  h += '<div class="grid-2"><div class="card"><div class="card-header">Profile <span class="card-sub">Ten headline metrics as tour percentiles' + (rival ? ', against ' + K.esc(K.name(T, rival)) : '') + '.</span></div><div id="pp-radar" style="height:400px"></div></div>' +
-    '<div class="card"><div class="card-header">Clutch <span class="card-sub">Actual against the chain\'s expectation from the pre-match prices.</span></div><div id="pp-clutch"></div></div></div>';
-  // Elo history and serve/return paths.
+  const surfOpts = V.SURF.filter(s => V.inPool(p, s, cat));
+  let h = hero + links +
+    '<div class="ta-kpis">' + QK.stats(tiles) + '</div><div id="pp-value"></div>' +
+    '<div class="qk-grid"><div class="qk-span-5" id="pp-pcard"></div><div class="qk-span-7"><div class="ta-stack">' +
+    (p && p.qualified ? V.card('Where ' + K.esc(K.surname(name)) + ' sits', 'Every qualified player in the peer group; bars coloured by percentile, the player and the median marked',
+      '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px;flex-wrap:wrap"></div>' + V.chart('pp-dist', 240, 'Distribution of the peer group')) : '') +
+    '<div id="pp-sim"></div></div></div></div>';
+  h += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-6">' + V.card('Luck: tiebreaks, deciding sets and close calls', 'Won against what our chances expected. Season to season these barely repeat (tiebreaks r = 0.03, wins over expected r = −0.10), so read them as luck, not skill', '<div id="pp-clutch"></div>', { flush: true }) + '</div>' +
+    '<div class="qk-span-6">' + V.card('Ranking', 'Official ranking over time (log scale); gaps are spells without a ranking', V.chart('pp-rank', 280, 'Ranking history'), {}) + '</div></div></section>';
   h += '<div class="card"><div class="card-header">Elo history <span class="card-sub">Overall and surface Elo after every match.</span>' + K.toggle('pp-elo-win', [['all', 'Career'], ['3', 'Last 3 years'], ['1', 'Last year']], 'all') + '</div><div id="pp-elo" style="height:340px"></div></div>';
   h += '<div class="card"><div class="card-header">Serve and return <span class="card-sub">The serve (s) and return (r) ratings from the score-based model, ±1 standard error shaded, by surface. Higher is better for both.</span>' +
     K.toggle('pp-sr-kind', [['rating', 'Ratings'], ['rates', 'Hold / break %']], 'rating') + '</div><div id="pp-sr" style="height:360px"></div><div class="pg-note" id="pp-sr-note"></div></div>';
-  h += '<div class="grid-2"><div class="card"><div class="card-header">Ranking <span class="card-sub">Official ranking over time (log scale).</span></div><div id="pp-rank" style="height:280px"></div></div>' +
-    '<div class="card"><div class="card-header">Points to defend <span class="card-sub">What drops off the 52-week ranking, by week.</span></div><div id="pp-defend"></div></div></div>';
+  h += '<div class="card"><div class="card-header">Points to defend <span class="card-sub">What drops off the 52-week ranking, by week.</span></div><div id="pp-defend"></div></div>';
   h += '<div class="card"><div class="card-header">Seasons <span class="card-sub">Tour-level record, titles, inferred hold and break, and Elo at the end of each year.</span></div><div id="pp-seasons"></div></div>';
-  h += '<div class="card"><div class="card-header">Results <span class="card-sub" id="pp-res-sub">The model\'s pre-match probability and the closing market against what happened.</span>' +
-    '<span class="pg-ctl"><select id="pp-res-surf"><option value="">all surfaces</option><option value="hard">hard</option><option value="clay">clay</option><option value="grass">grass</option></select></span></div><div id="pp-res-chart" style="height:220px"></div><div id="pp-results"></div></div>';
-  h += '<div class="card"><div class="card-header">Splits <span class="card-sub">Record, expected wins (sum of pre-match model probabilities) and the difference.</span>' +
+  h += '<div class="card"><div class="card-header">Results <span class="card-sub" id="pp-res-sub">Our pre-match chance against what happened.</span>' +
+    K.toggle('pp-res-lv', [['tour', 'Tour level'], ['all', T === 'atp' ? 'Every level, with Challengers' : 'Every level']], 'tour') +
+    '<span class="pg-ctl"><select id="pp-res-surf" aria-label="Surface"><option value="">all surfaces</option><option value="hard">hard</option><option value="clay">clay</option><option value="grass">grass</option></select></span></div><div id="pp-res-chart" style="height:220px"></div><div id="pp-results"></div></div>';
+  h += '<div class="card"><div class="card-header">Splits <span class="card-sub">Record, expected wins (the sum of our pre-match chances) and the difference.</span>' +
     K.toggle('pp-split', [['surface', 'Surface'], ['level', 'Level'], ['round', 'Round'], ['opp_band', 'Opponent rank']], 'surface') + '</div><div id="pp-splits"></div></div>';
   h += '<div class="card" id="pp-style-card"><div class="card-header">Style <span class="card-sub">Shot-by-shot profile from the Match Charting Project, against the median charted ' + K.TN(T) + ' player.</span></div><div id="pp-style"></div></div>';
   h += '<div class="card"><div class="card-header">Head to head <span class="card-sub">Most frequent opponents (top 30 by matches). Click for the full head-to-head page.</span></div><div id="pp-h2h"></div></div>';
+  h += '<div class="card"><div class="card-header">Every metric <span class="card-sub">The whole catalogue, ' + metrics.length + ' metrics, as percentiles against the tour or a surface pool (100 = best; ↓ marks metrics where lower is better).</span>' +
+    K.toggle('pp-src', [['tour', 'Tour']].concat(surfOpts.map(s => [s, K.SURF_LABEL[s]])), 'tour') + '</div><div id="pp-pct"></div></div>';
   el.innerHTML = h;
 
-  // Percentile panel.
+  // percentile card on the spec's metric set, by tour or surface
+  const drawCard = sf => {
+    const host = document.getElementById('pp-pcard');
+    if (!host) return;
+    const segH = V.seg('pp-pc-sf', [['', 'Tour']].concat(surfOpts.map(s => [s, K.SURF_LABEL[s]])), sf, 'Peer group');
+    host.innerHTML = QK.pctCard({ title: 'Percentile rankings', peer: V.peer(T, sf, cat), sample: p ? V.sampleLine(p, T, sf, cat) : '',
+      groups: p && V.inPool(p, sf, cat) ? V.pctGroups(p, cat, T, sf) : [], right: surfOpts.length ? segH : '',
+      note: 'Hold and break are inferred from set scores, not measured point by point.',
+      emptyText: p ? K.esc(name) + ' is short of the ' + (sf || 'tour') + ' match floor this season.' : 'Not in this season’s catalogue (no tour-level match this year).' });
+    const sg = host.querySelector('#pp-pc-sf');
+    if (sg) QK.seg(sg, v => { drawCard(v); drawDist(v); });
+  };
+  let distKey = null;
+  const drawDist = sf => {
+    const segEl = document.getElementById('pp-dist-m');
+    if (!segEl || !p) return;
+    const keys = V.set(T, sf);
+    if (keys.indexOf(distKey) < 0) distKey = keys[0];
+    segEl.innerHTML = keys.map(k => '<button type="button" aria-pressed="' + (k === distKey) + '" data-value="' + k + '">' + K.esc(SHORT[k] || V.label(k)) + '</button>').join('');
+    const one = k => {
+      distKey = k;
+      const peers = Object.keys(P).filter(id => V.inPool(P[id], sf, cat));
+      const xs = peers.map(id => V.value(P[id], k, sf)).filter(isNum).sort((a, b) => a - b);
+      const mine = V.value(p, k, sf);
+      if (xs.length < 5) { document.getElementById('pp-dist').innerHTML = QK.empty('Too few qualified peers yet'); return; }
+      const pctFmt = (V.META[k] || [])[2] === 'pct';
+      const f = pctFmt ? (v => (v * 100).toFixed(1) + '%') : (v => V.fmt(k, v));
+      QKC.distribution('#pp-dist', { values: xs, binCount: 20, fmt: f, xName: V.label(k, sf) + ' · ' + xs.length + ' ' + V.peer(T, sf, cat).replace(/,.*$/, ''), yName: 'Players',
+        marks: (isNum(mine) && V.inPool(p, sf, cat) ? [{ x: mine, label: K.surname(name) }] : []).concat([{ x: xs[Math.floor(xs.length / 2)], label: 'Median' }]), label: 'Distribution of ' + V.label(k) });
+    };
+    one(distKey);
+    QK.seg(segEl, one);
+  };
+  drawCard('');
+  drawDist('');
+  // most similar (the spec's weighted distance on the tour profile)
+  const sim = V.similar(T, pid, cat, 5);
+  const simHost = document.getElementById('pp-sim');
+  if (simHost && sim.length) simHost.innerHTML = V.card('Most similar', 'Nearest on this season’s profile: Elo, surface Elos, hold, break and games won' + (T === 'wta' ? ', aces and first serves in' : ', tiebreaks per set'),
+    '<ul class="ta-list">' + sim.map((x, i) => '<li><span class="n">' + (i + 1) + '</span><a class="nm" href="' + K.playerHref(T, x.id) + '">' + K.esc(K.name(T, x.id)) + '</a><span class="s">' + K.esc(K.country(T, x.id)) + '</span><a class="v ta-cmp-link" href="' + K.compareHref(T, pid, x.id) + '">Compare</a></li>').join('') + '</ul>',
+    { flush: true, foot: '<span></span><a href="' + K.compareHref(T, pid, sim[0].id) + (sim[1] ? '/' + encodeURIComponent(sim[1].id) : '') + '">Compare the top two →</a>' });
+
+  // every metric
   const drawPct = src => {
     const box = document.getElementById('pp-pct');
     if (!box) return;
     if (!p) { box.innerHTML = K.muted(K.esc(name) + ' is not in the ' + K.esc((cat || {}).year || '') + ' catalogue (no tour-level match this year).'); return; }
-    const pc = src === 'tour' ? p.pct : ((p.pct_surface || {})[src] || {});
+    const pcs = src === 'tour' ? p.pct : ((p.pct_surface || {})[src] || {});
     const vs = src !== 'tour' && (p.values_surface || {})[src] ? p.values_surface[src] : vals;
-    box.innerHTML = K.pctPanel(metrics, vs, pc, { note: (src === 'tour' ? 'Tour percentile' : K.SURF_LABEL[src] + ' percentile') + ', 100 = best. ↓ marks metrics where lower is better. Real serve/return stats exist for WTA matches from 2016 (not Slams); style metrics only for charted matches. With a surface picked, values are the figures on that surface where the catalogue carries them, ranked against that surface pool. Hover a row for the definition.' });
+    box.innerHTML = K.pctPanel(metrics, vs, pcs, { note: (src === 'tour' ? 'Tour percentile' : K.SURF_LABEL[src] + ' percentile') + ', 100 = best. Real serve and return statistics exist for WTA matches from 2016 (not the Slams); style metrics only for charted matches. Tiebreak, deciding-set and over-expected rows are mostly luck. Hover a row for the definition.' });
   };
   drawPct('tour');
   K.wireToggle(el, 'pp-src', drawPct);
-  const pctP = (p && p.pct) || {};
-  const axes = K.headline(metrics, RADAR_PREFS, 10, pctP).map(m => ({ key: m.key, label: K.shortLabel(m.label) }));
-  const rv = rival && P[rival] ? P[rival] : null;
-  K.radar('pp-radar', axes, [{ name: name, pct: pctP, colour: K.CA }].concat(rv ? [{ name: rv.name, pct: rv.pct || {}, colour: K.CB }] : []));
 
   if (TA.value && typeof TA.value.card === 'function') TA.value.card(T, pid, document.getElementById('pp-value'));
   drawClutch(c, p, metrics);
@@ -714,7 +730,7 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
   drawRanks(c);
   drawDefend(T, c, ranks, pid);
   drawSeasons(c);
-  drawResults(T, c);
+  drawResults(T, c, el);
   drawSplits(T, c, el);
   drawStyle(T, pid, c);
   drawH2H(T, pid, c);
@@ -762,7 +778,7 @@ function drawClutch(c, p, metrics) {
       '<div class="af-cl-v ' + ((r.diff || 0) > 0.05 ? 'pg-up' : (r.diff || 0) < -0.05 ? 'pg-down' : '') + '">' + K.signed(r.diff, 1) + '</div></div>';
   }).join('') + '</div>' : '') +
     (extra.length ? '<div class="af-kv">' + extra.map(k => '<div class="af-kv-i"><span>' + K.esc(meta[k].label) + '</span><strong>' + K.fmt(meta[k], p.values[k]) + ' ' + K.pill((p.pct || {})[k]) + '</strong></div>').join('') + '</div>' : '') +
-    '<div class="pg-note">Expected wins are the sum of the model\'s probabilities for those sets or matches, so a positive figure is more won than the ratings predicted. Small samples swing: a tiebreak record of 10 has a standard deviation of about 1.6 wins.</div>';
+    '<div class="pg-note">Expected wins are the sum of our chances for those sets or matches, so a positive figure is more won than the ratings predicted. Small samples swing: a tiebreak record of 10 has a standard deviation of about 1.6 wins.</div>';
 }
 
 function cutoff(win) { if (win === 'all') return ''; const d = new Date(); d.setFullYear(d.getFullYear() - Number(win)); return d.toISOString().slice(0, 10); }
@@ -823,10 +839,28 @@ function drawServeReturn(c, root) {
 function drawRanks(c) {
   const node = document.getElementById('pp-rank');
   if (!node) return;
-  const rs = (c.ranks || []).filter(r => Array.isArray(r) && isNum(r[1]));
+  const rs = (c.ranks || []).filter(r => Array.isArray(r) && isNum(r[1]) && TA.parseDate(r[0]));
   if (!rs.length) { node.innerHTML = K.muted('No ranking history.'); return; }
-  K.plot(node, [{ type: 'scatter', mode: 'lines', x: rs.map(r => r[0]), y: rs.map(r => r[1]), line: { color: K.C.yellow, width: 2, shape: 'hv' }, hovertemplate: '%{x}: No. %{y}<extra></extra>' }],
-    K.layout({ margin: { l: 44, r: 10, t: 10, b: 36 }, xaxis: { type: 'date', title: 'Date' }, yaxis: { type: 'log', autorange: 'reversed', title: 'Rank', tickvals: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000] } }));
+  /* a spell of more than nine weeks between ranking dates is drawn as a gap, not a line across it; the line holds
+     each ranking until the next one (steps) */
+  const pts = [];
+  rs.forEach((r, i) => {
+    const t = TA.parseDate(r[0]).getTime();
+    if (i && t - TA.parseDate(rs[i - 1][0]).getTime() > 63 * 864e5) pts.push([t - 864e5, null]);
+    pts.push([t, Number(r[1])]);
+  });
+  const worst = Math.max.apply(null, rs.map(r => Number(r[1])));
+  QKC.mount(node, T2 => {
+    const ya = QKC.axis(T2, { name: 'Ranking (log scale)', nameAlign: 'left', fmt: v => String(Math.round(v)) });
+    ya.type = 'log'; ya.logBase = 10; ya.inverse = true; ya.nameLocation = 'start'; ya.nameGap = 14; ya.min = 1; ya.max = Math.pow(10, Math.ceil(Math.log(Math.max(10, worst)) / Math.LN10));
+    return {
+      grid: { left: 8, right: 16, top: 30, bottom: 30, containLabel: true },
+      xAxis: QKC.axis(T2, { type: 'time', split: false, line: true, name: 'Date', nameLocation: 'middle', nameGap: 26 }),
+      yAxis: ya,
+      tooltip: QKC.tooltip(T2, { trigger: 'axis', formatter: ps => { const q = (ps || [])[0]; return q && isNum(q.value[1]) ? K.esc(K.fmtDate(new Date(q.value[0]).toISOString().slice(0, 10), { weekday: false })) + ': No. ' + q.value[1] : ''; } }),
+      series: [{ type: 'line', step: 'end', showSymbol: false, connectNulls: false, data: pts, lineStyle: { color: T2.model, width: 2 }, itemStyle: { color: T2.model } }]
+    };
+  }, { label: 'Ranking history' });
 }
 
 function drawDefend(T, c, ranks, pid) {
@@ -855,31 +889,48 @@ function drawSeasons(c) {
   K.sortable(host);
 }
 
-function drawResults(T, c) {
+function drawResults(T, c, root) {
   const host = document.getElementById('pp-results'), chart = document.getElementById('pp-res-chart'), sel = document.getElementById('pp-res-surf');
   const all = (c.results || []).filter(r => r && r.date).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  /* every level (qualifying, Challengers / WTA 125s): [date, event, round, surface, opp, won, score]; not forecast */
+  const every = (c.results_all || []).filter(r => Array.isArray(r) && r[0]).map(r => ({ date: r[0], event: r[1], round: r[2], surface: r[3], opp: r[4], won: !!r[5], score: r[6] }))
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  let level = 'tour', showAll = false;
+  const lvl = e => { const x = K.event(T, e); return x && x.level ? (K.LEVEL_LABEL[x.level] || x.level) : (T === 'atp' ? 'Challenger or other' : 'Other'); };
   const draw = () => {
     const sf = sel ? sel.value : '';
+    const sub = document.getElementById('pp-res-sub');
+    if (level === 'all') {
+      const rs = every.filter(r => !sf || r.surface === sf);
+      chart.style.display = 'none';
+      if (sub) sub.innerHTML = rs.length + ' matches at every level this season and last, qualifying and ' + (T === 'atp' ? 'Challengers' : 'WTA 125s') + ' included. They feed the ratings; only tour-level matches get our forecast.';
+      host.innerHTML = rs.length ? K.table([{ label: 'Date' }, { label: 'Event' }, { label: 'Level' }, { label: 'Rd' }, { label: 'Opponent' }, { label: 'Result' }, { label: 'Score' }],
+        rs.slice(0, showAll ? rs.length : 40).map(r => [{ v: r.date, html: K.esc(K.fmtDate(r.date, { weekday: false })) }, { v: K.eventName(T, r.event), html: K.surfChip(r.surface) + ' ' + K.eventLink(T, r.event) },
+          K.esc(lvl(r.event)), { v: K.ROUND_ORDER.indexOf(r.round), html: K.esc(r.round || '') }, { v: K.name(T, r.opp), html: K.playerLink(T, r.opp) },
+          { v: r.won ? 1 : 0, html: r.won ? '<span class="af-w">W</span>' : '<span class="af-l">L</span>' }, { v: r.score || '', html: '<span class="pg-mono">' + K.esc(r.score || '') + '</span>' }]), { compact: true, sticky: true }) +
+        (rs.length > 40 && !showAll ? '<div class="pg-note"><button type="button" class="af-more" id="pp-res-more">Show all ' + rs.length + ' matches</button></div>' : '')
+        : K.muted('No results at any level in the career file' + (sf ? ' on ' + sf : '') + '.');
+      K.sortable(host);
+      const more = document.getElementById('pp-res-more');
+      if (more) more.onclick = () => { showAll = true; draw(); };
+      return;
+    }
     const rs = all.filter(r => !sf || r.surface === sf);
     if (!rs.length) { host.innerHTML = K.muted('No results in the career file' + (sf ? ' on ' + sf : '') + '.'); chart.style.display = 'none'; return; }
     chart.style.display = '';
     const withP = rs.filter(r => isNum(r.p_pre));
     const wins = withP.filter(r => r.won).length, exp = withP.reduce((s, r) => s + r.p_pre, 0);
-    const withM = rs.filter(r => isNum(r.market_pre) && isNum(r.p_pre));
-    const ll = (list, k) => list.reduce((s, r) => { const q = Math.min(0.9999, Math.max(0.0001, r[k])); return s - Math.log(r.won ? q : 1 - q); }, 0) / (list.length || 1);
-    const sub = document.getElementById('pp-res-sub');
-    if (sub) sub.innerHTML = rs.length + ' matches (' + K.esc(String(rs[rs.length - 1].date).slice(0, 4)) + '–' + K.esc(String(rs[0].date).slice(0, 4)) + ')' +
-      (withP.length ? ' · won ' + wins + ' against ' + K.num(exp, 1) + ' expected (<span class="' + (wins - exp >= 0 ? 'pg-up' : 'pg-down') + '">' + K.signed(wins - exp, 1) + '</span>)' : '') +
-      (withM.length >= 5 ? ' · log-loss on the ' + withM.length + ' matches with a closing price: model ' + K.num(ll(withM, 'p_pre'), 3) + ', market ' + K.num(ll(withM, 'market_pre'), 3) : '');
-    // Wins minus expected, cumulative (oldest first).
+    if (sub) sub.innerHTML = rs.length + ' tour-level matches (' + K.esc(String(rs[rs.length - 1].date).slice(0, 4)) + '–' + K.esc(String(rs[0].date).slice(0, 4)) + ')' +
+      (withP.length ? ' · won ' + wins + ' against ' + K.num(exp, 1) + ' expected from our pre-match chances (<span class="' + (wins - exp >= 0 ? 'pg-up' : 'pg-down') + '">' + K.signed(wins - exp, 1) + '</span>)' : '');
+    // wins minus expected, cumulative (oldest first)
     const asc = withP.slice().reverse();
     let cum = 0;
     const ys = asc.map(r => (cum += (r.won ? 1 : 0) - r.p_pre));
-    K.plot(chart, [{ type: 'scatter', mode: 'lines', x: asc.map(r => r.date), y: ys, line: { color: K.C.blue, width: 2 }, fill: 'tozeroy', fillcolor: K.alpha(K.C.blue, 0.12),
-      text: asc.map(r => (r.won ? 'W ' : 'L ') + K.name(T, r.opp) + ' · ' + K.eventName(T, r.event) + ' ' + (r.round || '') + ' · model ' + K.pct(r.p_pre, 0)), hovertemplate: '%{x}<br>%{text}<br>running total %{y:+.1f}<extra></extra>' }],
+    K.plot(chart, [{ type: 'scatter', mode: 'lines', x: asc.map(r => r.date), y: ys, line: { color: 'var(--signal)', width: 2 }, fill: 'tozeroy', fillcolor: K.alpha('var(--signal)', 0.12),
+      text: asc.map(r => (r.won ? 'W ' : 'L ') + K.name(T, r.opp) + ' · ' + K.eventName(T, r.event) + ' ' + (r.round || '') + ' · our chance ' + K.pct(r.p_pre, 0)), hovertemplate: '%{x}<br>%{text}<br>running total %{y:+.1f}<extra></extra>' }],
       K.layout({ margin: { l: 46, r: 10, t: 8, b: 30 }, xaxis: { type: 'date', title: 'Date' }, yaxis: { title: 'Wins − expected', zeroline: true, zerolinecolor: '#6e7681' } }));
-    host.innerHTML = K.table([{ label: 'Date' }, { label: 'Event' }, { label: 'Rd' }, { label: 'Opponent' }, { label: 'Result' }, { label: 'Score' }, { label: 'Model', align: 'right', title: 'The model\'s pre-match probability for this player' },
-      { label: 'Market', align: 'right', title: 'Closing market probability (de-vigged) for this player' }, { label: 'Surprise', align: 'right', title: 'Outcome minus the model probability: +0.8 is a win the model gave 20%' }],
+    host.innerHTML = K.table([{ label: 'Date' }, { label: 'Event' }, { label: 'Rd' }, { label: 'Opponent' }, { label: 'Result' }, { label: 'Score' }, { label: 'Our chance', align: 'right', title: 'Our pre-match chance for this player' },
+      { label: 'Surprise', align: 'right', title: 'Outcome minus our chance: +0.8 is a win we gave 20%' }],
       rs.slice(0, showAll ? rs.length : 40).map(r => ({ _href: r.match ? K.matchHref(T, r.match) : undefined, cells: [
         { v: r.date, html: K.esc(K.fmtDate(r.date, { weekday: false })) },
         { v: K.eventName(T, r.event), html: K.surfChip(r.surface) + ' ' + K.eventLink(T, r.event) },
@@ -888,7 +939,6 @@ function drawResults(T, c) {
         { v: r.won ? 1 : 0, html: r.won ? '<span class="af-w">W</span>' : '<span class="af-l">L</span>' },
         { v: r.score || '', html: '<span class="pg-mono">' + K.esc(r.score || '') + '</span>' },
         { v: r.p_pre, html: K.pct(r.p_pre, 0) },
-        { v: r.market_pre, html: isNum(r.market_pre) ? K.pct(r.market_pre, 0) + (isNum(r.p_pre) ? ' <span class="muted-inline">(' + K.signed(100 * (r.p_pre - r.market_pre), 0) + ')</span>' : '') : '<span class="muted-inline">—</span>' },
         { v: isNum(r.p_pre) ? (r.won ? 1 : 0) - r.p_pre : null, html: isNum(r.p_pre) ? '<span class="' + (r.won ? 'pg-up' : 'pg-down') + '">' + K.signed((r.won ? 1 : 0) - r.p_pre, 2) + '</span>' : '—' }
       ] })), { compact: true, sticky: true }) +
       (rs.length > 40 && !showAll ? '<div class="pg-note"><button type="button" class="af-more" id="pp-res-more">Show all ' + rs.length + ' matches</button></div>' : '');
@@ -896,8 +946,8 @@ function drawResults(T, c) {
     const more = document.getElementById('pp-res-more');
     if (more) more.onclick = () => { showAll = true; draw(); };
   };
-  let showAll = false;
   if (sel) sel.onchange = draw;
+  K.wireToggle(root, 'pp-res-lv', v => { level = v; showAll = false; draw(); });
   draw();
 }
 

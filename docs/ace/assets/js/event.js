@@ -4,9 +4,9 @@
  *   the draw: an interactive bracket (click a player to light up their path; the panel below
  *             gives the probability of reaching each round and the likeliest opponents there);
  *             on phones the rounds collapse into a round picker;
- *   title odds against the market (de-vigged), with round-reached odds and expected points;
+ *   our title chances (Design System 2.0 chance bars), with the chance of reaching each round and expected points;
  *   results by round;
- *   ?p=<pid> in the hash preselects a player in the draw; upsets (winners the model gave under 40%); draw difficulty (expected
+ *   ?p=<pid> in the hash preselects a player in the draw; upsets (winners we gave under 40%); draw difficulty (expected
  *   opponents' Elo along the path); awards; past champions.
  *
  * Reads <T>/events/<event_id>.json (PAYLOADS.md) and <T>/history.json for older champions. */
@@ -61,24 +61,21 @@ function pathPanel(T, model, sim, pid, cards) {
   return html + '</div><div class="section-note">The percentage is the chance of reaching the round. Likely opponents assume the other half plays out independently: an opponent’s share is their own chance of reaching that round.</div></div>';
 }
 
-function oddsTable(T, sim, mk, rounds) {
-  const ids = Object.keys(sim).filter(p => (sim[p].p_title || 0) > 0 || TA.isNum(mk[p]));
-  if (!ids.length) return TA.muted('No title odds: every player in the draw is out or the simulation has not run.');
-  ids.sort((a, b) => (sim[b].p_title || 0) - (sim[a].p_title || 0) || (mk[b] || 0) - (mk[a] || 0));
-  const max = Math.max.apply(null, ids.map(p => Math.max(sim[p].p_title || 0, mk[p] || 0))) || 1;
+function oddsTable(T, sim, rounds) {
+  const ids = Object.keys(sim).filter(p => (sim[p].p_title || 0) > 0);
+  if (!ids.length) return TA.muted('No title chances: every player in the draw is out or the simulation has not run.');
+  ids.sort((a, b) => (sim[b].p_title || 0) - (sim[a].p_title || 0));
+  const max = Math.max.apply(null, ids.map(p => sim[p].p_title || 0)) || 1;
   const show = ['QF', 'SF', 'F'].filter(r => rounds.indexOf(r) >= 0);
   const key = { QF: 'p_qf', SF: 'p_sf', F: 'p_final' };
   return TA.tableHTML([{ label: 'Player' }].concat(show.map(r => ({ label: TA.roundLabel(r, true), align: 'right', title: 'Probability of reaching the ' + TA.roundLabel(r).toLowerCase(), cls: 'hide-sm' })),
-    [{ label: 'Title', align: 'right' }, { label: 'Market', align: 'right', title: 'De-vigged market probability' }, { label: 'Edge', align: 'right', title: 'Model minus market, percentage points' },
-      { label: 'Fair', align: 'right', title: 'Model fair decimal odds', cls: 'hide-sm' }, { label: 'Exp. pts', align: 'right', title: 'Expected ranking points from this event', cls: 'hide-sm' }]),
+    [{ label: 'Title', align: 'right', title: 'Our chance of winning the title' }, { label: 'Exp. pts', align: 'right', title: 'Expected ranking points from this event', cls: 'hide-sm' }]),
   ids.slice(0, 40).map(p => {
     const s = sim[p];
     return [{ v: TA.playerName(T, p), html: TA.playerLink(T, p, { rank: true }) }].concat(show.map(r => {
       const v = TA.isNum(s[key[r]]) ? s[key[r]] : (s.reach || {})[r];
       return { v: v, html: TA.isNum(v) ? TA.pct(v, 0) : '—' };
-    }), [{ v: s.p_title, html: TA.probCell(s.p_title, TA.C.ace, max) }, { v: mk[p], html: TA.isNum(mk[p]) ? TA.pct(mk[p], 1) : '—' },
-      { v: TA.isNum(mk[p]) ? s.p_title - mk[p] : null, html: TA.edgeHTML(s.p_title, mk[p]) }, { v: s.p_title, html: TA.decimal(s.p_title) },
-      { v: s.exp_points, html: TA.num(s.exp_points, 0) }]);
+    }), [{ v: s.p_title, html: TA.probCell(s.p_title, 'var(--signal)', max) }, { v: s.exp_points, html: TA.num(s.exp_points, 0) }]);
   }), { compact: true });
 }
 
@@ -89,7 +86,7 @@ function results(el, T, cards) {
   if (!rounds.length) { el.innerHTML = TA.muted('No results yet.'); return; }
   let active = rounds[0];
   const draw = () => {
-    el.querySelector('.ev-res').innerHTML = '<div class="gc-grid">' + byR[active].slice().sort((a, b) => String(a.date).localeCompare(String(b.date)))
+    el.querySelector('.ev-res').innerHTML = '<div class="gc-grid ta-gc-grid">' + byR[active].slice().sort((a, b) => String(a.date).localeCompare(String(b.date)))
       .map(c => TA.matchCard(c, { tour: T, event: false, date: true })).join('') + '</div>';
   };
   el.innerHTML = '<div class="toggle-row">' + TA.toggles(rounds.map(r => ({ key: r, label: TA.roundLabel(r, true) + ' (' + byR[r].length + ')' })), active, 'data-rr') + '</div><div class="ev-res"></div>';
@@ -111,7 +108,6 @@ function render(el, params) {
     }
     const ev = Object.assign({}, TA.eventInfo(T, id), d.event || {});
     const sim = (d.sim && d.sim.players) || {};
-    const mk = TA.titleProbs(d.market);
     const draw = d.draw || {};
     const cards = draw.matches || {};
     const col = TA.surfaceColour(ev.surface, ev.indoor);
@@ -126,13 +122,13 @@ function render(el, params) {
     else if (st === 'live') {
       const fav = Object.keys(sim).sort((a, b) => (sim[b].p_title || 0) - (sim[a].p_title || 0))[0];
       side = '<span class="chip st-live"><span class="live-dot"></span> In play' + (live ? ' · ' + live + ' live' : '') + '</span>' +
-        (fav ? '<div class="muted-inline">favourite ' + TA.playerLink(T, fav) + ' ' + TA.pct(sim[fav].p_title, 0) + '</div>' : '');
+        (fav ? '<div class="muted-inline">our favourite ' + TA.playerLink(T, fav) + ' ' + TA.pct(sim[fav].p_title, 0) + '</div>' : '');
     } else if (st === 'upcoming') side = '<span class="chip st-time">Starts ' + esc(TA.fmtDate(ev.start, { year: false })) + '</span>';
-    el.innerHTML = '<div class="ev-head" style="border-left-color:' + col + '"><div><div class="ev-kicker">' + TA.levelChip(ev.level, T) + TA.surfaceChip(ev.surface, ev.indoor) +
-      '<span>' + esc([ev.city, ev.country].filter(Boolean).join(', ')) + '</span></div>' +
-      '<div class="ev-title">' + esc(ev.name || TA.eventName(T, id)) + ' ' + (Y || '') + '</div>' +
-      '<div class="ev-sub">' + esc(TA.fmtRange(ev.start, ev.end)) + (ev.draw_size ? ' · draw of ' + esc(ev.draw_size) : '') + (ev.best_of ? ' · best of ' + esc(ev.best_of) : '') +
-      ' · <a href="' + TA.href(T, 'calendar', Y) + '">' + esc(TA.tourName(T)) + ' calendar</a></div></div><div class="ev-side">' + side + '</div></div>' +
+    void col;
+    el.innerHTML = '<div class="ta-ev-head" style="--sf:' + col + '">' + QK.sectionHead({ kicker: [TA.levelLabel(ev.level, T), TA.surfaceLabel(ev.surface, ev.indoor), [ev.city, ev.country].filter(Boolean).join(', ')].filter(Boolean).join(' · '),
+      title: esc(ev.name || TA.eventName(T, id)) + ' ' + (Y || ''), html: true, size: 'lg', tag: 'h1',
+      sub: esc(TA.fmtRange(ev.start, ev.end)) + (ev.draw_size ? ' · draw of ' + esc(ev.draw_size) : '') + (ev.best_of ? ' · best of ' + esc(ev.best_of) : '') +
+        ' · <a href="' + TA.href(T, 'calendar', Y) + '">' + esc(TA.tourName(T)) + ' tournaments</a>', actions: '<div class="ev-side">' + side + '</div>' }) + '</div>' +
       '<div id="ev-draw"></div><div class="grid-2"><div id="ev-odds"></div><div id="ev-side"></div></div><div id="ev-results"></div><div id="ev-more"></div>';
 
     // ── the draw
@@ -140,7 +136,7 @@ function render(el, params) {
     const drawSub = (draw.source === 'reconstructed' ? 'rebuilt from the matches played; seeds not shown' : draw.source === 'wta' ? 'the WTA draw with seeds and entry types' : '') +
       (draw.complete === false ? ' · some first-round blocks are not yet linked' +
         (draw.source === 'reconstructed' ? ' (ESPN gives no bracket order or seeds, so later-round paths are approximate until the next round is set)' : '') : '');
-    document.getElementById('ev-draw').innerHTML = TA.card('The draw', (drawSub ? esc(drawSub) + ' · ' : '') + 'percentages are the model’s chance of winning each match',
+    document.getElementById('ev-draw').innerHTML = TA.card('The draw', (drawSub ? esc(drawSub) + ' · ' : '') + 'percentages are our chance of winning each match',
       hasDraw ? '<div id="ev-bracket"></div><div id="ev-path"></div>' : TA.muted('The draw is not available yet.'));
     let api = null;
     if (hasDraw) {
@@ -156,20 +152,18 @@ function render(el, params) {
       else if (api && champ && api.model.leafOf[champ] !== undefined) api.pick(champ);   // a finished event opens on the champion's path
     }
 
-    // ── title odds against the market
+    // ── our title chances
     const oddsEl = document.getElementById('ev-odds');
     if (d.sim && !champ) {
-      oddsEl.innerHTML = TA.card('Title odds', (d.sim.n_sims ? TA.num(d.sim.n_sims, 0) + ' simulated draws · ' : '') + 'bars model, ticks market', '<div id="ev-bars"></div>') +
-        TA.card('Round by round', 'probability of reaching each round, against the market for the title', oddsTable(T, sim, mk, draw.rounds || []));
       const items = Object.keys(sim).filter(p => (sim[p].p_title || 0) > 0).sort((a, b) => sim[b].p_title - sim[a].p_title).slice(0, 12)
-        .map(p => ({ label: TA.playerSurname(T, p), p: sim[p].p_title, market: TA.isNum(mk[p]) ? mk[p] : null }));
-      TA.charts.probBars('ev-bars', items, { top: 12, xTitle: 'Title probability', emptyText: champ ? 'The tournament is over.' : 'No title odds yet.' });
+        .map(p => ({ label: TA.playerShort(T, p), p: sim[p].p_title, href: TA.playerHref(T, p), sub: TA.isNum(TA.playerRank(T, p)) ? 'No. ' + TA.playerRank(T, p) : '' }));
+      oddsEl.innerHTML = TA.v2.card('Title chances', 'Our chance of winning it, from ' + (d.sim.n_sims ? Number(d.sim.n_sims).toLocaleString('en-GB') + ' ' : '') + 'simulated draws', items.length ? QK.chances(items, { oursName: 'Our title chance' }) : QK.empty('No title chances yet')) +
+        TA.card('Round by round', 'our chance of reaching each round, and the title', oddsTable(T, sim, draw.rounds || []));
     } else {
       const cs = sim[champ] || {};
-      oddsEl.innerHTML = TA.card('Title odds', champ ? 'the tournament is over' : '', champ ? '<div class="pad">' + TA.playerLink(T, champ) + ' won the title' +
+      oddsEl.innerHTML = TA.card('Title chances', champ ? 'the tournament is over' : '', champ ? '<div class="pad">' + TA.playerLink(T, champ) + ' won the title' +
         (ev.runner_up ? ', beating ' + TA.playerLink(T, ev.runner_up) + ' in the final' : '') + '. ' +
-        (TA.isNum(cs.exp_points) ? 'Ranking points: ' + TA.num(cs.exp_points, 0) + '. ' : '') + 'The draw above opens on the champion’s path; click any other player to follow theirs.</div>' +
-        (TA.isNum(mk[champ]) ? '<div class="section-note">The market’s last price for ' + esc(TA.playerSurname(T, champ)) + ' was ' + TA.pct(mk[champ], 1) + '.</div>' : '')
+        (TA.isNum(cs.exp_points) ? 'Ranking points: ' + TA.num(cs.exp_points, 0) + '. ' : '') + 'The draw above opens on the champion’s path; click any other player to follow theirs.</div>'
         : TA.notBuilt('The tournament simulation', null));
     }
 
@@ -177,7 +171,7 @@ function render(el, params) {
     const ups = d.upsets || [];
     let sideHtml = '';
     if (ups.length) {
-      sideHtml += TA.card('Upsets', 'winners the model gave under 40% before the match', TA.tableHTML([{ label: 'Round' }, { label: 'Winner' }, { label: 'Beat' }, { label: 'Pre-match', align: 'right' }, { label: '', sortable: false }],
+      sideHtml += TA.card('Upsets', 'winners we gave under 40% before the match', TA.tableHTML([{ label: 'Round' }, { label: 'Winner' }, { label: 'Beat' }, { label: 'Pre-match', align: 'right' }, { label: '', sortable: false }],
         ups.map(u => [{ v: TA.roundIndex(u.round), html: esc(TA.roundLabel(u.round, true)) }, { v: TA.playerName(T, u.winner), html: TA.playerLink(T, u.winner, { short: true }) },
           { v: TA.playerName(T, u.loser), html: TA.playerLink(T, u.loser, { short: true }) }, { v: TA.isNum(u.p_pre) ? u.p_pre : u.p, html: TA.pct(TA.isNum(u.p_pre) ? u.p_pre : u.p, 0) },
           { html: u.match ? TA.matchLink(T, u.match, '→') : '' }]), { compact: true }));

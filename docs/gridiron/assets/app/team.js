@@ -91,7 +91,7 @@ GI.route('team', function (el, params) {
       meta: [isNum(r.seed) ? ['Seed today', GI.ordinal(r.seed)] : null, (x || {}).coach ? '<span>HC <b>' + GI.coachLink(x.coach, S) + '</b></span>' : null, isNum(r.diff) ? ['Point difference', GI.signed(r.diff, 0)] : null],
       stats: [{ label: 'Rating', value: isNum(v.rating) ? GI.signed(v.rating, 1) : '—', sub: 'pts a game' }, { label: 'Playoffs', value: GI.pct(sim.p_playoffs, 0) }, { label: 'Division', value: GI.pct(sim.p_div, 0) },
         { label: 'Super Bowl', value: GI.pct(sim.p_sb, 1) }, { label: 'Proj. wins', value: GI.num(sim.mean_wins, 1) }], tags: tags });
-    h += '<nav class="qk-chips scroll" aria-label="On this page" style="margin-top:12px">' + [['#tp-season', 'Season path'], ['#needs', 'Strengths and needs'], ['#roster', 'Roster'], ['#moves', 'Moves'], ['#tp-sched', 'Schedule'], ['#tp-profile', 'Profile'], ['#tp-4th', 'Fourth downs']]
+    h += '<nav class="qk-chips scroll" aria-label="On this page" style="margin-top:12px">' + [['#tp-season', 'Season path'], ['#needs', 'Strengths and needs'], ['#tp-moves-host', 'Who moves next'], ['#roster', 'Roster'], ['#moves', 'Moves'], ['#tp-sched', 'Schedule'], ['#tp-profile', 'Profile'], ['#tp-4th', 'Fourth downs']]
       .map(a => '<button type="button" class="qk-chip" data-jump="' + a[0] + '">' + esc(a[1]) + '</button>').join('') + '<a class="qk-chip" href="' + GI.compareHref('t:' + abbr) + '">Compare</a></nav>';
     if (!x) h += GI.notBuilt('The ' + S + ' page for ' + GI.teamName(abbr), res[0]);
     // season path
@@ -102,7 +102,7 @@ GI.route('team', function (el, params) {
     const hist = GI.TM.history(x);
     h += GI.grid(GI.card('Ratings through the season', 'points per game against an average team, after each week', hist.length > 1 ? GI.chartBox('tp-hist', 300, 'Ratings by week') : GI.muted('Rating history starts after week 2.'), { span: 7 }) +
       GI.card('Wins against our forecast', 'Cumulative wins minus the wins our pre-game chances expected', GI.chartBox('tp-woe', 300, 'Wins over expected'), { span: 5 }));
-    if (cur) h += needsBlock(abbr, res[4], S);
+    if (cur) h += needsBlock(abbr, res[4], S) + '<div id="tp-moves-host"></div>';
     if (cur) h += GI.grid('<div class="qk-span-7">' + rosterBlock(abbr, res[3], S) + '</div><div class="qk-span-5">' + movesBlock(res[5], S) + '</div>');
     else h += GI.note('Rosters, moves and needs are kept for the current season. <a href="' + GI.teamHref(abbr) + '">' + esc(GI.teamName(abbr)) + ' now →</a>');
     // schedule
@@ -113,9 +113,12 @@ GI.route('team', function (el, params) {
     if (qbs.length) h += GI.card('Quarterbacks', 'this season', GI.tableHTML([{ label: 'QB' }, { label: 'Games', align: 'right' }, { label: 'Dropbacks', align: 'right' }, { label: 'EPA/db', align: 'right' }, { label: 'Composite', align: 'right', title: '100 = average, 10 = one SD' }, { label: 'Role', sortable: false }],
       qbs.map(q => [{ html: GI.playerLink(q.pid, q.name), v: q.name }, { v: q.games }, { v: q.dropbacks }, { html: GI.signed(q.epa_db, 3), v: q.epa_db }, { html: GI.num(q.composite, 0), v: q.composite }, q.started_last ? 'Started last game' : ''])), { flush: true });
     // profile
-    const ms = cat ? cat.metrics.filter(m => m.scope !== 'style' && isNum(((x || {}).pct || {})[m.key])) : [];
-    if (ms.length) h += '<div id="tp-profile" class="gi-pcols">' + QK.pctCard({ title: 'Team profile', peer: 'the 32 NFL teams', sample: (isNum(rec.w) || isNum(r.w) ? (first(r.w, rec.w) + first(r.l, rec.l) + (first(r.t, rec.t) || 0)) + ' games this season' : S + ' season') + ' · lower-is-better metrics flipped',
-      groups: GI.metricGroups(ms).map(g => ({ label: g.name, rows: g.items.map(m => ({ label: m.label, pctl: x.pct[m.key], value: GI.fmtVal(x.values[m.key], m.fmt), tip: m.desc || '' })) })) }) + '</div>';
+    /* team profile: the metrics spec's team sets (overall, offence, defence) against the 32 teams (teams.json pct) */
+    const tmeta = cat ? GI.metaOf(cat.metrics) : {};
+    const tGroups = ['team', 'team_offence', 'team_defence'].map(id => GI.SP.BY[id]).filter(Boolean).map(g => ({ label: g.name.replace(/^Teams: /, '').replace(/^overall$/, 'Overall'),
+      rows: GI.SP.headline(g).map(m => { const pv = ((x || {}).pct || {})[m[0]], vv = ((x || {}).values || {})[m[0]]; return isNum(pv) ? { label: m[1] + (m[3] ? ' ↓' : ''), pctl: pv, value: GI.fmtVal(vv, (tmeta[m[0]] || {}).fmt || '2'), tip: m[5] } : null; }).filter(Boolean) }));
+    if (tGroups.some(g => g.rows.length)) h += '<div id="tp-profile" class="gi-pcols">' + QK.pctCard({ title: 'Team profile', peer: 'the 32 NFL teams', sample: (isNum(rec.w) || isNum(r.w) ? (first(r.w, rec.w) + first(r.l, rec.l) + (first(r.t, rec.t) || 0)) + ' games this season' : S + ' season') + ' · lower-is-better metrics flipped',
+      groups: tGroups.map(g => ({ label: g.label.charAt(0).toUpperCase() + g.label.slice(1), rows: g.rows })), note: 'The metric set from our metrics study: the adjusted ratings first, then the per-play process numbers that predict results. Offence settles after about six games, defence after about sixteen, so early-season defensive numbers are noisy.' }) + '</div>';
     // tendencies
     const SIT = [['proe', 'All plays'], ['proe_neutral', 'Neutral'], ['proe_3rd', '3rd down'], ['proe_rz', 'Red zone'], ['proe_lead', 'Leading by 8+'], ['proe_trail', 'Trailing by 8+']].filter(s => isNum(v[s[0]]));
     const TEND = [['pa_rate', 'Play action', 'pct'], ['rpo_rate', 'RPO', 'pct'], ['motion_rate', 'Motion', 'pct'], ['screen_rate', 'Screens', 'pct'], ['shotgun', 'Shotgun', 'pct'], ['no_huddle', 'No huddle', 'pct'],
@@ -166,6 +169,8 @@ GI.route('team', function (el, params) {
     // fourth downs
     const plays = GI.F ? GI.F.playsOf(res[2]).filter(p => p.team === abbr) : [];
     const go = plays.filter(p => p.choice === 'go').length;
+    /* who moves next: the movement payload, after the first paint (current season only) */
+    if (cur && GI.MV) GI.MV.load().then(md => { const host = document.getElementById('tp-moves-host'); if (!host || !el.isConnected) return; host.innerHTML = GI.MV.teamSection(md, abbr, GI.ok(res[4]) ? res[4] : null); GI.sortable(host); });
     GI.set('tp-4th-k', plays.length ? '<div style="padding:14px 16px 0">' + GI.kpis([GI.kpi('Fourth downs', String(plays.length), 'this season'), GI.kpi('Went for it', GI.pct(go / plays.length, 0), go + ' times'),
       isNum(v.go_rate_rec) ? GI.kpi('Went when our model said go', GI.pct(v.go_rate_rec, 0), '') : '', isNum(v.fd_wp_lost) ? GI.kpi('Win chance given away', GI.num(v.fd_wp_lost * 100, 1), 'percentage points, summed', { unit: 'pts' }) : '']) + '</div>' : '');
     if (plays.length) GI.F.table(document.getElementById('tp-4th-t'), plays, S, { team: false, max: 80, maxHeight: 420 });

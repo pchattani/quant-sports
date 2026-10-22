@@ -11,7 +11,7 @@
 'use strict';
 
 const esc = TA.esc;
-const VIEWS = [{ key: 'official', label: 'Official' }, { key: 'elo', label: 'Elo' }, { key: 'race', label: 'Race' }, { key: 'defend', label: 'Points to defend' }];
+const VIEWS = [{ key: 'official', label: 'Official' }, { key: 'elo', label: 'Elo' }, { key: 'race', label: 'Race (this week included)' }, { key: 'defend', label: 'Points to defend' }];
 
 function moveHTML(m) {
   if (!TA.isNum(m) || Number(m) === 0) return '<span class="muted-inline">–</span>';
@@ -38,7 +38,7 @@ function official(T, rk, eloRank, raceRank, race) {
   if (!rows.length) return TA.muted('No official ranking yet.');
   return TA.tableHTML([{ label: 'Rank', align: 'right' }, { label: '±', title: 'Places moved since the previous ranking', cls: 'hide-sm' }, { label: 'Player' },
     { label: 'Points', align: 'right' }, { label: 'Elo rank', align: 'right' }, { label: 'Gap', align: 'right', title: 'Official rank minus Elo rank: positive means Elo rates the player higher', cls: 'hide-sm' },
-    { label: 'Race', align: 'right', title: 'Position in the year-to-date race', cls: 'hide-sm' },
+    { label: 'Race', align: 'right', title: 'Position in the year-to-date race, this week\'s points included', cls: 'hide-sm' },
     { label: 'To defend', align: 'right', title: 'Points from the last 12 months that drop off over the coming year', cls: 'hide-sm' },
     { label: 'Finals', align: 'right', title: 'Model probability of qualifying for the Finals', cls: 'hide-sm' }], rows, { compact: true, sticky: true });
 }
@@ -67,7 +67,7 @@ function raceView(T, rk, race, offRank) {
       { v: offRank[r[0]], html: TA.isNum(offRank[r[0]]) ? String(offRank[r[0]]) : '—', cls: 'hide-sm' }, { v: fq, html: TA.isNum(fq) ? TA.probCell(fq) : '—' }] };
   });
   return TA.tableHTML([{ label: '#', align: 'right' }, { label: 'Player' }, { label: 'Race points', align: 'right' }, { label: 'v 8th', align: 'right', title: 'Points ahead of (or behind) the eighth place, the last automatic Finals place', cls: 'hide-sm' },
-    { label: 'Official', align: 'right', cls: 'hide-sm' }, { label: 'Finals (model)' }], rows, { compact: true }) +
+    { label: 'Official', align: 'right', cls: 'hide-sm' }, { label: 'Finals (our chance)', title: 'Our chance of qualifying, from the season simulation (which starts from its own, earlier snapshot of the race)' }], rows, { compact: true }) +
     '<div class="section-note">The dashed line marks the top eight, the automatic Finals places (a Grand Slam champion ranked 9th to 20th can take the last place at the ATP Finals). ' +
     '<a href="' + TA.href(T, 'race') + '">The full race simulation →</a></div>';
 }
@@ -119,8 +119,7 @@ function render(el, params) {
   const T = params.tour;
   let view = (params.query || {}).v;
   if (!VIEWS.some(v => v.key === view)) view = 'official';
-  el.innerHTML = TA.pageHead(TA.tourName(T) + ' rankings', 'The official ranking against Elo, the race and points to defend',
-    '<a href="' + TA.href(T, 'race') + '">Race</a><a href="' + TA.href(T, 'elo') + '">Elo</a>') + '<div id="rk-body"><div class="muted">Loading…</div></div>';
+  el.innerHTML = '<div id="rk-body">' + QK.skeleton('lines', 8) + '</div>';
   return TA.loadAll([TA.tpath('rankings.json', T), TA.tpath('race.json', T)]).then(arr => {
     if (!el.isConnected) return;
     const rk = arr[0], race = TA.ok(arr[1]) ? arr[1] : null;
@@ -131,7 +130,7 @@ function render(el, params) {
     (rk.official || []).forEach(r => { offRank[r[1]] = r[0]; });
     (rk.race || []).forEach((r, i) => { raceRank[r[0]] = i + 1; });
     const subs = { official: 'as of ' + esc(TA.fmtDate(rk.date)) + ' · Elo rank and race position beside each player',
-      elo: 'surface-blended Elo; surface columns are the surface ratings', race: 'points won this calendar year', defend: 'points dropping off over the next 12 months' };
+      elo: 'surface-blended Elo; surface columns are the surface ratings', race: 'points won this calendar year, this week included (the race simulation starts from its own snapshot)', defend: 'points dropping off over the next 12 months' };
     body.innerHTML = '<div class="card"><div class="toggle-row" id="rk-tabs">' + TA.toggles(VIEWS, view, 'data-v') + '</div><div class="section-note" id="rk-sub"></div><div id="rk-view"></div></div>';
     const show = k => {
       view = k;

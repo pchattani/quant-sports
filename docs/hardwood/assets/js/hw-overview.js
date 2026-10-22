@@ -49,7 +49,7 @@ function tiles(L, S, d) {
   }
   const pw = d.power[0];
   if (pw) out.push({ label: 'Best team', value: HW.teamAbbr(L, pw.tid) + ' ' + U.signed(pw.net, 1), href: HW.teamHref(L, pw.tid, S), sub: 'net points per 100 possessions' + (isNum(pw.se) ? ' ± ' + U.f(pw.se, 1) : ''), tip: 'Our opponent-adjusted net rating (a Kalman filter over every game); ± one standard error' });
-  if (d.mvp) out.push({ label: d.isCur ? 'MVP favourite' : 'MVP', value: d.mvp.name, text: true, href: HW.playerHref(L, d.mvp.id, S), sub: d.isCur ? 'our chance ' + U.pct(d.mvp.p) : HW.seasonLabel(L, S), tip: d.isCur ? 'Our chance he wins the MVP vote' : null });
+  if (d.mvp) out.push({ label: d.isCur ? 'MVP favourite' : 'MVP', value: d.mvp.name, text: true, href: HW.playerHref(L, d.mvp.id, S), sub: d.isCur ? 'our chance ' + U.pct(d.mvp.p) : HW.seasonLabel(L, S), tip: d.isCur ? 'Our chance of winning the MVP vote' : null });
   if (d.isCur) {
     const live = d.today.filter(g => HW.gameState(g) === 'in' && U.fresh(g));
     const next = d.upcoming[0];

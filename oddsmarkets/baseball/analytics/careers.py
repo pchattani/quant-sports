@@ -38,8 +38,37 @@ SEASON_KEYS_H = ["g", "pa", "ab", "h", "b2", "b3", "hr", "bb", "so", "sb", "avg"
                  "k_pct", "bb_pct", "barrel_pct", "hard_pct", "ev", "chase_pct", "whiff_pct", "bat_speed", "dv", "oaa", "framing_runs", "war", "war_results"]
 SEASON_KEYS_P = ["g", "gs", "w", "l", "sv", "ip", "bf", "so", "bb", "hr", "ra9", "fip", "whip", "k_pct", "bb_pct", "k_bb_pct", "csw_pct",
                  "whiff_pct", "xwoba_plus", "xwoba_savant", "fb_velo", "stuff_plus", "location_plus", "pitching_plus", "war", "war_x"]
-SIMILAR_H = ["k_pct", "bb_pct", "iso", "xwoba_savant", "barrel_pct", "chase_pct", "whiff_pct", "ev", "pull_air_pct", "gb_pct", "sprint_speed"]
-SIMILAR_P = ["k_pct", "bb_pct", "gb_pct", "fb_velo", "fb_ivb", "whiff_pct", "chase_pct", "csw_pct", "fb_usage", "br_usage", "hard_pct"]
+# similar players (docs/METRICS_SPEC.md): the peer group's features and year-to-year weights from
+# docs/_design/metrics/baseball.json (oddsmarkets/common/similar.py); the lists below are the fallback when the spec
+# file is absent, and SIMILAR_H / SIMILAR_P (every feature of every group) are the values the careers step keeps
+HIT_GROUP = {"C": "hitters_C", "1B": "hitters_1B", "2B": "hitters_2B", "3B": "hitters_3B", "SS": "hitters_SS",
+             "CF": "hitters_CF", "LF": "hitters_LFRF", "RF": "hitters_LFRF", "OF": "hitters_LFRF", "DH": "hitters_DH",
+             "TWP": "hitters_DH"}
+PIT_GROUP = {"SP": "sp", "RP": "rp"}
+SIM_MIN = {"hitter": ("pa", 200.0), "sp": ("bf", 300.0), "rp": ("bf", 120.0)}   # full-season minimums, prorated by team games
+SIM_FROM = 2015
+_FALLBACK_H = ["xwoba_n", "barrel_pct", "hard_pct", "bat_speed", "k_pct", "bb_pct", "chase_pct", "sprint_speed", "gb_pct", "pull_air_pct"]
+_FALLBACK_P = ["xwoba_n", "xfip", "k_pct", "bb_pct", "csw_pct", "stuff_plus", "pitching_plus", "fb_velo", "chase_pct", "gb_pct",
+               "fb_usage", "br_usage"]
+
+
+def _sim_cfg(gid: str, kind: str) -> dict:
+    from oddsmarkets.common import similar as SIM
+    return SIM.group_config("baseball", gid, fallback={"features": _FALLBACK_H if kind == "hitter" else _FALLBACK_P, "k": 5})
+
+
+def _sim_features(kind: str) -> list[str]:
+    gids = ["hitters_all"] + sorted(set(HIT_GROUP.values())) if kind == "hitter" else sorted(set(PIT_GROUP.values()))
+    out: list[str] = []
+    for g in gids:
+        for f in _sim_cfg(g, kind)["features"]:
+            if f not in out:
+                out.append(f)
+    return out
+
+
+SIMILAR_H = _sim_features("hitter")
+SIMILAR_P = _sim_features("pitcher")
 
 
 # ---------------------------------------------------------------------------------------------- current blocks
@@ -267,39 +296,70 @@ def season_row(level: str, season: int, kind: str, r: dict) -> dict:
             **{k: v.get(k) for k in keys}}
 
 
-def similar_index(cats: dict[tuple, dict], kind: str, keys: list[str], min_n: int = 200):
-    pts, ids = [], []
+def sim_group(r: dict, kind: str) -> str | None:
+    """The spec peer group of a catalogue row: hitters by position (hitters_all when it is unknown), pitchers by role."""
+    if kind == "hitter":
+        return HIT_GROUP.get(str(r.get("pos") or "").upper(), "hitters_all")
+    return PIT_GROUP.get(str(r.get("role") or "").upper())
+
+
+def similar_index(cats: dict[tuple, dict], kind: str, keys: list[str] | None = None, min_n: int | None = None):
+    """Per spec group: the qualified MLB player-seasons from 2015 (the group's minimum, prorated by the season's team
+    games), their features z-scored within group and season, and the year-to-year weights (floored at 0.2)."""
+    from oddsmarkets.common import similar as SIM
+    rows: dict[str, list] = {}
     for (lvl, s), c in cats.items():
-        if lvl != "mlb" or not c:
+        if lvl != "mlb" or not c or int(s) < SIM_FROM:
             continue
+        scale = min(1.0, float(c.get("team_games") or 162) / 162.0)
         for pid, r in (c.get("players") or {}).items():
-            if (r.get("pa" if kind == "hitter" else "bf") or 0) < min_n:
+            gid = sim_group(r, kind)
+            if gid is None:
                 continue
-            v = [an.fnum((r.get("values") or {}).get(k)) for k in keys]
-            if sum(x is None for x in v) > 2:
+            field, need = SIM_MIN["hitter" if kind == "hitter" else gid]
+            if (an.fnum(r.get(field)) or 0) < (min_n if min_n is not None else need * scale):
                 continue
-            pts.append(v)
-            ids.append((pid, s))
-    if len(pts) < 10:
-        return None
-    X = np.array([[np.nan if x is None else x for x in p] for p in pts], float)
-    mu, sd = np.nanmean(X, 0), np.nanstd(X, 0)
-    sd[sd == 0] = 1
-    Z = np.nan_to_num((X - mu) / sd)
-    return {"Z": Z, "ids": ids, "mu": mu, "sd": sd, "pos": {k: i for i, k in enumerate(ids)}}
-
-
-def similar(pid: str, season: int, idx, names: dict, k: int = 6) -> list:
-    if idx is None or (pid, season) not in idx["pos"]:
-        return []
-    i = idx["pos"][(pid, season)]
-    d = np.sqrt(((idx["Z"] - idx["Z"][i]) ** 2).sum(1))
-    out = []
-    for j in np.argsort(d):
-        q, s = idx["ids"][j]
-        if q == pid:
+            rows.setdefault(gid, []).append((str(pid), int(s), r))
+    groups, of = {}, {}
+    for gid, items in rows.items():
+        if len(items) < 6:
             continue
-        out.append({"pid": q, "season": s, "name": names.get(q), "distance": round(float(d[j]), 3)})
+        cfg = _sim_cfg(gid, kind)
+        feats = cfg["features"]
+        M = SIM.matrix([it[2] for it in items], feats)
+        seasons = [it[1] for it in items]
+        groups[gid] = {"Z": SIM.zscore(M, seasons), "w": np.array([cfg["weights"][f] for f in feats]), "k": cfg["k"],
+                       "ids": [(it[0], it[1]) for it in items], "team": [it[2].get("team") for it in items],
+                       "pids": np.array([it[0] for it in items], dtype=object)}
+        for i, it in enumerate(items):
+            of.setdefault(it[0], {})[it[1]] = (gid, i)
+    if not groups:
+        return None
+    return {"groups": groups, "of": of}
+
+
+def similar(pid: str, season: int, idx, names: dict, k: int | None = None) -> list:
+    """The spec's nearest player-seasons for the player's season `season`, else his latest qualified MLB season:
+    [{"pid","season","name","team","distance","for_season"}], nearest first, one season per person (his nearest),
+    never the player himself."""
+    from oddsmarkets.common import similar as SIM
+    if idx is None:
+        return []
+    mine = idx["of"].get(str(pid)) or {}
+    if not mine:
+        return []
+    s0 = season if season in mine else max(mine)
+    gid, i = mine[s0]
+    G = idx["groups"][gid]
+    k = k or G["k"]
+    out, seen = [], set()
+    for j, d in SIM.nearest(G["Z"], i, G["w"], 12 * k, allowed=G["pids"] != str(pid)):
+        q = G["ids"][j][0]
+        if q in seen:                                   # one row per person: his nearest season
+            continue
+        seen.add(q)
+        out.append({"pid": q, "season": G["ids"][j][1], "name": names.get(q), "team": G["team"][j], "distance": round(d, 3),
+                    "for_season": s0})
         if len(out) >= k:
             break
     return out
@@ -343,7 +403,7 @@ def write_careers(write, cats: dict[tuple, dict], blocks: dict[str, dict], histo
             if h is None and not hist and old.get("history"):
                 h = {k: v for k, v in old["history"].items() if k != "cols"}       # no Retrosheet tables here: keep
         sim = []
-        if lv and lv[0] == "mlb":
+        if lv:
             sim = similar(pid, lv[1], hidx if lv[2] == "hitter" else pidx, names)
         name = names.get(pid) or info.get("name") or pe.get("name") or pid
         payload = {"id": pid, "name": name, "bats": info.get("bats"), "throws": info.get("throws"), "pos": info.get("pos") or (lv[3].get("pos") if lv else None),

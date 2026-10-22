@@ -27,7 +27,7 @@ const PRESETS = [
   [['ace_pct', /^ace/], ['first_won', /first_?won|1st_?won/], 'Aces against first-serve points won', 'wta'],
   [['rank', /^rank$/, 'points', /^points$/], ['elo', /^elo$/], 'Elo against the official ranking', ''],
   [['serve_rating', /serve_?r/], ['return_rating', /return_?r/], 'Serve rating against return rating', ''],
-  [['win_pct', /win_?pct/], ['wins_over_exp', 'over_exp', /over_?exp/], 'Win % against wins over expected: who beats their prices?', ''],
+  [['win_pct', /win_?pct/], ['wins_over_exp', 'over_exp', /over_?exp/], 'Win % against wins over expected: who beats our forecasts?', ''],
   [['hold_real', /hold_?real/], ['hold', /^hold$/], 'Real against inferred hold % (WTA stats)', 'wta'],
   [['first_in', /first_?in/], ['second_won', /second_?won|2nd/], 'First serves in against second-serve points won', 'wta'],
   [['rally_len', /rally_?len/], ['winners_pp', 'winners_pt', /winner/], 'Rally length against winners per point (charted players)', ''],

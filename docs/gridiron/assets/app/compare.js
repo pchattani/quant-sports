@@ -1,6 +1,6 @@
 /* The Quant Gridiron — Compare (#/compare/<a>/<b>[/<c>]), in the Lab, on Design System 2.0 (the Rink compare page is
- * the reference). Players: two or three side by side on the one metric set the player card uses (GI.playerSet), each a
- * value and a percentile bar against the peer group (QB, RB, WR/TE, DL and outside rushers, LB, DB, K, P), the better
+ * the reference). Players: two or three side by side on the metrics spec's headline set (spec.js), each a value and a
+ * percentile bar against the group (QB, RB, WR, TE, outside pass rushers, interior linemen, LB, CB, S, K, P), the better
  * value bold and, for two, the difference; players from different peer groups are each ranked against their own, and
  * the page says so. Below: where each one sits in the peer distribution of a chosen metric. With one player picked the
  * others are his most similar players. Teams (t:KC) and ?view=all keep the classic comparison: who wins each shared
@@ -111,7 +111,7 @@ const DSEL = { key: null };
 /* The v2 player comparison: two or three players on the player card's metric set. */
 function compareV2(el, S, ids0, cat) {
   const sq = GI.sq(S);
-  let h = GI.pageHead('Lab · ' + S, 'Compare', 'Two or three players side by side on the metrics that best describe and predict their play, each ranked against his own peer group.') + GI.sectionNav('lab', 'compare') +
+  let h = GI.pageHead('Lab · ' + S, 'Compare', 'Two or three players side by side on the metrics that best describe and predict their play at their position, each ranked against his own group.') + GI.sectionNav('lab', 'compare') +
     GI.subnav([['#/compare' + sq, 'Players', 'p'], ['#/compare/t:KC/t:BUF' + sq, 'Teams (classic)', 't'], ['#/compare' + (ids0.length ? '/' + ids0.map(encodeURIComponent).join('/') : '') + '?view=all' + (sq ? '&' + sq.slice(1) : ''), 'Every metric (classic)', 'all']], 'p', 'Compare views');
   if (!cat) { el.innerHTML = h + GI.notBuilt('The ' + S + ' player catalogue', null); return; }
   const P = cat.players;
@@ -131,56 +131,57 @@ function compareV2(el, S, ids0, cat) {
   drawV2(el, h, S, ids, cat);
 }
 function drawV2(el, h, S, ids, cat) {
-  const P = cat.players;
-  const E = ids.slice(0, 3).map(id => ({ id: id, p: P[id], group: GI.groupOf(P[id].pos, P[id].group) }));
+  const P = cat.players, cx = cat._spv || cat._sp || GI.SP.ctx(cat, null);
+  const E = ids.slice(0, 3).map(id => ({ id: id, p: P[id], g: GI.SP.groupOf(P[id], id, cx) }));
   const items = {};
   Object.keys(P).forEach(id => { const p = P[id]; items[id] = { name: p.name || GI.playerName(id), sub: [GI.posLabel(p.pos), p.team].filter(Boolean).join(' · ') }; });
   const pick = '<div class="gi-cmp-pick">' + [0, 1, 2].map(i => '<div class="gi-cmp-slot" style="--ec:' + ECOL[i] + '"><span class="qk-kicker">' + (i === 2 ? 'Third player (optional)' : 'Player ' + (i + 1)) + '</span><div id="cmp-p' + i + '"></div></div>').join('') + '</div>';
-  if (E.length < 2) {
-    el.innerHTML = h + GI.card('Pick players', 'Choose two or three players to compare', pick + QK.empty('Pick at least two players', 'Type a name in each box.'));
+  const noGroup = E.filter(e => !e.g);
+  if (E.length < 2 || noGroup.length) {
+    el.innerHTML = h + GI.card('Pick players', 'Choose two or three players to compare', pick + (noGroup.length ? QK.empty('No comparison group', esc(noGroup.map(e => e.p.name).join(', ')) + ': percentiles are kept for QB, RB, WR, TE, the five defensive roles, K and P (not offensive linemen).') : QK.empty('Pick at least two players', 'Type a name in each box.')));
     wireV2(el, S, E, items);
     return;
   }
-  const meta = GI.metaOf(GI.allMetrics(cat));
-  const peers = E.map(e => GI.peerOf(e.p, e.group));
-  const same = peers.every(x => x.id === peers[0].id);
-  const g0 = E[0].group;
-  const sameGroup = E.every(e => e.group === g0 || (/^(WR|TE)$/.test(e.group) && /^(WR|TE)$/.test(g0)));
-  /* the metric set: the first player's group set, kept to the metrics every player has */
-  const set = GI.playerSet(g0, GI.metricsFor(cat, g0), 12);
-  const groups = set.map(g => ({ label: g[0], rows: g[1].filter(k => meta[k] && E.some(e => isNum((e.p.values || {})[k]))).map(k => {
-    const m = meta[k], pctFmt = m.fmt === 'pct' || m.fmt === 'pct0';
-    return { label: m.label + (m.lower ? ' ↓' : ''), tip: GI.copyText(m.desc || ''), better: m.lower ? 'low' : 'high', values: E.map(e => (e.p.values || {})[k]), pctls: E.map(e => GI.peerPct(e.p, e.group)[k]),
-      fmt: v => GI.fmtVal(v, m.fmt), dfmt: pctFmt ? (v => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v * 100).toFixed(1) + ' pts') : null };
-  }) })).filter(g => g.rows.length);
-  const ents = E.map((e, i) => ({ name: e.p.name || GI.playerName(e.id), href: GI.playerHref(e.id, S), abbr: GI.surnameOf(e.p.name || ''), colour: null,
-    sub: [GI.posLabel(e.p.pos), GI.teamAbbr(e.p.team), (e.p.games || 0) + ' G', GI.sampleLine(e.p, e.group, '').replace(/^\d+ G · /, '')].filter(Boolean).join(' · ') }));
-  const peerTxt = same ? peers[0].name : 'each against his own peer group (' + peers.map((x, i) => GI.surnameOf(E[i].p.name || '') + ': ' + x.name.replace(/^NFL /, '')).join('; ') + ')';
+  const g0 = E[0].g;
+  const same = E.every(e => e.g.id === g0.id);
+  const hl = GI.SP.headline(g0), sty = GI.SP.style(g0);
+  const groups = [{ label: 'The ' + g0.name.toLowerCase() + ' set', rows: hl.filter(m => E.some(e => isNum(GI.SP.value(e.p, e.id, m, cx)))).map(m => {
+    const pctFmt = GI.SP.fmtOf(m, cx) === 'pct';
+    return { label: m[1] + (m[3] ? ' ↓' : ''), tip: m[5], better: m[3] ? 'low' : 'high', values: E.map(e => GI.SP.value(e.p, e.id, m, cx)), pctls: E.map(e => GI.SP.pct(e.p, e.id, e.g, m, cx)),
+      fmt: v => GI.SP.fmt(m, v, cx), dfmt: pctFmt ? (v => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v * 100).toFixed(1) + ' pts') : null };
+  }) }];
+  const ents = E.map(e => ({ name: e.p.name || GI.playerName(e.id), href: GI.playerHref(e.id, S), abbr: GI.surnameOf(e.p.name || ''), colour: null,
+    sub: [GI.posLabel(e.p.pos), GI.teamAbbr(e.p.team), GI.SP.sample(e.p, e.g)].filter(Boolean).join(' · ') }));
+  const peerTxt = same ? g0.peer : 'each against his own group (' + E.map(e => GI.surnameOf(e.p.name || '') + ': ' + e.g.peer.replace(/^NFL /, '')).join('; ') + ')';
   const small = E.filter(e => e.p.qualified === false).map(e => e.p.name);
+  const styleRows = sty.filter(m => E.some(e => isNum(GI.SP.value(e.p, e.id, m, cx))));
+  const styleTbl = styleRows.length ? GI.card('How they play', 'Style, not quality: no better or worse', GI.tableHTML([{ label: 'Metric', sortable: false }].concat(E.map(e => ({ label: GI.surnameOf(e.p.name || ''), align: 'right', sortable: false }))),
+    styleRows.map(m => [{ html: '<span data-tip="' + esc(m[5]) + '" tabindex="0">' + esc(m[1]) + '</span>' }].concat(E.map(e => ({ html: GI.SP.fmt(m, GI.SP.value(e.p, e.id, m, cx), cx) })))))) : '';
   el.innerHTML = h + GI.card('Players', 'Ranked against ' + esc(peerTxt) + ' this season (' + S + ')', pick) +
-    '<section class="qk-section" style="margin-top:var(--sp-4)">' + GI.card('Side by side', 'Value · percentile against the peer group (100 = best) · ' + (E.length === 2 ? 'difference, green when ' + esc(E[0].p.name) + ' is better' : 'the best of three in bold'),
+    '<section class="qk-section" style="margin-top:var(--sp-4)">' + GI.card('Side by side', 'Value · percentile against the group, qualified players (100 = best) · ' + (E.length === 2 ? 'difference, green when ' + esc(E[0].p.name) + ' is better' : 'the best of three in bold'),
       QK.compareView({ entities: ents, groups: groups }) +
-      (small.length ? '<p class="qk-caption">' + esc(small.join(', ')) + (small.length > 1 ? ' are' : ' is') + ' short of the sample floor: read the percentiles as early, or missing.</p>' : '') +
-      (!sameGroup ? '<p class="qk-caption">Different positions: the rows are ' + esc(GI.GROUP_ONE[g0] || 'player') + ' metrics, and each percentile is against the player’s own peer group.</p>' : '')) + '</section>' +
-    '<section class="qk-section">' + GI.card('Where they sit', 'The qualified ' + esc(peers[0].name.replace(/^NFL /, '')) + ' this season, with each player marked', '<div class="qk-seg" id="cmp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + GI.chartBox('cmp-dist', 260, 'Peer distribution with the players marked')) + '</section>';
+      (small.length ? '<p class="qk-caption">' + esc(small.join(', ')) + (small.length > 1 ? ' are' : ' is') + ' below the qualifying minimum: no percentiles.</p>' : '') +
+      (!same ? '<p class="qk-caption">Different groups: the rows are the ' + esc(g0.name.toLowerCase()) + ' set, and each percentile is against the player’s own group.</p>' : '') +
+      (GI.SP.NOTE[g0.id] ? '<p class="qk-caption">' + esc(GI.SP.NOTE[g0.id]) + '</p>' : '')) + '</section>' + styleTbl +
+    '<section class="qk-section">' + GI.card('Where they sit', 'The qualified ' + esc(g0.peer.replace(/^NFL /, '')) + ' this season, with each player marked', '<div class="qk-seg" id="cmp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + GI.chartBox('cmp-dist', 260, 'Peer distribution with the players marked')) + '</section>';
   wireV2(el, S, E, items);
-  const keys = [].concat.apply([], set.map(g => g[1])).filter(k => meta[k] && E.every(e => isNum((e.p.values || {})[k]))).slice(0, 4);
+  const keys = hl.filter(m => E.every(e => isNum(GI.SP.value(e.p, e.id, m, cx)))).slice(0, 4);
   const seg = el.querySelector('#cmp-dist-m');
   if (!keys.length) { GI.ch.none('cmp-dist', 'No metric all of them have.'); return; }
-  if (!DSEL.key || keys.indexOf(DSEL.key) < 0) DSEL.key = keys[0];
-  seg.innerHTML = keys.map(k => '<button type="button" aria-pressed="' + (k === DSEL.key) + '" data-value="' + esc(k) + '">' + esc(GI.shortLabel(meta[k].label)) + '</button>').join('');
-  const pool = Object.keys(P).map(id => P[id]).filter(x => x && x.qualified !== false && GI.peerOf(x).id === peers[0].id);
+  if (!DSEL.key || !keys.some(m => m[0] === DSEL.key)) DSEL.key = keys[0][0];
+  seg.innerHTML = keys.map(m => '<button type="button" aria-pressed="' + (m[0] === DSEL.key) + '" data-value="' + esc(m[0]) + '">' + esc(GI.shortLabel(m[1])) + '</button>').join('');
+  const pool = GI.SP.members(cx, g0.id).filter(id => P[id].qualified !== false);
   const dd = key => {
     DSEL.key = key;
-    const m = meta[key] || {};
-    const vs = pool.map(x => (x.values || {})[key]).filter(isNum).sort((a, b) => a - b);
+    const m = hl.find(x => x[0] === key);
+    const vs = pool.map(id => GI.SP.value(P[id], id, m, cx)).filter(isNum).sort((a, b) => a - b);
     if (vs.length < 5) { GI.ch.none('cmp-dist', 'Too few qualified peers yet.'); return; }
     const n = document.getElementById('cmp-dist');
     if (!n) return;
     n.classList.remove('gi-chart-empty'); n.innerHTML = '';
     const cols = ['wpA', 'wpB', 'c3'];
-    const c = QKC.distribution(n, { values: vs, binCount: 22, lowerBetter: !!m.lower, fmt: v => GI.fmtVal(v, m.fmt), colorBy: 'flat', xName: (m.label || key) + ' · ' + vs.length + ' qualified peers', yName: 'Players',
-      marks: E.map((e, i) => ({ x: (e.p.values || {})[key], label: GI.surnameOf(e.p.name || ''), color: cols[i] })).filter(x => isNum(x.x)), label: 'Distribution of ' + (m.label || key) });
+    const c = QKC.distribution(n, { values: vs, binCount: 22, lowerBetter: !!m[3], fmt: v => GI.SP.fmt(m, v, cx), colorBy: 'flat', xName: m[1] + ' · ' + vs.length + ' qualified ' + g0.peer.replace(/^NFL /, ''), yName: 'Players',
+      marks: E.map((e, i) => ({ x: GI.SP.value(e.p, e.id, m, cx), label: GI.surnameOf(e.p.name || ''), color: cols[i] })).filter(x => isNum(x.x)), label: 'Distribution of ' + m[1] });
     if (c) GI.onLeave(() => { try { c.dispose(); } catch (e2) { /* gone */ } });
   };
   dd(DSEL.key);
@@ -200,10 +201,12 @@ GI.route('compare', function (el, params) {
   const a0 = params.a || '', b0 = params.b || '';
   const classic = ((params.query || {}).view) === 'all' || teamId(a0) || teamId(b0) || MODE === 'team' && !a0 && !b0 && ((params.query || {}).view) === 'teams';
   if (!classic) {
-    return GI.load(GI.ypath('players.json', S)).then(raw => {
+    return GI.loadAll([GI.ypath('players.json', S), GI.ypath('value.json', S)]).then(res0 => {
       if (!el.isConnected) return;
       MODE = 'player';
-      compareV2(el, S, [params.a, params.b, params.c].filter(Boolean).map(String), GI.catOf(raw));
+      const cat0 = GI.catOf(res0[0]);
+      if (cat0) GI.SP.ctx(cat0, GI.ok(res0[1]) ? res0[1] : null);
+      compareV2(el, S, [params.a, params.b, params.c].filter(Boolean).map(String), cat0);
     });
   }
   return GI.loadAll([GI.ypath('players.json', S), GI.ypath('teams.json', S)]).then(res => {

@@ -1,10 +1,10 @@
-/* The Quant Ace — compare two players (#/<T>/compare/<a>/<b>; #/<T>/compare alone shows the pickers).
+/* The Quant Ace — compare (#/<T>/compare/<a>/<b>[/<c>]), Design System 2.0 (the Rink compare page is the reference).
  *
- * Identity cards, a verdict strip (who wins more of the catalogue metrics on percentile, and the
- * biggest gaps each way, on the tour or one surface's pool), a radar, the full metric table with
- * gap bars and percentile pills, Elo and serve/return paths overlaid, the charting style side by
- * side, and the head-to-head tally with a link to the full page.
- *
+ * Two or three players side by side (QK.compareView) on the headline metric set of METRICS_SPEC.md (TA.v2), ranked
+ * against the tour or, with a surface picked, the players with enough matches on it; where each one sits in the peer
+ * distribution; Elo and serve/return paths; the whole catalogue as the classic view (first two players); the
+ * charting style side by side; the head-to-head tally. With nobody picked the top two by ranking open; with one, the
+ * most similar player (the spec's weighted distance). *
  * Data: data/<T>/players.json (catalogue), data/<T>/players/<a>.json and <b>.json (careers),
  * data/<T>/elo.json (current ratings), data/<T>/style.json (tour medians for the style tables).
  * Uses TA.fk from players.js. */
@@ -12,7 +12,7 @@
 'use strict';
 
 const K = () => TA.fk;
-const RADAR_P = ['hold', /^hold$/, 'brk', /^br(ea)?k$/, 'serve_rating', 'return_rating', 'win_pct', 'win_v_top20', 'win_top20', /top_?(10|20)/, 'tb_over', 'dec_over', 'dec_pct', /decid/, 'wins_over_exp', 'over_exp', 'elo_d90', 'spw_real', 'rpw_real'];
+const isNum = v => v !== null && v !== undefined && v !== '' && typeof v !== 'boolean' && !isNaN(v) && isFinite(v);
 
 function gapBar(gap) {
   const k = K();
@@ -58,106 +58,110 @@ function verdictAndTables(metrics, A, B, nameA, nameB, scopeNote) {
   return { verdict: verdict, byGroup: byGroup, byGap: byGap, n: comp.length };
 }
 
+const ECOL = ['var(--wp-a)', 'var(--wp-b)', 'var(--c-3)'];
+
 function render(el, params, state) {
-  const k = K(), T = k.T(params, state);
-  const a = String(params.a || (params.rest || [])[0] || ''), b = String(params.b || (params.rest || [])[1] || '');
-  el.innerHTML = '<div class="card"><div class="card-header">Compare ' + k.TN(T) + ' players <span class="card-sub">Pick two; the address updates so a comparison can be shared.</span></div>' +
-    '<div class="controls af-pickrow"><span class="cmp-pill-a"></span><span id="cmp-pa"></span><span class="muted-inline">v</span><span class="cmp-pill-b"></span><span id="cmp-pb"></span>' +
-    '<button type="button" id="cmp-swap" class="af-btn">⇄ swap</button>' + (a && b ? '<a class="af-btn" href="' + k.h2hHref(T, a, b) + '">Head to head →</a>' : '') + '</div></div><div id="cmp-body"></div>';
+  const k = K(), T = k.T(params, state), V = TA.v2;
+  let ids = [params.a, params.b].concat(params.rest || []).filter(Boolean).map(String).slice(0, 3);
+  el.innerHTML = QK.skeleton('lines', 6);
   return k.ready().then(() => Promise.all([TA.load(T + '/players.json'), k.loadNames(T)])).then(res => {
     if (!k.alive(el)) return null;
     const cat = res[0];
+    if (!k.ok(cat) || !cat.players) { el.innerHTML = V.card('Compare', '', k.notBuilt('The ' + k.TN(T) + ' player catalogue', cat)); return null; }
     k.learnCat(T, cat);
-    let pa = a, pb = b;
-    const go = () => { if (pa && pb && pa !== pb) location.hash = k.compareHref(T, pa, pb); };
-    k.picker(document.getElementById('cmp-pa'), { T: T, value: a, placeholder: 'First player…', onPick: id => { pa = id; go(); } });
-    k.picker(document.getElementById('cmp-pb'), { T: T, value: b, placeholder: 'Second player…', onPick: id => { pb = id; go(); } });
-    document.getElementById('cmp-swap').onclick = () => { if (a && b) location.hash = k.compareHref(T, b, a); };
+    const P = cat.players;
+    // nobody picked: the top two by ranking; one picked: the most similar player
+    if (!ids.length) ids = Object.keys(P).filter(id => P[id].qualified && isNum(P[id].rank)).sort((x, y) => P[x].rank - P[y].rank).slice(0, 2);
+    else if (ids.length === 1) { const s1 = V.similar(T, ids[0], cat, 1)[0]; if (s1) ids.push(s1.id); }
+    el.innerHTML = '<div class="ta-cmp-pick">' + [0, 1, 2].map(i => '<div class="ta-cmp-slot" style="--ec:' + ECOL[i] + '"><span class="qk-kicker">' + (i === 2 ? 'Third player (optional)' : 'Player ' + (i + 1)) + '</span><span id="cmp-p' + i + '"></span></div>').join('') + '</div><div id="cmp-body"></div>';
+    const cur = ids.slice();
+    const go = () => { const list = cur.filter(Boolean); if (list.length >= 2) location.hash = k.href(T, 'compare/' + list.map(encodeURIComponent).join('/')); };
+    [0, 1, 2].forEach(i => k.picker(document.getElementById('cmp-p' + i), { T: T, value: ids[i], placeholder: i === 2 ? 'Add a third…' : 'Type a player…', onPick: id => { cur[i] = id; go(); } }));
     const body = document.getElementById('cmp-body');
-    if (!a || !b) {
-      const P = (cat && cat.players) || {};
-      const top = Object.keys(P).filter(id => k.isNum(P[id].rank)).sort((x, y) => P[x].rank - P[y].rank).slice(0, 8);
-      const pairs = [];
-      for (let i = 0; i + 1 < top.length; i += 2) pairs.push([top[i], top[i + 1]]);
-      if (a && top[0]) pairs.unshift([a, top[0] === a ? top[1] : top[0]]);
-      body.innerHTML = k.card('Comparisons to try', 'Neighbours in the official ranking.', pairs.length ? '<div class="af-pairs">' + pairs.map(p => '<a class="af-pair" href="' + k.compareHref(T, p[0], p[1]) + '"><strong>' + k.esc(k.surname(k.name(T, p[0]))) + '</strong> v <strong>' + k.esc(k.surname(k.name(T, p[1]))) + '</strong></a>').join('') + '</div>' : k.muted('Pick two players above.'));
-      return null;
-    }
-    body.innerHTML = k.muted('Loading…');
-    return Promise.all([TA.load(T + '/players/' + a + '.json'), TA.load(T + '/players/' + b + '.json'), TA.load(T + '/elo.json')]).then(cs => {
-      if (k.alive(el)) build(T, [a, b], cat, [k.ok(cs[0]) ? cs[0] : null, k.ok(cs[1]) ? cs[1] : null], k.ok(cs[2]) ? cs[2] : {}, body);
+    if (ids.length < 2) { body.innerHTML = V.card('Pick players', '', QK.empty('Pick at least two players', 'Type a name in each box.')); return null; }
+    body.innerHTML = QK.skeleton('lines', 6);
+    return Promise.all(ids.map(id => TA.load(T + '/players/' + id + '.json')).concat([TA.load(T + '/elo.json')])).then(cs => {
+      if (k.alive(el)) build(T, ids, cat, ids.map((_, i) => (k.ok(cs[i]) ? cs[i] : null)), body);
     });
   });
 }
 
-function build(T, ids, cat, careers, E, body) {
-  const k = K();
+const CMP_GROUPS = [['Strength', ['elo', 'elo_hard', 'elo_clay', 'elo_grass']], ['Results', ['games_won_pct', 'win_pct', 'win_v_top50']],
+  ['Serve and return, inferred from scores', ['hold', 'brk', 'hold_plus_break']], ['Serve statistics (WTA)', ['dominance', 'ace_pct']]];
+
+function build(T, ids, cat, careers, body) {
+  const k = K(), V = TA.v2;
   const P = ((cat || {}).players) || {};
   const metrics = (cat || {}).metrics || [];
   const ps = ids.map(id => P[id] || null);
   const names = ids.map((id, i) => (ps[i] && ps[i].name) || (careers[i] && careers[i].name) || k.name(T, id));
   const short = names.map(k.surname);
-  const cols = [k.CA, k.CB];
-  const eloOf = i => ((E.current || {})[ids[i]]) || (() => { const r = (((careers[i] || {}).elo) || []).slice(-1)[0]; return r ? { all: r[1], hard: r[2], clay: r[3], grass: r[4] } : {}; })();
-  const card = i => {
-    const p = ps[i] || {}, c = careers[i] || {}, v = p.values || {}, e = eloOf(i);
-    const age = k.isNum(p.age) ? Math.floor(p.age) : k.ageOf(c.dob);
-    const yr = (c.seasons || []).slice().sort((x, y) => y.year - x.year)[0] || {};
-    const titles = (c.seasons || []).reduce((s, x) => s + (x.titles || 0), 0);
-    return '<div class="cmp-id ' + (i ? 'b' : 'a') + '"><div class="pg-num af-badge" style="width:52px;height:52px;font-size:0.95rem">' + k.esc(k.isNum(p.rank) ? '#' + p.rank : k.TN(T)) + '</div><div class="cmp-id-body">' +
-      '<div class="cmp-id-name">' + k.playerLink(T, ids[i], names[i]) + '</div>' +
-      '<div class="cmp-id-sub">' + k.ctry(p.country || c.country) + (c.hand ? ' · ' + (c.hand === 'L' ? 'left-handed' : c.hand === 'R' ? 'right-handed' : k.esc(c.hand)) : '') + (age !== null ? ' · age ' + age : '') + (k.isNum(c.height) ? ' · ' + k.num(c.height, 0) + ' cm' : '') + '</div>' +
-      '<div class="cmp-id-facts">' + [['Elo', k.num(e.all, 0)], ['Hard', k.num(e.hard, 0)], ['Clay', k.num(e.clay, 0)], ['Grass', k.num(e.grass, 0)],
-        [String(yr.year || 'Year'), k.rec(yr.w, yr.l)], ['Titles', titles + (yr.titles ? ' (' + yr.titles + ' in ' + yr.year + ')' : '')], ['Hold %', k.fmtV(v.hold, 'pct')], ['Break %', k.fmtV(v.brk, 'pct')]]
-        .map(f => '<div class="cmp-fact"><span>' + f[0] + '</span><strong>' + f[1] + '</strong></div>').join('') + '</div></div></div>';
-  };
-  // Head-to-head tally from the career files.
+  const cols = ['wpA', 'wpB', 'c3'];
+  const surfOpts = V.SURF.filter(s => ps.every(p => V.inPool(p, s, cat)));
   const hA = (((careers[0] || {}).h2h) || []).find(r => r[0] === ids[1]), hB = (((careers[1] || {}).h2h) || []).find(r => r[0] === ids[0]);
   const tally = hA ? [hA[1], hA[2], hA[3]] : hB ? [hB[2], hB[1], hB[3]] : null;
-  const surfOpts = K().SURFACES.filter(s => ps[0] && ps[1] && (ps[0].pct_surface || {})[s] && (ps[1].pct_surface || {})[s]);
 
-  let h = '<div class="cmp-ids">' + card(0) + card(1) + '</div>';
-  h += '<div class="card"><div class="card-header">Verdict <span class="card-sub">Who wins each catalogue metric on percentile, and the three biggest gaps each way.</span>' +
-    k.toggle('cmp-pool', [['tour', 'Tour']].concat(surfOpts.map(s => [s, k.SURF_LABEL[s]])), 'tour') + '</div><div id="cmp-verdict"></div>' +
-    '<div class="pg-note">' + (tally ? 'Head to head: <strong>' + k.esc(short[0]) + ' ' + tally[0] + '–' + tally[1] + ' ' + k.esc(short[1]) + '</strong>' + (tally[2] ? ', last met ' + k.esc(k.fmtDate(tally[2], { weekday: false })) : '') + '. ' : 'No tour-level meeting on file. ') +
-    '<a href="' + k.h2hHref(T, ids[0], ids[1]) + '">Matchup odds on every surface →</a></div></div>';
-  h += '<div class="grid-2"><div class="card"><div class="card-header">Profile <span class="card-sub">Ten headline metrics, tour percentiles.</span></div><div id="cmp-radar" style="height:420px"></div></div>' +
-    '<div class="card"><div class="card-header">Elo <span class="card-sub">After every match, career files.</span>' + k.toggle('cmp-elo-s', [['1', 'Overall'], ['2', 'Hard'], ['3', 'Clay'], ['4', 'Grass']], '1') + '</div><div id="cmp-elo" style="height:380px"></div></div></div>';
-  h += '<div class="card"><div class="card-header">Every metric <span class="card-sub">The whole catalogue: value, percentile and the gap in percentile points. Bold marks the better raw figure.</span><label class="pg-ctl">order <select id="cmp-metric-mode"><option value="group">by group</option><option value="gap">by size of gap</option></select></label></div><div id="cmp-metrics"></div></div>';
-  h += '<div class="card"><div class="card-header">Serve and return paths <span class="card-sub">The score-based serve (s, solid) and return (r, dotted) ratings over time, ±1 standard error shaded.</span>' +
+  let h = V.card('Side by side', '<span id="cmp-sub"></span>', V.seg('cmp-pool', [['', 'Tour']].concat(surfOpts.map(s => [s, k.SURF_LABEL[s]])), '', 'Peer group') + '<div id="cmp-view" style="margin-top:12px"></div><p class="ta-cap" id="cmp-cap"></p>',
+    { foot: '<span>' + (tally ? 'Head to head: <b>' + k.esc(short[0]) + ' ' + tally[0] + '–' + tally[1] + ' ' + k.esc(short[1]) + '</b>' + (tally[2] ? ', last met ' + k.esc(k.fmtDate(tally[2], { weekday: false })) : '') : 'No tour-level meeting on file') + '</span><a href="' + k.h2hHref(T, ids[0], ids[1]) + '">Head to head, our chance on every surface →</a>' });
+  h += '<section class="qk-section">' + V.card('Where they sit', 'Every qualified player in the peer group, with each one marked', '<div class="qk-seg" id="cmp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px;flex-wrap:wrap"></div>' + V.chart('cmp-dist', 260, 'Peer distribution with the players marked')) + '</section>';
+  h += '<div class="card"><div class="card-header">Elo <span class="card-sub">After every match, career files.</span>' + k.toggle('cmp-elo-s', [['1', 'Overall'], ['2', 'Hard'], ['3', 'Clay'], ['4', 'Grass']], '1') + '</div><div id="cmp-elo" style="height:380px"></div></div>';
+  h += '<div class="card"><div class="card-header">Serve and return paths <span class="card-sub">The score-based serve (solid) and return (dotted) ratings over time, ±1 standard error shaded.</span>' +
     k.toggle('cmp-sr-s', [['all', 'All']].concat(k.SURFACES.map(s => [s, k.SURF_LABEL[s]])), 'all') + '</div><div id="cmp-sr" style="height:380px"></div></div>';
-  h += '<div class="card"><div class="card-header">Style <span class="card-sub">Match Charting Project profiles side by side.</span></div><div class="grid-2 af-style-pair"><div><div class="cmp-group-head"><span class="cmp-pill-a"></span>' + k.esc(names[0]) + '</div><div id="cmp-st-a"></div></div>' +
-    '<div><div class="cmp-group-head"><span class="cmp-pill-b"></span>' + k.esc(names[1]) + '</div><div id="cmp-st-b"></div></div></div></div>';
+  h += '<div class="card"><div class="card-header">Every metric (classic) <span class="card-sub">' + k.esc(short[0]) + ' and ' + k.esc(short[1]) + ' on the whole catalogue: who leads each metric on percentile, then value, percentile and the gap. Tiebreak, deciding-set and over-expected rows are mostly luck.</span>' +
+    '<label class="pg-ctl">order <select id="cmp-metric-mode"><option value="group">by group</option><option value="gap">by size of gap</option></select></label></div><div id="cmp-verdict"></div><div id="cmp-metrics"></div></div>';
+  h += '<div class="card"><div class="card-header">Style <span class="card-sub">Match Charting Project profiles side by side.</span></div><div class="grid-2 af-style-pair"><div><div class="cmp-group-head">' + k.esc(names[0]) + '</div><div id="cmp-st-a"></div></div>' +
+    '<div><div class="cmp-group-head">' + k.esc(names[1]) + '</div><div id="cmp-st-b"></div></div></div></div>';
   body.innerHTML = h;
 
-  // Verdict and the metric table, on the tour or a surface pool.
-  let tables = null;
-  const drawVerdict = pool => {
-    const pc = i => (pool === 'tour' ? (ps[i] || {}).pct : (((ps[i] || {}).pct_surface || {})[pool] || {}));
-    const A = Object.assign({}, ps[0] || {}, { pct: pc(0) || {} }), B = Object.assign({}, ps[1] || {}, { pct: pc(1) || {} });
-    tables = verdictAndTables(metrics, A, B, short[0], short[1], pool === 'tour' ? k.TN(T) + ' percentiles' + (cat && cat.year ? ', ' + cat.year : '') : k.SURF_LABEL[pool] + ' pool');
-    document.getElementById('cmp-verdict').innerHTML = (!ps[0] || !ps[1]) ? k.muted((!ps[0] ? k.esc(names[0]) : k.esc(names[1])) + ' has no row in the ' + k.esc((cat || {}).year || '') + ' catalogue, so there is nothing to compare metric by metric.') : tables.verdict;
-    drawMetrics();
+  let distKey = null;
+  const drawView = sf => {
+    const set = V.set(T, sf).concat(['hold_plus_break']);
+    const groups = CMP_GROUPS.map(g => ({ label: g[0], rows: set.filter(x => g[1].indexOf(x) >= 0).map(x => ({ label: V.label(x, sf), tip: (V.META[x] || [])[1], better: 'high',
+      values: ps.map(p => V.value(p, x, sf)), pctls: ps.map(p => (V.inPool(p, sf, cat) ? V.pctl(p, x, sf, cat) : null)), fmt: v => V.fmt(x, v),
+      dfmt: (V.META[x] || [])[2] === 'pct' ? (d => (d > 0 ? '+' : d < 0 ? '−' : '±') + Math.abs(d * 100).toFixed(1) + ' pts') : null })) }));
+    const ents = ids.map((id, i) => {
+      const n = sf ? (((ps[i] || {}).values_surface || {})[sf] || {}).matches : (ps[i] || {}).matches;
+      return { name: names[i], href: k.playerHref(T, id), abbr: short[i], sub: [ps[i] && ps[i].country, ps[i] && isNum(ps[i].rank) ? 'No. ' + ps[i].rank : '', isNum(n) ? n + (sf ? ' ' + sf : '') + ' matches' : ''].filter(Boolean).join(' · ') };
+    });
+    document.getElementById('cmp-view').innerHTML = QK.compareView({ entities: ents, groups: groups });
+    document.getElementById('cmp-sub').textContent = 'Value · percentile against ' + V.peer(T, sf, cat) + ' (100 = best)' + (ids.length === 2 ? ' · difference, green when ' + short[0] + ' is better' : ' · the best of three in bold');
+    const outs = ps.map((p, i) => (V.inPool(p, sf, cat) ? '' : names[i])).filter(Boolean);
+    document.getElementById('cmp-cap').textContent = (outs.length ? outs.join(', ') + (outs.length > 1 ? ' are' : ' is') + ' short of the floor, so ' + (outs.length > 1 ? 'they have' : 'there is') + ' no percentile. ' : '') + 'Hold and break are inferred from set scores, not measured point by point.';
+    const segEl = document.getElementById('cmp-dist-m');
+    const dset = V.set(T, sf);
+    if (dset.indexOf(distKey) < 0) distKey = dset[0];
+    segEl.innerHTML = dset.map(x => '<button type="button" aria-pressed="' + (x === distKey) + '" data-value="' + x + '">' + k.esc(V.label(x)) + '</button>').join('');
+    const dd = x => {
+      distKey = x;
+      const xs = Object.keys(P).filter(id => V.inPool(P[id], sf, cat)).map(id => V.value(P[id], x, sf)).filter(isNum).sort((a, b) => a - b);
+      if (xs.length < 5) { document.getElementById('cmp-dist').innerHTML = QK.empty('Too few qualified peers yet'); return; }
+      const f = (V.META[x] || [])[2] === 'pct' ? (v => (v * 100).toFixed(1) + '%') : (v => V.fmt(x, v));
+      QKC.distribution('#cmp-dist', { values: xs, binCount: 20, fmt: f, colorBy: 'flat', xName: V.label(x, sf) + ' · ' + xs.length + ' qualified peers', yName: 'Players',
+        marks: ps.map((p, i) => ({ x: V.value(p, x, sf), label: short[i], color: cols[i] })).filter(m => isNum(m.x)), label: 'Distribution of ' + V.label(x) });
+    };
+    dd(distKey);
+    QK.seg(segEl, dd);
   };
-  const sel = document.getElementById('cmp-metric-mode');
-  const drawMetrics = () => { if (!tables) return; document.getElementById('cmp-metrics').innerHTML = sel.value === 'gap' ? tables.byGap : tables.byGroup; k.sortable('cmp-metrics'); };
-  sel.onchange = drawMetrics;
-  drawVerdict('tour');
-  k.wireToggle(body, 'cmp-pool', drawVerdict);
+  drawView('');
+  QK.seg(document.getElementById('cmp-pool'), drawView);
 
-  const pctA = (ps[0] || {}).pct || {}, pctB = (ps[1] || {}).pct || {};
-  const axes = k.headline(metrics, RADAR_P, 10, true).filter(m => k.isNum(pctA[m.key]) || k.isNum(pctB[m.key])).map(m => ({ key: m.key, label: k.shortLabel(m.label) }));
-  k.radar('cmp-radar', axes, [{ name: names[0], pct: pctA, colour: cols[0] }, { name: names[1], pct: pctB, colour: cols[1] }]);
+  // every metric (classic): the first two players on the tour percentiles
+  const sel = document.getElementById('cmp-metric-mode');
+  const tables = verdictAndTables(metrics, Object.assign({}, ps[0] || {}, { pct: (ps[0] || {}).pct || {} }), Object.assign({}, ps[1] || {}, { pct: (ps[1] || {}).pct || {} }), short[0], short[1], k.TN(T) + ' percentiles' + (cat && cat.year ? ', ' + cat.year : ''));
+  const drawMetrics = () => { document.getElementById('cmp-metrics').innerHTML = sel.value === 'gap' ? tables.byGap : tables.byGroup; k.sortable('cmp-metrics'); };
+  document.getElementById('cmp-verdict').innerHTML = (!ps[0] || !ps[1]) ? k.muted((!ps[0] ? k.esc(names[0]) : k.esc(names[1])) + ' has no row in the ' + k.esc((cat || {}).year || '') + ' catalogue, so there is nothing to compare metric by metric.') : tables.verdict;
+  sel.onchange = drawMetrics;
+  drawMetrics();
 
   const drawElo = col => {
     const c = Number(col);
     const tr = [];
     careers.forEach((cr, i) => {
       const rs = (((cr || {}).elo) || []).filter(r => Array.isArray(r) && k.isNum(r[c]));
-      if (rs.length) tr.push({ type: 'scatter', mode: 'lines', name: names[i], x: rs.map(r => r[0]), y: rs.map(r => r[c]), line: { color: cols[i], width: 2, shape: 'hv' }, hovertemplate: '%{x}: %{y:.0f}<extra>' + k.esc(short[i]) + '</extra>' });
+      if (rs.length) tr.push({ type: 'scatter', mode: 'lines', name: names[i], x: rs.map(r => r[0]), y: rs.map(r => r[c]), line: { color: ECOL[i], width: 2, shape: 'hv' }, hovertemplate: '%{x}: %{y:.0f}<extra>' + k.esc(short[i]) + '</extra>' });
     });
     if (tr.length) k.plot('cmp-elo', tr, k.layout(Object.assign(k.legendTop(), { margin: { l: 50, r: 10, t: 34, b: 36 }, xaxis: { type: 'date', title: 'Date' }, yaxis: { title: ['', 'Overall', 'Hard', 'Clay', 'Grass'][c] + ' Elo' } })));
-    else document.getElementById('cmp-elo').innerHTML = k.muted('No Elo history in either career file.');
+    else document.getElementById('cmp-elo').innerHTML = k.muted('No Elo history in the career files.');
   };
   drawElo('1');
   k.wireToggle(body, 'cmp-elo-s', drawElo);
@@ -167,24 +171,22 @@ function build(T, ids, cat, careers, E, body) {
     careers.forEach((cr, i) => {
       let rs = (((cr || {}).serve_return) || []).filter(r => Array.isArray(r) && r[1] === surf);
       if (!rs.length && surf === 'all') {
-        // No "all" rows: the most-played surface stands in.
         const cnt = {}; (((cr || {}).serve_return) || []).forEach(r => { cnt[r[1]] = (cnt[r[1]] || 0) + 1; });
         const best = Object.keys(cnt).sort((x, y) => cnt[y] - cnt[x])[0];
         rs = (((cr || {}).serve_return) || []).filter(r => r[1] === best);
       }
       if (!rs.length) return;
-      k.band(rs.map(r => ({ x: r[0], y: r[2], se: r[6], text: r[0] })), cols[i], short[i] + ' serve').forEach(t => tr.push(t));
-      k.band(rs.map(r => ({ x: r[0], y: r[3], se: r[7], text: r[0] })), cols[i], short[i] + ' return', { dash: 'dot' }).forEach(t => tr.push(t));
+      k.band(rs.map(r => ({ x: r[0], y: r[2], se: r[6], text: r[0] })), ECOL[i], short[i] + ' serve').forEach(t => tr.push(t));
+      k.band(rs.map(r => ({ x: r[0], y: r[3], se: r[7], text: r[0] })), ECOL[i], short[i] + ' return', { dash: 'dot' }).forEach(t => tr.push(t));
     });
     if (tr.length) k.plot('cmp-sr', tr, k.layout(Object.assign(k.legendTop(), { margin: { l: 50, r: 10, t: 34, b: 36 }, xaxis: { type: 'date', title: 'Date' }, yaxis: { title: 'Rating (log-odds of holding)', zeroline: true, zerolinecolor: '#6e7681' } })));
-    else document.getElementById('cmp-sr').innerHTML = k.muted('No serve/return path on this surface for either player.');
+    else document.getElementById('cmp-sr').innerHTML = k.muted('No serve/return path on this surface.');
   };
   drawSR('all');
   k.wireToggle(body, 'cmp-sr-s', drawSR);
 
   k.styleBlock(document.getElementById('cmp-st-a'), T, (careers[0] || {}).style || null, { stack: true });
   k.styleBlock(document.getElementById('cmp-st-b'), T, (careers[1] || {}).style || null, { stack: true });
-
 }
 
 if (typeof TA.route === 'function') TA.route('compare', render);

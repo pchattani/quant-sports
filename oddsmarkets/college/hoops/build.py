@@ -1781,6 +1781,58 @@ def markets_payload(ctx: dict, season: int, markets: bool, sims: int) -> dict:
             "futures": fut, "model": model, "games": games}
 
 
+ROLE_GROUP = {"G": "guards", "W": "wings", "B": "bigs"}
+
+
+def qualified_roles(ctx: dict, s: int) -> tuple[dict, set, dict]:
+    """(lines {pid: player_line}, qualified pids, role {pid: G|W|B}) of a season, as players_payload defines them."""
+    rows = player_rows(ctx, s)["rows"]
+    if not rows:
+        return {}, set(), {}
+    maxgp = max(r["gp"] for r in rows.values())
+    floor = {"gp": max(5, int(0.4 * maxgp)), "mpg": 10.0}
+    qual = {p for p, r in rows.items() if r["gp"] >= floor["gp"] and r["min"] / max(r["gp"], 1) >= floor["mpg"]}
+    role_of, _thr = PL.classify_roles(rows, qual)
+    return {p: player_line(rows[p]) for p in qual}, qual, role_of
+
+
+def similar_players(ctx: dict, seasons: list[int], current: int, k: int | None = None) -> dict[str, list]:
+    """{pid: [{"id","name","team","season","distance"}]} for players qualified in one of the last two seasons (their
+    latest): the nearest qualified player-seasons of the same role over the last ten seasons, the spec's weighted
+    distance, other players only."""
+    from oddsmarkets.common import similar as SIM
+    lv = ctx["level"]
+    pool = [s for s in seasons if current - 9 <= s <= current]
+    by_role: dict[str, list] = defaultdict(list)
+    for s in pool:
+        lines, qual, role_of = qualified_roles(ctx, s)
+        rows = player_rows(ctx, s)["rows"]
+        for p in qual:
+            r = role_of.get(p)
+            if r in ROLE_GROUP:
+                by_role[r].append((s, p, rows[p]["name"], rows[p]["team"], lines[p]))
+    out: dict[str, list] = {}
+    for role, items in by_role.items():
+        cfg = SIM.group_config("college", f"{lv}_{ROLE_GROUP[role]}")
+        if not cfg or len(items) < 6:
+            continue
+        feats = cfg["features"]
+        M = SIM.matrix([it[4] for it in items], feats, get=lambda r, f: r.get(f))
+        seas = np.array([it[0] for it in items])
+        Z = SIM.zscore(M, seas.tolist())
+        w = np.array([cfg["weights"][f] for f in feats])
+        pids = np.array([str(it[1]) for it in items], dtype=object)
+        latest: dict[str, int] = {}
+        for i, (s_, p_) in enumerate(zip(seas, pids)):
+            if s_ >= pool[-1] - 1 and (p_ not in latest or s_ > seas[latest[p_]]):
+                latest[p_] = i
+        for p_, i in latest.items():
+            nb = SIM.nearest(Z, i, w, k or cfg["k"], allowed=pids != p_)
+            out[p_] = [{"id": pids[j], "name": items[j][2], "team": items[j][3], "season": int(seas[j]), "distance": r3(d)}
+                       for j, d in nb]
+    return out
+
+
 def career_files(ctx: dict, out: Path, current: int) -> int:
     lv = ctx["level"]
     with_box = [s for s in ctx["seasons"] if s <= current and len(box_rows(ctx, s)["pid"])]
@@ -1797,23 +1849,10 @@ def career_files(ctx: dict, out: Path, current: int) -> int:
         for m in mv:
             mv_of[m["player"]].append({"season": s, "from": m["from"], "to": m["to"], "value_before": m["value_before"],
                                        "value_after": m["value_after"]})
-    # similarity on the latest season (per-40 profile, standardized)
-    last = with_box[-1]
-    keys = ["pts", "reb", "ast", "stl", "blk", "tov", "tpa", "fta"]
-    sim_ids, sim_mat = [], []
-    for p, r in rows_by[last].items():
-        if r["min"] >= 150:
-            t = r["tot"]
-            m = r["min"]
-            vec = [40 * t["pts"] / m, 40 * (t["oreb"] + t["dreb"]) / m, 40 * t["ast"] / m, 40 * t["stl"] / m, 40 * t["blk"] / m,
-                   40 * t["tov"] / m, 40 * t["tpa"] / m, 40 * t["fta"] / m]
-            sim_ids.append(p)
-            sim_mat.append(vec)
-    Zm = None
-    if sim_mat:
-        A = np.array(sim_mat)
-        Zm = (A - A.mean(0)) / (A.std(0) + 1e-9)
-    sim_pos = {p: i for i, p in enumerate(sim_ids)}
+    # similar players (docs/METRICS_SPEC.md): the role group's features and year-to-year weights from
+    # docs/_design/metrics/college.json, z within role and season over qualified players, weighted Euclidean
+    # (common.similar), k = 5, qualified player-seasons of the last ten seasons, never the player herself / himself
+    sim_of = similar_players(ctx, with_box, current)
     n = 0
     pdir = out / lv / "players"
     stores = {s: D.load(lv, s) for s in with_box}
@@ -1855,12 +1894,7 @@ def career_files(ctx: dict, out: Path, current: int) -> int:
                             "stl": int(x[11]), "blk": int(x[12]), "tov": int(x[13]), "fgm": int(x[2]), "fga": int(x[3]),
                             "tpm": int(x[4]), "tpa": int(x[5]), "ftm": int(x[6]), "fta": int(x[7])})
             log.sort(key=lambda z: z["date"])
-            similar = []
-            if Zm is not None and p in sim_pos:
-                dvec = np.sqrt(((Zm - Zm[sim_pos[p]]) ** 2).sum(1))
-                for j in np.argsort(dvec)[1:6]:
-                    q = sim_ids[j]
-                    similar.append({"id": q, "name": rows_by[last][q]["name"], "season": last, "distance": r3(dvec[j])})
+            similar = sim_of.get(p, [])
             page = {"ok": True, "id": p, "name": r["name"], "pos": r["pos"], "level": lv, "updated_at": now_iso(),
                     "class": info.get("class"), "height_in": info.get("height_in"), "weight_lb": info.get("weight_lb"),
                     "hometown": info.get("hometown"), "seasons": PK.pack(seasons_rows),

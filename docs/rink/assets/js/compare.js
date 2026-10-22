@@ -12,14 +12,15 @@
 
 const K = () => RK.fk;
 let MODE = 'S';
-const TEAM_HEAD = ['overall', 'off', 'def', 'pp', 'pk', 'goalie', 'xgf_pct5', 'cf_pct5', 'xgf_pct', 'cf_pct', 'gf_g', 'ga_g'];
+/* The spec's team set (docs/METRICS_SPEC.md "Teams"), in order; overall/off/def are this page's aliases for rating/off5/def5. */
+const TEAM_HEAD = ['overall', 'xgf_pct5', 'cf_pct5', 'off', 'def', 'pp', 'pk', 'goalie', 'gd_g', 'pts_pct'];
 const MODES = [['S', 'Skaters'], ['G', 'Goalies'], ['T', 'Teams']];
 
 function teamId(s) { const m = /^t:?([A-Za-z]{2,3})$/.exec(String(s || '')); return m ? m[1].toUpperCase() : (/^[A-Z]{2,3}$/.test(String(s || '')) ? String(s) : null); }
 function entity(id, sk, gk, tc) {
   const k = K();
   const t = teamId(id);
-  if (t && tc && tc.teams[t]) { const x = tc.teams[t]; const R = RK.fk.T.ratingsOf(x, null); const U = x.units || {}; return { kind: 'T', id: t, name: k.teamName(t), values: Object.assign({}, U, R, x.values || {}), pct: Object.assign({}, U.pct || {}, RK.fk.T.unitPct(x, null), x.pct || {}), rank: x.rank || {}, team: t, rec: RK.fk.T.recordOf(x, x.record), R: R }; }
+  if (t && tc && tc.teams[t]) { const x = tc.teams[t]; const R = RK.fk.T.ratingsOf(x, null); const U = x.units || {}; return { kind: 'T', id: t, name: k.teamName(t), values: Object.assign({}, U, R, x.values || {}, { gd_g: k.isNum(U.gf_g) && k.isNum(U.ga_g) ? U.gf_g - U.ga_g : null, pts_pct: x.record && x.record.gp ? x.record.pts / (2 * x.record.gp) : null }), pct: Object.assign({}, U.pct || {}, RK.fk.T.unitPct(x, null), x.pct || {}), rank: x.rank || {}, team: t, rec: RK.fk.T.recordOf(x, x.record), R: R }; }
   const s = sk && sk.players[String(id)], g = gk && gk.players[String(id)];
   const p = s || g;
   if (!p) return null;
@@ -29,7 +30,7 @@ function entity(id, sk, gk, tc) {
 function pc(X, other) { return X.kind === 'S' && other && other.kind === 'S' && X.group === other.group ? (Object.keys(X.pctPos || {}).length ? X.pctPos : X.pct) : X.pct; }
 function metricsFor(A, B, sk, gk, tc) {
   const k = K();
-  if (MODE === 'T') { const ms = ((tc && tc.metrics) || []).slice(); if (!ms.length) return RK.fk.T.UNITS.map(u => ({ key: u[0], label: u[1], group: 'Unit ratings', fmt: u[4], lower: u[5], desc: u[3] })).concat([['xgf_pct5', '5v5 xGF%', 'pct', false], ['cf_pct5', '5v5 CF%', 'pct', false], ['xgf_g', 'xGF / game', '2', false], ['xga_g', 'xGA / game', '2', true], ['gf_g', 'Goals for / game', '2', false], ['ga_g', 'Goals against / game', '2', true], ['gsax', 'Goalie GSAx', '1', false]].map(z => ({ key: z[0], label: z[1], group: 'Results and shares', fmt: z[2], lower: z[3] }))); return ms; }
+  if (MODE === 'T') { const ms = ((tc && tc.metrics) || []).slice(); if (!ms.length) return RK.fk.T.UNITS.map(u => ({ key: u[0], label: u[1], group: 'Unit ratings', fmt: u[4], lower: u[5], desc: u[3] })).concat([['xgf_pct5', '5v5 xGF%', 'pct', false], ['cf_pct5', '5v5 CF%', 'pct', false], ['xgf_g', 'xGF / game', '2', false], ['xga_g', 'xGA / game', '2', true], ['gf_g', 'Goals for / game', '2', false], ['ga_g', 'Goals against / game', '2', true], ['gsax', 'Goalie GSAx', '1', false], ['gd_g', 'Goal differential / game', '2', false], ['pts_pct', 'Points %', 'pct', false]].map(z => ({ key: z[0], label: z[1], group: 'Results and shares', fmt: z[2], lower: z[3] }))); return ms; }
   if (MODE === 'G') return gk ? k.allMetrics(gk) : [];
   const ga = k.metricsFor(sk, A.group), gb = B ? k.metricsFor(sk, B.group) : ga;
   return ga.filter(m => gb.some(x => x.key === m.key));

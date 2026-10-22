@@ -162,7 +162,7 @@ function metricOptions(sel, scope) {
 }
 function sync() {
   const k = K(), $ = id => document.getElementById(id), g = G(), P = presetList();
-  $('lab-kind').querySelectorAll('button').forEach(b => { b.classList.toggle('on', b.dataset.v === S0.kind); b.disabled = !LAB[b.dataset.v]; });
+  $('lab-kind').querySelectorAll('button').forEach(b => { const v = b.getAttribute('data-value'); b.setAttribute('aria-pressed', v === S0.kind ? 'true' : 'false'); b.disabled = !LAB[v]; });
   $('lab-win').innerHTML = g.wins.map(w => '<option value="' + k.esc(w) + '"' + (w === S0.win ? ' selected' : '') + '>' + k.esc(w === 'season' ? 'This season' : w) + '</option>').join('');
   $('lab-preset').innerHTML = P.map((p, i) => '<option value="' + i + '"' + (i === S0.preset ? ' selected' : '') + '>' + k.esc(p.title) + '</option>').join('') + '<option value="-1"' + (S0.preset < 0 ? ' selected' : '') + '>Custom axes</option>';
   $('lab-x').innerHTML = metricOptions(S0.x); $('lab-y').innerHTML = metricOptions(S0.y);
@@ -175,14 +175,15 @@ function applyPreset() { const P = presetList(); if (S0.preset < 0 || !P.length)
 function rowsNow() { const g = G(); return g.rows.filter(r => (g.idx.win === undefined || String(raw(r, 'win')) === String(S0.win))); }
 
 function draw(L, S) {
-  const k = K(), C = k.C;
+  const k = K();
+  const U = BP.ui;
   const base0 = rowsNow().filter(r => (raw(r, 'n') || 0) >= S0.min);
   Object.keys(MU).forEach(key => delete MU[key]);
   [S0.x, S0.y, S0.color].forEach(key => { if (key && G().idx[key] !== undefined && shrinkable(key)) MU[key] = k.median(base0.map(r => raw(r, key))); });
   const rows = base0.filter(r => val(r, S0.x) !== null && val(r, S0.y) !== null);
   const set = (id, h) => { const e = document.getElementById(id); if (e) e.innerHTML = h; };
   set('lab-sub', rows.length + ' ' + kindNoun() + ' · ' + k.esc(S0.win === 'season' ? S : S0.win) + ' · ' + S0.min + '+ ' + nU());
-  if (rows.length < 3) { set('lab-chart', k.muted(L === 'npb' ? 'Too few for this view: lower the floor, or pick metrics this season has (the play-by-play metrics start in 2016).' : 'Too few players for this view: lower the floor, widen the window, or pick metrics these players have (bat tracking starts in 2023; framing is for catchers).')); set('lab-table', ''); set('lab-note', ''); return; }
+  if (rows.length < 3) { set('lab-chart', QK.empty('Too few for this view', L === 'npb' ? 'Lower the floor, or pick metrics this season has (the play-by-play metrics start in 2016).' : 'Lower the floor, widen the window, or pick metrics these players have (bat tracking starts in 2023; framing is for catchers).')); set('lab-table', ''); set('lab-note', ''); return; }
   const xs = rows.map(r => val(r, S0.x)), ys = rows.map(r => val(r, S0.y));
   const mx = k.median(xs), my = k.median(ys), sx = zs(xs), sy = zs(ys);
   const dirx = lower(S0.x) ? -1 : 1, diry = lower(S0.y) ? -1 : 1;
@@ -196,72 +197,60 @@ function draw(L, S) {
   const sortedX = xs.slice().sort((a, b) => a - b), sortedY = ys.slice().sort((a, b) => a - b);
   const pOf = (sorted, v, dir) => { const p = pctRank(sorted, v); return dir > 0 ? p : 100 - p; };
   const ns = rows.map(r => raw(r, 'n') || 0), lo = Math.min.apply(null, ns), hi = Math.max.apply(null, ns);
-  const size = r => 6 + 13 * (hi > lo ? Math.sqrt(((raw(r, 'n') || 0) - lo) / (hi - lo)) : 0.5);
+  const size = r => 6 + 11 * (hi > lo ? Math.sqrt(((raw(r, 'n') || 0) - lo) / (hi - lo)) : 0.5);
   const href = r => (S0.kind === 'team' ? k.teamHref(L, String(raw(r, 'id')), S) : S0.kind === 'pitcher' ? k.pitcherHref(L, String(raw(r, 'id')), S) : k.hitterHref(L, String(raw(r, 'id')), S));
-  const hover = r => '<b>' + k.esc(nm(r)) + '</b> · ' + k.esc(k.teamAbbr(tm(r))) + ' · ' + k.int(raw(r, 'n')) + ' ' + nU() +
-    '<br>' + k.esc(label(S0.x)) + ': ' + fmt(S0.x, val(r, S0.x)) + ' (pct ' + Math.round(pOf(sortedX, val(r, S0.x), dirx)) + ')' +
-    '<br>' + k.esc(label(S0.y)) + ': ' + fmt(S0.y, val(r, S0.y)) + ' (pct ' + Math.round(pOf(sortedY, val(r, S0.y), diry)) + ')' +
-    (S0.shrink && (shrinkable(S0.x) || shrinkable(S0.y)) ? '<br><span style="opacity:.7">unshrunk: ' + fmt(S0.x, raw(r, S0.x)) + ' · ' + fmt(S0.y, raw(r, S0.y)) + '</span>' : '');
-  const trace = (pts, name, color, extra) => Object.assign({
-    type: 'scatter', mode: 'markers', name: name, x: pts.map(r => val(r, S0.x)), y: pts.map(r => val(r, S0.y)),
-    text: pts.map(hover), hovertemplate: '%{text}<extra></extra>', customdata: pts.map(href),
-    marker: { size: pts.map(size), color: color, opacity: 0.85, line: { color: '#0d1117', width: 0.7 } }
-  }, extra || {});
-  const traces = [];
-  if (S0.color === 'team' || S0.color === 'pos') {
-    const key = S0.color === 'team' ? r => k.teamAbbr(tm(r)) : r => String(raw(r, 'pos') || '—');
+  /* colour: club colour, position (categorical slots), or a metric on the percentile scale (cold -> hot) */
+  const T = QKC.tokens();
+  let colorOf = () => T.model, legend = [];
+  if (S0.color === 'team') colorOf = r => (BP.teamInfo(tm(r)) || {}).colour || T.ink3;
+  else if (S0.color === 'pos') {
     const cnt = {};
-    rows.forEach(r => { cnt[key(r)] = (cnt[key(r)] || 0) + 1; });
-    const top = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]).slice(0, S0.color === 'team' ? 30 : 12);
-    top.forEach((c, i) => {
-      const pts = rows.filter(r => key(r) === c);
-      const col = S0.color === 'team' && pts[0] ? k.teamColour(tm(pts[0])) : k.PALETTE[i % k.PALETTE.length];
-      traces.push(trace(pts, c + ' (' + cnt[c] + ')', col));
-    });
+    rows.forEach(r => { const p = String(raw(r, 'pos') || '—'); cnt[p] = (cnt[p] || 0) + 1; });
+    const top = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]).slice(0, 8);
+    colorOf = r => { const i = top.indexOf(String(raw(r, 'pos') || '—')); return i >= 0 ? T.cat[i] : T.ink3; };
+    legend = top.map((p, i) => ({ name: p + ' (' + cnt[p] + ')', color: T.cat[i] }));
   } else if (S0.color) {
-    const cv = rows.map(r => val(r, S0.color));
-    traces.push(trace(rows, label(S0.color), cv, { marker: { size: rows.map(size), color: cv, colorscale: 'RdBu', reversescale: !lower(S0.color), opacity: 0.85,
-      colorbar: { title: { text: label(S0.color), side: 'right' }, thickness: 10, tickfont: { color: C.text2 } }, line: { color: '#0d1117', width: 0.7 } } }));
-  } else traces.push(trace(rows, 'Players', '#58a6ff'));
-  if (hits.length) traces.push(Object.assign(trace(hits, 'Search', '#ffffff'), { marker: { size: 20, color: 'rgba(0,0,0,0)', symbol: 'star-open', line: { color: '#ffffff', width: 2 } }, showlegend: false }));
-  const ann = Array.from(labelled).map(r => ({ x: val(r, S0.x), y: val(r, S0.y), text: k.esc(k.surname(nm(r))), showarrow: false, yshift: 11, font: { size: 10, color: hits.indexOf(r) >= 0 ? '#ffffff' : '#c9d1d9' } }));
+    const cv = rows.map(r => val(r, S0.color)).filter(k.isNum).sort((a, b) => a - b);
+    const dc = lower(S0.color) ? -1 : 1;
+    colorOf = r => { const v = val(r, S0.color); return k.isNum(v) ? QK.pctHex(pOf(cv, v, dc)) : T.ink3; };
+  }
   const diag = (/xwoba/.test(S0.x) && /xwoba|^woba$/.test(S0.y)) || (/^woba$/.test(S0.x) && /xwoba/.test(S0.y));
-  if (diag) { const lim = [Math.min(Math.min.apply(null, xs), Math.min.apply(null, ys)), Math.max(Math.max.apply(null, xs), Math.max.apply(null, ys))]; traces.unshift({ type: 'scatter', mode: 'lines', x: lim, y: lim, line: { color: '#6e7681', dash: 'dash', width: 1 }, hoverinfo: 'skip', showlegend: false }); }
+  const fx = meta(S0.x).fmt === 'pct' ? (v => Math.round(v * 100) + '%') : (v => fmt(S0.x, v));
+  const fy = meta(S0.y).fmt === 'pct' ? (v => Math.round(v * 100) + '%') : (v => fmt(S0.y, v));
+  QKC.scatter('#lab-chart', { points: rows.map(r => ({ x: val(r, S0.x), y: val(r, S0.y), name: nm(r) + ' · ' + k.teamAbbr(tm(r)) + ' · ' + k.int(raw(r, 'n')) + ' ' + nU(),
+    label: labelled.has(r) ? k.surname(nm(r)) : ' ', color: hits.indexOf(r) >= 0 ? T.ink1 : colorOf(r), size: hits.indexOf(r) >= 0 ? 14 : size(r), href: href(r) })),
+    xName: label(S0.x) + (lower(S0.x) ? ' (better to the right)' : ''), yName: label(S0.y) + (lower(S0.y) ? ' (better up)' : ''), xFmt: fx, yFmt: fy, refX: mx, refY: my, labelAll: true,
+    xInverse: lower(S0.x), yInverse: lower(S0.y), diagonal: diag ? { label: 'equal' } : undefined, legendItems: legend, label: label(S0.y) + ' against ' + label(S0.x) });
   const r = k.corr(xs, ys);
-  const narrow = k.narrow(document.getElementById('lab-chart'));
-  k.plot('lab-chart', traces, k.layout({
-    showlegend: !narrow && (S0.color === 'team' || S0.color === 'pos'), legend: { orientation: 'h', y: -0.18, font: { color: C.text2, size: 9 } }, margin: { l: 66, r: 16, t: 20, b: narrow ? 50 : 90 }, annotations: ann, hovermode: 'closest',
-    xaxis: { title: label(S0.x), zeroline: false, autorange: lower(S0.x) ? 'reversed' : true, tickformat: meta(S0.x).fmt === 'pct' ? '.0%' : '' },
-    yaxis: { title: label(S0.y), zeroline: false, autorange: lower(S0.y) ? 'reversed' : true, tickformat: meta(S0.y).fmt === 'pct' ? '.0%' : '' },
-    shapes: [{ type: 'line', x0: mx, x1: mx, yref: 'paper', y0: 0, y1: 1, line: { color: '#3d444d', dash: 'dot', width: 1 } }, { type: 'line', y0: my, y1: my, xref: 'paper', x0: 0, x1: 1, line: { color: '#3d444d', dash: 'dot', width: 1 } }]
-  }));
-  const node = document.getElementById('lab-chart');
-  if (node && node.on) node.on('plotly_click', ev => { const h = ev.points && ev.points[0] && ev.points[0].customdata; if (h && typeof h === 'string') location.hash = h; });
   const mX = meta(S0.x), mY = meta(S0.y);
-  set('lab-note', 'Correlation on screen r = ' + k.num(r, 2) + ' (' + rows.length + ' players). Dotted lines are medians. ' + (lower(S0.x) || lower(S0.y) ? 'Axes where less is better are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
-    (diag ? 'The dashed diagonal is equality. ' : '') + 'Labelled: the eight furthest into the good corner, the four furthest from it' + (hits.length ? ', and your search' : '') + '. Marker size is the sample. Click a dot to open the player.' +
+  set('lab-note', 'Correlation on screen r = ' + k.num(r, 2) + ' (' + rows.length + ' ' + kindNoun() + '). The reference lines are the medians. ' + (lower(S0.x) || lower(S0.y) ? 'Axes where less is better are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
+    (diag ? 'The dashed diagonal is equality. ' : '') + (S0.color && S0.color !== 'team' && S0.color !== 'pos' ? 'Colour: ' + k.esc(label(S0.color)) + ' on the percentile scale (blue worst, red best). ' : '') +
+    'Labelled: the eight furthest into the good corner, the four furthest from it' + (hits.length ? ', and your search (white)' : '') + '. Marker size is the sample.' +
     (S0.shrink ? ' Rates marked "shrunk" are pulled to the median of the players on screen by their own stabilisation point: (n·x + k·median)/(n + k) with k = 3/7 of the sample at which the metric reaches 0.7 split-half reliability (' + (shrinkable(S0.x) ? k.esc(mX.label || S0.x) + ' k = ' + k.int(kOf(S0.x)) : '') + (shrinkable(S0.x) && shrinkable(S0.y) ? ', ' : '') + (shrinkable(S0.y) ? k.esc(mY.label || S0.y) + ' k = ' + k.int(kOf(S0.y)) : '') + '). Model scores (the "+" scores), WAR and run totals are never shrunk here: the models regularise them already.' : '') +
     (mX.desc ? '<br><strong>' + k.esc(mX.label) + '</strong>: ' + k.esc(mX.desc) : '') + (mY.desc ? '<br><strong>' + k.esc(mY.label) + '</strong>: ' + k.esc(mY.desc) : '') + npbNote([S0.x, S0.y]));
-  const host = document.getElementById('lab-table');
-  host.innerHTML = k.table([{ label: '#', sortable: false }, { label: S0.kind === 'pitcher' ? 'Pitcher' : S0.kind === 'team' ? 'Club' : 'Hitter' }, { label: S0.kind === 'team' ? 'League' : 'Team' }, { label: nU(), align: 'right' },
-    { label: label(S0.x), align: 'right' }, { label: 'Pct', align: 'right' }, { label: label(S0.y), align: 'right' }, { label: 'Pct', align: 'right' }, { label: 'Combined', align: 'right', title: 'Sum of standard scores in the better direction' }],
-  ranked.slice(0, 300).map((o, i) => { const rr = o.r, vx = val(rr, S0.x), vy = val(rr, S0.y);
-    return { _href: href(rr), cells: [{ v: i + 1, cls: 'pos-cell' }, { v: nm(rr), html: '<a class="ply-link" href="' + href(rr) + '">' + k.esc(nm(rr)) + '</a>' }, S0.kind === 'team' ? { v: raw(rr, 'pos'), html: k.esc(raw(rr, 'pos') || '—') } : { v: k.teamAbbr(tm(rr)), html: k.teamChip(L, tm(rr), S) }, { v: raw(rr, 'n'), html: k.int(raw(rr, 'n')) },
-      { v: vx, html: fmt(S0.x, vx) }, { v: pOf(sortedX, vx, dirx), html: k.pill(pOf(sortedX, vx, dirx)) }, { v: vy, html: fmt(S0.y, vy) }, { v: pOf(sortedY, vy, diry), html: k.pill(pOf(sortedY, vy, diry)) }, { v: o.z, html: '<strong>' + k.num(o.z, 2) + '</strong>' }] }; }), { sticky: true, compact: true });
-  k.sortable(host);
+  QK.leaderboard(document.getElementById('lab-table'), { dense: true, rank: true, maxHeight: 620, rowClass: o => (hits.indexOf(o._r) >= 0 ? 'is-me' : ''), rowHref: o => o.href, columns: [
+    { key: 'name', label: S0.kind === 'pitcher' ? 'Pitcher' : S0.kind === 'team' ? 'Club' : 'Hitter', type: 'entity', sub: 'sub', mark: o => (S0.kind === 'team' ? U.team(o.id, L, S) : (o.team ? U.team(o.team, L, S) : null)), href: o => o.href },
+    { key: 'n', label: nU(), num: true, fmt: v => k.int(v) },
+    { key: 'vx', label: label(S0.x), type: 'pctl', pctl: 'px', fmt: v => fmt(S0.x, v) },
+    { key: 'vy', label: label(S0.y), type: 'pctl', pctl: 'py', fmt: v => fmt(S0.y, v) },
+    { key: 'z', label: 'Combined', type: 'bar', fmt: v => k.num(v, 2), tip: 'Sum of standard scores in the better direction' }],
+    rows: ranked.slice(0, 300).map(o => { const rr = o.r, vx = val(rr, S0.x), vy = val(rr, S0.y);
+      return { _r: rr, id: String(raw(rr, 'id')), name: nm(rr), team: tm(rr), sub: S0.kind === 'team' ? String(raw(rr, 'pos') || '') : k.teamAbbr(tm(rr)), n: raw(rr, 'n'), vx: vx, px: pOf(sortedX, vx, dirx), vy: vy, py: pOf(sortedY, vy, diry), z: o.z, href: href(rr) }; }) });
 }
 
 function render(el, params, state) {
   const k = K();
+  const U = BP.ui;
   const L = k.L(params, state);
-  el.innerHTML = '<div class="card"><div class="card-header">' + k.LN(L) + ' lab <span class="card-sub" id="lab-sub">Loading…</span></div>' +
-    '<div class="lab-controls gq-controls">' + k.toggle('lab-kind', L === 'npb' ? [['hitter', 'Hitters'], ['pitcher', 'Pitchers'], ['team', 'Clubs']] : [['hitter', 'Hitters'], ['pitcher', 'Pitchers']], S0.kind) +
+  el.innerHTML = QK.sectionHead({ kicker: 'Lab · ' + k.LN(L), title: 'Any two metrics', sub: 'Plot one metric against another for a season or a window, colour by club, position or a third metric, and rank everyone on both. Presets ask the questions our models were built to answer.' }) +
+    '<section class="qk-card"><div class="qk-card-body"><div class="bp-ctl">' + U.seg('lab-kind', 'Kind', L === 'npb' ? [['hitter', 'Hitters'], ['pitcher', 'Pitchers'], ['team', 'Clubs']] : [['hitter', 'Hitters'], ['pitcher', 'Pitchers']], S0.kind) +
     '<label>Window<select id="lab-win"></select></label><label>Preset<select id="lab-preset" class="gq-wide"></select></label>' +
-    '<label>X axis<select id="lab-x"></select></label><label>Y axis<select id="lab-y"></select></label><label>&nbsp;<button type="button" id="lab-swap" class="gq-btn" title="Swap the axes">⇄ swap</button></label>' +
-    '<label>Colour<select id="lab-color"></select></label><label>Min <span id="lab-min-u"></span> <span id="lab-min-v"></span><input id="lab-min" type="range" min="0" max="700" step="5"></label>' +
-    '<label class="inline"><input id="lab-shrink" type="checkbox"> shrink by stabilisation</label><label>Highlight<input id="lab-q" class="gq-search" type="search" placeholder="player or team…"></label>' +
-    '</div><div id="lab-chart" class="gq-lab-chart"></div><div class="pg-note gq-note" id="lab-note"></div></div>' +
-    '<div class="card"><div class="card-header">Ranked <span class="card-sub">By the combined standard score on both axes (top 300). Click a row for the player.</span></div><div id="lab-table"></div></div>';
+    '<label>X axis<select id="lab-x"></select></label><label>Y axis<select id="lab-y"></select></label><button type="button" id="lab-swap" class="qk-btn" title="Swap the axes">⇄ Swap</button>' +
+    '<label>Colour<select id="lab-color"></select></label><label>Min <span id="lab-min-u"></span> <b id="lab-min-v"></b><input id="lab-min" type="range" min="0" max="700" step="5"></label>' +
+    '<label class="bp-check"><input id="lab-shrink" type="checkbox"> shrink by stabilisation</label><label>Highlight<input id="lab-q" class="gq-search" type="search" placeholder="player or team…"></label>' +
+    '</div></div></section>' +
+    '<div class="qk-grid" style="margin-top:var(--sp-4)"><div class="qk-span-12">' + U.card2('The chart', '<span id="lab-sub">Loading…</span>', U.chart('lab-chart', 560, 'Lab scatter') + '<p class="bp-note" id="lab-note"></p>') + '</div>' +
+    '<div class="qk-span-12">' + U.card2('Ranked', 'By the combined standard score on both axes (top 300); the cells are percentiles on screen', '<div id="lab-table"></div>', { flush: true }) + '</div></div>';
   return k.ready().then(() => {
     const S = k.S(params, state);
     // NPB: one file (npb/<S>/lab.json: hitters, pitchers and clubs); MLB and Triple-A fall back to the catalogues
@@ -275,7 +264,7 @@ function render(el, params, state) {
     if (pc) k.learnCat(pc);
     const key = L + '/' + S;
     if (LABK !== key) { LAB = prep(res[0], hc, pc); LABK = key; S0.win = null; S0.min = null; S0.x = ''; S0.y = ''; S0.preset = 0; }
-    if (!Object.keys(LAB).length) { $('lab-chart').innerHTML = k.notBuilt('The ' + k.LN(L) + ' ' + S + ' lab file', res[0]); $('lab-sub').textContent = ''; return; }
+    if (!Object.keys(LAB).length) { $('lab-chart').innerHTML = QK.empty('Not built yet', 'The ' + k.LN(L) + ' ' + S + ' lab file is not available.'); $('lab-sub').textContent = ''; return; }
     const qy = params.query || {};
     if (qy.kind && LAB[qy.kind]) S0.kind = qy.kind;
     if (!LAB[S0.kind]) S0.kind = Object.keys(LAB)[0];
@@ -293,7 +282,7 @@ function render(el, params, state) {
     reset();
     sync();
     const redraw = () => draw(L, S);
-    $('lab-kind').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { if (!LAB[b.dataset.v]) return; S0.kind = b.dataset.v; S0.x = ''; S0.y = ''; S0.preset = 0; S0.min = null; if (S0.color !== 'team' && S0.color !== 'pos' && S0.color) S0.color = 'team'; reset(); sync(); redraw(); }));
+    QK.seg($('lab-kind'), v => { if (!LAB[v]) return; S0.kind = v; S0.x = ''; S0.y = ''; S0.preset = 0; S0.min = null; if (S0.color !== 'team' && S0.color !== 'pos' && S0.color) S0.color = 'team'; reset(); sync(); redraw(); });
     $('lab-win').onchange = e => { S0.win = e.target.value; S0.min = null; reset(); sync(); redraw(); };
     $('lab-preset').onchange = e => { S0.preset = parseInt(e.target.value, 10); applyPreset(); sync(); redraw(); };
     $('lab-x').onchange = e => { S0.x = e.target.value; S0.preset = -1; sync(); redraw(); };

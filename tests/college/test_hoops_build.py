@@ -145,3 +145,28 @@ def test_migrate_upgrades_an_old_season_folder(built):
     t2 = load(tf)
     assert "schedule" not in t2 and "rating_path" not in t2 and t2["roster"] == tp["roster"]
     assert B.migrate("mbb", out, 2026) == 0                 # idempotent
+
+
+def test_career_similar_players_follow_the_spec(built):
+    """players/<pid>.json similar: same role, qualified player-seasons, never the player, nearest first (weighted
+    z distance of the role group's features from docs/_design/metrics/college.json)."""
+    out, _res = built
+    seen = 0
+    for f in (out / "mbb" / "players").glob("*.json"):
+        c = load(f)
+        sim = c.get("similar") or []
+        if not sim:
+            continue
+        seen += 1
+        assert len(sim) <= 5
+        assert all(s["id"] != c["id"] and {"id", "name", "team", "season", "distance"} <= set(s) for s in sim)
+        d = [s["distance"] for s in sim]
+        assert d == sorted(d)
+        roles = set()
+        for s in sim:
+            nb = load(out / "mbb" / str(s["season"]) / "players.json")["players"].get(s["id"])
+            assert nb is None or nb["qualified"]
+            if nb and nb.get("role"):
+                roles.add(nb["role"])
+        assert len(roles) <= 1                                     # one role group
+    assert seen > 0
