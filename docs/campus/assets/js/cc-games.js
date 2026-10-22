@@ -153,6 +153,21 @@ function pregame(L, g) {
   if (isNum(pg.espn_predictor)) rows.push(['ESPN predictor (home)', CC.pct(pg.espn_predictor, 1), '']);
   if (isNum(pg.elo_p_home)) rows.push(['Elo baseline (home)', CC.pct(pg.elo_p_home, 1), '']);
   var tbl = U.table(['', { label: 'Model', align: 'right' }, { label: 'Market', align: 'right' }], rows, { sticky: false });
+  var inf = m.informed || null, tri = m.trial || null, built = '';
+  if (inf || tri) {
+    var x = inf || tri, brows = [];
+    var cell = function (sp, p) { return (isNum(sp) ? CC.spread(sp) : '—') + (isNum(p) ? ' · ' + CC.pct(p, 1) : ''); };
+    brows.push(['Ratings model', cell(isNum(x.base_margin) ? -x.base_margin : null, x.base_p)]);
+    if (isNum(x.mk_spread)) brows.push(['Market ratings', cell(x.mk_spread, null)]);
+    brows.push([inf ? 'Published line' : 'Trial line', cell(isNum(x.margin) ? -x.margin : null, x.p_home)]);
+    if (mk && (isNum(mk.spread_home) || isNum(mk.p_home))) brows.push(['Market', cell(mk.spread_home, mk.p_home)]);
+    var moved = isNum(x.margin) && isNum(x.base_margin) ? x.margin - x.base_margin : null;
+    var note = inf ? 'The published line stacks the ratings model with market ratings (team ratings learned from earlier games’ closing lines; promoted 22 Oct 2026 after a sealed test on 2021-26).'
+      : 'Trial line, not the published forecast: the ratings model stacked with market ratings (team ratings learned from earlier games’ closing lines), tested forward on 2026-27 before it can replace the model above.';
+    if (isNum(moved)) note += ' Here it moves the line ' + CC.f(Math.abs(moved), 1) + ' points toward ' + esc(moved > 0 ? h : a) + '.';
+    if (inf && inf.early) note += ' Early in the season the market part leans on last season’s market ratings and returning production.';
+    built = '<div class="cc-sub">How the line is built</div>' + U.table(['', { label: h + ' line · win', align: 'right' }], brows, { sticky: false }) + '<p class="cc-note">' + note + '</p>';
+  }
   var bar = isNum(m.p_home) ? QK.probBar(1 - m.p_home, null, m.p_home, CC.team(L, g.away), CC.team(L, g.home)) + '<div class="cc-pb-lab"><span>' + esc(a) + ' ' + CC.pct(1 - m.p_home) + '</span><span>' + esc(h) + ' ' + CC.pct(m.p_home) + '</span></div>' : '';
   var mvm = mk && isNum(mk.p_home) && isNum(m.p_home) ? QK.mvm(m.p_home, mk.p_home, h + ' win') : '';
   var res = '';
@@ -161,7 +176,7 @@ function pregame(L, g) {
       (g.result.cover ? '<span class="qk-badge">' + esc(g.result.cover === 'push' ? 'Push against the spread' : CC.tshort(L, g.result.cover === 'home' ? g.home : g.away) + ' covered') + '</span>' : '') + '</div>';
   }
   var src = mk && mk.source ? { kalshi: 'Kalshi', polymarket: 'Polymarket', espn_close: 'ESPN closing line', espn: 'ESPN line' }[mk.source] || mk.source : null;
-  return U.card('Before the game', 'Model against the market' + (src ? ' (' + esc(src) + ')' : '') + '. ' + (isNum(m.sd) ? 'Margin uncertainty ± ' + CC.f(m.sd, 1) + ' points.' : ''), '<div class="qk-stack">' + bar + mvm + tbl + res + '</div>');
+  return U.card('Before the game', 'Model against the market' + (src ? ' (' + esc(src) + ')' : '') + '. ' + (isNum(m.sd) ? 'Margin uncertainty ± ' + CC.f(m.sd, 1) + ' points.' : ''), '<div class="qk-stack">' + bar + mvm + tbl + built + res + '</div>');
 }
 
 function teamStats(L, g) {

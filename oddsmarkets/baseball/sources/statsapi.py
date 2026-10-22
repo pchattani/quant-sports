@@ -245,7 +245,7 @@ def feed_extras(f: dict) -> dict:
 # /api/v1.1/game/{pk}/feed/live/timestamps lists the times (UTC, YYYYMMDD_HHMMSS) the feed changed;
 # /feed/live?timecode=T returns the feed as it stood at the latest change at or before T, and the first change when
 # T is earlier than all of them. The first change is the switch to "Pre-Game" (measured 22 Oct 2026: about 1 h
-# before first pitch in 2018-2024, about 3 h in 2026; 2016-2017 feeds start at first pitch). Asking for a time
+# before first pitch in 2017-2024 (samples), about 3 h in 2025-2026; the 2016 feeds sampled start at first pitch). Asking for a time
 # well before first pitch therefore returns the earliest state the archive holds, stamped (metaData.timeStamp)
 # with the time it was published: the batting orders and probable pitchers known then.
 

@@ -30,8 +30,19 @@ import pandas as pd
 from scipy.stats import norm
 
 from oddsmarkets.college import canon, store
+from oddsmarkets.college import informed as INF
 
-from . import backtest, committee, data, ep, fantasy, players, sim
+from . import (
+    backtest,
+    committee,
+    data,
+    ep,
+    fantasy,
+    game,
+    market_informed,
+    players,
+    sim,
+)
 
 logger = logging.getLogger(__name__)
 LEVEL = "cfb"
@@ -107,6 +118,28 @@ def context(current: int | None = None, use_cache: bool = True) -> dict:
                  "stores": str(store.paths()["stores"]),
                  "values": {}, "sims": {}})
     return _CTX
+
+
+def informed(ctx: dict, season: int) -> dict[str, dict]:
+    """The market-informed model's predictions for `season` ({gid: ...}; market_informed.predict), {} when no fit is
+    committed for it (past seasons keep the base model) or it fails (the base model still publishes)."""
+    cache = ctx.setdefault("informed", {})
+    if season not in cache:
+        try:
+            cache[season] = market_informed.predict(ctx["pipe"], season)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("cfb market-informed model failed for %s: %s", season, exc)
+            cache[season] = {}
+    return cache[season]
+
+
+def informed_block(inf: dict | None) -> dict | None:
+    """The game page's view of the informed model: the published line and what moved it."""
+    if not inf:
+        return None
+    return {"p_home": r2(inf["p_home"], 4), "margin": r2(inf["margin"]), "base_p": r2(inf["base_p"], 4),
+            "base_margin": r2(inf["base_margin"]), "mk_spread": r2(-inf["mk"], 1) if np.isfinite(inf["mk"]) else None,
+            "rd": r2(inf["rd"]) if np.isfinite(inf["rd"]) else None, "early": bool(inf["early"])}
 
 
 def ep_fit(ctx: dict) -> dict:
@@ -325,11 +358,15 @@ def market_of(g: dict, live_prices: dict | None, sd: float, season: int | None =
             "source": "espn_close" if g.get("status") == "post" else "espn"}
 
 
-def card(g: dict, season: int, pred: pd.Series | None, live_prices: dict | None = None, sd: float = 15.5) -> dict:
+def card(g: dict, season: int, pred: pd.Series | None, live_prices: dict | None = None, sd: float = 15.5,
+         inf: dict | None = None) -> dict:
     hs, as_ = g.get("hs"), g.get("as")
     model = None
     if pred is not None and np.isfinite(pred.get("p_home", np.nan)):
         model = {"p_home": r2(pred["p_home"], 4), "margin": r2(pred["margin"]), "total": r2(pred["total"], 1)}
+        if inf:      # the published (market-informed) model; `base` = the ratings model it was stacked on
+            model.update({"p_home": r2(inf["p_home"], 4), "margin": r2(inf["margin"]),
+                          "base": {"p_home": r2(inf["base_p"], 4), "margin": r2(inf["base_margin"])}})
     mk = market_of(g, live_prices, sd, season)
     res = None
     if g.get("status") == "post" and hs is not None and as_ is not None:
@@ -358,6 +395,7 @@ def season_cards(ctx: dict, season: int, live_prices: dict | None = None) -> lis
     st, preds = S["st"], S["preds"]
     sd = ((ctx["pipe"]["blends"].get(season) or {}).get("sd") or {}).get("mid", 15.5)
     tm = S["tm"]
+    inf = informed(ctx, season)
     out = []
     for gid, g in sorted((st.get("games") or {}).items(), key=lambda kv: (kv[1].get("date") or "", kv[0])):
         h, a = str(g.get("home")), str(g.get("away"))
@@ -366,7 +404,7 @@ def season_cards(ctx: dict, season: int, live_prices: dict | None = None) -> lis
         if not (data.real_team(h) and data.real_team(a)) and g.get("stype") == "reg":
             continue
         pr = preds.loc[gid] if len(preds) and gid in preds.index else None
-        out.append(card(g, season, pr, live_prices, sd))
+        out.append(card(g, season, pr, live_prices, sd, inf.get(str(gid))))
     return out
 
 
@@ -1215,6 +1253,13 @@ def game_page(ctx: dict, season: int, g: dict, cardd: dict, pl: pd.DataFrame | N
                     "spread_fair": r2(pred["spread_fair"], 1),
                     "detail": {"d_pts": r2(pred.get("d_pts")), "d_epa": r2(pred.get("d_epa"), 4), "d_sr": r2(pred.get("d_sr"), 4),
                                "model": "full" if (b.get("full") and np.isfinite(pred.get("d_epa", np.nan))) else "points"}}
+        inf = informed(ctx, season).get(gid)
+        if inf:
+            fit = market_informed.fitted() or {}
+            ph = game.phase(g.get("week"), g.get("stype") or "reg")
+            pg_model.update({"p_home": r2(inf["p_home"], 4), "margin": r2(inf["margin"]), "spread_fair": r2(-inf["margin"], 1),
+                             "sd": r2(((fit.get("cal") or {}).get("sd") or {}).get(ph, pred["sd"])),
+                             "informed": informed_block(inf)})
     out = dict(cardd)
     out.update({"ok": True, "level": LEVEL, "teams": {t: team_obj(t, tm) for t in (h, a)}, "venue": g.get("venue"),
                 "attendance": g.get("attendance"),
@@ -1455,6 +1500,7 @@ def calibration_payload(ctx: dict) -> dict:
                                               "ap_top12_overlap", "ap_top4_overlap", "features", "weights", "per_season")}
     cal["format_table"] = sim.format_table(list(range(2014, ctx["current"] + 1)))
     cal["players"] = ctx.get("player_validation")
+    cal["informed"] = INF.summary(LEVEL)
     return cal
 
 
@@ -1486,6 +1532,9 @@ def markets_payload(ctx: dict, season: int, markets: bool) -> dict:
             if pr is None or not np.isfinite(pr["p_home"]):
                 continue
             mo = {"p_home": r2(pr["p_home"], 4), "margin": r2(pr["margin"]), "total": r2(pr["total"], 1)}
+            inf = informed(ctx, season).get(str(gid))
+            if inf:
+                mo.update({"p_home": r2(inf["p_home"], 4), "margin": r2(inf["margin"])})
             mk_ = market_of(g, lp, 15.5)
             games[gid] = {"home": str(g["home"]), "away": str(g["away"]), "date": g.get("date"), "model": mo, "market": mk_,
                           "edge": r2(mo["p_home"] - mk_["p_home"], 4) if mk_ and mk_.get("p_home") is not None else None}

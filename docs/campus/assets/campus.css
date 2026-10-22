@@ -19,6 +19,7 @@ body.qk { font-size: var(--fs-md); }
 .cc-tabs a.qk-tab { display: inline-flex; align-items: center; }
 .cc-note { color: var(--ink-3); font-size: var(--fs-xs); margin: 0 0 var(--sp-3); max-width: 900px; }
 .cc-note b { color: var(--ink-2); }
+.cc-sub { color: var(--ink-2); font-size: var(--fs-xs); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; margin: var(--sp-2) 0 0; }
 .cc-notes { color: var(--ink-3); font-size: var(--fs-xs); padding-left: 18px; }
 .cc-link { color: var(--accent) !important; font-weight: 600; font-size: var(--fs-xs); white-space: nowrap; }
 .cc-link:hover { text-decoration: underline; text-underline-offset: 3px; }

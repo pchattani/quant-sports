@@ -164,6 +164,28 @@ markets with low limits, ESPN shows lines for only a third to a half of games, a
 may be stale; treat it as evidence that the market is soft, not as a proven betting edge. ESPN's matchup predictor
 is not stored for any backfilled game (it is captured only before tip-off), so there is no comparison yet.
 
+## 4b. Market-informed line (men: on trial; women: not promoted)
+
+Round 4 (22 Oct 2026, `docs/research/college_edge.md`) stacked the game model with ratings learned from earlier games'
+closing spreads (market ratings: weighted ridge, half-life 60 days, ridge 0.25, prior 0.7 x last season's final) and
+residual ratings (the same ridge on the closing spread minus our margin: half-life 60 days, ridge 4, carry 0.5),
+fitted to closing spreads of earlier seasons, with a walk-forward probit (`hoops/market_informed.py`,
+`oddsmarkets/college/informed.py`).
+
+- **Men**, sealed test 2021-2026 (32,376 games): log-loss 0.5349 -> 0.5278, paired difference -0.0071 [-0.0085,
+  -0.0057], every season's interval below zero; Brier -0.0028; 73 % of the gap to the de-vigged closing moneyline
+  closed (0.0098 -> 0.0027 nats); margin error on lined games 9.05 -> 8.91 (the close 8.83; ESPN's stored opener 8.96
+  on the games that have one). It was **not promoted**: its calibration slope (0.94 against the model's 1.00) missed
+  the pre-registered tolerance. A recalibrated version (the probit fitted on the last two seasons only, chosen on the
+  2015-2020 dev seasons: slope 0.975 there) is tested forward on 2026-27 to Selection Sunday with the fit frozen in
+  `oddsmarkets/college/fitted/informed_mbb.json`. Until then game pages show it as a trial line beside the published
+  model, with the market-ratings line.
+- **Women**, sealed test 2023-2026 (22,259 games): no change (-0.0001 [-0.0008, +0.0006]). The women's lines are thin
+  (a third of games) and the model already beats the de-vigged moneyline by 0.0117 nats on the games that have one,
+  so earlier lines teach it nothing. Not used.
+
+Rest days and back-to-backs added nothing on the men's dev seasons (-0.0037 with or without them).
+
 ## 5. Season simulation (`sim.py`)
 
 Team strengths drawn per run from N(rating, se); every remaining regular-season game simulated with the game model;

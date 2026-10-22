@@ -165,3 +165,47 @@ def test_starters_status_flags(monkeypatch):
     out = GM._starters_status(ctx, g)
     assert out["home"]["starts"] == 2 and out["home"]["flag"] == "few"               # only starts before the date
     assert out["away"]["flag"] == "debut" and out["away"]["throws"] == "L"
+
+
+# ── round 4: forecast wind geometry and the umpire term (scripts) ────────────
+
+def _scripts():
+    import sys
+    from pathlib import Path
+    p = str(Path(__file__).resolve().parents[2] / "scripts")
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
+
+def test_wind_out_component():
+    _scripts()
+    import mlb_weather_forecast as WF
+    # centre field due north (azimuth 0): a wind from the south blows out at full speed, from the north blows in
+    assert WF.wind_out(10, 180, 0) == pytest.approx(10)
+    assert WF.wind_out(10, 0, 0) == pytest.approx(-10)
+    assert WF.wind_out(10, 90, 0) == pytest.approx(0, abs=1e-9)
+    assert WF.wind_out(10, 90, None) is None
+
+
+def test_umpire_term_is_shrunk_and_walk_forward():
+    _scripts()
+    import mlb_round4 as R4
+    rng = np.random.default_rng(0)
+    n = 4000
+    dates = pd.date_range("2020-04-01", periods=n // 20, freq="D").strftime("%Y-%m-%d").repeat(20)[:n]
+    ump = rng.choice(["a", "b", "c", "d"], n)
+    eff = {"a": 0.5, "b": -0.5, "c": 0.0, "d": 0.0}
+    y = np.array([eff[u] for u in ump]) + rng.normal(0, 3, n)
+    d = pd.DataFrame({"date": dates, "ump": ump, "res_mkt": y})
+    pred = R4.second_stage(d, [("ump", "mkt", 50.0)], min_train=500)
+    per = d["date"].str[:7]
+    first = per == per.iloc[0]
+    assert (pred[first.to_numpy()] == 0).all()                 # nothing before enough earlier games
+    late = d.index[-500:]
+    assert pred[late][ump[late] == "a"].mean() > 0.3 and pred[late][ump[late] == "b"].mean() < -0.3
+    assert abs(pred[late][ump[late] == "a"].mean()) < 0.5      # shrunk towards zero
+    # changing later outcomes does not change earlier predictions
+    d2 = d.copy()
+    d2.loc[d2.index[-200:], "res_mkt"] += 100
+    p2 = R4.second_stage(d2, [("ump", "mkt", 50.0)], min_train=500)
+    assert np.allclose(pred[: n - 400], p2[: n - 400])

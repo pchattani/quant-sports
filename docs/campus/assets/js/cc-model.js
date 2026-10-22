@@ -117,6 +117,30 @@ var FALLBACK = {
     '- **Players**: a box-score value above replacement scaled so a team’s players add up to its margin; transfers inferred; fantasy points and 9-category projections.\n'
 };
 
+/* The market-informed model (calibration.json "informed"): status, dev and sealed-test numbers, v the market. */
+function informedCard(L, inf) {
+  if (!inf || !(inf.test || inf.dev)) return '';
+  var ci = function (x) { return x && isNum(x[0]) ? (x[0] > 0 ? '+' : '') + CC.f(x[0], 4) + ' [' + CC.f(x[1], 4) + ', ' + CC.f(x[2], 4) + ']' : '—'; };
+  var row = function (lab, r) {
+    if (!r) return null;
+    return [lab, isNum(r.n) ? QK.fmt.num(r.n) : '—', CC.f(r.ll0, 4) + ' → ' + CC.f(r.ll1, 4), ci(r.d_ll), CC.f(r.brier0, 4) + ' → ' + CC.f(r.brier1, 4), CC.f(r.slope0, 2) + ' → ' + CC.f(r.slope1, 2)];
+  };
+  var rows = [row('Dev seasons (choices made here)', inf.dev), row('Sealed test seasons', inf.test)].filter(Boolean);
+  var tbl = U.table(['', { label: 'Games', align: 'right' }, { label: 'Log loss, base → informed', align: 'right' }, { label: 'Difference [95% CI]', align: 'right' }, { label: 'Brier', align: 'right' }, { label: 'Calibration slope', align: 'right' }], rows, { sticky: false });
+  var mg = (inf.test || {}).ml_games, mc = (inf.test || {}).mae_close_games, mkt = '';
+  if (mg) {
+    mkt = U.table(['On test games with a closing moneyline', { label: 'Log loss', align: 'right' }, { label: 'Minus the market [95% CI]', align: 'right' }],
+      [['Base model', CC.f(mg.ll0, 4), ci(mg.m0_minus_mkt)], ['Market-informed', CC.f(mg.ll1, 4), ci(mg.new_minus_mkt)], ['De-vigged closing moneyline', CC.f(mg.ll_market, 4), '']], { sticky: false }) +
+      '<p class="cc-note">' + (isNum(mg.gap_closed) ? 'Share of the base model’s gap to the market closed: <b>' + CC.pct(mg.gap_closed, 0) + '</b>. ' : '') +
+      (mc ? 'Margin error on games with a close: base ' + CC.f(mc.m0, 2) + ', informed ' + CC.f(mc.new, 2) + ', closing line ' + CC.f(mc.close, 2) + '.' : '') + '</p>';
+  }
+  var ps = inf.per_season ? Object.keys(inf.per_season).sort().map(function (k) { var r = inf.per_season[k]; return [{ v: Number(k), html: esc(CC.seasonLabel(L, Number(k))) }, r.n, ci(r.d_ll)]; }) : [];
+  var per = ps.length ? U.table([{ label: 'Test season', align: 'right' }, { label: 'Games', align: 'right' }, { label: 'Log-loss difference [95% CI]', align: 'right' }], ps, { sticky: false }) : '';
+  var lab = { promoted: 'Published', trial: 'On trial', 'not promoted': 'Not promoted' }[inf.status] || inf.status;
+  return U.card('Market-informed model · ' + esc(lab), esc(inf.text || '') + ' Ratings learned from earlier games’ closing lines (and, where it helped, what the market says beyond our ratings) are stacked with the ratings model; every number is walk-forward and the promotion rule (a paired log-loss interval below zero, Brier and calibration no worse) was fixed before the test.',
+    '<div class="qk-stack">' + tbl + mkt + per + '</div>');
+}
+
 function calibration(node, L, d) {
   if (!CC.ok(d)) { node.innerHTML = U.missing('The backtest', d); return; }
   var s = d.summary || {}, m = s.model || {}, c = s.close || {}, vc = s.vs_close || {}, el0 = s.elo || {};
@@ -127,6 +151,7 @@ function calibration(node, L, d) {
     QK.kpi({ label: 'Brier score', value: CC.f(m.brier, 3), sub: 'closing moneyline ' + CC.f(c.brier, 3) + ' · Elo ' + CC.f(el0.brier, 3), tip: 'Mean squared error of the win probability; lower is better' }) +
     (isNum(vc.total_mae_model) ? QK.kpi({ label: 'Total error', value: CC.f(vc.total_mae_model, 2), sub: 'closing total ' + CC.f(vc.total_mae_close, 2) }) : '') + '</div>';
   html += '<p class="cc-note">Walk-forward: every game is predicted with ratings fitted only on games before its date, and nothing is tuned on the season being tested. The closing line is the hardest benchmark there is; matching it is good, beating it is rare.</p>';
+  html += informedCard(L, d.informed);
   html += '<div class="qk-grid cc-grid"><div class="qk-span-6">' + U.card('Calibration', 'When the model says 70%, does the team win about 70% of the time? Points on the diagonal are well calibrated.', U.chart('cal-rel', 320, 'Reliability diagram')) + '</div>' +
     '<div class="qk-span-6">' + U.card('Margin error by season', 'Mean absolute error of the predicted margin, model against the closing line.', U.chart('cal-ps', 320, 'Margin error by season')) + '</div></div>';
   var summ = [['Model', m], ['Closing line', c], ['Elo baseline', el0]].concat(s.espn_predictor ? [['ESPN predictor', s.espn_predictor]] : []);

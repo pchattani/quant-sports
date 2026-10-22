@@ -28,18 +28,21 @@ import re
 import time
 import traceback
 from collections import Counter, defaultdict
-from datetime import date, datetime, timedelta, timezone
+from collections.abc import Iterable
+from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import numpy as np
 from scipy.stats import norm
 
 from oddsmarkets.college import canon
+from oddsmarkets.college import informed as INF
 from oddsmarkets.college import packing as PK
 from oddsmarkets.college import store as ST
 from oddsmarkets.college.hoops import backtest as BT
 from oddsmarkets.college.hoops import data as D
+from oddsmarkets.college.hoops import market_informed as HMI
 from oddsmarkets.college.hoops import model as M
 from oddsmarkets.college.hoops import ncaa as N
 from oddsmarkets.college.hoops import players as PL
@@ -61,7 +64,7 @@ SPREAD_SD = {"mbb": 10.5, "wbb": 11.0}
 # ── small helpers ───────────────────────────────────────────────────────────
 
 def now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def r2(x):
@@ -243,6 +246,27 @@ def game_model(ctx: dict, s: int, g: dict) -> dict | None:
     neutral = bool(g.get("neutral"))
     p = M.predict_one(f, hi, ai, neutral, prm, se=f.get("se"))
     return {"p_home": r4(p["p_home"]), "margin": r1(p["margin"]), "total": r1(p["total"]), "sd": r1(p["sd"])}
+
+
+def informed(ctx: dict, s: int) -> dict[str, dict]:
+    """The market-informed model (hoops/market_informed.py) for season s: {gid: ...}; {} without a committed fit for
+    the season, or on failure (the published model is unaffected)."""
+    cache = ctx.setdefault("informed", {})
+    if s not in cache:
+        try:
+            cache[s] = HMI.predict(ctx["state"], ctx["level"], s, season_fit(ctx, s)) if s in ctx["state"]["tabs"] else {}
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("%s market-informed model failed for %s: %s", ctx["level"], s, exc)
+            cache[s] = {}
+    return cache[s]
+
+
+def informed_block(inf: dict | None) -> dict | None:
+    if not inf:
+        return None
+    return {"p_home": r4(inf["p_home"]), "margin": r1(inf["margin"]), "base_p": r4(inf["base_p"]),
+            "base_margin": r1(inf["base_margin"]), "mk_spread": r1(-inf["mk"]) if np.isfinite(inf["mk"]) else None,
+            "rd": r1(inf["rd"]) if np.isfinite(inf["rd"]) else None, "status": inf.get("status") or "trial"}
 
 
 def game_market(level: str, g: dict) -> dict | None:
@@ -693,8 +717,8 @@ def _regions_payload(regs: list[dict], names: list[str], teams: list[str], p_of:
     return out
 
 
-_SITE_PATTERNS = (re.compile(r"regional\s+(\d)\s+in\s+([A-Za-z .'-]+?)\s*(?:-|$)", re.I),        # 2024-: Regional 1 in Albany
-                  re.compile(r"-\s*([A-Za-z .'-]+?)\s+regional\s+(\d)\b", re.I))                  # 2023: Greenville Regional 1
+_SITE_PATTERNS = (re.compile(r"regional\s+(\d)\s+in\s+([A-Za-z .'-]+?)\s*(?:-|$)", re.IGNORECASE),        # 2024-: Regional 1 in Albany
+                  re.compile(r"-\s*([A-Za-z .'-]+?)\s+regional\s+(\d)\b", re.IGNORECASE))                  # 2023: Greenville Regional 1
 
 
 def region_sites(ncaa: list[dict], names: list[str]) -> dict[str, str]:
@@ -1418,6 +1442,10 @@ def game_page(ctx: dict, s: int, g: dict) -> dict:
             if isinstance(x.get("text"), str) and len(x["text"]) > 140:
                 x["text"] = x["text"][:139].rstrip() + "…"
     o = g.get("odds") or {}
+    if mdl is not None:
+        ib = informed_block(informed(ctx, s).get(str(g["id"])))
+        if ib:
+            mdl = {**mdl, "trial": ib}           # shown beside the published model, not used for it
     el = None
     tab = ctx["state"]["tabs"].get(s)
     if tab is not None:
@@ -1430,7 +1458,7 @@ def game_page(ctx: dict, s: int, g: dict) -> dict:
             "pregame": {"model": mdl, "market": {**(game_market(lv, g) or {}), "ml_home": o.get("ml_home"), "ml_away": o.get("ml_away"),
                                                  "open_spread_home": o.get("open_spread_home"), "provider": o.get("provider")} if o else None,
                         "espn_predictor": pred, "elo_p_home": el},
-            "box": box, "team_stats": {} if box and all((v.get("team") for v in box.values())) else (g.get("team_stats") or {}),
+            "box": box, "team_stats": {} if box and all(v.get("team") for v in box.values()) else (g.get("team_stats") or {}),
             "flow": flow, "wp": wp, "plays": plays, "leaders": leaders}
 
 
@@ -1633,6 +1661,7 @@ def calibration_payload(ctx: dict) -> dict:
                       "carryover": st8["coef"][max(st8["seasons"])],
                       "roster": (st8.get("roster_fit") or {}).get(max(st8["seasons"])),
                       "possessions": {k: v for k, v in kp.items() if k != "n"}}
+    body["informed"] = INF.summary(lv)
     return {"ok": True, "level": lv, "updated_at": now_iso(), **body, "notes": notes}
 
 
