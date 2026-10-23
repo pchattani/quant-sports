@@ -611,12 +611,12 @@ def team_needs(level: str, season: int, rows: list[dict], proj: dict, teams: dic
                 hints = []
                 c = contention.get(r["team"]) or {}
                 if c.get("out"):
-                    hints.append(c.get("why") or "his club is out of contention")
+                    hints.append(c.get("why") or "the player's club is out of contention")
                 # surplus: another player of his club at the position worth at least three quarters as much
                 mate = next((x for x in club_best.get((r["team"], pos), []) if x[1] != r["pid"]), None)
                 if mate is not None and v > 0 and mate[0] >= 0.75 * v and mate[0] > (1.0 if kind == "H" else 0.5):
-                    hints.append(f"his club has another {pos} projected at {mate[0]:.1f} wins" if kind == "H" else
-                                 f"his club has another {'starter' if pos == 'SP' else 'reliever'} projected at {mate[0]:.1f} wins a slot")
+                    hints.append(f"the player's club has another {pos} projected at {mate[0]:.1f} wins" if kind == "H" else
+                                 f"the player's club has another {'starter' if pos == 'SP' else 'reliever'} projected at {mate[0]:.1f} wins a slot")
                 cands.append({"pid": r["pid"], "name": r.get("name"), "team": r.get("team"), "pos": r.get("pos"), "age": an.rnd(r.get("age"), 1),
                               "war": an.rnd(r.get("war"), 1), "proj_ft": an.rnd(v, 1), "gain": an.rnd(gain, 1), "hints": hints,
                               "n": r.get("n")})
@@ -636,5 +636,5 @@ def _evidence(pos: str, names: list, by_pid: dict) -> str:
     pid, nm, sh, w, gm = names[0]
     r = by_pid.get(("P" if pos in PIT_POS else "H", pid)) or {}
     line = _stat_line(r)
-    lead = f"{nm}: {w:+.1f} WAR there" + (f" ({int(round(100 * sh))}% of his games)" if pos in HIT_POS and sh is not None else "")
+    lead = f"{nm}: {w:+.1f} WAR there" + (f" ({int(round(100 * sh))}% of their games)" if pos in HIT_POS and sh is not None else "")
     return lead + (f"; {line}" if line else "")

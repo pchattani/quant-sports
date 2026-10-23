@@ -143,7 +143,7 @@ function drawCorners(A, B, delta) {
     { key: 'vb', label: 'Min ' + nB, num: true, fmt: function (v, r) { return (r.bv === 'b' ? '<b>' : '') + PD.num(v, 0) + (r.bv === 'b' ? '</b>' : ''); } },
     { key: 'ba', label: 'Brake ' + nA, num: true, tip: 'Distance before the apex where braking began; shorter = later braking', fmt: function (v, r) { return isNum(v) ? (r.bb === 'a' ? '<b>' : '') + v + ' m' + (r.bb === 'a' ? '</b>' : '') : '—'; } },
     { key: 'bb2', label: 'Brake ' + nB, num: true, fmt: function (v, r) { return isNum(v) ? (r.bb === 'b' ? '<b>' : '') + v + ' m' + (r.bb === 'b' ? '</b>' : '') : '—'; } },
-    { key: 'gain', label: nA + ' gains', num: true, tip: 'Change in the delta across the corner; + = ' + nA + ' gained', fmt: function (v) { return '<span style="color:' + (v > 0 ? 'var(--c-model)' : 'var(--c-market)') + '">' + PD.signed(v, 3) + ' s</span>'; } }
+    { key: 'gain', label: nA + ' gains', num: true, tip: 'Change in the delta across the corner; + = ' + nA + ' gained', fmt: function (v) { return '<span style="color:' + (v > 0 ? 'var(--sky)' : 'var(--coral)') + '">' + PD.signed(v, 3) + ' s</span>'; } }
   ], cs.map(function (c, i) {
     var a = sumOf(A, i, c), b = sumOf(B, i, c);
     var prev = i ? cs[i - 1].d + (c.d - cs[i - 1].d) / 2 : 0, next = i < cs.length - 1 ? c.d + (cs[i + 1].d - c.d) / 2 : A.d[A.d.length - 1];
@@ -166,7 +166,7 @@ function drawSummary() {
   });
   if (!out.length) { PD.set('tl-laps', PD.muted('No laps.')); return; }
   PD.table('tl-laps', [
-    { key: 'who', label: 'Driver', sticky: true, fmt: function (v, r) { return '<i class="pd-dot" style="--tc:' + (r.side ? 'var(--c-market)' : 'var(--c-model)') + '"></i>' + esc(v) + (r.sel ? ' <span class="qk-badge accent">shown</span>' : ''); } },
+    { key: 'who', label: 'Driver', sticky: true, fmt: function (v, r) { return '<i class="pd-dot" style="--tc:' + (r.side ? 'var(--coral)' : 'var(--sky)') + '"></i>' + esc(v) + (r.sel ? ' <span class="qk-badge accent">shown</span>' : ''); } },
     { key: 'lap', label: 'Lap', num: true },
     { key: 'ms', label: 'Time', num: true, fmt: function (v, r) { return PD.fmtMs(v) + (r.out ? ' <span class="qk-badge">out</span>' : ''); } },
     { key: 'top', label: 'Top km/h', num: true, fmt: function (v) { return PD.num(v, 0); } },

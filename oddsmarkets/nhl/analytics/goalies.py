@@ -51,7 +51,7 @@ METRICS = [
     M("gsax_tip", "GSAx tips", "By shot type", "goals", desc="GSAx on tips and deflections."),
     M("gsax_back", "GSAx backhand", "By shot type", "goals", desc="GSAx on backhands."),
     M("gsax_5v5", "GSAx 5v5", "By strength", "goals", desc="GSAx at 5v5."),
-    M("gsax_sh", "GSAx short-handed", "By strength", "goals", desc="GSAx with his team short-handed."),
+    M("gsax_sh", "GSAx short-handed", "By strength", "goals", desc="GSAx with the goalie's team short-handed."),
     M("sv_pct_5v5", "5v5 sv%", "By strength", "pct", den="fa", k=2000, desc="Save % at 5v5."),
     M("sv_pct_sh", "PK sv%", "By strength", "pct", den="fa", k=1500, desc="Save % short-handed."),
     M("sa60", "Shots against / 60", "Workload", "2", pct=False, desc="Shots on goal faced per 60."),

@@ -237,7 +237,7 @@ function drawTeam(el, L, S, tid, cat, teams, season, embed) {
   // Schedule log.
   document.getElementById('tp-log').innerHTML = log.length ? HW.tableHTML([{ label: 'Date' }, { label: 'Opponent' }, { label: 'Result' }, { label: 'Score', align: 'right' }, { label: 'ORtg', align: 'right' }, { label: 'DRtg', align: 'right' }, { label: 'Pace', align: 'right' }, { label: 'Net after', align: 'right' }]
     .concat(log.some(g => fx.isNum(g.p_win) || fx.isNum(g.model_p)) ? [{ label: 'Model p', align: 'right', title: 'Pregame win probability from the game model' }] : []),
-    log.slice().reverse().map(g => ({ _href: g.game ? fx.gameHref(L, g.game) : undefined, cells: [{ v: g.date, html: fx.fmtDate(g.date, { year: false }) }, { v: fx.teamName(L, g.opp), html: (g.home ? 'v ' : '@ ') + fx.teamLink(L, g.opp) },
+    log.slice().reverse().map(g => ({ _href: g.game ? fx.gameHref(L, g.game, S) : undefined, cells: [{ v: g.date, html: fx.fmtDate(g.date, { year: false }) }, { v: fx.teamName(L, g.opp), html: (g.home ? 'v ' : '@ ') + fx.teamLink(L, g.opp) },
       { v: g.res, html: '<span class="' + (String(g.res).charAt(0) === 'W' ? 'pg-up' : 'pg-down') + '">' + fx.esc(g.res || '') + '</span>' }, { v: (g.pts || 0) - (g.opp_pts || 0), html: (g.pts || 0) + '-' + (g.opp_pts || 0) },
       { v: g.ortg, html: fx.num(g.ortg, 1) }, { v: g.drtg, html: fx.num(g.drtg, 1) }, { v: g.pace, html: fx.num(g.pace, 1) }, { v: g.net_rating_after, html: fx.signed(g.net_rating_after, 1) }]
       .concat(log.some(x => fx.isNum(x.p_win) || fx.isNum(x.model_p)) ? [{ v: fx.has(g.p_win) ? g.p_win : g.model_p, html: fx.pct(fx.has(g.p_win) ? g.p_win : g.model_p, 0) }] : []) })), { compact: true, sticky: true })

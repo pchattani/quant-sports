@@ -171,7 +171,7 @@ def value_payload(year: int, effects: dict, prev_effects: dict | None, dcat: dic
             "best": {"pace_tm": best_tm, "pace_field": best_field}, "min_races": MIN_RACES,
             "params": (effects.get("params") or {}),
             "notes": {"teammate": "Pace above team-mate is the decomposition's driver effect: team-mates share the car, so it is measured only "
-                                  "against the team-mate and shrunk toward zero. A driver beside a weak team-mate looks better than he is.",
+                                  "against the team-mate and shrunk toward zero. A driver beside a weak team-mate looks better than they are.",
                       "field": "Pace above the field adds the car's latest race-pace state: the driver and the car together now.",
                       "trend": "Trend: pace above team-mate against last season's (both seasons with at least five races)."}}
 
@@ -365,7 +365,7 @@ def needs_payload(year: int, tcat: dict | None, dcat: dict | None, table: dict, 
             else:
                 improve.append({"key": w["key"], "label": w["label"], "swaps": [],
                                 "note": "A car or operations area: there is no market for it, only development. Our models measure it but "
-                                        "cannot price an upgrade."})
+                                        "cannot put a number on an upgrade."})
         out[t] = {"name": x.get("name") or t, "areas": areas, "balance": balance, "strengths": strengths, "weaknesses": weak,
                   "improve": improve, "best_swaps": swaps}
     return {"ok": True, "year": year, "updated_at": _now(), "version": VERSION, "label": LABEL, "grades": [list(g) for g in GRADE_CUTS],

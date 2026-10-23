@@ -717,6 +717,15 @@ def main(argv: list[str] | None = None) -> int:
         def old_reader(pid):
             p = data / "players" / f"{pid}.json"
             return an.read_json(p) if p.exists() else None
+
+        def cat_reader(lvl, s, kind):              # last season's catalogue: this run's, else the one on disk
+            c = (cats.get((lvl, s)) or {}).get(kind)
+            if c:
+                return c
+            p = data / lvl / str(s) / f"{kind}.json"
+            return an.read_json(p) if p.exists() else None
+        n_prev = b.step("last-season percentiles", lambda: CR.add_prev_pct(blocks, cat_reader), 0)
+        logger.info("careers: last-season percentiles on %s current sub-blocks", n_prev)
         idx = b.step("careers", lambda: CR.write_careers(b.write, cats, blocks, hist_rows, hist_extra, old_reader), {}) or {}
         if idx:
             prev = an.read_json(data / "players_index.json") or {}

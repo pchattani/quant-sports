@@ -934,12 +934,12 @@ def payload(df: pd.DataFrame, cfg: Config, league: dict, res: dict, phase: str, 
             c = now[now["pid"] == pid].iloc[0]
             bits = [f"+{gain:.1f} {cfg.unit} over your {c['pos']} slot"]
             if _num(c["team_wp"], 0.5) <= cfg.rebuild:
-                bits.append("his team is rebuilding")
+                bits.append("the player's team is rebuilding")
             if cfg.walk_from is not None and c["yrs"] is not None and c["yrs"] == c["yrs"] and c["yrs"] >= cfg.walk_from:
                 bits.append("at or near free agency")
             if target_bits is not None:
                 bits.extend(target_bits(c) or [])
-            bits.append(f"{round(pl * 100)}% chance he moves")
+            bits.append(f"{round(pl * 100)}% chance of a move")
             tg.append([pid, names.get(pid), c["tid"], c["pos"], _rr(c["age"], 1), _rr(c["vnow"], 2), _rr(gain, 2), _rr(pl), _rr(score, 4),
                        "; ".join(bits)])
         teams[t] = {"wp": _rr(wp), "status": status_of(cfg, wp), "traj": _rr(float(g["team_traj"].iloc[0])),

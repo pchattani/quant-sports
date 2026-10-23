@@ -19,7 +19,7 @@ function render(el, params) {
   var q = params.query || {};
   var tab = ['championship', 'odds', 'pace'].indexOf(q.tab) >= 0 ? q.tab : 'championship';
   var base = '#/standings' + (y !== PD.currentSeason() ? '/' + y : '');
-  el.innerHTML = PD.pageHead('Season ' + y, 'Standings', '', PD.yearPager('standings', y)) +
+  el.innerHTML = PD.pageHead('Standings · ' + y, 'Who leads the ' + y + ' championship', '', PD.yearPager('standings', y)) +
     PD.subnav([[base, 'Championship', 'championship'], [base + '?tab=odds', 'Title chances', 'odds'], [base + '?tab=pace', 'Car v driver', 'pace']], tab, 'Standings views') + '<div id="st-body">' + PD.empty('Loading', '') + '</div>';
   return Promise.all([PD.load(y + '/season.json')]).then(function (arr) {
     if (!PD.alive(el)) return;
@@ -46,6 +46,7 @@ function championship(season) {
     fav ? PD.kpi('Drivers’ title', esc(PD.driverCode(fav)) + ' ' + PD.pct(ch.drivers[fav].p_title, ch.drivers[fav].p_title > 0.99 ? 2 : 1), esc(PD.driverName(fav)) + ' · our chance', { signal: true, href: PD.driverHref(fav) }) : PD.kpi('Champion’s wins', sd[0] ? String(sd[0].wins) : '—', sd[0] ? sd[0].podiums + ' podiums' : ''),
     PD.kpi('Rounds', season.rounds_done + ' / ' + season.rounds_total, (season.calendar || []).filter(function (c) { return c.sprint; }).length + ' sprint weekends')
   ]);
+  if (!finished) h += '<div class="pd-mt">' + PD.note('The <b>magic number</b> is how many more points the leader needs to be champion whatever the others do. The bar beside each driver is the middle 90% of our simulated final points: the season ends inside it 9 times in 10.') + '</div>';
   h += PD.grid(
     PD.card('Drivers’ championship', finished ? 'Final standings.' : 'Our title chance, our expected final points with the middle 90% of simulated outcomes (bar), and the magic number to clinch.', '<div id="st-d"></div>', { span: 12, flush: true }) +
     PD.card('The title race', 'Points after every round, then our expected points to the last round (shaded).', PD.chartBox('st-prog', 400, 'Championship points with our projection'), { span: 8, right: PD.seg('st-prog-k', [['drivers', 'Drivers'], ['constructors', 'Constructors']], 'drivers', 'Progression') }) +
@@ -126,6 +127,7 @@ function odds(season, markets, y) {
     PD.kpi('Rounds left', String((ch.remaining || []).length), isNum((ch.max_points_left || {}).driver) ? (ch.max_points_left.driver) + ' points still to win' : ''),
     PD.kpi('Simulated seasons', PD.int(ch.n_sims), 'each remaining round raced again')
   ]);
+  h += '<div class="pd-mt">' + PD.note('A <b>title chance</b> is the share of our ' + PD.int(ch.n_sims) + ' simulated seasons that a driver or team wins: 5% is about 1 season in 20. Every remaining round is raced again in each one.') + '</div>';
   h += '<section class="qk-section pd-sec">' + PD.secHead('Season simulation', 'The title race', 'Points so far, then our expected points for every round still to run (the shaded projection).', PD.seg('od-k', [['drivers', 'Drivers'], ['constructors', 'Constructors']], 'drivers', 'Championship')) +
     PD.grid(
       PD.card('Points, with our projection', 'Each line is labelled at its end with our expected final points.', PD.chartBox('od-fc', 400, 'Championship points with our projection'), { span: 8 }) +
@@ -169,7 +171,7 @@ function odds(season, markets, y) {
 function pace(season) {
   var cp = season.car_pace || {};
   var anyPace = Object.keys(cp).some(function (k) { return Object.keys(cp[k] || {}).length; });
-  var h = PD.grid(
+  var h = '<div class="pd-mt">' + PD.note('Our lap-time model splits every lap into the <b>car</b> and the <b>driver</b>. Pace is a share of a lap: 0.5% is about 0.45 seconds on a 90-second lap. The driver part is measured against the team-mate, so the car is taken out.') + '</div>' + PD.grid(
     PD.card('Car pace by race', 'Each car’s pace as a % of a lap against the field from the lap-time model; negative (blue) is faster.', PD.chartBox('cp-heat', 360), { span: 12, right: anyPace ? PD.seg('cp-k', [['race', 'Race'], ['quali', 'Qualifying']], 'race', 'Session') : '' }) +
     PD.card('Car pace through the season', 'Same numbers as lines; up is faster.', PD.chartBox('cp-lines', 380), { span: 12 }) +
     PD.card('Driver effects', 'Pace against the car, % of a lap with a 95% interval; left is faster.', PD.chartBox('cp-eff', 560), { span: 6, right: anyPace ? PD.seg('cp-ek', [['race', 'Race'], ['quali', 'Qualifying']], 'race', 'Session') : '' }) +
@@ -211,7 +213,7 @@ function pace(season) {
   if (teams.length) {
     var maxD = Math.max.apply(null, teams.map(function (t) { return Object.keys(sp[t].drivers || {}).length; }));
     var series = [{ name: 'Car', data: teams.map(function (t) { return sp[t].car || 0; }), colours: teams.map(PD.teamColour), stack: 's', fmt: function (v) { return PD.num(v, 1) + ' pts'; } }];
-    for (var k = 0; k < maxD; k++) series.push({ name: k ? 'Second driver' : 'First driver', stack: 's', colour: k ? '#8e8cf0' : '#46b9c9', data: teams.map(function (t) { var ds = Object.keys(sp[t].drivers || {}); return ds[k] ? sp[t].drivers[ds[k]] : 0; }), fmt: function (v) { return PD.signed(v, 1) + ' pts'; } });
+    for (var k = 0; k < maxD; k++) series.push({ name: k ? 'Second driver' : 'First driver', stack: 's', colour: k ? PD.col('plum') : PD.col('mint'), data: teams.map(function (t) { var ds = Object.keys(sp[t].drivers || {}); return ds[k] ? sp[t].drivers[ds[k]] : 0; }), fmt: function (v) { return PD.signed(v, 1) + ' pts'; } });
     PD.ch.columns('cp-split', { cats: teams.map(PD.teamAbbr), series: series, yName: 'Points against an average team', fmt: function (v) { return PD.num(v, 0); },
       tipLabel: function (i) { var t = teams[i]; var ds = Object.keys(sp[t].drivers || {}); return PD.teamName(t) + ' · ' + PD.pts(sp[t].points) + ' pts' + (ds.length ? ' (' + ds.map(PD.driverCode).join(', ') + ')' : ''); }, label: 'Car and driver split' });
   } else PD.ch.none('cp-split', 'No car-driver split for this season.');

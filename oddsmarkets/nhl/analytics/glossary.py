@@ -30,7 +30,7 @@ MODEL = [
     ("shooting", "Shooting talent", "Shots", "Goals above expected per unblocked attempt, regressed toward the league by the "
      "stabilisation constant of finishing (most of a season's goals-above-xG is noise)."),
     ("goalies", "GSAx", "Goaltending", "Goals saved above expected: the xG of the unblocked attempts a goalie faces minus the goals "
-     "he allows, overall, by danger band (xG under 0.08, 0.08-0.20, 0.20+), by shot type and by strength; empty-net goals excluded."),
+     "the goalie allows, overall, by danger band (xG under 0.08, 0.08-0.20, 0.20+), by shot type and by strength; empty-net goals excluded."),
     ("onice", "On-ice rates", "Skaters", "Shot attempts, unblocked attempts, shots, goals and xG for and against per 60 with the player "
      "on the ice at 5v5, on the power play and short-handed; the adjusted versions are score- and venue-adjusted (each event weighted "
      "by how its score state and venue inflate or deflate rates league-wide)."),
@@ -51,7 +51,7 @@ MODEL = [
      "expectation; without it the page uses a Poisson model of the remaining goals at the pre-game rates (labelled)."),
     ("season_sim", "Season simulation", "Prediction", "The remaining schedule simulated game by game (84 games from "
      "2026-27), points (win 2, OT / SO loss 1), the NHL tiebreak procedure, divisional and wild-card seeding, best-of-seven series, "
-     "the Presidents' Trophy and the draft lottery; magic numbers and next-game odds."),
+     "the Presidents' Trophy and the draft lottery; magic numbers and next-game chances."),
     ("awards", "Award races", "Prediction", "Hart, Vezina, Norris, Calder, Art Ross, Maurice Richard and Selke "
      "probabilities from the projected season and a fit on verified past winners."),
     ("percentile", "Percentiles", "Catalogue", "100 = best, reversed where lower is better; placed against the qualified pool "
@@ -73,21 +73,21 @@ MODEL = [
      "club's depth chart."),
     ("trade_sim", "Trade simulator", "Value", "Players move; incoming players take ice time from the lowest-rated players at their "
      "position (a better goalie takes the starts), outgoing minutes go to the next players up, any shortfall at replacement. "
-     "The change in the rotation's GAR per 60 x minutes shifts the club's rating in goals a game; points and odds come from "
+     "The change in the rotation's GAR per 60 x minutes shifts the club's rating in goals a game; points and chances come from "
      "re-running the season simulation at shifted ratings. The salary cap is not checked."),
     ("aging", "Aging curve", "Value", "The change in GAR per 60 from one season to the next by age (delta method on consecutive "
      "seasons, minute-weighted), centred on the all-ages mean and shrunk; used for next season's value in the trade simulator."),
     ("valuation", "Valuation (multi-season)", "Value", "A player's projected on-field value in WAR over the rest of this season and "
      "the next three, discounted 0.9 a season: rest-of-season GAR per 60 aged on the ageing curve, times projected minutes, "
-     "availability (games-played share, regressed) and survival (the chance he is still an NHL regular); a 10th-90th percentile "
+     "availability (games-played share, regressed) and survival (the chance the player is still an NHL regular); a 10th-90th percentile "
      "band from simulated careers. Not contracts or the salary cap."),
     ("vorp", "VORP (positional)", "Value", "Value over the replacement level at the player's own position (C, LW, RW, D, G): the "
      "minute-weighted GAR per 60 of players outside the league's top N at that position by ice time."),
     ("scarcity", "Scarcity index", "Value", "How much better a position's starters are than its replacement level, relative to all "
      "skaters (1 = average; above 1, good players at that position are harder to replace)."),
     ("survival", "Survival", "Value", "The chance a player who is an NHL regular this season (games played >= 25 % of team games; goalies "
-     "12 %) is still one next season, from a logistic regression on age, his rate and his minutes over every pair of completed seasons."),
-    ("availability", "Availability", "Value", "The expected share of his team's games a skater plays: games played this season and the "
+     "12 %) is still one next season, from a logistic regression on age, the player's rate and minutes over every pair of completed seasons."),
+    ("availability", "Availability", "Value", "The expected share of the team's games a skater plays: games played this season and the "
      "last two, regressed to the league mean of regulars with 30 pseudo-games, less the games an injury is expected to cost."),
     ("trade_grade", "Trade grade", "Moves", "A club's share of the value a trade moved, rescaled to two sides: A >= 65 %, B >= 55 %, "
      "C 45-55 %, D >= 35 %, F below; 'minor' when the deal moved under 0.25 WAR. Graded at the time (valuation as of the trade "
@@ -95,7 +95,7 @@ MODEL = [
     ("pick_value", "Pick-value curve", "Moves", "What a draft slot is worth: the mean discounted WAR of each overall pick over its first "
      "seven seasons (2010-2019 drafts, picks who never played count zero), fitted with a smooth decreasing curve; future picks of "
      "unknown slot are valued at the round's average, discounted by the seasons until the draft."),
-    ("realised_value", "Realised value", "Moves", "Since a trade: the player's GAR per 60 that season x his minutes for the new club "
+    ("realised_value", "Realised value", "Moves", "Since a trade: the player's GAR per 60 that season x the player's minutes for the new club "
      "after the trade date / goals per win."),
     ("fantasy_points", "Fantasy points (ours)", "Fantasy", "Our own default scoring, not any platform's: G 2, A 1.5, +/- 0.5, PPP 0.5, "
      "SOG 0.3, HIT 0.2, BLK 0.4; goalies W 4, GA -1, SV 0.2, SO 3. Every weight can be changed on the page."),
@@ -106,7 +106,7 @@ MODEL = [
     ("buy_low", "Buy low / sell high", "Fantasy", "Players whose results run far from what their chances support: goals 2+ away from "
      "finishing-adjusted expected goals or an on-ice 5v5 PDO beyond 0.950 / 1.050, with the projection 0.4+ points a game away from "
      "their pace; goalies with GSAx 4+ goals from what their save talent implies."),
-    ("pp_unit", "PP unit", "Fantasy", "PP1 / PP2 from each skater's recency-weighted power-play minutes ranked on his club (1-5 PP1, 6-10 PP2)."),
+    ("pp_unit", "PP unit", "Fantasy", "PP1 / PP2 from each skater's recency-weighted power-play minutes ranked within the club (1-5 PP1, 6-10 PP2)."),
     ("streaming", "Streaming goalies", "Fantasy", "Goalies outside the top 24 ranked by this week's projected starts x matchups: start "
      "probability from recent start share (a back-to-back's second game moved to the backup by the fitted ratio), wins from the game "
      "model's win probability, goals against from team defence, opponent offence and save talent."),

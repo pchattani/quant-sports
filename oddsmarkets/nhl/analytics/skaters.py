@@ -63,7 +63,7 @@ METRICS = [
     M("g60_5v5", "5v5 goals / 60", "Production", "p60", den="toi5", k=700 * MIN, desc="Goals per 60 at 5v5."),
     M("a1_60_5v5", "5v5 primary assists / 60", "Production", "p60", den="toi5", k=600 * MIN, desc="First assists per 60 at 5v5."),
     M("ipp", "IPP (5v5)", "Production", "pct", den="toi5", k=400 * MIN, stab="ipp", desc="Individual points percentage: the share of "
-      "5v5 goals scored with the player on ice on which he had a point."),
+      "5v5 goals scored with the player on ice on which the player had a point."),
     M("pts_pace", "Points pace", "Production", "1", pct=False, desc="Points per game times the season's games."),
     # shooting
     M("sog", "Shots on goal", "Shooting", "int", desc="Shots on goal (goals included)."),
@@ -114,8 +114,8 @@ METRICS = [
     M("pdo", "PDO", "On ice (5v5)", "3", pct=False, desc="On-ice sh% + sv% (luck indicator; 1.000 = average)."),
     M("gax_onice", "On-ice G - xG", "On ice (5v5)", "goals", desc="On-ice goal differential minus expected goal differential."),
     # relative
-    M("cf_pct_rel", "CF% rel", "Relative (5v5)", "pct", den="toi5", k=500 * MIN, desc="CF% on ice minus the team's CF% without him "
-      "(in his games)."),
+    M("cf_pct_rel", "CF% rel", "Relative (5v5)", "pct", den="toi5", k=500 * MIN, desc="CF% on ice minus the team's CF% without the player "
+      "(in the player's games)."),
     M("xgf_pct_rel", "xGF% rel", "Relative (5v5)", "pct", den="toi5", k=600 * MIN, stab="xgf_pct_rel", desc="xGF% on minus off ice."),
     M("gf_pct_rel", "GF% rel", "Relative (5v5)", "pct", den="toi5", k=1800 * MIN, desc="GF% on minus off ice."),
     M("xgf60_rel", "xGF/60 rel", "Relative (5v5)", "p60", den="toi5", k=600 * MIN, desc="xGF/60 on minus off ice."),
@@ -129,7 +129,7 @@ METRICS = [
     M("adj_cf60", "Adj. CF / 60", "Adjusted (5v5)", "p60", den="toi5", k=400 * MIN, desc="Score- and venue-adjusted CF/60."),
     M("adj_ca60", "Adj. CA / 60", "Adjusted (5v5)", "p60", lower=True, den="toi5", k=400 * MIN, desc="Score- and venue-adjusted CA/60."),
     # RAPM (builder B)
-    M("rapm_off", "RAPM offence", "RAPM", "2", desc="Regularised adjusted plus-minus: the player's isolated effect on his team's 5v5 "
+    M("rapm_off", "RAPM offence", "RAPM", "2", desc="Regularised adjusted plus-minus: the player's isolated effect on the team's 5v5 "
       "xG for per 60 (teammates, opponents, zone starts and score controlled; ridge with multi-season priors)."),
     M("rapm_def", "RAPM defence", "RAPM", "2", desc="Isolated effect on xG against per 60, signed so that higher is better (fewer "
       "chances allowed)."),
@@ -150,7 +150,7 @@ METRICS = [
     M("qot_toi", "QoT (TOI)", "Deployment", "toi_min", pct=False, desc="TOI-weighted mean 5v5 TOI per game of the team-mates on ice."),
     M("qoc_xgf", "QoC (xGF%)", "Deployment", "pct", pct=False, desc="TOI-weighted mean xGF% of the opponents faced."),
     M("qot_xgf", "QoT (xGF%)", "Deployment", "pct", pct=False, desc="TOI-weighted mean xGF% of the team-mates on ice."),
-    M("toi_share", "5v5 TOI share", "Deployment", "pct", pct=False, desc="Share of the team's 5v5 time in his games."),
+    M("toi_share", "5v5 TOI share", "Deployment", "pct", pct=False, desc="Share of the team's 5v5 time in the player's games."),
     M("shift_len", "Avg shift (s)", "Deployment", "sec", pct=False, desc="Mean shift length in seconds (stint segments joined)."),
     M("shifts_gp", "Shifts / GP", "Deployment", "1", pct=False, desc="On-ice segments per game."),
     # physical and possession
@@ -204,8 +204,8 @@ METRICS = [
     M("gar_shooting", "GAR shooting", "Value", "1", desc="Finishing component."),
     M("gar_pen", "GAR penalties", "Value", "1", desc="Penalty component (drawn minus taken)."),
     # projections
-    M("proj_pts", "Projected points", "Projection", "1", pct=False, desc="Full-season projection: points so far plus his club's "
-      "remaining games (times his share of its games so far) at a per-game rate that blends this season with the two before "
+    M("proj_pts", "Projected points", "Projection", "1", pct=False, desc="Full-season projection: points so far plus the club's "
+      "remaining games (times the player's share of its games so far) at a per-game rate that blends this season with the two before "
       "(weights 1, 0.8, 0.6 a game) and 30 games at the position average."),
     M("proj_g", "Projected goals", "Projection", "1", pct=False, desc="Full-season projection: goals so far plus remaining games "
       "at a goal rate built the same way (45 games at the position average)."),

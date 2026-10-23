@@ -690,6 +690,12 @@ def main(argv: list[str] | None = None) -> int:
         def old_reader(pid):
             p = data / "players" / f"{pid}.json"
             return an.read_json(p) if p.exists() else None
+
+        def cat_reader(s, fn):
+            p = data / str(s) / fn
+            return an.read_json(p) if p.exists() else None
+        n_prev = b.step("last-season percentiles", lambda: CR.add_prev_pct(blocks, cat_reader), 0)
+        logger.info("careers: last-season percentiles on %s current blocks", n_prev)
         idx = b.step("careers", lambda: CR.write_careers(b.write, rows_by, blocks, old_reader, current, people), {}) or {}
         if idx:
             prev = an.read_json(data / "players_index.json") or {}

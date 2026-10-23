@@ -324,7 +324,7 @@ def book_check(src: dict, field: int) -> dict:
     elif total < lo:
         reason = f"implied total {total:.2f} with {len(mid)} of {field} runners quoted (below {lo}: runners missing)"
     elif total > hi:
-        reason = f"implied total {total:.2f} (above {hi}: not a price)"
+        reason = f"implied total {total:.2f} (above {hi}: not a usable quote)"
     elif len(accounted) < BOOK_MIN_RUNNERS or (len(accounted) < need and total < BOOK_COMPLETE):
         reason = f"{len(accounted)} of {field} runners accounted for (need {need}, or {BOOK_MIN_RUNNERS} with a total of {BOOK_COMPLETE})"
     return {"quoted": len(mid), "accounted": len(accounted), "implied_total": round(total, 4), "need": need,

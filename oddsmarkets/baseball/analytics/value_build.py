@@ -168,9 +168,9 @@ def contention_mlb(teams_payload: dict | None, phase: str | None) -> dict:
         if pp is None:
             continue
         if phase in ("postseason", "offseason") and pp <= 0.0:
-            out[t] = {"out": True, "why": "his club missed the postseason"}
+            out[t] = {"out": True, "why": "the player's club missed the postseason"}
         elif phase == "regular" and pp < 0.05:
-            out[t] = {"out": True, "why": f"his club's postseason odds are {100 * pp:.1f}%"}
+            out[t] = {"out": True, "why": f"the player's club has a {100 * pp:.1f}% postseason chance"}
     return out
 
 
@@ -274,7 +274,7 @@ def _add_v2(b, level: str, s: int, pay: dict, rows: list[dict], pj: dict, tpl: d
         _merge_fields(pay, extra, meta["fields"])
         pay["prospects"] = {"model": {k: ({kk: vv for kk, vv in (v or {}).items()} if v else None) for k, v in (meta["model"] or {}).items()},
                             "notes": ["Prospect value: expected MLB WAR over the next four seasons (discounted 8% a year) from the "
-                                      "season's minor-league line at his highest level: level, age against the level's mean, "
+                                      "season's minor-league line at the player's highest level: level, age against the level's mean, "
                                       "performance against the level's (OPS; strikeouts minus walks per batter faced), sample. "
                                       "A log-link regression on the 2015-2022 cohorts (0 for a player who never reached the majors). "
                                       "Stat lines only, no scouting grades."]}

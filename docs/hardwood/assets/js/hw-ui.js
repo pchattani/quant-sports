@@ -104,7 +104,7 @@ U.fresh = g => {
   const st = U.status(g);
   if (st === 'final') return true;
   const t = Date.parse(g.date);
-  return !isFinite(t) || Date.now() - t < 12 * 36e5;
+  return !isFinite(t) || QK.now() - t < 12 * 36e5;
 };
 /* Season records by team from a season payload's standings ({ tid: 'W-L' }). */
 U.records = season => {
@@ -123,16 +123,21 @@ U.game = (g, L, o) => {
   const rec = o.records || {};
   if (rec[String(g.home)]) home.record = rec[String(g.home)];
   if (rec[String(g.away)]) away.record = rec[String(g.away)];
+  /* v3: live, the kit reads the live chance and keeps our pre-game call for "before the start we had ..." */
+  const preP = isNum(m.p_home) ? Number(m.p_home) : null;
   return {
     sport: 'basketball', id: g.id, start: g.date, status: st,
+    p_pre: live && isNum(g.wp_home) ? preP : null, pre_only: live && !isNum(g.wp_home) ? true : undefined,
     league: (o.league || HW.leagueName(L)) + (tag ? ' · ' + tag : ''),
     home: home, away: away, hs: isNum(g.hs) ? Number(g.hs) : null, as: isNum(g.as) ? Number(g.as) : null,
     p_home: p, market_home: mk && isNum(mk.p_home) ? Number(mk.p_home) : null, note: st === 'final' && Number(g.period) > 4 ? 'OT' : '',
-    period: isNum(g.period) ? Number(g.period) : null, clock: g.clock, href: HW.gameHref(L, g.id, o.season)
+    period: isNum(g.period) ? Number(g.period) : null, clock: g.clock, href: HW.gameHref(L, g.id, o.season || g.season)
   };
 };
-/* A v2 game card: our chance first, the market a quiet ring and tick (named in the tip). */
-U.card = (g, L, o) => QK.gameCard(U.game(g, L, o), { sport: false, marketLabel: 'Market', marketTip: 'The prediction-market or sportsbook probability for the home side (no vig), shown as a reference next to ours' });
+/* A game card (kit v3): our chance only, no market (the kit default); o.why adds the italic one-line reason. */
+U.card = (g, L, o) => QK.gameCard(U.game(g, L, o), { sport: false, why: !!(o && o.why) });
+/* Team nicknames for the preview card ("the Lakers"), two-word ones kept whole. */
+U.nick = (L, tid) => { const n = String(HW.teamName(L, tid) || tid); return /Trail Blazers$/.test(n) ? 'Trail Blazers' : n.split(' ').slice(-1)[0]; };
 
 /* ── charts, numbers, cards ────────────────────────────────────────────── */
 U.chart = (id, h, label) => '<div id="' + esc(id) + '" class="qk-chart" style="--h:' + (h || 280) + 'px"' + (label ? ' role="img" aria-label="' + esc(label) + '"' : '') + '></div>';
@@ -213,12 +218,44 @@ U.pctGroups = (L, cat, roles, pid, opts) => {
   const r = U.roleOf(p, pid, roles), set = r && U.MSET ? U.MSET.roles[r] : null;
   if (!p || !set) return [];
   const m50 = ((U.MSET.m50 || {})[L] || {})[r] || {};
+  const prev = o.prev || null;
   const row = k => { const pc = U.rolePctl(cat, roles, pid, k); const m = U.mMeta(k);
-    return isNum(pc) ? { label: m.label, pctl: pc, value: U.fmtM(k, (p.values || {})[k]), tip: m.desc, early: isNum(m50[k]) && isNum(p.min) && p.min < m50[k] } : null; };
+    return isNum(pc) ? { label: m.label, sub: U.SUB[k] || '', pctl: pc, prev: prev && isNum(prev[k]) ? prev[k] : null, value: U.fmtM(k, (p.values || {})[k]),
+      tip: m.desc + (isNum(m50[k]) ? ' Settles at about ' + Number(Math.round(m50[k])).toLocaleString('en-GB') + ' minutes.' : ''), early: isNum(m50[k]) && isNum(p.min) && p.min < m50[k] } : null; };
   const out = set.groups.map(g => ({ label: g[0], rows: g[1].map(row).filter(Boolean) }));
   if (o.more !== false) out.push({ label: 'More', rows: set.more.map(row).filter(Boolean) });
   return out.filter(g => g.rows.length);
 };
+/* v3 (Matchday): a plain-English line under each metric on the percentile rail. */
+U.SUB = {
+  hpm: 'Points a game better or worse than average, per 100 trips, with the player on.',
+  hpm_o: 'The scoring-end half of that impact.',
+  hpm_d: 'The defensive half: points kept off the board.',
+  pts100: 'Points scored for every 100 trips down the floor.',
+  ts_add: 'Extra points from shooting better than the league.',
+  pox100: 'Makes beyond what an average shooter gets from the same spots.',
+  fta100: 'Trips to the line: pressure on the rim.',
+  ast_pct: 'Share of team-mates’ baskets the player sets up.',
+  ast_tov: 'Assists for every turnover.',
+  stl_pct: 'Opponent trips ended by a steal.',
+  drb_pct: 'Share of the other side’s misses grabbed.',
+  orb_pct: 'Share of the team’s own misses won back.',
+  blk_pct: 'Share of opponents’ twos sent back.',
+  ts: 'Points per shot, threes and free throws counted.',
+  efg: 'Shooting with threes worth one and a half makes.',
+  fg3: 'Threes made.', fg2: 'Twos made.', ft: 'Free throws made.',
+  ftr: 'Free throws per shot attempt.', unassisted_share: 'Baskets the player made without help.',
+  ast100: 'Assists for every 100 trips.', tov_pct: 'Trips ended by a turnover (lower is better).',
+  trb_pct: 'Share of all rebounds grabbed.', pf100: 'Fouls per 100 trips (lower is better).',
+  rapm: 'The play-by-play half of impact on its own.', box_impact: 'The box-score half of impact.',
+  on_off: 'Team margin with the player on minus off. Noisy.', and1_100: 'Baskets made through contact.',
+  rim_fg: 'Shots made at the rim.', opp_rim_fg_on: 'Opponents’ makes at the rim with the player on (lower is better).',
+  putback100: 'Second-chance baskets per 100 trips.'
+};
+/* The type a player's best metric suggests (compare verdicts). */
+U.ARCHETYPE = { hpm: 'The difference-maker', hpm_o: 'The offensive engine', hpm_d: 'The stopper', pts100: 'The scorer', ts_add: 'The efficient scorer', pox100: 'The shot-maker',
+  fta100: 'The foul-drawer', ast_pct: 'The playmaker', ast_tov: 'The steady hand', stl_pct: 'The pickpocket', drb_pct: 'The glass-cleaner', orb_pct: 'The second-chance getter',
+  blk_pct: 'The rim protector', ts: 'The efficient scorer', efg: 'The shooter', fg3: 'The marksman', trb_pct: 'The rebounder', rapm: 'The difference-maker', box_impact: 'The stat-sheet stuffer' };
 U.sampleLine = (L, cat, p) => (p ? (p.gp || 0) + ' GP · ' + Number(Math.round(p.min || 0)).toLocaleString('en-GB') + ' min' + (isNum(cat && cat.min_floor) ? ' · peers need ' + Number(cat.min_floor).toLocaleString('en-GB') + ' min' : '') : '');
 
 

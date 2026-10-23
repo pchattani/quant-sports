@@ -6,8 +6,11 @@
  * price. Shows coverage, a plain-words reading written from the numbers, the score table (all
  * matches, matches with a Pinnacle or average line, by year and by level), reliability
  * diagrams, set-score, straight-sets, tiebreak and total-games calibration, live probability
- * at set boundaries, tournament-odds calibration, the blend weights by year, and (WTA) the
+ * at set boundaries, title-chance calibration, the blend weights by year, and (WTA) the
  * validation of score-inferred hold and serve points won against the real WTA stats.
+ *
+ * Kit v3: "How sure are we?" opens the page (QK.howSure on the match model's reliability bins: the calibration chart
+ * beside three plain-English cards); the full record follows.
  *
  * Data: data/<T>/calibration.json (models/backtest.py page_copy; PAYLOADS.md "committed"). */
 (function (TA) {
@@ -16,8 +19,8 @@
 const K = () => TA.fk;
 const LABELS = { model: 'Our match model', model_fund: 'Ours without the market rating', elo: 'Elo', serve_return: 'Serve/return chain', rank: 'Ranking', pinnacle: 'Pinnacle closing', b365: 'Bet365 closing', avg: 'Average closing', max: 'Best closing line', bt: 'Bradley-Terry' };
 const ORDER = ['model', 'model_fund', 'elo', 'serve_return', 'rank', 'bt', 'pinnacle', 'b365', 'avg', 'max'];
-/* ours in the signal violet, our components and baselines in categorical colours, the market rows in quiet greys */
-const COL = { model: '#9384ff', model_fund: '#e3b341', elo: '#3fb9a8', serve_return: '#39d0d8', rank: '#d2693c', bt: '#79c0ff', pinnacle: '#9aa1ad', b365: '#6f7785', avg: '#b9bec7', max: '#565d6a' };
+/* ours in teal, our components and baselines in the kit's other categorical colours, the market rows in quiet warm greys */
+const COL = { model: '#3cc9b4', model_fund: '#ffc94d', elo: '#ff7a5c', serve_return: '#6aa8ec', rank: '#c39be8', bt: '#8fd16a', pinnacle: '#a39886', b365: '#7d7466', avg: '#c9bfb0', max: '#5e574c' };
 const BOOK = { pinnacle: 1, b365: 1, avg: 1, max: 1 };
 const label = k => LABELS[k] || String(k).replace(/_/g, ' ');
 const H = p => (p > 0 && p < 1 ? -(p * Math.log(p) + (1 - p) * Math.log(1 - p)) : null);
@@ -111,7 +114,7 @@ function reading(d, T) {
   const TT = d.tournaments || {};
   if (TT.pre && TT.pre.title) {
     const cr = TT.champion_model_rank || {};
-    out.push('<p><strong>Tournament odds.</strong> ' + k.int(TT.n_events) + ' draws were simulated ' + k.int(TT.sims) + ' times each, before the first round and again at the quarter-finals. Title log-loss before the event is ' + k.num(TT.pre.title.logloss, 4) +
+    out.push('<p><strong>Title chances.</strong> ' + k.int(TT.n_events) + ' draws were simulated ' + k.int(TT.sims) + ' times each, before the first round and again at the quarter-finals. Title log-loss before the event is ' + k.num(TT.pre.title.logloss, 4) +
       (TT.qf && TT.qf.title ? ' and ' + k.num(TT.qf.title.logloss, 4) + ' at the quarter-finals' : '') + '. ' +
       (k.isNum(cr.median) ? 'The eventual champion was the model\'s favourite ' + k.pct(cr.share_favourite, 0) + ' of the time and in its top three ' + k.pct(cr.share_top3, 0) + '; the median champion was the model\'s No. ' + k.num(cr.median, 0) + '.' : '') + '</p>');
   }
@@ -133,7 +136,11 @@ function render(el, params, state) {
     const M = d.metrics, D = d.distributions || {}, TT = d.tournaments || {};
     const models = ORDER.filter(x => M[x]).concat(Object.keys(M).filter(x => ORDER.indexOf(x) < 0));
     const yrs = d.years || [];
-    let h = '<p class="ta-cap" style="margin:0 0 12px">Walk-forward backtest: every match predicted with ratings refitted from matches strictly before it and blend weights fitted on earlier years only, scored against what happened, with the closing market beside it as a reference.</p>' +
+    const yrs0 = d.years || [];
+    let h = '<section class="qk-section" style="margin-top:0">' + QK.sectionHead({ kicker: 'How sure are we?', title: 'When we say 70%, does it happen 70% of the time?', sub: 'Every ' + k.TN(T) + ' match since ' + (yrs0[0] || '') + ', forecast before it was played and checked against the result. Dots on the dashed line are spot on.' }) +
+      '<div id="cal-howsure"></div></section>' +
+      '<section class="qk-section">' + QK.sectionHead({ kicker: 'The full record', title: 'Every score, every check', sub: 'Our match model against its own parts, a ranking baseline and the closing market as a reference.' }) + '</section>' +
+      '<p class="ta-cap" style="margin:0 0 12px">Walk-forward backtest: every match predicted with ratings refitted from matches strictly before it and blend weights fitted on earlier years only, scored against what happened, with the closing market beside it as a reference.</p>' +
       '<div class="kpi-grid af-tiles">' + [
         k.tile('Matches scored', k.int(d.n_matches), yrs.length ? yrs.length + ' years, ' + yrs[0] + '–' + yrs[yrs.length - 1] : ''),
         k.tile('With Pinnacle', k.int(d.n_with_pinnacle), k.isNum(d.n_matches) ? k.num(100 * d.n_with_pinnacle / d.n_matches, 0) + '% of matches' : ''),
@@ -166,6 +173,7 @@ function render(el, params, state) {
       '<p class="muted-inline">Backtest ' + k.esc(d.version || '') + ', generated ' + k.esc(d.generated_at || '') + '.</p></div></div>';
     h += '<div id="cal-market"></div>';
     el.innerHTML = h;
+    QK.howSure(el.querySelector('#cal-howsure'), { calibration: d, league: k.TN(T), span: yrs0.length ? yrs0[0] + '–' + yrs0[yrs0.length - 1] : '', subject: 'that player', unit: 'matches' });
     if (TA.value && TA.value.market) TA.value.market(T, document.getElementById('cal-market')).then(() => {
       const mk = document.getElementById('cal-market');
       if (mk && ((params.query || {}).sec === 'market') && mk.scrollIntoView) mk.scrollIntoView();

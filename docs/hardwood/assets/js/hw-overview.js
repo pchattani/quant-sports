@@ -1,13 +1,15 @@
-/* The Quant Hardwood — Overview (#/<L>), on Design System 2.0 (the Rink overview is the reference).
+/* The Quant Hardwood — Overview (#/<L>), on kit v3 "Matchday" (the Rink overview is the reference, MIGRATION_V3.md).
  *
- *   a scoreboard ticker; headline and stat tiles: the title favourite (ours), the best team, the MVP favourite,
- *     the next tip-off or live games, the closest call coming up (no market headline);
- *   live, today's, next and recent games as v2 game cards (our chance first, the market a quiet tick);
- *   who wins it all (chance bars, the market a grey tick) and the award races; projected wins with the
+ *   the black score ticker; the greeting hero with the game to watch (QK.featureCard); stat tiles: the title
+ *     favourite (ours), the best team, the MVP favourite, the next tip-off or live games, the closest call coming up;
+ *   "What to watch": live, today's, next and recent games as game cards with a one-line reason, no market;
+ *   "Who's hot" (QK.hotRow, qualified leaders); "New here?" beside a "How sure are we?" teaser from
+ *     <L>/calibration.json;
+ *   who wins it all (our chance only: no market anywhere on the overview) and the award races; projected wins with the
  *     simulation's 90% range and power ratings; the playoff picture (series when the playoffs are on); most
  *     valuable players (projected WAR), the games that matter most; leaders (qualified players only).
  * A past season shows its champion, final standings and leaders.
- * Reads index.json, <L>/<S>/season.json, <L>/markets.json, <L>/<S>/awards.json, <L>/<S>/valuation.json, <L>/history.json. */
+ * Reads index.json, <L>/<S>/season.json, <L>/calibration.json, <L>/<S>/awards.json, <L>/<S>/valuation.json, <L>/history.json. */
 (function (HW) {
 'use strict';
 
@@ -30,7 +32,7 @@ function leverage(sim, cards) {
     seen[nx.game] = 1;
     const card = (cards || []).find(c => String(c.id) === String(nx.game));
     if (card ? !U.fresh(card) : (nx.date && !U.fresh({ date: nx.date, status: 'pre' }))) return;
-    out.push({ id: nx.game, lev: swing(nx) + swing(other), date: card ? card.date : nx.date, home: nx.home ? tid : nx.opp, away: nx.home ? nx.opp : tid,
+    out.push({ id: nx.game, season: card && card.season ? card.season : null, lev: swing(nx) + swing(other), date: card ? card.date : nx.date, home: nx.home ? tid : nx.opp, away: nx.home ? nx.opp : tid,
       p_home: nx.home ? nx.p_win : (isNum(nx.p_win) ? 1 - nx.p_win : null) });
   });
   return out.filter(x => x.lev > 0.005).sort((a, b) => b.lev - a.lev);
@@ -41,7 +43,7 @@ function tiles(L, S, d) {
   const sim = d.sim, tT = Object.keys(sim).filter(t => isNum(sim[t].p_title)).sort((a, b) => sim[b].p_title - sim[a].p_title);
   if (d.isCur) {
     const fav = tT[0];
-    out.push({ label: 'Title favourite', value: fav ? HW.teamAbbr(L, fav) + ' ' + U.pct(sim[fav].p_title) : '—', signal: true, href: fav ? HW.teamHref(L, fav) : null,
+    out.push({ label: 'Title favourite', value: fav ? HW.teamAbbr(L, fav) + ' ' + U.pct(sim[fav].p_title) : '—', signal: true, href: fav ? HW.teamHref(L, fav, S) : null,
       sub: fav ? 'from ' + Number(d.nSims || 20000).toLocaleString('en-GB') + ' simulated seasons' : 'no simulation yet', tip: 'Our chance of winning the title: the share of simulated seasons the team wins it' });
   } else {
     const ch = d.champ;
@@ -60,7 +62,7 @@ function tiles(L, S, d) {
     const close = d.upcoming.filter(g => isNum((g.model || {}).p_home)).sort((a, b) => Math.abs(a.model.p_home - 0.5) - Math.abs(b.model.p_home - 0.5))[0];
     if (close) {
       const ph = close.model.p_home, fav = ph >= 0.5 ? close.home : close.away;
-      out.push({ label: 'Closest call', value: HW.teamAbbr(L, fav) + ' ' + U.pct(Math.max(ph, 1 - ph)), href: HW.gameHref(L, close.id), sub: HW.teamAbbr(L, close.away) + ' @ ' + HW.teamAbbr(L, close.home) + ' · ' + HW.fmtDate(close.date, { year: false }), tip: 'The upcoming game nearest a coin flip by our chance' });
+      out.push({ label: 'Closest call', value: HW.teamAbbr(L, fav) + ' ' + U.pct(Math.max(ph, 1 - ph)), href: HW.gameHref(L, close.id, close.season || S), sub: HW.teamAbbr(L, close.away) + ' @ ' + HW.teamAbbr(L, close.home) + ' · ' + HW.fmtDate(close.date, { year: false }), tip: 'The upcoming game nearest a coin flip by our chance' });
     }
   } else if (d.best) {
     out.push({ label: 'Best record', value: HW.teamAbbr(L, d.best[0]) + ' ' + HW.record(d.best[1], d.best[2]), href: HW.teamHref(L, d.best[0], S), sub: HW.teamName(L, d.best[0]) });
@@ -89,17 +91,16 @@ function render(el, params) {
   const info = HW.leagueInfo(L);
   const isCur = U.isCur(L, S);
   el.innerHTML = U.secHead(HW.leagueName(L) + ' ' + HW.seasonLabel(L, S), '', null, null, U.kicker(L, S)) + QK.skeleton('lines', 4);
-  return Promise.all([HW.load(HW.path('season.json', L, S)), HW.load(HW.lpath('markets.json', L)), HW.load(HW.path('awards.json', L, S)),
+  return Promise.all([HW.load(HW.path('season.json', L, S)), Promise.resolve(null), HW.load(HW.path('awards.json', L, S)),
     isCur ? HW.load(HW.path('valuation.json', L, S)) : Promise.resolve(null), HW.load(HW.lpath('history.json', L)), HW.load(HW.path('value.json', L, S))]).then(arr => {
     if (!U.alive(el)) return;
-    const season = U.ok(arr[0]) ? arr[0] : null, markets = U.ok(arr[1]) && String(arr[1].season) === String(S) ? arr[1] : null;
+    const season = U.ok(arr[0]) ? arr[0] : null;
     const awards = U.ok(arr[2]) ? arr[2] : null, val = U.ok(arr[3]) ? arr[3] : null, hist = U.ok(arr[4]) ? arr[4] : null;
     const sim = HW.simTeams(season);
     const recs = U.records(season);
     const ph = isCur ? (info.phase || (season && season.phase)) : 'offseason';
     const today = isCur ? (info.today || []) : [], next = isCur ? (info.next_games || []) : [], last = isCur ? (info.last_games || []) : [];
     const upcoming = today.concat(next).filter(g => HW.gameState(g) === 'pre' && U.fresh(g)).sort((a, b) => String(a.date).localeCompare(String(b.date)));
-    const mkTitle = HW.titleProbs(markets && markets.futures && markets.futures.champion);
     const R = (season && season.ratings) || {};
     let power = ((season && season.power) || []).map(r => ({ tid: String(r[0]), net: r[1], chg: r[2], se: (R[String(r[0])] || {}).se_net }));
     if (!power.length) power = Object.keys(R).map(t => ({ tid: t, net: R[t].net, se: R[t].se_net })).filter(r => isNum(r.net)).sort((a, b) => b.net - a.net);
@@ -128,17 +129,43 @@ function render(el, params) {
     const G = isCur ? gamesBlock(d) : { today: [], next: [], last: [] };
     const tickList = G.today.concat(G.next.slice(0, 8), G.last.slice(0, 8)).map(g => U.game(g, L, { records: recs }));
 
-    const title = isCur ? 'Every ' + HW.leagueName(L) + ' game, by the numbers.' : HW.leagueName(L) + ' ' + HW.seasonLabel(L, S) + ', by the numbers.';
-    let h = (tickList.length ? '<div class="qk-ticker hw-ticker" aria-label="Scores and our chances">' + QK.ticker(tickList, { group: false, league: true }) + '</div>' : '') +
-      U.secHead(title, esc(sub), null, null, U.kicker(L, S), '<a class="qk-btn" href="' + esc(HW.href(L, 'games')) + '">All games</a><a class="qk-btn" href="' + esc(HW.href(L, 'standings', S)) + '">Standings</a>') + tiles(L, S, d);
+    const LN = HW.leagueName(L);
+    const evening = new Date(QK.now()).getHours() >= 15;
+    const when = evening ? 'tonight' : 'today';
+    /* the game to watch: live first, then the closest calls in the next two days (QK.watchScore) */
+    const feat = G.today.concat(G.next).map(g => U.game(g, L, { records: recs })).filter(g => g.status !== 'final').map(g => [QK.watchScore(g), g]).filter(x => x[0] > -1e8).sort((a, b) => b[0] - a[0])[0];
+    let h = (tickList.length ? '<div class="qk-ticker hw-ticker" aria-label="Scores and our chances">' + QK.ticker(tickList, { group: false, league: true }) + '</div>' : '');
+    if (isCur) {
+      h += QK.greeting({ date: U.kicker(L, S),
+        title: esc(QK.greet()) + '! Here’s what’s ' + QK.mark('worth watching') + ' in the ' + esc(LN) + ' ' + when + '.',
+        lede: 'Our chance for every game, playoff and title chances from ' + Number(nSims || 20000).toLocaleString('en-GB') + ' simulated seasons, team ratings and the players behind it all, in plain English. ' + (P[ph] || ''),
+        ctas: [{ label: 'All games', href: HW.href(L, 'games') }, { label: 'Standings', href: HW.href(L, 'standings', S), ghost: true }],
+        side: feat ? QK.featureCard(feat[1], { scribble: feat[1].status === 'live' ? 'Live now!' : 'Our pick ' + when + '!', kicker: feat[1].league }) : '' });
+    } else {
+      h += U.secHead('How the ' + LN + ' ' + HW.seasonLabel(L, S) + ' season went', esc(sub), null, null, U.kicker(L, S), '<a class="qk-btn" href="' + esc(HW.href(L, 'standings', S)) + '">Final standings</a>');
+    }
+    h += '<div class="hw-tiles">' + tiles(L, S, d) + '</div>';
     let first = null;
     if (G.today.length || G.next.length || G.last.length) {
       first = G.today.length ? 'today' : G.next.length ? 'next' : 'results';
       const segB = [['today', 'Today', G.today], ['next', 'Next', G.next], ['results', 'Results', G.last]].filter(x => x[2].length);
       const seg = '<div class="qk-seg" id="ov-when" role="group" aria-label="Games">' + segB.map(x => '<button type="button" aria-pressed="' + (x[0] === first) + '" data-value="' + x[0] + '">' + x[1] + '</button>').join('') + '</div>';
-      h += '<section class="qk-section hw-sec0">' + U.head({ kicker: 'Scoreboard', title: 'Games', sub: 'Our win chance on every card, the favourite in violet. A grey tick on the bar marks the market, for reference.', actions: seg }) +
-        '<div class="hw-games hw-gc" id="ov-games"></div></section>';
+      h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch ' + when, title: '<span id="ov-gh">Games</span>', html: true, sub: 'Our chance for each side, with a line on why it’s worth your time. Live games update as they go.', actions: seg }) +
+        '<div class="qk-watch" id="ov-games"></div></section>';
     }
+    // who's hot: the qualified leaders, one card each
+    const HOT = [['pts', 'Most points', 'points a game', 'Per game, among players over the minutes floor.'], ['reb', 'Most rebounds', 'rebounds a game', 'Per game, among players over the minutes floor.'],
+      ['ast', 'Most assists', 'assists a game', 'Per game, among players over the minutes floor.'], ['hpm', 'Biggest impact', 'points per 100 (HPM)', 'Points per 100 trips the player adds to the team’s margin over an average player.'],
+      ['ts', 'Best shooter', 'true shooting', 'Points per shot, threes and free throws counted.']];
+    const hot = HOT.filter(x => (ld[x[0]] || []).length).map(x => {
+      const r = ld[x[0]][0], r2 = ld[x[0]][1], p = HW.NAMES[L].players[String(r[0])] || {}, p2 = r2 ? HW.NAMES[L].players[String(r2[0])] || {} : null;
+      const fv = v => (x[0] === 'ts' ? HW.fmtVal(v, 'pct') : x[0] === 'hpm' ? U.signed(v, 1) : U.f(v, 1));
+      return { sport: 'basketball', title: x[1], name: p.name || HW.playerName(L, r[0]), value: fv(r[1]), unit: x[2], next: p2 ? { name: p2.name || HW.playerName(L, r2[0]), value: fv(r2[1]) } : null, expl: x[3], href: HW.playerHref(L, r[0], S) };
+    });
+    if (hot.length) h += '<section class="qk-section">' + U.head({ kicker: isCur ? 'Who’s hot' : 'The season’s best', title: isCur ? 'Leading the way right now' : 'Who led the way', sub: 'One name for each stat, with the next best behind.', actions: '<a class="qk-btn ghost" href="' + esc(HW.href(L, 'players', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=leaders') + '">Every leader</a>' }) + QK.hotRow(hot) + '</section>';
+    if (isCur) h += '<section class="qk-section qk-gside"><div id="ov-sure"></div><div>' + QK.newHere({ items: [QK.NEW_HERE[0],
+      'A <b>percentile</b> ranks a player against the same role (guards, wings or bigs): 90th means better than 90 in 100.',
+      'Every forecast is checked against what happened. <a class="qk-link" href="' + esc(HW.href(L, 'model') + '?tab=calibration') + '">The record is on the Model page.</a>'] }) + '</div></section>';
     if (liveSeries.length) {
       h += '<section class="qk-section">' + U.head({ kicker: 'Playoffs', title: 'Series in progress', sub: 'The bracket has every round and each team’s chance of reaching it.', actions: '<a class="qk-btn" href="' + esc(HW.href(L, 'standings') + '?tab=bracket') + '">Bracket →</a>' }) +
         '<div class="hw-mini-grid">' + liveSeries.map(x => seriesTile(L, x, sim)).join('') + '</div></section>';
@@ -147,7 +174,7 @@ function render(el, params) {
     const awKeys = awards ? (awards.keys || Object.keys(AWN)).filter(k => awards[k] && awards[k].model && Object.keys(awards[k].model).length) : [];
     if (isCur && (tTeams.length || awKeys.length)) {
       h += '<section class="qk-section">' + U.head({ kicker: 'Season simulation', title: 'Who wins it all', sub: 'Our title chances from ' + Number(nSims || 20000).toLocaleString('en-GB') + ' simulated seasons, and our chance for each award.' }) + '<div class="qk-grid">';
-      if (tTeams.length) h += '<div class="qk-span-' + (awKeys.length ? 6 : 12) + '">' + U.card2('Title chances', Object.keys(mkTitle).length ? 'Our chance; the grey tick is the Kalshi / Polymarket number, for reference' : 'Our chance from the season simulation', '<div id="ov-title"></div>',
+      if (tTeams.length) h += '<div class="qk-span-' + (awKeys.length ? 6 : 12) + '">' + U.card2('Title chances', 'Our chance from the season simulation', '<div id="ov-title"></div>',
         { foot: '<span>Top twelve</span>' + U.link(HW.href(L, 'standings', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=odds', 'Every season forecast') }) + '</div>';
       if (awKeys.length) h += '<div class="qk-span-' + (tTeams.length ? 6 : 12) + '">' + U.card2('Award races', 'Our chance of winning each award', '<div class="qk-seg" id="ov-aw-seg" role="group" aria-label="Award" style="margin-bottom:10px">' + awKeys.map((k, i) => '<button type="button" data-value="' + k + '" aria-pressed="' + (i === 0) + '">' + esc(AWN[k] || k.toUpperCase()) + '</button>').join('') + '</div><div id="ov-aw"></div>',
         { foot: '<span></span>' + U.link(HW.href(L, 'players') + '?tab=awards', 'Every race with the reasoning') }) + '</div>';
@@ -173,16 +200,17 @@ function render(el, params) {
     const seasonWar = !vrows.length && sv;
     if (seasonWar) vrows = U.rowsOf(sv).filter(r => isNum(r.war) && r.q).sort((a, b) => b.war - a.war).slice(0, 12).map(r => Object.assign({}, r, { w0: r.war }));
     if (vrows.length || lev.length) {
-      h += '<section class="qk-section">' + U.head({ kicker: 'Value', title: 'Who and what matters', sub: seasonWar ? 'Wins above replacement from HPM and minutes.' : 'Projected wins above replacement for the rest of the season, and the games that swing the most.', actions: '<a class="qk-btn" href="' + esc(HW.href(L, 'value')) + '">Value &amp; Moves →</a>' }) + '<div class="qk-grid">' +
+      h += '<section class="qk-section">' + U.head({ kicker: 'Value', title: 'Who matters, and which games do', sub: seasonWar ? 'Wins above replacement from HPM and minutes.' : 'Projected wins above replacement for the rest of the season, and the games that swing the most.', actions: '<a class="qk-btn" href="' + esc(HW.href(L, 'value')) + '">Value &amp; Moves →</a>' }) + '<div class="qk-grid">' +
         (vrows.length ? '<div class="qk-span-' + (lev.length ? 7 : 12) + '">' + U.card2('Most valuable players', seasonWar ? 'Wins above replacement over the season (qualified players)' : 'Projected WAR, rest of season (current rosters)', U.chart('ov-war', 28 * vrows.length + 60, 'Most valuable players')) + '</div>' : '') +
         (lev.length ? '<div class="qk-span-' + (vrows.length ? 5 : 12) + '">' + U.card2('Games that matter most', 'Combined swing in both teams’ ' + (ph === 'playoffs' ? 'title' : 'playoff') + ' chances between a win and a loss', '<ul class="hw-list hw-lead">' + lev.slice(0, 8).map(x =>
-          '<li><a href="' + esc(HW.gameHref(L, x.id)) + '" class="hw-ent"><span class="nm">' + esc(HW.teamAbbr(L, x.away) + ' @ ' + HW.teamAbbr(L, x.home)) + '</span><span class="sb">' + esc(HW.fmtDate(x.date, { year: false })) + '</span></a>' +
-          '<span class="s">' + (isNum(x.p_home) ? 'ours: ' + esc(HW.teamAbbr(L, x.home)) + ' ' + U.pct(x.p_home) : '') + '</span><span class="v">' + U.f(x.lev * 100, 1) + ' pts</span></li>').join('') + '</ul>', { flush: true }) + '</div>' : '') +
+          '<li><a href="' + esc(HW.gameHref(L, x.id, x.season || S)) + '" class="hw-ent"><span class="nm">' + esc(HW.teamAbbr(L, x.away) + ' @ ' + HW.teamAbbr(L, x.home)) + '</span><span class="sb">' + esc(HW.fmtDate(x.date, { year: false })) + '</span></a>' +
+          '<span class="s">' + (isNum(x.p_home) ? 'our chance: ' + esc(HW.teamAbbr(L, x.home)) + ' ' + U.pct(x.p_home) : '') + '</span><span class="v">' + U.f(x.lev * 100, 1) + ' pts</span></li>').join('') + '</ul>' +
+          '<div style="padding:4px 16px 16px">' + QK.note('A swing of <b>' + U.f(lev[0].lev * 100, 0) + ' pts</b> means a win instead of a loss moves the two teams’ ' + (ph === 'playoffs' ? 'title' : 'playoff') + ' chances by that many percentage points between them.') + '</div>', { flush: true }) + '</div>' : '') +
         '</div></section>';
     }
     if (ldKeys.length) {
       const LDL = { pts: 'Points', reb: 'Rebounds', ast: 'Assists', '3pm': 'Threes', stl: 'Steals', blk: 'Blocks', ts: 'True shooting', hpm: 'Total impact (HPM)' };
-      h += '<section class="qk-section">' + U.head({ kicker: 'Leaderboards', title: 'Leaders', sub: 'Per game; qualified players only (the league’s minimum games and minutes).', actions: '<a class="qk-btn" href="' + esc(HW.href(L, 'players', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=leaders') + '">Players →</a>' }) +
+      h += '<section class="qk-section">' + U.head({ kicker: 'Leaderboards', title: 'Every leaderboard', sub: 'Per game; qualified players only (the league’s minimum games and minutes).', actions: '<a class="qk-btn" href="' + esc(HW.href(L, 'players', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=leaders') + '">Players →</a>' }) +
         '<div class="hw-leaders">' + ldKeys.map(k => '<div class="qk-card"><div class="qk-card-head"><div class="qk-card-title">' + esc(LDL[k]) + '</div></div><ul class="hw-list hw-lead">' +
           ld[k].slice(0, 5).map((r, i) => { const p = HW.NAMES[L].players[String(r[0])] || {};
             return '<li><span class="n">' + (i + 1) + '</span>' + U.playerEnt(L, r[0], p.name, p.team, null, S) + '<span class="v">' + HW.fmtVal(r[1], k === 'ts' ? 'pct' : k === 'hpm' ? 'pm' : '1') + '</span></li>'; }).join('') + '</ul></div>').join('') + '</div></section>';
@@ -193,15 +221,18 @@ function render(el, params) {
     if (first) {
       const draw = w => {
         const list = w === 'next' ? G.next : w === 'results' ? G.last : G.today;
-        document.getElementById('ov-games').innerHTML = list.length ? list.map(g => U.card(g, L, { records: recs })).join('') : QK.empty('No games', 'Nothing to show yet.');
+        const n = list.length;
+        const ttl = document.getElementById('ov-gh');
+        if (ttl) ttl.textContent = w === 'next' ? 'Next up' : w === 'results' ? 'Latest results' : (n === 1 ? 'One game' : n + ' games') + ' on the slate';
+        document.getElementById('ov-games').innerHTML = list.length ? list.map(g => U.card(g, L, { records: recs, why: true })).join('') : QK.empty('No games', 'Nothing to show yet.');
       };
       draw(first);
       QK.seg(document.getElementById('ov-when'), draw);
     }
     // ── charts
     if (document.getElementById('ov-title')) {
-      document.getElementById('ov-title').innerHTML = QK.chances(tTeams.map(t => ({ label: HW.teamName(L, t), p: sim[t].p_title, market: isNum(mkTitle[t]) ? mkTitle[t] : null, color: HW.teamColourRaw(L, t), href: HW.teamHref(L, t), mark: U.team(L, t) })),
-        { limit: 12, marketName: 'Market (Kalshi / Polymarket)', oursName: 'Our title chance' });
+      document.getElementById('ov-title').innerHTML = QK.chances(tTeams.map(t => ({ label: HW.teamName(L, t), p: sim[t].p_title, href: HW.teamHref(L, t, S), mark: U.team(L, t) })),
+        { limit: 12, key: false });
     }
     if (document.getElementById('ov-aw')) {
       const drawAw = k => {
@@ -243,6 +274,18 @@ function render(el, params) {
       QKC.bar('#ov-war', { cats: vrows.map(r => r.name), series: [{ name: 'WAR', data: vrows.map(r => Math.round(r.w0 * 10) / 10) }], horizontal: true, labels: true, fmt: v => U.f(v, 1),
         colors: vrows.map(r => U.tcol(L, r.team)), hrefs: vrows.map(r => HW.playerHref(L, r.id)), labelWidth: 150, valName: seasonWar ? 'Wins above replacement' : 'Projected WAR, rest of season', catName: 'Player' });
     }
+    /* How sure are we? (teaser): the game model's record from <L>/calibration.json, the full chart on the Model page */
+    if (isCur) HW.load(L + '/calibration.json').then(cj => {
+      const box = el.querySelector('#ov-sure');
+      const cb = QK.calib.find(U.ok(cj) ? cj : null);
+      if (!box) return;
+      if (!cb || !cb.bins.length) { box.innerHTML = ''; return; }
+      const big = cb.bins.slice().sort((a, b) => b.n - a.n)[0];
+      box.innerHTML = '<article class="qk-card" style="height:100%"><div class="qk-card-body"><div class="qk-kicker">How sure are we?</div><h3 style="margin:8px 0 6px">When we say ' + Math.round(big.mean_p * 100) + '%, it happens ' + Math.round(big.freq * 100) + '% of the time</h3>' +
+        '<p style="margin:0 0 6px;color:var(--ink-2)">Our most common call puts the home team at ' + Math.round(big.lo * 100) + '–' + Math.round(big.hi * 100) + '%. Across ' + QK.fmt.num(big.n) + ' ' + esc(LN) + ' games like that, the home team won ' + QK.fmt.pct(big.freq, 1) + '.</p>' +
+        QK.note('<b>Brier score ' + (isNum(cb.brier) ? cb.brier.toFixed(3) : '—') + '</b> over ' + QK.fmt.num(cb.n) + ' games: 0 is perfect, 0.25 is a coin flip. Lower is better.') +
+        '<a class="qk-more" style="display:inline-block;margin-top:14px" href="' + esc(HW.href(L, 'model') + '?tab=calibration') + '">The full record</a></div></article>';
+    });
     const nx = upcoming[0];
     if (nx && !today.some(g => HW.gameState(g) === 'in' && U.fresh(g))) HW.interval(() => { const n = document.getElementById('ov-cd'); if (n) n.innerHTML = cdHTML(L, nx); }, 30000);
     HW.setMeta(nSims ? Number(nSims).toLocaleString('en-GB') + ' season simulations' + (season.updated_at ? ' · model ' + esc(HW.fmtStamp(season.updated_at)) : '') : '');

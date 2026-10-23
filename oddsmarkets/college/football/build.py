@@ -945,11 +945,11 @@ PLAYER_METRICS = [
     ("epa_rush", "EPA/carry", "Rushing", "3", False, "Expected points added per carry"),
     ("sr_rush", "Rush success", "Rushing", "pct", False, "Share of carries that gain expected points"),
     ("ypc", "Yds/carry", "Rushing", "2", False, "Rushing yards per carry"),
-    ("rush_share", "Rush share", "Rushing", "pct", False, "Share of the team's carries in his games"),
-    ("tgt_share", "Target share", "Receiving", "pct", False, "Share of the team's targets thrown his way in his games"),
+    ("rush_share", "Rush share", "Rushing", "pct", False, "Share of the team's carries in the player's games"),
+    ("tgt_share", "Target share", "Receiving", "pct", False, "Share of the team's targets thrown to the player in the player's games"),
     ("epa_tgt", "EPA/target", "Receiving", "3", False, "Expected points added per target"),
     ("sr_tgt", "Target success", "Receiving", "pct", False, "Share of targets that gain expected points"),
-    ("yptpa", "Yds/team att", "Receiving", "2", False, "Receiving yards per team pass attempt in his games"),
+    ("yptpa", "Yds/team att", "Receiving", "2", False, "Receiving yards per team pass attempt in the player's games"),
     ("ypr", "Yds/rec", "Receiving", "2", False, "Receiving yards per reception"),
     ("tkl_pg", "Tackles/game", "Defense", "2", False, "Total tackles per game"),
     ("tfl_pg", "TFL/game", "Defense", "2", False, "Tackles for loss per game"),
@@ -973,7 +973,7 @@ PLAYER_METRICS = [
     ("ypt", "Yds/target", "Receiving", "2", False, "Receiving yards per target"),
     ("catch_rate", "Catch rate", "Receiving", "pct", False, "Catches per target"),
     ("expl_tgt", "Explosive targets", "Receiving", "pct", False, "Targets that gain 20+ yards"),
-    ("fga_pg", "FGA/game", "Kicking", "2", False, "Field-goal attempts per game (how much his coach uses him)"),
+    ("fga_pg", "FGA/game", "Kicking", "2", False, "Field-goal attempts per game (how much the coach uses the kicker)"),
     ("fg_long", "Long FG", "Kicking", "int", False, "Longest made field goal of the season"),
 ]
 RATE_KEYS = sorted({k for ks in players.RATE_FIELDS.values() for k in ks})

@@ -131,7 +131,8 @@ function render(el, params) {
     (rk.race || []).forEach((r, i) => { raceRank[r[0]] = i + 1; });
     const subs = { official: 'as of ' + esc(TA.fmtDate(rk.date)) + ' · Elo rank and race position beside each player',
       elo: 'surface-blended Elo; surface columns are the surface ratings', race: 'points won this calendar year, this week included (the race simulation starts from its own snapshot)', defend: 'points dropping off over the next 12 months' };
-    body.innerHTML = '<div class="card"><div class="toggle-row" id="rk-tabs">' + TA.toggles(VIEWS, view, 'data-v') + '</div><div class="section-note" id="rk-sub"></div><div id="rk-view"></div></div>';
+    body.innerHTML = '<div class="card"><div class="toggle-row" id="rk-tabs">' + TA.toggles(VIEWS, view, 'data-v') + '</div><div class="section-note" id="rk-sub"></div><div id="rk-view"></div></div>' +
+      QK.note('<b>Ranking or Elo?</b> The official ranking adds up points from the last 52 weeks, so it rewards playing a lot and going deep. Our Elo rates every result by who it came against, so it moves faster after an upset. A 100-point Elo gap means the higher-rated player wins about 64% of the time.');
     const show = k => {
       view = k;
       document.getElementById('rk-sub').innerHTML = subs[k];

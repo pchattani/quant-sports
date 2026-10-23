@@ -418,7 +418,7 @@ class PeopleLines:
         _write(lab_dir / "index.json", {
             "windows": windows, "scopes": index_scopes, "scope_labels": SCOPE_LABELS, "comps": comps, "fields": fields,
             "metrics": metrics, "adjusted_keys": list(ADJUSTED_KEYS), "min_minutes": MIN_MINUTES,
-            "rule": ("One row per person in every view: his matches in the window, summed across the competitions of the scope "
+            "rule": ("One row per person in every view: the person's matches in the window, summed across the competitions of the scope "
                      "(every competition, club competitions, national-team football or one competition) and finalised like a "
                      "competition's season line. A season is the player's own (a European's 2026/27, a Brazilian's 2026); an "
                      "international or world-club match counts in it by date. Duplicate Sofascore ids of one person are merged "

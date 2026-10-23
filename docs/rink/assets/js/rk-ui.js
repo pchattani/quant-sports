@@ -103,6 +103,8 @@ U.game = (c, o) => {
     league: pg && pg.playoff ? RK.roundName(pg.round) + (pg.game ? ' · Game ' + pg.game : '') : (o.league || 'NHL'),
     home: U.team(c.home), away: U.team(c.away), hs: isNum(c.hs) ? Number(c.hs) : null, as: isNum(c.as) ? Number(c.as) : null,
     p_home: p, market_home: mk && isNum(mk.p_home) ? Number(mk.p_home) : null, note: note,
+    /* v3: live, the kit reads the live chance and keeps our pre-game call for "before the start we had ..." */
+    p_pre: live && isNum(m.p_home) ? Number(m.p_home) : null, pre_only: live && !isNum(c.wp_home) ? true : undefined,
     period: isNum(c.period) ? Number(c.period) : null, clock: c.clock, href: RK.gameHref(c.game_id || c.id),
     xg: c.xg && isNum(c.xg.away) && isNum(c.xg.home) && st !== 'pre' ? [Number(c.xg.away), Number(c.xg.home)] : null
   };
@@ -165,6 +167,32 @@ U.SPEC = {
   sv_pct_low: { label: 'Low-danger save %', unit: '%', tip: 'Save rate on low-danger chances (expected-goal value under 0.08).' },
   qs_pct: { label: 'Quality start %', unit: '%', tip: 'Share of starts with a save percentage above league average (or .885 on 20 shots or fewer).' }
 };
+/* v3 (Matchday): a plain-English line under each metric on the percentile rail (QK.pctlBars r.sub). */
+U.SUB = {
+  gar_60: 'Goals added over a replacement-level player, per hour.',
+  p60: 'Goals + assists for every hour on the ice.',
+  ixg60_all: 'How good the player’s own shots are, whether or not they go in.',
+  icf60: 'Shot attempts per hour at 5-on-5: the steadiest stat there is.',
+  adj_xgf_pct: 'With the player on the ice, the team’s share of the chances.',
+  xgf60_rel: 'Chances the team creates with the player on, against without.',
+  rapm_net: 'The player’s own effect on chances, after team-mates and opponents.',
+  rapm_def: 'The player’s own effect on chances against (higher is better).',
+  rapm_off: 'The player’s own effect on chances for.',
+  adj_xga60: 'Chances against with the player on the ice (lower is better).',
+  pen_diff60: 'Penalties drawn minus taken, per hour.',
+  toi_gp: 'Minutes a game: how much the coach trusts the player.',
+  gsax100: 'Goals stopped beyond an average goalie, per 100 shots.',
+  gsax: 'Season total of goals stopped beyond an average goalie.',
+  sv_pct: 'Saves per shot on goal.',
+  sv_pct_high: 'Saves on the most dangerous chances. Very noisy.',
+  sv_pct_med: 'Saves on medium-danger chances.',
+  sv_pct_low: 'Saves on the easier chances.',
+  qs_pct: 'Starts with an above-average save percentage.'
+};
+/* The type a player's best metric suggests (compare verdicts). */
+U.ARCHETYPE = { gar_60: 'The all-rounder', p60: 'The point machine', ixg60_all: 'The chance-getter', icf60: 'The volume shooter', adj_xgf_pct: 'The play-driver',
+  xgf60_rel: 'The play-driver', rapm_net: 'The difference-maker', rapm_def: 'The defender', rapm_off: 'The creator', adj_xga60: 'The defender', pen_diff60: 'The penalty-drawer',
+  toi_gp: 'The workhorse', gsax100: 'The shot-stopper', gsax: 'The shot-stopper', sv_pct: 'The steady one', qs_pct: 'The reliable starter' };
 /* [group label, [[id, settles at, sample unit], ...]] */
 U.SETS = {
   F: [['Value and scoring', [['gar_60', 722, 'minutes'], ['p60', 277, 'minutes'], ['ixg60_all', 224, 'minutes'], ['icf60', 109, '5v5 minutes']]],
@@ -267,8 +295,9 @@ U.faOf = p => {
 /* Percentile-card groups for one player from the catalogue: position-pool percentiles (pct_pos) when present.
    early = the sample is still short of where the metric stabilises (metrics[].stabilises_at). */
 /* sets: a U.SETS entry (ids with their settling sample) or the older [label, [ids]] lists. pcts: the percentile map
-   to read (the player file's current.pct_pos, else the catalogue row's pct_pos, else pct). */
-U.pctGroups = (p, meta, sets, pcts) => {
+   to read (the player file's current.pct_pos, else the catalogue row's pct_pos, else pct). prev: last season's
+   percentiles in the same peer group (the hollow ring on the v3 rail), or null. */
+U.pctGroups = (p, meta, sets, pcts, prev) => {
   const src = pcts || (p.pct_pos && Object.keys(p.pct_pos).length ? p.pct_pos : (p.pct || {}));
   return (sets || []).map(g => ({
     label: g[0],
@@ -278,7 +307,8 @@ U.pctGroups = (p, meta, sets, pcts) => {
       if (!isNum(pc) || m.unavailable) return null;
       const at = Array.isArray(x) && isNum(x[1]) ? x[1] : (isNum(m.stabilises_at) ? m.stabilises_at : null);
       const n = isNum(at) ? U.sampleOf(p, unit || m.unit) : null;
-      return { label: sp.label || m.label || k, pctl: pc, value: U.fmtBy(m, (p.values || {})[k]), tip: (sp.tip || m.desc || '') + (isNum(at) && unit ? ' Settles at about ' + QK.fmt.num(at) + ' ' + unit + '.' : ''), early: isNum(n) && n < at };
+      const pv = prev && isNum(prev[k]) ? prev[k] : null;
+      return { label: sp.label || m.label || k, sub: U.SUB[k] || '', pctl: pc, prev: pv, value: U.fmtBy(m, (p.values || {})[k]), tip: (sp.tip || m.desc || '') + (isNum(at) && unit ? ' Settles at about ' + QK.fmt.num(at) + ' ' + unit + '.' : ''), early: isNum(n) && n < at };
     }).filter(Boolean)
   }));
 };
@@ -328,7 +358,8 @@ U.gameV2 = (c, o, rows) => {
   g.home.record = rec(c.home); g.away.record = rec(c.away);
   return g;
 };
-U.gc = (c, o, rows) => QK.gameCard(U.gameV2(c, o, rows), { sport: false, marketLabel: 'Market', marketTip: 'The prediction-market or no-vig line probability for the home side, shown as a reference next to ours' });
+/* v3: no market on cards (kit default market: false); `why` adds the italic one-line reason (QK.whyLine). */
+U.gc = (c, o, rows, why) => QK.gameCard(U.gameV2(c, o, rows), { sport: false, why: why === undefined ? false : why });
 U.head = o => QK.sectionHead(Object.assign({ kicker: 'NHL · ' + RK.seasonLabel(RK.state.season || RK.currentSeason()) }, o));
 
 })(window.RK);

@@ -54,8 +54,9 @@ function render(el, params) {
       { label: 'Year-end No. 1', value: top1 ? TA.playerSurname(T, top1) + ' ' + TA.pct(no1[top1], 0) : '—', signal: true, href: top1 ? TA.playerHref(T, top1) : null, sub: 'our chance, the favourite' },
       { label: 'Virtually qualified', value: String(nIn), sub: 'our chance 99.5% or more' },
       { label: 'On the bubble', value: String(bubble.length), sub: 'our chance between 5% and 95%' },
-      { label: 'Simulations', value: nS || '—', sub: (race.remaining_events || []).length + ' events left' + (race.as_of ? ' · from ' + TA.fmtDate(race.as_of, { year: false, weekday: false }) : '') }]) + '</div>';
-    html += '<div class="qk-grid"><div class="qk-span-5">' + V.card('Who qualifies', 'Our chance of a place at the ' + esc(fin), '<div id="rc-ch"></div>') + '</div><div class="qk-span-7">' +
+      { label: 'Simulations', value: nS || '—', sub: (race.remaining_events || []).length + ' events left' + (race.as_of ? ' · from ' + TA.fmtDate(race.as_of, { year: false, weekday: false }) : '') }]) + '</div>' +
+      QK.note('<b>How it works.</b> We play out every event left in the season ' + (nS || 'many') + ' times, match by match, with our win chances, and count how often each player ends up in the top eight. A 70% chance still misses about 3 times in 10.') + '<div style="height:var(--sp-5)"></div>';
+    html += '<div class="qk-grid"><div class="qk-span-5">' + V.card('Who makes it to the ' + esc(fin.replace(/ \(.*\)$/, '')), 'Our chance of a place at the ' + esc(fin), '<div id="rc-ch"></div>') + '</div><div class="qk-span-7">' +
       V.card('Finals qualification', esc(ptsNote) + '; the dashed line sits below eighth in our order', '<div id="rc-table"></div>', { flush: true,
         foot: '<span>The top eight in the race qualify' + (T === 'atp' ? '; a Slam champion ranked 9–20 takes the eighth place' : '') + '</span>' }) + '</div></div>';
     const H = (race.history || []).filter(h => h && h.as_of).sort((a, b) => String(a.as_of).localeCompare(String(b.as_of)));
@@ -64,7 +65,7 @@ function render(el, params) {
         : '<p class="ta-cap" style="margin:0">' + (H.length ? 'Recording started on ' + esc(TA.fmtDate(H[0].as_of, { weekday: false })) + ' with ' + H.length + ' simulation date' + (H.length === 1 ? '' : 's') + ' so far' : 'The simulation has not recorded its history yet') +
           '. The chart appears once three dates are on record; earlier runs were not stored.</p>')) + '</section>';
     html += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-5">' + V.card('Year-end No. 1', 'Our chance of finishing the year ranked No. 1', '<div id="rc-no1"></div>') + '</div><div class="qk-span-7">' +
-      V.card('Where they finish', 'Simulated year-end rank, 1–20; cells show the chance where it is 10% or more', V.chart('rc-heat', 420, 'Simulated year-end rank')) + '</div></div></section>';
+      V.card('Where they finish the year', 'Simulated year-end rank, 1–20; cells show the chance where it is 10% or more', V.chart('rc-heat', 420, 'Simulated year-end rank')) + '</div></div></section>';
     const rem = race.remaining_events || [];
     html += TA.card('Still to play', rem.length + ' event' + (rem.length === 1 ? '' : 's') + ' in the simulation',
       rem.length ? TA.tableHTML([{ label: 'Starts' }, { label: 'Event' }, { label: 'Level' }, { label: 'How it is simulated', cls: 'hide-sm' }], rem.map(e0 => {

@@ -1,6 +1,8 @@
 /* The Quant Paddock — the race centre (#/race/<y>/<r>[/laps|strategy|quali|telemetry]).
- * Upcoming: our forecast before and after qualifying (and the sprint), the market a grey reference tick, the
- * finishing-position distribution and the weekend schedule. Finished: awards, the result against the
+ * Upcoming (kit v3, after rk-games.js): a preview hero (our favourite as a big teal number with a how-sure note, the
+ * top three, the market as one quiet labelled line when there is a usable quote) with the forecast table beside it;
+ * then the weekend schedule, our forecast before and after qualifying (and the sprint; the market a grey reference
+ * tick) and the finishing-position distribution. Finished: awards, the result against the
  * forecast; Laps (positions, gaps, lap times, corrected pace, overtakes, race control); Strategy
  * (stints, pit stops, degradation, weather); Qualifying; Telemetry (two laps overlaid, telemetry.js).
  * Every section says so when its data is missing (no stints, overtakes or race control before 2023,
@@ -133,15 +135,46 @@ function overviewUpcoming(host, race, season, teams, markets) {
   var nr = (markets || {}).next_race || {};
   var mk = nr.year === race.year && nr.round === race.round && nr.prices && Object.keys(nr.prices).length ? nr.prices : null;
   var raceS = sessions.filter(function (s) { return s.key === 'race'; })[0];
-  host.innerHTML = PD.kpis([
-    PD.kpi('Our favourite', fav ? esc(PD.driverCode(fav)) + ' ' + PD.pct(ds[fav].p_win, 0) : '—', fav ? esc(PD.driverName(fav)) + ' · our win chance' + (mk && isNum(mk[fav]) ? ' · market ' + PD.pct(mk[fav]) + ' (reference)' : '') : '', { signal: true, href: fav ? PD.driverHref(fav) : null }),
-    PD.kpi('Safety car', main && isNum(main[2].p_sc) ? PD.pct(main[2].p_sc, 0) : '—', 'our chance of at least one' + (main && isNum(main[2].p_vsc) ? ' · VSC ' + PD.pct(main[2].p_vsc, 0) : '')),
-    PD.kpi('Grid', post ? 'Set' : 'Not yet', post ? 'forecast updated after qualifying' : 'forecast before qualifying', { text: true }),
-    PD.kpi('Race start', raceS ? esc(PD.fmtTime(raceS.iso)) : esc(PD.fmtDate(race.date, { year: false })), raceS ? esc(PD.fmtDate(raceS.iso, { year: false })) + ', your time' : '')
-  ]) + (sessions.length ? PD.grid(PD.card('Weekend', 'Times in your time zone.', '<div class="pd-wk"><div class="pd-cd" id="rc-cd"></div><ul class="pd-sched" id="rc-sched"></ul></div>', { span: 12 }), 'pd-mt') : '') +
-    '<div id="rc-fc" class="pd-mt"></div>' + (race.forecast && race.forecast.generated_at ? '<p class="pd-cap">Forecast generated ' + esc(PD.fmtStamp(race.forecast.generated_at)) + '.</p>' : '');
+  host.innerHTML = '<div class="pd-gtop">' + hero(race, main, mk, raceS, post) + '<div class="pd-gside">' +
+    PD.card(post ? 'Our forecast, after qualifying' : 'Our forecast', 'The top ten by our win chance, from ' + (main && main[2].n ? PD.int(main[2].n) : '20,000') + ' simulated races.', '<div id="rc-top"></div>', { flush: true }) +
+    PD.kpis([
+      PD.kpi('Safety car', main && isNum(main[2].p_sc) ? PD.pct(main[2].p_sc, 0) : '—', 'our chance of at least one' + (main && isNum(main[2].p_vsc) ? ' · VSC ' + PD.pct(main[2].p_vsc, 0) : '')),
+      PD.kpi('Race start', raceS ? esc(PD.fmtTime(raceS.iso)) : esc(PD.fmtDate(race.date, { year: false })), raceS ? esc(PD.fmtDate(raceS.iso, { year: false })) + ', your time' : '')
+    ], 'pd-kpis-2') + '</div></div>' +
+    (sessions.length ? PD.grid(PD.card('The weekend', 'Times in your time zone.', '<div class="pd-wk"><div class="pd-cd" id="rc-cd"></div><ul class="pd-sched" id="rc-sched"></ul></div>', { span: 12 }), 'pd-mt') : '') +
+    '<div id="rc-fc" class="pd-mt"></div>' + (race.forecast && race.forecast.generated_at ? '<p class="pd-cap">Forecast made ' + esc(PD.fmtStamp(race.forecast.generated_at)) + '.</p>' : '');
+  if (main) {
+    var top = Object.keys(ds).sort(function (a, b) { return ds[b].p_win - ds[a].p_win; }).slice(0, 10);
+    PD.table('rc-top', [
+      { key: 'name', label: 'Driver', sticky: true, sort: false, fmt: function (x, row) { return PD.driverLink(row.id, { team: teams[row.id] }); } },
+      { key: 'p_win', label: 'Win', num: true, sort: false, fmt: function (x) { return '<b class="pd-ours">' + PD.pct(x, x < 0.1 ? 1 : 0) + '</b>'; } },
+      { key: 'p_podium', label: 'Podium', num: true, sort: false, fmt: function (x) { return PD.pct(x, 0); } },
+      { key: 'p_points', label: 'Points', num: true, sort: false, fmt: function (x) { return PD.pct(x, 0); } },
+      { key: 'exp_pos', label: 'Exp. pos', num: true, sort: false, tip: 'Our average finishing position across the simulated races', fmt: function (x) { return PD.num(x, 1); } }
+    ], top.map(function (id) { var d = ds[id]; return { id: id, name: PD.driverName(id), p_win: d.p_win, p_podium: d.p_podium, p_points: d.p_points, exp_pos: d.exp_pos }; }));
+  } else PD.set('rc-top', PD.muted('The forecast is built once the weekend is near.'));
   if (sessions.length) PD.weekendClock(sessions, 'rc-cd', 'rc-sched');
   forecastBlock('rc-fc', views, teams, 'Who wins? Our chance', post ? 'post' : 'pre', mk);
+}
+
+/* v3 (Matchday) hero for a race still to run, after QK.previewCard: the round and circuit, our favourite as a big
+   teal number with the next two, the top three with team marks, a "How sure are we?" note, and the market as one quiet
+   labelled line (game detail is one of the two places it may appear) when a usable quote exists. */
+function hero(race, main, mk, raceS, post) {
+  var circ = race.circuit || {};
+  var meta = '<div class="qk-feature-meta"><span class="qk-pill">F1 · ' + esc(circ.name || PD.shortRace(race.name)) + '</span><span class="qk-badge">' + esc(raceS ? PD.fmtDate(raceS.iso, { year: false, time: true }) : PD.fmtDate(race.date, { year: false })) + '</span></div>';
+  if (!main) return '<article class="qk-card qk-feature pd-rhero">' + meta + QK.note('Our forecast for this race is built once the weekend is near.') + '</article>';
+  var ds = main[2].drivers;
+  var ids = Object.keys(ds).sort(function (a, b) { return ds[b].p_win - ds[a].p_win; });
+  var f = ids[0], p = ds[f].p_win, miss = Math.max(1, Math.round(10 * (1 - p)));
+  var row = function (id) { var t = PD.driverTeam(id); return '<div class="qk-feature-row"><div class="t">' + (t ? PD.mark(t, 'md') : '') + '<span>' + esc(PD.driverName(id)) + '</span></div><div class="s pd-feat-p">' + PD.pct(ds[id].p_win, 0) + '</div></div>'; };
+  var mline = mk && isNum(mk[f]) ? '<div class="pd-mkt-line"><span class="qk-mkt">Market (Kalshi / Polymarket), for reference: ' + esc(PD.driverSurname(f)) + ' ' + PD.pct(mk[f], 0) + '</span></div>' : '';
+  return '<article class="qk-card qk-feature pd-rhero">' + meta +
+    '<div class="qk-feature-big"><div class="big">' + PD.pct(p, 0) + '</div><div class="say">chance <b>' + esc(PD.driverSurname(f)) + '</b> wins' + (post ? ', now the grid is set' : '') + '. ' +
+    ids.slice(1, 3).map(function (id) { return esc(PD.driverSurname(id)) + ': <b>' + PD.pct(ds[id].p_win, 0) + '</b>'; }).join(', ') + '.</div></div>' +
+    ids.slice(0, 3).map(row).join('') + mline +
+    QK.note('<b>How sure are we?</b> ' + PD.pct(p, 0) + ' means ' + esc(PD.driverSurname(f)) + ' loses a race like this about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.' +
+      (isNum(ds[f].p_podium) ? ' A podium is ' + PD.pct(ds[f].p_podium, 0) + ', and we expect P' + PD.num(ds[f].exp_pos, 1) + ' on average.' : '')) + '</article>';
 }
 
 // ── finished race: overview ───────────────────────────────────────────────
@@ -204,10 +237,12 @@ function overviewDone(host, race, season, teams) {
     PD.kpi('Neutralisations', has(race.control) ? String(sc + vsc + red) : '—', has(race.control) ? [sc + ' SC', vsc + ' VSC'].concat(red ? [red + ' red'] : []).join(' · ') : 'no race control data'),
     PD.kpi('Our favourite', fav ? PD.driverLink(fav, { team: teams[fav] }) : '—', fav ? PD.pct(pre[fav].p_win) + ' to win · finished ' + (favRes ? (PD.finished(favRes.status) ? 'P' + favRes.pos : 'DNF') : '—') : 'no pre-race forecast', { text: true })
   ]) +
+  (fav && winner ? '<div class="pd-mt">' + QK.note(winner.driver === fav ? 'Our favourite won: we gave <b>' + esc(PD.driverName(fav)) + '</b> ' + PD.pct(pre[fav].p_win, 0) + ' before qualifying.'
+    : '<b>' + esc(PD.driverName(winner.driver)) + '</b> won' + (isNum(winnerP) ? ', at ' + PD.pct(winnerP, winnerP < 0.1 ? 1 : 0) + ' in our numbers before qualifying' + (winnerP < 0.1 ? ': a real surprise, about 1 race in ' + Math.round(1 / Math.max(winnerP, 0.001)) : '') : '') + '. Our favourite, ' + esc(PD.driverName(fav)) + ', finished ' + (favRes ? (PD.finished(favRes.status) ? 'P' + favRes.pos : 'out of the race') : 'unclassified') + '.') + '</div>' : '') +
   (cards.length ? '<section class="qk-section pd-sec">' + PD.secHead('Awards', 'The race in numbers', 'Our picks of the race, each with the number behind it.') + '<div class="pd-awards">' + cards.join('') + '</div></section>' : '') +
   PD.grid(
     PD.card('Result', race.sprint && race.sprint.length ? 'Sprint result below.' : '', '<div id="rc-res"></div>', { span: 7, flush: true }) +
-    PD.card('Forecast v result', 'Where we expected each driver to finish (violet) against where they did (ring).', PD.chartBox('rc-eva', 560), { span: 5 }) +
+    PD.card('Forecast v result', 'Where we expected each driver to finish (teal) against where they did (ring).', PD.chartBox('rc-eva', 560), { span: 5 }) +
     PD.card('Positions lap by lap', 'Team colours; a team’s second driver is dashed. Bands: safety car (amber), red flag.', PD.chartBox('rc-pos-mini', 420), { span: 12, foot: '<a href="' + PD.raceHref(race.year, race.round, 'laps') + '">Gaps, lap times, overtakes and race control →</a>' }) +
     (race.sprint && race.sprint.length ? PD.card('Sprint result', '', '<div id="rc-sprint"></div>', { span: 12, flush: true }) : ''), 'pd-mt') +
   '<div id="rc-prefc" class="pd-mt"></div>';
@@ -283,7 +318,7 @@ function laps(host, race, teams) {
     var counts = [], who = {};
     for (var i = 1; i <= n; i++) counts.push(0);
     ov.forEach(function (o) { if (o.lap <= n) { counts[o.lap - 1]++; (who[o.lap] = who[o.lap] || []).push(PD.driverCode(o.by) + ' on ' + PD.driverCode(o.on)); } });
-    PD.ch.columns('rl-ot', { cats: counts.map(function (c, k) { return String(k + 1); }), series: [{ name: 'Overtakes', data: counts, colour: '#3987e5', fmt: function (v) { return String(v); } }], xName: 'Lap', yName: 'Overtakes', fmt: function (v) { return PD.num(v, 0); },
+    PD.ch.columns('rl-ot', { cats: counts.map(function (c, k) { return String(k + 1); }), series: [{ name: 'Overtakes', data: counts, colour: PD.col('sky'), fmt: function (v) { return String(v); } }], xName: 'Lap', yName: 'Overtakes', fmt: function (v) { return PD.num(v, 0); },
       tipLabel: function (k) { var w = who[k + 1] || []; return 'Lap ' + (k + 1) + (w.length ? ': ' + w.slice(0, 6).join(', ') + (w.length > 6 ? '…' : '') : ''); }, label: 'Overtakes by lap' });
   } else PD.ch.none('rl-ot', 'No overtake data for this race (tracked from 2023).');
   var key = (race.control || []).filter(function (e) { return e && (e.kind === 'SC' || e.kind === 'VSC' || e.kind === 'RED' || e.kind === 'PENALTY' || /INVESTIGATION|DELETED|DRS (EN|DIS)ABLED|RED FLAG|CHEQUERED/i.test(e.message || '')); });
@@ -333,9 +368,9 @@ function strategy(host, race, teams) {
     rows: dids.map(function (d) { return { label: PD.driverLink(d, { code: true, team: teams[d] }), values: comps.map(function (c) { return (ds[d].deg || {})[c]; }) }; }), fmt: function (v) { return PD.signed(v, 3); }, center: 'col', invert: true }) : PD.muted('No degradation estimates for this race.'));
   var w = (race.weather || []).filter(function (r) { return r && isNum(r.t_ms); }).sort(function (a, b) { return a.t_ms - b.t_ms; });
   if (w.length >= 2) PD.ch.lines('rs-wx', [
-    { name: 'Track °C', data: w.map(function (r) { return [r.t_ms / 60000, r.track > 0 ? r.track : null]; }), colour: '#e8833a' },
-    { name: 'Air °C', data: w.map(function (r) { return [r.t_ms / 60000, r.air]; }), colour: '#3987e5' },
-    { name: 'Wind m/s', data: w.map(function (r) { return [r.t_ms / 60000, r.wind]; }), colour: '#7d8590', dash: true }
+    { name: 'Track °C', data: w.map(function (r) { return [r.t_ms / 60000, r.track > 0 ? r.track : null]; }), colour: PD.col('coral') },
+    { name: 'Air °C', data: w.map(function (r) { return [r.t_ms / 60000, r.air]; }), colour: PD.col('sky') },
+    { name: 'Wind m/s', data: w.map(function (r) { return [r.t_ms / 60000, r.wind]; }), colour: PD.col('grey'), dash: true }
   ], { xName: 'Minutes from the start' + (w.some(function (r) { return r.rain; }) ? ' (rain recorded)' : ''), xFmt: function (v) { return Math.round(v); }, xLabel: function (v) { return Math.round(v) + ' min'; }, yName: '°C, or m/s for wind', yFmt: function (v) { return PD.num(v, 1); }, label: 'Weather through the race' });
   else PD.ch.none('rs-wx', 'No weather readings for this race.');
 }

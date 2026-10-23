@@ -165,7 +165,7 @@ MODEL = [
     ("game", "Game model", "Prediction", "Expected margin and total from team strength, home field (by season), rest, travel, time "
      "zones, weather and QB status; win, spread and total distributions with drive-level simulation."),
     ("season_sim", "Season simulation", "Prediction", "The remaining schedule simulated with the game model, the NFL tiebreakers "
-     "and the seven-team conference playoffs with reseeding; division, playoff, bye and Super Bowl odds, magic numbers and draft order."),
+     "and the seven-team conference playoffs with reseeding; division, playoff, bye and Super Bowl chances, magic numbers and draft order."),
     ("awards", "Award races", "Prediction", "MVP, OPOY, DPOY, OROY, DROY, CPOY and COTY from model value and voting features, fitted "
      "on a verified table of past winners."),
     ("epa_units", "EPA units", "Catalogue", "Opponent-adjusted EPA per play by unit: a ridge regression of play EPA on offence and "
@@ -186,9 +186,9 @@ MODEL = [
     ("starters_value", "Position value (team)", "Value", "The sum of a team's starters' per-game value above replacement at a "
      "position (QB 1, RB 2, WR 3, TE 2, outside pass rushers (ED) 2, interior line (DL) 2, LB 2, CB 3, S 2, K 1, P 1) from the current roster; the QB is the team-strength "
      "model's QB term. Graded A-F by percentile among the 32 teams on the team pages."),
-    ("trade_curve", "Trade sensitivity curve", "Season simulation", "A team's playoff, division, bye, conference and Super Bowl odds, "
+    ("trade_curve", "Trade sensitivity curve", "Season simulation", "A team's playoff, division, bye, conference and Super Bowl chances, "
      "wins and draft slot as its strength is shifted (-10 to +10 points a game), from the season simulation re-weighted by importance "
-     "sampling and anchored to the published odds; the trade simulator reads trades off it."),
+     "sampling and anchored to the published chances; the trade simulator reads trades off it."),
 ]
 
 

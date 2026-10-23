@@ -23,6 +23,14 @@ Usage:
     python scripts/build_home.py                  # links point at the public GitHub Pages sites
     python scripts/build_home.py --links local    # links point at ../site/, ../paddock/ ... (preview)
     python scripts/build_home.py --links local --with-pending   # also the sites not launched yet (local preview)
+    python scripts/build_home.py --links local --now 2026-10-17T23:00:00Z   # preview an older local snapshot
+
+Matchday copy (kit v3, docs/_design/MIGRATION_V3.md), all added fields:
+    games[].why          one friendly line on why a game is worth watching (our numbers only, never the market)
+    leaders[k].hot       { title, expl } for the home page's "Who's hot" card: what the name leads, what it means
+    calibration          { hockey | basketball | nfl | baseball: { league, span, n, brier, subject, unit, bins } }
+    stats[].title/note   a plain headline for the stat of the day and an "i" note on what the number means
+                         for "How sure are we?", read from each site's calibration.json
 
 Sites not launched yet (PENDING, e.g. The Quant Campus) are left out of home.json and search.json unless their key
 is in LAUNCHED or --with-pending is given, so the live home page never links a Pages site that does not exist.
@@ -32,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -308,6 +317,9 @@ def build_football(ctx: Ctx, base: str, out: dict):
           "updated_at": hub.get("updated_at")}
     if top and top.get("xg"):
         out["stats"].append({"sport": "football", "kicker": "Finishing above the model",
+                             "title": f"{surname(top['name'])} keeps beating the model",
+                             "note": "<b>Expected goals</b> rate every shot by how often that kind of chance goes in. "
+                                     "Scoring more than them means finishing better than the average shooter.",
                              "value": f"+{top['value'] - top['xg']:.1f}",
                              "unit": "goals over xG",
                              "text": f"{top['name']} has {top['value']} goals from {top['xg']:.1f} expected goals "
@@ -315,13 +327,25 @@ def build_football(ctx: Ctx, base: str, out: dict):
                              "href": top["href"]})
     if titles:
         t0 = titles[0]
-        if t0["rows"] and t0["rows"][0].get("market"):
+        if t0["rows"] and t0["rows"][0].get("p"):
             r0 = t0["rows"][0]
             out["stats"].append({"sport": "football", "kicker": f"{t0['league']} title",
-                                 "value": f"{r0['p'] * 100:.0f}%", "unit": "model title odds",
-                                 "text": f"The model makes {r0['name']} {r0['p'] * 100:.0f}% to win the "
-                                         f"{t0['league']}; the market says {r0['market'] * 100:.0f}%.",
+                                 "title": f"{r0['name']} lead the {t0['league']} race",
+                                 "note": "<b>Our title chance</b> plays out the rest of the season thousands of times "
+                                         "with our match forecasts and counts how often each club finishes first.",
+                                 "value": f"{r0['p'] * 100:.0f}%", "unit": "our title chance",
+                                 "text": f"We make {r0['name']} {r0['p'] * 100:.0f}% to win the {t0['league']}, "
+                                         f"from thousands of simulated seasons.",
                                  "href": t0["href"]})
+    if goals:
+        g0 = goals[0]
+        nxt = goals[1] if len(goals) > 1 else None
+        better = g0.get("xg") is not None and g0["value"] > g0["xg"]
+        out["leaders"]["football"]["hot"] = {
+            "title": "Most goals" + (f", {g0['league']}" if g0.get("league") else ""),
+            "expl": (f"{g0['value']} goals from chances worth {g0['xg']:.1f}: "
+                     + ("finishing better than the average shooter." if better else "the chances say more should have gone in."))
+            if g0.get("xg") is not None else "Goals in all competitions this season."}
     return sp
 
 
@@ -410,16 +434,24 @@ def build_f1(ctx: Ctx, base: str, out: dict):
                     "sub": (last.get("name") or "").replace(" Grand Prix", " GP")}],
           "updated_at": idx.get("updated_at")}
     if leader and second and title:
+        gap = leader['points'] - second['points']
         out["stats"].append({"sport": "f1", "kicker": "Championship lead",
+                             "title": f"{surname(dname(leader['driver']))} is " + ("out of sight" if gap >= 50 else "in front"),
+                             "note": "A win is worth 25 points, so every 25 clear is a race the rest need back.",
                              "value": f"{leader['points'] - second['points']:.0f}", "unit": "points clear",
                              "text": f"{dname(leader['driver'])} leads by {leader['points'] - second['points']:.0f} "
                                      f"points with {meta.get('rounds', 0) - meta.get('completed', 0)} rounds left; "
-                                     f"title odds {(title[0][1].get('p_title') or 0) * 100:.1f}%.",
+                                     f"our title chance {pct_text(title[0][1].get('p_title'))}.",
                              "href": base + "#/season/" + str(year)})
     lead_rows = [{"name": dname(r["driver"]), "team": (teams.get(r.get("team")) or {}).get("name"),
                   "value": r.get("points"), "sub": f"{r.get('wins', 0)} wins", "colour": dcol(r["driver"]),
                   "href": base + "#/driver/" + r["driver"]} for r in st[:10]]
     out["leaders"]["f1"] = {"title": "Drivers' points", "unit": "pts", "rows": lead_rows}
+    if leader and second:
+        left = meta.get("rounds", 0) - meta.get("completed", 0)
+        out["leaders"]["f1"]["hot"] = {"title": "Drivers' points",
+                                       "expl": f"{leader['points'] - second['points']:.0f} points clear with {left} "
+                                               f"race{'s' if left != 1 else ''} left."}
     for k, v in drivers.items():
         out["search"].append(["f1", v.get("name"), "Driver · " + ((teams.get(v.get("team")) or {}).get("name") or ""),
                               base + "#/driver/" + k])
@@ -540,7 +572,9 @@ def build_tennis(ctx: Ctx, base: str, out: dict):
         elo = (tour.get("elo_top") or {}).get("all") or []
         out["leaders"]["tennis_" + T] = {"title": f"{TU} Elo", "unit": "Elo", "rows": [
             {"name": names.get(p[0]) or p[0], "value": round(p[1]), "href": base + "#/" + T + "/player/" + p[0]}
-            for p in elo[:10]]}
+            for p in elo[:10]],
+            "hot": {"title": f"Top rated, {TU} (Elo)",
+                    "expl": "Elo rating: beat a stronger player, gain more. 2,000 and up is rare air."}}
         if elo:
             kpis.append({"label": f"{TU} Elo 1", "value": surname(names.get(elo[0][0]) or elo[0][0]),
                          "sub": f"{elo[0][1]:.0f}"})
@@ -619,7 +653,9 @@ def build_baseball(ctx: Ctx, base: str, out: dict):
         p = pidx.get(str(pid)) or []
         war.append({"name": p[0] if p else pid, "team": (teams.get(str(p[1])) or {}).get("abbr") if len(p) > 1 else None,
                     "value": v, "href": base + "#/player/" + str(pid)})
-    out["leaders"]["baseball"] = {"title": "Hitter WAR", "unit": "WAR", "rows": war}
+    out["leaders"]["baseball"] = {"title": "Hitter WAR", "unit": "WAR", "rows": war,
+                                  "hot": {"title": "Best season (WAR)",
+                                          "expl": "WAR: wins added over a bench-level player. 5 or more is all-star level."}}
     for k, t in teams.items():
         out["search"].append(["baseball", t.get("name"), "MLB team · " + (t.get("division") or ""),
                               base + "#/mlb/team/" + k])
@@ -634,7 +670,11 @@ def build_baseball(ctx: Ctx, base: str, out: dict):
         kp.append({"label": "WAR leader", "value": surname(war[0]["name"]), "sub": f"{war[0]['value']} WAR"})
     if rows:
         k0, v0 = rows[0]
-        out["stats"].append({"sport": "baseball", "kicker": "World Series odds",
+        miss = max(1, round(10 * (1 - (v0['p_ws'] or 0))))
+        out["stats"].append({"sport": "baseball", "kicker": "World Series chance",
+                             "title": f"The {(teams.get(k0) or {}).get('short') or (teams.get(k0) or {}).get('name')} are the favourites",
+                             "note": f"<b>{v0['p_ws'] * 100:.0f}%</b> still means someone else wins it about "
+                                     f"{miss} time{'s' if miss != 1 else ''} in 10.",
                              "value": f"{v0['p_ws'] * 100:.0f}%", "unit": (teams.get(k0) or {}).get("short"),
                              "text": f"The {(teams.get(k0) or {}).get('name')} are the model's World Series "
                                      f"favourite after 20,000 simulations of the bracket.",
@@ -727,6 +767,9 @@ def build_nfl(ctx: Ctx, base: str, out: dict):
     if movers:
         ab, dlt, h = movers[0]
         out["stats"].append({"sport": "nfl", "kicker": "Biggest mover",
+                             "title": f"The {((teams.get(ab) or {}).get('name', ab)).split(' ')[-1]} have moved the most",
+                             "note": "<b>Rating points</b>: how many points a game better or worse than an average team "
+                                     "our model rates a side.",
                              "value": f"{dlt:+.1f}", "unit": "rating points",
                              "text": f"The {(teams.get(ab) or {}).get('name', ab)} have moved {dlt:+.1f} points "
                                      f"per game against an average team since week {h[0][0]}.",
@@ -801,6 +844,10 @@ def build_hockey(ctx: Ctx, base: str, out: dict):
                     "colour": (teams.get(p[1]) or {}).get("colour") if len(p) > 1 else None,
                     "href": base + "#/player/" + pid})
     out["leaders"]["hockey"] = {"title": "Points", "unit": "pts", "rows": pts}
+    gp_max = max([r.get("gp") or 0 for r in srows] or [0])
+    out["leaders"]["hockey"]["hot"] = {"title": "Most points",
+                                       "expl": "Points = goals + assists." + (f" {gp_max} games in, so it is early."
+                                                                               if 0 < gp_max < 25 else "")}
     gs = []
     for pid, v in (lead.get("g_gsax") or [])[:1]:
         p = pidx.get(pid) or []
@@ -808,6 +855,9 @@ def build_hockey(ctx: Ctx, base: str, out: dict):
     if gs:
         nm, tmab, v, pid = gs[0]
         out["stats"].append({"sport": "hockey", "kicker": "Best in net", "value": f"{v:+.1f}",
+                             "title": f"{surname(nm)} has been a wall" if v >= 5 else f"{surname(nm)} leads in net",
+                             "note": "<b>Goals saved above expected</b> compares each shot faced with how often that kind "
+                                     "of shot goes in. Positive means better than an average goalie.",
                              "unit": "goals saved above expected",
                              "text": f"{nm} ({tmab}) has saved {v:.1f} more goals than an average goalie would on "
                                      f"the same shots this season.", "href": base + "#/player/" + pid})
@@ -895,6 +945,186 @@ def build_college(ctx: Ctx, base: str, out: dict):
     return {"phase": " · ".join(status), "status": " · ".join(status), "kpis": kpis[:3], "updated_at": idx.get("updated_at")}
 
 
+def pct_text(p):
+    """0.9999 -> '>99.9%', 0.0004 -> '<0.1%', else one decimal under 10% and whole numbers above."""
+    if p is None:
+        return "—"
+    p = float(p)
+    if p > 0.999:
+        return ">99.9%"
+    if 0 < p < 0.001:
+        return "<0.1%"
+    return f"{p * 100:.1f}%" if p < 0.1 else f"{p * 100:.0f}%"
+
+
+# ───────────────────────────────────────────────────────────── Matchday copy: why a game is worth watching
+PLAYER_SPORTS = {"tennis", "f1"}
+THE_SPORTS = {"nfl", "hockey", "baseball", "basketball"}   # team names here are nicknames: "the Ravens"; football and
+                                                          # college names stand alone ("Arsenal are", "Ohio State are")
+
+
+def _a(n):
+    """The article before a percentage: 'an 18% chance', 'a 31% chance'."""
+    return "an" if str(n).startswith("8") or n in (11, 18) else "a"
+
+
+def _fav(g):
+    """(favourite team dict, its chance, the other team, the other's chance, draw) from our numbers (live: wp_home)."""
+    live = g["status"] == "live" and g.get("wp_home") is not None
+    ph = g.get("wp_home") if live else g.get("p_home")
+    if ph is None:
+        return None
+    pd = 0.0 if live else (g.get("p_draw") or 0.0)
+    pa = 1 - ph if live else (g.get("p_away") if g.get("p_away") is not None else 1 - ph - pd)
+    if pa > ph:
+        return g["away"], pa, g["home"], ph, pd
+    return g["home"], ph, g["away"], pa, pd
+
+
+def _name(g, t):
+    n = t.get("name") or t.get("abbr") or ""
+    return "the " + n if g["sport"] in THE_SPORTS and not g.get("players") else n
+
+
+def _favourite_phrase(g, t, kind):
+    """'the Knicks are clear favourites' / 'J. Sinner is a clear favourite'."""
+    if g["sport"] in PLAYER_SPORTS or g.get("players"):
+        return f"{_name(g, t)} is a {kind} favourite"
+    return f"{_name(g, t)} are {kind} favourites"
+
+
+def why_line(g):
+    """One friendly line on why a game is worth watching, from our numbers only (STYLE_GUIDE: never the market).
+    None when there is nothing better to say than the card already shows (the front end then writes its own)."""
+    st = g.get("status")
+    if st == "final" or g.get("event"):
+        return None
+    note = str(g.get("note") or "")
+    game_no = re.search(r"\bG(\d)\b|Game (\d)", note)
+    game_no = (game_no.group(1) or game_no.group(2)) if game_no else None
+    f = _fav(g)
+    if st == "live":
+        wp, ph = g.get("wp_home"), g.get("p_home")
+        if wp is not None and ph is not None and abs(wp - ph) >= 0.08:
+            pre_home = ph >= 0.5
+            t = g["home"] if pre_home else g["away"]
+            return f"Before the start we had {_name(g, t)} at {round((ph if pre_home else 1 - ph) * 100)}%. The score has moved it."
+        return None
+    if game_no == "7":
+        if g["sport"] == "baseball" and "CS" in note:
+            return "Game 7. The winner goes to the World Series."
+        return "Game 7. The winner goes through."
+    if f is None:
+        return None
+    t, fp, o, op, pd = f
+    if game_no and "Finals" in note:
+        lead = f"Game {game_no} of the {note.split(' Finals')[0].split(' · ')[0]} Finals. "
+    else:
+        lead = ""
+    if pd >= 0.3:
+        return lead + f"A draw is live: {round(pd * 100)}% in our numbers."
+    if fp - op < 0.08:
+        k = sum(ord(c) for c in str(g.get("id") or "")) % 3
+        return lead + ["A coin flip: we can barely split them.",
+                       f"Too close to call: {round(fp * 100)}% to {round(op * 100)}%.",
+                       f"Nothing between them: {round(fp * 100)}% to {round(op * 100)}%."][k]
+    nm = _name(g, t)
+    nm = nm[0].upper() + nm[1:]
+    if pd >= 0.2 and fp < 0.55:
+        return lead + f"{nm} shade it at {round(fp * 100)}%, with the draw at {round(pd * 100)}%."
+    if fp >= 0.66:
+        u = max(0.01, 1 - fp - pd)
+        ph = _favourite_phrase(g, t, "clear")
+        lose = "loses" if g["sport"] in PLAYER_SPORTS or g.get("players") else "lose"
+        if pd >= 0.05:
+            return lead + ph[0].upper() + ph[1:] + f", but they still {lose} about 1 time in {round(1 / u)}."
+        uu = round(u * 100)
+        return lead + ph[0].upper() + ph[1:] + f", but {_a(uu)} {uu}% chance comes off about 1 time in {round(1 / u)}."
+    ph = _favourite_phrase(g, t, "slight")
+    return lead + ph[0].upper() + ph[1:] + f" at {round(fp * 100)}%."
+
+
+def add_why(games):
+    """Write games[].why; the closest two-way call among the upcoming games is named as such."""
+    for g in games:
+        w = why_line(g)
+        if w:
+            g["why"] = w
+    pre = [g for g in games if g["status"] == "pre" and not g.get("event") and g.get("p_home") is not None
+           and g.get("p_draw") is None]
+    if pre:
+        c = min(pre, key=lambda g: abs(g["p_home"] - 0.5))
+        if abs(c["p_home"] - 0.5) < 0.04 and not re.search(r"\bG7\b|Game 7", str(c.get("note") or "")):
+            c["why"] = "A coin flip: our closest call on the slate."
+
+
+# ───────────────────────────────────────────────────────────── "How sure are we?" (calibration)
+CALIBRATION = [
+    # key, folder, path under data/, league, subject
+    ("hockey", "rink", "calibration.json", "NHL", "the home team"),
+    ("basketball", "hardwood", "nba/calibration.json", "NBA", "the home team"),
+    ("nfl", "gridiron", "calibration.json", "NFL", "the home team"),
+    ("baseball", "bullpen", "mlb/calibration.json", "MLB", "the home team"),
+]
+
+
+def _cal_block(b):
+    if not isinstance(b, dict) or not isinstance(b.get("reliability"), list):
+        return None
+    return b
+
+
+def _season_label(x):
+    x = str(x)
+    if len(x) == 8:                                  # 20092010 -> 2009-10
+        return f"{x[:4]}-{x[6:]}"
+    return x
+
+
+def calibration_summary(docs: Path = DOCS):
+    """{ sport: { league, span, n, brier, logloss, subject, unit, bins } } from each site's calibration.json. The
+    game model's pre-game home-win forecasts, every season the file was scored on (Bullpen: seasons pooled)."""
+    out = {}
+    for key, folder, rel, league, subject in CALIBRATION:
+        j = load(docs / folder / "data" / rel)
+        if not j:
+            continue
+        blk, seasons = None, []
+        gm = j.get("game_model") if isinstance(j.get("game_model"), dict) else None
+        if gm and _cal_block((gm.get("metrics") or {}).get("model")):
+            blk, seasons = gm["metrics"]["model"], gm.get("seasons") or []
+        elif _cal_block((j.get("metrics") or {}).get("model")):
+            blk, seasons = j["metrics"]["model"], j.get("seasons") or []
+        elif isinstance((j.get("games") or {}).get("seasons"), dict):
+            ss = j["games"]["seasons"]
+            by, n, br = {}, 0, 0.0
+            for yr, v in ss.items():
+                m = _cal_block((v or {}).get("model"))
+                if not m:
+                    continue
+                seasons.append(yr)
+                n += m.get("n") or 0
+                br += (m.get("brier") or 0) * (m.get("n") or 0)
+                for b in m["reliability"]:
+                    t = by.setdefault(b["lo"], {"lo": b["lo"], "hi": b["hi"], "n": 0, "sp": 0.0, "sf": 0.0})
+                    t["n"] += b["n"]
+                    t["sp"] += b["mean_p"] * b["n"]
+                    t["sf"] += b["freq"] * b["n"]
+            if n:
+                blk = {"n": n, "brier": br / n, "reliability": [
+                    {"lo": t["lo"], "hi": t["hi"], "n": t["n"], "mean_p": t["sp"] / t["n"], "freq": t["sf"] / t["n"]}
+                    for t in sorted(by.values(), key=lambda t: t["lo"]) if t["n"]]}
+        if not blk:
+            continue
+        seasons = sorted(seasons, key=str)
+        out[key] = {"league": league, "subject": subject, "unit": "games",
+                    "span": f"{_season_label(seasons[0])} to {_season_label(seasons[-1])}" if seasons else None,
+                    "n": blk.get("n"), "brier": r4(blk.get("brier")), "logloss": r4(blk.get("logloss")),
+                    "bins": [{"lo": b["lo"], "hi": b["hi"], "n": b["n"], "mean_p": r4(b["mean_p"]), "freq": r4(b["freq"])}
+                             for b in blk["reliability"] if b.get("n")]}
+    return out
+
+
 BUILDERS = {"football": build_football, "f1": build_f1, "basketball": build_basketball, "tennis": build_tennis,
             "baseball": build_baseball, "nfl": build_nfl, "hockey": build_hockey, "college": build_college}
 
@@ -943,6 +1173,10 @@ def season_files(docs: Path = DOCS):
         idx = load(docs / folder / "data" / "index.json") or {}
         if idx.get("season"):
             rows.append((folder, f"the-quant-{folder}", f"{idx['season']}/season.json"))
+    # "How sure are we?" reads each site's calibration.json (fixed paths, listed here so CI fetches them too)
+    for key, folder, rel, league, subject in CALIBRATION:
+        if (docs / folder / "data" / "index.json").exists():
+            rows.append((folder, f"the-quant-{folder}", rel))
     return rows
 
 
@@ -952,6 +1186,7 @@ def main(argv=None):
                     help="print the season-dependent files to fetch ('<folder> <repo> <path>' per line) and exit")
     ap.add_argument("--links", choices=["public", "local"], default="public")
     ap.add_argument("--no-kit", action="store_true", help="do not copy docs/_design into docs/home/assets/qk")
+    ap.add_argument("--now", help="build as of this UTC time (ISO), to preview an older local snapshot")
     ap.add_argument("--with-pending", action="store_true",
                     help="include sites not launched yet (PENDING, e.g. The Quant Campus) for local preview")
     a = ap.parse_args(argv)
@@ -959,7 +1194,7 @@ def main(argv=None):
         for row in season_files():
             print(" ".join(row))
         return
-    now = datetime.now(timezone.utc).replace(microsecond=0)
+    now = parse_ts(a.now) if a.now else datetime.now(timezone.utc).replace(microsecond=0)
     ctx = Ctx(a.links, now)
     out = {"games": [], "gaps": [], "futures": {}, "leaders": {}, "charts": {}, "stats": [], "search": []}
     sports = []
@@ -995,6 +1230,8 @@ def main(argv=None):
             gaps.append(g)
     out["gaps"] = gaps[:20]
     out["games"].sort(key=lambda g: ({"live": 0, "pre": 1, "final": 2}[g["status"]], g["start"] or ""))
+    add_why(out["games"])
+    out["calibration"] = calibration_summary()
     search = out.pop("search")
     home = {"version": 1, "updated_at": iso(now), "links": a.links, "sports": sports, **out}
     (OUT / "data").mkdir(parents=True, exist_ok=True)

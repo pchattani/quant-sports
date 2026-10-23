@@ -89,7 +89,7 @@ function gamesPage(el, params) {
     if (!list.length) h += U.card2('No games', '', QK.empty('No games on ' + RK.fmtDate(day), next ? 'Next game day: ' + RK.fmtDate(next, { year: false }) : (RK.ok(sch) ? '' : 'The schedule is not built yet.')));
     else {
       h += '<div class="rk-games rk-gc">' + list.map(g => U.gc(g, { league: QK.fmt.time(g.start) || 'NHL' })).join('') + '</div>';
-      if (pre.length) h += '<section class="qk-section">' + U.card2('Our chance for every home side', 'Violet: our win chance (overtime and shootout included). Grey ring: the market, for reference', U.chart('gd-mvm', Math.max(200, 34 * pre.length + 50), 'Our home win chance, with the market for reference')) + '</section>';
+      if (pre.length) h += '<section class="qk-section">' + U.card2('Our chance for every home side', 'Teal: our win chance (overtime and shootout included). Grey ring: the market, for reference', U.chart('gd-mvm', Math.max(200, 34 * pre.length + 50), 'Our home win chance, with the market for reference')) + '</section>';
       h += review(list);
     }
     el.innerHTML = h;
@@ -111,28 +111,37 @@ function cardOf(d, id) {
   return c;
 }
 
-function hero(c, d, g) {
-  const st = g.status, fin = st === 'final', live = st === 'live', pre = st === 'pre';
-  const lsum = k => ((d && d.linescore) || []).reduce((s, r) => s + (isNum(r[k]) ? Number(r[k]) : 0), 0);
+/* v3 (Matchday) hero: QK.previewCard — away "at" home with records, the score bug when live, our chance for the
+   favourite as a big teal number, a plain-English note (overtime and goals in all), the market as a quiet reference
+   line before the game (game detail is one of the two places it may appear), and how the clubs match up so far. */
+const TWO_WORD = /(Maple Leafs|Red Wings|Golden Knights|Blue Jackets)$/;
+U.nick = abbr => { const n = RK.teamName(abbr) || abbr; const m = TWO_WORD.exec(n); return m ? m[1] : String(n).split(' ').slice(-1)[0]; };
+function hero(c, d, g, season) {
+  const st = g.status, pre = st === 'pre';
   const m = ((d && d.pregame) || {}).model || c.model || {};
-  const side = (abbr, cls) => '<div class="side ' + cls + '">' + (cls === 'home' ? '' : QK.teamMark(U.team(abbr), 'lg')) +
-    '<div style="min-width:0"><a class="nm" href="' + esc(RK.teamHref(abbr)) + '">' + esc(RK.teamName(abbr)) + '</a><div class="sb">' + (cls === 'home' ? 'Home' : 'Away') + '</div></div>' + (cls === 'home' ? QK.teamMark(U.team(abbr), 'lg') : '') + '</div>';
-  const score = pre ? '<div class="rk-score rk-score-pre"><span>' + esc(QK.fmt.time(c.start) || 'TBD') + '</span></div>'
-    : '<div class="rk-score"><span>' + (isNum(c.as) ? c.as : '–') + '</span><span class="dash">–</span><span>' + (isNum(c.hs) ? c.hs : '–') + '</span></div>';
-  const badge = QK.statusBadge(Object.assign({}, g, { sport: 'hockey' }));
-  const meta = [RK.fmtDate(c.start || c.date, { time: pre }), d && d.venue, d && isNum(d.attendance) ? QK.fmt.num(d.attendance) + ' fans' : '', RK.gtypeLabel ? RK.gtypeLabel(RK.gameType(c.game_id)) : '',
-    (fin || live) && lsum('s_away') + lsum('s_home') ? 'Shots ' + lsum('s_away') + '–' + lsum('s_home') : ''].filter(Boolean);
-  const [ca, ch] = U.pair(c.away, c.home);
-  /* the bar: live, our live chance; before the game, ours with the market's split as a quiet tick; after it, our pre-game call */
-  const pH = live && isNum(c.wp_home) ? Number(c.wp_home) : (isNum(m.p_home) ? Number(m.p_home) : null);
   const mk = ((d && d.pregame) || {}).market || c.market || {};
-  const A = U.team(c.away), H = U.team(c.home);
-  A.colour = ca; H.colour = ch;
-  const bar = isNum(pH) ? '<div class="rk-hero-bar"><div class="qk-kicker">' + (live ? 'Our live win chance' : fin ? 'Our pre-game win chance' : 'Our win chance') + '</div>' +
-    QK.wpBar(1 - pH, null, pH, A, H, { colors: [ca, ch], size: 'lg', market: pre && isNum(mk.p_home) ? 1 - mk.p_home : null, label: live ? 'Live win chance' : 'Our win chance' }) +
-    (pre && isNum(mk.p_home) ? '<div class="rk-hero-mkt"><span class="qk-mkt">Market ' + esc(RK.srcLineOnly && RK.srcLineOnly(mk.sources) ? '(no-vig line)' : '(' + (RK.srcLabel(mk.sources) || 'de-vigged') + ')') + ' <b>' + esc(RK.teamAbbr(c.home)) + ' ' + U.pct(mk.p_home) + '</b></span></div>' : '') + '</div>' : '';
-  return '<section class="qk-hero rk-hero2" style="--tc:' + esc(ch) + '"><div class="rk-gh">' + side(c.away, 'away') + '<div class="mid">' + score + badge + '</div>' + side(c.home, 'home') + '</div>' +
-    bar + '<div class="rk-hero-meta">' + meta.map(x => '<span>' + esc(x) + '</span>').join('') + '</div></section>';
+  const [ca, ch] = U.pair(c.away, c.home);
+  const rows = {}; (((season && season.standings) || {}).rows || []).forEach(r => { rows[r.team] = r; });
+  const rec = t => { const r = rows[t]; return r && isNum(r.w) ? r.w + '–' + r.l + '–' + (r.otl || 0) + (isNum(r.pts) ? ' · ' + r.pts + ' pts' : '') : ''; };
+  const G = Object.assign({}, g, { home: Object.assign({}, g.home, { colour: ch, record: rec(c.home) }), away: Object.assign({}, g.away, { colour: ca, record: rec(c.away) }) });
+  /* the pre-game call stays the pre-game call once the game is over */
+  if (st === 'final' && isNum(m.p_home)) G.p_home = Number(m.p_home);
+  const R = (season && season.ratings) || {};
+  const ua = (R[c.away] || {}).units || {}, uh = (R[c.home] || {}).units || {};
+  const fx = [];
+  const add = (label, a, b, f, low) => { if (isNum(a) && isNum(b)) fx.push({ label: label, a: f(a), b: f(b), better: Math.abs(a - b) < 1e-9 ? null : ((a > b) !== !!low ? 'a' : 'b') }); };
+  add('Goals for per game', ua.gf_g, uh.gf_g, v => U.f(v, 1));
+  add('Goals against per game', ua.ga_g, uh.ga_g, v => U.f(v, 1), true);
+  add('Chance share, 5-on-5', ua.xgf_pct5, uh.xgf_pct5, v => U.pct(v, 1));
+  add('Expected goals for per game', ua.xgf_g, uh.xgf_g, v => U.f(v, 2));
+  add('Team rating', (rows[c.away] || {}).rating, (rows[c.home] || {}).rating, v => U.signed(v, 2));
+  const extra = [];
+  if (pre && isNum(m.p_ot)) extra.push('About ' + (Math.round(1 / m.p_ot) > 1 ? '1 in ' + Math.round(1 / m.p_ot) : 'half') + ' (' + U.pct(m.p_ot) + ') go to overtime');
+  if (pre && isNum(m.total)) extra.push('we expect about ' + Math.round(m.total) + ' goals in all');
+  const kick = 'NHL' + (d && d.venue ? ' · ' + d.venue : '') + (RK.isPlayoffGame(c) && G.league !== 'NHL' ? ' · ' + G.league : '');
+  const src = RK.srcLineOnly && RK.srcLineOnly(mk.sources) ? 'no-vig line' : (RK.srcLabel(mk.sources) || 'de-vigged');
+  return '<div class="rk-preview">' + QK.previewCard(G, { kicker: kick, nick: t => U.nick(t.abbr), colors: [ca, ch], factors: fx,
+    noteExtra: extra.length ? esc(extra.join(', and ') + '.') : '', market: pre && isNum(mk.p_home) ? { p: Number(mk.p_home), label: 'Market (' + src + ')' } : null }) + '</div>';
 }
 
 function kpiStrip(c, d, g) {
@@ -297,7 +306,7 @@ function goaliesCard(d, c) {
     note = 'With these starters the model gives ' + esc(H) + ' ' + U.pct(m.p_home) + '; with each team\'s usual starter ' + U.pct(fx.p_home_usual) +
       ' (' + U.signed(100 * (m.p_home - fx.p_home_usual), 1) + ' pts)' + (isNum(fx.total_usual) && isNum(m.total) ? '. Total ' + U.f(m.total, 2) + ' v ' + U.f(fx.total_usual, 2) + ' goals.' : '.');
   } else if (h && h.status || a && a.status) {
-    note = 'The model prices the listed starters; a team with none listed is priced with its usual starter.';
+    note = 'The model uses the listed starters; a team with none listed is forecast with its usual starter.';
   }
   const tbl = '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Team</th><th>Starter</th><th>Since</th></tr></thead><tbody>' +
     row('away', a) + row('home', h) + '</tbody></table></div>';
@@ -325,7 +334,8 @@ function summary(node, d, c, g, season) {
     (aw.best_line ? U.card2('Best line', esc(RK.teamAbbr(aw.best_line.team)) + ' · ' + U.f(aw.best_line.toi, 1) + ' min together at 5v5', '<div class="qk-sub">' + esc((aw.best_line.names || []).join(' – ')) + '</div><div class="rk-note">xG difference ' + U.signed(aw.best_line.xg_diff, 2) + '</div>') : '') +
     '</div></div></div>';
   const tp = tape(season, c);
-  h += '<div class="qk-grid" style="margin-top:var(--sp-4)"><div class="qk-span-' + (sd && sd.p ? 7 : 12) + '"><div class="rk-stack">' + U.card2(pre ? 'Our forecast' : 'Our pre-game forecast', 'Chances from our game model; the market column is a reference', pregameCard(d, c) || QK.empty('No pre-game forecast'), { flush: true }) +
+  /* v3: the forecast table sits beside the hero (gamePage); here, the tale of the tape and the score grid */
+  h += '<div class="qk-grid" style="margin-top:var(--sp-4)"><div class="qk-span-' + (sd && sd.p ? 7 : 12) + '"><div class="rk-stack">' +
     (tp ? U.card2('Tale of the tape', 'Season so far: the stronger side of each bar is solid', tp) : '') + '</div></div>' +
     (sd && sd.p ? '<div class="qk-span-5">' + U.card2('Every final score', 'Our chance of each score (rows ' + esc(RK.teamAbbr(c.home)) + ', columns ' + esc(RK.teamAbbr(c.away)) + ')', U.chart('gm-sd', 300, 'Chance of each final score')) + '</div>' : '') + '</div>';
   if (pre) { const gk = goaliesCard(d, c); if (gk) h += '<div style="margin-top:var(--sp-4)">' + gk + '</div>'; }
@@ -394,7 +404,9 @@ function gamePage(el, params, state) {
     document.title = RK.teamAbbr(c.away) + ' @ ' + RK.teamAbbr(c.home) + ' · ' + RK.fmtDate(c.date || c.start, { year: false }) + ' · ' + RK.SITE;
     const tabs = [{ key: 'summary', label: 'Summary', href: RK.gameHref(id) }, { key: 'detail', label: 'Detail: preview, game flow, lines, full box', href: RK.gameHref(id) + '?view=detail' }];
     el.innerHTML = '<div class="qk-kicker" style="margin-bottom:10px"><a href="' + RK.gamesHref(c.date) + '">← ' + esc(RK.fmtDate(c.date || c.start, { year: false })) + ' games</a></div>' +
-      hero(c, RK.ok(d) ? d : null, g) + '<div style="margin-top:var(--sp-4)">' + kpiStrip(c, RK.ok(d) ? d : null, g) + '</div>' + U.tabsHTML(tabs, view) + '<div id="gm-body"></div>';
+      '<div class="rk-gtop">' + hero(c, RK.ok(d) ? d : null, g, season) + '<div class="rk-gside rk-stack">' + kpiStrip(c, RK.ok(d) ? d : null, g) +
+      (RK.ok(d) ? U.card2(g.status === 'pre' ? 'Our forecast' : 'Our pre-game forecast', 'Chances from our game model; the market column is a reference, not our forecast', pregameCard(d, c) || QK.empty('No pre-game forecast'), { flush: true }) : '') + '</div></div>' +
+      '<div style="margin-top:var(--sp-6)">' + U.tabsHTML(tabs, view) + '</div><div id="gm-body" style="margin-top:var(--sp-4)"></div>';
     const body = el.querySelector('#gm-body');
     if (view === 'detail') return U.legacy('game', body, params, state);
     if (!RK.ok(d)) { body.innerHTML = U.card2('Game centre', '', QK.empty('The game page is not built yet', RK.reason(d))); return; }

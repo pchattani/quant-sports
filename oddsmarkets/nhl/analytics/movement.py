@@ -478,7 +478,7 @@ WHY = {"ufa": ("free-agent age", "before free-agent age"), "tenure": ("long tenu
        "share": ("a big role", "a small role"), "gp_share": ("in the lineup every night", "in and out of the lineup"),
        "share_prev": ("a big role last season", "a small role last season"), "gp_prev": ("many games last season", "few games last season"),
        "v_prev": ("strong last season", "weak last season"), "v_trend": ("improving", "declining"),
-       "rank_pos": ("behind others at his position", "first choice at his position"),
+       "rank_pos": ("behind others at the position", "first choice at the position"),
        "depth": ("a crowded position", "a thin position"), "goalie": ("goalie", None), "defence": ("defenceman", "forward"),
        "team_wp": ("a winning club", "a losing club"), "team_traj": ("club trending up", "club trending down"),
        "team_age": ("an older roster", "a younger roster"), "team_turn": ("a high-turnover club", "a stable club"),
@@ -496,19 +496,19 @@ NOTES = [
     "the minors all season).",
     "Kind of departure: ESPN's transactions are cached only from March 2024, so the split is the 2024-25 departures' "
     "shares (base rates), not a model.",
-    "Value is Rink WAR, the last two completed seasons blended 3:2. Rostered: the last club he played for this season.",
+    "Value is Rink WAR, the last two completed seasons blended 3:2. Rostered: the last club the player played for this season.",
     "Outlook: the chance of adding at least one player at the position who was on another NHL club, before the deadline "
     "(during the season) or by next season (after it), from a Poisson model of past arrivals (need there, club strength "
     "and trajectory, turnover, expected departures). Call-ups from the club's own system are not counted.",
     "Targets: players on other clubs who would upgrade the club's weakest regular slot at their position (third-line "
-    "centre or winger, second-pair defenceman, starting goalie), ranked by their chance of joining it: the chance he moves "
-    "x the chance this club is where he goes (a conditional logit on past moves). An estimate from on-field value and "
+    "centre or winger, second-pair defenceman, starting goalie), ranked by their chance of joining it: the chance the player moves "
+    "x the chance this club is where they go (a conditional logit on past moves). An estimate from on-field value and "
     "history, not news.",
 ]
 
 CFG = MV.Config(level=LEVEL, version=VERSION, feats=FEATS, quad=QUAD, dl_feats=DL_FEATS, type_feats=TYPE_FEATS, arr_feats=ARR_FEATS,
                 types=TYPES, type_label=TYPE_LABEL, dev=DEV_Y, test=TEST_Y, slots=SLOTS, contend=CONTEND, rebuild=REBUILD, unit="WAR",
-                age_pivot=28.0, why=WHY, notes=NOTES, yrs_phrase="{n} years since his draft", walk_from=None,
+                age_pivot=28.0, why=WHY, notes=NOTES, yrs_phrase="{n} years since the draft", walk_from=None,
                 deadline_label="traded or claimed")
 
 

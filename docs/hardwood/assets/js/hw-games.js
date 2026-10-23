@@ -1,14 +1,15 @@
-/* The Quant Hardwood — Games (#/<L>/games[/<date>]) and the game centre (#/<L>/game/<gid>), on Design System 2.0
- * (the Rink games and game pages are the reference).
+/* The Quant Hardwood — Games (#/<L>/games[/<date>]) and the game centre (#/<L>/game/<gid>), on kit v3 "Matchday"
+ * (the Rink games and game pages are the reference, MIGRATION_V3.md).
  *
- * Games: a strip of game days around the chosen one, a date picker and month jump, the day's games as v2 game
- * cards (our chance first, the market a quiet tick), our chance for every home side, and how our forecasts did on
- * the day's finished games.
- * Game centre (Summary tab): scoreboard hero with our win-chance bar, stat tiles (our chance, the projected margin
- * and total, the live chance), the line score, what goes into our forecast, availability before tip-off (the injury
- * report and each team's availability term), our pre-game forecast with the market as a reference column, the tale
- * of the tape, win chance through the game, the margin flow, both teams' shot charts on the half court, four
- * factors, game awards and the box score.
+ * Games: a strip of game days around the chosen one, a date picker and month jump, the day's games as game cards
+ * (our chance, a one-line reason, no market), our chance for every home side (the market a quiet ring: game detail
+ * only), and how our forecasts did on the day's finished games.
+ * Game centre (Summary tab): the QK.previewCard hero (away "at" home with records, the score bug when live, our
+ * chance for the favourite with a how-sure note, the match-up factors, the market as a quiet labelled line before
+ * tip-off) with stat tiles and our forecast table beside it; then the line score, what goes into our forecast,
+ * availability before tip-off (the injury report and each team's availability term), the tale of the tape, win
+ * chance through the game, the margin flow, both teams' shot charts on the half court, four factors, game awards and
+ * the box score.
  * Detail tab (?tab=detail): the full pre-redesign game centre (lineups, rotations, key plays, shot modes).
  * Data: <L>/<S>/games/<gid>.json, <L>/<S>/schedule.json, <L>/<S>/season.json (records, the tale of the tape),
  * teams.json logs, index.json cards (game.js helpers). */
@@ -43,16 +44,16 @@ function renderGames(el, params) {
     const months = {};
     days.forEach(x => { const m = x.slice(0, 7); if (!months[m]) months[m] = x; });
     const dl = d => HW.href(L, 'games/' + d, S);
-    let h = U.secHead('Games', HW.leagueName(L) + ' ' + esc(HW.seasonLabel(L, S)) + ' · ' + list.length + ' games. Every card carries our win chance, the favourite in violet; a grey tick marks the market, for reference.', null, null, U.kicker(L, S));
+    let h = U.secHead('Games', HW.leagueName(L) + ' ' + esc(HW.seasonLabel(L, S)) + ' · ' + list.length + ' games. Every card has our chance for each side and a line on why it’s worth a look; tap one for the game centre.', null, null, U.kicker(L, S));
     h += '<div class="hw-flex" style="margin-bottom:12px">' + (days[i - 1] ? '<a class="qk-btn" href="' + esc(dl(days[i - 1])) + '" aria-label="Previous game day">←</a>' : '') +
       '<nav class="hw-strip" aria-label="Game days">' + strip.map(d => '<a href="' + esc(dl(d)) + '"' + (d === day ? ' aria-current="page"' : '') + '><span>' + esc(HW.fmtDate(d, { year: false }).split(' ')[0]) + '</span><b>' + esc(d.slice(8)) + '</b><span class="n">' + byDay[d].length + '</span></a>').join('') + '</nav>' +
       (days[i + 1] ? '<a class="qk-btn" href="' + esc(dl(days[i + 1])) + '" aria-label="Next game day">→</a>' : '') +
       '<input type="date" class="qk-input" id="gl-date" aria-label="Pick a date" value="' + esc(day) + '" min="' + esc(days[0]) + '" max="' + esc(days[days.length - 1]) + '">' +
       '<select class="qk-select" id="gl-month" aria-label="Jump to month"><option value="">Jump to month…</option>' + Object.keys(months).map(m => '<option value="' + months[m] + '">' + esc(HW.fmtDate(m + '-15', { weekday: false }).replace(/^\d+ /, '')) + '</option>').join('') + '</select></div>';
-    h += '<div class="hw-day"><b>' + esc(HW.fmtDate(day)) + '</b> · ' + games.length + ' game' + (games.length === 1 ? '' : 's') + '</div><div class="hw-games hw-gc">' + games.map(g => U.card(g, L, { season: S, records: recs })).join('') + '</div>';
+    h += '<div class="hw-day"><b>' + esc(HW.fmtDate(day)) + '</b> · ' + games.length + ' game' + (games.length === 1 ? '' : 's') + '</div><div class="qk-watch">' + games.map(g => U.card(g, L, { season: S, records: recs, why: true })).join('') + '</div>';
     if (mm.length || fin.length) {
       h += '<div class="qk-grid hw-sec">';
-      if (mm.length) h += U.card2('Our chance for every home side', 'Violet: our win chance. Grey ring: the market (no vig), for reference', U.chart('gl-mm', 34 * mm.length + 60, 'Our home win chance, with the market for reference'), { cls: fin.length ? 'qk-span-7' : 'qk-span-12' });
+      if (mm.length) h += U.card2('Our chance for every home side', 'Teal: our win chance. Grey ring: the market (no vig), a reference, not our forecast', U.chart('gl-mm', 34 * mm.length + 60, 'Our home win chance, with the market for reference'), { cls: fin.length ? 'qk-span-7' : 'qk-span-12' });
       if (fin.length) {
         const scored = fin.filter(g => isNum((g.model || {}).p_home) && isNum(g.hs) && isNum(g.as));
         const right = scored.filter(g => (g.model.p_home >= 0.5) === (g.hs > g.as)).length;
@@ -126,32 +127,42 @@ function boxTable(node, L, g, tid, S) {
   QK.table(node, { columns: cols, rows: rows, dense: true });
 }
 
-function headHTML(L, g, S) {
+/* v3 (Matchday) hero: QK.previewCard — away "at" home with records, the score bug when live, our chance for the
+   favourite as a big teal number, a plain-English note (the margin and total we expect), the market as a quiet
+   reference line before tip-off (game detail is one of the two places it may appear), and how the teams match up. */
+function headHTML(L, g, S, season) {
   const st = U.status(g);
   const fin = st === 'final', live = st === 'live', pre = st === 'pre';
   const pc = U.pair(L, g.away, g.home), ca = pc[0], ch = pc[1];
-  const side = (tid, home) => {
-    const t = U.team(L, tid);
-    return '<div class="side' + (home ? ' home' : '') + '">' + (home ? '' : QK.teamMark(t, 'lg')) + '<div style="min-width:0"><a class="nm" href="' + esc(HW.teamHref(L, tid, S)) + '">' + esc(HW.teamName(L, tid)) + '</a><div class="sb">' + (home ? 'Home' : 'Away') + '</div></div>' + (home ? QK.teamMark(t, 'lg') : '') + '</div>';
-  };
-  const sc = pre ? '<div class="hw-score2 hw-score-pre"><span>' + esc(HW.fmtTime(g.date) || 'TBD') + '</span></div>' :
-    '<div class="hw-score2"><span class="' + (fin && g.as < g.hs ? 'lost' : '') + '">' + (isNum(g.as) ? g.as : '–') + '</span><span class="dash">–</span><span class="' + (fin && g.hs < g.as ? 'lost' : '') + '">' + (isNum(g.hs) ? g.hs : '–') + '</span></div>';
-  const badge = QK.statusBadge({ status: st, start: g.date, period: g.periods || g.period, sport: 'basketball', note: fin && Number(g.periods) > 4 ? 'OT' : '' });
-  const meta = [HW.stypeLabel(g.stype), g.series && (g.series.summary || g.series.round) ? (g.series.summary || g.series.round) : '',
-    HW.fmtDate(g.date, { time: true }), g.venue ? (typeof g.venue === 'object' ? [g.venue.name, g.venue.city].filter(Boolean).join(', ') : g.venue) : '',
-    isNum(g.attendance) && g.attendance > 0 ? Number(g.attendance).toLocaleString('en-GB') + ' fans' : ''].filter(Boolean);
-  // the bar: live, our live chance; before the game, ours with the market's split as a quiet tick; after it, our pre-game call
   const m = (g.pregame || {}).model || {}, mk = (g.pregame || {}).market || {};
   const wpl = ((g.wp || {}).model || []);
   const pLive = live && wpl.length ? wpl[wpl.length - 1][1] : null;
-  const pH = live && isNum(pLive) ? Number(pLive) : (isNum(m.p_home) ? Number(m.p_home) : null);
-  const A = U.team(L, g.away), H = U.team(L, g.home);
-  A.colour = ca; H.colour = ch;
-  const bar = isNum(pH) ? '<div class="hw-hero-bar"><div class="qk-kicker">' + (live ? 'Our live win chance' : fin ? 'Our pre-game win chance' : 'Our win chance') + '</div>' +
-    QK.wpBar(1 - pH, null, pH, A, H, { colors: [ca, ch], size: 'lg', market: pre && isNum(mk.p_home) ? 1 - mk.p_home : null, label: live ? 'Live win chance' : 'Our win chance' }) +
-    (pre && isNum(mk.p_home) ? '<div class="hw-hero-mkt"><span class="qk-mkt" data-tip="The market probability with the bookmaker margin removed, shown as a reference next to ours">Market (' + esc(srcLabel(mk.sources)) + ') <b>' + esc(HW.teamAbbr(L, g.home)) + ' ' + U.pct(mk.p_home) + '</b></span></div>' : '') + '</div>' : '';
-  return '<section class="qk-hero hw-hero2" style="--tc:' + esc(ch) + '"><div class="hw-gh">' + side(g.away, false) + '<div class="mid">' + sc + badge + '</div>' + side(g.home, true) + '</div>' + bar +
-    '<div class="hw-hero-meta">' + meta.map(x => '<span>' + esc(x) + '</span>').join('') + '</div></section>';
+  const recs = U.records(season);
+  const rec = t => recs[String(t)] || '';
+  const A = Object.assign(U.team(L, g.away), { colour: ca, record: rec(g.away) }), H = Object.assign(U.team(L, g.home), { colour: ch, record: rec(g.home) });
+  const tag = g.series && (g.series.summary || g.series.round) ? (g.series.summary || g.series.round) + (g.series.game ? ' · Game ' + g.series.game : '') : (g.stype && g.stype !== 'reg' ? HW.stypeLabel(g.stype) : '');
+  const G = { sport: 'basketball', id: g.id, start: g.date, status: st, league: HW.leagueName(L) + (tag ? ' · ' + tag : ''), home: H, away: A,
+    hs: isNum(g.hs) ? Number(g.hs) : null, as: isNum(g.as) ? Number(g.as) : null,
+    p_home: live && isNum(pLive) ? Number(pLive) : (isNum(m.p_home) ? Number(m.p_home) : null), wp_home: live && isNum(pLive) ? Number(pLive) : null,
+    p_pre: live && isNum(m.p_home) ? Number(m.p_home) : null, pre_only: live && !isNum(pLive) ? true : undefined,
+    period: isNum(g.period) ? Number(g.period) : (isNum(g.periods) ? Number(g.periods) : null), clock: g.clock, note: fin && Number(g.periods) > 4 ? 'OT' : '' };
+  const R = (season && season.ratings) || {};
+  const ra = R[String(g.away)] || {}, rh = R[String(g.home)] || {};
+  const fx = [];
+  const add = (label, a, b, f, low) => { if (isNum(a) && isNum(b)) fx.push({ label: label, a: f(a), b: f(b), better: Math.abs(a - b) < 1e-9 ? null : ((a > b) !== !!low ? 'a' : 'b') }); };
+  add('Net rating, per 100 trips', ra.net, rh.net, v => U.signed(v, 1));
+  add('Points scored per 100', ra.off, rh.off, v => U.f(v, 1));
+  add('Points allowed per 100', ra.def, rh.def, v => U.f(v, 1), true);
+  const extra = [];
+  if (pre && isNum(m.margin)) extra.push('we expect ' + esc(HW.teamAbbr(L, m.margin >= 0 ? g.home : g.away)) + ' by about ' + Math.max(1, Math.round(Math.abs(m.margin))) + (isNum(m.sd) ? ', give or take ' + Math.round(m.sd) + ' points' : ''));
+  if (pre && isNum(m.total)) extra.push('about ' + Math.round(m.total) + ' points in all');
+  const venue = g.venue ? (typeof g.venue === 'object' ? g.venue.name : g.venue) : '';
+  const meta = [HW.fmtDate(g.date, { time: true }), g.venue && typeof g.venue === 'object' && g.venue.city ? [g.venue.name, g.venue.city].filter(Boolean).join(', ') : '',
+    isNum(g.attendance) && g.attendance > 0 ? Number(g.attendance).toLocaleString('en-GB') + ' fans' : ''].filter(Boolean);
+  return '<div class="hw-preview">' + QK.previewCard(G, { kicker: HW.leagueName(L) + (venue ? ' · ' + venue : '') + (tag ? ' · ' + tag : ''), nick: t => U.nick(L, t === A ? g.away : g.home), colors: [ca, ch], factors: fx,
+    factorsTitle: 'How they match up this season', noteExtra: extra.length ? 'This time ' + extra.join(', and ') + '.' : '',
+    market: pre && isNum(mk.p_home) ? { p: Number(mk.p_home), label: 'Market (' + srcLabel(mk.sources) + ')' } : null }) +
+    '<div class="hw-hero-meta">' + meta.map(x => '<span>' + esc(x) + '</span>').join('') + '</div></div>';
 }
 
 function pregameKpis(L, g) {
@@ -174,7 +185,7 @@ function pregameKpis(L, g) {
   return out.length ? '<div class="hw-kpis">' + QK.stats(out) + '</div>' : '';
 }
 
-/* Our pre-game forecast with the market as a reference column (the game detail page may show it). */
+/* Our pre-game forecast with the market as a quiet reference column (game detail is one of the two places it may appear). */
 function forecastTable(L, g) {
   const pre = g.pregame || {}, m = pre.model || {}, mk = pre.market || {};
   if (!isNum(m.p_home)) return '';
@@ -272,7 +283,11 @@ function renderGame(el, params) {
     const H = String(g.home), A = String(g.away);
     document.title = HW.teamAbbr(L, A) + ' @ ' + HW.teamAbbr(L, H) + ' · ' + HW.leagueName(L) + ' · The Quant Hardwood';
     const tabs = [{ key: 'summary', label: 'Summary', href: HW.gameHref(L, gid, S) }, { key: 'detail', label: 'Lineups, rotations and plays', href: HW.gameHref(L, gid, S) + (HW.sq(L, S) ? '&' : '?') + 'tab=detail' }];
-    let h = headHTML(L, g, S) + U.tabsHTML(tabs, tab);
+    const fc = forecastTable(L, g);
+    let h = '<nav class="hw-crumb" aria-label="Breadcrumb"><a href="' + esc(HW.href(L, 'games/' + HW.localDay(g.date), S)) + '">← ' + esc(HW.fmtDate(g.date, { year: false })) + ' games</a></nav>' +
+      '<div class="hw-gtop">' + headHTML(L, g, S, res.season) + '<div class="hw-gside hw-stack2">' + pregameKpis(L, g) +
+      (fc ? U.card2(st === 'pre' ? 'Our forecast' : 'Our pre-game forecast', 'Chances from our game model; the market column is a reference, not our forecast', fc, { flush: true }) : '') + '</div></div>' +
+      '<div style="margin-top:var(--sp-6)">' + U.tabsHTML(tabs, tab) + '</div>';
     if (tab === 'detail') {
       el.innerHTML = h + '<div class="hw-sub"></div>';
       return U.legacy('game', el.querySelector('.hw-sub'), params, null, { embed: 'detail' });
@@ -283,7 +298,6 @@ function renderGame(el, params) {
     const shots = g.shots && g.shots.rows ? U.rowsOf(g.shots) : [];
     const det = ((g.pregame || {}).model || {}).detail || {};
     const parts = ['rating', 'hca', 'rest', 'b2b', 'travel', 'tz', 'altitude', 'injury'].filter(k => isNum(det[k]) && Math.abs(det[k]) > 0.05);
-    h += pregameKpis(L, g);
     h += '<div class="qk-grid hw-sec">';
     if (la.length || lh.length) {
       h += U.card2('Line score', '', '<div id="gm-ls"></div>', { cls: 'qk-span-' + (parts.length ? '7' : '12'), flush: true });
@@ -300,9 +314,8 @@ function renderGame(el, params) {
         U.card2(HW.teamName(L, H) + ' shots', esc(sqTxt(H)) + (sqTxt(H) ? ' · ' : '') + 'size is expected points', '<div id="gm-sh-h"></div>', { cls: 'qk-span-6' });
     }
     h += availabilityHTML(L, g, S);
-    const fc = forecastTable(L, g), tp = tape(L, g, res.season);
-    if (fc) h += U.card2(st === 'pre' ? 'Our forecast' : 'Our pre-game forecast', 'Chances from our game model; the market column is a reference', fc, { cls: 'qk-span-' + (tp ? 7 : 12), flush: true });
-    if (tp) h += U.card2('Tale of the tape', 'Season so far: the stronger side of each bar is solid', tp, { cls: 'qk-span-' + (fc ? 5 : 12) });
+    const tp = tape(L, g, res.season);
+    if (tp) h += U.card2('Tale of the tape', 'Season so far: the stronger side of each bar is solid', tp, { cls: 'qk-span-12' });
     h += awardsHTML(L, g, S);
     if (hasBox) {
       h += U.card2('Box score', 'Advanced columns where play-by-play exists. Sort any column.', '<div class="qk-seg hw-boxtabs" id="gm-bx-seg" role="group" aria-label="Team">' +

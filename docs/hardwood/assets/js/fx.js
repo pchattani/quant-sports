@@ -148,7 +148,8 @@ FX.bar = (L, tid) => '<span class="team-bar" style="background:' + esc(FX.teamCo
 FX.SEASON = null;
 FX.teamHref = (L, tid, S) => (HW.teamHref ? HW.teamHref(L, tid, S || FX.SEASON) : '#/' + L + '/team/' + encodeURIComponent(tid));
 FX.playerHref = (L, pid, S) => (HW.playerHref ? HW.playerHref(L, pid, S || FX.SEASON) : '#/' + L + '/player/' + encodeURIComponent(pid));
-FX.gameHref = (L, gid) => (HW.gameHref ? HW.gameHref(L, gid, FX.SEASON) : '#/' + L + '/game/' + encodeURIComponent(gid));
+/* S: the game's season. Pass it: a link without one makes the game centre try the current season first. */
+FX.gameHref = (L, gid, S) => (HW.gameHref ? HW.gameHref(L, gid, S || FX.SEASON) : '#/' + L + '/game/' + encodeURIComponent(gid));
 FX.href = (L, sub, S) => (HW.href ? HW.href(L, sub, S || FX.SEASON) : '#/' + L + '/' + sub);
 FX.teamLink = (L, tid, opts) => {
   if (!tid) return '<span class="muted-inline">—</span>';

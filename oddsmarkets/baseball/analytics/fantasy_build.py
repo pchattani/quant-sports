@@ -1036,7 +1036,7 @@ def build(b, cfg: dict, vctx=None) -> dict | None:
         "ok": True, "level": level, "updated_at": an.now(), "by_season": bt, "summary": summ, "luck": luck, "version": VERSION,
         "notes": ["Season (draft): our projection made after the season before against the official line, on players who "
                   "qualified the season before (300 PA; 50 IP); a player who did not play counts with an empty line. The naive "
-                  "forecast is his line of the season before (2020 scaled to 162 games). Mean absolute errors (AVG, ERA, WHIP "
+                  "forecast is the player's line of the season before (2020 scaled to 162 games). Mean absolute errors (AVG, ERA, WHIP "
                   "weighted by at-bats and innings) and the rank correlation of points and of 5x5 value.",
                   "Rest of season: from the Monday on or after 1 June, 1 July and 1 August (2022 on) against the official lines "
                   "after it, players with 100 PA (20 IP) to date and 50 PA (10 IP) after; the naive forecast is the season-to-date "
@@ -1116,7 +1116,7 @@ def _notes(in_season: bool, T: int) -> list[str]:
             "5x5 values: z-scores over a 12-team mixed league's pool (C, 1B, 2B, 3B, SS, CI, MI, 5 OF, UT; 9 P), AVG, ERA and WHIP "
             "weighted by at-bats and innings, minus the replacement level of the player's best position; dollars on a $260 "
             "budget (67% hitters).",
-            "Positions: 20 games at a position last season (or his most); outfield spots count as OF.",
+            "Positions: 20 games at a position last season (or the position with the most); outfield spots count as OF.",
             "Points: our default scheme, editable on the page; the projections carry every counting stat it uses.",
             "Dynasty: this season's value above replacement times the player's five-season multiplier from valuation v2 "
             "(expected WAR over five seasons, discounted, against next season's), plus the best prospects from the minor-league "

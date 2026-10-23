@@ -612,7 +612,7 @@ METHOD = (
     "ratings we may not republish. No class history exists in the data (only this season's rosters carry a class), so "
     "experience is the number of earlier seasons with a box-score line; no NIL, coaching or eligibility data. Football box "
     "scores never list offensive linemen, so they have no estimate. Targets rank likely transfers by their chance of "
-    "joining the team: availability x a model of which teams transfers join (team and conference strength, his "
+    "joining the team: availability x a model of which teams transfers join (team and conference strength, the player's "
     "production x the team's strength, the team's expected departures); shown where that model beat availability alone."
 )
 P_COLS = ["id", "name", "team", "pos", "p", "p_transfer", "p_gone", "exp", "class", "pctl", "new_in"]
@@ -713,7 +713,7 @@ def build_movement(level: str, current: int) -> dict:
                 why = [f"{'transferred in to' if cur.info['new_in'][j] else 'at'} {tnames.get(cur.tid[j]) or cur.tid[j]}"]
                 if pc == pc:
                     why.append(f"{_ordinal(int(round(100 * pc)))} percentile of {g}s this season")
-                why.append("a step up for him" if md > 2 else "a step down for him" if md < -2 else "a similar team")
+                why.append("a step up" if md > 2 else "a step down" if md < -2 else "a similar team")
                 why.append(f"you expect {out_g.get(g, 0.0):.1f} {g} departures")
                 targets.append({"id": cur.pid[j], "name": names.get(cur.pid[j]), "team": cur.tid[j], "pos": g,
                                 "p_join": round(float(col[j]), 4), "p_transfer": round(float(p_tr[j]), 3),

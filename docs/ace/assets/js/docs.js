@@ -49,12 +49,16 @@ function fmtHint(e) {
   return tags.map(t => '<span class="gl-tag' + (t[1] ? ' ' + t[1] : '') + '">' + esc(t[0]) + '</span>').join('');
 }
 
-/* The glossary text comes from the builders (data/glossary.json); it is shown in the site's v2 copy (STYLE_GUIDE §8):
-   our forecasts, never prices or edges. A display rewrite only; the builder wording is listed in REMAINING.md. */
+/* The glossary text comes from the builders (data/glossary.json); it is shown in the site's copy (STYLE_GUIDE §8): our
+   forecasts, never prices or edges, and no player pronouns. A display rewrite only. The builders were cleaned on 23 Oct
+   2026 (a9fe6982), but the local and live glossary.json still carry the old wording until the next rebuild, so the
+   rewrite stays; drop it once the payload reads "forecast" and "the player". */
 const COPY = [[/match price's blend/g, 'match forecast’s blend'], [/a surface specialist's edge/g, 'a surface specialist’s advantage'],
   [/de-vigged closing prices/g, 'de-vigged closing lines'], [/de-vigged closing price/g, 'de-vigged closing line'], [/closing prices/g, 'closing lines'],
   [/A disagreement, not a value bet: the market is the better forecaster\./g, 'A disagreement, not a recommendation: the market is the sharper forecaster.'],
   [/\(used for pricing\)/g, '(used for the forecasts)'], [/each remaining match priced by the model/g, 'each remaining match forecast by the model'],
+  [/\bthe matches she lost the first set\b/g, 'the matches where the player lost the first set'], [/\bshe lost\b/g, 'the player lost'], [/\bif she wins\b/g, 'if the player wins'],
+  [/\bon her own racquet\b/g, 'on the player\u2019s own racquet'], [/\(her serve points\b/g, '(the player\u2019s serve points'], [/\(her return points\b/g, '(the player\u2019s return points'],
   [/\bpriced\b/g, 'forecast'], [/\bpricing\b/g, 'forecasting'], [/\bprices\b/g, 'forecasts'], [/\bprice\b/g, 'forecast'], [/\bedges?\b/g, 'advantage'], [/value bets?/g, 'recommendation']];
 function copy(t) { let x = String(t || ''); COPY.forEach(r => { x = x.replace(r[0], r[1]); }); return x; }
 function entryHTML(e, isModel) {
@@ -302,7 +306,11 @@ function renderMethodology(el, params) {
     '</ol><div class="doc-toc-head" style="margin-top:10px">See also</div><ol><li><a href="#/glossary">Glossary</a></li><li><a href="#/' + T + '/calibration">Calibration</a></li><li><a href="#/disclaimer">Disclaimer and terms</a></li></ol></div>';
   const intro = '<div class="card"><div class="card-header">Methodology <span class="card-sub">Where the data comes from, how every model works, and where it is wrong. Every constant is the one in the code or its committed fit, and each paragraph names its file.</span></div>' +
     '<div class="doc-meta">' + secs.length + ' sections · the ATP\'s and the WTA\'s committed fits, with the code defaults that apply only without a fit</div></div>';
-  el.innerHTML = '<div class="doc">' + toc + '<div class="doc-body">' + intro + secs.map((s, i) => '<div class="card" id="method-' + esc(s.id) + '"><div class="card-header">' + (i + 1) + '. ' + esc(s.title) +
+  /* kit v3: the Model page opens with "How sure are we?" for the tour in view, from <T>/calibration.json when it is
+     there (left out on a deep link, so the section it points to does not move) */
+  const sure = want ? '' : '<section class="qk-section" id="m-sure" style="margin-top:0" hidden>' + QK.sectionHead({ kicker: 'How sure are we?', title: 'When we say 70%, does it happen 70% of the time?',
+    sub: 'Our ' + (T === 'wta' ? 'WTA' : 'ATP') + ' match forecasts against what happened. <a class="qk-link" href="#/' + T + '/calibration">The full record</a> has every score and check.', html: true }) + '<div id="m-howsure"></div></section>';
+  el.innerHTML = sure + '<div class="doc">' + toc + '<div class="doc-body">' + intro + secs.map((s, i) => '<div class="card" id="method-' + esc(s.id) + '"><div class="card-header">' + (i + 1) + '. ' + esc(s.title) +
     ' <a class="doc-anchor" href="#/methodology/' + esc(s.id) + '" title="Link to this section">#</a></div><div class="pad">' + s.html + '</div></div>').join('') + '</div></div>';
   el.querySelectorAll('.doc-toc a[data-target]').forEach(a => a.addEventListener('click', ev => {
     ev.preventDefault();
@@ -311,6 +319,13 @@ function renderMethodology(el, params) {
     history.replaceState(null, '', a.getAttribute('href'));
   }));
   if (want) { const t = document.getElementById('method-' + String(want).replace(/^m-/, '')); if (t) setTimeout(() => t.scrollIntoView({ block: 'start' }), 0); }
+  if (!want) TA.load(T + '/calibration.json').then(d => {
+    const box = el.querySelector('#m-sure');
+    if (!box || !d || d.ok === false || !QK.calib.find(d)) return;
+    box.hidden = false;
+    const ys = d.years || [];
+    QK.howSure(el.querySelector('#m-howsure'), { calibration: d, league: T === 'wta' ? 'WTA' : 'ATP', span: ys.length ? ys[0] + '–' + ys[ys.length - 1] : '', subject: 'that player', unit: 'matches' });
+  });
 }
 
 if (typeof TA.route === 'function') {

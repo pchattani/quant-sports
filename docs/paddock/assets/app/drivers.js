@@ -1,9 +1,14 @@
 /* The Quant Paddock — Drivers: the list (#/drivers[/<y>]) and a driver (#/driver/<id>).
- * Driver page (Design System 2.0): player header, stat tiles with peer percentiles, the percentile card on the F1
- * metric set (PD.v2.DRIVER_SET, peers = drivers at the starts floor), where he sits in the peer distribution, grid
- * and finish, points against our expectation, pace rank, every metric (field or team-mate), team-mate head to
- * head, the race log, telemetry style) and the career (season by season, Elo through the years,
- * every team-mate). Reads <y>/drivers.json, teams.json, season.json, drivers/<id>.json, elo.json. */
+ * Driver page on kit v3 "Matchday" (MIGRATION_V3.md, after rk-player.js): a crumb; the player header with "The short
+ * version" (this season's peer percentiles in plain English, the weak spot, early days); five tiles with percentile
+ * chips; the percentile rail on the F1 headline set (PD.v2.DRIVER_SET, peers = drivers at the starts floor) with a
+ * plain line per metric and last season's ring (the career file's current.prev_pct_pos when the build carries it,
+ * else last season's catalogue, loaded when the rail scrolls in); beside it "How sure are we?" (where each metric
+ * settles), race by race and "Their type" (similar driver-seasons, the closest this season, the team-mate); a compare
+ * with the two closest this season and verdicts; the next and the last race; then "More on the driver": how the title
+ * picture moved (title_history, with the 90% band), the peer distribution, grid and finish, points against our
+ * expectation, pace rank, every metric (field or team-mate), the team-mate head to head, the race log, telemetry style;
+ * and the career. Reads <y>/drivers.json, teams.json, season.json, drivers/<id>.json, elo.json, <y-1>/drivers.json. */
 (function (PD) {
 'use strict';
 
@@ -31,7 +36,7 @@ function mates(season, drivers, id) {
 
 function renderList(el, params) {
   var y = isNum(params.year) ? params.year : PD.currentSeason();
-  el.innerHTML = PD.pageHead('Season ' + y, 'Drivers', 'Everyone who started a race: results, our title chances, percentiles against the peer group and Elo. Search any driver since 1950 with /.', PD.yearPager('drivers', y)) + '<div id="dl-body">' + PD.empty('Loading', '') + '</div>';
+  el.innerHTML = PD.pageHead('Season ' + y, 'Every driver, ' + y, 'Everyone who started a race: results, our title chances, percentiles against the season’s regular drivers and Elo. Search any driver since 1950 with /.', PD.yearPager('drivers', y)) + '<div id="dl-body">' + PD.empty('Loading', '') + '</div>';
   return Promise.all([PD.seasonData(y), PD.load('elo.json')]).then(function (res) {
     if (!PD.alive(el)) return;
     var drivers = res[0][0], season = res[0][2], elo = res[1];
@@ -49,9 +54,9 @@ function renderList(el, params) {
     var maxR = Math.max.apply(null, ids.map(function (id) { return D ? (D[id].races || 0) : ((stand[id] || {}).races || 0); }).concat([0]));
     var floor = Math.min(MIN_RACES, Math.max(1, Math.floor(maxR / 2)));
     var curElo = (elo || {}).current || {};
-    var h = PD.grid(
-      PD.card('Pace against points', D && meta.race_pace ? 'Race pace (field percentile) against points per race; drivers with ' + floor + '+ races.' : 'Points per race; drivers with ' + floor + '+ races.', PD.chartBox('dl-sc', 400), { span: 8 }) +
-      PD.card('All-time Elo', 'Peak field rating since 1950, top 15.', PD.chartBox('dl-elo', 400), { span: 4, foot: '<a href="#dl-elo-t">The top 50 →</a>' }) +
+    var h = PD.note('<b>Percentiles</b> rank a driver against the other regular drivers this season (' + (dP ? dP.floor + '+ starts' : 'a starts floor') + '): 90th means better than 90 in 100. <b>Elo</b> is a rating from every head-to-head: 1500 is average.') + PD.grid(
+      PD.card('Pace against points', D && meta.race_pace ? 'Race pace (field percentile) against points per race; drivers with ' + floor + '+ races.' : 'Points per race; drivers with ' + floor + '+ races.', PD.chartBox('dl-sc', 400, 'Pace against points'), { span: 8 }) +
+      PD.card('The best ever, by Elo', 'Peak field rating since 1950, top 15.', PD.chartBox('dl-elo', 400, 'All-time peak Elo'), { span: 4, foot: '<a href="#dl-elo-t">The top 50 →</a>' }) +
       PD.card('Every driver', dP ? 'Heat cells: percentile against ' + esc(dP.label) + ' (' + dP.n + ' drivers); blank below the floor.' : '', '<div class="pd-toolbar"><input id="dl-q" class="qk-input" type="search" placeholder="Filter drivers or teams…" aria-label="Filter drivers"></div><div id="dl-t"></div>', { span: 12, flush: true }) +
       PD.card('All-time Elo leaders', 'Peak ratings against the field, the team-mate and in qualifying.', '<div id="dl-elo-t"></div>', { span: 12, flush: true }), '');
     PD.set('dl-body', h);
@@ -85,7 +90,7 @@ function renderList(el, params) {
     }).filter(Boolean);
     PD.ch.scatter('dl-sc', pts, { xName: D && meta.race_pace ? 'Race pace, field percentile' : 'Elo', yName: 'Points per race', xFmt: function (v) { return PD.num(v, 0); }, yFmt: function (v) { return PD.num(v, 1); }, emptyText: 'No percentiles for this season (the catalogue starts in 2018).', label: 'Pace against points' });
     var at = ((elo || {}).all_time || []).slice();
-    PD.ch.hbars('dl-elo', at.slice(0, 15).map(function (x) { return { label: x.name, value: x.peak_field, href: PD.driverHref(x.driver), colour: '#e8833a', sub: (x.years || []).join('–') + ' · ' + x.races + ' races' }; }),
+    PD.ch.hbars('dl-elo', at.slice(0, 15).map(function (x) { return { label: x.name, value: x.peak_field, href: PD.driverHref(x.driver), colour: PD.col('coral'), sub: (x.years || []).join('–') + ' · ' + x.races + ' races' }; }),
       { fmt: function (v) { return PD.num(v, 0); }, min: 1500, name: 'Peak field Elo', emptyText: 'No Elo history.', label: 'All-time Elo' });
     if (at.length) PD.table('dl-elo-t', [
       { key: 'name', label: 'Driver', sticky: true, fmt: function (v, r) { return PD.driverLink(r.driver, { name: v, dot: false }); } },
@@ -126,6 +131,7 @@ function draw(el, id, y, cat, career, elo, askedY) {
   var idx = PD.index() || {};
   var info = Object.assign({}, PD.NAMES.drivers[id] || {}, (idx.drivers || {})[id] || {});
   var name = (d && d.name) || (career && career.name) || PD.driverName(id);
+  var sur = PD.driverSurname(id);
   var team = (d && d.team) || teamOf(season, drivers, id) || info.team;
   var curTeam = y === PD.currentSeason() || askedY ? ((idx.drivers || {})[id] || {}).team : null;
   var tcol = team ? PD.tc(team) : 'var(--accent)';
@@ -137,62 +143,205 @@ function draw(el, id, y, cat, career, elo, askedY) {
   var curT = curTeam || team;
   var dP = PD.ok(drivers) ? PD.v2.peer(drivers, 'drivers', season) : null;
   var pc = dP && dP.pct[id] ? dP.pct[id] : {};
-  var hstats = [];
-  if (stand.pos) hstats.push({ label: y + ' standings', value: 'P' + stand.pos }, { label: 'Points', value: PD.pts(stand.points) });
-  if (ch && !ch.eliminated) hstats.push({ label: 'Title chance', value: PD.pct(ch.p_title, ch.p_title > 0.99 ? 2 : 1) });
-  var h = '<div class="qk-kicker pd-back"><a href="#/drivers">← Drivers</a></div>' + QK.playerHeader({ name: name, number: info.number, pos: 'Driver', kicker: [info.nationality || (career || {}).nationality || '', age !== null ? (curTeam || (career && (career.seasons || []).some(function (z) { return z.year >= PD.currentSeason() - 1; })) ? 'age ' + age : 'born ' + String(career.dob).slice(0, 4)) : ''].filter(Boolean).join(' · '),
+  var meta = PD.v2.metaMap(drivers);
+  var races = d && isNum(d.races) ? d.races : 0;
+  var V = PD.v2;
+
+  /* "The short version": what the numbers say, in plain English, from this season's peer percentiles */
+  function shortVersion() {
+    if (!d || !races) return null;
+    var t = sur + ' has ' + PD.pts(stand.points || 0) + ' point' + (stand.points === 1 ? '' : 's') + ' from ' + races + ' start' + (races === 1 ? '' : 's') + (stand.pos ? ', ' + PD.ordinal(stand.pos) + ' in the championship' : '') + '.';
+    if (!dP || !dP.qualified(id)) return t + ' Short of the starts floor for percentiles so far, so read the rest lightly.';
+    var rows = [];
+    V.DRIVER_SET.forEach(function (g) { g[1].forEach(function (k) { if (isNum(pc[k])) rows.push([k, pc[k], V.label(meta, k)]); }); });
+    var top = rows.filter(function (r) { return r[1] >= 90; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 2);
+    var low = rows.slice().sort(function (a, b) { return a[1] - b[1]; })[0];
+    if (top.length) t += ' In the top ' + Math.max(1, Math.round(100 - Math.min(top[0][1], top[top.length - 1][1]))) + '% of this season’s regular drivers for ' + top.map(function (r) { return V.lc(r[2]); }).join(' and ') + '.';
+    else if (rows.length) { var avg = rows.reduce(function (s, r) { return s + r[1]; }, 0) / rows.length; t += avg >= 60 ? ' Above the middle of the pack on most of the numbers that matter.' : avg >= 40 ? ' Around the middle of the pack on the numbers that matter.' : ' Below the middle of the pack on most of the numbers that matter so far.'; }
+    if (low && low[1] <= 30 && !(top[0] && top[0][0] === low[0])) t += ' The weak spot: ' + V.lc(low[2]) + ', in the ' + PD.ordinal(Math.round(low[1])) + ' percentile.';
+    if (races < 6) t += ' Early days, so read it lightly.';
+    return t;
+  }
+
+  var crumb = '<nav class="pd-crumb" aria-label="Breadcrumb"><a href="#/drivers">F1</a><span aria-hidden="true">›</span>' + (curT ? '<a href="' + PD.teamHref(curT) + '">' + esc(PD.teamName(curT)) + '</a><span aria-hidden="true">›</span>' : '') + esc(name) + '</nav>';
+  var h = crumb + QK.playerHeader({ name: name, number: info.number, pos: 'Driver', kicker: [y + (races ? ' · ' + races + ' start' + (races === 1 ? '' : 's') + ' in' : ''), info.nationality || (career || {}).nationality || '', age !== null ? (curTeam || (career && (career.seasons || []).some(function (z) { return z.year >= PD.currentSeason() - 1; })) ? 'age ' + age : 'born ' + String(career.dob).slice(0, 4)) : ''].filter(Boolean).join(' · '),
       team: curT ? { name: PD.teamName(curT), abbr: PD.teamAbbr(curT), colour: PD.teamColour(curT), href: PD.teamHref(curT) } : null,
-      meta: [info.code ? ['Code', info.code] : null, isNum(tot.races) ? ['Starts', String(tot.races)] : null, isNum(tot.races) ? ['Wins', String(tot.wins || 0)] : null, tot.titles ? ['Titles', String(tot.titles)] : null, isNum(tot.peak_elo) ? ['Peak Elo', PD.num(tot.peak_elo, 0)] : null],
-      stats: hstats, tags: dP && dP.qualified(id) ? [QK.tag('In the ' + y + ' peer group', 'signal')] : [] }) +
-    (askedY ? PD.note(esc(name) + ' did not race in ' + askedY + '; showing ' + y + ', the latest season with a driver catalogue.') : '') +
-    '<div class="pd-links pd-mt">' + (mate ? '<a class="qk-btn" href="#/compare/drivers/' + encodeURIComponent(id) + '/' + encodeURIComponent(mate) + '">Compare with ' + esc(PD.driverSurname(mate)) + '</a>' : '') +
-    '<a class="qk-btn" href="#/compare/drivers/' + encodeURIComponent(id) + '">Compare with anyone</a><a class="qk-btn" href="#/lab">Driver lab</a>' + (curT ? '<a class="qk-btn" href="' + PD.teamHref(curT) + '">' + esc(PD.teamName(curT)) + '</a>' : '') + '</div>';
+      meta: [info.code ? ['Code', info.code] : null, isNum(tot.races) ? ['Starts', String(tot.races)] : null, isNum(tot.races) ? ['Wins', String(tot.wins || 0)] : null, tot.titles ? ['Titles', String(tot.titles)] : null],
+      tags: dP && dP.qualified(id) ? [QK.tag('In the ' + y + ' peer group', 'signal')] : [], short: shortVersion() }) +
+    (askedY ? PD.note(esc(name) + ' did not race in ' + askedY + '; showing ' + y + ', the latest season with a driver catalogue.') : '');
   if (d) {
-    var cur = ((elo || {}).current || {})[id] || ((season || {}).elo || {})[id] || {};
-    var dv = d.values || {};
-    var meta = PD.v2.metaMap(drivers);
-    h += '<div class="pd-mt">' + PD.kpis([
+    h += '<div class="pd-tiles">' + PD.kpis([
       ch && ch.eliminated ? PD.kpi('Title chance', 'Out', 'can no longer catch the leader', { text: true }) : ch ? PD.kpi('Title chance', PD.pct(ch.p_title, ch.p_title > 0.99 ? 2 : 1), 'expected ' + PD.num(ch.exp_points, 0) + ' pts (90%: ' + PD.num(ch.p05, 0) + '–' + PD.num(ch.p95, 0) + ')', { signal: true, tip: 'Our chance of the drivers’ title, from the season simulation' })
         : PD.kpi('Championship', stand.pos ? PD.ordinal(stand.pos) : '—', isNum(stand.points) ? PD.pts(stand.points) + ' points' : ''),
-      PD.kpi('Race pace v team-mate', isNum(dv.driver_effect) ? PD.signed(dv.driver_effect, 3) + '%' : '—', 'of a lap v the team-mate · lower is faster', { pctl: pc.driver_effect, tip: PD.v2.tip(meta, 'driver_effect') }),
-      PD.kpi('Qualifying pace v team-mate', isNum(dv.quali_driver_effect) ? PD.signed(dv.quali_driver_effect, 3) + '%' : '—', 'of a lap v the team-mate', { pctl: pc.quali_driver_effect, tip: PD.v2.tip(meta, 'quali_driver_effect') }),
-      PD.kpi('Points per race', isNum(dv.points_per_race) ? PD.num(dv.points_per_race, 2) : '—', (stand.wins || 0) + ' wins · ' + (stand.podiums || 0) + ' podiums · ' + (stand.poles || 0) + ' poles', { pctl: pc.points_per_race }),
-      PD.kpi('Race head-to-head v team-mate', isNum(dv.race_h2h) ? PD.pct(dv.race_h2h, 0) : '—', mate ? 'ahead of ' + esc(PD.driverSurname(mate)) : 'v the team-mate', { pctl: pc.race_h2h }),
-      PD.kpi('Elo v team-mates', isNum(cur.elo_teammate) ? PD.num(cur.elo_teammate, 0) : '—', isNum(cur.elo) ? 'field Elo ' + PD.num(cur.elo, 0) + ' · 1500 is average' : '', { pctl: pc.elo_teammate })
+      PD.kpi('Race pace v team-mate', isNum((d.values || {}).driver_effect) ? PD.signed(d.values.driver_effect, 3) + '%' : '—', 'of a lap · lower is faster', { pctl: pc.driver_effect, tip: V.tip(meta, 'driver_effect') }),
+      PD.kpi('Qualifying pace v team-mate', isNum((d.values || {}).quali_driver_effect) ? PD.signed(d.values.quali_driver_effect, 3) + '%' : '—', 'of a lap · lower is faster', { pctl: pc.quali_driver_effect, tip: V.tip(meta, 'quali_driver_effect') }),
+      PD.kpi('Points per race', isNum((d.values || {}).points_per_race) ? PD.num(d.values.points_per_race, 2) : '—', (stand.wins || 0) + ' wins · ' + (stand.podiums || 0) + ' podiums · ' + (stand.poles || 0) + ' poles', { pctl: pc.points_per_race }),
+      PD.kpi('Race head-to-head v team-mate', isNum((d.values || {}).race_h2h) ? PD.pct(d.values.race_h2h, 0) : '—', mate ? 'of races ahead of ' + esc(PD.driverSurname(mate)) : 'of races ahead of the team-mate', { pctl: pc.race_h2h })
     ]) + '</div>';
-    var distOpts = [['driver_effect', 'Race rating'], ['quali_driver_effect', 'Qualifying'], ['race_h2h', 'Race H2H'], ['points_per_race', 'Points / race'], ['race_pace', 'Race pace']];
-    h += PD.grid(
-      '<div class="qk-span-5">' + (dP ? PD.v2.pctCard(dP, id, PD.v2.DRIVER_SET, { foot: '<span>Metrics chosen for year-to-year stability and what they predict</span><a href="#/glossary">Glossary →</a>' }) : '') + '</div>' +
-      PD.card('Among peers', dP ? 'Every driver in the ' + y + ' peer group (' + dP.floor + '+ starts); bars coloured by percentile, ' + esc(PD.driverSurname(id)) + ' and the median marked.' : '', (dP ? PD.v2.distSeg('dv-dist-m', distOpts) : '') + PD.chartBox('dv-dist', 260, 'Peer distribution'), { span: 7 }) +
-      (d && (d.similar || []).length ? PD.card('Most similar driver-seasons', 'The five nearest seasons since 1996 on the eight headline metrics (the spec’s weighted distance; the driver’s own seasons left out).', '<ul class="pd-list">' + d.similar.slice(0, 5).map(function (x, i) { return '<li><span class="n">' + (i + 1) + '</span><a href="' + PD.driverHref(x.driver) + '">' + esc(x.name || PD.driverName(x.driver)) + '</a><span class="s">' + esc([x.year, x.team ? PD.teamName(x.team) : ''].filter(Boolean).join(' · ')) + '</span>' + (isNum(x.d) ? '<span class="v">' + PD.num(x.d, 2) + '</span>' : '') + '</li>'; }).join('') + '</ul>', { span: 12, flush: true }) : ''), 'pd-mt');
-    h += PD.grid(
-      PD.card('Grid and finish', 'Each round of ' + y + '; crosses are retirements.', PD.chartBox('dv-pos', 280), { span: 4 }) +
-      PD.card('Points v expected', 'Cumulative points against our pre-race expectation.', PD.chartBox('dv-pts', 280), { span: 4 }) +
-      PD.card('Race pace rank', 'Our lap-time model’s pace rank each round (1 = fastest).', PD.chartBox('dv-pace', 280), { span: 4 }) +
-      PD.card('Every metric', metrics.length + ' metrics. Field: against every driver who started this season (stand-ins included). Team-mate: only against drivers in the same car.', '<div id="dv-pct"></div>', { span: 12, right: PD.seg('dv-pk', [['field', 'Field'], ['teammate', 'Team-mate']], 'field', 'Percentiles') }) +
-      PD.card('Team-mate head to head', '<span id="dv-h2h-s"></span>', '<div id="dv-h2h"></div>', { span: 12, flush: true }) +
-      PD.card('Race log', 'Every round. Pace is the race-pace effect in s/lap against the field (negative = faster); deg is tyre degradation by compound.', '<div id="dv-log"></div>', { span: 12, flush: true }) +
-      PD.card('Telemetry style', 'How this driver uses the car, from OpenF1 car data (2023 on), with the field percentile.', '<div id="dv-style"></div>', { span: 12 }), 'pd-mt');
+    h += '<div class="pd-links pd-mt">' + (mate ? '<a class="qk-btn" href="#/compare/drivers/' + encodeURIComponent(id) + '/' + encodeURIComponent(mate) + '">Compare with ' + esc(PD.driverSurname(mate)) + '</a>' : '') +
+      '<a class="qk-btn" href="#/compare/drivers/' + encodeURIComponent(id) + '">Compare with anyone</a><a class="qk-btn" href="#/lab">Driver lab</a>' + (curT ? '<a class="qk-btn" href="' + PD.teamHref(curT) + '">' + esc(PD.teamName(curT)) + '</a>' : '') + '</div>';
+
+    /* How sure are we: how far the starts so far are from where each headline metric settles (f1.json m50) */
+    var settle = [['driver_effect', 'race pace against the team-mate'], ['quali_driver_effect', 'qualifying pace against the team-mate'], ['race_h2h', 'the race head-to-head'], ['lap1_gain', 'lap-1 gains']]
+      .filter(function (x) { return isNum(V.M50[x[0]]); }).map(function (x) { var at = Math.ceil(V.M50[x[0]]); return x[1] + ' after about <b>' + at + ' start' + (at === 1 ? '' : 's') + '</b>' + (races >= at ? ' (reached)' : ''); });
+    var small = races < 8;
+    var nums = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven'];
+    var sureCard = '<article class="qk-card cream"><div class="qk-card-body"><div class="qk-kicker">How sure are we?</div><h3 style="margin:8px 0 6px">' +
+      esc(races ? (small ? nums[races] + ' start' + (races === 1 ? ' is' : 's is') + ' a small sample' : races + ' starts: the picture is settling') : 'No starts yet this season') + '</h3>' +
+      '<p style="margin:0;color:var(--ink-2);font-size:15px">Team-mate numbers settle fastest because the car is the same. The hollow rings on the rail show last season, where there was one: dots next to their ring are the steady part of the profile.</p>' +
+      (settle.length ? QK.note('Half the season-to-season noise is gone for ' + settle.join(', ').replace(/, ([^,]*)$/, ', and $1') + '.') : '') + '</div></article>';
+
+    var rbr = (d.log || []).length ? PD.card('Race by race', 'Points each round this season; the best weekend is labelled.', PD.chartBox('dv-rbr', 240, 'Points each round')) : '';
+    var sim = (d.similar || []).slice(0, 3);
+    var near = dP ? V.nearest(dP, id, V.DRIVER_SET, 2) : [];
+    var typeCard = sim.length || near.length || mate ? '<article class="qk-card"><div class="qk-card-body"><div class="qk-kicker">Their type</div>' +
+      (sim.length ? '<h4 class="pd-h4">Drives most like (since 1996)</h4><ul class="pd-list pd-type">' + sim.map(function (x) { return '<li><a href="' + PD.driverHref(x.driver) + '">' + esc(x.name || PD.driverName(x.driver)) + '</a><span class="s">' + esc([x.year, x.team ? PD.teamName(x.team) : ''].filter(Boolean).join(' · ')) + '</span></li>'; }).join('') + '</ul>' : '') +
+      (near.length ? '<h4 class="pd-h4">Closest this season</h4><ul class="pd-list pd-type">' + near.map(function (x) { return '<li>' + PD.driverLink(x.id) + '<a class="v" href="#/compare/drivers/' + encodeURIComponent(id) + '/' + encodeURIComponent(x.id) + '">Compare</a></li>'; }).join('') + '</ul>' : '') +
+      (mate ? '<h4 class="pd-h4">Team-mate</h4><ul class="pd-list pd-type"><li>' + PD.driverLink(mate) + '<a class="v" href="#/compare/drivers/' + encodeURIComponent(id) + '/' + encodeURIComponent(mate) + '">Compare</a></li></ul>' : '') +
+      QK.aside('Closest matches on the headline metrics: pace against the team-mate and the field, head-to-heads, points and starts.') + '</div></article>' : '';
+    var rail = dP ? V.pctCard(dP, id, V.DRIVER_SET, { id: 'dv-rail', foot: '<span>Metrics chosen for year-to-year stability and what they predict</span><a href="#/glossary">Glossary →</a>' }) : '';
+    h += '<section class="qk-section pd-sec"><div class="qk-gside"><div>' + rail + '</div><div class="pd-stack">' + sureCard + rbr + typeCard + '</div></div></section>';
+    if (near.length) h += '<section class="qk-section pd-sec" id="dv-cmp-sec"></section>';
+    h += '<section class="qk-section pd-sec" id="dv-nl" hidden><div class="qk-g2" id="dv-nl-g"></div></section>';
+    var hist = ((season || {}).title_history || []).filter(function (x) { return x && isNum(x.after_round) && x.drivers && x.drivers[id]; });
+    h += '<section class="qk-section pd-sec">' + QK.sectionHead({ kicker: 'More on the driver', title: 'Peers, form and the long view', sub: 'Where ' + esc(sur) + ' sits among this season’s drivers, round by round, every metric and the career.' }) +
+      PD.grid((hist.length >= 3 && ch ? PD.card('How the title picture moved', 'Our expected final points after each round, with the band where 90% of simulated seasons end.', '<div id="dv-move" class="qk-chart" style="--h:280px" role="img" aria-label="Expected final points after each round"></div>', { span: 12 }) : '') +
+        PD.card('Among peers', dP ? 'Every driver in the ' + y + ' peer group (' + dP.floor + '+ starts); bars coloured by percentile, ' + esc(sur) + ' and the median marked.' : '', (dP ? V.distSeg('dv-dist-m', [['driver_effect', 'Race pace v team-mate'], ['quali_driver_effect', 'Qualifying v team-mate'], ['race_h2h', 'Race H2H'], ['points_per_race', 'Points / race'], ['race_pace', 'Race pace v field']]) : '') + PD.chartBox('dv-dist', 260, 'Peer distribution'), { span: 12 }) +
+        PD.card('Grid and finish', 'Each round of ' + y + '; crosses are retirements.', PD.chartBox('dv-pos', 280, 'Grid and finish'), { span: 4 }) +
+        PD.card('Points v expected', 'Cumulative points against our pre-race expectation.', PD.chartBox('dv-pts', 280, 'Points against expected'), { span: 4 }) +
+        PD.card('Race pace rank', 'Our lap-time model’s pace rank each round (1 = fastest).', PD.chartBox('dv-pace', 280, 'Race pace rank by round'), { span: 4 }) +
+        PD.card('Every metric', metrics.length + ' metrics. Field: against every driver who started this season (stand-ins included). Team-mate: only against drivers in the same car.', '<div id="dv-pct"></div>', { span: 12, right: PD.seg('dv-pk', [['field', 'Field'], ['teammate', 'Team-mate']], 'field', 'Percentiles') }) +
+        PD.card('Team-mate head to head', '<span id="dv-h2h-s"></span>', '<div id="dv-h2h"></div>', { span: 12, flush: true }) +
+        PD.card('Race log', 'Every round. Pace is the race-pace effect in seconds a lap against the field (negative is faster); deg is tyre degradation by compound.', '<div id="dv-log"></div>', { span: 12, flush: true }) +
+        PD.card('Telemetry style', 'How the driver uses the car, from OpenF1 car data (2023 on), with the field percentile.', '<div id="dv-style"></div>', { span: 12 }), 'pd-mt') + '</section>';
   } else {
     h += PD.empty(PD.ok(drivers) ? name + ' has no race in ' + y : 'The ' + y + ' driver catalogue is not built yet', 'The career is below.');
   }
   h += '<section class="qk-section pd-sec">' + PD.secHead('Since 1950', 'Career', '<span id="dv-car-s"></span>') + '<div id="dv-career"></div></section>';
   el.innerHTML = h;
-  if (d) season_(d, id, y, metrics, D, mate, ms, tcol, team, dP);
+  if (d) {
+    season_(d, id, y, metrics, D, mate, ms, tcol, team, dP);
+    raceByRace(d, team);
+    ringsLater(el, id, y, career, dP);
+    compareBlock(dP, id, near, y);
+    nextLast(id, d, y, team);
+    movement(season, id, team);
+  }
   careerBlock(id, career);
+}
+
+/* Race by race: points each round in the team colour, the best weekend labelled in an italic annotation. */
+function raceByRace(d, team) {
+  var log = (d.log || []).slice().sort(function (a, b) { return a.round - b.round; });
+  var node = document.getElementById('dv-rbr');
+  if (!node || !log.length || !window.QKC) return;
+  var bi = -1, best = -1;
+  log.forEach(function (r, i) { if ((r.points || 0) > best) { best = r.points || 0; bi = i; } });
+  var col = PD.tc(team);
+  QKC.mount(node, function (T) {
+    var xa = QKC.axis(T, { type: 'category', data: log.map(function (r) { return 'R' + r.round; }), split: false, line: true });
+    var ya = QKC.axis(T, { min: 0 });
+    var gB = 22 + QKC.nameAxis(xa, 'Round', 'bottom'), gT = 26 + QKC.nameAxis(ya, 'Points', 'side');
+    return { grid: { left: 8, right: 12, top: gT, bottom: gB, containLabel: true }, xAxis: xa, yAxis: ya,
+      tooltip: QKC.tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: function (ps) { var r = log[ps[0].dataIndex]; return '<b>' + esc(r.name || ('Round ' + r.round)) + '</b><br>' + (PD.finished(r.status) ? 'P' + r.pos : esc(r.status || 'DNF')) + (isNum(r.grid) && r.grid > 0 ? ' from P' + r.grid : '') + ' · ' + PD.pts(r.points || 0) + ' pts'; } }),
+      series: [{ type: 'bar', name: 'Points', barMaxWidth: 26, data: log.map(function (r, i) {
+        var o = { value: r.points || 0, itemStyle: { color: col, borderRadius: [6, 6, 0, 0] } };
+        if (i === bi && best > 0) o.label = Object.assign(QKC.annot(T), { show: true, position: 'top', formatter: (PD.finished(r.status) ? 'P' + r.pos : '') + ' · ' + PD.shortRace(r.name) });
+        return o; }) }] };
+  }, { label: 'Points each round this season' });
+}
+
+/* Last season's percentiles in the same peer group: the hollow rings on the rail. The career file's
+   current.prev_pct_pos when the build carries it; else last season's catalogue, loaded when the rail scrolls in. */
+function ringsLater(el, id, y, career, dP) {
+  var host = document.getElementById('dv-rail');
+  if (!host || !dP || !dP.qualified(id)) return;
+  var paint = function (prev, n) {
+    var old = document.getElementById('dv-rail');
+    if (!old || !prev) return;
+    old.outerHTML = PD.v2.pctCard(dP, id, PD.v2.DRIVER_SET, { id: 'dv-rail', prev: prev, ringLabel: 'last season' + (isNum(n) ? ' (' + n + ' starts)' : ''), foot: '<span>Metrics chosen for year-to-year stability and what they predict</span><a href="#/glossary">Glossary →</a>' });
+  };
+  var cur = (career || {}).current || {};
+  if (cur.prev_pct_pos && typeof cur.prev_pct_pos === 'object') { var pp = cur.prev_pct_pos; paint(pp.pct || pp, pp.races || pp.n); return; }
+  var fired = false;
+  var go = function () {
+    if (fired) return; fired = true;
+    PD.load((y - 1) + '/drivers.json').then(function (cat) {
+      if (!PD.alive(el) || !cat || !cat.drivers || !cat.drivers[id]) return;
+      var P = PD.v2.peer(cat, 'drivers', null);
+      if (!P.qualified(id)) return;
+      paint(P.pct[id], cat.drivers[id].races);
+    });
+  };
+  if (window.IntersectionObserver) { var io = new IntersectionObserver(function (es) { if (es.some(function (e) { return e.isIntersecting; })) { io.disconnect(); go(); } }, { rootMargin: '200px' }); io.observe(host); } else go();
+}
+
+/* Compare: the driver and the two closest this season on the headline set, the best in each row highlighted, verdicts. */
+function compareBlock(dP, id, near, y) {
+  var host = document.getElementById('dv-cmp-sec');
+  if (!host || !dP || !near.length) return;
+  var ids = [id].concat(near.map(function (x) { return x.id; }));
+  var names = ids.map(PD.driverSurname);
+  var ents = ids.map(function (k) { var r = dP.rows[k] || {}; return { name: r.name || PD.driverName(k), href: PD.driverHref(k), colour: PD.teamColour(r.team), sub: [PD.teamName(r.team), (r.races || 0) + ' starts'].join(' · ') }; });
+  host.innerHTML = QK.sectionHead({ kicker: 'Compare', title: names.slice(0, -1).join(', ') + ' or ' + names[names.length - 1] + '?',
+    sub: 'The closest matches on this season’s headline metrics, side by side against ' + esc(dP.label) + ' in ' + y + '. The best in each row is highlighted; the small pills are percentiles.',
+    actions: '<a class="qk-more" href="#/compare/drivers/' + encodeURIComponent(ids[0]) + '/' + encodeURIComponent(ids[1]) + '">Open in Compare</a>' }) +
+    '<article class="qk-card"><div class="qk-card-body">' + PD.v2.compare(dP, ids, PD.v2.DRIVER_SET, ents) + QK.verdicts(PD.v2.verdicts(ids.map(function () { return dP; }), ids, PD.v2.DRIVER_SET, names)) + '</div></article>';
+}
+
+/* Next and last race: our chances for the driver at the next Grand Prix, and how the last one went. */
+function nextLast(id, d, y, team) {
+  var idx = PD.index() || {};
+  var nx = idx.next && idx.next.year === y ? idx.next : null;
+  var log = (d.log || []).slice().sort(function (a, b) { return a.round - b.round; });
+  var last = log[log.length - 1];
+  var sur = PD.driverSurname(id);
+  (nx ? PD.load(nx.year + '/races/' + nx.round + '.json') : Promise.resolve(null)).then(function (race) {
+    var wrap = document.getElementById('dv-nl'), g = document.getElementById('dv-nl-g');
+    if (!wrap || !g) return;
+    var f = race && race.forecast ? ((race.forecast.post_quali && race.forecast.post_quali.drivers && race.forecast.post_quali.drivers[id]) ? race.forecast.post_quali : race.forecast.pre_quali) : null;
+    var me = f && f.drivers ? f.drivers[id] : null;
+    var out = '';
+    if (nx) {
+      out += '<div><div class="qk-kicker" style="margin-bottom:10px">Next up</div><a class="qk-card qk-feature pd-nl" href="' + PD.raceHref(nx.year, nx.round) + '" style="--tc:' + esc(PD.tc(team)) + '"><div class="qk-feature-meta"><span class="qk-pill">Round ' + nx.round + ' · ' + esc((nx.circuit || {}).locality || '') + '</span><span class="qk-badge">' + esc(PD.fmtDate(((nx.sessions || {}).race) || nx.date, { year: false, time: true })) + '</span></div>' +
+        '<div class="pd-feat-name">' + esc(nx.name) + '</div>' +
+        (me ? '<div class="qk-feature-big"><div class="big">' + PD.pct(me.p_podium, 0) + '</div><div class="say">chance <b>' + esc(sur) + '</b> finishes on the podium. Win: <b>' + PD.pct(me.p_win, me.p_win < 0.1 ? 1 : 0) + '</b>, points: <b>' + PD.pct(me.p_points, 0) + '</b>.</div></div>' +
+          QK.note('<b>How sure are we?</b> We expect P' + PD.num(me.exp_pos, 1) + ' on average; a retirement is ' + PD.pct(me.p_dnf, 0) + ' in our numbers.') : QK.note('Our forecast for the weekend is built once the race is near.')) + '</a></div>';
+    }
+    if (last) {
+      var fin = PD.finished(last.status);
+      out += '<div><div class="qk-kicker" style="margin-bottom:10px">Last time out</div><a class="qk-card qk-feature pd-nl" href="' + PD.raceHref(y, last.round) + '"><div class="qk-feature-meta"><span class="qk-pill">Round ' + last.round + '</span><span class="qk-badge final">Result</span></div>' +
+        '<div class="pd-feat-name">' + esc(last.name || ('Round ' + last.round)) + '</div>' +
+        '<div class="qk-feature-big"><div class="big pd-big-ink">' + (fin ? 'P' + last.pos : 'DNF') + '</div><div class="say">' + (isNum(last.grid) && last.grid > 0 ? 'from P' + last.grid + ' on the grid' : 'from the pit lane') + ', <b>' + PD.pts(last.points || 0) + ' point' + (last.points === 1 ? '' : 's') + '</b>.</div></div>' +
+        QK.note((isNum(last.exp_points) ? 'We expected about <b>' + PD.num(last.exp_points, 1) + ' points</b> before the race. ' : '') + (isNum(last.pace_rank) ? 'Race pace ranked ' + PD.ordinal(last.pace_rank) + ' in our lap-time model.' : '')) + '</a></div>';
+    }
+    if (out) { g.innerHTML = out; wrap.hidden = false; }
+  });
+}
+
+/* Movement: our expected final points after each recorded round, with the 5th-95th percentile band (title_history). */
+function movement(season, id, team) {
+  var node = document.getElementById('dv-move');
+  if (!node) return;
+  var H = (season.title_history || []).filter(function (x) { return x && isNum(x.after_round) && x.drivers && x.drivers[id]; }).sort(function (a, b) { return a.after_round - b.after_round; });
+  var get = function (h, k) { var r = h.drivers[id]; return r && isNum(r[k]) ? r[k] : null; };
+  QKC.forecast(node, { x: H.map(function (h) { return 'R' + h.after_round; }), xType: 'category', xName: 'After round', yName: 'Expected final points (5th–95th percentile band)', yMin: 0, yMax: 'auto',
+    yFmt: function (v) { return PD.num(v, 0); }, today: 'R' + H[H.length - 1].after_round,
+    series: [{ name: PD.driverName(id), label: PD.driverCode(id), color: PD.teamColour(team), data: H.map(function (h) { return get(h, 'exp_points'); }), band: { lo: H.map(function (h) { return get(h, 'p05'); }), hi: H.map(function (h) { return get(h, 'p95'); }) } }],
+    label: 'Expected final points after each round' });
 }
 
 function season_(d, id, y, metrics, D, mate, ms, tcol, team, dP) {
   var log = (d.log || []).slice().sort(function (a, b) { return a.round - b.round; });
   if (log.length) {
     PD.ch.lines('dv-pos', [
-      { name: 'Grid', data: log.map(function (r) { return [r.round, isNum(r.grid) && r.grid > 0 ? r.grid : null]; }), colour: '#7d8590', dash: true, symbols: true },
+      { name: 'Grid', data: log.map(function (r) { return [r.round, isNum(r.grid) && r.grid > 0 ? r.grid : null]; }), colour: PD.col('grey'), dash: true, symbols: true },
       { name: 'Finish', data: log.map(function (r) { return [r.round, PD.finished(r.status) ? r.pos : null]; }), colour: PD.teamColour(team), symbols: true, width: 2.5 }
     ], { inverse: true, yMin: 1, yScale: false, xName: 'Round', yName: 'Position', xFmt: function (v) { return 'R' + v; }, xLabel: function (v) { var r = log.filter(function (z) { return z.round === +v; })[0]; return r ? 'R' + v + ' ' + PD.shortRace(r.name) + (PD.finished(r.status) ? '' : ' · ' + r.status) : v; }, yFmt: function (v) { return 'P' + Math.round(v); }, label: 'Grid and finish' });
     var cp = 0, ce = 0, any = false;
     var actual = [], exp = [];
     log.forEach(function (r) { cp += r.points || 0; actual.push([r.round, cp]); if (isNum(r.exp_points)) { any = true; ce += r.exp_points; exp.push([r.round, ce]); } });
-    PD.ch.lines('dv-pts', [{ name: 'Points', data: actual, colour: PD.teamColour(team), width: 2.5, area: true }].concat(any ? [{ name: 'Expected', data: exp, colour: '#7d8590', dash: true }] : []),
+    PD.ch.lines('dv-pts', [{ name: 'Points', data: actual, colour: PD.teamColour(team), width: 2.5, area: true }].concat(any ? [{ name: 'Expected', data: exp, colour: PD.col('grey'), dash: true }] : []),
       { xName: 'Round', yName: 'Points, cumulative', xFmt: function (v) { return 'R' + v; }, xLabel: function (v) { return 'After round ' + v; }, yFmt: function (v) { return PD.num(v, 0); }, yScale: false, label: 'Points against expected' });
     PD.ch.lines('dv-pace', [{ name: 'Pace rank', data: log.map(function (r) { return [r.round, isNum(r.pace_rank) ? r.pace_rank : null]; }), colour: PD.teamColour(team), symbols: true, width: 2 }],
       { inverse: true, yMin: 1, yScale: false, xName: 'Round', yName: 'Race pace rank', xFmt: function (v) { return 'R' + v; }, xLabel: function (v) { var r = log.filter(function (z) { return z.round === +v; })[0]; return r ? 'R' + v + ' ' + PD.shortRace(r.name) + (isNum(r.pace) ? ' · ' + PD.signed(r.pace, 3) + ' s/lap' : '') : v; }, yFmt: function (v) { return 'P' + Math.round(v); }, label: 'Race pace rank by round' });
@@ -201,7 +350,7 @@ function season_(d, id, y, metrics, D, mate, ms, tcol, team, dP) {
   drawPct('field');
   PD.wireSeg(document, 'dv-pk', drawPct);
   var mrow = mate && D[mate];
-  var pc = PD.pairColours(PD.teamColour(team), mrow ? '#7d8590' : '#e8833a');
+  var pc = PD.pairColours(PD.teamColour(team), mrow ? PD.col('grey') : PD.col('coral'));
   if (dP && document.getElementById('dv-dist')) {
     var drawD = function (key) { PD.v2.distribution('#dv-dist', dP, key, [{ x: (d.values || {})[key], label: PD.driverSurname(id) }]); };
     drawD('driver_effect');
@@ -261,13 +410,13 @@ function careerBlock(id, career) {
     PD.card('Team-mates', 'Qualifying and race head to head with every team-mate.', '<div id="dc-m"></div>', { span: 5, flush: true }), 'pd-mt');
   if (seasons.length) PD.ch.columns('dc-seasons', { cats: seasons.map(function (s) { return String(s.year); }), xName: 'Season', y2Name: 'Position', y2Inverse: true, y2Max: Math.max.apply(null, seasons.map(function (s) { return s.pos || 0; }).concat([5])),
     series: [{ name: 'Points', data: seasons.map(function (s) { return s.points || 0; }), colours: seasons.map(function (s) { return PD.teamColour(s.team); }), fmt: function (v) { return PD.pts(v); } },
-      { name: 'Championship position', type: 'line', axis: 1, data: seasons.map(function (s) { return s.pos || null; }), colour: '#e3b341', fmt: function (v) { return 'P' + v; } }],
+      { name: 'Championship position', type: 'line', axis: 1, data: seasons.map(function (s) { return s.pos || null; }), colour: PD.col('sun'), fmt: function (v) { return 'P' + v; } }],
     yName: 'Points', fmt: function (v) { return PD.num(v, 0); }, tipLabel: function (i) { var s = seasons[i]; return s.year + ' · ' + PD.teamName(s.team) + ' · ' + s.races + ' races, ' + s.wins + ' wins'; }, rotate: seasons.length > 14 ? 45 : 0, label: 'Season by season' });
   else PD.ch.none('dc-seasons', 'No seasons.');
   var e = career.elo || [];
   if (e.length) {
     var xs = e.map(function (r) { return r[0] + (r[1] - 1) / 25; });
-    PD.ch.lines('dc-elo', [{ name: 'Field', data: e.map(function (r, i) { return [xs[i], r[2]]; }), colour: '#3987e5' }, { name: 'v team-mate', data: e.map(function (r, i) { return [xs[i], r[3]]; }), colour: '#e8833a' }],
+    PD.ch.lines('dc-elo', [{ name: 'Field', data: e.map(function (r, i) { return [xs[i], r[2]]; }), colour: PD.col('sky') }, { name: 'v team-mate', data: e.map(function (r, i) { return [xs[i], r[3]]; }), colour: PD.col('coral') }],
       { xName: 'Season', yName: 'Elo rating', xFmt: function (v) { return String(Math.floor(v)); }, xLabel: function (v) { var y0 = Math.floor(v); return y0 + ' R' + (Math.round((v - y0) * 25) + 1); }, yFmt: function (v) { return PD.num(v, 0); }, label: 'Elo history' });
   } else PD.ch.none('dc-elo', 'No Elo history.');
   PD.table('dc-t', [

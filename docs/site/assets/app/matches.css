@@ -23,30 +23,17 @@
 .fb-mx-more:hover { color: var(--signal); }
 .fb-fx-r { white-space: nowrap; }
 
-/* hero (v2 scoreboard) */
-.fb-mx-hero { padding: var(--sp-5) var(--sp-6); --tc: var(--signal); }
-.fb-mx-hero-in { position: relative; display: grid; gap: var(--sp-4); }
-.fb-mx-meta { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; justify-content: center; text-align: center; }
-.fb-mx-meta .fb-comp { color: var(--ink-1); }
-.fb-mx-board { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--sp-4); }
-.fb-mx-team { display: grid; justify-items: center; gap: 4px; text-align: center; color: var(--ink-1); min-width: 0; }
-.fb-mx-team .nm { font: 800 var(--fs-xl)/1.1 var(--font-display); font-stretch: var(--stretch-display); overflow-wrap: anywhere; }
-.fb-mx-team .sb { font: 700 var(--fs-2xs) var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-3); }
-.fb-mx-team .qk-team-mark.lg { width: 72px; height: 72px; margin-bottom: 4px; }
-a.fb-mx-team[href]:hover .nm { color: var(--signal); }
-.fb-mx-score { display: grid; justify-items: center; gap: 8px; }
-.fb-mx-big { font: 900 clamp(2.6rem, 8vw, 4.4rem)/1 var(--font-display); font-stretch: var(--stretch-display); font-variant-numeric: tabular-nums; display: inline-flex; gap: 12px; }
-.fb-mx-big i { font-style: normal; color: var(--ink-3); }
-.fb-mx-big.pre { font-size: clamp(1.6rem, 4vw, 2.2rem); color: var(--ink-2); }
-.fb-mx-bar { max-width: 720px; width: 100%; margin: 0 auto; display: grid; gap: 8px; }
-.fb-mx-bar > .qk-kicker { text-align: center; }
-.fb-mx-hmeta { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; font-size: var(--fs-xs); color: var(--ink-3); }
-@media (max-width: 720px) {
-  .fb-mx-hero { padding: var(--sp-4) var(--sp-3); }
-  .fb-mx-board { gap: var(--sp-2); }
-  .fb-mx-team .nm { font-size: var(--fs-md); }
-  .fb-mx-team .qk-team-mark.lg { width: 44px; height: 44px; }
-}
+/* hero (kit v3: QK.previewCard beside the tiles and our forecast, as the Rink game page) */
+.fb-mx-back { margin-bottom: 10px; }
+.fb-mx-back a:hover { color: var(--ink-1); }
+.fb-mx-top { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: var(--sp-5); align-items: start; }
+.fb-mx-top.solo { grid-template-columns: minmax(0, 1fr); max-width: 860px; }
+@media (max-width: 1000px) { .fb-mx-top { grid-template-columns: minmax(0, 1fr); } }
+.fb-mx-hero { display: grid; gap: 10px; min-width: 0; }
+.fb-mx-hero .qk-vs-side .nm { overflow-wrap: anywhere; }
+.fb-mx-hmeta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: var(--fs-xs); color: var(--ink-3); padding: 0 6px; }
+.fb-mx-hmeta a { color: var(--signal); font-weight: 600; }
+.fb-mx-stack .fb-mx-ktiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 /* our forecast, the tale of the tape */
 .fb-mx-fc td.ours { color: var(--ink-1); font-weight: 700; font-family: var(--font-num); font-variant-numeric: tabular-nums; white-space: normal; }
@@ -83,12 +70,12 @@ a.fb-mx-team[href]:hover .nm { color: var(--signal); }
 .fb-mx-formhead span { display: inline-flex; align-items: center; gap: 6px; }
 .fb-mx-sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 .fb-mx-bh { margin-bottom: 4px; color: var(--ink-1); }
-.fb-mx-bt { font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); margin: 10px 0 4px; }
+.fb-mx-bt { font-size: var(--fs-xs); font-weight: 700; color: var(--coral); margin: 10px 0 4px; }
 .fb-mx-list { list-style: none; margin: 0; padding: 0; }
 .fb-mx-list li { display: grid; grid-template-columns: 24px 26px minmax(0, 1fr) auto 34px; gap: 6px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--line-1); font-size: var(--fs-sm); }
 .fb-mx-no { font: 600 var(--fs-xs) var(--font-num); color: var(--ink-3); text-align: right; }
 .fb-mx-pn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fb-mx-rt { display: inline-grid; place-items: center; min-width: 30px; height: 18px; border-radius: 4px; font: 700 10px var(--font-num); color: #fff; }
+.fb-mx-rt { display: inline-grid; place-items: center; min-width: 30px; height: 18px; border-radius: var(--r-pill); font: 700 10px var(--font-num); color: var(--bg); }
 .fb-mx-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
 
 /* team statistics */

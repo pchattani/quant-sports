@@ -746,10 +746,10 @@ def needs_payload(season, t, recs, tm, tpv, pos_pct, qb_pct, qb_val, qbs, qb_nex
             if not free and pos == "QB" and qb_start.get(s) != rc["pid"]:
                 hints.append(f"not {s}'s starting QB at present")
             elif not free and cost is not None and cost < 0.5 * g:
-                hints.append(f"costs {s} only {k_resp * cost:.2f} points a game (depth behind him)")
+                hints.append(f"costs {s} only {k_resp * cost:.2f} points a game (depth behind the player)")
             ct = (contracts_tab or {}).get(rc["pid"]) if contracts_on else None
             if ct and ct.get("contract_year"):
-                hints.append("in the last year of his contract")
+                hints.append("in the last year of the contract")
             if rc.get("age") is not None and rc["age"] >= 31:
                 hints.append(f"age {rc['age']:.0f}")
             r = {"pid": rc["pid"], "name": rc["name"], "team": s, "pos": pos, "age": an.rnd(rc.get("age"), 1),

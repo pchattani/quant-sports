@@ -314,4 +314,4 @@ def merge_into_stores(tour: str = "atp", years: Iterable[int] | None = None, ran
 DROP = ("best_of", "final_set_rule", "pts1", "pts2", "odds", "stats", "live")
 LICENSE_NOTE = {"name": "Wikipedia", "license": "CC BY-SA 4.0", "url": "https://en.wikipedia.org/",
                 "attribution": "ATP Challenger main-draw results: Wikipedia contributors (CC BY-SA 4.0)",
-                "use": "Challenger rows (level ch): ratings and features only, never priced or scored"}
+                "use": "Challenger rows (level ch): ratings and features only, never forecast or scored"}

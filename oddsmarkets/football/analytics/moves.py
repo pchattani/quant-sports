@@ -844,12 +844,12 @@ def base_probs(P: Panel, B: BaseRates) -> tuple[np.ndarray, list[str]]:
 
 # The Model page's text (meta.method), so the page and the payload say the same thing.
 METHOD = (
-    "Chance of moving: the share of players like him who left their club in the latest transfer window of the same "
+    "Chance of moving: the share of similar players who left their club in the latest transfer window of the same "
     "kind (last winter for the coming winter), by league and role (regular, rotation, fringe; on loan by region), "
     "from Sofascore's club transfer lists and player histories and our line-ups. It is a base rate, not a player-level "
     "forecast: our player-level model was tested on a held-out window and did not beat the base rate, because the "
     "winter and summer windows move different players (the Americas' main window is our winter, Europe's our summer). "
-    "A region-aware version is being forward-tested on this winter's window. If he moves, how (transfer, free, loan, "
+    "A region-aware version is being forward-tested on this winter's window. If the player moves, how (transfer, free, loan, "
     "loan ending, release) and where (same league, a stronger or weaker one, outside our leagues) come from models that "
     "beat the base rates on the held-out window. Targets rank players by their chance of joining the club: availability "
     "x a model of which clubs movers join (league, region, strength, quality against the club's players, the club's "
@@ -921,7 +921,7 @@ def _round(x, n=4):
 
 def _why(cur: Panel, j: int, club_name: dict[int, str], same_lg: bool, stronger: bool, qgap: float, unit: str) -> str:
     share = float(min(cur.info["share"][j], 1.0))
-    parts = [f"{band_of(share)} at {club_name.get(int(cur.tid[j])) or 'his club'} ({int(round(100 * share))}% of minutes)"]
+    parts = [f"{band_of(share)} at {club_name.get(int(cur.tid[j])) or 'the current club'} ({int(round(100 * share))}% of minutes)"]
     parts.append("same league" if same_lg else ("from a stronger league" if stronger else "from a weaker league"))
     if cur.info["on_loan"][j] > 0:
         parts.append("on loan there")

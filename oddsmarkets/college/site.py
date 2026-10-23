@@ -163,9 +163,9 @@ def headline(level: str, season: dict, title: list[dict], teams: dict, today: li
     fav_s = ""
     if fav:
         t = teams.get(fav["team"]) or {}
-        fav_s = f"{t.get('short') or t.get('name') or fav['team']} lead the title odds at {round(fav['p'] * 100)}%"
+        fav_s = f"{t.get('short') or t.get('name') or fav['team']} lead the title chances at {round(fav['p'] * 100)}%"
     if level == "cfb" and season.get("week") and ph == "regular":
-        return f"Week {season['week']}" + (f" · {fav_s}" if fav_s else " · CFP odds after Saturday")
+        return f"Week {season['week']}" + (f" · {fav_s}" if fav_s else " · CFP chances after Saturday")
     if ph == "preseason":
         when = min((parse_ts(c.get("date")) for c in today + nxt if parse_ts(c.get("date"))), default=None)
         return ("Tip-off " + f"{when:%a} {when.day} {when:%b}" if when else lab) + (f" · {fav_s}" if fav_s else " · preseason ratings")
@@ -247,11 +247,11 @@ SITE_TERMS = [
     ]),
     ("Season", [
         ("sim", "Season simulation", "Every remaining game played thousands of times from the ratings, with uncertainty in the ratings themselves."),
-        ("p_cfp", "Playoff odds", "Share of simulated seasons a team makes the 12-team College Football Playoff."),
+        ("p_cfp", "Playoff chance", "Share of simulated seasons a team makes the 12-team College Football Playoff."),
         ("committee", "Committee proxy", "A model of the CFP selection committee's ranking fitted on its past rankings; an estimate of how the committee may see a team, not a prediction of its decision."),
         ("bracketology", "Bracketology", "The projected NCAA tournament field and seeds from simulated seasons and a selection model fitted on past fields."),
         ("p_round", "Reach round", "Share of simulated tournaments in which a team reaches the round."),
-        ("upset", "Upset odds", "The chance the lower seed wins a game."),
+        ("upset", "Upset chance", "The chance the lower seed wins a game."),
     ]),
     ("Players", [
         ("value", "Value", "Football: EPA above replacement. Basketball: box-score value above replacement, scaled so a team's players add up to its margin."),

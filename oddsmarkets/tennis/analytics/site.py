@@ -85,7 +85,7 @@ def model_payload(td: an.TourData) -> dict:
         fund = (_io.read_json(_io.FITTED / f"predict_{td.tour}.json") or {}).get("fundamental") or {}
         mkt = {"w_elo": bl.get("w_elo"), "w_sr": bl.get("w_sr"), "w_gelo": bl.get("w_gelo"), "w_mr": bl.get("w_mr"),
                "params": MRt.params(td.tour), "version": MRt.VERSION,
-               "formula": "the site's match prices: logit p = w_elo logit(elo_p) + w_sr logit(sr_p) + w_gelo (m1 - m2) + "
+               "formula": "the site's match forecasts: logit p = w_elo logit(elo_p) + w_sr logit(sr_p) + w_gelo (m1 - m2) + "
                           "w_mr s_b (M1 - M2), M = the market rating (R + D_surface; a Kalman filter on earlier "
                           "matches' closing lines (margin removed) and results), s_b = params.s5 for best of five, else 1"}
         from oddsmarkets.tennis.models import sched as SC
@@ -117,7 +117,7 @@ def model_payload(td: an.TourData) -> dict:
                                  "grass; 0 when either is missing); sr_p = chain(p_srv1, p_srv2); the serve-point "
                                  "pair is then shifted (p1 + d, p2 - d) until the chain returns p" +
                                  ("; these are the fundamental weights (fitted without the market rating): the match "
-                                  "pages' prices add it ('market')" if mkt else "")},
+                                  "pages' forecasts add it ('market')" if mkt else "")},
             **({"market": mkt} if mkt else {}),
             "serve_return": {"base": base, "through": sr.get("through"), "version": sr.get("version") or SR.VERSION,
                              "formula": "logit hold(i v j) = mu + clay|grass + indoor + bo5 + level[lv] + (s_i + ds_i,surface) - "

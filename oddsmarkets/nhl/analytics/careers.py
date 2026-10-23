@@ -279,6 +279,42 @@ def peer_blocks(sk: dict | None, gk: dict | None) -> dict[str, dict]:
     return out
 
 
+def prev_season(season: int) -> int:
+    """20252026 -> 20242025."""
+    return int(season) - 10001
+
+
+def add_prev_pct(blocks: dict[str, dict], load: Callable[[int, str], dict | None]) -> int:
+    """Last season's position-group percentiles on each "current" block (kit v3 rail rings, 23 Oct 2026), so the player
+    page need not load last season's 4 MB catalogue: "prev_pct_pos" (the same shape as "pct_pos") and "prev_peer"
+    {"season", "group", "gp", "qualified"}. Skaters only when last season's group (F / D) is this season's; goalies
+    against goalies. `load(season, "skaters.json" | "goalies.json")` reads a season's catalogue. Returns the count."""
+    cache: dict = {}
+
+    def cat(season: int, fn: str) -> dict:
+        if (season, fn) not in cache:
+            cache[(season, fn)] = ((load(season, fn) or {}).get("players") or {})
+        return cache[(season, fn)]
+
+    n = 0
+    for pid, b in blocks.items():
+        if not b or not b.get("season"):
+            continue
+        goalie = b.get("kind") == "goalie"
+        pr = cat(prev_season(b["season"]), "goalies.json" if goalie else "skaters.json").get(pid)
+        if not pr:
+            continue
+        grp = "G" if goalie else pr.get("group")
+        cur = "G" if goalie else (b.get("peer") or {}).get("group")
+        pc = (pr.get("pct_pos") or pr.get("pct")) if goalie else (pr.get("pct_pos") if grp == cur else None)
+        if not pc:
+            continue
+        b["prev_pct_pos"] = pc
+        b["prev_peer"] = {"season": prev_season(b["season"]), "group": grp, "gp": pr.get("gp"), "qualified": bool(pr.get("qualified"))}
+        n += 1
+    return n
+
+
 def onice_by_strength(pg: pd.DataFrame) -> dict[str, dict]:
     """{pid: {"5v5" | "pp" | "pk": {toi (min), cf60, ca60, ff60, fa60, sf60, sa60, gf60, ga60, xgf60, xga60, cf_pct, xgf_pct, gf_pct}}}
     over the regular season (pp / pk = the player's team with more / fewer skaters)."""

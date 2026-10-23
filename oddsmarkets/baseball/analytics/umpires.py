@@ -17,13 +17,13 @@ METRICS = [
     M("called", "Called pitches", "Umpire", "int", desc="Called pitches (balls and called strikes) with a location."),
     M("accuracy", "Accuracy", "Umpire", "pct", desc="Calls matching the rulebook zone (plate half-width plus a ball radius; the batter's "
       "zone top and bottom +/- 0.12 ft)."),
-    M("x_accuracy", "Expected accuracy", "Umpire", "pct", desc="Accuracy the league surface (without his effect) would have had on his pitches."),
+    M("x_accuracy", "Expected accuracy", "Umpire", "pct", desc="Accuracy the league surface (without the umpire's effect) would have had on the pitches the umpire called."),
     M("acc_above_x", "Accuracy above expected", "Umpire", "pct", desc="Accuracy minus expected accuracy."),
-    M("consistency", "Consistency", "Umpire", "pct", desc="Calls agreeing with his own fitted zone (league surface plus his effect)."),
+    M("consistency", "Consistency", "Umpire", "pct", desc="Calls agreeing with the umpire's own fitted zone (league surface plus the umpire's effect)."),
     M("zone_per100", "Zone size (+strikes/100)", "Umpire", "2", desc="Called strikes above the league expectation per 100 called pitches."),
     M("missed_per_game", "Missed calls/game", "Umpire", "2", lower=True, desc="Missed calls per game."),
     M("runs_per_game", "Run impact/game", "Umpire", "2", lower=True, desc="Absolute run-expectancy swing of missed calls per game."),
-    M("effect", "Zone effect (log-odds)", "Umpire", "3", desc="His random effect in the called-strike model (+ = more strikes)."),
+    M("effect", "Zone effect (log-odds)", "Umpire", "3", desc="The umpire's random effect in the called-strike model (+ = more strikes)."),
 ]
 
 

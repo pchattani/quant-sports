@@ -268,7 +268,7 @@ def team_ratings(ctx, history: bool = True) -> dict | None:
         except Exception as exc:                                 # noqa: BLE001
             ctx.model_errors["team_strength history"] = f"{type(exc).__name__}: {exc}"
     return {"teams": teams, "history": hist, "source": "team_strength", "version": getattr(_module("team_strength"), "VERSION", None),
-            "units": "points per game against an average team (pass / rush units: EPA per play edges)", "league": res.get("league")}
+            "units": "points per game against an average team (pass / rush units: EPA per play margins)", "league": res.get("league")}
 
 
 def _ts_history(ctx) -> dict[str, list]:

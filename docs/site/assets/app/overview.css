@@ -1,12 +1,13 @@
-/* The Quant Footballer — Overview layout (fb-ov- prefix), Design System 2.0. */
-.fb-ov-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--sp-3); }
+/* The Quant Footballer — Overview layout (fb-ov- prefix), kit v3 "Matchday" (dark only). */
+.fb-ov-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--sp-6); }
 .fb-ov-quick .qk-chip { text-decoration: none; }
-.fb-ov-ticker { margin-top: var(--sp-4); border: 1px solid var(--line-1); border-radius: var(--r-3); }
+.fb-ov-ticker { margin: 0 0 var(--sp-6); border-radius: var(--r-card); }
 .fb-ov-ticker[hidden] { display: none; }
-.fb-ov-kpis { margin-top: var(--sp-4); }
+.fb-ov-kpis { margin-top: var(--sp-6); }
+.fb-ov-new.solo { grid-template-columns: minmax(0, 1fr); max-width: 760px; }
+#ov-fam { margin: 0 0 var(--sp-2); }
 .fb-ov-livetile .qk-stat-v { color: var(--live); }
 .fb-ov-sig { color: var(--signal); }
-#ov-fam { margin-bottom: 0; }
 #ov-days .qk-seg { max-width: 100%; overflow-x: auto; }
 .fb-ov-lead { list-style: none; margin: 0; padding: 0; }
 .fb-ov-lead li { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--line-1); min-width: 0; font-size: var(--fs-sm); }
@@ -15,7 +16,7 @@
 .fb-ov-lead .who { display: grid; min-width: 0; flex: 1 1 auto; }
 .fb-ov-lead .who .fb-ent { max-width: 100%; }
 .fb-ov-lead .s { color: var(--ink-3); font-size: var(--fs-2xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fb-ov-lead .v { margin-left: auto; flex: none; font: 800 var(--fs-md) var(--font-display); font-stretch: var(--stretch-display); font-variant-numeric: tabular-nums; }
+.fb-ov-lead .v { margin-left: auto; flex: none; font: 650 var(--fs-md) var(--font-display); font-variation-settings: var(--fvs-display); font-variant-numeric: tabular-nums; }
 .fb-ov-lead li:first-child .v { color: var(--signal); }
 #ov-races .qk-chance-lab small { color: var(--ink-3); }
 .fb-ov-last { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }

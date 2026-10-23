@@ -37,10 +37,10 @@ function board(node, L) {
     let h = (target ? '<div class="qk-note" style="margin-bottom:14px">The ' + esc(HW.seasonLabel(L, S)) + ' season is over: projections are for ' + esc(target) + '.</div>' : '') + '<div class="hw-kpis">' + QK.stats(kp) + '</div>';
     const pk = Object.keys(PICKS).filter(k => ((d.picks || {})[k] || []).length);
     if (pk.length) {
-      h += '<section class="qk-section">' + U.head({ title: 'Our picks', sub: 'From our own projections; the reason is under each name.' }) + '<div class="hw-leaders">' + pk.map(k => '<div class="qk-card"><div class="qk-card-head"><div class="qk-card-title">' + esc(PICKS[k]) + '</div></div><div>' +
+      h += '<section class="qk-section">' + U.head({ kicker: 'Our picks', title: 'Who to start, add and stash', sub: 'From our own projections; the reason is under each name.' }) + '<div class="hw-leaders">' + pk.map(k => '<div class="qk-card"><div class="qk-card-head"><div class="qk-card-title">' + esc(PICKS[k]) + '</div></div><div>' +
         d.picks[k].slice(0, 5).map(x => { const r = byId[x[0]] || {}; return '<div class="hw-pick"><div style="min-width:0">' + U.playerEnt(L, x[0], r.name, r.team, HW.teamAbbr(L, r.team) + (r.pos ? ' · ' + r.pos : '')) + '<div class="why">' + esc(x[1] || '') + '</div></div></div>'; }).join('') + '</div></div>').join('') + '</div></section>';
     }
-    h += '<section class="qk-section">' + U.head({ title: 'Rankings', sub: '9-category rank (z-scores on per-game projections, no punts) and points rank. Change the format, punts and horizon in the tools.', actions: U.btnLink(HW.href(L, 'fantasy') + '?tab=tools', 'All formats and tools') }) + '' +
+    h += '<section class="qk-section">' + U.head({ kicker: 'Rankings', title: 'The top of the board', sub: '9-category rank (z-scores on per-game projections, no punts) and points rank. Change the format, punts and horizon in the tools.', actions: U.btnLink(HW.href(L, 'fantasy') + '?tab=tools', 'All formats and tools') }) + '' +
       '<div class="qk-card"><div id="fb-rank"></div></div></section>';
     h += '<div class="qk-grid hw-sec">' + U.card2('Fantasy points a game', (preset ? esc(preset.label) + ' scoring' : 'Standard scoring') + ', projected', U.chart('fb-pts', 24 * topP.length + 40, 'Fantasy points a game'), { cls: 'qk-span-6' });
     const tw = d.teams || {}, wk = d.weeks || [];

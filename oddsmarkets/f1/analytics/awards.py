@@ -234,7 +234,7 @@ def race_awards(year: int, rnd: int, forecast: dict | None = None, effects: dict
                 how = f"while running P{held}: {loss:g} points gone"
             elif d in post:
                 loss = post[d].get("exp_points") or 0.0
-                how = f"; the forecast had him on {loss:.1f} points"
+                how = f"; the forecast had the driver on {loss:.1f} points"
             else:
                 g = grid.get(d)
                 loss = _pts(table, g)

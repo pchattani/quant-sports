@@ -9,6 +9,26 @@ function nav(active) { return PD.subnav([['#/model', 'Calibration', 'calibration
 
 // ── calibration ───────────────────────────────────────────────────────────
 
+/* "How sure are we?" at the top of the Model page (QK.howSure): the simulator's win chance before qualifying for every
+   driver in every scored race (calibration.json metrics.model_pre.win), with F1 wording: the Brier score against
+   giving every driver the base rate, our contenders' bucket, and the top end. Shown only when the record is there. */
+function howSure(d) {
+  var box = document.getElementById('cal-sure');
+  var cb = PD.v2.calib(d);
+  if (!box) return;
+  if (!cb) { var s = document.getElementById('cal-sure-s'); if (s) s.hidden = true; return; }
+  var shown = cb.bins.filter(function (b) { return b.n >= 30; });
+  var fav = shown.filter(function (b) { return b.lo >= 0.2; }).sort(function (a, b) { return b.n - a.n; })[0];
+  var top = shown[shown.length - 1], gap = top ? top.freq - top.mean_p : 0;
+  var pts = [
+    isNum(cb.brier) ? { k: cb.brier.toFixed(3), b: 'Brier score', text: '0 is perfect.' + (isNum(cb.base) ? ' Giving every driver the same ' + PD.pct(cb.base_rate, 0) + ' would score ' + cb.base.toFixed(3) + '.' : '') + ' Lower is better.' } : null,
+    fav ? { k: Math.round(fav.mean_p * 100) + '% → ' + Math.round(fav.freq * 100) + '%', b: 'Our contenders', text: QK.fmt.num(fav.n) + ' drivers we gave ' + Math.round(fav.lo * 100) + '–' + Math.round(fav.hi * 100) + '%; ' + PD.pct(fav.freq, 1) + ' of them won.' } : null,
+    top ? { k: Math.abs(gap) <= 0.03 ? 'Spot on' : gap > 0 ? 'Too shy' : 'Too bold', b: 'at the top end', text: 'Our biggest favourites (' + Math.round(top.lo * 100) + '%+) won ' + PD.pct(top.freq, 0) + ' of the time; we said ' + PD.pct(top.mean_p, 0) + '.' + (Math.abs(gap) > 0.03 ? ' Bins this small swing a lot.' : '') } : null
+  ].filter(Boolean);
+  QK.howSure(box, { bins: cb.bins, brier: cb.brier, n: cb.n, league: 'F1', span: cb.span, subject: 'the driver', unit: 'driver-races', points: pts });
+}
+
+
 var LABELS = { model_pre: 'Race simulator, before qualifying', model_post: 'Race simulator, after qualifying', model_pre_results_only: 'Simulator, results-only pace (pre)',
   grid_order: 'Grid order (logistic on slot)', previous_results: 'Previous 5 results', elo: 'Field Elo (Plackett-Luce)', plackett_luce: 'Plackett-Luce on past orders' };
 var EVENTS = [['win', 'Win'], ['podium', 'Podium'], ['points', 'Points'], ['dnf', 'DNF']];
@@ -44,9 +64,12 @@ function reading(d) {
 }
 
 function calibration(el) {
-  el.innerHTML = PD.pageHead('How good is the model?', 'Model', 'Walk-forward backtest: every Grand Prix predicted using only the data before it, scored against what happened.') + nav('calibration') + '<div id="cal-body">' + PD.empty('Loading the backtest', '') + '</div>';
+  el.innerHTML = PD.pageHead('Model', 'How good are our forecasts?', 'Every Grand Prix since 2014 predicted with only the data before it, then checked against what happened.') + nav('calibration') +
+    '<section class="qk-section pd-sec" id="cal-sure-s">' + QK.sectionHead({ kicker: 'How sure are we?', title: 'When we say 25%, does it happen 25% of the time?', sub: 'Our race simulator’s win chance for every driver in every scored race, before qualifying, against how often the driver won.' }) + '<div id="cal-sure">' + QK.skeleton('card', 1) + '</div></section>' +
+    '<section class="qk-section pd-sec">' + QK.sectionHead({ kicker: 'The backtest', title: 'Every model, every event', sub: 'Before and after qualifying, against simple baselines, for wins, podiums, points and retirements.' }) + '<div id="cal-body">' + PD.empty('Loading the backtest', '') + '</div></section>';
   return PD.load('calibration.json').then(function (d) {
     if (!PD.alive(el)) return;
+    howSure(d);
     if (!d || d.ok === false || !d.metrics) { PD.set('cal-body', PD.notBuilt('The backtest', d)); return; }
     var M = d.metrics;
     var pre = (d.pre_quali_models || Object.keys(M).filter(function (k) { return k !== 'model_post' && k !== 'grid_order'; })).filter(function (k) { return M[k]; });
@@ -76,7 +99,7 @@ function calibration(el) {
     var pr = d.per_race || [];
     if (pr.length) {
       var xs = pr.map(function (r) { return r.year + ' R' + r.round; });
-      PD.ch.lines('cal-races', ['model_pre', 'model_post', 'grid_order', 'elo'].filter(function (k) { return M[k]; }).map(function (k, i) { return { name: label(k), data: pr.map(function (r) { return (r.p_winner || {})[k]; }), width: k.indexOf('model') === 0 ? 2 : 1.2, colour: ['#3987e5', '#2fb37b', '#e8833a', '#c95ac9'][i] }; }),
+      PD.ch.lines('cal-races', ['model_pre', 'model_post', 'grid_order', 'elo'].filter(function (k) { return M[k]; }).map(function (k, i) { return { name: label(k), data: pr.map(function (r) { return (r.p_winner || {})[k]; }), width: k.indexOf('model') === 0 ? 2 : 1.2, colour: [PD.col('sky'), PD.col('leaf'), PD.col('coral'), PD.col('plum')][i] }; }),
         { xs: xs, xName: 'Race', yName: 'Winner’s probability', yFmt: function (v) { return Math.round(v * 100) + '%'; }, xLabel: function (v) { var r = pr[xs.indexOf(v)]; return r ? v + ' ' + (r.name || '') + ': ' + PD.driverName(r.winner) : v; }, yMin: 0, label: 'Winner probability by race' });
     } else PD.ch.none('cal-races', 'No per-race records.');
     var rel = ['model_pre', 'model_post', 'grid_order', 'previous_results'].filter(function (k) { return M[k]; });
@@ -155,7 +178,7 @@ function methodology(el, params) {
     return { id: s.id.replace(/^m-/, ''), title: title, html: s.innerHTML };
   });
   var idx = PD.index() || {};
-  el.innerHTML = PD.pageHead('How it works', 'Methodology', 'Where the data comes from, how every model works and where it is wrong. Every constant is the one in the code; each section names its source file.' + (idx.updated_at ? ' Site updated ' + esc(PD.fmtStamp(idx.updated_at)) + '.' : '')) + nav('methodology') +
+  el.innerHTML = PD.pageHead('Model · how it works', 'How every model works', 'Where the data comes from, how every model works and where it is wrong. Every constant is the one in the code; each section names its source file.' + (idx.updated_at ? ' Site updated ' + esc(PD.fmtStamp(idx.updated_at)) + '.' : '')) + nav('methodology') +
     '<div class="pd-doc"><nav class="pd-toc qk-card" aria-label="Sections"><div class="qk-kicker">' + secs.length + ' sections</div><ol>' + secs.map(function (s) { return '<li><a href="#/methodology/' + esc(s.id) + '" data-t="m-' + esc(s.id) + '">' + esc(s.title) + '</a></li>'; }).join('') + '</ol></nav>' +
     '<div class="pd-doc-body">' + secs.map(function (s, i) { return '<section class="qk-card pd-prose" id="m-' + esc(s.id) + '"><div class="qk-card-body"><h2><span class="pd-num">' + (i + 1) + '</span> ' + esc(s.title) + '</h2>' + s.html + '</div></section>'; }).join('') + '</div></div>';
   Array.prototype.forEach.call(el.querySelectorAll('.pd-toc a[data-t]'), function (a) {
@@ -177,7 +200,7 @@ var REWORD = {
 function v2entry(e) { var o = Object.assign({}, e); o.desc = REWORD[o.key] || PD.v2.copy(o.desc); return o; }
 function glossary(el, params) {
   var key = params.key || '';
-  el.innerHTML = PD.pageHead('Every metric and model term', 'Glossary', 'How each is computed is in the methodology.') + nav('glossary') + '<div id="gl-body">' + PD.empty('Loading the glossary', '') + '</div>';
+  el.innerHTML = PD.pageHead('Model · glossary', 'What every number means', 'Every metric and model term in plain words. How each is computed is in the methodology.') + nav('glossary') + '<div id="gl-body">' + PD.empty('Loading the glossary', '') + '</div>';
   return PD.load('glossary.json').then(function (g) {
     if (!PD.alive(el)) return;
     var ready = g && g.ok !== false && (g.groups || []).length ? Promise.resolve(g) : PD.loadAll([PD.currentSeason() + '/drivers.json', PD.currentSeason() + '/teams.json']).then(function (res) {
@@ -222,7 +245,7 @@ function glossary(el, params) {
 
 function disclaimer(el) {
   var t = document.getElementById('disclaimer-template');
-  el.innerHTML = PD.pageHead('Legal', 'Disclaimer and terms', '') + nav('disclaimer') + '<section class="qk-card pd-prose pd-mt"><div class="qk-card-body">' + (t ? t.innerHTML : '') + '</div></section>';
+  el.innerHTML = PD.pageHead('Model · legal', 'Disclaimer and terms', '') + nav('disclaimer') + '<section class="qk-card pd-prose pd-mt"><div class="qk-card-body">' + (t ? t.innerHTML : '') + '</div></section>';
 }
 
 PD.route('model', calibration);

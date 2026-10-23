@@ -709,7 +709,7 @@ def finish_payload(season: int, rows: list[dict], P: dict, pre: dict, today: dat
             "constants": {"hl_toi": HL_TOI, "hl_rate": HL_RATE, "hl_goalie": HL_GOALIE, "hl_start": HL_START, "fin_prior": FIN_PRIOR,
                           "k_ixg": K_IXG, "k_ixg_pp": K_IXG_PP, "k_on": K_ON, "k_counts": K_CNT, "k_assist_share": K_ASH,
                           "goalie_prior_xg": G_PRIOR, "team_prior_games": TEAM_PRIOR, "decision": DECISION, "injury_games": INJ_GAMES},
-            "note": "Our projections from our own data and models. No fantasy platform's ownership, ADP, rankings or prices are used "
+            "note": "Our projections from our own data and models. No fantasy platform's ownership, ADP, rankings or costs are used "
                     "(their terms do not allow it): waiver targets are defined from our own projections."}
 
 
@@ -723,7 +723,7 @@ def our_picks(rows: list[dict], weeks: list) -> list[dict]:
         if r.get("pre_rank"):
             why += f" (season start {r['pre_rank']})"
         if r["kind"] == "S" and r.get("toi5") is not None:
-            why += f"; {r['toi5']:.1f} min a game over his last five"
+            why += f"; {r['toi5']:.1f} min a game over the last five"
             if r.get("pp_unit") == 1:
                 why += ", on the first power-play unit"
         out.append({"kind": "Add", "id": r["id"], "name": r["name"], "team": r["team"], "pos": r["pos"], "why": why})
@@ -732,14 +732,14 @@ def our_picks(rows: list[dict], weeks: list) -> list[dict]:
             why = (f"{r.get('g_s', 0):.0f} goals on {r.get('xg_s', 0):.1f} expected; projects {r['pts_pg']:.2f} points a game against "
                    f"{r.get('act_pg') or 0:.2f} so far")
         else:
-            why = f"GSAx {r.get('gsax_s', 0):+.1f} this season, {r['luck_gsax']:+.1f} below his record; save talent should pull him back up"
+            why = f"GSAx {r.get('gsax_s', 0):+.1f} this season, {r['luck_gsax']:+.1f} below the goalie's record; save talent should pull the numbers back up"
         out.append({"kind": "Buy low", "id": r["id"], "name": r["name"], "team": r["team"], "pos": r["pos"], "why": why})
     for r in sorted(by("sell"), key=lambda r: (r.get("regress") or 0) if r["kind"] == "S" else -(r.get("luck_gsax") or 0))[:2]:
         if r["kind"] == "S":
             why = (f"{r.get('g_s', 0):.0f} goals on {r.get('xg_s', 0):.1f} expected; projects {r['pts_pg']:.2f} points a game against "
                    f"{r.get('act_pg') or 0:.2f} so far")
         else:
-            why = f"GSAx {r.get('gsax_s', 0):+.1f} this season, {r['luck_gsax']:+.1f} above his record"
+            why = f"GSAx {r.get('gsax_s', 0):+.1f} this season, {r['luck_gsax']:+.1f} above the goalie's record"
         out.append({"kind": "Sell high", "id": r["id"], "name": r["name"], "team": r["team"], "pos": r["pos"], "why": why})
     gl = [r for r in rows if r["kind"] == "G"]
     rank_g = {r["id"]: i + 1 for i, r in enumerate(sorted(gl, key=lambda r: -r["ros"]))}
@@ -751,9 +751,9 @@ def our_picks(rows: list[dict], weeks: list) -> list[dict]:
     for r in sorted(by("breakout"), key=lambda r: r["rank"])[:2]:
         parts = [f"age {r['age']:.0f}"]
         if r.get("toi_up") is not None and r["toi_up"] >= 2.0:
-            parts.append(f"{r['toi5']:.1f} min a game over his last five, up {r['toi_up']:.1f} on last season")
+            parts.append(f"{r['toi5']:.1f} min a game over the last five, up {r['toi_up']:.1f} on last season")
         elif r.get("toi_prev") is None:
-            parts.append(f"{r['toi5']:.1f} min a game over his last five in his first full NHL run")
+            parts.append(f"{r['toi5']:.1f} min a game over the last five in a first full NHL run")
         if r.get("pp_up") is not None and r["pp_up"] >= 1.0:
             parts.append(f"{r['pp5']:.1f} PP minutes a game, up {r['pp_up']:.1f}")
         parts.append(f"projects {r['pts_pg']:.2f} points a game (rank {r['rank']})")

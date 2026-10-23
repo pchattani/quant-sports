@@ -3,7 +3,7 @@
 .fb-md-card .qk-sub { margin: 0; }
 .fb-md-card .qk-card-foot span:last-child { color: var(--signal); font-weight: 600; }
 .fb-md-stat { display: flex; align-items: baseline; gap: 8px; margin-top: var(--sp-3); }
-.fb-md-stat b { font-size: var(--fs-xl); letter-spacing: -0.03em; }
+.fb-md-stat b { font-size: var(--fs-xl); font-family: var(--font-display); font-variation-settings: var(--fvs-display); font-weight: 650; }
 .fb-md-stat span { font-size: var(--fs-xs); color: var(--ink-3); }
 .fb-md-list { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: var(--ink-2); font-size: var(--fs-sm); }
 .fb-md-list a, .fb-md-doc a, .fb-md-entry a.fb-md-gl { color: var(--signal); }
@@ -32,7 +32,7 @@
 .fb-md-gl { text-decoration: underline dotted; text-underline-offset: 3px; }
 .fb-md-formula { margin: 0 0 var(--sp-3); padding: 10px 12px; border-radius: var(--r-2); background: var(--s-2); border: 1px solid var(--line-1); border-left: 3px solid var(--signal); font: 500 var(--fs-xs)/1.6 var(--font-num); color: var(--ink-1); white-space: pre-wrap; overflow-x: auto; }
 .fb-md-note { margin: 0 0 var(--sp-3); }
-.fb-md-note.warn::before { content: "!"; background: var(--st-warn); color: #000; }
+.fb-md-note.warn::before { content: "!"; background: var(--st-warn); color: var(--bg); }
 @media (max-width: 900px) {
   .fb-md-layout { grid-template-columns: minmax(0, 1fr); }
   .fb-md-toc { position: static; max-height: none; }

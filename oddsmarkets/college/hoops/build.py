@@ -596,7 +596,7 @@ def season_sim(ctx: dict, s: int, sims: int) -> dict | None:
                      "p_round": {k: r4(reach[i, j + 1]) for j, k in enumerate(["r32", "s16", "e8", "f4", "final", "title"])} if a else None,
                      "p_title": r4(reach[i, 6]) if a else 0.0}
         out = {"kind": "bracket", "teams": tm, "reach": reach, "seeds_of": res["seeds_of"], "regs": res["regs"],
-               "n": max(2000, sims), "notes": ["Finished season: the NCAA tournament odds are pre-tournament (ratings fitted on "
+               "n": max(2000, sims), "notes": ["Finished season: the NCAA tournament chances are pre-tournament (ratings fitted on "
                                                 "games before the First Four), simulated on the actual bracket; records and "
                                                 "bids are actual."]}
     elif ctx["sel_all"] is not None and (s == current_season(lv) or s == 2020):
@@ -621,7 +621,7 @@ def season_sim(ctx: dict, s: int, sims: int) -> dict | None:
                  "Selection and seeding by our proxy (fitted on past fields); conference-separation and geography rules are not "
                  "modelled."]
         if s == 2020:
-            notes.insert(0, "2020: no NCAA tournament was played (COVID-19); the field and odds are hypothetical.")
+            notes.insert(0, "2020: no NCAA tournament was played (COVID-19); the field and chances are hypothetical.")
         out = {"kind": "full" if s != 2020 else "projected", "teams": tm, "res": res, "n": sims, "notes": notes}
     b["sim"] = out
     return out
@@ -1152,7 +1152,7 @@ PLAYER_METRICS = [("value", "Value", "Value", "1", False, "Points above replacem
                   # rates (docs/_design/metrics/college.json): per 100 possessions on the floor, shares as 0-1 fractions
                   ("pts100", "PTS/100", "Rates", "1", False, "Points per 100 team possessions on the floor"),
                   ("ts_add", "Scoring added /100", "Rates", "signed2", False,
-                   "Points per 100 possessions gained by shooting above the D-I true-shooting rate on his volume"),
+                   "Points per 100 possessions gained by shooting above the D-I true-shooting rate on the player's volume"),
                   ("efg", "eFG%", "Shooting", "pct", False, "Effective field-goal percentage (a three counts 1.5 field goals)"),
                   ("tpar", "3PA rate", "Shooting", "pct", False, "Three-point attempts per field-goal attempt (style)"),
                   ("ftr", "FT rate", "Shooting", "3", False, "Free-throw attempts per field-goal attempt"),
@@ -1667,8 +1667,8 @@ def calibration_payload(ctx: dict) -> dict:
     notes = [
         "Walk-forward: every game is predicted from ratings fitted on earlier days only (with the preseason prior from the "
         "previous season), and the game-model parameters for a season come from earlier seasons only.",
-        "Closing lines: ESPN core odds (consensus 2013, offshore books 2014-2016 as a median, US books later, DraftKings / "
-        "ESPN BET closes recently); coverage grows as the summaries/odds backfill lands, so v-close numbers cover only "
+        "Closing lines: ESPN's core API (consensus 2013, offshore books 2014-2016 as a median, US books later, DraftKings / "
+        "ESPN BET closes recently); coverage grows as the summaries/lines backfill lands, so v-close numbers cover only "
         "games with a stored line.",
         f"Possessions: box scores where present, else the scoreboard estimate x {kp['pooled']:.3f} (fitted ratio; MAE "
         f"{kp.get('mae_ratio')} possessions v {kp.get('mae_const')} for a constant).",
@@ -1676,7 +1676,7 @@ def calibration_payload(ctx: dict) -> dict:
         "team's usual venue (women before 2011 have no venues: tournament games only).",
         "Selection proxy accuracy is leave-one-season-out; the tournament forecasts use the actual bracket with "
         "pre-tournament ratings; the seed baseline is fitted on earlier seasons only."]
-    notes.append("Lines are sanity-checked (data.clean_odds): ESPN core odds put the -110 quote in the spread and total "
+    notes.append("Lines are sanity-checked: ESPN's core API put the -110 quote in the spread and total "
                  "fields of about 300 men's 2023 games; those lines are dropped, as are totals outside a plausible range.")
     notes.append("by_line splits the v-close numbers by line type: an explicit closing line (the book's close block, ESPN BET "
                  "2023-2025, DraftKings 2026) or the last listed line / median of books (earlier seasons), which may be "

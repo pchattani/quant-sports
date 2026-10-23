@@ -449,12 +449,12 @@ WHY = {"fa_elig": ("free-agent service (7+ seasons)", "years before free agency"
        "clubs2": ("several clubs lately", "settled with one club"), "share": ("a big role", "a small role"),
        "share_prev": ("a big role last season", "a small role last season"),
        "v_cur": ("strong season", "weak season"), "v_prev": ("strong last season", "weak last season"),
-       "v_trend": ("improving", "declining"), "rank_pos": ("behind others at his position", "first choice at his position"),
+       "v_trend": ("improving", "declining"), "rank_pos": ("behind others at the position", "first choice at the position"),
        "depth": ("a crowded position", "a thin position"), "pitcher": ("pitcher", "position player"), "starter": ("starter", None),
        "il_cur": ("injured-list time", "healthy"), "il_prev": ("injured-list time last season", None),
        "team_wp": ("a winning club", "a losing club"), "team_traj": ("club trending up", "club trending down"),
        "team_age": ("an older roster", "a younger roster"), "team_turn": ("a high-turnover club", "a stable club"),
-       "v_x_reb": ("value on a rebuilding club", None), "v_x_walk": ("value in his walk year", None),
+       "v_x_reb": ("value on a rebuilding club", None), "v_x_walk": ("value in a walk year", None),
        "age_x_reb": ("a veteran on a rebuilding club", None)}
 
 NOTES = [
@@ -463,20 +463,20 @@ NOTES = [
     "No contract data: salaries, contract years, options and no-trade clauses are not used, because no source whose terms "
     "allow our use has them. Free agency is inferred from age, years since the MLB debut (the service-time proxy: six "
     "years for free agency, three to five for arbitration), tenure with the club and role.",
-    "Value is Bullpen WAR, the last two seasons blended 3:2. Rostered: the last club he played for this season, with no "
+    "Value is Bullpen WAR, the last two seasons blended 3:2. Rostered: the last club the player played for this season, with no "
     "move off it since.",
     "Outlook: the chance of adding at least one player at the position who was on another MLB club, by next season, from "
     "a Poisson model of past arrivals (need there, club strength and trajectory, turnover, expected departures). Prospects "
     "from the club's own system and signings from outside MLB are not counted.",
     "Targets: players on other clubs who would upgrade the club's weakest regular slot at their position (the fifth "
-    "starter, the seventh reliever, else the regular), ranked by their chance of joining it: the chance he moves x the "
-    "chance this club is where he goes (a conditional logit on past moves: the upgrade, the need, contenders and veterans, "
+    "starter, the seventh reliever, else the regular), ranked by their chance of joining it: the chance the player moves x the "
+    "chance this club is where they go (a conditional logit on past moves: the upgrade, the need, contenders and veterans, "
     "rebuilders and youth, turnover, same league). An estimate from on-field value and history, not news.",
 ]
 
 CFG = MV.Config(level=LEVEL, version=VERSION, feats=FEATS, quad=QUAD, dl_feats=DL_FEATS, type_feats=TYPE_FEATS, arr_feats=ARR_FEATS,
                 types=TYPES, type_label=TYPE_LABEL, dev=DEV, test=TEST, slots=SLOTS, contend=CONTEND, rebuild=REBUILD, unit="WAR",
-                age_pivot=29.0, why=WHY, notes=NOTES, yrs_phrase="{n} seasons since his debut", walk_from=6, deadline_label="traded")
+                age_pivot=29.0, why=WHY, notes=NOTES, yrs_phrase="{n} seasons since the MLB debut", walk_from=6, deadline_label="traded")
 
 
 def frame(W: World, phase: str, x: float) -> pd.DataFrame:

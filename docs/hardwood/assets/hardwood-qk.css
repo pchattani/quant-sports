@@ -41,7 +41,7 @@ body.qk { font-size: var(--fs-md); }
 .qk .wc-table { font-size: var(--fs-sm); }
 .qk .wc-table thead th {
   background: var(--s-2); color: var(--ink-3); border-bottom: 1px solid var(--line-2);
-  font: 600 var(--fs-2xs)/1.2 var(--font-ui); letter-spacing: 0.06em; text-transform: uppercase;
+  font: 600 var(--fs-2xs)/1.2 var(--font-ui); letter-spacing: 0.06em; text-transform: none;
 }
 .qk .wc-table td { border-bottom: 1px solid var(--line-1); color: var(--ink-1); }
 .qk .wc-table td, .qk .kpi-value, .qk .gc-score, .qk .gc-p, .qk .pct-val, .qk .gc-xg { font-variant-numeric: tabular-nums; }
@@ -110,7 +110,7 @@ body.qk { font-size: var(--fs-md); }
 .hw-kpis { margin-bottom: var(--sp-5); }
 .hw-kpis .qk-kpi-value.is-text { font-size: var(--fs-md); }
 .hw-games { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); }
-.hw-day { font: 700 var(--fs-xs)/1.2 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-3); margin: var(--sp-5) 0 var(--sp-3); display: flex; gap: 8px; align-items: center; }
+.hw-day { font: 700 var(--fs-xs)/1.2 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: none; color: var(--ink-3); margin: var(--sp-5) 0 var(--sp-3); display: flex; gap: 8px; align-items: center; }
 .hw-day:first-child { margin-top: 0; }
 .hw-day b { color: var(--ink-1); }
 .hw-list { list-style: none; margin: 0; padding: 0; }
@@ -181,7 +181,7 @@ body.qk { font-size: var(--fs-md); }
 .hw-chartcap b { color: var(--ink-2); }
 .qk .qk-table .neg { color: var(--down); }
 .qk .qk-table .pos { color: var(--up); }
-.hw-inj { color: var(--down); font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.hw-inj { color: var(--down); font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.04em; text-transform: none; }
 .hw-pos { display: inline-grid; place-items: center; min-width: 22px; height: 18px; padding: 0 4px; border-radius: 4px; background: var(--s-3); font: 700 10px var(--font-ui); color: var(--ink-2); }
 .hw-teamhead { display: flex; gap: var(--sp-5); align-items: center; flex-wrap: wrap; position: relative; }
 .hw-teamhead .qk-hero-stats { margin-left: auto; }
@@ -330,7 +330,7 @@ body.qk { font-size: var(--fs-md); }
 .qk .hw-lcard .pad, .qk .card .pad { padding: var(--sp-3) var(--sp-4); }
 .qk .hw-lcard .section-note, .qk .hw-lcard .pg-note, .qk .card .pg-note, .qk .card .section-note, .qk .hw-lcard .mk-line, .qk .card .mk-line { padding: var(--sp-2) var(--sp-4) var(--sp-3); color: var(--ink-3); font-size: var(--fs-xs); line-height: 1.5; }
 .qk .hw-lcard > .qk-card-body > .qk-table-wrap, .qk .card > .qk-table-wrap { border-top: 1px solid var(--line-1); }
-.qk .day-head { font: 700 var(--fs-2xs)/1.2 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-3); padding: var(--sp-3) var(--sp-4) var(--sp-2); }
+.qk .day-head { font: 700 var(--fs-2xs)/1.2 var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: none; color: var(--ink-3); padding: var(--sp-3) var(--sp-4) var(--sp-2); }
 .qk .qk-table.wc-table th.sortable-th { cursor: pointer; }
 .qk .qk-table.wc-table th[data-sort-dir="asc"]::after { content: " ▲"; color: var(--accent); }
 .qk .qk-table.wc-table th[data-sort-dir="desc"]::after { content: " ▼"; color: var(--accent); }
@@ -351,3 +351,32 @@ body.qk { font-size: var(--fs-md); }
 .qk .hw-legacy .qk-surface, .qk .hw-legacy .hf-court.qk-surface { max-width: 520px !important; margin-left: auto; margin-right: auto; }
 /* a legacy view's own page head repeats the section head above it */
 .hw-legacy > .qk-sh:first-child { display: none; }
+
+/* ═════════════════════════════════ 9. kit v3 (Matchday, dark only): page structure and the legacy labels
+   base.css is copied from the football site at build time, so its all-caps labels are reset here (sentence case). */
+.qk .global-nav a, .qk .sr-head, .qk .card-header, .qk .wc-table thead th, .qk .group-card-header, .qk .kpi-label, .qk .cut-note,
+.qk .pct-group-head, .qk .fx-day, .qk .chip, .qk .day-name, .qk .sb-comp-head, .qk .mini-head, .qk .tc-prob, .qk .ts-head, .qk .ts-label,
+.qk .lu-sub-head, .qk .bracket-col-title, .qk .comp-country, .qk .ts-group, .qk .pb-round-head { text-transform: none; letter-spacing: 0; }
+.qk .hw-day, .qk .day-head, .qk .hw-inj { letter-spacing: 0; }
+.hw-tiles { margin-top: var(--sp-8); }
+.hw-tiles .qk-stats { margin: 0; }
+.hw-sec1 { margin-top: var(--sp-8); }
+.hw-crumb { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; font-size: var(--fs-sm); color: var(--ink-3); margin: 0 0 10px; }
+.hw-crumb a:hover { color: var(--ink-1); }
+.hw-gtop { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: var(--sp-5); align-items: start; }
+.hw-gside .hw-kpis { margin: 0; }
+.hw-gside .qk-stats { grid-template-columns: 1fr 1fr; }
+@media (max-width: 1000px) { .hw-gtop { grid-template-columns: 1fr; } }
+.hw-preview .qk-preview { height: auto; }
+.hw-preview .hw-hero-meta { justify-content: flex-start; margin-top: var(--sp-3); font-size: var(--fs-xs); color: var(--ink-3); }
+.hw-h4 { margin: 14px 0 6px !important; font: 700 var(--fs-xs)/1.2 var(--font-ui) !important; color: var(--ink-3) !important; }
+.hw-type li { padding: 8px 0; border-bottom: 1px dashed var(--line-1); }
+.hw-type .hw-link { color: var(--signal); font-size: var(--fs-xs); font-weight: 600; }
+a.hw-lastg { display: block; color: inherit; text-decoration: none; }
+a.hw-lastg:hover { box-shadow: var(--sh-2); }
+.hw-lead .v { font: 600 var(--fs-md) var(--font-display); font-stretch: normal; }
+.hw-cmp-pick { display: flex; gap: 10px; flex-wrap: wrap; }
+.hw-cmp-slot { display: grid; gap: 6px; flex: 1 1 220px; min-width: 0; border-left: 0; padding-left: 0; }
+.hw-cmp-slot .qk-input { border-radius: var(--r-pill); border: 1.5px solid color-mix(in srgb, var(--ec) 55%, var(--line-2)); padding-left: 16px; width: 100%; }
+.hw-ticker + .qk-greet { margin-top: var(--sp-6); }
+@media (max-width: 640px) { .hw-tiles, .hw-sec1 { margin-top: var(--sp-6); } }

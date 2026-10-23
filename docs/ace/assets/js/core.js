@@ -165,7 +165,7 @@ const PAGE_HEAD = {
   elo: ['Elo ratings', 'Our strength ratings from every tour-level result, overall and by surface.'],
   players: ['Players', ''], h2h: ['Head to head', 'Any two players: their record, how they match up on each surface and our chance if they met today.'],
   value: ['Player value', 'Who is likely to rise or fall over the next year, how much of a record is luck, and whose ranking runs ahead of or behind our rating.'], lab: ['Scatter lab', 'Any two metrics for any group of players.'],
-  compare: ['Compare', 'Two or three players side by side on the metrics that best describe and predict their tennis, ranked against their own tour.'],
+  compare: ['Compare', 'Pick two or three players: they line up on the metrics that best describe and predict their tennis, ranked against their own tour.'],
   methodology: ['How the models work', 'The ratings, the match model, the simulations and how well each has done.'],
   calibration: ['Calibration', 'How often our chances came true, and how they compare with the closing market as a reference.'],
   glossary: ['Glossary', 'Every metric on the site, defined.'], disclaimer: ['Disclaimer and terms', '']
@@ -848,15 +848,34 @@ function matchCard(c, opts) {
   const top1 = (m.sets_dist_top || [])[0];
   if (top1 && pre) bits.push('<span title="Likeliest score in sets">Likeliest <b>' + esc(top1[0]) + '</b> ' + pct(top1[1], 0) + '</span>');
   if (isNum(m.exp_games) && pre) bits.push('<span title="Expected games in the match">Games <b>' + num(m.exp_games, 1) + '</b></span>');
+  /* v3: opts.why adds the italic one-line reason (QK.whyLine on the kit shape: a coin flip, a clear favourite and how
+     often that still goes wrong, an upset, a live match the score has moved). */
+  const why = o.why && window.QK && QK.whyLine ? QK.whyLine(kitGame(c, T)) : '';
   return '<a class="qk-gc ta-mc' + (live ? ' is-live' : fin ? ' is-final' : '') + (o.compact ? ' gc-compact' : '') + '" href="' + matchHref(T, c.id) + '" style="--sa:var(--a-tennis)">' +
     '<div class="qk-gc-top"><span class="qk-gc-lg">' + esc(tag) + '</span>' + badge + '</div>' +
     '<div class="qk-gc-rows">' + row(c.p1, 0, pShow) + row(c.p2, 1, pShow === null ? null : 1 - pShow) + '</div>' + bar +
-    (bits.length ? '<div class="qk-gc-foot">' + bits.join('') + '</div>' : '') + '</a>';
+    (bits.length ? '<div class="qk-gc-foot">' + bits.join('') + '</div>' : '') + (why ? '<div class="qk-aside">' + esc(why) + '</div>' : '') + '</a>';
+}
+/* A MATCH_CARD as the kit's game shape (ticker, feature card, preview card, "why" lines): p1 on the top row (away),
+ * p2 below (home); p_home is our pre-match chance for p2 (kept after the match as the pre-match call), wp_home the live
+ * one; as / hs are sets won. No market: the kit shows it only where a page asks. opts.initials: the monogram reads the
+ * player's initials (feature and preview cards) instead of the surname (ticker, bar keys). */
+function kitGame(c, T0, opts) {
+  const T = T0 || state.tour, ko = opts || {};
+  const st = matchState(c), fin = isFinished(c), live = st === 'live';
+  const m = c.model || {};
+  const w = setsWon(c);
+  const ent = pid => { const x = NAMES[T][String(pid)] || {}; return { name: playerShort(T, pid), abbr: ko.initials ? fmtInitials(playerName(T, pid)) : playerSurname(T, pid).slice(0, 12), href: playerHref(T, pid), country: x.country || '' }; };
+  const d = parseDate(c.date);
+  return { sport: 'tennis', league: eventName(T, c.event), note: roundLabel(c.round), id: c.id, start: d ? d.toISOString() : c.date, status: live ? 'live' : fin ? 'final' : 'pre',
+    away: ent(c.p1), home: ent(c.p2), as: fin || live ? w[0] : null, hs: fin || live ? w[1] : null,
+    p_home: isNum(m.p1) ? 1 - Number(m.p1) : null, wp_home: live && isNum(c.wp_now) ? 1 - Number(c.wp_now) : undefined,
+    pre_only: live && !isNum(c.wp_now) ? true : undefined, href: matchHref(T, c.id), tba: !!c.tba || (c.date && String(c.date).length <= 10) };
 }
 /* Before the first ball a card is "upcoming"; a snapshot can keep a match live or upcoming long after it was played.
  * Cards still live or upcoming 12 hours after their start are dropped (the Home page applies the same guard). */
 function fresh(list) {
-  const cut = Date.now() - 12 * 3600e3;
+  const cut = (window.QK && QK.now ? QK.now() : Date.now()) - 12 * 3600e3;
   return (list || []).filter(c => {
     if (!c) return false;
     if (isFinished(c)) return true;
@@ -1193,7 +1212,7 @@ return {
   surfaceColour: surfaceColour, surfaceLabel: surfaceLabel, surfaceDot: surfaceDot, surfaceChip: surfaceChip,
   levelLabel: levelLabel, levelShort: levelShort, levelChip: levelChip, levelRank: levelRank, roundLabel: roundLabel, roundIndex: roundIndex,
   matchState: matchState, isFinished: isFinished, fmtScore: fmtScore, setsWon: setsWon, totalGames: totalGames, statusChip: statusChip,
-  matchCard: matchCard, fresh: fresh, titleProbs: titleProbs, awardValue: awardValue, playersOf: playersOf, eventsOf: eventsOf,
+  matchCard: matchCard, kitGame: kitGame, fresh: fresh, titleProbs: titleProbs, awardValue: awardValue, playersOf: playersOf, eventsOf: eventsOf,
   // names and links
   player: player, playerName: playerName, playerShort: playerShort, playerSurname: playerSurname, playerCountry: playerCountry,
   playerRank: playerRank, playerColour: playerColour, playerLink: playerLink, playerHref: playerHref,

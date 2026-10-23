@@ -117,7 +117,7 @@ METRICS: list[dict] = [
     _m("p_conf", "Finals probability", "Projections", "prob"),
     _m("p_title", "Title probability", "Projections", "prob"),
     _m("p_title_market", "Title probability (market)", "Projections", "prob"),
-    _m("title_edge", "Title edge (model - market)", "Projections", "prob"),
+    _m("title_edge", "Title chance: model minus market", "Projections", "prob"),
 ]
 METRIC_KEYS = [m["key"] for m in METRICS]
 

@@ -64,7 +64,7 @@ function controlBands(control, nLaps) {
 function bandArea(bands, T) {
   if (!bands || !bands.length) return undefined;
   return { silent: true, data: bands.map(function (b) {
-    var c = b.kind === 'RED' ? QKC.hexA(T.down || '#e05d5d', 0.16) : QKC.hexA('#e3b341', b.kind === 'VSC' ? 0.08 : 0.15);
+    var c = b.kind === 'RED' ? QKC.hexA(T.down || PD.col('down'), 0.16) : QKC.hexA(T.sun || '#ffc94d', b.kind === 'VSC' ? 0.08 : 0.15);
     return [{ xAxis: b.from - 0.5, itemStyle: { color: c }, label: { show: true, position: 'insideTop', formatter: b.kind, color: T.ink3, fontSize: 9 } }, { xAxis: b.to + 0.5 }];
   }) };
 }
@@ -233,7 +233,7 @@ function columns(x, o) {
         var cc = o.colours && i === 0 && o.colours[j] ? lift(o.colours[j], T) : (s.colours && s.colours[j] ? lift(s.colours[j], T) : c);
         return { value: v, href: o.hrefs ? o.hrefs[j] : undefined, itemStyle: { color: cc, borderRadius: s.stack ? 0 : [3, 3, 0, 0] } };
       }), label: s.labels ? { show: true, position: 'top', color: T.ink2, fontSize: 10, fontFamily: T.fontNum, formatter: function (p) { return s.fmt ? s.fmt(p.value) : PD.num(p.value, 0); } } : undefined,
-        markLine: isNum(s.ref) ? { silent: true, symbol: 'none', lineStyle: { color: T.market, type: [4, 3] }, label: { formatter: s.refLabel || '', color: T.ink3, fontSize: 10 }, data: [{ xAxis: s.ref }] } : undefined });
+        markLine: isNum(s.ref) ? { silent: true, symbol: 'none', lineStyle: { color: T.ink3, type: [4, 3] }, label: { formatter: s.refLabel || '', color: T.ink3, fontSize: 10 }, data: [{ xAxis: s.ref }] } : undefined });
     });
     var ya = [ax(T, { name: o.yName, nameAlign: 'left', fmt: o.fmt, min: o.yMin, max: o.yMax })];
     if (two) { var a2 = ax(T, { name: o.y2Name, nameAlign: 'right', nameLocation: o.y2Inverse ? 'start' : 'end', fmt: o.y2Fmt, min: o.y2Inverse ? 1 : 0, max: o.y2Max, split: false, inverse: !!o.y2Inverse }); a2.position = 'right'; ya.push(a2); }
@@ -430,11 +430,11 @@ function trackMap(x, tr, o) {
       grid: { left: 0, right: o.legendRight === false ? 0 : 50, top: 6, bottom: 6 },
       xAxis: { type: 'value', min: R.x[0], max: R.x[1], show: false }, yAxis: { type: 'value', min: R.y[0], max: R.y[1], show: false },
       visualMap: tr.v ? { type: 'continuous', dimension: 2, seriesIndex: 1, min: Math.min.apply(null, vs), max: Math.max.apply(null, vs), orient: 'vertical', right: 0, top: 'middle', itemWidth: 10, itemHeight: 140,
-        text: [tr.vName || '', ''], textStyle: { color: T.ink3, fontSize: 10 }, inRange: { color: ['#3987e5', '#46b9c9', '#7ee787', '#e3b341', '#e05d5d'] }, calculable: false } : undefined,
+        text: [tr.vName || '', ''], textStyle: { color: T.ink3, fontSize: 10 }, inRange: { color: [PD.col('sky'), PD.col('mint'), PD.col('leaf'), PD.col('sun'), PD.col('coral')] }, calculable: false } : undefined,
       tooltip: tip(T, { formatter: function (p) { if (p.seriesIndex !== 1) return p.name ? 'Turn ' + p.name : ''; var i = p.value[3]; return row(p.color, Math.round(i * step) + ' m', (tr.v ? PD.num(p.value[2], 0) + ' ' + (tr.vUnit || '') : '')) + (tr.gear ? row(T.ink3, 'Gear', String(tr.gear[i])) : ''); } }),
       series: [
-        { type: 'line', data: pts.map(function (p) { return [p[0], p[1]]; }), showSymbol: false, silent: true, lineStyle: { width: 9, color: T.dark ? '#262c36' : '#d7dbe2', cap: 'round', join: 'round' }, z: 1 },
-        { type: 'scatter', data: pts, symbolSize: 3.6, z: 2, itemStyle: { color: T.model } },
+        { type: 'line', data: pts.map(function (p) { return [p[0], p[1]]; }), showSymbol: false, silent: true, lineStyle: { width: 9, color: T.s3, cap: 'round', join: 'round' }, z: 1 },
+        { type: 'scatter', data: pts, symbolSize: 3.6, z: 2, itemStyle: { color: T.sky } },
         { type: 'scatter', data: cs, symbolSize: 15, z: 3, itemStyle: { color: T.s4, borderColor: T.line2, borderWidth: 1 }, label: { show: true, formatter: function (p) { return p.name; }, color: T.ink1, fontSize: 8.5, fontWeight: 700 } },
         { type: 'scatter', data: [[tr.x[0], tr.y[0]]], symbol: 'rect', symbolSize: [10, 10], z: 4, itemStyle: { color: T.ink1 }, tooltip: { formatter: 'Start / finish' } }
       ]
@@ -458,9 +458,9 @@ function segMap(x, geo, segs, names, o) {
       xAxis: { type: 'value', min: R.x[0], max: R.x[1], show: false }, yAxis: { type: 'value', min: R.y[0], max: R.y[1], show: false },
       tooltip: { show: false },
       series: [
-        { type: 'line', data: geo.x.map(function (v, i) { return [v, geo.y[i]]; }), showSymbol: false, silent: true, lineStyle: { width: 11, color: T.dark ? '#262c36' : '#d7dbe2' }, z: 1 },
-        { type: 'line', name: names[0] + ' faster (' + winsA + ')', data: A, showSymbol: false, connectNulls: false, lineStyle: { width: 5, color: T.model }, itemStyle: { color: T.model }, z: 2 },
-        { type: 'line', name: names[1] + ' faster (' + winsB + ')', data: B, showSymbol: false, connectNulls: false, lineStyle: { width: 5, color: T.market }, itemStyle: { color: T.market }, z: 2 },
+        { type: 'line', data: geo.x.map(function (v, i) { return [v, geo.y[i]]; }), showSymbol: false, silent: true, lineStyle: { width: 11, color: T.s3 }, z: 1 },
+        { type: 'line', name: names[0] + ' faster (' + winsA + ')', data: A, showSymbol: false, connectNulls: false, lineStyle: { width: 5, color: T.sky }, itemStyle: { color: T.sky }, z: 2 },
+        { type: 'line', name: names[1] + ' faster (' + winsB + ')', data: B, showSymbol: false, connectNulls: false, lineStyle: { width: 5, color: T.coral }, itemStyle: { color: T.coral }, z: 2 },
         { type: 'scatter', data: cs, symbolSize: 15, z: 3, silent: true, itemStyle: { color: T.s4, borderColor: T.line2 }, label: { show: true, formatter: function (p) { return p.name; }, color: T.ink1, fontSize: 8.5, fontWeight: 700 } }
       ]
     };
@@ -491,7 +491,7 @@ function telemetry(x, A, B, delta, names, corners) {
           markLine: { silent: true, symbol: 'none', lineStyle: { color: T.axis, type: [3, 3] }, label: { show: false }, data: [{ yAxis: 0 }].concat((corners || []).map(function (c) { return { xAxis: c.d }; })) } });
         return;
       }
-      [[A, T.model, names[0]], [B, T.market, names[1]]].forEach(function (z) {
+      [[A, T.sky, names[0]], [B, T.coral, names[1]]].forEach(function (z) {
         var arr = z[0][p[0]] || [];
         if (p[0] === 'brake') arr = arr.map(function (v) { return v > 1 ? v / 100 : v; });
         ser.push({ type: 'line', name: z[2], xAxisIndex: i, yAxisIndex: i, data: d.map(function (v, k) { return [v, arr[k]]; }), showSymbol: false, step: p[0] === 'gear' || p[0] === 'drs' || p[0] === 'brake' ? 'end' : false,
@@ -508,7 +508,7 @@ function telemetry(x, A, B, delta, names, corners) {
         var dist = ps[0] ? Math.round(ps[0].axisValue) : 0, k = Math.min(len - 1, Math.max(0, Math.round(dist / ((A.step) || 10))));
         var f = function (tr, key) { var v = (tr[key] || [])[k]; return isNum(v) ? PD.num(v, key === 'rpm' || key === 'speed' || key === 'throttle' ? 0 : 0) : '—'; };
         return '<div style="color:' + T.ink3 + ';font-size:11px;margin-bottom:4px">' + dist + ' m · delta ' + PD.signed(delta[k], 3) + ' s</div>' +
-          row(T.model, names[0], f(A, 'speed') + ' km/h · ' + f(A, 'throttle') + '% · g' + f(A, 'gear')) + row(T.market, names[1], f(B, 'speed') + ' km/h · ' + f(B, 'throttle') + '% · g' + f(B, 'gear'));
+          row(T.sky, names[0], f(A, 'speed') + ' km/h · ' + f(A, 'throttle') + '% · g' + f(A, 'gear')) + row(T.coral, names[1], f(B, 'speed') + ' km/h · ' + f(B, 'throttle') + '% · g' + f(B, 'gear'));
       } }),
       series: ser
     };
@@ -529,7 +529,7 @@ function radar(x, axes, rows) {
       radar: { indicator: use.map(function (a) { return { name: a.label, max: 100, min: 0 }; }), radius: narrow(x) ? '58%' : '66%', center: ['50%', list.length > 1 ? '56%' : '52%'], splitNumber: 4,
         axisName: { color: T.ink2, fontSize: narrow(x) ? 9 : 10.5 }, splitLine: { lineStyle: { color: T.grid } }, axisLine: { lineStyle: { color: T.grid } }, splitArea: { show: false } },
       series: [{ type: 'radar', symbolSize: 5, data: list.map(function (r, i) {
-        var c = r.colour ? lift(r.colour, T) : (i ? T.market : T.model);
+        var c = r.colour ? lift(r.colour, T) : (i ? T.coral : T.sky);
         return { name: r.name, value: use.map(function (a) { return isNum(r.pct[a.key]) ? Math.round(r.pct[a.key]) : 0; }), lineStyle: { color: c, width: 2 }, itemStyle: { color: c }, areaStyle: { color: QKC.hexA(c, 0.16) } };
       }) }]
     };

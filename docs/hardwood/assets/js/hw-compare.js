@@ -9,12 +9,16 @@
  * player this season (the spec's weighted method within the role); with none, the two best by total impact. Teams (#/<L>/compare/teams/...) and ?view=all open
  * the full pre-redesign comparison (every catalogue metric, radar, shot charts, careers).
  *
+ * v3 (Matchday): the title asks the question ("Jokic, Wembanyama or Gilgeous-Alexander?"), the best value in each row
+ * sits under the sun highlighter, the percentiles are coloured pills, and a verdict under the table names what each
+ * player does best (QK.verdicts, the type from HW.ui.ARCHETYPE).
+ *
  * Reads <L>/<S>/players.json (the catalogue), <L>/<S>/value.json (roles) and <L>/players/<pid>.json (similar). */
 (function (HW) {
 'use strict';
 
 const U = HW.ui, esc = HW.esc, isNum = HW.isNum;
-const ECOL = ['var(--wp-a)', 'var(--wp-b)', 'var(--c-3)'];
+const ECOL = ['var(--wp-a)', 'var(--wp-b)', 'var(--c-5)'];
 
 function tabs(L, S, active, ids) {
   const sq = HW.sq(L, S);
@@ -108,16 +112,30 @@ function draw(body, L, S, E, cat, roles, fellBack) {
     label: g[0],
     rows: keysOf(g).map(k => {
       const m = U.mMeta(k), pctFmt = m.fmt === 'pct';
-      return { label: m.label, tip: m.desc, better: m.better, values: E.map(id => (P[id].values || {})[k]), pctls: E.map(id => pc(id, k)), fmt: x => U.fmtM(k, x),
+      return { key: k, label: m.label, tip: m.desc, better: m.better, values: E.map(id => (P[id].values || {})[k]), pctls: E.map(id => pc(id, k)), fmt: x => U.fmtM(k, x),
         dfmt: pctFmt ? (x => (x > 0 ? '+' : x < 0 ? '−' : '±') + Math.abs(x * 100).toFixed(1) + ' pts') : null };
     })
   }));
   const ents = E.map(id => { const p = P[id]; return { name: p.name, href: HW.playerHref(L, id, S), abbr: String(p.name || '').split(' ').slice(-1)[0],
     sub: [HW.teamAbbr(L, p.team), (U.ROLE1 || {})[U.roleOf(p, id, roles)] || p.pos, (p.gp || 0) + ' GP', Number(Math.round(p.min || 0)).toLocaleString('en-GB') + ' min'].join(' · ') }; });
   const short = E.filter(id => !P[id].qualified).map(id => P[id].name);
+  /* verdicts: for each player, the metric where the player's percentile beats the others' by the most */
+  const sn = E.map(id => String(P[id].name || '').split(' ').slice(-1)[0]);
+  const verd = E.map((id, i) => {
+    let bestRow = null, bestD = 0;
+    groups.forEach(g => g.rows.forEach(r => {
+      const mine = r.pctls[i]; if (!isNum(mine)) return;
+      const d = mine - Math.max.apply(null, r.pctls.filter((_, j) => j !== i).map(x => (isNum(x) ? x : 0)));
+      if (d > bestD) { bestD = d; bestRow = r; }
+    }));
+    return bestRow ? { title: U.ARCHETYPE[bestRow.key] || 'The standout', who: sn[i], text: 'best of the ' + E.length + ' on ' + bestRow.label.charAt(0).toLowerCase() + bestRow.label.slice(1) + ' (' + bestRow.fmt(bestRow.values[i]) + ', ' + QK.ordinal(Math.round(bestRow.pctls[i])) + ' percentile).' } : null;
+  });
+  const q = sn.length === 2 ? sn[0] + ' or ' + sn[1] + '?' : sn.slice(0, -1).join(', ') + ' or ' + sn[sn.length - 1] + '?';
   body.innerHTML = U.card2('Players', 'Ranked against ' + esc(peer) + ' in ' + esc(HW.seasonLabel(L, S)) + (fellBack ? ' (the latest season with a catalogue)' : ''), pk.html) +
-    '<section class="qk-section" style="margin-top:var(--sp-4)">' + U.card2('Side by side', 'Value · percentile against ' + esc(peer) + ' (100 = best) · ' + (E.length === 2 ? 'the difference, green when ' + esc(P[E[0]].name) + ' is better' : 'the best of three in bold'),
-      QK.compareView({ entities: ents, groups: groups }) +
+    '<section class="qk-section" style="margin-top:var(--sp-8)">' + QK.sectionHead({ kicker: 'Side by side', title: q,
+      sub: 'Value and percentile against ' + peer + ' (100 = best). The best in each row is highlighted' + (E.length === 2 ? '; the last column is ' + sn[0] + ' minus ' + sn[1] + ', green when ' + sn[0] + ' is better.' : '.') }) +
+    U.card2(E.length + ' players, one metric set', 'The headline set for the role from our metrics spec: stable and predictive rates first',
+      QK.compareView({ entities: ents, groups: groups }) + QK.verdicts(verd) +
       (short.length ? '<p class="qk-caption">' + esc(short.join(', ')) + (short.length > 1 ? ' are' : ' is') + ' short of the minutes floor (' + Number(cat.min_floor || 0).toLocaleString('en-GB') + '): read the percentiles as early.</p>' : '') +
       (!same ? '<p class="qk-caption">Different roles: percentiles are against every qualified player, on the headline metrics all three roles share, so role effects (bigs rebound more, guards pass more) stay in.</p>' : '')) + '</section>' +
     '<section class="qk-section">' + U.card2('Where they sit', 'The qualified ' + esc(same ? U.ROLE_NAME[role] : 'players') + ' this season, with each player marked', '<div class="qk-seg" id="cmp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('cmp-dist', 260, 'Peer distribution with the players marked')) + '</section>';
@@ -130,7 +148,7 @@ function draw(body, L, S, E, cat, roles, fellBack) {
     const vals = pool.map(x => (x.values || {})[key]).filter(isNum).sort((a, b) => a - b);
     if (vals.length < 5) { body.querySelector('#cmp-dist').innerHTML = QK.empty('Too few qualified peers yet'); return; }
     QKC.distribution('#cmp-dist', { values: vals, binCount: 22, lowerBetter: m.better === 'low', fmt: x => U.fmtM(key, x), colorBy: 'flat', xName: m.label + ' · ' + vals.length + ' qualified peers', yName: 'Players',
-      marks: E.map((id, i) => ({ x: (P[id].values || {})[key], label: String(P[id].name || '').split(' ').slice(-1)[0], color: ['wpA', 'wpB', 'c3'][i] })).filter(x => isNum(x.x)), label: 'Distribution of ' + m.label });
+      marks: E.map((id, i) => ({ x: (P[id].values || {})[key], label: String(P[id].name || '').split(' ').slice(-1)[0], color: ['wpA', 'wpB', 'c5'][i] })).filter(x => isNum(x.x)), label: 'Distribution of ' + m.label });
   };
   if (opts.length) { dd(opts[0]); QK.seg(seg, dd); }
   HW.setMeta('');

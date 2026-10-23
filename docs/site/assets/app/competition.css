@@ -8,7 +8,7 @@
 .fb-co-card { padding: 14px 16px; gap: 10px; position: relative; overflow: hidden; }
 .fb-co-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--k, var(--accent)); }
 .fb-co-card-head { display: grid; gap: 2px; }
-.fb-co-card-name { font: 800 var(--fs-lg)/1.15 var(--font-display); font-stretch: var(--stretch-display); letter-spacing: 0; }
+.fb-co-card-name { font: 650 var(--fs-lg)/1.15 var(--font-display); font-variation-settings: var(--fvs-display); letter-spacing: 0; }
 .fb-co-card-head:hover .fb-co-card-name { color: var(--signal); }
 .fb-co-fav { display: grid; gap: 4px; }
 .fb-co-fav b { font-size: var(--fs-sm); display: inline-flex; align-items: center; gap: 6px; }
@@ -25,7 +25,6 @@
 
 /* header */
 .fb-co-head .qk-sh-kicker { flex-wrap: wrap; }
-.fb-co-head .qk-sh-kicker .fb-kind { text-transform: uppercase; }
 .fb-co-meta b { color: var(--ink-1); font-weight: 600; }
 .fb-co-season .qk-select { min-width: 180px; }
 .fb-co-banners { display: grid; gap: 8px; margin-top: var(--sp-3); }
@@ -53,7 +52,7 @@
 .fb-co-num { width: 96px; }
 
 /* fixtures */
-.fb-co-day { font: 600 var(--fs-2xs) var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-3); padding: 14px 4px 6px; border-bottom: 1px solid var(--line-2); display: flex; gap: 8px; align-items: center; }
+.fb-co-day { font: 700 var(--fs-xs) var(--font-ui); color: var(--coral); padding: 14px 4px 6px; border-bottom: 1px solid var(--line-2); display: flex; gap: 8px; align-items: center; }
 .fb-co-day:first-child { padding-top: 0; }
 .fb-co-day.today { color: var(--signal); }
 .fb-co-ml { display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: center; padding: 0 4px 8px; margin-top: -4px; font: 500 var(--fs-2xs) var(--font-num); color: var(--ink-3); border-bottom: 1px solid var(--line-1); }
@@ -109,7 +108,7 @@
 .fb-co-bench > span { display: inline-flex; align-items: center; gap: 5px; }
 .fb-co-potw { display: flex; gap: 14px; align-items: flex-start; padding-bottom: var(--sp-3); border-bottom: 1px solid var(--line-1); }
 .fb-co-potw-n { font-size: var(--fs-lg); font-weight: 800; display: flex; gap: 8px; align-items: center; }
-.fb-co-rt { flex: none; width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; font: 800 var(--fs-lg) var(--font-num); color: #fff; }
+.fb-co-rt { flex: none; width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; font: 800 var(--fs-lg) var(--font-num); color: var(--bg); }
 .fb-co-aws { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); margin-top: var(--sp-3); }
 .fb-co-aw { padding: 10px 12px; border-radius: var(--r-2); border: 1px solid var(--line-1); background: var(--s-2); display: grid; gap: 3px; font-size: var(--fs-sm); min-width: 0; }
 .fb-co-aw-n { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

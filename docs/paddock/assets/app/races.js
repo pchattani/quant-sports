@@ -13,7 +13,7 @@ function racesNav(active, y) {
 
 function renderRaces(el, params) {
   var y = isNum(params.year) ? params.year : PD.currentSeason();
-  el.innerHTML = PD.pageHead('Season ' + y, 'Races', '', PD.yearPager('races', y)) + racesNav('races', y) + '<div id="rc-body">' + PD.empty('Loading', '') + '</div>';
+  el.innerHTML = PD.pageHead('Races · ' + y, 'Every race, ' + y, '', PD.yearPager('races', y)) + racesNav('races', y) + '<div id="rc-body">' + PD.empty('Loading', '') + '</div>';
   return PD.load(y + '/season.json').then(function (season) {
     if (!PD.alive(el)) return;
     if (!PD.ok(season)) { PD.set('rc-body', PD.notBuilt('The ' + y + ' calendar', season)); return; }
@@ -72,7 +72,7 @@ function raceCard(y, c) {
 
 function renderCircuits(el, params, state) {
   var y = state.year || PD.currentSeason();
-  el.innerHTML = PD.pageHead('Every circuit since 1950', 'Circuits', 'Profiles from the circuit model (pit loss, safety-car hazards, overtaking) shrunk to the global profile, with winners and records.') + racesNav('circuits') +
+  el.innerHTML = PD.pageHead('Circuits', 'Every circuit since 1950', 'Profiles from the circuit model (pit loss, safety-car hazards, overtaking) shrunk to the global profile, with winners and records.') + racesNav('circuits') +
     PD.grid(PD.card('Circuit character', 'Overtaking difficulty against the chance of a safety car, ' + y + ' calendar; size = pit-stop time loss.', PD.chartBox('ci-char', 380), { span: 12 })) +
     PD.card('All circuits', '', '<div class="pd-toolbar">' + PD.seg('ci-scope', [['cal', y + ' calendar'], ['all', 'All circuits']], 'cal', 'Scope') + '<input id="ci-q" class="qk-input" type="search" placeholder="Filter circuits…" aria-label="Filter circuits"></div><div id="ci-table"></div>', { flush: true, cls: 'pd-mt' });
   return Promise.all([PD.load('circuits.json'), PD.load(y + '/season.json')]).then(function (res) {
@@ -86,7 +86,7 @@ function renderCircuits(el, params, state) {
     var calIds = ids.filter(function (k) { return cal[k] && all[k].profile; });
     PD.ch.scatter('ci-char', calIds.map(function (k) {
       var p = all[k].profile;
-      return { x: 100 * (p.overtake_difficulty || 0), y: p.p_sc_race, name: all[k].name, short: (all[k].locality || all[k].name || k).split(/[ -]/)[0], href: '#/circuit/' + k, size: 8 + Math.max(0, (p.pit_loss_s || 20) - 14), colour: '#e05d5d', label: true,
+      return { x: 100 * (p.overtake_difficulty || 0), y: p.p_sc_race, name: all[k].name, short: (all[k].locality || all[k].name || k).split(/[ -]/)[0], href: '#/circuit/' + k, size: 8 + Math.max(0, (p.pit_loss_s || 20) - 14), colour: PD.col('down'), label: true,
         sub: 'Round ' + cal[k].round + ' · pit loss ' + PD.num(p.pit_loss_s, 1) + ' s' };
     }), { xName: 'Overtaking difficulty (0–100)', yName: 'P(safety car)', yFmt: function (v) { return Math.round(v * 100) + '%'; }, xFmt: function (v) { return PD.num(v, 0); }, label: 'Circuit character' });
     var draw = function () {
@@ -197,9 +197,9 @@ function renderCircuit(el, params) {
         [['races', s.races], ['pit samples', s.pit], ['SC laps', s.sc_laps], ['pass opportunities', s.pass_opps], ['stops', s.stops], ['starts', s.starts]].filter(function (x) { return isNum(x[1]); }).map(function (x) { return PD.int(x[1]) + ' ' + x[0]; }).join(', ') + '. <a href="#/methodology/circuits">Method</a>.</p>');
       var mean = p.lap1_mean_by_grid || [], sd = p.lap1_sd_by_grid || [], inc = p.lap1_incident_by_grid || [];
       if (mean.length) PD.ch.columns('ci-lap1', { cats: mean.map(function (v, i) { return 'P' + (i + 1); }), xName: 'Grid slot', yName: 'Places gained', y2Name: 'Incident', y2Fmt: function (v) { return Math.round(v * 100) + '%'; },
-        series: [{ name: 'Mean places gained', data: mean, colours: mean.map(function (v) { return v >= 0 ? '#2fb37b' : '#e05d5d'; }), fmt: function (v) { return PD.signed(v, 2); } },
-          { name: '±1 sd', type: 'scatter', data: sd.map(function (v) { return v * (p.lap1_sd_scale || 1); }), colour: '#7d8590', symbol: 'diamond', size: 7, fmt: function (v) { return PD.num(v, 2) + ' places'; } },
-          { name: 'Incident rate', type: 'line', axis: 1, data: inc, colour: '#e3b341', fmt: function (v) { return PD.pct(v); } }], label: 'Opening lap by grid slot' });
+        series: [{ name: 'Mean places gained', data: mean, colours: mean.map(function (v) { return v >= 0 ? PD.col('leaf') : PD.col('down'); }), fmt: function (v) { return PD.signed(v, 2); } },
+          { name: '±1 sd', type: 'scatter', data: sd.map(function (v) { return v * (p.lap1_sd_scale || 1); }), colour: PD.col('grey'), symbol: 'diamond', size: 7, fmt: function (v) { return PD.num(v, 2) + ' places'; } },
+          { name: 'Incident rate', type: 'line', axis: 1, data: inc, colour: PD.col('sun'), fmt: function (v) { return PD.pct(v); } }], label: 'Opening lap by grid slot' });
       else PD.ch.none('ci-lap1', 'No opening-lap profile.');
     } else { PD.set('ci-prof', PD.muted('No profile.')); PD.ch.none('ci-lap1', 'No profile.'); }
 
@@ -212,7 +212,7 @@ function renderCircuit(el, params) {
     var wins = {};
     hist.forEach(function (x) { if (x.winner) wins[x.winner] = (wins[x.winner] || 0) + 1; });
     var top = Object.keys(wins).sort(function (a, b) { return wins[b] - wins[a]; }).slice(0, 8);
-    PD.ch.hbars('ci-wins', top.map(function (k) { return { label: PD.driverName(k), value: wins[k], colour: '#e05d5d', href: PD.driverHref(k) }; }), { fmt: function (v) { return String(v); }, name: 'Wins', emptyText: 'No races recorded.' });
+    PD.ch.hbars('ci-wins', top.map(function (k) { return { label: PD.driverName(k), value: wins[k], colour: PD.col('down'), href: PD.driverHref(k) }; }), { fmt: function (v) { return String(v); }, name: 'Wins', emptyText: 'No races recorded.' });
     var rec = c.records || {};
     var lr = rec.lap_record;
     PD.set('ci-rec', '<dl class="pd-dl">' + (lr && isNum(lr.ms) ? '<dt>Fastest race lap</dt><dd><b class="pd-num">' + PD.fmtMs(lr.ms) + '</b> ' + PD.driverLink(lr.driver) + ' <span class="qk-muted">' + esc(lr.year) + '</span></dd>' : '') +

@@ -9,9 +9,9 @@
 
 var esc = PD.esc, isNum = PD.isNum;
 var COMP = {
-  quali: ['Qualifying', '#3987e5'], race_pos: ['Race finish', '#2fb37b'], race_gain: ['Places gained', '#46b9c9'], race_fl: ['Fastest lap', '#c95ac9'],
-  overtakes: ['Overtakes', '#e3b341'], sprint_pos: ['Sprint finish', '#7ee787'], sprint_gain: ['Sprint places', '#8e8cf0'], sprint_fl: ['Sprint fastest lap', '#ff9bce'],
-  race_dnf: ['Retirement risk', '#e05d5d'], sprint_dnf: ['Sprint retirement risk', '#e8833a']
+  quali: ['Qualifying', 'sky'], race_pos: ['Race finish', 'teal'], race_gain: ['Places gained', 'mint'], race_fl: ['Fastest lap', 'plum'],
+  overtakes: ['Overtakes', 'sun'], sprint_pos: ['Sprint finish', 'leaf'], sprint_gain: ['Sprint places', 'sand'], sprint_fl: ['Sprint fastest lap', 'rose'],
+  race_dnf: ['Retirement risk', 'down'], sprint_dnf: ['Sprint retirement risk', 'coral']
 };
 var METHODS = { model: 'Our projection', std: 'Season-to-date average', prev: 'Previous weekend', last: 'Last season’s average', blend: 'Half ours, half season average' };
 var PICKS = [['top', 'Top picks', 'The five highest projections for the next weekend.'], ['boost', 'Boost pick', 'The highest expected score: the one to double.'],
@@ -24,7 +24,7 @@ var tier = function (t) { return isNum(t) ? '<span class="pd-tier t' + t + '">T'
 
 function render(el) {
   var y = PD.currentSeason();
-  el.innerHTML = PD.pageHead('Season ' + y, 'Fantasy', '', '<a class="qk-btn" href="#/methodology/fantasy">How it works</a>') + '<div id="ft-body">' + PD.empty('Loading', '') + '</div>';
+  el.innerHTML = PD.pageHead('Fantasy · ' + y, 'Our fantasy picks for the next weekend', 'Projected points from our race simulation with our own scoring table, the floor and ceiling for each pick, and how well it has worked.', '<a class="qk-btn" href="#/methodology/fantasy">How it works</a>') + '<div id="ft-body">' + PD.empty('Loading', '') + '</div>';
   return PD.loadAll([y + '/fantasy.json', 'fantasy_backtest.json']).then(function (res) {
     if (!PD.alive(el)) return;
     var F = res[0], BT = res[1];
@@ -87,7 +87,7 @@ function render(el) {
           legend: { top: 0, left: 0, type: 'scroll', icon: 'roundRect', itemWidth: 10, itemHeight: 10, textStyle: { color: Tk.ink2, fontSize: 11 }, pageTextStyle: { color: Tk.ink3 } },
           xAxis: window.QKC.axis(Tk, { fmt: function (v) { return PD.num(v, 0); }, name: 'Projected fantasy points', nameLocation: 'middle', nameGap: 26 }), yAxis: ya,
           tooltip: window.QKC.tooltip(Tk, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: function (ps) { var r = rows[ps[0].dataIndex]; return '<b>' + esc(r.name) + '</b> · ' + pts(r.next) + ' pts<br>' + ps.filter(function (p) { return p.seriesType === 'bar' && Math.abs(p.value) > 0.05; }).map(function (p) { return window.QKC.tipRow(p.color, p.seriesName, PD.num(p.value, 1)); }).join(''); } }),
-          series: keys.map(function (k) { return { type: 'bar', name: COMP[k][0], stack: 'c', barMaxWidth: 14, itemStyle: { color: COMP[k][1] }, data: rows.map(function (r) { return F.comp[r.id][ci[k]] || 0; }) }; })
+          series: keys.map(function (k) { return { type: 'bar', name: COMP[k][0], stack: 'c', barMaxWidth: 14, itemStyle: { color: PD.col(COMP[k][1]) }, data: rows.map(function (r) { return F.comp[r.id][ci[k]] || 0; }) }; })
             .concat([{ type: 'scatter', name: 'Total', symbol: 'diamond', symbolSize: 9, itemStyle: { color: Tk.ink1 }, data: rows.map(function (r) { return r.next; }), z: 5 }])
         };
       }, { label: 'Where the points come from' });
@@ -190,7 +190,7 @@ function backtest(F, BT) {
   if (pr.length) {
     var roll = function (arr) { return arr.map(function (v, i) { var s = arr.slice(Math.max(0, i - 9), i + 1).filter(isNum); return s.length ? s.reduce(function (a, b) { return a + b; }, 0) / s.length : null; }); };
     var xs = pr.map(function (r) { return r[0] + ' R' + r[1]; });
-    PD.ch.lines('ft-bt-ch', [{ name: 'Our projection', data: roll(pr.map(function (r) { return r[2]; })), colour: '#3987e5' }, { name: 'Season-to-date average', data: roll(pr.map(function (r) { return r[3]; })), colour: '#e8833a' }],
+    PD.ch.lines('ft-bt-ch', [{ name: 'Our projection', data: roll(pr.map(function (r) { return r[2]; })), colour: PD.col('sky') }, { name: 'Season-to-date average', data: roll(pr.map(function (r) { return r[3]; })), colour: PD.col('coral') }],
       { xs: xs, xName: 'Race', yName: 'MAE, points', yFmt: function (v) { return PD.num(v, 1); }, label: 'Backtest error through time' });
   }
 }

@@ -851,8 +851,8 @@ def build(season: int, today: date, raw: list[dict], matcher: Matcher, rc: RateC
            "notes": {"source": CREDIT, "left_out": LEFT_OUT,
                      "method": "Value at the time: the player's projection from the seasons completed before the trade (rest of "
                                "that season and the next three, discounted 10% a season), picks from our draft-pick value curve. "
-                               "Realised: his value above replacement per game times the games he has played for his new club "
-                               "since. Now: realised plus what is still projected while he is on that roster. Picks keep their "
+                               "Realised: the player's value above replacement per game times the games played for the new club "
+                               "since. Now: realised plus what is still projected while the player is on that roster. Picks keep their "
                                "curve value: our sources do not say which player a traded pick became.",
                      "parse": "Trades are parsed from the clubs' notes as ESPN publishes them; a note that names no player we "
                               "can match, or a club we cannot identify, is shown with what could be read."},

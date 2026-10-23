@@ -1,191 +1,163 @@
-/* The Quant design tokens — v2 "Signal" (Design System 2.0, Oct 2026). Spec: docs/_design/STYLE_GUIDE.md.
+/* The Quant design tokens — v3 "Matchday" (Oct 2026). Spec: docs/_design/STYLE_GUIDE.md; moving a page: MIGRATION_V3.md.
  *
- * Dark is the default. Light applies when the OS asks for it and the viewer has not
- * chosen, or when <html data-theme="light"> is set by the theme toggle. Dark is
- * re-declared under [data-theme="dark"] so the toggle wins in both directions.
+ * Dark only, and warm: charcoal planes (never blue-black), off-white ink, teal for "ours", a sun-yellow highlighter,
+ * coral and sky accents. There is no light theme: the tokens live on :root alone, so a stale data-theme="light"
+ * attribute or a light OS setting changes nothing (QK.theme pins data-theme="dark" as well, for old site CSS).
  *
- * Naming: --bg-* page planes, --s-* surfaces (cards), --ink-* text, --line-* rules,
- * --signal* the one signature accent (our forecasts, primary actions), --a-* sport accents (identity marks only),
+ * Naming: --bg-* page planes, --s-* surfaces (cards), --ink-* text, --line-* rules, --signal* "ours" (our forecasts,
+ * primary actions), --sun / --coral / --sky the Matchday accents, --a-* sport accents (identity marks only),
  * --c-* chart categorical slots, --pc-* the percentile scale (cold -> hot), --wp-* win-probability fallbacks,
- * --st-* status (never series). Every value a component uses comes from here; components never hard-code colour.
- * v1 names are all still defined (backward compatible); v2 changed some values: --brand is the signal violet, not
- * amber; --c-model is the signal, --c-market a quiet grey; the NFL accent is gold, not violet. */
+ * --st-* status (never series). Every v1 and v2 name is still defined (backward compatible).
+ *
+ * Contrast (WCAG 2.x, measured): ink-1 15.1:1 on --s-1, ink-2 9.9:1, ink-3 5.9:1 (4.6:1 on --s-3, the floor);
+ * signal 8.2:1, coral 6.6:1, sky 6.8:1 on --s-1. */
 
-:root {
+:root, :root[data-theme] {
   color-scheme: dark;
 
-  /* ── planes & surfaces (dark) ───────────────────────────── */
-  --bg:        #08090d;   /* page */
-  --bg-raise:  #0d0f15;   /* top bar, ticker, side rails */
-  --s-1:       #12141b;   /* card */
-  --s-2:       #181b24;   /* card header, inputs, hover */
-  --s-3:       #20242f;   /* pressed, selected, skeleton base, tracks */
-  --s-4:       #2b303d;   /* skeleton shine, strong fills, tooltips */
-  --s-glass:   rgba(13, 15, 21, 0.82);
+  /* ── planes & surfaces: warm charcoal ───────────────────── */
+  --bg:        #17140f;   /* page */
+  --bg-raise:  #1c1813;   /* top bar, section nav */
+  --s-1:       #211d17;   /* card */
+  --s-2:       #2c271f;   /* raised: card inset, inputs, hover, notes */
+  --s-3:       #37312a;   /* pressed, selected, tracks, skeleton base */
+  --s-4:       #433c33;   /* strong fills, tooltips, skeleton shine */
+  --s-glass:   rgba(23, 20, 15, 0.88);
+  --s-cream:   #2a2418;   /* the "cream" card: New here, The short version, How sure */
+  --line-cream: rgba(255, 201, 77, 0.22);
+  --s-ink:     #0d0b08;   /* the broadcast black: ticker, score bug */
 
-  /* ── ink ────────────────────────────────────────────────── */
-  --ink-1:     #f0f2f6;   /* primary — 16.9:1 on --s-1 */
-  --ink-2:     #aab1be;   /* secondary — 8.4:1 */
-  --ink-3:     #7d8697;   /* muted, axis labels — 4.9:1 (the floor for text) */
-  --ink-4:     #565f70;   /* disabled, decorations only (not text) */
-  --ink-inv:   #08090d;
+  /* ── ink: warm off-white ────────────────────────────────── */
+  --ink-1:     #f3ece0;   /* primary — 15.1:1 on --s-1 */
+  --ink-2:     #c9bfb0;   /* secondary — 9.9:1 */
+  --ink-3:     #a39886;   /* muted, axis labels — 5.9:1 on --s-1, 4.6:1 on --s-3 (the floor for text) */
+  --ink-4:     #6f6658;   /* decorations only (not text) */
+  --ink-inv:   #17140f;
 
   /* ── rules ──────────────────────────────────────────────── */
-  --line-1:    rgba(255, 255, 255, 0.07);  /* hairline */
-  --line-2:    rgba(255, 255, 255, 0.12);  /* card ring */
-  --line-3:    rgba(255, 255, 255, 0.22);  /* focusable control border */
-  --grid:      rgba(255, 255, 255, 0.06);  /* chart gridline */
-  --axis:      rgba(255, 255, 255, 0.20);
+  --line-1:    rgba(243, 236, 224, 0.08);  /* hairline */
+  --line-2:    rgba(243, 236, 224, 0.13);  /* card ring */
+  --line-3:    rgba(243, 236, 224, 0.26);  /* focusable control border */
+  --grid:      rgba(243, 236, 224, 0.08);  /* chart gridline (drawn dashed) */
+  --axis:      rgba(243, 236, 224, 0.24);
 
-  /* ── the signature accent: "signal" violet ───────────────
-   * One strong accent on every site. It means "ours": our probability, our rating, the forecast line, the primary
-   * action, the focused tab. Never a team, never the market, never good/bad. */
-  --signal:      #9384ff;   /* 5.7:1 on --s-1 */
-  --signal-2:    #b3a8ff;   /* hover, highlights on dark */
-  --signal-ink:  #0c0820;   /* text on a signal fill */
-  --signal-soft: rgba(147, 132, 255, 0.15);
+  /* ── "ours": teal, brightened for dark ─────────────────────
+   * Our probability, our rating, the forecast line, the favourite's chance on a card, primary actions, links.
+   * Never a team, never the market, never good/bad. */
+  --signal:      #3cc9b4;   /* 8.2:1 on --s-1 */
+  --signal-2:    #73dccb;   /* hover */
+  --signal-ink:  #0b1f1b;   /* text on a teal fill */
+  --signal-soft: rgba(60, 201, 180, 0.14);
   --brand:       var(--signal);
   --brand-ink:   var(--signal-ink);
   --brand-soft:  var(--signal-soft);
-  --focus:       #7cc4ff;
+  --focus:       #ffc94d;
 
-  /* ── sport accents (identity only: switcher icon, sport pill, section tick; text beside them stays ink) ── */
-  --a-football:   #2fd38a;
-  --a-f1:         #ff4b4b;
-  --a-basketball: #ff8a3d;
-  --a-tennis:     #c8f04e;
-  --a-baseball:   #5b9bff;
-  --a-nfl:        #e3b04b;   /* v2: gold (violet is the signal now) */
-  --a-hockey:     #3fd7f2;
-  --a-college:    #ff6fae;   /* 7.1:1 on --s-1 */
-  --accent:       var(--signal);        /* a site sets data-sport on <html>, which points --accent at its sport */
+  /* ── Matchday accents ───────────────────────────────────── */
+  --sun:        #ffc94d;                    /* highlighter, the "i" of a note, the logo dot */
+  --sun-soft:   rgba(255, 201, 77, 0.24);   /* translucent highlight under text */
+  --coral:      #ff7a5c;                    /* kickers, asides, annotations' arrow — 6.6:1 on --s-1 */
+  --sky:        #6aa8ec;                    /* a second series — 6.8:1 */
+  --plum:       #c39be8;
+  --mint:       #8fdcc8;
+
+  /* ── sport accents (identity only: switcher icon, sport pill, a tile rail; text beside them stays ink) ── */
+  --a-football:   #4fd48f;
+  --a-f1:         #ff6450;
+  --a-basketball: #ff9a52;
+  --a-tennis:     #c9e65a;
+  --a-baseball:   #6aa8ec;
+  --a-nfl:        #e8b85a;
+  --a-hockey:     #5fd0e8;
+  --a-college:    #f58cb8;
+  --accent:       var(--signal);   /* a site sets data-sport on <html>, which points --accent at its sport */
   --accent-soft:  color-mix(in srgb, var(--accent) 15%, transparent);
 
-  /* ── chart categorical slots (validated reference palette, dark steps) ── */
-  --c-1: #3987e5;  /* blue */
-  --c-2: #d95926;  /* orange */
-  --c-3: #199e70;  /* aqua */
-  --c-4: #c98500;  /* yellow */
-  --c-5: #d55181;  /* magenta */
-  --c-6: #008300;  /* green */
-  --c-7: #9085e9;  /* violet */
-  --c-8: #e66767;  /* red */
-  --c-model:  var(--signal);   /* v2: ours is always the signal */
-  --c-market: #8a93a3;         /* v2: the market is a quiet grey reference, never a headline */
-  --c-other:  #6b7480;
+  /* ── chart categorical slots: teal first (ours / the main series), then coral, sky, sun ... ── */
+  --c-1: #3cc9b4;  /* teal */
+  --c-2: #ff7a5c;  /* coral */
+  --c-3: #6aa8ec;  /* sky */
+  --c-4: #ffc94d;  /* sun */
+  --c-5: #c39be8;  /* plum */
+  --c-6: #8fd16a;  /* leaf */
+  --c-7: #f28fb5;  /* rose */
+  --c-8: #d9b38c;  /* sand */
+  --c-model:  var(--signal);   /* ours is always teal */
+  --c-market: #9a9082;         /* the market: a quiet warm grey reference, never a headline */
+  --c-other:  #7d7468;
 
-  /* sequential (blue) & diverging (blue <-> red, grey midpoint) */
-  --seq-1: #104281; --seq-2: #1c5cab; --seq-3: #2a78d6; --seq-4: #5598e7; --seq-5: #9ec5f4;
-  --div-neg: #e66767; --div-mid: #383835; --div-pos: #3987e5;
+  /* sequential (teal) & diverging (coral <-> sky, warm grey midpoint) */
+  --seq-1: #24403c; --seq-2: #2f6b62; --seq-3: #3a978a; --seq-4: #5cc4b3; --seq-5: #a6e8dc;
+  --div-neg: #ff7a6b; --div-mid: #3a342c; --div-pos: #6aa8ec;
 
-  /* ── percentile scale (Savant-style, cold -> hot, colour-blind safe: a blue-grey-red diverging ramp that also
-   *    steps in lightness). 0 = worst in the peer group, 100 = best. Interpolate between the five anchors. ── */
-  --pc-0:   #2f66d6;
-  --pc-25:  #6f97e6;
-  --pc-50:  #8b929f;
-  --pc-75:  #ec8c6c;
-  --pc-100: #e23b2b;
+  /* ── percentile scale (Savant-style, cold -> hot): blue -> warm grey -> red, stepping in lightness so it reads
+   *    for red-green colour-blind viewers. 0 = worst in the peer group, 100 = best. The ends take white ink (4.6:1),
+   *    the middle near-black ink. Every anchor clears 3:1 against --s-1 as a mark. ── */
+  --pc-0:   #3d6dd4;
+  --pc-25:  #86a3e0;
+  --pc-50:  #a39a8c;
+  --pc-75:  #ee9a78;
+  --pc-100: #cf3e25;
 
   /* ── win probability: team colours first (contrast-checked); these when two kits clash or none is known ── */
-  --wp-a:    #4b8ff0;   /* left / away fallback (blue) */
-  --wp-b:    #f2913d;   /* right / home fallback (orange) */
-  --wp-draw: #6b7480;
+  --wp-a:    #6aa8ec;   /* left / away fallback (sky) */
+  --wp-b:    #ff8a5c;   /* right / home fallback (coral) */
+  --wp-draw: #8a8073;
 
-  /* ── status (reserved; always with an icon or label) ── */
-  --st-good: #0ca30c; --st-warn: #fab219; --st-serious: #ec835a; --st-crit: #d03b3b;
-  --up:   #3ccf6e;    /* delta text, up/good */
-  --down: #ff6b6b;    /* delta text, down/bad */
-  --live: #ff3b4e;
+  /* ── status (reserved; always with an icon or a word) ── */
+  --st-good: #5fd38a; --st-warn: #ffc94d; --st-serious: #ff9a6b; --st-crit: #ff5a47;
+  --up:   #5fd38a;    /* delta text, up/good */
+  --down: #ff7a6b;    /* delta text, down/bad */
+  --live: #ff5a47;
 
-  /* ── type: Archivo (display: headlines, big numbers), Inter (UI), JetBrains Mono (tables, ticker, axes) ── */
-  --font-display: "Archivo", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-ui:   "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-num:  "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  --stretch-display: 88%;   /* Archivo width axis: semi-condensed for scoreboard numbers and headlines */
-  --fs-2xs: 0.6875rem;  /* 11 — micro labels, chips */
-  --fs-xs:  0.75rem;    /* 12 — table, captions */
-  --fs-sm:  0.8125rem;  /* 13 — body dense */
-  --fs-md:  0.9375rem;  /* 15 — body */
-  --fs-lg:  1.125rem;   /* 18 — card titles */
-  --fs-xl:  1.5rem;     /* 24 — section titles */
-  --fs-2xl: 2rem;       /* 32 — page titles, KPI */
+  /* ── type: Fraunces (display: headlines, big numbers), DM Sans (UI and numbers, tabular figures) ── */
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-ui:   "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-num:  "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;   /* with tabular-nums */
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;            /* code only */
+  --stretch-display: 100%;
+  --fvs-display: "SOFT" 100, "WONK" 0;
+  --fs-2xs: 0.75rem;    /* 12 — micro labels, chips */
+  --fs-xs:  0.8125rem;  /* 13 — captions, table cells on phones */
+  --fs-sm:  0.875rem;   /* 14 — dense body, tables */
+  --fs-md:  1rem;       /* 16 — body */
+  --fs-lg:  1.1875rem;  /* 19 — lede, card titles */
+  --fs-xl:  1.5rem;     /* 24 — small section titles */
+  --fs-2xl: 2rem;       /* 32 — KPI */
   --fs-3xl: 3rem;       /* 48 — hero number */
-  --fs-4xl: clamp(2.5rem, 6vw, 4.5rem); /* hero headline */
-  /* display scale (Archivo) */
-  --fs-d1: clamp(2.6rem, 7vw, 5.25rem);   /* home headline */
-  --fs-d2: clamp(1.9rem, 4.2vw, 3rem);    /* page title, scoreboard score */
-  --fs-d3: clamp(1.6rem, 3vw, 2.25rem);   /* stat tile number */
-  --fs-d4: 1.375rem;                      /* card numbers, chances in lists */
-  --lh-tight: 1.1; --lh-snug: 1.35; --lh-body: 1.55;
-  --tracking-caps: 0.08em;
+  --fs-4xl: clamp(2.5rem, 6vw, 4.5rem);
+  /* display scale (Fraunces) */
+  --fs-d1: clamp(2.4rem, 5.6vw, 4rem);      /* greeting headline (64 px at 1440) */
+  --fs-d2: clamp(1.75rem, 3.4vw, 2.5rem);   /* page title, player name, scores */
+  --fs-d3: clamp(1.75rem, 2.8vw, 2.5rem);   /* stat tile number (40 px) */
+  --fs-d4: 1.375rem;                        /* chances on cards (22 px) */
+  --fs-h2: clamp(1.6rem, 3.2vw, 2.25rem);   /* section titles (36 px) */
+  --lh-tight: 1.08; --lh-snug: 1.3; --lh-body: 1.55;
+  --tracking-caps: 0.02em;
 
-  /* ── space (4px grid) ───────────────────────────────────── */
+  /* ── space (4px grid), roomy ────────────────────────────── */
   --sp-0: 2px; --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px;
   --sp-6: 24px; --sp-8: 32px; --sp-10: 40px; --sp-12: 48px; --sp-16: 64px;
-  --gutter: 16px;
-  --page-max: 1440px;
-  --topbar-h: 56px;
-  --secnav-h: 44px;
+  --gutter: 24px;
+  --page-max: 1240px;
+  --topbar-h: 64px;
+  --secnav-h: 48px;
+  --sec-gap: 64px;     /* between page sections */
 
   /* ── radii, shadows, motion ─────────────────────────────── */
-  --r-1: 4px; --r-2: 8px; --r-3: 12px; --r-4: 16px; --r-pill: 999px;
-  --sh-1: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 1px 2px rgba(0, 0, 0, 0.4);
-  --sh-2: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 24px rgba(0, 0, 0, 0.45);
-  --sh-3: 0 20px 48px rgba(0, 0, 0, 0.6);
+  --r-1: 6px; --r-2: 12px; --r-3: 22px; --r-4: 26px; --r-pill: 999px;
+  --r-card: 22px; --r-tile: 18px;
+  --sh-1: 0 1px 0 rgba(255, 240, 215, 0.04) inset, 0 12px 30px -18px rgba(0, 0, 0, 0.75);
+  --sh-2: 0 1px 0 rgba(255, 240, 215, 0.05) inset, 0 18px 40px -16px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 201, 77, 0.08);
+  --sh-3: 0 24px 56px rgba(0, 0, 0, 0.6);
   --glow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent), 0 0 24px color-mix(in srgb, var(--accent) 18%, transparent);
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --t-fast: 120ms; --t-med: 220ms; --t-slow: 420ms;
   --z-bar: 50; --z-pop: 80; --z-modal: 100;
 }
-
-/* ── light ──────────────────────────────────────────────────────── */
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    color-scheme: light;
-    --bg: #f4f5f8; --bg-raise: #ffffff;
-    --s-1: #ffffff; --s-2: #f5f6f9; --s-3: #e9ecf1; --s-4: #dde2e9;
-    --s-glass: rgba(255, 255, 255, 0.86);
-    --ink-1: #0d1017; --ink-2: #474f5c; --ink-3: #646e7c; --ink-4: #9aa3ae; --ink-inv: #ffffff;
-    --line-1: rgba(13, 16, 23, 0.07); --line-2: rgba(13, 16, 23, 0.11); --line-3: rgba(13, 16, 23, 0.24);
-    --grid: rgba(13, 16, 23, 0.07); --axis: rgba(13, 16, 23, 0.24);
-    --signal: #5a44e4; --signal-2: #4330c9; --signal-ink: #ffffff; --signal-soft: rgba(90, 68, 228, 0.10); --focus: #0b6bcb;
-    --a-football: #0f9d63; --a-f1: #d91f26; --a-basketball: #d9620f; --a-tennis: #6f9200;
-    --a-baseball: #1f63d8; --a-nfl: #9a6b00; --a-hockey: #0389a6; --a-college: #c2185b;
-    --c-1: #2a78d6; --c-2: #eb6834; --c-3: #1baf7a; --c-4: #eda100; --c-5: #e87ba4; --c-6: #008300; --c-7: #6250d6; --c-8: #e34948;
-    --c-market: #8a93a0; --c-other: #98a1ac;
-    --seq-1: #cde2fb; --seq-2: #86b6ef; --seq-3: #3987e5; --seq-4: #1c5cab; --seq-5: #0d366b;
-    --div-neg: #e34948; --div-mid: #f0efec; --div-pos: #2a78d6;
-    --pc-0: #1f57c9; --pc-25: #7ea3ea; --pc-50: #b9bfc8; --pc-75: #f29b7f; --pc-100: #d42c1f;
-    --wp-a: #2a72d8; --wp-b: #e8771f; --wp-draw: #98a1ac;
-    --up: #0f8a3c; --down: #c92a2a; --live: #e0112b;
-    --sh-1: 0 1px 2px rgba(13, 16, 23, 0.06), 0 0 0 1px rgba(13, 16, 23, 0.04);
-    --sh-2: 0 6px 20px rgba(13, 16, 23, 0.08), 0 0 0 1px rgba(13, 16, 23, 0.04);
-    --sh-3: 0 20px 48px rgba(13, 16, 23, 0.16);
-  }
+@media (max-width: 640px) {
+  :root, :root[data-theme] { --gutter: 16px; --sec-gap: 44px; --r-card: 18px; }
 }
-:root[data-theme="light"] {
-  color-scheme: light;
-  --bg: #f4f5f8; --bg-raise: #ffffff;
-  --s-1: #ffffff; --s-2: #f5f6f9; --s-3: #e9ecf1; --s-4: #dde2e9;
-  --s-glass: rgba(255, 255, 255, 0.86);
-  --ink-1: #0d1017; --ink-2: #474f5c; --ink-3: #646e7c; --ink-4: #9aa3ae; --ink-inv: #ffffff;
-  --line-1: rgba(13, 16, 23, 0.07); --line-2: rgba(13, 16, 23, 0.11); --line-3: rgba(13, 16, 23, 0.24);
-  --grid: rgba(13, 16, 23, 0.07); --axis: rgba(13, 16, 23, 0.24);
-  --signal: #5a44e4; --signal-2: #4330c9; --signal-ink: #ffffff; --signal-soft: rgba(90, 68, 228, 0.10); --focus: #0b6bcb;
-  --a-football: #0f9d63; --a-f1: #d91f26; --a-basketball: #d9620f; --a-tennis: #6f9200;
-  --a-baseball: #1f63d8; --a-nfl: #9a6b00; --a-hockey: #0389a6; --a-college: #c2185b;
-  --c-1: #2a78d6; --c-2: #eb6834; --c-3: #1baf7a; --c-4: #eda100; --c-5: #e87ba4; --c-6: #008300; --c-7: #6250d6; --c-8: #e34948;
-  --c-market: #8a93a0; --c-other: #98a1ac;
-  --seq-1: #cde2fb; --seq-2: #86b6ef; --seq-3: #3987e5; --seq-4: #1c5cab; --seq-5: #0d366b;
-  --div-neg: #e34948; --div-mid: #f0efec; --div-pos: #2a78d6;
-  --pc-0: #1f57c9; --pc-25: #7ea3ea; --pc-50: #b9bfc8; --pc-75: #f29b7f; --pc-100: #d42c1f;
-  --wp-a: #2a72d8; --wp-b: #e8771f; --wp-draw: #98a1ac;
-  --up: #0f8a3c; --down: #c92a2a; --live: #e0112b;
-  --sh-1: 0 1px 2px rgba(13, 16, 23, 0.06), 0 0 0 1px rgba(13, 16, 23, 0.04);
-  --sh-2: 0 6px 20px rgba(13, 16, 23, 0.08), 0 0 0 1px rgba(13, 16, 23, 0.04);
-  --sh-3: 0 20px 48px rgba(13, 16, 23, 0.16);
-}
-:root[data-theme="dark"] { color-scheme: dark; }
 
 /* sport accent per site: <html data-sport="nfl"> */
 :root[data-sport="football"]   { --accent: var(--a-football); }

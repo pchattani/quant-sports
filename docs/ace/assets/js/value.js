@@ -119,10 +119,10 @@ function breakout(T, V, Val, body, q) {
     '. The model was fitted on quarterly snapshots since ' + (T === 'atp' ? '2008' : '2009') + ' and is scored here on years it never saw (' +
     '<a href="' + TA.href(T, 'value') + '?v=validation&h=' + h + '">validation</a>). The reasons are the features that move each forecast most against the average player; ' +
     '▲ pushes the rank up, ▼ down. ' + (isNum(base) ? 'About ' + TA.pct(base, 0) + ' of players outside the top 10 break out in a typical ' + H_LABEL[h] + '.' : '') + '</div></div>' +
-    '<div class="card"><div class="card-header">Breakout candidates <span class="card-sub">Most likely to rise by a third or more, outside the top 10</span></div>' + breakoutTable(T, rise, h, 'rise') + '</div>' +
-    '<div class="card"><div class="card-header">Regression candidates <span class="card-sub">Most likely to fall by half or more (and 5+ places), or out of tour-level draws</span></div>' + breakoutTable(T, fall, h, 'fall') + '</div>' +
+    '<div class="card"><div class="card-header">Who could break out <span class="card-sub">Most likely to rise by a third or more, outside the top 10</span></div>' + breakoutTable(T, rise, h, 'rise') + '</div>' +
+    '<div class="card"><div class="card-header">Who could slip back <span class="card-sub">Most likely to fall by half or more (and 5+ places), or out of tour-level draws</span></div>' + breakoutTable(T, fall, h, 'fall') + '</div>' +
     '<div class="grid-2"><div class="card"><div class="card-header">Age curve <span class="card-sub">Mean change in rank over the next 12 months by age, all snapshots (95% CI)</span></div><div id="vx-age" style="height:300px"></div></div>' +
-    '<div class="card"><div class="card-header">The points calendar <span class="card-sub">Points to defend in the next ' + H_LABEL[h] + ' against what players at the model\'s level earn in that time</span></div><div id="vx-cal" style="height:300px"></div></div></div>' +
+    '<div class="card"><div class="card-header">The points to defend <span class="card-sub">Points to defend in the next ' + H_LABEL[h] + ' against what players at the model\'s level earn in that time</span></div><div id="vx-cal" style="height:300px"></div></div></div>' +
     '<div class="card"><div class="card-header">Everyone in the top ' + (V.universe || 150) + ' <span class="card-sub">Sortable; click a row for the player</span></div><div id="vx-all">' + allTable(T, rows, h) + '</div></div>';
   TA.sortable(body);
   TA.wireToggles(document.getElementById('vx-h'), 'data-h', k => { q.h = k; setQuery(T, { v: 'breakout', h: k }); breakout(T, V, Val, body, q); });
@@ -266,8 +266,8 @@ function luck(T, V, Val, body, q) {
     (isNum((L.params || {}).k_games_bo3) ? TA.num(L.params.k_games_bo3, 1) : '≈20') + ' for best of three) + <b>draw luck</b> (opponents weaker than the typical draw for the round and seed band at that event) + <b>free wins</b> (walkovers and retirements received). ' +
     'Tiebreaks and deciding sets against the chain\'s odds show where close-match luck came from' + (wta ? '; break points saved and won against the player\'s own serve and return rates are the point-level view' : '') + '. ' +
     'All of it regresses: the next season it is close to zero for everyone. ' + glossLink('v_total_luck', 'Definitions') + '</div></div>' +
-    '<div class="grid-2"><div class="card"><div class="card-header">Luckiest <span class="card-sub">Most wins above expectation</span></div>' + mini(top) + '</div>' +
-    '<div class="card"><div class="card-header">Unluckiest <span class="card-sub">Fewest wins above expectation</span></div>' + mini(bottom) + '</div></div>' +
+    '<div class="grid-2"><div class="card"><div class="card-header">The luckiest <span class="card-sub">Most wins above expectation</span></div>' + mini(top) + '</div>' +
+    '<div class="card"><div class="card-header">The unluckiest <span class="card-sub">Fewest wins above expectation</span></div>' + mini(bottom) + '</div></div>' +
     '<div class="card"><div class="card-header">Every player <span class="card-sub">Wins above expectation and its parts; sortable</span></div>' + (rows.length ? luckTable(T, by('total'), w, wta) : TA.muted('No player has enough matches in this window yet.')) + '</div>' +
     '<div class="card"><div class="card-header">Why this is luck <span class="card-sub">Each measure in one season against the next, players with 20+ matches in both (95% CI)</span></div><div id="vx-ev" style="height:' + (wta ? 440 : 360) + 'px"></div></div>';
   TA.sortable(body);
@@ -495,8 +495,9 @@ function card(T, pid, el) {
     tiles.push(TA.statTile('Ranking v our rating', v && isNum(v.imp) ? 'No. ' + (isNum(v.rank) ? v.rank : '—') + ' v ' + v.imp : (v ? 'model No. ' + v.mrank : '—'),
       v ? (isNum(v.rank) && isNum(v.imp) ? (v.rank > v.imp ? 'underrated by ' + (v.rank - v.imp) + ' places' : v.rank < v.imp ? 'overrated by ' + (v.imp - v.rank) + ' places' : 'in line') + ' · rating ' + n0(v.R) + ' · ' : '') + '<a href="' + link('over') + '">ranking v our rating →</a>' : 'not rated (fewer than 10 rated matches or inactive)'));
     const why = b && (b.why12m || []).length ? '<div class="vx-card-why">Forecast drivers: ' + reasonsHTML(T, b, '12m', 4) + '</div>' : '';
-    el.innerHTML = '<div class="card vx-card"><div class="card-header">Value <span class="card-sub">Breakout forecast, luck, and whether the ranking runs ahead of or behind our rating (' +
-      '<a href="' + link('validation') + '">how good is this?</a>)</span></div><div class="kpi-grid">' + tiles.join('') + '</div>' + why + '</div>';
+    el.innerHTML = TA.v2.card('Where the ranking is heading', 'Our ranking forecast for a year from now, how much of the last 52 weeks was luck, and whether the ranking runs ahead of or behind our rating (' +
+      '<a href="' + link('validation') + '">how good is this?</a>)', '<div class="kpi-grid">' + tiles.join('') + '</div>' + why +
+      QK.note((b && isNum(b.lo12m) && isNum(b.hi12m) ? 'The range ' + Math.round(b.lo12m) + '–' + Math.round(b.hi12m) + ' is where the ranking lands 8 times in 10 in our forecast. ' : '') + 'Luck counts wins beyond what the games won predicted, kind draws and walkovers; it rarely repeats from one year to the next.'), { cls: 'vx-card' });
   });
 }
 

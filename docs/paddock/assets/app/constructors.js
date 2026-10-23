@@ -77,7 +77,7 @@ PD.pairColours = pairColours;
 
 function renderList(el, params) {
   var y = isNum(params.year) ? params.year : PD.currentSeason();
-  el.innerHTML = PD.pageHead('Season ' + y, 'Constructors', 'Every team: line-up, points, title chance, car pace and pit crew.', PD.yearPager('constructors', y)) + '<div id="cl-body">' + PD.empty('Loading', '') + '</div>';
+  el.innerHTML = PD.pageHead('Constructors · ' + y, 'Every team, ' + y, 'Line-ups, points, our title chances, car pace and pit crews.', PD.yearPager('constructors', y)) + '<div id="cl-body">' + PD.empty('Loading', '') + '</div>';
   return seasonData(y).then(function (res) {
     if (!PD.alive(el)) return;
     var drivers = res[0], teams = res[1], season = res[2];
@@ -165,7 +165,7 @@ function renderTeam(el, params, state) {
     var tpc = tP && tP.pct[id] ? tP.pct[id] : {};
     var hst = [{ label: 'Points', value: PD.pts(s.points) }, { label: 'Wins', value: String(s.wins || 0) }];
     if (ch) hst.push({ label: 'Title chance', value: PD.pct(ch.p_title, ch.p_title > 0.99 ? 2 : 1) });
-    var h = '<div class="qk-kicker pd-back"><a href="#/constructors">← Constructors</a></div>' + QK.playerHeader({ name: name, split: false, pos: 'Constructor', kicker: y + ' season' + (s.pos ? ' · P' + s.pos + ' in the constructors’ championship' : ''),
+    var h = '<nav class="pd-crumb" aria-label="Breadcrumb"><a href="#/constructors">F1</a><span aria-hidden="true">›</span><a href="#/constructors">Constructors</a><span aria-hidden="true">›</span>' + esc(name) + '</nav>' + QK.playerHeader({ name: name, split: false, pos: 'Constructor', kicker: y + ' season' + (s.pos ? ' · P' + s.pos + ' in the constructors’ championship' : ''),
         team: { colour: PD.teamColour(id) }, meta: lineup.map(function (d) { return PD.driverLink(d, { dot: false }); }), stats: hst, tags: tP && tP.qualified(id) ? [QK.tag('In the ' + y + ' peer group', 'signal')] : [] }) +
       '<div class="pd-links pd-mt">' + (lineup.length >= 2 ? '<a class="qk-btn" href="#/compare/drivers/' + encodeURIComponent(lineup[0]) + '/' + encodeURIComponent(lineup[1]) + '">Compare the drivers</a>' : '') +
       '<a class="qk-btn" href="#/compare/teams/' + encodeURIComponent(id) + '">Compare with another team</a><a class="qk-btn" href="#/value?tab=needs">Every team’s needs</a></div>';
@@ -232,7 +232,7 @@ function renderTeam(el, params, state) {
     var lg = ((t && t.log) || []).slice().sort(function (a, b) { return a.round - b.round; });
     if (lg.length) PD.ch.columns('tm-rel', { cats: lg.map(function (r) { return 'R' + r.round; }), xName: 'Round', yName: 'Points', y2Name: 'DNFs', y2Max: 2,
       series: [{ name: 'Points', data: lg.map(function (r) { return r.points || 0; }), colour: PD.teamColour(id), fmt: function (v) { return PD.pts(v); } },
-        { name: 'Retirements', type: 'scatter', axis: 1, symbol: 'triangle', size: 11, colour: '#e05d5d', data: lg.map(function (r) { return r.dnfs ? r.dnfs : null; }), fmt: function (v) { return String(v); } }], label: 'Points by round' });
+        { name: 'Retirements', type: 'scatter', axis: 1, symbol: 'triangle', size: 11, colour: PD.col('down'), data: lg.map(function (r) { return r.dnfs ? r.dnfs : null; }), fmt: function (v) { return String(v); } }], label: 'Points by round' });
     else PD.ch.none('tm-rel', 'No rounds logged yet.');
 
     // run-in
@@ -276,7 +276,7 @@ function renderTeam(el, params, state) {
       })));
       if (two.length === 2) {
         var hh = h2h(D[two[0]].log, D[two[1]].log);
-        var pc = pairColours(PD.teamColour(id), '#7d8590');
+        var pc = pairColours(PD.teamColour(id), PD.col('grey'));
         document.getElementById('tm-drv').insertAdjacentHTML('beforeend', '<div class="pd-pad">' + h2hBar('Qualifying', hh.quali[0], hh.quali[1], pc[0], pc[1], PD.driverSurname(two[0]), PD.driverSurname(two[1])) +
           h2hBar('Race', hh.race[0], hh.race[1], pc[0], pc[1], PD.driverSurname(two[0]), PD.driverSurname(two[1])) + '</div>');
       }
@@ -300,8 +300,10 @@ function renderTeam(el, params, state) {
   });
 }
 
-var GRADE_C = { A: '#2fb37b', B: '#7ee787', C: '#e3b341', D: '#e8833a', F: '#e05d5d' };
-function grade(g) { return g ? '<span class="pd-grade" style="--g:' + (GRADE_C[g] || '#7d8590') + '">' + g + '</span>' : '—'; }
+/* grades on the kit's percentile scale (A hot, F cold), read when drawn */
+var GRADE_P = { A: 100, B: 75, C: 50, D: 25, F: 0 };
+function gradeC(g) { return isNum(GRADE_P[g]) ? QK.pctHex(GRADE_P[g]) : PD.col('grey'); }
+function grade(g) { return g ? '<span class="pd-grade" style="--g:' + gradeC(g) + '">' + g + '</span>' : '—'; }
 PD.grade = grade;
 function swapsTable(id, list) {
   if (!list || !list.length) { PD.set(id, PD.muted('No swap adds points.')); return; }
@@ -326,7 +328,7 @@ function needsBlock(needs, id) {
       PD.card('Strengths', '', '<ul class="pd-glist">' + ((x.strengths || []).map(item).join('') || '<li>None stands out.</li>') + '</ul>', { span: 3 }) +
       PD.card('Weaknesses', '', '<ul class="pd-glist">' + ((x.weaknesses || []).map(item).join('') || '<li>None below the 40th percentile.</li>') + '</ul>', { span: 3 }) +
       PD.card('Moves that would add the most', 'Driver swaps run through the championship simulation of the remaining rounds (' + (needs.swaps_n || '') + ' runs, common random numbers): the change in expected constructors’ points.', '<div id="tm-swaps"></div>', { span: 12, flush: true })) + '</section>';
-  PD.ch.hbars('tm-areas', (x.areas || []).map(function (a) { return { label: a.label, value: a.pct, colour: GRADE_C[a.grade] || '#7d8590', sub: 'Grade ' + (a.grade || '—') + ' · ' + (a.stat || '') }; }), { fmt: function (v) { return PD.num(v, 0); }, min: 0, max: 100, name: 'Percentile', ref: 50, labelWidth: 150, label: 'Graded areas' });
+  PD.ch.hbars('tm-areas', (x.areas || []).map(function (a) { return { label: a.label, value: a.pct, colour: gradeC(a.grade), sub: 'Grade ' + (a.grade || '—') + ' · ' + (a.stat || '') }; }), { fmt: function (v) { return PD.num(v, 0); }, min: 0, max: 100, name: 'Percentile', ref: 50, labelWidth: 150, label: 'Graded areas' });
   swapsTable('tm-swaps', x.best_swaps);
 }
 

@@ -1,11 +1,12 @@
-/* The Quant Gridiron — Overview (#/), on Design System 2.0 (the Rink overview is the reference).
- *   head and stat tiles: games this week, the Super Bowl favourite (ours), the top-rated team, the EPA-per-dropback
- *              leader, the closest game of the week (no market headline);
- *   scoreboard ticker and the game of the week (our win chance in display numbers, the team-colour bar);
- *   this week's games as v2 game cards with records and form; who wins it all (our chances as bars, Kalshi /
- *   Polymarket as a quiet grey tick) beside projected wins with the simulation's 90% range; power map and rating
- *   trend; the playoff race by conference (chance bars); divisions at a glance; leaders; last week.
- * Reads index.json, <S>/season.json, <S>/markets.json, glossary.json (leader labels). */
+/* The Quant Gridiron — Overview (#/), on kit v3 "Matchday" (the Rink overview is the reference, MIGRATION_V3.md).
+ *   the ticker; the greeting hero with the game to watch (QK.featureCard); stat tiles: games this week, the Super Bowl
+ *   favourite (ours), the top-rated team, the EPA-per-dropback leader, the closest game of the week;
+ *   "What to watch this week": our six picks (live, then the closest calls with the most at stake), every game this
+ *   week or last week's results, each card with a one-line reason; "Who's hot" from five leaderboards; "New here?"
+ *   beside a "How sure are we?" teaser from calibration.json; who wins it all (our chances only: no market on the
+ *   overview) beside projected wins with the simulation's 90% range; power map and rating trend; the playoff race by
+ *   conference; divisions at a glance; leaders.
+ * Reads index.json, <S>/season.json, glossary.json (leader labels), calibration.json (the teaser). */
 (function (GI) {
 'use strict';
 
@@ -28,44 +29,37 @@ function leaderMeta(key, G) {
   return { label: f ? f[0] : GI.titleCase(k), fmt: f ? f[1] : null, pre: pre };
 }
 
-/* The game of the week: live first, else the upcoming game with the most at stake and the closest call. */
-function featured(games, po) {
-  const live = games.filter(GI.isLive);
-  if (live.length) return live[0];
-  const pre = games.filter(GI.isPre);
-  if (!pre.length) return games[games.length - 1] || null;
-  let best = null, bs = -1;
-  pre.forEach(g => {
-    const p = isNum((g.model || {}).p_home) ? g.model.p_home : 0.5;
-    const stake = ((po[g.home] || {}).p_playoffs || 0.5) + ((po[g.away] || {}).p_playoffs || 0.5);
-    const s = stake * (1 - Math.abs(p - 0.5) * 1.6);
-    if (s > bs) { bs = s; best = g; }
-  });
-  return best;
+/* The game to watch: live first, else the upcoming game with the most at stake and the closest call. */
+function watchVal(g, po) {
+  if (GI.isLive(g)) return 100;
+  if (!GI.isPre(g)) return -1;
+  const p = isNum((g.model || {}).p_home) ? g.model.p_home : 0.5;
+  const stake = ((po[g.home] || {}).p_playoffs || 0.5) + ((po[g.away] || {}).p_playoffs || 0.5);
+  return stake * (1 - Math.abs(p - 0.5) * 1.6);
 }
-function featureCard(g, po, rows) {
-  if (!g) return GI.card('Game of the week', '', GI.muted('No games scheduled.'));
-  const st = GI.gameState(g), live = GI.isLive(g), fin = st === 'final';
-  const m = g.model || {};
-  const pH = live && isNum(g.wp_home) ? g.wp_home : m.p_home;
-  const cols = GI.pair(g.away, g.home);
-  const rec = t => { const r = rows[t]; return r && isNum(r.w) ? GI.record(r.w, r.l, r.t) : ''; };
-  const side = (t, p, sc, c) => '<a class="gi-vs-team" href="' + GI.teamHref(t) + '">' + GI.mark(t, 'lg') + '<span class="nm">' + esc(GI.teamShort(t)) + '</span>' +
-    '<span class="p gi-disp" style="color:' + esc(fin || live ? 'var(--ink-1)' : c) + '">' + (fin || live ? esc(isNum(sc) ? sc : '–') : (isNum(p) ? GI.pct(p, 0) : '')) + '</span>' +
-    '<span class="qk-sub">' + esc([rec(t), po[t] ? 'playoffs ' + GI.pct(po[t].p_playoffs, 0) : ''].filter(Boolean).join(' · ')) + '</span></a>';
-  const mid = '<div class="gi-vs-mid">' + (live ? '<span class="qk-badge live">' + esc(GI.clockText(g.qtr, g.clock) || 'Live') + '</span>'
-    : fin ? '<span class="qk-badge final">Final</span>' : '<span>' + esc(GI.fmtDate(g.kickoff, { year: false })) + '</span><span class="sc gi-vs-t">' + esc(GI.fmtTime(g.kickoff)) + '</span><span>' + esc(GI.countdown(g.kickoff) ? 'in ' + GI.countdown(g.kickoff) : '') + '</span>') + '</div>';
-  const A = { name: GI.teamShort(g.away), abbr: GI.teamAbbr(g.away), colour: cols[0] }, H = { name: GI.teamShort(g.home), abbr: GI.teamAbbr(g.home), colour: cols[1] };
-  const facts = [];
-  const mg = GI.homeLine(m);
-  if (isNum(m.home_pts) && isNum(m.away_pts)) facts.push('Our projected score <b>' + esc(GI.teamAbbr(g.away)) + ' ' + GI.num(m.away_pts, 0) + '–' + GI.num(m.home_pts, 0) + ' ' + esc(GI.teamAbbr(g.home)) + '</b>');
-  if (isNum(mg) && Math.abs(mg) >= 0.5) facts.push('Projected margin <b>' + esc(GI.teamAbbr(mg < 0 ? g.home : g.away)) + ' by ' + GI.num(Math.abs(mg), 1) + '</b>');
-  if (isNum(m.total)) facts.push('Points expected <b>' + GI.num(m.total, 1) + '</b>');
-  return '<section class="qk-card gi-feature" style="--fa:' + esc(cols[0]) + ';--fh:' + esc(cols[1]) + '"><div class="qk-card-body">' +
-    '<div class="gi-feature-top"><span class="qk-kicker">' + (live ? 'Live now' : fin ? 'Final' : 'Game of the week') + '</span><a class="gi-more" href="' + GI.gameHref(g.game_id) + '">Game centre →</a></div>' +
-    '<div class="gi-vs">' + side(g.away, isNum(pH) ? 1 - pH : null, g.as, cols[0]) + mid + side(g.home, pH, g.hs, cols[1]) + '</div>' +
-    (!fin && isNum(pH) ? QK.wpBar(1 - pH, null, pH, A, H, { colors: cols, size: 'lg', label: live ? 'Our live win chance' : 'Our win chance' }) : '') +
-    (facts.length ? '<div class="gi-feature-foot">' + facts.map(f => '<span>' + f + '</span>').join('') + '</div>' : '') + '</div></section>';
+function featured(games, po) {
+  const list = games.filter(g => GI.isLive(g) || GI.isPre(g));
+  if (!list.length) return null;
+  return list.slice().sort((a, b) => watchVal(b, po) - watchVal(a, po))[0];
+}
+/* "Who's hot": the top of five of the builder's leaderboards, each with what the number means. */
+const HOT = [
+  ['qb_epa_db', 'Best passer', 'EPA per dropback', 'Expected points added each time the quarterback drops back, sacks and scrambles included. Zero is an average play.'],
+  ['rb_ryoe', 'Best runner', 'rush yards over expected a carry', 'Yards beyond what our model expects from the blocking, the box and the down and distance.'],
+  ['wr_rec_epa', 'Best receiver', 'receiving EPA', 'Expected points the offence gained on the throws to this receiver, this season.'],
+  ['def_sacks', 'Most sacks', 'sacks', 'Sacks this season. Pressure without the sack does not show in public data.'],
+  ['k_fg_oe', 'Best kicker', 'field-goal points over expected', 'Points from field goals beyond what our model expects from the distances tried. Kicking is close to noise.']
+];
+function hotItems(L, G) {
+  return HOT.map(h => {
+    const list = L[h[0]] || [];
+    const r0 = list[0], r1 = list[1];
+    if (!r0) return null;
+    const m = leaderMeta(h[0], G);
+    const f = v => GI.fmtVal(v, m.fmt);
+    return { sport: 'nfl', title: h[1], name: GI.playerName(r0[0]), value: f(r0[1]), unit: h[2] + ' · ' + GI.teamAbbr(GI.player(r0[0]).team), href: GI.playerHref(r0[0]),
+      next: r1 ? { name: GI.playerName(r1[0]), value: f(r1[1]) } : null, expl: h[3] };
+  }).filter(Boolean);
 }
 
 function divisionsGrid(rows) {
@@ -89,9 +83,9 @@ GI.route('overview', function (el) {
   const idx = GI.index() || {};
   if (!GI.ok(idx)) { el.innerHTML = GI.pageHead('NFL', 'The Quant Gridiron', '') + GI.notBuilt('The overview', idx); return; }
   const S = GI.currentSeason(), W = GI.currentWeek();
-  return GI.loadAll([GI.ypath('season.json', S), GI.ypath('markets.json', S), 'glossary.json']).then(res => {
+  return GI.loadAll([GI.ypath('season.json', S), 'glossary.json']).then(res => {
     if (!el.isConnected) return;
-    const season = GI.ok(res[0]) ? res[0] : null, mkts = GI.ok(res[1]) ? res[1] : null, G = glossIndex(res[2]);
+    const season = GI.ok(res[0]) ? res[0] : null, G = glossIndex(res[1]);
     const all = (idx.games || []).slice().sort((a, b) => String(a.kickoff).localeCompare(String(b.kickoff)));
     const games = all.filter(g => !GI.isStale(g));
     const stale = all.length - games.length;
@@ -115,50 +109,86 @@ GI.route('overview', function (el) {
     const close = games.filter(g => GI.isPre(g) && isNum((g.model || {}).p_home)).sort((a, b) => Math.abs(a.model.p_home - 0.5) - Math.abs(b.model.p_home - 0.5))[0];
     const tick = games.length ? '<div class="qk-ticker gi-ticker" aria-label="This week\'s games">' + QK.ticker(games.map(g => GI.qkGame(g, byTeam)), { group: 'league', pill: false }) + '</div>' : '';
     const wk = GI.weekLabel(W, S);
+    const fq = feat ? GI.qkGame(feat, byTeam) : null;
+    if (fq) fq.league = wk + (feat.div_game ? ' · Division game' : '');
 
     el.innerHTML = tick +
-      GI.pageHead(S + ' · ' + phaseText + ' · ' + wk, wk + ', by the numbers.', 'Our win chance for every game, playoff and Super Bowl chances from 20,000 simulated seasons, expected points, every fourth down graded and the players behind it all.',
-        '<a class="qk-btn primary" href="' + GI.weekHref(S, W) + '">All ' + esc(wk) + ' games</a><a class="qk-btn" href="#/standings">Standings</a><a class="qk-btn" href="#/playoffs">Playoff picture</a>') +
-      GI.kpis([
+      QK.greeting({ date: 'NFL · ' + S + ' · ' + phaseText + ' · ' + wk,
+        title: esc(QK.greet()) + '! Here’s what’s ' + QK.mark('worth watching') + ' in the NFL this week.',
+        lede: 'Our chance for every game, playoff and Super Bowl chances from 20,000 simulated seasons, every fourth down graded, and the players behind it all, in plain English.',
+        ctas: [{ label: 'All ' + wk + ' games', href: GI.weekHref(S, W) }, { label: 'Standings', href: '#/standings', ghost: true }],
+        side: fq ? QK.featureCard(fq, { scribble: GI.isLive(feat) ? 'Live now!' : 'Our pick this week!' }) : '' }) +
+      '<div style="margin-top:var(--sp-10)">' + GI.kpis([
         GI.kpi(live.length ? 'Live now' : 'Games this week', String(live.length || all.length), live.length ? all.length + ' this week' : done ? done + ' final' + (games.length - done ? ' · ' + (games.length - done) + ' to play' : '') + (stale ? ' · ' + stale + ' awaiting results' : '') : (next ? 'first kickoff ' + esc(GI.fmtDate(next, { year: false })) : '')),
         GI.kpi('Super Bowl favourite', fav ? esc(GI.teamAbbr(fav)) + ' ' + GI.pct(po[fav].p_sb, 0) : '—', fav ? esc(GI.teamShort(fav)) + ' · from 20,000 simulated seasons' : '', { signal: true, href: fav ? GI.teamHref(fav) : null, tip: 'Our chance of winning the Super Bowl in the season simulation' }),
         GI.kpi('Top-rated team', topR ? esc(GI.teamAbbr(topR)) + ' ' + GI.signed((ratings[topR].values || {}).rating, 1) : '—', topR ? 'points a game better than an average team' : '', { href: topR ? GI.teamHref(topR) : null, tip: 'Our team-strength rating: points per game better than an average team on a neutral field' }),
         GI.kpi('Best passer so far', qb ? esc(GI.playerSurname(qb[0])) + ' ' + GI.signed(qb[1], 2) : '—', qb ? 'EPA per dropback · ' + esc(GI.teamAbbr(GI.player(qb[0]).team)) : '', { href: qb ? GI.playerHref(qb[0]) : null, tip: 'Expected points added per dropback (passes, sacks and scrambles), qualified quarterbacks' }),
-        GI.kpi('Closest call', close ? esc(GI.teamAbbr(close.away)) + ' @ ' + esc(GI.teamAbbr(close.home)) : '—', close ? 'our chance ' + esc(GI.teamAbbr(close.model.p_home >= 0.5 ? close.home : close.away)) + ' ' + GI.pct(Math.max(close.model.p_home, 1 - close.model.p_home), 0) : 'no games to play this week', { text: true, href: close ? GI.gameHref(close.game_id) : null })
-      ]) +
+        GI.kpi('Closest call', close ? esc(GI.teamAbbr(close.away)) + ' at ' + esc(GI.teamAbbr(close.home)) : '—', close ? 'our chance ' + esc(GI.teamAbbr(close.model.p_home >= 0.5 ? close.home : close.away)) + ' ' + GI.pct(Math.max(close.model.p_home, 1 - close.model.p_home), 0) : 'no games to play this week', { text: true, href: close ? GI.gameHref(close.game_id) : null })
+      ]) + '</div>' +
 
-      '<section class="qk-section">' + GI.secHead({ kicker: 'Scoreboard', title: esc(wk) + ' games', html: true, sub: 'Our win chance on every card, the favourite in violet; records and the last five results beside each team. A grey tick on the bar marks the market, for reference.',
-        actions: '<a class="qk-btn" href="' + GI.weekHref(S, W) + '">Week page →</a>' }) +
-        GI.grid('<div class="qk-span-4">' + featureCard(feat, po, byTeam) + '</div><div class="qk-span-8">' + (games.length ? '<div class="qk-auto gi-games" style="--min:290px">' + games.filter(g => g !== feat).slice(0, 8).map(g => GI.gameCard(g, { rows: byTeam })).join('') + '</div>' : QK.empty('No games this week', 'The schedule is being set.')) + '</div>') +
-        (stale ? '<p class="qk-caption">' + stale + ' game' + (stale === 1 ? '' : 's') + ' from ' + esc(wk) + ' ' + (stale === 1 ? 'is' : 'are') + ' waiting for ' + (stale === 1 ? 'its result' : 'their results') + ' in the next update; the <a href="' + GI.weekHref(S, W) + '">week page</a> keeps our pre-game forecast for each.</p>' : '') +
-        (games.length > 9 ? '<div class="qk-auto gi-games" style="--min:290px;margin-top:var(--sp-4)">' + games.filter(g => g !== feat).slice(8).map(g => GI.gameCard(g, { rows: byTeam })).join('') + '</div>' : '') + '</section>' +
+      '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch this week', title: '<span id="ov-gh">Games we’d pick</span>', html: true,
+        sub: 'Our chance for each side, with a line on why it’s worth your time. Live games update as they go.',
+        actions: GI.seg('ov-when', [['picks', 'Our picks'], ['all', 'All ' + all.length], ['results', 'Last week', !(idx.recent || []).length]], 'picks', 'Games') }) +
+        '<div id="ov-games"></div>' +
+        (stale ? '<p class="qk-caption">' + stale + ' game' + (stale === 1 ? '' : 's') + ' from ' + esc(wk) + ' ' + (stale === 1 ? 'is' : 'are') + ' waiting for ' + (stale === 1 ? 'its result' : 'their results') + ' in the next update; the <a href="' + GI.weekHref(S, W) + '">week page</a> keeps our pre-game forecast for each.</p>' : '') + '</section>' +
 
-      '<section class="qk-section">' + GI.secHead({ kicker: 'Season simulation', title: 'Who wins it all', sub: 'Our chances from 20,000 simulated seasons, with each team’s projected wins and the range it lands in nine times out of ten.', actions: '<a class="qk-btn" href="#/futures">Every season forecast →</a>' }) +
-        GI.grid(GI.card('Super Bowl chances', 'Our chance; the grey tick is the Kalshi / Polymarket number, for reference', '<div id="ov-sb"></div>', { span: 5, foot: '<span>Top twelve of 32</span><a href="#/playoffs">Bracket →</a>' }) +
-          GI.card('Projected wins', 'Mean of the simulated seasons (dot) and its 90% range (bar)', GI.chartBox('ov-range', 520, 'Projected wins with a 90% range'), { span: 7, foot: '<span>Range: 5th to 95th percentile of 20,000 seasons</span><a href="' + GI.standingsHref(S, 'wins') + '">Win totals →</a>' })) + '</section>' +
+      '<section class="qk-section">' + QK.sectionHead({ kicker: 'Who’s hot', title: 'The leaders right now', sub: 'Top of five of our leaderboards, qualified players only, with what each number means.', actions: '<a class="qk-more" href="#/leaders">Every leaderboard</a>' }) +
+        '<div id="ov-hot"></div></section>' +
 
-      '<section class="qk-section">' + GI.secHead({ kicker: 'Team strength', title: 'Power map', sub: 'Our offence and defence ratings in points per game against an average team; up and right is better.', actions: '<a class="qk-btn" href="' + GI.standingsHref(S, 'ratings') + '">Power ratings →</a>' }) +
+      '<section class="qk-section qk-gside" id="ov-new"><div id="ov-sure"></div><div>' + QK.newHere({ items: [QK.NEW_HERE[0], QK.NEW_HERE[1], 'Every forecast is checked against what happened. <a class="qk-link" href="#/calibration">The record is on the Model page.</a>'] }) + '</div></section>' +
+
+      '<section class="qk-section">' + GI.secHead({ kicker: 'Season simulation', title: 'Who wins it all', sub: 'Our chances from 20,000 simulated seasons, with each team’s projected wins and the range it lands in nine times out of ten.', actions: '<a class="qk-more" href="#/futures">Every season forecast</a>' }) +
+        GI.grid(GI.card('Super Bowl chances', 'Our chance from 20,000 simulated seasons', '<div id="ov-sb"></div>', { span: 5, foot: '<span>Top twelve of 32</span><a href="#/playoffs">Bracket →</a>' }) +
+          GI.card('Projected wins', 'Mean of the simulated seasons (dot) and its 90% range (bar)', GI.chartBox('ov-range', 520, 'Projected wins with a 90% range'), { span: 7, foot: '<span>Range: 5th to 95th percentile of 20,000 seasons</span><a href="' + GI.standingsHref(S, 'wins') + '">Win totals →</a>' })) +
+        QK.note('<b>How to read it:</b> even the favourite misses most seasons. A 20% Super Bowl chance means four seasons in five end without the trophy.') + '</section>' +
+
+      '<section class="qk-section">' + GI.secHead({ kicker: 'Team strength', title: 'Who’s good, and how', sub: 'Our offence and defence ratings in points per game against an average team; up and right is better.', actions: '<a class="qk-more" href="' + GI.standingsHref(S, 'ratings') + '">Power ratings</a>' }) +
         GI.grid(GI.card('Offence v defence', 'Points per game against an average team', GI.chartBox('ov-power', 440, 'Offence against defence rating, every team'), { span: 7 }) +
           GI.card('Rating through the season', 'The top eight teams, week by week', GI.chartBox('ov-trend', 440, 'Team rating by week'), { span: 5 })) + '</section>' +
 
-      '<section class="qk-section">' + GI.secHead({ kicker: 'Playoff race', title: 'Who makes the playoffs', sub: 'Our chance of a playoff spot by conference, with the market as a grey tick where one trades.', actions: '<a class="qk-btn" href="#/playoffs">Seeds and bracket →</a>' }) +
+      '<section class="qk-section">' + GI.secHead({ kicker: 'Playoff race', title: 'Who makes the playoffs', sub: 'Our chance of a playoff spot by conference, from the same 20,000 seasons.', actions: '<a class="qk-more" href="#/playoffs">Seeds and bracket</a>' }) +
         GI.grid(GI.card('AFC', 'Our playoff chance', '<div id="ov-afc"></div>', { span: 6 }) + GI.card('NFC', 'Our playoff chance', '<div id="ov-nfc"></div>', { span: 6 })) + '</section>' +
 
-      '<section class="qk-section">' + GI.secHead({ kicker: 'Standings', title: 'Divisions', sub: 'Record and our playoff chance; tap a team for its page.', actions: '<a class="qk-btn" href="#/standings">Full standings →</a>' }) +
+      '<section class="qk-section">' + GI.secHead({ kicker: 'Standings', title: 'The divisions at a glance', sub: 'Record and our playoff chance; tap a team for its page.', actions: '<a class="qk-more" href="#/standings">Full standings</a>' }) +
         GI.card('', '', divisionsGrid(rows)) + '</section>' +
 
-      '<section class="qk-section">' + GI.secHead({ kicker: 'Leaderboards', title: 'Leaders', sub: S + ' to date, qualified players. Percentiles with sample floors are on the Players page.', actions: '<a class="qk-btn" href="#/leaders">Every leaderboard →</a>' }) +
-        GI.card('', '', '<div id="ov-ld-seg"></div>' + GI.chartBox('ov-leaders', 380, 'Leaderboard')) + '</section>' +
+      '<section class="qk-section">' + GI.secHead({ kicker: 'Leaderboards', title: 'The top ten', sub: S + ' to date, qualified players. Percentiles with sample floors are on the Players page.', actions: '<a class="qk-more" href="#/leaders">Every leaderboard</a>' }) +
+        GI.card('', '', '<div id="ov-ld-seg"></div>' + GI.chartBox('ov-leaders', 380, 'Leaderboard')) + '</section>';
 
-      ((idx.recent || []).length ? '<section class="qk-section">' + GI.secHead({ kicker: 'Results', title: 'Last week', sub: GI.weekLabel(Math.max(1, W - 1), S) + ' results, with our pre-game call on each.', actions: '<a class="qk-btn" href="' + GI.weekHref(S, Math.max(1, W - 1)) + '">Week page →</a>' }) +
-        '<div class="qk-auto gi-games" style="--min:260px">' + idx.recent.map(g => GI.gameCard(g, { compact: true, date: true })).join('') + '</div></section>' : '');
+    /* What to watch: our six picks (live first, then the closest calls with the most at stake), every game this week,
+       or last week's results with our pre-game call; each card with its one-line reason, no market */
+    const picks = games.filter(g => GI.isLive(g) || GI.isPre(g)).sort((a, b) => watchVal(b, po) - watchVal(a, po)).slice(0, 6);
+    const NUM = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six'];
+    const drawGames = w => {
+      const list = w === 'all' || !picks.length && w === 'picks' ? all : w === 'results' ? (idx.recent || []) : picks;
+      const n = list.length;
+      GI.set('ov-gh', w === 'all' || !picks.length && w === 'picks' ? 'Every game in ' + esc(wk) : w === 'results' ? 'How last week went' : NUM[n] + ' game' + (n === 1 ? '' : 's') + ' we’d pick');
+      GI.set('ov-games', n ? '<div class="qk-watch">' + list.map(g => GI.gameCard(g, { rows: byTeam, why: true, date: w === 'results', compact: w === 'results' })).join('') + '</div>' : QK.empty('No games this week', 'The schedule is being set.'));
+    };
+    drawGames('picks');
+    GI.wireSeg(el, 'ov-when', drawGames);
 
-    // Super Bowl: our chance, the market a tick
-    const sbM = {};
-    ((mkts && mkts.futures && mkts.futures.sb) || []).forEach(r => { if (r && r.team) sbM[r.team] = r.market; });
-    const chRow = (t, p, mk) => ({ label: GI.teamName(t), p: p, market: isNum(mk) ? mk : null, color: GI.teamColour(t), href: GI.teamHref(t), mark: { name: GI.teamName(t), abbr: GI.teamAbbr(t), colour: GI.teamInfo(t).colour } });
-    const sbRows = Object.keys(po).filter(t => isNum(po[t].p_sb)).map(t => chRow(t, po[t].p_sb, sbM[t]));
-    GI.set('ov-sb', sbRows.length ? QK.chances(sbRows, { limit: 12, marketName: 'Market (Kalshi / Polymarket)' }) : GI.muted('The season simulation has not run yet.'));
+    // who's hot
+    const hot = hotItems(L, G);
+    GI.set('ov-hot', hot.length ? QK.hotRow(hot) : QK.empty('No leaders yet', 'The leaderboards fill in after the first games.'));
+
+    /* How sure are we? (teaser): the game model's record from calibration.json, the full chart on the Model page */
+    GI.load('calibration.json').then(cj => {
+      const box = el.querySelector('#ov-sure');
+      if (!box) return;
+      const cb = QK.calib.find(GI.ok(cj) ? cj : null);
+      if (!cb || !cb.bins.length) { box.innerHTML = ''; return; }
+      const big = cb.bins.slice().sort((a, b) => b.n - a.n)[0];
+      box.innerHTML = '<article class="qk-card" style="height:100%"><div class="qk-card-body"><div class="qk-kicker">How sure are we?</div><h3 style="margin:8px 0 6px">When we say ' + Math.round(big.mean_p * 100) + '%, it happens ' + Math.round(big.freq * 100) + '% of the time</h3>' +
+        '<p style="margin:0 0 6px;color:var(--ink-2)">Our most common call puts the home team at ' + Math.round(big.lo * 100) + '–' + Math.round(big.hi * 100) + '%. Across ' + QK.fmt.num(big.n) + ' games like that, the home team won ' + QK.fmt.pct(big.freq, 1) + '.</p>' +
+        QK.note('<b>Brier score ' + (isNum(cb.brier) ? cb.brier.toFixed(3) : '—') + '</b> over ' + QK.fmt.num(cb.n) + ' games, each forecast made before kickoff: 0 is perfect, 0.25 is a coin flip. Football has upsets every week, so small gains count.') +
+        '<a class="qk-more" style="display:inline-block;margin-top:14px" href="#/calibration">The full record</a></div></article>';
+    });
+
+    // Super Bowl: our chance only (no market on the overview)
+    const chRow = (t, p) => ({ label: GI.teamShort(t), p: p, href: GI.teamHref(t), mark: { name: GI.teamName(t), abbr: GI.teamAbbr(t), colour: GI.teamInfo(t).colour } });
+    const sbRows = Object.keys(po).filter(t => isNum(po[t].p_sb)).map(t => chRow(t, po[t].p_sb));
+    GI.set('ov-sb', sbRows.length ? QK.chances(sbRows, { limit: 12, key: false }) : GI.muted('The season simulation has not run yet.'));
 
     // projected wins: mean and the 90% range
     const rr = rows.filter(r => isNum(r.mean_wins) && isNum(r.w_p05) && isNum(r.w_p95)).sort((a, b) => b.mean_wins - a.mean_wins);
@@ -186,12 +216,10 @@ GI.route('overview', function (el) {
       GI.ch.line('ov-trend', { x: wks.map(w => 'W' + w), series: top.map(t => ({ name: t, color: GI.teamColour(t), data: wks.map(w => { const h = (ratings[t].history || []).find(r => r[0] === w); return h ? h[1] : null; }) })), yFmt: v => GI.signed(v, 1), xName: 'Week', yName: 'Rating (pts/g v average)', label: 'Team rating by week' });
     } else { GI.ch.none('ov-power', 'Ratings arrive with the first build.'); GI.ch.none('ov-trend', 'Ratings arrive with the first build.'); }
 
-    // playoff race
-    const plM = {};
-    ((mkts && mkts.futures && mkts.futures.playoffs) || []).forEach(r => { if (r && r.team) plM[r.team] = r.market; });
+    // playoff race: our chance only
     GI.CONFERENCES.forEach(c => {
-      const list = Object.keys(po).filter(t => GI.teamInfo(t).conference === c && isNum(po[t].p_playoffs)).map(t => chRow(t, po[t].p_playoffs, plM[t]));
-      GI.set('ov-' + c.toLowerCase(), list.length ? QK.chances(list, { max: 1, oursName: 'Our playoff chance', marketName: 'Market (Kalshi / Polymarket)' }) : GI.muted('The season simulation has not run yet.'));
+      const list = Object.keys(po).filter(t => GI.teamInfo(t).conference === c && isNum(po[t].p_playoffs)).map(t => chRow(t, po[t].p_playoffs));
+      GI.set('ov-' + c.toLowerCase(), list.length ? QK.chances(list, { max: 1, key: false }) : GI.muted('The season simulation has not run yet.'));
     });
 
     // leaders

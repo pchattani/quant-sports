@@ -92,7 +92,8 @@ function standingsTab(node, L, S, params) {
         row.best_record ? { label: 'Best record', value: HW.teamAbbr(L, row.best_record[0]) + ' ' + HW.record(row.best_record[1], row.best_record[2]), sub: HW.teamName(L, row.best_record[0]) } : null]) + '</div>';
     }
     h += U.card2(open ? 'Standings and our chances' : 'Standings', open && season.sim ? Number(season.sim.n_sims).toLocaleString('en-GB') + ' simulations of the rest of the season. Dashed lines: the playoff' + (fmt.playin ? ' and play-in' : '') + ' cuts.' : 'Records and seeds.',
-      (views.length > 1 ? '<div class="qk-seg" id="st-seg" role="group" aria-label="Group" style="margin:0 16px 12px">' + views.map(v => '<button type="button" data-value="' + esc(v[0]) + '" aria-pressed="' + (v[0] === first) + '">' + esc(v[1]) + '</button>').join('') + '</div>' : '') + '<div id="st-table"></div>', { flush: true });
+      (views.length > 1 ? '<div class="qk-seg" id="st-seg" role="group" aria-label="Group" style="margin:0 16px 12px">' + views.map(v => '<button type="button" data-value="' + esc(v[0]) + '" aria-pressed="' + (v[0] === first) + '">' + esc(v[1]) + '</button>').join('') + '</div>' : '') + '<div id="st-table"></div>' +
+      (open ? '<div style="padding:12px 16px 16px">' + QK.note('<b>Playoffs 60%</b> means the team made the playoffs in about 6 of every 10 simulated seasons. <b>Proj W</b> is the average win total across them; hover it for the range that holds nine seasons in ten.') + '</div>' : ''), { flush: true });
     if (open) {
       h += '<div class="qk-grid hw-sec">' + confs.map((c, i) => U.card2(c + ': who makes the playoffs', fmt.playin ? 'Our chance: a top-six seed goes straight through; seeds 7-10 play in' : 'Our chance of a playoff place', U.chart('st-odds-' + i, 22 * (st[c] || []).length + 70, c + ' playoff chances'), { cls: confs.length > 1 ? 'qk-span-6' : 'qk-span-12' })).join('') + '</div>';
     }
@@ -140,7 +141,7 @@ function renderStandings(el, params) {
   // the market comparison lives on the Model page now; old links land there
   if (((params.query || {}).tab) === 'markets') { HW.go(HW.href(L, 'model', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=markets'); return null; }
   const tab = U.tab(params, ['table', 'odds', 'bracket', 'history'], 'table');
-  const body = U.section(el, { title: 'Standings', kicker: U.kicker(L, S), sub: 'Records, our playoff and title chances from the season simulation, and the bracket.',
+  const body = U.section(el, { title: 'Standings', kicker: U.kicker(L, S), sub: 'Where every team stands, our playoff and title chances from the season simulation, and the bracket.',
     tabs: U.tabs(L, 'standings', [['table', 'Table'], ['odds', 'Chances & ratings'], ['bracket', 'Bracket'], ['history', 'History', false]], S), active: tab });
   if (tab === 'table') return standingsTab(body, L, S, params);
   if (tab === 'history') return historyTab(body, L);
@@ -175,8 +176,10 @@ function renderTeams(el, params) {
     const withR = ids.filter(t => isNum((R[t] || {}).off) && isNum((R[t] || {}).def));
     let h = groups.map(g => (g[0] ? '<div class="hw-day"><b>' + esc(g[0]) + '</b> · by net rating</div>' : '') + '<div class="hw-mini-grid">' + g[1].map(tile).join('') + '</div>').join('');
     if (withR.length) {
-      h += '<div class="qk-grid hw-sec">' + U.card2('Offence against defence', 'Opponent-adjusted points per 100 possessions. Up and right is better (defence axis reversed); the dashed lines are the league average.', U.chart('tm-od', 460, 'Offence against defence'), { cls: 'qk-span-7' }) +
-        U.card2('Net rating through the season', 'Kalman path after each game', U.chart('tm-paths', 460, 'Rating paths'), { cls: 'qk-span-5' }) + '</div>';
+      h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Team strength', title: 'Who is good at what', sub: 'Every team’s offence against its defence, and how its rating has moved.' }) +
+        '<div class="qk-grid">' + U.card2('Offence against defence', 'Opponent-adjusted points per 100 possessions. Up and right is better (defence axis reversed); the dashed lines are the league average.', U.chart('tm-od', 460, 'Offence against defence') +
+        QK.note('A team <b>+5</b> on net rating scores five more points than it allows for every 100 trips down the floor: over a 100-possession game that is about a five-point favourite on a neutral floor.'), { cls: 'qk-span-7' }) +
+        U.card2('Net rating through the season', 'Our rating after each game: the top five and the bottom three', U.chart('tm-paths', 460, 'Rating paths'), { cls: 'qk-span-5' }) + '</div></section>';
     }
     body.innerHTML = h;
     if (withR.length) {
@@ -222,10 +225,11 @@ function leadersTab(node, L, S) {
       const fmtK = (k, v) => { const c = COUNT.find(x => x[0] === k); return c ? U.f(v, 1) : U.fmtM(k, v); };
       let h = r.fallback ? '<div class="qk-note" style="margin-bottom:14px">No ' + esc(HW.seasonLabel(L, S)) + ' regular-season games yet: these are the final ' + esc(HW.seasonLabel(L, SS)) + ' numbers.</div>' : '';
       h += '<div class="hw-flex" style="margin-bottom:14px"><input class="qk-input hw-search" id="pl-q" type="search" placeholder="Find a player…" aria-label="Find a player" autocomplete="off"><span class="hw-quiet">Qualified: ' + Number(cat.min_floor || 0).toLocaleString('en-GB') + '+ minutes (' + ids.length + ' players). Heat cells: percentile within the player’s role (guards, wings, bigs).</span></div><div id="pl-hits"></div>';
-      h += U.card2('Leaderboard', 'Pick a metric and a role. Every cell is coloured by the percentile within the role, cold to hot.',
+      h += U.card2('Pick a stat, pick a role', 'Every cell is coloured by the percentile within the role, cold (blue) to hot (red).',
         '<div class="hw-flex" style="margin-bottom:12px"><select class="qk-select" id="pl-k" aria-label="Metric">' + keys.map(k => '<option value="' + k + '">' + esc(lab(k)) + '</option>').join('') + '</select>' +
         '<div class="qk-seg" id="pl-r" role="group" aria-label="Role"><button type="button" data-value="" aria-pressed="true">All</button><button type="button" data-value="G" aria-pressed="false">Guards</button><button type="button" data-value="W" aria-pressed="false">Wings</button><button type="button" data-value="B" aria-pressed="false">Bigs</button></div></div><div id="pl-lb"></div>', { flush: false });
-      h += '<div class="qk-grid hw-sec"><div class="qk-span-12">' + U.card2('Impact at both ends', 'HPM per 100 possessions, offence against defence; qualified players, size is minutes', U.chart('pl-sc', 440, 'Impact at both ends')) + '</div></div>';
+      h += '<div class="qk-grid hw-sec"><div class="qk-span-12">' + U.card2('Impact at both ends', 'HPM per 100 possessions, offence against defence; qualified players, size is minutes', U.chart('pl-sc', 440, 'Impact at both ends') +
+        QK.note('<b>HPM</b> is the points per 100 trips a player adds to the team’s margin over an average player. Top right helps at both ends; most stars sit right of centre, and the best defenders sit high.')) + '</div></div>';
       node.innerHTML = h;
       const st = { k: keys[0], r: '' };
       const drawLb = () => {
@@ -334,7 +338,7 @@ function catalogueTab(node, L, S) {
 function renderPlayers(el, params) {
   const L = U.L(params), S = U.S(params);
   const tab = U.tab(params, ['leaders', 'catalogue', 'awards', 'boards'], 'leaders');
-  const body = U.section(el, { title: 'Players', kicker: U.kicker(L, S), sub: 'Leaderboards against each player’s role, the full catalogue of 125 metrics with percentiles, and the award races. Open a player for season by season, splits and value.',
+  const body = U.section(el, { title: 'Players', kicker: U.kicker(L, S), sub: 'Leaderboards against each player’s role (guards, wings, bigs), the full catalogue with percentiles, and the award races. Open a player for the short version, season by season and value.',
     tabs: U.tabs(L, 'players', [['leaders', 'Leaders'], ['catalogue', 'Catalogue'], ['awards', 'Awards'], ['boards', 'Any metric']], S), active: tab });
   if (tab === 'leaders') return leadersTab(body, L, S);
   if (tab === 'catalogue') return catalogueTab(body, L, S);
@@ -417,7 +421,18 @@ function renderModel(el, params, state) {
     tabs: U.tabs(L, 'model', [['methodology', 'Methodology'], ['calibration', 'Calibration'], ['markets', 'Our forecasts v the market'], ['moves', 'Who moves next'], ['glossary', 'Glossary'], ['terms', 'Terms']], null), active: tab });
   if (tab === 'moves') return movesModel(body, L);
   const v = { methodology: 'methodology', calibration: 'calibration', markets: 'markets', glossary: 'glossary', terms: 'disclaimer' }[tab];
-  return U.legacy(v, body, params);
+  if (tab !== 'methodology' && tab !== 'calibration') return U.legacy(v, body, params);
+  /* How sure are we? at the top: the game model's calibration from <L>/calibration.json (shown only when present) */
+  body.innerHTML = '<section class="qk-section hw-sure" id="md-sure" hidden></section><div></div>';
+  HW.load(L + '/calibration.json').then(cj => {
+    const box = body.querySelector('#md-sure');
+    if (!box || !U.ok(cj) || !QK.calib.find(cj)) return;
+    const ss = (cj.seasons || []).slice().sort((a, b) => a - b);
+    box.hidden = false;
+    box.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'When we say 70%, does it happen 70% of the time?', sub: 'Every pre-game forecast in the test seasons, bucketed by our chance for the home team, against how often the home team won.' }) + '<div id="md-sure-m"></div>';
+    QK.howSure(box.querySelector('#md-sure-m'), { calibration: cj, league: HW.leagueName(L), span: ss.length ? HW.seasonLabel(L, ss[0]) + ' to ' + HW.seasonLabel(L, ss[ss.length - 1]) : '', subject: 'the home team' });
+  });
+  return U.legacy(v, body.lastChild, params);
 }
 
 HW.page('standings', renderStandings);

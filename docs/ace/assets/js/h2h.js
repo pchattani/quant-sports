@@ -235,7 +235,7 @@ function build(T, a, b, res, body) {
     '<div class="ta-h2h-rec"><div class="n"><span>' + (tally.w || 0) + '</span><span class="dash">–</span><span>' + (tally.l || 0) + '</span></div><div class="s">' + (n ? n + ' tour-level meeting' + (n === 1 ? '' : 's') + (tally.last ? ' · last ' + k.esc(k.fmtDate(tally.last, { weekday: false })) : '') : 'no tour-level meeting yet') + '</div></div>' +
     side(b, pb, nB, 'r') + '</div>' + QK.matchupBar({ left: L, right: R, rows: tape, colors: ['var(--wp-a)', 'var(--wp-b)'] }) + '</div></section>';
   h += '<section class="qk-section" id="h2-pct-wrap"></section>';
-  h += '<div class="card"><div class="card-header">If they met today <span class="card-sub">Our chance on each surface and the set scores it implies.</span>' +
+  h += '<div class="card"><div class="card-header">If they met today <span class="card-sub">Our chance on each surface and the set scores it implies. 66% means the favourite still loses about 1 time in 3.</span>' +
     k.toggle('h2-fmt', T === 'atp' ? [['3', 'Best of 3'], ['5', 'Best of 5 (Slam)']] : [['3', 'Tour event'], ['slam', 'Slam (deciding-set tiebreak to 10)']], '3') + '</div><div id="h2-odds"></div></div>';
   h += '<div class="grid-2"><div class="card"><div class="card-header">Serve against return <span class="card-sub">Each player\'s chance of holding against this opponent, against the tour average, from the inferred ratings.</span></div><div id="h2-sr"></div></div>' +
     '<div class="card"><div class="card-header">Against the ratings <span class="card-sub">Did the rivalry go the way our pre-match chances said?</span></div><div id="h2-dev"></div></div></div>';

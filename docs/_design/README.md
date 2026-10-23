@@ -1,4 +1,8 @@
-# The Quant design system (v2 "Signal", Oct 2026)
+# The Quant design system (kit v3 "Matchday", dark only, Oct 2026)
+
+> v3 replaced v2 "Signal" on 23 Oct 2026: warm charcoal, Fraunces and DM Sans, teal for ours, dark only. The spec is
+> `STYLE_GUIDE.md`, the move guide `MIGRATION_V3.md`; the rest of this file is the older kit reference and still
+> holds for the v1/v2 APIs, which are unchanged.
 
 One look for every sports site: Bloomberg density, ESPN scoreboard energy, 538 probability stories and Savant
 percentile cards, in a look of our own. Dark first with a light mode, our numbers in one signature violet, the market

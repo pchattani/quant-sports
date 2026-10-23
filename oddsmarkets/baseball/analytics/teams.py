@@ -117,8 +117,8 @@ METRICS = [
     M("age_bat", "Hitter age", "Value", "1", desc="PA-weighted age of the hitters."),
     M("age_pit", "Pitcher age", "Value", "1", desc="BF-weighted age of the pitchers."),
     # simulation
-    M("p_postseason", "Postseason odds", "Simulation", "prob", scope="model", desc="Probability of reaching the postseason (season simulation)."),
-    M("p_ws", "World Series odds", "Simulation", "prob", scope="model", desc="Probability of winning the World Series."),
+    M("p_postseason", "Postseason chance", "Simulation", "prob", scope="model", desc="Probability of reaching the postseason (season simulation)."),
+    M("p_ws", "World Series chance", "Simulation", "prob", scope="model", desc="Probability of winning the World Series."),
 ]
 
 

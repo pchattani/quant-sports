@@ -245,3 +245,24 @@ body.qk { font-size: var(--fs-md); }
 .rk-ours { color: var(--signal); }
 .rk-teamtile .rec { white-space: nowrap; }
 .rk-why { font-family: var(--font-ui); }
+
+/* ═════════════════════════════════ 5. kit v3 (Matchday) reference pages: game hero, player page, overview */
+.rk-gtop { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: var(--sp-5); align-items: start; }
+.rk-gside .rk-kpis { margin: 0; }
+.rk-gside .qk-stats { grid-template-columns: 1fr 1fr; }
+@media (max-width: 1000px) { .rk-gtop { grid-template-columns: 1fr; } }
+.rk-crumb { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; font-size: var(--fs-sm); color: var(--ink-3); margin: 0 0 10px; }
+.rk-crumb a:hover { color: var(--ink-1); }
+.rk-tiles { margin-top: var(--sp-8); }
+.rk-sec1 { margin-top: var(--sp-8); }
+.rk-h4 { margin: 14px 0 6px !important; font: 700 var(--fs-xs)/1.2 var(--font-ui) !important; color: var(--ink-3) !important; }
+.rk-type li { padding: 8px 0; border-bottom: 1px dashed var(--line-1); }
+.rk-type .v { font-family: var(--font-ui); color: var(--ink-3); font-size: var(--fs-xs); font-weight: 600; }
+.rk-type .rk-link { color: var(--signal); }
+.rk-preview .qk-preview { height: 100%; }
+/* compare picker: pills with the slot colour */
+.rk-cmp-pick { display: flex; gap: 10px; flex-wrap: wrap; }
+.rk-cmp-slot { display: grid; gap: 6px; flex: 1 1 220px; min-width: 0; }
+.rk-cmp-slot .qk-input { border-radius: var(--r-pill); border: 1.5px solid color-mix(in srgb, var(--ec) 55%, var(--line-2)); padding-left: 16px; width: 100%; }
+@media (max-width: 640px) { .rk-tiles { margin-top: var(--sp-6); } }
+.rk-cmp-slot { border-left: 0 !important; padding-left: 0 !important; }

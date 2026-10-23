@@ -165,7 +165,7 @@ function buildPlayers(L, S, ids, ss, careers) {
     ['pts', 'reb', 'ast', 'game_score'].map(k => { const va = sumK(k, 0) / met.length, vb = sumK(k, 1) / met.length; const n = va + vb || 1;
       return '<div class="pg-h2h-lab">' + ({ pts: 'Points', reb: 'Rebounds', ast: 'Assists', game_score: 'Game score' })[k] + ' a game</div><div class="pg-h2h-row"><span class="n">' + fx.esc(short[0]) + ' ' + fx.num(va, 1) + '</span><div class="pg-h2h-bar"><span style="width:' + (100 * va / n) + '%;background:' + CA + '"></span><span style="width:' + (100 * vb / n) + '%;background:' + CB + '"></span></div><span class="n r">' + fx.num(vb, 1) + ' ' + fx.esc(short[1]) + '</span></div>'; }).join('') + '</div>' +
     HW.tableHTML([{ label: 'Date' }, { label: short[0] + ' pts', align: 'right' }, { label: 'GmSc', align: 'right' }, { label: short[1] + ' pts', align: 'right' }, { label: 'GmSc', align: 'right' }],
-      met.map(pr => ({ _href: fx.gameHref(L, pr[0].game), cells: [{ v: pr[0].date, html: fx.fmtDate(pr[0].date, { year: false }) }, pr[0].pts, { v: pr[0].game_score, html: fx.num(pr[0].game_score, 1) }, pr[1].pts, { v: pr[1].game_score, html: fx.num(pr[1].game_score, 1) }] })), { compact: true })
+      met.map(pr => ({ _href: fx.gameHref(L, pr[0].game, ((careers[0] || {}).current || {}).season || S), cells: [{ v: pr[0].date, html: fx.fmtDate(pr[0].date, { year: false }) }, pr[0].pts, { v: pr[0].game_score, html: fx.num(pr[0].game_score, 1) }, pr[1].pts, { v: pr[1].game_score, html: fx.num(pr[1].game_score, 1) }] })), { compact: true })
     : fx.muted('They did not meet in the games on file this season.');
   HW.sortable('cmp-h2h');
 
@@ -277,7 +277,7 @@ function buildTeams(L, S, ids, T, teams, season, cat) {
   const wA = games.filter(g => String(g.res).charAt(0) === 'W').length;
   document.getElementById('cmp-series').innerHTML = games.length ? '<div class="pg-h2h"><div class="pg-h2h-row"><span class="n">' + fx.esc(abbr[0]) + ' ' + wA + '</span><div class="pg-h2h-bar"><span style="width:' + 100 * wA / games.length + '%;background:' + CA + '"></span><span style="width:' + 100 * (games.length - wA) / games.length + '%;background:' + CB + '"></span></div><span class="n r">' + (games.length - wA) + ' ' + fx.esc(abbr[1]) + '</span></div></div>' +
     HW.tableHTML([{ label: 'Date' }, { label: 'Venue' }, { label: 'Score', align: 'right' }, { label: 'Winner' }],
-      games.map(g => ({ _href: g.game ? fx.gameHref(L, g.game) : undefined, cells: [{ v: g.date, html: fx.fmtDate(g.date, { year: false }) }, g.home ? fx.esc(abbr[0]) + ' home' : fx.esc(abbr[1]) + ' home', (g.pts || 0) + '-' + (g.opp_pts || 0), { v: g.res, html: String(g.res).charAt(0) === 'W' ? '<span style="color:' + CA + '">' + fx.esc(abbr[0]) + '</span>' : '<span style="color:' + CB + '">' + fx.esc(abbr[1]) + '</span>' }] })), { compact: true })
+      games.map(g => ({ _href: g.game ? fx.gameHref(L, g.game, S) : undefined, cells: [{ v: g.date, html: fx.fmtDate(g.date, { year: false }) }, g.home ? fx.esc(abbr[0]) + ' home' : fx.esc(abbr[1]) + ' home', (g.pts || 0) + '-' + (g.opp_pts || 0), { v: g.res, html: String(g.res).charAt(0) === 'W' ? '<span style="color:' + CA + '">' + fx.esc(abbr[0]) + '</span>' : '<span style="color:' + CB + '">' + fx.esc(abbr[1]) + '</span>' }] })), { compact: true })
     : fx.muted('They have not met this season.');
 }
 

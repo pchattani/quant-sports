@@ -64,7 +64,7 @@
 .fb-pl-res.w { background: color-mix(in srgb, var(--st-good) 22%, transparent); }
 .fb-pl-res.l { background: color-mix(in srgb, var(--st-crit) 22%, transparent); }
 a .fb-pl-res:hover { outline: 1px solid var(--signal); }
-.fb-pl-rt { display: inline-block; min-width: 30px; text-align: center; padding: 1px 4px; border-radius: 4px; font-weight: 700; color: #fff; background: var(--rc); }
+.fb-pl-rt { display: inline-block; min-width: 30px; text-align: center; padding: 1px 4px; border-radius: var(--r-pill); font-weight: 700; color: var(--bg); background: var(--rc); }
 .fb-pl-grade { display: inline-grid; place-items: center; width: 22px; height: 20px; border-radius: 5px; font: 800 11px var(--font-num); background: var(--s-3); color: var(--ink-1); }
 .fb-pl-grade.g-A { background: color-mix(in srgb, var(--st-good) 55%, var(--s-1)); }
 .fb-pl-grade.g-B { background: color-mix(in srgb, var(--st-good) 28%, var(--s-1)); }

@@ -639,8 +639,8 @@ def our_picks(players: list[dict], team_rows: dict, week_days: list, season_over
         lk = [x for x in players if x["luck"].get("luck") is not None and x["luck"].get("gp", 0) >= 8 and x["rank9"] <= 220]
         buy = sorted([x for x in lk if x["luck"]["luck"] <= -LUCK_LINE], key=lambda x: x["luck"]["luck"])
         sell = sorted([x for x in lk if x["luck"]["luck"] >= LUCK_LINE], key=lambda x: -x["luck"]["luck"])
-        out["buy_low"] = [[x["id"], f"shooting {abs(x['luck']['luck']):.1f} points a game below what his shots and history predict"] for x in buy[:8]]
-        out["sell_high"] = [[x["id"], f"shooting {x['luck']['luck']:.1f} points a game above what his shots and history predict"] for x in sell[:8]]
+        out["buy_low"] = [[x["id"], f"shooting {abs(x['luck']['luck']):.1f} points a game below what the shots and history predict"] for x in buy[:8]]
+        out["sell_high"] = [[x["id"], f"shooting {x['luck']['luck']:.1f} points a game above what the shots and history predict"] for x in sell[:8]]
         adds = [x for x in players if (x.get("rank_pre") or 999) > WAIVER_LINE and x["rank9"] <= WAIVER_LINE]
         adds.sort(key=lambda x: x["rank9"])
         out["adds"] = [[x["id"], f"No. {x['rank_pre'] or '—'} at the season start, No. {x['rank9']} now"] for x in adds[:10]]

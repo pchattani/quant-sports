@@ -363,7 +363,12 @@ function finished(st) { return !st || st === 'Finished' || /^\+\d+ Laps?$/.test(
 
 // ── names, colours, links ─────────────────────────────────────────────────
 
-var PALETTE = ['#3987e5', '#e8833a', '#2fb37b', '#c95ac9', '#e3b341', '#46b9c9', '#e05d5d', '#8e8cf0', '#7ee787', '#ff9bce'];
+/* Fallback colours for a team with none in the payloads (historic entrants): the kit's warm chart slots, teal left out
+ * because teal means ours. */
+var PALETTE = ['#6aa8ec', '#ff7a5c', '#8fd16a', '#c39be8', '#ffc94d', '#8fdcc8', '#f28fb5', '#d9b38c', '#ff9b7a', '#a7c7f2'];
+/* Kit colour tokens by name, read from the page (charts need the hex): PD.col('coral'). Teal is ours only. */
+var TOK = { teal: '--c-1', coral: '--c-2', sky: '--c-3', sun: '--c-4', plum: '--c-5', leaf: '--c-6', rose: '--c-7', sand: '--c-8', mint: '--mint', grey: '--c-other', muted: '--ink-3', faint: '--ink-4', up: '--up', down: '--down' };
+function col(k) { return QK.cssVar(TOK[k] || k) || '#a39886'; }
 var COMPOUNDS = { SOFT: '#e8002d', MEDIUM: '#ffd12e', HARD: '#f0f0ec', INTERMEDIATE: '#43b02a', WET: '#0067ad', UNKNOWN: '#7d8590', TEST_UNKNOWN: '#7d8590' };
 function driverName(id) { var x = NAMES.drivers[id]; return x && x.name ? x.name : titleCase(id); }
 function driverCode(id) {
@@ -380,7 +385,7 @@ function hashIndex(s, n) { var h = 0; String(s).split('').forEach(function (ch) 
 function teamColour(id) {
   var x = NAMES.teams[id];
   if (x && x.colour) { var c = String(x.colour); return c.charAt(0) === '#' ? c : '#' + c; }
-  return id ? PALETTE[hashIndex(id, PALETTE.length)] : '#7d8590';
+  return id ? PALETTE[hashIndex(id, PALETTE.length)] : '#7d7468';
 }
 /* The team colour lifted to 3:1 on the current card surface (marks, bars, text accents). */
 function tc(id) { return QK.color.team(teamColour(id)); }
@@ -435,7 +440,9 @@ function kpis(list, cls) { return '<div class="qk-stats pd-kpis' + (cls ? ' ' + 
 function chip(text, kind) { return '<span class="qk-badge' + (kind ? ' ' + kind : '') + '">' + esc(text) + '</span>'; }
 function muted(text) { return '<p class="pd-muted">' + text + '</p>'; }
 function empty(title, text) { return QK.empty(title, text); }
-function note(html) { return '<div class="qk-note pd-note">' + html + '</div>'; }
+/* The kit's "i" explainer (QK.note): one or two friendly sentences on what a number means. */
+function note(html) { return QK.note(html, { cls: 'pd-note' }); }
+function aside(text) { return QK.aside(text); }
 function notBuilt(what, d) { return empty(what + ' is not available', d && d.reason ? String(d.reason) : 'The payload is rebuilt after each session.'); }
 /* Page head (Design System 2.0 section head, large, h1): kicker ("F1 · ..."), title, sub line (HTML; always present so a
  * page can fill it later through .qk-sh-sub), right-hand HTML (links, a pager). */
@@ -619,7 +626,7 @@ return {
   driverName: driverName, driverCode: driverCode, driverSurname: driverSurname, teamName: teamName, circuitName: circuitName, teamAbbr: teamAbbr,
   teamColour: teamColour, tc: tc, driverTeam: driverTeam, driverColour: driverColour, compoundColour: compoundColour, COMPOUNDS: COMPOUNDS, PALETTE: PALETTE,
   teamDot: teamDot, driverLink: driverLink, teamLink: teamLink, circuitLink: circuitLink, raceLink: raceLink, raceHref: raceHref, driverHref: driverHref, teamHref: teamHref, mark: mark,
-  card: card, grid: grid, chartBox: chartBox, kpi: kpi, kpis: kpis, chip: chip, muted: muted, empty: empty, note: note, notBuilt: notBuilt,
+  card: card, grid: grid, chartBox: chartBox, kpi: kpi, kpis: kpis, chip: chip, muted: muted, empty: empty, note: note, aside: aside, notBuilt: notBuilt, col: col,
   pageHead: pageHead, secHead: secHead, subnav: subnav, seg: seg, wireSeg: wireSeg, yearPager: yearPager, table: table, set: set, alive: alive, pctl: pctl,
   probBar: probBar, deltaHTML: deltaHTML, posHTML: posHTML, heatTable: heatTable
 };

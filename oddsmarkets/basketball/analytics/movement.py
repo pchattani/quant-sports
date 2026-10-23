@@ -481,7 +481,7 @@ WHY = {"rookie": ("a rookie", None), "tenure": ("long tenure here", "short tenur
        "v_prev": ("strong last season", "weak last season"), "v_prev2": ("strong two seasons ago", "weak two seasons ago"),
        "v_cur": ("strong season", "weak season"), "v_trend": ("improving", "declining"),
        "hpm_prev": ("strong impact rate", "weak impact rate"), "hpm_cur": ("strong impact rate", "weak impact rate"),
-       "rank_pos": ("behind others at his position", "first choice at his position"),
+       "rank_pos": ("behind others at the position", "first choice at the position"),
        "depth": ("a crowded position", "a thin position"), "big": ("a centre", None), "guard": ("a guard", None),
        "team_wp": ("a winning team", "a losing team"), "team_traj": ("team trending up", "team trending down"),
        "team_age": ("an older roster", "a younger roster"), "team_turn": ("a high-turnover team", "a stable team"),
@@ -492,14 +492,14 @@ WHY = {"rookie": ("a rookie", None), "tenure": ("long tenure here", "short tenur
 def _notes(league: str, phase: str) -> list[str]:
     lg = "NBA" if league == "nba" else "WNBA"
     snap = ("Snapshot: the opening rosters; every feature is from earlier seasons." if phase == "inseason" else
-            "Snapshot: after the season; rostered = the team he was last listed for, if still listed in its last three weeks.")
+            "Snapshot: after the season; rostered = the team the player was last listed for, if still listed in its last three weeks.")
     return [
         f"Chance of moving: a ridge logistic regression on our own movement history ({lg} box scores and did-not-play lists "
         "since 1997: who was listed for which team on which date), refitted each season and validated on held-out seasons "
         "(Model page). ESPN's transaction list covers only the last two years, so the history is inferred from the box scores.",
         "Traded or claimed: a move straight to another team (listed there within three weeks) before the deadline. A trade and "
-        "a waiver claim cannot be told apart without transactions. Leaves: the first team he is listed for next season is not "
-        "this one, or he is not listed at all.",
+        "a waiver claim cannot be told apart without transactions. Leaves: the first team the player is listed for next season is not "
+        "this one, or the player is not listed at all.",
         "No contract data: salaries, contract years, options and no-trade clauses are not used, because no source whose terms "
         "allow our use has them. Free agency is inferred from age, years since the debut, tenure and role.",
         snap,
@@ -508,7 +508,7 @@ def _notes(league: str, phase: str) -> list[str]:
         "Poisson model of past arrivals (need there, team strength and trajectory, turnover, expected departures). Draft "
         "picks, two-way call-ups and signings from outside the league are not counted.",
         "Targets: players on other teams who would upgrade the team's weakest regular slot in the pool (its second guard or "
-        "forward, its centre), ranked by their chance of joining: the chance he moves x the chance this team is where he goes "
+        "forward, its centre), ranked by their chance of joining: the chance the player moves x the chance this team is where they go "
         "(a conditional logit on past moves). An estimate from on-field value and history, not news.",
     ]
 

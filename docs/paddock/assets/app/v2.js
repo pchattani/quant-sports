@@ -127,21 +127,24 @@ V.peer = function (cat, kind, season) {
   };
 };
 /* Percentile-card groups for one entry. Out of the peer group (short of the floor): no percentiles. */
-V.pctGroups = function (P, id, sets) {
+/* prev: last season's percentiles in the same peer group (the hollow ring on the v3 rail), or null. */
+V.pctGroups = function (P, id, sets, prev) {
   var row = P.rows[id] || {}, pc = P.pct[id];
   if (!pc) return [];
   var m50 = P.kind === 'teams' ? V.M50_TEAM : V.M50;
   return (sets || []).map(function (g) {
     return { label: g[0], rows: g[1].map(function (k) {
       if (!isNum(pc[k])) return null;
-      return { label: V.label(P.meta, k), pctl: pc[k], value: V.fmt(P.meta, k, (row.values || {})[k]), tip: V.tip(P.meta, k), early: isNum(m50[k]) && P.size(id) < m50[k] };
+      return { label: V.label(P.meta, k), sub: V.SUB[k] || '', pctl: pc[k], prev: prev && isNum(prev[k]) ? prev[k] : null, value: V.fmt(P.meta, k, (row.values || {})[k]), tip: V.tip(P.meta, k), early: isNum(m50[k]) && P.size(id) < m50[k] };
     }).filter(Boolean) };
   });
 };
+/* The v3 percentile rail (QK.pctRail): o.prev (last season's ring), o.ringLabel, o.id, o.kicker, o.title. */
 V.pctCard = function (P, id, sets, o) {
   o = o || {};
   var q = P.qualified(id);
-  return QK.pctCard({ title: o.title || 'Percentile rankings', peer: P.label, sample: P.sample(id), groups: q ? V.pctGroups(P, id, sets) : [], right: o.right, foot: o.foot,
+  return QK.pctRail({ id: o.id, kicker: o.kicker || 'How they stack up', title: o.title || (P.kind === 'teams' ? 'Percentiles: how the team ranks' : 'Percentiles: how the driver ranks'), peer: P.label, sample: P.sample(id),
+    groups: q ? V.pctGroups(P, id, sets, o.prev) : [], right: o.right, foot: o.foot, ringLabel: o.ringLabel || 'last season',
     emptyTitle: 'Short of the sample floor', emptyText: q ? 'No headline metric has a value yet.' : 'Percentiles appear once ' + (P.kind === 'teams' ? 'the team reaches ' : 'the driver reaches ') + P.floor + ' ' + P.unit + ' this season.' });
 };
 /* The peer distribution of one metric, entries marked (first in the signal colour), the median dashed. */
@@ -255,6 +258,88 @@ V.rangeChart = function (el, season, kind, n) {
   QKC.range(node, { rows: ids.map(function (id) { return { label: isD ? PD.driverName(id) : PD.teamName(id), lo: ch[id].p05, hi: ch[id].p95, mid: ch[id].exp_points, href: isD ? PD.driverHref(id) : PD.teamHref(id),
     color: PD.teamColour(isD ? (ch[id].team || PD.driverTeam(id)) : id), sub: 'Our title chance ' + PD.pct(ch[id].p_title, ch[id].p_title > 0.99 ? 2 : 1) }; }),
     fmt: function (v) { return PD.num(v, 0); }, loName: '5th', hiName: '95th percentile', midName: 'Expected points', valName: 'Points at the season end', labelWidth: 130, label: 'Season-end points range' });
+};
+
+/* ── kit v3 (Matchday): plain lines on the rail, verdicts ──────────────────────────────────────────────── */
+/* One plain-English line under each headline metric on the percentile rail (QK.pctRail r.sub). */
+V.SUB = {
+  driver_effect: 'Lap time with the car taken out, against the team-mate.',
+  quali_driver_effect: 'One-lap speed against the team-mate.',
+  race_h2h: 'How often the driver finishes ahead of the team-mate.',
+  team_points_share: 'The driver’s share of the points the car scored.',
+  elo_teammate: 'A rating built only from duels with team-mates.',
+  race_pace: 'Race pace against the whole field, car included.',
+  points_per_race: 'Championship points per start.',
+  lap1_gain: 'Places made or lost on the opening lap.',
+  car_race_pace: 'How fast the car is over a race, against the field.',
+  dnf_rate: 'How often a start ends in a retirement (lower is better).',
+  pit_lane_v_field: 'Time in the pit lane against the field (lower is better).',
+  pit_under_2500: 'How often the crew turns a stop in under 2.5 seconds.',
+  strategy_gain: 'Places made or lost through pit-stop timing.'
+};
+/* The type a driver's (or team's) best metric suggests (compare verdicts). */
+V.ARCHETYPE = { driver_effect: 'The racer', quali_driver_effect: 'The qualifier', race_h2h: 'The team leader', team_points_share: 'The points carrier', elo_teammate: 'The team-mate beater',
+  race_pace: 'The quick one', points_per_race: 'The points machine', lap1_gain: 'The fast starter', quali_h2h: 'The qualifier', avg_grid: 'The front-runner', podium_rate: 'The podium regular',
+  win_rate: 'The winner', pos_gained: 'The charger', overtakes_made: 'The overtaker', consistency: 'The metronome', tyre_mgmt: 'The tyre whisperer', dnf_rate: 'The finisher',
+  car_race_pace: 'The fast car', pit_lane_v_field: 'The slick pit lane', pit_under_2500: 'The quick crew', strategy_gain: 'The strategists' };
+function lc(x) { x = String(x || ''); return /^[A-Z][a-z]/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x; }
+V.lc = lc;
+/* QK.verdicts items: for each entry, the metric where it leads the others by the most percentile points.
+   Ps: a peer group per entry (V.peer), ids, sets (V.DRIVER_SET ...), names. */
+V.verdicts = function (Ps, ids, sets, names) {
+  var keys = [];
+  (sets || []).forEach(function (g) { g[1].forEach(function (k) { if (keys.indexOf(k) < 0) keys.push(k); }); });
+  return ids.map(function (id, i) {
+    var best = null;
+    keys.forEach(function (k) {
+      var mine = Ps[i] && Ps[i].pct[id] ? Ps[i].pct[id][k] : null;
+      if (!isNum(mine)) return;
+      var others = ids.map(function (o, j) { return j === i ? null : (Ps[j] && Ps[j].pct[o] ? Ps[j].pct[o][k] : null); }).filter(isNum);
+      if (!others.length) return;
+      var d = mine - Math.max.apply(null, others);
+      if (d > 0 && (!best || d > best.d)) best = { k: k, d: d };
+    });
+    if (!best) return null;
+    var P = Ps[i], v = ((P.rows[id] || {}).values || {})[best.k];
+    return { title: V.ARCHETYPE[best.k] || 'The standout', who: names[i], text: 'best of the ' + ids.length + ' on ' + lc(V.label(P.meta, best.k)) + ' (' + V.fmt(P.meta, best.k, v) + ', ' + PD.ordinal(Math.round(P.pct[id][best.k])) + ' percentile).' };
+  });
+};
+/* The compare view on a metric set for 2-3 entries of one peer group (QK.compareView), the best in each row under the
+   highlighter. */
+V.compare = function (P, ids, sets, ents) {
+  var meta = P.meta;
+  var groups = sets.map(function (g) {
+    return { label: g[0], rows: g[1].filter(function (k) { return meta[k]; }).map(function (k) {
+      var m = meta[k];
+      return { label: V.label(meta, k), tip: V.tip(meta, k), better: m.lower ? 'low' : 'high', values: ids.map(function (id) { return ((P.rows[id] || {}).values || {})[k]; }),
+        pctls: ids.map(function (id) { return P.pct[id] ? P.pct[id][k] : null; }), fmt: function (v) { return V.fmt(meta, k, v); } };
+    }) };
+  });
+  return QK.compareView({ entities: ents, groups: groups, delta: false });
+};
+/* Nearest entries in the peer group on the metric set's percentiles (mean absolute gap), excluding the entry itself. */
+V.nearest = function (P, id, sets, n) {
+  var mine = P.pct[id];
+  if (!mine) return [];
+  var keys = [];
+  (sets || []).forEach(function (g) { g[1].forEach(function (k) { if (isNum(mine[k])) keys.push(k); }); });
+  if (!keys.length) return [];
+  return P.ids.filter(function (o) { return o !== id && P.pct[o]; }).map(function (o) {
+    var s = 0, c = 0;
+    keys.forEach(function (k) { var v = P.pct[o][k]; if (isNum(v)) { s += Math.abs(v - mine[k]); c++; } });
+    return c ? { id: o, d: s / c } : null;
+  }).filter(Boolean).sort(function (a, b) { return a.d - b.d; }).slice(0, n || 2);
+};
+
+/* "How sure are we?" from calibration.json: the race simulator's win forecasts before qualifying (every driver in every
+   scored race; QK.calib.find reads metrics.model_pre.win), with the Brier score of giving everyone the base rate. */
+V.calib = function (cj) {
+  var cb = cj && cj.ok !== false ? QK.calib.find(cj) : null;
+  if (!cb || !cb.bins.length) return null;
+  var w = ((((cj.metrics || {}).model_pre) || {}).win) || {};
+  var br = isNum(cb.base_rate) ? cb.base_rate : w.base_rate;
+  var ys = Object.keys(cj.seasons_used || cj.seasons || {}).sort();
+  return { n: cb.n, brier: cb.brier, bins: cb.bins, base_rate: br, base: isNum(br) ? br * (1 - br) : null, span: ys.length ? ys[0] + '–' + ys[ys.length - 1] : '' };
 };
 
 /* Copy pass for builder text shown on the page (STYLE_GUIDE §8): fantasy "prices" are player costs; betting words go.

@@ -156,8 +156,12 @@ def build_season(b: Build, season: int, full: bool, cfg: dict, shared: dict) -> 
     sig = season_sig(season)
     current = season == shared["current"]
     skip = None
+    # last season's catalogue feeds the player files' last-season role percentiles (careers.add_prev_pct): rebuild it
+    # once if it predates the role fields (9d6e9722), even when its inputs are unchanged
+    stale_roles = season == shared["current"] - 1 and (sdir / "players.json").exists() and \
+        not any("pct_role" in r for r in ((an.read_json(sdir / "players.json") or {}).get("players") or {}).values())
     if not full and not cfg["force"] and manifest.get("sig") == sig and (sdir / "players.json").exists() \
-            and season not in shared["page_seasons"]:
+            and season not in shared["page_seasons"] and not stale_roles:
         skip = "inputs unchanged"
     elif not current and not cfg["force"] and not sig["files"]["pbp"] and (an.read_json(sdir / "players.json") or {}).get("ok"):
         skip = "play-by-play not on this machine; payloads kept"
@@ -639,6 +643,12 @@ def main(argv: list[str] | None = None) -> int:
         def old_reader(pid):
             p = data / "players" / f"{pid}.json"
             return an.read_json(p) if p.exists() else None
+
+        def cat_reader(s):
+            p = data / str(s) / "players.json"
+            return an.read_json(p) if p.exists() else None
+        n_prev = b.step("last-season percentiles", lambda: CR.add_prev_pct(blocks, cat_reader), 0)
+        logger.info("careers: last-season percentiles on %s current blocks", n_prev)
         idx = b.step("careers", lambda: CR.write_careers(b.write, rows_by, blocks, old_reader, current), {}) or {}
         if idx:
             prev = an.read_json(data / "players_index.json") or {}

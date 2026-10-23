@@ -1,4 +1,6 @@
-/* Kit v2 showcase: every Design System 2.0 component on sample data (not shipped to any site). ES5. */
+/* Kit v3 "Matchday" showcase (dark only): every component on sample data (not shipped to any site). ES5.
+ * The Matchday block (greeting, feature, watch grid, who's hot, stat of the day, New here, How sure, rail, short
+ * version, preview card, score bug, verdicts) comes first; the v2 components below render in the v3 look. */
 (function () {
 'use strict';
 var $ = QK.$, esc = QK.esc;
@@ -26,30 +28,58 @@ var GAMES = [
 
 QK.shell({
   sport: null,
-  sections: [['identity', 'Identity'], ['scoreboard', 'Scoreboard'], ['stats', 'Stat tiles'], ['player', 'Player'], ['forecast', 'Forecasts'], ['tables', 'Leaderboard'], ['compare', 'Compare'], ['copy', 'Copy']].map(function (x) { return { key: x[0], label: x[1], href: '#' + x[0] }; }),
+  sections: [['matchday', 'Matchday'], ['identity', 'Identity'], ['scoreboard', 'Scoreboard'], ['stats', 'Stat tiles'], ['player', 'Player'], ['forecast', 'Forecasts'], ['tables', 'Leaderboard'], ['compare', 'Compare'], ['copy', 'Copy']].map(function (x) { return { key: x[0], label: x[1], href: '#' + x[0] }; }),
   section: 'identity',
   ctx: '<span class="qk-tag signal">Kit ' + esc(QK.version) + '</span>'
 });
 $('#sc-ticker').innerHTML = QK.ticker(GAMES);
 
-$('#sc-hero').innerHTML = QK.sectionHead({ kicker: 'Design System 2.0 · sample data', title: 'Signal: the kit, on one page', size: 'lg', tag: 'h1',
-  sub: 'Bloomberg density, ESPN scoreboard energy, 538 probability stories, Savant percentile cards — in one look of our own. Every block below is the real kit (assets/qk), drawn on sample numbers, in both themes and at 375 px.',
-  actions: '<a class="qk-btn primary" href="#scoreboard">Components</a><button class="qk-btn" type="button" data-qk-theme-toggle-btn>Toggle theme</button>' });
-var tb = document.querySelector('[data-qk-theme-toggle-btn]'); if (tb) tb.addEventListener('click', QK.theme.toggle);
+$('#sc-hero').innerHTML = QK.greeting({ date: 'Kit ' + QK.version + ' · sample data · dark only',
+  lede: 'Matchday: warm charcoal, Fraunces and DM Sans, teal for ours, a sun highlighter, roomy rounded cards and plain-English notes on every number. Every block below is the real kit (assets/qk), drawn on sample numbers.',
+  ctas: [{ label: 'Matchday components', href: '#matchday' }, { label: 'The v2 set, restyled', href: '#scoreboard', ghost: true }],
+  side: QK.featureCard({ sport: 'basketball', league: 'WNBA', note: 'WNBA Finals · G1', status: 'live', start: iso(-2), period: 3, clock: '1:48', away: { name: 'Dream', abbr: 'ATL', colour: '#e31837' }, home: { name: 'Valkyries', abbr: 'GS', colour: '#b38fcf' }, as: 52, hs: 51, p_home: 0.55, wp_home: 0.5549, href: '#matchday' }, { scribble: 'Finals, Game 1!' }) });
+
+/* ── v3 Matchday block ── */
+$('#h-matchday').innerHTML = QK.sectionHead({ kicker: 'What to watch tonight', title: 'QK.watchGrid: game cards with a reason', sub: 'Our chance for each side (favourite in teal), the team-colour bar with a key, the score bug when live, and an italic one-line reason (g.why, else QK.whyLine). No market on cards.' });
+$('#sc-md-watch').innerHTML = QK.watchGrid(GAMES.concat([{ sport: 'nfl', league: 'NFL', note: 'Week 7', status: 'pre', start: iso(26), away: { name: 'Saints', abbr: 'NO', colour: '#D3BC8D' }, home: { name: 'Giants', abbr: 'NYG', colour: '#0B2265' }, p_home: 0.52 }]), { limit: 6 });
+$('#sc-md-hot').innerHTML = QK.sectionHead({ kicker: 'Who’s hot', title: 'QK.hotRow', sub: 'One name per sport and what the number means; a swipeable row on phones.' }) + QK.hotRow([
+  { sport: 'hockey', title: 'Most points', name: 'Connor McDavid', value: 18, unit: 'pts', next: { name: 'Nathan MacKinnon', value: 16 }, expl: 'Points = goals + assists. Nine games in, so it is early.' },
+  { sport: 'football', title: 'Most goals, MLS', name: 'Lionel Messi', value: 23, unit: 'goals', next: { name: 'Kevin Viveros', value: 21 }, expl: '23 goals from chances worth 19.4: finishing better than the average shooter.' },
+  { sport: 'baseball', title: 'Best season (WAR)', name: 'Pete Crow-Armstrong', value: 7.5, unit: 'WAR', next: { name: 'Bobby Witt Jr.', value: 6.2 }, expl: 'WAR: wins added over a bench-level player. 5 or more is all-star level.' },
+  { sport: 'f1', title: 'Drivers’ points', name: 'Andrea Kimi Antonelli', value: 340, unit: 'pts', next: { name: 'George Russell', value: 238 }, expl: '102 points clear with 6 races left.' },
+  { sport: 'tennis', title: 'Top rated (Elo)', name: 'J. Sinner', value: 2136, unit: 'Elo', next: { name: 'C. Alcaraz', value: 2024 }, expl: 'Elo rating: beat a stronger player, gain more. 2,000 and up is rare air.' }]);
+$('#sc-md-sotd').innerHTML = QK.statOfDay({ value: '+7.3', kicker: 'Stat of the day · Hockey', title: 'Ullmark has been a wall', text: 'Linus Ullmark (OTT) has saved 7.3 more goals than an average goalie would on the same shots this season.', note: '<b>Goals saved above expected</b> compares each shot faced with how often that kind of shot goes in.' });
+$('#sc-md-new').innerHTML = QK.newHere();
+$('#sc-md-sure').innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'QK.howSure: when we say 60%, does it happen 60% of the time?', sub: 'Fed from a site’s calibration.json through QK.calib.find; the chart is QKC.calibration.' }) + '<div id="sc-md-sure-body"></div>';
+QK.howSure('#sc-md-sure-body', { league: 'NHL', span: '2009-10 to 2025-26', brier: 0.2396, bins: [
+  { lo: 0.2, hi: 0.3, n: 30, mean_p: 0.2789, freq: 0.3 }, { lo: 0.3, hi: 0.4, n: 632, mean_p: 0.3693, freq: 0.3386 }, { lo: 0.4, hi: 0.5, n: 5201, mean_p: 0.4631, freq: 0.4336 },
+  { lo: 0.5, hi: 0.6, n: 11276, mean_p: 0.549, freq: 0.5488 }, { lo: 0.6, hi: 0.7, n: 4337, mean_p: 0.6352, freq: 0.6569 }, { lo: 0.7, hi: 0.8, n: 429, mean_p: 0.7277, freq: 0.7972 }, { lo: 0.8, hi: 0.9, n: 5, mean_p: 0.8178, freq: 0.8 }] });
+$('#sc-md-rail').innerHTML = QK.pctRail({ kicker: 'How they stack up', title: 'QK.pctRail: the Notebook slider rail', peer: 'NHL forwards (618 qualified)', sample: '8 GP · 167 min · 122 at 5v5', ringLabel: 'last season (80 games)', groups: [
+  { label: 'Scoring', rows: [{ label: 'Points per 60', sub: 'Goals + assists for every hour on the ice.', pctl: 100, prev: 99, value: '5.74' }, { label: 'Individual xG per 60', sub: 'How good the player’s own shots are.', pctl: 94, prev: 90, value: '1.45' }] },
+  { label: 'Play driving (5v5)', rows: [{ label: 'Shot-attempt share', sub: 'The team’s share of attempts with the player on.', pctl: 65, prev: 82, value: '52.3%' }, { label: 'Isolated defence', sub: 'The player’s own effect on chances against.', pctl: 21, prev: 33, value: '−0.05', early: true }] }] });
+$('#sc-md-short').innerHTML = QK.shortVersion('MacKinnon has 16 points in 8 games, on pace for 168. In the top 1% of forwards for points per 60 and shot attempts per 60. The weak spot: isolated defence sits in the 21st percentile.');
+$('#sc-md-preview').innerHTML = QK.previewCard({ sport: 'hockey', league: 'NHL', status: 'pre', start: iso(4), away: { name: 'Tampa Bay Lightning', abbr: 'TBL', colour: '#002868', record: '5–2–0', form: 'WWWLW' }, home: { name: 'Colorado Avalanche', abbr: 'COL', colour: '#6F263D', record: '5–2–1', form: 'WLWOW' }, p_home: 0.6 },
+  { kicker: 'NHL · Ball Arena, Denver', nick: function (t) { return t.name.split(' ').slice(-1)[0]; }, noteExtra: 'About 1 in 4 (23%) go to overtime, and we expect about 6 goals in all.',
+    factors: [{ label: 'Goals for per game', a: '3.0', b: '4.5', better: 'b' }, { label: 'Goals against per game', a: '2.7', b: '2.9', better: 'a' }, { label: 'Power play', a: '7.4%', b: '20.7%', better: 'b' }] });
+$('#sc-md-misc').innerHTML = '<div class="qk-kicker">Small pieces</div><h3 style="margin:8px 0 14px">Score bug, note, aside, highlighter, verdicts</h3>' +
+  '<div class="qk-row" style="gap:14px">' + QK.scorebug(GAMES[0]) + QK.scorebug(GAMES[0], { size: 'lg' }) + '</div>' +
+  QK.note('<b>QK.note</b>: one or two friendly sentences on what a number means.') + '<div style="margin-top:12px">' + QK.aside('QK.aside: a one-line reason in italic Fraunces.') + '</div>' +
+  '<p style="margin-top:12px">QK.mark puts the ' + QK.mark('sun highlighter') + ' under a phrase.</p>' +
+  QK.verdicts([{ title: 'The volume shooter', who: 'MacKinnon', text: 'more 5-on-5 shots per hour than any regular (13.8).' }, { title: 'The playmaker', who: 'McDavid', text: '14 assists in 7 games.' }, { title: 'Due a goal or two', who: 'Kucherov', text: '1 goal on about 17 shots.' }]);
 
 function head(id, kicker, title, sub) { $('#h-' + id).innerHTML = QK.sectionHead({ kicker: kicker, title: title, sub: sub }); }
-head('identity', 'Identity', 'Colour and type', 'One signature accent (signal violet) means "ours". Sport accents mark identity only. The percentile scale runs cold to hot. Team colours are accents, contrast-checked.');
-var SW = [['--signal', 'Signal', 'ours: forecast, rating, primary action'], ['--c-market', 'Market', 'a quiet reference, never a headline'], ['--wp-a', 'Win prob A', 'fallback when kits clash'], ['--wp-b', 'Win prob B', 'fallback when kits clash'],
+head('identity', 'Identity', 'Colour and type', 'Teal means "ours"; the sun highlighter, coral and sky are the Matchday accents. Sport accents mark identity only. The percentile scale runs cold to hot. Team colours are accents, contrast-checked.');
+var SW = [['--signal', 'Ours (teal)', 'our forecast, rating, links'], ['--sun', 'Sun', 'highlighter, the i of a note'], ['--coral', 'Coral', 'kickers, asides'], ['--sky', 'Sky', 'a second series'], ['--bg', 'Page', 'warm charcoal'], ['--s-1', 'Card', 'surface'], ['--s-cream', 'Cream card', 'New here, short version'], ['--c-market', 'Market', 'a quiet reference, never a headline'], ['--wp-a', 'Win prob A', 'fallback when kits clash'], ['--wp-b', 'Win prob B', 'fallback when kits clash'],
   ['--pc-0', 'Percentile 0', 'cold: worst in peers'], ['--pc-50', 'Percentile 50', 'average'], ['--pc-100', 'Percentile 100', 'hot: best in peers'], ['--live', 'Live', 'live status only'],
-  ['--a-football', 'Football', 'sport mark'], ['--a-hockey', 'Hockey', 'sport mark'], ['--a-nfl', 'NFL', 'sport mark (gold in v2)'], ['--a-baseball', 'Baseball', 'sport mark']];
+  ['--a-football', 'Football', 'sport mark'], ['--a-hockey', 'Hockey', 'sport mark'], ['--a-nfl', 'NFL', 'sport mark'], ['--a-baseball', 'Baseball', 'sport mark']];
 $('#sc-swatches').innerHTML = SW.map(function (s) { return '<div class="sc-sw"><i style="--k:var(' + s[0] + ')"></i><div><b>' + esc(s[1]) + '</b><code>' + esc(s[0]) + '</code><div class="qk-muted">' + esc(s[2]) + '</div></div></div>'; }).join('');
 $('#sc-chips').innerHTML = [3, 18, 35, 50, 64, 81, 97].map(QK.pctlChip).join('');
 $('#sc-type').innerHTML = [
-  ['Display d1 · Archivo 800', '<span class="qk-display" style="font-size:var(--fs-d1);line-height:1">Every game, by the numbers.</span>', '--fs-d1'],
+  ['Display d1 · Fraunces 650', '<span class="qk-display" style="font-size:var(--fs-d1);line-height:1">Every game, by the numbers.</span>', '--fs-d1'],
   ['Display d2 · page title', '<span class="qk-display" style="font-size:var(--fs-d2)">Connor McDavid</span>', '--fs-d2'],
   ['Display d3 · stat number', '<span class="qk-display" style="font-size:var(--fs-d3)">63.8% · 2.41 · +0.31</span>', '--fs-d3'],
-  ['UI · Inter 15/1.55', '<span>Our chance comes from 20,000 simulated seasons. The market is shown as a reference.</span>', '--font-ui'],
-  ['Data · JetBrains Mono', '<span class="num">BOS 4  TOR 3  ·  xG 3.41–2.07  ·  23:54 TOI</span>', '--font-num']
+  ['UI · DM Sans 16/1.55', '<span>Our chance comes from 20,000 simulated seasons. The market is shown as a reference.</span>', '--font-ui'],
+  ['Numbers · DM Sans, tabular figures', '<span class="num">BOS 4  TOR 3  ·  xG 3.41–2.07  ·  23:54 TOI</span>', '--font-num']
 ].map(function (r) { return '<div><div class="qk-kicker">' + esc(r[0]) + '<br><code>' + esc(r[2]) + '</code></div><div>' + r[1] + '</div></div>'; }).join('');
 
 head('scoreboard', 'Scoreboard', 'Ticker, game cards, win-probability bars', 'The ticker (above the page) groups by sport, live first. Cards put our chance first: the favourite in the signal colour, the bar in team colours, the market a hollow ring and a tick.');

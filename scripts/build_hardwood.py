@@ -547,15 +547,24 @@ def careers(b: Build, league: str, cats: dict[int, dict], blocks: dict[str, dict
     for s in sorted(cats, reverse=True)[:3]:
         for pid, info in (an.load_store(league, s).get("players") or {}).items():
             stores_players.setdefault(pid, info)
-    n = 0
-    for pid, seasons in rows.items():
-        s, r = latest[pid]
-        info = stores_players.get(pid) or {}
+    curs: dict[str, dict | None] = {}
+    for pid in rows:
         path = b.data / league / "players" / f"{pid}.json"
         cur = blocks.get(pid)
         if cur is None and path.exists():
             old = an.read_json(path) or {}
             cur = old.get("current")
+        curs[pid] = cur
+    # last season's role percentiles on the current block (the player page's rail rings)
+    roles_now = {pid: ((((cats.get(int(c["season"])) or {}).get("players") or {}).get(pid)) or {}).get("role")
+                 for pid, c in curs.items() if c and c.get("season")}
+    n_prev = PL.prev_role_pct(cats, curs, {p: r for p, r in roles_now.items() if r})
+    logger.info("%s careers: last-season role percentiles on %d current blocks", league, n_prev)
+    n = 0
+    for pid, seasons in rows.items():
+        s, r = latest[pid]
+        info = stores_players.get(pid) or {}
+        cur = curs.get(pid)
         payload = {"id": pid, "name": names.get(pid), "pos": info.get("pos") or r.get("pos"), "pool": r.get("pool"),
                    "dob": info.get("dob"), "league": league, "seasons": seasons, "current": cur,
                    "similar": PL.similar(pid, s, r, index, names), "similar_role": sim_role.get(pid, []),

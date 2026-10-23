@@ -59,7 +59,7 @@ DESC = {
     "dec_w": "Deciding sets won (final sets of completed matches that went the distance).", "dec_l": "Deciding sets lost.",
     "dec_pct": "Deciding sets won / played.", "dec_over": "Deciding sets won minus the chain's P(win the set) under its rule.",
     "fsd_w": "Matches won after losing the first set.", "fsd_pct": "Matches won / matches in which the first set was lost.",
-    "fsd_over": "Comebacks minus the chain's P(win | a set down), summed over the matches she lost the first set.",
+    "fsd_over": "Comebacks minus the chain's P(win | a set down), summed over the matches in which the player lost the first set.",
     "blown": "Matches lost after winning the first set.", "bagels_for": "Sets won 6-0.", "bagels_against": "Sets lost 0-6.",
     "breadsticks_for": "Sets won 6-1.", "breadsticks_against": "Sets lost 1-6.",
     "close_sets_pct": "Share of 7-5 and 7-6 sets won.",
@@ -87,7 +87,7 @@ DESC = {
     "bh_winners_pp": "Backhand winners per point." + CH, "net_rate": "Share of points with a net approach." + CH,
     "net_won": "Points won at the net." + CH, "ret_deep": "Share of returns landing deep." + CH,
     "aggression": "Aggression score: winners plus induced forced errors plus unforced errors per point, the share of points the "
-                  "player ends on her own racquet." + CH,
+                  "player ends on their own racquet." + CH,
     "rank": "Official ranking.", "best_rank": "Best ranking carried into a match in the season.",
     "points": "Official ranking points (current season).", "race_pts": "Points earned in this season's counted events (Slams, Finals, "
               "1000s, 500s, 250s; no qualifying, Challenger / WTA 125 or best-of-N rule).",
@@ -118,7 +118,7 @@ MODEL = [
     ("excitement", "Excitement", "Matches", "The sum of absolute win-probability changes along the match."),
     ("comeback", "Comeback", "Matches", "The winner's lowest win probability during the match."),
     ("tournament_sim", "Tournament simulation", "Tournaments", "20,000 Monte Carlo runs of the real bracket (round robin for the Finals) "
-     "with results so far fixed and each remaining match forecast by the model; the 'if she wins' chances are reweighted so they "
+     "with results so far fixed and each remaining match forecast by the model; the 'if the player wins' chances are reweighted so they "
      "measure the match itself."),
     ("season_sim", "Season simulation", "Rankings", "The rest of the calendar played many times: entry probabilities by level and history, "
      "seeded draws, the real points tables and 52-week drops, the Finals round robin. Gives Finals qualification, year-end No. 1 and "

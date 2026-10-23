@@ -115,7 +115,7 @@ def v2_rows(ctx: Ctx, rows: list[dict], proj: dict, season: int, slot: dict, rpw
                       "Injured list (il3): days in each of the last three seasons from the MLB Stats API transactions; il_exp and "
                       "il_p30: next season's expected days and the chance of 30 or more.",
                       "pos_line: the projected full-season value of the median starter (15th best) at the player's position; "
-                      "over_line: his projected value there minus that line."]}
+                      "over_line: the player's projected value there minus that line."]}
     return out, meta
 
 
@@ -214,7 +214,7 @@ def trades_payload(ctx: Ctx, level: str, today: date, teams: dict, validation: d
             "discount": VA.DISCOUNT, "source": SOURCE,
             "notes": ["Value at the time: expected Bullpen WAR for the club that received the player, from data before the trade "
                       "date only: the rest of the season and four more (five seasons between seasons), each later season "
-                      "weighted by the chance he is still with the club and discounted 8% a year.",
+                      "weighted by the chance the player is still with the club and discounted 8% a year.",
                       "Retention stands in for contracts and club control, which no legitimate free source gives: of traded "
                       "players who played in the majors in a later season, the share who did so mainly for the club that "
                       "acquired them, by years since their MLB debut and by in-season or off-season trade.",
@@ -222,6 +222,6 @@ def trades_payload(ctx: Ctx, level: str, today: date, teams: dict, validation: d
                       "level, performance, sample); players with no line: the average of traded players of their age band. "
                       "The model sees stat lines only, not scouting grades, and under-rates the very best prospects.",
                       "Realised: WAR produced for the club since the trade (the season split by plate appearances or batters "
-                      "faced with the club, adjusted by his wOBA there against his season's).",
+                      "faced with the club, adjusted by the player's wOBA there against the full season's).",
                       "Cash, players to be named later, bonus pool money and draft picks are listed but not valued.",
                       "Grades from the net expected value: A +2 wins or more, B +0.75, C within 0.75, D -0.75, F -2 or worse."]}

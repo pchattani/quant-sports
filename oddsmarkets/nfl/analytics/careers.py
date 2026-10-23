@@ -279,10 +279,50 @@ def current_blocks(ctx: SeasonContext, cat: dict | None, value: dict | None = No
         if kind and ngs.get(kind, {}).get(pid):
             row = ngs[kind][pid]
             ng = {k: an.rnd(row.get(k), 3) for k in NGS_KEEP[kind] if row.get(k) is not None}
-        out[pid] = {"season": ctx.season, "group": grp, "values": r.get("values"), "pct": r.get("pct"), "pct_pos": r.get("pct_pos"),
+        out[pid] = {"season": ctx.season, "group": grp, "pos": r.get("pos"), "values": r.get("values"), "pct": r.get("pct"), "pct_pos": r.get("pct_pos"),
                     "role": r.get("role"), "pct_role": r.get("pct_role"), "peer": peers.get(r.get("role")),
                     "log": lg, "charts": charts, "ngs": ng, "ftn": ftn or None, "similar": similar.get(pid) or [], "projection": None}
     return out
+
+
+def _pos_pool(r: dict) -> tuple:
+    """The pct_pos pool of a catalogue row (players.build): defenders by DL / LB / DB, receivers by WR / TE, the rest by
+    listed position within the group."""
+    g = r.get("group")
+    if g == "DEF":
+        return g, people.DEF_POS.get(str(r.get("pos")).upper(), "DB")
+    return g, (g if g in ("WR", "TE") else str(r.get("pos")))
+
+
+def add_prev_pct(blocks: dict[str, dict], load: Callable[[int], dict | None]) -> int:
+    """Last season's percentiles on each current block (kit v3 rail rings, 23 Oct 2026), so the player page need not load
+    last season's players.json: "prev_pct_role" (last season's pct_role, when the role is the same: QB ... EDGE, CB, S),
+    "prev_pct_pos" (last season's pct_pos, when the position pool is the same) and "prev_peer" {"season", "role",
+    "group", "pos_pool", "games", "qualified"}. `load(season)` returns that season's catalogue. Returns the count."""
+    cache: dict = {}
+    n = 0
+    for pid, b in blocks.items():
+        if not b or not b.get("season"):
+            continue
+        ps = int(b["season"]) - 1
+        if ps not in cache:
+            cache[ps] = (load(ps) or {}).get("players") or {}
+        pr = cache[ps].get(pid)
+        if not pr:
+            continue
+        got = False
+        if pr.get("role") and pr.get("role") == b.get("role") and pr.get("pct_role"):
+            b["prev_pct_role"] = pr["pct_role"]
+            got = True
+        pool = _pos_pool(pr)
+        if pr.get("pct_pos") and pool == _pos_pool({"group": b.get("group"), "pos": b.get("pos") or pr.get("pos")}):
+            b["prev_pct_pos"] = pr["pct_pos"]
+            got = True
+        if got:
+            b["prev_peer"] = {"season": ps, "role": pr.get("role"), "group": pr.get("group"), "pos_pool": pool[1],
+                              "games": pr.get("games"), "qualified": bool(pr.get("qualified"))}
+            n += 1
+    return n
 
 
 def role_peers(cat: dict | None) -> dict[str, dict]:
@@ -424,6 +464,7 @@ def write_careers(write: Callable[[str, Any], None], rows_by_season: dict[int, d
         if blk:
             payload["current"] = {k: blk.get(k) for k in ("season", "log", "charts", "ngs", "ftn", "projection", "values", "pct", "pct_pos",
                                                           "role", "pct_role", "peer")}
+            payload["current"].update({k: blk[k] for k in ("prev_pct_pos", "prev_pct_role", "prev_peer") if blk.get(k)})
             payload["similar"] = blk.get("similar") or []
         elif old_reader is not None:
             old = old_reader(pid)

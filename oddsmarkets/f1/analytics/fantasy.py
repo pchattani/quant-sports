@@ -147,7 +147,7 @@ SCORING = [  # the table the page shows: group, item, points, note
     ("Constructor", "Fastest stop of the race", "+5", ""),
 ]
 EXCLUDED = [
-    ("Official F1 Fantasy prices, ownership, picks and scores",
+    ("Official F1 Fantasy costs, ownership, picks and scores",
      "Not used. formula1.com's legal notices: material on the site is \"for your personal, non-commercial use only\" and users "
      "agree not to \"distribute copy extract or commercially exploit such material or content\". The game at fantasy.formula1.com "
      "is a JavaScript app whose own terms could not be read without running it; nothing is fetched from it."),
@@ -158,8 +158,8 @@ EXCLUDED = [
     ("Streaks, team-mate bonuses, chips, transfers and budgets", "Game mechanics of particular fantasy games; this table scores the weekend only."),
 ]
 LABEL = ("Our own fantasy-style scoring and projections from our race simulation. Not the official F1 Fantasy game: its "
-         "prices, ownership and scores are not used (their terms do not allow it), so 'value' is measured against our own "
-         "form line, a price proxy, not against real prices.")
+         "costs, ownership and scores are not used (their terms do not allow it), so 'value' is measured against our own "
+         "form line, a cost proxy, not against the game's costs.")
 
 
 def _now() -> str:
@@ -994,8 +994,8 @@ def backtest_summary(bt: dict) -> dict:
 
 BASELINES = {"model": "our projection before qualifying (the race simulation, module docstring)",
              "std": "the driver's (constructor's) season-to-date average weekend points",
-             "prev": "his (its) previous weekend's points",
-             "last": "his (its) average weekend points last season",
+             "prev": "the driver's (constructor's) previous weekend's points",
+             "last": "the driver's (constructor's) average weekend points last season",
              "blend": "half our projection, half the season-to-date average"}
 
 
@@ -1237,7 +1237,7 @@ def reasons(row: dict, kind: str, names: dict | None = None) -> list[str]:
           "riser": ("trend", "pace", "luck", "value_ros", "value"), "fade": ("value_neg", "luck_neg", "trend", "dnf"),
           "team": ("proj", "qb", "pit", "trend", "dnf"), "team_value": ("value", "value_ros", "proj", "trend")}.get(kind, ("proj",))
     is_team = kind in ("team", "team_value") or "q_bonus" in row
-    his = "its" if is_team else "his"
+    his = "its" if is_team else "the driver's"
     team = (names.get(row.get("id")) or row.get("name") or "the car") if is_team else (names.get(row.get("team")) or row.get("team") or "the car")
     txt = {}
     if nx is not None:

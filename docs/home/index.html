@@ -1,17 +1,16 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-GB" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Quant</title>
-<meta name="description" content="A sports hub for quant fans: live scores, our win chances for every game, title races, player percentiles and the stats behind them across football, the NFL, NBA, MLB, NHL, F1, tennis and college sports.">
-<meta name="color-scheme" content="dark light">
-<meta name="theme-color" content="#08090d">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%239384ff'/%3E%3Cpath d='M6 23l7-9 5 4 8-11' stroke='%230c0820' stroke-width='3.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<script>try{var t=/[?&]theme=(light|dark)/.exec(location.search);t=t?t[1]:localStorage.getItem('qk-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<meta name="description" content="Free sports numbers, explained: what to watch tonight, our chance for every game, who's hot, title races and how sure we are, across football, the NFL, NBA, MLB, NHL, F1, tennis and college sports.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#17140f">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2317140f'/%3E%3Ccircle cx='17' cy='17' r='8' fill='%23ff7a5c'/%3E%3Ccircle cx='14' cy='14' r='8' fill='%23ffc94d'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,400..800,0..100,0..1;1,9..144,400..700,0..100,0..1&display=swap">
 <link rel="stylesheet" href="assets/qk/tokens.css">
 <link rel="stylesheet" href="assets/qk/quant.css">
 <link rel="stylesheet" href="assets/home.css">
@@ -20,48 +19,59 @@
 <div id="qk-shell"></div>
 <div class="qk-ticker" id="ticker" aria-label="Scores and our chances"></div>
 
-<main id="main" class="qk-page">
-  <section class="hm-hero">
-    <div class="hm-hero-main">
-      <div class="qk-sh-kicker" id="hero-date">Today</div>
-      <h1 class="hm-headline">Every game,<br><span>by the numbers.</span></h1>
-      <p class="hm-lede">Live scores, our chance for every game, title races and the stats behind them, across eight sports. Built by quants, for fans.</p>
-      <div id="hero-stats"><div class="qk-skel line"></div><div class="qk-skel line short"></div></div>
+<main id="main" class="qk-page hm-page">
+  <div id="hero"><div class="qk-greet"><div><div class="qk-skel line short"></div><div class="qk-skel block"></div></div></div></div>
+
+  <section class="qk-section" id="watch">
+    <div id="h-watch"></div>
+    <div id="watch-grid">
+      <div class="qk-watch"><div class="qk-skel block"></div><div class="qk-skel block"></div><div class="qk-skel block"></div></div>
     </div>
-    <div class="hm-hero-side">
-      <div class="qk-card hm-feature" id="feature"><div class="qk-card-body"><div class="qk-skel line short"></div><div class="qk-skel block"></div></div></div>
-      <div class="qk-card hm-stat" id="stat"></div>
+  </section>
+
+  <section class="qk-section" id="hot-sec">
+    <header class="qk-sh"><div class="qk-sh-main"><div class="qk-sh-kicker">Who’s hot</div><h2 class="qk-sh-title">Leading the way right now</h2><p class="qk-sh-sub">One name from each sport, and what the number actually means.</p></div></header>
+    <div id="hot"></div>
+  </section>
+
+  <section class="qk-section qk-gside hm-pair">
+    <div id="sotd"></div>
+    <div id="newhere"></div>
+  </section>
+
+  <section class="qk-section" id="howsure">
+    <div id="h-howsure"></div>
+    <div id="howsure-body"></div>
+  </section>
+
+  <section class="qk-section qk-g2" id="races"></section>
+
+  <section class="qk-section" id="futures">
+    <header class="qk-sh"><div class="qk-sh-main"><div class="qk-sh-kicker">Season simulations</div><h2 class="qk-sh-title">Every title race</h2><p class="qk-sh-sub">Our title chances from thousands of simulated seasons, league by league.</p></div></header>
+    <div class="qk-card">
+      <div class="qk-card-body">
+        <div class="qk-tabs" role="tablist" id="fut-tabs" style="margin-bottom:16px"></div>
+        <div id="fut-panels"></div>
+      </div>
     </div>
   </section>
 
   <section class="qk-section" id="sports">
-    <div id="h-sports"></div>
+    <header class="qk-sh"><div class="qk-sh-main"><div class="qk-sh-kicker">Eight sites, one look</div><h2 class="qk-sh-title">Pick your sport</h2><p class="qk-sh-sub">Each site opens on today’s games, the standings, the players and the models behind them.</p></div></header>
     <div class="hm-tiles" id="tiles"></div>
   </section>
 
   <section class="qk-section" id="games">
-    <div id="h-games"></div>
+    <header class="qk-sh"><div class="qk-sh-main"><div class="qk-sh-kicker">Scoreboard</div><h2 class="qk-sh-title">Every game</h2><p class="qk-sh-sub">Our win chance on every card, the favourite in teal. Tap a game for the full breakdown.</p></div>
+      <div class="qk-sh-actions"><div class="qk-seg" id="when" role="group" aria-label="When"><button type="button" aria-pressed="true" data-value="now">Live &amp; next</button><button type="button" aria-pressed="false" data-value="results">Results</button></div></div></header>
     <div class="qk-chips scroll" id="sport-chips" role="group" aria-label="Filter by sport"></div>
-    <div class="qk-auto hm-games" id="game-grid" style="--min:290px;margin-top:14px"></div>
+    <div class="qk-auto hm-games" id="game-grid" style="--min:300px;margin-top:18px"></div>
     <div class="hm-more" id="game-more"></div>
   </section>
 
-  <section class="qk-section" id="futures">
-    <div id="h-futures"></div>
-    <div class="qk-card">
-      <div class="qk-tabs" role="tablist" id="fut-tabs" style="padding:0 8px"></div>
-      <div class="qk-card-body" id="fut-panels"></div>
-    </div>
-  </section>
-
   <section class="qk-section" id="charts">
-    <div id="h-charts"></div>
+    <header class="qk-sh"><div class="qk-sh-main"><div class="qk-sh-kicker">One picture per site</div><h2 class="qk-sh-title">Charts of the week</h2><p class="qk-sh-sub">A headline chart from each sport. Tap through for the full story.</p></div></header>
     <div class="qk-grid" id="chart-grid"></div>
-  </section>
-
-  <section class="qk-section" id="leaders">
-    <div id="h-leaders"></div>
-    <div class="hm-leaders" id="leader-grid"></div>
   </section>
 
   <p class="qk-sub hm-updated" id="updated"></p>

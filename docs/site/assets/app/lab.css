@@ -40,7 +40,7 @@
 @media (max-width: 900px) { .fb-lb-pair { grid-template-columns: minmax(0, 1fr); } }
 .fb-lb-hero { display: grid; gap: var(--sp-4); }
 .fb-lb-hero.a { --tc: var(--c-1); } .fb-lb-hero.b { --tc: var(--c-2); }
-.fb-lb-hero h2 { font-size: clamp(1.3rem, 3vw, 1.8rem); margin: 4px 0 0; letter-spacing: -0.025em; }
+.fb-lb-hero h2 { font-size: clamp(1.3rem, 3vw, 1.8rem); margin: 4px 0 0; font-family: var(--font-display); font-variation-settings: var(--fvs-display); font-weight: 650; }
 .fb-lb-hero h2 a:hover { color: var(--signal); }
 .fb-lb-hero-t { min-width: 0; }
 .fb-lb-hero .qk-kicker { display: flex; align-items: center; gap: 4px; }

@@ -189,9 +189,9 @@ VALUE_GLOSSARY: list[dict] = [
      "desc": "Expected wins from games minus expected wins from points (WTA matches with statistics): turning points into games. "
              "Shown, but not counted as luck: it persists from season to season."},
     {"key": "v_bp_saved", "label": "Break points saved over expected", "group": _G + "Luck", "fmt": "signed", "scope": "wta_stats",
-     "desc": "Break points saved minus break points faced x (her serve points won outside break points + the tour's pressure offset)."},
+     "desc": "Break points saved minus break points faced x (the player's serve points won outside break points + the tour's pressure offset)."},
     {"key": "v_bp_conv", "label": "Break points converted over expected", "group": _G + "Luck", "fmt": "signed", "scope": "wta_stats",
-     "desc": "Break points converted minus chances x (her return points won outside break points + the tour's offset)."},
+     "desc": "Break points converted minus chances x (the player's return points won outside break points + the tour's offset)."},
     {"key": "v_draw", "label": "Draw luck", "group": _G + "Luck", "fmt": "signed",
      "desc": "Sum of Elo P(win v the actual opponent) - the mean Elo P(win) v the typical opponents met at that level, round and "
              "seed band in earlier years, placed relative to the strength of the event's field."},

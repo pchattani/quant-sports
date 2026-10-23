@@ -8,7 +8,9 @@
  *   inPool(p, surface, cat)        does a catalogue row meet the group's minimum
  *   value(p, key, surface)         the metric value for the group (surface rates from values_surface; Elo from values)
  *   pctl(p, key, surface, cat)     the percentile (payload pct / pct_surface; surface Elo ranked here among the pool)
- *   pctGroups(p, cat, T, surface)  QK.pctCard groups for one player (early = short of the spec's M50)
+ *   pctGroups(p, cat, T, surface, prev)  QK.pctRail groups for one player (early = short of the spec's M50; sub = a plain
+ *                                  line, V.SUB; prev = last season's percentile, the hollow ring)
+ *   SUB, ARCHETYPE                 the rail's plain lines and the compare verdicts' types
  *   similar(T, pid, cat, k)        the spec's similar players: weighted Euclidean on z-scores within the tour
  *   card(title, sub, body, o)  chart(id, h, label)
  *
@@ -57,6 +59,24 @@ V.META = {
   dominance: ['Dominance ratio', 'Return points won % divided by serve points lost %; above 1.0 wins more return points than it concedes on serve. WTA matches with statistics, 2016 on (not the Slams).', '2'],
   ace_pct: ['Ace rate', 'Aces per serve point. WTA matches with statistics, 2016 on (not the Slams).', 'pct']
 };
+/* v3 (Matchday): a plain-English line under each metric on the percentile rail (QK.pctRail row.sub). */
+V.SUB = {
+  elo: 'How strong the player is, from every result and who it came against.',
+  elo_hard: 'The same rating, from hard-court matches only.',
+  elo_clay: 'The same rating, from clay matches only.',
+  elo_grass: 'The same rating, from grass matches only: a short season.',
+  games_won_pct: 'Share of all games won: steadier than wins, because every game counts.',
+  hold: 'How often the player holds serve against an average returner.',
+  brk: 'How often the player breaks an average server.',
+  hold_plus_break: 'Hold plus break: the best single sign of level beyond Elo.',
+  win_v_top50: 'Wins against the top 50: how the player does when the draw gets hard.',
+  win_pct: 'Share of tour-level matches won.',
+  dominance: 'Return points won against serve points lost: above 1.0 wins the exchange.',
+  ace_pct: 'Aces per serve point.'
+};
+/* The type a player's best metric suggests (compare verdicts, "Their type"). */
+V.ARCHETYPE = { elo: 'The all-round force', elo_hard: 'The hard-court player', elo_clay: 'The clay-courter', elo_grass: 'The grass-courter', games_won_pct: 'The game-winner',
+  hold: 'The big server', brk: 'The returner', hold_plus_break: 'The complete player', win_v_top50: 'The giant-killer', win_pct: 'The winner', dominance: 'The dominator', ace_pct: 'The ace machine' };
 V.label = (k, surface) => (k === 'win_pct' && surface ? 'Win % on ' + surface : ((V.META[k] || [])[0] || k));
 V.SURF = ['hard', 'clay', 'grass'];
 V.group = (T, surface) => (T === 'wta' ? 'wta' : 'atp') + '_' + (surface && V.SURF.indexOf(surface) >= 0 ? surface : 'all');
@@ -144,7 +164,8 @@ V.sample = (p, k, surface) => {
 /* QK.pctCard groups: strength, results, serve and return (inferred), serve statistics (WTA). */
 const GROUPS = [['Strength', ['elo', 'elo_hard', 'elo_clay', 'elo_grass']], ['Results', ['games_won_pct', 'win_pct', 'win_v_top50']],
   ['Serve and return, inferred from scores', ['hold', 'brk']], ['Serve statistics (WTA)', ['dominance', 'ace_pct']]];
-V.pctGroups = (p, cat, T, surface) => {
+/* prev: last season's percentiles in the same peer group ({ key: pctl }), the hollow ring on the v3 rail; or null. */
+V.pctGroups = (p, cat, T, surface, prev) => {
   const set = V.set(T, surface), m50 = V.M50[V.group(T, surface)] || {};
   return GROUPS.map(g => ({
     label: g[0],
@@ -152,7 +173,7 @@ V.pctGroups = (p, cat, T, surface) => {
       const pc = V.pctl(p, k, surface, cat);
       if (!isNum(pc)) return null;
       const n = V.sample(p, k, surface);
-      return { label: V.label(k, surface), pctl: pc, value: V.fmt(k, V.value(p, k, surface)), tip: (V.META[k] || [])[1] || '', early: isNum(m50[k]) && isNum(n) && n < m50[k] };
+      return { label: V.label(k, surface), sub: V.SUB[k] || '', pctl: pc, prev: prev && isNum(prev[k]) ? prev[k] : null, value: V.fmt(k, V.value(p, k, surface)), tip: (V.META[k] || [])[1] || '', early: isNum(m50[k]) && isNum(n) && n < m50[k] };
     }).filter(Boolean)
   }));
 };
@@ -241,7 +262,7 @@ V.scatter = (el, o) => {
 };
 /* Surface colours as hex for charts (identity marks: hard blue, clay terracotta, grass green, all surfaces = ours). */
 V.SURF_HEX = { all: null, hard: '#3b82f6', clay: '#d2693c', grass: '#3fb950', carpet: '#8b949e', indoor: '#a371f7' };
-V.signal = () => QK.cssVar('--signal') || '#9384ff';
+V.signal = () => QK.cssVar('--signal') || '#3cc9b4';
 V.wpA = () => QK.cssVar('--wp-a') || '#5b8def';
 V.wpB = () => QK.cssVar('--wp-b') || '#f08a3c';
 

@@ -343,8 +343,8 @@ def trade_index(level: str, season: int, teams: dict, curves: dict, unit: dict, 
             "sims": curves.get("sims"), "units": unit, "rpw": round(rpw, 2), "dh": dh, "order": list(ORDER),
             "caps": {"C": CAP["C"], "SP": CAP["SP"], "RP": round(CAP["RP"], 4), "other": CAP_DEFAULT},
             "not_checked": NOT_CHECKED, "version": VERSION,
-            "notes": ["Odds: each club's season simulation re-run at seven rating shifts (common random numbers, the other clubs fixed); "
+            "notes": ["Chances: each club's season simulation re-run at seven rating shifts (common random numbers, the other clubs fixed); "
                       "the page interpolates in expected wins.",
                       "Depth charts: positions filled by the best available eligible player by projected value (the same rule before and after).",
-                      "A trade between two clubs that play each other also moves each other's odds through head-to-head games; the curves hold "
+                      "A trade between two clubs that play each other also moves each other's chances through head-to-head games; the curves hold "
                       "the other clubs fixed, so that effect is left out."]}

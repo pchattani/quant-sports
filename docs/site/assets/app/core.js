@@ -1,6 +1,6 @@
 /* The Quant Footballer — core: state, routing (with the old-route redirects), cached loading, competitions,
  * clubs and people indexes, links and marks, formatting, and the HTML builders every page uses.
- * Built on the shared kit (assets/qk: window.QK, window.QKC). Older-browser rule: no optional chaining, no
+ * Built on the shared kit v3 "Matchday" (assets/qk: window.QK, window.QKC; dark only). Older-browser rule: no optional chaining, no
  * nullish coalescing (checked with esprima before shipping).
  *
  * Routes (hash). The section lit in the nav is in brackets.
@@ -876,8 +876,10 @@ function toGame(f, slug, extra) {
     hs: f.hs, as: f.as, note: roundText(f, s, true) + (f.result_missing || (stale && !isNum(f.hs)) ? ' · result not reported' : f.status === 'postponed' ? ' · postponed' : f.status === 'cancelled' ? ' · cancelled' : ''),
     href: f.detail ? href.match(s, f.id) : (extra && extra.href) || href.match(s, f.id)
   };
-  /* our pre-match chance before kick-off and, after the whistle, as the card's "pre-game" line; never while live (it is not a live model) */
-  if (f.model && st !== 'live') { g.p_home = f.model.h; g.p_draw = f.model.d; g.p_away = f.model.a; }
+  /* our pre-match chance before kick-off and, after the whistle, as the card's "pre-game" line. Football has no live
+     model: while a match is in play the card keeps the pre-match chance and says so (pre_only: "our pre-game chance"),
+     as the Home page and the ticker do. */
+  if (f.model && isNum(f.model.h)) { g.p_home = f.model.h; g.p_draw = f.model.d; g.p_away = f.model.a; if (st === 'live') g.pre_only = true; }
   if (extra && extra.home_form) g.home.form = extra.home_form;
   if (extra && extra.away_form) g.away.form = extra.away_form;
   if (extra && extra.home_record) g.home.record = extra.home_record;
@@ -885,12 +887,13 @@ function toGame(f, slug, extra) {
   if (f.xg && st !== 'pre') g.xg = f.xg;
   return g;
 }
-/* A v2 game card (kit QK.gameCard): our chance per side before kick-off (the favourite in the signal colour), the
-   home / draw / away bar, the score and xG after it. The market is never on a card: it is a quiet reference on the
-   match page only. extra: {league, href, home_form, away_form ('WDLWW', oldest first), home_record, away_record}. */
+/* A game card (kit v3 QK.gameCard): our chance per side before kick-off (the favourite in teal), the home / draw /
+   away bar, the score and xG after it, and with why the italic one-line reason (QK.whyLine). The market is never on
+   a card: it is a quiet reference on the match page only. extra: {league, href, home_form, away_form ('WDLWW', oldest
+   first), home_record, away_record, why: true}. */
 function matchCard(f, slug, extra) {
   var g = toGame(f, slug, extra);
-  var html = QK.gameCard(g, { sport: false, market: false });
+  var html = QK.gameCard(g, { sport: false, market: false, why: !!(extra && extra.why) });
   if (f.status === 'postponed' || f.status === 'cancelled') html = html.replace('class="qk-gc', 'class="qk-gc fb-void');
   return html;
 }
@@ -966,7 +969,18 @@ function kpis(list, cls) { return '<div class="qk-stats fb-kpis' + (cls ? ' ' + 
 function badge(text, kind, tip) { return '<span class="qk-badge' + (kind ? ' ' + kind : '') + '"' + (tip ? ' data-tip="' + esc(tip) + '"' : '') + '>' + esc(text) + '</span>'; }
 function muted(text) { return '<p class="fb-muted">' + text + '</p>'; }
 function empty(title, text) { return QK.empty(title, text); }
-function note(html) { return '<div class="qk-note fb-note"><div>' + html + '</div></div>'; }
+/* The kit's "i" explainer note (QK.note): one or two friendly sentences on what a number means. HTML in. */
+function note(html) { return QK.note(html, { cls: 'fb-note' }); }
+/* An italic aside (QK.aside): a one-line reason beside a number. Text in. */
+function aside(text) { return QK.aside(text); }
+/* The page crumb: [[href, label], ..., last label]. */
+function crumb(items) {
+  return '<nav class="fb-crumb" aria-label="Breadcrumb">' + items.map(function (x, i) {
+    var last = i === items.length - 1;
+    var t = Array.isArray(x) ? (x[0] ? '<a href="' + esc(x[0]) + '">' + esc(x[1]) + '</a>' : esc(x[1])) : esc(x);
+    return t + (last ? '' : '<span aria-hidden="true">›</span>');
+  }).join('') + '</nav>';
+}
 function loading(kind, n) { return QK.skeleton(kind || 'lines', n || 4); }
 /* Page head (Design System 2.0 large section head, the page's h1): kicker (HTML), title, sub line (HTML),
    right-hand actions (HTML). */
@@ -1148,7 +1162,7 @@ return {
   stageLabel: stageLabel, roundText: roundText, stageText: stageText, coverageChip: coverageChip, formChips: formChips,
   href: href, crest: crest, clubLink: clubLink, playerLink: playerLink, compLink: compLink,
   toGame: toGame, matchCard: matchCard, gameCard: matchCard, wpBar: wpBar, staleLive: staleLive, probBar3: probBar3, scoreText: scoreText, fixtureRow: fixtureRow,
-  card: card, grid: grid, chartBox: chartBox, kpi: kpi, kpis: kpis, badge: badge, muted: muted, empty: empty, note: note, loading: loading,
+  card: card, grid: grid, chartBox: chartBox, kpi: kpi, kpis: kpis, badge: badge, muted: muted, empty: empty, note: note, aside: aside, crumb: crumb, loading: loading,
   pageHead: pageHead, secHead: secHead, chances: chances, subnav: subnav, seg: seg, wireSeg: wireSeg, select: select, toolbar: toolbar, field: field, table: table, set: set,
   pctl: pctl, probBar: probBar, deltaHTML: deltaHTML, heatColour: heatColour, setCompPicker: setCompPicker, hubLive: hubLive
 };

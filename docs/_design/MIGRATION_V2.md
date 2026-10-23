@@ -1,5 +1,7 @@
 # Moving a site page to Design System 2.0
 
+> Superseded by `MIGRATION_V3.md` (kit v3 "Matchday", dark only, 23 Oct 2026). Kept for the v2 component history.
+
 For the phase-2 agents. Read `STYLE_GUIDE.md` first (identity, colour, type, copy rules), open
 `docs/_design/showcase.html` (serve `docs/`; `?theme=light` / `?theme=dark`) to see every component, and copy the
 pattern from the reference pages:

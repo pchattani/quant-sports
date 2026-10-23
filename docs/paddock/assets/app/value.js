@@ -17,8 +17,9 @@ function render(el, params) {
   var tab = ['drivers', 'swap', 'needs'].indexOf(q.tab) >= 0 ? q.tab : 'drivers';
   var cur = PD.currentSeason();
   var base = '#/value' + (y !== cur ? '/' + y : '');
-  el.innerHTML = PD.pageHead(tab === 'drivers' ? 'Season ' + y : 'Season ' + cur, 'Value & Moves', 'Who is fast, who has the car, and what moving drivers between seats would do.', tab === 'drivers' ? PD.yearPager('value', y) : '') +
-    PD.subnav([[base, 'Driver value', 'drivers'], ['#/value?tab=swap', 'Swap simulator', 'swap'], ['#/value?tab=needs', 'Team needs and moves', 'needs']], tab, 'Value views') + '<div id="vl-body">' + PD.empty('Loading', '') + '</div>';
+  el.innerHTML = PD.pageHead('Value & Moves · ' + (tab === 'drivers' ? y : cur), 'Who’s fast, and what a seat swap would do', 'Who is quick once the car is taken out, who has the car, and what moving drivers between seats would do to the championship.', tab === 'drivers' ? PD.yearPager('value', y) : '') +
+    PD.subnav([[base, 'Driver value', 'drivers'], ['#/value?tab=swap', 'Swap simulator', 'swap'], ['#/value?tab=needs', 'Team needs and moves', 'needs']], tab, 'Value views') +
+    '<div class="pd-mt">' + PD.note(tab === 'swap' ? 'The swap runs the rest of the season again with two drivers in each other’s seats, using the same random draws, so the difference is the swap and not luck.' : tab === 'needs' ? 'Each team is graded against the others in every area: <b>A</b> from the 80th percentile, then B, C and D every 20 points.' : '<b>Pace above the team-mate</b> is the driver alone, the car taken out; <b>pace above the field</b> is driver and car together. Both are shares of a lap: 0.5% is about 0.45 seconds.') + '</div>' + '<div id="vl-body">' + PD.empty('Loading', '') + '</div>';
   if (tab === 'swap') return swap(el, q);
   if (tab === 'needs') return needs(el);
   return value(el, y);
@@ -134,7 +135,7 @@ function swap(el, q) {
           '. Car pace, latest: ' + esc(PD.teamName(tx)) + ' ' + (vcar[tx] && isNum(vcar[tx].car) ? PD.signed(vcar[tx].car, 3) + '%' : '—') + ', ' + esc(PD.teamName(ty)) + ' ' + (vcar[ty] && isNum(vcar[ty].car) ? PD.signed(vcar[ty].car, 3) + '%' : '—') +
           ' (% of a lap, positive = faster). Each pair: ' + (SW.n || '') + ' championship simulations with the same random numbers as a baseline run; the change is added to the published championship. Points already scored stay with whoever scored them.');
       PD.ch.columns('sw-ch', { cats: rows.map(function (r) { return r.kind === 'd' ? PD.driverSurname(r.id) : PD.teamAbbr(r.id); }),
-        series: [{ name: 'Now', data: rows.map(function (r) { return r.now; }), colour: '#7d8590', fmt: function (z) { return PD.num(z, 1); } },
+        series: [{ name: 'Now', data: rows.map(function (r) { return r.now; }), colour: PD.col('grey'), fmt: function (z) { return PD.num(z, 1); } },
           { name: 'With the swap', data: rows.map(function (r) { return r.then; }), colours: rows.map(function (r) { return PD.teamColour(r.kind === 'd' ? r.team : r.id); }), fmt: function (z) { return PD.num(z, 1); } }],
         fmt: function (z) { return PD.num(z, 0); }, yName: 'Expected points', tipLabel: function (i) { return rows[i].label; }, label: 'Swap result' });
       PD.table('sw-t2', [

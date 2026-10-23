@@ -871,13 +871,13 @@ def find_targets(buyer_tid: int, unit: str, g: dict, buyer_strength: float | Non
             except ValueError:
                 pass
         if is_free:
-            hint.append("no club: Sofascore lists him without a team (as of " + free[sp] + ")")
+            hint.append("no club: Sofascore lists the player without a team (as of " + free[sp] + ")")
         elif hints_ctx and info["tid"] is not None:
             n_dep = (hints_ctx.get("depth") or {}).get((int(info["tid"]), unit), 0)
             if n_dep >= TYPICAL_SLOTS.get(unit, 2) + 2:
-                hint.append(f"his club has {n_dep} regulars in this unit (450+ minutes in 12 months)")
+                hint.append(f"the player's club has {n_dep} regulars in this unit (450+ minutes in 12 months)")
             if int(info["tid"]) in (hints_ctx.get("settled") or set()):
-                hint.append("his club has little left to play for this season (no title, band or relegation chance above 2%)")
+                hint.append("the player's club has little left to play for this season (no title, band or relegation chance above 2%)")
         per_match = gain * REGULAR_SHARE
         out.append({
             "id": sp, "name": info["name"], "age": int(info["age"]) if info["age"] is not None else None, "role": info["role"],

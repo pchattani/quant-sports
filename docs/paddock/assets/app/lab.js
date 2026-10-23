@@ -104,14 +104,14 @@ function draw() {
   var colourOf = function (r) {
     if (S.color === 'team') return PD.teamColour(r[I.team]);
     if (S.color === 'year') return PD.PALETTE[yrs.indexOf(r[I.year]) % PD.PALETTE.length];
-    if (S.color) { var v = val(r, S.color); if (v === null) return '#7d8590'; var t = chi > clo ? (v - clo) / (chi - clo) : 0.5; if (lower(S.color)) t = 1 - t; return window.QK.color.mix('#e05d5d', '#3987e5', t); }
-    return '#3987e5';
+    if (S.color) { var v = val(r, S.color); if (v === null) return PD.col('grey'); var t = chi > clo ? (v - clo) / (chi - clo) : 0.5; if (lower(S.color)) t = 1 - t; return window.QK.pctHex(100 * t); }
+    return PD.col('sky');
   };
   PD.ch.scatter('lab-chart', rows.map(function (r) {
     var vx = val(r, S.x), vy = val(r, S.y);
     return { x: vx, y: vy, name: nm(r) + (S.year === 'all' ? ' ' + r[I.year] : ''), short: String(nm(r)).split(' ').slice(-1)[0] + (S.year === 'all' ? ' ' + String(r[I.year]).slice(2) : ''), colour: colourOf(r), size: sizeOf(r),
       href: PD.driverHref(r[I.driver]), label: top10.indexOf(r) >= 0, hit: hit(r), sub: PD.teamName(r[I.team]) + ' · ' + r[I.year] + ' · ' + (r[I.races] || 0) + ' races',
-      extra: window.QKC.tipRow('#7d8590', 'Percentiles', Math.round(pOf(sortedX, vx, dx)) + ' / ' + Math.round(pOf(sortedY, vy, dy))) + (S.shrink ? window.QKC.tipRow('#7d8590', 'Unshrunk', fmt(S.x, raw(r, S.x)) + ' · ' + fmt(S.y, raw(r, S.y))) : '') };
+      extra: window.QKC.tipRow(PD.col('grey'), 'Percentiles', Math.round(pOf(sortedX, vx, dx)) + ' / ' + Math.round(pOf(sortedY, vy, dy))) + (S.shrink ? window.QKC.tipRow(PD.col('grey'), 'Unshrunk', fmt(S.x, raw(r, S.x)) + ' · ' + fmt(S.y, raw(r, S.y))) : '') };
   }), { xName: label(S.x), yName: label(S.y), invX: lower(S.x), invY: lower(S.y), refX: mx, refY: my, xFmt: function (v) { return fmt(S.x, v); }, yFmt: function (v) { return fmt(S.y, v); }, label: 'Driver lab scatter' });
   var mX = LAB.meta[S.x] || {}, mY = LAB.meta[S.y] || {};
   PD.set('lab-note', 'Dashed lines are the medians of this group. ' + (lower(S.x) || lower(S.y) ? 'Axes where less is better are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
@@ -130,7 +130,7 @@ function draw() {
 }
 
 function render(el, params, state) {
-  el.innerHTML = PD.pageHead('Build your own chart', 'Lab', '<span id="lab-sub">Loading…</span>') + labNav('lab') +
+  el.innerHTML = PD.pageHead('Lab', 'Build your own chart', '<span id="lab-sub">Loading…</span>') + labNav('lab') +
     PD.card('', '', '<div class="pd-toolbar pd-lab-ctl">' +
       '<label>Season<select class="qk-select" id="lab-year"></select></label>' +
       '<label class="pd-wide">Preset<select class="qk-select" id="lab-preset"></select></label>' +

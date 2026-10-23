@@ -917,10 +917,10 @@ def picks(rows: list[dict], K: dict, D: dict, w: int) -> dict:
                 rs_ = []
                 if pos in ("WR", "TE", "RB") and x.get("tgt_sh3") is not None and x.get("tgt_sh") is not None and x["tgt_sh3"] - x["tgt_sh"] >= 0.04:
                     trend += 1.5
-                    rs_.append(f"target share {_pct(x['tgt_sh3'])} over his last three games (season {_pct(x['tgt_sh'])})")
+                    rs_.append(f"target share {_pct(x['tgt_sh3'])} over the last three games (season {_pct(x['tgt_sh'])})")
                 if pos == "RB" and x.get("car_sh3") is not None and x.get("car_sh") is not None and x["car_sh3"] - x["car_sh"] >= 0.08:
                     trend += 1.5
-                    rs_.append(f"carry share {_pct(x['car_sh3'])} over his last three (season {_pct(x['car_sh'])})")
+                    rs_.append(f"carry share {_pct(x['car_sh3'])} over the last three (season {_pct(x['car_sh'])})")
                 if x.get("sos") and x["sos"] >= 1.05:
                     rs_.append("soft remaining schedule")
                 out["waiver"].append({"pid": x["pid"], "pos": pos, "score": ros_pg + trend,

@@ -19,7 +19,7 @@ function render(el, params, state) {
   el.innerHTML = '<div class="card"><div class="card-header">' + k.TN(T) + ' Elo <span class="card-sub" id="el-sub">Loading…</span>' +
     '<span class="pg-ctl">rank by ' + k.toggle('el-sort', [['all', 'Overall'], ['hard', 'Hard'], ['clay', 'Clay'], ['grass', 'Grass']], ES.sort) + '</span></div>' +
     '<div class="af-elo-top" id="el-top"></div><div id="el-table">' + k.muted('Loading…') + '</div>' +
-    '<div class="pg-note" id="el-note"></div></div>' +
+    '<div class="pg-note" id="el-note"></div>' + '<div style="padding:0 22px 18px">' + QK.note('<b>Reading Elo.</b> A 100-point gap means the higher-rated player wins about 64% of the time, 200 points about 76%. Surface ratings use matches on that surface only, so a clay specialist can sit far higher on clay than overall.') + '</div></div>' +
     '<div class="card"><div class="card-header">Elo over time <span class="card-sub">Pick up to eight players; the line follows every match they played.</span>' +
     k.toggle('el-line', [['all', 'Overall'], ['hard', 'Hard'], ['clay', 'Clay'], ['grass', 'Grass']], ES.line) + '</div>' +
     '<div class="lab-controls af-controls"><label>Add a player<span id="el-pick"></span></label><label>Window<select id="el-win"><option value="all">Everything on file</option><option value="5">Last 5 years</option><option value="2">Last 2 years</option><option value="1">Last year</option></select></label>' +

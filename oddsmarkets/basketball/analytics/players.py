@@ -137,10 +137,10 @@ METRICS: list[dict] = [
     _m("hpm_d", "Defensive HPM", "Defence", "2"),
     _m("rapm_d", "Defensive RAPM", "Defence", "2", scope="pbp"),
     _m("box_d", "Defensive box impact", "Defence", "2"),
-    _m("opp_rim_fg_on", "Opponent rim FG % with him on the floor", "Defence", "pct", True, "pbp"),
-    _m("opp_xpps_on", "Opponent xPTS per shot with him on the floor", "Defence", "3", True, "pbp"),
-    _m("opp_fg3_on", "Opponent 3-point % with him on the floor", "Defence", "pct", True, "pbp"),
-    _m("on_drtg", "Team defensive rating with him on", "Defence", "1", True, "pbp"),
+    _m("opp_rim_fg_on", "Opponent rim FG % with the player on the floor", "Defence", "pct", True, "pbp"),
+    _m("opp_xpps_on", "Opponent xPTS per shot with the player on the floor", "Defence", "3", True, "pbp"),
+    _m("opp_fg3_on", "Opponent 3-point % with the player on the floor", "Defence", "pct", True, "pbp"),
+    _m("on_drtg", "Team defensive rating with the player on", "Defence", "1", True, "pbp"),
     _m("dwpa", "Defensive WPA", "Defence", "3", scope="pbp"),
     # Impact
     _m("hpm", "Hardwood Plus-Minus (HPM)", "Impact", "2"),
@@ -151,8 +151,8 @@ METRICS: list[dict] = [
     _m("box_impact", "Box impact", "Impact", "2"),
     _m("box_o", "Offensive box impact", "Impact", "2"),
     _m("hpm_next", "Projected HPM next season (aging)", "Impact", "2"),
-    _m("on_net", "Team net rating with him on", "Impact", "1", scope="pbp"),
-    _m("off_net", "Team net rating with him off", "Impact", "1", True, "pbp"),
+    _m("on_net", "Team net rating with the player on", "Impact", "1", scope="pbp"),
+    _m("off_net", "Team net rating with the player off", "Impact", "1", True, "pbp"),
     _m("on_off", "On/off net difference", "Impact", "1", scope="pbp"),
     _m("wpa", "Win probability added", "Impact", "3", scope="pbp"),
     _m("li_wpa", "Leverage-weighted WPA", "Impact", "3", scope="pbp"),
@@ -184,7 +184,7 @@ METRICS: list[dict] = [
     _m("reb_share", "Share of team rebounds", "Team context", "pct"),
     _m("team_win_pct", "Team win %", "Team context", "pct"),
     _m("team_net", "Team net rating (model)", "Team context", "1"),
-    _m("lineup_net", "Best lineup net with him (25+ poss)", "Team context", "1", scope="pbp"),
+    _m("lineup_net", "Best lineup net with the player (25+ poss)", "Team context", "1", scope="pbp"),
     # Career
     _m("age", "Age (season end)", "Career", "1"),
     _m("seasons", "Seasons in the league", "Career", "int"),
@@ -686,6 +686,51 @@ def role_card(rows: dict[str, dict], pid: str, league: str, season: int, meta: d
     return {"season": int(season), "role": role, "group": f"{league}_{ROLE_GROUP.get(role, 'wings')}",
             "label": VAL.ROLE_LABELS.get(role, role), "qualified": bool(r.get("qualified")), "n": int(n),
             "min_floor": (meta or {}).get("min_floor"), "pct_role": r.get("pct_role") or {}}
+
+
+def prev_role_pct(cats: dict[int, dict], blocks: dict[str, dict | None], roles_now: dict[str, str],
+                  keys: list[str] = ROLE_PCT_KEYS, min_role: int = 3) -> int:
+    """Last season's role percentiles on each "current" block of players/<pid>.json (kit v3 rail rings, 23 Oct 2026):
+    "prev_pct_pos" {key: 0-100} and "prev_peer" {"season", "role", "label", "gp", "qualified"}, placed among last
+    season's qualified players of the role the player has now (the stored pct_role when the role is unchanged, the same
+    mid-rank rule against that role's pool when it changed). `cats` = {season: catalogue with role / pct_role on its
+    rows}, `roles_now` = {pid: role this season}. Returns the number of blocks that got one."""
+    lower = {m["key"]: bool(m["lower"]) for m in METRICS}
+    refs: dict[tuple[int, str], dict] = {}
+
+    def ref(season: int, role: str) -> dict:
+        if (season, role) not in refs:
+            P = (cats.get(season) or {}).get("players") or {}
+            mem = [r for r in P.values() if r.get("qualified") and (r.get("role") or "W") == role]
+            refs[(season, role)] = {k: sorted(v for v in (an.fnum((r.get("values") or {}).get(k)) for r in mem) if v is not None)
+                                    for k in keys if k in lower}
+        return refs[(season, role)]
+
+    n = 0
+    for pid, b in blocks.items():
+        if not b or not b.get("season"):
+            continue
+        ps = int(b["season"]) - 1
+        r = ((cats.get(ps) or {}).get("players") or {}).get(pid)
+        role = roles_now.get(pid)
+        if not r or not role:
+            continue
+        if (r.get("role") or "W") == role and r.get("pct_role"):
+            pc = dict(r["pct_role"])
+        else:
+            R, v = ref(ps, role), r.get("values") or {}
+            pc = {}
+            for k, rv in R.items():
+                x = an.fnum(v.get(k))
+                if x is not None and len(rv) >= min_role:
+                    pc[k] = an._place(rv, x, lower[k])
+        if not pc:
+            continue
+        b["prev_pct_pos"] = pc
+        b["prev_peer"] = {"season": ps, "role": role, "label": VAL.ROLE_LABELS.get(role, role), "gp": r.get("gp"),
+                          "qualified": bool(r.get("qualified"))}
+        n += 1
+    return n
 
 
 # ---------------------------------------------------------------------------------------------- the current-season block

@@ -823,7 +823,7 @@ def rate_deals(deals: list[dict], ix: NameIndex, asof, val_now: dict[str, dict],
                     if slot and slot[1]:
                         a["at"] = curve_value(curve, slot[1]) * DISCOUNT ** max(0, slot[0] - an.start_year(s0))
                         a["now"] = a["at"]
-                        a["note"] = f"prospect with no NHL games: valued at his draft slot (No. {slot[1]}, {slot[0]})"
+                        a["note"] = f"prospect with no NHL games: valued at the draft slot (No. {slot[1]}, {slot[0]})"
                     else:
                         a["note"] = "no NHL games: replacement level"
                     continue

@@ -275,7 +275,7 @@ def markets_payload(ctx: SeasonContext, sim: dict | None, awards: dict | None, c
               for k, v in mk["awards"].items() if isinstance(v, dict)}
     return {"ok": True, "season": ctx.season, "updated_at": an.now(), "futures": fut_rows, "points": _points(mk.get("points") or fut.get("points"), sim_t),
             "games": games, "awards": aw, "sources": ["Kalshi", "Polymarket"], "generated_at": fut.get("generated_at"),
-            "note": "Market probabilities are de-vigged mid prices of live two-sided quotes; edge = model minus market."}
+            "note": "Market probabilities (reference) are the midpoints of live two-sided quotes with the margin removed; the difference is model minus market."}
 
 
 def _points(pts: Any, sim_t: dict) -> list[dict] | None:

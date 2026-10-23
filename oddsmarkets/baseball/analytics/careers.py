@@ -384,6 +384,44 @@ def movement_rows(level: str = "mlb") -> dict[str, dict]:
     return {str(r[i]): {**ctx, "row": dict(zip(fields, r))} for r in rows if isinstance(r, list) and len(r) == len(fields)}
 
 
+def add_prev_pct(blocks: dict[str, dict], load) -> int:
+    """Last season's position / role percentiles on each current block (kit v3 rail rings, 23 Oct 2026), so the player
+    page need not load last season's catalogue: current.hitting / current.pitching get "prev_pct_pos" (the same shape
+    as their pct_role) and "prev_peer" {"level", "season", "group", "pa" | "bf", "qualified"}. Same level, and only when
+    last season's peer group is this season's (hitters: the position group, C ... LF/RF, DH; pitchers: SP / RP).
+    `load(level, season, "hitters" | "pitchers")` returns that season's catalogue. Returns the number of sub-blocks."""
+    from oddsmarkets.baseball.analytics.catalog import POS_GROUP
+    cache: dict = {}
+
+    def cat(level, season, kind):
+        if (level, season, kind) not in cache:
+            cache[(level, season, kind)] = ((load(level, season, kind) or {}).get("players") or {})
+        return cache[(level, season, kind)]
+
+    def grp(r: dict, kind: str):
+        return (r.get("role") or None) if kind == "pitchers" else POS_GROUP.get(r.get("pos") or "", "DH")
+
+    n = 0
+    for pid, b in blocks.items():
+        if not b or not b.get("season"):
+            continue
+        lvl, ps = b.get("level") or "mlb", int(b["season"]) - 1
+        for kind, key, den in (("hitters", "hitting", "pa"), ("pitchers", "pitching", "bf")):
+            sub = b.get(key)
+            if not sub:
+                continue
+            pr = cat(lvl, ps, kind).get(pid)
+            if not pr or not pr.get("pct_role"):
+                continue
+            g = grp(pr, kind)
+            if g is None or g != grp(sub, kind):
+                continue
+            sub["prev_pct_pos"] = pr["pct_role"]
+            sub["prev_peer"] = {"level": lvl, "season": ps, "group": g, den: pr.get(den), "qualified": bool(pr.get("qualified"))}
+            n += 1
+    return n
+
+
 def write_careers(write, cats: dict[tuple, dict], blocks: dict[str, dict], history_rows: dict[str, dict] | None,
                   history_extra: set[str] | None, old_reader) -> dict:
     """Write data/players/<pid>.json for every player in the catalogues (all levels and seasons on disk) and every

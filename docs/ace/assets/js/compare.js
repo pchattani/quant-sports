@@ -1,4 +1,5 @@
-/* The Quant Ace — compare (#/<T>/compare/<a>/<b>[/<c>]), Design System 2.0 (the Rink compare page is the reference).
+/* The Quant Ace — compare (#/<T>/compare/<a>/<b>[/<c>]), kit v3 "Matchday" (the Rink compare page is the reference):
+ * the question as the title ("Sinner or Alcaraz?"), the highlighter on the best value in each row, one-line verdicts.
  *
  * Two or three players side by side (QK.compareView) on the headline metric set of METRICS_SPEC.md (TA.v2), ranked
  * against the tour or, with a surface picked, the players with enough matches on it; where each one sits in the peer
@@ -58,7 +59,7 @@ function verdictAndTables(metrics, A, B, nameA, nameB, scopeNote) {
   return { verdict: verdict, byGroup: byGroup, byGap: byGap, n: comp.length };
 }
 
-const ECOL = ['var(--wp-a)', 'var(--wp-b)', 'var(--c-3)'];
+const ECOL = ['var(--wp-a)', 'var(--wp-b)', 'var(--plum)'];
 
 /* Players' own peer blocks (players/<pid>.json "peer", PAYLOADS.md) give the side-by-side card without the 1.5 MB season
    catalogue; the catalogue then loads only for the distribution and the classic every-metric table. Without the blocks
@@ -126,22 +127,25 @@ function build(T, ids, cat, careers, body, full) {
   const hA = (((careers[0] || {}).h2h) || []).find(r => r[0] === ids[1]), hB = (((careers[1] || {}).h2h) || []).find(r => r[0] === ids[0]);
   const tally = hA ? [hA[1], hA[2], hA[3]] : hB ? [hB[2], hB[1], hB[3]] : null;
 
-  let h = V.card('Side by side', '<span id="cmp-sub"></span>', V.seg('cmp-pool', [['', 'Tour']].concat(surfOpts.map(s => [s, k.SURF_LABEL[s]])), '', 'Peer group') + '<div id="cmp-view" style="margin-top:12px"></div><p class="ta-cap" id="cmp-cap"></p>',
+  const q = short.length > 2 ? short.slice(0, -1).join(', ') + ' or ' + short[short.length - 1] + '?' : short[0] + ' or ' + short[1] + '?';
+  let h = QK.sectionHead({ kicker: 'Compare · ' + k.TN(T), title: k.esc(q), html: true, sub: 'Side by side on the numbers that best describe and predict a player’s tennis, each ranked against the tour. The best value in each row is highlighted.' }) +
+    V.card('Side by side', '<span id="cmp-sub"></span>', V.seg('cmp-pool', [['', 'Tour']].concat(surfOpts.map(s => [s, k.SURF_LABEL[s]])), '', 'Peer group') + '<div id="cmp-view" style="margin-top:12px"></div><div id="cmp-verd"></div><p class="ta-cap" id="cmp-cap"></p>',
     { foot: '<span>' + (tally ? 'Head to head: <b>' + k.esc(short[0]) + ' ' + tally[0] + '–' + tally[1] + ' ' + k.esc(short[1]) + '</b>' + (tally[2] ? ', last met ' + k.esc(k.fmtDate(tally[2], { weekday: false })) : '') : 'No tour-level meeting on file') + '</span><a href="' + k.h2hHref(T, ids[0], ids[1]) + '">Head to head, our chance on every surface →</a>' });
   h += '<section class="qk-section">' + V.card('Where they sit', 'Every qualified player in the peer group, with each one marked', '<div class="qk-seg" id="cmp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px;flex-wrap:wrap"></div>' + V.chart('cmp-dist', 260, 'Peer distribution with the players marked')) + '</section>';
-  h += '<div class="card"><div class="card-header">Elo <span class="card-sub">After every match, career files.</span>' + k.toggle('cmp-elo-s', [['1', 'Overall'], ['2', 'Hard'], ['3', 'Clay'], ['4', 'Grass']], '1') + '</div><div id="cmp-elo" style="height:380px"></div></div>';
-  h += '<div class="card"><div class="card-header">Serve and return paths <span class="card-sub">The score-based serve (solid, ±1 standard error shaded) and return (dashed) ratings over time.</span>' +
-    k.toggle('cmp-sr-s', [['all', 'All']].concat(k.SURFACES.map(s => [s, k.SURF_LABEL[s]])), 'all') + '</div><div id="cmp-sr" style="height:380px"></div></div>';
-  h += '<div class="card"><div class="card-header">Every metric (classic) <span class="card-sub">' + k.esc(short[0]) + ' and ' + k.esc(short[1]) + ' on the whole catalogue: who leads each metric on percentile, then value, percentile and the gap. Tiebreak, deciding-set and over-expected rows are mostly luck.</span>' +
-    '<label class="pg-ctl">order <select id="cmp-metric-mode"><option value="group">by group</option><option value="gap">by size of gap</option></select></label></div><div id="cmp-verdict"></div><div id="cmp-metrics"></div></div>';
-  h += '<div class="card"><div class="card-header">Style <span class="card-sub">Match Charting Project profiles side by side.</span></div><div class="grid-2 af-style-pair"><div><div class="cmp-group-head">' + k.esc(names[0]) + '</div><div id="cmp-st-a"></div></div>' +
-    '<div><div class="cmp-group-head">' + k.esc(names[1]) + '</div><div id="cmp-st-b"></div></div></div></div>';
+  const ctl = x => '<div class="ta-cardctl">' + x + '</div>';
+  h += '<section class="qk-section ta-stack">' +
+    V.card('Elo over time', 'After every match, from the career files', ctl(k.toggle('cmp-elo-s', [['1', 'Overall'], ['2', 'Hard'], ['3', 'Clay'], ['4', 'Grass']], '1')) + '<div id="cmp-elo" style="height:380px"></div>') +
+    V.card('Serve and return paths', 'The score-based serve (solid, ±1 standard error shaded) and return (dashed) ratings over time', ctl(k.toggle('cmp-sr-s', [['all', 'All']].concat(k.SURFACES.map(s => [s, k.SURF_LABEL[s]])), 'all')) + '<div id="cmp-sr" style="height:380px"></div>') +
+    V.card('Every metric', k.esc(short[0]) + ' and ' + k.esc(short[1]) + ' on the whole catalogue: who leads each metric on percentile, then value, percentile and the gap. Tiebreak, deciding-set and over-expected rows are mostly luck.',
+      ctl('<label class="pg-ctl">Order <select id="cmp-metric-mode"><option value="group">By group</option><option value="gap">By size of gap</option></select></label>') + '<div id="cmp-verdict"></div><div id="cmp-metrics"></div>') +
+    V.card('Style: the charted matches', 'Match Charting Project profiles side by side', '<div class="grid-2 af-style-pair"><div><div class="cmp-group-head">' + k.esc(names[0]) + '</div><div id="cmp-st-a"></div></div>' +
+      '<div><div class="cmp-group-head">' + k.esc(names[1]) + '</div><div id="cmp-st-b"></div></div></div>') + '</section>';
   body.innerHTML = h;
 
   let distKey = null;
   const drawView = sf => {
     const set = V.set(T, sf).concat(['hold_plus_break']);
-    const groups = CMP_GROUPS.map(g => ({ label: g[0], rows: set.filter(x => g[1].indexOf(x) >= 0).map(x => ({ label: V.label(x, sf), tip: (V.META[x] || [])[1], better: 'high',
+    const groups = CMP_GROUPS.map(g => ({ label: g[0], rows: set.filter(x => g[1].indexOf(x) >= 0).map(x => ({ key: x, label: V.label(x, sf), tip: (V.META[x] || [])[1], better: 'high',
       values: ps.map(p => V.value(p, x, sf)), pctls: ps.map(p => (V.inPool(p, sf, cat) ? V.pctl(p, x, sf, cat) : null)), fmt: v => V.fmt(x, v),
       dfmt: (V.META[x] || [])[2] === 'pct' ? (d => (d > 0 ? '+' : d < 0 ? '−' : '±') + Math.abs(d * 100).toFixed(1) + ' pts') : null })) }));
     const ents = ids.map((id, i) => {
@@ -149,7 +153,16 @@ function build(T, ids, cat, careers, body, full) {
       return { name: names[i], href: k.playerHref(T, id), abbr: short[i], sub: [ps[i] && ps[i].country, ps[i] && isNum(ps[i].rank) ? 'No. ' + ps[i].rank : '', isNum(n) ? n + (sf ? ' ' + sf : '') + ' matches' : ''].filter(Boolean).join(' · ') };
     });
     document.getElementById('cmp-view').innerHTML = QK.compareView({ entities: ents, groups: groups });
-    document.getElementById('cmp-sub').textContent = 'Value · percentile against ' + V.peer(T, sf, cat) + ' (100 = best)' + (ids.length === 2 ? ' · difference, green when ' + short[0] + ' is better' : ' · the best of three in bold');
+    // verdicts: the metric where each player leads the others by the most (percentile points), named by its type
+    const best = {};
+    groups.forEach(g => g.rows.forEach((r, ri) => r.pctls.forEach((v, i) => {
+      if (!isNum(v)) return;
+      const d = v - Math.max.apply(null, r.pctls.filter((_, j) => j !== i).map(z => (isNum(z) ? z : 0)));
+      if (!best[i] || d > best[i].d) best[i] = { k: r.key, d: d, label: r.label, v: r.values[i], fmt: r.fmt };
+    })));
+    document.getElementById('cmp-verd').innerHTML = QK.verdicts(ids.map((_, i) => (best[i] && best[i].d > 0 ? { title: V.ARCHETYPE[best[i].k] || 'The standout', who: short[i],
+      text: 'best of the ' + ids.length + ' on ' + String(best[i].label).replace(/ \(inferred\)/, '').toLowerCase().replace(/^elo/, 'Elo').replace(/ elo/, ' Elo') + ' (' + best[i].fmt(best[i].v) + ').' } : null)));
+    document.getElementById('cmp-sub').textContent = 'Value · percentile against ' + V.peer(T, sf, cat) + ' (100 = best)' + (ids.length === 2 ? ' · the difference, green when ' + short[0] + ' is better' : '');
     const outs = ps.map((p, i) => (V.inPool(p, sf, cat) ? '' : names[i])).filter(Boolean);
     document.getElementById('cmp-cap').textContent = (outs.length ? outs.join(', ') + (outs.length > 1 ? ' are' : ' is') + ' short of the floor, so ' + (outs.length > 1 ? 'they have' : 'there is') + ' no percentile. ' : '') + 'Hold and break are inferred from set scores, not measured point by point.';
     const segEl = document.getElementById('cmp-dist-m');
@@ -184,7 +197,7 @@ function build(T, ids, cat, careers, body, full) {
     drawMetrics();
   });
 
-  const hexes = [V.wpA(), V.wpB(), QK.cssVar('--c-3') || '#3fb9a8'];
+  const hexes = [V.wpA(), V.wpB(), QK.cssVar('--plum') || '#c58fe0'];
   const drawElo = col => {
     const c = Number(col);
     V.lines('cmp-elo', { series: careers.map((cr, i) => ({ name: short[i], rows: (((cr || {}).elo) || []).filter(r => Array.isArray(r) && k.isNum(r[c])).map(r => [r[0], r[c]]), color: hexes[i], width: 2.2 })),

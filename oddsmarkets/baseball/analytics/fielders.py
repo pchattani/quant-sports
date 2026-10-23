@@ -17,7 +17,7 @@ OAA_K = an.OAA_K
 FLOORS = {"chances": 20, "called": 500}
 
 METRICS = [
-    M("chances", "Chances", "Fielding", "1", desc="Balls credited to him: outs made plus shares of balls not turned into outs."),
+    M("chances", "Chances", "Fielding", "1", desc="Balls credited to the fielder: outs made plus shares of balls not turned into outs."),
     M("oaa", "OAA", "Fielding", "1", den="chances", k=OAA_K, scope="model", desc="Outs above average (our catch-probability model)."),
     M("fielding_runs", "Fielding runs", "Fielding", "1", den="chances", k=OAA_K, scope="model", desc="OAA in runs."),
     M("sra", "Success rate added", "Fielding", "pct", den="chances", k=OAA_K, scope="model", desc="OAA per chance."),

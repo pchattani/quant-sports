@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="dark light">
+<meta name="color-scheme" content="dark">
 <meta name="robots" content="noindex">
 <link rel="icon" href="data:,">
-<title>The Quant · Kit v2 showcase</title>
-<!-- Design System 2.0 showcase: every v2 component on sample data. Lives in docs/_design only; design_kit.py never
+<title>The Quant · Kit v3 showcase</title>
+<!-- Kit v3 "Matchday" showcase (dark only): every component on sample data. Lives in docs/_design only; design_kit.py never
      copies it into a site. Serve docs/ and open /_design/showcase.html (add ?theme=light or ?theme=dark). -->
 <script>try{var t=/[?&]theme=(light|dark)/.exec(location.search);t=t?t[1]:localStorage.getItem('qk-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,400..800,0..100,0..1;1,9..144,400..700,0..100,0..1&display=swap">
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="quant.css">
 <style>
@@ -36,6 +36,16 @@
 <div class="qk-ticker" id="sc-ticker" aria-label="Scores"></div>
 <main id="main" class="qk-page">
   <div id="sc-hero"></div>
+
+  <section class="qk-section sc" id="matchday">
+    <div id="h-matchday"></div>
+    <div id="sc-md-watch"></div>
+    <div class="qk-section" style="margin-top:var(--sp-10)"><div id="sc-md-hot"></div></div>
+    <div class="qk-section qk-gside" style="margin-top:var(--sp-10)"><div id="sc-md-sotd"></div><div id="sc-md-new"></div></div>
+    <div class="qk-section" style="margin-top:var(--sp-10)" id="sc-md-sure"></div>
+    <div class="qk-section qk-gside" style="margin-top:var(--sp-10)"><div id="sc-md-rail"></div><div class="qk-stack"><div id="sc-md-short"></div><div id="sc-md-preview"></div></div></div>
+    <div class="qk-section" style="margin-top:var(--sp-10)"><div class="qk-card"><div class="qk-card-body" id="sc-md-misc"></div></div></div>
+  </section>
 
   <section class="qk-section sc" id="identity">
     <div id="h-identity"></div>

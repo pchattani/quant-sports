@@ -37,7 +37,7 @@ MODEL = [
      "raked so each class's league share is exact, weighted with the season's wOBA values. The ball's direction is not a "
      "feature. Shown next to xwOBA (Savant); the predictive test is on the Calibration page."),
     ("catchprob", "Catch probability and OAA", "Defence", "P(out) for every batted ball from landing spot, hang time and the "
-     "fielder's distance and speed required from his alignment-inferred start; OAA = outs minus the summed probabilities, "
+     "fielder's distance and speed required from their alignment-inferred start; OAA = outs minus the summed probabilities, "
      "credited to the responsible fielder; fielding runs with the season's linear weights."),
     ("framing", "Framing and umpires", "Defence", "A penalised logistic called-strike surface (location by batter hand, count, "
      "pitch family, hands) with catcher, umpire, pitcher and batter random effects; framing = strikes added by the catcher's "
@@ -60,8 +60,8 @@ MODEL = [
     ("live", "Live win probability", "Prediction", "An exact Markov chain over half-inning run distributions from the pre-game "
      "spec's lineups and pitchers, evaluated at every plate appearance's state (inning, outs, bases, score)."),
     ("season_sim", "Season and postseason simulation", "Prediction", "Unplayed games and the 12-team bracket simulated with "
-     "game-model or rating probabilities and a team-strength error held for the season; series odds in closed form; magic numbers "
-     "deterministic; next-game odds interventional."),
+     "game-model or rating probabilities and a team-strength error held for the season; series chances in closed form; magic numbers "
+     "deterministic; next-game chances interventional."),
     ("awards", "Award races", "Prediction", "A conditional logit over each league's candidates on Bullpen WAR, traditional voting "
      "features and team success, fitted on verified past winners."),
     ("percentile", "Percentiles", "Catalogue", "100 = best, reversed where lower is better; placed against the reference pool "

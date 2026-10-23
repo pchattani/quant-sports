@@ -337,13 +337,13 @@ def panel(W: World, week: int, seasons: list[int] | None = None) -> pd.DataFrame
 
 # ---------------------------------------------------------------------------------------------- configuration and build
 
-WHY = {"fa_elig": ("veteran contract years", "still on a first contract"), "rookie_deal": ("on his rookie deal", None),
+WHY = {"fa_elig": ("veteran contract years", "still on a first contract"), "rookie_deal": ("on a rookie deal", None),
        "walk": ("final rookie-deal season", None), "undrafted": ("undrafted", "drafted"), "first_round": ("a first-round pick", None),
        "tenure": ("long tenure here", "new here"), "joined": ("joined this year", None), "clubs2": ("several teams lately", None),
        "status_res": ("on injured reserve", None), "status_ina": ("inactive on game days", None),
        "played": ("playing every week", "rarely playing"), "touch_share": ("a big offensive role", "a small offensive role"),
        "v_prev": ("strong last season", "low value last season"), "v_prev2": ("strong two seasons ago", None),
-       "v_trend": ("improving", "declining"), "rank_pos": ("behind others at his position", "first choice at his position"),
+       "v_trend": ("improving", "declining"), "rank_pos": ("behind others at the position", "first choice at the position"),
        "depth": ("a crowded position", "a thin position"), "is_ol": ("offensive line", None), "is_st": ("a specialist", None),
        "team_wp": ("a winning team", "a losing team"), "team_traj": ("team trending up", "team trending down"),
        "team_age": ("an older roster", "a younger roster"), "team_turn": ("a high-turnover team", "a stable team"),
@@ -363,7 +363,7 @@ NOTES = [
     "by next season's week 1 (a Poisson model of past arrivals: need there, team strength and trajectory, turnover, expected "
     "departures).",
     "Targets: players on other rosters who would upgrade the team's weakest starting slot at their position, ranked by "
-    "their chance of joining it: the chance he moves x the chance this team is where he goes (a conditional logit on past "
+    "their chance of joining it: the chance the player moves x the chance this team is where they go (a conditional logit on past "
     "moves). An estimate from on-field value and history, not news.",
 ]
 

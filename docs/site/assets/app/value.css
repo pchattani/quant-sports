@@ -7,10 +7,10 @@
 .fb-va-drv.up { color: var(--up); background: color-mix(in srgb, var(--up) 12%, transparent); }
 .fb-va-drv.down { color: var(--down); background: color-mix(in srgb, var(--down) 12%, transparent); }
 .fb-va-sim { font-size: var(--fs-xs); white-space: nowrap; }
-.fb-va-grade { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; font: 800 11px var(--font-num); color: #0b0d10; background: var(--ink-4); }
-.fb-va-grade.g-A { background: var(--st-good); color: #fff; } .fb-va-grade.g-B { background: color-mix(in srgb, var(--st-good) 55%, var(--st-warn)); }
-.fb-va-grade.g-C { background: var(--st-warn); } .fb-va-grade.g-D { background: var(--st-serious); } .fb-va-grade.g-E { background: var(--st-crit); color: #fff; }
-.fb-va-kind { display: inline-block; font: 700 9.5px/1 var(--font-ui); letter-spacing: 0.05em; text-transform: uppercase; padding: 4px 6px; border-radius: 4px; background: var(--s-3); color: var(--ink-2); white-space: nowrap; }
+.fb-va-grade { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; font: 800 11px var(--font-num); color: var(--bg); background: var(--ink-3); }
+.fb-va-grade.g-A { background: var(--st-good); } .fb-va-grade.g-B { background: color-mix(in srgb, var(--st-good) 55%, var(--st-warn)); }
+.fb-va-grade.g-C { background: var(--st-warn); } .fb-va-grade.g-D { background: var(--st-serious); } .fb-va-grade.g-E { background: var(--st-crit); }
+.fb-va-kind { display: inline-block; font: 600 11px/1 var(--font-ui); padding: 4px 8px; border-radius: var(--r-pill); background: var(--s-3); color: var(--ink-2); white-space: nowrap; }
 .fb-va-kind.k-fee { background: color-mix(in srgb, var(--c-2) 22%, transparent); color: var(--ink-1); }
 .fb-va-kind.k-loan, .fb-va-kind.k-loan_end { background: color-mix(in srgb, var(--c-7) 20%, transparent); }
 .fb-va-kind.k-free { background: color-mix(in srgb, var(--c-3) 20%, transparent); }
@@ -36,18 +36,18 @@
 .fb-va-res button:hover, .fb-va-res button:focus-visible { background: var(--s-3); }
 .fb-va-res-n { font-weight: 600; }
 .fb-va-res-empty { padding: 8px; color: var(--ink-3); font-size: var(--fs-sm); }
-.fb-va-hero h2.fb-va-hero-n { font-size: clamp(1.4rem, 3.5vw, 2rem); font-weight: 800; letter-spacing: -0.03em; margin: 4px 0 0; }
+.fb-va-hero h2.fb-va-hero-n { font-size: clamp(1.4rem, 3.5vw, 2rem); font-weight: 650; font-family: var(--font-display); font-variation-settings: var(--fvs-display); margin: 4px 0 0; }
 .fb-va-hero-n a { color: inherit; }
 .fb-va-hero-why { position: relative; margin-top: var(--sp-3); }
-.fb-va-unit { font: 700 var(--fs-2xs) var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-3); margin: var(--sp-4) 0 6px; }
+.fb-va-unit { font: 700 var(--fs-xs) var(--font-ui); color: var(--coral); margin: var(--sp-4) 0 6px; }
 tr.fb-va-new td { background: color-mix(in srgb, var(--up) 8%, transparent); }
 tr.fb-va-gone td { opacity: 0.55; }
 .fb-va-outs { display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .fb-va-out { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--ink-2); }
-.fb-va-sw { font: 700 var(--fs-xs) var(--font-ui); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-2); }
+.fb-va-sw { font: 700 var(--fs-xs) var(--font-ui); color: var(--ink-2); }
 .fb-va-sw.up { color: var(--up); } .fb-va-sw.down { color: var(--down); }
 .fb-va-ol { margin: 6px 0 0; padding-left: 18px; font-size: var(--fs-sm); color: var(--ink-2); display: grid; gap: 4px; }
-.fb-va-aff { font: 700 9.5px/1 var(--font-ui); text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 6px; border-radius: 4px; }
+.fb-va-aff { font: 600 11px/1 var(--font-ui); padding: 4px 8px; border-radius: var(--r-pill); }
 .fb-va-aff.a-yes { color: var(--up); background: color-mix(in srgb, var(--up) 14%, transparent); }
 .fb-va-aff.a-stretch { color: var(--st-warn); background: color-mix(in srgb, var(--st-warn) 14%, transparent); }
 .fb-va-aff.a-no { color: var(--down); background: color-mix(in srgb, var(--down) 14%, transparent); }

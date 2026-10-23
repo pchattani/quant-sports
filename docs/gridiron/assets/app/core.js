@@ -71,21 +71,21 @@ const CONFERENCES = ['AFC', 'NFC'];
 const GTYPE_LONG = { REG: 'Regular season', WC: 'Wild Card', DIV: 'Divisional round', CON: 'Conference championship', SB: 'Super Bowl', PRE: 'Preseason' };
 const GTYPE_SHORT = { REG: 'Reg', WC: 'WC', DIV: 'DIV', CON: 'CONF', SB: 'SB', PRE: 'Pre' };
 const POST_KEYS = ['WC', 'DIV', 'CON', 'SB'];
-/* Drive results -> [label, colour] (kit status colours: up green, brand amber, down red, market orange). */
+/* Drive results -> [label, colour] (kit v3 status colours: up green, sun, down coral-red, warm grey). */
 const DRIVE_RESULTS = {
-  touchdown: ['Touchdown', '#2fb37b'], td: ['Touchdown', '#2fb37b'],
-  field_goal: ['Field goal', '#e3b341'], fg: ['Field goal', '#e3b341'],
-  missed_field_goal: ['Missed FG', '#a0703c'], missed_fg: ['Missed FG', '#a0703c'], blocked_fg: ['Blocked FG', '#a0703c'],
-  punt: ['Punt', '#7d8590'], blocked_punt: ['Blocked punt', '#e05d5d'],
-  turnover: ['Turnover', '#e05d5d'], interception: ['Interception', '#e05d5d'], int: ['Interception', '#e05d5d'], fumble: ['Fumble', '#e05d5d'],
-  fumble_lost: ['Fumble', '#e05d5d'], fumble_return_td: ['Fumble (TD)', '#e05d5d'], int_td: ['Pick-six', '#e05d5d'],
-  turnover_on_downs: ['Downs', '#e8833a'], downs: ['Downs', '#e8833a'],
-  safety: ['Safety', '#c95ac9'],
-  end_of_half: ['End of half', '#5a6270'], end_of_game: ['End of game', '#5a6270'], end_of_period: ['End of half', '#5a6270'],
-  opp_touchdown: ['Opp. touchdown', '#e05d5d'], kneel: ['Kneel', '#5a6270']
+  touchdown: ['Touchdown', '#5fd38a'], td: ['Touchdown', '#5fd38a'],
+  field_goal: ['Field goal', '#ffc94d'], fg: ['Field goal', '#ffc94d'],
+  missed_field_goal: ['Missed FG', '#d9b38c'], missed_fg: ['Missed FG', '#d9b38c'], blocked_fg: ['Blocked FG', '#d9b38c'],
+  punt: ['Punt', '#9a9082'], blocked_punt: ['Blocked punt', '#ff7a6b'],
+  turnover: ['Turnover', '#ff7a6b'], interception: ['Interception', '#ff7a6b'], int: ['Interception', '#ff7a6b'], fumble: ['Fumble', '#ff7a6b'],
+  fumble_lost: ['Fumble', '#ff7a6b'], fumble_return_td: ['Fumble (TD)', '#ff7a6b'], int_td: ['Pick-six', '#ff7a6b'],
+  turnover_on_downs: ['Downs', '#ff9a6b'], downs: ['Downs', '#ff9a6b'],
+  safety: ['Safety', '#c39be8'],
+  end_of_half: ['End of half', '#7d7468'], end_of_game: ['End of game', '#7d7468'], end_of_period: ['End of half', '#7d7468'],
+  opp_touchdown: ['Opp. touchdown', '#ff7a6b'], kneel: ['Kneel', '#7d7468']
 };
-const GOOD = '#2fb37b', CLOSE = '#e3b341', BAD = '#e05d5d';
-const PALETTE = ['#3987e5', '#e8833a', '#2fb37b', '#c95ac9', '#e3b341', '#46b9c9', '#e05d5d', '#8e8cf0', '#7ee787', '#ff9bce'];
+const GOOD = '#5fd38a', CLOSE = '#ffc94d', BAD = '#ff7a6b';
+const PALETTE = ['#3987e5', '#ff9a6b', '#5fd38a', '#c39be8', '#ffc94d', '#46b9c9', '#ff7a6b', '#8e8cf0', '#7ee787', '#ff9bce'];
 
 // ── state and registries ──────────────────────────────────────────────────
 
@@ -725,7 +725,7 @@ function teamChip(t, S) {
   if (!t) return '<span class="qk-muted">—</span>';
   return '<a class="gi-tchip" href="' + teamHref(t, S) + '" style="--tc:' + esc(tc(t)) + '" title="' + esc(teamName(t)) + '">' + esc(teamAbbr(t)) + '</a>';
 }
-function playerColour(pid) { return pid ? PALETTE[hashIndex(pid, PALETTE.length)] : '#7d8590'; }
+function playerColour(pid) { return pid ? PALETTE[hashIndex(pid, PALETTE.length)] : '#9a9082'; }
 function gameHref(id) { return '#/game/' + encodeURIComponent(id); }
 function matchupLink(id, away, home) {
   const g = parseGameId(id) || {};
@@ -843,7 +843,9 @@ const PREFS = {
 };
 PREFS.TE = PREFS.WR;
 function shortLabel(s) { return String(s || '').replace(/percentage/i, '%').replace(/ over expected/i, ' OE').replace(/ per play/i, '/play').replace(/^Expected /, 'x').slice(0, 24); }
-function cleanDesc(t) { return String(t || '').replace(/\(?builder [A-Z]'s ([a-z_ ]+?) model; /gi, '(').replace(/builder [A-Z]'s /gi, 'our ').replace(/\s+\(\)/g, '').replace(/player_value/g, 'player-value model').replace(/team_strength/g, 'team-strength model'); }
+/* Model ids in payload prose read as words (glossary.json, players.json and lab.json still carry player_value and
+ * team_strength, 23 Oct 2026). The "builder X's" rewrite went with the builder copy pass (b463b937..a7f39783). */
+function cleanDesc(t) { return String(t || '').replace(/player_value/g, 'player-value model').replace(/team_strength/g, 'team-strength model'); }
 function cleanMetrics(list) { (Array.isArray(list) ? list : []).forEach(m => { if (m && m.desc && !m._c) { m.desc = cleanDesc(m.desc); m._c = 1; } }); return list; }
 function catOf(d) {
   if (!d || d.ok === false) return null;
@@ -984,11 +986,13 @@ const POS_SHOW = { EDGE: 'ED' };
 const POS_LONG = { QB: 'Quarterback', RB: 'Running back', WR: 'Wide receiver', TE: 'Tight end', EDGE: 'Edge rusher', ED: 'Edge rusher', DL: 'Interior lineman', IDL: 'Interior lineman', LB: 'Linebacker', CB: 'Cornerback', S: 'Safety', DB: 'Defensive back', K: 'Kicker', P: 'Punter', OL: 'Offensive lineman', FB: 'Fullback' };
 function posLabel(p) { const k = String(p || '').toUpperCase(); return POS_SHOW[k] || String(p || ''); }
 function posLong(p) { const k = String(p || '').toUpperCase(); return POS_LONG[k] || String(p || ''); }
-/* Payload prose (glossary, method notes) in the site's v2 copy: the edge-rusher code as ED, betting words as forecast words. */
+/* Payload prose (glossary, value, trade and movement notes): the edge-rusher code as ED and "edge rushers" as outside
+ * rushers. Still needed: value.json, trade.json, movement.json and transactions.json carry the EDGE code, and value.json
+ * and trade.json the word (local payloads, 23 Oct 2026). The betting-word rewrite went with the builder copy pass
+ * (b463b937..a7f39783): no payload carries those words any more. */
 function copyText(t) {
   return String(t === null || t === undefined ? '' : t).replace(/\bEDGE\b/g, 'ED')
-    .replace(/\b([Ee])dge(s?)\b(?=[ -](rush|and interior|or interior|role|defender|player))/g, (m, e, pl) => (e === 'E' ? 'Outside' : 'outside') + (pl ? 's' : ''))
-    .replace(/\bpriced\b/gi, 'forecast').replace(/\bpricing\b/gi, 'forecast').replace(/\bprices\b/gi, 'numbers').replace(/\bprice\b/gi, 'number');
+    .replace(/\b([Ee])dge(s?)\b(?=[ -](rush|and interior|or interior|role|defender|player))/g, (m, e, pl) => (e === 'E' ? 'Outside' : 'outside') + (pl ? 's' : ''));
 }
 function deltaHTML(v, d) { return !isNum(v) ? '<span class="qk-muted">—</span>' : '<span class="' + (v > 0 ? 'gi-up' : v < 0 ? 'gi-down' : '') + '">' + signed(v, d === undefined ? 1 : d) + '</span>'; }
 /* Percentile bars (kit): items [{label, p, value, href, tip}]; grouped when items carry .group. */
@@ -1035,10 +1039,12 @@ function heatTable(spec) {
   return h + '</tbody></table></div>';
 }
 
-/* A game card (Design System 2.0: QK.gameCard): our chance per team (the favourite in the signal colour), the
- * win-probability bar in team colours, records when the page has the standings, the market a quiet ring. Below it the
- * NFL facts: before kickoff the starting QBs and our projected score; live the clock and the down and distance.
- * opts: {date: true (date in the top line), week: true (week label in the top line), rows: {team: standings row}, compact} */
+/* A game card (kit v3: QK.gameCard): our chance per team (the favourite in teal), the win-probability bar in team
+ * colours with a key, records and form when the page has the standings, the score bug when live. No market on cards
+ * (the kit's default). Below it the NFL facts: before kickoff the starting QBs and our projected score; live the clock
+ * and the down and distance.
+ * opts: {date: true (date in the top line), week: true (week label in the top line), rows: {team: standings row}, compact,
+ *        why: true (the italic one-line reason, QK.whyLine)} */
 function gameCard(g, opts) {
   const o = opts || {};
   if (!g) return '';
@@ -1056,8 +1062,13 @@ function gameCard(g, opts) {
   } else if (live) {
     extra.push('<span><i>' + esc(st === 'half' ? 'Halftime' : (clockText(g.qtr, g.clock) || 'Live')) + '</i>' + (g.down && g.possession ? ' ' + esc(teamAbbr(g.possession)) + ' ' + esc(downDist(g.down, g.dist, g.yl100)) + (isNum(g.yl100) ? ' at ' + esc(fieldPos(g.yl100, g.possession, otherTeam(g, g.possession))) : '') : '') + '</span>');
   }
-  let h = QK.gameCard(x, { sport: false, marketLabel: 'Market', marketTip: 'The prediction-market probability for the home side (Kalshi / Polymarket), shown as a reference next to ours' });
-  if (extra.length && !o.compact) h = h.replace(/<\/(a|div)>$/, '<div class="gi-gc-x">' + extra.join('') + '</div></$1>');
+  /* a winner we had between 40% and 50% was neither an upset nor expected: say so (the kit's line calls it expected) */
+  if (o.why && fin && isNum(x.p_home) && isNum(x.hs) && isNum(x.as) && x.hs !== x.as) {
+    const hw = x.hs > x.as, wp = hw ? x.p_home : 1 - x.p_home;
+    if (wp >= 0.4 && wp < 0.5) x.why = 'A near coin flip: we had the ' + (hw ? x.home : x.away).name + ' at ' + pct(wp, 0) + ' before the start.';
+  }
+  let h = QK.gameCard(x, { sport: false, why: !!o.why });
+  if (extra.length && !o.compact) h = h.indexOf('<div class="qk-aside">') > 0 ? h.replace('<div class="qk-aside">', '<div class="gi-gc-x">' + extra.join('') + '</div><div class="qk-aside">') : h.replace(/<\/(a|div)>$/, '<div class="gi-gc-x">' + extra.join('') + '</div></$1>');
   return h;
 }
 /* The same game in the kit's shared shape (QK.gameCard, QK.ticker, QKC.winProb); rows {team: standings row} adds records. */
@@ -1067,8 +1078,11 @@ function qkGame(g, rows) {
   const form = t => { const r = rows && rows[canonTeam(t)]; return r && Array.isArray(r.last5) ? r.last5.join('') : ''; };
   const T = t => ({ name: teamShort(t), abbr: teamAbbr(t), colour: teamInfo(t).colour, href: teamHref(t), record: rec(t), form: form(t) });
   const live = st === 'live' || st === 'half';
+  const p0 = (g.model || {}).p_home;
+  /* v3: live, the kit reads wp_home as the live chance and p_home as our pre-game call ("before the start we had ...") */
   return { sport: 'nfl', league: 'NFL', id: g.game_id, start: g.kickoff, status: live ? 'live' : (st === 'final' ? 'final' : 'pre'),
-    home: T(g.home), away: T(g.away), hs: g.hs, as: g.as, p_home: isNum(g.wp_home) && live ? g.wp_home : (g.model || {}).p_home,
+    home: T(g.home), away: T(g.away), hs: g.hs, as: g.as, p_home: isNum(p0) ? Number(p0) : null,
+    wp_home: live && isNum(g.wp_home) ? Number(g.wp_home) : null, pre_only: live && !isNum(g.wp_home) ? true : undefined,
     market_home: (g.market || {}).p_home, period: g.qtr, clock: fmtClock(g.clock), note: isOT(g) ? 'OT' : '', href: gameHref(g.game_id) };
 }
 /* Team -> standings row, from season.json rows (for records on game cards). */
