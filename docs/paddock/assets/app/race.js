@@ -1,5 +1,5 @@
 /* The Quant Paddock — the race centre (#/race/<y>/<r>[/laps|strategy|quali|telemetry]).
- * Upcoming (kit v3, after rk-games.js): a preview hero (our favourite as a big teal number with a how-sure note, the
+ * Upcoming (kit v3, after rk-games.js): a preview hero (our favourite as a big blue number with a how-sure note, the
  * top three, the market as one quiet labelled line when there is a usable quote) with the forecast table beside it;
  * then the weekend schedule, our forecast before and after qualifying (and the sprint; the market a grey reference
  * tick) and the finishing-position distribution. Finished: awards, the result against the
@@ -158,7 +158,7 @@ function overviewUpcoming(host, race, season, teams, markets) {
 }
 
 /* v3 (Matchday) hero for a race still to run, after QK.previewCard: the round and circuit, our favourite as a big
-   teal number with the next two, the top three with team marks, a "How sure are we?" note, and the market as one quiet
+   blue number with the next two, the top three with team marks, a "How sure are we?" note, and the market as one quiet
    labelled line (game detail is one of the two places it may appear) when a usable quote exists. */
 function hero(race, main, mk, raceS, post) {
   var circ = race.circuit || {};
@@ -242,7 +242,7 @@ function overviewDone(host, race, season, teams) {
   (cards.length ? '<section class="qk-section pd-sec">' + PD.secHead('Awards', 'The race in numbers', 'Our picks of the race, each with the number behind it.') + '<div class="pd-awards">' + cards.join('') + '</div></section>' : '') +
   PD.grid(
     PD.card('Result', race.sprint && race.sprint.length ? 'Sprint result below.' : '', '<div id="rc-res"></div>', { span: 7, flush: true }) +
-    PD.card('Forecast v result', 'Where we expected each driver to finish (teal) against where they did (ring).', PD.chartBox('rc-eva', 560), { span: 5 }) +
+    PD.card('Forecast v result', 'Where we expected each driver to finish (blue) against where they did (ring).', PD.chartBox('rc-eva', 560), { span: 5 }) +
     PD.card('Positions lap by lap', 'Team colours; a team’s second driver is dashed. Bands: safety car (amber), red flag.', PD.chartBox('rc-pos-mini', 420), { span: 12, foot: '<a href="' + PD.raceHref(race.year, race.round, 'laps') + '">Gaps, lap times, overtakes and race control →</a>' }) +
     (race.sprint && race.sprint.length ? PD.card('Sprint result', '', '<div id="rc-sprint"></div>', { span: 12, flush: true }) : ''), 'pd-mt') +
   '<div id="rc-prefc" class="pd-mt"></div>';

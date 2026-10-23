@@ -112,7 +112,7 @@ function cardOf(d, id) {
 }
 
 /* v3 (Matchday) hero: QK.previewCard — away "at" home with records, the score bug when live, our chance for the
-   favourite as a big teal number, a plain-English note (overtime and goals in all), the market as a quiet reference
+   favourite as a big blue number, a plain-English note (overtime and goals in all), the market as a quiet reference
    line before the game (game detail is one of the two places it may appear), and how the clubs match up so far. */
 const TWO_WORD = /(Maple Leafs|Red Wings|Golden Knights|Blue Jackets)$/;
 U.nick = abbr => { const n = RK.teamName(abbr) || abbr; const m = TWO_WORD.exec(n); return m ? m[1] : String(n).split(' ').slice(-1)[0]; };

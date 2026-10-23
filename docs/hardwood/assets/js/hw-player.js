@@ -90,7 +90,7 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
   const vrow = U.rowsOf(val).find(x => String(x.id) === pid) || null;
   const swar = U.rowsOf(sv).find(x => String(x.id) === pid) || null;
   const name = (p && p.name) || (career && career.name) || (vrow && vrow.name) || HW.playerName(L, pid);
-  const sur = String(name).split(' ').slice(-1)[0];
+  const sur = QK.surname(name);
   const team = (vrow && vrow.team) || (p && p.team) || srow.team || null;
   const col = team ? U.tcol(L, team) : QK.cssVar('--signal');
   const v = (p && p.values) || {};
@@ -167,7 +167,7 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
     esc(gpNow ? (small ? (gpNow < 11 ? NUMW[gpNow] : gpNow) + ' game' + (gpNow === 1 ? ' is' : 's is') + ' a small sample' : gpNow + ' games: the picture is settling') : 'No games yet this season') + '</h3>' +
     '<p style="margin:0;color:var(--ink-2);font-size:15px">' + (small ? 'Shooting numbers swing a lot early on. ' : '') + 'The hollow rings on the rail show last season, where there was one: dots that sit next to their ring are the steady part of the profile; the ones far from it are the ones to watch.</p>' +
     (settle.length && isNum(mpg) ? QK.note('At ' + U.f(mpg, 1) + ' minutes a game, ' + settle.join(', ').replace(/, ([^,]*)$/, ', and $1') + '.') : '') + '</div></article>';
-  const gbg = log.length ? U.card2('Game by game', 'Game score each game (Hollinger’s one-number box score); teal when the team won the player’s minutes', U.chart('pp-log', 240, 'Game score per game')) : '';
+  const gbg = log.length ? U.card2('Game by game', 'Game score each game (Hollinger’s one-number box score); blue when the team won the player’s minutes', U.chart('pp-log', 240, 'Game score per game')) : '';
   const simR = (career && Array.isArray(career.similar_role) && career.similar_role.length) ? career.similar_role.filter(x => Number(x.season) === Number(S)).map(x => ({ id: String(x.id), name: x.name, d: x.distance }))
     : (p && p.qualified ? U.similarRole(L, cat, roles, pid, 5) : []);
   const typeCard = simR.length ? '<article class="qk-card"><div class="qk-card-body"><div class="qk-kicker">Their type</div><h4 class="hw-h4">Plays most like</h4><ul class="hw-list hw-type">' +
@@ -264,7 +264,7 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
         pcl.forEach((x, i) => { if (!isNum(x)) return; const d = x - Math.max.apply(null, pcl.filter((_, j) => j !== i).map(z => (isNum(z) ? z : 0))); if (!bestOf[i] || d > bestOf[i].d) bestOf[i] = { k: kk, d: d, v: (E[i].values || {})[kk] }; });
         return { label: m.label, tip: m.desc, better: m.better, values: E.map(e => (e.values || {})[kk]), pctls: pcl, fmt: x => U.fmtM(kk, x) };
       }) }));
-      const names = E.map(e => String(e.name || '').split(' ').slice(-1)[0]);
+      const names = E.map(e => QK.surname(e.name || ''));
       el.querySelector('#pp-cmp-h').innerHTML = QK.sectionHead({ kicker: 'Compare', title: names.slice(0, -1).join(', ') + ' or ' + names[names.length - 1] + '?',
         sub: 'The closest matches on this season’s profile, side by side against ' + esc(peer) + '. The best in each row is highlighted; the small pills are percentiles.',
         actions: '<a class="qk-more" href="' + esc(HW.href(L, 'compare/players/' + ids.map(encodeURIComponent).join('/'), S)) + '">Open in Compare</a>' });
@@ -327,7 +327,7 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
       xa.nameGap = 40;
       return {
         grid: { left: 8, right: 12, top: gT, bottom: gB, containLabel: true }, xAxis: xa, yAxis: ya,
-        tooltip: QKC.tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(255,201,77,.08)' } }, formatter: ps => { const r = log[ps[0].dataIndex];
+        tooltip: QKC.tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(125,147,255,.10)' } }, formatter: ps => { const r = log[ps[0].dataIndex];
           return '<div style="font-weight:600">' + esc(HW.fmtDate(r.date, { year: false }) + ' ' + (r.home ? 'v ' : '@ ') + HW.teamAbbr(L, r.opp)) + '</div>' + QKC.tipRow(ps[0].color, 'Game score', U.f(r.game_score, 1)) +
             QKC.tipRow(T.ink3, 'Line', (r.pts || 0) + ' pts · ' + (r.reb || 0) + ' reb · ' + (r.ast || 0) + ' ast') + QKC.tipRow(T.ink3, '+/-', U.signed(r.pm, 0)); } }),
         series: [{ type: 'bar', barMaxWidth: 26, data: log.map((r, i) => {

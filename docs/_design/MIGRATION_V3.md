@@ -20,7 +20,8 @@ add a toggle, and run the checker with `--themes dark` only.
 
 Copying the kit (`python scripts/design_kit.py docs/<site>`) is enough for every page on every site to look Matchday:
 
-- **Tokens:** warm charcoal planes, off-white ink, teal for ours, sun / coral / sky accents, the dark percentile ramp,
+- **Tokens:** the Broadcast palette (23 Oct, later): near-black planes, cool charcoal cards, white and cool-grey
+  ink, cobalt for ours, volt for kickers, the highlighter and key numbers, red-orange live, the dark percentile ramp,
   22 px card radii, roomy spacing (1240 px page, 64 px between sections). The legacy variables each site maps onto
   kit tokens (`rink-qk.css` §1, `hardwood-qk.css`, ...) follow.
 - **Fonts:** `QK.shell()` injects Fraunces + DM Sans when the page links the v2 faces; every kit class uses them.
@@ -28,8 +29,8 @@ Copying the kit (`python scripts/design_kit.py docs/<site>`) is enough for every
   `prefers-color-scheme: light` rules in site CSS never apply; the toggle button is gone from the shell.
 - **Every v1 / v2 builder** renders in the v3 look with the same API: shell (word mark, round pills), section heads
   (coral kicker, Fraunces title), black ticker, stat tiles, game cards (monograms, Fraunces chances, team bar with a
-  key, the score bug when live), chance bars (teal), the percentile card (now the rail), compare (highlighter),
-  leaderboards, tables, tabs, chips, buttons, notes, tooltips, charts (warm dashed grid, DM Sans labels, teal first
+  key, the score bug when live), chance bars (team colours, else ours in blue), the percentile card (now the rail), compare (highlighter),
+  leaderboards, tables, tabs, chips, buttons, notes, tooltips, charts (cool dashed grid, DM Sans labels, cobalt first
   series, italic annotations).
 - **Game cards default to `market: false`.** The market disappears from every overview card without a code change.
   Only pass `market: true` on game detail or the Model page, never on an overview.
@@ -55,8 +56,8 @@ Check with the checker after the copy: nothing should break (no overflow, no con
    { key: false })` with no market on the overview.
 3. **Game page.** Hero → `QK.previewCard(g, { kicker: '<League> · <venue>', nick, colors, factors, noteExtra,
    market })`: away "at" home with records (and form if you have it), the score bug when live, our chance for the
-   favourite as a big teal number with a sentence, the bar, a "How sure are we?" note (add overtime / draws / expected
-   total in `noteExtra`) and the match-up factors (better side in teal). The market may sit here as `market: { p,
+   favourite as a big blue number with a sentence, the bar, a "How sure are we?" note (add overtime / draws / expected
+   total in `noteExtra`) and the match-up factors (better side in blue). The market may sit here as `market: { p,
    label: 'Market (<source>)' }`, a quiet line. Put your forecast table beside the hero (rk-games.js `.rk-gtop`).
 4. **Player page.** As rk-player.js:
    - a crumb (`Sport › Team › Name`);
@@ -85,7 +86,10 @@ Check with the checker after the copy: nothing should break (no overflow, no con
   titles say the story ("Six games we'd pick", "Percentiles: how the player ranks").
 - Neutral labels: no player pronouns ("the player", "Their type").
 - No betting words in headlines, KPIs, labels, buttons or chart titles (STYLE_GUIDE §8). Not "violet" any more: the
-  favourite is "in teal".
+  favourite is "in blue".
+- **Colours (Broadcast palette, 23 Oct).** Use tokens only: no hard-coded Matchday values (#3cc9b4, #17140f,
+  #211d17, #2c271f, #f3ece0, #ffc94d) in site CSS or JS. Copy says "ours in blue", never "teal"; text on a volt or
+  cobalt fill is near-black. Game cards carry a team-colour stripe and title races use team colours by default.
 
 | v2 | v3 |
 |---|---|

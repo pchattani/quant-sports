@@ -64,7 +64,7 @@ function controlBands(control, nLaps) {
 function bandArea(bands, T) {
   if (!bands || !bands.length) return undefined;
   return { silent: true, data: bands.map(function (b) {
-    var c = b.kind === 'RED' ? QKC.hexA(T.down || PD.col('down'), 0.16) : QKC.hexA(T.sun || '#ffc94d', b.kind === 'VSC' ? 0.08 : 0.15);
+    var c = b.kind === 'RED' ? QKC.hexA(T.down || PD.col('down'), 0.16) : QKC.hexA(T.sun || '#d4ff3a', b.kind === 'VSC' ? 0.08 : 0.15);
     return [{ xAxis: b.from - 0.5, itemStyle: { color: c }, label: { show: true, position: 'insideTop', formatter: b.kind, color: T.ink3, fontSize: 9 } }, { xAxis: b.to + 0.5 }];
   }) };
 }

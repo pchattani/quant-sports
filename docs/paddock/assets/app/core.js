@@ -363,12 +363,12 @@ function finished(st) { return !st || st === 'Finished' || /^\+\d+ Laps?$/.test(
 
 // ── names, colours, links ─────────────────────────────────────────────────
 
-/* Fallback colours for a team with none in the payloads (historic entrants): the kit's warm chart slots, teal left out
- * because teal means ours. */
+/* Fallback colours for a team with none in the payloads (historic entrants): the kit's warm chart slots, blue left out
+ * because blue means ours. */
 var PALETTE = ['#6aa8ec', '#ff7a5c', '#8fd16a', '#c39be8', '#ffc94d', '#8fdcc8', '#f28fb5', '#d9b38c', '#ff9b7a', '#a7c7f2'];
-/* Kit colour tokens by name, read from the page (charts need the hex): PD.col('coral'). Teal is ours only. */
+/* Kit colour tokens by name, read from the page (charts need the hex): PD.col('coral'). Blue is ours only. */
 var TOK = { teal: '--c-1', coral: '--c-2', sky: '--c-3', sun: '--c-4', plum: '--c-5', leaf: '--c-6', rose: '--c-7', sand: '--c-8', mint: '--mint', grey: '--c-other', muted: '--ink-3', faint: '--ink-4', up: '--up', down: '--down' };
-function col(k) { return QK.cssVar(TOK[k] || k) || '#a39886'; }
+function col(k) { return QK.cssVar(TOK[k] || k) || '#8a93a3'; }
 var COMPOUNDS = { SOFT: '#e8002d', MEDIUM: '#ffd12e', HARD: '#f0f0ec', INTERMEDIATE: '#43b02a', WET: '#0067ad', UNKNOWN: '#7d8590', TEST_UNKNOWN: '#7d8590' };
 function driverName(id) { var x = NAMES.drivers[id]; return x && x.name ? x.name : titleCase(id); }
 function driverCode(id) {
@@ -385,7 +385,7 @@ function hashIndex(s, n) { var h = 0; String(s).split('').forEach(function (ch) 
 function teamColour(id) {
   var x = NAMES.teams[id];
   if (x && x.colour) { var c = String(x.colour); return c.charAt(0) === '#' ? c : '#' + c; }
-  return id ? PALETTE[hashIndex(id, PALETTE.length)] : '#7d7468';
+  return id ? PALETTE[hashIndex(id, PALETTE.length)] : '#6b7383';
 }
 /* The team colour lifted to 3:1 on the current card surface (marks, bars, text accents). */
 function tc(id) { return QK.color.team(teamColour(id)); }

@@ -2,21 +2,24 @@
 
 The spec every sport site follows. It replaces v2 "Signal" (a dark, dense terminal the user found neither different
 nor friendly enough). The user chose **Matchday + bits** on 23 Oct 2026, then asked for it **in dark mode only**: no
-light theme, no theme toggle. The kit is in this folder; `showcase.html` shows every component on sample data; the
+light theme, no theme toggle. Later that day the user swapped the colours for the Broadcast concept's dark palette
+("more fan of what you had in the ESPN one"): near-black, cobalt for ours, volt accents, team colours up front. The
+layouts, type and copy stay Matchday. The kit is in this folder; `showcase.html` shows every component on sample data; the
 reference pages are the Home page (`docs/home`) and the Rink overview, game, player and compare pages (`docs/rink`).
 To move a page over, follow `MIGRATION_V3.md`.
 
 ## 1. Identity
 
 **Name.** The Quant. Each site is "The Quant <Site>" (Footballer, Paddock, Hardwood, Ace, Bullpen, Gridiron, Rink,
-Campus). The logo is the lower-case word mark "the quant" in Fraunces with a sun dot and a coral offset; a site adds
+Campus). The logo is the lower-case word mark "the quant" in Fraunces with a volt dot and a cobalt offset; a site adds
 its name in italic in the sport accent ("the quant *rink*").
 
 **What it is.** A fun sports hub for people who like numbers: what to watch tonight, our forecasts, ratings and the
 stats behind them, each explained. It is not a betting site. The headline is always our forecast, our rating or a stat.
 
-**Feel.** Warm, roomy and explained. Friendliness comes from the type (Fraunces), the spacing, the round cards, the
-warmth of the dark and the copy, never from decoration. It must never slide back into the cold terminal look.
+**Feel.** Bright, roomy and explained. Friendliness comes from the type (Fraunces), the spacing, the round cards and
+the copy; energy comes from the Broadcast colours (near-black, cobalt, volt, team colours). It must never slide back
+into the dense terminal look.
 
 **What we borrow, and what we do not.**
 
@@ -52,7 +55,7 @@ except the broadcast ticker's tiny group labels.
 | `--fs-d4` | 1.375 rem | chances on game cards |
 | `--fs-lg` … `--fs-2xs` | 19 / 16 / 14 / 13 / 12 px | lede, body, dense body, captions, chips |
 
-## 3. Colour (dark only, warm)
+## 3. Colour (dark only, Broadcast palette)
 
 There is one theme. The tokens live on `:root` only; `QK.theme.boot()` pins `data-theme="dark"` so a site's old
 light-mode CSS never applies, and a stored "light" choice is forgotten. `QK.theme.get()` always returns `'dark'`;
@@ -60,41 +63,48 @@ light-mode CSS never applies, and a stored "light" choice is forgotten. `QK.them
 
 | Role | Token | Value |
 |---|---|---|
-| Page | `--bg` | #17140f warm charcoal (never blue-black) |
-| Card / raised / pressed | `--s-1` / `--s-2` / `--s-3` | #211d17 / #2c271f / #37312a |
-| Cream card (New here, The short version, How sure) | `--s-cream`, `--line-cream` | #2a2418 with a faint sun rule |
-| Broadcast black (ticker, score bug) | `--s-ink` | #0d0b08 |
-| Ink | `--ink-1` / `--ink-2` / `--ink-3` | #f3ece0 / #c9bfb0 / #a39886 |
-| Ours | `--signal` (= `--c-model`, `--brand`) | teal #3cc9b4 |
-| Highlighter | `--sun`, `--sun-soft` | #ffc94d, a translucent band under text (`.qk-mark`) |
-| Accents | `--coral`, `--sky`, `--plum` | kickers and asides; a second series; a third |
-| Market (reference only) | `--c-market` | quiet warm grey |
+| Page | `--bg` | #0a0c10 near-black |
+| Card / raised / pressed | `--s-1` / `--s-2` / `--s-3` | #14171d / #1c2028 / #262b35 cool charcoal |
+| Cream card (New here, The short version, How sure) | `--s-cream`, `--line-cream` | #181c24 with a faint volt rule |
+| Broadcast black (ticker, score bug) | `--s-ink` | #000000 |
+| Ink | `--ink-1` / `--ink-2` / `--ink-3` | #f3f5f8 / #c3c9d4 / #939bab |
+| Hairlines | `--line-1` / `--line-2` / `--line-3` | cool grey at 8% / 13% / 26% |
+| Ours | `--signal` (= `--c-model`, `--brand`) | periwinkle cobalt #7d93ff; text on a cobalt fill is near-black |
+| Accent | `--volt` (old name `--sun`), `--sun-soft` | #d4ff3a: kickers (section tags), the stat-of-the-day slab, the compare highlighter, the "i" of a note, "it happened" beside ours (`--c-actual`); text on volt is near-black (`--volt-ink`) |
+| Live | `--live` | red-orange #ff4d2e |
+| Other accents | `--coral`, `--sky`, `--plum` | red-orange #ff6a4d (asides' arrow, a second series); cyan #5ec8f0; plum |
+| Market (reference only) | `--c-market` | quiet cool grey |
 
-**Contrast (WCAG 2.x, measured).** Text on every surface clears AA: ink-1 10.9–15.6:1, ink-2 7.1–10.1:1, ink-3
-4.5:1 on `--s-3` up to 6.5:1 on the page (the floor for text), teal 6.2–8.9:1, coral 5.0–7.2:1, sky 5.2–7.4:1. The
-score bug's clock is white on #c8321f (5.3:1). Percentile knobs take white or near-black, whichever reads better on
+**Contrast (WCAG 2.x, measured on `--bg` to `--s-3`).** Text on every surface clears AA: ink-1 13.0–17.9:1, ink-2
+8.5–11.8:1, ink-3 5.1–7.0:1 (the floor for text), cobalt 5.1–7.0:1, volt 12.3–16.9:1, coral 5.0–6.9:1, sky
+7.4–10.2:1, the live badge's #ff7a5f 5.5–7.6:1. Text on a volt fill is #0a0c10 (16.9:1), on a cobalt fill #0a0c10
+(7.0:1). The score bug's clock is white on #c92d17 (5.4:1). Percentile knobs take white or near-black, whichever reads better on
 that exact colour (`QK.pctInk`).
 
-**Ours.** Teal means ours: our probability, our rating, the forecast line, the favourite's chance on a card, links.
-It never marks a team, the market, or good/bad.
+**Ours.** Blue (cobalt) means ours: our probability, our rating, the forecast line, the favourite's chance on a card,
+primary actions, links. It never marks a team, the market, or good/bad. In copy, say "ours in blue".
 
 **Market.** Never on overview cards, never in a headline stat, never on the home page. It may appear only as a quiet
 reference on game detail and the Model page: a grey tick, a hollow ring, a muted column, with its source named.
 Game cards default to `market: false`.
 
-**Percentile scale (cold → hot).** `--pc-0` blue #3d6dd4 → `--pc-25` → `--pc-50` warm grey #a39a8c → `--pc-75` →
-`--pc-100` red #cf3e25. It steps in lightness, so it reads for red-green colour-blind viewers, and every anchor clears
+**Percentile scale (cold → hot).** Broadcast's ramp brightened for dark: `--pc-0` blue #2f6fe0 → `--pc-25` #7fa6e6
+→ `--pc-50` cool grey #a9adb5 → `--pc-75` #f59a72 → `--pc-100` red #d9361d (white ink 4.7:1 at both ends). It steps in lightness, so it reads for red-green colour-blind viewers, and every anchor clears
 3:1 as a mark on a card. Use `QK.pctColor(p)` in HTML, `QK.pctHex(p)` in charts, `QK.pctInk(p)` for text on it.
 
-**Team colours** are accents: monograms, the win-probability bar, the player tile, lines in a race. `QK.color.team()`
-lifts a dark kit until it clears 3:1 on the card; two kits side by side must be distinct (`QK.color.distinct`).
+**Team colours** are used prominently, as in Broadcast: monograms, the win-probability bar in the two teams' colours,
+the stripe across the top of every game card (split by our chance), title-race bars (`QK.chances` uses a row's
+`color` by default), the player tile, lines in a race. `QK.color.team()` lifts a dark kit until it clears 3:1 on the
+card; two kits side by side must be distinct (`QK.color.distinct`), else the fallbacks are cobalt v grey (`--wp-a` /
+`--wp-b`). Where there is no team colour, use cobalt (tennis players: cobalt v grey; F1 constructors have colours).
 
 **Sport accents** (`--a-<sport>`) are identity marks only: the switcher icon, the sport dot, the site word in the logo.
 
 **Status** colours (`--live`, `--up`, `--down`, `--st-*`) are reserved, always with a word or symbol.
 
-**Chart categorical slots** start with teal: `--c-1` teal, `--c-2` coral, `--c-3` sky, `--c-4` sun, `--c-5` plum,
-`--c-6` leaf, `--c-7` rose, `--c-8` sand.
+**Chart categorical slots** start with cobalt: `--c-1` cobalt, `--c-2` red-orange, `--c-3` cyan, `--c-4` volt,
+`--c-5` plum, `--c-6` leaf, `--c-7` rose, `--c-8` sand (the slots keep their Matchday roles, so maps by slot still
+read right). A "we said / it happened" pair is cobalt (`--c-model`) with volt (`--c-actual`).
 
 ## 4. Space and shape
 
@@ -136,16 +146,16 @@ All builders return HTML strings unless noted. Full signatures are in the commen
 | Component | Builder | v3 notes |
 |---|---|---|
 | Shell | `QK.shell(opts)` | the word mark, round sport pills (current one in off-white), a round search pill; no theme toggle |
-| Section head | `QK.sectionHead({ kicker, title, sub, actions, size: 'lg', tag })` | coral kicker, Fraunces title, no rules |
-| Ticker | `QK.ticker(games, o)` into `.qk-ticker` | broadcast black, our chance in teal |
+| Section head | `QK.sectionHead({ kicker, title, sub, actions, size: 'lg', tag })` | volt kicker, Fraunces title, no rules |
+| Ticker | `QK.ticker(games, o)` into `.qk-ticker` | broadcast black, our chance in blue |
 | Game card | `QK.gameCard(g, { sport, market, form, why, bug })` | monograms, Fraunces chances, team bar with a key, the score bug when live, `why` aside; **`market` defaults to false** |
 | Win bar | `QK.wpBar(pL, pD, pR, tL, tR, { labels: 'key', keyText })` | rounded segments; `'key'` puts short names at the ends and "chance to win" between |
-| Chance bars | `QK.chances(rows, { teamColours })` | teal bars (ours); team colours only on request |
+| Chance bars | `QK.chances(rows, { teamColours })` | bars in team colours when rows carry `color` (`teamColours: false` for ours in blue) |
 | Stat tile | `QK.statTile(o)`, `QK.stats(list)` | sentence-case label, percentile pill, Fraunces number |
-| Player header | `QK.playerHeader({ name, number, pos, team, kicker, meta, tags, stats, short, face })` | tilted number tile with a sun shadow, chips, the short version |
+| Player header | `QK.playerHeader({ name, number, pos, team, kicker, meta, tags, stats, short, face })` | tilted number tile with a volt shadow, chips, the short version |
 | Percentile card | `QK.pctCard(o)` | now the rail: explanation line, last-season ring, median tick, key |
 | Leaderboard | `QK.leaderboard(el, spec)` | heat pills on the percentile scale |
-| Compare | `QK.compareView(o)` | the best value in each row under the sun highlighter; percentile pills |
+| Compare | `QK.compareView(o)` | the best value in each row under the volt highlighter; percentile pills |
 | Matchup bar, keys, tags | `QK.matchupBar`, `QK.keys`, `QK.tag(text, 'signal' / 'sun')` | rounded |
 | v1 (kept) | `QK.kpi`, `QK.matchCard`, `QK.tick`, `QK.mvm`, `QK.table`, `QK.tableHTML`, `QK.pctlBars`, `QK.pctlChip`, `QKC.*` | restyled |
 
@@ -159,8 +169,9 @@ One library, ECharts 5.5.1. Everything themes from the tokens.
 
 - **Axis titles always** (the standing rule): every value axis says what it measures and its unit. The checker fails
   a page with an untitled value axis.
-- **Warm grid**: dashed hairlines in warm ink at 8%, DM Sans labels in `--ink-3`, axis titles in `--ink-2`.
-- **Teal for ours**, the first series; coral and sky for the next ones; team colours for teams.
+- **Cool grid**: dashed hairlines in cool grey at 8%, DM Sans labels in `--ink-3`, axis titles in `--ink-2`.
+- **Blue (cobalt) for ours**, the first series; volt for what happened beside it; red-orange and cyan for the next
+  ones; team colours for teams.
 - **Annotations** in italic Fraunces (`QKC.annot(T)`): "dashed line = spot on", "two goals in 29 seconds", the
   forecast chart's event labels, quadrant names. Write on the chart instead of a legend wherever a mark can carry its
   own words.

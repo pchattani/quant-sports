@@ -9,7 +9,7 @@
  *                           #/glossary/<key> and #/methodology/<part> render inside Model
  * Old routes (#/skaters, #/playoffs, #/markets, #/calibration ...) are redirected by core.js (REDIRECTS).
  *
- * Kit v3 "Matchday" (MIGRATION_V3.md): friendly section titles (the coral kicker says what it is, the Fraunces title
+ * Kit v3 "Matchday" (MIGRATION_V3.md): friendly section titles (the volt kicker says what it is, the Fraunces title
  * the story), "i" notes (QK.note) under the numbers that need a sentence, a "Who's hot" strip (QK.hotRow) on Players,
  * "How sure are we?" (QK.howSure, from data/calibration.json) at the top of the Model page, and season forecasts
  * without the market tick (the market stays on game pages and the Model page only). */
@@ -279,7 +279,7 @@ function leadersPage(node, S) {
     if (fin.length) {
       const top = fin.slice().sort((a, b) => v(b, 'g') - v(a, 'g')).slice(0, 160);
       const m = Math.max.apply(null, top.map(p => Math.max(v(p, 'g'), v(p, 'ixg'))));
-      QKC.scatter('#pl-fin', { points: top.map(p => ({ x: v(p, 'ixg'), y: v(p, 'g'), name: p.name + ' · ' + RK.teamAbbr(p.team), label: (p.name || '').split(' ').slice(-1)[0], color: RK.teamColourRaw(p.team), href: RK.playerHref(p.id), size: 9 })),
+      QKC.scatter('#pl-fin', { points: top.map(p => ({ x: v(p, 'ixg'), y: v(p, 'g'), name: p.name + ' · ' + RK.teamAbbr(p.team), label: QK.surname(p.name || ''), color: RK.teamColourRaw(p.team), href: RK.playerHref(p.id), size: 9 })),
         xName: 'Individual expected goals', yName: 'Goals', xFmt: x => x.toFixed(0), yFmt: x => x.toFixed(0), labelTop: 10, xMin: 0, yMin: 0, xMax: Math.ceil(m), yMax: Math.ceil(m) });
       const c = node.querySelector('#pl-fin');
       if (c && c.__qkc) { const e = c.__qkc, b0 = e.build; e.build = (T, x) => { const o = b0(T, x); o.series[0].markLine = { silent: true, symbol: 'none', lineStyle: { color: T.axis, type: [4, 4] }, label: { show: false }, data: [[{ coord: [0, 0] }, { coord: [Math.ceil(m), Math.ceil(m)] }]] }; return o; }; e.paint(); }

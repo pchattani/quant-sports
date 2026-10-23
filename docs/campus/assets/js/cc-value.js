@@ -32,8 +32,8 @@ CC.route('value', function (el, p) {
         return '<button type="button" class="qk-chip" style="--ca:var(--signal)" data-value="' + esc(k) + '" aria-pressed="' + (i === 0) + '">' + esc(k === 'all' ? 'All' : k) + '</button>'; }).join('') + '</div>';
       var r0 = rows[0], pg0 = rows.filter(function (r) { return isNum(r.value_pg); }).slice().sort(function (x, y) { return y.value_pg - x.value_pg; })[0];
       var tl = [];
-      if (r0) tl.push({ label: 'Most valuable', value: String(r0.name || '').split(' ').slice(-1)[0] + ' ' + CC.f(r0.value, fb ? 1 : 1), signal: true, href: CC.playerHref(L, r0.id, S), sub: (r0.pos || '') + ' · ' + CC.tname(L, r0.team), tip: 'Our value model: ' + (cur.label || 'value') });
-      if (pg0) tl.push({ label: 'Most valuable a game', value: String(pg0.name || '').split(' ').slice(-1)[0] + ' ' + CC.f(pg0.value_pg, 2), href: CC.playerHref(L, pg0.id, S), sub: (pg0.pos || '') + ' · ' + CC.tname(L, pg0.team) });
+      if (r0) tl.push({ label: 'Most valuable', value: QK.surname(r0.name || '') + ' ' + CC.f(r0.value, fb ? 1 : 1), signal: true, href: CC.playerHref(L, r0.id, S), sub: (r0.pos || '') + ' · ' + CC.tname(L, r0.team), tip: 'Our value model: ' + (cur.label || 'value') });
+      if (pg0) tl.push({ label: 'Most valuable a game', value: QK.surname(pg0.name || '') + ' ' + CC.f(pg0.value_pg, 2), href: CC.playerHref(L, pg0.id, S), sub: (pg0.pos || '') + ' · ' + CC.tname(L, pg0.team) });
       tl.push({ label: 'Players ranked', value: QK.fmt.num(rows.length), sub: d.basis === 'last_season' ? 'on this season’s rosters, valued on last season' : 'qualified players this season' });
       body.innerHTML = U.stats(tl) + '<p class="cc-note">' + sub + '</p>' + chips + '<div class="qk-grid cc-grid"><div class="qk-span-5">' + U.card('Top 20', 'Our value this season, in team colours.', U.chart('v-top', 560, 'Top 20 players by value')) + '</div><div class="qk-span-7">' + U.card('Leaderboard', '<span id="v-n"></span>', U.lb('v-tbl'), { flush: true }) + '</div></div>';
       var curPos = 'all';
@@ -96,7 +96,7 @@ CC.route('fantasy', function (el, p) {
     var bt = d.backtest || {};
     var html = U.head('Fantasy', 'Projections for ' + esc(d.period || 'the coming period') + ' from usage, efficiency and the opponent. Our own scoring; no official fantasy-game data or ownership (their terms do not allow reuse).', U.kicker(L, S));
     var top0 = (proj || []).slice().sort(function (x, y) { return (y.proj || 0) - (x.proj || 0); })[0];
-    html += U.stats([top0 ? { label: 'Top projection', value: String(top0.name || '').split(' ').slice(-1)[0] + ' ' + CC.f(top0.proj, 1), signal: true, href: CC.playerHref(L, top0.id, S), sub: (top0.pos || '') + ' · ' + CC.tname(L, top0.team) + (isNum(top0.proj_lo) ? ' · ' + CC.f(top0.proj_lo, 1) + '–' + CC.f(top0.proj_hi, 1) : '') } : null,
+    html += U.stats([top0 ? { label: 'Top projection', value: QK.surname(top0.name || '') + ' ' + CC.f(top0.proj, 1), signal: true, href: CC.playerHref(L, top0.id, S), sub: (top0.pos || '') + ' · ' + CC.tname(L, top0.team) + (isNum(top0.proj_lo) ? ' · ' + CC.f(top0.proj_lo, 1) + '–' + CC.f(top0.proj_hi, 1) : '') } : null,
       isNum(bt.mae) ? { label: 'Projection error', value: CC.f(bt.mae, 2), unit: 'pts', sub: 'mean absolute; a naive projection ' + CC.f(bt.mae_naive, 2), tip: 'Walk-forward backtest against the actual fantasy points' } : null,
       isNum(bt.rank_corr) ? { label: 'Rank correlation', value: CC.f(bt.rank_corr, 2), sub: 'naive ' + CC.f(bt.rank_corr_naive, 2) } : null, isNum(bt.n) ? { label: 'Games tested', value: QK.fmt.num(bt.n) } : null]);
     if (!proj.length) { el.innerHTML = html + (CC.isCur(L, S) ? QK.empty('No projections yet', 'They appear before the first games of the period.') : QK.empty('No projections for this season', 'Weekly projections are kept for the current season; the backtest above covers the past seasons.')); return; }

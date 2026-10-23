@@ -145,7 +145,7 @@ GI.route('team', function (el, params) {
     if (stages.length) GI.set('tp-stages', QK.chances(stages.map(s => ({ label: s[1], p: sim[s[0]], color: GI.teamColour(abbr) })), { max: 1, sort: false }));
     if (Array.isArray(sim.seed_dist)) {
       const sd = sim.seed_dist.slice(0, 7), out = Math.max(0, 1 - sd.reduce((a, b) => a + (b || 0), 0));
-      GI.ch.bar('tp-seed', { cats: ['1', '2', '3', '4', '5', '6', '7', 'Out'], series: [{ name: 'Chance', data: sd.concat([out]) }], colors: sd.map(() => GI.teamColour(abbr)).concat(['#9a9082']), fmt: v2 => GI.pct(v2, 0), labels: true, catName: 'Final seed', valName: 'Probability' });
+      GI.ch.bar('tp-seed', { cats: ['1', '2', '3', '4', '5', '6', '7', 'Out'], series: [{ name: 'Chance', data: sd.concat([out]) }], colors: sd.map(() => GI.teamColour(abbr)).concat(['#8a93a3']), fmt: v2 => GI.pct(v2, 0), labels: true, catName: 'Final seed', valName: 'Probability' });
     }
     if (Array.isArray(sim.win_dist)) GI.ch.distBars('tp-wins', sim.win_dist.map((p, k) => [k, p]), { colour: GI.teamColour(abbr), unit: 'wins', xName: 'Wins', yName: 'Chance', exp: sim.mean_wins });
     if (hist.length > 1) GI.ch.lines('tp-hist', [{ name: 'Overall', x: hist.map(z => z.week), y: hist.map(z => z.net), colour: GI.teamColour(abbr), width: 3, symbol: true }, { name: 'Offence', x: hist.map(z => z.week), y: hist.map(z => z.off), dash: true }, { name: 'Defence', x: hist.map(z => z.week), y: hist.map(z => z.def), dash: true }],

@@ -1,4 +1,4 @@
-/* The Quant — base styles and components, v3 "Matchday" (dark only, warm). Every v1 and v2 class is kept and now
+/* The Quant — base styles and components, v3 "Matchday" layouts in the Broadcast colours (dark only). Every v1 and v2 class is kept and now
  * renders in the Matchday look. Needs tokens.css first. Spec: STYLE_GUIDE.md; moving a page: MIGRATION_V3.md.
  * Every class is prefixed qk- so the kit can sit next to a site's old CSS.
  * Sections: base · shell · layout · card · kpi · table · percentile rail · controls · badges · match + ticker · hero ·
@@ -13,11 +13,11 @@ body.qk {
   font: 400 var(--fs-md)/var(--lh-body) var(--font-ui);
   -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
 }
-body.qk::before { /* a warm glow behind everything: sun at the top left, teal at the top right */
+body.qk::before { /* a faint glow behind everything: cobalt at the top left, volt at the top right */
   content: ""; position: fixed; inset: 0; pointer-events: none; z-index: -1;
   background:
-    radial-gradient(900px 480px at 8% -10%, rgba(255, 201, 77, 0.06), transparent 62%),
-    radial-gradient(900px 480px at 96% -6%, rgba(60, 201, 180, 0.05), transparent 60%);
+    radial-gradient(900px 480px at 8% -10%, rgba(125, 147, 255, 0.07), transparent 62%),
+    radial-gradient(900px 480px at 96% -6%, rgba(212, 255, 58, 0.035), transparent 60%);
 }
 .qk h1, .qk h2, .qk h3, .qk h4 { margin: 0; line-height: var(--lh-tight); color: var(--ink-1); }
 .qk h1, .qk h2, .qk h3, .qk-display {
@@ -43,13 +43,14 @@ body.qk::before { /* a warm glow behind everything: sun at the top left, teal at
 /* .qk-sr is absolutely placed: give the kit's scrolling and clipping boxes a positioning context so a
  * screen-reader-only caption or label never escapes to the page and widens it */
 .qk-table-wrap, .qk-card-body, .qk-secnav-in, .qk-secnav-links, .qk-secnav-ctx, .qk-seg, .qk-chips, .qk-tabs, .qk-hscroll, .qk-ticker, .qk-hot { position: relative; }
-.qk-kicker { font: 700 var(--fs-xs)/1.25 var(--font-ui); letter-spacing: var(--tracking-caps); color: var(--coral); }
+.qk-kicker { font: 700 var(--fs-xs)/1.25 var(--font-ui); letter-spacing: var(--tracking-caps); color: var(--volt); }
 .qk-kicker a { color: inherit; }
 .qk-muted { color: var(--ink-3); }
 .qk-sub { color: var(--ink-2); font-size: var(--fs-sm); }
 /* the highlighter: a translucent sun band under the text (headlines, the best value in a compare row) */
-.qk-mark { background: linear-gradient(transparent 56%, rgba(255, 201, 77, 0.36) 56%, rgba(255, 201, 77, 0.36) 92%, transparent 92%); padding: 0 0.12em; margin: 0 -0.06em; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
-.qk-hl { background: linear-gradient(transparent 52%, var(--sun-soft) 52%); padding: 0 3px; border-radius: 2px; }
+/* the volt highlighter is a solid stroke under the words (Broadcast), never a tint behind them: text keeps its contrast */
+.qk-mark { background: linear-gradient(transparent 84%, var(--volt) 84%, var(--volt) 94%, transparent 94%); padding: 0 0.12em; margin: 0 -0.06em; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.qk-hl { background: linear-gradient(transparent 86%, var(--volt) 86%); padding: 0 3px; border-radius: 1px; }
 
 @media (prefers-reduced-motion: reduce) {
   .qk *, .qk *::before, .qk *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
@@ -63,7 +64,7 @@ body.qk::before { /* a warm glow behind everything: sun at the top left, teal at
 }
 .qk-topbar-in { max-width: var(--page-max); margin: 0 auto; height: var(--topbar-h); padding: 0 var(--gutter); display: flex; align-items: center; gap: var(--sp-4); }
 .qk-brand { display: flex; align-items: center; gap: 9px; flex: none; white-space: nowrap; font: 700 23px/1 var(--font-display); font-variation-settings: "SOFT" 100, "WONK" 1; letter-spacing: -0.02em; color: var(--ink-1); }
-.qk-brand-mark { width: 14px; height: 14px; border-radius: 50%; background: var(--sun); box-shadow: 4px 3px 0 var(--coral); flex: none; display: inline-block; margin-right: 3px; }
+.qk-brand-mark { width: 14px; height: 14px; border-radius: 50%; background: var(--volt); box-shadow: 4px 3px 0 var(--signal); flex: none; display: inline-block; margin-right: 3px; }
 .qk-brand-mark svg { display: none; }
 .qk-brand-name { font-size: inherit; }
 .qk-brand-name b { color: var(--accent); font-weight: 600; font-style: italic; }
@@ -292,8 +293,10 @@ body.qk::before { /* a warm glow behind everything: sun at the top left, teal at
 .qk-select:focus, .qk-input:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 22%, transparent); }
 .qk-btn { all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 18px; border-radius: var(--r-pill); font-size: var(--fs-sm); font-weight: 700; background: transparent; border: 1.5px solid var(--line-3); color: var(--ink-1); white-space: nowrap; }
 .qk-btn:hover { border-color: var(--ink-2); background: var(--s-2); }
-.qk-btn.primary, .qk-btn.solid { background: var(--ink-1); border-color: var(--ink-1); color: var(--ink-inv); }
-.qk-btn.primary:hover, .qk-btn.solid:hover { background: #fffaf0; }
+.qk-btn.primary { background: var(--signal); border-color: var(--signal); color: var(--signal-ink); }   /* primary actions are ours: cobalt */
+.qk-btn.primary:hover { background: var(--signal-2); border-color: var(--signal-2); }
+.qk-btn.solid { background: var(--ink-1); border-color: var(--ink-1); color: var(--ink-inv); }
+.qk-btn.solid:hover { background: #ffffff; }
 .qk-btn.teal { background: var(--signal); border-color: var(--signal); color: var(--signal-ink); }
 .qk-btn.ghost { background: transparent; border-color: var(--ink-1); }
 .qk-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
@@ -302,7 +305,7 @@ body.qk::before { /* a warm glow behind everything: sun at the top left, teal at
 .qk-more:hover { color: var(--signal-2); }
 
 /* search dialog */
-.qk-search-dlg { position: fixed; inset: 0; z-index: var(--z-modal); display: none; align-items: flex-start; justify-content: center; padding: 10vh var(--gutter) var(--gutter); background: rgba(8, 6, 3, 0.6); backdrop-filter: blur(4px); }
+.qk-search-dlg { position: fixed; inset: 0; z-index: var(--z-modal); display: none; align-items: flex-start; justify-content: center; padding: 10vh var(--gutter) var(--gutter); background: rgba(0, 0, 0, 0.62); backdrop-filter: blur(4px); }
 .qk-search-dlg.open { display: flex; animation: qk-fade var(--t-med) var(--ease); }
 .qk-search-box { width: min(640px, 100%); background: var(--s-1); border: 1px solid var(--line-2); border-radius: var(--r-card); box-shadow: var(--sh-3); overflow: hidden; }
 .qk-search-field { display: flex; align-items: center; gap: 10px; padding: 0 18px; border-bottom: 1px solid var(--line-1); }
@@ -318,7 +321,7 @@ body.qk::before { /* a warm glow behind everything: sun at the top left, teal at
 
 /* ═════════════════════════════════════════════ badges, pills, team marks, live */
 .qk-badge, .qk-pill { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: var(--r-pill); font: 700 var(--fs-2xs)/1 var(--font-ui); background: var(--s-2); color: var(--ink-2); white-space: nowrap; }
-.qk-badge.live, .qk-pill.live { background: rgba(255, 90, 71, 0.16); color: #ff8a7a; }
+.qk-badge.live, .qk-pill.live { background: var(--live-soft); color: #ff7a5f; }
 .qk-badge.live::before, .qk-pill.live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--live); animation: qk-pulse 1.4s infinite; }
 .qk-badge.final { background: transparent; border: 1px solid var(--line-2); color: var(--ink-3); }
 .qk-badge.accent { background: var(--accent-soft); color: var(--accent); }
@@ -327,7 +330,7 @@ body.qk::before { /* a warm glow behind everything: sun at the top left, teal at
 .qk-badge.signal, .qk-pill.ours { background: var(--signal-soft); color: var(--signal); }
 .qk-sportpill { display: inline-flex; align-items: center; gap: 6px; font: 700 var(--fs-2xs)/1 var(--font-ui); color: var(--ink-2); }
 .qk-sportpill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--sa, var(--accent)); }
-.qk-team-mark { --tc: var(--s-4); --ti: var(--ink-1); width: 30px; height: 30px; flex: none; border-radius: 50%; display: inline-grid; place-items: center; background: var(--tc); color: var(--ti); font: 700 10px/1 var(--font-ui); letter-spacing: 0.02em; overflow: hidden; box-shadow: 0 0 0 1px rgba(255, 245, 230, 0.08); }
+.qk-team-mark { --tc: var(--s-4); --ti: var(--ink-1); width: 30px; height: 30px; flex: none; border-radius: 50%; display: inline-grid; place-items: center; background: var(--tc); color: var(--ti); font: 700 10px/1 var(--font-ui); letter-spacing: 0.02em; overflow: hidden; box-shadow: 0 0 0 1px rgba(200, 212, 235, 0.1); }
 .qk-team-mark img { width: 100%; height: 100%; object-fit: contain; padding: 3px; background: transparent; }
 .qk-team-mark.img { background: transparent; box-shadow: none; border-radius: 6px; }
 .qk-team-mark.lg { width: 56px; height: 56px; font-size: 16px; }
@@ -338,7 +341,7 @@ body.qk::before { /* a warm glow behind everything: sun at the top left, teal at
 /* ═════════════════════════════════════════════ match card (v1) + ticker */
 .qk-match { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; background: var(--s-1); border: 1px solid var(--line-1); border-radius: var(--r-card); box-shadow: var(--sh-1); min-width: 0; transition: border-color var(--t-fast), transform var(--t-med) var(--ease), background var(--t-fast); }
 a.qk-match:hover { border-color: var(--line-3); transform: translateY(-2px); }
-.qk-match.is-live { border-color: rgba(255, 90, 71, 0.35); }
+.qk-match.is-live { border-color: rgba(255, 77, 46, 0.4); }
 .qk-match-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: var(--fs-xs); color: var(--ink-3); min-width: 0; }
 .qk-match-top .lg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qk-match-teams { display: grid; gap: 9px; }
@@ -364,20 +367,20 @@ a.qk-match:hover { border-color: var(--line-3); transform: translateY(-2px); }
 .qk-mvm-link { position: absolute; top: 50%; height: 2px; margin-top: -1px; background: color-mix(in srgb, var(--ink-3) 40%, transparent); }
 
 /* the broadcast black ticker: scores and our chance, grouped by sport or league */
-.qk-ticker { display: flex; gap: 0; overflow-x: auto; scrollbar-width: none; background: var(--s-ink); border-bottom: 1px solid rgba(255, 240, 215, 0.06); min-height: 58px; }
+.qk-ticker { display: flex; gap: 0; overflow-x: auto; scrollbar-width: none; background: var(--s-ink); border-bottom: 1px solid rgba(200, 212, 235, 0.08); min-height: 58px; }
 .qk-ticker::-webkit-scrollbar { display: none; }
-.qk-tick { flex: none; display: grid; gap: 2px; padding: 8px 14px 9px; border-right: 1px solid rgba(255, 240, 215, 0.07); min-width: 136px; font: 700 12.5px/1.35 var(--font-ui); font-variant-numeric: tabular-nums; color: #f6f0e4; position: relative; }
-.qk-tick:hover { background: #1a1611; }
-.qk-tick-top { display: flex; justify-content: space-between; gap: 10px; font: 700 10px/1.4 var(--font-ui); letter-spacing: 0.08em; text-transform: uppercase; color: #a89d8b; }
-.qk-tick-top .st.live { color: #ff7a6b; }
+.qk-tick { flex: none; display: grid; gap: 2px; padding: 8px 14px 9px; border-right: 1px solid rgba(200, 212, 235, 0.1); min-width: 136px; font: 700 12.5px/1.35 var(--font-ui); font-variant-numeric: tabular-nums; color: #f3f5f8; position: relative; }
+.qk-tick:hover { background: #12151c; }
+.qk-tick-top { display: flex; justify-content: space-between; gap: 10px; font: 700 10px/1.4 var(--font-ui); letter-spacing: 0.08em; text-transform: uppercase; color: #9aa3b2; }
+.qk-tick-top .st.live { color: #ff6a4d; }
 .qk-tick-row { display: flex; justify-content: space-between; gap: 12px; font-weight: 700; }
 .qk-tick-row .s { font-variant-numeric: tabular-nums; }
 .qk-tick-row.fav .s { color: var(--signal); }
-.qk-tick-row.lost { color: #8f8574; font-weight: 600; }
-.qk-tick.is-live { background: rgba(255, 90, 71, 0.08); }
-.qk-tick-bar { position: absolute; left: 14px; right: 14px; bottom: 3px; height: 2px; border-radius: 1px; background: rgba(255, 240, 215, 0.12); overflow: hidden; }
+.qk-tick-row.lost { color: #7c8494; font-weight: 600; }
+.qk-tick.is-live { background: rgba(255, 77, 46, 0.1); }
+.qk-tick-bar { position: absolute; left: 14px; right: 14px; bottom: 3px; height: 2px; border-radius: 1px; background: rgba(200, 212, 235, 0.14); overflow: hidden; }
 .qk-tick-bar i { display: block; height: 100%; background: var(--signal); }
-.qk-tick-grp { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 66px; padding: 0 10px; border-right: 1px solid rgba(255, 240, 215, 0.08); background: var(--s-ink); font: 800 9.5px/1 var(--font-ui); letter-spacing: 0.1em; text-transform: uppercase; color: #cfc4b2; position: sticky; left: 0; z-index: 1; }
+.qk-tick-grp { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 66px; padding: 0 10px; border-right: 1px solid rgba(200, 212, 235, 0.1); background: var(--s-ink); font: 800 9.5px/1 var(--font-ui); letter-spacing: 0.1em; text-transform: uppercase; color: #cfc4b2; position: sticky; left: 0; z-index: 1; }
 .qk-tick-grp .ic { width: 16px; height: 16px; color: var(--sa, var(--accent)); display: grid; place-items: center; }
 .qk-tick-grp .ic svg { width: 16px; height: 16px; }
 .qk-tick-grp b { font-weight: 800; }
@@ -412,7 +415,7 @@ a.qk-match:hover { border-color: var(--line-3); transform: translateY(-2px); }
 .qk-note { display: flex; gap: 10px; align-items: flex-start; padding: 11px 14px; border-radius: 14px; background: var(--s-2); border: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--ink-2); margin-top: 14px; }
 .qk-note:first-child { margin-top: 0; }
 .qk-note b, .qk-note strong { color: var(--ink-1); }
-.qk-note::before { content: "i"; flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font: italic 700 13px/1 var(--font-display); background: var(--sun); color: #1d1a12; margin-top: 1px; }
+.qk-note::before { content: "i"; flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font: italic 700 13px/1 var(--font-display); background: var(--sun); color: var(--volt-ink); margin-top: 1px; }
 .qk-cream .qk-note, .qk-card.cream .qk-note { background: rgba(0, 0, 0, 0.22); }
 /* the italic aside: a one-line reason, a note on a number */
 .qk-aside { font: italic 400 var(--fs-sm)/1.4 var(--font-display); font-variation-settings: var(--fvs-display); color: var(--ink-2); }
@@ -466,7 +469,7 @@ a.qk-match:hover { border-color: var(--line-3); transform: translateY(-2px); }
 .qk-sh { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-3) var(--sp-4); flex-wrap: wrap; margin-bottom: var(--sp-5); position: relative; }
 .qk-sh::after { content: none; }
 .qk-sh-main { min-width: 0; flex: 1 1 320px; }
-.qk-sh-kicker { display: inline-flex; align-items: center; gap: 8px; font: 700 var(--fs-xs)/1.25 var(--font-ui); letter-spacing: var(--tracking-caps); color: var(--coral); margin-bottom: 8px; }
+.qk-sh-kicker { display: inline-flex; align-items: center; gap: 8px; font: 700 var(--fs-xs)/1.25 var(--font-ui); letter-spacing: var(--tracking-caps); color: var(--volt); margin-bottom: 8px; }
 .qk-sh-kicker::before { content: none; }
 .qk .qk-sh-title { font-size: var(--fs-h2); line-height: 1.1; margin: 0; font-weight: 600; }
 .qk-sh.lg .qk-sh-title { font-size: clamp(2.1rem, 4.6vw, 3.4rem); line-height: 1.04; font-weight: 650; }
@@ -478,8 +481,12 @@ a.qk-match:hover { border-color: var(--line-3); transform: translateY(-2px); }
  *    a key under it, and an italic one-line reason ── */
 .qk-gc { display: flex; flex-direction: column; gap: 12px; padding: 20px 22px; background: var(--s-1); border: 1px solid var(--line-1); border-radius: var(--r-card); box-shadow: var(--sh-1); min-width: 0; position: relative; transition: border-color var(--t-fast), transform var(--t-med) var(--ease), box-shadow var(--t-med); }
 a.qk-gc:hover { border-color: var(--line-3); transform: translateY(-2px); box-shadow: var(--sh-2); }
-.qk-gc.is-live { border-color: rgba(255, 90, 71, 0.32); }
+.qk-gc.is-live { border-color: rgba(255, 77, 46, 0.4); }
 .qk-gc.is-live::before { content: none; }
+.qk-gc { overflow: hidden; }
+.qk-gc-stripe { position: absolute; left: 0; right: 0; top: 0; height: 4px; display: flex; gap: 2px; pointer-events: none; }
+.qk-gc-stripe > i { display: block; height: 100%; min-width: 6px; }
+.qk-gc-stripe > i.d { background: var(--wp-draw); }
 .qk-gc-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: var(--fs-xs); color: var(--ink-3); min-width: 0; }
 .qk-gc-lg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; display: block; flex: 0 1 auto; height: 24px; padding: 0 10px; border-radius: var(--r-pill); background: var(--s-2); color: var(--ink-2); font: 700 var(--fs-2xs)/24px var(--font-ui); }
 .qk-gc-lg .qk-sportpill { margin-right: 4px; }
@@ -508,7 +515,7 @@ a.qk-gc:hover { border-color: var(--line-3); transform: translateY(-2px); box-sh
 .qk-form { display: inline-flex; gap: 3px; }
 .qk-form i { width: 17px; height: 17px; border-radius: 5px; display: inline-grid; place-items: center; font: 700 9.5px/1 var(--font-ui); font-style: normal; color: var(--ink-3); background: var(--s-2); }
 .qk-form i.w { background: var(--signal-soft); color: var(--signal); }
-.qk-form i.l { background: rgba(255, 122, 107, 0.14); color: #ff9a8c; }
+.qk-form i.l { background: rgba(255, 106, 77, 0.14); color: #ff8a70; }
 .qk-form i.d { background: var(--s-3); color: var(--ink-2); }
 
 /* win-probability bar: rounded team segments with a gap, numbers (or a key) underneath, the market a quiet tick */
@@ -565,7 +572,7 @@ a.qk-stat:hover { border-color: var(--line-3); transform: translateY(-2px); }
 .qk-ph-face { width: 112px; height: 112px; border-radius: 34px; display: grid; place-items: center; background: var(--tc); color: var(--ti, #fff); font: 650 50px/1 var(--font-display); font-variation-settings: var(--fvs-display); font-variant-numeric: lining-nums; transform: rotate(-3deg); box-shadow: 6px 6px 0 var(--sun); }
 .qk-ph-face.txt { font-size: 34px; }
 .qk-ph-num { display: none; }
-.qk-ph-kicker { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font: 700 var(--fs-xs)/1.3 var(--font-ui); color: var(--coral); }
+.qk-ph-kicker { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font: 700 var(--fs-xs)/1.3 var(--font-ui); color: var(--volt); }
 .qk-ph-kicker a { color: inherit; }
 .qk-ph-kicker a:hover { color: var(--ink-1); }
 .qk-ph-name { margin: 8px 0 0 !important; line-height: 1.02 !important; font-size: clamp(2.2rem, 4.6vw, 3.6rem) !important; font-weight: 650 !important; }
@@ -594,7 +601,7 @@ a.qk-stat:hover { border-color: var(--line-3); transform: translateY(-2px); }
 .qk-pcard-peer .qk-tag { white-space: normal; height: auto; min-height: 22px; padding: 3px 10px; line-height: 1.3; max-width: 100%; }
 .qk-tag { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 10px; border-radius: var(--r-pill); border: 0; background: var(--s-2); font: 700 var(--fs-2xs)/1 var(--font-ui); color: var(--ink-2); white-space: nowrap; }
 .qk-tag.signal { color: var(--signal); background: var(--signal-soft); }
-.qk-tag.sun { color: #1d1a12; background: var(--sun); }
+.qk-tag.sun { color: var(--volt-ink); background: var(--sun); }
 .qk-pscale { display: none; }
 .qk-pgrp + .qk-pgrp { margin-top: 18px; }
 .qk-pgrp-h { font: 700 var(--fs-xs)/1.2 var(--font-ui); color: var(--ink-3); margin: 6px 0 4px; }
@@ -630,7 +637,7 @@ a.qk-stat:hover { border-color: var(--line-3); transform: translateY(-2px); }
 .qk-cmp-lab { color: var(--ink-1); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .qk-cmp-cell { display: grid; grid-template-columns: auto minmax(20px, 1fr) 30px; gap: 8px; align-items: center; min-width: 0; }
 .qk-cmp-cell .v { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; padding: 0 3px; }
-.qk-cmp-cell.best .v { color: var(--ink-1); font-weight: 800; background: linear-gradient(transparent 50%, rgba(255, 201, 77, 0.38) 50%); border-radius: 2px; }
+.qk-cmp-cell.best .v { color: var(--ink-1); font-weight: 800; background: linear-gradient(transparent 84%, var(--volt) 84%); border-radius: 1px; }
 .qk-cmp-cell:not(.best) .v { color: var(--ink-2); }
 .qk-cmp-pb { height: 6px; border-radius: 99px; background: var(--s-3); position: relative; overflow: hidden; }
 .qk-cmp-pb i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; }
@@ -647,6 +654,7 @@ a.qk-stat:hover { border-color: var(--line-3); transform: translateY(-2px); }
   .qk-cmp-ent b { font-size: var(--fs-md); }
   /* three side by side: the value alone (no bar), so each column fits a third of a phone */
   .qk-cmp.n3 .qk-cmp-cell { grid-template-columns: minmax(0, auto); }
+  .qk-cmp.n3 .qk-cmp-cell .v { justify-self: start; }
   .qk-cmp.n3 .qk-cmp-pb { display: none; }
   .qk-cmp.n3 .qk-cmp-ent { padding-left: 7px; }
 }
@@ -692,7 +700,7 @@ a.qk-stat:hover { border-color: var(--line-3); transform: translateY(-2px); }
 
 /* ── feature card (a live or marquee game in the hero) with a sun "scribble" sticker ── */
 .qk-feature { position: relative; padding: 24px; }
-.qk-scribble { position: absolute; right: 20px; top: -16px; transform: rotate(4deg); background: var(--sun); color: #1d1a12; padding: 6px 12px; border-radius: 10px; font: italic 600 14px/1.2 var(--font-display); box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.7); z-index: 2; white-space: nowrap; max-width: calc(100% - 40px); overflow: hidden; text-overflow: ellipsis; }
+.qk-scribble { position: absolute; right: 20px; top: -16px; transform: rotate(4deg); background: var(--sun); color: var(--volt-ink); padding: 6px 12px; border-radius: 10px; font: italic 600 14px/1.2 var(--font-display); box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.7); z-index: 2; white-space: nowrap; max-width: calc(100% - 40px); overflow: hidden; text-overflow: ellipsis; }
 .qk-feature-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .qk-feature-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
 .qk-feature-row .t { display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: var(--fs-lg); min-width: 0; }
@@ -730,12 +738,12 @@ a.qk-hot-card:hover { transform: translateY(-2px); border-color: var(--line-3); 
 
 /* ── stat of the day ── */
 .qk-sotd { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 26px; align-items: center; padding: 26px; }
-.qk-sotd-v { font: 650 clamp(4rem, 9vw, 7rem)/0.9 var(--font-display); font-variation-settings: var(--fvs-display); font-variant-numeric: lining-nums; letter-spacing: -0.04em; color: var(--ink-1); }
+.qk-sotd-v { font: 650 clamp(4rem, 9vw, 7rem)/0.9 var(--font-display); font-variation-settings: var(--fvs-display); font-variant-numeric: lining-nums; letter-spacing: -0.04em; color: var(--volt-ink); background: var(--volt); padding: 18px 24px 14px; border-radius: var(--r-tile); justify-self: start; }
 .qk-sotd h3 { margin: 8px 0 6px; font-size: 1.5rem; }
 .qk-sotd p { color: var(--ink-2); margin: 0; }
 .qk-sotd-nav { display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap; }
 .qk-sotd-nav button { all: unset; cursor: pointer; width: 18px; height: 5px; border-radius: 3px; background: var(--s-4); }
-.qk-sotd-nav button[aria-pressed="true"] { background: var(--sun); width: 30px; }
+.qk-sotd-nav button[aria-pressed="true"] { background: var(--volt); width: 30px; }
 .qk-sotd-nav button:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 @media (max-width: 640px) { .qk-sotd { grid-template-columns: 1fr; gap: 8px; padding: 20px; } }
 
@@ -761,14 +769,14 @@ a.qk-hot-card:hover { transform: translateY(-2px); border-color: var(--line-3); 
 .qk-short p { margin: 0 !important; color: var(--ink-2); font-size: 15px; line-height: 1.55; }
 
 /* ── the live scoreboard bug (broadcast): black, the clock, both scores, our live chance ── */
-.qk-bug { display: inline-flex; align-items: stretch; border-radius: 12px; overflow: hidden; background: var(--s-ink); color: #f6f0e4; font: 800 13px/1 var(--font-ui); font-variant-numeric: tabular-nums; box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 240, 215, 0.08); max-width: 100%; }
+.qk-bug { display: inline-flex; align-items: stretch; border-radius: 12px; overflow: hidden; background: var(--s-ink); color: #f3f5f8; font: 800 13px/1 var(--font-ui); font-variant-numeric: tabular-nums; box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(200, 212, 235, 0.1); max-width: 100%; }
 .qk-bug > span { display: inline-flex; align-items: center; gap: 7px; padding: 8px 11px; white-space: nowrap; }
-.qk-bug .clk { background: #c8321f; color: #fff; letter-spacing: 0.04em; }
+.qk-bug .clk { background: #c92d17; color: #fff; letter-spacing: 0.04em; }
 .qk-bug .clk::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: qk-pulse 1.4s infinite; }
-.qk-bug .tm { border-left: 3px solid var(--tc, #888); }
+.qk-bug .tm { border-left: 3px solid var(--tc, var(--ink-4)); }
 .qk-bug .tm b { font-size: 15px; min-width: 1.2ch; text-align: right; }
-.qk-bug .ch { color: var(--signal); background: #15120d; font-weight: 800; }
-.qk-bug .ch small { color: #a89d8b; font-weight: 700; font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; }
+.qk-bug .ch { color: var(--signal); background: #0e1116; font-weight: 800; }
+.qk-bug .ch small { color: #9aa3b2; font-weight: 700; font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; }
 .qk-bug.lg { font-size: 15px; border-radius: 14px; }
 .qk-bug.lg > span { padding: 11px 14px; }
 .qk-bug.lg .tm b { font-size: 20px; }
@@ -777,7 +785,7 @@ a.qk-hot-card:hover { transform: translateY(-2px); border-color: var(--line-3); 
 
 /* ── game preview card (QK.previewCard): away "at" home, our chance, a note, the match-up factors ── */
 .qk-preview { padding: 24px; gap: 0; }
-.qk-preview.is-live { border-color: rgba(255, 90, 71, 0.32); }
+.qk-preview.is-live { border-color: rgba(255, 77, 46, 0.4); }
 .qk-vs { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; align-items: start; text-align: center; margin: 18px 0 8px; }
 .qk-vs-side { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
 .qk-vs-side .nm { font: 600 1.25rem/1.15 var(--font-display); font-variation-settings: var(--fvs-display); max-width: 100%; overflow-wrap: anywhere; }

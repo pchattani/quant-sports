@@ -1,8 +1,7 @@
 /* The Quant Gridiron — Games (#/games/<S>/<w>): a week of games (old #/week), on kit v3 "Matchday".
- * Week strip, every game as a game card with its one-line reason, grouped by day; our chance for every home side (the
- * market a grey ring, a reference: this page is game detail for the week),
- * our forecast game by game (projected score, margin, points; the market a reference column), and once games are
- * final how our forecast did.
+ * Week strip, every game as a game card with its one-line reason, grouped by day; our chance for every home side,
+ * our forecast game by game (projected score, margin, points), and once games are final how our forecast did. The
+ * market stays on the game page and the Model page only (STYLE_GUIDE).
  * Reads <S>/weeks/<w>.json, falling back to <S>/schedule.json. Refreshes every minute while a game is live. */
 (function (GI) {
 'use strict';
@@ -17,7 +16,7 @@ function strip(S, w) {
 }
 
 /* Our forecast for every game, one row per game: our win chance for the side we favour, the projected score, margin and
- * points, and the market's number as a quiet reference column. */
+ * points. */
 function forecastTable(cards) {
   const list = (cards || []).filter(Boolean);
   if (!list.length) return GI.muted('No games this week.');
@@ -26,16 +25,14 @@ function forecastTable(cards) {
     { label: 'Our chance', align: 'right', title: 'Our pre-game win chance for the side we favour (live: our live win chance)' },
     { label: 'Projected score', align: 'right', title: 'The average score of our game simulations' },
     { label: 'Margin', align: 'right', title: 'Our projected winning margin, points' },
-    { label: 'Points', align: 'right', title: 'Total points we expect' },
-    { label: 'Market', align: 'right', title: 'The prediction-market probability (Kalshi / Polymarket) for the same side, shown as a reference' }
+    { label: 'Points', align: 'right', title: 'Total points we expect' }
   ];
   const rows = list.map(g => {
-    const m = g.model || {}, mk = g.market || {};
+    const m = g.model || {};
     const st = GI.gameState(g), live = st === 'live' || st === 'half', fin = st === 'final';
     const pH = live && isNum(g.wp_home) ? Number(g.wp_home) : (isNum(m.p_home) ? Number(m.p_home) : null);
     const fav = pH === null ? 'home' : (pH >= 0.5 ? 'home' : 'away');
     const mp = pH === null ? null : (fav === 'home' ? pH : 1 - pH);
-    const kp = isNum(mk.p_home) && !fin && !live ? (fav === 'home' ? Number(mk.p_home) : 1 - Number(mk.p_home)) : null;
     const mg = GI.homeLine(m);
     const status = fin ? '<b>' + esc(GI.teamAbbr(g.away)) + ' ' + esc(g.as) + ', ' + esc(GI.teamAbbr(g.home)) + ' ' + esc(g.hs) + '</b>' + (GI.isOT(g) ? ' OT' : '')
       : live ? '<span class="qk-badge live">' + esc(GI.clockText(g.qtr, g.clock) || 'Live') + '</span>' : esc(GI.fmtDate(g.kickoff, { year: false })) + ' ' + esc(GI.fmtTime(g.kickoff));
@@ -45,8 +42,7 @@ function forecastTable(cards) {
       { html: mp === null ? '—' : esc(GI.teamAbbr(g[fav])) + ' <b class="gi-ours">' + GI.pct(mp, 0) + '</b>', v: mp },
       { html: isNum(m.home_pts) && isNum(m.away_pts) ? esc(GI.teamAbbr(g.away)) + ' ' + GI.num(m.away_pts, 0) + '–' + GI.num(m.home_pts, 0) + ' ' + esc(GI.teamAbbr(g.home)) : '—', v: isNum(m.home_pts) ? m.home_pts - m.away_pts : null },
       { html: isNum(mg) ? (Math.abs(mg) < 0.5 ? 'even' : esc(GI.teamAbbr(mg < 0 ? g.home : g.away)) + ' by ' + GI.num(Math.abs(mg), 1)) : '—', v: isNum(mg) ? Math.abs(mg) : null },
-      { html: GI.num(m.total, 1), v: m.total },
-      { html: kp === null ? '<span class="qk-muted">—</span>' : '<span class="qk-muted">' + GI.pct(kp, 0) + '</span>', v: kp }
+      { html: GI.num(m.total, 1), v: m.total }
     ] };
   });
   return GI.tableHTML(cols, rows, { sticky: true });
@@ -97,16 +93,14 @@ GI.route('games', function (el, params) {
       strip(S, w) +
       (games.length ? days.map(x => '<div class="gi-day">' + esc(x.day === 'TBD' ? 'Kickoff to be set' : GI.fmtDate(x.day)) + '</div><div class="qk-auto gi-games" style="--min:290px">' + x.games.map(g => GI.gameCard(g, { why: true })).join('') + '</div>').join('')
         : QK.empty('No games this week', GI.weekType(w, S) === 'REG' ? 'A bye week for everyone?' : 'The round is not set yet.')) +
-      (pre.length ? '<section class="qk-section">' + GI.card('Our chance for every home side', 'Teal: our win chance. Grey ring: the market (Kalshi / Polymarket), a reference, not our forecast', GI.chartBox('gw-chance', Math.max(220, pre.length * 34 + 50), 'Our home win chance, with the market for reference') +
+      (pre.length ? '<section class="qk-section">' + GI.card('Our chance for every home side', 'Our win chance for each home team before kickoff', GI.chartBox('gw-chance', Math.max(220, pre.length * 34 + 50), 'Our home win chance') +
         QK.note('<b>How sure are we?</b> 60% means the home team loses a game like this about 4 times in 10. Football has upsets every week.')) + '</section>' : '') +
-      (games.length ? GI.card('Our forecast, game by game', label + ' · our win chance, the projected score, margin and points; the market column is a reference', forecastTable(games) +
+      (games.length ? GI.card('Our forecast, game by game', label + ' · our win chance, the projected score, margin and points', forecastTable(games) +
         '<p class="gi-cap">Projections are the average of our game simulations. How the game model scores over many seasons is on the <a href="#/calibration">Model page</a>.</p>') : '') +
       review(games);
     GI.sortable(el);
     if (pre.length) {
-      const withMk = pre.filter(g => isNum((g.market || {}).p_home));
-      if (withMk.length) GI.ch.dumbbell('gw-chance', { rows: pre.map(g => ({ label: GI.teamAbbr(g.away) + ' @ ' + GI.teamAbbr(g.home), a: g.model.p_home, b: isNum((g.market || {}).p_home) ? g.market.p_home : g.model.p_home, href: GI.gameHref(g.game_id), sub: GI.fmtDate(g.kickoff, { year: false }) + ' ' + GI.fmtTime(g.kickoff) + (isNum((g.market || {}).p_home) ? '' : ' · no market') })), aName: 'Our chance', bName: 'Market', labelWidth: 90, valName: 'Home win chance', min: 0, max: 1 });
-      else GI.ch.probBars('gw-chance', pre.map(g => ({ label: GI.teamAbbr(g.away) + ' @ ' + GI.teamAbbr(g.home), p: g.model.p_home, colour: GI.teamColour(g.home), href: GI.gameHref(g.game_id) })), { top: 20, labelWidth: 90, valName: 'Home win chance' });
+      GI.ch.probBars('gw-chance', pre.map(g => ({ label: GI.teamAbbr(g.away) + ' @ ' + GI.teamAbbr(g.home), p: g.model.p_home, colour: GI.teamColour(g.home), href: GI.gameHref(g.game_id) })), { top: 20, labelWidth: 90, valName: 'Home win chance' });
     }
     if (live.length) GI.liveRefresh([GI.weekPath(w, S), GI.ypath('schedule.json', S)], 60000);
   });

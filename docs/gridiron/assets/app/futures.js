@@ -1,7 +1,8 @@
-/* The Quant Gridiron — Season forecasts (#/futures; old #/markets), in the Standings section, on Design System 2.0.
+/* The Quant Gridiron — Season forecasts (#/futures; old #/markets), in the Standings section, on kit v3.
  * Every season question we forecast (Super Bowl, conferences, divisions, playoffs, No. 1 seed, win totals, awards):
- * our chance as chance bars with the Kalshi / Polymarket number as a quiet grey tick, and a table with the market as
- * a reference column. Reads <S>/markets.json (current season). */
+ * our chance as chance bars and a table. The market stays off this page (STYLE_GUIDE: the market appears only as a
+ * quiet reference on game detail and the Model page); the win-total questions keep the line the prediction markets
+ * ask about, as the question. Reads <S>/markets.json (current season). */
 (function (GI) {
 'use strict';
 
@@ -10,7 +11,6 @@ const esc = GI.esc, isNum = GI.isNum;
 let SEL = null;
 const ORDER = ['sb', 'conf_afc', 'conf_nfc', 'afc', 'nfc', 'playoffs', 'seed1_afc', 'seed1_nfc', 'seed1', 'win_totals', 'mvp', 'opoy', 'dpoy', 'oroy', 'droy', 'cpoy', 'coty'];
 const AWARD = { mvp: 'MVP', opoy: 'Offensive Player of the Year', dpoy: 'Defensive Player of the Year', oroy: 'Offensive Rookie of the Year', droy: 'Defensive Rookie of the Year', cpoy: 'Comeback Player of the Year', coty: 'Coach of the Year' };
-const MK = 'Market (Kalshi / Polymarket)';
 function labelOf(k, f) {
   if (f && !Array.isArray(f) && (f.label || f.name)) return f.label || f.name;
   if (k === 'sb') return 'Super Bowl';
@@ -40,7 +40,7 @@ function totalsRows(wt) {
   return Object.keys(wt || {}).map(t => {
     const x = wt[t] || {}, k = x.kalshi || x.polymarket || {};
     const mean = isNum(x.mean_wins) ? x.mean_wins : null;
-    return { team: t, exp: mean, line: k.line, mo: k.model_over, ko: k.p_over };
+    return { team: t, exp: mean, line: k.line, mo: k.model_over };
   }).sort((a, b) => (b.exp || 0) - (a.exp || 0));
 }
 function view(el, key, f) {
@@ -48,20 +48,20 @@ function view(el, key, f) {
     const rows = totalsRows(f);
     const need = r => (isNum(r.line) ? Math.floor(Number(r.line)) + 1 : null);
     const ch = rows.filter(r => isNum(r.mo) && isNum(need(r)));
-    el.innerHTML = GI.grid('<div class="qk-span-6">' + (ch.length ? QK.chances(ch.map(r => ({ label: GI.teamName(r.team), sub: need(r) + '+ wins', p: r.mo, market: isNum(r.ko) ? r.ko : null, color: GI.teamColour(r.team), href: GI.teamHref(r.team), mark: teamMark(r.team) })), { max: 1, oursName: 'Our chance of that many wins', marketName: MK }) : GI.muted('No win-total questions yet.')) + '</div>' +
-      '<div class="qk-span-6">' + GI.tableHTML([{ label: 'Team' }, { label: 'Projected wins', align: 'right', title: 'The mean of our simulated seasons' }, { label: 'Question', align: 'right' }, { label: 'Our chance', align: 'right' }, { label: 'Market', align: 'right', title: 'The Kalshi / Polymarket number for the same question, shown as a reference' }],
+    el.innerHTML = GI.grid('<div class="qk-span-6">' + (ch.length ? QK.chances(ch.map(r => ({ label: GI.teamName(r.team), sub: need(r) + '+ wins', p: r.mo, color: GI.teamColour(r.team), href: GI.teamHref(r.team), mark: teamMark(r.team) })), { max: 1, oursName: 'Our chance of that many wins' }) : GI.muted('No win-total questions yet.')) + '</div>' +
+      '<div class="qk-span-6">' + GI.tableHTML([{ label: 'Team' }, { label: 'Projected wins', align: 'right', title: 'The mean of our simulated seasons' }, { label: 'Question', align: 'right' }, { label: 'Our chance', align: 'right' }],
         rows.map(r => ({ _href: GI.teamHref(r.team), cells: [{ html: GI.teamLink(r.team, { short: true }), v: r.team }, { html: GI.num(r.exp, 1), v: r.exp }, { html: isNum(need(r)) ? need(r) + '+ wins' : '—', v: need(r) },
-          { html: '<b class="gi-ours">' + GI.pct(r.mo, 0) + '</b>', v: r.mo }, { html: '<span class="qk-muted">' + GI.pct(r.ko, 0) + '</span>', v: r.ko }] })), { sticky: true, maxHeight: 640 }) + '</div>') +
-      '<p class="gi-cap">Each team’s question is the win total the prediction markets ask about. Full distributions: <a href="' + GI.standingsHref(null, 'wins') + '">Standings → Win totals</a>.</p>';
+          { html: '<b class="gi-ours">' + GI.pct(r.mo, 0) + '</b>', v: r.mo }] })), { sticky: true, maxHeight: 640 }) + '</div>') +
+      '<p class="gi-cap">Each team’s question is a win total: our chance that they reach it. Full distributions: <a href="' + GI.standingsHref(null, 'wins') + '">Standings → Win totals</a>.</p>';
     GI.sortable(el);
     return;
   }
   const player = !!AWARD[key];
   const rows = rowsOf(f).filter(r => isNum(r.model)).sort((a, b) => (b.model || 0) - (a.model || 0));
   if (!rows.length) { el.innerHTML = GI.muted('We do not forecast this question yet.'); return; }
-  el.innerHTML = GI.grid('<div class="qk-span-6">' + QK.chances(rows.map(r => { const e = entity(r, player); return { label: e.text, p: r.model, market: isNum(r.market) ? r.market : null, color: e.colour, href: e.href, mark: e.mark }; }), { limit: 16, marketName: MK }) + '</div>' +
-    '<div class="qk-span-6">' + GI.tableHTML([{ label: player ? 'Player' : 'Team' }, { label: 'Our chance', align: 'right' }, { label: 'Market', align: 'right', title: 'The Kalshi / Polymarket number, shown as a reference' }],
-      rows.map(r => { const e = entity(r, player); return { cells: [{ html: e.html, v: e.text }, { html: '<b class="gi-ours">' + GI.pct(r.model, 1) + '</b>', v: r.model }, { html: '<span class="qk-muted">' + GI.pct(r.market, 1) + '</span>', v: r.market }] }; }), { sticky: true, maxHeight: 560 }) + '</div>');
+  el.innerHTML = GI.grid('<div class="qk-span-6">' + QK.chances(rows.map(r => { const e = entity(r, player); return { label: e.text, p: r.model, color: e.colour, href: e.href, mark: e.mark }; }), { limit: 16 }) + '</div>' +
+    '<div class="qk-span-6">' + GI.tableHTML([{ label: player ? 'Player' : 'Team' }, { label: 'Our chance', align: 'right' }],
+      rows.map(r => { const e = entity(r, player); return { cells: [{ html: e.html, v: e.text }, { html: '<b class="gi-ours">' + GI.pct(r.model, 1) + '</b>', v: r.model }] }; }), { sticky: true, maxHeight: 560 }) + '</div>');
   GI.sortable(el);
 }
 
@@ -69,7 +69,7 @@ GI.route('futures', function (el) {
   const S = GI.currentSeason();
   return GI.loadYear('markets.json', S).then(d => {
     if (!el.isConnected) return;
-    const head = GI.pageHead('Standings · ' + S, 'Season forecasts', 'Our chances from the season simulation for every season question: titles, divisions, the playoffs, win totals and awards. The prediction-market number sits beside ours as a grey tick, for reference.' + (d && d.updated_at ? ' Updated ' + esc(GI.fmtStamp(d.updated_at)) + '.' : ''));
+    const head = GI.pageHead('Standings · ' + S, 'Season forecasts', 'Our chances from the season simulation for every season question: titles, divisions, the playoffs, win totals and awards.' + (d && d.updated_at ? ' Updated ' + esc(GI.fmtStamp(d.updated_at)) + '.' : ''));
     const nav = GI.sectionNav('standings', 'futures');
     if (!GI.ok(d)) { el.innerHTML = head + nav + GI.notBuilt('The season forecasts', d); return; }
     const fut = Object.assign({}, d.futures || {});
@@ -78,11 +78,10 @@ GI.route('futures', function (el) {
     const keys = Object.keys(fut).filter(k => fut[k] && (Array.isArray(fut[k]) ? fut[k].length : Object.keys(fut[k]).length)).sort((a, b) => orderKey(a) - orderKey(b) || a.localeCompare(b));
     if (!SEL || keys.indexOf(SEL) < 0) SEL = keys[0] || null;
     el.innerHTML = head + nav +
-      (d.fetched === false ? GI.note('The market numbers were not fetched on this build: our chances stand alone until they are.') : '') +
-      GI.card('Season questions', 'Our chance as the bar; the grey tick is the ' + esc((Array.isArray(d.sources) ? d.sources : []).join(' / ') || 'prediction-market') + ' number, for reference', keys.length ?
+      GI.card('Season questions', 'Our chance as the bar, from the season simulation', keys.length ?
         '<div class="qk-chips scroll" id="fu-chips" role="group" aria-label="Question">' + keys.map(k => '<button type="button" class="qk-chip" data-value="' + esc(k) + '" aria-pressed="' + (k === SEL) + '">' + esc(labelOf(k, fut[k])) + '</button>').join('') + '</div><div id="fu-body" style="margin-top:14px"></div>'
         : GI.muted('No season forecasts yet.')) +
-      GI.note('<p><b>Our chance</b> comes from 20,000 simulated seasons (the award forecasts from our player models). <b>Market</b> is the public prediction-market number (Kalshi, Polymarket) with the overround removed in proportion, shown only as a reference: markets carry information our models do not, and how our game model compares with the closing line is on the <a href="#/calibration">Model page</a>. For information and entertainment only.</p>');
+      GI.note('<p><b>Our chance</b> comes from 20,000 simulated seasons (the award forecasts from our player models). How our game forecasts have done, and how they compare with the closing line, is on the <a href="#/calibration">Model page</a>. For information and entertainment only.</p>');
     GI.sortable(el);
     const body = el.querySelector('#fu-body');
     const chips = el.querySelector('#fu-chips');

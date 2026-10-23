@@ -245,7 +245,8 @@ CC.route('player', function (el, p) {
     var peerShort = (useSpec ? G.d : (posLabel(cat, pos) || 'players')).toLowerCase();
     var prevPct = null, prevGp = null;
     var pp0 = cur.prev_pct_pos;
-    if (pp0 && typeof pp0 === 'object') { prevPct = pp0.pct && typeof pp0.pct === 'object' ? pp0.pct : pp0; prevGp = isNum(pp0.gp) ? pp0.gp : (isNum(pp0.games) ? pp0.games : null); }
+    /* last season's games from prev_peer (college build.py: {season, pos | role, gp, qualified}) */
+    if (pp0 && typeof pp0 === 'object') { prevPct = pp0.pct && typeof pp0.pct === 'object' ? pp0.pct : pp0; prevGp = cur.prev_peer && isNum(cur.prev_peer.gp) ? cur.prev_peer.gp : (isNum(pp0.gp) ? pp0.gp : (isNum(pp0.games) ? pp0.games : null)); }
     var withRing = function (rows, key) { return rows.map(function (r) { var k = key(r); return Object.assign({}, r, { sub: (!fb && SUB_BB[k]) || SUB[k] || '', prev: prevPct && isNum(prevPct[k]) ? prevPct[k] : null }); }); };
     var railGroups = function () {
       if (useSpec) {
@@ -428,7 +429,7 @@ CC.route('player', function (el, p) {
           pcs.forEach(function (v, i) { if (!isNum(v)) return; var dd = v - Math.max.apply(null, pcs.filter(function (_, j) { return j !== i; }).map(function (z) { return isNum(z) ? z : 0; })); if (!best[i] || dd > best[i].d) best[i] = { m: m, d: dd, v: (E[i].p.values || {})[m.id], mt: mt }; });
           return { label: m.d, tip: m.x || '', better: m.low ? 'low' : 'high', values: E.map(function (e) { return (e.p.values || {})[m.id]; }), pctls: pcs, fmt: function (v) { return CC.fmtMetric(mt, v); } };
         });
-        var names = E.map(function (e) { return String(e.p.name || '').split(' ').slice(-1)[0]; });
+        var names = E.map(function (e) { return QK.surname(e.p.name || ''); });
         QK.$('#pp-cmp-h', el).innerHTML = QK.sectionHead({ kicker: 'Compare', title: names.slice(0, -1).join(', ') + ' or ' + names[names.length - 1] + '?',
           sub: 'The closest matches on this season’s profile, side by side against ' + G.d.toLowerCase() + '. The best in each row is highlighted; the small pills are percentiles.',
           actions: '<a class="qk-more" href="' + esc(CC.href(L, 'lab', null, S, 'kind=compare&p=' + ids.join(','))) + '">Open in Compare</a>' });
@@ -466,7 +467,7 @@ CC.route('player', function (el, p) {
         ya.max = function (v) { if (!(v.max > 0)) return 1; var x = v.max * 1.2, p = Math.pow(10, Math.floor(Math.log(x) / Math.LN10)), n = [1, 2, 2.5, 5, 10].filter(function (k) { return k * p >= x; })[0]; return n * p; };
         var gB = 26 + QKC.nameAxis(xa, 'Opponent, in date order', 'bottom'), gT = 26 + QKC.nameAxis(ya, lab + ' in the game', 'side');
         return { grid: { left: 8, right: 12, top: gT, bottom: gB, containLabel: true }, xAxis: xa, yAxis: ya,
-          tooltip: QKC.tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(255,201,77,.08)' } }, formatter: function (ps) { var g = log[ps[0].dataIndex]; return '<b>' + esc(CC.date(g.date) + ' · ' + (g.home ? 'v ' : 'at ') + CC.tname(L, g.opp) + ' · ' + (g.res || '')) + '</b>' + QKC.tipRow(T.model, lab, CC.f(g[vkLog], vkLog === 'value' || vkLog === 'epa' ? 1 : 0)); } }),
+          tooltip: QKC.tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(125,147,255,.10)' } }, formatter: function (ps) { var g = log[ps[0].dataIndex]; return '<b>' + esc(CC.date(g.date) + ' · ' + (g.home ? 'v ' : 'at ') + CC.tname(L, g.opp) + ' · ' + (g.res || '')) + '</b>' + QKC.tipRow(T.model, lab, CC.f(g[vkLog], vkLog === 'value' || vkLog === 'epa' ? 1 : 0)); } }),
           series: [{ type: 'bar', name: lab, barMaxWidth: 30, data: log.map(function (g, i) {
             var v = isNum(g[vkLog]) ? g[vkLog] : 0;
             var o = { value: v, itemStyle: { color: v < 0 ? T.coral : T.model, borderRadius: v < 0 ? [0, 0, 6, 6] : [6, 6, 0, 0] } };

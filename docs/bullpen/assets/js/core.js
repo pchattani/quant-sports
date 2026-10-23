@@ -129,7 +129,7 @@ const PITCH_NAMES = {
   EP: 'Eephus', FA: 'Fastball', PO: 'Pitchout', IN: 'Intentional ball', UN: 'Unknown', AB: 'Automatic ball', AS: 'Automatic strike'
 };
 /* Kit v3 (Matchday): the Savant families (fastballs red-orange, cutters brown, sliders yellow, curves blue, changeups
-   green, splitters cyan) on the warm dark palette; teal stays "ours", so no pitch type uses it. */
+   green, splitters cyan) on the warm dark palette; blue stays "ours", so no pitch type uses it. */
 const PITCH_COLOURS = {
   FF: '#ef6a4c', FA: '#ef6a4c', SI: '#f39a3d', FT: '#f39a3d', FC: '#b97d4e', SL: '#ffc94d', ST: '#e0b04a', SV: '#94cf7c',
   CU: '#62aef0', KC: '#a08cf0', CS: '#7da7dc', CH: '#5cc183', FS: '#58c5d8', FO: '#86d6c0', SC: '#a9dc7a', KN: '#cbbfa9',

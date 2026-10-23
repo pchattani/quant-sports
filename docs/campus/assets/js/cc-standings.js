@@ -188,7 +188,7 @@ function playoff(node, L, S, season, cfp) {
     return [r.rank, { html: U.teamEnt(L, r.team, { season: S }), v: CC.tname(L, r.team) }, r.record || '—', CC.f(r.score, 2), U.heat(r.p_top12), U.heat(r.conf_champ_p), isNum(r.sos_rank) ? r.sos_rank : '—'];
   }), { maxHeight: 620 }) : QK.empty('No committee proxy', '');
   var actualRk = cfp.actual && cfp.actual.rankings && cfp.actual.rankings.length ? U.table([{ label: '#', align: 'right' }, 'Team'], cfp.actual.rankings.slice(0, 25).map(function (r) { return [r.rank, { html: U.teamEnt(L, r.team, { season: S }), v: CC.tname(L, r.team) }]; }), { maxHeight: 620 }) : '';
-  html += '<div class="qk-grid cc-grid"><div class="qk-span-7">' + U.card('Chance to reach each round', 'Our chances: the share of simulated seasons. Darker teal is likelier.', heat) + '</div><div class="qk-span-5">' +
+  html += '<div class="qk-grid cc-grid"><div class="qk-span-7">' + U.card('Chance to reach each round', 'Our chances: the share of simulated seasons. Darker blue is likelier.', heat) + '</div><div class="qk-span-5">' +
     U.card('Committee proxy', 'How the committee may rank teams, fitted on its past rankings' + (pf.n_seasons ? ' (' + pf.n_seasons + ' seasons; out of sample Spearman ' + CC.f(pf.spearman, 2) + ', ' + (isNum(pf.top12_overlap) && pf.top12_overlap <= 1 ? CC.pct(pf.top12_overlap, 0) + ' of the top 12' : CC.f(pf.top12_overlap, 1) + ' of the top 12') + ' matched)' : '') + '. An estimate, not the committee.', px) +
     (actualRk ? U.card('Final CFP ranking', '', actualRk) : '') + '</div></div>';
   var ctg = cfp.conf_title_games || {};
@@ -356,7 +356,7 @@ function bracket(node, L, S, season, br) {
   var upT = ups.length ? U.table(['Matchup', { label: 'Upset', align: 'right', title: 'Our chance the lower seed wins' }], ups.slice(0, 32).map(function (u) {
     return [{ html: '<span class="cc-ups">(' + u.seed_dog + ') ' + U.teamEnt(L, u.dog, { season: S, abbr: true }) + ' <span class="qk-muted">over</span> (' + u.seed_fav + ') ' + U.teamEnt(L, u.fav, { season: S, abbr: true }) + '</span>', v: u.seed_dog }, U.heat(u.p_upset)];
   }), { maxHeight: 560 }) : QK.empty('No first-round games yet', 'Upset chances appear once the first round is set.');
-  html += '<div class="qk-grid cc-grid"><div class="qk-span-8">' + U.card('Chance to reach each round', (D.actual ? 'Our pre-tournament chances. ' : 'Our chances. ') + 'Darker teal is likelier.', heat) + '</div><div class="qk-span-4">' + U.card('First-round upset chances', 'Our chance the lower seed wins.', upT) + '</div></div>';
+  html += '<div class="qk-grid cc-grid"><div class="qk-span-8">' + U.card('Chance to reach each round', (D.actual ? 'Our pre-tournament chances. ' : 'Our chances. ') + 'Darker blue is likelier.', heat) + '</div><div class="qk-span-4">' + U.card('First-round upset chances', 'Our chance the lower seed wins.', upT) + '</div></div>';
   // bracketology
   var bo = (br.bracketology || []).slice().sort(function (x, y) { return (isNum(x.seed_mean) ? x.seed_mean : 99) - (isNum(y.seed_mean) ? y.seed_mean : 99) || (y.p_ncaa || 0) - (x.p_ncaa || 0); });
   if (bo.length) {

@@ -788,7 +788,7 @@ function gameByGame(body, doc, R, era) {
     var ya = QKC.axis(T, gk ? { min: 5, max: 10, fmt: function (v) { return v.toFixed(0); } } : { min: 0, max: Math.max(3, best + 1), interval: 1 });
     var gB = 26 + QKC.nameAxis(xa, 'Match (date and opponent)', 'bottom'), gT = 26 + QKC.nameAxis(ya, gk ? 'Match rating (out of 10)' : 'Goals and assists in the match', 'side');
     xa.nameGap = 40;
-    var tip = QKC.tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(255,201,77,.08)' } }, formatter: function (ps) {
+    var tip = QKC.tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(125,147,255,.10)' } }, formatter: function (ps) {
       var r = list[ps[0].dataIndex];
       return '<b>' + esc((r.home ? 'v ' : 'at ') + r.opp) + ' · ' + esc(r.res || '') + '</b><div style="color:' + T.ink3 + '">' + esc(compName(r.comp, doc.comps)) + ' · ' + esc(FB.fmtDate(r.date)) + '</div>' +
         (gk ? '' : QKC.tipRow(T.coral, 'Goals', r.g || 0) + QKC.tipRow(T.sky, 'Assists', r.a || 0)) + QKC.tipRow(T.ink3, 'Minutes', r.min) +

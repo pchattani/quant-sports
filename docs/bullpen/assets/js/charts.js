@@ -69,9 +69,9 @@ function rows(x) {
 }
 function median(a) { const s = a.filter(isNum).map(Number).sort((x, y) => x - y); if (!s.length) return null; const k = s.length >> 1; return s.length % 2 ? s[k] : (s[k - 1] + s[k]) / 2; }
 function mean(a) { const s = a.filter(isNum).map(Number); return s.length ? s.reduce((x, y) => x + y, 0) / s.length : null; }
-const DIV_SCALE = [[0, '#3d6dd4'], [0.25, '#7f92c4'], [0.5, '#a39a8c'], [0.75, '#d27a5c'], [1, '#cf3e25']];
-const SEQ_SCALE = [[0, 'rgba(255,201,77,0.06)'], [0.5, 'rgba(255,201,77,0.5)'], [1, '#ffc94d']];
-const XWOBA_SCALE = [[0, '#3d6dd4'], [0.2, '#7f92c4'], [0.35, '#a39a8c'], [0.6, '#e08a5c'], [1, '#cf3e25']];
+const DIV_SCALE = [[0, '#2f6fe0'], [0.25, '#7fa6e6'], [0.5, '#a9adb5'], [0.75, '#f59a72'], [1, '#d9361d']];
+const SEQ_SCALE = [[0, 'rgba(212,255,58,0.06)'], [0.5, 'rgba(212,255,58,0.5)'], [1, '#d4ff3a']];
+const XWOBA_SCALE = [[0, '#2f6fe0'], [0.2, '#7fa6e6'], [0.35, '#a9adb5'], [0.6, '#f59a72'], [1, '#d9361d']];
 
 // ── strike zone ────────────────────────────────────────────────────────────
 
@@ -94,7 +94,7 @@ function zoneShapes(top, bot, opts) {
   // home plate, catcher's view (the point toward the viewer)
   const py = o.plateY !== undefined ? o.plateY : 0.32;
   sh.push({ type: 'path', path: 'M ' + (-w) + ' ' + (py + 0.12) + ' L ' + w + ' ' + (py + 0.12) + ' L ' + w + ' ' + py + ' L 0 ' + (py - 0.14) + ' L ' + (-w) + ' ' + py + ' Z',
-    fillcolor: 'rgba(230,237,243,0.10)', line: { color: '#a39886', width: 1 }, layer: 'below' });
+    fillcolor: 'rgba(230,237,243,0.10)', line: { color: '#8a93a3', width: 1 }, layer: 'below' });
   return sh;
 }
 function zoneOf(list, opts) {
@@ -214,8 +214,8 @@ function fieldShapes(dims) {
   // the wall
   sh.push({ type: 'path', path: 'M ' + wall.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L '), line: { color: '#c9d1d9', width: 2.2 }, layer: 'below' });
   // foul lines
-  sh.push({ type: 'line', x0: 0, y0: 0, x1: first[0], y1: first[1], line: { color: '#a39886', width: 1.2 }, layer: 'below' });
-  sh.push({ type: 'line', x0: 0, y0: 0, x1: last[0], y1: last[1], line: { color: '#a39886', width: 1.2 }, layer: 'below' });
+  sh.push({ type: 'line', x0: 0, y0: 0, x1: first[0], y1: first[1], line: { color: '#8a93a3', width: 1.2 }, layer: 'below' });
+  sh.push({ type: 'line', x0: 0, y0: 0, x1: last[0], y1: last[1], line: { color: '#8a93a3', width: 1.2 }, layer: 'below' });
   // infield dirt arc (95 ft from the rubber) and the diamond
   const arc = [];
   for (let a = -45; a <= 45; a += 3) {
@@ -228,7 +228,7 @@ function fieldShapes(dims) {
   }
   sh.push({ type: 'path', path: 'M 0 0 L ' + arc.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L ') + ' Z', fillcolor: 'rgba(217,128,78,0.10)', line: { color: 'rgba(217,128,78,0.35)', width: 1 }, layer: 'below' });
   const b = 90 / Math.SQRT2;
-  sh.push({ type: 'path', path: 'M 0 0 L ' + b + ' ' + b + ' L 0 ' + (2 * b) + ' L ' + (-b) + ' ' + b + ' Z', line: { color: '#a39886', width: 1 }, fillcolor: 'rgba(63,185,80,0.08)', layer: 'below' });
+  sh.push({ type: 'path', path: 'M 0 0 L ' + b + ' ' + b + ' L 0 ' + (2 * b) + ' L ' + (-b) + ' ' + b + ' Z', line: { color: '#8a93a3', width: 1 }, fillcolor: 'rgba(63,185,80,0.08)', layer: 'below' });
   return sh;
 }
 function ballHover(b) {

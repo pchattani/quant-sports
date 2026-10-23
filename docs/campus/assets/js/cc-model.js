@@ -4,8 +4,10 @@
  * Model: "How sure are we?" at the top (kit v3: QK.howSure from <L>/calibration.json, shown only when the file is
  * there), methodology (docs/campus/MODELS_CFB.md or MODELS_HOOPS.md rendered), the walk-forward backtest against
  * closing lines (calibration.json), the glossary (data/glossary.json) and the terms.
- * Payload copy still reworded here (local payloads, 23 Oct 2026): noteV2 (calibration.json notes say "price"),
- * GLOSS_V2 / GLOSS_DROP (glossary.json carries "Edge", "Fair spread" and the market's "price"). */
+ * Payload copy still reworded here for the local payloads (23 Oct 2026): noteV2 (the local mbb / wbb / cfb
+ * calibration.json notes say "price"), GLOSS_V2 / GLOSS_DROP (the local glossary.json carries "Edge", "Fair spread"
+ * and the market's "price"). The deployed payloads are clean (checked 23 Oct), so these go after the next local
+ * rebuild. */
 (function (CC) {
 'use strict';
 var U = CC.ui, esc = CC.esc, isNum = CC.isNum;
@@ -70,7 +72,7 @@ function compare(el, p) {
       : [{ label: 'Season numbers', rows: rowsOf((cat.metrics || []).slice(0, 10)) }];
     var ents = E.map(function (e) { return { name: e.p.name, href: CC.playerHref(L, e.id, S), colour: null, sub: [CC.tabbr(L, e.p.team), e.p.pos, isNum(e.p.gp) ? e.p.gp + ' GP' : ''].filter(Boolean).join(' · ') }; });
     /* verdicts: for each player, the metric where the player's percentile beats the others' by the most */
-    var short = E.map(function (e) { return String(e.p.name || '').split(' ').slice(-1)[0]; });
+    var short = E.map(function (e) { return QK.surname(e.p.name || ''); });
     var verd = E.map(function (e, i) {
       var bd = 0, br = null;
       groups[0].rows.forEach(function (r) {
@@ -97,7 +99,7 @@ function compare(el, p) {
       if (vs.length < 10) { QK.$('#cmp-dist', el).innerHTML = QK.empty('Too few qualified peers yet', 'The distribution appears with ten or more.'); return; }
       var mt = meta[key] || { fmt: '2' };
       QKC.distribution('#cmp-dist', { values: vs, binCount: 22, lowerBetter: o[2], colorBy: 'flat', fmt: function (v) { return CC.fmtMetric(mt, v); }, xName: o[1] + ' · ' + vs.length + ' qualified peers', yName: 'Players',
-        marks: E.map(function (e, i) { return { x: (e.p.values || {})[key], label: String(e.p.name || '').split(' ').slice(-1)[0], color: CMP_COL[i] }; }).filter(function (x) { return isNum(x.x); }), label: 'Distribution of ' + o[1] });
+        marks: E.map(function (e, i) { return { x: (e.p.values || {})[key], label: QK.surname(e.p.name || ''), color: CMP_COL[i] }; }).filter(function (x) { return isNum(x.x); }), label: 'Distribution of ' + o[1] });
     };
     if (dm.length) { dd(dm[0][0]); QK.seg(QK.$('#cmp-dist-m', el), dd); }
     function wire() {
@@ -279,7 +281,7 @@ function calibration(node, L, d) {
   html += '<p class="cc-note">Walk-forward: every game is predicted with ratings fitted only on games before its date, and nothing is tuned on the season being tested. The closing line is the hardest benchmark there is; matching it is good, beating it is rare.</p>';
   html += informedCard(L, d.informed);
   html += '<div class="qk-grid cc-grid"><div class="qk-span-6">' + U.card('Calibration', 'When we say 70%, does the team win about 70% of the time? Points on the diagonal are well calibrated; dot size is the number of games.', U.chart('cal-rel', 320, 'Reliability diagram')) + '</div>' +
-    '<div class="qk-span-6">' + U.card('Margin error by season', 'Mean absolute error of the predicted margin: ours (teal) and the closing line (grey, the market reference).', U.chart('cal-ps', 320, 'Margin error by season')) + '</div></div>';
+    '<div class="qk-span-6">' + U.card('Margin error by season', 'Mean absolute error of the predicted margin: ours (blue) and the closing line (grey, the market reference).', U.chart('cal-ps', 320, 'Margin error by season')) + '</div></div>';
   var summ = [['Ours', m], ['Market (closing line)', c], ['Elo baseline', el0]].concat(s.espn_predictor ? [['ESPN predictor', s.espn_predictor]] : []);
   html += '<div class="qk-grid cc-grid"><div class="qk-span-6">' + U.card('Summary', '', U.table(['', { label: 'Games', align: 'right' }, { label: 'Brier', align: 'right' }, { label: 'Log loss', align: 'right' }, { label: 'Winner right', align: 'right' }, { label: 'Margin MAE', align: 'right' }],
     summ.map(function (r) { var x = r[1] || {}; return [r[0], isNum(x.n) ? QK.fmt.num(x.n) : '—', CC.f(x.brier, 4), CC.f(x.logloss, 4), CC.pct(x.acc, 1), CC.f(x.mae, 2)]; }), { sticky: false })) + '</div>' +

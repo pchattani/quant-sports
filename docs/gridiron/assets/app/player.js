@@ -117,7 +117,7 @@ function drawGameByGame(id, spec, log) {
     const gB = 26 + QKC.nameAxis(xa, 'Week and opponent', 'bottom'), gT = 26 + QKC.nameAxis(ya, spec.y, 'side');
     xa.nameGap = 40;
     const col = k => (k === 'coral' ? T.coral : k === 'sky' ? T.sky : T.model);
-    const tip = QKC.tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(255,201,77,.08)' } }, formatter: ps => {
+    const tip = QKC.tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(125,147,255,.10)' } }, formatter: ps => {
       const r = rows[ps[0].dataIndex];
       const extra = spec.s[0][0] === 'x_yds' ? QKC.tipRow(T.ink3, 'Catches / targets', (r.x_rec || 0) + ' / ' + (r.x_tgt || 0)) + QKC.tipRow(T.ink3, 'Touchdowns', r.x_td || 0)
         : spec.s[0][0] === 'd_tkl' ? QKC.tipRow(T.ink3, 'Sacks', r.d_sacks || 0) + QKC.tipRow(T.ink3, 'Interceptions', r.d_int || 0) + QKC.tipRow(T.ink3, 'Passes defensed', r.d_pd || 0)
@@ -359,9 +359,12 @@ GI.route('player', function (el, params) {
           if (ab) { ab.textContent = 'All ' + peerShort; ab.setAttribute('href', GI.ghref('players', S, { g: g.code })); }
           el.querySelectorAll('.gi-peer-name').forEach(n => { n.textContent = peerShort; });
         }
+        // last season's ring from the player file (careers.add_prev_pct): the pool the rail ranks in this season, so
+        // QB, RB, K, P, WR and TE read prev_pct_pos (their pct / pct_pos pool), defenders prev_pct_role; prev_peer has
+        // last season's games. Without them, last season's catalogue below.
         let prevPct = null, prevGp = null;
-        const pp0 = now.prev_pct_pos;
-        if (pp0 && typeof pp0 === 'object') { prevPct = pp0.pct && typeof pp0.pct === 'object' ? pp0.pct : pp0; prevGp = isNum(pp0.games) ? pp0.games : (isNum(pp0.gp) ? pp0.gp : null); }
+        const pp0 = /^(qb|rb|k|p|wr|te)$/.test(g.id) ? now.prev_pct_pos : now.prev_pct_role;
+        if (pp0 && typeof pp0 === 'object' && Object.keys(pp0).length) { prevPct = pp0; prevGp = now.prev_peer && isNum(now.prev_peer.games) ? now.prev_peer.games : null; }
         const railRows = () => GI.SP.headline(g).map(m => { const v = GI.SP.value(row, pid, m, cx); const pv = prevPct && isNum(prevPct[m[0]]) ? Number(prevPct[m[0]]) : null;
           return { label: m[1] + (m[3] ? ' ↓' : ''), sub: SUB[m[0]] || '', pctl: GI.SP.pct(row, pid, g, m, cx), prev: pv, value: isNum(v) ? GI.SP.fmt(m, v, cx) : '—', tip: m[5] + ' ' + GI.SP.m50Text(m), early: GI.SP.early(row, m) }; });
         const rail = () => QK.pctRail({ kicker: 'How they stack up', title: 'Percentiles: how the player ranks', peer: g.peer + ', qualified', sample: [GI.SP.sample(row, g), 'qualified: ' + GI.SP.minLine(g)].filter(Boolean).join(' · '),
@@ -384,7 +387,8 @@ GI.route('player', function (el, params) {
         // playing style
         const st = GI.SP.style(g).map(m => { const v = GI.SP.value(row, pid, m, cx); const r = GI.SP.pct(row, pid, g, [m[0], m[1], m[2], 0, 0, m[5], m[6]], cx); return isNum(v) && isNum(r) ? { label: m[1], pctl: m[3] ? 100 - r : r, value: GI.SP.fmt(m, v, cx), tip: m[5] + ' ' + GI.SP.m50Text(m), style: true, early: GI.SP.early(row, m) } : null; }).filter(Boolean);
         GI.set('pp-style', st.length ? GI.card('Playing style', 'How the player plays, not how well: rank among peers from low to high, in neutral grey', QK.pctlBars(st)) : '');
-        // last season's ring: the payload's prev_pct_pos when it has one, else last season's catalogue when the rail comes into view
+        // last season's ring: the payload's prev_pct_pos / prev_pct_role when it has them, else (fallback) last season's
+        // catalogue when the rail comes into view
         if (!prevPct) {
           const host = document.getElementById('pp-pcard');
           let fired = false;

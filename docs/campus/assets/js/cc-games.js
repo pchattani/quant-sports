@@ -2,7 +2,7 @@
  * Games: by week (cfb: weeks, championship week, bowls, playoff) or by day (basketball), filters for ranked teams,
  * conference games, a conference, close lines and model-v-market gaps. Reads <L>/<S>/schedule.json.
  * Game centre (kit v3 "Matchday", the Rink game page is the reference): the hero is QK.previewCard (away "at" home
- * with records, the score bug when live, our chance for the favourite as a big teal number with a how-sure note, the
+ * with records, the score bug when live, our chance for the favourite as a big blue number with a how-sure note, the
  * team-colour bar, the market as a quiet labelled reference before the game, how the teams match up from the
  * ratings); beside it the tiles and our forecast table (the market a reference column; "How our forecast is built",
  * the trial labelled as a trial); then win probability (model and ESPN), score flow, drives and EPA (cfb),
@@ -62,7 +62,7 @@ CC.route('games', function (el, p) {
     var chips = QK.note('<b>How sure are we?</b> 70% means the underdog still wins a game like this about 3 times in 10. Toss-ups are the games we can barely split.') + '<div class="qk-chips scroll cc-filters" id="g-chips" role="group" aria-label="Filters">' +
       [['ranked', fb ? 'Ranked' : 'Ranked or seeded'], ['conf', 'Conference games'], ['close', 'Toss-ups (35–65%)']].map(function (x) {
         return '<button type="button" class="qk-chip" style="--ca:var(--signal)" data-value="' + x[0] + '" aria-pressed="false">' + esc(x[1]) + '</button>'; }).join('') + '</div>';
-    el.innerHTML = U.head('Games', (fb ? 'Every game involving an FBS team, week by week' : 'Every game involving a Division I team, day by day') + ', with our chance for each side and a line on why it’s worth your time (the favourite in teal). Tap a game for its page.', U.kicker(L, S)) +
+    el.innerHTML = U.head('Games', (fb ? 'Every game involving an FBS team, week by week' : 'Every game involving a Division I team, day by day') + ', with our chance for each side and a line on why it’s worth your time (the favourite in blue). Tap a game for its page.', U.kicker(L, S)) +
       '<div class="cc-toolbar">' + nav + '<select class="qk-select" id="g-conf" aria-label="Conference">' + confOpts + '</select></div>' + chips + '<div id="g-sum" class="cc-note"></div><div id="g-list"></div>';
     QK.$('#g-conf', el).value = flt.cid;
     function paint() {

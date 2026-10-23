@@ -1,5 +1,5 @@
-/* The Quant — chart kit, v3 "Matchday" (dark only, warm; every v1 and v2 call still works) on Apache ECharts 5.
- * Conventions: STYLE_GUIDE.md §6. v3 theme: a warm dashed grid, DM Sans labels, every axis titled, teal for ours
+/* The Quant — chart kit, v3 "Matchday" in the Broadcast colours (dark only; every v1 and v2 call still works) on Apache ECharts 5.
+ * Conventions: STYLE_GUIDE.md §6. v3 theme: a cool dashed grid, DM Sans labels, every axis titled, blue for ours
  * (the first categorical slot), annotations in italic Fraunces (QKC.annot), rounded tooltips.
  * Load after quant.js and after
  *   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" defer></script>
@@ -44,7 +44,8 @@ QKC.tokens = function () {
     seq: [tok('--seq-1'), tok('--seq-2'), tok('--seq-3'), tok('--seq-4'), tok('--seq-5')],
     fontUI: tok('--font-ui') || 'system-ui, sans-serif', fontNum: tok('--font-num') || 'system-ui, sans-serif',
     fontDisplay: tok('--font-display') || 'Georgia, serif',
-    sun: tok('--sun') || '#ffc94d', coral: tok('--coral') || '#ff7a5c', sky: tok('--sky') || '#6aa8ec',
+    sun: tok('--volt') || '#d4ff3a', volt: tok('--volt') || '#d4ff3a', actual: tok('--c-actual') || tok('--volt') || '#d4ff3a',
+    coral: tok('--coral') || '#ff6a4d', sky: tok('--sky') || '#5ec8f0',
     dark: true
   };
   T.cat = [1, 2, 3, 4, 5, 6, 7, 8].map(function (i) { return tok('--c-' + i); });
@@ -932,7 +933,7 @@ QKC.distribution = function (el, s) {
 
 /* ─────────────────────────────────────── chances (horizontal probability bars, ours first) */
 /* QKC.chances(el, { rows: [{ label, p, market, color, href, sub }], valName: 'Chance', marketName: 'Market', max, limit,
- * teamColours: true }) The bars are our chance (teal; team colours only with teamColours); the market, where there is
+ * teamColours: true }) The bars are our chance (blue; team colours only with teamColours); the market, where there is
  * one, is a quiet grey tick. */
 QKC.chances = function (el, s) {
   var rows = (s.rows || []).filter(function (r) { return r && isNum(r.p); }).slice().sort(function (a, b) { return b.p - a.p; });
@@ -952,7 +953,7 @@ QKC.chances = function (el, s) {
 /* ─────────────────────────────────────── calibration ("How sure are we?") */
 /* QKC.calibration(el, { bins: [{ lo, hi, n, mean_p, freq }] (0-1), subject: 'the home team', unit: 'games',
  *   xName, yName, annotate: true, min, max (axis range in %, default fitted to the bins in steps of 10), label })
- * Our forecast chance (x) against how often it happened (y), one teal dot per bucket sized by its count, the dashed
+ * Our forecast chance (x) against how often it happened (y), one blue dot per bucket sized by its count, the dashed
  * diagonal labelled "dashed line = spot on", and italic notes on the busiest bucket and the top one. */
 QKC.calibration = function (el, s) {
   var bins = (s.bins || []).filter(function (b) { return b && isNum(b.mean_p) && isNum(b.freq) && b.n > 0; });
@@ -1015,7 +1016,7 @@ QKC.calibration = function (el, s) {
         { type: 'scatter', name: 'Our forecasts', z: 3, data: pts,
           symbolSize: function (v, p) { return 9 + 26 * Math.sqrt((p.data && p.data.n || 0) / nMax); },
           itemStyle: { color: T.model, borderColor: T.s1, borderWidth: 2, opacity: 0.95 },
-          labelLayout: placeNote, labelLine: { show: true, lineStyle: { color: T.ink3, width: 1 } } }
+          labelLayout: placeNote, labelLine: { show: true, lineStyle: { color: T.actual, width: 1 } } }
       ]
     };
   }, { label: s.label || 'Calibration: our forecast chance against how often ' + subj + ' won' });

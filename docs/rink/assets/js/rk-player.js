@@ -84,7 +84,7 @@ function render(el, params, state) {
     const tagsH = [];
     if (catP && catP.qualified) tagsH.push(QK.tag('Qualified for percentiles', 'signal'));
     if (vv && Array.isArray(vv.inj) && vv.inj[0]) tagsH.push('<span class="qk-tag rk-inj">' + esc(vv.inj[0]) + '</span>');
-    const mates = c && (c.linemates || []).length ? c.linemates.slice(0, 2).map(m => RK.playerSurname(m[0]) || String(m[1]).split(' ').slice(-1)[0]) : [];
+    const mates = c && (c.linemates || []).length ? c.linemates.slice(0, 2).map(m => RK.playerSurname(m[0]) || QK.surname(m[1])) : [];
     const hero = QK.playerHeader({ name: p.name, number: p.number, pos: posName,
       kicker: (last.season ? RK.seasonLabel(last.season) : '') + (gpNow ? ' · ' + gpNow + ' game' + (gpNow === 1 ? '' : 's') + ' in' : ''),
       team: curTeam ? { name: RK.teamName(curTeam), abbr: RK.teamAbbr(curTeam), colour: RK.teamColourRaw(curTeam), href: RK.teamHref(curTeam) } : null,
@@ -251,13 +251,13 @@ function render(el, params, state) {
         const ya = QKC.axis(T, goalie ? { fmt: v => v.toFixed(1) } : { min: 0, max: Math.max(4, best + 1), interval: 1 });
         const gB = 26 + QKC.nameAxis(xa, 'Game (date and opponent)', 'bottom'), gT = 26 + QKC.nameAxis(ya, goalie ? 'Goals saved above expected' : 'Points in the game', 'side');
         xa.nameGap = 40;
-        const tip = QKC.tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(255,201,77,.08)' } }, formatter: ps => { const r = lg[ps[0].dataIndex]; return '<b>' + esc((r.home ? 'v ' : 'at ') + r.opp) + ' · ' + esc(r.result || '') + '</b>' + (goalie ? QKC.tipRow(T.model, 'GSAx', U.signed(r.gsax, 2)) : QKC.tipRow(T.coral, 'Goals', r.g) + QKC.tipRow(T.sky, 'Assists', r.a) + QKC.tipRow(T.ink3, 'Shots', r.sog) + QKC.tipRow(T.ink3, 'Expected goals', U.f(r.ixg, 2)) + QKC.tipRow(T.ink3, 'Minutes', U.f(r.toi, 1))); } });
+        const tip = QKC.tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(125,147,255,.10)' } }, formatter: ps => { const r = lg[ps[0].dataIndex]; return '<b>' + esc((r.home ? 'v ' : 'at ') + r.opp) + ' · ' + esc(r.result || '') + '</b>' + (goalie ? QKC.tipRow(T.model, 'GSAx', U.signed(r.gsax, 2)) : QKC.tipRow(T.coral, 'Goals', r.g) + QKC.tipRow(T.sky, 'Assists', r.a) + QKC.tipRow(T.ink3, 'Shots', r.sog) + QKC.tipRow(T.ink3, 'Expected goals', U.f(r.ixg, 2)) + QKC.tipRow(T.ink3, 'Minutes', U.f(r.toi, 1))); } });
         if (goalie) return { grid: { left: 8, right: 12, top: gT, bottom: gB, containLabel: true }, xAxis: xa, yAxis: ya, tooltip: tip,
           series: [{ type: 'bar', name: 'GSAx', barMaxWidth: 30, data: lg.map(r => ({ value: r.gsax, itemStyle: { color: r.gsax >= 0 ? T.model : T.coral, borderRadius: 6 } })) }] };
         return { grid: { left: 8, right: 12, top: gT, bottom: gB, containLabel: true }, xAxis: xa, yAxis: ya, tooltip: tip,
           legend: { top: 0, right: 0, itemWidth: 12, itemHeight: 12, icon: 'roundRect', textStyle: { color: T.ink2, fontFamily: T.fontUI, fontSize: 12 } },
           series: [{ type: 'bar', name: 'Goals', stack: 'p', barMaxWidth: 30, data: lg.map(r => r.g || 0), itemStyle: { color: T.coral, borderColor: T.s1, borderWidth: 1 } },
-            { type: 'bar', name: 'Assists', stack: 'p', barMaxWidth: 30, data: lg.map((r, i) => {
+            { type: 'bar', name: 'Assists', stack: 'p', barMaxWidth: 30, itemStyle: { color: T.sky }, data: lg.map((r, i) => {
               const o = { value: r.a || 0, itemStyle: { color: T.sky, borderRadius: [6, 6, 0, 0], borderColor: T.s1, borderWidth: 1 } };
               if (i === bi && best >= 3) o.label = Object.assign(QKC.annot(T), { show: true, position: 'top', formatter: best + ' points' });
               return o; }) }] };

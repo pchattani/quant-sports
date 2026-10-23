@@ -87,7 +87,7 @@ function draw(el, c) {
   const ok = U.meets(blk, setKey, tg);
   const peer = U.peerName(setKey);
   const peerShort = peer.replace(/^MLB /, '');
-  const sur = BP.playerSurname(pid) || String(p.name).split(' ').slice(-1)[0];
+  const sur = BP.playerSurname(pid) || QK.surname(p.name);
   const n = blk.n || {};
   document.title = p.name + ' · ' + BP.SITE;
   const posName = pit ? (blk.role === 'RP' ? 'Relief pitcher' : 'Starting pitcher') : ({ C: 'Catcher', '1B': 'First base', '2B': 'Second base', '3B': 'Third base', SS: 'Shortstop', LF: 'Left field', CF: 'Centre field', RF: 'Right field', DH: 'Designated hitter', TWP: 'Two-way player' }[String(blk.pos || p.pos)] || blk.pos || p.pos);
@@ -163,7 +163,7 @@ function draw(el, c) {
     '<p style="margin:0;color:var(--ink-2);font-size:15px">' + (pit ? 'Strikeouts and Stuff+ settle fast; runs allowed and results on balls in play take far longer, so lean on the first two early on. ' : 'Strikeouts and walks settle within weeks; batting average on balls in play takes seasons, which is why the rail leans on what the contact deserved. ') +
     'The hollow rings show last season, where there was one.</p>' + (settle.length ? QK.note('For ' + esc(peerShort) + ': ' + settle.join(', ').replace(/, ([^,]*)$/, ', and $1') + '. This player has ' + (isNum(samp) ? QK.fmt.num(Math.round(samp)) : 'none') + '.') : '') + '</div></article>';
   const roll = !pit && Array.isArray(cur.rolling) && cur.rolling.length > 5;
-  const formCard = roll ? U.card2('Form through the season', 'Rolling xwOBA+ (what the contact deserved, teal) against wOBA (what happened)', U.chart('pp-roll', 240, 'Rolling xwOBA+ and wOBA')) : '';
+  const formCard = roll ? U.card2('Form through the season', 'Rolling xwOBA+ (what the contact deserved, blue) against wOBA (what happened)', U.chart('pp-roll', 240, 'Rolling xwOBA+ and wOBA')) : '';
   const simAll = (p.similar || []).filter(m => String(m.pid) !== pid);
   const seenS = {}, simU = simAll.filter(m => (seenS[m.pid] ? false : (seenS[m.pid] = 1))).slice(0, 4);
   const typeCard = simU.length ? '<article class="qk-card"><div class="qk-card-body"><div class="qk-kicker">Their type</div><h4 class="bp-h4">Plays most like</h4><ul class="bp-list bp-type">' +
@@ -255,7 +255,7 @@ function draw(el, c) {
       pcl.forEach((x, i) => { if (!isNum(x)) return; const d = x - Math.max.apply(null, pcl.filter((_, j) => j !== i).map(z => (isNum(z) ? z : 0))); if (!bestOf[i] || d > bestOf[i].d) bestOf[i] = { k: kk, d: d, v: (E[i].values || {})[kk], m: m }; });
       return { label: m.label, tip: m.tip, better: m.lower ? 'low' : 'high', values: E.map(e => (e.values || {})[kk]), pctls: pcl, fmt: z => U.fmtBy(m, z) };
     }) })).filter(g => g.rows.length);
-    const names = ids.map(id => BP.playerSurname(id) || String((P[id] || {}).name || '').split(' ').slice(-1)[0]);
+    const names = ids.map(id => BP.playerSurname(id) || QK.surname((P[id] || {}).name || ''));
     el.querySelector('#pp-cmp-h').innerHTML = QK.sectionHead({ kicker: 'Compare', title: names.slice(0, -1).join(', ') + ' or ' + names[names.length - 1] + '?',
       sub: 'The closest ' + esc(peerShort) + ' to this player’s profile this season, side by side. The best in each row is highlighted; the small pills are percentiles.',
       actions: '<a class="qk-more" href="' + esc(BP.compareHref(ids[0], ids[1])) + '">Open in Compare</a>' });

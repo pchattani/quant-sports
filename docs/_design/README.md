@@ -1,6 +1,6 @@
 # The Quant design system (kit v3 "Matchday", dark only, Oct 2026)
 
-> v3 replaced v2 "Signal" on 23 Oct 2026: warm charcoal, Fraunces and DM Sans, teal for ours, dark only. The spec is
+> v3 replaced v2 "Signal" on 23 Oct 2026: Fraunces and DM Sans, dark only; colours from the Broadcast concept (near-black, cobalt for ours, volt accents). The spec is
 > `STYLE_GUIDE.md`, the move guide `MIGRATION_V3.md`; the rest of this file is the older kit reference and still
 > holds for the v1/v2 APIs, which are unchanged.
 

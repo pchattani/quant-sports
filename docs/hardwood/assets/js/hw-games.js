@@ -128,7 +128,7 @@ function boxTable(node, L, g, tid, S) {
 }
 
 /* v3 (Matchday) hero: QK.previewCard — away "at" home with records, the score bug when live, our chance for the
-   favourite as a big teal number, a plain-English note (the margin and total we expect), the market as a quiet
+   favourite as a big blue number, a plain-English note (the margin and total we expect), the market as a quiet
    reference line before tip-off (game detail is one of the two places it may appear), and how the teams match up. */
 function headHTML(L, g, S, season) {
   const st = U.status(g);

@@ -2,7 +2,7 @@
  *
  *   head: event, round, surface, the score by set (tiebreaks in superscript), status;
  *   kit v3 hero (QK.previewCard): both players with ranking and country, the score in sets (the score bug when live),
- *     our chance for the favourite as a big teal number with a "how sure" note, the bar, the market as a quiet labelled
+ *     our chance for the favourite as a big blue number with a "how sure" note, the bar, the market as a quiet labelled
  *     line before the first ball, and how the two match up (Elo, surface Elo, inferred hold and serve points); beside
  *     it the set-by-set board, stat tiles (our chance, likeliest score, expected games) and our forecast table;
  *   before the match: our forecast and its components (Elo, serve/return, the market-rating term), with the
@@ -197,8 +197,8 @@ function preBoxes(T, d) {
     (!isNum(m.mr_p) && isNum(m.blend_w) ? '<div class="section-note">Blend weight on Elo ' + TA.num(m.blend_w, 2) + '.</div>' : '');
 }
 
-/* v3 (Matchday) hero: QK.previewCard on the kit shape (p1 on the left, p2 on the right; tennis has no home side, so
-   the card reads "v", not "at"). The market appears here only before the first ball, as a quiet labelled line. */
+/* v3 (Matchday) hero: QK.previewCard on the kit shape (p1 on the left, p2 on the right; the kit's tennis defaults
+   read "v" and "a match like this"). The market appears here only before the first ball, as a quiet labelled line. */
 function hero(T, d, p1, ev, surface) {
   const st = TA.matchState(d), fin = TA.isFinished(d), live = st === 'live', pre = !fin && !live;
   const mk = (d.pre || {}).market || null;
@@ -207,7 +207,7 @@ function hero(T, d, p1, ev, surface) {
   if (live && isNum(d.wp_now)) { G.wp_home = 1 - d.wp_now; G.pre_only = undefined; }
   const rec = pid => { const rk = TA.playerRank(T, pid), cc = TA.playerCountry(T, pid); return [isNum(rk) ? 'No. ' + rk : 'Unranked', cc].filter(Boolean).join(' · '); };
   G.away.record = rec(d.p1); G.home.record = rec(d.p2);
-  // how they match up: ratings and the inferred serve numbers, the better side in teal
+  // how they match up: ratings and the inferred serve numbers, the better side in blue
   const e = (d.pre || {}).elo || {}, ea = e.p1 || {}, eb = e.p2 || {};
   const sf = surface && surface !== 'all' ? surface : null;
   const sa = isNum(ea.surface) ? ea.surface : (sf ? ea[sf] : null), sb = isNum(eb.surface) ? eb.surface : (sf ? eb[sf] : null);
@@ -222,20 +222,12 @@ function hero(T, d, p1, ev, surface) {
   add('Ranking', TA.playerRank(T, d.p1), TA.playerRank(T, d.p2), v => 'No. ' + v, true);
   const dist = ((d.pre || {}).model || {}).dist || {};
   const top = Object.keys(dist.sets || {}).sort((x, y) => dist.sets[y] - dist.sets[x])[0];
-  let note;
-  if (!fin && isNum(p1)) {
-    const fav = p1 >= 0.5 ? d.p1 : d.p2, pf = live && isNum(d.wp_now) ? (fav === d.p1 ? d.wp_now : 1 - d.wp_now) : Math.max(p1, 1 - p1);
-    const miss = Math.max(1, Math.round(10 * (1 - pf)));
-    note = '<b>How sure are we?</b> ' + TA.pct(pf, 0) + ' means ' + esc(TA.playerShort(T, fav)) + ' loses a match like this about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.' +
-      (pre && top ? ' The likeliest score is ' + esc(top) + ' in sets (' + TA.pct(dist.sets[top], 0) + ', ' + esc(TA.playerSurname(T, d.p1)) + ' first)' + (isNum(dist.exp_games) ? ', with about ' + Math.round(dist.exp_games) + ' games in all.' : '.') : '');
-  }
-  else if (fin && isNum(p1)) {
-    const fav = p1 >= 0.5 ? d.p1 : d.p2;
-    note = 'Our pre-match call: <b>' + esc(TA.playerShort(T, fav)) + ' ' + TA.pct(Math.max(p1, 1 - p1), 0) + '</b>. ' + esc(QK.whyLine(G));
-  }
+  // the kit writes the "How sure are we?" note ("loses a match like this") and the pre-match call once it is over;
+  // before the first ball the likeliest set score rides along
+  const extra = !fin && pre && isNum(p1) && top ? 'The likeliest score is ' + esc(top) + ' in sets (' + TA.pct(dist.sets[top], 0) + ', ' + esc(TA.playerSurname(T, d.p1)) + ' first)' + (isNum(dist.exp_games) ? ', with about ' + Math.round(dist.exp_games) + ' games in all.' : '.') : '';
   const kick = [TA.tourName(T), TA.eventName(T, d.event), TA.roundLabel(d.round), TA.surfaceLabel(surface, ev.indoor)].filter(Boolean).join(' · ');
-  const card = QK.previewCard(G, { kicker: kick, nick: t => t.name, factors: fx, factorsTitle: 'How they match up', note: note,
-    market: pre && mk && isNum(mk.p1) ? { p: 1 - mk.p1, label: 'Market (' + (TA.sourceNames(mk.sources).join(' / ') || 'prediction markets') + ')' } : null }).replace('<div class="at">at</div>', '<div class="at">v</div>');
+  const card = QK.previewCard(G, { kicker: kick, nick: t => t.name, factors: fx, factorsTitle: 'How they match up', noteExtra: extra,
+    market: pre && mk && isNum(mk.p1) ? { p: 1 - mk.p1, label: 'Market (' + (TA.sourceNames(mk.sources).join(' / ') || 'prediction markets') + ')' } : null });
   const tba = d.tba || String(d.date || '').length <= 10;
   const meta = [ev.level ? TA.levelLabel(ev.level, T) : '', d.best_of ? 'Best of ' + d.best_of : '',
     pre ? TA.fmtDate(d.date, { year: false }) + (tba ? ', time to be announced' : ' ' + TA.fmtTime(d.date) + ' your time') : TA.fmtDate(d.date, { year: false }), isNum(d.duration_min) ? TA.fmtDuration(d.duration_min) : ''].filter(Boolean);

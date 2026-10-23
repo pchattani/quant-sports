@@ -116,11 +116,11 @@ function draw(body, L, S, E, cat, roles, fellBack) {
         dfmt: pctFmt ? (x => (x > 0 ? '+' : x < 0 ? '−' : '±') + Math.abs(x * 100).toFixed(1) + ' pts') : null };
     })
   }));
-  const ents = E.map(id => { const p = P[id]; return { name: p.name, href: HW.playerHref(L, id, S), abbr: String(p.name || '').split(' ').slice(-1)[0],
+  const ents = E.map(id => { const p = P[id]; return { name: p.name, href: HW.playerHref(L, id, S), abbr: QK.surname(p.name || ''),
     sub: [HW.teamAbbr(L, p.team), (U.ROLE1 || {})[U.roleOf(p, id, roles)] || p.pos, (p.gp || 0) + ' GP', Number(Math.round(p.min || 0)).toLocaleString('en-GB') + ' min'].join(' · ') }; });
   const short = E.filter(id => !P[id].qualified).map(id => P[id].name);
   /* verdicts: for each player, the metric where the player's percentile beats the others' by the most */
-  const sn = E.map(id => String(P[id].name || '').split(' ').slice(-1)[0]);
+  const sn = E.map(id => QK.surname(P[id].name || ''));
   const verd = E.map((id, i) => {
     let bestRow = null, bestD = 0;
     groups.forEach(g => g.rows.forEach(r => {
@@ -148,7 +148,7 @@ function draw(body, L, S, E, cat, roles, fellBack) {
     const vals = pool.map(x => (x.values || {})[key]).filter(isNum).sort((a, b) => a - b);
     if (vals.length < 5) { body.querySelector('#cmp-dist').innerHTML = QK.empty('Too few qualified peers yet'); return; }
     QKC.distribution('#cmp-dist', { values: vals, binCount: 22, lowerBetter: m.better === 'low', fmt: x => U.fmtM(key, x), colorBy: 'flat', xName: m.label + ' · ' + vals.length + ' qualified peers', yName: 'Players',
-      marks: E.map((id, i) => ({ x: (P[id].values || {})[key], label: String(P[id].name || '').split(' ').slice(-1)[0], color: ['wpA', 'wpB', 'c5'][i] })).filter(x => isNum(x.x)), label: 'Distribution of ' + m.label });
+      marks: E.map((id, i) => ({ x: (P[id].values || {})[key], label: QK.surname(P[id].name || ''), color: ['wpA', 'wpB', 'c5'][i] })).filter(x => isNum(x.x)), label: 'Distribution of ' + m.label });
   };
   if (opts.length) { dd(opts[0]); QK.seg(seg, dd); }
   HW.setMeta('');

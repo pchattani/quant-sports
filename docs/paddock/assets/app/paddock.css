@@ -321,6 +321,3 @@ a.pd-watch:hover { transform: translateY(-2px); }
 .pd-nl { display: block; text-decoration: none; color: inherit; height: calc(100% - 28px); }
 .qk-feature-big .big.pd-big-ink { color: var(--ink-1); }
 @media (max-width: 640px) { .pd-tiles { margin-top: var(--sp-6); } }
-/* three-way compare on phones: the view scrolls inside its card */
-.pd-cmp-wrap { overflow-x: auto; max-width: 100%; }
-@media (max-width: 640px) { .pd-cmp-wrap > * { min-width: 520px; } }

@@ -343,7 +343,8 @@ V.calib = function (cj) {
 };
 
 /* Copy pass for builder text shown on the page (STYLE_GUIDE §8): fantasy "prices" are player costs; betting words go.
-   The builders keep their wording; this is display only. */
+   Display only. Kept for the local payloads: the local fantasy.json label and glossary.json still say "prices" /
+   "edge" (23 Oct 2026); the deployed ones are clean (checked 23 Oct), so this goes after the next local rebuild. */
 V.copy = function (t) {
   return String(t === undefined || t === null ? '' : t)
     .replace(/\bPrices\b/g, 'Costs').replace(/\bprices\b/g, 'costs').replace(/\bPrice\b/g, 'Cost').replace(/\bpriced\b/g, 'costed').replace(/\bprice\b/g, 'cost')

@@ -1,4 +1,4 @@
-/* The Quant — shared UI kit, v3 "Matchday" (dark only, warm; every v1 and v2 call still works). Framework-free; one
+/* The Quant — shared UI kit, v3 "Matchday" in the Broadcast colours (dark only; every v1 and v2 call still works). Framework-free; one
  * global, QK. Spec: docs/_design/STYLE_GUIDE.md; moving a page to v3: docs/_design/MIGRATION_V3.md.
  * Older-browser rule shared with the sites: no optional chaining, no nullish coalescing.
  *
@@ -171,8 +171,8 @@ var color = {
     return d >= 60;
   },
   /* Ink (black or white) that reads on a team-coloured fill: whichever has more contrast. */
-  ink: function (bg) { return color.contrast(bg, '#ffffff') >= color.contrast(bg, '#17140f') ? '#ffffff' : '#17140f'; },
-  surface: function () { return cssVar('--s-1') || '#211d17'; },
+  ink: function (bg) { return color.contrast(bg, '#ffffff') >= color.contrast(bg, '#0a0c10') ? '#ffffff' : '#0a0c10'; },
+  surface: function () { return cssVar('--s-1') || '#14171d'; },
   /* A team colour ready for a chart mark on the current theme. */
   team: function (hex) { return color.parse(hex) ? color.ensure(hex, color.surface(), 3) : cssVar('--c-other'); }
 };
@@ -994,17 +994,17 @@ QK.pctColor = function (p) {
   return 'color-mix(in srgb, var(--pc-' + PC[i + 1] + ') ' + t + '%, var(--pc-' + PC[i] + '))';
 };
 QK.pctHex = function (p) {
-  if (!isNum(p)) return cssVar('--pc-50') || '#a39a8c';
+  if (!isNum(p)) return cssVar('--pc-50') || '#a9adb5';
   p = Math.max(0, Math.min(100, p));
   var i = Math.min(3, Math.floor(p / 25));
-  return color.mix(cssVar('--pc-' + PC[i]) || '#a39a8c', cssVar('--pc-' + PC[i + 1]) || '#a39a8c', (p - PC[i]) / 25);
+  return color.mix(cssVar('--pc-' + PC[i]) || '#a9adb5', cssVar('--pc-' + PC[i + 1]) || '#a9adb5', (p - PC[i]) / 25);
 };
 /* the ink with more contrast on the percentile colour itself (white at the deep ends, near-black in the middle) */
 QK.pctInk = function (p) {
-  if (!isNum(p)) return '#17140f';
+  if (!isNum(p)) return '#0a0c10';
   var hx = null;
   try { hx = QK.pctHex(p); } catch (e) { hx = null; }
-  return hx && color.parse(hx) ? color.ink(hx) : (p < 15 || p > 88 ? '#ffffff' : '#17140f');
+  return hx && color.parse(hx) ? color.ink(hx) : (p < 15 || p > 88 ? '#ffffff' : '#0a0c10');
 };
 
 /* ─────────────────────────────────────── small pieces */
@@ -1103,7 +1103,7 @@ QK.formDots = function (f) {
  *   g.p_pre     the pre-game chance for the home side, when p_home already carries the live chance
  *   g.pre_only  live, but the only chance we have is the pre-game one (labelled so)
  *   g.why       a one-line reason it is worth watching (the builder's copy)
- * Before the game each row carries our chance (favourite in teal) and the bar shows the split; live, the score and
+ * Before the game each row carries our chance (favourite in blue) and the bar shows the split; live, the score and
  * the live chance; final, the score with the pre-game call in the foot. */
 QK.liveP = function (g) {
   if (!g) return null;
@@ -1146,7 +1146,12 @@ QK.gameCard = function (g, o) {
   var whyTxt = o.why === false ? '' : (typeof o.why === 'string' ? o.why : (g.why || (o.why === true ? QK.whyLine(g) : '')));
   var tag = g.href ? 'a' : 'div';
   var top = live && o.bug !== false && isNum(hs) && isNum(as) ? QK.scorebug(g, { compact: true }) : QK.statusBadge(g);
-  return '<' + tag + (g.href ? ' href="' + esc(g.href) + '"' : '') + ' class="qk-gc' + (live ? ' is-live' : fin ? ' is-final' : '') + '" style="--sa:' + (s.accent || 'var(--accent)') + '">' +
+  /* the team-colour stripe across the top: away | (draw) | home, split by our chance (even before one exists or
+   * once it is over); team colours after the contrast and clash checks, else cobalt v grey */
+  var sA = isNum(pA) && !fin ? pA : 0.5, sH = isNum(pH) && !fin ? pH : 0.5, sD = !fin && isNum(pD) ? pD : 0;
+  var stripe = o.stripe === false ? '' : '<span class="qk-gc-stripe" aria-hidden="true"><i style="flex:' + sA.toFixed(3) + ';background:' + QK.probColour(g.away, g.home, 'left') + '"></i>' +
+    (sD > 0 ? '<i class="d" style="flex:' + sD.toFixed(3) + '"></i>' : '') + '<i style="flex:' + sH.toFixed(3) + ';background:' + QK.probColour(g.home, g.away, 'right') + '"></i></span>';
+  return '<' + tag + (g.href ? ' href="' + esc(g.href) + '"' : '') + ' class="qk-gc' + (live ? ' is-live' : fin ? ' is-final' : '') + '" style="--sa:' + (s.accent || 'var(--accent)') + '">' + stripe +
     '<div class="qk-gc-top"><span class="qk-gc-lg">' + (o.sport !== false ? '<span class="qk-sportpill">' + esc(s.label || g.sport) + '</span> · ' : '') + esc(g.league || '') + (g.note && g.note !== 'OT' && g.note !== 'SO' ? ' · ' + esc(g.note) : '') + '</span>' + top + '</div>' +
     '<div class="qk-gc-rows">' + row(g.away, as, pA, hw > 0, favA) + row(g.home, hs, pH, hw < 0, !favA) + '</div>' + bar +
     (left || xg || mk ? '<div class="qk-gc-foot">' + (left || '<span></span>') + (xg || '') + mk + '</div>' : '') +
@@ -1155,14 +1160,15 @@ QK.gameCard = function (g, o) {
 
 /* ─────────────────────────────────────── chance bars (538-style probability bars) */
 /* QK.chanceBar({ label, p, market, color (team hex or CSS colour), href, sub, mark: team }, { max, teamColours })
- * QK.chances(rows, { max, sort: false, key: false, marketName: 'Market', limit, teamColours: true }) -> the list with a key.
- * v3: every bar is ours, so it is teal; r.color is used only with teamColours: true (a race where the team colour
- * is the point, e.g. a two-team series). */
+ * QK.chances(rows, { max, sort: false, key: false, marketName: 'Market', limit, teamColours: false }) -> the list with a key.
+ * Broadcast colours: a title race shows each bar in its team's colour (r.color, else r.mark.colour; contrast-lifted
+ * by QK.color.team); rows without one, or teamColours: false, are ours in blue. The value stays ours. */
 QK.chanceBar = function (r, o) {
   o = o || {};
   var max = isNum(o.max) && o.max > 0 ? o.max : 1;
   var w = Math.max(0, Math.min(100, 100 * (isNum(r.p) ? r.p : 0) / max));
-  var c = r.color && o.teamColours ? (color.parse(r.color) ? color.team(r.color) : r.color) : 'var(--signal)';
+  var rc = r.color || (r.mark && r.mark.colour);   /* a row's team colour, else its team mark's */
+  var c = rc && o.teamColours ? (color.parse(rc) ? color.team(rc) : rc) : 'var(--signal)';
   var mk = isNum(r.market) ? '<i class="qk-chance-mk" style="left:' + Math.min(100, 100 * r.market / max).toFixed(1) + '%"></i>' : '';
   var aria = r.label + ': our chance ' + fmt.pct(r.p) + (isNum(r.market) ? ', market ' + fmt.pct(r.market) : '');
   var tag = r.href ? 'a' : 'div';
@@ -1179,8 +1185,8 @@ QK.chances = function (rows, o) {
   var mx = o.max;
   if (!isNum(mx)) { var m = Math.max.apply(null, rs.map(function (r) { return Math.max(r.p || 0, isNum(r.market) ? r.market : 0); }).concat([0.01])); mx = m > 0.6 ? 1 : Math.min(1, Math.ceil(m * 10 + 0.4) / 10); }
   var anyM = rs.some(function (r) { return isNum(r.market); });
-  return '<div class="qk-chances">' + rs.map(function (r) { return QK.chanceBar(r, { max: mx, teamColours: o.teamColours }); }).join('') +
-    (o.key === false ? '' : '<div class="qk-chances-key"><span><i class="bar"' + (o.teamColours && rs.some(function (r) { return !!r.color; }) ? ' style="background:var(--ink-3)"' : '') + '></i>' + esc(o.oursName || 'Our chance') + '</span>' + (anyM ? '<span><i class="tick"></i>' + esc(o.marketName || 'Market (reference)') + '</span>' : '') + (mx < 1 ? '<span>Scale 0–' + fmt.pct(mx) + '</span>' : '') + '</div>') + '</div>';
+  return '<div class="qk-chances">' + rs.map(function (r) { return QK.chanceBar(r, { max: mx, teamColours: o.teamColours !== false }); }).join('') +
+    (o.key === false ? '' : '<div class="qk-chances-key"><span><i class="bar"' + (o.teamColours !== false && rs.some(function (r) { return !!(r.color || (r.mark && r.mark.colour)); }) ? ' style="background:var(--ink-3)"' : '') + '></i>' + esc(o.oursName || 'Our chance') + '</span>' + (anyM ? '<span><i class="tick"></i>' + esc(o.marketName || 'Market (reference)') + '</span>' : '') + (mx < 1 ? '<span>Scale 0–' + fmt.pct(mx) + '</span>' : '') + '</div>') + '</div>';
 };
 
 /* ─────────────────────────────────────── stat tile */
@@ -1525,7 +1531,7 @@ QK.watchGrid = function (games, o) {
 
 /* ─────────────────────────────────────── feature card (a marquee or live game, for the greeting hero) */
 /* QK.featureCard(g, { scribble: 'Finals, Game 1!', kicker }) -> a card with the league and status pills, both teams
- * (with the score once it starts), our chance for the favourite as a big teal number, what it means, and a note. */
+ * (with the score once it starts), our chance for the favourite as a big blue number, what it means, and a note. */
 QK.featureCard = function (g, o) {
   o = o || {};
   if (!g) return '';
@@ -1653,7 +1659,7 @@ QK.calib = {
 };
 /* QK.howSure(el, { bins | calibration (a calibration.json, read with QK.calib.find), brier, n, league: 'NHL',
  * span: '2009-10 to 2025-26', subject: 'the home team', unit: 'games', minN: 30, points: [{ k, b, text }] (override
- * the three cards), caption }) -> renders the module into el: the calibration chart (QKC.calibration, ours in teal,
+ * the three cards), caption }) -> renders the module into el: the calibration chart (QKC.calibration, ours in blue,
  * the dashed diagonal "spot on", italic annotations on the busiest and the top bins) beside three plain-English
  * cards: the Brier score, our most common call and how it did, and what happens at the top end. */
 QK.howSure = function (el, o) {
@@ -1688,12 +1694,12 @@ QK.howSure = function (el, o) {
 /* ─────────────────────────────────────── game preview card (the game-page hero) */
 /* QK.previewCard(g, { kicker: 'NHL · Ball Arena, Denver', nick: fn(team) -> short name, note: HTML (replaces the
  * default "How sure are we?" note), noteExtra: HTML (appended to it), factors: [{ label, a, b, better: 'a' | 'b' }]
- * (away value, home value; the better side in teal), factorsTitle, keyLeft, keyRight, market: { p, label } (game
+ * (away value, home value; the better side in blue), factorsTitle, keyLeft, keyRight, market: { p, label } (game
  * detail only: a quiet reference line under the bar), vs: 'at' | 'v' (the word between the sides), noun: 'game' |
  * 'match' | 'race' ("a match like this"), homeFirst: true (home on the left, "Home v Away") }) -> a card. The
  * defaults follow g.sport: football is home first with "v" and "match", tennis "v" and "match", F1 "race",
  * everything else away "at" home and "game". The card: both sides with monogram, record and form, the
- * score once it starts (the score bug when live), our chance for the favourite as a big teal number with a
+ * score once it starts (the score bug when live), our chance for the favourite as a big blue number with a
  * sentence, the team-colour bar, a plain-English note and the match-up factors. */
 var PREVIEW_WORDS = { football: { vs: 'v', noun: 'match', homeFirst: true }, tennis: { vs: 'v', noun: 'match' }, f1: { vs: 'v', noun: 'race' } };
 QK.previewCard = function (g, o) {
@@ -1729,7 +1735,7 @@ QK.previewCard = function (g, o) {
   var L = hf ? 'b' : 'a', R = hf ? 'a' : 'b';
   var fxh = fx.length ? '<h4 class="qk-factors-h">' + esc(o.factorsTitle || 'How they match up so far') + '</h4><div class="qk-factors">' + fx.map(function (r) {
     return '<div class="l' + (r.better === L ? ' better' : '') + '">' + esc(r[L]) + '</div><div class="c">' + esc(r.label) + '</div><div class="r' + (r.better === R ? ' better' : '') + '">' + esc(r[R]) + '</div>';
-  }).join('') + '</div><div class="qk-wpbar-lab" style="margin-top:10px"><span>' + esc(o.keyLeft || nk(hf ? H : A)) + '</span><span class="mid">better side in teal</span><span>' + esc(o.keyRight || nk(hf ? A : H)) + '</span></div>' : '';
+  }).join('') + '</div><div class="qk-wpbar-lab" style="margin-top:10px"><span>' + esc(o.keyLeft || nk(hf ? H : A)) + '</span><span class="mid">better side in blue</span><span>' + esc(o.keyRight || nk(hf ? A : H)) + '</span></div>' : '';
   return '<article class="qk-card qk-preview' + (live ? ' is-live' : '') + '"><div class="qk-feature-meta"><span class="qk-pill">' + esc(o.kicker || g.league || '') + '</span>' + (live ? QK.scorebug(g, { size: 'lg', homeFirst: hf }) : QK.statusBadge(g)) + '</div>' +
     '<div class="qk-vs">' + (hf ? side(H, g.hs) : side(A, g.as)) + '<div class="at">' + esc(vs) + '</div>' + (hf ? side(A, g.as) : side(H, g.hs)) + '</div>' + big + bar + mk + (note ? QK.note(note) : '') + fxh + '</article>';
 };

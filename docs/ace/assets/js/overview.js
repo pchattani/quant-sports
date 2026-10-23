@@ -96,7 +96,7 @@ function render(el, params) {
 
     if (isCurrent) {
       const first = nowList.length ? 'now' : nextList.length ? 'next' : 'results';
-      html += '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch ' + when, title: '<span id="ov-gh"></span>', html: true, sub: 'Our chance for each player before the first ball, the favourite in teal, with a line on why it’s worth your time. Once a match starts: the sets and how our call is doing.',
+      html += '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch ' + when, title: '<span id="ov-gh"></span>', html: true, sub: 'Our chance for each player before the first ball, the favourite in blue, with a line on why it’s worth your time. Once a match starts: the sets and how our call is doing.',
         actions: V().seg('ov-when', [['now', 'Today'], ['next', 'Next'], ['results', 'Results']], first, 'Matches') + '<a class="qk-btn" href="' + TA.href(T, 'calendar', Y) + '">Every draw</a>' }) +
         '<div class="qk-watch" id="ov-games"></div></section>';
     }

@@ -1,5 +1,5 @@
 /* The Quant Campus — Overview (#/<L>), on kit v3 "Matchday" (the Rink overview is the reference, MIGRATION_V3.md).
- *   the greeting hero with the game to watch (QK.featureCard); stat tiles: the title favourite (ours, in teal), the
+ *   the greeting hero with the game to watch (QK.featureCard); stat tiles: the title favourite (ours, in blue), the
  *     top-rated team with its uncertainty, AP No. 1, the next kick-off / tip-off or the live count (a past season: the
  *     champion);
  *   "What to watch": our picks from live, today's and upcoming games (or what's coming up, or the latest results), each
@@ -242,7 +242,7 @@ function postSnapshot(L, S, post, sim, node) {
   var fb = CC.fb(L);
   if (fb) {
     var odds = (post && post.odds) || {};
-    /* v3: our chances in teal (no team colours on the bars) */
+    /* v3: our chances in blue (no team colours on the bars) */
     var rows = Object.keys(odds).filter(function (t) { return isNum(odds[t].p_in); }).sort(function (a, b) { return odds[b].p_in - odds[a].p_in; }).slice(0, 12);
     if (!rows.length) rows = Object.keys(sim).filter(function (t) { return isNum(sim[t].p_cfp); }).sort(function (a, b) { return sim[b].p_cfp - sim[a].p_cfp; }).slice(0, 12).map(function (t) { odds[t] = { p_in: sim[t].p_cfp, p_bye: sim[t].p_bye, p_title: sim[t].p_title }; return t; });
     if (!rows.length || !(odds[rows[0]].p_in > 0)) { node.innerHTML = U.card('Playoff picture', '', QK.empty('No playoff chances yet', 'They appear once the season simulation has run.')); return; }

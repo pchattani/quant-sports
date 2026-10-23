@@ -327,7 +327,7 @@ function draw(el) {
   }, { label: 'Player lab: ' + label(S.y) + ' against ' + label(S.x) });
 
   FB.set('lb-note', 'One dot per player: minutes and rates over ' + esc(single() ? scopeName : scopeName.toLowerCase()) + ' in the view, however many competitions that spans. Dotted lines are the medians of this group. ' + (lower(S.x) || lower(S.y) ? 'Axes where less is better are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
-    'Labelled: the twelve players furthest into that corner (sum of standard scores on both axes)' + (hits.length ? ', and your search (teal rings)' : '') + '. Click a dot to open the player.' +
+    'Labelled: the twelve players furthest into that corner (sum of standard scores on both axes)' + (hits.length ? ', and your search (blue rings)' : '') + '. Click a dot to open the player.' +
     (adjOn() ? ' Attacking rates marked "adj." are multiplied by the scoring factor from the pooled model: the minutes-weighted blend of the player\'s competitions.' : '') +
     (S.shrink ? ' Rates marked "shrunk" are pulled towards the group median by ' + SHRINK_K + ' minutes of prior, so a player five matches in is not ranked on five matches alone; the tooltip shows the raw figures.' : '') +
     ' <a href="#/model/glossary/shrinkage">Glossary →</a>');

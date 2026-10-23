@@ -464,7 +464,7 @@ function drawFeed(el, box, TR, q) {
     FB.kpi('Record fee', fees.length ? money(Math.max.apply(null, fees.map(function (d) { return d.fee; }))) : '—', { sub: (fees.slice().sort(function (a, b) { return b.fee - a.fee; })[0] || {}).name || '' }),
     FB.kpi('Graded deals', intl(deals.filter(function (d) { return d.b_grade; }).length), { sub: 'buyer grades, A the best fifth' })
   ]) +
-    '<div class="fb-mt">' + FB.card('The biggest fees of the last 12 months', 'What was paid (grey ring) against our fair fee at the time (teal).', FB.chartBox('va-fees', 420, 'Biggest fees against fair fees')) + '</div>' +
+    '<div class="fb-mt">' + FB.card('The biggest fees of the last 12 months', 'What was paid (grey ring) against our fair fee at the time (blue).', FB.chartBox('va-fees', 420, 'Biggest fees against fair fees')) + '</div>' +
     '<div class="fb-mt">' + FB.card('Every move', 'Newest first; involving a followed club in the last 13 months.',
       FB.toolbar([
         FB.field('League', FB.select('tf-lg', [['', 'Every league']].concat(Object.keys(leagues).sort().map(function (l) { return [l, compName(l)]; })), q.lg || '', 'League')),
@@ -807,9 +807,9 @@ function drawSimResult(el, tb, P, B, S, sens, probs, q) {
       (longTerm ? '<p>' + esc(longTerm) + '</p>' : '') + (winText ? '<p class="fb-cap">' + esc(winText) + '</p>' : '') + '</div>') + '</div>' +
     '<div class="fb-mt">' + FB.grid(
       FB.card(crest(B.tid, B.name) + ' ' + esc(B.name), 'Buying · ' + esc(compName(B.league)) + ' · rating shift ' + signed(deltaB, 3) + ' (log goal rate)',
-        '<p class="fb-cap">Our season chances: grey bar now, teal bar after the move.</p>' + FB.chartBox('tr-odds-b', 220, 'Season chances before and after for the buyer') + oddsTableHTML(oB) + bd.units.map(depthHTML).join(''), { span: 6 }) +
+        '<p class="fb-cap">Our season chances: grey bar now, blue bar after the move.</p>' + FB.chartBox('tr-odds-b', 220, 'Season chances before and after for the buyer') + oddsTableHTML(oB) + bd.units.map(depthHTML).join(''), { span: 6 }) +
       FB.card(S ? crest(S.tid, S.name) + ' ' + esc(S.name) : 'The seller', S ? 'Selling · ' + esc(compName(S.league)) + ' · rating shift ' + signed(deltaS, 3) : '',
-        S ? '<p class="fb-cap">Our season chances: grey bar now, teal bar after the move.</p>' + FB.chartBox('tr-odds-s', 220, 'Season chances before and after for the seller') + oddsTableHTML(oS) + sd.units.map(depthHTML).join('') : FB.muted('No strengths-and-needs file for the seller: its season chances are not simulated here.'), { span: 6 })
+        S ? '<p class="fb-cap">Our season chances: grey bar now, blue bar after the move.</p>' + FB.chartBox('tr-odds-s', 220, 'Season chances before and after for the seller') + oddsTableHTML(oS) + sd.units.map(depthHTML).join('') : FB.muted('No strengths-and-needs file for the seller: its season chances are not simulated here.'), { span: 6 })
     ) + '</div>' +
     (ff ? '<div class="fb-mt">' + FB.card('Fair fee and budget', 'The fee model, fitted on real fees, for this buyer.',
       '<div class="fb-prose"><p><b>Fair fee to ' + esc(B.name) + ': ' + money(ff[0]) + '</b> (middle half of similar deals ' + moneyRange(ff[1], ff[2]) + '), from the player\'s value over the next four seasons (' + num(P.v2, 1) + ' points above replacement), age, position, minutes and both clubs\' strength. Sofascore\'s market value, for reference: ' + money(P.mv) + '.</p>' +

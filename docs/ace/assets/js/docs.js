@@ -51,8 +51,8 @@ function fmtHint(e) {
 
 /* The glossary text comes from the builders (data/glossary.json); it is shown in the site's copy (STYLE_GUIDE §8): our
    forecasts, never prices or edges, and no player pronouns. A display rewrite only. The builders were cleaned on 23 Oct
-   2026 (a9fe6982), but the local and live glossary.json still carry the old wording until the next rebuild, so the
-   rewrite stays; drop it once the payload reads "forecast" and "the player". */
+   2026 (a9fe6982) and the deployed glossary.json is clean (checked 23 Oct), but the local one still carries the old
+   wording, so the rewrite stays until the next local rebuild. */
 const COPY = [[/match price's blend/g, 'match forecast’s blend'], [/a surface specialist's edge/g, 'a surface specialist’s advantage'],
   [/de-vigged closing prices/g, 'de-vigged closing lines'], [/de-vigged closing price/g, 'de-vigged closing line'], [/closing prices/g, 'closing lines'],
   [/A disagreement, not a value bet: the market is the better forecaster\./g, 'A disagreement, not a recommendation: the market is the sharper forecaster.'],

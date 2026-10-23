@@ -118,7 +118,7 @@ function render(el) {
   });
 }
 
-/* The hero's side card: the next Grand Prix with our favourite as a big teal number, the top three, and how sure. */
+/* The hero's side card: the next Grand Prix with our favourite as a big blue number, the top three, and how sure. */
 function feature(next, race, season) {
   if (!next) {
     var champ = PD.ok(season) ? ((season.standings || {}).drivers || [])[0] : null;

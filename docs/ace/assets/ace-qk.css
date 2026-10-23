@@ -406,12 +406,6 @@ tr.cut td, .qk-table tr.cut td { border-top: 2px dashed color-mix(in srgb, var(-
 .ta-page .pg-toggle button:hover { color: var(--ink-1); }
 .ta-page .pg-toggle button.on { background: var(--ink-1); color: var(--ink-inv); }
 .ta-page .pg-toggle button:focus-visible { outline: 2px solid var(--focus); }
-/* three players side by side on a phone: a narrower label column, the value and its percentile without the bar */
-@media (max-width: 640px) {
-  .ta-page .qk-cmp-head, .ta-page .qk-cmp-row { grid-template-columns: minmax(84px, 1fr) repeat(var(--n), minmax(0, 1fr)) var(--dw, 64px); gap: 8px; }
-  .ta-page .qk-cmp[style*="--n:3"] .qk-cmp-cell { grid-template-columns: auto 28px; }
-  .ta-page .qk-cmp[style*="--n:3"] .qk-cmp-pb { display: none; }
-}
 /* the older cards (.card > .card-header, title text then a sub-line) read as kit v3 cards: round, a Fraunces title,
    the sub-line on its own row, controls in the UI face */
 .ta-page .card { border-radius: var(--r-card); margin-bottom: var(--sp-5); }

@@ -215,17 +215,13 @@ CC.addRecords = function (L, S, standings) {
 CC.rec = function (L, S, tid) { var m = RECS[L][String(S)]; return (m && m[String(tid)]) || ''; };
 var MK_SRC = { kalshi: 'Kalshi', polymarket: 'Polymarket', espn_close: 'ESPN closing line', espn: 'ESPN line' };
 CC.mkSource = function (mk) { return mk && mk.source ? (MK_SRC[mk.source] || mk.source) : ''; };
-/* A game card (kit v3): our chance per team, the favourite in teal, records, the team-colour bar with a key, and no
+/* A game card (kit v3): our chance per team, the favourite in blue, records, the team-colour bar with a key, and no
  * market (the kit's default: the market sits only on the game page and the Model page). o.why adds the italic
- * one-line reason (QK.whyLine); a winner we had between 40% and 50% is called a near coin flip, not "as expected". */
+ * one-line reason (QK.whyLine). */
 CC.card = function (c, L, o) {
   o = o || {};
   var g = CC.game(c, L), S = c.season || (CC.state && CC.state.S);
   g.home.record = CC.rec(L, S, c.home); g.away.record = CC.rec(L, S, c.away);
-  if (o.why && g.status === 'final' && isNum(g.p_home) && isNum(g.hs) && isNum(g.as) && g.hs !== g.as) {
-    var hw = g.hs > g.as, wp = hw ? g.p_home : 1 - g.p_home;
-    if (wp >= 0.4 && wp < 0.5) g.why = 'A near coin flip: we had ' + (hw ? g.home : g.away).name + ' at ' + CC.pct(wp) + ' before the start.';
-  }
   var h = QK.gameCard(g, { sport: false, why: !!o.why });
   /* the kit's badge prints the start time: a TBA game shows its day and "TBA" instead of the midnight placeholder */
   if (g.tba) h = h.replace(QK.statusBadge(g), '<span class="qk-badge">' + esc(fmt.relDay(g.start)) + ' · TBA</span>');
@@ -246,8 +242,9 @@ CC.calib = function (j) {
 };
 /* Unit names for display: the football defensive front is written "DL/edge" in the payloads. */
 CC.unit = function (s) { return String(s || '').replace(/DL\/edge/gi, 'Defensive front'); };
-/* Payload copy in our voice (headlines written by the builder): "title odds" -> "title chances". Still needed: the local
- * index.json headlines and the basketball season.json say "title odds" (23 Oct 2026); DL/edge (CC.unit) is in the team pages. */
+/* Payload copy in our voice (headlines written by the builder): "title odds" -> "title chances". Still needed for the
+ * local payloads: index.json headlines and the basketball season.json say "title odds" (23 Oct 2026; the deployed
+ * index.json is clean, so this goes after the next local rebuild). DL/edge (CC.unit) is the payloads' unit name and stays. */
 CC.copy = function (s) { return String(s || '').replace(/\btitle odds\b/gi, 'title chances').replace(/\bodds\b/gi, 'chances'); };
 
 /* ── comparison metric sets (METRICS_SPEC.md; assets/js/cc-metrics.js, generated from docs/_design/metrics/college.json) ──

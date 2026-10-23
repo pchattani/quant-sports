@@ -191,7 +191,9 @@ function methodology(el, params) {
 
 function slug(s) { return String(s || 'group').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
 /* Display-only copy for builder glossary text (STYLE_GUIDE §8): the betting term "edge" is no longer used on the site;
- * two market terms are reworded; anything else goes through PD.v2.copy. */
+ * two market terms are reworded; anything else goes through PD.v2.copy. Kept for the local glossary.json (23 Oct 2026:
+ * "Edge", "de-vig", "price"); the deployed one is clean (its edge entry is "Model v market"), so DROP / REWORD go
+ * after the next local rebuild. */
 var DROP = { edge: 1 };
 var REWORD = {
   de_vig: 'Market probabilities quoted across a field add up to more than 100% (the market’s margin). De-vigging rescales them so they sum to one: p_i = q_i / the sum of every q.',

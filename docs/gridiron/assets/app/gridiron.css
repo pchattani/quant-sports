@@ -420,7 +420,3 @@ td.gi-ours-cell { text-align: left; }
 .gi-cmp-slot { border-left: 0; padding-left: 0; }
 .gi-cmp-slot .qk-input { border-radius: var(--r-pill); border: 1.5px solid color-mix(in srgb, var(--ec) 55%, var(--line-2)); padding-left: 16px; width: 100%; }
 @media (max-width: 640px) { .gi-tiles { margin-top: var(--sp-6); } }
-/* compare headers: let long names ellipsize at 375 px (the entity link is a grid item; kit follow-up) */
-.qk-cmp-ent > * { min-width: 0; }
-.qk-cmp-a { overflow: hidden; display: block; }
-.qk-cmp-a b { display: block; }

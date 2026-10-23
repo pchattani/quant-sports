@@ -262,7 +262,7 @@ V.scatter = (el, o) => {
 };
 /* Surface colours as hex for charts (identity marks: hard blue, clay terracotta, grass green, all surfaces = ours). */
 V.SURF_HEX = { all: null, hard: '#3b82f6', clay: '#d2693c', grass: '#3fb950', carpet: '#8b949e', indoor: '#a371f7' };
-V.signal = () => QK.cssVar('--signal') || '#3cc9b4';
+V.signal = () => QK.cssVar('--signal') || '#7d93ff';
 V.wpA = () => QK.cssVar('--wp-a') || '#5b8def';
 V.wpB = () => QK.cssVar('--wp-b') || '#f08a3c';
 

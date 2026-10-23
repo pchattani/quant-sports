@@ -258,7 +258,7 @@ function renderMatch(el, c, f, m, mk, hit, side) {
 }
 
 /* The hero (kit v3 QK.previewCard, the Rink game page's pattern): football's home-first order ("Home v Away"), with the record and
-   league form, the score once it starts (the score bug while live), our chance for the favourite as a big teal number
+   league form, the score once it starts (the score bug while live), our chance for the favourite as a big blue number
    with a sentence, the home / draw / away bar, a plain-English "how sure" note and how the sides match up so far.
    Football has no live model: during a match the card keeps the pre-match chance and says so. The market sits here
    only as a quiet labelled reference line before kick-off. */

@@ -19,7 +19,7 @@
 const K = () => BP.gk;
 const LABELS = { model: 'Game model', ratings: 'Team ratings', starter_record: 'Starter and record', market: 'Closing line (ESPN)', blend_50: '50/50 model and market' };
 const ORDER = ['model', 'ratings', 'starter_record', 'market', 'blend_50'];
-const COL = { model: '#3cc9b4', ratings: '#a08cf0', starter_record: '#62aef0', market: '#a39886', blend_50: '#ff7a5c' };
+const COL = { model: '#7d93ff', ratings: '#5ec8f0', starter_record: '#8fd16a', market: '#8a93a3', blend_50: '#ff6a4d' };
 const lab = m => LABELS[m] || K().titleCase(m);
 const H = p => (p > 0 && p < 1 ? -(p * Math.log(p) + (1 - p) * Math.log(1 - p)) : null);
 
@@ -29,7 +29,7 @@ function scoreTable(src, models) {
   const bl = best('logloss'), bb = best('brier');
   return k.table([{ label: 'Forecaster' }, { label: 'Games', align: 'right' }, { label: 'Log-loss', align: 'right', title: 'Lower is better' }, { label: 'Brier', align: 'right', title: 'Lower is better' }, { label: 'Skill v coin', align: 'right', title: '1 − log-loss / ln 2' }, { label: 'Skill v base rate', align: 'right', title: '1 − log-loss / entropy of the home win rate' }],
     models.filter(m => src[m] && src[m].n).map(m => { const s = src[m], h0 = H(s.base_rate);
-      return [{ v: ORDER.indexOf(m), html: '<span class="gq-dotc" style="background:' + (COL[m] || '#a39886') + '"></span><strong>' + k.esc(lab(m)) + '</strong>' + (m === 'market' ? ' <span class="gq-tag">market</span>' : '') },
+      return [{ v: ORDER.indexOf(m), html: '<span class="gq-dotc" style="background:' + (COL[m] || '#8a93a3') + '"></span><strong>' + k.esc(lab(m)) + '</strong>' + (m === 'market' ? ' <span class="gq-tag">market</span>' : '') },
         { v: s.n, html: k.int(s.n) }, { v: s.logloss, html: bl && bl.m === m ? '<strong class="gq-ok">' + k.num(s.logloss, 4) + '</strong>' : k.num(s.logloss, 4) },
         { v: s.brier, html: bb && bb.m === m ? '<strong class="gq-ok">' + k.num(s.brier, 4) + '</strong>' : k.num(s.brier, 4) },
         { v: k.isNum(s.logloss) ? 1 - s.logloss / Math.LN2 : null, html: k.isNum(s.logloss) ? k.signed(100 * (1 - s.logloss / Math.LN2), 2) + '%' : '—' },
@@ -148,7 +148,7 @@ function render(el, params, state) {
     k.wireToggle(el, 'cal-rel', rel);
     if (seasons.length) {
       k.plot('cal-years', ORDER.filter(m => m !== 'blend_50').map(m => ({ type: 'scatter', mode: 'lines+markers', name: lab(m), x: seasons, y: seasons.map(s => { const x = (G.seasons[s] || {}); return m === 'market' ? ((x.vs_market || {}).market || {}).logloss : (x[m] || {}).logloss; }), line: { color: COL[m], width: 2 }, connectgaps: false }))
-        .concat([{ type: 'scatter', mode: 'lines', name: 'Coin', x: seasons, y: seasons.map(() => Math.LN2), line: { color: '#a39886', dash: 'dot', width: 1 } }]), k.layout(Object.assign({ margin: { l: 56, r: 10, t: 30, b: 36 }, yaxis: { title: 'Log-loss', tickformat: '.3f' }, xaxis: { type: 'category', title: 'Season' } }, k.legendTop())));
+        .concat([{ type: 'scatter', mode: 'lines', name: 'Coin', x: seasons, y: seasons.map(() => Math.LN2), line: { color: '#8a93a3', dash: 'dot', width: 1 } }]), k.layout(Object.assign({ margin: { l: 56, r: 10, t: 30, b: 36 }, yaxis: { title: 'Log-loss', tickformat: '.3f' }, xaxis: { type: 'category', title: 'Season' } }, k.legendTop())));
     } else document.getElementById('cal-years').innerHTML = k.muted('One season only.');
     lineCal('cal-tot', P.totals, P.totals_market);
     lineCal('cal-rl', P.runline, P.runline_market);
@@ -178,7 +178,7 @@ function xwoba(x) {
   if (x.within_pooled) rows.push(['Pooled, within seasons', x.within_pooled]);
   if (x.across_pooled) rows.push(['Pooled, across winters', x.across_pooled]);
   const ok = rows.filter(r => r[1] && r[1].n);
-  const ser = [['xwoba', 'xwOBA+', '#3cc9b4'], ['savant_xwoba', 'Savant xwOBA', '#62aef0'], ['woba', 'wOBA', '#a39886']];
+  const ser = [['xwoba', 'xwOBA+', '#7d93ff'], ['savant_xwoba', 'Savant xwOBA', '#c39be8'], ['woba', 'wOBA', '#d4ff3a']];
   k.plot(node, ser.map(s => ({ type: 'bar', name: s[1], x: ok.map(r => r[0]), y: ok.map(r => (r[1][s[0]] || {}).r), marker: { color: s[2] }, hovertemplate: '%{x}: r = %{y:.3f}<extra>' + s[1] + '</extra>' })),
     k.layout(Object.assign({ barmode: 'group', margin: { l: 44, r: 10, t: 30, b: 70 }, yaxis: { title: 'r with next-period wOBA', rangemode: 'tozero' }, xaxis: { type: 'category', tickangle: -20, title: 'Test period' } }, k.legendTop())));
   tab.innerHTML = k.table([{ label: 'Test' }, { label: 'Hitters', align: 'right' }, { label: 'xwOBA+ r', align: 'right' }, { label: 'Savant r', align: 'right' }, { label: 'wOBA r', align: 'right' }, { label: 'xwOBA+ RMSE', align: 'right' }, { label: 'Savant RMSE', align: 'right' }, { label: 'r gap', align: 'right', title: 'xwOBA+ r minus Savant r' }],

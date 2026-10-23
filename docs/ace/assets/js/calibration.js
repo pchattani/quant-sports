@@ -19,8 +19,8 @@
 const K = () => TA.fk;
 const LABELS = { model: 'Our match model', model_fund: 'Ours without the market rating', elo: 'Elo', serve_return: 'Serve/return chain', rank: 'Ranking', pinnacle: 'Pinnacle closing', b365: 'Bet365 closing', avg: 'Average closing', max: 'Best closing line', bt: 'Bradley-Terry' };
 const ORDER = ['model', 'model_fund', 'elo', 'serve_return', 'rank', 'bt', 'pinnacle', 'b365', 'avg', 'max'];
-/* ours in teal, our components and baselines in the kit's other categorical colours, the market rows in quiet warm greys */
-const COL = { model: '#3cc9b4', model_fund: '#ffc94d', elo: '#ff7a5c', serve_return: '#6aa8ec', rank: '#c39be8', bt: '#8fd16a', pinnacle: '#a39886', b365: '#7d7466', avg: '#c9bfb0', max: '#5e574c' };
+/* ours in blue, our components and baselines in the kit's other categorical colours, the market rows in quiet warm greys */
+const COL = { model: '#7d93ff', model_fund: '#d4ff3a', elo: '#ff6a4d', serve_return: '#5ec8f0', rank: '#c39be8', bt: '#8fd16a', pinnacle: '#8a93a3', b365: '#6b7383', avg: '#c3c9d4', max: '#5b6372' };
 const BOOK = { pinnacle: 1, b365: 1, avg: 1, max: 1 };
 const label = k => LABELS[k] || String(k).replace(/_/g, ' ');
 const H = p => (p > 0 && p < 1 ? -(p * Math.log(p) + (1 - p) * Math.log(1 - p)) : null);
@@ -168,6 +168,8 @@ function render(el, params, state) {
     h += '<div class="card"><div class="card-header">Blend weights by year <span class="card-sub">Fitted on all earlier years and used for the next one: logit p = w<sub>Elo</sub> · logit p<sub>Elo</sub> + w<sub>SR</sub> · logit p<sub>SR</sub>. Also the ranking baseline\'s slope b.</span></div><div id="cal-blend" style="height:300px"></div></div>';
     if (d.validation || T === 'wta') h += '<div class="card"><div class="card-header">Inferred against real <span class="card-sub">Hold % and serve points won inferred from scores alone (the WTA stats switched off) against the WTA\'s real point-level numbers, per player.</span>' +
       k.toggle('cal-val', [['hold', 'Hold %'], ['spw', 'Serve points won %']], 'hold') + '</div><div class="grid-2"><div id="cal-val-chart" style="height:440px"></div><div id="cal-val-t"></div></div></div>';
+    // "closing prices" -> "closing lines": kept, the committed backtest file (atp/wta calibration.json, local and deployed,
+    // 23 Oct 2026) still says "prices" until the backtest is rerun
     h += '<div class="card"><div class="card-header">Notes <span class="card-sub">From the backtest itself.</span></div><div class="pad doc-body"><ul>' + (d.notes || []).map(n => '<li>' + k.esc(String(n).replace(/closing prices/g, 'closing lines').replace(/closing price/g, 'closing line')) + '</li>').join('') +
       '<li>Each match is oriented to a side picked by a hash of its id, so "player 1" is a coin toss and the base rate sits near 50%.</li><li>Details in the <a href="#/methodology/backtest">methodology</a>.</li></ul>' +
       '<p class="muted-inline">Backtest ' + k.esc(d.version || '') + ', generated ' + k.esc(d.generated_at || '') + '.</p></div></div>';

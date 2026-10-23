@@ -1,6 +1,6 @@
 /* The Quant Gridiron — the game centre (#/game/<game_id>), on kit v3 "Matchday" (the Rink game page is the reference).
  * Top: the hero is QK.previewCard (away "at" home with records and form, the score bug when live, our chance for the
- * favourite as a big teal number with a how-sure note, the team-colour bar, the market as a quiet labelled reference
+ * favourite as a big blue number with a how-sure note, the team-colour bar, the market as a quiet labelled reference
  * before kickoff, how the teams match up from the season ratings), then the week, venue, weather, quarterbacks and
  * coaches, the field strip when live and the linescore; beside it the stat tiles, our forecast table (the market a
  * reference column) and, before kickoff, what the game means for each team's playoff chance.

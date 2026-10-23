@@ -627,7 +627,7 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
     K.esc(isNum(nM) && nM ? (small ? word(nM) + ' match' + (nM === 1 ? ' is' : 'es is') + ' a small sample' : nM + ' matches: the picture is settling') : 'No tour-level matches this year') + '</h3>' +
     '<p style="margin:0;color:var(--ink-2);font-size:15px">Hold and break are inferred from set scores, not counted point by point, so they firm up more slowly than a served-points stat. The hollow rings on the rail show last season: a dot next to its ring is the steady part of the profile; one far from it is the one to watch.</p>' +
     (settle.length ? QK.note('Across the tour, ' + settle.join(', ').replace(/, ([^,]*)$/, ', and $1') + '.') : '') + '</div></article>';
-  const gbg = log.length ? V.card('Match by match this year', 'Our chance before each tour-level match: teal bars were won, coral lost. Tall coral bars are surprises; short teal ones are upsets.', V.chart('pp-gbg', 260, 'Our pre-match chance in every match this year')) : '';
+  const gbg = log.length ? V.card('Match by match this year', 'Our chance before each tour-level match: blue bars were won, red ones lost. Tall red bars are surprises; short blue ones are upsets.', V.chart('pp-gbg', 260, 'Our pre-match chance in every match this year')) : '';
   const h2hTop2 = (c.h2h || []).filter(r => Array.isArray(r) && r[0]).slice(0, 2);
   const typeCard = sim.length || h2hTop2.length ? '<article class="qk-card"><div class="qk-card-body"><div class="qk-kicker">Their type</div>' +
     (sim.length ? '<h4 class="ta-h4">Plays most like</h4><ul class="ta-type">' + sim.slice(0, 3).map(x => '<li><span><a class="ply-link" href="' + K.playerHref(T, x.id) + '">' + K.esc(K.name(T, x.id)) + '</a><span class="s">' + K.esc(K.country(T, x.id)) + '</span></span><a class="v" href="' + K.compareHref(T, pid, x.id) + '">Compare</a></li>').join('') + '</ul>' : '') +
@@ -649,12 +649,8 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
     if (nxt) {
       const g = TA.kitGame(nxt, T, { initials: true });
       const live = g.status === 'live';
-      const pFav = live && isNum(g.wp_home) ? Math.max(g.wp_home, 1 - g.wp_home) : (isNum(g.p_home) ? Math.max(g.p_home, 1 - g.p_home) : null);
-      const favN = isNum(g.p_home) ? ((live && isNum(g.wp_home) ? g.wp_home : g.p_home) >= 0.5 ? g.home.name : g.away.name) : '';
-      const miss = isNum(pFav) ? Math.max(1, Math.round(10 * (1 - pFav))) : null;
       h += '<div><div class="qk-kicker" style="margin-bottom:10px">' + (live ? 'Live now' : (QK.fmt.relDay(g.start) === 'Today' ? 'What to watch today' : 'Next up')) + '</div>' +
-        QK.previewCard(g, { kicker: [K.TN(T), g.league, g.note].filter(Boolean).join(' · '), nick: t => t.name,
-          note: isNum(pFav) ? '<b>How sure are we?</b> ' + K.pct(pFav, 0) + ' means ' + K.esc(favN) + ' loses a match like this about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.' : '' }).replace('<div class="at">at</div>', '<div class="at">v</div>') + '</div>';
+        QK.previewCard(g, { kicker: [K.TN(T), g.league, g.note].filter(Boolean).join(' · '), nick: t => t.name }) + '</div>';
     }
     if (lastR) {
       const oppN = K.name(T, lastR.opp);
@@ -751,7 +747,7 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
   drawCard('');
   drawDist('');
 
-  // match by match: our pre-match chance in every match this year, won in teal, lost in coral; the biggest upset win named
+  // match by match: our pre-match chance in every match this year, won in blue, lost in red; the biggest upset win named
   if (log.length && document.getElementById('pp-gbg')) {
     const cats = log.map(r => K.fmtDate(r.date, { year: false, weekday: false }) + '\nv ' + K.surname(K.name(T, r.opp)));
     let up = -1; log.forEach((r, i) => { if (r.won && r.p_pre < 0.45 && (up < 0 || r.p_pre < log[up].p_pre)) up = i; });
@@ -761,7 +757,7 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
       const ya = QKC.axis(Tk, { min: 0, max: 1, interval: 0.25, fmt: v => Math.round(v * 100) + '%' });
       const gB = 26 + QKC.nameAxis(xa, 'Match (date and opponent)', 'bottom'), gT = 26 + QKC.nameAxis(ya, 'Our pre-match chance', 'side');
       xa.nameGap = 40;
-      const tip = QKC.tooltip(Tk, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(255,201,77,.08)' } }, formatter: ps => { const r = log[ps[0].dataIndex]; return '<b>' + (r.won ? 'Beat ' : 'Lost to ') + K.esc(K.name(T, r.opp)) + '</b>' + QKC.tipRow(r.won ? Tk.model : Tk.coral, 'Our chance', K.pct(r.p_pre, 0)) + QKC.tipRow(Tk.ink3, 'Score', K.esc(r.score || '')) + QKC.tipRow(Tk.ink3, 'Event', K.esc(K.eventName(T, r.event))); } });
+      const tip = QKC.tooltip(Tk, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(125,147,255,.10)' } }, formatter: ps => { const r = log[ps[0].dataIndex]; return '<b>' + (r.won ? 'Beat ' : 'Lost to ') + K.esc(K.name(T, r.opp)) + '</b>' + QKC.tipRow(r.won ? Tk.model : Tk.coral, 'Our chance', K.pct(r.p_pre, 0)) + QKC.tipRow(Tk.ink3, 'Score', K.esc(r.score || '')) + QKC.tipRow(Tk.ink3, 'Event', K.esc(K.eventName(T, r.event))); } });
       const bar = won => log.map((r, i) => {
         if (!!r.won !== won) return { value: null };
         const o = { value: r.p_pre, itemStyle: { color: won ? Tk.model : Tk.coral, borderRadius: [6, 6, 0, 0] } };

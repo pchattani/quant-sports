@@ -1,63 +1,71 @@
-/* The Quant design tokens — v3 "Matchday" (Oct 2026). Spec: docs/_design/STYLE_GUIDE.md; moving a page: MIGRATION_V3.md.
+/* The Quant design tokens — v3 "Matchday" layouts in the Broadcast colours (Oct 2026). Spec:
+ * docs/_design/STYLE_GUIDE.md; moving a page: MIGRATION_V3.md.
  *
- * Dark only, and warm: charcoal planes (never blue-black), off-white ink, teal for "ours", a sun-yellow highlighter,
- * coral and sky accents. There is no light theme: the tokens live on :root alone, so a stale data-theme="light"
- * attribute or a light OS setting changes nothing (QK.theme pins data-theme="dark" as well, for old site CSS).
+ * Dark only, cool and bright (user decision 23 Oct 2026: "more fan of what you had in the ESPN one"): near-black
+ * page, cool charcoal cards, white and cool-grey ink, periwinkle cobalt for "ours", volt for the highlighter, tags
+ * and key numbers, red-orange for live, team colours wherever a team is shown. There is no light theme: the tokens
+ * live on :root alone, so a stale data-theme="light" attribute or a light OS setting changes nothing (QK.theme pins
+ * data-theme="dark" as well, for old site CSS).
  *
  * Naming: --bg-* page planes, --s-* surfaces (cards), --ink-* text, --line-* rules, --signal* "ours" (our forecasts,
- * primary actions), --sun / --coral / --sky the Matchday accents, --a-* sport accents (identity marks only),
- * --c-* chart categorical slots, --pc-* the percentile scale (cold -> hot), --wp-* win-probability fallbacks,
- * --st-* status (never series). Every v1 and v2 name is still defined (backward compatible).
+ * primary actions), --volt the highlighter / tag / key-number accent (--sun is its old name), --coral / --sky the
+ * second and third accents, --a-* sport accents (identity marks only), --c-* chart categorical slots, --pc-* the
+ * percentile scale (cold -> hot), --wp-* win-probability fallbacks, --st-* status (never series). Every v1, v2 and
+ * Matchday name is still defined (backward compatible).
  *
- * Contrast (WCAG 2.x, measured): ink-1 15.1:1 on --s-1, ink-2 9.9:1, ink-3 5.9:1 (4.6:1 on --s-3, the floor);
- * signal 8.2:1, coral 6.6:1, sky 6.8:1 on --s-1. */
+ * Contrast (WCAG 2.x, measured): ink-1 16.4:1 on --s-1, ink-2 10.8:1, ink-3 6.4:1 (5.1:1 on --s-3, the floor);
+ * signal 6.4:1, volt 15.5:1, live 5.4:1, coral 6.3:1 on --s-1; text on a volt or cobalt fill is near-black
+ * (--volt-ink 16.9:1, --signal-ink 7.0:1). */
 
 :root, :root[data-theme] {
   color-scheme: dark;
 
-  /* ── planes & surfaces: warm charcoal ───────────────────── */
-  --bg:        #17140f;   /* page */
-  --bg-raise:  #1c1813;   /* top bar, section nav */
-  --s-1:       #211d17;   /* card */
-  --s-2:       #2c271f;   /* raised: card inset, inputs, hover, notes */
-  --s-3:       #37312a;   /* pressed, selected, tracks, skeleton base */
-  --s-4:       #433c33;   /* strong fills, tooltips, skeleton shine */
-  --s-glass:   rgba(23, 20, 15, 0.88);
-  --s-cream:   #2a2418;   /* the "cream" card: New here, The short version, How sure */
-  --line-cream: rgba(255, 201, 77, 0.22);
-  --s-ink:     #0d0b08;   /* the broadcast black: ticker, score bug */
+  /* ── planes & surfaces: near-black and cool charcoal ────── */
+  --bg:        #0a0c10;   /* page */
+  --bg-raise:  #0e1116;   /* top bar, section nav */
+  --s-1:       #14171d;   /* card */
+  --s-2:       #1c2028;   /* raised: card inset, inputs, hover, notes */
+  --s-3:       #262b35;   /* pressed, selected, tracks, skeleton base */
+  --s-4:       #313744;   /* strong fills, tooltips, skeleton shine */
+  --s-glass:   rgba(10, 12, 16, 0.88);
+  --s-cream:   #181c24;   /* the "cream" card (New here, The short version, How sure): one step up, a volt hairline */
+  --line-cream: rgba(212, 255, 58, 0.22);
+  --s-ink:     #000000;   /* the broadcast black: ticker, score bug */
 
-  /* ── ink: warm off-white ────────────────────────────────── */
-  --ink-1:     #f3ece0;   /* primary — 15.1:1 on --s-1 */
-  --ink-2:     #c9bfb0;   /* secondary — 9.9:1 */
-  --ink-3:     #a39886;   /* muted, axis labels — 5.9:1 on --s-1, 4.6:1 on --s-3 (the floor for text) */
-  --ink-4:     #6f6658;   /* decorations only (not text) */
-  --ink-inv:   #17140f;
+  /* ── ink: white and cool light grey ─────────────────────── */
+  --ink-1:     #f3f5f8;   /* primary — 16.4:1 on --s-1 */
+  --ink-2:     #c3c9d4;   /* secondary — 10.8:1 */
+  --ink-3:     #939bab;   /* muted, axis labels — 6.4:1 on --s-1, 5.1:1 on --s-3 (the floor for text) */
+  --ink-4:     #5b6372;   /* decorations only (not text) */
+  --ink-inv:   #0a0c10;
 
-  /* ── rules ──────────────────────────────────────────────── */
-  --line-1:    rgba(243, 236, 224, 0.08);  /* hairline */
-  --line-2:    rgba(243, 236, 224, 0.13);  /* card ring */
-  --line-3:    rgba(243, 236, 224, 0.26);  /* focusable control border */
-  --grid:      rgba(243, 236, 224, 0.08);  /* chart gridline (drawn dashed) */
-  --axis:      rgba(243, 236, 224, 0.24);
+  /* ── rules: subtle cool grey ────────────────────────────── */
+  --line-1:    rgba(200, 212, 235, 0.08);  /* hairline */
+  --line-2:    rgba(200, 212, 235, 0.13);  /* card ring */
+  --line-3:    rgba(200, 212, 235, 0.26);  /* focusable control border */
+  --grid:      rgba(200, 212, 235, 0.08);  /* chart gridline (drawn dashed) */
+  --axis:      rgba(200, 212, 235, 0.24);
 
-  /* ── "ours": teal, brightened for dark ─────────────────────
+  /* ── "ours": periwinkle cobalt ──────────────────────────────
    * Our probability, our rating, the forecast line, the favourite's chance on a card, primary actions, links.
    * Never a team, never the market, never good/bad. */
-  --signal:      #3cc9b4;   /* 8.2:1 on --s-1 */
-  --signal-2:    #73dccb;   /* hover */
-  --signal-ink:  #0b1f1b;   /* text on a teal fill */
-  --signal-soft: rgba(60, 201, 180, 0.14);
+  --signal:      #7d93ff;   /* 6.4:1 on --s-1 */
+  --signal-2:    #a3b3ff;   /* hover */
+  --signal-ink:  #0a0c10;   /* text on a cobalt fill — 7.0:1 */
+  --signal-soft: rgba(125, 147, 255, 0.16);
   --brand:       var(--signal);
   --brand-ink:   var(--signal-ink);
   --brand-soft:  var(--signal-soft);
-  --focus:       #ffc94d;
+  --focus:       #d4ff3a;
 
-  /* ── Matchday accents ───────────────────────────────────── */
-  --sun:        #ffc94d;                    /* highlighter, the "i" of a note, the logo dot */
-  --sun-soft:   rgba(255, 201, 77, 0.24);   /* translucent highlight under text */
-  --coral:      #ff7a5c;                    /* kickers, asides, annotations' arrow — 6.6:1 on --s-1 */
-  --sky:        #6aa8ec;                    /* a second series — 6.8:1 */
+  /* ── accents ────────────────────────────────────────────── */
+  --volt:       #d4ff3a;                    /* highlighter, section tags, the stat-of-the-day slab, key numbers, the "i" of a note */
+  --volt-ink:   #0a0c10;                    /* text on volt: always near-black (16.9:1) */
+  --volt-soft:  rgba(212, 255, 58, 0.16);
+  --sun:        var(--volt);                /* the Matchday name, kept for old CSS */
+  --sun-soft:   rgba(212, 255, 58, 0.22);   /* translucent highlight under text */
+  --coral:      #ff6a4d;                    /* a warm second accent (asides' arrow, the second series) — 6.3:1 */
+  --sky:        #5ec8f0;                    /* a third series — 9.4:1 */
   --plum:       #c39be8;
   --mint:       #8fdcc8;
 
@@ -73,42 +81,47 @@
   --accent:       var(--signal);   /* a site sets data-sport on <html>, which points --accent at its sport */
   --accent-soft:  color-mix(in srgb, var(--accent) 15%, transparent);
 
-  /* ── chart categorical slots: teal first (ours / the main series), then coral, sky, sun ... ── */
-  --c-1: #3cc9b4;  /* teal */
-  --c-2: #ff7a5c;  /* coral */
-  --c-3: #6aa8ec;  /* sky */
-  --c-4: #ffc94d;  /* sun */
+  /* ── chart categorical slots: cobalt first (ours), then red-orange (the old coral slot), cyan (sky), volt (sun):
+   *    the slots keep their Matchday roles so site colour maps by slot still read right. "We said / it happened"
+   *    pairs cobalt with volt through --c-model and --c-actual. ── */
+  --c-1: #7d93ff;  /* cobalt */
+  --c-2: #ff6a4d;  /* red-orange */
+  --c-3: #5ec8f0;  /* cyan */
+  --c-4: #d4ff3a;  /* volt */
   --c-5: #c39be8;  /* plum */
   --c-6: #8fd16a;  /* leaf */
   --c-7: #f28fb5;  /* rose */
   --c-8: #d9b38c;  /* sand */
-  --c-model:  var(--signal);   /* ours is always teal */
-  --c-market: #9a9082;         /* the market: a quiet warm grey reference, never a headline */
-  --c-other:  #7d7468;
+  --c-model:  var(--signal);   /* ours is always cobalt */
+  --c-actual: var(--volt);     /* what happened, beside ours */
+  --c-market: #8a93a3;         /* the market: a quiet cool grey reference, never a headline */
+  --c-other:  #6b7383;
 
-  /* sequential (teal) & diverging (coral <-> sky, warm grey midpoint) */
-  --seq-1: #24403c; --seq-2: #2f6b62; --seq-3: #3a978a; --seq-4: #5cc4b3; --seq-5: #a6e8dc;
-  --div-neg: #ff7a6b; --div-mid: #3a342c; --div-pos: #6aa8ec;
+  /* sequential (cobalt) & diverging (red-orange <-> cobalt, cool grey midpoint) */
+  --seq-1: #1d2440; --seq-2: #2c3a7a; --seq-3: #4a5fc0; --seq-4: #7d93ff; --seq-5: #bcc8ff;
+  --div-neg: #ff6a4d; --div-mid: #2a303c; --div-pos: #7d93ff;
 
-  /* ── percentile scale (Savant-style, cold -> hot): blue -> warm grey -> red, stepping in lightness so it reads
-   *    for red-green colour-blind viewers. 0 = worst in the peer group, 100 = best. The ends take white ink (4.6:1),
-   *    the middle near-black ink. Every anchor clears 3:1 against --s-1 as a mark. ── */
-  --pc-0:   #3d6dd4;
-  --pc-25:  #86a3e0;
-  --pc-50:  #a39a8c;
-  --pc-75:  #ee9a78;
-  --pc-100: #cf3e25;
+  /* ── percentile scale (Savant-style, cold -> hot): Broadcast's blue -> cool grey -> red, brightened for dark and
+   *    stepping in lightness so it reads for red-green colour-blind viewers. 0 = worst in the peer group, 100 = best.
+   *    The ends take white ink (4.7:1), the middle near-black ink. Every anchor clears 3:1 against --s-1 as a mark. ── */
+  --pc-0:   #2f6fe0;
+  --pc-25:  #7fa6e6;
+  --pc-50:  #a9adb5;
+  --pc-75:  #f59a72;
+  --pc-100: #d9361d;
 
-  /* ── win probability: team colours first (contrast-checked); these when two kits clash or none is known ── */
-  --wp-a:    #6aa8ec;   /* left / away fallback (sky) */
-  --wp-b:    #ff8a5c;   /* right / home fallback (coral) */
-  --wp-draw: #8a8073;
+  /* ── win probability: team colours first (contrast-checked; QK.color.distinct drops a clashing pair); these
+   *    when two kits clash or none is known: cobalt v grey ── */
+  --wp-a:    #7d93ff;   /* left / away fallback (cobalt) */
+  --wp-b:    #8a93a3;   /* right / home fallback (cool grey) */
+  --wp-draw: #4a5160;
 
   /* ── status (reserved; always with an icon or a word) ── */
-  --st-good: #5fd38a; --st-warn: #ffc94d; --st-serious: #ff9a6b; --st-crit: #ff5a47;
+  --st-good: #5fd38a; --st-warn: #ffc94d; --st-serious: #ff9a6b; --st-crit: #ff4d2e;
   --up:   #5fd38a;    /* delta text, up/good */
-  --down: #ff7a6b;    /* delta text, down/bad */
-  --live: #ff5a47;
+  --down: #ff6a4d;    /* delta text, down/bad */
+  --live: #ff4d2e;    /* red-orange */
+  --live-soft: rgba(255, 77, 46, 0.16);
 
   /* ── type: Fraunces (display: headlines, big numbers), DM Sans (UI and numbers, tabular figures) ── */
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;
@@ -147,8 +160,8 @@
   /* ── radii, shadows, motion ─────────────────────────────── */
   --r-1: 6px; --r-2: 12px; --r-3: 22px; --r-4: 26px; --r-pill: 999px;
   --r-card: 22px; --r-tile: 18px;
-  --sh-1: 0 1px 0 rgba(255, 240, 215, 0.04) inset, 0 12px 30px -18px rgba(0, 0, 0, 0.75);
-  --sh-2: 0 1px 0 rgba(255, 240, 215, 0.05) inset, 0 18px 40px -16px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 201, 77, 0.08);
+  --sh-1: 0 1px 0 rgba(220, 230, 255, 0.04) inset, 0 12px 30px -18px rgba(0, 0, 0, 0.8);
+  --sh-2: 0 1px 0 rgba(220, 230, 255, 0.05) inset, 0 18px 40px -16px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(125, 147, 255, 0.12);
   --sh-3: 0 24px 56px rgba(0, 0, 0, 0.6);
   --glow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent), 0 0 24px color-mix(in srgb, var(--accent) 18%, transparent);
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);

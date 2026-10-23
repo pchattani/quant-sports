@@ -76,16 +76,16 @@ const DRIVE_RESULTS = {
   touchdown: ['Touchdown', '#5fd38a'], td: ['Touchdown', '#5fd38a'],
   field_goal: ['Field goal', '#ffc94d'], fg: ['Field goal', '#ffc94d'],
   missed_field_goal: ['Missed FG', '#d9b38c'], missed_fg: ['Missed FG', '#d9b38c'], blocked_fg: ['Blocked FG', '#d9b38c'],
-  punt: ['Punt', '#9a9082'], blocked_punt: ['Blocked punt', '#ff7a6b'],
-  turnover: ['Turnover', '#ff7a6b'], interception: ['Interception', '#ff7a6b'], int: ['Interception', '#ff7a6b'], fumble: ['Fumble', '#ff7a6b'],
-  fumble_lost: ['Fumble', '#ff7a6b'], fumble_return_td: ['Fumble (TD)', '#ff7a6b'], int_td: ['Pick-six', '#ff7a6b'],
+  punt: ['Punt', '#8a93a3'], blocked_punt: ['Blocked punt', '#ff6a4d'],
+  turnover: ['Turnover', '#ff6a4d'], interception: ['Interception', '#ff6a4d'], int: ['Interception', '#ff6a4d'], fumble: ['Fumble', '#ff6a4d'],
+  fumble_lost: ['Fumble', '#ff6a4d'], fumble_return_td: ['Fumble (TD)', '#ff6a4d'], int_td: ['Pick-six', '#ff6a4d'],
   turnover_on_downs: ['Downs', '#ff9a6b'], downs: ['Downs', '#ff9a6b'],
   safety: ['Safety', '#c39be8'],
-  end_of_half: ['End of half', '#7d7468'], end_of_game: ['End of game', '#7d7468'], end_of_period: ['End of half', '#7d7468'],
-  opp_touchdown: ['Opp. touchdown', '#ff7a6b'], kneel: ['Kneel', '#7d7468']
+  end_of_half: ['End of half', '#6b7383'], end_of_game: ['End of game', '#6b7383'], end_of_period: ['End of half', '#6b7383'],
+  opp_touchdown: ['Opp. touchdown', '#ff6a4d'], kneel: ['Kneel', '#6b7383']
 };
-const GOOD = '#5fd38a', CLOSE = '#ffc94d', BAD = '#ff7a6b';
-const PALETTE = ['#3987e5', '#ff9a6b', '#5fd38a', '#c39be8', '#ffc94d', '#46b9c9', '#ff7a6b', '#8e8cf0', '#7ee787', '#ff9bce'];
+const GOOD = '#5fd38a', CLOSE = '#ffc94d', BAD = '#ff6a4d';
+const PALETTE = ['#3987e5', '#ff9a6b', '#5fd38a', '#c39be8', '#ffc94d', '#46b9c9', '#ff6a4d', '#8e8cf0', '#7ee787', '#ff9bce'];
 
 // ── state and registries ──────────────────────────────────────────────────
 
@@ -725,7 +725,7 @@ function teamChip(t, S) {
   if (!t) return '<span class="qk-muted">—</span>';
   return '<a class="gi-tchip" href="' + teamHref(t, S) + '" style="--tc:' + esc(tc(t)) + '" title="' + esc(teamName(t)) + '">' + esc(teamAbbr(t)) + '</a>';
 }
-function playerColour(pid) { return pid ? PALETTE[hashIndex(pid, PALETTE.length)] : '#9a9082'; }
+function playerColour(pid) { return pid ? PALETTE[hashIndex(pid, PALETTE.length)] : '#8a93a3'; }
 function gameHref(id) { return '#/game/' + encodeURIComponent(id); }
 function matchupLink(id, away, home) {
   const g = parseGameId(id) || {};
@@ -987,9 +987,9 @@ const POS_LONG = { QB: 'Quarterback', RB: 'Running back', WR: 'Wide receiver', T
 function posLabel(p) { const k = String(p || '').toUpperCase(); return POS_SHOW[k] || String(p || ''); }
 function posLong(p) { const k = String(p || '').toUpperCase(); return POS_LONG[k] || String(p || ''); }
 /* Payload prose (glossary, value, trade and movement notes): the edge-rusher code as ED and "edge rushers" as outside
- * rushers. Still needed: value.json, trade.json, movement.json and transactions.json carry the EDGE code, and value.json
- * and trade.json the word (local payloads, 23 Oct 2026). The betting-word rewrite went with the builder copy pass
- * (b463b937..a7f39783): no payload carries those words any more. */
+ * rushers. Kept: EDGE is the payloads' position code (a data key the builders keep), so value.json, trade.json,
+ * movement.json and transactions.json carry it in the deployed build too (checked 23 Oct 2026), and ESPN's own
+ * transaction notes use it. The betting-word rewrite went with the builder copy pass (b463b937..a7f39783). */
 function copyText(t) {
   return String(t === null || t === undefined ? '' : t).replace(/\bEDGE\b/g, 'ED')
     .replace(/\b([Ee])dge(s?)\b(?=[ -](rush|and interior|or interior|role|defender|player))/g, (m, e, pl) => (e === 'E' ? 'Outside' : 'outside') + (pl ? 's' : ''));
@@ -1039,7 +1039,7 @@ function heatTable(spec) {
   return h + '</tbody></table></div>';
 }
 
-/* A game card (kit v3: QK.gameCard): our chance per team (the favourite in teal), the win-probability bar in team
+/* A game card (kit v3: QK.gameCard): our chance per team (the favourite in blue), the win-probability bar in team
  * colours with a key, records and form when the page has the standings, the score bug when live. No market on cards
  * (the kit's default). Below it the NFL facts: before kickoff the starting QBs and our projected score; live the clock
  * and the down and distance.
@@ -1061,11 +1061,6 @@ function gameCard(g, opts) {
     if (isNum(m.home_pts) && isNum(m.away_pts)) extra.push('<span><i>Projected</i> ' + esc(teamAbbr(g.away)) + ' ' + num(m.away_pts, 0) + '–' + num(m.home_pts, 0) + ' ' + esc(teamAbbr(g.home)) + '</span>');
   } else if (live) {
     extra.push('<span><i>' + esc(st === 'half' ? 'Halftime' : (clockText(g.qtr, g.clock) || 'Live')) + '</i>' + (g.down && g.possession ? ' ' + esc(teamAbbr(g.possession)) + ' ' + esc(downDist(g.down, g.dist, g.yl100)) + (isNum(g.yl100) ? ' at ' + esc(fieldPos(g.yl100, g.possession, otherTeam(g, g.possession))) : '') : '') + '</span>');
-  }
-  /* a winner we had between 40% and 50% was neither an upset nor expected: say so (the kit's line calls it expected) */
-  if (o.why && fin && isNum(x.p_home) && isNum(x.hs) && isNum(x.as) && x.hs !== x.as) {
-    const hw = x.hs > x.as, wp = hw ? x.p_home : 1 - x.p_home;
-    if (wp >= 0.4 && wp < 0.5) x.why = 'A near coin flip: we had the ' + (hw ? x.home : x.away).name + ' at ' + pct(wp, 0) + ' before the start.';
   }
   let h = QK.gameCard(x, { sport: false, why: !!o.why });
   if (extra.length && !o.compact) h = h.indexOf('<div class="qk-aside">') > 0 ? h.replace('<div class="qk-aside">', '<div class="gi-gc-x">' + extra.join('') + '</div><div class="qk-aside">') : h.replace(/<\/(a|div)>$/, '<div class="gi-gc-x">' + extra.join('') + '</div></$1>');
