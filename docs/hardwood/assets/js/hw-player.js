@@ -128,7 +128,7 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
       '<div class="hw-mvcard">' + QK.stats([{ label: 'Chance of moving', value: U.pctMv(mr.p_next), signal: true, sub: U.mvHorizon(mv), tip: (m.notes || [])[0] || '' },
         mv.pub.deadline && isNum(mr.p_dl) ? { label: 'Before the deadline', value: U.pctMv(mr.p_dl), sub: (m.deadline_label || 'traded or claimed') + ' by ' + HW.fmtDate(String((m.horizons || {}).deadline || ''), { weekday: false }) } : null]) +
       '<div style="margin-top:12px">' + U.mvBar(mv, mr) + '</div><div style="margin-top:8px">' + U.mvKeys(mv) + '</div>' +
-      '<div class="hw-mvctx">' + esc([isNum(mr.age) && !/age/.test(mr.why || '') ? 'Age ' + Math.floor(mr.age) : '', isNum(mr.yrs) && !/seasons in the league/.test(mr.why || '') ? mr.yrs + ' seasons in the league' : '', isNum(mr.value) ? U.f(mr.value, 1) + ' WAR (last two seasons, 3:2)' : '', mr.why || ''].filter(Boolean).join(' · ')) + '</div></div>') + '</div></div>';
+      '<div class="hw-mvctx">' + esc([isNum(mr.age) && !/\bage\b/.test(mr.why || '') ? 'Age ' + Math.floor(mr.age) : '', isNum(mr.yrs) && !/seasons in the league/.test(mr.why || '') ? mr.yrs + ' seasons in the league' : '', isNum(mr.value) ? U.f(mr.value, 1) + ' WAR (last two seasons, 3:2)' : '', mr.why || ''].filter(Boolean).join(' · ')) + '</div></div>') + '</div></div>';
   }
   if (cells.length || vrow) {
     h += '<div class="qk-grid hw-sec">';

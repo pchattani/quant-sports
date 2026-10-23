@@ -55,7 +55,7 @@ const COPY = [[/match price's blend/g, 'match forecast’s blend'], [/a surface 
   [/de-vigged closing prices/g, 'de-vigged closing lines'], [/de-vigged closing price/g, 'de-vigged closing line'], [/closing prices/g, 'closing lines'],
   [/A disagreement, not a value bet: the market is the better forecaster\./g, 'A disagreement, not a recommendation: the market is the sharper forecaster.'],
   [/\(used for pricing\)/g, '(used for the forecasts)'], [/each remaining match priced by the model/g, 'each remaining match forecast by the model'],
-  [/priced/g, 'forecast'], [/pricing/g, 'forecasting'], [/prices/g, 'forecasts'], [/price/g, 'forecast'], [/edges?/g, 'advantage'], [/value bets?/g, 'recommendation']];
+  [/\bpriced\b/g, 'forecast'], [/\bpricing\b/g, 'forecasting'], [/\bprices\b/g, 'forecasts'], [/\bprice\b/g, 'forecast'], [/\bedges?\b/g, 'advantage'], [/value bets?/g, 'recommendation']];
 function copy(t) { let x = String(t || ''); COPY.forEach(r => { x = x.replace(r[0], r[1]); }); return x; }
 function entryHTML(e, isModel) {
   const q = [e.label, e.key, e.desc, e.group, e.scope, isModel ? 'model' : ''].join(' ');

@@ -124,8 +124,17 @@ function featureRace(el, c, sp) {
 }
 
 var statIdx = 0, statTimer = null;
+/* home.json's stat strip still carries betting phrasing from scripts/build_home.py ("model title odds", "the market
+   says 64%", "World Series odds"): our chance is the headline and the market is not part of a headline stat. */
+function neutralStat(s) {
+  function fix(x) {
+    return String(x || '').replace(/;\s*the market says\s+[\d.]+%\.?/i, '.').replace(/\bmodel title odds\b/i, 'our title chance')
+      .replace(/\btitle odds\b/gi, 'title chance').replace(/\bodds\b/gi, 'chance');
+  }
+  return Object.assign({}, s, { kicker: fix(s.kicker), unit: fix(s.unit), text: fix(s.text) });
+}
 function renderStats() {
-  var S = D.stats || [];
+  var S = (D.stats || []).map(neutralStat);
   var el = $('#stat');
   if (!S.length) { el.innerHTML = QK.empty('No featured stat today'); return; }
   var day = Math.floor(Date.now() / 864e5);

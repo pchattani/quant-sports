@@ -440,7 +440,7 @@ function notBuilt(what, d) { return empty(what + ' is not available', d && d.rea
 /* Page head (Design System 2.0 section head, large, h1): kicker ("F1 · ..."), title, sub line (HTML; always present so a
  * page can fill it later through .qk-sh-sub), right-hand HTML (links, a pager). */
 function pageHead(kicker, title, sub, right) {
-  var k = kicker ? (/^F1/.test(String(kicker)) ? String(kicker) : 'F1 · ' + kicker) : 'F1';
+  var k = kicker ? (/^F1\b/.test(String(kicker)) ? String(kicker) : 'F1 · ' + kicker) : 'F1';
   return '<header class="qk-sh lg pd-head"><div class="qk-sh-main"><div class="qk-sh-kicker">' + k + '</div><h1 class="qk-sh-title">' + esc(title) + '</h1><p class="qk-sh-sub">' + (sub || '') + '</p></div>' +
     (right ? '<div class="qk-sh-actions">' + right + '</div>' : '') + '</header>';
 }

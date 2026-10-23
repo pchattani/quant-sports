@@ -63,7 +63,8 @@ function renderTeams(el, params, state) {
     if (!cat && !Object.keys(rows).length) { $('tm-table').innerHTML = k.notBuilt('The ' + k.LN(L) + ' ' + S + ' team catalogue', o.res[0]); $('tm-sub').textContent = ''; return; }
     const T = (cat && cat.teams) || {};
     Object.keys(T).forEach(t => k.learnTeam(t, T[t]));
-    const metrics = (cat && cat.metrics) || [], meta = k.metaOf(metrics);
+    /* the catalogue labels its simulation columns "Postseason odds" / "World Series odds" (teams.py): our chance */
+    const metrics = ((cat && cat.metrics) || []).map(m => (m && /\bodds\b/i.test(m.label || '') ? Object.assign({}, m, { label: m.label.replace(/\bodds\b/gi, 'chance') }) : m)), meta = k.metaOf(metrics);
     const ids = Array.from(new Set(Object.keys(T).concat(Object.keys(rows))));
     const lgs = Array.from(new Set(ids.map(t => k.team(t).league || (rows[t] || {}).league).filter(Boolean))).sort();
     $('tm-lg').innerHTML = '<option value="">' + (lgs.length > 1 ? 'Both leagues' : 'All teams') + '</option>' + lgs.map(x => '<option value="' + k.esc(x) + '"' + (x === ST.league ? ' selected' : '') + '>' + k.esc(x) + '</option>').join('');
