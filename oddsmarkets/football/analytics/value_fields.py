@@ -78,8 +78,14 @@ def annotate_players_live(data_dir: Path, lines: dict, players: dict) -> int:
                 continue
             pid = str(p.get("player_id"))
             ln = lines.get((pid, slug))
-            p["role"] = (ln[0] if ln else None) or (players.get(pid) or (None, None))[0]
-            p["gar90"] = ln[1] if ln else None
+            # players_live writes no nulls (absent means unknown): a row without a value drops the key
+            vals = {"role": (ln[0] if ln else None) or (players.get(pid) or (None, None))[0],
+                    "gar90": ln[1] if ln else None}
+            for k, v in vals.items():
+                if v is None:
+                    p.pop(k, None)
+                else:
+                    p[k] = v
         n += _write_if_changed(path, live)
     return n
 

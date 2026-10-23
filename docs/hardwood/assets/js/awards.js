@@ -2,9 +2,9 @@
  * Player, Sixth Man (Sixth Player in the WNBA), Most Improved and Clutch Player.
  *
  * Each race: the model's probability (a conditional logit on pool-standardised features,
- * fitted on past winners and projected to season end by simulation; models/awards.py)
- * against Kalshi / Polymarket where they trade, the eligibility under the NBA's 65-game
- * rule, and the features behind every candidate.
+ * fitted on past winners and projected to season end by simulation; models/awards.py),
+ * the eligibility under the NBA's 65-game rule, and the features behind every candidate. v3: no market
+ * here (it sits on game pages and the Model page only), so awards.json's market block is not read.
  *
  * Data: data/<L>/<S>/awards.json {award: {model, market, features, eligible}},
  * data/<L>/<S>/players.json (names, teams). */
@@ -60,7 +60,7 @@ function render(el, params, state) {
       if (params.rest && params.rest[0] && keys.indexOf(params.rest[0]) >= 0) CUR = params.rest[0];
       const fav = k => { const M = aw[k].model || {}; const ids = Object.keys(M).sort((a, b) => fx.pOf(M[b]) - fx.pOf(M[a])); return ids[0] ? [ids[0], fx.pOf(M[ids[0]])] : null; };
       const won = k => { const W = aw[k].winner; return W && (W.names || []).length ? 'Won: ' + W.names.join(' / ') : ''; };
-      el.innerHTML = '<div class="card"><div class="card-header">Award races ' + fx.esc(fx.seasonLabel(L, S)) + ' <span class="card-sub">The model\'s probability of winning each award, projected to the end of the season; the market, where one trades, is a grey reference. Click a race.</span></div>' +
+      el.innerHTML = '<div class="card"><div class="card-header">Award races ' + fx.esc(fx.seasonLabel(L, S)) + ' <span class="card-sub">Our chance of winning each award, projected to the end of the season. Click a race.</span></div>' +
         '<div class="hf-races">' + keys.map(k => { const f = fav(k); const n = f ? ((P[f[0]] || {}).name || ((aw[k].features || {})[f[0]] || {}).name || fx.playerName(L, f[0])) : '—';
           return '<button type="button" class="hf-race' + (k === CUR ? ' on' : '') + '" data-k="' + fx.esc(k) + '"><span class="hf-race-k">' + fx.esc(fx.awardName(k, L)) + '</span><span class="hf-race-n">' + fx.esc(n) + '</span><span class="hf-race-p">' + (f ? fx.pct(f[1]) : '') + '</span>' + (won(k) ? '<span class="hf-race-k">' + fx.esc(won(k)) + '</span>' : '') + '</button>'; }).join('') + '</div></div>' +
         '<div id="aw-body"></div>';
@@ -79,7 +79,7 @@ function drawRace(L, S, key, A, P, aw) {
   const featKeys = Array.from(new Set([].concat.apply([], ids.slice(0, 40).map(id => Object.keys(F[id] || {}))))).filter(k => ['name', 'team'].indexOf(k) < 0 && ids.some(id => fx.isNum((F[id] || {})[k])));
   featKeys.sort((a, b) => (['games', 'elig_games'].indexOf(a) >= 0) - (['games', 'elig_games'].indexOf(b) >= 0));
   const rule = L === 'nba' && ['mvp', 'dpoy', 'mip', 'clutch'].indexOf(key) >= 0 && S >= 2024;
-  const mkOn = mk && mk.available !== false && Object.keys(mk.probs || mk.prices || {}).length;
+  const mkOn = false && mk;   // v3: the market stays on game pages and the Model page
   const host = document.getElementById('aw-body');
   const model = A.fit || (aw.models || {})[key] || null;
   const T3 = A.p_top3 || {};
@@ -91,8 +91,7 @@ function drawRace(L, S, key, A, P, aw) {
   }).join(' and ') + '. Our race below is computed from the whole season, for comparison with the announced result.</div>' : '';
   let h = '<div class="card"><div class="card-header">' + fx.esc(((aw.labels || {})[key]) || fx.awardName(key, L)) + ' <span class="card-sub">' + fx.esc(WHY[key] || '') + '</span></div>' +
     winLine + '<div id="aw-chart" style="height:' + Math.max(260, 26 * Math.min(14, ids.length) + 70) + 'px"></div>' +
-    '<div class="mk-line">' + (mkOn ? '<strong>Market</strong>: ' + HW.ui.srcLabel(mk.sources).split(' / ').map(s => '<span class="mk-src">' + fx.esc(s) + '</span>').join('') + ' mid-market numbers with the margin removed (a reference)' + (fx.isNum(mk.implied_total) ? ' (raw book total ' + fx.pct(mk.implied_total, 0) + ')' : '') + '.' : '<strong>Market</strong>: no two-sided market for this award at the moment.') +
-    (rule ? ' <strong>65-game rule</strong>: from 2023-24 the NBA requires 65 qualifying games (20+ minutes; two games of 15-20 minutes also count) for this award; the model removes players who cannot reach it and simulates the rest.' : '') + '</div></div>';
+    (rule ? '<div class="mk-line"><strong>65-game rule</strong>: from 2023-24 the NBA requires 65 qualifying games (20+ minutes; two games of 15-20 minutes also count) for this award; the model removes players who cannot reach it and simulates the rest.</div>' : '') + '</div>';
   h += '<div class="card"><div class="card-header">Candidates <span class="card-sub">Everyone in the pool, by our chance. Features are the raw season figures the model standardises within the pool.</span></div><div id="aw-table"></div>' +
     (model && model.weights ? '<div class="pg-note"><strong>Fitted weights</strong> (on pool-standardised features' + (fx.isNum(model.n_seasons) ? ', from ' + model.n_seasons + ' past seasons' : '') + '): ' + (model.features || []).map((f, i) => fx.esc((FEAT[f] || [f])[0]) + ' ' + fx.num(model.weights[i], 2)).join(' · ') + '.</div>' : '') +
     '<div class="pg-note">P(win) = exp(θᵢ) / Σⱼ exp(θⱼ) over the pool, θᵢ = Σₖ wₖ zᵢₖ, projected to season end by simulating remaining games, availability, team wins and HPM drift. See the <a href="#/methodology/awards">methodology</a>.</div></div>';

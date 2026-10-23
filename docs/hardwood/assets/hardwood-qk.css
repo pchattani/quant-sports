@@ -383,6 +383,3 @@ a.hw-lastg:hover { box-shadow: var(--sh-2); }
 .hw-cmp-slot .qk-input { border-radius: var(--r-pill); border: 1.5px solid color-mix(in srgb, var(--ec) 55%, var(--line-2)); padding-left: 16px; width: 100%; }
 .hw-ticker + .qk-greet { margin-top: var(--sp-6); }
 @media (max-width: 640px) { .hw-tiles, .hw-sec1 { margin-top: var(--sp-6); } }
-/* compare header: a linked name ellipsises inside its column (a long name widened the page at 375 px) */
-.qk-cmp-ent .qk-cmp-a { display: block; min-width: 0; overflow: hidden; }
-.qk-cmp-ent .qk-cmp-a b { display: block; }

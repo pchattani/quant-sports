@@ -376,7 +376,10 @@ function load(p0) {
 function loadAll(paths) { return Promise.all(paths.map(load)); }
 /* Design System 2.0 copy on payload labels written before the redesign (the builders are shared, so the words are
    fixed where they are shown): tracking metrics are labelled by what they measure ("Tracked high-danger sv%"; the
-   source, NHL EDGE, stays in the description), fantasy notes say "salaries" for platform prices. */
+   source, NHL EDGE, stays in the description), fantasy notes say "salaries" for platform prices.
+   Still needed (23 Oct 2026): the EDGE labels and group come from the committed builders (nhl/analytics/skaters.py,
+   goalies.py) and are in the live skaters.json / goalies.json; the "rankings or prices" note is gone from the builder
+   (now "costs") and the live fantasy.json, but the local 20262027/fantasy.json still has it until its next rebuild. */
 function fixLabel(s) { return typeof s === 'string' ? s.replace(/^EDGE tracking$/, 'Puck and player tracking').replace(/^EDGE /, 'Tracked ') : s; }
 function copyFix(p, d) {
   if (!d || typeof d !== 'object') return;

@@ -58,8 +58,8 @@ def test_value_fields_reach_players_live_lab_and_people(tmp_path):
     assert out == {"players_live": 1, "lab": 2, "people": 2}
     live = {p["player_id"]: p for p in json.loads((d / "premier-league" / "players_live.json").read_text(encoding="utf-8"))["players"]}
     assert (live["1"]["role"], live["1"]["gar90"]) == ("CB", 0.12)
-    assert (live["3"]["role"], live["3"]["gar90"]) == ("W", None)        # no line in this competition: role from 12 months
-    assert live["9"]["role"] is None
+    assert live["3"]["role"] == "W" and "gar90" not in live["3"]         # no line in this competition: role from 12 months
+    assert "role" not in live["9"] and "gar90" not in live["9"]          # unknown: no key (players_live writes no nulls)
     s = json.loads((d / "lab" / "season" / "premier-league.json").read_text(encoding="utf-8"))
     assert s["fields"][:4] == lab["fields"] and s["fields"][4:] == ["role", "gar90"]       # appended, positions kept
     assert s["rows"][0][4:] == ["CB", 0.12] and s["rows"][1][4:] == ["W", 0.2]

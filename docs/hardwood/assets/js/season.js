@@ -140,10 +140,8 @@ function drawPaths(el, L, season, teams, focus) {
 function drawWinTotal(el, L, season, sim, tid) {
   const s = sim[tid] || {};
   const wd = s.win_dist || [];
-  const wt = (season.win_totals || {})[tid] || {};
   if (!wd.length) { el.innerHTML = HW.muted('No win distribution for this team.'); return; }
   const x = wd.map((_, i) => i), y = wd;
-  const line = HW.isNum(wt.line) ? wt.line : null;
   const colour = HW.teamColour(L, tid);
   const lo = wd.findIndex(p => p > 0.001), hi = wd.length - 1 - wd.slice().reverse().findIndex(p => p > 0.001);
   const xs = x.slice(Math.max(0, lo - 1), hi + 2);
@@ -197,7 +195,7 @@ function render(el, params) {
   const info = HW.leagueInfo(L);
   const isCurrent = S === HW.currentSeason(L);
   el.innerHTML = HW.pageHead(HW.leagueName(L) + ' ' + HW.seasonLabel(L, S), 'Standings, our chances and ratings',
-    '<a href="' + HW.href(L, 'playoffs', S) + '">Playoffs</a><a href="' + HW.href(L, 'games', S) + '">Games</a><a href="' + HW.href(L, 'markets', S) + '">Markets</a>') +
+    '<a href="' + HW.href(L, 'playoffs', S) + '">Playoffs</a><a href="' + HW.href(L, 'games', S) + '">Games</a>') +
     '<div id="sn-body"><div class="muted">Loading the season…</div></div>';
   return HW.loadAll([HW.path('season.json', L, S), HW.lpath('history.json', L), HW.path('players.json', L, S), HW.lpath('markets.json', L)]).then(arr => {
     if (!el.isConnected) return;

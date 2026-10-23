@@ -2,7 +2,8 @@
  *
  * Top, as the concept: a crumb; the header (tilted number tile, kicker, name, chips) with "The short version" in plain
  * English; five stat tiles with percentile chips; the Notebook percentile rail against the position group (the
- * sample named, early metrics dashed, a hollow ring for last season, loaded lazily from last season's catalogue)
+ * sample named, early metrics dashed, a hollow ring for last season from the player file's current.prev_pct_pos, else
+ * loaded lazily from last season's catalogue)
  * beside "How sure are we?" (when the numbers settle), game by game and "Their type" (plays most like, most time
  * with); a compare of the player and the two closest matches with the highlighter and one-line verdicts; the next
  * game (QK.previewCard) and the last one. Below, "More on the player": value tiles, where the player sits among
@@ -152,7 +153,9 @@ function render(el, params, state) {
     if (goalie && c && c.goalie) { const gg = c.goalie; k.push({ label: 'High-danger save %', value: RK.fmtVal(gg.sv_pct_high, '3'), pctl: pp.sv_pct_high, sub: 'expected ' + RK.fmtVal(gg.xfsv_pct, '3') + ' overall' }); }
 
     const peerOf = () => (catP ? (catP.pct_pos ? (U.GROUP_NAME[group] || 'the same position') + (isNum(catP.peerN) ? ' (' + catP.peerN + ' qualified)' : '') : 'all NHL skaters') : '');
-    let prevPct = null, prevGp = null;
+    /* last season's ring: the player file's current.prev_pct_pos / prev_peer (same peer group; c99a4ba9), else last
+       season's catalogue (about 4 MB), loaded only when the rail scrolls into view */
+    let prevPct = c && c.prev_pct_pos && Object.keys(c.prev_pct_pos).length ? c.prev_pct_pos : null, prevGp = prevPct ? ((c.prev_peer || {}).gp) : null;
     const pcardHTML = () => QK.pctRail({ id: 'pp-pcard', kicker: 'How they stack up', title: 'Percentiles: how the player ranks', peer: peerOf(), sample: catP ? U.sampleLine(catP, cat.reference, goalie) : '',
       groups: catP ? U.pctGroups(catP, meta, SETS, null, prevPct) : [], ringLabel: 'last season' + (isNum(prevGp) ? ' (' + prevGp + ' games)' : ''),
       note: goalie && catP ? U.goalieNote(catP) : '', emptyText: catP ? 'This player is short of the sample floors for this season.' : 'No current-season profile yet.' });
@@ -265,7 +268,7 @@ function render(el, params, state) {
     let catFull = cat && cat.players ? cat : null, catP0 = null;
     const withCat = cb => { if (catFull) { cb(catFull); return; } if (catP0) { catP0.then(cb); return; } catP0 = RK.loadYear(goalie ? 'goalies.json' : 'skaters.json', S).then(full => { catFull = full && full.players ? full : null; return catFull; }); catP0.then(cb); };
     const repaint = () => { const old = body.querySelector('#pp-pcard'); if (old) old.outerHTML = pcardHTML(); };
-    if (catP && body.querySelector('#pp-pcard')) {
+    if (catP && !prevPct && body.querySelector('#pp-pcard')) {
       const host = body.querySelector('#pp-pcard');
       let fired = false;
       const go = () => {

@@ -248,6 +248,8 @@ function tradePage(el, params) {
         '<div><span class="gq-dot b"></span>' + sel('trd-b', st.b, st.a) + '<div id="trd-rb" class="trd-roster"></div></div></div>' +
         '<div class="trd-actions"><button type="button" class="tbtn" id="trd-clear">Clear players</button> <button type="button" class="tbtn" id="trd-copy">Copy link</button> <span id="trd-copied" class="muted-inline"></span></div></div>' +
         '<div id="trd-out"></div>' +
+        /* "Odds:" in older trade.json notes reads "Chances:". Kept (23 Oct 2026): the builder and the live trade.json are
+           clean, the local mlb/2026/trade.json is not until its next local rebuild. */
         '<div class="npb-note">' + esc(ix.not_checked || '') + ' ' + esc((ix.notes || []).join(' ').replace(/^Odds:/, 'Chances:').replace(/ Odds:/g, ' Chances:').replace(/\bodds\b/g, 'chances')) + ' Values: ' + esc(CUR[L] || 'WAR') + '; a full season at a position is ' + BP.int((ix.units || {}).pa) + ' PA in a lineup slot, ' + BP.int((ix.units || {}).sp) + ' BF for a rotation and ' + BP.int((ix.units || {}).rp) + ' for a bullpen.</div>';
       el.innerHTML = h;
       const $ = id => document.getElementById(id);

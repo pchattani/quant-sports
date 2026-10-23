@@ -816,8 +816,10 @@ function buildPlayers(el, P) {
     ) + '</div>' +
     FB.card('Every metric', 'The whole catalogue for the ' + (gk ? 'goalkeeper' : 'outfield') + ' scope: value, percentile and the gap in percentile points.', '<div class="fb-toolbar">' + FB.seg('lb-mmode', [['group', 'By group'], ['gap', 'By size of gap']], 'group', 'Order') + '</div><div id="lb-metrics"></div>', { cls: 'fb-mt' }) +
     '<div class="fb-mt">' + FB.grid(
-      FB.card('Goals against xG, this season', 'Cumulative goals (solid) and xG (dashed) match by match, every competition.', FB.chartBox('lb-evo', 300, 'Cumulative goals and xG'), { span: 6 }) +
-      FB.card('Form', 'Sofascore rating, five-match rolling average, every competition.', FB.chartBox('lb-rt', 300, 'Rolling rating'), { span: 6 })
+      /* two goalkeepers: their own goals and xG are zeros (the match logs carry no goals conceded or xGOT faced), so
+         only the form chart */
+      (gk ? '' : FB.card('Goals against xG, this season', 'Cumulative goals (solid) and xG (dashed) match by match, every competition.', FB.chartBox('lb-evo', 300, 'Cumulative goals and xG'), { span: 6 })) +
+      FB.card('Form', 'Sofascore rating, five-match rolling average, every competition.', FB.chartBox('lb-rt', 300, 'Rolling rating'), { span: gk ? 12 : 6 })
     ) + '</div>' +
     '<div class="fb-mt">' + FB.grid(
       FB.card(sideDot(0) + esc(A.doc.name) + ': shots', A.comp ? 'Every shot in ' + esc(FB.compName(A.comp)) + ' this season; size by xG.' : '', '<div id="lb-sh-a"></div>', { span: 6 }) +
@@ -884,7 +886,7 @@ function buildPlayers(el, P) {
       var rts = chron.map(function (r) { return isNum(r.rt) ? r.rt : null; });
       rser.push({ name: nm, color: c, data: rts.map(function (v, j) { var w = rts.slice(Math.max(0, j - 4), j + 1).filter(isNum); return w.length ? Math.round(mean(w) * 100) / 100 : null; }) });
     });
-    QKC.line(el.querySelector('#lb-evo'), { x: xs, xLabel: function (v) { return 'Match ' + v; }, series: ser, yFmt: function (v) { return num(v, 1); }, yMin: 0, xName: 'Match', yName: 'Cumulative goals and xG', label: 'Cumulative goals and xG' });
+    if (!gk) QKC.line(el.querySelector('#lb-evo'), { x: xs, xLabel: function (v) { return 'Match ' + v; }, series: ser, yFmt: function (v) { return num(v, 1); }, yMin: 0, xName: 'Match', yName: 'Cumulative goals and xG', label: 'Cumulative goals and xG' });
     QKC.line(el.querySelector('#lb-rt'), { x: xs, xLabel: function (v) { return 'Match ' + v; }, series: rser, yFmt: function (v) { return num(v, 2); }, yScale: true, xName: 'Match', yName: 'Rating, 5-match average', label: 'Five-match rolling rating' });
   } else { FB.set('lb-evo', FB.muted('No match logs this season.')); FB.set('lb-rt', ''); }
 

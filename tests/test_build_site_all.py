@@ -95,6 +95,17 @@ def test_index_lists_every_competition_built(built) -> None:
     assert "bracket" in by_slug["mls"]["tabs"] and "bracket" not in by_slug["premier-league"]["tabs"]
 
 
+def test_calibration_json_is_published_for_how_sure(built) -> None:
+    """data/calibration.json is the committed walk-forward record (CALIBRATION_PATH), copied as is: the kit's
+    QK.calib.find reads metrics.model (n, brier, reliability buckets of mean_p against freq)."""
+    data, _ = built
+    cal = _load(data, "calibration.json")
+    assert cal["ok"] is True and cal["subject"] and cal["unit"]
+    m = cal["metrics"]["model"]
+    assert m["n"] > 1000 and 0 < m["brier"] < 0.25 and m["reliability"]
+    assert all(0 <= r["mean_p"] <= 1 and 0 <= r["freq"] <= 1 and r["n"] > 0 for r in m["reliability"])
+
+
 def test_league_payloads_are_complete_and_consistent(built) -> None:
     data, _ = built
     for name in LEAGUE_PAYLOADS:

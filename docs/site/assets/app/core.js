@@ -81,7 +81,7 @@ var TITLES = {
 var COMP_TAB_MAP = {
   overview: ['overview'], table: ['table'], zones: ['table', { view: 'zones' }], anual: ['table', { view: 'anual' }],
   relegation: ['table', { view: 'relegation' }], fixtures: ['fixtures'], matches: ['fixtures', { view: 'played' }],
-  bracket: ['bracket'], probs: ['odds'], market: ['odds', { view: 'market' }], history: ['odds', { view: 'history' }],
+  bracket: ['bracket'], probs: ['odds'], market: ['odds'], history: ['odds', { view: 'history' }],
   power: ['power'], team: ['clubs'], players: ['players'], analytics: ['analytics'],
   'p-table': ['table'], 'p-results': ['fixtures'], 'p-bracket': ['bracket'], 'p-players': ['players'], 'p-leaders': ['players', { view: 'leaders' }]
 };

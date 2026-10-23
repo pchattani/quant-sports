@@ -61,7 +61,7 @@ body.qk::before { /* a warm glow behind everything: sun at the top left, teal at
   background: var(--s-glass); backdrop-filter: saturate(140%) blur(14px); -webkit-backdrop-filter: saturate(140%) blur(14px);
   border-bottom: 1px solid var(--line-1);
 }
-.qk-topbar-in { max-width: var(--page-max); margin: 0 auto; height: var(--topbar-h); padding: 0 var(--gutter); display: flex; align-items: center; gap: var(--sp-5); }
+.qk-topbar-in { max-width: var(--page-max); margin: 0 auto; height: var(--topbar-h); padding: 0 var(--gutter); display: flex; align-items: center; gap: var(--sp-4); }
 .qk-brand { display: flex; align-items: center; gap: 9px; flex: none; white-space: nowrap; font: 700 23px/1 var(--font-display); font-variation-settings: "SOFT" 100, "WONK" 1; letter-spacing: -0.02em; color: var(--ink-1); }
 .qk-brand-mark { width: 14px; height: 14px; border-radius: 50%; background: var(--sun); box-shadow: 4px 3px 0 var(--coral); flex: none; display: inline-block; margin-right: 3px; }
 .qk-brand-mark svg { display: none; }
@@ -69,11 +69,11 @@ body.qk::before { /* a warm glow behind everything: sun at the top left, teal at
 .qk-brand-name b { color: var(--accent); font-weight: 600; font-style: italic; }
 .qk-brand-sep { display: none; }
 
-.qk-sports { display: flex; gap: 4px; align-items: center; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; mask-image: linear-gradient(90deg, #000 94%, transparent); -webkit-mask-image: linear-gradient(90deg, #000 94%, transparent); }
+.qk-sports { display: flex; gap: 2px; align-items: center; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; mask-image: linear-gradient(90deg, #000 94%, transparent); -webkit-mask-image: linear-gradient(90deg, #000 94%, transparent); }
 .qk-sports::-webkit-scrollbar { display: none; }
 .qk-sport {
   --sa: var(--ink-3);
-  display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: var(--r-pill);
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: var(--r-pill);
   font-size: var(--fs-sm); font-weight: 600; color: var(--ink-2); white-space: nowrap;
   transition: background var(--t-fast), color var(--t-fast);
 }
@@ -91,10 +91,18 @@ body.qk::before { /* a warm glow behind everything: sun at the top left, teal at
 .qk-iconbtn:hover { background: var(--s-2); color: var(--ink-1); border-color: var(--line-3); }
 .qk-iconbtn svg { width: 17px; height: 17px; }
 .qk-iconbtn[data-qk-theme-toggle] { display: none; }   /* v3 is dark only: an old page's toggle never shows */
-.qk-searchbtn { display: inline-flex; align-items: center; gap: 9px; height: 38px; padding: 0 12px 0 16px; min-width: 220px; border-radius: var(--r-pill); border: 1px solid var(--line-2); background: var(--s-1); color: var(--ink-3); cursor: pointer; font-size: var(--fs-sm); }
+.qk-searchbtn { display: inline-flex; align-items: center; gap: 9px; height: 38px; padding: 0 12px 0 16px; min-width: 220px; white-space: nowrap; border-radius: var(--r-pill); border: 1px solid var(--line-2); background: var(--s-1); color: var(--ink-3); cursor: pointer; font-size: var(--fs-sm); }
 .qk-searchbtn:hover { border-color: var(--line-3); color: var(--ink-2); }
 .qk-searchbtn svg { width: 15px; height: 15px; }
 .qk-searchbtn kbd { margin-left: auto; font: 600 var(--fs-2xs) var(--font-ui); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line-2); color: var(--ink-3); }
+.qk-searchbtn .qk-sb-s { display: none; }
+/* below 1500 px the bar is the page width (1240 px) and every sport must fit beside the brand ("the quant footballer"
+ * is the longest), so the search button says just "Search" */
+@media (max-width: 1499px) {
+  .qk-searchbtn { min-width: 0; padding: 0 14px; }
+  .qk-searchbtn .qk-sb-l, .qk-searchbtn kbd { display: none; }
+  .qk-searchbtn .qk-sb-s { display: inline; }
+}
 
 .qk-secnav { position: sticky; top: var(--topbar-h); z-index: calc(var(--z-bar) - 1); background: var(--s-glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--line-1); }
 .qk-secnav-in { position: relative; max-width: var(--page-max); margin: 0 auto; padding: 0 var(--gutter); min-height: var(--secnav-h); display: flex; align-items: center; gap: 4px; overflow-x: auto; scrollbar-width: none; }
@@ -109,7 +117,7 @@ body.qk::before { /* a warm glow behind everything: sun at the top left, teal at
 
 @media (max-width: 900px) {
   .qk-searchbtn { min-width: 0; width: 38px; padding: 0; justify-content: center; }
-  .qk-searchbtn span, .qk-searchbtn kbd { display: none; }
+  .qk-searchbtn span, .qk-searchbtn kbd, .qk-searchbtn .qk-sb-s { display: none; }
 }
 @media (max-width: 860px) {
   .qk-topbar-in { flex-wrap: wrap; height: auto; padding-top: 12px; padding-bottom: 0; row-gap: 8px; }
@@ -612,6 +620,10 @@ a.qk-stat:hover { border-color: var(--line-3); transform: translateY(-2px); }
 .qk-cmp-ent b { font: 600 var(--fs-lg)/1.15 var(--font-display); font-variation-settings: var(--fvs-display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qk-cmp-ent small { color: var(--ink-3); font-size: var(--fs-2xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qk-cmp-ent .wins { font: 700 var(--fs-2xs) var(--font-ui); color: var(--ink-2); }
+/* a long name shrinks to an ellipsis instead of widening its column (a grid item's min-width is its content's) */
+.qk-cmp-ent > * { min-width: 0; }
+.qk-cmp-a { display: block; overflow: hidden; }
+.qk-cmp-a b { display: block; }
 .qk-cmp-dh { text-align: right; font: 700 var(--fs-xs) var(--font-ui); color: var(--ink-2); }
 .qk-cmp-grp { padding: 16px 0 6px; font: 700 var(--fs-xs)/1.2 var(--font-ui); color: var(--ink-3); border-bottom: 1px solid var(--line-1); }
 .qk-cmp-row { padding: 9px 0; border-bottom: 1px solid var(--line-1); font-size: var(--fs-sm); }
@@ -633,6 +645,10 @@ a.qk-stat:hover { border-color: var(--line-3); transform: translateY(-2px); }
   .qk-cmp-cell { grid-template-columns: auto minmax(12px, 1fr); }
   .qk-cmp-cell .p { display: none; }
   .qk-cmp-ent b { font-size: var(--fs-md); }
+  /* three side by side: the value alone (no bar), so each column fits a third of a phone */
+  .qk-cmp.n3 .qk-cmp-cell { grid-template-columns: minmax(0, auto); }
+  .qk-cmp.n3 .qk-cmp-pb { display: none; }
+  .qk-cmp.n3 .qk-cmp-ent { padding-left: 7px; }
 }
 
 /* ── matchup bar (tale of the tape): one split bar per metric, the better side in full colour ── */

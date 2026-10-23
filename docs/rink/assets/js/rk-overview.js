@@ -6,7 +6,7 @@
  *   headline and stat tiles: games today (live), the Cup favourite, the top-rated club, the points leader, the
  *              best goalie by goals saved above expected (ours first; no market headline);
  *   scoreboard: live and today's games (then the next ones and the latest results) as v2 game cards;
- *   charts: Stanley Cup chances (ours as bars, Kalshi / Polymarket as a quiet tick), projected points with the
+ *   charts: Stanley Cup chances (ours only, no market tick), projected points with the
  *           simulation's 90% range, power ratings, results v process (points % against 5v5 xGF%);
  *   playoff race by conference (chance bars) beside the standings; four leader boards (counting stats).
  *
@@ -106,7 +106,7 @@ function render(el) {
     if (!G.today.length) el.querySelectorAll('#ov-when button').forEach(b => b.setAttribute('aria-pressed', b.getAttribute('data-value') === 'next' ? 'true' : 'false'));
     QK.seg(el.querySelector('#ov-when'), draw);
 
-    // cup chances: ours first, the market a tick
+    // cup chances: ours only (the market is on game pages and the Model page)
     el.querySelector('#ov-cup').innerHTML = QK.chances(cup.filter(r => isNum(r.model)).map(r => ({ label: RK.teamName(r.team), p: r.model, href: RK.teamHref(r.team), mark: U.team(r.team) })),
       { limit: 12, key: false });
 

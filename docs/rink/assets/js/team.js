@@ -3,7 +3,8 @@
  * Record, rating and odds tiles; playoff paths (the odds of each stage, the points and seed
  * distributions, magic numbers); unit ratings over the season; special teams; shot maps for and against
  * against the league; line combinations and defence pairs; deployment (ice time by strength and zone
- * starts for every regular); the schedule against the model and the market; the roster's value.
+ * starts for every regular); the schedule against the model (the market stays on game pages and the Model page);
+ * the roster's value.
  *
  * Data: data/<S>/teams.json, season.json, schedule.json, lines.json, skaters.json, goalies.json. Uses RK.fk
  * and RK.fk.T (teams.js). */
@@ -58,7 +59,7 @@ function render(el, params, state) {
     if (cat && cat.metrics && cat.metrics.length && x.pct) h += '<div class="card"><div class="card-header">Team profile <span class="card-sub">Percentiles among the 32 teams on the team catalogue (100 = best).</span></div><div class="gq-pad">' + k.sliders(cat.metrics.filter(m => k.isNum((x.pct || {})[m.key])), x.values || {}, x.pct || {}, {}) + '</div></div>';
     h += '<div class="card"><div class="card-header">Line combinations <span class="card-sub">Forward lines and defence pairs by 5-on-5 time together, with their expected-goals share (shrunk towards the team\'s by the time together).</span></div><div class="grid-2"><div id="tp-fl"></div><div id="tp-dp"></div></div></div>';
     h += '<div class="card"><div class="card-header">Deployment <span class="card-sub">Ice time per game by strength and offensive-zone start share for every regular.</span></div><div class="grid-2"><div id="tp-dep"></div><div id="tp-dep-c" style="height:420px"></div></div></div>';
-    h += '<div class="card"><div class="card-header">Schedule against the model <span class="card-sub">Every game with our pre-game win probability beside the market\'s; the chart is points minus the model\'s expected points.</span></div><div id="tp-sched-c" style="height:220px"></div><div id="tp-sched"></div></div>';
+    h += '<div class="card"><div class="card-header">Schedule against the model <span class="card-sub">Every game with our pre-game win probability; the chart is points minus the model\'s expected points.</span></div><div id="tp-sched-c" style="height:220px"></div><div id="tp-sched"></div></div>';
     h += '<div class="card"><div class="card-header">Roster value <span class="card-sub">Rink value this season (goals above replacement) for the team\'s skaters and goalies in the catalogues. Click a player for the player page.</span></div><div class="grid-2"><div id="tp-roster"></div><div id="tp-roster-c" style="height:380px"></div></div></div>';
     el.innerHTML = h;
     k.setMeta(k.esc(k.teamName(abbr)));
@@ -143,11 +144,9 @@ function playoffPaths(x, r, od, colour) {
   const pv = distOf(pd).map(z => [Number(z[0]), z[1]]).filter(z => k.isNum(z[0]) && k.isNum(z[1]));
   const pNode = k.$('tp-pts');
   if (pv.length) {
-    const line = k.first((x.market || {}).points_line, (x.markets || {}).season_points, r.points_line, sim.kalshi_points);
     const band = k.isNum(sim.pts_p05) ? ' (90% range ' + sim.pts_p05 + '–' + sim.pts_p95 + ')' : '';
     k.plot(pNode, [{ type: 'bar', x: pv.map(z => z[0]), y: pv.map(z => z[1]), marker: { color: k.alpha(colour, 0.75) }, hovertemplate: '%{x} points: %{y:.1%}<extra></extra>' }],
-      k.layout({ margin: { l: 44, r: 10, t: 24, b: 30 }, title: { text: 'Final points' + band + (k.isNum(line) ? ' (dashed: market line ' + line + ')' : ''), font: { size: 11, color: k.C.text2 }, x: 0.02 }, yaxis: { tickformat: Math.max.apply(null, pv.map(z => z[1])) < 0.1 ? '.1%' : '.0%', title: 'Probability' }, xaxis: { title: 'Final points' },
-        shapes: k.isNum(line) ? [{ type: 'line', x0: line, x1: line, yref: 'paper', y0: 0, y1: 1, line: { color: '#e6edf3', dash: 'dash', width: 1 } }] : [] }));
+      k.layout({ margin: { l: 44, r: 10, t: 24, b: 30 }, title: { text: 'Final points' + band, font: { size: 11, color: k.C.text2 }, x: 0.02 }, yaxis: { tickformat: Math.max.apply(null, pv.map(z => z[1])) < 0.1 ? '.1%' : '.0%', title: 'Probability' }, xaxis: { title: 'Final points' } }));
   } else pNode.style.display = 'none';
   const sNode = k.$('tp-seed');
   const dr = sim.div_rank_dist;
@@ -299,21 +298,20 @@ function schedule(abbr, x, sch, S, colour) {
   const rows = games.map(g => {
     const home = g.home !== undefined && typeof g.home === 'string' ? g.home === abbr : (g.is_home === true || g.side === 'home' || g.home === true);
     const opp = g.opp || g.opponent || (g.home === abbr ? g.away : g.home);
-    const m = g.model || {}, mk = g.market || {};
+    const m = g.model || {};
     const pTeam = k.first(g.p_win, g.model_p, k.isNum(m.p_home) ? (home ? m.p_home : 1 - m.p_home) : null);
-    const pMk = k.first(g.p_market, g.market_p, k.isNum(mk.p_home) ? (home ? mk.p_home : 1 - mk.p_home) : null);
     const card = cards[g.game_id || g.id] || {};
     const pOT = k.first(m.p_ot, g.p_ot, (card.model || {}).p_ot);
     const gf = k.first(g.gf, home ? g.hs : g.as), ga = k.first(g.ga, home ? g.as : g.hs);
     const st = String(g.status || '').toLowerCase();
     const fin = k.isNum(gf) && k.isNum(ga) && (!st || /final|off|post|done|complete/.test(st));
     const ot = !!(g.ot || g.so || card.ot || card.so || g.result === 'OTL' || /ot|so/i.test(String(g.period_type || g.last_period || '')) || (k.isNum(card.period) && card.period > 3));
-    return { gid: g.game_id || g.id, date: g.date || '', home: home, opp: opp, p: pTeam, pm: pMk, pot: pOT, gf: gf, ga: ga, fin: fin, ot: ot, so: !!g.so };
+    return { gid: g.game_id || g.id, date: g.date || '', home: home, opp: opp, p: pTeam, pot: pOT, gf: gf, ga: ga, fin: fin, ot: ot, so: !!g.so };
   }).sort((a, b) => String(a.date).localeCompare(String(b.date)));
   const res = z => (!z.fin ? '' : (z.gf > z.ga ? 'W' : z.ot ? 'OTL' : 'L') + ' ' + z.gf + '–' + z.ga + (z.ot && z.gf > z.ga ? (z.so ? ' (SO)' : ' (OT)') : ''));
-  host.innerHTML = k.table([{ label: 'Date' }, { label: 'Opponent' }, { label: 'Model', align: 'right', title: 'Our pre-game win probability (including overtime)' }, { label: 'Market', align: 'right', title: 'De-vigged market win probability' }, { label: 'Model − market', align: 'right' }, { label: 'Result' }],
+  host.innerHTML = k.table([{ label: 'Date' }, { label: 'Opponent' }, { label: 'Our chance', align: 'right', title: 'Our pre-game win probability (including overtime)' }, { label: 'Result' }],
     rows.map(z => [{ v: z.date, html: '<strong>' + k.esc(k.fmtDate(z.date, { year: false })) + '</strong>' }, { v: z.opp, html: (z.home ? 'v ' : '@ ') + k.teamChip(z.opp, S) },
-      { v: z.p, html: k.isNum(z.p) ? k.pct(z.p, 0) : '—' }, { v: z.pm, html: k.isNum(z.pm) ? k.pct(z.pm, 0) : '—' }, { v: k.isNum(z.p) && k.isNum(z.pm) ? z.p - z.pm : null, html: k.isNum(z.p) && k.isNum(z.pm) ? k.signed((z.p - z.pm) * 100, 1) + ' pp' : '—' },
+      { v: z.p, html: k.isNum(z.p) ? k.pct(z.p, 0) : '—' },
       { v: res(z), html: z.gid ? '<a href="' + k.gameHref(z.gid) + '">' + k.esc(res(z) || 'Preview') + '</a>' : k.esc(res(z)) }]), { compact: true, sticky: true });
   k.sortable(host);
   const done = rows.filter(z => z.fin && k.isNum(z.p));

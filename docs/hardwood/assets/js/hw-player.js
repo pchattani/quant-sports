@@ -41,14 +41,17 @@ function rcCatalogue(career, rc, pid, S) {
   return { ok: true, players: players, min_floor: rc.min_floor, metrics: [], __rc: rc };
 }
 
-/* Last season's percentiles in the same peer group, when the career file carries them (the data builders add
-   current.prev_pct_pos or role_card.prev_pct_role): { pct: {key: percentile}, gp, role } or null. */
+/* Last season's percentiles in the same peer group, when the career file carries them (02157d80: current.prev_pct_pos
+   {key: 0-100} beside current.prev_peer {season, role (this season's role), label, gp, qualified}; role_card.prev_pct_role
+   is read too): { pct: {key: percentile}, gp, role } or null. Without it the page loads last season's catalogue. */
 function prevFromFile(career) {
   const c = (career && career.current) || {}, rc = (career && career.role_card) || {};
   const pc = c.prev_pct_pos || c.prev_pct_role || rc.prev_pct_role || rc.prev_pct_pos;
   if (!pc || typeof pc !== 'object') return null;
   const m = pc.pct || pc.pct_role || pc;
-  return { pct: m, gp: isNum(pc.gp) ? pc.gp : null, role: pc.role || null };
+  if (!Object.keys(m).length) return null;
+  const peer = (c.prev_pct_pos || c.prev_pct_role ? c.prev_peer : rc.prev_peer) || {};
+  return { pct: m, gp: isNum(peer.gp) ? peer.gp : (isNum(pc.gp) ? pc.gp : null), role: peer.role || pc.role || null };
 }
 
 function render(el, params) {

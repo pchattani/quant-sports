@@ -383,6 +383,3 @@ tr.row-link { cursor: pointer; }
 .bp-mix-row .tr b { border-radius: 999px; }
 .bp-mix-row .qk-pcell { border-radius: 999px; }
 @media (max-width: 640px) { .bp-tiles { margin-top: var(--sp-6); } .bp-mix-row:not(.h) { padding: 8px 10px; } }
-/* compare header: a linked name ellipsises inside its column (a long name widened the page at 375 px) */
-.qk-cmp-ent .qk-cmp-a { display: block; min-width: 0; overflow: hidden; }
-.qk-cmp-ent .qk-cmp-a b { display: block; }

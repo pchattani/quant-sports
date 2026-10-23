@@ -121,13 +121,13 @@ All builders return HTML strings unless noted. Full signatures are in the commen
 | Greeting hero | `QK.greeting({ date, title, lede, ctas, side })`, `QK.greet()` | Home and every sport overview |
 | Feature card | `QK.featureCard(g, { scribble })` | the hero's side: the game to watch, with a sun sticker |
 | What to watch | `QK.watchGrid(games, { limit, card })`, `QK.whyLine(g)`, `QK.watchScore(g)` | overviews: six cards with a reason |
-| Who's hot | `QK.hotRow(items)` | Home; any site's leaders strip (swipeable on phones) |
+| Who's hot | `QK.hotRow(items)` | Home; any site's leaders strip (swipeable on phones); "next best" by `QK.surname` (keeps "Witt Jr.") |
 | Stat of the day | `QK.statOfDay(s, { nav })` | Home |
 | New here? | `QK.newHere({ items })` | Home and overviews |
 | How sure are we? | `QK.howSure(el, { bins / calibration, brier, n, league, span, subject })` (renders), `QK.calib.find(json)`, `QKC.calibration(el, spec)` | Home; every Model page; a teaser on overviews |
 | Percentile rail | `QK.pctRail(o)` (= `QK.pctCard`), rows `{ label, sub, pctl, prev, value, tip, early }`, `QK.pctKey()` | player pages |
 | The short version | `QK.shortVersion(text)`; `QK.playerHeader({ ..., short })` puts it in the header | player (and team) pages |
-| Preview card | `QK.previewCard(g, { kicker, nick, factors, note, noteExtra, market })` | game pages: away "at" home, our chance, factors |
+| Preview card | `QK.previewCard(g, { kicker, nick, factors, note, noteExtra, market, vs, noun, homeFirst })` | game pages: away "at" home (football: home "v" away; tennis "v"; `noun` "match" / "race" in the note), our chance, factors |
 | Score bug | `QK.scorebug(g, { size: 'lg' })` | live games (cards, heroes, game pages) |
 | Compare verdicts | `QK.verdicts([{ title, who, text }])` | under a compare table |
 

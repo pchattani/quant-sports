@@ -45,7 +45,7 @@ const HOT = [['h_war', 'Best hitter', 'Bullpen WAR', 'Wins above a replacement p
 function hotItems(lead, L) {
   return HOT.filter(x => (lead[x[0]] || []).length).map(x => {
     const r = lead[x[0]][0], r2 = lead[x[0]][1];
-    return { sport: 'baseball', title: x[1], name: BP.playerName(r[0]), value: x[4](r[1]), unit: x[2], next: r2 ? { name: BP.playerName(r2[0]).replace(/ (Jr\.|Sr\.|II|III|IV)$/, ' $1'), value: x[4](r2[1]) } : null, expl: x[3],
+    return { sport: 'baseball', title: x[1], name: BP.playerName(r[0]), value: x[4](r[1]), unit: x[2], next: r2 ? { name: BP.playerName(r2[0]), value: x[4](r2[1]) } : null, expl: x[3],
       href: BP.playerHref(r[0], { level: L, role: x[5] }) };
   });
 }
@@ -180,7 +180,7 @@ function render(el, params) {
       draw(first);
       QK.seg(el.querySelector('#ov-when'), draw);
     }
-    // World Series chances: ours first, the market a tick
+    // World Series chances: ours only (the market is on game pages and the Model page)
     if (titles.length && el.querySelector('#ov-ws')) el.querySelector('#ov-ws').innerHTML = QK.chances(titles.map(r => ({ label: BP.teamName(r.t), p: r.p, href: BP.teamHref(r.t, L, S), mark: U.team(r.t, L, S) })),
       { limit: 12, key: false });
     /* How sure are we? (teaser): the game model's record from mlb/calibration.json, the full chart on the Model page */

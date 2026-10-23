@@ -965,16 +965,36 @@ QKC.calibration = function (el, s) {
   return QKC.mount(el, function (T, ent) {
     var narrow = ent.el.clientWidth && ent.el.clientWidth < 520;
     var pts = bins.map(function (b, i) {
-      var note = '';
+      var note = '', ann = null;
       if (s.annotate !== false) {
-        if (b === top && top !== big) note = narrow ? 'said ' + Math.round(b.mean_p * 100) + '%,\nwon ' + Math.round(b.freq * 100) + '%' : 'We said ' + Math.round(b.mean_p * 100) + '%.\nThey won ' + Math.round(b.freq * 100) + '%\nof ' + fmt.num(b.n) + ' ' + unit + '.';
-        else if (b === big && !narrow) note = fmt.num(b.n) + ' ' + unit + ' here:\nsaid ' + Math.round(b.mean_p * 100) + '%, won ' + Math.round(b.freq * 100) + '%';
+        if (b === top && top !== big) { ann = 'top'; note = narrow ? 'said ' + Math.round(b.mean_p * 100) + '%,\nwon ' + Math.round(b.freq * 100) + '%' : 'We said ' + Math.round(b.mean_p * 100) + '%.\nThey won ' + Math.round(b.freq * 100) + '%\nof ' + fmt.num(b.n) + ' ' + unit + '.'; }
+        else if (b === big && !narrow) { ann = 'big'; note = fmt.num(b.n) + ' ' + unit + ' here:\nsaid ' + Math.round(b.mean_p * 100) + '%, won ' + Math.round(b.freq * 100) + '%'; }
       }
-      return { value: [b.mean_p * 100, b.freq * 100], n: b.n, lo: b.lo, hi: b.hi,
+      return { value: [b.mean_p * 100, b.freq * 100], n: b.n, lo: b.lo, hi: b.hi, _ann: ann,
         label: Object.assign(QKC.annot(T, narrow ? { fontSize: 12 } : null), { show: !!note, formatter: note, position: b === top ? (narrow ? 'bottom' : 'left') : 'right', distance: narrow ? 18 : 12 }) };
     });
-    var diagAt = mn + (mx - mn) * (narrow ? 0.42 : 0.55);
-    var xa = axis(T, { type: 'value', min: mn, max: mx, interval: 10, line: true, fmt: function (v) { return v + '%'; } });
+    /* The dots sit near the diagonal, so the empty space is the two triangles either side of it. The note on the
+     * busiest bucket goes above the diagonal, ending just left of its dot; the note on the top bucket goes below the
+     * diagonal, under its dot, its right edge on the dot's. Neither then covers a dot. Falls back to beside the dot
+     * when the note would leave the plot. */
+    var chart = ent.chart;
+    function gridPx(x, y) { try { return chart.convertToPixel({ gridIndex: 0 }, [x, y]); } catch (e) { return null; } }
+    function placeNote(p) {
+      var d = pts[p.dataIndex], r = p.rect, lr = p.labelRect;
+      if (!d || !d._ann || !r || !lr) return {};
+      var c0 = gridPx(mn, mn), c1 = gridPx(mx, mx);
+      if (!c0 || !c1) return {};
+      var diagY = function (px) { var t = (px - c0[0]) / ((c1[0] - c0[0]) || 1); return c0[1] + t * (c1[1] - c0[1]); };
+      if (d._ann === 'big') {
+        var xr = r.x - 8, yb = Math.min(r.y + r.height / 2, diagY(xr) - 8);
+        if (xr - lr.width < c0[0] + 4 || yb - lr.height < c1[1] - 4) return {};
+        return { x: xr, y: yb, align: 'right', verticalAlign: 'bottom' };
+      }
+      var xe = Math.min(r.x + r.width, c1[0]), yt = Math.max(r.y + r.height + 8, diagY(xe - lr.width) + 10);
+      if (yt + lr.height > c0[1] - 4) return {};
+      return { x: xe, y: yt, align: 'right', verticalAlign: 'top' };
+    }
+    var xa = axis(T, { type: 'value', min: mn, max: mx, interval: narrow && mx - mn > 60 ? 20 : 10, line: true, fmt: function (v) { return v + '%'; } });
     var ya = axis(T, { type: 'value', min: mn, max: mx, interval: 10, fmt: function (v) { return v + '%'; } });
     var gB = 10 + nameAxis(xa, s.xName || 'Our forecast for ' + subj + ' (%)', 'bottom');
     var gT = 16 + nameAxis(ya, s.yName || 'How often ' + subj + ' won (%)', 'side');
@@ -989,12 +1009,13 @@ QKC.calibration = function (el, s) {
       } }),
       series: [
         { type: 'line', data: [[mn, mn], [mx, mx]], symbol: 'none', silent: true, z: 1, lineStyle: { color: T.ink4 || T.axis, type: [6, 5], width: 1.5 }, tooltip: { show: false } },
-        { type: 'scatter', silent: true, z: 1, data: [[diagAt, diagAt - (mx - mn) * 0.1]], symbolSize: 0, tooltip: { show: false },
-          label: Object.assign(QKC.annot(T, { color: T.ink3 }), { show: true, formatter: 'dashed line = spot on', position: 'right' }) },
+        /* the key to the diagonal, in the bottom-right corner (clear of the dots and the notes) */
+        { type: 'scatter', silent: true, z: 1, data: [[mx, mn + (mx - mn) * 0.04]], symbolSize: 0, tooltip: { show: false },
+          label: Object.assign(QKC.annot(T, { color: T.ink3 }), { show: true, formatter: 'dashed line = spot on', position: 'left', distance: 4 }) },
         { type: 'scatter', name: 'Our forecasts', z: 3, data: pts,
           symbolSize: function (v, p) { return 9 + 26 * Math.sqrt((p.data && p.data.n || 0) / nMax); },
           itemStyle: { color: T.model, borderColor: T.s1, borderWidth: 2, opacity: 0.95 },
-          labelLayout: { hideOverlap: false } }
+          labelLayout: placeNote, labelLine: { show: true, lineStyle: { color: T.ink3, width: 1 } } }
       ]
     };
   }, { label: s.label || 'Calibration: our forecast chance against how often ' + subj + ' won' });

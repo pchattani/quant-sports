@@ -711,28 +711,13 @@ function methodology(el, p) {
 // ── glossary ────────────────────────────────────────────────────────────────
 
 function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
-/* Terms the site no longer uses (betting framing) and the cleaned wording for a few entries. The builder was cleaned
-   (b463b937..a7f39783) and the live glossary.json (23 Oct 2026) already carries the clean text, so these change
-   nothing there; they stay only for the local snapshot built before that (glossary.json of 18 Oct still has "Edge",
-   "Fair odds", "Fantasy price" and the "Odds" group). Remove them once every glossary.json is rebuilt. */
-var RETIRED = { edge: 1, fair_odds: 1 };
-var REWORD = {
-  fantasy_price: { label: 'Fantasy cost', desc: 'Our own cost proxy: expected points above replacement next season from the value model, ranked within the league and position and mapped onto FPL-like ranges. FPL\'s official figures and ownership are not used (the Premier League\'s terms forbid reusing its material).' },
-  de_vig: { desc: 'Removing a market\'s margin so its implied probabilities add up to 100%. The site does this only to show the market as a grey reference beside our chance on match pages and here.' }
-};
-var GROUP_NAME = { Odds: 'Market reference', Markets: 'Market reference' };
-function v2entry(e) {
-  var r = REWORD[e.key];
-  var o = FB.merge(e, r || {});
-  if (o.group && GROUP_NAME[o.group]) o.group = GROUP_NAME[o.group];
-  return o;
-}
+/* glossary.json carries the clean wording since the builder pass (b463b937..a7f39783; live and local checked 23 Oct
+   2026: no "Edge", "Fair odds", "Fantasy price" or "Odds" group), so it is shown as built. */
 function loadGlossary() {
   return FB.load('glossary.json').then(function (g) {
-    var keep = function (e) { return !RETIRED[e.key] && !/ballon/i.test(String(e.key || '') + ' ' + String(e.label || '') + ' ' + String(e.desc || '')); };
     if (g && (g.groups || []).length) {
-      return { groups: g.groups.map(function (grp) { return { name: GROUP_NAME[grp.name] || grp.name, entries: (grp.entries || []).filter(keep).map(v2entry) }; }),
-        model: ((g.model || []).length ? g.model : MODEL_TERMS.map(function (t) { return { key: t[0], label: t[1], desc: t[2], group: t[3] }; })).filter(keep).map(v2entry), updated_at: g.updated_at };
+      return { groups: g.groups.map(function (grp) { return { name: grp.name, entries: grp.entries || [] }; }),
+        model: (g.model || []).length ? g.model : MODEL_TERMS.map(function (t) { return { key: t[0], label: t[1], desc: t[2], group: t[3] }; }), updated_at: g.updated_at };
     }
     var groups = {};
     Object.keys(DESC).forEach(function (k) { (groups.Metrics = groups.Metrics || []).push({ key: k, label: k, desc: DESC[k] }); });

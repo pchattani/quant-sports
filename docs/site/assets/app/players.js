@@ -688,11 +688,13 @@ function drawOverview(el, body, doc, R, q) {
     '<section class="qk-section" id="pl-nl" hidden><div class="qk-g2" id="pl-nl-g"></div></section>' +
     '<div id="pl-move" class="fb-pl-move"></div>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'More on the player', title: 'Peers, seasons and value', sub: 'Where the player sits in the peer group, every season in the data, and what the player is worth to a team.' }) +
-    '<div class="qk-grid"><div class="qk-span-6">' +
+    /* a goalkeeper's own goals and xG are zeros, and the people files carry no goals conceded or xGOT faced by
+       season, so a keeper's page drops the goals-against-xG card (its shot-stopping is in the rail and the lab) */
+    '<div class="qk-grid"><div class="' + (doc.pos === 'G' ? 'qk-span-12' : 'qk-span-6') + '">' +
         FB.card('Among peers', '<span id="pl-dist-sub">The peer group in the player\'s main competition this season, with the player and the median marked.</span>',
           '<div id="pl-dist-seg" class="fb-pl-distseg"></div>' + FB.chartBox('pl-dist', 250, 'Among peers'), { id: 'pl-distcard' }) + '</div>' +
-      '<div class="qk-span-6">' + FB.card('Goals against xG', '<span id="pl-xg-sub">Per season, where the stores carry xG (archive seasons are totals without xG).</span>', FB.chartBox('pl-xg', 250, 'Goals and xG by season') +
-        FB.note('<b>xG</b> is how many goals an average finisher would score from the same shots.')) + '</div></div>' +
+      (doc.pos === 'G' ? '' : '<div class="qk-span-6">' + FB.card('Goals against xG', '<span id="pl-xg-sub">Per season, where the stores carry xG (archive seasons are totals without xG).</span>', FB.chartBox('pl-xg', 250, 'Goals and xG by season') +
+        FB.note('<b>xG</b> is how many goals an average finisher would score from the same shots.')) + '</div>') + '</div>' +
     FB.grid(
       FB.card('Goals and assists by season', 'Stacked by competition kind' + (filtered ? ', in the filter' : '') + '.', FB.chartBox('pl-ga', 280, 'Goals and assists by season'), { span: 4 }) +
       FB.card('Minutes by season', 'Where the minutes came from: league, continental, cups, international.', FB.chartBox('pl-min', 280, 'Minutes by season'), { span: 4 }) +
@@ -828,7 +830,7 @@ function nextLast(body, doc, R) {
       var g = FB.toGame(f, nx.comp);
       var rel = FB.relDay(nx.date);
       h += '<div><div class="qk-kicker" style="margin-bottom:10px">' + (f.status === 'live' ? 'Live now' : rel === 'Today' ? 'What to watch today' : 'Next up') + '</div>' +
-        QK.previewCard(g, { kicker: FB.compName(nx.comp) + (g.note ? ' · ' + g.note : ''), nick: function (t) { return t.name; },
+        QK.previewCard(g, { kicker: FB.compName(nx.comp) + (g.note ? ' · ' + g.note : ''), nick: function (t) { return t.name; }, homeFirst: true, vs: 'v', noun: 'match',
           note: f.status === 'live' ? '<b>Our pre-match chance.</b> We have no live model for football; this is the call from before kick-off.' : undefined }) +
         '<p class="fb-cap"><a href="' + esc(FB.href.match(nx.comp, nx.id)) + '">The match centre →</a></p></div>';
     }
@@ -1097,7 +1099,7 @@ function seasonCharts(body, Y) {
   var anyPart = ys.some(partXg);
   var xgSub = body.querySelector('#pl-xg-sub');
   if (xgSub && anyPart) xgSub.textContent = 'Per season, where the stores carry xG. Where xG covers only some of the player\'s matches, goals count those matches only, so the two compare like with like.';
-  QKC.line(boxes[2], { x: eras, legend: true, endLabels: false, yMin: 0, yFmt: function (v) { return num(v, 0); }, xName: 'Season', yName: 'Goals and xG', label: 'Goals against xG by season',
+  if (boxes[2]) QKC.line(boxes[2], { x: eras, legend: true, endLabels: false, yMin: 0, yFmt: function (v) { return num(v, 0); }, xName: 'Season', yName: 'Goals and xG', label: 'Goals against xG by season',
     series: [{ name: anyPart ? 'Goals (in matches with xG)' : 'Goals', color: QK.cssVar('--c-2'), data: ys.map(function (y) { return partXg(y) ? y.xg_g : y.g; }) }].concat(xgOk ? [{ name: 'xG', color: QK.cssVar('--c-1'), dash: true, data: ys.map(function (y) { return isNum(y.xg) ? Math.round(y.xg * 10) / 10 : null; }) }] : []) });
   var rts = ys.map(function (y) { return isNum(y.rt) ? Math.round(y.rt * 100) / 100 : null; });
   if (!rts.some(isNum)) chartEmpty(boxes[3], 'No ratings', 'No rated season in the filter.');

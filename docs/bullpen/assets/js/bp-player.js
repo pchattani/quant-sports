@@ -140,8 +140,11 @@ function draw(el, c) {
   }
 
   // the rail, with last season's ring (from the player file when written, else the catalogue on view)
-  const pf = blk.prev_pct_pos || blk.prev_pct_role || cur.prev_pct_pos || null;
-  let prevPct = pf ? (pf.pct || pf.pct_role || pf) : null, prevN = pf && isNum(pf.n) ? pf.n : null;
+  // current.hitting / current.pitching carry prev_pct_pos and prev_peer {level, season, group, pa | bf} (4b41ed54)
+  const pf = blk.prev_pct_pos || blk.prev_pct_role || cur.prev_pct_pos || null, ppeer = blk.prev_peer || {};
+  let prevPct = pf ? (pf.pct || pf.pct_role || pf) : null;
+  if (prevPct && !Object.keys(prevPct).length) prevPct = null;
+  let prevN = isNum(pit ? ppeer.bf : ppeer.pa) ? (pit ? ppeer.bf : ppeer.pa) : (pf && isNum(pf.n) ? pf.n : null);
   let which = 'head';
   const more = ok ? U.pctGroups(blk, kind, setKey, gl, 'more', tg) : [];
   const railHTML = () => QK.pctRail({ id: 'pp-pcard', kicker: 'How they stack up', title: which === 'more' ? 'More percentiles' : 'Percentiles: how the player ranks', peer: peer, sample: U.sampleLine(blk, kind, setKey, tg),

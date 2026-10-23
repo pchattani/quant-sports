@@ -8,8 +8,8 @@
  *                Liga Argentina: ?view=zones|anual|relegation
  *     fixtures   every match by day with status / stage-round / club filters and our full forecast (?view=played)
  *     bracket    knockout ladder, seeds, known ties, reach-each-round probabilities
- *     odds       "Chances": our chances from the simulated seasons; ?view=market (the prediction markets as a quiet
- *                reference beside ours); ?view=history (our chances after each model run, QKC.forecast)
+ *     odds       "Chances": our chances from the simulated seasons; ?view=history (our chances after each model run,
+ *                QKC.forecast). No market here: it appears only as a quiet reference on the match centre and Model.
  *     power      model strength, luck against xG, schedule, Elo over the season
  *     players    leaderboard (metric, position, club, minutes, qualified), top-scorer race, side-by-side compare,
  *                creation v finishing, shot maps
@@ -101,8 +101,8 @@ function chanceList(ctx, c, rows, opts) {
   var o = opts || {};
   var rs = rows.filter(function (r) { return isNum(r.p) && r.p > 0; });
   if (!rs.length) return cardMsg(o.empty || 'Nothing to show yet.');
-  return FB.chances(rs.map(function (r) { var id = ctx.tidOf(r.team); return { label: r.team, sub: r.sub, p: r.p, market: isNum(r.market) ? r.market : null, mark: markOf(ctx, r.team), href: id ? FB.href.club(id, { c: c.slug }) : null }; }),
-    { limit: o.limit || 10, oursName: o.oursName || 'Our chance', marketName: o.marketName });
+  return FB.chances(rs.map(function (r) { var id = ctx.tidOf(r.team); return { label: r.team, sub: r.sub, p: r.p, mark: markOf(ctx, r.team), href: id ? FB.href.club(id, { c: c.slug }) : null }; }),
+    { limit: o.limit || 10, oursName: o.oursName || 'Our chance' });
 }
 function riskPct(v) { return heatPct(v, 'var(--c-8)'); }
 function rowsSorted(list, key, desc) { return list.slice().sort(function (a, b) { var x = a[key], y = b[key]; x = isNum(x) ? x : -1e9; y = isNum(y) ? y : -1e9; return desc === false ? x - y : y - x; }); }
@@ -887,12 +887,11 @@ function ligaBracket(el, body, ctx, b) {
 
 LIVE.odds = function (el, body, c, d0, q) {
   var tabs = c.tabs || [];
-  var views = [['summary', 'Our chances']].concat(tabs.indexOf('history') >= 0 ? [['history', 'Over time']] : []).concat(tabs.indexOf('market') >= 0 ? [['market', 'Market reference']] : []);
+  var views = [['summary', 'Our chances']].concat(tabs.indexOf('history') >= 0 ? [['history', 'Over time']] : []);
   var view = views.some(function (v) { return v[0] === q.view; }) ? q.view : 'summary';
   body.innerHTML = '<div class="fb-toolbar">' + FB.seg('co-oview', views, view, 'Chances view') + '</div><div id="co-obody" class="fb-mt">' + FB.loading('lines', 5) + '</div>';
   FB.wireSeg(body, 'co-oview', function (v) { FB.setQuery({ view: v === 'summary' ? null : v }, true); });
   var ob = $(el, 'co-obody');
-  if (view === 'market') return oddsMarket(el, ob, c, d0);
   if (view === 'history') return oddsHistory(el, ob, c, d0);
   return FB.compFiles(c.slug, ['probs', 'table']).then(function (d1) {
     if (!FB.alive(el)) return;
@@ -939,43 +938,6 @@ LIVE.odds = function (el, body, c, d0, q) {
     else bar($(el, 'co-oc2'), function (t) { return t[k === 'cup' ? 'p_conference' : 'p_playoffs']; }, k === 'cup' ? 'Our chance of reaching the final' : 'Our play-off chance');
   });
 };
-/* The prediction markets as a quiet reference beside our chances (Kalshi and Polymarket, public data): ours is the
-   headline, the market a grey column or tick with its source named. No gap or edge columns. */
-function oddsMarket(el, ob, c, d0) {
-  return FB.compFiles(c.slug, ['market_odds', 'probs']).then(function (d1) {
-    if (!FB.alive(el)) return;
-    var ctx = makeCtx(c, d0), m = d1.market_odds || {};
-    var SRC = { polymarket: 'Polymarket', kalshi: 'Kalshi' };
-    var srcName = m.sources && m.sources.length ? uniq(m.sources.map(function (x) { return SRC[x] || 'Other markets'; })).join(' / ') : 'Kalshi / Polymarket';
-    var MK = 'Market (' + srcName + '), reference';
-    var fx = ((m.matches || {}).fixtures || []).slice().sort(function (a, b) { return String(a.commence).localeCompare(String(b.commence)); });
-    var out = m.outrights || {};
-    var expl = 'For reference only. Our chances are the headline; beside them in grey is what the prediction markets ' + srcName + ' (public data) make of the same outcomes: the midpoint of each market\'s best bid and ask with the margin removed, pooled across sources. Nothing is placed or offered here.';
-    var ourTitle = {};
-    (((d1.probs || {}).teams) || []).forEach(function (t) { ourTitle[t.team] = has(t[favKeyOf(c)]) ? t[favKeyOf(c)] : t.p_title; });
-    ob.innerHTML = FB.note(esc(expl)) +
-      '<div class="fb-mt">' + (out.available && (out.teams || []).length
-        ? FB.card('Who wins ' + esc(winnerWord(c)) + ': our chance', 'The bar is our chance from the season simulation; the grey tick is the market\'s number, for reference.' + (out.field_complete === false ? ' The market does not list every club, so its numbers run high.' : ''), '<div id="co-out"></div>')
-        : FB.card('Who wins ' + esc(winnerWord(c)), null, cardMsg('No market lists the winner of this competition.'))) + '</div>' +
-      '<div class="fb-mt">' + (fx.length
-        ? FB.card('Coming matches: our chance', fx.length + ' coming matches the markets list. Ours first (home / draw / away); the market in grey, for reference.', '<div id="co-mt"></div>', { flush: true })
-        : FB.empty('No market lists these fixtures yet', 'The markets usually open a matchday about a week before it. The fixtures tab carries our chance for every match.')) + '</div>';
-    if (out.available && (out.teams || []).length) {
-      $(el, 'co-out').innerHTML = chanceList(ctx, c, out.teams.map(function (t) { return { team: t.team, p: isNum(t.model) ? t.model : ourTitle[t.team], market: t.market }; }).sort(function (a, b) { return (b.p || 0) - (a.p || 0); }),
-        { limit: 16, oursName: 'Our chance of winning', marketName: MK });
-    }
-    if (fx.length) {
-      var trio = function (o, strong) { return '<span class="fb-num' + (strong ? '' : ' qk-muted') + '">' + ['home', 'draw', 'away'].map(function (k) { return pct(o[k]); }).join(' / ') + '</span>'; };
-      FB.table($(el, 'co-mt'), [
-        { key: 'commence', label: 'Kick-off', fmt: function (v) { return esc(FB.fmtDate(v, { time: true })); } },
-        { key: 'home', label: 'Match', fmt: function (v, r) { return '<a class="fb-link" href="' + esc(FB.href.match(c.slug, r.match_id)) + '">' + esc(r.home) + ' v ' + esc(r.away) + '</a>'; } },
-        { key: '_m', label: 'Our chance H/D/A', sort: false, fmt: function (v, r) { return '<b>' + trio(r.model, true) + '</b>'; } },
-        { key: '_k', label: 'Market H/D/A', sort: false, tip: MK, fmt: function (v, r) { return trio(r.market, false); } },
-        { key: 'books', label: 'Sources', num: true, tip: 'How many markets list the match' }
-      ], fx, { sort: { key: 'commence', dir: 'asc' }, caption: 'Our chance and the market' });
-    }
-  });
-}
 function oddsHistory(el, ob, c, d0) {
   return FB.compFiles(c.slug, ['history', 'table', 'probs']).then(function (d1) {
     if (!FB.alive(el)) return;

@@ -64,7 +64,9 @@ function renderTeams(el, params, state) {
     if (!cat && !Object.keys(rows).length) { $('tm-table').innerHTML = k.notBuilt('The ' + k.LN(L) + ' ' + S + ' team catalogue', o.res[0]); $('tm-sub').textContent = ''; return; }
     const T = (cat && cat.teams) || {};
     Object.keys(T).forEach(t => k.learnTeam(t, T[t]));
-    /* the catalogue labels its simulation columns "Postseason odds" / "World Series odds" (teams.py): our chance */
+    /* older catalogues label the simulation columns "Postseason odds" / "World Series odds": our chance. Kept (23 Oct
+       2026): the builder and the live teams.json say "chance", but the local mlb/2026/teams.json predates the builder
+       pass (b463b937); drop after its next local rebuild. */
     const metrics = ((cat && cat.metrics) || []).map(m => (m && /\bodds\b/i.test(m.label || '') ? Object.assign({}, m, { label: m.label.replace(/\bodds\b/gi, 'chance') }) : m)), meta = k.metaOf(metrics);
     const ids = Array.from(new Set(Object.keys(T).concat(Object.keys(rows))));
     const lgs = Array.from(new Set(ids.map(t => k.team(t).league || (rows[t] || {}).league).filter(Boolean))).sort();

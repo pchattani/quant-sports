@@ -55,30 +55,30 @@ function render(el, params, state) {
 
 function race(L, S, a, i) {
   const k = K();
-  const model = probsOf(a.model || a.probs), market = probsOf(a.market);
+  // v3: our chance only; the market sits on game pages and the Model page
+  const model = probsOf(a.model || a.probs), market = {};
   // E: rows [{pid, name, p, value, team}], features = the model's feature names; else {pid: {...}}.
   const feats = Array.isArray(a.rows) ? a.rows.reduce((o, r) => { if (r && r.pid !== undefined) o[String(r.pid)] = Object.assign({}, r, { p: undefined }); return o; }, {}) : (Array.isArray(a.features) ? {} : (a.features || {}));
-  (a.vs_market || []).forEach(x => { if (x && x.pid !== undefined && K().isNum(x.market) && market[String(x.pid)] === undefined) market[String(x.pid)] = x.market; });
   (a.candidates || []).forEach(c => { if (c && (c.pid || c.id) && c.name) k.learn(String(c.pid || c.id), { name: c.name }); });
   Object.keys(feats).forEach(pid => { if (feats[pid] && feats[pid].name) k.learn(pid, { name: feats[pid].name, team: feats[pid].team }); });
   const ids = Array.from(new Set(Object.keys(model).concat(Object.keys(market)))).sort((x, y) => (model[y] || 0) - (model[x] || 0) || (market[y] || 0) - (market[x] || 0));
   const top = ids.slice(0, 12);
   const fkeys = Array.from(new Set([].concat.apply([], top.map(pid => Object.keys(feats[pid] || {}).filter(f => k.isNum(feats[pid][f]) && !/^(z_|p$|rank|pid|league|team$)/.test(f)))))).slice(0, 5);
   const pitch = /cy/i.test(a.label || '') || fkeys.some(f => /^(ip|ra9|era)$/.test(f));
-  document.getElementById('aw-t-' + i).innerHTML = top.length ? k.table([{ label: 'Candidate' }, { label: 'Our chance', align: 'right' }, { label: 'Market', align: 'right', title: 'Kalshi / Polymarket, de-vigged: a reference' }]
+  document.getElementById('aw-t-' + i).innerHTML = top.length ? k.table([{ label: 'Candidate' }, { label: 'Our chance', align: 'right' }]
     .concat(fkeys.map(f => ({ label: FEAT[f] || k.titleCase(f), align: 'right' }))),
-  top.map(pid => { const f = feats[pid] || {}, m = model[pid], mk = market[pid];
-    return [{ v: k.name(pid), html: k.playerLink(L, pid, (f.name || null), S, pitch ? 'pitcher' : null) + (f.team ? ' ' + k.teamChip(L, f.team, S) : '') }, { v: m, html: k.isNum(m) ? '<strong>' + k.pct(m, 1) + '</strong>' : '—' }, { v: mk, html: k.isNum(mk) ? '<span class="qk-muted">' + k.pct(mk, 1) + '</span>' : '—' }]
+  top.map(pid => { const f = feats[pid] || {}, m = model[pid];
+    return [{ v: k.name(pid), html: k.playerLink(L, pid, (f.name || null), S, pitch ? 'pitcher' : null) + (f.team ? ' ' + k.teamChip(L, f.team, S) : '') }, { v: m, html: k.isNum(m) ? '<strong>' + k.pct(m, 1) + '</strong>' : '—' }]
       .concat(fkeys.map(fk => ({ v: f[fk], html: k.isNum(f[fk]) ? (/win|wpct/.test(fk) ? k.rate3(f[fk]) : /woba/.test(fk) ? k.rate3(f[fk]) : /ra9|era|fip/.test(fk) ? k.num(f[fk], 2) : /value|war/.test(fk) ? k.num(f[fk], 1) : /^ip$/.test(fk) ? k.fmtV(f[fk], 'ip') : k.int(f[fk])) : '—' }))); }), { compact: true })
     : k.muted('No candidates yet.');
   const s = document.getElementById('aw-s-' + i);
   const FN = { value: 'value (WAR)', hr: 'home runs', team: 'team win %', woba: 'wOBA', k: 'strikeouts', ip: 'innings', ra9: 'RA9', pa_ip: 'playing time' };
-  if (s) s.innerHTML = (Object.keys(market).length ? 'our chance, the market a grey tick' : 'our chance' + (a.market && a.market.reason ? ' (no market: ' + k.esc(a.market.reason) + ')' : '')) + ' · ' + ids.length + ' candidates' +
+  if (s) s.innerHTML = 'our chance · ' + ids.length + ' candidates' +
     (Array.isArray(a.features) ? ' · weighs ' + a.features.map(f => FN[f] || f).join(', ') : '') + (a.reason ? ' · ' + k.esc(a.reason) : '');
   const node = document.getElementById('aw-c-' + i);
   const bars = top.slice(0, 8);
   if (!bars.length) { node.style.display = 'none'; return; }
-  node.innerHTML = QK.chances(bars.map(pid => ({ label: k.name(pid), p: model[pid] || 0, market: k.isNum(market[pid]) ? market[pid] : null, href: BP.playerHref(pid, { level: L, role: pitch ? 'pitcher' : null }) })), { marketName: 'Market (Kalshi / Polymarket)' });
+  node.innerHTML = QK.chances(bars.map(pid => ({ label: k.name(pid), p: model[pid] || 0, href: BP.playerHref(pid, { level: L, role: pitch ? 'pitcher' : null }) })));
 }
 
 if (typeof BP.route === 'function') { BP.route('awards', render); try { BP.route('#/awards', render); } catch (e) { /* bound */ } }

@@ -39,8 +39,8 @@ function seriesTable(list, games, L, sims) {
     const nx = s.next || null;
     const lastG = (s.games || []).slice(-1)[0];
     const cell = i => {
-      const p = s.p ? s.p[i] : null, m = s.market ? s.market[i] : null;
-      return st.done ? (st.winner === t[i] ? '<span class="edge-pos">won</span>' : '<span class="muted-inline">out</span>') : (isNum(p) ? '<b class="bp-ours">' + BP.pct(p, 0) + '</b>' : '—') + (isNum(m) ? ' <span class="muted-inline" title="Market reference (Kalshi / Polymarket)">mkt ' + BP.pct(m, 0) + '</span>' : '');
+      const p = s.p ? s.p[i] : null;
+      return st.done ? (st.winner === t[i] ? '<span class="edge-pos">won</span>' : '<span class="muted-inline">out</span>') : (isNum(p) ? '<b class="bp-ours">' + BP.pct(p, 0) + '</b>' : '—');
     };
     return { _class: st.done ? 'ser-done' : '', cells: [
       { v: ORDER[BP.roundKey(s.round)], html: '<b>' + esc((s.league && BP.roundKey(s.round) !== 'WS' ? s.league + ' ' : '') + BP.roundLabel(BP.roundKey(s.round), true)) + '</b><div class="sub-line">best of ' + esc(s.best_of || '') + '</div>' },
@@ -51,30 +51,28 @@ function seriesTable(list, games, L, sims) {
     ] };
   });
   if (!rows.length) return BP.muted('No series yet.');
-  return BP.tableHTML([{ label: 'Round' }, { label: 'Series: wins · our chance to win the series · market (reference)', sortable: false }, { label: 'Next game', cls: 'hide-sm' }], rows, { compact: true, cls: 'ser-table' }) +
-    '<div class="section-note">Series chances from ' + (sims ? BP.int(sims) : 'the') + ' simulations of the bracket; the next game in each series uses our game forecast with the probable starters, so a series can move before a pitch is thrown. Market: the de-vigged Kalshi or Polymarket number where they quote the series, for reference.</div>';
+  return BP.tableHTML([{ label: 'Round' }, { label: 'Series: wins · our chance to win the series', sortable: false }, { label: 'Next game', cls: 'hide-sm' }], rows, { compact: true, cls: 'ser-table' }) +
+    '<div class="section-note">Series chances from ' + (sims ? BP.int(sims) : 'the') + ' simulations of the bracket; the next game in each series uses our game forecast with the probable starters, so a series can move before a pitch is thrown.</div>';
 }
 
-function pathTable(post, ws, L) {
+function pathTable(post, L) {
   const pt = post.teams || {};
   const ids = Object.keys(pt).sort((a, b) => (pt[b].p_ws || 0) - (pt[a].p_ws || 0));
   if (!ids.length) return BP.muted('Path chances arrive with the bracket simulation.');
   const rows = ids.map(t => {
-    const x = pt[t], nx = x.next || null, m = ws.probs[t];
+    const x = pt[t], nx = x.next || null;
     return [{ v: x.seed, html: '<span class="muted-inline">' + esc(x.league || '') + '</span> ' + esc(x.seed || '') },
       { v: BP.teamName(t), html: BP.teamLink(t, { level: L }) },
       { v: x.p_ds, html: x.p_ds >= 0.9995 ? '<span class="odds-done">✓</span>' : BP.pct(x.p_ds, 0), align: 'right' },
       { v: x.p_lcs, html: BP.pct(x.p_lcs, 0), align: 'right' },
       { v: x.p_pennant, html: BP.pct(x.p_pennant, 1), align: 'right' },
       { v: x.p_ws, html: BP.probCell(x.p_ws, BP.teamColour(t), 0.4), align: 'right' },
-      { v: m, html: isNum(m) ? '<span class="qk-muted">' + BP.pct(m, 1) + '</span>' : '—', align: 'right' },
       { v: nx && nx.if_win ? nx.if_win.p_ws : null, html: nx && nx.if_win ? BP.pct(nx.if_win.p_ws, 1) + ' <span class="muted-inline">/</span> ' + BP.pct((nx.if_loss || {}).p_ws, 1) : '—', align: 'right', cls: 'hide-sm',
         title: 'World Series probability if they win / lose their next game' }];
   });
   return BP.tableHTML([{ label: 'Seed' }, { label: 'Team' }, { label: 'DS', align: 'right', title: 'Reach the Division Series' }, { label: 'LCS', align: 'right' },
-    { label: 'Pennant', align: 'right' }, { label: 'World Series', align: 'right' }, { label: 'Market', align: 'right', title: 'The de-vigged World Series market, for reference' },
-    { label: 'Next game: win / lose', align: 'right', cls: 'hide-sm' }], rows, { compact: true }) +
-    (ws.sources.length ? '<div class="section-note">Market (reference): ' + esc(BP.ui.srcName(ws.sources)) + ', de-vigged across the field.</div>' : '');
+    { label: 'Pennant', align: 'right' }, { label: 'World Series', align: 'right' },
+    { label: 'Next game: win / lose', align: 'right', cls: 'hide-sm' }], rows, { compact: true });
 }
 
 function seriesDetail(s, games, L) {
@@ -95,10 +93,9 @@ function render(el, params) {
   const idx = BP.index() || {};
   el.innerHTML = QK.sectionHead({ kicker: 'Postseason · MLB ' + S, title: 'The bracket', sub: 'Our chance in every series from simulating the bracket, and every team’s path to the World Series.',
     actions: '<a class="qk-btn" href="' + BP.href('standings', L, S) + '">Standings</a><a class="qk-btn" href="#/markets">Forecast board</a>' }) + '<div id="ps-body">' + QK.skeleton('card', 2) + '</div>';
-  return BP.loadAll([BP.ypath('season.json', L, S), BP.marketsPath(S), BP.marketsPath(S), BP.ypath('schedule.json', L, S)]).then(arr => {
+  return BP.loadAll([BP.ypath('season.json', L, S), BP.ypath('schedule.json', L, S)]).then(arr => {
     if (!el.isConnected) return;
     const season = BP.ok(arr[0]) ? arr[0] : null;
-    const mk = BP.ok(arr[1]) ? arr[1] : (BP.ok(arr[2]) ? arr[2] : null);
     const post = postOf(season, S === BP.currentSeason(L) ? idx.postseason : null);
     const body = document.getElementById('ps-body');
     if (!post || (!(post.series || []).length && !Object.keys(post.teams || {}).length)) {
@@ -106,22 +103,21 @@ function render(el, params) {
       return;
     }
     const games = {};
-    const sched = arr[3] && Array.isArray(arr[3].games) ? arr[3].games : [];
+    const sched = arr[1] && Array.isArray(arr[1].games) ? arr[1].games : [];
     sched.forEach(g => { if (g && g.gpk) games[g.gpk] = g; });
     [].concat(idx.today || [], idx.recent || [], idx.upcoming || []).forEach(g => { if (g && g.gpk) games[g.gpk] = g; });
-    const ws = futureMap(mk, /^ws|world/);
     const list = BP.charts.seriesList(post);
     const live = list.filter(s => !seriesState(s).done);
     let sel = live.find(s => (s.games || []).length) || live[0] || list[list.length - 1] || null;
     body.innerHTML = BP.card('Bracket', esc(post.round ? 'now: ' + BP.roundLabel(post.round) : '') + ' · click a series for its games', '<div id="ps-bk"></div><div id="ps-sd" class="pad0"></div>') +
-      '<div class="grid-2"><div>' + BP.card('World Series chances', 'our chance; the grey tick is the market, for reference', '<div id="ps-ws"></div>') + '</div><div>' +
+      '<div class="grid-2"><div>' + BP.card('World Series chances', 'our chance from the bracket simulation', '<div id="ps-ws"></div>') + '</div><div>' +
         BP.card('Series', 'wins and our chance to win each series', seriesTable(list, games, L, post.sims)) + '</div></div>' +
-      BP.card('Path chances', 'each team’s chance to reach every round', pathTable(post, ws, L)) +
+      BP.card('Path chances', 'each team’s chance to reach every round', pathTable(post, L)) +
       BP.card('How the bracket is simulated', '', '<div class="mk-explain">' +
         '<p><b>Format.</b> Six teams per league: three division winners and three wild cards. Seeds 1 and 2 (the best division winners) skip the Wild Card Series. The Wild Card Series is best of three, all at the higher seed; the Division Series best of five (2-2-1); the League Championship Series and the World Series best of seven (2-3-2). Seed 1 meets the winner of 4 v 5; seed 2 the winner of 3 v 6. No reseeding.</p>' +
         '<p><b>Simulation.</b> Every remaining game is drawn from the game model\'s probabilities between the two teams (lineups, the rotation in order, the bullpen, home field), with a shared team-strength shock per simulation so a hot team stays hot. The next game of each live series uses our full game forecast with the announced starters.' + (post.sims ? ' ' + BP.int(post.sims) + ' brackets.' : '') + '</p>' +
         '<p><b>What the next game is worth.</b> The win / lose columns rerun the bracket with the next game fixed each way, so the gap between them is how much that single game moves the World Series chances.</p>' +
-        '<p><b>Markets.</b> Series, pennant and World Series numbers from Kalshi and Polymarket, de-vigged, are shown as a grey reference beside ours. For information and entertainment only. <a href="#/disclaimer">Disclaimer &amp; terms</a>.</p></div>');
+        '<p>For information and entertainment only. <a href="#/disclaimer">Disclaimer &amp; terms</a>.</p></div>');
     const drawSel = () => {
       document.getElementById('ps-sd').innerHTML = seriesDetail(sel, games, L);
       document.querySelectorAll('#ps-bk .bk-series').forEach(x => x.classList.toggle('sel', !!sel && x.getAttribute('data-sid') === String(sel.id)));
@@ -129,8 +125,8 @@ function render(el, params) {
     BP.charts.mlbBracket(document.getElementById('ps-bk'), post, { level: L, onSeries: s => { if (s) { sel = s; drawSel(); } } });
     drawSel();
     const pt = post.teams || {};
-    document.getElementById('ps-ws').innerHTML = QK.chances(Object.keys(pt).filter(t => isNum(pt[t].p_ws) && pt[t].p_ws > 0.0005).map(t => ({ label: BP.teamName(t), p: pt[t].p_ws, market: isNum(ws.probs[t]) ? ws.probs[t] : null, color: (BP.teamInfo(t) || {}).colour, href: BP.teamHref(t, L, S), mark: BP.ui.team(t, L, S) })),
-      { limit: 12, marketName: 'Market (' + (BP.ui.srcName(ws.sources) || 'reference') + ')' });
+    document.getElementById('ps-ws').innerHTML = QK.chances(Object.keys(pt).filter(t => isNum(pt[t].p_ws) && pt[t].p_ws > 0.0005).map(t => ({ label: BP.teamName(t), p: pt[t].p_ws, color: (BP.teamInfo(t) || {}).colour, href: BP.teamHref(t, L, S), mark: BP.ui.team(t, L, S) })),
+      { limit: 12 });
     BP.sortable(body);
     BP.setMeta(post.sims ? BP.int(post.sims) + ' bracket simulations' : '');
   });

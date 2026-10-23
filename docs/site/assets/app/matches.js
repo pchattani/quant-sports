@@ -257,7 +257,7 @@ function renderMatch(el, c, f, m, mk, hit, side) {
   else preview(el, c, f, tape);
 }
 
-/* The hero (kit v3 QK.previewCard, the Rink game page's pattern): away "at" home as on every card, with the record and
+/* The hero (kit v3 QK.previewCard, the Rink game page's pattern): football's home-first order ("Home v Away"), with the record and
    league form, the score once it starts (the score bug while live), our chance for the favourite as a big teal number
    with a sentence, the home / draw / away bar, a plain-English "how sure" note and how the sides match up so far.
    Football has no live model: during a match the card keeps the pre-match chance and says so. The market sits here
@@ -298,11 +298,12 @@ function hero(c, f, m, hit, mk, side) {
   var rnd = FB.roundText(f, c.slug);
   var void_ = /postponed|cancelled|not reported/.exec(String(g.note || ''));
   var kick = c.name + (rnd ? ' · ' + rnd : '') + (void_ ? ' · ' + void_[0] : '') + (f.group || (m && m.group) ? ' · Group ' + (f.group || m.group) : '') + (m && m.venue ? ' · ' + m.venue : '');
-  var o = { kicker: kick, nick: function (t) { return t.name; }, factors: fx, factorsTitle: 'How they match up this season', noteExtra: extra.length ? extra.join(', and ') + '.' : '', market: mref };
+  var o = { kicker: kick, nick: function (t) { return t.name; }, factors: fx, factorsTitle: 'How they match up this season', noteExtra: extra.length ? extra.join(', and ') + '.' : '', market: mref,
+    homeFirst: true, vs: 'v', noun: 'match' };
   if (note) o.note = note;
   var meta = [esc(FB.fmtDate(f.date, { year: true, time: true })), hit.season ? esc(c.name + ' ' + hit.season) : ''];
   var xg = m && m.xg ? m.xg : f.xg;
-  if (xg && isNum(xg[0]) && f.status !== 'scheduled') meta.push('xG ' + FB.esc(f.away) + ' ' + num(xg[1], 2) + ' – ' + num(xg[0], 2) + ' ' + FB.esc(f.home));
+  if (xg && isNum(xg[0]) && f.status !== 'scheduled') meta.push('xG ' + FB.esc(f.home) + ' ' + num(xg[0], 2) + ' – ' + num(xg[1], 2) + ' ' + FB.esc(f.away));
   var links = '<div class="fb-mx-hmeta">' + meta.filter(Boolean).map(function (x) { return '<span>' + x + '</span>'; }).join('') +
     (f.home_id ? '<a href="' + esc(FB.href.club(f.home_id, { c: c.slug })) + '">' + esc(f.home) + ' →</a>' : '') + (f.away_id ? '<a href="' + esc(FB.href.club(f.away_id, { c: c.slug })) + '">' + esc(f.away) + ' →</a>' : '') + '</div>';
   return '<div class="fb-mx-hero">' + QK.previewCard(g, o) + links + '</div>';

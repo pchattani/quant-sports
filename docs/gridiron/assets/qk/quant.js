@@ -308,7 +308,7 @@ QK.shell = function (o) {
         (s.key === sportKey ? ' aria-current="page"' : '') + '>' + ICON[s.key] + esc(s.label) + '<span class="qk-sport-live" hidden><span class="qk-sport-dot" aria-label="live now"></span></span></a>';
     }).join('') + '</nav>';
   var actions = '<div class="qk-bar-actions">' +
-    (o.search ? '<button class="qk-searchbtn" type="button" data-qk-search aria-label="Search">' + ICON.search + '<span>Find a player or team</span><kbd>/</kbd></button>' : '') + '</div>';
+    (o.search ? '<button class="qk-searchbtn" type="button" data-qk-search aria-label="Search">' + ICON.search + '<span class="qk-sb-l">Find a player or team</span><span class="qk-sb-s">Search</span><kbd>/</kbd></button>' : '') + '</div>';
   var secs = o.sections || (sportKey ? QK.sections(sportKey) : null);
   /* links scroll in their own box; the context controls sit beside them (desktop) or on a second row (phones) */
   var secnav = secs ? '<nav class="qk-secnav' + (o.ctx ? ' has-ctx' : '') + '" aria-label="Sections"><div class="qk-secnav-in"><div class="qk-secnav-links">' +
@@ -1346,13 +1346,13 @@ QK.compareView = function (o) {
       return '<div class="qk-cmp-row"><div class="qk-cmp-lab"' + (r.tip ? ' data-tip="' + esc(r.tip) + '" tabindex="0"' : '') + '>' + esc(r.label) + '</div>' + cells + d + '</div>';
     }).join('');
   }).join('');
-  var short = function (e) { return e.abbr || String(e.name || '').split(' ').slice(-1)[0]; };
+  var short = function (e) { return e.abbr || QK.surname(e.name); };
   var head = '<div class="qk-cmp-head"><div class="qk-cmp-dh" style="text-align:left">' + esc(o.metricLabel || 'Metric · value · percentile') + '</div>' + E.map(function (e, i) {
     var nm = '<b>' + esc(e.name) + '</b>';
     return '<div class="qk-cmp-ent" style="--ec:' + cols[i] + '">' + (e.href ? '<a class="qk-cmp-a" href="' + esc(e.href) + '">' + nm + '</a>' : nm) + '<small>' + esc(e.sub || '') + '</small>' +
       (total ? '<span class="wins">Better on ' + wins[i] + ' of ' + total + '</span>' : '') + '</div>';
   }).join('') + (delta ? '<div class="qk-cmp-dh" title="' + esc(E[0].name) + ' minus ' + esc(E[1].name) + '">Δ ' + esc(short(E[0])) + '</div>' : '') + '</div>';
-  return '<div class="qk-cmp' + (delta ? '' : ' nodelta') + '" style="--n:' + n + '">' + head + (body || QK.empty('Nothing to compare', 'These players share no metrics with values this season.')) + '</div>';
+  return '<div class="qk-cmp' + (delta ? '' : ' nodelta') + (n === 3 ? ' n3' : '') + '" style="--n:' + n + '">' + head + (body || QK.empty('Nothing to compare', 'These players share no metrics with values this season.')) + '</div>';
 };
 
 /* ─────────────────────────────────────── matchup bar (tale of the tape) */
@@ -1411,6 +1411,7 @@ QK.greeting = function (o) {
 /* QK.scorebug(g, { compact: true (no 'ours' label), size: 'lg', chance: false }) -> a black bug for a live game:
  * the period and clock, both teams with their score on a team-colour edge, and our live chance for the side ahead
  * in it. Returns the plain status badge for a game that is not live. */
+/* o.homeFirst: the home side first (football reads "Home v Away"). */
 QK.scorebug = function (g, o) {
   o = o || {};
   if (!g || g.status !== 'live') return QK.statusBadge(g || {});
@@ -1420,10 +1421,11 @@ QK.scorebug = function (g, o) {
   var ca = QK.probColour(A, H, 'left'), ch = QK.probColour(H, A, 'right');
   var p = QK.liveP(g), fav = null;
   if (isNum(p) && !g.pre_only && !isNum(g.p_draw)) fav = p >= 0.5 ? [H, p] : [A, 1 - p];
+  var tmA = '<span class="tm" style="--tc:' + ca + '">' + esc(QK.shortName(A)) + ' <b>' + (isNum(g.as) ? esc(g.as) : '–') + '</b></span>';
+  var tmH = '<span class="tm" style="--tc:' + ch + '">' + esc(QK.shortName(H)) + ' <b>' + (isNum(g.hs) ? esc(g.hs) : '–') + '</b></span>';
   return '<span class="qk-bug' + (o.size === 'lg' ? ' lg' : '') + '" role="img" aria-label="' + esc('Live, ' + clk + ': ' + (A.name || '') + ' ' + (isNum(g.as) ? g.as : '') + ', ' + (H.name || '') + ' ' + (isNum(g.hs) ? g.hs : '') + (fav ? '; our live chance ' + (fav[0].name || '') + ' ' + fmt.pct(fav[1]) : '')) + '">' +
     '<span class="clk">' + esc(clk) + '</span>' +
-    '<span class="tm" style="--tc:' + ca + '">' + esc(QK.shortName(A)) + ' <b>' + (isNum(g.as) ? esc(g.as) : '–') + '</b></span>' +
-    '<span class="tm" style="--tc:' + ch + '">' + esc(QK.shortName(H)) + ' <b>' + (isNum(g.hs) ? esc(g.hs) : '–') + '</b></span>' +
+    (o.homeFirst ? tmH + tmA : tmA + tmH) +
     (fav && o.chance !== false && !o.compact ? '<span class="ch"><small>ours</small>' + esc(fav[0].abbr || fav[0].name || '') + ' ' + fmt.pct(fav[1]) + '</span>' : '') + '</span>';
 };
 
@@ -1458,7 +1460,10 @@ QK.whyLine = function (g) {
     var pAw = 1 - pp - (isNum(g.p_draw) ? g.p_draw : 0), homeWon = g.hs > g.as, draw = g.hs === g.as;
     if (draw) return 'A draw. We had it at ' + fmt.pct(g.p_draw || 0) + ' before the start.';
     var w = homeWon ? g.home : g.away, wp = homeWon ? pp : pAw;
-    return wp < 0.4 ? 'An upset: we gave ' + nmOf(g, w || {}) + ' ' + fmt.pct(wp) + ' before the start.' : 'As expected: ' + nmOf(g, w || {}) + ' won at ' + fmt.pct(wp) + ' in our numbers.';
+    if (wp < 0.4) return 'An upset: we gave ' + nmOf(g, w || {}) + ' ' + fmt.pct(wp) + ' before the start.';
+    /* 40-50%: the winner was the slight underdog, so not "as expected" */
+    if (wp < 0.5) return 'A near coin flip: we had ' + nmOf(g, w || {}) + ' at ' + fmt.pct(wp) + ' before the start.';
+    return 'As expected: ' + nmOf(g, w || {}) + ' won at ' + fmt.pct(wp) + ' in our numbers.';
   }
   if (g.status === 'live') {
     var pre = QK.preP(g);
@@ -1541,7 +1546,8 @@ QK.featureCard = function (g, o) {
     } else if (!live) {
       var miss = Math.round(10 * (1 - f.p));
       miss = Math.max(1, miss);
-      note = QK.note('<b>How sure are we?</b> ' + fmt.pct(f.p) + ' means ' + (f.d > 0.02 ? 'a game like this goes another way' : esc(nmOf(g, f.o)) + ' win' + (solo(g) ? 's' : '') + ' a game like this') + ' about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.');
+      var fn = o.noun || (PREVIEW_WORDS[g.sport] || {}).noun || 'game';
+      note = QK.note('<b>How sure are we?</b> ' + fmt.pct(f.p) + ' means ' + (f.d > 0.02 ? 'a ' + fn + ' like this goes another way' : esc(nmOf(g, f.o)) + ' win' + (solo(g) ? 's' : '') + ' a ' + fn + ' like this') + ' about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.');
     }
   }
   var bar = !fin && f ? QK.wpBar(live && isNum(g.wp_home) ? 1 - g.wp_home : (isNum(g.p_away) ? g.p_away : null), live && isNum(g.wp_home) ? null : g.p_draw, live ? QK.liveP(g) : g.p_home, A, H, { labels: 'key', keyText: live && !g.pre_only ? 'chance to win, right now' : 'chance to win', size: 'lg' }) : '';
@@ -1555,12 +1561,19 @@ QK.featureCard = function (g, o) {
 /* QK.hotRow([{ sport, title ('Most points'), name, value, unit, next: { name, value }, expl, href, colour }]) -> one
  * card per name: sport and what it leads, the name, the number, the next best, and what the number means.
  * Five across on desktop, three on tablets, a swipeable row on phones. */
+/* QK.surname('Bobby Witt Jr.') -> 'Witt Jr.': the last word of a name, with a suffix (Jr., Sr., II-V) kept with the
+ * word before it (joined by a no-break space). */
+QK.surname = function (name) {
+  var w = String(name || '').trim().split(/\s+/), k = w.length - 1;
+  if (k > 0 && /^(jr|sr|ii|iii|iv|v)\.?$/i.test(w[k])) return w[k - 1] + '\u00a0' + w[k];
+  return w[k] || '';
+};
 QK.hotRow = function (items) {
   var it = (items || []).filter(Boolean);
   return '<div class="qk-hot' + (it.length === 4 ? ' n4' : it.length >= 6 ? ' n6' : '') + '">' + it.map(function (h) {
     var sp = QK.sport(h.sport) || {};
     var v = isNum(h.value) ? (h.value % 1 ? fmt.num(h.value, 1) : fmt.num(h.value)) : esc(h.value === undefined || h.value === null ? '—' : h.value);
-    var nx = h.next && h.next.name ? ' · next best ' + esc(String(h.next.name).split(' ').slice(-1)[0]) + (h.next.value !== undefined && h.next.value !== null ? ' ' + esc(isNum(h.next.value) && h.next.value % 1 ? fmt.num(h.next.value, 1) : h.next.value) : '') : '';
+    var nx = h.next && h.next.name ? ' · next best ' + esc(QK.surname(h.next.name)) + (h.next.value !== undefined && h.next.value !== null ? ' ' + esc(isNum(h.next.value) && h.next.value % 1 ? fmt.num(h.next.value, 1) : h.next.value) : '') : '';
     var tag = h.href ? 'a' : 'div';
     return '<' + tag + ' class="qk-hot-card"' + (h.href ? ' href="' + esc(h.href) + '"' : '') + ' style="--sa:' + (sp.accent || 'var(--accent)') + '">' +
       '<div class="qk-hot-sport"><i aria-hidden="true"></i>' + esc(sp.label || h.sport || '') + (h.title ? ' · ' + esc(h.title) : '') + '</div>' +
@@ -1676,15 +1689,22 @@ QK.howSure = function (el, o) {
 /* QK.previewCard(g, { kicker: 'NHL · Ball Arena, Denver', nick: fn(team) -> short name, note: HTML (replaces the
  * default "How sure are we?" note), noteExtra: HTML (appended to it), factors: [{ label, a, b, better: 'a' | 'b' }]
  * (away value, home value; the better side in teal), factorsTitle, keyLeft, keyRight, market: { p, label } (game
- * detail only: a quiet reference line under the bar) }) -> a card: both sides with monogram, record and form, the
+ * detail only: a quiet reference line under the bar), vs: 'at' | 'v' (the word between the sides), noun: 'game' |
+ * 'match' | 'race' ("a match like this"), homeFirst: true (home on the left, "Home v Away") }) -> a card. The
+ * defaults follow g.sport: football is home first with "v" and "match", tennis "v" and "match", F1 "race",
+ * everything else away "at" home and "game". The card: both sides with monogram, record and form, the
  * score once it starts (the score bug when live), our chance for the favourite as a big teal number with a
  * sentence, the team-colour bar, a plain-English note and the match-up factors. */
+var PREVIEW_WORDS = { football: { vs: 'v', noun: 'match', homeFirst: true }, tennis: { vs: 'v', noun: 'match' }, f1: { vs: 'v', noun: 'race' } };
 QK.previewCard = function (g, o) {
   o = o || {};
   if (!g) return '';
   var live = g.status === 'live', fin = g.status === 'final';
   var A = g.away || {}, H = g.home || {};
   var nk = o.nick || function (t) { return t.name || t.abbr || ''; };
+  var dw = PREVIEW_WORDS[g.sport] || {};
+  var vs = o.vs || dw.vs || 'at', noun = o.noun || dw.noun || 'game';
+  var hf = o.homeFirst !== undefined ? !!o.homeFirst : !!dw.homeFirst;
   function side(t, sc) {
     return '<div class="qk-vs-side">' + QK.teamMark(t, 'lg') + '<div class="nm">' + esc(nk(t)) + '</div>' + (t.record ? '<div class="rec">' + esc(t.record) + '</div>' : '') +
       (t.form ? QK.formDots(t.form) : '') + (live || fin ? '<div class="sc">' + (isNum(sc) ? esc(sc) : '–') + '</div>' : '') + '</div>';
@@ -1695,20 +1715,23 @@ QK.previewCard = function (g, o) {
     big = '<div class="qk-feature-big"><div class="big">' + fmt.pct(f.p) + '</div><div class="say">chance ' + (THE_SPORTS[g.sport] && !g.players ? 'the ' : '') + '<b>' + esc(nk(f.t)) + '</b> win' + (solo(g) ? 's' : '') + (live && !g.pre_only ? ' from here' : '') + '. ' +
       esc(nk(other)) + ': <b>' + fmt.pct(f.op) + '</b>' + (f.d > 0.02 ? ', draw <b>' + fmt.pct(f.d) + '</b>' : '') + '.</div></div>';
     var miss = Math.max(1, Math.round(10 * (1 - f.p)));
-    note = o.note !== undefined ? o.note : '<b>How sure are we?</b> ' + fmt.pct(f.p) + ' means ' + (f.d > 0.02 ? 'a game like this goes another way' : (THE_SPORTS[g.sport] && !g.players ? 'the ' : '') + esc(nk(f.t)) + ' lose' + (solo(g) ? 's' : '') + ' a game like this') + ' about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.' + (o.noteExtra ? ' ' + o.noteExtra : '');
+    note = o.note !== undefined ? o.note : '<b>How sure are we?</b> ' + fmt.pct(f.p) + ' means ' + (f.d > 0.02 ? 'a ' + noun + ' like this goes another way' : (THE_SPORTS[g.sport] && !g.players ? 'the ' : '') + esc(nk(f.t)) + ' lose' + (solo(g) ? 's' : '') + ' a ' + noun + ' like this') + ' about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.' + (o.noteExtra ? ' ' + o.noteExtra : '');
   } else if (fin) {
     var pp = QK.preP(g);
-    if (isNum(pp)) { var pa = 1 - pp - (isNum(g.p_draw) ? g.p_draw : 0); note = o.note !== undefined ? o.note : 'Our pre-game call: <b>' + esc(nk(pa > pp ? A : H)) + ' ' + fmt.pct(Math.max(pa, pp)) + '</b>. ' + esc(QK.whyLine(g)) + (o.noteExtra ? ' ' + o.noteExtra : ''); }
+    if (isNum(pp)) { var pa = 1 - pp - (isNum(g.p_draw) ? g.p_draw : 0); note = o.note !== undefined ? o.note : 'Our pre-' + noun + ' call: <b>' + esc(nk(pa > pp ? A : H)) + ' ' + fmt.pct(Math.max(pa, pp)) + '</b>. ' + esc(QK.whyLine(g)) + (o.noteExtra ? ' ' + o.noteExtra : ''); }
   }
-  var bar = !fin && f ? QK.wpBar(live && isNum(g.wp_home) ? 1 - g.wp_home : (isNum(g.p_away) ? g.p_away : null), live && isNum(g.wp_home) ? null : g.p_draw, live ? QK.liveP(g) : g.p_home, A, H,
-    { labels: 'key', keyText: live && !g.pre_only ? 'chance to win, right now' : 'chance to win', size: 'lg', colors: o.colors }) : '';
+  var pA = live && isNum(g.wp_home) ? 1 - g.wp_home : (isNum(g.p_away) ? g.p_away : null), pD = live && isNum(g.wp_home) ? null : g.p_draw, pH = live ? QK.liveP(g) : g.p_home;
+  var bo = { labels: 'key', keyText: live && !g.pre_only ? 'chance to win, right now' : 'chance to win', size: 'lg', colors: o.colors && hf ? [o.colors[1], o.colors[0]] : o.colors };
+  if (hf && !isNum(pH)) pH = isNum(pA) ? 1 - pA - (isNum(pD) ? pD : 0) : null;
+  var bar = !fin && f ? (hf ? QK.wpBar(pH, pD, pA, H, A, bo) : QK.wpBar(pA, pD, pH, A, H, bo)) : '';
   var mk = o.market && isNum(o.market.p) ? '<div class="qk-gc-foot" style="margin-top:8px"><span class="qk-mkt">' + esc(o.market.label || 'Market') + ' <b>' + esc(QK.shortName(H)) + ' ' + fmt.pct(o.market.p) + '</b></span><span>a reference, not our forecast</span></div>' : '';
   var fx = (o.factors || []).filter(function (r) { return r && r.a !== undefined && r.b !== undefined; });
+  var L = hf ? 'b' : 'a', R = hf ? 'a' : 'b';
   var fxh = fx.length ? '<h4 class="qk-factors-h">' + esc(o.factorsTitle || 'How they match up so far') + '</h4><div class="qk-factors">' + fx.map(function (r) {
-    return '<div class="l' + (r.better === 'a' ? ' better' : '') + '">' + esc(r.a) + '</div><div class="c">' + esc(r.label) + '</div><div class="r' + (r.better === 'b' ? ' better' : '') + '">' + esc(r.b) + '</div>';
-  }).join('') + '</div><div class="qk-wpbar-lab" style="margin-top:10px"><span>' + esc(o.keyLeft || nk(A)) + '</span><span class="mid">better side in teal</span><span>' + esc(o.keyRight || nk(H)) + '</span></div>' : '';
-  return '<article class="qk-card qk-preview' + (live ? ' is-live' : '') + '"><div class="qk-feature-meta"><span class="qk-pill">' + esc(o.kicker || g.league || '') + '</span>' + (live ? QK.scorebug(g, { size: 'lg' }) : QK.statusBadge(g)) + '</div>' +
-    '<div class="qk-vs">' + side(A, g.as) + '<div class="at">at</div>' + side(H, g.hs) + '</div>' + big + bar + mk + (note ? QK.note(note) : '') + fxh + '</article>';
+    return '<div class="l' + (r.better === L ? ' better' : '') + '">' + esc(r[L]) + '</div><div class="c">' + esc(r.label) + '</div><div class="r' + (r.better === R ? ' better' : '') + '">' + esc(r[R]) + '</div>';
+  }).join('') + '</div><div class="qk-wpbar-lab" style="margin-top:10px"><span>' + esc(o.keyLeft || nk(hf ? H : A)) + '</span><span class="mid">better side in teal</span><span>' + esc(o.keyRight || nk(hf ? A : H)) + '</span></div>' : '';
+  return '<article class="qk-card qk-preview' + (live ? ' is-live' : '') + '"><div class="qk-feature-meta"><span class="qk-pill">' + esc(o.kicker || g.league || '') + '</span>' + (live ? QK.scorebug(g, { size: 'lg', homeFirst: hf }) : QK.statusBadge(g)) + '</div>' +
+    '<div class="qk-vs">' + (hf ? side(H, g.hs) : side(A, g.as)) + '<div class="at">' + esc(vs) + '</div>' + (hf ? side(A, g.as) : side(H, g.hs)) + '</div>' + big + bar + mk + (note ? QK.note(note) : '') + fxh + '</article>';
 };
 
 /* ─────────────────────────────────────── compare verdicts */
