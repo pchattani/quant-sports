@@ -1,8 +1,12 @@
 /* The Quant Campus — Games (#/<L>/games) and the game centre (#/<L>/game/<gid>).
  * Games: by week (cfb: weeks, championship week, bowls, playoff) or by day (basketball), filters for ranked teams,
  * conference games, a conference, close lines and model-v-market gaps. Reads <L>/<S>/schedule.json.
- * Game centre: score and status, pregame model v market, win probability (model and ESPN), score flow, drives and
- * EPA (cfb), highest-leverage plays, box scores, team stats, leaders. Reads <L>/<S>/games/<gid>.json and falls back
+ * Game centre (kit v3 "Matchday", the Rink game page is the reference): the hero is QK.previewCard (away "at" home
+ * with records, the score bug when live, our chance for the favourite as a big teal number with a how-sure note, the
+ * team-colour bar, the market as a quiet labelled reference before the game, how the teams match up from the
+ * ratings); beside it the tiles and our forecast table (the market a reference column; "How our forecast is built",
+ * the trial labelled as a trial); then win probability (model and ESPN), score flow, drives and EPA (cfb),
+ * highest-leverage plays, box scores, team stats, leaders. Reads <L>/<S>/games/<gid>.json and falls back
  * to the schedule CARD when a game has no page (game pages exist for the current season and last postseason). */
 (function (CC) {
 'use strict';
@@ -55,10 +59,10 @@ CC.route('games', function (el, p) {
       '<select class="qk-select" id="g-key" aria-label="' + (fb ? 'Week' : 'Day') + '">' + keys.map(function (k) {
         var n = byKey[k].length; return '<option value="' + esc(k) + '"' + (k === cur ? ' selected' : '') + '>' + esc(fb ? wkLabel(k) : CC.date(k + 'T12:00:00Z')) + ' · ' + n + ' game' + (n > 1 ? 's' : '') + '</option>';
       }).join('') + '</select><button class="qk-btn" type="button" id="g-next" aria-label="Next"' + (i >= keys.length - 1 ? ' disabled' : '') + '>→</button></div>';
-    var chips = '<div class="qk-chips scroll cc-filters" id="g-chips" role="group" aria-label="Filters">' +
+    var chips = QK.note('<b>How sure are we?</b> 70% means the underdog still wins a game like this about 3 times in 10. Toss-ups are the games we can barely split.') + '<div class="qk-chips scroll cc-filters" id="g-chips" role="group" aria-label="Filters">' +
       [['ranked', fb ? 'Ranked' : 'Ranked or seeded'], ['conf', 'Conference games'], ['close', 'Toss-ups (35–65%)']].map(function (x) {
         return '<button type="button" class="qk-chip" style="--ca:var(--signal)" data-value="' + x[0] + '" aria-pressed="false">' + esc(x[1]) + '</button>'; }).join('') + '</div>';
-    el.innerHTML = U.head('Games', fb ? 'Every game involving an FBS team, week by week, with our win chance on each card (the favourite in violet; the grey tick is the market, for reference). Tap a game for its page.' : 'Every game involving a Division I team, day by day, with our win chance on each card (the favourite in violet; the grey tick is the market, for reference). Tap a game for its page.', U.kicker(L, S)) +
+    el.innerHTML = U.head('Games', (fb ? 'Every game involving an FBS team, week by week' : 'Every game involving a Division I team, day by day') + ', with our chance for each side and a line on why it’s worth your time (the favourite in teal). Tap a game for its page.', U.kicker(L, S)) +
       '<div class="cc-toolbar">' + nav + '<select class="qk-select" id="g-conf" aria-label="Conference">' + confOpts + '</select></div>' + chips + '<div id="g-sum" class="cc-note"></div><div id="g-list"></div>';
     QK.$('#g-conf', el).value = flt.cid;
     function paint() {
@@ -77,7 +81,7 @@ CC.route('games', function (el, p) {
       list.forEach(function (c) {
         var d = dayKey(CC.gameDate(c));
         if (d !== last) { if (last !== null) html += '</div>'; html += '<div class="cc-day">' + esc(CC.date(CC.gameDate(c))) + '</div><div class="cc-games">'; last = d; }
-        html += CC.card(c, L);
+        html += CC.card(c, L, { why: true });
       });
       QK.$('#g-list', el).innerHTML = html + '</div>';
     }
@@ -126,34 +130,41 @@ CC.pair = function (L, a, h) {
 };
 function pickOf(L, g, margin) { return isNum(margin) ? (Math.abs(margin) < 0.05 ? 'Even' : CC.tabbr(L, margin > 0 ? g.home : g.away) + ' by ' + CC.f(Math.abs(margin), 1)) : '—'; }
 
-function hero(L, g) {
-  var st = CC.status(g), fin = st === 'final', live = st === 'live', pre = st === 'pre';
+/* v3 (Matchday) hero: QK.previewCard with records, our chance (the live curve's last point once it starts, our
+   pre-game call after it ends), a how-sure note with the projected score and the margin's spread, the market as a
+   quiet reference line before the game (game detail is one of the two places it may appear) and how the teams match
+   up from the season ratings. */
+function hero(L, g, season) {
+  var st = CC.status(g), live = st === 'live', pre = st === 'pre';
   var pg = g.pregame || {}, m = pg.model || g.model || {}, mk = pg.market || g.market || {};
-  var tag = CC.roundLabel(g) || (g.conf_game ? 'Conference game' : 'Non-conference');
-  var rk = function (side0) { var s0 = side0 === 'home' ? g.hseed : g.aseed, r = side0 === 'home' ? g.hr : g.ar; return isNum(s0) && (g.stype === 'ncaa' || g.stype === 'cfp') ? '(' + s0 + ') ' : (isNum(r) && r <= 25 ? '#' + r + ' ' : ''); };
-  var A = CC.team(L, g.away) || { name: 'Team ' + g.away }, H = CC.team(L, g.home) || { name: 'Team ' + g.home };
   var cols = CC.pair(L, g.away, g.home);
-  function side(t, tid, cls) {
-    var rec = CC.rec(L, g.season, tid);
-    return '<div class="side ' + cls + '">' + (cls === 'home' ? '' : QK.teamMark(t, 'lg')) + '<div style="min-width:0"><a class="nm" href="' + esc(CC.teamHref(L, tid, g.season)) + '">' + esc(rk(cls) + (t.short || t.name)) + '</a>' +
-      '<div class="sb">' + (cls === 'home' ? (g.neutral ? 'Neutral site' : 'Home') : 'Away') + (rec ? ' · ' + esc(rec) : '') + '</div></div>' + (cls === 'home' ? QK.teamMark(t, 'lg') : '') + '</div>';
-  }
-  var score = pre ? '<div class="cc-score pre"><span>' + esc(CC.tba(g) ? 'TBA' : QK.fmt.time(g.date)) + '</span></div>'
-    : '<div class="cc-score"><span>' + (isNum(g.as) ? g.as : '–') + '</span><span class="dash">–</span><span>' + (isNum(g.hs) ? g.hs : '–') + '</span></div>';
-  var badge = live ? '<span class="qk-badge live">Live' + (g.period ? ' · ' + esc(perLabel(L, g.season, g.period)) : '') + '</span>' : fin ? '<span class="qk-badge final">Final' + (isNum(g.periods) && g.periods > (CC.fb(L) ? 4 : (L === 'mbb' ? 2 : 4)) ? '/OT' : '') + '</span>' : '<span class="qk-badge">' + esc(CC.date(CC.gameDate(g))) + '</span>';
-  var venue = g.venue && g.venue.name ? g.venue.name + (g.venue.city ? ', ' + g.venue.city : '') + (g.venue.state ? ', ' + g.venue.state : '') : '';
-  var meta = [CC.when(g), venue ? venue + (g.neutral ? ' (neutral)' : '') : '', isNum(g.attendance) ? QK.fmt.num(g.attendance) + ' fans' : '', g.note && g.stype === 'reg' ? g.note : ''].filter(Boolean);
-  /* live: the last point of our in-game curve; before: ours with the market's split as a quiet tick; after: our pre-game call */
+  var G = CC.game(g, L);
+  G.home.colour = cols[1]; G.away.colour = cols[0];
+  G.home.record = CC.rec(L, g.season, g.home); G.away.record = CC.rec(L, g.season, g.away);
   var wpm = g.wp && g.wp.model && g.wp.model.length ? g.wp.model[g.wp.model.length - 1][1] : null;
-  var pH = live && isNum(wpm) ? wpm : (isNum(m.p_home) ? m.p_home : null);
+  if (live && isNum(wpm)) { G.wp_home = wpm; G.pre_only = undefined; }
+  if (isNum(m.p_home)) G.p_home = m.p_home;
+  var R = (season && season.ratings) || {}, ra = R[String(g.away)] || {}, rh = R[String(g.home)] || {}, fb = CC.fb(L);
+  var fx = [];
+  var add = function (label, x, y, f, low) { if (isNum(x) && isNum(y)) fx.push({ label: label, a: f(x), b: f(y), better: Math.abs(x - y) < 1e-9 ? null : ((x > y) !== !!low ? 'a' : 'b') }); };
+  add(fb ? 'Rating, points v average' : 'Rating, margin per 100', ra.rating, rh.rating, function (v) { return CC.signed(v, 1); });
+  add(fb ? 'Offence, points a game' : 'Offence, points per 100', ra.off, rh.off, function (v) { return CC.f(v, 1); });
+  add(fb ? 'Defence, points prevented' : 'Defence, allowed per 100', ra.def, rh.def, function (v) { return CC.f(v, 1); }, !fb);
+  if (fb) add('Offensive EPA a play', ra.epa_off, rh.epa_off, function (v) { return CC.signed(v, 2); });
+  add('Strength of schedule', ra.sos, rh.sos, function (v) { return CC.signed(v, 1); });
+  var extra = [];
+  if (pre && isNum(m.margin) && isNum(m.total)) { var hs = (m.total + m.margin) / 2, as = (m.total - m.margin) / 2; extra.push('Our projected score is ' + CC.tshort(L, g.away) + ' ' + CC.f(as, 0) + ', ' + CC.tshort(L, g.home) + ' ' + CC.f(hs, 0)); }
+  if (pre && isNum(m.sd)) extra.push('the final margin usually lands within ' + CC.f(m.sd, 0) + ' points of that');
+  var tag = CC.roundLabel(g) || (g.conf_game ? 'Conference game' : 'Non-conference');
+  var venue = g.venue && g.venue.name ? g.venue.name : '';
   var src = CC.mkSource(mk);
-  var At = { name: A.short || A.name, abbr: A.abbr, colour: cols[0] }, Ht = { name: H.short || H.name, abbr: H.abbr, colour: cols[1] };
-  var bar = isNum(pH) ? '<div class="cc-hero-bar"><div class="qk-kicker">' + (live ? 'Our live win chance' : fin ? 'Our pre-game win chance' : 'Our win chance') + '</div>' +
-    QK.wpBar(1 - pH, null, pH, At, Ht, { colors: cols, size: 'lg', market: pre && isNum(mk.p_home) ? 1 - mk.p_home : null, label: live ? 'Live win chance' : 'Our win chance' }) +
-    (pre && isNum(mk.p_home) ? '<div class="cc-hero-mkt"><span class="qk-mkt" data-tip="The market’s chance for the home side, shown as a reference next to ours">Market' + (src ? ' (' + esc(src) + ')' : '') + ' <b>' + esc(CC.tabbr(L, g.home)) + ' ' + CC.pct(mk.p_home) + '</b></span></div>' : '') + '</div>' : '';
-  return '<section class="qk-hero cc-hero2" style="--tc:' + esc(cols[1]) + '"><div class="cc-gh-top"><span class="qk-kicker">' + esc(CC.LSHORT[L] + ' · ' + CC.seasonLabel(L, g.season) + ' · ' + tag + (isNum(g.week) && g.stype === 'reg' ? ' · Week ' + g.week : '')) + '</span></div>' +
-    '<div class="cc-g2">' + side(A, g.away, 'away') + '<div class="mid">' + score + badge + '</div>' + side(H, g.home, 'home') + '</div>' + bar +
-    '<div class="cc-hero-meta">' + meta.map(function (x) { return '<span>' + esc(x) + '</span>'; }).join('') + '</div></section>';
+  return '<div class="cc-preview">' + QK.previewCard(G, { kicker: CC.LSHORT[L] + ' · ' + tag + (venue ? ' · ' + venue : ''), nick: function (x) { return x.name; }, colors: cols, factors: fx, factorsTitle: CC.isCur(L, g.season) ? 'How they match up this season' : 'How they matched up',
+    noteExtra: extra.length ? esc(extra.join(', and ') + '.') : '', market: pre && isNum(mk.p_home) ? { p: mk.p_home, label: 'Market' + (src ? ' (' + src + ')' : '') } : null }) + '</div>';
+}
+function heroMeta(L, g) {
+  var venue = g.venue && g.venue.name ? g.venue.name + (g.venue.city ? ', ' + g.venue.city : '') + (g.venue.state ? ', ' + g.venue.state : '') : '';
+  var meta = [CC.when(g), venue ? venue + (g.neutral ? ' (neutral)' : '') : '', isNum(g.attendance) ? QK.fmt.num(g.attendance) + ' fans' : '', isNum(g.week) && g.stype === 'reg' ? 'Week ' + g.week : '', g.note && g.stype === 'reg' ? g.note : ''].filter(Boolean);
+  return '<div class="cc-hero-meta2">' + meta.map(function (x) { return '<span>' + esc(x) + '</span>'; }).join('') + '</div>';
 }
 
 function tiles(L, g) {
@@ -208,11 +219,11 @@ function pregame(L, g) {
       : 'A trial, not our published forecast: the ratings model stacked with market ratings (team ratings learned from the market’s closing numbers on earlier games), tested forward on 2026-27 before it can replace the forecast above.';
     if (isNum(moved)) note += ' Here it moves the margin ' + CC.f(Math.abs(moved), 1) + ' points toward ' + (moved > 0 ? hs : as) + '.';
     if (inf && inf.early) note += ' Early in the season the market part leans on last season’s market ratings and returning production.';
-    built = '<div class="cc-sub">How our forecast is built</div><div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th></th><th>Margin · ' + esc(h) + ' win chance</th></tr></thead><tbody>' +
+    built = '<div class="cc-sub">How our forecast is built' + (inf ? '' : ' <span class="qk-tag">Trial</span>') + '</div><div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th></th><th>Margin · ' + esc(h) + ' win chance</th></tr></thead><tbody>' +
       brows.map(function (r) { var ours = r[0] === 'Our forecast'; return '<tr><td>' + esc(r[0]) + '</td><td class="num" style="text-align:left' + (ours ? ';color:var(--signal);font-weight:700' : (/^Market/.test(r[0]) ? ';color:var(--ink-3)' : '')) + '">' + esc(r[1]) + '</td></tr>'; }).join('') +
-      '</tbody></table></div><p class="cc-note">' + esc(note) + '</p>';
+      '</tbody></table></div>' + QK.note(esc(note));
   }
-  return U.card(CC.status(g) === 'pre' ? 'Our forecast' : 'Our pre-game forecast', 'Chances from our game model; the market column is a reference.' + (refs.length ? ' Also: ' + esc(refs.join(', ')) + '.' : ''), '<div class="qk-stack">' + tbl + built + '</div>');
+  return U.card(CC.status(g) === 'pre' ? 'Our forecast' : 'Our pre-game forecast', 'Chances from our game model; the market column is a reference, not our forecast.' + (refs.length ? ' Also: ' + esc(refs.join(', ')) + '.' : ''), '<div class="qk-stack">' + tbl + built + '</div>');
 }
 
 /* Tale of the tape: the two teams' season profile from the ratings (season.json ratings[team]). */
@@ -330,10 +341,12 @@ CC.route('game', function (el, p) {
     var fb = CC.fb(L), st = CC.status(g);
     var season = CC.ok(a[2]) ? a[2] : null;
     var back = '<div class="qk-kicker" style="margin-bottom:10px"><a href="' + esc(CC.href(L, 'games', null, g.season, fb && isNum(g.week) && g.stype === 'reg' ? 'w=w' + g.week : '')) + '">← ' + esc(CC.LSHORT[L]) + ' games</a></div>';
-    var html = back + hero(L, g) + '<div style="margin-top:var(--sp-4)">' + tiles(L, g) + '</div>';
-    if (g.light) html += '<p class="cc-note">' + (st === 'pre' ? 'The full game page appears on game day.' : 'This game has no detailed page (game pages are kept for the current season and the last postseason); the result and the pregame numbers are below.') + '</p>';
+    var html = back + '<div class="cc-gtop"><div class="qk-stack">' + hero(L, g, season) + heroMeta(L, g) + '</div><div class="qk-stack">' + tiles(L, g) + pregame(L, g) + '</div></div>';
+    if (g.light) html += QK.note(st === 'pre' ? 'The full game page appears on game day.' : 'This game has no detailed page (game pages are kept for the current season and the last postseason); the result and the pregame numbers are above.');
     var tp = tape(L, g, season);
-    html += '<div class="qk-grid cc-grid"><div class="qk-span-6"><div class="qk-stack">' + pregame(L, g) + '</div></div><div class="qk-span-6"><div class="qk-stack"><div id="gc-wpcard"></div>' + tp + '</div></div>';
+    /* before the game there is no win-chance path: the tale of the tape takes the row */
+    html += st === 'pre' ? '<div style="margin-top:var(--sp-6)">' + tp + '<div id="gc-wpcard"></div></div><div>'
+      : '<div class="qk-grid cc-grid" style="margin-top:var(--sp-6)"><div class="qk-span-7"><div class="qk-stack"><div id="gc-wpcard"></div></div></div><div class="qk-span-5"><div class="qk-stack">' + tp + '</div></div>';
     var wp = g.wp || null, flow = g.flow || null;
     html += '</div>';
     if (fb && (g.drives || g.epa)) html += '<div class="qk-grid cc-grid"><div class="qk-span-7" id="gc-drives"></div><div class="qk-span-5" id="gc-epa"></div></div>';

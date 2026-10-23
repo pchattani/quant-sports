@@ -6,7 +6,7 @@
  *   #/<L>/standings?tab=    conferences | polls | playoff | bowls (cfb) | bracket | conftourneys (basketball)
  *   #/<L>/teams  #/<L>/team/<tid>  #/<L>/players  #/<L>/player/<pid>
  *   #/<L>/value?tab=value|position|transfers   #/<L>/fantasy   #/<L>/lab   #/<L>/model?tab=method|calibration|glossary|terms
- *   ?season=S (or a trailing /S) for a past season;  #/disclaimer
+ *   ?season=S (or a trailing /S: #/<L>/<S> or #/<L>/<sec>/<id>/<S>) for a past season;  #/disclaimer
  * Data: data/index.json, data/<L>/..., data/<L>/<S>/... (PAYLOADS.md). In local preview only, ?data=<path> points
  * the page at another data folder (the development fixture).
  * Older-browser rule: no optional chaining, no nullish coalescing. */
@@ -200,6 +200,8 @@ CC.game = function (c, L) {
     league: CC.LSHORT[L] + (tag ? ' · ' + tag : (c.conf_game ? ' · Conference' : '')) + (c.neutral && !tag ? ' · Neutral' : ''),
     home: CC.side(L, c, 'home'), away: CC.side(L, c, 'away'), hs: isNum(c.hs) ? c.hs : null, as: isNum(c.as) ? c.as : null,
     p_home: isNum(m.p_home) ? m.p_home : null, market_home: mk && isNum(mk.p_home) ? mk.p_home : null,
+    /* no live chance in the payload: a live game shows our pre-game call, labelled so (kit v3) */
+    pre_only: st === 'live' ? true : undefined,
     note: '', period: per, clock: c.clock, href: CC.gameHref(L, c.id, c.season)
   };
 };
@@ -213,20 +215,39 @@ CC.addRecords = function (L, S, standings) {
 CC.rec = function (L, S, tid) { var m = RECS[L][String(S)]; return (m && m[String(tid)]) || ''; };
 var MK_SRC = { kalshi: 'Kalshi', polymarket: 'Polymarket', espn_close: 'ESPN closing line', espn: 'ESPN line' };
 CC.mkSource = function (mk) { return mk && mk.source ? (MK_SRC[mk.source] || mk.source) : ''; };
-/* A v2 game card (Design System 2.0): our chance per team, the favourite in the signal colour, records, the market a
- * quiet ring and tick with its source named. */
-CC.card = function (c, L) {
+/* A game card (kit v3): our chance per team, the favourite in teal, records, the team-colour bar with a key, and no
+ * market (the kit's default: the market sits only on the game page and the Model page). o.why adds the italic
+ * one-line reason (QK.whyLine); a winner we had between 40% and 50% is called a near coin flip, not "as expected". */
+CC.card = function (c, L, o) {
+  o = o || {};
   var g = CC.game(c, L), S = c.season || (CC.state && CC.state.S);
   g.home.record = CC.rec(L, S, c.home); g.away.record = CC.rec(L, S, c.away);
-  var src = CC.mkSource(c.market);
-  var h = QK.gameCard(g, { sport: false, marketLabel: 'Market', marketTip: 'The market’s chance for the home side' + (src ? ' (' + src + ')' : '') + ', shown as a reference next to ours' });
+  if (o.why && g.status === 'final' && isNum(g.p_home) && isNum(g.hs) && isNum(g.as) && g.hs !== g.as) {
+    var hw = g.hs > g.as, wp = hw ? g.p_home : 1 - g.p_home;
+    if (wp >= 0.4 && wp < 0.5) g.why = 'A near coin flip: we had ' + (hw ? g.home : g.away).name + ' at ' + CC.pct(wp) + ' before the start.';
+  }
+  var h = QK.gameCard(g, { sport: false, why: !!o.why });
   /* the kit's badge prints the start time: a TBA game shows its day and "TBA" instead of the midnight placeholder */
   if (g.tba) h = h.replace(QK.statusBadge(g), '<span class="qk-badge">' + esc(fmt.relDay(g.start)) + ' · TBA</span>');
   return h;
 };
+/* The game model's calibration record for "How sure are we?": a level's calibration.json in the kit's shape
+ * (QK.calib.find), else the builder's own (calibration: [{lo, hi, n, p_mean, y_mean}], summary.model {n, brier}).
+ * null when the file is not there or has no buckets: the module is then left out. */
+CC.calib = function (j) {
+  if (!CC.ok(j)) return null;
+  var c = QK.calib.find(j);
+  if (c && c.bins && c.bins.length) return c;
+  var b = (Array.isArray(j.calibration) ? j.calibration : []).filter(function (r) { return r && isNum(r.p_mean) && isNum(r.y_mean) && isNum(r.n); })
+    .map(function (r) { return { lo: r.lo, hi: r.hi, n: r.n, mean_p: r.p_mean, freq: r.y_mean }; });
+  if (!b.length) return null;
+  var m = (j.summary || {}).model || {};
+  return { n: isNum(m.n) ? m.n : b.reduce(function (a, x) { return a + x.n; }, 0), brier: m.brier, logloss: m.logloss, bins: b };
+};
 /* Unit names for display: the football defensive front is written "DL/edge" in the payloads. */
 CC.unit = function (s) { return String(s || '').replace(/DL\/edge/gi, 'Defensive front'); };
-/* Payload copy in the v2 voice (headlines written by the builder): "title odds" -> "title chances". */
+/* Payload copy in our voice (headlines written by the builder): "title odds" -> "title chances". Still needed: the local
+ * index.json headlines and the basketball season.json say "title odds" (23 Oct 2026); DL/edge (CC.unit) is in the team pages. */
 CC.copy = function (s) { return String(s || '').replace(/\btitle odds\b/gi, 'title chances').replace(/\bodds\b/gi, 'chances'); };
 
 /* ── comparison metric sets (METRICS_SPEC.md; assets/js/cc-metrics.js, generated from docs/_design/metrics/college.json) ──
@@ -381,7 +402,8 @@ CC.parse = function (hash) {
   if (parts[0] === 'disclaimer') { r.sec = 'disclaimer'; return r; }
   if (CC.LEVELS.indexOf(parts[0]) >= 0) {
     r.L = parts.shift();
-    if (parts.length && /^\d{4}$/.test(parts[parts.length - 1])) r.S = Number(parts.pop());
+    /* a trailing year is the season only in #/<L>/<S> and #/<L>/<sec>/<id>/<S>: in #/cfb/team/2390 it is the id */
+    if ((parts.length === 1 || parts.length === 3) && /^\d{4}$/.test(parts[parts.length - 1])) r.S = Number(parts.pop());
     if (parts[0]) r.sec = parts[0];
     if (parts[1]) r.id = parts[1];
   }

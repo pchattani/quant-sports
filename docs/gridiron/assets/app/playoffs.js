@@ -1,7 +1,7 @@
 /* The Quant Gridiron — the playoff picture (#/playoffs[/<S>]), in the Standings section, on Design System 2.0.
  * The bracket (projected from today's seeds before the playoffs; 14 teams from 2020), each game with our win chance;
- * Super Bowl chances (ours as bars, the market a quiet grey tick); the likeliest Super Bowl matchups; each
- * conference's seed distribution; our round-by-round chances. Reads <S>/season.json and <S>/markets.json. */
+ * Super Bowl chances (ours only: kit v3 keeps the market to game detail and the Model page); the likeliest Super Bowl
+ * matchups; each conference's seed distribution; our round-by-round chances. Reads <S>/season.json. */
 (function (GI) {
 'use strict';
 
@@ -92,9 +92,9 @@ function seedDist(rows, S) {
 
 GI.route('playoffs', function (el, params) {
   const S = Number(params.season);
-  return GI.loadAll([GI.ypath('season.json', S)].concat(S === GI.currentSeason() ? [GI.ypath('markets.json', S)] : [])).then(res => {
+  return GI.loadAll([GI.ypath('season.json', S)]).then(res => {
     if (!el.isConnected) return;
-    const d = res[0], mk = GI.ok(res[1]) ? res[1] : null;
+    const d = res[0];
     const pager = (S > GI.FIRST_SEASON ? '<a class="qk-btn" href="' + GI.playoffsHref(S - 1) + '">← ' + (S - 1) + '</a>' : '') + (S < GI.currentSeason() ? '<a class="qk-btn" href="' + GI.playoffsHref(S + 1) + '">' + (S + 1) + ' →</a>' : '');
     const nav = GI.sectionNav('standings', 'playoffs');
     if (!GI.ok(d)) { el.innerHTML = GI.pageHead('Standings', S + ' playoff picture', '', pager) + nav + GI.notBuilt('The ' + S + ' playoff picture', d); return; }
@@ -102,12 +102,10 @@ GI.route('playoffs', function (el, params) {
     const m = bracketModel(d, rows);
     const fmt = S >= 2020 ? '14 teams: seven per conference; only the No. 1 seed has a bye' : '12 teams: six per conference; the top two seeds have byes';
     const sbm = (((d.bracket || {}).sim || {}).sb_matchups || []).slice(0, 10);
-    const sbMk = {};
-    (((mk || {}).futures || {}).sb || []).forEach(r => { if (r && r.team) sbMk[r.team] = r.market; });
     const list = rows.filter(r => isNum(r.p_sb)).sort((a, b) => (b.p_sb || 0) - (a.p_sb || 0));
     el.innerHTML = GI.pageHead('Standings', S + ' playoff picture', esc(fmt) + (m.projected ? ' · <b>projected</b> from today\'s seeds' : ''), pager) + nav +
       GI.card(m.projected ? 'Projected bracket' : 'Bracket', m.projected ? 'If the season ended today · each matchup with our win chance' : 'Our win chance for each game, the score once played', S < 2020 ? GI.muted('The bracket view follows the 14-team format (2020 on). The seeds and chances below still apply.') : bracketHTML(m)) +
-      GI.grid(GI.card('Super Bowl chances', 'Our chance; the grey tick is the Kalshi / Polymarket number, for reference', '<div id="po-sb"></div>', { span: 7 }) +
+      GI.grid(GI.card('Super Bowl chances', 'Our chance from 20,000 simulated seasons', '<div id="po-sb"></div>' + QK.note('Even the favourite misses most seasons: a 20% chance means four seasons in five end without the trophy.'), { span: 7 }) +
         GI.card('Likeliest Super Bowls', 'Share of our simulated seasons', sbm.length ? GI.chartBox('po-sbm', 440, 'Likeliest Super Bowl matchups') : GI.muted('Matchups arrive with the season simulation.'), { span: 5 })) +
       seedDist(rows, S) +
       GI.card('Round by round', 'Our chance of reaching each stage, from the season simulation', GI.tableHTML([{ label: 'Team' }, { label: 'Conf' }, { label: 'Playoffs', align: 'right' }, { label: 'Bye', align: 'right' },
@@ -115,7 +113,7 @@ GI.route('playoffs', function (el, params) {
         list.map(r => ({ _href: GI.teamHref(r.team, S), cells: [{ html: GI.teamLink(r.team, { short: true, season: S }), v: r.team }, r.conference,
           { html: GI.probBar(r.p_playoffs, GI.tc(r.team)), v: r.p_playoffs }, { html: GI.pct(r.p_bye, 0), v: r.p_bye }, { html: GI.pct(r.p_conf, 1), v: r.p_conf }, { html: '<b class="gi-ours">' + GI.pct(r.p_sb, 1) + '</b>', v: r.p_sb }] })), { sticky: true }), { flush: true });
     GI.sortable(el);
-    GI.set('po-sb', list.length ? QK.chances(list.map(r => ({ label: GI.teamName(r.team), p: r.p_sb, market: isNum(sbMk[r.team]) ? sbMk[r.team] : null, color: GI.teamColour(r.team), href: GI.teamHref(r.team, S), mark: { name: GI.teamName(r.team), abbr: GI.teamAbbr(r.team), colour: GI.teamInfo(r.team).colour } })), { limit: 14, marketName: 'Market (Kalshi / Polymarket)' }) : GI.muted('The season simulation has not run yet.'));
+    GI.set('po-sb', list.length ? QK.chances(list.map(r => ({ label: GI.teamShort(r.team), p: r.p_sb, href: GI.teamHref(r.team, S), mark: { name: GI.teamName(r.team), abbr: GI.teamAbbr(r.team), colour: GI.teamInfo(r.team).colour } })), { limit: 14, key: false }) : GI.muted('The season simulation has not run yet.'));
     if (sbm.length) GI.ch.bar('po-sbm', { cats: sbm.map(x => GI.teamAbbr(x.afc) + ' v ' + GI.teamAbbr(x.nfc)), series: [{ name: 'Chance', color: 'model', data: sbm.map(x => x.p) }], horizontal: true, labels: true, fmt: v => GI.pct(v, 1), labelWidth: 80, valName: 'Share of simulated seasons', catName: 'AFC v NFC' });
   });
 });

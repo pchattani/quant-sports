@@ -69,7 +69,7 @@ function futuresBars(f) {
 function gameCards(cards, L) {
   const list = cards.filter(c => c && !BP.isFinal(c) && BP.ui.fresh(c) && isNum((c.model || {}).p_home)).sort((a, b) => String(a.start || a.date).localeCompare(String(b.start || b.date)));
   if (!list.length) return QK.empty('No games ahead', 'Our next forecasts appear here when the schedule fills in.');
-  return '<div class="bp-gc-grid">' + list.map(c => BP.gameCard(c, { level: L, date: true })).join('') + '</div>';
+  return '<div class="bp-gc-grid">' + list.map(c => BP.gameCard(c, { level: L, date: true, market: true })).join('') + '</div>';
 }
 function seriesBars(post, L) {
   const list = ((post && post.series) || []).filter(s => s && !s.done && Array.isArray(s.p) && (s.teams || []).length === 2);

@@ -29,7 +29,7 @@ function boards(d) {
 GI.route('history', function (el) {
   return GI.load('history.json').then(d => {
     if (!el.isConnected) return;
-    const head = GI.pageHead('Players · since 1999', 'All-time', 'The best single seasons and careers since 1999 from play-by-play, raw or against their own era.') + GI.sectionNav('players', 'history');
+    const head = GI.pageHead('Players · since 1999', 'All-time', 'The best single seasons and careers since 1999 from play-by-play, raw or against their own era.') + GI.sectionNav('players', 'history') + QK.note('<b>Against their own era</b> means 100 is an average qualified player that season and every 10 points is one standard deviation, so a 2004 season and a 2024 season sit on the same scale.');
     if (!GI.ok(d)) { el.innerHTML = head + GI.notBuilt('The history boards', d); return; }
     const B = boards(d);
     if (!B.find(b => b.id === ST.board)) ST.board = B[0] ? B[0].id : '';

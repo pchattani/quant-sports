@@ -45,7 +45,7 @@ GI.route('transactions', function (el, params) {
   return GI.load(GI.ypath('transactions.json', S)).then(d => {
     if (!el.isConnected) return;
     D = d;
-    const head = GI.pageHead('Value & Moves', 'Transactions and trade ratings', GI.ok(d) ? 'The last twelve months · ' + esc((d.window || []).join(' to ')) : '') + GI.sectionNav('value', 'transactions');
+    const head = GI.pageHead('Value & Moves', 'Transactions and trade ratings', GI.ok(d) ? 'The last twelve months · ' + esc((d.window || []).join(' to ')) : '') + GI.sectionNav('value', 'transactions') + QK.note('<b>Trade value</b> is what each club has gained so far plus what the players are projected to add, in points above a replacement player. Picks are valued from the draft-pick curve on the Player value page.');
     if (!GI.ok(d) || !d.trades) { el.innerHTML = head + GI.notBuilt('The transactions', d); return; }
     const TT = (d.table || []).slice().sort((a, b) => (b.wins_now || 0) - (a.wins_now || 0));
     const tiles = GI.kpis([GI.kpi('Trades', GI.int((d.trades || []).length), 'in the window, each rated for every side'),

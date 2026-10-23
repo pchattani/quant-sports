@@ -18,7 +18,7 @@ GI.route('leaders', function (el, params) {
   return GI.loadAll([GI.ypath('players.json', S), GI.ypath('value.json', S)]).then(res => {
     if (!el.isConnected) return;
     const raw = res[0];
-    const head = GI.pageHead('Players · ' + S, 'Leaders', 'Qualified players only unless you say otherwise; each player is ranked within their comparison group (QB, RB, WR, TE, outside pass rushers, interior linemen, LB, CB, S, K, P).') + GI.sectionNav('players', 'leaders');
+    const head = GI.pageHead('Players · ' + S, 'Leaders', 'Qualified players only unless you say otherwise; each player is ranked within their comparison group (QB, RB, WR, TE, outside pass rushers, interior linemen, LB, CB, S, K, P).') + GI.sectionNav('players', 'leaders') + QK.note('<b>Qualified players only:</b> a rate needs a sample before it means much, so each board has a minimum (attempts, carries, targets or games). Toggle it off to see everyone.');
     const X = GI.cat.prepare(raw);
     if (!X) {
       return GI.load(GI.ypath('leaders.json', S)).then(d => {

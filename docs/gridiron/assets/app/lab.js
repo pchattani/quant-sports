@@ -145,7 +145,7 @@ GI.route('lab', function (el, params) {
   const S = Number(params.season);
   return GI.load(GI.ypath('lab.json', S)).then(rawD => {
     if (!el.isConnected) return;
-    const head = GI.pageHead('Lab · ' + S, 'Scatter lab', 'Any two metrics for a position group or the teams. Presets ask the questions the models were built for.') + GI.sectionNav('lab', 'lab');
+    const head = GI.pageHead('Lab · ' + S, 'Scatter lab', 'Any two metrics for a position group or the teams. Presets ask the questions the models were built for.') + GI.sectionNav('lab', 'lab') + QK.note('<b>How to read it:</b> each dot is a player or a team, placed on any two metrics. Up and right is not always better: a metric marked ↓ is better when lower, and tendencies are neither good nor bad.');
     if (LABK !== String(S)) { LAB = prep(rawD); LABK = String(S); S0.min = null; S0.x = ''; S0.y = ''; S0.preset = 0; }
     if (!Object.keys(LAB).length) { el.innerHTML = head + GI.notBuilt('The ' + S + ' lab file', rawD); return; }
     const qy = params.query || {};

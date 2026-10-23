@@ -189,7 +189,8 @@ function ratingsPanel(el, all, L, S) {
 function render(el, params) {
   const L = params.level, S = params.season;
   el.innerHTML = QK.sectionHead({ kicker: 'Standings · ' + BP.levelName(L) + ' ' + S, title: 'The table', sub: 'Records, run differential, Pythagorean and expected records, and our chances from the season simulation.',
-    actions: '<a class="qk-btn" href="' + BP.ghref('postseason') + '">Postseason</a><a class="qk-btn" href="' + BP.href('teams', L, S) + '">Teams</a>' }) + '<div id="std-body">' + QK.skeleton('card', 2) + '</div>';
+    actions: '<a class="qk-btn" href="' + BP.ghref('postseason') + '">Postseason</a><a class="qk-btn" href="' + BP.href('teams', L, S) + '">Teams</a>' }) +
+    QK.note('<b>Pythagorean</b> is the record a club’s runs scored and allowed usually buy; a gap to the real record is mostly close-game luck. <b>Postseason 60%</b> means the club made it in about 6 of every 10 simulated seasons.') + '<div id="std-body">' + QK.skeleton('card', 2) + '</div>';
   return BP.loadYear('season.json', L, S).then(d => {
     if (!el.isConnected) return null;
     if (BP.ok(d) && (d.standings || d.sim)) return { d: d, rows: rowsOf(d) };

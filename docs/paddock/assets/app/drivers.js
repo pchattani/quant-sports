@@ -286,7 +286,7 @@ function compareBlock(dP, id, near, y) {
   host.innerHTML = QK.sectionHead({ kicker: 'Compare', title: names.slice(0, -1).join(', ') + ' or ' + names[names.length - 1] + '?',
     sub: 'The closest matches on this season’s headline metrics, side by side against ' + esc(dP.label) + ' in ' + y + '. The best in each row is highlighted; the small pills are percentiles.',
     actions: '<a class="qk-more" href="#/compare/drivers/' + encodeURIComponent(ids[0]) + '/' + encodeURIComponent(ids[1]) + '">Open in Compare</a>' }) +
-    '<article class="qk-card"><div class="qk-card-body">' + PD.v2.compare(dP, ids, PD.v2.DRIVER_SET, ents) + QK.verdicts(PD.v2.verdicts(ids.map(function () { return dP; }), ids, PD.v2.DRIVER_SET, names)) + '</div></article>';
+    '<article class="qk-card"><div class="qk-card-body"><div class="pd-cmp-wrap">' + PD.v2.compare(dP, ids, PD.v2.DRIVER_SET, ents) + '</div>' + QK.verdicts(PD.v2.verdicts(ids.map(function () { return dP; }), ids, PD.v2.DRIVER_SET, names)) + '</div></article>';
 }
 
 /* Next and last race: our chances for the driver at the next Grand Prix, and how the last one went. */

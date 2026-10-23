@@ -39,7 +39,7 @@ GI.route('players', function (el, params) {
   return GI.loadAll([GI.ypath('players.json', S), GI.ypath('value.json', S)]).then(res => {
     if (!el.isConnected) return;
     const raw = res[0];
-    const head = GI.pageHead('Players · ' + S, 'Player catalogue', 'Every player of the season by comparison group; each cell is coloured by the player\'s percentile among the qualified players of the same group (100 = best). Search the whole league with <kbd>/</kbd>.') + GI.sectionNav('players', 'players');
+    const head = GI.pageHead('Players · ' + S, 'Player catalogue', 'Every player of the season by comparison group; each cell is coloured by the player\'s percentile among the qualified players of the same group (100 = best). Search the whole league with <kbd>/</kbd>.') + GI.sectionNav('players', 'players') + QK.note('<b>A percentile</b> ranks a player against others in the same role this season: 90th means better than 90 in 100 qualified peers. Outside pass rushers, interior linemen, linebackers, corners and safeties each have their own pool.');
     const X = prepare(raw);
     if (!X) { el.innerHTML = head + GI.notBuilt('The ' + S + ' player catalogue', raw); return; }
     const P = X.P, cat = X.cat;

@@ -168,13 +168,13 @@ function zone5(host, grids, opts) {
     const hov = z.map((r, i) => r.map((v, j) => (k.isNum(v) ? k.esc(c[1]) + ' ' + k.fmtV(v, c[3]) + (k.isNum(nOf(g[i][j])) ? ' · ' + k.int(nOf(g[i][j])) + (o.nLabel || ' pitches') : '') : 'no pitches')));
     const ann = [];
     z.forEach((r, i) => r.forEach((v, j) => { if (k.isNum(v)) ann.push({ x: j, y: i, text: txt[i][j], showarrow: false, font: { size: K().narrow(fig) ? 9 : 11, color: '#f0f3f6' } }); }));
-    const scale = div ? K().DIVERGE : [[0, '#1b2433'], [0.5, '#5b6f8f'], [1, '#e8504f']];
+    const scale = div ? K().DIVERGE : [[0, '#211d17'], [0.5, '#a39a8c'], [1, '#cf3e25']];
     K().plot(fig, [{ type: 'heatmap', x: [0, 1, 2, 3, 4], y: [0, 1, 2, 3, 4], z: z, zmin: zmin, zmax: zmax, colorscale: scale, xgap: 2, ygap: 2, showscale: false, text: hov, hoverinfo: 'text' }],
       K().layout({ margin: { l: 6, r: 6, t: 6, b: 24 }, annotations: ann,
         xaxis: { range: [-0.6, 4.6], showgrid: false, zeroline: false, showticklabels: false, fixedrange: true, scaleanchor: 'y', scaleratio: 1.15 },
         yaxis: { range: [-1.0, 4.6], showgrid: false, zeroline: false, showticklabels: false, fixedrange: true },
-        shapes: [{ type: 'rect', x0: 0.5, x1: 3.5, y0: 0.5, y1: 3.5, line: { color: '#e6edf3', width: 2 } },
-          { type: 'path', path: 'M 1.0 -0.55 L 3.0 -0.55 L 3.0 -0.7 L 2.0 -0.9 L 1.0 -0.7 Z', line: { color: '#8b949e', width: 1 }, fillcolor: 'rgba(230,237,243,0.12)' }] }));
+        shapes: [{ type: 'rect', x0: 0.5, x1: 3.5, y0: 0.5, y1: 3.5, line: { color: '#f3ece0', width: 2 } },
+          { type: 'path', path: 'M 1.0 -0.55 L 3.0 -0.55 L 3.0 -0.7 L 2.0 -0.9 L 1.0 -0.7 Z', line: { color: '#a39886', width: 1 }, fillcolor: 'rgba(230,237,243,0.12)' }] }));
     note.innerHTML = 'Catcher\'s view. The white box is the strike zone in thirds (the batter\'s own zone height); the outer ring is outside it. ' + (o.note || '');
   };
   host.querySelectorAll('select').forEach(sel => sel.addEventListener('change', () => { if (/-k$/.test(sel.id)) st.key = sel.value; else st.col = sel.value; draw(); }));
@@ -467,7 +467,7 @@ function drawHitter(body, ctx) {
   zone5(document.getElementById('pp-dec'), cur.decisions, { id: 'hd', cols: [['dv', 'Decision value per 100 pitches', 0, 'signed2', 'div', 0], ['n', 'Pitches', 1, 'int', 'seq']], nIndex: 1,
     note: 'Decision value: the run value of the choice made minus the expected value of the average choice at that pitch, location and count (swing model).', empty: 'The swing-decision map is not available for this player yet.' });
   battrack(document.getElementById('pp-bat'), cur.battrack, v, pc, meta);
-  rolling('pp-roll', cur.rolling, ['xwOBA+', 'wOBA'], ['#f97316', '#58a6ff'], '3');
+  rolling('pp-roll', cur.rolling, ['xwOBA+', 'wOBA'], ['#3cc9b4', '#62aef0'], '3');
   splitsTable(document.getElementById('pp-splits'), cur.splits, 'batter', meta);
 }
 
@@ -518,7 +518,7 @@ function rolling(id, raw, names, colours, fmt) {
   const tr = [];
   const ncol = Math.max.apply(null, rows.map(r => r.length));
   const nm = names.concat(['Savant xwOBA', 'Series 4']);
-  const col = colours.concat(['#bc8cff', '#8b949e']);
+  const col = colours.concat(['#a08cf0', '#a39886']);
   for (let j = 1; j < ncol; j++) {
     if (!rows.some(r => k.isNum(r[j]))) continue;
     tr.push({ type: 'scatter', mode: 'lines', name: nm[j - 1], x: rows.map(r => r[0]), y: rows.map(r => (k.isNum(r[j]) ? r[j] : null)), line: { color: col[j - 1], width: j === 1 ? 2.5 : 1.8, dash: j > 2 ? 'dot' : 'solid' }, connectgaps: true,
@@ -665,18 +665,18 @@ function fatigue(f, ctx) {
     '<div class="pg-note gq-note">Descriptive, not medical. Within-game slopes are shrunk to the league\'s by empirical Bayes; the flag needs five or more games. Right: rolling Stuff+, Location+ and Pitching+ over 500-pitch windows.</div>';
   host.innerHTML = h;
   if (games.length) {
-    const tr = [{ type: 'scatter', mode: 'lines+markers', name: 'Velo (mph)', x: games.map(r => r.date), y: games.map(r => r.velo), line: { color: '#f85149', width: 2 }, marker: { size: 5 } }];
-    if (games.some(r => k.isNum(r.spin))) tr.push({ type: 'scatter', mode: 'lines', name: 'Spin (rpm)', x: games.map(r => r.date), y: games.map(r => r.spin), yaxis: 'y2', line: { color: '#58a6ff', width: 1.5, dash: 'dot' } });
+    const tr = [{ type: 'scatter', mode: 'lines+markers', name: 'Velo (mph)', x: games.map(r => r.date), y: games.map(r => r.velo), line: { color: '#ef6a4c', width: 2 }, marker: { size: 5 } }];
+    if (games.some(r => k.isNum(r.spin))) tr.push({ type: 'scatter', mode: 'lines', name: 'Spin (rpm)', x: games.map(r => r.date), y: games.map(r => r.spin), yaxis: 'y2', line: { color: '#62aef0', width: 1.5, dash: 'dot' } });
     const base = k.isNum(f.velo_base) ? f.velo_base : null;
     k.plot('fat-g', tr, k.layout(Object.assign({ margin: { l: 44, r: 50, t: 28, b: 32 }, xaxis: { title: 'Date' }, yaxis: { title: 'Fastball velocity (mph)' }, yaxis2: { title: 'Spin rate (rpm)', overlaying: 'y', side: 'right', showgrid: false },
-      shapes: base ? [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: base, y1: base, line: { color: '#6e7681', dash: 'dash', width: 1 } }] : [] }, k.legendTop())));
+      shapes: base ? [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: base, y1: base, line: { color: '#a39886', dash: 'dash', width: 1 } }] : [] }, k.legendTop())));
   } else document.getElementById('fat-g').innerHTML = k.muted('No game-by-game fastball velocity yet.');
   const pr = (ctx.cur.pitching_rolling || []).map(r => (Array.isArray(r) ? r : [r.date, r.n, r.stuff, r.location, r.pitching, r.roll]));
   if (pr.length) {
-    const ser = [[2, 'Stuff+', '#f97316'], [3, 'Location+', '#58a6ff'], [4, 'Pitching+', '#3fb950']].filter(x => pr.some(r => k.isNum(r[x[0]])));
+    const ser = [[2, 'Stuff+', '#3cc9b4'], [3, 'Location+', '#62aef0'], [4, 'Pitching+', '#5cc183']].filter(x => pr.some(r => k.isNum(r[x[0]])));
     k.plot('fat-w', ser.map(x => ({ type: 'scatter', mode: 'lines', name: x[1], x: pr.map(r => r[0]), y: pr.map(r => r[x[0]]), line: { color: x[2], width: 2 } })),
       k.layout(Object.assign({ margin: { l: 40, r: 10, t: 28, b: 32 }, xaxis: { title: 'Date' }, yaxis: { title: 'Score (100 = average)' },
-        shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 100, y1: 100, line: { color: '#6e7681', dash: 'dot', width: 1 } }] }, k.legendTop())));
+        shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 100, y1: 100, line: { color: '#a39886', dash: 'dot', width: 1 } }] }, k.legendTop())));
   } else document.getElementById('fat-w').innerHTML = k.muted('No rolling pitch-model series yet.');
 }
 

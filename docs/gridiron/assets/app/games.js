@@ -1,5 +1,6 @@
-/* The Quant Gridiron — Games (#/games/<S>/<w>): a week of games (old #/week), on Design System 2.0.
- * Week strip, every game as a v2 game card grouped by day, our chance for every home side (the market a grey ring),
+/* The Quant Gridiron — Games (#/games/<S>/<w>): a week of games (old #/week), on kit v3 "Matchday".
+ * Week strip, every game as a game card with its one-line reason, grouped by day; our chance for every home side (the
+ * market a grey ring, a reference: this page is game detail for the week),
  * our forecast game by game (projected score, margin, points; the market a reference column), and once games are
  * final how our forecast did.
  * Reads <S>/weeks/<w>.json, falling back to <S>/schedule.json. Refreshes every minute while a game is live. */
@@ -94,9 +95,10 @@ GI.route('games', function (el, params) {
     const pre = games.filter(g => GI.isPre(g) && isNum((g.model || {}).p_home));
     el.innerHTML = GI.pageHead('Games · ' + S + ' · ' + GI.gtypeLabel(GI.weekType(w, S)), label, [span, games.length + ' game' + (games.length === 1 ? '' : 's'), live.length ? live.length + ' live' : ''].filter(Boolean).join(' · '), GI.weekNav(S, w)) +
       strip(S, w) +
-      (games.length ? days.map(x => '<div class="gi-day">' + esc(x.day === 'TBD' ? 'Kickoff to be set' : GI.fmtDate(x.day)) + '</div><div class="qk-auto gi-games" style="--min:290px">' + x.games.map(g => GI.gameCard(g)).join('') + '</div>').join('')
+      (games.length ? days.map(x => '<div class="gi-day">' + esc(x.day === 'TBD' ? 'Kickoff to be set' : GI.fmtDate(x.day)) + '</div><div class="qk-auto gi-games" style="--min:290px">' + x.games.map(g => GI.gameCard(g, { why: true })).join('') + '</div>').join('')
         : QK.empty('No games this week', GI.weekType(w, S) === 'REG' ? 'A bye week for everyone?' : 'The round is not set yet.')) +
-      (pre.length ? '<section class="qk-section">' + GI.card('Our chance for every home side', 'Violet: our win chance. Grey ring: the market (Kalshi / Polymarket), for reference', GI.chartBox('gw-chance', Math.max(220, pre.length * 34 + 50), 'Our home win chance, with the market for reference')) + '</section>' : '') +
+      (pre.length ? '<section class="qk-section">' + GI.card('Our chance for every home side', 'Teal: our win chance. Grey ring: the market (Kalshi / Polymarket), a reference, not our forecast', GI.chartBox('gw-chance', Math.max(220, pre.length * 34 + 50), 'Our home win chance, with the market for reference') +
+        QK.note('<b>How sure are we?</b> 60% means the home team loses a game like this about 4 times in 10. Football has upsets every week.')) + '</section>' : '') +
       (games.length ? GI.card('Our forecast, game by game', label + ' · our win chance, the projected score, margin and points; the market column is a reference', forecastTable(games) +
         '<p class="gi-cap">Projections are the average of our game simulations. How the game model scores over many seasons is on the <a href="#/calibration">Model page</a>.</p>') : '') +
       review(games);

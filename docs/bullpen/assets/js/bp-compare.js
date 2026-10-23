@@ -6,13 +6,17 @@
  * group (pct_role) and the set is the group's; otherwise against all MLB hitters (or all starters / relievers mixed:
  * the payload's league-wide pct) on the all-hitters set, and the page says so. Data: data/players/<pid>.json for each
  * (the current season's values, pct and pct_role are in the player file), glossary.json; the season catalogue loads only
- * for the distribution. Teams, other levels and seasons, and the classic every-metric view: ?view=classic. */
+ * for the distribution. Teams, other levels and seasons, and the classic every-metric view: ?view=classic.
+ *
+ * v3 (Matchday): the title asks the question ("Judge, Ohtani or Soto?"), the best value in each row sits under the sun
+ * highlighter, the percentiles are coloured pills, and a verdict under the table names what each player does best
+ * (QK.verdicts, the type from BP.ui.ARCHETYPE); the third player in plum. */
 (function (BP) {
 'use strict';
 
 const U = BP.ui, esc = BP.esc, isNum = BP.isNum;
 const LEG = BP.HANDLERS.compare;
-const COLS = ['var(--wp-a)', 'var(--wp-b)', 'var(--c-3)'];
+const COLS = ['var(--wp-a)', 'var(--wp-b)', 'var(--c-5)'];
 let KIND = 'hitter';
 
 function blockOf(p, kind, L, S) {
@@ -40,7 +44,8 @@ function render(el, params, state) {
     const peer = same ? U.peerName(setKey) : (KIND === 'pitcher' ? 'all MLB pitchers' : 'all MLB hitters');
     const why = same ? '' : ' (they play different ' + (KIND === 'pitcher' ? 'roles' : 'positions') + ', so the percentiles are league-wide)';
     const href = (a, b, c) => BP.compareHref(a, b) + (c ? '?c=' + encodeURIComponent(c) : '');
-    let h = U.head({ kicker: 'Compare · ' + BP.levelName(L) + ' ' + S, title: E.length >= 2 ? E.map(x => BP.playerSurname(x.id)).join(' v ') : 'Compare players',
+    const sn = E.map(x => BP.playerSurname(x.id));
+    let h = U.head({ kicker: 'Compare · ' + BP.levelName(L) + ' ' + S, title: E.length >= 2 ? sn.slice(0, -1).join(', ') + ' or ' + sn[sn.length - 1] + '?' : 'Compare players',
       sub: 'Two or three ' + (KIND === 'pitcher' ? 'pitchers' : 'hitters') + ' on the metrics that are stable from year to year and predict next season, chosen for their position or role.',
       actions: U.seg('cmp-kind', 'Kind', [['hitter', 'Hitters'], ['pitcher', 'Pitchers']], KIND) + '<a class="qk-btn" href="' + esc(href(params.a || '', params.b || '', q.c) + (q.c ? '&' : '?') + 'view=classic') + '">Every metric (classic)</a>' }) +
       '<section class="qk-card"><div class="qk-card-body"><div class="bp-cmp-pick">' + [0, 1, 2].map(i => '<div class="bp-cmp-slot" style="--ec:' + COLS[i] + '"><span class="qk-kicker" style="margin:0">' + (i === 2 ? 'Third (optional)' : i ? 'Second' : 'First') + '</span><div id="cmp-p' + i + '"></div></div>').join('') + '</div></div></section>';
@@ -53,14 +58,25 @@ function render(el, params, state) {
       const extra = flat.filter(x => !groups.some(g => g.keys.indexOf(x[0]) >= 0)).map(x => x[0]);
       if (extra.length) groups.push({ label: 'More', keys: extra });
       const pk = same ? 'pct_role' : 'pct';
+      const cgroups = groups.map(g => ({ label: g.label, rows: g.keys.map(k => {
+        const m = U.metaOf(KIND, k, gl);
+        return { key: k, label: m.label, tip: m.tip, values: E.map(x => (x.b.values || {})[k]), pctls: E.map(x => (U.metricOk(x.b, k, same ? setKey : 'ALL', null) && U.meets(x.b, U.setFor(KIND, x.b), null) ? (x.b[pk] || {})[k] : null)), better: m.lower ? 'low' : 'high', fmt: val => U.fmtBy(m, val) };
+      }) }));
+      /* verdicts: for each player, the metric where the player's percentile beats the others' by the most */
+      const verd = E.map((x, i) => {
+        let bestRow = null, bestD = 0;
+        cgroups.forEach(g => g.rows.forEach(r => {
+          const mine = r.pctls[i]; if (!isNum(mine)) return;
+          const d = mine - Math.max.apply(null, r.pctls.filter((_, j) => j !== i).map(z => (isNum(z) ? z : 0)));
+          if (d > bestD) { bestD = d; bestRow = r; }
+        }));
+        return bestRow ? { title: ((U.ARCHETYPE || {})[KIND] || {})[bestRow.key] || 'The standout', who: sn[i], text: 'best of the ' + E.length + ' on ' + bestRow.label + ' (' + bestRow.fmt(bestRow.values[i]) + ', ' + QK.ordinal(Math.round(bestRow.pctls[i])) + ' percentile).' } : null;
+      });
       const cv = QK.compareView({
         entities: E.map((x, i) => ({ name: x.p.name, sub: [BP.teamAbbr(x.b.team), x.b.pos || x.b.role, U.sampleLine(x.b, KIND, U.setFor(KIND, x.b), null).split(' · peers')[0]].filter(Boolean).join(' · '), colour: (BP.teamInfo(x.b.team) || {}).colour, href: BP.playerHref(x.id, { level: L, role: KIND, season: S }) })),
-        groups: groups.map(g => ({ label: g.label, rows: g.keys.map(k => {
-          const m = U.metaOf(KIND, k, gl);
-          return { label: m.label, tip: m.tip, values: E.map(x => (x.b.values || {})[k]), pctls: E.map(x => (U.metricOk(x.b, k, same ? setKey : 'ALL', null) && U.meets(x.b, U.setFor(KIND, x.b), null) ? (x.b[pk] || {})[k] : null)), better: m.lower ? 'low' : 'high', fmt: val => U.fmtBy(m, val) };
-        }) }))
-      });
-      h += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-7">' + U.card2('Side by side', 'Peers: ' + esc(peer) + why + '. The bar and the small number are the percentile (100 = best); the better value is bold.', cv) + '</div>' +
+        groups: cgroups
+      }) + QK.verdicts(verd);
+      h += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-7">' + U.card2('Side by side', 'Peers: ' + esc(peer) + why + '. The pill is the percentile (100 = best); the best value in each row is highlighted.', cv) + '</div>' +
         '<div class="qk-span-5"><div class="bp-stack">' + U.card2('Where they sit', 'Every ' + esc(peer.replace(/^MLB /, '')) + ' past the floor this season', U.seg('cmp-dseg', 'Metric', flat.slice(0, 5).map(x => [x[0], U.metaOf(KIND, x[0], gl).label]), '') + '<div id="cmp-dist" style="margin-top:10px">' + QK.empty('Pick a metric', 'The peer group loads on request (the season catalogue is several megabytes).') + '</div>') +
         U.card2('Samples', 'Percentiles need ' + (U.floorOf(setKey, null) || {}).full + '+ ' + ((U.floorOf(setKey, null) || {}).unit || '') + ' over a full season (prorated in season)', '<ul class="bp-list">' + E.map((x, i) => '<li><span class="bp-dot" style="background:' + COLS[i] + '"></span>' + U.playerEnt(x.id, L, null, KIND) + '<span class="v" style="font:600 var(--fs-xs) var(--font-num)">' + esc(U.sampleLine(x.b, KIND, U.setFor(KIND, x.b), null).split(' · peers')[0]) + '</span></li>').join('') + '</ul>', { flush: true }) +
         '</div></div></div></section>';
@@ -88,7 +104,7 @@ function render(el, params, state) {
         if (vals.length < 5) { box.innerHTML = QK.empty('Too few peers yet'); return; }
         box.innerHTML = U.chart('cmp-dist-c', 260, 'Distribution of ' + m.label);
         const T = QKC.tokens();
-        const marks = E.map((x, i) => ({ x: (x.b.values || {})[key], label: BP.playerSurname(x.id), color: QK.cssVar(['--wp-a', '--wp-b', '--c-3'][i]) || T.cat[i] })).filter(mk => isNum(mk.x));
+        const marks = E.map((x, i) => ({ x: (x.b.values || {})[key], label: BP.playerSurname(x.id), color: QK.cssVar(['--wp-a', '--wp-b', '--c-5'][i]) || T.cat[i] })).filter(mk => isNum(mk.x));
         marks.push({ x: vals[Math.floor(vals.length / 2)], label: 'Median', color: T.ink2 });
         QKC.distribution('#cmp-dist-c', { values: vals, binCount: 22, lowerBetter: m.lower, fmt: v => U.fmtBy(m, v), xName: m.label + ' · ' + vals.length + ' peers', yName: 'Players', marks: marks, label: 'Distribution of ' + m.label });
       });

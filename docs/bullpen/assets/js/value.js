@@ -50,7 +50,8 @@ function valuePage(el, params) {
   return BP.load(y(L, S, 'value.json')).then(d => {
     if (!el.isConnected) return;
     const head = QK.sectionHead({ kicker: 'Player value · ' + BP.levelName(L) + ' ' + S, title: 'What every player is worth', sub: (CUR[L] || 'WAR') + ' this season and the rate behind it, next season\'s projection, ' + (L === 'aaa' ? 'the prospect model' : 'the next five seasons with their range') + ', and the best at each position.',
-      actions: '<a class="qk-btn" href="' + BP.href('trade', L, S) + '">Trade simulator</a>' });
+      actions: '<a class="qk-btn" href="' + BP.href('trade', L, S) + '">Trade simulator</a>' }) +
+      QK.note('<b>WAR</b> is wins above a replacement-level player, the kind a club can call up any time: about 2 is a solid regular, 5 an All-Star, 8 an MVP-level season.');
     if (!BP.ok(d)) { el.innerHTML = head + QK.empty('Not built yet', 'The value file for ' + BP.levelName(L) + ' ' + S + ' is not available.'); return; }
     if (V.L !== L || V.S !== S) { V.L = L; V.S = S; V.min = null; V.team = ''; V.pos = ''; V.lg = ''; }
     const F = {};

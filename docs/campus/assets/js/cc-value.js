@@ -14,7 +14,8 @@ CC.route('value', function (el, p) {
   var L = p.L, S = p.S, fb = CC.fb(L);
   var list = [['value', 'Value'], ['position', 'By position'], ['transfers', 'Transfers']];
   var tab = U.tab(p, ['value', 'position', 'transfers'], 'value');
-  el.innerHTML = U.head('Value & Moves', 'What every player is worth on the field in our value model, the best at each position, and the transfers we can see in the box scores.', U.kicker(L, S)) + U.tabs(L, 'value', list, S, tab) + '<div id="vb">' + QK.skeleton('lines', 8) + '</div>';
+  el.innerHTML = U.head('Value & Moves', 'What every player is worth on the field in our value model, the best at each position, and the transfers we can see in the box scores.', U.kicker(L, S)) + U.tabs(L, 'value', list, S, tab) +
+    QK.note('<b>Value above replacement</b> is what a player adds over a replacement-level player at the same position: ' + (CC.fb(L) ? 'expected points on the player’s plays' : 'a box-score rating scaled so a team’s players add up to its margin') + '. Transfers here are inferred from box scores and rosters, not the official portal.') + '<div id="vb">' + QK.skeleton('lines', 8) + '</div>';
   var body = QK.$('#vb', el);
   return Promise.all([CC.load(CC.path(L, S, tab === 'transfers' ? 'moves.json' : 'value.json')), CC.season(L, S)]).then(function (a) {
     if (!U.alive(el)) return;

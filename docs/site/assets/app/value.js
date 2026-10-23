@@ -273,6 +273,7 @@ function drawPlayers(el, body, q) {
     FB.kpi('Fee model', cv.error_factor ? '×' + num(cv.error_factor, 2) : '—', { sub: cv.spearman ? 'typical error · rank corr. ' + num(cv.spearman, 2) : 'not fitted', tip: 'Out-of-sample typical error of the fair fee against real published fees.' }),
     FB.kpi('Updated', esc(FB.fmtDate(m.updated_at)), { text: true, sub: 'rebuilt every hour' })
   ]) +
+    '<div class="fb-mt">' + FB.note('<b>GAR/90</b> is the goals a player adds per 90 minutes over a replacement-level player in the same role, the kind a club could sign cheaply. +0.30 is about one extra goal of difference every three matches. A <b>held-out fit</b> of ' + (r2.value ? pct(r2.value, 0) : '—') + ' sounds low, but one match is noisy and a player is one of eleven.') + '</div>' +
     '<div id="va-filter-card" class="fb-mt">' + FB.card('', '', '<div id="va-filters"></div><p class="fb-cap" id="va-note"></p>') + '</div>' +
     '<div class="fb-mt">' + FB.grid(
       FB.card('Value against age', 'GAR/90 of the players shown (top 200) by age; colour is the position. Click a dot for the player.', FB.chartBox('va-sc-age', 340, 'Value per 90 by age') + roleLegend(), { span: 6 }) +

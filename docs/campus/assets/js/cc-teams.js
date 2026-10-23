@@ -161,11 +161,17 @@ CC.route('team', function (el, p) {
     var pc = function (k) { return stx[k] && isNum(stx[k].pct) ? stx[k].pct : (isNum(cpt[k]) ? cpt[k] : null); };
     var peers = fb ? 'FBS teams' : 'Division I teams';
     document.title = (t ? t.name : 'Team ' + tid) + ' · ' + CC.seasonLabel(L, S) + ' · The Quant Campus';
-    var html = '<div class="qk-kicker" style="margin-bottom:10px"><a href="' + esc(CC.href(L, 'teams', null, S)) + '">← All teams</a></div>';
-    html += QK.playerHeader({ name: t ? t.name : 'Team ' + tid, split: false, pos: conf ? (conf.name || conf.short) : 'Independent', kicker: CC.LNAME[L] + ' · ' + CC.seasonLabel(L, S),
+    /* The short version: the record, the rating and its rank, the schedule, and what the simulation says */
+    var nm = t ? (t.short || t.name) : 'Team ' + tid;
+    var shortTxt = (isNum(rec.w) ? nm + ' ' + (CC.isCur(L, S) ? 'are' : 'went') + ' ' + CC.record(rec.w, rec.l) + (isNum(rec.conf_w) ? ' (' + CC.record(rec.conf_w, rec.conf_l) + ' in the conference)' : '') + '. ' : '') +
+      (isNum(R.rating) ? 'We rate them ' + CC.f(Math.abs(R.rating), 1) + (fb ? ' points' : ' points per 100 possessions') + ' ' + (R.rating >= 0 ? 'better' : 'worse') + ' than an average ' + (fb ? 'FBS' : 'D-I') + ' team' + (isNum(R.rank) ? ', ' + QK.ordinal(R.rank) + ' in the country' : '') + (isNum(R.se) ? ', give or take ' + CC.f(R.se, 1) : '') + '. ' : '') +
+      (sim && isNum(sim.p_title) && sim.p_title >= 0.005 ? 'Our simulations give them a ' + CC.pct(sim.p_title) + ' chance to win the title.' : (isNum(R.sos_rank) ? 'Their schedule ranks ' + QK.ordinal(R.sos_rank) + ' for strength.' : ''));
+    var html = '<nav class="cc-crumb" aria-label="Breadcrumb"><a href="' + esc(CC.href(L, 'teams', null, S)) + '">' + esc(CC.LNAME[L]) + '</a><span aria-hidden="true">›</span>' + esc(conf ? (conf.short || conf.name) : 'Independent') + '<span aria-hidden="true">›</span>' + esc(t ? t.name : 'Team ' + tid) + '</nav>';
+    html += QK.playerHeader({ name: t ? t.name : 'Team ' + tid, split: false, pos: conf ? (conf.name || conf.short) : 'Independent', kicker: CC.LNAME[L] + ' · ' + CC.seasonLabel(L, S), face: t && t.abbr ? t.abbr : null,
       team: t ? { name: '', abbr: t.abbr, colour: t.colour } : null,
       meta: [['Record', CC.record(rec.w, rec.l)], isNum(rec.conf_w) ? ['Conference', CC.record(rec.conf_w, rec.conf_l)] : null, rec.streak ? ['Streak', rec.streak] : null, isNum(R.games) ? ['Games rated', String(R.games)] : null],
-      stats: [{ label: 'Rating', value: CC.signed(R.rating, 1) }, { label: 'Our rank', value: isNum(R.rank) ? '#' + R.rank : '—' }, { label: 'SOS rank', value: isNum(R.sos_rank) ? '#' + R.sos_rank : '—' }] });
+      short: shortTxt.trim() || null,
+      stats: shortTxt.trim() ? null : [{ label: 'Rating', value: CC.signed(R.rating, 1) }, { label: 'Our rank', value: isNum(R.rank) ? '#' + R.rank : '—' }, { label: 'SOS rank', value: isNum(R.sos_rank) ? '#' + R.sos_rank : '—' }] });
     if (!d) html += '<p class="cc-note">The full team page has not been built for this season; ratings come from the season file.</p>';
     var dm = ((cat && cat.metrics) || []).filter(function (m0) { return m0.key === 'def'; })[0];
     var defLow = dm ? !!dm.lower : !fb;

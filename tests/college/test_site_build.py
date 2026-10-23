@@ -109,9 +109,10 @@ def test_kit_college_entry_is_launched_and_the_gate_remains():
     assert "for (var i = 0; i < QK.ALL_SPORTS.length; i++)" in js
 
 
-def test_tokens_college_accent_both_themes():
+def test_tokens_college_accent_on_the_dark_page():
+    """Kit v3 "Matchday" is dark only (23 Oct 2026): one college accent, readable on the warm charcoal page."""
     css = (KIT / "tokens.css").read_text(encoding="utf-8")
-    assert css.count("--a-college:") == 3          # dark, light (media query), light (data-theme)
+    assert css.count("--a-college:") == 1
     assert ':root[data-sport="college"]    { --accent: var(--a-college); }' in css
 
     def lum(h):
@@ -123,8 +124,8 @@ def test_tokens_college_accent_both_themes():
         x, y = lum(a), lum(b)
         return (max(x, y) + 0.05) / (min(x, y) + 0.05)
     dark = re.search(r"--a-college:\s*(#[0-9a-f]{6})", css).group(1)
-    light = re.findall(r"--a-college: (#[0-9a-f]{6})", css)[-1]
-    assert cr(dark, "#11151b") >= 4.5 and cr(light, "#ffffff") >= 4.5
+    page = re.search(r"--bg:\s*(#[0-9a-f]{6})", css).group(1)
+    assert cr(dark, page) >= 4.5
 
 
 # ── home page gate ────────────────────────────────────────────────────────
@@ -179,7 +180,8 @@ def test_front_end_files_and_older_browser_rule():
         assert "?." not in re.sub(r"\?\.\d", "", src), p.name
         assert "??" not in src, p.name
     html = (FRONT / "index.html").read_text(encoding="utf-8")
-    assert '<html lang="en" data-sport="college">' in html
+    assert '<html lang="en-GB" data-sport="college" data-theme="dark">' in html
+    assert 'name="color-scheme" content="dark"' in html and "Fraunces" in html and "Archivo" not in html
     assert "qc-notice-v1" in html and "not affiliated" in html and "College Football Playoff" in html
     # cc-metrics.js (the generated comparison metric sets) is loaded on demand by cc-core.js, not by a script tag
     lazy = {"cc-metrics.js"}
@@ -190,6 +192,16 @@ def test_front_end_files_and_older_browser_rule():
         else:
             assert f'src="assets/js/{p.name}"' in html, p.name
     assert "<img" not in html
+
+
+def test_parse_takes_a_trailing_year_as_the_season_only_where_a_season_goes():
+    """#/<L>/<S> and #/<L>/<sec>/<id>/<S> carry a season; in #/cfb/team/2390 the four digits are the team id."""
+    core = (FRONT / "assets" / "js" / "cc-core.js").read_text(encoding="utf-8")
+    body = core[core.index("CC.parse = function"):core.index("CC.defaultLevel")]
+    pop = re.search(r"if \((.*)\) r\.S = Number\(parts\.pop\(\)\)", body)
+    assert pop, "the trailing-season rule is missing"
+    cond = pop.group(1)
+    assert "parts.length === 1" in cond and "parts.length === 3" in cond, cond
 
 
 def test_routes_cover_the_nine_sections():

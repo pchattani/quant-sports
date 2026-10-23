@@ -78,3 +78,13 @@ a .fb-pl-res:hover { outline: 1px solid var(--signal); }
   .fb-pl-filter .qk-select { width: 100%; }
 }
 .fb-pl-move:empty { display: none; }
+
+/* kit v3 player page (the Rink reference): rail beside how sure, game by game and their type */
+.fb-pl-sec1 { margin-top: var(--sp-8); }
+.fb-pl-sec1 .qk-gside { align-items: start; }
+.fb-pl-h4 { margin: 14px 0 6px; font: 700 var(--fs-xs)/1.2 var(--font-ui); color: var(--ink-3); }
+.fb-pl-type { list-style: none; margin: 0; padding: 0; }
+.fb-pl-type li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--line-1); min-width: 0; }
+.fb-pl-type .s { color: var(--ink-3); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.fb-pl-type .v { margin-left: auto; color: var(--signal); font-size: var(--fs-xs); font-weight: 600; white-space: nowrap; }
+#pl-tiles-cap:empty { display: none; }

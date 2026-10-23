@@ -1,9 +1,11 @@
-/* The Quant Bullpen — game centre (#/<L>/game/<gpk>).
+/* The Quant Bullpen — game centre (#/<L>/game/<gpk>), on kit v3 "Matchday" (the Rink game page is the reference).
  *
- *   header: teams, score, status, series, park, umpire; live state (inning, count, bases, outs,
- *           at bat) and win probability; the linescore once the game has started;
- *   Preview: our forecast (win, by two or more, total runs, the first five; the market a quiet reference column),
- *            the total-runs distribution, the probable pitchers, lineups (posted time, strength) with matchup
+ *   hero: QK.previewCard (away "at" home with records and form, the score bug when live, our chance for the
+ *           favourite with a how-sure note on runs and extra innings, the match-up factors from our team ratings, the
+ *           market as a quiet labelled line before the first pitch); under it the live state (inning, count, bases,
+ *           outs, at bat), the linescore once the game has started, and the date, park, umpire, weather and decisions;
+ *           beside it the stat tiles and our forecast table (the market a quiet reference column);
+ *   Preview: the total-runs distribution, the probable pitchers, lineups (posted time, strength) with matchup
  *            projections, the lineup adjustment, the tale of the tape, weather, park and umpire;
  *   Game:    win probability (ours v ESPN) with the top WPA plays; spray chart with xwOBA+ v
  *            Savant xwOBA and the batted-ball table;
@@ -199,30 +201,44 @@ function normalise(raw, P) {
 
 // ── header ─────────────────────────────────────────────────────────────────
 
-function header(g, L, S) {
+function header(g, L, S, season) {
   const U = BP.ui;
   const st = BP.gameState(g);
   const pre = preOf(g);
-  const pH = isNum(pre.model.p_home) ? Number(pre.model.p_home) : null;
+  const m = pre.model || {};
+  const pH = isNum(m.p_home) ? Number(m.p_home) : null;
   const live = st === 'live', fin = st === 'final', started = live || fin;
   const wpH = live && isNum(g.wp_home) ? Number(g.wp_home) : null;
   const pair = U.pair(g.away, g.home);
-  const ent = (tid, isHome) => {
-    const sp = (g.probables || {})[isHome ? 'home' : 'away'];
-    const mark = BP.teamMark(tid, 'lg');
-    const rec = BP.RECORDS[String(tid)];
-    return '<div class="side ' + (isHome ? 'home' : 'away') + '">' + (isHome ? '' : mark) + '<div style="min-width:0"><a class="nm" href="' + esc(BP.teamHref(tid, L, S)) + '">' + esc(BP.teamName(tid)) + '</a>' +
-      '<div class="sb">' + (isHome ? 'Home' : 'Away') + (rec ? ' · ' + esc(rec) : '') + (sp && !started ? ' · SP ' + BP.playerLink(sp, { role: 'pitcher', level: L, surname: true }) : '') + '</div></div>' + (isHome ? mark : '') + '</div>';
-  };
-  const score = started ? '<div class="bp-score"><span>' + (isNum(g.as) ? g.as : '–') + '</span><span class="dash">–</span><span>' + (isNum(g.hs) ? g.hs : '–') + '</span></div>'
-    : '<div class="bp-score bp-score-pre"><span>' + esc(BP.fmtTime(g.start || g.date) || 'TBD') + '</span></div>';
-  const p = live && wpH !== null ? wpH : pH;
   const mk = pre.market || {};
   const A = U.team(g.away, L, S), H = U.team(g.home, L, S);
   A.colour = pair[0]; H.colour = pair[1];
-  const bar = isNum(p) ? '<div class="bp-hero-bar"><div class="qk-kicker">' + (live ? 'Our live win chance' : fin ? 'Our pre-game win chance' : 'Our win chance') + '</div>' +
-    QK.wpBar(1 - p, null, p, A, H, { colors: pair, size: 'lg', market: !started && isNum(mk.p_home) ? 1 - mk.p_home : null, label: live ? 'Live win chance' : 'Our win chance' }) +
-    (!started && isNum(mk.p_home) ? '<div class="bp-hero-mkt"><span class="qk-mkt" data-tip="The de-vigged prediction-market number for the home side, a reference next to ours">Market (' + esc(U.srcName(mk.sources) || 'reference') + ') <b>' + esc(BP.teamAbbr(g.home)) + ' ' + U.pct(mk.p_home) + '</b></span></div>' : '') + '</div>' : '';
+  const rec = t => BP.RECORDS[String(t)] || '';
+  A.record = rec(g.away); H.record = rec(g.home);
+  const tag = g.series ? BP.seriesText(g.series) : (g.gtype && g.gtype !== 'R' ? BP.roundLabel(g.gtype) : '');
+  const G = { sport: 'baseball', id: g.gpk, start: g.start || g.date, status: live ? 'live' : fin ? 'final' : 'pre', league: (L === 'aaa' ? 'Triple-A' : 'MLB') + (tag ? ' · ' + tag : ''),
+    home: H, away: A, hs: isNum(g.hs) ? Number(g.hs) : null, as: isNum(g.as) ? Number(g.as) : null,
+    p_home: wpH !== null ? wpH : pH, wp_home: wpH, p_pre: live && wpH !== null ? pH : null, pre_only: live && wpH === null ? true : undefined,
+    period: live && isNum(g.inning) ? g.inning : null };
+  // how they match up: our team ratings (runs a game against an average club) and the starters
+  const rows = BP.standingsRows ? BP.standingsRows(season || {}) : {};
+  const ra = (rows[String(g.away)] || {}).rating || {}, rh = (rows[String(g.home)] || {}).rating || {};
+  const fx = [];
+  const add = (label, a, b, f, low) => { if (isNum(a) && isNum(b)) fx.push({ label: label, a: f(a), b: f(b), better: Math.abs(a - b) < 1e-9 ? null : ((a > b) !== !!low ? 'a' : 'b') }); };
+  add('Team rating, runs a game', ra.net, rh.net, v => U.signed(v, 2));
+  add('Offence, runs a game', ra.off, rh.off, v => U.signed(v, 2));
+  add('Run prevention, runs a game', (ra.def || 0) + (ra.pitch || 0), (rh.def || 0) + (rh.pitch || 0), v => U.signed(v, 2));
+  const extra = [];
+  const tot = isNum((m.runs || {}).total) ? m.runs.total : m.total;
+  if (!started && isNum(tot)) extra.push('we expect about ' + Math.round(tot) + ' runs in all');
+  if (!started && isNum(m.extra_innings) && m.extra_innings > 0.02) extra.push('about 1 game in ' + Math.max(2, Math.round(1 / m.extra_innings)) + ' like this goes to extra innings');
+  const sp = g.probables || {};
+  const spLine = !started && (sp.home || sp.away) ? '<div class="bp-sp-line"><span>Probable starters</span>' + (sp.away ? BP.playerLink(sp.away, { role: 'pitcher', level: L, surname: true }) : 'TBD') + ' <span class="qk-muted">v</span> ' + (sp.home ? BP.playerLink(sp.home, { role: 'pitcher', level: L, surname: true }) : 'TBD') + '</div>' : '';
+  const card = QK.previewCard(G, { kicker: (L === 'aaa' ? 'Triple-A' : 'MLB') + (g._park && g._park.name ? ' · ' + g._park.name : '') + (tag ? ' · ' + tag : ''),
+    nick: t => String(t.name || '').split(' ').slice(-1)[0] === 'Sox' || /Blue Jays$/.test(t.name || '') ? String(t.name || '').split(' ').slice(-2).join(' ') : String(t.name || '').split(' ').slice(-1)[0],
+    colors: pair, factors: fx, factorsTitle: 'How they match up this season',
+    noteExtra: extra.length ? esc(extra.join('; ').replace(/^we/, 'We')) + '.' : '',
+    market: !started && isNum(mk.p_home) ? { p: Number(mk.p_home), label: 'Market (' + (U.srcName(mk.sources) || 'reference') + ')' } : null });
   const ump = g._ump || {};
   const meta = [];
   if (g.series) meta.push(esc(BP.seriesText(g.series)));
@@ -245,10 +261,8 @@ function header(g, L, S) {
       BP.basesHTML(g.bases, g.outs) +
       (ab.batter ? '<span class="gm-ab">' + BP.playerLink(ab.batter, { short: true, level: L }) + (ab.pitcher ? ' <span class="muted-inline">v</span> ' + BP.playerLink(ab.pitcher, { short: true, role: 'pitcher', level: L }) : '') + '</span>' : '') + '</div>';
   }
-  const badge = QK.statusBadge(Object.assign({}, BP.kitGame(g, L), { period: live && isNum(g.inning) ? g.inning : null }));
-  return '<section class="qk-hero bp-hero" style="--tc:' + esc(pair[1]) + '"><div class="bp-gh">' + ent(g.away, false) + '<div class="mid">' + score + badge + '</div>' + ent(g.home, true) + '</div>' +
-    bar + liveBox + (started ? '<div class="gm-ls">' + CH().linescore(g, { level: L }) + '</div>' : '') +
-    '<div class="bp-hero-meta">' + meta.map(x => '<span>' + x + '</span>').join('') + '</div></section>';
+  return '<div class="bp-preview">' + card + spLine + liveBox + (started ? '<div class="gm-ls qk-card">' + CH().linescore(g, { level: L }) + '</div>' : '') +
+    '<div class="bp-hero-meta">' + meta.map(x => '<span>' + x + '</span>').join('') + '</div></div>';
 }
 /* Stat tiles under the hero: ours first. */
 function kpiStrip(g) {
@@ -444,12 +458,11 @@ function previewPanel(el, g, L, season) {
   const pre = preOf(g);
   const m = pre.model || {};
   const tp = tape(g, season);
-  el.innerHTML = '<div class="qk-grid"><div class="qk-span-7">' + BP.ui.card2('Our forecast', 'the questions our simulation answers', forecastTable(g)) + '</div>' +
+  el.innerHTML = '<div class="qk-grid"><div class="qk-span-7">' + BP.ui.card2('Probable pitchers', esc(BP.teamAbbr(g.away)) + ' v ' + esc(BP.teamAbbr(g.home)) + ' · the matchup our forecast uses', matchupCard(g, L)) + '</div>' +
     '<div class="qk-span-5">' + BP.ui.card2('Total runs', 'our distribution of the total; the dashed line is the expected total', '<div id="gm-tot" class="chart-box"></div>' +
-      (isNum((m.runs || {}).home) ? '<div class="bp-note">Expected runs: ' + esc(BP.teamAbbr(g.away)) + ' ' + BP.num(m.runs.away, 2) + ', ' + esc(BP.teamAbbr(g.home)) + ' ' + BP.num(m.runs.home, 2) +
-        (isNum(m.extra_innings) ? ' · extra innings ' + BP.pct(m.extra_innings, 0) : '') + '</div>' : '')) + '</div></div>' +
+      (isNum((m.runs || {}).home) ? QK.note('Expected runs: ' + esc(BP.teamAbbr(g.away)) + ' <b>' + BP.num(m.runs.away, 2) + '</b>, ' + esc(BP.teamAbbr(g.home)) + ' <b>' + BP.num(m.runs.home, 2) + '</b>' +
+        (isNum(m.extra_innings) ? ' · extra innings ' + BP.pct(m.extra_innings, 0) : '') + '. The bars are how often each total came up across our simulations.') : '')) + '</div></div>' +
     '<div class="bp-stack" style="margin-top:var(--sp-4)">' +
-    BP.ui.card2('Probable pitchers', esc(BP.teamAbbr(g.away)) + ' v ' + esc(BP.teamAbbr(g.home)) + ' · the matchup our forecast uses', matchupCard(g, L)) +
     '<div class="qk-grid"><div class="qk-span-6">' + BP.ui.card2(BP.teamName(g.away), lineupSub(g, 'away'), strengthNote(g, 'away') + lineupTable((pre.lineups || {}).away, L, 'away', g), { flush: false }) + '</div>' +
       '<div class="qk-span-6">' + BP.ui.card2(BP.teamName(g.home), lineupSub(g, 'home'), strengthNote(g, 'home') + lineupTable((pre.lineups || {}).home, L, 'home', g)) + '</div></div>' + lineupNote(g) +
     (tp ? BP.ui.card2('Tale of the tape', 'the two clubs this season, from our ratings; the better side is solid', tp) : '') +
@@ -732,7 +745,9 @@ function render(el, params) {
     if (params.query && params.query.tab && tabs.some(t => t.key === params.query.tab)) tab = params.query.tab;
     el.innerHTML = '<div class="ph-nav gm-nav"><a href="' + BP.href('games/' + g.date, L, S) + '">‹ ' + esc(BP.fmtDate(g.date, { year: false })) + ' games</a>' +
       (g.series ? '<a href="' + BP.ghref('postseason') + '">Postseason</a>' : '<a href="' + BP.href('standings', L, S) + '">Standings</a>') + '</div>' +
-      header(g, L, S) + '<div style="margin-top:var(--sp-5)"></div>' + kpiStrip(g) +
+      '<div class="bp-gtop">' + header(g, L, S, season) + '<div class="bp-gside bp-stack">' + kpiStrip(g) +
+      ((g.model || preOf(g).model) && forecastRows(g).length ? BP.ui.card2(st === 'pre' ? 'Our forecast' : 'Our pre-game forecast', 'the questions our simulation answers; the market column is a reference, not our forecast', forecastTable(g)) : '') + '</div></div>' +
+      '<div style="margin-top:var(--sp-6)"></div>' +
       (tabs.length > 1 ? '<nav class="qk-tabs bp-tabs2" id="gm-tabs" aria-label="Game views">' + tabs.map(t => '<a class="qk-tab" href="javascript:void(0)" data-tab="' + t.key + '" aria-selected="' + (t.key === tab ? 'true' : 'false') + '">' + esc(t.label) + '</a>').join('') + '</nav>' : '') +
       '<div id="gm-panel"></div>' + (res.full ? '' : '<div class="section-note">' + (Number(S || BP.currentSeason(L)) < Number(BP.currentSeason(L)) ?
         'Pitch-by-pitch game centres are kept on the site for the current season only; this is the schedule card. Stats, tables and careers for the season are complete.' :

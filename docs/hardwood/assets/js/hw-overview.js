@@ -160,7 +160,7 @@ function render(el, params) {
     const hot = HOT.filter(x => (ld[x[0]] || []).length).map(x => {
       const r = ld[x[0]][0], r2 = ld[x[0]][1], p = HW.NAMES[L].players[String(r[0])] || {}, p2 = r2 ? HW.NAMES[L].players[String(r2[0])] || {} : null;
       const fv = v => (x[0] === 'ts' ? HW.fmtVal(v, 'pct') : x[0] === 'hpm' ? U.signed(v, 1) : U.f(v, 1));
-      return { sport: 'basketball', title: x[1], name: p.name || HW.playerName(L, r[0]), value: fv(r[1]), unit: x[2], next: p2 ? { name: p2.name || HW.playerName(L, r2[0]), value: fv(r2[1]) } : null, expl: x[3], href: HW.playerHref(L, r[0], S) };
+      return { sport: 'basketball', title: x[1], name: p.name || HW.playerName(L, r[0]), value: fv(r[1]), unit: x[2], next: p2 ? { name: String(p2.name || HW.playerName(L, r2[0])).replace(/ (Jr\.|Sr\.|II|III|IV)$/, ' $1'), value: fv(r2[1]) } : null, expl: x[3], href: HW.playerHref(L, r[0], S) };
     });
     if (hot.length) h += '<section class="qk-section">' + U.head({ kicker: isCur ? 'Who’s hot' : 'The season’s best', title: isCur ? 'Leading the way right now' : 'Who led the way', sub: 'One name for each stat, with the next best behind.', actions: '<a class="qk-btn ghost" href="' + esc(HW.href(L, 'players', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=leaders') + '">Every leader</a>' }) + QK.hotRow(hot) + '</section>';
     if (isCur) h += '<section class="qk-section qk-gside"><div id="ov-sure"></div><div>' + QK.newHere({ items: [QK.NEW_HERE[0],

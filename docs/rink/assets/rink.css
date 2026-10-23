@@ -79,13 +79,13 @@ sup { font-size: 0.66em; line-height: 0; }
 .split-bar .sb-b { background: var(--blue); }
 .split-bar .sb-mk { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--text); }
 .split-bar.empty { opacity: 0.4; }
-.scope-tag { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; border-radius: 999px; padding: 0 6px; margin-left: 5px; border: 1px solid var(--border); color: var(--text3); vertical-align: 1px; }
+.scope-tag { font-size: 0.62rem; text-transform: none; letter-spacing: 0; border-radius: 999px; padding: 0 6px; margin-left: 5px; border: 1px solid var(--border); color: var(--text3); vertical-align: 1px; }
 .scope-tag.real { border-color: var(--green); color: var(--green); }
 .scope-tag.model { border-color: var(--ice); color: var(--ice); }
 .scope-tag.ftn { border-color: var(--purple); color: var(--purple); }
 .scope-tag.pbp { border-color: var(--blue); color: var(--blue); }
 .scope-tag.inferred { border-color: var(--yellow); color: var(--yellow); }
-.qb-st { font-size: 0.66rem; color: var(--orange); text-transform: uppercase; letter-spacing: 0.04em; margin-left: 3px; }
+.qb-st { font-size: 0.66rem; color: var(--orange); text-transform: none; letter-spacing: 0; margin-left: 3px; }
 
 /* ── Page head ───────────────────────────────────────────────────────────── */
 .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -125,7 +125,7 @@ html, body { overflow-x: hidden; }
 .ps-panel.one { grid-template-columns: minmax(0, 1fr); }
 @media (max-width: 960px) { .ps-panel { grid-template-columns: minmax(0, 1fr); } }
 .ps-group { min-width: 0; }
-.ps-group-head { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin: 8px 0 4px; font-weight: 700; }
+.ps-group-head { font-size: 0.66rem; text-transform: none; letter-spacing: 0; color: var(--text3); margin: 8px 0 4px; font-weight: 700; }
 .ps-row { display: grid; grid-template-columns: minmax(0, 170px) minmax(0, 1fr) 62px; gap: 12px; align-items: center; padding: 4px 0; font-size: 0.8rem; }
 .ps-label { color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ps-label a.gl-link { color: var(--text2); border-bottom: 1px dotted var(--text3); }
@@ -133,7 +133,7 @@ html, body { overflow-x: hidden; }
 .ps-lower { color: var(--orange); font-size: 0.8em; }
 .ps-track { position: relative; height: 4px; background: var(--bg4, #2b323b); border-radius: 2px; margin: 0 11px; }
 .ps-fill { position: absolute; left: 0; top: 0; height: 100%; border-radius: 2px; opacity: 0.5; }
-.ps-dot { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px; border-radius: 50%; color: #fff; font-size: 0.7rem; font-weight: 800;
+.ps-dot { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px; border-radius: 50%; color: var(--ink-1); font-size: 0.7rem; font-weight: 800;
   display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--bg2); z-index: 1; text-shadow: 0 1px 1px rgba(0,0,0,0.35); }
 .ps-tick { position: absolute; top: -4px; width: 1px; height: 12px; background: var(--border); }
 .ps-tick.mid { background: var(--text3); }
@@ -150,7 +150,7 @@ html, body { overflow-x: hidden; }
 
 /* ── Linescore (GI.charts.linescore) ─────────────────────────────────────── */
 .linescore { border-collapse: collapse; font-size: 0.86rem; font-variant-numeric: tabular-nums; min-width: 100%; }
-.linescore th, .linescore td { padding: 5px 9px; text-align: center; border-bottom: 1px solid #21262d; }
+.linescore th, .linescore td { padding: 5px 9px; text-align: center; border-bottom: 1px solid var(--line-1); }
 .linescore thead th { font-size: 0.68rem; color: var(--text3); font-weight: 600; }
 .linescore th.ls-team { text-align: left; white-space: nowrap; font-weight: 700; padding-left: 12px; }
 .linescore td.ls-run { color: var(--text); font-weight: 700; }
@@ -176,7 +176,7 @@ html, body { overflow-x: hidden; }
 .linescore th.ls-sog, .linescore td.ls-sog { color: var(--text3); border-left: 1px solid var(--border); font-weight: 500; }
 
 /* ── Value (value.js), trade simulator (trade.js), strengths and needs (team.js) ─────────────── */
-.vl-best-h, .nd-h { font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); margin: 10px 0 6px; }
+.vl-best-h, .nd-h { font-size: 0.74rem; font-weight: 700; text-transform: none; letter-spacing: 0; color: var(--text2); margin: 10px 0 6px; }
 .vl-best5 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 0 14px 12px; }
 @media (max-width: 1100px) { .vl-best5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .vl-best5 { grid-template-columns: 1fr; padding: 0 8px 8px; } }
@@ -199,8 +199,8 @@ tr.tr-sel td { background: rgba(92, 198, 242, 0.14); }
 .nd-tg { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 0.82rem; min-width: 0; }
 .nd-tg.nd-att { box-shadow: inset 3px 0 0 var(--green); }
 .nd-tg-h { line-height: 1.4; } .nd-tg-v { margin: 4px 0 2px; } .nd-tg-a { margin-top: 4px; font-size: 0.78rem; }
-.nd-grade { display: inline-block; min-width: 22px; padding: 1px 6px; border-radius: 4px; font-weight: 700; font-size: 0.78rem; text-align: center; color: #0d1117; }
-.nd-a { background: #3fb950; } .nd-b { background: #39d0d8; } .nd-c { background: #8b949e; } .nd-d { background: #f0883e; } .nd-f { background: #f85149; }
+.nd-grade { display: inline-block; min-width: 22px; padding: 1px 6px; border-radius: 4px; font-weight: 700; font-size: 0.78rem; text-align: center; color: var(--ink-inv); }
+.nd-a { background: var(--up); } .nd-b { background: var(--c-1); } .nd-c { background: var(--c-other); } .nd-d { background: var(--c-2); } .nd-f { background: var(--down); }
 #tp-needs .pg-note { padding: 8px 14px 12px; }
 @media (max-width: 760px) { .nd-tgs { grid-template-columns: 1fr; } .nd-top, .nd-ways { padding: 0 8px; } }
 #tr-out .gq-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }

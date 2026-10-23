@@ -1,17 +1,18 @@
-/* The Quant Bullpen — Overview (#/ and #/<L>), on Design System 2.0 (docs/_design/STYLE_GUIDE.md; the Rink overview
- * is the reference).
+/* The Quant Bullpen — Overview (#/ and #/<L>), on kit v3 "Matchday" (docs/_design/STYLE_GUIDE.md; the Rink overview
+ * is the reference, MIGRATION_V3.md).
  *
- *   headline and stat tiles: games today (live), the World Series favourite (our chance), the top-rated club, the
- *              hitter and pitcher WAR leaders, and how our game forecasts have scored (ours first; no market headline);
- *   scoreboard: live and today's games, the next ones and the latest results as v2 game cards (records, our chance,
- *              the market a quiet grey tick);
- *   season simulation: World Series chances (ours as bars, Kalshi / Polymarket a grey tick) and the bracket, or, in the
- *              regular season, postseason chances by league;
+ *   the greeting hero with the game to watch (QK.featureCard), then stat tiles: games today (live), the World Series
+ *              favourite (our chance), the top-rated club, the hitter and pitcher WAR leaders, how our forecasts score;
+ *   what to watch: live and today's games, the next ones and the latest results as game cards (records, our chance,
+ *              a one-line reason; no market anywhere on the overview);
+ *   who's hot (QK.hotRow from the leaders); "New here?" beside a "How sure are we?" teaser from mlb/calibration.json;
+ *   season simulation: World Series chances (ours only) and the bracket, or, in the regular season, postseason
+ *              chances by league;
  *   team strength: power ratings, the offence-against-run-prevention map and who has been lucky;
  *   standings by league as a leaderboard with our postseason chance; four leader boards.
  *
  * Reads index.json (cards, postseason, leaders, teams; levels.aaa for Triple-A), <L>/<S>/season.json (standings,
- * ratings, simulation), mlb/<S>/markets.json (the champion market, a reference), mlb/calibration.json (backtest). */
+ * ratings, simulation), mlb/calibration.json (backtest: the tile and the How sure teaser). */
 (function (BP) {
 'use strict';
 
@@ -25,16 +26,28 @@ const BOARDS = [
   ['p_war', 'Pitchers: Bullpen WAR', v => BP.num(v, 1)], ['p_stuff_plus', 'Pitchers: Stuff+', v => String(Math.round(v))]
 ];
 
-/* World Series chances: ours (the postseason paths, else index teams) with the market as a reference. */
-function titleRows(idx, post, mk) {
+/* World Series chances: ours only (the postseason paths, else index teams); no market on the overview. */
+function titleRows(idx, post) {
   const pt = (post && post.teams) || {};
   const it = idx.teams || {};
-  const mkt = mk && mk.champion && mk.champion.market ? BP.titleProbs(mk.champion.market) : {};
   const ids = Object.keys(Object.keys(pt).length ? pt : it);
   return ids.map(t => {
     const p = isNum((pt[t] || {}).p_ws) ? pt[t].p_ws : (it[t] || {}).p_ws;
-    return { t: t, p: p, m: isNum(mkt[t]) ? mkt[t] : null };
+    return { t: t, p: p };
   }).filter(r => isNum(r.p) && r.p > 0.0005).sort((a, b) => b.p - a.p);
+}
+/* Who's hot: one card per leaderboard, the leader with the next best behind. */
+const HOT = [['h_war', 'Best hitter', 'Bullpen WAR', 'Wins above a replacement player: batting, running, fielding and position.', v => BP.num(v, 1), 'hitter'],
+  ['h_hr', 'Most home runs', 'home runs', 'The season total so far.', v => String(v), 'hitter'],
+  ['h_xwoba_plus', 'Best contact', 'xwOBA+', 'Our expected wOBA from how hard and at what angle the ball was hit: .320 is about average.', v => BP.fmtAvg(v), 'hitter'],
+  ['p_war', 'Best pitcher', 'Bullpen WAR', 'Wins above a replacement-level arm, from the runs allowed.', v => BP.num(v, 1), 'pitcher'],
+  ['p_stuff_plus', 'Nastiest stuff', 'Stuff+', 'The physics of the pitches alone: 100 is league average, 110 is excellent.', v => String(Math.round(v)), 'pitcher']];
+function hotItems(lead, L) {
+  return HOT.filter(x => (lead[x[0]] || []).length).map(x => {
+    const r = lead[x[0]][0], r2 = lead[x[0]][1];
+    return { sport: 'baseball', title: x[1], name: BP.playerName(r[0]), value: x[4](r[1]), unit: x[2], next: r2 ? { name: BP.playerName(r2[0]).replace(/ (Jr\.|Sr\.|II|III|IV)$/, ' $1'), value: x[4](r2[1]) } : null, expl: x[3],
+      href: BP.playerHref(r[0], { level: L, role: x[5] }) };
+  });
 }
 
 function tiles(L, S, src, rows, titles, cal, isCurrent, lv) {
@@ -64,10 +77,9 @@ function render(el, params) {
   const src = L === 'mlb' ? idx : lv;
   const phase = isCurrent ? String(lv.phase || idx.phase || '') : 'complete';
   el.innerHTML = QK.skeleton('card', 3);
-  return BP.loadAll([BP.ypath('season.json', L, S), L === 'mlb' && isCurrent ? BP.ypath('markets.json', L, S) : 'index.json', L === 'mlb' ? BP.lpath('calibration.json', L) : 'index.json']).then(arr => {
+  return BP.loadAll([BP.ypath('season.json', L, S), 'index.json', L === 'mlb' ? BP.lpath('calibration.json', L) : 'index.json']).then(arr => {
     if (!U.alive(el)) return;
     const season = BP.ok(arr[0]) ? arr[0] : null;
-    const mk = L === 'mlb' && isCurrent && BP.ok(arr[1]) ? arr[1] : null;
     const cal = L === 'mlb' && BP.ok(arr[2]) ? arr[2] : null;
     let post = isCurrent ? (L === 'mlb' ? idx.postseason : lv.postseason) || null : null;
     const sp = season && season.postseason && typeof season.postseason === 'object' && season.postseason.series ? season.postseason : null;
@@ -75,7 +87,7 @@ function render(el, params) {
     const rows = BP.standingsRows ? BP.standingsRows(season || {}) : {};
     BP.setRecords(U.records(season || {}));
     const hasSim = Object.keys(rows).some(t => rows[t].sim && isNum(rows[t].sim.p_postseason)) || Object.keys(rows).some(t => isNum(rows[t].p_postseason));
-    const titles = L === 'mlb' ? titleRows(idx, post, mk) : [];
+    const titles = L === 'mlb' ? titleRows(idx, post) : [];
     const inPost = phase === 'postseason' && post && post.series && post.series.length;
     const round = inPost && post.round ? BP.roundLabel(post.round) : '';
     const kicker = [BP.levelLong(L), S, PHASE[phase] || BP.titleCase(phase), round].filter(Boolean).join(' · ');
@@ -95,17 +107,36 @@ function render(el, params) {
     const hasGames = today.length + next.length + results.length > 0;
     const first = today.length ? 'today' : next.length ? 'next' : 'results';
 
-    let h = QK.sectionHead({ kicker: kicker, title: title, sub: sub, size: 'lg', tag: 'h1',
-      actions: '<a class="qk-btn primary" href="' + BP.href('games', L, S) + '">' + (isCurrent ? 'All games' : 'Every game') + '</a><a class="qk-btn" href="' + BP.href('standings', L, S) + '">Standings</a>' }) +
-      '<div class="bp-kpis">' + tiles(L, S, src, rows, titles, cal, isCurrent, lv) + '</div>';
+    const evening = new Date(QK.now()).getHours() >= 15;
+    const when = evening ? 'tonight' : 'today';
+    const lgName = L === 'aaa' ? 'Triple-A' : 'majors';
+    /* the game to watch: live first, then the closest calls in the next two days (QK.watchScore) */
+    const feat = today.concat(next).map(c => Object.assign(BP.kitGame(c, L), { league: c.series ? BP.seriesText(c.series, true) : (L === 'aaa' ? 'Triple-A' : 'MLB') })).filter(g => g.status !== 'final')
+      .map(g => [QK.watchScore(g), g]).filter(x => x[0] > -1e8).sort((a, b) => b[0] - a[0])[0];
+    let h = '';
+    if (isCurrent && L === 'mlb') {
+      h += QK.greeting({ date: kicker, title: esc(QK.greet()) + '! Here’s what’s ' + QK.mark('worth watching') + ' in the ' + lgName + ' ' + when + '.',
+        lede: sub, ctas: [{ label: 'All games', href: BP.href('games', L, S) }, { label: inPost ? 'The bracket' : 'Standings', href: inPost ? BP.ghref('postseason') : BP.href('standings', L, S), ghost: true }],
+        side: feat ? QK.featureCard(feat[1], { scribble: feat[1].status === 'live' ? 'Live now!' : 'Our pick ' + when + '!', kicker: feat[1].league }) : '' });
+    } else {
+      h += QK.sectionHead({ kicker: kicker, title: title, sub: sub, size: 'lg', tag: 'h1',
+        actions: '<a class="qk-btn primary" href="' + BP.href('games', L, S) + '">' + (isCurrent ? 'All games' : 'Every game') + '</a><a class="qk-btn ghost" href="' + BP.href('standings', L, S) + '">Standings</a>' });
+    }
+    h += '<div class="bp-tiles">' + tiles(L, S, src, rows, titles, cal, isCurrent, lv) + '</div>';
 
-    if (hasGames) h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Scoreboard', title: '<span id="ov-gh">Today</span>', html: true, sub: 'Our win chance on every card, the favourite in violet. A grey tick on the bar marks the market, for reference.',
-      actions: U.seg('ov-when', 'Games', [['today', 'Today'], ['next', 'Next'], ['results', 'Results']], first) }) + '<div class="bp-gc-grid" id="ov-games"></div></section>';
+    if (hasGames) h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch ' + when, title: '<span id="ov-gh">Today</span>', html: true, sub: 'Our chance for each side, with a line on why it’s worth your time. Live games update as they go.',
+      actions: U.seg('ov-when', 'Games', [['today', 'Today'], ['next', 'Next'], ['results', 'Results']], first) }) + '<div class="qk-watch" id="ov-games"></div></section>';
+    const hot = hotItems(src.leaders || {}, L);
+    if (hot.length) h += '<section class="qk-section">' + QK.sectionHead({ kicker: isCurrent ? 'Who’s hot' : 'The season’s best', title: isCurrent ? 'Leading the way right now' : 'Who led the way', sub: 'One name for each leaderboard, with the next best behind.',
+      actions: '<a class="qk-btn ghost" href="' + BP.href('leaders', L, S) + '">Every leaderboard</a>' }) + QK.hotRow(hot) + '</section>';
+    if (L === 'mlb' && isCurrent) h += '<section class="qk-section qk-gside"><div id="ov-sure"></div><div>' + QK.newHere({ items: [QK.NEW_HERE[0],
+      'A <b>percentile</b> ranks a player against the same position or role (shortstops, starters, relievers): 90th means better than 90 in 100.',
+      'Every forecast is checked against what happened. <a class="qk-link" href="#/calibration">The record is on the Model page.</a>'] }) + '</div></section>';
 
     // season simulation
     if (titles.length || inPost) {
       h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Season simulation', title: inPost ? 'Who wins the World Series' : 'Who wins it all', sub: 'Our chances from simulating every remaining game and the bracket, with each series played out pitch by pitch in the model.' }) +
-        '<div class="qk-grid">' + (titles.length ? '<div class="qk-span-' + (inPost ? 5 : 12) + '">' + U.card2('World Series chances', 'Our chance; the grey tick is the ' + (mk && mk.champion && mk.champion.market ? U.srcName(mk.champion.market.sources) || 'market' : 'market') + ' number, for reference', '<div id="ov-ws"></div>', { foot: '<span>Clubs still alive</span>' + U.more(BP.ghref('postseason'), 'Every series and path') }) + '</div>' : '') +
+        '<div class="qk-grid">' + (titles.length ? '<div class="qk-span-' + (inPost ? 5 : 12) + '">' + U.card2('World Series chances', 'Our chance from 20,000 simulated brackets', '<div id="ov-ws"></div>', { foot: '<span>Clubs still alive</span>' + U.more(BP.ghref('postseason'), 'Every series and path') }) + '</div>' : '') +
         (inPost ? '<div class="qk-span-' + (titles.length ? 7 : 12) + '">' + U.card2('The bracket', 'Series wins and our chance to win each series', '<div id="ov-bk"></div>', { foot: '<span>' + (post.sims ? BP.int(post.sims) + ' simulated brackets' : '') + '</span>' + U.more(BP.ghref('postseason'), 'Postseason') }) + '</div>' : '') + '</div></section>';
     }
 
@@ -116,7 +147,8 @@ function render(el, params) {
       h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Team strength', title: 'Ratings and luck', sub: 'How good each club is per game, where its strength comes from, and whether its record matches its runs.' }) + '<div class="qk-grid">';
       if (haveRatings) h += '<div class="qk-span-5">' + U.card2('Power ratings', 'Runs a game better than an average club, our ratings', U.chart('ov-power', 560, 'Team ratings'), { foot: '<span>All clubs</span>' + U.more(BP.href('teams', L, S), 'Every team') }) + '</div>' +
         '<div class="qk-span-7">' + U.card2('Team strength map', 'Offence against run prevention (pitching and defence), runs a game above average. Up and right is better.', U.chart('ov-map', 560, 'Offence against run prevention')) + '</div>';
-      if (haveLuck) h += '<div class="qk-span-12">' + U.card2('Who has been lucky', 'Wins above (or below) the Pythagorean record from runs scored and allowed', U.chart('ov-luck', 300, 'Wins above the Pythagorean record'), { foot: '<span>The eight luckiest and unluckiest</span>' + U.more(BP.href('standings', L, S), 'Standings') }) + '</div>';
+      if (haveLuck) h += '<div class="qk-span-12">' + U.card2('Who has been lucky', 'Wins above (or below) the Pythagorean record from runs scored and allowed', U.chart('ov-luck', 300, 'Wins above the Pythagorean record') +
+        QK.note('A club <b>+5</b> here won five more games than its runs scored and allowed usually buy: close wins tend not to last, so expect it to drift back.'), { foot: '<span>The eight luckiest and unluckiest</span>' + U.more(BP.href('standings', L, S), 'Standings') }) + '</div>';
       h += '</div></section>';
     }
 
@@ -141,15 +173,26 @@ function render(el, params) {
     if (hasGames) {
       const draw = w => {
         const list = w === 'next' ? next : w === 'results' ? results : today;
-        el.querySelector('#ov-gh').textContent = w === 'next' ? 'Next up' : w === 'results' ? 'Latest results' : 'Today';
-        el.querySelector('#ov-games').innerHTML = list.length ? list.slice(0, 9).map(c => BP.gameCard(c, { level: L, date: w !== 'today' })).join('') : QK.empty('No games', w === 'today' ? 'No games today: see the next ones.' : 'Nothing to show yet.');
+        const n = Math.min(9, list.length);
+        el.querySelector('#ov-gh').textContent = w === 'next' ? 'Next up' : w === 'results' ? 'Latest results' : (n ? (n === 1 ? 'One game' : n + ' games') + ' on the slate' : 'Today');
+        el.querySelector('#ov-games').innerHTML = list.length ? list.slice(0, 9).map(c => BP.gameCard(c, { level: L, date: w !== 'today', why: true })).join('') : QK.empty('No games', w === 'today' ? 'No games today: see the next ones.' : 'Nothing to show yet.');
       };
       draw(first);
       QK.seg(el.querySelector('#ov-when'), draw);
     }
     // World Series chances: ours first, the market a tick
-    if (titles.length && el.querySelector('#ov-ws')) el.querySelector('#ov-ws').innerHTML = QK.chances(titles.map(r => ({ label: BP.teamName(r.t), p: r.p, market: r.m, color: BP.teamInfo(r.t).colour, href: BP.teamHref(r.t, L, S), mark: U.team(r.t, L, S) })),
-      { limit: 12, marketName: 'Market (' + (mk && mk.champion && mk.champion.market ? U.srcName(mk.champion.market.sources) || 'reference' : 'reference') + ')' });
+    if (titles.length && el.querySelector('#ov-ws')) el.querySelector('#ov-ws').innerHTML = QK.chances(titles.map(r => ({ label: BP.teamName(r.t), p: r.p, href: BP.teamHref(r.t, L, S), mark: U.team(r.t, L, S) })),
+      { limit: 12, key: false });
+    /* How sure are we? (teaser): the game model's record from mlb/calibration.json, the full chart on the Model page */
+    const box = el.querySelector('#ov-sure');
+    const cb = box ? QK.calib.find(cal) : null;
+    if (box && cb && cb.bins.length) {
+      const big = cb.bins.slice().sort((a, b) => b.n - a.n)[0];
+      box.innerHTML = '<article class="qk-card" style="height:100%"><div class="qk-card-body"><div class="qk-kicker">How sure are we?</div><h3 style="margin:8px 0 6px">When we say ' + Math.round(big.mean_p * 100) + '%, it happens ' + Math.round(big.freq * 100) + '% of the time</h3>' +
+        '<p style="margin:0 0 6px;color:var(--ink-2)">Our most common call puts the home team at ' + Math.round(big.lo * 100) + '–' + Math.round(big.hi * 100) + '%. Across ' + QK.fmt.num(big.n) + ' games like that, the home team won ' + QK.fmt.pct(big.freq, 1) + '.</p>' +
+        QK.note('<b>Brier score ' + (isNum(cb.brier) ? cb.brier.toFixed(3) : '—') + '</b> over ' + QK.fmt.num(cb.n) + ' games: 0 is perfect, 0.25 is a coin flip. Baseball is close to random game to game, so small gains count.') +
+        '<a class="qk-more" style="display:inline-block;margin-top:14px" href="#/calibration">The full record</a></div></article>';
+    } else if (box) box.innerHTML = '';
     if (inPost && BP.charts && BP.charts.mlbBracket && el.querySelector('#ov-bk')) BP.charts.mlbBracket(el.querySelector('#ov-bk'), post, { level: L, narrow: true });
     // power ratings and the strength map
     if (haveRatings) {
@@ -187,7 +230,7 @@ function render(el, params) {
       drawLg(leagues[0]);
       if (leagues.length > 1) QK.seg(el.querySelector('#ov-lg'), drawLg);
     }
-    if (today.some(BP.isLive)) BP.liveRefresh([BP.ypath('markets.json', L, S)], 60000);
+    if (today.some(BP.isLive)) BP.liveRefresh([BP.ypath('season.json', L, S)], 60000);
     BP.setMeta(post && post.sims ? BP.int(post.sims) + ' bracket simulations' : '');
   });
 }

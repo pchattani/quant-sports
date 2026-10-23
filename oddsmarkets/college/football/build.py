@@ -1579,6 +1579,12 @@ def calibration_payload(ctx: dict) -> dict:
     cal = backtest.calibration(pipe)
     if not cal.get("ok"):
         return cal
+    # the kit's "How sure are we?" block (QK.calib.find reads metrics.model): the walk-forward bins and scores above
+    from oddsmarkets.common import calibration as CB
+    sm = (cal.get("summary") or {}).get("model") or {}
+    blk = CB.from_table(cal.get("calibration") or [], sm.get("n"), sm.get("brier"), sm.get("logloss"))
+    if blk:
+        cal["metrics"] = {"model": blk}
     try:
         sb = sim.backtest(pipe, ctx["comm"], n=4000)
         cal["sim_detail"] = sb.pop("per_season", [])
@@ -1681,6 +1687,19 @@ def similar_players(vals: dict[int, pd.DataFrame], current: int, k: int | None =
     return out
 
 
+def prev_ring(prev_cat: Any, pid: str, pos: str | None, season: int) -> dict:
+    """Last season's position percentiles for a current block (kit v3 rail rings, 23 Oct 2026): {"prev_pct_pos" (last
+    season's pct_pos, the same shape), "prev_peer" {"season", "pos", "gp", "qualified"}} when the player was qualified
+    at the same position last season, else {}. prev_cat: last season's players.json (packed or not)."""
+    from oddsmarkets.college import packing as PK
+    P = (PK.unpack(prev_cat) or {}).get("players") if isinstance(prev_cat, dict) else None
+    r = (P or {}).get(str(pid)) if isinstance(P, dict) else None
+    if not r or r.get("qualified") is False or not pos or r.get("pos") != pos or not r.get("pct_pos"):
+        return {}
+    return {"prev_pct_pos": r["pct_pos"], "prev_peer": {"season": season, "pos": r.get("pos"), "gp": r.get("gp"),
+                                                         "qualified": r.get("qualified") is not False}}
+
+
 def career_files(ctx: dict, out: Path, current: int, sizes: dict) -> int:
     seasons = [s for s in data.seasons_available() if current - 6 <= s <= current]
     vals = {}
@@ -1727,6 +1746,8 @@ def career_files(ctx: dict, out: Path, current: int, sizes: dict) -> int:
     # docs/_design/metrics/college.json, z within position and season over rate-qualified player-seasons, weighted
     # Euclidean (common.similar), k = 5, from the seasons loaded here (the last seven), never the player himself
     sim_map = similar_players(vals, current)
+    pc_path = out / str(current - 1) / "players.json"
+    prev_cat = json.loads(pc_path.read_text(encoding="utf-8")) if pc_path.exists() else None
     pdir = out / "players"
     n = 0
     keep = set()
@@ -1755,6 +1776,7 @@ def career_files(ctx: dict, out: Path, current: int, sizes: dict) -> int:
         if rows[-1][0] == current:
             current_block = {"season": current, "team": last["team"], "log": logs.get(pid, []), "value": value_row(last),
                              "fantasy": (ctx.get("fantasy_proj") or {}).get(pid)}
+            current_block.update(prev_ring(prev_cat, pid, last["pos"], current - 1))
         obj = {"ok": True, "id": pid, "name": info.get("name") or last.get("name"), "pos": last["pos"], "level": LEVEL,
                "updated_at": data.now_iso(), "class": info.get("class"), "height_in": info.get("height_in"),
                "weight_lb": info.get("weight_lb"), "hometown": info.get("hometown"), "seasons": seasons_rows,

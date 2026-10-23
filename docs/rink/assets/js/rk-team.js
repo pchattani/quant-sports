@@ -1,4 +1,5 @@
-/* The Quant Rink — the team page (#/team/<abbr>), Design System 2.0.
+/* The Quant Rink — the team page (#/team/<abbr>), kit v3 "Matchday": a crumb, the header with "The short version"
+ * (record, our chances, what the club is best at and its weak spot, in plain English), then as below.
  *
  * Team header in the club colour (record, points, streak, rank; our rating and chances), stat tiles with our playoff
  * and Cup chances and the projected full-season points with the simulation's 90% range; Overview: the percentile
@@ -25,12 +26,32 @@ function yTitleLeft(node) {
   fix();
 }
 
-function header(abbr, S, x, row, sim) {
+/* "The short version" for a club: the record, our playoff and Cup chances, then (from 10 games, the spec's minimum
+   for ranks) what it does best among the 32 clubs and its weak spot. Small samples are named. */
+const NUMW = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
+function lc(x) { return /^[A-Z][a-z]/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x; }
+function shortTeam(abbr, x, sim, tr) {
+  const rec = x.record || {}, gp = rec.gp || 0;
+  const nm = RK.teamShort(abbr);
+  if (!gp) return sim && isNum(sim.p_playoffs) ? 'No games yet. Before the first puck drop we give the ' + nm + ' a ' + U.pct(sim.p_playoffs) + ' chance of making the playoffs.' : null;
+  let t = 'The ' + nm + ' are ' + RK.record(rec.w, rec.l, rec.otl) + (isNum(rec.pts) ? ', with ' + rec.pts + ' point' + (rec.pts === 1 ? '' : 's') + ' from ' + gp + ' game' + (gp === 1 ? '' : 's') : '') + '.';
+  if (sim && isNum(sim.p_playoffs)) t += ' We give them a ' + U.pct(sim.p_playoffs) + ' chance of the playoffs' + (isNum(sim.p_cup) ? ' and ' + U.pct(sim.p_cup, 1) + ' to win the Cup' : '') + '.';
+  const pc = (tr && tr.p) || {};
+  const rows = U.TEAM_SET.filter(m => m[0] !== 'pts_pct' && m[0] !== 'gd_g' && isNum(pc[m[0]])).map(m => [m[0], pc[m[0]], m[1]]);
+  if (gp >= U.TEAM_MIN_GP && rows.length) {
+    const top = rows.slice().sort((a, b) => b[1] - a[1])[0], low = rows.slice().sort((a, b) => a[1] - b[1])[0];
+    if (top[1] >= 70) t += ' Best at ' + lc(top[2]) + ' (' + QK.ordinal(Math.round(top[1])) + ' percentile of the 32 clubs).';
+    if (low[1] <= 30 && low[0] !== top[0]) t += ' The weak spot: ' + lc(low[2]) + ', in the ' + QK.ordinal(Math.round(low[1])) + ' percentile.';
+  } else if (gp < U.TEAM_MIN_GP) t += ' ' + (NUMW[gp] || gp) + ' game' + (gp === 1 ? ' is' : 's is') + ' a small sample, so the ranks start after ' + U.TEAM_MIN_GP + '.';
+  return t;
+}
+function header(abbr, S, x, row, sim, tr) {
   const rec = x.record || {};
-  return QK.playerHeader({ name: RK.teamName(abbr), split: false, pos: (x.conference || RK.teamConf(abbr)) + ' Conference', kicker: RK.seasonLabel(S),
+  return QK.playerHeader({ name: RK.teamName(abbr), split: false, pos: (x.conference || RK.teamConf(abbr)) + ' Conference', kicker: RK.seasonLabel(S) + (rec.gp ? ' · ' + rec.gp + ' game' + (rec.gp === 1 ? '' : 's') + ' in' : ''),
     team: { name: (x.division || RK.teamDiv(abbr)) + ' Division', abbr: RK.teamAbbr(abbr), colour: RK.teamColourRaw(abbr) },
     meta: [['Record', RK.record(rec.w, rec.l, rec.otl)], ['Points', (isNum(rec.pts) ? rec.pts : '—') + ' in ' + (rec.gp || 0)], row && row.streak ? ['Streak', row.streak] : null, row && row.league_rank ? ['League', RK.ordinal(row.league_rank)] : null],
-    stats: [{ label: 'Rating', value: U.signed((x.units || {}).rating, 2) }, { label: 'Playoffs', value: sim && isNum(sim.p_playoffs) ? U.pct(sim.p_playoffs) : '—' }, { label: 'Cup', value: sim && isNum(sim.p_cup) ? U.pct(sim.p_cup, 1) : '—' }] });
+    stats: [{ label: 'Rating', value: U.signed((x.units || {}).rating, 2) }, { label: 'Playoffs', value: sim && isNum(sim.p_playoffs) ? U.pct(sim.p_playoffs) : '—' }, { label: 'Cup', value: sim && isNum(sim.p_cup) ? U.pct(sim.p_cup, 1) : '—' }],
+    short: shortTeam(abbr, x, sim, tr) });
 }
 
 function rosterRows(abbr, S, x, val, value) {
@@ -118,14 +139,15 @@ function render(el, params, state) {
     const sim = (RK.ok(sj) && sj.sim && sj.sim.teams && sj.sim.teams[abbr]) || x.sim || null;
     document.title = RK.teamName(abbr) + ' · ' + RK.seasonLabel(S) + ' · ' + RK.SITE;
     const tabs = [{ key: 'overview', label: 'Overview', href: RK.teamHref(abbr, S) }, { key: 'detail', label: 'Detail: lines, deployment, shot maps, goalies, trade ledger', href: RK.teamHref(abbr, S) + (RK.sq(S) ? '&' : '?') + 'view=detail' }];
-    el.innerHTML = '<div class="qk-kicker" style="margin-bottom:10px"><a href="' + RK.href('teams', S) + '">← All teams</a></div>' + header(abbr, S, x, row, sim) + '<div style="margin-top:var(--sp-4)"></div>' + U.tabsHTML(tabs, view) + '<div id="tp-body"></div>';
+    const TS = U.teamSet(tj, RK.ok(sj) ? sj : null);
+    const tr = TS.by[abbr] || { p: {}, v: {} };
+    const crumb = '<nav class="rk-crumb" aria-label="Breadcrumb"><a href="#/">Hockey</a><span aria-hidden="true">›</span><a href="' + esc(RK.href('teams', S)) + '">Teams</a><span aria-hidden="true">›</span>' + esc(RK.teamName(abbr)) + '</nav>';
+    el.innerHTML = crumb + header(abbr, S, x, row, sim, tr) + '<div style="margin-top:var(--sp-6)"></div>' + U.tabsHTML(tabs, view) + '<div id="tp-body"></div>';
     const body = el.querySelector('#tp-body');
     if (view === 'detail') return U.legacy('team', body, params, state);
 
     const val = cur ? res[3] : null, needs = cur && RK.ok(res[4]) ? res[4] : null, tx = cur && RK.ok(res[5]) ? res[5] : null, M = cur ? res[6] : null;
     const R = rosterRows(abbr, S, x, RK.ok(val) ? val : null, RK.ok(res[2]) ? res[2] : null);
-    const TS = U.teamSet(tj, RK.ok(sj) ? sj : null);
-    const tr = TS.by[abbr] || { p: {}, v: {} };
     const sched = x.schedule || [];
     const done = sched.filter(g => g.result), next = sched.filter(g => !g.result && g.status !== 'final').slice(0, 6);
 
@@ -138,15 +160,17 @@ function render(el, params, state) {
     ]);
     let h = '<div class="rk-kpis">' + tiles + '</div><div class="qk-grid">' +
       '<div class="qk-span-5">' + teamCard(abbr, TS) + '</div>' +
-      '<div class="qk-span-7"><div class="rk-stack">' + U.card2('Form through the season', 'Rolling 10-game shares at 5v5 (xGF%, CF%) and of all goals (GF%); above 50% the club is on top', U.chart('tp-form', 300, 'Rolling form')) +
-      U.card2('Results v process', 'Cumulative goal difference against cumulative expected-goal difference, game by game', U.chart('tp-cum', 260, 'Goal difference against expected goal difference')) + '</div></div></div>';
+      '<div class="qk-span-7"><div class="rk-stack">' + U.card2('Form through the season', 'Rolling 10-game shares at 5v5 (xGF%, CF%) and of all goals (GF%); above 50% the club is on top', U.chart('tp-form', 300, 'Rolling form') +
+        QK.note('<b>Which line matters most?</b> The expected-goal share (the thick line) predicts the next games better than the goal share: goals swing on a few bounces, chances much less.')) +
+      U.card2('Results v process', 'Cumulative goal difference against cumulative expected-goal difference, game by game', U.chart('tp-cum', 260, 'Goal difference against expected goal difference') +
+        QK.note('When the solid line runs above the dashed one, the club has done better than its chances suggest. Over a season that gap usually shrinks.')) + '</div></div></div>';
 
     if (needs && (needs.grades || []).length) {
       const gr = needs.grades.map(g => '<div class="rk-flex" style="gap:8px;min-width:0"><span class="rk-grade" data-g="' + esc(g.grade) + '">' + esc(g.grade) + '</span><div style="min-width:0"><div style="font-weight:600">' + esc(g.label) + '</div><div class="qk-muted" style="font-size:var(--fs-xs)">' + RK.ordinal(g.rank) + ' of ' + g.n + ' · ' + U.f(g.value, 1) + ' GAR</div></div></div>').join('');
       const str = (needs.strengths || []).map(s => '<li><span class="rk-grade" data-g="' + esc(s.grade) + '">' + esc(s.grade) + '</span><div><b>' + esc(s.label) + '</b><div class="s">' + esc(s.evidence || '') + '</div></div></li>').join('');
       const wk = (needs.weaknesses || []).map(w => '<li style="align-items:flex-start"><span class="rk-grade" data-g="' + esc(w.grade) + '">' + esc(w.grade) + '</span><div style="min-width:0"><b>' + esc(w.label) + '</b><div class="s">' + esc(w.evidence || '') + '</div>' +
         ((w.targets || []).length ? '<div class="s" style="margin-top:4px">Ways to improve: ' + w.targets.slice(0, 3).map(t => '<a class="rk-link" href="' + RK.playerHref(t.id) + '">' + esc(t.name) + '</a> (' + esc(RK.teamAbbr(t.team)) + ', ' + U.signed(t.gain_season, 1) + ' goals a season' + (isNum(t.d_playoffs) ? ', playoffs ' + QK.fmt.pp(t.d_playoffs) : '') + ')').join(', ') + '</div>' : '') + '</div></li>').join('');
-      h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Roster strength', title: 'Strengths and needs', sub: 'Projected value by position and unit against the other 31 clubs; the players listed under a need are the ones who would help most there.' }) +
+      h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Roster strength', title: 'What they do well, and what they need', sub: 'Projected value by position and unit against the other 31 clubs; the players listed under a need are the ones who would help most there.' }) +
         '<div class="qk-grid"><div class="qk-span-4">' + U.card2('Grades', 'A to F against the league', '<div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">' + gr + '</div>') + '</div>' +
         '<div class="qk-span-4">' + U.card2('Strengths', '', '<ul class="rk-list">' + str + '</ul>', { flush: true }) + '</div>' +
         '<div class="qk-span-4">' + U.card2('Needs', '', '<ul class="rk-list">' + wk + '</ul>', { flush: true }) + '</div></div>' + (needs.note ? '<p class="rk-note">' + esc(needs.note) + '</p>' : '') + '</section>';
@@ -157,7 +181,7 @@ function render(el, params, state) {
       sub: R.current ? 'Today’s roster (rosters, recalls, trades and injured reserve as of the last refresh), with season numbers, our value (WAR for the rest of this season and over four seasons)' + (M ? ' and each player’s chance of not being in the lineup next season.' : '.') : 'Everyone who played for the club in ' + RK.seasonLabel(S) + '.' }) +
       (M ? U.deadlineLine(M) : '') + '<div class="qk-card">' + (M ? '<div class="rk-keys-row">' + U.moveKeys(M) + '</div>' : '') + '<div id="tp-roster"></div></div></section>';
 
-    h += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-' + (tx ? 7 : 12) + '">' + U.card2('Schedule', next.length ? 'Next games with our win chance; then results' : 'Results, game by game, with our pre-game win chance', '<div id="tp-sched"></div>', { flush: true }) + '</div>' +
+    h += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-' + (tx ? 7 : 12) + '">' + U.card2(next.length ? 'Coming up, and how it went' : 'How it went', next.length ? 'Next games with our win chance; then results' : 'Results, game by game, with our pre-game win chance', '<div id="tp-sched"></div>', { flush: true, foot: '<span>How sure are we? 60% means the club loses a game like that about 4 times in 10.</span>' }) + '</div>' +
       (tx ? '<div class="qk-span-5">' + U.card2('Recent moves', 'Transactions of the last twelve months (ESPN)', '<div id="tp-moves"></div>', { flush: true, foot: '<span>Trades are graded on Value &amp; Moves</span><a href="#/value?tab=moves&team=' + esc(abbr) + '">All moves →</a>' }) + '</div>' : '') + '</div></section>';
     body.innerHTML = h;
 

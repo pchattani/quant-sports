@@ -677,6 +677,36 @@ def peer_floor(year: int) -> int:
 PEER_RULE = ("Race drivers with at least `peer_floor` starts: 8 in a finished season of 16+ rounds, else max(3, min(8, "
              "ceil(0.35 x rounds completed))); drivers below it get no peer percentile and are nobody's similar driver.")
 
+def prev_peer_pct(cat: dict | None, driver: str) -> dict:
+    """Last season's peer percentiles for a career file's current block (kit v3 rail rings, 23 Oct 2026):
+    {"prev_pct_pos": that season's pct_peer, "prev_peer": {"year", "races", "floor", "qualified"}} when the driver met
+    that season's peer floor, else {}. A catalogue built before pct_peer (22 Oct 2026) is ranked here the same way
+    (percentiles among the drivers with races >= its peer floor), as the front end does (v2.js V.peer)."""
+    rows = (cat or {}).get("drivers") or {}
+    r = rows.get(driver)
+    if not r:
+        return {}
+    y = (cat or {}).get("year")
+    fl = (cat or {}).get("peer_floor") or (peer_floor(int(y)) if y else PEER_MIN_FULL)
+    if any(x.get("pct_peer") for x in rows.values()):
+        pc = r.get("pct_peer") if r.get("qualified") else None
+    elif (r.get("races") or 0) >= fl:
+        qual = [d for d, x in rows.items() if (x.get("races") or 0) >= fl]
+        pc = {}
+        for m in (cat or {}).get("metrics") or METRICS:
+            if m.get("key") in (None, "races"):
+                continue
+            k = m["key"]
+            x = percentiles({d: (rows[d].get("values") or {}).get(k) for d in qual}, bool(m.get("lower")))
+            if driver in x:
+                pc[k] = x[driver]
+    else:
+        pc = None
+    if not pc:
+        return {}
+    return {"prev_pct_pos": dict(pc), "prev_peer": {"year": y, "races": r.get("races"), "floor": fl, "qualified": True}}
+
+
 # Similar drivers (the spec's recipe): the eight headline metrics, z-scored within each season among its qualifying
 # drivers, weighted by season-to-season r floored at 0.2; weighted Euclidean distance; the 5 nearest driver-seasons from
 # 1996 on, the driver's own seasons excluded. A feature missing for either driver-season (a pointless team has no

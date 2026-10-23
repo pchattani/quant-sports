@@ -49,6 +49,7 @@ function renderTeams(el, params, state) {
   const k = K();
   const L = k.L(params, state);
   el.innerHTML = QK.sectionHead({ kicker: 'Teams · ' + k.LN(L), title: 'Every club', sub: 'Records, our ratings and chances, and each club’s percentile on the team metrics; add any metric as a column.' }) +
+    QK.note('A <b>team rating of +1.0</b> means the club scores about one run a game more than it allows against an average opponent: over a season that is roughly 16 extra wins.') +
     '<div class="card"><div class="card-header">' + k.LN(L) + ' teams <span class="card-sub" id="tm-sub">Loading…</span></div>' +
     '<div class="lab-controls gq-controls"><label>League<select id="tm-lg"><option value="">Both leagues</option></select></label><label>Add a metric<select id="tm-extra"><option value="">—</option></select></label><label>&nbsp;<button type="button" class="gq-btn" id="tm-clear">Clear added</button></label></div>' +
     '<div id="tm-chips" class="gq-chips"></div><div id="tm-table">' + k.muted('Loading…') + '</div><div class="pg-note gq-note" id="tm-note"></div></div>' +

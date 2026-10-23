@@ -1,7 +1,7 @@
 /* The Quant Bullpen — games of a day (#/<L>/games[/<date>]).
  *
  *   a date picker (input, previous/next game day, a strip of nearby game days);
- *   the day's games as v2 cards (our win chance, records and form as of that morning, the market a grey tick) or
+ *   the day's games as v2 cards (our win chance, records and form as of that morning, a one-line reason; no market) or
  *   as a table (our favourite, expected runs, the result, and whether our favourite won); a one-line summary.
  *
  * Reads <L>/<S>/schedule.json ({"games": [GAME_CARD]}) and, for today, the fresher cards in index.json. */
@@ -117,7 +117,7 @@ function render(el, params) {
     const sum = summary(games);
     body.innerHTML = QK.sectionHead({ kicker: 'Scoreboard · ' + BP.levelName(L), title: BP.fmtDate(day), sub: games.length + ' game' + (games.length === 1 ? '' : 's') + (sum ? ' · ' + sum : '') }) +
       '<div class="qk-card bp-daynav">' + nav + '</div><div id="gd-list"></div>' +
-      '<p class="bp-note">Our chance comes from the plate-appearance simulation with the probable starters and the posted (or projected) lineups. Records and form are as they stood that morning. A grey tick on a card marks the market (Kalshi and Polymarket), for reference.</p>';
+      '<p class="bp-note">Our chance comes from the plate-appearance simulation with the probable starters and the posted (or projected) lineups. Records and form are as they stood that morning. The italic line on each card says why it is worth a look.</p>';
     const draw = () => {
       const box = document.getElementById('gd-list');
       if (!box) return;
@@ -125,7 +125,7 @@ function render(el, params) {
       if (VIEW === 'table') { box.innerHTML = tableView(games, L, S); BP.sortable(box); return; }
       const live = games.filter(BP.isLive), pre = games.filter(c => BP.gameState(c) === 'pre'), fin = games.filter(BP.isFinal);
       const other = games.filter(c => live.indexOf(c) < 0 && pre.indexOf(c) < 0 && fin.indexOf(c) < 0);
-      const block = (t, l) => (l.length ? '<div class="day-head">' + esc(t) + '</div><div class="bp-gc-grid">' + l.map(c => BP.gameCard(c, { level: L, season: S })).join('') + '</div>' : '');
+      const block = (t, l) => (l.length ? '<div class="day-head">' + esc(t) + '</div><div class="bp-gc-grid">' + l.map(c => BP.gameCard(c, { level: L, season: S, why: true })).join('') + '</div>' : '');
       box.innerHTML = block('Live', live) + block('Still to play', pre) + block('Final', fin) + block('Postponed or suspended', other);
     };
     draw();

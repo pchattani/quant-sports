@@ -6,6 +6,8 @@
  * or league-wide. The other tabs render the pre-redesign views: season value (value.js), the multi-season valuation
  * (?tab=val), moves and trade grades (moves.js), the trade simulator (trade.js, its state in &t=&m=).
  *
+ * Kit v3 "Matchday": friendly section titles and "i" notes (QK.note) on WAR, GAR and the trade grades.
+ *
  * Reads <S>/value.json, <S>/deals.json and <S>/movement.json. */
 (function (RK) {
 'use strict';
@@ -37,9 +39,11 @@ function board(node, S) {
       { label: 'Goals per win', value: v.currency && isNum(v.currency.goals_per_win) ? U.f(v.currency.goals_per_win, 2) : '—', sub: 'the exchange rate from GAR to WAR', tip: 'How many goals above replacement buy one win this season' }
     ];
     let h = '<div class="rk-kpis">' + QK.stats(k) + '</div>' +
+      QK.note('<b>What is WAR?</b> Wins above replacement: how many more wins a team gets from the player than from a replacement-level call-up. <b>GAR</b> is the same in goals' + (v.currency && isNum(v.currency.goals_per_win) ? ': this season about ' + U.f(v.currency.goals_per_win, 1) + ' goals buy one win' : '') + '.', { cls: 'rk-note-top' }) +
+      QK.sectionHead({ kicker: 'This season', title: 'Who is worth the most', sub: 'Our value model on qualified players: everything a player adds at even strength, on special teams and in net, in one number.' }) +
       '<div class="qk-grid"><div class="qk-span-7">' + U.card2('Most valuable this season', 'Wins above replacement (Rink value); qualified players', U.chart('vb-top', 440, 'Most valuable players'), { foot: '<span>' + esc(v.note || '') + '</span><a href="#/value?tab=season">Full leaderboard →</a>' }) + '</div>' +
       '<div class="qk-span-5">' + U.card2('Value v ice time', 'GAR against minutes played: up and left is value in fewer minutes', U.chart('vb-sc', 440, 'Value against ice time')) + '</div></div>';
-    h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'By position', title: 'Best by position', sub: 'Top five qualified players at each position by WAR this season.' }) + '<div class="qk-grid">' +
+    h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'By position', title: 'The best at each position', sub: 'Top five qualified players at each position by WAR this season.' }) + '<div class="qk-grid">' +
       POS.map(p => {
         const ids = ((v.best || {})[p[0]] || []).slice(0, 5);
         const list = ids.map(id => by[id]).filter(Boolean);
@@ -47,6 +51,7 @@ function board(node, S) {
       }).join('') + '</div></section>';
     if (dl) {
       h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Trades', title: 'Who won the trades', sub: 'Every NHL trade of the last twelve months, valued (multi-season WAR, picks from our pick-value curve) at the time and with what has happened since.', actions: '<a class="qk-btn" href="#/value?tab=moves">All moves and grades →</a>' }) +
+        QK.note('<b>How the grades work.</b> Each side gets a grade from its share of the value that changed hands: an A means it got at least 65% of it. Grades move as the players play, so a deal can look different a year on.') +
         '<div class="qk-grid"><div class="qk-span-6">' + U.card2('Net value from trades, by club', 'Value received minus value sent, current view (WAR)', U.chart('vb-net', 620, 'Net trade value by club')) + '</div>' +
         '<div class="qk-span-6">' + U.card2('The best-graded deals', 'Largest value moved, graded for each side (A ≥ 65% of the value)', '<div id="vb-deals"></div>', { flush: true }) + '</div></div></section>';
     }
@@ -88,7 +93,8 @@ function nextTab(node, S, team0) {
     ]) + '</div>' +
       QK.sectionHead({ kicker: 'By ' + M.horizon, title: U.MOVE_HEAD, html: true, sub: esc((d.notes || [])[2] || '') + ' <a href="#/model?tab=moves">How it works and how it tested →</a>',
         actions: '<select class="qk-select" id="mv-team" aria-label="Club"><option value="">All clubs</option>' + teams.map(t => '<option value="' + esc(t) + '"' + (t === team ? ' selected' : '') + '>' + esc(RK.teamName(t)) + '</option>').join('') + '</select>' }) +
-      U.deadlineLine(M) + '<div class="qk-card"><div class="rk-keys-row">' + U.moveKeys(M) + '</div><div id="mv-board"></div></div>';
+      U.deadlineLine(M) + '<div class="qk-card"><div class="rk-keys-row">' + U.moveKeys(M) + '</div><div id="mv-board"></div></div>' +
+      (isNum(br.next) ? QK.note('<b>How to read a chance here.</b> About ' + U.pct(br.next) + ' of players are not in the same lineup a season later, so that is the middle. A player at 60% stays put about 4 times in 10. The chance counts trades, signings elsewhere, waivers and time in the minors.') : '');
     const draw = t => {
       const list = (t ? top.filter(r => r.team === t) : top.slice(0, 100)).map(r => Object.assign({ sub: [r.pos, isNum(r.age) ? 'age ' + Math.floor(r.age) : ''].filter(Boolean).join(' · ') }, r));
       QK.leaderboard(node.querySelector('#mv-board'), { dense: true, rank: true, maxHeight: 720, rowHref: r => RK.playerHref(r.pid), columns: [
@@ -109,7 +115,7 @@ function page(el, params, state) {
   const q = (params.query || {});
   const tab = TABS.map(t => t[0]).indexOf(q.tab) >= 0 ? q.tab : 'board';
   const tabs = TABS.map((t, i) => ({ key: t[0], label: t[1], href: '#/value' + (i ? '?tab=' + t[0] : '') + (U.sq(S) && (t[0] === 'board' || t[0] === 'season') ? (i ? '&' : '?') + U.sq(S) : '') }));
-  const body = U.section(el, { section: 'value', title: 'Value & Moves', sub: 'What every player is worth on the ice (goals and wins above replacement), who is likely to move next, the multi-season valuation, every trade graded, and a simulator to try your own.', tabs: tabs, active: tab });
+  const body = U.section(el, { section: 'value', title: 'Value & Moves', sub: 'What every player is worth on the ice, who is likely to move next, what a player is worth over the next four seasons, every trade graded, and a simulator to try your own.', tabs: tabs, active: tab });
   if (tab === 'board') return board(body, S);
   if (tab === 'next') return nextTab(body, S, q.team);
   if (tab === 'season' || tab === 'val') return U.legacy('value', body, params, state, { tab: tab });

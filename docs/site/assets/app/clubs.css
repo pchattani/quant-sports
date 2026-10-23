@@ -80,3 +80,7 @@
 /* who moves next (FB.moves views in value.js render into these hosts) */
 #cl-moves:empty { display: none; }
 #cl-moves { margin-bottom: var(--sp-6); }
+
+/* kit v3: "The short version" beside the club's name */
+.fb-cl-short { flex: 1 1 320px; max-width: 460px; margin-left: auto; min-width: 0; }
+@media (max-width: 720px) { .fb-cl-short { max-width: none; margin-left: 0; } }

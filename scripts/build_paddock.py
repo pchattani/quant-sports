@@ -381,8 +381,13 @@ def main(argv: list[str] | None = None) -> int:
     b.write_or_fail("markets.json", "markets", lambda: ssn.markets_payload(current, champ_block, cur.get("next"), fetch=not args.no_market))
     if not args.no_careers:
         def careers():
+            from oddsmarkets.f1.analytics import drivers as drv
             cs = ssn.careers(years, shared["standings"], shared["elo"], finished_years)
+            on_grid = set(((cats.get(current) or {}).get("drivers") or {}))
             for d, c in cs.items():
+                prev = drv.prev_peer_pct(cats.get(current - 1), d) if d in on_grid else {}
+                if prev:                                  # last season's peer percentiles: the rail's rings
+                    c["current"] = {"year": current, **prev}
                 b.write(f"drivers/{d}.json", c)
             return len(cs)
         n = b.step("careers", careers, 0)

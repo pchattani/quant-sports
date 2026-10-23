@@ -431,11 +431,11 @@ LIVE.overview = function (el, body, c, d0, q, seasons) {
     var upcoming = fx.filter(function (f) { return f.status === 'scheduled' || f.status === 'live'; });
     body.innerHTML = FB.kpis(kp) +
       FB.grid(
-        FB.card('Next fixtures', 'Our home, draw and away chance for each.', upcoming.length ? '<div class="fb-fxlist">' + upcoming.slice(0, 8).map(function (f) { return FB.fixtureRow(f, { slug: c.slug, date: true, round: true }); }).join('') + '</div>' : cardMsg('No fixtures scheduled.'), { span: 6, foot: '<span></span><a href="' + esc(FB.href.comp(c.slug, 'fixtures')) + '">All fixtures →</a>' }) +
+        FB.card('Coming up', 'Our home, draw and away chance for each; kick-off in your time zone.', upcoming.length ? '<div class="fb-fxlist">' + upcoming.slice(0, 8).map(function (f) { return FB.fixtureRow(f, { slug: c.slug, date: true, round: true }); }).join('') + '</div>' : cardMsg('No fixtures scheduled.'), { span: 6, foot: '<span></span><a href="' + esc(FB.href.comp(c.slug, 'fixtures')) + '">All fixtures →</a>' }) +
         FB.card('Latest results', 'Score and xG; the score opens the match centre.', played.length ? '<div class="fb-fxlist">' + played.slice(-8).reverse().map(function (f) { return FB.fixtureRow(f, { slug: c.slug, date: true, round: true }); }).join('') + '</div>' : cardMsg('No results yet.'), { span: 6, foot: '<span></span><a href="' + esc(FB.href.comp(c.slug, 'fixtures', { view: 'played' })) + '">All results →</a>' })
       , 'fb-mt') +
       FB.grid(
-        FB.card('The race', last ? 'This edition is over.' : 'Our chance of winning ' + esc(winnerWord(c)) + ', from ' + FB.int(m.n_sims || 0) + ' simulated seasons.', '<div id="co-race"></div>', { span: 7, foot: last ? '' : '<span>Top ten</span><a href="' + esc(FB.href.comp(c.slug, 'odds')) + '">Every club\'s chances →</a>' }) +
+        FB.card('Who wins ' + esc(winnerWord(c)), last ? 'This edition is over.' : 'Our chance of winning ' + esc(winnerWord(c)) + ', from ' + FB.int(m.n_sims || 0) + ' simulated seasons.', '<div id="co-race"></div>', { span: 7, foot: last ? '' : '<span>Top ten</span><a href="' + esc(FB.href.comp(c.slug, 'odds')) + '">Every club\'s chances →</a>' }) +
         FB.card('Leaders', 'This season, every player in the competition.', '<div id="co-leaders" class="fb-co-minis"></div>', { span: 5, foot: '<span></span><a href="' + esc(FB.href.comp(c.slug, 'players')) + '">All players →</a>' })
       , 'fb-mt') +
       '<div id="co-hist-wrap"></div>' +
@@ -448,7 +448,9 @@ LIVE.overview = function (el, body, c, d0, q, seasons) {
     var rb = $(el, 'co-race');
     if (last) rb.innerHTML = cardMsg('This edition is over' + (champ ? ': ' + esc(champ) + ' won it' : '') + '. The next edition is not in the data yet, so there is nothing to simulate.');
     else if (m.field_partial) rb.innerHTML = cardMsg('Winner chances appear once the top flight is in the draw.');
-    else if (race.length) rb.innerHTML = chanceList(ctx, c, race, { limit: 10, oursName: 'Our chance of winning ' + winnerWord(c) });
+    else if (race.length) rb.innerHTML = chanceList(ctx, c, race, { limit: 10, oursName: 'Our chance of winning ' + winnerWord(c) }) +
+      FB.note(race[0].p >= 0.5 ? 'Even at ' + FB.pct(race[0].p) + ', ' + esc(race[0].team) + ' miss out about ' + Math.max(1, Math.round(10 * (1 - race[0].p))) + ' times in 10. The bars are our chances from the simulated seasons.'
+        : 'No one is better than a coin flip yet: ' + esc(race[0].team) + ' lead the way at ' + FB.pct(race[0].p) + '. The bars are our chances from the simulated seasons.');
     else rb.innerHTML = cardMsg(m.unsimulated ? 'National-team competitions are not simulated.' : 'No simulation for this competition yet.');
     // leaders
     var mini = function (key, label, fmt) {
@@ -463,7 +465,7 @@ LIVE.overview = function (el, body, c, d0, q, seasons) {
     // run-by-run
     var snaps = ((d.history || {}).snapshots || []).filter(function (s) { return s.title; });
     if (snaps.length >= 2 && !last) {
-      $(el, 'co-hist-wrap').innerHTML = '<div class="fb-mt">' + FB.card('The race over time', 'Our chance of winning ' + esc(winnerWord(c)) + ' after each model run (hourly), the six likeliest clubs.', FB.chartBox('co-hist', 300, 'Our title chances over time'), { foot: '<span>' + snaps.length + ' model runs</span><a href="' + esc(FB.href.comp(c.slug, 'odds', { view: 'history' })) + '">Every series →</a>' }) + '</div>';
+      $(el, 'co-hist-wrap').innerHTML = '<div class="fb-mt">' + FB.card('How the race has moved', 'Our chance of winning ' + esc(winnerWord(c)) + ' after each model run (hourly), the six likeliest clubs.', FB.chartBox('co-hist', 300, 'Our title chances over time'), { foot: '<span>' + snaps.length + ' model runs</span><a href="' + esc(FB.href.comp(c.slug, 'odds', { view: 'history' })) + '">Every series →</a>' }) + '</div>';
       historyChart($(el, 'co-hist'), snaps, 'title', 6, 'Chance of winning');
     }
   });
@@ -1030,6 +1032,7 @@ LIVE.power = function (el, body, c, d0) {
         FB.card('Power ratings', 'Our rating: expected points a game against an average opponent at a neutral venue, shown against this competition\'s average club.', FB.chartBox('co-pr', Math.max(300, rows.length * 20 + 50), 'Power ratings'), { span: 5 }) +
         FB.card('Results v process', 'Points a game against expected-goal difference a game. Right of centre: creates more than it concedes; above the line: wins more than the average club.', hasProc ? FB.chartBox('co-rvp', 420, 'Points per game against xG difference per game') : cardMsg('No xG coverage for this season yet.'), { span: 7 })
       ) +
+      '<div class="fb-mt">' + FB.note('<b>Our rating</b> is the points a game we would expect a club to take against an average side in this competition at a neutral ground: roughly 2 is title form and 1 a relegation fight. <b>Luck</b> is points won minus the points the chances (xG) deserved; it rarely lasts.') + '</div>' +
       '<div class="fb-mt">' + FB.card('Ratings table', esc(n.strength_ppg || 'Expected points per game against an average opponent at a neutral venue.'), '<div id="co-pw"></div>', { flush: true }) + '</div>' +
       '<div class="fb-mt">' + FB.grid(
         FB.card('Luck: points against what the xG deserved', 'Right of zero: more points than the chances deserved; left: fewer.', FB.chartBox('co-luck', Math.max(300, played.length * 20 + 40), 'Luck'), { span: 6 }) +

@@ -4,6 +4,8 @@
  * schedule strength for the next four weeks (games per club and week), the rankings with position filters and
  * the backtest. Tools: the pre-redesign fantasy page (scoring weights, categories, weekly planner, goalie starts).
  *
+ * Kit v3 "Matchday": friendly section titles and "i" notes (QK.note) on the projection, VOR and the schedule.
+ *
  * Reads <S>/fantasy.json (current season). Points use our default weights (fantasy.json "points"). */
 (function (RK) {
 'use strict';
@@ -36,12 +38,15 @@ function board(node) {
       return s(b) - s(a) || a.localeCompare(b);
     });
     node.innerHTML = '<div class="rk-kpis">' + QK.stats(k) + '</div>' +
+      QK.sectionHead({ kicker: 'This week', title: 'Who to pick up, and who to hold', sub: 'Our picks of the week from the projections, ice time and the luck model, then the rest-of-season leaders.' }) +
       '<div class="qk-grid"><div class="qk-span-5">' + U.card2('This week\'s picks', 'From our projections, ice time and luck model', picks.length ? picks.map(p => '<div class="rk-pick"><span class="qk-badge' + (p.kind === 'Add' || p.kind === 'Breakout' ? ' accent' : '') + '" style="flex:none;min-width:70px;justify-content:center">' + esc(p.kind) + '</span><div style="min-width:0">' + U.playerEnt(p.id, p.name, p.team, p.pos) + '<div class="why">' + esc(p.why || '') + '</div></div></div>').join('') : QK.empty('No picks this week'), { flush: true }) + '</div>' +
       '<div class="qk-span-7">' + U.card2('Rest-of-season leaders', 'Projected fantasy points for the rest of the season (our default scoring)', U.chart('fy-top', 470, 'Projected rest-of-season points')) + '</div></div>' +
-      '<section class="qk-section"><div class="qk-grid"><div class="qk-span-5">' + U.card2('Schedule: games per week', 'Clubs with more games give their players more chances; sorted by games in the four weeks', U.chart('fy-wk', Math.max(400, teams.length * 18 + 60), 'Games per club and week')) + '</div>' +
+      '<section class="qk-section">' + QK.sectionHead({ kicker: 'Planning ahead', title: 'The next four weeks', sub: 'Which clubs play the most, and the full rankings by position.' }) +
+      '<div class="qk-grid"><div class="qk-span-5">' + U.card2('Schedule: games per week', 'Clubs with more games give their players more chances; sorted by games in the four weeks', U.chart('fy-wk', Math.max(400, teams.length * 18 + 60), 'Games per club and week') +
+        QK.note('Four games in a week instead of three is a third more chances to score: often the tie-breaker between two similar options.')) + '</div>' +
       '<div class="qk-span-7">' + U.card2('Rankings', 'Rest-of-season value over replacement at the position; filter by position', '<div class="qk-chips" id="fy-pos" role="group" aria-label="Position" style="padding:0 0 10px">' +
         ['All', 'C', 'L', 'R', 'D', 'G'].map((p, i) => '<button type="button" class="qk-chip" aria-pressed="' + (i === 0) + '" data-value="' + p + '">' + p + '</button>').join('') + '</div><div id="fy-tab"></div>') + '</div></div></section>' +
-      (f.note ? '<p class="rk-note">' + esc(f.note) + '</p>' : '');
+      QK.note('<b>VOR</b> is value over replacement: projected points above the best player you could pick up for free at the same position. It is how the rankings weigh a centre against a goalie.' + (f.note ? ' ' + esc(f.note) : ''));
     const t20 = top.slice(0, 20);
     QKC.bar('#fy-top', { cats: t20.map(r => r.name + ' (' + r.pos + ')'), series: [{ name: 'Points', data: t20.map(r => r.ros) }], horizontal: true, labels: true, fmt: x => U.f(x, 0), colors: t20.map(r => RK.teamColourRaw(r.team)), hrefs: t20.map(r => RK.playerHref(r.id)), labelWidth: 150, valName: 'Projected fantasy points' });
     if (teams.length && wk.length) {

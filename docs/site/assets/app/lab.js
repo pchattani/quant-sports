@@ -589,7 +589,7 @@ function buildCompareRole(el, P, R, ix) {
   P.forEach(function (x) { (x.metrics || []).forEach(function (m) { if (!catMeta[m.key]) catMeta[m.key] = m; }); });
   var rowOf = function (k) {
     var info = FB.metricInfo(k) || {}, m = catMeta[k] || {};
-    return { label: (info.label || m.label || k) + (pooled && adj[k] ? ' (adj.)' : ''), tip: (info.tip || m.desc || '') + (pooled && adj[k] ? ' League-adjusted in this pooled view.' : ''), better: info.lower ? 'low' : 'high',
+    return { key: k, label: (info.label || m.label || k) + (pooled && adj[k] ? ' (adj.)' : ''), tip: (info.tip || m.desc || '') + (pooled && adj[k] ? ' League-adjusted in this pooled view.' : ''), better: info.lower ? 'low' : 'high',
       values: X.map(function (y) { return y.raw && y.rk ? y.rk.val(y.raw, k) : null; }), pctls: X.map(function (y) { return y.pct ? y.pct[k] : null; }),
       fmt: function (v) { return FB.fmtSet(k, v, m.fmt); } };
   };
@@ -615,9 +615,11 @@ function buildCompareRole(el, P, R, ix) {
   var withRow = X.filter(function (y) { return y.raw; });
   var distKeys = FB.groupKeys(g, 'headline').filter(function (k) { return G.rk && G.rk.PP.values(g, k).length >= 8; }).slice(0, 4);
   var showDist = same && sameComp && distKeys.length && G.rk;
-  body.innerHTML = FB.card('Side by side', 'Value · percentile ' + esc(FB.peerLine(g, where, min)) + ' · 100 = best · ' +
-      (P.length === 2 ? 'the difference, green when ' + esc(P[0].doc.name) + ' is better' : 'the best of three in bold'),
-    (withRow.length >= 2 ? QK.compareView({ entities: ents, groups: groups }) : FB.empty('Not enough to compare', 'At least two players need a line in this view.')) +
+  var names = P.map(function (x) { return FB.surname(x.doc.name); });
+  body.innerHTML = QK.sectionHead({ kicker: 'Side by side', title: cmpQuestion(names), sub: 'Value and percentile ' + esc(FB.peerLine(g, where, min)) + ' (100 = best). The best in each row is highlighted' +
+      (P.length === 2 ? '; the last column is ' + esc(names[0]) + ' minus ' + esc(names[1]) + ', green when ' + esc(names[0]) + ' is better.' : '.'), html: true }) +
+    FB.card(P.length + ' players, one metric set', 'The headline set for the role from our metrics spec: stable and predictive rates first.',
+    (withRow.length >= 2 ? '<div class="fb-cmp-wrap">' + QK.compareView({ entities: ents, groups: groups }) + '</div>' + QK.verdicts(cmpVerdicts(groups, names)) : FB.empty('Not enough to compare', 'At least two players need a line in this view.')) +
     (notes.length ? '<p class="fb-cap">' + notes.map(esc).join(' ') + '</p>' : ''), { cls: 'fb-lb-cv' }) +
     (showDist ? FB.card('Where they sit', '<span id="lb-dist-sub"></span>', '<div class="fb-lb-distseg">' + FB.seg('lb-dist-m', distKeys.map(function (k) { return [k, (FB.metricInfo(k) || {}).label || k]; }), distKeys[0], 'Metric') + '</div>' +
       FB.chartBox('lb-dist', 260, 'Peer distribution with the players marked'), { cls: 'fb-mt' }) : '') +
@@ -644,7 +646,27 @@ function buildCompareRole(el, P, R, ix) {
 /* The v2 comparison (STYLE_GUIDE 5, MIGRATION_V2 8): two or three players on the player card's metric set, with each
    value, its percentile against the position group (100 = best), the better value in bold and, for two, the
    difference; then where each one sits in the shared peer group. */
-var CMP_MARK = ['wpA', 'wpB', 'c3'];
+var CMP_MARK = ['wpA', 'wpB', 'c5'];
+/* v3: the compare title asks the question ("Saka, Rogers or Mbeumo?"). */
+function cmpQuestion(names) { return names.length === 2 ? names[0] + ' or ' + names[1] + '?' : names.slice(0, -1).join(', ') + ' or ' + names[names.length - 1] + '?'; }
+/* One verdict per player: the metric where the player's percentile beats the others' by the most (QK.verdicts). */
+function cmpVerdicts(groups, names) {
+  var ARCH = FB.PLAYER_ARCH || {};
+  return names.map(function (nm, i) {
+    var best = null;
+    groups.forEach(function (g) {
+      g.rows.forEach(function (r) {
+        var mine = (r.pctls || [])[i];
+        if (!isNum(mine)) return;
+        var others = Math.max.apply(null, r.pctls.filter(function (_, j) { return j !== i; }).map(function (v) { return isNum(v) ? v : 0; }));
+        if (mine - others > 0 && (!best || mine - others > best.d)) best = { d: mine - others, r: r, p: mine };
+      });
+    });
+    if (!best) return null;
+    var lab = String(best.r.label || '').replace(/ \(adj\.\)$/, '');
+    return { title: ARCH[best.r.key] || 'The standout', who: nm, text: 'best of the ' + names.length + ' on ' + lab.charAt(0).toLowerCase() + lab.slice(1) + ' (' + best.r.fmt(best.r.values[i]) + ', ' + FB.ordinal(best.p) + ' percentile).' };
+  });
+}
 function letterOf(x) {
   var r = x.row || {};
   if (r.is_gk || (r.position === 'G')) return 'G';
@@ -674,7 +696,7 @@ function buildCompareV2(el, P) {
   var groups = set.map(function (g) {
     return { label: g[0], rows: g[1].filter(function (k) { return meta[k]; }).map(function (k) {
       var m = meta[k];
-      return { label: m.label || k, tip: m.desc || '', better: m.lower ? 'low' : 'high', values: P.map(function (x) { return x.row ? x.row[k] : null; }),
+      return { key: k, label: m.label || k, tip: m.desc || '', better: m.lower ? 'low' : 'high', values: P.map(function (x) { return x.row ? x.row[k] : null; }),
         pctls: P.map(function (x) { return x.row && x.row.pct ? x.row.pct[k] : null; }), fmt: function (v) { return isNum(v) ? FB.fmtMetric(v, m.fmt) : '—'; } };
     }) };
   });
@@ -694,9 +716,11 @@ function buildCompareV2(el, P) {
   if (none.length) notes.push(none.join(', ') + ': no line in this view.');
   if (early.length) notes.push(early.join(', ') + (early.length > 1 ? ' have' : ' has') + ' under 900 minutes: a small sample, read the percentiles as early.');
   var distKeys = (DIST[L] || []).filter(function (k) { return meta[k]; });
-  body.innerHTML = FB.card('Side by side', 'Value · percentile against ' + esc(peer) + (floor ? ' (' + FB.int(floor) + '+ minutes)' : '') + ' · 100 = best · ' +
-      (P.length === 2 ? 'the difference, green when ' + esc(P[0].doc.name) + ' is better' : 'the best of three in bold'),
-    (withRow.length >= 2 ? QK.compareView({ entities: ents, groups: groups }) : FB.empty('Not enough to compare', 'At least two players need a line in this view.')) +
+  var names = P.map(function (x) { return FB.surname(x.doc.name); });
+  body.innerHTML = QK.sectionHead({ kicker: 'Side by side', title: cmpQuestion(names), sub: 'Value and percentile against ' + esc(peer) + (floor ? ' (' + FB.int(floor) + '+ minutes)' : '') + ' (100 = best). The best in each row is highlighted' +
+      (P.length === 2 ? '; the last column is ' + esc(names[0]) + ' minus ' + esc(names[1]) + ', green when ' + esc(names[0]) + ' is better.' : '.'), html: true }) +
+    FB.card(P.length + ' players, one metric set', 'The set for the position: stable and predictive rates first.',
+    (withRow.length >= 2 ? '<div class="fb-cmp-wrap">' + QK.compareView({ entities: ents, groups: groups }) + '</div>' + QK.verdicts(cmpVerdicts(groups, names)) : FB.empty('Not enough to compare', 'At least two players need a line in this view.')) +
     (notes.length ? '<p class="fb-cap">' + notes.map(esc).join(' ') + '</p>' : ''), { cls: 'fb-lb-cv' }) +
     (same && sameComp && distKeys.length ? FB.card('Where they sit', '<span id="lb-dist-sub"></span>', '<div class="fb-lb-distseg">' + FB.seg('lb-dist-m', distKeys.map(function (k) { return [k, meta[k].label || k]; }), distKeys[0], 'Metric') + '</div>' +
       FB.chartBox('lb-dist', 260, 'Peer distribution with the players marked'), { cls: 'fb-mt' }) : '') +

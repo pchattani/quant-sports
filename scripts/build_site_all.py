@@ -220,6 +220,9 @@ DEFAULT_PARAMS = {
     "dc_weight": 0.80, "ridge": 0.5, "xi": 0.0035,
 }
 MODEL_PARAMS_PATH = ROOT / "oddsmarkets" / "football" / "competitions" / "league" / "data" / "model_params.json"
+# The match model's walk-forward calibration (oddsmarkets/football/research/site_calibration.py, committed), published as
+# data/calibration.json for the kit's "How sure are we?" (QK.calib.find reads metrics.model).
+CALIBRATION_PATH = ROOT / "oddsmarkets" / "football" / "competitions" / "league" / "data" / "calibration.json"
 
 
 def model_params_for(slug: str) -> tuple[dict, str]:
@@ -2316,6 +2319,7 @@ def main() -> int:
     unified = _step("people, clubs and seasons", lambda: build_unified(hub_entries, seasons, archive)) or {}
     from oddsmarkets.football.analytics import value_fields
     roles_before = value_fields.roles(DATA_DIR)
+    value = None
     if not args.no_value:
         value = _step("player value", lambda: build_value_layer(hub_entries, archive))
         if value:
@@ -2325,7 +2329,8 @@ def main() -> int:
                 if fan:
                     logger.info("fantasy: %d leagues in %.1fs", fan["leagues"], fan["runtime_s"])
     # the value model's role and GAR/90 on players_live, the lab and people files (METRICS_SPEC peer groups)
-    _step("value fields", lambda: value_fields.apply(DATA_DIR, roles_before))
+    _step("value fields", lambda: value_fields.apply(DATA_DIR, roles_before, (value or {}).get("_prev_lines"),
+                                                     (value or {}).get("_prev_sid")))
     LAST_UNIFIED = None
 
     # Keep entries for competitions not rebuilt this run, so --only never drops
@@ -2336,6 +2341,9 @@ def main() -> int:
         if slug in prev:
             prev[slug].pop("winner", None)      # set again below only while the competition is between editions
             prev[slug].update(fields)
+    cal = _read_json(CALIBRATION_PATH, None)
+    if isinstance(cal, dict) and cal.get("ok"):
+        _step("calibration", lambda: _write(DATA_DIR, "calibration.json", cal))
     # Which clubs have a crest file: the front end draws a monogram for any other id instead of requesting a 404.
     _step("crest list", lambda: _write(DATA_DIR, "crests.json", {"ids": sorted(
         int(f.stem) for f in CRESTS_DIR.glob("*.png") if f.stem.isdigit())}))

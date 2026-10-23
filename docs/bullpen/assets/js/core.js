@@ -128,23 +128,25 @@ const PITCH_NAMES = {
   KC: 'Knuckle curve', CS: 'Slow curve', CH: 'Changeup', FS: 'Splitter', FO: 'Forkball', SC: 'Screwball', KN: 'Knuckleball',
   EP: 'Eephus', FA: 'Fastball', PO: 'Pitchout', IN: 'Intentional ball', UN: 'Unknown', AB: 'Automatic ball', AS: 'Automatic strike'
 };
+/* Kit v3 (Matchday): the Savant families (fastballs red-orange, cutters brown, sliders yellow, curves blue, changeups
+   green, splitters cyan) on the warm dark palette; teal stays "ours", so no pitch type uses it. */
 const PITCH_COLOURS = {
-  FF: '#e8484a', FA: '#e8484a', SI: '#f2a33a', FT: '#f2a33a', FC: '#a8673a', SL: '#e5d544', ST: '#d6b34a', SV: '#8fd18a',
-  CU: '#4fb3e8', KC: '#7a6ff0', CS: '#5aa0d8', CH: '#3fbf7f', FS: '#3cc6c6', FO: '#5fd3b0', SC: '#9be06a', KN: '#c0c0c0',
-  EP: '#b0b0b0', PO: '#6e7681', IN: '#6e7681', UN: '#6e7681'
+  FF: '#ef6a4c', FA: '#ef6a4c', SI: '#f39a3d', FT: '#f39a3d', FC: '#b97d4e', SL: '#ffc94d', ST: '#e0b04a', SV: '#94cf7c',
+  CU: '#62aef0', KC: '#a08cf0', CS: '#7da7dc', CH: '#5cc183', FS: '#58c5d8', FO: '#86d6c0', SC: '#a9dc7a', KN: '#cbbfa9',
+  EP: '#b9ae9c', PO: '#8a8070', IN: '#8a8070', UN: '#8a8070'
 };
 const PITCH_ORDER = ['FF', 'FA', 'SI', 'FT', 'FC', 'SL', 'ST', 'SV', 'CU', 'KC', 'CS', 'CH', 'FS', 'FO', 'SC', 'KN', 'EP'];
 /* Pitch result -> [label, colour, kind]; kind: ball | called | swinging | foul | inplay | hbp. */
 const CALLS = {
-  ball: ['Ball', '#58a6ff', 'ball'], blocked_ball: ['Ball (blocked)', '#58a6ff', 'ball'], intent_ball: ['Intentional ball', '#58a6ff', 'ball'],
-  pitchout: ['Pitchout', '#58a6ff', 'ball'], automatic_ball: ['Automatic ball', '#58a6ff', 'ball'],
-  called_strike: ['Called strike', '#f85149', 'called'], automatic_strike: ['Automatic strike', '#f85149', 'called'],
-  swinging_strike: ['Swinging strike', '#d9804e', 'swinging'], swinging_strike_blocked: ['Swinging strike', '#d9804e', 'swinging'],
-  missed_bunt: ['Missed bunt', '#d9804e', 'swinging'], foul_tip: ['Foul tip', '#d9804e', 'swinging'],
-  foul: ['Foul', '#d29922', 'foul'], foul_bunt: ['Foul bunt', '#d29922', 'foul'], bunt_foul_tip: ['Foul bunt', '#d29922', 'foul'],
-  hit_into_play: ['In play', '#3fb950', 'inplay'], hit_into_play_no_out: ['In play', '#3fb950', 'inplay'], hit_into_play_score: ['In play', '#3fb950', 'inplay'],
-  hit_by_pitch: ['Hit by pitch', '#bc8cff', 'hbp'],
-  B: ['Ball', '#58a6ff', 'ball'], S: ['Strike', '#f85149', 'called'], X: ['In play', '#3fb950', 'inplay'], C: ['Called strike', '#f85149', 'called']
+  ball: ['Ball', '#62aef0', 'ball'], blocked_ball: ['Ball (blocked)', '#62aef0', 'ball'], intent_ball: ['Intentional ball', '#62aef0', 'ball'],
+  pitchout: ['Pitchout', '#62aef0', 'ball'], automatic_ball: ['Automatic ball', '#62aef0', 'ball'],
+  called_strike: ['Called strike', '#ef6a4c', 'called'], automatic_strike: ['Automatic strike', '#ef6a4c', 'called'],
+  swinging_strike: ['Swinging strike', '#f39a3d', 'swinging'], swinging_strike_blocked: ['Swinging strike', '#f39a3d', 'swinging'],
+  missed_bunt: ['Missed bunt', '#f39a3d', 'swinging'], foul_tip: ['Foul tip', '#f39a3d', 'swinging'],
+  foul: ['Foul', '#ffc94d', 'foul'], foul_bunt: ['Foul bunt', '#ffc94d', 'foul'], bunt_foul_tip: ['Foul bunt', '#ffc94d', 'foul'],
+  hit_into_play: ['In play', '#5cc183', 'inplay'], hit_into_play_no_out: ['In play', '#5cc183', 'inplay'], hit_into_play_score: ['In play', '#5cc183', 'inplay'],
+  hit_by_pitch: ['Hit by pitch', '#a08cf0', 'hbp'],
+  B: ['Ball', '#62aef0', 'ball'], S: ['Strike', '#ef6a4c', 'called'], X: ['In play', '#5cc183', 'inplay'], C: ['Called strike', '#ef6a4c', 'called']
 };
 const ROUND_LONG = { F: 'Wild Card Series', WC: 'Wild Card Series', D: 'Division Series', DS: 'Division Series', L: 'League Championship Series',
   LCS: 'League Championship Series', CS: 'League Championship Series', W: 'World Series', WS: 'World Series', R: 'Regular season', S: 'Spring training', E: 'Exhibition', A: 'All-Star Game',
@@ -969,8 +971,9 @@ function glossHref(key) { return '#/glossary' + (key ? '/' + encodeURIComponent(
 /* A GAME_CARD as the kit's v2 game card (QK.gameCard; index.json today/recent/upcoming, schedule.json), linking to the
  * game centre: the two clubs with our (or, live, the in-game) win chance, the favourite in the signal colour, the
  * win-probability bar, records (BP.records, filled by pages that load season.json), recent form (BP.forms), the
- * probable starters, our expected total runs, and the market as a quiet grey reference before the first pitch.
- * opts {level, season, date: true (show the date), compact, series: true (default), market: false}. */
+ * probable starters and our expected total runs. Kit v3: no market on cards unless opts.market === true (game detail
+ * only); opts.why adds the italic one-line reason (QK.whyLine).
+ * opts {level, season, date: true (show the date), compact, series: true (default), market: false, why}. */
 const RECORDS = {}, FORMS = {};
 /* A postseason game that was never needed (series decided; Stats API status cancelled / not_needed): hidden everywhere. */
 function notNeeded(g) { return !!g && (g.not_needed === true || (String(g.status || '').toLowerCase() === 'cancelled' && g.gtype && g.gtype !== 'R')); }
@@ -996,8 +999,8 @@ function gameCard(g, opts) {
   k.away.record = sub('away'); k.home.record = sub('home');
   if (FORMS[String(g.away)]) k.away.form = FORMS[String(g.away)];
   if (FORMS[String(g.home)]) k.home.form = FORMS[String(g.home)];
-  if (o.market === false || !mk) k.market_home = null;
-  let html = window.QK && QK.gameCard ? QK.gameCard(k, { sport: false, marketLabel: 'Market', marketTip: 'The prediction-market or no-vig line probability for the home side, shown as a reference next to ours' }) : '';
+  if (o.market !== true || !mk) k.market_home = null;
+  let html = window.QK && QK.gameCard ? QK.gameCard(k, { sport: false, why: !!o.why, market: o.market === true, marketLabel: 'Market', marketTip: 'The prediction-market or no-vig line probability for the home side, a reference, not our forecast' }) : '';
   const extra = [];
   if (isNum(m.total) && !fin) extra.push('<span data-tip="Our expected total runs from the plate-appearance simulation">' + num(m.total, 1) + ' runs expected</span>');
   if (live && isNum(g.outs)) extra.push('<span>' + esc(outsText(g.outs)) + '</span>');
@@ -1017,6 +1020,8 @@ function kitGame(g, L) {
     status: st === 'live' ? 'live' : st === 'final' ? 'final' : 'pre', home: teamObj(g.home, L), away: teamObj(g.away, L),
     hs: isNum(g.hs) ? g.hs : null, as: isNum(g.as) ? g.as : null,
     p_home: live && isNum(g.wp_home) ? g.wp_home : (isNum(m.p_home) ? m.p_home : null), market_home: isNum(mk.p_home) ? mk.p_home : null,
+    /* v3: live, the kit reads the live chance and keeps our pre-game call for "before the start we had ..." */
+    p_pre: live && isNum(g.wp_home) && isNum(m.p_home) ? m.p_home : null, pre_only: live && !isNum(g.wp_home) ? true : undefined,
     period: isNum(g.inning) ? g.inning : null, href: gameHref(g.gpk, L) };
 }
 /* A market TITLE dict -> {id: p} (de-vigged "probs", else "prices", else the raw "mid"); {} when unavailable. */

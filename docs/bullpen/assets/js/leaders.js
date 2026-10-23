@@ -28,6 +28,7 @@ function render(el, params, state) {
   if (q.m) S0.metric = q.m;
   if (q.pt) S0.pt = q.pt;
   el.innerHTML = QK.sectionHead({ kicker: 'Leaderboards · ' + k.LN(L), title: 'Leaderboards', sub: 'Any metric for hitters, pitchers or one pitch type, best or worst first, with the sample floor in your hands. Percentile cells rank each player against everyone past the floor (100 = best).' }) +
+    QK.note('A <b>90th percentile</b> means better than 90 in 100 of the players past the floor. Rates need a sample: early in a season the floor is prorated, so small samples are kept out.') +
     '<section class="qk-card"><div class="qk-card-body"><div class="bp-ctl">' +
     U.seg('ld-kind', 'Board', [['hitter', 'Hitters'], ['pitcher', 'Pitchers'], ['pitch', 'Pitch types']], S0.kind) +
     '<label id="ld-pt-l">Pitch type<select id="ld-pt"></select></label>' +

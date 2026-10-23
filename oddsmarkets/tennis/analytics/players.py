@@ -937,6 +937,43 @@ def peer_blocks(cat: dict, tour: str) -> dict[str, dict]:
     return out
 
 
+def prev_pct(prev_cat: dict | None, pid: str, tour: str) -> dict:
+    """Last season's percentiles for the career file's current block (kit v3 rail rings, 23 Oct 2026), the shape the
+    player page reads (players.js prevFor): {"prev_pct_pos": {"all": last season's tour percentiles (when qualified),
+    "<surface>": its surface percentiles (when the player met that surface's floor)}, "prev_peer": {"year", "matches",
+    "qualified", "surface_matches"}}; {} when the player is in neither. Each group keeps the spec's metric set
+    (PEER_KEYS, as peer_blocks: a surface's own Elo from pct_surface.<s>.elo_surface). prev_cat: last season's
+    players.json."""
+    r = ((prev_cat or {}).get("players") or {}).get(str(pid))
+    if not r:
+        return {}
+    sfl = (prev_cat or {}).get("surface_floor") or SURFACE_FLOOR
+    out: dict[str, dict] = {}
+    pc = r.get("pct") or {}
+    if r.get("qualified"):
+        a = {k: pc[k] for k in PEER_KEYS.get(f"{tour}_all", []) if pc.get(k) is not None}
+        if a:
+            out["all"] = a
+    sm = {}
+    for s in an.SURFACES:
+        m = (((r.get("values_surface") or {}).get(s) or {}).get("matches")) or 0
+        sm[s] = m
+        ps = (r.get("pct_surface") or {}).get(s) or {}
+        if not ps or m < sfl.get(s, SURFACE_FLOOR.get(s, 8)):
+            continue
+        x = {}
+        for k in PEER_KEYS.get(f"{tour}_{s}", []):
+            pk = "elo_surface" if k == f"elo_{s}" else k
+            if ps.get(pk) is not None:
+                x[k] = ps[pk]
+        if x:
+            out[s] = x
+    if not out:
+        return {}
+    return {"prev_pct_pos": out, "prev_peer": {"year": (prev_cat or {}).get("year"), "matches": r.get("matches"),
+                                               "qualified": bool(r.get("qualified")), "surface_matches": sm}}
+
+
 # ---------------------------------------------------------------------------------------------- careers
 
 def season_summary(E: list[dict], titles_finals: tuple[int, int] | None = None) -> dict:

@@ -579,9 +579,19 @@ def build_value(ctx: ValueContext, R: V.Rows, vm: V.ValueModel | None = None, ou
     logger.info("value: %d players, %d lines, %d clubs; held-out R2 (xG diff) value %s v rating %s",
                 len(p_rows), len(l_rows), n_clubs, ((vm.validation.get("r2") or {}).get("xgd") or {}).get("value"),
                 ((vm.validation.get("r2") or {}).get("xgd") or {}).get("rating"))
+    # For the value-fields step (value_fields.annotate_people_prev): each player's line last season in each competition,
+    # with the formation role of that line (the one started in most) and its GAR/90 against that role's replacement.
+    prev_out: dict[tuple[str, str], dict] = {}
+    for (pid, ci), ln in prev_lines.items():
+        if ln.mins < 90:
+            continue
+        prole = V.modal_role(ln.role_min, ln.letter())
+        prev_out[(str(pid), R.comps[ci])] = {"role": prole, "gar90": _round(ln.rate - repl[prole]) if prole in repl else None,
+                                             "min": int(round(ln.mins))}
     return {"players": len(p_rows), "lines": len(l_rows), "clubs": n_clubs, "validation": vm.validation,
             # For the fantasy step: each player's expected points above replacement next season (its price proxy).
-            "_fantasy_score": {pid: v.get("v2y1", 0.0) for pid, v in trx.players.items()}}
+            "_fantasy_score": {pid: v.get("v2y1", 0.0) for pid, v in trx.players.items()},
+            "_prev_lines": prev_out, "_prev_sid": {s: (str(v) if v is not None else None) for s, v in prev_sid.items()}}
 
 
 def make_fee_fn(trx: "TR.TransferResult | None", player_info: dict[int, dict], pool_clubs: dict[int, dict]):

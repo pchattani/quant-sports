@@ -44,7 +44,7 @@ GI.route('coaches', function (el, params) {
   const S = Number(params.season);
   return GI.loadAll(['coaches.json', GI.ypath('fourth_downs.json', S)]).then(res => {
     if (!el.isConnected) return;
-    const head = GI.pageHead('Lab · ' + S, 'Coaches', 'Who goes for it on fourth down, against the league and against our model.') + GI.sectionNav('lab', 'coaches');
+    const head = GI.pageHead('Lab · ' + S, 'Coaches', 'Who goes for it on fourth down, against the league and against our model.') + GI.sectionNav('lab', 'coaches') + QK.note('<b>Go rate over expected</b> compares how often a coach went for it with how often the league goes in the same spots. Above zero is bolder than the league; the win chance given up says whether the boldness paid.');
     const C = readCoaches(res[0]);
     const rows = C.rows;
     if (!rows.some(r => r.season === S) && GI.ok(res[1])) GI.F.coachesOf(res[1], GI.F.playsOf(res[1])).filter(r => r.coach).forEach(r => rows.push(Object.assign({}, r, { season: S })));

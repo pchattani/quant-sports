@@ -79,7 +79,7 @@ U.fresh = c => {
   if (c && BP.notNeeded && BP.notNeeded(c)) return false;
   if (!c || BP.isFinal(c)) return true;
   const t = Date.parse(c.start || c.date);
-  return !isNum(t) || Date.now() - t < 12 * 3600 * 1000;
+  return !isNum(t) || QK.now() - t < 12 * 3600 * 1000;
 };
 U.srcName = list => {
   const N = { kalshi: 'Kalshi', polymarket: 'Polymarket', draftkings_ml: 'DraftKings', draftkings: 'DraftKings', espn: 'ESPN BET' };
@@ -206,9 +206,29 @@ U.metaOf = (kind, id, gl) => {
   return { key: id, label: d[0] || g.label || id, tip: d[1] || g.desc || '', fmt: g.fmt, lower: !!g.lower };
 };
 U.fmtBy = (meta, v) => (isNum(v) ? BP.fmtVal(v, (meta && meta.fmt) || '2') : '—');
+/* v3 (Matchday): a plain-English line under each metric on the percentile rail. */
+U.SUB = {
+  hitter: { xwoba_n: 'What the contact deserved, walks and strikeouts in, any park.', woba: 'Every way of reaching base, weighted by the runs it is worth.',
+    barrel_pct: 'Balls hit at the speed and angle that become extra-base hits.', hard_pct: 'Balls in play at 95 mph or harder.', bat_speed: 'How fast the sweet spot moves on a real swing.',
+    k_pct: 'Strikeouts per trip to the plate (lower is better).', bb_pct: 'Walks per trip to the plate.', chase_pct: 'Swings at pitches off the plate (lower is better).',
+    sprint_speed: 'Top speed on the fastest runs.', war_600: 'Wins added per full season of trips to the plate.', sra: 'Extra outs made per chance against an average fielder.',
+    arm: 'Speed of the hardest throws.', framing_rate: 'Extra strikes stolen per called pitch.', iso: 'Extra bases per at-bat: raw power.' },
+  pitcher: { xwoba_n: 'What the contact allowed deserved, any park (lower is better).', xfip: 'Runs per nine from strikeouts, walks and fly balls (lower is better).',
+    stuff_plus: 'The pitches alone: velocity, movement, spin. 100 is average.', pitching_plus: 'Stuff plus where the pitches go and the count.', fb_velo: 'Average fastball speed.',
+    k_pct: 'Strikeouts per batter.', csw_pct: 'Called strikes and whiffs per pitch.', chase_pct: 'How often batters chase off the plate.', bb_pct: 'Walks per batter (lower is better).',
+    gb_pct: 'Ground balls per ball in play: fewer home runs.', k_bb_pct: 'Strikeouts minus walks: the best quick guide to a pitcher.', whiff_pct: 'Swings that miss.' }
+};
+U.UNIT = { pa: 'PA', bf: 'batters faced', bip: 'balls in play', pitches: 'pitches', swings: 'swings', oz: 'pitches outside the zone', iz: 'pitches in the zone', fb: 'fastballs',
+  bat_swings: 'tracked swings', chances: 'chances', called: 'called pitches', tto3: 'batters faced a third time', games: 'games' };
+/* The type a player's best metric suggests (compare verdicts). */
+U.ARCHETYPE = { hitter: { xwoba_n: 'The hitter', woba: 'The on-base machine', barrel_pct: 'The slugger', hard_pct: 'The hard hitter', bat_speed: 'The bat speed', k_pct: 'The contact hitter',
+    bb_pct: 'The patient one', chase_pct: 'The disciplined eye', sprint_speed: 'The burner', war_600: 'The all-rounder', sra: 'The glove', arm: 'The cannon', framing_rate: 'The framer', iso: 'The power bat' },
+  pitcher: { xwoba_n: 'The run preventer', xfip: 'The craftsman', stuff_plus: 'The nasty stuff', pitching_plus: 'The complete pitcher', fb_velo: 'The flamethrower', k_pct: 'The strikeout artist',
+    csw_pct: 'The strike thrower', chase_pct: 'The deceiver', bb_pct: 'The control artist', gb_pct: 'The groundballer', k_bb_pct: 'The dominator', whiff_pct: 'The bat-misser' } };
 /* Percentile-card groups for one player (a catalogue row or the player file's current hitting / pitching block):
-   pct_role (his position or role pool) only; a metric without a value or a percentile is left out. */
-U.pctGroups = (row, kind, setKey, gl, which, teamGames) => {
+   pct_role (his position or role pool) only; a metric without a value or a percentile is left out. prev: last
+   season's percentiles in the same peer group (the hollow ring on the v3 rail), or null. */
+U.pctGroups = (row, kind, setKey, gl, which, teamGames, prev) => {
   const set = U.SETS[setKey] || U.SETS[kind === 'pitcher' ? 'SP' : 'ALL'] || {};
   /* spec: pct_role for the position and role groups, pct for "All hitters" */
   const pr = (row && (setKey === 'ALL' ? row.pct : row.pct_role)) || {}, vals = (row && row.values) || {};
@@ -219,9 +239,26 @@ U.pctGroups = (row, kind, setKey, gl, which, teamGames) => {
       if (!isNum(pc) || !isNum(vals[id]) || !U.metricOk(row, id, setKey, teamGames)) return null;
       const m = U.metaOf(kind, id, gl);
       const n = x[1] && x[2] ? U.sampleOf(row, x[2]) : null;
-      return { key: id, label: m.label, pctl: pc, value: U.fmtBy(m, vals[id]), tip: m.tip, early: isNum(n) && n < x[1] };
+      return { key: id, label: m.label, sub: (U.SUB[kind] || {})[id] || '', pctl: pc, prev: prev && isNum(prev[id]) ? prev[id] : null, value: U.fmtBy(m, vals[id]),
+        tip: m.tip + (isNum(x[1]) && x[2] ? ' Settles at about ' + Math.round(x[1]) + ' ' + (U.UNIT[x[2]] || x[2]) + '.' : ''), early: isNum(n) && n < x[1] };
     }).filter(Boolean)
   })).filter(g => g.rows.length);
+};
+/* "How sure are we?" at the top of a Model page (kit v3): <L>/calibration.json read with QK.calib.find, rendered with
+   QK.howSure into a section put first in el; nothing is shown when the level has no game backtest (Triple-A today). */
+U.howSureTop = (el, L) => {
+  if (!el) return;
+  const box = document.createElement('section');
+  box.className = 'qk-section bp-sure';
+  box.hidden = true;
+  el.insertBefore(box, el.firstChild);
+  BP.load(BP.lpath('calibration.json', L)).then(cj => {
+    if (!BP.ok(cj) || !QK.calib.find(cj) || !box.isConnected) return;
+    const ss = Object.keys((cj.games || {}).seasons || {}).sort();
+    box.hidden = false;
+    box.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'When we say 60%, does it happen 60% of the time?', sub: 'Every pre-game forecast since ' + (ss[0] || 'the first season') + ', made walk-forward from what was known before the first pitch, bucketed by our chance for the home team, against how often the home team won.' }) + '<div></div>';
+    QK.howSure(box.lastChild, { calibration: cj, league: BP.levelName(L), span: ss.length ? ss[0] + ' to ' + ss[ss.length - 1] : '', subject: 'the home team' });
+  });
 };
 /* The flat metric list of a set: [[id, m50, field], ...] */
 U.flat = (setKey, which) => {

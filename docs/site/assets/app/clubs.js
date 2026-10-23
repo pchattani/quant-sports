@@ -158,7 +158,8 @@ function drawPool(box, pool, q) {
   clubs.forEach(function (c) { if (c.comp) leagues[c.comp] = c.comp_name || FB.compName(c.comp); });
   var lopts = [['', 'All competitions']].concat(Object.keys(leagues).sort(function (a, b) { return String(leagues[a]).localeCompare(String(leagues[b])); }).map(function (k) { return [k, leagues[k]]; }));
   var blocks = Array.from(new Set(clubs.map(function (c) { return c.block; }).filter(Boolean))).sort();
-  box.innerHTML = FB.grid(
+  box.innerHTML = FB.note('<b>One scale for every club.</b> The rating is the points a game we would expect a club to take against an average side from the whole pool, at a neutral ground. Clubs from different continents rarely meet, so the gaps between continents are the least certain numbers here.') +
+    '<div class="fb-mt"></div>' + FB.grid(
     FB.card('Every club', clubs.length + ' clubs with a rated match' + (unrated ? ' (' + unrated + ' cup entrants with none yet are left out: they carry the prior)' : '') + ' · home advantage ' + num(pool.model.home_adv, 2) + ' goals (log scale) · ρ ' + num(pool.model.rho, 3),
       FB.toolbar([FB.field('Competition', FB.select('cl-lg', lopts, q.lg || '', 'Competition')), FB.field('Block', FB.select('cl-bl', [['', 'All blocks']].concat(blocks.map(function (b) { return [b, b]; })), q.bl || '', 'Block')),
         FB.field('Club', '<input class="qk-input" id="cl-q" type="search" placeholder="Filter by name" value="' + esc(q.q || '') + '">')], 'fb-cl-ftb') +
@@ -465,9 +466,14 @@ function hero(C) {
   if (curY && curY.played) tiles.push(FB.kpi(curY.era + ' record', curY.w + '-' + curY.d + '-' + curY.l, { text: false, sub: 'won, drawn, lost · ' + curY.played + ' played' }));
   if (curY && curY.played) tiles.push(FB.kpi('Points a game', num(ppgOf(curY), 2), { sub: 'every competition, ' + esc(curY.era) }));
   tiles.push(FB.kpi('Trophies on record', String(trophies), { sub: years.length + ' season' + (years.length === 1 ? '' : 's') + ' in the data' }));
+  /* v3: "The short version" in plain English, beside the name */
+  var short = '';
+  if (curY && curY.played) short = doc.name + ' have won ' + curY.w + ', drawn ' + curY.d + ' and lost ' + curY.l + ' of ' + curY.played + ' in ' + curY.era + (curY.comps > 1 ? ' across ' + curY.comps + ' competitions' : '') + ', ' + num(ppgOf(curY), 2) + ' points a game.';
+  if (isNum(pool.strength) && rated) short += (short ? ' ' : '') + 'Our rating puts them at ' + num(pool.strength, 2) + ' points a game against an average side anywhere' + (isNum(pool.rank) ? ', ' + FB.ordinal(pool.rank) + ' of every ' + (doc.national ? 'national team' : 'club') + ' on one scale' : '') + '.';
+  if (curY && curY.played && curY.played < 8) short += ' Early days: ' + curY.played + ' matches is a small sample.';
   return '<section class="qk-hero fb-cl-hero"><div class="qk-hero-in">' + FB.crest(doc.id, doc.name, 'lg') +
     '<div class="fb-cl-hero-t"><div class="qk-sh-kicker">' + esc(doc.national ? 'National team' : 'Club') + (live.length ? ' · this season in ' + live.map(function (s) { return FB.compName(s, true); }).join(', ') : '') + '</div>' +
-    '<h1>' + esc(doc.name) + '</h1><div class="qk-hero-meta">' + meta.join('') + '</div></div></div></section>' +
+    '<h1>' + esc(doc.name) + '</h1><div class="qk-hero-meta">' + meta.join('') + '</div></div>' + (short ? '<div class="fb-cl-short">' + QK.shortVersion(short) + '</div>' : '') + '</div></section>' +
     (tiles.length ? FB.kpis(tiles, 'fb-cl-tiles') : '');
 }
 function filterBar(C, q, tab) {

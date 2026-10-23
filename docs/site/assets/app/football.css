@@ -144,3 +144,12 @@ a.fb-xi-p:hover .fb-xi-l { color: var(--accent); }
 .fb-prose h3, .fb-prose h4 { color: var(--ink-1); margin: var(--sp-5) 0 var(--sp-2); }
 .fb-prose a { color: var(--accent); }
 .fb-prose p { margin: 0 0 var(--sp-3); }
+
+/* kit v3 pieces shared by the pages: the page crumb */
+.fb-crumb { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; font-size: var(--fs-sm); color: var(--ink-3); margin: 0 0 10px; }
+.fb-crumb a:hover { color: var(--ink-1); }
+/* a compare table scrolls inside its card on phones instead of widening the page */
+.fb-cmp-wrap { max-width: 100%; }
+@media (max-width: 720px) { .fb-cmp-wrap { overflow-x: auto; } .fb-cmp-wrap .qk-cmp-head { position: static; } }
+/* the kit's cards set their own display: a card or section a page hides stays hidden */
+.fb-page .qk-card[hidden], .fb-page .qk-section[hidden], .fb-page section[hidden] { display: none; }

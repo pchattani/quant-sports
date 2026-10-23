@@ -90,7 +90,7 @@ function renderList(el, params, state) {
     if (pts.length > 2) {
       k.plot('pk-chart', [{ type: 'scatter', mode: 'markers+text', x: pts.map(p => p.x), y: pts.map(p => p.y), text: pts.map(p => { const t = P[p.v].team || P[p.v].tid; return t ? k.teamAbbr(t) : String(P[p.v].name || '').split(' ')[0]; }),
         customdata: pts.map(p => p.v), textposition: 'top center', textfont: { size: 9, color: k.C.text2 }, hovertemplate: '%{customdata}: runs %{x:.0f}, HR %{y:.0f}<extra></extra>',
-        marker: { size: 10, color: pts.map(p => (P[p.v].team ? k.teamColour(P[p.v].team) : '#58a6ff')), line: { color: '#0d1117', width: 1 } } }],
+        marker: { size: 10, color: pts.map(p => (P[p.v].team ? k.teamColour(P[p.v].team) : '#62aef0')), line: { color: '#0d1117', width: 1 } } }],
       k.layout({ margin: { l: 50, r: 10, t: 10, b: 44 }, xaxis: { title: 'Run factor', zeroline: false }, yaxis: { title: 'Home-run factor', zeroline: false },
         shapes: [{ type: 'line', x0: 100, x1: 100, yref: 'paper', y0: 0, y1: 1, line: { color: '#3d444d', dash: 'dot' } }, { type: 'line', y0: 100, y1: 100, xref: 'paper', x0: 0, x1: 1, line: { color: '#3d444d', dash: 'dot' } }] }));
       const node = $('pk-chart');

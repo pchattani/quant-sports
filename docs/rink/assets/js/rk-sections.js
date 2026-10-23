@@ -7,7 +7,12 @@
  *   #/lab?tab=              lab · compare            #/compare/<a>/<b> renders inside Lab
  *   #/model?tab=            methodology · calibration · glossary · terms
  *                           #/glossary/<key> and #/methodology/<part> render inside Model
- * Old routes (#/skaters, #/playoffs, #/markets, #/calibration ...) are redirected by core.js (REDIRECTS). */
+ * Old routes (#/skaters, #/playoffs, #/markets, #/calibration ...) are redirected by core.js (REDIRECTS).
+ *
+ * Kit v3 "Matchday" (MIGRATION_V3.md): friendly section titles (the coral kicker says what it is, the Fraunces title
+ * the story), "i" notes (QK.note) under the numbers that need a sentence, a "Who's hot" strip (QK.hotRow) on Players,
+ * "How sure are we?" (QK.howSure, from data/calibration.json) at the top of the Model page, and season forecasts
+ * without the market tick (the market stays on game pages and the Model page only). */
 (function (RK) {
 'use strict';
 
@@ -59,13 +64,15 @@ function standingsNew(node, S) {
       best ? { label: 'Top-rated club', value: RK.teamAbbr(best.team) + ' ' + U.signed(best.rating, 2), href: RK.teamHref(best.team, S), sub: 'goals a game better than an average club', tip: 'Our team rating: expected goal difference per game against an average club' } : null
     ]);
     node.innerHTML = '<div class="rk-kpis">' + tiles + '</div>' +
-      QK.sectionHead({ kicker: RK.seasonLabel(S), title: 'The table', sub: esc(RK.regGames(S)) + ' games a club · 2 points a win, 1 for an overtime or shootout loss.' + (early ? ' The heat colours start after ' + U.TEAM_MIN_GP + ' games: earlier ranks are noise.' : ' xGF% and rating cells are coloured by rank among the 32 clubs (red best, blue worst).'), html: true,
+      QK.sectionHead({ kicker: 'The table · ' + RK.seasonLabel(S), title: 'Where everyone stands', sub: esc(RK.regGames(S)) + ' games a club · 2 points a win, 1 for an overtime or shootout loss.' + (early ? ' The heat colours start after ' + U.TEAM_MIN_GP + ' games: earlier ranks are noise.' : ' xGF% and rating cells are coloured by rank among the 32 clubs (red best, blue worst).'), html: true,
         actions: '<div class="qk-seg" id="st-view" role="group" aria-label="Standings view">' + [['wc', 'Wild card'], ['div', 'Divisions'], ['league', 'League']].map((v, i) => '<button type="button" aria-pressed="' + (i === 0) + '" data-value="' + v[0] + '">' + v[1] + '</button>').join('') + '</div>' }) +
       '<div id="st-body"></div>' +
-      '<section class="qk-section">' + QK.sectionHead({ kicker: 'Season simulation', title: 'Projected full-season points', sub: 'Each club’s points at the end of the regular season across the simulated seasons: the dot is the mean, the bar the range it lands in nine times out of ten.',
+      QK.note('<b>Reading the table.</b> <b>P%</b> is the share of the points available that a club has taken. <b>xGF%</b> is its share of the 5-on-5 chances (expected goals): over a season it predicts the next games better than the goal difference. <b>Rating</b> is our estimate of how many goals a game better or worse than an average club it is. <b>Playoffs</b> is our chance from ' + QK.fmt.num((d.sim || {}).n || 20000) + ' simulated seasons: 80% still misses about 1 time in 5.') +
+      '<section class="qk-section">' + QK.sectionHead({ kicker: 'Season simulation', title: 'Where they finish', sub: 'Each club’s points at the end of the regular season across the simulated seasons: the dot is the mean, the bar the range it lands in nine times out of ten.',
         actions: '<div class="qk-seg" id="st-conf" role="group" aria-label="Conference"><button type="button" aria-pressed="true" data-value="Eastern">East</button><button type="button" aria-pressed="false" data-value="Western">West</button></div>' }) +
-      U.card2('Projected full-season points', d.sim && d.sim.n ? QK.fmt.num(d.sim.n) + ' simulations of the rest of the season, from today’s points' : '', U.chart('st-range', 520, 'Projected full-season points with a 90% range')) + '</section>' +
-      '<p class="rk-note">Clinch marks: x playoff spot, y division, z conference, p Presidents\' Trophy, e eliminated. Ties: points %, regulation wins, regulation and overtime wins, then wins.' + (d.updated_at ? ' Updated ' + esc(RK.fmtStamp(d.updated_at)) + '.' : '') + '</p>';
+      U.card2('Projected full-season points', d.sim && d.sim.n ? QK.fmt.num(d.sim.n) + ' simulations of the rest of the season, from today’s points' : '', U.chart('st-range', 520, 'Projected full-season points with a 90% range') +
+        QK.note('<b>Why are the bars so wide?</b> Every club still has most of its games to play, and hockey games are close to coin flips. The bars narrow with every game day.')) + '</section>' +
+      QK.note('<b>Clinch marks:</b> x playoff spot, y division, z conference, p Presidents\' Trophy, e eliminated. Ties go to points %, then regulation wins, regulation and overtime wins, then wins.' + (d.updated_at ? ' Updated ' + esc(RK.fmtStamp(d.updated_at)) + '.' : ''));
     const draw = v => {
       const groups = [];
       if (v === 'wc') {
@@ -97,7 +104,7 @@ function standingsNew(node, S) {
 }
 
 /* Season forecasts: our chances for every season-long question (Cup, conference, division, Presidents' Trophy,
-   playoffs). The prediction-market number is a quiet grey tick with its source named, for reference only. */
+   playoffs). v3: ours only; the market appears only on game pages and the Model page. */
 const FC = [['cup', 'Stanley Cup', 'Our chance of winning the Cup'], ['conference', 'Conference', 'Our chance of winning the conference (reaching the Final)'], ['presidents', 'Presidents’ Trophy', 'Our chance of the best regular-season record'],
   ['division', 'Division', 'Our chance of winning the division'], ['playoffs', 'Playoffs', 'Our chance of a playoff spot']];
 function forecastsTab(node, S) {
@@ -107,18 +114,19 @@ function forecastsTab(node, S) {
     const mk = RK.ok(res[0]) ? res[0] : {}, se = RK.ok(res[1]) ? res[1] : {};
     const F = mk.futures || {}, sim = (se.sim && se.sim.teams) || {};
     const simKey = { cup: 'p_cup', conference: 'p_conf', presidents: 'p_pres', division: 'p_div', playoffs: 'p_playoffs' };
-    const src = list => { const s = {}; (list || []).forEach(x => (x.sources || []).forEach(k => { s[k] = 1; })); const n = Object.keys(s).map(k => k.charAt(0).toUpperCase() + k.slice(1)); return n.length ? n.join(' / ') : 'prediction markets'; };
     const block = f => {
-      let rows = (F[f[0]] || []).filter(x => isNum(x.model)).map(x => ({ team: x.team, p: x.model, market: isNum(x.market) ? x.market : null }));
-      if (!rows.length) rows = Object.keys(sim).filter(t => isNum(sim[t][simKey[f[0]]])).map(t => ({ team: t, p: sim[t][simKey[f[0]]], market: null }));
+      let rows = (F[f[0]] || []).filter(x => isNum(x.model)).map(x => ({ team: x.team, p: x.model }));
+      if (!rows.length) rows = Object.keys(sim).filter(t => isNum(sim[t][simKey[f[0]]])).map(t => ({ team: t, p: sim[t][simKey[f[0]]] }));
       if (!rows.length) return '';
       const full = f[0] === 'playoffs' || f[0] === 'division';
-      return '<div class="qk-span-6">' + U.card2(f[1], esc(f[2]) + (rows.some(r => isNum(r.market)) ? '; the grey tick is the ' + esc(src(F[f[0]])) + ' number, for reference' : ''),
-        QK.chances(rows.map(r => ({ label: RK.teamName(r.team), p: r.p, market: r.market, color: RK.teamColourRaw(r.team), href: RK.teamHref(r.team, S), mark: U.team(r.team) })), { limit: full ? 32 : 16, marketName: 'Market (' + src(F[f[0]]) + ')', max: full ? 1 : undefined })) + '</div>';
+      return '<div class="qk-span-6">' + U.card2(f[1], esc(f[2]),
+        QK.chances(rows.map(r => ({ label: RK.teamName(r.team), p: r.p, href: RK.teamHref(r.team, S), mark: U.team(r.team) })), { limit: full ? 32 : 16, key: false, max: full ? 1 : undefined })) + '</div>';
     };
     const html = FC.map(block).join('');
-    node.innerHTML = html ? QK.sectionHead({ kicker: 'Season simulation', title: 'Our season forecasts', sub: 'Every season-long question, answered from ' + QK.fmt.num((se.sim || {}).n || 20000) + ' simulated seasons. Where a prediction market lists the same question, its number is a grey tick for reference; how the two compare over time is on the Model page.' }) +
-      '<div class="qk-grid">' + html + '</div>' : U.card2('Season forecasts', '', QK.empty('Not built yet', 'The season simulation has not run for this season.'));
+    const cupTop = Object.keys(sim).map(t => sim[t].p_cup).filter(isNum).sort((a, b) => b - a)[0];
+    node.innerHTML = html ? QK.sectionHead({ kicker: 'Season simulation', title: 'Every question about the season', html: true, sub: 'Our chances for the Cup, the conference, the division, the best record and a playoff spot, from ' + QK.fmt.num((se.sim || {}).n || 20000) + ' simulated seasons. <a class="qk-link" href="#/model?tab=calibration">How past simulations did is on the Model page.</a>' }) +
+      (isNum(cupTop) ? QK.note('<b>Is ' + U.pct(cupTop) + ' a lot for the Cup?</b> For the favourite, yes. With 32 clubs and four rounds of best-of-seven series, even the best club loses somewhere along the way ' + (cupTop < 0.5 ? 'more often than not' : 'quite often') + ': ' + U.pct(cupTop) + ' still misses about ' + Math.round(10 * (1 - cupTop)) + ' times in 10.') : '') +
+      '<div class="qk-grid" style="margin-top:var(--sp-5)">' + html + '</div>' : U.card2('Season forecasts', '', QK.empty('Not built yet', 'The season simulation has not run for this season.'));
   });
 }
 
@@ -129,7 +137,7 @@ function standingsPage(el, params, state) {
   const tabs = ST_TABS.map((t, i) => ({ key: t[0], label: t[1], href: base + (i ? '?tab=' + t[0] : '') }));
   const nav = (S > RK.FIRST_SEASON ? '<a class="qk-btn" href="' + RK.standingsHref(S - 10001) + (tab !== 'table' ? '?tab=' + tab : '') + '">← ' + esc(RK.seasonLabel(S - 10001)) + '</a>' : '') +
     (S < RK.currentSeason() ? '<a class="qk-btn" href="' + RK.standingsHref(S + 10001) + (tab !== 'table' ? '?tab=' + tab : '') + '">' + esc(RK.seasonLabel(S + 10001)) + ' →</a>' : '');
-  const body = U.section(el, { section: 'standings', title: 'Standings', sub: 'The table, our playoff and Cup chances from simulating the rest of the season, team ratings, the bracket and the draft lottery.', tabs: tabs, active: tab, actions: nav });
+  const body = U.section(el, { section: 'standings', title: 'Standings', sub: 'Where every club stands, and where we think it finishes: playoff and Cup chances from simulating the rest of the season, our team ratings, the bracket and the draft lottery.', tabs: tabs, active: tab, actions: nav });
   if (tab === 'table') return standingsNew(body, S);
   if (tab === 'bracket') return U.legacy('playoffs', body, params, state);
   if (tab === 'markets') return forecastsTab(body, S);
@@ -161,12 +169,13 @@ function teamsNew(node, S) {
       tile('pp', 'Most dangerous power play', 'expected goals per 60 on the power play', 'Expected goals created per 60 minutes on the power play'),
       tile('goalie', 'Best goaltending', 'goals saved above expected per 60', 'Goals the team’s goalies saved above expected per 60 minutes')
     ]) + '</div>';
-    h += '<section class="qk-section" style="margin-top:0">' + QK.sectionHead({ kicker: 'Team set', title: 'How the 32 clubs compare', html: true,
+    h += '<section class="qk-section" style="margin-top:0">' + QK.sectionHead({ kicker: 'How they compare', title: 'The 32 clubs, side by side', html: true,
       sub: 'Our rating first, then the process numbers that predict results (5v5 expected-goal and shot-attempt shares, offence, defence, special teams, goaltending), then the results. ' +
         (early ? 'Ranks start after ' + U.TEAM_MIN_GP + ' games: before then they are mostly noise, so the cells stay grey.' : 'Cells are coloured by rank among the 32 clubs: red best, blue worst (for defence and the penalty kill, fewer chances allowed is better).') }) +
-      '<div class="qk-card" id="tm-board"></div></section>';
+      '<div class="qk-card" id="tm-board"></div>' +
+      QK.note('<b>Rating</b> is our estimate of how many goals a game better (or worse) than an average club a team is, in all situations: +0.50 means half a goal a game. The <b>process</b> numbers (shares of chances and shot attempts) come first because they predict the next games better than the record does.') + '</section>';
     if (pts.length) h += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-12">' + U.card2('Offence v defence', '5v5 expected goals for and against per 60 minutes; top right is best (the defence axis is flipped)', U.chart('tm-od', 420, 'Offence against defence')) + '</div></div></section>';
-    h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'By division', title: 'Every club', sub: 'Record, our rating and our playoff chance. Open a club for its rating over time, roster, strengths and needs, schedule and outlook.' });
+    h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'By division', title: 'Every club, division by division', sub: 'Record, our rating and our playoff chance. Open a club for its rating over time, roster, strengths and needs, schedule and outlook.' });
     (d.standings.divisions || []).forEach(dv => {
       h += '<div class="rk-day"><b>' + esc(dv.division) + '</b><span>' + esc(dv.conference) + ' Conference</span></div><div class="rk-mini-grid">' + (dv.teams || []).map(t => {
         const r = by[t] || {};
@@ -196,7 +205,7 @@ function teamsNew(node, S) {
 function teamsPage(el, params, state) {
   const S = params.season;
   const tab = U.tab(params, ['clubs', 'stats'], 'clubs');
-  const body = U.section(el, { section: 'teams', title: 'Teams', sub: 'Every club on the numbers that predict results: our rating, expected-goal and shot shares, special teams and goaltending. Open a club for its page.',
+  const body = U.section(el, { section: 'teams', title: 'Teams', sub: 'Every club on the numbers that predict results: our rating, the share of the chances, special teams and goaltending. Open a club for the short version, its form and its roster.',
     tabs: U.tabs('#/teams', [['clubs', 'Clubs'], ['stats', 'Team stats']], S), active: tab });
   if (tab === 'stats') return U.legacy('teams', body, params, state);
   return teamsNew(body, S);
@@ -248,12 +257,25 @@ function leadersPage(node, S) {
       return '<div class="qk-span-3">' + U.card2(b[0], esc(b[5]) + (rate ? ' · qualified' : ''), inner, { flush: true, cls: 'rk-board', right: sp.tip ? '<span class="rk-info" tabindex="0" data-tip="' + esc(sp.tip) + '">ⓘ</span>' : '' }) + '</div>';
     };
     const fin = P.filter(p => (v(p, 'sog') || 0) >= 20 && isNum(v(p, 'ixg')) && isNum(v(p, 'g')));
+    /* Who's hot: the leader of each headline total (and the qualified leader per 60), with the next best */
+    const lead2 = (pool, k, q, lower) => pool.filter(p => isNum(v(p, k)) && (!q || q(p))).sort((x, y) => (lower ? v(x, k) - v(y, k) : v(y, k) - v(x, k))).slice(0, 2);
+    /* a leader tied with the next best (as shown) is no leader: that card is left out */
+    const hot = (title, pool, k, f, unit, expl, q) => { const t = lead2(pool, k, q); return t.length && !(t[1] && f(v(t[0], k)) === f(v(t[1], k))) ? { sport: 'hockey', title: title, name: t[0].name, value: f(v(t[0], k)), unit: unit + ' · ' + RK.teamAbbr(t[0].team), next: t[1] ? { name: t[1].name, value: f(v(t[1], k)) } : null, expl: expl, href: RK.playerHref(t[0].id) } : null; };
+    const hotItems = [hot('Most points', P, 'p', x => String(x), 'points', 'Goals plus assists, all situations.'),
+      hot('Most goals', P, 'g', x => String(x), 'goals', 'Finishing swings a lot over a few weeks; the chances behind it swing less.'),
+      hot('Most value', P, 'gar', x => U.f(x, 1), 'goals above replacement', 'Goals added over a replacement-level player, all parts of the game.'),
+      hot('Best in net', G, 'gsax', x => U.signed(x, 1), 'goals saved above expected', 'Goals stopped beyond what an average goalie would on the same shots.'),
+      hot('Best per hour', F, 'gar_60', x => U.f(x, 2), 'value per 60, forwards', 'Value per 60 minutes among qualified forwards: fair across ice time.', skQ),
+      hot('Most assists', P, 'a', x => String(x), 'assists', 'Primary and secondary assists, all situations.')].filter(Boolean).slice(0, 5);
     node.innerHTML = '<div class="rk-flex" style="margin-bottom:var(--sp-4)"><input class="qk-input rk-search" id="pl-q" type="search" placeholder="Find a player…" aria-label="Find a player" autocomplete="off"></div><div id="pl-hits"></div>' +
-      QK.sectionHead({ kicker: 'Totals', title: 'Season leaders', sub: 'Counting stats, so everyone ranks.' }) + '<div class="qk-grid">' + TOT.map(b => board(b, null)).join('') + '</div>' +
+      (hotItems.length >= 3 ? '<section class="rk-hot">' + QK.sectionHead({ kicker: 'Who’s hot', title: 'Leading the way in ' + RK.seasonLabel(S), sub: 'The leader of each headline number, with the next best. Tap a card for the player.' }) + QK.hotRow(hotItems) + '</section>' : '') +
+      QK.sectionHead({ kicker: 'Season leaders', title: 'Who has the most', sub: 'Counting stats, so everyone ranks.' }) + '<div class="qk-grid">' + TOT.map(b => board(b, null)).join('') + '</div>' +
       '<section class="qk-section">' + QK.sectionHead({ kicker: 'Rates by position', title: 'Who is best per minute', html: true,
         sub: 'The stable, predictive rates from our metric spec, ranked within each position group. Only qualified players rank: skaters need 250 5v5 minutes over a full season (' + (skFloor !== null ? skFloor + ' now' : 'prorated') + '), goalies a quarter of the team’s minutes and ' + gFa + ' unblocked shots. ' + tg + ' team games played.' }) +
-      '<div class="qk-grid">' + RATE.map(b => board(b, b[1] === G ? 'g' : 's')).join('') + '</div></section>' +
-      (fin.length ? '<section class="qk-section">' + U.card2('Finishing: goals against expected goals', 'Skaters with 20+ shots; above the line scores more than the chances suggest (finishing is mostly luck over one season)', U.chart('pl-fin', 400, 'Goals against expected goals')) + '</section>' : '');
+      '<div class="qk-grid">' + RATE.map(b => board(b, b[1] === G ? 'g' : 's')).join('') + '</div>' +
+      QK.note('<b>Why per 60 minutes?</b> A rate compares a fourth-liner and a top-line star on the same footing. The floor keeps one hot week from topping a board: below it, a rate is mostly noise.') + '</section>' +
+      (fin.length ? '<section class="qk-section">' + U.card2('Finishing: goals against expected goals', 'Skaters with 20+ shots; above the dashed line scores more than the chances suggest', U.chart('pl-fin', 400, 'Goals against expected goals') +
+        QK.note('<b>Hot hands cool off.</b> Over one season, scoring above or below the chances is mostly luck: the players far above the line usually drift back towards it.')) + '</section>' : '');
     if (fin.length) {
       const top = fin.slice().sort((a, b) => v(b, 'g') - v(a, 'g')).slice(0, 160);
       const m = Math.max.apply(null, top.map(p => Math.max(v(p, 'g'), v(p, 'ixg'))));
@@ -293,7 +315,8 @@ function awardsPage(node, S) {
     /* a race whose chances are all the same carries no information (a degenerate fit): treat it as no race */
     const live = k => { const r = races[k] || []; if (!r.length) return false; const p0 = r[0].p; return !r.every(x => Math.abs((x.p || 0) - (p0 || 0)) < 1e-6); };
     const withRace = list.filter(w => live(w.key));
-    node.innerHTML = (withRace.length ? '' : '<p class="rk-note">None of the award models has a race yet this season; each card says why and lists the players leading the usual criteria.</p>') + '<div class="qk-grid">' + list.map(w => {
+    node.innerHTML = QK.sectionHead({ kicker: 'Award races', title: 'Who wins the awards', sub: 'Our chances where the award model has a race, and the players leading the usual criteria.' }) +
+      (withRace.length ? '' : QK.note('None of the award models has a race yet this season. Each card says why and lists the players leading the usual criteria.', { cls: 'rk-note-top' })) + '<div class="qk-grid">' + list.map(w => {
       const r = live(w.key) ? (races[w.key] || []).slice(0, 8) : [];
       const b = (boards[w.key] || []).slice(0, 5);
       const win = winners[w.key];
@@ -317,7 +340,7 @@ const PL_TABS = [['leaders', 'Leaders'], ['skaters', 'Skaters'], ['goalies', 'Go
 function playersPage(el, params, state) {
   const S = params.season;
   const tab = U.tab(params, PL_TABS.map(t => t[0]), 'leaders');
-  const body = U.section(el, { section: 'players', title: 'Players', sub: 'Leaders on the stable, predictive rates by position (qualified players only), every skater and goalie with percentiles, line combinations and the award races. Open a player for the full card.',
+  const body = U.section(el, { section: 'players', title: 'Players', sub: 'Who leads, who is best per minute at each position, every skater and goalie against their peers, the line combinations and the award races. Open a player for the short version.',
     tabs: U.tabs('#/players', PL_TABS, S), active: tab });
   if (tab === 'leaders') return leadersPage(body, S);
   if (tab === 'awards') return awardsPage(body, S);
@@ -329,7 +352,7 @@ function playersPage(el, params, state) {
 function labPage(el, params, state) {
   const S = params.season;
   const tab = state.route === 'compare' ? 'compare' : U.tab(params, ['lab', 'compare'], 'lab');
-  const body = U.section(el, { section: 'lab', title: 'Lab', sub: 'Build your own chart from any two metrics, or put two skaters, goalies or clubs side by side.',
+  const body = U.section(el, { section: 'lab', title: 'Lab', sub: 'Your turn: pick any two numbers and see who stands out, or put skaters, goalies or clubs side by side.',
     tabs: [{ key: 'lab', label: 'Chart builder', href: '#/lab' + (U.sq(S) ? '?' + U.sq(S) : '') }, { key: 'compare', label: 'Compare', href: '#/compare' + (U.sq(S) ? '?' + U.sq(S) : '') }], active: tab });
   return U.legacy(tab, body, params, state);
 }
@@ -366,12 +389,35 @@ function movesModel(node, S) {
     } else node.querySelector('#mv-dec').innerHTML = QK.empty('No deciles published');
   });
 }
+/* v3: "How sure are we?" at the top of the Model page (methodology and calibration): the game model's record from
+   data/calibration.json (QK.howSure), our chance for the home team against how often it won. Nothing when absent. */
+function howSure(node) {
+  return RK.load('calibration.json').then(cj => {
+    if (!U.alive(node)) return;
+    const cb = QK.calib.find(RK.ok(cj) ? cj : null);
+    if (!cb) { node.innerHTML = ''; return; }
+    const ss = (((cj || {}).game_model || {}).seasons || []).slice().sort();
+    const span = ss.length ? RK.seasonLabel(ss[0]) + ' to ' + RK.seasonLabel(ss[ss.length - 1]) : '';
+    node.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'When we say 60%, does it happen 60% of the time?', sub: 'Every game forecast we would have made before puck drop' + (span ? ', ' + esc(span) : '') + ', against what happened. On the dashed line, a chance came true exactly as often as it said.' }) + '<div id="md-sure-mod"></div>';
+    QK.howSure(node.querySelector('#md-sure-mod'), { calibration: cj, league: 'NHL', span: span, subject: 'the home team' });
+  });
+}
 function modelPage(el, params, state) {
   let tab = state.route === 'glossary' ? 'glossary' : state.route === 'methodology' ? 'methodology' : U.tab(params, MD_TABS.map(t => t[0]), 'methodology');
   if (tab === 'terms') { location.replace('#/disclaimer'); return; }
   const tabs = MD_TABS.map((t, i) => ({ key: t[0], label: t[1], href: t[0] === 'terms' ? '#/disclaimer' : '#/model' + (i ? '?tab=' + t[0] : '') }));
-  const body = U.section(el, { section: 'model', title: 'Model', sub: 'How the models work, how well they have done on seasons they never saw, and what every number means.', tabs: tabs, active: tab });
+  const sub = tab === 'glossary' ? 'Every number on the site in plain English: what it measures, and how many games it takes to mean something.' : 'How the models work, how well they have done on seasons they never saw, and what every number means.';
+  const body = U.section(el, { section: 'model', title: tab === 'glossary' ? 'Glossary' : 'Model', sub: sub, tabs: tabs, active: tab });
   if (tab === 'moves') return movesModel(body, params.season);
+  if (tab === 'methodology' || tab === 'calibration') {
+    body.innerHTML = '<div class="rk-howsure" id="md-sure"></div><div id="md-tab"></div>';
+    howSure(body.querySelector('#md-sure'));
+    return U.legacy(tab, body.querySelector('#md-tab'), params, state);
+  }
+  if (tab === 'glossary') {
+    body.innerHTML = QK.note('<b>New here?</b> A <b>percentile</b> ranks a player against others in the same role: 90th means better than 90 in 100. <b>Stabilises at</b> is the sample after which a number is more signal than noise; before it, read it lightly.', { cls: 'rk-note-top' }) + '<div id="md-tab"></div>';
+    return U.legacy(tab, body.querySelector('#md-tab'), params, state);
+  }
   return U.legacy(tab, body, params, state);
 }
 

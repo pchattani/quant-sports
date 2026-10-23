@@ -132,7 +132,7 @@ function render(el, params) {
         rows: rows.slice(0, 200).map(r => { const o2 = { _r: r, name: r.name || k.name(r.pid) || r.pid, season: r.season || '', n: r.n, v: r.v, href: hrefOf(r) }; ex.forEach(x => { o2['x_' + x[0]] = (r.raw || {})[x[0]]; }); return o2; }) });
       const all = rows.filter(r => seasonNum(r.season));
       if (all.length) {
-        $('hi-chart-card').innerHTML = U.card2('When they played', 'Each player at the middle of the ' + (ST.scope === 'season' ? 'season' : 'career') + '; the top ten in violet' + (hits.length ? ', your highlight in white' : ''), U.chart('hi-chart', 420, lbl + ' by era'));
+        $('hi-chart-card').innerHTML = U.card2('When they played', 'Each player at the middle of the ' + (ST.scope === 'season' ? 'season' : 'career') + '; the top ten in teal' + (hits.length ? ', your highlight in white' : ''), U.chart('hi-chart', 420, lbl + ' by era'));
         const T = QKC.tokens();
         QKC.scatter('#hi-chart', { points: all.slice(0, 400).map((r, i) => ({ x: Math.round((seasonNum(r.season) + seasonEnd(r.season)) / 2), y: r.v, name: (r.name || r.pid) + ' · ' + r.season, label: i < 5 || hits.indexOf(r) >= 0 ? k.surname(r.name || r.pid) : ' ', color: hits.indexOf(r) >= 0 ? T.ink1 : i < 10 ? T.model : QKC.hexA(T.ink3, 0.55), size: i < 10 || hits.indexOf(r) >= 0 ? 11 : 6, href: hrefOf(r) })),
           xName: ST.scope === 'season' ? 'Season' : 'Middle of the career', yName: lbl, xFmt: x => String(Math.round(x)), yFmt: v => fmtM(ST.metric, v, meta), labelAll: true, yInverse: lower, label: lbl + ' by era' });

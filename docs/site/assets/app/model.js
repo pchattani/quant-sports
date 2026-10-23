@@ -512,10 +512,25 @@ FB.route('model', function (el, p) {
 
 // ── overview ────────────────────────────────────────────────────────────────
 
+/* "How sure are we?" (kit v3 QK.howSure): the match model's record from data/calibration.json, at the top of the
+   overview and of Model checks. The section stays empty until the file exists (the data build adds it). */
+function howSure(el) {
+  return FB.load('calibration.json').then(function (j) {
+    var box = el.querySelector('#md-sure');
+    if (!box || !FB.alive(el)) return;
+    var cb = FB.calibOf ? FB.calibOf(j) : QK.calib.find(j);
+    if (!cb || !cb.bins || !cb.bins.length) { box.innerHTML = ''; return; }
+    box.innerHTML = '<section class="qk-section fb-md-sure">' + QK.sectionHead({ kicker: 'How sure are we?', title: 'When we say 60%, does it happen 60% of the time?',
+      sub: 'Every pre-match chance we published, grouped by how sure we were, against how often it came off. Dots on the dashed line mean we were spot on.' }) + '<div id="md-sure-in"></div></section>';
+    QK.howSure(box.querySelector('#md-sure-in'), { bins: cb.bins, brier: cb.brier, n: cb.n, league: (j && j.league) || 'Football', span: (j && j.span) || '', subject: (j && j.subject) || 'the home side', unit: 'matches' });
+  });
+}
+
 function overview(el) {
   var live = FB.comps().filter(function (c) { return c.ok; }).length;
-  el.innerHTML = head('', 'Every probability, rating and value on the site comes from a model fitted to match data. Here is what each one does, how well it checks out, and where it is wrong.') +
-    '<div id="md-ov" class="fb-md-ov">' + FB.loading('card', 6) + '</div>';
+  el.innerHTML = head('', 'Every chance, rating and value on the site comes from a model fitted to match data. Here is what each one does, how well it checks out, and where it is wrong.') +
+    '<div id="md-sure"></div><div id="md-ov" class="fb-md-ov">' + FB.loading('card', 6) + '</div>';
+  howSure(el);
   return Promise.all([FB.load('value/meta.json'), FB.load('fantasy/meta.json')]).then(function (arr) {
     if (!FB.alive(el)) return;
     var vm = arr[0] || {}, fm = arr[1] || {};
@@ -696,13 +711,14 @@ function methodology(el, p) {
 // ── glossary ────────────────────────────────────────────────────────────────
 
 function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
-/* Terms the site no longer uses (betting framing; Design System 2.0 copy rules) and v2 wording for a few entries the
-   payload (glossary.py) still words the old way. */
+/* Terms the site no longer uses (betting framing) and the cleaned wording for a few entries. The builder was cleaned
+   (b463b937..a7f39783) and the live glossary.json (23 Oct 2026) already carries the clean text, so these change
+   nothing there; they stay only for the local snapshot built before that (glossary.json of 18 Oct still has "Edge",
+   "Fair odds", "Fantasy price" and the "Odds" group). Remove them once every glossary.json is rebuilt. */
 var RETIRED = { edge: 1, fair_odds: 1 };
 var REWORD = {
   fantasy_price: { label: 'Fantasy cost', desc: 'Our own cost proxy: expected points above replacement next season from the value model, ranked within the league and position and mapped onto FPL-like ranges. FPL\'s official figures and ownership are not used (the Premier League\'s terms forbid reusing its material).' },
-  de_vig: { desc: 'Removing a market\'s margin so its implied probabilities add up to 100%. The site does this only to show the market as a grey reference beside our chance on match pages and here.' },
-  o25: { label: '3 or more goals' }
+  de_vig: { desc: 'Removing a market\'s margin so its implied probabilities add up to 100%. The site does this only to show the market as a grey reference beside our chance on match pages and here.' }
 };
 var GROUP_NAME = { Odds: 'Market reference', Markets: 'Market reference' };
 function v2entry(e) {
@@ -790,7 +806,8 @@ function glossary(el, p) {
 function metaComps() { return FB.comps().filter(function (c) { return c.ok; }); }
 function calibration(el) {
   el.innerHTML = head('calibration', 'What the models\' own checks say. Every number here is measured on matches the model had not seen when it made the call, or (for the match model) on the matches it was fitted to.') +
-    '<div id="md-cal">' + FB.loading('chart', 2) + '</div>';
+    '<div id="md-sure"></div><div id="md-cal">' + FB.loading('chart', 2) + '</div>';
+  howSure(el);
   var leagues = metaComps().filter(function (c) { return FB.familyOf(c) === 'league'; });
   return Promise.all([FB.load('value/meta.json'), FB.load('fantasy/meta.json'), Promise.all(leagues.map(function (c) { return FB.compFile(c.slug, 'meta'); }))]).then(function (arr) {
     if (!FB.alive(el)) return;

@@ -43,7 +43,7 @@ body.lv-npb .bp-nav a[data-nav="awards"], body.lv-npb .bp-nav a[data-nav="market
 /* leaders */
 .npb-ld { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 16px; padding: 10px 14px; }
 .npb-ld-col { min-width: 0; }
-.npb-ld-h { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text3); margin-bottom: 4px; }
+.npb-ld-h { font-size: 0.72rem; text-transform: none; letter-spacing: 0.05em; color: var(--text3); margin-bottom: 4px; }
 .npb-ld-r { display: flex; align-items: baseline; gap: 6px; font-size: 0.82rem; padding: 2px 0; border-bottom: 1px solid #21262d; min-width: 0; }
 .npb-ld-r a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .npb-ld-r b { margin-left: auto; font-variant-numeric: tabular-nums; }

@@ -1,0 +1,300 @@
+{
+ "ok": true,
+ "league": "Football",
+ "span": "2019/20 to 2026/27",
+ "subject": "the home side",
+ "unit": "matches",
+ "updated_at": "2026-10-23T20:37:23Z",
+ "source": "walk-forward 1X2 backtest of the promoted match model on football-data.co.uk results, the site's 12 leagues, test seasons only (2019/20 on; settings chosen on 2014-2018)",
+ "leagues": [
+  "belgian-pro-league",
+  "brasileirao",
+  "bundesliga",
+  "eredivisie",
+  "la-liga",
+  "liga-argentina",
+  "liga-mx",
+  "ligue-1",
+  "mls",
+  "premier-league",
+  "primeira-liga",
+  "serie-a"
+ ],
+ "metrics": {
+  "model": {
+   "n": 31127,
+   "brier": 0.2174,
+   "logloss": 0.62327,
+   "base_rate": 0.4416,
+   "mean_p": 0.4436,
+   "reliability": [
+    {
+     "lo": 0.0,
+     "hi": 0.1,
+     "n": 354,
+     "mean_p": 0.0793,
+     "freq": 0.0706
+    },
+    {
+     "lo": 0.1,
+     "hi": 0.2,
+     "n": 1766,
+     "mean_p": 0.1566,
+     "freq": 0.1393
+    },
+    {
+     "lo": 0.2,
+     "hi": 0.3,
+     "n": 3843,
+     "mean_p": 0.2557,
+     "freq": 0.2462
+    },
+    {
+     "lo": 0.3,
+     "hi": 0.4,
+     "n": 6662,
+     "mean_p": 0.3534,
+     "freq": 0.344
+    },
+    {
+     "lo": 0.4,
+     "hi": 0.5,
+     "n": 7701,
+     "mean_p": 0.4488,
+     "freq": 0.454
+    },
+    {
+     "lo": 0.5,
+     "hi": 0.6,
+     "n": 5482,
+     "mean_p": 0.5454,
+     "freq": 0.5447
+    },
+    {
+     "lo": 0.6,
+     "hi": 0.7,
+     "n": 3111,
+     "mean_p": 0.6447,
+     "freq": 0.6461
+    },
+    {
+     "lo": 0.7,
+     "hi": 0.8,
+     "n": 1512,
+     "mean_p": 0.7439,
+     "freq": 0.7599
+    },
+    {
+     "lo": 0.8,
+     "hi": 0.9,
+     "n": 639,
+     "mean_p": 0.8403,
+     "freq": 0.8529
+    },
+    {
+     "lo": 0.9,
+     "hi": 1.0,
+     "n": 57,
+     "mean_p": 0.9202,
+     "freq": 0.9123
+    }
+   ]
+  }
+ },
+ "outcomes_1x2": {
+  "n": 31127,
+  "logloss": 0.99275,
+  "brier": 0.59247,
+  "rps": 0.20155,
+  "draw": {
+   "n": 31127,
+   "brier": 0.18938,
+   "logloss": 0.56487,
+   "base_rate": 0.2586,
+   "mean_p": 0.2555,
+   "reliability": [
+    {
+     "lo": 0.0,
+     "hi": 0.1,
+     "n": 246,
+     "mean_p": 0.0824,
+     "freq": 0.0813
+    },
+    {
+     "lo": 0.1,
+     "hi": 0.2,
+     "n": 3456,
+     "mean_p": 0.1658,
+     "freq": 0.1557
+    },
+    {
+     "lo": 0.2,
+     "hi": 0.3,
+     "n": 23131,
+     "mean_p": 0.2584,
+     "freq": 0.2663
+    },
+    {
+     "lo": 0.3,
+     "hi": 0.4,
+     "n": 4288,
+     "mean_p": 0.3219,
+     "freq": 0.3102
+    },
+    {
+     "lo": 0.4,
+     "hi": 0.5,
+     "n": 6,
+     "mean_p": 0.4058,
+     "freq": 0.3333
+    }
+   ]
+  },
+  "away": {
+   "n": 31127,
+   "brier": 0.18569,
+   "logloss": 0.55233,
+   "base_rate": 0.2998,
+   "mean_p": 0.3009,
+   "reliability": [
+    {
+     "lo": 0.0,
+     "hi": 0.1,
+     "n": 1828,
+     "mean_p": 0.0689,
+     "freq": 0.0667
+    },
+    {
+     "lo": 0.1,
+     "hi": 0.2,
+     "n": 6278,
+     "mean_p": 0.1559,
+     "freq": 0.1579
+    },
+    {
+     "lo": 0.2,
+     "hi": 0.3,
+     "n": 9229,
+     "mean_p": 0.2504,
+     "freq": 0.2365
+    },
+    {
+     "lo": 0.3,
+     "hi": 0.4,
+     "n": 7076,
+     "mean_p": 0.3452,
+     "freq": 0.3389
+    },
+    {
+     "lo": 0.4,
+     "hi": 0.5,
+     "n": 3484,
+     "mean_p": 0.4451,
+     "freq": 0.4621
+    },
+    {
+     "lo": 0.5,
+     "hi": 0.6,
+     "n": 1786,
+     "mean_p": 0.5438,
+     "freq": 0.5571
+    },
+    {
+     "lo": 0.6,
+     "hi": 0.7,
+     "n": 940,
+     "mean_p": 0.644,
+     "freq": 0.6872
+    },
+    {
+     "lo": 0.7,
+     "hi": 0.8,
+     "n": 434,
+     "mean_p": 0.7404,
+     "freq": 0.7442
+    },
+    {
+     "lo": 0.8,
+     "hi": 0.9,
+     "n": 71,
+     "mean_p": 0.8283,
+     "freq": 0.8732
+    },
+    {
+     "lo": 0.9,
+     "hi": 1.0,
+     "n": 1,
+     "mean_p": 0.904,
+     "freq": 1.0
+    }
+   ]
+  }
+ },
+ "by_league": {
+  "belgian-pro-league": {
+   "n": 2157,
+   "logloss_1x2": 0.98427,
+   "brier_home": 0.21315
+  },
+  "brasileirao": {
+   "n": 2963,
+   "logloss_1x2": 1.01201,
+   "brier_home": 0.23036
+  },
+  "bundesliga": {
+   "n": 2196,
+   "logloss_1x2": 0.98389,
+   "brier_home": 0.21339
+  },
+  "eredivisie": {
+   "n": 2149,
+   "logloss_1x2": 0.94327,
+   "brier_home": 0.20124
+  },
+  "la-liga": {
+   "n": 2748,
+   "logloss_1x2": 0.97613,
+   "brier_home": 0.21156
+  },
+  "liga-argentina": {
+   "n": 2692,
+   "logloss_1x2": 1.05665,
+   "brier_home": 0.23679
+  },
+  "liga-mx": {
+   "n": 2414,
+   "logloss_1x2": 1.01997,
+   "brier_home": 0.22653
+  },
+  "ligue-1": {
+   "n": 2400,
+   "logloss_1x2": 0.99112,
+   "brier_home": 0.21389
+  },
+  "mls": {
+   "n": 3734,
+   "logloss_1x2": 1.03704,
+   "brier_home": 0.24052
+  },
+  "premier-league": {
+   "n": 2730,
+   "logloss_1x2": 0.9724,
+   "brier_home": 0.20882
+  },
+  "primeira-liga": {
+   "n": 2214,
+   "logloss_1x2": 0.92777,
+   "brier_home": 0.19247
+  },
+  "serie-a": {
+   "n": 2730,
+   "logloss_1x2": 0.96817,
+   "brier_home": 0.2016
+  }
+ },
+ "notes": [
+  "Every forecast is the model's pre-match one, refitted at each decision time on matches settled at least 2.5 hours before it; closing prices only judge.",
+  "The chart shows the home side's chance; the three-way log-loss, Brier score and ranked probability score are in outcomes_1x2.",
+  "Cups and international matches are not in the backtest (football-data.co.uk covers leagues)."
+ ]
+}

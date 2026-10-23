@@ -439,6 +439,8 @@ def careers(b: Build, td: an.TourData, entries: dict[int, dict], preds: dict, de
     erank = {p: i + 1 for i, p in enumerate(order)}
     srp = (td.season_sr(td.current) or {}).get("players") or {}
     peer = (b.step(f"{td.tour} peer blocks", lambda: PL.peer_blocks(cat_cur, td.tour), {}) or {}) if (cat_cur or {}).get("players") else {}
+    # last season's percentiles for the player page's rail rings (current.prev_pct_pos)
+    prev_cat = an.read_json(b.data / td.tour / str(td.current - 1) / "players.json") or {}
     n = 0
     for pid in sorted(per):
         ex = extras_cur.get(pid) or {}
@@ -447,6 +449,7 @@ def careers(b: Build, td: an.TourData, entries: dict[int, dict], preds: dict, de
         cur = {"rank": ex.get("rank"), "points": ex.get("points"), "race": ex.get("race_pts"), "to_defend": ex.get("to_defend"),
                "elo": {k: round(e[k], 1) for k in ("all",) + an.SURFACES} if e else None, "elo_rank": erank.get(pid),
                "hold": an.rnd(rec.get("hold"), 3), "brk": an.rnd(rec.get("break"), 3), "age": td.age(pid, td.today)}
+        cur.update(PL.prev_pct(prev_cat, pid, td.tour))
         payload = PL.career_payload(td, pid, per[pid], sr_by_year, elo_series.get(pid), ranks.get(pid),
                                     PL.results_rows(td, pid, recent.get(pid) or [], preds), h2h.get(pid), defend.get(pid),
                                     {"finals_qual": an.prob(fq.get(pid)), "year_end_no1": an.prob(no1.get(pid))}, cur,

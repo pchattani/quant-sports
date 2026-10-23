@@ -129,7 +129,7 @@ GI.route('trade', function (el, params) {
   return GI.load(GI.ypath('trade.json', S)).then(d => {
     if (!el.isConnected) return;
     D = d;
-    const head = GI.pageHead('Value & Moves · ' + S, 'Trade simulator', 'Swap players between two or three teams and see each side\'s strength, wins and our season chances move.' + (GI.ok(d) && d.basis_season && d.basis_season !== S ? ' Player values from ' + d.basis_season + '.' : '')) + GI.sectionNav('value', 'trade');
+    const head = GI.pageHead('Value & Moves · ' + S, 'Trade simulator', 'Swap players between two or three teams and see each side\'s strength, wins and our season chances move.' + (GI.ok(d) && d.basis_season && d.basis_season !== S ? ' Player values from ' + d.basis_season + '.' : '')) + GI.sectionNav('value', 'trade') + QK.note('<b>How a trade is scored:</b> each side\'s team rating moves by the value of the players in and out, then the season is simulated again, so you see wins and playoff chances move.');
     if (!GI.ok(d) || !d.players) { el.innerHTML = head + GI.notBuilt('The ' + S + ' trade data', d); return; }
     P = {};
     (d.players || []).forEach(r => { const o = {}; d.cols.forEach((c, i) => { o[c] = r[i]; }); P[o.pid] = o; });

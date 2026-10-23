@@ -34,7 +34,7 @@ GI.route('value', function (el, params) {
   return GI.loadAll([GI.ypath('value.json', S)].concat(cur ? [GI.ypath('valuation.json', S)] : [])).then(res => {
     if (!el.isConnected) return;
     const d = res[0], v = cur && GI.ok(res[1]) ? res[1] : null;
-    const head = GI.pageHead('Value & Moves · ' + S, 'Player value', 'One currency for every position: points (EPA) above a replacement-level player at the same position.') + GI.sectionNav('value', 'value');
+    const head = GI.pageHead('Value & Moves · ' + S, 'Player value', 'One currency for every position: points (EPA) above a replacement-level player at the same position.') + GI.sectionNav('value', 'value') + QK.note('<b>Points above replacement</b> is one currency for every position: the expected points a player adds over a freely available backup at the same position. Our value model counts roughly 40 points as one win.');
     if (ST.season !== S) { ST.season = S; if (!qy.team) ST.team = ''; }
     if (!GI.ok(d) || !d.rows) { el.innerHTML = head + GI.notBuilt('The ' + S + ' value table', d); return; }
     const rows = GI.colRows(d), by = {};

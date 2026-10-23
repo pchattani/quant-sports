@@ -132,8 +132,120 @@ def refresh_people_roles(data_dir: Path, before: dict[str, str], after: dict[str
     return n
 
 
-def apply(data_dir: Path, roles_before: dict[str, str] | None = None) -> dict[str, int]:
-    """Every annotation above from the value files on disk; returns {what: files rewritten}."""
+def spec_groups() -> list[dict]:
+    """The player peer groups of docs/_design/metrics/football.json: [{"id", "codes", "min", "metrics": [(id, lower)]}]."""
+    from oddsmarkets.common import similar as SIM
+    out = []
+    for g in SIM.spec("football").get("groups") or []:
+        if g.get("entity") != "player" or not g.get("position_codes"):
+            continue
+        out.append({"id": g["id"], "codes": list(g["position_codes"]), "min": float((g.get("minimum") or {}).get("value") or 450),
+                    "metrics": [(m["id"], m.get("direction") == "lower") for m in g.get("metrics") or [] if m.get("id")]})
+    return out
+
+
+def _mid_rank(vals: list[float], v: float, lower: bool) -> int:
+    from bisect import bisect_left, bisect_right
+    lo, hi = bisect_left(vals, v), bisect_right(vals, v)
+    rank = (lo + 0.5 * (hi - lo)) / len(vals)
+    return int(round(100 * (1 - rank if lower else rank)))
+
+
+def prev_role_pct(rows: list[dict], prev: dict[str, dict], groups: list[dict], floor: float) -> dict[str, tuple[str, dict]]:
+    """Last season's percentiles in one competition, against the formation-role group (the front end's FB.peerPct,
+    core.js): {player id: (group id, {metric: 0-100})}. rows: that season's player rows (s/<sid>/season.json);
+    prev: {player id: {"role", "gar90"}} (the value model's line in that competition last season); a player needs a
+    fine role and max(the group's minimum, the season's floor) minutes; a metric needs five peers with a value."""
+    code = {c: g for g in groups for c in g["codes"]}
+    by_g: dict[str, list[dict]] = {}
+    gof: dict[str, dict] = {}
+    for r in rows:
+        pid = str(r.get("player_id"))
+        g = code.get(((prev.get(pid) or {}).get("role")) or "")
+        if g and (r.get("minutes") or 0) >= max(g["min"], floor):
+            gof[pid] = g
+            by_g.setdefault(g["id"], []).append(r)
+
+    def val(r: dict, k: str):
+        v = (prev.get(str(r.get("player_id"))) or {}).get("gar90") if k == "gar90" else r.get(k)
+        return float(v) if isinstance(v, (int, float)) and v == v else None
+    sorted_v: dict[tuple[str, str], list[float]] = {}
+    out: dict[str, tuple[str, dict]] = {}
+    for r in rows:
+        pid = str(r.get("player_id"))
+        g = gof.get(pid)
+        if not g:
+            continue
+        pc = {}
+        for k, lower in g["metrics"]:
+            key = (g["id"], k)
+            if key not in sorted_v:
+                sorted_v[key] = sorted(x for x in (val(q, k) for q in by_g[g["id"]]) if x is not None)
+            v, vals = val(r, k), sorted_v[key]
+            if v is not None and len(vals) >= 5:
+                pc[k] = _mid_rank(vals, v, lower)
+        if pc:
+            out[pid] = (g["id"], pc)
+    return out
+
+
+def annotate_people_prev(data_dir: Path, prev_lines: dict[tuple[str, str], dict], prev_sid: dict[str, str | None]) -> int:
+    """people/<pid>.json `current`: {"prev_pct_pos": {slug: {metric: 0-100}}, "prev_peer": {slug: {"sid", "season",
+    "role", "group", "min"}}} for every player on a competition's players_live.json whose formation-role group last
+    season in that competition (the value model's line) is the group of this season's row: last season's percentiles
+    against that season's group in that competition, for the kit v3 rail rings (23 Oct 2026). The unified step
+    rewrites every people file without `current` first, so a block that no longer applies drops out; returns the
+    files rewritten."""
+    from oddsmarkets.football.analytics.players import minutes_floor
+    groups = spec_groups()
+    if not groups or not prev_lines:
+        return 0
+    code = {c: g["id"] for g in groups for c in g["codes"]}
+    per_pid: dict[str, dict] = {}
+    for path in sorted(data_dir.glob("*/players_live.json")):
+        slug = path.parent.name
+        live = _read(path)
+        if not isinstance(live, dict) or not isinstance(live.get("players"), list):
+            continue
+        sid = prev_sid.get(slug)
+        if not sid:
+            continue
+        man = _read(data_dir / slug / "seasons.json") or {}
+        ent = next((s for s in man.get("seasons") or [] if str(s.get("sid")) == str(sid)), None)
+        past = _read(data_dir / slug / str((ent or {}).get("path") or f"s/{sid}/") / "season.json") if ent else None
+        rows = [r for r in ((past or {}).get("players") or []) if isinstance(r, dict)]
+        if not rows:
+            continue
+        prev = {pid: v for (pid, s), v in prev_lines.items() if s == slug}
+        floor = float(minutes_floor(rows))
+        got = prev_role_pct(rows, prev, groups, floor)
+        mins = {str(r.get("player_id")): r.get("minutes") for r in rows}
+        for p in live["players"]:
+            if not isinstance(p, dict):
+                continue
+            pid = str(p.get("player_id"))
+            if pid not in got or code.get(p.get("role") or "") != got[pid][0]:
+                continue
+            blk = per_pid.setdefault(pid, {"prev_pct_pos": {}, "prev_peer": {}})
+            blk["prev_pct_pos"][slug] = got[pid][1]
+            blk["prev_peer"][slug] = {"sid": str(sid), "season": (ent or {}).get("season"), "role": prev[pid]["role"],
+                                      "group": got[pid][0], "min": mins.get(pid)}
+    n = 0
+    for pid, blk in per_pid.items():
+        path = data_dir / "people" / f"{pid}.json"
+        doc = _read(path)
+        if not isinstance(doc, dict) or doc.get("merged_into"):
+            continue
+        doc["current"] = blk
+        n += _write_if_changed(path, doc)
+    logger.info("value fields: last-season role percentiles for %d players", len(per_pid))
+    return n
+
+
+def apply(data_dir: Path, roles_before: dict[str, str] | None = None, prev_lines: dict | None = None,
+          prev_sid: dict | None = None) -> dict[str, int]:
+    """Every annotation above from the value files on disk (and, with `prev_lines` / `prev_sid` from this build's
+    value layer, last season's role percentiles on the people files); returns {what: files rewritten}."""
     lines, players = load(data_dir)
     if not lines and not players:
         logger.info("value fields: no value layer on disk, nothing added")
@@ -141,5 +253,7 @@ def apply(data_dir: Path, roles_before: dict[str, str] | None = None) -> dict[st
     out = {"players_live": annotate_players_live(data_dir, lines, players), "lab": annotate_lab(data_dir, lines, players)}
     out["people"] = refresh_people_roles(data_dir, roles_before or {}, {i: r for i, (r, _g) in players.items() if r}) \
         if roles_before is not None else 0
+    if prev_lines:
+        out["people_prev"] = annotate_people_prev(data_dir, prev_lines, prev_sid or {})
     logger.info("value fields: %s", out)
     return out

@@ -182,5 +182,6 @@ if (METH) BP.route('methodology', (el, params, state) => Promise.resolve(METH(el
   box.className = 'qk-section';
   el.appendChild(box);
   modelBlock(box);
+  if (BP.ui && BP.ui.howSureTop) BP.ui.howSureTop(el, (BP.state && BP.state.level) || 'mlb');
 }));
 })(window.BP);

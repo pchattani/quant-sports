@@ -1175,12 +1175,14 @@ def player_line(r: dict) -> dict:
     return {**pg, "value": r2(r["value"]), "value_pg": r2(r["value_pg"]), "r": r2(r["r"])}
 
 
-def players_payload(ctx, s) -> dict:
+def season_percentiles(ctx, s) -> dict | None:
+    """A season's player percentiles as the catalogue places them, whether or not the season is an archive one (whose
+    players.json leaves them out): {"rows", "lines", "floor", "qual", "role_of", "role_thr", "pcts", "pcts_pos",
+    "pcts_role"} (each pcts {pid: {metric: 0-100}}), or None when the season has no rows."""
     pr = player_rows(ctx, s)
     rows = pr["rows"]
     if not rows:
-        return fail("no usable ESPN box scores for this season (none before men 2005 / women 2014; or not played yet)", season=s)
-    st = D.load(ctx["level"], s)
+        return None
     maxgp = max(r["gp"] for r in rows.values())
     floor = {"gp": max(5, int(0.4 * maxgp)), "mpg": 10.0}
     lines = {p: player_line(r) for p, r in rows.items()}
@@ -1206,6 +1208,18 @@ def players_payload(ctx, s) -> dict:
         if k in ROLE_PCT_KEYS:                         # within the role (guards / wings / bigs): the spec's peer group
             for role in ("G", "W", "B"):
                 _rank({p: x for p, x in xs.items() if role_of.get(p) == role}, k, lower, pcts_role)
+    return {"rows": rows, "lines": lines, "floor": floor, "qual": qual, "role_of": role_of, "role_thr": role_thr,
+            "pcts": pcts, "pcts_pos": pcts_pos, "pcts_role": pcts_role}
+
+
+def players_payload(ctx, s) -> dict:
+    sp = season_percentiles(ctx, s)
+    if sp is None:
+        return fail("no usable ESPN box scores for this season (none before men 2005 / women 2014; or not played yet)", season=s)
+    pr = player_rows(ctx, s)
+    rows, lines, floor, qual = sp["rows"], sp["lines"], sp["floor"], sp["qual"]
+    role_of, role_thr = sp["role_of"], sp["role_thr"]
+    pcts, pcts_pos, pcts_role = sp["pcts"], sp["pcts_pos"], sp["pcts_role"]
     out = {}
     old = archive(ctx, s)                              # archive seasons: qualified players only (size budget)
     for p, r in rows.items():
@@ -1693,6 +1707,12 @@ def calibration_payload(ctx: dict) -> dict:
                       "roster": (st8.get("roster_fit") or {}).get(max(st8["seasons"])),
                       "possessions": {k: v for k, v in kp.items() if k != "n"}}
     body["informed"] = INF.summary(lv)
+    # the kit's "How sure are we?" block (QK.calib.find reads metrics.model): the walk-forward bins and scores above
+    from oddsmarkets.common import calibration as CB
+    sm = (body.get("summary") or {}).get("model") or {}
+    blk = CB.from_table(body.get("calibration") or [], sm.get("n"), sm.get("brier"), sm.get("logloss"))
+    if blk:
+        body["metrics"] = {"model": blk}
     return {"ok": True, "level": lv, "updated_at": now_iso(), **body, "notes": notes}
 
 
@@ -1833,6 +1853,22 @@ def similar_players(ctx: dict, seasons: list[int], current: int, k: int | None =
     return out
 
 
+def prev_ring(cur_sp: dict | None, prev_sp: dict | None, pid: str, season: int) -> dict:
+    """Last season's role percentiles for a current block (kit v3 rail rings, 23 Oct 2026): {"prev_pct_pos" (last
+    season's pct_role: the spec's guards / wings / bigs), "prev_peer" {"season", "role", "pos", "gp", "qualified"}}
+    when the player was qualified last season in the role this season's catalogue gives, else {}. cur_sp / prev_sp:
+    season_percentiles() of this season and last (past seasons' players.json carry no percentiles, so they are
+    placed here as the catalogue would)."""
+    if not cur_sp or not prev_sp:
+        return {}
+    role = cur_sp["role_of"].get(pid)
+    pc = prev_sp["pcts_role"].get(pid)
+    if not role or pid not in prev_sp["qual"] or prev_sp["role_of"].get(pid) != role or not pc:
+        return {}
+    r = prev_sp["rows"].get(pid) or {}
+    return {"prev_pct_pos": dict(pc), "prev_peer": {"season": season, "role": role, "pos": r.get("pos"), "gp": r.get("gp"), "qualified": True}}
+
+
 def career_files(ctx: dict, out: Path, current: int) -> int:
     lv = ctx["level"]
     with_box = [s for s in ctx["seasons"] if s <= current and len(box_rows(ctx, s)["pid"])]
@@ -1856,6 +1892,12 @@ def career_files(ctx: dict, out: Path, current: int) -> int:
     n = 0
     pdir = out / lv / "players"
     stores = {s: D.load(lv, s) for s in with_box}
+    sps: dict[int, dict | None] = {}
+
+    def sp_of(season: int) -> dict | None:             # a season's percentiles (season_percentiles), once
+        if season not in sps:
+            sps[season] = season_percentiles(ctx, season) if season in ctx["seasons"] else None
+        return sps[season]
     pidx: dict[int, dict[str, list[int]]] = {}
     for s in recent:
         acc_ = defaultdict(list)
@@ -1899,7 +1941,7 @@ def career_files(ctx: dict, out: Path, current: int) -> int:
                     "class": info.get("class"), "height_in": info.get("height_in"), "weight_lb": info.get("weight_lb"),
                     "hometown": info.get("hometown"), "seasons": PK.pack(seasons_rows),
                     "current": {"season": ls, "team": r["team"], "log": PK.pack(log), "value": value_row(r, player_rows(ctx, ls)["params"]),
-                                "fantasy": None},
+                                "fantasy": None, **prev_ring(sp_of(ls), sp_of(ls - 1), p, ls - 1)},
                     "moves": mv_of.get(p, []), "similar": similar}
             write(pdir / f"{p}.json", page)
             written.add(f"{p}.json")

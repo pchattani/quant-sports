@@ -17,7 +17,7 @@ CC.route('standings', function (el, p) {
   var tab = U.tab(p, list.map(function (x) { return x[0]; }), 'conferences');
   var sub = { conferences: 'Conference and overall records with our rating and the chance to win the conference.', polls: 'The voters next to the model.', playoff: 'The 12-team College Football Playoff: the bracket, everyone’s chance to reach each round, and how the committee may rank them.',
     bowls: 'Who reaches six wins, and the bowl games announced so far.', bracket: 'The NCAA tournament: the bracket by region, each team’s chance to reach each round, and our first-round upset chances.', conftourneys: 'Our chance to win each conference tournament (formats approximated where no bracket is published).' }[tab];
-  el.innerHTML = U.head('Standings', sub, U.kicker(L, S)) + U.tabs(L, 'standings', list, S, tab) + '<div id="st-body">' + QK.skeleton('lines', 6) + '</div>';
+  el.innerHTML = U.head('Standings', sub, U.kicker(L, S)) + U.tabs(L, 'standings', list, S, tab) + QK.note('<b>How to read the chances:</b> each is the share of our simulated seasons in which it happens. A 30% playoff chance still comes off about 1 season in 3.') + '<div id="st-body">' + QK.skeleton('lines', 6) + '</div>';
   var body = QK.$('#st-body', el);
   return Promise.all([CC.season(L, S), (tab === 'playoff' || tab === 'bowls' || tab === 'bracket' || tab === 'conftourneys') ? CC.load(CC.path(L, S, fb ? 'cfp.json' : 'bracket.json')) : Promise.resolve(null)]).then(function (a) {
     if (!U.alive(el)) return;
@@ -188,7 +188,7 @@ function playoff(node, L, S, season, cfp) {
     return [r.rank, { html: U.teamEnt(L, r.team, { season: S }), v: CC.tname(L, r.team) }, r.record || '—', CC.f(r.score, 2), U.heat(r.p_top12), U.heat(r.conf_champ_p), isNum(r.sos_rank) ? r.sos_rank : '—'];
   }), { maxHeight: 620 }) : QK.empty('No committee proxy', '');
   var actualRk = cfp.actual && cfp.actual.rankings && cfp.actual.rankings.length ? U.table([{ label: '#', align: 'right' }, 'Team'], cfp.actual.rankings.slice(0, 25).map(function (r) { return [r.rank, { html: U.teamEnt(L, r.team, { season: S }), v: CC.tname(L, r.team) }]; }), { maxHeight: 620 }) : '';
-  html += '<div class="qk-grid cc-grid"><div class="qk-span-7">' + U.card('Chance to reach each round', 'Our chances: the share of simulated seasons. Darker violet is likelier.', heat) + '</div><div class="qk-span-5">' +
+  html += '<div class="qk-grid cc-grid"><div class="qk-span-7">' + U.card('Chance to reach each round', 'Our chances: the share of simulated seasons. Darker teal is likelier.', heat) + '</div><div class="qk-span-5">' +
     U.card('Committee proxy', 'How the committee may rank teams, fitted on its past rankings' + (pf.n_seasons ? ' (' + pf.n_seasons + ' seasons; out of sample Spearman ' + CC.f(pf.spearman, 2) + ', ' + (isNum(pf.top12_overlap) && pf.top12_overlap <= 1 ? CC.pct(pf.top12_overlap, 0) + ' of the top 12' : CC.f(pf.top12_overlap, 1) + ' of the top 12') + ' matched)' : '') + '. An estimate, not the committee.', px) +
     (actualRk ? U.card('Final CFP ranking', '', actualRk) : '') + '</div></div>';
   var ctg = cfp.conf_title_games || {};
@@ -356,7 +356,7 @@ function bracket(node, L, S, season, br) {
   var upT = ups.length ? U.table(['Matchup', { label: 'Upset', align: 'right', title: 'Our chance the lower seed wins' }], ups.slice(0, 32).map(function (u) {
     return [{ html: '<span class="cc-ups">(' + u.seed_dog + ') ' + U.teamEnt(L, u.dog, { season: S, abbr: true }) + ' <span class="qk-muted">over</span> (' + u.seed_fav + ') ' + U.teamEnt(L, u.fav, { season: S, abbr: true }) + '</span>', v: u.seed_dog }, U.heat(u.p_upset)];
   }), { maxHeight: 560 }) : QK.empty('No first-round games yet', 'Upset chances appear once the first round is set.');
-  html += '<div class="qk-grid cc-grid"><div class="qk-span-8">' + U.card('Chance to reach each round', (D.actual ? 'Our pre-tournament chances. ' : 'Our chances. ') + 'Darker violet is likelier.', heat) + '</div><div class="qk-span-4">' + U.card('First-round upset chances', 'Our chance the lower seed wins.', upT) + '</div></div>';
+  html += '<div class="qk-grid cc-grid"><div class="qk-span-8">' + U.card('Chance to reach each round', (D.actual ? 'Our pre-tournament chances. ' : 'Our chances. ') + 'Darker teal is likelier.', heat) + '</div><div class="qk-span-4">' + U.card('First-round upset chances', 'Our chance the lower seed wins.', upT) + '</div></div>';
   // bracketology
   var bo = (br.bracketology || []).slice().sort(function (x, y) { return (isNum(x.seed_mean) ? x.seed_mean : 99) - (isNum(y.seed_mean) ? y.seed_mean : 99) || (y.p_ncaa || 0) - (x.p_ncaa || 0); });
   if (bo.length) {

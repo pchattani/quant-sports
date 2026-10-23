@@ -136,7 +136,7 @@ GI.route('fourth', function (el, params) {
     if (!el.isConnected) return;
     const d = res[0];
     const plays = F.playsOf(d), model = F.hasModel(plays);
-    const head = GI.pageHead('Lab · ' + S, 'Fourth downs', 'Every fourth down graded by our decision model: go, punt or kick, valued with our own win-probability model.') + GI.sectionNav('lab', 'fourth');
+    const head = GI.pageHead('Lab · ' + S, 'Fourth downs', 'Every fourth down graded by our decision model: go, punt or kick, valued with our own win-probability model.') + GI.sectionNav('lab', 'fourth') + QK.note('<b>How the grades work:</b> for every fourth down our model works out the win chance after going for it, punting and kicking. The grade is how much win chance the call gave up against the best option: under 1.5 points is the right call.');
     if (!plays.length) { el.innerHTML = head + GI.notBuilt('The ' + S + ' fourth-down file', d); return; }
     if (ST.season !== S) { ST.season = S; ST.week = ''; ST.sel = null; }
     const teams = Array.from(new Set(plays.map(p => p.team).filter(Boolean))).sort();

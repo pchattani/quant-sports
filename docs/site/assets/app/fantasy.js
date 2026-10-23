@@ -73,7 +73,8 @@ function draw(el, meta, doc, q) {
       FB.kpi('Players projected', String(rows.length), { sub: 'current squads of ' + esc(doc.name || '') }),
       FB.kpi('Backtest rank corr.', isNum(m.spearman_round_mean) ? num(m.spearman_round_mean, 2) : '—', { sub: 'per round · last-5 form ' + (isNum(l5.spearman_round_mean) ? num(l5.spearman_round_mean, 2) : '—'), tip: 'Spearman correlation of projected and actual points among a round\'s players, averaged over rounds, walk-forward.' }),
       FB.kpi('Top-20 picks scored', isNum(m.top20_actual_mean) ? n1(m.top20_actual_mean) : '—', { sub: 'points a round · form picks ' + (isNum(l5.top20_actual_mean) ? n1(l5.top20_actual_mean) : '—') })
-    ]) + '</div>';
+    ]) + '</div>' +
+    '<div class="fb-mt">' + FB.note('<b>Rank correlation</b> runs from 0 (no better than guessing) to 1 (every player in the right order). A single gameweek is mostly luck, so even a good projection misses often. Costs are our own proxy, not FPL\'s.') + '</div>';
   var sel = el.querySelector('#fa-league');
   if (sel) sel.addEventListener('change', function () { FB.go(href({ l: sel.value, v: q.v })); });
   var body = el.querySelector('#fa-body');

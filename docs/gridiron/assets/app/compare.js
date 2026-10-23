@@ -5,6 +5,8 @@
  * the page says so. Below: where each one sits in the peer distribution of a chosen metric. With one player picked the
  * others are his most similar players. Teams (t:KC) and ?view=all keep the classic comparison: who wins each shared
  * metric by percentile, the biggest differences, a radar, a percentile butterfly and every metric with values.
+ * v3 (Matchday): the title asks the question ("Purdy, Prescott or Goff?"), the best value in each row sits under the
+ * sun highlighter, the percentiles are coloured pills, and a verdict under the table names what each player does best.
  * Reads <S>/players.json and <S>/teams.json. Exports GI.picker. */
 (function (GI) {
 'use strict';
@@ -102,12 +104,18 @@ function idCard(S, X, side) {
   else { const rc = X.rec || {}; facts = [['W-L', GI.record(rc.w, rc.l, rc.t)], ['Rating', GI.signed(v.rating, 1)], ['Off EPA', GI.signed(v.off_epa, 3)], ['Def EPA', GI.signed(v.def_epa, 3)]]; }
   const col = X.team ? GI.tc(X.team) : 'var(--accent)';
   return '<div class="qk-card gi-cmp-id" style="--tc:' + esc(col) + '"><div class="gi-toolbar">' + (X.kind === 'team' ? GI.mark(X.team, 'lg') : '<div class="qk-avatar" style="--tc:' + esc(col) + ';width:52px;height:52px;font-size:18px">' + esc(QK.fmt.initials(X.name)) + '</div>') +
-    '<div><span class="qk-kicker" style="color:' + (side === 'a' ? 'var(--wp-a)' : 'var(--wp-b)') + '">' + (side === 'a' ? 'Blue' : 'Orange') + '</span><br><a class="gi-link" style="font-size:var(--fs-lg)" href="' + (X.kind === 'team' ? GI.teamHref(X.id, S) : GI.playerHref(X.id, S)) + '">' + esc(X.name) + '</a>' + (X.qualified === false ? ' <span class="gi-tag">small sample</span>' : '') + '</div></div>' +
+    '<div><span class="qk-kicker" style="color:' + (side === 'a' ? 'var(--wp-a)' : 'var(--wp-b)') + '">' + (side === 'a' ? 'First' : 'Second') + '</span><br><a class="gi-link" style="font-size:var(--fs-lg)" href="' + (X.kind === 'team' ? GI.teamHref(X.id, S) : GI.playerHref(X.id, S)) + '">' + esc(X.name) + '</a>' + (X.qualified === false ? ' <span class="gi-tag">small sample</span>' : '') + '</div></div>' +
     GI.kpis(facts.map(f => GI.kpi(f[0], f[1]))) + '</div>';
 }
 
-const ECOL = ['var(--wp-a)', 'var(--wp-b)', 'var(--c-3)'];
+const ECOL = ['var(--wp-a)', 'var(--wp-b)', 'var(--c-5)'];
 const DSEL = { key: null };
+/* The type a player's best metric suggests (verdicts), by the spec's metric id. */
+const ARCHETYPE = { composite: 'The all-round passer', epa_db: 'The efficient passer', cpoe: 'The accurate passer', sack_rate: 'The sack-dodger', int_rate: 'The ball-protector', pressure_rate: 'The quick processor',
+  gvar_pg: 'The most valuable', ryoe: 'The elusive runner', rush_success: 'The steady runner', explosive: 'The home-run hitter', rush_epa: 'The efficient runner', stuff_rate: 'The tough runner', target_share: 'The go-to target',
+  yptpa: 'The yardage machine', rec_epa_tgt: 'The efficient target', croe: 'The sure hands', yac_rec: 'The YAC threat', pressures_pg: 'The pass rusher', tfl_pg: 'The backfield wrecker', tackles_pg: 'The tackler',
+  ff_pg: 'The strip specialist', pd_pg: 'The ball hawk', ints_pg: 'The ball hawk', splash_pg: 'The playmaker', fg_oe: 'The accurate kicker', fg_50_pct: 'The big leg', xp_pct: 'The steady kicker', fg_50: 'The big leg',
+  epa_punt: 'The field flipper', net: 'The field flipper', gross: 'The big leg', inside20: 'The pin-it-deep punter', touchback_rate: 'The precise punter' };
 /* The v2 player comparison: two or three players on the player card's metric set. */
 function compareV2(el, S, ids0, cat) {
   const sq = GI.sq(S);
@@ -147,9 +155,21 @@ function drawV2(el, h, S, ids, cat) {
   const hl = GI.SP.headline(g0), sty = GI.SP.style(g0);
   const groups = [{ label: 'The ' + g0.name.toLowerCase() + ' set', rows: hl.filter(m => E.some(e => isNum(GI.SP.value(e.p, e.id, m, cx)))).map(m => {
     const pctFmt = GI.SP.fmtOf(m, cx) === 'pct';
-    return { label: m[1] + (m[3] ? ' ↓' : ''), tip: m[5], better: m[3] ? 'low' : 'high', values: E.map(e => GI.SP.value(e.p, e.id, m, cx)), pctls: E.map(e => GI.SP.pct(e.p, e.id, e.g, m, cx)),
+    return { key: m[0], m: m, label: m[1] + (m[3] ? ' ↓' : ''), tip: m[5], better: m[3] ? 'low' : 'high', values: E.map(e => GI.SP.value(e.p, e.id, m, cx)), pctls: E.map(e => GI.SP.pct(e.p, e.id, e.g, m, cx)),
       fmt: v => GI.SP.fmt(m, v, cx), dfmt: pctFmt ? (v => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v * 100).toFixed(1) + ' pts') : null };
   }) }];
+  /* verdicts: for each player, the metric where the player's percentile beats the others' by the most */
+  const short = E.map(e => GI.surnameOf(e.p.name || '') || e.p.name || e.id);
+  const verd = E.map((e, i) => {
+    let bestD = 0, bestRow = null;
+    groups[0].rows.forEach(r => {
+      const mine = r.pctls[i]; if (!isNum(mine)) return;
+      const d = mine - Math.max.apply(null, r.pctls.filter((_, j) => j !== i).map(v => (isNum(v) ? v : 0)));
+      if (d > bestD) { bestD = d; bestRow = r; }
+    });
+    return bestRow ? { title: ARCHETYPE[bestRow.key] || 'The standout', who: short[i], text: 'best of the ' + E.length + ' on ' + (/^[A-Z][a-z]/.test(bestRow.m[1]) ? bestRow.m[1].charAt(0).toLowerCase() + bestRow.m[1].slice(1) : bestRow.m[1]) + ' (' + bestRow.fmt(bestRow.values[i]) + ', ' + QK.ordinal(Math.round(bestRow.pctls[i])) + ' percentile).' } : null;
+  });
+  const q = short.length === 2 ? short[0] + ' or ' + short[1] + '?' : short.slice(0, -1).join(', ') + ' or ' + short[short.length - 1] + '?';
   const ents = E.map(e => ({ name: e.p.name || GI.playerName(e.id), href: GI.playerHref(e.id, S), abbr: GI.surnameOf(e.p.name || ''), colour: null,
     sub: [GI.posLabel(e.p.pos), GI.teamAbbr(e.p.team), GI.SP.sample(e.p, e.g)].filter(Boolean).join(' · ') }));
   const peerTxt = same ? g0.peer : 'each against their own group (' + E.map(e => GI.surnameOf(e.p.name || '') + ': ' + e.g.peer.replace(/^NFL /, '')).join('; ') + ')';
@@ -158,8 +178,10 @@ function drawV2(el, h, S, ids, cat) {
   const styleTbl = styleRows.length ? GI.card('Playing style', 'How they play, not how well: no better or worse', GI.tableHTML([{ label: 'Metric', sortable: false }].concat(E.map(e => ({ label: GI.surnameOf(e.p.name || ''), align: 'right', sortable: false }))),
     styleRows.map(m => [{ html: '<span data-tip="' + esc(m[5]) + '" tabindex="0">' + esc(m[1]) + '</span>' }].concat(E.map(e => ({ html: GI.SP.fmt(m, GI.SP.value(e.p, e.id, m, cx), cx) })))))) : '';
   el.innerHTML = h + GI.card('Players', 'Ranked against ' + esc(peerTxt) + ' this season (' + S + ')', pick) +
-    '<section class="qk-section" style="margin-top:var(--sp-4)">' + GI.card('Side by side', 'Value · percentile against the group, qualified players (100 = best) · ' + (E.length === 2 ? 'difference, green when ' + esc(E[0].p.name) + ' is better' : 'the best of three in bold'),
-      QK.compareView({ entities: ents, groups: groups }) +
+    '<section class="qk-section" style="margin-top:var(--sp-8)">' + QK.sectionHead({ kicker: 'Side by side', title: esc(q), html: true,
+      sub: 'Value and percentile against the group, qualified players (100 = best). The best in each row is highlighted' + (E.length === 2 ? '; the last column is ' + esc(short[0]) + ' minus ' + esc(short[1]) + ', green when ' + esc(short[0]) + ' is better.' : '.') }) +
+      GI.card(E.length + ' players, one metric set', 'The headline set for the role from our metrics spec: stable and predictive rates first',
+      QK.compareView({ entities: ents, groups: groups }) + QK.verdicts(verd) +
       (small.length ? '<p class="qk-caption">' + esc(small.join(', ')) + (small.length > 1 ? ' are' : ' is') + ' below the qualifying minimum: no percentiles.</p>' : '') +
       (!same ? '<p class="qk-caption">Different groups: the rows are the ' + esc(g0.name.toLowerCase()) + ' set, and each percentile is against the player’s own group.</p>' : '') +
       (GI.SP.NOTE[g0.id] ? '<p class="qk-caption">' + esc(GI.SP.NOTE[g0.id]) + '</p>' : '')) + '</section>' + styleTbl +
@@ -179,7 +201,7 @@ function drawV2(el, h, S, ids, cat) {
     const n = document.getElementById('cmp-dist');
     if (!n) return;
     n.classList.remove('gi-chart-empty'); n.innerHTML = '';
-    const cols = ['wpA', 'wpB', 'c3'];
+    const cols = ['wpA', 'wpB', 'c5'];
     const c = QKC.distribution(n, { values: vs, binCount: 22, lowerBetter: !!m[3], fmt: v => GI.SP.fmt(m, v, cx), colorBy: 'flat', xName: m[1] + ' · ' + vs.length + ' qualified ' + g0.peer.replace(/^NFL /, ''), yName: 'Players',
       marks: E.map((e, i) => ({ x: GI.SP.value(e.p, e.id, m, cx), label: GI.surnameOf(e.p.name || ''), color: cols[i] })).filter(x => isNum(x.x)), label: 'Distribution of ' + m[1] });
     if (c) GI.onLeave(() => { try { c.dispose(); } catch (e2) { /* gone */ } });
@@ -239,7 +261,7 @@ GI.route('compare', function (el, params) {
           '<div class="gi-verdict-side b">' + esc(B.name) + ' is ahead on ' + gl(gaps.filter(g => g.d < 0).sort((x, y) => x.d - y.d).slice(0, 3)) + '.</div></div>' +
           (A.kind === 'player' && A.group !== B.group ? '<p class="gi-cap">Different position groups: each percentile is against the player\'s own group.</p>' : '')) +
         GI.grid(GI.card('Profile', 'headline metrics as percentiles (100 = best)', GI.chartBox('cmp-radar', 420, 'Percentile radar'), { span: 5 }) +
-          GI.card('Every shared metric', 'percentile, blue left and orange right', GI.chartBox('cmp-fly', Math.max(300, ms.length * 24 + 40), 'Percentile butterfly'), { span: 7 })) +
+          GI.card('Every shared metric', 'percentile: the first player to the left, the second to the right', GI.chartBox('cmp-fly', Math.max(300, ms.length * 24 + 40), 'Percentile butterfly'), { span: 7 })) +
         GI.card('The numbers', '', '<div id="cmp-all"></div>', { flush: true });
     }
     el.innerHTML = h;
@@ -256,7 +278,7 @@ GI.route('compare', function (el, params) {
     GI.wireSeg(el, 'cmp-mode', v => { MODE = v; location.hash = v === 'team' ? '#/compare/t:KC/t:BUF' + GI.sq(S) : '#/compare' + GI.sq(S); });
     if (!A || !B || !src) return;
     const heads = (A.kind === 'team' ? TEAM_HEAD.map(x => metrics.find(m => m.key === x)).filter(Boolean) : GI.headline(metrics, GI.PREFS[A.group] || [], 10)).filter(m => isNum(A.pct[m.key]) || isNum(B.pct[m.key])).slice(0, 10);
-    GI.ch.radar('cmp-radar', [{ name: A.name, values: heads.map(m => A.pct[m.key]), colour: '#3987e5' }, { name: B.name, values: heads.map(m => B.pct[m.key]), colour: '#e8833a' }], { labels: heads.map(m => GI.shortLabel(m.label)) });
+    GI.ch.radar('cmp-radar', [{ name: A.name, values: heads.map(m => A.pct[m.key]), colour: QK.cssVar('--wp-a') || '#6aa8ec' }, { name: B.name, values: heads.map(m => B.pct[m.key]), colour: QK.cssVar('--wp-b') || '#ff8a5c' }], { labels: heads.map(m => GI.shortLabel(m.label)) });
     const ms = metrics.filter(m => isNum(A.pct[m.key]) && isNum(B.pct[m.key]));
     GI.ch.mount('cmp-fly', T => {
       const cats = ms.map(m => m.label + (m.lower ? ' ↓' : ''));
@@ -268,7 +290,7 @@ GI.route('compare', function (el, params) {
         series: [{ type: 'bar', name: A.name, stack: 's', data: ms.map(m => -A.pct[m.key]), barMaxWidth: 12, itemStyle: { color: QK.cssVar('--wp-a') || T.cat[0], borderRadius: [3, 0, 0, 3] } },
           { type: 'bar', name: B.name, stack: 's', data: ms.map(m => B.pct[m.key]), barMaxWidth: 12, itemStyle: { color: QK.cssVar('--wp-b') || T.cat[1], borderRadius: [0, 3, 3, 0] } }] };
     }, 'Percentile butterfly');
-    GI.set('cmp-all', GI.tableHTML([{ label: 'Group' }, { label: 'Metric' }, { label: A.name, align: 'right' }, { label: 'Pct', align: 'right' }, { label: B.name, align: 'right' }, { label: 'Pct', align: 'right' }, { label: 'Gap', align: 'right', title: 'Percentile points, blue minus orange' }],
+    GI.set('cmp-all', GI.tableHTML([{ label: 'Group' }, { label: 'Metric' }, { label: A.name, align: 'right' }, { label: 'Pct', align: 'right' }, { label: B.name, align: 'right' }, { label: 'Pct', align: 'right' }, { label: 'Gap', align: 'right', title: 'Percentile points, the first player minus the second' }],
       metrics.filter(m => isNum(A.values[m.key]) || isNum(B.values[m.key])).map(m => { const pa2 = A.pct[m.key], pb2 = B.pct[m.key], d = isNum(pa2) && isNum(pb2) ? pa2 - pb2 : null;
         return [m.group || '', { html: GI.glossLink(m.key, esc(m.label)) + (m.lower ? ' ↓' : ''), v: m.label }, { html: GI.fmtVal(A.values[m.key], m.fmt), v: A.values[m.key] }, { html: QK.pctlChip(pa2) || '—', v: pa2 }, { html: GI.fmtVal(B.values[m.key], m.fmt), v: B.values[m.key] }, { html: QK.pctlChip(pb2) || '—', v: pb2 }, { html: GI.deltaHTML(d, 0), v: d }]; }), { sticky: true, maxHeight: 600 }));
     GI.sortable(document.getElementById('cmp-all'));
