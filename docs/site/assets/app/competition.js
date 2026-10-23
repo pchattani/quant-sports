@@ -1128,8 +1128,8 @@ LIVE.players = function (el, body, c, d0) {
     var pool = all.filter(function (p) { return p.qualified; }).sort(function (a, b) { return (b.goals + b.assists) - (a.goals + a.assists) || b.minutes - a.minutes; });
     var teams = uniq(all.map(function (p) { return p.team; })).sort(function (a, b) { return a.localeCompare(b); });
     var heatLine = roleOk
-      ? 'Heat: percentile v his role group in ' + esc(where) + ' (centre-backs, full-backs, DMs and CMs, AMs and wingers, strikers, goalkeepers), ' + FB.int(FB.peerMin(null, floor0)) + '+ min (' + FB.int(FB.peerMin(GROUPS.filter(function (g) { return g.id === 'gk'; })[0], floor0)) + '+ for goalkeepers); no cell under that or without a formation role.'
-      : 'Heat: percentile v his position (G, D, M, F) in this competition, ' + floor0 + '+ min: this season\'s formation roles could not be read.';
+      ? 'Heat: percentile v the role group in ' + esc(where) + ' (centre-backs, full-backs, DMs and CMs, AMs and wingers, strikers, goalkeepers), ' + FB.int(FB.peerMin(null, floor0)) + '+ min (' + FB.int(FB.peerMin(GROUPS.filter(function (g) { return g.id === 'gk'; })[0], floor0)) + '+ for goalkeepers); no cell under that or without a formation role.'
+      : 'Heat: percentile v position (G, D, M, F) in this competition, ' + floor0 + '+ min: this season\'s formation roles could not be read.';
     var roleOpts = roleOk ? [['', 'All roles']].concat(GROUPS.map(function (g) { return [g.id, g.codes.join('/') + ' · ' + g.name.charAt(0).toUpperCase() + g.name.slice(1)]; }))
       : [['', 'All positions'], ['G', 'Goalkeepers'], ['D', 'Defenders'], ['M', 'Midfielders'], ['F', 'Forwards']];
     body.innerHTML = FB.card('Leaderboard', all.length + ' players · ' + (live.matches_covered || 0) + ' matches with player data. ' + heatLine,
@@ -1184,7 +1184,7 @@ LIVE.players = function (el, body, c, d0) {
           : { key: 'position', label: 'Pos', fmt: function (v, r) { return FB.posBadge(v || (r.is_gk ? 'G' : '')); } },
         { key: 'age', label: 'Age', num: true },
         { key: 'minutes', label: 'Min', num: true },
-        { key: '_v', label: metric.label, type: 'pctl', pctl: '_p', tip: (metric.desc ? metric.desc + ' ' : '') + (roleOk ? 'Cell colour: percentile v his role group in this competition, over the group\'s minimum minutes.' : 'Cell colour: percentile v his position group in this competition (' + floor0 + '+ min).'), fmt: function (v) { return '<b>' + fmtK(key, v) + '</b>'; } },
+        { key: '_v', label: metric.label, type: 'pctl', pctl: '_p', tip: (metric.desc ? metric.desc + ' ' : '') + (roleOk ? 'Cell colour: percentile v the player\'s role group in this competition, over the group\'s minimum minutes.' : 'Cell colour: percentile v the player\'s position group in this competition (' + floor0 + '+ min).'), fmt: function (v) { return '<b>' + fmtK(key, v) + '</b>'; } },
         { key: 'goals', label: 'G', num: true }, { key: 'assists', label: 'A', num: true },
         { key: 'xg', label: 'xG', num: true, fmt: function (v) { return num(v, 1); } }, { key: 'xa', label: 'xA', num: true, fmt: function (v) { return num(v, 1); } },
         { key: 'rating', label: 'Rating', num: true, fmt: function (v) { return isNum(v) ? num(v, 2) : '—'; } }
@@ -1216,9 +1216,9 @@ LIVE.players = function (el, body, c, d0) {
       var g = gA || gB;
       var same = !!gA && gA === gB;
       var sub = $(el, 'co-cmp-sub');
-      if (!g) { if (sub) sub.textContent = 'Side by side on his role group\'s metric set.'; rb.innerHTML = cardMsg('Neither player has a formation role this season (substitute appearances only), so there is no peer group to compare on.'); return; }
-      if (gkMix) { if (sub) sub.textContent = 'Side by side on his role group\'s metric set.'; rb.innerHTML = cardMsg('A goalkeeper and an outfield player share no metric set: pick two goalkeepers or two outfield players.'); return; }
-      if (sub) sub.innerHTML = 'Value · percentile ' + esc(same ? FB.peerLine(g, where, PP.min(g)) : 'each v his own role group in ' + where + ', ' + FB.int(FB.peerMin(null, floor0)) + '+ min') + ' · 100 = best · the better value in bold. The metric set is the ' + esc(g.name) + '\' (the metrics spec): stable and predictive rates for the role.';
+      if (!g) { if (sub) sub.textContent = 'Side by side on the role group\'s metric set.'; rb.innerHTML = cardMsg('Neither player has a formation role this season (substitute appearances only), so there is no peer group to compare on.'); return; }
+      if (gkMix) { if (sub) sub.textContent = 'Side by side on the role group\'s metric set.'; rb.innerHTML = cardMsg('A goalkeeper and an outfield player share no metric set: pick two goalkeepers or two outfield players.'); return; }
+      if (sub) sub.innerHTML = 'Value · percentile ' + esc(same ? FB.peerLine(g, where, PP.min(g)) : 'each v their own role group in ' + where + ', ' + FB.int(FB.peerMin(null, floor0)) + '+ min') + ' · 100 = best · the better value in bold. The metric set is the ' + esc(g.name) + '\' (the metrics spec): stable and predictive rates for the role.';
       var row = function (k) {
         var mi = FB.metricInfo(k) || {}, mm = metaOf[k] || {};
         return { label: mi.label || mm.label || k, tip: mi.tip || mm.desc || '', better: lowerOf(k) ? 'low' : 'high', values: E.map(function (p) { return isNum(p[k]) ? p[k] : null; }),
@@ -1226,11 +1226,11 @@ LIVE.players = function (el, body, c, d0) {
       };
       var keysOf = function (which) { return FB.groupKeys(g, which).filter(function (k) { return metaOf[k] || k === 'gar90'; }); };
       var notes = [];
-      if (!same) notes.push('Different roles (' + E.map(function (p) { return p.name + ': ' + roleText(p); }).join(', ') + '): the set is the ' + g.name + '\', and each percentile is against his own group, so read the values, not just the colours.');
+      if (!same) notes.push('Different roles (' + E.map(function (p) { return p.name + ': ' + roleText(p); }).join(', ') + '): the set is the ' + g.name + '\', and each percentile is against the player\'s own group, so read the values, not just the colours.');
       E.forEach(function (p) {
         if (!p._grp) notes.push(p.name + ' has no formation role this season (substitute appearances only): no percentiles.');
         else if ((p.minutes || 0) < PP.min(p._grp)) notes.push(p.name + ' is under the ' + FB.int(PP.min(p._grp)) + '-minute minimum for ' + p._grp.short + ': no percentiles yet.');
-        else if ((p.minutes || 0) < p._grp.small) notes.push(p.name + ' has under ' + FB.int(p._grp.small) + ' minutes: a small sample, read his percentiles as early.');
+        else if ((p.minutes || 0) < p._grp.small) notes.push(p.name + ' has under ' + FB.int(p._grp.small) + ' minutes: a small sample, read those percentiles as early.');
       });
       rb.innerHTML = QK.compareView({
         entities: E.map(function (p) { return { name: p.name, sub: p.team + ' · ' + roleText(p) + ' · ' + FB.int(p.minutes) + ' min', href: FB.href.player(p.player_id, { c: c.slug }) }; }),
@@ -1244,14 +1244,14 @@ LIVE.players = function (el, body, c, d0) {
       if (!a) { rb.innerHTML = cardMsg('Not enough qualified players yet.'); return; }
       if (roleOk) { drawCmpRoles(a, b, rb); return; }
       var sub0 = $(el, 'co-cmp-sub');
-      if (sub0) sub0.textContent = 'Side by side on one metric set. Each percentile is against his own position (G, D, M, F) in this competition (' + floor0 + '+ min): this season\'s formation roles could not be read. The better value is bold.';
+      if (sub0) sub0.textContent = 'Side by side on one metric set. Each percentile is against the player\'s own position (G, D, M, F) in this competition (' + floor0 + '+ min): this season\'s formation roles could not be read. The better value is bold.';
       var E = [a, b].filter(Boolean);
       var gk = E.every(function (p) { return p.is_gk; });
       var set = gk ? CMP_GK : CMP_OUT;
       var meta = {}; metrics.forEach(function (mm) { meta[mm.key] = mm; });
       var posOf = function (p) { return p.is_gk ? 'G' : p.position; };
       var same = E.length < 2 || posOf(E[0]) === posOf(E[1]);
-      var peer = same ? 'v ' + (POSN[posOf(a)] || 'his position') + ' in ' + c.name + ', ' + floor0 + '+ min' : 'each v his own position group in ' + c.name + ', ' + floor0 + '+ min';
+      var peer = same ? 'v ' + (POSN[posOf(a)] || 'the position') + ' in ' + c.name + ', ' + floor0 + '+ min' : 'each v their own position group in ' + c.name + ', ' + floor0 + '+ min';
       rb.innerHTML = QK.compareView({
         entities: E.map(function (p) { return { name: p.name, sub: p.team + ' · ' + (FB.POS_LABEL[posOf(p)] || '') + ' · ' + FB.int(p.minutes) + ' min', href: FB.href.player(p.player_id, { c: c.slug }) }; }),
         metricLabel: 'Metric · value · percentile',
@@ -1260,7 +1260,7 @@ LIVE.players = function (el, body, c, d0) {
           return { label: x.label, values: E.map(function (p) { return p[x.key]; }), pctls: E.map(function (p) { return (p.pct || {})[x.key]; }), better: mm.lower ? 'low' : 'high', tip: mm.desc || '',
             fmt: function (v) { return FB.fmtMetric(v, mm.fmt || '2'); } };
         }) }]
-      }) + (same ? '' : '<p class="fb-cap">Different positions: each percentile is against his own position group, so read the values, not just the colours.</p>');
+      }) + (same ? '' : '<p class="fb-cap">Different positions: each percentile is against the player\'s own position group, so read the values, not just the colours.</p>');
     }
     ca.addEventListener('change', drawCmp); cb.addEventListener('change', drawCmp); drawCmp();
     // shots

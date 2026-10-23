@@ -377,6 +377,17 @@ function peopleIndex() {
     return PEOPLE;
   });
 }
+/* The search box's names-only index (people_names.json: id, name, pos, club; about a seventh of people_index.json,
+   b8691423), rows already ordered by minutes; people_index.json when a build has not written it yet. */
+function namesIndex() {
+  return load('people_names.json').then(function (d) {
+    var list = rows(d);
+    if (!list.length) return peopleIndex();
+    var n = list.length;
+    list.forEach(function (r, i) { r._rank = 1 - i / n; });
+    return { list: list, names: true };
+  });
+}
 /* The person id of a player id (a merged duplicate id -> the person's). */
 function personId(pid) { var a = PEOPLE ? PEOPLE.aliases[String(pid)] : null; return a ? String(a) : String(pid); }
 
@@ -396,53 +407,53 @@ var MSET = {
     {"id": "gk", "name": "goalkeepers", "short": "goalkeepers", "codes": ["GK"], "min": 900, "small": 1800, "headline": [["goals_prevented_90", null], ["save_pct", null], ["high_claims_90", 1570], ["sweeper_90", 1330], ["pass_pct", 320], ["long_ball_pct", 940], ["passes_90", 260], ["gar90", 8690]], "more": [["saves_90", 2380], ["conceded_90", 2720], ["long_balls_90", 430], ["rating", 14820]]}
   ],
   metrics: {
-    "gar90": {"label": "Value added (GAR/90)", "unit": "goals per 90", "lower": false, "tip": "Goals of expected goal difference a player adds per 90 minutes over a replacement-level player in his role, from the site's player value model (box score plus match rating)."},
-    "rating": {"label": "Match rating", "unit": "rating", "lower": false, "tip": "Sofascore's 1-10 match rating, averaged over his matches and weighted by minutes."},
+    "gar90": {"label": "Value added (GAR/90)", "unit": "goals per 90", "lower": false, "tip": "Goals of expected goal difference a player adds per 90 minutes over a replacement-level player in the same role, from the site's player value model (box score plus match rating)."},
+    "rating": {"label": "Match rating", "unit": "rating", "lower": false, "tip": "Sofascore's 1-10 match rating, averaged over the player's matches and weighted by minutes."},
     "aerials_won_90": {"label": "Aerial duels won", "unit": "per 90", "lower": false, "tip": "Headers won against an opponent per 90."},
-    "aerial_pct": {"label": "Aerial duel success", "unit": "%", "lower": false, "tip": "Share of his aerial duels that he wins."},
+    "aerial_pct": {"label": "Aerial duel success", "unit": "%", "lower": false, "tip": "Share of aerial duels won."},
     "padj_tkl_int_90": {"label": "Tackles + interceptions (possession-adjusted)", "unit": "per 90", "lower": false, "tip": "Tackles plus interceptions per 90, scaled up for players whose team has the ball a lot (fewer chances to defend) and down for those who defend all game."},
-    "opp_half_passes_90": {"label": "Passes in the opposition half", "unit": "per 90", "lower": false, "tip": "Completed passes in the opponent's half per 90: how much of his team's play in the attacking half goes through him."},
-    "pass_pct": {"label": "Pass completion", "unit": "%", "lower": false, "tip": "Share of his passes that find a team-mate. It also reflects how risky his passes are."},
-    "long_ball_pct": {"label": "Long-ball accuracy", "unit": "%", "lower": false, "tip": "Share of his long passes that find a team-mate."},
+    "opp_half_passes_90": {"label": "Passes in the opposition half", "unit": "per 90", "lower": false, "tip": "Completed passes in the opponent's half per 90: how much of the team's play in the attacking half goes through the player."},
+    "pass_pct": {"label": "Pass completion", "unit": "%", "lower": false, "tip": "Share of passes that find a team-mate. It also reflects how risky the passing is."},
+    "long_ball_pct": {"label": "Long-ball accuracy", "unit": "%", "lower": false, "tip": "Share of long passes that find a team-mate."},
     "duels_won_90": {"label": "Duels won", "unit": "per 90", "lower": false, "tip": "Ground and aerial duels won per 90."},
-    "duel_pct": {"label": "Duel success", "unit": "%", "lower": false, "tip": "Share of his ground and aerial duels that he wins."},
-    "recoveries_90": {"label": "Ball recoveries", "unit": "per 90", "lower": false, "tip": "Loose balls he wins back for his team, per 90."},
+    "duel_pct": {"label": "Duel success", "unit": "%", "lower": false, "tip": "Share of ground and aerial duels won."},
+    "recoveries_90": {"label": "Ball recoveries", "unit": "per 90", "lower": false, "tip": "Loose balls won back for the team, per 90."},
     "interceptions_90": {"label": "Interceptions", "unit": "per 90", "lower": false, "tip": "Opponent passes cut out per 90."},
-    "clearances_90": {"label": "Clearances", "unit": "per 90", "lower": false, "tip": "Clearances per 90. Mostly says how much his team is under pressure, not how good he is."},
-    "blocks_90": {"label": "Blocks", "unit": "per 90", "lower": false, "tip": "Shots and passes blocked per 90. Mostly a sign of how much his team defends."},
+    "clearances_90": {"label": "Clearances", "unit": "per 90", "lower": false, "tip": "Clearances per 90. Mostly says how much the team is under pressure, not how good the player is."},
+    "blocks_90": {"label": "Blocks", "unit": "per 90", "lower": false, "tip": "Shots and passes blocked per 90. Mostly a sign of how much the team defends."},
     "long_balls_90": {"label": "Accurate long balls", "unit": "per 90", "lower": false, "tip": "Long passes that find a team-mate, per 90."},
     "prog_carries_90": {"label": "Progressive carries", "unit": "per 90", "lower": false, "tip": "Carries that move the ball well upfield, per 90."},
-    "loss_per_100": {"label": "Possession lost per 100 touches", "unit": "per 100 touches", "lower": true, "tip": "How often he gives the ball away for every 100 touches: ball security, whatever his volume."},
-    "shot_creation_90": {"label": "Shots + key passes", "unit": "per 90", "lower": false, "tip": "Shots taken plus passes that led to a team-mate's shot, per 90: how often he ends or sets up an attack."},
-    "npxg_xa_90": {"label": "npxG + xA", "unit": "per 90", "lower": false, "tip": "Non-penalty expected goals plus expected assists per 90: the quality of the chances he takes and sets up."},
+    "loss_per_100": {"label": "Possession lost per 100 touches", "unit": "per 100 touches", "lower": true, "tip": "How often the ball is given away for every 100 touches: ball security, whatever the volume."},
+    "shot_creation_90": {"label": "Shots + key passes", "unit": "per 90", "lower": false, "tip": "Shots taken plus passes that led to a team-mate's shot, per 90: how often the player ends or sets up an attack."},
+    "npxg_xa_90": {"label": "npxG + xA", "unit": "per 90", "lower": false, "tip": "Non-penalty expected goals plus expected assists per 90: the quality of the chances taken and set up."},
     "key_passes_90": {"label": "Key passes", "unit": "per 90", "lower": false, "tip": "Passes that lead directly to a team-mate's shot, per 90."},
     "crosses_90": {"label": "Accurate crosses", "unit": "per 90", "lower": false, "tip": "Crosses that reach a team-mate, per 90."},
-    "prog_actions_90": {"label": "Progressive carries + dribbles", "unit": "per 90", "lower": false, "tip": "Carries that move the ball well upfield plus successful take-ons, per 90: how much he moves the team forward with the ball at his feet."},
-    "xa_90": {"label": "Expected assists (xA)", "unit": "per 90", "lower": false, "tip": "The chance that each of his passes is turned into a goal, added up per 90: chances created, whatever the finish."},
+    "prog_actions_90": {"label": "Progressive carries + dribbles", "unit": "per 90", "lower": false, "tip": "Carries that move the ball well upfield plus successful take-ons, per 90: how much the player moves the team forward with the ball at their feet."},
+    "xa_90": {"label": "Expected assists (xA)", "unit": "per 90", "lower": false, "tip": "The chance that each pass is turned into a goal, added up per 90: chances created, whatever the finish."},
     "dribbles_90": {"label": "Dribbles completed", "unit": "per 90", "lower": false, "tip": "Successful take-ons per 90: beating a defender with the ball."},
     "hsr_km_90": {"label": "High-speed running", "unit": "km per 90", "lower": false, "tip": "Distance covered at high speed and sprinting per 90 (not every league has tracking data)."},
     "passes_90": {"label": "Passes", "unit": "per 90", "lower": false, "tip": "Passes attempted per 90."},
-    "carries_90": {"label": "Carries", "unit": "per 90", "lower": false, "tip": "Times he moves with the ball per 90."},
+    "carries_90": {"label": "Carries", "unit": "per 90", "lower": false, "tip": "Times the player moves with the ball per 90."},
     "ball_wins_90": {"label": "Ball wins", "unit": "per 90", "lower": false, "tip": "Tackles won, interceptions and recoveries per 90."},
-    "npxg_90": {"label": "Non-penalty xG", "unit": "per 90", "lower": false, "tip": "Expected goals from his own shots per 90, penalties left out: how good his chances are, and how many he gets."},
+    "npxg_90": {"label": "Non-penalty xG", "unit": "per 90", "lower": false, "tip": "Expected goals from the player's own shots per 90, penalties left out: how good the chances are, and how many there are."},
     "big_chances_90": {"label": "Big chances created", "unit": "per 90", "lower": false, "tip": "Passes that set up a chance a player would be expected to score, per 90."},
     "shots_90": {"label": "Shots", "unit": "per 90", "lower": false, "tip": "Shots of any kind per 90."},
     "ga_90": {"label": "Goals + assists", "unit": "per 90", "lower": false, "tip": "Goals plus assists per 90 minutes, penalties included."},
-    "dribble_pct": {"label": "Dribble success", "unit": "%", "lower": false, "tip": "Share of his take-ons that succeed. Too noisy in one season to rank on."},
-    "touches_90": {"label": "Touches", "unit": "per 90", "lower": false, "tip": "Touches of the ball per 90: how involved he is."},
+    "dribble_pct": {"label": "Dribble success", "unit": "%", "lower": false, "tip": "Share of take-ons that succeed. Too noisy in one season to rank on."},
+    "touches_90": {"label": "Touches", "unit": "per 90", "lower": false, "tip": "Touches of the ball per 90: how involved the player is."},
     "finishing": {"label": "Finishing (npG - npxG per shot)", "unit": "goals per shot", "lower": false, "tip": "Non-penalty goals minus non-penalty xG, per shot. Fun to look at, but in one season it is almost all luck: it does not carry over to the next."},
     "sot_90": {"label": "Shots on target", "unit": "per 90", "lower": false, "tip": "Shots that would have gone in without the goalkeeper, per 90."},
-    "xg_per_shot": {"label": "xG per shot", "unit": "xG", "lower": false, "tip": "The average quality of his shots: high means he shoots from good positions."},
-    "xgot_90": {"label": "xG on target (xGOT)", "unit": "per 90", "lower": false, "tip": "Expected goals of his shots on target, judged after the shot from where it was placed, per 90."},
+    "xg_per_shot": {"label": "xG per shot", "unit": "xG", "lower": false, "tip": "The average quality of the player's shots: high means shooting from good positions."},
+    "xgot_90": {"label": "xG on target (xGOT)", "unit": "per 90", "lower": false, "tip": "Expected goals of shots on target, judged after the shot from where it was placed, per 90."},
     "goals_90": {"label": "Goals", "unit": "per 90", "lower": false, "tip": "Goals per 90, penalties included."},
-    "fouled_90": {"label": "Fouls won", "unit": "per 90", "lower": false, "tip": "Times he is fouled per 90."},
+    "fouled_90": {"label": "Fouls won", "unit": "per 90", "lower": false, "tip": "Times the player is fouled per 90."},
     "g_minus_xg": {"label": "Goals - xG", "unit": "goals", "lower": false, "tip": "Goals minus expected goals. Mostly luck in one season."},
     "goals_prevented_90": {"label": "Goals prevented", "unit": "per 90", "lower": false, "tip": "Expected goals on target faced minus goals conceded, per 90: shot-stopping above or below an average keeper. Takes several seasons to separate skill from luck."},
-    "save_pct": {"label": "Save percentage", "unit": "%", "lower": false, "tip": "Share of shots on target he saves. Depends on the shots he faces; noisy within a season."},
+    "save_pct": {"label": "Save percentage", "unit": "%", "lower": false, "tip": "Share of shots on target saved. Depends on the shots faced; noisy within a season."},
     "high_claims_90": {"label": "High claims", "unit": "per 90", "lower": false, "tip": "Crosses and high balls caught or punched clear per 90: commanding the box."},
-    "sweeper_90": {"label": "Sweeper actions", "unit": "per 90", "lower": false, "tip": "Times he comes off his line to deal with a ball behind the defence, per 90."},
-    "saves_90": {"label": "Saves", "unit": "per 90", "lower": false, "tip": "Saves per 90. Mostly says how busy his defence leaves him."},
-    "conceded_90": {"label": "Goals conceded", "unit": "per 90", "lower": true, "tip": "Goals conceded per 90. Mostly about the team in front of him."}
+    "sweeper_90": {"label": "Sweeper actions", "unit": "per 90", "lower": false, "tip": "Times the keeper comes off the line to deal with a ball behind the defence, per 90."},
+    "saves_90": {"label": "Saves", "unit": "per 90", "lower": false, "tip": "Saves per 90. Mostly says how busy the defence leaves the keeper."},
+    "conceded_90": {"label": "Goals conceded", "unit": "per 90", "lower": true, "tip": "Goals conceded per 90. Mostly about the team in front of the keeper."}
   },
   generated: "2026-10-22"
 };
@@ -1036,7 +1047,7 @@ function setCompPicker(slug) {
 /* Search rows; w ranks matches that start equally well (kit QK.search): competitions, then clubs by reach, then
    players by market value and minutes, so a star comes before a namesake in the reserves. */
 function searchRows() {
-  return Promise.all([clubsIndex(), peopleIndex()]).then(function (arr) {
+  return Promise.all([clubsIndex(), namesIndex()]).then(function (arr) {
     var out = [];
     INDEX.comps.filter(function (c) { return c.ok; }).forEach(function (c) {
       out.push({ sport: 'football', t: c.name, s: 'Competition · ' + (c.country || (FAMILIES.filter(function (f) { return f.key === familyOf(c); })[0] || {}).label || ''), href: href.comp(c.slug), w: 6 });
@@ -1048,7 +1059,7 @@ function searchRows() {
     });
     arr[1].list.forEach(function (p) {
       out.push({ sport: 'football', t: p.name, s: (POS_LABEL[p.pos] || 'Player') + (p.club ? ' · ' + p.club : '') + (p.nt ? ' · ' + p.nt : ''), href: href.player(p.id),
-        w: (isNum(p.mv) && p.mv > 0 ? Math.max(0, Math.log10(p.mv) - 4) : 0) + Math.min(1, (isNum(p.min) ? p.min : 0) / 3000) });
+        w: arr[1].names ? 2.5 * p._rank : (isNum(p.mv) && p.mv > 0 ? Math.max(0, Math.log10(p.mv) - 4) : 0) + Math.min(1, (isNum(p.min) ? p.min : 0) / 3000) });
     });
     [['Matches today', '#/matches'], ['Value leaderboard', '#/value'], ['Transfers', '#/value/transfers'], ['Transfer simulator', '#/value/simulator'],
       ['Fantasy', '#/fantasy'], ['Player lab', '#/lab'], ['Compare players', '#/compare/players'], ['Compare clubs', '#/compare/clubs'], ['Clubs on one scale', '#/clubs'],

@@ -371,12 +371,15 @@ function valueTeam(host, L, S, tid) {
     const names = g => (g.players || []).map(p => plink(L, p[0], p[1], S, (g.pos === 'SP' || g.pos === 'RP') ? 'P' : 'H') + ' <span class="muted-inline">' + s1(p[3]) + '</span>').join(', ');
     const gradeRows = POS.filter(p => by[p]).map(p => { const g = by[p]; return [{ v: p, html: '<b>' + esc(p) + '</b>' }, { v: g.grade, html: gradeChip(g.grade) },
       { v: g.war, html: s1(g.war), align: 'right' }, { v: g.rank, html: g.ungraded ? '—' : (g.rank || '—') + ' of ' + (g.of || '—'), align: 'right' }, { v: g.pct, html: BP.pctPill(g.pct), align: 'right' }, { v: '', html: g.ungraded ? '<span class="muted-inline">' + esc(g.evidence || '') + '</span>' : names(g) }]; });
-    const tile = (list, kind) => (list || []).map(p => { const g = by[p] || {}; return '<div class="val-sn ' + kind + '"><div class="val-sn-h">' + gradeChip(g.grade) + ' <b>' + esc(p) + '</b> <span class="muted-inline">' + (g.ungraded ? 'not graded' : s1(g.war) + ' WAR · ' + (g.rank || '—') + ' of ' + (g.of || '—')) + '</span></div><div class="val-sn-b">' + esc(g.evidence || '') + '</div></div>'; }).join('');
-    let h = '<div class="card"><div class="card-header">Strengths and needs <span class="card-sub">Every position\'s ' + esc((d.units || {}).war || 'WAR') + ' this season (a player\'s WAR split by games at each position) against the other clubs: A top fifth … F bottom fifth.</span></div>' +
-      '<div class="val-sn-grid"><div><div class="val-sn-t">Strongest</div>' + tile(d.strengths, 'good') + '</div><div><div class="val-sn-t">Weakest</div>' + tile(d.weaknesses, 'bad') + '</div></div>' +
-      BP.tableHTML([{ label: 'Pos' }, { label: 'Grade' }, { label: 'WAR', align: 'right' }, { label: 'Rank', align: 'right' }, { label: 'Pct', align: 'right' }, { label: 'Players (WAR there)' }], gradeRows, { compact: true }) + '</div>';
+    /* v2: the strongest and weakest positions as stat tiles (WAR there, percentile chip v the other clubs) */
+    const tile = (p, kind) => { const g = by[p] || {}; return QK.statTile({ label: (kind === 'good' ? 'Strength · ' : 'Need · ') + p, value: g.ungraded ? 'Not graded' : s1(g.war), text: !!g.ungraded,
+      unit: g.ungraded ? '' : 'WAR', pctl: g.ungraded ? null : g.pct, sub: (g.ungraded ? '' : 'Grade ' + esc(g.grade || '—') + ' · ' + (g.rank || '—') + ' of ' + (g.of || '—') + (g.evidence ? ' · ' : '')) + esc(g.evidence || ''), html: true, cls: 'bp-sn ' + kind }); };
+    const tiles = (d.strengths || []).map(p => tile(p, 'good')).concat((d.weaknesses || []).map(p => tile(p, 'bad')));
+    let h = BP.card('Strengths and needs', 'Every position\'s ' + esc((d.units || {}).war || 'WAR') + ' this season (a player\'s WAR split by games at each position) against the other clubs; chips are the percentile, grades A top fifth … F bottom fifth.',
+      (tiles.length ? '<div class="bp-sn-tiles">' + QK.stats(tiles) + '</div>' : '') +
+      BP.tableHTML([{ label: 'Pos' }, { label: 'Grade' }, { label: 'WAR', align: 'right' }, { label: 'Rank', align: 'right' }, { label: 'Pct', align: 'right' }, { label: 'Players (WAR there)' }], gradeRows, { compact: true }));
     const imp = d.improve || {};
-    h += '<div class="card"><div class="card-header">Ways to improve <span class="card-sub">' + esc(d.label || '') + '</span></div>' + (d.weaknesses || []).map(p => {
+    h += BP.card('Ways to improve', esc(d.label || ''), (d.weaknesses || []).map(p => {
       const list = imp[p] || [];
       const inc = (by[p] || {}).incumbent_ft;
       const g0 = by[p] || {};
@@ -388,8 +391,8 @@ function valueTeam(host, L, S, tid) {
           { v: c.age, html: isNum(c.age) ? n1(c.age) : '—', align: 'right' }, { v: c.war, html: s1(c.war), align: 'right' }, { v: c.proj_ft, html: s1(c.proj_ft), align: 'right' },
           { v: c.gain, html: '<strong>' + s1(c.gain) + '</strong>', align: 'right' }, { v: (c.hints || []).length, html: esc((c.hints || []).join('; ') || '—') },
           { v: '', html: (L !== 'aaa' ? '<a href="' + tradeHash(L, S, { a: tid, b: c.team, ao: [], bo: [c.pid] }) + '">Trade →</a>' : '') }]), { compact: true }) : BP.muted('No candidate on another club projects more than a third of a win better.')) + '</div>';
-    }).join('') + '<div class="npb-note">' + esc(d.free_agents || '') + ' Gains are projected wins over a full season at the position (next season\'s projection: three seasons of WAR rate, regressed and aged), against the player with the most games there.</div></div>';
-    host.innerHTML = h;
+    }).join('') + '<div class="npb-note">' + esc(d.free_agents || '') + ' Gains are projected wins over a full season at the position (next season\'s projection: three seasons of WAR rate, regressed and aged), against the player with the most games there.</div>');
+    host.innerHTML = '<div class="bp-sn-wrap">' + h + '</div>';
     BP.sortable(host);
   });
 }

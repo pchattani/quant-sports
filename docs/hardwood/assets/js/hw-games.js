@@ -122,7 +122,7 @@ function boxTable(node, L, g, tid, S) {
   if (has('ts')) cols.push({ key: 'ts', label: 'TS%', num: true, fmt: v => HW.fmtVal(v, 'pct'), tip: 'True shooting' });
   if (has('game_score')) cols.push({ key: 'game_score', label: 'GmSc', num: true, fmt: v => U.f(v, 1), tip: 'Game score (Hollinger)' });
   if (has('wpa')) cols.push({ key: 'wpa100', label: 'WPA', num: true, fmt: v => U.sgnHTML(v, 1), tip: 'Win probability added, percentage points (own team)' });
-  if (has('pox')) cols.push({ key: 'pox', label: 'POX', num: true, fmt: v => U.sgnHTML(v, 1), tip: 'Points over expected on his shots' });
+  if (has('pox')) cols.push({ key: 'pox', label: 'POX', num: true, fmt: v => U.sgnHTML(v, 1), tip: 'Points over expected on the player\'s shots' });
   QK.table(node, { columns: cols, rows: rows, dense: true });
 }
 
@@ -232,7 +232,7 @@ function availabilityHTML(L, g, S) {
       const o = order(r.status) === 0;
       return '<li><div class="hw-av-p">' + U.playerEnt(L, r.player, r.name, null, null, S) + (r.detail ? '<div class="s">' + esc(r.detail) + '</div>' : '') + '</div>' +
         '<span class="hw-inj' + (o ? '' : ' q') + '">' + esc(r.status || '—') + '</span>' +
-        '<span class="v" data-tip="Points per 100 possessions the team loses without him (projected rate above replacement x minutes)">' + (isNum(r.impact) ? U.f(r.impact, 1) : '—') + '</span></li>';
+        '<span class="v" data-tip="Points per 100 possessions the team loses without the player (projected rate above replacement x minutes)">' + (isNum(r.impact) ? U.f(r.impact, 1) : '—') + '</span></li>';
     });
     return '<div>' + head + (items.length ? '<ul class="hw-list">' + items.join('') + '</ul>' : '<p class="hw-quiet" style="padding:8px 16px">Nobody listed.</p>') + '</div>';
   };
@@ -240,7 +240,7 @@ function availabilityHTML(L, g, S) {
   const sub = (st === 'pre' ? 'ESPN’s injury report, updated every run until tip-off.' : 'ESPN’s injury report as last fetched for this game.') +
     ' The model counts players listed Out as not playing; Day-To-Day players keep the rate their recent games imply.' +
     (informed ? ' Each team’s figure is its availability term: points of its own margin from the expected rotation against what its rating already reflects (net ' + U.signed(det.injury, 1) + ' for ' + esc(HW.teamAbbr(L, H)) + ').' : '') +
-    ' The right-hand column is the points per 100 possessions each player is worth to his team.';
+    ' The right-hand column is the points per 100 possessions each player is worth to the team.';
   return U.card2('Availability before tip-off', sub, '<div class="grid-2 hw-av">' + [A, H].map(block).join('') + '</div>', { flush: true, cls: 'qk-span-12' });
 }
 

@@ -181,8 +181,14 @@ def test_front_end_files_and_older_browser_rule():
     html = (FRONT / "index.html").read_text(encoding="utf-8")
     assert '<html lang="en" data-sport="college">' in html
     assert "qc-notice-v1" in html and "not affiliated" in html and "College Football Playoff" in html
+    # cc-metrics.js (the generated comparison metric sets) is loaded on demand by cc-core.js, not by a script tag
+    lazy = {"cc-metrics.js"}
+    core = (FRONT / "assets" / "js" / "cc-core.js").read_text(encoding="utf-8")
     for p in js:
-        assert f'src="assets/js/{p.name}"' in html
+        if p.name in lazy:
+            assert f"'assets/js/{p.name}'" in core, p.name
+        else:
+            assert f'src="assets/js/{p.name}"' in html, p.name
     assert "<img" not in html
 
 

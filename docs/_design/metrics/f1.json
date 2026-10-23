@@ -69,7 +69,7 @@
      "set": "headline",
      "order": 1,
      "basis": "rate",
-     "explanation": "The driver's own share of race pace once the car is taken out: how much faster or slower than his team-mate, per lap. Negative is faster.",
+     "explanation": "The driver's own share of race pace once the car is taken out: how much faster or slower than the team-mate, per lap. Negative is faster.",
      "in_payload": true,
      "team_mate_relative": true,
      "reliability": {
@@ -141,7 +141,7 @@
      "set": "headline",
      "order": 3,
      "basis": "rate",
-     "explanation": "Share of races he finished ahead of his team-mate, the one rival in identical machinery.",
+     "explanation": "Share of races finished ahead of the team-mate, the one rival in identical machinery.",
      "in_payload": true,
      "team_mate_relative": true,
      "reliability": {
@@ -177,7 +177,7 @@
      "set": "headline",
      "order": 4,
      "basis": "rate",
-     "explanation": "His share of everything the team scored: how much of the car's haul he turned into points.",
+     "explanation": "The driver's share of everything the team scored: how much of the car's haul became points.",
      "in_payload": true,
      "team_mate_relative": true,
      "reliability": {
@@ -355,7 +355,7 @@
      "set": "secondary",
      "order": 1,
      "basis": "rate",
-     "explanation": "Share of qualifying sessions he beat his team-mate.",
+     "explanation": "Share of qualifying sessions ahead of the team-mate.",
      "in_payload": true,
      "team_mate_relative": true,
      "reliability": {
@@ -463,7 +463,7 @@
      "set": "secondary",
      "order": 4,
      "basis": "rate",
-     "explanation": "Share of races his corrected pace beat his team-mate's.",
+     "explanation": "Share of races where the driver's corrected pace beat the team-mate's.",
      "in_payload": true,
      "team_mate_relative": true,
      "reliability": {
@@ -955,7 +955,7 @@
      "set": "secondary",
      "order": 18,
      "basis": "rate",
-     "explanation": "Mean rank of his fastest lap in each race (2004 on).",
+     "explanation": "Mean rank of the driver's fastest lap in each race (2004 on).",
      "in_payload": true,
      "team_mate_relative": false,
      "reliability": {
@@ -990,7 +990,7 @@
      "set": "secondary",
      "order": 19,
      "basis": "rate",
-     "explanation": "Mean rank of his best sector times (OpenF1, 2023 on).",
+     "explanation": "Mean rank of the driver's best sector times (OpenF1, 2023 on).",
      "in_payload": true,
      "team_mate_relative": false,
      "reliability": {

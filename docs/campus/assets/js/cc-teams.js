@@ -128,10 +128,10 @@ function mountTargets(L, S, d, el) {
   if (!node || !mv || !(mv.targets || []).length) return;
   QK.leaderboard(node, { dense: true, rank: true, rowHref: function (r) { return CC.playerHref(L, r.id, S); }, columns: [
     { key: 'name', label: 'Player', type: 'entity', sub: 'sub', mark: function (r) { return U.mark(L, r.team); }, href: function (r) { return CC.playerHref(L, r.id, S); } },
-    { key: 'p_join', label: 'Chance of joining', num: true, fmt: function (v) { return isNum(v) ? (v < 0.001 ? '<0.1%' : CC.pct(v, 1)) : '—'; }, tip: 'The chance he ends up here; around 0.5% is a strong target among ~360 teams' },
-    { key: 'p_transfer', label: 'Availability', type: 'bar', max: 1, fmt: function (v) { return CC.pct(v); }, tip: 'Our chance he transfers' },
-    { key: 'pctl', label: 'Fit', num: true, fmt: function (v, r) { return isNum(v) ? QK.ordinal(v) + ' pctl' : '—'; }, tip: 'His production percentile among his position this season' },
-    { key: 'plaus', label: 'Plausibility', num: true, fmt: function (v) { return isNum(v) ? CC.f(v, 1) + '×' : '—'; }, tip: 'This team’s share of his likely destinations against an average team (1×)' },
+    { key: 'p_join', label: 'Chance of joining', num: true, fmt: function (v) { return isNum(v) ? (v < 0.001 ? '<0.1%' : CC.pct(v, 1)) : '—'; }, tip: 'The chance the player ends up here; around 0.5% is a strong target among ~360 teams' },
+    { key: 'p_transfer', label: 'Availability', type: 'bar', max: 1, fmt: function (v) { return CC.pct(v); }, tip: 'Our chance the player transfers' },
+    { key: 'pctl', label: 'Fit', num: true, fmt: function (v, r) { return isNum(v) ? QK.ordinal(v) + ' pctl' : '—'; }, tip: 'Production percentile within the position this season' },
+    { key: 'plaus', label: 'Plausibility', num: true, fmt: function (v) { return isNum(v) ? CC.f(v, 1) + '×' : '—'; }, tip: 'This team’s share of the player’s likely destinations against an average team (1×)' },
     { key: 'why', label: 'Why', sort: false, fmt: function (v) { return '<span class="qk-muted">' + esc(v || '') + '</span>'; } }
   ], rows: mv.targets.map(function (t) { return Object.assign({ sub: (t.pos || '') + ' · ' + CC.tabbr(L, t.team) }, t); }) });
 }
@@ -285,7 +285,7 @@ CC.route('team', function (el, p) {
         { key: 'value', label: 'Value', type: 'bar', max: mx, fmt: function (v) { return CC.f(v, fb ? 1 : 2); }, tip: fb ? 'EPA above replacement this season' : 'Value above replacement this season' },
         { key: 'value_pg', label: 'Per game', num: true, fmt: function (v) { return CC.f(v, 2); } }
       ].concat(rcols.map(function (c) { return { key: c[0], label: c[1], num: true, fmt: function (v) { return isNum(v) ? CC.f(v, c[2]) : '—'; } }; }))
-       .concat(hasLv ? [{ key: 'p_leave', label: 'Chance of leaving', type: 'bar', max: 1, fmt: function (v) { return isNum(v) ? CC.pct(v) : '—'; }, tip: 'Our chance he is not with the team next season (an inferred transfer or no box-score line). ' + INFERRED }] : []),
+       .concat(hasLv ? [{ key: 'p_leave', label: 'Chance of leaving', type: 'bar', max: 1, fmt: function (v) { return isNum(v) ? CC.pct(v) : '—'; }, tip: 'Our chance the player is not with the team next season (an inferred transfer or no box-score line). ' + INFERRED }] : []),
         rows: roster.map(function (r) { return Object.assign({ sub: [r.pos, r['class']].filter(Boolean).join(' · '), p_leave: lv[String(r.id)] ? lv[String(r.id)].p : null }, r); }) });
     }
     mountTargets(L, S, d, el);

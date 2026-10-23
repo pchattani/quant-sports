@@ -77,15 +77,17 @@ function standingsTable(id, season, kind, compact) {
   var maxE = ch ? Math.max.apply(null, Object.keys(ch).map(function (k) { return ch[k].p95 || 0; }).concat([1])) : 1;
   var rows = list.map(function (r) {
     var key = isD ? r.driver : r.team, c = ch ? ch[key] : null;
-    return { pos: r.pos, id: key, team: r.team, name: isD ? PD.driverName(key) : PD.teamName(key), points: r.points, wins: r.wins, podiums: r.podiums, poles: r.poles,
+    return { pos: r.pos, id: key, team: r.team, name: isD ? PD.driverName(key) : PD.teamName(key), points: r.points, gross: r.points_gross, excluded: r.excluded || null, wins: r.wins, podiums: r.podiums, poles: r.poles,
       p: c ? c.p_title : null, exp: c ? c.exp_points : null, lo: c ? c.p05 : null, hi: c ? c.p95 : null, magic: magicOf(c), clinched: flag(c, 'clinched'), elim: flag(c, 'eliminated') };
   });
   var cols = [
-    { key: 'pos', label: 'Pos', num: true },
+    /* an entry excluded from the championship (Schumacher 1997, McLaren 2007) keeps its results, scores 0 and ranks last: EX */
+    { key: 'pos', label: 'Pos', num: true, fmt: function (v, r) { return r.excluded ? '<span class="qk-badge" data-tip="Excluded from the championship: ' + esc(String(r.excluded)) + '" tabindex="0">EX</span>' : (isNum(v) ? String(v) : '—'); } },
     { key: 'name', label: isD ? 'Driver' : 'Constructor', sticky: true, fmt: function (v, r) { return (isD ? PD.driverLink(r.id, { team: r.team }) : PD.teamLink(r.id)) + (!season.championship && r.pos === 1 ? ' <span class="qk-badge accent">Champion</span>' : r.clinched ? ' <span class="qk-badge accent">Clinched</span>' : ''); } }
   ];
   if (isD && !compact) cols.push({ key: 'team', label: 'Team', fmt: function (v) { return '<span class="qk-muted">' + esc(PD.teamName(v)) + '</span>'; } });
-  cols.push({ key: 'points', label: 'Pts', num: true, fmt: function (v) { return '<b>' + PD.pts(v) + '</b>'; } });
+  /* counted points; the gross total beside them when dropped scores (before 1991) or an exclusion made them differ */
+  cols.push({ key: 'points', label: 'Pts', num: true, tip: 'Points that count for the championship; the smaller figure is the gross total when dropped scores or an exclusion made them differ', fmt: function (v, r) { return '<b>' + PD.pts(v) + '</b>' + (isNum(r.gross) && isNum(v) && Math.abs(r.gross - v) > 1e-9 ? ' <span class="qk-muted">(' + PD.pts(r.gross) + ' gross)</span>' : ''); } });
   cols.push({ key: 'wins', label: 'Wins', num: true });
   if (isD && !compact) { cols.push({ key: 'podiums', label: 'Podiums', num: true }); cols.push({ key: 'poles', label: 'Poles', num: true }); }
   if (ch) {

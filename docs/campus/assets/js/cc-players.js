@@ -107,7 +107,7 @@ CC.route('players', function (el, p) {
         if (hs.length >= 3) { var mm0 = {}; mets.forEach(function (m) { mm0[m.key] = m; }); cols = hs.map(function (m) { return { key: m.id, label: m.d, desc: m.x, lower: m.low, style: m.style, meta: mm0[m.id] || { fmt: '2' } }; }); pk = G.pct; }
         else G = null;
       }
-      var peer = G ? G.d.toLowerCase() + ' (the spec’s headline set)' : st.within ? (st.pos === 'all' ? 'his position' : posLabel(cat, st.pos).toLowerCase()) : 'all qualified players';
+      var peer = G ? G.d.toLowerCase() + ' (the spec’s headline set)' : st.within ? (st.pos === 'all' ? 'each player’s position' : posLabel(cat, st.pos).toLowerCase()) : 'all qualified players';
       QK.$('#pl-n', el).innerHTML = '<b>' + esc(QK.fmt.num(rs.length)) + ' players</b> · percentiles v ' + esc(peer) + (computed ? ' (computed from this catalogue)' : '') + (rs.length > shown.length ? ' · showing the top 400 by ' + esc((mets[0] || {}).label || 'value') + '; search to find anyone' : '');
       var rows = shown.map(function (k) {
         var x = P[k], pc = pk ? (x[pk] || {}) : st.within ? (x.pct_pos || {}) : (x.pct || {});
@@ -175,7 +175,7 @@ function movementCard(L, S, pid, team, node) {
     var pt = isNum(me.p_transfer) ? me.p_transfer : 0, pg = isNum(me.p_gone) ? me.p_gone : Math.max(0, me.p - pt);
     var ctx = [isNum(me.exp) ? (me.exp >= 4 ? '4+' : me.exp) + ' earlier season' + (me.exp === 1 ? '' : 's') + ' in our box scores' : '', me['class'] ? 'class: ' + me['class'] : '', me.new_in ? 'transferred in this season' : ''].filter(Boolean).join(' · ');
     node.innerHTML = U.card('Movement: before ' + nx, QK.tag('Inferred from box scores, not the official transfer portal'),
-      U.stats([{ label: 'Chance of leaving', value: CC.pct(me.p), signal: true, sub: ctx, tip: 'Our chance he is not with this team next season: an inferred transfer or no box-score line. ' + (meta.method ? String(meta.method).slice(0, 220) : '') }]) +
+      U.stats([{ label: 'Chance of leaving', value: CC.pct(me.p), signal: true, sub: ctx, tip: 'Our chance the player is not with this team next season: an inferred transfer or no box-score line. ' + (meta.method ? String(meta.method).slice(0, 220) : '') }]) +
       '<div class="cc-split" role="img" aria-label="' + esc('Transfer ' + CC.pct(pt) + ', no line next season ' + CC.pct(pg)) + '"><span style="flex:' + pt + ';background:var(--signal)"></span><span style="flex:' + pg + ';background:var(--c-3)"></span><span style="flex:' + Math.max(0, 1 - pt - pg) + '"></span></div>' +
       QK.keys([{ name: 'Transfer ' + CC.pct(pt), color: 'var(--signal)', kind: 'dot' }, { name: 'No box-score line next season ' + CC.pct(pg) + ' (graduation, the pros, a lower division, injury or not playing)', color: 'var(--c-3)', kind: 'dot' }]));
   });
@@ -208,10 +208,10 @@ CC.route('player', function (el, p) {
         stats: hstats.slice(0, 4), tags: cp && cp.qualified !== false ? [QK.tag('Qualified for percentiles', 'signal')] : [] });
     // stat tiles: ours first
     var k = [];
-    if (vr) k.push({ label: fb ? 'Value (EPA above replacement)' : 'Value above replacement', value: CC.f(vr.value, fb ? 1 : 1), signal: true, pctl: isNum(pp.value) ? pp.value : (isNum(vr.pctl) ? vr.pctl : null), sub: isNum(vr.gp) ? vr.gp + ' games · ' + CC.f(vr.value_pg, 2) + ' a game' : '', tip: 'Our value model this season; the chip is the percentile against his position' });
+    if (vr) k.push({ label: fb ? 'Value (EPA above replacement)' : 'Value above replacement', value: CC.f(vr.value, fb ? 1 : 1), signal: true, pctl: isNum(pp.value) ? pp.value : (isNum(vr.pctl) ? vr.pctl : null), sub: isNum(vr.gp) ? vr.gp + ' games · ' + CC.f(vr.value_pg, 2) + ' a game' : '', tip: 'Our value model this season; the chip is the percentile against the same position' });
     if (isNum(vals.epa_play)) k.push({ label: 'EPA per play', value: CC.signed(vals.epa_play, 3), pctl: pp.epa_play, sub: 'expected points added per credited play' });
     if (!fb && isNum(vals.ts)) k.push({ label: 'True shooting', value: CC.pct(vals.ts, 1), pctl: pp.ts, sub: 'points per shooting chance' });
-    if (!fb && isNum(vals.r)) k.push({ label: 'Rating per 100', value: CC.signed(vals.r, 1), pctl: pp.r, sub: 'his on-court margin per 100 possessions v average' });
+    if (!fb && isNum(vals.r)) k.push({ label: 'Rating per 100', value: CC.signed(vals.r, 1), pctl: pp.r, sub: 'on-court margin per 100 possessions v average' });
     if (vr && isNum(vr.pctl)) k.push({ label: 'Value percentile', value: QK.ordinal(vr.pctl), text: true, sub: 'against every qualified player' });
     if (cur.fantasy && isNum(cur.fantasy.proj)) k.push({ label: 'Fantasy projection', value: CC.f(cur.fantasy.proj, 1), sub: 'points next ' + (fb ? 'week' : 'period') });
     html += '<div style="margin-top:var(--sp-4)">' + (k.length ? U.stats(k) : '') + '</div>';
@@ -239,12 +239,12 @@ CC.route('player', function (el, p) {
       var rowsPc = mets.filter(function (m) { return isNum(pp[m.key]); }).map(function (m) { return { label: m.label, pctl: pp[m.key], value: CC.fmtMetric(m, vals[m.key]), tip: (m.desc || '') + (m.lower ? ' Lower is better; the bar is flipped.' : '') }; });
       groupsPc = [{ label: 'Value and efficiency', rows: rowsPc.slice(0, 7) }, { label: 'Production', rows: rowsPc.slice(7) }];
     }
-    var peerName = useSpec ? G.d + (CC.groupFloor(G) ? ', ' + CC.groupFloor(G) : '') : (posLabel(cat, pos) || 'his position') + (fl ? ', ' + fl : '');
+    var peerName = useSpec ? G.d + (CC.groupFloor(G) ? ', ' + CC.groupFloor(G) : '') : (posLabel(cat, pos) || 'same position') + (fl ? ', ' + fl : '');
     var pcard = QK.pctCard({ title: 'Percentile rankings', peer: peerName, sample: (cp && isNum(cp.gp) ? cp.gp + ' games' : '') + (peerN ? ' · ' + peerN + ' qualified peers' : '') + ' · ' + CC.seasonLabel(L, S),
       groups: groupsPc,
-      note: cp && cp.qualified === false ? 'He is below the qualifying floor: read these as early.' : (useSpec && head.length < G.m.filter(function (m) { return m.set === 'h'; }).length ? 'More of the headline rates (per dropback, carry or target) arrive with the next data build.' : ''), emptyText: cp ? 'No percentiles for this season yet.' : 'No current-season profile yet.' });
+      note: cp && cp.qualified === false ? 'Below the qualifying floor: read these as early.' : (useSpec && head.length < G.m.filter(function (m) { return m.set === 'h'; }).length ? 'More of the headline rates (per dropback, carry or target) arrive with the next data build.' : ''), emptyText: cp ? 'No percentiles for this season yet.' : 'No current-season profile yet.' });
     html += '<div class="qk-grid cc-grid"><div class="qk-span-5">' + pcard + '</div><div class="qk-span-7"><div class="qk-stack">' +
-      (cp && peerN >= 10 ? U.card('Where he sits', 'Every qualified ' + esc((useSpec ? G.d : (posLabel(cat, pos) || 'player')).toLowerCase()) + ' this season, coloured by percentile', '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('pp-dist', 240, 'Distribution of the position group')) : '') +
+      (cp && peerN >= 10 ? U.card('Among peers', 'Every qualified ' + esc((useSpec ? G.d : (posLabel(cat, pos) || 'player')).toLowerCase()) + ' this season, coloured by percentile', '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('pp-dist', 240, 'Distribution of the position group')) : '') +
       '<div id="pp-log-card"></div><div id="pp-move"></div></div></div></div>';
     if (!d) html += '<p class="cc-note">Career pages are kept for players with a game in the last two seasons; this season’s catalogue numbers are shown.</p>';
     var log = cur.log || [];

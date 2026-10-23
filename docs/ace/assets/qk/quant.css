@@ -527,7 +527,8 @@ a.qk-stat:hover { border-color: var(--line-3); }
 
 /* ── percentile card (Savant-style sliders, peer group and sample always labelled) ── */
 .qk-pcard .qk-card-body { padding-top: 10px; }
-.qk-pcard-peer { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 6px; font-size: var(--fs-2xs); color: var(--ink-3); }
+.qk-pcard-peer { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 6px; font-size: var(--fs-2xs); color: var(--ink-3); min-width: 0; }
+.qk-pcard-peer .qk-tag { white-space: normal; height: auto; min-height: 20px; padding: 3px 8px; line-height: 1.3; max-width: 100%; }
 .qk-tag { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: var(--r-pill); border: 1px solid var(--line-2); font: 650 var(--fs-2xs)/1 var(--font-ui); color: var(--ink-2); white-space: nowrap; }
 .qk-tag.signal { border-color: color-mix(in srgb, var(--signal) 50%, transparent); color: var(--signal); background: var(--signal-soft); }
 .qk-pscale { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; font: 600 var(--fs-2xs) var(--font-ui); color: var(--ink-3); margin: 2px 0 6px; }

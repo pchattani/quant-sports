@@ -71,7 +71,7 @@ function render(el, params) {
     const nextList = pick(upcoming.slice().sort(byDate));
     const doneList = pick(today.filter(TA.isFinished).sort((a, b) => String(b.date).localeCompare(String(a.date)))).concat(pick(recent.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))));
     const tick = nowList.concat(nextList).slice(0, 14).concat(doneList.slice(0, 8)).map(c => tickGame(T, c));
-    let html = (tick.length ? '<div class="qk-ticker ta-ticker" aria-label="Scoreboard">' + QK.ticker(tick, { group: 'league' }) + '</div>' : '') +
+    let html = (tick.length ? '<div class="qk-ticker ta-ticker" aria-label="Scoreboard">' + QK.ticker(tick, { group: 'league', pill: false }) + '</div>' : '') +
       QK.sectionHead({ kicker: kicker, title: isCurrent ? 'Every ' + TA.tourName(T) + ' match, by the numbers.' : 'The ' + TA.tourName(T) + ' in ' + Y + '.', size: 'lg', tag: 'h1',
         sub: isCurrent ? 'Our win chance for every match from surface Elo and serve and return ratings inferred from scores, title chances from simulating every draw, and the players behind it all.'
           : 'The ' + Y + ' season: the champions, the rankings and the ratings as they finished.',

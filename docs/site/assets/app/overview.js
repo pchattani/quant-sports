@@ -168,7 +168,7 @@ function drawTicker(el, h) {
   FB.comps().forEach(function (c, i) { rank[c.slug] = i; });
   list.sort(function (a, b) { return (rank[a.comp] === undefined ? 999 : rank[a.comp]) - (rank[b.comp] === undefined ? 999 : rank[b.comp]) || String(a.date).localeCompare(String(b.date)); });
   var games = list.slice(0, 40).map(function (m) { return FB.toGame(m, m.comp); });
-  box.innerHTML = QK.ticker(games, { group: 'league', max: 40 });
+  box.innerHTML = QK.ticker(games, { group: 'league', max: 40, pill: false });
   box.hidden = false;
 }
 

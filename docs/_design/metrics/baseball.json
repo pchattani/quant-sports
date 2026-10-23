@@ -289,7 +289,7 @@
      "set": "headline",
      "order": 9,
      "basis": "rate",
-     "explanation": "How often he swings at pitches outside the strike zone.",
+     "explanation": "How often the batter swings at pitches outside the strike zone.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.832,
@@ -315,7 +315,7 @@
      "set": "headline",
      "order": 10,
      "basis": "rate",
-     "explanation": "Top running speed on his fastest runs.",
+     "explanation": "Top running speed on the fastest runs.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.948,
@@ -341,7 +341,7 @@
      "set": "secondary",
      "order": 1,
      "basis": "rate",
-     "explanation": "Expected wOBA from how the ball was hit, in the parks he actually played in.",
+     "explanation": "Expected wOBA from how the ball was hit, in the parks actually played in.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.579,
@@ -445,7 +445,7 @@
      "set": "secondary",
      "order": 5,
      "basis": "rate",
-     "explanation": "Average speed of his balls in play.",
+     "explanation": "Average speed of balls in play.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.773,
@@ -471,7 +471,7 @@
      "set": "secondary",
      "order": 6,
      "basis": "rate",
-     "explanation": "His 90th-percentile exit velocity: how hard his best contact is.",
+     "explanation": "90th-percentile exit velocity: how hard the best contact is.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.886,
@@ -497,7 +497,7 @@
      "set": "secondary",
      "order": 7,
      "basis": "rate",
-     "explanation": "Share of his swings that miss.",
+     "explanation": "Share of swings that miss.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.849,
@@ -835,7 +835,7 @@
      "set": "secondary",
      "order": 20,
      "basis": "rate",
-     "explanation": "How far the bat head travels on his swings.",
+     "explanation": "How far the bat head travels on each swing.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.93,
@@ -965,7 +965,7 @@
      "set": "secondary",
      "order": 25,
      "basis": "rate",
-     "explanation": "Outs above average per chance: how many more plays he makes than an average fielder on the same balls.",
+     "explanation": "Outs above average per chance: how many more plays are made than an average fielder would on the same balls.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.06,
@@ -991,7 +991,7 @@
      "set": "secondary",
      "order": 26,
      "basis": "rate",
-     "explanation": "Average speed of his hardest throws from the field.",
+     "explanation": "Average speed of the hardest throws from the field.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.859,
@@ -1027,7 +1027,7 @@
     "weights": "yoy_r floored at 0.2",
     "distance": "weighted euclidean over features both players have (bat_speed only 2023+), divided by the weight sum used",
     "k": 5,
-    "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player himself); qualifying minimum"
+    "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player's own); qualifying minimum"
    },
    "pct_field": "pct"
   },
@@ -1134,7 +1134,7 @@
      "set": "headline",
      "order": 4,
      "basis": "rate",
-     "explanation": "Extra called strikes per called pitch he receives, against an average catcher on the same pitches, umpire and batter.",
+     "explanation": "Extra called strikes per called pitch received, against an average catcher on the same pitches, umpire and batter.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.547,
@@ -1264,7 +1264,7 @@
      "set": "headline",
      "order": 9,
      "basis": "rate",
-     "explanation": "How often he swings at pitches outside the strike zone.",
+     "explanation": "How often the batter swings at pitches outside the strike zone.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.835,
@@ -1340,7 +1340,7 @@
      "set": "secondary",
      "order": 3,
      "basis": "rate",
-     "explanation": "Expected wOBA from how the ball was hit, in the parks he actually played in.",
+     "explanation": "Expected wOBA from how the ball was hit, in the parks actually played in.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.478,
@@ -1444,7 +1444,7 @@
      "set": "secondary",
      "order": 7,
      "basis": "rate",
-     "explanation": "Average speed of his balls in play.",
+     "explanation": "Average speed of balls in play.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.652,
@@ -1470,7 +1470,7 @@
      "set": "secondary",
      "order": 8,
      "basis": "rate",
-     "explanation": "His 90th-percentile exit velocity: how hard his best contact is.",
+     "explanation": "90th-percentile exit velocity: how hard the best contact is.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.845,
@@ -1496,7 +1496,7 @@
      "set": "secondary",
      "order": 9,
      "basis": "rate",
-     "explanation": "Share of his swings that miss.",
+     "explanation": "Share of swings that miss.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.809,
@@ -1834,7 +1834,7 @@
      "set": "secondary",
      "order": 22,
      "basis": "rate",
-     "explanation": "How far the bat head travels on his swings.",
+     "explanation": "How far the bat head travels on each swing.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.896,
@@ -1990,7 +1990,7 @@
      "set": "secondary",
      "order": 28,
      "basis": "rate",
-     "explanation": "Top running speed on his fastest runs.",
+     "explanation": "Top running speed on the fastest runs.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.944,
@@ -2024,7 +2024,7 @@
     "weights": "yoy_r floored at 0.2",
     "distance": "weighted euclidean over features both players have (bat_speed only 2023+), divided by the weight sum used",
     "k": 5,
-    "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player himself); qualifying minimum"
+    "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player's own); qualifying minimum"
    },
    "pct_field": "pct_role"
   },
@@ -2261,7 +2261,7 @@
      "set": "headline",
      "order": 9,
      "basis": "rate",
-     "explanation": "How often he swings at pitches outside the strike zone.",
+     "explanation": "How often the batter swings at pitches outside the strike zone.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.81,
@@ -2287,7 +2287,7 @@
      "set": "headline",
      "order": 10,
      "basis": "rate",
-     "explanation": "Outs above average per chance: how many more plays he makes than an average fielder on the same balls.",
+     "explanation": "Outs above average per chance: how many more plays are made than an average fielder would on the same balls.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.21,
@@ -2313,7 +2313,7 @@
      "set": "secondary",
      "order": 1,
      "basis": "rate",
-     "explanation": "Expected wOBA from how the ball was hit, in the parks he actually played in.",
+     "explanation": "Expected wOBA from how the ball was hit, in the parks actually played in.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.462,
@@ -2417,7 +2417,7 @@
      "set": "secondary",
      "order": 5,
      "basis": "rate",
-     "explanation": "Average speed of his balls in play.",
+     "explanation": "Average speed of balls in play.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.635,
@@ -2443,7 +2443,7 @@
      "set": "secondary",
      "order": 6,
      "basis": "rate",
-     "explanation": "His 90th-percentile exit velocity: how hard his best contact is.",
+     "explanation": "90th-percentile exit velocity: how hard the best contact is.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.832,
@@ -2469,7 +2469,7 @@
      "set": "secondary",
      "order": 7,
      "basis": "rate",
-     "explanation": "Share of his swings that miss.",
+     "explanation": "Share of swings that miss.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.816,
@@ -2807,7 +2807,7 @@
      "set": "secondary",
      "order": 20,
      "basis": "rate",
-     "explanation": "How far the bat head travels on his swings.",
+     "explanation": "How far the bat head travels on each swing.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.947,
@@ -2937,7 +2937,7 @@
      "set": "secondary",
      "order": 25,
      "basis": "rate",
-     "explanation": "Top running speed on his fastest runs.",
+     "explanation": "Top running speed on the fastest runs.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.911,
@@ -2972,7 +2972,7 @@
     "weights": "yoy_r floored at 0.2",
     "distance": "weighted euclidean over features both players have (bat_speed only 2023+), divided by the weight sum used",
     "k": 5,
-    "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player himself); qualifying minimum"
+    "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player's own); qualifying minimum"
    },
    "pct_field": "pct_role"
   },
@@ -3079,7 +3079,7 @@
      "set": "headline",
      "order": 4,
      "basis": "rate",
-     "explanation": "Outs above average per chance: how many more plays he makes than an average fielder on the same balls.",
+     "explanation": "Outs above average per chance: how many more plays are made than an average fielder would on the same balls.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.327,
@@ -3105,7 +3105,7 @@
      "set": "headline",
      "order": 5,
      "basis": "rate",
-     "explanation": "Top running speed on his fastest runs.",
+     "explanation": "Top running speed on the fastest runs.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.923,
@@ -3235,7 +3235,7 @@
      "set": "headline",
      "order": 10,
      "basis": "rate",
-     "explanation": "How often he swings at pitches outside the strike zone.",
+     "explanation": "How often the batter swings at pitches outside the strike zone.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.853,
@@ -3261,7 +3261,7 @@
      "set": "secondary",
      "order": 1,
      "basis": "rate",
-     "explanation": "Expected wOBA from how the ball was hit, in the parks he actually played in.",
+     "explanation": "Expected wOBA from how the ball was hit, in the parks actually played in.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.442,
@@ -3365,7 +3365,7 @@
      "set": "secondary",
      "order": 5,
      "basis": "rate",
-     "explanation": "Average speed of his balls in play.",
+     "explanation": "Average speed of balls in play.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.733,
@@ -3391,7 +3391,7 @@
      "set": "secondary",
      "order": 6,
      "basis": "rate",
-     "explanation": "His 90th-percentile exit velocity: how hard his best contact is.",
+     "explanation": "90th-percentile exit velocity: how hard the best contact is.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.882,
@@ -3417,7 +3417,7 @@
      "set": "secondary",
      "order": 7,
      "basis": "rate",
-     "explanation": "Share of his swings that miss.",
+     "explanation": "Share of swings that miss.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.887,
@@ -3755,7 +3755,7 @@
      "set": "secondary",
      "order": 20,
      "basis": "rate",
-     "explanation": "How far the bat head travels on his swings.",
+     "explanation": "How far the bat head travels on each swing.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.898,
@@ -3911,7 +3911,7 @@
      "set": "secondary",
      "order": 26,
      "basis": "rate",
-     "explanation": "Average speed of his hardest throws from the field.",
+     "explanation": "Average speed of the hardest throws from the field.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.701,
@@ -3946,7 +3946,7 @@
     "weights": "yoy_r floored at 0.2",
     "distance": "weighted euclidean over features both players have (bat_speed only 2023+), divided by the weight sum used",
     "k": 5,
-    "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player himself); qualifying minimum"
+    "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player's own); qualifying minimum"
    },
    "pct_field": "pct_role"
   },
@@ -4053,7 +4053,7 @@
      "set": "headline",
      "order": 4,
      "basis": "rate",
-     "explanation": "Outs above average per chance: how many more plays he makes than an average fielder on the same balls.",
+     "explanation": "Outs above average per chance: how many more plays are made than an average fielder would on the same balls.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.355,
@@ -4079,7 +4079,7 @@
      "set": "headline",
      "order": 5,
      "basis": "rate",
-     "explanation": "Average speed of his hardest throws from the field.",
+     "explanation": "Average speed of the hardest throws from the field.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.8,
@@ -4209,7 +4209,7 @@
      "set": "headline",
      "order": 10,
      "basis": "rate",
-     "explanation": "How often he swings at pitches outside the strike zone.",
+     "explanation": "How often the batter swings at pitches outside the strike zone.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.812,
@@ -4235,7 +4235,7 @@
      "set": "secondary",
      "order": 1,
      "basis": "rate",
-     "explanation": "Expected wOBA from how the ball was hit, in the parks he actually played in.",
+     "explanation": "Expected wOBA from how the ball was hit, in the parks actually played in.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.566,
@@ -4339,7 +4339,7 @@
      "set": "secondary",
      "order": 5,
      "basis": "rate",
-     "explanation": "Average speed of his balls in play.",
+     "explanation": "Average speed of balls in play.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.734,
@@ -4365,7 +4365,7 @@
      "set": "secondary",
      "order": 6,
      "basis": "rate",
-     "explanation": "His 90th-percentile exit velocity: how hard his best contact is.",
+     "explanation": "90th-percentile exit velocity: how hard the best contact is.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.865,
@@ -4391,7 +4391,7 @@
      "set": "secondary",
      "order": 7,
      "basis": "rate",
-     "explanation": "Share of his swings that miss.",
+     "explanation": "Share of swings that miss.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.857,
@@ -4729,7 +4729,7 @@
      "set": "secondary",
      "order": 20,
      "basis": "rate",
-     "explanation": "How far the bat head travels on his swings.",
+     "explanation": "How far the bat head travels on each swing.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.953,
@@ -4885,7 +4885,7 @@
      "set": "secondary",
      "order": 26,
      "basis": "rate",
-     "explanation": "Top running speed on his fastest runs.",
+     "explanation": "Top running speed on the fastest runs.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.89,
@@ -4919,7 +4919,7 @@
     "weights": "yoy_r floored at 0.2",
     "distance": "weighted euclidean over features both players have (bat_speed only 2023+), divided by the weight sum used",
     "k": 5,
-    "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player himself); qualifying minimum"
+    "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player's own); qualifying minimum"
    },
    "pct_field": "pct_role"
   },
@@ -5026,7 +5026,7 @@
      "set": "headline",
      "order": 4,
      "basis": "rate",
-     "explanation": "Outs above average per chance: how many more plays he makes than an average fielder on the same balls.",
+     "explanation": "Outs above average per chance: how many more plays are made than an average fielder would on the same balls.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.394,
@@ -5052,7 +5052,7 @@
      "set": "headline",
      "order": 5,
      "basis": "rate",
-     "explanation": "Average speed of his hardest throws from the field.",
+     "explanation": "Average speed of the hardest throws from the field.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.817,
@@ -5078,7 +5078,7 @@
      "set": "headline",
      "order": 6,
      "basis": "rate",
-     "explanation": "Top running speed on his fastest runs.",
+     "explanation": "Top running speed on the fastest runs.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.936,
@@ -5182,7 +5182,7 @@
      "set": "headline",
      "order": 10,
      "basis": "rate",
-     "explanation": "How often he swings at pitches outside the strike zone.",
+     "explanation": "How often the batter swings at pitches outside the strike zone.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.812,
@@ -5208,7 +5208,7 @@
      "set": "secondary",
      "order": 1,
      "basis": "rate",
-     "explanation": "Expected wOBA from how the ball was hit, in the parks he actually played in.",
+     "explanation": "Expected wOBA from how the ball was hit, in the parks actually played in.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.527,
@@ -5312,7 +5312,7 @@
      "set": "secondary",
      "order": 5,
      "basis": "rate",
-     "explanation": "Average speed of his balls in play.",
+     "explanation": "Average speed of balls in play.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.759,
@@ -5338,7 +5338,7 @@
      "set": "secondary",
      "order": 6,
      "basis": "rate",
-     "explanation": "His 90th-percentile exit velocity: how hard his best contact is.",
+     "explanation": "90th-percentile exit velocity: how hard the best contact is.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.843,
@@ -5364,7 +5364,7 @@
      "set": "secondary",
      "order": 7,
      "basis": "rate",
-     "explanation": "Share of his swings that miss.",
+     "explanation": "Share of swings that miss.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.857,
@@ -5702,7 +5702,7 @@
      "set": "secondary",
      "order": 20,
      "basis": "rate",
-     "explanation": "How far the bat head travels on his swings.",
+     "explanation": "How far the bat head travels on each swing.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.955,
@@ -5892,7 +5892,7 @@
     "weights": "yoy_r floored at 0.2",
     "distance": "weighted euclidean over features both players have (bat_speed only 2023+), divided by the weight sum used",
     "k": 5,
-    "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player himself); qualifying minimum"
+    "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player's own); qualifying minimum"
    },
    "pct_field": "pct_role"
   },
@@ -5999,7 +5999,7 @@
      "set": "headline",
      "order": 4,
      "basis": "rate",
-     "explanation": "Outs above average per chance: how many more plays he makes than an average fielder on the same balls.",
+     "explanation": "Outs above average per chance: how many more plays are made than an average fielder would on the same balls.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.396,
@@ -6025,7 +6025,7 @@
      "set": "headline",
      "order": 5,
      "basis": "rate",
-     "explanation": "Top running speed on his fastest runs.",
+     "explanation": "Top running speed on the fastest runs.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.888,
@@ -6051,7 +6051,7 @@
      "set": "headline",
      "order": 6,
      "basis": "rate",
-     "explanation": "Average speed of his hardest throws from the field.",
+     "explanation": "Average speed of the hardest throws from the field.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.811,
@@ -6155,7 +6155,7 @@
      "set": "headline",
      "order": 10,
      "basis": "rate",
-     "explanation": "How often he swings at pitches outside the strike zone.",
+     "explanation": "How often the batter swings at pitches outside the strike zone.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.845,
@@ -6181,7 +6181,7 @@
      "set": "secondary",
      "order": 1,
      "basis": "rate",
-     "explanation": "Expected wOBA from how the ball was hit, in the parks he actually played in.",
+     "explanation": "Expected wOBA from how the ball was hit, in the parks actually played in.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.628,
@@ -6285,7 +6285,7 @@
      "set": "secondary",
      "order": 5,
      "basis": "rate",
-     "explanation": "Average speed of his balls in play.",
+     "explanation": "Average speed of balls in play.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.793,
@@ -6311,7 +6311,7 @@
      "set": "secondary",
      "order": 6,
      "basis": "rate",
-     "explanation": "His 90th-percentile exit velocity: how hard his best contact is.",
+     "explanation": "90th-percentile exit velocity: how hard the best contact is.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.895,
@@ -6337,7 +6337,7 @@
      "set": "secondary",
      "order": 7,
      "basis": "rate",
-     "explanation": "Share of his swings that miss.",
+     "explanation": "Share of swings that miss.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.802,
@@ -6675,7 +6675,7 @@
      "set": "secondary",
      "order": 20,
      "basis": "rate",
-     "explanation": "How far the bat head travels on his swings.",
+     "explanation": "How far the bat head travels on each swing.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.924,
@@ -6865,7 +6865,7 @@
     "weights": "yoy_r floored at 0.2",
     "distance": "weighted euclidean over features both players have (bat_speed only 2023+), divided by the weight sum used",
     "k": 5,
-    "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player himself); qualifying minimum"
+    "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player's own); qualifying minimum"
    },
    "pct_field": "pct_role"
   },
@@ -6974,7 +6974,7 @@
      "set": "headline",
      "order": 4,
      "basis": "rate",
-     "explanation": "Outs above average per chance: how many more plays he makes than an average fielder on the same balls.",
+     "explanation": "Outs above average per chance: how many more plays are made than an average fielder would on the same balls.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.235,
@@ -7000,7 +7000,7 @@
      "set": "headline",
      "order": 5,
      "basis": "rate",
-     "explanation": "Average speed of his hardest throws from the field.",
+     "explanation": "Average speed of the hardest throws from the field.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.804,
@@ -7130,7 +7130,7 @@
      "set": "headline",
      "order": 10,
      "basis": "rate",
-     "explanation": "How often he swings at pitches outside the strike zone.",
+     "explanation": "How often the batter swings at pitches outside the strike zone.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.827,
@@ -7156,7 +7156,7 @@
      "set": "secondary",
      "order": 1,
      "basis": "rate",
-     "explanation": "Expected wOBA from how the ball was hit, in the parks he actually played in.",
+     "explanation": "Expected wOBA from how the ball was hit, in the parks actually played in.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.555,
@@ -7260,7 +7260,7 @@
      "set": "secondary",
      "order": 5,
      "basis": "rate",
-     "explanation": "Average speed of his balls in play.",
+     "explanation": "Average speed of balls in play.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.759,
@@ -7286,7 +7286,7 @@
      "set": "secondary",
      "order": 6,
      "basis": "rate",
-     "explanation": "His 90th-percentile exit velocity: how hard his best contact is.",
+     "explanation": "90th-percentile exit velocity: how hard the best contact is.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.883,
@@ -7312,7 +7312,7 @@
      "set": "secondary",
      "order": 7,
      "basis": "rate",
-     "explanation": "Share of his swings that miss.",
+     "explanation": "Share of swings that miss.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.846,
@@ -7650,7 +7650,7 @@
      "set": "secondary",
      "order": 20,
      "basis": "rate",
-     "explanation": "How far the bat head travels on his swings.",
+     "explanation": "How far the bat head travels on each swing.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.894,
@@ -7806,7 +7806,7 @@
      "set": "secondary",
      "order": 26,
      "basis": "rate",
-     "explanation": "Top running speed on his fastest runs.",
+     "explanation": "Top running speed on the fastest runs.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.886,
@@ -7840,7 +7840,7 @@
     "weights": "yoy_r floored at 0.2",
     "distance": "weighted euclidean over features both players have (bat_speed only 2023+), divided by the weight sum used",
     "k": 5,
-    "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player himself); qualifying minimum"
+    "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player's own); qualifying minimum"
    },
    "pct_field": "pct_role"
   },
@@ -8104,7 +8104,7 @@
      "set": "headline",
      "order": 10,
      "basis": "rate",
-     "explanation": "How often he swings at pitches outside the strike zone.",
+     "explanation": "How often the batter swings at pitches outside the strike zone.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.829,
@@ -8130,7 +8130,7 @@
      "set": "secondary",
      "order": 1,
      "basis": "rate",
-     "explanation": "Expected wOBA from how the ball was hit, in the parks he actually played in.",
+     "explanation": "Expected wOBA from how the ball was hit, in the parks actually played in.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.584,
@@ -8208,7 +8208,7 @@
      "set": "secondary",
      "order": 4,
      "basis": "rate",
-     "explanation": "Average speed of his balls in play.",
+     "explanation": "Average speed of balls in play.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.776,
@@ -8234,7 +8234,7 @@
      "set": "secondary",
      "order": 5,
      "basis": "rate",
-     "explanation": "His 90th-percentile exit velocity: how hard his best contact is.",
+     "explanation": "90th-percentile exit velocity: how hard the best contact is.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.89,
@@ -8260,7 +8260,7 @@
      "set": "secondary",
      "order": 6,
      "basis": "rate",
-     "explanation": "Share of his swings that miss.",
+     "explanation": "Share of swings that miss.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.818,
@@ -8598,7 +8598,7 @@
      "set": "secondary",
      "order": 19,
      "basis": "rate",
-     "explanation": "How far the bat head travels on his swings.",
+     "explanation": "How far the bat head travels on each swing.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.947,
@@ -8728,7 +8728,7 @@
      "set": "secondary",
      "order": 24,
      "basis": "rate",
-     "explanation": "Top running speed on his fastest runs.",
+     "explanation": "Top running speed on the fastest runs.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.951,
@@ -8764,7 +8764,7 @@
     "weights": "yoy_r floored at 0.2",
     "distance": "weighted euclidean over features both players have (bat_speed only 2023+), divided by the weight sum used",
     "k": 5,
-    "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player himself); qualifying minimum"
+    "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player's own); qualifying minimum"
    },
    "pct_field": "pct_role"
   },
@@ -8773,7 +8773,7 @@
    "entity": "player",
    "display": "Starting pitchers",
    "pct_field": "pct_role",
-   "peer_group": "pitchers.json players with role == 'SP' (SP: half or more of his games started); compared within level and season",
+   "peer_group": "pitchers.json players with role == 'SP' (SP: half or more of games started); compared within level and season",
    "position_field": "role",
    "position_codes": [
     "SP"
@@ -8794,7 +8794,7 @@
      "set": "headline",
      "order": 1,
      "basis": "rate",
-     "explanation": "Expected wOBA allowed from the contact, walks and strikeouts he gave up, in a standard park.",
+     "explanation": "Expected wOBA allowed from the contact, walks and strikeouts given up, in a standard park.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.481,
@@ -8924,7 +8924,7 @@
      "set": "headline",
      "order": 6,
      "basis": "rate",
-     "explanation": "Quality of his pitches from velocity, movement, spin, release and extension alone.",
+     "explanation": "Pitch quality from velocity, movement, spin, release and extension alone.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.726,
@@ -8976,7 +8976,7 @@
      "set": "headline",
      "order": 8,
      "basis": "rate",
-     "explanation": "Average speed of his primary fastball.",
+     "explanation": "Average speed of the primary fastball.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.903,
@@ -9002,7 +9002,7 @@
      "set": "headline",
      "order": 9,
      "basis": "rate",
-     "explanation": "How often batters swing at his pitches outside the zone.",
+     "explanation": "How often batters swing at the pitcher's pitches outside the zone.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.54,
@@ -9132,7 +9132,7 @@
      "set": "secondary",
      "order": 4,
      "basis": "rate",
-     "explanation": "Share of swings against him that miss.",
+     "explanation": "Share of swings against the pitcher that miss.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.72,
@@ -9184,7 +9184,7 @@
      "set": "secondary",
      "order": 6,
      "basis": "rate",
-     "explanation": "Expected wOBA allowed in his parks.",
+     "explanation": "Expected wOBA allowed in the parks pitched in.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.477,
@@ -9288,7 +9288,7 @@
      "set": "secondary",
      "order": 10,
      "basis": "rate",
-     "explanation": "Value of where he puts the ball, given count and pitch type.",
+     "explanation": "Value of where the ball is located, given count and pitch type.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.655,
@@ -9366,7 +9366,7 @@
      "set": "secondary",
      "order": 13,
      "basis": "rate",
-     "explanation": "How far in front of the rubber he releases the ball.",
+     "explanation": "How far in front of the rubber the ball is released.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.946,
@@ -9444,7 +9444,7 @@
      "set": "secondary",
      "order": 16,
      "basis": "rate",
-     "explanation": "Average speed of balls in play against him.",
+     "explanation": "Average speed of balls in play against the pitcher.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.511,
@@ -9522,7 +9522,7 @@
      "set": "secondary",
      "order": 19,
      "basis": "rate",
-     "explanation": "Average on balls in play against him (mostly defence and luck).",
+     "explanation": "Average on balls in play against the pitcher (mostly defence and luck).",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.217,
@@ -9750,7 +9750,7 @@
    "entity": "player",
    "display": "Relief pitchers",
    "pct_field": "pct_role",
-   "peer_group": "pitchers.json players with role == 'RP' (SP: half or more of his games started); compared within level and season",
+   "peer_group": "pitchers.json players with role == 'RP' (SP: half or more of games started); compared within level and season",
    "position_field": "role",
    "position_codes": [
     "RP"
@@ -9823,7 +9823,7 @@
      "set": "headline",
      "order": 3,
      "basis": "rate",
-     "explanation": "Share of swings against him that miss.",
+     "explanation": "Share of swings against the pitcher that miss.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.662,
@@ -9875,7 +9875,7 @@
      "set": "headline",
      "order": 5,
      "basis": "rate",
-     "explanation": "Quality of his pitches from velocity, movement, spin, release and extension alone.",
+     "explanation": "Pitch quality from velocity, movement, spin, release and extension alone.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.705,
@@ -9901,7 +9901,7 @@
      "set": "headline",
      "order": 6,
      "basis": "rate",
-     "explanation": "Average speed of his primary fastball.",
+     "explanation": "Average speed of the primary fastball.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.9,
@@ -9927,7 +9927,7 @@
      "set": "headline",
      "order": 7,
      "basis": "rate",
-     "explanation": "Expected wOBA allowed from the contact, walks and strikeouts he gave up, in a standard park.",
+     "explanation": "Expected wOBA allowed from the contact, walks and strikeouts given up, in a standard park.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.283,
@@ -10005,7 +10005,7 @@
      "set": "headline",
      "order": 10,
      "basis": "rate",
-     "explanation": "How often batters swing at his pitches outside the zone.",
+     "explanation": "How often batters swing at the pitcher's pitches outside the zone.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.512,
@@ -10135,7 +10135,7 @@
      "set": "secondary",
      "order": 5,
      "basis": "rate",
-     "explanation": "Average leverage when he enters (relievers; 1 = average).",
+     "explanation": "Average leverage on entering the game (relievers; 1 = average).",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.503,
@@ -10213,7 +10213,7 @@
      "set": "secondary",
      "order": 8,
      "basis": "rate",
-     "explanation": "Expected wOBA allowed in his parks.",
+     "explanation": "Expected wOBA allowed in the parks pitched in.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.292,
@@ -10265,7 +10265,7 @@
      "set": "secondary",
      "order": 10,
      "basis": "rate",
-     "explanation": "Value of where he puts the ball, given count and pitch type.",
+     "explanation": "Value of where the ball is located, given count and pitch type.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.616,
@@ -10343,7 +10343,7 @@
      "set": "secondary",
      "order": 13,
      "basis": "rate",
-     "explanation": "How far in front of the rubber he releases the ball.",
+     "explanation": "How far in front of the rubber the ball is released.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.956,
@@ -11211,20 +11211,23 @@
   {
    "field": "hitters.json / fielders.json stabilisation k for oaa, fielding_runs, sra (den chances)",
    "builder": "oddsmarkets/baseball/analytics/hitters.py METRICS, fielders.py METRICS",
-   "status": "needed",
-   "note": "k=60 chances; measured M50 is about 500 (infield) and 355 (outfield) chances (odd/even games). Raise k to ~400 so a 100-chance fielder is not ranked as if established."
+   "status": "done",
+   "note": "k=60 chances; measured M50 is about 500 (infield) and 355 (outfield) chances (odd/even games). Raise k to ~400 so a 100-chance fielder is not ranked as if established.",
+   "done": "e3fa45d8 (OAA k 60 -> 400 chances in hitters.py and fielders.py); live after the next build"
   },
   {
    "field": "framing_rate / framing_runs shrinkage",
    "builder": "oddsmarkets/baseball/models/stabilise.py (c_frame) used by hitters.py and fielders.py",
-   "status": "needed",
-   "note": "k=365 called pitches comes from a raw location-only split-half; year-to-year framing r is 0.54 at ~5,300 called pitches (implied M50 ~4,500). A game-split measure of the model's strikes added is needed before changing it."
+   "status": "done",
+   "note": "k=365 called pitches comes from a raw location-only split-half; year-to-year framing r is 0.54 at ~5,300 called pitches (implied M50 ~4,500). A game-split measure of the model's strikes added is needed before changing it.",
+   "done": "9fa856d1 (game-parity split: framing k 365 -> 659 called pitches, display shrinkage); live after the next build"
   },
   {
    "field": "stabilise.py split-half method",
    "builder": "oddsmarkets/baseball/models/stabilise.py:split_half_curve",
-   "status": "needed",
-   "note": "Odd/even events within the same games share pitcher, park and umpire, so k is too small (K% 37 v 70 PA by odd/even games, xwOBA 121 v 186 PA, wOBA 369 v 434, whiff 38 v 70 swings). Split by game parity instead."
+   "status": "done",
+   "note": "Odd/even events within the same games share pitcher, park and umpire, so k is too small (K% 37 v 70 PA by odd/even games, xwOBA 121 v 186 PA, wOBA 369 v 434, whiff 38 v 70 swings). Split by game parity instead.",
+   "done": "9fa856d1 (stab-4: odd v even games; projections and WAR keep the validated event-split constants); live after the next build"
   },
   {
    "field": "catcher throwing (pop time, CS above average) and blocking",

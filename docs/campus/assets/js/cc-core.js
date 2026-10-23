@@ -281,7 +281,7 @@ CC.specRows = function (g, row, set, meta) {
   return g.m.filter(function (m) { return m.set === set && isNum(v[m.id]) && isNum(pc[m.id]); }).map(function (m) {
     var n = m.m50 ? CC.sampleIn(row, m.mu) : null;
     return { m: m, label: m.d, pctl: pc[m.id], value: CC.fmtMetric((meta || {})[m.id] || { fmt: /pct|rate|share/.test(m.id) && v[m.id] <= 1 ? 'pct' : '2' }, v[m.id]),
-      tip: (m.x || m.d) + (m.style ? ' Describes how he plays, not how well: shown in grey.' : '') + (m.m50 ? ' Settles after about ' + Math.round(m.m50) + ' ' + m.mu + '.' : ''),
+      tip: (m.x || m.d) + (m.style ? ' Describes playing style, not how well: shown in grey.' : '') + (m.m50 ? ' Settles after about ' + Math.round(m.m50) + ' ' + m.mu + '.' : ''),
       early: isNum(n) && m.m50 && n < m.m50, style: !!m.style };
   });
 };

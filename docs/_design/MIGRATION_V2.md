@@ -42,7 +42,7 @@ the kit copied is not broken. Migration is about using the v2 builders, the v2 p
 7. **Player pages.** Hero → `QK.playerHeader({ name, number, pos, team, kicker, meta: [[label, value]], stats, tags })`.
    Percentiles → `QK.pctCard({ peer, sample, groups })`: the peer group is the position group from the payload's
    position-pool percentiles (`pct_pos` / equivalent), the sample line names games, minutes and the floor, and
-   `early: true` marks a metric whose sample is short of `stabilises_at`. Add `QKC.distribution` ("Where he sits")
+   `early: true` marks a metric whose sample is short of `stabilises_at`. Add `QKC.distribution` ("Among peers")
    with the player and the median marked. Rink's `RK.ui.pctGroups`, `sampleOf`, `sampleLine` show how.
 8. **Compare.** A compare page puts two or three players side by side with `QK.compareView({ entities, groups })`,
    the same metric set as the player card, peers = shared position group (else say "all skaters" and why), and a

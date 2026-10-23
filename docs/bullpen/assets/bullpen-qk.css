@@ -343,3 +343,8 @@ tr.row-link { cursor: pointer; }
 .bp-trd-club.won { background: var(--signal-soft); }
 .bp-trd-n { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-family: var(--font-num); font-size: var(--fs-sm); }
 .bp-trd-n b { font: 800 var(--fs-md) var(--font-display); font-stretch: var(--stretch-display); }
+/* team page: strengths and needs (v2 stat tiles: a quiet up/down rule on the left) */
+.bp-sn-tiles { padding: var(--sp-3) var(--sp-3) 0; margin-bottom: var(--sp-3); }
+.qk-stat.bp-sn.good { box-shadow: inset 3px 0 0 var(--up); }
+.qk-stat.bp-sn.bad { box-shadow: inset 3px 0 0 var(--down); }
+.bp-sn-wrap { display: grid; gap: var(--sp-4); }

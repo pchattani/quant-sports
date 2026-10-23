@@ -113,7 +113,7 @@ head('copy', 'Copy', 'Say it like a friendly analyst', 'Chance, rating, projecti
 $('#sc-copy').innerHTML = [
   ['Headlines', ['Every game, priced.', 'Every game, by the numbers.'], ['Biggest edges tonight', 'Closest calls tonight']],
   ['Labels', ['Model v market · Gap +9 pts · Edge', 'Our chance 58% · Market 52% (reference)'], ['Value bet', '— (never)']],
-  ['Explanations', ['xGF% 0.698 rel +0.311', '70% of the expected goals at 5v5 went his team’s way with him on the ice'], ['Priced at -118', 'Our chance: 58%']]
+  ['Explanations', ['xGF% 0.698 rel +0.311', '70% of the expected goals at 5v5 went the team’s way with this player on the ice'], ['Priced at -118', 'Our chance: 58%']]
 ].map(function (c) {
   return '<div class="qk-card"><div class="qk-card-head"><div class="qk-card-title">' + esc(c[0]) + '</div></div><div class="qk-card-body">' +
     [c[1], c[2]].map(function (p) { return '<p><span class="sc-bad">Not:</span> ' + esc(p[0]) + '</p><p><span class="sc-good">Say:</span> ' + esc(p[1]) + '</p>'; }).join('') + '</div></div>';

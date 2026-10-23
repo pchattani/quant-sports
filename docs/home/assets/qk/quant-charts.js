@@ -467,14 +467,17 @@ QKC.scatter = function (el, s) {
       if (isNum(lo0) && isNum(hi0)) ml.push([{ coord: [lo0, lo0], label: { show: !!s.diagonal.label, formatter: s.diagonal.label || '', position: 'insideEndTop', color: T.ink3, fontSize: 10 } }, { coord: [hi0, hi0] }]);
     }
     var legendItems = s.legendItems || [];
-    var gr = { left: 8, right: 24, top: legendItems.length ? 34 : 28, bottom: 26, containLabel: true };
+    /* a labelled point at the top of the plot puts its name where the y-axis title sits: with labels, the title
+       moves up a line and the plot top makes room */
+    var lifted = Object.keys(show).length > 0 && !!s.yName && !s.yInverse;
+    var gr = { left: 8, right: 24, top: (legendItems.length ? 34 : 28) + (lifted ? 14 : 0), bottom: 26, containLabel: true };
     return {
       grid: gr,
       legend: legendItems.length ? legendOpt(T, { icon: 'circle', left: 'auto', right: 0, data: legendItems.map(function (it) { return it.name; }) }) : undefined,
       xAxis: axis(T, { fmt: s.xFmt, name: s.xName, nameLocation: 'middle', nameGap: 30, scale: true, min: s.xMin, max: s.xMax, inverse: !!s.xInverse, ticks: s.xTicks }),
-      yAxis: axis(T, { fmt: s.yFmt, name: s.yName, scale: true, min: s.yMin, max: s.yMax, inverse: !!s.yInverse, ticks: s.yTicks, nameLocation: s.yInverse ? 'start' : 'end', nameAlign: 'left' }),
+      yAxis: axis(T, { fmt: s.yFmt, name: s.yName, scale: true, min: s.yMin, max: s.yMax, inverse: !!s.yInverse, ticks: s.yTicks, nameLocation: s.yInverse ? 'start' : 'end', nameAlign: 'left', nameGap: lifted ? 24 : undefined }),
       tooltip: tooltip(T, { formatter: function (p) { if (p.seriesIndex !== 0 || p.componentType !== 'series') return ''; var d = pts[p.dataIndex]; return '<div style="font-weight:600;margin-bottom:4px">' + esc(d.name) + '</div>' + tipRow(p.color, s.xName || 'x', s.xFmt ? s.xFmt(d.x) : fmt.num(d.x, 2)) + tipRow(p.color, s.yName || 'y', s.yFmt ? s.yFmt(d.y) : fmt.num(d.y, 2)); } }),
-      graphic: s.quadrants ? quadrantLabels(T, s.quadrants) : undefined,
+      graphic: s.quadrants ? quadrantLabels(T, s.quadrants, lifted ? 14 : 0) : undefined,
       series: [{
         type: 'scatter', symbolSize: function (v, p) { return pts[p.dataIndex].size || 12; },
         data: pts.map(function (p, i) {
@@ -491,11 +494,12 @@ QKC.scatter = function (el, s) {
 };
 function avg(a) { return a.reduce(function (x, y) { return x + y; }, 0) / (a.length || 1); }
 function spread(pts, k) { var v = pts.map(function (p) { return p[k]; }); return Math.max.apply(null, v) - Math.min.apply(null, v); }
-function quadrantLabels(T, q) {
+function quadrantLabels(T, q, off) {
+  off = off || 0;
   var st = { fill: T.ink3, font: '600 10px ' + T.fontUI, opacity: 0.85 };
   return [
-    { type: 'text', left: 70, top: 34, style: Object.assign({ text: q[0] }, st), silent: true },
-    { type: 'text', right: 34, top: 34, style: Object.assign({ text: q[1], align: 'right' }, st), silent: true },
+    { type: 'text', left: 70, top: 34 + off, style: Object.assign({ text: q[0] }, st), silent: true },
+    { type: 'text', right: 34, top: 34 + off, style: Object.assign({ text: q[1], align: 'right' }, st), silent: true },
     { type: 'text', left: 70, bottom: 60, style: Object.assign({ text: q[2] }, st), silent: true },
     { type: 'text', right: 34, bottom: 60, style: Object.assign({ text: q[3], align: 'right' }, st), silent: true }
   ].filter(function (g) { return g.style.text; });
@@ -875,11 +879,19 @@ QKC.distribution = function (el, s) {
       return { value: [b.x0, b.x1, b.n], itemStyle: { color: c } };
     });
     var x0 = bins[0].x0, x1 = bins[bins.length - 1].x1;
+    /* the count axis title sits at the top left of the plot, on the same line as the mark labels: a label whose
+       left end would reach into the title's width is lifted one line above it (and the plot top makes room) */
+    var cw = (el && el.clientWidth) || 600, yNameW = 6.4 * String(s.yName || 'Players').length + 18, lift = 0;
     var ml = (s.marks || []).filter(function (m) { return isNum(m.x); }).map(function (m, k) {
       var c = m.color && typeof T[m.color] === 'string' ? T[m.color] : (m.color || (k === 0 ? T.model : T.ink2));
       var at = x1 > x0 ? (m.x - x0) / (x1 - x0) : 0.5;
+      var txt = m.label + (m.noValue ? '' : ' ' + f(m.x)), al = at > 0.82 ? 'right' : at < 0.18 ? 'left' : 'center';
+      var tw = 6.6 * txt.length, px = 56 + at * Math.max(80, cw - 80);
+      var leftEnd = al === 'left' ? px : al === 'right' ? px - tw : px - tw / 2;
+      var up = leftEnd < 56 + yNameW ? 18 : 0;
+      if (up) lift = 18;
       return { xAxis: m.x, lineStyle: { color: c, type: k === 0 ? 'solid' : [4, 3], width: k === 0 ? 2 : 1.2 },
-        label: { show: true, formatter: m.label + (m.noValue ? '' : ' ' + f(m.x)), position: 'end', rotate: 0, align: at > 0.82 ? 'right' : at < 0.18 ? 'left' : 'center', color: c, fontSize: 10.5, fontWeight: 700, fontFamily: T.fontUI, distance: k % 2 ? 16 : 3 } };
+        label: { show: true, formatter: txt, position: 'end', rotate: 0, align: al, color: c, fontSize: 10.5, fontWeight: 700, fontFamily: T.fontUI, distance: (k % 2 ? 16 : 3) + up } };
     });
     var xa = axis(T, { type: 'value', min: bins[0].x0, max: bins[bins.length - 1].x1, fmt: f, split: false, line: true });
     var ya = axis(T, { fmt: function (x) { return fmt.num(x, 0); }, minInterval: 1 });
@@ -887,7 +899,7 @@ QKC.distribution = function (el, s) {
     /* keep the count axis at the left edge when the values run negative (ECharts puts it on x = 0 by default) */
     ya.axisLine = Object.assign({}, ya.axisLine || {}, { onZero: false });
     var gB = 8 + nameAxis(xa, s.xName || 'Value', 'bottom');
-    var gT = 14 + nameAxis(ya, s.yName || 'Players', 'side') + (ml.length ? 16 : 0);
+    var gT = 14 + nameAxis(ya, s.yName || 'Players', 'side') + (ml.length ? 16 : 0) + lift;
     return {
       grid: { left: 8, right: 16, top: gT, bottom: gB, containLabel: true },
       xAxis: xa, yAxis: ya,

@@ -195,10 +195,10 @@ function drawPlayer(el, L, S, pid, seasonRes, career, askedS) {
     '<div class="card"><div class="card-header">Season line <span class="card-sub">Per game, from the game log.</span></div><div id="pp-line"></div></div></div>';
   h += '<div class="card"><div class="card-header">Shot chart <span class="card-sub">Every located shot this season. Colour is points per shot against the league average from the same spot (red above, blue below); size is volume.</span>' +
     fx.toggle('pp-shot-kind', [['hex', 'Hex'], ['zone', 'Zones']], 'hex') + '</div><div class="hf-shot"><div id="pp-shot" class="hf-court"></div><div><div class="cmp-group-head">Zones</div><div id="pp-zones"></div><div class="cmp-group-head">Shot types</div><div id="pp-types"></div></div></div></div>';
-  h += '<div class="grid-3"><div class="card"><div class="card-header">On / off <span class="card-sub">Team net rating per 100 with and without him.</span></div><div id="pp-onoff"></div></div>' +
+  h += '<div class="grid-3"><div class="card"><div class="card-header">On / off <span class="card-sub">Team net rating per 100 with and without the player.</span></div><div id="pp-onoff"></div></div>' +
     '<div class="card"><div class="card-header">Clutch <span class="card-sub">Last 5 minutes, margin within 5.</span></div><div id="pp-clutch"></div></div>' +
     '<div class="card"><div class="card-header">Projection <span class="card-sub">Rates the game model uses for lineups and injuries.</span></div><div id="pp-proj"></div></div></div>';
-  h += '<div class="card"><div class="card-header">Best lineups <span class="card-sub">Five-man units with him, by possessions; net per 100, and shrunk towards the sum of the five players\' HPM.</span></div><div id="pp-lineups"></div></div>';
+  h += '<div class="card"><div class="card-header">Best lineups <span class="card-sub">Five-man units with the player, by possessions; net per 100, and shrunk towards the sum of the five players\' HPM.</span></div><div id="pp-lineups"></div></div>';
   h += '<div class="card"><div class="card-header">Game log <span class="card-sub">Game score (Hollinger) per game; bar colour is the plus-minus sign.</span></div><div id="pp-gs" style="height:240px"></div><div id="pp-log"></div></div>';
   h += '<div id="pp-career"></div>';
   el.innerHTML = h;
@@ -270,7 +270,7 @@ function drawPlayer(el, L, S, pid, seasonRes, career, askedS) {
   // Game log.
   if (log.length) {
     QKC.bar('#pp-gs', { cats: log.map((r, i) => String(i + 1)), series: [{ name: 'Game score', data: log.map(r => r.game_score) }], colors: log.map(r => (r.pm > 0 ? C.green : r.pm < 0 ? C.red : C.text3)),
-      fmt: v => fx.num(v, 1), catName: 'Game of the season', valName: 'Game score (green: his team won his minutes)', label: 'Game score, game by game' });
+      fmt: v => fx.num(v, 1), catName: 'Game of the season', valName: 'Game score (green: the team won the player\'s minutes)', label: 'Game score, game by game' });
     document.getElementById('pp-log').innerHTML = HW.tableHTML([{ label: 'Date' }, { label: 'Opp' }, { label: 'Min', align: 'right' }, { label: 'Pts', align: 'right' }, { label: 'Reb', align: 'right' }, { label: 'Ast', align: 'right' }, { label: 'Stl', align: 'right' }, { label: 'Blk', align: 'right' }, { label: 'TO', align: 'right' },
       { label: 'FG', align: 'right' }, { label: '3P', align: 'right' }, { label: 'FT', align: 'right' }, { label: '+/-', align: 'right' }, { label: 'GmSc', align: 'right' }, { label: 'WPA', align: 'right' }],
       log.slice().reverse().map(r => ({ _href: r.game ? fx.gameHref(L, r.game) : undefined, cells: [{ v: r.date, html: fx.fmtDate(r.date, { year: false }) }, { v: fx.teamAbbr(L, r.opp), html: (r.home ? 'v ' : '@ ') + fx.teamLink(L, r.opp, { abbr: true }) },

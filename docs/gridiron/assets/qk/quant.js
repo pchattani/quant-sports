@@ -867,7 +867,7 @@ QK.tick = function (g, o) {
   var a = Object.assign({}, g.away, { _p: pa });
   var hm = Object.assign({}, g.home, { _p: g.p_home });
   var bar = pre && isNum(pa) ? '<span class="qk-tick-bar" aria-hidden="true"><i style="width:' + Math.round(pa * 100) + '%"></i></span>' : '';
-  return '<a class="qk-tick' + (live ? ' is-live' : '') + '" href="' + esc(g.href || '#') + '" style="--sa:' + (s.accent || '') + '"><div class="qk-tick-top"><span class="qk-sportpill">' + esc(o.league ? (g.league || s.label || '') : (s.label || '')) + '</span><span class="st' + (live ? ' live' : '') + '">' +
+  return '<a class="qk-tick' + (live ? ' is-live' : '') + '" href="' + esc(g.href || '#') + '" style="--sa:' + (s.accent || '') + '"><div class="qk-tick-top">' + (o.pill === false ? '' : '<span class="qk-sportpill">' + esc(o.league ? (g.league || s.label || '') : (s.label || '')) + '</span>') + '<span class="st' + (live ? ' live' : '') + '">' +
     (live ? '● ' + esc(QK.periodLabel(g) || 'Live') : fin ? 'Final' + (g.note === 'OT' || g.note === 'SO' ? '/' + esc(g.note) : '') : esc(QK.whenShort(g.start, g.tba))) + '</span></div>' + r(a, g.as, hw > 0, 'a') + r(hm, g.hs, hw < 0, 'h') + bar + '</a>';
 };
 
@@ -1003,7 +1003,8 @@ QK.sectionHead = function (o) {
 };
 
 /* ─────────────────────────────────────── scoreboard ticker */
-/* QK.ticker(games, { group: 'sport' (default) | 'league' | false, max, sort: false }) -> the inside of a
+/* QK.ticker(games, { group: 'sport' (default) | 'league' | false, max, sort: false, pill: false (no sport/league pill
+ * on each tick: single-sport sites, where the group label already says it) }) -> the inside of a
  * <div class="qk-ticker">. Live games first, then upcoming, then finals; one labelled block per sport (or league). */
 QK.ticker = function (games, o) {
   o = o || {};
@@ -1022,7 +1023,7 @@ QK.ticker = function (games, o) {
     var g0 = groups[k][0], s = QK.sport(g0.sport) || {};
     var lab = o.group === 'league' ? k : (s.label || k);
     return '<span class="qk-tick-grp" style="--sa:' + (s.accent || 'var(--accent)') + '">' + (ICON[g0.sport] ? '<span class="ic" aria-hidden="true">' + ICON[g0.sport] + '</span>' : '') + '<b>' + esc(lab) + '</b></span>' +
-      groups[k].map(function (g) { return QK.tick(g, { league: o.group === 'league' ? false : o.league }); }).join('');
+      groups[k].map(function (g) { return QK.tick(g, { league: o.group === 'league' ? false : o.league, pill: o.pill }); }).join('');
   }).join('');
 };
 

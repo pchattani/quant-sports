@@ -115,7 +115,7 @@
      "set": "headline",
      "order": 3,
      "basis": "rate",
-     "explanation": "Expected goals from his own shots per 60 minutes, all situations: how much scoring chance he creates for himself.",
+     "explanation": "Expected goals from the player's own shots per 60 minutes, all situations: how much scoring chance the player creates for themselves.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.744,
@@ -147,7 +147,7 @@
      "set": "headline",
      "order": 4,
      "basis": "rate",
-     "explanation": "His own shot attempts (on goal, missed or blocked) per 60 minutes at 5-on-5: the steadiest individual stat in hockey.",
+     "explanation": "The player's own shot attempts (on goal, missed or blocked) per 60 minutes at 5-on-5: the steadiest individual stat in hockey.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.797,
@@ -179,7 +179,7 @@
      "set": "headline",
      "order": 5,
      "basis": "rate",
-     "explanation": "Share of 5-on-5 expected goals his team gets with him on the ice, adjusted for score and venue.",
+     "explanation": "Share of 5-on-5 expected goals the team gets with the player on the ice, adjusted for score and venue.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.49,
@@ -211,7 +211,7 @@
      "set": "headline",
      "order": 6,
      "basis": "rate",
-     "explanation": "How many more expected goals per 60 his team creates at 5-on-5 with him on the ice than without him.",
+     "explanation": "How many more expected goals per 60 the team creates at 5-on-5 with the player on the ice than without.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.612,
@@ -243,7 +243,7 @@
      "set": "headline",
      "order": 7,
      "basis": "rate",
-     "explanation": "His 5-on-5 expected-goal differential per 60 after accounting for team-mates, opponents, zone starts and score.",
+     "explanation": "5-on-5 expected-goal differential per 60 after accounting for team-mates, opponents, zone starts and score.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.772,
@@ -307,7 +307,7 @@
      "set": "headline",
      "order": 9,
      "basis": "rate",
-     "explanation": "Minutes per game in all situations: how much the coach trusts him.",
+     "explanation": "Minutes per game in all situations: how much the coach trusts the player.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.848,
@@ -755,7 +755,7 @@
      "set": "secondary",
      "order": 14,
      "basis": "rate",
-     "explanation": "CF% on ice minus the team's CF% without him (in his games).",
+     "explanation": "CF% on ice minus the team's CF% without the player (in the games played).",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.57,
@@ -883,7 +883,7 @@
      "set": "secondary",
      "order": 18,
      "basis": "rate",
-     "explanation": "Regularised adjusted plus-minus: the player's isolated effect on his team's 5v5 xG for per 60 (teammates, opponents, zone starts and score controlled; ridge with multi-season priors).",
+     "explanation": "Regularised adjusted plus-minus: the player's isolated effect on the team's 5v5 xG for per 60 (teammates, opponents, zone starts and score controlled; ridge with multi-season priors).",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.839,
@@ -1706,7 +1706,7 @@
      "set": "headline",
      "order": 2,
      "basis": "rate",
-     "explanation": "Share of 5-on-5 expected goals his team gets with him on the ice, adjusted for score and venue.",
+     "explanation": "Share of 5-on-5 expected goals the team gets with the player on the ice, adjusted for score and venue.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.413,
@@ -1738,7 +1738,7 @@
      "set": "headline",
      "order": 3,
      "basis": "rate",
-     "explanation": "Expected goals against per 60 he prevents at 5-on-5 after accounting for team-mates, opponents, zone starts and score.",
+     "explanation": "Expected goals against per 60 prevented at 5-on-5 after accounting for team-mates, opponents, zone starts and score.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.749,
@@ -1770,7 +1770,7 @@
      "set": "headline",
      "order": 4,
      "basis": "rate",
-     "explanation": "Expected goals for per 60 he adds at 5-on-5 after accounting for team-mates, opponents, zone starts and score.",
+     "explanation": "Expected goals for per 60 added at 5-on-5 after accounting for team-mates, opponents, zone starts and score.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.724,
@@ -1802,7 +1802,7 @@
      "set": "headline",
      "order": 5,
      "basis": "rate",
-     "explanation": "Expected goals his team allows per 60 at 5-on-5 with him on the ice, adjusted for score and venue (lower is better).",
+     "explanation": "Expected goals the team allows per 60 at 5-on-5 with the player on the ice, adjusted for score and venue (lower is better).",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.421,
@@ -1866,7 +1866,7 @@
      "set": "headline",
      "order": 7,
      "basis": "rate",
-     "explanation": "Expected goals from his own shots per 60 minutes, all situations.",
+     "explanation": "Expected goals from the player's own shots per 60 minutes, all situations.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.782,
@@ -1898,7 +1898,7 @@
      "set": "headline",
      "order": 8,
      "basis": "rate",
-     "explanation": "Minutes per game in all situations: how much the coach trusts him.",
+     "explanation": "Minutes per game in all situations: how much the coach trusts the player.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.806,
@@ -2058,7 +2058,7 @@
      "set": "secondary",
      "order": 4,
      "basis": "rate",
-     "explanation": "CF% on ice minus the team's CF% without him (in his games).",
+     "explanation": "CF% on ice minus the team's CF% without the player (in the games played).",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.442,
@@ -3040,7 +3040,7 @@
      "set": "headline",
      "order": 1,
      "basis": "rate",
-     "explanation": "Goals he stopped beyond what an average goalie would on the same shots (by our expected-goals model), per 100 unblocked shots faced.",
+     "explanation": "Goals stopped beyond what an average goalie would on the same shots (by our expected-goals model), per 100 unblocked shots faced.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.101,
@@ -3232,7 +3232,7 @@
      "set": "headline",
      "order": 7,
      "basis": "rate",
-     "explanation": "Share of his starts with a save percentage above league average (or .885 on 20 shots or fewer).",
+     "explanation": "Share of starts with a save percentage above league average (or .885 on 20 shots or fewer).",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.126,
@@ -4312,7 +4312,7 @@
      "order": 9,
      "basis": "rate",
      "explanation": "Goals for minus goals against per game (shootout winners excluded).",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.556,
       "split_half_r": 0.59,
@@ -4598,14 +4598,16 @@
   {
    "field": "teams.json units.gd_g",
    "builder": "oddsmarkets/nhl/analytics/teams.py:unit_ratings",
-   "status": "needed",
-   "note": "goal differential per game; trivially gf_g - ga_g, so the front end may derive it instead"
+   "status": "done",
+   "note": "goal differential per game; trivially gf_g - ga_g, so the front end may derive it instead",
+   "done": "a7098c07 (units.gd_g with its league percentile); live after the next build"
   },
   {
    "field": "careers.py SIMILAR_S / SIMILAR_G and weights",
    "builder": "oddsmarkets/nhl/analytics/careers.py:similar",
-   "status": "needed",
-   "note": "switch the feature lists to the 'similar' blocks here and weight each z by yoy_r floored at 0.2 (changes existing similar[] values, so not done in this pass)"
+   "status": "done",
+   "note": "switch the feature lists to the 'similar' blocks here and weight each z by yoy_r floored at 0.2 (changes existing similar[] values, so not done in this pass)",
+   "done": "a7098c07 (similar on the spec recipe, k 6); live after the next build"
   },
   {
    "field": "past-season skaters.json reb60, rush60",

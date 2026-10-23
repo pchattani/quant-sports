@@ -677,7 +677,7 @@ function drawDossier(box, C, slug) {
     var pc = function (key, fmt) { return { key: key, label: '', num: true, fmt: function (v, r) { return FB.fmtMetric(v, fmt); }, pctl: '_p_' + key }; };
     var rowsP = players.map(function (p) { var o = FB.merge(p, {}); Object.keys(p.pct || {}).forEach(function (k) { o['_p_' + k] = p.pct[k]; }); return o; });
     var cols = [
-      { key: 'name', label: 'Player', sticky: true, fmt: function (v, r) { return FB.playerLink(r.player_id, v) + ' ' + FB.posBadge(r.position || (r.is_gk ? 'G' : '')) + (r.current === false ? ' ' + FB.badge('left', '', 'No longer at the club; his minutes here stay') : ''); } },
+      { key: 'name', label: 'Player', sticky: true, fmt: function (v, r) { return FB.playerLink(r.player_id, v) + ' ' + FB.posBadge(r.position || (r.is_gk ? 'G' : '')) + (r.current === false ? ' ' + FB.badge('left', '', 'No longer at the club; minutes played here still count') : ''); } },
       { key: 'age', label: 'Age', num: true }, { key: 'matches', label: 'Apps', num: true }, { key: 'minutes', label: 'Min', num: true },
       { key: 'goals', label: 'G', num: true }, { key: 'assists', label: 'A', num: true },
       { key: 'xg', label: 'xG', num: true, d: 2 }, { key: 'xa', label: 'xA', num: true, d: 2 }
@@ -771,7 +771,7 @@ function drawSquad(body, C, q) {
       var g = sq.filter(function (x) { return pos === '?' ? POS_ORDER.indexOf(x.pos) < 0 : x.pos === pos; }).map(function (x) { return FB.merge(x, { shirtN: Number(x.shirt) || 999, ix: people ? people[String(x.id)] || {} : {} }); });
       var cols = [
         { key: 'shirtN', label: '#', num: true, fmt: function (v, r) { return r.shirt && !doc.national ? esc(r.shirt) : ''; } },
-        { key: 'name', label: 'Player', sticky: true, fmt: function (v, r) { return FB.playerLink(r.id, v) + (src !== 'roster' && !doc.national && !r.apps ? ' <span class="qk-muted" data-tip="Listed from his latest club appearance; no appearance this season">not played</span>' : ''); } },
+        { key: 'name', label: 'Player', sticky: true, fmt: function (v, r) { return FB.playerLink(r.id, v) + (src !== 'roster' && !doc.national && !r.apps ? ' <span class="qk-muted" data-tip="Listed from the latest club appearance; no appearance this season">not played</span>' : ''); } },
         { key: 'age', label: 'Age', num: true },
         { key: 'nat', label: 'Nat' },
         { key: 'link', label: doc.national ? 'Club' : 'International', sort: false, fmt: function (v, r) {
@@ -787,7 +787,7 @@ function drawSquad(body, C, q) {
       ];
       if (MV && FB.moves) {
         g.forEach(function (x) { var r = MV.rows[String(x.id)] || MV.rows[FB.personId(x.id)]; x.mvP = r ? r.p : null; x.mvRow = r || null; });
-        cols.push({ key: 'mvP', label: 'Chance of moving', num: true, tip: 'Our chance he leaves the club in ' + (MV.movement.horizon || 'the coming window') + ': a base rate (how often players like him left in the last window of the same kind), split by how he would go. A dash: not enough recent minutes for an estimate.',
+        cols.push({ key: 'mvP', label: 'Chance of moving', num: true, tip: 'Our chance the player leaves the club in ' + (MV.movement.horizon || 'the coming window') + ': a base rate (how often similar players left in the last window of the same kind), split by type of move. A dash: not enough recent minutes for an estimate.',
           fmt: function (v, r) { return FB.moves.cell(r.mvRow, MV.meta); } });
       }
       board(n, cols, g, { sort: { key: doc.national ? 'min' : 'shirtN', dir: doc.national ? 'desc' : 'asc' }, caption: (FB.POS_GROUP[pos] || 'Players') });
@@ -912,7 +912,7 @@ function drawTransfers(body, C) {
       FB.card('Top strengths' + (allBelow ? ' (relative)' : ''), allBelow ? 'Every unit is below the league median; these are the best of them.' : '', '<ol class="fb-cl-list">' + (d.strengths || []).map(function (k) { return '<li>' + evidence(units[k]) + '</li>'; }).join('') + '</ol>', { span: 6 }) +
       FB.card('Top weaknesses' + (allAbove ? ' (relative)' : ''), allAbove ? 'Even these are above the league median.' : '', '<ol class="fb-cl-list">' + (d.weaknesses || []).map(function (k) { return '<li>' + evidence(units[k]) + '</li>'; }).join('') + '</ol>', { span: 6 })
     ) +
-      '<section class="fb-sec">' + FB.secHead('Ways to improve', 'For each weakness, the realistic targets who add the most projected value over the weakest current regular: a club of similar or lower strength, a league at most a step stronger, aged 31 or under, 900+ minutes in the last 12 months (or without a club). Points assume he plays 85% of the minutes. ' +
+      '<section class="fb-sec">' + FB.secHead('Ways to improve', 'For each weakness, the realistic targets who add the most projected value over the weakest current regular: a club of similar or lower strength, a league at most a step stronger, aged 31 or under, 900+ minutes in the last 12 months (or without a club). Points assume the target plays 85% of the minutes. ' +
       (win ? (win.open ? 'The window is open (usually until ' + esc(win.until) + ').' : 'The window is closed; the next usually opens ' + esc(win.next || '') + '.') : ''), '', 'By weakness') +
       (d.weaknesses || []).map(function (k) { return FB.card(esc((units[k] || {}).label || k), '', '<div data-unit="' + esc(k) + '"></div>', { flush: true, cls: 'fb-mt' }); }).join('') + '</section>' +
       '<section class="fb-sec" id="cl-budget"></section>' +

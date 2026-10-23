@@ -55,7 +55,7 @@
      "set": "headline",
      "order": 1,
      "basis": "rate",
-     "explanation": "Points above a replacement-level player per game: EPA on his plays for skill players, box-score points for defenders and specialists (value.json).",
+     "explanation": "Points above a replacement-level player per game: EPA on the player's plays for skill players, box-score points for defenders and specialists (value.json).",
      "in_payload": true,
      "payload_status": "published",
      "reliability": {
@@ -96,7 +96,7 @@
      "set": "headline",
      "order": 2,
      "basis": "rate",
-     "explanation": "Expected points added per credited play at his position (QB: dropbacks and runs; RB: carries and targets; WR/TE: targets and carries), garbage time excluded.",
+     "explanation": "Expected points added per credited play at the player's position (QB: dropbacks and runs; RB: carries and targets; WR/TE: targets and carries), garbage time excluded.",
      "in_payload": true,
      "payload_status": "published",
      "reliability": {
@@ -137,7 +137,7 @@
      "set": "headline",
      "order": 3,
      "basis": "rate",
-     "explanation": "Share of his dropbacks that gain expected points (a steadier read than yards).",
+     "explanation": "Share of dropbacks that gain expected points (a steadier read than yards).",
      "in_payload": true,
      "payload_status": "added",
      "payload_note": "field added to the builder on 22 Oct 2026; appears in players.json at the next build",
@@ -347,7 +347,7 @@
      "set": "headline",
      "order": 8,
      "basis": "rate",
-     "explanation": "Designed runs and scrambles per game: how much he carries the ball (style).",
+     "explanation": "Designed runs and scrambles per game: how much the quarterback carries the ball (style).",
      "in_payload": true,
      "payload_status": "added",
      "payload_note": "field added to the builder on 22 Oct 2026; appears in players.json at the next build",
@@ -432,8 +432,8 @@
      "order": 2,
      "basis": "rate",
      "explanation": "Sacks per dropback: the most quarterback-driven part of protection.",
-     "in_payload": false,
-     "payload_status": "needed",
+     "in_payload": true,
+     "payload_status": "done",
      "reliability": {
       "yoy_r": 0.444,
       "split_half_r": 0.412,
@@ -473,8 +473,8 @@
      "order": 3,
      "basis": "rate",
      "explanation": "Completions of 20+ yards per dropback.",
-     "in_payload": false,
-     "payload_status": "needed",
+     "in_payload": true,
+     "payload_status": "done",
      "reliability": {
       "yoy_r": 0.274,
       "split_half_r": 0.257,
@@ -514,8 +514,8 @@
      "order": 4,
      "basis": "rate",
      "explanation": "Yards per dropback after sack losses.",
-     "in_payload": false,
-     "payload_status": "needed",
+     "in_payload": true,
+     "payload_status": "done",
      "reliability": {
       "yoy_r": 0.318,
       "split_half_r": 0.333,
@@ -555,8 +555,8 @@
      "order": 5,
      "basis": "rate",
      "explanation": "Expected points added per quarterback run.",
-     "in_payload": false,
-     "payload_status": "needed",
+     "in_payload": true,
+     "payload_status": "done",
      "reliability": {
       "yoy_r": 0.201,
       "split_half_r": 0.166,
@@ -595,7 +595,7 @@
      "set": "secondary",
      "order": 6,
      "basis": "count",
-     "explanation": "Dropbacks credited to him from the play-by-play (the volume behind his rates).",
+     "explanation": "Dropbacks credited from the play-by-play (the volume behind the rates).",
      "in_payload": true,
      "payload_status": "added",
      "payload_note": "field added to the builder on 22 Oct 2026; appears in players.json at the next build",
@@ -624,7 +624,7 @@
      "set": "secondary",
      "order": 8,
      "basis": "count",
-     "explanation": "Total expected points added on his credited plays.",
+     "explanation": "Total expected points added on credited plays.",
      "in_payload": true,
      "payload_status": "published",
      "reliability": null,
@@ -654,7 +654,7 @@
     "weights_rule": "yoy_r in this group, floored at 0.2",
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
-    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player himself"
+    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
    }
   },
   {
@@ -691,7 +691,7 @@
      "set": "headline",
      "order": 1,
      "basis": "rate",
-     "explanation": "Points above a replacement-level player per game: EPA on his plays for skill players, box-score points for defenders and specialists (value.json).",
+     "explanation": "Points above a replacement-level player per game: EPA on the player's plays for skill players, box-score points for defenders and specialists (value.json).",
      "in_payload": true,
      "payload_status": "published",
      "reliability": {
@@ -732,7 +732,7 @@
      "set": "headline",
      "order": 2,
      "basis": "rate",
-     "explanation": "Expected points added per credited play at his position (QB: dropbacks and runs; RB: carries and targets; WR/TE: targets and carries), garbage time excluded.",
+     "explanation": "Expected points added per credited play at the player's position (QB: dropbacks and runs; RB: carries and targets; WR/TE: targets and carries), garbage time excluded.",
      "in_payload": true,
      "payload_status": "published",
      "reliability": {
@@ -773,7 +773,7 @@
      "set": "headline",
      "order": 3,
      "basis": "rate",
-     "explanation": "Share of his carries that gain expected points.",
+     "explanation": "Share of carries that gain expected points.",
      "in_payload": true,
      "payload_status": "added",
      "payload_note": "field added to the builder on 22 Oct 2026; appears in players.json at the next build",
@@ -857,7 +857,7 @@
      "set": "headline",
      "order": 5,
      "basis": "rate",
-     "explanation": "Share of his team's carries in the games he played: his role in the run game.",
+     "explanation": "Share of the team's carries in the games played: the role in the run game.",
      "in_payload": true,
      "payload_status": "added",
      "payload_note": "field added to the builder on 22 Oct 2026; appears in players.json at the next build",
@@ -899,7 +899,7 @@
      "set": "headline",
      "order": 6,
      "basis": "rate",
-     "explanation": "Share of his team's targets that went to him in the games he played: how often he earns the ball.",
+     "explanation": "Share of the team's targets that went to the player in the games played: how often the player earns the ball.",
      "in_payload": true,
      "payload_status": "added",
      "payload_note": "field added to the builder on 22 Oct 2026; appears in players.json at the next build",
@@ -984,8 +984,8 @@
      "order": 2,
      "basis": "rate",
      "explanation": "Share of carries gaining 10+ yards.",
-     "in_payload": false,
-     "payload_status": "needed",
+     "in_payload": true,
+     "payload_status": "done",
      "reliability": {
       "yoy_r": 0.331,
       "split_half_r": 0.24,
@@ -1025,8 +1025,8 @@
      "order": 3,
      "basis": "rate",
      "explanation": "Share of carries stopped for no gain or a loss.",
-     "in_payload": false,
-     "payload_status": "needed",
+     "in_payload": true,
+     "payload_status": "done",
      "reliability": {
       "yoy_r": 0.353,
       "split_half_r": 0.256,
@@ -1079,7 +1079,7 @@
      "set": "secondary",
      "order": 5,
      "basis": "count",
-     "explanation": "Total expected points added on his credited plays.",
+     "explanation": "Total expected points added on credited plays.",
      "in_payload": true,
      "payload_status": "published",
      "reliability": null,
@@ -1105,7 +1105,7 @@
     "weights_rule": "yoy_r in this group, floored at 0.2",
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
-    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player himself"
+    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
    }
   },
   {
@@ -1142,7 +1142,7 @@
      "set": "headline",
      "order": 1,
      "basis": "rate",
-     "explanation": "Points above a replacement-level player per game: EPA on his plays for skill players, box-score points for defenders and specialists (value.json).",
+     "explanation": "Points above a replacement-level player per game: EPA on the player's plays for skill players, box-score points for defenders and specialists (value.json).",
      "in_payload": true,
      "payload_status": "published",
      "reliability": {
@@ -1183,7 +1183,7 @@
      "set": "headline",
      "order": 2,
      "basis": "rate",
-     "explanation": "Expected points added per credited play at his position (QB: dropbacks and runs; RB: carries and targets; WR/TE: targets and carries), garbage time excluded.",
+     "explanation": "Expected points added per credited play at the player's position (QB: dropbacks and runs; RB: carries and targets; WR/TE: targets and carries), garbage time excluded.",
      "in_payload": true,
      "payload_status": "published",
      "reliability": {
@@ -1224,7 +1224,7 @@
      "set": "headline",
      "order": 3,
      "basis": "rate",
-     "explanation": "Receiving yards per team pass attempt in his games: a route-free stand-in for yards per route run.",
+     "explanation": "Receiving yards per team pass attempt in the games played: a route-free stand-in for yards per route run.",
      "in_payload": true,
      "payload_status": "added",
      "payload_note": "field added to the builder on 22 Oct 2026; appears in players.json at the next build",
@@ -1266,7 +1266,7 @@
      "set": "headline",
      "order": 4,
      "basis": "rate",
-     "explanation": "Share of his team's targets that went to him in the games he played: how often he earns the ball.",
+     "explanation": "Share of the team's targets that went to the player in the games played: how often the player earns the ball.",
      "in_payload": true,
      "payload_status": "added",
      "payload_note": "field added to the builder on 22 Oct 2026; appears in players.json at the next build",
@@ -1350,7 +1350,7 @@
      "set": "headline",
      "order": 6,
      "basis": "rate",
-     "explanation": "Share of targets to him that gain expected points.",
+     "explanation": "Share of targets to the player that gain expected points.",
      "in_payload": true,
      "payload_status": "added",
      "payload_note": "field added to the builder on 22 Oct 2026; appears in players.json at the next build",
@@ -1435,8 +1435,8 @@
      "order": 2,
      "basis": "rate",
      "explanation": "Receiving yards per target.",
-     "in_payload": false,
-     "payload_status": "needed",
+     "in_payload": true,
+     "payload_status": "done",
      "reliability": {
       "yoy_r": 0.25,
       "split_half_r": 0.204,
@@ -1476,8 +1476,8 @@
      "order": 3,
      "basis": "rate",
      "explanation": "Catches per target.",
-     "in_payload": false,
-     "payload_status": "needed",
+     "in_payload": true,
+     "payload_status": "done",
      "reliability": {
       "yoy_r": 0.254,
       "split_half_r": 0.226,
@@ -1517,8 +1517,8 @@
      "order": 4,
      "basis": "rate",
      "explanation": "Targets that gain 20+ yards.",
-     "in_payload": false,
-     "payload_status": "needed",
+     "in_payload": true,
+     "payload_status": "done",
      "reliability": {
       "yoy_r": 0.225,
       "split_half_r": 0.181,
@@ -1571,7 +1571,7 @@
      "set": "secondary",
      "order": 6,
      "basis": "count",
-     "explanation": "Total expected points added on his credited plays.",
+     "explanation": "Total expected points added on credited plays.",
      "in_payload": true,
      "payload_status": "published",
      "reliability": null,
@@ -1597,7 +1597,7 @@
     "weights_rule": "yoy_r in this group, floored at 0.2",
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
-    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player himself"
+    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
    }
   },
   {
@@ -1634,7 +1634,7 @@
      "set": "headline",
      "order": 1,
      "basis": "rate",
-     "explanation": "Points above a replacement-level player per game: EPA on his plays for skill players, box-score points for defenders and specialists (value.json).",
+     "explanation": "Points above a replacement-level player per game: EPA on the player's plays for skill players, box-score points for defenders and specialists (value.json).",
      "in_payload": true,
      "payload_status": "published",
      "reliability": {
@@ -1675,7 +1675,7 @@
      "set": "headline",
      "order": 2,
      "basis": "rate",
-     "explanation": "Expected points added per credited play at his position (QB: dropbacks and runs; RB: carries and targets; WR/TE: targets and carries), garbage time excluded.",
+     "explanation": "Expected points added per credited play at the player's position (QB: dropbacks and runs; RB: carries and targets; WR/TE: targets and carries), garbage time excluded.",
      "in_payload": true,
      "payload_status": "published",
      "reliability": {
@@ -1716,7 +1716,7 @@
      "set": "headline",
      "order": 3,
      "basis": "rate",
-     "explanation": "Receiving yards per team pass attempt in his games: a route-free stand-in for yards per route run.",
+     "explanation": "Receiving yards per team pass attempt in the games played: a route-free stand-in for yards per route run.",
      "in_payload": true,
      "payload_status": "added",
      "payload_note": "field added to the builder on 22 Oct 2026; appears in players.json at the next build",
@@ -1758,7 +1758,7 @@
      "set": "headline",
      "order": 4,
      "basis": "rate",
-     "explanation": "Share of his team's targets that went to him in the games he played: how often he earns the ball.",
+     "explanation": "Share of the team's targets that went to the player in the games played: how often the player earns the ball.",
      "in_payload": true,
      "payload_status": "added",
      "payload_note": "field added to the builder on 22 Oct 2026; appears in players.json at the next build",
@@ -1842,7 +1842,7 @@
      "set": "headline",
      "order": 6,
      "basis": "rate",
-     "explanation": "Share of targets to him that gain expected points.",
+     "explanation": "Share of targets to the player that gain expected points.",
      "in_payload": true,
      "payload_status": "added",
      "payload_note": "field added to the builder on 22 Oct 2026; appears in players.json at the next build",
@@ -1927,8 +1927,8 @@
      "order": 2,
      "basis": "rate",
      "explanation": "Receiving yards per target.",
-     "in_payload": false,
-     "payload_status": "needed",
+     "in_payload": true,
+     "payload_status": "done",
      "reliability": {
       "yoy_r": 0.147,
       "split_half_r": 0.143,
@@ -1968,8 +1968,8 @@
      "order": 3,
      "basis": "rate",
      "explanation": "Catches per target.",
-     "in_payload": false,
-     "payload_status": "needed",
+     "in_payload": true,
+     "payload_status": "done",
      "reliability": {
       "yoy_r": 0.123,
       "split_half_r": 0.04,
@@ -2009,8 +2009,8 @@
      "order": 4,
      "basis": "rate",
      "explanation": "Targets that gain 20+ yards.",
-     "in_payload": false,
-     "payload_status": "needed",
+     "in_payload": true,
+     "payload_status": "done",
      "reliability": {
       "yoy_r": 0.255,
       "split_half_r": 0.164,
@@ -2063,7 +2063,7 @@
      "set": "secondary",
      "order": 6,
      "basis": "count",
-     "explanation": "Total expected points added on his credited plays.",
+     "explanation": "Total expected points added on credited plays.",
      "in_payload": true,
      "payload_status": "published",
      "reliability": null,
@@ -2089,7 +2089,7 @@
     "weights_rule": "yoy_r in this group, floored at 0.2",
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
-    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player himself"
+    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
    }
   },
   {
@@ -2126,7 +2126,7 @@
      "set": "headline",
      "order": 1,
      "basis": "rate",
-     "explanation": "Points above a replacement-level player per game: EPA on his plays for skill players, box-score points for defenders and specialists (value.json).",
+     "explanation": "Points above a replacement-level player per game: EPA on the player's plays for skill players, box-score points for defenders and specialists (value.json).",
      "in_payload": true,
      "payload_status": "published",
      "reliability": {
@@ -2489,7 +2489,7 @@
     "weights_rule": "yoy_r in this group, floored at 0.2",
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
-    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player himself"
+    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
    }
   },
   {
@@ -2526,7 +2526,7 @@
      "set": "headline",
      "order": 1,
      "basis": "rate",
-     "explanation": "Points above a replacement-level player per game: EPA on his plays for skill players, box-score points for defenders and specialists (value.json).",
+     "explanation": "Points above a replacement-level player per game: EPA on the player's plays for skill players, box-score points for defenders and specialists (value.json).",
      "in_payload": true,
      "payload_status": "published",
      "reliability": {
@@ -2889,7 +2889,7 @@
     "weights_rule": "yoy_r in this group, floored at 0.2",
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
-    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player himself"
+    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
    }
   },
   {
@@ -2926,7 +2926,7 @@
      "set": "headline",
      "order": 1,
      "basis": "rate",
-     "explanation": "Points above a replacement-level player per game: EPA on his plays for skill players, box-score points for defenders and specialists (value.json).",
+     "explanation": "Points above a replacement-level player per game: EPA on the player's plays for skill players, box-score points for defenders and specialists (value.json).",
      "in_payload": true,
      "payload_status": "published",
      "reliability": {
@@ -3287,7 +3287,7 @@
     "weights_rule": "yoy_r in this group, floored at 0.2",
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
-    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player himself"
+    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
    }
   },
   {
@@ -3324,7 +3324,7 @@
      "set": "headline",
      "order": 1,
      "basis": "rate",
-     "explanation": "Points above a replacement-level player per game: EPA on his plays for skill players, box-score points for defenders and specialists (value.json).",
+     "explanation": "Points above a replacement-level player per game: EPA on the player's plays for skill players, box-score points for defenders and specialists (value.json).",
      "in_payload": true,
      "payload_status": "published",
      "reliability": {
@@ -3449,9 +3449,9 @@
      "set": "secondary",
      "order": 1,
      "basis": "rate",
-     "explanation": "Field-goal attempts per game (how much his coach uses him).",
-     "in_payload": false,
-     "payload_status": "needed",
+     "explanation": "Field-goal attempts per game (how much the coach uses the kicker).",
+     "in_payload": true,
+     "payload_status": "done",
      "reliability": {
       "yoy_r": 0.245,
       "split_half_r": 0.178,
@@ -3491,8 +3491,8 @@
      "order": 2,
      "basis": "count",
      "explanation": "Longest made field goal of the season.",
-     "in_payload": false,
-     "payload_status": "needed",
+     "in_payload": true,
+     "payload_status": "done",
      "reliability": {
       "yoy_r": 0.247,
       "split_half_r": 0.235,
@@ -3551,7 +3551,7 @@
     "weights_rule": "yoy_r in this group, floored at 0.2",
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
-    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player himself"
+    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
    }
   },
   {
@@ -3714,7 +3714,7 @@
      "set": "secondary",
      "order": 1,
      "basis": "rate",
-     "explanation": "Points above a replacement-level player per game: EPA on his plays for skill players, box-score points for defenders and specialists (value.json).",
+     "explanation": "Points above a replacement-level player per game: EPA on the player's plays for skill players, box-score points for defenders and specialists (value.json).",
      "in_payload": true,
      "payload_status": "published",
      "reliability": {
@@ -3777,7 +3777,7 @@
     "weights_rule": "yoy_r in this group, floored at 0.2",
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
-    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player himself"
+    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
    }
   },
   {
@@ -5057,7 +5057,7 @@
     "weights_rule": "yoy_r in this group, floored at 0.2",
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
-    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player himself"
+    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
    }
   },
   {
@@ -6339,7 +6339,7 @@
     "weights_rule": "yoy_r in this group, floored at 0.2",
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
-    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player himself"
+    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
    }
   },
   {
@@ -7663,7 +7663,7 @@
     "weights_rule": "yoy_r in this group, floored at 0.2",
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
-    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player himself"
+    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
    }
   },
   {
@@ -8943,7 +8943,7 @@
     "weights_rule": "yoy_r in this group, floored at 0.2",
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
-    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player himself"
+    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
    }
   },
   {
@@ -10225,7 +10225,7 @@
     "weights_rule": "yoy_r in this group, floored at 0.2",
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
-    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player himself"
+    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
    }
   },
   {
@@ -11549,7 +11549,7 @@
     "weights_rule": "yoy_r in this group, floored at 0.2",
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
-    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player himself"
+    "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
    }
   },
   {
@@ -13428,8 +13428,9 @@
   {
    "field": "players.json values (cfb): sack_rate, expl_pass, ypd, expl_rush, stuff_rate, ypt, catch_rate, expl_tgt",
    "builder": "oddsmarkets/college/football/players.py:play_credit (add sacks, yards, 10+/20+ gains, stuffs, completions per role) and build.season_players (cache key v6 -> v7)",
-   "status": "needed",
-   "note": "the credit table keeps only plays, EPA and successes; these need per-play yards and flags, so the cached credit must be recomputed for every season (an attribution pass, not an EPA refit)."
+   "status": "done",
+   "note": "the credit table keeps only plays, EPA and successes; these need per-play yards and flags, so the cached credit must be recomputed for every season (an attribution pass, not an EPA refit).",
+   "done": "c73f7b9d (play-credit rates with pct_pos; credit cache v7); live after the next build"
   },
   {
    "field": "BUG cfb players.json: ESPN team rows (negative ids, name ' Team') listed as RB players",
@@ -13440,14 +13441,16 @@
   {
    "field": "BUG cfb players.json pct / pct_pos for lower-is-better box counts (pass_int)",
    "builder": "oddsmarkets/college/football/build.py:players_payload",
-   "status": "needed",
-   "note": "existing keys rank ascending, so the most interceptions get the 99th percentile; basketball reverses lower metrics. The new rate keys are reversed; the old key is an existing value, left to the data-accuracy owner."
+   "status": "done",
+   "note": "existing keys rank ascending, so the most interceptions get the 99th percentile; basketball reverses lower metrics. The new rate keys are reversed; the old key is an existing value, left to the data-accuracy owner.",
+   "done": "c73f7b9d (box counts follow the metric's lower flag: 100 = best); live after the next build"
   },
   {
    "field": "players/<pid>.json similar (cfb and basketball)",
    "builder": "oddsmarkets/college/football/build.py:career_files; oddsmarkets/college/hoops/build.py:career_files",
-   "status": "needed",
-   "note": "today: cfb = unweighted distance on season totals per game of the position, current season only; basketball = per-40 box profile over all positions. Spec: group features above, z within group, league and season, yoy-weighted euclidean, k = 5, same group, last ten seasons."
+   "status": "done",
+   "note": "today: cfb = unweighted distance on season totals per game of the position, current season only; basketball = per-40 box profile over all positions. Spec: group features above, z within group, league and season, yoy-weighted euclidean, k = 5, same group, last ten seasons.",
+   "done": "e8dc10dd (common/similar.py: CFB position, basketball role, k 5); live after the next build"
   },
   {
    "field": "cfb positions before 2023",
@@ -13458,8 +13461,9 @@
   {
    "field": "teams.json (cfb): opponent-adjusted pass and rush EPA, offence and defence (def_pass_epa, def_rush_epa)",
    "builder": "oddsmarkets/college/football/build.py:team_stats (the EPA ratings fit, split by play type)",
-   "status": "needed",
-   "note": "published pass_epa / rush_epa are raw; adjusted halves are more stable (pass 0.48 v 0.43 between halves) and there is no defensive split at all."
+   "status": "done",
+   "note": "published pass_epa / rush_epa are raw; adjusted halves are more stable (pass 0.48 v 0.43 between halves) and there is no defensive split at all.",
+   "done": "0e8f6131 (off/def pass and rush EPA, opponent-adjusted); live after the next build"
   },
   {
    "field": "basketball players.json pct / pct_pos / pct_role in archive seasons",

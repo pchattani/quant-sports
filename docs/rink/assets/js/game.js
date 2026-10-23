@@ -33,6 +33,24 @@ const isNum = RK.isNum;
 const R = x => RK.charts.rows(x);
 const TAB = {};       // game_id -> tab shown (kept across live refreshes)
 
+/* The favourite's side of a puck line and the model's chance it covers: {team, line, p} (null without a line).
+ * (Moved here from hub.js, which is no longer loaded; rk-games.js reads both through RK.) */
+function puckCover(g, model, line) {
+  const l = RK.homeLine(line || {});
+  if (!isNum(l)) return null;
+  const pc = model && isNum(model.puck_line_home) && model.puck_line_home > 0 && model.puck_line_home < 1 ? Number(model.puck_line_home) : null;
+  const homeFav = l < 0;
+  return { team: homeFav ? g.home : g.away, line: -Math.abs(l), p: pc === null ? null : (homeFav ? pc : 1 - pc) };
+}
+/* The live or closing line object for a card: the close for a final game when there is one. */
+function lineNow(g) {
+  const ln = g.line || null;
+  if (!ln) return {};
+  return RK.isFinal(g) && ln.close && typeof ln.close === 'object' ? Object.assign({}, ln, ln.close) : ln;
+}
+RK.puckCover = puckCover;
+RK.lineNow = lineNow;
+
 // ── normalise ──────────────────────────────────────────────────────────────
 
 /* The two teams' colours for this game, told apart when the clubs share one (CAR and FLA are both red): the home

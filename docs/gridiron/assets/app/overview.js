@@ -113,7 +113,7 @@ GI.route('overview', function (el) {
     const L = idx.leaders || {};
     const qb = (L.qb_epa_db || [])[0];
     const close = games.filter(g => GI.isPre(g) && isNum((g.model || {}).p_home)).sort((a, b) => Math.abs(a.model.p_home - 0.5) - Math.abs(b.model.p_home - 0.5))[0];
-    const tick = games.length ? '<div class="qk-ticker gi-ticker" aria-label="This week\'s games">' + QK.ticker(games.map(g => GI.qkGame(g, byTeam)), { group: 'league' }) + '</div>' : '';
+    const tick = games.length ? '<div class="qk-ticker gi-ticker" aria-label="This week\'s games">' + QK.ticker(games.map(g => GI.qkGame(g, byTeam)), { group: 'league', pill: false }) + '</div>' : '';
     const wk = GI.weekLabel(W, S);
 
     el.innerHTML = tick +

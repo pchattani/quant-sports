@@ -152,7 +152,7 @@ function writeHash() {
 
 FB.route('lab', function (el, p) {
   S = stateFromRoute(p);
-  el.innerHTML = FB.pageHead('Lab', 'Player lab', 'Chart any two player metrics for one position group. Every player is one dot: his matches in the season or window, across every competition, club football only, his national team only, or one competition. Presets pick the pairs that separate styles of player; medians split the chart into quadrants.') +
+  el.innerHTML = FB.pageHead('Lab', 'Player lab', 'Chart any two player metrics for one position group. Every player is one dot: matches in the season or window, across every competition, club football only, national-team football only, or one competition. Presets pick the pairs that separate styles of player; medians split the chart into quadrants.') +
     subnav('lab') +
     '<section class="qk-card fb-lb-ctl"><div class="qk-card-body" id="lb-ctl">' + FB.loading('lines', 3) + '</div></section>' +
     '<div id="lb-cover"></div>' +
@@ -326,9 +326,9 @@ function draw(el) {
     return opt;
   }, { label: 'Player lab: ' + label(S.y) + ' against ' + label(S.x) });
 
-  FB.set('lb-note', 'One dot per player: his minutes and rates over ' + esc(single() ? scopeName : scopeName.toLowerCase()) + ' in the view, however many competitions that spans. Dotted lines are the medians of this group. ' + (lower(S.x) || lower(S.y) ? 'Axes where less is better are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
+  FB.set('lb-note', 'One dot per player: minutes and rates over ' + esc(single() ? scopeName : scopeName.toLowerCase()) + ' in the view, however many competitions that spans. Dotted lines are the medians of this group. ' + (lower(S.x) || lower(S.y) ? 'Axes where less is better are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
     'Labelled: the twelve players furthest into that corner (sum of standard scores on both axes)' + (hits.length ? ', and your search (violet rings)' : '') + '. Click a dot to open the player.' +
-    (adjOn() ? ' Attacking rates marked "adj." are multiplied by the scoring factor from the pooled model: the minutes-weighted blend of the competitions he played in.' : '') +
+    (adjOn() ? ' Attacking rates marked "adj." are multiplied by the scoring factor from the pooled model: the minutes-weighted blend of the player\'s competitions.' : '') +
     (S.shrink ? ' Rates marked "shrunk" are pulled towards the group median by ' + SHRINK_K + ' minutes of prior, so a player five matches in is not ranked on five matches alone; the tooltip shows the raw figures.' : '') +
     ' <a href="#/model/glossary/shrinkage">Glossary →</a>');
 
@@ -602,8 +602,8 @@ function buildCompareRole(el, P, R, ix) {
       sub: [club, role || FB.POS_LABEL[x.doc.pos] || '', mins].filter(Boolean).join(' · ') };
   });
   var notes = [];
-  if (!same) notes.push('Different roles: each percentile is against his own role group (' + X.map(function (y) { return y.x.doc.name + ': ' + (y.g ? y.g.short : 'no role'); }).join(', ') + '), on the ' + g.short + '\' set.');
-  if (!sameComp) notes.push('Different competitions: each percentile is against his own competition\'s peers. Pick "All competitions" above to rank them in one pool.');
+  if (!same) notes.push('Different roles: each percentile is against the player\'s own role group (' + X.map(function (y) { return y.x.doc.name + ': ' + (y.g ? y.g.short : 'no role'); }).join(', ') + '), on the ' + g.short + '\' set.');
+  if (!sameComp) notes.push('Different competitions: each percentile is against peers in the player\'s own competition. Pick "All competitions" above to rank them in one pool.');
   X.forEach(function (y) {
     var mn = y.g && y.rk ? y.rk.PP.min(y.g) : null;
     if (!y.raw) notes.push(y.x.doc.name + ': no line in this view.');
@@ -664,7 +664,7 @@ function buildCompareV2(el, P) {
   var sameComp = pooled || P.every(function (x) { return x.comp && x.comp === P[0].comp; });
   var where = pooled ? P[0].pooled.toLowerCase() + ' this season' : sameComp && P[0].comp ? FB.compName(P[0].comp) + ' ' + (FB.currentSeason(FB.comp(P[0].comp)).season || '') : 'each player\'s main competition this season';
   var floor = ((P[0].live || {}).minutes_floor) || 0;
-  var peer = same ? PEER[L] + ' · ' + where : 'each against his own position · ' + where;
+  var peer = same ? PEER[L] + ' · ' + where : 'each against their own position · ' + where;
   var body = el.querySelector('#lb-body');
   if (gkMix) {
     body.innerHTML = FB.card('Side by side', '', FB.empty('A goalkeeper and an outfield player share no metric set', 'Compare goalkeepers with goalkeepers, or open the classic view for every metric.'));
@@ -688,8 +688,8 @@ function buildCompareV2(el, P) {
   var none = P.filter(function (x) { return !x.row; }).map(function (x) { return x.doc.name; });
   var early = P.filter(function (x) { return x.row && x.row.minutes >= floor && x.row.minutes < 900; }).map(function (x) { return x.doc.name; });
   var notes = [];
-  if (!same) notes.push('Different positions: each percentile is against his own position group, so read across positions with care.');
-  if (!sameComp) notes.push('Different competitions: each percentile is against his own competition\'s peers. Pick "All competitions" above to rank them in one pool.');
+  if (!same) notes.push('Different positions: each percentile is against the player\'s own position group, so read across positions with care.');
+  if (!sameComp) notes.push('Different competitions: each percentile is against peers in the player\'s own competition. Pick "All competitions" above to rank them in one pool.');
   if (short.length) notes.push(short.join(', ') + (short.length > 1 ? ' are' : ' is') + ' under the ' + FB.int(floor) + '-minute floor: no percentiles yet.');
   if (none.length) notes.push(none.join(', ') + ': no line in this view.');
   if (early.length) notes.push(early.join(', ') + (early.length > 1 ? ' have' : ' has') + ' under 900 minutes: a small sample, read the percentiles as early.');

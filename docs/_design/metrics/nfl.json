@@ -271,7 +271,7 @@
      "set": "headline",
      "order": 7,
      "basis": "rate",
-     "explanation": "Air yards per attempt: how far downfield he throws (style, not quality).",
+     "explanation": "Air yards per attempt: how far downfield the passes go (style, not quality).",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.422,
@@ -333,7 +333,7 @@
      "set": "headline",
      "order": 9,
      "basis": "rate",
-     "explanation": "Scrambles per dropback: how often he escapes and runs (style).",
+     "explanation": "Scrambles per dropback: how often the quarterback escapes and runs (style).",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.826,
@@ -668,7 +668,7 @@
      "set": "secondary",
      "order": 12,
      "basis": "count",
-     "explanation": "Season total of expected points credited to him, adjusted for opponent and cast.",
+     "explanation": "Season total of expected points credited to the player, adjusted for opponent and cast.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.448,
@@ -985,7 +985,7 @@
      "set": "headline",
      "order": 7,
      "basis": "rate",
-     "explanation": "Share of his team's pass attempts thrown his way in his games: his role in the passing game.",
+     "explanation": "Share of the team's pass attempts thrown to the player in the games played: the role in the passing game.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.661,
@@ -1233,7 +1233,7 @@
      "set": "headline",
      "order": 1,
      "basis": "rate",
-     "explanation": "Gridiron Value above a replacement receiver at his position per game (value.json).",
+     "explanation": "Gridiron Value above a replacement receiver at the same position per game (value.json).",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.372,
@@ -1264,7 +1264,7 @@
      "set": "headline",
      "order": 2,
      "basis": "rate",
-     "explanation": "Receiving yards per team pass attempt in his games: a route-free stand-in for yards per route run.",
+     "explanation": "Receiving yards per team pass attempt in the games played: a route-free stand-in for yards per route run.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.543,
@@ -1294,7 +1294,7 @@
      "set": "headline",
      "order": 3,
      "basis": "rate",
-     "explanation": "Share of his team's pass attempts thrown his way in his games: how often he earns the ball.",
+     "explanation": "Share of the team's pass attempts thrown to the player in the games played: how often the player earns the ball.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.664,
@@ -1324,7 +1324,7 @@
      "set": "headline",
      "order": 4,
      "basis": "rate",
-     "explanation": "Expected points added per target: what the offence gains when he is the target.",
+     "explanation": "Expected points added per target: what the offence gains when the player is the target.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.188,
@@ -1354,7 +1354,7 @@
      "set": "headline",
      "order": 5,
      "basis": "rate",
-     "explanation": "Catches above what our completion model expects for his targets (depth, coverage, pressure).",
+     "explanation": "Catches above what our completion model expects for these targets (depth, coverage, pressure).",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.257,
@@ -1414,7 +1414,7 @@
      "set": "headline",
      "order": 7,
      "basis": "rate",
-     "explanation": "Air yards per target: how far downfield he is used (role and style).",
+     "explanation": "Air yards per target: how far downfield the player is used (role and style).",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.696,
@@ -1475,7 +1475,7 @@
      "set": "secondary",
      "order": 2,
      "basis": "rate",
-     "explanation": "Share of the team's intended air yards in his games.",
+     "explanation": "Share of the team's intended air yards in the games played.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.69,
@@ -1678,7 +1678,7 @@
      "set": "secondary",
      "order": 9,
      "basis": "rate",
-     "explanation": "Receiving yards per dropback he was on the field for (participation, 2016-2025 only; not available in-season).",
+     "explanation": "Receiving yards per dropback on the field (participation, 2016-2025 only; not available in-season).",
      "in_payload": false,
      "reliability": {
       "yoy_r": 0.523,
@@ -1872,7 +1872,7 @@
      "set": "headline",
      "order": 1,
      "basis": "rate",
-     "explanation": "Gridiron Value above a replacement receiver at his position per game (value.json).",
+     "explanation": "Gridiron Value above a replacement receiver at the same position per game (value.json).",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.505,
@@ -1903,7 +1903,7 @@
      "set": "headline",
      "order": 2,
      "basis": "rate",
-     "explanation": "Receiving yards per team pass attempt in his games: a route-free stand-in for yards per route run.",
+     "explanation": "Receiving yards per team pass attempt in the games played: a route-free stand-in for yards per route run.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.663,
@@ -1933,7 +1933,7 @@
      "set": "headline",
      "order": 3,
      "basis": "rate",
-     "explanation": "Share of his team's pass attempts thrown his way in his games: how often he earns the ball.",
+     "explanation": "Share of the team's pass attempts thrown to the player in the games played: how often the player earns the ball.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.631,
@@ -1963,7 +1963,7 @@
      "set": "headline",
      "order": 4,
      "basis": "rate",
-     "explanation": "Expected points added per target: what the offence gains when he is the target.",
+     "explanation": "Expected points added per target: what the offence gains when the player is the target.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.218,
@@ -1993,7 +1993,7 @@
      "set": "headline",
      "order": 5,
      "basis": "rate",
-     "explanation": "Catches above what our completion model expects for his targets (depth, coverage, pressure).",
+     "explanation": "Catches above what our completion model expects for these targets (depth, coverage, pressure).",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.212,
@@ -2053,7 +2053,7 @@
      "set": "headline",
      "order": 7,
      "basis": "rate",
-     "explanation": "Air yards per target: how far downfield he is used (role and style).",
+     "explanation": "Air yards per target: how far downfield the player is used (role and style).",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.503,
@@ -2114,7 +2114,7 @@
      "set": "secondary",
      "order": 2,
      "basis": "rate",
-     "explanation": "Share of the team's intended air yards in his games.",
+     "explanation": "Share of the team's intended air yards in the games played.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.665,
@@ -2317,7 +2317,7 @@
      "set": "secondary",
      "order": 9,
      "basis": "rate",
-     "explanation": "Receiving yards per dropback he was on the field for (participation, 2016-2025 only; not available in-season).",
+     "explanation": "Receiving yards per dropback on the field (participation, 2016-2025 only; not available in-season).",
      "in_payload": false,
      "reliability": {
       "yoy_r": 0.551,
@@ -2511,7 +2511,7 @@
      "set": "headline",
      "order": 1,
      "basis": "rate",
-     "explanation": "Splash EPA above a replacement outside pass rusher per game (value.json): the expected points his sacks, takeaways, pass break-ups and tackles for loss saved.",
+     "explanation": "Splash EPA above a replacement outside pass rusher per game (value.json): the expected points saved by sacks, takeaways, pass break-ups and tackles for loss.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.441,
@@ -2573,7 +2573,7 @@
      "order": 3,
      "basis": "rate",
      "explanation": "Tackles behind the line per game.",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.424,
       "split_half_r": null,
@@ -2635,7 +2635,7 @@
      "order": 4,
      "basis": "rate",
      "explanation": "Solo and assisted tackles per game (involvement, not quality).",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.519,
       "split_half_r": null,
@@ -2667,7 +2667,7 @@
      "order": 5,
      "basis": "rate",
      "explanation": "Forced fumbles per game. Unstable (r about 0.2).",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.204,
       "split_half_r": null,
@@ -2699,7 +2699,7 @@
      "order": 2,
      "basis": "rate",
      "explanation": "Sacks per game (r 0.86-0.88 with sacks + hits per game, less stable).",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.404,
       "split_half_r": null,
@@ -2731,7 +2731,7 @@
      "order": 6,
      "basis": "rate",
      "explanation": "Passes broken up or intercepted per game (batted balls for linemen).",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.389,
       "split_half_r": null,
@@ -2969,7 +2969,7 @@
      "set": "headline",
      "order": 1,
      "basis": "rate",
-     "explanation": "Splash EPA above a replacement interior lineman per game (value.json): the expected points his sacks, takeaways, pass break-ups and tackles for loss saved.",
+     "explanation": "Splash EPA above a replacement interior lineman per game (value.json): the expected points saved by sacks, takeaways, pass break-ups and tackles for loss.",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.518,
@@ -3031,7 +3031,7 @@
      "order": 3,
      "basis": "rate",
      "explanation": "Tackles behind the line per game.",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.436,
       "split_half_r": null,
@@ -3093,7 +3093,7 @@
      "order": 4,
      "basis": "rate",
      "explanation": "Solo and assisted tackles per game (involvement, not quality).",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.557,
       "split_half_r": null,
@@ -3125,7 +3125,7 @@
      "order": 5,
      "basis": "rate",
      "explanation": "Forced fumbles per game. Unstable (r about 0.2).",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.168,
       "split_half_r": null,
@@ -3157,7 +3157,7 @@
      "order": 2,
      "basis": "rate",
      "explanation": "Sacks per game (r 0.86-0.88 with sacks + hits per game, less stable).",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.485,
       "split_half_r": null,
@@ -3189,7 +3189,7 @@
      "order": 6,
      "basis": "rate",
      "explanation": "Passes broken up or intercepted per game (batted balls for linemen).",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.338,
       "split_half_r": null,
@@ -3459,7 +3459,7 @@
      "order": 2,
      "basis": "rate",
      "explanation": "Solo and assisted tackles per game: the linebacker's workload and range.",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.476,
       "split_half_r": null,
@@ -3491,7 +3491,7 @@
      "order": 3,
      "basis": "rate",
      "explanation": "Tackles behind the line per game.",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.288,
       "split_half_r": null,
@@ -3553,7 +3553,7 @@
      "order": 5,
      "basis": "rate",
      "explanation": "Passes broken up or intercepted per game: the only coverage credit in the data.",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.293,
       "split_half_r": null,
@@ -3615,7 +3615,7 @@
      "order": 1,
      "basis": "rate",
      "explanation": "Interceptions per game. Close to noise (r 0.10).",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.098,
       "split_half_r": null,
@@ -3647,7 +3647,7 @@
      "order": 2,
      "basis": "rate",
      "explanation": "Forced fumbles per game.",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.219,
       "split_half_r": null,
@@ -3888,7 +3888,7 @@
      "order": 2,
      "basis": "rate",
      "explanation": "Passes broken up or intercepted per game: the best coverage signal in public data, and still weak.",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.301,
       "split_half_r": null,
@@ -3920,7 +3920,7 @@
      "order": 3,
      "basis": "rate",
      "explanation": "Interceptions per game. Mostly luck from one season to the next.",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.193,
       "split_half_r": null,
@@ -3982,7 +3982,7 @@
      "order": 4,
      "basis": "rate",
      "explanation": "Solo and assisted tackles per game (for corners, partly a sign of being thrown at).",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.354,
       "split_half_r": null,
@@ -4014,7 +4014,7 @@
      "order": 5,
      "basis": "rate",
      "explanation": "Tackles behind the line per game (run support and blitzes).",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.252,
       "split_half_r": null,
@@ -4046,7 +4046,7 @@
      "order": 6,
      "basis": "rate",
      "explanation": "Forced fumbles per game.",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.12,
       "split_half_r": null,
@@ -4315,7 +4315,7 @@
      "order": 2,
      "basis": "rate",
      "explanation": "Solo and assisted tackles per game: run support and last-line tackling.",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.402,
       "split_half_r": null,
@@ -4347,7 +4347,7 @@
      "order": 3,
      "basis": "rate",
      "explanation": "Passes broken up or intercepted per game: the best coverage signal in public data, and still weak.",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.277,
       "split_half_r": null,
@@ -4379,7 +4379,7 @@
      "order": 4,
      "basis": "rate",
      "explanation": "Interceptions per game. Mostly luck from one season to the next.",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.156,
       "split_half_r": null,
@@ -4411,7 +4411,7 @@
      "order": 5,
      "basis": "rate",
      "explanation": "Tackles behind the line per game (run support and blitzes).",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.328,
       "split_half_r": null,
@@ -4473,7 +4473,7 @@
      "order": 1,
      "basis": "rate",
      "explanation": "Forced fumbles per game.",
-     "in_payload": false,
+     "in_payload": true,
      "reliability": {
       "yoy_r": 0.148,
       "split_half_r": null,
@@ -4712,7 +4712,7 @@
      "set": "headline",
      "order": 1,
      "basis": "count",
-     "explanation": "Field goals made minus what our model expects from the distances and conditions he faced (season total).",
+     "explanation": "Field goals made minus what our model expects from the distances and conditions faced (season total).",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.084,
@@ -4832,7 +4832,7 @@
      "set": "headline",
      "order": 4,
      "basis": "rate",
-     "explanation": "Average distance of his field-goal tries (how far his coach trusts him).",
+     "explanation": "Average distance of field-goal tries (how far the coach trusts the kicker).",
      "in_payload": true,
      "reliability": {
       "yoy_r": 0.119,
@@ -6030,50 +6030,58 @@
   {
    "field": "players.json values.separation, values.cushion (WR/TE), values.box8 (RB), NGS RYOE fallback",
    "builder": "oddsmarkets/nfl/analytics/context.py:load_release (and SeasonContext.ngs)",
-   "status": "needed",
-   "note": "bug: load_release('nextgen_stats', S, None, kind) returns the passing file for kind='receiving' and 'rushing' (nflverse.load answers first and ignores kind), so these fields are null in every season. Apply the kind filter to the loader's answer, or read raw/nextgen_stats/ngs_<kind>.parquet. context.py has another agent's uncommitted edits, so not changed here."
+   "status": "done",
+   "note": "bug: load_release('nextgen_stats', S, None, kind) returns the passing file for kind='receiving' and 'rushing' (nflverse.load answers first and ignores kind), so these fields are null in every season. Apply the kind filter to the loader's answer, or read raw/nextgen_stats/ngs_<kind>.parquet. context.py has another agent's uncommitted edits, so not changed here.",
+   "done": "020c7071 (NGS kinds: receiving and rushing read their own files); live after the next build"
   },
   {
    "field": "players.json values.net_oe (P)",
    "builder": "oddsmarkets/nfl/analytics/adapters.py:player_tables (net_oe from models/kicking.py:punter_value)",
-   "status": "needed",
-   "note": "bug: per_punt = expected - actual receiving-team spot, so positive = worse; r = -0.95 with net average, while the metric is published as higher-is-better. Flip the sign in the adapter (_put(..., scale=-1)) or define oe = actual - expected. Data accuracy, not an addition, so left to the data-accuracy owner."
+   "status": "done",
+   "note": "bug: per_punt = expected - actual receiving-team spot, so positive = worse; r = -0.95 with net average, while the metric is published as higher-is-better. Flip the sign in the adapter (_put(..., scale=-1)) or define oe = actual - expected. Data accuracy, not an addition, so left to the data-accuracy owner.",
+   "done": "9d6e9722 (sign flipped in the adapter: higher is better); live after the next build"
   },
   {
    "field": "players.json role (EDGE|DL|LB|CB|S) and pct_role{id}",
    "builder": "oddsmarkets/nfl/analytics/players.py:build (value.py:def_position for the role)",
-   "status": "needed",
-   "note": "five defensive peer groups; interim: the front end reads value.json pos by pid. players.py has another agent's uncommitted edits."
+   "status": "done",
+   "note": "five defensive peer groups; interim: the front end reads value.json pos by pid. players.py has another agent's uncommitted edits.",
+   "done": "9d6e9722 (role EDGE/DL/LB/CB/S, pct_role, catalogue roles with the ED code); live after the next build"
   },
   {
    "field": "players.json values.tfl_pg, tackles_pg, pd_pg, ints_pg, ff_pg, sacks_pg (DEF)",
    "builder": "oddsmarkets/nfl/analytics/players.py:def_rows + DEF_METRICS",
-   "status": "needed",
-   "note": "per-game rates with percentiles; interim: values.<count> / games (fallback_id in nfl.json). Note games for defenders counts games with a credited stat."
+   "status": "done",
+   "note": "per-game rates with percentiles; interim: values.<count> / games (fallback_id in nfl.json). Note games for defenders counts games with a credited stat.",
+   "done": "9d6e9722 (per-game defensive rates, k 6); live after the next build"
   },
   {
    "field": "players.json DEF qualified",
    "builder": "oddsmarkets/nfl/analytics/players.py:build (q for DEF)",
-   "status": "needed",
-   "note": "the tackles-equivalent condition qualifies only 48% of snap-regular interior linemen and 62% of edge rushers (83-89% of LB/CB/S); qualify defenders on games (>= half the team's games) and, 2016-2025, 300 defensive snaps."
+   "status": "done",
+   "note": "the tackles-equivalent condition qualifies only 48% of snap-regular interior linemen and 62% of edge rushers (83-89% of LB/CB/S); qualify defenders on games (>= half the team's games) and, 2016-2025, 300 defensive snaps.",
+   "done": "9d6e9722 (half the team's games with a credited stat plus 300 snaps where participation exists); live after the next build"
   },
   {
    "field": "players.json values.fg_oe_att (K)",
    "builder": "oddsmarkets/nfl/analytics/players.py:kick_rows",
-   "status": "needed",
-   "note": "fg_oe is a season total but is shrunk as a rate; a per-attempt version is the right percentile basis. Kicking is close to noise either way (YoY 0.08 total, 0.01 per attempt)."
+   "status": "done",
+   "note": "fg_oe is a season total but is shrunk as a rate; a per-attempt version is the right percentile basis. Kicking is close to noise either way (YoY 0.08 total, 0.01 per attempt).",
+   "done": "9d6e9722 (fg_oe per attempt); live after the next build"
   },
   {
    "field": "players.json values.yprr, tprr, routes (WR/TE/RB); values.pass_rush_rate, tackle_snap, ball_cov, def_snaps (DEF)",
    "builder": "oddsmarkets/nfl/analytics/players.py:rec_rows / def_rows (participation offense_players / defense_players via SeasonContext.plays)",
-   "status": "needed",
-   "note": "optional: 2016-2025 only (no participation for the current season), so secondary; yprr YoY 0.52 WR / 0.55 TE."
+   "status": "partly done",
+   "note": "optional: 2016-2025 only (no participation for the current season), so secondary; yprr YoY 0.52 WR / 0.55 TE.",
+   "done": "def_snaps delivered in 9d6e9722; yprr, tprr, routes, pass_rush_rate, tackle_snap, ball_cov still needed (participation 2016-2025 only)"
   },
   {
    "field": "careers.similar_players features",
    "builder": "oddsmarkets/nfl/analytics/careers.py:similar_players",
-   "status": "needed",
-   "note": "today: unweighted distance on the percentile vector of every group metric (counts included). Spec: z-scores of the headline rates within group and season, weights = YoY r floored at 0.2, weighted Euclidean, k 5; defenders by role. careers.py has another agent's uncommitted edits."
+   "status": "done",
+   "note": "today: unweighted distance on the percentile vector of every group metric (counts included). Spec: z-scores of the headline rates within group and season, weights = YoY r floored at 0.2, weighted Euclidean, k 5; defenders by role. careers.py has another agent's uncommitted edits.",
+   "done": "9d6e9722 (common/similar.py: role features, yoy-r weights floored at 0.2, k 5); live after the next build"
   },
   {
    "field": "teams.json early-down EPA",

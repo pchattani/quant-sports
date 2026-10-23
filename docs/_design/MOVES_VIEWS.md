@@ -173,7 +173,7 @@ One payload shape for all five leagues (engine `oddsmarkets/common/movement.py` 
 
 Keys (never renamed; read by name, not position):
 - `players`: rows with `player_fields` = `pid, name, team, pos, age, yrs, value, p_next, p_<type>... , p_dl, why`.
-  `p_next` = chance he is not with this team at `horizons.next`; `p_<type>` (in `types` order, labels in
+  `p_next` = chance the player is not with this team at `horizons.next`; `p_<type>` (in `types` order, labels in
   `type_labels`) split it and sum to it; `p_dl` = chance he moves before `horizons.deadline`, labelled with
   `deadline_label` ("traded" for MLB, "traded or claimed" elsewhere: the box scores cannot tell the two apart);
   `why` = up to two drivers in words ("age 34, a small role"). A probability is `null` when its block is not
@@ -238,7 +238,7 @@ Keys (never renamed; read by name, not position):
 - Only when `published.targets` (MLB today). Title "Who they could get"; sub "Ranked by chance of joining: chance he
   moves x chance he lands here; only players who would upgrade your weakest regular at the position".
 - Columns: rank; player (link), age, position; team (mark); **Chance of joining** (`p_join`, one decimal: "1.8%";
-  tip: "the chance he joins this team by `horizons.next`; 1-2% is a strong target among 30 teams"); **Availability**
+  tip: "the chance the player joins this team by `horizons.next`; 1-2% is a strong target among 30 teams"); **Availability**
   (`p_move` bar); **Fit** (`gain` signed in `unit`: "+0.7 WAR over your 3B slot"); **Why** (`why`).
 - Info tip from `validation.targets.test`: "On 2023-2025, 2.7% of a team's top 10 joined it, against 0.3% for the
   best upgrades alone and 0.8% by chance." Keep it modest: a shortlist, not a prediction of the move.

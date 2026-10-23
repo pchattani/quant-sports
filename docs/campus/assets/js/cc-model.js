@@ -54,7 +54,7 @@ function compare(el, p) {
     var rowsOf = function (list) {
       return list.map(function (m) {
         var mt = meta[m.id || m.key] || { fmt: '2' }, key = m.id || m.key;
-        return { label: m.d || m.label, tip: (m.x || m.desc || '') + (m.style ? ' Describes how he plays, not how well.' : ''), better: (m.low || m.lower) ? 'low' : 'high',
+        return { label: m.d || m.label, tip: (m.x || m.desc || '') + (m.style ? ' Describes playing style, not how well.' : ''), better: (m.low || m.lower) ? 'low' : 'high',
           values: E.map(function (e) { return (e.p.values || {})[key]; }), pctls: m.style ? E.map(function () { return null; }) : E.map(function (e) { return (e.p[pcKey] || {})[key]; }), fmt: function (v) { return CC.fmtMetric(mt, v); } };
       });
     };

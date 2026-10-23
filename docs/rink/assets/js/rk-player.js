@@ -88,6 +88,12 @@ function render(el, params, state) {
     if (!goalie && catP) k.push({ label: 'Points per 60', value: U.f((catP.values || {}).p60, 2), pctl: pp.p60, sub: 'all situations', tip: (meta.p60 || {}).desc });
     if (c && c.onice && isNum(c.onice.xgf_pct)) k.push({ label: '5v5 expected-goals share', value: U.f(c.onice.xgf_pct * 100, 1), unit: '%', pctl: pp.xgf_pct, sub: isNum(c.onice.xgf_pct_rel) ? U.signed(c.onice.xgf_pct_rel * 100, 1) + ' pts relative to the team' : '', tip: 'Of the expected goals at 5v5 with this player on the ice, the share that went the team’s way' });
     if (c && c.rapm && isNum(c.rapm.rapm_net)) k.push({ label: 'On-ice impact (RAPM)', value: U.signed(c.rapm.rapm_net, 2), pctl: pp.rapm_net, sub: '± ' + U.f(c.rapm.rapm_net_se, 2) + ' xG per 60 (one standard error)', tip: 'Regularised adjusted plus-minus: the player’s on-ice expected-goal impact after teammates and opponents' });
+    // round 4 (dc918944): the skater's term in the game model, when the player file carries it
+    if (!goalie && c && c.game_model && isNum(c.game_model.xgd60)) {
+      const gm = c.game_model;
+      k.push({ label: 'Weight in the game model', value: U.signed(gm.xgd60, 3), unit: 'xG/60', sub: 'to the team' + (isNum(gm.share) ? ' · on the ice for ' + Math.round(gm.share * 100) + '% of 5v5 time' : ''),
+        tip: 'How much this skater moves the team’s game forecasts: walk-forward RAPM (offence ' + U.signed(gm.o, 3) + ', defence ' + U.signed(gm.d, 3) + ' xG/60) times the share of 5v5 time the lineup gives this player' + (isNum(gm.toi5) ? ' (' + U.f(gm.toi5 / 60, 1) + ' min a game)' : '') + '.' });
+    }
     if (goalie && c && c.goalie) { const gg = c.goalie; k.push({ label: 'Goals saved above expected', value: U.signed(gg.gsax, 2), pctl: pp.gsax60, signal: true, sub: U.signed(gg.gsax60, 3) + ' per 60' }, { label: 'High-danger save %', value: RK.fmtVal(gg.sv_pct_high, '3'), pctl: pp.sv_pct_high, sub: 'expected ' + RK.fmtVal(gg.xfsv_pct, '3') + ' overall' }); }
 
     const SETS = U.SETS[group] || U.SETS.F;
