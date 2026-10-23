@@ -75,14 +75,14 @@ MV.teamSection = function (d, abbr, needs) {
   const outlookCard = GI.card('Outlook: ' + esc(horizon), (tm.status ? 'Status: ' + chip(tm.status, statusTip) + ' · ' : '') + 'who is likely to leave, by position', tiles + grid, { span: 5 });
   /* roster: chance of leaving */
   const dlOn = !!pub.deadline;
-  const tbl = mine.length ? GI.tableHTML([{ label: 'Player' }, { label: 'Pos' }, { label: 'Age', align: 'right' }, { label: 'Chance of leaving', align: 'right', title: 'Our chance he is not with this team at ' + nextText(d) + '. ' + ((d.notes || [])[0] || '') },
-    dlOn ? { label: cap1(d.deadline_label || 'traded') + ' by ' + deadlineText(d), align: 'right', title: 'Our chance he is ' + (d.deadline_label || 'traded') + ' before the trade deadline (the weekly rosters cannot tell a trade from a waiver claim)' } : null].filter(Boolean),
+  const tbl = mine.length ? GI.tableHTML([{ label: 'Player' }, { label: 'Pos' }, { label: 'Age', align: 'right' }, { label: 'Chance of leaving', align: 'right', title: 'Our chance the player is not with this team at ' + nextText(d) + '. ' + ((d.notes || [])[0] || '') },
+    dlOn ? { label: cap1(d.deadline_label || 'traded') + ' by ' + deadlineText(d), align: 'right', title: 'Our chance the player is ' + (d.deadline_label || 'traded') + ' before the trade deadline (the weekly rosters cannot tell a trade from a waiver claim)' } : null].filter(Boolean),
     mine.map(r => ({ _href: GI.playerHref(r.pid), cells: [{ html: GI.playerLink(r.pid, r.name) + (r.why ? '<span class="gi-sub-line">' + esc(r.why) + '</span>' : ''), v: r.name }, { html: esc(GI.posLabel(r.pos)), v: r.pos }, { html: GI.num(r.age, 0), v: r.age },
       { html: typeBar(r, d), v: r.p_next }].concat(dlOn ? [{ html: pct1(r.p_dl), v: r.p_dl }] : []) })), { sticky: true, maxHeight: 520 }) : GI.muted('No players on this roster in the movement model.');
-  const rosterCard = GI.card('Chance of leaving', 'Every player on the roster, by our chance he is gone by ' + esc(nextText(d)) + (dlOn ? '; and the chance he is ' + esc(d.deadline_label || 'traded') + ' before ' + esc(deadlineText(d)) : ''), legend(d) + tbl, { span: 7 });
+  const rosterCard = GI.card('Chance of leaving', 'Every player on the roster, by our chance of being gone by ' + esc(nextText(d)) + (dlOn ? '; and the chance of being ' + esc(d.deadline_label || 'traded') + ' before ' + esc(deadlineText(d)) : ''), legend(d) + tbl, { span: 7 });
   /* targets: only when the payload publishes them (the ranking must beat need x value and chance on the sealed seasons) */
   const tg = Array.isArray(tm.targets) && tm.targets.length && pub.targets ? GI.colRows({ cols: (d.team_fields || {}).targets || [], rows: tm.targets }) : [];
-  const targets = tg.length ? GI.card('Who they could get', 'Ranked by chance of joining: the chance he moves × the chance he lands here; only players who would upgrade the weakest starter at the position',
+  const targets = tg.length ? GI.card('Who they could get', 'Ranked by chance of joining: the chance of a move × the chance of landing here; only players who would upgrade the weakest starter at the position',
     GI.tableHTML([{ label: '#', align: 'right', sortable: false }, { label: 'Player' }, { label: 'Pos' }, { label: 'Team' }, { label: 'Chance of joining', align: 'right' }, { label: 'Availability', align: 'right' }, { label: 'Fit', align: 'right' }, { label: 'Why', sortable: false }],
       tg.map((r, i) => [i + 1, { html: GI.playerLink(r.pid, r.name), v: r.name }, esc(GI.posLabel(r.pos)), { html: GI.teamChip(r.team), v: r.team }, { html: '<b class="gi-ours">' + pct1(r.p_join) + '</b>', v: r.p_join }, { html: GI.probBar(r.p_move), v: r.p_move }, { html: GI.signed(r.gain, 2) + ' ' + esc(d.unit || 'pts'), v: r.gain }, { html: '<span class="gi-play-desc">' + esc(r.why || '') + '</span>' }]))) : '';
   return '<section class="qk-section" id="tp-moves">' + GI.secHead({ kicker: 'Value & Moves', title: 'Who moves next', sub: 'Our chance each player leaves and the team\'s outlook by position. ' + esc((d.notes || [])[1] || '') }) +
@@ -96,18 +96,18 @@ MV.playerCard = function (d, pid) {
   if (!r) return '';
   const pub = d.published || {};
   const T = d.types || [];
-  const big = pub.next && isNum(r.p_next) ? '<div class="gi-mv-big"><span class="gi-disp">' + pct(r.p_next) + '</span><span>chance of leaving: he is not with ' + esc(GI.teamName(r.team)) + ' at ' + esc(nextText(d)) + '</span></div>' : '';
-  const split = isNum(r.p_next) && r.p_next > 0 ? '<div class="gi-mv-split"><div class="qk-kicker">If he leaves</div><span class="gi-mv-track wide">' + T.map((t, i) => { const v = r['p_' + t]; return isNum(v) && v > 0 ? '<i style="width:' + (100 * v / r.p_next).toFixed(1) + '%;background:' + TYPE_COL[i % TYPE_COL.length] + '" title="' + esc(typeLabel(d, t) + ': ' + Math.round(100 * v / r.p_next) + '%') + '"></i>' : ''; }).join('') + '</span>' + legend(d) + '</div>' : '';
-  const dl = pub.deadline && isNum(r.p_dl) ? '<div class="gi-mv-dl"><b>' + pct1(r.p_dl) + '</b> chance he is ' + esc(d.deadline_label || 'traded') + ' before the deadline, ' + esc(deadlineText(d)) + '</div>' : '';
+  const big = pub.next && isNum(r.p_next) ? '<div class="gi-mv-big"><span class="gi-disp">' + pct(r.p_next) + '</span><span>chance of leaving: not with ' + esc(GI.teamName(r.team)) + ' at ' + esc(nextText(d)) + '</span></div>' : '';
+  const split = isNum(r.p_next) && r.p_next > 0 ? '<div class="gi-mv-split"><div class="qk-kicker">If the player leaves</div><span class="gi-mv-track wide">' + T.map((t, i) => { const v = r['p_' + t]; return isNum(v) && v > 0 ? '<i style="width:' + (100 * v / r.p_next).toFixed(1) + '%;background:' + TYPE_COL[i % TYPE_COL.length] + '" title="' + esc(typeLabel(d, t) + ': ' + Math.round(100 * v / r.p_next) + '%') + '"></i>' : ''; }).join('') + '</span>' + legend(d) + '</div>' : '';
+  const dl = pub.deadline && isNum(r.p_dl) ? '<div class="gi-mv-dl"><b>' + pct1(r.p_dl) + '</b> chance of being ' + esc(d.deadline_label || 'traded') + ' before the deadline, ' + esc(deadlineText(d)) + '</div>' : '';
   const ctx = [isNum(r.age) ? 'age ' + GI.num(r.age, 0) : '', isNum(r.yrs) ? r.yrs + ' accrued season' + (r.yrs === 1 ? '' : 's') : '', isNum(r.value) ? GI.num(r.value, 1) + ' ' + (d.unit || 'points') + ' of value' : '', r.why || ''].filter(Boolean).join(' · ');
-  return GI.card('Movement', 'Our chance he leaves, from our own movement model · ' + esc((d.notes || [])[1] ? 'no contract data is used' : ''), big + (ctx ? '<p class="gi-cap">' + esc(ctx) + '</p>' : '') + split + dl, { cls: 'gi-mv-card' });
+  return GI.card('Movement', 'Our chance the player leaves, from our own movement model · ' + esc((d.notes || [])[1] ? 'no contract data is used' : ''), big + (ctx ? '<p class="gi-cap">' + esc(ctx) + '</p>' : '') + split + dl, { cls: 'gi-mv-card' });
 };
 
 /* ── Model page: Who moves next ────────────────────────────────────────────────────────────────────────────── */
 MV.modelSection = function (d) {
   if (!d) return '';
   const V = d.validation || {}, pub = d.published || {};
-  const NAME = { next: 'Leaves by ' + nextText(d), deadline: cap1(d.deadline_label || 'traded') + ' before the deadline', type: 'How he leaves (type split)', arrivals: 'Arrivals by position', targets: 'Targets' };
+  const NAME = { next: 'Leaves by ' + nextText(d), deadline: cap1(d.deadline_label || 'traded') + ' before the deadline', type: 'How the player leaves (type split)', arrivals: 'Arrivals by position', targets: 'Targets' };
   const ci = a => (Array.isArray(a) ? GI.signed(a[0], 4) + ' [' + GI.signed(a[1], 4) + ', ' + GI.signed(a[2], 4) + ']' : '—');
   const tbl = GI.tableHTML([{ label: 'Block', sortable: false }, { label: 'Sealed seasons', sortable: false }, { label: 'n', align: 'right' }, { label: 'Rate', align: 'right' }, { label: 'Log-loss model v base', align: 'right' }, { label: 'Gain (95% CI)', align: 'right' }, { label: 'Calibration slope', align: 'right' }, { label: 'Published', sortable: false }],
     Object.keys(NAME).filter(k => V[k]).map(k => { const t = (V[k] || {}).test || {}; return [esc(NAME[k]), esc(((d.split || {}).test || []).join(', ')), { html: GI.int(t.n || t.team_seasons), v: t.n }, { html: isNum(t.rate) ? GI.pct(t.rate, 1) : '—', v: t.rate },

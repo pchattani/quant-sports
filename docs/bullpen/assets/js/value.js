@@ -88,7 +88,7 @@ function valuePage(el, params) {
       const pj = d.projection || {};
       const vtxt = ['H', 'P'].map(k => { const v = (pj[k] || {}).validation; if (!v) return ''; const r = v.rmse || {};
         return (k === 'H' ? 'Hitters' : 'Pitchers') + ': out-of-sample RMSE ' + BP.num(r.projection, 2) + ' against ' + BP.num(r.last_season, 2) + ' for last season\'s rate and ' + BP.num(r.league_rate, 2) + ' for the league rate (' + esc(v.unit) + ', ' + (v.targets || []).length + ' target seasons, players with ' + v.min_n + '+).'; }).filter(Boolean).join(' ');
-      $('val-card').innerHTML = U.card2('The leaderboard', sel.length + (V.kind === 'P' ? ' pitchers' : ' hitters') + ' · ' + esc((d.units || {})[V.kind] || '') + ' · the cell colour is his WAR percentile among qualified players of the same kind', '<div id="val-table"></div>',
+      $('val-card').innerHTML = U.card2('The leaderboard', sel.length + (V.kind === 'P' ? ' pitchers' : ' hitters') + ' · ' + esc((d.units || {})[V.kind] || '') + ' · the cell colour is the WAR percentile among qualified players of the same kind', '<div id="val-table"></div>',
         { flush: true, foot: '<span>' + esc((d.notes || []).join(' ')) + (vtxt ? ' Projection check: ' + vtxt : '') + ' Floors: ' + fl.H + ' PA, ' + fl.P + ' BF.</span>' });
       if (!sel.length) $('val-table').innerHTML = QK.empty('Nobody here', 'Lower the floor or widen the filters.');
       else QK.leaderboard($('val-table'), { dense: true, rank: true, maxHeight: 640, rowHref: o => o.href, columns: [
@@ -140,7 +140,7 @@ function drawV2(d, F, sel, L, S, $) {
     const note = esc((vm.notes || []).join(' ')) + ' Median-starter lines (full-season wins): ' + esc(lines) + '.' +
       (cov.H1 ? ' Band check (out of sample): ' + BP.pct(cov.H1.rate, 0) + ' of hitters and ' + BP.pct((cov.P1 || {}).rate, 0) + ' of pitchers landed inside next season\'s 80% band; ' + BP.pct((cov.H3 || {}).rate, 0) + ' and ' + BP.pct((cov.P3 || {}).rate, 0) + ' inside the three-season band.' : '') +
       (ivh && ivp ? ' Injured-list model: mean absolute error ' + n1(ivh.mae_model) + ' days against ' + n1(ivh.mae_mean) + ' for the league mean (hitters), ' + n1(ivp.mae_model) + ' against ' + n1(ivp.mae_mean) + ' (pitchers); it did not improve playing-time projections walk-forward, so it is shown as risk and not used in them.' : '');
-    $('val-v2card').innerHTML = QK.sectionHead({ kicker: 'The next five seasons', title: 'Who holds value', sub: 'Expected WAR next season and over three with the 80% band of what players with that expectation went on to produce; the five-season value (discounted 8% a year); injured-list risk; wins over the median starter at his position. The same filters as the leaderboard.' }) +
+    $('val-v2card').innerHTML = QK.sectionHead({ kicker: 'The next five seasons', title: 'Who holds value', sub: 'Expected WAR next season and over three with the 80% band of what players with that expectation went on to produce; the five-season value (discounted 8% a year); injured-list risk; wins over the median starter at the same position. The same filters as the leaderboard.' }) +
       '<div class="qk-grid"><div class="qk-span-5">' + U.card2('Next season, with its range', 'The fifteen with the most five-season value: expected WAR next season (dot) and its 80% band', list.length ? U.chart('val-range', 470, 'Next season WAR with an 80% band') : QK.empty('Nobody here')) + '</div>' +
       '<div class="qk-span-7">' + U.card2('Valuation', list.length + ' players', '<div id="val-v2"></div>', { flush: true, foot: '<span>' + note + '</span>' }) + '</div></div>';
     if (!list.length) return;
@@ -152,7 +152,7 @@ function drawV2(d, F, sel, L, S, $) {
       { key: 'e1', label: 'Next season', num: true, fmt: (v, o) => '<b>' + s1(v) + '</b> ' + band(o.lo1, o.hi1), tip: 'Expected WAR next season and its 80% band' },
       { key: 'e3', label: '3 seasons', num: true, fmt: (v, o) => s1(v) + ' ' + band(o.lo3, o.hi3), tip: 'Expected WAR over the next three seasons and its 80% band' },
       { key: 'v5', label: 'Value (5 yrs)', type: 'bar', fmt: v => s1(v), tip: 'Expected WAR over five seasons, discounted 8% a year' },
-      { key: 'over', label: 'v median starter', num: true, fmt: v => (isNum(v) ? BP.signed(v, 1) : '—'), tip: 'Projected full-season wins at his position minus the median starter there (the 15th best)' },
+      { key: 'over', label: 'v median starter', num: true, fmt: v => (isNum(v) ? BP.signed(v, 1) : '—'), tip: 'Projected full-season wins at the position minus the median starter there (the 15th best)' },
       { key: 'ilsum', label: 'IL days', num: true, fmt: (v, o) => (o.il.length ? o.il.map(x => BP.int(x)).join(' / ') : '—'), tip: 'Days on the injured list: two seasons ago / last season / this season' },
       { key: 'ilp', label: 'IL risk', num: true, fmt: (v, o) => (isNum(o.ilexp) ? BP.int(o.ilexp) + ' d · ' + BP.pct(v, 0) : '—'), tip: 'Expected injured-list days next season and the chance of 30 or more' }],
       rows: list.map(r => { const il = r[F.il3] || []; return { name: r[F.name], team: r[F.team], sub: (r[F.pos] || '') + ' · ' + BP.teamAbbr(r[F.team]) + ' · ' + n1(r[F.age]), e1: r[F.e1], lo1: r[F.lo1], hi1: r[F.hi1], e3: r[F.e3], lo3: r[F.lo3], hi3: r[F.hi3], v5: r[F.v5], over: r[F.over_line],
@@ -160,7 +160,7 @@ function drawV2(d, F, sel, L, S, $) {
   } else if (d.prospects && F.p_value !== undefined) {
     const LV = { aaa: 'Triple-A', aa: 'Double-A', hia: 'High-A', a: 'Single-A' };
     const list = sel.filter(r => isNum(r[F.p_value])).sort((a, b) => b[F.p_value] - a[F.p_value]).slice(0, 200);
-    $('val-v2card').innerHTML = U.card2('Prospect value', 'Expected MLB WAR over the next four seasons (discounted) from the season\'s minor-league line at his highest level; the same filters as the leaderboard', '<div id="val-v2"></div>',
+    $('val-v2card').innerHTML = U.card2('Prospect value', 'Expected MLB WAR over the next four seasons (discounted) from the season\'s minor-league line at the highest level reached; the same filters as the leaderboard', '<div id="val-v2"></div>',
       { flush: true, foot: '<span>' + esc(((d.prospects || {}).notes || []).join(' ')) + '</span>' });
     if (!list.length) { $('val-v2').innerHTML = QK.empty('Nobody here'); return; }
     QK.leaderboard($('val-v2'), { dense: true, rank: true, maxHeight: 560, rowHref: o => o.href, columns: [
@@ -372,7 +372,7 @@ function valueTeam(host, L, S, tid) {
     const gradeRows = POS.filter(p => by[p]).map(p => { const g = by[p]; return [{ v: p, html: '<b>' + esc(p) + '</b>' }, { v: g.grade, html: gradeChip(g.grade) },
       { v: g.war, html: s1(g.war), align: 'right' }, { v: g.rank, html: g.ungraded ? '—' : (g.rank || '—') + ' of ' + (g.of || '—'), align: 'right' }, { v: g.pct, html: BP.pctPill(g.pct), align: 'right' }, { v: '', html: g.ungraded ? '<span class="muted-inline">' + esc(g.evidence || '') + '</span>' : names(g) }]; });
     const tile = (list, kind) => (list || []).map(p => { const g = by[p] || {}; return '<div class="val-sn ' + kind + '"><div class="val-sn-h">' + gradeChip(g.grade) + ' <b>' + esc(p) + '</b> <span class="muted-inline">' + (g.ungraded ? 'not graded' : s1(g.war) + ' WAR · ' + (g.rank || '—') + ' of ' + (g.of || '—')) + '</span></div><div class="val-sn-b">' + esc(g.evidence || '') + '</div></div>'; }).join('');
-    let h = '<div class="card"><div class="card-header">Strengths and needs <span class="card-sub">Every position\'s ' + esc((d.units || {}).war || 'WAR') + ' this season (a player\'s WAR split by his games at each position) against the other clubs: A top fifth … F bottom fifth.</span></div>' +
+    let h = '<div class="card"><div class="card-header">Strengths and needs <span class="card-sub">Every position\'s ' + esc((d.units || {}).war || 'WAR') + ' this season (a player\'s WAR split by games at each position) against the other clubs: A top fifth … F bottom fifth.</span></div>' +
       '<div class="val-sn-grid"><div><div class="val-sn-t">Strongest</div>' + tile(d.strengths, 'good') + '</div><div><div class="val-sn-t">Weakest</div>' + tile(d.weaknesses, 'bad') + '</div></div>' +
       BP.tableHTML([{ label: 'Pos' }, { label: 'Grade' }, { label: 'WAR', align: 'right' }, { label: 'Rank', align: 'right' }, { label: 'Pct', align: 'right' }, { label: 'Players (WAR there)' }], gradeRows, { compact: true }) + '</div>';
     const imp = d.improve || {};

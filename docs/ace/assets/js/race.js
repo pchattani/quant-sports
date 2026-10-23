@@ -4,6 +4,7 @@
  *   Finals qualification: our chance from the rest-of-season simulation (chance bars and a table with race points,
  *     the gap to eighth and the simulated year-end points with their 5th-95th percentile range);
  *   year-end No. 1: our chances; where they finish: the simulated year-end rank as a heat map (both axes titled);
+ *   chances over time from race.json "history" (one snapshot per simulation date; a note until three are on record);
  *   the events left in the simulation and what it assumes.
  * Race points come from the latest ranking (this week included); the simulation starts from its own snapshot.
  * Reads <T>/race.json and <T>/rankings.json. */
@@ -57,6 +58,11 @@ function render(el, params) {
     html += '<div class="qk-grid"><div class="qk-span-5">' + V.card('Who qualifies', 'Our chance of a place at the ' + esc(fin), '<div id="rc-ch"></div>') + '</div><div class="qk-span-7">' +
       V.card('Finals qualification', esc(ptsNote) + '; the dashed line sits below eighth in our order', '<div id="rc-table"></div>', { flush: true,
         foot: '<span>The top eight in the race qualify' + (T === 'atp' ? '; a Slam champion ranked 9–20 takes the eighth place' : '') + '</span>' }) + '</div></div>';
+    const H = (race.history || []).filter(h => h && h.as_of).sort((a, b) => String(a.as_of).localeCompare(String(b.as_of)));
+    html += '<section class="qk-section">' + V.card('Chances over time', 'Our chance after each simulation of the rest of the season' + (H.length ? ', from ' + esc(TA.fmtDate(H[0].as_of, { weekday: false })) : ''),
+      (H.length >= 3 ? V.seg('rc-h-k', [['finals_qual', 'Finals qualification'], ['year_end_no1', 'Year-end No. 1']], 'finals_qual', 'Chance') + V.chart('rc-hist', 340, 'Chances over time')
+        : '<p class="ta-cap" style="margin:0">' + (H.length ? 'Recording started on ' + esc(TA.fmtDate(H[0].as_of, { weekday: false })) + ' with ' + H.length + ' simulation date' + (H.length === 1 ? '' : 's') + ' so far' : 'The simulation has not recorded its history yet') +
+          '. The chart appears once three dates are on record; earlier runs were not stored.</p>')) + '</section>';
     html += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-5">' + V.card('Year-end No. 1', 'Our chance of finishing the year ranked No. 1', '<div id="rc-no1"></div>') + '</div><div class="qk-span-7">' +
       V.card('Where they finish', 'Simulated year-end rank, 1–20; cells show the chance where it is 10% or more', V.chart('rc-heat', 420, 'Simulated year-end rank')) + '</div></div></section>';
     const rem = race.remaining_events || [];
@@ -88,6 +94,19 @@ function render(el, params) {
     const items = Object.keys(no1).sort((a, b) => (no1[b] || 0) - (no1[a] || 0)).slice(0, 8).filter(p => (no1[p] || 0) >= 0.001).map(p => ({ label: TA.playerShort(T, p), p: no1[p], href: TA.playerHref(T, p) }));
     el.querySelector('#rc-no1').innerHTML = items.length ? QK.chances(items, { max: 1, oursName: 'Our chance' }) : QK.empty('No year-end No. 1 chances');
     rankHeat('#rc-heat', T, race, ids.length ? ids : Object.keys(race.rank_dist || {}));
+    if (H.length >= 3) {
+      const drawH = key => {
+        const last = H[H.length - 1][key] || {};
+        const who = Object.keys(last).filter(p => H.some(h => isNum((h[key] || {})[p]) && h[key][p] >= 0.02 && h[key][p] <= 0.995))
+          .sort((a, b) => (last[b] || 0) - (last[a] || 0)).slice(0, 8);
+        if (!who.length) { el.querySelector('#rc-hist').innerHTML = QK.empty('No contest yet', 'Every contender is above 99.5% or below 2%.'); return; }
+        QKC.forecast('#rc-hist', { x: H.map(h => h.as_of), xType: 'time', xName: 'Simulation date', yName: key === 'year_end_no1' ? 'Our chance of finishing No. 1' : 'Our chance of qualifying',
+          series: who.map((p, i) => ({ name: TA.playerShort(T, p), label: TA.playerSurname(T, p), color: QK.cssVar('--c-' + ((i % 8) + 1)), data: H.map(h => { const v = (h[key] || {})[p]; return isNum(v) ? v : null; }) })),
+          today: H[H.length - 1].as_of, label: 'Chances over time' });
+      };
+      drawH('finals_qual');
+      QK.seg(el.querySelector('#rc-h-k'), drawH);
+    }
     TA.sortable(el);
     TA.setMeta(nS ? nS + ' season simulations' : '');
   });

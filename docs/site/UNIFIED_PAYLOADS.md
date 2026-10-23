@@ -871,3 +871,20 @@ coefficients), `arrivals` (`window`, `mean_per_club`, `mix` by unit), `n_players
 Targets are players who would improve the club (450+ minutes for their club in 12 months, `q_gap` >= 0) and leave
 out a player whose fair fee to the club is over 1.5 x its 90th-percentile summer budget (as the existing `targets`). The existing `targets` (by weak unit, on value) are unchanged; `movement.targets` is the
 movement-based list.
+
+## Metrics-spec fields (23 Oct 2026)
+
+- `<slug>/players_live.json` players[]: `role` (the value model's formation role of his line in that competition: GK,
+  CB, FB, DM, CM, AM, W, ST; DF / MF / FW for substitute-only lines; else his 12-month role) and `gar90` (goals added
+  above replacement per 90 in that competition, from `value/lines.json`; null under 90 minutes there).
+- `lab/<window>/<scope>.json`: `role` and `gar90` appended to `fields` (earlier column positions unchanged). The
+  "season" window of one competition reads that line; other windows and scopes read the 12-month value
+  (`value/players.json`).
+- `people/<pid>.json` `role`: the 12-month formation role (absent when the value model has no line for him).
+- `people_names.json`: the search index, names only: `fields` [id, name, pos, club], `rows`, `aliases` (about 0.5 MB
+  gzipped against 1.1 MB for `people_index.json`).
+- `pool.json` clubs[]: `rated` (in a followed league or with league-table games: the clubs the pages list) and
+  `rank_rated` (rank by strength among rated clubs; null otherwise); `model.n_rated`. Club files
+  (`clubs/<tid>.json` and `value/club/<tid>.json`) `pool` gain `rank_rated` and `rated`.
+- Written by `oddsmarkets/football/analytics/value_fields.py` after the value layer (players_live, lab, changed
+  people roles) and by the unified step (people roles from the value files on disk, people_names.json).

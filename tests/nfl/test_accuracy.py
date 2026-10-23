@@ -148,3 +148,17 @@ def test_load_release_passes_the_kind(monkeypatch):
         df = load_release("nextgen_stats", None, None, k)
         assert df["kind"].tolist() == [k]
     assert seen == ["passing", "rushing", "receiving"]
+
+
+def test_punter_net_oe_is_higher_is_better(monkeypatch):
+    """models/kicking.py's per_punt is expected - actual receiving-team spot (positive = short of the model); the payload
+    net_oe is yards over expected, higher = better, so the adapter flips the sign (accuracy, 23 Oct 2026)."""
+    from oddsmarkets.nfl.analytics import adapters as AD
+    from types import SimpleNamespace
+    res = {"ok": True, "kickers": pd.DataFrame({"kicker": ["K1"], "fgoe": [1.0], "pts_oe": [3.0]}),
+           "punters": pd.DataFrame({"punter": ["P1", "P2"], "per_punt": [2.5, -1.5]})}
+    monkeypatch.setattr(AD, "_module", lambda name: object() if name == "kicking" else None)
+    ctx = SimpleNamespace(use_models=True, model=lambda name: res)
+    out = AD.player_tables(ctx)
+    assert out["net_oe"] == {"P1": -2.5, "P2": 1.5}
+    assert out["fg_oe"] == {"K1": 1.0}

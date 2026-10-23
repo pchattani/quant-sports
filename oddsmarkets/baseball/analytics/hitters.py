@@ -34,7 +34,7 @@ QUAL_PA_PER_G = 3.1
 
 METRICS: list[dict] = [
     # traditional
-    M("g", "Games", "Traditional", "int", desc="Games with a plate appearance."),
+    M("g", "G (with a PA)", "Traditional", "int", desc="Games with a plate appearance (defensive replacements and pinch runners without a PA are not counted)."),
     M("pa", "PA", "Traditional", "int", desc="Plate appearances."),
     M("ab", "AB", "Traditional", "int", desc="At-bats: PA minus walks, HBP, sacrifices and catcher's interference."),
     M("h", "H", "Traditional", "int", desc="Hits."),

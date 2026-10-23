@@ -100,6 +100,7 @@ def unit_ratings(ctx: SeasonContext, T: dict, cat_g: dict | None) -> dict:
             off5, def5 = an.per60(f("xgf_5v5"), f("toi_5v5")), an.per60(f("xga_5v5"), f("toi_5v5"))
             counts[t] = {"off5": off5, "def5": def5, "pp": an.per60(f("xgf_PP"), f("toi_PP")), "pk": an.per60(f("xga_SH"), f("toi_SH")),
                          "gf_g": an.div(f("gf_all"), gp.get(t)), "ga_g": an.div(f("ga_all"), gp.get(t)),
+                         "gd_g": an.div(f("gf_all") - f("ga_all"), gp.get(t)),
                          "xgf_g": an.div(f("xgf_all"), gp.get(t)), "xga_g": an.div(f("xga_all"), gp.get(t)),
                          "xgf_pct5": (f("xgf_5v5") / (f("xgf_5v5") + f("xga_5v5"))) if f("xgf_5v5") + f("xga_5v5") else None,
                          "cf_pct5": (f("cf_5v5") / (f("cf_5v5") + f("ca_5v5"))) if f("cf_5v5") + f("ca_5v5") else None,
@@ -131,7 +132,7 @@ def unit_ratings(ctx: SeasonContext, T: dict, cat_g: dict | None) -> dict:
             e["source"] = "counts"
         out[t] = e
     # league percentiles of the units (100 = best)
-    for k, lower in (("off5", False), ("def5", True), ("pp", False), ("pk", True), ("goalie", False), ("rating", False)):
+    for k, lower in (("off5", False), ("def5", True), ("pp", False), ("pk", True), ("goalie", False), ("rating", False), ("gd_g", False)):
         pc = an.percentiles({t: v.get(k) for t, v in out.items()}, lower)
         for t, p in pc.items():
             out[t].setdefault("pct", {})[k] = p

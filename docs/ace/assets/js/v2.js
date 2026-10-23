@@ -62,9 +62,33 @@ V.SURF = ['hard', 'clay', 'grass'];
 V.group = (T, surface) => (T === 'wta' ? 'wta' : 'atp') + '_' + (surface && V.SURF.indexOf(surface) >= 0 ? surface : 'all');
 V.set = (T, surface) => V.SETS[V.group(T, surface)] || [];
 V.floor = (cat, surface) => (surface ? (((cat || {}).surface_floor || {})[surface] || { hard: 10, clay: 8, grass: 5 }[surface]) : ((cat || {}).floor || 20));
-V.peer = (T, surface, cat) => (T === 'wta' ? 'WTA' : 'ATP') + (surface ? ' on ' + surface + ', ' + V.floor(cat, surface) + '+ ' + surface + ' matches' : ' players, ' + V.floor(cat) + '+ matches');
+V.peer = (T, surface, cat) => (T === 'wta' ? 'WTA' : 'ATP') + (surface ? ' on ' + surface + ', ' + V.floor(cat, surface) + '+ ' + surface + ' matches' : ' players, ' + (cat && cat._peerCat && !cat.floor ? 'qualified' : V.floor(cat) + '+ matches'));
+/* players/<pid>.json "peer" (PAYLOADS.md, 22 Oct 2026): the player's own peer block, so the player page can draw its
+   percentile card and similar players without the season catalogue. Returns a one-player catalogue in the
+   players.json shape (flagged _peerCat), or null when the block is missing. */
+V.peerCat = (peer, career, pid) => {
+  const g = (peer && peer.groups) || {}, all = g.all;
+  if (!all || !all.values) return null;
+  const row = { name: (career || {}).name, country: (career || {}).country, qualified: !!all.in_pool, matches: (all.sample || {}).matches,
+    values: Object.assign({}, all.values), pct: all.in_pool ? Object.assign({}, all.pct || {}) : {}, values_surface: {}, pct_surface: {}, _inPool: { all: !!all.in_pool } };
+  if (isNum((all.sample || {}).stats_matches)) row.values.stats_matches = all.sample.stats_matches;
+  const sfl = {};
+  V.SURF.forEach(s => {
+    const x = g[s];
+    if (!x) return;
+    row.values_surface[s] = Object.assign({ matches: (x.sample || {}).matches }, x.values || {});
+    if (x.in_pool) row.pct_surface[s] = Object.assign({}, x.pct || {});
+    row._inPool[s] = !!x.in_pool;
+    if (x.minimum && isNum(x.minimum.value)) sfl[s] = x.minimum.value;
+  });
+  const players = {};
+  players[pid] = row;
+  return { ok: true, _peerCat: true, year: peer.year, tour: peer.tour, surface_floor: sfl, floor: null, metrics: [], players: players,
+    similar: (peer.similar || []).map(x => ({ id: String(x.id), d: x.d, name: x.name })) };
+};
 V.inPool = (p, surface, cat) => {
   if (!p) return false;
+  if (p._inPool) return !!p._inPool[surface || 'all'];
   if (!surface) return p.qualified === true;
   const s = ((p.values_surface || {})[surface]) || null;
   return !!s && isNum(s.matches) && s.matches >= V.floor(cat, surface);
@@ -95,7 +119,14 @@ function eloPct(cat, surface, k, v) {
 }
 V.pctl = (p, k, surface, cat) => {
   if (!p) return null;
-  if (surface) return V.isElo(k) ? (V.inPool(p, surface, cat) ? eloPct(cat, surface, k, (p.values || {})[k]) : null) : (((p.pct_surface || {})[surface]) || {})[k];
+  if (surface) {
+    const ps = ((p.pct_surface || {})[surface]) || {};
+    if (!V.isElo(k)) return ps[k];
+    if (!V.inPool(p, surface, cat)) return null;
+    if (isNum(ps[k])) return ps[k];
+    if (k === 'elo_' + surface && isNum(ps.elo_surface)) return ps.elo_surface;
+    return eloPct(cat, surface, k, (p.values || {})[k]);
+  }
   return (p.pct || {})[k];
 };
 V.fmt = (k, v, meta) => {
@@ -129,7 +160,7 @@ V.sampleLine = (p, T, surface, cat) => {
   if (!p) return '';
   const n = surface ? ((p.values_surface || {})[surface] || {}).matches : p.matches;
   const st = (p.values || {}).stats_matches;
-  return (isNum(n) ? n + (surface ? ' ' + surface : '') + ' matches' : '') + (T === 'wta' && isNum(st) && st > 0 ? ' · ' + st + ' with WTA statistics' : '') + ' · peers need ' + V.floor(cat, surface);
+  return (isNum(n) ? n + (surface ? ' ' + surface : '') + ' matches' : '') + (T === 'wta' && isNum(st) && st > 0 ? ' · ' + st + ' with WTA statistics' : '') + (surface || !(cat && cat._peerCat && !cat.floor) ? ' · peers need ' + V.floor(cat, surface) : '');
 };
 /* Similar players (spec: tour view features, z-scored within tour and season among qualified players, weights = YoY r
  * floored at 0.2 and capped at 0.8, surface Elos as the difference from overall Elo). */
@@ -158,6 +189,61 @@ V.similar = (T, pid, cat, k) => {
     return { id: id, d: w ? Math.sqrt(s / w) : null };
   }).filter(x => isNum(x.d)).sort((a, b) => a.d - b.d).slice(0, k || 5);
 };
+
+/* ── charts on the kit (QKC, ECharts), for the dated series the career files carry ──
+ * V.lines(el, { series: [{ name, rows: [[iso, v], ..], color (hex), dash, width, band: [[iso, lo, hi], ..] }], yName, xName,
+ *   yFmt, step, legend, yScale, ref: { y, label }, area, label }) -> a time-axis QKC.line; every axis titled. */
+V.ms = d => { const t = TA.parseDate(d); return t ? t.getTime() : null; };
+V.node = el => (typeof el === 'string' ? document.getElementById(el.replace(/^#/, '')) : el);
+V.lines = (el, o) => {
+  const n = V.node(el);
+  if (!n) return null;
+  if (!n.classList.contains('qk-chart')) n.classList.add('qk-chart');
+  const series = (o.series || []).map(x => {
+    const rows = (x.rows || []).filter(r => V.ms(r[0]) !== null && isNum(r[1]));
+    const band = x.band ? x.band.filter(b => V.ms(b[0]) !== null && isNum(b[1]) && isNum(b[2])) : null;
+    return { name: x.name, label: x.label, color: x.color, dash: x.dash, width: x.width, area: x.area, data: rows.map(r => [V.ms(r[0]), Number(r[1])]),
+      band: band && band.length ? { x: band.map(b => V.ms(b[0])), lo: band.map(b => b[1]), hi: band.map(b => b[2]) } : undefined };
+  }).filter(x => x.data.length);
+  if (!series.length) { n.innerHTML = '<div class="muted">' + esc(o.emptyText || 'No data to chart.') + '</div>'; return null; }
+  return QKC.line(n, { xType: 'time', series: series, xName: o.xName || 'Date', yName: o.yName, yFmt: o.yFmt, step: o.step, legend: o.legend, endLabels: o.endLabels,
+    yScale: o.yScale !== false, ref: o.ref, area: o.area, xLabel: v => TA.fmtDate(new Date(v).toISOString().slice(0, 10), { weekday: false }), label: o.label });
+};
+/* A scatter on the kit with log axes where asked: V.scatter(el, { points: [{ x, y, color (hex or a token name: 'up',
+ * 'down', 'model', 'ink3'), name (tooltip), label (shown), href, size }], xName, yName, xLog, yLog, xInverse, yInverse,
+ * diagonal: [lo, hi] (the y = x line), xFmt, yFmt, keys: [{ name, color }] (what the colours mean), label }) */
+V.scatter = (el, o) => {
+  const n = V.node(el);
+  if (!n) return null;
+  if (!n.classList.contains('qk-chart')) n.classList.add('qk-chart');
+  const pts = (o.points || []).filter(p => isNum(p.x) && isNum(p.y));
+  const r = QKC.mount(n, Tk => {
+    const col = c => (c && Tk[c] && String(Tk[c]).charAt(0) === '#' ? Tk[c] : (c || Tk.model));
+    const ax = (name, log, inv, f, bottom) => {
+      const a = QKC.axis(Tk, { fmt: f, inverse: !!inv, scale: true, line: bottom, split: true });
+      if (log) { a.type = 'log'; a.logBase = 10; }
+      QKC.nameAxis(a, name, bottom ? 'bottom' : 'side');
+      return a;
+    };
+    const series = [{ type: 'scatter', name: 'points', data: pts.map(p => ({ value: [p.x, p.y], name: p.name, href: p.href, symbolSize: p.size || 9,
+      itemStyle: { color: QKC.hexA(col(p.color), 0.85), borderColor: Tk.s1, borderWidth: 1 },
+      label: { show: !!p.label, formatter: p.label || '', position: 'top', distance: 3, color: Tk.ink2, fontSize: 10 } })), labelLayout: { hideOverlap: true },
+      markLine: o.diagonal ? { silent: true, symbol: 'none', animation: false, label: { show: false }, data: [[{ coord: [o.diagonal[0], o.diagonal[0]], lineStyle: { color: Tk.ink3, type: [3, 4] } }, { coord: [o.diagonal[1], o.diagonal[1]] }]] } : undefined }];
+    (o.keys || []).forEach(k => series.push({ type: 'scatter', name: k.name, data: [], itemStyle: { color: col(k.color) } }));
+    return { grid: { left: 8, right: 18, top: 30, bottom: (o.keys || []).length ? 58 : 34, containLabel: true },
+      xAxis: ax(o.xName, o.xLog, o.xInverse, o.xFmt, true), yAxis: ax(o.yName, o.yLog, o.yInverse, o.yFmt, false),
+      legend: (o.keys || []).length ? { bottom: 0, left: 0, textStyle: { color: Tk.ink2 }, itemWidth: 10, itemHeight: 10, data: o.keys.map(k => k.name) } : undefined,
+      tooltip: QKC.tooltip(Tk, { formatter: p => (p.data && p.data.name ? p.data.name : '') }), series: series };
+  }, { label: o.label });
+  const inst = window.echarts && echarts.getInstanceByDom(n);
+  if (inst) { inst.off('click'); inst.on('click', ev => { if (ev.data && ev.data.href) location.hash = ev.data.href; }); }
+  return r;
+};
+/* Surface colours as hex for charts (identity marks: hard blue, clay terracotta, grass green, all surfaces = ours). */
+V.SURF_HEX = { all: null, hard: '#3b82f6', clay: '#d2693c', grass: '#3fb950', carpet: '#8b949e', indoor: '#a371f7' };
+V.signal = () => QK.cssVar('--signal') || '#9384ff';
+V.wpA = () => QK.cssVar('--wp-a') || '#5b8def';
+V.wpB = () => QK.cssVar('--wp-b') || '#f08a3c';
 
 /* ── layout ── */
 V.card = (title, sub, body, o) => {

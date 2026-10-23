@@ -239,9 +239,9 @@ SITE_TERMS = [
     ]),
     ("Games", [
         ("p_home", "Win probability", "The model's pregame chance the home side wins, from the two ratings, home field and rest."),
-        ("spread_fair", "Fair spread", "The points line the model would set: its expected margin with the sign of a betting line."),
-        ("market", "Market", "The de-vigged price of a prediction market (Kalshi, Polymarket) or the sportsbook closing line ESPN shows."),
-        ("edge", "Edge", "Model probability minus the market's, in percentage points. A gap is a disagreement, not a bet."),
+        ("spread_fair", "Model margin", "The points margin the model expects, written the way a points spread is (the favourite negative)."),
+        ("market", "Market", "A reference beside our forecast: a prediction market's probability with its margin removed (Kalshi, Polymarket), or the closing line ESPN shows."),
+        ("edge", "Model v market", "Our probability minus the market's, in percentage points: where the model and the market disagree, shown for reference."),
         ("ats", "Against the spread", "Whether a team beat the closing line; the model's side 'covers' when its pick beats the spread."),
         ("wp", "Win probability chart", "The chance of winning after each play; the steepest swings are the game's highest-leverage moments."),
     ]),

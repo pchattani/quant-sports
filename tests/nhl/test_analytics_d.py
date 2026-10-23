@@ -218,6 +218,7 @@ def test_goalie_catalogue_identities(rink):
         parts = [v[k] for k in ("gsax_low", "gsax_med", "gsax_high") if v[k] is not None]
         assert sum(parts) == pytest.approx(v["gsax"], abs=0.05)
         assert v["w"] + v["l"] + v["otl"] <= v["gp"]
+        assert v["fa"] >= v["sa"]                         # unblocked attempts faced: shots on goal plus misses
     m = {x["key"]: x for x in cat["metrics"]}
     assert m["gaa"]["lower"] and not m["sv_pct"]["lower"]
 
@@ -234,6 +235,8 @@ def test_teams_and_season(rink):
     assert t["lines"]["forwards"] and len(t["lines"]["forwards"][0]["ids"]) == 3
     assert t["lines"]["pairs"] and len(t["lines"]["pairs"][0]["ids"]) == 2
     assert t["units"]["source"] == "counts" and "pct" in t["units"]
+    u = t["units"]
+    assert u["gd_g"] == pytest.approx(u["gf_g"] - u["ga_g"], abs=0.002) and "gd_g" in u["pct"]
     sp = season.build(c, tp, None)
     rows = sp["standings"]["rows"]
     assert len(rows) == 6 and all(r["pts"] == 2 * r["w"] + r["otl"] for r in rows)
@@ -413,3 +416,21 @@ def test_box_rebound_rush_match_the_xg_features(rink):
     assert len(m) == len(att) > 500
     assert m["rebound"].sum() > 0 and m["rush"].sum() > 0
     assert (m["reb_box"] == m["rebound"]).all() and (m["rush_box"] == m["rush"]).all()
+
+
+def test_similar_spec_recipe_weighted_within_group():
+    """METRICS_SPEC: hockey.json group features, z within group, weights = yoy r floored at 0.2, k = 6, qualified only."""
+    from oddsmarkets.common import similar as SIM
+    from oddsmarkets.nhl.analytics import careers
+    feats = SIM.group_config("hockey", "forwards")["features"]
+    rows = {}
+    for i in range(10):
+        rows[f"f{i}"] = {"name": f"F{i}", "team": "BOS", "group": "F", "qualified": True, "sim": {k: float(i) for k in feats}}
+        rows[f"d{i}"] = {"name": f"D{i}", "team": "TOR", "group": "D", "qualified": True, "sim": {"gar_60": float(i)}}
+    rows["x"] = {"name": "X", "team": "BOS", "group": "F", "qualified": False, "sim": {k: 4.0 for k in feats}}
+    sim = careers.similar(rows, "skater")
+    nb = sim["f4"]
+    assert len(nb) == 6 and all(p.startswith("f") for p, *_ in nb) and "x" not in [p for p, *_ in nb]
+    assert {nb[0][0], nb[1][0]} == {"f3", "f5"} and nb[0][3] <= nb[-1][3]
+    assert all(p.startswith("d") for p, *_ in sim["d0"])
+    assert set(careers.sim_keys("skater")) >= set(feats)

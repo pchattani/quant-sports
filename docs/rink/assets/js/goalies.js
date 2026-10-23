@@ -43,7 +43,7 @@ function render(el, params, state) {
     '<div id="gk-chips" class="gq-chips"></div><div id="gk-table">' + k.muted('Loading…') + '</div><div class="pg-note gq-note" id="gk-note"></div></div>' +
     '<div class="card"><div class="card-header">GSAx by shot danger <span class="card-sub">Goals saved above expected on low-, medium- and high-danger shots (danger bands from our xG); the busiest goalies by shots faced. Right of zero is better than an average goalie on the same shots.</span></div><div id="gk-danger" class="gf-chart-lg"></div></div>' +
     '<div class="card"><div class="card-header">By shot type <span class="card-sub" id="gk-type-sub">Each cell is the goalie against one shot type; red is better than expected, blue worse.</span><span class="gq-ctl">' + k.toggle('gk-type-m', [['gsax', 'GSAx'], ['sv', 'Save %']], ST.typeMode) + '</span></div><div id="gk-types"></div></div>' +
-    '<div class="card"><div class="card-header">Workload <span class="card-sub">How much each goalie faced against how well he did it; marker size is games played. Click a dot for the goalie.</span><span class="gq-ctl">' + k.toggle('gk-work', [['shots', 'Shots faced'], ['xga', 'xG faced / 60']], ST.work) + '</span></div><div id="gk-work-c" class="gf-chart-lg"></div><div class="pg-note gq-note" id="gk-work-n"></div></div>';
+    '<div class="card"><div class="card-header">Workload <span class="card-sub">Shots faced against how well each goalie did; marker size is games played. Click a dot for the goalie.</span><span class="gq-ctl">' + k.toggle('gk-work', [['shots', 'Shots faced'], ['xga', 'xG faced / 60']], ST.work) + '</span></div><div id="gk-work-c" class="gf-chart-lg"></div><div class="pg-note gq-note" id="gk-work-n"></div></div>';
   return k.ready().then(() => {
     const S = k.S(params, state);
     return Promise.all([k.loadY(S, 'goalies.json'), k.loadNames()]).then(res => ({ S: S, raw: res[0] }));
@@ -112,7 +112,7 @@ function drawTable(ctx) {
   const gs = ctx.metrics.find(m => /^gsax$/.test(m.key)) || ctx.metrics.find(m => /gsax/.test(m.key));
   const gpFloor = ((ctx.cat && ctx.cat.reference) || {}).floors ? ctx.cat.reference.floors.gp : null;
   k.set('gk-note', 'Pills are percentiles among qualified goalies (100 = best)' + (k.isNum(gpFloor) ? '; GSAx totals, value and the other counts need ' + k.int(gpFloor) + ' games and rates 100 unblocked shots faced before they get one, so early in the season most cells are values only' : '') + '. ' + (gs && k.isNum(gs.stabilises_at) ? 'GSAx per shot stabilises only at about ' + k.int(gs.stabilises_at) + ' ' + k.esc(gs.unit || 'shots') + ': a season of a backup is mostly noise, and the percentiles shrink it towards the mean before ranking. ' : 'Save percentage and GSAx take thousands of shots to stabilise; the percentiles shrink small samples towards the mean before ranking. ') +
-    'GSAx counts unblocked shots on goal only (misses and blocks never test the goalie), with the shooter\'s xG from our model; rebounds the goalie allowed are themselves shots and count against him. ' + k.glossLink('gsax', 'Glossary →') + ' · <a href="#/methodology/goalies">Methodology →</a>');
+    'GSAx counts unblocked shots on goal only (misses and blocks never test the goalie), with the shooter\'s xG from our model; rebounds the goalie allowed are themselves shots and count against the goalie. ' + k.glossLink('gsax', 'Glossary →') + ' · <a href="#/methodology/goalies">Methodology →</a>');
 }
 
 function drawDanger(ctx) {

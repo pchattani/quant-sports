@@ -132,6 +132,8 @@ REC_METRICS = [
 K_METRICS = [
     M("fg_oe", "FG over expected", "Kicking", "2", scope="K", den="fga", stab="fg_oe",
       desc="Field goals made minus expected (our make-probability model by distance and conditions)."),
+    M("fg_oe_att", "FG over expected / attempt", "Kicking", "3", scope="K", den="fga", stab="fg_oe",
+      desc="Field goals made minus expected per attempt (the rate behind FG over expected; the percentile basis)."),
     M("pts_oe", "Points over expected", "Kicking", "1", scope="K", desc="3 x FG over expected + extra points over expected."),
     M("fg_pct", "FG %", "Kicking", "pct", scope="K", den="fga", stab="fg_oe", desc="Field goals made per attempt."),
     M("fg_50", "50+ made", "Kicking", "int", scope="K", desc="Field goals of 50+ yards made."),
@@ -167,7 +169,23 @@ DEF_METRICS = [
     M("ints", "Interceptions", "Coverage", "int", scope="DEF", desc="Interceptions."),
     M("pd", "Passes defensed", "Coverage", "int", scope="DEF", desc="Passes defensed."),
     M("ff", "Forced fumbles", "Coverage", "int", scope="DEF", desc="Forced fumbles."),
+    # per-game rates (METRICS_SPEC: the defensive headline sets are per game; games = games with a credited stat)
+    M("sacks_pg", "Sacks / game", "Pass rush", "2", scope="DEF", den="games", k=6.0, desc="Sacks per game (half sacks count 0.5)."),
+    M("tfl_pg", "TFL / game", "Run defence", "2", scope="DEF", den="games", k=6.0, desc="Tackles for loss per game."),
+    M("tackles_pg", "Tackles / game", "Run defence", "2", scope="DEF", den="games", k=6.0,
+      desc="Solo and assisted tackles per game, special teams included."),
+    M("pd_pg", "Passes defensed / game", "Coverage", "2", scope="DEF", den="games", k=6.0, desc="Passes defensed per game."),
+    M("ints_pg", "Interceptions / game", "Coverage", "2", scope="DEF", den="games", k=6.0, desc="Interceptions per game."),
+    M("ff_pg", "Forced fumbles / game", "Coverage", "2", scope="DEF", den="games", k=6.0, desc="Forced fumbles per game."),
+    M("def_snaps", "Defensive snaps", "Volume", "int", scope="DEF",
+      desc="Scrimmage snaps on the field on defence (nflverse participation, 2016-2025; none for the current season)."),
 ]
+# defensive roles (players.json `role`; value.py def_position): the five peer groups of docs/METRICS_SPEC.md
+DEF_ROLES = ("EDGE", "DL", "LB", "CB", "S")
+ROLE_SHORT = {"EDGE": "ED"}   # display code for a role (the id stays EDGE: docs/_design/metrics/nfl.json position_codes)
+ROLE_LABEL = {"QB": "Quarterback", "RB": "Running back", "WR": "Wide receiver", "TE": "Tight end", "K": "Kicker", "P": "Punter",
+              "EDGE": "Outside pass rusher", "DL": "Interior lineman", "LB": "Linebacker", "CB": "Cornerback", "S": "Safety"}
+DEF_SNAPS_FULL = 300.0        # defensive snaps over a 17-game season for a qualified defender (where participation exists)
 for _m in DEF_METRICS + QB_METRICS + RB_METRICS + REC_METRICS + K_METRICS + P_METRICS:
     if _m["fmt"] == "int" and _m["key"] in ("fg_50", "sacks"):
         _m["_pct_int"] = True
@@ -635,6 +653,7 @@ def def_rows(ctx: SeasonContext, P: pd.DataFrame, tg: int) -> dict[str, dict]:
     nspl = sp_u.groupby("pid").size()
     games = C.groupby("pid")["game_id"].nunique()
     team = C.sort_values("game_id").groupby("pid")["team"].last()
+    snaps = def_snaps(P)
     out = {}
     for p in stats.index:
         r = stats.loc[p]
@@ -645,7 +664,47 @@ def def_rows(ctx: SeasonContext, P: pd.DataFrame, tg: int) -> dict[str, dict]:
                              "tackles": float(r.get("tackles", 0)), "ints": float(r.get("ints", 0)), "pd": float(r.get("pd", 0)),
                              "ff": float(r.get("ff", 0))},
                   "n": {"games": gp}, "team": team.get(p), "games": gp}
+        v = out[p]["values"]
+        for k in ("sacks", "tfl", "tackles", "pd", "ints", "ff"):
+            v[k + "_pg"] = an.div(v[k], gp)
+        if snaps is not None:
+            v["def_snaps"] = float(snaps.get(p, 0) or 0)
+            out[p]["n"]["snaps"] = v["def_snaps"]
     return out
+
+
+def def_snaps(P: pd.DataFrame) -> pd.Series | None:
+    """{pid: defensive scrimmage snaps} from participation's defense_players (2016-2025), else None."""
+    if "defense_players" not in P or not P["defense_players"].notna().any() or "play_type" not in P:
+        return None
+    S = P[P["play_type"].isin(["pass", "run"]) & P["defense_players"].notna()]
+    if "two_point_attempt" in S:
+        S = S[flag(S, "two_point_attempt").fillna(0) != 1]
+    ex = S["defense_players"].astype(str).str.split(";").explode().str.strip()
+    ex = ex[(ex != "") & (ex.str.lower() != "nan")]
+    return ex.value_counts() if len(ex) else None
+
+
+def def_roles(ctx: SeasonContext, rows: dict[str, dict]) -> dict[str, str]:
+    """{pid: EDGE | DL | LB | CB | S} for the DEF rows, by value.py's rule (the weekly roster and depth chart for the
+    current season, the nflverse players crosswalk, else the listed position), so players.json and value.json agree."""
+    from oddsmarkets.nfl.analytics import value as VL
+    try:
+        xw = VL.crosswalk()
+    except Exception:                                            # noqa: BLE001
+        xw = {}
+    roster, dc_pos = {}, {}
+    if getattr(ctx, "current", False):
+        try:
+            roster = VL.current_roster(ctx) or {}
+            for _t, by in (VL.depth_charts(ctx) or {}).items():
+                for pos, ids in by.items():
+                    for q in ids:
+                        dc_pos.setdefault(q, pos)
+        except Exception:                                        # noqa: BLE001
+            roster, dc_pos = {}, {}
+    return {p: VL.def_position(p, r.get("pos"), roster.get(p), xw.get(p), dc_pos.get(p)) for p, r in rows.items()
+            if r.get("group") == "DEF"}
 
 
 # ---------------------------------------------------------------------------------------------- the catalogue
@@ -729,6 +788,10 @@ def build(ctx: SeasonContext) -> dict | None:
             if x is not None:
                 v[k] = x
                 used[k] = used.get(k, 0) + 1
+    for r in raw.values():
+        if r["group"] == "K":
+            v = r["values"]
+            v["fg_oe_att"] = an.div(v.get("fg_oe"), v.get("fga")) if v.get("fg_oe") is not None else None
     comp_src = "model" if used.get("composite") else "fallback"
     # rows, qualification and reference pools
     rows: dict[str, dict] = {}
@@ -740,23 +803,27 @@ def build(ctx: SeasonContext) -> dict | None:
         if q is None:
             q = {"RB": (n.get("carries") or 0) >= 6.25 * tg, "WR": (n.get("targets") or 0) >= 3.0 * tg,
                  "TE": (n.get("targets") or 0) >= 2.0 * tg, "K": (n.get("fga") or 0) >= 0.8 * tg, "P": (n.get("punts") or 0) >= 2.0 * tg,
-                 "DEF": (n.get("games") or 0) >= 0.5 * tg and ((r["values"].get("tackles") or 0) + 3 * (r["values"].get("sacks") or 0)
-                                                               + 3 * (r["values"].get("pd") or 0)) >= 2.5 * tg}.get(grp, False)
+                 "DEF": (n.get("games") or 0) >= 0.5 * tg and (n.get("snaps") is None
+                                                                or n["snaps"] >= DEF_SNAPS_FULL * min(tg, 17) / 17.0)}.get(grp, False)
         ref = r.get("ref")
         if ref is None:
             ref = {"RB": (n.get("carries") or 0) >= max(20, 4 * tg), "WR": (n.get("targets") or 0) >= max(12, 2.5 * tg),
                    "TE": (n.get("targets") or 0) >= max(8, 1.5 * tg), "K": (n.get("fga") or 0) >= max(5, 0.6 * tg),
                    "P": (n.get("punts") or 0) >= max(10, 1.5 * tg), "DEF": bool(q)}.get(grp, False)
         pos = info.get("pos") or grp
-        rows[p] = {"name": info["name"], "team": r.get("team"), "pos": pos, "group": grp, "age": an.age_on(info.get("dob"), ctx.season),
+        rows[p] = {"name": info["name"], "team": r.get("team"), "pos": pos, "group": grp, "role": grp,
+                   "age": an.age_on(info.get("dob"), ctx.season),
                    "games": int(r.get("games") or games_all.get(p) or (n.get("games") or 0)), "qualified": bool(q), "_ref": bool(ref),
                    "values": r["values"], "n": n}
+    for p, role in def_roles(ctx, rows).items():
+        rows[p]["role"] = role
     if comp_src == "model":
         _scale_composite({p: r for p, r in rows.items() if r["group"] == "QB"})
     else:
         _fallback_composite({p: r for p, r in rows.items() if r["group"] == "QB"})
     floors = {"dropbacks": 50, "plays": 60, "att": 40, "carries": 30, "targets": 15, "rec": 10, "catchable": 12, "contested": 4,
               "fga": 5, "punts": 10, "games": 3}
+    role_pct = role_percentiles(rows, floors)
     means = {}
     for grp in GROUPS:
         mem = {p: r for p, r in rows.items() if r["group"] == grp}
@@ -772,18 +839,46 @@ def build(ctx: SeasonContext) -> dict | None:
     if rec_mem:
         ref = [p for p, r in rec_mem.items() if r["_ref"]]
         means["WR/TE"] = an.finish(rec_mem, REC_METRICS, ref, {p: r["group"] for p, r in rec_mem.items()}, floors)
-    for r in rows.values():
+    for p, r in rows.items():
         r.pop("n", None)
         r.pop("_ref", None)
+        r["pct_role"] = {k: v for k, v in (role_pct.get(p) or {}).items() if r["values"].get(k) is not None}
     groups = {g: [m["key"] for m in GROUP_METRICS[g]] for g in GROUPS}
+    roles: dict[str, dict] = {}
+    for r in rows.values():
+        e = roles.setdefault(r["role"], {"label": ROLE_LABEL.get(r["role"], r["role"]), "short": ROLE_SHORT.get(r["role"], r["role"]),
+                                         "group": r["group"], "n": 0, "qualified": 0})
+        e["n"] += 1
+        e["qualified"] += int(bool(r["qualified"]))
     return {"ok": True, "season": ctx.season, "updated_at": an.now(), "phase": ctx.phase, "team_games": tg,
             "metrics": [an.public_metric(m) for m in all_metrics()], "groups": groups, "players": rows,
             "reference": {g: {k: an.rnd(v, 4) for k, v in m.items()} for g, m in means.items()},
             "composite_source": comp_src, "model_metrics": used, "model_errors": dict(ctx.model_errors),
+            "roles": roles, "role_rule": ("role = group for QB, RB, WR, TE, K and P; defenders EDGE (outside pass rushers: DE and "
+                                          "3-4 outside linebackers), DL (interior), LB (off-ball), CB, S by value.json's rule "
+                                          "(NGS / PFF position, depth chart, listed position). pct_role: v the qualified players "
+                                          "of the same role"),
             "qualification": {"QB": "14 attempts per team game", "RB": "6.25 carries per team game", "WR": "3 targets per team game",
                               "TE": "2 targets per team game", "K": "0.8 FG attempts per team game", "P": "2 punts per team game",
-                              "DEF": "half the team's games and 2.5 tackles-equivalent per team game"},
+                              "DEF": "half the team's games with a credited stat, and 300 defensive snaps over 17 games "
+                                     "where participation exists (2016-2025)"},
             "credits": [an.NFLVERSE_CREDIT] + ([an.FTN_CREDIT] if ctx.season >= 2022 else []) + ([an.NGS_CREDIT] if ctx.season >= 2016 else [])}
+
+
+def role_percentiles(rows: dict[str, dict], floors: dict[str, float]) -> dict[str, dict]:
+    """{pid: {metric: 0-100}} against the qualified players of the same role (the METRICS_SPEC peer groups: QB, RB, WR,
+    TE, K, P and the defensive roles EDGE, DL, LB, CB, S), same shrinkage, floors and direction as pct."""
+    out: dict[str, dict] = {}
+    for grp in GROUPS:
+        mem = {p: {"values": dict(r["values"]), "n": dict(r.get("n") or {})} for p, r in rows.items() if r["group"] == grp}
+        if not mem:
+            continue
+        role_of = {p: rows[p]["role"] for p in mem}
+        ref = [p for p in mem if rows[p]["qualified"]]
+        an.add_percentiles(mem, GROUP_METRICS[grp], ref, role_of, floors)
+        for p, r in mem.items():
+            out[p] = r.get("pct_pos") or {}
+    return out
 
 
 def _scale_composite(qbs: dict[str, dict]) -> None:

@@ -876,7 +876,7 @@ function drawCatalogue(S, cat, ctx) {
     (isNum(((cat.reference || {}).floors || {}).gp) ? k.int(cat.reference.floors.gp) : 5) + ' games before they get a percentile (early in the season most cells are values only), and every rate is shrunk towards the pool mean by its stabilisation point before ranking' +
     (stab.length ? ' (' + stab.slice(0, 4).map(m => k.esc(m.label) + ' about ' + k.int(m.stabilises_at) + ' ' + k.esc(m.unit || 'minutes')).join(', ') + ')' : '') + '. ' +
     'Headline columns: ' + ctx.heads.map(m => k.glossLink(m.key, k.esc(m.label))).join(' · ') + '. All ' + ctx.metrics.length + ' metrics are on every player page, the <a href="' + k.withQ('#/leaders', S) + '">leaders</a> page and in the <a href="' + k.withQ('#/lab', S) + '">lab</a>. ' +
-    'On-ice rates are per 60 minutes at 5-on-5 unless the label says otherwise; RAPM isolates a skater from his linemates, opponents, zone starts and score (see the <a href="#/methodology/rapm">methodology</a>).');
+    'On-ice rates are per 60 minutes at 5-on-5 unless the label says otherwise; RAPM isolates a skater from linemates, opponents, zone starts and score (see the <a href="#/methodology/rapm">methodology</a>).');
 }
 
 K.route(['skaters', '#/skaters'], renderSkaters);

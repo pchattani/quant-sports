@@ -213,7 +213,7 @@ def build_season(b: Build, season: int, full: bool, cfg: dict, shared: dict) -> 
                        pages) or pages
     blocks = {}
     if full and not cfg["no_careers"]:
-        blocks = b.step(f"player blocks {season}", lambda: CR.current_blocks(ctx, cat), {}) or {}
+        blocks = b.step(f"player blocks {season}", lambda: CR.current_blocks(ctx, cat, an.read_json(sdir / "value.json")), {}) or {}
     rows = CR.reduce_cat(cat, season) if (cat or {}).get("ok") else CR.reduce_cat(an.read_json(sdir / "players.json"), season)
     out = {"rows": rows, "blocks": blocks, "current": current, "phase": ctx.phase, "week": ctx.week, "league": league,
            "fourth": fd if (fd or {}).get("ok") else None, "referees": refs if (refs or {}).get("ok") else None}

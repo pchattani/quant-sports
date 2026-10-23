@@ -18,7 +18,7 @@ from oddsmarkets.football.analytics.players import METRICS  # noqa: E402
 
 REQUIRED_MODEL_TERMS = {
     "xg", "npxg", "xgot", "xa", "xpts", "luck", "strength", "elo", "attack_defence", "home_advantage", "rho", "time_decay",
-    "ridge", "pooled_scale", "scoring_factor", "fair_odds", "de_vig", "edge", "consensus", "percentile", "minutes_floor",
+    "ridge", "pooled_scale", "scoring_factor", "de_vig", "consensus", "percentile", "minutes_floor",
     "shrinkage", "field_tilt", "ppda", "monte_carlo", "position_distribution", "bands", "expected_result", "rating",
     "formation", "form",
 }
@@ -77,3 +77,12 @@ def test_glossary_payload_shape() -> None:
     assert {e["scope"] for e in entries} == {"out", "gk", "all", "team"}
     assert payload["model"] == g.MODEL_TERMS
     json.dumps(payload)
+
+
+def test_no_betting_terms_in_the_glossary() -> None:
+    """Redesign copy pass (23 Oct 2026): no edge or fair-odds entries; market terms are a reference only."""
+    keys = {t["key"] for t in g.MODEL_TERMS} if hasattr(g, "MODEL_TERMS") else set()
+    text = json.dumps(g.build_glossary() if hasattr(g, "build_glossary") else {}).lower()
+    assert "fair_odds" not in text and '"edge"' not in text
+    assert "fantasy price" not in text and "bookmaker" not in text
+    assert not ({"edge", "fair_odds"} & keys)

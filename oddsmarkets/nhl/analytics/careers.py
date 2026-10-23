@@ -32,6 +32,19 @@ PLUS_S = ["p60", "ixg60", "xgf_pct", "xgf_pct_rel", "rapm_net", "gar"]
 PLUS_G = ["sv_pct", "gsax60", "gsax_high"]
 SIMILAR_S = ["p60", "ixg60", "icf60", "xgf60", "xga60", "cf_pct", "hits60", "blocks60", "toi_gp", "ozs_pct", "pen_drawn60", "shot_dist"]
 SIMILAR_G = ["sv_pct", "gsax60", "sv_pct_high", "sv_pct_low", "xg_per_shot", "reb_rate", "start_share"]
+# catalogue group -> docs/_design/metrics/hockey.json group (the METRICS_SPEC similar-players features and weights)
+SPEC_GROUP = {"F": "forwards", "D": "defence", "G": "goalies"}
+
+
+def sim_keys(kind: str) -> list[str]:
+    """Every feature a season row keeps for the similarity: the spec groups' features (fallback: the old lists)."""
+    from oddsmarkets.common import similar as SIM
+    groups = ("forwards", "defence") if kind == "skater" else ("goalies",)
+    keys: list[str] = []
+    for g in groups:
+        cfg = SIM.group_config("hockey", g)
+        keys += cfg["features"] if cfg else []
+    return list(dict.fromkeys(keys)) or (SIMILAR_S if kind == "skater" else SIMILAR_G)
 LOWER = {"gaa", "xga60"}
 
 
@@ -41,6 +54,7 @@ def reduce_cat(cat: dict | None, season: int, kind: str) -> dict[str, dict] | No
     P = cat["players"]
     keys = SEASON_KEYS_S if kind == "skater" else SEASON_KEYS_G
     plus_keys = PLUS_S if kind == "skater" else PLUS_G
+    skeys = sim_keys(kind)
     # the plus needs the catalogue's games floor too (one game's GAR is not a season): the pool and the rows placed
     gp_floor = an.fnum(((cat.get("reference") or {}).get("floors") or {}).get("gp")) or 0.0
 
@@ -57,7 +71,7 @@ def reduce_cat(cat: dict | None, season: int, kind: str) -> dict[str, dict] | No
     out = {}
     for pid, r in P.items():
         vals = {k: (r.get("values") or {}).get(k) for k in keys}
-        sim = {k: (r.get("values") or {}).get(k) for k in (SIMILAR_S if kind == "skater" else SIMILAR_G)}
+        sim = {k: (r.get("values") or {}).get(k) for k in skeys}
         pl = {}
         if placed(r):
             for k in plus_keys:
@@ -294,28 +308,29 @@ def onice_by_strength(pg: pd.DataFrame) -> dict[str, dict]:
     return out
 
 
-def similar(rows: dict[str, dict], kind: str, n: int = 6) -> dict[str, list]:
-    """Nearest neighbours (Euclidean on standardised SIMILAR metrics) within the position group, qualified rows only."""
-    keys = SIMILAR_S if kind == "skater" else SIMILAR_G
+def similar(rows: dict[str, dict], kind: str, n: int | None = None) -> dict[str, list]:
+    """Nearest neighbours by the METRICS_SPEC recipe (oddsmarkets/common/similar.py) within the position group (F, D, G),
+    qualified rows of the season only: the group's features from docs/_design/metrics/hockey.json, z-scored within the
+    group, a missing feature at the group mean (z 0), weights = year-to-year r floored at 0.2, weighted Euclidean,
+    k from the spec (6). Rows [pid, name, team, distance] (weighted RMS z gap, smaller = closer)."""
+    from oddsmarkets.common import similar as SIM
     out = {}
     by_grp: dict[str, list[str]] = {}
     for p, r in rows.items():
         if r.get("qualified"):
             by_grp.setdefault(r.get("group") or "-", []).append(p)
     for grp, ids in by_grp.items():
-        if len(ids) < n + 2:
+        fb = {"features": SIMILAR_S if kind == "skater" else SIMILAR_G, "k": 6}
+        cfg = SIM.group_config("hockey", SPEC_GROUP.get(grp, ""), fallback=fb)
+        k = n or cfg["k"]
+        if len(ids) < k + 2:
             continue
-        X = np.array([[an.fnum((rows[p].get("sim") or {}).get(k)) if an.fnum((rows[p].get("sim") or {}).get(k)) is not None else np.nan
-                       for k in keys] for p in ids], dtype=float)
-        mu = np.nanmean(X, axis=0)
-        sd = np.nanstd(X, axis=0)
-        sd[~np.isfinite(sd) | (sd == 0)] = 1.0
-        Z = (X - mu) / sd
+        X = SIM.matrix([rows[p] for p in ids], cfg["features"], lambda r, f: (r.get("sim") or {}).get(f))
+        Z = SIM.zscore(X)
         Z = np.where(np.isnan(Z), 0.0, Z)
-        D = np.sqrt(((Z[:, None, :] - Z[None, :, :]) ** 2).sum(axis=2))
+        w = np.array([cfg["weights"][f] for f in cfg["features"]])
         for i, p in enumerate(ids):
-            o = np.argsort(D[i])
-            out[p] = [[ids[j], rows[ids[j]].get("name"), rows[ids[j]].get("team"), round(float(D[i, j]), 2)] for j in o[1:n + 1]]
+            out[p] = [[ids[j], rows[ids[j]].get("name"), rows[ids[j]].get("team"), round(d, 2)] for j, d in SIM.nearest(Z, i, w, k)]
     return out
 
 

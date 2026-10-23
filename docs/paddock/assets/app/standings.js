@@ -128,13 +128,17 @@ function odds(season, markets, y) {
     PD.grid(
       PD.card('Points, with our projection', 'Each line is labelled at its end with our expected final points.', PD.chartBox('od-fc', 400, 'Championship points with our projection'), { span: 8 }) +
       PD.card('Title chances', '<span id="od-t-s"></span>', '<div id="od-t"></div>', { span: 4 }) +
+      PD.card('After each round', 'Our title chance, or expected final points with the 5th–95th percentile band, as each round finished; the latest is Today.', '<div id="od-hist" class="qk-chart" style="--h:320px" role="img" aria-label="Title race after each round"></div>', { span: 12, right: PD.seg('od-hm', [['p', 'Title chance'], ['pts', 'Points']], 'p', 'Measure') }) +
       PD.card('Where the points land', 'The bar spans the 5th to 95th percentile of simulated season-end points; the dot is our expectation.', PD.chartBox('od-range', 400, 'Season-end points range'), { span: 6 }) +
-      PD.card('What the next rounds mean', cond ? 'For the leader, ' + PD.driverLink(cond.driver, { dot: false }) + ': our chance of winning each remaining round, and of the title if he does or does not.' : 'Conditional chances for the championship leader.', '<div id="od-cond"></div>', { span: 6, flush: true })) + '</section>';
+      PD.card('What the next rounds mean', cond ? 'For the leader, ' + PD.driverLink(cond.driver, { dot: false }) + ': our chance of winning each remaining round, and of the title if the leader does or does not.' : 'Conditional chances for the championship leader.', '<div id="od-cond"></div>', { span: 6, flush: true })) + '</section>';
   PD.set('st-body', h);
+  var curK = 'drivers', hm = 'p';
   var draw = function (kind) {
     var isD = kind === 'drivers';
     var ids = (isD ? dTop : cTop).slice(0, 10);
     PD.v2.pointsForecast('od-fc', season, kind, isD ? 8 : 6);
+    curK = kind;
+    PD.v2.titleHistory('od-hist', season, kind, isD ? 6 : 5, hm);
     PD.v2.rangeChart('od-range', season, kind, 10);
     PD.set('od-t-s', 'Our chance of the ' + (isD ? 'drivers’' : 'constructors’') + ' title from ' + PD.int(ch.n_sims) + ' simulated seasons.');
     var rows = PD.v2.chanceRows(ids, function (id) { return ch[kind][id].p_title; }, isD, null);
@@ -143,6 +147,7 @@ function odds(season, markets, y) {
   };
   draw('drivers');
   PD.wireSeg(document, 'od-k', draw);
+  PD.wireSeg(document, 'od-hm', function (v) { hm = v; PD.v2.titleHistory('od-hist', season, curK, curK === 'drivers' ? 6 : 5, hm); });
   if (cond && cond.by_round) {
     var rounds = Object.keys(cond.by_round).sort(function (a, b) { return a - b; });
     var calBy = {};
@@ -150,8 +155,8 @@ function odds(season, markets, y) {
     PD.table('od-cond', [
       { key: 'round', label: 'Rd', num: true },
       { key: 'name', label: 'Race', sticky: true, fmt: function (v, r) { return PD.raceLink(season.year, r.round, PD.shortRace(v)); } },
-      { key: 'pw', label: 'Wins it', num: true, tip: 'Our chance he wins this round', fmt: function (v) { return PD.pct(v, 0); } },
-      { key: 'iw', label: 'Title if he wins', num: true, fmt: function (v) { return PD.pct(v, 1); } },
+      { key: 'pw', label: 'Wins it', num: true, tip: 'Our chance the leader wins this round', fmt: function (v) { return PD.pct(v, 0); } },
+      { key: 'iw', label: 'Title with win', num: true, fmt: function (v) { return PD.pct(v, 1); } },
       { key: 'inw', label: 'If not', num: true, fmt: function (v) { return PD.pct(v, 1); } }
     ], rounds.map(function (k) { var b = cond.by_round[k]; return { round: +k, name: (calBy[k] || {}).name || 'Round ' + k, pw: b.p_win_round, iw: b.p_title_if_win, inw: b.p_title_if_not_win }; }), { sort: { key: 'round', dir: 'asc' } });
   } else PD.set('od-cond', PD.muted('No conditional chances for this season.'));

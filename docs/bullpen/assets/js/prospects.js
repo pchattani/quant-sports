@@ -32,7 +32,7 @@ function sub(r, keys) { for (let i = 0; i < keys.length; i++) { const x = r[keys
 function render(el, params, state) {
   const k = K();
   const U = BP.ui;
-  el.innerHTML = QK.sectionHead({ kicker: 'Prospects · Triple-A', title: 'Triple-A to the majors', sub: 'Every Triple-A player with his line translated to the majors, and what our model would expect on the day he is called up.' }) +
+  el.innerHTML = QK.sectionHead({ kicker: 'Prospects · Triple-A', title: 'Triple-A to the majors', sub: 'Every Triple-A player\'s line translated to the majors, and what our model would expect on the day of a call-up.' }) +
     '<div id="pr-kpis"></div>' +
     '<section class="qk-card"><div class="qk-card-body"><div class="bp-ctl">' + U.seg('pr-kind', 'Kind', [['hitter', 'Hitters'], ['pitcher', 'Pitchers']], ST.kind) +
     '<label>Search<input id="pr-q" class="gq-search" type="search" placeholder="name or club…"></label><label>Parent club<select id="pr-parent"><option value="">All organisations</option></select></label></div></div></section>' +

@@ -165,6 +165,19 @@ def reduce_cat(cat: dict | None, kind: str) -> dict | None:
     return {"players": out, "team_games": cat.get("team_games")}
 
 
+def small_files(b: Build, d: str, sdir: Path, level: str, season: int, hit: dict | None, pit: dict | None,
+                only_missing: bool = False) -> None:
+    """peers.json and league_types.json (analytics/peers.py): what the player page needs from the 4-7 MB catalogues.
+    Skipped seasons write them only when absent (from the catalogues on disk)."""
+    from oddsmarkets.baseball.analytics import peers as PE
+    if not (hit or {}).get("ok") and not (pit or {}).get("ok"):
+        return
+    for name, fn in (("peers.json", lambda: PE.build(hit, pit, level, season)), ("league_types.json", lambda: PE.league_types(pit, level, season))):
+        if only_missing and (sdir / name).exists():
+            continue
+        b.write_or_fail(d + name, f"{name} {level} {season}", fn, level=level, season=season)
+
+
 def build_season(b: Build, level: str, season: int, full: bool, cfg: dict, shared: dict) -> dict:
     from oddsmarkets.baseball.analytics import awards as AW
     from oddsmarkets.baseball.analytics import careers as CR
@@ -195,8 +208,9 @@ def build_season(b: Build, level: str, season: int, full: bool, cfg: dict, share
         skip = "pitch table not on this machine; payloads kept"
     if skip:
         logger.info("%s %s: %s, skipped", level, season, skip)
-        return {"skipped": True, "hitters": reduce_cat(an.read_json(sdir / "hitters.json"), "hitter"),
-                "pitchers": reduce_cat(an.read_json(sdir / "pitchers.json"), "pitcher")}
+        hit0, pit0 = an.read_json(sdir / "hitters.json"), an.read_json(sdir / "pitchers.json")
+        small_files(b, d, sdir, level, season, hit0, pit0, only_missing=True)
+        return {"skipped": True, "hitters": reduce_cat(hit0, "hitter"), "pitchers": reduce_cat(pit0, "pitcher")}
     ctx = SeasonContext(level, season, full=full, today=cfg["today"], current=current, sims=cfg["sims"],
                         fetch_markets=cfg["markets"] and full and current and level == "mlb", use_models=not cfg["no_models"])
     logger.info("%s %s (%s): %d games, phase %s, pitches %s", level, season, "full" if full else "light", len(ctx.games), ctx.phase,
@@ -204,6 +218,7 @@ def build_season(b: Build, level: str, season: int, full: bool, cfg: dict, share
     hit = b.write_or_fail(d + "hitters.json", f"hitters {level} {season}", lambda: HT.build(ctx), level=level, season=season)
     pit = b.write_or_fail(d + "pitchers.json", f"pitchers {level} {season}", lambda: PT.build(ctx), level=level, season=season)
     fldp = b.write_or_fail(d + "fielders.json", f"fielders {level} {season}", lambda: FD.build(ctx, hit), level=level, season=season)
+    small_files(b, d, sdir, level, season, hit, pit)
     sim = None
     if full and level == "mlb":
         sim = b.step(f"season sim {level} {season}", ctx.sim, None)

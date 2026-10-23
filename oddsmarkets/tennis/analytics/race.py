@@ -4,7 +4,14 @@ data/<T>/race.json: C's rest-of-season simulation (season_sim.for_tour) with the
 {"n_sims","finals_qual": {pid: p},"year_end_no1": {pid: p},"rank_dist": {pid: [p by rank 1..20, 21+]},
  "points": {pid: {"mean","p05","p95","now"}},"remaining_events": [{"id","name","level","start","method"}],
  "market": {"finals_qual": BINARY | null,"year_end_no1": TITLE | null},
- plus "race" {pid: {"now","mean","p05","p95"}}, "finals_title", "simplifications", "basis", "snapshot", "as_of"}
+ plus "race" {pid: {"now","mean","p05","p95"}}, "finals_title", "simplifications", "basis", "snapshot", "as_of",
+ "history": [{"as_of","n_sims","finals_qual": {pid: p},"year_end_no1": {pid: p}}]}
+
+"history" is a rolling series of the season simulation's year-end chances, one snapshot per simulation date (a later
+run on the same date replaces that date's snapshot), oldest first, for a chance-over-time chart. Each run carries the
+previous race.json's series forward and appends its own; only the season of the current snapshot is kept (at most
+HISTORY_MAX dates), and players are listed at HISTORY_MIN_P or above. It starts with the first build that has it
+(22 Oct 2026): earlier runs were not stored. A failed simulation keeps the series unchanged.
 """
 from __future__ import annotations
 
@@ -15,6 +22,8 @@ from typing import Any
 from oddsmarkets.tennis import analytics as an
 
 logger = logging.getLogger(__name__)
+HISTORY_MAX = 400
+HISTORY_MIN_P = 0.001
 
 
 def simulate(td: an.TourData, n: int = 10000, ctx=None) -> dict:
@@ -31,9 +40,28 @@ def _title(t: dict | None) -> dict | None:
     return {k: t.get(k) for k in keep if k in t}
 
 
-def build(td: an.TourData, sim: dict | None, futures: dict | None = None) -> dict:
+def _snap(probs: dict | None) -> dict:
+    return {p: an.prob(v) for p, v in sorted((probs or {}).items()) if v is not None and float(v) >= HISTORY_MIN_P}
+
+
+def history(prev: dict | None, sim: dict | None) -> list[dict]:
+    """The previous race.json's "history" with this simulation's snapshot added (module docstring)."""
+    old = [h for h in ((prev or {}).get("history") or []) if isinstance(h, dict) and h.get("as_of")]
+    if not sim or not sim.get("ok") or not sim.get("as_of"):
+        return old
+    as_of = str(sim["as_of"])[:10]
+    snap = {"as_of": as_of, "n_sims": sim.get("n_sims"), "finals_qual": _snap(sim.get("finals_qual")),
+            "year_end_no1": _snap(sim.get("year_end_no1"))}
+    keep = [h for h in old if str(h["as_of"])[:4] == as_of[:4] and str(h["as_of"])[:10] < as_of]
+    return (keep + [snap])[-HISTORY_MAX:]
+
+
+def build(td: an.TourData, sim: dict | None, futures: dict | None = None, prev: dict | None = None) -> dict:
+    """race.json; `prev` is the race.json on disk (its "history" is carried forward)."""
+    hist = history(prev, sim)
     if not sim or not sim.get("ok"):
-        return {"ok": False, "reason": (sim or {}).get("reason") or "the season simulation did not run", "tour": td.tour}
+        return {"ok": False, "reason": (sim or {}).get("reason") or "the season simulation did not run", "tour": td.tour,
+                **({"history": hist} if hist else {})}
     evs = td.events(td.current)
     prev = {}
     if td.current - 1 in td.years:
@@ -60,7 +88,7 @@ def build(td: an.TourData, sim: dict | None, futures: dict | None = None) -> dic
             "market": {"finals_qual": _title(fut.get("finals_qual")), "year_end_no1": _title(fut.get("year_end_no1")),
                        "finals_winner": _title(fut.get("finals_winner")), "top10": _title(fut.get("top10"))},
             "simplifications": sim.get("simplifications") or [], "basis": sim.get("basis"), "snapshot": sim.get("snapshot"),
-            "runtime_s": sim.get("runtime_s")}
+            "runtime_s": sim.get("runtime_s"), "history": hist}
 
 
 def proj_ranks(sim: dict | None) -> dict[str, int]:

@@ -30,6 +30,8 @@ METRICS = [
     M("l", "Losses", "Results", "int", pct=False, desc="Regulation losses."),
     M("otl", "OT / SO losses", "Results", "int", pct=False, desc="Overtime and shootout losses."),
     M("sa", "Shots against", "Workload", "int", pct=False, desc="Shots on goal faced."),
+    M("fa", "Unblocked attempts faced", "Workload", "int", pct=False,
+      desc="Unblocked shot attempts faced (shots on goal plus misses; empty-net attempts excluded): the sample behind GSAx / 100."),
     M("ga", "Goals against", "Results", "int", pct=False, desc="Goals allowed (empty-net goals excluded)."),
     M("sv_pct", "Save %", "Results", "3", den="fa", k=2000, stab="g_sv_pct", desc="Saves per shot on goal."),
     M("gaa", "GAA", "Results", "2", lower=True, den="fa", k=2000, desc="Goals against per 60."),
@@ -203,6 +205,7 @@ def build(ctx: SeasonContext) -> dict | None:
         v["rbs"] = rbs
         saves = f("sa") - f("ga")
         v["reb_rate"] = f("reb") / saves if saves else None
+        v["fa"] = f("fa")
         for k, d in models.items():
             if k in ("gsax_m", "gsax_shrunk") and p in d:
                 v[k] = d[p]

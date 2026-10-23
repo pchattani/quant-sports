@@ -1623,7 +1623,7 @@
      "explanation": "Strength rating from matches on hard courts only.",
      "in_payload": true,
      "payload_path": "values",
-     "percentile_from": "pct",
+     "percentile_from": "pct_surface",
      "scope": "all",
      "reliability": {
       "yoy_r": 0.831,
@@ -1638,7 +1638,9 @@
       "r": 0.665,
       "partial_r_given_elo": null,
       "r_next_games_won_pct": 0.691
-     }
+     },
+     "percentile_key": "elo_surface",
+     "surface_pool_value": "values_surface.hard.elo_surface"
     },
     {
      "id": "games_won_pct",
@@ -1796,7 +1798,7 @@
      "explanation": "Overall strength rating from every result, adjusted for the opponent's rating.",
      "in_payload": true,
      "payload_path": "values",
-     "percentile_from": "pct",
+     "percentile_from": "pct_surface",
      "scope": "all",
      "reliability": {
       "yoy_r": 0.805,
@@ -1811,7 +1813,9 @@
       "r": 0.661,
       "partial_r_given_elo": 0.125,
       "r_next_games_won_pct": 0.686
-     }
+     },
+     "percentile_key": "elo",
+     "surface_pool_value": "values_surface.hard.elo"
     },
     {
      "id": "hold_plus_break",
@@ -2029,7 +2033,7 @@
      "explanation": "Strength rating from matches on clay only.",
      "in_payload": true,
      "payload_path": "values",
-     "percentile_from": "pct",
+     "percentile_from": "pct_surface",
      "scope": "all",
      "reliability": {
       "yoy_r": 0.84,
@@ -2044,7 +2048,9 @@
       "r": 0.551,
       "partial_r_given_elo": null,
       "r_next_games_won_pct": 0.588
-     }
+     },
+     "percentile_key": "elo_surface",
+     "surface_pool_value": "values_surface.clay.elo_surface"
     },
     {
      "id": "elo",
@@ -2057,7 +2063,7 @@
      "explanation": "Overall strength rating from every result, adjusted for the opponent's rating.",
      "in_payload": true,
      "payload_path": "values",
-     "percentile_from": "pct",
+     "percentile_from": "pct_surface",
      "scope": "all",
      "reliability": {
       "yoy_r": 0.836,
@@ -2072,7 +2078,9 @@
       "r": 0.558,
       "partial_r_given_elo": 0.235,
       "r_next_games_won_pct": 0.583
-     }
+     },
+     "percentile_key": "elo",
+     "surface_pool_value": "values_surface.clay.elo"
     },
     {
      "id": "games_won_pct",
@@ -2408,7 +2416,7 @@
      "explanation": "Strength rating from matches on grass only.",
      "in_payload": true,
      "payload_path": "values",
-     "percentile_from": "pct",
+     "percentile_from": "pct_surface",
      "scope": "all",
      "reliability": {
       "yoy_r": 0.879,
@@ -2423,7 +2431,9 @@
       "r": 0.486,
       "partial_r_given_elo": null,
       "r_next_games_won_pct": 0.53
-     }
+     },
+     "percentile_key": "elo_surface",
+     "surface_pool_value": "values_surface.grass.elo_surface"
     },
     {
      "id": "elo",
@@ -2436,7 +2446,7 @@
      "explanation": "Overall strength rating from every result, adjusted for the opponent's rating.",
      "in_payload": true,
      "payload_path": "values",
-     "percentile_from": "pct",
+     "percentile_from": "pct_surface",
      "scope": "all",
      "reliability": {
       "yoy_r": 0.839,
@@ -2451,7 +2461,9 @@
       "r": 0.599,
       "partial_r_given_elo": 0.404,
       "r_next_games_won_pct": 0.618
-     }
+     },
+     "percentile_key": "elo",
+     "surface_pool_value": "values_surface.grass.elo"
     },
     {
      "id": "games_won_pct",
@@ -2787,7 +2799,7 @@
      "explanation": "Strength rating from matches on hard courts only.",
      "in_payload": true,
      "payload_path": "values",
-     "percentile_from": "pct",
+     "percentile_from": "pct_surface",
      "scope": "all",
      "reliability": {
       "yoy_r": 0.795,
@@ -2802,7 +2814,9 @@
       "r": 0.59,
       "partial_r_given_elo": null,
       "r_next_games_won_pct": 0.617
-     }
+     },
+     "percentile_key": "elo_surface",
+     "surface_pool_value": "values_surface.hard.elo_surface"
     },
     {
      "id": "games_won_pct",
@@ -2991,7 +3005,7 @@
      "explanation": "Overall strength rating from every result, adjusted for the opponent's rating.",
      "in_payload": true,
      "payload_path": "values",
-     "percentile_from": "pct",
+     "percentile_from": "pct_surface",
      "scope": "all",
      "reliability": {
       "yoy_r": 0.759,
@@ -3006,7 +3020,9 @@
       "r": 0.575,
       "partial_r_given_elo": 0.046,
       "r_next_games_won_pct": 0.6
-     }
+     },
+     "percentile_key": "elo",
+     "surface_pool_value": "values_surface.hard.elo"
     },
     {
      "id": "hold_plus_break",
@@ -3343,7 +3359,7 @@
      "explanation": "Strength rating from matches on clay only.",
      "in_payload": true,
      "payload_path": "values",
-     "percentile_from": "pct",
+     "percentile_from": "pct_surface",
      "scope": "all",
      "reliability": {
       "yoy_r": 0.818,
@@ -3358,7 +3374,9 @@
       "r": 0.451,
       "partial_r_given_elo": null,
       "r_next_games_won_pct": 0.488
-     }
+     },
+     "percentile_key": "elo_surface",
+     "surface_pool_value": "values_surface.clay.elo_surface"
     },
     {
      "id": "elo",
@@ -3371,7 +3389,7 @@
      "explanation": "Overall strength rating from every result, adjusted for the opponent's rating.",
      "in_payload": true,
      "payload_path": "values",
-     "percentile_from": "pct",
+     "percentile_from": "pct_surface",
      "scope": "all",
      "reliability": {
       "yoy_r": 0.806,
@@ -3386,7 +3404,9 @@
       "r": 0.513,
       "partial_r_given_elo": 0.294,
       "r_next_games_won_pct": 0.532
-     }
+     },
+     "percentile_key": "elo",
+     "surface_pool_value": "values_surface.clay.elo"
     },
     {
      "id": "games_won_pct",
@@ -3899,7 +3919,7 @@
      "explanation": "Strength rating from matches on grass only.",
      "in_payload": true,
      "payload_path": "values",
-     "percentile_from": "pct",
+     "percentile_from": "pct_surface",
      "scope": "all",
      "reliability": {
       "yoy_r": 0.824,
@@ -3914,7 +3934,9 @@
       "r": 0.354,
       "partial_r_given_elo": null,
       "r_next_games_won_pct": 0.438
-     }
+     },
+     "percentile_key": "elo_surface",
+     "surface_pool_value": "values_surface.grass.elo_surface"
     },
     {
      "id": "elo",
@@ -3927,7 +3949,7 @@
      "explanation": "Overall strength rating from every result, adjusted for the opponent's rating.",
      "in_payload": true,
      "payload_path": "values",
-     "percentile_from": "pct",
+     "percentile_from": "pct_surface",
      "scope": "all",
      "reliability": {
       "yoy_r": 0.711,
@@ -3942,7 +3964,9 @@
       "r": 0.421,
       "partial_r_given_elo": 0.267,
       "r_next_games_won_pct": 0.491
-     }
+     },
+     "percentile_key": "elo",
+     "surface_pool_value": "values_surface.grass.elo"
     },
     {
      "id": "games_won_pct",
@@ -4347,16 +4371,22 @@
  ],
  "payload_changes": [
   {
-   "field": "values_surface.<s>.elo_surface / pct_surface.<s>.elo_surface",
+   "field": "values_surface.<s>.elo_surface / pct_surface.<s>.elo_surface (and .elo)",
    "builder": "oddsmarkets/tennis/analytics/players.py:build",
-   "status": "needed",
-   "note": "the surface Elo (values.elo_<s>) is only ranked in the tour pool (pct); a surface-pool percentile needs it added to SURFACE_KEYS / surf_vals. Not done: players.py has uncommitted changes from another agent. Until then the front end can rank values.elo_<s> client-side among the players listed in values_surface.<s>."
+   "status": "done",
+   "note": "22 Oct 2026: the surface's Elo (elo_surface, = values.elo_<s>) and the overall Elo (elo) are ranked among the surface pool; surface groups read their Elo percentiles from pct_surface.<s>.<percentile_key>."
   },
   {
    "field": "SHRINK pseudo-counts (no new field)",
    "builder": "oddsmarkets/tennis/analytics/players.py:SHRINK",
-   "status": "needed",
-   "note": "percentile shrinkage is lighter than the measured stabilisation: win_pct uses 10 pseudo-matches (M50 about 16-19 tour, 19-24 hard), win_v_top50 6 top-50 matches, tb_pct 8 tiebreaks (M50 300+ matches). Suggest win_pct 20, games_won_pct 12, and drop tb_pct, dec_pct from percentile cards."
+   "status": "done",
+   "note": "22 Oct 2026: win_pct 10 -> 20, games_won_pct 8 -> 12 pseudo-matches (display percentiles only; no model reads them). Dropping tb_pct and dec_pct from the percentile cards is a front-end choice (they are secondary here)."
+  },
+  {
+   "field": "players/<pid>.json peer",
+   "builder": "oddsmarkets/tennis/analytics/players.py:peer_blocks, scripts/build_ace.py:careers",
+   "status": "done",
+   "note": "22 Oct 2026: per peer group (all, hard, clay, grass) the group id, minimum, pool size, in_pool, sample, the spec's values (headline ids first), percentiles and ranks for players in the pool, and similar players (tour and surface views, this recipe): the player and compare pages need not load players.json."
   }
  ]
 }

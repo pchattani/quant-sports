@@ -242,7 +242,8 @@ def build_tour(b: Build, tour: str, args, cfg: dict) -> dict:
     if cur_full:
         prev_rk = an.read_json(b.data / tour / "rankings.json") or {}
         b.write_or_fail(f"{tour}/rankings.json", f"{tour} rankings", lambda: RK.build_rankings(td, prev_rk, defend, race_rows), tour=tour)
-        b.write_or_fail(f"{tour}/race.json", f"{tour} race.json", lambda: RC.build(td, race_sim, futures), tour=tour)
+        prev_race = an.read_json(b.data / tour / "race.json") or {}
+        b.write_or_fail(f"{tour}/race.json", f"{tour} race.json", lambda: RC.build(td, race_sim, futures, prev_race), tour=tour)
         b.write_or_fail(f"{tour}/elo.json", f"{tour} elo.json", lambda: RK.build_elo(td), tour=tour)
 
     # catalogues, calendars, schedules and event pages per year
@@ -353,7 +354,7 @@ def build_tour(b: Build, tour: str, args, cfg: dict) -> dict:
     if cur_full:
         b.step(f"{tour} value", lambda: value(b, td, entries, preds))
     if not args.no_careers:
-        n = b.step(f"{tour} careers", lambda: careers(b, td, entries, preds, defend, race_sim, extras_cur), 0)
+        n = b.step(f"{tour} careers", lambda: careers(b, td, entries, preds, defend, race_sim, extras_cur, catalogues.get(cur)), 0)
         logger.info("%s careers: %s written", tour, n)
     entry = None
     if cur_full:
@@ -375,6 +376,9 @@ def calibration(b: Build, td: an.TourData, cfg: dict) -> None:
     if isinstance(cached, dict) and str(cached.get("generated_at") or "") > str(cur.get("generated_at") or ""):
         from oddsmarkets.tennis.models import backtest as BT
         cur = BT.page_copy(cached)
+    if cur.get("notes"):
+        from oddsmarkets.tennis.models import backtest as BT
+        cur["notes"] = BT.page_notes(cur["notes"])         # a page copy written before the rewording
     if not cur.get("generated_at"):
         cur = {"ok": False, "reason": "the walk-forward backtest has not been run yet (scripts/tn_fit.py --backtest)",
                "tour": td.tour, **({"validation_stats": cur["validation_stats"]} if cur.get("validation_stats") else {})}
@@ -404,7 +408,10 @@ def value(b: Build, td: an.TourData, entries: dict[int, dict], preds: dict) -> N
 
 
 def careers(b: Build, td: an.TourData, entries: dict[int, dict], preds: dict, defend: dict, race_sim: dict | None,
-            extras_cur: dict) -> int:
+            extras_cur: dict, cat_cur: dict | None = None) -> int:
+    """players/<pid>.json for every player with entries; players in the current season's catalogue `cat_cur` also get
+    its "peer" block (players.peer_blocks: peer groups, percentiles and similar players), so the player and compare
+    pages need not load the tour's players.json."""
     from oddsmarkets.tennis.analytics import players as PL
     from oddsmarkets.tennis.analytics.rankings import active_elo
     per: dict[str, dict[int, list]] = {}
@@ -431,6 +438,7 @@ def careers(b: Build, td: an.TourData, entries: dict[int, dict], preds: dict, de
     order = sorted(act, key=lambda p: -act[p]["all"])
     erank = {p: i + 1 for i, p in enumerate(order)}
     srp = (td.season_sr(td.current) or {}).get("players") or {}
+    peer = (b.step(f"{td.tour} peer blocks", lambda: PL.peer_blocks(cat_cur, td.tour), {}) or {}) if (cat_cur or {}).get("players") else {}
     n = 0
     for pid in sorted(per):
         ex = extras_cur.get(pid) or {}
@@ -444,6 +452,8 @@ def careers(b: Build, td: an.TourData, entries: dict[int, dict], preds: dict, de
                                     {"finals_qual": an.prob(fq.get(pid)), "year_end_no1": an.prob(no1.get(pid))}, cur,
                                     r_all.get(pid),
                                     {y: ((tf.get(y) or {}).get(pid) or {}).get("all") or (0, 0) for y in per[pid]})
+        if pid in peer:
+            payload["peer"] = peer[pid]
         if b.write_if_changed(td.tour, f"{td.tour}/players/{an.fname(pid)}.json", payload):
             n += 1
     return n

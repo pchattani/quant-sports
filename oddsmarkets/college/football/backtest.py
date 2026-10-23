@@ -274,7 +274,7 @@ def calibration(pipe: dict) -> dict:
         "Closing lines are ESPN's: 'consensus' for 2013, the median of the books ESPN lists for 2014-2022, and "
         "the book's explicit close (ESPN BET, then DraftKings) from 2023; seasons covered here: "
         + (f"{seasons_close[0]}-{seasons_close[-1]}" if seasons_close else "none") + ".",
-        "Market win probabilities are the de-vigged moneylines where both prices are stored; otherwise the spread "
+        "Market win probabilities are the moneylines with the margin removed where both sides are stored; otherwise the spread "
         "through a normal (used only for the 'close' Brier score, flagged).",
         "Games involving at least one FBS team; ties and games without a final score excluded.",
         *[f"{k}: {v}." for k, v in sorted(data.UNRELIABLE_LINES.items())],

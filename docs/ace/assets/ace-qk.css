@@ -350,3 +350,28 @@ tr.row-link { cursor: pointer; }
 .pg-toggle button.on { background: var(--signal); color: var(--signal-ink); border-color: var(--signal); }
 .ta-page a.qk-chance, .ta-page a.qk-stat, .ta-page a.ov-x, .ta-page a.ta-evcard { color: var(--ink-1); }
 tr.cut td, .qk-table tr.cut td { border-top: 2px dashed color-mix(in srgb, var(--signal) 55%, transparent) !important; }
+/* v2 draw (bracket): match boxes as v2 cards, our chance in the signal, the lit path in the signal */
+.br-title { font: 700 var(--fs-2xs)/1.2 var(--font-ui); letter-spacing: var(--tracking-caps); color: var(--ink-3); }
+.br-m { background: var(--s-1); border: 1px solid var(--line-1); border-radius: var(--r-2); padding: 5px 8px; font: 500 12px/1.35 var(--font-ui); box-shadow: var(--sh-1); }
+.br-m.done { border-color: var(--line-2); }
+.br-m.live { border-color: color-mix(in srgb, var(--live) 60%, transparent); }
+.br-m.path, .br-m.champ { border-color: color-mix(in srgb, var(--signal) 70%, transparent); box-shadow: 0 0 0 1px var(--signal-soft); }
+.br-pl:hover { background: var(--s-2); }
+.br-pl.hl { background: var(--signal-soft); }
+.br-pl.hl .br-nm { color: var(--ink-1); font-weight: 700; }
+.br-nm { color: var(--ink-2); }
+.br-pl.won .br-nm { color: var(--ink-1); }
+.br-seed { font-family: var(--font-num); color: var(--ink-3); }
+.br-g { font-family: var(--font-num); color: var(--ink-3); }
+.br-g.w { color: var(--ink-1); }
+.br-g.cur { color: var(--live); }
+.br-p { font: 600 11px var(--font-num); color: var(--signal); }
+.br-link { background: var(--s-2); border-color: var(--line-2); color: var(--ink-2); }
+.br-link:hover { color: var(--signal); border-color: var(--signal); }
+.path-step { background: var(--s-1); border-color: var(--line-1); border-radius: var(--r-2); }
+.path-step .ps-r { font: 700 var(--fs-2xs) var(--font-ui); letter-spacing: var(--tracking-caps); color: var(--ink-3); }
+.path-step .ps-p { font: 800 var(--fs-lg)/1.1 var(--font-display); font-stretch: var(--stretch-display); color: var(--signal); }
+.path-step.done-w { border-color: color-mix(in srgb, var(--up) 55%, transparent); }
+.path-step.done-l { border-color: color-mix(in srgb, var(--down) 55%, transparent); }
+.path-head .ph-name { font: 800 var(--fs-lg) var(--font-display); font-stretch: var(--stretch-display); }
+#pp-elo, #pp-sr, #pp-res-chart, #cmp-elo, #cmp-sr, #el-chart, #h2-sets, #mt-wp, #mt-sets, #mt-games, #cal-rel, #cal-years, #cal-sets, #cal-ss, #cal-pit, #cal-tour, #cal-live, #cal-blend, #cal-val-chart, #vx-age, #vx-cal, #vx-sc, #vx-yr, #vx-ev2, #vx-age2 { margin: 0 var(--sp-3) var(--sp-3); }

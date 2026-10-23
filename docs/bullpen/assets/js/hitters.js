@@ -811,7 +811,7 @@ K.renderCatalogue = function (el, params, state, kind) {
     (pit ? '<label>Role<select id="cat-role"><option value="">Starters and relievers</option><option value="SP">Starters</option><option value="RP">Relievers</option></select></label>'
       : '<label>Position<select id="cat-pos"><option value="">All positions</option></select></label>') +
     '<label>Min ' + (pit ? 'batters faced' : 'PA') + ' <span id="cat-floor-v"></span><input id="cat-floor" type="range" min="0" max="700" step="5"></label>' +
-    '<label>Percentiles<select id="cat-basis"><option value="role">against ' + (pit ? 'his role (starters or relievers)' : 'his position') + '</option><option value="all">against all ' + K.LN(L) + ' ' + (pit ? 'pitchers' : 'hitters') + '</option></select></label>' +
+    '<label>Percentiles<select id="cat-basis"><option value="role">against ' + (pit ? 'the same role (starters or relievers)' : 'the same position') + '</option><option value="all">against all ' + K.LN(L) + ' ' + (pit ? 'pitchers' : 'hitters') + '</option></select></label>' +
     '<label>Add a metric<select id="cat-extra"><option value="">—</option></select></label>' +
     '<label>&nbsp;<button type="button" id="cat-clear" class="gq-btn">Clear added</button></label>' +
     '</div><div id="cat-chips" class="gq-chips"></div><div id="cat-table">' + K.muted('Loading…') + '</div><div class="pg-note gq-note" id="cat-note"></div></div>';
@@ -894,7 +894,7 @@ function drawCatalogue(L, S, kind, cat, heads) {
     const p = P[id];
     return { _href: pit ? K.pitcherHref(L, id, S) : K.hitterHref(L, id, S), cells: [
       { v: i + 1, cls: 'pos-cell' },
-      { v: p.name || K.name(id), html: '<a class="ply-link" href="' + (pit ? K.pitcherHref(L, id, S) : K.hitterHref(L, id, S)) + '">' + K.esc(p.name || K.name(id)) + '</a>' + (!ok(p) ? ' <span class="gq-tag" title="Below the sample floor for his position or role: no percentiles">small sample</span>' : '') },
+      { v: p.name || K.name(id), html: '<a class="ply-link" href="' + (pit ? K.pitcherHref(L, id, S) : K.hitterHref(L, id, S)) + '">' + K.esc(p.name || K.name(id)) + '</a>' + (!ok(p) ? ' <span class="gq-tag" title="Below the sample floor for the position or role: no percentiles">small sample</span>' : '') },
       { v: K.teamAbbr(p.team), html: K.teamChip(L, p.team, S) },
       { v: pit ? K.roleOf(p) : (p.pos || ''), html: K.esc(pit ? K.roleOf(p) : (p.pos || '—')) },
       { v: p.age, html: isNum(p.age) ? K.num(p.age, 0) : '—', align: 'right' },

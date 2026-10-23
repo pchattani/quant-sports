@@ -111,7 +111,7 @@ const DSEL = { key: null };
 /* The v2 player comparison: two or three players on the player card's metric set. */
 function compareV2(el, S, ids0, cat) {
   const sq = GI.sq(S);
-  let h = GI.pageHead('Lab · ' + S, 'Compare', 'Two or three players side by side on the metrics that best describe and predict their play at their position, each ranked against his own group.') + GI.sectionNav('lab', 'compare') +
+  let h = GI.pageHead('Lab · ' + S, 'Compare', 'Two or three players side by side on the metrics that best describe and predict their play at their position, each ranked against their own group.') + GI.sectionNav('lab', 'compare') +
     GI.subnav([['#/compare' + sq, 'Players', 'p'], ['#/compare/t:KC/t:BUF' + sq, 'Teams (classic)', 't'], ['#/compare' + (ids0.length ? '/' + ids0.map(encodeURIComponent).join('/') : '') + '?view=all' + (sq ? '&' + sq.slice(1) : ''), 'Every metric (classic)', 'all']], 'p', 'Compare views');
   if (!cat) { el.innerHTML = h + GI.notBuilt('The ' + S + ' player catalogue', null); return; }
   const P = cat.players;
@@ -152,10 +152,10 @@ function drawV2(el, h, S, ids, cat) {
   }) }];
   const ents = E.map(e => ({ name: e.p.name || GI.playerName(e.id), href: GI.playerHref(e.id, S), abbr: GI.surnameOf(e.p.name || ''), colour: null,
     sub: [GI.posLabel(e.p.pos), GI.teamAbbr(e.p.team), GI.SP.sample(e.p, e.g)].filter(Boolean).join(' · ') }));
-  const peerTxt = same ? g0.peer : 'each against his own group (' + E.map(e => GI.surnameOf(e.p.name || '') + ': ' + e.g.peer.replace(/^NFL /, '')).join('; ') + ')';
+  const peerTxt = same ? g0.peer : 'each against their own group (' + E.map(e => GI.surnameOf(e.p.name || '') + ': ' + e.g.peer.replace(/^NFL /, '')).join('; ') + ')';
   const small = E.filter(e => e.p.qualified === false).map(e => e.p.name);
   const styleRows = sty.filter(m => E.some(e => isNum(GI.SP.value(e.p, e.id, m, cx))));
-  const styleTbl = styleRows.length ? GI.card('How they play', 'Style, not quality: no better or worse', GI.tableHTML([{ label: 'Metric', sortable: false }].concat(E.map(e => ({ label: GI.surnameOf(e.p.name || ''), align: 'right', sortable: false }))),
+  const styleTbl = styleRows.length ? GI.card('Playing style', 'How they play, not how well: no better or worse', GI.tableHTML([{ label: 'Metric', sortable: false }].concat(E.map(e => ({ label: GI.surnameOf(e.p.name || ''), align: 'right', sortable: false }))),
     styleRows.map(m => [{ html: '<span data-tip="' + esc(m[5]) + '" tabindex="0">' + esc(m[1]) + '</span>' }].concat(E.map(e => ({ html: GI.SP.fmt(m, GI.SP.value(e.p, e.id, m, cx), cx) })))))) : '';
   el.innerHTML = h + GI.card('Players', 'Ranked against ' + esc(peerTxt) + ' this season (' + S + ')', pick) +
     '<section class="qk-section" style="margin-top:var(--sp-4)">' + GI.card('Side by side', 'Value · percentile against the group, qualified players (100 = best) · ' + (E.length === 2 ? 'difference, green when ' + esc(E[0].p.name) + ' is better' : 'the best of three in bold'),
@@ -163,7 +163,7 @@ function drawV2(el, h, S, ids, cat) {
       (small.length ? '<p class="qk-caption">' + esc(small.join(', ')) + (small.length > 1 ? ' are' : ' is') + ' below the qualifying minimum: no percentiles.</p>' : '') +
       (!same ? '<p class="qk-caption">Different groups: the rows are the ' + esc(g0.name.toLowerCase()) + ' set, and each percentile is against the player’s own group.</p>' : '') +
       (GI.SP.NOTE[g0.id] ? '<p class="qk-caption">' + esc(GI.SP.NOTE[g0.id]) + '</p>' : '')) + '</section>' + styleTbl +
-    '<section class="qk-section">' + GI.card('Where they sit', 'The qualified ' + esc(g0.peer.replace(/^NFL /, '')) + ' this season, with each player marked', '<div class="qk-seg" id="cmp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + GI.chartBox('cmp-dist', 260, 'Peer distribution with the players marked')) + '</section>';
+    '<section class="qk-section">' + GI.card('Among peers', 'The qualified ' + esc(g0.peer.replace(/^NFL /, '')) + ' this season, with each player marked', '<div class="qk-seg" id="cmp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + GI.chartBox('cmp-dist', 260, 'Peer distribution with the players marked')) + '</section>';
   wireV2(el, S, E, items);
   const keys = hl.filter(m => E.every(e => isNum(GI.SP.value(e.p, e.id, m, cx)))).slice(0, 4);
   const seg = el.querySelector('#cmp-dist-m');

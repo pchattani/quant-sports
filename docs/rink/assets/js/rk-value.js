@@ -1,16 +1,17 @@
 /* The Quant Rink — Value & Moves (#/value?tab=board|season|val|moves|trade).
  *
- * Board (new): the most valuable players this season (WAR), best by position, value against ice time, the
- * trade market (net value each club has gained from trades) and the best-graded deals. The other tabs render the
- * pre-redesign views: season value (value.js), the multi-season valuation (?tab=val), moves and trade grades
- * (moves.js), the trade simulator (trade.js, its state in &t=&m=).
+ * Board (Design System 2.0): stat tiles, the most valuable players this season (WAR), best by position, value against
+ * ice time, net value each club has gained from trades and the best-graded deals. Who moves next (?tab=next):
+ * every player's chance of not being in his club's lineup next season (movement.json, MOVES_VIEWS.md), by club
+ * or league-wide. The other tabs render the pre-redesign views: season value (value.js), the multi-season valuation
+ * (?tab=val), moves and trade grades (moves.js), the trade simulator (trade.js, its state in &t=&m=).
  *
- * Reads <S>/value.json and <S>/deals.json. */
+ * Reads <S>/value.json, <S>/deals.json and <S>/movement.json. */
 (function (RK) {
 'use strict';
 
 const U = RK.ui, esc = RK.esc, isNum = RK.isNum;
-const TABS = [['board', 'Board'], ['season', 'Season value'], ['val', 'Valuation (4 seasons)'], ['moves', 'Moves & trade grades'], ['trade', 'Trade simulator']];
+const TABS = [['board', 'Board'], ['next', 'Who moves next'], ['season', 'Season value'], ['val', 'Valuation (4 seasons)'], ['moves', 'Moves & trade grades'], ['trade', 'Trade simulator']];
 const POS = [['C', 'Centres'], ['L', 'Left wings'], ['R', 'Right wings'], ['D', 'Defence'], ['G', 'Goalies']];
 
 function board(node, S) {
@@ -26,24 +27,26 @@ function board(node, S) {
     const sk = q.filter(r => r.kind !== 'G'), gk = q.filter(r => r.kind === 'G');
     const top = q.slice().sort((a, b) => (b.war || 0) - (a.war || 0)).slice(0, 15);
     const riser = q.filter(r => isNum(r.war) && isNum(r.prev_war)).sort((a, b) => (b.war - b.prev_war) - (a.war - a.prev_war))[0];
+    const top1 = (list, k) => list.filter(r => isNum(r[k])).sort((a, b) => b[k] - a[k])[0];
+    const s0 = top1(sk, 'war'), g0 = top1(gk, 'war');
     const k = [
-      QK.kpi({ label: 'Most valuable skater', value: sk[0] ? RK.surnameOf(sk[0].name) : '—', sub: sk[0] ? U.f(sk[0].war, 2) + ' WAR · ' + RK.teamAbbr(sk[0].team) + ' · ' + U.f(sk[0].gar, 1) + ' GAR' : '' }),
-      QK.kpi({ label: 'Most valuable goalie', value: gk[0] ? RK.surnameOf(gk[0].name) : '—', sub: gk[0] ? U.f(gk[0].war, 2) + ' WAR · ' + RK.teamAbbr(gk[0].team) + ' · ' + U.signed(gk[0].gsax, 1) + ' GSAx' : '' }),
-      QK.kpi({ label: 'Qualified players', value: QK.fmt.num(q.length), sub: (v.n_qualified ? (v.n_qualified.S || 0) + ' skaters, ' + (v.n_qualified.G || 0) + ' goalies' : '') }),
-      QK.kpi({ label: 'Goals per win', value: v.currency && isNum(v.currency.goals_per_win) ? U.f(v.currency.goals_per_win, 2) : '—', sub: 'the exchange rate from GAR to WAR' })
+      s0 ? { label: 'Most valuable skater', value: RK.surnameOf(s0.name) + ' ' + U.f(s0.war, 2), unit: 'WAR', signal: true, href: RK.playerHref(s0.id), sub: RK.teamAbbr(s0.team) + ' · ' + U.f(s0.gar, 1) + ' goals above replacement', tip: 'Wins above replacement this season, our value model' } : null,
+      g0 ? { label: 'Most valuable goalie', value: RK.surnameOf(g0.name) + ' ' + U.f(g0.war, 2), unit: 'WAR', href: RK.playerHref(g0.id), sub: RK.teamAbbr(g0.team) + ' · ' + U.signed(g0.gsax, 1) + ' goals saved above expected' } : null,
+      riser ? { label: 'Biggest riser', value: RK.surnameOf(riser.name) + ' ' + U.signed(riser.war - riser.prev_war, 2), unit: 'WAR', href: RK.playerHref(riser.id), sub: 'on last season · ' + RK.teamAbbr(riser.team) } : null,
+      { label: 'Qualified players', value: QK.fmt.num(q.length), sub: (v.n_qualified ? (v.n_qualified.S || 0) + ' skaters, ' + (v.n_qualified.G || 0) + ' goalies' : '') },
+      { label: 'Goals per win', value: v.currency && isNum(v.currency.goals_per_win) ? U.f(v.currency.goals_per_win, 2) : '—', sub: 'the exchange rate from GAR to WAR', tip: 'How many goals above replacement buy one win this season' }
     ];
-    if (riser) k.push(QK.kpi({ label: 'Biggest riser', value: RK.surnameOf(riser.name), sub: U.signed(riser.war - riser.prev_war, 2) + ' WAR on last season · ' + RK.teamAbbr(riser.team) }));
-    let h = '<div class="qk-kpis rk-kpis">' + k.join('') + '</div>' +
+    let h = '<div class="rk-kpis">' + QK.stats(k) + '</div>' +
       '<div class="qk-grid"><div class="qk-span-7">' + U.card2('Most valuable this season', 'Wins above replacement (Rink value); qualified players', U.chart('vb-top', 440, 'Most valuable players'), { foot: '<span>' + esc(v.note || '') + '</span><a href="#/value?tab=season">Full leaderboard →</a>' }) + '</div>' +
       '<div class="qk-span-5">' + U.card2('Value v ice time', 'GAR against minutes played: up and left is value in fewer minutes', U.chart('vb-sc', 440, 'Value against ice time')) + '</div></div>';
-    h += '<section class="qk-section"><div class="qk-section-head"><div><h2>Best by position</h2><div class="qk-sub">Top five qualified players at each position by WAR this season.</div></div></div><div class="qk-grid">' +
+    h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'By position', title: 'Best by position', sub: 'Top five qualified players at each position by WAR this season.' }) + '<div class="qk-grid">' +
       POS.map(p => {
         const ids = ((v.best || {})[p[0]] || []).slice(0, 5);
         const list = ids.map(id => by[id]).filter(Boolean);
-        return '<div class="qk-span-' + (p[0] === 'G' ? 4 : 4) + '">' + U.card2(p[1], '', list.length ? '<ul class="rk-list">' + list.map((r, i) => '<li><span class="n">' + (i + 1) + '</span>' + U.playerEnt(r.id, r.name, r.team) + '<span class="v">' + U.f(r.war, 2) + '</span></li>').join('') + '</ul>' : QK.empty('Nobody qualifies yet'), { flush: true }) + '</div>';
+        return '<div class="qk-span-4">' + U.card2(p[1], 'WAR this season', list.length ? '<ul class="rk-list rk-lead">' + list.map((r, i) => '<li><span class="n">' + (i + 1) + '</span>' + U.playerEnt(r.id, r.name, r.team) + '<span class="v">' + U.f(r.war, 2) + '</span></li>').join('') + '</ul>' : '<div class="rk-board-empty"><b>Fills in when the first ' + esc(p[1].toLowerCase()) + ' qualify</b><span>Value needs 200 minutes in all situations over a full season, prorated by games played.</span></div>', { flush: true }) + '</div>';
       }).join('') + '</div></section>';
     if (dl) {
-      h += '<section class="qk-section"><div class="qk-section-head"><div><h2>The trade market</h2><div class="qk-sub">Every NHL trade of the last twelve months, valued (multi-season WAR, picks from our pick-value curve) at the time and with what has happened since.</div></div><a class="qk-btn" href="#/value?tab=moves">All moves and grades →</a></div>' +
+      h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Trades', title: 'Who won the trades', sub: 'Every NHL trade of the last twelve months, valued (multi-season WAR, picks from our pick-value curve) at the time and with what has happened since.', actions: '<a class="qk-btn" href="#/value?tab=moves">All moves and grades →</a>' }) +
         '<div class="qk-grid"><div class="qk-span-6">' + U.card2('Net value from trades, by club', 'Value received minus value sent, current view (WAR)', U.chart('vb-net', 620, 'Net trade value by club')) + '</div>' +
         '<div class="qk-span-6">' + U.card2('The best-graded deals', 'Largest value moved, graded for each side (A ≥ 65% of the value)', '<div id="vb-deals"></div>', { flush: true }) + '</div></div></section>';
     }
@@ -66,13 +69,49 @@ function board(node, S) {
   });
 }
 
+/* Who moves next: the league list (or one club's) by our chance of not being in the lineup next season. */
+function nextTab(node, S, team0) {
+  node.innerHTML = QK.skeleton('lines', 8);
+  return U.moves(S).then(M => {
+    if (!U.alive(node)) return;
+    if (!M || !M.pub.next) { node.innerHTML = U.card2('Who moves next', '', QK.empty('Not published', M && (M.d.reasons || {}).next ? M.d.reasons.next : 'The movement model is not published for this season.')); return; }
+    const d = M.d, br = d.base_rates || {};
+    const teams = Object.keys(M.teams).sort((a, b) => RK.teamName(a).localeCompare(RK.teamName(b)));
+    const team = team0 && M.teams[RK.canonTeam(team0)] ? RK.canonTeam(team0) : '';
+    const top = M.rows.filter(r => isNum(r.p_next)).sort((a, b) => b.p_next - a.p_next);
+    const dep = teams.map(t => ({ t: t, v: M.teams[t].exp_departures })).filter(x => isNum(x.v)).sort((a, b) => b.v - a.v);
+    node.innerHTML = '<div class="rk-kpis">' + QK.stats([
+      { label: 'Players forecast', value: QK.fmt.num(top.length), sub: 'rostered NHL players this season' },
+      isNum(br.next) ? { label: 'League base rate', value: U.pct(br.next), sub: 'of players were not in the same lineup the next season', tip: 'Over the seasons the model learned from' } : null,
+      dep[0] ? { label: 'Most expected departures', value: RK.teamAbbr(dep[0].t) + ' ' + U.f(dep[0].v, 1), signal: true, href: RK.teamHref(dep[0].t), sub: 'players not in the lineup by ' + M.horizon } : null,
+      dep.length ? { label: 'Fewest expected departures', value: RK.teamAbbr(dep[dep.length - 1].t) + ' ' + U.f(dep[dep.length - 1].v, 1), href: RK.teamHref(dep[dep.length - 1].t), sub: 'the most settled lineup' } : null
+    ]) + '</div>' +
+      QK.sectionHead({ kicker: 'By ' + M.horizon, title: U.MOVE_HEAD, html: true, sub: esc((d.notes || [])[2] || '') + ' <a href="#/model?tab=moves">How it works and how it tested →</a>',
+        actions: '<select class="qk-select" id="mv-team" aria-label="Club"><option value="">All clubs</option>' + teams.map(t => '<option value="' + esc(t) + '"' + (t === team ? ' selected' : '') + '>' + esc(RK.teamName(t)) + '</option>').join('') + '</select>' }) +
+      U.deadlineLine(M) + '<div class="qk-card"><div class="rk-keys-row">' + U.moveKeys(M) + '</div><div id="mv-board"></div></div>';
+    const draw = t => {
+      const list = (t ? top.filter(r => r.team === t) : top.slice(0, 100)).map(r => Object.assign({ sub: [r.pos, isNum(r.age) ? 'age ' + Math.floor(r.age) : ''].filter(Boolean).join(' · ') }, r));
+      QK.leaderboard(node.querySelector('#mv-board'), { dense: true, rank: true, maxHeight: 720, rowHref: r => RK.playerHref(r.pid), columns: [
+        { key: 'name', label: 'Player', type: 'entity', mark: r => U.team(r.team), href: r => RK.playerHref(r.pid), sub: 'sub' },
+        { key: 'team', label: 'Club', fmt: v => esc(RK.teamAbbr(v)) },
+        { key: 'value', label: 'Value', num: true, fmt: v => U.signed(v, 2), tip: 'Rink WAR, the last two completed seasons blended 3:2' },
+        { key: 'yrs', label: 'Seasons', num: true, tip: 'Seasons in the league' },
+        { key: 'p_next', label: 'Not in lineup next season', num: true, tip: U.moveTip(M), fmt: (v, r) => U.moveBar(r, M) + (r.why ? '<span class="rk-why">' + esc(r.why) + '</span>' : '') }
+      ], rows: list });
+    };
+    draw(team);
+    node.querySelector('#mv-team').addEventListener('change', e => draw(e.target.value));
+  });
+}
+
 function page(el, params, state) {
   const S = params.season;
   const q = (params.query || {});
   const tab = TABS.map(t => t[0]).indexOf(q.tab) >= 0 ? q.tab : 'board';
   const tabs = TABS.map((t, i) => ({ key: t[0], label: t[1], href: '#/value' + (i ? '?tab=' + t[0] : '') + (U.sq(S) && (t[0] === 'board' || t[0] === 'season') ? (i ? '&' : '?') + U.sq(S) : '') }));
-  const body = U.section(el, { section: 'value', title: 'Value & Moves', sub: 'What every player is worth on the ice (goals and wins above replacement), the multi-season valuation, every trade graded, and a simulator to try your own.', tabs: tabs, active: tab });
+  const body = U.section(el, { section: 'value', title: 'Value & Moves', sub: 'What every player is worth on the ice (goals and wins above replacement), who is likely to move next, the multi-season valuation, every trade graded, and a simulator to try your own.', tabs: tabs, active: tab });
   if (tab === 'board') return board(body, S);
+  if (tab === 'next') return nextTab(body, S, q.team);
   if (tab === 'season' || tab === 'val') return U.legacy('value', body, params, state, { tab: tab });
   return U.legacy(tab, body, params, state);
 }

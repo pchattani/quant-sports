@@ -210,7 +210,10 @@ def player_tables(ctx) -> dict[str, dict[str, float]]:
         k = _records(res, "kickers")
         _put(out, "fg_oe", k, "kicker", "fgoe")
         _put(out, "pts_oe", k, "kicker", "pts_oe")
-        _put(out, "net_oe", _records(res, "punters"), "punter", "per_punt")
+        # models/kicking.py:punter_value's oe is expected - actual receiving-team spot (positive = the punt fell short of
+        # the model); the payload's net_oe is higher-is-better yards over expected, so the sign flips (it ran r -0.95
+        # with net average before 23 Oct 2026)
+        _put(out, "net_oe", _records(res, "punters"), "punter", "per_punt", scale=-1.0)
     return out
 
 

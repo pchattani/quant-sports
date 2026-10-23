@@ -60,28 +60,52 @@ function verdictAndTables(metrics, A, B, nameA, nameB, scopeNote) {
 
 const ECOL = ['var(--wp-a)', 'var(--wp-b)', 'var(--c-3)'];
 
+/* Players' own peer blocks (players/<pid>.json "peer", PAYLOADS.md) give the side-by-side card without the 1.5 MB season
+   catalogue; the catalogue then loads only for the distribution and the classic every-metric table. Without the blocks
+   (older builds, past years) the catalogue loads first, as before. */
 function render(el, params, state) {
   const k = K(), T = k.T(params, state), V = TA.v2;
   let ids = [params.a, params.b].concat(params.rest || []).filter(Boolean).map(String).slice(0, 3);
+  const Y = k.Y(params, state, T);
   el.innerHTML = QK.skeleton('lines', 6);
-  return k.ready().then(() => Promise.all([TA.load(T + '/players.json'), k.loadNames(T)])).then(res => {
+  const loadC = id => TA.load(T + '/players/' + id + '.json');
+  const peerOf = c => (c && k.ok(c) && c.peer && Number(c.peer.year) === Number(Y) ? c.peer : null);
+  return k.ready().then(() => k.loadNames(T)).then(() => {
     if (!k.alive(el)) return null;
-    const cat = res[0];
-    if (!k.ok(cat) || !cat.players) { el.innerHTML = V.card('Compare', '', k.notBuilt('The ' + k.TN(T) + ' player catalogue', cat)); return null; }
-    k.learnCat(T, cat);
-    const P = cat.players;
-    // nobody picked: the top two by ranking; one picked: the most similar player
-    if (!ids.length) ids = Object.keys(P).filter(id => P[id].qualified && isNum(P[id].rank)).sort((x, y) => P[x].rank - P[y].rank).slice(0, 2);
-    else if (ids.length === 1) { const s1 = V.similar(T, ids[0], cat, 1)[0]; if (s1) ids.push(s1.id); }
-    el.innerHTML = '<div class="ta-cmp-pick">' + [0, 1, 2].map(i => '<div class="ta-cmp-slot" style="--ec:' + ECOL[i] + '"><span class="qk-kicker">' + (i === 2 ? 'Third player (optional)' : 'Player ' + (i + 1)) + '</span><span id="cmp-p' + i + '"></span></div>').join('') + '</div><div id="cmp-body"></div>';
-    const cur = ids.slice();
-    const go = () => { const list = cur.filter(Boolean); if (list.length >= 2) location.hash = k.href(T, 'compare/' + list.map(encodeURIComponent).join('/')); };
-    [0, 1, 2].forEach(i => k.picker(document.getElementById('cmp-p' + i), { T: T, value: ids[i], placeholder: i === 2 ? 'Add a third…' : 'Type a player…', onPick: id => { cur[i] = id; go(); } }));
-    const body = document.getElementById('cmp-body');
-    if (ids.length < 2) { body.innerHTML = V.card('Pick players', '', QK.empty('Pick at least two players', 'Type a name in each box.')); return null; }
-    body.innerHTML = QK.skeleton('lines', 6);
-    return Promise.all(ids.map(id => TA.load(T + '/players/' + id + '.json')).concat([TA.load(T + '/elo.json')])).then(cs => {
-      if (k.alive(el)) build(T, ids, cat, ids.map((_, i) => (k.ok(cs[i]) ? cs[i] : null)), body);
+    const N = k.NAMES[T] || {};
+    if (!ids.length) ids = Object.keys(N).filter(id => isNum(N[id].rank)).sort((x, y) => N[x].rank - N[y].rank).slice(0, 2);
+    return loadC(ids[0]).then(c0 => {
+      if (ids.length === 1) { const s1 = ((peerOf(c0) || {}).similar || [])[0]; if (s1) ids.push(String(s1.id)); }
+      return Promise.all(ids.map((id, i) => (i === 0 ? Promise.resolve(c0) : loadC(id)))).then(cs => {
+        const peers = cs.map(peerOf);
+        const usePeers = ids.length >= 2 && peers.every(Boolean);
+        const catP = usePeers ? Promise.resolve(null) : TA.load(T + '/players.json');
+        return catP.then(cat0 => {
+          if (!k.alive(el)) return null;
+          let cat = cat0;
+          if (usePeers) {
+            cat = { ok: true, _peerCat: true, year: Y, players: {}, metrics: [], surface_floor: {}, floor: null };
+            ids.forEach((id, i) => { const pc = V.peerCat(peers[i], cs[i], id); if (pc) { cat.players[id] = pc.players[id]; Object.assign(cat.surface_floor, pc.surface_floor); } });
+          } else {
+            if (!k.ok(cat) || !cat.players) { el.innerHTML = V.card('Compare', '', k.notBuilt('The ' + k.TN(T) + ' player catalogue', cat)); return null; }
+            k.learnCat(T, cat);
+            if (ids.length === 1) { const s1 = V.similar(T, ids[0], cat, 1)[0]; if (s1) { ids.push(s1.id); return loadC(s1.id).then(c1 => { cs.push(c1); return draw(cat); }); } }
+          }
+          return draw(cat);
+          function draw(catX) {
+            el.innerHTML = '<div class="ta-cmp-pick">' + [0, 1, 2].map(i => '<div class="ta-cmp-slot" style="--ec:' + ECOL[i] + '"><span class="qk-kicker">' + (i === 2 ? 'Third player (optional)' : 'Player ' + (i + 1)) + '</span><span id="cmp-p' + i + '"></span></div>').join('') + '</div><div id="cmp-body"></div>';
+            const cur = ids.slice();
+            const go = () => { const list = cur.filter(Boolean); if (list.length >= 2) location.hash = k.href(T, 'compare/' + list.map(encodeURIComponent).join('/')); };
+            [0, 1, 2].forEach(i => k.picker(document.getElementById('cmp-p' + i), { T: T, value: ids[i], placeholder: i === 2 ? 'Add a third…' : 'Type a player…', onPick: id => { cur[i] = id; go(); } }));
+            const body = document.getElementById('cmp-body');
+            if (ids.length < 2) { body.innerHTML = V.card('Pick players', '', QK.empty('Pick at least two players', 'Type a name in each box.')); return null; }
+            let fullP = null;
+            const full = () => (catX._peerCat ? (fullP || (fullP = TA.load(T + '/players.json').then(d => (k.ok(d) && d.players ? d : catX)))) : Promise.resolve(catX));
+            build(T, ids, catX, ids.map((_, i) => (k.ok(cs[i]) ? cs[i] : null)), body, full);
+            return null;
+          }
+        });
+      });
     });
   });
 }
@@ -89,7 +113,8 @@ function render(el, params, state) {
 const CMP_GROUPS = [['Strength', ['elo', 'elo_hard', 'elo_clay', 'elo_grass']], ['Results', ['games_won_pct', 'win_pct', 'win_v_top50']],
   ['Serve and return, inferred from scores', ['hold', 'brk', 'hold_plus_break']], ['Serve statistics (WTA)', ['dominance', 'ace_pct']]];
 
-function build(T, ids, cat, careers, body) {
+function build(T, ids, cat, careers, body, full) {
+  full = full || (() => Promise.resolve(cat));
   const k = K(), V = TA.v2;
   const P = ((cat || {}).players) || {};
   const metrics = (cat || {}).metrics || [];
@@ -105,7 +130,7 @@ function build(T, ids, cat, careers, body) {
     { foot: '<span>' + (tally ? 'Head to head: <b>' + k.esc(short[0]) + ' ' + tally[0] + '–' + tally[1] + ' ' + k.esc(short[1]) + '</b>' + (tally[2] ? ', last met ' + k.esc(k.fmtDate(tally[2], { weekday: false })) : '') : 'No tour-level meeting on file') + '</span><a href="' + k.h2hHref(T, ids[0], ids[1]) + '">Head to head, our chance on every surface →</a>' });
   h += '<section class="qk-section">' + V.card('Where they sit', 'Every qualified player in the peer group, with each one marked', '<div class="qk-seg" id="cmp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px;flex-wrap:wrap"></div>' + V.chart('cmp-dist', 260, 'Peer distribution with the players marked')) + '</section>';
   h += '<div class="card"><div class="card-header">Elo <span class="card-sub">After every match, career files.</span>' + k.toggle('cmp-elo-s', [['1', 'Overall'], ['2', 'Hard'], ['3', 'Clay'], ['4', 'Grass']], '1') + '</div><div id="cmp-elo" style="height:380px"></div></div>';
-  h += '<div class="card"><div class="card-header">Serve and return paths <span class="card-sub">The score-based serve (solid) and return (dotted) ratings over time, ±1 standard error shaded.</span>' +
+  h += '<div class="card"><div class="card-header">Serve and return paths <span class="card-sub">The score-based serve (solid, ±1 standard error shaded) and return (dashed) ratings over time.</span>' +
     k.toggle('cmp-sr-s', [['all', 'All']].concat(k.SURFACES.map(s => [s, k.SURF_LABEL[s]])), 'all') + '</div><div id="cmp-sr" style="height:380px"></div></div>';
   h += '<div class="card"><div class="card-header">Every metric (classic) <span class="card-sub">' + k.esc(short[0]) + ' and ' + k.esc(short[1]) + ' on the whole catalogue: who leads each metric on percentile, then value, percentile and the gap. Tiebreak, deciding-set and over-expected rows are mostly luck.</span>' +
     '<label class="pg-ctl">order <select id="cmp-metric-mode"><option value="group">by group</option><option value="gap">by size of gap</option></select></label></div><div id="cmp-verdict"></div><div id="cmp-metrics"></div></div>';
@@ -131,14 +156,16 @@ function build(T, ids, cat, careers, body) {
     const dset = V.set(T, sf);
     if (dset.indexOf(distKey) < 0) distKey = dset[0];
     segEl.innerHTML = dset.map(x => '<button type="button" aria-pressed="' + (x === distKey) + '" data-value="' + x + '">' + k.esc(V.label(x)) + '</button>').join('');
-    const dd = x => {
+    const dd = x => full().then(fc => {
+      if (!document.getElementById('cmp-dist')) return;
       distKey = x;
-      const xs = Object.keys(P).filter(id => V.inPool(P[id], sf, cat)).map(id => V.value(P[id], x, sf)).filter(isNum).sort((a, b) => a - b);
+      const FP = fc.players || {};
+      const xs = Object.keys(FP).filter(id => V.inPool(FP[id], sf, fc)).map(id => V.value(FP[id], x, sf)).filter(isNum).sort((a, b) => a - b);
       if (xs.length < 5) { document.getElementById('cmp-dist').innerHTML = QK.empty('Too few qualified peers yet'); return; }
       const f = (V.META[x] || [])[2] === 'pct' ? (v => (v * 100).toFixed(1) + '%') : (v => V.fmt(x, v));
       QKC.distribution('#cmp-dist', { values: xs, binCount: 20, fmt: f, colorBy: 'flat', xName: V.label(x, sf) + ' · ' + xs.length + ' qualified peers', yName: 'Players',
         marks: ps.map((p, i) => ({ x: V.value(p, x, sf), label: short[i], color: cols[i] })).filter(m => isNum(m.x)), label: 'Distribution of ' + V.label(x) });
-    };
+    });
     dd(distKey);
     QK.seg(segEl, dd);
   };
@@ -147,27 +174,27 @@ function build(T, ids, cat, careers, body) {
 
   // every metric (classic): the first two players on the tour percentiles
   const sel = document.getElementById('cmp-metric-mode');
-  const tables = verdictAndTables(metrics, Object.assign({}, ps[0] || {}, { pct: (ps[0] || {}).pct || {} }), Object.assign({}, ps[1] || {}, { pct: (ps[1] || {}).pct || {} }), short[0], short[1], k.TN(T) + ' percentiles' + (cat && cat.year ? ', ' + cat.year : ''));
-  const drawMetrics = () => { document.getElementById('cmp-metrics').innerHTML = sel.value === 'gap' ? tables.byGap : tables.byGroup; k.sortable('cmp-metrics'); };
-  document.getElementById('cmp-verdict').innerHTML = (!ps[0] || !ps[1]) ? k.muted((!ps[0] ? k.esc(names[0]) : k.esc(names[1])) + ' has no row in the ' + k.esc((cat || {}).year || '') + ' catalogue, so there is nothing to compare metric by metric.') : tables.verdict;
-  sel.onchange = drawMetrics;
-  drawMetrics();
+  full().then(fc => {
+    if (!document.getElementById('cmp-metrics')) return;
+    const fp = ids.map(id => (fc.players || {})[id] || null);
+    const tables = verdictAndTables(fc.metrics || [], Object.assign({}, fp[0] || {}, { pct: (fp[0] || {}).pct || {} }), Object.assign({}, fp[1] || {}, { pct: (fp[1] || {}).pct || {} }), short[0], short[1], k.TN(T) + ' percentiles' + (fc && fc.year ? ', ' + fc.year : ''));
+    const drawMetrics = () => { document.getElementById('cmp-metrics').innerHTML = sel.value === 'gap' ? tables.byGap : tables.byGroup; k.sortable('cmp-metrics'); };
+    document.getElementById('cmp-verdict').innerHTML = (!fp[0] || !fp[1]) ? k.muted((!fp[0] ? k.esc(names[0]) : k.esc(names[1])) + ' has no row in the ' + k.esc((fc || {}).year || '') + ' catalogue, so there is nothing to compare metric by metric.') : tables.verdict;
+    sel.onchange = drawMetrics;
+    drawMetrics();
+  });
 
+  const hexes = [V.wpA(), V.wpB(), QK.cssVar('--c-3') || '#3fb9a8'];
   const drawElo = col => {
     const c = Number(col);
-    const tr = [];
-    careers.forEach((cr, i) => {
-      const rs = (((cr || {}).elo) || []).filter(r => Array.isArray(r) && k.isNum(r[c]));
-      if (rs.length) tr.push({ type: 'scatter', mode: 'lines', name: names[i], x: rs.map(r => r[0]), y: rs.map(r => r[c]), line: { color: ECOL[i], width: 2, shape: 'hv' }, hovertemplate: '%{x}: %{y:.0f}<extra>' + k.esc(short[i]) + '</extra>' });
-    });
-    if (tr.length) k.plot('cmp-elo', tr, k.layout(Object.assign(k.legendTop(), { margin: { l: 50, r: 10, t: 34, b: 36 }, xaxis: { type: 'date', title: 'Date' }, yaxis: { title: ['', 'Overall', 'Hard', 'Clay', 'Grass'][c] + ' Elo' } })));
-    else document.getElementById('cmp-elo').innerHTML = k.muted('No Elo history in the career files.');
+    V.lines('cmp-elo', { series: careers.map((cr, i) => ({ name: short[i], rows: (((cr || {}).elo) || []).filter(r => Array.isArray(r) && k.isNum(r[c])).map(r => [r[0], r[c]]), color: hexes[i], width: 2.2 })),
+      yName: ['', 'Overall', 'Hard-court', 'Clay', 'Grass'][c] + ' Elo', step: 'end', yFmt: v => String(Math.round(v)), emptyText: 'No Elo history in the career files.', label: 'Elo histories' });
   };
   drawElo('1');
   k.wireToggle(body, 'cmp-elo-s', drawElo);
 
   const drawSR = surf => {
-    const tr = [];
+    const series = [];
     careers.forEach((cr, i) => {
       let rs = (((cr || {}).serve_return) || []).filter(r => Array.isArray(r) && r[1] === surf);
       if (!rs.length && surf === 'all') {
@@ -176,11 +203,10 @@ function build(T, ids, cat, careers, body) {
         rs = (((cr || {}).serve_return) || []).filter(r => r[1] === best);
       }
       if (!rs.length) return;
-      k.band(rs.map(r => ({ x: r[0], y: r[2], se: r[6], text: r[0] })), ECOL[i], short[i] + ' serve').forEach(t => tr.push(t));
-      k.band(rs.map(r => ({ x: r[0], y: r[3], se: r[7], text: r[0] })), ECOL[i], short[i] + ' return', { dash: 'dot' }).forEach(t => tr.push(t));
+      series.push({ name: short[i] + ' serve', rows: rs.map(r => [r[0], r[2]]), color: hexes[i], width: 2.2, band: rs.map(r => [r[0], k.isNum(r[6]) ? r[2] - r[6] : null, k.isNum(r[6]) ? r[2] + r[6] : null]) });
+      series.push({ name: short[i] + ' return', rows: rs.map(r => [r[0], r[3]]), color: hexes[i], dash: true, width: 1.8 });
     });
-    if (tr.length) k.plot('cmp-sr', tr, k.layout(Object.assign(k.legendTop(), { margin: { l: 50, r: 10, t: 34, b: 36 }, xaxis: { type: 'date', title: 'Date' }, yaxis: { title: 'Rating (log-odds of holding)', zeroline: true, zerolinecolor: '#6e7681' } })));
-    else document.getElementById('cmp-sr').innerHTML = k.muted('No serve/return path on this surface.');
+    V.lines('cmp-sr', { series: series, yName: 'Rating (log-odds of holding or breaking)', yFmt: v => Number(v).toFixed(2), ref: { y: 0 }, emptyText: 'No serve/return path on this surface.', label: 'Serve and return ratings over time' });
   };
   drawSR('all');
   k.wireToggle(body, 'cmp-sr-s', drawSR);

@@ -271,7 +271,7 @@ function render(el, params) {
     // ── live / after: win probability first
     const wpRows = d.wp || [];
     if (wpRows.length > 1) {
-      html += TA.card('Win probability, game by game', (fin ? 'how the match swung' : 'updates after every game') + (d.reconstructed ? ' · game order within sets reconstructed from the set scores' : ''),
+      html += TA.card('Our win chance, game by game', (fin ? 'how the match swung' : 'updates after every game') + (d.reconstructed ? ' · game order within sets reconstructed from the set scores' : ''),
         '<div id="mt-wp"></div><div class="grid-2" style="padding:0 12px 12px;gap:12px"><div id="mt-tiles" class="kpi-grid three"></div><div id="mt-swings"></div></div>');
     }
     // ── before the match
@@ -312,12 +312,12 @@ function render(el, params) {
       const games = k === 'handicap';
       const note = document.getElementById('mt-games-note');
       if (games) {
-        TA.charts.gamesDist('mt-games', dist.handicap || {}, { signed: true, xTitle: TA.playerSurname(T, d.p1) + ' games minus ' + TA.playerSurname(T, d.p2), colour: TA.C.p1,
+        TA.charts.gamesDist('mt-games', dist.handicap || {}, { signed: true, xTitle: TA.playerSurname(T, d.p1) + ' games minus ' + TA.playerSurname(T, d.p2), colour: 'b',
           actual: actual ? sumSide(d, 0) - sumSide(d, 1) : null });
-        note.innerHTML = 'Positive: ' + esc(TA.playerSurname(T, d.p1)) + ' wins more games. The white bar is the final margin.';
+        note.innerHTML = 'Positive: ' + esc(TA.playerSurname(T, d.p1)) + ' wins more games. The highlighted bar is the final margin.';
       } else {
         TA.charts.gamesDist('mt-games', dist.games || {}, { exp: dist.exp_games, xTitle: 'Total games in the match', actual: actual ? TA.totalGames(d) : null });
-        note.innerHTML = isNum(dist.exp_games) ? 'Expected ' + TA.num(dist.exp_games, 1) + ' games (dotted line)' + (actual ? '; the white bar is what happened (' + TA.totalGames(d) + ').' : '.') : '';
+        note.innerHTML = isNum(dist.exp_games) ? 'Expected ' + TA.num(dist.exp_games, 1) + ' games (dashed line)' + (actual ? '; the highlighted bar is what happened (' + TA.totalGames(d) + ').' : '.') : '';
       }
     };
     showGames('games');

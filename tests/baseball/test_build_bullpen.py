@@ -48,6 +48,9 @@ def test_full_build_writes_every_payload(built):
     assert hit["ok"] and {"metrics", "players"} <= set(hit)
     pit = _read(s / "pitchers.json")
     assert "arsenal" in pit
+    peers = _read(s / "peers.json")                          # the player page's peer distributions, without the catalogue
+    assert peers["ok"] and peers["groups"] and all({"kind", "n", "floor"} <= set(g) for g in peers["groups"].values())
+    assert _read(s / "league_types.json")["league_types"] == pit.get("league_types")
     tm = _read(s / "teams.json")
     t = next(iter(tm["teams"].values()))
     assert {"log", "roster", "park", "values", "pct"} <= set(t)
@@ -74,7 +77,7 @@ def test_full_build_writes_every_payload(built):
     pid, row = next(iter(pi.items()))
     assert isinstance(row, list) and len(row) == 6
     car = _read(data / "players" / f"{pid}.json")
-    for k in ("id", "name", "bats", "throws", "pos", "dob", "debut", "ids", "seasons", "current", "similar"):
+    for k in ("id", "name", "bats", "throws", "pos", "dob", "debut", "ids", "seasons", "current", "similar", "movement"):
         assert k in car
     assert car["seasons"][0]["season"] == 2025
     assert (data.parent / "assets" / "base.css").exists()

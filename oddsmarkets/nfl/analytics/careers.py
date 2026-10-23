@@ -71,7 +71,7 @@ def reduce_cat(cat: dict | None, season: int) -> dict[str, dict] | None:
                 x = an.fnum(vals.get(k))
                 if x is not None:
                     pl[k] = int(round(100 + 10 * ((mu - x) if k in LOWER else (x - mu)) / sd))
-        out[pid] = {"season": int(season), "team": r.get("team"), "group": grp, "pos": r.get("pos"), "name": r.get("name"),
+        out[pid] = {"season": int(season), "team": r.get("team"), "group": grp, "role": r.get("role"), "pos": r.get("pos"), "name": r.get("name"),
                     "games": r.get("games"), "qualified": r.get("qualified"), "age": r.get("age"), "values": vals, "plus": pl}
     return out
 
@@ -219,7 +219,7 @@ NGS_KEEP = {"passing": ["avg_time_to_throw", "avg_completed_air_yards", "avg_int
                           "catch_percentage", "avg_yac", "avg_expected_yac", "avg_yac_above_expectation"]}
 
 
-def current_blocks(ctx: SeasonContext, cat: dict | None) -> dict[str, dict]:
+def current_blocks(ctx: SeasonContext, cat: dict | None, value: dict | None = None) -> dict[str, dict]:
     """{pid: {"season","log","charts","ngs","ftn","similar","projection"}} for the full season's players."""
     from oddsmarkets.nfl.analytics.players import reg_plays, ngs_map
     if not cat or not cat.get("players"):
@@ -234,7 +234,8 @@ def current_blocks(ctx: SeasonContext, cat: dict | None) -> dict[str, dict]:
     pid_x = S["receiver_id"] if "receiver_id" in S else S.get("receiver_player_id")
     by_p = {str(k): v for k, v in S[(flag(S, "qb_dropback").fillna(0) == 1)].groupby(pid_p)} if pid_p is not None else {}
     by_x = {str(k): v for k, v in S[S["play_type"] == "pass"].groupby(pid_x)} if pid_x is not None else {}
-    similar = similar_players(cat)
+    similar = similar_players(cat, value=value)
+    peers = role_peers(cat)
     from oddsmarkets.nfl.analytics.players import league_fg_curve
     FG = P[(P["play_type"] == "field_goal") & P["kicker_player_id"].notna()] if "kicker_player_id" in P else P.iloc[0:0]
     fg_curve = num(FG, "fg_prob_ours") if "fg_prob_ours" in FG and FG["fg_prob_ours"].notna().any() else league_fg_curve(FG)
@@ -279,7 +280,26 @@ def current_blocks(ctx: SeasonContext, cat: dict | None) -> dict[str, dict]:
             row = ngs[kind][pid]
             ng = {k: an.rnd(row.get(k), 3) for k in NGS_KEEP[kind] if row.get(k) is not None}
         out[pid] = {"season": ctx.season, "group": grp, "values": r.get("values"), "pct": r.get("pct"), "pct_pos": r.get("pct_pos"),
+                    "role": r.get("role"), "pct_role": r.get("pct_role"), "peer": peers.get(r.get("role")),
                     "log": lg, "charts": charts, "ngs": ng, "ftn": ftn or None, "similar": similar.get(pid) or [], "projection": None}
+    return out
+
+
+def role_peers(cat: dict | None) -> dict[str, dict]:
+    """{role: {"role", "label", "group", "n" (qualified players of the role), "minimum" (the catalogue's rule),
+    "spec_group" (docs/_design/metrics/nfl.json id)}}: the peer block a player file carries beside pct_role, so the
+    player page needs neither players.json nor value.json."""
+    from oddsmarkets.nfl.analytics.players import ROLE_LABEL, ROLE_SHORT
+    qual = (cat or {}).get("qualification") or {}
+    out: dict[str, dict] = {}
+    for r in ((cat or {}).get("players") or {}).values():
+        role = r.get("role")
+        if not role:
+            continue
+        e = out.setdefault(role, {"role": role, "label": ROLE_LABEL.get(role, role), "short": ROLE_SHORT.get(role, role),
+                                  "group": r.get("group"), "n": 0,
+                                  "minimum": qual.get(r.get("group")), "spec_group": SPEC_GROUP.get(role)})
+        e["n"] += int(bool(r.get("qualified")))
     return out
 
 
@@ -317,22 +337,54 @@ def _punt_chart(U: pd.DataFrame) -> list:
     return out
 
 
-def similar_players(cat: dict, n: int = 5) -> dict[str, list]:
-    """Nearest neighbours within the position group on the percentile vector (qualified players)."""
+# players.json role -> docs/_design/metrics/nfl.json group id (the METRICS_SPEC peer groups)
+SPEC_GROUP = {"QB": "qb", "RB": "rb", "WR": "wr", "TE": "te", "EDGE": "edge", "DL": "idl", "LB": "lb", "CB": "cb", "S": "s",
+              "K": "k", "P": "p"}
+
+
+def value_rates(value: dict | None) -> dict[str, dict]:
+    """{pid: {"gvar_pg": x, "pos": role}} from a season's value.json (cols/rows), for the similarity features."""
+    cols = (value or {}).get("cols") or []
+    if "pid" not in cols:
+        return {}
+    i, g, ps = cols.index("pid"), cols.index("gvar_pg") if "gvar_pg" in cols else None, cols.index("pos") if "pos" in cols else None
+    return {str(r[i]): {"gvar_pg": r[g] if g is not None else None, "pos": r[ps] if ps is not None else None}
+            for r in (value or {}).get("rows") or [] if isinstance(r, list) and len(r) == len(cols)}
+
+
+def similar_players(cat: dict, n: int | None = None, value: dict | None = None) -> dict[str, list]:
+    """Nearest neighbours by the METRICS_SPEC recipe (oddsmarkets/common/similar.py): the role's similarity features
+    (docs/_design/metrics/nfl.json; gvar_pg from value.json), z-scored within the role among qualified players of the
+    season, weights = year-to-year r floored at 0.2, weighted Euclidean over the features both have, k = 5; defenders
+    within their role (EDGE, DL, LB, CB, S). Rows [pid, name, team, similarity 0-100] (100 exp(-distance)); qualified
+    players only."""
+    from oddsmarkets.common import similar as SIM
+    vr = value_rates(value)
     out: dict[str, list] = {}
-    for grp, keys in (cat.get("groups") or {}).items():
-        mem = [(p, r) for p, r in cat["players"].items() if r.get("group") == grp and r.get("qualified")]
-        if len(mem) < 3:
+    by_role: dict[str, list] = {}
+    for p, r in (cat.get("players") or {}).items():
+        if r.get("qualified"):
+            role = r.get("role") or ((vr.get(p) or {}).get("pos") if r.get("group") == "DEF" else r.get("group"))
+            by_role.setdefault(role, []).append((p, r))
+    for role, mem in by_role.items():
+        cfg = SIM.group_config("nfl", SPEC_GROUP.get(role, ""))
+        if cfg is None or len(mem) < 3:
             continue
-        keys = [k for k in keys if sum(1 for _, r in mem if k in (r.get("pct") or {})) >= 0.7 * len(mem)]
-        if not keys:
+        feats = cfg["features"]
+
+        def get(item, f):
+            p, r = item
+            v = (r.get("values") or {}).get(f)
+            return (vr.get(p) or {}).get(f) if v is None else v
+        X = SIM.matrix(mem, feats, get)
+        keep = [j for j in range(len(feats)) if np.isfinite(X[:, j]).sum() >= 0.5 * len(mem)]
+        if not keep:
             continue
-        M = np.array([[((r.get("pct") or {}).get(k, 50)) for k in keys] for _, r in mem], dtype=float)
+        Z = SIM.zscore(X[:, keep])
+        w = np.array([cfg["weights"][feats[j]] for j in keep])
         for i, (p, r) in enumerate(mem):
-            d = np.sqrt(((M - M[i]) ** 2).mean(axis=1))
-            d[i] = np.inf
-            idx = np.argsort(d)[:n]
-            out[p] = [[mem[j][0], mem[j][1].get("name"), mem[j][1].get("team"), an.rnd(100 - d[j], 1)] for j in idx]
+            out[p] = [[mem[j][0], mem[j][1].get("name"), mem[j][1].get("team"), SIM.similarity(d)]
+                      for j, d in SIM.nearest(Z, i, w, n or cfg["k"])]
     return out
 
 
@@ -364,13 +416,14 @@ def write_careers(write: Callable[[str, Any], None], rows_by_season: dict[int, d
         payload = {"ok": True, "id": pid, "name": p.get("name") or last.get("name"), "pos": p.get("pos") or last.get("pos"),
                    "group": last.get("group"), "college": p.get("college"), "draft": p.get("draft"), "dob": p.get("dob"),
                    "height": p.get("height"), "weight": p.get("weight"),
-                   "seasons": [{"season": r["season"], "team": r.get("team"), "group": r.get("group"), "games": r.get("games"),
+                   "seasons": [{"season": r["season"], "team": r.get("team"), "group": r.get("group"), "role": r.get("role"), "games": r.get("games"),
                                 "qualified": r.get("qualified"), "age": r.get("age"), **(r.get("values") or {}),
                                 "plus": r.get("plus") or {}, "epa": _epa_of(r), "value": _value_of(r)} for r in seasons],
                    "current": None, "similar": []}
         blk = blocks.get(pid)
         if blk:
-            payload["current"] = {k: blk.get(k) for k in ("season", "log", "charts", "ngs", "ftn", "projection", "values", "pct", "pct_pos")}
+            payload["current"] = {k: blk.get(k) for k in ("season", "log", "charts", "ngs", "ftn", "projection", "values", "pct", "pct_pos",
+                                                          "role", "pct_role", "peer")}
             payload["similar"] = blk.get("similar") or []
         elif old_reader is not None:
             old = old_reader(pid)

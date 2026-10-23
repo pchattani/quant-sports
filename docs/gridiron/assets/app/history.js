@@ -1,11 +1,14 @@
 /* The Quant Gridiron — All-time (#/history): single-season and career boards since 1999, raw or
  * era-adjusted (100 = that season's average at the position, 10 = one SD), filtered by seasons and
- * searchable, with a chart of the board's top 15 and the league environment by season.
+ * searchable, with a chart of the board's top 15 and the league environment by season (Design System 2.0: stat tiles,
+ * a leaderboard with team marks and inline bars).
  * Reads history.json ({season_leaders, career_leaders, *_cols, league, era_note, season_floor, coverage}). */
 (function (GI) {
 'use strict';
 
+const QK = window.QK;
 const esc = GI.esc, isNum = GI.isNum;
+const MARK = t => ({ name: GI.teamName(t), abbr: GI.teamAbbr(t), colour: GI.teamInfo(t).colour });
 const ST = { board: '', adj: true, from: 1999, to: 2100, q: '', env: 'epa_play' };
 const ENV = { epa_play: ['EPA per play', '3'], pass_epa: ['EPA per dropback', '3'], rush_epa: ['EPA per carry', '3'], ppg: ['Points per team game', '1'], pass_rate: ['Pass rate', 'pct'], success: ['Success rate', 'pct'],
   go_rate: ['4th-down go rate', 'pct'], fg_pct: ['FG %', 'pct'], sack_rate: ['Sack rate', 'pct'], int_rate: ['INT rate', 'pct'], home_win: ['Home win rate', 'pct'], penalties_pg: ['Penalties per game', '1'], adot: ['aDOT', '1'] };
@@ -35,11 +38,11 @@ GI.route('history', function (el) {
     if (ST.to > y1) ST.to = y1;
     const opts = [{ group: 'Single seasons', items: B.filter(b => b.scope === 'season').map(b => [b.id, (b.group ? b.group + ' · ' : '') + b.label]) }, { group: 'Careers', items: B.filter(b => b.scope === 'career').map(b => [b.id, (b.group && b.group !== 'all' ? b.group.toUpperCase() + ' · ' : '') + b.label]) }];
     const years = []; for (let y = y1; y >= y0; y--) years.push([String(y), String(y)]);
-    el.innerHTML = head +
+    el.innerHTML = head + '<div id="hi-kpis"></div>' +
       GI.card('Board', '<span id="hi-sub"></span>', '<div class="gi-toolbar" style="margin-bottom:12px">' + GI.field('Board', GI.select('hi-board', opts, ST.board, 'Board')) +
         GI.seg('hi-adj', [['1', 'Era-adjusted'], ['0', 'Raw']], ST.adj ? '1' : '0', 'Measure') + GI.field('From', GI.select('hi-from', years.slice().reverse(), String(ST.from), 'From')) + GI.field('To', GI.select('hi-to', years, String(ST.to), 'To')) +
         GI.field('Search', '<input id="hi-q" class="qk-input" type="search" placeholder="Player or team">') + '</div>' + GI.chartBox('hi-chart', 420, 'Top of the board') + '<div id="hi-table" style="margin-top:12px"></div><p class="gi-cap" id="hi-note"></p>') +
-      GI.card('The league since ' + y0, 'league-wide rates by season: the environment the era adjustment works against', '<div class="gi-toolbar" style="margin-bottom:8px">' + GI.field('Rate', GI.select('hi-env', Object.keys(ENV).filter(k => (d.league || []).some(r => isNum(r[k]))).map(k => [k, ENV[k][0]]), ST.env, 'Rate')) + '</div>' + GI.chartBox('hi-envc', 300, 'League rate by season'));
+      GI.card('The league since ' + y0, 'League-wide rates by season: the environment the era adjustment works against', '<div class="gi-toolbar" style="margin-bottom:8px">' + GI.field('Rate', GI.select('hi-env', Object.keys(ENV).filter(k => (d.league || []).some(r => isNum(r[k]))).map(k => [k, ENV[k][0]]), ST.env, 'Rate')) + '</div>' + GI.chartBox('hi-envc', 300, 'League rate by season'));
     const $ = id => document.getElementById(id);
     $('hi-q').value = ST.q;
     const draw = () => {
@@ -57,10 +60,15 @@ GI.route('history', function (el) {
       const lab = r => (r.name || GI.playerName(r.pid)) + (b.scope === 'season' ? ' ' + r.season : '');
       if (top.length) GI.ch.bar('hi-chart', { cats: top.map(lab), series: [{ name: useAdj ? 'Era-adjusted' : b.label, data: top.map(r => r[key]) }], horizontal: true, labels: true, colors: top.map(r => GI.teamColour(r.team || GI.player(r.pid).team)), hrefs: top.map(r => GI.playerHref(r.pid)), fmt: v => (useAdj ? GI.int(v) : fmtV(v)), labelWidth: 190, min: useAdj ? 100 : undefined, valName: useAdj ? 'Era-adjusted (100 = average)' : b.label, catName: 'Player' });
       else GI.ch.none('hi-chart', 'Nobody on this board matches.');
-      GI.set('hi-table', rows.length ? GI.tableHTML([{ label: '#', align: 'right', sortable: false }, { label: 'Player' }, { label: b.scope === 'career' ? 'Years' : 'Season' }, { label: b.scope === 'career' ? 'Seasons' : 'Team', align: b.scope === 'career' ? 'right' : null }, { label: b.label + (b.lower ? ' ↓' : ''), align: 'right' }].concat(hasAdj ? [{ label: 'Era-adjusted', align: 'right', title: d.era_note || '' }] : []),
-        rows.slice(0, 200).map((r, i) => ({ _href: r.pid ? GI.playerHref(r.pid) : null, cells: [i + 1, { html: r.pid ? GI.playerLink(r.pid, r.name) : esc(r.name), v: r.name }, b.scope === 'career' ? (r.first || '') + '–' + (r.last || '') : { html: '<b>' + r.season + '</b>', v: r.season },
-          b.scope === 'career' ? { v: r.n } : { html: r.team ? GI.teamChip(r.team, r.season) : '—', v: r.team }, { html: (useAdj ? '' : '<b>') + fmtV(r.value) + (useAdj ? '' : '</b>'), v: r.value }].concat(hasAdj ? [{ html: (useAdj ? '<b>' : '') + GI.int(r.adj) + (useAdj ? '</b>' : ''), v: r.adj }] : []) })), { sticky: true, maxHeight: 600 }) : GI.muted('Nobody on this board matches.'));
-      GI.sortable($('hi-table'));
+      const L2 = rows.slice(0, 200).map(r => ({ pid: r.pid, name: r.name || GI.playerName(r.pid), team: r.team || GI.player(r.pid).team, sub: b.scope === 'career' ? (r.first || '') + '–' + (r.last || '') + ' · ' + (r.n || 0) + ' seasons' : r.season + ' · ' + GI.teamAbbr(r.team), value: r.value, adj: r.adj }));
+      if (L2.length) QK.leaderboard($('hi-table'), { dense: true, rank: true, maxHeight: 600, rows: L2, rowHref: r => (r.pid ? GI.playerHref(r.pid) : ''),
+        columns: [{ key: 'name', label: 'Player', type: 'entity', sub: 'sub', mark: r => MARK(r.team), href: r => (r.pid ? GI.playerHref(r.pid) : null), sort: false },
+          useAdj ? { key: 'value', label: b.label + (b.lower ? ' ↓' : ''), num: true, fmt: v => fmtV(v), sort: false } : { key: 'value', label: b.label + (b.lower ? ' ↓' : ''), type: 'bar', fmt: v => '<b>' + fmtV(v) + '</b>', sort: false }]
+          .concat(hasAdj ? [useAdj ? { key: 'adj', label: 'Era-adjusted', type: 'bar', fmt: v => '<b>' + GI.int(v) + '</b>', tip: '100 = that season\'s average at the position, 10 = one SD', sort: false } : { key: 'adj', label: 'Era-adjusted', num: true, fmt: v => GI.int(v), sort: false }] : []) });
+      else GI.set('hi-table', GI.muted('Nobody on this board matches.'));
+      const top1 = rows[0];
+      GI.set('hi-kpis', top1 ? GI.kpis([GI.kpi(b.scope === 'career' ? 'Top career' : 'Top season', esc(top1.name || GI.playerName(top1.pid)), (b.scope === 'career' ? '' : top1.season + ' · ') + (useAdj ? GI.int(top1.adj) + ' era-adjusted' : fmtV(top1.value) + ' ' + esc(b.label)), { signal: true, text: true, href: top1.pid ? GI.playerHref(top1.pid) : null }),
+        GI.kpi('On the board', GI.int(rows.length), ST.from + '–' + ST.to), GI.kpi('Measure', useAdj ? 'Era-adjusted' : 'Raw', useAdj ? '100 = that season\'s average, 10 = one SD' : 'as recorded', { text: true })]) : '');
       const fl = (d.season_floor || {})[b.group];
       GI.set('hi-sub', rows.length + ' on the ' + (b.scope === 'career' ? 'career' : 'single-season') + ' board · ' + ST.from + '–' + ST.to + (useAdj ? ' · era-adjusted' : ''));
       GI.set('hi-note', (useAdj ? esc(d.era_note || '') + ' ' : '') + (fl && b.scope === 'season' ? 'Sample floor: ' + fl.min + ' ' + esc(fl.metric) + '. ' : '') +

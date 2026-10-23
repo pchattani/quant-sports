@@ -131,7 +131,7 @@ function drawLines(T, E) {
     const col = { all: 1, hard: 2, clay: 3, grass: 4 }[surf];
     const cut = ES.win === 'all' ? '' : (() => { const d = new Date(); d.setFullYear(d.getFullYear() - Number(ES.win)); return d.toISOString().slice(0, 10); })();
     const missing = [];
-    const traces = [];
+    const series = [];
     picks.forEach((pid, i) => {
       let rows;
       const c = careers[pid];
@@ -140,12 +140,11 @@ function drawLines(T, E) {
       else { missing.push(pid); return; }
       rows = rows.filter(r => k.isNum(r[1]) && String(r[0]) >= cut);
       if (!rows.length) { missing.push(pid); return; }
-      traces.push({ type: 'scatter', mode: 'lines', name: k.name(T, pid), x: rows.map(r => r[0]), y: rows.map(r => r[1]), line: { color: k.PALETTE[i % k.PALETTE.length], width: 2, shape: 'hv' },
-        text: rows.map(r => (r[2] ? r[2] : '')), hovertemplate: '%{x}: %{y:.0f}' + (surf === 'all' ? ' (%{text})' : '') + '<extra>' + k.esc(k.surname(k.name(T, pid))) + '</extra>' });
+      series.push({ name: k.surname(k.name(T, pid)), rows: rows.map(r => [r[0], r[1]]), color: QK.cssVar('--c-' + ((i % 8) + 1)), width: 2 });
     });
-    if (!traces.length) { node.innerHTML = k.muted('No Elo history for these players.'); return; }
-    k.plot(node, traces, k.layout(Object.assign(k.legendTop(), { margin: { l: 50, r: 10, t: 36, b: 36 }, xaxis: { type: 'date', title: 'Date' }, yaxis: { title: (surf === 'all' ? 'Overall' : k.SURF_LABEL[surf]) + ' Elo' } })));
-    document.getElementById('el-chart-note').innerHTML = (surf === 'all' ? 'Overall Elo after each match; hover shows the surface the match was on. ' : k.SURF_LABEL[surf] + ' Elo from the career files (it moves only on ' + surf + ' matches, so it is flat between them). ') +
+    if (!series.length) { node.innerHTML = k.muted('No Elo history for these players.'); return; }
+    TA.v2.lines(node, { series: series, yName: (surf === 'all' ? 'Overall' : k.SURF_LABEL[surf]) + ' Elo', step: 'end', yFmt: v => String(Math.round(v)), label: 'Elo histories' });
+    document.getElementById('el-chart-note').innerHTML = (surf === 'all' ? 'Overall Elo after each match. ' : k.SURF_LABEL[surf] + ' Elo from the career files (it moves only on ' + surf + ' matches, so it is flat between them). ') +
       (missing.length ? 'No history on file for ' + missing.map(p => k.esc(k.name(T, p))).join(', ') + '. ' : '') + 'Click a name above the chart to remove it.';
   });
 }

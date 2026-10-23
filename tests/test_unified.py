@@ -103,6 +103,11 @@ def test_one_person_across_club_cup_and_national_team(world) -> None:
     assert len(ids) == len(set(ids))
     row = dict(zip(idx["fields"], next(r for r in idx["rows"] if r[0] == "82474")))
     assert row["nt_tid"] == 4698 and row["nt"] == "Spain"
+    # the names-only search index: the same people, four columns
+    names = _j(d / "people_names.json")
+    assert names["fields"] == ["id", "name", "pos", "club"] and len(names["rows"]) == len(idx["rows"])
+    nrow = dict(zip(names["fields"], next(r for r in names["rows"] if r[0] == "82474")))
+    assert nrow["name"] == row["name"] and nrow["club"] == row["club"]
 
 
 def test_a_player_who_left_is_not_in_the_squad_and_his_new_club_comes_from_his_profile(world) -> None:

@@ -39,7 +39,7 @@ GI.route('players', function (el, params) {
   return GI.loadAll([GI.ypath('players.json', S), GI.ypath('value.json', S)]).then(res => {
     if (!el.isConnected) return;
     const raw = res[0];
-    const head = GI.pageHead('Players · ' + S, 'Player catalogue', 'Every player of the season by comparison group; each cell is coloured by his percentile among the qualified players of his group (100 = best). Search the whole league with <kbd>/</kbd>.') + GI.sectionNav('players', 'players');
+    const head = GI.pageHead('Players · ' + S, 'Player catalogue', 'Every player of the season by comparison group; each cell is coloured by the player\'s percentile among the qualified players of the same group (100 = best). Search the whole league with <kbd>/</kbd>.') + GI.sectionNav('players', 'players');
     const X = prepare(raw);
     if (!X) { el.innerHTML = head + GI.notBuilt('The ' + S + ' player catalogue', raw); return; }
     const P = X.P, cat = X.cat;
@@ -91,7 +91,7 @@ GI.route('players', function (el, params) {
       const mvOn = MV.map && S === GI.currentSeason();
       const rows = ids.slice(0, 400).map(id => { const p = P[id];
         const o = { id: id, name: p.name || GI.playerName(id), team: p.team, sub: GI.posLabel(p.pos || '') + ' · ' + GI.teamAbbr(p.team) + (p.qualified === false ? ' · below the minimum' : ''), age: isNum(p.age) ? Math.round(p.age) : null, games: first(p.games, p.g), n: GI.sampleOf(p, sk) };
-        g.m.forEach(m => { o['v_' + m[0]] = GI.SP.value(p, id, m, cx); o['p_' + m[0]] = GI.SP.pct(p, id, g, m, cx); });
+        g.m.forEach(m => { o['v_' + m[0]] = GI.SP.value(p, id, m, cx); o['p_' + m[0]] = GI.SP.pct(p, id, g, m, cx); if (m[4]) o['s_' + m[0]] = GI.SP.pct(p, id, g, [m[0], m[1], m[2], 0, 0, m[5], m[6]], cx); });
         extras.forEach(m => { o['x_' + m.key] = (p.values || {})[m.key]; });
         if (mvOn) { const mr = MV.map[id]; o.mvRow = mr || null; o.mv = mr && isNum(mr.p_next) ? mr.p_next : null; }
         return o; });
@@ -99,10 +99,10 @@ GI.route('players', function (el, params) {
       if (rows.length) QK.leaderboard(tbl, { dense: true, rank: true, maxHeight: 720, rowHref: r => GI.playerHref(r.id, S), sort: { key: 'p_' + m0[0], dir: 'desc' },
         columns: [{ key: 'name', label: 'Player', type: 'entity', sub: 'sub', mark: r => ({ name: GI.teamName(r.team), abbr: GI.teamAbbr(r.team), colour: GI.teamInfo(r.team).colour }), href: r => GI.playerHref(r.id, S) },
           { key: 'age', label: 'Age', num: true }, { key: 'games', label: 'G', num: true }, { key: 'n', label: ctx.sk[1], num: true }]
-          .concat(g.m.map(m => (m[4] ? { key: 'v_' + m[0], label: GI.shortLabel(m[1]), num: true, fmt: v => GI.SP.fmt(m, v, cx), tip: m[5] + ' (style: no better or worse)' }
+          .concat(g.m.map(m => (m[4] ? { key: 'v_' + m[0], label: GI.shortLabel(m[1]), type: 'pctl', pctl: 's_' + m[0], style: true, fmt: v => GI.SP.fmt(m, v, cx), tip: m[5] + ' (style: no better or worse)' }
             : { key: 'p_' + m[0], label: GI.shortLabel(m[1]) + (m[3] ? ' ↓' : ''), type: 'pctl', pctl: 'p_' + m[0], fmt: (v, r) => GI.SP.fmt(m, r['v_' + m[0]], cx), tip: m[5] + ' · sorted by percentile' })))
           .concat(extras.map(m => ({ key: 'x_' + m.key, label: GI.shortLabel(m.label) + (m.lower ? ' ↓' : ''), num: true, fmt: v => GI.fmtVal(v, m.fmt), tip: GI.copyText(m.desc || m.label) })))
-          .concat(mvOn ? [{ key: 'mv', label: 'Chance of leaving', num: true, fmt: (v, r) => (r.mvRow ? GI.MV.typeBar(r.mvRow, MV.d) : '—'), tip: 'Our chance he is not with this team at ' + (((MV.d || {}).horizons || {}).next || 'next season') + ' (Who moves next)' }] : []),
+          .concat(mvOn ? [{ key: 'mv', label: 'Chance of leaving', num: true, fmt: (v, r) => (r.mvRow ? GI.MV.typeBar(r.mvRow, MV.d) : '—'), tip: 'Our chance the player is not with this team at ' + (((MV.d || {}).horizons || {}).next || 'next season') + ' (Who moves next)' }] : []),
         rows: rows });
       else GI.set('cat-table', GI.muted('No player matches these filters.'));
       GI.set('cat-chips', extras.length ? 'Added: ' + extras.map(m => '<button type="button" class="qk-chip" aria-pressed="true" data-rm="' + esc(m.key) + '">' + esc(m.label) + ' ×</button>').join(' ') : '');

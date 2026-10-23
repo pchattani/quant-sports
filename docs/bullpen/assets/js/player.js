@@ -225,7 +225,7 @@ function careerTable(rows, cols, L, meta) {
   if (!rows.length) return '';
   const present = cols.filter(c => rows.some(r => r[c] !== undefined && r[c] !== null));
   const tot = {};
-  const TT = { g: 'Games with a plate appearance (hitters) or games pitched (pitchers)', bb: 'Unintentional walks (intentional walks are IBB)', r: 'For a pitcher, runs scored while he was on the mound (inherited runners are not reassigned; not earned runs)' };
+  const TT = { g: 'Games with a plate appearance (hitters) or games pitched (pitchers)', bb: 'Unintentional walks (intentional walks are IBB)', r: 'For a pitcher, runs scored while the pitcher was on the mound (inherited runners are not reassigned; not earned runs)' };
   return k.table(present.map(c => ({ label: label(c), align: /season|level|team/.test(c) ? 'left' : 'right', title: TT[c] || '' })),
     rows.slice().sort((a, b) => (a.season - b.season) || String(a.level).localeCompare(String(b.level))).map(r => present.map(c => {
       const v = r[c];
@@ -430,16 +430,16 @@ function drawHitter(body, ctx) {
     k.tile('wOBA', k.rate3(wo.v), k.isNum(wo.v) && k.isNum(xw.v) ? (wo.v >= xw.v ? 'above' : 'below') + ' xwOBA+ by ' + k.num(1000 * Math.abs(wo.v - xw.v), 0) + ' pts' : 'actual'),
     k.tile('Bullpen WAR', k.isNum(war.v) ? k.signed(war.v, 1) : '—', 'batting, running, fielding, position' + pctTxt(war)),
     k.tile('Decision value', k.isNum(dv.v) ? k.signed(dv.v, 1) : '—', 'runs from swing/take choices' + pctTxt(dv)),
-    k.tile('Bat speed (adj.)', k.isNum(bs.v) ? k.num(bs.v, 1) + ' <span class="kpi-dim">mph</span>' : '—', 'for the pitches, counts and locations he saw' + pctTxt(bs)),
+    k.tile('Bat speed (adj.)', k.isNum(bs.v) ? k.num(bs.v, 1) + ' <span class="kpi-dim">mph</span>' : '—', 'for the pitches, counts and locations faced' + pctTxt(bs)),
     k.tile('PA', k.int(pa.v || (p && p.pa)), k.isNum(v.hr) ? k.int(v.hr) + ' HR · ' + fv('avg', v.avg) + '/' + fv('obp', v.obp) + '/' + fv('slg', v.slg) : '')
   ]);
   h += sliderCard(ctx, ctx.hc, p, 'hit');
-  h += '<div class="grid-2"><div class="card"><div class="card-header">Spray chart <span class="card-sub">His last 400 balls in play, coloured by xwOBA+ (filled: hits, open: outs). Field drawn from his home park\'s fences.</span></div>' +
+  h += '<div class="grid-2"><div class="card"><div class="card-header">Spray chart <span class="card-sub">The last 400 balls in play, coloured by xwOBA+ (filled: hits, open: outs). Field drawn from the home park\'s fences.</span></div>' +
     '<div class="lab-controls gq-controls" id="sp-ctl"></div><div id="pp-spray" class="gq-spray"></div><div class="pg-note gq-note" id="sp-note"></div></div>' +
-    '<div class="card"><div class="card-header">Zone profile <span class="card-sub">What he did with pitches in each part of the zone, by pitch family.</span></div><div id="pp-zones" class="gq-pad"></div></div></div>';
-  h += '<div class="grid-2"><div class="card"><div class="card-header">Swing decisions <span class="card-sub">Decision value per 100 pitches in each cell: red where his choices (swing or take) beat the average choice at that pitch, blue where they cost runs.</span></div><div id="pp-dec" class="gq-pad"></div></div>' +
+    '<div class="card"><div class="card-header">Zone profile <span class="card-sub">Results on pitches in each part of the zone, by pitch family.</span></div><div id="pp-zones" class="gq-pad"></div></div></div>';
+  h += '<div class="grid-2"><div class="card"><div class="card-header">Swing decisions <span class="card-sub">Decision value per 100 pitches in each cell: red where the choices (swing or take) beat the average choice at that pitch, blue where they cost runs.</span></div><div id="pp-dec" class="gq-pad"></div></div>' +
     '<div class="card"><div class="card-header">Bat speed and swing path <span class="card-sub">Bat tracking adjusted for count, location and pitch speed; the swing path against the pitch\'s plane.</span></div><div id="pp-bat" class="gq-pad"></div></div></div>';
-  h += '<div class="card"><div class="card-header">Rolling xwOBA+ against wOBA <span class="card-sub">Over his last 100 plate appearances at each date: the gap is luck, defence and park; the expected line is what the contact deserved.</span></div><div id="pp-roll" style="height:300px"></div></div>';
+  h += '<div class="card"><div class="card-header">Rolling xwOBA+ against wOBA <span class="card-sub">Over the last 100 plate appearances at each date: the gap is luck, defence and park; the expected line is what the contact deserved.</span></div><div id="pp-roll" style="height:300px"></div></div>';
   h += '<div class="card"><div class="card-header">Splits <span class="card-sub">By pitcher hand, home and road, and month.</span></div><div id="pp-splits"></div></div>';
   body.innerHTML = h;
   fillSliders(ctx, ctx.hc, p);
@@ -465,7 +465,7 @@ function drawHitter(body, ctx) {
     cols: [['xwoba', 'xwOBA (per PA ending there)', 3, '3', 'div', 0.315], ['swing', 'Swing%', 1, 'pct', 'seq'], ['whiff', 'Whiff%', 2, 'pct', 'seq'], ['n', 'Pitches seen', 0, 'int', 'seq']], share: 0,
     note: 'xwOBA counts plate appearances that ended on a pitch in the cell.', empty: 'Zone grids are not available for this player yet.' });
   zone5(document.getElementById('pp-dec'), cur.decisions, { id: 'hd', cols: [['dv', 'Decision value per 100 pitches', 0, 'signed2', 'div', 0], ['n', 'Pitches', 1, 'int', 'seq']], nIndex: 1,
-    note: 'Decision value: the run value of the choice he made minus the expected value of the average choice at that pitch, location and count (swing model).', empty: 'The swing-decision map is not available for this player yet.' });
+    note: 'Decision value: the run value of the choice made minus the expected value of the average choice at that pitch, location and count (swing model).', empty: 'The swing-decision map is not available for this player yet.' });
   battrack(document.getElementById('pp-bat'), cur.battrack, v, pc, meta);
   rolling('pp-roll', cur.rolling, ['xwOBA+', 'wOBA'], ['#f97316', '#58a6ff'], '3');
   splitsTable(document.getElementById('pp-splits'), cur.splits, 'batter', meta);
@@ -503,7 +503,7 @@ function battrack(host, bt, v, pc, meta) {
     tiles.push(k.tile(x[1], (x[3] === 'pct' && x[0] === 'sq_oe' ? k.signed(100 * val, 1) + ' pp' : k.fmtV(val, x[3])) + (x[2] ? ' <span class="kpi-dim">' + x[2] + '</span>' : ''), k.isNum(p) ? k.ordinal(p) + ' percentile' : ''));
   });
   let h = tiles.length ? '<div class="kpi-grid gq-tiles gq-tiles-3">' + tiles.join('') + '</div>' : '';
-  if (k.isNum(b.n)) h += '<div class="pg-note gq-note">' + k.int(b.n) + ' competitive swings (50+ mph). Adjusted figures add the hitter\'s residuals against a league model of the pitch speed, location and count he faced, shrunk with 50 swings; squared up means 80% or more of the exit velocity the swing and pitch allowed (1.23 × bat speed + 0.23 × pitch speed); the path is matched when attack angle + VAA is within 5°.</div>';
+  if (k.isNum(b.n)) h += '<div class="pg-note gq-note">' + k.int(b.n) + ' competitive swings (50+ mph). Adjusted figures add the hitter\'s residuals against a league model of the pitch speed, location and count faced, shrunk with 50 swings; squared up means 80% or more of the exit velocity the swing and pitch allowed (1.23 × bat speed + 0.23 × pitch speed); the path is matched when attack angle + VAA is within 5°.</div>';
   host.innerHTML = h || k.muted('Bat tracking is not available for this player (it starts in 2023 and needs competitive swings).');
 }
 
@@ -551,12 +551,12 @@ function drawPitcher(body, ctx) {
     k.tile('K−BB%', k.fmtV(kbb.v, 'pct'), (k.isNum(xw.v) ? 'xwOBA+ against ' + k.rate3(xw.v) : '') + (pctTxt(kbb) ? ' · ' + pctTxt(kbb) : ''))
   ]);
   h += sliderCard(ctx, ctx.pc, p, 'pit');
-  h += '<div class="card"><div class="card-header">Arsenal <span class="card-sub">Per pitch type, ' + (k.isNum(cur.season) ? cur.season : ctx.S) + ' (10+ thrown). Movement in inches with gravity removed; HB is towards his arm side. Stuff+, Location+ and Pitching+: 100 = league average; pills on Stuff+ and Whiff% are percentiles among pitches of the same type (100+ thrown).</span></div><div id="pp-ars"></div></div>';
-  h += '<div class="grid-2"><div class="card"><div class="card-header">Movement <span class="card-sub">Induced vertical break against horizontal break towards his arm side (glove side negative). Dots are a sample of his pitches, discs the averages (size = usage), dotted rings the league average for each type; the dashed line is his arm angle.</span></div><div id="pp-mov" class="gq-mov"></div></div>' +
-    '<div class="card"><div class="card-header">Release point and extension <span class="card-sub">Where each pitch type leaves his hand (feet; side measured towards his arm side) and how consistently.</span></div><div id="pp-rel" style="height:300px"></div><div id="pp-rel-t"></div></div></div>';
+  h += '<div class="card"><div class="card-header">Arsenal <span class="card-sub">Per pitch type, ' + (k.isNum(cur.season) ? cur.season : ctx.S) + ' (10+ thrown). Movement in inches with gravity removed; HB is towards the arm side. Stuff+, Location+ and Pitching+: 100 = league average; pills on Stuff+ and Whiff% are percentiles among pitches of the same type (100+ thrown).</span></div><div id="pp-ars"></div></div>';
+  h += '<div class="grid-2"><div class="card"><div class="card-header">Movement <span class="card-sub">Induced vertical break against horizontal break towards the arm side (glove side negative). Dots are a sample of the pitches, discs the averages (size = usage), dotted rings the league average for each type; the dashed line is the arm angle.</span></div><div id="pp-mov" class="gq-mov"></div></div>' +
+    '<div class="card"><div class="card-header">Release point and extension <span class="card-sub">Where each pitch type leaves the hand (feet; side measured towards the arm side) and how consistently.</span></div><div id="pp-rel" style="height:300px"></div><div id="pp-rel-t"></div></div></div>';
   h += '<div class="grid-2"><div class="card"><div class="card-header">Tunneling <span class="card-sub">Back-to-back pairs: distance apart at the batter\'s decision point (167 ms before the plate) against separation at the plate. Index 100 = an average pair; above it, the pair stays together longer than pairs that split as much usually do.</span></div><div id="pp-tun"></div></div>' +
     '<div class="card"><div class="card-header">Usage by count and batter hand <span class="card-sub">Share of each pitch type in each situation.</span></div><div id="pp-use" style="height:300px"></div></div></div>';
-  h += '<div class="card"><div class="card-header">Velocity, spin and fatigue <span class="card-sub">The primary fastball game by game against his season baseline, the within-game decline, and the workload flag.</span></div><div id="pp-fat"></div></div>';
+  h += '<div class="card"><div class="card-header">Velocity, spin and fatigue <span class="card-sub">The primary fastball game by game against the season baseline, the within-game decline, and the workload flag.</span></div><div id="pp-fat"></div></div>';
   h += '<div class="grid-2"><div class="card"><div class="card-header">Locations <span class="card-sub">Where each pitch type goes, and how often it is missed when swung at.</span></div><div id="pp-zones" class="gq-pad"></div></div>' +
     '<div class="card"><div class="card-header">Times through the order <span class="card-sub">Expected wOBA allowed each time through the lineup (shrunk with 100 PA to the league\'s).</span></div><div id="pp-tto"></div></div></div>';
   body.innerHTML = h;
@@ -659,7 +659,7 @@ function fatigue(f, ctx) {
     if (k.isNum(f[x[0]])) tiles.push(k.tile(x[1], k.fmtV(f[x[0]], x[3]) + ' <span class="kpi-dim">' + x[2] + '</span>', ''));
   });
   if (tiles.length) h += '<div class="kpi-grid gq-tiles">' + tiles.join('') + '</div>';
-  if (f.flag === true || f.flag === 1) h += '<div class="gq-flags"><span class="chip warn">Workload flag: the last three games\' fastball is down 1+ mph or 75+ rpm on his season</span></div>';
+  if (f.flag === true || f.flag === 1) h += '<div class="gq-flags"><span class="chip warn">Workload flag: the last three games\' fastball is down 1+ mph or 75+ rpm on the season</span></div>';
   else if (f.flag === false || f.flag === 0) h += '<div class="gq-flags"><span class="chip">No workload flag</span></div>';
   h += '<div class="grid-2"><div id="fat-g" style="height:280px"></div><div id="fat-w" style="height:280px"></div></div>' +
     '<div class="pg-note gq-note">Descriptive, not medical. Within-game slopes are shrunk to the league\'s by empirical Bayes; the flag needs five or more games. Right: rolling Stuff+, Location+ and Pitching+ over 500-pitch windows.</div>';

@@ -86,21 +86,21 @@ function render(el, params, state) {
     if (vrow) k.push({ label: 'Rink value this season', value: U.f(vrow.war, 2), unit: 'WAR', sub: U.f(vrow.gar, 1) + ' goals above replacement', pctl: isNum(vrow.pct_pos) ? vrow.pct_pos : null, signal: true, tip: 'Wins and goals above replacement, our model' });
     if (vv) k.push({ label: 'Four-season value', value: U.f(vv.total, 1), unit: 'WAR', sub: 'likely range ' + U.f(vv.p10, 1) + ' to ' + U.f(vv.p90, 1), tip: 'Discounted WAR over the rest of this season and the next three; the range is the 10th to 90th percentile' });
     if (!goalie && catP) k.push({ label: 'Points per 60', value: U.f((catP.values || {}).p60, 2), pctl: pp.p60, sub: 'all situations', tip: (meta.p60 || {}).desc });
-    if (c && c.onice && isNum(c.onice.xgf_pct)) k.push({ label: '5v5 expected-goals share', value: U.f(c.onice.xgf_pct * 100, 1), unit: '%', pctl: pp.xgf_pct, sub: isNum(c.onice.xgf_pct_rel) ? U.signed(c.onice.xgf_pct_rel * 100, 1) + ' pts relative to his team' : '', tip: 'Of the expected goals at 5v5 with him on the ice, the share that went his team’s way' });
-    if (c && c.rapm && isNum(c.rapm.rapm_net)) k.push({ label: 'On-ice impact (RAPM)', value: U.signed(c.rapm.rapm_net, 2), pctl: pp.rapm_net, sub: '± ' + U.f(c.rapm.rapm_net_se, 2) + ' xG per 60 (one standard error)', tip: 'Regularised adjusted plus-minus: his on-ice expected-goal impact after teammates and opponents' });
+    if (c && c.onice && isNum(c.onice.xgf_pct)) k.push({ label: '5v5 expected-goals share', value: U.f(c.onice.xgf_pct * 100, 1), unit: '%', pctl: pp.xgf_pct, sub: isNum(c.onice.xgf_pct_rel) ? U.signed(c.onice.xgf_pct_rel * 100, 1) + ' pts relative to the team' : '', tip: 'Of the expected goals at 5v5 with this player on the ice, the share that went the team’s way' });
+    if (c && c.rapm && isNum(c.rapm.rapm_net)) k.push({ label: 'On-ice impact (RAPM)', value: U.signed(c.rapm.rapm_net, 2), pctl: pp.rapm_net, sub: '± ' + U.f(c.rapm.rapm_net_se, 2) + ' xG per 60 (one standard error)', tip: 'Regularised adjusted plus-minus: the player’s on-ice expected-goal impact after teammates and opponents' });
     if (goalie && c && c.goalie) { const gg = c.goalie; k.push({ label: 'Goals saved above expected', value: U.signed(gg.gsax, 2), pctl: pp.gsax60, signal: true, sub: U.signed(gg.gsax60, 3) + ' per 60' }, { label: 'High-danger save %', value: RK.fmtVal(gg.sv_pct_high, '3'), pctl: pp.sv_pct_high, sub: 'expected ' + RK.fmtVal(gg.xfsv_pct, '3') + ' overall' }); }
 
     const SETS = U.SETS[group] || U.SETS.F;
-    const peerOf = () => (catP ? (catP.pct_pos ? (U.GROUP_NAME[group] || 'his position') + (isNum(catP.peerN) ? ' (' + catP.peerN + ' qualified)' : '') : 'all NHL skaters') : '');
+    const peerOf = () => (catP ? (catP.pct_pos ? (U.GROUP_NAME[group] || 'the same position') + (isNum(catP.peerN) ? ' (' + catP.peerN + ' qualified)' : '') : 'all NHL skaters') : '');
     const pcardHTML = () => QK.pctCard({ id: 'pp-pcard', title: 'Percentile rankings', peer: peerOf(), sample: catP ? U.sampleLine(catP, cat.reference, goalie) : '', groups: catP ? U.pctGroups(catP, meta, SETS) : [],
-      note: goalie && catP ? U.goalieNote(catP) : '', emptyText: catP ? 'He is short of the sample floors for this season.' : 'No current-season profile yet.' });
+      note: goalie && catP ? U.goalieNote(catP) : '', emptyText: catP ? 'This player is short of the sample floors for this season.' : 'No current-season profile yet.' });
     const pcard = pcardHTML();
 
     let h = (k.length ? '<div class="rk-kpis">' + QK.stats(k) + '</div>' : '') +
       '<div class="qk-grid"><div class="qk-span-5">' + pcard + '</div>' +
       '<div class="qk-span-7"><div class="rk-stack">' +
-      (catP ? U.card2('Where he sits', 'Every qualified ' + (U.GROUP_NAME[group] || 'player').replace('NHL ', '') + ' this season; bars coloured by percentile', '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('pp-dist', 240, 'Distribution of the peer group')) : '') +
-      U.card2('Season by season', goalie ? 'Save % and goals saved above expected' : 'Points and value by season; 100 = average for a qualified player at his position', U.chart('pp-seasons', 280, 'Season by season')) +
+      (catP ? U.card2('Among peers', 'Every qualified ' + (U.GROUP_NAME[group] || 'player').replace('NHL ', '') + ' this season; bars coloured by percentile', '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('pp-dist', 240, 'Distribution of the peer group')) : '') +
+      U.card2('Season by season', goalie ? 'Save % and goals saved above expected' : 'Points and value by season; 100 = average for a qualified player at the position', U.chart('pp-seasons', 280, 'Season by season')) +
       ((c && (c.log || {}).rows || []).length ? U.card2('This season, game by game', goalie ? 'Goals saved above expected per game' : 'Game score per game (bars) and individual xG (line)', U.chart('pp-log', 220, 'Game log')) : '') + '</div></div></div>';
 
     // season table
@@ -108,13 +108,13 @@ function render(el, params, state) {
 
     // splits, shots, value, linemates
     h += '<section class="qk-section"><div class="qk-grid">';
-    if (c && c.shots && Array.isArray(c.shots.points) && c.shots.points.length) h += '<div class="qk-span-6">' + U.card2(goalie ? 'Shots faced' : 'Shot map', (goalie ? 'Unblocked shots faced' : 'His last ' + c.shots.points.length + ' unblocked attempts') + ', attacking right; filled = goal, size = xG', '<div id="pp-shots"></div>') + '</div>';
+    if (c && c.shots && Array.isArray(c.shots.points) && c.shots.points.length) h += '<div class="qk-span-6">' + U.card2(goalie ? 'Shots faced' : 'Shot map', (goalie ? 'Unblocked shots faced' : 'Last ' + c.shots.points.length + ' unblocked attempts') + ', attacking right; filled = goal, size = xG', '<div id="pp-shots"></div>') + '</div>';
     h += '<div class="qk-span-6">' + U.card2('Splits', 'This season', '<div id="pp-splits"></div>', { flush: true }) + '</div>';
     h += '</div></section>';
     const side = [];
     if (c && (c.linemates || []).length) side.push('<div class="qk-span-4">' + U.card2('Linemates', 'Shared 5v5 minutes this season', '<ul class="rk-list">' + c.linemates.slice(0, 6).map(m => '<li>' + U.playerEnt(m[0], m[1]) + '<span class="v">' + U.f(m[2], 0) + ' min</span></li>').join('') + '</ul>', { flush: true }) + '</div>');
     if ((p.similar || []).length) side.push('<div class="qk-span-4">' + U.card2('Most similar', 'Nearest on this season\'s profile', '<ul class="rk-list">' + p.similar.slice(0, 6).map(m => '<li>' + U.playerEnt(m[0], m[1], m[2]) + '<a class="v rk-link" href="' + RK.compareHref(pid, m[0]) + '">Compare</a></li>').join('') + '</ul>', { flush: true, foot: '<span></span><a href="' + RK.compareHref(pid, (p.similar[0] || [])[0]) + (p.similar[1] ? '/' + encodeURIComponent(p.similar[1][0]) : '') + '">Compare the top three →</a>' }) + '</div>');
-    if (vrow && (vrow.why || []).length) side.push('<div class="qk-span-4">' + U.card2('Where his value comes from', 'GAR by component this season', '<ul class="rk-list">' + vrow.why.map(w => '<li><span>' + esc(w[0]) + '</span><span class="v">' + esc(isNum(w[1]) ? (Math.abs(w[1]) < 1 && w[0].indexOf('%') >= 0 ? RK.fmtVal(w[1], '3') : U.signed(w[1], 2)) : '') + '</span></li>').join('') + '</ul>', { flush: true, foot: '<span></span><a href="#/value">Value leaderboard →</a>' }) + '</div>');
+    if (vrow && (vrow.why || []).length) side.push('<div class="qk-span-4">' + U.card2('Where the value comes from', 'GAR by component this season', '<ul class="rk-list">' + vrow.why.map(w => '<li><span>' + esc(w[0]) + '</span><span class="v">' + esc(isNum(w[1]) ? (Math.abs(w[1]) < 1 && w[0].indexOf('%') >= 0 ? RK.fmtVal(w[1], '3') : U.signed(w[1], 2)) : '') + '</span></li>').join('') + '</ul>', { flush: true, foot: '<span></span><a href="#/value">Value leaderboard →</a>' }) + '</div>');
     // movement (MOVES_VIEWS.md §4): our chance he is not in the lineup next season, the type split, the deadline base rate
     const M = res[6], mvr = M ? M.byPid[pid] : null;
     if (mvr && isNum(mvr.p_next)) {

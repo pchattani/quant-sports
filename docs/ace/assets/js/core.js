@@ -1,6 +1,6 @@
 /* The Quant Ace — core: namespace, state, routing, cached loading, helpers, search, and the shell from
  * The Quant design kit (assets/qk: QK.shell top bar, the section nav, search palette, theme; charts
- * through the kit module assets/qk/plotly-ec.js on ECharts).
+ * through the kit's QKC on ECharts).
  *
  * Sections (docs/REDESIGN.md; tennis labels): Overview #/<T> · Draws (tournaments, draws and draw
  * simulations, match centre, odds board) · Rankings (rankings, race, Elo) · Players (players, player
@@ -60,18 +60,6 @@ function alpha(c, a) {
   if (/^[0-9a-f]{6}$/i.test(h)) return 'rgba(' + parseInt(h.slice(0, 2), 16) + ',' + parseInt(h.slice(2, 4), 16) + ',' + parseInt(h.slice(4, 6), 16) + ',' + a + ')';
   return 'color-mix(in srgb, ' + (c || 'var(--ink-3)') + ' ' + Math.round(a * 100) + '%, transparent)';
 }
-const DARK_LAYOUT = {
-  paper_bgcolor: 'rgba(0,0,0,0)',
-  plot_bgcolor: 'rgba(0,0,0,0)',
-  font: { color: '#8b949e', family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', size: 11 },
-  xaxis: { gridcolor: '#21262d', zerolinecolor: '#30363d', linecolor: '#30363d' },
-  yaxis: { gridcolor: '#21262d', zerolinecolor: '#30363d', linecolor: '#30363d' },
-  margin: { l: 60, r: 20, t: 30, b: 50 },
-  hovermode: 'closest',
-  hoverlabel: { bgcolor: '#161b22', bordercolor: '#30363d', font: { color: '#e6edf3', size: 12 } },
-  showlegend: false
-};
-const PLOTLY_CONF = { displayModeBar: false, responsive: true };
 const FOOTBALL_URL = 'https://pchattani.github.io/the-quant-footballer/';
 const PADDOCK_URL = 'https://pchattani.github.io/the-quant-paddock/';
 const HARDWOOD_URL = 'https://pchattani.github.io/the-quant-hardwood/';
@@ -1058,36 +1046,6 @@ function pageHead(title, sub, right, kicker) {
     (right ? '<div class="ph-nav">' + right + '</div>' : '') + '</div>';
 }
 
-// ── charts ─────────────────────────────────────────────────────────────────
-
-function deepCopy(o) { return JSON.parse(JSON.stringify(o)); }
-function layout(extra) {
-  const base = deepCopy(DARK_LAYOUT);
-  const out = Object.assign(base, extra || {});
-  Object.keys(extra || {}).forEach(k => {
-    if (/^[xy]axis\d*$/.test(k) && extra[k] && typeof extra[k] === 'object') out[k] = Object.assign({}, DARK_LAYOUT.xaxis, extra[k]);
-  });
-  if (extra && extra.font) out.font = Object.assign({}, DARK_LAYOUT.font, extra.font);
-  return out;
-}
-function plot(el, traces, lay, conf) {
-  const node = typeof el === 'string' ? document.getElementById(el) : el;
-  if (!node) return null;
-  if (typeof Plotly === 'undefined') {
-    node.innerHTML = '<div class="muted">The chart library did not load. The tables carry the same data.</div>';
-    return null;
-  }
-  try {
-    const p = Plotly.newPlot(node, traces, lay && lay.paper_bgcolor !== undefined ? lay : layout(lay), Object.assign({}, PLOTLY_CONF, conf || {}));
-    onLeave(() => { try { Plotly.purge(node); } catch (e) { /* gone */ } });
-    return p;
-  } catch (err) {
-    console.warn('chart failed', err);
-    node.innerHTML = '<div class="muted">The chart could not be drawn.</div>';
-    return null;
-  }
-}
-
 // ── header: tour switch, year picker, nav, meta, search ────────────────────
 
 function setTourState(T) {
@@ -1247,7 +1205,7 @@ return {
   toggles: toggles, wireToggles: wireToggles, pageHead: pageHead, pctInk: pctInk, alpha: alpha, playerObj: playerObj,
   SECTION_OF: SECTION_OF, SECTION_TABS: SECTION_TABS, shell: () => SHELL, liveAny: liveAny,
   // charts
-  plot: plot, layout: layout, PALETTE: PALETTE, C: C, DARK_LAYOUT: DARK_LAYOUT, PLOTLY_CONF: PLOTLY_CONF,
+  PALETTE: PALETTE, C: C,
   FOOTBALL_URL: FOOTBALL_URL, PADDOCK_URL: PADDOCK_URL, HARDWOOD_URL: HARDWOOD_URL, BULLPEN_URL: BULLPEN_URL, GRIDIRON_URL: GRIDIRON_URL, RINK_URL: RINK_URL,
   charts: {}
 };

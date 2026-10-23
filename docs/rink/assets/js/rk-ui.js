@@ -147,23 +147,23 @@ U.dayKey = iso => RK.localDay(iso);
 U.SPEC = {
   gar_60: { label: 'Rink value per 60', unit: 'GAR/60', tip: 'Goals above a replacement-level player per 60 minutes, from our value model (even-strength impact, power play, penalty kill, finishing, penalties).' },
   p60: { label: 'Points per 60', unit: 'per 60', tip: 'Goals plus assists per 60 minutes, all situations.' },
-  ixg60_all: { label: 'Individual xG per 60', unit: 'per 60', tip: 'Expected goals from his own shots per 60 minutes, all situations: how much scoring chance he creates for himself.' },
-  icf60: { label: 'Shot attempts per 60 (5v5)', unit: 'per 60', tip: 'His own shot attempts (on goal, missed or blocked) per 60 minutes at 5-on-5: the steadiest individual stat in hockey.' },
-  adj_xgf_pct: { label: 'On-ice xG share (5v5)', unit: '%', tip: 'Share of 5-on-5 expected goals his team gets with him on the ice, adjusted for score and venue.' },
-  xgf60_rel: { label: 'xG for per 60, relative to team (5v5)', unit: 'per 60', tip: 'How many more expected goals per 60 his team creates at 5-on-5 with him on the ice than without him.' },
-  rapm_net: { label: 'Isolated impact (RAPM)', unit: 'xG per 60', tip: 'His 5-on-5 expected-goal differential per 60 after accounting for team-mates, opponents, zone starts and score.' },
-  rapm_def: { label: 'Isolated defence (RAPM)', unit: 'xGA per 60 prevented', tip: 'Expected goals against per 60 he prevents at 5-on-5 after accounting for team-mates, opponents, zone starts and score.' },
-  rapm_off: { label: 'Isolated offence (RAPM)', unit: 'xGF per 60', tip: 'Expected goals for per 60 he adds at 5-on-5 after accounting for team-mates, opponents, zone starts and score.' },
-  adj_xga60: { label: 'On-ice xG against per 60 (5v5)', unit: 'per 60', lower: true, tip: 'Expected goals his team allows per 60 at 5-on-5 with him on the ice, adjusted for score and venue (lower is better).' },
+  ixg60_all: { label: 'Individual xG per 60', unit: 'per 60', tip: 'Expected goals from the player’s own shots per 60 minutes, all situations: how much scoring chance the player creates.' },
+  icf60: { label: 'Shot attempts per 60 (5v5)', unit: 'per 60', tip: 'The player’s own shot attempts (on goal, missed or blocked) per 60 minutes at 5-on-5: the steadiest individual stat in hockey.' },
+  adj_xgf_pct: { label: 'On-ice xG share (5v5)', unit: '%', tip: 'Share of 5-on-5 expected goals the team gets with the player on the ice, adjusted for score and venue.' },
+  xgf60_rel: { label: 'xG for per 60, relative to team (5v5)', unit: 'per 60', tip: 'How many more expected goals per 60 the team creates at 5-on-5 with the player on the ice than without.' },
+  rapm_net: { label: 'Isolated impact (RAPM)', unit: 'xG per 60', tip: 'The player’s 5-on-5 expected-goal differential per 60 after accounting for team-mates, opponents, zone starts and score.' },
+  rapm_def: { label: 'Isolated defence (RAPM)', unit: 'xGA per 60 prevented', tip: 'Expected goals against per 60 the player prevents at 5-on-5 after accounting for team-mates, opponents, zone starts and score.' },
+  rapm_off: { label: 'Isolated offence (RAPM)', unit: 'xGF per 60', tip: 'Expected goals for per 60 the player adds at 5-on-5 after accounting for team-mates, opponents, zone starts and score.' },
+  adj_xga60: { label: 'On-ice xG against per 60 (5v5)', unit: 'per 60', lower: true, tip: 'Expected goals the team allows per 60 at 5-on-5 with the player on the ice, adjusted for score and venue (lower is better).' },
   pen_diff60: { label: 'Penalty differential per 60', unit: 'per 60', tip: 'Penalties drawn minus penalties taken per 60 minutes; each one is a power play for or against.' },
-  toi_gp: { label: 'Ice time per game', unit: 'min', tip: 'Minutes per game in all situations: how much the coach trusts him.' },
-  gsax100: { label: 'Goals saved above expected per 100 shots', unit: 'per 100 unblocked attempts', tip: 'Goals he stopped beyond what an average goalie would on the same shots (by our expected-goals model), per 100 unblocked shots faced.' },
+  toi_gp: { label: 'Ice time per game', unit: 'min', tip: 'Minutes per game in all situations: how much the coach trusts the player.' },
+  gsax100: { label: 'Goals saved above expected per 100 shots', unit: 'per 100 unblocked attempts', tip: 'Goals stopped beyond what an average goalie would on the same shots (by our expected-goals model), per 100 unblocked shots faced.' },
   gsax: { label: 'Goals saved above expected', unit: 'goals', tip: 'Season total of goals saved beyond an average goalie facing the same shots.' },
   sv_pct: { label: 'Save percentage', unit: '%', tip: 'Saves per shot on goal, all situations.' },
   sv_pct_high: { label: 'High-danger save %', unit: '%', tip: 'Save rate on high-danger chances (expected-goal value 0.20 or more). Pure noise season to season: never rank a goalie on it alone.' },
   sv_pct_med: { label: 'Medium-danger save %', unit: '%', tip: 'Save rate on medium-danger chances (expected-goal value 0.08 to 0.20).' },
   sv_pct_low: { label: 'Low-danger save %', unit: '%', tip: 'Save rate on low-danger chances (expected-goal value under 0.08).' },
-  qs_pct: { label: 'Quality start %', unit: '%', tip: 'Share of his starts with a save percentage above league average (or .885 on 20 shots or fewer).' }
+  qs_pct: { label: 'Quality start %', unit: '%', tip: 'Share of starts with a save percentage above league average (or .885 on 20 shots or fewer).' }
 };
 /* [group label, [[id, settles at, sample unit], ...]] */
 U.SETS = {
@@ -292,7 +292,7 @@ U.sampleLine = (p, ref, goalie) => {
 /* The goalie card's honesty line (spec: show that one season is a small sample). */
 U.goalieNote = p => {
   const fa = U.faOf(p);
-  return 'One season is a small sample for a goalie: goals saved above expected per 100 shots settles at about 7,000 unblocked shots, roughly four seasons' + (isNum(fa) ? '; he has faced about ' + QK.fmt.num(fa) + '.' : '.');
+  return 'One season is a small sample for a goalie: goals saved above expected per 100 shots settles at about 7,000 unblocked shots, roughly four seasons' + (isNum(fa) ? '; this goalie has faced about ' + QK.fmt.num(fa) + '.' : '.');
 };
 
 /* ── who moves next (movement.json; docs/_design/MOVES_VIEWS.md, US sports) ───────────────────────────────── */
@@ -309,10 +309,10 @@ const MV_COL = ['var(--c-1)', 'var(--c-4)', 'var(--c-other)', 'var(--c-6)'];
 U.moveBar = (r, M) => {
   if (!r || !isNum(r.p_next)) return '<span class="qk-muted" data-tip="Not enough recent games for an estimate">—</span>';
   const segs = M.types.map((t, i) => { const v = r['p_' + t]; return isNum(v) && v > 0 ? '<span style="width:' + (100 * v).toFixed(1) + '%;background:' + MV_COL[i % MV_COL.length] + '"></span>' : ''; }).join('');
-  return '<span class="rk-mv" role="img" aria-label="' + esc('Chance he is not in the lineup next season: ' + U.pct(r.p_next)) + '"><span class="rk-mv-t">' + segs + '</span><b>' + (r.p_next < 0.01 ? '<1%' : U.pct(r.p_next)) + '</b></span>';
+  return '<span class="rk-mv" role="img" aria-label="' + esc('Chance of not being in the lineup next season: ' + U.pct(r.p_next)) + '"><span class="rk-mv-t">' + segs + '</span><b>' + (r.p_next < 0.01 ? '<1%' : U.pct(r.p_next)) + '</b></span>';
 };
 U.moveKeys = M => QK.keys(M.types.map((t, i) => ({ name: M.labels[t] || t, color: MV_COL[i % MV_COL.length], kind: 'dot' }))) + (M.pub.type ? '' : ' ' + QK.tag('base shares') + '<span class="qk-muted rk-mv-note"> the split is the league’s shares, not the player’s</span>');
-U.MOVE_HEAD = 'Chance he’s not in the lineup next season';
+U.MOVE_HEAD = 'Chance of not being in the lineup next season';
 U.moveTip = M => 'By ' + M.horizon + '. It includes a season in the minors. ' + (((M.d.notes || [])[0]) || '');
 U.deadlineLine = M => {
   const d = M.d, br = (d.base_rates || {}).deadline;

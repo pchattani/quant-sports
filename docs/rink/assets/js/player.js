@@ -38,7 +38,7 @@ const LABEL = {
   shots_faced: 'Shots faced', xga_faced: 'xG faced', qs: 'Quality starts', qs_pct: 'QS%', rbs: 'Really bad starts', starts: 'Starts', b2b: 'Back-to-backs', rest: 'Days rest',
   max_speed: 'Max skating speed', top_speed: 'Max skating speed', bursts_18: 'Bursts 18+ mph', bursts_20: 'Bursts 20+ mph', bursts_22: 'Bursts 22+ mph', distance: 'Distance skated', distance_60: 'Distance per 60',
   max_shot_speed: 'Max shot speed', top_shot_speed: 'Max shot speed', avg_shot_speed: 'Average shot speed', shots_70: 'Shots 70+ mph', shots_80: 'Shots 80+ mph', shots_90: 'Shots 90+ mph',
-  toi5: '5v5 TOI', gs_score: 'Game score', plus_minus: '+/−', ppp: 'PPP', fa: 'Unblocked faced', proj_pts: 'Projected points', proj_g: 'Projected goals', proj_xgf_pct: 'Projected xGF%', pts_pace: 'Points pace',
+  toi5: '5v5 TOI', gs_score: 'Game score', plus_minus: '+/−', ppp: 'PPP', fa: 'Unblocked faced', proj_pts: 'Projected points (full season)', proj_g: 'Projected goals (full season)', proj_xgf_pct: 'Projected xGF%', pts_pace: 'Points pace',
   edge_max_speed: 'Top speed', edge_bursts_20: '20+ mph bursts', edge_bursts_22: '22+ mph bursts', edge_shot_speed: 'Hardest shot', edge_avg_shot_speed: 'Average shot speed', edge_distance: 'Distance skated', edge_distance60: 'Distance / 60', edge_oz_time: 'OZ time %',
   p10: '10th pct', p50: 'Median', p90: '90th pct', mean: 'Mean', proj: 'Projection'
 };
@@ -130,7 +130,7 @@ function render(el, params, state) {
     if (goalie) h += goalieCards();
     else h += skaterCards(ctx);
     h += '<div class="card"><div class="card-header">Game log <span class="card-sub">' + k.esc(k.sLabel(cur.season || S)) + ', every game played.</span></div><div id="pp-log"></div></div>';
-    h += '<div class="card"><div class="card-header">Career <span class="card-sub">Every NHL season from his debut (the league\'s season totals); shot, on-ice and model columns start in 2009–10, when the play-by-play does' + (goalie ? '' : ' (shifts from 2010–11)') + '.</span></div><div id="pp-car-c" style="height:240px"></div><div id="pp-car"></div></div>';
+    h += '<div class="card"><div class="card-header">Career <span class="card-sub">Every NHL season since the debut (the league\'s season totals); shot, on-ice and model columns start in 2009–10, when the play-by-play does' + (goalie ? '' : ' (shifts from 2010–11)') + '.</span></div><div id="pp-car-c" style="height:240px"></div><div id="pp-car"></div></div>';
     h += '<div class="grid-2"><div class="card"><div class="card-header">Projection <span class="card-sub">Rest of season and next season: each rate regressed towards the mean by its stabilisation point, with ageing; ranges are 10th–90th percentiles.</span></div><div id="pp-proj"></div></div>' +
       '<div class="card"><div class="card-header">Similar players <span class="card-sub">This season\'s nearest qualified ' + (goalie ? 'goalies' : 'skaters at the position') + ' on the percentile profile; 100 would be identical.</span></div><div id="pp-sim"></div></div></div>';
     el.innerHTML = h;
@@ -198,13 +198,13 @@ function tiles(ctx) {
 // ── skater panels ──────────────────────────────────────────────────────────
 
 function skaterCards(ctx) {
-  return '<div class="card"><div class="card-header">Shots <span class="card-sub" id="pp-shot-sub">Where his unblocked shots come from.</span><span class="gq-ctl"><select id="pp-shot-str"></select>' + K().toggle('pp-shot-m', [['diff', 'v league'], ['raw', 'Raw rate']], ST.shots) + '</span></div>' +
+  return '<div class="card"><div class="card-header">Shots <span class="card-sub" id="pp-shot-sub">Where the unblocked shots come from.</span><span class="gq-ctl"><select id="pp-shot-str"></select>' + K().toggle('pp-shot-m', [['diff', 'v league'], ['raw', 'Raw rate']], ST.shots) + '</span></div>' +
     '<div class="grid-2 gf-shots"><div id="pp-shot-a" class="gf-rink"></div><div id="pp-shot-b" class="gf-rink"></div></div><div class="pg-note gq-note" id="pp-shot-n"></div></div>' +
-    '<div class="grid-2"><div class="card"><div class="card-header">On-ice impact (RAPM) <span class="card-sub">Regularised adjusted plus-minus: his effect on expected goals for and against per 60 at 5 on 5, isolated from teammates, opponents, zone starts and score. Every qualified skater in grey; the cross is ±1 standard error.</span></div><div id="pp-rapm" class="gf-chart"></div><div class="pg-note gq-note" id="pp-rapm-n"></div></div>' +
-    '<div class="card"><div class="card-header">Deployment <span class="card-sub">Where and against whom he starts: zone starts, quality of competition and of teammates, ice time by strength.</span></div><div id="pp-dep"></div></div></div>' +
-    '<div class="card"><div class="card-header">On ice by strength <span class="card-sub">Team rates per 60 with him on the ice, score and venue adjusted where the label says so; xGF% = xGF / (xGF + xGA).</span></div><div id="pp-onice"></div></div>' +
-    '<div class="grid-2"><div class="card"><div class="card-header">NHL EDGE <span class="card-sub">Skating and shot speed from the league\'s puck and player tracking, as the NHL publishes it: season aggregates only (2021–22 on), with the league\'s own percentiles where given.</span></div><div id="pp-edge"></div></div>' +
-    '<div class="card"><div class="card-header">Linemates <span class="card-sub">Who he plays with most at 5 on 5, with the pair\'s on-ice results together.</span></div><div id="pp-mates"></div></div></div>';
+    '<div class="grid-2"><div class="card"><div class="card-header">On-ice impact (RAPM) <span class="card-sub">Regularised adjusted plus-minus: the player\'s effect on expected goals for and against per 60 at 5 on 5, isolated from teammates, opponents, zone starts and score. Every qualified skater in grey; the cross is ±1 standard error.</span></div><div id="pp-rapm" class="gf-chart"></div><div class="pg-note gq-note" id="pp-rapm-n"></div></div>' +
+    '<div class="card"><div class="card-header">Deployment <span class="card-sub">Where and against whom the player starts: zone starts, quality of competition and of teammates, ice time by strength.</span></div><div id="pp-dep"></div></div></div>' +
+    '<div class="card"><div class="card-header">On ice by strength <span class="card-sub">Team rates per 60 with the player on the ice, score and venue adjusted where the label says so; xGF% = xGF / (xGF + xGA).</span></div><div id="pp-onice"></div></div>' +
+    '<div class="grid-2"><div class="card"><div class="card-header">Skating and shot tracking <span class="card-sub">Skating and shot speed from the league\'s puck and player tracking, as the NHL publishes it: season aggregates only (2021–22 on), with the league\'s own percentiles where given.</span></div><div id="pp-edge"></div></div>' +
+    '<div class="card"><div class="card-header">Linemates <span class="card-sub">Most frequent linemates at 5 on 5, with the pair\'s on-ice results together.</span></div><div id="pp-mates"></div></div></div>';
 }
 
 /* A grid in the catalogues' compact form ({grid: {x0, dx, nx, y0, dy, ny}, <layer>: [flat, row-major by y]}) -> {x, y, v}. */
@@ -254,13 +254,13 @@ function shotsPanel(ctx) {
   const drawHeat = () => {
     if (G) {
       if (ST.shots === 'raw' || !G.diff) k.shotHeatmap(a, G.raw, 'raw', { title: 'Unblocked attempts' + (G.per60 ? ' per 60' : '') + ' by area', label: G.per60 ? 'per 60' : 'attempts', fmt: '2' });
-      else k.shotHeatmap(a, G.diff, 'diff', { rel: true, title: 'Share of his attempts from each area v the league (pp)', label: 'pp', fmt: '1' });
+      else k.shotHeatmap(a, G.diff, 'diff', { rel: true, title: 'Share of attempts from each area v the league (pp)', label: 'pp', fmt: '1' });
     } else k.shotHeatmap(a, generic, ST.shots === 'raw' ? 'raw' : 'diff', { title: 'Unblocked shot rate', label: '', empty: 'No shot-rate grid for this skater yet.' });
   };
   drawHeat();
   k.shotMap(b, pts, { team: ctx.team, colour: k.teamColour(ctx.team), empty: 'No shots on file for this skater this season.' });
-  const lim = pts.length >= 400 ? ' The map shows his latest 400 attempts.' : '';
-  if (note) note.innerHTML = 'Attacking right; the goal line is 11 ft from the end boards. ' + (G ? 'The heatmap is ' + k.int(G.n) + ' unblocked attempts (all situations, regular season) on a 5 ft grid, lightly smoothed; against the league it is the share of his attempts from each area minus the league\'s share at 5 on 5 (red: he shoots from there more often), so it shows where he shoots from, not how much. ' : '') +
+  const lim = pts.length >= 400 ? ' The map shows the latest 400 attempts.' : '';
+  if (note) note.innerHTML = 'Attacking right; the goal line is 11 ft from the end boards. ' + (G ? 'The heatmap is ' + k.int(G.n) + ' unblocked attempts (all situations, regular season) on a 5 ft grid, lightly smoothed; against the league it is the share of the player\'s attempts from each area minus the league\'s share at 5 on 5 (red: more attempts from there than the league), so it shows where the player shoots from, not how much. ' : '') +
     'On the map, dots are sized by xG and filled dots are goals; the filters above it pick the strength and period.' + lim + ' Before 2023–24, NHL shot coordinates carry arena scorer bias and are arena-adjusted (see the <a href="#/methodology/limitations">limitations</a>).';
   k.wireToggle(document, 'pp-shot-m', v => { ST.shots = v; drawHeat(); });
 }
@@ -299,7 +299,7 @@ function impact(ctx) {
   const so = sig(myO, mine.xse), sd = sig(myD, mine.yse);
   if (note) note.innerHTML = 'Offence ' + k.signed(myO, 3) + (k.isNum(mine.xse) ? ' ± ' + k.num(mine.xse, 3) : '') + ', defence ' + k.signed(myD, 3) + (k.isNum(mine.yse) ? ' ± ' + k.num(mine.yse, 3) : '') + ' expected goals per 60 against an average skater' +
     (k.isNum(po) && same.length > 10 ? ' (' + k.ordinal(po) + ' and ' + k.ordinal(pd) + ' percentile among ' + (ctx.group === 'D' ? 'defencemen' : 'forwards') + ')' : '') + '. ' +
-    (k.isNum(so) && k.isNum(sd) ? (so < 1 && sd < 1 ? 'Both are within one standard error of zero: on this sample he is <strong>indistinguishable from average</strong> at either end. ' : (so >= 2 || sd >= 2 ? 'At least one is two or more standard errors from zero. ' : 'Neither is two standard errors from zero, so read them as leanings, not verdicts. ')) : '') +
+    (k.isNum(so) && k.isNum(sd) ? (so < 1 && sd < 1 ? 'Both are within one standard error of zero: on this sample the player is <strong>indistinguishable from average</strong> at either end. ' : (so >= 2 || sd >= 2 ? 'At least one is two or more standard errors from zero. ' : 'Neither is two standard errors from zero, so read them as leanings, not verdicts. ')) : '') +
     'Defence is shown so that up is better (fewer expected goals against). ' + (me && me.seasons ? 'Window: ' + k.esc(Array.isArray(me.seasons) ? me.seasons.map(k.sLabel).join(', ') : me.seasons) + '. ' : '') + '<a href="#/methodology/rapm">How RAPM is fitted →</a>';
 }
 function drawImpact(node, pts, me, ctx) {
@@ -338,7 +338,7 @@ function onIce(ctx) {
     const keys = Object.keys(r).filter(x => x !== 's' && x !== 'pct' && k.isNum(r[x])).sort((a, b) => (PREF.indexOf(a) < 0 ? 99 : PREF.indexOf(a)) - (PREF.indexOf(b) < 0 ? 99 : PREF.indexOf(b)));
     host.innerHTML = '<div class="gq-cmp-facts gq-pad gf-facts">' + keys.map(x => { const v = r[x]; const good = /xgf_pct$|cf_pct$|gf_pct$/.test(x) && k.isNum(v) ? (v > 0.5 ? ' gq-ok' : v < 0.5 ? ' gq-no' : '') : '';
       return '<div class="gq-fact" title="' + k.esc(k.cleanDesc((ctx.meta[x] || {}).desc || '')) + '"><span>' + k.esc(label(x, ctx.meta)) + '</span><strong class="' + good + '">' + fv(x, v, ctx.meta) + '</strong>' + (k.isNum(pc[x]) ? ' ' + k.pill(pc[x]) : '') + '</div>'; }).join('') + '</div>' +
-      '<div class="pg-note gq-note">5 on 5 with him on the ice. Adjusted rates are score- and venue-adjusted; "rel" is on ice minus the team without him. Pills are league percentiles among qualified skaters.</div>';
+      '<div class="pg-note gq-note">5 on 5 with the player on the ice. Adjusted rates are score- and venue-adjusted; "rel" is on ice minus the team without the player. Pills are league percentiles among qualified skaters.</div>';
     return;
   }
   const keys = [];
@@ -357,7 +357,7 @@ function edge(ctx) {
   const k = K(), host = k.$('pp-edge');
   if (!host) return;
   const E = ctx.cur.edge;
-  if (!E || typeof E !== 'object' || !Object.keys(E).length || E.ok === false) { host.innerHTML = k.muted('No NHL EDGE data for this skater (EDGE covers 2021–22 on and is published as season aggregates).'); return; }
+  if (!E || typeof E !== 'object' || !Object.keys(E).length || E.ok === false) { host.innerHTML = k.muted('No tracking data for this skater (it covers 2021–22 on and is published as season aggregates).'); return; }
   const cpP = ctx.cp ? ((ST.basis === 'pct_pos' ? ctx.cp.pct_pos : ctx.cp.pct) || ctx.cp.pct || {}) : {};
   const P = E.pct || E.percentiles || E.percentile || {};
   const AVG = E.league || E.league_avg || E.avg || {};
@@ -368,14 +368,14 @@ function edge(ctx) {
     if (k.isNum(v)) items.push({ key: x, v: Number(v), p: k.first(P[x], cpP[x]), avg: k.first(AVG[x]) });
     else if (v && typeof v === 'object' && k.isNum(k.first(v.value, v.v, v.max, v.avg))) items.push({ key: x, v: k.first(v.value, v.v, v.max, v.avg), p: k.first(v.pct, v.percentile, v.p, cpP[x]), avg: k.first(v.league, v.league_avg, v.avg_league) });
   });
-  if (!items.length) { host.innerHTML = k.muted('No NHL EDGE figures for this skater.'); return; }
+  if (!items.length) { host.innerHTML = k.muted('No tracking figures for this skater.'); return; }
   const ORDER = ['edge_max_speed', 'max_speed', 'edge_bursts_22', 'edge_bursts_20', 'edge_distance60', 'edge_distance', 'edge_shot_speed', 'edge_avg_shot_speed', 'edge_oz_time'];
   items.sort((a, b) => (ORDER.indexOf(a.key) < 0 ? 99 : ORDER.indexOf(a.key)) - (ORDER.indexOf(b.key) < 0 ? 99 : ORDER.indexOf(b.key)));
   const val = i => (/speed/.test(i.key) ? k.num(i.v, 1) + ' mph' : /oz_time|pct/.test(i.key) ? k.pct(i.v, 1) : /distance60/.test(i.key) ? k.num(i.v, 2) + ' mi' : /distance/.test(i.key) ? k.num(i.v, 1) + ' mi' : k.int(i.v));
   const anyP = items.some(i => k.isNum(i.p));
   if (anyP) host.innerHTML = '<div class="gq-pad">' + items.map(i => k.slider(label(i.key, ctx.meta), i.p, val(i), (k.isNum(i.avg) ? 'League average ' + k.num(i.avg, 1) + '. ' : '') + k.cleanDesc((ctx.meta[i.key] || {}).desc || ''), '#/glossary/' + encodeURIComponent(i.key))).join('') + '</div>';
   else host.innerHTML = '<div class="gq-cmp-facts gq-pad">' + items.map(i => '<div class="gq-fact"><span>' + k.esc(label(i.key, ctx.meta)) + '</span><strong>' + val(i) + '</strong>' + (k.isNum(i.avg) ? '<span>league ' + k.num(i.avg, 1) + '</span>' : '') + '</div>').join('') + '</div>';
-  host.innerHTML += '<div class="pg-note gq-note">NHL EDGE data as the NHL publishes it, for informational, non-commercial use: season aggregates only, so EDGE never enters our play-level models. ' + (anyP ? 'Percentiles are among this season\'s qualified skaters in our catalogue (EDGE values are not shrunk).' : '') + '</div>';
+  host.innerHTML += '<div class="pg-note gq-note">NHL EDGE data as the NHL publishes it, for informational, non-commercial use: season aggregates only, so tracking never enters our play-level models. ' + (anyP ? 'Percentiles are among this season\'s qualified skaters in our catalogue (tracking values are not shrunk).' : '') + '</div>';
 }
 
 function deployment(ctx) {
@@ -391,7 +391,7 @@ function deployment(ctx) {
     const z = k.isNum(dz) ? [oz, nz || 0, dz] : [oz, 0, 1 - oz];
     h += '<div class="gq-sub-head">5v5 faceoff starts, offensive against defensive zone</div><div class="gq-stack"><span style="width:' + (z[0] * 100).toFixed(1) + '%;background:#3fb950">OZ ' + k.pct(z[0], 0) + '</span>' +
       (z[1] > 0 ? '<span style="width:' + (z[1] * 100).toFixed(1) + '%;background:#8b949e">NZ ' + k.pct(z[1], 0) + '</span>' : '') + '<span style="width:' + (z[2] * 100).toFixed(1) + '%;background:#58a6ff">DZ ' + k.pct(z[2], 0) + '</span></div>' +
-      '<div class="pg-note gq-note">Offensive-zone share of the 5v5 offensive and defensive faceoffs taken with him on the ice' + (k.isNum(fr(v.dzs_share)) ? '; ' + k.pct(fr(v.dzs_share), 0) + ' of all his 5v5 on-ice faceoffs were in his own end' : '') + '. Around 50% is neutral usage.</div>';
+      '<div class="pg-note gq-note">Offensive-zone share of the 5v5 offensive and defensive faceoffs taken with the player on the ice' + (k.isNum(fr(v.dzs_share)) ? '; ' + k.pct(fr(v.dzs_share), 0) + ' of all the player\'s 5v5 on-ice faceoffs were in the defensive zone' : '') + '. Around 50% is neutral usage.</div>';
   }
   const F = [['toi_gp', 'TOI / game', 'mmss'], ['toi5_gp', '5v5 TOI / game', 'mmss'], ['toi_pp_gp', 'PP TOI / game', 'mmss'], ['toi_sh_gp', 'PK TOI / game', 'mmss'], ['toi_share', '5v5 share of team time', 'pct'],
     ['qoc_toi', 'Quality of competition (TOI)', 'mmss'], ['qot_toi', 'Quality of teammates (TOI)', 'mmss'], ['qoc_xgf', 'Quality of competition (xGF%)', 'pct'], ['qot_xgf', 'Quality of teammates (xGF%)', 'pct'],
@@ -399,7 +399,7 @@ function deployment(ctx) {
   const facts = F.filter(f => k.isNum(v[f[0]])).map(f => '<div class="gq-fact" title="' + k.esc(k.cleanDesc((ctx.meta[f[0]] || {}).desc || '')) + '"><span>' + k.esc(f[1]) + '</span><strong>' +
     (f[2] === 'mmss' ? k.mmss(v[f[0]]) : f[2] === 'pct' ? k.pct(fr(v[f[0]]), 1) : f[2] === 'sec' ? k.num(v[f[0]], 0) + ' s' : k.num(v[f[0]], 1)) + '</strong></div>');
   if (facts.length) h += '<div class="gq-cmp-facts gq-pad">' + facts.join('') + '</div>';
-  if (k.isNum(v.qoc_toi) || k.isNum(v.qoc_xgf)) h += '<div class="pg-note gq-note">Quality of competition and of teammates are time-weighted means over the skaters he shared 5v5 ice with: their 5v5 minutes per game, or their on-ice xGF%. Differences between regulars are usually small.</div>';
+  if (k.isNum(v.qoc_toi) || k.isNum(v.qoc_xgf)) h += '<div class="pg-note gq-note">Quality of competition and of teammates are time-weighted means over the skaters on the ice with the player at 5v5: their 5v5 minutes per game, or their on-ice xGF%. Differences between regulars are usually small.</div>';
   const S0 = v.by_strength || v.toi_by_strength;
   if (S0 && typeof S0 === 'object') h += rowsTable(S0, ctx.meta, { first: 'Strength', keyLabel: strengthLabel });
   host.innerHTML = h || k.muted('Deployment is not available for this skater yet.');
@@ -432,7 +432,7 @@ function linemates(ctx) {
 
 function goalieCards() {
   return '<div class="grid-2"><div class="card"><div class="card-header">GSAx by danger <span class="card-sub">Goals saved above expected on low-, medium- and high-danger shots, with the shots and expected goals behind each.</span></div><div id="pp-gdan" class="gf-chart"></div><div id="pp-gdan-t"></div></div>' +
-    '<div class="card"><div class="card-header">By location <span class="card-sub">Where he saved more (red) or fewer (blue) than expected, from the shooter\'s side: attacking right, his net on the right.</span></div><div id="pp-gloc" class="gf-rink"></div><div class="pg-note gq-note" id="pp-gloc-n"></div></div></div>' +
+    '<div class="card"><div class="card-header">By location <span class="card-sub">Where the goalie saved more (red) or fewer (blue) than expected, from the shooter\'s side: attacking right, the net on the right.</span></div><div id="pp-gloc" class="gf-rink"></div><div class="pg-note gq-note" id="pp-gloc-n"></div></div></div>' +
     '<div class="card"><div class="card-header">Save percentage by shot type <span class="card-sub">Actual against expected (from our xG on the same shots).</span></div><div class="grid-2"><div id="pp-gtype" class="gf-chart"></div><div id="pp-gtype-t"></div></div></div>' +
     '<div class="card"><div class="card-header">Workload <span class="card-sub">Starts, shots and expected goals faced, rest, and the season game by game.</span></div><div id="pp-gwork"></div><div id="pp-gwork-c" class="gf-chart"></div></div>';
 }
@@ -470,7 +470,7 @@ function locationGrid(ctx, B) {
   }
   if (!G || !k.gridOf(G)) { k.empty(node, 'GSAx by location is not available for this goalie yet.'); return; }
   k.shotHeatmap(node, G, 'diff', { rel: true, title: 'Goals saved above expected by area', label: 'GSAx', fmt: 'signed', empty: 'GSAx by location is not available for this goalie yet.' });
-  if (note) note.innerHTML = (n ? k.int(n) + ' unblocked attempts faced, ' : 'Unblocked attempts faced, ') + 'binned on a 5 ft grid by where they were taken (attacking right, his net on the right) and lightly smoothed: each area is expected goals minus goals allowed from there. Small areas carry few shots; read the broad pattern, not single cells. Pre-2020–21 coordinates were hand-recorded and are arena-adjusted.';
+  if (note) note.innerHTML = (n ? k.int(n) + ' unblocked attempts faced, ' : 'Unblocked attempts faced, ') + 'binned on a 5 ft grid by where they were taken (attacking right, the goalie\'s net on the right) and lightly smoothed: each area is expected goals minus goals allowed from there. Small areas carry few shots; read the broad pattern, not single cells. Pre-2020–21 coordinates were hand-recorded and are arena-adjusted.';
 }
 
 function goalieTypes(ctx) {
@@ -605,7 +605,7 @@ function projection(ctx) {
   if (RK.valuation && RK.valuation.playerLine) {
     RK.valuation.playerLine(ctx.pid).then(r => {
       if (!r || !host.isConnected) return;
-      host.insertAdjacentHTML('beforeend', '<div class="pg-note gq-note"><strong>Multi-season valuation</strong>: ' + k.num(r.total, 1) + ' WAR over the rest of this season and the next three, discounted (10th–90th percentile ' + k.num(r.p10, 1) + ' to ' + k.num(r.p90, 1) + '); ' + k.num(r.now, 2) + ' this season, ' + k.num(r.next, 2) + ' next; ' + k.num(r.vorp, 1) + ' over replacement at his position. <a href="#/value?tab=val">Valuation →</a></div>');
+      host.insertAdjacentHTML('beforeend', '<div class="pg-note gq-note"><strong>Multi-season valuation</strong>: ' + k.num(r.total, 1) + ' WAR over the rest of this season and the next three, discounted (10th–90th percentile ' + k.num(r.p10, 1) + ' to ' + k.num(r.p90, 1) + '); ' + k.num(r.now, 2) + ' this season, ' + k.num(r.next, 2) + ' next; ' + k.num(r.vorp, 1) + ' over replacement at that position. <a href="#/value?tab=val">Valuation →</a></div>');
     }, () => { /* no valuation payload */ });
   }
   if (!pr || typeof pr !== 'object' || pr.ok === false) { host.innerHTML = k.muted('No projection yet.'); return; }

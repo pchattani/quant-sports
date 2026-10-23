@@ -87,7 +87,7 @@ def model_payload(td: an.TourData) -> dict:
                "params": MRt.params(td.tour), "version": MRt.VERSION,
                "formula": "the site's match prices: logit p = w_elo logit(elo_p) + w_sr logit(sr_p) + w_gelo (m1 - m2) + "
                           "w_mr s_b (M1 - M2), M = the market rating (R + D_surface; a Kalman filter on earlier "
-                          "matches' de-vigged closing prices and results), s_b = params.s5 for best of five, else 1"}
+                          "matches' closing lines (margin removed) and results), s_b = params.s5 for best of five, else 1"}
         from oddsmarkets.tennis.models import sched as SC
         if SC.on(td.tour) and bl.get("w_x"):
             # the schedule and form terms (models/sched.py) are part of the price on this tour

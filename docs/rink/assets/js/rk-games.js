@@ -54,7 +54,7 @@ function review(games) {
   });
   const t = (k, n, label) => QK.kpi({ label: label, value: n ? k + '–' + (n - k) : '—', sub: n ? QK.fmt.pct(k / n) + ' right' : 'no games yet' });
   return '<section class="qk-section"><div class="qk-section-head"><div><h2>How the model did</h2><div class="qk-sub">' + fin.length + ' final' + (fin.length === 1 ? '' : 's') + '. One day says little: the long run is on the <a class="qk-link" href="#/model?tab=calibration">calibration</a> page.</div></div></div>' +
-    '<div class="qk-kpis">' + t(su, suN, 'Favourites, straight up') + t(pl, plN, 'Puck-line side') + t(ou, ouN, 'Totals v the line') +
+    '<div class="qk-kpis">' + t(su, suN, 'Our favourite won') + t(pl, plN, 'Two-goal margins called') + t(ou, ouN, 'Goal totals called') +
     QK.kpi({ label: 'Brier score', value: bN ? (brier / bN).toFixed(3) : '—', sub: '0.250 = a coin flip', tip: 'Mean squared error of the win probability; lower is better' }) + '</div></section>';
 }
 
@@ -222,7 +222,7 @@ function boxTables(node, d, c) {
       { key: 'pos', label: 'Pos', fmt: v => U.pos(v) }, { key: 'g', label: 'G', num: true }, { key: 'a', label: 'A', num: true }, { key: 'p', label: 'P', num: true },
       { key: 'sog', label: 'SOG', num: true }, { key: 'ixg', label: 'ixG', num: true, fmt: v => U.f(v, 2), tip: 'Individual expected goals' },
       { key: 'hits', label: 'Hits', num: true }, { key: 'blocks', label: 'Blk', num: true }, { key: 'toi', label: 'TOI', num: true, fmt: v => RK.fmtTOI(v, { minutes: true }) },
-      { key: 'xgf_pct', label: 'xGF%', num: true, fmt: v => U.pct(v), tip: 'Share of 5v5 expected goals with him on the ice' },
+      { key: 'xgf_pct', label: 'xGF%', num: true, fmt: v => U.pct(v), tip: 'Share of 5v5 expected goals with the player on the ice' },
       { key: 'gs', label: 'Game score', num: true, fmt: v => U.f(v, 2) }], rows: sk });
     const gl = ((b.goalies || {})[t] || []).map(r => obj(gc, r));
     QK.table(node.querySelector('#gm-box-g'), { dense: true, columns: [
@@ -329,7 +329,7 @@ function summary(node, d, c, g, season) {
     (tp ? U.card2('Tale of the tape', 'Season so far: the stronger side of each bar is solid', tp) : '') + '</div></div>' +
     (sd && sd.p ? '<div class="qk-span-5">' + U.card2('Every final score', 'Our chance of each score (rows ' + esc(RK.teamAbbr(c.home)) + ', columns ' + esc(RK.teamAbbr(c.away)) + ')', U.chart('gm-sd', 300, 'Chance of each final score')) + '</div>' : '') + '</div>';
   if (pre) { const gk = goaliesCard(d, c); if (gk) h += '<div style="margin-top:var(--sp-4)">' + gk + '</div>'; }
-  if (pre && Array.isArray(td) && td.length) h += '<div style="margin-top:var(--sp-4)">' + U.card2('Total goals', 'Our chance of each total, both teams combined', U.chart('gm-td', 240, 'Total goals distribution')) + '</div>';
+  if (pre && Array.isArray(td) && td.length) h += '<div style="margin-top:var(--sp-4)">' + U.card2('Total goals', 'Our chance of each total, both teams combined. Totals include the overtime or shootout winner, which is why odd totals come up more often than even ones.', U.chart('gm-td', 240, 'Total goals distribution')) + '</div>';
   if (!pre) h += '<div style="margin-top:var(--sp-4)">' + U.card2('Box score', 'Every skater and goalie; sort any column', '<div id="gm-box"></div>') + '</div>';
   node.innerHTML = h;
 

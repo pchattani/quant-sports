@@ -2314,6 +2314,8 @@ def main() -> int:
     logger.info("site-wide payloads: %d careers, %d past seasons", counts["careers"], counts["seasons"])
 
     unified = _step("people, clubs and seasons", lambda: build_unified(hub_entries, seasons, archive)) or {}
+    from oddsmarkets.football.analytics import value_fields
+    roles_before = value_fields.roles(DATA_DIR)
     if not args.no_value:
         value = _step("player value", lambda: build_value_layer(hub_entries, archive))
         if value:
@@ -2322,6 +2324,8 @@ def main() -> int:
                 fan = _step("fantasy", lambda: build_fantasy_layer(hub_entries, value.get("_fantasy_score") or {}))
                 if fan:
                     logger.info("fantasy: %d leagues in %.1fs", fan["leagues"], fan["runtime_s"])
+    # the value model's role and GAR/90 on players_live, the lab and people files (METRICS_SPEC peer groups)
+    _step("value fields", lambda: value_fields.apply(DATA_DIR, roles_before))
     LAST_UNIFIED = None
 
     # Keep entries for competitions not rebuilt this run, so --only never drops

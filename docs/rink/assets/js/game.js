@@ -124,39 +124,33 @@ function header(g, pre) {
 
 // ── preview ────────────────────────────────────────────────────────────────
 
+/* Our forecast for the game, with the market as a quiet reference column (Design System 2.0: no sportsbook odds, no
+   model-minus-market column; margins and totals in words). */
+function marginText(team, line) {
+  const t = esc(RK.teamAbbr(team));
+  return Number(line) < 0 ? t + ' wins by two or more' : t + ' wins, or loses by one';
+}
 function mvmBig(g, pre) {
   const m = pre.model || {}, mk = pre.market || g.market || {}, ln0 = pre.line || g.line || {};
   const ln = RK.isFinal(g) && ln0.close && typeof ln0.close === 'object' ? Object.assign({}, ln0, ln0.close) : ln0;
   const H = RK.teamAbbr(g.home), A = RK.teamAbbr(g.away);
-  const nv = isNum(ln.ml_home) && isNum(ln.ml_away) ? RK.devigAm([ln.ml_home, ln.ml_away]) : null;
   const pRegA = isNum(m.p_reg_away) ? m.p_reg_away : (isNum(m.p_reg_home) && isNum(m.p_ot) ? 1 - m.p_reg_home - m.p_ot : null);
   const pc = RK.puckCover(g, m, ln);
-  const op = ln0.open || {};
   const sub = t => '<span class="sub-line">' + t + '</span>';
+  const over = isNum(ln.total) ? Math.ceil(Number(ln.total)) : null;
   const rows = [
-    { cells: [{ html: 'Win (' + esc(H) + ')' + sub('overtime and shootout included'), cls: 'mv-k' }, { html: RK.pct(m.p_home), cls: 'mv-model' },
-      { html: RK.pct(mk.p_home) + (RK.srcLabel(mk.sources) ? sub(esc(RK.srcLabel(mk.sources))) : '') },
-      { html: isNum(ln.ml_home) ? esc(H) + ' ' + RK.fmtOdds(ln.ml_home) + ' / ' + esc(A) + ' ' + RK.fmtOdds(ln.ml_away) + (nv !== null ? sub('no-vig ' + RK.pct(nv)) : '') +
-        (isNum(op.ml_home) && op.ml_home !== ln.ml_home ? sub('open ' + RK.fmtOdds(op.ml_home) + ' / ' + RK.fmtOdds(op.ml_away)) : '') : '—' },
-      { html: RK.edgeHTML(m.p_home, isNum(mk.p_home) ? mk.p_home : nv), title: 'Model minus market (or the de-vigged moneyline), percentage points' }] },
-    { cells: [{ html: 'Regulation' + sub(esc(H) + ' · OT · ' + esc(A) + ' after 60 minutes'), cls: 'mv-k' },
+    { cells: [{ html: esc(H) + ' wins' + sub('overtime and shootout included'), cls: 'mv-k' }, { html: RK.pct(m.p_home), cls: 'mv-model' },
+      { html: RK.pct(mk.p_home) + (RK.srcLabel(mk.sources) ? sub(esc(RK.srcLabel(mk.sources))) : '') }] },
+    { cells: [{ html: 'After 60 minutes' + sub(esc(H) + ' · tied · ' + esc(A)), cls: 'mv-k' },
       { html: isNum(m.p_reg_home) ? RK.pct(m.p_reg_home, 0) + ' · ' + RK.pct(m.p_ot, 0) + ' · ' + RK.pct(pRegA, 0) : '—', cls: 'mv-model' },
-      { html: isNum(mk.p_reg_home) ? RK.pct(mk.p_reg_home, 0) + ' · ' + RK.pct(mk.p_ot, 0) + ' · ' + RK.pct(mk.p_reg_away, 0) : '—' }, { html: '—' },
-      { html: isNum(mk.p_reg_home) ? RK.edgeHTML(m.p_reg_home, mk.p_reg_home) : '—' }] },
-    { cells: [{ html: 'Overtime' + sub('tied after 60 minutes' + (isNum(m.p_so) ? '; shootout ' + RK.pct(m.p_so, 0) : '')), cls: 'mv-k' }, { html: RK.pct(m.p_ot), cls: 'mv-model' },
-      { html: RK.pct(mk.p_ot) }, { html: '—' }, { html: RK.edgeHTML(m.p_ot, mk.p_ot) }] },
-    { cells: [{ html: 'Puck line', cls: 'mv-k' },
-      { html: pc && pc.p !== null ? esc(RK.teamAbbr(pc.team)) + ' ' + RK.fmtLine(pc.line) + ' covers ' + RK.pct(pc.p, 0) : (isNum(m.puck_line_home) && Math.abs(m.puck_line_home) >= 1 ? esc(RK.lineText(g.home, g.away, m.puck_line_home)) : '—'), cls: 'mv-model' },
-      { html: isNum(mk.p_cover) ? RK.pct(mk.p_cover, 0) : '—' },
-      { html: esc(RK.lineText(g.home, g.away, RK.homeLine(ln))) + (isNum(RK.homeLine(op)) && RK.homeLine(op) !== RK.homeLine(ln) ? sub('open ' + esc(RK.lineText(g.home, g.away, RK.homeLine(op)))) : '') },
-      { html: pc && pc.p !== null && isNum(mk.p_cover) ? RK.edgeHTML(pc.p, mk.p_cover) : '—' }] },
-    { cells: [{ html: 'Total goals', cls: 'mv-k' },
-      { html: RK.num(m.total, 2) + (isNum(m.p_over) && isNum(ln.total) ? sub('over ' + RK.num(ln.total, 1) + ': ' + RK.pct(m.p_over, 0)) : ''), cls: 'mv-model' },
-      { html: isNum(mk.total) ? RK.num(mk.total, 1) + (isNum(mk.p_over) ? sub('over ' + RK.pct(mk.p_over, 0)) : '') : '—' },
-      { html: RK.num(ln.total, 1) + (isNum(op.total) && op.total !== ln.total ? sub('open ' + RK.num(op.total, 1)) : '') },
-      { html: isNum(m.total) && isNum(ln.total) ? RK.ptsEdge(m.total - ln.total) : '—', title: 'Model total minus the line, goals' }] }
-  ];
-  return RK.tableHTML([{ label: '', sortable: false }, { label: 'Model', sortable: false }, { label: 'Market', sortable: false }, { label: 'Line', sortable: false }, { label: 'Model v market', sortable: false }], rows, { cls: 'mvm-big' });
+      { html: isNum(mk.p_reg_home) ? RK.pct(mk.p_reg_home, 0) + ' · ' + RK.pct(mk.p_ot, 0) + ' · ' + RK.pct(mk.p_reg_away, 0) : '—' }] },
+    { cells: [{ html: 'Overtime' + sub('tied after 60 minutes' + (isNum(m.p_so) ? '; shootout ' + RK.pct(m.p_so, 0) : '')), cls: 'mv-k' }, { html: RK.pct(m.p_ot), cls: 'mv-model' }, { html: RK.pct(mk.p_ot) }] },
+    pc && pc.p !== null ? { cells: [{ html: marginText(pc.team, pc.line), cls: 'mv-k' }, { html: RK.pct(pc.p, 0), cls: 'mv-model' }, { html: isNum(mk.p_cover) ? RK.pct(mk.p_cover, 0) : '—' }] } : null,
+    { cells: [{ html: 'Total goals' + sub('both teams, overtime and shootout winner included'), cls: 'mv-k' },
+      { html: RK.num(m.total, 2) + ' expected' + (isNum(m.p_over) && over !== null ? sub(over + ' or more: ' + RK.pct(m.p_over, 0)) : ''), cls: 'mv-model' },
+      { html: isNum(mk.p_over) && over !== null ? over + ' or more: ' + RK.pct(mk.p_over, 0) : '—' }] }
+  ].filter(Boolean);
+  return RK.tableHTML([{ label: '', sortable: false }, { label: 'Our forecast', sortable: false }, { label: 'Market (reference)', sortable: false }], rows, { cls: 'mvm-big' });
 }
 function projBlock(g, m, ln) {
   const pc = RK.puckCover(g, m, ln || { puck_line: isNum(m.p_home) && m.p_home < 0.5 ? 1.5 : -1.5 });
@@ -166,7 +160,7 @@ function projBlock(g, m, ln) {
   const t = (team, v) => '<div class="pj-t"><span class="pj-s" style="color:' + GC.of(team) + '">' + RK.num(v, 2) + '</span><span class="pj-n">' + esc(RK.teamShort(team)) + '</span></div>';
   return '<div class="proj">' + t(g.away, ag) + '<span class="pj-dash">–</span>' + t(g.home, hg) + '</div>' +
     '<div class="kpi-grid three pad">' + RK.statTile('Overtime', RK.pct(m.p_ot, 0), 'tied after 60') + RK.statTile('Shootout', RK.pct(m.p_so, 0), isNum(m.p_so) ? '' : 'not modelled') +
-    (pc && pc.p !== null ? RK.statTile('Puck line', RK.pct(pc.p, 0), esc(RK.teamAbbr(pc.team)) + ' ' + RK.fmtLine(pc.line) + ' covers') : RK.statTile('Puck line', '—', 'no line yet')) + '</div>';
+    (pc && pc.p !== null ? RK.statTile(Number(pc.line) < 0 ? 'Wins by two or more' : 'Wins, or loses by one', RK.pct(pc.p, 0), esc(RK.teamAbbr(pc.team))) : '') + '</div>';
 }
 function goalieCard(g, pre) {
   const gl = g.goalies || {};
@@ -194,7 +188,7 @@ function goalieCard(g, pre) {
       (isNum(fx.total_usual) && isNum(pre.model.total) ? '; total ' + RK.num(pre.model.total, 2) + ' v ' + RK.num(fx.total_usual, 2) + ' goals' : '') + '.</div>';
   }
   const sub = RK.isPre(g) && (gl.home && typeof gl.home === 'object' || gl.away && typeof gl.away === 'object')
-    ? 'ESPN\'s probable starters, read every hour (every 15 minutes near game time); the model prices these' : 'confirmed or projected; season to date';
+    ? 'ESPN\'s probable starters, read every hour (every 15 minutes near game time); our forecast uses these' : 'confirmed or projected; season to date';
   return RK.card('Starting goalies', sub, '<div class="gk-grid">' + one('away') + one('home') + '</div>' + eff);
 }
 function previewTab(g, pre) {
@@ -202,25 +196,25 @@ function previewTab(g, pre) {
   const hasModel = isNum(m.p_home) || isNum(m.total);
   let h = '';
   if (hasModel) {
-    h += '<div class="grid-32"><div>' + RK.card('Model v market v line', pre.priced_at ? 'priced ' + esc(RK.fmtStamp(pre.priced_at)) + (RK.isPre(g) ? '' : ' · frozen at puck drop') : '', mvmBig(g, pre) +
-      '<div class="chart-note">The puck line is the favourite\'s (negative = favoured by more than a goal). The market is the de-vigged prediction-market price; the line is the sportsbook line as ESPN shows it. For information only.</div>') + '</div>' +
+    h += '<div class="grid-32"><div>' + RK.card('Our forecast', pre.priced_at ? 'made ' + esc(RK.fmtStamp(pre.priced_at)) + (RK.isPre(g) ? '' : ' · frozen at puck drop') : '', mvmBig(g, pre) +
+      '<div class="chart-note">Our chances, with the prediction market (or the sportsbook line without its margin) as a grey reference. Totals include the overtime or shootout winner, which is why odd totals come up more often than even ones. For information only.</div>') + '</div>' +
       '<div>' + RK.card('Projected score', 'expected goals in regulation and overtime', projBlock(g, m, pre.line || g.line) || RK.muted('No projection.')) + goalieCard(g, pre) + '</div></div>';
     const sd = m.score_dist || m.scores, td = m.total_dist;
     if (sd || td) {
       h += '<div class="grid-2">' +
         (sd ? RK.card('Exact scores', (RK.charts.isFinalScores(sd) ? 'final score, overtime and shootout winners included · up to 6 goals a side' : 'regulation · dotted diagonal: tied, to overtime') +
           (RK.isFinal(g) ? ' · outlined: the final' : ''), '<div id="gm-sd"></div>') : '<div></div>') +
-        (td ? RK.card('Total goals', 'dashed: the line · dotted: our mean', '<div id="gm-td"></div>') : '<div></div>') + '</div>';
+        (td ? RK.card('Total goals', 'our chance of each total · dotted: our mean · odd totals are likelier: the overtime or shootout winner counts', '<div id="gm-td"></div>') : '<div></div>') + '</div>';
     }
   } else {
-    h += RK.card('Model v market v line', '', RK.muted('The pre-game price is not available for this game.')) + goalieCard(g);
+    h += RK.card('Our forecast', '', RK.muted('Our pre-game forecast is not available for this game.')) + goalieCard(g);
   }
   return { html: h, after: root => {
     const sd = m.score_dist || m.scores, td = m.total_dist;
     const ln = pre.line || g.line || {};
     const fin = RK.isFinal(g) && isNum(g.hs) && isNum(g.as);
     if (sd && root.querySelector('#gm-sd')) RK.charts.scoreGrid(root.querySelector('#gm-sd'), sd, { home: g.home, away: g.away, actual: fin && (RK.endedIn(g) === '' || RK.charts.isFinalScores(sd)) ? [g.hs, g.as] : null, height: 300 });
-    if (td && root.querySelector('#gm-td')) RK.charts.distBars(root.querySelector('#gm-td'), td, { line: ln.total, exp: m.total, actual: fin ? Number(g.hs) + Number(g.as) : null, unit: 'goals', height: 300, xTitle: 'Total goals' });
+    if (td && root.querySelector('#gm-td')) RK.charts.distBars(root.querySelector('#gm-td'), td, { exp: m.total, actual: fin ? Number(g.hs) + Number(g.as) : null, unit: 'goals', height: 300, xTitle: 'Total goals' });
   } };
 }
 

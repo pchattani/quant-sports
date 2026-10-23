@@ -469,7 +469,7 @@ function go(hash) {
    zone; the copy rules in docs/_design/STYLE_GUIDE.md keep "edge" out of labels). Applied to every catalogue and the glossary. */
 const RELABEL = { edge_pct: ['Shadow%', 'Pitches in the shadow zone: the band just inside and just outside the border of the strike zone.'] };
 /* per catalogue kind (ACCURACY_AUDIT.md: pitcher R is runs while on the mound; BB is unintentional walks; G counts games with a PA) */
-const RELABEL_KIND = { pitcher: { r: ['R (on the mound)', 'Runs scored while he was on the mound: inherited runners are not reassigned to the pitcher who put them on, and these are not earned runs.'], bb: ['uBB', 'Unintentional walks.'] },
+const RELABEL_KIND = { pitcher: { r: ['R (on the mound)', 'Runs scored while the pitcher was on the mound: inherited runners are not reassigned to the pitcher who put them on, and these are not earned runs.'], bb: ['uBB', 'Unintentional walks.'] },
   hitter: { g: ['G (with a PA)', 'Games with a plate appearance (defensive replacements and pinch runners without a PA are not counted).'], bb: ['uBB', 'Unintentional walks.'] } };
 function relabel(d) {
   if (!d || typeof d !== 'object') return;

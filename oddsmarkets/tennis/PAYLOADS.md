@@ -106,7 +106,10 @@ event's end + 364 days; only events still inside the 52 weeks); adds `"source"`,
 (`[1..20, "21+"]`, the 21 entries of each `rank_dist` row), `"simplifications": [str]`, `"basis"`, `"snapshot"`, `"as_of"`;
 `points` rows add `"now"`; `remaining_events` are `{"id","name","level","start","surface","method","draw_size"}` (events taken
 from last season's calendar carry last season's name and start + 364 days); `market` = `{"finals_qual": BINARY,
-"year_end_no1": TITLE, "finals_winner": TITLE, "top10": BINARY}` (each may be null).
+"year_end_no1": TITLE, "finals_winner": TITLE, "top10": BINARY}` (each may be null); `"history": [{"as_of","n_sims",
+"finals_qual": {pid: p}, "year_end_no1": {pid: p}}]` (22 Oct 2026): the year-end chances after each simulation date, oldest
+first, carried forward run to run (a later run on the same date replaces its snapshot; this season only, at most 400 dates,
+players at p >= 0.001; it starts with the first build that wrote it, earlier runs were not stored).
 
 **elo.json**: `history` rows are `[date, all, surface]` (surface = the match's surface string), last 5 years, top 100 current
 players; adds `"params"` (Elo constants), `"as_of"`, `"history_from"`. `current[pid]` adds `"g"` (game-share Elo [all, hard,
@@ -118,6 +121,18 @@ grass] (models/mrating.py; the H2H page prices with it, weights in `model.json` 
 (`{"hard":10,"clay":8,"grass":5}`: matches on a surface to enter that surface's reference pool); rows add `"short"` and
 `"values_surface": {surface: {key: v}}` (the surface-capable keys only; written for surfaces with at least half the surface
 floor, as is `pct_surface`). `rank_metric` = rank among qualified players. 138 metrics (`analytics/players.py` `METRICS`); every METRIC has `desc`.
+Surface blocks add two ratings ranked in the surface pool (22 Oct 2026; not catalogue metrics, not in the lab):
+`values_surface.<s>.elo_surface` / `pct_surface.<s>.elo_surface` (that surface's Elo, = `values.elo_<s>`) and
+`values_surface.<s>.elo` / `pct_surface.<s>.elo` (the overall Elo). Percentile shrinkage (`SHRINK`): win % 20
+pseudo-matches, games won % 12 (were 10 and 8), after the measured stabilisation (docs/METRICS_SPEC.md).
+
+**players/<pid>.json** adds `"peer"` (22 Oct 2026) for players in the current season's catalogue (`players.peer_blocks`):
+`{"year","tour","groups": {"all" | surface: {"group" (spec id, e.g. "atp_all", "wta_clay"),"peer_group","minimum": {"field",
+"value"},"pool","in_pool","sample": {"matches"[,"stats_matches"]},"headline": [ids],"values": {id: v},"pct": {id: 0-100},
+"rank": {id: rank} (tour group only)}},"similar": [{"id","name","d"}],"similar_surface": {surface: [...]},"method"}`. Values
+are the spec's headline then secondary ids (docs/_design/metrics/tennis.json); `pct` / `rank` only when `in_pool` (surface
+groups take Elo percentiles from the surface pool); similar = the 5 nearest by the spec's weighted recipe (`d` in pooled
+standard deviations), tour view for qualified players, a surface view per surface pool the player is in.
 
 **lab.json**: `fields` = `["id","name","year","qualified","rank", ...metric keys]` (`matches` once, among the metric keys;
 rows with ≥ 10 matches); `"surface": {"fields": ["id","year","surface","matches", ...surface keys], "rows": [...],

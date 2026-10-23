@@ -30,7 +30,7 @@ function assetLabel(a) {
   if (a.k === 'player') {
     const nm = a.pid ? k.playerLink(a.pid, a.name) : k.esc(a.name || '?');
     return (a.pos ? '<span class="muted-inline">' + k.esc(POS_ONE[a.pos] || a.pos) + '</span> ' : '') + nm + (a.rights ? ' <span class="muted-inline">(rights)</span>' : '') +
-      (a.gone ? ' <span class="chip" title="No longer with this club: no projected value after he left">gone</span>' : '') +
+      (a.gone ? ' <span class="chip" title="No longer with this club: no projected value after leaving">gone</span>' : '') +
       (a.note ? ' <span class="mv-note" title="' + k.esc(a.note) + '">ⓘ</span>' : '');
   }
   if (a.k === 'pick') return (a.year ? a.year + ' ' : '') + (ORD[a.round] || (a.round + 'th')) + '-round pick' + (a.overall ? ' (No. ' + a.overall + ')' : '') +

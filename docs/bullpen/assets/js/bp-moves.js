@@ -52,7 +52,7 @@ function typeBar(m, row, w) {
 function rosterColumn(m, label) {
   const d = m.d, F = m.F;
   if (!d.published || d.published.next === false) return null;
-  const head = 'Chance he’s gone by ' + (d.horizons || {}).next;
+  const head = 'Chance of leaving by ' + (d.horizons || {}).next;
   return {
     col: { key: 'p_move', label: label || 'Chance of leaving', tip: head + '. ' + ((d.notes || [])[0] || ''), fmt: (x, r) => (r._mv ? typeBar(m, r._mv) + (r._mv[F.why] ? '<div class="bp-mv-why">' + esc(r._mv[F.why]) + '</div>' : '') : '<span class="qk-muted" title="Not on a club’s roster in the movement file">—</span>') },
     rowOf: pid => m.byPid[String(pid)] || null,
@@ -95,7 +95,7 @@ function teamCards(host, tid, L, S) {
     const vt = ((d.validation || {}).targets || {}).test || {};
     const vtip = isNum((vt.model || {}).precision) ? 'On 2023-2025, ' + pct((vt.model || {}).precision, 1) + ' of a club\'s top 10 joined it, against ' + pct((vt.need_value || {}).precision, 1) + ' for the best upgrades alone and ' + pct(vt.chance_precision, 1) + ' by chance. A shortlist, not a prediction of the move.' : '';
     let targets;
-    if (pubT) targets = U.card2('Who they could get', 'Ranked by chance of joining: the chance he moves x the chance he lands here; only players who would upgrade the weakest regular at the position ' + (vtip ? tip(vtip) : ''), tg.length ? '<div id="mv-tg"></div>' : QK.empty('No targets', 'No player on another club would upgrade a regular slot here.'));
+    if (pubT) targets = U.card2('Who they could get', 'Ranked by chance of joining: the chance the player moves x the chance of landing here; only players who would upgrade the weakest regular at the position ' + (vtip ? tip(vtip) : ''), tg.length ? '<div id="mv-tg"></div>' : QK.empty('No targets', 'No player on another club would upgrade a regular slot here.'));
     else targets = U.card2('Who they could get', '', QK.empty('Not published', (d.reasons || {}).targets || 'The targets model did not pass its test.'));
     host.innerHTML = '<div class="qk-grid" style="margin-top:var(--sp-4)"><div class="qk-span-5">' + outlook + '</div><div class="qk-span-7">' + targets + '</div></div>';
     QK.leaderboard(host.querySelector('#mv-out'), { dense: true, sort: { key: 'p_add', dir: 'desc' }, columns: [
@@ -108,9 +108,9 @@ function teamCards(host, tid, L, S) {
     const tgHost = host.querySelector('#mv-tg');
     if (tgHost) QK.leaderboard(tgHost, { dense: true, rank: true, sort: { key: 'p_join', dir: 'desc' }, columns: [
       { key: 'name', label: 'Player', type: 'entity', sub: 'sub', mark: r => U.team(r.team), href: r => BP.playerHref(r.pid, { level: 'mlb', role: /^(SP|RP|P)$/.test(r.pos) ? 'pitcher' : 'hitter' }) },
-      { key: 'p_join', label: 'Chance of joining', num: true, fmt: x => pct(x, 1), tip: 'The chance he joins this club by ' + (d.horizons || {}).next + '; 1-2% is a strong target among 30 clubs' },
-      { key: 'p_move', label: 'Availability', type: 'bar', max: 1, fmt: x => pct(x), tip: 'His chance of leaving his club at all' },
-      { key: 'gain', label: 'Fit', num: true, fmt: (x, r) => (isNum(x) ? U.signed(x, 1) + ' ' + esc(d.unit || 'WAR') : '—'), tip: 'The upgrade over the club\'s weakest regular at his position' },
+      { key: 'p_join', label: 'Chance of joining', num: true, fmt: x => pct(x, 1), tip: 'The chance of joining this club by ' + (d.horizons || {}).next + '; 1-2% is a strong target among 30 clubs' },
+      { key: 'p_move', label: 'Availability', type: 'bar', max: 1, fmt: x => pct(x), tip: 'The chance of leaving the current club at all' },
+      { key: 'gain', label: 'Fit', num: true, fmt: (x, r) => (isNum(x) ? U.signed(x, 1) + ' ' + esc(d.unit || 'WAR') : '—'), tip: 'The upgrade over the club\'s weakest regular at the same position' },
       { key: 'why', label: 'Why', sort: false, fmt: x => '<span class="bp-mv-why">' + esc(x || '') + '</span>' }],
       rows: tg.map(r => ({ pid: String(r[TG.pid]), name: nameOf(r[TG.pid], r[TG.name]), team: String(r[TG.team]), pos: r[TG.pos], sub: r[TG.pos] + ' · ' + BP.teamAbbr(r[TG.team]) + ' · age ' + Math.floor(r[TG.age]), p_join: r[TG.p_join], p_move: r[TG.p_move], gain: r[TG.gain], why: r[TG.why] })) });
   });
@@ -129,8 +129,8 @@ function playerCard(host, pid, L, S) {
     const TG = m.TF.targets || {};
     Object.keys(d.teams || {}).forEach(t => (d.teams[t].targets || []).forEach(r => { if (String(r[TG.pid]) === String(pid)) fits.push({ t: t, p: r[TG.p_join] }); }));
     fits.sort((a, b) => b.p - a.p);
-    const ctx = [isNum(row[F.age]) ? 'age ' + Math.floor(row[F.age]) : '', isNum(row[F.yrs]) ? row[F.yrs] + ' season' + (row[F.yrs] === 1 ? '' : 's') + ' since his debut' : '', isNum(row[F.value]) ? U.signed(row[F.value], 1) + ' ' + (d.unit || 'WAR') + ' (two seasons blended)' : ''].filter(Boolean).join(' · ');
-    host.innerHTML = U.card2('Movement', 'Chance he’s gone by ' + esc((d.horizons || {}).next) + ' ' + tip((d.notes || []).slice(0, 2).join(' ')),
+    const ctx = [isNum(row[F.age]) ? 'age ' + Math.floor(row[F.age]) : '', isNum(row[F.yrs]) ? row[F.yrs] + ' season' + (row[F.yrs] === 1 ? '' : 's') + ' since debut' : '', isNum(row[F.value]) ? U.signed(row[F.value], 1) + ' ' + (d.unit || 'WAR') + ' (two seasons blended)' : ''].filter(Boolean).join(' · ');
+    host.innerHTML = U.card2('Movement', 'Chance of leaving by ' + esc((d.horizons || {}).next) + ' ' + tip((d.notes || []).slice(0, 2).join(' ')),
       '<div class="bp-mv-big"><span class="big">' + pct(row[F.p_next]) + '</span><span class="qk-muted">' + esc(row[F.why] || '') + '</span></div>' + typeBar(m, row) +
       '<div style="margin-top:8px">' + typeKeys(m) + '</div><div class="bp-note">' + esc(ctx) + '</div>' +
       (deadlineLine(m) ? '<div class="bp-note">' + deadlineLine(m) + '</div>' : (isNum(row[F.p_dl]) ? '<div class="bp-note">' + esc(d.deadline_label === 'traded' ? 'Traded' : 'Moved') + ' before the deadline: <b>' + pct(row[F.p_dl]) + '</b></div>' : '')) +
@@ -150,7 +150,7 @@ function modelBlock(host) {
   load().then(m => {
     if (!host.isConnected || !m) return;
     const d = m.d, V = d.validation || {}, pub = d.published || {}, U = BP.ui;
-    const NAME = { next: 'Leaves by next season', deadline: 'Traded before the deadline', type: 'How he leaves', arrivals: 'Arrivals by position', targets: 'Targets (top 10 per club)' };
+    const NAME = { next: 'Leaves by next season', deadline: 'Traded before the deadline', type: 'How players leave', arrivals: 'Arrivals by position', targets: 'Targets (top 10 per club)' };
     const rows = Object.keys(NAME).filter(k => V[k]).map(k => {
       const t = V[k].test || {};
       if (k === 'targets') return '<tr><td>' + esc(NAME[k]) + '</td><td class="num">' + esc((d.split || {}).test ? d.split.test.join(', ') : '') + '</td><td class="num">' + esc(t.team_seasons) + ' club-seasons</td><td class="num" colspan="3">precision ' + pct((t.model || {}).precision, 1) + ' v ' + pct((t.need_value || {}).precision, 1) + ' (need x value) and ' + pct(t.chance_precision, 1) + ' (chance)</td><td>' + (pub[k] ? 'yes' : 'no') + '</td></tr>';

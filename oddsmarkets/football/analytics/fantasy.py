@@ -1046,7 +1046,7 @@ def build_fantasy(R: V.Rows, *, people: dict[str, dict], club_of: dict[str, dict
             "rates": {"tau_rates_days": TAU_RATES, "tau_minutes_days": TAU_MIN, "span_days": SPAN, "prior_90s": PRIOR_90S,
                       "goals_per_xg": _r(RI.g_per_xg, 3), "assists_per_xa": _r(RI.a_per_xa, 3), "new_at_club_prior": list(MIN_PRIOR)},
             "official_data": "Not used: the Premier League's terms of use forbid reproducing, re-utilising or redistributing its material "
-                             "or creating a database from it, so FPL's prices and ownership are left out. Prices here are our own proxy.",
+                             "or creating a database from it, so FPL's official figures and ownership are left out. Costs here are our own proxy.",
             "today": today.isoformat(), "runtime_s": round((datetime.now(timezone.utc) - t0).total_seconds(), 1),
             "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
     tmp = out_dir / "meta.json.tmp"

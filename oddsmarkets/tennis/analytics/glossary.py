@@ -105,7 +105,7 @@ MODEL = [
      "(an exact dynamic programme over service games; the first server is unknown, so both orders are mixed), time-decayed. The WTA "
      "fit adds the official point and game statistics as binomial terms."),
     ("chain_hold", "Chain-scale hold", "Ratings", "The hold probability whose i.i.d. point/game/set chain reproduces observed "
-     "scorelines (used for pricing); the displayed calibrated hold adds the tour's offset learned from real WTA stats."),
+     "scorelines (used for the match forecasts); the displayed calibrated hold adds the tour's offset learned from real WTA stats."),
     ("match_chain", "Match chain", "Matches", "Exact Markov chain point -> game -> tiebreak -> set -> match from the two serve-point "
      "probabilities: win probability, set-score, total-games and game-handicap distributions, tiebreak and straight-sets "
      "probabilities; deciding-set rules by event and year (advantage, tiebreak to 7, to 10, at 12-12)."),
@@ -118,20 +118,23 @@ MODEL = [
     ("excitement", "Excitement", "Matches", "The sum of absolute win-probability changes along the match."),
     ("comeback", "Comeback", "Matches", "The winner's lowest win probability during the match."),
     ("tournament_sim", "Tournament simulation", "Tournaments", "20,000 Monte Carlo runs of the real bracket (round robin for the Finals) "
-     "with results so far fixed and each remaining match priced by the model; the 'if she wins' odds are reweighted so they measure "
-     "the match itself."),
+     "with results so far fixed and each remaining match forecast by the model; the 'if she wins' chances are reweighted so they "
+     "measure the match itself."),
     ("season_sim", "Season simulation", "Rankings", "The rest of the calendar played many times: entry probabilities by level and history, "
      "seeded draws, the real points tables and 52-week drops, the Finals round robin. Gives Finals qualification, year-end No. 1 and "
      "ranking distributions."),
     ("draw_difficulty", "Draw difficulty", "Tournaments", "Mean expected opponent Elo along the bracket path from the bracket recursion "
      "with Elo probabilities at the start of the event."),
-    ("markets", "Markets", "Markets", "Kalshi and Polymarket two-sided midpoints (spread <= 12c), de-vigged for fields; a field is shown only "
-     "when enough runners are quoted. Closing bookmaker odds (Pinnacle, average) from tennis-data.co.uk, de-vigged multiplicatively."),
+    ("markets", "Market reference", "Markets", "A quiet reference beside our forecasts, never the headline: Kalshi and Polymarket "
+     "two-sided midpoints (spread <= 12c), with the margin removed across a field; a field is shown only when enough runners are "
+     "quoted. The closing lines (Pinnacle and the bookmakers' average) from tennis-data.co.uk, with the margin removed "
+     "multiplicatively."),
     ("percentile", "Percentiles", "Catalogue", "100 = best among the season's qualified players (a matches floor scaled to the season "
      "played), reversed where lower is better; rates are shrunk towards the pool mean by a few pseudo-matches before placing. The "
      "surface view compares players with enough matches on that surface."),
     ("backtest", "Backtest", "Calibration", "Walk-forward from 2010: ratings use only earlier results, the serve/return model is refitted "
-     "monthly, blend weights come from earlier years; scored by log-loss and Brier against Pinnacle's de-vigged closing prices."),
+     "monthly, blend weights come from earlier years; scored by log-loss and Brier, beside Pinnacle's closing line (margin removed) as "
+     "the market reference."),
     ("charting", "Match Charting Project", "Data", "Shot-by-shot records of selected matches by volunteers (Tennis Abstract), "
      "CC BY-NC-SA 4.0; style profiles derived here are shared under the same licence."),
 ]

@@ -160,8 +160,8 @@ function rankHTML(d, HF, PF) {
   const cols = [{ key: 'name', label: S.kind === 'P' ? 'Pitcher' : S.kind === 'H' ? 'Hitter' : 'Player', type: 'entity', sub: 'sub', mark: o => (o.team ? BP.ui.team(o.team, 'mlb') : null), href: o => phref(o.pid, o.kind) }]
     .concat(statCols ? statCols.map(c => ({ key: c[0], label: c[1], num: true, fmt: c[2] })) : [{ key: 'line', label: 'Projection', sort: false, fmt: v => '<span class="ft-line">' + esc(v) + '</span>' }])
     .concat([pts ? { key: 'money', label: 'Points', type: 'bar', fmt: v => n0(v), tip: 'Projected points under your scoring (the Scoring tab)' } : { key: 'money', label: '$', type: 'bar', fmt: v => '$' + n0(v), tip: 'Auction value for a ' + (lg.teams || 12) + '-team league with a $' + (lg.budget || 260) + ' budget' },
-      { key: 'val', label: 'Value', num: true, fmt: v => n2(v), tip: '5x5 z-score above replacement at his best position' },
-      { key: 'tier', label: 'Tier', num: true, fmt: v => tierChip(v), tip: 'Tier within his position (1-D k-means of value)' },
+      { key: 'val', label: 'Value', num: true, fmt: v => n2(v), tip: '5x5 z-score above replacement at the best eligible position' },
+      { key: 'tier', label: 'Tier', num: true, fmt: v => tierChip(v), tip: 'Tier within the position (1-D k-means of value)' },
       { key: 'last', label: 'Last', num: true, fmt: v => (isNum(v) ? '#' + v : '—'), tip: 'Last season\'s value rank' },
       { key: 'flags', label: 'Notes', sort: false, fmt: v => flagsHTML(v) }]);
   const sub = list.length + ' players · ' + (pts ? 'points under your scoring' : '5x5 for a ' + (lg.teams || 12) + '-team mixed league, $' + (lg.budget || 260) + ' budget') + (list.length > 500 ? ' · the first 500 shown' : '');

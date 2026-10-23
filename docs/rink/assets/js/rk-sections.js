@@ -253,7 +253,7 @@ function leadersPage(node, S) {
       '<section class="qk-section">' + QK.sectionHead({ kicker: 'Rates by position', title: 'Who is best per minute', html: true,
         sub: 'The stable, predictive rates from our metric spec, ranked within each position group. Only qualified players rank: skaters need 250 5v5 minutes over a full season (' + (skFloor !== null ? skFloor + ' now' : 'prorated') + '), goalies a quarter of the team’s minutes and ' + gFa + ' unblocked shots. ' + tg + ' team games played.' }) +
       '<div class="qk-grid">' + RATE.map(b => board(b, b[1] === G ? 'g' : 's')).join('') + '</div></section>' +
-      (fin.length ? '<section class="qk-section">' + U.card2('Finishing: goals against expected goals', 'Skaters with 20+ shots; above the line scores more than his chances suggest (finishing is mostly luck over one season)', U.chart('pl-fin', 400, 'Goals against expected goals')) + '</section>' : '');
+      (fin.length ? '<section class="qk-section">' + U.card2('Finishing: goals against expected goals', 'Skaters with 20+ shots; above the line scores more than the chances suggest (finishing is mostly luck over one season)', U.chart('pl-fin', 400, 'Goals against expected goals')) + '</section>' : '');
     if (fin.length) {
       const top = fin.slice().sort((a, b) => v(b, 'g') - v(a, 'g')).slice(0, 160);
       const m = Math.max.apply(null, top.map(p => Math.max(v(p, 'g'), v(p, 'ixg'))));
@@ -317,7 +317,7 @@ const PL_TABS = [['leaders', 'Leaders'], ['skaters', 'Skaters'], ['goalies', 'Go
 function playersPage(el, params, state) {
   const S = params.season;
   const tab = U.tab(params, PL_TABS.map(t => t[0]), 'leaders');
-  const body = U.section(el, { section: 'players', title: 'Players', sub: 'Leaders on the stable, predictive rates by position (qualified players only), every skater and goalie with percentiles, line combinations and the award races. Open a player for his card.',
+  const body = U.section(el, { section: 'players', title: 'Players', sub: 'Leaders on the stable, predictive rates by position (qualified players only), every skater and goalie with percentiles, line combinations and the award races. Open a player for the full card.',
     tabs: U.tabs('#/players', PL_TABS, S), active: tab });
   if (tab === 'leaders') return leadersPage(body, S);
   if (tab === 'awards') return awardsPage(body, S);
@@ -333,14 +333,48 @@ function labPage(el, params, state) {
     tabs: [{ key: 'lab', label: 'Chart builder', href: '#/lab' + (U.sq(S) ? '?' + U.sq(S) : '') }, { key: 'compare', label: 'Compare', href: '#/compare' + (U.sq(S) ? '?' + U.sq(S) : '') }], active: tab });
   return U.legacy(tab, body, params, state);
 }
-const MD_TABS = [['methodology', 'Methodology'], ['calibration', 'Calibration'], ['glossary', 'Glossary'], ['terms', 'Terms']];
+const MD_TABS = [['methodology', 'Methodology'], ['calibration', 'Calibration'], ['moves', 'Who moves next'], ['glossary', 'Glossary'], ['terms', 'Terms']];
+/* Model › Who moves next (MOVES_VIEWS.md "Model page text"): the notes verbatim, the validation of each block on the
+   sealed seasons (published or not, with the reason), and the calibration deciles of the published model. */
+const MV_BLOCKS = [['next', 'Not in the lineup next season'], ['deadline', 'Traded or claimed before the deadline'], ['type', 'Kind of departure'], ['arrivals', 'Arrivals by position'], ['targets', 'Targets']];
+function movesModel(node, S) {
+  node.innerHTML = QK.skeleton('lines', 6);
+  return U.moves(S || RK.currentSeason()).then(M => {
+    if (!U.alive(node)) return;
+    if (!M) { node.innerHTML = U.card2('Who moves next', '', QK.empty('Not built yet', 'The movement model has not been published for this season.')); return; }
+    const d = M.d, V = d.validation || {}, pub = M.pub, R = d.reasons || {}, split = (d.split || {}).test || [];
+    const sea = split.length ? RK.seasonLabel(split[0]) + ' to ' + RK.seasonLabel(split[split.length - 1]) : 'the sealed seasons';
+    const ci = x => (Array.isArray(x) && x.length >= 3 ? U.f(x[0], 4) + ' (' + U.f(x[1], 4) + ' to ' + U.f(x[2], 4) + ')' : '—');
+    const rows = MV_BLOCKS.map(b => {
+      const t = (V[b[0]] || {}).test || {};
+      const p = b[0] === 'arrivals' ? pub.arrivals : b[0] === 'targets' ? pub.targets : pub[b[0]];
+      if (b[0] === 'targets') return '<tr><td>' + esc(b[1]) + '</td><td class="num">' + (isNum(t.team_seasons) ? QK.fmt.num(t.team_seasons) + ' club-seasons' : '—') + '</td><td class="num" colspan="4">' + (isNum(t.model) ? 'top ' + (t.k || 10) + ' joined: ' + U.pct(t.model, 1) + (isNum(t.need_value) ? ' · need x value ' + U.pct(t.need_value, 1) : '') + (isNum(t.chance_precision) ? ' · chance ' + U.pct(t.chance_precision, 1) : '') : '—') + '</td><td>' + (p ? QK.tag('published', 'signal') : QK.tag('not published')) + (R[b[0]] ? '<span class="rk-why">' + esc(R[b[0]]) + '</span>' : '') + '</td></tr>';
+      return '<tr><td>' + esc(b[1]) + '</td><td class="num">' + (isNum(t.n) ? QK.fmt.num(t.n) : '—') + '</td><td class="num">' + (isNum(t.rate) ? U.pct(t.rate, 1) : '—') + '</td><td class="num">' + (isNum(t.logloss) ? U.f(t.logloss, 4) + ' v ' + U.f(t.logloss_base, 4) : '—') + '</td><td class="num">' + ci(t.ll_gain) + '</td><td class="num">' + (isNum(t.cal_slope) ? U.f(t.cal_slope, 2) : '—') + '</td><td>' +
+        (p ? QK.tag('published', 'signal') : QK.tag(b[0] === 'type' || b[0] === 'deadline' || b[0] === 'arrivals' ? 'base rate shown' : 'not published')) + (R[b[0]] ? '<span class="rk-why">' + esc(R[b[0]]) + '</span>' : '') + '</td></tr>';
+    }).join('');
+    const nx = (V.next || {}).test || {};
+    node.innerHTML = QK.sectionHead({ kicker: 'Movement model · ' + RK.seasonLabel(d.season || S), title: 'Who moves next', sub: 'How we estimate each player’s chance of not being in the club’s lineup next season, and how it did on seasons it never saw (' + sea + ').' }) +
+      '<div class="qk-grid"><div class="qk-span-7">' + U.card2('How it works', 'In our own words, as the payload states it', '<ul class="rk-list">' + (d.notes || []).map(n => '<li style="align-items:flex-start"><span>' + esc(n) + '</span></li>').join('') + '</ul>', { flush: true }) + '</div>' +
+      '<div class="qk-span-5">' + U.card2('Calibration: not in the lineup next season', 'Each dot is a tenth of the sealed-season players by our chance; on the diagonal, the chance came true as often as it said', U.chart('mv-dec', 300, 'Predicted chance against observed share')) + '</div></div>' +
+      '<section class="qk-section">' + U.card2('Validation on the sealed seasons', 'Log-loss: ours v the league base rate (lower is better); the gain is base minus ours with its 95% interval. A block is published only when the gain’s interval excludes zero and it stays calibrated.',
+        '<div class="qk-table-wrap"><table class="rk-ol"><thead><tr><th>Block</th><th class="num">Players</th><th class="num">Happened</th><th class="num">Log-loss</th><th class="num">Gain (95% CI)</th><th class="num">Calibration slope</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>', { flush: true }) + '</section>';
+    const dec = (nx.deciles || []).filter(x => Array.isArray(x) && isNum(x[0]) && isNum(x[1]));
+    if (dec.length) {
+      QKC.scatter('#mv-dec', { points: dec.map(x => ({ x: x[0], y: x[1], name: 'Predicted ' + U.pct(x[0]) + ' · happened ' + U.pct(x[1]) + ' · ' + x[2] + ' players', size: 11 })), xName: 'Predicted chance', yName: 'Observed share', xFmt: v => Math.round(v * 100) + '%', yFmt: v => Math.round(v * 100) + '%', xMin: 0, yMin: 0, xMax: 0.8, yMax: 0.8 });
+      const c = node.querySelector('#mv-dec');
+      if (c && c.__qkc) { const e = c.__qkc, b0 = e.build; e.build = (T, x) => { const o = b0(T, x); o.series[0].markLine = { silent: true, symbol: 'none', lineStyle: { color: T.axis, type: [4, 4] }, label: { show: false }, data: [[{ coord: [0, 0] }, { coord: [0.8, 0.8] }]] }; return o; }; e.paint(); }
+    } else node.querySelector('#mv-dec').innerHTML = QK.empty('No deciles published');
+  });
+}
 function modelPage(el, params, state) {
   let tab = state.route === 'glossary' ? 'glossary' : state.route === 'methodology' ? 'methodology' : U.tab(params, MD_TABS.map(t => t[0]), 'methodology');
   if (tab === 'terms') { location.replace('#/disclaimer'); return; }
   const tabs = MD_TABS.map((t, i) => ({ key: t[0], label: t[1], href: t[0] === 'terms' ? '#/disclaimer' : '#/model' + (i ? '?tab=' + t[0] : '') }));
-  const body = U.section(el, { section: 'model', title: 'Model', sub: 'How the models work, how well they have done, and what every number means.', tabs: tabs, active: tab });
+  const body = U.section(el, { section: 'model', title: 'Model', sub: 'How the models work, how well they have done on seasons they never saw, and what every number means.', tabs: tabs, active: tab });
+  if (tab === 'moves') return movesModel(body, params.season);
   return U.legacy(tab, body, params, state);
 }
+
 RK.ui.modelTabs = active => U.tabsHTML(MD_TABS.map((t, i) => ({ key: t[0], label: t[1], href: t[0] === 'terms' ? '#/disclaimer' : '#/model' + (i ? '?tab=' + t[0] : '') })), active);
 
 RK.page('standings', standingsPage);

@@ -59,7 +59,7 @@ function render(el, params, state) {
     h += '<div class="card"><div class="card-header">Line combinations <span class="card-sub">Forward lines and defence pairs by 5-on-5 time together, with their expected-goals share (shrunk towards the team\'s by the time together).</span></div><div class="grid-2"><div id="tp-fl"></div><div id="tp-dp"></div></div></div>';
     h += '<div class="card"><div class="card-header">Deployment <span class="card-sub">Ice time per game by strength and offensive-zone start share for every regular.</span></div><div class="grid-2"><div id="tp-dep"></div><div id="tp-dep-c" style="height:420px"></div></div></div>';
     h += '<div class="card"><div class="card-header">Schedule against the model <span class="card-sub">Every game with our pre-game win probability beside the market\'s; the chart is points minus the model\'s expected points.</span></div><div id="tp-sched-c" style="height:220px"></div><div id="tp-sched"></div></div>';
-    h += '<div class="card"><div class="card-header">Roster value <span class="card-sub">Rink value this season (goals above replacement) for the team\'s skaters and goalies in the catalogues. Click a player for his page.</span></div><div class="grid-2"><div id="tp-roster"></div><div id="tp-roster-c" style="height:380px"></div></div></div>';
+    h += '<div class="card"><div class="card-header">Roster value <span class="card-sub">Rink value this season (goals above replacement) for the team\'s skaters and goalies in the catalogues. Click a player for the player page.</span></div><div class="grid-2"><div id="tp-roster"></div><div id="tp-roster-c" style="height:380px"></div></div></div>';
     el.innerHTML = h;
     k.setMeta(k.esc(k.teamName(abbr)));
     if (Number(S) === Number(curS)) k.loadY(S, 'needs/' + abbr + '.json').then(nd => { if (k.alive(el)) drawNeeds(abbr, S, nd); });
@@ -342,7 +342,7 @@ function roster(abbr, skRaw, gkRaw, S, colour) {
   });
   if (!mine.length) { host.innerHTML = k.muted('No players for this team in the catalogues yet.'); cnode.style.display = 'none'; return; }
   mine.sort((a, b) => (k.isNum(b.v) ? b.v : -1e9) - (k.isNum(a.v) ? a.v : -1e9));
-  host.innerHTML = k.table([{ label: 'Player' }, { label: 'Pos' }, { label: 'GP', align: 'right' }, { label: 'Value', align: 'right', title: 'Rink value (goals above replacement); goalies: their value from goals saved above expected' }, { label: 'Pct', align: 'right', title: 'Percentile in his position pool' }],
+  host.innerHTML = k.table([{ label: 'Player' }, { label: 'Pos' }, { label: 'GP', align: 'right' }, { label: 'Value', align: 'right', title: 'Rink value (goals above replacement); goalies: their value from goals saved above expected' }, { label: 'Pct', align: 'right', title: 'Percentile in the position pool' }],
     mine.slice(0, 32).map(z => ({ _href: k.playerHref(z.id, S), cells: [{ v: z.p.name || k.name(z.id), html: k.playerLink(z.id, z.p.name, S) }, { v: z.p.pos || z.g, html: k.esc(k.posLabel(z.p.pos || z.g)) }, { v: k.gpOf(z.p), html: k.int(k.gpOf(z.p)) },
       { v: z.v, html: k.isNum(z.v) ? k.signed(z.v, 1) : '—' }, { v: z.pc, html: k.pill(z.pc) }] })), { compact: true, sticky: true });
   k.sortable(host);

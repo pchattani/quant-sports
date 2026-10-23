@@ -368,12 +368,25 @@ function load(p0) {
   if (PENDING[p]) return PENDING[p];
   PENDING[p] = fetch('data/' + p, { cache: 'no-cache' })
     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(d => { lateMetrics(p, d); learn(p, d); return d; })
+    .then(d => { lateMetrics(p, d); copyFix(p, d); learn(p, d); return d; })
     .catch(err => { console.warn('payload missing:', p, err.message); return null; })
     .then(d => { if (d !== null) CACHE[p] = d; delete PENDING[p]; return d; });
   return PENDING[p];
 }
 function loadAll(paths) { return Promise.all(paths.map(load)); }
+/* Design System 2.0 copy on payload labels written before the redesign (the builders are shared, so the words are
+   fixed where they are shown): tracking metrics are labelled by what they measure ("Tracked high-danger sv%"; the
+   source, NHL EDGE, stays in the description), fantasy notes say "salaries" for platform prices. */
+function fixLabel(s) { return typeof s === 'string' ? s.replace(/^EDGE tracking$/, 'Puck and player tracking').replace(/^EDGE /, 'Tracked ') : s; }
+function copyFix(p, d) {
+  if (!d || typeof d !== 'object') return;
+  try {
+    const metric = m => { if (m && typeof m === 'object') { m.label = fixLabel(m.label); m.group = fixLabel(m.group); if (typeof m.desc === 'string') m.desc = m.desc.replace(/\(EDGE\)/g, '(NHL tracking)'); } };
+    (Array.isArray(d.metrics) ? d.metrics : []).forEach(metric);
+    if (Array.isArray(d.groups)) d.groups.forEach(g => { if (g && typeof g === 'object') { if (typeof g.name === 'string') g.name = g.name.replace(/EDGE tracking/, 'puck and player tracking'); (g.entries || []).forEach(metric); } });
+    if (typeof d.note === 'string') d.note = d.note.replace(/rankings or prices/g, 'rankings or salaries');
+  } catch (e) { /* left as written */ }
+}
 /* Metrics fixed after a season's payload was built: rebound and rush attempts (reb60 / rush60) were 0 for every
    skater until 22 Oct 2026, and a season keeps its payload until it is rebuilt. When every skater of a season has 0,
    the values and percentiles are dropped (shown as missing, not as a 0 at the 50th percentile) and the metric says

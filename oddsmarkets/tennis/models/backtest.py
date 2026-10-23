@@ -878,10 +878,8 @@ def backtest(tour: str, years: Iterable[int] | None = None, matches: list[dict] 
                      "the constants are not.",
                      "Serve/return constants (half-life, ridges) are B's tuned values; the fits themselves are walk-forward.",
                      "Retirements, walkovers and defaults are excluded from scoring.",
-                     "Bookmaker probabilities are closing prices de-vigged multiplicatively.",
-                     "model = Elo + serve/return + game-share Elo + market rating (mrating.py: learnt from earlier "
-                     "matches' closing prices and results, never the match's own); model_fund = the same blend "
-                     "without the market rating."],
+                     NOTE_REWORDS["Bookmaker probabilities are closing prices de-vigged multiplicatively."],
+                     NOTE_REWORDS[_OLD_MODEL_NOTE]],
            "runtime_s": round(time.perf_counter() - t0, 1)}
     if write:
         _io.write_json(_io.cache_root() / f"backtest_{t}.json", out)
@@ -899,9 +897,27 @@ def backtest(tour: str, years: Iterable[int] | None = None, matches: list[dict] 
     return out
 
 
+_OLD_MODEL_NOTE = ("model = Elo + serve/return + game-share Elo + market rating (mrating.py: learnt from earlier matches' closing "
+                   "prices and results, never the match's own); model_fund = the same blend without the market rating.")
+# Notes in the old wording (backtests run before 22 Oct 2026) -> the site's neutral wording (the market is a reference).
+NOTE_REWORDS = {
+    "Bookmaker probabilities are closing prices de-vigged multiplicatively.":
+        "The market reference is the closing line, with the bookmaker margin removed multiplicatively.",
+    _OLD_MODEL_NOTE: "model = Elo + serve/return + game-share Elo + market rating (mrating.py: learnt from earlier matches' "
+                     "closing lines and results, never the match's own); model_fund = the same blend without the market rating.",
+}
+
+
+def page_notes(notes: list | None) -> list:
+    """`notes` with any old-wording note replaced by its NOTE_REWORDS text."""
+    return [NOTE_REWORDS.get(n, n) if isinstance(n, str) else n for n in (notes or [])]
+
+
 def page_copy(bt: dict) -> dict:
-    """The calibration page's subset (per-player validation rows trimmed to 300)."""
+    """The calibration page's subset (per-player validation rows trimmed to 300; notes in the site's wording)."""
     keep = {k: v for k, v in bt.items() if k not in ("validation",)}
+    if "notes" in keep:
+        keep["notes"] = page_notes(keep["notes"])
     if bt.get("validation"):
         v = dict(bt["validation"])
         v["players"] = (v.get("players") or [])[:300]

@@ -166,7 +166,7 @@ FX.glossLink = (key, text) => '<a class="gl-link" href="#/glossary/' + encodeURI
 /* Scope note for a METRIC: NHL play-by-play, shifts, our model, NHL EDGE tracking, MoneyPuck benchmark. */
 FX.scopeTag = m => {
   const s = String((m || {}).scope || '').toLowerCase();
-  if (s === 'edge') return '<span class="scope-tag real" title="NHL EDGE puck and player tracking, 2021-22 on">EDGE</span>';
+  if (s === 'edge') return '<span class="scope-tag real" title="NHL EDGE puck and player tracking, 2021-22 on">Tracking</span>';
   if (s === 'model') return '<span class="scope-tag model" title="Our model">model</span>';
   if (s === 'shifts' || s === 'onice') return '<span class="scope-tag inferred" title="On-ice, from NHL shift charts (2010-11 on)">on-ice</span>';
   if (s === 'pbp') return '<span class="scope-tag pbp" title="NHL play-by-play">pbp</span>';

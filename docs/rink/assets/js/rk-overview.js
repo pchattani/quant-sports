@@ -24,7 +24,7 @@ function tiles(idx, rows, cup) {
     { label: 'Cup favourite', value: fav ? RK.teamAbbr(fav.team) + ' ' + U.pct(fav.model) : '—', signal: true, href: fav ? RK.teamHref(fav.team) : null, sub: 'from 20,000 simulated seasons', tip: 'Our chance of winning the Stanley Cup in the season simulation' },
     { label: 'Top-rated club', value: top ? RK.teamAbbr(top.team) + ' ' + U.signed(top.rating, 2) : '—', href: top ? RK.teamHref(top.team) : null, sub: top ? 'goals a game better than an average club' : '', tip: 'Our team rating: expected goal difference per game against an average club' },
     { label: 'Points leader', value: ld ? RK.playerSurname(ld[0]) + ' ' + ld[1] : '—', href: ld ? RK.playerHref(ld[0]) : null, sub: ld ? RK.teamName(RK.player(ld[0]).team) : '' },
-    { label: 'Best goalie so far', value: gk ? RK.playerSurname(gk[0]) + ' ' + U.signed(gk[1], 1) : '—', href: gk ? RK.playerHref(gk[0]) : null, sub: 'goals saved above expected', tip: 'Goals he has stopped beyond what the shot quality he faced predicts' }
+    { label: 'Best goalie so far', value: gk ? RK.playerSurname(gk[0]) + ' ' + U.signed(gk[1], 1) : '—', href: gk ? RK.playerHref(gk[0]) : null, sub: 'goals saved above expected', tip: 'Goals stopped beyond what the quality of the shots faced predicts' }
   ]);
 }
 
@@ -52,7 +52,7 @@ function render(el) {
     '<div class="rk-games rk-gc" id="ov-games">' + QK.skeleton('card', 3) + '</div></section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'Season simulation', title: 'Who wins the Cup', sub: 'Our chances from 20,000 simulated seasons, with each club’s projected points and the range it lands in nine times out of ten.' }) +
     '<div class="qk-grid"><div class="qk-span-5">' + U.card2('Stanley Cup chances', 'Our chance; the grey tick is the Kalshi / Polymarket number, for reference', '<div id="ov-cup"></div>', { foot: '<span>Top twelve of 32</span><a href="#/standings?tab=markets">Every season forecast →</a>' }) + '</div>' +
-    '<div class="qk-span-7">' + U.card2('Projected points', 'Mean of the simulated seasons (dot) and its 90% range (bar)', U.chart('ov-range', 470, 'Projected points with a 90% range'), { foot: '<span>Range: 5th to 95th percentile of 20,000 seasons</span><a href="#/standings">Standings →</a>' }) + '</div></div></section>' +
+    '<div class="qk-span-7">' + U.card2('Projected full-season points', 'Mean of the simulated seasons (dot) and its 90% range (bar)', U.chart('ov-range', 470, 'Projected points with a 90% range'), { foot: '<span>Range: 5th to 95th percentile of 20,000 seasons</span><a href="#/standings">Standings →</a>' }) + '</div></div></section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'Team strength', title: 'Ratings and process', sub: 'How good each club is per game, and whether its results match the chances it creates.' }) +
     '<div class="qk-grid"><div class="qk-span-5">' + U.card2('Power ratings', 'Expected goal difference a game against an average club', U.chart('ov-power', 470, 'Team ratings'), { foot: '<span>All 32 clubs</span><a href="#/standings?tab=ratings">Ratings by component →</a>' }) + '</div>' +
     '<div class="qk-span-7">' + U.card2('Results v process', 'Points % against share of 5v5 expected goals. Right of centre: plays better than its record; above: winning more than its play', U.chart('ov-luck', 470, 'Points percentage against expected goals share'), { foot: '<span>Tap a club for its page</span><a href="#/teams">All teams →</a>' }) + '</div></div></section>' +
@@ -94,7 +94,7 @@ function render(el) {
     if (rr.length) {
       const show = rr.slice(0, 16);
       QKC.range('#ov-range', { rows: show.map(t => ({ label: RK.teamName(t), lo: sim[t].pts_p05, hi: sim[t].pts_p95, mid: sim[t].mean_pts, href: RK.teamHref(t), color: RK.teamColourRaw(t), sub: U.pct(sim[t].p_playoffs) + ' to make the playoffs' })),
-        fmt: v => U.f(v, 0), loName: '5th', hiName: '95th percentile', midName: 'Projected points', valName: 'Points at season end', labelWidth: 150 });
+        fmt: v => U.f(v, 0), loName: '5th', hiName: '95th percentile', midName: 'Projected full-season points', valName: 'Points at season end (full season)', labelWidth: 150 });
       el.querySelector('#ov-range').insertAdjacentHTML('afterend', '<p class="qk-caption">The top sixteen by projected points. Each bar spans the 5th to 95th percentile of the club’s points across the simulated seasons.</p>');
     } else el.querySelector('#ov-range').innerHTML = QK.empty('No simulation yet', 'The projection appears once the season simulation has run.');
 

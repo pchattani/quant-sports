@@ -171,8 +171,8 @@ VALUE_GLOSSARY: list[dict] = [
     {"key": "v_tl_share", "label": "Tour-level share", "group": _G + "Breakout", "fmt": "pct",
      "desc": "Tour-level points in the ranking / official points: low means a ranking built mostly on Challengers or ITF events."},
     {"key": "v_mk_feature", "label": "Market v Elo", "group": _G + "Breakout", "fmt": "signed",
-     "desc": "The closing market's implied rating of the player minus Elo's over the last 12 months (Elo points, shrunk towards 0 "
-             "by 10 matches): the one market input of the breakout model."},
+     "desc": "The rating of the player implied by the closing line (the market reference) minus Elo's over the last 12 months "
+             "(Elo points, shrunk towards 0 by 10 matches): the breakout model's one market input."},
     # luck
     {"key": "v_close", "label": "Close-match luck", "group": _G + "Luck", "fmt": "signed",
      "desc": "Wins minus the sum over completed matches of P(win | share of games won): the Pythagorean expectation s^k / (s^k + "
@@ -211,7 +211,7 @@ VALUE_GLOSSARY: list[dict] = [
              "matches in both): near 0 for luck, high for skill."},
     # over / undervalue
     {"key": "v_model_rating", "label": "Model rating", "group": _G + "Over / undervalue", "fmt": "int",
-     "desc": "The match price's blend linearised into one number per player on the Elo scale: w_elo x Elo + (400 / ln 10) x (w_sr x beta "
+     "desc": "The match forecast's blend linearised into one number per player on the Elo scale: w_elo x Elo + (400 / ln 10) x (w_sr x beta "
              "x (serve + return rating) + w_gelo x game-share Elo), offset so the active top 100 average as on Elo."},
     {"key": "v_model_rank", "label": "Model rank", "group": _G + "Over / undervalue", "fmt": "int", "lower": True,
      "desc": "Order of the model rating among players with a rated match in the last year and 10+ rated matches."},
@@ -223,12 +223,13 @@ VALUE_GLOSSARY: list[dict] = [
              "the model."},
     {"key": "v_surface", "label": "Surface rating", "group": _G + "Over / undervalue", "fmt": "int",
      "desc": "The model rating on one surface (surface-blended Elo and game-share Elo, the surface serve/return record), its rank, and "
-             "the gap to the overall rating: a surface specialist's edge."},
+             "the gap to the overall rating: a surface specialist's advantage."},
     # market
     {"key": "v_market_gap", "label": "Market v model", "group": _G + "Market", "fmt": "signed",
-     "desc": "Mean over the player's matches of logit(market) - logit(model), in Elo points: positive = the market rates the player "
-             "above the model. Market = the de-vigged closing price (Pinnacle, else Betfair, else the average) or Kalshi's quote about "
-             "4 h before the start. A disagreement, not a value bet: the market is the better forecaster."},
+     "desc": "Mean over the player's matches of logit(market) - logit(model), in Elo points: positive = the market reference rates "
+             "the player above the model. Market reference = the closing line with the margin removed (Pinnacle, else Betfair, else "
+             "the average) or Kalshi's quote about 4 h before the start. A difference of opinion, not a signal: the market reference "
+             "is the better forecaster."},
     {"key": "v_market_x", "label": "Expected wins: model, market", "group": _G + "Market", "fmt": "1",
      "desc": "Sums of the model's and the market's pre-match probabilities over the same matches, beside the actual wins."},
     {"key": "v_market_ll", "label": "Log-loss: model, market", "group": _G + "Market", "fmt": "3", "lower": True,
@@ -257,10 +258,10 @@ VALUE_MODEL_TERMS = [
      "points, close-match and draw luck and the market's view; ridge regression refitted every year on past snapshots."),
     ("value_luck", "Luck decomposition", "Value",
      "A record split into what the performance deserved and what luck added: Pythagorean expectations from games (and points), "
-     "the chain's tiebreak and deciding-set odds, break-point base rates, draws against the typical draw for the seed band, "
+     "the chain's tiebreak and deciding-set chances, break-point base rates, draws against the typical draw for the seed band, "
      "walkovers and retirements received."),
     ("value_rating", "Model rating", "Value",
-     "One number per player from the match price's blend of Elo, serve/return and game-share Elo, on the Elo scale; the basis of "
+     "One number per player from the match forecast's blend of Elo, serve/return and game-share Elo, on the Elo scale; the basis of "
      "the model rank and the over/undervalue table."),
 ]
 

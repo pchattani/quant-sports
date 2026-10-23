@@ -124,7 +124,7 @@ function note(x) { return x && x.note ? '<div class="pg-note gq-note">' + K().es
 function gamesSection(d, out, read) {
   const k = K();
   const G = get(d, ['game_model', 'games', 'backtest']);
-  if (!G || typeof G !== 'object' || !(G.metrics || G.pooled || G.vs_market || G.metrics_vs_market)) { out.push(k.card('The game model against the closing line', '', k.muted('The walk-forward backtest (every game priced with only what was known before it, against the closing lines from 2019–20 and against Elo from 2009–10) has not been published yet.'))); return; }
+  if (!G || typeof G !== 'object' || !(G.metrics || G.pooled || G.vs_market || G.metrics_vs_market)) { out.push(k.card('The game model against the closing line', '', k.muted('The walk-forward backtest (every game forecast with only what was known before it, against the closing lines from 2019–20 and against Elo from 2009–10) has not been published yet.'))); return; }
   const ALL = scorers(G.metrics || (G.pooled || {}).win || G.pooled || {}), VM = scorers(G.metrics_vs_market || G.vs_market || {});
   const PSD = G.per_season || G.by_season || {};
   const seasons = (Object.keys(PSD).length ? Object.keys(PSD) : (G.seasons || [])).map(String).filter(s => k.sid(s)).sort();
@@ -199,7 +199,7 @@ function side(id, cid, A, what, read, title, textOnly) {
   }
   read.push('<p><strong>' + title + '.</strong> Against the closing ' + (what === 'covers' ? 'puck line' : 'total') + ', the model\'s probability scores ' + k.num(A.logloss, 4) + ' against ' + k.num(coin, 4) + ' for ' + (k.isNum(A.logloss_base) ? 'the base rate' : 'a coin') + ' over ' + k.int(A.n) + ' games: ' +
     (v === 'tie' ? 'a tie, which is what a closing line should allow. ' : v === 'win' ? 'better. ' : 'worse: the model adds noise to the closing number here. ') +
-    (k.isNum(pk.win_rate) ? 'Where it leans 55% or more, its side ' + (what === 'covers' ? 'covered' : 'won') + ' ' + k.pct(pk.win_rate, 1) + ' of ' + k.int(pk.n) + (se ? ' (±' + k.num(200 * se, 1) + ' points)' : '') + ': ' + (pv === 'tie' ? 'a tie with 50%.' : pv === 'win' ? 'above 50%; treat as provisional, and remember the prices are not even money.' : 'below 50%.') : '') + '</p>');
+    (k.isNum(pk.win_rate) ? 'Where it leans 55% or more, its side ' + (what === 'covers' ? 'covered' : 'won') + ' ' + k.pct(pk.win_rate, 1) + ' of ' + k.int(pk.n) + (se ? ' (±' + k.num(200 * se, 1) + ' points)' : '') + ': ' + (pv === 'tie' ? 'a tie with 50%.' : pv === 'win' ? 'above 50%; treat as provisional, and remember a lean is not a sure thing.' : 'below 50%.') : '') + '</p>');
 }
 
 /* Season odds: {metrics: {playoffs, div, pres, cup: scorer + base_rate + by_checkpoint}, n_sims, checkpoints}. */
@@ -207,7 +207,7 @@ function seasonOdds(d, out, read) {
   const k = K();
   const X = get(d, ['season_sim', 'season_odds', 'season']);
   const M = X && (X.metrics || X);
-  if (!M || typeof M !== 'object' || !Object.keys(M).some(x => isScorer(M[x]))) { out.push(k.card('Season odds', '', k.muted('Season-odds calibration (playoff, division, Presidents\' Trophy and Cup odds at fixed points of past seasons, against what happened) is not published yet.'))); return; }
+  if (!M || typeof M !== 'object' || !Object.keys(M).some(x => isScorer(M[x]))) { out.push(k.card('Season chances', '', k.muted('Season-odds calibration (playoff, division, Presidents\' Trophy and Cup odds at fixed points of past seasons, against what happened) is not published yet.'))); return; }
   const NAME = { playoffs: 'Make the playoffs', div: 'Win the division', pres: 'Presidents\' Trophy', presidents: 'Presidents\' Trophy', conf: 'Reach the Final', cup: 'Win the Stanley Cup' };
   const cps = X.checkpoints || X.check_dates || X.check_games || [];
   const rows = {};

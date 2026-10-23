@@ -128,8 +128,16 @@ def build_pool(pooled, league_names: dict[str, str], cup_names: dict[str, str],
             "slug": info.get("slug"),
         })
     rows.sort(key=lambda r: -r["strength"])
+    n_rated = 0
     for i, r in enumerate(rows, start=1):
         r["rank"] = i
+        # rated: a club of a followed league, or one with league-table games this season (the clubs the pages list); the
+        # rest (lower-division cup entrants, about 1,300) carry ratings that lean on the cup tier prior. rank_rated ranks
+        # the rated clubs only, so pages need not filter and re-rank.
+        r["rated"] = bool(r["in_league"] or (r.get("played") or 0) > 0)
+        if r["rated"]:
+            n_rated += 1
+        r["rank_rated"] = n_rated if r["rated"] else None
 
     leagues: dict[str, dict] = {}
     for slug, name in league_names.items():
@@ -158,7 +166,7 @@ def build_pool(pooled, league_names: dict[str, str], cup_names: dict[str, str],
         r["block"] = BLOCKS.get(r["comp"], "Other")
     return {
         "model": {"rho": round(rho, 5), "home_adv": round(home_adv, 5), "attack_mean": round(att_bar, 5),
-                  "defence_mean": round(def_bar, 5), "max_goals": MAX_GOALS, "n_clubs": len(rows)},
+                  "defence_mean": round(def_bar, 5), "max_goals": MAX_GOALS, "n_clubs": len(rows), "n_rated": n_rated},
         "leagues": leagues,
         "clubs": rows,
         "bridges": bridges or {},

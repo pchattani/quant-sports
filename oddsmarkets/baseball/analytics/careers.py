@@ -207,6 +207,9 @@ def current_blocks(ctx: SeasonContext, hcat: dict | None, pcat: dict | None) -> 
             r = pp[pid]
             blk["pitching"] = {k: r.get(k) for k in ("values", "pct", "pct_role", "n", "qualified", "bf", "team", "role", "primary", "age")}
             blk["arsenal"] = arsenal.get(pid)
+            # the league average of each of his pitch types (the movement chart's grey marks; peers.own_types)
+            from oddsmarkets.baseball.analytics.peers import own_types
+            blk["league_types"] = own_types((pcat or {}).get("league_types"), arsenal.get(pid))
             blk["pitch_zones"] = zp.get(pid)
             blk["movement"] = move.get(pid)
             blk["release"] = (phys.get(pid) or {}).get("release")
@@ -365,11 +368,28 @@ def similar(pid: str, season: int, idx, names: dict, k: int | None = None) -> li
     return out
 
 
+MOVE_CONTEXT = ("season", "snapshot", "phase", "horizons", "published", "base_rates", "deadline_label", "type_labels", "updated_at")
+
+
+def movement_rows(level: str = "mlb") -> dict[str, dict]:
+    """{pid: the player's movement.json row} for players/<pid>.json `movement`: {"row": {field: value} (movement.json
+    player_fields), plus the payload's season, snapshot, phase, horizons, published flags, base rates and labels} so the
+    player page needs no movement.json. {} when the file is absent (written by the value step, before the careers)."""
+    m = an.read_json(an.data_root() / level / "movement.json") or {}
+    fields, rows = m.get("player_fields") or [], m.get("players") or []
+    if not m.get("ok") or not fields or "pid" not in fields:
+        return {}
+    ctx = {k: m.get(k) for k in MOVE_CONTEXT if k in m}
+    i = fields.index("pid")
+    return {str(r[i]): {**ctx, "row": dict(zip(fields, r))} for r in rows if isinstance(r, list) and len(r) == len(fields)}
+
+
 def write_careers(write, cats: dict[tuple, dict], blocks: dict[str, dict], history_rows: dict[str, dict] | None,
                   history_extra: set[str] | None, old_reader) -> dict:
     """Write data/players/<pid>.json for every player in the catalogues (all levels and seasons on disk) and every
     Retrosheet-era player on the all-time leaderboards; returns players_index rows."""
     people = an.load_people()
+    moves = movement_rows("mlb")
     rows: dict[str, list] = {}
     latest: dict[str, tuple] = {}
     names: dict[str, str] = {}
@@ -412,7 +432,7 @@ def write_careers(write, cats: dict[tuple, dict], blocks: dict[str, dict], histo
                            "fg": info.get("fg") or pe.get("fg")},
                    "seasons": rows.get(pid, []), "history": ({**h, "cols": {"batting": _hist_cols("batting"), "pitching": _hist_cols("pitching")}}
                                                            if h else None),
-                   "current": cur, "similar": sim, "updated_at": an.now()}
+                   "current": cur, "similar": sim, "movement": moves.get(pid), "updated_at": an.now()}
         if h:
             from oddsmarkets.baseball.analytics.history import notice_meta
             payload["meta"] = notice_meta()

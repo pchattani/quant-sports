@@ -291,7 +291,7 @@ def markets_payload(ctx: SeasonContext, sim: dict | None, awards: dict | None, c
             "awards": (awards or {}).get("markets") if isinstance(awards, dict) else None, "fetched": bool(mk),
             "futures_error": (fut or {}).get("error") if isinstance(fut, dict) else None, "generated_at": (fut or {}).get("generated_at")
             if isinstance(fut, dict) else None,
-            "sources": ["Kalshi", "Polymarket"], "notice": "18+. Prices are informational; no affiliation with any bookmaker or exchange."}
+            "sources": ["Kalshi", "Polymarket"], "notice": "18+. Market probabilities are shown for reference only; no affiliation with any bookmaker or exchange."}
 
 
 def gaps(cards: list[dict], futures: dict | None = None, n: int = 10) -> list[dict]:

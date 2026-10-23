@@ -18,7 +18,7 @@ GI.route('leaders', function (el, params) {
   return GI.loadAll([GI.ypath('players.json', S), GI.ypath('value.json', S)]).then(res => {
     if (!el.isConnected) return;
     const raw = res[0];
-    const head = GI.pageHead('Players · ' + S, 'Leaders', 'Qualified players only unless you say otherwise; each player is ranked within his comparison group (QB, RB, WR, TE, outside pass rushers, interior linemen, LB, CB, S, K, P).') + GI.sectionNav('players', 'leaders');
+    const head = GI.pageHead('Players · ' + S, 'Leaders', 'Qualified players only unless you say otherwise; each player is ranked within their comparison group (QB, RB, WR, TE, outside pass rushers, interior linemen, LB, CB, S, K, P).') + GI.sectionNav('players', 'leaders');
     const X = GI.cat.prepare(raw);
     if (!X) {
       return GI.load(GI.ypath('leaders.json', S)).then(d => {
@@ -88,7 +88,7 @@ GI.route('leaders', function (el, params) {
           .concat(m[4] ? [] : [{ key: 'p', label: 'Percentile', type: 'bar', max: 100, fmt: v => (isNum(v) ? String(Math.round(v)) : '—'), tip: 'Against ' + g.peer + ', qualified (100 = best)', sort: false }]) });
       else GI.set('ld-table', GI.muted('Nobody with this metric matches.'));
       GI.set('ld-sub', (ST.dir === 'worst' ? 'Bottom ' : 'Top ') + Math.min(ST.n, total) + ' of ' + total + ' ' + esc(g.name.toLowerCase()) + ' · ' + S);
-      GI.set('ld-note', '<b>' + esc(m[1]) + '</b>: ' + esc(m[5] || '') + (m[4] ? ' A style metric: it describes how he plays, not how well.' : '') + ' Qualified: ' + esc(GI.SP.minLine(g)) + '.' + (GI.SP.NOTE[g.id] ? ' ' + esc(GI.SP.NOTE[g.id]) : '') +
+      GI.set('ld-note', '<b>' + esc(m[1]) + '</b>: ' + esc(m[5] || '') + (m[4] ? ' A style metric: it describes how a player plays, not how well.' : '') + ' Qualified: ' + esc(GI.SP.minLine(g)) + '.' + (GI.SP.NOTE[g.id] ? ' ' + esc(GI.SP.NOTE[g.id]) : '') +
         ' ' + GI.glossLink(m[0], 'Glossary →') + ' · <a href="' + GI.ghref('lab', S, { g: core, x: m[0] }) + '">In the lab →</a>');
     };
     setup();

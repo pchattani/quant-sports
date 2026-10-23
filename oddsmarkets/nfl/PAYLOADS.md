@@ -295,3 +295,20 @@ targets: {k, test, dev}}, split {dev, test}, notes, updated_at}`.
 A block that failed its pre-registered test carries `null` probabilities / empty lists and a `reasons` entry; on
 22 Oct 2026 `next` and `deadline` are published, the type split shows the base shares, arrivals and targets are
 not published. `p_<type>` sum to `p_next`. Positions are the value page's plus OL and LS (never targets: not valued).
+
+## Metrics-spec fields (23 Oct 2026; docs/METRICS_SPEC.md, docs/_design/metrics/nfl.json)
+
+- `players.json` rows: `role` (QB, RB, WR, TE, K, P; defenders EDGE = outside pass rushers, display code "ED", DL =
+  interior, LB, CB, S by value.json's `def_position` rule, so the two files agree) and `pct_role` {metric: 0-100} against
+  the qualified players of the same role (same shrinkage, floors and direction as `pct`). Catalogue `roles`
+  {role: {label, short, group, n, qualified}} and `role_rule`.
+- DEF `values`: `sacks_pg`, `tfl_pg`, `tackles_pg`, `pd_pg`, `ints_pg`, `ff_pg` (per game with a credited stat, k 6) and
+  `def_snaps` (participation, 2016-2025). DEF `qualified`: half the team's games with a credited stat, plus 300 defensive
+  snaps over 17 games where participation exists (the old tackles-equivalent rule qualified 48% of snap-regular interior
+  linemen; 2024: DL 48 -> 101, EDGE 66 -> 97).
+- K `values.fg_oe_att`: field goals over expected per attempt (the percentile basis; `fg_oe` stays the season total).
+- P `values.net_oe`: sign fixed (higher = better; it ran r -0.95 with net average before).
+- `players/<pid>.json`: `current.role`, `current.pct_role`, `current.peer` {role, label, short, group, n, minimum,
+  spec_group}; `seasons[].role`; `similar` [[pid, name, team, similarity 0-100]] by the spec recipe
+  (oddsmarkets/common/similar.py: the role's features with gvar_pg from value.json, z within role and season, weights
+  = year-to-year r floored at 0.2, k 5; similarity = 100 exp(-distance)).

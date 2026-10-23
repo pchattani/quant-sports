@@ -135,7 +135,7 @@ function buildDrivers(ids, ss, careers, elo, season, y) {
   };
   var Ps = [0, 1].map(function (i) { return ss[i].cat ? PD.v2.peer(ss[i].cat, 'drivers', ss[i].year === y ? season : null) : null; });
   var ents = [0, 1].map(function (i) { var d = ss[i].d || {}; return { name: names[i], href: PD.driverHref(ids[i]), abbr: short[i], sub: [d.team ? PD.teamName(d.team) : '', ss[i].year ? ss[i].year : '', isNum(d.races) ? d.races + ' starts' : ''].filter(Boolean).join(' · ') }; });
-  var peerTxt = Ps[0] && Ps[1] ? (same ? 'Ranked against ' + esc(Ps[0].label) + ' in ' + ss[0].year + ' (' + Ps[0].n + ' drivers)' : 'Different seasons: each ranked against his own season’s drivers (' + (ss[0].year || '—') + ' v ' + (ss[1].year || '—') + ')') : 'No driver catalogue for one of them (it starts in 2018)';
+  var peerTxt = Ps[0] && Ps[1] ? (same ? 'Ranked against ' + esc(Ps[0].label) + ' in ' + ss[0].year + ' (' + Ps[0].n + ' drivers)' : 'Different seasons: each ranked against their own season’s drivers (' + (ss[0].year || '—') + ' v ' + (ss[1].year || '—') + ')') : 'No driver catalogue for one of them (it starts in 2018)';
   var shortOf = [0, 1].filter(function (i) { return Ps[i] && !Ps[i].qualified(ids[i]); }).map(function (i) { return names[i]; });
   var dOpts = [['driver_effect', 'Race rating'], ['quali_driver_effect', 'Qualifying'], ['race_h2h', 'Race H2H'], ['points_per_race', 'Points / race'], ['race_pace', 'Race pace']];
   PD.set('cmp-body', '<div class="pd-cmp-ids">' + card(0) + card(1) + '</div>' +

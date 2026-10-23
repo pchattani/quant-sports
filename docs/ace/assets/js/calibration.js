@@ -38,23 +38,32 @@ function scoreRows(src, models) {
 const SCORE_COLS = [{ label: 'Forecaster' }, { label: 'Matches', align: 'right' }, { label: 'Log-loss', align: 'right', title: 'Lower is better' }, { label: 'Brier', align: 'right', title: 'Lower is better' },
   { label: 'Skill v coin', align: 'right', title: '1 − log-loss / ln 2: the improvement on calling every match 50-50' }];
 
-/* Reliability: series [{name, colour, bins: [{lo, hi, n, mean_p, freq}]}] */
+/* Reliability on the kit (QKC): series [{name, colour (hex), bins: [{lo, hi, n, mean_p, freq}]}]; the diagonal is perfect
+   calibration, marker size the number of forecasts in the bin. */
 function reliability(elId, series, opts) {
   const k = K(), o = opts || {};
   const node = document.getElementById(elId);
   if (!node) return;
-  const tr = [{ type: 'scatter', mode: 'lines', x: [0, o.max || 1], y: [0, o.max || 1], line: { color: '#6e7681', dash: 'dot', width: 1 }, hoverinfo: 'skip', showlegend: false }];
-  series.forEach(s => {
-    const bins = (s.bins || []).map(b => ({ x: b.mean_p, y: b.freq, n: b.n || 0, lo: b.lo, hi: b.hi })).filter(b => k.isNum(b.x) && k.isNum(b.y) && b.n >= (o.minN || 1));
-    if (!bins.length) return;
-    const maxN = Math.max.apply(null, bins.map(b => b.n));
-    tr.push({ type: 'scatter', mode: 'lines+markers', name: s.name, x: bins.map(b => b.x), y: bins.map(b => b.y), customdata: bins.map(b => [b.n, k.pct(b.lo, 0), k.pct(b.hi, 0)]),
-      marker: { size: bins.map(b => 5 + 13 * Math.sqrt(b.n / maxN)), color: s.colour }, line: { color: s.colour, width: 1.5 },
-      hovertemplate: k.esc(s.name) + '<br>bin %{customdata[1]}–%{customdata[2]}: forecast %{x:.1%}, observed %{y:.1%} (n=%{customdata[0]})<extra></extra>' });
-  });
-  if (tr.length < 2) { node.innerHTML = k.muted('No reliability bins.'); return; }
-  k.plot(node, tr, k.layout({ showlegend: true, legend: { orientation: 'h', y: -0.22, font: { color: k.C.text2, size: 10 } }, margin: { l: 55, r: 15, t: 10, b: 84 },
-    xaxis: { title: 'Forecast probability (bin mean)', tickformat: '.0%', range: [0, o.max || 1] }, yaxis: { title: 'Observed frequency', tickformat: '.0%', range: [0, o.max || 1] } }));
+  const S = series.map(x => ({ name: x.name, colour: x.colour, bins: (x.bins || []).map(b => ({ x: b.mean_p, y: b.freq, n: b.n || 0, lo: b.lo, hi: b.hi })).filter(b => k.isNum(b.x) && k.isNum(b.y) && b.n >= (o.minN || 1)) })).filter(x => x.bins.length);
+  if (!S.length) { node.innerHTML = k.muted('No reliability bins.'); return; }
+  node.classList.add('qk-chart');
+  const mx = o.max || 1;
+  QKC.mount(node, Tk => {
+    const pf = v => Math.round(v * 100) + '%';
+    const xa = QKC.axis(Tk, { fmt: pf, min: 0, max: mx, line: true });
+    QKC.nameAxis(xa, 'Forecast probability (bin mean)', 'bottom');
+    const ya = QKC.axis(Tk, { fmt: pf, min: 0, max: mx });
+    QKC.nameAxis(ya, 'Observed frequency', 'side');
+    return { grid: { left: 8, right: 26, top: 30, bottom: 62, containLabel: true }, xAxis: xa, yAxis: ya,
+      legend: { bottom: 0, left: 0, textStyle: { color: Tk.ink2 }, itemWidth: 12, itemHeight: 8, data: S.map(x => x.name) },
+      tooltip: QKC.tooltip(Tk, { formatter: q => { const b = q.data.b || {}; return '<b>' + k.esc(q.seriesName) + '</b><br>bin ' + k.pct(b.lo, 0) + '–' + k.pct(b.hi, 0) + ': forecast ' + k.pct(b.x, 1) + ', observed ' + k.pct(b.y, 1) + ' (n = ' + k.int(b.n) + ')'; } }),
+      series: S.map((x, i) => {
+        const maxN = Math.max.apply(null, x.bins.map(b => b.n));
+        return { type: 'line', name: x.name, data: x.bins.map(b => ({ value: [b.x, b.y], b: b, symbolSize: 5 + 13 * Math.sqrt(b.n / maxN) })), symbol: 'circle',
+          lineStyle: { color: x.colour, width: i === 0 ? 2.4 : 1.5 }, itemStyle: { color: x.colour, borderColor: Tk.s1, borderWidth: 1 },
+          markLine: i === 0 ? { silent: true, symbol: 'none', animation: false, label: { show: false }, data: [[{ coord: [0, 0], lineStyle: { color: Tk.ink3, type: [3, 4] } }, { coord: [mx, mx] }]] } : undefined };
+      }) };
+  }, { label: 'Reliability: forecast against observed' });
 }
 
 function reading(d, T) {
@@ -180,10 +189,13 @@ function render(el, params, state) {
     k.wireToggle(el, 'cal-rel-set', drawRel);
 
     const PY = d.per_year || {}, ys = Object.keys(PY).sort();
-    if (ys.length) k.plot('cal-years', ['model', 'elo', 'rank', 'pinnacle', 'avg'].filter(x => ys.some(y => (PY[y][x] || {}).n)).map(x => ({
-      type: 'scatter', mode: 'lines+markers', name: label(x), x: ys, y: ys.map(y => (PY[y][x] || {}).logloss), line: { color: COL[x], width: x === 'model' ? 2.6 : 1.5, dash: BOOK[x] ? 'dot' : 'solid' }, marker: { size: 5 },
-      hovertemplate: '%{x}: ' + label(x) + ' %{y:.4f}<extra></extra>' })), k.layout(Object.assign(k.legendTop(), { margin: { l: 55, r: 10, t: 34, b: 36 }, xaxis: { type: 'category', title: 'Year' }, yaxis: { title: 'Log-loss' } })));
-    else document.getElementById('cal-years').innerHTML = k.muted('No per-year scores.');
+    const yrsN = document.getElementById('cal-years');
+    const yrSeries = ['model', 'elo', 'rank', 'pinnacle', 'avg'].filter(x => ys.some(y => (PY[y][x] || {}).n));
+    if (ys.length && yrsN) {
+      yrsN.classList.add('qk-chart');
+      QKC.line(yrsN, { x: ys, series: yrSeries.map(x => ({ name: label(x), label: { model: 'Ours', elo: 'Elo', rank: 'Ranking', pinnacle: 'Pinnacle', avg: 'Average' }[x], data: ys.map(y => (PY[y][x] || {}).logloss), color: COL[x], width: x === 'model' ? 2.6 : 1.5, dash: !!BOOK[x], symbols: true })),
+        xName: 'Year', yName: 'Log-loss (lower is better)', yFmt: v => Number(v).toFixed(3), yScale: true, label: 'Log-loss by year' });
+    } else if (yrsN) yrsN.innerHTML = k.muted('No per-year scores.');
 
     const drawBins = () => {
       const v = document.getElementById('cal-bin-model').value;
@@ -205,17 +217,17 @@ function render(el, params, state) {
       if (!keys.length) { document.getElementById('cal-sets').innerHTML = k.muted('No best-of-' + bo + ' matches.'); document.getElementById('cal-sets-t').innerHTML = ''; sub.textContent = ''; return; }
       const n = (S[keys[0]] || {}).n;
       sub.innerHTML = 'Forecast against observed share of each set score, best of ' + bo + ', ' + k.int(n) + ' matches' + (k.isNum((D.set_score_logloss || {})[bo]) ? ' · multi-class log-loss ' + k.num(D.set_score_logloss[bo], 3) : '') + '. Player 1 is a coin toss, so mirror scores should match.';
-      k.plot('cal-sets', [
-        { type: 'bar', name: 'Forecast', x: keys, y: keys.map(s => S[s].pred), marker: { color: '#d9f24f' }, hovertemplate: '%{x}: forecast %{y:.1%}<extra></extra>' },
-        { type: 'bar', name: 'Observed', x: keys, y: keys.map(s => S[s].obs), marker: { color: '#58a6ff' }, hovertemplate: '%{x}: observed %{y:.1%}<extra></extra>' }
-      ], k.layout(Object.assign(k.legendTop(), { barmode: 'group', margin: { l: 44, r: 10, t: 30, b: 34 }, xaxis: { type: 'category', title: 'Set score' }, yaxis: { title: 'Share of matches', tickformat: '.0%' } })));
+      const csN = document.getElementById('cal-sets');
+      csN.classList.add('qk-chart');
+      QKC.bar(csN, { cats: keys, series: [{ name: 'Our forecast', color: 'model', data: keys.map(x => S[x].pred) }, { name: 'Observed', color: QK.cssVar('--c-other'), data: keys.map(x => S[x].obs) }],
+        legend: true, min: 0, fmt: v => Math.round(v * 100) + '%', catName: 'Set score', valName: 'Share of matches', label: 'Set scores: forecast against observed' });
       document.getElementById('cal-sets-t').innerHTML = k.table([{ label: 'Sets' }, { label: 'Forecast', align: 'right' }, { label: 'Observed', align: 'right' }, { label: 'Gap', align: 'right' }],
         keys.map(s => [s, { v: S[s].pred, html: k.pct(S[s].pred, 1) }, { v: S[s].obs, html: k.pct(S[s].obs, 1) }, { v: S[s].obs - S[s].pred, html: k.signed(100 * (S[s].obs - S[s].pred), 1) + ' pts' }]), { compact: true });
     };
     drawSets('3');
     k.wireToggle(el, 'cal-bo', drawSets);
 
-    reliability('cal-ss', [{ name: 'Straight sets', colour: '#d9f24f', bins: (D.straight_sets || {}).reliability }, { name: 'At least one tiebreak', colour: '#bc8cff', bins: (D.tiebreak || {}).reliability }], { minN: 20 });
+    reliability('cal-ss', [{ name: 'Straight sets', colour: COL.model, bins: (D.straight_sets || {}).reliability }, { name: 'At least one tiebreak', colour: '#3fb9a8', bins: (D.tiebreak || {}).reliability }], { minN: 20 });
 
     const TG = D.total_games || {}, OL = TG.over_lines || {};
     const olk = Object.keys(OL).sort((a, b) => { const x = a.split('_'), y = b.split('_'); return x[0] === y[0] ? Number(x[1]) - Number(y[1]) : x[0].localeCompare(y[0]); });
@@ -224,15 +236,28 @@ function render(el, params, state) {
         { v: o.base_rate - o.mean_p, html: '<span class="' + (Math.abs(o.base_rate - o.mean_p) > 0.03 ? 'pg-down' : '') + '">' + k.signed(100 * (o.base_rate - o.mean_p), 1) + ' pts</span>' }, { v: o.logloss, html: k.num(o.logloss, 4) }]; }), { compact: true }) +
       '<div class="pg-note">Mean total games: ' + Object.keys(TG.mean || {}).map(b => 'best of ' + b + ' ' + k.num(TG.mean[b].pred, 1) + ' forecast v ' + k.num(TG.mean[b].obs, 1) + ' played').join('; ') + (k.isNum(D.handicap_logloss) ? '. Game-handicap log-loss ' + k.num(D.handicap_logloss, 3) : '') + '.</div>' : k.muted('No total-games lines.');
     const PIT = TG.pit_hist || {};
-    if (Object.keys(PIT).length) k.plot('cal-pit', Object.keys(PIT).map((b, i) => { const tot = PIT[b].reduce((s, x) => s + x, 0) || 1; return { type: 'bar', name: 'Best of ' + b, x: PIT[b].map((_, j) => (j + 0.5) / PIT[b].length), y: PIT[b].map(x => x / tot), marker: { color: i ? '#58a6ff' : '#d9f24f' }, opacity: 0.8, hovertemplate: 'PIT %{x:.2f}: %{y:.1%}<extra>Best of ' + b + '</extra>' }; }),
-      k.layout(Object.assign(k.legendTop(), { barmode: 'group', margin: { l: 44, r: 10, t: 30, b: 36 }, xaxis: { title: 'PIT of total games (flat = calibrated; a slope means a biased mean)', range: [0, 1] }, yaxis: { title: 'Share of matches', tickformat: '.0%' },
-        shapes: [{ type: 'line', x0: 0, x1: 1, y0: 0.1, y1: 0.1, line: { color: '#6e7681', dash: 'dot', width: 1 } }] })));
+    const pitN = document.getElementById('cal-pit');
+    if (Object.keys(PIT).length && pitN) {
+      pitN.classList.add('qk-chart');
+      const pk = Object.keys(PIT), nb = Math.max.apply(null, pk.map(b => PIT[b].length));
+      QKC.mount(pitN, Tk => {
+        const xa = QKC.axis(Tk, { type: 'category', data: Array.from({ length: nb }, (_, j) => ((j + 0.5) / nb).toFixed(2)), split: false, line: true });
+        QKC.nameAxis(xa, 'PIT of total games (flat = calibrated; a slope means a biased mean)', 'bottom');
+        const ya = QKC.axis(Tk, { fmt: v => Math.round(v * 100) + '%', min: 0 });
+        QKC.nameAxis(ya, 'Share of matches', 'side');
+        return { grid: { left: 8, right: 12, top: 50, bottom: 34, containLabel: true }, xAxis: xa, yAxis: ya,
+          legend: { top: 0, left: 0, textStyle: { color: Tk.ink2 }, itemWidth: 12, itemHeight: 8 },
+          tooltip: QKC.tooltip(Tk, { trigger: 'axis', formatter: ps => 'PIT ' + ps[0].axisValue + ps.map(q => QKC.tipRow(q.color, q.seriesName, Math.round(q.value * 1000) / 10 + '%')).join('') }),
+          series: pk.map((b, i) => { const tot = PIT[b].reduce((a, x) => a + x, 0) || 1; return { type: 'bar', name: 'Best of ' + b, data: PIT[b].map(x => x / tot), itemStyle: { color: QKC.hexA(i ? '#5b8def' : COL.model, 0.8) },
+            markLine: i === 0 ? { silent: true, symbol: 'none', label: { show: false }, lineStyle: { color: Tk.ink3, type: [3, 4] }, data: [{ yAxis: 1 / nb }] } : undefined }; }) };
+      }, { label: 'Total games: probability integral transform' });
+    }
 
     // Tournaments.
     const drawTour = cp => {
       const X = TT[cp] || {};
       document.getElementById('cal-tour-sub').textContent = k.isNum(TT.n_events) ? k.int(TT.n_events) + ' events, ' + k.int(TT.sims) + ' simulations each' : '';
-      reliability('cal-tour', [['title', 'Title', '#d9f24f'], ['final', 'Final', '#58a6ff'], ['sf', 'Semi-final', '#f97316']].filter(x => X[x[0]]).map(x => ({ name: x[1], colour: x[2], bins: X[x[0]].reliability })), { minN: 10 });
+      reliability('cal-tour', [['title', 'Title', COL.model], ['final', 'Final', '#5b8def'], ['sf', 'Semi-final', '#f08a3c']].filter(x => X[x[0]]).map(x => ({ name: x[1], colour: x[2], bins: X[x[0]].reliability })), { minN: 10 });
       document.getElementById('cal-tour-t').innerHTML = Object.keys(X).length ? k.table([{ label: 'Reach' }, { label: 'Player-events', align: 'right' }, { label: 'Log-loss', align: 'right' }, { label: 'Brier', align: 'right' }, { label: 'Mean forecast', align: 'right' }, { label: 'Base rate', align: 'right' }],
         Object.keys(X).map(x => [x === 'sf' ? 'Semi-final' : x.charAt(0).toUpperCase() + x.slice(1), { v: X[x].n, html: k.int(X[x].n) }, { v: X[x].logloss, html: k.num(X[x].logloss, 4) }, { v: X[x].brier, html: k.num(X[x].brier, 4) }, { v: X[x].mean_p, html: k.pct(X[x].mean_p, 1) }, { v: X[x].base_rate, html: k.pct(X[x].base_rate, 1) }]), { compact: true }) : k.muted('No tournament checkpoints in this file.');
     };
@@ -240,19 +265,19 @@ function render(el, params, state) {
     k.wireToggle(el, 'cal-tour-cp', drawTour);
 
     const LV = D.live_by_sets || {};
-    reliability('cal-live', [{ name: 'All set boundaries', colour: '#39d0d8', bins: (LV.all || {}).reliability }], { minN: 20 });
+    reliability('cal-live', [{ name: 'All set boundaries', colour: COL.model, bins: (LV.all || {}).reliability }], { minN: 20 });
     const BS = LV.by_state || {};
     document.getElementById('cal-live-t').innerHTML = Object.keys(BS).length ? k.table([{ label: 'State (p1 sets first)' }, { label: 'n', align: 'right' }, { label: 'Forecast', align: 'right' }, { label: 'Won', align: 'right' }, { label: 'Log-loss', align: 'right' }],
       Object.keys(BS).sort().map(s => [k.esc(s.replace('bo3', 'Best of 3,').replace('bo5', 'Best of 5,')), { v: BS[s].n, html: k.int(BS[s].n) }, { v: BS[s].mean_p, html: k.pct(BS[s].mean_p, 1) }, { v: BS[s].base_rate, html: k.pct(BS[s].base_rate, 1) }, { v: BS[s].logloss, html: k.num(BS[s].logloss, 3) }]), { compact: true }) : '';
 
     // Blend.
     const BY = d.blend_by_year || {}, by = Object.keys(BY).sort(), RS = d.rank_slope_by_year || {};
-    if (by.length) k.plot('cal-blend', [
-      { type: 'scatter', mode: 'lines+markers', name: 'w Elo', x: by, y: by.map(y => BY[y].w_elo), line: { color: '#bc8cff', width: 2 }, hovertemplate: '%{x}: w Elo %{y:.3f}<extra></extra>' },
-      { type: 'scatter', mode: 'lines+markers', name: 'w serve/return', x: by, y: by.map(y => BY[y].w_sr), line: { color: '#39d0d8', width: 2 }, hovertemplate: '%{x}: w SR %{y:.3f}<extra></extra>' },
-      { type: 'scatter', mode: 'lines', name: 'Rank slope b', x: by, y: by.map(y => RS[y]), line: { color: '#8b949e', width: 1.5, dash: 'dot' }, hovertemplate: '%{x}: b %{y:.3f}<extra></extra>' }
-    ], k.layout(Object.assign(k.legendTop(), { margin: { l: 44, r: 10, t: 34, b: 36 }, xaxis: { type: 'category', title: 'Year' }, yaxis: { title: 'Weight', rangemode: 'tozero' } })));
-    else document.getElementById('cal-blend').innerHTML = k.muted('No blend history.');
+    const blN = document.getElementById('cal-blend');
+    if (by.length && blN) {
+      blN.classList.add('qk-chart');
+      QKC.line(blN, { x: by, series: [{ name: 'w Elo', data: by.map(y => BY[y].w_elo), color: '#3fb9a8', symbols: true }, { name: 'w serve/return', data: by.map(y => BY[y].w_sr), color: '#39d0d8', symbols: true },
+        { name: 'Rank slope b', data: by.map(y => RS[y]), color: '#8b929f', dash: true }], xName: 'Year', yName: 'Weight', yMin: 0, yFmt: v => Number(v).toFixed(2), label: 'Blend weights by year' });
+    } else if (blN) blN.innerHTML = k.muted('No blend history.');
 
     // Validation.
     if (document.getElementById('cal-val-chart')) {
@@ -264,12 +289,9 @@ function render(el, params, state) {
         const xs = rows.map(r => r['inf_' + kind]), ys = rows.map(r => r['real_' + kind]);
         const lo = Math.min.apply(null, xs.concat(ys)), hi = Math.max.apply(null, xs.concat(ys));
         const maxN = Math.max.apply(null, rows.map(r => r.n || 1));
-        k.plot(node, [{ type: 'scatter', mode: 'lines', x: [lo, hi], y: [lo, hi], line: { color: '#6e7681', dash: 'dash', width: 1 }, hoverinfo: 'skip', showlegend: false },
-          { type: 'scatter', mode: 'markers', x: xs, y: ys, customdata: rows.map(r => r.pid), text: rows.map(r => k.esc(k.name(T, r.pid)) + ' · ' + r.n + ' matches'),
-            marker: { size: rows.map(r => 5 + 10 * Math.sqrt((r.n || 1) / maxN)), color: '#d9f24f', opacity: 0.75, line: { color: '#0d1117', width: 0.6 } },
-            hovertemplate: '%{text}<br>inferred %{x:.1%} · real %{y:.1%}<extra></extra>' }],
-          k.layout({ margin: { l: 55, r: 15, t: 10, b: 50 }, xaxis: { title: 'Inferred from scores', tickformat: '.0%' }, yaxis: { title: 'Real (WTA stats)', tickformat: '.0%' } }));
-        if (node.on) node.on('plotly_click', ev => { const p = ev.points && ev.points[0]; if (p && p.customdata) location.hash = k.playerHref(T, p.customdata); });
+        TA.v2.scatter(node, { points: rows.map(r => ({ x: r['inf_' + kind], y: r['real_' + kind], color: 'model', size: 5 + 10 * Math.sqrt((r.n || 1) / maxN), href: k.playerHref(T, r.pid),
+          name: k.esc(k.name(T, r.pid)) + ' · ' + r.n + ' matches<br>inferred ' + k.pct(r['inf_' + kind], 1) + ' · real ' + k.pct(r['real_' + kind], 1) })), diagonal: [lo, hi],
+          xName: 'Inferred from scores', yName: 'Real (WTA statistics)', xFmt: v => Math.round(v * 100) + '%', yFmt: v => Math.round(v * 100) + '%', label: 'Inferred against real, per player' });
         const st = V2[kind] || {};
         tab.innerHTML = '<div class="af-kv">' + [['Players', k.int(st.n || V2.n_players)], ['Pearson', k.num(st.pearson, 3)], ['Spearman', k.num(st.spearman, 3)], ['RMSE', k.isNum(st.rmse) ? k.num(100 * st.rmse, 1) + ' pts' : '—'], ['Bias', k.isNum(st.bias) ? k.signed(100 * st.bias, 1) + ' pts' : '—']]
           .map(x => '<div class="af-kv-i"><span>' + x[0] + '</span><strong>' + x[1] + '</strong></div>').join('') + '</div>' +

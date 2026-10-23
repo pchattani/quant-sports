@@ -57,7 +57,7 @@ VERSION = "value-1"
 POSITIONS = ("QB", "RB", "WR", "TE", "EDGE", "DL", "LB", "CB", "S", "K", "P")
 OFFENCE = ("QB", "RB", "WR", "TE")
 DEFENCE = ("EDGE", "DL", "LB", "CB", "S")
-POS_LABEL = {"QB": "Quarterback", "RB": "Running back", "WR": "Wide receiver", "TE": "Tight end", "EDGE": "Edge rusher",
+POS_LABEL = {"QB": "Quarterback", "RB": "Running back", "WR": "Wide receiver", "TE": "Tight end", "EDGE": "Outside pass rusher",
              "DL": "Interior line", "LB": "Linebacker", "CB": "Cornerback", "S": "Safety", "K": "Kicker", "P": "Punter",
              "OL": "Offensive line"}
 SLOTS = {"QB": 1, "RB": 2, "WR": 3, "TE": 2, "EDGE": 2, "DL": 2, "LB": 2, "CB": 3, "S": 2, "K": 1, "P": 1}

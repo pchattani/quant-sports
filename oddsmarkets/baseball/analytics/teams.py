@@ -455,6 +455,12 @@ def bullpens(ctx: SeasonContext, t2a: dict) -> dict[str, list]:
     return out
 
 
+# extra roster columns (Bullpen redesign): next season's projected wOBA, platoon wOBA; starts, expected RA9, Pitching+,
+# pitches per start
+ROSTER_H = ("proj_woba", "woba_vl", "woba_vr")
+ROSTER_P = ("proj_woba", "gs", "xra9", "pitching_plus", "p_start")
+
+
 def roster(ctx: SeasonContext, tid: str, hp: dict, pp: dict) -> list:
     """[{pid, name, pos, kind, war, key stat}] for the team's players this season (latest team), plus the 40-man and
     injured list from the store when the fetch recorded them."""
@@ -465,12 +471,12 @@ def roster(ctx: SeasonContext, tid: str, hp: dict, pp: dict) -> list:
         if r.get("team") == tid:
             out.append({"pid": pid, "name": r["name"], "pos": r.get("pos"), "kind": "hitter", "pa": r.get("pa"),
                         "war": r["values"].get("war"), "woba": r["values"].get("woba"), "xwoba_plus": r["values"].get("xwoba_plus"),
-                        "injured": inj.get(pid)})
+                        **{k: r["values"].get(k) for k in ROSTER_H}, "injured": inj.get(pid)})
     for pid, r in pp.items():
         if r.get("team") == tid:
             out.append({"pid": pid, "name": r["name"], "pos": r.get("role"), "kind": "pitcher", "ip": r["values"].get("ip"),
                         "war": r["values"].get("war"), "ra9": r["values"].get("ra9"), "stuff_plus": r["values"].get("stuff_plus"),
-                        "injured": inj.get(pid)})
+                        **{k: r["values"].get(k) for k in ROSTER_P}, "injured": inj.get(pid)})
     out.sort(key=lambda x: -(x.get("war") or -99))
     rn, rp = meta.get("names") or {}, meta.get("pos") or {}
     for pid in meta.get("40man") or []:

@@ -1676,7 +1676,7 @@ def calibration_payload(ctx: dict) -> dict:
         "team's usual venue (women before 2011 have no venues: tournament games only).",
         "Selection proxy accuracy is leave-one-season-out; the tournament forecasts use the actual bracket with "
         "pre-tournament ratings; the seed baseline is fitted on earlier seasons only."]
-    notes.append("Lines are sanity-checked (data.clean_odds): ESPN core odds put the price (-110) in the spread and total "
+    notes.append("Lines are sanity-checked (data.clean_odds): ESPN core odds put the -110 quote in the spread and total "
                  "fields of about 300 men's 2023 games; those lines are dropped, as are totals outside a plausible range.")
     notes.append("by_line splits the v-close numbers by line type: an explicit closing line (the book's close block, ESPN BET "
                  "2023-2025, DraftKings 2026) or the last listed line / median of books (earlier seasons), which may be "

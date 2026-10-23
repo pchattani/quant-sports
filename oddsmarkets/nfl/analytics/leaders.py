@@ -184,7 +184,7 @@ MODEL = [
      "Value's per-play rate in each role less the position's 20th-percentile rate, times plays (QB, RB, WR, TE); kickers' points over "
      "expected, punters' punting EPA and defenders' Splash EPA the same way. Offensive linemen are not valued individually."),
     ("starters_value", "Position value (team)", "Value", "The sum of a team's starters' per-game value above replacement at a "
-     "position (QB 1, RB 2, WR 3, TE 2, EDGE 2, DL 2, LB 2, CB 3, S 2, K 1, P 1) from the current roster; the QB is the team-strength "
+     "position (QB 1, RB 2, WR 3, TE 2, outside pass rushers (ED) 2, interior line (DL) 2, LB 2, CB 3, S 2, K 1, P 1) from the current roster; the QB is the team-strength "
      "model's QB term. Graded A-F by percentile among the 32 teams on the team pages."),
     ("trade_curve", "Trade sensitivity curve", "Season simulation", "A team's playoff, division, bye, conference and Super Bowl odds, "
      "wins and draft slot as its strength is shifted (-10 to +10 points a game), from the season simulation re-weighted by importance "

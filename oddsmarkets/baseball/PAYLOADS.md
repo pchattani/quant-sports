@@ -358,3 +358,17 @@ Sizes from the local build of 16 October 2026.
 - `mlb/fantasy_backtest.json` (27 KB): `{ok, by_season {season {T: {H, P: {n, <cat>: {model, last}, points {model, last,
   rank_model, rank_last}, value_5x5 {rank_model, rank_last}}}}, ros {T: ...}, week {T: ...}}, summary {season, ros, week},
   luck {H, P: {n, slope, corr, gap}}, version, notes}`.
+
+## Redesign payload asks (23 Oct 2026)
+
+- `data/<L>/<S>/peers.json` (`analytics/peers.py:build`): the player page's "Among peers" distributions without the
+  catalogue: `groups[set]` = {kind, n, floor {field, value, unit}, <metric>: [sorted values]} for hitters by position (C,
+  1B, 2B, 3B, SS, CF, LF/RF, DH, ALL) and pitchers by role (SP, RP), qualified at 200 PA / 300 BF (SP) / 120 BF (RP)
+  prorated by team games; `metrics` lists the keys per kind.
+- `data/<L>/<S>/league_types.json`: pitchers.json `league_types` alone (league average per pitch type, about 2 KB);
+  `players/<pid>.json` `current.league_types` holds the pitcher's own types.
+- `players/<pid>.json` `movement`: the player's `movement.json` row (`row` {field: value}) plus that payload's season,
+  snapshot, phase, horizons, published flags, base rates and labels (MLB).
+- `teams.json` roster rows: hitters add `proj_woba`, `woba_vl`, `woba_vr`; pitchers add `proj_woba`, `gs`, `xra9`,
+  `pitching_plus`, `p_start` (null where the catalogue has none).
+- Labels (ids unchanged): `edge_pct` "Shadow%", pitcher `r` "R (on the mound)", `bb` "uBB", hitter `g` "G (with a PA)".

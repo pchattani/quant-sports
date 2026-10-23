@@ -120,7 +120,8 @@ def pool_club_xgd(pool: dict, comps: dict[str, dict]) -> dict[int, dict]:
         cur = out.get(int(tid))
         if cur is None or prio > cur["_prio"]:
             out[int(tid)] = {"xgd": float(c["xg_for"]) - float(c["xg_against"]), "strength": c.get("strength"),
-                             "rank": c.get("rank"), "comp": c.get("comp"), "_prio": prio}
+                             "rank": c.get("rank"), "rank_rated": c.get("rank_rated"), "rated": c.get("rated"),
+                             "comp": c.get("comp"), "_prio": prio}
     return out
 
 
@@ -781,7 +782,8 @@ def write_club_needs(ctx: ValueContext, R: V.Rows, vals: np.ndarray, player_info
             payload = {
                 "tid": tid, "name": name, "league": slug, "league_name": (ctx.comps.get(slug) or {}).get("name"),
                 "season": e.get("season"), "as_of": today.isoformat(),
-                "pool": {"strength": buyer_strength, "rank": pc.get("rank"), "xgd": _round(pc.get("xgd"))} if pc else None,
+                "pool": {"strength": buyer_strength, "rank": pc.get("rank"), "rank_rated": pc.get("rank_rated"), "rated": pc.get("rated"),
+                         "xgd": _round(pc.get("xgd"))} if pc else None,
                 "units": unit_rows, "strengths": strengths, "weaknesses": weaknesses, "targets": targets,
                 "ppg": rate_pg, "remaining": remaining, "matches_per_season": e.get("games_total") and int(round(2 * e["games_total"] / max(len(league_clubs), 1))),
                 "gd_per_delta": ((sp.get("teams") or {}).get(name) or {}).get("gd_per_delta"),

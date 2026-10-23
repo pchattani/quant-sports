@@ -244,3 +244,4 @@ body.qk { font-size: var(--fs-md); }
 .rk-ol td.num, .rk-ol th.num { text-align: right; font-family: var(--font-num); }
 .rk-ours { color: var(--signal); }
 .rk-teamtile .rec { white-space: nowrap; }
+.rk-why { font-family: var(--font-ui); }

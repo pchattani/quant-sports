@@ -327,7 +327,7 @@ function bullpen(L, S, t, tid, pcat) {
       rows.map(r => { const a = [r.available, r.avail, r.availability].find(x => x !== undefined && x !== null); return [{ v: k.name(r.pid), html: k.playerLink(L, r.pid, r.name, S, 'pitcher') }, { v: a, html: k.isNum(a) ? k.pct(a, 0) : k.esc(a === true ? 'yes' : a === false ? 'no' : '—') }, { v: r.pitches_3d, html: k.int(r.pitches_3d) }, { v: r.rest, html: k.isNum(r.rest) ? r.rest + ' d' : '—' }]; }), { compact: true });
     return;
   }
-  host.innerHTML = k.table([{ label: 'Reliever' }, { label: 'G', align: 'right' }, { label: 'IP', align: 'right' }, { label: 'gmLI', align: 'right', title: 'Mean leverage when he entered (1 = average)' }, { label: 'RA9', align: 'right' }, { label: 'K−BB%', align: 'right' }, { label: 'Pitching+', align: 'right' }, { label: 'WAR', align: 'right' }],
+  host.innerHTML = k.table([{ label: 'Reliever' }, { label: 'G', align: 'right' }, { label: 'IP', align: 'right' }, { label: 'gmLI', align: 'right', title: 'Mean leverage on entering (1 = average)' }, { label: 'RA9', align: 'right' }, { label: 'K−BB%', align: 'right' }, { label: 'Pitching+', align: 'right' }, { label: 'WAR', align: 'right' }],
     rows.map(r => [{ v: r.name || k.name(r.pid), html: k.playerLink(L, r.pid, r.name, S, 'pitcher') }, { v: vv(r, 'g'), html: k.int(vv(r, 'g')) }, { v: vv(r, 'ip'), html: k.num(vv(r, 'ip'), 1) },
       { v: vv(r, 'gmli'), html: k.num(vv(r, 'gmli'), 2) }, { v: vv(r, 'ra9'), html: k.num(vv(r, 'ra9'), 2) }, { v: vv(r, 'k_bb_pct'), html: k.fmtV(vv(r, 'k_bb_pct'), 'pct') },
       { v: vv(r, 'pitching_plus'), html: k.fmtV(vv(r, 'pitching_plus'), 'plus') }, { v: vv(r, 'war'), html: k.isNum(vv(r, 'war')) ? k.signed(vv(r, 'war'), 1) : '—' }]), { compact: true });

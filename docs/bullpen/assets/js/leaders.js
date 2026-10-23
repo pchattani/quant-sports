@@ -36,7 +36,7 @@ function render(el, params, state) {
     '<label>Order' + k.select('ld-dir', [['best', 'Best first'], ['worst', 'Worst first']], S0.dir) + '</label>' +
     '<label>Show' + k.select('ld-n', [[25, 'Top 25'], [50, 'Top 50'], [100, 'Top 100'], [1000, 'All']], S0.n) + '</label>' +
     '<label>Min <span id="ld-floor-u"></span> <b id="ld-floor-v"></b><input id="ld-floor" type="range" min="0" max="700" step="5"></label>' +
-    '<label class="bp-check"><input type="checkbox" id="ld-qual"> past the floor for his position or role</label>' +
+    '<label class="bp-check"><input type="checkbox" id="ld-qual"> past the floor for the position or role</label>' +
     '</div></div></section>' +
     '<div class="qk-grid" style="margin-top:var(--sp-4)"><div class="qk-span-5"><div id="ld-chart-card"></div></div><div class="qk-span-7"><div id="ld-board-card"></div></div></div>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'At a glance', title: 'Top five', sub: 'The headline metrics from the metrics spec, players past the floor for their position or role.' }) + '<div class="qk-grid" id="ld-glance"></div></section>';

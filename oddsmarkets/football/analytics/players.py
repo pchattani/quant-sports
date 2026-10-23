@@ -421,6 +421,8 @@ def finalize_player(pid: str, a: dict[str, Any], meta: dict | None, pos: str | N
     mins = a["minutesPlayed"]
     p90 = max(mins, 1.0) / 90.0
     pens = int(inc.get("pens", 0))
+    # non-penalty xG leaves out every penalty taken: scored (incidents) and missed or saved (penaltyMiss); before 23 Oct
+    # 2026 a missed penalty's 0.79 stayed in npxg (value.py already removed both)
     goals = int(a["goals"])
     is_gk = pos == "G" if pos else bool(a["saves"] > 0 or a["keeperSaveValue"] > 0 or a["savedShotsFromInsideTheBox"] > 0)
     shots = int(a["totalShots"])
@@ -432,7 +434,7 @@ def finalize_player(pid: str, a: dict[str, Any], meta: dict | None, pos: str | N
         "matches": a["matches"], "starts": a["starts"], "minutes": int(mins),
         "goals": goals, "assists": int(a["goalAssist"]),
         "pens": pens, "npg": goals - pens,
-        "xg": round(a["expectedGoals"], 2), "npxg": round(max(a["expectedGoals"] - PEN_XG * pens, 0.0), 2),
+        "xg": round(a["expectedGoals"], 2), "npxg": round(max(a["expectedGoals"] - PEN_XG * (pens + int(a.get("penaltyMiss") or 0)), 0.0), 2),
         "xa": round(a["expectedAssists"], 2), "xgot": round(a["expectedGoalsOnTarget"], 2),
         "g_minus_xg": round(goals - a["expectedGoals"], 2),
         "shots": shots, "sot": int(a["onTargetScoringAttempt"]),

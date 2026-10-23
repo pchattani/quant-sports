@@ -60,6 +60,11 @@ def test_pool_ranks_clubs_and_derives_league_factors() -> None:
     assert clubs[0]["block"] == "Europe" and pool["leagues"]["saudi-pro-league"]["block"] == "Asia"
     # The cup-only club is in the table but not in any league's aggregate.
     assert any(c["team"] == "Outsider" and not c["in_league"] for c in clubs)
+    # rated = in a followed league or with table games; rank_rated ranks those only (the cup-only Outsider is unrated)
+    out = next(c for c in clubs if c["team"] == "Outsider")
+    assert out["rated"] is False and out["rank_rated"] is None
+    rated = [c for c in clubs if c["rated"]]
+    assert [c["rank_rated"] for c in rated] == list(range(1, len(rated) + 1)) and pool["model"]["n_rated"] == len(rated)
     leagues = pool["leagues"]
     assert leagues["premier-league"]["rank"] == 1 and leagues["saudi-pro-league"]["rank"] == 2
     # Weaker defences in the Saudi league: its scoring factor is below one, the Premier League's above.

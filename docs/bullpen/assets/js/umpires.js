@@ -17,11 +17,11 @@ const COLS = [
   ['accuracy', 'Accuracy', ['accuracy', 'acc'], 'pct', 'Share of calls matching the rule-book zone (|x| ≤ 0.83 ft, sz_bot − 0.12 to sz_top + 0.12 ft)'],
   ['x_accuracy', 'Expected', ['x_accuracy', 'exp_accuracy', 'acc_exp', 'xacc'], 'pct', 'Accuracy an average umpire would have on the same pitches'],
   ['acc_ae', 'Above exp.', ['acc_ae', 'accuracy_ae', 'acc_above_exp', 'aae', 'acc_oe'], 'pctpp', 'Accuracy minus expected accuracy'],
-  ['consistency', 'Consistency', ['consistency', 'cons'], 'pct', 'Share of calls agreeing with his own fitted zone'],
+  ['consistency', 'Consistency', ['consistency', 'cons'], 'pct', 'Share of calls agreeing with the umpire\'s own fitted zone'],
   ['zone_size', 'Zone size', ['zone_size', 'strikes_ae', 'zone', 'zone_100'], 'signed', 'Strikes above expected per 100 called pitches (positive = a big zone)'],
   ['run_impact', 'Run impact', ['run_impact', 'runs', 'rv_missed', 'impact'], 'runs', 'Runs moved by missed calls (absolute, per game where the payload says so)'],
-  ['favour', 'Home favour', ['favour', 'favor', 'home_favour', 'fav'], 'signed2', 'Runs his misses gave home batters minus away batters, per game'],
-  ['abs_over', 'ABS overturned', ['abs_overturned', 'overturned', 'abs_rate', 'overturn_rate'], 'pct', 'Share of ABS challenges against his calls that were overturned (2026)']
+  ['favour', 'Home favour', ['favour', 'favor', 'home_favour', 'fav'], 'signed2', 'Runs the missed calls gave home batters minus away batters, per game'],
+  ['abs_over', 'ABS overturned', ['abs_overturned', 'overturned', 'abs_rate', 'overturn_rate'], 'pct', 'Share of ABS challenges against the umpire\'s calls that were overturned (2026)']
 ];
 const LOWER = { run_impact: 1, abs_over: 1 };
 function umpsOf(d) {
@@ -64,10 +64,10 @@ function renderList(el, params, state) {
   const k = K();
   const U = BP.ui;
   const L = k.L(params, state);
-  el.innerHTML = QK.sectionHead({ kicker: 'Umpires · ' + k.LN(L), title: 'Behind the plate', sub: 'Every home-plate umpire against the rule-book zone, against what his pitches made likely, and the runs his missed calls moved.' }) +
+  el.innerHTML = QK.sectionHead({ kicker: 'Umpires · ' + k.LN(L), title: 'Behind the plate', sub: 'Every home-plate umpire against the rule-book zone, against what the pitches seen made likely, and the runs the missed calls moved.' }) +
     '<div id="um-kpis"></div>' +
     '<section class="qk-card"><div class="qk-card-body"><div class="bp-ctl"><label>Search<input id="um-q" class="gq-search" type="search" placeholder="umpire…"></label><label>Min games <b id="um-min-v"></b><input type="range" id="um-min" min="0" max="40" step="1" value="10"></label></div></div></section>' +
-    '<div class="qk-grid" style="margin-top:var(--sp-4)"><div class="qk-span-7">' + U.card2('Accuracy and consistency', 'Right: more accurate than his pitches made likely; up: more consistent with his own zone; size is games, colour the accuracy percentile', U.chart('um-chart', 420, 'Accuracy above expected against consistency')) + '</div>' +
+    '<div class="qk-grid" style="margin-top:var(--sp-4)"><div class="qk-span-7">' + U.card2('Accuracy and consistency', 'Right: more accurate than the pitches seen made likely; up: more consistent with the umpire\'s own zone; size is games, colour the accuracy percentile', U.chart('um-chart', 420, 'Accuracy above expected against consistency')) + '</div>' +
     '<div class="qk-span-5">' + U.card2('ABS challenges', '2026: who challenged, how often calls were overturned, and what an overturn was worth', '<div id="um-abs"></div>') + '</div></div>' +
     '<section class="qk-section"><div id="um-card"></div></section>';
   return k.ready().then(() => {
@@ -94,7 +94,7 @@ function renderList(el, params, state) {
     const abs = d.abs || d.abs_challenges || {};
     $('um-kpis').innerHTML = '<div class="bp-kpis">' + QK.stats([
       k.isNum(lg.accuracy) ? { label: 'League accuracy', value: k.pct(lg.accuracy, 1), sub: 'calls matching the rule-book zone' } : null,
-      best ? { label: 'Most accurate for his pitches', value: k.surname(best.name || k.umpName(best.id)) + ' ' + k.signed(100 * ae(best), 1), unit: 'pts', signal: true, sub: 'accuracy above expected · ' + g(best) + ' games', href: k.umpHref(best.id) } : null,
+      best ? { label: 'Most accurate v expected', value: k.surname(best.name || k.umpName(best.id)) + ' ' + k.signed(100 * ae(best), 1), unit: 'pts', signal: true, sub: 'accuracy above expected · ' + g(best) + ' games', href: k.umpHref(best.id) } : null,
       calm ? { label: 'Fewest runs moved', value: k.surname(calm.name || k.umpName(calm.id)) + ' ' + k.num(ri(calm), 2), sub: 'run impact of missed calls', href: k.umpHref(calm.id) } : null,
       k.isNum(abs.overturn_rate) ? { label: 'ABS overturns', value: k.pct(abs.overturn_rate, 1), sub: k.isNum(abs.n) ? k.int(abs.n) + ' challenges' : 'of challenged calls' } : null
     ]) + '</div>';
@@ -103,7 +103,7 @@ function renderList(el, params, state) {
       const sk = r => { const v = ae(r); return k.isNum(v) ? v : -1; };
       list.sort((a, b) => sk(b) - sk(a));
       $('um-card').innerHTML = U.card2('Every umpire', list.length + ' of ' + rows.length + ' home-plate umpires, ' + S + ' · cells coloured by percentile among umpires (100 = best); expected accuracy and zone size describe style, so they are grey', '<div id="um-table"></div>', { flush: true,
-        foot: '<span>Rule-book zone: |plate_x| ≤ 0.83 ft between sz_bot − 0.12 and sz_top + 0.12 ft. Expected accuracy comes from the called-strike model without his own effect.</span>' });
+        foot: '<span>Rule-book zone: |plate_x| ≤ 0.83 ft between sz_bot − 0.12 and sz_top + 0.12 ft. Expected accuracy comes from the called-strike model without the umpire\'s own effect.</span>' });
       if (!list.length) { $('um-table').innerHTML = QK.empty('Nobody here', 'Lower the minimum games.'); scatter([], pr, cols); return; }
       QK.leaderboard($('um-table'), { dense: true, rank: true, maxHeight: 620, rowHref: r => k.umpHref(r.id), columns: [{ key: 'name', label: 'Umpire', type: 'entity', href: r => k.umpHref(r.id) }]
         .concat(cols.map(c => (/^(games|called)$/.test(c[0]) || c[3] === 'int' ? { key: 'c_' + c[0], label: c[1], num: true, fmt: v => fmtC(c, v), tip: c[4] }
@@ -212,12 +212,12 @@ function renderOne(el, params, state) {
     const pcard = QK.pctCard({ title: 'Against the other umpires', peer: 'MLB home-plate umpires', sample: (k.isNum(games) ? games + ' games · ' : '') + '100 = best',
       groups: [{ label: 'Calling the zone', rows: metricCols.filter(c => !STYLE.test(c[0])).map(c => ({ label: c[1], pctl: pq(c), value: fmtC(c, v(c)), tip: c[4] })) },
         { label: 'Style (not better or worse)', rows: metricCols.filter(c => STYLE.test(c[0])).map(c => ({ label: c[1], pctl: pr[c[0]](v(c), u), value: fmtC(c, v(c)), tip: c[4], style: true })) }],
-      note: 'Grey rows describe his pitches and his zone, not how well he calls them.' });
+      note: 'Grey rows describe the pitches seen and the zone, not the quality of the calls.' });
     el.innerHTML = '<div class="qk-kicker" style="margin-bottom:10px"><a href="#/umpires">← Umpires</a></div>' + hero +
       '<div class="bp-kpis" style="margin-top:var(--sp-5)">' + QK.stats(tiles) + '</div>' +
       '<div class="qk-grid"><div class="qk-span-5">' + pcard + '</div><div class="qk-span-7"><div class="bp-stack">' +
-      U.card2('Game by game', 'His accuracy against the accuracy expected for his pitches', U.chart('u-trend', 260, 'Accuracy by game')) +
-      U.card2('Runs moved', 'The run impact of his missed calls in each game', U.chart('u-imp', 220, 'Run impact by game')) + '</div></div></div>' +
+      U.card2('Game by game', 'Accuracy against the accuracy expected for the pitches seen', U.chart('u-trend', 260, 'Accuracy by game')) +
+      U.card2('Runs moved', 'The run impact of the missed calls in each game', U.chart('u-imp', 220, 'Run impact by game')) + '</div></div></div>' +
       '<section class="qk-section">' + U.card2('Scorecards', 'Each game: calls, misses, the runs they moved and the side they favoured; a row opens the game centre with the full scorecard', '<div id="u-cards"></div>', { flush: true }) + '</section>';
     const gcols = (o.d && o.d.games_cols) || ['gpk', 'date', 'home', 'away', 'called', 'missed', 'accuracy', 'x_accuracy', 'home_favour', 'favoured', 'impact'];
     const cards = (u.games_list || u.scorecards || u.cards || []).map(r => { if (!Array.isArray(r)) return r; const x = {}; gcols.forEach((c, i) => { x[c] = r[i]; }); return x; });

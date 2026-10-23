@@ -209,3 +209,12 @@ validation {next|deadline|type|arrivals: {test, dev, l2}, targets: {k, test, dev
 p_next is the chance he is not in this club's NHL lineup next season; p_trade + p_release + p_other = p_next (the split is
 the 2024-25 shares, a base rate). As built 22 Oct 2026: next published; deadline, arrivals and targets not (reasons in
 the file); ~96 KB.
+
+## Metrics-spec fields (23 Oct 2026)
+
+- `teams.json` `teams[].units.gd_g`: goal differential per game (all situations, regular season) with `units.pct.gd_g`.
+- `goalies.json` `values.fa`: unblocked shot attempts faced (the sample behind GSAx / 100), not percentiled.
+- `players/<pid>.json` `similar` [[pid, name, team, distance]]: the METRICS_SPEC recipe (oddsmarkets/common/similar.py)
+  within F, D or G of the season: hockey.json group features (forwards: gar_60, p60, ixg60_all, icf60, adj_xgf_pct,
+  xgf60_rel, rapm_net, pen_diff60, toi_gp, hits60, shot_dist; defence and goalies per the spec), z within the group,
+  a missing feature at z 0, weights = year-to-year r floored at 0.2, k 6; distance = weighted RMS z gap.

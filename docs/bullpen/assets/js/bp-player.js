@@ -94,9 +94,9 @@ function draw(el, c) {
   const pc = k => (ok && isNum(pr[k]) ? pr[k] : null);
   const k = [];
   if (pit) {
-    if (isNum(v.war)) k.push({ label: 'Bullpen WAR', value: BP.num(v.war, 1), pctl: pc('war'), signal: true, sub: isNum(v.war_x) ? 'from xwOBA+ against ' + BP.num(v.war_x, 1) : 'runs allowed basis', tip: 'Our wins above replacement for a pitcher, from the runs he allowed (RA9) against a replacement-level arm' });
+    if (isNum(v.war)) k.push({ label: 'Bullpen WAR', value: BP.num(v.war, 1), pctl: pc('war'), signal: true, sub: isNum(v.war_x) ? 'from xwOBA+ against ' + BP.num(v.war_x, 1) : 'runs allowed basis', tip: 'Our wins above replacement for a pitcher, from the runs allowed (RA9) against a replacement-level arm' });
     if (isNum(v.pitching_plus)) k.push({ label: 'Pitching+', value: String(Math.round(v.pitching_plus)), pctl: pc('pitching_plus'), sub: 'stuff, location and sequence · 100 = average', tip: 'Our pitch model: expected run value from the pitch, where it went and the count' });
-    if (isNum(v.stuff_plus)) k.push({ label: 'Stuff+', value: String(Math.round(v.stuff_plus)), pctl: pc('stuff_plus'), sub: 'the physics of his pitches · 100 = average' });
+    if (isNum(v.stuff_plus)) k.push({ label: 'Stuff+', value: String(Math.round(v.stuff_plus)), pctl: pc('stuff_plus'), sub: 'the physics of the pitches · 100 = average' });
     if (isNum(v.xfip)) k.push({ label: 'xFIP', value: BP.num(v.xfip, 2), pctl: pc('xfip'), sub: 'RA9 ' + BP.num(v.ra9, 2) + ' · FIP ' + BP.num(v.fip, 2) });
     if (isNum(v.k_bb_pct)) k.push({ label: 'K-BB%', value: BP.fmtVal(v.k_bb_pct, 'pct'), pctl: pc('k_bb_pct'), sub: 'strikeouts minus walks per batter' });
   } else {
@@ -111,7 +111,7 @@ function draw(el, c) {
   const more = ok ? U.pctGroups(blk, kind, setKey, gl, 'more', tg) : [];
   const pcard = (which, g) => QK.pctCard({ id: 'pp-pcard', title: which === 'more' ? 'More percentiles' : 'Percentile rankings', peer: peer, sample: U.sampleLine(blk, kind, setKey, tg), groups: g,
     right: more.length ? U.seg('pp-pset', 'Metric set', [['head', 'Core'], ['more', 'More']], which) : '',
-    emptyTitle: 'Not ranked yet', emptyText: fl ? 'He is short of the ' + fl.value + ' ' + fl.unit + ' floor for ' + peer + ' this season.' : 'No ranking this season.',
+    emptyTitle: 'Not ranked yet', emptyText: fl ? 'The player is short of the ' + fl.value + ' ' + fl.unit + ' floor for ' + peer + ' this season.' : 'No ranking this season.',
     foot: '<span>Peers: ' + esc(peer) + ' in ' + esc(BP.levelName(L)) + ' ' + S + '; 100 = best</span><a href="' + esc(BP.compareHref(pid)) + '">Compare →</a>' });
 
   let h = '<div class="qk-kicker" style="margin-bottom:10px"><a href="' + esc(BP.href(pit ? 'pitchers' : 'hitters', L, S)) + '">← ' + (pit ? 'Pitchers' : 'Hitters') + '</a></div>' + hero +
@@ -121,7 +121,7 @@ function draw(el, c) {
     U.card2('Among peers', 'Every ' + peer.replace(/^MLB /, '') + ' past the floor this season; bars coloured by percentile', '<div id="pp-dist-m" style="margin-bottom:10px">' + U.seg('pp-dseg', 'Metric', DIST[kind], '') + '</div><div id="pp-dist">' +
       QK.empty('Pick a metric', 'The peer group loads on request (the season catalogue is several megabytes).') + '</div>') +
     (pit ? U.card2('Pitch mix', 'Each pitch type this season: usage, speed, Stuff+ and whiffs; the heat cells are percentiles among pitches of the same type', '<div id="pp-mix"></div>') +
-      U.card2('Movement', 'Average induced vertical break against horizontal break towards his arm side, in inches; size is usage', U.chart('pp-mov', 360, 'Pitch movement') + '<div class="bp-note" id="pp-mov-cap"></div>')
+      U.card2('Movement', 'Average induced vertical break against horizontal break towards the arm side, in inches; size is usage', U.chart('pp-mov', 360, 'Pitch movement') + '<div class="bp-note" id="pp-mov-cap"></div>')
       : (Array.isArray(cur.rolling) && cur.rolling.length > 5 ? U.card2('Form through the season', 'Rolling xwOBA+ (our expected wOBA, violet) against wOBA (what happened)', U.chart('pp-roll', 260, 'Rolling xwOBA+ and wOBA')) : '')) +
     '</div></div></div>';
 
@@ -135,7 +135,7 @@ function draw(el, c) {
   h += '<section class="qk-section" id="pp-mv"></section>';
   h += '<section class="qk-section">' + U.card2('Season by season', 'Every ' + (pit ? 'pitching' : 'hitting') + ' season in the data, all levels', '<div id="pp-career"></div>', { flush: true }) + '</section>';
   const sim = (p.similar || []).slice(0, 6);
-  if (sim.length) h += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-6">' + U.card2('Most similar', 'The nearest player-seasons since 2015 in his ' + (pit ? 'role' : 'position') + ' group, on the spec’s weighted metrics', '<ul class="bp-list">' + sim.map(m =>
+  if (sim.length) h += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-6">' + U.card2('Most similar', 'The nearest player-seasons since 2015 in the same ' + (pit ? 'role' : 'position') + ' group, on the spec’s weighted metrics', '<ul class="bp-list">' + sim.map(m =>
     '<li>' + U.playerEnt(m.pid, L, String(m.season) + (m.team ? ' · ' + BP.teamAbbr(m.team) : ''), kind) + '<a class="v bp-link" href="' + esc(BP.compareHref(pid, m.pid)) + '">Compare</a></li>').join('') + '</ul>', { flush: true }) + '</div></div></section>';
   el.innerHTML = h;
 
@@ -194,11 +194,11 @@ function pitchMix(el, cur, v) {
     const cell = (val, p, f) => (isNum(val) ? (isNum(p) ? '<span class="qk-pcell" style="background:' + QK.pctColor(p) + ';color:' + QK.pctInk(p) + '" title="' + esc(QK.ordinal(p)) + ' percentile among this pitch type">' + f(val) + '</span>' : f(val)) : '—');
     box.innerHTML = '<div class="bp-mix" role="table" aria-label="Pitch mix"><div class="bp-mix-row h" role="row"><span>Pitch</span><span>Usage</span><span class="v">mph</span><span class="v">Stuff+</span><span class="v">Whiff%</span><span class="v">xwOBA</span></div>' +
       ars.map(r => '<div class="bp-mix-row" role="row" style="--k:' + esc(BP.pitchColour(r.pt)) + '"><span class="nm"><i aria-hidden="true"></i>' + esc(BP.pitchName(r.pt)) + '</span>' +
-        '<span class="tr" title="' + esc(BP.fmtVal(r.usage, 'pct')) + ' of his pitches"><b style="width:' + (100 * Math.min(1, r.usage)).toFixed(1) + '%"></b></span>' +
+        '<span class="tr" title="' + esc(BP.fmtVal(r.usage, 'pct')) + ' of pitches"><b style="width:' + (100 * Math.min(1, r.usage)).toFixed(1) + '%"></b></span>' +
         '<span class="v">' + BP.fmtVal(r.usage, 'pct') + ' · ' + U.f(r.velo, 1) + '</span>' +
         '<span class="v">' + cell(r.stuff, r.stuff_pct, x => String(Math.round(x))) + '</span><span class="v">' + cell(r.whiff, r.whiff_pct_type, x => BP.fmtVal(x, 'pct')) + '</span>' +
         '<span class="v">' + (isNum(r.xwoba) ? BP.fmtAvg(r.xwoba) : '—') + '</span></div>').join('') + '</div>' +
-      '<div class="bp-note">Ten or more of a type this season. Stuff+: 100 = league average for all pitches; heat cells rank him among pitchers throwing that type (100+ thrown).</div>';
+      '<div class="bp-note">Ten or more of a type this season. Stuff+: 100 = league average for all pitches; heat cells rank against other pitchers throwing that type (100+ thrown).</div>';
   }
   drawMovement(el, ars, cur.league_types || (cur.pitching || {}).league_types || (BP.cached(BP.ypath('pitchers.json')) || {}).league_types || null);
 }
@@ -214,7 +214,7 @@ function drawMovement(el, ars, lt) {
   const pts = mine.map(r => ({ x: r.hb, y: r.ivb, name: BP.pitchName(r.pt) + ' · ' + BP.fmtVal(r.usage, 'pct') + ' · ' + U.f(r.velo, 1) + ' mph', label: r.pt, color: BP.pitchColour(r.pt), size: 10 + 34 * Math.sqrt(r.usage) }));
   QKC.scatter('#pp-mov', { points: lg.concat(pts), xName: 'Horizontal break, arm side + (in)', yName: 'Induced vertical break (in)', xFmt: x => U.f(x, 0), yFmt: x => U.f(x, 0), refX: 0, refY: 0, labelAll: true, label: 'Pitch movement' });
   const cap = el.querySelector('#pp-mov-cap');
-  if (cap) cap.textContent = lg.length ? 'Grey: the league average for each of his pitch types.' : 'Open "Among peers" to add the league average for each type.';
+  if (cap) cap.textContent = lg.length ? 'Grey: the league average for each pitch type thrown.' : 'Open "Among peers" to add the league average for each type.';
 }
 
 function rollingChart(el, cur) {
@@ -233,7 +233,7 @@ function projection(el, pj, pit) {
     return '<li><span>' + esc(COMP[k][0] + (pit ? ' allowed' : '')) + '</span><span class="v">' + f(c.proj) + '</span><span class="s">' + (isNum(c.p10) ? f(c.p10) + '–' + f(c.p90) : '') + '</span></li>';
   });
   el.querySelector('#pp-proj').innerHTML = '<ul class="bp-list bp-proj">' + (isNum(pj.wOBA) ? '<li><span><b>wOBA' + (pit ? ' allowed' : '') + '</b></span><span class="v">' + BP.fmtAvg(pj.wOBA) + '</span><span class="s">ISO ' + BP.fmtAvg(pj.ISO) + ' · BABIP ' + BP.fmtAvg(pj.BABIP) + '</span></li>' : '') + rows.join('') + '</ul>' +
-    '<div class="bp-note" style="padding:0 16px 12px">Regressed to his age and level with ' + BP.int(pj.n) + ' plate appearances of weight; the range is where the rate lands eight times out of ten.</div>';
+    '<div class="bp-note" style="padding:0 16px 12px">Regressed to the player\'s age and level with ' + BP.int(pj.n) + ' plate appearances of weight; the range is where the rate lands eight times out of ten.</div>';
 }
 
 function splits(el, sp) {

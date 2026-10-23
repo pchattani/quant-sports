@@ -18,8 +18,8 @@ const K = () => RK.fk;
 const PRESETS = [
   ['S', ['ixg60', 'ixg_60', /^i?xg_?(per_?)?60/], ['g60_5v5', 'g60', 'goals60', /^g(oals)?_?(per_?)?60/], 'Individual xG/60 against goals/60 (5v5): finishing above or below the chances'],
   ['S', ['rapm_off', /rapm.*(off|xgf)/], ['rapm_def', /rapm.*(def|xga)/], 'RAPM offence against defence: two-way impact, isolated'],
-  ['S', ['edge_max_speed', 'max_speed', /max_?speed|top_?speed/], ['xgf_pct', /xgf_?pct/], 'EDGE top skating speed against on-ice xGF%: does speed drive play?'],
-  ['S', ['edge_shot_speed', 'max_shot_speed', /shot_?speed/], ['sh_pct', /sh(ooting)?_?pct/], 'EDGE hardest shot against shooting %'],
+  ['S', ['edge_max_speed', 'max_speed', /max_?speed|top_?speed/], ['xgf_pct', /xgf_?pct/], 'Tracked top skating speed against on-ice xGF%: does speed drive play?'],
+  ['S', ['edge_shot_speed', 'max_shot_speed', /shot_?speed/], ['sh_pct', /sh(ooting)?_?pct/], 'Tracked hardest shot against shooting %'],
   ['S', ['xgf_pct', /xgf_?pct/], ['gf_pct', /gf_?pct/], 'On-ice xGF% against GF%: process against results'],
   ['S', ['ozs_pct', 'oz_start_pct', /oz.*start|ozs/], ['xgf_pct', /xgf_?pct/], 'Offensive-zone starts against xGF%: deployment or talent?'],
   ['S', ['qoc_toi', /qoc/], ['xgf_pct_rel', /xgf.*rel/], 'Quality of competition against relative xGF%'],
@@ -164,7 +164,7 @@ function draw(S) {
   const rows = base0.filter(r => val(r, S0.x) !== null && val(r, S0.y) !== null);
   const noun = team ? 'teams' : S0.kind === 'G' ? 'goalies' : ({ F: 'forwards', D: 'defencemen', A: 'skaters' })[S0.pos];
   k.set('lab-sub', rows.length + ' ' + noun + ' · ' + k.sLabel(S) + (team || !G().nKey ? '' : ' · ' + k.int(S0.min) + '+ ' + G().nLabel.toLowerCase() + (S0.qual ? ' · qualified' : '')));
-  if (rows.length < 3) { k.set('lab-chart', k.muted('Too few for this view: lower the floor, untick qualified only, or pick metrics these players have (EDGE starts in 2021–22, shift-based metrics in 2010–11).')); k.set('lab-table', ''); k.set('lab-note', ''); return; }
+  if (rows.length < 3) { k.set('lab-chart', k.muted('Too few for this view: lower the floor, untick qualified only, or pick metrics these players have (puck and player tracking starts in 2021–22, shift-based metrics in 2010–11).')); k.set('lab-table', ''); k.set('lab-note', ''); return; }
   const xs = rows.map(r => val(r, S0.x)), ys = rows.map(r => val(r, S0.y));
   const mx = k.median(xs), my = k.median(ys), sx = zs(xs), sy = zs(ys);
   const dirx = lower(S0.x) ? -1 : 1, diry = lower(S0.y) ? -1 : 1;
@@ -222,7 +222,7 @@ function draw(S) {
   const unit = m => k.esc(m.unit || (S0.kind === 'G' ? 'shots' : 'minutes'));
   k.set('lab-note', 'Correlation on screen r = ' + k.num(rr, 2) + ' (' + rows.length + ' ' + noun + '). Dotted lines are medians. ' + (lower(S0.x) || lower(S0.y) ? 'Axes where less is better are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
     (team ? '' : 'Labelled: the eight furthest into the good corner, the four furthest from it' + (hits.length ? ', and your search' : '') + '. Marker size is the sample. ') + 'Click a dot to open the page.' +
-    (S0.shrink && !team ? ' Rates marked "shrunk" are pulled to the median of the ' + noun + ' on screen by their own stabilisation point: (n·x + k·median)/(n + k) with k = 3/7 of the sample at which the metric reaches 0.7 split-half reliability' + (shrinkable(S0.x) ? ' (' + k.esc(mX.label) + ' k = ' + k.int(kOf(S0.x)) + ' ' + unit(mX) + ')' : '') + (shrinkable(S0.y) ? ' (' + k.esc(mY.label) + ' k = ' + k.int(kOf(S0.y)) + ' ' + unit(mY) + ')' : '') + '. Totals, RAPM, values and EDGE figures are never shrunk here: the models regularise them already or they are not rates.' : '') +
+    (S0.shrink && !team ? ' Rates marked "shrunk" are pulled to the median of the ' + noun + ' on screen by their own stabilisation point: (n·x + k·median)/(n + k) with k = 3/7 of the sample at which the metric reaches 0.7 split-half reliability' + (shrinkable(S0.x) ? ' (' + k.esc(mX.label) + ' k = ' + k.int(kOf(S0.x)) + ' ' + unit(mX) + ')' : '') + (shrinkable(S0.y) ? ' (' + k.esc(mY.label) + ' k = ' + k.int(kOf(S0.y)) + ' ' + unit(mY) + ')' : '') + '. Totals, RAPM, values and tracking figures are never shrunk here: the models regularise them already or they are not rates.' : '') +
     (mX.desc ? '<br><strong>' + k.esc(mX.label) + '</strong>: ' + k.esc(k.cleanDesc(mX.desc)) : '') + (mY.desc ? '<br><strong>' + k.esc(mY.label) + '</strong>: ' + k.esc(k.cleanDesc(mY.desc)) : ''));
   const host = k.$('lab-table');
   host.innerHTML = k.table([{ label: '#', sortable: false }, { label: team ? 'Team' : (S0.kind === 'G' ? 'Goalie' : 'Skater') }].concat(team ? [] : [{ label: 'Team' }].concat(G().nKey ? [{ label: G().nLabel, align: 'right' }] : []))

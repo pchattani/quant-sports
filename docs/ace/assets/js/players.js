@@ -3,8 +3,8 @@
  *
  * TA.fk is defined here and read lazily at render time by elo.js, h2h.js, lab.js, compare.js,
  * calibration.js and docs.js (const K = () => TA.fk), so script order does not matter as long
- * as this file is loaded. It leans on the core (core.js: TA.tableHTML, TA.sortable, TA.plot,
- * TA.layout, TA.pctColor, TA.statTile, TA.load) where those exist and falls back to local
+ * as this file is loaded. It leans on the core (core.js: TA.tableHTML, TA.sortable, TA.pctColor,
+ * TA.statTile, TA.load) and draws its charts with the kit (QKC, through TA.v2) where those exist and falls back to local
  * versions where they do not.
  *
  * Data (oddsmarkets/tennis/PAYLOADS.md): data/<T>/players.json (catalogue: values, tour and
@@ -277,69 +277,7 @@ K.sortable = el => {
   });
 };
 
-// ── charts ─────────────────────────────────────────────────────────────────
-
-const DARK = {
-  paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
-  font: { color: '#8b949e', family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', size: 11 },
-  xaxis: { gridcolor: '#21262d', zerolinecolor: '#30363d', linecolor: '#30363d' },
-  yaxis: { gridcolor: '#21262d', zerolinecolor: '#30363d', linecolor: '#30363d' },
-  margin: { l: 60, r: 20, t: 30, b: 50 }, hovermode: 'closest',
-  hoverlabel: { bgcolor: '#161b22', bordercolor: '#30363d', font: { color: '#e6edf3', size: 12 } }, showlegend: false
-};
-K.layout = extra => {
-  if (typeof TA.layout === 'function') return TA.layout(extra);
-  const out = Object.assign(JSON.parse(JSON.stringify(DARK)), extra || {});
-  Object.keys(extra || {}).forEach(k => { if (/^[xy]axis\d*$/.test(k) && extra[k] && typeof extra[k] === 'object') out[k] = Object.assign({}, DARK.xaxis, extra[k]); });
-  if (extra && extra.font) out.font = Object.assign({}, DARK.font, extra.font);
-  return out;
-};
-K.plot = (el, traces, lay, conf) => {
-  const node = typeof el === 'string' ? document.getElementById(el) : el;
-  if (!node) return null;
-  if (typeof TA.plot === 'function') return TA.plot(node, traces, lay, conf);
-  if (typeof Plotly === 'undefined') { node.innerHTML = K.muted('The chart library did not load. The tables carry the same data.'); return null; }
-  try {
-    const p = Plotly.newPlot(node, traces, lay, Object.assign({ displayModeBar: false, responsive: true }, conf || {}));
-    if (typeof TA.onLeave === 'function') TA.onLeave(() => { try { Plotly.purge(node); } catch (e) { /* gone */ } });
-    return p;
-  } catch (err) { node.innerHTML = K.muted('The chart could not be drawn.'); return null; }
-};
-K.legendTop = () => ({ showlegend: true, legend: { orientation: 'h', y: 1.14, x: 0, font: { color: K.C.text2, size: 10 } } });
-K.radar = (el, axes, rows) => {
-  const node = typeof el === 'string' ? document.getElementById(el) : el;
-  if (!node) return;
-  axes = axes.filter(a => rows.some(r => r && r.pct && isNum(r.pct[a.key])));
-  const usable = rows.filter(r => r && r.pct && axes.some(a => isNum(r.pct[a.key])));
-  if (!usable.length || axes.length < 3) { node.innerHTML = K.muted('No percentiles to draw yet.'); return; }
-  const narrow = (node.clientWidth || 600) < 520;
-  const wrap = s => (narrow && s.length > 12 ? s.replace(/^(.{6,14}?)\s+/, '$1<br>') : s);
-  const ax = axes.map(a => Object.assign({}, a, { label: wrap(a.label) }));
-  K.plot(node, usable.map((r, i) => ({
-    type: 'scatterpolar', fill: 'toself', name: r.name,
-    r: ax.map(a => (isNum(r.pct[a.key]) ? r.pct[a.key] : 0)).concat([isNum(r.pct[ax[0].key]) ? r.pct[ax[0].key] : 0]),
-    theta: ax.map(a => a.label).concat([ax[0].label]),
-    line: { color: r.colour || (i ? K.CB : K.CA), width: 2 }, fillcolor: K.alpha(r.colour || (i ? K.CB : K.CA), 0.18),
-    hovertemplate: '%{theta}: %{r:.0f}th percentile<extra>' + K.esc(r.name) + '</extra>'
-  })), K.layout({
-    showlegend: usable.length > 1, legend: { orientation: 'h', y: -0.1, font: { color: K.C.text2 } },
-    polar: { bgcolor: 'rgba(0,0,0,0)', radialaxis: { visible: true, range: [0, 100], gridcolor: '#21262d', tickfont: { size: 9 }, tickvals: [25, 50, 75, 100] }, angularaxis: { gridcolor: '#21262d', tickfont: { size: narrow ? 8 : 10 } } },
-    margin: narrow ? { l: 46, r: 46, t: 24, b: 40 } : { l: 70, r: 70, t: 24, b: 40 }
-  }));
-};
-/* Line with a ±se band: rows [{x, y, se, text}] -> traces. */
-K.band = (rows, colour, name, opts) => {
-  const o = opts || {};
-  const x = rows.map(r => r.x), out = [];
-  if (o.band !== false && rows.some(r => isNum(r.se))) {
-    out.push({ type: 'scatter', mode: 'lines', x: x, y: rows.map(r => r.y + (r.se || 0)), line: { width: 0, shape: o.shape || 'linear' }, hoverinfo: 'skip', showlegend: false, xaxis: o.xaxis, yaxis: o.yaxis });
-    out.push({ type: 'scatter', mode: 'lines', x: x, y: rows.map(r => r.y - (r.se || 0)), line: { width: 0, shape: o.shape || 'linear' }, fill: 'tonexty', fillcolor: K.alpha(colour, 0.16), hoverinfo: 'skip', showlegend: false, xaxis: o.xaxis, yaxis: o.yaxis });
-  }
-  out.push({ type: 'scatter', mode: o.mode || 'lines', name: name, x: x, y: rows.map(r => r.y), text: rows.map(r => r.text || ''), customdata: rows.map(r => (isNum(r.se) ? r.se : 0)),
-    line: { color: colour, width: o.width || 2, dash: o.dash || 'solid', shape: o.shape || 'linear' }, xaxis: o.xaxis, yaxis: o.yaxis,
-    hovertemplate: o.hover || ('%{text} ' + K.esc(name) + ': %{y:+.2f} ± %{customdata:.2f}<extra></extra>') });
-  return out;
-};
+// ── charts: the kit's (QKC on ECharts) through TA.v2 (v2.js); no Plotly.
 
 // ── catalogue helpers ──────────────────────────────────────────────────────
 
@@ -586,19 +524,25 @@ function renderPlayer(el, params, state) {
   const T = K.T(params, state);
   const pid = String(params.id || params.pid || (params.rest || [])[0] || '');
   el.innerHTML = K.muted('Loading…');
-  return K.ready().then(() => Promise.all([
-    TA.load(T + '/players/' + pid + '.json'), TA.load(T + '/players.json'), TA.load(T + '/elo.json'), TA.load(T + '/rankings.json'), TA.load(T + '/race.json'), K.loadNames(T)
-  ])).then(res => {
-    if (!K.alive(el)) return null;
-    const career = K.ok(res[0]) ? res[0] : null;
-    K.learnCat(T, res[1]);
-    const years = Array.from(new Set(((career || {}).results || []).map(r => String(r.date || '').slice(0, 4)).filter(y => /^\d{4}$/.test(y))));
-    return K.loadEvents(T, years).then(() => { if (K.alive(el)) drawPlayer(el, T, pid, career, res[0], res[1], res[2], res[3], res[4]); });
+  /* A career file with its own peer block (PAYLOADS.md "peer") draws without the 1.5 MB season catalogue, which then
+     loads only for the distribution, the luck tiles and every-metric table; without one, the catalogue loads first. */
+  return K.ready().then(() => TA.load(T + '/players/' + pid + '.json')).then(c0 => {
+    const career0 = K.ok(c0) ? c0 : null;
+    const pc = career0 && career0.peer && Number(career0.peer.year) === Number(K.Y(params, state, T)) ? TA.v2.peerCat(career0.peer, career0, pid) : null;
+    return Promise.all([pc ? Promise.resolve(pc) : TA.load(T + '/players.json'), TA.load(T + '/elo.json'), TA.load(T + '/rankings.json'), TA.load(T + '/race.json'), K.loadNames(T)]).then(res => {
+      if (!K.alive(el)) return null;
+      if (!pc) K.learnCat(T, res[0]);
+      const years = Array.from(new Set(((career0 || {}).results || []).map(r => String(r.date || '').slice(0, 4)).filter(y => /^\d{4}$/.test(y))));
+      return K.loadEvents(T, years).then(() => { if (K.alive(el)) drawPlayer(el, T, pid, career0, c0, res[0], res[1], res[2], res[3]); });
+    });
   });
 }
 
 function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
   const C = K.C;
+  /* the full season catalogue: already here, or loaded on demand when the page drew from the career file's peer block */
+  let fullP = null;
+  const full = () => (cat && cat._peerCat ? (fullP || (fullP = TA.load(T + '/players.json').then(d => (K.ok(d) && d.players ? d : cat)))) : Promise.resolve(cat));
   const P = (K.ok(cat) && cat.players) || {};
   const p = P[pid] || null;
   const metrics = (cat || {}).metrics || [];
@@ -654,8 +598,8 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
   h += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-6">' + V.card('Luck: tiebreaks, deciding sets and close calls', 'Won against what our chances expected. Season to season these barely repeat (tiebreaks r = 0.03, wins over expected r = −0.10), so read them as luck, not skill', '<div id="pp-clutch"></div>', { flush: true }) + '</div>' +
     '<div class="qk-span-6">' + V.card('Ranking', 'Official ranking over time (log scale); gaps are spells without a ranking', V.chart('pp-rank', 280, 'Ranking history'), {}) + '</div></div></section>';
   h += '<div class="card"><div class="card-header">Elo history <span class="card-sub">Overall and surface Elo after every match.</span>' + K.toggle('pp-elo-win', [['all', 'Career'], ['3', 'Last 3 years'], ['1', 'Last year']], 'all') + '</div><div id="pp-elo" style="height:340px"></div></div>';
-  h += '<div class="card"><div class="card-header">Serve and return <span class="card-sub">The serve (s) and return (r) ratings from the score-based model, ±1 standard error shaded, by surface. Higher is better for both.</span>' +
-    K.toggle('pp-sr-kind', [['rating', 'Ratings'], ['rates', 'Hold / break %']], 'rating') + '</div><div id="pp-sr" style="height:360px"></div><div class="pg-note" id="pp-sr-note"></div></div>';
+  h += '<div class="card"><div class="card-header">Serve and return <span class="card-sub">The serve and return ratings from the score-based model by surface, ±1 standard error shaded. Higher is better for both.</span>' +
+    K.toggle('pp-sr-kind', [['serve', 'Serve'], ['return', 'Return'], ['hold', 'Hold %'], ['brk', 'Break %']], 'serve') + '</div><div id="pp-sr" style="height:340px"></div><div class="pg-note" id="pp-sr-note"></div></div>';
   h += '<div class="card"><div class="card-header">Points to defend <span class="card-sub">What drops off the 52-week ranking, by week.</span></div><div id="pp-defend"></div></div>';
   h += '<div class="card"><div class="card-header">Seasons <span class="card-sub">Tour-level record, titles, inferred hold and break, and Elo at the end of each year.</span></div><div id="pp-seasons"></div></div>';
   h += '<div class="card"><div class="card-header">Results <span class="card-sub" id="pp-res-sub">Our pre-match chance against what happened.</span>' +
@@ -665,7 +609,7 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
     K.toggle('pp-split', [['surface', 'Surface'], ['level', 'Level'], ['round', 'Round'], ['opp_band', 'Opponent rank']], 'surface') + '</div><div id="pp-splits"></div></div>';
   h += '<div class="card" id="pp-style-card"><div class="card-header">Style <span class="card-sub">Shot-by-shot profile from the Match Charting Project, against the median charted ' + K.TN(T) + ' player.</span></div><div id="pp-style"></div></div>';
   h += '<div class="card"><div class="card-header">Head to head <span class="card-sub">Most frequent opponents (top 30 by matches). Click for the full head-to-head page.</span></div><div id="pp-h2h"></div></div>';
-  h += '<div class="card"><div class="card-header">Every metric <span class="card-sub">The whole catalogue, ' + metrics.length + ' metrics, as percentiles against the tour or a surface pool (100 = best; ↓ marks metrics where lower is better).</span>' +
+  h += '<div class="card"><div class="card-header">Every metric <span class="card-sub">The whole catalogue' + (metrics.length ? ', ' + metrics.length + ' metrics,' : '') + ' as percentiles against the tour or a surface pool (100 = best; ↓ marks metrics where lower is better).</span>' +
     K.toggle('pp-src', [['tour', 'Tour']].concat(surfOpts.map(s => [s, K.SURF_LABEL[s]])), 'tour') + '</div><div id="pp-pct"></div></div>';
   el.innerHTML = h;
 
@@ -688,43 +632,46 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
     const keys = V.set(T, sf);
     if (keys.indexOf(distKey) < 0) distKey = keys[0];
     segEl.innerHTML = keys.map(k => '<button type="button" aria-pressed="' + (k === distKey) + '" data-value="' + k + '">' + K.esc(SHORT[k] || V.label(k)) + '</button>').join('');
-    const one = k => {
+    const one = k => full().then(fc => {
+      if (!document.getElementById('pp-dist')) return;
       distKey = k;
-      const peers = Object.keys(P).filter(id => V.inPool(P[id], sf, cat));
-      const xs = peers.map(id => V.value(P[id], k, sf)).filter(isNum).sort((a, b) => a - b);
+      const FP = fc.players || {};
+      const peers = Object.keys(FP).filter(id => V.inPool(FP[id], sf, fc));
+      const xs = peers.map(id => V.value(FP[id], k, sf)).filter(isNum).sort((a, b) => a - b);
       const mine = V.value(p, k, sf);
       if (xs.length < 5) { document.getElementById('pp-dist').innerHTML = QK.empty('Too few qualified peers yet'); return; }
       const pctFmt = (V.META[k] || [])[2] === 'pct';
       const f = pctFmt ? (v => (v * 100).toFixed(1) + '%') : (v => V.fmt(k, v));
       QKC.distribution('#pp-dist', { values: xs, binCount: 20, fmt: f, xName: V.label(k, sf) + ' · ' + xs.length + ' ' + V.peer(T, sf, cat).replace(/,.*$/, ''), yName: 'Players',
         marks: (isNum(mine) && V.inPool(p, sf, cat) ? [{ x: mine, label: K.surname(name) }] : []).concat([{ x: xs[Math.floor(xs.length / 2)], label: 'Median' }]), label: 'Distribution of ' + V.label(k) });
-    };
+    });
     one(distKey);
     QK.seg(segEl, one);
   };
   drawCard('');
   drawDist('');
   // most similar (the spec's weighted distance on the tour profile)
-  const sim = V.similar(T, pid, cat, 5);
+  const sim = cat && cat._peerCat ? (cat.similar || []).slice(0, 5) : V.similar(T, pid, cat, 5);
   const simHost = document.getElementById('pp-sim');
   if (simHost && sim.length) simHost.innerHTML = V.card('Most similar', 'Nearest on this season’s profile: Elo, surface Elos, hold, break and games won' + (T === 'wta' ? ', aces and first serves in' : ', tiebreaks per set'),
     '<ul class="ta-list">' + sim.map((x, i) => '<li><span class="n">' + (i + 1) + '</span><a class="nm" href="' + K.playerHref(T, x.id) + '">' + K.esc(K.name(T, x.id)) + '</a><span class="s">' + K.esc(K.country(T, x.id)) + '</span><a class="v ta-cmp-link" href="' + K.compareHref(T, pid, x.id) + '">Compare</a></li>').join('') + '</ul>',
     { flush: true, foot: '<span></span><a href="' + K.compareHref(T, pid, sim[0].id) + (sim[1] ? '/' + encodeURIComponent(sim[1].id) : '') + '">Compare the top two →</a>' });
 
   // every metric
-  const drawPct = src => {
+  const drawPct = src => full().then(fc => {
     const box = document.getElementById('pp-pct');
     if (!box) return;
+    const p = (fc.players || {})[pid] || null, metrics = fc.metrics || [], vals = (p && p.values) || {};
     if (!p) { box.innerHTML = K.muted(K.esc(name) + ' is not in the ' + K.esc((cat || {}).year || '') + ' catalogue (no tour-level match this year).'); return; }
     const pcs = src === 'tour' ? p.pct : ((p.pct_surface || {})[src] || {});
     const vs = src !== 'tour' && (p.values_surface || {})[src] ? p.values_surface[src] : vals;
     box.innerHTML = K.pctPanel(metrics, vs, pcs, { note: (src === 'tour' ? 'Tour percentile' : K.SURF_LABEL[src] + ' percentile') + ', 100 = best. Real serve and return statistics exist for WTA matches from 2016 (not the Slams); style metrics only for charted matches. Tiebreak, deciding-set and over-expected rows are mostly luck. Hover a row for the definition.' });
-  };
+  });
   drawPct('tour');
   K.wireToggle(el, 'pp-src', drawPct);
 
   if (TA.value && typeof TA.value.card === 'function') TA.value.card(T, pid, document.getElementById('pp-value'));
-  drawClutch(c, p, metrics);
+  full().then(fc => { if (K.alive(el)) drawClutch(c, (fc.players || {})[pid] || p, fc.metrics || metrics); });
   drawEloHistory(T, c, el);
   drawServeReturn(c, el);
   drawRanks(c);
@@ -785,54 +732,43 @@ function cutoff(win) { if (win === 'all') return ''; const d = new Date(); d.set
 
 function drawEloHistory(T, c, root) {
   const rows = (c.elo || []).filter(r => Array.isArray(r) && r[0]);
+  const V = TA.v2;
   const draw = win => {
     const node = document.getElementById('pp-elo');
     if (!node) return;
     const cut = cutoff(win);
     const rs = rows.filter(r => String(r[0]) >= cut);
     if (!rs.length) { node.innerHTML = K.muted('No Elo history in the career file.'); return; }
-    const x = rs.map(r => r[0]);
-    const tr = [['All', 1, 'all', 2.6], ['Hard', 2, 'hard', 1.4], ['Clay', 3, 'clay', 1.4], ['Grass', 4, 'grass', 1.4]].filter(s => rs.some(r => isNum(r[s[1]]))).map(s => ({
-      type: 'scatter', mode: 'lines', name: s[0], x: x, y: rs.map(r => r[s[1]]), line: { color: K.surfColour(s[2]), width: s[3], shape: 'hv' },
-      hovertemplate: '%{x}: ' + s[0] + ' %{y:.0f}<extra></extra>'
-    }));
-    K.plot(node, tr, K.layout(Object.assign(K.legendTop(), { margin: { l: 50, r: 10, t: 30, b: 36 }, yaxis: { title: 'Elo' }, xaxis: { type: 'date', title: 'Date' } })));
+    V.lines(node, { series: [['Overall', 1, 'all', 3], ['Hard', 2, 'hard', 1.6], ['Clay', 3, 'clay', 1.6], ['Grass', 4, 'grass', 1.6]].map(x => ({
+      name: x[0], rows: rs.map(r => [r[0], r[x[1]]]), color: x[2] === 'all' ? V.signal() : V.SURF_HEX[x[2]], width: x[3] })),
+      yName: 'Elo rating', step: 'end', yFmt: v => String(Math.round(v)), label: 'Elo history, overall and by surface' });
   };
   draw('all');
   K.wireToggle(root, 'pp-elo-win', draw);
 }
 
+/* career serve_return rows: [date, surface, serve, return, hold, break, serve_se, return_se] */
 function drawServeReturn(c, root) {
   const rows = (c.serve_return || []).filter(r => Array.isArray(r) && r[0]);
   const note = document.getElementById('pp-sr-note');
+  const V = TA.v2;
+  const KIND = { serve: [2, 6, 'Serve rating (log-odds of holding)'], 'return': [3, 7, 'Return rating (log-odds of breaking)'], hold: [4, null, 'Hold % against an average returner'], brk: [5, null, 'Break % against an average server'] };
   const draw = kind => {
     const node = document.getElementById('pp-sr');
     if (!node) return;
     if (!rows.length) { node.innerHTML = K.muted('No serve/return path in the career file.'); return; }
+    const k = KIND[kind] || KIND.serve;
     const surfs = Array.from(new Set(rows.map(r => r[1]))).sort((a, b) => (a === 'all' ? -1 : b === 'all' ? 1 : K.SURFACES.indexOf(a) - K.SURFACES.indexOf(b)));
-    const tr = [];
-    surfs.forEach(s => {
-      const rs = rows.filter(r => r[1] === s);
-      const col = K.surfColour(s), lab = K.SURF_LABEL[s] || s;
-      if (kind === 'rates') {
-        tr.push({ type: 'scatter', mode: 'lines', name: lab + ' hold', x: rs.map(r => r[0]), y: rs.map(r => r[4]), line: { color: col, width: 2 }, hovertemplate: '%{x}: ' + lab + ' hold %{y:.1%}<extra></extra>' });
-        tr.push({ type: 'scatter', mode: 'lines', name: lab + ' break', x: rs.map(r => r[0]), y: rs.map(r => r[5]), line: { color: col, width: 1.5, dash: 'dot' }, yaxis: 'y2', hovertemplate: '%{x}: ' + lab + ' break %{y:.1%}<extra></extra>' });
-      } else {
-        K.band(rs.map(r => ({ x: r[0], y: r[2], se: r[6], text: r[0] })), col, lab + ' serve').forEach(t => tr.push(t));
-        K.band(rs.map(r => ({ x: r[0], y: r[3], se: r[7], text: r[0] })), col, lab + ' return', { dash: 'dot', yaxis: 'y2' }).forEach(t => tr.push(t));
-      }
-    });
-    const lay = K.layout(Object.assign(K.legendTop(), { margin: { l: 50, r: 10, t: 34, b: 36 }, xaxis: { type: 'date', title: 'Date' },
-      grid: { rows: 2, columns: 1, pattern: 'independent', roworder: 'top to bottom' },
-      yaxis: { title: kind === 'rates' ? 'Hold %' : 'Serve rating', domain: [0.54, 1], tickformat: kind === 'rates' ? '.0%' : '' },
-      yaxis2: { title: kind === 'rates' ? 'Break %' : 'Return rating', domain: [0, 0.44], tickformat: kind === 'rates' ? '.0%' : '', gridcolor: '#21262d', zerolinecolor: '#30363d' },
-      xaxis2: { type: 'date', anchor: 'y2', gridcolor: '#21262d', title: 'Date' } }));
-    tr.forEach(t => { if (t.yaxis === 'y2') t.xaxis = 'x2'; });
-    K.plot(node, tr, lay);
-    if (note) note.innerHTML = kind === 'rates' ? 'Hold and break against the average tour-level opponent on that surface, from the same fits. Solid: hold (top). Dotted: break (bottom).' :
-      'Ratings are on the log-odds scale of holding serve: a serve rating 0.3 higher raises the log-odds of holding by 0.3 against any returner. Fitted by penalised maximum likelihood over every set score, matches weighted by a half-life (see the <a href="#/methodology/serve-return">methodology</a>). The band is ±1 standard error from the curvature of the fit.';
+    const pct = kind === 'hold' || kind === 'brk';
+    V.lines(node, { series: surfs.map(sf => {
+      const rs = rows.filter(r => r[1] === sf);
+      return { name: K.SURF_LABEL[sf] || sf, rows: rs.map(r => [r[0], r[k[0]]]), color: sf === 'all' ? V.signal() : V.SURF_HEX[sf], width: sf === 'all' ? 3 : 1.8,
+        band: k[1] !== null ? rs.map(r => [r[0], isNum(r[k[1]]) ? r[k[0]] - r[k[1]] : null, isNum(r[k[1]]) ? r[k[0]] + r[k[1]] : null]) : null };
+    }), yName: k[2], yFmt: pct ? (v => Math.round(v * 100) + '%') : (v => Number(v).toFixed(2)), label: k[2] + ' over time' });
+    if (note) note.innerHTML = pct ? 'Hold and break against the average tour-level opponent on that surface, from the same fits.' :
+      'Ratings are on the log-odds scale of holding serve: a serve rating 0.3 higher raises the log-odds of holding by 0.3 against any returner. Fitted by penalised maximum likelihood over every set score, matches weighted by a half-life (see the <a href="#/methodology/serve-return">methodology</a>). The shaded band is ±1 standard error from the curvature of the fit.';
   };
-  draw('rating');
+  draw('serve');
   K.wireToggle(root, 'pp-sr-kind', draw);
 }
 
@@ -926,9 +862,8 @@ function drawResults(T, c, root) {
     const asc = withP.slice().reverse();
     let cum = 0;
     const ys = asc.map(r => (cum += (r.won ? 1 : 0) - r.p_pre));
-    K.plot(chart, [{ type: 'scatter', mode: 'lines', x: asc.map(r => r.date), y: ys, line: { color: 'var(--signal)', width: 2 }, fill: 'tozeroy', fillcolor: K.alpha('var(--signal)', 0.12),
-      text: asc.map(r => (r.won ? 'W ' : 'L ') + K.name(T, r.opp) + ' · ' + K.eventName(T, r.event) + ' ' + (r.round || '') + ' · our chance ' + K.pct(r.p_pre, 0)), hovertemplate: '%{x}<br>%{text}<br>running total %{y:+.1f}<extra></extra>' }],
-      K.layout({ margin: { l: 46, r: 10, t: 8, b: 30 }, xaxis: { type: 'date', title: 'Date' }, yaxis: { title: 'Wins − expected', zeroline: true, zerolinecolor: '#6e7681' } }));
+    TA.v2.lines(chart, { series: [{ name: 'Wins minus expected', rows: asc.map((r, k) => [r.date, ys[k]]), color: TA.v2.signal(), area: true }], yName: 'Wins minus expected, running total',
+      yFmt: v => K.signed(v, 1), ref: { y: 0 }, yScale: true, label: 'Wins against our pre-match chances, running total' });
     host.innerHTML = K.table([{ label: 'Date' }, { label: 'Event' }, { label: 'Rd' }, { label: 'Opponent' }, { label: 'Result' }, { label: 'Score' }, { label: 'Our chance', align: 'right', title: 'Our pre-match chance for this player' },
       { label: 'Surprise', align: 'right', title: 'Outcome minus our chance: +0.8 is a win we gave 20%' }],
       rs.slice(0, showAll ? rs.length : 40).map(r => ({ _href: r.match ? K.matchHref(T, r.match) : undefined, cells: [
@@ -1018,19 +953,30 @@ K.styleBlock = (host, T, st, opts) => {
   const dir = ((st.serve || {}).direction) || {};
   const sides = [['first_deuce', '1st, deuce'], ['first_ad', '1st, ad'], ['second_deuce', '2nd, deuce'], ['second_ad', '2nd, ad']].filter(s => dir[s[0]]);
   if (sides.length) {
-    K.plot(id + '-dir', [['wide', 'Wide', '#58a6ff'], ['body', 'Body', '#8b949e'], ['t', 'T', '#f97316']].map(z => ({
-      type: 'bar', orientation: 'h', name: z[1], y: sides.map(s => s[1] + ' (' + K.int(dir[s[0]].n) + ')'), x: sides.map(s => dir[s[0]][z[0]]), marker: { color: z[2] },
-      hovertemplate: '%{y}: ' + z[1] + ' %{x:.0%}<extra></extra>', text: sides.map(s => Math.round(100 * (dir[s[0]][z[0]] || 0)) + '%'), textposition: 'inside', insidetextanchor: 'middle'
-    })), K.layout(Object.assign(K.legendTop(), { barmode: 'stack', margin: { l: 110, r: 10, t: 28, b: 24 }, xaxis: { title: 'Share of serves', tickformat: '.0%', range: [0, 1] }, yaxis: { autorange: 'reversed' } })));
+    const dn = document.getElementById(id + '-dir');
+    dn.classList.add('qk-chart');
+    QKC.bar(dn, { cats: sides.map(x => x[1] + ' (' + K.int(dir[x[0]].n) + ')'), horizontal: true, stack: true, max: 1, min: 0, fmt: v => Math.round(v * 100) + '%', legend: true, labelWidth: 120,
+      series: [['wide', 'Wide', '#5b8def'], ['body', 'Body', '#8b929f'], ['t', 'T', '#f08a3c']].map(z => ({ name: z[1], color: z[2], data: sides.map(x => dir[x[0]][z[0]] || 0) })),
+      valName: 'Share of serves', catName: 'Serve and court', label: 'Serve direction' });
   } else document.getElementById(id + '-dir').innerHTML = K.muted('No serve direction.');
   const ra = st.rally || {};
   const bk = Object.keys(ra.dist || {});
   if (bk.length) {
-    K.plot(id + '-rally', [
-      { type: 'bar', name: 'Share of points', x: bk, y: bk.map(k => ra.dist[k]), marker: { color: K.alpha('#58a6ff', 0.75) }, hovertemplate: '%{x} shots: %{y:.0%} of points<extra></extra>' },
-      { type: 'scatter', mode: 'lines+markers', name: 'Points won', x: bk, y: bk.map(k => (ra.won || {})[k]), yaxis: 'y2', line: { color: '#f97316', width: 2 }, hovertemplate: '%{x} shots: won %{y:.0%}<extra></extra>' }
-    ], K.layout(Object.assign(K.legendTop(), { margin: { l: 44, r: 44, t: 28, b: 30 }, xaxis: { title: 'Shots in the rally', type: 'category' }, yaxis: { title: 'Share of points', tickformat: '.0%' },
-      yaxis2: { title: 'Points won', overlaying: 'y', side: 'right', tickformat: '.0%', range: [0.3, 0.7], gridcolor: 'rgba(0,0,0,0)' } })));
+    const rn = document.getElementById(id + '-rally');
+    rn.classList.add('qk-chart');
+    QKC.mount(rn, Tk => {
+      const xa = QKC.axis(Tk, { type: 'category', data: bk, split: false, line: true });
+      QKC.nameAxis(xa, 'Shots in the rally', 'bottom');
+      const y1 = QKC.axis(Tk, { fmt: v => Math.round(v * 100) + '%', min: 0 });
+      QKC.nameAxis(y1, 'Share of points', 'side');
+      const y2 = QKC.axis(Tk, { fmt: v => Math.round(v * 100) + '%', min: 0.3, max: 0.7, split: false, position: 'right' });
+      y2.name = 'Points won'; y2.nameLocation = 'end'; y2.nameGap = 8;
+      return { grid: { left: 8, right: 8, top: 52, bottom: 34, containLabel: true }, xAxis: xa, yAxis: [y1, y2],
+        legend: { top: 0, left: 0, textStyle: { color: Tk.ink2 }, itemWidth: 12, itemHeight: 8 },
+        tooltip: QKC.tooltip(Tk, { trigger: 'axis', formatter: ps => '<b>' + esc(ps[0].axisValue) + ' shots</b>' + ps.map(q => QKC.tipRow(q.color, q.seriesName, Math.round(q.value * 100) + '%')).join('') }),
+        series: [{ type: 'bar', name: 'Share of points', data: bk.map(k => ra.dist[k]), barMaxWidth: 34, itemStyle: { color: QKC.hexA('#5b8def', 0.8), borderRadius: [3, 3, 0, 0] } },
+          { type: 'line', name: 'Points won', yAxisIndex: 1, data: bk.map(k => (ra.won || {})[k]), lineStyle: { color: Tk.model, width: 2 }, itemStyle: { color: Tk.model }, symbolSize: 6 }] };
+    }, { label: 'Rally length' });
   } else document.getElementById(id + '-rally').innerHTML = K.muted('No rally lengths.');
   return styleMedians(T).then(M => {
     const tab = document.getElementById(id + '-tab');

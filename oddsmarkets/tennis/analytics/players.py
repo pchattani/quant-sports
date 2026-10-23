@@ -197,12 +197,21 @@ SURFACE_GROUPS = ("Results", "Serve (inferred)", "Return (inferred)", "Serve (WT
 SURFACE_SKIP = {"win_hard", "win_clay", "win_grass", "win_indoor", "hold_hard", "hold_clay", "hold_grass", "brk_hard",
                 "brk_clay", "brk_grass", "hold_v_strong", "brk_v_strong"}
 SURFACE_KEYS = [m["key"] for m in METRICS if m["group"] in SURFACE_GROUPS and m["key"] not in SURFACE_SKIP]
-# rate -> (sample-size key, pseudo-observations) for the percentile shrinkage
-SHRINK = {"win_pct": ("matches", 10), "win_v_top10": ("n_top10", 4), "win_v_top20": ("n_top20", 5), "win_v_top50": ("n_top50", 6),
+# Ratings ranked in the surface pool as well (values_surface.<s> / pct_surface.<s>; not in the lab's surface block):
+# elo_surface = that surface's Elo (values.elo_<s>), elo = the overall Elo, both at the season's end
+# (docs/METRICS_SPEC.md, tennis surface groups).
+ELO_SURFACE = M("elo_surface", "Surface Elo", "Form", "1", desc="The surface's own Elo rating (hard, clay or grass) at the season's "
+                "end, ranked among the players with enough matches on that surface.")
+BY_KEY["elo_surface"] = ELO_SURFACE
+SURFACE_RATING_KEYS = ["elo_surface", "elo"]
+# rate -> (sample-size key, pseudo-observations) for the percentile shrinkage. win_pct 20 and games_won_pct 12 follow
+# the measured stabilisation (docs/METRICS_SPEC.md, tennis: M50 about 16-26 matches for win %, 12-17 for games won %);
+# display only (no model reads these percentiles).
+SHRINK = {"win_pct": ("matches", 20), "win_v_top10": ("n_top10", 4), "win_v_top20": ("n_top20", 5), "win_v_top50": ("n_top50", 6),
           "win_slam": ("n_slam", 5), "win_m1000": ("n_m1000", 5), "win_500": ("n_500", 5), "win_250": ("n_250", 5),
           "tb_pct": ("tb_n", 8), "dec_pct": ("dec_n", 6), "fsd_pct": ("fsd_n", 6), "close_out": ("fsu_n", 6),
           "close_sets_pct": ("close_n", 8), "final_win_pct": ("finals", 2), "straight_win_pct": ("wins", 6),
-          "games_won_pct": ("matches", 8), "sets_won_pct": ("matches", 8), "woe_pm": ("matches", 10)}
+          "games_won_pct": ("matches", 12), "sets_won_pct": ("matches", 8), "woe_pm": ("matches", 10)}
 SURFACE_FLOOR = {"hard": 10, "clay": 8, "grass": 5}
 MIN_LIST = 5
 UPSET_P = 0.4
@@ -690,6 +699,7 @@ def build(td: an.TourData, year: int, entries: dict[str, list[dict]] | None = No
             sv, sn = values_from(Es, (srp.get(p) or {}).get(s))
             _apply_titles(sv, sn, (tf.get(p) or {}).get(s))
             surf_vals.setdefault(s, {})[p] = {k: sv.get(k) for k in SURFACE_KEYS}
+            surf_vals[s][p].update(elo_surface=v.get(f"elo_{s}"), elo=v.get("elo"))
             surf_n.setdefault(s, {})[p] = sn
     qual = {p for p in pids if rows[p]["matches"] >= floor}
     pct, rank_m = _percentiles(rows, nns, qual, METRICS)
@@ -697,7 +707,7 @@ def build(td: an.TourData, year: int, entries: dict[str, list[dict]] | None = No
     for s, vals in surf_vals.items():
         fl = SURFACE_FLOOR.get(s, 8)
         q = {p for p, x in vals.items() if (x.get("matches") or 0) >= fl}
-        ps, _ = _percentiles(vals, surf_n[s], q, [BY_KEY[k] for k in SURFACE_KEYS])
+        ps, _ = _percentiles(vals, surf_n[s], q, [BY_KEY[k] for k in SURFACE_KEYS + SURFACE_RATING_KEYS])
         for p, d in ps.items():
             if (vals[p].get("matches") or 0) >= _surface_show(s):
                 pct_s.setdefault(p, {})[s] = d
@@ -752,6 +762,179 @@ def _percentiles(rows: dict[str, dict], nns: dict[str, dict], qual: set[str], me
             if p in qual:
                 rk[p][k] = an.rank_in(ref, x, lower)
     return pct, rk
+
+
+# ---------------------------------------------------------------------------------------------- peer blocks
+
+# The spec's metric ids per peer group, headline then secondary (docs/_design/metrics/tennis.json, docs/METRICS_SPEC.md
+# "Tennis"), and the similar-player weights (YoY r floored at 0.2, capped at 0.8 for ratings and fits).
+PEER_KEYS = {
+    "atp_all": ["elo", "games_won_pct", "hold", "brk", "win_v_top50", "elo_clay", "elo_grass", "hold_plus_break", "serve_rating",
+                "return_rating", "win_pct", "sets_won_pct", "elo_hard", "elo_peak", "avg_opp_elo", "win_v_top10", "win_v_top20",
+                "tb_per_set", "games_per_set", "tb_pct", "dec_pct", "close_sets_pct"],
+    "wta_all": ["elo", "games_won_pct", "hold", "brk", "dominance", "ace_pct", "win_v_top50", "elo_clay", "elo_grass",
+                "hold_plus_break", "serve_rating", "return_rating", "win_pct", "spw_real", "rpw_real", "tpw", "hold_real", "brk_real",
+                "first_in", "first_won", "second_won", "df_pct", "elo_hard", "elo_peak", "avg_opp_elo", "tb_pct", "dec_pct",
+                "bp_saved_pct", "bp_conv_pct"],
+    "atp_hard": ["elo_hard", "games_won_pct", "hold", "brk", "win_pct", "win_v_top50", "elo", "hold_plus_break", "serve_rating",
+                 "return_rating", "tb_per_set", "tb_pct", "dec_pct"],
+    "atp_clay": ["elo_clay", "elo", "games_won_pct", "hold", "brk", "win_pct", "hold_plus_break", "serve_rating", "return_rating",
+                 "win_v_top50", "tb_pct", "dec_pct"],
+    "atp_grass": ["elo_grass", "elo", "games_won_pct", "hold", "brk", "win_pct", "hold_plus_break", "serve_rating", "return_rating",
+                  "win_v_top50", "tb_per_set", "tb_pct"],
+    "wta_hard": ["elo_hard", "games_won_pct", "hold", "brk", "win_pct", "dominance", "ace_pct", "elo", "hold_plus_break", "serve_rating",
+                 "return_rating", "win_v_top50", "spw_real", "rpw_real", "first_won", "tb_pct", "bp_saved_pct", "bp_conv_pct"],
+    "wta_clay": ["elo_clay", "elo", "games_won_pct", "hold", "brk", "win_pct", "dominance", "ace_pct", "hold_plus_break", "serve_rating",
+                 "return_rating", "win_v_top50", "spw_real", "rpw_real", "first_won", "tb_pct", "bp_saved_pct", "bp_conv_pct"],
+    "wta_grass": ["elo_grass", "elo", "games_won_pct", "hold", "brk", "win_pct", "ace_pct", "hold_plus_break", "serve_rating",
+                  "return_rating", "dominance", "spw_real", "rpw_real", "first_won", "tb_pct"],
+}
+PEER_HEADLINE = {"atp_all": 7, "wta_all": 9, "atp_hard": 6, "atp_clay": 6, "atp_grass": 6, "wta_hard": 7, "wta_clay": 8, "wta_grass": 7}
+SIMILAR_W = {
+    "atp_all": {"elo": 0.8, "hold": 0.8, "brk": 0.8, "elo_clay": 0.74, "elo_grass": 0.68, "games_won_pct": 0.72, "tb_per_set": 0.57},
+    "wta_all": {"elo": 0.75, "hold": 0.8, "brk": 0.8, "elo_clay": 0.64, "elo_grass": 0.65, "games_won_pct": 0.62, "ace_pct": 0.8,
+                "first_in": 0.78},
+    "atp_hard": {"elo_hard": 0.8, "hold": 0.8, "brk": 0.8, "games_won_pct": 0.65},
+    "atp_clay": {"elo_clay": 0.8, "hold": 0.8, "brk": 0.8, "games_won_pct": 0.52},
+    "atp_grass": {"elo_grass": 0.8, "hold": 0.8, "brk": 0.8, "games_won_pct": 0.46},
+    "wta_hard": {"elo_hard": 0.8, "hold": 0.8, "brk": 0.8, "games_won_pct": 0.55, "ace_pct": 0.8},
+    "wta_clay": {"elo_clay": 0.8, "hold": 0.8, "brk": 0.8, "games_won_pct": 0.47, "ace_pct": 0.74},
+    "wta_grass": {"elo_grass": 0.8, "hold": 0.8, "brk": 0.8, "games_won_pct": 0.34, "ace_pct": 0.59},
+}
+SIMILAR_K = 5
+
+
+def _num(x) -> float | None:
+    x = an.fnum(x)
+    return x if x is not None and math.isfinite(x) else None
+
+
+def similar_players(feats: dict[str, dict], weights: dict[str, float], k: int = SIMILAR_K) -> dict[str, list]:
+    """{pid: [[other pid, distance]]} by the spec's recipe. `feats` {pid: {feature: value}} is the pool (players meeting
+    the group's minimum); each feature is z-scored within the pool; distance = sqrt(sum w (za - zb)^2 / sum w) over the
+    features both players have (a missing feature is dropped and the weights renormalised; at least half the weight
+    must remain); the k nearest, nearest first."""
+    ids = sorted(feats)
+    stats: dict[str, tuple[float, float]] = {}
+    for f in weights:
+        xs = [v for v in (_num(feats[p].get(f)) for p in ids) if v is not None]
+        if len(xs) < 3:
+            continue
+        m = sum(xs) / len(xs)
+        sd = math.sqrt(sum((x - m) ** 2 for x in xs) / (len(xs) - 1)) or 1.0
+        stats[f] = (m, sd)
+    z: dict[str, dict[str, float]] = {}
+    for p in ids:
+        zp = {}
+        for f, (m, sd) in stats.items():
+            v = _num(feats[p].get(f))
+            if v is not None:
+                zp[f] = (v - m) / sd
+        z[p] = zp
+    w_all = sum(weights[f] for f in stats)
+    out: dict[str, list] = {}
+    for a in ids:
+        za = z[a]
+        rows = []
+        for b in ids:
+            if b == a:
+                continue
+            zb = z[b]
+            s = w = 0.0
+            for f, wt in weights.items():
+                if f in za and f in zb:
+                    s += wt * (za[f] - zb[f]) ** 2
+                    w += wt
+            if w > 0 and w >= 0.5 * w_all:
+                rows.append((math.sqrt(s / w), b))
+        rows.sort()
+        out[a] = [[b, round(d, 3)] for d, b in rows[:k]]
+    return out
+
+
+def peer_blocks(cat: dict, tour: str) -> dict[str, dict]:
+    """{pid: peer block} for a season catalogue `cat` (build()'s payload), written into the career files
+    (players/<pid>.json "peer") so the player and compare pages need not load players.json.
+
+    Per peer group of the spec (the tour, then each surface the player has a block on): the group id, its minimum and
+    pool size, whether the player meets it, the sample, the spec's metric values (headline ids first, `headline` lists
+    them) and, only for players in the pool, their percentiles (surface groups rank Elo among the surface pool, from
+    pct_surface.<s>.elo_surface / .elo) and tour ranks; plus the similar players (the tour view and each surface view)
+    by the spec's weights."""
+    P = cat.get("players") or {}
+    floor = cat.get("floor")
+    sfl = cat.get("surface_floor") or SURFACE_FLOOR
+    T = "WTA" if tour == "wta" else "ATP"
+    g_all = f"{tour}_all"
+    q = [p for p, r in P.items() if r.get("qualified")]
+
+    def tour_feat(r: dict) -> dict:
+        v = r.get("values") or {}
+        o = {}
+        for f in SIMILAR_W[g_all]:
+            x = _num(v.get(f))
+            if f in ("elo_clay", "elo_grass"):
+                e = _num(v.get("elo"))
+                x = None if x is None or e is None else x - e
+            o[f] = x
+        return o
+    sim_all = similar_players({p: tour_feat(P[p]) for p in q}, SIMILAR_W[g_all])
+    pools: dict[str, list[str]] = {}
+    sim_s: dict[str, dict] = {}
+    for s in an.SURFACES:
+        fl = sfl.get(s, SURFACE_FLOOR.get(s, 8))
+        pools[s] = [p for p, r in P.items() if (((r.get("values_surface") or {}).get(s) or {}).get("matches") or 0) >= fl]
+        g = f"{tour}_{s}"
+        feats = {}
+        for p in pools[s]:
+            vs = (P[p].get("values_surface") or {}).get(s) or {}
+            feats[p] = {f: ((P[p].get("values") or {}).get(f) if f.startswith("elo") else vs.get(f)) for f in SIMILAR_W[g]}
+        sim_s[s] = similar_players(feats, SIMILAR_W[g])
+
+    def named(rows: list) -> list[dict]:
+        return [{"id": o, "name": (P.get(o) or {}).get("name") or o, "d": d} for o, d in rows]
+    out: dict[str, dict] = {}
+    for p, r in P.items():
+        v = r.get("values") or {}
+        inq = bool(r.get("qualified"))
+        keys = PEER_KEYS[g_all]
+        groups = {"all": {"group": g_all, "peer_group": f"{T} players with {floor}+ tour-level matches",
+                          "minimum": {"field": "matches", "value": floor}, "pool": len(q), "in_pool": inq,
+                          "sample": {"matches": r.get("matches"), "stats_matches": v.get("stats_matches")},
+                          "headline": keys[:PEER_HEADLINE[g_all]],
+                          "values": {k: v.get(k) for k in keys if v.get(k) is not None},
+                          "pct": {k: x for k, x in (r.get("pct") or {}).items() if k in keys} if inq else {},
+                          "rank": {k: x for k, x in (r.get("rank_metric") or {}).items() if k in keys} if inq else {}}}
+        for s in an.SURFACES:
+            vs = (r.get("values_surface") or {}).get(s)
+            if not vs:
+                continue
+            g = f"{tour}_{s}"
+            fl = sfl.get(s, SURFACE_FLOOR.get(s, 8))
+            ins = (vs.get("matches") or 0) >= fl
+            ps = (r.get("pct_surface") or {}).get(s) or {}
+            keys = PEER_KEYS[g]
+            vals, pc = {}, {}
+            for k in keys:
+                if k.startswith("elo"):
+                    x, pk = v.get(k), ("elo_surface" if k == f"elo_{s}" else k)
+                else:
+                    x, pk = vs.get(k), k
+                if x is not None:
+                    vals[k] = x
+                if ins and ps.get(pk) is not None:
+                    pc[k] = ps[pk]
+            groups[s] = {"group": g, "peer_group": f"{T} players with {fl}+ tour-level matches on {s}",
+                         "minimum": {"field": f"values_surface.{s}.matches", "value": fl}, "pool": len(pools[s]), "in_pool": ins,
+                         "sample": {"matches": vs.get("matches")}, "headline": keys[:PEER_HEADLINE[g]], "values": vals, "pct": pc}
+        out[p] = {"year": cat.get("year"), "tour": tour, "groups": groups,
+                  "similar": named(sim_all.get(p, [])) if inq else [],
+                  "similar_surface": {s: named(sim_s[s][p]) for s in an.SURFACES if p in sim_s[s]},
+                  "method": "Percentiles: 100 = best among the group's pool (players meeting its minimum); rates are shrunk "
+                            "towards the pool mean by a few pseudo-matches before placing. Similar players: weighted Euclidean "
+                            "distance on z-scores within the pool (weights = season-to-season reliability, floored at 0.2 and "
+                            "capped at 0.8), the 5 nearest; the tour view takes clay and grass Elo as the gap to overall Elo."}
+    return out
 
 
 # ---------------------------------------------------------------------------------------------- careers

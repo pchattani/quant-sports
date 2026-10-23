@@ -41,10 +41,10 @@ V.MORE_TEAM = [
 ];
 /* Display names and plain-words explanations for the headline metrics (f1.json display / explanation). */
 V.NAMES = {
-  driver_effect: ['Race pace v team-mate', 'His own share of race pace once the car is taken out: how much faster or slower than his team-mate per lap. Lower is faster.'],
+  driver_effect: ['Race pace v team-mate', 'Race pace once the car is taken out: how much faster or slower than the team-mate per lap. Lower is faster.'],
   quali_driver_effect: ['Qualifying pace v team-mate', 'The same in qualifying: one-lap pace against the team-mate, % of a lap. Lower is faster.'],
-  race_h2h: ['Race head-to-head v team-mate', 'Share of races he finished ahead of his team-mate.'],
-  team_points_share: ['Share of team points v team-mate', 'His share of the points the car scored.'],
+  race_h2h: ['Race head-to-head v team-mate', 'Share of races finished ahead of the team-mate.'],
+  team_points_share: ['Share of team points v team-mate', 'Share of the points the car scored.'],
   elo_teammate: ['Elo v team-mates', 'Elo rating from head-to-heads with team-mates only.'],
   race_pace: ['Race pace v field', 'Race pace against the field, seconds a lap (driver and car together). Lower is faster.'],
   points_per_race: ['Points per race', 'Championship points per start.'],
@@ -102,10 +102,14 @@ V.peer = function (cat, kind, season) {
   var rows = (cat && (kind === 'teams' ? cat.teams : cat.drivers)) || {};
   var meta = V.metaMap(cat), f = V.floors(season, kind);
   var size = function (id) { var r = rows[id] || {}; return kind === 'teams' ? ((r.log || []).length) : (isNum(r.races) ? r.races : 0); };
-  var ids = Object.keys(rows).filter(function (id) { return size(id) >= f.n; });
+  /* drivers.json from 22 Oct 2026 carries peer_floor, qualified and pct_peer (the same formula among the qualifying
+     drivers): read them when present, else compute here */
+  var usePayload = kind !== 'teams' && cat && isNum(cat.peer_floor) && Object.keys(rows).some(function (id) { return rows[id] && rows[id].pct_peer; });
+  if (usePayload) f = { n: cat.peer_floor, unit: f.unit };
+  var ids = Object.keys(rows).filter(function (id) { return usePayload ? rows[id].qualified === true : size(id) >= f.n; });
   var pct = {};
-  ids.forEach(function (id) { pct[id] = {}; });
-  Object.keys(meta).forEach(function (k) {
+  ids.forEach(function (id) { pct[id] = usePayload ? Object.assign({}, rows[id].pct_peer || {}) : {}; });
+  if (!usePayload) Object.keys(meta).forEach(function (k) {
     var vals = {};
     ids.forEach(function (id) { vals[id] = ((rows[id] || {}).values || {})[k]; });
     var p = pctOf(vals, !!meta[k].lower);
@@ -138,7 +142,7 @@ V.pctCard = function (P, id, sets, o) {
   o = o || {};
   var q = P.qualified(id);
   return QK.pctCard({ title: o.title || 'Percentile rankings', peer: P.label, sample: P.sample(id), groups: q ? V.pctGroups(P, id, sets) : [], right: o.right, foot: o.foot,
-    emptyTitle: 'Short of the sample floor', emptyText: q ? 'No headline metric has a value yet.' : 'Percentiles appear once ' + (P.kind === 'teams' ? 'the team reaches ' : 'he reaches ') + P.floor + ' ' + P.unit + ' this season.' });
+    emptyTitle: 'Short of the sample floor', emptyText: q ? 'No headline metric has a value yet.' : 'Percentiles appear once ' + (P.kind === 'teams' ? 'the team reaches ' : 'the driver reaches ') + P.floor + ' ' + P.unit + ' this season.' });
 };
 /* The peer distribution of one metric, entries marked (first in the signal colour), the median dashed. */
 V.distribution = function (el, P, key, marks) {
@@ -207,6 +211,38 @@ V.pointsForecast = function (el, season, kind, n) {
   QKC.forecast(node, { x: xs, xType: 'category', series: series, yFmt: function (v) { return PD.pts(v); }, yMax: 'auto', yMin: 0, yName: 'Championship points', xName: 'Round',
     today: hasProj ? last : undefined, split: hasProj ? { x: last, label: 'Projection: our expected points' } : undefined,
     xLabel: function (v) { var c = cal[xs.indexOf(v)]; return c ? v + ' · ' + c.name + (c.status === 'done' ? '' : ' (projected)') : v; }, label: (isD ? 'Drivers' : 'Constructors') + ' championship points, with our projection' });
+};
+/* Title chances after each completed round (season.json "title_history", recorded from round 17 of 2026): 538-style
+   lines, one per contender, labelled at the end, the latest round "Today". mode 'pts': expected final points with the
+   simulation's 5th-95th percentile band. Until three rounds are on record it writes a short note instead of a
+   near-empty chart. */
+V.titleHistory = function (el, season, kind, n, mode) {
+  var node = typeof el === 'string' ? document.getElementById(el) : el;
+  if (!node) return false;
+  var H = ((season && season.title_history) || []).filter(function (h) { return h && isNum(h.after_round) && h[kind]; }).sort(function (a, b) { return a.after_round - b.after_round; });
+  if (H.length < 3) {
+    node.innerHTML = '<p class="pd-cap" style="margin:0">' + (H.length ? 'Recording started after round ' + H[0].after_round + ' with ' + H.length + ' round' + (H.length === 1 ? '' : 's') + ' so far' : 'No round has been recorded yet') +
+      '. The chart appears once three rounds are on record; earlier rounds were never stored.</p>';
+    node.style.height = 'auto';
+    return false;
+  }
+  var isD = kind === 'drivers', pts = mode === 'pts';
+  var lastH = H[H.length - 1][kind];
+  var ids = Object.keys(lastH).filter(function (id) { return H.some(function (h) { return isNum((h[kind][id] || {}).p_title) && h[kind][id].p_title >= 0.01; }); })
+    .sort(function (a, b) { return pts ? (((lastH[b] || {}).exp_points || 0) - ((lastH[a] || {}).exp_points || 0)) : (((lastH[b] || {}).p_title || 0) - ((lastH[a] || {}).p_title || 0)); }).slice(0, n || 6);
+  if (!ids.length) { node.innerHTML = '<p class="pd-cap" style="margin:0">Nobody else has a 1% title chance on record.</p>'; return false; }
+  var teamOf = {};
+  ((season.standings || {}).drivers || []).forEach(function (r) { teamOf[r.driver] = r.team; });
+  var st = isD ? PD.ch.styleMap(ids, teamOf) : null;
+  var xs = H.map(function (h) { return 'R' + h.after_round; });
+  var get = function (h, id, k) { var r = h[kind][id]; return r && isNum(r[k]) ? r[k] : null; };
+  QKC.forecast(node, { x: xs, xType: 'category', xName: 'After round', yName: pts ? 'Expected final points (5th–95th percentile band)' : 'Our title chance',
+    yFmt: pts ? function (v) { return PD.num(v, 0); } : undefined, yMax: pts ? 'auto' : undefined, yMin: 0,
+    series: ids.map(function (id) { return { name: isD ? PD.driverName(id) : PD.teamName(id), label: isD ? PD.driverCode(id) : PD.teamAbbr(id), color: isD ? st[id].colour : PD.teamColour(id), dash: isD ? st[id].dash : false,
+      data: H.map(function (h) { return get(h, id, pts ? 'exp_points' : 'p_title'); }),
+      band: pts ? { lo: H.map(function (h) { return get(h, id, 'p05'); }), hi: H.map(function (h) { return get(h, id, 'p95'); }) } : undefined }; }),
+    today: xs[xs.length - 1], label: (isD ? 'Drivers' : 'Constructors') + (pts ? ' expected points' : ' title chances') + ' after each round' });
+  return true;
 };
 /* Season-end points: the simulation's 5th to 95th percentile (bar) and the expectation (dot). */
 V.rangeChart = function (el, season, kind, n) {

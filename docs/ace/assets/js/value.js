@@ -151,14 +151,11 @@ function ageChart(id, Val) {
   const node = document.getElementById(id);
   if (!node) return;
   if (!a.length) { node.innerHTML = TA.muted('The age curve is not available yet.'); return; }
-  const x = a.map(r => r[0]), pc = v => (Math.exp(v) - 1) * 100;
-  const y = a.map(r => pc(r[2])), lo = a.map(r => pc(r[3])), hi = a.map(r => pc(r[4]));
-  TA.plot(id, [
-    { x: x.concat(x.slice().reverse()), y: hi.concat(lo.slice().reverse()), fill: 'toself', fillcolor: 'rgba(217,242,79,0.12)', line: { width: 0 }, hoverinfo: 'skip', type: 'scatter', showlegend: false },
-    { x: x, y: y, type: 'scatter', mode: 'lines+markers', line: { color: TA.C.ace, width: 2 }, marker: { size: 8, color: TA.C.ace },
-      customdata: a.map((r, i) => [r[1], lo[i], hi[i]]), hovertemplate: 'Age %{x}<br>Rank change %{y:+.0f}% (%{customdata[1]:+.0f}% to %{customdata[2]:+.0f}%)<br>%{customdata[0]} player-snapshots<extra></extra>' }
-  ], TA.layout({ margin: { l: 56, r: 12, t: 10, b: 46 }, xaxis: { title: { text: 'Age at the snapshot (18 = 18 or younger, 34 = 34+)' }, dtick: 2 },
-    yaxis: { title: { text: 'Mean change in rank number, %' }, zeroline: true, ticksuffix: '%' } }));
+  node.classList.add('qk-chart');
+  const pc = v => (Math.exp(v) - 1) * 100;
+  QKC.line(node, { x: a.map(r => r[0]), xType: 'value', series: [{ name: 'Mean change in rank', data: a.map(r => pc(r[2])), color: QK.cssVar('--signal'), symbols: true,
+    band: { lo: a.map(r => pc(r[3])), hi: a.map(r => pc(r[4])) } }], xName: 'Age at the snapshot (18 = 18 or younger, 34 = 34+)', yName: 'Mean change in rank number, %',
+    yFmt: v => (v > 0 ? '+' : '') + Math.round(v) + '%', xFmt: v => String(Math.round(v)), ref: { y: 0 }, label: 'Age curve' });
 }
 
 function calendarChart(T, id, rows, h) {
@@ -167,14 +164,10 @@ function calendarChart(T, id, rows, h) {
   const pts = rows.filter(r => isNum(r['drop' + h]) && isNum(r['exp_earn' + h]));
   if (!pts.length) { node.innerHTML = TA.muted('No points calendar yet.'); return; }
   const mx = Math.max.apply(null, pts.map(r => Math.max(r['drop' + h], r['exp_earn' + h]))) * 1.05;
-  TA.plot(id, [
-    { x: [1, mx], y: [1, mx], type: 'scatter', mode: 'lines', line: { color: TA.C.text3, width: 1, dash: 'dot' }, hoverinfo: 'skip', showlegend: false },
-    { x: pts.map(r => Math.max(1, r['exp_earn' + h])), y: pts.map(r => Math.max(1, r['drop' + h])), type: 'scatter', mode: 'markers',
-      marker: { size: 9, color: pts.map(r => (r['drop' + h] > r['exp_earn' + h] ? TA.C.red : TA.C.green)), line: { color: TA.C.bg, width: 1 } },
-      text: pts.map(r => TA.playerName(T, r.pid) + ' (No. ' + r.rank + ')'),
-      hovertemplate: '%{text}<br>To defend %{y:,.0f}<br>Expected at this level %{x:,.0f}<extra></extra>' }
-  ], TA.layout({ margin: { l: 60, r: 12, t: 10, b: 46 }, xaxis: { type: 'log', title: { text: 'Expected tour-level points at the model\'s level' } },
-    yaxis: { type: 'log', title: { text: 'Tour-level points to defend' } } }));
+  TA.v2.scatter(node, { points: pts.map(r => ({ x: Math.max(1, r['exp_earn' + h]), y: Math.max(1, r['drop' + h]), color: r['drop' + h] > r['exp_earn' + h] ? 'down' : 'up', href: TA.playerHref(T, r.pid),
+    name: esc(TA.playerName(T, r.pid)) + ' (No. ' + r.rank + ')<br>To defend ' + n0(r['drop' + h]) + '<br>Expected at this level ' + n0(r['exp_earn' + h]) })),
+    xLog: true, yLog: true, diagonal: [1, mx], xName: 'Expected tour-level points at our rating', yName: 'Tour-level points to defend', xFmt: v => n0(v), yFmt: v => n0(v),
+    keys: [{ name: 'More to defend than expected', color: 'down' }, { name: 'Less to defend', color: 'up' }], label: 'Points to defend against points expected' });
 }
 
 // ── luck ───────────────────────────────────────────────────────────────────
@@ -239,18 +232,14 @@ function evidenceChart(id, Val) {
   const C = ((Val && Val.luck_evidence) || {}).correlations || [];
   if (!node) return;
   if (!C.length) { node.innerHTML = TA.muted('The evidence is not available yet.'); return; }
-  const list = C.slice().reverse();
-  const col = { luck: TA.C.ace, skill: TA.C.blue, schedule: TA.C.purple, structural: TA.C.orange };
-  const kinds = ['luck', 'skill', 'schedule', 'structural'].filter(k => list.some(c => c.kind === k));
+  node.classList.add('qk-chart');
+  const col = { luck: QK.cssVar('--signal'), skill: QK.cssVar('--c-1'), schedule: QK.cssVar('--c-7'), structural: QK.cssVar('--c-2') };
   const name = { luck: 'Luck (counted)', skill: 'Skill', schedule: 'Schedule (not counted)', structural: 'Structural (not counted)' };
-  TA.plot(id, kinds.map(k => {
-    const s = list.filter(c => c.kind === k);
-    return { type: 'scatter', mode: 'markers', name: name[k], y: s.map(c => c.label), x: s.map(c => c.r),
-      error_x: { type: 'data', symmetric: false, array: s.map(c => (isNum(c.hi) ? c.hi - c.r : 0)), arrayminus: s.map(c => (isNum(c.lo) ? c.r - c.lo : 0)), color: col[k], thickness: 2, width: 0 },
-      marker: { size: 10, color: col[k] }, customdata: s.map(c => [c.n, c.lo, c.hi]),
-      hovertemplate: '%{y}<br>r = %{x:.3f} [%{customdata[1]:.2f}, %{customdata[2]:.2f}]<br>%{customdata[0]} player pairs<extra></extra>' };
-  }), TA.layout({ showlegend: true, legend: { orientation: 'h', y: -0.18, x: 0 }, margin: { l: 250, r: 12, t: 10, b: 70 },
-    xaxis: { title: { text: 'Correlation, one season with the next' }, range: [-0.2, 1], zeroline: true }, yaxis: { automargin: true } }));
+  const kinds = ['luck', 'skill', 'schedule', 'structural'].filter(k => C.some(c => c.kind === k));
+  QKC.bar(node, { cats: C.map(c => c.label), horizontal: true, labels: false, min: -0.2, max: 1, labelWidth: 230, fmt: v => Number(v).toFixed(2),
+    series: [{ name: 'Correlation', data: C.map(c => c.r), lo: C.map(c => (isNum(c.lo) ? c.lo : null)), hi: C.map(c => (isNum(c.hi) ? c.hi : null)) }],
+    colors: C.map(c => col[c.kind] || QK.cssVar('--c-other')), legendItems: kinds.map(k => ({ name: name[k], color: col[k] })),
+    valName: 'Correlation, one season with the next (95% interval)', catName: 'Measure', label: 'Season-to-season correlations: luck against skill' });
 }
 
 function luck(T, V, Val, body, q) {
@@ -312,7 +301,7 @@ function over(T, V, Val, body) {
     '<div class="card"><div class="section-note">The <b>model rating</b> is our match forecast in one number per player (Elo, the serve/return model and game-share Elo, blended as our match forecasts are). ' +
     'Ordering players by it and handing out the official ranks in that order gives the <b>rank the model implies</b>. A player ranked well below it is underrated by the ranking (often back from injury, or winning more than the points show); above it, overrated (points from a hot spell, or luck). ' +
     'Ranks below the ESPN top 150 (ATP) come from the latest match on record. The points column is the official total; "at implied rank" is what the player holding that rank has. ' + glossLink('v_implied_rank', 'Definitions') + '</div>' +
-    '<div id="vx-sc" style="height:420px"></div></div>' +
+    '<div id="vx-sc" style="height:440px"></div></div>' +
     '<div class="grid-2"><div class="card"><div class="card-header">Underrated by the ranking <span class="card-sub">Ranked furthest below the model</span></div>' + overTable(T, under) + '</div>' +
     '<div class="card"><div class="card-header">Overrated by the ranking <span class="card-sub">Ranked furthest above the model</span></div>' + overTable(T, overr) + '</div></div>' +
     '<div class="card"><div class="card-header">Model ranking <span class="card-sub">Active players by model rating; sortable</span></div>' + overTable(T, ((V.value || {}).rows || []).slice(0, 150)) + '</div>';
@@ -320,16 +309,11 @@ function over(T, V, Val, body) {
   const pts = top200;
   if (!pts.length) { document.getElementById('vx-sc').innerHTML = TA.muted('No ranking to compare yet.'); return; }
   const lab = new Set(under.slice(0, 6).concat(overr.slice(0, 6)).map(r => r.pid));
-  TA.plot('vx-sc', [
-    { x: [1, 300], y: [1, 300], type: 'scatter', mode: 'lines', line: { color: TA.C.text3, width: 1, dash: 'dot' }, hoverinfo: 'skip', name: 'Ranking = model' },
-    { x: pts.map(r => r.rank), y: pts.map(r => r.imp), type: 'scatter', mode: 'markers+text', name: 'Players',
-      text: pts.map(r => (lab.has(r.pid) ? TA.playerSurname(T, r.pid) : '')), textposition: 'top center', textfont: { size: 10, color: TA.C.text2 },
-      marker: { size: 8, color: pts.map(r => (r.gap > 0.15 ? TA.C.green : r.gap < -0.15 ? TA.C.red : TA.C.text3)), line: { color: TA.C.bg, width: 1 } },
-      customdata: pts.map(r => [TA.playerName(T, r.pid), r.mrank]),
-      hovertemplate: '%{customdata[0]}<br>Ranked %{x}, model implies %{y}<br>Model rank %{customdata[1]}<extra></extra>' }
-  ], TA.layout({ margin: { l: 60, r: 12, t: 10, b: 50 }, xaxis: { type: 'log', title: { text: 'Official rank (log scale)' }, autorange: 'reversed' },
-    yaxis: { type: 'log', title: { text: 'Rank the model implies (log scale)' }, autorange: 'reversed' },
-    annotations: [{ x: 0.98, y: 0.04, xref: 'paper', yref: 'paper', showarrow: false, text: 'green: underrated by the ranking · red: overrated', font: { size: 10, color: TA.C.text3 }, xanchor: 'right' }] }));
+  TA.v2.scatter('vx-sc', { points: pts.map(r => ({ x: r.rank, y: r.imp, color: r.gap > 0.15 ? 'up' : r.gap < -0.15 ? 'down' : 'ink3', label: lab.has(r.pid) ? TA.playerSurname(T, r.pid) : '',
+    href: TA.playerHref(T, r.pid), name: esc(TA.playerName(T, r.pid)) + '<br>Ranked ' + r.rank + ', our rating implies ' + r.imp + '<br>Our rank ' + r.mrank })),
+    xLog: true, yLog: true, xInverse: true, yInverse: true, diagonal: [1, 300], xName: 'Official rank (log scale)', yName: 'Rank our rating implies (log scale)',
+    xFmt: v => String(Math.round(v)), yFmt: v => String(Math.round(v)), keys: [{ name: 'Underrated by the ranking', color: 'up' }, { name: 'Overrated', color: 'down' }, { name: 'In line', color: 'ink3' }],
+    label: 'Official rank against the rank our rating implies' });
 }
 
 // ── surfaces ───────────────────────────────────────────────────────────────
@@ -453,14 +437,15 @@ function validation(T, V, Val, body, q) {
   TA.wireToggles(document.getElementById('vx-vh'), 'data-h', k => { q.h = k; setQuery(T, { v: 'validation', h: k }); validation(T, V, Val, body, q); });
   const ys = years.filter(y => per[y] && per[y].rho);
   const xs = ys.map(Number);
-  TA.plot('vx-yr', [
-    { x: xs, y: ys.map(y => per[y].rho[0]), type: 'scatter', mode: 'markers', name: 'Model (95% CI)', marker: { size: 9, color: TA.C.ace },
-      error_y: { type: 'data', symmetric: false, array: ys.map(y => (isNum(per[y].rho[2]) ? per[y].rho[2] - per[y].rho[0] : 0)), arrayminus: ys.map(y => (isNum(per[y].rho[1]) ? per[y].rho[0] - per[y].rho[1] : 0)), color: TA.C.ace, thickness: 2, width: 0 },
-      hovertemplate: '%{x}: %{y:.3f}<extra>model</extra>' },
-    { x: xs, y: ys.map(y => per[y].rho_rank_only), type: 'scatter', mode: 'markers', name: 'Rank only', marker: { size: 8, color: TA.C.text3, symbol: 'diamond' }, hovertemplate: '%{x}: %{y:.3f}<extra>rank only</extra>' }
-  ], TA.layout({ showlegend: true, legend: { orientation: 'h', y: -0.25, x: 0 }, margin: { l: 56, r: 12, t: 10, b: 70 },
-    xaxis: { title: { text: 'Snapshot year (shaded: test years)' }, dtick: 2 }, yaxis: { title: { text: 'Spearman: predicted v actual' }, range: [0, 0.8] },
-    shapes: [{ type: 'rect', xref: 'x', yref: 'paper', x0: test[0] - 0.5, x1: test[1] + 0.5, y0: 0, y1: 1, fillcolor: 'rgba(63,185,80,0.07)', line: { width: 0 } }] }));
+  const yn = document.getElementById('vx-yr');
+  if (yn && xs.length) {
+    yn.classList.add('qk-chart');
+    QKC.line(yn, { x: xs, xType: 'value', series: [
+      { name: 'Our model (95% CI)', data: ys.map(y => per[y].rho[0]), color: QK.cssVar('--signal'), lo: ys.map(y => (isNum(per[y].rho[1]) ? per[y].rho[1] : null)), hi: ys.map(y => (isNum(per[y].rho[2]) ? per[y].rho[2] : null)), symbols: true },
+      { name: 'Rank only', data: ys.map(y => per[y].rho_rank_only), color: QK.cssVar('--c-other'), dash: true, symbols: true }],
+      xName: 'Snapshot year' + (test ? ' (test years from ' + test[0] + ')' : ''), yName: 'Spearman: predicted v actual rank change', yMin: 0, yMax: 0.8, xFmt: v => String(Math.round(v)),
+      yFmt: v => Number(v).toFixed(2), ref: test ? { x: test[0] - 0.5, label: 'test years →' } : undefined, label: 'Rank correlation by year' });
+  }
   evidenceChart('vx-ev2', Val);
   ageChart('vx-age2', Val);
 }

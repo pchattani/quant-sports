@@ -6,7 +6,9 @@
 (function (GI) {
 'use strict';
 
+const QK = window.QK;
 const esc = GI.esc, isNum = GI.isNum, first = GI.first;
+const MARK = t => ({ name: GI.teamName(t), abbr: GI.teamAbbr(t), colour: GI.teamInfo(t).colour });
 const F = {};
 F.LAB = { go: 'Go for it', punt: 'Punt', fg: 'Field goal' };
 F.COL = { go: '#2fb37b', punt: '#3987e5', fg: '#e3b341' };
@@ -55,26 +57,30 @@ F.wpCell = (p, o) => {
   const best = Math.max.apply(null, ['go', 'punt', 'fg'].map(x => p.wp[x]).filter(isNum));
   return { v: v, html: (v === best ? '<b>' : '') + (p.choice === o ? '<u>' : '') + GI.pct(v, 1) + (p.choice === o ? '</u>' : '') + (v === best ? '</b>' : '') };
 };
-/* The play table. opts {team: false (hide the team column), max, onPick(p)}. */
+/* The play table (Design System 2.0 leaderboard: team marks, the win chance given up as an inline bar).
+ * opts {team: false (hide the team column), max, maxHeight, onPick(p)}. */
 F.table = (host, plays, S, opts) => {
   const o = opts || {};
   if (!host) return;
   const list = plays.slice(0, o.max || 400);
   if (!list.length) { host.innerHTML = GI.muted('No fourth downs match.'); return; }
   const model = F.hasModel(plays), hasExp = plays.some(p => isNum(p.go_exp));
-  const cols = [{ label: 'Wk', align: 'right' }].concat(o.team === false ? [] : [{ label: 'Team' }]).concat([{ label: 'Opp' }, { label: 'Situation' }, { label: 'Down' }, { label: 'Choice' }])
-    .concat(hasExp ? [{ label: 'League goes', align: 'right', title: 'How often teams go for it in this situation' }] : []).concat([{ label: 'Result' }])
-    .concat(model ? [{ label: 'Our call', title: 'What our fourth-down model recommends' }, { label: 'Go', align: 'right', title: 'Win probability if they go for it' }, { label: 'Punt', align: 'right' }, { label: 'FG', align: 'right' }, { label: 'WP lost', align: 'right', title: 'Win probability given up against the best choice, points' }, { label: 'Grade' }] : []);
-  host.innerHTML = GI.tableHTML(cols, list.map((p, i) => ({ _attrs: ' data-i="' + i + '"', cells: [{ v: p.week, html: p.gid ? '<a class="gi-link" href="' + GI.gameHref(p.gid) + '">' + esc(p.week === null ? '—' : p.week) + '</a>' : esc(p.week) }]
-    .concat(o.team === false ? [] : [{ v: p.team, html: GI.teamChip(p.team, S) }])
-    .concat([{ v: p.opp || '', html: p.opp ? GI.teamChip(p.opp, S) : '—' }, { v: (p.qtr || 0) * 1000, html: esc(F.sit(p)) },
-      { v: (p.dist || 0) + (p.yl || 0) / 1000, html: '4th & ' + (isNum(p.dist) && isNum(p.yl) && p.dist >= p.yl ? 'Goal' : esc(isNum(p.dist) ? p.dist : '?')) + ' <span class="qk-muted">' + esc(GI.fieldPos(p.yl, p.team, p.opp)) + '</span>' },
-      { v: p.choice, html: F.choiceTag(p.choice) }])
-    .concat(hasExp ? [{ v: p.go_exp, html: GI.pct(p.go_exp, 0) }] : []).concat([{ v: String(p.result || ''), html: F.resultText(p) }])
-    .concat(model ? [{ v: p.rec, html: F.choiceTag(p.rec) }, F.wpCell(p, 'go'), F.wpCell(p, 'punt'), F.wpCell(p, 'fg'),
-      { v: p.lost, html: isNum(p.lost) ? GI.num(p.lost * 100, 1) : '—' }, { v: isNum(p.lost) ? p.lost : -1, html: F.gradeChip(p) }] : []) })), { sticky: false, maxHeight: o.maxHeight || 560 });
-  GI.sortable(host);
-  if (o.onPick) host.querySelectorAll('tbody tr').forEach(tr => { tr.style.cursor = 'pointer'; tr.addEventListener('click', ev => { if (ev.target.closest('a')) return; o.onPick(list[Number(tr.dataset.i)]); }); });
+  const rows = list.map((p, i) => ({ _i: i, p: p, wk: p.week, team: p.team, name: GI.teamAbbr(p.team), sub: p.opp ? 'v ' + GI.teamAbbr(p.opp) : '', sit: (p.qtr || 0) * 10000 - (parseInt(String(p.clock || '').replace(':', ''), 10) || 0),
+    down: (p.dist || 0) + (p.yl || 0) / 1000, choice: p.choice, exp: p.go_exp, res: String(p.result || ''), rec: p.rec, go: p.wp.go, punt: p.wp.punt, fg: p.wp.fg, lost: isNum(p.lost) ? p.lost * 100 : null, grade: isNum(p.lost) ? p.lost : -1 }));
+  const wp = o2 => ({ key: o2, label: o2 === 'fg' ? 'FG' : GI.titleCase(o2), num: true, fmt: (v, r) => F.wpCell(r.p, o2).html, tip: 'Our win probability if they ' + (o2 === 'go' ? 'go for it' : o2 === 'punt' ? 'punt' : 'kick the field goal') + '; best bold, the choice underlined' });
+  const cols = [{ key: 'wk', label: 'Wk', num: true, fmt: (v, r) => (r.p.gid ? '<a class="gi-link" href="' + GI.gameHref(r.p.gid) + '">' + esc(v === null ? '—' : v) + '</a>' : esc(v)) }]
+    .concat(o.team === false ? [{ key: 'sub', label: 'Opp', fmt: v => esc(v) }] : [{ key: 'name', label: 'Team', type: 'entity', sub: 'sub', mark: r => MARK(r.team), href: r => GI.teamHref(r.team, S) }])
+    .concat([{ key: 'sit', label: 'Situation', fmt: (v, r) => esc(F.sit(r.p)) }, { key: 'down', label: 'Down', fmt: (v, r) => '4th & ' + (isNum(r.p.dist) && isNum(r.p.yl) && r.p.dist >= r.p.yl ? 'Goal' : esc(isNum(r.p.dist) ? r.p.dist : '?')) + ' <span class="qk-muted">' + esc(GI.fieldPos(r.p.yl, r.p.team, r.p.opp)) + '</span>' },
+      { key: 'choice', label: 'Choice', fmt: v => F.choiceTag(v) }])
+    .concat(hasExp ? [{ key: 'exp', label: 'League goes', num: true, fmt: v => GI.pct(v, 0), tip: 'How often teams go for it in this situation' }] : []).concat([{ key: 'res', label: 'Result', fmt: (v, r) => F.resultText(r.p) }])
+    .concat(model ? [{ key: 'rec', label: 'Our call', fmt: v => F.choiceTag(v), tip: 'What our fourth-down model recommends' }, wp('go'), wp('punt'), wp('fg'),
+      { key: 'lost', label: 'Win chance lost', type: 'bar', max: 10, fmt: v => (isNum(v) ? GI.num(v, 1) : '—'), tip: 'Win probability given up against the best option, percentage points (bar to 10)' }, { key: 'grade', label: 'Grade', fmt: (v, r) => F.gradeChip(r.p) || '—' }] : []);
+  QK.leaderboard(host, { dense: true, maxHeight: o.maxHeight || 560, columns: cols, rows: rows, rowClass: r => 'fd-row fd-i' + r._i });
+  if (o.onPick && !host.__fdPick) {
+    host.__fdPick = true;
+    host.addEventListener('click', ev => { if (ev.target.closest('a, button')) return; const tr = ev.target.closest('tr.fd-row'); if (!tr) return; const m = /fd-i(\d+)/.exec(tr.className); if (m) o.onPick(list[Number(m[1])]); });
+  }
+  if (o.onPick) host.querySelectorAll('tr.fd-row').forEach(tr => { tr.style.cursor = 'pointer'; });
 };
 F.coachRow = r => {
   const o = { coach: r.coach || r.name, season: first(r.season), team: r.team || (Array.isArray(r.teams) ? r.teams.join('/') : r.teams) || '', n: first(r.n, r.fourth_downs), go: first(r.go, r.went),
@@ -101,22 +107,19 @@ F.coachTable = (host, rows, S) => {
   if (!host) return;
   if (!rows.length) { host.innerHTML = GI.muted('No coach table yet.'); return; }
   const hasModel = rows.some(r => isNum(r.should) || isNum(r.lost));
-  host.innerHTML = GI.tableHTML([{ label: 'Coach' }, { label: 'Team' }, { label: '4th downs', align: 'right' }, { label: 'Went', align: 'right' }, { label: 'Go rate', align: 'right' },
-    { label: 'League would', align: 'right', title: 'Expected go rate in the same situations from a league model' }, { label: 'GOE', align: 'right', title: 'Go rate over expected, points: aggressiveness against the league' }]
-    .concat(hasModel ? [{ label: 'Our model said go', align: 'right' }, { label: 'Went when it did', align: 'right' }, { label: 'Agree', align: 'right' }, { label: 'WP lost', align: 'right', title: 'Summed, points' }, { label: 'Per call', align: 'right' }] : []),
-  rows.slice().sort((a, b) => (isNum(b.goe) ? b.goe : -9) - (isNum(a.goe) ? a.goe : -9)).map(r => ({ _href: r.coach ? GI.coachHref(r.coach, S) : null, cells: [
-    { v: r.coach || '', html: r.coach ? GI.coachLink(r.coach, S) : '<span class="qk-muted">unknown</span>' }, { v: r.team || '', html: String(r.team || '').split('/').filter(Boolean).map(t => GI.teamChip(t, S)).join(' ') || '—' },
-    { v: r.n, html: GI.int(r.n) }, { v: r.go, html: GI.int(r.go) }, { v: r.go_rate, html: GI.pct(r.go_rate, 0) }, { v: r.go_exp, html: GI.pct(r.go_exp, 0) },
-    { v: r.goe, html: isNum(r.goe) ? GI.ptsEdge(r.goe * 100, 1) : '—' }]
-    .concat(hasModel ? [{ v: r.should, html: GI.int(r.should) }, { v: r.go_when, html: GI.pct(r.go_when, 0) }, { v: r.agree, html: GI.pct(r.agree, 0) },
-      { v: r.lost, html: isNum(r.lost) ? GI.num(r.lost * 100, 1) : '—' }, { v: r.lost_per, html: isNum(r.lost_per) ? GI.num(r.lost_per * 100, 2) : '—' }] : []) })), { sticky: true, maxHeight: 640 });
-  GI.sortable(host);
+  const R = rows.map(r => Object.assign({ name: r.coach || 'unknown', t0: String(r.team || '').split('/')[0], sub: String(r.team || '').split('/').filter(Boolean).join(' · '), goeP: isNum(r.goe) ? r.goe * 100 : null, lostP: isNum(r.lost) ? r.lost * 100 : null, perP: isNum(r.lost_per) ? r.lost_per * 100 : null }, r));
+  QK.leaderboard(host, { dense: true, rank: true, maxHeight: 640, sort: { key: 'goeP', dir: 'desc' }, rowHref: r => (r.coach ? GI.coachHref(r.coach, S) : ''), rows: R,
+    columns: [{ key: 'name', label: 'Coach', type: 'entity', sub: 'sub', mark: r => MARK(r.t0), href: r => (r.coach ? GI.coachHref(r.coach, S) : null) }, { key: 'n', label: '4th downs', num: true }, { key: 'go', label: 'Went', num: true },
+      { key: 'go_rate', label: 'Go rate', type: 'bar', max: 1, fmt: v => GI.pct(v, 0) }, { key: 'go_exp', label: 'League would', num: true, fmt: v => GI.pct(v, 0), tip: 'Expected go rate in the same situations from a league model' },
+      { key: 'goeP', label: 'GOE', num: true, fmt: v => (isNum(v) ? GI.ptsEdge(v, 1) : '—'), tip: 'Go rate over expected, points: aggressiveness against the league' }]
+      .concat(hasModel ? [{ key: 'should', label: 'Our model said go', num: true }, { key: 'go_when', label: 'Went when it did', num: true, fmt: v => GI.pct(v, 0) }, { key: 'agree', label: 'Agree', num: true, fmt: v => GI.pct(v, 0) },
+        { key: 'lostP', label: 'Win chance lost', num: true, fmt: v => (isNum(v) ? GI.num(v, 1) : '—'), tip: 'Summed, points' }, { key: 'perP', label: 'Per call', num: true, fmt: v => (isNum(v) ? GI.num(v, 2) : '—') }] : []) });
 };
 F.optionChart = (id, p) => {
   if (!p) return GI.ch.none(id, 'Click a fourth down for its options.');
   const opts = ['go', 'punt', 'fg'].filter(o => isNum(p.wp[o]));
   if (!opts.length) return GI.ch.none(id, 'No option values for this play.');
-  return GI.ch.bar(id, { cats: opts.map(o => F.LAB[o] + (p.choice === o ? ' (chosen)' : '') + (p.rec === o ? ' ★' : '')), series: [{ name: 'Win probability', data: opts.map(o => p.wp[o]) }], horizontal: true, labels: true,
+  return GI.ch.bar(id, { cats: opts.map(o => F.LAB[o] + (p.choice === o ? ' (chosen)' : '') + (p.rec === o ? ' ★' : '')), series: [{ name: 'Win probability', data: opts.map(o => p.wp[o]) }], horizontal: true, labels: true, valName: 'Our win probability', catName: 'Option',
     colors: opts.map(o => F.COL[o]), fmt: v => GI.pct(v, 1), labelWidth: 120, max: Math.min(1, Math.max.apply(null, opts.map(o => p.wp[o])) * 1.2 + 0.05), label: 'Win probability by option' });
 };
 GI.F = F;
@@ -140,6 +143,7 @@ GI.route('fourth', function (el, params) {
     const weeks = Array.from(new Set(plays.map(p => p.week).filter(isNum))).sort((a, b) => a - b);
     el.innerHTML = head + (model ? '' : GI.note('<b>The fourth-down model has not graded this season yet.</b> Until it does, each decision shows how often the league goes for it in that spot; recommendations and grades stay empty rather than guessed.')) +
       '<div id="fd-kpis"></div>' +
+      GI.secHead({ kicker: 'Fourth downs', title: 'Every call this season', sub: 'Filter by team, week, choice, our model\'s call or the grade; click a decision for its options.' }) +
       GI.card('Filters', '', '<div class="gi-toolbar">' + GI.field('Team', GI.select('fd-team', [['', 'All teams']].concat(teams.map(t => [t, t + ' · ' + GI.teamName(t)])), ST.team, 'Team')) +
         GI.field('Week', GI.select('fd-week', [['', 'All weeks']].concat(weeks.map(w => [String(w), GI.weekLabel(w, S)])), ST.week, 'Week')) +
         GI.field('Choice', GI.select('fd-choice', [['', 'Any'], ['go', 'Went for it'], ['punt', 'Punted'], ['fg', 'Kicked a field goal']], ST.choice, 'Choice')) +
@@ -148,7 +152,7 @@ GI.route('fourth', function (el, params) {
       GI.grid(GI.card('The field', 'every fourth down by field position and distance · colour: ' + (model ? 'the model\'s call' : 'the choice') + ' · ringed: mistakes', GI.chartBox('fd-map', 380, 'Fourth downs on the field'), { span: 7 }) +
         GI.card('Win probability by option', 'the selected play · ★ the model\'s pick', GI.chartBox('fd-opt', 220, 'Options for the selected play') + '<p class="gi-cap" id="fd-opt-n"></p>', { span: 5 })) +
       GI.card('Every decision', '<span id="fd-tsub"></span>', '<div id="fd-table"></div>', { flush: true }) +
-      GI.card('Coach aggressiveness', 'go rate against the league (GOE) and against the model · <a href="' + GI.ghref('coaches', S) + '">coach pages →</a>', '<div id="fd-coaches"></div>', { flush: true }) +
+      '<section class="qk-section">' + GI.secHead({ kicker: 'Coaches', title: 'Who goes for it', sub: 'Go rate against the league (GOE) and against our model.', actions: '<a class="qk-btn" href="' + GI.ghref('coaches', S) + '">Coach pages →</a>' }) + GI.card('', '', '<div id="fd-coaches"></div>', { flush: true }) + '</section>' +
       GI.note('<p>For every fourth down (kneels and the last seconds of a half excluded) our model values <b>go for it</b> (conversion probability, then the win probability after a conversion or a turnover on downs), <b>punt</b> (expected net distance) and <b>field goal</b> (our make probability by distance, kicker, weather and roof), each valued with our win-probability model. <b>WP lost</b> is the best option minus the chosen one: up to 1.5 points is a right call, up to 3 a close call (the model\'s own uncertainty is about that size), beyond that a mistake. <a href="#/methodology/fourth">Methodology →</a></p>');
     const filt = () => plays.filter(p => (!ST.team || p.team === ST.team) && (!ST.week || String(p.week) === ST.week) && (!ST.choice || p.choice === ST.choice) && (!ST.rec || p.rec === ST.rec) &&
       (!ST.grade || (ST.grade === 'disagree' ? p.rec && p.choice !== p.rec : F.grade(p).key === ST.grade)));
@@ -164,9 +168,9 @@ GI.route('fourth', function (el, params) {
       const worst = list.filter(p => isNum(p.lost)).sort((a, b) => b.lost - a.lost)[0];
       GI.set('fd-kpis', GI.kpis([GI.kpi('Fourth downs', GI.int(n), n !== plays.length ? 'of ' + GI.int(plays.length) + ' this season' : 'this season'),
         GI.kpi('Went for it', n ? GI.pct(go / n, 0) : '—', GI.int(go) + ' times' + (model ? ' · model said go ' + GI.int(rec) : '')),
-        model ? GI.kpi('Agreed with the model', recN ? GI.pct(agree / recN, 0) : '—', GI.int(list.filter(p => p.rec === 'go' && p.choice !== 'go').length) + ' times it said go and they kicked') : '',
-        model ? GI.kpi('Win probability given away', GI.num(lost * 100, 1) + ' pts', 'summed over these decisions') : '',
-        worst ? GI.kpi('Costliest call', GI.num(worst.lost * 100, 1) + ' pts', esc((worst.team || '') + ' ' + GI.weekLabel(worst.week, S, true) + ': ' + (F.LAB[worst.choice] || worst.choice) + ' on 4th & ' + (worst.dist || '?'))) : '']));
+        model ? GI.kpi('Agreed with our model', recN ? GI.pct(agree / recN, 0) : '—', GI.int(list.filter(p => p.rec === 'go' && p.choice !== 'go').length) + ' times it said go and they kicked') : '',
+        model ? GI.kpi('Win chance given away', GI.num(lost * 100, 1), 'percentage points, summed over these decisions', { unit: 'pts', signal: true }) : '',
+        worst ? GI.kpi('Costliest call', GI.num(worst.lost * 100, 1),  esc((worst.team || '') + ' ' + GI.weekLabel(worst.week, S, true) + ': ' + (F.LAB[worst.choice] || worst.choice) + ' on 4th & ' + (worst.dist || '?')), { unit: 'pts', href: worst.gid ? GI.gameHref(worst.gid) : null }) : '']));
       F.table(document.getElementById('fd-table'), list, S, { onPick: pick, max: 500 });
       GI.set('fd-tsub', n + ' decisions' + (n > 500 ? ' (first 500)' : '') + ' · ' + (model ? 'sorted by win probability lost; best option bold, the choice underlined' : 'newest first') + ' · click a row for its options');
       const pts = list.filter(p => isNum(p.yl) && isNum(p.dist));

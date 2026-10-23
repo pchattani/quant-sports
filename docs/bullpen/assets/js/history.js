@@ -93,8 +93,8 @@ function render(el, params) {
     const t1 = lead('all', 'war') || lead('hitters', 'war'), t2 = lead('hitters', 'wrc_plus'), t3 = lead('pitchers', 'ra9_minus'), t4 = lead('pitchers', 'war');
     $('hi-kpis').innerHTML = '<div class="bp-kpis">' + QK.stats([
       t1 ? { label: 'Career WAR leader', value: k.surname(t1.name || t1.pid) + ' ' + fmtM('war', t1.v, {}), signal: true, sub: String(t1.season || ''), tip: 'Bullpen WAR, the historical version before 2015' } : null,
-      t2 ? { label: 'Best career wRC+', value: k.surname(t2.name || t2.pid) + ' ' + fmtM('wrc_plus', t2.v, {}), sub: (t2.season || '') + ' · 3,000+ PA', tip: 'Runs created per PA against his league, 100 = average' } : null,
-      t3 ? { label: 'Best career RA9−', value: k.surname(t3.name || t3.pid) + ' ' + fmtM('ra9_minus', t3.v, {}), sub: (t3.season || '') + ' · 1,500+ IP', tip: 'Runs allowed per nine against his league, 100 = average, lower is better' } : null,
+      t2 ? { label: 'Best career wRC+', value: k.surname(t2.name || t2.pid) + ' ' + fmtM('wrc_plus', t2.v, {}), sub: (t2.season || '') + ' · 3,000+ PA', tip: 'Runs created per PA against the league, 100 = average' } : null,
+      t3 ? { label: 'Best career RA9−', value: k.surname(t3.name || t3.pid) + ' ' + fmtM('ra9_minus', t3.v, {}), sub: (t3.season || '') + ' · 1,500+ IP', tip: 'Runs allowed per nine against the league, 100 = average, lower is better' } : null,
       t4 ? { label: 'Pitching WAR leader', value: k.surname(t4.name || t4.pid) + ' ' + fmtM('war', t4.v, {}), sub: String(t4.season || '') } : null
     ]) + '</div>';
     if (scopes.indexOf(ST.scope) < 0) ST.scope = scopes.indexOf('all') >= 0 ? 'all' : scopes[0];
@@ -132,7 +132,7 @@ function render(el, params) {
         rows: rows.slice(0, 200).map(r => { const o2 = { _r: r, name: r.name || k.name(r.pid) || r.pid, season: r.season || '', n: r.n, v: r.v, href: hrefOf(r) }; ex.forEach(x => { o2['x_' + x[0]] = (r.raw || {})[x[0]]; }); return o2; }) });
       const all = rows.filter(r => seasonNum(r.season));
       if (all.length) {
-        $('hi-chart-card').innerHTML = U.card2('When they played', 'Each player at the middle of his ' + (ST.scope === 'season' ? 'season' : 'career') + '; the top ten in violet' + (hits.length ? ', your highlight in white' : ''), U.chart('hi-chart', 420, lbl + ' by era'));
+        $('hi-chart-card').innerHTML = U.card2('When they played', 'Each player at the middle of the ' + (ST.scope === 'season' ? 'season' : 'career') + '; the top ten in violet' + (hits.length ? ', your highlight in white' : ''), U.chart('hi-chart', 420, lbl + ' by era'));
         const T = QKC.tokens();
         QKC.scatter('#hi-chart', { points: all.slice(0, 400).map((r, i) => ({ x: Math.round((seasonNum(r.season) + seasonEnd(r.season)) / 2), y: r.v, name: (r.name || r.pid) + ' · ' + r.season, label: i < 5 || hits.indexOf(r) >= 0 ? k.surname(r.name || r.pid) : ' ', color: hits.indexOf(r) >= 0 ? T.ink1 : i < 10 ? T.model : QKC.hexA(T.ink3, 0.55), size: i < 10 || hits.indexOf(r) >= 0 ? 11 : 6, href: hrefOf(r) })),
           xName: ST.scope === 'season' ? 'Season' : 'Middle of the career', yName: lbl, xFmt: x => String(Math.round(x)), yFmt: v => fmtM(ST.metric, v, meta), labelAll: true, yInverse: lower, label: lbl + ' by era' });

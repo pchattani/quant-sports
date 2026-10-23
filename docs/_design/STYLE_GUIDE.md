@@ -169,10 +169,23 @@ Polymarket)", "No-vig line"). Never say "fair odds"; say "our chance".
 | Every price | Our forecast |
 | BOS −1.5 covers 35% | BOS wins by two or more: 35% |
 | Over 6.5 45% | 7 or more goals: 45% |
-| xGF% 0.698 | 70% of the expected goals at 5v5 went his team's way with him on the ice |
+| xGF% 0.698 | 70% of the expected goals at 5v5 went the team's way with this player on the ice |
 
 Explanations are friendly and short: say what the number means, then the method in a tooltip. Say "our" for our
 models. Name the peer group and the sample under every percentile. The disclaimer stays in the footer of every site.
+
+Labels are neutral: no player pronouns in UI copy. "Among peers", not "Where he sits"; "Playing style", not "How he
+plays"; "the player's team", not "his team". Real names and quoted text are left as they are.
+
+**Legal terms (one decision for every site, 23 Oct 2026).** Each site's disclaimer and terms panel is the
+`<template id="disclaimer-template">`, and its outermost element carries the class `qk-legal` (the card itself, or a
+`<div class="qk-legal">` wrapper). The panel keeps its legal substance on every site: information and entertainment
+only; not betting, financial or professional advice; no bets accepted; provided "as is"; 18+ and responsible
+gambling. "Betting" stays in its heading and in the advice disclaimer, because that wording is the protection. The
+standard sentence is "Model probabilities carry no margin; they are not offers of any kind, and no bets can be placed
+here." The panel does not list "fair odds" (the sites no longer show them), says "market probabilities", not "market
+prices", and "closing lines", not "closing prices". The checker's `--banned` scan skips `.qk-legal` and nothing else:
+any new legal text goes inside that container, and no other element may carry the class.
 
 ## 9. Comparisons (metrics)
 

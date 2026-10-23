@@ -5,7 +5,9 @@
 (function (GI) {
 'use strict';
 
+const QK = window.QK;
 const esc = GI.esc, isNum = GI.isNum;
+const MARK = t => ({ name: GI.teamName(t), abbr: GI.teamAbbr(t), colour: GI.teamInfo(t).colour });
 const ST = { scope: 'season', min: 10, q: '' };
 
 function readCoaches(d) {
@@ -64,15 +66,16 @@ GI.route('coaches', function (el, params) {
       const list = base.filter(r => (r.n || 0) >= (career ? ST.min * 4 : ST.min) && (!q || GI.fold(r.coach + ' ' + r.team).indexOf(q) >= 0)).sort((a, b) => (isNum(b.goe) ? b.goe : -9) - (isNum(a.goe) ? a.goe : -9));
       const hasModel = list.some(r => isNum(r.should) || isNum(r.lost));
       GI.set('co-sub', list.length + ' head coaches · ' + (career ? 'careers' : SS) + ' · sorted by GOE');
-      GI.set('co-table', list.length ? GI.tableHTML([{ label: 'Coach' }, { label: career ? 'Teams' : 'Team' }].concat(career ? [{ label: 'Seasons', align: 'right' }, { label: 'Record', align: 'right' }] : [])
-        .concat([{ label: '4th downs', align: 'right' }, { label: 'Go rate', align: 'right' }, { label: 'League would', align: 'right' }, { label: 'GOE', align: 'right' }])
-        .concat(hasModel ? [{ label: 'Went when model said go', align: 'right' }, { label: 'Agree', align: 'right' }, { label: 'WP lost', align: 'right' }, { label: 'Per call', align: 'right' }] : []),
-        list.map(r => { const rec = (C.info[r.coach] || {}).record;
-          return { _href: GI.coachHref(r.coach, S), cells: [{ html: GI.coachLink(r.coach, S), v: r.coach }, { html: String(r.team || '').split('/').filter(Boolean).slice(0, 4).map(t => GI.teamChip(t)).join(' ') || '—', v: r.team }]
-            .concat(career ? [{ html: r.nSeasons + ' <span class="qk-muted">' + (r.first ? r.first + '–' + r.last : '') + '</span>', v: r.nSeasons }, { html: rec ? esc(GI.record(rec.w, rec.l, rec.t) + (rec.post_w || rec.post_l ? ' (' + (rec.post_w || 0) + '-' + (rec.post_l || 0) + ')' : '')) : '—', v: rec ? rec.w - rec.l : null }] : [])
-            .concat([{ v: r.n }, { html: GI.pct(r.go_rate, 1), v: r.go_rate }, { html: GI.pct(r.go_exp, 1), v: r.go_exp }, { html: isNum(r.goe) ? GI.ptsEdge(r.goe * 100, 1) : '—', v: r.goe }])
-            .concat(hasModel ? [{ html: isNum(r.go_when) ? GI.pct(r.go_when, 0) + ' <span class="qk-muted">of ' + GI.int(r.should) + '</span>' : '—', v: r.go_when }, { html: GI.pct(r.agree, 0), v: r.agree }, { html: isNum(r.lost) ? GI.num(r.lost * 100, 1) : '—', v: r.lost }, { html: isNum(r.lost_per) ? GI.num(r.lost_per * 100, 2) : '—', v: r.lost_per }] : []) }; }), { sticky: true, maxHeight: 640 }) : GI.muted('No coach matches.'));
-      GI.sortable($('co-table'));
+      const R = list.map(r => { const rec = (C.info[r.coach] || {}).record; return Object.assign({ name: r.coach, t0: String(r.team || '').split('/')[0], sub: String(r.team || '').split('/').filter(Boolean).slice(0, 4).join(' · '),
+        rec: rec ? GI.record(rec.w, rec.l, rec.t) + (rec.post_w || rec.post_l ? ' (' + (rec.post_w || 0) + '-' + (rec.post_l || 0) + ')' : '') : '', goeP: isNum(r.goe) ? r.goe * 100 : null, lostP: isNum(r.lost) ? r.lost * 100 : null, perP: isNum(r.lost_per) ? r.lost_per * 100 : null }, r); });
+      if (R.length) QK.leaderboard($('co-table'), { dense: true, rank: true, maxHeight: 680, rows: R, sort: { key: 'goeP', dir: 'desc' }, rowHref: r => GI.coachHref(r.coach, S),
+        columns: [{ key: 'name', label: 'Coach', type: 'entity', sub: 'sub', mark: r => MARK(r.t0), href: r => GI.coachHref(r.coach, S) }]
+          .concat(career ? [{ key: 'nSeasons', label: 'Seasons', num: true, fmt: (v, r) => v + ' <span class="qk-muted">' + (r.first ? r.first + '–' + r.last : '') + '</span>' }, { key: 'rec', label: 'Record', num: true, sort: false }] : [])
+          .concat([{ key: 'n', label: '4th downs', num: true }, { key: 'go_rate', label: 'Go rate', type: 'bar', max: 1, fmt: v => GI.pct(v, 1) }, { key: 'go_exp', label: 'League would', num: true, fmt: v => GI.pct(v, 1) },
+            { key: 'goeP', label: 'GOE', num: true, fmt: v => (isNum(v) ? GI.ptsEdge(v, 1) : '—'), tip: 'Go rate over expected, points' }])
+          .concat(hasModel ? [{ key: 'go_when', label: 'Went when our model said go', num: true, fmt: (v, r) => (isNum(v) ? GI.pct(v, 0) + ' <span class="qk-muted">of ' + GI.int(r.should) + '</span>' : '—') }, { key: 'agree', label: 'Agree', num: true, fmt: v => GI.pct(v, 0) },
+            { key: 'lostP', label: 'Win chance lost', num: true, fmt: v => (isNum(v) ? GI.num(v, 1) : '—') }, { key: 'perP', label: 'Per call', num: true, fmt: v => (isNum(v) ? GI.num(v, 2) : '—') }] : []) });
+      else GI.set('co-table', GI.muted('No coach matches.'));
       const pts = list.filter(r => isNum(r.goe) && isNum(r.lost_per));
       const maxN = Math.max.apply(null, pts.map(r => r.n || 1).concat([1]));
       if (pts.length >= 3) GI.ch.scatter('co-chart', { points: pts.map(r => ({ x: r.goe * 100, y: r.lost_per * 100, name: r.coach + ' (' + r.team + ')', label: GI.surnameOf(r.coach), color: GI.teamColour(String(r.team || '').split('/')[0]), href: GI.coachHref(r.coach, S), size: 7 + 16 * Math.sqrt((r.n || 1) / maxN) })),
@@ -111,13 +114,12 @@ GI.route('coach', function (el, params) {
     const team = String((mine[mine.length - 1] || {}).team || car.team || '').split('/')[0];
     const col = team ? GI.tc(team) : 'var(--accent)';
     document.title = name + ' · ' + GI.SITE;
-    el.innerHTML = '<section class="qk-hero gi-hero-ent" style="--tc:' + esc(col) + '"><div class="qk-hero-in"><div class="qk-avatar" style="--tc:' + esc(col) + '">' + esc(QK.fmt.initials(name)) + '</div><div><div class="qk-kicker">Head coach</div><h1>' + esc(name) + '</h1><div class="qk-hero-meta">' +
-      [String(car.team || '').split('/').filter(Boolean).map(t => GI.teamLink(t, { abbr: true })).join(' '), car.nSeasons ? car.nSeasons + ' season' + (car.nSeasons === 1 ? '' : 's') + ' graded' + (car.first ? ', ' + car.first + '–' + car.last : '') : '', rec ? 'Record ' + GI.record(rec.w, rec.l, rec.t) + (rec.post_w || rec.post_l ? ', playoffs ' + (rec.post_w || 0) + '-' + (rec.post_l || 0) : '') : ''].filter(Boolean).map(x => '<span>' + x + '</span>').join('') + '</div></div>' +
-      '<div class="qk-hero-stats"><div class="qk-hero-stat"><div class="v">' + GI.pct(car.go_rate, 0) + '</div><div class="l">Go rate</div></div><div class="qk-hero-stat"><div class="v">' + (isNum(car.goe) ? GI.signed(car.goe * 100, 1) : '—') + '</div><div class="l">GOE (pts)</div></div>' +
-      (isNum(car.lost) ? '<div class="qk-hero-stat"><div class="v">' + GI.num(car.lost * 100, 1) + '</div><div class="l">WP lost (pts)</div></div>' : '') + '</div></div></section>' + nav +
-      GI.kpis([GI.kpi('Fourth downs', GI.int(car.n), 'graded, career'), GI.kpi('League would', GI.pct(car.go_exp, 1), 'expected go rate in his spots'), isNum(car.go_when) ? GI.kpi('Went when the model said go', GI.pct(car.go_when, 0), GI.int(car.should) + ' such fourth downs') : '',
-        isNum(car.agree) ? GI.kpi('Agreed with the model', GI.pct(car.agree, 0), '') : '', isNum(car.lost_per) ? GI.kpi('Per call', GI.num(car.lost_per * 100, 2) + ' pts', 'win probability given up') : '']) +
-      GI.card('Season by season', 'his go rate against what the league would have done in the same spots', (mine.length >= 2 ? GI.chartBox('cp-chart', 300, 'Go rate by season') : '') + '<div id="cp-table"></div>') +
+    el.innerHTML = QK.playerHeader({ name: name, kicker: 'Head coach', pos: '', team: team ? { name: GI.teamName(team), abbr: GI.teamAbbr(team), colour: GI.teamInfo(team).colour, href: GI.teamHref(team) } : null,
+      meta: [car.nSeasons ? ['Graded', car.nSeasons + ' season' + (car.nSeasons === 1 ? '' : 's') + (car.first ? ', ' + car.first + '–' + car.last : '')] : null, rec ? ['Record', GI.record(rec.w, rec.l, rec.t)] : null],
+      stats: [{ label: 'Go rate', value: GI.pct(car.go_rate, 0) }, { label: 'GOE (pts)', value: isNum(car.goe) ? GI.signed(car.goe * 100, 1) : '—' }].concat(isNum(car.lost) ? [{ label: 'Win chance lost', value: GI.num(car.lost * 100, 1) }] : []) }) + nav +
+      GI.kpis([GI.kpi('Fourth downs', GI.int(car.n), 'graded, career'), GI.kpi('League would', GI.pct(car.go_exp, 1), 'expected go rate in the same spots'), isNum(car.go_when) ? GI.kpi('Went when our model said go', GI.pct(car.go_when, 0), GI.int(car.should) + ' such fourth downs') : '',
+        isNum(car.agree) ? GI.kpi('Agreed with our model', GI.pct(car.agree, 0), '') : '', isNum(car.lost_per) ? GI.kpi('Per call', GI.num(car.lost_per * 100, 2), 'win chance given up, percentage points', { unit: 'pts', signal: true }) : '']) +
+      GI.card('Season by season', 'go rate against what the league would have done in the same spots', (mine.length >= 2 ? GI.chartBox('cp-chart', 300, 'Go rate by season') : '') + '<div id="cp-table"></div>') +
       GI.card(S + ' fourth downs', 'every decision this season, graded', '<div id="cp-plays"></div>', { flush: true });
     if (mine.length >= 2) GI.ch.lines('cp-chart', [{ name: 'Go rate', x: mine.map(r => r.season), y: mine.map(r => r.go_rate), symbol: true, colour: team ? GI.teamColour(team) : null }, { name: 'League would', x: mine.map(r => r.season), y: mine.map(r => r.go_exp), dash: true, symbol: true }], { yFmt: v => GI.pct(v, 0), xFmt: String, xLabel: x => String(x), yMin: 0, xName: 'Season', yName: 'Go rate on fourth down' });
     GI.set('cp-table', GI.tableHTML([{ label: 'Season' }, { label: 'Team' }, { label: '4th downs', align: 'right' }, { label: 'Went', align: 'right' }, { label: 'Go rate', align: 'right' }, { label: 'League would', align: 'right' }, { label: 'GOE', align: 'right' }, { label: 'Went when model said go', align: 'right' }, { label: 'Agree', align: 'right' }, { label: 'WP lost', align: 'right' }],
@@ -125,7 +127,7 @@ GI.route('coach', function (el, params) {
         { html: isNum(r.goe) ? GI.ptsEdge(r.goe * 100, 1) : '—', v: r.goe }, { html: isNum(r.go_when) ? GI.pct(r.go_when, 0) : '—', v: r.go_when }, { html: GI.pct(r.agree, 0), v: r.agree }, { html: isNum(r.lost) ? GI.num(r.lost * 100, 1) : '—', v: r.lost }])));
     GI.sortable(document.getElementById('cp-table'));
     if (plays.length) GI.F.table(document.getElementById('cp-plays'), plays.sort((a, b) => (isNum(b.lost) ? b.lost : -1) - (isNum(a.lost) ? a.lost : -1)), S, { max: 120 });
-    else GI.set('cp-plays', GI.muted('No fourth downs for him in ' + S + '.'));
+    else GI.set('cp-plays', GI.muted('No fourth downs for this coach in ' + S + '.'));
   });
 });
 

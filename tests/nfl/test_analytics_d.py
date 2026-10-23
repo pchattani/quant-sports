@@ -259,3 +259,58 @@ def test_careers_skip_placeholder_ids(gridiron_roots):
     assert set(written) == {"players/00-0012345.json"}
     assert not CR.real_pid("0") and not CR.real_pid(None) and not CR.real_pid("nan") and CR.real_pid("00-0036355")
     people.reset()
+
+
+def test_roles_rates_and_role_percentiles(synth):
+    """METRICS_SPEC payload fields: role (EDGE/DL/LB/CB/S for defenders, the group otherwise), pct_role against the
+    role's qualified players, per-game defensive rates, fg_oe_att, and a games-based defensive minimum."""
+    from oddsmarkets.nfl.analytics import players as PL
+    cat = PL.build(_ctx())
+    rows = cat["players"]
+    for p, r in rows.items():
+        assert "role" in r and "pct_role" in r
+        if r["group"] == "DEF":
+            assert r["role"] in PL.DEF_ROLES
+            v = r["values"]
+            assert v["tackles_pg"] == pytest.approx(v["tackles"] / r["games"], abs=0.01)
+            assert v["sacks_pg"] == pytest.approx(v["sacks"] / r["games"], abs=0.01)
+            assert r["qualified"] == (r["games"] >= 0.5 * cat["team_games"])      # no participation in the fixture
+        else:
+            assert r["role"] == r["group"]
+        for x in r["pct_role"].values():
+            assert 0 <= x <= 100
+    assert set(cat["roles"]) >= {"QB", "RB", "WR"} and "role_rule" in cat
+    ks = [r for r in rows.values() if r["group"] == "K" and r["values"].get("fg_oe") is not None]
+    for r in ks:
+        assert r["values"]["fg_oe_att"] == pytest.approx(r["values"]["fg_oe"] / r["values"]["fga"], abs=1e-3)
+    keys = {m["key"] for m in cat["metrics"]}
+    assert {"tackles_pg", "tfl_pg", "pd_pg", "ints_pg", "ff_pg", "sacks_pg", "fg_oe_att"} <= keys
+
+
+def test_def_snaps_from_participation():
+    import pandas as pd
+    from oddsmarkets.nfl.analytics import players as PL
+    P = pd.DataFrame({"play_type": ["pass", "run", "punt", "pass"], "two_point_attempt": [0, 0, 0, 1],
+                      "defense_players": ["A;B", "A", "A;B;C", "A"]})
+    assert PL.def_snaps(P).to_dict() == {"A": 2, "B": 1}
+    assert PL.def_snaps(P.drop(columns=["defense_players"])) is None
+
+
+def test_similar_players_spec_recipe():
+    """Weighted z distance on the role's spec features, within the role, qualified only, k = 5."""
+    from oddsmarkets.nfl.analytics import careers as CR
+    rows = {}
+    for i in range(8):
+        rows[f"e{i}"] = {"name": f"E{i}", "team": "SF", "group": "DEF", "role": "EDGE", "qualified": True,
+                         "values": {"pressures_pg": 0.1 * i, "tfl_pg": 0.05 * i, "tackles_pg": 2 + 0.1 * i, "ff_pg": 0.01, "pd_pg": 0.02 * i}}
+        rows[f"c{i}"] = {"name": f"C{i}", "team": "LA", "group": "DEF", "role": "CB", "qualified": True,
+                         "values": {"pd_pg": 0.1 * i, "ints_pg": 0.02 * i, "tackles_pg": 3 + 0.1 * i, "tfl_pg": 0.01, "ff_pg": 0.01}}
+    rows["x"] = {"name": "X", "team": "LA", "group": "DEF", "role": "EDGE", "qualified": False, "values": {"pressures_pg": 0.3}}
+    value = {"cols": ["pid", "pos", "gvar_pg"], "rows": [[f"e{i}", "EDGE", 0.1 * i] for i in range(8)]}
+    sim = CR.similar_players({"players": rows}, value=value)
+    assert "x" not in sim
+    nb = sim["e3"]
+    assert len(nb) == 5 and all(p.startswith("e") for p, *_ in nb)          # within the role
+    assert {nb[0][0], nb[1][0]} == {"e2", "e4"}                              # the nearest are the neighbours in rank
+    assert nb[0][3] >= nb[-1][3] and 0 < nb[-1][3] <= 100
+    assert all(p.startswith("c") for p, *_ in sim["c0"])

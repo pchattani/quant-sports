@@ -1320,6 +1320,10 @@ class Unified:
         # Genuine duplicate Sofascore ids of one person fold into one record (same_person_aliases).
         self.aliases = self._merge_duplicates(roster, roster_row)
         archive_players = self.archive.get("players") or {}
+        # the value model's 12-month formation role (value_fields.py: the value files on disk; this build's value layer
+        # corrects any that change)
+        from oddsmarkets.football.analytics.value_fields import roles as value_roles
+        role_of = value_roles(self.data_dir)
         all_pids = set(self.apps) | {p for p in archive_players if (archive_players[p] or {}).get("details")} | set(roster) | listed
         all_pids -= set(self.aliases)
         self.frame_of_person: dict[str, str] = {}
@@ -1390,6 +1394,8 @@ class Unified:
             if nt:
                 payload["national_team"] = nt
             payload.update(_market_fields(roster_row.get(pid), det))
+            if role_of.get(pid):
+                payload["role"] = role_of[pid]
             payload["frame"] = frame
             payload["comps"] = {s: {"name": self.comps[s]["short"], "kind": self.comps[s]["kind"], "scope": self.comps[s]["scope"]}
                                 for s in sorted(comps_used) if s in self.comps}
@@ -1425,6 +1431,10 @@ class Unified:
             "fields": ["id", "name", "pos", "nat", "dob", "club_tid", "club", "nt_tid", "nt", "comps", "min", "last", "season", "mv"],
             "rows": index_rows, "aliases": dict(sorted(self.aliases.items())), "merge_rule": MERGE_RULE,
             "updated_at": today.strftime("%Y-%m-%dT%H:%M:%SZ")})
+        # the search box's names-only index (a fraction of people_index.json, loaded on the first search)
+        _write(self.data_dir / "people_names.json", {
+            "fields": ["id", "name", "pos", "club"], "rows": [[r[0], r[1], r[2], r[6]] for r in index_rows],
+            "aliases": dict(sorted(self.aliases.items())), "updated_at": today.strftime("%Y-%m-%dT%H:%M:%SZ")})
         n_clubs = self._write_clubs(clubs_dir, club_of, nt_of, roster, rostered)
         self.club_of = club_of
         logger.info("unified: %d people (%d pruned), %d clubs", len(written), pruned, n_clubs)
@@ -1790,7 +1800,8 @@ class Unified:
             payload["matches"] = matches
             pc = pool_by_tid.get(tid)
             if pc and not national:
-                payload["pool"] = {"strength": pc.get("strength"), "rank": pc.get("rank"), "comp": pc.get("comp")}
+                payload["pool"] = {"strength": pc.get("strength"), "rank": pc.get("rank"), "rank_rated": pc.get("rank_rated"),
+                                   "rated": pc.get("rated"), "comp": pc.get("comp")}
             _write(clubs_dir / f"{tid}.json", payload)
             written.add(tid)
             comps_used = sorted({r["comp"] for r in seasons if r.get("source") in ("live", "store")},

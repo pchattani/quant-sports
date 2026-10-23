@@ -1922,10 +1922,22 @@
  ],
  "payload_changes": [
   {
-   "field": "drivers.json drivers{id}.pct_peer (optional)",
+   "field": "drivers.json peer_floor, peer_rule, peer_count; drivers{id}.qualified, pct_peer",
    "builder": "oddsmarkets/f1/analytics/drivers.py:build",
-   "status": "needed",
-   "note": "Optional: field percentiles among qualifying drivers only (the current pct ranks every entrant, one-race stand-ins included). The front end can compute the same thing from values with the analytics.percentiles formula; not implemented. No chosen metric is missing from the payloads."
+   "status": "done",
+   "note": "22 Oct 2026: field percentiles among the qualifying drivers only (8 starts in a finished season of 16+ rounds, else max(3, min(8, ceil(0.35 x rounds completed)))); empty for drivers below the floor. pct (every entrant) is unchanged."
+  },
+  {
+   "field": "drivers.json drivers{id}.similar, similar_method",
+   "builder": "oddsmarkets/f1/analytics/drivers.py:add_similar (build_paddock post-pass)",
+   "status": "done",
+   "note": "22 Oct 2026: the 5 nearest driver-seasons from 1996 (own seasons excluded) by this group's similar recipe; a feature missing for either season is dropped and the weights renormalised, with at least 6 of the 8 kept (a pointless team has no share of team points)."
+  },
+  {
+   "field": "season.json title_history",
+   "builder": "oddsmarkets/f1/analytics/season.py:title_history",
+   "status": "done",
+   "note": "22 Oct 2026: one championship-simulation snapshot per completed round (p_title, expected points, final-points quantiles p05-p95, actual points) for a chance-over-time chart with a band. Recording starts after round 17 of 2026; earlier rounds were never stored."
   }
  ]
 }

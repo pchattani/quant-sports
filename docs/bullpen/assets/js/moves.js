@@ -130,10 +130,10 @@ function tradesHTML(tr) {
     const rv = t.r_winner ? '; ' + BP.teamShort(t.r_winner) + ' ahead on what has happened since' : '; even on what has happened since';
     return card(BP.fmtDate(t.date) + ' · ' + t.teams.map(c => BP.teamAbbr(c)).join(' – '), esc(verdict + rv), '<div class="bp-trd-clubs">' + clubs + '</div>' +
       board('mv-tp' + i, { dense: true, columns: [ENT(), { key: 'move', label: 'Move', sort: false }, { key: 'age', label: 'Age', num: true, fmt: v => n1(v) },
-        { key: 'svc', label: 'MLB yrs', num: true, tip: 'Seasons since his MLB debut (stands in for club control)' }, { key: 'typ', label: 'Valued by', sort: false, fmt: v => '<span class="qk-muted">' + esc(v) + '</span>' },
+        { key: 'svc', label: 'MLB yrs', num: true, tip: 'Seasons since MLB debut (stands in for club control)' }, { key: 'typ', label: 'Valued by', sort: false, fmt: v => '<span class="qk-muted">' + esc(v) + '</span>' },
         { key: 'rest', label: 'Rest', num: true, fmt: v => s2(v), tip: 'Expected WAR for the club over the rest of the season (in-season trades)' },
-        { key: 'next', label: 'Next', num: true, fmt: v => s2(v), tip: 'Expected WAR next season (if he plays; before the chance he stays)' },
-        { key: 'value', label: 'Value', type: 'bar', fmt: v => s2(v), tip: 'Expected WAR for the club over five seasons, each weighted by the chance he is still there, discounted 8% a year' },
+        { key: 'next', label: 'Next', num: true, fmt: v => s2(v), tip: 'Expected WAR next season (if the player plays; before the chance of staying)' },
+        { key: 'value', label: 'Value', type: 'bar', fmt: v => s2(v), tip: 'Expected WAR for the club over five seasons, each weighted by the chance the player is still there, discounted 8% a year' },
         { key: 'real', label: 'Realised', num: true, fmt: v => s2(v), tip: 'WAR produced for the club since the trade' }],
         rows: t.pieces.map(p => ({ pid: p[F.pid], name: nameOf(p[F.pid], p[F.name]), team: p[F.to], sub: p[F.detail] || '', move: BP.teamAbbr(p[F.from]) + ' → ' + BP.teamAbbr(p[F.to]), age: p[F.age], svc: p[F.service] || '—',
           typ: TYPE[p[F.type]] || p[F.type] || '', rest: p[F.rest], next: p[F.next], value: p[F.value], real: p[F.realised] })) }), { flush: false });
@@ -175,7 +175,7 @@ function nextHTML(m) {
   const rows = (d.players || []).filter(r => (!M.team || String(r[F.team]) === M.team) && (!q || String(nameOf(r[F.pid], r[F.name])).toLowerCase().indexOf(q) >= 0))
     .sort((a, b) => (b[F.p_next] || 0) - (a[F.p_next] || 0)).slice(0, 300);
   const col = BP.moves.rosterColumn(m, 'Chance of leaving');
-  return card('Who leaves next', 'The chance each rostered player is not with his club by ' + esc((d.horizons || {}).next) + ', split by how; ranked from the most likely' + (rows.length === 300 ? ' (the first 300)' : ''),
+  return card('Who leaves next', 'The chance each rostered player is not with the club by ' + esc((d.horizons || {}).next) + ', split by how; ranked from the most likely' + (rows.length === 300 ? ' (the first 300)' : ''),
     col.legend + (rows.length ? board('mv-next', { dense: true, rank: true, maxHeight: 680, columns: [ENT(), { key: 'age', label: 'Age', num: true, fmt: v => n1(v) }, { key: 'value', label: (d.unit || 'WAR'), num: true, fmt: v => s2(v), tip: 'Value, the last two seasons blended 3:2' }, col.col],
       rows: rows.map(r => ({ pid: r[F.pid], name: nameOf(r[F.pid], r[F.name]), team: r[F.team], sub: (r[F.pos] || '') + ' · ' + BP.teamAbbr(r[F.team]), age: r[F.age], value: r[F.value], _mv: r, p_move: r[F.p_next] })) }) : QK.empty('Nobody here')),
     { foot: '<span>' + esc((d.notes || []).slice(0, 2).join(' ')) + '</span><a href="#/methodology#who-moves-next">How →</a>' });

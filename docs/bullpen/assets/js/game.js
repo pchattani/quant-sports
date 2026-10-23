@@ -324,7 +324,7 @@ function lineupTable(list, L, side, g) {
   const opp = ((g.probables || {})[side === 'home' ? 'away' : 'home']);
   return BP.tableHTML([{ label: '#', sortable: false }, { label: 'Batter' }, { label: 'xwOBA', align: 'right', title: 'Projected wOBA (xwOBA+ basis) against this starter' },
     { label: 'K%', align: 'right', cls: 'hide-sm' }, { label: 'BB%', align: 'right', cls: 'hide-sm' }, { label: 'HR%', align: 'right' }, { label: 'v SP', align: 'right', cls: 'hide-sm' }], rows, { compact: true }) +
-    (opp ? '<div class="section-note">Projections per plate appearance against ' + esc(BP.playerName(opp)) + ' and the bullpen behind him.</div>' : '');
+    (opp ? '<div class="section-note">Projections per plate appearance against ' + esc(BP.playerName(opp)) + ' and the bullpen that follows.</div>' : '');
 }
 /* The probable-pitcher matchup: each starter with his hand, his record of starts (a debut, the first few starts and a
    return after 60+ days are flagged) and our projection. */
@@ -658,11 +658,11 @@ function delta(v, n, d, unit) {
 function arsenalPanel(el, g, P, L) {
   const ars = g._ars || {};
   const pids = Object.keys(ars);
-  if (!pids.length) { el.innerHTML = BP.card('Arsenals', '', BP.muted(BP.gameState(g) === 'pre' ? 'Each pitcher\'s arsenal against his norm appears once he has thrown.' : 'No arsenal data for this game yet.')); return; }
+  if (!pids.length) { el.innerHTML = BP.card('Arsenals', '', BP.muted(BP.gameState(g) === 'pre' ? 'Each pitcher\'s arsenal against the season norm appears once the pitcher has thrown.' : 'No arsenal data for this game yet.')); return; }
   // starters first, by pitches thrown, away team first
   pids.sort((a, b) => (ars[a].team === g.away ? 0 : 1) - (ars[b].team === g.away ? 0 : 1) || (ars[b].n || 0) - (ars[a].n || 0));
   let cur = pids[0];
-  el.innerHTML = BP.card('Arsenals today v norm', 'each pitch type: today, and the change from his season (green up, red down)',
+  el.innerHTML = BP.card('Arsenals today v norm', 'each pitch type: today, and the change from the season norm (green up, red down)',
     '<div class="toggle-row" id="ar-pick">' + BP.toggles(pids.map(p => ({ key: p, label: BP.teamAbbr(ars[p].team) + ' ' + BP.playerSurname(p) })), cur, 'data-p') + '</div><div id="ar-body"></div>');
   const draw = () => {
     const a = ars[cur] || {};
@@ -684,7 +684,7 @@ function arsenalPanel(el, g, P, L) {
       BP.tableHTML([{ label: 'Pitch' }, { label: 'N', align: 'right' }, { label: 'Usage', align: 'right' }, { label: 'mph', align: 'right' }, { label: 'Max', align: 'right', cls: 'hide-sm' },
         { label: 'Spin', align: 'right', cls: 'hide-sm' }, { label: 'IVB', align: 'right', title: 'Induced vertical break, inches' }, { label: 'HB', align: 'right', cls: 'hide-sm', title: "Horizontal break, inches (catcher's view)" },
         { label: 'Stuff+', align: 'right' }, { label: 'Whiff', align: 'right', cls: 'hide-sm', title: 'Whiffs per swing (or the number of whiffs)' }, { label: 'CSW', align: 'right' }], rows, { compact: true }) +
-      '<div class="grid-2 pad0"><div><div class="ar-sub">Movement today (dots) and his season norm (dotted circles)</div><div id="ar-mv" class="chart-box"></div></div>' +
+      '<div class="grid-2 pad0"><div><div class="ar-sub">Movement today (dots) and the season norm (dotted circles)</div><div id="ar-mv" class="chart-box"></div></div>' +
       '<div><div class="ar-sub">Velocity by pitch of the game (dashed: season norm)</div><div id="ar-velo" class="chart-box"></div></div></div>';
     CH().movementPlot('ar-mv', mine.length ? mine : types.map(t => Object.assign({ pitch_type: t }, pt[t])), { throws: a.throws, armAngle: a.arm_angle, league: norms, height: 360, means: !mine.length });
     const base = {};

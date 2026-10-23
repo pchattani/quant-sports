@@ -1,4 +1,5 @@
-/* The Quant Gridiron — the scatter lab (#/lab?g=QB|RB|WR|TE|K|P|DEF|TEAM&x=&y=), first view of the Lab.
+/* The Quant Gridiron — the scatter lab (#/lab?g=QB|RB|WR|TE|K|P|DEF|TEAM&x=&y=), first view of the Lab, on Design System
+ * 2.0 (stat tiles, a leaderboard with percentile heat cells, our highlight in the signal colour).
  * Any two catalogue metrics for a position group or the teams, with presets for the questions the models
  * were built for, colour by team, position, conference or any metric, medians, the corners labelled, a
  * search highlight and the group ranked below. Rates can be shrunk towards the median by their
@@ -77,7 +78,7 @@ function draw(S) {
   const rows = base0.filter(r => val(r, S0.x) !== null && val(r, S0.y) !== null);
   const noun = team ? 'teams' : (GI.GROUP_NAME[S0.kind] || 'players').toLowerCase();
   GI.set('lab-sub', rows.length + ' ' + noun + ' · ' + S + (team ? '' : ' · ' + S0.min + '+ ' + G().nLabel.toLowerCase() + (S0.qual ? ' · qualified' : '')));
-  if (rows.length < 3) { GI.ch.none('lab-chart', 'Too few for this view: lower the floor, untick qualified only, or pick metrics these players have (FTN charting starts in 2022, NGS in 2016).'); GI.set('lab-table', ''); GI.set('lab-note', ''); return; }
+  if (rows.length < 3) { GI.ch.none('lab-chart', 'Too few for this view: lower the floor, untick qualified only, or pick metrics these players have (FTN charting starts in 2022, NGS in 2016).'); GI.set('lab-table', ''); GI.set('lab-note', ''); GI.set('lab-kpis', ''); return; }
   const xs = rows.map(r => val(r, S0.x)), ys = rows.map(r => val(r, S0.y));
   const mx = GI.median(xs), my = GI.median(ys), sx = zs(xs), sy = zs(ys);
   const dirx = lower(S0.x) ? -1 : 1, diry = lower(S0.y) ? -1 : 1;
@@ -115,10 +116,10 @@ function draw(S) {
       series: [{ type: 'scatter', symbolSize: v => v[3],
         data: rows.map(r => ({ value: [val(r, S0.x), val(r, S0.y), colourMetric ? val(r, colourMetric) : 0, size(r)], r: r, href: href(r),
           itemStyle: colourMetric ? { borderColor: T.s1, borderWidth: 0.7, opacity: 0.9 } : { color: colourOf(r), borderColor: T.s1, borderWidth: 0.7, opacity: 0.88 },
-          label: { show: labelled.indexOf(r) >= 0, formatter: short(r), position: 'top', color: hits.indexOf(r) >= 0 ? T.brand : T.ink2, fontSize: 10, fontWeight: 600 } })),
+          label: { show: labelled.indexOf(r) >= 0, formatter: short(r), position: 'top', color: hits.indexOf(r) >= 0 ? T.model : T.ink2, fontSize: 10, fontWeight: 600 } })),
         labelLayout: { hideOverlap: true }, emphasis: { scale: 1.4, label: { show: true } },
         markLine: { silent: true, symbol: 'none', lineStyle: { color: T.axis, type: [4, 4] }, label: { show: false }, data: [{ xAxis: mx }, { yAxis: my }] } }]
-        .concat(hits.length ? [{ type: 'scatter', silent: true, symbol: 'circle', symbolSize: 22, z: 5, itemStyle: { color: 'transparent', borderColor: T.brand, borderWidth: 2 }, data: hits.map(r => [val(r, S0.x), val(r, S0.y)]) }] : [])
+        .concat(hits.length ? [{ type: 'scatter', silent: true, symbol: 'circle', symbolSize: 22, z: 5, itemStyle: { color: 'transparent', borderColor: T.model, borderWidth: 2 }, data: hits.map(r => [val(r, S0.x), val(r, S0.y)]) }] : [])
     };
   }, 'Scatter of ' + label(S0.x) + ' against ' + label(S0.y));
   const rr = GI.corr(xs, ys), mX = meta(S0.x), mY = meta(S0.y);
@@ -126,12 +127,17 @@ function draw(S) {
     (team ? '' : 'Labelled: the eight furthest into the good corner, the four furthest from it' + (hits.length ? ', and your search' : '') + '. Dot size is the sample. ') + 'Tap a dot for the page.' +
     (S0.shrink && !team ? ' "Shrunk" rates are pulled towards the median by their stabilisation point' + (shrinkable(S0.x) ? ' (' + esc(mX.label) + ' k = ' + GI.int(kOf(S0.x)) + ')' : '') + (shrinkable(S0.y) ? ' (' + esc(mY.label) + ' k = ' + GI.int(kOf(S0.y)) + ')' : '') + '.' : '') +
     (mX.desc ? '<br><b>' + esc(mX.label) + '</b>: ' + esc(mX.desc) : '') + (mY.desc ? '<br><b>' + esc(mY.label) + '</b>: ' + esc(mY.desc) : ''));
-  GI.set('lab-table', GI.tableHTML([{ label: '#', align: 'right', sortable: false }, { label: team ? 'Team' : 'Player' }].concat(team ? [] : [{ label: 'Team' }, { label: G().nLabel, align: 'right' }])
-    .concat([{ label: label(S0.x), align: 'right' }, { label: 'Pct', align: 'right' }, { label: label(S0.y), align: 'right' }, { label: 'Pct', align: 'right' }, { label: 'Combined', align: 'right', title: 'Sum of standard scores in the better direction' }]),
-    ranked.slice(0, 300).map((o, i) => { const r = o.r, vx = val(r, S0.x), vy = val(r, S0.y);
-      return { _href: href(r), cells: [i + 1, { html: team ? GI.teamLink(idOf(r), { season: S }) : '<a class="gi-link" href="' + href(r) + '">' + esc(nm(r)) + '</a>', v: nm(r) }].concat(team ? [] : [{ html: GI.teamChip(tm(r), S), v: tm(r) || '' }, { v: nOf(r) }])
-        .concat([{ html: fmt(S0.x, vx), v: vx }, { html: QK.pctlChip(pOf(sX, vx, dirx)), v: pOf(sX, vx, dirx) }, { html: fmt(S0.y, vy), v: vy }, { html: QK.pctlChip(pOf(sY, vy, diry)), v: pOf(sY, vy, diry) }, { html: '<b>' + GI.num(o.z, 2) + '</b>', v: o.z }]) }; }), { sticky: true, maxHeight: 600 }));
-  GI.sortable(document.getElementById('lab-table'));
+  const best = ranked[0] ? ranked[0].r : null;
+  GI.set('lab-kpis', GI.kpis([GI.kpi('Correlation', GI.num(rr, 2), 'r on screen, ' + rows.length + ' ' + noun, { tip: 'Pearson correlation of the two axes for the rows shown' }),
+    best ? GI.kpi('Best on both', esc(team ? GI.teamAbbr(idOf(best)) : GI.surnameOf(nm(best))), 'the furthest into the good corner (combined standard score ' + GI.num(ranked[0].z, 2) + ')', { signal: true, href: href(best) }) : '',
+    GI.kpi('Medians', fmt(S0.x, mx) + ' · ' + fmt(S0.y, my), esc(label(S0.x)) + ' · ' + esc(label(S0.y)), { text: true })]));
+  const lrows = ranked.slice(0, 300).map(o => { const r = o.r, vx = val(r, S0.x), vy = val(r, S0.y);
+    return { id: idOf(r), name: nm(r), team: tm(r) || (team ? idOf(r) : null), sub: team ? (GI.teamInfo(idOf(r)).division || '') : [raw(r, 'pos') ? GI.posLabel(raw(r, 'pos')) : '', GI.teamAbbr(tm(r))].filter(Boolean).join(' · '), n: nOf(r), vx: vx, px: pOf(sX, vx, dirx), vy: vy, py: pOf(sY, vy, diry), z: o.z }; });
+  QK.leaderboard(document.getElementById('lab-table'), { dense: true, rank: true, maxHeight: 600, rows: lrows, rowHref: r => (team ? GI.teamHref(r.id, S) : GI.playerHref(r.id, S)),
+    columns: [{ key: 'name', label: team ? 'Team' : 'Player', type: 'entity', sub: 'sub', mark: r => ({ name: GI.teamName(r.team), abbr: GI.teamAbbr(r.team), colour: GI.teamInfo(r.team).colour }), href: r => (team ? GI.teamHref(r.id, S) : GI.playerHref(r.id, S)) }]
+      .concat(team ? [] : [{ key: 'n', label: G().nLabel, num: true }])
+      .concat([{ key: 'px', label: label(S0.x), type: 'pctl', pctl: 'px', fmt: (v, r) => fmt(S0.x, r.vx), tip: 'Cell colour: percentile on screen (100 = best)' }, { key: 'py', label: label(S0.y), type: 'pctl', pctl: 'py', fmt: (v, r) => fmt(S0.y, r.vy), tip: 'Cell colour: percentile on screen (100 = best)' },
+        { key: 'z', label: 'Combined', type: 'bar', fmt: v => '<b>' + GI.num(v, 2) + '</b>', tip: 'Sum of standard scores in the better direction' }]) });
   GI.setHashQuiet(GI.ghref('lab', S, { g: S0.kind, x: S0.x, y: S0.y }));
 }
 
@@ -145,13 +151,13 @@ GI.route('lab', function (el, params) {
     const qy = params.query || {};
     if (qy.g && LAB[String(qy.g).toUpperCase()]) S0.kind = String(qy.g).toUpperCase();
     if (!LAB[S0.kind]) S0.kind = Object.keys(LAB)[0];
-    el.innerHTML = head + '<div class="gi-toolbar">' + GI.seg('lab-kind', GI.GROUPS.concat(['TEAM']).map(g => [g, g === 'TEAM' ? 'Teams' : g, !LAB[g]]), S0.kind, 'Group') + '</div>' +
+    el.innerHTML = head + '<div id="lab-kpis"></div><div class="gi-toolbar">' + GI.seg('lab-kind', GI.GROUPS.concat(['TEAM']).map(g => [g, g === 'TEAM' ? 'Teams' : g, !LAB[g]]), S0.kind, 'Group') + '</div>' +
       GI.card('<span id="lab-title">Scatter</span>', '<span id="lab-sub"></span>', '<div class="gi-toolbar" style="margin-bottom:12px">' + GI.field('Preset', '<select id="lab-preset" class="qk-select"></select>') +
         GI.field('X axis', '<select id="lab-x" class="qk-select"></select>') + GI.field('Y axis', '<select id="lab-y" class="qk-select"></select>') + '<button type="button" class="qk-btn" id="lab-swap" aria-label="Swap the axes">⇄ Swap</button>' +
         GI.field('Colour', '<select id="lab-color" class="qk-select"></select>') + '<label class="gi-field" id="lab-min-w"><span>Min <span id="lab-min-u"></span> <b id="lab-min-v"></b></span><input id="lab-min" type="range" min="0" max="700" step="1"></label>' +
         '<label class="gi-check" id="lab-qual-w"><input id="lab-qual" type="checkbox"> qualified only</label><label class="gi-check" id="lab-shrink-w"><input id="lab-shrink" type="checkbox"> shrink by stabilisation</label>' +
         GI.field('Highlight', '<input id="lab-q" class="qk-input" type="search" placeholder="Player or team">') + '</div>' + GI.chartBox('lab-chart', 520, 'Scatter') + '<p class="gi-cap" id="lab-note"></p>') +
-      GI.card('Ranked', 'by the combined standard score on both axes (top 300)', '<div id="lab-table"></div>', { flush: true });
+      GI.card('Ranked', 'By the combined standard score on both axes (top 300); cells coloured by percentile on screen', '<div id="lab-table"></div>', { flush: true });
     const $ = id => document.getElementById(id);
     const applyPreset = () => { const P = presetList(); if (S0.preset < 0 || !P.length) return; const p = P[S0.preset] || P[0]; S0.x = p.x; S0.y = p.y; };
     const reset = () => {

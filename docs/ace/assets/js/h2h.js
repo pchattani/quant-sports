@@ -268,8 +268,11 @@ function build(T, a, b, res, body) {
         'blended as logit p = ' + k.num(M.blend.w_elo, 3) + ' × logit(Elo) + ' + k.num(M.blend.w_sr, 3) + ' × logit(serve/return)' + (M.blend.w_gelo ? ' + ' + k.num(M.blend.w_gelo, 3) + ' × the game-share Elo difference' : '') + (M.market ? ' (the fundamental weights: one of the two has no market rating yet)' : '')) + ', then the serve-point probabilities shifted so the chain reproduces that chance; the set scores come from the chain averaged over a per-match swing with σ = ' + k.num(M.blend.sigma, 2) + ', the first server a coin toss. ' +
       'It uses the latest published hold and break per surface, so it can differ by a point or two from the match-centre forecast. <a href="#/methodology/match-chain">How the chain works →</a></div>';
     if (keys.length) {
-      k.plot('h2-sets', ms.filter(m => m.dist).map(m => ({ type: 'bar', name: k.SURF_LABEL[m.surface], x: keys, y: keys.map(s => m.dist.sets[s]), marker: { color: k.surfColour(m.surface) }, hovertemplate: k.SURF_LABEL[m.surface] + ' %{x}: %{y:.1%}<extra></extra>' })),
-        k.layout(Object.assign(k.legendTop(), { barmode: 'group', margin: { l: 44, r: 10, t: 30, b: 40 }, xaxis: { type: 'category', title: 'Sets (' + sA + '–' + sB + ')' }, yaxis: { title: 'Our chance', tickformat: '.0%' } })));
+      const hn = document.getElementById('h2-sets');
+      hn.classList.add('qk-chart');
+      const sm = ms.filter(m => m.dist);
+      QKC.bar(hn, { cats: keys, series: sm.map(m => ({ name: k.SURF_LABEL[m.surface], color: TA.v2.SURF_HEX[m.surface], data: keys.map(x => m.dist.sets[x] || 0) })), legend: true,
+        fmt: v => Math.round(v * 100) + '%', min: 0, catName: 'Sets (' + sA + '–' + sB + ')', valName: 'Our chance', label: 'Set scores by surface' });
     }
     drawSR(ms);
   };
