@@ -70,7 +70,9 @@ CC.route('teams', function (el, p) {
     }
     QK.$('#tm-q', el).addEventListener('input', paint);
     QK.$('#tm-conf', el).addEventListener('change', paint);
+    CC.oursHeads(QK.$('#tm-table', el));
     paint();
+    QK.$('#tm-table', el).insertAdjacentHTML('afterend', '<div class="cc-ours">' + QK.oursExplain('Our rating is the margin we expect against an average team on a neutral field, split into offence and defence' + (fb ? ', with opponent-adjusted EPA and schedule strength from the same model' : ' (adjusted efficiency per 100 possessions)') + '; columns tagged ' + QK.ours({ short: true }) + ' are ours.') + '</div>');
   });
 });
 
@@ -285,7 +287,8 @@ CC.route('team', function (el, p) {
       var lv = {}; (((d && d.movement) || {}).roster || []).forEach(function (x) { lv[String(x[0])] = { p: x[1], pt: x[2] }; });
       var hasLv = Object.keys(lv).length > 0;
       var mx = Math.max.apply(null, roster.map(function (r) { return Math.abs(r.value || 0); }).concat([1e-9]));
-      QK.leaderboard(QK.$('#tp-roster', el), { dense: true, maxHeight: 640, sort: { key: 'value', dir: 'desc' }, rowHref: function (r) { return CC.playerHref(L, r.id, S); }, columns: [
+      CC.oursHeads(QK.$('#tp-roster', el));
+        QK.leaderboard(QK.$('#tp-roster', el), { dense: true, maxHeight: 640, sort: { key: 'value', dir: 'desc' }, rowHref: function (r) { return CC.playerHref(L, r.id, S); }, columns: [
         { key: 'name', label: 'Player', type: 'entity', sub: 'sub', href: function (r) { return CC.playerHref(L, r.id, S); } },
         { key: 'gp', label: 'GP', num: true },
         { key: 'value', label: 'Value', type: 'bar', max: mx, fmt: function (v) { return CC.f(v, fb ? 1 : 2); }, tip: fb ? 'EPA above replacement this season' : 'Value above replacement this season' },

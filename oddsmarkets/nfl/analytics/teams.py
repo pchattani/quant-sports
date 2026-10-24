@@ -61,6 +61,15 @@ METRICS = [
     M("pressure_allowed", "Pressure rate allowed", "Pressure", "pct", lower=True, desc="Share of dropbacks under pressure "
       "(our pressure model: participation 2016-2025, modelled otherwise)."),
     M("pressure_rate_def", "Pressure rate (defence)", "Pressure", "pct", desc="Share of opponent dropbacks pressured."),
+    M("ed_pass_epa", "Early-down pass EPA", "Passing", "epa", desc="EPA per dropback on first and second down (offence, raw)."),
+    M("ed_pass_epa_def", "Early-down pass EPA allowed", "Passing", "epa", lower=True, desc="EPA per dropback allowed on first and "
+      "second down (defence, raw)."),
+    M("ed_pass_rate", "Early-down pass rate", "Passing", "pct", scope="style", desc="Share of first- and second-down plays that "
+      "are dropbacks."),
+    M("sack_rate_def", "Sack rate (defence)", "Pass rush", "pct", desc="Sacks per opponent dropback: the pass rush when no "
+      "pressure data is available."),
+    M("sack_rate_allowed", "Sack rate allowed", "Pass rush", "pct", lower=True, desc="Sacks taken per dropback: pass protection "
+      "(and the quarterback's part in it)."),
     M("sec_per_play_neutral", "Seconds / play (neutral)", "Pace", "1", lower=True, scope="style",
       desc="Seconds between consecutive offensive snaps in neutral situations (lower = faster)."),
     M("sec_per_play", "Seconds / play", "Pace", "1", lower=True, scope="style", desc="Seconds between consecutive offensive snaps."),
@@ -220,6 +229,30 @@ def tendencies(P: pd.DataFrame) -> dict[str, dict]:
     return out
 
 
+def passing_extras(P: pd.DataFrame) -> dict[str, dict]:
+    """Early-down passing (first and second down: EPA per dropback for and against, the dropback rate) and the sack
+    rates (per dropback, defence and offence): the league page's early-down passing and pass rush, raw per team."""
+    S = scrimmage(P)
+    if not len(S):
+        return {}
+    db = flag(S, "qb_dropback").fillna(0) == 1
+    ed = num(S, "down").isin([1, 2])
+    epa = num(S, "epa")
+    sack = flag(S, "sack").fillna(0)
+    out: dict[str, dict] = {}
+    E = S[ed & db]
+    for col, key in (("posteam", "ed_pass_epa"), ("defteam", "ed_pass_epa_def")):
+        for t, x in epa[ed & db].groupby(E[col]).mean().items():
+            out.setdefault(t, {})[key] = an.fnum(x)
+    for t, x in db[ed].astype(float).groupby(S.loc[ed, "posteam"]).mean().items():
+        out.setdefault(t, {})["ed_pass_rate"] = an.fnum(x)
+    D = S[db]
+    for col, key in (("defteam", "sack_rate_def"), ("posteam", "sack_rate_allowed")):
+        for t, x in sack[db].groupby(D[col]).mean().items():
+            out.setdefault(t, {})[key] = an.fnum(x)
+    return out
+
+
 def personnel(P: pd.DataFrame) -> dict[str, dict]:
     """Offensive personnel groupings ("11", "12", ...) and formations, share and EPA per play (participation)."""
     S = scrimmage(P)
@@ -306,6 +339,7 @@ def build(ctx: SeasonContext, cat: dict | None, sim: dict | None, cards: list[di
     have_plays = bool(len(P))
     units = epa_units(P) if have_plays else {}
     tend = tendencies(P) if have_plays else {}
+    extra = passing_extras(P) if have_plays else {}
     pers = personnel(P) if have_plays else {}
     fourth = fourth_rates(P) if have_plays else {}
     qbs = qb_situation(P, cat) if have_plays else {}
@@ -328,6 +362,7 @@ def build(ctx: SeasonContext, cat: dict | None, sim: dict | None, cards: list[di
         u = units.get(t, {})
         vals: dict[str, Any] = {k: v for k, v in u.items() if not k.startswith("_")}
         vals.update(tend.get(t, {}))
+        vals.update(extra.get(t, {}))
         vals.update(fourth.get(t, {}))
         vals.update({k: v for k, v in (press.get(t) or {}).items() if k in ("pressure_allowed", "pressure_rate_def")})
         epa_off = u.get("_off", 0.0) * ppg if u else None

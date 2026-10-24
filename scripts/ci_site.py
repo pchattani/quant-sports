@@ -475,6 +475,7 @@ def cmd_feed(site: str) -> int:
 # snapshot a day, the last CHANCE_LOG_KEEP days) and the Footballer's frozen pre-match chances (build_site_all.py
 # _forecast_log: {match id: [h, d, a, kick-off ISO, comp]}, written only before kick-off, kept FORECAST_LOG_DAYS).
 CHANCE_LOG_KEEP = 10          # digest.roll_log keep
+RACE_LOG_KEEP = 400           # race_log.json (Campus's season-long race lines, oddsmarkets/college/site.py RACE_LOG_KEEP)
 FORECAST_LOG_DAYS = 9         # build_site_all.FORECAST_LOG_DAYS (tests/test_ci_site_logs.py checks they agree)
 LOGS = {
     "football": ("data/forecast_log.json",),
@@ -484,7 +485,7 @@ LOGS = {
     "bullpen": ("data/*/chance_log.json",),
     "gridiron": ("data/chance_log.json",),
     "rink": ("data/chance_log.json",),
-    "campus": ("data/*/chance_log.json",),
+    "campus": ("data/*/chance_log.json", "data/*/race_log.json"),
 }
 
 
@@ -529,7 +530,7 @@ def merge_log(name: str, live, new, now: datetime):
             if not isinstance(days, dict):
                 continue
             mine = dict(cur.get(m) or {})
-            keep = sorted(set(days) | set(mine))[-CHANCE_LOG_KEEP:]
+            keep = sorted(set(days) | set(mine))[-(RACE_LOG_KEEP if name == "race_log.json" else CHANCE_LOG_KEEP):]
             miss = [d for d in keep if d not in mine]
             if miss:
                 lost += len(miss)

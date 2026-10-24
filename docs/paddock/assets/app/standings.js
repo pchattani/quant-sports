@@ -5,6 +5,10 @@
  *     (538 style), the season-end points range and what the next rounds mean for the leader. The market
  *     reference for the titles is on the Model page.
  *   Car v driver: car pace by round, driver effects, the car/driver split of points, Elo.
+ *   Below the championship tables (fight.js, PD.fight): how the fights are shaping up (clinch lines, the next Grand
+ *     Prix's stakes, the fights for places, who moved, points against our forecast, the run-in), the shape of the grid
+ *     (tiers, car v driver, team-mate battles) and every driver's and team's strengths and weak spots; the drivers'
+ *     table gains a Profile column of the same chips.
  * A finished season shows final standings without the simulation. Reads <y>/season.json. */
 (function (PD) {
 'use strict';
@@ -52,9 +56,18 @@ function championship(season) {
     PD.card('The title race', 'Points after every round, then our expected points to the last round (shaded).', PD.chartBox('st-prog', 400, 'Championship points with our projection'), { span: 8, right: PD.seg('st-prog-k', [['drivers', 'Drivers'], ['constructors', 'Constructors']], 'drivers', 'Progression') }) +
     PD.card('Constructors’ championship', '', '<div id="st-c"></div>', { span: 4, flush: true }) +
     (finished ? '' : PD.card('Where they finish', 'Our chance of each championship position: the share of simulated seasons ending in each place.', PD.chartBox('st-pd', 500), { span: 12, right: PD.seg('st-pd-k', [['drivers', 'Drivers'], ['constructors', 'Constructors']], 'drivers', 'Distribution') })), 'pd-mt');
+  h += '<div id="st-fight"></div><div id="st-shape"></div><div id="st-prof"></div>';
   PD.set('st-body', h);
   standingsTable('st-d', season, 'drivers');
   standingsTable('st-c', season, 'constructors', true);
+  /* the fights, the shape of the grid and the profiles (fight.js); the drivers' table is drawn again with its chips */
+  if (PD.fight) PD.fight.load(season.year).then(function (ex) {
+    if (!document.getElementById('st-fight')) return;
+    standingsTable('st-d', season, 'drivers', false, function (id) { return PD.fight.chips(ex, id, season); });
+    PD.fight.race('st-fight', season, ex);
+    PD.fight.shape('st-shape', season, ex);
+    PD.fight.profiles('st-prof', season, ex);
+  });
   var prog = function (kind) { PD.v2.pointsForecast('st-prog', season, kind, kind === 'drivers' ? 10 : 11); };
   prog('drivers');
   PD.wireSeg(document, 'st-prog-k', prog);
@@ -70,7 +83,7 @@ function championship(season) {
   }
 }
 
-function standingsTable(id, season, kind, compact) {
+function standingsTable(id, season, kind, compact, chipsOf) {
   var isD = kind === 'drivers';
   var list = (season.standings || {})[kind] || [];
   if (!list.length) { PD.set(id, PD.muted('No standings for this season.')); return; }
@@ -99,6 +112,7 @@ function standingsTable(id, season, kind, compact) {
       cols.push({ key: 'magic', label: 'Magic', num: true, tip: 'Points needed over every rival’s maximum to clinch', fmt: function (v, r) { return v === null || r.elim ? '<span class="qk-muted">—</span>' : PD.num(v, 0); } });
     }
   }
+  if (chipsOf) cols.push({ key: 'id', label: 'Profile', sort: false, tip: 'Standout strengths and weak spots against the grid (percentiles on the F1 metric set), and points against our pre-race forecast', fmt: function (v) { return '<span class="fx-chips">' + (chipsOf(v) || '') + '</span>'; } });
   PD.table(id, cols, rows, { sort: { key: 'pos', dir: 'asc' } });
 }
 function rangeBar(lo, mid, hi, max) {

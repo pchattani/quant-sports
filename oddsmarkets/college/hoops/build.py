@@ -617,6 +617,9 @@ def season_sim(ctx: dict, s: int, sims: int) -> dict | None:
                      "seed_dist": {str(k): r4(sd[k]) for k in range(1, 17) if sd[k] >= 0.0005},
                      "p_round": {k: r4(res["reach"][i, j + 1]) for j, k in enumerate(["r32", "s16", "e8", "f4", "final", "title"])},
                      "p_title": r4(res["reach"][i, 6])}
+            if "n_rem" in res:
+                tm[t]["n_rem"] = int(res["n_rem"][i])
+                tm[t]["sos_rem"] = r2(res["sos_rem"][i]) if np.isfinite(res["sos_rem"][i]) else None
         notes = ["Season simulation from today's ratings (preseason: the prior from last season's ratings, regressed).",
                  "Conference tournaments are generic and approximate: every member, single elimination, seeded by the simulated "
                  "standings, neutral floors (actual formats are not in a free feed).",

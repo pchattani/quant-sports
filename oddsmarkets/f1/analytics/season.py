@@ -24,8 +24,9 @@ points, carry `"excluded": "<reason>"` and 0 counted points, and rank last.
 
 The season payload's championship block maps `models.championship.simulate_championship`:
 p_title, exp_points, p05/p95 (5th/95th percentile of final points), pos_dist, the magic
-number (points still needed to be sure of the title), clinched, eliminated; finished seasons
-get null.
+number (points still needed to be sure of the title), clinched, eliminated, the points system of the
+simulated rounds (race, sprint, fastest_lap: for the clinch arithmetic on the standings page) and the conditionals
+(conditional.next_round.fights: the next Grand Prix's stakes for each place fight); finished seasons get null.
 
 Title history (`title_history`): one snapshot of the championship simulation per completed round, for a
 chance-over-time chart with a band: {"after_round", "rounds_done", "as_of", "n_sims", "drivers" | "constructors":
@@ -349,7 +350,8 @@ def _champ_block(sim: dict | None) -> dict | None:
     return {"drivers": {d: ent(v) for d, v in sim["drivers"].items()},
             "constructors": {t: ent(v) for t, v in (sim.get("constructors") or {}).items()},
             "conditional": sim.get("conditionals") or {}, "n_sims": sim.get("n"), "remaining": sim.get("remaining"),
-            "max_points_left": sim.get("max_points_left"), "runtime_s": sim.get("runtime_s"), "sources": sim.get("sources")}
+            "max_points_left": sim.get("max_points_left"), "runtime_s": sim.get("runtime_s"), "sources": sim.get("sources"),
+            "points_system": {k: v for k, v in (sim.get("points_system") or {}).items() if k in ("race", "sprint", "fastest_lap")} or None}
 
 
 def _hist_ent(v: dict) -> dict:

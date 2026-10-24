@@ -104,10 +104,23 @@ function normalise(raw, P) {
   // ABS challenges
   const ab = g.abs;
   const ch = Array.isArray(ab) ? ab : ((ab && ab.challenges) || []);
+  // pages built before the challenger's id was stored carry only the name: match it to a player in the game
+  // (every batter and pitcher in the pitch table; catchers bat, so they are there too)
+  const fold = s => String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\./g, '').replace(/ jr$/, '').trim();
+  let pool = null;
+  const byName = nm => {
+    if (!pool) { pool = {}; P.forEach(q => [q.batter, q.pitcher].forEach(pid => { if (pid && !pool[fold(BP.playerName(pid))]) pool[fold(BP.playerName(pid))] = String(pid); })); }
+    return pool[fold(nm)] || null;
+  };
+  const isAbs = c => !c.kind || /pitch result/i.test(String(c.kind)) || (!!c.role && c.role !== 'review');
   g._abs = { summary: g.abs_summary || (ab && !Array.isArray(ab) ? ab.summary : null) || {}, challenges: ch.map(c => {
-    const team = c.team || (BP.halfOf(c.half) === 'top' ? (/catcher|pitcher|fielding/i.test(String(c.kind || c.role || '')) ? g.home : g.away) : null);
-    const pitch = !isNum(c.plate_x) && isNum(c.ab) ? P.filter(q => q.ab === c.ab && BP.callInfo(q._call).kind === 'called').pop() : null;
-    return Object.assign({}, c, { team: team ? String(team) : null, by: c.by || null, who: c.who || null, role: c.role || c.kind || null,
+    const abs = isAbs(c);
+    const by = c.by ? String(c.by) : (abs && (c.name || c.who) ? byName(c.name || c.who) : null);
+    const role = c.role || (!abs ? 'review' : by && by === String(c.batter) ? 'batter' : by && by === String(c.pitcher) ? 'pitcher' : by ? 'catcher' : null);
+    const top = BP.halfOf(c.half) === 'top';
+    const team = c.team || (role === 'batter' ? (top ? g.away : g.home) : (role === 'catcher' || role === 'pitcher') ? (top ? g.home : g.away) : null);
+    const pitch = !isNum(c.plate_x) && isNum(c.ab) ? P.filter(q => { const kd = BP.callInfo(q._call).kind; return q.ab === c.ab && (kd === 'called' || kd === 'ball'); }).pop() : null;
+    return Object.assign({}, c, { team: team ? String(team) : null, by: by, who: c.name || c.who || null, role: role, abs: abs,
       overturned: c.overturned !== undefined ? !!c.overturned : /overturn/i.test(String(c.result || '')),
       call: c.call || (pitch ? pitch._call : null), plate_x: isNum(c.plate_x) ? c.plate_x : (pitch ? pitch.plate_x : null),
       plate_z: isNum(c.plate_z) ? c.plate_z : (pitch ? pitch.plate_z : null), sz_top: c.sz_top || (pitch ? pitch.sz_top : null), sz_bot: c.sz_bot || (pitch ? pitch.sz_bot : null),
@@ -638,26 +651,33 @@ function umpirePanel(el, g, P, L) {
     { v: m.dist_in, html: isNum(m.dist_in) ? BP.num(Math.abs(m.dist_in), 1) + ' in ' + (m.dist_in > 0 ? 'outside' : 'inside') : '—', cls: 'hide-sm', title: 'Distance of the ball edge from the zone' },
     { v: m.re_cost, html: isNum(m.re_cost) ? BP.num(m.re_cost, 2) : '—', align: 'right' },
     { v: m.favoured, html: m.favoured ? BP.teamLink(m.favoured, { abbr: true, level: L }) : '—' }]);
-  const ch = ab.challenges || [];
+  const all = ab.challenges || [];
+  const ch = all.filter(c => c.abs !== false);
+  const reviews = all.filter(c => c.abs === false);
   const sm = ab.summary || {};
+  const who = c => { const n = c.by ? BP.playerName(c.by) : ''; return n && !/^Player \d+$/.test(n) ? n : (c.who || n); };
+  const hasRuns = ch.some(c => isNum(c.re_value));
   const chRows = ch.map(c => [
-    { v: c.inning, html: esc(BP.inningLabel(c.inning, c.half, true)) }, { v: c.team, html: BP.teamLink(c.team, { abbr: true, level: L }) },
-    { v: c.by ? BP.playerName(c.by) : (c.who || ''), html: (c.by ? BP.playerLink(c.by, { short: true, level: L }) : esc(c.who || '—')) + (c.role ? '<span class="pl-pos">' + esc(c.role) + '</span>' : '') },
+    { v: c.inning, html: esc(BP.inningLabel(c.inning, c.half, true)) }, { v: c.team, html: c.team ? BP.teamLink(c.team, { abbr: true, level: L }) : '—' },
+    { v: who(c), html: (c.by ? BP.playerLink(c.by, { short: true, level: L, name: who(c) !== BP.playerName(c.by) ? who(c) : null, role: c.role === 'pitcher' ? 'pitcher' : null }) : esc(c.who || '—')) + (c.role ? '<span class="pl-pos">' + esc(c.role) + '</span>' : '') },
     { v: (c.balls || 0) * 3 + (c.strikes || 0), html: BP.countText(c.balls, c.strikes), cls: 'hide-sm' },
-    { v: c.call, html: esc(BP.callInfo(c.call).label) },
-    { v: c.overturned ? 1 : 0, html: c.overturned ? '<span class="edge-pos">Overturned</span>' : '<span class="edge-neg">Upheld</span>' },
-    { v: c.re_value, html: isNum(c.re_value) ? BP.signed(c.re_value, 2) : '—', align: 'right' }]);
+    { v: c.call, html: esc(BP.callInfo(c.call).label), cls: 'hide-sm' },
+    { v: c.overturned ? 1 : 0, html: c.overturned ? '<span class="edge-pos">Overturned</span>' : '<span class="edge-neg">Upheld</span>' }]
+    .concat(hasRuns ? [{ v: c.re_value, html: isNum(c.re_value) ? BP.signed(c.re_value, 2) : '—', align: 'right' }] : []));
+  const revNote = reviews.length ? '<div class="section-note">Replay reviews (not ABS): ' + reviews.map(c => esc(BP.inningLabel(c.inning, c.half, true)) + ' ' +
+    (c.team ? BP.teamLink(c.team, { abbr: true, level: L }) : esc(c.who || '—')) + ', ' + esc(c.kind || 'review') + ' (' + (c.overturned ? 'overturned' : 'upheld') + ')').join(' · ') + '</div>' : '';
   const absSum = ['away', 'home'].map(s => { const x = sm[s] || {}; return '<div class="abs-team">' + BP.teamLink(g[s], { abbr: true, level: L }) + ' <span>won ' + (x.won || 0) + ' · lost ' + (x.lost || 0) + ' · ' + (isNum(x.left) ? x.left + ' left' : '') + '</span></div>'; }).join('');
   el.innerHTML = BP.card('Umpire scorecard', (ump.id || ump.name ? BP.umpireLink(ump.id, ump.name) + ' · ' : '') + 'called pitches against the rulebook zone', tiles +
       '<div class="grid-23 pad0"><div><div id="gm-uz" class="chart-box"></div><div class="chart-note">Every called pitch, catcher\'s view; ringed: missed calls.</div></div><div>' +
       (mrows.length ? BP.tableHTML([{ label: 'Inn' }, { label: 'Matchup', cls: 'hide-sm' }, { label: 'Count' }, { label: 'Call' }, { label: 'Miss by', cls: 'hide-sm' }, { label: 'Runs', align: 'right', title: 'Run-expectancy cost of the missed call' }, { label: 'Helped' }], mrows, { compact: true }) : BP.muted(missed ? 'No missed calls recorded.' : 'The scorecard arrives after the game.')) +
       '</div></div><div class="section-note">A call is missed when the whole ball is outside the zone on a called strike, or touches it on a ball (zone from each batter\'s Statcast top and bottom). Run cost is the run-expectancy swing between the call made and the right call.</div>') +
     BP.card('ABS challenges', 'the automated ball-strike challenge system (2026)', '<div class="abs-sum">' + absSum + '</div>' +
-      (chRows.length ? '<div class="grid-23 pad0"><div id="gm-abs" class="chart-box"></div><div>' + BP.tableHTML([{ label: 'Inn' }, { label: 'Team' }, { label: 'By' }, { label: 'Count', cls: 'hide-sm' }, { label: 'Call' }, { label: 'Result' }, { label: 'Runs', align: 'right', title: 'Run expectancy gained by the challenging team' }], chRows, { compact: true }) + '</div></div>'
-        : BP.muted('No challenges in this game.')));
+      (chRows.length ? '<div class="grid-23 pad0"><div id="gm-abs" class="chart-box"></div><div>' + BP.tableHTML([{ label: 'Inn' }, { label: 'Team' }, { label: 'By' }, { label: 'Count', cls: 'hide-sm' }, { label: 'Final call', title: 'The call after the review', cls: 'hide-sm' }, { label: 'Result' }]
+        .concat(hasRuns ? [{ label: 'Runs', align: 'right', title: 'Run expectancy gained by the challenging team' }] : []), chRows, { compact: true }) + '</div></div>'
+        : BP.muted('No ABS challenges of plate-appearance-ending calls in this game.')) + revNote);
   const zoneList = calledP.length ? calledP : missed;
   CH().strikeZone('gm-uz', zoneList, { colourBy: 'call', height: 400, highlight: p => !!missedKeys[key(p)] || missed.indexOf(p) >= 0, highlightName: 'Missed call' });
-  if (chRows.length) CH().strikeZone('gm-abs', ch.map(c => Object.assign({ desc: c.call }, c)), { colourBy: 'call', height: 320, highlight: c => !!c.overturned, highlightName: 'Overturned', hover: c => esc(BP.inningLabel(c.inning, c.half, true)) + ' · ' + esc(BP.playerName(c.by)) + '<br>' + (c.overturned ? 'Overturned' : 'Upheld') });
+  if (chRows.length) CH().strikeZone('gm-abs', ch.map(c => Object.assign({ desc: c.call }, c)), { colourBy: 'call', height: 320, highlight: c => !!c.overturned, highlightName: 'Overturned', hover: c => esc(BP.inningLabel(c.inning, c.half, true)) + ' · ' + esc(who(c) || '—') + (c.role ? ' (' + esc(c.role) + ')' : '') + '<br>' + (c.overturned ? 'Overturned' : 'Upheld') });
   BP.sortable(el);
 }
 

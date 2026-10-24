@@ -7,7 +7,9 @@
  *   our title chances (Design System 2.0 chance bars), with the chance of reaching each round and expected points;
  *   results by round;
  *   ?p=<pid> in the hash preselects a player in the draw; upsets (winners we gave under 40%); draw difficulty (expected
- *   opponents' Elo along the path); awards; past champions.
+ *   opponents' Elo along the path); awards; past champions;
+ *   for an event in progress or about to start: what is at stake in it for the race to the Finals and the year-end
+ *   No. 1 (race.json "stakes", drawn by race-shape.js; round 5, 24 Oct 2026).
  *
  * Reads <T>/events/<event_id>.json (PAYLOADS.md) and <T>/history.json for older champions. */
 (function (TA) {
@@ -129,7 +131,7 @@ function render(el, params) {
       title: esc(ev.name || TA.eventName(T, id)) + ' ' + (Y || ''), html: true, size: 'lg', tag: 'h1',
       sub: esc(TA.fmtRange(ev.start, ev.end)) + (ev.draw_size ? ' · draw of ' + esc(ev.draw_size) : '') + (ev.best_of ? ' · best of ' + esc(ev.best_of) : '') +
         ' · <a href="' + TA.href(T, 'calendar', Y) + '">' + esc(TA.tourName(T)) + ' tournaments</a>', actions: '<div class="ev-side">' + side + '</div>' }) + '</div>' +
-      '<div id="ev-draw"></div><div class="grid-2"><div id="ev-odds"></div><div id="ev-side"></div></div><div id="ev-results"></div><div id="ev-more"></div>';
+      '<div id="ev-draw"></div><div class="grid-2"><div id="ev-odds"></div><div id="ev-side"></div></div><div id="ev-race"></div><div id="ev-results"></div><div id="ev-more"></div>';
 
     // ── the draw
     const hasDraw = (draw.slots || []).length > 0;
@@ -209,6 +211,17 @@ function render(el, params) {
       hrows.length ? TA.tableHTML([{ label: 'Year' }, { label: 'Champion' }, { label: 'Runner-up' }, { label: '', sortable: false }],
         hrows.map(r => [{ v: r[0], html: String(r[0]) }, { v: TA.playerName(T, r[1]), html: TA.playerLink(T, r[1]) }, { v: TA.playerName(T, r[2]), html: r[2] ? TA.playerLink(T, r[2]) : '—' },
           { html: '<a href="' + TA.eventHref(T, tid + '-' + r[0]) + '">draw →</a>' }]), { compact: true }) : TA.muted('No earlier editions on record.'));
+    if (!champ && Number(Y) === Number(TA.currentYear(T))) {
+      TA.load(TA.tpath('race.json', T)).then(race => {
+        const box = document.getElementById('ev-race');
+        if (!box || !TA.ok(race) || !TA.shape) return;
+        const q = TA.shape.stakesHTML(T, race, 'finals_qual', { event: id, limit: 6 }), n1 = TA.shape.stakesHTML(T, race, 'year_end_no1', { event: id, limit: 3 });
+        if (!q && !n1) return;
+        box.innerHTML = '<section class="qk-section">' + QK.sectionHead({ kicker: 'What’s at stake', title: 'What this event means for the race',
+          sub: 'Our chance of reaching the Finals (and of finishing the year No. 1) if the next match here is won or lost. <a href="' + TA.href(T, 'race') + '">The full race →</a>', html: true }) +
+          (q ? '<h3 class="rs-h3">Finals qualification</h3>' + q : '') + (n1 ? '<h3 class="rs-h3">Year-end No. 1</h3>' + n1 : '') + '</section>';
+      });
+    }
     TA.sortable(el);
     document.title = (ev.name || TA.eventName(T, id)) + ' ' + (Y || '') + ' · ' + TA.tourName(T) + ' · The Quant Ace';
     TA.setMeta(esc(ev.name || TA.eventName(T, id)) + (d.sim && d.sim.n_sims ? ' · ' + TA.num(d.sim.n_sims, 0) + ' simulations' : ''));

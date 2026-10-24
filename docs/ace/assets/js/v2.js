@@ -57,7 +57,9 @@ V.META = {
   win_v_top50: ['Win % v top 50', 'Share of matches won against opponents ranked in the top 50.', 'pct'],
   win_pct: ['Win %', 'Share of tour-level matches won.', 'pct'],
   dominance: ['Dominance ratio', 'Return points won % divided by serve points lost %; above 1.0 wins more return points than it concedes on serve. WTA matches with statistics, 2016 on (not the Slams).', '2'],
-  ace_pct: ['Ace rate', 'Aces per serve point. WTA matches with statistics, 2016 on (not the Slams).', 'pct']
+  ace_pct: ['Ace rate', 'Aces per serve point. WTA matches with statistics, 2016 on (not the Slams).', 'pct'],
+  serve_rating: ['Serve rating', 'Serve strength inferred from scores, on a log-odds scale (0 = tour average).', '2'],
+  return_rating: ['Return rating', 'Return strength inferred from scores, on a log-odds scale (0 = tour average).', '2']
 };
 /* v3 (Matchday): a plain-English line under each metric on the percentile rail (QK.pctRail row.sub). */
 V.SUB = {
@@ -79,6 +81,50 @@ V.ARCHETYPE = { elo: 'The all-round force', elo_hard: 'The hard-court player', e
   hold: 'The big server', brk: 'The returner', hold_plus_break: 'The complete player', win_v_top50: 'The giant-killer', win_pct: 'The winner', dominance: 'The dominator', ace_pct: 'The ace machine' };
 V.label = (k, surface) => (k === 'win_pct' && surface ? 'Win % on ' + surface : ((V.META[k] || [])[0] || k));
 V.SURF = ['hard', 'clay', 'grass'];
+/* Our metrics (round 5): the spec's labels file (assets/qk/metrics/tennis.labels.json through QK.spec) names the metrics
+ * that come from our own models (Elo, the serve and return model, the forecasts). V.ours(k) -> { key, name, about } |
+ * null; V.oursTag(k, short) the cobalt tag; V.oursHeads(box, map) tags the table heads of our metrics (map: header text
+ * or data-k -> metric key; re-applied when a table re-renders on sort); V.picker(metrics, sel, extra) the lab's metric
+ * <select> options: "Our models" first, then the spec's headline box-score metrics, then the rest by group. */
+V.spec = null;
+V.specP = (window.QK && QK.spec ? QK.spec.load('tennis') : Promise.resolve(null)).then(c => { V.spec = c; return c; }, () => null);
+V.ours = k => (V.spec ? V.spec.ours(k) : null);
+/* the row tooltip on compare, head to head and the percentile rail: what it measures, and which of our models made it */
+V.tipOf = k => { const t = ((V.META[k] || [])[1]) || V.explain(k), o = V.ours(k); return t + (o ? (t ? ' ' : '') + 'Our model: ' + o.name + '.' : ''); };
+V.explain = k => { const m = V.spec ? V.spec.metric(k, 'player') : null; return (m && m.explain) || ((V.META[k] || [])[1]) || ''; };
+V.oursTag = (k, short) => { const o = V.ours(k); return o ? QK.ours({ short: !!short, model: o.name, about: V.explain(k) || o.about }) : ''; };
+V.oursHeads = (box, map) => {
+  if (!box) return;
+  const apply = () => {
+    if (!V.spec) return;
+    QK.$$('th', box).forEach(th => {
+      if (th.querySelector('.qk-ours')) return;
+      const dk = th.getAttribute('data-k'), txt = (th.textContent || '').replace(/[\u2191\u2193\u2195\u25b2\u25bc\u25b4\u25be\u21c5]/g, '').trim();
+      const key = map ? (map[dk] || map[txt]) : dk;
+      if (!key || !V.ours(key)) return;
+      (th.querySelector('button') || th.querySelector('span') || th).insertAdjacentHTML('beforeend', V.oursTag(key, true));
+    });
+  };
+  V.specP.then(apply);
+  apply();
+  if (window.MutationObserver && !box._qkOurs) {
+    box._qkOurs = new MutationObserver(() => apply());
+    box._qkOurs.observe(box, { childList: true, subtree: true });
+  }
+};
+V.picker = (metrics, sel, groupsOf, extra) => {
+  const opt = m => '<option value="' + esc(m.key) + '"' + (m.key === sel ? ' selected' : '') + '>' + esc(m.label) + (m.lower ? ' ↓' : '') + (extra ? extra(m) : '') + '</option>';
+  if (!V.spec) return groupsOf(metrics).map(g => '<optgroup label="' + esc(g.name) + '">' + g.items.map(opt).join('') + '</optgroup>').join('');
+  const parts = V.spec.order(metrics, { key: m => m.key });
+  let h = '';
+  parts.forEach(g => {
+    if (g.label === 'Our models') { h += '<optgroup label="Our models">' + g.items.map(opt).join('') + '</optgroup>'; return; }
+    const head = g.items.filter(m => V.spec.isHeadline(m.key, 'player')), rest = g.items.filter(m => !V.spec.isHeadline(m.key, 'player'));
+    if (head.length) h += '<optgroup label="Box score: headline">' + head.map(opt).join('') + '</optgroup>';
+    groupsOf(rest).forEach(gr => { h += '<optgroup label="Box score: ' + esc(gr.name) + '">' + gr.items.map(opt).join('') + '</optgroup>'; });
+  });
+  return h;
+};
 V.group = (T, surface) => (T === 'wta' ? 'wta' : 'atp') + '_' + (surface && V.SURF.indexOf(surface) >= 0 ? surface : 'all');
 V.set = (T, surface) => V.SETS[V.group(T, surface)] || [];
 V.floor = (cat, surface) => (surface ? (((cat || {}).surface_floor || {})[surface] || { hard: 10, clay: 8, grass: 5 }[surface]) : ((cat || {}).floor || 20));
@@ -173,7 +219,7 @@ V.pctGroups = (p, cat, T, surface, prev) => {
       const pc = V.pctl(p, k, surface, cat);
       if (!isNum(pc)) return null;
       const n = V.sample(p, k, surface);
-      return { label: V.label(k, surface), sub: V.SUB[k] || '', pctl: pc, prev: prev && isNum(prev[k]) ? prev[k] : null, value: V.fmt(k, V.value(p, k, surface)), tip: (V.META[k] || [])[1] || '', early: isNum(m50[k]) && isNum(n) && n < m50[k] };
+      return { label: V.label(k, surface), sub: V.SUB[k] || '', pctl: pc, prev: prev && isNum(prev[k]) ? prev[k] : null, value: V.fmt(k, V.value(p, k, surface)), tip: V.tipOf(k), early: isNum(m50[k]) && isNum(n) && n < m50[k] };
     }).filter(Boolean)
   }));
 };

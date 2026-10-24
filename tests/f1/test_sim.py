@@ -262,3 +262,31 @@ def test_results_only_inputs_rank_the_dominant_driver_first(monkeypatch):
     assert min(inp.pace_mu, key=inp.pace_mu.get) == "d7"
     res = rs.simulate_race(inp, n=2000, seed=13)
     assert max(res["drivers"], key=lambda d: res["drivers"][d]["p_win"]) == "d7"
+
+
+def test_next_round_fights_condition_on_the_podium():
+    # A 100, B 93 with one race left: B's title (place 1) hangs on B winning, so on the podium it is likelier than off it.
+    state, ev = _endgame(100, 93, [3, 1, 0], [2, 2, 1])
+    out = ch.simulate_championship(YEAR, n=4000, seed=13, state=state, events=ev)
+    f = out["conditionals"]["next_round"]["fights"]
+    assert f["round"] == 2
+    b = f["drivers"]["B"]
+    assert b["place"] == 1 and b["p"] == pytest.approx(out["drivers"]["B"]["p_title"], abs=1e-4)
+    # two cars: both are always on the podium, so "not on the podium" has too few simulations to say anything
+    assert b["p_podium_next"] == 1.0 and b["p_if_not"] is None and b["p_if_podium"] == pytest.approx(b["p"], abs=1e-4)
+    assert set(f["constructors"]) <= {"ta", "tb"}
+
+
+def test_place_fight_picks_the_place_most_in_the_balance():
+    pos = np.array([0] * 10 + [1] * 45 + [2] * 45)          # 10% champion, 55% top two, 100% top three
+    assert ch._place_fight(pos) == (2, pytest.approx(0.55))
+    assert ch._place_fight(np.zeros(100, int)) is None       # always champion: nothing in the balance
+
+
+def test_season_payload_carries_the_points_system_and_fights():
+    from oddsmarkets.f1.analytics import season as ssn
+    state, ev = _endgame(100, 93, [3, 1, 0], [2, 2, 1])
+    out = ch.simulate_championship(YEAR, n=500, seed=14, state=state, events=ev)
+    blk = ssn._champ_block(out)
+    assert blk["points_system"]["race"][0] == 25 and "sprint" in blk["points_system"] and "fastest_lap" in blk["points_system"]
+    assert "fights" in blk["conditional"]["next_round"]

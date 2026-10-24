@@ -36,7 +36,7 @@ GI.route('players', function (el, params) {
   const S = Number(params.season);
   const qy = params.query || {};
   if (groupFromQuery(qy.g)) ST.group = groupFromQuery(qy.g);
-  return GI.loadAll([GI.ypath('players.json', S), GI.ypath('value.json', S)]).then(res => {
+  return Promise.all([GI.loadAll([GI.ypath('players.json', S), GI.ypath('value.json', S)]), GI.SP.specReady()]).then(all => all[0]).then(res => {
     if (!el.isConnected) return;
     const raw = res[0];
     const head = GI.pageHead('Players · ' + S, 'Player catalogue', 'Every player of the season by comparison group; each cell is coloured by the player\'s percentile among the qualified players of the same group (100 = best). Search the whole league with <kbd>/</kbd>.') + GI.sectionNav('players', 'players') + QK.note('<b>A percentile</b> ranks a player against others in the same role this season: 90th means better than 90 in 100 qualified peers. Outside pass rushers, interior linemen, linebackers, corners and safeties each have their own pool.');
@@ -75,7 +75,7 @@ GI.route('players', function (el, params) {
       ids.forEach(id => { const x = P[id].pos; if (x) pos[x] = (pos[x] || 0) + 1; });
       $('cat-pos').innerHTML = '<option value="">All positions</option>' + Object.keys(pos).sort().map(x => '<option value="' + esc(x) + '"' + (x === ST.pos ? ' selected' : '') + '>' + esc(GI.posLabel(x)) + ' (' + pos[x] + ')</option>').join('');
       const setIds = g.m.map(m => m[0]);
-      $('cat-extra').innerHTML = '<option value="">—</option>' + GI.metricGroups(metrics.filter(m => setIds.indexOf(m.key) < 0)).map(gr => '<optgroup label="' + esc(gr.name) + '">' + gr.items.map(m => '<option value="' + esc(m.key) + '">' + esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>').join('');
+      $('cat-extra').innerHTML = '<option value="">—</option>' + GI.SP.orderOpts(metrics.filter(m => setIds.indexOf(m.key) < 0).map(m => ({ key: m.key, label: m.label, lower: m.lower, group: m.group })), '', []);
       ST.extra = ST.extra.filter(x => meta[x]);
       ctx = { g: g, core: core, ids: ids, meta: meta, sk: sk };
     };
@@ -105,6 +105,7 @@ GI.route('players', function (el, params) {
           .concat(mvOn ? [{ key: 'mv', label: 'Chance of leaving', num: true, fmt: (v, r) => (r.mvRow ? GI.MV.typeBar(r.mvRow, MV.d) : '—'), tip: 'Our chance the player is not with this team at ' + (((MV.d || {}).horizons || {}).next || 'next season') + ' (Who moves next)' }] : []),
         rows: rows });
       else GI.set('cat-table', GI.muted('No player matches these filters.'));
+      if (rows.length) { const tm = {}; g.m.forEach(m => { tm[(m[4] ? 'v_' : 'p_') + m[0]] = m[0]; }); extras.forEach(m => { tm['x_' + m.key] = m.key; }); GI.SP.tagHeads(tbl, tm); }
       GI.set('cat-chips', extras.length ? 'Added: ' + extras.map(m => '<button type="button" class="qk-chip" aria-pressed="true" data-rm="' + esc(m.key) + '">' + esc(m.label) + ' ×</button>').join(' ') : '');
       GI.set('cat-note', ids.length + ' of ' + ctx.ids.length + ' ' + esc(g.name.toLowerCase()) + (ids.length > 400 ? ' (first 400 shown)' : '') + '. Peers: ' + esc(g.peer.replace(/^NFL /, '')) + ', qualified (' + esc(GI.SP.minLine(g)) + '); ↓ metrics are flipped so a high percentile is always good, and style metrics carry no colour. ' +
         (GI.SP.NOTE[g.id] ? esc(GI.SP.NOTE[g.id]) + ' ' : '') + 'The metric set comes from our metrics study; every other metric is on each player page, the <a href="' + GI.ghref('leaders', S, { g: g.code }) + '">leaders</a> and the <a href="' + GI.ghref('lab', S, { g: ctx.core }) + '">lab</a>.');

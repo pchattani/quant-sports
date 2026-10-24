@@ -311,7 +311,7 @@ def build_page(ctx: SeasonContext, g: dict, gp: pd.DataFrame | None, card_: dict
     page["wp"] = {"ours": series, "ours_kind": kind, "espn": espn_wp(ctx, gpk)}
     page["pitches"] = _pitch_rows(gp, wpa)
     page["umpire"] = _scorecard(ctx, g, gp, re_info, umps)
-    page["abs"] = _abs(ctx, gp)
+    page["abs"] = _abs(ctx, gp, g)
     page["box"] = _box(ctx, g, gp, wpa, fl, pa)
     page["linescore_totals"] = (page["box"] or {}).get("totals")
     page["arsenal"] = _arsenal_vs_norm(gp, season_arsenal or {})
@@ -565,8 +565,11 @@ def _scorecard(ctx: SeasonContext, g: dict, gp: pd.DataFrame, re_info: dict | No
             "season": {k: (umps or {}).get(str(u), {}).get(k) for k in ("accuracy", "x_accuracy", "acc_above_x", "consistency")} if u else None}
 
 
-def _abs(ctx: SeasonContext, gp: pd.DataFrame) -> list | None:
-    """ABS challenges in the play text (2026): [{inning, half, ab, who, kind, result, batter, pitcher}]."""
+def _abs(ctx: SeasonContext, gp: pd.DataFrame, g: dict | None = None) -> list | None:
+    """ABS challenges in the play text (2026): [{inning, half, ab, who, kind, result, batter, pitcher, by, role, name, team}].
+    An ABS challenge (kind "pitch result") names its challenger: `by` is that player's id (batter, catcher or pitcher,
+    matched by name as in models/umpire.abs_from_des), `name` the stored name and `team` the challenging side's team id.
+    Other kinds are manager replay reviews: `who` is the club, `team` the side it names, `role` "review"."""
     if "des" not in gp:
         return None
     from oddsmarkets.baseball.models import umpire as U
@@ -576,13 +579,43 @@ def _abs(ctx: SeasonContext, gp: pd.DataFrame) -> list | None:
         return []
     x = gp[m].drop_duplicates(["at_bat_number"])
     ex = PG._s(x, "des").str.extract(U.DES_RE)
+    g = g or {}
+    names: dict[str, str | None] = {}
+
+    def folded(pid: str) -> str | None:
+        if pid not in names:
+            n = ctx.name(pid)
+            names[pid] = U._c_name(n) if n and n != pid else None
+        return names[pid]
+
+    def club(who: str | None) -> str | None:
+        w = (who or "").strip().lower()
+        for side in ("home", "away"):
+            t = (ctx.teams.get(str(g.get(side))) or {}) if g.get(side) is not None else {}
+            if w and any(str(t.get(k) or "").lower().endswith(w) for k in ("name", "short", "club")):
+                return str(g.get(side))
+        return None
     out = []
     def _t(v):
         return v.strip() if isinstance(v, str) and v.strip() else None
     for (_, r), (_, e) in zip(x.iterrows(), ex.iterrows()):
-        out.append({"inning": an.inum(r["inning"]), "half": 0 if str(r["inning_topbot"]).lower().startswith("t") else 1,
-                    "ab": int(r["at_bat_number"]), "who": _t(e.get("who")), "kind": _t(e.get("kind")),
-                    "result": (_t(e.get("res")) or "").lower() or None, "batter": str(int(r["batter"])), "pitcher": str(int(r["pitcher"]))})
+        top = str(r["inning_topbot"]).lower().startswith("t")
+        who, kind = _t(e.get("who")), _t(e.get("kind"))
+        row = {"inning": an.inum(r["inning"]), "half": 0 if top else 1,
+               "ab": int(r["at_bat_number"]), "who": who, "kind": kind,
+               "result": (_t(e.get("res")) or "").lower() or None, "batter": str(int(r["batter"])), "pitcher": str(int(r["pitcher"]))}
+        if kind == "pitch result":
+            text = str(r.get("des") or "")
+            rest = U._c_name(text.split(": ", 1)[1]) if ": " in text else None
+            role, pid = U.resolve_challenger(U._c_name(who), r["batter"], r["pitcher"], r.get("fielder_2"), rest, folded)
+            bat, fld = (g.get("away"), g.get("home")) if top else (g.get("home"), g.get("away"))
+            team = bat if role == "batter" else (fld if role in ("catcher", "pitcher") else None)
+            stored = ctx.name(pid) if pid else None
+            row.update({"by": pid, "role": role if pid else None, "name": stored if stored and stored != pid else who,
+                        "team": str(team) if team is not None else None})
+        else:
+            row.update({"by": None, "role": "review", "name": who, "team": club(who)})
+        out.append(row)
     return out
 
 

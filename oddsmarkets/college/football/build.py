@@ -522,7 +522,7 @@ def season_payload(ctx: dict, season: int, simres: dict | None, cards: list[dict
            "sim": None, "leaders": leaders(sp["value"][sp["value"]["team"].isin(S["mem"])] if len(sp["value"]) else None)}
     if simres:
         out["sim"] = {"n_sims": simres["n_sims"], "teams": simres["teams"], "notes": simres["notes"],
-                      "as_of": data.now_iso()}
+                      "as_of": data.now_iso(), "stakes": simres.get("stakes") or []}
     return out
 
 

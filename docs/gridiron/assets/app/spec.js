@@ -139,7 +139,7 @@ function sample(p, g) {
 let readyP = null;
 function ready() {
   if (readyP) return readyP;
-  readyP = fetch('assets/qk/metrics/nfl.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).catch(() => null).then(j => {
+  readyP = Promise.all([fetch('assets/qk/metrics/nfl.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).catch(() => null), specReady()]).then(a => a[0]).then(j => {
     ((j && j.groups) || []).forEach(g => {
       const G = BY[g.id];
       if (!G) return;
@@ -175,6 +175,73 @@ function minLine(g) {
   return t.replace(/^payload:\s*/, '').replace(/;.*$/, '').replace(/\s*\(.*$/, '');
 }
 
+/* ── our models (round 5): the spec's `our_models` registry through the kit's QK.spec (assets/qk/metrics/nfl.labels.json).
+ * specReady() -> Promise of the catalogue; ours(id) -> { name, about } | null; oursTag(id, short) the cobalt "Our model" tag;
+ * specLabel(id, fallback, entity) the spec's display name; headIds(code) the spec's headline ids for a lab / catalogue
+ * group code (QB, RB, WR, TE, K, P, DEF = the five defensive roles, TEAM = team, offence, defence); orderOpts(items, sel)
+ * a metric picker: "Our models", "Box score · headline", then the items' groups; tagHeads(host, { colKey: id }) the tag
+ * on a QK.table head (kept through re-sorts); oursNote([[id, label]]) the cobalt strip naming the models. Once loaded,
+ * every spec explanation of ours ends "Our model: <name>." (the tooltips of the cards, compare and tables). */
+let CAT = null, specP = null;
+function specReady() {
+  if (specP) return specP;
+  specP = window.QK && QK.spec ? QK.spec.load('nfl').then(c => {
+    if (!c) return null;
+    CAT = c;
+    SPEC.forEach(g => g.m.forEach(m => { m[5] = String(m[5] || '').replace(/\s*\((?:[a-z_]+\.json|leaderboards)\)/g, ''); const o = c.ours(m[0]); if (o && String(m[5] || '').indexOf('Our model:') < 0) m[5] = (m[5] ? m[5] + ' ' : '') + 'Our model: ' + o.name + '.'; }));
+    return c;
+  }) : Promise.resolve(null);
+  return specP;
+}
+specReady();
+function ours(id) { return CAT ? CAT.ours(id) : null; }
+function oursTag(id, short) { const o = ours(id); return o ? QK.ours({ short: !!short, model: o.name, about: o.about }) : ''; }
+function specLabel(id, fallback, entity) { return CAT ? CAT.label(id, entity || 'player', fallback) : (fallback || id); }
+const CODE_GROUPS = { QB: ['qb'], RB: ['rb'], WR: ['wr'], TE: ['te'], K: ['k'], P: ['p'], DEF: DEF, TEAM: ['team', 'team_offence', 'team_defence'] };
+function headIds(code) {
+  const out = [];
+  (CODE_GROUPS[String(code || '').toUpperCase()] || [String(code || '').toLowerCase()]).forEach(gid => ((BY[gid] || {}).m || []).forEach(m => { if (out.indexOf(m[0]) < 0) out.push(m[0]); }));
+  return out;
+}
+function orderOpts(items, sel, heads) {
+  const esc = GI.esc, pos = k => { const i = (heads || []).indexOf(k); return i < 0 ? 999 : i; };
+  const opt = x => '<option value="' + esc(x.it.key) + '"' + (x.it.key === sel ? ' selected' : '') + '>' + esc(x.it.label) + (x.it.lower ? ' ↓' : '') + '</option>';
+  const L = (items || []).map((it, i) => ({ it: it, i: i }));
+  const by = (a, b) => (pos(a.it.key) - pos(b.it.key)) || (a.i - b.i);
+  const grp = (label, list) => (list.length ? '<optgroup label="' + esc(label) + '">' + list.map(opt).join('') + '</optgroup>' : '');
+  const our = L.filter(x => ours(x.it.key)).sort(by), head = L.filter(x => !ours(x.it.key) && pos(x.it.key) < 999).sort(by), rest = L.filter(x => !ours(x.it.key) && pos(x.it.key) === 999);
+  let h = grp('Our models', our) + grp('Box score · headline', head);
+  const names = [];
+  rest.forEach(x => { const g = x.it.group || 'More'; if (names.indexOf(g) < 0) names.push(g); });
+  names.forEach(g => { h += grp('Box score · ' + g, rest.filter(x => (x.it.group || 'More') === g)); });
+  return h;
+}
+function tagHeads(host, map) {
+  if (!host) return;
+  const apply = () => Object.keys(map || {}).forEach(col => {
+    const tag = oursTag(map[col], true);
+    if (!tag) return;
+    host.querySelectorAll('th[data-k="' + col + '"]').forEach(th => { if (!th.querySelector('.qk-ours')) (th.querySelector('button') || th).insertAdjacentHTML('beforeend', tag); });
+  });
+  apply();
+  if (host._oursObs) host._oursObs.disconnect();
+  if (window.MutationObserver) { host._oursObs = new MutationObserver(apply); host._oursObs.observe(host, { childList: true, subtree: true }); }
+}
+function oursNote(pairs) {
+  const seen = {}, parts = [];
+  (pairs || []).forEach(p => {
+    const o = ours(p[0]);
+    if (!o || seen[p[0]]) return;
+    seen[p[0]] = 1;
+    const m = CAT ? CAT.metric(p[0], p[2] || 'player') : null;
+    const lab = p[1] || specLabel(p[0], p[0]);
+    const txt = String((m && m.explain) || o.about).replace(/\s*Our model:.*$/, '').replace(/\s*\((?:[a-z_]+\.json|leaderboards)\)/g, '');
+    parts.push('<b>' + GI.esc(lab) + '</b>' + (o.name !== lab ? ' · ' + GI.esc(o.name) : '') + '. ' + GI.esc(txt));
+  });
+  return parts.length ? QK.oursExplain(parts.join(' ')) : '';
+}
+
 GI.SP = { SPEC: SPEC, BY: BY, PLAYER: PLAYER, DEF: DEF, NOTE: NOTE, ctx: ctx, groupOf: groupOf, members: members, value: value, pct: pct, pctSync: pctSync, fmtOf: fmtOf, fmt: fmt,
-  headline: headline, style: style, sample: sample, minLine: minLine, ready: ready, early: early, sampleIn: sampleIn, m50Text: m50Text };
+  headline: headline, style: style, sample: sample, minLine: minLine, ready: ready, early: early, sampleIn: sampleIn, m50Text: m50Text,
+  specReady: specReady, ours: ours, oursTag: oursTag, specLabel: specLabel, headIds: headIds, orderOpts: orderOpts, tagHeads: tagHeads, oursNote: oursNote };
 })(window.GI);

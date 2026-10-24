@@ -113,7 +113,8 @@ function draw(body, L, S, E, cat, roles, fellBack) {
     label: g[0],
     rows: keysOf(g).map(k => {
       const m = U.mMeta(k), pctFmt = m.fmt === 'pct';
-      return { key: k, label: m.label, tip: m.desc, better: m.better, values: E.map(id => (P[id].values || {})[k]), pctls: E.map(id => pc(id, k)), fmt: x => U.fmtM(k, x),
+      const ours = HW.ours ? HW.ours.of(k) : null;
+      return { key: k, label: m.label, tip: m.desc + (ours ? ' Our model: ' + ours.name + '.' : ''), better: m.better, values: E.map(id => (P[id].values || {})[k]), pctls: E.map(id => pc(id, k)), fmt: x => U.fmtM(k, x),
         dfmt: pctFmt ? (x => (x > 0 ? '+' : x < 0 ? '−' : '±') + Math.abs(x * 100).toFixed(1) + ' pts') : null };
     })
   }));

@@ -123,7 +123,7 @@ CC.route('lab', function (el, p) {
   if (q.kind === 'compare') return compare(el, p);
   var kind = q.kind === 'players' ? 'players' : 'teams';
   el.innerHTML = U.head('Lab', 'Pick any two numbers and see every ' + (kind === 'players' ? 'player' : 'team') + ' at once. Click a point to open its page.', U.kicker(L, S)) + QK.skeleton('chart', 1);
-  return Promise.all([CC.load(CC.path(L, S, kind === 'players' ? 'lab_players.json' : 'lab_teams.json')), CC.season(L, S)]).then(function (a) {
+  return Promise.all([CC.load(CC.path(L, S, kind === 'players' ? 'lab_players.json' : 'lab_teams.json')), CC.season(L, S), CC.metrics(), CC.specP]).then(function (a) {
     if (!U.alive(el)) return;
     var d = a[0];
     var segHtml = labSeg(kind);
@@ -134,26 +134,41 @@ CC.route('lab', function (el, p) {
     }
     var F = d.fields || [], ix = {};
     F.forEach(function (f, i) { ix[f] = i; });
-    var mets = (d.metrics || []).filter(function (m) { return ix[m.key] !== undefined; });
-    var num = mets.length ? mets : F.filter(function (f) { return d.rows.some(function (r) { return isNum(r[ix[f]]); }); }).map(function (f) { return { key: f, label: f, fmt: '2' }; });
+    var ent = kind === 'players' ? 'player' : 'team';
+    /* the level's spec names and explanations (cc-metrics.js), our models first, then the headline box score */
+    var mets = (d.metrics || []).filter(function (m) { return ix[m.key] !== undefined; }).map(function (m) {
+      var sm = CC.specMeta(L, ent, m.key), o = {}, k;
+      for (k in m) if (Object.prototype.hasOwnProperty.call(m, k)) o[k] = m[k];
+      if (sm) { o.label = sm.d; if (sm.x) o.desc = sm.x; if (sm.low) o.lower = true; }
+      return o;
+    });
+    var num0 = mets.length ? mets : F.filter(function (f) { return d.rows.some(function (r) { return isNum(r[ix[f]]); }); }).map(function (f) { return { key: f, label: f, fmt: '2' }; });
+    var ordered = CC.orderMetrics(L, ent, num0), num = [];
+    ordered.forEach(function (g) { num = num.concat(g.items); });
     var mk = {}; num.forEach(function (m) { mk[m.key] = m; });
-    var xk = mk[q.x] ? q.x : (num[1] || num[0]).key, yk = mk[q.y] ? q.y : (num[2] || num[0]).key;
+    var dx0 = kind === 'teams' && mk.off && mk.def ? 'off' : (num[0] || {}).key, dy0 = kind === 'teams' && mk.off && mk.def ? 'def' : (num[1] || num[0] || {}).key;
+    var xk = mk[q.x] ? q.x : dx0, yk = mk[q.y] ? q.y : dy0;
     var grpKey = kind === 'players' ? 'pos' : 'conference';
     var groups = {};
     d.rows.forEach(function (r) { var g = r[ix[grpKey]]; if (g !== undefined && g !== null) groups[g] = (groups[g] || 0) + 1; });
     var gk = Object.keys(groups).sort(function (x, y) { return groups[y] - groups[x]; });
-    var opt = function (sel) { return num.map(function (m) { return '<option value="' + esc(m.key) + '"' + (m.key === sel ? ' selected' : '') + '>' + esc(m.label) + '</option>'; }).join(''); };
+    var opt = function (sel) { return ordered.map(function (g) { return '<optgroup label="' + esc(g.label) + '">' + g.items.map(function (m) { return '<option value="' + esc(m.key) + '"' + (m.key === sel ? ' selected' : '') + '>' + esc(m.label) + '</option>'; }).join('') + '</optgroup>'; }).join(''); };
     var minGp = kind === 'players' && ix.gp !== undefined;
     el.innerHTML = U.head('Lab', 'Pick any two numbers and see every ' + (kind === 'players' ? 'player' : 'team') + ' at once. Click a point to open its page; the table below holds the same rows.', U.kicker(L, S)) +
       '<div class="cc-toolbar">' + segHtml + '<label class="cc-lab-sel">X <select class="qk-select" id="lab-x">' + opt(xk) + '</select></label><label class="cc-lab-sel">Y <select class="qk-select" id="lab-y">' + opt(yk) + '</select></label>' +
       '<select class="qk-select" id="lab-g" aria-label="' + (kind === 'players' ? 'Position' : 'Conference') + '"><option value="">' + (kind === 'players' ? 'All positions' : 'All conferences') + '</option>' + gk.map(function (g) { return '<option value="' + esc(g) + '">' + esc(kind === 'players' ? g : CC.cname(L, g)) + '</option>'; }).join('') + '</select>' +
       (minGp ? '<label class="cc-lab-sel">Min games <input class="qk-input" type="number" id="lab-gp" min="0" value="' + (kind === 'players' ? 3 : 0) + '" style="width:72px"></label>' : '') + '</div>' +
-      U.card('Chart', '<span id="lab-t"></span>', U.chart('lab-sc', 460, 'Scatter of the chosen metrics')) + '<div id="lab-tbl"></div>';
+      U.card('Chart', '<span id="lab-t"></span>', U.chart('lab-sc', 460, 'Scatter of the chosen metrics') + '<div id="lab-ours" class="cc-lab-ours"></div>') + '<div id="lab-tbl"></div>';
     function paint() {
       var x = QK.$('#lab-x', el).value, y = QK.$('#lab-y', el).value, g = QK.$('#lab-g', el).value, gp = minGp ? Number(QK.$('#lab-gp', el).value || 0) : 0;
       var rs = d.rows.filter(function (r) { return isNum(r[ix[x]]) && isNum(r[ix[y]]) && (!g || String(r[ix[grpKey]]) === g) && (!minGp || (r[ix.gp] || 0) >= gp); });
       rs.sort(function (r1, r2) { return mk[y].lower ? r1[ix[y]] - r2[ix[y]] : r2[ix[y]] - r1[ix[y]]; });
-      var tn = QK.$('#lab-t', el); if (tn) tn.textContent = mk[y].label + ' against ' + mk[x].label + (mk[y].lower ? ' (lower is better on the vertical axis, so it is flipped: better is up)' : '') + '.';
+      var tn = QK.$('#lab-t', el); if (tn) tn.innerHTML = esc(mk[y].label) + CC.oursTag(y, false, mk[y].desc) + ' against ' + esc(mk[x].label) + CC.oursTag(x, false, mk[x].desc) + (mk[y].lower ? ' (lower is better on the vertical axis, so it is flipped: better is up)' : '') + '.';
+      var models = [];
+      [CC.ours(x), CC.ours(y)].forEach(function (o) { if (o && models.every(function (z) { return z.key !== o.key; })) models.push(o); });
+      var on = QK.$('#lab-ours', el);
+      if (on) on.innerHTML = models.length ? QK.oursExplain(models.map(function (o) { return '<b>' + esc(o.name) + '.</b> ' + esc(o.about); }).join(' '), { title: models.length > 1 ? 'Our models.' : 'Our model.' })
+        : QK.explain('Neither axis comes from our models. ' + (kind === 'teams' ? 'Our rating and its offence and defence split' : CC.fb(L) ? 'Value and EPA' : 'Value and the box rating') + ' are ours: they lead the metric lists, tagged ' + QK.ours({ short: true }) + '.');
       var href = function (r) { return kind === 'players' ? CC.playerHref(L, r[ix.id], S) : CC.teamHref(L, r[ix.id], S); };
       var col = function (r) { return kind === 'players' ? CC.tcol(L, r[ix.team]) : CC.tcol(L, r[ix.id]); };
       QKC.scatter('#lab-sc', { points: rs.map(function (r) { return { x: r[ix[x]], y: r[ix[y]], name: r[ix.name] + (kind === 'players' ? ' · ' + CC.tabbr(L, r[ix.team]) : ''), label: kind === 'players' ? String(r[ix.name]).split(' ').slice(-1)[0] : CC.tabbr(L, r[ix.id]), color: col(r), href: href(r), size: rs.length > 300 ? 7 : 10 }; }),
@@ -164,6 +179,8 @@ CC.route('lab', function (el, p) {
           .concat(num.map(function (m) { var v = r[ix[m.key]]; return { v: isNum(v) ? v : null, html: CC.fmtMetric(m, v) }; })), _href: href(r) };
       }), { maxHeight: 560 }));
       U.wire(QK.$('#lab-tbl', el));
+      var hm = {}; num.forEach(function (m) { hm[m.label] = m.key; });
+      CC.oursHeads(QK.$('#lab-tbl', el), hm);
     }
     ['#lab-x', '#lab-y', '#lab-g', '#lab-gp'].forEach(function (s) { var n = QK.$(s, el); if (n) n.addEventListener(s === '#lab-gp' ? 'input' : 'change', paint); });
     QK.seg(QK.$('#lab-kind', el), function (v) { CC.go(CC.href(L, 'lab', null, S, 'kind=' + v)); });

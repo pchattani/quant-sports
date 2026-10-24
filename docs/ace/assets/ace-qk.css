@@ -469,3 +469,7 @@ tr.cut td, .qk-table tr.cut td { border-top: 2px dashed color-mix(in srgb, var(-
 @media (max-width: 1000px) { .ql-intro { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 720px) { .ql-week .qk-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ql-week .qk-stat-v { font-size: 2rem; } .ql-week .qk-stat:last-child:nth-child(odd) { grid-column: 1 / -1; } }
 @media (max-width: 420px) { .ql-links a { padding: 10px 10px 12px; } .ql-links b { font-size: 1.25rem; } .ql-links b::after { content: none; } .ql-links span { font-size: 11px; } .ql-race { padding: 14px; } }
+/* round 5: our model metrics (the cobalt tag and explain strip) */
+.af-lab-ours { margin-top: 12px; }
+.af-lab-ours .qk-ours { margin-left: 4px; }
+#cmp-view > .qk-explain-ours, .ta-pl-ours { margin-top: 12px; }

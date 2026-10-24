@@ -222,8 +222,9 @@ U.pctGroups = (L, cat, roles, pid, opts) => {
   const m50 = ((U.MSET.m50 || {})[L] || {})[r] || {};
   const prev = o.prev || null;
   const row = k => { const pc = U.rolePctl(cat, roles, pid, k); const m = U.mMeta(k);
-    return isNum(pc) ? { label: m.label, sub: U.SUB[k] || '', pctl: pc, prev: prev && isNum(prev[k]) ? prev[k] : null, value: U.fmtM(k, (p.values || {})[k]),
-      tip: m.desc + (isNum(m50[k]) ? ' Settles at about ' + Number(Math.round(m50[k])).toLocaleString('en-GB') + ' minutes.' : ''), early: isNum(m50[k]) && isNum(p.min) && p.min < m50[k] } : null; };
+    const ours = HW.ours ? HW.ours.of(k) : null;
+    return isNum(pc) ? { label: m.label, sub: (U.SUB[k] || '') + (ours ? (U.SUB[k] ? ' · ' : '') + 'our model' : ''), pctl: pc, prev: prev && isNum(prev[k]) ? prev[k] : null, value: U.fmtM(k, (p.values || {})[k]),
+      tip: m.desc + (ours ? ' Our model: ' + ours.name + '.' : '') + (isNum(m50[k]) ? ' Settles at about ' + Number(Math.round(m50[k])).toLocaleString('en-GB') + ' minutes.' : ''), early: isNum(m50[k]) && isNum(p.min) && p.min < m50[k] } : null; };
   const out = set.groups.map(g => ({ label: g[0], rows: g[1].map(row).filter(Boolean) }));
   if (o.more !== false) out.push({ label: 'More', rows: set.more.map(row).filter(Boolean) });
   return out.filter(g => g.rows.length);

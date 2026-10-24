@@ -446,7 +446,7 @@ CH.shift = (pa, pb, bestOf, rule, target) => {
  * left out of the ranked board (they have no percentile) and listed underneath. */
 let IDXS = { q: '', country: '', surface: '' };
 const SHORT = { elo: 'Elo', elo_hard: 'Hard Elo', elo_clay: 'Clay Elo', elo_grass: 'Grass Elo', games_won_pct: 'Games won', hold: 'Hold', brk: 'Break', win_v_top50: 'v top 50',
-  win_pct: 'Win %', dominance: 'Dominance', ace_pct: 'Aces', hold_plus_break: 'Serve + return' };
+  win_pct: 'Win %', dominance: 'Dominance', ace_pct: 'Aces', hold_plus_break: 'Serve + return', serve_rating: 'Serve rtg', return_rating: 'Return rtg' };
 
 function renderPlayers(el, params, state) {
   const T = K.T(params, state);
@@ -464,6 +464,7 @@ function renderPlayers(el, params, state) {
       '<input id="pl-q" class="qk-input" type="search" placeholder="Player or country" aria-label="Search players" value="' + K.esc(IDXS.q) + '">' +
       '<select id="pl-country" class="qk-select" aria-label="Country"><option value="">All countries</option>' + Object.keys(ctry).sort().map(c => '<option value="' + K.esc(c) + '"' + (c === IDXS.country ? ' selected' : '') + '>' + K.esc(c) + ' (' + ctry[c] + ')</option>').join('') + '</select></div>' +
       V.card('<span id="pl-title"></span>', '<span id="pl-sub"></span>', '<div id="pl-table"></div>', { flush: true, html: true, foot: '<span id="pl-foot"></span><a href="' + K.href(T, 'lab') + '">Every metric in the lab →</a>' }) +
+      '<div class="ta-pl-ours">' + QK.oursExplain('Elo (overall and by surface) and the serve and return model are ours: the model reads hold and break rates from set scores against the quality of the opposition, and the ratings put them on one scale (0 = tour average). Columns tagged ' + QK.ours({ short: true }) + ' come from them; hover a tag for what it measures.') + '</div>' +
       '<section class="qk-section">' + V.card('Below the floor', 'Listed with their raw numbers only: too few matches for a percentile', '<div id="pl-below"></div>', { flush: true }) + '</section>';
     const draw = () => drawIndex(el, T, cat);
     let t = null;
@@ -477,7 +478,8 @@ function renderPlayers(el, params, state) {
 function drawIndex(el, T, cat) {
   const V = TA.v2, P = cat.players, sf = IDXS.surface;
   const q = fold(IDXS.q.trim());
-  const keys = ['hold_plus_break'].concat(V.set(T, sf));
+  /* our serve and return model leads (hold + break, then the two ratings on the whole tour), then the headline set */
+  const keys = ['hold_plus_break'].concat(sf ? [] : ['serve_rating', 'return_rating'], V.set(T, sf));
   const match = id => {
     const p = P[id];
     if (IDXS.country && p.country !== IDXS.country) return false;
@@ -496,9 +498,10 @@ function drawIndex(el, T, cat) {
   QK.leaderboard(el.querySelector('#pl-table'), {
     dense: true, rank: true, sort: { key: 'hold_plus_break', dir: 'desc' }, rowHref: r => K.playerHref(T, r.id),
     columns: [{ key: 'name', label: 'Player', type: 'entity', sub: 'sub', href: r => K.playerHref(T, r.id) }, { key: 'm', label: sf ? 'Matches (' + sf + ')' : 'Matches', num: true }]
-      .concat(keys.map(k => ({ key: k, label: SHORT[k] || V.label(k), type: 'pctl', pctl: 'p_' + k, fmt: v => V.fmt(k, v) }))),
+      .concat(keys.map(k => ({ key: k, label: SHORT[k] || V.label(k), type: 'pctl', pctl: 'p_' + k, fmt: v => V.fmt(k, v), tip: V.ours(k) ? null : ((V.META[k] || [])[1] || null) }))),
     rows: rows
   });
+  V.oursHeads(el.querySelector('#pl-table'));
   el.querySelector('#pl-title').textContent = K.TN(T) + (sf ? ' on ' + sf : ' players') + ', ' + (cat.year || '');
   el.querySelector('#pl-sub').innerHTML = 'Peers: ' + K.esc(V.peer(T, sf, cat)) + '. Cells are coloured by percentile against them (blue low, red high); sorted by serve + return. Hold and break are inferred from set scores' + (T === 'wta' ? '; dominance and aces come from WTA match statistics (2016 on, not the Slams)' : '') + '.';
   el.querySelector('#pl-foot').textContent = pool.length + ' qualified of ' + ids.length + (q || IDXS.country ? ' matching' : '') + ' players';

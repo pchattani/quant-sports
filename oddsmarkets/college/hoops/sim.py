@@ -257,6 +257,11 @@ def simulate(state: dict, season: int, fit: dict, n: int = 10000, seed: int = 0,
            "seed_mean": np.where(acc["ncaa"] > 0, acc["seed_sum"] / np.maximum(acc["ncaa"], 1), np.nan),
            "seed_dist": seed_cnt / n, "reach": reach / n,
            "conf_win": {c: v / n for c, v in conf_win.items()}, "groups": groups}
+    # remaining regular-season schedule: games left and their opponents' mean rating
+    n_rem = np.bincount(np.concatenate([rh, ra]), minlength=T).astype(float) if Gn else np.zeros(T)
+    s_rem = (np.bincount(rh, weights=net[ra], minlength=T) + np.bincount(ra, weights=net[rh], minlength=T)) if Gn else np.zeros(T)
+    out["n_rem"] = n_rem
+    out["sos_rem"] = np.where(n_rem > 0, s_rem / np.maximum(n_rem, 1), np.nan)
     return out
 
 

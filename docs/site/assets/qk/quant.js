@@ -42,7 +42,8 @@
  *   QK.meter(p, o)                                      the LED segmented percentile meter (20 segments, ▼ last season)
  *   QK.outlineNum(n, o) QK.longName(name, max)          the outlined number; Barlow Condensed for long names
  *   QK.color.deep / block / blockPair / markOutline     block contrast (white type >= 4.5:1) and the team-colour rules
- *   QK.scorebug(g, { size: 'xl' })                      the scoreboard bug: both team blocks, the start or the clock */
+ *   QK.scorebug(g, { size: 'xl' })                      the scoreboard bug: both team blocks, the start or the clock
+ *   QK.spec.load(sport) QK.ours(o) QK.oursExplain(html)  the spec's labels (<sport>.labels.json) and the "Our model" tag */
 (function (root) {
 'use strict';
 
@@ -2127,6 +2128,110 @@ QK.verdicts = function (items) {
   }).join('') + '</div>';
 };
 
+
+/* ─────────────────────────────────────── our metrics: the spec's labels and the "Our model" tag */
+/* QK.spec.load(sport?) -> Promise of the catalogue (null when the file is missing): assets/qk/metrics/<sport>.labels.json,
+ * which design_kit.py writes from docs/_design/metrics/<sport>.json (display names, units, direction, headline sets,
+ * explanations and `our_models`). The sport defaults to <html data-sport>. Once loaded, QK.spec.get(sport) returns it
+ * synchronously. Catalogue:
+ *   cat.metric(id, entity)  -> { id, label, unit, dir, set ('h'|'s'), order, style, explain, ours: model | null } | null
+ *   cat.label(id, entity, fallback)   the spec's display name (fallback when the spec has none)
+ *   cat.tip(id, entity, fallback)     the explanation, plus "Our model: <name>." when it is ours
+ *   cat.ours(id)            -> { key, name, about } | null    (id is a spec metric id or a payload key)
+ *   cat.headline(groupId)   -> [ids] in the spec's order;  cat.isHeadline(id, entity) -> order | 0
+ *   cat.order(items, o)     -> [{ label: 'Our models', items }, { label: 'Box score', items }] (empty groups dropped):
+ *        items are { key|id|value, ... }; within each, the spec's headline metrics first (by order), then the rest in
+ *        the order given. o.entity picks the metric table (default 'player'); o.key(item) reads the id.
+ * QK.optgroups(items, cat, o) -> '<optgroup>' HTML for a <select>: items [{ value, label, key? }], o.selected, o.entity.
+ * QK.ours(o) -> the cobalt "Our model" tag; o.short ('Ours', for table heads), o.model (name, in the tooltip), o.text.
+ * QK.oursExplain(html, o) -> the explain strip with the cobalt rule: what our number is, in a sentence. */
+var SPEC_CACHE = {}, SPEC_P = {};
+function SpecCat(j) {
+  this.j = j || {};
+  var o = this.j.ours || {};
+  this.models = o.models || {};
+  this.map = o.metrics || {};
+}
+SpecCat.prototype.table = function (entity) { var m = this.j.m || {}; return m[entity || 'player'] || m.player || {}; };
+SpecCat.prototype.ours = function (id) {
+  var k = Object.prototype.hasOwnProperty.call(this.map, id) ? this.map[id] : null;
+  if (!k) return null;
+  var md = this.models[k] || {};
+  return { key: k, name: md.name || 'Our model', about: md.about || '' };
+};
+SpecCat.prototype.metric = function (id, entity) {
+  var t = this.table(entity), r = Object.prototype.hasOwnProperty.call(t, id) ? t[id] : null;
+  if (!r) {
+    var m = this.j.m || {}, ks = Object.keys(m);
+    for (var i = 0; i < ks.length && !r; i++) if (Object.prototype.hasOwnProperty.call(m[ks[i]], id)) r = m[ks[i]][id];
+  }
+  var ours = this.ours(id);
+  if (!r) return ours ? { id: id, label: id, unit: '', dir: 'higher', set: 's', order: 99, style: false, explain: ours.about, ours: ours } : null;
+  return { id: id, label: r[0], unit: r[1], dir: r[2], set: r[3], order: r[4], style: !!r[5], explain: r[6], ours: ours };
+};
+SpecCat.prototype.label = function (id, entity, fallback) { var m = this.metric(id, entity); return m && m.label !== id ? m.label : (fallback || id); };
+SpecCat.prototype.tip = function (id, entity, fallback) {
+  var m = this.metric(id, entity);
+  var t = m && m.explain ? m.explain : (fallback || '');
+  if (m && m.ours) t += (t ? ' ' : '') + 'Our model: ' + m.ours.name + '.';
+  return t;
+};
+SpecCat.prototype.headline = function (groupId) {
+  var g = (this.j.groups || []).filter(function (x) { return x.id === groupId; })[0];
+  return g ? (g.headline || []).slice() : [];
+};
+SpecCat.prototype.isHeadline = function (id, entity) { var m = this.metric(id, entity); return m && m.set === 'h' ? (m.order || 99) : 0; };
+SpecCat.prototype.order = function (items, o) {
+  o = o || {};
+  var self = this, ent = o.entity || 'player';
+  var keyOf = o.key || function (it) { return it.key !== undefined ? it.key : (it.id !== undefined ? it.id : it.value); };
+  var ours = [], box = [];
+  (items || []).forEach(function (it, i) {
+    var k = keyOf(it), h = self.isHeadline(k, ent);
+    (self.ours(k) ? ours : box).push({ it: it, h: h, i: i });
+  });
+  var cmp = function (a, b) { return ((a.h || 1e3) - (b.h || 1e3)) || (a.i - b.i); };
+  var out = [];
+  if (ours.length) out.push({ label: o.oursLabel || 'Our models', items: ours.sort(cmp).map(function (x) { return x.it; }) });
+  if (box.length) out.push({ label: o.boxLabel || 'Box score', items: box.sort(cmp).map(function (x) { return x.it; }) });
+  return out;
+};
+QK.spec = {
+  url: function (sport) { return (QK.spec.base || 'assets/qk/metrics/') + sport + '.labels.json'; },
+  get: function (sport) { return SPEC_CACHE[sport || document.documentElement.getAttribute('data-sport') || ''] || null; },
+  load: function (sport) {
+    sport = sport || document.documentElement.getAttribute('data-sport') || '';
+    if (SPEC_CACHE[sport]) return Promise.resolve(SPEC_CACHE[sport]);
+    if (!SPEC_P[sport]) {
+      SPEC_P[sport] = QK.fetchJSON(QK.spec.url(sport), { timeout: 15000 }).then(function (j) {
+        SPEC_CACHE[sport] = new SpecCat(j);
+        return SPEC_CACHE[sport];
+      }, function () { SPEC_P[sport] = null; return null; });
+    }
+    return SPEC_P[sport];
+  },
+  /* a catalogue from an already-parsed labels object (tests, pages that inline it) */
+  from: function (j) { return new SpecCat(j); }
+};
+QK.ours = function (o) {
+  o = o || {};
+  var txt = o.text || (o.short ? 'Ours' : 'Our model');
+  var tip = o.model ? 'Our model: ' + o.model + (o.about ? '. ' + o.about : '') : 'From our own model, not a box-score count';
+  return '<span class="qk-ours' + (o.short ? ' sm' : '') + '" data-tip="' + esc(tip) + '" aria-label="' + esc(tip) + '">' + esc(txt) + '</span>';
+};
+QK.oursExplain = function (html, o) {
+  o = o || {};
+  return QK.explain(html, { title: o.title === undefined ? 'Our model.' : o.title, cls: 'qk-explain-ours' + (o.cls ? ' ' + o.cls : '') });
+};
+QK.optgroups = function (items, cat, o) {
+  o = o || {};
+  var opt = function (it) {
+    var v = it.value !== undefined ? it.value : (it.key !== undefined ? it.key : it.id);
+    return '<option value="' + esc(v) + '"' + (String(v) === String(o.selected) ? ' selected' : '') + '>' + esc(it.label) + '</option>';
+  };
+  if (!cat) return (items || []).map(opt).join('');
+  return cat.order(items, o).map(function (g) { return '<optgroup label="' + esc(g.label) + '">' + g.items.map(opt).join('') + '</optgroup>'; }).join('');
+};
 
 root.QK = QK;
 })(window);

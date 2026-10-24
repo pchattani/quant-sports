@@ -105,14 +105,20 @@ GI.route('playoffs', function (el, params) {
     const list = rows.filter(r => isNum(r.p_sb)).sort((a, b) => (b.p_sb || 0) - (a.p_sb || 0));
     el.innerHTML = GI.pageHead('Standings', S + ' playoff picture', esc(fmt) + (m.projected ? ' · <b>projected</b> from today\'s seeds' : ''), pager) + nav +
       GI.card(m.projected ? 'Projected bracket' : 'Bracket', m.projected ? 'If the season ended today · each matchup with our win chance' : 'Our win chance for each game, the score once played', S < 2020 ? GI.muted('The bracket view follows the 14-team format (2020 on). The seeds and chances below still apply.') : bracketHTML(m)) +
+      (d.league && window.QKL ? '<div id="po-race"></div>' : '') +
       GI.grid(GI.card('Super Bowl chances', 'Our chance from 20,000 simulated seasons', '<div id="po-sb"></div>' + QK.note('Even the favourite misses most seasons: a 20% chance means four seasons in five end without the trophy.'), { span: 7 }) +
         GI.card('Likeliest Super Bowls', 'Share of our simulated seasons', sbm.length ? GI.chartBox('po-sbm', 440, 'Likeliest Super Bowl matchups') : GI.muted('Matchups arrive with the season simulation.'), { span: 5 })) +
       seedDist(rows, S) +
       GI.card('Round by round', 'Our chance of reaching each stage, from the season simulation', GI.tableHTML([{ label: 'Team' }, { label: 'Conf' }, { label: 'Playoffs', align: 'right' }, { label: 'Bye', align: 'right' },
         { label: 'Reach SB', align: 'right', title: 'Win the conference' }, { label: 'Win SB', align: 'right' }],
         list.map(r => ({ _href: GI.teamHref(r.team, S), cells: [{ html: GI.teamLink(r.team, { short: true, season: S }), v: r.team }, r.conference,
-          { html: GI.probBar(r.p_playoffs, GI.tc(r.team)), v: r.p_playoffs }, { html: GI.pct(r.p_bye, 0), v: r.p_bye }, { html: GI.pct(r.p_conf, 1), v: r.p_conf }, { html: '<b class="gi-ours">' + GI.pct(r.p_sb, 1) + '</b>', v: r.p_sb }] })), { sticky: true }), { flush: true });
+          { html: GI.probBar(r.p_playoffs, GI.tc(r.team)), v: r.p_playoffs }, { html: GI.pct(r.p_bye, 0), v: r.p_bye }, { html: GI.pct(r.p_conf, 1), v: r.p_conf }, { html: '<b class="gi-ours">' + GI.pct(r.p_sb, 1) + '</b>', v: r.p_sb }] })), { sticky: true }), { flush: true }) +
+      (d.league && window.QKL ? '<div id="po-shape"></div>' : '');
     GI.sortable(el);
+    /* how the playoff race is shaping up (docs/_design/league.js): our chances over the season by conference, the
+       week's movers and why, magic numbers and the schedule left, the games that swing it; then the league's shape */
+    const lo = GI.leagueOpts ? GI.leagueOpts(d, S, GI.CONFERENCES[0]) : null;
+    if (lo && el.querySelector('#po-race')) { QKL.race(el.querySelector('#po-race'), lo); QKL.shape(el.querySelector('#po-shape'), lo); }
     GI.set('po-sb', list.length ? QK.chances(list.map(r => ({ label: GI.teamShort(r.team), p: r.p_sb, href: GI.teamHref(r.team, S), mark: { name: GI.teamName(r.team), abbr: GI.teamAbbr(r.team), colour: GI.teamInfo(r.team).colour } })), { limit: 14, key: false }) : GI.muted('The season simulation has not run yet.'));
     if (sbm.length) GI.ch.bar('po-sbm', { cats: sbm.map(x => GI.teamAbbr(x.afc) + ' v ' + GI.teamAbbr(x.nfc)), series: [{ name: 'Chance', color: 'model', data: sbm.map(x => x.p) }], horizontal: true, labels: true, fmt: v => GI.pct(v, 1), labelWidth: 80, valName: 'Share of simulated seasons', catName: 'AFC v NFC' });
   });

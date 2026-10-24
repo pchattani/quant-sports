@@ -151,7 +151,7 @@ function render(el, params, state) {
     if (!goalie && c && c.game_model && isNum(c.game_model.xgd60)) {
       const gm = c.game_model;
       k.push({ label: 'Weight in the game model', value: U.signed(gm.xgd60, 3), unit: 'xG/60', sub: 'to the team' + (isNum(gm.share) ? ' · on the ice for ' + Math.round(gm.share * 100) + '% of 5v5 time' : ''),
-        tip: 'How much this skater moves the team’s game forecasts: walk-forward RAPM (offence ' + U.signed(gm.o, 3) + ', defence ' + U.signed(gm.d, 3) + ' xG/60) times the share of 5v5 time the lineup gives this player' + (isNum(gm.toi5) ? ' (' + U.f(gm.toi5 / 60, 1) + ' min a game)' : '') + '.' });
+        tip: 'Our game model: how much this skater moves the team’s game forecasts: walk-forward RAPM (offence ' + U.signed(gm.o, 3) + ', defence ' + U.signed(gm.d, 3) + ' xG/60) times the share of 5v5 time the lineup gives this player' + (isNum(gm.toi5) ? ' (' + U.f(gm.toi5 / 60, 1) + ' min a game)' : '') + '.' });
     }
     if (goalie && c && c.goalie) { const gg = c.goalie; k.push({ label: 'High-danger save %', value: RK.fmtVal(gg.sv_pct_high, '3'), pctl: pp.sv_pct_high, sub: 'expected ' + RK.fmtVal(gg.xfsv_pct, '3') + ' overall' }); }
 
@@ -327,7 +327,7 @@ function render(el, params, state) {
             const m = meta2[kk], spx = U.SPEC[kk] || {};
             const pcs = E.map(e => pcOf(e)[kk]);
             pcs.forEach((v, i) => { const o = pcs[1 - i]; const d = isNum(v) ? v - (isNum(o) ? o : 0) : null; if (isNum(d) && (!best[i] || d > best[i].d)) best[i] = { k: kk, d: d, v: (E[i].values || {})[kk] }; });
-            return { label: spx.label || m.label || kk, tip: spx.tip || m.desc, better: (m.lower || spx.lower) ? 'low' : 'high', values: E.map(e => (e.values || {})[kk]), pctls: pcs, fmt: v => U.fmtBy(m, v) };
+            return { label: spx.label || m.label || kk, tip: (spx.tip || m.desc || '') + (RK.ours && RK.ours.of(kk) ? ' Our model: ' + RK.ours.of(kk).name + '.' : ''), better: (m.lower || spx.lower) ? 'low' : 'high', values: E.map(e => (e.values || {})[kk]), pctls: pcs, fmt: v => U.fmtBy(m, v) };
           }) }));
           const names = ids.map((id, i) => RK.playerSurname(id) || E[i].name);
           body.querySelector('#pp-tape-h').innerHTML = QK.sectionHead({ kicker: 'Tale of the tape', title: names[0] + ' or ' + names[1] + '?',

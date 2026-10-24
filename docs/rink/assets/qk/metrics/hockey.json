@@ -877,8 +877,8 @@
     },
     {
      "id": "rapm_off",
-     "display": "RAPM offence",
-     "unit": "2",
+     "display": "Isolated offence (RAPM)",
+     "unit": "xGF per 60",
      "direction": "higher",
      "set": "secondary",
      "order": 18,
@@ -909,8 +909,8 @@
     },
     {
      "id": "rapm_def",
-     "display": "RAPM defence",
-     "unit": "2",
+     "display": "Isolated defence (RAPM)",
+     "unit": "xGA per 60 prevented",
      "direction": "higher",
      "set": "secondary",
      "order": 19,
@@ -1553,7 +1553,7 @@
     {
      "id": "war",
      "display": "Rink value (WAR)",
-     "unit": "2",
+     "unit": "wins",
      "direction": "higher",
      "set": "secondary",
      "order": 39,
@@ -1956,8 +1956,8 @@
     },
     {
      "id": "rapm_net",
-     "display": "RAPM net",
-     "unit": "2",
+     "display": "Isolated impact (RAPM)",
+     "unit": "xG per 60",
      "direction": "higher",
      "set": "secondary",
      "order": 1,
@@ -2919,7 +2919,7 @@
     {
      "id": "war",
      "display": "Rink value (WAR)",
-     "unit": "2",
+     "unit": "wins",
      "direction": "higher",
      "set": "secondary",
      "order": 31,
@@ -3419,7 +3419,7 @@
     {
      "id": "gaa",
      "display": "GAA",
-     "unit": "2",
+     "unit": "goals per 60",
      "direction": "lower",
      "set": "secondary",
      "order": 6,
@@ -3835,7 +3835,7 @@
     {
      "id": "war",
      "display": "Rink value (WAR)",
-     "unit": "2",
+     "unit": "wins",
      "direction": "higher",
      "set": "secondary",
      "order": 19,
@@ -4627,5 +4627,101 @@
    "status": "needed",
    "note": "optional: 5v5 unblocked-attempt share predicts second-half points % slightly better than CF% (0.489 v 0.434)"
   }
- ]
+ ],
+ "our_models": {
+  "models": {
+   "gar": {
+    "name": "Rink value (GAR / WAR)",
+    "about": "Our goals above a replacement-level player: even-strength impact, power play, penalty kill, finishing and penalties, and the wins they are worth."
+   },
+   "rapm": {
+    "name": "RAPM",
+    "about": "Regularised adjusted plus-minus on our expected goals: a skater's isolated effect on xG for and against at 5v5."
+   },
+   "xg": {
+    "name": "Our expected-goals model",
+    "about": "Our shot model: the chance each unblocked attempt becomes a goal, from distance, angle, type and the play before."
+   },
+   "gsax": {
+    "name": "Goalie model (GSAx)",
+    "about": "Goals saved above expected from our shot model: saves made over what an average goalie would make on the same shots."
+   },
+   "team": {
+    "name": "Team rating model",
+    "about": "Our game model's team rating, with 5v5 offence and defence, special teams and goaltending parts."
+   },
+   "proj": {
+    "name": "Projection model",
+    "about": "Rest-of-season points, goals and on-ice xG share from recency-weighted rates regressed to the position mean."
+   }
+  },
+  "metrics": {
+   "gar_60": "gar",
+   "gar": "gar",
+   "war": "gar",
+   "gar_ev_off": "gar",
+   "gar_ev_def": "gar",
+   "gar_pp": "gar",
+   "gar_pk": "gar",
+   "rapm_net": "rapm",
+   "rapm_off": "rapm",
+   "rapm_def": "rapm",
+   "ixg60_all": "xg",
+   "ixg60": "xg",
+   "adj_xgf_pct": "xg",
+   "adj_xgf60": "xg",
+   "adj_xga60": "xg",
+   "xgf60_rel": "xg",
+   "xga60_rel": "xg",
+   "shooting_talent": "xg",
+   "xfsh_pct": "xg",
+   "pp_ixg60": "xg",
+   "pp_xgf60": "xg",
+   "pk_xga60": "xg",
+   "gsax": "gsax",
+   "gsax100": "gsax",
+   "gsax60": "gsax",
+   "gsax_shrunk": "gsax",
+   "dfsv_pct": "gsax",
+   "gsax_low": "gsax",
+   "gsax_med": "gsax",
+   "gsax_high": "gsax",
+   "gsax_5v5": "gsax",
+   "gsax_wrist": "gsax",
+   "gsax_slap": "gsax",
+   "gsax_tip": "gsax",
+   "gsax_back": "gsax",
+   "rating": "team",
+   "off5": "team",
+   "def5": "team",
+   "goalie": "team",
+   "pp": "team",
+   "pk": "team",
+   "rapm_cf": "rapm",
+   "rapm_ca": "rapm",
+   "rapm_pp": "rapm",
+   "rapm_pk": "rapm",
+   "gar_shooting": "gar",
+   "gar_pen": "gar",
+   "war_82": "gar",
+   "ixg": "xg",
+   "xgf60": "xg",
+   "xga60": "xg",
+   "xgf_pct": "xg",
+   "xgf_pct_rel": "xg",
+   "gax": "xg",
+   "gax_onice": "xg",
+   "xg_per_shot": "xg",
+   "xgf_g": "xg",
+   "xga_g": "xg",
+   "xgf_pct5": "xg",
+   "hd_att60": "xg",
+   "gsax_sh": "gsax",
+   "gsax_m": "gsax",
+   "xfsv_pct": "gsax",
+   "proj_pts": "proj",
+   "proj_g": "proj",
+   "proj_xgf_pct": "proj"
+  }
+ }
 }

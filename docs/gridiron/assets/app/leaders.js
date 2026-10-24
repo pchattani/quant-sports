@@ -2,7 +2,9 @@
  * the headline metrics of every comparison group (QB, RB, WR, TE, the five defensive roles, K, P) at a glance, then any
  * metric (the group's headline set first, then the rest of the catalogue) as a ranked bar chart and a leaderboard with
  * heat cells against the group, qualified players only (or everyone), best or worst, one team or all.
- * Reads <S>/players.json and <S>/value.json (leaders.json as a fallback). */
+ * Reads <S>/players.json and <S>/value.json (leaders.json as a fallback). Round 5: the metric picker lists our model
+ * metrics first (QB composite, Gridiron Value per game, kicking over expected ...), the board's head and the glance cards
+ * carry the cobalt "Our model" tag, and a cobalt strip names the model behind the board's metric. */
 (function (GI) {
 'use strict';
 
@@ -15,7 +17,7 @@ GI.route('leaders', function (el, params) {
   const qy = params.query || {};
   if (GI.cat.groupFromQuery(qy.g)) ST.group = GI.cat.groupFromQuery(qy.g);
   if (qy.m) ST.metric = String(qy.m);
-  return GI.loadAll([GI.ypath('players.json', S), GI.ypath('value.json', S)]).then(res => {
+  return Promise.all([GI.loadAll([GI.ypath('players.json', S), GI.ypath('value.json', S)]), GI.SP.specReady()]).then(all => all[0]).then(res => {
     if (!el.isConnected) return;
     const raw = res[0];
     const head = GI.pageHead('Players · ' + S, 'Leaders', 'Qualified players only unless you say otherwise; each player is ranked within their comparison group (QB, RB, WR, TE, outside pass rushers, interior linemen, LB, CB, S, K, P).') + GI.sectionNav('players', 'leaders') + QK.note('<b>Qualified players only:</b> a rate needs a sample before it means much, so each board has a minimum (attempts, carries, targets or games). Toggle it off to see everyone.');
@@ -39,7 +41,7 @@ GI.route('leaders', function (el, params) {
       if (!ids.length) return;
       GI.SP.headline(g).slice(0, g.id === 'qb' || g.id === 'wr' ? 2 : 1).forEach(m => {
         const top = ids.map(id => [id, GI.SP.value(P[id], id, m, cx)]).filter(x => isNum(x[1])).sort((a, b) => (m[3] ? a[1] - b[1] : b[1] - a[1])).slice(0, 5);
-        if (top.length) glance.push(GI.card('<a class="gi-link" href="' + GI.ghref('leaders', S, { g: g.code, m: m[0] }) + '">' + esc(g.code + ' · ' + m[1]) + '</a>', '', '<ol class="gi-ldl gi-lead">' + top.map(x => '<li>' + GI.mark(P[x[0]].team) + GI.playerLink(x[0], { name: P[x[0]].name, season: S }) + '<b class="gi-num">' + GI.SP.fmt(m, x[1], cx) + '</b></li>').join('') + '</ol>'));
+        if (top.length) glance.push(GI.card('<a class="gi-link" href="' + GI.ghref('leaders', S, { g: g.code, m: m[0] }) + '">' + esc(g.code + ' · ' + m[1]) + '</a>' + GI.SP.oursTag(m[0]), '', '<ol class="gi-ldl gi-lead">' + top.map(x => '<li>' + GI.mark(P[x[0]].team) + GI.playerLink(x[0], { name: P[x[0]].name, season: S }) + '<b class="gi-num">' + GI.SP.fmt(m, x[1], cx) + '</b></li>').join('') + '</ol>'));
       });
     });
     el.innerHTML = head + '<div class="qk-auto" style="--min:250px">' + glance.join('') + '</div>' +
@@ -47,7 +49,7 @@ GI.route('leaders', function (el, params) {
         GI.field('Metric', '<select id="ld-metric" class="qk-select"></select>') + GI.field('Team', '<select id="ld-team" class="qk-select"></select>') +
         GI.field('Show', GI.select('ld-dir', [['best', 'Best first'], ['worst', 'Worst first']], ST.dir, 'Order')) + GI.field('How many', GI.select('ld-n', [['10', '10'], ['25', '25'], ['50', '50'], ['999', 'All']], String(ST.n), 'How many')) +
         '<label class="gi-check"><input id="ld-qual" type="checkbox"' + (ST.qual ? ' checked' : '') + '> qualified only</label></div>' +
-        GI.chartBox('ld-chart', 420, 'Leaderboard') + '<div id="ld-table" style="margin-top:12px"></div><p class="gi-cap" id="ld-note"></p>');
+        '<div id="ld-ours"></div>' + GI.chartBox('ld-chart', 420, 'Leaderboard') + '<div id="ld-table" style="margin-top:12px"></div><p class="gi-cap" id="ld-note"></p>');
     const $ = id => document.getElementById(id);
     let ms = [];
     /* the group's metrics as spec tuples: the headline set first, then the catalogue's other metrics for the group */
@@ -56,9 +58,10 @@ GI.route('leaders', function (el, params) {
       const cm = GI.metricsFor(cat, GI.cat.CORE[g.id]);
       const ids0 = g.m.map(m => m[0]);
       ms = g.m.map(m => ({ t: m, set: true })).concat(cm.filter(m => ids0.indexOf(m.key) < 0).map(m => ({ t: [m.key, m.label, '', m.lower ? 1 : 0, 0, GI.copyText(m.desc || ''), null], set: false, group: m.group })));
+      /* quarterbacks: Gridiron Value per game (value.json) beside the composite, as for every other group */
+      if (ids0.indexOf('gvar_pg') < 0 && GI.SP.members(cx, g.id).some(id => isNum(GI.SP.value(P[id], id, ['gvar_pg'], cx)))) ms.push({ t: ['gvar_pg', GI.SP.specLabel('gvar_pg', 'Value per game'), 'points/game', 0, 0, 'Points above a replacement-level player at the position, per game (Gridiron Value).', null], set: false, group: 'Value' });
       if (!ms.some(x => x.t[0] === ST.metric)) ST.metric = GI.SP.headline(g)[0][0];
-      $('ld-metric').innerHTML = '<optgroup label="Headline set">' + ms.filter(x => x.set).map(x => '<option value="' + esc(x.t[0]) + '"' + (x.t[0] === ST.metric ? ' selected' : '') + '>' + esc(x.t[1]) + (x.t[3] ? ' ↓' : '') + '</option>').join('') + '</optgroup>' +
-        '<optgroup label="More">' + ms.filter(x => !x.set).map(x => '<option value="' + esc(x.t[0]) + '"' + (x.t[0] === ST.metric ? ' selected' : '') + '>' + esc(x.t[1]) + (x.t[3] ? ' ↓' : '') + '</option>').join('') + '</optgroup>';
+      $('ld-metric').innerHTML = GI.SP.orderOpts(ms.map(x => ({ key: x.t[0], label: x.t[1], lower: !!x.t[3], group: x.set ? 'headline' : 'more' })), ST.metric, ids0);
       const teams = Array.from(new Set(GI.SP.members(cx, g.id).map(id => P[id].team).filter(Boolean))).sort();
       $('ld-team').innerHTML = '<option value="">All teams</option>' + teams.map(t => '<option value="' + esc(t) + '"' + (t === ST.team ? ' selected' : '') + '>' + esc(t) + '</option>').join('');
     };
@@ -87,6 +90,8 @@ GI.route('leaders', function (el, params) {
             : { key: 'v', label: m[1] + (m[3] ? ' ↓' : ''), type: 'pctl', pctl: 'p', fmt: v => '<b>' + GI.SP.fmt(m, v, cx) + '</b>', tip: m[5], sort: false }]
           .concat(m[4] ? [] : [{ key: 'p', label: 'Percentile', type: 'bar', max: 100, fmt: v => (isNum(v) ? String(Math.round(v)) : '—'), tip: 'Against ' + g.peer + ', qualified (100 = best)', sort: false }]) });
       else GI.set('ld-table', GI.muted('Nobody with this metric matches.'));
+      if (lrows.length) GI.SP.tagHeads($('ld-table'), { v: m[0] });
+      GI.set('ld-ours', GI.SP.oursNote([[m[0], m[1]]]));
       GI.set('ld-sub', (ST.dir === 'worst' ? 'Bottom ' : 'Top ') + Math.min(ST.n, total) + ' of ' + total + ' ' + esc(g.name.toLowerCase()) + ' · ' + S);
       GI.set('ld-note', '<b>' + esc(m[1]) + '</b>: ' + esc(m[5] || '') + (m[4] ? ' A style metric: it describes how a player plays, not how well.' : '') + ' Qualified: ' + esc(GI.SP.minLine(g)) + '.' + (GI.SP.NOTE[g.id] ? ' ' + esc(GI.SP.NOTE[g.id]) : '') +
         ' ' + GI.glossLink(m[0], 'Glossary →') + ' · <a href="' + GI.ghref('lab', S, { g: core, x: m[0] }) + '">In the lab →</a>');

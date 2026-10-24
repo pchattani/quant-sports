@@ -146,14 +146,15 @@ function build(T, ids, cat, careers, body, full) {
   let distKey = null;
   const drawView = sf => {
     const set = V.set(T, sf).concat(['hold_plus_break']);
-    const groups = CMP_GROUPS.map(g => ({ label: g[0], rows: set.filter(x => g[1].indexOf(x) >= 0).map(x => ({ key: x, label: V.label(x, sf), tip: (V.META[x] || [])[1], better: 'high',
+    const groups = CMP_GROUPS.map(g => ({ label: g[0], rows: set.filter(x => g[1].indexOf(x) >= 0).map(x => ({ key: x, label: V.label(x, sf), tip: V.tipOf(x), better: 'high',
       values: ps.map(p => V.value(p, x, sf)), pctls: ps.map(p => (V.inPool(p, sf, cat) ? V.pctl(p, x, sf, cat) : null)), fmt: v => V.fmt(x, v),
       dfmt: (V.META[x] || [])[2] === 'pct' ? (d => (d > 0 ? '+' : d < 0 ? '−' : '±') + Math.abs(d * 100).toFixed(1) + ' pts') : null })) }));
     const ents = ids.map((id, i) => {
       const n = sf ? (((ps[i] || {}).values_surface || {})[sf] || {}).matches : (ps[i] || {}).matches;
       return { name: names[i], short: short[i], href: k.playerHref(T, id), abbr: short[i], sub: [ps[i] && ps[i].country, ps[i] && isNum(ps[i].rank) ? 'No. ' + ps[i].rank : '', isNum(n) ? n + (sf ? ' ' + sf : '') + ' matches' : ''].filter(Boolean).join(' · ') };
     });
-    document.getElementById('cmp-view').innerHTML = QK.compareView({ entities: ents, groups: groups });
+    document.getElementById('cmp-view').innerHTML = QK.compareView({ entities: ents, groups: groups }) +
+      QK.oursExplain('Elo (overall and by surface), hold, break and serve + return come from our models: Elo ratings, and the serve and return model that reads hold and break from set scores against the quality of the opposition. Hover a row for what it measures.');
     // verdicts: the metric where each player leads the others by the most (percentile points), named by its type
     const best = {};
     groups.forEach(g => g.rows.forEach((r, ri) => r.pctls.forEach((v, i) => {

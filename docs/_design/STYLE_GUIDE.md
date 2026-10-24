@@ -197,6 +197,8 @@ All builders return HTML strings unless noted. Signatures are in `quant.js` / `q
 | Outlined number, long names | `QK.outlineNum(n)`, `.qk-outline`; `QK.longName(name, max)`, `.qk-long` | jersey numbers, ranks; long names |
 | Team-colour rules | `QK.color.deep / block / blockPair / markOutline` | anything drawing a team block |
 | Small % | `QK.pctSmall(p)` | Bebas chances with a half-size % sign |
+| Our model tag | `QK.ours({ short, model })` (cobalt "Our model" / "Ours" chip, the model named in its tooltip); `QK.oursExplain(html)` (the explain strip with a cobalt rule) | every lab, leaderboard, table head and explain strip showing a metric from `our_models` |
+| Spec labels | `QK.spec.load(sport)` -> catalogue (`label`, `tip`, `metric`, `ours`, `headline`, `order`); `QK.optgroups(items, cat)` ("Our models" then "Box score", headline metrics first) | labs and "any metric" boards: names, units and explanations from `assets/qk/metrics/<sport>.labels.json` |
 
 **v1–v3 builders, now in Broadcast (same API)**
 
@@ -319,6 +321,9 @@ Percentiles, leaderboards, the tale of the tape and "most similar" lists use the
 - metrics are stable and predictive;
 - a metric still short of its stabilisation sample has a dashed box ("early");
 - the ▼ marks last season's percentile in the same peer group (`prev_pct_pos`).
+- our own model metrics (`our_models` in the spec JSON) come first in every metric picker, grouped "Our models" then
+  "Box score", carry the cobalt `QK.ours` tag, and take their names, units and explanations from the spec
+  (`QK.spec`), never a hard-coded copy.
 
 ## 10. Accessibility
 

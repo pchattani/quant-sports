@@ -383,3 +383,95 @@ FX.awardName = (k, L) => (k === 'sixth' || k === '6moy' ? (L === 'wnba' ? 'Sixth
 FX.pOf = v => (isNum(v) ? Number(v) : v && isNum(v.p) ? Number(v.p) : null);
 
 })(window.HW);
+
+/* Our model metrics (round 5, METRICS_SHOWCASE.md): the spec's labels file (assets/qk/metrics/<sport>.labels.json,
+ * read through QK.spec) names each metric, explains it and says which come from our own models.
+ *   NS.ours.load()               -> Promise of the catalogue (null without the file); NS.ours.cat() once loaded
+ *   NS.ours.of(key)              -> { key, name, about } when the metric is ours, else null
+ *   NS.ours.label(key, fb, ent)  the spec's display name for the entity ('player' | 'team'), else fb
+ *   NS.ours.tip(key, fb, ent)    the spec's explanation (+ "Our model: <name>."), else fb
+ *   NS.ours.relabel(list, ent)   metric metas [{ key, label, desc }] with the spec's names and explanations
+ *   NS.ours.tag(key)             the short cobalt "Ours" tag (QK.ours) when ours, else ''
+ *   NS.ours.groups(items, o)     metric pickers: [{ name, items }]: "Our models" (headline first), "Box score · key
+ *                                numbers" (the spec's other headline metrics), then "Box score · <group>" for the rest
+ *   NS.ours.explain(keys, o)     the cobalt explain strip for each of our metrics among keys (one per metric)
+ * Table heads: a table inside .qk-ours-cols gets the "Ours" tag on every head whose data-k is ours (QK.table and
+ * QK.leaderboard write data-k), and any th with .qk-ours-th; the style is added once the catalogue loads. */
+(function (NS) {
+'use strict';
+const O = NS.ours = NS.ours || {};
+let CAT = null, P = null;
+const has = (o, k) => !!o && Object.prototype.hasOwnProperty.call(o, k);
+const e = s => String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+O.load = () => {
+  if (CAT) return Promise.resolve(CAT);
+  if (!P) P = (window.QK && QK.spec ? QK.spec.load() : Promise.resolve(null)).then(c => { CAT = c || null; if (CAT) O.css(CAT); return CAT; }, () => null);
+  return P;
+};
+O.cat = () => CAT;
+/* read early (about 15 KB) so player and compare pages built from other files can tag our metrics */
+if (window.QK && QK.spec) setTimeout(O.load, 0);
+O.of = key => (CAT ? CAT.ours(key) : null);
+O.row = (key, ent) => { if (!CAT) return null; const t = CAT.table(ent || 'player'); return has(t, key) ? t[key] : null; };
+O.label = (key, fb, ent) => { const r = O.row(key, ent); return r && r[0] ? r[0] : (fb === undefined ? key : fb); };
+O.tip = (key, fb, ent) => {
+  const r = O.row(key, ent), o = O.of(key);
+  let t = r && r[6] ? r[6] : (fb || (o ? o.about : ''));
+  if (o) t += (t ? ' ' : '') + 'Our model: ' + o.name + '.';
+  return t;
+};
+O.relabel = (list, ent) => (list || []).map(m => { const r = O.row(m.key, ent); return r ? Object.assign({}, m, { label: r[0], desc: r[6] || m.desc }) : m; });
+O.tag = key => { const o = O.of(key); return o && window.QK && QK.ours ? QK.ours({ short: true, model: o.name, about: o.about }) : ''; };
+O.css = cat => {
+  if (document.getElementById('qk-ours-cols-style')) return;
+  const keys = Object.keys((cat && cat.map) || {}).filter(k => /^[A-Za-z0-9_]+$/.test(k));
+  const sel = keys.map(k => '.qk-ours-cols th[data-k="' + k + '"] > button::after,.qk-ours-cols th[data-k="' + k + '"]:not([aria-sort])::after').concat(['th.qk-ours-th::after']).join(',');
+  const st = document.createElement('style');
+  st.id = 'qk-ours-cols-style';
+  st.textContent = sel + '{content:"Ours";display:inline-flex;align-items:center;height:14px;padding:0 4px;margin-left:4px;border-left:2px solid var(--signal);background:var(--signal-soft);color:var(--signal);font:700 9px/1 var(--font-cond);letter-spacing:.06em;text-transform:uppercase;vertical-align:1px;white-space:nowrap}';
+  document.head.appendChild(st);
+};
+O.groups = (items, o) => {
+  o = o || {};
+  const keyOf = o.key || (it => it.key), grpOf = o.group || (it => it.group || 'Other'), ent = o.entity || 'player';
+  const head = k => { const r = O.row(k, ent); return r && r[3] === 'h' ? (r[4] || 99) : 0; };
+  const ours = [], key = [], rest = [];
+  (items || []).forEach((it, i) => {
+    const k = keyOf(it), h = head(k), x = { it: it, h: h, i: i };
+    if (O.of(k)) ours.push(x); else if (h) key.push(x); else rest.push(x);
+  });
+  const cmp = (a, b) => ((a.h || 1e3) - (b.h || 1e3)) || (a.i - b.i);
+  const out = [];
+  if (ours.length) out.push({ name: 'Our models', ours: true, items: ours.sort(cmp).map(x => x.it) });
+  if (key.length) out.push({ name: 'Box score · key numbers', items: key.sort(cmp).map(x => x.it) });
+  rest.forEach(x => { const g = 'Box score · ' + grpOf(x.it); let b = out.find(y => y.name === g); if (!b) { b = { name: g, items: [] }; out.push(b); } b.items.push(x.it); });
+  return out;
+};
+O.explain = (keys, o) => {
+  o = o || {};
+  if (!window.QK || !QK.oursExplain) return '';
+  const seen = {};
+  return (keys || []).filter(k => k && O.of(k) && !seen[k] && (seen[k] = 1)).map(k => {
+    const m = O.of(k), lab = o.label ? o.label(k) : O.label(k, k, o.entity);
+    const r = O.row(k, o.entity), ex = r && r[6] ? r[6] : m.about;
+    return QK.oursExplain('<b>' + e(lab) + '</b> ' + QK.ours({ model: m.name, about: m.about }) + ' ' + e(ex) + ' <span class="qk-muted">' + e(m.name) + '.</span>', { title: '' });
+  }).join('');
+};
+})(window.HW);
+/* Our value model's WAR on a season catalogue (players.json carries HPM but not WAR): value.json joined on the player
+ * id, once per catalogue object; adds the `war` metric to cat.metrics. Resolves to the catalogue. */
+(function (HW) {
+'use strict';
+const FX = HW.fx = HW.fx || {};
+FX.joinValue = (L, S, cat) => {
+  if (!cat || !cat.players || cat._war !== undefined || !HW.load || !HW.path) return Promise.resolve(cat);
+  return HW.load(HW.path('value.json', L, S)).then(v => {
+    const cols = (v && v.cols) || [], iId = cols.indexOf('id'), iW = cols.indexOf('war');
+    cat._war = 0;
+    if (iId < 0 || iW < 0) return cat;
+    ((v && v.rows) || []).forEach(r => { const p = cat.players[String(r[iId])]; if (p && typeof r[iW] === 'number') { p.values = p.values || {}; if (typeof p.values.war !== 'number') { p.values.war = r[iW]; cat._war++; } } });
+    if (cat._war && !(cat.metrics || []).some(m => m.key === 'war')) (cat.metrics = cat.metrics || []).push({ key: 'war', label: 'Wins above replacement (WAR)', group: 'Impact', fmt: '1', desc: 'Wins the player added over a replacement-level player in the minutes played, from HPM.' });
+    return cat;
+  }, () => cat);
+};
+})(window.HW);

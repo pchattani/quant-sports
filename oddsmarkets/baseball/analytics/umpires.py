@@ -66,10 +66,48 @@ def build(ctx: SeasonContext) -> dict:
             gpk_of[gpk] = uid
     for r in rows.values():
         r["games_list"].sort(key=lambda x: str(x[1]))
-    abs_ = u.get("abs") or {}
+    abs_ = named_abs(ctx, u.get("abs") or {}, names)
     return {**CT.season_meta(ctx), "metrics": [an.public_metric(m) for m in METRICS], "umpires": rows,
             "games_cols": ["gpk", "date", "home", "away", "called", "missed", "accuracy", "x_accuracy", "home_favour", "favoured", "impact"],
             "league": u.get("league"), "abs": abs_, "min_called": MIN_CALLED}
+
+
+def _add_col(tab: dict | None, key: str, new: str, fn) -> dict | None:
+    """A copy of a {"cols", "rows"} table with column `new` = fn(value of column `key`) appended (once)."""
+    if not isinstance(tab, dict) or key not in (tab.get("cols") or []) or new in tab["cols"]:
+        return tab
+    i = tab["cols"].index(key)
+    return {**tab, "cols": list(tab["cols"]) + [new], "rows": [list(r) + [fn(r[i]) if len(r) > i else None] for r in tab.get("rows") or []]}
+
+
+def named_abs(ctx: SeasonContext, abs_: dict, umpires: dict | None = None) -> dict:
+    """The ABS tables with names: challengers, best and worst gain the player's `name` (store, then the people index),
+    teams the team id `tid` (the tables carry Savant abbreviations) and umpires the umpire's `name`, so the page never
+    falls back to a bare id."""
+    if not isinstance(abs_, dict) or not abs_:
+        return abs_
+    out = dict(abs_)
+
+    def pname(pid):
+        if pid in (None, ""):
+            return None
+        n = ctx.name(str(pid))
+        return n if n and n != str(pid) else None
+
+    def tid(a):
+        if a in (None, ""):
+            return None
+        return ctx.tid(a) or (str(a) if str(a) in ctx.teams else None)
+    for k in ("challengers", "best", "worst"):
+        if k in out:
+            out[k] = _add_col(out[k], "challenger", "name", pname)
+    for k, col in (("teams", "team"), ("by_batting_team", "bat_team")):
+        if k in out:
+            out[k] = _add_col(out[k], col, "tid", tid)
+    um = umpires or {}
+    if "umpires" in out:
+        out["umpires"] = _add_col(out["umpires"], "ump", "name", lambda x: (um.get(str(x)) or {}).get("name") if x is not None else None)
+    return out
 
 
 def profiles(payload: dict | None) -> dict[str, dict]:

@@ -40,6 +40,7 @@ CC.route('value', function (el, p) {
       var paint = function () {
         var rs = rows.filter(function (r) { return curPos === 'all' || r.pos === curPos; });
         QK.$('#v-n', body).textContent = rs.length + ' players · the value cell is coloured by its percentile against every qualified player';
+        CC.oursHeads(QK.$('#v-tbl', body));
         QK.leaderboard(QK.$('#v-tbl', body), { dense: true, rank: true, maxHeight: 620, rowHref: function (r) { return CC.playerHref(L, r.id, S); }, columns: [
           { key: 'name', label: 'Player', type: 'entity', sub: 'sub', mark: function (r) { return U.mark(L, r.team); }, href: function (r) { return CC.playerHref(L, r.id, S); } },
           { key: 'gp', label: 'GP', num: true },

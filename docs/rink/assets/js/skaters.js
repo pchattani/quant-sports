@@ -773,7 +773,7 @@ function renderSkaters(el, params, state) {
     '</div><div id="cat-chips" class="gq-chips"></div><div id="cat-table">' + k.muted('Loading…') + '</div><div class="pg-note gq-note" id="cat-note"></div></div>';
   return k.ready().then(() => {
     const S = k.S(params, state);
-    return Promise.all([k.loadY(S, 'skaters.json'), k.loadNames()]).then(res => ({ S: S, raw: res[0] }));
+    return Promise.all([k.loadY(S, 'skaters.json'), k.loadNames(), RK.ours ? RK.ours.load() : null]).then(res => ({ S: S, raw: res[0] }));
   }).then(o => {
     if (!k.alive(el)) return;
     const S = o.S, cat = k.catOf(o.raw), $ = k.$;
@@ -789,8 +789,9 @@ function renderSkaters(el, params, state) {
     $('cat-group').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === ST.group));
     const setup = () => {
       const g = ST.group, ids = byGroup[g] || [];
-      const metrics = g === 'A' ? k.allMetrics(cat).filter(m => k.scopeOk(m, 'F') && k.scopeOk(m, 'D')) : k.metricsFor(cat, g);
-      const meta = k.metaOf(k.allMetrics(cat));
+      const rl = list => (RK.ours ? RK.ours.relabel(list, 'player') : list);   // the spec's names and explanations
+      const metrics = rl(g === 'A' ? k.allMetrics(cat).filter(m => k.scopeOk(m, 'F') && k.scopeOk(m, 'D')) : k.metricsFor(cat, g));
+      const meta = k.metaOf(metrics.concat(rl(k.allMetrics(cat))));
       const maxN = Math.max.apply(null, ids.map(id => k.toiOf(P[id], scale)).concat([60]));
       const floorDef = [((cat.floors || {})[g]), cat.toi_floor, cat.floor].find(isNum);
       $('cat-floor').max = String(Math.ceil(maxN / 10) * 10);
@@ -804,7 +805,7 @@ function renderSkaters(el, params, state) {
       if (ST.pos && !pos[ST.pos]) ST.pos = '';
       $('cat-pos').innerHTML = '<option value="">All</option>' + Object.keys(pos).sort().map(x => '<option value="' + k.esc(x) + '"' + (x === ST.pos ? ' selected' : '') + '>' + k.esc(k.posLabel(x)) + ' (' + pos[x] + ')</option>').join('');
       $('cat-pos').parentNode.style.display = Object.keys(pos).length > 1 ? '' : 'none';
-      $('cat-extra').innerHTML = '<option value="">—</option>' + k.groups(metrics).map(gr => '<optgroup label="' + k.esc(gr.name) + '">' + gr.items.map(m => '<option value="' + k.esc(m.key) + '">' + k.esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>').join('');
+      $('cat-extra').innerHTML = '<option value="">—</option>' + (RK.ours ? RK.ours.groups(metrics) : k.groups(metrics)).map(gr => '<optgroup label="' + k.esc(gr.name) + '">' + gr.items.map(m => '<option value="' + k.esc(m.key) + '">' + k.esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>').join('');
       ST.extra = ST.extra.filter(x => meta[x]);
       const heads = k.headline(metrics, k.PREFS[g === 'D' ? 'D' : 'F'] || [], 7);
       if (ST.sortKey && !meta[ST.sortKey]) ST.sortKey = null;
@@ -873,7 +874,7 @@ function drawCatalogue(S, cat, ctx) {
   const host = k.$('cat-table');
   if (!host) return;
   const head = [{ label: '#', sortable: false }, { label: 'Skater' }, { label: 'Team' }, { label: 'Pos' }, { label: 'Age', align: 'right' }, { label: 'GP', align: 'right' }, { label: 'TOI', align: 'right', title: 'Total ice time, minutes (all strengths)' }]
-    .concat(cols.map(m => ({ label: k.shortLabel(m.label) + (m.lower ? ' ↓' : ''), align: 'right', title: k.cleanDesc(m.desc || m.label) + (m.lower ? ' (lower is better)' : '') + (isNum(m.stabilises_at) ? ' · stabilises at about ' + k.int(m.stabilises_at) + ' ' + (m.unit || 'minutes') : '') })));
+    .concat(cols.map(m => ({ label: k.shortLabel(m.label) + (m.lower ? ' ↓' : ''), align: 'right', cls: RK.ours && RK.ours.of(m.key) ? 'qk-ours-th' : '', title: k.cleanDesc(m.desc || m.label) + (m.lower ? ' (lower is better)' : '') + (isNum(m.stabilises_at) ? ' · stabilises at about ' + k.int(m.stabilises_at) + ' ' + (m.unit || 'minutes') : '') + (RK.ours && RK.ours.of(m.key) ? ' · Our model: ' + RK.ours.of(m.key).name : '') })));
   host.innerHTML = rows.length ? k.table(head, rows, { sticky: true, compact: true }) : k.muted('No skater matches these filters.');
   k.sortable(host);
   const chips = k.$('cat-chips');

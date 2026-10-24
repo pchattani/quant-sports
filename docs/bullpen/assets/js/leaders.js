@@ -7,7 +7,9 @@
  * pre-filtered boards (leaders.json) when they exist.
  *
  * Address: ?k=hitter|pitcher|pitch&m=<metric>&pt=<pitch type> presets the board.
- * Data: data/<L>/<S>/hitters.json, pitchers.json ("arsenal"), leaders.json. Uses BP.gk. */
+ * Data: data/<L>/<S>/hitters.json, pitchers.json ("arsenal"), leaders.json. Uses BP.gk.
+ * Round 5: the metric picker lists our model metrics first (BP.ui.metricOpts), the board and its head carry the cobalt
+ * "Our model" tag with a strip naming the model, and the top-five cards lead with Bullpen WAR and Stuff+. */
 (function (BP) {
 'use strict';
 
@@ -46,11 +48,11 @@ function render(el, params, state) {
     '<label>Min <span id="ld-floor-u"></span> <b id="ld-floor-v"></b><input id="ld-floor" type="range" min="0" max="700" step="5"></label>' +
     '<label class="bp-check"><input type="checkbox" id="ld-qual"> past the floor for the position or role</label>' +
     '</div></div></section>' +
-    '<div class="qk-grid" style="margin-top:var(--sp-4)"><div class="qk-span-5"><div id="ld-chart-card"></div></div><div class="qk-span-7"><div id="ld-board-card"></div></div></div>' +
-    '<section class="qk-section">' + QK.sectionHead({ kicker: 'At a glance', title: 'Top five', sub: 'The headline metrics from the metrics spec, players past the floor for their position or role.' }) + '<div class="qk-grid" id="ld-glance"></div></section>';
+    '<div id="ld-ours" style="margin-top:var(--sp-4)"></div><div class="qk-grid" style="margin-top:var(--sp-4)"><div class="qk-span-5"><div id="ld-chart-card"></div></div><div class="qk-span-7"><div id="ld-board-card"></div></div></div>' +
+    '<section class="qk-section">' + QK.sectionHead({ kicker: 'At a glance', title: 'Top five', sub: 'Our models first (Bullpen WAR, Stuff+), then the headline metrics from the metrics spec; players past the floor for their position or role.' }) + '<div class="qk-grid" id="ld-glance"></div></section>';
   return k.ready().then(() => {
     const S = k.S(params, state);
-    return Promise.all([k.loadY(L, S, 'hitters.json'), k.loadY(L, S, 'pitchers.json'), k.loadY(L, S, 'leaders.json'), k.loadNames()]).then(res => ({ S: S, res: res }));
+    return Promise.all([k.loadY(L, S, 'hitters.json'), k.loadY(L, S, 'pitchers.json'), k.loadY(L, S, 'leaders.json'), k.loadNames(), U.specReady()]).then(res => ({ S: S, res: res }));
   }).then(o => {
     if (!k.alive(el)) return;
     const S = o.S, hc = k.catOf(o.res[0], 'hitters'), pc = k.catOf(o.res[1], 'pitchers'), lead = o.res[2];
@@ -75,13 +77,14 @@ function render(el, params, state) {
         if (ptList.indexOf(S0.pt) < 0) S0.pt = ptList[0];
         const avail = ARS_METRICS.filter(m => Object.keys(ars).some(pid => { const r = (ars[pid] || {})[S0.pt]; return r && k.isNum(k.val(r, ALIAS[m[0]] || [m[0]])); }));
         if (!avail.find(m => m[0] === S0.metric)) S0.metric = (avail[0] || ARS_METRICS[0])[0];
-        $('ld-metric').innerHTML = avail.map(m => '<option value="' + m[0] + '"' + (m[0] === S0.metric ? ' selected' : '') + '>' + k.esc(m[1]) + '</option>').join('');
+        const aO = avail.filter(m => U.ours(m[0])), aB = avail.filter(m => !U.ours(m[0])), aOpt = m => '<option value="' + m[0] + '"' + (m[0] === S0.metric ? ' selected' : '') + '>' + k.esc(m[1]) + '</option>';
+        $('ld-metric').innerHTML = (aO.length ? '<optgroup label="Our models">' + aO.map(aOpt).join('') + '</optgroup>' : '') + (aB.length ? '<optgroup label="Box score">' + aB.map(aOpt).join('') + '</optgroup>' : '');
         $('ld-floor-u').textContent = 'pitches';
       } else {
         const cat = kind === 'pitcher' ? pc : hc;
         const ms = (cat && cat.metrics) || [];
         if (!ms.find(m => m.key === S0.metric)) S0.metric = (k.headline(ms, kind === 'pitcher' ? k.PIT_PREFS : k.HIT_PREFS, 1)[0] || {}).key || '';
-        $('ld-metric').innerHTML = k.groups(ms).map(g => '<optgroup label="' + k.esc(g.name) + '">' + g.items.map(m => '<option value="' + k.esc(m.key) + '"' + (m.key === S0.metric ? ' selected' : '') + '>' + k.esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>').join('');
+        $('ld-metric').innerHTML = U.metricOpts(ms, S0.metric, kind);
         $('ld-floor-u').textContent = kind === 'pitcher' ? 'BF' : 'PA';
       }
       const maxN = kind === 'pitch' ? Math.max.apply(null, Object.keys(ars).map(pid => { const r = (ars[pid] || {})[S0.pt]; return r ? (k.val(r, ['n', 'pitches', 'count']) || 0) : 0; }).concat([100]))
@@ -130,7 +133,8 @@ function drawBoard(L, S, hc, pc) {
   } else {
     const cat = kind === 'pitcher' ? pc : hc;
     if (!cat) { document.getElementById('ld-board-card').innerHTML = U.card2('Leaderboard', '', QK.empty('Not built yet')); return; }
-    m = k.metaOf(cat.metrics)[S0.metric] || { key: S0.metric, label: S0.metric };
+    m = Object.assign({}, k.metaOf(cat.metrics)[S0.metric] || { key: S0.metric, label: S0.metric });
+    m.label = U.label(kind, m.key, m.label);
     lower = !!m.lower; fmt = m.fmt;
     Object.keys(cat.players).forEach(pid => {
       const p = cat.players[pid], v = (p.values || {})[m.key], n = k.sampleOf(p, kind);
@@ -149,7 +153,9 @@ function drawBoard(L, S, hc, pc) {
   const unit = kind === 'pitch' ? 'Pitches' : kind === 'pitcher' ? 'BF' : 'PA';
   const med = k.median(all);
   const sub = rows.length + ' with a value · ' + (S0.dir === 'best' ? 'best' : 'worst') + ' first · median ' + k.fmtV(med, fmt) + (lower ? ' · lower is better' : '');
-  document.getElementById('ld-board-card').innerHTML = U.card2(m.label, esc0(sub) + (m.desc ? ' · ' + esc0(m.desc) : ''), '<div id="ld-table"></div>', { flush: true });
+  document.getElementById('ld-board-card').innerHTML = U.card2(m.label, U.oursTag(m.key) + (U.ours(m.key) ? ' ' : '') + esc0(sub) + (m.desc ? ' · ' + esc0(m.desc) : ''), '<div id="ld-table"></div>', { flush: true });
+  const oursBox = document.getElementById('ld-ours');
+  if (oursBox) oursBox.innerHTML = U.oursNote(kind === 'pitch' ? 'pitcher' : kind, [m.key]);
   const host = document.getElementById('ld-table');
   if (!shown.length) host.innerHTML = QK.empty('Nobody here', 'Lower the floor or untick the position floor.');
   else QK.leaderboard(host, { dense: true, rank: true, maxHeight: 640, rowHref: r => r.href, columns: [
@@ -157,6 +163,7 @@ function drawBoard(L, S, hc, pc) {
     { key: 'n', label: unit, num: true, fmt: x => k.int(x) },
     { key: 'v', label: m.label.split(' · ')[0] + (lower ? ' ↓' : ''), type: 'pctl', pctl: 'pct', fmt: x => k.fmtV(x, fmt), tip: (m.desc || '') + ' The cell colour is the percentile (100 = best).' }],
     rows: shown.slice() });
+  if (shown.length) U.tagHeads(host, { v: m.key });
   const top = shown.slice(0, 15);
   document.getElementById('ld-chart-card').innerHTML = U.card2('The top ' + top.length, 'Coloured by percentile; the median past the floor is ' + k.fmtV(med, fmt), top.length ? U.chart('ld-chart', Math.max(260, 22 * top.length + 70), 'Leaders: ' + m.label) : QK.empty('Nobody here'));
   if (top.length) QKC.bar('#ld-chart', { cats: top.map(r => k.surname(r.name) + ' · ' + k.teamAbbr(r.team)), series: [{ name: m.label, data: top.map(r => r.v) }], horizontal: true, labels: true, fmt: x => k.fmtV(x, fmt),
@@ -171,10 +178,10 @@ function glance(L, S, lead, hc, pc) {
   const host = document.getElementById('ld-glance');
   if (!host) return;
   const boards = [];
-  const want = kind0 => (kind0 === 'pitcher' ? k.PIT_PREFS : k.HIT_PREFS).filter(x => typeof x === 'string').slice(0, 6);
+  const want = kind0 => (kind0 === 'pitcher' ? ['war', 'stuff_plus'] : ['war']).concat((kind0 === 'pitcher' ? k.PIT_PREFS : k.HIT_PREFS).filter(x => typeof x === 'string')).slice(0, 7);
   [[hc, 'hitter'], [pc, 'pitcher']].forEach(x => {
     if (!x[0]) return;
-    k.headline(x[0].metrics, want(x[1]), 6).forEach(m => {
+    k.headline(x[0].metrics, want(x[1]), 6).map(m0 => Object.assign({}, m0, { label: U.label(x[1], m0.key, m0.label) })).forEach(m => {
       const rows = Object.keys(x[0].players).filter(pid => U.meets(x[0].players[pid], U.setFor(x[1], x[0].players[pid]), x[0].team_games) && k.isNum((x[0].players[pid].values || {})[m.key]))
         .map(pid => ({ pid: pid, v: x[0].players[pid].values[m.key] })).sort((a, b) => (m.lower ? a.v - b.v : b.v - a.v)).slice(0, 5);
       if (rows.length) boards.push({ m: m, kind: x[1], rows: rows });
@@ -184,7 +191,7 @@ function glance(L, S, lead, hc, pc) {
     const src = lead.leaders || lead;
     Object.keys(src).filter(key => Array.isArray(src[key]) && src[key].length).slice(0, 8).forEach(key => boards.push({ m: { key: key, label: key, fmt: '' }, kind: /^p_/.test(key) ? 'pitcher' : 'hitter', rows: src[key].slice(0, 5).map(r => ({ pid: String(r[0]), v: r[1] })) }));
   }
-  host.innerHTML = boards.length ? boards.map(b => '<div class="qk-span-3">' + U.card2(b.m.label || b.m.key, b.kind === 'pitcher' ? 'Pitchers' : 'Hitters', '<ul class="bp-list bp-lead">' +
+  host.innerHTML = boards.length ? boards.map(b => '<div class="qk-span-3">' + U.card2(b.m.label || b.m.key, (b.kind === 'pitcher' ? 'Pitchers' : 'Hitters') + U.oursTag(b.m.key), '<ul class="bp-list bp-lead">' +
     b.rows.map((r, i) => '<li><span class="n">' + (i + 1) + '</span>' + U.playerEnt(r.pid, L, BP.teamAbbr(BP.player(r.pid).team), b.kind) + '<span class="v">' + k.fmtV(r.v, b.m.fmt) + '</span></li>').join('') + '</ul>', { flush: true }) + '</div>').join('')
     : '<div class="qk-span-12">' + QK.empty('No leaderboards yet') + '</div>';
 }

@@ -17,6 +17,9 @@ const FX = () => HW.fx;
 
 /* Presets: [x candidates, y candidates, title, {color}]; candidates are matched in order against metric keys, then labels. */
 const PRESETS = [
+  [['hpm_o', 'o_hpm', /hpm_?o/], ['hpm_d', 'd_hpm', /hpm_?d/], 'Our impact model at both ends: offensive against defensive HPM'],
+  [['min', /^min$/], ['war', /^war$/], 'Wins above replacement against minutes: our value model'],
+  [['box_impact', /box/], ['rapm', /^rapm/], 'Box score against RAPM: does the box agree with the lineups?'],
   [['pox100', 'pox', 'shot_making', 'pox_100', /pox|shot_?making|over_?exp/], ['xpps', 'xefg', 'shot_difficulty', /xpps|xefg|difficult|xpts/], 'Shot-making against shot difficulty (expected points per shot)'],
   [['usg', 'usg_pct', /usg|usage/], ['ts', 'ts_pct', /^ts/], 'Usage against true shooting'],
   [['blk_pct', /blk/], ['hpm_d', 'd_hpm', /hpm_?d/], 'Rim protection: block rate against defensive HPM'],
@@ -24,8 +27,6 @@ const PRESETS = [
   [['tpar', 'tpa_rate', '3par', 'fg3a_rate', /3pa|tpa_?rate|three.*rate/], ['c3_freq', 'corner3_share', 'freq_corner3', 'corner3_freq', /corner|c3/], 'Three-point rate against corner-three share'],
   [['ast_pct', /ast_?pct|^ast%/], ['tov_pct', /tov/], 'Playmaking: assist rate against turnover rate'],
   [['rim_freq', 'freq_rim', /rim.*freq|freq.*rim/], ['ftr', 'ft_rate', /ftr|ft_?rate/], 'Pressure: rim attempts against free-throw rate'],
-  [['hpm_o', 'o_hpm', /hpm_?o/], ['hpm_d', 'd_hpm', /hpm_?d/], 'Two-way: offensive against defensive HPM'],
-  [['box_impact', /box/], ['rapm', /^rapm/], 'Box score against RAPM: does the box agree with the lineups?'],
   [['trb_pct', 'reb_pct', /trb|reb_?pct/], ['blk_pct', /blk/], 'Bigs: rebound rate against block rate']
 ];
 const SHRINK_K = 300;   // minutes of prior: a player with 300 minutes sits halfway between the pool median and his own rate
@@ -44,8 +45,10 @@ function prep(raw) {
   (raw.metrics || []).forEach(m => { meta[m.key] = m; });
   meta.min = meta.min || { key: 'min', label: 'Minutes', fmt: 'int' };
   meta.gp = meta.gp || { key: 'gp', label: 'Games', fmt: 'int' };
+  const O = HW.ours;
+  if (O && O.cat()) Object.keys(meta).forEach(k => { const r = O.row(k, 'player'); if (r) meta[k] = Object.assign({}, meta[k], { label: r[0], desc: r[6] || meta[k].desc, lower: r[2] === 'lower' }); });
   const years = (raw.years && raw.years.length ? raw.years.slice() : Array.from(new Set((raw.rows || []).map(r => r[idx.season])))).filter(v => FX().isNum(v)).map(Number).sort((a, b) => b - a);
-  return { idx: idx, meta: meta, metrics: (raw.metrics || []).filter(m => idx[m.key] !== undefined), rows: raw.rows || [], years: years };
+  return { idx: idx, meta: meta, metrics: (raw.metrics || []).filter(m => idx[m.key] !== undefined).map(m => meta[m.key] || m), rows: raw.rows || [], years: years };
 }
 function resolve(pats) {
   const ms = LAB.metrics;
@@ -83,7 +86,7 @@ function pool() { return LAB.rows.filter(r => inWindow(r) && (raw(r, 'min') || 0
 function metricOptions(sel, scope) {
   const fx = FX();
   let h = scope === 'color' ? '<option value="team">Team</option><option value="pool">Position pool</option><option value="season">Season</option><option value="">One colour</option>' : '';
-  fx.groups(LAB.metrics).forEach(g => { h += '<optgroup label="' + fx.esc(g.name) + '">' + g.items.map(m => '<option value="' + fx.esc(m.key) + '"' + (m.key === sel ? ' selected' : '') + '>' + fx.esc(m.label) + (m.lower ? ' ↓' : '') + (m.scope === 'pbp' ? ' ·pbp' : '') + '</option>').join('') + '</optgroup>'; });
+  (HW.ours ? HW.ours.groups(LAB.metrics) : fx.groups(LAB.metrics)).forEach(g => { h += '<optgroup label="' + fx.esc(g.name) + '">' + g.items.map(m => '<option value="' + fx.esc(m.key) + '"' + (m.key === sel ? ' selected' : '') + '>' + fx.esc(m.label) + (m.lower ? ' ↓' : '') + (m.scope === 'pbp' ? ' ·pbp' : '') + '</option>').join('') + '</optgroup>'; });
   if (!scope) h += '<optgroup label="Sample"><option value="min"' + (sel === 'min' ? ' selected' : '') + '>Minutes</option><option value="gp"' + (sel === 'gp' ? ' selected' : '') + '>Games</option></optgroup>';
   return h;
 }
@@ -185,10 +188,12 @@ function draw() {
     'Labelled: the eight players furthest into that corner and the four furthest from it (sum of standard scores on both axes)' + (hits.length ? ', and your search' : '') + '. Marker size is minutes. Click a dot to open the player in that season.' +
     (S.shrink ? ' Rates marked "shrunk" are pulled towards the median of the player\'s position pool (guards, forwards, centres, on screen) by ' + SHRINK_K + ' minutes of prior, (minutes × rate + ' + SHRINK_K + ' × median) / (minutes + ' + SHRINK_K + '), so a player with 200 minutes is not ranked on 200 minutes alone; hover shows the raw figures. Counts (games, minutes) are never shrunk.' : '') +
     (mX.desc ? '<br><strong>' + fx.esc(mX.label) + '</strong>: ' + fx.esc(mX.desc) : '') + (mY.desc ? '<br><strong>' + fx.esc(mY.label) + '</strong>: ' + fx.esc(mY.desc) : ''));
+  set('lab-ours', HW.ours ? HW.ours.explain([S.x, S.y], { label: k => (LAB.meta[k] || {}).label || k }) : '');
+  const oth = k => (HW.ours && HW.ours.of(k) ? 'qk-ours-th' : '');
   const host = document.getElementById('lab-table');
   host.innerHTML = HW.tableHTML([
     { label: '#', sortable: false }, { label: 'Player' }, { label: 'Team' }, { label: 'Season', align: 'right' }, { label: 'Pool' }, { label: 'Min', align: 'right' },
-    { label: label(S.x), align: 'right' }, { label: 'Pct', align: 'right' }, { label: label(S.y), align: 'right' }, { label: 'Pct', align: 'right' }, { label: 'Combined', align: 'right', title: 'Sum of standard scores in the better direction' }
+    { label: label(S.x), align: 'right', cls: oth(S.x) }, { label: 'Pct', align: 'right' }, { label: label(S.y), align: 'right', cls: oth(S.y) }, { label: 'Pct', align: 'right' }, { label: 'Combined', align: 'right', title: 'Sum of standard scores in the better direction' }
   ], ranked.slice(0, 300).map((o, i) => {
     const r = o.r, vx = val(r, S.x), vy = val(r, S.y);
     return { _href: fx.playerHref(L, raw(r, 'id'), raw(r, 'season')), cells: [
@@ -215,11 +220,12 @@ function renderLab(el, params, state) {
     '<label>Min minutes <span id="lab-min-v"></span><input id="lab-min" type="range" min="0" max="2000" step="25"></label>' +
     '<label class="inline"><input id="lab-shrink" type="checkbox"> shrink small samples</label>' +
     '<label>Highlight<input id="lab-q" class="pg-search" type="search" placeholder="player or team…"></label>' +
-    '</div><div id="lab-chart" class="hf-lab-chart"></div><div class="pg-note" id="lab-note"></div></div>' +
+    '</div><div id="lab-ours" class="hw-lab-ours"></div><div id="lab-chart" class="hf-lab-chart"></div><div class="pg-note" id="lab-note"></div></div>' +
     '<div class="card"><div class="card-header">Ranked <span class="card-sub">The group by the combined standard score on both axes (top 300). Click a row for the player.</span></div><div id="lab-table"></div></div>';
   return fx.ready().then(() => {
     const Sx = fx.S(params, state, L);
-    return fx.first([L + '/lab.json', fx.path(L, Sx, 'lab.json')]).then(rawLab => {
+    return Promise.all([fx.first([L + '/lab.json', fx.path(L, Sx, 'lab.json')]), HW.ours ? HW.ours.load() : null]).then(both => {
+      const rawLab = both[0];
       if (!fx.alive(el)) return;
       if (!rawLab || rawLab.ok === false || !(rawLab.rows || []).length) { document.getElementById('lab-chart').innerHTML = fx.notBuilt('The lab file', rawLab); document.getElementById('lab-sub').textContent = ''; return; }
       if (LABL !== L) { S.win = null; S.x = ''; S.y = ''; S.preset = 0; }

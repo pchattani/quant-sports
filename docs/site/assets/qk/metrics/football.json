@@ -3995,5 +3995,38 @@
       "status": "needed",
       "note": "optional secondary: metres of progression per 90; reliable (split-half 0.66-0.75) but adds little over existing progression metrics."
     }
-  ]
+  ],
+  "our_models": {
+    "models": {
+      "value": {
+        "name": "Player value model",
+        "about": "Goals above a replacement-level player in the same role (GAR), from the box score and match rating, fitted on the site's own match data."
+      },
+      "valuation": {
+        "name": "Valuation model",
+        "about": "A fair transfer value from the player's value added, age, contract and role."
+      },
+      "team": {
+        "name": "Team rating model",
+        "about": "The pooled Dixon-Coles fit across competitions: attack and defence ratings on one scale, with the line-up term."
+      }
+    },
+    "metrics": {
+      "gar90": "value",
+      "gar": "value",
+      "par": "value",
+      "pct": "value",
+      "proj": "value",
+      "fvi": "valuation",
+      "v2": "valuation",
+      "lineup_value": "team",
+      "lineup": "team",
+      "strength": "team",
+      "rating_model": "team",
+      "att": "team",
+      "def": "team",
+      "attack": "team",
+      "defence": "team"
+    }
+  }
 }

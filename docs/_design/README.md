@@ -25,6 +25,7 @@ or `?theme=dark` to force a theme). Every component on that page is the real kit
 | `quant.js` | `window.QK`: shell (top bar, sport switcher, section nav, search, footer), theme, tables, tabs, chips, match cards, ticker, team marks, colour/contrast, sparklines, formatting, fetch |
 | `quant-charts.js` | `window.QKC`: the chart kit on Apache ECharts 5.5.1 |
 | `plotly-ec.js` | optional: `window.Plotly` (newPlot, react, purge, relayout, `plotly_click`) drawn by ECharts on the tokens, for views still written against Plotly. Load it after `quant-charts.js`, or inject it on first use (Hardwood, Rink); no site loads the Plotly CDN any more |
+| `league.js` | `window.QKL`: the league pages' module for the US sports (Rink, Hardwood, Gridiron, Bullpen): how the race is shaping up (chances over time from the race log, movers with reasons, magic numbers, schedule left, the games that matter), the team card (chips and percentile meters, expandable under a standings row) and the shape of the league (offence v defence, record v the numbers, tiers), drawn from `season.json["league"]` (`oddsmarkets/common/league.py`). Load it after `quant-charts.js` |
 | `index.html`, `guide.js` | The v1 style guide (not copied into sites) |
 | `showcase.html`, `showcase.js` | The v2 showcase (not copied into sites) |
 | `STYLE_GUIDE.md`, `MIGRATION_V2.md` | The v2 spec and the migration guide |
@@ -36,7 +37,7 @@ Each site's build copies the kit files (`KIT_FILES` in `scripts/design_kit.py`) 
 
 ```python
 from design_kit import copy_kit          # scripts/design_kit.py
-copy_kit(DOCS / "rink")                  # -> docs/rink/assets/qk/{tokens.css, quant.css, quant.js, quant-charts.js, plotly-ec.js}
+copy_kit(DOCS / "rink")                  # -> docs/rink/assets/qk/{tokens.css, quant.css, quant.js, quant-charts.js, plotly-ec.js, league.js}
 ```
 
 `scripts/build_home.py` already does this for `docs/home/`. Never edit the copies; edit `docs/_design/` and rebuild.

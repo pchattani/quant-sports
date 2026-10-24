@@ -183,6 +183,10 @@ function renderTeam(el, params, state) {
       (stages.length ? U.card2('Season simulation', 'Our chance of reaching each stage' + (k.isNum(r.magic) ? ' · magic number ' + k.esc(r.magic) : ''), QK.chances(stages.map(x => ({ label: x[1], p: od[x[0]], color: (BP.teamInfo(tid) || {}).colour })), { sort: false, max: 1, key: false })) : '') +
       QK.pctCard({ title: 'Team profile', peer: 'MLB clubs', sample: k.isNum(v.g) ? v.g + ' games' : '', groups: tGroups, foot: '<span>Percentiles among the ' + Object.keys(T).length + ' clubs; 100 = best</span><a href="' + k.compareHref('t' + tid, '') + '?view=classic">Every metric →</a>' }) +
       '</div></div><div class="qk-span-7">' + U.card2('Roster value', 'Bullpen WAR this season for everyone who played for the club (latest team), with the 40-man roster and injured list where recorded', '' + BP.ui.chart('tm-war', 330, 'Roster WAR') + '<div id="tm-roster" style="margin-top:12px"></div>') + '</div></div>';
+    /* strengths, weaknesses and the race (docs/_design/league.js: the chips, the race facts and our chances over the season;
+       the percentile card above already carries the meters) */
+    const lo = BP.leagueOpts && k.ok(res[1]) ? BP.leagueOpts(res[1], L, S) : null;
+    if (lo && ((lo.league.teams || {})[tid] || (lo.league.race || {})[tid])) h += '<div id="tm-league"></div>';
     h += '<div id="tm-mv"></div><div id="tm-value"></div>';
     h += '<div id="tm-moves"></div>';
     h += '<div class="qk-grid" style="margin-top:var(--sp-4)"><div class="qk-span-6">' + U.card2('Regular lineup', 'The nine with the most plate appearances, by xwOBA+ (our expected wOBA); our game forecast uses the posted lineup', '<div id="tm-lineup"></div>') + '</div>' +
@@ -193,6 +197,7 @@ function renderTeam(el, params, state) {
     h += '<div class="card"><div class="card-header">Home park <span class="card-sub">Our park factors (100 = neutral) by batter hand and batted-ball type.</span></div><div id="tm-park"></div></div>';
     h += U.card2('Schedule and results', 'Every game with our pre-game win chance; the line is wins minus the wins we expected', U.chart('tm-logc', 260, 'Wins minus expected wins') + '<div id="tm-log"></div>');
     el.innerHTML = h;
+    if (document.getElementById('tm-league')) QKL.team(document.getElementById('tm-league'), Object.assign({}, lo, { meters: false }), tid);
     roster(L, S, t, tid, meta);
     lineupLite(L, S, t);
     bullpen(L, S, t, tid, null);

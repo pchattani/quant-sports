@@ -116,7 +116,7 @@ function renderList(el, params, state) {
     let t = null;
     $('um-q').oninput = e => { q = k.fold(e.target.value.trim()); clearTimeout(t); t = setTimeout(draw, 150); };
     draw();
-    absPanel(d.abs || d.abs_challenges);
+    absPanel(d.abs || d.abs_challenges, L);
     BP.setMeta(k.isNum(lg.accuracy) ? 'League accuracy ' + k.pct(lg.accuracy, 1) : '');
   });
 }
@@ -133,27 +133,43 @@ function scatter(list, pr, cols) {
     xName: 'Accuracy above expected (points)', yName: 'Consistency (%)', xFmt: v => k.signed(v, 1), yFmt: v => k.num(v, 0), refX: 0, labelTop: 6, quadrants: ['Consistent, misses more', 'Accurate and consistent', '', 'Accurate, own zone moves'], label: 'Umpire accuracy and consistency' });
 }
 
-function absPanel(a) {
+function absPanel(a, Lv) {
   const k = K();
   const host = document.getElementById('um-abs');
   if (!host) return;
   if (!a || a.ok === false || !Object.keys(a).length) { host.innerHTML = k.muted('No ABS challenge data for this season (the challenge system is in use from 2026)' + (a && a.reason ? ': ' + k.esc(a.reason) : '') + '.'); return; }
   if (a.challengers || a.by_batting_team || a.teams) {
+    const L2 = Lv || (BP.state || {}).level || 'mlb';
+    const num = (r, keys) => { const v = k.val(r, keys); return k.isNum(v) ? v : null; };
+    const runs = r => num(r, ['runs', 'value']);
+    const tm = k.colRows(a.by_batting_team || a.teams);
     const tiles = [];
     if (k.isNum(a.n) || k.isNum(a.used)) tiles.push(k.tile('Challenges', k.int(k.isNum(a.n) ? a.n : a.used), a.source === 'store' ? 'from the game records' : 'plate-appearance-ending calls'));
-    if (k.isNum(a.overturn_rate)) tiles.push(k.tile('Overturned', k.pct(a.overturn_rate, 1), k.isNum(a.won) ? k.int(a.won) + ' calls' : ''));
-    if (k.isNum(a.mean_value_overturned)) tiles.push(k.tile('Value of an overturn', k.signed(a.mean_value_overturned, 3) + ' <span class="kpi-dim">runs</span>', 'mean run-expectancy swing'));
+    const wonAll = k.isNum(a.won) ? a.won : (tm.length && tm.every(r => k.isNum(r.won)) ? tm.reduce((s, r) => s + r.won, 0) : null);
+    if (k.isNum(a.overturn_rate)) tiles.push(k.tile('Overturned', k.pct(a.overturn_rate, 1), k.isNum(wonAll) ? k.int(wonAll) + ' calls' : ''));
+    const vo = k.isNum(a.value_per_overturn) ? a.value_per_overturn : a.mean_value_overturned;
+    if (k.isNum(vo)) tiles.push(k.tile('Value of an overturn', k.signed(vo, 2) + ' <span class="kpi-dim">runs</span>', 'run expectancy gained by the challenging side'));
     let h2 = tiles.length ? '<div class="kpi-grid gq-tiles gq-tiles-3">' + tiles.join('') + '</div>' : '';
+    const ROLE = { batter: 'Batters', catcher: 'Catchers', pitcher: 'Pitchers' };
+    const br = a.by_role && typeof a.by_role === 'object' ? Object.keys(a.by_role).filter(r => ROLE[r]) : [];
+    if (br.length) h2 += '<div class="gq-sub-head">Who challenges</div>' + k.table([{ label: 'Challenger' }, { label: 'Challenges', align: 'right' }, { label: 'Overturned', align: 'right' }, { label: 'Runs', align: 'right', title: 'Run expectancy gained from overturned calls' }],
+      br.map(r => { const x = a.by_role[r] || {}; return [{ v: ROLE[r] }, { v: x.n, html: k.int(x.n) }, { v: x.overturn_rate, html: k.pct(x.overturn_rate, 0) }, { v: x.runs, html: k.isNum(x.runs) ? k.num(x.runs, 1) : '—' }]; }), { compact: true });
     const ch = k.colRows(a.challengers);
     if (ch.length) {
       const best = ch.filter(r => (r.n || 0) >= 3);
-      h2 += '<div class="gq-sub-head">Challengers (3+ challenges)</div>' + k.table([{ label: 'Challenger' }, { label: 'Challenges', align: 'right' }, { label: 'Won', align: 'right' }, { label: 'Rate', align: 'right' }, { label: 'Runs', align: 'right' }],
-        best.slice(0, 15).map(r => [{ v: r.challenger, html: k.esc(r.challenger || r.name || '—') }, { v: r.n, html: k.int(r.n) }, { v: r.won, html: k.int(r.won) }, { v: r.rate, html: k.pct(r.rate, 0) }, { v: r.value, html: k.isNum(r.value) ? k.signed(r.value, 2) : '—' }]), { compact: true });
+      h2 += '<div class="gq-sub-head">Challengers (3+ challenges)</div>' + k.table([{ label: 'Player' }, { label: 'Challenges', align: 'right' }, { label: 'Won', align: 'right', cls: 'hide-sm' }, { label: 'Rate', align: 'right' }, { label: 'Runs', align: 'right', title: 'Run expectancy gained from overturned calls' }],
+        best.slice(0, 15).map(r => { const pid = r.challenger === null || r.challenger === undefined ? '' : String(r.challenger); const nm = r.name || (pid ? k.name(pid) : '');
+          return [{ v: nm, html: (pid && /^\d+$/.test(pid) ? k.playerLink(L2, pid, nm, null, r.role === 'pitcher' ? 'pitcher' : null) : k.esc(nm || pid || '—')) + (r.role ? '<span class="pl-pos hide-sm">' + k.esc(r.role) + '</span>' : '') },
+            { v: r.n, html: k.int(r.n) }, { v: r.won, html: k.int(r.won), cls: 'hide-sm' }, { v: r.rate, html: k.pct(r.rate, 0) }, { v: runs(r), html: k.isNum(runs(r)) ? k.signed(runs(r), 2) : '—' }]; }), { compact: true });
     }
-    const tm = k.colRows(a.by_batting_team || a.teams);
-    if (tm.length) h2 += '<div class="gq-sub-head">By team</div>' + k.table([{ label: 'Team' }, { label: 'Challenges', align: 'right' }, { label: 'Overturned', align: 'right' }],
-      tm.map(r => { const t = r.bat_team || r.team; const n = k.isNum(r.size) ? r.size : r.used; const rate = k.isNum(r.mean) ? r.mean : r.rate;
-        return [{ v: t, html: k.TEAMS[String(t)] ? k.teamChip((BP.state || {}).level || 'mlb', t) : k.esc(t) }, { v: n, html: k.int(n) }, { v: rate, html: k.pct(rate, 0) }]; }), { compact: true });
+    const um = k.colRows(a.umpires).filter(r => (r.n || 0) >= 10).sort((x, y) => (y.rate || 0) - (x.rate || 0));
+    if (um.length) h2 += '<div class="gq-sub-head">Umpires most overturned (10+ challenges)</div>' + k.table([{ label: 'Umpire' }, { label: 'Challenges', align: 'right' }, { label: 'Overturned', align: 'right' }, { label: 'Rate', align: 'right' }],
+      um.slice(0, 8).map(r => { const id = String(r.ump); const nm = r.name || k.umpName(id);
+        return [{ v: nm, html: '<a class="ump-link" href="' + k.umpHref(id) + '">' + k.esc(nm) + '</a>' }, { v: r.n, html: k.int(r.n) }, { v: r.overturned, html: k.int(r.overturned) }, { v: r.rate, html: k.pct(r.rate, 0) }]; }), { compact: true });
+    if (tm.length) h2 += '<div class="gq-sub-head">By team</div>' + k.table([{ label: 'Team' }, { label: 'Challenges', align: 'right' }, { label: 'Overturned', align: 'right' }, { label: 'Runs', align: 'right', title: 'Run expectancy gained from overturned calls' }],
+      tm.map(r => { const t = r.bat_team || r.team; const tid = r.tid || (k.TEAMS[String(t)] ? t : null);
+        const n = k.isNum(r.n) ? r.n : (k.isNum(r.size) ? r.size : r.used); const rate = k.isNum(r.rate) ? r.rate : r.mean;
+        return [{ v: t, html: tid ? k.teamChip(L2, tid) : k.esc(t) }, { v: n, html: k.int(n) }, { v: rate, html: k.pct(rate, 0) }, { v: runs(r), html: k.isNum(runs(r)) ? k.num(runs(r), 1) : '—' }]; }), { compact: true });
     host.innerHTML = h2 || k.muted('No ABS tables yet.');
     k.sortable(host);
     return;
@@ -165,7 +181,7 @@ function absPanel(a) {
     if (k.isNum(v)) tiles.push(k.tile(x[1], k.fmtV(v, x[2]) + (x[0] === 'value' ? ' <span class="kpi-dim">runs</span>' : ''), ''));
   });
   let h = tiles.length ? '<div class="kpi-grid gq-tiles gq-tiles-3">' + tiles.join('') + '</div>' : '';
-  const L = (BP.state && BP.state.level) || 'mlb';
+  const L = Lv || (BP.state && BP.state.level) || 'mlb';
   const lst = (x, title) => {
     const rows = (Array.isArray(x) ? x : Object.keys(x || {}).map(id => Object.assign({ pid: id }, x[id]))).map(r => (Array.isArray(r) ? { pid: String(r[0]), n: r[1], won: r[2], value: r[3] } : r));
     if (!rows.length) return '';
@@ -184,13 +200,20 @@ function absPanel(a) {
 function renderOne(el, params, state) {
   const k = K();
   const U = BP.ui;
-  const L = k.L(params, state);
+  let L = k.L(params, state);
   const id = String(params.id || (params.rest || [])[0] || '');
   el.innerHTML = QK.skeleton('card', 2);
+  const has = d => umpsOf(d).some(r => r.id === id);
   return k.ready().then(() => {
     const S = k.S(params, state);
-    return k.loadY(L, S, 'umpires.json').then(d => ({ S: S, d: d }));
+    // the umpire route is global: an umpire of the other level (an MLB link while Triple-A is selected) loads that level
+    return k.loadY(L, S, 'umpires.json').then(d => {
+      if (has(d) || (L !== 'mlb' && L !== 'aaa')) return { S: S, d: d, L: L };
+      const L2 = L === 'aaa' ? 'mlb' : 'aaa';
+      return k.loadY(L2, S, 'umpires.json').then(d2 => (has(d2) ? { S: S, d: d2, L: L2 } : { S: S, d: d, L: L }), () => ({ S: S, d: d, L: L }));
+    });
   }).then(o => {
+    L = o.L;
     if (!k.alive(el)) return;
     const S = o.S, rows = umpsOf(o.d);
     const u = rows.find(r => r.id === id);
@@ -205,8 +228,10 @@ function renderOne(el, params, state) {
     /* style, not quality: the accuracy his pitches made likely, and the size and lean of his zone get no percentile */
     const STYLE = /x_accuracy|exp_accuracy|zone_size|zone_effect|strikes_ae|zone_100/;
     const pq = c => (STYLE.test(c[0]) ? null : pr[c[0]](v(c), u));
+    const absU = k.colRows(((o.d || {}).abs || {}).umpires).filter(r => String(r.ump) === id)[0];
     const hero = QK.playerHeader({ name: name, pos: 'Home-plate umpire', kicker: k.LN(L) + ' ' + S,
-      meta: [k.isNum(games) ? ['Games behind the plate', k.int(games)] : null, k.isNum(k.val(u, ['called', 'n_called'])) ? ['Called pitches', k.int(k.val(u, ['called', 'n_called']))] : null],
+      meta: [k.isNum(games) ? ['Games behind the plate', k.int(games)] : null, k.isNum(k.val(u, ['called', 'n_called'])) ? ['Called pitches', k.int(k.val(u, ['called', 'n_called']))] : null,
+        absU && k.isNum(absU.n) ? ['ABS challenges', k.int(absU.overturned) + ' of ' + k.int(absU.n) + ' overturned'] : null],
       stats: metricCols.slice(0, 3).map(c => ({ label: c[1], value: fmtC(c, v(c)) })) });
     const tiles = metricCols.slice(0, 5).map((c, i) => ({ label: c[1], value: fmtC(c, v(c)), pctl: pq(c), signal: i === 0, tip: c[4] }));
     const pcard = QK.pctCard({ title: 'Against the other umpires', peer: 'MLB home-plate umpires', sample: (k.isNum(games) ? games + ' games · ' : '') + '100 = best',

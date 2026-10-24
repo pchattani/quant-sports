@@ -4,13 +4,20 @@
  * were built for, colour by team, position, conference or any metric, medians, the corners labelled, a
  * search highlight and the group ranked below. Rates can be shrunk towards the median by their
  * stabilisation point: shrunk = (n·x + k·median)/(n + k), k = 3/7 of the sample at which split-half
- * reliability reaches 0.7. Reads <S>/lab.json (players.json and teams.json as the fallback). */
+ * reliability reaches 0.7. Reads <S>/lab.json (players.json and teams.json as the fallback) and <S>/value.json (Gridiron
+ * Value per game and in total, joined by player id). Round 5: the pickers list our model metrics first ("Our models",
+ * then the spec's headline box-score metrics, then the payload's groups), and our metrics carry the cobalt tag on the
+ * axes line and in the ranked table's heads, with a cobalt strip naming the model. */
 (function (GI) {
 'use strict';
 
 const QK = window.QK;
 const esc = GI.esc, isNum = GI.isNum;
 const PRESETS = [
+  /* our models lead each group: the QB composite, Gridiron Value per game, kicking over expected, the team ratings */
+  ['QB', 'epa_db', 'composite', 'EPA per dropback against the QB composite'], ['RB', 'ryoe', 'gvar_pg', 'RYOE against value per game'], ['WR', 'target_share', 'gvar_pg', 'Volume against value per game'],
+  ['TE', 'target_share', 'gvar_pg', 'Volume against value per game'], ['DEF', 'pressures_pg', 'gvar_pg', 'Sacks and hits per game against value per game'],
+  ['TEAM', 'off_rating', 'def_rating', 'Our team ratings: offence against defence'],
   ['QB', 'cpoe', 'adot', 'CPOE against aDOT: accuracy against depth'], ['QB', 'epa_clean', 'epa_pressure', 'Clean pocket against under pressure'], ['QB', 'ttt', 'sack_rate', 'Time to throw against sack rate'],
   ['QB', 'epa_db', 'composite', 'EPA per dropback against the QB composite'], ['QB', 'pa_rate', 'epa_pa', 'Play-action rate against EPA on play action'],
   ['RB', 'ryoe', 'rush_success', 'RYOE against success rate'], ['RB', 'box8', 'ryoe', 'Eight-man boxes against RYOE'], ['RB', 'explosive', 'stuff_rate', 'Explosive runs against stuffed runs'],
@@ -24,8 +31,18 @@ let LAB = null, LABK = '';
 const S0 = { kind: 'QB', min: null, shrink: true, preset: 0, x: '', y: '', color: 'team', q: '', qual: true };
 const MU = {};
 
-function prep(raw) {
+/* Gridiron Value per game and in total (value.json, joined by player id) so the lab can plot our value model too. */
+function withValue(G0, vr) {
+  const ip = G0.cols.indexOf('pid');
+  if (ip < 0 || !Object.keys(vr).length || G0.cols.indexOf('gvar_pg') >= 0) return G0;
+  return { cols: G0.cols.concat(['gvar_pg', 'gvar']), rows: G0.rows.map(r => { const v = vr[String(r[ip])]; return r.concat([v && isNum(v.gvar_pg) ? v.gvar_pg : null, v && isNum(v.gvar) ? v.gvar : null]); }) };
+}
+const VMETRICS = () => [{ key: 'gvar_pg', label: GI.SP.specLabel('gvar_pg', 'Value per game'), group: 'Value', fmt: 'signed2', lower: false, desc: 'Points above a replacement-level player at the position, per game (Gridiron Value, value.json).' },
+  { key: 'gvar', label: 'Value above replacement', group: 'Value', fmt: 'signed1', lower: false, desc: 'Points above a replacement-level player at the position over the season so far (Gridiron Value).' }];
+function prep(raw, vraw) {
   const kinds = {};
+  const vr = {};
+  if (GI.ok(vraw) && vraw.rows) GI.colRows(vraw).forEach(r => { if (r && r.pid) vr[String(r.pid)] = r; });
   const mk = (g, cols, rows, metrics) => {
     const idx = {};
     cols.forEach((c, i) => { idx[c] = i; });
@@ -35,7 +52,9 @@ function prep(raw) {
   };
   if (GI.ok(raw) && raw.groups) {
     GI.cleanMetrics(raw.metrics); GI.cleanMetrics(raw.team_metrics);
-    Object.keys(raw.groups).forEach(g => { const G = raw.groups[g] || {}; if (Array.isArray(G.cols) && (G.rows || []).length) mk(g, G.cols, G.rows, GI.metricsFor(raw, g).length ? GI.metricsFor(raw, g) : (raw.metrics || [])); });
+    Object.keys(raw.groups).forEach(g => { const G0 = raw.groups[g] || {}; if (!Array.isArray(G0.cols) || !(G0.rows || []).length) return;
+      const G = withValue(G0, vr), ms0 = GI.metricsFor(raw, g).length ? GI.metricsFor(raw, g) : (raw.metrics || []);
+      mk(g, G.cols, G.rows, G.cols.length > G0.cols.length ? ms0.concat(VMETRICS()) : ms0); });
     if (raw.teams && Array.isArray(raw.teams.cols) && (raw.teams.rows || []).length) mk('TEAM', raw.teams.cols, raw.teams.rows, raw.team_metrics || []);
   }
   return kinds;
@@ -67,7 +86,7 @@ function zs(a) { const n = a.length; if (!n) return { m: 0, s: 1 }; const m = a.
 function pctRank(sorted, v) { let lo = 0, hi = sorted.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (sorted[mid] < v) lo = mid + 1; else hi = mid; } let up = lo; while (up < sorted.length && sorted[up] === v) up++; return sorted.length ? 100 * ((lo + up) / 2) / sorted.length : null; }
 function metricOpts(sel, colour) {
   return (colour ? '<option value="team">Team</option>' + (S0.kind !== 'TEAM' ? '<option value="pos">Position</option>' : '<option value="conf">Conference</option>') + '<option value="">One colour</option>' : '') +
-    GI.metricGroups(G().metrics).map(g => '<optgroup label="' + esc(g.name) + '">' + g.items.map(m => '<option value="' + esc(m.key) + '"' + (m.key === sel ? ' selected' : '') + '>' + esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>').join('');
+    GI.SP.orderOpts(G().metrics.map(m => ({ key: m.key, label: m.label, lower: m.lower, group: m.group })), sel, GI.SP.headIds(S0.kind));
 }
 
 function draw(S) {
@@ -78,6 +97,7 @@ function draw(S) {
   const rows = base0.filter(r => val(r, S0.x) !== null && val(r, S0.y) !== null);
   const noun = team ? 'teams' : (GI.GROUP_NAME[S0.kind] || 'players').toLowerCase();
   GI.set('lab-sub', rows.length + ' ' + noun + ' · ' + S + (team ? '' : ' · ' + S0.min + '+ ' + G().nLabel.toLowerCase() + (S0.qual ? ' · qualified' : '')));
+  GI.set('lab-ours', GI.SP.ours(S0.x) || GI.SP.ours(S0.y) ? '<p class="gi-lab-axes">' + [['X', S0.x], ['Y', S0.y]].map(a => a[0] + ': <b>' + esc(meta(a[1]).label || a[1]) + '</b>' + GI.SP.oursTag(a[1])).join(' &nbsp;·&nbsp; ') + '</p>' + GI.SP.oursNote([[S0.x, meta(S0.x).label, team ? 'team' : 'player'], [S0.y, meta(S0.y).label, team ? 'team' : 'player']]) : '');
   if (rows.length < 3) { GI.ch.none('lab-chart', 'Too few for this view: lower the floor, untick qualified only, or pick metrics these players have (FTN charting starts in 2022, NGS in 2016).'); GI.set('lab-table', ''); GI.set('lab-note', ''); GI.set('lab-kpis', ''); return; }
   const xs = rows.map(r => val(r, S0.x)), ys = rows.map(r => val(r, S0.y));
   const mx = GI.median(xs), my = GI.median(ys), sx = zs(xs), sy = zs(ys);
@@ -138,15 +158,17 @@ function draw(S) {
       .concat(team ? [] : [{ key: 'n', label: G().nLabel, num: true }])
       .concat([{ key: 'px', label: label(S0.x), type: 'pctl', pctl: 'px', fmt: (v, r) => fmt(S0.x, r.vx), tip: 'Cell colour: percentile on screen (100 = best)' }, { key: 'py', label: label(S0.y), type: 'pctl', pctl: 'py', fmt: (v, r) => fmt(S0.y, r.vy), tip: 'Cell colour: percentile on screen (100 = best)' },
         { key: 'z', label: 'Combined', type: 'bar', fmt: v => '<b>' + GI.num(v, 2) + '</b>', tip: 'Sum of standard scores in the better direction' }]) });
+  GI.SP.tagHeads(document.getElementById('lab-table'), { px: S0.x, py: S0.y });
   GI.setHashQuiet(GI.ghref('lab', S, { g: S0.kind, x: S0.x, y: S0.y }));
 }
 
 GI.route('lab', function (el, params) {
   const S = Number(params.season);
-  return GI.load(GI.ypath('lab.json', S)).then(rawD => {
+  return Promise.all([GI.load(GI.ypath('lab.json', S)), GI.load(GI.ypath('value.json', S)).catch(() => null), GI.SP.specReady()]).then(all => {
+    const rawD = all[0];
     if (!el.isConnected) return;
     const head = GI.pageHead('Lab · ' + S, 'Scatter lab', 'Any two metrics for a position group or the teams. Presets ask the questions the models were built for.') + GI.sectionNav('lab', 'lab') + QK.note('<b>How to read it:</b> each dot is a player or a team, placed on any two metrics. Up and right is not always better: a metric marked ↓ is better when lower, and tendencies are neither good nor bad.');
-    if (LABK !== String(S)) { LAB = prep(rawD); LABK = String(S); S0.min = null; S0.x = ''; S0.y = ''; S0.preset = 0; }
+    if (LABK !== String(S)) { LAB = prep(rawD, all[1]); LABK = String(S); S0.min = null; S0.x = ''; S0.y = ''; S0.preset = 0; }
     if (!Object.keys(LAB).length) { el.innerHTML = head + GI.notBuilt('The ' + S + ' lab file', rawD); return; }
     const qy = params.query || {};
     if (qy.g && LAB[String(qy.g).toUpperCase()]) S0.kind = String(qy.g).toUpperCase();
@@ -156,7 +178,7 @@ GI.route('lab', function (el, params) {
         GI.field('X axis', '<select id="lab-x" class="qk-select"></select>') + GI.field('Y axis', '<select id="lab-y" class="qk-select"></select>') + '<button type="button" class="qk-btn" id="lab-swap" aria-label="Swap the axes">⇄ Swap</button>' +
         GI.field('Colour', '<select id="lab-color" class="qk-select"></select>') + '<label class="gi-field" id="lab-min-w"><span>Min <span id="lab-min-u"></span> <b id="lab-min-v"></b></span><input id="lab-min" type="range" min="0" max="700" step="1"></label>' +
         '<label class="gi-check" id="lab-qual-w"><input id="lab-qual" type="checkbox"> qualified only</label><label class="gi-check" id="lab-shrink-w"><input id="lab-shrink" type="checkbox"> shrink by stabilisation</label>' +
-        GI.field('Highlight', '<input id="lab-q" class="qk-input" type="search" placeholder="Player or team">') + '</div>' + GI.chartBox('lab-chart', 520, 'Scatter') + '<p class="gi-cap" id="lab-note"></p>') +
+        GI.field('Highlight', '<input id="lab-q" class="qk-input" type="search" placeholder="Player or team">') + '</div>' + '<div id="lab-ours"></div>' + GI.chartBox('lab-chart', 520, 'Scatter') + '<p class="gi-cap" id="lab-note"></p>') +
       GI.card('Ranked', 'By the combined standard score on both axes (top 300); cells coloured by percentile on screen', '<div id="lab-table"></div>', { flush: true });
     const $ = id => document.getElementById(id);
     const applyPreset = () => { const P = presetList(); if (S0.preset < 0 || !P.length) return; const p = P[S0.preset] || P[0]; S0.x = p.x; S0.y = p.y; };

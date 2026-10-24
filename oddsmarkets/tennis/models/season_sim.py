@@ -86,6 +86,15 @@ SIMPLIFICATIONS = [
     "whole weeks by which this season's calendar has been running late or early)",
 ]
 N_SEEDS = {128: 32, 96: 32, 64: 16, 56: 16, 48: 16, 32: 8, 28: 8, 16: 4}
+# The race page's "what is at stake" and clinch lines (race_extras): events starting within NEAR_DAYS of the
+# simulation date (and every event in progress) keep their per-simulation points; a chance is conditioned on a
+# player's result there only for players whose chance is inside STAKES_BAND, and only on outcomes with at least
+# STAKES_MIN_N simulations behind them.
+NEAR_DAYS = 10
+STAKES_BAND = (0.005, 0.995)
+STAKES_MIN_N = 40
+STAKES_KEEP = 16
+BOUNDS_TOP = 40
 
 
 def _sig(x):
@@ -235,6 +244,37 @@ def simulate_season(state: dict, n: int = N_SIMS, seed: int = 0) -> dict:
     events = sorted(state.get("events") or [], key=lambda e: (str(e.get("start")), -LEVEL_PRIORITY.get(str(e.get("level")), 0)))
     ev_log = []
     mats: dict = {}
+    as_of_d = _io.day(state.get("as_of"))
+    near_until = (as_of_d + timedelta(days=NEAR_DAYS)) if as_of_d else None
+    tracked: list = []           # near-term and in-progress events: per-simulation points and who was in the draw
+    ip_lo = np.zeros(P)          # points already certain from events in progress
+    ip_hi = np.zeros(P)          # the most each player can still reach in them
+    ip_w = [0.0]                 # sum of the winners' points of the events in progress (the outsider bound)
+    week_w: dict = {}            # future events: the biggest winner's points in each week (one event a week)
+
+    def winner_pts(tab):
+        try:
+            return float(tab.get("W") or max(float(v) for v in tab.values()))
+        except (TypeError, ValueError):
+            return 0.0
+
+    def track(ev, ev_pts, entered, in_progress, tab):
+        if in_progress:
+            w = winner_pts(tab)
+            ip_w[0] += w
+            lo, hi = ev_pts.min(0), ev_pts.max(0)
+            ip_lo[:] += lo
+            ip_hi[:] += np.where(hi > lo, np.maximum(hi, w), hi)
+        else:
+            try:
+                wk = _week(_io.day(ev.get("start")))
+            except Exception:  # noqa: BLE001
+                wk = ("?", ev.get("id"))
+            week_w[wk] = max(week_w.get(wk, 0.0), winner_pts(tab))
+        d0 = _io.day(ev.get("start"))
+        if in_progress or (near_until is not None and d0 is not None and d0 <= near_until):
+            tracked.append({"id": ev.get("id"), "start": ev.get("start"), "level": ev.get("level"), "in_progress": in_progress,
+                            "pts": ev_pts.astype(np.float32), "entered": entered})
 
     def L_for(surface, bo):
         key = (surface or "hard", 5 if int(bo or 3) == 5 else 3)
@@ -253,17 +293,25 @@ def simulate_season(state: dict, n: int = N_SIMS, seed: int = 0) -> dict:
         tab = ev.get("points") or _points.table(tour, lvl, ev.get("draw_size"))
         if ev.get("fixed_sims") is not None:
             fs = ev["fixed_sims"]
+            ev_pts = np.zeros((n, P))
+            ent = np.zeros(P, bool)
             for j, p in enumerate(fs["pids"]):
                 if p in idx:
-                    new_pts[:, idx[p]] += fs["points"][:n, j]
+                    ev_pts[:, idx[p]] += fs["points"][:n, j]
+                    ent[idx[p]] = True
+            new_pts += ev_pts
+            track(ev, ev_pts, np.broadcast_to(ent, (n, P)), True, tab)
             ev_log.append({"id": ev.get("id"), "start": ev.get("start"), "method": "tournament_sim (drawn, results fixed)"})
             continue
         L = L_for(ev.get("surface"), ev.get("best_of"))
         if ev.get("alive") is not None:
             # in progress without a draw: earned points fixed, the alive play out the remaining rounds
+            ev_pts = np.zeros((n, P))
+            ent = np.zeros(P, bool)
             for p, v in (ev.get("earned") or {}).items():
                 if p in idx and p not in set(ev["alive"]):
-                    new_pts[:, idx[p]] += float(v)
+                    ev_pts[:, idx[p]] += float(v)
+                    ent[idx[p]] = True
             alive = [p for p in ev["alive"] if p in idx]
             k = len(ev["alive"])
             if k >= 2:
@@ -284,7 +332,10 @@ def simulate_season(state: dict, n: int = N_SIMS, seed: int = 0) -> dict:
                 for p in alive:
                     i = idx[p]
                     e = ex[:, i]
-                    new_pts[:, i] += np.where(e >= 0, vals[np.clip(e, 0, len(vals) - 1)], 0.0)
+                    ev_pts[:, i] += np.where(e >= 0, vals[np.clip(e, 0, len(vals) - 1)], 0.0)
+                    ent[i] = True
+            new_pts += ev_pts
+            track(ev, ev_pts, np.broadcast_to(ent, (n, P)), True, tab)
             ev_log.append({"id": ev.get("id"), "start": ev.get("start"), "method": "in progress, alive players re-drawn"})
             continue
         # a future event: entries, draw, results
@@ -324,6 +375,7 @@ def simulate_season(state: dict, n: int = N_SIMS, seed: int = 0) -> dict:
         hb = had_bye[:, :P] & (ex[:, :P] == 1)
         pts = np.where(hb, vals[0], pts)
         new_pts += pts
+        track(ev, pts, E.copy(), False, tab)
         ev_log.append({"id": ev.get("id"), "start": ev.get("start"), "method": "entry model + seeded draw", "draw_size": D,
                        "p_enter_top10": round(float(E[:, :10].mean()), 3)})
     # Race and qualification
@@ -397,11 +449,101 @@ def simulate_season(state: dict, n: int = N_SIMS, seed: int = 0) -> dict:
         rc = race[:, i]
         race_out[p] = {"now": round(float(race_now[i]), 1), "mean": round(float(rc.mean()), 1),
                        "p05": round(float(np.percentile(rc, 5)), 1), "p95": round(float(np.percentile(rc, 95)), 1)}
-    return {"ok": True, "tour": tour, "as_of": str(state.get("as_of")), "n_sims": n,
+    extras = race_extras(tour, pids, race_now, ip_lo, ip_hi, ip_w[0], sum(week_w.values()), rank_now,
+                         [idx[p] for p in (state.get("slam_winners") or []) if p in idx], q_mask, no1, qual, p_no1, tracked)
+    return {"ok": True, "tour": tour, "as_of": str(state.get("as_of")), "n_sims": n, **extras,
             "year_end_no1": out_no1, "finals_qual": out_q, "rank_dist": rank_dist, "rank_dist_labels": list(range(1, 21)) + ["21+"],
             "points": points, "race": race_out,
             "finals_title": {pids[i]: round(float(finals_title[i]), 5) for i in np.argsort(-finals_title) if finals_title[i] > 0},
             "events": ev_log, "simplifications": SIMPLIFICATIONS, "runtime_s": round(time.perf_counter() - t0, 2)}
+
+
+def race_extras(tour: str, pids: list, race_now: np.ndarray, ip_lo: np.ndarray, ip_hi: np.ndarray, ip_w: float,
+                future_max: float, rank_now: np.ndarray, slam_ix: list, q_mask: np.ndarray, no1: np.ndarray,
+                qual: np.ndarray, p_no1: np.ndarray, tracked: list) -> dict:
+    """The race page's clinch lines and "what is at stake", from the simulation's own arrays.
+
+    "bounds" {pid: [lowest, highest]}: Race points certain now (finished events plus what the events in progress
+      have already paid) and the most still reachable (winning every event in progress the player is still in, then
+      one event a week on the remaining calendar at that week's biggest winner's points). Finals points do not count
+      towards the Race. For the top BOUNDS_TOP of the Race.
+    "status" {pid: "in" | "out"}: mathematically certain, never from the simulation's share. "in": fewer than eight
+      players (ATP: seven, unless every other Slam champion of the season is sure to finish ahead, because a Slam
+      champion ranked 9th-20th takes the eighth place) can still reach the player's certain total, ties counted
+      against; "out": eight or more are sure to finish ahead (twenty for an ATP Slam champion). Players outside the
+      simulation's tracked list are bounded by the lowest tracked ranking (or Race) total plus everything left.
+    "stakes" [{"metric", "pid", "event", "in_progress", "p", "p_enter", "p_win", "if_win", "if_lose", "if_title",
+      "if_skip", "levels"}]: a chance (Finals qualification, year-end No. 1) conditioned on the player's result at an
+      event in progress or starting within NEAR_DAYS, in the same simulations. "if_lose" = out in the next (or
+      first) match, "if_win" = wins it, "if_title" = wins the event, "if_skip" = does not enter (future events
+      only), "p_win" = share of the player's simulations there that win that match, "levels" [[Race points from the
+      event, share of the simulations where the player plays it, chance]] by result. Kept: the STAKES_KEEP biggest
+      swings (if_win - if_lose) per metric, players whose chance is inside STAKES_BAND only.
+    "left" {"future_max", "in_progress_max", "near": [event ids]}."""
+    P = len(pids)
+    lower = race_now + ip_lo
+    upper = race_now + ip_hi + future_max
+    tracked_pts = rank_now[rank_now > 0]
+    base = max(float(tracked_pts.min()) if tracked_pts.size else 0.0, float(race_now.min()) if P else 0.0)
+    outsider = base + ip_w + future_max
+    order = [int(i) for i in np.argsort(-lower, kind="stable") if race_now[i] > 0 or lower[i] > 0][:BOUNDS_TOP]
+    bounds, status = {}, {}
+    atp = tour == "atp"
+    for i in order:
+        others = np.arange(P) != i
+        can_pass = int(((upper >= lower[i]) & others).sum()) + (99 if outsider >= lower[i] else 0)
+        sure_ahead = int(((lower > upper[i]) & others).sum())
+        is_sw = i in slam_ix
+        if atp and not is_sw:
+            safe = can_pass <= 6 or (can_pass <= 7 and all(lower[s] > upper[i] for s in slam_ix if s != i))
+        else:
+            safe = can_pass <= 7
+        out = sure_ahead >= (20 if (atp and is_sw) else 8)
+        bounds[pids[i]] = [round(float(lower[i]), 1), round(float(upper[i]), 1)]
+        if safe:
+            status[pids[i]] = "in"
+        elif out:
+            status[pids[i]] = "out"
+    stakes = []
+    n = q_mask.shape[0]
+    for metric, ind_of, share in (("finals_qual", lambda i: q_mask[:, i], qual), ("year_end_no1", lambda i: no1 == i, p_no1)):
+        rows = []
+        for i in range(P):
+            p = float(share[i])
+            if not (STAKES_BAND[0] < p < STAKES_BAND[1]):
+                continue
+            ind = ind_of(i)
+            for ev in tracked:
+                ent = np.asarray(ev["entered"][:, i], bool)
+                ne = int(ent.sum())
+                if ne < STAKES_MIN_N or ne < 0.05 * n:
+                    continue
+                v = ev["pts"][:, i]
+                levels = np.unique(v[ent])
+                if levels.size < 2:
+                    continue
+                lo = levels.min()
+                lose, win = ent & (v == lo), ent & (v > lo)
+                if lose.sum() < STAKES_MIN_N or win.sum() < STAKES_MIN_N:
+                    continue
+                lv = []
+                for x in levels:
+                    m = ent & (v == x)
+                    if m.sum() >= STAKES_MIN_N:
+                        lv.append([round(float(x), 1), round(float(m.sum() / ne), 4), round(float(ind[m].mean()), 4)])
+                top = ent & (v == levels.max())
+                skip = ~ent
+                rows.append({"metric": metric, "pid": pids[i], "event": ev["id"], "in_progress": bool(ev["in_progress"]),
+                             "p": round(p, 4), "p_enter": round(ne / n, 4), "p_win": round(float(win.sum() / ne), 4),
+                             "if_win": round(float(ind[win].mean()), 4), "if_lose": round(float(ind[lose].mean()), 4),
+                             "if_title": round(float(ind[top].mean()), 4) if top.sum() >= STAKES_MIN_N else None,
+                             "if_skip": round(float(ind[skip].mean()), 4) if skip.sum() >= STAKES_MIN_N else None,
+                             "levels": lv})
+        rows.sort(key=lambda r: -(r["if_win"] - r["if_lose"]))
+        stakes += rows[:STAKES_KEEP]
+    return {"bounds": bounds, "status": status, "stakes": stakes,
+            "left": {"future_max": round(float(future_max), 1), "in_progress_max": round(float(ip_w), 1),
+                     "near": [ev["id"] for ev in tracked]}}
 
 
 def _presence(occ: list[np.ndarray], n: int, width: int) -> np.ndarray:

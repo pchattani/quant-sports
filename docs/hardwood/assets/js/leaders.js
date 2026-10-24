@@ -30,14 +30,15 @@ function render(el, params, state) {
       '<label>Min minutes <span id="ld-min-v"></span><input id="ld-min" type="range" min="0" max="2500" step="25"></label>' +
       '<label>Show<select id="ld-n"><option value="25">Top 25</option><option value="50">Top 50</option><option value="100">Top 100</option><option value="0">All</option></select></label>' +
       '</div><div id="ld-table"></div><div class="pg-note" id="ld-note"></div></div>';
-    return Promise.all([fx.season(L, S)]).then(res => {
+    return Promise.all([fx.season(L, S), HW.ours ? HW.ours.load() : null]).then(res => (fx.joinValue ? fx.joinValue(L, S, res[0][0]) : Promise.resolve(null)).then(() => res)).then(res => {
       if (!fx.alive(el)) return;
       const cat = res[0][0], season = res[0][2];
       drawBoards(L, S, season, cat);
       if (!fx.ok(cat) || !cat.players || !Object.keys(cat.players).length) { document.getElementById('ld-table').innerHTML = fx.notBuilt('The ' + fx.seasonLabel(L, S) + ' player catalogue', cat); return; }
-      const metrics = (cat.metrics || []).filter(m => Object.keys(cat.players).some(id => fx.isNum((cat.players[id].values || {})[m.key])));
+      const metrics0 = (cat.metrics || []).filter(m => Object.keys(cat.players).some(id => fx.isNum((cat.players[id].values || {})[m.key])));
+      const metrics = HW.ours ? HW.ours.relabel(metrics0, 'player') : metrics0;
       const meta = fx.metaOf(metrics);
-      if (!LS.metric || !meta[LS.metric]) LS.metric = fx.pick(metrics, ['pts_g', 'pts_pg', 'ppg', 'pts', /^pts/, 'hpm']) || (metrics[0] || {}).key;
+      if (!LS.metric || !meta[LS.metric]) LS.metric = fx.pick(metrics, ['hpm', 'pts_g', 'pts_pg', 'ppg', 'pts', /^pts/]) || (metrics[0] || {}).key;
       if (params.query && params.query.m && meta[params.query.m]) LS.metric = params.query.m;
       const P = cat.players, ids = Object.keys(P);
       const maxGp = Math.max.apply(null, ids.map(id => P[id].gp || 0).concat([1]));
@@ -48,7 +49,7 @@ function render(el, params, state) {
       if (LS.minMin === null || LS.minMin > maxMin) LS.minMin = fx.isNum(cat.min_floor) ? Math.min(cat.min_floor, maxMin) : 0;
       $('ld-gp').value = LS.minGp; $('ld-gp-v').textContent = LS.minGp; $('ld-min').value = LS.minMin; $('ld-min-v').textContent = LS.minMin;
       $('ld-pool').value = LS.pool; $('ld-n').value = String(LS.n);
-      $('ld-metric').innerHTML = fx.groups(metrics).map(g => '<optgroup label="' + fx.esc(g.name) + '">' + g.items.map(m => '<option value="' + fx.esc(m.key) + '">' + fx.esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>').join('');
+      $('ld-metric').innerHTML = (HW.ours ? HW.ours.groups(metrics) : fx.groups(metrics)).map(g => '<optgroup label="' + fx.esc(g.name) + '">' + g.items.map(m => '<option value="' + fx.esc(m.key) + '">' + fx.esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>').join('');
       const draw = () => drawTable(L, S, cat, metrics, meta);
       $('ld-metric').onchange = e => { LS.metric = e.target.value; draw(); };
       $('ld-pool').onchange = e => { LS.pool = e.target.value; draw(); };
@@ -103,7 +104,7 @@ function drawTable(L, S, cat, metrics, meta) {
   const vals = ids.map(id => P[id].values[LS.metric]);
   const mx = Math.max.apply(null, vals.map(v => Math.abs(v)).concat([1e-9]));
   const host = document.getElementById('ld-table');
-  host.innerHTML = shown.length ? HW.tableHTML([{ label: '#', align: 'right' }, { label: 'Player' }, { label: 'Team' }, { label: 'Pos' }, { label: 'GP', align: 'right' }, { label: 'Min', align: 'right' }, { label: m.label, align: 'right' }, { label: '', sortable: false }, { label: 'League pct', align: 'center' }, { label: 'Pool pct', align: 'center' }],
+  host.innerHTML = shown.length ? HW.tableHTML([{ label: '#', align: 'right' }, { label: 'Player' }, { label: 'Team' }, { label: 'Pos' }, { label: 'GP', align: 'right' }, { label: 'Min', align: 'right' }, { label: m.label, align: 'right', cls: HW.ours && HW.ours.of(m.key) ? 'qk-ours-th' : '' }, { label: '', sortable: false }, { label: 'League pct', align: 'center' }, { label: 'Pool pct', align: 'center' }],
     shown.map((id, i) => { const p = P[id], v = p.values[LS.metric];
       return { _href: fx.playerHref(L, id), cells: [i + 1, { v: p.name, html: fx.playerLink(L, id, p.name, p.team) }, { v: fx.teamAbbr(L, p.team), html: fx.teamLink(L, p.team, { abbr: true }) }, p.pos || p.pool || '', p.gp, { v: p.min, html: fx.num(p.min, 0) },
         { v: v, html: '<strong>' + fx.fmt(m, v) + '</strong>' }, { v: v, html: '<span class="hf-lbar"><span style="width:' + (100 * Math.abs(v) / mx).toFixed(1) + '%;background:' + (v < 0 ? fx.C.red : fx.teamColour(L, p.team)) + '"></span></span>' },
@@ -111,7 +112,7 @@ function drawTable(L, S, cat, metrics, meta) {
     : fx.muted('No player passes these filters.');
   HW.sortable(host);
   document.getElementById('ld-sub').innerHTML = ids.length + ' players with ' + LS.minGp + '+ games and ' + LS.minMin + '+ minutes' + (LS.pool !== 'all' ? ' in the ' + LS.pool + ' pool' : '') + (m.lower ? ' · lower is better, so the lowest ranks first' : '');
-  document.getElementById('ld-note').innerHTML = '<strong>' + fx.glossLink(m.key, fx.esc(m.label)) + '</strong>' + (m.desc ? ': ' + fx.esc(m.desc).replace(/\.?$/, '.') : '.') + (m.scope === 'pbp' ? ' Play-by-play metric (about 2017 on).' : '') +
+  document.getElementById('ld-note').innerHTML = (HW.ours ? HW.ours.explain([m.key], { label: () => m.label }) : '') + '<strong>' + fx.glossLink(m.key, fx.esc(m.label)) + '</strong>' + (m.desc ? ': ' + fx.esc(m.desc).replace(/\.?$/, '.') : '.') + (m.scope === 'pbp' ? ' Play-by-play metric (about 2017 on).' : '') +
     ' Per-100 figures are per 100 team possessions with the player on the floor; per-game and totals are raw. The <a href="' + fx.href(L, 'lab') + '">lab</a> plots any two of these against each other.';
 }
 

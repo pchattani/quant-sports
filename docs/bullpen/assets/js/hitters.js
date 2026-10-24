@@ -817,7 +817,7 @@ K.renderCatalogue = function (el, params, state, kind) {
     '</div><div id="cat-chips" class="gq-chips"></div><div id="cat-table">' + K.muted('Loading…') + '</div><div class="pg-note gq-note" id="cat-note"></div></div>';
   return K.ready().then(() => {
     const S = K.S(params, state);
-    return Promise.all([K.loadY(L, S, file), K.loadNames()]).then(res => ({ S: S, raw: res[0] }));
+    return Promise.all([K.loadY(L, S, file), K.loadNames(), BP.ui && BP.ui.specReady ? BP.ui.specReady() : null]).then(res => ({ S: S, raw: res[0] }));
   }).then(o => {
     if (!K.alive(el)) return;
     const S = o.S, cat = K.catOf(o.raw, pit ? 'pitchers' : 'hitters');
@@ -844,7 +844,7 @@ K.renderCatalogue = function (el, params, state, kind) {
       $('cat-pos').innerHTML = '<option value="">All positions</option>' + Object.keys(pos).sort((a, b) => (ORDER.indexOf(a) < 0 ? 99 : ORDER.indexOf(a)) - (ORDER.indexOf(b) < 0 ? 99 : ORDER.indexOf(b))).map(x => '<option value="' + K.esc(x) + '"' + (x === st.pos ? ' selected' : '') + '>' + K.esc(x) + ' (' + pos[x] + ')</option>').join('');
     } else $('cat-role').value = st.role;
     $('cat-q').value = st.q; $('cat-basis').value = st.basis;
-    $('cat-extra').innerHTML = '<option value="">—</option>' + K.groups(metrics).map(g => '<optgroup label="' + K.esc(g.name) + '">' + g.items.map(m => '<option value="' + K.esc(m.key) + '">' + K.esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>').join('');
+    $('cat-extra').innerHTML = '<option value="">—</option>' + (BP.ui && BP.ui.metricOpts ? BP.ui.metricOpts(metrics, '', kind) : K.groups(metrics).map(g => '<optgroup label="' + K.esc(g.name) + '">' + g.items.map(m => '<option value="' + K.esc(m.key) + '">' + K.esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>').join(''));
     st.extra = st.extra.filter(k => meta[k]);
     const headsFor = () => K.headline(metrics, specPrefs(kind, st), 10);
     const draw = () => drawCatalogue(L, S, kind, cat, headsFor());
@@ -907,7 +907,8 @@ function drawCatalogue(L, S, kind, cat, heads) {
   const host = document.getElementById('cat-table');
   if (!host) return;
   host.innerHTML = rows.length ? K.table([{ label: '#', sortable: false }, { label: pit ? 'Pitcher' : 'Hitter' }, { label: 'Team' }, { label: pit ? 'Role' : 'Pos' }, { label: 'Age', align: 'right' }, { label: pit ? 'BF' : 'PA', align: 'right' }]
-    .concat(cols.map(m => ({ label: K.shortLabel(m.label) + (m.lower ? ' ↓' : ''), align: 'right', title: (m.desc || m.label) + (m.lower ? ' (lower is better)' : '') }))), rows.slice(0, 600), { sticky: true, compact: true })
+    .concat(cols.map(m => { const lab = K.shortLabel(BP.ui && BP.ui.label ? BP.ui.label(kind, m.key, m.label) : m.label) + (m.lower ? ' ↓' : ''), tag = BP.ui && BP.ui.oursTag ? BP.ui.oursTag(m.key, true) : '';
+      return { label: lab, html: K.esc(lab) + tag, align: 'right', title: (m.desc || m.label) + (m.lower ? ' (lower is better)' : '') + (tag ? ' Our model: ' + BP.ui.ours(m.key).name + '.' : '') }; })), rows.slice(0, 600), { sticky: true, compact: true })
     : K.muted('No ' + (pit ? 'pitcher' : 'hitter') + ' matches these filters.');
   K.sortable(host);
   const chips = document.getElementById('cat-chips');

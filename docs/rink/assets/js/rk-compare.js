@@ -83,7 +83,8 @@ function draw(body, E, sk, gk, S) {
     rows: g[1].map(x => x[0]).filter(k => meta[k] && !meta[k].unavailable).map(k => {
       const m = meta[k], sp = U.SPEC[k] || {};
       const pctFmt = m.fmt === 'pct';
-      return { key: k, label: sp.label || m.label || k, tip: sp.tip || m.desc, better: (m.lower || sp.lower) ? 'low' : 'high', values: E.map(e => (e.p.values || {})[k]), pctls: E.map(e => pcOf(e)[k]),
+      const ours = RK.ours ? RK.ours.of(k) : null;
+      return { key: k, label: sp.label || m.label || k, tip: (sp.tip || m.desc || '') + (ours ? ' Our model: ' + ours.name + '.' : ''), better: (m.lower || sp.lower) ? 'low' : 'high', values: E.map(e => (e.p.values || {})[k]), pctls: E.map(e => pcOf(e)[k]),
         fmt: v => U.fmtBy(m, v), dfmt: pctFmt ? (v => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v * 100).toFixed(1) + ' pts') : null };
     })
   }));

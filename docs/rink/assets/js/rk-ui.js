@@ -308,7 +308,8 @@ U.pctGroups = (p, meta, sets, pcts, prev) => {
       const at = Array.isArray(x) && isNum(x[1]) ? x[1] : (isNum(m.stabilises_at) ? m.stabilises_at : null);
       const n = isNum(at) ? U.sampleOf(p, unit || m.unit) : null;
       const pv = prev && isNum(prev[k]) ? prev[k] : null;
-      return { label: sp.label || m.label || k, sub: U.SUB[k] || '', pctl: pc, prev: pv, value: U.fmtBy(m, (p.values || {})[k]), tip: (sp.tip || m.desc || '') + (isNum(at) && unit ? ' Settles at about ' + QK.fmt.num(at) + ' ' + unit + '.' : ''), early: isNum(n) && n < at };
+      const ours = RK.ours ? RK.ours.of(k) : null;
+      return { label: sp.label || m.label || k, sub: (U.SUB[k] || '') + (ours ? (U.SUB[k] ? ' · ' : '') + 'our model' : ''), pctl: pc, prev: pv, value: U.fmtBy(m, (p.values || {})[k]), tip: (sp.tip || m.desc || '') + (ours ? ' Our model: ' + ours.name + '.' : '') + (isNum(at) && unit ? ' Settles at about ' + QK.fmt.num(at) + ' ' + unit + '.' : ''), early: isNum(n) && n < at };
     }).filter(Boolean)
   }));
 };

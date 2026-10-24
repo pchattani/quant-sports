@@ -242,8 +242,6 @@ def build_tour(b: Build, tour: str, args, cfg: dict) -> dict:
     if cur_full:
         prev_rk = an.read_json(b.data / tour / "rankings.json") or {}
         b.write_or_fail(f"{tour}/rankings.json", f"{tour} rankings", lambda: RK.build_rankings(td, prev_rk, defend, race_rows), tour=tour)
-        prev_race = an.read_json(b.data / tour / "race.json") or {}
-        b.write_or_fail(f"{tour}/race.json", f"{tour} race.json", lambda: RC.build(td, race_sim, futures, prev_race), tour=tour)
         b.write_or_fail(f"{tour}/elo.json", f"{tour} elo.json", lambda: RK.build_elo(td), tour=tour)
 
     # catalogues, calendars, schedules and event pages per year
@@ -344,6 +342,13 @@ def build_tour(b: Build, tour: str, args, cfg: dict) -> dict:
             c = an.read_json(b.data / tour / str(y) / "players.json")
             if c and c.get("players") is not None:
                 catalogues[y] = c
+    if cur_full:
+        # race.json after the catalogues: its player profiles read the season's (RC.profiles)
+        prev_race = an.read_json(b.data / tour / "race.json") or {}
+        rk_rows = (td.store(cur).get("rankings") or {}).get("rows") or []
+        b.write_or_fail(f"{tour}/race.json", f"{tour} race.json",
+                        lambda: RC.build(td, race_sim, futures, prev_race, catalogues.get(cur), RC.profile_ids(rk_rows, race_rows)),
+                        tour=tour)
     b.write_or_fail(f"{tour}/players_index.json", f"{tour} players index", lambda: SI.players_index(td), tour=tour)
     b.write_or_fail(f"{tour}/lab.json", f"{tour} lab", lambda: SI.lab(td, catalogues), tour=tour)
     if cur_full:

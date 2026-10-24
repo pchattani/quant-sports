@@ -41,11 +41,11 @@ V.MORE_TEAM = [
 ];
 /* Display names and plain-words explanations for the headline metrics (f1.json display / explanation). */
 V.NAMES = {
-  driver_effect: ['Race pace v team-mate', 'Race pace once the car is taken out: how much faster or slower than the team-mate per lap. Lower is faster.'],
-  quali_driver_effect: ['Qualifying pace v team-mate', 'The same in qualifying: one-lap pace against the team-mate, % of a lap. Lower is faster.'],
-  race_h2h: ['Race head-to-head v team-mate', 'Share of races finished ahead of the team-mate.'],
-  team_points_share: ['Share of team points v team-mate', 'Share of the points the car scored.'],
-  elo_teammate: ['Elo v team-mates', 'Elo rating from head-to-heads with team-mates only.'],
+  driver_effect: ['Race driver rating', 'Race pace once the car is taken out: how much faster or slower than the team-mate per lap. Lower is faster.'],
+  quali_driver_effect: ['Qualifying driver rating', 'The same in qualifying: one-lap pace against the team-mate, % of a lap. Lower is faster.'],
+  race_h2h: ['Race head-to-head', 'Share of races finished ahead of the team-mate.'],
+  team_points_share: ['Share of team points', 'Share of the points the car scored.'],
+  elo_teammate: ['Team-mate Elo', 'Elo rating from head-to-heads with team-mates only.'],
   race_pace: ['Race pace v field', 'Race pace against the field, seconds a lap (driver and car together). Lower is faster.'],
   points_per_race: ['Points per race', 'Championship points per start.'],
   lap1_gain: ['Lap-1 gain', 'Places gained on the opening lap, per start.'],
@@ -63,8 +63,56 @@ V.M50_TEAM = { car_race_pace: 0.3, points_per_race: 0.5, dnf_rate: 16.9, pit_lan
   car_pace_trend: 19.2, avg_best_finish: 0.5, avg_best_grid: 0.3, both_points_rate: 2, wins: 1.3, podiums: 0.6, pit_stop_ms: 46.7, pit_best_ms: 2, dnf_mech: 17.8,
   corner_speed: 3.1, top_speed: 57.3, tyre_mgmt: 21.4, lead_driver_share: 29.3 };
 
-V.label = function (meta, k) { return (V.NAMES[k] || [])[0] || ((meta || {})[k] || {}).label || PD.titleCase(k); };
-V.tip = function (meta, k) { return (V.NAMES[k] || [])[1] || ((meta || {})[k] || {}).desc || ''; };
+/* Our metrics (round 5): the spec's labels file (assets/qk/metrics/f1.labels.json through QK.spec) names the metrics
+ * that come from our own models (the driver model, the pace model, Elo, the race forecast). V.ours(k) -> { key, name,
+ * about } | null; V.oursTag(k, short) the cobalt tag; V.oursHeads(box, map) tags the table heads of our metrics (map:
+ * header text or data-k -> metric key; re-applied when a table re-renders on sort); V.picker(metrics, sel, entity) the
+ * lab's <select> groups: "Our models" first, then the spec's headline box-score metrics, then the rest by group. */
+V.spec = null;
+V.specP = (window.QK && QK.spec ? QK.spec.load('f1') : Promise.resolve(null)).then(function (c) { V.spec = c; return c; }, function () { return null; });
+V.ours = function (k) { return V.spec ? V.spec.ours(k) : null; };
+V.explain = function (k, entity) { var m = V.spec ? V.spec.metric(k, entity || 'driver') : null; return (m && m.explain) || ((V.NAMES[k] || [])[1]) || ''; };
+V.oursTag = function (k, short, entity) { var o = V.ours(k); return o ? QK.ours({ short: !!short, model: o.name, about: V.explain(k, entity) || o.about }) : ''; };
+V.oursHeads = function (box, map, entity) {
+  if (!box) return;
+  var apply = function () {
+    if (!V.spec) return;
+    QK.$$('th', box).forEach(function (th) {
+      if (th.querySelector('.qk-ours')) return;
+      var dk = th.getAttribute('data-k'), txt = (th.textContent || '').replace(/[\u2191\u2193\u2195\u25b2\u25bc\u25b4\u25be\u21c5]/g, '').trim();
+      var key = map ? (map[dk] || map[txt]) : dk;
+      if (!key || !V.ours(key)) return;
+      (th.querySelector('button') || th).insertAdjacentHTML('beforeend', V.oursTag(key, true, entity));
+    });
+  };
+  V.specP.then(apply);
+  apply();
+  if (window.MutationObserver && !box._qkOurs) {
+    box._qkOurs = new MutationObserver(function () { apply(); });
+    box._qkOurs.observe(box, { childList: true, subtree: true });
+  }
+};
+V.picker = function (metrics, sel, entity) {
+  var opt = function (m) { return '<option value="' + esc(m.key) + '"' + (m.key === sel ? ' selected' : '') + '>' + esc(m.label) + (m.lower ? ' ↓' : '') + '</option>'; };
+  var byGroup = function (list) {
+    var gs = [];
+    list.forEach(function (m) { var g = gs.filter(function (x) { return x.name === (m.group || 'Other'); })[0]; if (!g) { g = { name: m.group || 'Other', items: [] }; gs.push(g); } g.items.push(m); });
+    return gs;
+  };
+  if (!V.spec) return byGroup(metrics).map(function (g) { return '<optgroup label="' + esc(g.name) + '">' + g.items.map(opt).join('') + '</optgroup>'; }).join('');
+  var h = '';
+  V.spec.order(metrics, { key: function (m) { return m.key; }, entity: entity || 'driver' }).forEach(function (g) {
+    if (g.label === 'Our models') { h += '<optgroup label="Our models">' + g.items.map(opt).join('') + '</optgroup>'; return; }
+    var head = g.items.filter(function (m) { return V.spec.isHeadline(m.key, entity || 'driver'); });
+    var rest = g.items.filter(function (m) { return !V.spec.isHeadline(m.key, entity || 'driver'); });
+    if (head.length) h += '<optgroup label="Box score: headline">' + head.map(opt).join('') + '</optgroup>';
+    byGroup(rest).forEach(function (gr) { h += '<optgroup label="Box score: ' + esc(gr.name) + '">' + gr.items.map(opt).join('') + '</optgroup>'; });
+  });
+  return h;
+};
+/* names: the spec's display (V.NAMES copies it for the headline sets; the labels file, once loaded, for the rest) */
+V.label = function (meta, k) { var sm = V.spec ? V.spec.metric(k, 'driver') : null; return (V.NAMES[k] || [])[0] || (sm && sm.label !== k ? sm.label : '') || ((meta || {})[k] || {}).label || PD.titleCase(k); };
+V.tip = function (meta, k) { var t = (V.NAMES[k] || [])[1] || ((meta || {})[k] || {}).desc || '', o = V.ours(k); return t + (o ? (t ? ' ' : '') + 'Our model: ' + o.name + '.' : ''); };
 V.metaMap = function (cat) { var m = {}; ((cat && cat.metrics) || []).forEach(function (x) { if (x && x.key) m[x.key] = x; }); return m; };
 V.fmt = function (meta, k, v) {
   var m = (meta || {})[k] || {};
@@ -315,7 +363,13 @@ V.compare = function (P, ids, sets, ents) {
         pctls: ids.map(function (id) { return P.pct[id] ? P.pct[id][k] : null; }), fmt: function (v) { return V.fmt(meta, k, v); } };
     }) };
   });
-  return QK.compareView({ entities: ents, groups: groups, delta: false });
+  return QK.compareView({ entities: ents, groups: groups, delta: false }) + V.oursStrip(sets, meta);
+};
+/* The strip under a comparison: which of our models the rows on screen come from (sets: [[label, keys]], meta). */
+V.oursStrip = function (sets, meta) {
+  var models = [];
+  (sets || []).forEach(function (g) { g[1].forEach(function (k) { var o = !meta || meta[k] ? V.ours(k) : null; if (o && models.every(function (x) { return x.key !== o.key; })) models.push(o); }); });
+  return models.length ? '<div class="pd-ours">' + QK.oursExplain(models.map(function (o) { return '<b>' + esc(o.name) + '.</b> ' + esc(o.about); }).join(' ') + ' Hover a row for which of these it comes from.', { title: models.length > 1 ? 'Our models.' : 'Our model.' }) + '</div>' : '';
 };
 /* Nearest entries in the peer group on the metric set's percentiles (mean absolute gap), excluding the entry itself. */
 V.nearest = function (P, id, sets, n) {

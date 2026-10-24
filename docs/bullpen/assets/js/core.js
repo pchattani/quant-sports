@@ -1119,7 +1119,7 @@ function tableHTML(cols, rows, opts) {
   cols.forEach(c => {
     const cc = typeof c === 'string' ? { label: c } : c;
     h += '<th class="' + (cc.sortable === false ? '' : 'sortable-th') + (cc.cls ? ' ' + cc.cls : '') + '"' +
-         (cc.align ? ' style="text-align:' + cc.align + '"' : '') + (cc.title ? ' title="' + esc(cc.title) + '"' : '') + '>' + esc(cc.label) + '</th>';
+         (cc.align ? ' style="text-align:' + cc.align + '"' : '') + (cc.title ? ' title="' + esc(cc.title) + '"' : '') + '>' + (cc.html !== undefined ? cc.html : esc(cc.label)) + '</th>';
   });
   h += '</tr></thead><tbody>';
   (rows || []).forEach(r => {

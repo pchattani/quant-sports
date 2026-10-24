@@ -9,6 +9,7 @@
  *   fresh(card)                     false for a cached card still marked live or upcoming 12 hours after its start
  *   SETS / MDESC / setFor(kind, row) / pctGroups / sampleLine / floorOf   the comparison metric sets
  *   gloss()                          glossary.json as { hitter: {key: entry}, pitcher: {...} } (labels, formats)
+ *   specReady / ours / oursTag / label / headIds / metricOpts / tagHeads / oursNote   our models first and tagged (round 5)
  *
  * Older-browser rule: no optional chaining, no nullish coalescing. */
 (function (BP) {
@@ -206,7 +207,8 @@ U.gloss = () => {
 U.metaOf = (kind, id, gl) => {
   const g = ((gl || {})[kind] || {})[id] || {};
   const d = (U.MDESC[kind] || {})[id] || [];
-  return { key: id, label: d[0] || g.label || id, tip: d[1] || g.desc || '', fmt: g.fmt, lower: !!g.lower };
+  const o = U.ours ? U.ours(id) : null, tip = d[1] || g.desc || '';
+  return { key: id, label: d[0] || g.label || id, tip: tip + (o ? (tip ? ' ' : '') + 'Our model: ' + o.name + '.' : ''), fmt: g.fmt, lower: !!g.lower, ours: o };
 };
 U.fmtBy = (meta, v) => (isNum(v) ? BP.fmtVal(v, (meta && meta.fmt) || '2') : '—');
 /* A plain-English line under each metric on the percentile meters. */
@@ -268,6 +270,70 @@ U.flat = (setKey, which) => {
   const out = [];
   ((U.SETS[setKey] || {})[which || 'head'] || []).forEach(g => g[1].forEach(x => out.push(x)));
   return out;
+};
+
+/* ── our models (round 5): the spec's `our_models` registry through the kit's QK.spec (assets/qk/metrics/baseball.labels.json)
+   U.specReady() -> Promise of the catalogue (null when missing); U.ours(key) -> { name, about } | null; U.oursTag(key, short)
+   the cobalt "Our model" tag; U.label(kind, key, fallback) the spec's display name (U.MDESC, per kind) else the payload's;
+   U.headIds(kind) the spec's headline ids for hitters (every position group) or pitchers (starters, then relievers);
+   U.metricOpts(metrics, sel, kind) a metric picker: "Our models", "Box score · headline", then the payload's groups;
+   U.tagHeads(host, { colKey: metricKey }) the tag on a QK.table head (kept through re-sorts); U.oursNote(kind, keys) the
+   cobalt explain strip naming the models behind the keys that are ours. */
+U.SPEC = null;
+U.specReady = () => (window.QK && QK.spec ? QK.spec.load('baseball').then(c => { if (c) U.SPEC = c; return c; }) : Promise.resolve(null));
+U.specReady();
+U.ours = key => (U.SPEC ? U.SPEC.ours(key) : null);
+U.oursTag = (key, short) => { const o = U.ours(key); return o ? QK.ours({ short: !!short, model: o.name, about: o.about }) : ''; };
+U.label = (kind, key, fallback) => {
+  const d = (U.MDESC[kind === 'pitcher' ? 'pitcher' : kind === 'team' ? 'team' : 'hitter'] || {})[key];
+  return d && d[0] ? d[0] : String(fallback || key).replace(/ \(ours\)$/, '');
+};
+U.headIds = kind => {
+  const keys = kind === 'pitcher' ? ['SP', 'RP'] : kind === 'team' ? ['TEAM'] : ['ALL', 'C', '1B', '2B', '3B', 'SS', 'CF', 'LF/RF', 'DH'];
+  const out = [];
+  keys.forEach(k => U.flat(k, 'head').forEach(x => { if (out.indexOf(x[0]) < 0) out.push(x[0]); }));
+  return out;
+};
+U.metricOpts = (metrics, sel, kind, o) => {
+  o = o || {};
+  const heads = U.headIds(kind), pos = key => { const i = heads.indexOf(key); return i < 0 ? 999 : i; };
+  const opt = m => '<option value="' + esc(m.key) + '"' + (m.key === sel ? ' selected' : '') + '>' + esc(U.label(kind, m.key, m.label)) + (m.lower ? ' ↓' : '') + '</option>';
+  const ms = (metrics || []).map((m, i) => ({ m: m, i: i }));
+  const ours = ms.filter(x => U.ours(x.m.key)).sort((a, b) => (pos(a.m.key) - pos(b.m.key)) || (a.i - b.i));
+  const head = ms.filter(x => !U.ours(x.m.key) && pos(x.m.key) < 999).sort((a, b) => pos(a.m.key) - pos(b.m.key));
+  const rest = ms.filter(x => !U.ours(x.m.key) && pos(x.m.key) === 999);
+  const grp = (label, list) => (list.length ? '<optgroup label="' + esc(label) + '">' + list.map(x => opt(x.m)).join('') + '</optgroup>' : '');
+  let h = grp('Our models', ours) + grp('Box score · headline', head);
+  const names = [];
+  rest.forEach(x => { const g = x.m.group || 'Other'; if (names.indexOf(g) < 0) names.push(g); });
+  names.forEach(g => { h += grp('Box score · ' + g, rest.filter(x => (x.m.group || 'Other') === g)); });
+  return h;
+};
+U.tagHeads = (host, map) => {
+  if (!host) return;
+  const apply = () => Object.keys(map || {}).forEach(col => {
+    const tag = U.oursTag(map[col], true);
+    if (!tag) return;
+    host.querySelectorAll('th[data-k="' + col + '"]').forEach(th => {
+      if (th.querySelector('.qk-ours')) return;
+      const b = th.querySelector('button') || th;
+      b.insertAdjacentHTML('beforeend', tag);
+    });
+  });
+  apply();
+  if (host._oursObs) host._oursObs.disconnect();
+  if (window.MutationObserver) { host._oursObs = new MutationObserver(apply); host._oursObs.observe(host, { childList: true, subtree: true }); }
+};
+U.oursNote = (kind, keys) => {
+  const seen = {}, parts = [];
+  (keys || []).forEach(k => {
+    const o = U.ours(k);
+    if (!o || seen[k]) return;
+    seen[k] = 1;
+    const d = (U.MDESC[kind === 'pitcher' ? 'pitcher' : kind === 'team' ? 'team' : 'hitter'] || {})[k];
+    parts.push('<b>' + esc(U.label(kind, k, k)) + '</b> comes from our ' + esc(o.name.charAt(0).toLowerCase() + o.name.slice(1)) + ': ' + esc((d && d[1]) || o.about));
+  });
+  return parts.length ? QK.oursExplain(parts.join(' '), { title: 'Our model.' }) : '';
 };
 
 })(window.BP);

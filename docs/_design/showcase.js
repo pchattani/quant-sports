@@ -57,6 +57,7 @@ $('#sc-bc-tape').innerHTML = QK.sectionHead({ kicker: 'Tale of the tape', title:
 $('#sc-bc-meters').innerHTML = '<div class="qk-pgrp-h">QK.meter (20 LED segments, ▼ last season)</div>' + [[100, 92], [74, 80], [21, 35], [3, null]].map(function (x) { return '<div style="margin:14px 0">' + QK.meter(x[0], { prev: x[1] }) + '</div>'; }).join('') + QK.pctKey({ ring: true }) +
   '<p style="margin:16px 0 0">' + QK.outlineNum('29', { size: '96px' }) + ' <span class="qk-display" style="font-size:60px">BEBAS</span> <span class="qk-cond qk-long" style="font-size:28px">Barlow Condensed for long names</span></p>';
 $('#sc-bc-explain').innerHTML = QK.explain('<b>What’s that number?</b> Our live chance updates with the score and the clock. Before the start it was 55% too: a one-point game late in the third is still close to a coin flip.');
+$('#sc-bc-ours').innerHTML = '<p style="margin:10px 0">Value added (GAR/90)' + QK.ours({ model: 'Player value model' }) + ' &nbsp; Stuff+' + QK.ours({ short: true, model: 'Pitch models' }) + '</p>' + QK.oursExplain('Goals a player adds per 90 minutes over a replacement-level player in the same role, from our player value model.');
 
 /* ── v3 Matchday modules, in the v4 look ── */
 $('#h-matchday').innerHTML = QK.sectionHead({ kicker: 'What to watch tonight', title: 'QK.watchGrid: game cards with a reason', sub: 'Our chance for each side (favourite in blue), the team-colour bar with a key, the score bug when live, and an italic one-line reason (g.why, else QK.whyLine). No market on cards.' });

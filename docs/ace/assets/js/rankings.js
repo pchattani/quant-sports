@@ -4,14 +4,17 @@
  *             (the gap shows who the ranking over- or under-rates), the race position and points to defend;
  *   elo: the Elo ranking with surface ratings and the official rank beside it;
  *   race: the year-to-date race with the Finals cut;
- *   to defend: the points each top player drops week by week over the coming year (a heat grid).
+ *   to defend: the points each top player drops week by week over the coming year (a heat grid);
+ *   profiles: strengths and weak spots of the top 32 as cards (race-shape.js, from race.json "profiles"); the
+ *             official view carries the same plain-English chips in a column (round 5, 24 Oct 2026).
  *
  * ?v=official|elo|race|defend picks the view. Reads <T>/rankings.json and <T>/race.json. */
 (function (TA) {
 'use strict';
 
 const esc = TA.esc;
-const VIEWS = [{ key: 'official', label: 'Official' }, { key: 'elo', label: 'Elo' }, { key: 'race', label: 'Race (this week included)' }, { key: 'defend', label: 'Points to defend' }];
+const VIEWS = [{ key: 'official', label: 'Official' }, { key: 'elo', label: 'Elo' }, { key: 'race', label: 'Race (this week included)' }, { key: 'defend', label: 'Points to defend' },
+  { key: 'profiles', label: 'Strengths and weak spots' }];
 
 function moveHTML(m) {
   if (!TA.isNum(m) || Number(m) === 0) return '<span class="muted-inline">–</span>';
@@ -20,6 +23,7 @@ function moveHTML(m) {
 function defendTotal(rows) { return (rows || []).reduce((a, r) => a + (TA.isNum(r[2]) ? Number(r[2]) : 0), 0); }
 
 function official(T, rk, eloRank, raceRank, race) {
+  const prof = TA.shape.profiles(race);
   const rows = (rk.official || []).slice(0, 200).map(r => {
     const pid = r[1], er = eloRank[pid];
     const gap = TA.isNum(er) ? r[0] - er : null;
@@ -32,7 +36,8 @@ function official(T, rk, eloRank, raceRank, race) {
       { v: gap, html: TA.isNum(gap) ? '<span class="rank-gap ' + (gap > 0 ? 'edge-pos' : gap < 0 ? 'edge-neg' : '') + '" title="' + (gap > 0 ? 'Elo ranks this player higher than the official ranking' : gap < 0 ? 'The official ranking is ahead of Elo' : '') + '">' + TA.signed(gap, 0) + '</span>' : '—', cls: 'hide-sm' },
       { v: raceRank[pid], html: TA.isNum(raceRank[pid]) ? String(raceRank[pid]) : '—', cls: 'hide-sm' },
       { v: defendTotal((rk.to_defend || {})[pid]), html: (rk.to_defend || {})[pid] ? TA.num(defendTotal(rk.to_defend[pid]), 0) : '—', cls: 'hide-sm' },
-      { v: fq, html: TA.isNum(fq) ? TA.pct(fq, 0) : '—', cls: 'hide-sm' }
+      { v: fq, html: TA.isNum(fq) ? TA.pct(fq, 0) : '—', cls: 'hide-sm' },
+      { v: '', html: '<span class="rs-chips-cell">' + TA.shape.chipHTML(TA.shape.chips(prof(pid), 2)) + '</span>', cls: 'hide-sm' }
     ] };
   });
   if (!rows.length) return TA.muted('No official ranking yet.');
@@ -40,7 +45,8 @@ function official(T, rk, eloRank, raceRank, race) {
     { label: 'Points', align: 'right' }, { label: 'Elo rank', align: 'right' }, { label: 'Gap', align: 'right', title: 'Official rank minus Elo rank: positive means Elo rates the player higher', cls: 'hide-sm' },
     { label: 'Race', align: 'right', title: 'Position in the year-to-date race, this week\'s points included', cls: 'hide-sm' },
     { label: 'To defend', align: 'right', title: 'Points from the last 12 months that drop off over the coming year', cls: 'hide-sm' },
-    { label: 'Finals', align: 'right', title: 'Model probability of qualifying for the Finals', cls: 'hide-sm' }], rows, { compact: true, sticky: true });
+    { label: 'Finals', align: 'right', title: 'Model probability of qualifying for the Finals', cls: 'hide-sm' },
+    { label: 'Strengths and weak spots', sortable: false, title: 'Plain-English reads of the season against the tour (percentiles among qualified players); hover a chip for the number', cls: 'hide-sm' }], rows, { compact: true, sticky: true });
 }
 
 function elo(T, rk, offRank) {
@@ -115,6 +121,15 @@ function isoWeek(d) {
   return Math.ceil(((t - y0) / 86400000 + 1) / 7);
 }
 
+function profiles(T, rk, race) {
+  const ids = (rk.official || []).slice(0, 32).map(r => r[1]);
+  const off = {};
+  (rk.official || []).forEach(r => { off[r[1]] = r; });
+  const html = TA.shape.cardsHTML(T, race, ids, { n: 12, sub: p => (off[p] ? 'No. ' + off[p][0] + ' · ' + TA.num(off[p][2], 0) + ' ranking points' : ''),
+    badge: p => { const q = ((race || {}).finals_qual || {})[p]; return TA.isNum(q) && q >= 0.001 ? '<small>Finals</small>' + TA.pct(q, q > 0.995 || q < 0.01 ? 1 : 0) : ''; } });
+  return html || TA.muted('Player profiles come with the season simulation’s next build.');
+}
+
 function render(el, params) {
   const T = params.tour;
   let view = (params.query || {}).v;
@@ -130,7 +145,7 @@ function render(el, params) {
     (rk.official || []).forEach(r => { offRank[r[1]] = r[0]; });
     (rk.race || []).forEach((r, i) => { raceRank[r[0]] = i + 1; });
     const subs = { official: 'as of ' + esc(TA.fmtDate(rk.date)) + ' · Elo rank and race position beside each player',
-      elo: 'surface-blended Elo; surface columns are the surface ratings', race: 'points won this calendar year, this week included (the race simulation starts from its own snapshot)', defend: 'points dropping off over the next 12 months' };
+      elo: 'surface-blended Elo; surface columns are the surface ratings', profiles: 'the top 32: percentiles among this season’s qualified players, with a plain-English read of each', race: 'points won this calendar year, this week included (the race simulation starts from its own snapshot)', defend: 'points dropping off over the next 12 months' };
     /* v4: the black power list of this week's biggest climbers inside the top 100 (places gained since the last ranking) */
     const climb = (rk.official || []).filter(r => r[0] <= 100 && TA.isNum(r[3]) && r[3] > 0).sort((a, b) => b[3] - a[3] || a[0] - b[0]).slice(0, 5);
     const band = climb.length >= 3 ? QK.band(QK.sectionHead({ kicker: 'Who’s climbing', title: 'The week’s big movers', sub: 'The biggest climbs inside the top 100 since the last ranking. Points come from the last 52 weeks, so a deep run lifts a player straight away.' }) +
@@ -142,8 +157,10 @@ function render(el, params) {
       view = k;
       document.getElementById('rk-sub').innerHTML = subs[k];
       const v = document.getElementById('rk-view');
-      v.innerHTML = k === 'elo' ? elo(T, rk, offRank) : k === 'race' ? raceView(T, rk, race, offRank) : k === 'defend' ? defend(T, rk) : official(T, rk, eloRank, raceRank, race);
+      v.innerHTML = k === 'elo' ? elo(T, rk, offRank) : k === 'race' ? raceView(T, rk, race, offRank) : k === 'defend' ? defend(T, rk) : k === 'profiles' ? profiles(T, rk, race) : official(T, rk, eloRank, raceRank, race);
       TA.sortable(v);
+      TA.shape.wire(v);
+      if (TA.v2 && TA.v2.oursHeads) TA.v2.oursHeads(v, { Elo: 'elo', Hard: 'elo_hard', Clay: 'elo_clay', Grass: 'elo_grass', 'Elo rank': 'elo_rank', 'Finals (our chance)': 'p_finals' });
     };
     show(view);
     TA.wireToggles(document.getElementById('rk-tabs'), 'data-v', show);

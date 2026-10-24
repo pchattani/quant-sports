@@ -13471,5 +13471,44 @@
    "status": "needed",
    "note": "archive seasons publish no percentiles (size budget); a past season's player page shows no percentile card. pct_role for the rate keys alone is about 0.3 MB per season-level."
   }
- ]
+ ],
+ "our_models": {
+  "models": {
+   "value": {
+    "name": "Campus value model",
+    "about": "Points above a replacement-level player: EPA on the player's plays for skill players, box-score points for defenders and specialists."
+   },
+   "epa": {
+    "name": "Opponent-adjusted EPA",
+    "about": "Expected points added per play at the player's position, garbage time excluded; team EPA rates adjusted for the opponents faced."
+   },
+   "box": {
+    "name": "Box rating",
+    "about": "Points per 100 possessions above an average D-I player: our team-constrained box value, so a player on a strong team against a strong schedule is credited for it."
+   },
+   "team": {
+    "name": "Team rating model",
+    "about": "Our opponent-adjusted team rating, split into offence and defence."
+   }
+  },
+  "metrics": {
+   "value_pg": "value",
+   "value": "value",
+   "epa_play": "epa",
+   "epa_db": "epa",
+   "epa_rush": "epa",
+   "epa_tgt": "epa",
+   "qb_rush_epa": "epa",
+   "epa": "epa",
+   "epa_off": "epa",
+   "epa_def": "epa",
+   "pass_epa": "epa",
+   "rush_epa": "epa",
+   "r": "box",
+   "rating": "team",
+   "off": "team",
+   "def": "team",
+   "sos": "team"
+  }
+ }
 }

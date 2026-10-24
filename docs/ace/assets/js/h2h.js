@@ -359,7 +359,7 @@ function build(T, a, b, res, body) {
     const ps = [P[a] || null, P[b] || null];
     const set = V.set(T, sf).concat(['hold_plus_break']);
     const G = [['Strength', ['elo', 'elo_hard', 'elo_clay', 'elo_grass']], ['Results', ['games_won_pct', 'win_pct', 'win_v_top50']], ['Serve and return, inferred from scores', ['hold', 'brk', 'hold_plus_break']], ['Serve statistics (WTA)', ['dominance', 'ace_pct']]];
-    const groups = G.map(g => ({ label: g[0], rows: set.filter(x => g[1].indexOf(x) >= 0).map(x => ({ label: V.label(x, sf), tip: (V.META[x] || [])[1], better: 'high', values: ps.map(p => V.value(p, x, sf)),
+    const groups = G.map(g => ({ label: g[0], rows: set.filter(x => g[1].indexOf(x) >= 0).map(x => ({ label: V.label(x, sf), tip: V.tipOf(x), better: 'high', values: ps.map(p => V.value(p, x, sf)),
       pctls: ps.map(p => (V.inPool(p, sf, cat) ? V.pctl(p, x, sf, cat) : null)), fmt: v => V.fmt(x, v), dfmt: (V.META[x] || [])[2] === 'pct' ? (d => (d > 0 ? '+' : d < 0 ? '−' : '±') + Math.abs(d * 100).toFixed(1) + ' pts') : null })) }));
     wrap.innerHTML = V.card('On the numbers', 'This season, value · percentile against ' + k.esc(V.peer(T, sf, cat)) + (sf && last ? ', the surface of their last meeting' : '') + ' (100 = best)',
       QK.compareView({ entities: [{ name: nA, abbr: sA, href: k.playerHref(T, a) }, { name: nB, abbr: sB, href: k.playerHref(T, b) }], groups: groups }), { foot: '<span>Hold and break are inferred from set scores</span><a href="' + k.compareHref(T, a, b) + '">Compare profiles →</a>' });

@@ -42,6 +42,23 @@ function seasonRows(d) {
   });
 }
 GI.seasonRows = seasonRows;
+/* The league module's options (docs/_design/league.js, QKL) from season.json["league"]: the teams, the race chart's
+   groups (the two conferences, then the eight divisions; `group` picks the first shown) and the race log
+   (data/race_log.json through the site's cached loader). null without the block or the module. */
+function leagueOpts(d, S, group) {
+  const L = d && d.league;
+  if (!L || !window.QKL) return null;
+  const rows = seasonRows(d), teams = {};
+  rows.forEach(r => { teams[r.team] = { abbr: GI.teamAbbr(r.team), name: GI.teamName(r.team), colour: GI.teamColour(r.team), href: GI.teamHref(r.team, S) }; });
+  const groups = GI.CONFERENCES.map(c => ({ key: c, label: c, teams: rows.filter(r => r.conference === c).map(r => r.team) }))
+    .concat(GI.DIVISIONS.map(dv => ({ key: dv, label: dv, teams: rows.filter(r => r.division === dv).map(r => r.team) })));
+  return { league: L, teams: teams, groups: groups, season: String(S), group: group || GI.CONFERENCES[0], loadLog: () => GI.load('race_log.json'),
+    title: 'How the playoff race is shaping up', unitGames: 'games' };
+}
+GI.leagueOpts = leagueOpts;
+function toggle(lo, t) { return lo ? QKL.toggle(t, GI.teamName(t)) : ''; }
+function chipCell(lo, t) { return { html: QKL.chip(lo, t) || '<span class="qk-muted">—</span>', v: '' }; }
+const PROFILE_COL = { label: 'Profile', sortable: false, title: 'What stands out about the team; + opens its card: strengths, weaknesses and the race' };
 function flag(o, k) { return o && typeof o === 'object' && o[k] === true; }
 function pctW(r) { const g = (num(r.w) || 0) + (num(r.l) || 0) + (num(r.t) || 0); return g ? ((num(r.w) || 0) + 0.5 * (num(r.t) || 0)) / g : 0; }
 function clinchTag(r) {
@@ -69,33 +86,33 @@ function oddsCell(p, colour) {
   if (p <= 0.0005) return { html: '<span class="qk-muted">0%</span>', v: 0 };
   return { html: GI.probBar(p, colour), v: p };
 }
-function divTable(rows, S) {
+function divTable(rows, S, lo) {
   return GI.tableHTML([{ label: 'Team' }, { label: 'W-L', align: 'right' }, { label: 'Diff', align: 'right', title: 'Points for minus points against' },
     { label: 'Rating', align: 'right', title: 'Our team rating: points better than an average team on a neutral field' },
     { label: 'Rem SOS', align: 'right', title: 'Strength of the remaining schedule (average opponent rating; played so far in the tooltip)' },
     { label: 'Playoffs', align: 'right', title: 'Our chance of making the playoffs (season simulation)' }, { label: 'Div', align: 'right', title: 'Our chance of winning the division' }, { label: 'Bye', align: 'right', title: 'Our chance of the No. 1 seed and the bye' },
-    { label: 'SB', align: 'right', title: 'Our chance of winning the Super Bowl' }, { label: 'Magic', align: 'right', title: 'Magic numbers: P to clinch a playoff place, D to win the division' }],
+    { label: 'SB', align: 'right', title: 'Our chance of winning the Super Bowl' }, { label: 'Magic', align: 'right', title: 'Magic numbers: P to clinch a playoff place, D to win the division' }].concat(lo ? [PROFILE_COL] : []),
   rows.map(r => ({ _href: GI.teamHref(r.team, S), cells: [
-    { html: GI.teamLink(r.team, { short: true, season: S }) + clinchTag(r), v: r.team },
+    { html: toggle(lo, r.team) + GI.teamLink(r.team, { short: true, season: S }) + clinchTag(r), v: r.team },
     { html: GI.record(r.w, r.l, r.t), v: pctW(r) },
     { html: '<span title="' + esc((isNum(r.pf) ? r.pf + ' for, ' + r.pa + ' against' : '')) + '">' + GI.deltaHTML(r.diff, 0) + '</span>', v: r.diff }, { html: isNum(r.rating) ? GI.signed(r.rating, 1) : '—', v: r.rating },
     { html: '<span title="' + esc(isNum(r.sos) ? 'played so far ' + GI.signed(r.sos, 1) : '') + '">' + (isNum(r.sos_rem) ? GI.signed(r.sos_rem, 1) : '—') + '</span>', v: r.sos_rem },
     oddsCell(r.p_playoffs, GI.tc(r.team)), { html: GI.pct(r.p_div, 0), v: r.p_div }, { html: GI.pct(r.p_bye, 0), v: r.p_bye },
-    { html: GI.pct(r.p_sb, 1), v: r.p_sb }, magicCell(r)] })), { sticky: true });
+    { html: GI.pct(r.p_sb, 1), v: r.p_sb }, magicCell(r)].concat(lo ? [chipCell(lo, r.team)] : []) })), { sticky: true });
 }
-function divisionsView(rows, S) {
+function divisionsView(rows, S, lo) {
   return GI.grid(GI.DIVISIONS.map(div => {
     const list = rows.filter(r => r.division === div).sort((a, b) => (isNum(a.div_rank) && isNum(b.div_rank) ? a.div_rank - b.div_rank : pctW(b) - pctW(a) || (b.p_div || 0) - (a.p_div || 0)));
-    return list.length ? GI.card(div, '', divTable(list, S), { span: 6, flush: true }) : '';
+    return list.length ? GI.card(div, '', divTable(list, S, lo), { span: lo ? 12 : 6, flush: true }) : '';
   }).join('')) + '<p class="gi-cap">x clinched a playoff place · y the division · z the bye · e eliminated. Chances from our season simulation of the remaining schedule with the NFL tiebreakers.</p>';
 }
-function conferencesView(rows, S) {
+function conferencesView(rows, S, lo) {
   return GI.grid(GI.CONFERENCES.map(conf => {
     const list = rows.filter(r => r.conference === conf).sort((a, b) => (isNum(a.seed) && isNum(b.seed) ? a.seed - b.seed : isNum(a.seed) ? -1 : isNum(b.seed) ? 1 : (num(b.p_playoffs) || 0) - (num(a.p_playoffs) || 0)));
-    return GI.card(conf + ' seeding race', 'seeds as they stand · the line falls after the 7th seed', GI.tableHTML([{ label: '#', align: 'right' }, { label: 'Team' }, { label: 'W-L', align: 'right' }, { label: 'Div' }, { label: 'Playoffs', align: 'right' }, { label: 'Bye', align: 'right' }, { label: 'Conf', align: 'right' }, { label: 'SB', align: 'right' }],
-      list.map((r, i) => ({ _class: i === 6 ? 'gi-cut' : '', _href: GI.teamHref(r.team, S), cells: [isNum(r.seed) ? r.seed : i + 1, { html: GI.teamLink(r.team, { short: true, season: S }) + clinchTag(r), v: r.team },
+    return GI.card(conf + ' seeding race', 'seeds as they stand · the line falls after the 7th seed', GI.tableHTML([{ label: '#', align: 'right' }, { label: 'Team' }, { label: 'W-L', align: 'right' }, { label: 'Div' }, { label: 'Playoffs', align: 'right' }, { label: 'Bye', align: 'right' }, { label: 'Conf', align: 'right' }, { label: 'SB', align: 'right' }].concat(lo ? [PROFILE_COL] : []),
+      list.map((r, i) => ({ _class: i === 6 ? 'gi-cut' : '', _href: GI.teamHref(r.team, S), cells: [isNum(r.seed) ? r.seed : i + 1, { html: toggle(lo, r.team) + GI.teamLink(r.team, { short: true, season: S }) + clinchTag(r), v: r.team },
         { html: GI.record(r.w, r.l, r.t), v: pctW(r) }, String(r.division || '').replace(/^(AFC|NFC) /, ''), oddsCell(r.p_playoffs, GI.tc(r.team)),
-        { html: GI.pct(r.p_bye, 0), v: r.p_bye }, { html: GI.pct(r.p_conf, 1), v: r.p_conf }, { html: GI.pct(r.p_sb, 1), v: r.p_sb }] })), { sticky: true }), { span: 6, flush: true });
+        { html: GI.pct(r.p_bye, 0), v: r.p_bye }, { html: GI.pct(r.p_conf, 1), v: r.p_conf }, { html: GI.pct(r.p_sb, 1), v: r.p_sb }].concat(lo ? [chipCell(lo, r.team)] : []) })), { sticky: true }), { span: lo ? 12 : 6, flush: true });
   }).join(''));
 }
 function flatRatings(d) {
@@ -221,8 +238,12 @@ GI.route('standings', function (el, params) {
     el.innerHTML = GI.pageHead('Standings · ' + S, title, esc(sub), pager) + nav + (view === 'table' ? tiles(rows, S) : '') + '<div id="std-body"></div>';
     const body = el.querySelector('#std-body');
     if (view === 'table') {
-      const draw = () => { body.innerHTML = '<div class="gi-toolbar" style="margin-bottom:12px">' + GI.seg('std-tv', [['div', 'Divisions'], ['conf', 'Conferences']], TV, 'Group by') + '</div>' + (TV === 'conf' ? conferencesView(rows, S) : divisionsView(rows, S)); GI.sortable(body); GI.wireSeg(body, 'std-tv', x => { TV = x; draw(); }); };
+      const lo = leagueOpts(d, S, GI.DIVISIONS[0]);
+      if (lo) body.insertAdjacentHTML('afterend', '<div id="std-race"></div><div id="std-shape"></div>');
+      const draw = () => { body.innerHTML = '<div class="gi-toolbar" style="margin-bottom:12px">' + GI.seg('std-tv', [['div', 'Divisions'], ['conf', 'Conferences']], TV, 'Group by') + '</div>' + (TV === 'conf' ? conferencesView(rows, S, lo) : divisionsView(rows, S, lo)) +
+        (lo ? '<p class="gi-cap">+ opens a team\u2019s card: its strengths and weaknesses against the other 31 and where its race stands.</p>' : ''); GI.sortable(body); GI.wireSeg(body, 'std-tv', x => { TV = x; draw(); }); if (lo) QKL.wire(body, lo); };
       draw();
+      if (lo) { QKL.race(el.querySelector('#std-race'), lo); QKL.shape(el.querySelector('#std-shape'), lo); }
     } else if (view === 'ratings') { body.innerHTML = ratingsView(d, rows, S); GI.sortable(body); drawRatings(body, d); }
     else if (view === 'wins') { body.innerHTML = winsView(rows, S); drawWins(rows); }
     else {

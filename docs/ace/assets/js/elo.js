@@ -88,6 +88,7 @@ function drawTable(T, E) {
     { label: 'Elo rank', align: 'right', title: 'Rank by overall Elo' }, { label: 'ATP/WTA rank', align: 'right', title: 'Latest official ranking' }], rows, { compact: true, sticky: true }) +
     (ids.length > ES.show ? '<div class="pg-note"><button type="button" class="af-more" id="el-more">Show all ' + ids.length + '</button></div>' : '');
   k.sortable(host);
+  if (TA.v2 && TA.v2.oursHeads) TA.v2.oursHeads(host, { Overall: 'elo', Hard: 'elo_hard', Clay: 'elo_clay', Grass: 'elo_grass', 'Elo rank': 'elo_rank' });
   const more = document.getElementById('el-more');
   if (more) more.onclick = () => { ES.show = 100000; drawTable(T, E); };
   document.getElementById('el-sub').textContent = ids.length + ' active players rated · ranked by ' + (s === 'all' ? 'overall' : s) + ' Elo; click a header to sort';

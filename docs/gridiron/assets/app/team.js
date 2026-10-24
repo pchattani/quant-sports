@@ -111,6 +111,10 @@ GI.route('team', function (el, params) {
     h += '<div id="tp-season">' + GI.grid(GI.card('How far they go', 'Our chance of reaching each stage, from 20,000 simulated seasons', stages.length ? '<div id="tp-stages"></div>' : GI.muted('Our simulation chances are not available for this season.'), { span: 4 }) +
       GI.card('Final seed', 'Share of our simulated seasons', Array.isArray(sim.seed_dist) ? GI.chartBox('tp-seed', 230, 'Final seed distribution') : GI.muted('No seed distribution.'), { span: 4 }) +
       GI.card('Final wins', 'Our simulated regular-season wins' + (isNum(sim.mean_wins) ? ' · mean ' + GI.num(sim.mean_wins, 1) : ''), Array.isArray(sim.win_dist) ? GI.chartBox('tp-wins', 230, 'Final win distribution') : GI.muted('No win distribution.'), { span: 4 })) + '</div>';
+    /* strengths, weaknesses and the race (docs/_design/league.js): the plain-English read, the race facts and our
+       chances over the season (the percentile card stays further down, under Profile) */
+    const lo = GI.leagueOpts && GI.ok(res[1]) ? GI.leagueOpts(res[1], S) : null;
+    if (lo) h += '<div id="tp-league"></div>';
     const hist = GI.TM.history(x);
     h += GI.grid(GI.card('Ratings through the season', 'points per game against an average team, after each week', hist.length > 1 ? GI.chartBox('tp-hist', 300, 'Ratings by week') : GI.muted('Rating history starts after week 2.'), { span: 7 }) +
       GI.card('Wins against our forecast', 'Cumulative wins minus the wins our pre-game chances expected', GI.chartBox('tp-woe', 300, 'Wins over expected') +
@@ -140,6 +144,7 @@ GI.route('team', function (el, params) {
       GI.card('Tendencies and pace', 'rank among the 32 teams (#1 = highest)', GI.kpis(TEND.map(t => GI.kpi(t[1], GI.fmtVal(v[t[0]], t[2]), isNum(((x || {}).rank || {})[t[0]]) ? '#' + x.rank[t[0]] + ' of 32' : '')), 'gi-stats-sm'), { span: 6 }));
     h += GI.card('Fourth downs', 'every fourth down the team faced, graded · <a href="' + GI.ghref('fourth-downs', S, { team: abbr }) + '">in the fourth-down centre →</a>', '<div id="tp-4th-k"></div><div id="tp-4th-t"></div>', { id: 'tp-4th', flush: true });
     el.innerHTML = h;
+    if (lo) QKL.team(el.querySelector('#tp-league'), Object.assign({}, lo, { meters: false }), abbr);
     el.querySelectorAll('[data-jump]').forEach(a => a.addEventListener('click', () => { const n = el.querySelector(a.getAttribute('data-jump')); if (n && n.scrollIntoView) n.scrollIntoView({ behavior: 'smooth', block: 'start' }); }));
 
     // charts

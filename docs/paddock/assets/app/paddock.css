@@ -352,3 +352,7 @@
 @media (max-width: 420px) { .ql-links a { padding: 10px 10px 12px; } .ql-links b { font-size: 1.25rem; } .ql-links b::after { content: none; } .ql-links span { font-size: 11px; } .ql-race { padding: 14px; } }
 /* the landing top sits a section gap under the intro band */
 .ql-intro + .ql-week { margin-top: var(--sec-gap, 56px); }
+
+/* round 5: our model metrics (the cobalt tag and explain strip) */
+.pd-lab-ours { margin-top: 12px; }
+.pd-ours { margin-top: 16px; }

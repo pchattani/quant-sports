@@ -32,10 +32,22 @@ function prep(raw) {
   var al = function (want, list) { if (idx[want] === undefined) for (var i = 0; i < list.length; i++) if (idx[list[i]] !== undefined) { idx[want] = idx[list[i]]; break; } };
   al('driver', ['driverId', 'driver_id', 'id']); al('name', ['driver_name']); al('team', ['constructorId', 'team_id', 'constructor']); al('year', ['season']); al('races', ['starts', 'n_races']);
   var meta = {};
-  (raw.metrics || []).forEach(function (m) { meta[m.key] = m; });
+  (raw.metrics || []).forEach(function (m) { meta[m.key] = specLabel(m); });
   meta.races = meta.races || { key: 'races', label: 'Races', fmt: 'int' };
   var years = (raw.rows || []).map(function (r) { return r[idx.year]; }).filter(function (v, i, a) { return isNum(v) && a.indexOf(v) === i; }).sort(function (a, b) { return b - a; });
   return { idx: idx, meta: meta, metrics: (raw.metrics || []).filter(function (m) { return idx[m.key] !== undefined; }), rows: raw.rows || [], years: years };
+}
+/* The spec's display name and explanation for a payload metric (assets/qk/metrics/f1.labels.json via PD.v2.spec), with
+   the payload's unit kept in the name; the payload's own label when the spec does not list it. */
+function specLabel(m) {
+  var c = PD.v2 && PD.v2.spec, sm = c ? c.metric(m.key, 'driver') : null;
+  if (!sm || sm.label === m.key) return m;
+  var out = {}, k;
+  for (k in m) if (Object.prototype.hasOwnProperty.call(m, k)) out[k] = m[k];
+  var unit = /\(([^)]*)\)\s*$/.exec(m.label || '');
+  out.label = sm.label + (unit && sm.label.indexOf('(') < 0 && !/ v /.test(unit[1]) ? ' (' + unit[1] + ')' : '');
+  if (sm.explain) out.desc = sm.explain;
+  return out;
 }
 function resolve(pats) {
   pats = pats.map(function (p) { return typeof p === 'string' ? new RegExp('^' + p + '$') : p; });
@@ -55,7 +67,7 @@ function options(sel, scope) {
   var groups = [];
   LAB.metrics.forEach(function (m) { var g = groups.filter(function (x) { return x.name === (m.group || 'Other'); })[0]; if (!g) { g = { name: m.group || 'Other', items: [] }; groups.push(g); } g.items.push(m); });
   var h = scope === 'size' ? '<option value="races">Races</option><option value="">Same size</option>' : scope === 'color' ? '<option value="team">Team</option><option value="year">Season</option><option value="">One colour</option>' : '';
-  groups.forEach(function (g) { h += '<optgroup label="' + esc(g.name) + '">' + g.items.map(function (m) { return '<option value="' + esc(m.key) + '"' + (m.key === sel ? ' selected' : '') + '>' + esc(m.label) + (m.lower ? ' ↓' : '') + '</option>'; }).join('') + '</optgroup>'; });
+  h += PD.v2.picker(LAB.metrics.map(function (m) { return LAB.meta[m.key] || m; }), sel, 'driver');
   return h;
 }
 function sync() {
@@ -117,7 +129,11 @@ function draw() {
   PD.set('lab-note', 'Dashed lines are the medians of this group. ' + (lower(S.x) || lower(S.y) ? 'Axes where less is better are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
     'Labelled: the ten drivers furthest into that corner (sum of standard scores)' + (q ? ', and your search (outlined)' : '') + '. Click a dot to open the driver.' +
     (S.shrink ? ' Shrunk values are pulled towards the group median by ' + SHRINK_K + ' races of prior, (races × value + ' + SHRINK_K + ' × median) / (races + ' + SHRINK_K + ').' : '') +
-    (mX.desc ? '<br><b>' + esc(mX.label) + '</b>: ' + esc(mX.desc) : '') + (mY.desc ? '<br><b>' + esc(mY.label) + '</b>: ' + esc(mY.desc) : ''));
+    (mX.desc ? '<br><b>' + esc(mX.label) + '</b>' + PD.v2.oursTag(S.x) + ': ' + esc(mX.desc) : '') + (mY.desc ? '<br><b>' + esc(mY.label) + '</b>' + PD.v2.oursTag(S.y) + ': ' + esc(mY.desc) : ''));
+  var models = [];
+  [PD.v2.ours(S.x), PD.v2.ours(S.y)].forEach(function (o) { if (o && models.every(function (x) { return x.key !== o.key; })) models.push(o); });
+  PD.set('lab-ours', models.length ? QK.oursExplain(models.map(function (o) { return '<b>' + esc(o.name) + '.</b> ' + esc(o.about); }).join(' '), { title: models.length > 1 ? 'Our models.' : 'Our model.' })
+    : QK.explain('Neither axis comes from our models. The driver ratings (race and qualifying pace v the team-mate), race and qualifying pace v the field, Elo and points against our forecast are ours: they lead every metric list, tagged ' + QK.ours({ short: true }) + '.'));
   PD.table('lab-table', [
     { key: 'name', label: 'Driver', sticky: true, fmt: function (v, r) { return PD.driverLink(r.id, { name: v, team: r.team }); } },
     { key: 'team', label: 'Team', fmt: function (v) { return esc(PD.teamName(v)); } },
@@ -127,6 +143,7 @@ function draw() {
     { key: 'z', label: 'Combined', num: true, tip: 'Sum of standard scores in the better direction', fmt: function (v) { return '<b>' + PD.num(v, 2) + '</b>'; } }
   ], ranked.map(function (o) { var r = o.r, vx = val(r, S.x), vy = val(r, S.y); return { id: r[I.driver], name: nm(r), team: r[I.team], year: r[I.year], races: r[I.races] || 0, vx: vx, vy: vy, px: pOf(sortedX, vx, dx), py: pOf(sortedY, vy, dy), z: o.z }; }),
   { sort: { key: 'z', dir: 'desc' }, rank: true, maxHeight: 560 });
+  PD.v2.oursHeads(document.getElementById('lab-table'), { vx: S.x, vy: S.y });
 }
 
 function render(el, params, state) {
@@ -140,9 +157,10 @@ function render(el, params, state) {
       '<label>Min races <b id="lab-min-v"></b><input id="lab-min" type="range" min="1" max="20" step="1"></label>' +
       '<label class="pd-check"><input id="lab-shrink" type="checkbox"> Shrink small samples</label>' +
       '<label>Highlight<input class="qk-input" id="lab-q" type="search" placeholder="Driver or team…"></label></div>' +
-      PD.chartBox('lab-chart', 600) + '<p class="pd-cap" id="lab-note"></p>') +
+      PD.chartBox('lab-chart', 600) + '<p class="pd-cap" id="lab-note"></p><div id="lab-ours" class="pd-lab-ours"></div>') +
     PD.card('Ranked', 'The whole group by the combined standard score on both axes.', '<div id="lab-table"></div>', { flush: true, cls: 'pd-mt' });
-  return PD.load('lab.json').then(function (rawLab) {
+  return Promise.all([PD.load('lab.json'), PD.v2.specP]).then(function (got) {
+    var rawLab = got[0];
     if (!PD.alive(el)) return;
     if (!rawLab || rawLab.ok === false || !(rawLab.rows || []).length) { PD.ch.none('lab-chart', 'The lab file is not built yet.'); PD.set('lab-sub', ''); return; }
     LAB = prep(rawLab);

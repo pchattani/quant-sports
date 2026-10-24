@@ -1052,3 +1052,10 @@ body.qk .qk-split-foot .lab { color: #c7ced9; }
 }
 .qk-tape-head .t > * { max-width: 100%; }
 .qk-bugxl .tm > * { min-width: 0; max-width: 100%; }
+/* ── our metrics: the cobalt "Our model" tag (QK.ours) and the cobalt explain strip (QK.oursExplain) ── */
+.qk-ours { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; margin-left: 6px; border-left: 3px solid var(--signal); background: var(--signal-soft); color: var(--signal); font: 700 10px/1 var(--font-cond); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; vertical-align: middle; text-decoration: none; cursor: help; }
+.qk-ours.sm { height: 14px; padding: 0 4px; margin-left: 4px; border-left-width: 2px; font-size: 9px; letter-spacing: 0.06em; }
+th .qk-ours { vertical-align: 1px; }
+.qk-explain.qk-explain-ours { border-left-color: var(--signal); }
+.qk-explain.qk-explain-ours > b:first-child { color: var(--signal); }
+optgroup { font-style: normal; font-weight: 700; color: var(--ink-3); }

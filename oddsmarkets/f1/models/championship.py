@@ -40,6 +40,11 @@ Conditionals
 ``p_title_if_win[r]`` / ``p_title_if_not_win[r]``: the share of simulations in which the driver is champion
 among those where he does / does not win round r's Grand Prix (reported for the leader for every remaining
 round, and for each contender for the next round).
+
+``fights`` (next Grand Prix only): for every driver and constructor, the championship place k in 1..3 whose chance
+P(final position <= k) is most in the balance (largest p(1-p), kept when 2% <= p <= 98%), with that chance among the
+simulations where the driver (a constructor: either car) is on the podium at the next Grand Prix and where not. The
+same simulations, so no extra run; a side with fewer than ``FIGHT_MIN_SIMS`` simulations gives None.
 """
 from __future__ import annotations
 
@@ -58,6 +63,7 @@ TEAM_FORM_STEP, DRIVER_FORM_STEP = 0.06, 0.03
 CB_PLACES_DRV, CB_BITS_DRV = 10, 5
 CB_PLACES_TEAM, CB_BITS_TEAM = 8, 6
 QUANTILES = (5, 25, 50, 75, 95)
+FIGHT_PLACES, FIGHT_MIN_P, FIGHT_MIN_SIMS = 3, 0.02, 100
 
 
 # ----------------------------------------------------------------------------------------------- state
@@ -161,6 +167,51 @@ def rank_by_key(key: np.ndarray, rng: np.random.Generator | None = None) -> np.n
     return pos
 
 
+def _place_fight(pos: np.ndarray) -> tuple[int, float] | None:
+    """(k, P(pos < k)) for the place k in 1..FIGHT_PLACES most in the balance; pos is 0-based. None when every
+    such chance is under FIGHT_MIN_P or over 1 - FIGHT_MIN_P."""
+    best = None
+    for k in range(1, FIGHT_PLACES + 1):
+        p = float(np.mean(pos < k))
+        if FIGHT_MIN_P <= p <= 1 - FIGHT_MIN_P and (best is None or p * (1 - p) > best[1] * (1 - best[1])):
+            best = (k, p)
+    return best
+
+
+def _cond(hit: np.ndarray, flag: np.ndarray) -> float | None:
+    return float(hit[flag].mean()) if int(flag.sum()) >= FIGHT_MIN_SIMS else None
+
+
+def fights(next_pod, posD: np.ndarray, posT: np.ndarray, di: dict, ti: dict) -> dict:
+    """The next Grand Prix's stakes (module docstring, ``fights``): {"round", "drivers": {id: row}, "constructors": {...}},
+    row = {"place", "p", "p_podium_next", "p_if_podium", "p_if_not"}."""
+    rnd, cols, tcols, pod = next_pod
+    out: dict = {"round": int(rnd), "drivers": {}, "constructors": {}}
+    col_of = {int(c): j for j, c in enumerate(cols)}
+    for d, i in di.items():
+        f = _place_fight(posD[:, i])
+        if f is None or i not in col_of:
+            continue
+        flag = pod[:, col_of[i]]
+        hit = posD[:, i] < f[0]
+        out["drivers"][d] = {"place": f[0], "p": round(f[1], 4), "p_podium_next": round(float(flag.mean()), 4),
+                             "p_if_podium": _r4(_cond(hit, flag)), "p_if_not": _r4(_cond(hit, ~flag))}
+    for t, i in ti.items():
+        f = _place_fight(posT[:, i])
+        js = [j for j, tc in enumerate(tcols) if int(tc) == i]
+        if f is None or not js:
+            continue
+        flag = pod[:, js].any(axis=1)
+        hit = posT[:, i] < f[0]
+        out["constructors"][t] = {"place": f[0], "p": round(f[1], 4), "p_podium_next": round(float(flag.mean()), 4),
+                                  "p_if_podium": _r4(_cond(hit, flag)), "p_if_not": _r4(_cond(hit, ~flag))}
+    return out
+
+
+def _r4(x: float | None) -> float | None:
+    return None if x is None else round(x, 4)
+
+
 # ----------------------------------------------------------------------------------------------- simulation
 
 def _events(year: int, remaining: list[tuple[int, str]]) -> list[tuple[int, str, _rs.RaceInputs]]:
@@ -220,6 +271,7 @@ def simulate_championship(year: int, n: int = 20000, seed: int | None = None, *,
     G = np.zeros((n, D))
     per_round: dict[str, dict[str, np.ndarray]] = {}
     race_wins: dict[int, np.ndarray] = {}                 # round -> (n,) winner index (GP only)
+    next_pod = None                                       # the next GP: (driver cols, team cols, (n, k) podium flags)
     last_round = None
     for k_ev, (rnd, kind, inp) in enumerate(events):
         if rnd != last_round:
@@ -250,6 +302,8 @@ def simulate_championship(year: int, n: int = 20000, seed: int | None = None, *,
                         CT[:, tc, place - 1] += hit[:, j].astype(np.int16)
             winner_local = np.argmin(pos, axis=1)
             race_wins[rnd] = cols[winner_local]
+            if next_pod is None:
+                next_pod = (rnd, cols, tcols, (pos <= 3) & cls)
 
     kD = countback_key(P, C, CB_PLACES_DRV, CB_BITS_DRV)
     kT = countback_key(PT, CT, CB_PLACES_TEAM, CB_BITS_TEAM)
@@ -307,6 +361,8 @@ def simulate_championship(year: int, n: int = 20000, seed: int | None = None, *,
                            "p_title_if_win_next": float(np.mean(champD[won] == i)) if won.any() else None,
                            "p_title_if_not_win_next": float(np.mean(champD[~won] == i)) if (~won).any() else None}
             cond["next_round"] = {"round": nxt, "contenders": cont}
+            if next_pod is not None:
+                cond["next_round"]["fights"] = fights(next_pod, posD, posT, di, ti)
 
     return {"year": int(year), "n": int(n), "drivers": out_d, "constructors": out_t, "remaining": [list(x) for x in remaining],
             "completed": state.get("completed", []), "max_points_left": ml, "conditionals": cond,

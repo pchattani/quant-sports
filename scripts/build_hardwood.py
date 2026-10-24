@@ -606,7 +606,8 @@ def build_league(b: Build, league: str, args, cfg: dict) -> dict:
     nv = b.step(f"{league} value seasons", lambda: value_seasons(b, league, seasons, cats, out_ctx), 0)
     logger.info("%s value.json: %s seasons rewritten", league, nv)
     hist = b.write_or_fail(f"{league}/history.json", f"{league} history", lambda: SN.history(league, seasons, shared["elo"]))
-    b.write_or_fail(f"{league}/lab.json", f"{league} lab", lambda: SN.lab_payload(league, cats))
+    vcols = {s: SN.value_columns(an.read_json(b.data / league / str(s) / "value.json")) for s in seasons if s in cats}
+    b.write_or_fail(f"{league}/lab.json", f"{league} lab", lambda: SN.lab_payload(league, cats, vcols))
     b.write_or_fail(f"{league}/calibration.json", f"{league} calibration", lambda: SN.calibration(league, b.data))
     if out_ctx is not None:
         b.write_or_fail(f"{league}/markets.json", f"{league} markets", lambda: SN.markets_payload(out_ctx))

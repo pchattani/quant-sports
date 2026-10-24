@@ -6089,5 +6089,44 @@
    "status": "not needed",
    "note": "measured: early-down EPA/play is less stable (first v second half 0.47 v 0.57) and less predictive of second-half win% (0.35 v 0.41) than all-down EPA/play."
   }
- ]
+ ],
+ "our_models": {
+  "models": {
+   "composite": {
+    "name": "QB composite",
+    "about": "Our all-round passing grade: EPA per dropback, accuracy, sack avoidance and turnovers blended into a forecast of next season's EPA per dropback."
+   },
+   "value": {
+    "name": "Gridiron Value (GVAR)",
+    "about": "Our value above a replacement-level player at the same position, per game and in total, from the plays the player is credited with."
+   },
+   "kicking": {
+    "name": "Expected kicking model",
+    "about": "Field goals, points and net punting over what an average kicker or punter would manage on the same attempts."
+   },
+   "fourth": {
+    "name": "Fourth-down model",
+    "about": "Our go / kick / punt advice from the win-probability model, and how often a team goes when it says go."
+   },
+   "team": {
+    "name": "Team rating model",
+    "about": "Points per game better than average, split into offence and defence, from our game model."
+   }
+  },
+  "metrics": {
+   "composite": "composite",
+   "gvar_pg": "value",
+   "value": "value",
+   "gvar": "value",
+   "def_value": "value",
+   "fg_oe": "kicking",
+   "pts_oe": "kicking",
+   "net_oe": "kicking",
+   "go_rate_rec": "fourth",
+   "rating": "team",
+   "off_rating": "team",
+   "def_rating": "team",
+   "composite_epa": "composite"
+  }
+ }
 }

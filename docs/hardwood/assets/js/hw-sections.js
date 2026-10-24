@@ -210,8 +210,10 @@ function renderTeams(el, params) {
 /* The leaderboard's metrics: counting boards (everyone who qualifies ranks), then the role metric set. */
 const COUNT = [['pts_g', 'Points a game', '1'], ['reb_g', 'Rebounds a game', '1'], ['ast_g', 'Assists a game', '1'], ['tpm_g', 'Threes a game', '1'], ['stl_g', 'Steals a game', '1'], ['blk_g', 'Blocks a game', '1']];
 
+const WAR_LABEL = 'Wins above replacement (WAR)';
+const oursOf = k => (HW.ours ? HW.ours.of(k) : null);
 function leadersTab(node, L, S) {
-  return Promise.all([U.catalogue(L, S), U.roles(L, S)]).then(res => {
+  return Promise.all([U.catalogue(L, S), U.roles(L, S), HW.ours ? HW.ours.load() : null]).then(res => HW.fx.joinValue(L, res[0].S, res[0].cat).then(() => res)).then(res => {
     if (!U.alive(node)) return;
     const r = res[0], cat = r.cat;
     if (!U.ok(cat) || !Object.keys(cat.players || {}).length) { node.innerHTML = U.empty('No player numbers yet', 'The catalogue fills in once games are played.'); return; }
@@ -220,39 +222,45 @@ function leadersTab(node, L, S) {
     const finish = rl => {
       const P = cat.players;
       const ids = Object.keys(P).filter(id => P[id].qualified);
-      const keys = COUNT.map(x => x[0]).concat(['hpm', 'hpm_o', 'hpm_d', 'pts100', 'ts_add', 'pox100', 'ast_pct', 'drb_pct', 'stl_pct', 'blk_pct', 'ts']).filter(k => ids.some(id => isNum((P[id].values || {})[k])));
-      const lab = k => { const c = COUNT.find(x => x[0] === k); return c ? c[1] : U.mMeta(k).label; };
-      const fmtK = (k, v) => { const c = COUNT.find(x => x[0] === k); return c ? U.f(v, 1) : U.fmtM(k, v); };
+      const keys = COUNT.map(x => x[0]).concat(['hpm', 'hpm_o', 'hpm_d', 'war', 'pts100', 'ts_add', 'pox100', 'ast_pct', 'drb_pct', 'stl_pct', 'blk_pct', 'ts']).filter(k => ids.some(id => isNum((P[id].values || {})[k])));
+      const lab = k => { const c = COUNT.find(x => x[0] === k); return c ? c[1] : k === 'war' ? WAR_LABEL : U.mMeta(k).label; };
+      const fmtK = (k, v) => { const c = COUNT.find(x => x[0] === k); return c || k === 'war' ? U.f(v, 1) : U.fmtM(k, v); };
+      const picker = HW.ours ? HW.ours.groups(keys.map(k => ({ key: k, label: lab(k), group: COUNT.find(x => x[0] === k) ? 'per game' : 'rates' }))) : [{ name: 'Metrics', items: keys.map(k => ({ key: k, label: lab(k) })) }];
       let h = r.fallback ? '<div class="qk-note" style="margin-bottom:14px">No ' + esc(HW.seasonLabel(L, S)) + ' regular-season games yet: these are the final ' + esc(HW.seasonLabel(L, SS)) + ' numbers.</div>' : '';
       /* v4: Who's hot, the black power list: the top qualified name on five boards */
       const HOT = [['pts_g', 'Most points', 'points a game', U.f], ['reb_g', 'Most rebounds', 'rebounds a game', U.f], ['ast_g', 'Most assists', 'assists a game', U.f],
-        ['hpm', 'Biggest impact', 'points per 100 (HPM)', (x, d) => U.signed(x, d)], ['ts', 'Best shooter', 'true shooting', x => HW.fmtVal(x, 'pct')]];
+        ['hpm', 'Biggest impact', 'points per 100 (HPM)', (x, d) => U.signed(x, d)], ['war', 'Most wins added', 'wins above replacement', x => U.f(x, 1)], ['ts', 'Best shooter', 'true shooting', x => HW.fmtVal(x, 'pct')]];
       const EXPL = { pts_g: 'Per game, among players over the minutes floor.', reb_g: 'Per game, among players over the minutes floor.', ast_g: 'Per game, among players over the minutes floor.',
-        hpm: 'Points per 100 trips the player adds to the team’s margin over an average player.', ts: 'Points per shot, with threes and free throws counted.' };
+        hpm: 'Points per 100 trips the player adds to the team’s margin over an average player. Our impact model.', war: 'Wins added over a replacement-level player in the minutes played. Our value model, from HPM.', ts: 'Points per shot, with threes and free throws counted.' };
       const hot = HOT.map(b => { const top = ids.filter(id => isNum((P[id].values || {})[b[0]])).sort((x, y) => P[y].values[b[0]] - P[x].values[b[0]]);
         if (!top.length) return null; const a = P[top[0]], n = top[1] ? P[top[1]] : null;
-        return { sport: 'basketball', kicker: HW.leagueName(L) + ' · ' + HW.teamAbbr(L, a.team), title: b[1], name: a.name, value: b[3](a.values[b[0]], 1), unit: b[2], next: n ? { name: n.name, value: b[3](n.values[b[0]], 1) } : null, expl: EXPL[b[0]], href: HW.playerHref(L, top[0], SS) }; }).filter(Boolean);
+        return { sport: 'basketball', kicker: HW.leagueName(L) + ' · ' + HW.teamAbbr(L, a.team), title: b[1], name: a.name, value: b[3](a.values[b[0]], 1), unit: b[2], next: n ? { name: n.name, value: b[3](n.values[b[0]], 1) } : null, expl: EXPL[b[0]], href: HW.playerHref(L, top[0], SS) }; }).filter(Boolean).slice(0, 5);
       if (hot.length) h += QK.band(QK.sectionHead({ kicker: 'Who’s hot', title: 'The leaders, stat by stat', sub: 'The top qualified name on five boards, the next best behind, and what the number means.' }) + QK.hotRow(hot));
       h += '<div class="hw-flex" style="margin-bottom:14px"><input class="qk-input hw-search" id="pl-q" type="search" placeholder="Find a player…" aria-label="Find a player" autocomplete="off"><span class="hw-quiet">Qualified: ' + Number(cat.min_floor || 0).toLocaleString('en-GB') + '+ minutes (' + ids.length + ' players). Heat cells: percentile within the player’s role (guards, wings, bigs).</span></div><div id="pl-hits"></div>';
       h += U.card2('Pick a stat, pick a role', 'Every cell is coloured by the percentile within the role, cold (blue) to hot (red).',
-        '<div class="hw-flex" style="margin-bottom:12px"><select class="qk-select" id="pl-k" aria-label="Metric">' + keys.map(k => '<option value="' + k + '">' + esc(lab(k)) + '</option>').join('') + '</select>' +
-        '<div class="qk-seg" id="pl-r" role="group" aria-label="Role"><button type="button" data-value="" aria-pressed="true">All</button><button type="button" data-value="G" aria-pressed="false">Guards</button><button type="button" data-value="W" aria-pressed="false">Wings</button><button type="button" data-value="B" aria-pressed="false">Bigs</button></div></div><div id="pl-lb"></div>', { flush: false });
+        '<div class="hw-flex" style="margin-bottom:12px"><select class="qk-select" id="pl-k" aria-label="Metric">' + picker.map(g => '<optgroup label="' + esc(g.name) + '">' + g.items.map(it => '<option value="' + it.key + '">' + esc(it.label) + '</option>').join('') + '</optgroup>').join('') + '</select>' +
+        '<div class="qk-seg" id="pl-r" role="group" aria-label="Role"><button type="button" data-value="" aria-pressed="true">All</button><button type="button" data-value="G" aria-pressed="false">Guards</button><button type="button" data-value="W" aria-pressed="false">Wings</button><button type="button" data-value="B" aria-pressed="false">Bigs</button></div></div><div id="pl-lbx"></div><div id="pl-lb" class="qk-ours-cols"></div>', { flush: false });
       h += '<div class="qk-grid hw-sec"><div class="qk-span-12">' + U.card2('Impact at both ends', 'HPM per 100 possessions, offence against defence; qualified players, size is minutes', U.chart('pl-sc', 440, 'Impact at both ends') +
         QK.note('<b>HPM</b> is the points per 100 trips a player adds to the team’s margin over an average player. Top right helps at both ends; most stars sit right of centre, and the best defenders sit high.')) + '</div></div>';
       node.innerHTML = h;
-      const st = { k: keys[0], r: '' };
+      const st = { k: keys.indexOf('hpm') >= 0 ? 'hpm' : keys[0], r: '' };
       const drawLb = () => {
         const k = st.k, low = U.mMeta(k).better === 'low' && !COUNT.find(x => x[0] === k);
         const list = ids.filter(id => isNum((P[id].values || {})[k]) && (!st.r || U.roleOf(P[id], id, rl) === st.r)).sort((a, b) => (low ? 1 : -1) * (P[a].values[k] - P[b].values[k])).slice(0, 25);
         const rows = list.map(id => { const p = P[id], v = p.values || {}, role = U.roleOf(p, id, rl);
           return { id: id, name: p.name, team: p.team, sub: [HW.teamAbbr(L, p.team), (U.ROLE1 || {})[role] || p.pos].filter(Boolean).join(' · '), val: v[k], val_p: U.rolePctl(cat, rl, id, k),
-            hpm: v.hpm, hpm_p: U.rolePctl(cat, rl, id, 'hpm'), ts: v.ts, ts_p: U.rolePctl(cat, rl, id, 'ts'), min: p.min, gp: p.gp }; });
+            hpm: v.hpm, hpm_p: U.rolePctl(cat, rl, id, 'hpm'), war: v.war, ts: v.ts, ts_p: U.rolePctl(cat, rl, id, 'ts'), min: p.min, gp: p.gp }; });
+        const xb = document.getElementById('pl-lbx');
+        if (xb) xb.innerHTML = HW.ours ? HW.ours.explain([k], { label: lab }) : '';
         QK.leaderboard(document.getElementById('pl-lb'), { dense: true, rank: true, rows: rows, rowHref: x => HW.playerHref(L, x.id, SS), columns: [
           { key: 'name', label: 'Player', type: 'entity', sub: 'sub', mark: x => U.team(L, x.team), href: x => HW.playerHref(L, x.id, SS) },
-          { key: 'val', label: lab(k), type: 'pctl', pctl: 'val_p', fmt: v => fmtK(k, v) },
-          { key: 'hpm', label: 'HPM', type: 'pctl', pctl: 'hpm_p', fmt: v => U.signed(v, 1), tip: 'Total impact per 100 possessions' },
+          { key: 'val', label: lab(k), type: 'pctl', pctl: 'val_p', fmt: v => fmtK(k, v), tip: HW.ours ? HW.ours.tip(k, '') : '' },
+          { key: 'hpm', label: 'HPM', type: 'pctl', pctl: 'hpm_p', fmt: v => U.signed(v, 1), tip: HW.ours ? HW.ours.tip('hpm', 'Total impact per 100 possessions') : 'Total impact per 100 possessions' }]
+          .concat(k !== 'war' && rows.some(x => isNum(x.war)) ? [{ key: 'war', label: 'WAR', num: true, fmt: v => U.f(v, 1), tip: HW.ours ? HW.ours.tip('war', 'Wins added over a replacement-level player in the minutes played, from HPM.') : '' }] : []).concat([
           { key: 'ts', label: 'TS%', type: 'pctl', pctl: 'ts_p', fmt: v => HW.fmtVal(v, 'pct') },
-          { key: 'gp', label: 'GP', num: true }, { key: 'min', label: 'Min', type: 'bar', fmt: v => Number(Math.round(v || 0)).toLocaleString('en-GB') }] });
+          { key: 'gp', label: 'GP', num: true }, { key: 'min', label: 'Min', type: 'bar', fmt: v => Number(Math.round(v || 0)).toLocaleString('en-GB') }]) });
+        const vh = document.querySelector('#pl-lb th[data-k="val"]');
+        if (vh) vh.classList.toggle('qk-ours-th', !!oursOf(k));
       };
       drawLb();
       document.getElementById('pl-k').addEventListener('change', e => { st.k = e.target.value; drawLb(); });
@@ -283,9 +291,9 @@ function leadersTab(node, L, S) {
  * spec's shared headline metrics, heat cells by percentile within the role (or the league), a role filter, a team
  * filter, any extra catalogue column, and the chance of moving where the movement model is published (NBA). */
 const CAT = { q: '', role: '', team: '', basis: 'role', extra: '', all: false };
-const CAT_KEYS = ['hpm', 'hpm_o', 'hpm_d', 'pts100', 'ts_add', 'ast_pct', 'drb_pct', 'stl_pct', 'blk_pct'];
+const CAT_KEYS = ['hpm', 'hpm_o', 'hpm_d', 'war', 'pts100', 'ts_add', 'ast_pct', 'drb_pct', 'stl_pct', 'blk_pct'];
 function catalogueTab(node, L, S) {
-  return Promise.all([U.catalogue(L, S), U.roles(L, S), U.isCur(L, S) ? U.movement(L) : Promise.resolve(null)]).then(res => {
+  return Promise.all([U.catalogue(L, S), U.roles(L, S), U.isCur(L, S) ? U.movement(L) : Promise.resolve(null), HW.ours ? HW.ours.load() : null]).then(res => HW.fx.joinValue(L, res[0].S, res[0].cat).then(() => res)).then(res => {
     if (!U.alive(node)) return null;
     const r = res[0], cat = r.cat, SS = r.S;
     if (!U.ok(cat) || !Object.keys(cat.players || {}).length) { node.innerHTML = U.empty('No player numbers yet', 'The catalogue fills in once games are played.'); return null; }
@@ -297,20 +305,20 @@ function catalogueTab(node, L, S) {
       const P = cat.players, ids = Object.keys(P);
       const meta = {}; (cat.metrics || []).forEach(m => { meta[m.key] = m; });
       const teams = Array.from(new Set(ids.map(id => P[id].team).filter(Boolean))).sort((a, b) => HW.teamName(L, a).localeCompare(HW.teamName(L, b)));
-      const groups = {}; (cat.metrics || []).forEach(m => { (groups[m.group || 'Other'] || (groups[m.group || 'Other'] = [])).push(m); });
+      const pick = HW.ours ? HW.ours.groups(HW.ours.relabel(cat.metrics || [], 'player')) : HW.fx.groups(cat.metrics || []);
       node.innerHTML = (r.fallback ? '<div class="qk-note" style="margin-bottom:14px">No ' + esc(HW.seasonLabel(L, S)) + ' regular-season games yet: these are the final ' + esc(HW.seasonLabel(L, SS)) + ' numbers.</div>' : '') +
         U.card2('Every player', 'Heat cells: the percentile within the player’s role (guards, wings, bigs) or the whole league, 100 = best. Percentiles need ' + Number(cat.min_floor || 0).toLocaleString('en-GB') + '+ minutes.' + (mv ? ' Chance of moving: ' + esc(U.mvHorizon(mv)) + '.' : ''),
           '<div class="hw-catctl"><input class="qk-input hw-search" id="ct-q" type="search" placeholder="Player or team…" aria-label="Find a player" value="' + esc(CAT.q) + '">' +
           '<div class="qk-seg" id="ct-role" role="group" aria-label="Role">' + [['', 'All'], ['G', 'Guards'], ['W', 'Wings'], ['B', 'Bigs']].map(x => '<button type="button" data-value="' + x[0] + '" aria-pressed="' + (CAT.role === x[0]) + '">' + x[1] + '</button>').join('') + '</div>' +
           '<div class="qk-seg" id="ct-basis" role="group" aria-label="Percentiles against">' + [['role', 'Against the role'], ['league', 'Against the league']].map(x => '<button type="button" data-value="' + x[0] + '" aria-pressed="' + (CAT.basis === x[0]) + '">' + x[1] + '</button>').join('') + '</div>' +
           '<select class="qk-select" id="ct-team" aria-label="Team"><option value="">All teams</option>' + teams.map(t => '<option value="' + esc(t) + '"' + (t === CAT.team ? ' selected' : '') + '>' + esc(HW.teamName(L, t)) + '</option>').join('') + '</select>' +
-          '<select class="qk-select" id="ct-extra" aria-label="Add a column"><option value="">Add a column…</option>' + Object.keys(groups).map(g => '<optgroup label="' + esc(g) + '">' + groups[g].map(m => '<option value="' + esc(m.key) + '"' + (m.key === CAT.extra ? ' selected' : '') + '>' + esc(m.label) + '</option>').join('') + '</optgroup>').join('') + '</select>' +
+          '<select class="qk-select" id="ct-extra" aria-label="Add a column"><option value="">Add a column…</option>' + pick.map(g => '<optgroup label="' + esc(g.name) + '">' + g.items.map(m => '<option value="' + esc(m.key) + '"' + (m.key === CAT.extra ? ' selected' : '') + '>' + esc(m.label) + '</option>').join('') + '</optgroup>').join('') + '</select>' +
           '<label class="hw-quiet hw-chk"><input type="checkbox" id="ct-all"' + (CAT.all ? ' checked' : '') + '> include players under the floor</label></div>' +
           (mv ? '<div class="hw-mvline" style="margin-top:10px"><span class="qk-muted">Chance of moving, split by how:</span>' + U.mvKeys(mv) + '</div>' : '') +
-          '<div id="ct-sub" class="hw-quiet" style="margin:8px 0"></div><div id="ct-table"></div>');
+          '<div id="ct-sub" class="hw-quiet" style="margin:8px 0"></div><div id="ct-table" class="qk-ours-cols"></div>' + (HW.ours ? HW.ours.explain(['hpm', 'war'], { label: k => (k === 'war' ? WAR_LABEL : U.mMeta(k).label) }) : ''));
       const pctOf = (id, k) => (CAT.basis === 'league' ? ((P[id].pct || {})[k]) : U.rolePctl(cat, rl, id, k));
       const fmtK = (k, v) => (meta[k] && !U.MSET.meta[k] ? HW.fmtVal(v, meta[k].fmt) : U.fmtM(k, v));
-      const lab = k => (U.MSET.meta[k] ? U.mMeta(k).label : (meta[k] || {}).label || k);
+      const lab = k => (U.MSET.meta[k] ? U.mMeta(k).label : HW.ours ? HW.ours.label(k, (meta[k] || {}).label || k) : (meta[k] || {}).label || k);
       const drawT = () => {
         const q = CAT.q.trim().toLowerCase();
         const keys = CAT_KEYS.concat(CAT.extra && CAT_KEYS.indexOf(CAT.extra) < 0 ? [CAT.extra] : []).filter(k => ids.some(id => isNum((P[id].values || {})[k])));
@@ -328,7 +336,8 @@ function catalogueTab(node, L, S) {
         QK.leaderboard(document.getElementById('ct-table'), { dense: true, rows: rows, maxHeight: 720, sort: { key: 'hpm', dir: 'desc' }, rowHref: x => HW.playerHref(L, x.id, SS), columns: [
           { key: 'name', label: 'Player', type: 'entity', sub: 'sub', mark: x => U.team(L, x.team), href: x => HW.playerHref(L, x.id, SS) },
           { key: 'gp', label: 'GP', num: true }, { key: 'min', label: 'Min', type: 'bar', fmt: v => Number(Math.round(v || 0)).toLocaleString('en-GB') }]
-          .concat(keys.map(k => ({ key: k, label: lab(k).replace(/ \(HPM\)$/, ''), type: 'pctl', pctl: k + '_p', fmt: v => fmtK(k, v), tip: U.mMeta(k).desc || (meta[k] || {}).desc || '' })))
+          .concat(keys.map(k => ({ key: k, label: k === 'war' ? 'WAR' : lab(k).replace(/ \(HPM\)$/, ''), type: k === 'war' ? undefined : 'pctl', num: k === 'war', pctl: k === 'war' ? undefined : k + '_p', fmt: v => (k === 'war' ? U.f(v, 1) : fmtK(k, v)),
+            tip: HW.ours && HW.ours.of(k) ? HW.ours.tip(k, k === 'war' ? 'Wins added over a replacement-level player in the minutes played, from HPM.' : U.mMeta(k).desc) : U.mMeta(k).desc || (meta[k] || {}).desc || '' })))
           .concat(mv ? [{ key: 'p_next', label: 'Chance of moving', num: true, fmt: (v, x) => U.mvBar(mv, x.mr), tip: 'Our chance the player has left the team ' + U.mvHorizon(mv) }] : []) });
       };
       drawT();

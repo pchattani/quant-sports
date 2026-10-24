@@ -1939,5 +1939,49 @@
    "status": "done",
    "note": "22 Oct 2026: one championship-simulation snapshot per completed round (p_title, expected points, final-points quantiles p05-p95, actual points) for a chance-over-time chart with a band. Recording starts after round 17 of 2026; earlier rounds were never stored."
   }
- ]
+ ],
+ "our_models": {
+  "models": {
+   "driver": {
+    "name": "Driver model",
+    "about": "The driver's own share of race and qualifying pace once the car is taken out, and points against the forecast."
+   },
+   "pace": {
+    "name": "Pace model",
+    "about": "Fuel- and tyre-corrected lap pace against the field, for drivers and for cars."
+   },
+   "elo": {
+    "name": "Elo ratings",
+    "about": "Our driver Elo against the whole field and against the team-mate."
+   },
+   "forecast": {
+    "name": "Race forecast",
+    "about": "Our pre-race forecast of every finishing position, and the points it expects."
+   }
+  },
+  "metrics": {
+   "driver_effect": "driver",
+   "quali_driver_effect": "driver",
+   "points_v_expected": "driver",
+   "race_pace": "pace",
+   "quali_pace": "pace",
+   "race_pace_tm_delta": "pace",
+   "car_race_pace": "pace",
+   "car_quali_pace": "pace",
+   "car_pace_latest": "pace",
+   "car_pace_trend": "pace",
+   "elo": "elo",
+   "elo_teammate": "elo",
+   "race_pace_pct": "pace",
+   "race_pace_rank": "pace",
+   "race_pace_season_rank": "pace",
+   "race_pace_best_rank": "pace",
+   "quali_pace_rank": "pace",
+   "car_race_rank": "pace",
+   "car_quali_rank": "pace",
+   "exp_points": "forecast",
+   "points_v_expected_pre": "forecast",
+   "points_lost_dnf": "forecast"
+  }
+ }
 }

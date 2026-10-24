@@ -4388,5 +4388,55 @@
    "status": "done",
    "note": "22 Oct 2026: per peer group (all, hard, clay, grass) the group id, minimum, pool size, in_pool, sample, the spec's values (headline ids first), percentiles and ranks for players in the pool, and similar players (tour and surface views, this recipe): the player and compare pages need not load players.json."
   }
- ]
+ ],
+ "our_models": {
+  "models": {
+   "elo": {
+    "name": "Elo ratings",
+    "about": "Our Elo ratings, overall and by surface: each match moves them by how surprising the result was."
+   },
+   "serve": {
+    "name": "Serve and return model",
+    "about": "Serve and return strength inferred from scores against the quality of the opposition, and the hold and break rates they imply."
+   },
+   "forecast": {
+    "name": "Match and season forecasts",
+    "about": "Our match forecast (Elo blended with the serve and return model) and the rest-of-season simulation: wins against it, projected ranks and chances."
+   }
+  },
+  "metrics": {
+   "elo": "elo",
+   "elo_clay": "elo",
+   "elo_grass": "elo",
+   "elo_hard": "elo",
+   "elo_peak": "elo",
+   "avg_opp_elo": "elo",
+   "surface_elo": "elo",
+   "serve_rating": "serve",
+   "return_rating": "serve",
+   "hold": "serve",
+   "brk": "serve",
+   "hold_plus_break": "serve",
+   "elo_rank": "elo",
+   "elo_d30": "elo",
+   "elo_d90": "elo",
+   "elo_d365": "elo",
+   "sr_total": "serve",
+   "spw_exp": "serve",
+   "rpw_exp": "serve",
+   "hold_hard": "serve",
+   "hold_clay": "serve",
+   "hold_grass": "serve",
+   "brk_hard": "serve",
+   "brk_clay": "serve",
+   "brk_grass": "serve",
+   "hold_v_strong": "serve",
+   "brk_v_strong": "serve",
+   "wins_over_exp": "forecast",
+   "woe_pm": "forecast",
+   "proj_rank": "forecast",
+   "p_finals": "forecast",
+   "p_no1": "forecast"
+  }
+ }
 }

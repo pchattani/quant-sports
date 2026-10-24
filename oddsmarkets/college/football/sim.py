@@ -220,6 +220,8 @@ def simulate(season: int, pipe: dict, comm: dict | None, *, n: int = 20000, as_o
             BADL[:, ai] += hwin
 
     next_game: dict[str, dict] = {}
+    next_win: dict[str, tuple] = {}              # gid -> (hi, ai, hwin, p_home, date): a team's next game, kept for stakes
+    rem_opp: dict[str, list[float]] = {t: [] for t in fbs}     # remaining regular-season opponents' power ratings
     for df, sim_it in ((known_reg, False), (rem_reg, True)):
         for r in df.itertuples(index=False):
             hi, ai = ix[r.home], ix[r.away]
@@ -235,6 +237,9 @@ def simulate(season: int, pipe: dict, comm: dict | None, *, n: int = 20000, as_o
                 for t, o, p, home in ((r.home, r.away, p_h, not r.neutral), (r.away, r.home, 1 - p_h, False)):
                     if t not in next_game:
                         next_game[t] = {"game": r.gid, "opp": o, "p_win": round(p, 4), "date": r.date}
+                        next_win.setdefault(r.gid, (hi, ai, hwin, p_h, r.date))
+                    if t in rem_opp:
+                        rem_opp[t].append(float(pw[ix[o]]))
             else:
                 hwin = np.full(n, bool(r.hs > r.as_))
             record(hi, ai, hwin, cg)
@@ -390,13 +395,17 @@ def simulate(season: int, pipe: dict, comm: dict | None, *, n: int = 20000, as_o
             "p_auto": round(float(np.mean(auto_in[:, i] & in_cfp[:, i])), 4) if n_field == 12 else 0.0,
             "seed_mean": round(float(seed_of[in_cfp[:, i], i].mean()), 2) if in_cfp[:, i].any() else None,
             "rank_mean": round(float(rank_pos[:, i].mean()), 2),
-            "next": ({k: v for k, v in next_game[t].items() if k != "date"} if t in next_game else None)}
+            "next": ({k: v for k, v in next_game[t].items() if k != "date"} if t in next_game else None),
+            "n_rem": len(rem_opp.get(t) or []),
+            "sos_rem": round(float(np.mean(rem_opp[t])), 2) if rem_opp.get(t) else None}
     conf_out = {}
     for c, idx in members.items():
         rows = [{"team": allt[i], "p_appear": round(float(in_ccg[:, i].mean()), 4), "p_win": round(float(champ[:, i].mean()), 4)}
                 for i in idx]
         conf_out[c] = sorted(rows, key=lambda r: (-r["p_win"], -r["p_appear"]))
+    stakes = game_stakes(next_win, {"cfp": in_cfp, "conf": champ, "title": reach["title"]}, allt, set(fbs))
     return {"n_sims": n, "as_of": as_of, "format": fmt, "teams": teams_out, "conf": conf_out, "power": power, "pts": pts,
+            "stakes": stakes,
             "sd": sd, "noise_sd": round(s_noise, 2), "b_home": b_home, "ccg": {c: (list(v[:2]) if v else None) for c, v in ccg.items()},
             "notes": [
                 "Remaining regular-season games simulated from the blend ratings with correlated team strength draws.",
@@ -404,6 +413,47 @@ def simulate(season: int, pipe: dict, comm: dict | None, *, n: int = 20000, as_o
                 "Committee ranking: resume proxy fitted on 2014-2025 CFP rankings, with noise.",
                 "CFP format: " + fmt["rule"] + ("" if fmt.get("verified") else " (" + fmt.get("note", "unverified") + ")"),
                 "Bowl eligibility = 6+ wins including a conference title game; bowl games are not simulated."]}
+
+
+def game_stakes(next_win: dict, outcomes: dict, allt: list, members: set, *, keep: int = 25, others: int = 3,
+                min_n: int = 30) -> list[dict]:
+    """What rides on each team's next game, from the same simulated seasons (conditional, not a re-run).
+
+    next_win: gid -> (home idx, away idx, home-win bool array over sims, our pre-game home chance, date).
+    outcomes: metric -> (n_sims, T) bool array (cfp: in the field, conf: conference champion, title: national title).
+    Per game: each side's chance of each outcome if it wins and if it loses; "swing", the CFP places we expect the
+    result to move: every team's expected absolute change in its CFP chance (2 p q |change if the home side wins v
+    loses|, p the home side's win share in the sims), summed and halved; and the three other teams whose CFP chance
+    moves most. Sampling noise inflates a sum of absolute changes, so a team counts only when its change is more than
+    3 standard errors. Only games with an FBS member, and only where each result happens in at least min_n
+    simulations (and 2% of them). Largest swing first, at most `keep` games."""
+    rows = []
+    for gid, (hi, ai, hwin, p_h, day) in next_win.items():
+        if allt[hi] not in members and allt[ai] not in members:
+            continue
+        nw = int(hwin.sum())
+        nl = len(hwin) - nw
+        if min(nw, nl) < max(min_n, 0.02 * len(hwin)):
+            continue
+        pw_ = nw / len(hwin)
+        row = {"game": str(gid), "home": allt[hi], "away": allt[ai], "p_home": round(float(p_h), 4), "date": day}
+        for m, arr in outcomes.items():
+            a_w, a_l = arr[hwin].mean(0), arr[~hwin].mean(0)
+            row[m] = {"home": [round(float(a_w[hi]), 4), round(float(a_l[hi]), 4)],
+                      "away": [round(float(a_l[ai]), 4), round(float(a_w[ai]), 4)]}
+            if m == "cfp":
+                d = a_w - a_l
+                se = np.sqrt(a_w * (1 - a_w) / nw + a_l * (1 - a_l) / nl)
+                real = np.abs(d) > 3.0 * se
+                real[[hi, ai]] = True
+                row["swing"] = round(float(pw_ * (1 - pw_) * np.abs(np.where(real, d, 0.0)).sum()), 4)
+                mask = real.copy()
+                mask[[hi, ai]] = False
+                idx = [int(i) for i in np.argsort(-np.abs(np.where(mask, d, 0.0)))[:others] if mask[i] and abs(d[i]) >= 0.02]
+                row["others"] = [{"team": allt[i], "d": round(float(d[i]), 4)} for i in idx]
+        rows.append(row)
+    rows.sort(key=lambda r: -r.get("swing", 0.0))
+    return rows[:keep]
 
 
 def actual_field(season: int, st: dict | None = None) -> dict:

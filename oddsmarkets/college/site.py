@@ -217,6 +217,38 @@ def _et_day(s: Any) -> str | None:
     return t.astimezone(_ET).date().isoformat()
 
 
+RACE_LOG_KEEP = 400            # days: a whole season (scripts/ci_site.py RACE_LOG_KEEP restores it in full)
+RACE_METRICS = {"cfb": ("p_cfp", "p_title", "p_conf"), "mbb": ("p_ncaa", "p_title", "p_conf_reg"),
+                "wbb": ("p_ncaa", "p_title", "p_conf_reg")}
+
+
+def write_race_log(data: Path, level: str, cur: int, sim: dict, now: datetime, floor: float | None = None) -> dict | None:
+    """<L>/race_log.json: {season: {metric: {"YYYY-MM-DD": {team: p}}}}, one snapshot a UTC day of every team's
+    playoff / tournament, title and conference chance at `floor` or more (default 1% for football, 2% for basketball's
+    360-team fields), kept the whole season. The standings race
+    tab draws its forecast lines from it ("tracking since" its first day). Snapshots of this build's sims only, never
+    rebuilt or revised, so no look-ahead. None (nothing written) without sims."""
+    from oddsmarkets.common import digest as DG
+    if floor is None:
+        floor = 0.01 if level == "cfb" else 0.02
+    cur_p = {m: {str(t): v.get(m) for t, v in (sim or {}).items()
+                 if isinstance(v, dict) and isinstance(v.get(m), (int, float)) and v.get(m) >= floor}
+             for m in RACE_METRICS.get(level, ())}
+    if not any(cur_p.values()):
+        return None
+    lp = data / level / "race_log.json"
+    old = load(lp) or {}
+    log_s = (old.get(str(cur)) or {}) if isinstance(old, dict) else {}
+    if not log_s:                                   # first build: start from the digest's chance log (same snapshots)
+        ch = load(data / level / "chance_log.json") or {}
+        ch = (ch.get(str(cur)) or {}) if isinstance(ch, dict) else {}
+        log_s = {m: {d: {t: p for t, p in (v or {}).items() if isinstance(p, (int, float)) and p >= floor}
+                     for d, v in (ch.get(m) or {}).items()} for m in cur_p if ch.get(m)}
+    new_log = {m: DG.roll_log(log_s.get(m), now, cur_p[m], keep=RACE_LOG_KEEP, digits=3) for m in cur_p}
+    write(lp, {str(cur): new_log})
+    return new_log
+
+
 def level_digest(data: Path, level: str, cur: int, cards: list[dict], season: dict, now: datetime) -> dict:
     """index.json levels.<L>.digest: "This week in <level>" (oddsmarkets/common/digest.py: our record this week, the
     upset of the week, the team of the week, the biggest movers in our playoff / tournament chance from the chance
@@ -260,6 +292,7 @@ def level_digest(data: Path, level: str, cur: int, cards: list[dict], season: di
     new_log = {m: DG.roll_log(log_s.get(m), now, cur_p[m]) for m in cur_p}
     if any(cur_p.values()):
         write(lp, {str(cur): new_log})
+    write_race_log(data, level, cur, sim, now)
     if phase != "offseason":
         mv = DG.movers(new_log.get(metric), cur_p.get(metric) or {}, now)
         if mv:

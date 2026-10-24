@@ -15,6 +15,28 @@
 const esc = BP.esc;
 const isNum = BP.isNum;
 let VIEW = 'div';
+let LO = null;      // the league module's options (docs/_design/league.js, QKL) for the season on show, or null
+
+/* QKL options from season.json's "league" block (oddsmarkets/baseball/analytics/race.py): the clubs, the race chart's
+   groups (divisions, then the two leagues) and the race log (data/<L>/race_log.json through the site's cached loader). */
+function leagueOpts(d, L, S) {
+  const lg = d && d.league;
+  if (!lg || !window.QKL) return null;
+  const rows = rowsOf(d), teams = {}, divs = {}, lgs = {};
+  Object.keys(rows).forEach(t => {
+    const r = rows[t];
+    if (BP.teamInfo(t).placeholder) return;
+    teams[t] = { abbr: BP.teamAbbr(t), name: BP.teamName(t), colour: BP.teamColourRaw(t), href: BP.teamHref(t, L, S) };
+    if (r.division) (divs[r.division] = divs[r.division] || []).push(t);
+    if (r.league) (lgs[r.league] = lgs[r.league] || []).push(t);
+  });
+  const order = (a, b) => { const ia = BP.DIVISIONS.indexOf(a), ib = BP.DIVISIONS.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b); };
+  const groups = Object.keys(divs).sort(order).map(k => ({ key: k, label: k, teams: divs[k] }))
+    .concat(Object.keys(lgs).sort().map(k => ({ key: 'lg:' + k, label: k, teams: lgs[k] })));
+  return { league: lg, teams: teams, groups: groups, season: String(S), loadLog: () => BP.loadLevel('race_log.json', L),
+    title: 'How the races are shaping up', unitGames: 'games' };
+}
+BP.leagueOpts = leagueOpts;
 
 /* season.json -> {tid: row} merging standings, simulation, ratings and magic numbers. Accepts
  * standings as [row], {divisions: [{name, teams: [row]}]} or {tid: row}; the simulation under
@@ -111,8 +133,13 @@ function magicCell(r) {
 }
 
 function teamCell(r, L, S) {
-  return { v: BP.teamName(r.tid), html: BP.teamLink(r.tid, { short: true, level: L, season: S }) + clinch(r) };
+  return { v: BP.teamName(r.tid), html: (LO ? QKL.toggle(r.tid, BP.teamName(r.tid)) : '') + BP.teamLink(r.tid, { short: true, level: L, season: S }) + clinch(r) };
 }
+/* the club's first chip ("Bullpen is the weak spot"); + under the club opens the full card */
+function profileCell(r) {
+  return { v: '', html: (LO && QKL.chip(LO, r.tid)) || '<span class="muted-inline">—</span>', cls: 'hide-sm' };
+}
+const PROFILE_COL = { label: 'Profile', sortable: false, cls: 'hide-sm', title: 'What stands out about the club; + opens its card (strengths, weaknesses and the race)' };
 function divisionTable(list, L, S) {
   gbOf(list);
   const rows = list.map(r => {
@@ -127,7 +154,7 @@ function divisionTable(list, L, S) {
       { v: r.pythag_w, html: isNum(r.pythag_w) ? BP.record(r.pythag_w, r.pythag_l) + (isNum(luck) && Math.abs(luck) >= 3 ? ' <span class="' + (luck > 0 ? 'edge-pos' : 'edge-neg') + '" title="Wins above Pythagorean record">' + BP.signed(luck, 0) + '</span>' : '') : '—', cls: 'hide-sm' },
       { v: ew, html: isNum(ew) ? BP.record(ew, el) : '—', cls: 'hide-sm', title: 'Expected record from our team ratings (offence, defence, pitching)' },
       oddsCell(s.p_postseason), Object.assign(oddsCell(s.p_division), { cls: 'hide-sm' }), Object.assign(oddsCell(s.p_bye), { cls: 'hide-sm' }), oddsCell(s.p_ws),
-      Object.assign(magicCell(r), { align: 'right', cls: 'hide-sm' })] };
+      Object.assign(magicCell(r), { align: 'right', cls: 'hide-sm' })].concat(LO ? [profileCell(r)] : []) };
   });
   return BP.tableHTML([{ label: 'Team' }, { label: 'W', align: 'right' }, { label: 'L', align: 'right' }, { label: 'Pct', align: 'right' }, { label: 'GB', align: 'right' },
     { label: 'RS', align: 'right', cls: 'hide-sm' }, { label: 'RA', align: 'right', cls: 'hide-sm' }, { label: 'Diff', align: 'right' },
@@ -135,7 +162,7 @@ function divisionTable(list, L, S) {
     { label: 'Expected', align: 'right', cls: 'hide-sm', title: 'Our expected record from the team ratings' },
     { label: 'Playoffs', align: 'right', title: 'Our chance of a postseason place (season simulation)' }, { label: 'Division', align: 'right', cls: 'hide-sm' },
     { label: 'Bye', align: 'right', cls: 'hide-sm', title: 'A top-two seed: straight to the Division Series' }, { label: 'WS', align: 'right', title: 'Our World Series chance' },
-    { label: 'Magic', align: 'right', cls: 'hide-sm', title: 'Division magic number: wins plus rival losses to clinch' }], rows, { compact: true, cls: 'std-table' });
+    { label: 'Magic', align: 'right', cls: 'hide-sm', title: 'Division magic number: wins plus rival losses to clinch' }].concat(LO ? [PROFILE_COL] : []), rows, { compact: true, cls: 'std-table' });
 }
 function wildcardTable(list, L, S) {
   // the division leaders sit out; the rest are ranked by win percentage, the cut after the third
@@ -152,11 +179,11 @@ function wildcardTable(list, L, S) {
     return { _class: !isLead && k === 2 ? 'wc-cut' : '', cells: [{ v: k, html: isLead ? '<span class="muted-inline">' + (k + 1) + '</span>' : String(k + 4) }, teamCell(r, L, S),
       { v: r.w, html: esc(r.w) }, { v: r.l, html: esc(r.l) }, { v: r.pct, html: BP.fmtAvg(r.pct) },
       { v: wgb, html: isLead ? '<span class="muted-inline">leader</span>' : (k < 3 ? (first ? '+' + (((r.w - first.w) + (first.l - r.l)) / 2) : '—') : (isNum(wgb) ? String(wgb) : '—')) },
-      { v: r.rd, html: isNum(r.rd) ? BP.signed(r.rd, 0) : '—', cls: 'hide-sm' }, oddsCell(s.p_postseason), oddsCell(s.p_wildcard), oddsCell(s.p_ws)] };
+      { v: r.rd, html: isNum(r.rd) ? BP.signed(r.rd, 0) : '—', cls: 'hide-sm' }, oddsCell(s.p_postseason), oddsCell(s.p_wildcard), oddsCell(s.p_ws)].concat(LO ? [profileCell(r)] : []) };
   };
   return BP.tableHTML([{ label: 'Seed', sortable: false }, { label: 'Team' }, { label: 'W', align: 'right' }, { label: 'L', align: 'right' }, { label: 'Pct', align: 'right' },
     { label: 'WCGB', align: 'right', title: 'Games ahead of / behind the third wild card' }, { label: 'Diff', align: 'right', cls: 'hide-sm' },
-    { label: 'Playoffs', align: 'right' }, { label: 'Wild card', align: 'right' }, { label: 'WS', align: 'right' }],
+    { label: 'Playoffs', align: 'right' }, { label: 'Wild card', align: 'right' }, { label: 'WS', align: 'right' }].concat(LO ? [PROFILE_COL] : []),
   lead.map((r, k) => row(r, k, true)).concat(rest.map((r, k) => row(r, k, false))), { compact: true, cls: 'std-table' }) +
     '<div class="section-note">Division leaders first (seeds 1–3 by record, the top two with a bye), then the wild-card race: the dashed line is the cut after the third wild card.</div>';
 }
@@ -207,6 +234,7 @@ function render(el, params) {
     all.forEach(r => { (divs[r.division] = divs[r.division] || []).push(r); });
     const divOrder = Object.keys(divs).sort((a, b) => { const ia = BP.DIVISIONS.indexOf(a), ib = BP.DIVISIONS.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b); });
     const d = res.d || {};
+    LO = res.fallback ? null : leagueOpts(d, L, S);
     const draw = () => {
       const box = document.getElementById('std-view');
       if (VIEW === 'div') {
@@ -232,12 +260,17 @@ function render(el, params) {
     if (rdb) tiles.push({ label: 'Best run differential', value: BP.teamAbbr(rdb.tid) + ' ' + BP.ui.signed(rdb.rd, 0), sub: rdb.rs + ' scored, ' + rdb.ra + ' allowed', href: BP.teamHref(rdb.tid, L, S) });
     if (lk) tiles.push({ label: 'Luckiest', value: BP.teamAbbr(lk.r.tid) + ' ' + BP.ui.signed(lk.v, 1), sub: 'wins above the Pythagorean record', href: BP.teamHref(lk.r.tid, L, S) });
     body.innerHTML = (tiles.length ? '<div class="bp-kpis">' + QK.stats(tiles) + '</div>' : '') + '<div class="toggle-row std-tabs" id="std-tabs">' + BP.toggles([{ key: 'div', label: 'Divisions' }, { key: 'wc', label: 'Wild card' }, { key: 'rt', label: 'Ratings and luck' }], VIEW, 'data-v') + '</div>' +
-      '<div id="std-view"></div>' +
+      '<div id="std-view"></div>' + (LO ? '<div id="std-race"></div><div id="std-shape"></div>' : '') +
       '<div class="section-note">' + (res.fallback ? 'Computed from the final regular-season games while the season payload is built; our chances and expected records arrive with it. ' : '') +
       'Chances: ' + (d.sim && (d.sim.n_sims || d.sim.sims) ? BP.int(d.sim.n_sims || d.sim.sims) + ' ' : '') + 'simulations of the rest of the season and the bracket from our team ratings (x: clinched a place, y: the division, z: the division and a bye, e: eliminated). ' +
       'Pythagorean records use exponent 1.83. Magic numbers count wins plus division-rival losses to clinch.</div>';
     BP.wireToggles(document.getElementById('std-tabs'), 'data-v', k => { VIEW = k; draw(); });
     draw();
+    if (LO) {
+      QKL.wire(document.getElementById('std-view'), LO);
+      if ((LO.league.metrics || []).length) QKL.race(document.getElementById('std-race'), LO);
+      QKL.shape(document.getElementById('std-shape'), LO);
+    }
     BP.setMeta(d.updated_at ? 'Season data ' + esc(BP.fmtStamp(d.updated_at)) : '');
   });
 }

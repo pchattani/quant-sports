@@ -303,9 +303,71 @@ CC.specRows = function (g, row, set, meta) {
   return g.m.filter(function (m) { return m.set === set && isNum(v[m.id]) && isNum(pc[m.id]); }).map(function (m) {
     var n = m.m50 ? CC.sampleIn(row, m.mu) : null;
     return { m: m, label: m.d, pctl: pc[m.id], value: CC.fmtMetric((meta || {})[m.id] || { fmt: /pct|rate|share/.test(m.id) && v[m.id] <= 1 ? 'pct' : '2' }, v[m.id]),
-      tip: (m.x || m.d) + (m.style ? ' Describes playing style, not how well: shown in grey.' : '') + (m.m50 ? ' Settles after about ' + Math.round(m.m50) + ' ' + m.mu + '.' : ''),
+      tip: (m.x || m.d) + (CC.ours(m.id) ? ' Our model: ' + CC.ours(m.id).name + '.' : '') + (m.style ? ' Describes playing style, not how well: shown in grey.' : '') + (m.m50 ? ' Settles after about ' + Math.round(m.m50) + ' ' + m.mu + '.' : ''),
       early: isNum(n) && m.m50 && n < m.m50, style: !!m.style };
   });
+};
+
+/* ── our metrics (round 5) ──────────────────────────────────────────────
+ * The spec's labels file (assets/qk/metrics/college.labels.json through QK.spec) names the metrics that come from our
+ * own models (team ratings and their offence / defence split, the value model, opponent-adjusted EPA, the box
+ * rating). Names, units and explanations come from the level's own spec groups (cc-metrics.js), because college.json
+ * reuses ids across football and basketball. CC.ours(k) -> { key, name, about } | null; CC.oursTag(k, short, about);
+ * CC.oursHeads(box, map) tags the heads of our metrics (map: header text or data-k -> key; re-applied when a table
+ * re-renders); CC.specMeta(L, e, k) -> the level's spec entry { d, x, u, low, style, set } | null; CC.orderMetrics(L, e,
+ * list) -> [{ label, items }]: "Our models", then the spec's headline box-score metrics, then the rest by group. */
+CC.spec = null;
+CC.specP = (window.QK && QK.spec ? QK.spec.load('college') : Promise.resolve(null)).then(function (c) { CC.spec = c; return c; }, function () { return null; });
+CC.ours = function (k) { return CC.spec ? CC.spec.ours(k) : null; };
+CC.oursTag = function (k, short, about) { var o = CC.ours(k); return o ? QK.ours({ short: !!short, model: o.name, about: about || o.about }) : ''; };
+CC.specMeta = function (L, e, k) {
+  var gs = CC.METRICS || [], best = null;
+  for (var i = 0; i < gs.length; i++) {
+    var g = gs[i];
+    if (g.L !== L || g.e !== e) continue;
+    for (var j = 0; j < (g.m || []).length; j++) {
+      var m = g.m[j];
+      if (m.id !== k) continue;
+      if (m.set === 'h') return m;
+      if (!best) best = m;
+    }
+  }
+  return best;
+};
+CC.oursHeads = function (box, map) {
+  if (!box) return;
+  var apply = function () {
+    if (!CC.spec) return;
+    QK.$$('th', box).forEach(function (th) {
+      if (th.querySelector('.qk-ours')) return;
+      var dk = th.getAttribute('data-k'), txt = (th.textContent || '').replace(/[\u2191\u2193\u2195\u25b2\u25bc\u25b4\u25be\u21c5]/g, '').trim();
+      var key = map ? (map[dk] || map[txt]) : dk;
+      if (!key || !CC.ours(key)) return;
+      (th.querySelector('button') || th).insertAdjacentHTML('beforeend', CC.oursTag(key, true));
+    });
+  };
+  CC.specP.then(apply);
+  apply();
+  if (window.MutationObserver && !box._qkOurs) {
+    box._qkOurs = new MutationObserver(function () { apply(); });
+    box._qkOurs.observe(box, { childList: true, subtree: true });
+  }
+};
+CC.orderMetrics = function (L, e, list) {
+  var ours = [], head = [], rest = [];
+  (list || []).forEach(function (m, i) {
+    var sm = CC.specMeta(L, e, m.key);
+    var o = { m: m, i: i, h: sm && sm.set === 'h' ? 1 : 0 };
+    (CC.ours(m.key) ? ours : o.h ? head : rest).push(o);
+  });
+  var byH = function (a, b) { return (b.h - a.h) || (a.i - b.i); };
+  var out = [];
+  if (ours.length) out.push({ label: 'Our models', items: ours.sort(byH).map(function (x) { return x.m; }) });
+  if (head.length) out.push({ label: 'Box score: headline', items: head.map(function (x) { return x.m; }) });
+  var gs = [];
+  rest.forEach(function (x) { var gn = x.m.group || 'Other', g = gs.filter(function (y) { return y.n === gn; })[0]; if (!g) { g = { n: gn, items: [] }; gs.push(g); } g.items.push(x.m); });
+  gs.forEach(function (g) { out.push({ label: 'Box score: ' + g.n, items: g.items }); });
+  return out;
 };
 
 /* ── UI pieces ───────────────────────────────────────────────────────── */

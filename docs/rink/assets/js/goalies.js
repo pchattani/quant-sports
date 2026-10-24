@@ -47,7 +47,7 @@ function render(el, params, state) {
     '<div class="card"><div class="card-header">Workload <span class="card-sub">Shots faced against how well each goalie did; marker size is games played. Click a dot for the goalie.</span><span class="gq-ctl">' + k.toggle('gk-work', [['shots', 'Shots faced'], ['xga', 'xG faced / 60']], ST.work) + '</span></div><div id="gk-work-c" class="gf-chart-lg"></div><div class="pg-note gq-note" id="gk-work-n"></div></div>';
   return k.ready().then(() => {
     const S = k.S(params, state);
-    return Promise.all([k.loadY(S, 'goalies.json'), k.loadNames()]).then(res => ({ S: S, raw: res[0] }));
+    return Promise.all([k.loadY(S, 'goalies.json'), k.loadNames(), RK.ours ? RK.ours.load() : null]).then(res => ({ S: S, raw: res[0] }));
   }).then(o => {
     if (!k.alive(el)) return;
     const S = o.S, cat = k.catOf(o.raw), $ = k.$;
@@ -57,7 +57,7 @@ function render(el, params, state) {
     const P = cat.players;
     const ids = Object.keys(P);
     const scale = k.toiScale(P);
-    const metrics = k.allMetrics(cat), meta = k.metaOf(metrics);
+    const metrics = RK.ours ? RK.ours.relabel(k.allMetrics(cat), 'player') : k.allMetrics(cat), meta = k.metaOf(metrics);
     const maxN = Math.max.apply(null, ids.map(id => k.toiOf(P[id], scale)).concat([60]));
     $('gk-floor').max = String(Math.ceil(maxN / 20) * 20);
     const floorDef = [cat.toi_floor, cat.floor, (cat.floors || {}).G].find(k.isNum);
@@ -65,7 +65,7 @@ function render(el, params, state) {
     $('gk-floor').value = ST.floor; $('gk-floor-v').textContent = k.int(ST.floor);
     const teams = Array.from(new Set(ids.map(id => P[id].team).filter(Boolean))).sort();
     $('gk-team').innerHTML = '<option value="">All teams</option>' + teams.map(t => '<option value="' + k.esc(t) + '"' + (t === ST.team ? ' selected' : '') + '>' + k.esc(t + ' · ' + k.teamName(t)) + '</option>').join('');
-    $('gk-extra').innerHTML = '<option value="">—</option>' + k.groups(metrics).map(g => '<optgroup label="' + k.esc(g.name) + '">' + g.items.map(m => '<option value="' + k.esc(m.key) + '">' + k.esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>').join('');
+    $('gk-extra').innerHTML = '<option value="">—</option>' + (RK.ours ? RK.ours.groups(metrics) : k.groups(metrics)).map(g => '<optgroup label="' + k.esc(g.name) + '">' + g.items.map(m => '<option value="' + k.esc(m.key) + '">' + k.esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>').join('');
     ST.extra = ST.extra.filter(x => meta[x]);
     const heads = k.headline(metrics, k.PREFS.G, 7);
     if (!typeKeys(metrics, 'sv').length) { const tg = k.$('gk-type-m'); if (tg) tg.style.display = 'none'; ST.typeMode = 'gsax'; }
@@ -101,7 +101,7 @@ function drawTable(ctx) {
   const sm = ctx.heads[0] || {};
   ids.sort((a, b) => { const qa = P[a].qualified === false ? 1 : 0, qb = P[b].qualified === false ? 1 : 0; if (qa !== qb) return qa - qb; const va = (P[a].values || {})[sm.key], vb = (P[b].values || {})[sm.key]; return ((k.isNum(vb) ? vb : -1e9) - (k.isNum(va) ? va : -1e9)) * (sm.lower ? -1 : 1) || k.toiOf(P[b], ctx.scale) - k.toiOf(P[a], ctx.scale); });
   const head = [{ label: '#', sortable: false }, { label: 'Goalie' }, { label: 'Team' }, { label: 'Age', align: 'right' }, { label: 'GP', align: 'right' }, { label: 'TOI', align: 'right', title: 'Minutes in net' }]
-    .concat(cols.map(m => ({ label: k.shortLabel(m.label) + (m.lower ? ' ↓' : ''), align: 'right', title: k.cleanDesc(m.desc || m.label) + (k.isNum(m.stabilises_at) ? ' · stabilises at about ' + k.int(m.stabilises_at) + ' ' + (m.unit || 'shots') : '') })));
+    .concat(cols.map(m => ({ label: k.shortLabel(m.label) + (m.lower ? ' ↓' : ''), align: 'right', cls: RK.ours && RK.ours.of(m.key) ? 'qk-ours-th' : '', title: k.cleanDesc(m.desc || m.label) + (k.isNum(m.stabilises_at) ? ' · stabilises at about ' + k.int(m.stabilises_at) + ' ' + (m.unit || 'shots') : '') + (RK.ours && RK.ours.of(m.key) ? ' · Our model: ' + RK.ours.of(m.key).name : '') })));
   const rows = ids.map((id, i) => { const p = P[id], gp = k.gpOf(p);
     return { _href: k.playerHref(id, S), cells: [{ v: i + 1, cls: 'pos-cell' }, { v: p.name || k.name(id), html: '<a class="ply-link" href="' + k.playerHref(id, S) + '">' + k.esc(p.name || k.name(id)) + '</a>' + (p.qualified === false ? ' <span class="gq-tag">small sample</span>' : '') },
       { v: p.team || '', html: k.teamChip(p.team, S) }, { v: p.age, html: k.isNum(p.age) ? k.num(p.age, 0) : '—', align: 'right' }, { v: gp, html: k.int(gp), align: 'right' }, { v: k.toiOf(p, ctx.scale), html: k.int(k.toiOf(p, ctx.scale)), align: 'right' }]

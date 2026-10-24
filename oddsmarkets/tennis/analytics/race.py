@@ -12,6 +12,18 @@ run on the same date replaces that date's snapshot), oldest first, for a chance-
 previous race.json's series forward and appends its own; only the season of the current snapshot is kept (at most
 HISTORY_MAX dates), and players are listed at HISTORY_MIN_P or above. It starts with the first build that has it
 (22 Oct 2026): earlier runs were not stored. A failed simulation keeps the series unchanged.
+
+The race page's "how the race is shaping up" fields (24 Oct 2026; season_sim.race_extras has the definitions):
+ "bounds" {pid: [certain Race points, most still reachable]}, "status" {pid: "in" | "out"} (mathematically
+ certain only), "stakes" [chance conditioned on a result at an event in progress or starting within ten days; an
+ in-progress row carries "next" {"id", "opp", "round", "date"}: the player's next scheduled match there],
+ "left" {"future_max", "in_progress_max", "near"};
+ "week" {pid: [[event id, round, "W" | "L" | "A"]]}: each tracked player's tour-level results in the seven days to
+ the simulation date, one row per event: the last round played and won it ("W", a title when the round is "F"),
+ lost it ("L"), or still in the draw ("A", the round of the next match). Results only, no look-ahead;
+ "profiles" {"keys": [...], "rows": {pid: [...]}, "floor"}: the season catalogue's numbers (players.json values and
+ percentiles among the season's qualified players, the METRICS_SPEC tennis peer group) for the Race top 40 and the
+ official top 100, positional on "keys" to stay small (profile()).
 """
 from __future__ import annotations
 
@@ -24,6 +36,16 @@ from oddsmarkets.tennis import analytics as an
 logger = logging.getLogger(__name__)
 HISTORY_MAX = 400
 HISTORY_MIN_P = 0.001
+WEEK_DAYS = 7
+WEEK_TOP = 40
+# profile keys: ("v", key) is the season value, ("p", key) its percentile (players.json values / pct)
+PROFILE_KEYS = [("p", "elo"), ("p", "games_won_pct"), ("p", "hold"), ("p", "brk"), ("p", "win_v_top50"),
+                ("p", "elo_hard"), ("p", "elo_clay"), ("p", "elo_grass"), ("p", "serve_rating"), ("p", "return_rating"),
+                ("p", "tb_pct"), ("p", "dec_pct"), ("p", "close_sets_pct"), ("p", "tb_per_set"),
+                ("v", "elo"), ("v", "elo_hard"), ("v", "elo_clay"), ("v", "elo_grass"), ("v", "serve_rating"),
+                ("v", "return_rating"), ("v", "hold"), ("v", "brk"), ("v", "woe_pm"), ("v", "wins_over_exp"),
+                ("v", "tb_over"), ("v", "dec_over"), ("v", "elo_d30"), ("v", "elo_d90"), ("v", "matches"),
+                ("v", "wins"), ("v", "losses")]
 
 
 def simulate(td: an.TourData, n: int = 10000, ctx=None) -> dict:
@@ -56,7 +78,85 @@ def history(prev: dict | None, sim: dict | None) -> list[dict]:
     return (keep + [snap])[-HISTORY_MAX:]
 
 
-def build(td: an.TourData, sim: dict | None, futures: dict | None = None, prev: dict | None = None) -> dict:
+def week_results(td: an.TourData, as_of, pids) -> dict[str, list]:
+    """{pid: [[event id, round, "W" | "L" | "A"]]} for the seven days to `as_of` (module docstring)."""
+    d = an.day(as_of)
+    want = {str(p) for p in pids}
+    if d is None or not want:
+        return {}
+    lo = d - timedelta(days=WEEK_DAYS)
+    last: dict = {}
+    for m in td.matches(td.current).values():
+        if not an.is_tour_level(m) or str(m.get("level")) not in an.POINT_LEVELS:
+            continue
+        md = an.day(m.get("date"))
+        st = m.get("status")
+        if st not in an.FINISHED and st not in ("live", "upcoming"):
+            continue
+        # results to the simulation date; a scheduled match up to three days on still says "in the draw"
+        if md is None or md < lo or md > (d if st in an.FINISHED else d + timedelta(days=3)):
+            continue
+        for p in (m.get("p1"), m.get("p2")):
+            p = str(p or "")
+            if p not in want:
+                continue
+            key = (p, m.get("event"))
+            r = an.ROUND_ORDER.get(str(m.get("round")), -1)
+            res = ("W" if str(m.get("winner") or "") == p else "L") if st in an.FINISHED else "A"
+            old = last.get(key)
+            if old is None or r > old[0] or (r == old[0] and res == "A"):
+                last[key] = (r, str(m.get("round") or ""), res, str(md))
+    out: dict = {}
+    for (p, eid), (r, rnd, res, md) in sorted(last.items(), key=lambda kv: kv[1][3]):
+        if res == "W" and rnd != "F":
+            res = "A"                     # won the last match on record and not yet out: still in the draw
+        out.setdefault(p, []).append([eid, rnd, res])
+    return out
+
+
+def next_match(td: an.TourData, pid: str, eid: str) -> dict | None:
+    """The player's next scheduled match at an event in progress: {"id", "opp", "round", "date"}, or None."""
+    best = None
+    for m in td.matches(td.current).values():
+        if m.get("event") != eid or m.get("status") not in ("live", "upcoming"):
+            continue
+        p1, p2 = str(m.get("p1") or ""), str(m.get("p2") or "")
+        if pid not in (p1, p2):
+            continue
+        k = (an.ROUND_ORDER.get(str(m.get("round")), 99), str(m.get("date") or ""))
+        if best is None or k < best[0]:
+            best = (k, {"id": m.get("id"), "opp": p2 if pid == p1 else p1 or None, "round": m.get("round"),
+                        "date": m.get("date")})
+    return best[1] if best else None
+
+
+def profiles(cat: dict | None, pids) -> dict:
+    """The race page's player profiles from the season catalogue (module docstring), {} without one."""
+    players = (cat or {}).get("players") or {}
+    rows = {}
+    for p in pids:
+        r = players.get(str(p))
+        if not r:
+            continue
+        v, pc = r.get("values") or {}, r.get("pct") or {}
+        rows[str(p)] = [(pc if k == "p" else v).get(key) for k, key in PROFILE_KEYS] + [1 if r.get("qualified") else 0]
+    if not rows:
+        return {}
+    return {"keys": [f"{k}:{key}" for k, key in PROFILE_KEYS] + ["qualified"], "rows": rows,
+            "floor": (cat or {}).get("floor"), "year": (cat or {}).get("year")}
+
+
+def profile_ids(rankings_rows, race_rows, top_rank: int = 100, top_race: int = WEEK_TOP) -> list[str]:
+    """The official top `top_rank` and the Race top `top_race`, Race order first."""
+    out = [str(p) for p, _ in (race_rows or [])[:top_race]]
+    for r in rankings_rows or []:
+        if int(r[0]) <= top_rank and str(r[1]) not in out:
+            out.append(str(r[1]))
+    return out
+
+
+def build(td: an.TourData, sim: dict | None, futures: dict | None = None, prev: dict | None = None,
+          cat: dict | None = None, profile_pids=None) -> dict:
     """race.json; `prev` is the race.json on disk (its "history" is carried forward)."""
     hist = history(prev, sim)
     if not sim or not sim.get("ok"):
@@ -88,7 +188,34 @@ def build(td: an.TourData, sim: dict | None, futures: dict | None = None, prev: 
             "market": {"finals_qual": _title(fut.get("finals_qual")), "year_end_no1": _title(fut.get("year_end_no1")),
                        "finals_winner": _title(fut.get("finals_winner")), "top10": _title(fut.get("top10"))},
             "simplifications": sim.get("simplifications") or [], "basis": sim.get("basis"), "snapshot": sim.get("snapshot"),
-            "runtime_s": sim.get("runtime_s"), "history": hist}
+            "runtime_s": sim.get("runtime_s"), "history": hist, **shaping(td, sim, cat, profile_pids)}
+
+
+def shaping(td: an.TourData, sim: dict, cat: dict | None = None, profile_pids=None) -> dict:
+    """The "how the race is shaping up" fields (module docstring); each is left out when it has nothing."""
+    out: dict = {}
+    for k in ("bounds", "status", "left"):
+        if sim.get(k):
+            out[k] = sim[k]
+    stakes = []
+    for r in sim.get("stakes") or []:
+        r = dict(r)
+        if r.get("in_progress"):
+            nx = next_match(td, str(r["pid"]), str(r["event"]))
+            if nx:
+                r["next"] = nx
+        stakes.append(r)
+    if stakes:
+        out["stakes"] = stakes
+    race_now = sim.get("race") or {}
+    top = sorted(race_now, key=lambda p: -(race_now[p].get("now") or 0))[:WEEK_TOP]
+    week = week_results(td, sim.get("as_of"), top)
+    if week:
+        out["week"] = week
+    prof = profiles(cat, profile_pids if profile_pids is not None else top)
+    if prof:
+        out["profiles"] = prof
+    return out
 
 
 def proj_ranks(sim: dict | None) -> dict[str, int]:

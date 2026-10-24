@@ -188,7 +188,9 @@ def build_season(b: Build, season: int, full: bool, cfg: dict, shared: dict) -> 
     cards = (sched or {}).get("games") or []
     sim = b.step(f"season sim {season}", ctx.sim, None) if full and current else None
     tms = b.write_or_fail(d + "teams.json", f"teams {season}", lambda: TM.build(ctx, cat, sim, cards), season=season)
-    spl = b.write_or_fail(d + "season.json", f"season {season}", lambda: SN.build(ctx, tms, sim, cards), season=season)
+    spl = b.write_or_fail(d + "season.json", f"season {season}",
+                          lambda: with_league(b, season, SN.build(ctx, tms, sim, cards), tms, cards, cfg) if full and current
+                          else SN.build(ctx, tms, sim, cards), season=season)
 
     def weeks():
         wk = SN.weeks(ctx, cards, tms)
@@ -238,6 +240,28 @@ def build_season(b: Build, season: int, full: bool, cfg: dict, shared: dict) -> 
     gc.collect()
     logger.info("%s (%s): %.1f s", season, "full" if full else "light", time.perf_counter() - t0)
     return out
+
+
+def with_league(b: Build, season: int, spl: dict | None, tms: dict | None, cards: list[dict], cfg: dict) -> dict | None:
+    """season.json with its "league" block (how the playoff race is shaping up, strengths and weaknesses:
+    oddsmarkets/nfl/analytics/race.py on oddsmarkets/common/league.py) and data/race_log.json carried forward (the
+    whole season's chances, one snapshot a day; the opening day and each Tuesday before live tracking rebuilt from the
+    season simulation as of that date, inside a time budget a build). A failure leaves season.json as it was."""
+    if not isinstance(spl, dict) or not spl.get("ok", True):
+        return spl
+    from oddsmarkets.nfl.analytics import race as RC
+
+    def run():
+        prev = an.read_json(b.data / "race_log.json") or {}
+        runner = None if cfg.get("no_models") else RC.asof_runner(season)
+        blk, log = RC.build(season, spl, tms, cards, prev, _digest_now(cfg.get("today")), run_asof=runner)
+        if log.get(str(season)):
+            b.write("race_log.json", log)
+        return blk
+    blk = b.step(f"league block {season}", run, None)
+    if blk:
+        spl["league"] = blk
+    return spl
 
 
 def value_pages(b: Build, ctx, cfg: dict, cat: dict | None, tms: dict | None, sim: dict | None, full_current: bool) -> None:

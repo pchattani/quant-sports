@@ -129,6 +129,7 @@ function renderList(el, params) {
       heads.forEach(function (m) { r[m.key] = (T[id].values || {})[m.key]; r['p_' + m.key] = tP && tP.pct[id] ? tP.pct[id][m.key] : null; });
       return r;
     }) });
+    PD.v2.oursHeads(document.getElementById('cl-t'), null, 'constructor');
   });
 }
 

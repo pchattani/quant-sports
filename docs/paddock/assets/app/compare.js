@@ -48,7 +48,7 @@ function sideBySide(ids, rows, Ps, sets, ents) {
         dfmt: m.fmt === 'prob' ? function (v) { return (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v * 100).toFixed(0) + ' pts'; } : null };
     }) };
   });
-  return QK.compareView({ entities: ents, groups: groups });
+  return QK.compareView({ entities: ents, groups: groups }) + PD.v2.oursStrip(sets, meta);
 }
 function distCard(id, opts) {
   return PD.card('Where they sit', '<span id="' + id + '-s"></span>', PD.v2.distSeg(id + '-m', opts) + PD.chartBox(id, 260, 'Peer distribution with both marked'), { span: 12 });
@@ -137,7 +137,7 @@ function buildDrivers(ids, ss, careers, elo, season, y) {
   var shortOf = [0, 1].filter(function (i) { return Ps[i] && !Ps[i].qualified(ids[i]); }).map(function (i) { return names[i]; });
   ask(short);
   var verd = Ps[0] && Ps[1] ? QK.verdicts(PD.v2.verdicts(Ps, ids, PD.v2.DRIVER_SET.concat(PD.v2.MORE_DRIVER), short)) : '';
-  var dOpts = [['driver_effect', 'Race pace v team-mate'], ['quali_driver_effect', 'Qualifying'], ['race_h2h', 'Race H2H'], ['points_per_race', 'Points / race'], ['race_pace', 'Race pace']];
+  var dOpts = [['driver_effect', 'Race driver rating'], ['quali_driver_effect', 'Qualifying'], ['race_h2h', 'Race H2H'], ['points_per_race', 'Points / race'], ['race_pace', 'Race pace']];
   PD.set('cmp-body', '<div class="pd-cmp-ids">' + card(0) + card(1) + '</div>' +
     PD.card('Side by side', peerTxt + '. Bar length = percentile (100 = best); the better number in each row is solid.', Ps[0] && Ps[1] ? sideBySide(ids, [ss[0].d, ss[1].d], Ps, PD.v2.DRIVER_SET.concat(PD.v2.MORE_DRIVER), ents) + verd +
       (shortOf.length ? '<p class="pd-cap">' + esc(shortOf.join(' and ')) + (shortOf.length > 1 ? ' are' : ' is') + ' short of the starts floor: no percentile.</p>' : '') : PD.muted('Nothing to compare yet.'), { cls: 'pd-mt' }) +

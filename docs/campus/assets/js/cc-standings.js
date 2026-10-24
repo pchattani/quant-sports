@@ -13,17 +13,25 @@ var POWER = { cfb: ['SEC', 'Big Ten', 'Big 12', 'ACC'], mbb: ['SEC', 'Big Ten', 
 
 CC.route('standings', function (el, p) {
   var L = p.L, S = p.S, fb = CC.fb(L);
-  var list = fb ? [['conferences', 'Conferences'], ['polls', 'Polls'], ['playoff', 'Playoff'], ['bowls', 'Bowls']] : [['conferences', 'Conferences'], ['polls', 'Polls'], ['bracket', 'Bracket'], ['conftourneys', 'Conference tournaments']];
-  var tab = U.tab(p, list.map(function (x) { return x[0]; }), 'conferences');
-  var sub = { conferences: 'Conference and overall records with our rating and the chance to win the conference.', polls: 'The voters next to the model.', playoff: 'The 12-team College Football Playoff: the bracket, everyone’s chance to reach each round, and how the committee may rank them.',
+  var cur = CC.isCur(L, S);
+  var list = fb ? [['conferences', 'Conferences'], ['cards', 'Team cards'], ['polls', 'Polls'], ['playoff', 'Playoff'], ['bowls', 'Bowls']] : [['conferences', 'Conferences'], ['cards', 'Team cards'], ['polls', 'Polls'], ['bracket', 'Bracket'], ['conftourneys', 'Conference tournaments']];
+  if (cur) list.unshift(['race', 'The race']);
+  var tab = U.tab(p, list.map(function (x) { return x[0]; }), list[0][0]);
+  var sub = { race: 'How the race is shaping up: our chances over time, who moved and why, what is at stake next, the road left and the tiers.', cards: 'Every team’s strengths and weaknesses against the rest of the country, and the shape of the league.',
+    conferences: 'Conference and overall records with our rating and the chance to win the conference.', polls: 'The voters next to the model.', playoff: 'The 12-team College Football Playoff: the bracket, everyone’s chance to reach each round, and how the committee may rank them.',
     bowls: 'Who reaches six wins, and the bowl games announced so far.', bracket: 'The NCAA tournament: the bracket by region, each team’s chance to reach each round, and our first-round upset chances.', conftourneys: 'Our chance to win each conference tournament (formats approximated where no bracket is published).' }[tab];
   el.innerHTML = U.head('Standings', sub, U.kicker(L, S)) + U.tabs(L, 'standings', list, S, tab) + QK.note('<b>How to read the chances:</b> each is the share of our simulated seasons in which it happens. A 30% playoff chance still comes off about 1 season in 3.') + '<div id="st-body">' + QK.skeleton('lines', 6) + '</div>';
   var body = QK.$('#st-body', el);
-  return Promise.all([CC.season(L, S), (tab === 'playoff' || tab === 'bowls' || tab === 'bracket' || tab === 'conftourneys') ? CC.load(CC.path(L, S, fb ? 'cfp.json' : 'bracket.json')) : Promise.resolve(null)]).then(function (a) {
+  var none = Promise.resolve(null);
+  return Promise.all([CC.season(L, S), (tab === 'playoff' || tab === 'bowls' || tab === 'bracket' || tab === 'conftourneys' || tab === 'race') ? CC.load(CC.path(L, S, fb ? 'cfp.json' : 'bracket.json')) : none,
+    tab === 'race' ? CC.load(CC.lpath(L, 'race_log.json')) : none, tab === 'race' ? CC.load(CC.path(L, S, 'schedule.json')) : none,
+    tab === 'cards' ? CC.load(CC.path(L, S, 'teams.json')) : none]).then(function (a) {
     if (!U.alive(el)) return;
     var season = CC.ok(a[0]) ? a[0] : null;
     if (!season) { body.innerHTML = U.missing('Standings', a[0]); return; }
-    if (tab === 'conferences') conferences(body, L, S, season);
+    if (tab === 'race') CC.raceTab(body, L, S, season, { post: CC.ok(a[1]) ? a[1] : null, log: a[2], sched: CC.ok(a[3]) ? a[3] : null });
+    else if (tab === 'cards') CC.cardsTab(body, L, S, season, a[4], p.query || {});
+    else if (tab === 'conferences') conferences(body, L, S, season);
     else if (tab === 'polls') polls(body, L, S, season);
     else if (tab === 'playoff') playoff(body, L, S, season, a[1]);
     else if (tab === 'bowls') bowls(body, L, S, season, a[1]);
@@ -52,7 +60,7 @@ function conferences(node, L, S, season) {
   var cards = cs.map(function (c, k) {
     var rows = season.standings[c] || [];
     var hasDiv = rows.some(function (r) { return r.division; });
-    return '<div class="cc-conf" data-conf="' + esc(c) + '">' + U.card(CC.conf(L, c) ? (CC.conf(L, c).name || CC.cname(L, c)) : CC.cname(L, c), rows.length + ' teams' + (hasDiv ? ' · divisions' : '') + (cur ? ' · the bar is our chance to win the ' + (fb ? 'conference' : 'regular-season title') : ''), U.lb('cf-' + k), { flush: true }) + '</div>';
+    return '<div class="cc-conf" data-conf="' + esc(c) + '">' + U.card(CC.conf(L, c) ? (CC.conf(L, c).name || CC.cname(L, c)) : CC.cname(L, c), rows.length + ' teams' + (hasDiv ? ' · divisions' : '') + (cur ? ' · the bar is our chance to win the ' + (fb ? 'conference' : 'regular-season title') : '') + ' · ' + U.link(CC.href(L, 'standings', null, S, 'tab=cards&conf=' + encodeURIComponent(c)), 'Team cards'), U.lb('cf-' + k), { flush: true }) + '</div>';
   }).join('');
   node.innerHTML = chips + '<div class="cc-confs">' + cards + '</div>';
   cs.forEach(function (c, k) {

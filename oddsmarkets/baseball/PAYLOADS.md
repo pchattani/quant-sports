@@ -128,6 +128,25 @@ SERIES also has `round_name`, `p_sim` (simulation: the next game priced with its
 matrix), `done`, `market_sources`, and
 `next: {home, away, p_home, gpk, date, start}`; `teams[0]` holds home field; `p` = `p_sim` for a live series, else `p_closed`.
 
+**`league`** (the current season's full build, both levels; `oddsmarkets/baseball/analytics/race.py` on the shared engine
+`oddsmarkets/common/league.py`, schema v1, about 25 KB; drawn by the kit's `docs/_design/league.js` on the standings and team
+pages): `{v, asof, phase, metrics: [{key, label}] (p_postseason, p_div, p_ws; empty for Triple-A, which has no simulation),
+current {metric: {tid: p}}, history {first, last, days, live_from, rebuilt [days], n}, movers {metric, since, days, up/down:
+[{team, p, d, why}]}, games [{id, start, home, away, p_home, swing, sides {tid: [if_win, if_loss]}, stakes, why}], race {tid:
+{magic (division, within reach), unit, status clinched|out, all_sims, sos [avg, rank, n], sos_played, next {id, date, opp, home,
+p, w, l}}}, profile {metrics: [{id, label, dir, fmt, unit, chip, group, model}], min_gp 20, early}, teams {tid: {tier, pct, vals,
+chips [[text, tone]], luck {a, x, d, close [w, l], flag}, gp}}, tiers [{key, label, sub, teams}], quad {x: off_rpg, y: prev_rpg
+(pit_rpg + def_rpg)}, notes}`. Chips on the lineup (off_rpg), power (barrel%), rotation (war_sp), bullpen (war_rp) and defence
+(def_rpg) dimensions; luck is wins against BaseRuns wins with the one-run record.
+
+**`<L>/race_log.json`** (MLB): `{season: {p_postseason | p_div | p_ws: {"YYYY-MM-DD": {tid: p}}, "_meta": {rebuilt, n,
+live_from}}}`: one snapshot a day from each build (from 24 Oct 2026), never trimmed. The dates before live tracking are rebuilt
+(at most 90 s a build, about 1 s a date at 2,000 simulations): the regular season weekly with `season_sim.regular_season(store,
+through=<date>)` (run-differential ratings from the games before that date, regressed to average: not the full game model, no
+preseason projection, so April is flatter than what we published then), and the postseason every two days with
+`season_sim.postseason` on the store with every postseason game from that date unplayed. A persistent CI log
+(`scripts/ci_site.py` LOGS).
+
 ### schedule.json and GAME_CARD
 GAME_CARD as specified plus `"venue"`. `model` may carry `"source": "backtest"` (builder D's walk-forward price for games played
 before the first build). `market`: prediction markets `{p_home, sources}` when fetched (today/tomorrow), else the de-vigged
@@ -155,7 +174,7 @@ opp_starter_name}}`, `has_statcast`, and with pitch data: `pitches {cols, rows}`
 (+ a final row at 1/0), ours_kind "model" (the game's own pre-game strengths: current season, games in play or just finished) |
 "league" (league-average Markov model: the archive), espn: [[x, wp_home]] | null}` (**ESPN's x is the 0-1 fraction of its play
 list**; ours is a PA index), `umpire {umpire, name, called, missed, accuracy, home_gain, away_gain, home_favour, favoured (tid or
-null), total_impact, calls_cols, calls, season}`, `abs [{inning, half, ab, who, kind, result, batter, pitcher}]`, `box {batting:
+null), total_impact, calls_cols, calls, season}`, `abs [{inning, half, ab, who, kind, result, batter, pitcher, by, role, name, team}]` (by: the challenger's id; role batter | catcher | pitcher, or review for a manager replay review; team: the challenging side), `box {batting:
 {home, away: [{pid, name, pa, ab, h, hr, bb, so, hbp, tb, xwoba_plus, xwoba_savant, woba, ev_max, pitches, wpa}]}, pitching: {home,
 away: [{pid, name, ip "6.1", outs, bf, h, r, bb, so, hr, pitches, strikes, whiffs, csw, velo_max, stuff, pitching, xwoba_plus,
 xwoba_savant, wpa}]}, totals}` (no earned runs: R is runs while he pitched), `arsenal {pitcher: {pt: {n, velo, velo_max, ivb, hb,
@@ -168,7 +187,7 @@ inning, batter, pitcher, wpa}]`. Without pitch data on the machine an existing p
 
 ### Other per-season payloads
 - `umpires.json`: `{"metrics","umpires": {id: {name, values, pct, qualified, games_list}}, "games_cols": [gpk, date, home, away,
-  called, missed, accuracy, x_accuracy, home_favour, favoured, impact], "league", "abs" (builder C's season ABS block), "min_called"}`.
+  called, missed, accuracy, x_accuracy, home_favour, favoured, impact], "league", "abs" (builder C's season ABS block; challengers, best and worst gain `name`, teams `tid`, umpires `name`), "min_called"}`.
 - `parks.json`: `{"parks": {vid: {id, abbr, team, name, city, state, dims, walls, elev_ft, roof, turf, azimuth, capacity, lat, lon,
   factors (ratios), index (x100), by_hand {L, R}, n_bip, season {games, runs, runs_per_game}}}, "years", "dimension_effects",
   "weather_effects", "model_ok"}` (keyed by venue id).

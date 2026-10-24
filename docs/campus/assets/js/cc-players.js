@@ -93,7 +93,8 @@ CC.route('players', function (el, p) {
       '<label class="cc-check"><input type="checkbox" id="pl-qual" checked> Qualified only</label><label class="cc-check"><input type="checkbox" id="pl-within" checked> Percentiles within the position</label></div>' +
       '<div class="qk-chips scroll cc-filters" id="pl-pos" role="group" aria-label="Position">' + ['all'].concat(pos).map(function (k) {
         return '<button type="button" class="qk-chip" style="--ca:var(--signal)" data-value="' + esc(k) + '" aria-pressed="' + (k === st.pos) + '">' + esc(k === 'all' ? 'All' : posLabel(cat, k)) + (k !== 'all' ? ' <span class="n">' + ((cat.positions[k] || {}).n || '') + '</span>' : '') + '</button>'; }).join('') + '</div>' +
-      U.card('', '', '<div class="cc-lbh" id="pl-n"></div>' + U.lb('pl-table'), { flush: true });
+      U.card('', '', '<div class="cc-lbh" id="pl-n"></div>' + U.lb('pl-table'), { flush: true }) +
+      '<div class="cc-ours">' + QK.oursExplain((CC.fb(L) ? 'Value (points above a replacement-level player) and EPA per play' : 'Value (points above a replacement-level player) and the box rating') + ' come from our models; columns tagged ' + QK.ours({ short: true }) + ' are theirs, and the tag says what each measures.') + '</div>';
     function paint() {
       var q = st.q.toLowerCase();
       var rs = ids.filter(function (k) {
@@ -107,7 +108,7 @@ CC.route('players', function (el, p) {
       rs.sort(function (x, y) { var vx = (P[x].values || {})[k0], vy = (P[y].values || {})[k0]; return (isNum(vy) ? vy : -1e9) - (isNum(vx) ? vx : -1e9); });
       var shown = rs.slice(0, 400);
       /* a position picked: the spec's headline set for its peer group, when the payload carries it */
-      var G = null, cols = mets.map(function (m) { return { key: m.key, label: m.label, desc: m.desc, lower: m.lower, meta: m }; }), pk = null;
+      var G = null, cols = mets.map(function (m) { var sm = CC.specMeta(L, 'player', m.key); return { key: m.key, label: sm ? sm.d : m.label, desc: (sm && sm.x) || m.desc, lower: m.lower, meta: m }; }), pk = null;
       if (st.pos !== 'all' && rs.length) {
         G = CC.group(L, 'player', P[rs[0]]);
         var hs = G ? G.m.filter(function (m) { return m.set === 'h' && rs.some(function (k) { return isNum(((P[k] || {}).values || {})[m.id]) && isNum(((P[k] || {})[G.pct] || {})[m.id]); }); }) : [];
@@ -127,6 +128,7 @@ CC.route('players', function (el, p) {
         { key: 'gp', label: 'GP', num: true }
       ].concat(cols.map(function (m) { return { key: m.key, label: m.label, type: 'pctl', pctl: 'p_' + m.key, style: !!m.style, tip: (m.desc || m.label) + (m.lower ? ' (lower is better; the colour is flipped)' : '') + (m.style ? ' (style: shown in grey)' : ''), fmt: function (v) { return CC.fmtMetric(m.meta, v); } }; })), rows: rows });
     }
+    CC.oursHeads(QK.$('#pl-table', el));
     QK.$('#pl-q', el).addEventListener('input', function (e) { st.q = e.target.value || ''; paint(); });
     QK.$('#pl-qual', el).addEventListener('change', function (e) { st.qual = e.target.checked; paint(); });
     QK.$('#pl-within', el).addEventListener('change', function (e) { st.within = e.target.checked; paint(); });

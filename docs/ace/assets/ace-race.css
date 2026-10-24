@@ -1,0 +1,109 @@
+/* The Quant Ace — how the race is shaping up and the player profiles (assets/js/race-shape.js), kit v4 dark. */
+
+/* chips: strengths cobalt, weak spots red-orange, luck volt outline, notes grey */
+.rs-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 6px; }
+.rs-chip { display: inline-flex; align-items: center; padding: 3px 8px; font: 700 12px/1.2 var(--font-cond, 'Barlow Condensed', sans-serif); letter-spacing: .02em;
+  text-transform: uppercase; border: 1px solid var(--s-4); background: var(--s-2); color: var(--ink-1); cursor: help; }
+.rs-chip.good { background: var(--signal-soft); border-color: var(--signal); color: var(--signal-2); }
+.rs-chip.bad { background: color-mix(in srgb, var(--coral, #ff6b4a) 14%, transparent); border-color: var(--coral, #ff6b4a); color: var(--ink-1); }
+.rs-chip.luck { border-color: var(--volt); color: var(--volt); background: transparent; }
+.rs-chip.note { color: var(--ink-3); }
+.rs-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.rs-chips-cell .rs-chip { font-size: 11px; padding: 2px 6px; }
+.rs-chips-cell { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* profile cards */
+.rs-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 2px; }
+.rs-cards .rs-more { display: none; }
+.rs-cards.open .rs-more { display: block; }
+.rs-card { background: var(--s-1); padding: 14px 16px 12px; height: 100%; box-sizing: border-box; border-top: 3px solid var(--block-2, #000); }
+.rs-card:hover { border-top-color: var(--volt); }
+.rs-card-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.rs-name { font: 700 20px/1.1 var(--font-cond, 'Barlow Condensed', sans-serif); text-transform: uppercase; color: var(--ink-1) !important; text-decoration: none; }
+.rs-name:hover { color: var(--signal) !important; }
+.rs-sub { color: var(--ink-3); font-size: 12px; margin-top: 2px; }
+.rs-badge { font: 400 22px/1 var(--font-display, 'Bebas Neue', sans-serif); color: var(--volt); white-space: nowrap; text-align: right; }
+.rs-badge small { display: block; font: 600 10px/1.2 var(--font-cond, 'Barlow Condensed', sans-serif); color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; }
+.rs-short { margin: 0 0 8px; color: var(--ink-2); font-size: 13px; }
+.rs-sfs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin-top: 8px; }
+.rs-sf { background: var(--s-2); border-left: 3px solid var(--sc); padding: 5px 8px; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 6px; font-size: 12px; min-width: 0; }
+.rs-sf .l { grid-column: 1 / -1; font: 700 11px/1 var(--font-cond, 'Barlow Condensed', sans-serif); text-transform: uppercase; letter-spacing: .03em; color: var(--ink-2); }
+.rs-sf .pc { font: 700 11px/1 var(--font-cond, 'Barlow Condensed', sans-serif); padding: 2px 4px; min-width: 18px; text-align: center; }
+.rs-sf .pc.none { background: var(--s-3); color: var(--ink-3); }
+.rs-sf .v { font-variant-numeric: tabular-nums; color: var(--ink-1); text-align: right; }
+.rs-show { margin-top: var(--sp-3, 12px); }
+
+/* tiers */
+.rs-tiers { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 2px; margin-bottom: var(--sp-4, 16px); }
+.rs-tier { background: var(--s-1); padding: 12px 14px; border-top: 4px solid var(--ink-3); }
+.rs-tier.in { border-top-color: var(--volt); }
+.rs-tier.lock { border-top-color: var(--signal); }
+.rs-tier.bubble { border-top-color: var(--sky, #38c6f4); }
+.rs-tier.long { border-top-color: var(--coral, #ff6b4a); }
+.rs-tier.out { border-top-color: var(--s-4); }
+.rs-tier-h b { display: block; font: 400 24px/1 var(--font-display, 'Bebas Neue', sans-serif); letter-spacing: .02em; color: var(--ink-1); }
+.rs-tier-h span { display: block; color: var(--ink-3); font-size: 12px; margin: 2px 0 8px; }
+.rs-tier ol { list-style: none; margin: 0; padding: 0; }
+.rs-tier li { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px solid var(--grid); font-size: 13px; }
+.rs-tier li:last-child { border-bottom: 0; }
+.rs-tier li .n { font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; }
+.rs-tier li.more { color: var(--ink-3); }
+
+/* movers */
+.rs-movers { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 2px; }
+.rs-mv { background: var(--s-1); padding: 10px 12px; border-left: 4px solid var(--ink-3); }
+.rs-mv.up { border-left-color: var(--signal); }
+.rs-mv.down { border-left-color: var(--coral, #ff6b4a); }
+.rs-mv-h { display: flex; justify-content: space-between; gap: 8px; font: 700 16px/1.2 var(--font-cond, 'Barlow Condensed', sans-serif); text-transform: uppercase; }
+.rs-mv.up .rs-mv-h b { color: var(--signal-2); }
+.rs-mv.down .rs-mv-h b { color: var(--coral, #ff6b4a); }
+.rs-mv-p { color: var(--ink-2); font-size: 13px; margin: 2px 0 4px; }
+.rs-mv-why { color: var(--ink-3); font-size: 12.5px; }
+
+/* what is at stake */
+.rs-stakes { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 2px; }
+.rs-stake { background: var(--s-1); padding: 12px 14px; min-width: 0; }
+.rs-stake-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.rs-stake-h .who { font: 700 18px/1.1 var(--font-cond, 'Barlow Condensed', sans-serif); text-transform: uppercase; color: var(--ink-1) !important; }
+.rs-stake-h .at { color: var(--ink-2); font-size: 13px; flex: 1; min-width: 0; }
+.rs-stake-h .lvl { font: 700 11px/1 var(--font-cond, 'Barlow Condensed', sans-serif); background: var(--s-3); padding: 2px 5px; color: var(--ink-2); }
+.rs-stake-h .sw { font: 400 22px/1 var(--font-display, 'Bebas Neue', sans-serif); color: var(--volt); white-space: nowrap; }
+.rs-swing { position: relative; height: 22px; margin: 10px 4px 6px; }
+.rs-swing .track { position: absolute; left: 0; right: 0; top: 10px; height: 2px; background: var(--grid); }
+.rs-swing .span { position: absolute; top: 8px; height: 6px; background: var(--s-4); }
+.rs-swing .m { position: absolute; top: 4px; width: 14px; height: 14px; margin-left: -7px; }
+.rs-swing .m.lose { background: var(--coral, #ff6b4a); }
+.rs-swing .m.win { background: var(--signal); }
+.rs-swing .m.now { top: 0; width: 3px; height: 22px; margin-left: -1.5px; background: var(--volt); }
+.rs-stake-n { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--ink-3); }
+.rs-stake-n b { color: var(--ink-1); font-variant-numeric: tabular-nums; }
+.rs-stake-n .lose b { color: var(--coral, #ff6b4a); }
+.rs-stake-n .win b { color: var(--signal-2); }
+.rs-stake-w { color: var(--ink-3); font-size: 12px; margin-top: 4px; }
+
+/* shape of the tour */
+.rs-cell { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.rs-cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 2px; }
+.rs-col { background: var(--s-1); padding: 10px 12px; }
+.rs-col-h { font: 700 12px/1.2 var(--font-cond, 'Barlow Condensed', sans-serif); text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); margin-bottom: 6px; }
+.rs-list { list-style: none; margin: 0; padding: 0; }
+.rs-list li { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px solid var(--grid); font-size: 13px; }
+.rs-list li:last-child { border-bottom: 0; }
+.rs-list .num { white-space: nowrap; }
+.rs-status { font: 700 11px/1 var(--font-cond, 'Barlow Condensed', sans-serif); text-transform: uppercase; padding: 2px 5px; white-space: nowrap; }
+.rs-status.in { background: var(--volt); color: var(--volt-ink); }
+.rs-status.out { background: var(--s-3); color: var(--ink-3); }
+
+@media (max-width: 600px) {
+  .rs-cards, .rs-stakes, .rs-movers { grid-template-columns: 1fr; }
+  .rs-name { font-size: 18px; }
+  .rs-sf { padding: 5px 6px; gap: 4px; }
+}
+.rs-h3 { font: 700 15px/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: .04em; color: var(--ink-2); margin: var(--sp-4) 0 8px; }
+
+/* compact meters inside a profile card: one line per metric */
+.rs-card .qk-pbar { grid-template-columns: 96px minmax(0, 1fr) 30px 46px; gap: 8px; padding: 5px 0; }
+.rs-card .qk-pbar .qk-segs { grid-column: auto; grid-row: auto; height: 12px; gap: 2px; margin: 0 2px; }
+.rs-card .qk-pbar-label { font-size: 13px; }
+.rs-card .qk-pbox { font-size: 18px; padding: 2px 0 0; }
+.rs-card .qk-pbar-val { font-size: 14px; }

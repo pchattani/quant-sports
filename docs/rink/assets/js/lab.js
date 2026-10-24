@@ -16,14 +16,15 @@
 
 const K = () => RK.fk;
 const PRESETS = [
+  ['S', ['rapm_off', /rapm.*(off|xgf)/], ['rapm_def', /rapm.*(def|xga)/], 'Our RAPM at both ends: isolated offence against defence (5v5 xG)'],
+  ['S', ['gar_ev_off', /gar_ev_off/], ['gar_ev_def', /gar_ev_def/], 'Our value model at both ends: even-strength offence against defence (GAR)'],
+  ['S', ['toi_gp', /toi.*(gp|pg)/], ['gar', 'value', /^(rink_)?value|gar|war/], 'Ice time per game against Rink value (GAR)'],
   ['S', ['ixg60', 'ixg_60', /^i?xg_?(per_?)?60/], ['g60_5v5', 'g60', 'goals60', /^g(oals)?_?(per_?)?60/], 'Individual xG/60 against goals/60 (5v5): finishing above or below the chances'],
-  ['S', ['rapm_off', /rapm.*(off|xgf)/], ['rapm_def', /rapm.*(def|xga)/], 'RAPM offence against defence: two-way impact, isolated'],
   ['S', ['edge_max_speed', 'max_speed', /max_?speed|top_?speed/], ['xgf_pct', /xgf_?pct/], 'Tracked top skating speed against on-ice xGF%: does speed drive play?'],
   ['S', ['edge_shot_speed', 'max_shot_speed', /shot_?speed/], ['sh_pct', /sh(ooting)?_?pct/], 'Tracked hardest shot against shooting %'],
   ['S', ['xgf_pct', /xgf_?pct/], ['gf_pct', /gf_?pct/], 'On-ice xGF% against GF%: process against results'],
   ['S', ['ozs_pct', 'oz_start_pct', /oz.*start|ozs/], ['xgf_pct', /xgf_?pct/], 'Offensive-zone starts against xGF%: deployment or talent?'],
   ['S', ['qoc_toi', /qoc/], ['xgf_pct_rel', /xgf.*rel/], 'Quality of competition against relative xGF%'],
-  ['S', ['toi_gp', /toi.*(gp|pg)/], ['gar', 'value', /^(rink_)?value|gar|war/], 'Ice time per game against Rink value (GAR)'],
   ['S', ['p60', 'pts60', /^p(ts|oints)_?(per_?)?60/], ['rapm_off', /rapm.*(off|xgf)/], 'Points/60 against RAPM offence'],
   ['G', ['sa', 'shots_faced', /shots?_?faced|^sa$/], ['gsax', /^gsax$/], 'GSAx against workload (shots faced)'],
   ['G', ['xga60', /xga_?(per_?)?60/], ['gsax60', /gsax.*60/], 'Expected goals faced per 60 against GSAx per 60: busy nights and quality'],
@@ -61,6 +62,7 @@ function prep(raw, sk, gk, tms) {
     const meta = k.metaOf(ms0);
     // columns that carry numbers but no METRIC still become axes
     cols.forEach(c => { if (!meta[c] && !/^(pid|id|name|team|pos|qualified|colour|age)$/.test(c) && rows.some(r => k.isNum(r[idx[c]]))) { const m = { key: c, label: (RK.fk.playerLabel ? RK.fk.playerLabel(c) : c), group: 'Other', fmt: '' }; ms0.push(m); meta[c] = m; } });
+    if (RK.ours && RK.ours.cat()) ms0.forEach((m, i) => { const r = RK.ours.row(m.key, g === 'T' ? 'team' : 'player'); if (r) { ms0[i] = meta[m.key] = Object.assign({}, m, { label: r[0], desc: r[6] || m.desc }); } });
     const ms = ms0.filter(m => idx[m.key] !== undefined && rows.some(r => k.isNum(r[idx[m.key]])));
     const nKey = g === 'T' ? (idx.gp !== undefined ? 'gp' : null) : (g === 'G' ? ['shots_faced', 'sa', 'toi'].find(c => idx[c] !== undefined) : (idx.toi !== undefined ? 'toi' : (idx.gp !== undefined ? 'gp' : null)));
     kinds[g] = { idx: idx, meta: meta, metrics: ms, rows: rows, nKey: nKey, nLabel: nKey === 'toi' ? 'TOI (min)' : nKey === 'gp' ? 'Games' : 'Shots faced' };
@@ -136,7 +138,7 @@ function pctRank(sorted, v) { let lo = 0, hi = sorted.length; while (lo < hi) { 
 function metricOptions(sel, scope) {
   const k = K();
   let h = scope === 'color' ? '<option value="team">Team</option>' + (S0.kind === 'S' ? '<option value="pos">Position</option>' : (S0.kind === 'T' ? '<option value="conf">Conference</option>' : '')) + '<option value="">One colour</option>' : '';
-  k.groups(G().metrics).forEach(g => { h += '<optgroup label="' + k.esc(g.name) + '">' + g.items.map(m => '<option value="' + k.esc(m.key) + '"' + (m.key === sel ? ' selected' : '') + '>' + k.esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>'; });
+  (RK.ours ? RK.ours.groups(G().metrics, { entity: S0.kind === 'T' ? 'team' : 'player' }) : k.groups(G().metrics)).forEach(g => { h += '<optgroup label="' + k.esc(g.name) + '">' + g.items.map(m => '<option value="' + k.esc(m.key) + '"' + (m.key === sel ? ' selected' : '') + '>' + k.esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>'; });
   return h;
 }
 function sync() {
@@ -224,9 +226,11 @@ function draw(S) {
     (team ? '' : 'Labelled: the eight furthest into the good corner, the four furthest from it' + (hits.length ? ', and your search' : '') + '. Marker size is the sample. ') + 'Click a dot to open the page.' +
     (S0.shrink && !team ? ' Rates marked "shrunk" are pulled to the median of the ' + noun + ' on screen by their own stabilisation point: (n·x + k·median)/(n + k) with k = 3/7 of the sample at which the metric reaches 0.7 split-half reliability' + (shrinkable(S0.x) ? ' (' + k.esc(mX.label) + ' k = ' + k.int(kOf(S0.x)) + ' ' + unit(mX) + ')' : '') + (shrinkable(S0.y) ? ' (' + k.esc(mY.label) + ' k = ' + k.int(kOf(S0.y)) + ' ' + unit(mY) + ')' : '') + '. Totals, RAPM, values and tracking figures are never shrunk here: the models regularise them already or they are not rates.' : '') +
     (mX.desc ? '<br><strong>' + k.esc(mX.label) + '</strong>: ' + k.esc(k.cleanDesc(mX.desc)) : '') + (mY.desc ? '<br><strong>' + k.esc(mY.label) + '</strong>: ' + k.esc(k.cleanDesc(mY.desc)) : ''));
+  k.set('lab-ours', RK.ours ? RK.ours.explain([S0.x, S0.y], { label: kk => meta(kk).label || kk, entity: team ? 'team' : 'player' }) : '');
+  const oth = kk => (RK.ours && RK.ours.of(kk) ? 'qk-ours-th' : '');
   const host = k.$('lab-table');
   host.innerHTML = k.table([{ label: '#', sortable: false }, { label: team ? 'Team' : (S0.kind === 'G' ? 'Goalie' : 'Skater') }].concat(team ? [] : [{ label: 'Team' }].concat(G().nKey ? [{ label: G().nLabel, align: 'right' }] : []))
-    .concat([{ label: label(S0.x), align: 'right' }, { label: 'Pct', align: 'right' }, { label: label(S0.y), align: 'right' }, { label: 'Pct', align: 'right' }, { label: 'Combined', align: 'right', title: 'Sum of standard scores in the better direction' }]),
+    .concat([{ label: label(S0.x), align: 'right', cls: oth(S0.x) }, { label: 'Pct', align: 'right' }, { label: label(S0.y), align: 'right', cls: oth(S0.y) }, { label: 'Pct', align: 'right' }, { label: 'Combined', align: 'right', title: 'Sum of standard scores in the better direction' }]),
   ranked.slice(0, 300).map((o, i) => { const r = o.r, vx = val(r, S0.x), vy = val(r, S0.y);
     return { _href: href(r), cells: [{ v: i + 1, cls: 'pos-cell' }, { v: nm(r), html: team ? k.teamChip(idOf(r), S) + ' <a href="' + href(r) + '">' + k.esc(nm(r)) + '</a>' : '<a class="ply-link" href="' + href(r) + '">' + k.esc(nm(r)) + '</a>' }]
       .concat(team ? [] : [{ v: tm(r) || '', html: k.teamChip(tm(r), S) }].concat(G().nKey ? [{ v: nOf(r), html: k.int(nOf(r)) }] : []))
@@ -242,11 +246,11 @@ function render(el, params, state) {
     '<label>X axis<select id="lab-x"></select></label><label>Y axis<select id="lab-y"></select></label><label>&nbsp;<button type="button" id="lab-swap" class="gq-btn" title="Swap the axes">⇄ swap</button></label>' +
     '<label>Colour<select id="lab-color"></select></label><label><span>Min <span id="lab-min-u"></span> <span id="lab-min-v"></span></span><input id="lab-min" type="range" min="0" max="2000" step="10"></label>' +
     '<label class="inline"><input id="lab-qual" type="checkbox"> qualified only</label><label class="inline"><input id="lab-shrink" type="checkbox"> shrink by stabilisation</label><label>Highlight<input id="lab-q" class="gq-search" type="search" placeholder="player or team…"></label>' +
-    '</div><div id="lab-chart" class="gq-lab-chart"></div><div class="pg-note gq-note" id="lab-note"></div></div>' +
+    '</div><div id="lab-ours" class="rk-lab-ours"></div><div id="lab-chart" class="gq-lab-chart"></div><div class="pg-note gq-note" id="lab-note"></div></div>' +
     '<div class="card"><div class="card-header">Ranked <span class="card-sub">By the combined standard score on both axes (top 300). Click a row for the page.</span></div><div id="lab-table"></div></div>';
   return k.ready().then(() => {
     const S = k.S(params, state);
-    return Promise.all([k.loadY(S, 'lab.json'), k.loadY(S, 'skaters.json'), k.loadY(S, 'goalies.json'), k.loadY(S, 'teams.json'), k.loadNames()]).then(res => ({ S: S, res: res }));
+    return Promise.all([k.loadY(S, 'lab.json'), k.loadY(S, 'skaters.json'), k.loadY(S, 'goalies.json'), k.loadY(S, 'teams.json'), k.loadNames(), RK.ours ? RK.ours.load() : null]).then(res => ({ S: S, res: res }));
   }).then(o => {
     if (!k.alive(el)) return;
     const S = o.S, res = o.res, $ = k.$;

@@ -290,11 +290,32 @@ def history(league: str, seasons: list[int], elo_hist: dict | None) -> dict:
 LAB_MIN_SHARE = 0.5
 
 
-def lab_payload(league: str, catalogues: dict[int, dict]) -> dict:
-    """Column-oriented: every player-season with at least half the season's qualifying minutes."""
+# The value model's columns appended to the lab (value.json per season, joined on the player id): our wins above
+# replacement, so the lab can chart it beside HPM (METRICS_SHOWCASE.md, 24 Oct 2026).
+LAB_VALUE_METRICS = [an.metric("war", "Wins above replacement (WAR)", "Impact", "1",
+                               desc="Wins the player added over a replacement-level player in the minutes played, from HPM.")]
+
+
+def value_columns(value_payload: dict | None) -> dict[str, dict]:
+    """{player id: {"war": ...}} from one season's value.json (cols / rows)."""
+    cols = (value_payload or {}).get("cols") or []
+    if "id" not in cols:
+        return {}
+    i_id = cols.index("id")
+    idx = {m["key"]: cols.index(m["key"]) for m in LAB_VALUE_METRICS if m["key"] in cols}
+    return {str(r[i_id]): {k: r[i] for k, i in idx.items()} for r in (value_payload or {}).get("rows") or []
+            if isinstance(r, list) and len(r) == len(cols)}
+
+
+def lab_payload(league: str, catalogues: dict[int, dict], value: dict[int, dict[str, dict]] | None = None) -> dict:
+    """Column-oriented: every player-season with at least half the season's qualifying minutes. `value`: {season:
+    {player id: {"war": ...}}} (value_columns of each season's value.json) adds the value model's columns."""
     from oddsmarkets.basketball.analytics.players import METRICS
+    value = value or {}
+    vmetrics = [m for m in LAB_VALUE_METRICS if any(m["key"] in row for rows in value.values() for row in rows.values())]
     keys = [m["key"] for m in METRICS]
-    fields = ["id", "name", "team", "season", "pool", "gp", "min", "qualified"] + keys
+    vkeys = [m["key"] for m in vmetrics]
+    fields = ["id", "name", "team", "season", "pool", "gp", "min", "qualified"] + keys + vkeys
     rows = []
     years = []
     for s in sorted(catalogues):
@@ -308,9 +329,10 @@ def lab_payload(league: str, catalogues: dict[int, dict]) -> dict:
             if (r.get("min") or 0) < floor:
                 continue
             v = r.get("values") or {}
+            vv = (value.get(int(s)) or value.get(s) or {}).get(str(pid)) or {}
             rows.append([pid, r.get("name"), r.get("team"), int(s), r.get("pool"), r.get("gp"), r.get("min"), bool(r.get("qualified"))]
-                        + [v.get(k) for k in keys])
-    return {"ok": True, "league": league, "updated_at": an.now(), "fields": fields, "metrics": METRICS, "rows": rows, "years": years}
+                        + [v.get(k) for k in keys] + [vv.get(k) for k in vkeys])
+    return {"ok": True, "league": league, "updated_at": an.now(), "fields": fields, "metrics": METRICS + vmetrics, "rows": rows, "years": years}
 
 
 # ---------------------------------------------------------------------------------------------- markets

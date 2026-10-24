@@ -49,11 +49,21 @@ function prep(raw) {
   const al = (want, list) => { if (idx[want] === undefined) for (let i = 0; i < list.length; i++) if (idx[list[i]] !== undefined) { idx[want] = idx[list[i]]; break; } };
   al('id', ['pid', 'player', 'player_id']); al('year', ['season', 'window']); al('matches', ['n', 'm', 'played']);
   const meta = {};
-  (raw.metrics || []).forEach(m => { meta[m.key] = m; });
+  (raw.metrics || []).forEach(m => { meta[m.key] = specLabel(m); });
   meta.matches = meta.matches || { key: 'matches', label: 'Matches', fmt: 'int', group: 'Sample' };
   const ys = (raw.years && raw.years.length ? raw.years.slice() : Array.from(new Set((raw.rows || []).map(r => r[idx.year]))));
   const num = ys.filter(k.isNum).map(Number).sort((a, b) => b - a), lab = ys.filter(y => !k.isNum(y));
   return { idx: idx, meta: meta, metrics: (raw.metrics || []).filter(m => idx[m.key] !== undefined), rows: raw.rows || [], years: num, labels: lab, hasSurf: idx.surface !== undefined };
+}
+/* The spec's display name, unit and explanation for a payload metric (assets/qk/metrics/tennis.labels.json via
+   TA.v2.spec); the payload's own label and description when the spec does not list it. */
+function specLabel(m) {
+  const c = TA.v2 && TA.v2.spec, sm = c ? c.metric(m.key, 'player') : null;
+  if (!sm || sm.label === m.key || / on (hard|clay|grass)$/.test(sm.label)) return m;   // a surface group's name for an all-surface column
+  const out = Object.assign({}, m);
+  out.label = sm.label + (sm.unit === '%' && sm.label.indexOf('%') < 0 ? ' %' : '');
+  if (sm.explain) out.desc = sm.explain;
+  return out;
 }
 function resolve(pats) {
   const ms = LAB.metrics.concat(LAB.idx.rank !== undefined && !LAB.meta.rank ? [{ key: 'rank' }] : []);
@@ -112,7 +122,7 @@ function val(r, key) {
 function metricOptions(sel, scope) {
   const k = K();
   let h = scope === 'color' ? '<option value="country">Country</option><option value="year">Year</option>' + (LAB.hasSurf ? '' : '') + '<option value="">One colour</option>' : '';
-  k.groups(LAB.metrics).forEach(g => { h += '<optgroup label="' + k.esc(g.name) + '">' + g.items.map(m => '<option value="' + k.esc(m.key) + '"' + (m.key === sel ? ' selected' : '') + '>' + k.esc(m.label) + (m.lower ? ' ↓' : '') + (m.scope === 'wta_stats' ? ' ·stats' : m.scope === 'charted' ? ' ·charted' : '') + '</option>').join('') + '</optgroup>'; });
+  h += TA.v2.picker(LAB.metrics.map(m => LAB.meta[m.key] || m), sel, k.groups, m => (m.scope === 'wta_stats' ? ' ·stats' : m.scope === 'charted' ? ' ·charted' : ''));
   if (!scope) h += '<optgroup label="Sample"><option value="matches"' + (sel === 'matches' ? ' selected' : '') + '>Matches</option>' + (LAB.idx.rank !== undefined && !LAB.meta.rank ? '<option value="rank"' + (sel === 'rank' ? ' selected' : '') + '>Ranking</option>' : '') + '</optgroup>';
   return h;
 }
@@ -224,7 +234,11 @@ function draw() {
     'Labelled: the eight players furthest into the good corner and the four furthest from it (sum of standard scores on both axes)' + (hits.length ? ', and your search (ringed)' : '') + '. Marker size is matches' + (S.color && S.color !== 'country' && S.color !== 'year' ? '; colour is the percentile of ' + k.esc(label(S.color)) + ' on screen (blue worse, red better)' : '') + '. Click a dot to open the player.' +
     (S.shrink ? ' Rates marked "shrunk" are pulled towards the median of the players on screen by ' + SHRINK_K + ' matches of prior, (matches × rate + ' + SHRINK_K + ' × median) / (matches + ' + SHRINK_K + '), so a player with five matches is not ranked on five matches alone; hover shows the raw figures. Ratings, Elo, ranks and counts are never shrunk: the models behind them already regularise.' : '') +
     (multi ? ' A combined window sums counts and over-expected figures, averages rates weighted by matches, and takes ratings and ranks from the latest year.' : '') +
-    (mX.desc ? '<br><strong>' + k.esc(mX.label) + '</strong>: ' + k.esc(mX.desc) : '') + (mY.desc ? '<br><strong>' + k.esc(mY.label) + '</strong>: ' + k.esc(mY.desc) : ''));
+    (mX.desc ? '<br><strong>' + k.esc(mX.label) + '</strong>' + TA.v2.oursTag(S.x) + ': ' + k.esc(mX.desc) : '') + (mY.desc ? '<br><strong>' + k.esc(mY.label) + '</strong>' + TA.v2.oursTag(S.y) + ': ' + k.esc(mY.desc) : ''));
+  const ox = TA.v2.ours(S.x), oy = TA.v2.ours(S.y), models = [];
+  [ox, oy].forEach(o => { if (o && models.every(x => x.key !== o.key)) models.push(o); });
+  set('lab-ours', models.length ? QK.oursExplain(models.map(o => '<b>' + k.esc(o.name) + '.</b> ' + k.esc(o.about)).join(' '), { title: models.length > 1 ? 'Our models.' : 'Our model.' })
+    : QK.explain('Neither axis comes from our models. Elo, surface Elo, the serve and return ratings and the hold and break they imply are ours: they lead every metric list, tagged ' + QK.ours({ short: true }) + '.'));
   const host = document.getElementById('lab-table');
   host.innerHTML = k.table([
     { label: '#', sortable: false }, { label: 'Player' }, { label: 'Ctry' }, { label: 'Year', align: 'right' }, { label: 'Matches', align: 'right' },
@@ -239,6 +253,8 @@ function draw() {
     ] };
   }), { sticky: true, compact: true });
   k.sortable(host);
+  const hm = {}; hm[label(S.x)] = S.x; hm[label(S.y)] = S.y;
+  TA.v2.oursHeads(host, hm);
 }
 
 function render(el, params, state) {
@@ -255,9 +271,9 @@ function render(el, params, state) {
     '<label>Min matches <span id="lab-min-v"></span><input id="lab-min" type="range" min="0" max="80" step="1"></label>' +
     '<label class="inline"><input id="lab-shrink" type="checkbox"> shrink small samples</label>' +
     '<label>Highlight<input id="lab-q" class="pg-search" type="search" placeholder="player or country…"></label>' +
-    '</div><div id="lab-chart" class="af-lab-chart qk-chart" style="--h:520px" role="img" aria-label="Scatter of the two chosen metrics"></div><div class="pg-note" id="lab-note"></div></div>' +
+    '</div><div id="lab-chart" class="af-lab-chart qk-chart" style="--h:520px" role="img" aria-label="Scatter of the two chosen metrics"></div><div class="pg-note" id="lab-note"></div><div id="lab-ours" class="af-lab-ours"></div></div>' +
     '<div class="card"><div class="card-header">Ranked <span class="card-sub">The group by the combined standard score on both axes (top 300). Click a row for the player.</span></div><div id="lab-table"></div></div>';
-  return k.ready().then(() => Promise.all([TA.load(T + '/lab.json'), k.loadNames(T)])).then(res => {
+  return k.ready().then(() => Promise.all([TA.load(T + '/lab.json'), k.loadNames(T), TA.v2.specP])).then(res => {
     if (!k.alive(el)) return;
     const rawLab = res[0];
     if (!rawLab || rawLab.ok === false || !(rawLab.rows || []).length) { document.getElementById('lab-chart').innerHTML = k.notBuilt('The ' + k.TN(T) + ' lab file', rawLab); document.getElementById('lab-sub').textContent = ''; return; }

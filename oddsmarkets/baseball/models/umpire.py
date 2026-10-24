@@ -157,19 +157,9 @@ def abs_from_des(pitches: pd.DataFrame, store: dict | None, re: np.ndarray, coun
     rest = d[m][a.index].str.split(": ", n=1).str[1].fillna("").map(_c_name)
     pn = a["player_name"].astype(str).map(lambda s: " ".join(reversed([t.strip() for t in s.split(",", 1)])) if "," in s else s)         if "player_name" in a else pd.Series(None, index=a.index)
     pn = pn.map(_c_name)
-    roles = []
-    for w, b, c, pt, r, pnm in zip(who, a["batter"], a.get("fielder_2", pd.Series(np.nan, index=a.index)), a["pitcher"],
-                                  rest, pn):
-        if not w:
-            roles.append(("unknown", None))
-        elif w == nm(b) or (r or "").startswith(w):
-            roles.append(("batter", str(int(b))))
-        elif w == nm(pt) or (pnm and w == pnm):
-            roles.append(("pitcher", str(int(pt))))
-        elif pd.notna(c):
-            roles.append(("catcher", str(int(c))))
-        else:
-            roles.append(("unknown", None))
+    roles = [resolve_challenger(w, b, pt, c, r, nm, pnm)
+             for w, b, c, pt, r, pnm in zip(who, a["batter"], a.get("fielder_2", pd.Series(np.nan, index=a.index)), a["pitcher"],
+                                            rest, pn)]
     a["role"] = [r[0] for r in roles]
     a["challenger"] = [r[1] for r in roles]
     a["y"] = a["description"].astype(str).eq("called_strike").astype(int)        # the call after review
@@ -204,6 +194,32 @@ def abs_from_des(pitches: pd.DataFrame, store: dict | None, re: np.ndarray, coun
     out["replay"] = {"n": int(len(replay)), "overturn_rate": float(replay["overturned"].mean()) if len(replay) else None,
                      "by_kind": replay.groupby("kind")["overturned"].agg(["size", "mean"]).reset_index().values.tolist()}
     return out
+
+
+def _pid(x) -> str | None:
+    try:
+        return None if x is None or pd.isna(x) else str(int(x))
+    except (TypeError, ValueError):
+        return None
+
+
+def resolve_challenger(who: str | None, batter, pitcher, catcher, rest: str | None, name_of, pitcher_name: str | None = None
+                       ) -> tuple[str, str | None]:
+    """(role, player id) of the person named in an ABS challenge's play text. `who` and `rest` (the play text after the
+    colon, which starts with the batter's name) are already folded by `_c_name`; `name_of(pid)` gives a folded name.
+    The batter is matched by name or by the play text, the pitcher by name (or Savant's player_name), the catcher by
+    name, and an unmatched name falls to the catcher (fielder_2): batters and pitchers are named in the row, the catcher
+    is the one who is not."""
+    b, pt, c = _pid(batter), _pid(pitcher), _pid(catcher)
+    if not who:
+        return ("unknown", None)
+    if b and (who == name_of(b) or (rest or "").startswith(who)):
+        return ("batter", b)
+    if pt and (who == name_of(pt) or (pitcher_name and who == pitcher_name)):
+        return ("pitcher", pt)
+    if c:
+        return ("catcher", c)
+    return ("unknown", None)
 
 
 def _c_name(s) -> str | None:

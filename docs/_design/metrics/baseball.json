@@ -11235,5 +11235,60 @@
    "status": "needed",
    "note": "Not on disk; would need Savant's poptime and catcher-blocking leaderboards (a new fetch, out of scope here)."
   }
- ]
+ ],
+ "our_models": {
+  "models": {
+   "war": {
+    "name": "Bullpen WAR",
+    "about": "Our wins above replacement: batting, baserunning, fielding and pitching runs over a replacement-level player."
+   },
+   "xwoba": {
+    "name": "Expected contact model (xwOBA+)",
+    "about": "Our expected wOBA from exit velocity, launch angle, hang time and sprint speed, plus walks and strikeouts, re-scored in a standard park."
+   },
+   "stuff": {
+    "name": "Pitch models (Stuff+, Location+, Pitching+)",
+    "about": "Our pitch-quality models: pitch quality from velocity, movement, spin, release and extension (Stuff+), from location (Location+) and both together (Pitching+); 100 = average."
+   },
+   "framing": {
+    "name": "Catcher framing model",
+    "about": "Strikes a catcher adds over an average catcher on the same pitches, and the runs they are worth."
+   },
+   "fielding": {
+    "name": "Fielding model (OAA per chance)",
+    "about": "Outs above average per chance: plays made beyond what an average fielder makes on the same balls, and the runs they are worth."
+   },
+   "decisions": {
+    "name": "Swing-decision model",
+    "about": "The run value of a hitter's swing and take decisions per 100 pitches."
+   },
+   "team": {
+    "name": "Team rating model",
+    "about": "Runs per game better than average from offence, pitching and defence, from our game model."
+   }
+  },
+  "metrics": {
+   "war": "war",
+   "war_600": "war",
+   "war_200": "war",
+   "war_x": "war",
+   "bwar": "war",
+   "xwoba_n": "xwoba",
+   "xwoba_plus": "xwoba",
+   "xwobacon_plus": "xwoba",
+   "xra9": "xwoba",
+   "stuff_plus": "stuff",
+   "pitching_plus": "stuff",
+   "location_plus": "stuff",
+   "framing_rate": "framing",
+   "framing_runs": "framing",
+   "sra": "fielding",
+   "fielding_runs": "fielding",
+   "dv100": "decisions",
+   "rating": "team",
+   "off_rpg": "team",
+   "pit_rpg": "team",
+   "def_rpg": "team"
+  }
+ }
 }

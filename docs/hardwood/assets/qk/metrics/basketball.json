@@ -5976,5 +5976,65 @@
    "status": "needed",
    "note": "no measurement change needed in the payload; the spec measured them through an equivalent opponent-adjusted offence/defence fit on half-seasons (adj_off / adj_def). The rating path (log.net_rating_after) has net only."
   }
- ]
+ ],
+ "our_models": {
+  "models": {
+   "impact": {
+    "name": "Impact model (HPM)",
+    "about": "Our plus-minus model: box score and play-by-play blended into points per 100 possessions above an average player, split into offence and defence."
+   },
+   "rapm": {
+    "name": "RAPM",
+    "about": "Regularised adjusted plus-minus from every stint, shrunk towards zero and towards last season."
+   },
+   "war": {
+    "name": "Wins above replacement",
+    "about": "Total impact turned into wins over a replacement-level player, given minutes."
+   },
+   "team": {
+    "name": "Team rating model",
+    "about": "Adjusted net, offensive and defensive ratings from our game model, opponent and venue adjusted."
+   },
+   "wp": {
+    "name": "Win-probability model",
+    "about": "Our in-game chance of winning before and after every play; WPA adds up the swings while the player was involved."
+   },
+   "shot": {
+    "name": "Shot-quality model",
+    "about": "Expected points per shot from location and shot type, fitted on league shots; shot-making is the points scored above it."
+   }
+  },
+  "metrics": {
+   "hpm": "impact",
+   "hpm_o": "impact",
+   "hpm_d": "impact",
+   "box_impact": "impact",
+   "impact": "impact",
+   "rapm": "rapm",
+   "rapm_o": "rapm",
+   "rapm_d": "rapm",
+   "war": "war",
+   "war82": "war",
+   "model_net": "team",
+   "model_off": "team",
+   "model_def": "team",
+   "rating": "team",
+   "box_o": "impact",
+   "box_d": "impact",
+   "hpm_next": "impact",
+   "career_hpm": "impact",
+   "hpm_delta": "impact",
+   "par": "war",
+   "par_g": "war",
+   "prev_war": "war",
+   "team_net": "team",
+   "wpa": "wp",
+   "li_wpa": "wp",
+   "dwpa": "wp",
+   "clutch_wpa": "wp",
+   "xpps": "shot",
+   "pox100": "shot",
+   "opp_xpps_on": "shot"
+  }
+ }
 }

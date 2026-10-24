@@ -27,7 +27,7 @@ function render(el, params, state) {
     '<label class="inline"><input id="ld-qual" type="checkbox"> qualified only</label></div><div id="ld-table"></div><div class="pg-note gq-note" id="ld-note"></div></div>';
   return k.ready().then(() => {
     const S = k.S(params, state);
-    return Promise.all([k.loadY(S, 'skaters.json'), k.loadY(S, 'goalies.json'), k.loadNames()]).then(res => ({ S: S, sk: res[0], gk: res[1] }));
+    return Promise.all([k.loadY(S, 'skaters.json'), k.loadY(S, 'goalies.json'), k.loadNames(), RK.ours ? RK.ours.load() : null]).then(res => ({ S: S, sk: res[0], gk: res[1] }));
   }).then(o => {
     if (!k.alive(el)) return;
     const S = o.S, sk = k.catOf(o.sk), gk = k.catOf(o.gk), $ = k.$;
@@ -42,14 +42,18 @@ function render(el, params, state) {
       pools.A = { cat: sk, ids: Object.keys(P).filter(id => (P[id].group || k.groupOf(P[id].pos)) !== 'G'), metrics: k.allMetrics(sk).filter(m => k.scopeOk(m, 'F') && k.scopeOk(m, 'D')), pctKey: 'pct' };
     }
     if (gk) pools.G = { cat: gk, ids: Object.keys(gk.players), metrics: k.allMetrics(gk), pctKey: 'pct' };
+    // the spec's names and explanations (assets/qk/metrics/hockey.labels.json)
+    if (RK.ours) Object.keys(pools).forEach(x => { pools[x].metrics = RK.ours.relabel(pools[x].metrics, 'player'); });
     glance(S, pools);
     $('ld-pool').querySelectorAll('button').forEach(b => { b.disabled = !pools[b.dataset.v] || !pools[b.dataset.v].ids.length; });
     if (!pools[S0.pool]) S0.pool = Object.keys(pools)[0];
     $('ld-pool').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === S0.pool));
     const setup = () => {
       const pl = pools[S0.pool], ms = pl.metrics;
-      if (!ms.some(m => m.key === S0.metric)) S0.metric = (k.headline(ms, k.PREFS[S0.pool === 'A' ? 'F' : S0.pool] || [], 1)[0] || ms[0] || {}).key || '';
-      $('ld-metric').innerHTML = k.groups(ms).map(g => '<optgroup label="' + k.esc(g.name) + '">' + g.items.map(m => '<option value="' + k.esc(m.key) + '"' + (m.key === S0.metric ? ' selected' : '') + '>' + k.esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>').join('');
+      // our value model leads a board nobody has picked yet: GAR per 60 for skaters, GSAx per 100 shots for goalies
+      const lead = S0.pool === 'G' ? 'gsax100' : 'gar_60';
+      if (!ms.some(m => m.key === S0.metric)) S0.metric = ms.some(m => m.key === lead) ? lead : (k.headline(ms, k.PREFS[S0.pool === 'A' ? 'F' : S0.pool] || [], 1)[0] || ms[0] || {}).key || '';
+      $('ld-metric').innerHTML = (RK.ours ? RK.ours.groups(ms) : k.groups(ms)).map(g => '<optgroup label="' + k.esc(g.name) + '">' + g.items.map(m => '<option value="' + k.esc(m.key) + '"' + (m.key === S0.metric ? ' selected' : '') + '>' + k.esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>').join('');
       const teams = Array.from(new Set(pl.ids.map(id => pl.cat.players[id].team).filter(Boolean))).sort();
       if (S0.team && teams.indexOf(S0.team) < 0) S0.team = '';
       $('ld-team').innerHTML = '<option value="">All teams</option>' + teams.map(t => '<option value="' + k.esc(t) + '"' + (t === S0.team ? ' selected' : '') + '>' + k.esc(t) + '</option>').join('');
@@ -79,7 +83,7 @@ function glance(S, pools) {
     k.headline(pl.metrics, k.PREFS[z[0]] || [], z[2]).forEach(m => {
       const top = ids.filter(id => k.isNum((P[id].values || {})[m.key])).sort((a, b) => { const d = P[b].values[m.key] - P[a].values[m.key]; return m.lower ? -d : d; }).slice(0, 5);
       if (!top.length) return;
-      boxes.push('<div class="gq-mini"><div class="gq-mini-h"><a href="' + k.withQ('#/leaders', S, { p: z[0], m: m.key }) + '">' + k.esc(z[1] + ' · ' + m.label) + (m.lower ? ' ↓' : '') + '</a></div>' +
+      boxes.push('<div class="gq-mini"><div class="gq-mini-h"><a href="' + k.withQ('#/leaders', S, { p: z[0], m: m.key }) + '">' + k.esc(z[1] + ' · ' + m.label) + (m.lower ? ' ↓' : '') + '</a>' + (RK.ours ? RK.ours.tag(m.key) : '') + '</div>' +
         top.map((id, i) => '<div class="gq-mini-r"><span class="gq-mini-n">' + (i + 1) + '</span>' + k.playerLink(id, P[id].name, S) + '<span class="gq-mini-v">' + k.fmt(m, P[id].values[m.key]) + '</span></div>').join('') + '</div>');
     });
   });
@@ -102,7 +106,7 @@ function board(S, pl) {
   const lo = Math.min.apply(null, vals.concat([0])), hi = Math.max.apply(null, vals.concat([0]));
   const bar = v => { const span = hi - lo || 1; const z = (0 - lo) / span * 100, w = Math.abs(v) / span * 100; return '<span class="gf-hbar"><i style="left:' + (v >= 0 ? z : z - w).toFixed(1) + '%;width:' + Math.max(1, w).toFixed(1) + '%"></i></span>'; };
   const pc = p => ((S0.pool === 'F' || S0.pool === 'D' ? (p.pct_pos || p.pct) : p.pct) || {})[m.key];
-  k.set('ld-table', ids.length ? k.table([{ label: '#', sortable: false }, { label: 'Player' }, { label: 'Team' }, { label: 'Pos' }, { label: 'GP', align: 'right' }, { label: 'TOI', align: 'right', title: 'Minutes' }, { label: m.label + (m.lower ? ' ↓' : ''), align: 'right', title: k.cleanDesc(m.desc || '') }, { label: '', sortable: false }, { label: 'Pct', align: 'right' }],
+  k.set('ld-table', ids.length ? k.table([{ label: '#', sortable: false }, { label: 'Player' }, { label: 'Team' }, { label: 'Pos' }, { label: 'GP', align: 'right' }, { label: 'TOI', align: 'right', title: 'Minutes' }, { label: m.label + (m.lower ? ' ↓' : ''), align: 'right', title: k.cleanDesc(m.desc || ''), cls: RK.ours && RK.ours.of(m.key) ? 'qk-ours-th' : '' }, { label: '', sortable: false }, { label: 'Pct', align: 'right' }],
     ids.map((id, i) => { const p = P[id], v = p.values[m.key];
       return { _href: k.playerHref(id, S), cells: [{ v: i + 1, cls: 'pos-cell' }, { v: p.name, html: k.playerLink(id, p.name, S) + (p.qualified === false ? ' <span class="gq-tag">small sample</span>' : '') }, { v: p.team || '', html: k.teamChip(p.team, S) }, { v: p.pos, html: k.esc(k.posLabel(p.pos || '')) },
         { v: k.gpOf(p), html: k.int(k.gpOf(p)) }, { v: k.toiOf(p, scale), html: k.int(k.toiOf(p, scale)) }, { v: v, html: '<strong>' + k.fmt(m, v) + '</strong>' }, { v: v, html: bar(v) }, { v: pc(p), html: k.pill(pc(p)) }] }; }), { compact: true, sticky: true })
@@ -111,7 +115,7 @@ function board(S, pl) {
   const name = { F: 'forwards', D: 'defencemen', A: 'skaters', G: 'goalies' }[S0.pool];
   k.set('ld-sub', (S0.dir === 'worst' ? 'Bottom ' : 'Top ') + Math.min(S0.n, total) + ' of ' + total + ' ' + name + ' · ' + k.sLabel(S));
   const q = (pl.cat.qualification || {})[S0.pool === 'A' ? 'F' : S0.pool] || pl.cat.qualification_note;
-  k.set('ld-note', '<strong>' + k.esc(m.label) + '</strong>: ' + k.esc(k.cleanDesc(m.desc || '')) + (k.isNum(m.stabilises_at) ? ' Stabilises at about ' + k.int(m.stabilises_at) + ' ' + k.esc(m.unit || (S0.pool === 'G' ? 'shots' : 'minutes')) + '.' : '') +
+  k.set('ld-note', (RK.ours ? RK.ours.explain([m.key], { label: () => m.label }) : '') + '<strong>' + k.esc(m.label) + '</strong>: ' + k.esc(k.cleanDesc(m.desc || '')) + (k.isNum(m.stabilises_at) ? ' Stabilises at about ' + k.int(m.stabilises_at) + ' ' + k.esc(m.unit || (S0.pool === 'G' ? 'shots' : 'minutes')) + '.' : '') +
     (q && typeof q === 'string' ? ' Qualified: ' + k.esc(q) + '.' : '') + ' Percentiles are against qualified ' + (S0.pool === 'F' || S0.pool === 'D' ? name + ' (the position pool)' : name) + ' after shrinking towards the pool mean. ' + k.glossLink(m.key, 'Glossary →') +
     ' · <a href="' + k.withQ('#/lab', S, { kind: S0.pool === 'G' ? 'G' : 'S', x: m.key }) + '">In the lab →</a>');
 }

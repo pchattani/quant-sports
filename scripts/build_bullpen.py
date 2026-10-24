@@ -239,7 +239,9 @@ def build_season(b: Build, level: str, season: int, full: bool, cfg: dict, share
                             level=level, season=season)
     tms = b.write_or_fail(d + "teams.json", f"teams {level} {season}", lambda: TM.build(ctx, hit, pit, sim, (sched or {}).get("games")),
                           level=level, season=season)
-    spl = b.write_or_fail(d + "season.json", f"season {level} {season}", lambda: SN.build(ctx, tms, sim, markets), level=level, season=season)
+    spl = b.write_or_fail(d + "season.json", f"season {level} {season}",
+                          lambda: with_league(b, level, season, SN.build(ctx, tms, sim, markets), tms, (sched or {}).get("games") or [], cfg)
+                          if full and current else SN.build(ctx, tms, sim, markets), level=level, season=season)
     ump = b.write_or_fail(d + "umpires.json", f"umpires {level} {season}", lambda: UM.build(ctx), level=level, season=season)
     b.write_or_fail(d + "parks.json", f"parks {level} {season}", lambda: PK.build(ctx), level=level, season=season)
     b.write_or_fail(d + "leaders.json", f"leaders {level} {season}", lambda: LD.build(ctx, hit, pit, tms), level=level, season=season)
@@ -281,6 +283,29 @@ def build_season(b: Build, level: str, season: int, full: bool, cfg: dict, share
     gc.collect()
     logger.info("%s %s (%s): %.1f s", level, season, "full" if full else "light", time.perf_counter() - t0)
     return out
+
+
+def with_league(b: Build, level: str, season: int, spl: dict | None, tms: dict | None, cards: list[dict], cfg: dict) -> dict | None:
+    """season.json with its "league" block (how the races are shaping up, strengths and weaknesses:
+    oddsmarkets/baseball/analytics/race.py on oddsmarkets/common/league.py) and data/<level>/race_log.json carried
+    forward (the whole season's chances, one snapshot a day; MLB's dates before live tracking rebuilt from the season
+    simulation as of each date, within a time budget a build). Triple-A has no simulation: its block carries the
+    strengths and weaknesses only. A failure leaves season.json as it was."""
+    if not isinstance(spl, dict) or not spl.get("ok", True):
+        return spl
+    from oddsmarkets.baseball.analytics import race as RC
+
+    def run():
+        prev = an.read_json(b.data / level / "race_log.json") or {}
+        runner = RC.asof_runner(level, season) if level == "mlb" and not cfg.get("no_models") else None
+        blk, log = RC.build(level, season, spl, tms, cards, prev, _digest_now(cfg["today"]), run_asof=runner)
+        if log.get(str(season)):
+            b.write(f"{level}/race_log.json", log)
+        return blk
+    blk = b.step(f"league block {level} {season}", run, None)
+    if blk:
+        spl["league"] = blk
+    return spl
 
 
 def _headline(cat: dict | None, keys: list[str]) -> dict:

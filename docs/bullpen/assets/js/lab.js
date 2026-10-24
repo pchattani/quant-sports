@@ -14,7 +14,10 @@
  * "n_label" (PA / BF / G); registered with BP.routeNpb.
  * Data: data/<L>/<S>/lab.json, column-oriented {"fields", "metrics", "rows", "kinds"}; a "kind" field
  * (hitter|pitcher) and a "season"/"window" field select rows; "windows": {label: {...}} is also read.
- * Falls back to the hitters and pitchers catalogues. Uses BP.gk. */
+ * Falls back to the hitters and pitchers catalogues. Uses BP.gk.
+ * Round 5: the axis pickers list our model metrics first ("Our models", then the spec's headline box-score metrics,
+ * then the payload's groups), with the spec's names (BP.ui.label); our metrics carry the cobalt tag on the axes line
+ * and in the ranked table's heads, and a cobalt strip says which model each comes from. */
 (function (BP) {
 'use strict';
 
@@ -125,7 +128,7 @@ function meta(key) { return G().meta[key] || (key === 'n' ? { key: 'n', label: n
 function shrinkable(key) { const m = meta(key); if (S0.kind === 'team') return false; return !NO_SHRINK.test(key) && ['int', 'plus', 'signed', 'rv', 'war'].indexOf(m.fmt) < 0 && key !== 'n'; }
 function kOf(key) { const m = meta(key); return K().isNum(m.stabilises_at) ? m.stabilises_at * 3 / 7 : 200; }
 function lower(key) { return !!meta(key).lower; }
-function label(key) { return (meta(key).label || key) + (S0.shrink && shrinkable(key) ? ' (shrunk)' : ''); }
+function label(key) { return BP.ui.label(S0.kind, key, meta(key).label || key) + (S0.shrink && shrinkable(key) ? ' (shrunk)' : ''); }
 function fmt(key, v) { return K().fmtV(v, meta(key).fmt); }
 function val(r, key) {
   const v = raw(r, key);
@@ -156,7 +159,7 @@ function pctRank(sorted, v) { let lo = 0, hi = sorted.length; while (lo < hi) { 
 function metricOptions(sel, scope) {
   const k = K();
   let h = scope === 'color' ? '<option value="team">Team</option><option value="pos">' + (S0.kind === 'pitcher' ? 'Role' : S0.kind === 'team' ? 'League' : 'Position') + '</option><option value="">One colour</option>' : '';
-  k.groups(G().metrics).forEach(g => { h += '<optgroup label="' + k.esc(g.name) + '">' + g.items.map(m => '<option value="' + k.esc(m.key) + '"' + (m.key === sel ? ' selected' : '') + '>' + k.esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>'; });
+  h += BP.ui.metricOpts(G().metrics, sel, S0.kind);
   if (!scope) h += '<optgroup label="Sample"><option value="n"' + (sel === 'n' ? ' selected' : '') + '>' + nLong() + '</option></optgroup>';
   return h;
 }
@@ -183,7 +186,8 @@ function draw(L, S) {
   const rows = base0.filter(r => val(r, S0.x) !== null && val(r, S0.y) !== null);
   const set = (id, h) => { const e = document.getElementById(id); if (e) e.innerHTML = h; };
   set('lab-sub', rows.length + ' ' + kindNoun() + ' · ' + k.esc(S0.win === 'season' ? S : S0.win) + ' · ' + S0.min + '+ ' + nU());
-  if (rows.length < 3) { set('lab-chart', QK.empty('Too few for this view', L === 'npb' ? 'Lower the floor, or pick metrics this season has (the play-by-play metrics start in 2016).' : 'Lower the floor, widen the window, or pick metrics these players have (bat tracking starts in 2023; framing is for catchers).')); set('lab-table', ''); set('lab-note', ''); return; }
+  set('lab-ours', (BP.ui.ours(S0.x) || BP.ui.ours(S0.y) ? '<p class="bp-lab-axes">' + [['X', S0.x], ['Y', S0.y]].map(a => a[0] + ': <b>' + k.esc(BP.ui.label(S0.kind, a[1], meta(a[1]).label || a[1])) + '</b>' + BP.ui.oursTag(a[1])).join(' &nbsp;·&nbsp; ') + '</p>' : '') + BP.ui.oursNote(S0.kind, [S0.x, S0.y]));
+  if (rows.length < 3) { set('lab-ours', ''); set('lab-chart', QK.empty('Too few for this view', L === 'npb' ? 'Lower the floor, or pick metrics this season has (the play-by-play metrics start in 2016).' : 'Lower the floor, widen the window, or pick metrics these players have (bat tracking starts in 2023; framing is for catchers).')); set('lab-table', ''); set('lab-note', ''); return; }
   const xs = rows.map(r => val(r, S0.x)), ys = rows.map(r => val(r, S0.y));
   const mx = k.median(xs), my = k.median(ys), sx = zs(xs), sy = zs(ys);
   const dirx = lower(S0.x) ? -1 : 1, diry = lower(S0.y) ? -1 : 1;
@@ -227,7 +231,7 @@ function draw(L, S) {
     (diag ? 'The dashed diagonal is equality. ' : '') + (S0.color && S0.color !== 'team' && S0.color !== 'pos' ? 'Colour: ' + k.esc(label(S0.color)) + ' on the percentile scale (blue worst, red best). ' : '') +
     'Labelled: the eight furthest into the good corner, the four furthest from it' + (hits.length ? ', and your search (white)' : '') + '. Marker size is the sample.' +
     (S0.shrink ? ' Rates marked "shrunk" are pulled to the median of the players on screen by their own stabilisation point: (n·x + k·median)/(n + k) with k = 3/7 of the sample at which the metric reaches 0.7 split-half reliability (' + (shrinkable(S0.x) ? k.esc(mX.label || S0.x) + ' k = ' + k.int(kOf(S0.x)) : '') + (shrinkable(S0.x) && shrinkable(S0.y) ? ', ' : '') + (shrinkable(S0.y) ? k.esc(mY.label || S0.y) + ' k = ' + k.int(kOf(S0.y)) : '') + '). Model scores (the "+" scores), WAR and run totals are never shrunk here: the models regularise them already.' : '') +
-    (mX.desc ? '<br><strong>' + k.esc(mX.label) + '</strong>: ' + k.esc(mX.desc) : '') + (mY.desc ? '<br><strong>' + k.esc(mY.label) + '</strong>: ' + k.esc(mY.desc) : '') + npbNote([S0.x, S0.y]));
+    (mX.desc ? '<br><strong>' + k.esc(BP.ui.label(S0.kind, S0.x, mX.label)) + '</strong>: ' + k.esc(mX.desc) : '') + (mY.desc ? '<br><strong>' + k.esc(BP.ui.label(S0.kind, S0.y, mY.label)) + '</strong>: ' + k.esc(mY.desc) : '') + npbNote([S0.x, S0.y]));
   QK.leaderboard(document.getElementById('lab-table'), { dense: true, rank: true, maxHeight: 620, rowClass: o => (hits.indexOf(o._r) >= 0 ? 'is-me' : ''), rowHref: o => o.href, columns: [
     { key: 'name', label: S0.kind === 'pitcher' ? 'Pitcher' : S0.kind === 'team' ? 'Club' : 'Hitter', type: 'entity', sub: 'sub', mark: o => (S0.kind === 'team' ? U.team(o.id, L, S) : (o.team ? U.team(o.team, L, S) : null)), href: o => o.href },
     { key: 'n', label: nU(), num: true, fmt: v => k.int(v) },
@@ -236,6 +240,7 @@ function draw(L, S) {
     { key: 'z', label: 'Combined', type: 'bar', fmt: v => k.num(v, 2), tip: 'Sum of standard scores in the better direction' }],
     rows: ranked.slice(0, 300).map(o => { const rr = o.r, vx = val(rr, S0.x), vy = val(rr, S0.y);
       return { _r: rr, id: String(raw(rr, 'id')), name: nm(rr), team: tm(rr), sub: S0.kind === 'team' ? String(raw(rr, 'pos') || '') : k.teamAbbr(tm(rr)), n: raw(rr, 'n'), vx: vx, px: pOf(sortedX, vx, dirx), vy: vy, py: pOf(sortedY, vy, diry), z: o.z, href: href(rr) }; }) });
+  BP.ui.tagHeads(document.getElementById('lab-table'), { vx: S0.x, vy: S0.y });
 }
 
 function render(el, params, state) {
@@ -249,13 +254,13 @@ function render(el, params, state) {
     '<label>Colour<select id="lab-color"></select></label><label>Min <span id="lab-min-u"></span> <b id="lab-min-v"></b><input id="lab-min" type="range" min="0" max="700" step="5"></label>' +
     '<label class="bp-check"><input id="lab-shrink" type="checkbox"> shrink by stabilisation</label><label>Highlight<input id="lab-q" class="gq-search" type="search" placeholder="player or team…"></label>' +
     '</div></div></section>' +
-    '<div class="qk-grid" style="margin-top:var(--sp-4)"><div class="qk-span-12">' + U.card2('The chart', '<span id="lab-sub">Loading…</span>', U.chart('lab-chart', 560, 'Lab scatter') + '<p class="bp-note" id="lab-note"></p>') + '</div>' +
+    '<div class="qk-grid" style="margin-top:var(--sp-4)"><div class="qk-span-12">' + U.card2('The chart', '<span id="lab-sub">Loading…</span>', '<div id="lab-ours"></div>' + U.chart('lab-chart', 560, 'Lab scatter') + '<p class="bp-note" id="lab-note"></p>') + '</div>' +
     '<div class="qk-span-12">' + U.card2('Ranked', 'By the combined standard score on both axes (top 300); the cells are percentiles on screen', '<div id="lab-table"></div>', { flush: true }) + '</div></div>';
   return k.ready().then(() => {
     const S = k.S(params, state);
     // NPB: one file (npb/<S>/lab.json: hitters, pitchers and clubs); MLB and Triple-A fall back to the catalogues
     const more = L === 'npb' ? [Promise.resolve(null), Promise.resolve(null), Promise.resolve(null)] : [k.loadY(L, S, 'hitters.json'), k.loadY(L, S, 'pitchers.json'), k.loadNames()];
-    return Promise.all([k.loadY(L, S, 'lab.json')].concat(more)).then(res => ({ S: S, res: res }));
+    return Promise.all([k.loadY(L, S, 'lab.json')].concat(more).concat([U.specReady()])).then(res => ({ S: S, res: res }));
   }).then(o => {
     if (!k.alive(el)) return;
     const S = o.S, res = o.res, $ = id => document.getElementById(id);
