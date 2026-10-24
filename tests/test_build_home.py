@@ -56,3 +56,13 @@ def test_season_files_follow_each_sites_index(tmp_path):
 def test_home_workflow_fetches_the_season_files():
     gen = (ROOT / "scripts" / "gen_ci_workflows.py").read_text(encoding="utf-8")
     assert "build_home.py --season-files" in gen
+
+
+def test_team_nicknames_and_broadcast_fields():
+    # the Broadcast hero prints the nickname large and the city under it; two-word nicknames stay whole
+    assert bh.nickname("Vegas Golden Knights") == "Golden Knights"
+    assert bh.nickname("Toronto Maple Leafs") == "Maple Leafs"
+    assert bh.nickname("Colorado Avalanche") == "Avalanche"
+    t = bh.team("Jets", "WPG", "#041E42", full="Winnipeg Jets", alt="#004C97")
+    assert t["full"] == "Winnipeg Jets" and t["alt"] == "#004C97"
+    assert "full" not in bh.team("Arsenal", full="Arsenal")          # no city to print: not written

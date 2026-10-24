@@ -1,56 +1,55 @@
-/* The Quant home (kit v3 "Matchday") — page layout only; every component comes from the kit (assets/qk). */
-.hm-page { padding-top: 0; }
+/* The Quant home (kit v4 "Broadcast") — page layout only; every component comes from the kit (assets/qk). */
+.hm-page { padding-top: 24px; }
+.hm-hero .qk-split-top { min-height: 340px; }
 
-/* stat of the day beside "New here?" */
-.hm-pair { align-items: stretch; }
-.hm-pair > div { min-width: 0; display: flex; }
-.hm-pair > div > * { flex: 1; }
+/* "We say it" beside "Who's for real?" */
+.hm-sure > div { min-width: 0; }
+.hm-sure .qk-howsure .qk-chart { --h: 360px; }
 
-/* title races */
-.hm-race h3 { margin: 8px 0 4px; }
-.hm-race-lede { margin: 0 0 18px !important; color: var(--ink-2); font-size: 15px; }
-.hm-race-more { display: inline-block; margin-top: 16px; }
-.hm-fut { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--sp-8); align-items: start; }
-.hm-fut-side { display: grid; gap: 14px; }
-.hm-fut-side .qk-stats { grid-template-columns: 1fr 1fr; }
-.hm-fut-side .qk-note { margin-top: 0; }
+/* title race */
+.hm-race { padding: 18px 20px 20px; }
+.hm-race-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px 20px; flex-wrap: wrap; margin-bottom: 16px; }
+.hm-race-lede { margin: 0 !important; color: var(--ink-2); font-size: 15px; }
+.hm-race-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+.hm-race .qk-select { height: 34px; }
 
-/* sport tiles: rounded cards, the sport's colour on the icon only */
-.hm-tiles { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
-.hm-tile { --sa: var(--accent); position: relative; display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; border-radius: var(--r-tile); border: 1px solid var(--line-1); background: var(--s-1); box-shadow: var(--sh-1); transition: border-color var(--t-med), transform var(--t-med) var(--ease); min-height: 172px; }
-.hm-tile:hover { border-color: var(--line-3); transform: translateY(-2px); }
+/* sport tiles: black blocks, the sport's colour on the icon only */
+.hm-tiles { display: grid; gap: 2px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.hm-tile { --sa: var(--accent); position: relative; display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; background: var(--block); color: #fff; min-height: 172px; border-top: 4px solid var(--sa); transition: background var(--t-fast); }
+.hm-tile:hover { background: #0e1015; color: #fff; }
+.hm-tile:hover .hm-tile-name { color: var(--volt); }
 .hm-tile-top { display: flex; align-items: center; gap: 12px; }
-.hm-tile-ic { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--sa) 16%, transparent); color: var(--sa); flex: none; }
+.hm-tile-ic { width: 40px; height: 40px; display: grid; place-items: center; background: color-mix(in srgb, var(--sa) 18%, transparent); color: var(--sa); flex: none; }
 .hm-tile-ic svg { width: 20px; height: 20px; }
-.hm-tile-name { font: 600 1.25rem/1.1 var(--font-display); font-variation-settings: var(--fvs-display); }
-.hm-tile-site { font-size: var(--fs-xs); color: var(--ink-3); }
-.hm-tile-status { font-size: var(--fs-sm); color: var(--ink-2); display: flex; gap: 8px; align-items: center; min-height: 22px; }
-.hm-tile-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: auto; padding-top: 12px; border-top: 1px dashed var(--line-2); }
+.hm-tile-name { font: 400 2rem/0.9 var(--font-display); text-transform: uppercase; }
+.hm-tile-site { font: 700 var(--fs-2xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; color: var(--block-ink-3); margin-top: 2px; }
+.hm-tile-status { font-size: var(--fs-sm); color: var(--block-ink-2); display: flex; gap: 8px; align-items: center; min-height: 22px; }
+.hm-tile-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--card-rule); }
 .hm-tile-kpis div { min-width: 0; }
-.hm-tile-kpis .l { font: 600 var(--fs-2xs)/1.2 var(--font-ui); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hm-tile-kpis .v { font: 650 1.0625rem/1.2 var(--font-display); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hm-tile-kpis .s { font-size: var(--fs-2xs); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hm-tile-kpis .l { font: 700 var(--fs-2xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; color: var(--block-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hm-tile-kpis .v { font: 400 1.5rem/1 var(--font-display); text-transform: uppercase; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hm-tile-kpis .s { font-size: var(--fs-2xs); color: var(--block-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* every game */
 .hm-games .qk-gc { animation: qk-rise var(--t-slow) var(--ease) both; }
 .hm-more { display: flex; justify-content: center; margin-top: 18px; }
-.hm-day { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; margin-top: 8px; font: 600 1.0625rem/1 var(--font-display); color: var(--ink-2); }
-.hm-day::after { content: ""; flex: 1; height: 1px; background: var(--line-1); }
+.hm-day { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; margin-top: 8px; font: 400 1.75rem/1 var(--font-display); text-transform: uppercase; color: var(--ink-1); }
+.hm-day::after { content: ""; flex: 1; height: 2px; background: var(--card-rule); }
 
 /* MLB series */
-.hm-series { display: grid; gap: 12px; }
-.hm-series-row { display: grid; gap: 10px; padding: 14px 16px; border-radius: 16px; background: var(--s-2); }
-.hm-series-teams { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-weight: 700; }
-.hm-series-teams .w { font: 650 1.5rem var(--font-display); font-variant-numeric: lining-nums tabular-nums; }
+.hm-series { display: grid; gap: 2px; }
+.hm-series-row { display: grid; gap: 10px; padding: 14px 16px; background: var(--s-2); }
+.hm-series-teams { display: flex; justify-content: space-between; align-items: center; gap: 10px; font: 700 16px/1.1 var(--font-cond); text-transform: uppercase; }
+.hm-series-teams .w { font: 400 2.25rem/1 var(--font-display); font-variant-numeric: tabular-nums; }
 .hm-updated { text-align: center; margin-top: var(--sp-12); color: var(--ink-3); }
 
-@media (max-width: 1000px) { .hm-fut { grid-template-columns: 1fr; } }
 @media (max-width: 600px) {
-  .hm-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .hm-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hm-tile { min-height: 0; padding: 14px; gap: 8px; }
   .hm-tile-kpis, .hm-tile-site { display: none; }
   .hm-tile-top { flex-direction: column; align-items: flex-start; gap: 8px; }
-  .hm-tile-name { font-size: 1.0625rem; }
+  .hm-tile-name { font-size: 1.625rem; }
   .hm-tile-status { font-size: var(--fs-2xs); }
   .hm-tile-status .qk-truncate { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .hm-race { padding: 14px 14px 16px; }
 }

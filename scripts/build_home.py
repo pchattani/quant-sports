@@ -163,12 +163,31 @@ class Ctx:
         return f"../{folder}/" if self.links == "local" else PUBLIC.format(repo)
 
 
-def team(name, abbr=None, colour=None, logo=None, href=None):
+TWO_WORD = ("Maple Leafs", "Red Wings", "Golden Knights", "Blue Jackets", "Blue Jays", "Red Sox", "White Sox",
+            "Trail Blazers")
+
+
+def nickname(full):
+    """'Vegas Golden Knights' -> 'Golden Knights', 'Colorado Avalanche' -> 'Avalanche' (US-league team names)."""
+    full = str(full or "")
+    for two in TWO_WORD:
+        if full.endswith(two):
+            return two
+    return full.split(" ")[-1] if full else full
+
+
+def team(name, abbr=None, colour=None, logo=None, href=None, full=None, alt=None):
+    """A team for home.json. full (the full name, 'Winnipeg Jets') lets the Broadcast hero print the city under the
+    nickname; alt (the second kit colour) is the hero's fallback when the two teams' colours clash."""
     t = {"name": name}
     if abbr:
         t["abbr"] = abbr
     if colour:
         t["colour"] = colour
+    if full and full != name:
+        t["full"] = full
+    if alt:
+        t["alt"] = alt
     if logo:
         t["logo"] = logo
     if href:
@@ -475,7 +494,7 @@ def build_basketball(ctx: Ctx, base: str, out: dict):
         def tm(tid):
             t = teams.get(str(tid)) or {}
             return team(t.get("short") or t.get("name") or str(tid), t.get("abbr"), t.get("colour"),
-                        href=base + "#/" + L + "/team/" + str(tid))
+                        href=base + "#/" + L + "/team/" + str(tid), full=t.get("name"), alt=t.get("alt"))
 
         seen, games = set(), []
         for g in (lg.get("today") or []) + (lg.get("next_games") or []) + (lg.get("last_games") or []):
@@ -600,7 +619,7 @@ def build_baseball(ctx: Ctx, base: str, out: dict):
     def tm(tid):
         t = teams.get(str(tid)) or {}
         return team(t.get("short") or t.get("name") or str(tid), t.get("abbr"), t.get("colour"),
-                    href=base + "#/mlb/team/" + str(tid))
+                    href=base + "#/mlb/team/" + str(tid), full=t.get("name"), alt=t.get("alt"))
 
     seen, games = set(), []
     for g in (idx.get("today") or []) + (idx.get("recent") or []) + (idx.get("upcoming") or []):
@@ -694,8 +713,8 @@ def build_nfl(ctx: Ctx, base: str, out: dict):
 
     def tm(a):
         t = teams.get(a) or {}
-        return team(t.get("name", a).split(" ")[-1] if t.get("name") else a, a, t.get("colour"),
-                    href=base + "#/team/" + a)
+        return team(nickname(t.get("name")) if t.get("name") else a, a, t.get("colour"),
+                    href=base + "#/team/" + a, full=t.get("name"), alt=t.get("alt"))
 
     seen, games = set(), []
     for g in (idx.get("live") or []) + (idx.get("games") or []) + (idx.get("recent") or []):
@@ -794,8 +813,8 @@ def build_hockey(ctx: Ctx, base: str, out: dict):
 
     def tm(a):
         t = teams.get(a) or {}
-        return team(t.get("name", a).split(" ")[-1] if t.get("name") else a, a, t.get("colour"),
-                    href=base + "#/team/" + a)
+        return team(nickname(t.get("name")) if t.get("name") else a, a, t.get("colour"),
+                    href=base + "#/team/" + a, full=t.get("name"), alt=t.get("alt"))
 
     seen, games = set(), []
     for g in (idx.get("live") or []) + (idx.get("today") or []) + (idx.get("recent") or []) + (idx.get("upcoming") or []):

@@ -1,75 +1,89 @@
-/* The Quant design tokens — v3 "Matchday" layouts in the Broadcast colours (Oct 2026). Spec:
- * docs/_design/STYLE_GUIDE.md; moving a page: MIGRATION_V3.md.
+/* The Quant design tokens — kit v4 "Broadcast" (23 Oct 2026). Spec: docs/_design/STYLE_GUIDE.md; moving a page:
+ * MIGRATION_V4.md.
  *
- * Dark only, cool and bright (user decision 23 Oct 2026: "more fan of what you had in the ESPN one"): near-black
- * page, cool charcoal cards, white and cool-grey ink, periwinkle cobalt for "ours", volt for the highlighter, tags
- * and key numbers, red-orange for live, team colours wherever a team is shown. There is no light theme: the tokens
- * live on :root alone, so a stale data-theme="light" attribute or a light OS setting changes nothing (QK.theme pins
- * data-theme="dark" as well, for old site CSS).
+ * Dark only (user decisions, 23 Oct 2026: "I want it in dark mode", then "Switch everything to the ESPN style view").
+ * A near-black page, black broadcast blocks, cool charcoal cards, white and cool-grey ink, periwinkle cobalt for
+ * "ours", volt for tags, the stat-of-the-day slab and key numbers, red-orange for live, team colours as big blocks.
+ * Type: Bebas Neue (scores, numbers, short headlines), Barlow (body), Barlow Condensed (labels, long names). Hard
+ * edges: no radii, no soft shadows; cards carry a 5 px top rule; signature shapes are cut on a diagonal.
+ * The tokens live on :root alone, so a stale data-theme="light" attribute or a light OS setting changes nothing.
  *
- * Naming: --bg-* page planes, --s-* surfaces (cards), --ink-* text, --line-* rules, --signal* "ours" (our forecasts,
- * primary actions), --volt the highlighter / tag / key-number accent (--sun is its old name), --coral / --sky the
- * second and third accents, --a-* sport accents (identity marks only), --c-* chart categorical slots, --pc-* the
- * percentile scale (cold -> hot), --wp-* win-probability fallbacks, --st-* status (never series). Every v1, v2 and
- * Matchday name is still defined (backward compatible).
+ * Naming: --bg-* page planes, --s-* surfaces (cards), --block* the broadcast black, --ink-* text, --line-* rules,
+ * --signal* "ours", --volt the accent (--sun is its old name), --coral / --sky the second and third accents, --a-*
+ * sport accents (identity marks only), --c-* chart slots, --pc-* the percentile scale (cold -> hot), --wp-* the
+ * win-probability fallbacks, --st-* status. Every v1, v2 and v3 name is still defined (backward compatible).
  *
  * Contrast (WCAG 2.x, measured): ink-1 16.4:1 on --s-1, ink-2 10.8:1, ink-3 6.4:1 (5.1:1 on --s-3, the floor);
- * signal 6.4:1, volt 15.5:1, live 5.4:1, coral 6.3:1 on --s-1; text on a volt or cobalt fill is near-black
- * (--volt-ink 16.9:1, --signal-ink 7.0:1). */
+ * on the black blocks block-ink-3 8.3:1 (7.2:1 on --block-2); signal 6.4:1 on --s-1, 7.5:1 on black; volt 15.5:1 on
+ * --s-1, 17:1 on black; live 5.4:1 on --s-1, 5.5:1 on --block-2; text on volt or cobalt fills is near-black
+ * (--volt-ink 16.9:1, --signal-ink 7.0:1); white on a team block >= 4.5:1 through QK.color.block. */
 
 :root, :root[data-theme] {
   color-scheme: dark;
 
-  /* ── planes & surfaces: near-black and cool charcoal ────── */
+  /* ── planes & surfaces ─────────────────────────────────── */
   --bg:        #0a0c10;   /* page */
-  --bg-raise:  #0e1116;   /* top bar, section nav */
+  --bg-raise:  #000000;   /* top bar */
   --s-1:       #14171d;   /* card */
-  --s-2:       #1c2028;   /* raised: card inset, inputs, hover, notes */
+  --s-2:       #1c2028;   /* raised: card inset, inputs, hover, notes, bar tracks */
   --s-3:       #262b35;   /* pressed, selected, tracks, skeleton base */
-  --s-4:       #313744;   /* strong fills, tooltips, skeleton shine */
-  --s-glass:   rgba(10, 12, 16, 0.88);
-  --s-cream:   #181c24;   /* the "cream" card (New here, The short version, How sure): one step up, a volt hairline */
-  --line-cream: rgba(212, 255, 58, 0.22);
-  --s-ink:     #000000;   /* the broadcast black: ticker, score bug */
+  --s-4:       #313744;   /* strong fills, skeleton shine */
+  --s-glass:   rgba(0, 0, 0, 0.92);
+  --s-cream:   #14171d;   /* v3 "cream" card: now a card with the volt rule on its left (the explain strip) */
+  --line-cream: var(--volt);
+  --s-ink:     #000000;   /* the broadcast black: ticker groups, score bug, strips, the power list */
 
-  /* ── ink: white and cool light grey ─────────────────────── */
+  /* ── the broadcast blocks ──────────────────────────────── */
+  --block:       #000000;   /* black blocks: stat strips, big numbers, section tags, the footer */
+  --block-2:     #12151c;   /* the ticker, the section nav, power-list cards */
+  --block-3:     #1a1e27;
+  --block-ink:   #ffffff;
+  --block-ink-2: #c3c9d4;   /* 12.6:1 on black */
+  --block-ink-3: #9aa3b2;   /* 8.3:1 on black, 7.2:1 on --block-2 */
+  --block-line:  #222835;
+  --card-rule:   #2a303c;   /* the 5 px rule across the top of every card */
+  --seg-off:     #262c38;   /* an unlit LED segment */
+  --slate:       #3a4150;   /* the neutral side of a two-sided block (no team colour, or a clash) */
+
+  /* ── ink ───────────────────────────────────────────────── */
   --ink-1:     #f3f5f8;   /* primary — 16.4:1 on --s-1 */
   --ink-2:     #c3c9d4;   /* secondary — 10.8:1 */
   --ink-3:     #939bab;   /* muted, axis labels — 6.4:1 on --s-1, 5.1:1 on --s-3 (the floor for text) */
   --ink-4:     #5b6372;   /* decorations only (not text) */
   --ink-inv:   #0a0c10;
 
-  /* ── rules: subtle cool grey ────────────────────────────── */
+  /* ── rules ─────────────────────────────────────────────── */
   --line-1:    rgba(200, 212, 235, 0.08);  /* hairline */
-  --line-2:    rgba(200, 212, 235, 0.13);  /* card ring */
+  --line-2:    rgba(200, 212, 235, 0.13);  /* row rule */
   --line-3:    rgba(200, 212, 235, 0.26);  /* focusable control border */
-  --grid:      rgba(200, 212, 235, 0.08);  /* chart gridline (drawn dashed) */
-  --axis:      rgba(200, 212, 235, 0.24);
+  --grid:      #232833;                    /* chart gridline (solid) */
+  --axis:      #596171;                    /* chart axis line (decoration, 2 px) */
 
-  /* ── "ours": periwinkle cobalt ──────────────────────────────
+  /* ── "ours": periwinkle cobalt ─────────────────────────────
    * Our probability, our rating, the forecast line, the favourite's chance on a card, primary actions, links.
    * Never a team, never the market, never good/bad. */
   --signal:      #7d93ff;   /* 6.4:1 on --s-1 */
   --signal-2:    #a3b3ff;   /* hover */
   --signal-ink:  #0a0c10;   /* text on a cobalt fill — 7.0:1 */
+  --signal-deep: #5a69b7;   /* cobalt as a block carrying white type — 5.1:1 */
   --signal-soft: rgba(125, 147, 255, 0.16);
   --brand:       var(--signal);
   --brand-ink:   var(--signal-ink);
   --brand-soft:  var(--signal-soft);
   --focus:       #d4ff3a;
 
-  /* ── accents ────────────────────────────────────────────── */
-  --volt:       #d4ff3a;                    /* highlighter, section tags, the stat-of-the-day slab, key numbers, the "i" of a note */
+  /* ── accents ───────────────────────────────────────────── */
+  --volt:       #d4ff3a;                    /* section tags, the stat-of-the-day slab, key numbers, "it happened" */
   --volt-ink:   #0a0c10;                    /* text on volt: always near-black (16.9:1) */
   --volt-soft:  rgba(212, 255, 58, 0.16);
   --sun:        var(--volt);                /* the Matchday name, kept for old CSS */
-  --sun-soft:   rgba(212, 255, 58, 0.22);   /* translucent highlight under text */
-  --coral:      #ff6a4d;                    /* a warm second accent (asides' arrow, the second series) — 6.3:1 */
+  --sun-soft:   rgba(212, 255, 58, 0.22);
+  --coral:      #ff6a4d;                    /* a warm second accent (the second series) — 6.3:1 */
   --sky:        #5ec8f0;                    /* a third series — 9.4:1 */
   --plum:       #c39be8;
   --mint:       #8fdcc8;
 
-  /* ── sport accents (identity only: switcher icon, sport pill, a tile rail; text beside them stays ink) ── */
+  /* ── sport accents (identity only: the sport word in the logo, a tick-group icon) ── */
   --a-football:   #4fd48f;
   --a-f1:         #ff6450;
   --a-basketball: #ff9a52;
@@ -81,9 +95,7 @@
   --accent:       var(--signal);   /* a site sets data-sport on <html>, which points --accent at its sport */
   --accent-soft:  color-mix(in srgb, var(--accent) 15%, transparent);
 
-  /* ── chart categorical slots: cobalt first (ours), then red-orange (the old coral slot), cyan (sky), volt (sun):
-   *    the slots keep their Matchday roles so site colour maps by slot still read right. "We said / it happened"
-   *    pairs cobalt with volt through --c-model and --c-actual. ── */
+  /* ── chart categorical slots: cobalt first (ours), then red-orange, cyan, volt ... (roles kept from v3) ── */
   --c-1: #7d93ff;  /* cobalt */
   --c-2: #ff6a4d;  /* red-orange */
   --c-3: #5ec8f0;  /* cyan */
@@ -101,75 +113,79 @@
   --seq-1: #1d2440; --seq-2: #2c3a7a; --seq-3: #4a5fc0; --seq-4: #7d93ff; --seq-5: #bcc8ff;
   --div-neg: #ff6a4d; --div-mid: #2a303c; --div-pos: #7d93ff;
 
-  /* ── percentile scale (Savant-style, cold -> hot): Broadcast's blue -> cool grey -> red, brightened for dark and
-   *    stepping in lightness so it reads for red-green colour-blind viewers. 0 = worst in the peer group, 100 = best.
-   *    The ends take white ink (4.7:1), the middle near-black ink. Every anchor clears 3:1 against --s-1 as a mark. ── */
+  /* ── percentile scale (cold -> hot): blue -> cool grey -> red, brightened for dark, stepping in lightness so it
+   *    reads for red-green colour-blind viewers. The ends take white ink (4.7:1), the middle near-black ink. The LED
+   *    meters light each segment in the colour of its own position on this scale. ── */
   --pc-0:   #2f6fe0;
   --pc-25:  #7fa6e6;
   --pc-50:  #a9adb5;
   --pc-75:  #f59a72;
   --pc-100: #d9361d;
 
-  /* ── win probability: team colours first (contrast-checked; QK.color.distinct drops a clashing pair); these
-   *    when two kits clash or none is known: cobalt v grey ── */
-  --wp-a:    #7d93ff;   /* left / away fallback (cobalt) */
-  --wp-b:    #8a93a3;   /* right / home fallback (cool grey) */
+  /* ── win probability fallbacks (two kits clash or none is known): cobalt v grey ── */
+  --wp-a:    #7d93ff;
+  --wp-b:    #8a93a3;
   --wp-draw: #4a5160;
 
   /* ── status (reserved; always with an icon or a word) ── */
   --st-good: #5fd38a; --st-warn: #ffc94d; --st-serious: #ff9a6b; --st-crit: #ff4d2e;
-  --up:   #5fd38a;    /* delta text, up/good */
-  --down: #ff6a4d;    /* delta text, down/bad */
-  --live: #ff4d2e;    /* red-orange */
+  --up:   #5fd38a;
+  --down: #ff6a4d;
+  --live: #ff4d2e;
   --live-soft: rgba(255, 77, 46, 0.16);
+  --live-clock: #c92d17;   /* the score bug's clock block: white 5.4:1 */
 
-  /* ── type: Fraunces (display: headlines, big numbers), DM Sans (UI and numbers, tabular figures) ── */
-  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
-  --font-ui:   "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-num:  "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;   /* with tabular-nums */
+  /* ── type: Bebas Neue (display: scores, big numbers, short headlines; no lower case), Barlow (UI, body),
+   *    Barlow Condensed (labels, tags, long names: player, club and event names too long for Bebas) ── */
+  --font-display: "Bebas Neue", "Oswald", Impact, "Arial Narrow", sans-serif;
+  --font-ui:   "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-cond: "Barlow Condensed", "Barlow", "Arial Narrow", sans-serif;
+  --font-num:  "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;   /* with tabular-nums */
   --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;            /* code only */
   --stretch-display: 100%;
-  --fvs-display: "SOFT" 100, "WONK" 0;
+  --fvs-display: normal;
   --fs-2xs: 0.75rem;    /* 12 — micro labels, chips */
-  --fs-xs:  0.8125rem;  /* 13 — captions, table cells on phones */
+  --fs-xs:  0.8125rem;  /* 13 — captions, labels */
   --fs-sm:  0.875rem;   /* 14 — dense body, tables */
   --fs-md:  1rem;       /* 16 — body */
-  --fs-lg:  1.1875rem;  /* 19 — lede, card titles */
-  --fs-xl:  1.5rem;     /* 24 — small section titles */
-  --fs-2xl: 2rem;       /* 32 — KPI */
-  --fs-3xl: 3rem;       /* 48 — hero number */
-  --fs-4xl: clamp(2.5rem, 6vw, 4.5rem);
-  /* display scale (Fraunces) */
-  --fs-d1: clamp(2.4rem, 5.6vw, 4rem);      /* greeting headline (64 px at 1440) */
-  --fs-d2: clamp(1.75rem, 3.4vw, 2.5rem);   /* page title, player name, scores */
-  --fs-d3: clamp(1.75rem, 2.8vw, 2.5rem);   /* stat tile number (40 px) */
-  --fs-d4: 1.375rem;                        /* chances on cards (22 px) */
-  --fs-h2: clamp(1.6rem, 3.2vw, 2.25rem);   /* section titles (36 px) */
-  --lh-tight: 1.08; --lh-snug: 1.3; --lh-body: 1.55;
-  --tracking-caps: 0.02em;
+  --fs-lg:  1.125rem;   /* 18 — lede */
+  --fs-xl:  1.75rem;    /* 28 — small display titles (Bebas) */
+  --fs-2xl: 2.5rem;     /* 40 — KPI (Bebas) */
+  --fs-3xl: 3.75rem;    /* 60 — strip numbers (Bebas) */
+  --fs-4xl: clamp(3rem, 7vw, 5.5rem);
+  /* display scale (Bebas) */
+  --fs-d1: clamp(2.4rem, 4.6vw, 4rem);      /* the greeting line (64 px at 1440) */
+  --fs-d2: clamp(3rem, 7vw, 6rem);          /* page titles */
+  --fs-d3: clamp(2.4rem, 4vw, 3.75rem);     /* stat numbers (60 px) */
+  --fs-d4: 2.5rem;                          /* chances and scores on game cards (40 px) */
+  --fs-h2: clamp(2.5rem, 5vw, 4rem);        /* section titles (40 to 64 px) */
+  --lh-tight: 0.92; --lh-snug: 1.25; --lh-body: 1.45;
+  --tracking-caps: 0.08em;
 
-  /* ── space (4px grid), roomy ────────────────────────────── */
+  /* ── space (4 px grid) ─────────────────────────────────── */
   --sp-0: 2px; --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px;
   --sp-6: 24px; --sp-8: 32px; --sp-10: 40px; --sp-12: 48px; --sp-16: 64px;
   --gutter: 24px;
-  --page-max: 1240px;
-  --topbar-h: 64px;
-  --secnav-h: 48px;
-  --sec-gap: 64px;     /* between page sections */
+  --page-max: 1320px;
+  --topbar-h: 58px;
+  --secnav-h: 46px;
+  --sec-gap: 56px;     /* between page sections */
+  --cut: 28px;         /* the diagonal cut on signature blocks */
+  --skew: -18deg;      /* the brand mark, the tags, the volt stripes */
 
-  /* ── radii, shadows, motion ─────────────────────────────── */
-  --r-1: 6px; --r-2: 12px; --r-3: 22px; --r-4: 26px; --r-pill: 999px;
-  --r-card: 22px; --r-tile: 18px;
-  --sh-1: 0 1px 0 rgba(220, 230, 255, 0.04) inset, 0 12px 30px -18px rgba(0, 0, 0, 0.8);
-  --sh-2: 0 1px 0 rgba(220, 230, 255, 0.05) inset, 0 18px 40px -16px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(125, 147, 255, 0.12);
-  --sh-3: 0 24px 56px rgba(0, 0, 0, 0.6);
-  --glow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent), 0 0 24px color-mix(in srgb, var(--accent) 18%, transparent);
+  /* ── shape, shadows, motion: hard edges ────────────────── */
+  --r-1: 0; --r-2: 0; --r-3: 0; --r-4: 0; --r-pill: 0;
+  --r-card: 0; --r-tile: 0;
+  --sh-1: none;
+  --sh-2: none;
+  --sh-3: 0 24px 56px rgba(0, 0, 0, 0.7);
+  --glow: 0 0 0 2px var(--volt);
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --t-fast: 120ms; --t-med: 220ms; --t-slow: 420ms;
+  --t-fast: 120ms; --t-med: 200ms; --t-slow: 380ms;
   --z-bar: 50; --z-pop: 80; --z-modal: 100;
 }
 @media (max-width: 640px) {
-  :root, :root[data-theme] { --gutter: 16px; --sec-gap: 44px; --r-card: 18px; }
+  :root, :root[data-theme] { --gutter: 16px; --sec-gap: 40px; }
 }
 
 /* sport accent per site: <html data-sport="nfl"> */

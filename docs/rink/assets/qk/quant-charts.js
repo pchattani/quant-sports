@@ -1,6 +1,7 @@
-/* The Quant — chart kit, v3 "Matchday" in the Broadcast colours (dark only; every v1 and v2 call still works) on Apache ECharts 5.
- * Conventions: STYLE_GUIDE.md §6. v3 theme: a cool dashed grid, DM Sans labels, every axis titled, blue for ours
- * (the first categorical slot), annotations in italic Fraunces (QKC.annot), rounded tooltips.
+/* The Quant — chart kit, v4 "Broadcast" (dark only; every v1, v2 and v3 call still works) on Apache ECharts 5.
+ * Conventions: STYLE_GUIDE.md §6. v4 theme: a solid cool grid, 2 px axis lines, Barlow Condensed labels, every axis
+ * titled, blue for ours (the first categorical slot), volt for what happened, team colours for teams, square bars,
+ * annotations in Barlow Condensed (QKC.annot), black tooltips with a volt edge.
  * Load after quant.js and after
  *   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" defer></script>
  *
@@ -14,8 +15,10 @@
  *   QKC.range(el, spec) (floor–ceiling)  QKC.butterfly(el, spec) (two sides of one category list)
  *   QKC.tokens()  QKC.palette()  QKC.axis(T, {ticks})  QKC.legendSeries(T, items)
  *   QKC.plotlyLayout()  and the optional module plotly-ec.js (window.Plotly on this kit) for old views
+ * v4: QKC.quadrant(el, spec) ("Who's for real?": results against chances, team-colour dots, the four corners named)
+ *     QKC.calibration(el, spec) now draws "we said / it happened" bars by default (style: 'dots' keeps v3)
  * v3: QKC.calibration(el, spec) ("How sure are we?": forecast chance against how often it happened, annotated)
- *     QKC.annot(T, extra) (the italic annotation label style for markLine / markPoint / graphic text)
+ *     QKC.annot(T, extra) (the annotation label style for markLine / markPoint / graphic text: Barlow Condensed)
  * v2: QKC.forecast(el, spec) (538-style chance over time: end labels, annotations, bands, today, projection)
  *     QKC.distribution(el, spec) (histogram on the percentile scale with labelled marks)
  *     QKC.chances(el, spec) (our chance as bars, the market as a quiet tick)
@@ -43,7 +46,8 @@ QKC.tokens = function () {
     neg: tok('--div-neg'), mid: tok('--div-mid'), pos: tok('--div-pos'),
     seq: [tok('--seq-1'), tok('--seq-2'), tok('--seq-3'), tok('--seq-4'), tok('--seq-5')],
     fontUI: tok('--font-ui') || 'system-ui, sans-serif', fontNum: tok('--font-num') || 'system-ui, sans-serif',
-    fontDisplay: tok('--font-display') || 'Georgia, serif',
+    fontDisplay: tok('--font-display') || 'Impact, sans-serif', fontCond: tok('--font-cond') || 'Arial Narrow, sans-serif',
+    block: tok('--block') || '#000000', signalDeep: tok('--signal-deep') || '#5a69b7',
     sun: tok('--volt') || '#d4ff3a', volt: tok('--volt') || '#d4ff3a', actual: tok('--c-actual') || tok('--volt') || '#d4ff3a',
     coral: tok('--coral') || '#ff6a4d', sky: tok('--sky') || '#5ec8f0',
     dark: true
@@ -60,17 +64,17 @@ function base(T) {
     backgroundColor: 'transparent',
     color: T.cat,
     animation: anim, animationDuration: anim ? 500 : 0, animationDurationUpdate: anim ? 300 : 0, animationEasing: 'cubicOut',
-    textStyle: { fontFamily: T.fontUI, color: T.ink2, fontSize: 12 },
+    textStyle: { fontFamily: T.fontCond, color: T.ink2, fontSize: 13, fontWeight: 600 },
     tooltip: tooltip(T)
   };
 }
 function tooltip(T, extra) {
   var t = {
     trigger: 'item', confine: true, appendToBody: false,
-    backgroundColor: T.s2, borderColor: T.line2, borderWidth: 1, padding: [10, 12],
-    textStyle: { color: T.ink1, fontFamily: T.fontUI, fontSize: 13 },
-    extraCssText: 'border-radius:12px;box-shadow:0 14px 34px -12px rgba(0,0,0,.7);',
-    axisPointer: { type: 'line', lineStyle: { color: T.axis, width: 1 }, crossStyle: { color: T.axis }, label: { backgroundColor: T.s4, color: T.ink1, fontFamily: T.fontNum } }
+    backgroundColor: T.block, borderColor: T.block, borderWidth: 0, padding: [10, 12],
+    textStyle: { color: '#ffffff', fontFamily: T.fontUI, fontSize: 13 },
+    extraCssText: 'border-radius:0;border-left:4px solid ' + T.volt + ';box-shadow:0 14px 34px -12px rgba(0,0,0,.8);',
+    axisPointer: { type: 'line', lineStyle: { color: T.axis, width: 1 }, crossStyle: { color: T.axis }, label: { backgroundColor: T.block, color: '#ffffff', fontFamily: T.fontCond } }
   };
   if (extra) Object.keys(extra).forEach(function (k) { t[k] = extra[k]; });
   return t;
@@ -79,18 +83,18 @@ function axis(T, o) {
   o = o || {};
   var a = {
     type: o.type || 'value',
-    axisLine: { show: !!o.line, lineStyle: { color: T.axis } },
+    axisLine: { show: !!o.line, lineStyle: { color: T.axis, width: 2 } },
     axisTick: { show: false },
-    axisLabel: { color: T.ink3, fontFamily: T.fontUI, fontSize: 11.5, margin: 10, hideOverlap: true, formatter: o.fmt },
-    splitLine: { show: o.split !== false, lineStyle: { color: T.grid, width: 1, type: [4, 4] } },
-    nameTextStyle: { color: T.ink2, fontFamily: T.fontUI, fontSize: 12, fontWeight: 600 },
+    axisLabel: { color: T.ink3, fontFamily: T.fontCond, fontSize: 12.5, fontWeight: 600, margin: 10, hideOverlap: true, formatter: o.fmt },
+    splitLine: { show: o.split !== false, lineStyle: { color: T.grid, width: 1, type: 'solid' } },
+    nameTextStyle: { color: T.ink2, fontFamily: T.fontCond, fontSize: 13, fontWeight: 700 },
     name: o.name || '', nameLocation: o.nameLocation || 'end', nameGap: o.nameGap || 10,
     inverse: !!o.inverse, scale: !!o.scale
   };
   if (o.nameAlign) a.nameTextStyle.align = o.nameAlign;
   /* only pass keys that are set: an explicit undefined overrides ECharts defaults (boundaryGap, min…) */
   ['min', 'max', 'interval', 'data', 'boundaryGap', 'position'].forEach(function (k) { if (o[k] !== undefined) a[k] = o[k]; });
-  if (o.data) a.axisLabel.fontFamily = T.fontUI;
+  if (o.data) a.axisLabel.fontFamily = T.fontCond;
   if (o.show === false) { a.axisLabel.show = false; a.splitLine.show = false; }
   /* custom ticks: { values: [..], labels: [..] } puts labels at exactly those values. containLabel measures the
    * default ticks, not these, so QKC.mount widens the grid by the longest label (see fitTicks). */
@@ -141,17 +145,17 @@ function nameAxis(a, name, where) {
 }
 QKC.nameAxis = nameAxis;
 /* Legend entries that carry their own colour (per-point or per-bar colours, made v missed shots ...):
- * items [{ name, color, icon: 'roundRect' | 'circle' | 'line' }] -> empty series the legend can show. */
+ * items [{ name, color, icon: 'rect' | 'circle' | 'line' }] -> empty series the legend can show. */
 QKC.legendSeries = function (T, items) {
   return (items || []).map(function (it) {
     var c = it.color || T.other;
     return { type: it.icon === 'line' ? 'line' : 'scatter', name: it.name, data: [], silent: true, tooltip: { show: false },
-      itemStyle: { color: c, borderColor: it.border || c }, lineStyle: { color: c, width: 2 }, symbol: it.icon === 'line' ? 'none' : (it.icon || 'roundRect') };
+      itemStyle: { color: c, borderColor: it.border || c }, lineStyle: { color: c, width: 2 }, symbol: it.icon === 'line' ? 'none' : (it.icon || 'rect') };
   });
 };
 var LINE_ICON = 'path://M0,4L12,4L12,6.5L0,6.5Z';
 function legendOpt(T, o, items) {
-  var l = { top: 0, left: 0, icon: 'roundRect', itemWidth: 10, itemHeight: 10, textStyle: { color: T.ink2 }, type: 'scroll', pageTextStyle: { color: T.ink3 }, pageIconColor: T.ink2, pageIconInactiveColor: T.ink4 };
+  var l = { top: 0, left: 0, icon: 'rect', itemWidth: 12, itemHeight: 12, textStyle: { color: T.ink2, fontFamily: T.fontCond, fontSize: 13, fontWeight: 700 }, type: 'scroll', pageTextStyle: { color: T.ink3 }, pageIconColor: T.ink2, pageIconInactiveColor: T.ink4 };
   if (o) Object.keys(o).forEach(function (k) { l[k] = o[k]; });
   /* legend items drawn as a line (a market tick, a reference) get a line icon */
   if (items && l.data) l.data = l.data.map(function (n) { var it = items.filter(function (x) { return x.name === n; })[0]; return it && it.icon === 'line' ? { name: n, icon: LINE_ICON } : n; });
@@ -160,10 +164,10 @@ function legendOpt(T, o, items) {
 function tipRow(c, name, val) { return '<div style="display:flex;gap:10px;align-items:center;justify-content:space-between"><span style="display:inline-flex;align-items:center;gap:6px"><i style="width:8px;height:8px;border-radius:2px;background:' + c + ';display:inline-block"></i>' + esc(name) + '</span><b style="font-family:var(--font-num);font-weight:600">' + esc(val) + '</b></div>'; }
 QKC.tipRow = tipRow;
 QKC.axis = axis; QKC.base = base; QKC.tooltip = tooltip;
-/* The v3 annotation style: italic Fraunces in the secondary ink, for the notes a chart writes on itself ("dashed line
- * = spot on", "two goals in 29 seconds"). QKC.annot(T, { color, fontSize }) -> an ECharts label/text style. */
+/* The v4 annotation style: Barlow Condensed bold in the secondary ink, for the notes a chart writes on itself
+ * ("dashed line = spot on", "two goals in 29 seconds"). QKC.annot(T, { color, fontSize }) -> an ECharts label style. */
 QKC.annot = function (T, x) {
-  var a = { color: T.ink2, fontFamily: T.fontDisplay, fontStyle: 'italic', fontWeight: 400, fontSize: 13, lineHeight: 16 };
+  var a = { color: T.ink2, fontFamily: T.fontCond, fontStyle: 'normal', fontWeight: 700, fontSize: 13, lineHeight: 16 };
   if (x) Object.keys(x).forEach(function (k) { a[k] = x[k]; });
   return a;
 };
@@ -234,7 +238,7 @@ QKC.line = function (el, s) {
         itemStyle: { color: c, borderColor: T.s1, borderWidth: hasErr ? 1 : 2 },
         emphasis: { focus: 'series', lineStyle: { width: (x.width || 2) + 1 } },
         areaStyle: x.area || s.area ? { color: new root.echarts.graphic.LinearGradient(0, s.yInverse ? 1 : 0, 0, s.yInverse ? 0 : 1, [{ offset: 0, color: hexA(c, 0.28) }, { offset: 1, color: hexA(c, 0) }]) } : undefined,
-        endLabel: s.endLabels !== false && s.series.length > 1 ? { show: true, formatter: x.label || x.name, color: T.ink2, fontFamily: T.fontUI, fontSize: 11, fontWeight: 600, distance: 6 } : undefined,
+        endLabel: s.endLabels !== false && s.series.length > 1 ? { show: true, formatter: x.label || x.name, color: T.ink2, fontFamily: T.fontCond, fontSize: 12, fontWeight: 700, distance: 6 } : undefined,
         labelLayout: { moveOverlap: 'shiftY' },
         markLine: i === 0 && s.ref ? { silent: true, symbol: 'none', lineStyle: { color: T.axis, type: [3, 3], width: 1 }, label: Object.assign(QKC.annot(T, { fontSize: 12 }), { formatter: s.ref.label || '', position: 'insideEndTop' }), data: [isNum(s.ref.x) || (s.ref.x !== undefined && s.ref.y === undefined) ? { xAxis: s.ref.x } : { yAxis: s.ref.y }] } : undefined
       };
@@ -339,9 +343,9 @@ QKC.bar = function (el, s) {
         itemStyle: { color: s.diverging ? T.pos : c },
         data: x.data.map(function (v, j) {
           var cc = s.diverging ? (v >= 0 ? T.pos : T.neg) : (s.colors && s.colors[j] ? QK.color.ensure(s.colors[j], T.s1, 3) : c);
-          return { value: v, href: s.hrefs ? s.hrefs[j] : undefined, itemStyle: { color: cc, borderRadius: hz ? (v < 0 ? [6, 0, 0, 6] : [0, 6, 6, 0]) : (v < 0 ? [0, 0, 6, 6] : [6, 6, 0, 0]) } };
+          return { value: v, href: s.hrefs ? s.hrefs[j] : undefined, itemStyle: { color: cc, borderRadius: 0 } };
         }),
-        label: s.labels ? { show: true, position: hz ? 'right' : 'top', distance: x.hi || x.market ? 8 : 5, color: T.ink2, fontFamily: T.fontUI, fontSize: 11.5, fontWeight: 600, formatter: function (p) { return s.fmt ? s.fmt(p.value) : fmt.num(p.value, 1); } } : undefined,
+        label: s.labels ? { show: true, position: hz ? 'right' : 'top', distance: x.hi || x.market ? 8 : 5, color: T.ink2, fontFamily: T.fontCond, fontSize: 12.5, fontWeight: 700, formatter: function (p) { return s.fmt ? s.fmt(p.value) : fmt.num(p.value, 1); } } : undefined,
         emphasis: { itemStyle: { shadowBlur: 0, opacity: 1 }, focus: 'none' },
         cursor: s.hrefs ? 'pointer' : 'default'
       };
@@ -497,7 +501,7 @@ QKC.scatter = function (el, s) {
         data: pts.map(function (p, i) {
           var c = p.color ? QK.color.ensure(p.color, T.s1, 3) : T.model;
           return { value: [p.x, p.y], name: p.name, href: p.href, itemStyle: { color: c, borderColor: T.s1, borderWidth: 1.5, opacity: 0.95 },
-            label: { show: !!show[i], formatter: p.label || p.name, position: 'top', color: T.ink2, fontSize: 10.5, fontWeight: 600, fontFamily: T.fontUI } };
+            label: { show: !!show[i], formatter: p.label || p.name, position: 'top', color: T.ink2, fontSize: 12.5, fontWeight: 700, fontFamily: T.fontCond } };
         }),
         emphasis: { scale: 1.4, label: { show: true } },
         labelLayout: { hideOverlap: true },
@@ -510,12 +514,12 @@ function avg(a) { return a.reduce(function (x, y) { return x + y; }, 0) / (a.len
 function spread(pts, k) { var v = pts.map(function (p) { return p[k]; }); return Math.max.apply(null, v) - Math.min.apply(null, v); }
 function quadrantLabels(T, q, off) {
   off = off || 0;
-  var st = { fill: T.ink3, font: 'italic 400 12px ' + T.fontDisplay, opacity: 0.95 };
+  var st = { fill: T.signal, font: '700 13px ' + T.fontCond, opacity: 0.95 };
   return [
-    { type: 'text', left: 70, top: 34 + off, style: Object.assign({ text: q[0] }, st), silent: true },
-    { type: 'text', right: 34, top: 34 + off, style: Object.assign({ text: q[1], align: 'right' }, st), silent: true },
-    { type: 'text', left: 70, bottom: 60, style: Object.assign({ text: q[2] }, st), silent: true },
-    { type: 'text', right: 34, bottom: 60, style: Object.assign({ text: q[3], align: 'right' }, st), silent: true }
+    { type: 'text', left: 70, top: 34 + off, style: Object.assign({ text: String(q[0] || '').toUpperCase() }, st), silent: true },
+    { type: 'text', right: 34, top: 34 + off, style: Object.assign({ text: String(q[1] || '').toUpperCase(), align: 'right' }, st), silent: true },
+    { type: 'text', left: 70, bottom: 60, style: Object.assign({ text: String(q[2] || '').toUpperCase() }, st), silent: true },
+    { type: 'text', right: 34, bottom: 60, style: Object.assign({ text: String(q[3] || '').toUpperCase(), align: 'right' }, st), silent: true }
   ].filter(function (g) { return g.style.text; });
 }
 
@@ -554,7 +558,7 @@ QKC.heatmap = function (el, s) {
         textStyle: { color: T.ink3, fontFamily: T.fontNum, fontSize: 10 }, formatter: function (v) { return s.fmt ? s.fmt(v) : fmt.num(v, 1); },
         inRange: { color: s.diverging ? [T.neg, T.mid, T.pos] : (T.dark ? T.seq : T.seq) } },
       tooltip: tooltip(T, { formatter: function (p) { return '<div style="font-weight:600">' + esc(s.y[p.value[1]]) + ' · ' + esc(s.x[p.value[0]]) + '</div><div style="font-family:var(--font-num)">' + esc(s.fmt ? s.fmt(p.value[2]) : fmt.num(p.value[2], 2)) + '</div>'; } }),
-      series: [{ type: 'heatmap', data: cells, itemStyle: { borderColor: T.s1, borderWidth: 2, borderRadius: 3 },
+      series: [{ type: 'heatmap', data: cells, itemStyle: { borderColor: T.s1, borderWidth: 2, borderRadius: 0 },
         label: { show: s.cellLabels !== false, fontFamily: T.fontNum, fontSize: 10, color: T.ink1, formatter: function (p) { return s.fmt ? s.fmt(p.value[2]) : fmt.num(p.value[2], 1); } },
         emphasis: { itemStyle: { borderColor: T.ink1, borderWidth: 1 } } }]
     };
@@ -719,7 +723,7 @@ QKC.range = function (el, s) {
     var gB = 6 + nameAxis(xa, s.valName || s.xName, 'bottom');
     return {
       grid: { left: 8, right: 20, top: 26, bottom: gB, containLabel: true },
-      legend: legendOpt(T, { icon: 'roundRect', data: [loN + '–' + hiN, mN] }),
+      legend: legendOpt(T, { icon: 'rect', data: [loN + '–' + hiN, mN] }),
       xAxis: xa,
       yAxis: ya,
       tooltip: tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: hexA(T.ink1, 0.04) } },
@@ -753,8 +757,8 @@ QKC.butterfly = function (el, s) {
     var lc = s.left.color ? QK.color.ensure(s.left.color, T.s1, 3) : T.model, rc = s.right.color ? QK.color.ensure(s.right.color, T.s1, 3) : T.market;
     function side(x, c, neg) {
       return { type: 'bar', name: x.name, stack: 'bf', barMaxWidth: 16, barCategoryGap: '30%', itemStyle: { color: c },
-        data: x.data.map(function (v, j) { return { value: isNum(v) ? (neg ? -Math.abs(v) : Math.abs(v)) : null, raw: v, href: s.hrefs ? s.hrefs[j] : undefined, itemStyle: { color: c, borderRadius: neg ? [4, 0, 0, 4] : [0, 4, 4, 0] } }; }),
-        label: s.labels !== false ? { show: true, position: neg ? 'left' : 'right', color: T.ink2, fontFamily: T.fontUI, fontSize: 11.5, fontWeight: 600, formatter: function (p) { return isNum(p.data.raw) ? f(p.data.raw) : ''; } } : undefined,
+        data: x.data.map(function (v, j) { return { value: isNum(v) ? (neg ? -Math.abs(v) : Math.abs(v)) : null, raw: v, href: s.hrefs ? s.hrefs[j] : undefined, itemStyle: { color: c, borderRadius: 0 } }; }),
+        label: s.labels !== false ? { show: true, position: neg ? 'left' : 'right', color: T.ink2, fontFamily: T.fontCond, fontSize: 12.5, fontWeight: 700, formatter: function (p) { return isNum(p.data.raw) ? f(p.data.raw) : ''; } } : undefined,
         emphasis: { focus: 'none' }, cursor: s.hrefs ? 'pointer' : 'default' };
     }
     var all = s.left.data.concat(s.right.data).filter(isNum).map(Math.abs), m = all.length ? Math.max.apply(null, all) : 1;
@@ -824,7 +828,7 @@ QKC.forecast = function (el, s) {
         type: 'line', name: x.name, data: pts(x.data), showSymbol: false, symbol: 'circle', symbolSize: 7, z: x.ours ? 6 : 4, connectNulls: false,
         lineStyle: { width: x.ours ? 3 : 2, color: c, type: x.dash ? [5, 4] : 'solid', cap: 'round', join: 'round' }, itemStyle: { color: c, borderColor: T.s1, borderWidth: 2 },
         emphasis: { focus: 'series', lineStyle: { width: (x.ours ? 3 : 2) + 1 } },
-        endLabel: s.endLabels === false ? undefined : { show: true, color: c, fontFamily: T.fontUI, fontSize: 11, fontWeight: 700, distance: 6,
+        endLabel: s.endLabels === false ? undefined : { show: true, color: c, fontFamily: T.fontCond, fontSize: 12, fontWeight: 700, distance: 6,
           formatter: function () { return (x.label || x.name) + (isNum(last) && !narrow ? ' ' + yF(last) : ''); } },
         labelLayout: { moveOverlap: 'shiftY' }
       });
@@ -835,7 +839,7 @@ QKC.forecast = function (el, s) {
       ml.push({ xAxis: numX ? xv(a.x) : a.x, lineStyle: { color: T.ink3, type: [3, 4], width: 1 },
         label: Object.assign(QKC.annot(T, { fontSize: 12 }), { show: true, formatter: a.label, position: 'end', rotate: 0, distance: k % 2 ? 17 : 4 }) });
     });
-    if (s.today !== undefined && s.today !== null) ml.push({ xAxis: numX ? xv(s.today) : s.today, lineStyle: { color: T.ink2, type: 'solid', width: 1 }, label: { show: true, formatter: 'Today', position: 'end', rotate: 0, color: T.ink1, fontFamily: T.fontUI, fontSize: 11, fontWeight: 700, distance: 4 } });
+    if (s.today !== undefined && s.today !== null) ml.push({ xAxis: numX ? xv(s.today) : s.today, lineStyle: { color: T.ink2, type: 'solid', width: 1 }, label: { show: true, formatter: 'Today', position: 'end', rotate: 0, color: T.ink1, fontFamily: T.fontCond, fontSize: 12, fontWeight: 700, distance: 4 } });
     if (lines.length) {
       if (ml.length) lines[0].markLine = { silent: true, symbol: 'none', animation: false, data: ml };
       if (s.split && s.split.x !== undefined) lines[0].markArea = { silent: true, itemStyle: { color: hexA(T.ink1, T.dark ? 0.035 : 0.04) }, label: Object.assign(QKC.annot(T, { fontSize: 12, color: T.ink3 }), { show: !!s.split.label, position: 'insideTopRight', formatter: s.split.label || '' }),
@@ -905,7 +909,7 @@ QKC.distribution = function (el, s) {
       var up = leftEnd < 56 + yNameW ? 18 : 0;
       if (up) lift = 18;
       return { xAxis: m.x, lineStyle: { color: c, type: k === 0 ? 'solid' : [4, 3], width: k === 0 ? 2 : 1.2 },
-        label: { show: true, formatter: txt, position: 'end', rotate: 0, align: al, color: c, fontSize: 10.5, fontWeight: 700, fontFamily: T.fontUI, distance: (k % 2 ? 16 : 3) + up } };
+        label: { show: true, formatter: txt, position: 'end', rotate: 0, align: al, color: c, fontSize: 12.5, fontWeight: 700, fontFamily: T.fontCond, distance: (k % 2 ? 16 : 3) + up } };
     });
     var xa = axis(T, { type: 'value', min: bins[0].x0, max: bins[bins.length - 1].x1, fmt: f, split: false, line: true });
     var ya = axis(T, { fmt: function (x) { return fmt.num(x, 0); }, minInterval: 1 });
@@ -958,6 +962,7 @@ QKC.chances = function (el, s) {
 QKC.calibration = function (el, s) {
   var bins = (s.bins || []).filter(function (b) { return b && isNum(b.mean_p) && isNum(b.freq) && b.n > 0; });
   var subj = s.subject || 'the home team', unit = s.unit || 'games';
+  if (s.style !== 'dots') return calBars(el, s, bins, subj, unit);
   var lo = Math.max(0, Math.floor(Math.min.apply(null, bins.map(function (b) { return Math.min(b.mean_p, b.freq); }).concat([0.5])) * 10) / 10);
   var hi = Math.min(1, Math.ceil(Math.max.apply(null, bins.map(function (b) { return Math.max(b.mean_p, b.freq); }).concat([0.5])) * 10) / 10);
   var mn = isNum(s.min) ? s.min : lo * 100, mx = isNum(s.max) ? s.max : hi * 100;
@@ -1022,6 +1027,95 @@ QKC.calibration = function (el, s) {
   }, { label: s.label || 'Calibration: our forecast chance against how often ' + subj + ' won' });
 };
 function cap1(x) { x = String(x || ''); return x.charAt(0).toUpperCase() + x.slice(1); }
+
+/* v4 "We say it. Then we check it.": per forecast bucket, a cobalt bar for what we said (the average forecast) beside
+ * a volt bar for what happened, the happened share written on top in Bebas (hidden on narrow charts). */
+function calBars(el, s, bins, subj, unit) {
+  return QKC.mount(el, function (T, ent) {
+    var narrow = ent.el.clientWidth && ent.el.clientWidth < 520;
+    var cats = bins.map(function (b) { return Math.round(b.lo * 100) + '–' + Math.round(b.hi * 100) + '%'; });
+    var xa = axis(T, { type: 'category', data: cats, split: false, line: true });
+    var ya = axis(T, { type: 'value', min: 0, max: 100, interval: 20, fmt: function (v) { return v + '%'; } });
+    var gB = 10 + nameAxis(xa, s.xName || 'Our forecast for ' + subj, 'bottom');
+    var gT = 40 + nameAxis(ya, s.yName || cap1(subj) + ' won (%)', 'side');
+    return {
+      grid: { left: 10, right: 10, top: gT, bottom: gB, containLabel: true },
+      legend: legendOpt(T, { type: 'plain', data: ['We said', 'It happened'] }),
+      xAxis: xa, yAxis: ya,
+      tooltip: tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(125,147,255,.08)' } }, formatter: function (ps) {
+        var b = bins[ps[0].dataIndex];
+        return '<div style="font-weight:700;margin-bottom:4px">We said ' + Math.round(b.lo * 100) + '–' + Math.round(b.hi * 100) + '%</div>' +
+          tipRow(T.model, 'Average forecast', (b.mean_p * 100).toFixed(1) + '%') + tipRow(T.actual, cap1(subj) + ' won', (b.freq * 100).toFixed(1) + '%') + tipRow(T.ink3, cap1(unit), fmt.num(b.n));
+      } }),
+      series: [
+        { type: 'bar', name: 'We said', data: bins.map(function (b) { return +(b.mean_p * 100).toFixed(1); }), itemStyle: { color: T.model }, barGap: '8%', barMaxWidth: 34 },
+        { type: 'bar', name: 'It happened', data: bins.map(function (b) { return +(b.freq * 100).toFixed(1); }), itemStyle: { color: T.actual }, barMaxWidth: 34,
+          label: { show: !narrow, position: 'top', color: T.ink1, fontFamily: T.fontDisplay, fontSize: 20, formatter: function (p) { return Math.round(p.value); } } }
+      ]
+    };
+  }, { label: s.label || 'Calibration: our average forecast against how often ' + subj + ' won, by forecast bucket' });
+}
+
+/* ─────────────────────────────────────── quadrant ("Who's for real?") */
+/* QKC.quadrant(el, { points: [{ x, y, name, label (short, drawn beside the dot), color (team), href, sub (a tooltip
+ * line), size }], xName, yName (axis titles: required), xFmt, yFmt, refX, refY (numbers, or 'mean'), xMin, xMax, yMin,
+ * yMax, corners: { tl, tr, bl, br } (default: 'Winning on luck?', 'The real deal', 'Struggling', 'Due a run'), label })
+ * Results (y) against chances (x): one dot per team in its colour (lifted to 3:1 on the card), its abbreviation beside
+ * it, dashed lines at the two references, and the four corners named in cobalt capitals. */
+QKC.quadrant = function (el, s) {
+  var pts = (s.points || []).filter(function (p) { return p && isNum(p.x) && isNum(p.y); });
+  var mean = function (k) { return pts.reduce(function (a, p) { return a + p[k]; }, 0) / (pts.length || 1); };
+  var rx = s.refX === 'mean' || !isNum(s.refX) ? mean('x') : s.refX, ry = s.refY === 'mean' || !isNum(s.refY) ? mean('y') : s.refY;
+  /* each end padded on its own (8% of the spread), on a round step of at most six intervals; never below zero when
+   * the data are not */
+  function nice(lo, hi) {
+    var pad = (hi - lo) * 0.08 || 1, span = hi - lo + 2 * pad;
+    var mag = Math.pow(10, Math.floor(Math.log(span) / Math.LN10)) / 10, st = [1, 2, 2.5, 5, 10, 20, 25, 50].map(function (k) { return k * mag; }).filter(function (k) { return span / k <= 6; })[0] || mag * 100;
+    var a = Math.floor((lo - pad) / st) * st, b = Math.ceil((hi + pad) / st) * st;
+    if (lo >= 0 && a < 0) a = 0;
+    return [+a.toFixed(10), +b.toFixed(10), st];
+  }
+  var xs = pts.map(function (p) { return p.x; }), ys = pts.map(function (p) { return p.y; });
+  var nx = nice(Math.min.apply(null, xs.concat([rx])), Math.max.apply(null, xs.concat([rx]))), ny = nice(Math.min.apply(null, ys.concat([ry])), Math.max.apply(null, ys.concat([ry])));
+  var x0 = isNum(s.xMin) ? s.xMin : nx[0], x1 = isNum(s.xMax) ? s.xMax : nx[1], y0 = isNum(s.yMin) ? s.yMin : ny[0], y1 = isNum(s.yMax) ? s.yMax : ny[1];
+  var c = s.corners || {};
+  var C = { tl: c.tl !== undefined ? c.tl : 'Winning on luck?', tr: c.tr !== undefined ? c.tr : 'The real deal', bl: c.bl !== undefined ? c.bl : 'Struggling', br: c.br !== undefined ? c.br : 'Due a run' };
+  return QKC.mount(el, function (T, ent) {
+    var narrow = ent.el.clientWidth && ent.el.clientWidth < 520;
+    var xa = axis(T, { type: 'value', min: x0, max: x1, interval: nx[2], fmt: s.xFmt, line: true, split: true });
+    var ya = axis(T, { type: 'value', min: y0, max: y1, interval: ny[2], fmt: s.yFmt });
+    var gB = 10 + nameAxis(xa, s.xName, 'bottom'), gT = 22 + nameAxis(ya, s.yName, 'side');
+    var w = (x1 - x0) * (narrow ? 0.46 : 0.3), h = (y1 - y0) * 0.1;
+    var lab = function (txt, pos) { return Object.assign(QKC.annot(T, { color: T.signal, fontSize: narrow ? 11 : 13 }), { show: true, formatter: String(txt).toUpperCase(), position: pos }); };
+    var areas = [];
+    if (C.tl) areas.push([{ coord: [x0, y1], name: C.tl, label: lab(C.tl, 'insideTopLeft') }, { coord: [x0 + w, y1 - h] }]);
+    if (C.tr) areas.push([{ coord: [x1 - w, y1], name: C.tr, label: lab(C.tr, 'insideTopRight') }, { coord: [x1, y1 - h] }]);
+    if (C.bl) areas.push([{ coord: [x0, y0 + h], name: C.bl, label: lab(C.bl, 'insideBottomLeft') }, { coord: [x0 + w, y0] }]);
+    if (C.br) areas.push([{ coord: [x1 - w, y0 + h], name: C.br, label: lab(C.br, 'insideBottomRight') }, { coord: [x1, y0] }]);
+    return {
+      grid: { left: 10, right: 18, top: gT, bottom: gB, containLabel: true },
+      xAxis: xa, yAxis: ya,
+      tooltip: tooltip(T, { formatter: function (p) {
+        if (p.componentType !== 'series' || !p.data || p.data.n === undefined) return '';
+        var d = pts[p.data.n];
+        return '<div style="font-weight:700;margin-bottom:4px">' + esc(d.name || d.label || '') + '</div>' + tipRow(p.color, s.xName || 'x', s.xFmt ? s.xFmt(d.x) : fmt.num(d.x, 2)) + tipRow(p.color, s.yName || 'y', s.yFmt ? s.yFmt(d.y) : fmt.num(d.y, 2)) + (d.sub ? '<div style="margin-top:4px;color:#c3c9d4">' + esc(d.sub) + '</div>' : '');
+      } }),
+      series: [{
+        type: 'scatter', z: 3,
+        symbolSize: function (v, p) { return pts[p.dataIndex].size || 13; },
+        data: pts.map(function (p, i) {
+          var col = p.color ? QK.color.ensure(p.color, T.s1, 3) : T.model;
+          return { value: [p.x, p.y], n: i, name: p.name, href: p.href, itemStyle: { color: col, borderColor: T.s1, borderWidth: 2 } };
+        }),
+        label: { show: true, formatter: function (p) { var d = pts[p.data.n]; return d.label || d.name || ''; }, position: 'right', distance: 3, color: T.ink2, fontFamily: T.fontCond, fontSize: 11.5, fontWeight: 700 },
+        labelLayout: { hideOverlap: true },
+        emphasis: { scale: 1.35 },
+        markLine: { silent: true, symbol: 'none', lineStyle: { color: T.ink3, type: [5, 4], width: 1 }, label: { show: false }, data: [{ xAxis: rx }, { yAxis: ry }] },
+        markArea: { silent: true, itemStyle: { color: 'transparent' }, data: areas }
+      }]
+    };
+  }, { label: s.label || 'Quadrant chart: ' + (s.yName || '') + ' against ' + (s.xName || '') });
+};
 
 root.QKC = QKC;
 })(window);
