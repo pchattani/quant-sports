@@ -168,10 +168,9 @@ CC.route('team', function (el, p) {
       (sim && isNum(sim.p_title) && sim.p_title >= 0.005 ? 'Our simulations give them a ' + CC.pct(sim.p_title) + ' chance to win the title.' : (isNum(R.sos_rank) ? 'Their schedule ranks ' + QK.ordinal(R.sos_rank) + ' for strength.' : ''));
     var html = '<nav class="cc-crumb" aria-label="Breadcrumb"><a href="' + esc(CC.href(L, 'teams', null, S)) + '">' + esc(CC.LNAME[L]) + '</a><span aria-hidden="true">›</span>' + esc(conf ? (conf.short || conf.name) : 'Independent') + '<span aria-hidden="true">›</span>' + esc(t ? t.name : 'Team ' + tid) + '</nav>';
     html += QK.playerHeader({ name: t ? t.name : 'Team ' + tid, split: false, pos: conf ? (conf.name || conf.short) : 'Independent', kicker: CC.LNAME[L] + ' · ' + CC.seasonLabel(L, S), face: t && t.abbr ? t.abbr : null,
-      team: t ? { name: '', abbr: t.abbr, colour: t.colour } : null,
+      team: t ? { name: '', abbr: t.abbr, colour: t.colour, alt: CC.talt(L, tid) || undefined } : null,
       meta: [['Record', CC.record(rec.w, rec.l)], isNum(rec.conf_w) ? ['Conference', CC.record(rec.conf_w, rec.conf_l)] : null, rec.streak ? ['Streak', rec.streak] : null, isNum(R.games) ? ['Games rated', String(R.games)] : null],
-      short: shortTxt.trim() || null,
-      stats: shortTxt.trim() ? null : [{ label: 'Rating', value: CC.signed(R.rating, 1) }, { label: 'Our rank', value: isNum(R.rank) ? '#' + R.rank : '—' }, { label: 'SOS rank', value: isNum(R.sos_rank) ? '#' + R.sos_rank : '—' }] });
+      short: null }) + '%STRIP_HTML%' + (shortTxt.trim() ? '<div class="qk-ph-short">' + QK.shortVersion(shortTxt.trim()) + '</div>' : '');
     if (!d) html += '<p class="cc-note">The full team page has not been built for this season; ratings come from the season file.</p>';
     var dm = ((cat && cat.metrics) || []).filter(function (m0) { return m0.key === 'def'; })[0];
     var defLow = dm ? !!dm.lower : !fb;
@@ -180,7 +179,8 @@ CC.route('team', function (el, p) {
     if (isNum(R.off)) k.push({ label: 'Offense', value: CC.f(R.off, 1), pctl: pc('off'), sub: fb ? 'points a game added' : 'adjusted points per 100' });
     if (isNum(R.def)) k.push({ label: 'Defense', value: CC.f(R.def, 1), pctl: pc('def'), sub: defLow ? 'points allowed per 100 (lower is better)' : 'points a game prevented' });
     if (CC.isCur(L, S)) k = k.concat(chanceTiles(L, sim));
-    html += '<div style="margin-top:var(--sp-4)">' + U.stats(k.slice(0, 6)) + '</div>';
+    /* v4: the numbers are the black strip under the team-colour hero (QK.playerHeader strip), "The short version" after */
+    html = html.replace('%STRIP_HTML%', QK.statStrip(k.slice(0, 6)));
     // percentile card (every team in the country) beside the rating path and rank history
     var groups = [];
     if (cat && cat.metrics) {

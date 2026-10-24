@@ -1,6 +1,6 @@
-/* The Quant Bullpen — game centre (#/<L>/game/<gpk>), on kit v3 "Matchday" (the Rink game page is the reference).
+/* The Quant Bullpen — game centre (#/<L>/game/<gpk>), on kit v4 "Broadcast" (the Rink game page is the reference).
  *
- *   hero: QK.previewCard (away "at" home with records and form, the score bug when live, our chance for the
+ *   hero: QK.previewCard, the diagonal split (away "at" home with records, the clock when live, our chance for the
  *           favourite with a how-sure note on runs and extra innings, the match-up factors from our team ratings, the
  *           market as a quiet labelled line before the first pitch); under it the live state (inning, count, bases,
  *           outs, at bat), the linescore once the game has started, and the date, park, umpire, weather and decisions;
@@ -211,8 +211,10 @@ function header(g, L, S, season) {
   const wpH = live && isNum(g.wp_home) ? Number(g.wp_home) : null;
   const pair = U.pair(g.away, g.home);
   const mk = pre.market || {};
+  /* v4: the diagonal hero takes the raw kit colours and the alternates (QK.color.blockPair makes them blocks with white
+     type and resolves a clash; a club without a colour falls to the kit's cobalt v slate); the charts keep the lifted pair */
   const A = U.team(g.away, L, S), H = U.team(g.home, L, S);
-  A.colour = pair[0]; H.colour = pair[1];
+  A.colour = U.raw(g.away) || pair[0]; H.colour = U.raw(g.home) || pair[1];
   const rec = t => BP.RECORDS[String(t)] || '';
   A.record = rec(g.away); H.record = rec(g.home);
   const tag = g.series ? BP.seriesText(g.series) : (g.gtype && g.gtype !== 'R' ? BP.roundLabel(g.gtype) : '');
@@ -234,8 +236,8 @@ function header(g, L, S, season) {
   if (!started && isNum(m.extra_innings) && m.extra_innings > 0.02) extra.push('about 1 game in ' + Math.max(2, Math.round(1 / m.extra_innings)) + ' like this goes to extra innings');
   const sp = g.probables || {};
   const spLine = !started && (sp.home || sp.away) ? '<div class="bp-sp-line"><span>Probable starters</span>' + (sp.away ? BP.playerLink(sp.away, { role: 'pitcher', level: L, surname: true }) : 'TBD') + ' <span class="qk-muted">v</span> ' + (sp.home ? BP.playerLink(sp.home, { role: 'pitcher', level: L, surname: true }) : 'TBD') + '</div>' : '';
-  const card = QK.previewCard(G, { kicker: (L === 'aaa' ? 'Triple-A' : 'MLB') + (g._park && g._park.name ? ' · ' + g._park.name : '') + (tag ? ' · ' + tag : ''),
-    nick: t => String(t.name || '').split(' ').slice(-1)[0] === 'Sox' || /Blue Jays$/.test(t.name || '') ? String(t.name || '').split(' ').slice(-2).join(' ') : String(t.name || '').split(' ').slice(-1)[0],
+  const card = QK.previewCard(G, { kicker: (L === 'aaa' ? 'Triple-A' : 'MLB') + (tag ? ' · ' + (g.series ? BP.seriesText(g.series, true) : tag) : (g._park && g._park.name ? ' · ' + g._park.name : '')),
+    nick: t => t.short || t.name,
     colors: pair, factors: fx, factorsTitle: 'How they match up this season',
     noteExtra: extra.length ? esc(extra.join('; ').replace(/^we/, 'We')) + '.' : '',
     market: !started && isNum(mk.p_home) ? { p: Number(mk.p_home), label: 'Market (' + (U.srcName(mk.sources) || 'reference') + ')' } : null });
@@ -451,7 +453,8 @@ function tape(g, season) {
   ];
   if (!list.some(r => isNum(r.a) && isNum(r.b))) return '';
   const pair = BP.ui.pair(g.away, g.home);
-  const A = BP.ui.team(g.away), H = BP.ui.team(g.home); A.colour = pair[0]; H.colour = pair[1];
+  /* v4: the tape's blocks take the raw kits (and alternates); its bars the lifted, distinct chart pair */
+  const A = BP.ui.team(g.away), H = BP.ui.team(g.home);
   return QK.matchupBar({ left: A, right: H, rows: list, colors: pair });
 }
 function previewPanel(el, g, L, season) {

@@ -173,6 +173,9 @@ function formation(el, spec) {
     Array.prototype.forEach.call(el.querySelectorAll('.fb-xi-dot'), function (d) {
       var r = d.getAttribute('data-rt');
       if (r !== null && r !== '') d.style.background = ratingColor(Number(r));
+      /* the number on the dot in black or white, whichever reads on its fill (AA on the pale rating colours) */
+      var m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(getComputedStyle(d).backgroundColor || '');
+      if (m && QK.color) d.style.color = QK.color.ink(QK.color.hex([Number(m[1]), Number(m[2]), Number(m[3])]));
     });
   }
   el.className = 'fb-xi' + (half ? ' half' : ' full');
@@ -195,7 +198,7 @@ function formation(el, spec) {
 function radar(el, s) {
   return QKC.mount(el, function (T) {
     return {
-      legend: s.series.length > 1 ? { bottom: 0, icon: 'roundRect', itemWidth: 12, itemHeight: 4, textStyle: { color: T.ink2 } } : undefined,
+      legend: s.series.length > 1 ? { bottom: 0, icon: 'rect', itemWidth: 12, itemHeight: 4, textStyle: { color: T.ink2 } } : undefined,
       tooltip: QKC.tooltip(T, { trigger: 'item' }),
       radar: {
         indicator: s.axes.map(function (a) { return { name: a.name, max: a.max || 100, min: a.min || 0 }; }),

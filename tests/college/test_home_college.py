@@ -16,19 +16,20 @@ def test_every_college_futures_entry_has_a_home_tab(tmp_path, monkeypatch):
     home, _ = _home(tmp_path, monkeypatch, ["--links", "local"])
     keys = [k for k in home["futures"] if k.split("_")[0] == "college"]
     assert "college" in keys
-    tabs = re.search(r"\[\['nfl', 'NFL'\].*?\]\]\.forEach", _src(), re.S).group(0)
+    # v4 Home: the title-race tabs are the RACE_ORDER keys that carry futures rows
+    tabs = re.search(r"var RACE_ORDER = \[(.*?)\];", _src(), re.S).group(1)
     for k in keys:
-        assert f"['{k}', " in tabs, k
+        assert f"'{k}'" in tabs, k
         f = home["futures"][k]
         assert f["title"] and f["rows"] and all(r["href"].startswith("../campus/#/") for r in f["rows"])
     for k in ("college", "college_mbb", "college_wbb"):
-        assert f"['{k}', " in tabs, k
+        assert f"'{k}'" in tabs, k
 
 
 def test_tab_sport_and_live_adapter():
     src = _src()
     # a tab id maps to its sport by the part before "_" (basketball_2 -> basketball, college_mbb -> college)
-    assert "futuresPanel(p, F[id], id.split('_')[0])" in src
+    assert "sport: k.split('_')[0]" in src
     m = re.search(r"\n  college: \['index\.json', (function .*?)\],\n", src)
     assert m, "no college live adapter"
     body = m.group(1)

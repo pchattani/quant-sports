@@ -512,16 +512,17 @@ FB.route('model', function (el, p) {
 
 // ── overview ────────────────────────────────────────────────────────────────
 
-/* "How sure are we?" (kit v3 QK.howSure): the match model's record from data/calibration.json, at the top of the
-   overview and of Model checks. The section stays empty until the file exists (the data build adds it). */
+/* "We say it. Then we check it." (kit v4 QK.howSure: three big numbers over the we-said / it-happened bars): the match
+   model's walk-forward record from data/calibration.json, at the top of the overview and of Model checks. The section
+   stays empty until the file exists (the data build adds it). */
 function howSure(el) {
   return FB.load('calibration.json').then(function (j) {
     var box = el.querySelector('#md-sure');
     if (!box || !FB.alive(el)) return;
     var cb = FB.calibOf ? FB.calibOf(j) : QK.calib.find(j);
     if (!cb || !cb.bins || !cb.bins.length) { box.innerHTML = ''; return; }
-    box.innerHTML = '<section class="qk-section fb-md-sure">' + QK.sectionHead({ kicker: 'How sure are we?', title: 'When we say 60%, does it happen 60% of the time?',
-      sub: 'Every pre-match chance we published, grouped by how sure we were, against how often it came off. Dots on the dashed line mean we were spot on.' }) + '<div id="md-sure-in"></div></section>';
+    box.innerHTML = '<section class="qk-section fb-md-sure">' + QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.',
+      sub: 'Every match in our backtest, grouped by the chance we gave ' + esc((j && j.subject) || 'the home side') + ' to win, against how often it happened. When the two bars match, our numbers mean what they say.' }) + '<div id="md-sure-in"></div></section>';
     QK.howSure(box.querySelector('#md-sure-in'), { bins: cb.bins, brier: cb.brier, n: cb.n, league: (j && j.league) || 'Football', span: (j && j.span) || '', subject: (j && j.subject) || 'the home side', unit: 'matches' });
   });
 }

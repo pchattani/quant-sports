@@ -151,7 +151,7 @@ function drawTypes(ctx) {
     const v = (P[id].values || {})[t.m.key];
     if (!k.isNum(v)) return { v: null, html: '—', align: 'right' };
     const z = (v - max[t.type].c) / max[t.type].m * (t.m.lower ? -1 : 1);
-    const bg = z >= 0 ? 'rgba(248,81,73,' + (0.1 + 0.55 * Math.min(1, z)).toFixed(2) + ')' : 'rgba(88,166,255,' + (0.1 + 0.55 * Math.min(1, -z)).toFixed(2) + ')';
+    const bg = z >= 0 ? 'rgba(248,81,73,' + (0.08 + 0.42 * Math.min(1, z)).toFixed(2) + ')' : 'rgba(88,166,255,' + (0.08 + 0.42 * Math.min(1, -z)).toFixed(2) + ')';
     return { v: v, html: k.fmt(t.m, v), align: 'right', style: 'background:' + bg, title: (P[id].name || '') + ' · ' + t.label + ': ' + k.fmt(t.m, v) };
   };
   host.innerHTML = k.table([{ label: 'Goalie' }, { label: 'Team' }].concat(T.map(t => ({ label: t.label, align: 'right', title: k.cleanDesc(t.m.desc || t.m.label) }))),

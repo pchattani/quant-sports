@@ -1,19 +1,21 @@
-/* The Quant Campus — Players (#/<L>/players) and the player page (#/<L>/player/<pid>), on kit v3 "Matchday".
+/* The Quant Campus — Players (#/<L>/players) and the player page (#/<L>/player/<pid>), on kit v4 "Broadcast".
  * Catalogue: a leaderboard with heat cells on the percentile against the position group (the payload's position
  * pools; or all qualified players), position chips, search and the qualified-only floor.
- * Player page (the Rink reference, MIGRATION_V3.md): a crumb; the header with "The short version" in plain English
- * from this season's percentiles against the position (football) or role (basketball) group; tiles (our value
- * first); the percentile rail with a plain line per metric, early-sample markers and last season's hollow ring
- * (current.prev_pct_pos when the payload has it, else last season's catalogue when the rail scrolls into view) beside
- * "How sure are we?" (when the headline numbers are half signal at this playing time, from the spec's M50), game by
- * game and "Their type"; a compare of the player and the two closest matches with the highlighter and verdicts; next
- * up and last time out; then where the player sits among peers, the movement card, the game log, season by season
- * and inferred moves.
+ * Player page (the Rink reference, MIGRATION_V4.md): a crumb; the full-bleed team-colour hero (the alternate colour on
+ * the diagonal) with the black strip of five numbers (our value first) and "The short version" in plain English from
+ * this season's percentiles against the position (football) or role (basketball) group; the LED percentile meters
+ * with a plain line per metric, early-sample markers and last season's ▼ (current.prev_pct_pos when the payload has
+ * it, else last season's catalogue when the rail scrolls into view) and "How sure are we?" under them (when the
+ * headline numbers are half signal at this playing time, from the spec's M50), beside the tale of the tape against the
+ * closest match this season (chips switch) with verdicts; what to watch next (the scoreboard bug and how the teams
+ * match up) beside the last game (the score, the team box and the win-chance race from the game file); every game this
+ * season (the best game highlighted); game by game and "Their type"; then where the player sits among peers, the
+ * movement card, season by season and inferred moves.
  * Percentiles: the payload's pct_pos (position pool) and pct (all qualified). Where a payload carries none (basketball
  * catalogues are compact), they are computed here from the same catalogue: qualified players at the position, the
  * payload's own floor (min_floor), lower-is-better metrics flipped.
- * Reads <L>/<S>/players.json, <L>/players/<pid>.json (career), <L>/<S-1>/players.json (the rings, lazy), then
- * <L>/<S>/movement.json (lazy). */
+ * Reads <L>/<S>/players.json, <L>/players/<pid>.json (career), <L>/<S>/season.json (ratings for the next game),
+ * <L>/<S>/games/<id>.json (the last game), <L>/<S-1>/players.json (the ▼, lazy), then <L>/<S>/movement.json (lazy). */
 (function (CC) {
 'use strict';
 var U = CC.ui, esc = CC.esc, isNum = CC.isNum;
@@ -218,6 +220,7 @@ CC.route('player', function (el, p) {
   return Promise.all([CC.load(CC.lpath(L, 'players/' + pid + '.json')), CC.load(CC.path(L, S, 'players.json')), CC.season(L, S), CC.metrics()]).then(function (a) {
     if (!U.alive(el)) return;
     var d = CC.ok(a[0]) ? a[0] : null, cat = CC.ok(a[1]) ? a[1] : null;
+    var seasonD = CC.ok(a[2]) ? a[2] : null, NL = {};
     if (cat) { clean(cat); fillPct(cat); }
     var cp = cat && cat.players ? cat.players[pid] : null;
     if (!d && !cp) { el.innerHTML = U.head('Player', '', U.kicker(L, S)) + QK.empty('Player not found', 'No career file for this player (careers are kept for players with a game in the last two seasons).'); return; }
@@ -291,11 +294,7 @@ CC.route('player', function (el, p) {
     var short0 = cp ? shortText() : '';
     var crumb = '<nav class="cc-crumb" aria-label="Breadcrumb"><a href="' + esc(CC.href(L, 'players', null, S)) + '">' + esc(CC.LNAME[L]) + '</a><span aria-hidden="true">›</span>' +
       (t ? '<a href="' + esc(CC.teamHref(L, team, cur.season || S)) + '">' + esc(t.short || t.name) + '</a><span aria-hidden="true">›</span>' : '') + esc(name) + '</nav>';
-    var html = crumb + QK.playerHeader({ name: name, pos: posLabel(cat, pos) || pos, kicker: CC.seasonLabel(L, cur.season || S) + (gpNow ? ' · ' + plural(gpNow, 'game') + ' in' : ''),
-        team: t ? { name: t.short || t.name, abbr: t.abbr, colour: t.colour, href: CC.teamHref(L, team, cur.season || S) } : null,
-        meta: [(d && d['class']) || (cp && cp['class']) ? (d && d['class']) || cp['class'] : null, hgt ? hgt + (d && isNum(d.weight_lb) ? ', ' + d.weight_lb + ' lb' : '') : null, d && d.hometown ? 'From ' + d.hometown : null],
-        stats: short0 ? null : hstats.slice(0, 4), short: short0 || null, tags: cp && cp.qualified !== false ? [QK.tag('Qualified for percentiles', 'signal')] : [] });
-    // stat tiles: ours first
+    // stat tiles: ours first (v4: the black strip of five numbers under the hero)
     var k = [];
     if (vr) k.push({ label: fb ? 'Value (EPA above replacement)' : 'Value above replacement', value: CC.f(vr.value, fb ? 1 : 1), signal: true, pctl: isNum(pp.value) ? pp.value : (isNum(vr.pctl) ? vr.pctl : null), sub: isNum(vr.gp) ? vr.gp + ' games · ' + CC.f(vr.value_pg, 2) + ' a game' : '', tip: 'Our value model this season; the chip is the percentile against the same position' });
     if (isNum(vals.epa_play)) k.push({ label: 'EPA per play', value: CC.signed(vals.epa_play, 3), pctl: pp.epa_play, sub: 'expected points added per credited play' });
@@ -303,8 +302,13 @@ CC.route('player', function (el, p) {
     if (!fb && isNum(vals.r)) k.push({ label: 'Rating per 100', value: CC.signed(vals.r, 1), pctl: pp.r, sub: 'on-court margin per 100 possessions v average' });
     hstats.filter(function (h0) { return h0.label !== 'GP'; }).slice(0, 5 - k.length - (cur.fantasy && isNum(cur.fantasy.proj) ? 1 : 0)).forEach(function (h0) { k.push({ label: h0.label, value: h0.value, sub: fb ? 'this season' : 'a game' }); });
     if (cur.fantasy && isNum(cur.fantasy.proj)) k.push({ label: 'Fantasy projection', value: CC.f(cur.fantasy.proj, 1), sub: 'points next ' + (fb ? 'week' : 'period') });
-    html += k.length ? '<div class="cc-tiles">' + U.stats(k.slice(0, 5)) + '</div>' : '';
-    if (vr && vr.why) html += QK.note('<b>Why:</b> ' + esc(vr.why));
+    /* v4 (Broadcast): the full-bleed team-colour hero (the alternate colour on the diagonal; slate behind a volt
+       stripe until the payload has one) with the black strip of five numbers and "The short version" under it */
+    var html = crumb + QK.playerHeader({ name: name, number: d && (isNum(d.jersey) || /^\d+$/.test(String(d.jersey || ''))) ? d.jersey : null, pos: posLabel(cat, pos) || pos, kicker: CC.LSHORT[L] + ' · ' + CC.seasonLabel(L, cur.season || S) + (gpNow ? ' · ' + plural(gpNow, 'game') + ' in' : ''),
+        team: t ? { name: t.short || t.name, abbr: t.abbr, colour: t.colour, alt: CC.talt(L, team) || undefined, href: CC.teamHref(L, team, cur.season || S) } : null,
+        meta: [(d && d['class']) || (cp && cp['class']) ? (d && d['class']) || cp['class'] : null, hgt ? hgt + (d && isNum(d.weight_lb) ? ', ' + d.weight_lb + ' lb' : '') : null, d && d.hometown ? 'From ' + d.hometown : null],
+        strip: k.length ? k.slice(0, 5) : hstats.slice(0, 5), short: short0 || null, tags: cp && cp.qualified !== false ? [QK.tag('Qualified for percentiles', 'signal')] : [] });
+    if (vr && vr.why) html += QK.explain('<b>Why that value?</b> ' + esc(vr.why), { cls: 'cc-settle' });
 
     /* How sure are we: when the headline numbers are half signal at this playing time (the spec's M50 samples) */
     var small = gpNow < (fb ? 6 : 12);
@@ -313,11 +317,11 @@ CC.route('player', function (el, p) {
       var n0 = CC.sampleIn(cp, r.m.mu);
       return isNum(n0) && n0 > 0 && gpNow ? [r.label, Math.round(r.m.m50 / (n0 / gpNow))] : null;
     }).filter(function (x) { return x && x[1] > 0 && x[1] < 400; }).slice(0, 3) : [];
-    var sureCard = '<article class="qk-card cream"><div class="qk-card-body"><div class="qk-kicker">How sure are we?</div><h3 style="margin:8px 0 6px">' +
-      esc(gpNow ? (small ? (gpNow <= 10 ? NUMW[gpNow] : gpNow) + ' game' + (gpNow === 1 ? ' is' : 's is') + ' a small sample' : gpNow + ' games: the picture is settling') : 'No games yet this season') + '</h3>' +
-      '<p style="margin:0;color:var(--ink-2);font-size:15px">' + (small ? 'College seasons are short and schedules uneven, so rates swing a lot early on. ' : 'Schedules in college vary a lot, so read a rate with the opponents in mind. ') +
-      'The hollow rings on the rail show last season, where the player had one in the same group: dots next to their ring are the steady part of the profile.</p>' +
-      (settle.length ? QK.note('At this playing time, ' + settle.map(function (x) { return lc(x[0]) + ' is half signal after about <b>' + plural(x[1], 'game') + '</b>'; }).join('; ') + '.') : '') + '</div></article>';
+    /* v4: "How sure are we?" is the explain strip under the meters */
+    var settleNote = '<b>How sure are we?</b> ' + esc(gpNow ? (small ? (gpNow <= 10 ? NUMW[gpNow] : gpNow) + ' game' + (gpNow === 1 ? ' is' : 's is') + ' a small sample.' : gpNow + ' games: the picture is settling.') : 'No games yet this season.') + ' ' +
+      (small ? 'College seasons are short and schedules uneven, so rates swing a lot early on. ' : 'Schedules in college vary a lot, so read a rate with the opponents in mind. ') +
+      (settle.length ? 'At this playing time, ' + settle.map(function (x) { return esc(lc(x[0])) + ' is half signal after about <b>' + plural(x[1], 'game') + '</b>'; }).join('; ') + '. ' : '') +
+      'The ▼ on each meter is last season, where the player had one in the same group: rows that sit on it are the steady part of the profile.';
     var sim = ((d && d.similar) || []).filter(function (s0) { return s0 && s0.id; });
     var typeCard = sim.length ? '<article class="qk-card"><div class="qk-card-body"><div class="qk-kicker">Their type</div><h4 class="cc-h4">Plays most like</h4><ul class="cc-type">' + sim.slice(0, 4).map(function (s0) {
       var same = Number(s0.season) === Number(S);
@@ -333,21 +337,31 @@ CC.route('player', function (el, p) {
       vkLog = ['value', 'epa', 'pts', 'pass_yds', 'rush_yds', 'rec_yds', 'tkl', 'sacks', 'fgm'].filter(function (k2) { return lk.indexOf(k2) >= 0 && tot(k2) > 0; })[0] || null;
     }
     var gbg = log.length && vkLog ? U.card((LOGK[vkLog] || vkLog) + ', game by game', CC.seasonLabel(L, cur.season || S) + '; the best game is marked', U.chart('pp-log', 240, (LOGK[vkLog] || vkLog) + ' per game this season')) : '';
-    html += '<section class="qk-section cc-sec1"><div class="qk-gside"><div>' + rail() + '</div><div class="qk-stack">' + sureCard + gbg + typeCard + '</div></div></section>';
-    // compare: the player and the two closest matches of this season, the best in each row highlighted (filled below)
-    html += '<section class="qk-section" id="pp-cmp-sec" hidden><div id="pp-cmp-h"></div><article class="qk-card"><div class="qk-card-body"><div id="pp-cmp"></div></div></article></section>';
-    // next up and last time out
+    /* 1. the LED meters (7) with "How sure are we?" under them, beside the tale of the tape against the closest match
+          this season (5; chips switch between the matches) */
+    var tapeIds = cp && useSpec ? sim.filter(function (s0) { return Number(s0.season) === Number(S); }).map(function (s0) { return String(s0.id); }).filter(function (id) { return id !== String(pid) && cat.players[id] && CC.group(L, 'player', cat.players[id]) === G; }).slice(0, 3) : [];
+    var tape = tapeIds.length > 0;
+    html += '<section class="qk-section cc-sec1"><div class="qk-g75"><div>' + rail() + QK.explain(settleNote, { cls: 'cc-settle' }) + '</div><div class="qk-stack">' +
+      (tape ? '<div><div id="pp-tape-h"></div><div class="qk-chips cc-pick" id="pp-tape-pick" role="group" aria-label="Compare with"></div><div id="pp-tape">' + QK.skeleton('lines', 6) + '</div><div id="pp-verd"></div></div>' : gbg + typeCard) + '</div></div></section>';
+    /* 2. what to watch next (the scoreboard bug) beside the last game (the score, the box and the win-chance race) */
     html += nextLast();
+    /* 3. the game log: every game this season, the best game highlighted */
+    if (log.length) {
+      var bestI = -1, bestV = -1e9;
+      if (vkLog) log.forEach(function (g, i) { var v = isNum(g[vkLog]) ? g[vkLog] : -1e9; if (v > bestV) { bestV = v; bestI = i; } });
+      var bestG = bestI >= 0 && bestV > 0 && log.length >= 2 ? log[bestI] : null;
+      html += U.section('Every game this season', esc(bestG ? CC.date(bestG.date) + ' ' + (bestG.home ? 'against ' : 'at ') + CC.tname(L, bestG.opp) + ' is the best game so far (highlighted): ' + CC.f(bestV, vkLog === 'value' || vkLog === 'epa' ? 1 : 0) + ' ' + lc(LOGK[vkLog] || vkLog) + '. Newest first.' : CC.seasonLabel(L, cur.season || S) + ', newest first.'),
+        U.card('', '', U.table(['Date', 'Opp', 'Result'].concat(lk.map(function (k2) { return { label: k2.replace(/_/g, ' ').toUpperCase(), align: 'right' }; })), log.map(function (g, i) {
+          return { _class: bestG && i === bestI ? 'hl' : '', cells: [{ v: g.date, html: esc(CC.date(g.date)) }, { html: (g.home ? '' : '@ ') + U.teamEnt(L, g.opp, { season: cur.season || S, abbr: true }), v: CC.tname(L, g.opp) }, { html: '<a href="' + esc(CC.gameHref(L, g.game, cur.season || S)) + '">' + esc(g.res || '') + '</a>', v: g.res }].concat(lk.map(function (k2) { return isNum(g[k2]) ? (Math.round(g[k2] * 100) / 100) : '—'; })), _href: CC.gameHref(L, g.game, cur.season || S) };
+        }).reverse(), { maxHeight: 420 })), '', 'Game log');
+    }
+    /* 4. game by game and their type, when the tape took the right column */
+    if (tape && (gbg || typeCard)) html += '<section class="qk-section"><div class="qk-gside"><div>' + gbg + '</div><div>' + typeCard + '</div></div></section>';
     // ── more on the player
-    html += '<section class="qk-section cc-sec">' + QK.sectionHead({ kicker: 'More on the player', title: 'Peers, the long view and moves', sub: 'Where the player sits among ' + esc(peerShort) + ', every game this season, every season on file, and inferred moves.', html: true }) +
+    html += '<section class="qk-section cc-sec">' + QK.sectionHead({ kicker: 'More on the player', title: 'Peers, the long view and moves', sub: 'Where the player sits among ' + esc(peerShort) + ', the movement view, every season on file, and inferred moves.', html: true }) +
       '<div class="qk-grid cc-grid"><div class="qk-span-' + (cp && peerN >= 10 ? 7 : 12) + '">' + (cp && peerN >= 10 ? U.card('Among peers', 'Every qualified ' + esc(peerShort) + ' this season, coloured by percentile', '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('pp-dist', 240, 'Distribution of the position group')) : '') + '</div>' +
       '<div class="qk-span-' + (cp && peerN >= 10 ? 5 : 12) + '" id="pp-move"></div></div></section>';
     if (!d) html += '<p class="cc-note">Career pages are kept for players with a game in the last two seasons; this season’s catalogue numbers are shown.</p>';
-    if (log.length) {
-      html += U.section('Game log', CC.seasonLabel(L, cur.season || S) + ', newest first.', U.card('', '', U.table(['Date', 'Opp', 'Result'].concat(lk.map(function (k2) { return { label: k2.replace(/_/g, ' ').toUpperCase(), align: 'right' }; })), log.slice().reverse().map(function (g) {
-        return { cells: [{ v: g.date, html: esc(CC.date(g.date)) }, { html: (g.home ? '' : '@ ') + U.teamEnt(L, g.opp, { season: cur.season || S, abbr: true }), v: CC.tname(L, g.opp) }, { html: '<a href="' + esc(CC.gameHref(L, g.game, cur.season || S)) + '">' + esc(g.res || '') + '</a>', v: g.res }].concat(lk.map(function (k2) { return isNum(g[k2]) ? (Math.round(g[k2] * 100) / 100) : '—'; })), _href: CC.gameHref(L, g.game, cur.season || S) };
-      }), { maxHeight: 420 })), '', 'This season');
-    }
     var seasons = ((d && d.seasons) || []).map(flat);
     if (seasons.length) {
       var C = (fb ? SEASON_COLS.cfb : SEASON_COLS.bb).filter(function (c) { return seasons.some(function (r) { return isNum(r[c[0]]); }); });
@@ -367,7 +381,7 @@ CC.route('player', function (el, p) {
     el.innerHTML = html;
     U.wire(el);
 
-    /* next up (QK.previewCard) and last time out (the game card with the player's line) */
+    /* what to watch next (the scoreboard bug and the match-up) and the last game (the score, the box and the race) */
     function nextLast() {
       if (!team || !CC.isCur(L, S)) return '';
       var info = CC.info(L), T = String(team);
@@ -376,11 +390,21 @@ CC.route('player', function (el, p) {
         .sort(function (x, y) { return String(x.date).localeCompare(String(y.date)); })[0];
       var lastG = log.length ? log[log.length - 1] : null;
       if (!nx && !lastG) return '';
+      NL.nx = nx; NL.last = lastG;
       var out = '<section class="qk-section"><div class="qk-g2">';
       if (nx) {
         var g = CC.game(nx, L);
         g.home.record = CC.rec(L, S, nx.home); g.away.record = CC.rec(L, S, nx.away);
-        out += '<div><div class="qk-kicker" style="margin-bottom:10px">' + (nx.status === 'in' ? 'Live now' : 'Next up') + '</div>' + QK.previewCard(g, { kicker: CC.LSHORT[L] + ' · ' + CC.when(nx), nick: function (x) { return x.name; } }) + '</div>';
+        var R = (seasonD && seasonD.ratings) || {}, ra = R[String(nx.away)] || {}, rh = R[String(nx.home)] || {};
+        var fx = [];
+        var add = function (lab, x, y, f, low) { if (isNum(x) && isNum(y)) fx.push({ label: lab, a: f(x), b: f(y), better: Math.abs(x - y) < 1e-9 ? null : ((x > y) !== !!low ? 'a' : 'b') }); };
+        add(fb ? 'Rating, points v average' : 'Rating, margin per 100', ra.rating, rh.rating, function (v) { return CC.signed(v, 1); });
+        add(fb ? 'Offence, points a game' : 'Offence, points per 100', ra.off, rh.off, function (v) { return CC.f(v, 1); });
+        add(fb ? 'Defence, points prevented' : 'Defence, allowed per 100', ra.def, rh.def, function (v) { return CC.f(v, 1); }, !fb);
+        add('Strength of schedule', ra.sos, rh.sos, function (v) { return CC.signed(v, 1); });
+        var soon = nx.status === 'in' ? 'Live now' : (QK.fmt.relDay(CC.gameDate(nx)) === 'Today' ? 'What to watch tonight' : 'What to watch next');
+        out += '<div>' + QK.sectionHead({ kicker: soon, title: CC.tshort(L, nx.away) + ' at ' + CC.tshort(L, nx.home) }) +
+          QK.previewCard(g, { layout: 'bug', nick: function (x) { return x.name; }, factors: fx, factorsTitle: 'How they match up this season' }) + '</div>';
       }
       if (lastG) {
         var gm = (info.last_games || []).concat(info.today || []).filter(function (c) { return String(c.id) === String(lastG.game) && c.status === 'post'; })[0];
@@ -389,12 +413,55 @@ CC.route('player', function (el, p) {
           : [isNum(Lg.pass_att) ? Lg.pass_cmp + ' of ' + Lg.pass_att + ' for ' + Lg.pass_yds + ' yards' : '', isNum(Lg.pass_td) && Lg.pass_td ? plural(Lg.pass_td, 'touchdown pass').replace('touchdown passs', 'touchdown passes') : '', isNum(Lg.rush_car) && Lg.rush_car ? Lg.rush_car + ' carries for ' + Lg.rush_yds + ' yards' : '',
             isNum(Lg.rec) && Lg.rec ? Lg.rec + ' catches for ' + Lg.rec_yds + ' yards' : '', isNum(Lg.tkl) && Lg.tkl ? plural(Lg.tkl, 'tackle') : '', isNum(Lg.sacks) && Lg.sacks ? CC.f(Lg.sacks, Lg.sacks % 1 ? 1 : 0) + ' sacks' : ''];
         var line = bits.filter(Boolean).join(', ');
-        out += '<div><div class="qk-kicker" style="margin-bottom:10px">Last time out</div>' + (gm ? CC.card(gm, L, { why: true }) :
-          '<article class="qk-card"><div class="qk-card-body"><div class="qk-feature-meta"><span class="qk-pill">' + esc(CC.date(Lg.date)) + '</span></div><h3 style="margin:12px 0 4px"><a href="' + esc(CC.gameHref(L, Lg.game, S)) + '">' + esc((Lg.home ? 'v ' : 'at ') + CC.tname(L, Lg.opp)) + ' · ' + esc(Lg.res || '') + '</a></h3></div></article>') +
-          (line ? QK.note('<b>' + esc(sur) + ':</b> ' + esc(line) + '.') : '') + '</div>';
+        var where = (Lg.home ? 'v ' : 'at ') + CC.tname(L, Lg.opp);
+        out += '<div><div id="pp-last-h">' + QK.sectionHead({ kicker: 'Last game', title: gm && isNum(gm.hs) && isNum(gm.as) ? scoreTitle(gm) : esc(where + (Lg.res ? ' · ' + Lg.res : '')), html: true, actions: '<a class="qk-more" href="' + esc(CC.gameHref(L, Lg.game, S)) + '">Game centre</a>' }) + '</div>' +
+          '<article class="qk-card"><div class="qk-card-body"><div id="pp-box">' + (gm ? CC.card(gm, L, { why: true }) : '') + '</div>' +
+          (line ? '<p style="margin:12px 0 0;color:var(--ink-2);font-size:15px"><b style="color:var(--ink-1)">' + esc(sur) + ':</b> ' + esc(line) + '.</p>' : '') + '<div id="pp-race"></div></div></article></div>';
       }
       return out + '</div></section>';
     }
+    /* "ALA 42, ECU 7": the winner first */
+    function scoreTitle(x) {
+      var a = [CC.tabbr(L, x.away), x.as], h = [CC.tabbr(L, x.home), x.hs], w = x.as > x.hs ? [a, h] : [h, a];
+      return esc(w[0][0] + ' ' + w[0][1] + ', ' + w[1][0] + ' ' + w[1][1]);
+    }
+    /* the last game from its file: the score, the team box (yards, passing, rushing, turnovers or the shooting line) and
+       the player's team's win chance through the game (our model, else ESPN's) */
+    function fillLast() {
+      var Lg = NL.last;
+      if (!Lg || !QK.$('#pp-race', el)) return;
+      CC.load(CC.path(L, S, 'games/' + Lg.game + '.json')).then(function (gd) {
+        if (!CC.ok(gd) || !U.alive(el)) return;
+        if (gd.teams) CC.addTeams(L, gd.teams);
+        if (isNum(gd.hs) && isNum(gd.as)) QK.$('#pp-last-h', el).innerHTML = QK.sectionHead({ kicker: 'Last game', title: scoreTitle(gd), html: true, actions: '<a class="qk-more" href="' + esc(CC.gameHref(L, Lg.game, S)) + '">Game centre</a>' });
+        var ts = gd.team_stats || {}, mine = String(team);
+        var C = fb ? [['total_yards', 'Yards'], ['pass_yards', 'Pass'], ['rush_yards', 'Rush'], ['turnovers', 'TO']] : [['fg', 'FG'], ['tp', '3PT'], ['reb', 'Reb'], ['tov', 'TO']];
+        C = C.filter(function (c) { return [gd.home, gd.away].some(function (t0) { return isNum((ts[String(t0)] || {})[c[0]]) || (ts[String(t0)] || {})[c[0]]; }); });
+        if (isNum(gd.hs) && isNum(gd.as)) {
+          var row = function (t0, sc) { var x = ts[String(t0)] || {}; return '<tr' + (String(t0) === mine ? ' class="hl"' : '') + '><td>' + QK.teamMark(U.mark(L, t0), 'sm') + '</td><td class="num"><b>' + sc + '</b></td>' + C.map(function (c) { return '<td class="num">' + esc(x[c[0]] === undefined || x[c[0]] === null ? '–' : x[c[0]]) + '</td>'; }).join('') + '</tr>'; };
+          QK.$('#pp-box', el).innerHTML = '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Team</th><th class="num">Pts</th>' + C.map(function (c) { return '<th class="num">' + esc(c[1]) + '</th>'; }).join('') + '</tr></thead><tbody>' + row(gd.away, gd.as) + row(gd.home, gd.hs) + '</tbody></table></div>';
+        }
+        var wp = gd.wp || {}, src = wp.model && wp.model.length > 10 ? wp.model : (wp.espn && wp.espn.length > 10 ? wp.espn : null);
+        if (!src) return;
+        var mx = Math.max.apply(null, src.map(function (x) { return x[0]; })), sec = mx > 100;
+        var home = String(gd.home) === mine, me = CC.tabbr(L, team), col = CC.tcol(L, team);
+        var data = src.map(function (x) { return [sec ? x[0] / 60 : x[0], 100 * (home ? x[1] : 1 - x[1])]; });
+        var full = fb ? 60 : (L === 'mbb' && Number(S) >= 2016 ? 40 : 40);
+        QK.$('#pp-race', el).innerHTML = U.chart('pp-race-c', 240, me + ' chance to win through the last game') + '<p class="qk-caption">' + esc(me) + '’s chance to win through the game, from ' + (src === wp.model ? 'our win-probability model' : 'ESPN’s model') + '. Dashed: 50%.</p>';
+        QKC.mount('#pp-race-c', function (T) {
+          var end = data[data.length - 1][0];
+          var xa = QKC.axis(T, { type: 'value', min: 0, max: Math.max(full, Math.ceil(end / 10) * 10), interval: fb ? 15 : 10, split: false, line: true });
+          var ya = QKC.axis(T, { min: 0, max: 100, interval: 25, fmt: function (v) { return v + '%'; } });
+          var gB = 8 + QKC.nameAxis(xa, 'Minutes played', 'bottom'), gT = 14 + QKC.nameAxis(ya, me + ' chance to win (%)', 'side');
+          return { grid: { left: 8, right: 64, top: gT, bottom: gB, containLabel: true }, xAxis: xa, yAxis: ya,
+            tooltip: QKC.tooltip(T, { trigger: 'axis', formatter: function (ps) { return '<div>Minute ' + esc(CC.f(ps[0].value[0], 0)) + '</div>' + QKC.tipRow(col, me, CC.f(ps[0].value[1], 0) + '%'); } }),
+            series: [{ type: 'line', name: me, step: 'end', showSymbol: false, data: data, lineStyle: { width: 3, color: col }, itemStyle: { color: col }, areaStyle: { color: QKC.hexA(col, 0.12), origin: 50 },
+              markLine: { silent: true, symbol: 'none', lineStyle: { color: T.axis, type: [4, 4], width: 1 }, label: { show: false }, data: [{ yAxis: 50 }] },
+              endLabel: { show: true, formatter: function (p0) { return me + ' ' + Math.round(p0.value[1]) + '%'; }, color: T.ink1, fontFamily: T.fontDisplay, fontSize: 20 } }] };
+        }, { label: me + ' chance to win through the last game' });
+      });
+    }
+    fillLast();
 
     // last season's ring: the payload's prev_pct_pos when it has one, else last season's catalogue when the rail scrolls into view
     var prevS = CC.seasons(L).filter(function (s0) { return s0 < Number(S); })[0];
@@ -416,28 +483,33 @@ CC.route('player', function (el, p) {
       };
       if (host && window.IntersectionObserver) { var io = new IntersectionObserver(function (es) { if (es.some(function (e) { return e.isIntersecting; })) { io.disconnect(); go(); } }, { rootMargin: '200px' }); io.observe(host); } else go();
     }
-    // compare: the player and the two closest matches this season, on the group's headline set
-    if (cp && useSpec) {
-      var ids = [pid].concat(sim.filter(function (s0) { return Number(s0.season) === Number(S); }).map(function (s0) { return String(s0.id); })).filter(function (id) { return cat.players[id] && CC.group(L, 'player', cat.players[id]) === G; }).slice(0, 3);
-      if (ids.length >= 2) {
-        var E = ids.map(function (id) { return { id: id, p: cat.players[id] }; });
+    /* the tale of the tape: the player against one of the closest matches this season in the same group (chips
+       switch), on the group's headline set; the better number in each row solid, verdicts under it */
+    if (tape && QK.$('#pp-tape', el)) {
+      var drawTape = function (oid) {
+        var E = [pid, oid].map(function (id) { return { id: String(id), p: cat.players[id] }; });
         var best = {};
         var hs = G.m.filter(function (m) { return m.set === 'h' && !m.style && E.some(function (e) { return isNum((e.p.values || {})[m.id]); }); });
         var rowsC = hs.map(function (m) {
           var mt = meta[m.id] || { fmt: /pct|rate|share/.test(m.id) ? 'pct' : '2' };
           var pcs = E.map(function (e) { return (e.p[G.pct] || {})[m.id]; });
-          pcs.forEach(function (v, i) { if (!isNum(v)) return; var dd = v - Math.max.apply(null, pcs.filter(function (_, j) { return j !== i; }).map(function (z) { return isNum(z) ? z : 0; })); if (!best[i] || dd > best[i].d) best[i] = { m: m, d: dd, v: (E[i].p.values || {})[m.id], mt: mt }; });
+          pcs.forEach(function (v, i) { var o = pcs[1 - i]; var dd = isNum(v) ? v - (isNum(o) ? o : 0) : null; if (isNum(dd) && (!best[i] || dd > best[i].d)) best[i] = { m: m, d: dd, v: (E[i].p.values || {})[m.id], mt: mt }; });
           return { label: m.d, tip: m.x || '', better: m.low ? 'low' : 'high', values: E.map(function (e) { return (e.p.values || {})[m.id]; }), pctls: pcs, fmt: function (v) { return CC.fmtMetric(mt, v); } };
         });
-        var names = E.map(function (e) { return QK.surname(e.p.name || ''); });
-        QK.$('#pp-cmp-h', el).innerHTML = QK.sectionHead({ kicker: 'Compare', title: names.slice(0, -1).join(', ') + ' or ' + names[names.length - 1] + '?',
-          sub: 'The closest matches on this season’s profile, side by side against ' + G.d.toLowerCase() + '. The best in each row is highlighted; the small pills are percentiles.',
-          actions: '<a class="qk-more" href="' + esc(CC.href(L, 'lab', null, S, 'kind=compare&p=' + ids.join(','))) + '">Open in Compare</a>' });
-        var ents = E.map(function (e) { return { name: e.p.name, href: CC.playerHref(L, e.id, S), sub: [CC.tabbr(L, e.p.team), e.p.pos, isNum(e.p.gp) ? e.p.gp + ' GP' : ''].filter(Boolean).join(' · ') }; });
-        var verd = E.map(function (e, i) { return best[i] && best[i].d > 0 ? { title: ARCHETYPE[best[i].m.id] || 'The standout', who: names[i], text: 'best of the ' + E.length + ' on ' + lc(best[i].m.d) + ' (' + CC.fmtMetric(best[i].mt, best[i].v) + ').' } : null; });
-        QK.$('#pp-cmp', el).innerHTML = QK.compareView({ entities: ents, groups: [{ label: '', rows: rowsC }], delta: false }) + QK.verdicts(verd);
-        QK.$('#pp-cmp-sec', el).hidden = false;
-      }
+        var names = E.map(function (e) { return QK.surname(e.p.name || '') || e.p.name; });
+        QK.$('#pp-tape-h', el).innerHTML = QK.sectionHead({ kicker: 'Tale of the tape', title: names[0] + ' or ' + names[1] + '?', sub: 'Bar length = percentile against ' + G.d.toLowerCase() + ' (100 = best). The better number in each row is solid.' });
+        var ents = E.map(function (e, i) { return { name: e.p.name, short: names[i], href: CC.playerHref(L, e.id, S), colour: CC.traw(L, e.p.team), alt: CC.talt(L, e.p.team) || undefined, sub: [CC.tshort(L, e.p.team), isNum(e.p.gp) ? plural(e.p.gp, 'game') : ''].filter(Boolean).join(' · ') }; });
+        QK.$('#pp-tape', el).innerHTML = QK.compareView({ entities: ents, groups: [{ label: '', rows: rowsC }] });
+        QK.$('#pp-verd', el).innerHTML = QK.verdicts(E.map(function (e, i) { return best[i] && best[i].d > 0 ? { title: ARCHETYPE[best[i].m.id] || 'The standout', who: names[i], text: 'the better of the two on ' + lc(best[i].m.d) + ' (' + CC.fmtMetric(best[i].mt, best[i].v) + ').' } : null; }));
+      };
+      var pick = QK.$('#pp-tape-pick', el);
+      pick.innerHTML = tapeIds.map(function (id, i) { return '<button type="button" class="qk-chip" data-value="' + esc(id) + '" aria-pressed="' + (i === 0) + '">' + esc(QK.surname(cat.players[id].name || '') || cat.players[id].name) + '</button>'; }).join('') +
+        '<a class="qk-chip" href="' + esc(CC.href(L, 'lab', null, S, 'kind=compare&p=' + [pid].concat(tapeIds.slice(0, 2)).join(','))) + '">' + (tapeIds.length > 1 ? 'All three in Compare' : 'Open in Compare') + '</a>';
+      QK.$$('button', pick).forEach(function (b) { b.addEventListener('click', function () {
+        QK.$$('button', pick).forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+        drawTape(b.getAttribute('data-value'));
+      }); });
+      drawTape(tapeIds[0]);
     }
     // where the player sits
     if (cp && QK.$('#pp-dist', el)) {
@@ -470,7 +542,7 @@ CC.route('player', function (el, p) {
           tooltip: QKC.tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(125,147,255,.10)' } }, formatter: function (ps) { var g = log[ps[0].dataIndex]; return '<b>' + esc(CC.date(g.date) + ' · ' + (g.home ? 'v ' : 'at ') + CC.tname(L, g.opp) + ' · ' + (g.res || '')) + '</b>' + QKC.tipRow(T.model, lab, CC.f(g[vkLog], vkLog === 'value' || vkLog === 'epa' ? 1 : 0)); } }),
           series: [{ type: 'bar', name: lab, barMaxWidth: 30, data: log.map(function (g, i) {
             var v = isNum(g[vkLog]) ? g[vkLog] : 0;
-            var o = { value: v, itemStyle: { color: v < 0 ? T.coral : T.model, borderRadius: v < 0 ? [0, 0, 6, 6] : [6, 6, 0, 0] } };
+            var o = { value: v, itemStyle: { color: v < 0 ? T.coral : T.model } };
             if (i === bi && bv > 0 && log.length >= 3) o.label = Object.assign(QKC.annot(T), { show: true, position: 'top', formatter: 'best: ' + CC.f(bv, vkLog === 'value' || vkLog === 'epa' ? 1 : 0) });
             return o; }) }] };
       }, { label: lab + ' per game this season' });

@@ -3,8 +3,8 @@
 The home page (docs/home/) is a static page in the shared design system. It reads one compact,
 normalised file written here from the sport sites' already-built data trees:
 
-    docs/site/data      football   (hub.json, competitions.json, <comp>/probs.json, market_odds.json)
-    docs/paddock/data   F1         (index.json, markets.json, <year>/season.json)
+    docs/site/data      football   (hub.json, competitions.json, <comp>/probs.json)
+    docs/paddock/data   F1         (index.json, markets.json for our next-race model, <year>/season.json)
     docs/hardwood/data  NBA/WNBA   (index.json, <league>/<season>/season.json)
     docs/ace/data       tennis     (index.json)
     docs/bullpen/data   MLB        (index.json, players_index.json)
@@ -290,21 +290,17 @@ def build_football(ctx: Ctx, base: str, out: dict):
         g.pop("rank", None)
     out["games"].extend(picked)
 
-    # Title races: model v market outrights per big league
+    # Title races: our chance per big league (the market never reaches the home page, STYLE_GUIDE §3)
     titles = []
     for slug in TITLE_LEAGUES:
         probs = load(d / slug / "probs.json")
-        mk = load(d / slug / "market_odds.json") or {}
         if not probs:
             continue
-        outr = (mk.get("outrights") or {})
-        mkt = {t["team"]: t.get("market") for t in (outr.get("teams") or [])} if outr.get("available") else {}
         rows = []
         ids = {k: (v or {}).get("team_id") for k, v in ((load(d / slug / "teams.json") or {}).get("teams") or {}).items()
                if isinstance(v, dict)}
         for t in sorted(probs.get("teams", []), key=lambda t: -(t.get("p_title") or 0))[:6]:
-            row = {"name": t["team"], "p": r4(t.get("p_title")), "market": r4(mkt.get(t["team"])),
-                   "exp_pts": t.get("exp_pts")}
+            row = {"name": t["team"], "p": r4(t.get("p_title")), "exp_pts": t.get("exp_pts")}
             colour = (kit.get(str(ids.get(t["team"]))) or (None, None))[0]
             if colour:
                 row["colour"] = colour
@@ -380,7 +376,7 @@ def build_f1(ctx: Ctx, base: str, out: dict):
     idx = load(d / "index.json")
     if not idx:
         raise RuntimeError("index.json missing")
-    mk = load(d / "markets.json") or {}
+    mk = load(d / "markets.json") or {}   # our next-race model only; its prices never reach the home page
     year = idx.get("current_season")
     season = load(d / str(year) / "season.json") or {}
     teams = idx.get("teams") or {}
@@ -397,8 +393,7 @@ def build_f1(ctx: Ctx, base: str, out: dict):
     if nx:
         nr = mk.get("next_race") or {}
         model = nr.get("model") or {}
-        prices = nr.get("prices") or {}
-        field = sorted(set(model) | set(prices), key=lambda k: -(model.get(k) or 0))[:8]
+        field = sorted(model, key=lambda k: -(model.get(k) or 0))[:8]
         race = {"name": nx.get("name"), "round": nx.get("round"), "year": nx.get("year"),
                 "date": nx.get("date"), "circuit": (nx.get("circuit") or {}).get("name"),
                 "locality": (nx.get("circuit") or {}).get("locality"),
@@ -406,7 +401,7 @@ def build_f1(ctx: Ctx, base: str, out: dict):
                 "sessions": nx.get("sessions"),
                 "href": base + "#/race/" + str(nx.get("year")) + "/" + str(nx.get("round")),
                 "field": [{"name": dname(k), "code": (drivers.get(k) or {}).get("code"), "colour": dcol(k),
-                           "p": r4(model.get(k)), "market": r4(prices.get(k)),
+                           "p": r4(model.get(k)),
                            "href": base + "#/driver/" + k} for k in field]}
         sess = nx.get("sessions") or {}
         out["games"].append(game("f1", "Formula 1", f"{nx.get('year')}-{nx.get('round')}",
@@ -435,9 +430,8 @@ def build_f1(ctx: Ctx, base: str, out: dict):
 
     champ = (season.get("championship") or {}).get("drivers") or {}
     title = sorted(champ.items(), key=lambda kv: -(kv[1].get("p_title") or 0))[:6]
-    dt = mk.get("drivers_title") or {}
     out["futures"]["f1"] = {"title": "Drivers' title", "rows": [
-        {"name": dname(k), "p": r4(v.get("p_title")), "market": r4((dt.get("prices") or {}).get(k)),
+        {"name": dname(k), "p": r4(v.get("p_title")),
          "colour": dcol(k), "href": base + "#/driver/" + k} for k, v in title]}
 
     last = idx.get("last") or {}
@@ -502,12 +496,12 @@ def build_basketball(ctx: Ctx, base: str, out: dict):
             if g["id"] in seen:
                 continue
             seen.add(g["id"])
-            m, mk = g.get("model") or {}, g.get("market") or {}
+            m = g.get("model") or {}
             ser = g.get("series") or {}
             note = ser.get("round") and (ser["round"] + (f" · G{ser['game']}" if ser.get("game") else ""))
             games.append(game("basketball", LU, g["id"], g["date"], g["status"], tm(g["home"]), tm(g["away"]),
-                              g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")), market_home=r4(mk.get("p_home")),
-                              spread=mk.get("spread_home"), total=m.get("total"), clock=g.get("clock"),
+                              g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
+                              total=m.get("total"), clock=g.get("clock"),
                               period=g.get("period"), wp_home=r4(g.get("wp_home")), note=note,
                               href=base + "#/" + L + "/game/" + str(g["id"])))
         out["games"].extend(pick_games(ctx, games, 4, 6))
@@ -564,7 +558,7 @@ def build_tennis(ctx: Ctx, base: str, out: dict):
             if sets and norm_status(m.get("status")) != "pre":
                 hs = sum(1 for s in sets if s[0] is not None and s[1] is not None and s[0] > s[1])
                 as_ = sum(1 for s in sets if s[0] is not None and s[1] is not None and s[1] > s[0])
-            mod, mk = m.get("model") or {}, m.get("market") or {}
+            mod = m.get("model") or {}
             e = ev.get(m.get("event")) or {}
             start = m.get("date")
             if start and len(start) == 16:
@@ -572,7 +566,7 @@ def build_tennis(ctx: Ctx, base: str, out: dict):
             g = game("tennis", f"{TU} · {e.get('name') or m.get('event')}", m["id"], start, m.get("status"),
                      team(n[0], href=base + "#/" + T + "/player/" + str(m.get("p1"))),
                      team(n[1], href=base + "#/" + T + "/player/" + str(m.get("p2"))),
-                     hs, as_, p_home=r4(mod.get("p1")), market_home=r4(mk.get("p1")),
+                     hs, as_, p_home=r4(mod.get("p1")),
                      sets=[[s[0], s[1]] for s in sets if s[0] is not None] if sets else None,
                      note=m.get("round"), href=base + "#/" + T + "/match/" + str(m["id"]), players=True,
                      tba=True if (m.get("tba") or (start and len(start) == 10)) else None)   # date-only start
@@ -616,12 +610,12 @@ def build_baseball(ctx: Ctx, base: str, out: dict):
         if g["gpk"] in seen:
             continue
         seen.add(g["gpk"])
-        m, mk = g.get("model") or {}, g.get("market") or {}
+        m = g.get("model") or {}
         ser = g.get("series") or {}
         note = ser.get("desc") and (ser["desc"].replace("Championship Series", "CS").replace("Division Series", "DS")
                                     + (f" · G{ser['game']}" if ser.get("game") else ""))
         games.append(game("baseball", "MLB", g["gpk"], g.get("start"), g.get("status"), tm(g["home"]), tm(g["away"]),
-                          g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")), market_home=r4(mk.get("p_home")),
+                          g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
                           total=m.get("total"), period=g.get("inning"), wp_home=r4(g.get("wp_home")), note=note,
                           href=base + "#/mlb/game/" + str(g["gpk"])))
     out["games"].extend(pick_games(ctx, games, 3, 4))
@@ -639,8 +633,7 @@ def build_baseball(ctx: Ctx, base: str, out: dict):
         if not s.get("done"):
             a, b = s["teams"]
             series.append({"round": s.get("round_name"), "a": tm(a), "b": tm(b), "wins": s.get("wins"),
-                           "p": [r4(x) for x in (s.get("p") or [])], "best_of": s.get("best_of"),
-                           "market": s.get("market")})
+                           "p": [r4(x) for x in (s.get("p") or [])], "best_of": s.get("best_of")})
     out["charts"]["mlb_series"] = series
 
     lead = idx.get("leaders") or {}
@@ -698,10 +691,10 @@ def build_nfl(ctx: Ctx, base: str, out: dict):
         if g["game_id"] in seen:
             continue
         seen.add(g["game_id"])
-        m, mk, ln = g.get("model") or {}, g.get("market") or {}, g.get("line") or {}
+        m = g.get("model") or {}
         games.append(game("nfl", "NFL", g["game_id"], g["kickoff"], g["status"], tm(g["home"]), tm(g["away"]),
-                          g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")), market_home=r4(mk.get("p_home")),
-                          spread=ln.get("spread_home"), model_spread=m.get("spread"), total=ln.get("total"),
+                          g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
+                          model_spread=m.get("spread"),
                           period=g.get("qtr"), clock=g.get("clock"), wp_home=r4(g.get("wp_home")),
                           note=f"Week {g.get('week')}", href=base + "#/game/" + g["game_id"]))
     out["games"].extend(pick_games(ctx, games, 4, 10))
@@ -774,9 +767,9 @@ def build_hockey(ctx: Ctx, base: str, out: dict):
         if g["game_id"] in seen:
             continue
         seen.add(g["game_id"])
-        m, mk = g.get("model") or {}, g.get("market") or {}
+        m = g.get("model") or {}
         games.append(game("hockey", "NHL", g["game_id"], g.get("start"), g.get("status"), tm(g["home"]), tm(g["away"]),
-                          g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")), market_home=r4(mk.get("p_home")),
+                          g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
                           total=m.get("total"), period=g.get("period"), clock=g.get("clock"),
                           wp_home=r4(g.get("wp_home")), xg=[(g.get("xg") or {}).get("home"), (g.get("xg") or {}).get("away")] if g.get("xg") else None,
                           note=("OT" if g.get("ot") else None), href=base + "#/game/" + g["game_id"]))
@@ -871,12 +864,12 @@ def build_college(ctx: Ctx, base: str, out: dict):
             if g.get("id") in seen or (g.get("tba") and norm_status(g.get("status")) == "pre"):
                 continue                       # a game whose start time is not set (TBA) has no slot on the home page
             seen.add(g.get("id"))
-            m, mk = g.get("model") or {}, g.get("market") or {}
+            m = g.get("model") or {}
             note = g.get("round") if g.get("stype") in ("cfp", "ncaa", "bowl") else None
             href = base + "#/" + L + "/game/" + str(g["id"]) + ("" if g.get("season") in (None, S) else f"?season={g['season']}")
             games.append(game("college", LU, g["id"], g.get("date"), g.get("status"), tm(g["home"], g.get("hr")),
                               tm(g["away"], g.get("ar")), g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
-                              market_home=r4(mk.get("p_home")), spread=mk.get("spread_home"), total=m.get("total"),
+                              total=m.get("total"),
                               note=note, href=href))
         out["games"].extend(pick_games(ctx, games, 4, 6))
         rows = [r for r in (lg.get("title_odds") or []) if r.get("p")][:8]
@@ -884,7 +877,7 @@ def build_college(ctx: Ctx, base: str, out: dict):
             out["futures"]["college" if L == "cfb" else "college_" + L] = {
                 "title": COLLEGE_TITLE[L], "rows": [
                     {"name": (teams.get(r["team"]) or {}).get("name") or r["team"], "abbr": (teams.get(r["team"]) or {}).get("abbr"),
-                     "p": r4(r["p"]), "market": r4(r.get("market")), "colour": (teams.get(r["team"]) or {}).get("colour"),
+                     "p": r4(r["p"]), "colour": (teams.get(r["team"]) or {}).get("colour"),
                      "href": base + "#/" + L + "/team/" + r["team"]} for r in rows]}
             t0 = teams.get(rows[0]["team"]) or {}
             kpis.append({"label": f"{LU} fav", "value": t0.get("short") or t0.get("name") or rows[0]["team"],
@@ -1112,8 +1105,7 @@ def season_files(docs: Path = DOCS):
     """
     rows = []
     for slug in TITLE_LEAGUES:
-        rows += [("site", "the-quant-footballer", f"{slug}/probs.json"),
-                 ("site", "the-quant-footballer", f"{slug}/market_odds.json")]
+        rows += [("site", "the-quant-footballer", f"{slug}/probs.json")]
     idx = load(docs / "paddock" / "data" / "index.json") or {}
     if idx.get("current_season"):
         rows.append(("paddock", "the-quant-paddock", f"{idx['current_season']}/season.json"))

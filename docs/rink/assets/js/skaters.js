@@ -318,13 +318,14 @@ K.pctColor = p => {
   const a = t < 0.5 ? lo : mid, b = t < 0.5 ? mid : hi, u = t < 0.5 ? t * 2 : (t - 0.5) * 2;
   return 'rgb(' + [0, 1, 2].map(i => Math.round(a[i] + (b[i] - a[i]) * u)).join(',') + ')';
 };
-K.pill = p => (isNum(p) ? '<span class="pct-pill" style="background:' + K.pctColor(p) + '">' + Math.round(p) + '</span>' : '<span class="pct-pill empty">—</span>');
+K.pctInk = p => (has('pctInk') ? RK.pctInk(p) : '#ffffff');
+K.pill = p => (isNum(p) ? '<span class="pct-pill" style="background:' + K.pctColor(p) + ';color:' + K.pctInk(p) + '">' + Math.round(p) + '</span>' : '<span class="pct-pill empty">—</span>');
 /* Savant-style percentile slider: a track, a coloured disc carrying the percentile, the value on the right. */
 K.slider = (label, p, valueText, title, href) => {
   const known = isNum(p), x = known ? Math.max(0, Math.min(100, p)) : 0;
   const lab = href ? '<a href="' + href + '" class="gq-sl-a">' + K.esc(label) + '</a>' : K.esc(label);
   return '<div class="gq-sl"' + (title ? ' title="' + K.esc(title) + '"' : '') + '><span class="gq-sl-label">' + lab + '</span><div class="gq-sl-track">' +
-    (known ? '<div class="gq-sl-fill" style="width:' + x + '%;background:' + K.pctColor(p) + '"></div><span class="gq-sl-dot" style="left:' + x + '%;background:' + K.pctColor(p) + '">' + Math.round(p) + '</span>' : '<span class="gq-sl-none">below the sample floor</span>') +
+    (known ? '<div class="gq-sl-fill" style="width:' + x + '%;background:' + K.pctColor(p) + '"></div><span class="gq-sl-dot" style="left:' + x + '%;background:' + K.pctColor(p) + ';color:' + K.pctInk(p) + '">' + Math.round(p) + '</span>' : '<span class="gq-sl-none">below the sample floor</span>') +
     '</div><span class="gq-sl-val">' + (valueText === undefined ? '' : valueText) + '</span></div>';
 };
 /* Grouped sliders over a catalogue. opts {onlyKnown, note, glossary: true, unit}. The shell's sliders keep one look across the site. */

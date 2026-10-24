@@ -95,6 +95,10 @@ CC.conf = function (L, cid) { return CONFS[L][String(cid)] || null; };
 CC.cname = function (L, cid) { var c = CC.conf(L, cid); return c ? (c.short || c.name) : (cid ? 'Conf ' + cid : 'Independent'); };
 CC.pname = function (L, pid) { var p = PLAYERS[L][String(pid)]; return p ? p.name : 'Player ' + pid; };
 /* A team colour for marks and chart series on the current theme (the kit lifts dark kits to 3:1). */
+/* v4: the raw kit colour and the alternate (payload alt, else alt_colour; absent until the data agent adds it, when the
+ * kit's fallbacks apply: QK.color.blockPair gives a clash slate with the kit as its rule) for blocks and heroes */
+CC.traw = function (L, tid) { var t = CC.team(L, tid); return t && QK.color.parse(t.colour) ? t.colour : null; };
+CC.talt = function (L, tid) { var t = CC.team(L, tid) || {}; var a = t.alt || t.alt_colour; return QK.color.parse(a) ? a : null; };
 CC.tcol = function (L, tid) { var t = CC.team(L, tid); return t && QK.color.parse(t.colour) ? QK.color.team(t.colour) : QK.cssVar('--c-other'); };
 /* Season payload: season.json for (L, S) with its teams and conferences registered. */
 CC.season = function (L, S) {
@@ -188,7 +192,7 @@ function rankTag(c, side) {
 }
 CC.side = function (L, c, side, S) {
   var tid = c[side], t = CC.team(L, tid) || {};
-  return { name: rankTag(c, side) + (t.short || t.name || ('Team ' + tid)), abbr: t.abbr, colour: t.colour, href: CC.teamHref(L, tid, S || c.season) };
+  return { name: rankTag(c, side) + (t.short || t.name || ('Team ' + tid)), abbr: t.abbr, colour: t.colour, alt: CC.talt(L, tid) || undefined, full: t.name || undefined, href: CC.teamHref(L, tid, S || c.season) };
 };
 CC.game = function (c, L) {
   if (c && !c.season && CC.state && CC.state.S) c = Object.assign({ season: CC.state.S }, c);
@@ -326,7 +330,7 @@ U.head = function (title, sub, kicker, right) {
 U.stats = function (list) { return '<div class="cc-kpis">' + QK.stats(list) + '</div>'; };
 /* A leaderboard into a fresh node, returned as HTML with an id to mount after the page is written. */
 U.lb = function (id) { return '<div id="' + esc(id) + '" class="cc-lb"></div>'; };
-U.mark = function (L, tid) { var t = CC.team(L, tid) || { name: tid ? 'Team ' + tid : '?' }; return { name: t.name, abbr: t.abbr, colour: t.colour }; };
+U.mark = function (L, tid) { var t = CC.team(L, tid) || { name: tid ? 'Team ' + tid : '?' }; return { name: t.name, abbr: t.abbr, colour: t.colour, alt: CC.talt(L, tid) || undefined }; };
 U.tabs = function (L, sec, list, S, active) {
   return U.tabsHTML(list.map(function (x, i) { return { key: x[0], label: x[1], href: CC.href(L, sec, null, S, i ? 'tab=' + x[0] : '') }; }), active);
 };

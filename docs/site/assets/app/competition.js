@@ -90,18 +90,19 @@ function pctCell(v, strong) { return isNum(v) ? (strong ? '<b class="fb-num">' +
 /* a probability cell washed in the accent, for reach / probability grids */
 function heatPct(v, colour) {
   if (!isNum(v)) return '<span class="qk-muted">—</span>';
-  var a = Math.round(Math.min(1, v) * 60);
+  var a = Math.round(Math.min(1, v) * 45);   // capped so white type keeps AA on the fullest cell
   return '<span class="fb-co-hp" style="background:color-mix(in srgb, ' + (colour || 'var(--signal)') + ' ' + a + '%, transparent)">' + pct(v, v < 0.1 && v > 0 ? 1 : 0) + '</span>';
 }
 function pctFmt(v) { return isNum(v) ? pct(v, v < 0.1 && v > 0 ? 1 : 0) : '—'; }
 /* A club's mark for the chance bars (crest where there is one, else the monogram). */
-function markOf(ctx, team) { var id = ctx.tidOf(team); return { name: team, logo: id ? FB.crestUrl(id) : null }; }
-/* Our chances as 538-style bars: rows [{team, p}] (sorted here). */
+function markOf(ctx, team) { var id = ctx.tidOf(team); return { name: team, logo: id ? FB.crestUrl(id) : null, colour: id ? FB.clubColour(id) : null }; }
+/* Our chances as 538-style bars (v4: club-colour blocks with the name inside when clubs_index.json has the colour, else
+   ours in blue): rows [{team, p}] (sorted here). */
 function chanceList(ctx, c, rows, opts) {
   var o = opts || {};
   var rs = rows.filter(function (r) { return isNum(r.p) && r.p > 0; });
   if (!rs.length) return cardMsg(o.empty || 'Nothing to show yet.');
-  return FB.chances(rs.map(function (r) { var id = ctx.tidOf(r.team); return { label: r.team, sub: r.sub, p: r.p, mark: markOf(ctx, r.team), href: id ? FB.href.club(id, { c: c.slug }) : null }; }),
+  return FB.chances(rs.map(function (r) { var id = ctx.tidOf(r.team); return { label: r.team, sub: r.sub, p: r.p, mark: markOf(ctx, r.team), color: id ? FB.clubColour(id) : null, href: id ? FB.href.club(id, { c: c.slug }) : null }; }),
     { limit: o.limit || 10, oursName: o.oursName || 'Our chance' });
 }
 function riskPct(v) { return heatPct(v, 'var(--c-8)'); }
@@ -312,13 +313,33 @@ FB.route('competition', function (el, p) {
       if (tabs.indexOf(tab) < 0) tab = 'overview';
       $(el, 'co-head').innerHTML = headHTML(c, d0, seasons);
       wirePicker(el, c, seasons, tab);
-      $(el, 'co-tabs').innerHTML = FB.subnav(tabs.map(function (t) { return [FB.href.comp(c.slug, t), tabLabel(c, t), t]; }), tab, c.name);
+      $(el, 'co-tabs').innerHTML = FB.subnav(tabs.map(function (t) { return [FB.href.comp(c.slug, t), tabLabel(c, t), t]; }), tab, c.name) + tabHead(c, tab);
       document.title = tabLabel(c, tab) + ' · ' + c.name + ' · The Quant Footballer';
       var fn = LIVE[tab];
       return fn(el, $(el, 'co-body'), c, d0, q, seasons);
     });
   });
 });
+
+/* v4: each tab opens with a Broadcast section head (the volt tag says the tab, the Bebas title the story); the
+   overview carries its own heads. */
+var TAB_HEAD = {
+  table: function (c) { return ['The table', 'Where every ' + (c.scope === 'international' ? 'side' : 'club') + ' stands now. Points decide it; the coloured bands show what each place is worth.']; },
+  fixtures: function () { return ['Every match. Our call on each.', 'Our home, draw and away chance before kick-off; the score and xG after it. Kick-off in your time zone.']; },
+  bracket: function () { return ['The road to the final', 'The ties as drawn, and our chance of each side reaching each round.']; },
+  odds: function (c) { return ['Who finishes where', 'Our chances from the simulated seasons' + (c.kind === 'cup' ? ' of the rest of the competition' : '') + ', and how they have moved run by run.']; },
+  power: function () { return ['Who is really good?', 'Our rating, luck against the chances (xG), the schedule so far and to come, and Elo through the season.']; },
+  players: function () { return ['The players behind it', 'Leaders, rates against the same role and the top-scorer race. Percentiles compare like with like: centre-backs with centre-backs.']; },
+  analytics: function () { return ['The numbers behind the results', 'Team of the week, the best XIs, styles, attack against defence, and points against expected points.']; },
+  clubs: function (c) { return ['Every ' + (c.scope === 'international' ? 'side' : 'club'), 'One page for each, across every competition it plays.']; },
+  seasons: function () { return ['Every edition on record', 'Champions, sources and how complete each season is.']; }
+};
+function tabHead(c, tab) {
+  var f = TAB_HEAD[tab];
+  if (!f) return '';
+  var t = f(c);
+  return '<div class="fb-co-tabhead">' + QK.sectionHead({ kicker: tabLabel(c, tab), title: t[0], sub: t[1] }) + '</div>';
+}
 
 /* The header: name, kind, season picker, meta line, banners. d = {meta, fixtures} for a live season, doc for a past one. */
 function headHTML(c, d, seasons, doc) {
@@ -430,19 +451,22 @@ LIVE.overview = function (el, body, c, d0, q, seasons) {
     var played = fx.filter(function (f) { return f.status === 'finished'; });
     var upcoming = fx.filter(function (f) { return f.status === 'scheduled' || f.status === 'live'; });
     body.innerHTML = FB.kpis(kp) +
+      '<section class="qk-section fb-co-sec">' + QK.sectionHead({ kicker: 'Matches', title: 'Next up. Just played.', sub: 'Our home, draw and away chance for each match to come; the score and xG for each one played.' }) +
       FB.grid(
         FB.card('Coming up', 'Our home, draw and away chance for each; kick-off in your time zone.', upcoming.length ? '<div class="fb-fxlist">' + upcoming.slice(0, 8).map(function (f) { return FB.fixtureRow(f, { slug: c.slug, date: true, round: true }); }).join('') + '</div>' : cardMsg('No fixtures scheduled.'), { span: 6, foot: '<span></span><a href="' + esc(FB.href.comp(c.slug, 'fixtures')) + '">All fixtures →</a>' }) +
         FB.card('Latest results', 'Score and xG; the score opens the match centre.', played.length ? '<div class="fb-fxlist">' + played.slice(-8).reverse().map(function (f) { return FB.fixtureRow(f, { slug: c.slug, date: true, round: true }); }).join('') + '</div>' : cardMsg('No results yet.'), { span: 6, foot: '<span></span><a href="' + esc(FB.href.comp(c.slug, 'fixtures', { view: 'played' })) + '">All results →</a>' })
-      , 'fb-mt') +
+      ) + '</section>' +
+      '<section class="qk-section fb-co-sec">' + QK.sectionHead({ kicker: last ? 'Last edition' : 'Title race', title: last ? 'How it finished' : 'Who wins ' + winnerWord(c) + '?', sub: last ? '' : 'Our chances from ' + FB.int(m.n_sims || 0) + ' simulated seasons, beside the players leading the way.' }) +
       FB.grid(
         FB.card('Who wins ' + esc(winnerWord(c)), last ? 'This edition is over.' : 'Our chance of winning ' + esc(winnerWord(c)) + ', from ' + FB.int(m.n_sims || 0) + ' simulated seasons.', '<div id="co-race"></div>', { span: 7, foot: last ? '' : '<span>Top ten</span><a href="' + esc(FB.href.comp(c.slug, 'odds')) + '">Every club\'s chances →</a>' }) +
         FB.card('Leaders', 'This season, every player in the competition.', '<div id="co-leaders" class="fb-co-minis"></div>', { span: 5, foot: '<span></span><a href="' + esc(FB.href.comp(c.slug, 'players')) + '">All players →</a>' })
-      , 'fb-mt') +
-      '<div id="co-hist-wrap"></div>' +
+      ) +
+      '<div id="co-hist-wrap"></div></section>' +
+      '<section class="qk-section fb-co-sec">' + QK.sectionHead({ kicker: 'Behind the numbers', title: 'How we model it', sub: 'The settings, the record and the format behind this competition’s pages, and every season we have.' }) +
       FB.grid(
         FB.card('How this competition is modelled', esc(c.name) + ': the model settings, calibration and format behind its pages.', modelCard(c, d), { span: 7, foot: '<span></span><a href="#/model/methodology?c=' + esc(FB.enc(c.slug)) + '">Full methodology →</a>' }) +
         FB.card('Every season', seasons.length + ' edition' + (seasons.length === 1 ? '' : 's') + ' on record.', seasonPills(c, seasons, FB.currentSeason(c).sid), { span: 5 })
-      , 'fb-mt');
+      ) + '</section>';
     // race
     var race = probs.map(function (pp) { return { team: pp.team, p: has(pp[fk]) ? pp[fk] : (pp.p_title || 0) }; }).sort(function (a, b) { return b.p - a.p; }).filter(function (r) { return r.p > 0; }).slice(0, 10);
     var rb = $(el, 'co-race');

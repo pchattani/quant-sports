@@ -433,6 +433,8 @@ def write_careers(write: Callable[[str, Any], None], rows_by_season: dict[int, d
     """players/<pid>.json for every player with enough volume in some season; returns the players_index entries
     {pid: [name, team, pos, first_season, last_season]}. Placeholder ids (`real_pid` false, e.g. "0") are skipped."""
     ppl = people.people()
+    # the jersey number for the player hero: the current season's weekly rosters, else the players release's latest
+    nums = people.season_numbers(current_season)
     by: dict[str, list] = {}
     for s, rows in sorted(rows_by_season.items()):
         for pid, r in (rows or {}).items():
@@ -456,6 +458,7 @@ def write_careers(write: Callable[[str, Any], None], rows_by_season: dict[int, d
         payload = {"ok": True, "id": pid, "name": p.get("name") or last.get("name"), "pos": p.get("pos") or last.get("pos"),
                    "group": last.get("group"), "college": p.get("college"), "draft": p.get("draft"), "dob": p.get("dob"),
                    "height": p.get("height"), "weight": p.get("weight"),
+                   "number": nums.get(pid) if nums.get(pid) is not None else p.get("number"),
                    "seasons": [{"season": r["season"], "team": r.get("team"), "group": r.get("group"), "role": r.get("role"), "games": r.get("games"),
                                 "qualified": r.get("qualified"), "age": r.get("age"), **(r.get("values") or {}),
                                 "plus": r.get("plus") or {}, "epa": _epa_of(r), "value": _value_of(r)} for r in seasons],

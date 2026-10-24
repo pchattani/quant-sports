@@ -1,4 +1,4 @@
-/* The Quant Bullpen — leaderboards (#/<L>/leaders), on Design System 2.0: controls, the top 15 as a chart coloured by
+/* The Quant Bullpen — leaderboards (#/<L>/leaders), on kit v4 "Broadcast": the black power list, controls, the top 15 as a chart coloured by
  * percentile, the board as a v2 leaderboard with percentile heat cells, and top-five cards on the spec's headline metrics.
  *
  * Any catalogue metric for hitters or pitchers, or any per-pitch arsenal metric for one pitch
@@ -19,6 +19,12 @@ const ALIAS = { stuff_plus: ['stuff_plus', 'stuff'], location_plus: ['location_p
   spin: ['spin', 'spin_rate'], vaa: ['vaa'], ext: ['ext', 'extension'], whiff_pct: ['whiff_pct', 'whiff'], csw_pct: ['csw_pct', 'csw'], rv: ['rv', 'run_value'], rv100: ['rv100', 'rv_per_100'], usage: ['usage', 'usage_pct'], xwoba_plus: ['xwoba_plus', 'xwoba', 'xwoba_against'] };
 const LOWER_ARS = { xwoba_plus: true };
 
+/* v4: Who's hot, the black power list: the top name on five boards (the index's leaders, as on the overview) */
+function hotBand(L) {
+  const src = L === 'mlb' ? (BP.index() || {}) : (BP.levelInfo(L) || {});
+  const hot = BP.ui.hotItems ? BP.ui.hotItems(src.leaders || {}, L) : [];
+  return hot.length ? QK.band(QK.sectionHead({ kicker: 'Who’s hot', title: 'The leaders, board by board', sub: 'The top name on five boards, the next best behind, and a line on what the number means.' }) + QK.hotRow(hot)) : '';
+}
 function render(el, params, state) {
   const k = K();
   const U = BP.ui;
@@ -29,6 +35,7 @@ function render(el, params, state) {
   if (q.pt) S0.pt = q.pt;
   el.innerHTML = QK.sectionHead({ kicker: 'Leaderboards · ' + k.LN(L), title: 'Leaderboards', sub: 'Any metric for hitters, pitchers or one pitch type, best or worst first, with the sample floor in your hands. Percentile cells rank each player against everyone past the floor (100 = best).' }) +
     QK.note('A <b>90th percentile</b> means better than 90 in 100 of the players past the floor. Rates need a sample: early in a season the floor is prorated, so small samples are kept out.') +
+    hotBand(L) +
     '<section class="qk-card"><div class="qk-card-body"><div class="bp-ctl">' +
     U.seg('ld-kind', 'Board', [['hitter', 'Hitters'], ['pitcher', 'Pitchers'], ['pitch', 'Pitch types']], S0.kind) +
     '<label id="ld-pt-l">Pitch type<select id="ld-pt"></select></label>' +

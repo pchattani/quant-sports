@@ -451,7 +451,9 @@ function hero(C) {
   var mv = 0, nmv = 0;
   sq.forEach(function (x) { if (isNum(x.mv)) { mv += x.mv; nmv++; } });
   var ages = sq.map(function (x) { return x.age; }).filter(isNum);
+  /* v4 chips on the hero (QK.playerHeader meta: HTML items keep their links) */
   var meta = [];
+  if (FB.hasCrest(doc.id)) meta.push('<span class="fb-cl-crest">' + FB.crest(doc.id, doc.name, 'sm') + '</span>');
   if (doc.national) meta.push('<span>National team</span>');
   if (home) meta.push('<span>' + FB.compLink(home.slug) + '</span>');
   if (doc.country && !doc.national) meta.push('<span>' + esc(doc.country) + '</span>');
@@ -466,15 +468,17 @@ function hero(C) {
   if (curY && curY.played) tiles.push(FB.kpi(curY.era + ' record', curY.w + '-' + curY.d + '-' + curY.l, { text: false, sub: 'won, drawn, lost · ' + curY.played + ' played' }));
   if (curY && curY.played) tiles.push(FB.kpi('Points a game', num(ppgOf(curY), 2), { sub: 'every competition, ' + esc(curY.era) }));
   tiles.push(FB.kpi('Trophies on record', String(trophies), { sub: years.length + ' season' + (years.length === 1 ? '' : 's') + ' in the data' }));
-  /* v3: "The short version" in plain English, beside the name */
+  /* "The short version" in plain English, the explain strip under the hero */
   var short = '';
   if (curY && curY.played) short = doc.name + ' have won ' + curY.w + ', drawn ' + curY.d + ' and lost ' + curY.l + ' of ' + curY.played + ' in ' + curY.era + (curY.comps > 1 ? ' across ' + curY.comps + ' competitions' : '') + ', ' + num(ppgOf(curY), 2) + ' points a game.';
   if (isNum(pool.strength) && rated) short += (short ? ' ' : '') + 'Our rating puts them at ' + num(pool.strength, 2) + ' points a game against an average side anywhere' + (isNum(pool.rank) ? ', ' + FB.ordinal(pool.rank) + ' of every ' + (doc.national ? 'national team' : 'club') + ' on one scale' : '') + '.';
   if (curY && curY.played && curY.played < 8) short += ' Early days: ' + curY.played + ' matches is a small sample.';
-  return '<section class="qk-hero fb-cl-hero"><div class="qk-hero-in">' + FB.crest(doc.id, doc.name, 'lg') +
-    '<div class="fb-cl-hero-t"><div class="qk-sh-kicker">' + esc(doc.national ? 'National team' : 'Club') + (live.length ? ' · this season in ' + live.map(function (s) { return FB.compName(s, true); }).join(', ') : '') + '</div>' +
-    '<h1>' + esc(doc.name) + '</h1><div class="qk-hero-meta">' + meta.join('') + '</div></div>' + (short ? '<div class="fb-cl-short">' + QK.shortVersion(short) + '</div>' : '') + '</div></section>' +
-    (tiles.length ? FB.kpis(tiles, 'fb-cl-tiles') : '');
+  /* v4 (Broadcast): the club as the full-bleed team-colour hero (QK.playerHeader: the club's kit colour and its
+     alternate from clubs_index.json, else cobalt; the club's short code outlined where a player's number goes, the name
+     in Bebas, chips), the black strip of its numbers, and "The short version" as the explain strip */
+  return FB.crumb([['#/clubs', doc.national ? 'National teams' : 'Clubs'], home ? [FB.href.comp(home.slug), home.name] : null, doc.name].filter(Boolean)) + QK.playerHeader({ name: doc.name, face: FB.clubCode(doc.name), colour: FB.clubColour(doc.id), alt: FB.clubAlt(doc.id),
+    kicker: (doc.national ? 'National team' : 'Club') + (live.length ? ' · this season in ' + live.map(function (s) { return FB.compName(s, true); }).join(', ') : ''),
+    meta: meta, strip: tiles, short: short || null });
 }
 function filterBar(C, q, tab) {
   if (tab === 'squad' || tab === 'transfers') return '';
@@ -561,7 +565,7 @@ function drawYears(body, C, q) {
       yb.name = 'Points per game'; yb.nameLocation = 'end'; yb.nameGap = 8; yb.nameTextStyle.align = 'right';
       return {
         grid: { left: 8, right: 8, top: gT, bottom: gB, containLabel: true },
-        legend: { top: 0, right: 0, icon: 'roundRect', itemWidth: 10, itemHeight: 10, textStyle: { color: T.ink2 } },
+        legend: { top: 0, right: 0, icon: 'rect', itemWidth: 10, itemHeight: 10, textStyle: { color: T.ink2 } },
         tooltip: QKC.tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: QKC.hexA(T.ink1, 0.04) } } }),
         xAxis: xa,
         yAxis: [ya, yb],

@@ -23,20 +23,20 @@ body.qk { font-size: var(--fs-md); }
 .qk #app a:not([class]):hover { text-decoration: underline; text-underline-offset: 3px; }
 
 .qk .card {
-  background: var(--s-1); border: 1px solid var(--line-1); border-radius: var(--r-card); box-shadow: var(--sh-1);
+  background: var(--s-1); border: 1px solid var(--line-1); border-radius: 0; box-shadow: var(--sh-1);
   margin-bottom: var(--sp-5); overflow: hidden;
 }
 /* the legacy card head reads as a kit card title (the display face), its sub-line in the UI face */
 .qk .card-header {
   background: transparent; border-bottom: 1px solid var(--line-1); color: var(--ink-1);
-  font: 600 1.1875rem/1.25 var(--font-display); font-variation-settings: var(--fvs-display); letter-spacing: -0.015em; padding: 18px 22px 14px;
+  font: 600 1.1875rem/1.25 var(--font-display); letter-spacing: -0.015em; padding: 18px 22px 14px;
 }
 .qk .card-sub { color: var(--ink-3); font: 500 var(--fs-xs)/1.45 var(--font-ui); letter-spacing: 0; }
 @media (max-width: 640px) { .qk .card-header { padding: 14px 18px 12px; } }
 .qk .muted { color: var(--ink-3); }
 .qk .muted-inline { color: var(--ink-3); }
 .qk .page-head h2 { font-size: var(--fs-xl); font-weight: 800; letter-spacing: -0.02em; }
-.qk .ph-nav a { border-color: var(--line-2); border-radius: var(--r-2); color: var(--ink-2); }
+.qk .ph-nav a { border-color: var(--line-2); border-radius: 0; color: var(--ink-2); }
 .qk .ph-nav a:hover { border-color: var(--line-3); color: var(--ink-1); }
 .qk .grid-2, .qk .grid-3 { gap: var(--sp-4); }
 
@@ -51,12 +51,12 @@ body.qk { font-size: var(--fs-md); }
 .qk .wc-table tbody tr:hover { background: var(--s-2); }
 .qk .wc-table tr.row-link { cursor: pointer; }
 
-.qk .kpi { background: var(--s-1); border: 1px solid var(--line-1); border-radius: var(--r-tile, 18px); padding: 14px 16px; }
+.qk .kpi { background: var(--s-1); border: 1px solid var(--line-1); border-radius: 0; padding: 14px 16px; }
 .qk .kpi-label { color: var(--ink-3); font: 600 var(--fs-2xs)/1.2 var(--font-ui); letter-spacing: 0; }
-.qk .kpi-value { font-family: var(--font-display); font-variation-settings: var(--fvs-display); font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.qk .kpi-value { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .qk .kpi-sub { color: var(--ink-3); }
 
-.qk .chip { border-color: var(--line-2); color: var(--ink-2); background: var(--s-2); border-radius: 6px; }
+.qk .chip { border-color: var(--line-2); color: var(--ink-2); background: var(--s-2); border-radius: 0; }
 .qk .tbtn { border-color: var(--line-2); color: var(--ink-2); font: 600 var(--fs-xs) var(--font-ui); padding: 4px 11px; }
 .qk .tbtn:hover { border-color: var(--line-3); color: var(--ink-1); }
 .qk .tbtn.active, .qk .tbtn.on { background: color-mix(in srgb, var(--accent) 16%, var(--s-1)); border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--ink-1); }
@@ -65,24 +65,24 @@ body.qk { font-size: var(--fs-md); }
 .qk .seg-tabs a { color: var(--ink-3); font-weight: 600; cursor: pointer; }
 .qk .seg-tabs a.active, .qk .seg-tabs a:hover { color: var(--ink-1); border-bottom-color: var(--accent); }
 .qk select, .qk input[type="search"], .qk input[type="text"], .qk input[type="number"] {
-  background: var(--s-2); color: var(--ink-1); border: 1px solid var(--line-2); border-radius: var(--r-2); font-family: var(--font-ui);
+  background: var(--s-2); color: var(--ink-1); border: 1px solid var(--line-2); border-radius: 0; font-family: var(--font-ui);
 }
 .qk select { min-height: 30px; }
 .qk input[type="range"] { accent-color: var(--accent); }
 
-.qk .gc { background: var(--s-1); border-color: var(--line-1); border-radius: var(--r-3); }
+.qk .gc { background: var(--s-1); border-color: var(--line-1); border-radius: 0; }
 .qk .gc:hover { border-color: var(--line-3); }
 .qk .gc-live { border-color: color-mix(in srgb, var(--live) 45%, transparent); }
 .qk .pct-bar { background: var(--s-3); }
-.qk .error-banner { background: color-mix(in srgb, var(--down) 14%, var(--s-1)); color: var(--ink-1); border: 1px solid color-mix(in srgb, var(--down) 45%, transparent); border-radius: var(--r-2); padding: 10px 12px; margin-bottom: 12px; }
+.qk .error-banner { background: color-mix(in srgb, var(--down) 14%, var(--s-1)); color: var(--ink-1); border: 1px solid color-mix(in srgb, var(--down) 45%, transparent); border-radius: 0; padding: 10px 12px; margin-bottom: 12px; }
 .qk .prose-dark { color: var(--ink-2); }
 .qk .prose-dark h5, .qk .prose-dark h3, .qk .prose-dark h4 { color: var(--ink-1); }
 .qk .legal h5 { font-size: var(--fs-md); margin: 18px 0 6px; }
-.qk code { font-family: var(--font-num); background: var(--s-2); padding: 1px 5px; border-radius: 4px; }
-.qk .team-bar { border-radius: 2px; }
+.qk code { font-family: var(--font-num); background: var(--s-2); padding: 1px 5px; border-radius: 0; }
+.qk .team-bar { border-radius: 0; }
 .qk details summary { cursor: pointer; }
 .qk .vv-tabs { display: none; }                 /* the Value & Moves section tabs replace the old strip */
-.rk-plot-wait { min-height: 120px; border-radius: var(--r-2); background: linear-gradient(90deg, var(--s-2), var(--s-3), var(--s-2)); background-size: 200% 100%; animation: rk-shim 1.3s linear infinite; }
+.rk-plot-wait { min-height: 120px; border-radius: 0; background: linear-gradient(90deg, var(--s-2), var(--s-3), var(--s-2)); background-size: 200% 100%; animation: rk-shim 1.3s linear infinite; }
 @keyframes rk-shim { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .rk-plot-wait { animation: none; } }
 
@@ -132,7 +132,7 @@ body.qk { font-size: var(--fs-md); }
 .rk-note a { color: var(--accent); }
 .rk-cards { display: grid; gap: var(--sp-4); }
 .rk-mini-grid { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
-.rk-teamtile { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; background: var(--s-1); border: 1px solid var(--line-1); border-radius: var(--r-3); min-width: 0; position: relative; overflow: hidden; }
+.rk-teamtile { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; background: var(--s-1); border: 1px solid var(--line-1); border-radius: 0; min-width: 0; position: relative; overflow: hidden; }
 .rk-teamtile::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--tc, var(--accent)); }
 .rk-teamtile:hover { border-color: var(--line-3); }
 .rk-teamtile .top { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -140,9 +140,9 @@ body.qk { font-size: var(--fs-md); }
 .rk-teamtile .rec { margin-left: auto; font: 600 var(--fs-sm) var(--font-num); }
 .rk-teamtile .row { display: flex; justify-content: space-between; font-size: var(--fs-xs); color: var(--ink-3); gap: 8px; }
 .rk-teamtile .row b { color: var(--ink-1); font-family: var(--font-num); font-weight: 600; }
-.rk-bar { height: 6px; border-radius: 3px; background: var(--s-3); overflow: hidden; }
-.rk-bar > span { display: block; height: 100%; background: var(--tc, var(--c-1)); border-radius: 3px; }
-.rk-grade { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; font: 800 12px var(--font-ui); color: var(--ink-1); background: var(--s-3); flex: none; }
+.rk-bar { height: 6px; border-radius: 0; background: var(--s-3); overflow: hidden; }
+.rk-bar > span { display: block; height: 100%; background: var(--tc, var(--c-1)); border-radius: 0; }
+.rk-grade { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 0; font: 800 12px var(--font-ui); color: var(--ink-1); background: var(--s-3); flex: none; }
 .rk-grade[data-g="A"] { background: color-mix(in srgb, var(--div-pos) 65%, var(--s-1)); color: var(--ink-1); }
 .rk-grade[data-g="B"] { background: color-mix(in srgb, var(--div-pos) 32%, var(--s-1)); }
 .rk-grade[data-g="D"] { background: color-mix(in srgb, var(--div-neg) 30%, var(--s-1)); }
@@ -170,7 +170,7 @@ body.qk { font-size: var(--fs-md); }
 .rk-pills { display: flex; gap: 6px; flex-wrap: wrap; }
 .rk-strip { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
 .rk-strip::-webkit-scrollbar { display: none; }
-.rk-strip a { flex: none; display: grid; justify-items: center; gap: 2px; min-width: 58px; padding: 7px 8px; border-radius: var(--r-2); border: 1px solid var(--line-1); background: var(--s-1); font-size: var(--fs-2xs); color: var(--ink-3); }
+.rk-strip a { flex: none; display: grid; justify-items: center; gap: 2px; min-width: 58px; padding: 7px 8px; border-radius: 0; border: 1px solid var(--line-1); background: var(--s-1); font-size: var(--fs-2xs); color: var(--ink-3); }
 .rk-strip a b { font: 700 var(--fs-md) var(--font-num); color: var(--ink-1); }
 .rk-strip a[aria-current="page"] { border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: var(--accent-soft); color: var(--ink-1); }
 .rk-strip a:hover { border-color: var(--line-3); }
@@ -183,7 +183,7 @@ body.qk { font-size: var(--fs-md); }
 .qk .qk-table .neg { color: var(--down); }
 .qk .qk-table .pos { color: var(--up); }
 .rk-inj { color: var(--down); font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0; text-transform: none; }
-.rk-pos { display: inline-grid; place-items: center; min-width: 22px; height: 18px; padding: 0 4px; border-radius: 4px; background: var(--s-3); font: 700 10px var(--font-ui); color: var(--ink-2); }
+.rk-pos { display: inline-grid; place-items: center; min-width: 22px; height: 18px; padding: 0 4px; border-radius: 0; background: var(--s-3); font: 700 10px var(--font-ui); color: var(--ink-2); }
 .rk-teamhead { display: flex; gap: var(--sp-5); align-items: center; flex-wrap: wrap; position: relative; }
 .rk-teamhead .qk-hero-stats { margin-left: auto; }
 .rk-num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
@@ -229,7 +229,7 @@ body.qk { font-size: var(--fs-md); }
 .rk-info { color: var(--ink-3); cursor: help; font-size: var(--fs-xs); }
 .rk-note b { color: var(--ink-1); }
 .rk-mv { display: inline-flex; align-items: center; gap: 8px; min-width: 120px; justify-content: flex-end; }
-.rk-mv-t { display: inline-flex; width: 76px; height: 8px; border-radius: 4px; overflow: hidden; background: var(--s-3); flex: none; }
+.rk-mv-t { display: inline-flex; width: 76px; height: 8px; border-radius: 0; overflow: hidden; background: var(--s-3); flex: none; }
 .rk-mv-t span { display: block; height: 100%; }
 .rk-mv b { font: 600 var(--fs-sm) var(--font-num); min-width: 3.2ch; text-align: right; }
 .rk-mv-note { font-size: var(--fs-xs); }
@@ -265,7 +265,7 @@ body.qk { font-size: var(--fs-md); }
 /* compare picker: pills with the slot colour */
 .rk-cmp-pick { display: flex; gap: 10px; flex-wrap: wrap; }
 .rk-cmp-slot { display: grid; gap: 6px; flex: 1 1 220px; min-width: 0; }
-.rk-cmp-slot .qk-input { border-radius: var(--r-pill); border: 1.5px solid color-mix(in srgb, var(--ec) 55%, var(--line-2)); padding-left: 16px; width: 100%; }
+.rk-cmp-slot .qk-input { border-radius: 0; border: 1.5px solid color-mix(in srgb, var(--ec) 55%, var(--line-2)); padding-left: 16px; width: 100%; }
 @media (max-width: 640px) { .rk-tiles { margin-top: var(--sp-6); } }
 .rk-cmp-slot { border-left: 0 !important; padding-left: 0 !important; }
 
@@ -275,7 +275,7 @@ body.qk { font-size: var(--fs-md); }
 .rk-howsure:empty { display: none; }
 .rk-noteblock { max-width: 860px; }
 .rk-sub > .qk-note:first-child, .rk-note-top { margin: 0 0 var(--sp-5); }
-.rk-hot { margin: 0 0 var(--sp-8); }
+.rk-hot { margin-bottom: var(--sp-8); }
 
 /* ═════════════════════════════════ 7. kit v4 (Broadcast) reference pages */
 .rk-crumb { font: 700 var(--fs-xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; }
@@ -292,3 +292,28 @@ body.qk { font-size: var(--fs-md); }
 .rk-lead .v { font: 400 1.375rem/1 var(--font-display); }
 .rk-score, .rk-gh .side .nm, .rk-teamtile .big { font-weight: 400; letter-spacing: 0.01em; }
 .rk-teamtile .big { font-size: 1.5rem; }
+
+/* ═════════════════════════════════ 8. kit v4 (Broadcast): standings, teams, team page, players, value, fantasy, lab,
+   model, glossary */
+.rk-page .qk-blk + .qk-sh, .qk-blk + .qk-sh { margin-top: var(--sec-gap); }
+.qk-blk.rk-hot { margin-top: var(--sec-gap); margin-bottom: var(--sec-gap); }
+/* a club tile carries its colour as the card's top rule (the Broadcast card), not a thin left edge */
+.rk-teamtile { border-top: 0; }
+.rk-teamtile::before { left: 0; right: 0; top: 0; bottom: auto; width: auto; height: 5px; }
+.rk-teamtile .top { margin-top: 3px; }
+.rk-teamtile .nm { font: 800 var(--fs-md)/1.1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.03em; }
+/* the club hero's outlined abbreviation: three letters fit the number slot */
+.qk-ph-num.txt { letter-spacing: 0.02em; }
+.rk-day.rk-grp b { font: 400 1.5rem/1 var(--font-display); letter-spacing: 0.01em; text-transform: uppercase; }
+/* the legacy views' toggles and tabs read as the kit's segmented control: a 2 px frame, condensed capitals, the
+   pressed one filled white (no ice-blue fills) */
+.qk .pg-toggle, .qk .gq-toggle, .qk .gq-tabs { border: 2px solid var(--ink-1); background: transparent; }
+.qk .pg-toggle button, .qk .gq-toggle button, .qk .gq-tabs button { background: transparent; color: var(--ink-2); font: 700 12px/1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; padding: 6px 11px; }
+.qk .pg-toggle button + button, .qk .gq-toggle button + button, .qk .gq-tabs button + button { border-left: 0; }
+.qk .pg-toggle button:hover, .qk .gq-toggle button:hover, .qk .gq-tabs button:hover { color: var(--ink-1); }
+.qk .pg-toggle button.on, .qk .gq-toggle button.on, .qk .gq-tabs button.on { background: var(--ink-1); color: var(--ink-inv); }
+.qk .gq-toggle button:disabled { color: var(--ink-3); background: transparent; }
+.qk .vv-tab { font: 700 12px/1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; padding: 7px 12px; border: 2px solid var(--line-2); color: var(--ink-2); }
+.qk .vv-tab.on { background: var(--ink-1); color: var(--ink-inv); border-color: var(--ink-1); }
+.qk .day-strip a.on { border-color: var(--volt); background: var(--block); color: var(--ink-1); }
+.qk-blk.rk-hot-top { margin-top: var(--sp-5); }

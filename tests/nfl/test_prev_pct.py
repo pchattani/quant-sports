@@ -28,3 +28,21 @@ def test_write_careers_carries_prev_fields():
     CR.write_careers(lambda rel, p: written.__setitem__(rel, p), rows, {"1": blk}, None, 2026)
     cur = written["players/1.json"]["current"]
     assert cur["prev_pct_role"] == {"d_sacks": 90} and cur["prev_peer"] == {"season": 2025} and "prev_pct_pos" not in cur
+
+
+def test_write_careers_carries_the_jersey_number(monkeypatch):
+    """The player hero's outlined number: the season's weekly rosters first, the players release's latest second."""
+    import pandas as pd
+    from oddsmarkets.nfl.analytics import context, people
+    monkeypatch.setattr(people, "people", lambda: {"00-1": {"name": "A", "number": 9}, "00-2": {"name": "B", "number": 33}})
+    wk = pd.DataFrame({"gsis_id": ["00-1", "00-1", "00-3"], "week": [2, 1, 1], "jersey_number": [12.0, 4.0, None]})
+    monkeypatch.setattr(context, "load_release", lambda name, season, cols=None, kind=None: wk if name == "weekly_rosters" else None)
+    assert people.season_numbers(2026) == {"00-1": 12}               # the latest week wins; a missing number is skipped
+    rows = {2026: {p: {"season": 2026, "group": "QB", "values": {"games": 10}, "name": p} for p in ("00-1", "00-2", "00-3")}}
+    written = {}
+    blocks = {p: {"season": 2026, "group": "QB"} for p in rows[2026]}   # current blocks: every file is written
+    CR.write_careers(lambda rel, p: written.__setitem__(rel, p), rows, blocks, None, 2026)
+    assert written["players/00-1.json"]["number"] == 12
+    assert written["players/00-2.json"]["number"] == 33
+    assert written["players/00-3.json"]["number"] is None
+    assert people.jersey("07") == 7 and people.jersey(150) is None

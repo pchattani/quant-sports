@@ -181,7 +181,8 @@ def test_front_end_files_and_older_browser_rule():
         assert "??" not in src, p.name
     html = (FRONT / "index.html").read_text(encoding="utf-8")
     assert '<html lang="en-GB" data-sport="college" data-theme="dark">' in html
-    assert 'name="color-scheme" content="dark"' in html and "Fraunces" in html and "Archivo" not in html
+    assert 'name="color-scheme" content="dark"' in html and "Bebas+Neue" in html and "Barlow" in html
+    assert "Fraunces" not in html and "Archivo" not in html
     assert "qc-notice-v1" in html and "not affiliated" in html and "College Football Playoff" in html
     # cc-metrics.js (the generated comparison metric sets) is loaded on demand by cc-core.js, not by a script tag
     lazy = {"cc-metrics.js"}

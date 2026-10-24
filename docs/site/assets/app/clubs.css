@@ -1,9 +1,9 @@
 /* The Quant Footballer — Clubs: directory and the club page (fb-cl- prefix). */
 .fb-cl-find { position: relative; width: min(340px, 100%); }
 .fb-cl-find .qk-input { width: 100%; }
-.fb-cl-find-r { position: absolute; z-index: 20; left: 0; right: 0; top: 40px; margin: 0; padding: 6px; list-style: none; background: var(--s-1); border: 1px solid var(--line-2); border-radius: var(--r-3); box-shadow: var(--sh-3); max-height: 360px; overflow: auto; }
+.fb-cl-find-r { position: absolute; z-index: 20; left: 0; right: 0; top: 40px; margin: 0; padding: 6px; list-style: none; background: var(--s-1); border: 1px solid var(--line-2); border-radius: 0; box-shadow: var(--sh-3); max-height: 360px; overflow: auto; }
 .fb-cl-find-r[hidden] { display: none; }
-.fb-cl-find-r a { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 7px 8px; border-radius: var(--r-2); font-size: var(--fs-sm); }
+.fb-cl-find-r a { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 7px 8px; border-radius: 0; font-size: var(--fs-sm); }
 .fb-cl-find-r a:hover { background: var(--s-2); }
 .fb-cl-find-r .n { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fb-cl-find-r .s { color: var(--ink-3); font-size: var(--fs-2xs); white-space: nowrap; }
@@ -13,14 +13,13 @@
 .fb-cl-price .qk-stats { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .fb-cl-price .qk-wpbar { max-width: 760px; }
 
-/* club hero and bar */
-.fb-cl-hero .qk-team-mark.lg { width: 72px; height: 72px; }
-.fb-cl-hero-t { min-width: 0; }
-.fb-cl-hero h1 { margin: 4px 0 0; font-family: var(--font-display); font-variation-settings: var(--fvs-display); font-weight: 650; letter-spacing: -0.01em; line-height: 1.05; overflow-wrap: anywhere; }
-.fb-cl-tiles { margin-top: var(--sp-3); }
+/* club hero (v4: QK.playerHeader, the crest as the first chip) and bar */
+.qk-ph-meta .fb-cl-crest { padding: 0; background: transparent; display: inline-flex; align-items: center; }
+.qk-ph-meta .fb-cl-crest .qk-team-mark { width: 28px; height: 28px; background: #fff; }
+.qk-ph + .qk-strip + .qk-ph-short + .fb-cl-bar, .qk-ph + .qk-strip + .fb-cl-bar { margin-top: var(--sp-6); }
 .fb-cl-gcs { display: grid; gap: var(--sp-3); }
 .fb-cl-gcs > .qk-kicker { margin: 2px 0 -4px; }
-.fb-cl-hero .qk-hero-meta .fb-comp { color: var(--ink-1); }
+.qk-ph-meta .fb-comp { color: inherit; }
 .fb-cl-bar { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line-1); }
 .fb-cl-bar .fb-subnav .qk-tabs { border-bottom: 0; }
 .fb-cl-bar .fb-subnav { min-width: 0; max-width: 100%; }
@@ -46,7 +45,7 @@
 
 /* most used */
 .fb-cl-most { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
-.fb-cl-mp { display: grid; gap: 3px; padding: 10px 12px; border: 1px solid var(--line-1); border-radius: var(--r-2); background: var(--s-2); min-width: 0; }
+.fb-cl-mp { display: grid; gap: 3px; padding: 10px 12px; border: 1px solid var(--line-1); border-radius: 0; background: var(--s-2); min-width: 0; }
 .fb-cl-mp:hover { border-color: var(--line-3); }
 .fb-cl-mp-n { font-weight: 600; font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fb-cl-mp-s { color: var(--ink-3); font-size: var(--fs-xs); }
@@ -55,7 +54,7 @@
 .fb-cl-era { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-bottom: var(--sp-3); }
 .fb-cl-era h2 { font-size: var(--fs-xl); display: flex; align-items: center; gap: 8px; }
 .fb-cl-tot { color: var(--ink-2); font-size: var(--fs-sm); }
-.fb-cl-trophy { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: var(--r-pill); font: 700 11px/1 var(--font-ui); color: var(--sun); background: color-mix(in srgb, var(--sun) 16%, transparent); white-space: nowrap; }
+.fb-cl-trophy { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: 0; font: 700 11px/1 var(--font-ui); color: var(--sun); background: color-mix(in srgb, var(--sun) 16%, transparent); white-space: nowrap; }
 .fb-cl-trophy::before { content: "★"; font-size: 9px; }
 .fb-cl-win { color: var(--ink-1); }
 .fb-cl-pos { margin-top: var(--sp-4); }
@@ -63,12 +62,12 @@
 .fb-cl-pos h3 { font-size: var(--fs-sm); color: var(--coral); margin: 0 0 6px; }
 
 /* results, grades, budgets */
-.fb-cl-res { display: inline-block; min-width: 54px; padding: 1px 6px; border-radius: 4px; font: 600 var(--fs-xs) var(--font-num); text-align: center; background: var(--s-3); }
+.fb-cl-res { display: inline-block; min-width: 54px; padding: 1px 6px; border-radius: 0; font: 600 var(--fs-xs) var(--font-num); text-align: center; background: var(--s-3); }
 .fb-cl-res.r-W { background: color-mix(in srgb, var(--st-good) 22%, transparent); color: var(--ink-1); }
 .fb-cl-res.r-L { background: color-mix(in srgb, var(--st-crit) 22%, transparent); color: var(--ink-1); }
-.fb-cl-grade { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; font: 800 11px var(--font-num); color: var(--bg); background: var(--ink-3); }
+.fb-cl-grade { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 0; font: 800 11px var(--font-num); color: var(--bg); background: var(--ink-3); }
 .fb-cl-grade.g-A { background: var(--st-good); } .fb-cl-grade.g-B { background: color-mix(in srgb, var(--st-good) 55%, var(--st-warn)); } .fb-cl-grade.g-C { background: var(--st-warn); } .fb-cl-grade.g-D { background: var(--st-serious); } .fb-cl-grade.g-E { background: var(--st-crit); }
-.fb-cl-aff { font: 700 11px var(--font-ui); padding: 2px 8px; border-radius: var(--r-pill); }
+.fb-cl-aff { font: 700 11px var(--font-ui); padding: 2px 8px; border-radius: 0; }
 .fb-cl-aff.a-yes { color: var(--st-good); background: color-mix(in srgb, var(--st-good) 14%, transparent); }
 .fb-cl-aff.a-stretch { color: var(--st-warn); background: color-mix(in srgb, var(--st-warn) 14%, transparent); }
 .fb-cl-aff.a-no { color: var(--st-crit); background: color-mix(in srgb, var(--st-crit) 14%, transparent); }
@@ -81,6 +80,3 @@
 #cl-moves:empty { display: none; }
 #cl-moves { margin-bottom: var(--sp-6); }
 
-/* kit v3: "The short version" beside the club's name */
-.fb-cl-short { flex: 1 1 320px; max-width: 460px; margin-left: auto; min-width: 0; }
-@media (max-width: 720px) { .fb-cl-short { max-width: none; margin-left: 0; } }

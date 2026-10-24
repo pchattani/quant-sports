@@ -259,7 +259,7 @@ function ratingsView(d, rows, S) {
     ? RK.tableHTML([{ label: 'Team' }].concat(keys.map(k => ({ label: k[1], align: 'right', title: k[0] === 'ev_def' ? 'Expected goals against per 60 at 5v5 (lower is better); colour: league percentile' : 'Colour: league percentile' }))),
       list.map(t => { const x = rt[t] || {}; return { _href: RK.teamHref(t, S), cells: [{ html: RK.teamLink(t, { short: true, season: S }), v: t }].concat(keys.map(k => {
         const v = num(x[k[0]]), p = (x.pct || {})[k[0]];
-        return { html: v === null ? '—' : '<span class="rt-cell" style="background:' + (isNum(p) ? RK.pctColor(p) : 'transparent') + '" title="' + (isNum(p) ? Math.round(p) + 'th percentile' : '') + '">' + (k[0] === 'overall' ? RK.signed(v, 2) : RK.num(v, 2)) + '</span>', v: v };
+        return { html: v === null ? '—' : '<span class="rt-cell" style="background:' + (isNum(p) ? RK.pctColor(p) + ';color:' + RK.pctInk(p) : 'transparent') + '" title="' + (isNum(p) ? Math.round(p) + 'th percentile' : '') + '">' + (k[0] === 'overall' ? RK.signed(v, 2) : RK.num(v, 2)) + '</span>', v: v };
       })) }; }), { compact: true, cls: 'std-table' })
     : RK.charts.heatTable({ corner: 'Team', cols: keys.map(k => ({ label: k[1] })), center: 0, fmt: v => RK.signed(v, 2),
       rows: list.map(t => ({ label: RK.teamLink(t, { short: true, season: S }), values: keys.map(k => num((rt[t] || {})[k[0]])) })) });

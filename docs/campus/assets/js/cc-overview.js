@@ -1,11 +1,14 @@
-/* The Quant Campus — Overview (#/<L>), on kit v3 "Matchday" (the Rink overview is the reference, MIGRATION_V3.md).
- *   the greeting hero with the game to watch (QK.featureCard); stat tiles: the title favourite (ours, in blue), the
+/* The Quant Campus — Overview (#/<L>), on kit v4 "Broadcast" (the Rink overview is the reference, MIGRATION_V4.md).
+ *   the greeting (the lower third) over the game to watch as the diagonal split hero (QK.featureCard -> splitHero; the
+ *     latest result when nothing is left to play); the black stat strip: the title favourite (ours, in blue), the
  *     top-rated team with its uncertainty, AP No. 1, the next kick-off / tip-off or the live count (a past season: the
  *     champion);
- *   "What to watch": our picks from live, today's and upcoming games (or what's coming up, or the latest results), each
- *     card with a one-line reason and no market; "Who's hot" from the season leaders; "New here?" beside a "How sure
- *     are we?" teaser from <L>/calibration.json when it is there;
- *   who wins it all: our title chances (ours only: no market on the overview), power ratings with one standard error,
+ *   "N games. Our calls.": our picks from live, today's and upcoming games (or what's coming up, or the latest
+ *     results), each card with a one-line reason and no market; the black power list from the season leaders; "We say
+ *     it. Then we check it." (QK.howSure from <L>/calibration.json when it is there) beside "Who's for real?" (win %
+ *     against our rating); "What's that number?";
+ *   the title race: our title chances in team colours (ours only: no market on the overview), power ratings with one
+ *     standard error,
  *     AP poll v our ranking, the CFP picture (cfb) or bracketology / the bracket (basketball);
  *   leaders: value and the counting leaders, loaded after the page (value.json carries the names).
  * Reads index.json, <L>/<S>/season.json, <L>/<S>/cfp.json | bracket.json, <L>/history.json, <L>/calibration.json,
@@ -79,7 +82,7 @@ function watchBlock(L, S, G) {
   var picks = pool.slice().sort(function (x, y) { return pickScore(y, L) - pickScore(x, L); }).slice(0, 6);
   var when = fb ? 'this week' : (new Date(QK.now()).getHours() >= 15 ? 'tonight' : 'today');
   var seg = '<div class="qk-seg" id="ov-when" role="group" aria-label="Games"><button type="button" aria-pressed="true" data-value="picks">Our picks</button><button type="button" aria-pressed="false" data-value="next"' + (pool.length ? '' : ' disabled') + '>Coming up</button><button type="button" aria-pressed="false" data-value="results"' + (G.last.length ? '' : ' disabled') + '>Latest results</button></div>';
-  return { picks: picks, pool: pool, html: '<section class="qk-section cc-sec">' + QK.sectionHead({ kicker: 'What to watch ' + when, title: '<span id="ov-gh">Games we’d pick</span>', html: true,
+  return { picks: picks, pool: pool, html: '<section class="qk-section cc-sec">' + QK.sectionHead({ kicker: 'What to watch ' + when, title: '<span id="ov-gh">Our calls</span>', html: true,
     sub: 'Our chance for each side, with a line on why it’s worth your time. ' + (fb ? 'Ranked teams carry their AP rank.' : 'Ranked and seeded teams carry their number.'), actions: seg }) + '<div id="ov-games"></div></section>' };
 }
 function drawWatch(el, L, W, G) {
@@ -87,7 +90,7 @@ function drawWatch(el, L, W, G) {
   var draw = function (w) {
     var list = w === 'results' ? G.last.slice(0, 6) : w === 'next' ? W.pool.slice().sort(function (x, y) { return String(x.date).localeCompare(String(y.date)); }).slice(0, 9) : (W.picks.length ? W.picks : G.last.slice(0, 6));
     var n = list.length;
-    QK.$('#ov-gh', el).textContent = w === 'results' || !W.picks.length ? 'The latest results' : w === 'next' ? 'Coming up' : NUM[n] + ' game' + (n === 1 ? '' : 's') + ' we’d pick';
+    QK.$('#ov-gh', el).textContent = w === 'results' || !W.picks.length ? 'The latest results' : w === 'next' ? 'Coming up' : NUM[n] + ' game' + (n === 1 ? '' : 's') + '. Our calls.';
     QK.$('#ov-games', el).innerHTML = n ? '<div class="qk-watch">' + list.map(function (c) { return CC.card(c, L, { why: true }); }).join('') + '</div>' : QK.empty('No games right now', 'The next games appear here as soon as they are scheduled.');
   };
   draw('picks');
@@ -135,25 +138,31 @@ CC.route('overview', function (el, p) {
     var hl = isCur ? CC.copy(info.headline || '').replace(/^[^·]*·\s*/, '') : (champ ? CC.tname(L, champ) + ' won the title' : '');
     var G = isCur ? gameLists(L, info) : { live: [], today: [], next: [], last: [] };
     var W = isCur ? watchBlock(L, S, G) : null;
-    var feat = W && W.picks.length ? CC.game(W.picks[0], L) : null;
-    if (feat) { feat.home.record = CC.rec(L, S, W.picks[0].home); feat.away.record = CC.rec(L, S, W.picks[0].away); }
+    /* the game to watch: our top pick, else (nothing left to play) the latest result with our pre-game call */
+    var featC = W && W.picks.length ? W.picks[0] : (G.last.length ? G.last.slice().sort(function (x, y) { return String(y.date).localeCompare(String(x.date)); })[0] : null);
+    var feat = featC ? CC.game(featC, L) : null;
+    if (feat) { feat.home.record = CC.rec(L, S, featC.home); feat.away.record = CC.rec(L, S, featC.away); }
     var evening = new Date(QK.now()).getHours() >= 15;
     var html = QK.greeting({ date: U.kicker(L, S),
       title: isCur ? esc(QK.greet()) + '! Here’s what’s ' + QK.mark('worth watching') + ' in ' + esc(fb ? 'college football' : L === 'mbb' ? 'men’s college basketball' : 'women’s college basketball') + ' ' + (fb ? 'this week' : evening ? 'tonight' : 'today') + '.'
         : esc(CC.LNAME[L] + ' ' + CC.seasonLabel(L, S)) + ', ' + QK.mark('looking back') + '.',
       lede: (hl ? hl.replace(/\.?$/, '. ') : '') + sub0,
       ctas: [{ label: 'All games', href: CC.href(L, 'games', null, S) }, { label: 'Standings', href: CC.href(L, 'standings', null, S), ghost: true }],
-      side: feat ? QK.featureCard(feat, { scribble: feat.status === 'live' ? 'Live now!' : 'Our pick ' + (fb ? 'this week' : evening ? 'tonight' : 'today') + '!' }) : '' }) +
+      side: feat ? QK.featureCard(feat, { scribble: feat.status === 'live' ? 'Live now' : feat.status === 'final' ? 'The latest result' : 'Our pick ' + (fb ? 'this week' : evening ? 'tonight' : 'today') }) : '' }) +
       '<div style="margin-top:var(--sp-10)">' + tiles(L, S, d, nSims) + '</div>';
     html += isCur ? W.html : pastGames(L, S, a[3]);
     html += '<div id="ov-hot"></div>';
-    html += '<section class="qk-section qk-gside" id="ov-new"><div id="ov-sure"></div><div>' + QK.newHere({ items: [QK.NEW_HERE[0], QK.NEW_HERE[1], 'Every forecast is checked against what happened. <a class="qk-link" href="' + esc(CC.href(L, 'model', null, null, 'tab=calibration')) + '">The record is on the Model page.</a>'] }) + '</div></section>';
+    /* v4: "We say it. Then we check it." beside "Who's for real?" (rating against win %), then "What's that number?" */
+    html += '<section class="qk-section qk-g75"><div><div id="ov-sure-h"></div><div id="ov-sure"></div></div>' +
+      '<div class="cc-ov-real">' + QK.sectionHead({ kicker: 'Who’s for real?', title: 'Results v chances', sub: 'Teams top-left are winning more than their rating suggests; bottom-right, the reverse. A soft schedule, luck, or something real?' }) +
+      '<div class="qk-card"><div class="qk-card-body"><div id="ov-luck" class="qk-chart" role="img" aria-label="Win percentage against our rating, every team"></div><p class="qk-caption" id="ov-luck-cap"></p></div></div></div></section>';
+    html += '<section class="qk-section">' + QK.newHere({ items: [QK.NEW_HERE[0], fb ? 'A <b>rating</b> is points better than an average FBS team on a neutral field: +14 is two touchdowns better.' : 'A <b>rating</b> is points per 100 possessions better than an average Division I team.', 'Every forecast is checked against what happened. <a class="qk-link" href="' + esc(CC.href(L, 'model', null, null, 'tab=calibration')) + '">The record is on the Model page.</a>'] }) + '</section>';
     // title chances: ours only (no market on the overview)
     var titleRows = (isCur ? (info.title_odds || []) : []).filter(function (r) { return isNum(r.p); }).slice(0, 12);
     if (!titleRows.length) titleRows = Object.keys(sim).filter(function (t) { return isNum(sim[t].p_title) && sim[t].p_title > 0; }).sort(function (x, y) { return sim[y].p_title - sim[x].p_title; }).slice(0, 12).map(function (t) { return { team: t, p: sim[t].p_title }; });
     var top = power.slice(0, 25);
     var grid = '<div class="qk-grid cc-grid">';
-    if (titleRows.length) grid += '<div class="qk-span-5">' + U.card('National title chances', 'Our chance of winning it all' + (nSims ? ', from ' + QK.fmt.num(nSims) + ' simulated seasons' : '') + '.',
+    if (titleRows.length) grid += '<div class="qk-span-5">' + U.card('National title chances', 'Our chance of winning it all' + (nSims ? ', from ' + QK.fmt.num(nSims) + ' simulated seasons' : '') + ', in team colours.',
       '<div id="ov-title"></div>', { foot: '<span>Top ' + titleRows.length + '</span>' + U.link(CC.href(L, 'standings', null, S, fb ? 'tab=playoff' : 'tab=bracket'), fb ? 'The playoff picture' : 'The bracket') }) + '</div>';
     if (top.length) grid += '<div class="qk-span-7">' + U.card('Power ratings', (fb ? 'Points better than an average FBS team on a neutral field' : 'Adjusted efficiency margin per 100 possessions') + '; whiskers ± one standard error.',
       U.chart('ov-power', Math.max(320, top.length * 22 + 30), 'Power ratings, top 25') +
@@ -167,14 +176,19 @@ CC.route('overview', function (el, p) {
       d.apPts = pts; d.mrank = mrank;
     }
     grid += '<div class="qk-span-' + (ap.length ? 6 : 12) + '" id="ov-post"></div></div>';
-    html += U.section(isCur ? 'Who wins it all' : 'The season in numbers', isCur ? 'Our chances from simulating the rest of the season, the ratings behind them and how they compare with the polls.' : '', grid, '', isCur ? 'Season simulation' : 'Season');
+    html += U.section(isCur ? (fb ? 'Who wins the national title?' : 'Who cuts down the nets?') : 'The season in numbers', isCur ? '<span id="ov-title-lede">Our chances from simulating the rest of the season, the ratings behind them and how they compare with the polls.</span>' : '', grid, '', isCur ? 'Title race' : 'Season');
     html += '<div id="ov-leaders"></div>';
     el.innerHTML = html;
     U.wire(el);
     if (isCur) drawWatch(el, L, W, G);
-    howSureTeaser(L, QK.$('#ov-sure', el));
-    if (titleRows.length) QK.$('#ov-title', el).innerHTML = QK.chances(titleRows.map(function (r) { return { label: CC.tshort(L, r.team), p: r.p, href: CC.teamHref(L, r.team, S), mark: U.mark(L, r.team) }; }), { key: false }) +
-      QK.note('Even the favourite misses most seasons: ' + CC.pct(titleRows[0].p, 0) + ' means about ' + Math.max(1, Math.round(10 * (1 - titleRows[0].p))) + ' seasons in 10 end without the title.');
+    howSure(L, QK.$('#ov-sure', el), QK.$('#ov-sure-h', el));
+    realOrNot(L, S, season, ap, QK.$('#ov-luck', el), QK.$('#ov-luck-cap', el));
+    if (titleRows.length) {
+      QK.$('#ov-title', el).innerHTML = QK.chances(titleRows.map(function (r) { return { label: CC.tshort(L, r.team), p: r.p, href: CC.teamHref(L, r.team, S), color: CC.traw(L, r.team), mark: U.mark(L, r.team) }; }), { key: false }) +
+        QK.explain('<b>What’s that number?</b> Even the favourite misses most seasons: ' + CC.pct(titleRows[0].p, 0) + ' means about ' + Math.max(1, Math.round(10 * (1 - titleRows[0].p))) + ' seasons in 10 end without the title.');
+      var t0 = titleRows.slice().sort(function (x, y) { return y.p - x.p; })[0], lede = QK.$('#ov-title-lede', el);
+      if (t0 && lede) lede.textContent = (t0.p < 0.25 ? 'Nobody’s better than 1 in 4. ' + CC.tshort(L, t0.team) + ' lead our board at ' + CC.pct(t0.p) + '.' : CC.tshort(L, t0.team) + ' lead at ' + CC.pct(t0.p) + '.') + (nSims ? ' From ' + QK.fmt.num(nSims) + ' simulated seasons.' : '');
+    }
     if (top.length) QKC.bar('#ov-power', { cats: top.map(function (r) { return CC.tshort(L, r.team); }), horizontal: true, fmt: function (v) { return CC.signed(v, 1); },
       series: [{ name: 'Rating', data: top.map(function (r) { return r.rating; }), lo: top.map(function (r) { var R = ratings[String(r.team)] || {}; return isNum(R.se) ? r.rating - R.se : null; }), hi: top.map(function (r) { var R = ratings[String(r.team)] || {}; return isNum(R.se) ? r.rating + R.se : null; }) }],
       colors: top.map(function (r) { return CC.tcol(L, r.team); }), hrefs: top.map(function (r) { return CC.teamHref(L, r.team, S); }), labelWidth: 96, valName: fb ? 'Rating (points v average)' : 'Margin per 100 possessions', catName: 'Team' });
@@ -213,27 +227,45 @@ function leaders(L, S, season, node, hotNode) {
       if (!r0) return null;
       var lab = /^[A-Z][a-z]/.test(b[1]) ? b[1].charAt(0).toLowerCase() + b[1].slice(1) : b[1];
       var fv = function (v) { return b[2] ? CC.f(v, b[2]) : QK.fmt.num(v); };
-      return { sport: 'college', title: b[0] === 'value' ? 'Most valuable' : 'Most ' + lab.replace(/ per game$/, ''), name: names[String(r0[0])], value: fv(r0[2]), unit: lab + ' · ' + CC.tabbr(L, r0[1]),
+      return { sport: 'college', kicker: (b[0] === 'value' ? 'Most valuable' : 'Most ' + lab.replace(/ per game$/, '')) + ' · ' + CC.tabbr(L, r0[1]), title: lab.charAt(0).toUpperCase() + lab.slice(1), name: names[String(r0[0])], value: fv(r0[2]),
         href: CC.playerHref(L, r0[0], S), next: r1 ? { name: names[String(r1[0])], value: fv(r1[2]) } : null, expl: HOT_EXPL[b[0]] || '' };
     }).filter(Boolean);
-    if (hotNode && hot.length) hotNode.innerHTML = U.section('The leaders right now', 'The top of ' + (hot.length === 1 ? 'one' : ['', 'one', 'two', 'three', 'four', 'five'][hot.length]) + ' of our leaderboards, with what each number means.', QK.hotRow(hot), '<a class="qk-more" href="' + esc(CC.href(L, 'players', null, S)) + '">Every player</a>', 'Who’s hot');
+    /* v4: the black power list (QK.band + QK.hotRow) */
+    if (hotNode && hot.length) hotNode.innerHTML = QK.band(QK.sectionHead({ kicker: 'Who’s hot', title: 'The leaders, board by board', sub: 'The top name on ' + (hot.length === 1 ? 'one' : ['', 'one', 'two', 'three', 'four', 'five'][hot.length]) + ' of our leaderboards, and a line on what each number means.', actions: '<a class="qk-more" href="' + esc(CC.href(L, 'players', null, S)) + '">Every player</a>' }) + QK.hotRow(hot));
   });
 }
 
-/* How sure are we? (teaser): the game model's walk-forward record, the full chart on the Model page. Shown only when
-   the level's calibration.json is there (CC.calib reads the kit's shape and the builder's own). */
-function howSureTeaser(L, box) {
+/* We say it. Then we check it.: the game model's walk-forward record (QK.howSure: the big numbers over the we-said /
+   it-happened bars); the full record is on the Model page. Shown only when the level's calibration.json is there
+   (CC.calib reads the kit's shape and the builder's own). */
+function howSure(L, box, hd) {
   if (!box) return;
   CC.load(CC.lpath(L, 'calibration.json')).then(function (cj) {
     if (!U.alive(box)) return;
     var cb = CC.calib(cj);
-    if (!cb || !cb.bins.length) { box.innerHTML = ''; return; }
-    var big = cb.bins.slice().sort(function (x, y) { return y.n - x.n; })[0];
-    box.innerHTML = '<article class="qk-card" style="height:100%"><div class="qk-card-body"><div class="qk-kicker">How sure are we?</div><h3 style="margin:8px 0 6px">When we say ' + Math.round(big.mean_p * 100) + '%, it happens ' + Math.round(big.freq * 100) + '% of the time</h3>' +
-      '<p style="margin:0 0 6px;color:var(--ink-2)">Our most common call puts the home team at ' + Math.round(big.lo * 100) + '–' + Math.round(big.hi * 100) + '%. Across ' + QK.fmt.num(big.n) + ' games like that, the home team won ' + QK.fmt.pct(big.freq, 1) + '.</p>' +
-      QK.note('<b>Brier score ' + (isNum(cb.brier) ? cb.brier.toFixed(3) : '—') + '</b> over ' + QK.fmt.num(cb.n) + ' games, every forecast made before the game with only earlier games: 0 is perfect, 0.25 is a coin flip.') +
-      '<a class="qk-more" style="display:inline-block;margin-top:14px" href="' + esc(CC.href(L, 'model', null, null, 'tab=calibration')) + '">The full record</a></div></article>';
+    if (!cb || !cb.bins.length) { box.innerHTML = ''; if (hd) hd.innerHTML = ''; return; }
+    var yrs = ((cj && cj.seasons) || []).filter(isNum);
+    if (hd) hd.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every ' + CC.LSHORT[L] + ' game we have forecast, each with only the games before it, grouped by the chance we gave the home team. When the two bars match, our numbers mean what they say.',
+      actions: '<a class="qk-more" href="' + esc(CC.href(L, 'model', null, null, 'tab=calibration')) + '">The full record</a>' });
+    QK.howSure(box, { bins: cb.bins, brier: cb.brier, n: cb.n, league: CC.LSHORT[L], span: yrs.length ? CC.seasonLabel(L, yrs[0]) + ' to ' + CC.seasonLabel(L, yrs[yrs.length - 1]) : '', subject: 'the home team' });
   });
+}
+
+/* Who's for real?: win % against our rating (QKC.quadrant), every team with a game this season; labels on the AP top
+   25 and our top 25 (the rest unlabelled, so the chart stays readable with 130-360 teams). */
+function realOrNot(L, S, season, ap, node, cap) {
+  if (!node) return;
+  var fb = CC.fb(L), R = season.ratings || {}, rows = [], seen = {};
+  Object.keys(season.standings || {}).forEach(function (c) { (season.standings[c] || []).forEach(function (r) { var t = r && String(r.team); if (r && !seen[t] && isNum(r.w) && isNum(r.l) && r.w + r.l > 0 && R[t] && isNum(R[t].rating)) { seen[t] = 1; rows.push(r); } }); });
+  if (rows.length < 8) { node.innerHTML = QK.empty('Not yet', 'The chart fills in after the first games.'); if (cap) cap.textContent = ''; return; }
+  var named = {};
+  (ap || []).slice(0, 25).forEach(function (r) { named[String(r.team)] = 1; });
+  Object.keys(R).filter(function (t) { return isNum(R[t].rating); }).sort(function (a, b) { return R[b].rating - R[a].rating; }).slice(0, 25).forEach(function (t) { named[t] = 1; });
+  var pts = rows.map(function (r) { var t = String(r.team), lab = !!named[t]; return { x: R[t].rating, y: 100 * r.w / (r.w + r.l), label: lab ? CC.tabbr(L, t) : ' ', name: CC.tname(L, t), sub: CC.record(r.w, r.l) + ' · rating ' + CC.signed(R[t].rating, 1), color: CC.traw(L, t), href: CC.teamHref(L, t, S), size: lab ? 13 : 8 }; });
+  var gp = rows.map(function (r) { return r.w + r.l; }), g0 = Math.min.apply(null, gp), g1 = Math.max.apply(null, gp);
+  QKC.quadrant(node, { points: pts, xName: fb ? 'Our rating (points v an average FBS team)' : 'Our rating (points per 100 v average)', yName: 'Win %', refX: 0, refY: 50, yMin: 0, yMax: 100,
+    xFmt: function (v) { return CC.signed(v, 0); }, yFmt: function (v) { return Math.round(v) + '%'; }, label: CC.LSHORT[L] + ' teams: our rating against win percentage' });
+  if (cap) cap.textContent = CC.LSHORT[L] + ' ' + CC.seasonLabel(L, S) + ', ' + rows.length + ' teams, ' + (g0 === g1 ? g0 : g0 + '–' + g1) + ' games each. Our rating: ' + (fb ? 'expected points margin against an average FBS team on a neutral field' : 'adjusted points per 100 possessions against an average Division I team') + '. Dashed lines: an average rating and a .500 record. Labels: the AP top 25 and our top 25. Tap a team for its page.';
 }
 
 /* The CFP picture (cfb) or the bracket picture (basketball). */

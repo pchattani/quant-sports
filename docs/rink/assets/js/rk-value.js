@@ -6,7 +6,8 @@
  * or league-wide. The other tabs render the pre-redesign views: season value (value.js), the multi-season valuation
  * (?tab=val), moves and trade grades (moves.js), the trade simulator (trade.js, its state in &t=&m=).
  *
- * Kit v3 "Matchday": friendly section titles and "i" notes (QK.note) on WAR, GAR and the trade grades.
+ * Kit v4 "Broadcast": Broadcast section heads, black stat blocks, team-colour bars and explain strips (QK.note) on WAR,
+ * GAR and the trade grades.
  *
  * Reads <S>/value.json, <S>/deals.json and <S>/movement.json. */
 (function (RK) {

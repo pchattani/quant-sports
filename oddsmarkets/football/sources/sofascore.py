@@ -140,7 +140,9 @@ def get_json(path: str, timeout: int = 20, quiet: bool = False) -> dict | None:
             resp = curl_requests.get(url, impersonate="chrome", timeout=timeout)
             LAST_STATUS = int(resp.status_code)
             if resp.status_code == 200:
-                return resp.json()
+                payload = resp.json()
+                harvest_colours(payload)
+                return payload
             logger.debug("%s -> HTTP %s", url, resp.status_code)
         except Exception as exc:  # noqa: BLE001
             LAST_STATUS = None
@@ -157,6 +159,58 @@ LAST_STATUS: int | None = None
 
 def is_blocked() -> bool:
     return LAST_STATUS == 403
+
+
+# ── team colours, kept from answers already received ────────────────────────
+# Every team object Sofascore returns (an event's homeTeam / awayTeam, a standings row's team, a player's team)
+# carries `teamColors` {primary, secondary, text}. The stores keep none of it, so get_json notes them here as they
+# pass, and each fetcher's run ends with save_team_colours(): no call is made for them. They are facts about club
+# colours (the kit's heroes and stripes, oddsmarkets/football/analytics/colours.py); no crest or image is kept.
+SEEN_COLOURS: dict[str, list] = {}
+
+
+def harvest_colours(payload: Any) -> int:
+    """Note the teamColors of every football team object in one API answer; returns how many were noted. Never
+    raises: a malformed answer only means nothing is noted."""
+    n = 0
+    try:
+        stack = [payload]
+        while stack:
+            node = stack.pop()
+            if isinstance(node, list):
+                stack.extend(node)
+                continue
+            if not isinstance(node, dict):
+                continue
+            tc = node.get("teamColors")
+            tid = node.get("id")
+            sport = node.get("sport")
+            if (isinstance(tc, dict) and isinstance(tid, int) and tc.get("primary")
+                    and not (isinstance(sport, dict) and sport.get("slug") not in (None, "football"))):
+                SEEN_COLOURS[str(tid)] = [tc.get("primary"), tc.get("secondary"), tc.get("text")]
+                n += 1
+            stack.extend(v for v in node.values() if isinstance(v, (dict, list)))
+    except Exception:  # noqa: BLE001
+        pass
+    return n
+
+
+def save_team_colours() -> int:
+    """Fold this process's noted colours into the kept map and rebuild the club colour table when anything changed;
+    returns the number of clubs added or changed. Never raises (a fetcher's exit code is about its stores)."""
+    if not SEEN_COLOURS:
+        return 0
+    try:
+        from oddsmarkets.football.analytics import colours
+
+        changed = colours.keep_sofascore(SEEN_COLOURS)
+        if changed:
+            colours.rebuild()
+        logger.info("team colours: %d seen, %d new or changed", len(SEEN_COLOURS), changed)
+        return changed
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("team colours not saved: %s", exc)
+        return 0
 
 
 def list_seasons(tournament_id: int) -> list[dict]:

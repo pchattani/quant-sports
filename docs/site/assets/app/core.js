@@ -1,6 +1,6 @@
 /* The Quant Footballer — core: state, routing (with the old-route redirects), cached loading, competitions,
  * clubs and people indexes, links and marks, formatting, and the HTML builders every page uses.
- * Built on the shared kit v3 "Matchday" (assets/qk: window.QK, window.QKC; dark only). Older-browser rule: no optional chaining, no
+ * Built on the shared kit v4 "Broadcast" (assets/qk: window.QK, window.QKC; dark only). Older-browser rule: no optional chaining, no
  * nullish coalescing (checked with esprima before shipping).
  *
  * Routes (hash). The section lit in the nav is in brackets.
@@ -922,7 +922,7 @@ function toGame(f, slug, extra) {
   if (f.xg && st !== 'pre') g.xg = f.xg;
   return g;
 }
-/* A game card (kit v3 QK.gameCard): our chance per side before kick-off (the favourite in blue), the home / draw /
+/* A game card (kit QK.gameCard, v4: the team-colour stripe): our chance per side before kick-off (the favourite in blue), the home / draw /
    away bar, the score and xG after it, and with why the italic one-line reason (QK.whyLine). The market is never on
    a card: it is a quiet reference on the match page only. extra: {league, href, home_form, away_form ('WDLWW', oldest
    first), home_record, away_record, why: true}. */

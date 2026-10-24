@@ -48,7 +48,7 @@ def test_season_files_follow_each_sites_index(tmp_path):
     assert ("gridiron", "the-quant-gridiron", "2026/season.json") in rows
     assert ("rink", "the-quant-rink", "20262027/season.json") in rows
     assert ("site", "the-quant-footballer", "premier-league/probs.json") in rows
-    assert ("site", "the-quant-footballer", "premier-league/market_odds.json") in rows
+    assert ("site", "the-quant-footballer", "premier-league/market_odds.json") not in rows   # no market on the home page
     # a missing tree gives no rows for that site rather than an error
     assert all(r[0] == "site" for r in bh.season_files(tmp_path / "nothing"))
 
@@ -66,3 +66,50 @@ def test_team_nicknames_and_broadcast_fields():
     t = bh.team("Jets", "WPG", "#041E42", full="Winnipeg Jets", alt="#004C97")
     assert t["full"] == "Winnipeg Jets" and t["alt"] == "#004C97"
     assert "full" not in bh.team("Arsenal", full="Arsenal")          # no city to print: not written
+
+
+def _keys(x):
+    """Every dict key anywhere in a JSON-like value."""
+    if isinstance(x, dict):
+        for k, v in x.items():
+            yield k
+            yield from _keys(v)
+    elif isinstance(x, list):
+        for v in x:
+            yield from _keys(v)
+
+
+def test_no_market_field_reaches_home_json(tmp_path, monkeypatch):
+    """STYLE_GUIDE §3: the market never shows on the home page, so home.json carries none (games, title rows, F1 field)."""
+    def put(rel, obj):
+        p = tmp_path / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(obj), encoding="utf-8")
+
+    start = bh.iso(NOW + timedelta(hours=3))
+    put("paddock/data/index.json", {"current_season": 2026, "teams": {"mclaren": {"colour": "#FF8000"}},
+                                    "drivers": {"norris": {"name": "Lando Norris", "code": "NOR", "team": "mclaren"}},
+                                    "next": {"name": "Mexico City GP", "round": 20, "year": 2026, "date": start[:10],
+                                             "sessions": {"race": start}, "circuit": {"name": "Hermanos Rodríguez"}}})
+    put("paddock/data/markets.json", {"next_race": {"model": {"norris": 0.31}, "prices": {"norris": 0.4, "piastri": 0.2}},
+                                      "drivers_title": {"prices": {"norris": 0.5}}})
+    put("paddock/data/2026/season.json", {"championship": {"drivers": {"norris": {"p_title": 0.6}}}})
+    put("hardwood/data/index.json", {"leagues": {"nba": {"teams": {"1": {"name": "Boston Celtics", "abbr": "BOS"},
+                                                                    "2": {"name": "New York Knicks", "abbr": "NYK"}},
+                                                          "today": [{"id": 9, "date": start, "status": "pre", "home": 1, "away": 2,
+                                                                     "model": {"p_home": 0.6, "total": 221.5},
+                                                                     "market": {"p_home": 0.55, "spread_home": -3.5}}]}}})
+    monkeypatch.setattr(bh, "DOCS", tmp_path)
+    ctx = bh.Ctx("local", NOW)
+    out = {"games": [], "charts": {}, "futures": {}, "sports": [], "search": []}
+    for fn in (bh.build_f1, bh.build_basketball):
+        try:
+            fn(ctx, "../x/", out)
+        except (KeyError, TypeError, AttributeError):
+            pass   # a later block wants more fixture than this test gives; the fields below are already written
+    assert out["games"] and out["charts"].get("f1_next_race") and out["futures"].get("f1")
+    assert [r["name"] for r in out["charts"]["f1_next_race"]["field"]] == ["Lando Norris"]   # model only
+    bad = {k for k in _keys(out) if k.startswith("market") or k == "spread"}
+    assert not bad, bad
+    src = (ROOT / "scripts" / "build_home.py").read_text(encoding="utf-8")
+    assert "market_home=" not in src and '"market":' not in src and "market_odds.json" not in src

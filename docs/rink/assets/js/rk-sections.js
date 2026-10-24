@@ -10,9 +10,11 @@
  * Old routes (#/skaters, #/playoffs, #/markets, #/calibration ...) are redirected by core.js (REDIRECTS).
  *
  * Kit v4 "Broadcast" (MIGRATION_V4.md): friendly section titles (the volt tag says what it is, the Bebas title
- * the story), "i" notes (QK.note) under the numbers that need a sentence, a "Who's hot" strip (QK.hotRow) on Players,
- * "How sure are we?" (QK.howSure, from data/calibration.json) at the top of the Model page, and season forecasts
- * without the market tick (the market stays on game pages and the Model page only). */
+ * the story), explain strips (QK.note) under the numbers that need a sentence, the black power list (QK.band +
+ * QK.hotRow) on Players and on the standings (the clubs on top of four boards), our playoff chance as a bar in each
+ * club's colour, "We say it. Then we check it." (QK.howSure, from data/calibration.json) at the top of the Model
+ * page, and season forecasts in team colours without the market tick (the market stays on game pages and the Model
+ * page only). */
 (function (RK) {
 'use strict';
 
@@ -20,6 +22,12 @@ const U = RK.ui, esc = RK.esc, isNum = RK.isNum;
 
 /* ── standings ───────────────────────────────────────────────────────────── */
 const ST_TABS = [['table', 'Standings'], ['odds', 'Playoff chances'], ['ratings', 'Ratings'], ['lottery', 'Draft lottery'], ['bracket', 'Bracket'], ['markets', 'Season forecasts'], ['history', 'History']];
+
+/* our chance as a bar in the club's colour (lifted to 3:1 on the card), the number beside it */
+function teamBarCell(v, team) {
+  if (!isNum(v)) return '—';
+  return '<span class="qk-barcell"><span>' + U.pct(v) + '</span><i aria-hidden="true"><b style="width:' + Math.min(100, 100 * v).toFixed(1) + '%;background:' + esc(QK.color.team(RK.teamColourRaw(team))) + '"></b></i></span>';
+}
 
 /* One standings block as a v2 leaderboard: heat cells for the 5v5 xG share and our rating (league percentile among
    the 32 clubs), our playoff chance as a bar, the cut line dashed. */
@@ -34,7 +42,7 @@ function stBoard(node, g, pc) {
     { key: 'gf', label: 'GF', num: true }, { key: 'ga', label: 'GA', num: true }, { key: 'diff', label: 'Diff', num: true, fmt: v => '<span class="' + U.cls(v) + '">' + U.signed(v, 0) + '</span>' },
     { key: 'xgf_pct', label: 'xGF%', type: 'pctl', pctl: 'xp', fmt: v => U.pct(v, 1), tip: 'Share of 5v5 expected goals; the cell is coloured by its rank among the 32 clubs' },
     { key: 'rating', label: 'Rating', type: 'pctl', pctl: 'rp', fmt: v => U.signed(v, 2), tip: 'Our team rating: expected goal difference a game against an average club' },
-    { key: 'p_playoffs', label: 'Playoffs', type: 'bar', max: 1, fmt: v => (isNum(v) ? U.pct(v) : '—'), tip: 'Our chance of a playoff spot, from 20,000 simulated seasons' },
+    { key: 'p_playoffs', label: 'Playoffs', num: true, fmt: (v, r) => teamBarCell(v, r.team), tip: 'Our chance of a playoff spot, from 20,000 simulated seasons' },
     { key: 'p_cup', label: 'Cup', num: true, fmt: v => (isNum(v) ? U.pct(v, 1) : '—'), tip: 'Our chance of winning the Stanley Cup' },
     { key: 'l10s', label: 'L10', sort: false }, { key: 'streak', label: 'Strk', sort: false }
   ], rows: rows });
@@ -63,7 +71,18 @@ function standingsNew(node, S) {
       lead ? { label: 'Most points', value: RK.teamAbbr(lead.team) + ' ' + lead.pts, href: RK.teamHref(lead.team, S), sub: RK.record(lead.w, lead.l, lead.otl) + ' in ' + lead.gp + ' games' } : null,
       best ? { label: 'Top-rated club', value: RK.teamAbbr(best.team) + ' ' + U.signed(best.rating, 2), href: RK.teamHref(best.team, S), sub: 'goals a game better than an average club', tip: 'Our team rating: expected goal difference per game against an average club' } : null
     ]);
-    node.innerHTML = '<div class="rk-kpis">' + tiles + '</div>' +
+    /* Who's on top: the club leading four boards, with the next best and what the number means */
+    const two = (list, k) => list.filter(r => isNum(r[k])).sort((a, b) => b[k] - a[k]).slice(0, 2);
+    const hotT = (title, list, k, f, expl) => { const t = two(list, k); return t.length && !(t[1] && f(t[0][k]) === f(t[1][k])) ? { sport: 'hockey', kicker: 'NHL · ' + RK.teamAbbr(t[0].team), title: title, name: RK.teamName(t[0].team), value: f(t[0][k]), href: RK.teamHref(t[0].team, S), next: t[1] ? { name: RK.teamShort(t[1].team), value: f(t[1][k]) } : null, expl: expl } : null; };
+    const nSim = QK.fmt.num((d.sim || {}).n || 20000);
+    const hot = [hotT('Cup favourite', simRows, 'p_cup', x => U.pct(x, 0), 'Our chance of winning the Stanley Cup, from ' + nSim + ' simulated seasons.'),
+      hotT('Presidents’ Trophy', simRows, 'p_pres', x => U.pct(x, 0), 'Our chance of finishing with the best record in the league.'),
+      hotT('Most points', rows, 'pts', x => String(x), 'Two for a win, one for an overtime or shootout loss.'),
+      hotT('Top-rated club', rows, 'rating', x => U.signed(x, 2), 'Goals a game better than an average club, all situations: our rating.'),
+      hotT('Best 5v5 chance share', rows, 'xgf_pct', x => U.pct(x, 1), 'Share of the 5-on-5 expected goals: over a season, the number that best predicts the next games.' + (early ? ' Early: under ' + U.TEAM_MIN_GP + ' games.' : ''))].filter(Boolean);
+    /* the black power list replaces the stat tiles when it has enough cards (it carries the same leaders, the next best
+       and a line on each number); otherwise the tiles stay */
+    node.innerHTML = (hot.length >= 3 ? QK.band(QK.sectionHead({ kicker: 'Who’s on top', title: 'The clubs to beat', sub: 'The club leading each board, the next best, and what the number means.' }) + QK.hotRow(hot), { cls: 'rk-hot rk-hot-top' }) : '<div class="rk-kpis">' + tiles + '</div>') +
       QK.sectionHead({ kicker: 'The table · ' + RK.seasonLabel(S), title: 'Where everyone stands', sub: esc(RK.regGames(S)) + ' games a club · 2 points a win, 1 for an overtime or shootout loss.' + (early ? ' The heat colours start after ' + U.TEAM_MIN_GP + ' games: earlier ranks are noise.' : ' xGF% and rating cells are coloured by rank among the 32 clubs (red best, blue worst).'), html: true,
         actions: '<div class="qk-seg" id="st-view" role="group" aria-label="Standings view">' + [['wc', 'Wild card'], ['div', 'Divisions'], ['league', 'League']].map((v, i) => '<button type="button" aria-pressed="' + (i === 0) + '" data-value="' + v[0] + '">' + v[1] + '</button>').join('') + '</div>' }) +
       '<div id="st-body"></div>' +
@@ -87,7 +106,7 @@ function standingsNew(node, S) {
       } else groups.push({ title: 'League', sub: 'all 32 clubs', rows: rows.slice().sort((a, b) => (a.league_rank || 99) - (b.league_rank || 99)) });
       if (!groups.length) groups.push({ title: 'League', rows: rows });
       const body = node.querySelector('#st-body');
-      body.innerHTML = groups.map((g, i) => '<div class="rk-day"' + (i ? '' : ' style="margin-top:0"') + '><b>' + esc(g.title) + '</b>' + (g.sub ? '<span>' + esc(g.sub) + '</span>' : '') + '</div><div class="qk-card rk-st" id="st-g' + i + '"></div>').join('');
+      body.innerHTML = groups.map((g, i) => '<div class="rk-day rk-grp"' + (i ? '' : ' style="margin-top:0"') + '><b>' + esc(g.title) + '</b>' + (g.sub ? '<span>' + esc(g.sub) + '</span>' : '') + '</div><div class="qk-card rk-st" id="st-g' + i + '"></div>').join('');
       groups.forEach((g, i) => stBoard(body.querySelector('#st-g' + i), g, pc));
     };
     draw('wc');
@@ -120,7 +139,7 @@ function forecastsTab(node, S) {
       if (!rows.length) return '';
       const full = f[0] === 'playoffs' || f[0] === 'division';
       return '<div class="qk-span-6">' + U.card2(f[1], esc(f[2]),
-        QK.chances(rows.map(r => ({ label: RK.teamName(r.team), p: r.p, href: RK.teamHref(r.team, S), mark: U.team(r.team) })), { limit: full ? 32 : 16, key: false, max: full ? 1 : undefined })) + '</div>';
+        QK.chances(rows.map(r => ({ label: RK.teamName(r.team), p: r.p, href: RK.teamHref(r.team, S), mark: U.team(r.team), color: RK.teamColourRaw(r.team) })), { limit: full ? 32 : 16, key: false, max: full ? 1 : undefined })) + '</div>';
     };
     const html = FC.map(block).join('');
     const cupTop = Object.keys(sim).map(t => sim[t].p_cup).filter(isNum).sort((a, b) => b - a)[0];
@@ -177,7 +196,7 @@ function teamsNew(node, S) {
     if (pts.length) h += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-12">' + U.card2('Offence v defence', '5v5 expected goals for and against per 60 minutes; top right is best (the defence axis is flipped)', U.chart('tm-od', 420, 'Offence against defence')) + '</div></div></section>';
     h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'By division', title: 'Every club, division by division', sub: 'Record, our rating and our playoff chance. Open a club for its rating over time, roster, strengths and needs, schedule and outlook.' });
     (d.standings.divisions || []).forEach(dv => {
-      h += '<div class="rk-day"><b>' + esc(dv.division) + '</b><span>' + esc(dv.conference) + ' Conference</span></div><div class="rk-mini-grid">' + (dv.teams || []).map(t => {
+      h += '<div class="rk-day rk-grp"><b>' + esc(dv.division) + '</b><span>' + esc(dv.conference) + ' Conference</span></div><div class="rk-mini-grid">' + (dv.teams || []).map(t => {
         const r = by[t] || {};
         return '<a class="rk-teamtile" href="' + esc(RK.teamHref(t, S)) + '" style="--tc:' + esc(U.tcol(t)) + '"><div class="top">' + QK.teamMark(U.team(t)) + '<span class="nm">' + esc(RK.teamName(t)) + '</span><span class="rec">' + (isNum(r.pts) ? r.pts + ' pts' : '') + '</span></div>' +
           '<div class="row"><span>' + esc(RK.record ? RK.record(r.w, r.l, r.otl) : '') + ' · GP ' + (r.gp || 0) + '</span><span>Rating <b>' + U.signed(r.rating, 2) + '</b></span></div>' +
@@ -268,7 +287,7 @@ function leadersPage(node, S) {
       hot('Best per hour', F, 'gar_60', x => U.f(x, 2), 'value per 60, forwards', 'Value per 60 minutes among qualified forwards: fair across ice time.', skQ),
       hot('Most assists', P, 'a', x => String(x), 'assists', 'Primary and secondary assists, all situations.')].filter(Boolean).slice(0, 5);
     node.innerHTML = '<div class="rk-flex" style="margin-bottom:var(--sp-4)"><input class="qk-input rk-search" id="pl-q" type="search" placeholder="Find a player…" aria-label="Find a player" autocomplete="off"></div><div id="pl-hits"></div>' +
-      (hotItems.length >= 3 ? '<section class="rk-hot">' + QK.sectionHead({ kicker: 'Who’s hot', title: 'Leading the way in ' + RK.seasonLabel(S), sub: 'The leader of each headline number, with the next best. Tap a card for the player.' }) + QK.hotRow(hotItems) + '</section>' : '') +
+      (hotItems.length >= 3 ? QK.band(QK.sectionHead({ kicker: 'Who’s hot', title: 'Leading the way in ' + RK.seasonLabel(S), sub: 'The leader of each headline number, with the next best. Tap a card for the player.' }) + QK.hotRow(hotItems), { cls: 'rk-hot' }) : '') +
       QK.sectionHead({ kicker: 'Season leaders', title: 'Who has the most', sub: 'Counting stats, so everyone ranks.' }) + '<div class="qk-grid">' + TOT.map(b => board(b, null)).join('') + '</div>' +
       '<section class="qk-section">' + QK.sectionHead({ kicker: 'Rates by position', title: 'Who is best per minute', html: true,
         sub: 'The stable, predictive rates from our metric spec, ranked within each position group. Only qualified players rank: skaters need 250 5v5 minutes over a full season (' + (skFloor !== null ? skFloor + ' now' : 'prorated') + '), goalies a quarter of the team’s minutes and ' + gFa + ' unblocked shots. ' + tg + ' team games played.' }) +
@@ -398,7 +417,7 @@ function howSure(node) {
     if (!cb) { node.innerHTML = ''; return; }
     const ss = (((cj || {}).game_model || {}).seasons || []).slice().sort();
     const span = ss.length ? RK.seasonLabel(ss[0]) + ' to ' + RK.seasonLabel(ss[ss.length - 1]) : '';
-    node.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'When we say 60%, does it happen 60% of the time?', sub: 'Every game forecast we would have made before puck drop' + (span ? ', ' + esc(span) : '') + ', against what happened. On the dashed line, a chance came true exactly as often as it said.' }) + '<div id="md-sure-mod"></div>';
+    node.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every game forecast we would have made before puck drop' + (span ? ', ' + esc(span) : '') + ', grouped by the chance we gave the home team, against how often it won. When the two bars match, our numbers mean what they say.' }) + '<div id="md-sure-mod"></div>';
     QK.howSure(node.querySelector('#md-sure-mod'), { calibration: cj, league: 'NHL', span: span, subject: 'the home team' });
   });
 }

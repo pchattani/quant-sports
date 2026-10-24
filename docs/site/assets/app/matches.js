@@ -7,8 +7,9 @@
  *   hub.json is re-read every minute while anything is in play.
  *
  * #/match/<slug>/<id>
- *   Design System 2.0 scoreboard hero (crests, score, xG, status, round, our home / draw / away chance bar), stat
- *   tiles, our forecast before kick-off (win, draw, expected goals, most likely score, 3 or more goals, both score)
+ *   the kit v4 diagonal split hero (QK.previewCard: home first, club colours when clubs_index.json has them, the
+ *   score once it starts, our chance for the favourite, the home / draw / away bar, the market as a quiet line before
+ *   kick-off: the only place it appears besides the Model page), stat tiles, our forecast before kick-off (win, draw, expected goals, most likely score, 3 or more goals, both score)
  *   with the prediction market only as a quiet reference column named by its source, the tale of the tape (our
  *   rating, Elo, xG for and against, from the competition's strength.json and team_stats.json), the confirmed XIs
  *   once posted (fixtures[].xi, about an hour before kick-off) with our forecast before and after the line-up term
@@ -257,7 +258,9 @@ function renderMatch(el, c, f, m, mk, hit, side) {
   else preview(el, c, f, tape);
 }
 
-/* The hero (kit v3 QK.previewCard, the Rink game page's pattern): football's home-first order ("Home v Away"), with the record and
+/* The hero (kit v4 QK.previewCard, the diagonal split as on the Rink game page): football's home-first order ("Home v
+   Away"), the clubs' raw kit and alternate colours (FB.toGame, from clubs_index.json; QK.color.blockPair makes the blocks
+   and resolves a clash; cobalt v slate by our favourite until the colours land), short codes (FB.heroGame), the record and
    league form, the score once it starts (the score bug while live), our chance for the favourite as a big blue number
    with a sentence, the home / draw / away bar, a plain-English "how sure" note and how the sides match up so far.
    Football has no live model: during a match the card keeps the pre-match chance and says so. The market sits here
@@ -266,7 +269,7 @@ function hero(c, f, m, hit, mk, side) {
   var stale = FB.staleLive(f);
   var live = f.status === 'live' && !stale;
   var hs = m && isNum(m.hs) ? m.hs : f.hs, as = m && isNum(m.as) ? m.as : f.as;
-  var g = FB.toGame(FB.merge(f, { hs: hs, as: as }), c.slug);
+  var g = FB.heroGame(FB.toGame(FB.merge(f, { hs: hs, as: as }), c.slug));
   g.href = null;
   var rows = {};
   var tbl = side && side.table && Array.isArray(side.table.standings) ? side.table.standings : [];
@@ -371,12 +374,13 @@ function tapeCard(c, f, side) {
     { label: 'xG against a match', a: isNum(th.xga) ? th.xga : per(h, 'xg_against'), b: isNum(ta.xga) ? ta.xga : per(a, 'xg_against'), fmt: function (v) { return num(v, 2); }, better: 'low' },
     { label: 'Shots on target a match', a: th.sot, b: ta.sot, fmt: function (v) { return num(v, 1); } },
     { label: 'Possession', a: th.poss, b: ta.poss, fmt: function (v) { return Math.round(v) + '%'; } }
-  ].filter(function (r) { return isNum(r.a) && isNum(r.b); }).map(function (r) { var x = r.a; r.a = r.b; r.b = x; return r; });   // away on the left, as in the hero
+  ].filter(function (r) { return isNum(r.a) && isNum(r.b); });   // home on the left, as in the hero ("Home v Away")
   if (rows.length < 2) return '';
   var form = function (r) { return (r.form_results || []).length ? QK.formDots(r.form_results.join('')) : ''; };
+  var team = function (tid, name) { return { name: name, logo: FB.crestUrl(tid), colour: FB.clubColour(tid), alt: FB.clubAlt(tid) }; };
   return FB.card('Tale of the tape', 'This season in ' + esc(c.name) + '; the better side\'s bar is solid.',
-    QK.matchupBar({ left: { name: f.away, logo: FB.crestUrl(f.away_id) }, right: { name: f.home, logo: FB.crestUrl(f.home_id) }, rows: rows, colors: [sideHex('away'), sideHex('home')] }) +
-    (form(h) || form(a) ? '<div class="fb-mx-tform"><span>' + form(a) + '</span><span class="qk-muted">League form, oldest first</span><span>' + form(h) + '</span></div>' : ''), { span: 6 });
+    QK.matchupBar({ left: team(f.home_id, f.home), right: team(f.away_id, f.away), rows: rows }) +
+    (form(h) || form(a) ? '<div class="fb-mx-tform"><span>' + form(h) + '</span><span class="qk-muted">League form, oldest first</span><span>' + form(a) + '</span></div>' : ''), { span: 6 });
 }
 
 // Percentage points, signed: 0.034 -> "+3.4" (the column header says pts).
@@ -594,17 +598,19 @@ function drawRace(el, m, hasShots) {
     var hc = sideHex('home'), ac = sideHex('away');
     function line(name, data, col) {
       return { type: 'line', name: name, data: data, step: 'end', showSymbol: false, lineStyle: { width: 2.5, color: col }, itemStyle: { color: col },
-        areaStyle: { color: QKC.hexA(col, 0.08) }, endLabel: { show: true, formatter: function (p) { return name + ' ' + Number(p.value).toFixed(2); }, color: T.ink2, fontSize: 11, fontWeight: 600 } };
+        areaStyle: { color: QKC.hexA(col, 0.08) }, endLabel: { show: true, formatter: function (p) { return FB.clubCode(name, name === m.home ? m.away : m.home) + ' ' + Number(p.value).toFixed(2); }, color: T.ink1, fontFamily: T.fontDisplay, fontSize: 20 } };
     }
     var gp = goals.map(function (s) {
       var side = sideOf(s, m);
       var tm = minOf(s, maxT);
       return { value: [String(tm), (side === 'home' ? hh : aa)[tm]], name: (s.player_name || '') + ' ' + minuteText(s), itemStyle: { color: side === 'home' ? hc : ac, borderColor: T.s1, borderWidth: 2 } };
     });
+    var xa = QKC.axis(T, { type: 'category', data: x.map(String), split: false, line: true, boundaryGap: false });
+    var ya = QKC.axis(T, { fmt: function (v) { return v.toFixed(1); } });
+    var gB = 8 + QKC.nameAxis(xa, 'Minute', 'bottom'), gT = 16 + QKC.nameAxis(ya, 'Expected goals, added up', 'side');
     return {
-      grid: { left: 8, right: 110, top: 16, bottom: 26, containLabel: true },
-      xAxis: QKC.axis(T, { type: 'category', data: x.map(String), split: false, line: true, boundaryGap: false, name: 'Minute', nameLocation: 'middle', nameGap: 26 }),
-      yAxis: QKC.axis(T, { name: 'Cumulative xG' }),
+      grid: { left: 8, right: 120, top: gT, bottom: gB, containLabel: true },
+      xAxis: xa, yAxis: ya,
       tooltip: QKC.tooltip(T, { trigger: 'axis', formatter: function (ps) {
         var mm = ps[0].axisValue;
         return '<div style="color:' + T.ink3 + ';font-size:11px">Minute ' + esc(mm) + '</div>' + ps.filter(function (q) { return q.seriesType === 'line'; }).map(function (q) { return QKC.tipRow(q.color, q.seriesName, Number(q.value).toFixed(2)); }).join('');

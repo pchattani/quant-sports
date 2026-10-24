@@ -1,6 +1,6 @@
-/* The Quant Bullpen — compare (#/compare/<a>/<b>?c=<third>), on Design System 2.0 (the Rink compare page is the
+/* The Quant Bullpen — compare (#/compare/<a>/<b>?c=<third>), on kit v4 "Broadcast" (the Rink compare page is the
  * reference): two or three hitters or pitchers side by side on the spec's metric set (BP.ui.SETS), the better value
- * bold, the delta for two, and where each sits in the peer distribution (loaded on request).
+ * solid, and where each sits in the peer distribution (loaded on request).
  *
  * Peers: when every player is in the same position group (hitters) or role (pitchers), the percentiles are against that
  * group (pct_role) and the set is the group's; otherwise against all MLB hitters (or all starters / relievers mixed:
@@ -8,9 +8,9 @@
  * (the current season's values, pct and pct_role are in the player file), glossary.json; the season catalogue loads only
  * for the distribution. Teams, other levels and seasons, and the classic every-metric view: ?view=classic.
  *
- * v3 (Matchday): the title asks the question ("Judge, Ohtani or Soto?"), the best value in each row sits under the sun
- * highlighter, the percentiles are coloured pills, and a verdict under the table names what each player does best
- * (QK.verdicts, the type from BP.ui.ARCHETYPE); the third player in plum. */
+ * v4 (Broadcast): the title asks the question ("Judge, Ohtani or Soto?"); two players are the tale of the tape in their
+ * club colours (bars = percentile, the better number solid), three a table with the best value under the volt stroke;
+ * a verdict under it names what each player does best (QK.verdicts, the type from BP.ui.ARCHETYPE). */
 (function (BP) {
 'use strict';
 
@@ -73,10 +73,10 @@ function render(el, params, state) {
         return bestRow ? { title: ((U.ARCHETYPE || {})[KIND] || {})[bestRow.key] || 'The standout', who: sn[i], text: 'best of the ' + E.length + ' on ' + bestRow.label + ' (' + bestRow.fmt(bestRow.values[i]) + ', ' + QK.ordinal(Math.round(bestRow.pctls[i])) + ' percentile).' } : null;
       });
       const cv = QK.compareView({
-        entities: E.map((x, i) => ({ name: x.p.name, sub: [BP.teamAbbr(x.b.team), x.b.pos || x.b.role, U.sampleLine(x.b, KIND, U.setFor(KIND, x.b), null).split(' · peers')[0]].filter(Boolean).join(' · '), colour: (BP.teamInfo(x.b.team) || {}).colour, href: BP.playerHref(x.id, { level: L, role: KIND, season: S }) })),
+        entities: E.map((x, i) => ({ name: x.p.name, sub: [BP.teamAbbr(x.b.team), x.b.pos || x.b.role, U.sampleLine(x.b, KIND, U.setFor(KIND, x.b), null).split(' · ')[0]].filter(Boolean).join(' · '), colour: U.raw(x.b.team), alt: U.alt(x.b.team), short: sn[i], href: BP.playerHref(x.id, { level: L, role: KIND, season: S }) })),
         groups: cgroups
       }) + QK.verdicts(verd);
-      h += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-7">' + U.card2('Side by side', 'Peers: ' + esc(peer) + why + '. The pill is the percentile (100 = best); the best value in each row is highlighted.', cv) + '</div>' +
+      h += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-7">' + U.card2(E.length === 2 ? 'Tale of the tape' : 'Side by side', 'Peers: ' + esc(peer) + why + (E.length === 2 ? '. Bar length = percentile (100 = best); the better number in each row is solid.' : '. The pill is the percentile (100 = best); the best value in each row is highlighted.'), cv) + '</div>' +
         '<div class="qk-span-5"><div class="bp-stack">' + U.card2('Where they sit', 'Every ' + esc(peer.replace(/^MLB /, '')) + ' past the floor this season', U.seg('cmp-dseg', 'Metric', flat.slice(0, 5).map(x => [x[0], U.metaOf(KIND, x[0], gl).label]), '') + '<div id="cmp-dist" style="margin-top:10px">' + QK.empty('Pick a metric', 'The peer group loads on request (the season catalogue is several megabytes).') + '</div>') +
         U.card2('Samples', 'Percentiles need ' + (U.floorOf(setKey, null) || {}).full + '+ ' + ((U.floorOf(setKey, null) || {}).unit || '') + ' over a full season (prorated in season)', '<ul class="bp-list">' + E.map((x, i) => '<li><span class="bp-dot" style="background:' + COLS[i] + '"></span>' + U.playerEnt(x.id, L, null, KIND) + '<span class="v" style="font:600 var(--fs-xs) var(--font-num)">' + esc(U.sampleLine(x.b, KIND, U.setFor(KIND, x.b), null).split(' · peers')[0]) + '</span></li>').join('') + '</ul>', { flush: true }) +
         '</div></div></div></section>';

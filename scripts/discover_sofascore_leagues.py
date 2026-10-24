@@ -231,4 +231,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    finally:
+        sofascore.save_team_colours()   # teamColors from the answers this run received (no extra call)

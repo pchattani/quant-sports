@@ -39,7 +39,10 @@ U.seg = (id, label, opts, active) => '<div class="qk-seg" id="' + esc(id) + '" r
   '<button type="button" aria-pressed="' + (String(o[0]) === String(active) ? 'true' : 'false') + '" data-value="' + esc(o[0]) + '">' + esc(o[1]) + '</button>').join('') + '</div>';
 
 /* ── teams ─────────────────────────────────────────────────────────────── */
-U.team = (tid, L, S) => { const x = BP.teamInfo(tid) || {}; return { name: x.short || x.name || BP.teamName(tid), abbr: BP.teamAbbr(tid), colour: x.colour, href: BP.teamHref(tid, L, S) }; };
+U.team = (tid, L, S) => { const x = BP.teamInfo(tid) || {}; return { name: x.short || x.name || BP.teamName(tid), full: x.name || '', short: x.short || '', abbr: BP.teamAbbr(tid), colour: x.colour, alt: x.alt || '', href: BP.teamHref(tid, L, S) }; };
+/* v4: the raw kit colour and the alternate, for team blocks (QK.color.block / blockPair) */
+U.raw = tid => (BP.teamInfo(tid) || {}).colour || '';
+U.alt = tid => (BP.teamInfo(tid) || {}).alt || '';
 U.tcol = tid => {
   const c = (BP.teamInfo(tid) || {}).colour;
   return c && QK.color.parse(c) ? QK.color.team(c) : QK.cssVar('--c-other');
@@ -206,7 +209,7 @@ U.metaOf = (kind, id, gl) => {
   return { key: id, label: d[0] || g.label || id, tip: d[1] || g.desc || '', fmt: g.fmt, lower: !!g.lower };
 };
 U.fmtBy = (meta, v) => (isNum(v) ? BP.fmtVal(v, (meta && meta.fmt) || '2') : '—');
-/* v3 (Matchday): a plain-English line under each metric on the percentile rail. */
+/* A plain-English line under each metric on the percentile meters. */
 U.SUB = {
   hitter: { xwoba_n: 'What the contact deserved, walks and strikeouts in, any park.', woba: 'Every way of reaching base, weighted by the runs it is worth.',
     barrel_pct: 'Balls hit at the speed and angle that become extra-base hits.', hard_pct: 'Balls in play at 95 mph or harder.', bat_speed: 'How fast the sweet spot moves on a real swing.',
@@ -244,7 +247,7 @@ U.pctGroups = (row, kind, setKey, gl, which, teamGames, prev) => {
     }).filter(Boolean)
   })).filter(g => g.rows.length);
 };
-/* "How sure are we?" at the top of a Model page (kit v3): <L>/calibration.json read with QK.calib.find, rendered with
+/* "How sure are we?" at the top of a Model page (kit v4: "We say it. Then we check it."): <L>/calibration.json read with QK.calib.find, rendered with
    QK.howSure into a section put first in el; nothing is shown when the level has no game backtest (Triple-A today). */
 U.howSureTop = (el, L) => {
   if (!el) return;
@@ -256,7 +259,7 @@ U.howSureTop = (el, L) => {
     if (!BP.ok(cj) || !QK.calib.find(cj) || !box.isConnected) return;
     const ss = Object.keys((cj.games || {}).seasons || {}).sort();
     box.hidden = false;
-    box.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'When we say 60%, does it happen 60% of the time?', sub: 'Every pre-game forecast since ' + (ss[0] || 'the first season') + ', made walk-forward from what was known before the first pitch, bucketed by our chance for the home team, against how often the home team won.' }) + '<div></div>';
+    box.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every pre-game forecast since ' + (ss[0] || 'the first season') + ', made walk-forward from what was known before the first pitch, grouped by our chance for the home team, against how often the home team won. When the two bars match, our numbers mean what they say.' }) + '<div></div>';
     QK.howSure(box.lastChild, { calibration: cj, league: BP.levelName(L), span: ss.length ? ss[0] + ' to ' + ss[ss.length - 1] : '', subject: 'the home team' });
   });
 };

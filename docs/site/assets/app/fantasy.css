@@ -1,12 +1,12 @@
 /* The Quant Footballer — Fantasy layout (fb-fa- prefix). */
-.fb-fa-pos { display: inline-grid; place-items: center; min-width: 32px; height: 18px; padding: 0 5px; border-radius: 4px; font: 700 9.5px var(--font-num); color: var(--ink-1); background: color-mix(in srgb, var(--k) 32%, var(--s-2)); }
+.fb-fa-pos { display: inline-grid; place-items: center; min-width: 32px; height: 18px; padding: 0 5px; border-radius: 0; font: 700 9.5px var(--font-num); color: var(--ink-1); background: color-mix(in srgb, var(--k) 32%, var(--s-2)); }
 .fb-fa-num { width: 88px; }
 .fb-fa-sub { font-size: var(--fs-2xs); color: var(--ink-3); }
-.fb-fa-tier { display: inline-grid; place-items: center; min-width: 22px; height: 18px; border-radius: 4px; font: 700 10px var(--font-num); color: var(--bg); }
+.fb-fa-tier { display: inline-grid; place-items: center; min-width: 22px; height: 18px; border-radius: 0; font: 700 10px var(--font-num); color: var(--bg); }
 .fb-fa-tier.t1 { background: var(--st-good); } .fb-fa-tier.t2 { background: color-mix(in srgb, var(--st-good) 50%, var(--st-warn)); }
 .fb-fa-tier.t3 { background: var(--st-warn); } .fb-fa-tier.t4 { background: var(--st-serious); } .fb-fa-tier.t5, .fb-fa-tier.t6 { background: var(--ink-4); }
 .fb-fa-caps { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
-.fb-fa-cap { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: var(--r-2); border: 1px solid var(--line-1); border-left: 3px solid var(--k); background: var(--s-2); }
+.fb-fa-cap { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 0; border: 1px solid var(--line-1); border-left: 3px solid var(--k); background: var(--s-2); }
 .fb-fa-cap-r { font: 700 var(--fs-lg) var(--font-num); color: var(--ink-3); }
 .fb-fa-cap-n { min-width: 0; overflow: hidden; }
 .fb-fa-cap-p { text-align: right; }
@@ -15,10 +15,10 @@
 .fb-fa-legend { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0; font-size: var(--fs-xs); }
 .fb-fa-fdrwrap { max-height: 720px; }
 .fb-fa-fdrc { padding: 3px 4px !important; }
-.fb-fa-fdr { display: inline-flex; align-items: baseline; justify-content: center; gap: 4px; min-width: 64px; padding: 4px 6px; border-radius: 5px; font: 700 10.5px var(--font-ui); color: var(--bg); }
+.fb-fa-fdr { display: inline-flex; align-items: baseline; justify-content: center; gap: 4px; min-width: 64px; padding: 4px 6px; border-radius: 0; font: 700 10.5px var(--font-ui); color: var(--bg); }
 .fb-fa-fdr + .fb-fa-fdr { margin-left: 3px; }
-.fb-fa-fdr i { font-style: normal; font-weight: 500; opacity: 0.75; }
-.fb-fa-fdr b { font: 600 10px var(--font-num); opacity: 0.85; }
+.fb-fa-fdr i { font-style: normal; font-weight: 500; }
+.fb-fa-fdr b { font: 600 10px var(--font-num); }
 .fb-fa-legend .fb-fa-fdr { min-width: 26px; }
 .fb-fa-fdr.r1 { background: var(--st-good); } .fb-fa-fdr.r2 { background: color-mix(in srgb, var(--st-good) 50%, var(--st-warn)); }
 .fb-fa-fdr.r3 { background: var(--st-warn); } .fb-fa-fdr.r4 { background: var(--st-serious); } .fb-fa-fdr.r5 { background: var(--st-crit); }

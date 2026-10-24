@@ -412,7 +412,9 @@ function jumpNav(el, r) {
     const heads = Array.prototype.slice.call(el.querySelectorAll('.card > .card-header, .qk-card > .qk-card-head')).filter(h => h.offsetParent);
     let nav = el.parentNode.querySelector('.bp-jump');
     if (heads.length < 4) { if (nav) nav.remove(); return; }
-    if (!nav) { nav = document.createElement('nav'); nav.className = 'bp-jump'; nav.setAttribute('aria-label', 'On this page'); el.parentNode.insertBefore(nav, el); }
+    /* v4: on a page with the full-bleed hero the strip sits under the hero and its tabs, not above the hero */
+    const after = el.querySelector('.qk-ph') ? el.querySelector('.bp-flexrow, .bp-tabs2, .qk-tabs') : null;
+    if (!nav) { nav = document.createElement('nav'); nav.className = 'bp-jump'; nav.setAttribute('aria-label', 'On this page'); if (after) after.parentNode.insertBefore(nav, after.nextSibling); else el.parentNode.insertBefore(nav, el); }
     const label = h => { const t = h.querySelector('.qk-card-title'); const raw = t ? t.textContent : (h.childNodes[0] ? h.childNodes[0].textContent : h.textContent); return String(raw || '').trim().slice(0, 34); };
     nav.innerHTML = '<div class="qk-chips scroll">' + heads.map((h, i) => '<button type="button" class="qk-chip" data-i="' + i + '">' + esc(label(h)) + '</button>').join('') + '</div>';
     nav.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
@@ -545,8 +547,10 @@ function putTeam(tid, x, L) {
   if (!tid || !x || typeof x !== 'object') return;
   const cur = TEAMS[tid] || {};
   const o = {};
-  ['name', 'abbr', 'short', 'league', 'division', 'colour', 'venue', 'parent', 'city', 'placeholder', 'jp'].forEach(k => { if (x[k] !== undefined && x[k] !== null && x[k] !== '') o[k] = x[k]; });
+  ['name', 'abbr', 'short', 'league', 'division', 'colour', 'alt', 'venue', 'parent', 'city', 'placeholder', 'jp'].forEach(k => { if (x[k] !== undefined && x[k] !== null && x[k] !== '') o[k] = x[k]; });
   if (x.color && !o.colour) o.colour = x.color;
+  /* v4: the second kit colour (the split hero's fallback when two kits clash), as alt or alt_colour */
+  if (!o.alt && (x.alt_colour || x.alt_color)) o.alt = x.alt_colour || x.alt_color;
   if (L && !cur.level) o.level = L;
   TEAMS[tid] = Object.assign({}, cur, o);
 }
@@ -930,7 +934,8 @@ function teamMark(tid, size) {
   const x = TEAMS[String(tid)] || {};
   return window.QK ? QK.teamMark({ name: x.name || String(tid), abbr: x.abbr || teamAbbr(tid), colour: x.colour }, size) : teamBar(tid);
 }
-function teamObj(tid, L, S) { const x = TEAMS[String(tid)] || {}; return { name: x.short || x.name || String(tid), abbr: x.abbr || teamAbbr(tid), colour: x.colour, href: teamHref(tid, L, S) }; }
+/* v4: full (the city line on the split hero), short, alt (the second kit colour; the kit's fallbacks cover a club without one) */
+function teamObj(tid, L, S) { const x = TEAMS[String(tid)] || {}; return { name: x.short || x.name || String(tid), full: x.name || '', short: x.short || '', abbr: x.abbr || teamAbbr(tid), colour: x.colour, alt: x.alt || '', href: teamHref(tid, L, S) }; }
 /* The raw club colour (for fills behind white text). */
 function teamColourRaw(tid) { const x = TEAMS[String(tid)] || {}; return x.colour || C.bg3; }
 function teamBar(tid) { return '<span class="team-bar" style="background:' + teamColour(tid) + '"></span>'; }

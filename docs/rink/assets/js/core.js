@@ -1217,7 +1217,11 @@ function sortable(el) {
 }
 function lerp(a, b, t) { return a + (b - a) * t; }
 /* Savant-style: blue at the bottom, grey in the middle, red at the top (p is 0-100). */
+/* v4: the kit's percentile scale (cold blue to grey to hot red, QK.pctHex) and its ink (QK.pctInk: white or pure black,
+   whichever clears AA), so the legacy pills, dots and heat cells read as the Broadcast pages do */
+function pctInk(p) { return window.QK && QK.pctInk ? QK.pctInk(p) : '#ffffff'; }
 function pctColor(p) {
+  if (isNum(p) && window.QK && QK.pctHex) return QK.pctHex(p);
   if (!isNum(p)) return '#30363d';
   const t = Math.max(0, Math.min(100, p)) / 100;
   const from = t < 0.5 ? C.pctLow : C.pctMid, to = t < 0.5 ? C.pctMid : C.pctHigh;
@@ -1226,7 +1230,7 @@ function pctColor(p) {
 }
 function pctPill(p) {
   if (!isNum(p)) return '<span class="pct-pill empty">—</span>';
-  return '<span class="pct-pill" style="background:' + pctColor(p) + '">' + Math.round(p) + '</span>';
+  return '<span class="pct-pill" style="background:' + pctColor(p) + ';color:' + pctInk(p) + '">' + Math.round(p) + '</span>';
 }
 function pctRow(label, p, valueText, title) {
   const known = isNum(p);
@@ -1235,7 +1239,7 @@ function pctRow(label, p, valueText, title) {
     '<span class="pct-label">' + esc(label) + '</span>' +
     '<div class="pct-bar">' + (known
       ? '<div class="pct-fill" style="width:' + x + '%;background:' + pctColor(p) + '"></div>' +
-        '<span class="pct-dot" style="left:' + x + '%;background:' + pctColor(p) + '">' + Math.round(p) + '</span>'
+        '<span class="pct-dot" style="left:' + x + '%;background:' + pctColor(p) + ';color:' + pctInk(p) + '">' + Math.round(p) + '</span>'
       : '<span class="pct-none">not enough data</span>') +
     '</div><span class="pct-val">' + (valueText === undefined ? '' : valueText) + '</span></div>';
 }
@@ -1571,7 +1575,7 @@ return {
   compareHref: compareHref, glossHref: glossHref, href: href, ghref: href, sq: sq,
   // HTML
   card: card, muted: muted, chip: chip, pill: pill, notBuilt: notBuilt, tableHTML: tableHTML, sortable: sortable,
-  pctPill: pctPill, pctColor: pctColor, pctRow: pctRow, statTile: statTile, tile: statTile, probCell: probCell, edgeHTML: edgeHTML, ptsEdge: ptsEdge,
+  pctPill: pctPill, pctColor: pctColor, pctInk: pctInk, pctRow: pctRow, statTile: statTile, tile: statTile, probCell: probCell, edgeHTML: edgeHTML, ptsEdge: ptsEdge,
   splitBar: splitBar, divColour: divColour, seqColour: seqColour, toggles: toggles, wireToggles: wireToggles, pageHead: pageHead,
   // charts
   plot: plot, layout: layout, purge: purge, PALETTE: PALETTE, C: C, DARK_LAYOUT: DARK_LAYOUT, PLOTLY_CONF: PLOTLY_CONF,

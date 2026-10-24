@@ -57,6 +57,7 @@ def people() -> dict[str, dict]:
                               _col(df, "draft_team", "draft_club"))
             rk, ls = _col(df, "rookie_season", "rookie_year"), _col(df, "last_season")
             ht, wt = _col(df, "height"), _col(df, "weight")
+            jn = _col(df, "jersey_number")
             for r in df.to_dict("records"):
                 pid = an.sid(r.get(idc))
                 if not pid or not pid.startswith("00-"):
@@ -68,7 +69,8 @@ def people() -> dict[str, dict]:
                             "college": an.sid(r.get(col)) if col else None,
                             "draft": _draft(r, dy, dr, dp, dt),
                             "rookie": an.inum(r.get(rk)) if rk else None, "last": an.inum(r.get(ls)) if ls else None,
-                            "height": an.fnum(r.get(ht)) if ht else None, "weight": an.fnum(r.get(wt)) if wt else None}
+                            "height": an.fnum(r.get(ht)) if ht else None, "weight": an.fnum(r.get(wt)) if wt else None,
+                            "number": jersey(r.get(jn)) if jn else None}
     _PEOPLE = out
     return out
 
@@ -113,6 +115,35 @@ def reset() -> None:
     global _PEOPLE, _ESPN
     _PEOPLE = None
     _ESPN = None
+
+
+def jersey(v: Any) -> int | None:
+    """A jersey number from an nflverse column (12, 12.0, "12"); None when missing or out of the 0-99 range."""
+    n = an.inum(v)
+    return n if n is not None and 0 <= n <= 99 else None
+
+
+def season_numbers(season: int | None) -> dict[str, int]:
+    """{gsis_id: jersey number} from the season's nflverse weekly rosters (the release the fantasy and availability
+    models already read), each player's latest week; {} when the release is not on disk."""
+    if season is None:
+        return {}
+    from oddsmarkets.nfl.analytics.context import load_release
+    try:
+        df = load_release("weekly_rosters", int(season), ["gsis_id", "week", "jersey_number"])
+    except Exception as exc:                                     # noqa: BLE001
+        logger.info("weekly rosters %s: %s", season, exc)
+        return {}
+    if df is None or not len(df) or "jersey_number" not in df.columns or "gsis_id" not in df.columns:
+        return {}
+    out: dict[str, int] = {}
+    wk = df["week"] if "week" in df.columns else None
+    rows = df.assign(_w=wk).sort_values("_w", na_position="first") if wk is not None else df
+    for pid, j in zip(rows["gsis_id"], rows["jersey_number"]):
+        pid, n = an.sid(pid), jersey(j)
+        if pid and n is not None:
+            out[pid] = n                                         # later weeks overwrite earlier ones
+    return out
 
 
 def season_roster(ctx) -> dict[str, dict]:

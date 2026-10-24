@@ -1,7 +1,7 @@
 /* The Quant Campus — Lab (#/<L>/lab) and Model (#/<L>/model?tab=method|calibration|glossary|terms).
  * Lab: build-your-own scatter and table over lab_teams.json / lab_players.json (pick x, y, filter, colour by
  * conference or position; the table beside the chart holds the same rows).
- * Model: "How sure are we?" at the top (kit v3: QK.howSure from <L>/calibration.json, shown only when the file is
+ * Model: "We say it. Then we check it." at the top (kit v4: QK.howSure from <L>/calibration.json, shown only when the file is
  * there), methodology (docs/campus/MODELS_CFB.md or MODELS_HOOPS.md rendered), the walk-forward backtest against
  * closing lines (calibration.json), the glossary (data/glossary.json) and the terms.
  * Payload copy still reworded here for the local payloads (23 Oct 2026): noteV2 (the local mbb / wbb / cfb
@@ -70,7 +70,8 @@ function compare(el, p) {
     };
     var groups = useSpec ? [{ label: 'Headline: ' + G.d.toLowerCase(), rows: rowsOf(hs) }, { label: 'More', rows: rowsOf(G.m.filter(function (m) { return m.set === 's' && E.some(function (e) { return isNum((e.p.values || {})[m.id]); }); }).slice(0, 6)) }]
       : [{ label: 'Season numbers', rows: rowsOf((cat.metrics || []).slice(0, 10)) }];
-    var ents = E.map(function (e) { return { name: e.p.name, href: CC.playerHref(L, e.id, S), colour: null, sub: [CC.tabbr(L, e.p.team), e.p.pos, isNum(e.p.gp) ? e.p.gp + ' GP' : ''].filter(Boolean).join(' · ') }; });
+    /* v4: two players draw the tale of the tape in their team colours (QK.tape via QK.compareView); three keep the table */
+    var ents = E.map(function (e) { return { name: e.p.name, short: QK.surname(e.p.name || '') || e.p.name, href: CC.playerHref(L, e.id, S), colour: CC.traw(L, e.p.team), alt: CC.talt(L, e.p.team) || undefined, sub: [CC.tabbr(L, e.p.team), e.p.pos, isNum(e.p.gp) ? e.p.gp + ' GP' : ''].filter(Boolean).join(' · ') }; });
     /* verdicts: for each player, the metric where the player's percentile beats the others' by the most */
     var short = E.map(function (e) { return QK.surname(e.p.name || ''); });
     var verd = E.map(function (e, i) {
@@ -83,7 +84,7 @@ function compare(el, p) {
       return br ? { title: CMP_TYPE[br.key] || 'The standout', who: short[i], text: 'best of the ' + E.length + ' on ' + (/^[A-Z][a-z]/.test(br.label) ? br.label.charAt(0).toLowerCase() + br.label.slice(1) : br.label) + ' (' + br.fmt(br.values[i]) + ', ' + QK.ordinal(Math.round(br.pctls[i])) + ' percentile).' } : null;
     });
     var q = short.length === 2 ? short[0] + ' or ' + short[1] + '?' : short.slice(0, -1).join(', ') + ' or ' + short[short.length - 1] + '?';
-    html += '<section class="qk-section" style="margin-top:var(--sp-8)">' + QK.sectionHead({ kicker: 'Side by side', title: esc(q), html: true, sub: 'Value and percentile against ' + esc(/^[A-Z][a-z]/.test(peer) ? peer.charAt(0).toLowerCase() + peer.slice(1) : peer) + ' (100 = best). The best in each row is highlighted' + (E.length === 2 ? '; the last column is ' + esc(short[0]) + ' minus ' + esc(short[1]) + ', green when ' + esc(short[0]) + ' is better.' : '.') }) +
+    html += '<section class="qk-section" style="margin-top:var(--sp-8)">' + QK.sectionHead({ kicker: 'Side by side', title: esc(q), html: true, sub: (E.length === 2 ? 'Bar length = percentile against ' : 'Value and percentile against ') + esc(/^[A-Z][a-z]/.test(peer) ? peer.charAt(0).toLowerCase() + peer.slice(1) : peer) + ' (100 = best). ' + (E.length === 2 ? 'The better number in each row is solid.' : 'The best in each row is highlighted.') }) +
       U.card(E.length + ' players, one metric set', 'The headline set for the group from our metrics spec: stable and predictive rates first',
       QK.compareView({ entities: ents, groups: groups }) + QK.verdicts(verd) +
       (!useSpec ? '<p class="cc-note">' + (same || samePos ? 'The spec’s headline rates for this group are not in this season’s payload yet, so the catalogue’s own numbers are shown.' : 'Different positions: percentiles are against all qualified players, so position effects stay in. Compare players of one position for the spec’s headline set.') + '</p>' : '')) + '</section>';
@@ -348,8 +349,8 @@ CC.route('model', function (el, p) {
     var cb = CC.calib(cj);
     if (!host || !U.alive(host) || !cb) return;
     var ss = (cj.seasons || []).map(Number).filter(isNum).sort(function (x, y) { return x - y; });
-    host.innerHTML = '<section class="qk-section cc-sec" style="margin-top:var(--sp-6)">' + QK.sectionHead({ kicker: 'How sure are we?', title: 'When we say 70%, does it happen 70% of the time?',
-      sub: 'Every pre-game forecast from the game model, each made with only the games before it, grouped by the chance we gave the home team.' }) + '<div id="mb-sure-m"></div></section>';
+    host.innerHTML = '<section class="qk-section cc-sec" style="margin-top:var(--sp-6)">' + QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.',
+      sub: 'Every pre-game forecast from the game model, each made with only the games before it, grouped by the chance we gave the home team. When the two bars match, our numbers mean what they say.' }) + '<div id="mb-sure-m"></div></section>';
     QK.howSure(QK.$('#mb-sure-m', host), { bins: cb.bins, brier: cb.brier, n: cb.n, league: CC.LSHORT[L], span: ss.length ? CC.seasonLabel(L, ss[0]) + ' to ' + CC.seasonLabel(L, ss[ss.length - 1]) : '', subject: 'the home team', unit: 'games' });
   });
   if (tab === 'terms') { var t = document.getElementById('disclaimer-template'); body.innerHTML = t ? t.innerHTML : ''; return null; }

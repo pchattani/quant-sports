@@ -1,8 +1,8 @@
 /* The Quant Campus — Games (#/<L>/games) and the game centre (#/<L>/game/<gid>).
  * Games: by week (cfb: weeks, championship week, bowls, playoff) or by day (basketball), filters for ranked teams,
  * conference games, a conference, close lines and model-v-market gaps. Reads <L>/<S>/schedule.json.
- * Game centre (kit v3 "Matchday", the Rink game page is the reference): the hero is QK.previewCard (away "at" home
- * with records, the score bug when live, our chance for the favourite as a big blue number with a how-sure note, the
+ * Game centre (kit v4 "Broadcast", the Rink game page is the reference): the hero is QK.previewCard, the diagonal split
+ * hero (away "at" home in the team colours with records, the clock when live, our chance for the favourite as a big blue number with a how-sure note, the
  * team-colour bar, the market as a quiet labelled reference before the game, how the teams match up from the
  * ratings); beside it the tiles and our forecast table (the market a reference column; "How our forecast is built",
  * the trial labelled as a trial); then win probability (model and ESPN), score flow, drives and EPA (cfb),
@@ -130,7 +130,7 @@ CC.pair = function (L, a, h) {
 };
 function pickOf(L, g, margin) { return isNum(margin) ? (Math.abs(margin) < 0.05 ? 'Even' : CC.tabbr(L, margin > 0 ? g.home : g.away) + ' by ' + CC.f(Math.abs(margin), 1)) : '—'; }
 
-/* v3 (Matchday) hero: QK.previewCard with records, our chance (the live curve's last point once it starts, our
+/* v4 (Broadcast) hero: QK.previewCard, the diagonal split, with records, our chance (the live curve's last point once it starts, our
    pre-game call after it ends), a how-sure note with the projected score and the margin's spread, the market as a
    quiet reference line before the game (game detail is one of the two places it may appear) and how the teams match
    up from the season ratings. */
@@ -139,7 +139,9 @@ function hero(L, g, season) {
   var pg = g.pregame || {}, m = pg.model || g.model || {}, mk = pg.market || g.market || {};
   var cols = CC.pair(L, g.away, g.home);
   var G = CC.game(g, L);
-  G.home.colour = cols[1]; G.away.colour = cols[0];
+  /* v4: the diagonal hero takes the raw kit colours and the alternates (CC.side: alt and full; QK.color.blockPair makes
+     the blocks and resolves a clash, slate when no alternate is there yet); the lifted pair stays for the factors */
+  G.home.colour = CC.traw(L, g.home) || cols[1]; G.away.colour = CC.traw(L, g.away) || cols[0];
   G.home.record = CC.rec(L, g.season, g.home); G.away.record = CC.rec(L, g.season, g.away);
   var wpm = g.wp && g.wp.model && g.wp.model.length ? g.wp.model[g.wp.model.length - 1][1] : null;
   if (live && isNum(wpm)) { G.wp_home = wpm; G.pre_only = undefined; }

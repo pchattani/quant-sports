@@ -1,16 +1,19 @@
-/* The Quant Bullpen — the player page (#/<L>/hitter/<pid>, #/<L>/pitcher/<pid>, #/player/<pid>) on kit v3 "Matchday"
- * (the Rink player page is the reference, MIGRATION_V3.md).
+/* The Quant Bullpen — the player page (#/<L>/hitter/<pid>, #/<L>/pitcher/<pid>, #/player/<pid>) on kit v4 "Broadcast"
+ * (the Rink player page is the reference, MIGRATION_V4.md).
  *
- * Overview, as the concept: a crumb; the header (tilted tile, kicker, name, chips) with "The short version" in plain
- *   English; stat tiles with percentile chips; the Savant-style percentile rail against the position (hitters:
- *   catchers, first base ... designated hitter) or role (starters, relievers), the spec's metric set
- *   (docs/METRICS_SPEC.md; BP.ui.SETS), the sample and the floor shown, early metrics dashed, a plain line per
- *   metric and a hollow ring for last season (from the player file when the builder writes it, else last season's
- *   catalogue when the rail scrolls into view); beside it "How sure are we?" (when the numbers settle), the form
- *   through the season and "Their type" (the most similar player-seasons); pitchers: the arsenal (pitch mix and the
- *   movement chart, in the pitch colours, against the league's averages for each type); a compare with the two
- *   closest matches this season and verdicts; the club's next game and last result; then among peers, next
- *   season's projection with its 80% range, splits, movement, season by season.
+ * Overview, as the concept: a crumb; the full-bleed team-colour hero (QK.playerHeader: the alternate colour on a
+ *   diagonal, the outlined initials, the name in Bebas, chips) with the black strip of five numbers (percentiles
+ *   against the peers) and "The short version"; the LED percentile meters against the position (hitters: catchers,
+ *   first base ... designated hitter) or role (starters, relievers), the spec's metric set (docs/METRICS_SPEC.md;
+ *   BP.ui.SETS), the sample and the floor shown, early metrics dashed, a plain line per metric and a ▼ for last
+ *   season (from the player file when the builder writes it, else last season's catalogue when the rail scrolls
+ *   into view), with "How sure are we?" under them; beside them the tale of the tape against the closest match this
+ *   season (chips switch between the three closest; verdicts under it); pitchers: the arsenal (pitch mix and the
+ *   movement chart, in the pitch colours, against the league's averages for each type); what to watch tonight (the
+ *   club's next game as the scoreboard bug, with the probable starters and how the clubs match up) beside the last
+ *   game (the line score by inning and our win chance through it, from the game file); the form through the season
+ *   and "Their type"; then among peers (peers.json when the build writes it), next season's projection with its 80%
+ *   range, splits, movement, season by season.
  * Detail (?view=detail): the full pre-redesign page (every metric, spray chart, zones, bat tracking, tunnels ...).
  *
  * First load: data/players/<pid>.json (the current season's values, pct_role and samples are in it), glossary.json and
@@ -113,31 +116,36 @@ function draw(el, c) {
     if (isNum(samp) && samp < 150) t += ' Early days, so read it lightly.';
     return t;
   }
-  const hero = QK.playerHeader({ name: p.name, pos: posName, kicker: BP.levelName(L) + ' ' + S + (pit ? (isNum(n.games) ? ' · ' + n.games + ' games' : '') : (isNum(v.pa) ? ' · ' + v.pa + ' PA' : '')),
-    team: tid ? { name: BP.teamName(tid), abbr: BP.teamAbbr(tid), colour: (BP.teamInfo(tid) || {}).colour, href: BP.teamHref(tid, L, S) } : null,
-    meta: [isNum(a) ? a + ' years old' : null, 'Bats ' + (p.bats || '—') + ', throws ' + (p.throws || '—'), p.debut ? 'MLB debut ' + BP.fmtDate(p.debut, { year: true }) : null], tags: tags, short: shortVersion() });
+  /* the hero is built after the five numbers below (its black strip) */
+  const heroOf = strip => QK.playerHeader({ name: p.name, pos: posName, kicker: BP.levelName(L) + ' · ' + S + (pit ? (isNum(n.games) ? ' · ' + n.games + ' games' : '') : (isNum(v.pa) ? ' · ' + v.pa + ' PA' : '')),
+    team: tid ? { name: BP.teamName(tid), abbr: BP.teamAbbr(tid), colour: U.raw(tid), alt: U.alt(tid), href: BP.teamHref(tid, L, S) } : null,
+    meta: [isNum(a) ? a + ' years old' : null, 'Bats ' + (p.bats || '—') + ', throws ' + (p.throws || '—'), p.debut ? 'MLB debut ' + BP.fmtDate(p.debut, { year: true }) : null], tags: tags, strip: strip, short: shortVersion() });
   const role = c.route === 'player' ? null : c.route;
   const base = BP.playerHref(pid, { level: L, role: role, season: S });
   const tabs = [['overview', 'Overview', base], ['detail', 'Detail: every metric, spray, zones' + (pit ? ', tunnels' : ', bat tracking'), base + (base.indexOf('?') >= 0 ? '&' : '?') + 'view=detail']];
   let twoTabs = '';
   if (c.twoWay) twoTabs = '<div class="qk-seg" role="group" aria-label="Side" style="margin-left:auto"><a class="qk-btn' + (pit ? '' : ' primary') + '" href="' + esc(BP.playerHref(pid, { level: L, role: 'hitter', season: S })) + '">Hitting</a><a class="qk-btn' + (pit ? ' primary' : '') + '" href="' + esc(BP.playerHref(pid, { level: L, role: 'pitcher', season: S })) + '">Pitching</a></div>';
 
-  // stat tiles: ours first, with the percentile against the peers
+  /* v4: the black strip of five numbers under the hero, the plain one first, then ours, each with its percentile
+     against the peers where there is one */
   const pc = k => (ok && isNum(pr[k]) ? pr[k] : null);
   const k = [];
   if (pit) {
-    if (isNum(v.war)) k.push({ label: 'Bullpen WAR', value: BP.num(v.war, 1), pctl: pc('war'), signal: true, sub: isNum(v.war_x) ? 'from xwOBA+ against ' + BP.num(v.war_x, 1) : 'runs allowed basis', tip: 'Our wins above replacement for a pitcher, from the runs allowed (RA9) against a replacement-level arm' });
-    if (isNum(v.pitching_plus)) k.push({ label: 'Pitching+', value: String(Math.round(v.pitching_plus)), pctl: pc('pitching_plus'), sub: 'stuff, location and sequence · 100 = average', tip: 'Our pitch model: expected run value from the pitch, where it went and the count' });
-    if (isNum(v.stuff_plus)) k.push({ label: 'Stuff+', value: String(Math.round(v.stuff_plus)), pctl: pc('stuff_plus'), sub: 'the physics of the pitches · 100 = average' });
-    if (isNum(v.xfip)) k.push({ label: 'xFIP', value: BP.num(v.xfip, 2), pctl: pc('xfip'), sub: 'RA9 ' + BP.num(v.ra9, 2) + ' · FIP ' + BP.num(v.fip, 2) });
+    if (isNum(v.ip)) k.push({ label: 'Innings', value: BP.fmtIP(v.ip), sub: (isNum(v.ra9) ? BP.num(v.ra9, 2) + ' runs allowed per nine' : '') + (isNum(n.games) ? (isNum(v.ra9) ? ', ' : '') + n.games + ' games' : '') });
+    if (isNum(v.war)) k.push({ label: 'Bullpen WAR', value: BP.num(v.war, 1), pctl: pc('war'), signal: true, sub: 'wins above a replacement-level arm', tip: 'Our wins above replacement for a pitcher, from the runs allowed (RA9) against a replacement-level arm' + (isNum(v.war_x) ? '; from xwOBA+ against it would be ' + BP.num(v.war_x, 1) : '') });
+    if (isNum(v.stuff_plus)) k.push({ label: 'Stuff+', value: String(Math.round(v.stuff_plus)), pctl: pc('stuff_plus'), sub: 'the physics of the pitches · 100 = average', tip: 'Speed, movement, spin and release of every pitch, scored against the league: 100 is average, 110 excellent' + (isNum(v.pitching_plus) ? '. Pitching+ (location and count too): ' + Math.round(v.pitching_plus) : '') });
+    if (isNum(v.xfip)) k.push({ label: 'xFIP', value: BP.num(v.xfip, 2), pctl: pc('xfip'), sub: 'runs a nine from what the pitcher controls', tip: 'Fielding-independent pitching with a league-average home-run rate: strikeouts, walks and fly balls only. RA9 ' + BP.num(v.ra9, 2) + ' · FIP ' + BP.num(v.fip, 2) });
     if (isNum(v.k_bb_pct)) k.push({ label: 'K-BB%', value: BP.fmtVal(v.k_bb_pct, 'pct'), pctl: pc('k_bb_pct'), sub: 'strikeouts minus walks per batter' });
+    if (k.length < 5 && isNum(v.pitching_plus)) k.push({ label: 'Pitching+', value: String(Math.round(v.pitching_plus)), pctl: pc('pitching_plus'), sub: 'stuff, location and count · 100 = average' });
   } else {
-    if (isNum(v.war)) k.push({ label: 'Bullpen WAR', value: BP.num(v.war, 1), pctl: pc('war_600'), signal: true, sub: isNum(v.war_600) ? BP.num(v.war_600, 1) + ' per 600 PA (the percentile)' : '', tip: 'Our wins above replacement: batting, baserunning, fielding and position' });
-    if (isNum(v.xwoba_n)) k.push({ label: 'xwOBA+ (park-neutral)', value: BP.fmtAvg(v.xwoba_n), pctl: pc('xwoba_n'), sub: 'our expected wOBA · Savant ' + BP.fmtAvg(v.xwoba_savant), tip: (U.MDESC.hitter.xwoba_n || [])[1] });
-    if (isNum(v.woba)) k.push({ label: 'wOBA', value: BP.fmtAvg(v.woba), pctl: pc('woba'), sub: 'OPS ' + BP.fmtAvg(v.ops) });
-    if (isNum(v.barrel_pct)) k.push({ label: 'Barrel%', value: BP.fmtVal(v.barrel_pct, 'pct'), pctl: pc('barrel_pct'), sub: 'hard-hit ' + BP.fmtVal(v.hard_pct, 'pct') });
-    if (isNum(v.bat_speed)) k.push({ label: 'Bat speed', value: BP.num(v.bat_speed, 1), unit: 'mph', pctl: pc('bat_speed'), sub: isNum(v.sprint_speed) ? 'sprint ' + BP.num(v.sprint_speed, 1) + ' ft/s' : '' });
+    if (isNum(v.hr)) k.push({ label: 'Home runs', value: String(v.hr), sub: isNum(v.avg) ? BP.fmtAvg(v.avg) + ' / ' + BP.fmtAvg(v.obp) + ' / ' + BP.fmtAvg(v.slg) : '', tip: 'Batting average / on-base / slugging' });
+    if (isNum(v.war)) k.push({ label: 'Bullpen WAR', value: BP.num(v.war, 1), pctl: pc('war_600'), signal: true, sub: isNum(v.war_600) ? BP.num(v.war_600, 1) + ' per 600 trips to the plate' : 'wins above replacement', tip: 'Our wins above replacement: batting, baserunning, fielding and position. The percentile is per 600 plate appearances.' });
+    if (isNum(v.xwoba_n)) k.push({ label: 'xwOBA+', value: BP.fmtAvg(v.xwoba_n), pctl: pc('xwoba_n'), sub: 'what the contact deserved · .320 is average', tip: (U.MDESC.hitter.xwoba_n || [])[1] + (isNum(v.xwoba_savant) ? ' Savant’s xwOBA: ' + BP.fmtAvg(v.xwoba_savant) + '.' : '') });
+    if (isNum(v.woba)) k.push({ label: 'wOBA', value: BP.fmtAvg(v.woba), pctl: pc('woba'), sub: 'what happened · OPS ' + BP.fmtAvg(v.ops) });
+    if (isNum(v.barrel_pct)) k.push({ label: 'Barrel%', value: BP.fmtVal(v.barrel_pct, 'pct'), pctl: pc('barrel_pct'), sub: 'the best kind of contact · hard-hit ' + BP.fmtVal(v.hard_pct, 'pct') });
+    if (k.length < 5 && isNum(v.bat_speed)) k.push({ label: 'Bat speed', value: BP.num(v.bat_speed, 1), unit: 'mph', pctl: pc('bat_speed'), sub: isNum(v.sprint_speed) ? 'sprint ' + BP.num(v.sprint_speed, 1) + ' ft/s' : '' });
   }
+  const hero = heroOf(k.slice(0, 5));
 
   // the rail, with last season's ring (from the player file when written, else the catalogue on view)
   // current.hitting / current.pitching carry prev_pct_pos and prev_peer {level, season, group, pa | bf} (4b41ed54)
@@ -158,10 +166,10 @@ function draw(el, c) {
   (pit ? ['k_pct', 'xwoba_n', 'stuff_plus'] : ['k_pct', 'bb_pct', 'xwoba_n']).forEach(id => { const x = at(id); if (x) settle.push(U.metaOf(kind, id, gl).label + ' after about <b>' + QK.fmt.num(Math.round(x[1])) + ' ' + esc(U.UNIT[x[2]] || x[2]) + '</b>'); });
   const samp = pit ? n.bf : n.pa, unit = pit ? 'batters faced' : 'trips to the plate';
   const small = !isNum(samp) || samp < 300;
-  const sureCard = '<article class="qk-card cream"><div class="qk-card-body"><div class="qk-kicker">How sure are we?</div><h3 style="margin:8px 0 6px">' +
-    esc(isNum(samp) ? (small ? (samp < 11 ? NUMW[samp] : QK.fmt.num(Math.round(samp))) + ' ' + unit + ' is a small sample' : QK.fmt.num(Math.round(samp)) + ' ' + unit + ': the picture is settling') : 'No games yet this season') + '</h3>' +
-    '<p style="margin:0;color:var(--ink-2);font-size:15px">' + (pit ? 'Strikeouts and Stuff+ settle fast; runs allowed and results on balls in play take far longer, so lean on the first two early on. ' : 'Strikeouts and walks settle within weeks; batting average on balls in play takes seasons, which is why the rail leans on what the contact deserved. ') +
-    'The hollow rings show last season, where there was one.</p>' + (settle.length ? QK.note('For ' + esc(peerShort) + ': ' + settle.join(', ').replace(/, ([^,]*)$/, ', and $1') + '. This player has ' + (isNum(samp) ? QK.fmt.num(Math.round(samp)) : 'none') + '.') : '') + '</div></article>';
+  /* v4: "How sure are we?" sits under the meters as the explain strip */
+  const settleNote = '<b>How sure are we?</b> ' + esc(isNum(samp) ? (small ? (samp < 11 ? NUMW[samp] : QK.fmt.num(Math.round(samp))) + ' ' + unit + ' is a small sample.' : QK.fmt.num(Math.round(samp)) + ' ' + unit + ': the picture is settling.') : 'No games yet this season.') + ' ' +
+    (pit ? 'Strikeouts and Stuff+ settle fast; runs allowed and results on balls in play take far longer, so lean on the first two early on. ' : 'Strikeouts and walks settle within weeks; batting average on balls in play takes seasons, which is why the meters lean on what the contact deserved. ') +
+    (settle.length ? 'For ' + esc(peerShort) + ': ' + settle.join(', ').replace(/, ([^,]*)$/, ', and $1') + '. ' : '') + 'The ▼ on a meter marks last season, where there was one.';
   const roll = !pit && Array.isArray(cur.rolling) && cur.rolling.length > 5;
   const formCard = roll ? U.card2('Form through the season', 'Rolling xwOBA+ (what the contact deserved, blue) against wOBA (what happened)', U.chart('pp-roll', 240, 'Rolling xwOBA+ and wOBA')) : '';
   const simAll = (p.similar || []).filter(m => String(m.pid) !== pid);
@@ -172,15 +180,16 @@ function draw(el, c) {
 
   const crumb = '<nav class="bp-crumb" aria-label="Breadcrumb"><a href="' + esc(BP.href(pit ? 'pitchers' : 'hitters', L, S)) + '">' + esc(BP.levelName(L)) + ' ' + (pit ? 'pitchers' : 'hitters') + '</a><span aria-hidden="true">›</span>' +
     (tid ? '<a href="' + esc(BP.teamHref(tid, L, S)) + '">' + esc(BP.teamName(tid)) + '</a><span aria-hidden="true">›</span>' : '') + esc(p.name) + '</nav>';
-  let h = crumb + hero + (k.length ? '<div class="bp-tiles">' + QK.stats(k) + '</div>' : '') +
+  /* v4: the hero carries the black strip; then the meters (7) beside the tale of the tape against the closest match (5) */
+  const tapeOn = ok;
+  let h = crumb + hero +
     '<div class="bp-flexrow">' + '<nav class="qk-tabs bp-tabs2" aria-label="Player views">' + tabs.map(t => '<a class="qk-tab" href="' + esc(t[2]) + '" aria-selected="' + (t[0] === 'overview') + '"' + (t[0] === 'overview' ? ' aria-current="page"' : '') + '>' + esc(t[1]) + '</a>').join('') + '</nav>' + twoTabs + '</div>' +
-    '<section class="qk-section bp-sec1"><div class="qk-gside"><div id="pp-pwrap">' + railHTML() + '</div><div class="bp-stack">' + sureCard + formCard + typeCard + '</div></div></section>';
+    '<section class="qk-section bp-sec1"><div class="qk-g75"><div><div id="pp-pwrap">' + railHTML() + '</div>' + QK.explain(settleNote, { cls: 'bp-settle' }) + '</div><div class="bp-stack">' +
+    (tapeOn ? '<div id="pp-tape-h"></div><div class="qk-chips bp-pick" id="pp-tape-pick" role="group" aria-label="Compare with"></div><div id="pp-tape">' + QK.skeleton('lines', 6) + '</div><div id="pp-verd"></div>' : formCard + typeCard) + '</div></div></section>';
   if (pit) h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'The arsenal', title: 'What the player throws', sub: 'Every pitch type thrown ten times or more this season, in the same colours on every chart.' }) +
     '<div class="qk-grid"><div class="qk-span-6">' + U.card2('Pitch mix', 'Usage, speed, Stuff+ and whiffs; the heat cells are percentiles among pitches of the same type', '<div id="pp-mix"></div>') + '</div>' +
     '<div class="qk-span-6">' + U.card2('Movement', 'Average induced vertical break against horizontal break towards the arm side, in inches; size is usage', U.chart('pp-mov', 360, 'Pitch movement') + '<div class="bp-note" id="pp-mov-cap"></div>') + '</div></div></section>';
-  // compare with the two closest matches this season (filled when the catalogue loads, as the section comes into view)
-  h += '<div id="pp-cmp-sent"></div><section class="qk-section" id="pp-cmp-sec" hidden><div id="pp-cmp-h"></div><article class="qk-card"><div class="qk-card-body"><div id="pp-cmp"></div></div></article></section>';
-  // the club's next game and last result
+  // the club's next game (the scoreboard bug) and its last game (the line score and our win chance through it)
   const idx = BP.index() || {};
   const src = L === 'mlb' ? idx : BP.levelInfo(L);
   const isCur = Number(S) === Number(BP.currentSeason(L));
@@ -191,13 +200,34 @@ function draw(el, c) {
     h += '<section class="qk-section"><div class="qk-g2">';
     if (nxt) {
       const g = BP.kitGame(nxt, L);
-      g.league = nxt.series ? BP.seriesText(nxt.series, true) : (L === 'aaa' ? 'Triple-A' : 'MLB');
+      g.league = L === 'aaa' ? 'Triple-A' : 'MLB';
       g.home.record = BP.RECORDS[String(nxt.home)] || ''; g.away.record = BP.RECORDS[String(nxt.away)] || '';
-      h += '<div><div class="qk-kicker" style="margin-bottom:10px">' + (BP.isLive(nxt) ? 'Live now' : 'Next up for the ' + esc(BP.teamName(tid).split(' ').slice(-1)[0])) + '</div>' + QK.previewCard(g, { kicker: g.league + ' · ' + BP.teamName(nxt.away) + ' at ' + BP.teamName(nxt.home) }) + '</div>';
+      /* how the clubs match up: our team ratings (season.json), as on the game page */
+      const rows0 = BP.standingsRows ? BP.standingsRows(c.season || {}) : {};
+      const ra = (rows0[String(nxt.away)] || {}).rating || {}, rh = (rows0[String(nxt.home)] || {}).rating || {};
+      const fx = [];
+      const add = (label, x1, x2, f, low) => { if (isNum(x1) && isNum(x2)) fx.push({ label: label, a: f(x1), b: f(x2), better: Math.abs(x1 - x2) < 1e-9 ? null : ((x1 > x2) !== !!low ? 'a' : 'b') }); };
+      add('Team rating, runs a game', ra.net, rh.net, x => U.signed(x, 2));
+      add('Offence, runs a game', ra.off, rh.off, x => U.signed(x, 2));
+      add('Run prevention, runs a game', (ra.def || 0) + (ra.pitch || 0), (rh.def || 0) + (rh.pitch || 0), x => U.signed(x, 2));
+      const prob = nxt.probables || {};
+      const spTxt = !BP.isLive(nxt) && (prob.home || prob.away) ? 'Probable starters: ' + (prob.away ? BP.playerSurname(prob.away) : 'TBD') + ' v ' + (prob.home ? BP.playerSurname(prob.home) : 'TBD') + '.' : '';
+      const occ = nxt.series ? BP.seriesText(nxt.series, true) : '';
+      h += '<div>' + QK.sectionHead({ kicker: BP.isLive(nxt) ? 'Live now' : (QK.fmt.relDay(nxt.start || nxt.date) === 'Today' ? 'What to watch tonight' : 'Next up'), title: BP.teamShort(nxt.away) + ' at ' + BP.teamShort(nxt.home), sub: occ ? esc(occ) : '', html: true }) +
+        QK.previewCard(g, { layout: 'bug', nick: t => t.short || t.name, factors: fx, factorsTitle: 'How they match up this season', noteExtra: esc(spTxt) }) + '</div>';
     }
-    if (lastG) h += '<div><div class="qk-kicker" style="margin-bottom:10px">Last time out</div>' + BP.gameCard(lastG, { level: L, date: true, why: true }) + '</div>';
+    if (lastG) {
+      const w = lastG.hs >= lastG.as ? [lastG.home, lastG.hs, lastG.away, lastG.as] : [lastG.away, lastG.as, lastG.home, lastG.hs];
+      const ttl = isNum(lastG.hs) && isNum(lastG.as) ? BP.teamAbbr(w[0]) + ' ' + w[1] + ', ' + BP.teamAbbr(w[2]) + ' ' + w[3] : BP.teamShort(lastG.away) + ' at ' + BP.teamShort(lastG.home);
+      h += '<div>' + QK.sectionHead({ kicker: 'Last game', title: ttl, sub: esc([BP.fmtDate(lastG.date, { year: false }), lastG.series ? BP.seriesText(lastG.series, true) : ''].filter(Boolean).join(' · ')), html: true,
+        actions: '<a class="qk-more" href="' + esc(BP.gameHref(lastG.gpk, L, S)) + '">The game centre</a>' }) +
+        '<article class="qk-card"><div class="qk-card-body"><div id="pp-box">' + BP.gameCard(lastG, { level: L, date: true }) + '</div><div id="pp-race"></div></div></article></div>';
+    }
     h += '</div></section>';
   }
+  /* game by game (the form through the season) and their type, when the tape took the side column */
+  if (tapeOn && formCard && typeCard) h += '<section class="qk-section"><div class="qk-gside"><div>' + formCard + '</div><div>' + typeCard + '</div></div></section>';
+  else if (tapeOn && (formCard || typeCard)) h += '<section class="qk-section">' + formCard + typeCard + '</section>';
   // ── more on the player
   h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'More on the player', title: 'Peers, projection and the long view', sub: 'Where the player sits among ' + esc(peerShort) + ', what we expect next season, the splits and every season in the data.' }) +
     U.card2('Among peers', 'Every ' + esc(peerShort) + ' past the floor this season; bars coloured by percentile', '<div id="pp-dist-m" style="margin-bottom:10px">' + U.seg('pp-dseg', 'Metric', DIST[kind], '') + '</div><div id="pp-dist">' +
@@ -232,11 +262,14 @@ function draw(el, c) {
     }));
   }
 
-  // compare: the player and the two closest matches this season on the core set (percentiles), the best highlighted
-  onView(el.querySelector('#pp-cmp-sent'), () => BP.loadYear(catFile, L, S).then(cat => {
-    if (!BP.ok(cat) || !cat.players || !U.alive(el) || !ok) return;
+  // the tale of the tape: the player against one of the three closest matches this season (chips switch)
+  onView(el.querySelector('#pp-tape'), () => BP.loadYear(catFile, L, S).then(cat => {
+    const box = el.querySelector('#pp-tape');
+    if (!box || !U.alive(el)) return;
+    const none = () => { el.querySelector('#pp-tape-h').innerHTML = QK.sectionHead({ kicker: 'Tale of the tape', title: 'Closest matches' }); box.innerHTML = QK.empty('No comparison yet', 'The closest matches appear once the season catalogue has them.'); };
+    if (!BP.ok(cat) || !cat.players || !ok) { none(); return; }
     const P = cat.players, me = P[pid];
-    if (!me) return;
+    if (!me) { none(); return; }
     const keys = U.flat(setKey, 'head').map(x => x[0]);
     const pcOf = r => (setKey === 'ALL' ? r.pct : r.pct_role) || {};
     const mp = pcOf(me);
@@ -245,37 +278,85 @@ function draw(el, c) {
       const q = pcOf(P[id]); let d = 0, m = 0;
       keys.forEach(kk => { if (isNum(mp[kk]) && isNum(q[kk])) { d += (mp[kk] - q[kk]) * (mp[kk] - q[kk]); m++; } });
       return { id: id, d: m >= 4 ? Math.sqrt(d / m) - (want[id] ? 1000 : 0) : null };
-    }).filter(x => isNum(x.d)).sort((x, y) => x.d - y.d).slice(0, 2);
-    if (!cands.length) return;
-    const ids = [pid].concat(cands.map(x => x.id));
-    const E = ids.map(id => P[id]);
-    const bestOf = {};
-    const groups = ((U.SETS[setKey] || {}).head || []).map(g => ({ label: g[0], rows: g[1].map(x => x[0]).filter(kk => U.metricOk(me, kk, setKey, cat.team_games)).map(kk => {
-      const m = U.metaOf(kind, kk, gl), pcl = E.map(e => pcOf(e)[kk]);
-      pcl.forEach((x, i) => { if (!isNum(x)) return; const d = x - Math.max.apply(null, pcl.filter((_, j) => j !== i).map(z => (isNum(z) ? z : 0))); if (!bestOf[i] || d > bestOf[i].d) bestOf[i] = { k: kk, d: d, v: (E[i].values || {})[kk], m: m }; });
-      return { label: m.label, tip: m.tip, better: m.lower ? 'low' : 'high', values: E.map(e => (e.values || {})[kk]), pctls: pcl, fmt: z => U.fmtBy(m, z) };
-    }) })).filter(g => g.rows.length);
-    const names = ids.map(id => BP.playerSurname(id) || QK.surname((P[id] || {}).name || ''));
-    el.querySelector('#pp-cmp-h').innerHTML = QK.sectionHead({ kicker: 'Compare', title: names.slice(0, -1).join(', ') + ' or ' + names[names.length - 1] + '?',
-      sub: 'The closest ' + esc(peerShort) + ' to this player’s profile this season, side by side. The best in each row is highlighted; the small pills are percentiles.',
-      actions: '<a class="qk-more" href="' + esc(BP.compareHref(ids[0], ids[1])) + '">Open in Compare</a>' });
-    const ents = E.map((e, i) => ({ name: e.name, href: BP.playerHref(ids[i], { level: L, role: kind }), sub: [e.team_abbr || BP.teamAbbr(e.team), pit ? (isNum((e.n || {}).bf) ? Math.round(e.n.bf) + ' BF' : '') : (isNum(e.pa) ? e.pa + ' PA' : '')].filter(Boolean).join(' · ') }));
-    const verd = E.map((e, i) => (bestOf[i] && bestOf[i].d > 0 ? { title: ((U.ARCHETYPE || {})[kind] || {})[bestOf[i].k] || 'The standout', who: names[i], text: 'best of the ' + E.length + ' on ' + lc(bestOf[i].m.label) + ' (' + U.fmtBy(bestOf[i].m, bestOf[i].v) + ').' } : null));
-    el.querySelector('#pp-cmp').innerHTML = QK.compareView({ entities: ents, groups: groups, delta: false }) + QK.verdicts(verd);
-    el.querySelector('#pp-cmp-sec').hidden = false;
+    }).filter(x => isNum(x.d)).sort((x, y) => x.d - y.d).slice(0, 3);
+    if (!cands.length) { none(); return; }
+    const drawTape = oid => {
+      const ids = [pid, oid];
+      const E = ids.map(id => P[id]);
+      const best = {};
+      const groups = ((U.SETS[setKey] || {}).head || []).map(g => ({ label: g[0], rows: g[1].map(x => x[0]).filter(kk => U.metricOk(me, kk, setKey, cat.team_games)).map(kk => {
+        const m = U.metaOf(kind, kk, gl), pcl = E.map(e => pcOf(e)[kk]);
+        pcl.forEach((x, i) => { const o = pcl[1 - i]; const d = isNum(x) ? x - (isNum(o) ? o : 0) : null; if (isNum(d) && (!best[i] || d > best[i].d)) best[i] = { k: kk, d: d, v: (E[i].values || {})[kk], m: m }; });
+        return { label: m.label, tip: m.tip, better: m.lower ? 'low' : 'high', values: E.map(e => (e.values || {})[kk]), pctls: pcl, fmt: z => U.fmtBy(m, z) };
+      }) })).filter(g => g.rows.length);
+      const names = ids.map(id => BP.playerSurname(id) || QK.surname((P[id] || {}).name || ''));
+      el.querySelector('#pp-tape-h').innerHTML = QK.sectionHead({ kicker: 'Tale of the tape', title: names[0] + ' or ' + names[1] + '?',
+        sub: 'Bar length = percentile against ' + esc(peer) + ' (100 = best). The better number in each row is solid.', html: true });
+      const ents = E.map((e, i) => ({ name: e.name, short: names[i], href: BP.playerHref(ids[i], { level: L, role: kind }), colour: U.raw(e.team), alt: U.alt(e.team),
+        sub: [BP.teamShort(e.team), pit ? (isNum((e.n || {}).bf) ? Math.round(e.n.bf) + ' batters faced' : '') : (isNum(e.pa) ? e.pa + ' PA' : '')].filter(Boolean).join(' · ') }));
+      box.innerHTML = QK.compareView({ entities: ents, groups: groups });
+      el.querySelector('#pp-verd').innerHTML = QK.verdicts(E.map((e, i) => (best[i] && best[i].d > 0 ? { title: ((U.ARCHETYPE || {})[kind] || {})[best[i].k] || 'The standout', who: names[i], text: 'the better of the two on ' + lc(best[i].m.label) + ' (' + U.fmtBy(best[i].m, best[i].v) + ').' } : null)));
+      const lk = el.querySelector('#pp-tape-cmp');
+      if (lk) lk.setAttribute('href', BP.compareHref(pid, oid));
+    };
+    const pick = el.querySelector('#pp-tape-pick');
+    pick.innerHTML = cands.map((x, i) => '<button type="button" class="qk-chip" data-value="' + esc(x.id) + '" aria-pressed="' + (i === 0) + '">' + esc(BP.playerSurname(x.id) || QK.surname((P[x.id] || {}).name || '')) + '</button>').join('') +
+      '<a class="qk-chip" id="pp-tape-cmp" href="' + esc(BP.compareHref(pid, cands[0].id)) + '">Open in Compare</a>';
+    pick.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      pick.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+      drawTape(b.getAttribute('data-value'));
+    }));
+    drawTape(cands[0].id);
   }));
 
+  // the last game: the line score by inning (runs, hits, errors) and our win chance through it (the game file)
+  if (lastG && el.querySelector('#pp-race')) {
+    BP.loadGame(lastG.gpk, L, S).then(d => {
+      if (!BP.ok(d) || !U.alive(el)) return;
+      const ls = Array.isArray(d.linescore) ? d.linescore : (d.linescore && d.linescore.innings) || [];
+      if (ls.length) {
+        const tot = d.linescore_totals || {};
+        const n9 = Math.max(9, ls.length);
+        const mine = String(tid);
+        const row = (t, kx, runs) => '<tr' + (String(t) === mine ? ' class="hl"' : '') + '><td>' + BP.teamMark(t, 'sm') + '</td>' +
+          Array.apply(null, Array(n9)).map((_, i) => '<td class="num">' + (ls[i] && isNum(ls[i][kx]) ? ls[i][kx] : (ls[i] ? 'x' : '')) + '</td>').join('') +
+          '<td class="num"><b>' + (isNum(runs) ? runs : '–') + '</b></td>' + (tot.h ? '<td class="num">' + (isNum(tot.h[kx]) ? tot.h[kx] : '–') + '</td>' : '') + (tot.e ? '<td class="num">' + (isNum(tot.e[kx]) ? tot.e[kx] : '–') + '</td>' : '') + '</tr>';
+        el.querySelector('#pp-box').innerHTML = '<div class="qk-table-wrap"><table class="qk-table dense bp-ls"><thead><tr><th>Club</th>' + Array.apply(null, Array(n9)).map((_, i) => '<th class="num">' + (i + 1) + '</th>').join('') +
+          '<th class="num" data-tip="Runs">R</th>' + (tot.h ? '<th class="num" data-tip="Hits">H</th>' : '') + (tot.e ? '<th class="num" data-tip="Errors">E</th>' : '') + '</tr></thead><tbody>' + row(d.away, 0, d.as) + row(d.home, 1, d.hs) + '</tbody></table></div>';
+      }
+      /* wp.ours rows [play, inning, half (0 top, 1 bottom), our home win chance]: placed by inning and half */
+      const wr = (((d.wp || {}).ours) || (Array.isArray(d.wp) ? d.wp : [])).filter(r => Array.isArray(r) && isNum(r[1]) && isNum(r[3]));
+      if (wr.length > 4) {
+        const cnt = {}, seen = {};
+        wr.forEach(r => { const kk = r[1] + ':' + (r[2] ? 1 : 0); cnt[kk] = (cnt[kk] || 0) + 1; });
+        const t = wr.map(r => { const kk = r[1] + ':' + (r[2] ? 1 : 0); const j = seen[kk] = (seen[kk] || 0) + 1; return (r[1] - 1) + (r[2] ? 0.5 : 0) + 0.5 * (j - 1) / cnt[kk]; });
+        const innN = Math.max(9, Math.ceil(t[t.length - 1]));
+        const per = []; for (let i = 1; i < innN; i++) per.push(i);
+        const hc = U.pair(d.home, d.away);
+        el.querySelector('#pp-race').innerHTML = U.chart('pp-race-c', 230, 'Our win chance through the last game');
+        QKC.winProb('#pp-race-c', { t: t, p: wr.map(r => r[3]), step: true, tMin: 0, tMax: innN, interval: 1, periods: per,
+          home: { name: BP.teamName(d.home), abbr: BP.teamAbbr(d.home), colour: hc[0] }, away: { name: BP.teamName(d.away), abbr: BP.teamAbbr(d.away), colour: hc[1] },
+          tFmt: x => (x < innN ? String(Math.round(x) + 1) : ''), tLabel: x => (x % 1 >= 0.5 ? 'Bottom ' : 'Top ') + (Math.floor(x) + 1),
+          tName: 'Inning', yName: BP.teamAbbr(d.home) + ' win chance (ours)' });
+      }
+    });
+  }
+
   // where the player sits: the peer group loads on request
+  let PEERS = null;   // <L>/<S>/peers.json once fetched (false: not built)
   const dseg = el.querySelector('#pp-dseg');
   QK.seg(dseg, key => {
     const box = el.querySelector('#pp-dist');
     box.innerHTML = QK.skeleton('chart', 1);
     const slim = peerValues(blk, cur, key);
-    (slim ? Promise.resolve(null) : BP.loadYear(catFile, L, S)).then(cat => {
+    /* peers.json (the build's per-group sorted values) first, then the player file's peers, then the catalogue */
+    const peerFile = kk => { const g = PEERS && PEERS.groups ? PEERS.groups[setKey] : null; return g && Array.isArray(g[kk]) ? g[kk] : null; };
+    (slim ? Promise.resolve(null) : (PEERS !== null ? Promise.resolve(PEERS) : BP.loadYear('peers.json', L, S).then(x => { PEERS = BP.ok(x) && x.groups ? x : false; return PEERS; }))
+      .then(() => (peerFile(key) ? null : BP.loadYear(catFile, L, S)))).then(cat => {
       if (!U.alive(el)) return;
-      if (!slim && (!BP.ok(cat) || !cat.players)) { box.innerHTML = QK.empty('Not available', 'The season catalogue did not load.'); return; }
+      if (!slim && !peerFile(key) && (!BP.ok(cat) || !cat.players)) { box.innerHTML = QK.empty('Not available', 'The season catalogue did not load.'); return; }
       const m = U.metaOf(kind, key, gl);
-      const vals = (slim || Object.keys(cat.players).map(id => cat.players[id]).filter(x => x && U.setFor(kind, x) === setKey && U.meets(x, setKey, cat.team_games)).map(x => (x.values || {})[key])).filter(isNum).sort((x, y) => x - y);
+      const vals = (slim || peerFile(key) || Object.keys(cat.players).map(id => cat.players[id]).filter(x => x && U.setFor(kind, x) === setKey && U.meets(x, setKey, cat.team_games)).map(x => (x.values || {})[key])).filter(isNum).sort((x, y) => x - y);
       if (vals.length < 5) { box.innerHTML = QK.empty('Too few peers yet', 'Fewer than five ' + peer + ' have reached the floor.'); return; }
       box.innerHTML = U.chart('pp-dist-c', 240, 'Distribution of ' + m.label);
       if (pit && cat && cat.league_types) drawMovement(el, Object.keys(cur.arsenal || {}).map(pt => Object.assign({ pt: pt }, cur.arsenal[pt])).filter(r => r.pt !== 'all' && isNum(r.usage) && (r.n || 0) >= MIX_MIN), cat.league_types);

@@ -4,7 +4,8 @@
  * schedule strength for the next four weeks (games per club and week), the rankings with position filters and
  * the backtest. Tools: the pre-redesign fantasy page (scoring weights, categories, weekly planner, goalie starts).
  *
- * Kit v3 "Matchday": friendly section titles and "i" notes (QK.note) on the projection, VOR and the schedule.
+ * Kit v4 "Broadcast": Broadcast section heads, black stat blocks, team-colour bars and explain strips (QK.note) on the
+ * projection, VOR and the schedule.
  *
  * Reads <S>/fantasy.json (current season). Points use our default weights (fantasy.json "points"). */
 (function (RK) {

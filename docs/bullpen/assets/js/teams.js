@@ -162,21 +162,23 @@ function renderTeam(el, params, state) {
     const xw = [r.exp_w, v.exp_w].find(k.isNum), xl = k.isNum(xw) && k.isNum(w) ? w + l - xw : null, pw = [r.pythag_w, v.pythag_w].find(k.isNum);
     const rt = { off: [r.off, v.off_rpg].find(k.isNum), def: [r.def, v.def_rpg].find(k.isNum), pit: [r.pit, v.pit_rpg].find(k.isNum), tot: [r.rating, v.rating].find(k.isNum) };
     document.title = k.teamName(tid) + ' · ' + BP.SITE;
-    const hero = QK.playerHeader({ name: k.teamName(tid), split: false, pos: [info.league, info.division].filter(Boolean).join(' · '), kicker: k.LN(L) + ' ' + S + (k.isNum(r.div_rank) ? ' · ' + k.ordinal(r.div_rank) + ' in the division' : ''),
-      team: { name: k.teamAbbr(tid), abbr: k.teamAbbr(tid), colour: (BP.teamInfo(tid) || {}).colour },
-      meta: [vid ? ['Home park', k.parkName(vid)] : null, k.isNum(pw) ? ['Pythagorean', k.num(pw, 0) + ' wins'] : null],
-      stats: [{ label: 'Record', value: k.isNum(w) ? w + '-' + l : '—' }, { label: 'Run diff', value: k.isNum(rd) ? k.signed(rd, 0) : '—' }, { label: 'Rating', value: k.isNum(rt.tot) ? k.signed(rt.tot, 2) : '—' }] });
     const tiles = [];
     if (k.isNum(od.p_ws)) tiles.push({ label: 'World Series chance', value: k.pct(od.p_ws, 1), signal: true, sub: k.isNum(od.p_pennant) ? 'pennant ' + k.pct(od.p_pennant, 1) : 'season simulation', tip: 'Our chance from simulating the rest of the season and the bracket' });
     if (k.isNum(od.p_playoffs)) tiles.push({ label: 'Postseason chance', value: k.pct(od.p_playoffs, 1), signal: !k.isNum(od.p_ws), sub: k.isNum(od.p_division) ? 'division ' + k.pct(od.p_division, 1) : (r.clinched ? 'clinched' : '') });
     tiles.push({ label: 'Team rating', value: k.isNum(rt.tot) ? k.signed(rt.tot, 2) : '—', pctl: pc.rating, sub: 'offence ' + k.signed(rt.off, 2) + ' · pitching ' + k.signed(rt.pit, 2) + ' · fielding ' + k.signed(rt.def, 2), tip: 'Runs a game better than an average club' });
     tiles.push({ label: 'Expected record', value: k.isNum(xw) ? k.num(xw, 0) + '-' + k.num(xl, 0) : '—', sub: 'from our ratings' });
     if (k.isNum(v.war)) tiles.push({ label: 'Roster WAR', value: k.signed(v.war, 1), pctl: pc.war, sub: 'Bullpen WAR, hitters and pitchers' });
+    /* v4: the full-bleed club-colour hero (the alternate colour on the diagonal, the abbreviation outlined) with the
+       black strip: the record and run differential, then our chances and rating */
+    const hero = QK.playerHeader({ name: k.teamName(tid), split: false, face: k.teamAbbr(tid), pos: [info.league, info.division].filter(Boolean).join(' · '), kicker: k.LN(L) + ' · ' + S + (k.isNum(r.div_rank) ? ' · ' + k.ordinal(r.div_rank) + ' in the division' : ''),
+      team: { name: k.teamAbbr(tid), abbr: k.teamAbbr(tid), colour: U.raw(tid), alt: U.alt(tid) },
+      meta: [vid ? ['Home park', k.parkName(vid)] : null, k.isNum(pw) ? ['Pythagorean', k.num(pw, 0) + ' wins'] : null],
+      strip: [{ label: 'Record', value: k.isNum(w) ? w + '-' + l : '—', sub: k.isNum(rd) ? 'run differential ' + k.signed(rd, 0) : '' }].concat(tiles).slice(0, 5) });
     const stages = [['p_playoffs', 'Postseason'], ['p_division', 'Win the division'], ['p_bye', 'A first-round bye'], ['p_pennant', 'Win the pennant'], ['p_ws', 'Win the World Series']].filter(x => k.isNum(od[x[0]]));
     const tGroups = U.pctGroups({ values: v, pct_role: pc, n: { g: v.g } }, 'team', 'TEAM', gl, 'head');
     const links = '<a class="qk-btn" href="' + k.compareHref('t' + tid, '') + '?view=classic">Compare</a>' + (vid ? '<a class="qk-btn" href="' + k.parkHref(vid) + '">' + k.esc(k.parkName(vid)) + '</a>' : '') + '<a class="qk-btn" href="' + k.href(L, 'teams', S) + '">All teams</a>';
-    let h = '<div class="qk-kicker" style="margin-bottom:10px"><a href="' + k.href(L, 'teams', S) + '">← Teams</a></div>' + hero + '<div class="bp-flexrow" style="justify-content:flex-end">' + links + '</div>' +
-      '<div class="bp-kpis" style="margin-top:var(--sp-5)">' + QK.stats(tiles) + '</div>';
+    /* the section bar above already links back to every team */
+    let h = hero + '<div class="bp-flexrow" style="justify-content:flex-end;margin-top:var(--sp-4)">' + links + '</div>';
     h += '<div class="qk-grid"><div class="qk-span-5"><div class="bp-stack">' +
       (stages.length ? U.card2('Season simulation', 'Our chance of reaching each stage' + (k.isNum(r.magic) ? ' · magic number ' + k.esc(r.magic) : ''), QK.chances(stages.map(x => ({ label: x[1], p: od[x[0]], color: (BP.teamInfo(tid) || {}).colour })), { sort: false, max: 1, key: false })) : '') +
       QK.pctCard({ title: 'Team profile', peer: 'MLB clubs', sample: k.isNum(v.g) ? v.g + ' games' : '', groups: tGroups, foot: '<span>Percentiles among the ' + Object.keys(T).length + ' clubs; 100 = best</span><a href="' + k.compareHref('t' + tid, '') + '?view=classic">Every metric →</a>' }) +

@@ -588,7 +588,7 @@ function sliderRow(label, p, valueText, title) {
   return '<div class="ps-row"' + (title ? ' title="' + esc(title) + '"' : '') + '>' +
     '<span class="ps-label">' + label + '</span>' +
     '<span class="ps-track">' + (known
-      ? '<span class="ps-fill" style="width:' + x + '%;background:' + col + '"></span><span class="ps-dot" style="left:' + x + '%;background:' + col + '">' + Math.round(p) + '</span>'
+      ? '<span class="ps-fill" style="width:' + x + '%;background:' + col + '"></span><span class="ps-dot" style="left:' + x + '%;background:' + col + ';color:' + (RK.pctInk ? RK.pctInk(p) : '#ffffff') + '">' + Math.round(p) + '</span>'
       : '<span class="ps-none">below the sample floor</span>') +
     '<i class="ps-tick" style="left:10%"></i><i class="ps-tick mid" style="left:50%"></i><i class="ps-tick" style="left:90%"></i></span>' +
     '<span class="ps-val">' + (valueText === undefined ? '' : valueText) + '</span></div>';
@@ -668,6 +668,18 @@ function distBars(el, dist, opts) {
     margin: { l: 44, r: 10, t: 10, b: o.xTitle ? 42 : 28 }
   }));
 }
+/* v4: the ink on a heat cell is white or pure black, whichever clears AA on the cell as drawn (a translucent fill is
+   blended onto the card first), so the strongest cells stay readable */
+function heatInk(bg) {
+  const m = /rgba?\(([^)]+)\)/.exec(String(bg || ''));
+  let rgb = null, a = 1;
+  if (m) { const q = m[1].split(/[ ,\/]+/).filter(Boolean).map(Number); rgb = q.slice(0, 3); a = q.length > 3 ? q[3] : 1; }
+  else if (window.QK && QK.color.parse(bg)) rgb = QK.color.parse(bg);
+  if (!rgb || !window.QK) return '';
+  const card = QK.color.parse(QK.cssVar('--s-1') || '#14171d') || [20, 23, 29];
+  const hex = QK.color.hex([0, 1, 2].map(i => rgb[i] * a + card[i] * (1 - a)));
+  return QK.color.ink(hex);
+}
 function heatTable(spec) {
   const s = spec || {};
   const rws = s.rows || [];
@@ -692,7 +704,8 @@ function heatTable(spec) {
     h += '<tr><td class="heat-label">' + (r.label || '') + '</td>';
     (r.values || []).forEach((v, i) => {
       const t = r.titles && r.titles[i] ? ' title="' + esc(r.titles[i]) + '"' : '';
-      h += isNum(v) ? '<td class="heat-cell" style="background:' + colour(v, i) + '"' + t + '>' + fmt(v, i) + '</td>' : '<td class="heat-cell heat-empty"' + t + '>·</td>';
+      const bg = isNum(v) ? colour(v, i) : '';
+      h += isNum(v) ? '<td class="heat-cell" style="background:' + bg + ';color:' + heatInk(bg) + '"' + t + '>' + fmt(v, i) + '</td>' : '<td class="heat-cell heat-empty"' + t + '>·</td>';
     });
     h += '</tr>';
   });
