@@ -354,8 +354,76 @@ V.copy = function (t) {
 V.chanceRows = function (ids, pOf, isD, mk) {
   return ids.map(function (id) {
     var t = isD ? PD.driverTeam(id) : id;
-    return { label: isD ? PD.driverName(id) : PD.teamName(id), p: pOf(id), market: mk && isNum(mk[id]) ? mk[id] : null, color: PD.teamColour(t), href: isD ? PD.driverHref(id) : PD.teamHref(id),
-      mark: { name: PD.teamName(t), abbr: PD.teamAbbr(t), colour: PD.teamColour(t) } };
+    return { label: isD ? PD.driverName(id) : PD.teamName(id), p: pOf(id), market: mk && isNum(mk[id]) ? mk[id] : null, color: PD.teamColourRaw(t), href: isD ? PD.driverHref(id) : PD.teamHref(id),
+      mark: { name: PD.teamName(t), abbr: PD.teamAbbr(t), colour: PD.teamColourRaw(t) } };
   });
+};
+/* ── kit v4 (Broadcast) ─────────────────────────────────────────────────────────────────────────────────── */
+/* A driver as one side of a two-sided kit block (QK.splitHero, QK.previewCard, QK.scorebugXL, QK.tape): the surname
+   shown, the code, the constructor's colour from the payloads (team-mates share it: QK.color.blockPair gives the
+   second driver slate with the constructor colour as the rule), the full name, and the team and car number as the line
+   under the name. No colour in the payloads: the kit's cobalt v slate rule. */
+V.side = function (id, team) {
+  var t = team || PD.driverTeam(id), info = PD.NAMES.drivers[id] || {};
+  var sub = [t ? PD.teamName(t) : '', isNum(info.number) ? '#' + info.number : ''].filter(Boolean).join(' · ');
+  /* city: the line QK.splitHero prints under the name when no sub function is passed (QK.previewCard) */
+  return { name: PD.driverSurname(id), abbr: PD.driverCode(id), colour: PD.teamColourRaw(t), full: PD.driverName(id), team: t, sub: sub, city: sub, href: PD.driverHref(id) };
+};
+V.sideSub = function (t) { return t.sub || ''; };
+/* The race as a two-sided "game" for the kit's diagonal hero: our favourite against our second pick, each with our win
+   chance. The favourite is the "home" side and callers pass homeFirst: true, so it sits on the left and the quiet
+   market line on the race page (QK.previewCard prints the home side's number) is the favourite's. A race is not a
+   duel, so the note says how often the favourite loses to the whole field; factors set the two side by side. */
+V.raceGame = function (race, ds, o) {
+  o = o || {};
+  var ids = Object.keys(ds || {}).filter(function (id) { return isNum((ds[id] || {}).p_win); }).sort(function (a, b) { return ds[b].p_win - ds[a].p_win; });
+  if (ids.length < 2) return null;
+  var a = ids[0], b = ids[1], c = ids[2];
+  var teams = o.teams || {};
+  var p = ds[a].p_win, miss = Math.max(1, Math.round(10 * (1 - p)));
+  var note = '<b>How sure are we?</b> ' + PD.pct(p, 0) + ' means ' + esc(PD.driverSurname(a)) + ' loses a race like this about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10: with twenty cars, even a clear favourite is usually under 50%.' +
+    (c ? ' ' + esc(PD.driverSurname(c)) + ' is next on ' + PD.pct(ds[c].p_win, 0) + '.' : '') + (o.extra ? ' ' + o.extra : '');
+  return { ids: ids, note: note, g: { sport: 'f1', status: 'pre', start: o.start || race.date, league: o.league || ('Round ' + race.round), href: o.href,
+    home: V.side(a, teams[a]), away: V.side(b, teams[b]), p_home: p, p_away: ds[b].p_win },
+    factors: [['Podium', 'p_podium', false, function (v) { return PD.pct(v, 0); }], ['Points finish', 'p_points', false, function (v) { return PD.pct(v, 0); }],
+      ['Expected finish', 'exp_pos', true, function (v) { return 'P' + PD.num(v, 1); }], ['Retirement', 'p_dnf', true, function (v) { return PD.pct(v, 0); }]]
+      .filter(function (f) { return isNum(ds[a][f[1]]) && isNum(ds[b][f[1]]); })
+      .map(function (f) { var va = ds[b][f[1]], vb = ds[a][f[1]]; return { label: f[0], a: f[3](va), b: f[3](vb), better: Math.abs(va - vb) < 1e-9 ? null : ((va > vb) !== f[2] ? 'a' : 'b') }; }) };
+};
+/* One "call" on the overview, as a kit game card (.qk-gc): the stripe in the constructor colour split by our chance,
+   the kicker, one or two rows (the team mark, the name and team, our number in Bebas, the favourite in blue), and the
+   foot "Our chance · <why>". o: { kicker, right, href, rows: [{ team, name, sub, p | text, fav }], stripe: p, team,
+   why, ft } */
+V.callCard = function (o) {
+  var tag = o.href ? 'a' : 'div';
+  var raw = o.team ? PD.teamColourRaw(o.team) : null;
+  var c = raw ? QK.color.team(raw) : 'var(--signal)';
+  var sp = isNum(o.stripe) ? Math.max(0.04, Math.min(0.96, o.stripe)) : 1;
+  var stripe = '<span class="qk-gc-stripe" aria-hidden="true"><i style="flex:' + sp.toFixed(3) + ';background:' + c + '"></i>' + (sp < 1 ? '<i style="flex:' + (1 - sp).toFixed(3) + ';background:var(--seg-off)"></i>' : '') + '</span>';
+  var rows = (o.rows || []).map(function (r) {
+    var mk = r.team ? PD.mark(r.team, 'md') : QK.teamMark({ abbr: r.abbr || '' }, 'md');
+    var v = isNum(r.p) ? QK.pctSmall(r.p, r.p < 0.1 && r.p > 0 ? 1 : undefined) : esc(r.text || '');
+    return '<div class="qk-gc-row' + (r.fav ? ' fav' : '') + '">' + mk + '<span class="qk-gc-nm">' + esc(r.name) + (r.sub ? '<small>' + esc(r.sub) + '</small>' : '') + '</span><span></span><span></span><span class="qk-gc-v pct">' + v + '</span></div>';
+  }).join('');
+  return '<' + tag + (o.href ? ' href="' + esc(o.href) + '"' : '') + ' class="qk-gc pd-call">' + stripe +
+    '<div class="qk-gc-top"><span class="qk-gc-lg">' + esc(o.kicker || '') + '</span>' + (o.right ? '<span class="qk-badge">' + esc(o.right) + '</span>' : '') + '</div>' +
+    '<div class="qk-gc-rows">' + rows + '</div>' + (o.why ? '<div class="qk-gc-ft"><b>' + esc(o.ft || 'Our chance · ') + '</b>' + esc(o.why) + '</div>' : '') + '</' + tag + '>';
+};
+/* "We say it. Then we check it." (QK.howSure) from calibration.json: the simulator's win chance before qualifying for
+   every driver in every scored race, with F1 wording on the three big numbers (the Brier score against giving every
+   driver the base rate, our contenders' bucket, the top end). Returns false when the record is missing. */
+V.howSure = function (box, cj) {
+  var cb = V.calib(cj);
+  if (!box || !cb) return false;
+  var shown = cb.bins.filter(function (b) { return b.n >= 30; });
+  var fav = shown.filter(function (b) { return b.lo >= 0.2; }).sort(function (a, b) { return b.n - a.n; })[0];
+  var top = shown[shown.length - 1], gap = top ? top.freq - top.mean_p : 0;
+  var pts = [
+    isNum(cb.brier) ? { k: cb.brier.toFixed(3), b: 'Brier score', text: '0 is perfect.' + (isNum(cb.base) ? ' Giving every driver the same ' + PD.pct(cb.base_rate, 0) + ' would score ' + cb.base.toFixed(3) + '.' : '') + ' Lower is better.' } : null,
+    fav ? { k: Math.round(fav.freq * 100) + '%', b: 'won when we said ' + Math.round(fav.mean_p * 100) + '%', text: 'Our contenders: ' + QK.fmt.num(fav.n) + ' drivers we gave ' + Math.round(fav.lo * 100) + '–' + Math.round(fav.hi * 100) + '%; ' + PD.pct(fav.freq, 1) + ' of them won.' } : null,
+    top ? { k: (gap > 0 ? '+' : gap < 0 ? '−' : '±') + Math.abs(Math.round(gap * 100)) + ' pts', b: 'at the top end', text: 'Our biggest favourites (' + Math.round(top.lo * 100) + '%+) won ' + PD.pct(top.freq, 0) + ' of the time; we said ' + PD.pct(top.mean_p, 0) + (Math.abs(gap) <= 0.03 ? ': spot on.' : gap > 0 ? ': a little too shy.' : ': a little too bold.') + (Math.abs(gap) > 0.03 ? ' Bins this small swing a lot.' : '') } : null
+  ].filter(Boolean);
+  QK.howSure(box, { bins: cb.bins, brier: cb.brier, n: cb.n, league: 'F1', span: cb.span, subject: 'the driver', unit: 'driver-races', points: pts });
+  return true;
 };
 })(window.PD);

@@ -1,14 +1,17 @@
-/* The Quant Hardwood — the player page (#/<L>/player/<pid>), on kit v3 "Matchday" (the Rink player page is the
- * reference, MIGRATION_V3.md).
+/* The Quant Hardwood — the player page (#/<L>/player/<pid>), on kit v4 "Broadcast" (the Rink player page is the
+ * reference, MIGRATION_V4.md).
  *
- * Top, as the concept: a crumb; the header (tilted tile, kicker, name, chips) with "The short version" in plain
- * English; stat tiles with percentile chips (impact, WAR, projected WAR, scoring, award chance); the percentile rail
+ * Top, as the concept: a crumb; the full-bleed team-colour hero (QK.playerHeader: the alternate colour on a diagonal,
+ * the outlined number or initials, the name in Bebas, chips) with the black strip of five numbers (points, rebounds,
+ * assists, total impact and WAR, percentiles against the role) and "The short version"; the LED percentile meters
  * against the role (guards, wings or bigs, qualified players, the sample named, metrics short of their reliability
- * sample dashed, a hollow ring for last season) from the one metric set (HW.ui.MSET), beside "How sure are we?"
- * (when the numbers settle at this playing time), game by game and "Their type" (most similar this season); a
- * compare of the player and the two closest matches with the highlighter and verdicts; the next game
- * (QK.previewCard) and the last one. Below, "More on the player": among peers in the role's distribution, season
- * by season, splits, movement, the shot chart on the half court, value, the career table and awards.
+ * sample dashed, a ▼ for last season from current.prev_pct_pos, else last season's catalogue) from the one metric set
+ * (HW.ui.MSET), with "How sure are we?" under them, beside the tale of the tape against the closest match (chips
+ * switch between the matches; a link opens all three in Compare) and one-line verdicts; what to watch tonight (the
+ * scoreboard bug and how the teams match up, QK.previewCard layout 'bug') beside the last game (the line score by
+ * quarter and the win-chance race from the game file); the game log (every game, the best night highlighted); game
+ * by game and "Their type". Below, "More on the player": value tiles, among peers in the role's distribution,
+ * season by season, splits, movement, the shot chart on the half court, value, the career table and awards.
  * Detail tab (?tab=detail): the pre-redesign player page in full (the whole catalogue, radar, on/off, clutch,
  * projection, lineups, game log table).
  * Data: <L>/players/<pid>.json (career; role_card and prev-season percentiles when the builder writes them),
@@ -18,6 +21,7 @@
 'use strict';
 
 const U = HW.ui, esc = HW.esc, isNum = HW.isNum;
+const GC = () => HW.gameCentre;
 function splits(log) {
   const agg = list => {
     const n = list.length; if (!n) return null;
@@ -128,20 +132,28 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
   }
   const crumb = '<nav class="hw-crumb" aria-label="Breadcrumb"><a href="' + esc(HW.href(L, 'players', S)) + '">' + esc(HW.leagueName(L)) + '</a><span aria-hidden="true">›</span>' +
     (team ? '<a href="' + esc(HW.teamHref(L, team, S)) + '">' + esc(HW.teamName(L, team)) + '</a><span aria-hidden="true">›</span>' : '') + esc(name) + '</nav>';
-  let h = crumb + QK.playerHeader({ name: name, pos: role ? (U.ROLE1 || {})[role] || role : pos, kicker: HW.seasonLabel(L, S) + (gpNow ? ' · ' + gpNow + ' game' + (gpNow === 1 ? '' : 's') + ' in' : ''),
-    team: team ? { name: HW.teamName(L, team), abbr: HW.teamAbbr(L, team), colour: HW.teamColourRaw(L, team), href: HW.teamHref(L, team, S) } : { name: 'Free agent' },
-    meta: [age !== null ? age + ' years old' : null, pos ? 'Listed ' + pos : null, p ? Number(Math.round(p.min || 0)).toLocaleString('en-GB') + ' minutes' : null], tags: tags, short: shortVersion() });
-  // stat tiles: ours first, each with its percentile against the role where there is one
-  const k = [];
+  /* v4 (Broadcast): the black strip of five numbers under the hero, each with its percentile against the role where
+     there is one: the box-score three, then ours (total impact and wins above replacement) */
   const hpm = isNum(v.hpm) ? v.hpm : srow.hpm;
-  if (isNum(hpm)) k.push({ label: 'Total impact (HPM)', value: U.signed(hpm, 1), signal: true, pctl: isNum(pcs.hpm) ? pcs.hpm : null, sub: 'points per 100 trips: offence ' + U.signed(isNum(v.hpm_o) ? v.hpm_o : srow.o, 1) + ', defence ' + U.signed(isNum(v.hpm_d) ? v.hpm_d : srow.d, 1), tip: 'Hardwood Plus-Minus: points per 100 possessions the player adds to the team’s margin over an average player (play-by-play on/off blended with the box score)' });
-  if (swar && isNum(swar.war)) k.push({ label: 'Wins above replacement', value: U.f(swar.war, 1), pctl: isNum(swar.pct_role) ? swar.pct_role : null, sub: HW.seasonLabel(L, S) + (role ? ' · percentile among ' + U.ROLE_NAME[role] : ''), tip: 'Our wins above a replacement-level player this season, from HPM and minutes' });
-  if (vrow) k.push({ label: 'Projected WAR', value: U.f(vrow.w0, 1), sub: 'rest of ' + HW.seasonLabel(L, HW.currentSeason(L)) + (isNum(vrow.p10) ? ' · four seasons ' + U.f(vrow.v, 1) + ' (likely range ' + U.f(vrow.p10, 1) + ' to ' + U.f(vrow.p90, 1) + ')' : ''), tip: 'Our projection of the player’s wins above replacement; the four-season value is discounted, with its 80% range' });
-  if (isNum(v.pts100)) k.push({ label: 'Points per 100', value: U.f(v.pts100, 1), pctl: p ? U.rolePctl(cat, roles, pid, 'pts100') : null, sub: 'true shooting ' + HW.fmtVal(v.ts, 'pct') });
+  const ppg = isNum(v.pts_g) ? v.pts_g : srow.pts, rpg = isNum(v.reb_g) ? v.reb_g : srow.reb, apg = isNum(v.ast_g) ? v.ast_g : srow.ast;
+  const strip = [
+    { label: 'Points', value: isNum(ppg) ? U.f(ppg, 1) : '—', sub: gpNow ? 'a game, in ' + gpNow + ' game' + (gpNow === 1 ? '' : 's') : 'a game' },
+    { label: 'Rebounds', value: isNum(rpg) ? U.f(rpg, 1) : '—', sub: 'a game' },
+    { label: 'Assists', value: isNum(apg) ? U.f(apg, 1) : '—', sub: 'a game' },
+    { label: 'Total impact', value: isNum(hpm) ? U.signed(hpm, 1) : '—', signal: true, pctl: isNum(pcs.hpm) ? pcs.hpm : null, sub: 'points per 100 trips over an average player',
+      tip: 'Hardwood Plus-Minus (HPM): points per 100 possessions the player adds to the team’s margin over an average player (play-by-play on/off blended with the box score). Offence ' + U.signed(isNum(v.hpm_o) ? v.hpm_o : srow.o, 1) + ', defence ' + U.signed(isNum(v.hpm_d) ? v.hpm_d : srow.d, 1) + '.' },
+    swar && isNum(swar.war) ? { label: 'Wins above replacement', value: U.f(swar.war, 1), pctl: isNum(swar.pct_role) ? swar.pct_role : null, sub: 'this season, from impact and minutes', tip: 'Our wins above a replacement-level player this season, from HPM and minutes' }
+      : { label: 'Minutes', value: isNum(mpg) ? U.f(mpg, 1) : '—', sub: 'a game' }];
+  let h = crumb + QK.playerHeader({ name: name, pos: role ? (U.ROLE1 || {})[role] || role : pos, kicker: HW.leagueName(L) + ' · ' + HW.seasonLabel(L, S) + (gpNow ? ' · ' + gpNow + ' game' + (gpNow === 1 ? '' : 's') : ''),
+    team: team ? { name: HW.teamName(L, team), abbr: HW.teamAbbr(L, team), colour: HW.teamColourRaw(L, team), alt: HW.teamAlt(L, team), href: HW.teamHref(L, team, S) } : { name: 'Free agent' },
+    meta: [age !== null ? age + ' years old' : null, pos ? 'Listed ' + pos : null, p ? Number(Math.round(p.min || 0)).toLocaleString('en-GB') + ' minutes' : null], tags: tags, strip: strip, short: shortVersion() });
+  // value tiles (below the fold: "More on the player")
+  const k = [];
+  if (vrow) k.push({ label: 'Projected WAR', value: U.f(vrow.w0, 1), signal: true, sub: 'rest of ' + HW.seasonLabel(L, HW.currentSeason(L)) + (isNum(vrow.p10) ? ' · four seasons ' + U.f(vrow.v, 1) + ' (likely range ' + U.f(vrow.p10, 1) + ' to ' + U.f(vrow.p90, 1) + ')' : ''), tip: 'Our projection of the player’s wins above replacement; the four-season value is discounted, with its 80% range' });
+  if (isNum(v.pts100)) k.push({ label: 'Points per 100', value: U.f(v.pts100, 1), pctl: p ? U.rolePctl(cat, roles, pid, 'pts100') : null, sub: 'possessions · true shooting ' + HW.fmtVal(v.ts, 'pct'), tip: 'Points scored per 100 possessions the player is on the floor for; true shooting counts threes and free throws' });
   const aw = cur.awards || {};
   const best = Object.keys(aw).filter(x => isNum(aw[x]) || (aw[x] && isNum(aw[x].p))).sort((a, b) => (isNum(aw[b]) ? aw[b] : aw[b].p) - (isNum(aw[a]) ? aw[a] : aw[a].p))[0];
   if (best) k.push({ label: 'Our ' + (best === 'mvp' ? 'MVP' : best.toUpperCase()) + ' chance', value: U.pct(isNum(aw[best]) ? aw[best] : aw[best].p), sub: 'from the award model' });
-  if (k.length) h += '<div class="hw-tiles">' + QK.stats(k) + '</div>';
   const base = HW.playerHref(L, pid, S);
   h += '<div style="margin-top:var(--sp-6)">' + U.tabsHTML([{ key: 'overview', label: 'Overview', href: base }, { key: 'detail', label: 'Detail: the whole catalogue, on/off and lineups', href: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'tab=detail' }], tab) + '</div>';
   if (tab === 'detail') { el.innerHTML = h + '<div class="hw-sub"></div>'; U.legacy('player', el.querySelector('.hw-sub'), params, null, { embed: 'detail' }); return; }
@@ -163,44 +175,66 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
   if (isNum(games('ast_pct'))) settle.push('assist rate after about <b>' + games('ast_pct') + '</b>');
   if (isNum(games('hpm'))) settle.push('total impact after about <b>' + games('hpm') + '</b>');
   const small = gpNow < 30;
-  const sureCard = '<article class="qk-card cream"><div class="qk-card-body"><div class="qk-kicker">How sure are we?</div><h3 style="margin:8px 0 6px">' +
-    esc(gpNow ? (small ? (gpNow < 11 ? NUMW[gpNow] : gpNow) + ' game' + (gpNow === 1 ? ' is' : 's is') + ' a small sample' : gpNow + ' games: the picture is settling') : 'No games yet this season') + '</h3>' +
-    '<p style="margin:0;color:var(--ink-2);font-size:15px">' + (small ? 'Shooting numbers swing a lot early on. ' : '') + 'The hollow rings on the rail show last season, where there was one: dots that sit next to their ring are the steady part of the profile; the ones far from it are the ones to watch.</p>' +
-    (settle.length && isNum(mpg) ? QK.note('At ' + U.f(mpg, 1) + ' minutes a game, ' + settle.join(', ').replace(/, ([^,]*)$/, ', and $1') + '.') : '') + '</div></article>';
-  const gbg = log.length ? U.card2('Game by game', 'Game score each game (Hollinger’s one-number box score); blue when the team won the player’s minutes', U.chart('pp-log', 240, 'Game score per game')) : '';
+  const sampleWords = gpNow ? (small ? (gpNow < 11 ? NUMW[gpNow] : gpNow) + ' game' + (gpNow === 1 ? ' is' : 's is') + ' a small sample.' : gpNow + ' games: the picture is settling.') : 'No games yet this season.';
+  /* v4: "How sure are we?" sits under the meters as the explain strip */
+  const settleNote = '<b>How sure are we?</b> ' + esc(sampleWords) + ' ' + (small && gpNow ? 'Shooting numbers swing a lot early on. ' : '') +
+    (settle.length && isNum(mpg) ? 'At ' + U.f(mpg, 1) + ' minutes a game, ' + settle.join(', ').replace(/, ([^,]*)$/, ', and $1') + '. ' : '') +
+    (prevPct ? 'The ▼ marks last season: rows that sit on it are the steady part of the profile; the ones far from it are the ones to watch.' : 'The ▼ on a meter marks last season, where there was one.');
+  const gbg = log.length ? U.card2('Game by game', 'Game score each game (Hollinger’s one-number box score); cyan when the team won the player’s minutes, red-orange when it lost them', U.chart('pp-log', 240, 'Game score per game')) : '';
   const simR = (career && Array.isArray(career.similar_role) && career.similar_role.length) ? career.similar_role.filter(x => Number(x.season) === Number(S)).map(x => ({ id: String(x.id), name: x.name, d: x.distance }))
     : (p && p.qualified ? U.similarRole(L, cat, roles, pid, 5) : []);
   const typeCard = simR.length ? '<article class="qk-card"><div class="qk-card-body"><div class="qk-kicker">Their type</div><h4 class="hw-h4">Plays most like</h4><ul class="hw-list hw-type">' +
     simR.slice(0, 3).map(x => '<li>' + U.playerEnt(L, x.id, x.name || HW.playerName(L, x.id), (P[x.id] || {}).team, null, S) + '<a class="v hw-link" href="' + esc(HW.href(L, 'compare/players/' + encodeURIComponent(pid) + '/' + encodeURIComponent(x.id), S)) + '">Compare</a></li>').join('') + '</ul>' +
     '<div class="qk-aside" style="margin-top:10px">Closest match among ' + esc(peerShort) + ' on this season’s profile, each metric weighted by how stable it is.</div></div></article>' : '';
-  h += '<section class="qk-section hw-sec1"><div class="qk-gside"><div>' + railHTML() + '</div><div class="hw-stack2">' + sureCard + gbg + typeCard + '</div></div></section>';
-  // compare (filled once the catalogue is in)
-  if (simR.length && p) h += '<div id="pp-cmp-sent"></div><section class="qk-section" id="pp-cmp-sec" hidden><div id="pp-cmp-h"></div><article class="qk-card"><div class="qk-card-body"><div id="pp-cmp"></div></div></article></section>';
-  // next game and last time out
+  /* 1. the meters (7) beside the tale of the tape against the closest match (5), as the concept */
+  const tapeOn = !!(simR.length && p && set);
+  h += '<section class="qk-section hw-sec1"><div class="qk-g75"><div>' + railHTML() + QK.explain(settleNote, { cls: 'hw-settle' }) + '</div>' +
+    '<div class="hw-stack2">' + (tapeOn ? '<div id="pp-tape-h"></div><div class="qk-chips hw-pick" id="pp-tape-pick" role="group" aria-label="Compare with"></div><div id="pp-tape">' + QK.skeleton('lines', 6) + '</div><div id="pp-verd"></div>'
+      : gbg + typeCard) + '</div></div></section>';
+  /* 2. what to watch tonight (the scoreboard bug and the match-up) beside the last game (line score, win-chance race) */
   const info = HW.leagueInfo(L) || {};
   const nxt = U.isCur(L, S) && team ? (info.today || []).concat(info.next_games || []).filter(g => (String(g.home) === String(team) || String(g.away) === String(team)) && HW.gameState(g) !== 'post' && U.fresh(g)).sort((x, y) => String(x.date).localeCompare(String(y.date)))[0] : null;
   const lastG = log.length ? log[log.length - 1] : null;
   if (nxt || lastG) {
     h += '<section class="qk-section"><div class="qk-g2">';
     if (nxt) {
-      const g = U.game(nxt, L, {});
-      h += '<div><div class="qk-kicker" style="margin-bottom:10px">' + (g.status === 'live' ? 'Live now' : (QK.fmt.relDay(nxt.date) === 'Today' ? 'What to watch tonight' : 'Next up')) + '</div>' +
-        QK.previewCard(g, { kicker: HW.leagueName(L) + ' · ' + HW.teamName(L, nxt.away) + ' at ' + HW.teamName(L, nxt.home), nick: t => String(t.name || '').split(' ').slice(-1)[0] }) + '</div>';
+      const st0 = U.status(nxt);
+      h += '<div>' + QK.sectionHead({ kicker: st0 === 'live' ? 'Live now' : (QK.fmt.relDay(nxt.date) === 'Today' ? 'What to watch tonight' : 'Next up'), title: U.nick(L, nxt.away) + ' at ' + U.nick(L, nxt.home) }) +
+        '<div id="pp-next">' + QK.skeleton('card', 1) + '</div></div>';
     }
     if (lastG) {
       const line = (lastG.pts || 0) + ' points, ' + (lastG.reb || 0) + ' rebounds, ' + (lastG.ast || 0) + ' assists in ' + U.f(lastG.min, 0) + ' minutes' + (isNum(lastG.game_score) ? ', game score ' + U.f(lastG.game_score, 1) : '') + (isNum(lastG.pm) ? ', ' + U.signed(lastG.pm, 0) + ' on the floor' : '');
       const href = lastG.game ? HW.gameHref(L, lastG.game, S) : null;
-      h += '<div><div class="qk-kicker" style="margin-bottom:10px">Last time out</div><' + (href ? 'a href="' + esc(href) + '"' : 'div') + ' class="qk-card hw-lastg"><div class="qk-card-body"><div class="qk-feature-meta"><span class="qk-pill">' + esc(HW.fmtDate(lastG.date, { year: false })) + '</span></div>' +
-        '<h3 style="margin:12px 0 4px">' + esc((lastG.home ? 'v ' : 'at ') + HW.teamName(L, lastG.opp)) + '</h3>' + QK.note('<b>' + esc(sur) + ':</b> ' + esc(line) + '.') + '</div></' + (href ? 'a' : 'div') + '></div>';
+      h += '<div>' + QK.sectionHead({ kicker: 'Last game', title: '<span id="pp-last-t">' + esc((lastG.home ? 'v ' : 'at ') + HW.teamName(L, lastG.opp)) + '</span>', html: true, sub: esc(HW.fmtDate(lastG.date, { year: false })),
+        actions: href ? '<a class="qk-more" href="' + esc(href) + '">The game centre</a>' : '' }) +
+        '<article class="qk-card"><div class="qk-card-body"><div id="pp-box"></div>' +
+        '<p class="hw-lastline"><b>' + esc(sur) + ':</b> ' + esc(line) + '.</p><div id="pp-race"></div></div></article></div>';
     }
     h += '</div></section>';
   }
+  /* 3. the game log: every game this season, the best night (game score) highlighted */
+  if (log.length) {
+    let bi = -1, bv = -1e9; log.forEach((r, i) => { if (isNum(r.game_score) && r.game_score >= bv) { bv = r.game_score; bi = i; } });
+    const bR = log[bi];
+    const shot = (m, a) => (isNum(m) && isNum(a) ? m + '–' + a : '—');
+    h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Game log', title: U.isCur(L, S) ? 'Every game this season' : 'Every game of ' + HW.seasonLabel(L, S),
+      sub: bR ? esc((bR.pts || 0) + ' points ' + (bR.home ? 'against ' : 'at ') + HW.teamName(L, bR.opp) + ' is the best night so far (game score ' + U.f(bR.game_score, 1) + ', highlighted). Game score is Hollinger’s one-number box score: 10 is a solid night, 20 a big one.') : '', html: true }) +
+      '<article class="qk-card"><div class="qk-card-body flush"><div class="qk-table-wrap hw-logwrap"><table class="qk-table hw-gamelog"><thead><tr><th>Date</th><th>Opp</th><th class="num">Min</th><th class="num">Pts</th><th class="num">Reb</th><th class="num">Ast</th><th class="num" data-tip="Field goals made–attempted">FG</th><th class="num" data-tip="Threes made–attempted">3P</th><th class="num" data-tip="Free throws made–attempted">FT</th><th class="num" data-tip="The team’s points margin with the player on the floor">+/-</th><th class="num" data-tip="Hollinger’s game score: one number for the box-score line">Game score</th></tr></thead><tbody>' +
+      log.map((r, i) => [r, i]).reverse().map(x => { const r = x[0];
+        return '<tr' + (x[1] === bi ? ' class="hl"' : '') + '><td>' + (r.game ? '<a class="hw-link" href="' + esc(HW.gameHref(L, r.game, S)) + '">' + esc(HW.fmtDate(r.date, { year: false })) + '</a>' : esc(HW.fmtDate(r.date, { year: false }))) + '</td><td>' + (r.home ? 'v ' : '@ ') + esc(HW.teamAbbr(L, r.opp)) + '</td>' +
+          '<td class="num">' + U.f(r.min, 0) + '</td><td class="num"><b>' + (r.pts || 0) + '</b></td><td class="num">' + (r.reb || 0) + '</td><td class="num">' + (r.ast || 0) + '</td><td class="num">' + shot(r.fgm, r.fga) + '</td><td class="num">' + shot(r.tpm, r.tpa) + '</td><td class="num">' + shot(r.ftm, r.fta) + '</td>' +
+          '<td class="num">' + U.sgnHTML(r.pm, 0) + '</td><td class="num">' + U.f(r.game_score, 1) + '</td></tr>'; }).join('') +
+      '</tbody></table></div></div></article></section>';
+  }
+  /* 4. game by game and their type */
+  if (tapeOn && (gbg || typeCard)) h += '<section class="qk-section"><div class="qk-gside"><div>' + gbg + '</div><div>' + typeCard + '</div></div></section>';
 
   // ── more on the player
   const cells = cur.shots && cur.shots.grid ? U.rowsOf(cur.shots.grid).filter(c => isNum(c.x) && isNum(c.y) && c.y <= 41.5) : [];
   const groupsAll = p ? U.pctGroups(L, cat, roles, pid) : [];
-  h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'More on the player', title: 'Peers, splits and the long view', sub: 'Where the player sits among ' + esc(peerShort) + ', how the season splits, and every season in the data.' }) +
-    '<div class="qk-grid">' + (groupsAll.length ? '<div class="qk-span-6">' + U.card2('Among peers', 'Every qualified ' + esc(peer.replace(HW.leagueName(L) + ' ', '')) + ' this season; bars coloured by percentile', '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('pp-dist', 240, 'Among peers: the role’s distribution')) + '</div>' : '') +
+  h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'More on the player', title: 'Value, peers and the long view', sub: 'What the player is worth, where the player sits among ' + esc(peerShort) + ', how the season splits, and every season in the data.' }) +
+    (k.length ? '<div class="hw-kpis">' + QK.stats(k) + '</div>' : '') +
+    '<div class="qk-grid" style="margin-top:var(--sp-5)">' + (groupsAll.length ? '<div class="qk-span-6">' + U.card2('Among peers', 'Every qualified ' + esc(peer.replace(HW.leagueName(L) + ' ', '')) + ' this season; bars coloured by percentile', '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('pp-dist', 240, 'Among peers: the role’s distribution')) + '</div>' : '') +
     (cs.length > 1 ? '<div class="qk-span-' + (groupsAll.length ? 6 : 12) + '">' + U.card2('Season by season', 'Impact per 100 possessions: total, offence and defence', U.chart('pp-career', 280, 'Impact by season')) + '</div>' : '') + '</div>';
   if (log.length) h += '<div class="qk-grid hw-sec"><div class="qk-span-12">' + U.card2('Splits', 'Per game', '<div id="pp-splits"></div>', { flush: true }) + '</div></div>';
   h += '</section>';
@@ -249,33 +283,91 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
     if (window.IntersectionObserver) { const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); go(); } }, { rootMargin: '200px' }); io.observe(host); } else go();
   }
 
-  // compare: the player and the two closest matches, on the role's headline set, the best in each row highlighted
-  const withFull = cb => (cat && !cat.__rc ? cb(cat) : HW.load(HW.path('players.json', L, S)).then(full => { if (U.ok(full) && full.players) cb(full); }));
-  if (el.querySelector('#pp-cmp-sec')) {
-    const host = el.querySelector('#pp-cmp-sec');
+  // the tale of the tape: the player against one of the closest matches (chips switch), on the role's headline set
+  const withFull = cb => (cat && !cat.__rc ? cb(cat) : HW.load(HW.path('players.json', L, S)).then(full => { if (U.ok(full) && full.players) cb(full); else cb(null); }));
+  if (el.querySelector('#pp-tape')) {
+    const box = el.querySelector('#pp-tape');
     const fill = () => withFull(full => {
       if (!U.alive(el)) return;
-      const ids = [pid].concat(simR.map(x => x.id)).filter(id => full.players[id]).slice(0, 3);
-      if (ids.length < 2 || !set) return;
-      const E = ids.map(id => full.players[id]);
-      const bestOf = {};
-      const groups = set.groups.map(g => ({ label: g[0], rows: g[1].map(kk => {
-        const m = U.mMeta(kk), pcl = ids.map(id => U.rolePctl(full, roles, id, kk));
-        pcl.forEach((x, i) => { if (!isNum(x)) return; const d = x - Math.max.apply(null, pcl.filter((_, j) => j !== i).map(z => (isNum(z) ? z : 0))); if (!bestOf[i] || d > bestOf[i].d) bestOf[i] = { k: kk, d: d, v: (E[i].values || {})[kk] }; });
-        return { label: m.label, tip: m.desc, better: m.better, values: E.map(e => (e.values || {})[kk]), pctls: pcl, fmt: x => U.fmtM(kk, x) };
-      }) }));
-      const names = E.map(e => QK.surname(e.name || ''));
-      el.querySelector('#pp-cmp-h').innerHTML = QK.sectionHead({ kicker: 'Compare', title: names.slice(0, -1).join(', ') + ' or ' + names[names.length - 1] + '?',
-        sub: 'The closest matches on this season’s profile, side by side against ' + esc(peer) + '. The best in each row is highlighted; the small pills are percentiles.',
-        actions: '<a class="qk-more" href="' + esc(HW.href(L, 'compare/players/' + ids.map(encodeURIComponent).join('/'), S)) + '">Open in Compare</a>' });
-      const ents = E.map((e, i) => ({ name: e.name, href: HW.playerHref(L, ids[i], S), sub: [HW.teamAbbr(L, e.team), (e.gp || 0) + ' GP'].join(' · ') }));
-      const verd = E.map((e, i) => (bestOf[i] && bestOf[i].d > 0 ? { title: U.ARCHETYPE[bestOf[i].k] || 'The standout', who: names[i], text: 'best of the ' + E.length + ' on ' + lc(U.mMeta(bestOf[i].k).label) + ' (' + U.fmtM(bestOf[i].k, bestOf[i].v) + ').' } : null));
-      el.querySelector('#pp-cmp').innerHTML = QK.compareView({ entities: ents, groups: groups, delta: false }) + QK.verdicts(verd);
-      host.hidden = false;
+      const others = full ? simR.map(x => x.id).filter(id => id !== pid && full.players[id]).slice(0, 3) : [];
+      if (!others.length || !full.players[pid]) { el.querySelector('#pp-tape-h').innerHTML = QK.sectionHead({ kicker: 'Tale of the tape', title: 'Closest matches' }); box.innerHTML = QK.empty('No comparison yet', 'The closest matches appear once the season catalogue has them.'); return; }
+      const drawTape = oid => {
+        const ids = [pid, oid], E = ids.map(id => full.players[id]);
+        const best = {};
+        const groups = set.groups.map(g => ({ label: g[0], rows: g[1].map(kk => {
+          const m = U.mMeta(kk), pcl = ids.map(id => U.rolePctl(full, roles, id, kk));
+          pcl.forEach((x, i) => { const o = pcl[1 - i]; const d = isNum(x) ? x - (isNum(o) ? o : 0) : null; if (isNum(d) && (!best[i] || d > best[i].d)) best[i] = { k: kk, d: d, v: (E[i].values || {})[kk] }; });
+          return { label: m.label, tip: m.desc, better: m.better, values: E.map(e => (e.values || {})[kk]), pctls: pcl, fmt: x => U.fmtM(kk, x) };
+        }) }));
+        const names = E.map(e => QK.surname(e.name || ''));
+        el.querySelector('#pp-tape-h').innerHTML = QK.sectionHead({ kicker: 'Tale of the tape', title: names[0] + ' or ' + names[1] + '?',
+          sub: 'Bar length = percentile against ' + esc(peer) + ' (100 = best). The better number in each row is solid.', html: true });
+        const ents = E.map((e, i) => ({ name: e.name, short: names[i], href: HW.playerHref(L, ids[i], S), colour: HW.teamColourRaw(L, e.team), alt: HW.teamAlt(L, e.team), sub: [HW.teamName(L, e.team), (e.gp || 0) + ' games'].join(' · ') }));
+        box.innerHTML = QK.compareView({ entities: ents, groups: groups });
+        el.querySelector('#pp-verd').innerHTML = QK.verdicts(E.map((e, i) => (best[i] && best[i].d > 0 ? { title: U.ARCHETYPE[best[i].k] || 'The standout', who: names[i], text: 'the better of the two on ' + lc(U.mMeta(best[i].k).label) + ' (' + U.fmtM(best[i].k, best[i].v) + ').' } : null)));
+      };
+      const pick = el.querySelector('#pp-tape-pick');
+      pick.innerHTML = others.map((id, i) => '<button type="button" class="qk-chip" data-value="' + esc(id) + '" aria-pressed="' + (i === 0) + '">' + esc(QK.surname(full.players[id].name || '')) + '</button>').join('') +
+        '<a class="qk-chip" href="' + esc(HW.href(L, 'compare/players/' + [pid].concat(others.slice(0, 2)).map(encodeURIComponent).join('/'), S)) + '">' + (others.length > 1 ? 'All three in Compare' : 'Open in Compare') + '</a>';
+      pick.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+        pick.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+        drawTape(b.getAttribute('data-value'));
+      }));
+      drawTape(others[0]);
     });
-    const sent = el.querySelector('#pp-cmp-sent');
-    if ((cat && !cat.__rc) || !window.IntersectionObserver || !sent) fill();
-    else { const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); fill(); } }, { rootMargin: '300px' }); io.observe(sent); }
+    if ((cat && !cat.__rc) || !window.IntersectionObserver) fill();
+    else { const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); fill(); } }, { rootMargin: '300px' }); io.observe(box); }
+  }
+
+  // what to watch tonight: the scoreboard bug, the bar and how the teams match up this season (season.json ratings)
+  if (nxt && el.querySelector('#pp-next')) {
+    HW.load(HW.path('season.json', L, S)).then(sn => {
+      const box = el.querySelector('#pp-next');
+      if (!box || !U.alive(box)) return;
+      const season = U.ok(sn) ? sn : null;
+      const g = U.game(nxt, L, { records: U.records(season) });
+      const R = (season && season.ratings) || {}, ra = R[String(nxt.away)] || {}, rh = R[String(nxt.home)] || {};
+      const fx = [];
+      const add = (label, a, b, f, low) => { if (isNum(a) && isNum(b)) fx.push({ label: label, a: f(a), b: f(b), better: Math.abs(a - b) < 1e-9 ? null : ((a > b) !== !!low ? 'a' : 'b') }); };
+      add('Net rating, per 100 trips', ra.net, rh.net, x => U.signed(x, 1));
+      add('Points scored per 100', ra.off, rh.off, x => U.f(x, 1));
+      add('Points allowed per 100', ra.def, rh.def, x => U.f(x, 1), true);
+      const m = nxt.model || {};
+      const extra = U.status(nxt) === 'pre' && isNum(m.margin) ? 'We expect ' + HW.teamAbbr(L, m.margin >= 0 ? nxt.home : nxt.away) + ' by about ' + Math.max(1, Math.round(Math.abs(m.margin))) + (isNum(m.total) ? ', with about ' + Math.round(m.total) + ' points in all' : '') + '.' : '';
+      box.innerHTML = QK.previewCard(g, { layout: 'bug', nick: t => t.short || t.name, factors: fx, factorsTitle: 'How they match up this season', noteExtra: esc(extra) });
+    });
+  }
+
+  // the last game: the line score by quarter and our win chance through it (the game file)
+  if (lastG && lastG.game && el.querySelector('#pp-box')) {
+    GC().loadGame(L, S, lastG.game).then(res => {
+      if (!res || !U.ok(res.d) || !U.alive(el)) return;
+      const d = res.d, H = String(d.home), A = String(d.away), mine = lastG.home ? H : A;
+      if (isNum(d.hs) && isNum(d.as) && U.status(d) === 'final') {
+        const w = d.hs >= d.as ? [H, d.hs, A, d.as] : [A, d.as, H, d.hs];
+        const t = el.querySelector('#pp-last-t');
+        if (t) t.textContent = HW.teamAbbr(L, w[0]) + ' ' + w[1] + ', ' + HW.teamAbbr(L, w[2]) + ' ' + w[3] + (Number(d.periods) > 4 ? ' (OT)' : '');
+      }
+      const ln = d.line || {}, la = ln.away || [], lh = ln.home || [];
+      if (la.length && lh.length) {
+        const n = Math.max(la.length, lh.length);
+        const ql = i => (i < 4 ? 'Q' + (i + 1) : (n > 5 ? 'OT' + (i - 3) : 'OT'));
+        const sum = a => a.reduce((s, x) => s + (isNum(x) ? x : 0), 0);
+        const row = (tid, a) => '<tr' + (tid === mine ? ' class="hl"' : '') + '><td>' + QK.teamMark(U.team(L, tid), 'sm') + '</td>' + a.map(x => '<td class="num">' + (isNum(x) ? x : '–') + '</td>').join('') + '<td class="num"><b>' + sum(a) + '</b></td></tr>';
+        el.querySelector('#pp-box').innerHTML = '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Team</th>' + la.map((_, i) => '<th class="num">' + ql(i) + '</th>').join('') + '<th class="num">Total</th></tr></thead><tbody>' + row(A, la) + row(H, lh) + '</tbody></table></div>';
+      }
+      const wp = ((d.wp || {}).model || []).filter(x => isNum(x[0]) && isNum(x[1]));
+      if (wp.length > 4) {
+        const PS = L === 'wnba' ? 600 : 720, tMax = Math.max(wp[wp.length - 1][0], 4 * PS);
+        const per = []; for (let t = PS; t < tMax; t += t < 4 * PS ? PS : 300) per.push(t);
+        const hc = U.pair(L, H, A);
+        el.querySelector('#pp-race').innerHTML = U.chart('pp-race-c', 240, 'Our win chance through the last game');
+        QKC.winProb('#pp-race-c', { t: wp.map(x => x[0]), p: wp.map(x => x[1]), step: true, tMin: 0, tMax: tMax, interval: PS, periods: per,
+          home: { name: HW.teamName(L, H), abbr: HW.teamAbbr(L, H), colour: hc[0] }, away: { name: HW.teamName(L, A), abbr: HW.teamAbbr(L, A), colour: hc[1] },
+          tFmt: x => (x < 4 * PS ? 'Q' + (Math.round(x / PS) + 1) : ''), tLabel: x => (x < 4 * PS ? 'Q' + (Math.floor(x / PS) + 1) : 'OT') + ' · ' + Math.floor((x % PS) / 60) + ' min in',
+          tName: 'Game time (quarters)', yName: HW.teamAbbr(L, H) + ' win chance (ours)' });
+      }
+    });
   }
 
   // where the player sits: the peer distribution of one metric of the role's set, with the player and the median marked
@@ -332,7 +424,7 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
             QKC.tipRow(T.ink3, 'Line', (r.pts || 0) + ' pts · ' + (r.reb || 0) + ' reb · ' + (r.ast || 0) + ' ast') + QKC.tipRow(T.ink3, '+/-', U.signed(r.pm, 0)); } }),
         series: [{ type: 'bar', barMaxWidth: 26, data: log.map((r, i) => {
           const o = { value: isNum(r.game_score) ? Math.round(r.game_score * 10) / 10 : 0, href: r.game ? HW.gameHref(L, r.game, S) : undefined,
-            itemStyle: { color: r.pm > 0 ? T.model : r.pm < 0 ? T.coral : T.ink3, borderRadius: [6, 6, 0, 0] } };
+            itemStyle: { color: r.pm > 0 ? T.sky : r.pm < 0 ? T.coral : T.ink3 } };
           if (i === bi && bv >= 20) o.label = Object.assign(QKC.annot(T), { show: true, position: 'top', formatter: 'best: ' + U.f(bv, 1) });
           return o; }) }]
       };

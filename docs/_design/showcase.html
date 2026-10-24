@@ -6,21 +6,21 @@
 <meta name="color-scheme" content="dark">
 <meta name="robots" content="noindex">
 <link rel="icon" href="data:,">
-<title>The Quant · Kit v3 showcase</title>
-<!-- Kit v3 "Matchday" showcase (dark only): every component on sample data. Lives in docs/_design only; design_kit.py never
+<title>The Quant · Kit v4 showcase</title>
+<!-- Kit v4 "Broadcast" showcase (dark only): every component on sample data. Lives in docs/_design only; design_kit.py never
      copies it into a site. Serve docs/ and open /_design/showcase.html (add ?theme=light or ?theme=dark). -->
 <script>try{var t=/[?&]theme=(light|dark)/.exec(location.search);t=t?t[1]:localStorage.getItem('qk-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,400..800,0..100,0..1;1,9..144,400..700,0..100,0..1&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&family=Bebas+Neue&display=swap">
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="quant.css">
 <style>
   .sc-swatches { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-  .sc-sw { border-radius: 10px; border: 1px solid var(--line-1); overflow: hidden; background: var(--s-1); font-size: var(--fs-xs); }
+  .sc-sw { border-radius: 0; border: 1px solid var(--line-1); overflow: hidden; background: var(--s-1); font-size: var(--fs-xs); }
   .sc-sw i { display: block; height: 54px; background: var(--k); }
   .sc-sw div { padding: 8px 10px; } .sc-sw b { display: block; font-weight: 700; } .sc-sw code { color: var(--ink-3); font: 500 11px var(--font-num); }
-  .sc-ramp { height: 18px; border-radius: 9px; background: linear-gradient(90deg, var(--pc-0), var(--pc-25), var(--pc-50), var(--pc-75), var(--pc-100)); }
+  .sc-ramp { height: 18px; border-radius: 0; background: linear-gradient(90deg, var(--pc-0), var(--pc-25), var(--pc-50), var(--pc-75), var(--pc-100)); }
   .sc-type .qk-card-body > div { padding: 12px 0; border-bottom: 1px solid var(--line-1); display: grid; grid-template-columns: 160px 1fr; gap: 12px; align-items: baseline; }
   .sc-type code { color: var(--ink-3); font: 500 11px var(--font-num); }
   @media (max-width: 600px) { .sc-type .qk-card-body > div { grid-template-columns: 1fr; gap: 4px; } }
@@ -36,6 +36,14 @@
 <div class="qk-ticker" id="sc-ticker" aria-label="Scores"></div>
 <main id="main" class="qk-page">
   <div id="sc-hero"></div>
+
+  <section class="qk-section sc" id="broadcast">
+    <div id="h-broadcast"></div>
+    <div id="sc-bc-split"></div>
+    <div class="qk-section qk-g75" style="margin-top:var(--sp-10)"><div id="sc-bc-bug"></div><div><div id="sc-bc-quad-h"></div><div class="qk-card"><div class="qk-card-body"><div id="sc-bc-quad" class="qk-chart" style="--h:380px"></div></div></div></div></div>
+    <div id="sc-bc-band"></div>
+    <div class="qk-section qk-g2"><div id="sc-bc-tape"></div><div class="qk-stack"><div class="qk-card"><div class="qk-card-body" id="sc-bc-meters"></div></div><div id="sc-bc-explain"></div></div></div>
+  </section>
 
   <section class="qk-section sc" id="matchday">
     <div id="h-matchday"></div>

@@ -1,5 +1,5 @@
-/* The Quant Gridiron — the game centre (#/game/<game_id>), on kit v3 "Matchday" (the Rink game page is the reference).
- * Top: the hero is QK.previewCard (away "at" home with records and form, the score bug when live, our chance for the
+/* The Quant Gridiron — the game centre (#/game/<game_id>), on kit v4 "Broadcast" (the Rink game page is the reference).
+ * Top: the hero is QK.previewCard, the diagonal split hero (away "at" home in the team colours with records, the clock when live, our chance for the
  * favourite as a big blue number with a how-sure note, the team-colour bar, the market as a quiet labelled reference
  * before kickoff, how the teams match up from the season ratings), then the week, venue, weather, quarterbacks and
  * coaches, the field strip when live and the linescore; beside it the stat tiles, our forecast table (the market a
@@ -121,7 +121,7 @@ function heroMeta(g) {
   const hc = co.away || co.home ? 'Head coaches: ' + (co.away ? GI.coachLink(co.away) : '?') + ' and ' + (co.home ? GI.coachLink(co.home) : '?') : '';
   return '<div class="gi-hero-meta">' + meta.map(x => '<span>' + x + '</span>').join('') + '</div>' + (qb || hc ? '<div class="gi-hero-meta">' + [qb, hc].filter(Boolean).map(x => '<span>' + x + '</span>').join('') + '</div>' : '');
 }
-/* v3 (Matchday) hero: QK.previewCard with the records and form from the standings, our chance (the live chance once it
+/* v4 (Broadcast) hero: QK.previewCard, the diagonal split, with the records and form from the standings, our chance (the live chance once it
    starts, our pre-game call after it ends), a how-sure note with the projected score, the market as a quiet reference
    line before kickoff (game detail is one of the two places it may appear) and how the teams match up so far. */
 function hero(g, pre, season) {
@@ -132,7 +132,10 @@ function hero(g, pre, season) {
   ((season && season.standings) || []).forEach(d => (d.teams || []).forEach(t => { rows[GI.canonTeam(t.team)] = t; }));
   const cols = GI.pair(g.away, g.home);
   const G = GI.qkGame(Object.assign({}, g, { model: m }), rows);
-  G.home.colour = cols[1]; G.away.colour = cols[0];
+  /* v4: the diagonal hero takes the raw kit colours, the alternates and the full names (QK.color.blockPair makes the
+     blocks and resolves a clash); the lifted pair `cols` stays for the factors and the charts */
+  G.home.colour = GI.teamInfo(g.home).colour || cols[1]; G.away.colour = GI.teamInfo(g.away).colour || cols[0];
+  G.home.alt = GI.teamInfo(g.home).alt; G.away.alt = GI.teamInfo(g.away).alt; G.home.full = GI.teamName(g.home); G.away.full = GI.teamName(g.away);
   G.league = 'NFL';
   if (live && st === 'half') G.clock = 'Half';
   const R = (season && season.ratings) || {};
@@ -347,8 +350,8 @@ function drawUnits(root) {
       legend: GI.ch.legend(T, { data: ['Offence percentile', 'Defence percentile'] }),
       xAxis: GI.ch.ax(T, { min: 0, max: 100, fmt: v => v + 'th', name: 'Percentile among teams', nameLocation: 'middle', nameGap: 26 }), yAxis: ya,
       tooltip: GI.ch.tip(T, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: ps => { const r = rows[ps[0].dataIndex]; return GI.ch.thead(esc(r.label)) + GI.ch.trow(T.model, GI.teamAbbr(r.t) + ' offence', GI.signed(r.off, 3) + ' · ' + GI.ordinal(r.offR)) + GI.ch.trow(T.cat[1], GI.teamAbbr(r.o) + ' defence', GI.signed(r.def, 3) + ' · ' + GI.ordinal(r.defR)); } }),
-      series: [{ type: 'bar', name: 'Offence percentile', data: rows.map(r => rankPct(r.offR)), barMaxWidth: 12, itemStyle: { color: T.model, borderRadius: [0, 3, 3, 0] } },
-        { type: 'bar', name: 'Defence percentile', data: rows.map(r => rankPct(r.defR)), barMaxWidth: 12, itemStyle: { color: T.cat[1], borderRadius: [0, 3, 3, 0] } }]
+      series: [{ type: 'bar', name: 'Offence percentile', data: rows.map(r => rankPct(r.offR)), barMaxWidth: 12, itemStyle: { color: T.model } },
+        { type: 'bar', name: 'Defence percentile', data: rows.map(r => rankPct(r.defR)), barMaxWidth: 12, itemStyle: { color: T.cat[1] } }]
     };
   }, 'Unit matchups');
 }

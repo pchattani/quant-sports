@@ -147,6 +147,23 @@ TEAMS: dict[str, dict] = {
             "retro": [(1969, "SE1"), (1970, "MIL")], "bbref": [(1969, "SEP"), (1970, "MIL")]},
 }
 
+# Second kit colour per franchise (the Broadcast hero's colour when the two teams' main colours clash,
+# docs/_design/MIGRATION_V4.md). The stores keep no ESPN team objects for MLB (the ESPN fetch reads lines and win
+# probability only), so these are the clubs' published secondary colours, like `colour` above: a fixed table.
+ALT: dict[str, str] = {
+    "108": "#003263", "109": "#e3d4ad", "110": "#000000", "111": "#bd3039", "112": "#cc3433", "113": "#000000",
+    "114": "#e50022", "115": "#c4ced4", "116": "#fa4616", "117": "#eb6e1f", "118": "#bd9b60", "119": "#ef3e42",
+    "120": "#14225a", "121": "#ff5910", "133": "#efb21e", "134": "#fdb827", "135": "#ffc425", "136": "#0c2c56",
+    "137": "#27251f", "138": "#0c2340", "139": "#8fbce6", "140": "#c0111f", "141": "#e8291c", "142": "#d31145",
+    "143": "#002d72", "144": "#ce1141", "145": "#c4ced4", "146": "#ef3340", "147": "#c4ced4", "158": "#ffc52f",
+}
+
+
+def team_alt(tid) -> str | None:
+    """A franchise's second kit colour ("#rrggbb"), or None (a minor-league or unknown id)."""
+    return ALT.get(str(tid))
+
+
 # league by season: (first season, "AL"|"NL"); division from 1994 (three-division era), by season.
 _LEAGUE_MOVES = {"158": [(1969, "AL"), (1998, "NL")], "117": [(1962, "NL"), (2013, "AL")]}
 _NL = {"109", "112", "113", "115", "119", "120", "121", "134", "135", "137", "138", "143", "144", "146"}

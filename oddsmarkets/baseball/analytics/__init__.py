@@ -390,9 +390,12 @@ def ranks(values: dict[str, Any], lower: bool = False) -> dict[str, int]:
 # ---------------------------------------------------------------------------------------------- store helpers
 
 def team_info(store: dict, tid: Any) -> dict:
+    from oddsmarkets.baseball import canon
     t = (store.get("teams") or {}).get(str(tid)) or {}
+    # alt: the second kit colour (canon.ALT, MLB only) for the Broadcast hero's clash rule
     return {"id": str(tid), "name": t.get("name") or str(tid), "abbr": t.get("abbr"), "short": t.get("short") or t.get("name"),
-            "league": t.get("league"), "division": t.get("division"), "colour": t.get("colour"), "venue": t.get("venue")}
+            "league": t.get("league"), "division": t.get("division"), "colour": t.get("colour"),
+            "alt": t.get("alt") or canon.team_alt(tid), "venue": t.get("venue")}
 
 
 def abbr_to_tid(store: dict) -> dict[str, str]:

@@ -295,7 +295,7 @@ function setDist(el, sets, opts) {
     return { grid: { left: 8, right: 12, top: 34, bottom: 34, containLabel: true }, xAxis: xa, yAxis: ya,
       tooltip: QKC.tooltip(Tk, { formatter: p => esc(p.name) + ': <b>' + TA.pct(p.value, 1) + '</b>' + (keys[p.dataIndex] === o.actual ? ' · what happened' : '') }),
       series: [{ type: 'bar', barMaxWidth: 46, data: keys.map(k => { const w = Number(k.split('-')[0]) > Number(k.split('-')[1]);
-        return { value: sets[k], itemStyle: { color: QKC.hexA(w ? ca : cb, 0.85), borderColor: k === o.actual ? Tk.ink1 : 'transparent', borderWidth: k === o.actual ? 2 : 0, borderRadius: [3, 3, 0, 0] } }; }),
+        return { value: sets[k], itemStyle: { color: QKC.hexA(w ? ca : cb, 0.85), borderColor: k === o.actual ? Tk.ink1 : 'transparent', borderWidth: k === o.actual ? 2 : 0, borderRadius: 0 } }; }),
         label: { show: true, position: 'top', color: Tk.ink2, fontFamily: Tk.fontNum, fontSize: 10.5, formatter: p => TA.pct(p.value, 0) } }] };
   }, { label: 'Set-score distribution' });
 }
@@ -319,7 +319,7 @@ function gamesDist(el, dist, opts) {
     if (TA.isNum(o.exp)) ml.push({ xAxis: Math.max(0, Math.min(full.length - 1, o.exp - lo)), lineStyle: { color: Tk.ink2, type: [3, 3] }, label: { show: true, formatter: 'Expected ' + TA.num(o.exp, 1), color: Tk.ink2, fontSize: 10 } });
     return { grid: { left: 8, right: 12, top: 34, bottom: 34, containLabel: true }, xAxis: xa, yAxis: ya,
       tooltip: QKC.tooltip(Tk, { formatter: p => esc(p.name) + ' ' + esc(o.unit || 'games') + ': <b>' + TA.pct(p.value, 1) + '</b>' + (TA.isNum(o.actual) && full[p.dataIndex] === Number(o.actual) ? ' · what happened' : '') }),
-      series: [{ type: 'bar', barCategoryGap: '12%', data: full.map(k => ({ value: dist[k] || 0, itemStyle: { color: TA.isNum(o.actual) && k === Number(o.actual) ? Tk.ink1 : QKC.hexA(col, 0.8), borderRadius: [2, 2, 0, 0] } })),
+      series: [{ type: 'bar', barCategoryGap: '12%', data: full.map(k => ({ value: dist[k] || 0, itemStyle: { color: TA.isNum(o.actual) && k === Number(o.actual) ? Tk.ink1 : QKC.hexA(col, 0.8), borderRadius: 0 } })),
         markLine: ml.length ? { silent: true, symbol: 'none', data: ml } : undefined }] };
   }, { label: o.xTitle || 'Games distribution' });
 }

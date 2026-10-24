@@ -9,7 +9,7 @@
  *                           #/glossary/<key> and #/methodology/<part> render inside Model
  * Old routes (#/skaters, #/playoffs, #/markets, #/calibration ...) are redirected by core.js (REDIRECTS).
  *
- * Kit v3 "Matchday" (MIGRATION_V3.md): friendly section titles (the volt kicker says what it is, the Fraunces title
+ * Kit v4 "Broadcast" (MIGRATION_V4.md): friendly section titles (the volt tag says what it is, the Bebas title
  * the story), "i" notes (QK.note) under the numbers that need a sentence, a "Who's hot" strip (QK.hotRow) on Players,
  * "How sure are we?" (QK.howSure, from data/calibration.json) at the top of the Model page, and season forecasts
  * without the market tick (the market stays on game pages and the Model page only). */

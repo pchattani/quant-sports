@@ -1,5 +1,6 @@
-/* The Quant Ace — compare (#/<T>/compare/<a>/<b>[/<c>]), kit v3 "Matchday" (the Rink compare page is the reference):
- * the question as the title ("Sinner or Alcaraz?"), the highlighter on the best value in each row, one-line verdicts.
+/* The Quant Ace — compare (#/<T>/compare/<a>/<b>[/<c>]), kit v4 "Broadcast" (rk-compare.js is the reference): the
+ * question as the title ("Sinner or Alcaraz?"); two players draw the tale of the tape (cobalt v slate: tennis has no
+ * team colours), three the table with the volt stroke under the best in each row; one-line verdicts.
  *
  * Two or three players side by side (QK.compareView) on the headline metric set of METRICS_SPEC.md (TA.v2), ranked
  * against the tour or, with a surface picked, the players with enough matches on it; where each one sits in the peer
@@ -128,7 +129,7 @@ function build(T, ids, cat, careers, body, full) {
   const tally = hA ? [hA[1], hA[2], hA[3]] : hB ? [hB[2], hB[1], hB[3]] : null;
 
   const q = short.length > 2 ? short.slice(0, -1).join(', ') + ' or ' + short[short.length - 1] + '?' : short[0] + ' or ' + short[1] + '?';
-  let h = QK.sectionHead({ kicker: 'Compare · ' + k.TN(T), title: k.esc(q), html: true, sub: 'Side by side on the numbers that best describe and predict a player’s tennis, each ranked against the tour. The best value in each row is highlighted.' }) +
+  let h = QK.sectionHead({ kicker: 'Compare · ' + k.TN(T), title: k.esc(q), html: true, sub: 'Side by side on the numbers that best describe and predict a player’s tennis, each ranked against the tour. ' + (ids.length === 2 ? 'Bar length is the percentile; the better number in each row is solid.' : 'The best in each row is underlined.') }) +
     V.card('Side by side', '<span id="cmp-sub"></span>', V.seg('cmp-pool', [['', 'Tour']].concat(surfOpts.map(s => [s, k.SURF_LABEL[s]])), '', 'Peer group') + '<div id="cmp-view" style="margin-top:12px"></div><div id="cmp-verd"></div><p class="ta-cap" id="cmp-cap"></p>',
     { foot: '<span>' + (tally ? 'Head to head: <b>' + k.esc(short[0]) + ' ' + tally[0] + '–' + tally[1] + ' ' + k.esc(short[1]) + '</b>' + (tally[2] ? ', last met ' + k.esc(k.fmtDate(tally[2], { weekday: false })) : '') : 'No tour-level meeting on file') + '</span><a href="' + k.h2hHref(T, ids[0], ids[1]) + '">Head to head, our chance on every surface →</a>' });
   h += '<section class="qk-section">' + V.card('Where they sit', 'Every qualified player in the peer group, with each one marked', '<div class="qk-seg" id="cmp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px;flex-wrap:wrap"></div>' + V.chart('cmp-dist', 260, 'Peer distribution with the players marked')) + '</section>';
@@ -150,7 +151,7 @@ function build(T, ids, cat, careers, body, full) {
       dfmt: (V.META[x] || [])[2] === 'pct' ? (d => (d > 0 ? '+' : d < 0 ? '−' : '±') + Math.abs(d * 100).toFixed(1) + ' pts') : null })) }));
     const ents = ids.map((id, i) => {
       const n = sf ? (((ps[i] || {}).values_surface || {})[sf] || {}).matches : (ps[i] || {}).matches;
-      return { name: names[i], href: k.playerHref(T, id), abbr: short[i], sub: [ps[i] && ps[i].country, ps[i] && isNum(ps[i].rank) ? 'No. ' + ps[i].rank : '', isNum(n) ? n + (sf ? ' ' + sf : '') + ' matches' : ''].filter(Boolean).join(' · ') };
+      return { name: names[i], short: short[i], href: k.playerHref(T, id), abbr: short[i], sub: [ps[i] && ps[i].country, ps[i] && isNum(ps[i].rank) ? 'No. ' + ps[i].rank : '', isNum(n) ? n + (sf ? ' ' + sf : '') + ' matches' : ''].filter(Boolean).join(' · ') };
     });
     document.getElementById('cmp-view').innerHTML = QK.compareView({ entities: ents, groups: groups });
     // verdicts: the metric where each player leads the others by the most (percentile points), named by its type
@@ -162,7 +163,7 @@ function build(T, ids, cat, careers, body, full) {
     })));
     document.getElementById('cmp-verd').innerHTML = QK.verdicts(ids.map((_, i) => (best[i] && best[i].d > 0 ? { title: V.ARCHETYPE[best[i].k] || 'The standout', who: short[i],
       text: 'best of the ' + ids.length + ' on ' + String(best[i].label).replace(/ \(inferred\)/, '').toLowerCase().replace(/^elo/, 'Elo').replace(/ elo/, ' Elo') + ' (' + best[i].fmt(best[i].v) + ').' } : null)));
-    document.getElementById('cmp-sub').textContent = 'Value · percentile against ' + V.peer(T, sf, cat) + ' (100 = best)' + (ids.length === 2 ? ' · the difference, green when ' + short[0] + ' is better' : '');
+    document.getElementById('cmp-sub').textContent = 'Value · percentile against ' + V.peer(T, sf, cat) + ' (100 = best)';
     const outs = ps.map((p, i) => (V.inPool(p, sf, cat) ? '' : names[i])).filter(Boolean);
     document.getElementById('cmp-cap').textContent = (outs.length ? outs.join(', ') + (outs.length > 1 ? ' are' : ' is') + ' short of the floor, so ' + (outs.length > 1 ? 'they have' : 'there is') + ' no percentile. ' : '') + 'Hold and break are inferred from set scores, not measured point by point.';
     const segEl = document.getElementById('cmp-dist-m');

@@ -1071,7 +1071,8 @@ function qkGame(g, rows) {
   const st = gameState(g);
   const rec = t => { const r = rows && rows[canonTeam(t)]; return r && isNum(r.w) ? record(r.w, r.l, r.t) : ''; };
   const form = t => { const r = rows && rows[canonTeam(t)]; return r && Array.isArray(r.last5) ? r.last5.join('') : ''; };
-  const T = t => ({ name: teamShort(t), abbr: teamAbbr(t), colour: teamInfo(t).colour, href: teamHref(t), record: rec(t), form: form(t) });
+  /* v4: the raw kit colour, the alternate (for a clash) and the full name (the hero's city line) */
+  const T = t => ({ name: teamShort(t), abbr: teamAbbr(t), colour: teamInfo(t).colour, alt: teamInfo(t).alt, full: teamName(t), href: teamHref(t), record: rec(t), form: form(t) });
   const live = st === 'live' || st === 'half';
   const p0 = (g.model || {}).p_home;
   /* v3: live, the kit reads wp_home as the live chance and p_home as our pre-game call ("before the start we had ...") */

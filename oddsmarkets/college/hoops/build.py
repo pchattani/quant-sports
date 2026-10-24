@@ -142,7 +142,8 @@ def american_p(ml_h, ml_a) -> float | None:
 def team_rec(st: dict, tid: str) -> dict:
     t = (st.get("teams") or {}).get(tid) or {}
     return {"name": t.get("name"), "short": t.get("short"), "abbr": t.get("abbr"), "colour": t.get("colour"),
-            "alt_colour": t.get("alt_colour"), "conference": t.get("conference"), "member": bool(t.get("member"))}
+            "alt_colour": t.get("alt_colour"), "alt": t.get("alt_colour"), "conference": t.get("conference"),
+            "member": bool(t.get("member"))}
 
 
 # ── level context (cached per process) ──────────────────────────────────────

@@ -26,7 +26,7 @@ body.qk { font-size: var(--fs-md); }
   background: var(--s-1); border: 1px solid var(--line-1); border-radius: var(--r-card); box-shadow: var(--sh-1);
   margin-bottom: var(--sp-5); overflow: hidden;
 }
-/* v3: the legacy card head reads as a Matchday card title (Fraunces), its sub-line in the UI face */
+/* the legacy card head reads as a kit card title (the display face), its sub-line in the UI face */
 .qk .card-header {
   background: transparent; border-bottom: 1px solid var(--line-1); color: var(--ink-1);
   font: 600 1.1875rem/1.25 var(--font-display); font-variation-settings: var(--fvs-display); letter-spacing: -0.015em; padding: 18px 22px 14px;
@@ -276,3 +276,19 @@ body.qk { font-size: var(--fs-md); }
 .rk-noteblock { max-width: 860px; }
 .rk-sub > .qk-note:first-child, .rk-note-top { margin: 0 0 var(--sp-5); }
 .rk-hot { margin: 0 0 var(--sp-8); }
+
+/* ═════════════════════════════════ 7. kit v4 (Broadcast) reference pages */
+.rk-crumb { font: 700 var(--fs-xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; }
+.rk-crumb + .qk-ph { margin-top: 12px; }
+.rk-settle { margin-top: 12px; }
+.rk-pick { margin: -4px 0 12px; }
+.rk-sec1 .qk-pcard { border-top-color: var(--card-rule); }
+.rk-h4 { font: 700 var(--fs-xs)/1.2 var(--font-cond) !important; letter-spacing: 0.1em !important; text-transform: uppercase !important; color: var(--signal) !important; }
+.rk-ov-real .qk-chart { --h: 420px; }
+/* Bebas has one weight: legacy rules that asked the display face for 600-900 would draw a faux bold; set it right */
+.qk .card-header { font: 400 1.625rem/1 var(--font-display); letter-spacing: 0.01em; text-transform: uppercase; }
+.qk .card-header .card-sub { display: block; margin-top: 4px; text-transform: none; }
+.qk .kpi-value { font-weight: 400; letter-spacing: 0.01em; }
+.rk-lead .v { font: 400 1.375rem/1 var(--font-display); }
+.rk-score, .rk-gh .side .nm, .rk-teamtile .big { font-weight: 400; letter-spacing: 0.01em; }
+.rk-teamtile .big { font-size: 1.5rem; }

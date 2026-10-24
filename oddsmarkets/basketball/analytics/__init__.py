@@ -390,8 +390,9 @@ def team_info(store: dict, tid: str) -> dict:
     name = t.get("name") or str(tid)
     loc = t.get("location") or ""
     short = name[len(loc):].strip() if loc and name.startswith(loc) else name.split(" ")[-1]
+    # alt: the kit's name for the second colour (docs/_design/MIGRATION_V4.md); alt_colour stays for the site's own JS
     return {"name": name, "abbr": t.get("abbr"), "short": short or name, "colour": t.get("colour"), "alt_colour": t.get("alt_colour"),
-            "conference": t.get("conference"), "division": t.get("division")}
+            "alt": t.get("alt_colour"), "conference": t.get("conference"), "division": t.get("division")}
 
 
 def player_name(store: dict, pid: str) -> str:

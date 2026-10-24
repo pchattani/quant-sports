@@ -1,14 +1,17 @@
-/* The Quant Hardwood — Overview (#/<L>), on kit v3 "Matchday" (the Rink overview is the reference, MIGRATION_V3.md).
+/* The Quant Hardwood — Overview (#/<L>), on kit v4 "Broadcast" (the Rink overview is the reference, MIGRATION_V4.md).
  *
- *   the black score ticker; the greeting hero with the game to watch (QK.featureCard); stat tiles: the title
- *     favourite (ours), the best team, the MVP favourite, the next tip-off or live games, the closest call coming up;
- *   "What to watch": live, today's, next and recent games as game cards with a one-line reason, no market;
- *   "Who's hot" (QK.hotRow, qualified leaders); "New here?" beside a "How sure are we?" teaser from
- *     <L>/calibration.json;
- *   who wins it all (our chance only: no market anywhere on the overview) and the award races; projected wins with the
- *     simulation's 90% range and power ratings; the playoff picture (series when the playoffs are on); most
- *     valuable players (projected WAR), the games that matter most; leaders (qualified players only).
- * A past season shows its champion, final standings and leaders.
+ *   the black score ticker; the greeting (QK.greeting: the date tag, the line, buttons) over the game to watch as the
+ *     diagonal split hero (QK.featureCard -> QK.splitHero, the teams' full names and alternate colours); the black
+ *     stat strip: the title favourite (ours), the best team, the MVP favourite, the next tip-off or live games, the
+ *     closest call coming up;
+ *   "N games. Our calls.": live, today's, next and recent games as game cards with a one-line reason, no market;
+ *   the black power list (QK.band + QK.hotRow: the top qualified name on five boards);
+ *   "We say it. Then we check it." (QK.howSure from <L>/calibration.json) beside "Who's for real?" (QKC.quadrant:
+ *     win % against net rating); "What's that number?";
+ *   series in progress (playoffs); the title race in team colours (our chance only: no market anywhere on the
+ *     overview) beside the award races; projected wins with the simulation's 90% range and power ratings; the
+ *     playoff picture; most valuable players (projected WAR), the games that matter most; leaders (qualified only).
+ * A past season shows its champion, "Who's for real?", final standings and leaders.
  * Reads index.json, <L>/<S>/season.json, <L>/calibration.json, <L>/<S>/awards.json, <L>/<S>/valuation.json, <L>/history.json. */
 (function (HW) {
 'use strict';
@@ -134,13 +137,19 @@ function render(el, params) {
     const when = evening ? 'tonight' : 'today';
     /* the game to watch: live first, then the closest calls in the next two days (QK.watchScore) */
     const feat = G.today.concat(G.next).map(g => U.game(g, L, { records: recs })).filter(g => g.status !== 'final').map(g => [QK.watchScore(g), g]).filter(x => x[0] > -1e8).sort((a, b) => b[0] - a[0])[0];
+    /* the split hero: the league on the status chip, the occasion (a series game) or our pick as the volt tag */
+    const featHTML = fg => {
+      const raw = G.today.concat(G.next).filter(x => String(x.id) === String(fg.id))[0] || {}, sr = raw.series || null;
+      const occ = sr && sr.round ? sr.round + (sr.game ? ' · Game ' + sr.game : '') : '';
+      return QK.featureCard(Object.assign({}, fg, { league: LN }), { scribble: occ || (fg.status === 'live' ? 'Live now!' : 'Our pick ' + when + '!'), nick: t => t.short || t.name });
+    };
     let h = (tickList.length ? '<div class="qk-ticker hw-ticker" aria-label="Scores and our chances">' + QK.ticker(tickList, { group: false, league: true }) + '</div>' : '');
     if (isCur) {
       h += QK.greeting({ date: U.kicker(L, S),
         title: esc(QK.greet()) + '! Here’s what’s ' + QK.mark('worth watching') + ' in the ' + esc(LN) + ' ' + when + '.',
         lede: 'Our chance for every game, playoff and title chances from ' + Number(nSims || 20000).toLocaleString('en-GB') + ' simulated seasons, team ratings and the players behind it all, in plain English. ' + (P[ph] || ''),
         ctas: [{ label: 'All games', href: HW.href(L, 'games') }, { label: 'Standings', href: HW.href(L, 'standings', S), ghost: true }],
-        side: feat ? QK.featureCard(feat[1], { scribble: feat[1].status === 'live' ? 'Live now!' : 'Our pick ' + when + '!', kicker: feat[1].league }) : '' });
+        side: feat ? featHTML(feat[1]) : '' });
     } else {
       h += U.secHead('How the ' + LN + ' ' + HW.seasonLabel(L, S) + ' season went', esc(sub), null, null, U.kicker(L, S), '<a class="qk-btn" href="' + esc(HW.href(L, 'standings', S)) + '">Final standings</a>');
     }
@@ -160,12 +169,19 @@ function render(el, params) {
     const hot = HOT.filter(x => (ld[x[0]] || []).length).map(x => {
       const r = ld[x[0]][0], r2 = ld[x[0]][1], p = HW.NAMES[L].players[String(r[0])] || {}, p2 = r2 ? HW.NAMES[L].players[String(r2[0])] || {} : null;
       const fv = v => (x[0] === 'ts' ? HW.fmtVal(v, 'pct') : x[0] === 'hpm' ? U.signed(v, 1) : U.f(v, 1));
-      return { sport: 'basketball', title: x[1], name: p.name || HW.playerName(L, r[0]), value: fv(r[1]), unit: x[2], next: p2 ? { name: p2.name || HW.playerName(L, r2[0]), value: fv(r2[1]) } : null, expl: x[3], href: HW.playerHref(L, r[0], S) };
+      return { sport: 'basketball', kicker: LN + (p.team ? ' · ' + HW.teamAbbr(L, p.team) : ''), title: x[1], name: p.name || HW.playerName(L, r[0]), value: fv(r[1]), unit: x[2], next: p2 ? { name: p2.name || HW.playerName(L, r2[0]), value: fv(r2[1]) } : null, expl: x[3], href: HW.playerHref(L, r[0], S) };
     });
-    if (hot.length) h += '<section class="qk-section">' + U.head({ kicker: isCur ? 'Who’s hot' : 'The season’s best', title: isCur ? 'Leading the way right now' : 'Who led the way', sub: 'One name for each stat, with the next best behind.', actions: '<a class="qk-btn ghost" href="' + esc(HW.href(L, 'players', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=leaders') + '">Every leader</a>' }) + QK.hotRow(hot) + '</section>';
-    if (isCur) h += '<section class="qk-section qk-gside"><div id="ov-sure"></div><div>' + QK.newHere({ items: [QK.NEW_HERE[0],
+    /* Who's hot: the black power list, the top qualified name on five boards */
+    if (hot.length) h += QK.band(QK.sectionHead({ kicker: isCur ? 'Who’s hot' : 'The season’s best', title: isCur ? 'The leaders, stat by stat' : 'Who led the way',
+      sub: 'The top name on five boards, the next best behind, and a line on what the number means. Qualified players only.',
+      actions: '<a class="qk-more" href="' + esc(HW.href(L, 'players', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=leaders') + '">Every leader</a>' }) + QK.hotRow(hot));
+    /* We say it. Then we check it. (filled from calibration.json) beside Who's for real? (win % against net rating) */
+    const realHTML = '<div class="hw-ov-real">' + QK.sectionHead({ kicker: 'Who’s for real?', title: 'Results v chances', sub: 'Teams top-left are winning more than their play suggests; bottom-right, the reverse. Luck, or something real?' }) +
+      '<div class="qk-card"><div class="qk-card-body"><div id="ov-luck" class="qk-chart" role="img" aria-label="Win percentage against net rating"></div><p class="qk-caption" id="ov-luck-cap"></p></div></div></div>';
+    h += isCur ? '<section class="qk-section qk-g75"><div><div id="ov-sure-h"></div><div id="ov-sure"></div></div>' + realHTML + '</section>' : '<section class="qk-section">' + realHTML + '</section>';
+    if (isCur) h += '<section class="qk-section">' + QK.newHere({ items: [QK.NEW_HERE[0],
       'A <b>percentile</b> ranks a player against the same role (guards, wings or bigs): 90th means better than 90 in 100.',
-      'Every forecast is checked against what happened. <a class="qk-link" href="' + esc(HW.href(L, 'model') + '?tab=calibration') + '">The record is on the Model page.</a>'] }) + '</div></section>';
+      'Every forecast is checked against what happened. <a class="qk-link" href="' + esc(HW.href(L, 'model') + '?tab=calibration') + '">The record is on the Model page.</a>'] }) + '</section>';
     if (liveSeries.length) {
       h += '<section class="qk-section">' + U.head({ kicker: 'Playoffs', title: 'Series in progress', sub: 'The bracket has every round and each team’s chance of reaching it.', actions: '<a class="qk-btn" href="' + esc(HW.href(L, 'standings') + '?tab=bracket') + '">Bracket →</a>' }) +
         '<div class="hw-mini-grid">' + liveSeries.map(x => seriesTile(L, x, sim)).join('') + '</div></section>';
@@ -173,9 +189,11 @@ function render(el, params) {
     const tTeams = Object.keys(sim).filter(t => isNum(sim[t].p_title) && sim[t].p_title > 0);
     const awKeys = awards ? (awards.keys || Object.keys(AWN)).filter(k => awards[k] && awards[k].model && Object.keys(awards[k].model).length) : [];
     if (isCur && (tTeams.length || awKeys.length)) {
-      h += '<section class="qk-section">' + U.head({ kicker: 'Season simulation', title: 'Who wins it all', sub: 'Our title chances from ' + Number(nSims || 20000).toLocaleString('en-GB') + ' simulated seasons, and our chance for each award.' }) + '<div class="qk-grid">';
-      if (tTeams.length) h += '<div class="qk-span-' + (awKeys.length ? 6 : 12) + '">' + U.card2('Title chances', 'Our chance from the season simulation', '<div id="ov-title"></div>',
-        { foot: '<span>Top twelve</span>' + U.link(HW.href(L, 'standings', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=odds', 'Every season forecast') }) + '</div>';
+      h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Title race', title: 'Who lifts the trophy?', html: true,
+        sub: '<span id="ov-title-lede">Our title chances from ' + Number(nSims || 20000).toLocaleString('en-GB') + ' simulated seasons, and our chance for each award.</span>',
+        actions: '<a class="qk-more" href="' + esc(HW.href(L, 'standings', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=odds') + '">Every season forecast</a>' }) + '<div class="qk-grid">';
+      if (tTeams.length) h += '<div class="qk-span-' + (awKeys.length ? 6 : 12) + '">' + U.card2('Title chances', 'Our chance from the season simulation, in team colours', '<div id="ov-title"></div>',
+        { foot: '<span>' + (tTeams.length > 10 ? 'Top ten of ' + tTeams.length : 'Every team still in it') + '</span>' + U.link(HW.href(L, 'standings', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=odds', 'Every season forecast') }) + '</div>';
       if (awKeys.length) h += '<div class="qk-span-' + (tTeams.length ? 6 : 12) + '">' + U.card2('Award races', 'Our chance of winning each award', '<div class="qk-seg" id="ov-aw-seg" role="group" aria-label="Award" style="margin-bottom:10px">' + awKeys.map((k, i) => '<button type="button" data-value="' + k + '" aria-pressed="' + (i === 0) + '">' + esc(AWN[k] || k.toUpperCase()) + '</button>').join('') + '</div><div id="ov-aw"></div>',
         { foot: '<span></span>' + U.link(HW.href(L, 'players') + '?tab=awards', 'Every race with the reasoning') }) + '</div>';
       h += '</div></section>';
@@ -223,16 +241,35 @@ function render(el, params) {
         const list = w === 'next' ? G.next : w === 'results' ? G.last : G.today;
         const n = list.length;
         const ttl = document.getElementById('ov-gh');
-        if (ttl) ttl.textContent = w === 'next' ? 'Next up' : w === 'results' ? 'Latest results' : (n === 1 ? 'One game' : n + ' games') + ' on the slate';
+        const W = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen'];
+        if (ttl) ttl.textContent = w === 'next' ? 'Next up. Our calls.' : w === 'results' ? 'Latest results' : (W[n] || n) + ' game' + (n === 1 ? '' : 's') + '. Our calls.';
         document.getElementById('ov-games').innerHTML = list.length ? list.map(g => U.card(g, L, { records: recs, why: true })).join('') : QK.empty('No games', 'Nothing to show yet.');
       };
       draw(first);
       QK.seg(document.getElementById('ov-when'), draw);
     }
     // ── charts
+    /* the title race in team colours, ours only (the market is on game pages and the Model page) */
     if (document.getElementById('ov-title')) {
-      document.getElementById('ov-title').innerHTML = QK.chances(tTeams.map(t => ({ label: HW.teamName(L, t), p: sim[t].p_title, href: HW.teamHref(L, t, S), mark: U.team(L, t) })),
-        { limit: 12, key: false });
+      const tRows = tTeams.map(t => ({ label: HW.teamShort(L, t), p: sim[t].p_title, href: HW.teamHref(L, t, S), mark: U.team(L, t), color: HW.teamColourRaw(L, t) }));
+      document.getElementById('ov-title').innerHTML = QK.chances(tRows, { limit: 10, key: false });
+      const t0 = tRows.slice().sort((a, b) => b.p - a.p)[0], lede = document.getElementById('ov-title-lede');
+      if (t0 && lede) lede.textContent = (t0.p < 0.2 ? 'Nobody’s better than 1 in 5. The ' + t0.label + ' lead our board at ' + U.pct(t0.p) + '.'
+        : 'The ' + t0.label + ' lead at ' + U.pct(t0.p) + (t0.p >= 0.5 ? ': they win it in about ' + Math.round(t0.p * 10) + ' of 10 simulated seasons.' : '.')) +
+        ' From ' + Number(nSims || 20000).toLocaleString('en-GB') + ' simulated seasons; our award chances beside it.';
+    }
+    /* Who's for real?: win % against our net rating (QKC.quadrant), the corners named */
+    if (document.getElementById('ov-luck')) {
+      const sRows = []; confs.forEach(c => (st[c] || []).forEach(r => sRows.push(r)));
+      const luck = sRows.filter(r => isNum((R[String(r.team)] || {}).net) && isNum(r.w) && isNum(r.l) && r.w + r.l > 0);
+      const pts = luck.map(r => ({ x: R[String(r.team)].net, y: r.w / (r.w + r.l) * 100, name: HW.teamName(L, r.team), sub: HW.record(r.w, r.l) + ' · net rating ' + U.signed(R[String(r.team)].net, 1),
+        label: HW.teamAbbr(L, r.team), color: HW.teamColourRaw(L, r.team), href: HW.teamHref(L, r.team, S) }));
+      if (pts.length >= 6) {
+        const gps = luck.map(r => r.w + r.l), g0 = Math.min.apply(null, gps), g1 = Math.max.apply(null, gps);
+        QKC.quadrant('#ov-luck', { points: pts, xName: 'Net rating (points per 100 possessions)', yName: 'Games won (%)', refX: 0, refY: 50,
+          xFmt: v => U.signed(v, 0), yFmt: v => Math.round(v) + '%', label: LN + ' teams: net rating against games won' });
+        document.getElementById('ov-luck-cap').textContent = LN + ' ' + HW.seasonLabel(L, S) + ', ' + (g0 === g1 ? g0 : g0 + '–' + g1) + ' games each. Net rating is our opponent-adjusted points per 100 possessions better than an average team. Dashed lines: an average team and a .500 record. Tap a team for its page.';
+      } else document.getElementById('ov-luck').innerHTML = QK.empty('Not yet', 'The chart fills in after the first games.');
     }
     if (document.getElementById('ov-aw')) {
       const drawAw = k => {
@@ -274,17 +311,16 @@ function render(el, params) {
       QKC.bar('#ov-war', { cats: vrows.map(r => r.name), series: [{ name: 'WAR', data: vrows.map(r => Math.round(r.w0 * 10) / 10) }], horizontal: true, labels: true, fmt: v => U.f(v, 1),
         colors: vrows.map(r => U.tcol(L, r.team)), hrefs: vrows.map(r => HW.playerHref(L, r.id)), labelWidth: 150, valName: seasonWar ? 'Wins above replacement' : 'Projected WAR, rest of season', catName: 'Player' });
     }
-    /* How sure are we? (teaser): the game model's record from <L>/calibration.json, the full chart on the Model page */
+    /* We say it. Then we check it.: the game model's record from <L>/calibration.json (QK.howSure: big numbers and
+       the we-said / it-happened bars); the full record is on the Model page */
     if (isCur) HW.load(L + '/calibration.json').then(cj => {
-      const box = el.querySelector('#ov-sure');
+      const box = el.querySelector('#ov-sure'), hd = el.querySelector('#ov-sure-h');
       const cb = QK.calib.find(U.ok(cj) ? cj : null);
-      if (!box) return;
-      if (!cb || !cb.bins.length) { box.innerHTML = ''; return; }
-      const big = cb.bins.slice().sort((a, b) => b.n - a.n)[0];
-      box.innerHTML = '<article class="qk-card" style="height:100%"><div class="qk-card-body"><div class="qk-kicker">How sure are we?</div><h3 style="margin:8px 0 6px">When we say ' + Math.round(big.mean_p * 100) + '%, it happens ' + Math.round(big.freq * 100) + '% of the time</h3>' +
-        '<p style="margin:0 0 6px;color:var(--ink-2)">Our most common call puts the home team at ' + Math.round(big.lo * 100) + '–' + Math.round(big.hi * 100) + '%. Across ' + QK.fmt.num(big.n) + ' ' + esc(LN) + ' games like that, the home team won ' + QK.fmt.pct(big.freq, 1) + '.</p>' +
-        QK.note('<b>Brier score ' + (isNum(cb.brier) ? cb.brier.toFixed(3) : '—') + '</b> over ' + QK.fmt.num(cb.n) + ' games: 0 is perfect, 0.25 is a coin flip. Lower is better.') +
-        '<a class="qk-more" style="display:inline-block;margin-top:14px" href="' + esc(HW.href(L, 'model') + '?tab=calibration') + '">The full record</a></div></article>';
+      if (!box || !hd) return;
+      if (!cb || !cb.bins.length) { box.innerHTML = ''; hd.innerHTML = ''; return; }
+      hd.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every ' + LN + ' game we have forecast, grouped by the chance we gave the home team. When the two bars match, our numbers mean what they say.',
+        actions: '<a class="qk-more" href="' + esc(HW.href(L, 'model') + '?tab=calibration') + '">The full record</a>' });
+      QK.howSure(box, { calibration: cj, league: LN, subject: 'the home team' });
     });
     const nx = upcoming[0];
     if (nx && !today.some(g => HW.gameState(g) === 'in' && U.fresh(g))) HW.interval(() => { const n = document.getElementById('ov-cd'); if (n) n.innerHTML = cdHTML(L, nx); }, 30000);
@@ -303,9 +339,10 @@ function seriesTile(L, s, sim) {
   const w = s.wins || {};
   const a = t[0], b = t[1];
   const pa = (sim[a] || {}).p_title, pb = (sim[b] || {}).p_title;
-  return '<div class="hw-teamtile" style="--tc:' + esc(U.tcol(L, a)) + '"><div class="qk-kicker">' + esc(s.round || 'Series') + '</div>' +
-    [a, b].map(x => '<div class="top">' + QK.teamMark(U.team(L, x), 'sm') + '<a class="nm" href="' + esc(HW.teamHref(L, x)) + '">' + esc(HW.teamName(L, x)) + '</a><span class="rec">' + (isNum(w[x]) ? w[x] : 0) + '</span></div>').join('') +
-    '<div class="row"><span>' + esc(s.summary || '') + '</span><b>' + (isNum(pa) || isNum(pb) ? 'our title chance ' + esc(HW.teamAbbr(L, a)) + ' ' + U.pct(pa) + ' · ' + esc(HW.teamAbbr(L, b)) + ' ' + U.pct(pb) : '') + '</b></div></div>';
+  /* v4: a black block, each side on a team-colour edge with its series wins in Bebas */
+  return '<div class="hw-series"><div class="hw-series-k">' + esc(s.round || 'Series') + '</div>' +
+    [a, b].map(x => '<div class="hw-series-r" style="--tc:' + esc(U.tcol(L, x)) + '">' + QK.teamMark(U.team(L, x), 'sm') + '<a class="nm" href="' + esc(HW.teamHref(L, x)) + '">' + esc(HW.teamShort(L, x)) + '</a><b class="num">' + (isNum(w[x]) ? w[x] : 0) + '</b></div>').join('') +
+    '<div class="hw-series-f">' + (s.summary ? esc(s.summary) + '. ' : '') + (isNum(pa) || isNum(pb) ? 'Our title chance: ' + esc(HW.teamAbbr(L, a)) + ' ' + U.pct(pa) + ', ' + esc(HW.teamAbbr(L, b)) + ' ' + U.pct(pb) + '.' : '') + '</div></div>';
 }
 
 HW.page('hub', render);

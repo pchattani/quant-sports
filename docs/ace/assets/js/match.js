@@ -1,7 +1,7 @@
 /* The Quant Ace — the match centre (#/<T>/match/<mid>).
  *
  *   head: event, round, surface, the score by set (tiebreaks in superscript), status;
- *   kit v3 hero (QK.previewCard): both players with ranking and country, the score in sets (the score bug when live),
+ *   kit v4 hero (QK.previewCard: the diagonal split hero, cobalt for the player we favour, slate for the other): both players with ranking and country, the score in sets (the score bug when live),
  *     our chance for the favourite as a big blue number with a "how sure" note, the bar, the market as a quiet labelled
  *     line before the first ball, and how the two match up (Elo, surface Elo, inferred hold and serve points); beside
  *     it the set-by-set board, stat tiles (our chance, likeliest score, expected games) and our forecast table;
@@ -226,7 +226,10 @@ function hero(T, d, p1, ev, surface) {
   // before the first ball the likeliest set score rides along
   const extra = !fin && pre && isNum(p1) && top ? 'The likeliest score is ' + esc(top) + ' in sets (' + TA.pct(dist.sets[top], 0) + ', ' + esc(TA.playerSurname(T, d.p1)) + ' first)' + (isNum(dist.exp_games) ? ', with about ' + Math.round(dist.exp_games) + ' games in all.' : '.') : '';
   const kick = [TA.tourName(T), TA.eventName(T, d.event), TA.roundLabel(d.round), TA.surfaceLabel(surface, ev.indoor)].filter(Boolean).join(' · ');
-  const card = QK.previewCard(G, { kicker: kick, nick: t => t.name, factors: fx, factorsTitle: 'How they match up', noteExtra: extra,
+  /* once it is over, the hero's foot already names the pre-match call: the strip under it says what the number meant */
+  const miss = isNum(p1) ? Math.max(1, Math.round(10 * (1 - Math.max(p1, 1 - p1)))) : null;
+  const finNote = fin && isNum(p1) ? '<b>What’s that number?</b> ' + TA.pct(Math.max(p1, 1 - p1), 0) + ' was our chance for ' + esc(TA.playerSurname(T, p1 >= 0.5 ? d.p1 : d.p2)) + ' before the first ball. A match like this goes the other way about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.' : undefined;
+  const card = QK.previewCard(G, { kicker: kick, nick: t => t.name, factors: fx, factorsTitle: 'How they match up', noteExtra: extra, note: finNote,
     market: pre && mk && isNum(mk.p1) ? { p: 1 - mk.p1, label: 'Market (' + (TA.sourceNames(mk.sources).join(' / ') || 'prediction markets') + ')' } : null });
   const tba = d.tba || String(d.date || '').length <= 10;
   const meta = [ev.level ? TA.levelLabel(ev.level, T) : '', d.best_of ? 'Best of ' + d.best_of : '',
@@ -269,7 +272,7 @@ function render(el, params) {
     // ── hero and stat tiles
     const live0 = TA.matchState(d) === 'live';
     const tiles = [];
-    if (isNum(p1)) tiles.push({ label: fin ? 'Our pre-match chance' : 'Our chance', value: TA.playerSurname(T, p1 >= 0.5 ? d.p1 : d.p2) + ' ' + TA.pct(Math.max(p1, 1 - p1), 0), signal: true, sub: 'Elo, serve and return and the market-rating term, blended' });
+    if (isNum(p1)) tiles.push({ label: fin ? 'Our pre-match chance' : 'Our chance', value: TA.playerSurname(T, p1 >= 0.5 ? d.p1 : d.p2) + ' ' + TA.pct(Math.max(p1, 1 - p1), 0), signal: true, sub: isNum(m.mr_p) ? 'Elo, serve and return and the market-rating term, blended' : 'Elo and serve and return, blended' });
     if (live0 && isNum(d.wp_now)) tiles.push({ label: 'Live chance', value: TA.playerSurname(T, d.wp_now >= 0.5 ? d.p1 : d.p2) + ' ' + TA.pct(Math.max(d.wp_now, 1 - d.wp_now), 0), sub: 'updates after every game' });
     const top = Object.keys(dist.sets || {}).sort((x, y) => dist.sets[y] - dist.sets[x])[0];
     if (top) tiles.push({ label: 'Likeliest score', value: top, sub: TA.pct(dist.sets[top], 0) + ' · sets, ' + TA.playerSurname(T, d.p1) + ' first' });

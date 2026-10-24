@@ -9,7 +9,7 @@
  * at set boundaries, title-chance calibration, the blend weights by year, and (WTA) the
  * validation of score-inferred hold and serve points won against the real WTA stats.
  *
- * Kit v3: "How sure are we?" opens the page (QK.howSure on the match model's reliability bins: the calibration chart
+ * Kit v4: "We say it. Then we check it." (How sure are we?) opens the page (QK.howSure on the match model's reliability bins: the calibration chart
  * beside three plain-English cards); the full record follows.
  *
  * Data: data/<T>/calibration.json (models/backtest.py page_copy; PAYLOADS.md "committed"). */
@@ -137,7 +137,7 @@ function render(el, params, state) {
     const models = ORDER.filter(x => M[x]).concat(Object.keys(M).filter(x => ORDER.indexOf(x) < 0));
     const yrs = d.years || [];
     const yrs0 = d.years || [];
-    let h = '<section class="qk-section" style="margin-top:0">' + QK.sectionHead({ kicker: 'How sure are we?', title: 'When we say 70%, does it happen 70% of the time?', sub: 'Every ' + k.TN(T) + ' match since ' + (yrs0[0] || '') + ', forecast before it was played and checked against the result. Dots on the dashed line are spot on.' }) +
+    let h = '<section class="qk-section" style="margin-top:0">' + QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every ' + k.TN(T) + ' match since ' + (yrs0[0] || '') + ', forecast before it was played and checked against the result, grouped by the chance we gave a player. When the two bars match, our numbers mean what they say.' }) +
       '<div id="cal-howsure"></div></section>' +
       '<section class="qk-section">' + QK.sectionHead({ kicker: 'The full record', title: 'Every score, every check', sub: 'Our match model against its own parts, a ranking baseline and the closing market as a reference.' }) + '</section>' +
       '<p class="ta-cap" style="margin:0 0 12px">Walk-forward backtest: every match predicted with ratings refitted from matches strictly before it and blend weights fitted on earlier years only, scored against what happened, with the closing market beside it as a reference.</p>' +

@@ -304,11 +304,11 @@ function render(el) {
   });
 }
 
-/* v3 (Matchday): "How sure are we?" at the top (QK.howSure from calibration.json: our chance against how often the home
+/* v4 (Broadcast): "We say it. Then we check it." at the top (QK.howSure from calibration.json: our chance against how often the home
    team won, the Brier score, our most common call and the top end), then the full record below. */
 GI.route('calibration', function (el, params) {
   el.innerHTML = GI.pageHead('Model', 'How good are our forecasts?', 'Every game forecast since 2006 checked against what happened, out of sample, with the closing line and the best public alternatives as references.') + GI.sectionNav('model', 'calibration') +
-    '<section class="qk-section" id="cal-sure-sec" style="margin-top:var(--sp-6)">' + QK.sectionHead({ kicker: 'How sure are we?', title: 'When we say 70%, does it happen 70% of the time?', sub: 'Every pre-game forecast from the game model, walk-forward (each season forecast with only the seasons before it), grouped by the chance we gave the home team.' }) + '<div id="cal-sure"></div></section>' +
+    '<section class="qk-section" id="cal-sure-sec" style="margin-top:var(--sp-6)">' + QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every pre-game forecast from the game model, walk-forward (each season forecast with only the seasons before it), grouped by the chance we gave the home team. When the two bars match, our numbers mean what they say.' }) + '<div id="cal-sure"></div></section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'The full record', title: 'Scores, baselines and the closing line', sub: 'Log-loss and Brier against the closing line and simple baselines, the spread and totals, season odds, expected points and win probability, and the fourth-down model.' }) + '<div id="cal-root" class="gi-page"></div></section>';
   GI.load('calibration.json').then(cj => {
     const box = el.querySelector('#cal-sure');

@@ -131,7 +131,12 @@ function render(el, params) {
     (rk.race || []).forEach((r, i) => { raceRank[r[0]] = i + 1; });
     const subs = { official: 'as of ' + esc(TA.fmtDate(rk.date)) + ' · Elo rank and race position beside each player',
       elo: 'surface-blended Elo; surface columns are the surface ratings', race: 'points won this calendar year, this week included (the race simulation starts from its own snapshot)', defend: 'points dropping off over the next 12 months' };
-    body.innerHTML = '<div class="card"><div class="toggle-row" id="rk-tabs">' + TA.toggles(VIEWS, view, 'data-v') + '</div><div class="section-note" id="rk-sub"></div><div id="rk-view"></div></div>' +
+    /* v4: the black power list of this week's biggest climbers inside the top 100 (places gained since the last ranking) */
+    const climb = (rk.official || []).filter(r => r[0] <= 100 && TA.isNum(r[3]) && r[3] > 0).sort((a, b) => b[3] - a[3] || a[0] - b[0]).slice(0, 5);
+    const band = climb.length >= 3 ? QK.band(QK.sectionHead({ kicker: 'Who’s climbing', title: 'The week’s big movers', sub: 'The biggest climbs inside the top 100 since the last ranking. Points come from the last 52 weeks, so a deep run lifts a player straight away.' }) +
+      QK.hotRow(climb.map(r => ({ sport: 'tennis', kicker: TA.tourName(T) + ' · up ' + r[3] + ' place' + (r[3] === 1 ? '' : 's'), title: 'Ranked No. ' + r[0], name: TA.playerShort(T, r[1]), value: '#' + r[0], href: TA.playerHref(T, r[1]),
+        expl: TA.num(r[2], 0) + ' ranking points' + (TA.isNum(eloRank[r[1]]) ? '; No. ' + eloRank[r[1]] + ' by our Elo.' : '.') }))), { cls: 'ta-rk-band' }) : '';
+    body.innerHTML = band + '<div class="card"><div class="toggle-row" id="rk-tabs">' + TA.toggles(VIEWS, view, 'data-v') + '</div><div class="section-note" id="rk-sub"></div><div id="rk-view"></div></div>' +
       QK.note('<b>Ranking or Elo?</b> The official ranking adds up points from the last 52 weeks, so it rewards playing a lot and going deep. Our Elo rates every result by who it came against, so it moves faster after an upset. A 100-point Elo gap means the higher-rated player wins about 64% of the time.');
     const show = k => {
       view = k;

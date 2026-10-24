@@ -224,6 +224,15 @@ function leadersTab(node, L, S) {
       const lab = k => { const c = COUNT.find(x => x[0] === k); return c ? c[1] : U.mMeta(k).label; };
       const fmtK = (k, v) => { const c = COUNT.find(x => x[0] === k); return c ? U.f(v, 1) : U.fmtM(k, v); };
       let h = r.fallback ? '<div class="qk-note" style="margin-bottom:14px">No ' + esc(HW.seasonLabel(L, S)) + ' regular-season games yet: these are the final ' + esc(HW.seasonLabel(L, SS)) + ' numbers.</div>' : '';
+      /* v4: Who's hot, the black power list: the top qualified name on five boards */
+      const HOT = [['pts_g', 'Most points', 'points a game', U.f], ['reb_g', 'Most rebounds', 'rebounds a game', U.f], ['ast_g', 'Most assists', 'assists a game', U.f],
+        ['hpm', 'Biggest impact', 'points per 100 (HPM)', (x, d) => U.signed(x, d)], ['ts', 'Best shooter', 'true shooting', x => HW.fmtVal(x, 'pct')]];
+      const EXPL = { pts_g: 'Per game, among players over the minutes floor.', reb_g: 'Per game, among players over the minutes floor.', ast_g: 'Per game, among players over the minutes floor.',
+        hpm: 'Points per 100 trips the player adds to the team’s margin over an average player.', ts: 'Points per shot, with threes and free throws counted.' };
+      const hot = HOT.map(b => { const top = ids.filter(id => isNum((P[id].values || {})[b[0]])).sort((x, y) => P[y].values[b[0]] - P[x].values[b[0]]);
+        if (!top.length) return null; const a = P[top[0]], n = top[1] ? P[top[1]] : null;
+        return { sport: 'basketball', kicker: HW.leagueName(L) + ' · ' + HW.teamAbbr(L, a.team), title: b[1], name: a.name, value: b[3](a.values[b[0]], 1), unit: b[2], next: n ? { name: n.name, value: b[3](n.values[b[0]], 1) } : null, expl: EXPL[b[0]], href: HW.playerHref(L, top[0], SS) }; }).filter(Boolean);
+      if (hot.length) h += QK.band(QK.sectionHead({ kicker: 'Who’s hot', title: 'The leaders, stat by stat', sub: 'The top qualified name on five boards, the next best behind, and what the number means.' }) + QK.hotRow(hot));
       h += '<div class="hw-flex" style="margin-bottom:14px"><input class="qk-input hw-search" id="pl-q" type="search" placeholder="Find a player…" aria-label="Find a player" autocomplete="off"><span class="hw-quiet">Qualified: ' + Number(cat.min_floor || 0).toLocaleString('en-GB') + '+ minutes (' + ids.length + ' players). Heat cells: percentile within the player’s role (guards, wings, bigs).</span></div><div id="pl-hits"></div>';
       h += U.card2('Pick a stat, pick a role', 'Every cell is coloured by the percentile within the role, cold (blue) to hot (red).',
         '<div class="hw-flex" style="margin-bottom:12px"><select class="qk-select" id="pl-k" aria-label="Metric">' + keys.map(k => '<option value="' + k + '">' + esc(lab(k)) + '</option>').join('') + '</select>' +
@@ -429,7 +438,7 @@ function renderModel(el, params, state) {
     if (!box || !U.ok(cj) || !QK.calib.find(cj)) return;
     const ss = (cj.seasons || []).slice().sort((a, b) => a - b);
     box.hidden = false;
-    box.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'When we say 70%, does it happen 70% of the time?', sub: 'Every pre-game forecast in the test seasons, bucketed by our chance for the home team, against how often the home team won.' }) + '<div id="md-sure-m"></div>';
+    box.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every pre-game forecast in the test seasons, grouped by the chance we gave the home team, against how often the home team won. When the two bars match, our numbers mean what they say.' }) + '<div id="md-sure-m"></div>';
     QK.howSure(box.querySelector('#md-sure-m'), { calibration: cj, league: HW.leagueName(L), span: ss.length ? HW.seasonLabel(L, ss[0]) + ' to ' + HW.seasonLabel(L, ss[ss.length - 1]) : '', subject: 'the home team' });
   });
   return U.legacy(v, body.lastChild, params);

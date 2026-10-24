@@ -1,8 +1,10 @@
-# The Quant design system (kit v3 "Matchday", dark only, Oct 2026)
+# The Quant design system (kit v4 "Broadcast", dark only, Oct 2026)
 
-> v3 replaced v2 "Signal" on 23 Oct 2026: Fraunces and DM Sans, dark only; colours from the Broadcast concept (near-black, cobalt for ours, volt accents). The spec is
-> `STYLE_GUIDE.md`, the move guide `MIGRATION_V3.md`; the rest of this file is the older kit reference and still
-> holds for the v1/v2 APIs, which are unchanged.
+> v4 replaced v3 "Matchday" on 23 Oct 2026, when the user picked the Broadcast concept for everything: Bebas Neue,
+> Barlow and Barlow Condensed; black blocks, team colours as diagonal blocks, volt tags, hard edges; dark only. The
+> spec is `STYLE_GUIDE.md`, the move guide `MIGRATION_V4.md` (`MIGRATION_V3.md` and `MIGRATION_V2.md` are history);
+> `showcase.html` shows every component. The rest of this file is the older kit reference and still holds for the
+> v1/v2 APIs, which are unchanged.
 
 One look for every sports site: Bloomberg density, ESPN scoreboard energy, 538 probability stories and Savant
 percentile cards, in a look of our own. Dark first with a light mode, our numbers in one signature violet, the market
@@ -201,7 +203,7 @@ Storage access is wrapped so private mode never breaks a page.
 ## The home page (`docs/home/`)
 
 `python scripts/build_home.py` reads the local sport data trees (`docs/site/data`, `docs/paddock/data`, …),
-writes `docs/home/data/home.json` (~85 KB: games, model-v-market gaps, futures, leaders, chart series, stats of
+writes `docs/home/data/home.json` (~85 KB: games, futures, leaders, chart series, stats of
 the day, per-sport tiles) and `docs/home/data/search.json` (~4,400 teams, players, drivers and competitions,
 loaded only when search opens), and copies the kit. A missing or broken sport is skipped and logged. Links point
 at the public GitHub Pages sites; `--links local` points them at `../site/`, `../paddock/` … for preview.

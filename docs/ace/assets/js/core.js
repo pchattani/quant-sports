@@ -334,7 +334,7 @@ function sectionBar(r) {
   return bar;
 }
 /* Long detail pages (player, tournament) get a sticky "on this page" strip of their card titles. */
-const JUMP_PAGES = ['player', 'event'];
+const JUMP_PAGES = ['event'];
 function jumpNav(el, r) {
   if (JUMP_PAGES.indexOf(r.name) < 0) return;
   const build = () => {
@@ -790,71 +790,65 @@ function matchLink(T, id, label) {
 }
 
 /* A MATCH_CARD as the kit's game card (index.json live/today/recent/upcoming, schedule, draws), linking to the match
- * centre (Design System 2.0 game card): both players with rank and set scores, our win chance before the first ball (the
- * favourite in the signal colour), sets won once it starts, our win-chance bar, and the likeliest score and expected games.
- * opts {tour, date: true (show the date), event: true (show the event name), compact, round: true}. */
+ * centre. v4 (Broadcast): built by QK.gameCard on the kit shape (players as away / home, the tennis rule: no colours, so
+ * the stripe is ours in blue against grey), the 8 px stripe split by our chance, the initials on the squares, ranking
+ * and country under the name, our chance in Bebas before the first ball (the favourite in blue), sets won once it
+ * starts, and the foot "Our chance · why". Tennis adds the score set by set beside the sets won (tiebreaks in
+ * superscript, the set in play in red-orange) and, before the first ball, the likeliest score and the games we expect.
+ * opts {tour, event: true (the event name before the round), why: true (the one-line reason), compact}. */
 function playerObj(T, pid) { const x = NAMES[T][String(pid)] || {}; return { name: playerShort(T, pid), abbr: (x.country || '').slice(0, 3) || fmtInitials(playerName(T, pid)), href: playerHref(T, pid) }; }
 function fmtInitials(n) { const p = String(n || '?').split(' '); return (p.length > 1 ? p[0][0] + p[p.length - 1][0] : p[0].slice(0, 2)).toUpperCase(); }
 function matchCard(c, opts) {
   const o = opts || {};
   const T = o.tour || state.tour;
-  if (!c) return '';
+  if (!c || !window.QK) return '';
   const st = matchState(c);
   const m = c.model || {};
-  const p1 = isNum(m.p1) ? Number(m.p1) : null;
   const live = st === 'live', fin = isFinished(c), pre = !live && !fin;
-  const pShow = live && isNum(c.wp_now) ? Number(c.wp_now) : p1;
   const sets = c.sets || [];
   const lv = c.live || null;
   const nSets = Math.max(sets.length + (live && lv && lv.games && sets.length < (lv.set || 0) ? 1 : 0), 0);
-  const won = setsWon(c);
-  const fav1 = isNum(pShow) && pShow >= 0.5;
-  const row = (pid, side, p) => {
-    const win = fin && c.winner === pid;
-    let cells = '';
+  const g = kitGame(c, T, { initials: true });
+  g.players = true;
+  g.league = o.event !== false ? eventName(T, c.event) : roundLabel(c.round);
+  g.note = o.event !== false ? roundLabel(c.round, true) + (st === 'ret' ? ' · Ret.' : st === 'wo' ? ' · W/O' : '') : (st === 'ret' ? 'Ret.' : st === 'wo' ? 'W/O' : '');
+  /* the set cells ride in the row's form slot: a marker at the end of the sub-line is swapped for them */
+  const cells = side => {
+    let h = '';
     for (let i = 0; i < nSets; i++) {
       const s = sets[i];
-      let g, tb = '', cls = 'ta-set';
+      let v, tb = '', cls = 'ta-set';
       if (s) {
-        g = s[side]; const og = s[1 - side];
-        if (g > og) cls += ' won';
-        if (isNum(s[2 + side]) && g < og) tb = '<sup>' + s[2 + side] + '</sup>';
-      } else if (lv && lv.games) { g = lv.games[side]; cls += ' cur'; }
-      cells += '<span class="' + cls + '">' + (isNum(g) ? g : '') + tb + '</span>';
+        v = s[side]; const ov = s[1 - side];
+        if (v > ov) cls += ' won';
+        if (isNum(s[2 + side]) && v < ov) tb = '<sup>' + s[2 + side] + '</sup>';
+      } else if (lv && lv.games) { v = lv.games[side]; cls += ' cur'; }
+      h += '<span class="' + cls + '">' + (isNum(v) ? v : '') + tb + '</span>';
     }
-    const rk = playerRank(T, pid);
-    const cc = playerCountry(T, pid);
-    const v = pre ? '<span class="qk-gc-v pct" title="Our win chance">' + (isNum(p) ? pct(p, 0) : '') + '</span>'
-      : '<span class="qk-gc-v" title="Sets won">' + (sets.length || live ? won[side] : '–') + '</span>';
-    return '<div class="qk-gc-row ta-gcrow' + (fin && c.winner && !win ? ' lost' : '') + (pre && (side === 0) === fav1 && isNum(p) ? ' fav' : '') + '">' +
-      '<span class="ta-rank" title="Ranking">' + (isNum(rk) ? rk : '') + '</span>' +
-      '<span class="qk-gc-nm">' + esc(playerShort(T, pid)) + (cc ? '<small>' + esc(cc) + '</small>' : '') + (win ? ' <span class="ta-win" aria-label="winner">✓</span>' : '') + '</span>' +
-      '<span class="ta-sets">' + cells + '</span>' + v + '</div>';
+    return '<span class="ta-sets" aria-label="Games by set">' + h + '</span>';
   };
-  let badge;
-  if (live) badge = '<span class="qk-badge live">Live' + (lv && lv.set ? ' · Set ' + lv.set : '') + '</span>';
-  else if (fin) badge = '<span class="qk-badge final">' + (st === 'ret' ? 'Ret.' : st === 'wo' ? 'W/O' : 'Final') + '</span>';
-  else {
-    const tba = c.tba || (c.date && String(c.date).length <= 10);
-    badge = '<span class="qk-badge"' + (tba ? ' title="Start time to be announced"' : '') + '>' + esc((o.date !== false ? fmtDate(c.date, { year: false, weekday: false }) + ' ' : '') + (tba ? 'TBA' : (fmtTime(c.date) || 'TBA'))) + '</span>';
-  }
-  const tag = (o.event !== false ? eventName(T, c.event) + ' · ' : '') + roundLabel(c.round, true);
-  const A = { name: playerShort(T, c.p1), abbr: playerSurname(T, c.p1) }, B = { name: playerShort(T, c.p2), abbr: playerSurname(T, c.p2) };
-  const bar = !fin && pShow !== null && window.QK ? QK.wpBar(pShow, null, 1 - pShow, A, B, { label: live ? 'Live win chance' : 'Our win chance' }) : '';
-  const bits = [];
-  if (pre && isNum(p1)) bits.push('<span class="ours">Our chance</span>');
-  else if (live && isNum(c.wp_now)) bits.push('<span class="ours">Live chance</span>');
-  else if (fin && isNum(p1)) bits.push('<span>Before: <b>' + esc(playerSurname(T, p1 >= 0.5 ? c.p1 : c.p2)) + ' ' + pct(Math.max(p1, 1 - p1), 0) + '</b></span>');
+  const sub = pid => { const rk = playerRank(T, pid), cc = playerCountry(T, pid); return [isNum(rk) ? 'No. ' + rk : '', cc].filter(Boolean).join(' · '); };
+  g.away.record = sub(c.p1) + '\u0001a'; g.home.record = sub(c.p2) + '\u0001h';
+  const why = o.why ? (QK.whyLine ? QK.whyLine(g) : '') : false;
+  let h = QK.gameCard(g, { sport: false, form: false, why: why || false });
+  ['a', 'h'].forEach((k, side) => {
+    const mark = '\u0001' + k + '</small></span><span></span>';
+    h = h.replace(mark, '</small></span>' + (nSets ? cells(side) : '<span></span>'));
+  });
+  h = h.replace(/<small>\u0001[ah]<\/small>/g, '').replace(/\u0001[ah]/g, '');
+  /* the squares carry initials; the foot's pre-match call names the player */
+  const p1 = isNum(m.p1) ? Number(m.p1) : null;
+  if (fin && isNum(p1)) h = h.replace(/(Our pre-game call: <b>)[^<]*? (?=[<\d])/, '$1' + esc(playerSurname(T, p1 >= 0.5 ? c.p1 : c.p2)) + ' ').replace('Our pre-game call:', 'Our pre-match call:');
+  /* before the first ball: the likeliest score in sets and the games we expect */
   const top1 = (m.sets_dist_top || [])[0];
-  if (top1 && pre) bits.push('<span title="Likeliest score in sets">Likeliest <b>' + esc(top1[0]) + '</b> ' + pct(top1[1], 0) + '</span>');
-  if (isNum(m.exp_games) && pre) bits.push('<span title="Expected games in the match">Games <b>' + num(m.exp_games, 1) + '</b></span>');
-  /* v3: opts.why adds the italic one-line reason (QK.whyLine on the kit shape: a coin flip, a clear favourite and how
-     often that still goes wrong, an upset, a live match the score has moved). */
-  const why = o.why && window.QK && QK.whyLine ? QK.whyLine(kitGame(c, T)) : '';
-  return '<a class="qk-gc ta-mc' + (live ? ' is-live' : fin ? ' is-final' : '') + (o.compact ? ' gc-compact' : '') + '" href="' + matchHref(T, c.id) + '" style="--sa:var(--a-tennis)">' +
-    '<div class="qk-gc-top"><span class="qk-gc-lg">' + esc(tag) + '</span>' + badge + '</div>' +
-    '<div class="qk-gc-rows">' + row(c.p1, 0, pShow) + row(c.p2, 1, pShow === null ? null : 1 - pShow) + '</div>' + bar +
-    (bits.length ? '<div class="qk-gc-foot">' + bits.join('') + '</div>' : '') + (why ? '<div class="qk-aside">' + esc(why) + '</div>' : '') + '</a>';
+  const bits = [];
+  if (pre && top1) bits.push('<span title="Likeliest score in sets, ' + esc(playerSurname(T, c.p1)) + ' first">Likeliest <b>' + esc(top1[0]) + '</b> ' + pct(top1[1], 0) + '</span>');
+  if (pre && isNum(m.exp_games)) bits.push('<span title="Games we expect in the match">Games <b>' + num(m.exp_games, 1) + '</b></span>');
+  if (bits.length) {
+    const foot = '<div class="qk-gc-foot ta-gc-bits">' + bits.join('') + '</div>';
+    h = h.indexOf('<div class="qk-gc-ft">') >= 0 ? h.replace('<div class="qk-gc-ft">', foot + '<div class="qk-gc-ft">') : h.replace(/<\/a>$/, foot + '</a>');
+  }
+  return h.replace('class="qk-gc', 'class="qk-gc ta-mc' + (o.compact ? ' gc-compact' : ''));
 }
 /* A MATCH_CARD as the kit's game shape (ticker, feature card, preview card, "why" lines): p1 on the top row (away),
  * p2 below (home); p_home is our pre-match chance for p2 (kept after the match as the pre-match call), wp_home the live

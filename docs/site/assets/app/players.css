@@ -47,7 +47,7 @@
 .fb-pl-yr td { background: color-mix(in srgb, var(--s-2) 55%, var(--s-1)); }
 .fb-pl-yr td.sticky-col { background: color-mix(in srgb, var(--s-2) 55%, var(--s-1)); }
 .fb-pl-tog { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
-.fb-pl-tog:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
+.fb-pl-tog:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .fb-pl-car { display: inline-block; transition: transform var(--t-fast); color: var(--ink-3); font-size: 10px; }
 .fb-pl-tog[aria-expanded="true"] .fb-pl-car { transform: rotate(90deg); }
 .fb-pl-sub td { font-size: var(--fs-xs); }
@@ -60,12 +60,12 @@
 .fb-pl-shotmap { max-width: 560px; margin: 0 auto; }
 
 /* match log */
-.fb-pl-res { font: 600 var(--fs-xs) var(--font-num); white-space: nowrap; padding: 1px 6px; border-radius: 4px; background: var(--s-3); }
+.fb-pl-res { font: 600 var(--fs-xs) var(--font-num); white-space: nowrap; padding: 1px 6px; background: var(--s-3); }
 .fb-pl-res.w { background: color-mix(in srgb, var(--st-good) 22%, transparent); }
 .fb-pl-res.l { background: color-mix(in srgb, var(--st-crit) 22%, transparent); }
 a .fb-pl-res:hover { outline: 1px solid var(--signal); }
-.fb-pl-rt { display: inline-block; min-width: 30px; text-align: center; padding: 1px 4px; border-radius: var(--r-pill); font-weight: 700; color: var(--bg); background: var(--rc); }
-.fb-pl-grade { display: inline-grid; place-items: center; width: 22px; height: 20px; border-radius: 5px; font: 800 11px var(--font-num); background: var(--s-3); color: var(--ink-1); }
+.fb-pl-rt { display: inline-block; min-width: 30px; text-align: center; padding: 1px 4px; font-weight: 700; color: #000000; background: var(--rc); }
+.fb-pl-grade { display: inline-grid; place-items: center; width: 22px; height: 20px; font: 800 11px var(--font-num); background: var(--s-3); color: var(--ink-1); }
 .fb-pl-grade.g-A { background: color-mix(in srgb, var(--st-good) 55%, var(--s-1)); }
 .fb-pl-grade.g-B { background: color-mix(in srgb, var(--st-good) 28%, var(--s-1)); }
 .fb-pl-grade.g-D { background: color-mix(in srgb, var(--st-serious) 35%, var(--s-1)); }
@@ -79,12 +79,31 @@ a .fb-pl-res:hover { outline: 1px solid var(--signal); }
 }
 .fb-pl-move:empty { display: none; }
 
-/* kit v3 player page (the Rink reference): rail beside how sure, game by game and their type */
-.fb-pl-sec1 { margin-top: var(--sp-8); }
-.fb-pl-sec1 .qk-gside { align-items: start; }
-.fb-pl-h4 { margin: 14px 0 6px; font: 700 var(--fs-xs)/1.2 var(--font-ui); color: var(--ink-3); }
+/* kit v4 player page (rk-player.js): the meters with how sure beside the tale of the tape, the bug beside the last
+   game, the game log, game by game and their type */
+.fb-pl-sec1 { margin-top: var(--sp-6); }
+.fb-pl-sec1 .qk-g75 { align-items: start; }
+.fb-pl-left, .fb-pl-stack > * { min-width: 0; }
+.fb-pl-settle { margin-top: 12px; }
+.fb-pl-pick { margin: -4px 0 12px; }
+.fb-pl-pick[hidden], .fb-pl-hot:empty { display: none; }
+.fb-pl-stack > div:empty { display: none; }
+.fb-pl-h4 { margin: 14px 0 6px; font: 700 var(--fs-xs)/1.2 var(--font-cond); letter-spacing: 0.1em; text-transform: uppercase; color: var(--signal); }
 .fb-pl-type { list-style: none; margin: 0; padding: 0; }
 .fb-pl-type li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--line-1); min-width: 0; }
 .fb-pl-type .s { color: var(--ink-3); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .fb-pl-type .v { margin-left: auto; color: var(--signal); font-size: var(--fs-xs); font-weight: 600; white-space: nowrap; }
 #pl-tiles-cap:empty { display: none; }
+.fb-pl-stripcap { margin: 8px 0 var(--sp-2); }
+.fb-page-player .qk-ph + .qk-strip { margin-top: 0; }
+.fb-pl-opp { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.fb-page-player .fb-crumb + .qk-ph { margin-top: 12px; }
+.fb-page-player .qk-ph { margin-bottom: 0; }
+.fb-page-player .qk-ph-short, .fb-page-player .fb-pl-stripcap + * { margin-top: var(--sp-4); }
+.fb-pl-line { margin: 12px 0 0; color: var(--ink-2); font-size: 15px; }
+.fb-pl-line b { color: var(--ink-1); }
+#pl-race:not(:empty) { margin-top: 12px; }
+.fb-pl-box td:first-child { min-width: 140px; }
+.fb-pl-glog td { white-space: nowrap; }
+.fb-pl-hot { margin: var(--sp-6) 0 var(--sp-8); }
+.fb-page-players .fb-pl-hot .qk-blk { margin-top: 0; }

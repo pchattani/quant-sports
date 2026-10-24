@@ -189,8 +189,8 @@ def season_players(ctx: dict, season: int) -> dict:
 def team_obj(t: str, tm: dict) -> dict:
     v = tm.get(t) or {}
     return {"name": v.get("name"), "short": v.get("short") or v.get("location"), "abbr": v.get("abbr"),
-            "colour": v.get("colour"), "alt_colour": v.get("alt_colour"), "conference": v.get("conference"),
-            "member": bool(v.get("member"))}
+            "colour": v.get("colour"), "alt_colour": v.get("alt_colour"), "alt": v.get("alt_colour"),
+            "conference": v.get("conference"), "member": bool(v.get("member"))}
 
 
 def season_state(ctx: dict, season: int) -> dict:

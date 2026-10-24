@@ -34,6 +34,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
+from oddsmarkets.football.analytics import colours as club_colours
 from oddsmarkets.football.analytics.archive import season_row, sort_key
 from oddsmarkets.football.analytics.players import METRICS, add_percentiles, aggregate_players, player_incidents
 from oddsmarkets.football.competitions.cup.config import CUPS
@@ -1792,6 +1793,10 @@ class Unified:
             # Only a crest that is on disk (the public build ships none: docs/HOSTING_MIGRATION.md, D6).
             if not national and (self.data_dir.parent / "assets" / "crests" / f"{tid}.png").exists():
                 payload["crest"] = f"assets/crests/{tid}.png"
+            # Kit colours for the Broadcast heroes and stripes, from the committed table (derived from the crests on
+            # the PC, so CI has them without the crests): none for a national team or a club without a crest.
+            if not national:
+                payload.update(club_colours.club(tid))
             if tid in home_league:
                 payload["home"] = home_league[tid]
             payload["squad"] = {"source": source, "as_of": as_of, "era": era_now, "players": players}
@@ -1806,12 +1811,16 @@ class Unified:
             written.add(tid)
             comps_used = sorted({r["comp"] for r in seasons if r.get("source") in ("live", "store")},
                                 key=lambda s: (self.comps.get(s, {}).get("kind") != "league", s))
-            index_rows.append([int(tid), club["name"], _slugify(club["name"]), country, 1 if national else 0,
-                               payload.get("crest"), home_league.get(tid), comps_used])
+            row = [int(tid), club["name"], _slugify(club["name"]), country, 1 if national else 0,
+                   payload.get("crest"), home_league.get(tid), comps_used]
+            if payload.get("colour"):            # the two colour columns only when known: most rows end at comps
+                row += [payload["colour"], payload.get("alt")]
+            index_rows.append(row)
         _prune(clubs_dir, written)
         index_rows.sort(key=lambda r: (r[4], r[6] is None, r[1] or ""))
         _write(self.data_dir / "clubs_index.json", {
-            "fields": ["id", "name", "slug", "country", "national", "crest", "home", "comps"], "rows": index_rows,
+            "fields": ["id", "name", "slug", "country", "national", "crest", "home", "comps", "colour", "alt"],
+            "rows": index_rows,
             "updated_at": self.today.strftime("%Y-%m-%dT%H:%M:%SZ")})
         return len(written)
 

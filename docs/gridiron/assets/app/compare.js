@@ -1,12 +1,12 @@
-/* The Quant Gridiron — Compare (#/compare/<a>/<b>[/<c>]), in the Lab, on Design System 2.0 (the Rink compare page is
+/* The Quant Gridiron — Compare (#/compare/<a>/<b>[/<c>]), in the Lab, on kit v4 "Broadcast" (the Rink compare page is
  * the reference). Players: two or three side by side on the metrics spec's headline set (spec.js), each a value and a
- * percentile bar against the group (QB, RB, WR, TE, outside pass rushers, interior linemen, LB, CB, S, K, P), the better
- * value bold and, for two, the difference; players from different peer groups are each ranked against their own, and
+ * percentile bar against the group (QB, RB, WR, TE, outside pass rushers, interior linemen, LB, CB, S, K, P); two are
+ * the tale of the tape in their team colours (the better number solid), three a table with the best under the volt
+ * stroke; players from different peer groups are each ranked against their own, and
  * the page says so. Below: where each one sits in the peer distribution of a chosen metric. With one player picked the
  * others are his most similar players. Teams (t:KC) and ?view=all keep the classic comparison: who wins each shared
  * metric by percentile, the biggest differences, a radar, a percentile butterfly and every metric with values.
- * v3 (Matchday): the title asks the question ("Purdy, Prescott or Goff?"), the best value in each row sits under the
- * sun highlighter, the percentiles are coloured pills, and a verdict under the table names what each player does best.
+ * The title asks the question ("Purdy, Prescott or Goff?") and a verdict under it names what each player does best.
  * Reads <S>/players.json and <S>/teams.json. Exports GI.picker. */
 (function (GI) {
 'use strict';
@@ -170,7 +170,9 @@ function drawV2(el, h, S, ids, cat) {
     return bestRow ? { title: ARCHETYPE[bestRow.key] || 'The standout', who: short[i], text: 'best of the ' + E.length + ' on ' + (/^[A-Z][a-z]/.test(bestRow.m[1]) ? bestRow.m[1].charAt(0).toLowerCase() + bestRow.m[1].slice(1) : bestRow.m[1]) + ' (' + bestRow.fmt(bestRow.values[i]) + ', ' + QK.ordinal(Math.round(bestRow.pctls[i])) + ' percentile).' } : null;
   });
   const q = short.length === 2 ? short[0] + ' or ' + short[1] + '?' : short.slice(0, -1).join(', ') + ' or ' + short[short.length - 1] + '?';
-  const ents = E.map(e => ({ name: e.p.name || GI.playerName(e.id), href: GI.playerHref(e.id, S), abbr: GI.surnameOf(e.p.name || ''), colour: null,
+  /* v4: two players draw the tale of the tape in their team colours (QK.tape via QK.compareView); three keep the table */
+  const ents = E.map(e => ({ name: e.p.name || GI.playerName(e.id), href: GI.playerHref(e.id, S), abbr: GI.surnameOf(e.p.name || ''), short: GI.surnameOf(e.p.name || '') || e.p.name,
+    colour: GI.teamInfo(e.p.team).colour, alt: GI.teamInfo(e.p.team).alt,
     sub: [GI.posLabel(e.p.pos), GI.teamAbbr(e.p.team), GI.SP.sample(e.p, e.g)].filter(Boolean).join(' · ') }));
   const peerTxt = same ? g0.peer : 'each against their own group (' + E.map(e => GI.surnameOf(e.p.name || '') + ': ' + e.g.peer.replace(/^NFL /, '')).join('; ') + ')';
   const small = E.filter(e => e.p.qualified === false).map(e => e.p.name);
@@ -179,7 +181,7 @@ function drawV2(el, h, S, ids, cat) {
     styleRows.map(m => [{ html: '<span data-tip="' + esc(m[5]) + '" tabindex="0">' + esc(m[1]) + '</span>' }].concat(E.map(e => ({ html: GI.SP.fmt(m, GI.SP.value(e.p, e.id, m, cx), cx) })))))) : '';
   el.innerHTML = h + GI.card('Players', 'Ranked against ' + esc(peerTxt) + ' this season (' + S + ')', pick) +
     '<section class="qk-section" style="margin-top:var(--sp-8)">' + QK.sectionHead({ kicker: 'Side by side', title: esc(q), html: true,
-      sub: 'Value and percentile against the group, qualified players (100 = best). The best in each row is highlighted' + (E.length === 2 ? '; the last column is ' + esc(short[0]) + ' minus ' + esc(short[1]) + ', green when ' + esc(short[0]) + ' is better.' : '.') }) +
+      sub: E.length === 2 ? 'Bar length = percentile against the group, qualified players (100 = best). The better number in each row is solid.' : 'Value and percentile against the group, qualified players (100 = best). The best in each row is highlighted.' }) +
       GI.card(E.length + ' players, one metric set', 'The headline set for the role from our metrics spec: stable and predictive rates first',
       QK.compareView({ entities: ents, groups: groups }) + QK.verdicts(verd) +
       (small.length ? '<p class="qk-caption">' + esc(small.join(', ')) + (small.length > 1 ? ' are' : ' is') + ' below the qualifying minimum: no percentiles.</p>' : '') +
@@ -287,8 +289,8 @@ GI.route('compare', function (el, params) {
       return { grid: { left: 8, right: 16, top: 26, bottom: 30, containLabel: true }, legend: GI.ch.legend(T, { data: [A.name, B.name] }),
         xAxis: GI.ch.ax(T, { min: -100, max: 100, fmt: v => String(Math.abs(v)), name: 'Percentile', nameLocation: 'middle', nameGap: 26 }), yAxis: ya,
         tooltip: GI.ch.tip(T, { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: ps => { const m = ms[ps[0].dataIndex]; return GI.ch.thead(esc(m.label)) + GI.ch.trow(QK.cssVar('--wp-a') || T.cat[0], A.name, GI.fmtVal(A.values[m.key], m.fmt) + ' · ' + Math.round(A.pct[m.key]) + 'th') + GI.ch.trow(T.cat[1], B.name, GI.fmtVal(B.values[m.key], m.fmt) + ' · ' + Math.round(B.pct[m.key]) + 'th'); } }),
-        series: [{ type: 'bar', name: A.name, stack: 's', data: ms.map(m => -A.pct[m.key]), barMaxWidth: 12, itemStyle: { color: QK.cssVar('--wp-a') || T.cat[0], borderRadius: [3, 0, 0, 3] } },
-          { type: 'bar', name: B.name, stack: 's', data: ms.map(m => B.pct[m.key]), barMaxWidth: 12, itemStyle: { color: QK.cssVar('--wp-b') || T.cat[1], borderRadius: [0, 3, 3, 0] } }] };
+        series: [{ type: 'bar', name: A.name, stack: 's', data: ms.map(m => -A.pct[m.key]), barMaxWidth: 12, itemStyle: { color: QK.cssVar('--wp-a') || T.cat[0] } },
+          { type: 'bar', name: B.name, stack: 's', data: ms.map(m => B.pct[m.key]), barMaxWidth: 12, itemStyle: { color: QK.cssVar('--wp-b') || T.cat[1] } }] };
     }, 'Percentile butterfly');
     GI.set('cmp-all', GI.tableHTML([{ label: 'Group' }, { label: 'Metric' }, { label: A.name, align: 'right' }, { label: 'Pct', align: 'right' }, { label: B.name, align: 'right' }, { label: 'Pct', align: 'right' }, { label: 'Gap', align: 'right', title: 'Percentile points, the first player minus the second' }],
       metrics.filter(m => isNum(A.values[m.key]) || isNum(B.values[m.key])).map(m => { const pa2 = A.pct[m.key], pb2 = B.pct[m.key], d = isNum(pa2) && isNum(pb2) ? pa2 - pb2 : null;

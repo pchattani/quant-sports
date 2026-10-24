@@ -1,6 +1,6 @@
-/* Kit v3 "Matchday" showcase (dark only): every component on sample data (not shipped to any site). ES5.
- * The Matchday block (greeting, feature, watch grid, who's hot, stat of the day, New here, How sure, rail, short
- * version, preview card, score bug, verdicts) comes first; the v2 components below render in the v3 look. */
+/* Kit v4 "Broadcast" showcase (dark only): every component on sample data (not shipped to any site). ES5.
+ * The Broadcast pieces (split hero, scoreboard bug, quadrant, black band, tale of the tape, LED meters, explain strip,
+ * outlined numbers) come first; then the Matchday modules and the v2 components, all drawn in the v4 look. */
 (function () {
 'use strict';
 var $ = QK.$, esc = QK.esc;
@@ -28,18 +28,37 @@ var GAMES = [
 
 QK.shell({
   sport: null,
-  sections: [['matchday', 'Matchday'], ['identity', 'Identity'], ['scoreboard', 'Scoreboard'], ['stats', 'Stat tiles'], ['player', 'Player'], ['forecast', 'Forecasts'], ['tables', 'Leaderboard'], ['compare', 'Compare'], ['copy', 'Copy']].map(function (x) { return { key: x[0], label: x[1], href: '#' + x[0] }; }),
+  sections: [['broadcast', 'Broadcast'], ['matchday', 'Modules'], ['identity', 'Identity'], ['scoreboard', 'Scoreboard'], ['stats', 'Stat tiles'], ['player', 'Player'], ['forecast', 'Forecasts'], ['tables', 'Leaderboard'], ['compare', 'Compare'], ['copy', 'Copy']].map(function (x) { return { key: x[0], label: x[1], href: '#' + x[0] }; }),
   section: 'identity',
   ctx: '<span class="qk-tag signal">Kit ' + esc(QK.version) + '</span>'
 });
 $('#sc-ticker').innerHTML = QK.ticker(GAMES);
 
 $('#sc-hero').innerHTML = QK.greeting({ date: 'Kit ' + QK.version + ' · sample data · dark only',
-  lede: 'Matchday layouts in the Broadcast colours: near-black, Fraunces and DM Sans, cobalt for ours, a volt highlighter, roomy rounded cards and plain-English notes on every number. Every block below is the real kit (assets/qk), drawn on sample numbers.',
-  ctas: [{ label: 'Matchday components', href: '#matchday' }, { label: 'The v2 set, restyled', href: '#scoreboard', ghost: true }],
+  lede: 'Broadcast: near-black and black blocks, Bebas Neue for scores and headlines, Barlow and Barlow Condensed for the rest, cobalt for ours, volt tags, team colours as big blocks, hard edges. Every block below is the real kit (assets/qk), drawn on sample numbers.',
+  ctas: [{ label: 'Broadcast pieces', href: '#broadcast' }, { label: 'Modules', href: '#matchday', ghost: true }],
   side: QK.featureCard({ sport: 'basketball', league: 'WNBA', note: 'WNBA Finals · G1', status: 'live', start: iso(-2), period: 3, clock: '1:48', away: { name: 'Dream', abbr: 'ATL', colour: '#e31837' }, home: { name: 'Valkyries', abbr: 'GS', colour: '#b38fcf' }, as: 52, hs: 51, p_home: 0.55, wp_home: 0.5549, href: '#matchday' }, { scribble: 'Finals, Game 1!' }) });
 
-/* ── v3 Matchday block ── */
+/* ── v4 Broadcast pieces ── */
+$('#h-broadcast').innerHTML = QK.sectionHead({ kicker: 'Broadcast', title: 'The signature pieces', sub: 'QK.splitHero (also what QK.featureCard and QK.previewCard draw), the scoreboard bug, QKC.quadrant, QK.band with QK.hotRow, QK.tape, QK.meter and QK.explain.' });
+$('#sc-bc-split').innerHTML = QK.splitHero({ sport: 'hockey', league: 'NHL', status: 'pre', start: iso(4), away: { name: 'Lightning', full: 'Tampa Bay Lightning', abbr: 'TBL', colour: '#002868', record: '5-2-0' }, home: { name: 'Avalanche', full: 'Colorado Avalanche', abbr: 'COL', colour: '#6F263D', alt: '#236192', record: '5-2-1' }, p_home: 0.6, href: '#broadcast' }, { tag: 'Our pick tonight' });
+$('#sc-bc-bug').innerHTML = QK.sectionHead({ kicker: 'What to watch tonight', title: 'QK.scorebug, size xl' }) + QK.previewCard({ sport: 'hockey', league: 'NHL', status: 'pre', start: iso(4), away: { name: 'Lightning', abbr: 'TBL', colour: '#002868', record: '5-2-0' }, home: { name: 'Avalanche', abbr: 'COL', colour: '#6F263D', record: '5-2-1' }, p_home: 0.6 },
+  { layout: 'bug', factors: [{ label: 'Goals for per game', a: '3.0', b: '4.5', better: 'b' }, { label: 'Goals against per game', a: '2.7', b: '2.9', better: 'a' }, { label: 'Chance share, 5-on-5', a: '54.3%', b: '55.9%', better: 'b' }] });
+$('#sc-bc-quad-h').innerHTML = QK.sectionHead({ kicker: 'Who’s for real?', title: 'QKC.quadrant' });
+QKC.quadrant('#sc-bc-quad', { points: [['CAR', 59.6, 81.2, '#CE1126'], ['VGK', 57, 77.8, '#B4975A'], ['UTA', 61.9, 75, '#71AFE5'], ['OTT', 46.5, 75, '#C52032'], ['COL', 55.9, 68.8, '#6F263D'], ['TOR', 43, 50, '#00205B'], ['NJD', 62, 50, '#CE1126'], ['CHI', 38, 37.5, '#CF0A2C'], ['VAN', 40, 28.6, '#00205B'], ['PHI', 33.6, 16.7, '#F74902'], ['LAK', 51.3, 20, '#A2AAAD'], ['BUF', 53.5, 56.3, '#003087']].map(function (r) { return { label: r[0], name: r[0], x: r[1], y: r[2], color: r[3] }; }),
+  xName: 'Share of expected goals at 5-on-5 (%)', yName: 'Points won (% of possible)', refX: 50, refY: 'mean', xFmt: function (v) { return Math.round(v) + '%'; }, yFmt: function (v) { return Math.round(v) + '%'; } });
+$('#sc-bc-band').innerHTML = QK.band(QK.sectionHead({ kicker: 'Who’s hot', title: 'QK.band + QK.hotRow', sub: 'The black power list with outlined ranks; long names drop to Barlow Condensed.' }) + QK.hotRow([
+  { sport: 'hockey', kicker: 'Hockey', title: 'Most points', name: 'Connor McDavid', value: 18, expl: 'Points = goals + assists. Nine games in, so it is early.' },
+  { sport: 'f1', kicker: 'Formula 1', title: 'Drivers’ points', name: 'Andrea Kimi Antonelli', value: 340, expl: '102 points clear with six races left.' },
+  { sport: 'baseball', kicker: 'Baseball', title: 'Best season (WAR)', name: 'Pete Crow-Armstrong', value: 7.5, expl: 'WAR: wins added over a bench-level player.' },
+  { sport: 'tennis', kicker: 'Tennis', title: 'Top rated (Elo)', name: 'J. Sinner', value: 2136, expl: 'Beat a stronger player, gain more.' }]));
+$('#sc-bc-tape').innerHTML = QK.sectionHead({ kicker: 'Tale of the tape', title: 'QK.tape' }) + QK.tape({ left: { name: 'Nathan MacKinnon', sub: 'Colorado · 8 games', colour: '#6F263D' }, right: { name: 'Connor McDavid', sub: 'Edmonton · 7 games', colour: '#041E42', alt: '#FF4C00' },
+  rows: [{ label: 'Points', a: 16, b: 18, pa: 99, pb: 100 }, { label: 'Points per 60', a: 5.74, b: 6.46, pa: 99, pb: 100, ta: '5.74', tb: '6.46' }, { label: 'Expected-goals share', a: 0.595, b: 0.698, pa: 89, pb: 97, ta: '59.5%', tb: '69.8%' }, { label: 'Isolated defence', a: -0.05, b: 0, pa: 21, pb: 48, ta: '−0.05', tb: '0.00' }] });
+$('#sc-bc-meters').innerHTML = '<div class="qk-pgrp-h">QK.meter (20 LED segments, ▼ last season)</div>' + [[100, 92], [74, 80], [21, 35], [3, null]].map(function (x) { return '<div style="margin:14px 0">' + QK.meter(x[0], { prev: x[1] }) + '</div>'; }).join('') + QK.pctKey({ ring: true }) +
+  '<p style="margin:16px 0 0">' + QK.outlineNum('29', { size: '96px' }) + ' <span class="qk-display" style="font-size:60px">BEBAS</span> <span class="qk-cond qk-long" style="font-size:28px">Barlow Condensed for long names</span></p>';
+$('#sc-bc-explain').innerHTML = QK.explain('<b>What’s that number?</b> Our live chance updates with the score and the clock. Before the start it was 55% too: a one-point game late in the third is still close to a coin flip.');
+
+/* ── v3 Matchday modules, in the v4 look ── */
 $('#h-matchday').innerHTML = QK.sectionHead({ kicker: 'What to watch tonight', title: 'QK.watchGrid: game cards with a reason', sub: 'Our chance for each side (favourite in blue), the team-colour bar with a key, the score bug when live, and an italic one-line reason (g.why, else QK.whyLine). No market on cards.' });
 $('#sc-md-watch').innerHTML = QK.watchGrid(GAMES.concat([{ sport: 'nfl', league: 'NFL', note: 'Week 7', status: 'pre', start: iso(26), away: { name: 'Saints', abbr: 'NO', colour: '#D3BC8D' }, home: { name: 'Giants', abbr: 'NYG', colour: '#0B2265' }, p_home: 0.52 }]), { limit: 6 });
 $('#sc-md-hot').innerHTML = QK.sectionHead({ kicker: 'Who’s hot', title: 'QK.hotRow', sub: 'One name per sport and what the number means; a swipeable row on phones.' }) + QK.hotRow([

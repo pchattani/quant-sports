@@ -1,4 +1,4 @@
-/* The Quant Rink — Compare (#/compare/<a>/<b>[/<c>]), Design System 2.0 reference compare page.
+/* The Quant Rink — Compare (#/compare/<a>/<b>[/<c>]), the v4 reference compare page.
  *
  * Two or three skaters (or goalies) side by side on the one metric set the player card uses (RK.ui.SK_SET / G_SET,
  * after docs/METRICS_SPEC.md): value, a percentile bar against the position group, the better value in bold, and
@@ -7,9 +7,9 @@
  * peer distribution of a chosen metric. With one player picked, the other is his most similar player; with none,
  * the two points leaders. Teams (t:TOR) and ?view=all open the full pre-redesign comparison (every metric).
  *
- * v3 (Matchday): the title asks the question ("MacKinnon, McDavid or Kucherov?"), the best value in each row sits under
- * the sun highlighter, the percentiles are coloured pills, and a verdict under the table names what each player does
- * best (QK.verdicts, the archetype from RK.ui.ARCHETYPE).
+ * v4 (Broadcast): the title asks the question ("MacKinnon, McDavid or Kucherov?"); two players are the tale of the
+ * tape in their team colours (bars = percentile, the better number solid), three a table with the best value under the
+ * volt stroke; a verdict under it names what each player does best (QK.verdicts, the archetype from RK.ui.ARCHETYPE).
  *
  * Reads <S>/skaters.json and <S>/goalies.json (and players/<pid>.json for the most similar player). */
 (function (RK) {
@@ -87,7 +87,8 @@ function draw(body, E, sk, gk, S) {
         fmt: v => U.fmtBy(m, v), dfmt: pctFmt ? (v => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v * 100).toFixed(1) + ' pts') : null };
     })
   }));
-  const ents = E.map((e, i) => ({ name: e.p.name, href: RK.playerHref(e.id), colour: null, abbr: RK.playerSurname(e.id),
+  /* v4: two players draw the tale of the tape in their team colours (QK.tape via QK.compareView); three keep the table */
+  const ents = E.map((e, i) => ({ name: e.p.name, href: RK.playerHref(e.id), colour: RK.teamColourRaw(e.p.team), alt: RK.teamAlt(e.p.team), abbr: RK.playerSurname(e.id), short: RK.playerSurname(e.id),
     sub: [RK.teamAbbr(e.p.team), goalie ? 'G' : e.p.pos, e.p.gp + ' GP', U.f(e.p.toi, 0) + ' min'].join(' · ') }));
   const quals = E.filter(e => !e.p.qualified).map(e => e.p.name);
   /* verdicts: for each player, the metric where the player's percentile beats the others' by the most */
@@ -105,7 +106,7 @@ function draw(body, E, sk, gk, S) {
   const q = short.length === 2 ? short[0] + ' or ' + short[1] + '?' : short.slice(0, -1).join(', ') + ' or ' + short[short.length - 1] + '?';
   body.innerHTML = U.card2('Players', 'Ranked against ' + esc(peer) + ' this season (' + esc(RK.seasonLabel(S)) + ')', pk.html) +
     '<section class="qk-section" style="margin-top:var(--sp-8)">' + QK.sectionHead({ kicker: 'Side by side', title: q,
-      sub: 'Value and percentile against ' + peer + ' (100 = best). The best in each row is highlighted' + (E.length === 2 ? '; the last column is ' + short[0] + ' minus ' + short[1] + ', green when ' + short[0] + ' is better.' : '.') }) +
+      sub: E.length === 2 ? 'Bar length = percentile against ' + peer + ' (100 = best). The better number in each row is solid.' : 'Value and percentile against ' + peer + ' (100 = best). The best in each row is highlighted.' }) +
     U.card2(E.length + ' players, one metric set', 'The headline set for the position from our metrics spec: stable and predictive rates first',
       QK.compareView({ entities: ents, groups: groups }) + QK.verdicts(verd) +
       (quals.length ? '<p class="qk-caption">' + esc(quals.join(', ')) + (quals.length > 1 ? ' are' : ' is') + ' short of the sample floors: read the percentiles as early.</p>' : '') +

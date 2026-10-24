@@ -209,16 +209,21 @@ is not in that club's squad.
 
 ```jsonc
 {
-  "fields": ["id", "name", "slug", "country", "national", "crest", "home", "comps"],
+  "fields": ["id", "name", "slug", "country", "national", "crest", "home", "comps", "colour", "alt"],
   "rows": [[17, "Manchester City", "manchester-city", "ENG", 0, "assets/crests/17.png",
-            "premier-league", ["premier-league", "champions-league", "efl-cup", "fa-cup"]]],
+            "premier-league", ["premier-league", "champions-league", "efl-cup", "fa-cup"], "#143a6c", "#eecb7a"]],
   "updated_at": "..."
 }
 ```
 
 `home` - the club's domestic league slug (or `null` if it plays in no followed
 league); `national` - 1 for a national team. Replaces `search.json`'s team list
-(which has PSG seven times).
+(which has PSG seven times). `colour` / `alt` - the club's main and second kit colours ("#rrggbb", or `null`) for
+the Broadcast heroes, stripes and bars (`docs/_design/MIGRATION_V4.md`): derived from the club's crest on the PC by
+`oddsmarkets/football/analytics/colours.py` and committed as `oddsmarkets/football/analytics/data/club_colours.json`,
+so CI writes them without the crests. A row without colours (national teams, clubs without a crest: the kit falls
+back to cobalt v slate) stops at `comps`; `alt` may be `null`. The club file (3.2) carries the same two keys when
+known.
 
 ### 3.2 `data/clubs/<tid>.json` (new; one file per club or national team)
 

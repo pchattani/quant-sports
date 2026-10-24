@@ -1,17 +1,19 @@
-/* The Quant Rink — the player page (#/player/<pid>), the kit v3 "Matchday" reference player page (MIGRATION_V3.md).
+/* The Quant Rink — the player page (#/player/<pid>), the kit v4 "Broadcast" reference player page (MIGRATION_V4.md).
  *
- * Top, as the concept: a crumb; the header (tilted number tile, kicker, name, chips) with "The short version" in plain
- * English; five stat tiles with percentile chips; the Notebook percentile rail against the position group (the
- * sample named, early metrics dashed, a hollow ring for last season from the player file's current.prev_pct_pos, else
- * loaded lazily from last season's catalogue)
- * beside "How sure are we?" (when the numbers settle), game by game and "Their type" (plays most like, most time
- * with); a compare of the player and the two closest matches with the highlighter and one-line verdicts; the next
- * game (QK.previewCard) and the last one. Below, "More on the player": value tiles, where the player sits among
- * peers, season by season, career, shot map, splits, movement and value. Detail (?view=detail): the full
- * pre-redesign player page.
+ * Top, as the concept: a crumb; the full-bleed team-colour hero (QK.playerHeader: the alternate colour on a diagonal,
+ * the outlined number, the name in Bebas, chips) with the black strip of five numbers and "The short version"; the
+ * LED percentile meters against the position group (the sample named, early metrics dashed, a ▼ for last season
+ * from the player file's current.prev_pct_pos, else loaded lazily from last season's catalogue) with "How sure are
+ * we?" under them, beside the tale of the tape against the closest match (chips switch between the matches; a link
+ * opens all three in Compare) and one-line verdicts; what to watch tonight (the scoreboard bug, the bar and how the
+ * clubs match up, QK.previewCard layout 'bug') beside the last game (the box score by period and the
+ * expected-goals race from the game file); the game log (every game, the best night highlighted); game by game and
+ * "Their type". Below, "More on the player": value tiles, where the player sits among peers, season by season,
+ * career, shot map, splits, movement and value. Detail (?view=detail): the full pre-redesign player page.
  *
  * Reads data/players/<pid>.json, data/glossary.json (labels), <S>/skaters.json or goalies.json (position-pool
- * percentiles, the metric catalogue and the peer distribution), <S>/value.json and <S>/valuation.json (current). */
+ * percentiles, the metric catalogue and the peer distribution), <S>/value.json and <S>/valuation.json (current),
+ * <S>/season.json (records and ratings for the next game) and <S>/games/<id>.json (the last game). */
 (function (RK) {
 'use strict';
 
@@ -87,15 +89,16 @@ function render(el, params, state) {
     const mates = c && (c.linemates || []).length ? c.linemates.slice(0, 2).map(m => RK.playerSurname(m[0]) || QK.surname(m[1])) : [];
     const hero = QK.playerHeader({ name: p.name, number: p.number, pos: posName,
       kicker: (last.season ? RK.seasonLabel(last.season) : '') + (gpNow ? ' · ' + gpNow + ' game' + (gpNow === 1 ? '' : 's') + ' in' : ''),
-      team: curTeam ? { name: RK.teamName(curTeam), abbr: RK.teamAbbr(curTeam), colour: RK.teamColourRaw(curTeam), href: RK.teamHref(curTeam) } : null,
+      team: curTeam ? { name: RK.teamName(curTeam), abbr: RK.teamAbbr(curTeam), colour: RK.teamColourRaw(curTeam), alt: RK.teamAlt(curTeam), href: RK.teamHref(curTeam) } : null,
       meta: [p.shoots ? (goalie ? 'Catches ' : 'Shoots ') + (p.shoots === 'L' ? 'left' : p.shoots === 'R' ? 'right' : p.shoots) : null, a ? a + ' years old' : null,
         ht ? ht + (isNum(p.weight) ? ', ' + p.weight + ' lb' : '') : null, mates.length === 2 && !goalie ? 'Lines up with ' + mates[0] + ' and ' + mates[1] : null],
-      tags: tagsH, short: shortVersion() });
+      tags: tagsH, strip: tileList(), short: shortVersion() });
     const tabs = [{ key: 'overview', label: 'Overview', href: RK.playerHref(pid) }, { key: 'detail', label: 'Detail: every metric, shot maps, game log, on-ice, comparisons', href: RK.playerHref(pid) + '?view=detail' }];
     const crumb = '<nav class="rk-crumb" aria-label="Breadcrumb"><a href="#/players">Hockey</a><span aria-hidden="true">›</span>' + (curTeam ? '<a href="' + esc(RK.teamHref(curTeam)) + '">' + esc(RK.teamName(curTeam)) + '</a><span aria-hidden="true">›</span>' : '') + esc(p.name) + '</nav>';
-    el.innerHTML = crumb + hero + '<div id="pp-tiles" class="rk-tiles"></div><div style="margin-top:var(--sp-6)">' + U.tabsHTML(tabs, view) + '</div><div id="pp-body"></div>';
+    /* v4 (Broadcast): the hero is the full-bleed team-colour diagonal with the black strip of five numbers and
+       "The short version" under it (QK.playerHeader strip / short) */
+    el.innerHTML = crumb + hero + '<div style="margin-top:var(--sp-6)">' + U.tabsHTML(tabs, view) + '</div><div id="pp-body"></div>';
     const body = el.querySelector('#pp-body');
-    el.querySelector('#pp-tiles').innerHTML = tiles();
     if (view === 'detail') return U.legacy('player', body, params, state);
 
     /* "The short version": what the numbers say, in plain English, from this season's percentiles */
@@ -120,8 +123,8 @@ function render(el, params, state) {
       if (gpNow < 15) t += ' Early days, so read it lightly.';
       return t;
     }
-    /* five tiles, each with its percentile against the position group where there is one */
-    function tiles() {
+    /* five tiles, each with its percentile against the position group where there is one (the hero's strip) */
+    function tileList() {
       const v = lv;
       const lastP = prevSeason && prevSeason.values ? prevSeason.values.p : null;
       const t = goalie ? [
@@ -136,7 +139,7 @@ function render(el, params, state) {
         { label: 'Assists', value: isNum(v.a) ? String(v.a) : '—', pctl: pp.a, sub: gpNow ? U.f(v.a / gpNow, 1) + ' a game' : '' },
         { label: 'Points pace', value: c && c.projection && isNum(c.projection.pts_pace) ? String(Math.round(c.projection.pts_pace)) : '—', signal: true, sub: 'over 82 games.' + (isNum(lastP) ? ' Last season: ' + lastP + '.' : ''), tip: 'This season’s points per game over a full 82-game season. Early in a season it swings a lot.' },
         { label: 'Ice time', value: isNum(v.toi_gp) ? U.f(v.toi_gp, 1) : '—', pctl: pp.toi_gp, sub: 'minutes a game' }];
-      return QK.stats(t.map(x => Object.assign(x, { pctl: isNum(x.pctl) ? x.pctl : null })));
+      return t.map(x => Object.assign(x, { pctl: isNum(x.pctl) ? x.pctl : null }));
     }
 
     // value tiles (moved below the fold: "More on the player")
@@ -173,47 +176,65 @@ function render(el, params, state) {
       if (isNum(a3)) parts.push('the team’s chance share with the player on the ice after about <b>' + a3 + '</b>');
       return parts.length ? 'At this ice time, ' + parts.join(', ').replace(/, ([^,]*)$/, ', and $1') + '.' : '';
     }
+    const nickOf = ab => (U.nick ? U.nick(ab) : RK.teamName(ab));
     const small = gpNow < 30;
-    const sureCard = '<article class="qk-card cream"><div class="qk-card-body"><div class="qk-kicker">How sure are we?</div><h3 style="margin:8px 0 6px">' +
-      esc(gpNow ? (small ? (gpNow < 11 ? ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'][gpNow] : gpNow) + ' game' + (gpNow === 1 ? ' is' : 's is') + ' a small sample' : gpNow + ' games: the picture is settling') : 'No games yet this season') + '</h3>' +
+    const NUMW = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
+    const sampleWords = gpNow ? (small ? (gpNow < 11 ? NUMW[gpNow] : gpNow) + ' game' + (gpNow === 1 ? ' is' : 's is') + ' a small sample.' : gpNow + ' games: the picture is settling.') : 'No games yet this season.';
+    /* v4: "How sure are we?" sits under the meters as the explain strip (skaters); goalies keep the explained card */
+    const settleNote = '<b>How sure are we?</b> ' + esc(sampleWords) + ' ' + (settleLine() ? settleLine() + ' ' : '') +
+      (prevPct ? 'The ▼ marks last season: rows that sit on it are the steady part of the profile; the ones far from it are the ones to watch.' : '');
+    const sureCard = '<article class="qk-card cream"><div class="qk-card-body"><div class="qk-kicker">How sure are we?</div><h3 style="margin:8px 0 6px">' + esc(sampleWords.replace(/\.$/, '')) + '</h3>' +
       '<p style="margin:0;color:var(--ink-2);font-size:15px">' + (goalie ? 'Goalie numbers swing more than any other position: a single season is a small sample, and save percentage needs thousands of shots to settle.'
-        : (small ? 'Scoring rates swing a lot early on. ' : '') + 'The hollow rings on the rail show last season, where there was one: dots that sit next to their ring are the steady part of the profile; the ones far from it are the ones to watch.') + '</p>' +
+        : (small ? 'Scoring rates swing a lot early on. ' : '') + 'The ▼ on each meter is last season, where there was one.') + '</p>' +
       (settleLine() ? QK.note(settleLine()) : '') + '</div></article>';
 
-    const gbg = lg.length ? U.card2('Points in every game this season', goalie ? 'Goals saved above expected in each game' : 'Goals and assists, game by game', U.chart('pp-gbg', 260, 'Game by game'), { right: '' }) : '';
+    const gbg = lg.length ? U.card2(goalie ? 'Goals saved above expected in every game' : 'Points in every game this season', goalie ? 'Goals saved above expected in each game' : 'Goals and assists, game by game', U.chart('pp-gbg', 260, 'Game by game'), { right: '' }) : '';
     const sim = (p.similar || []).slice(0, 3);
     const typeCard = (sim.length || (c && (c.linemates || []).length)) ? '<article class="qk-card"><div class="qk-card-body"><div class="qk-kicker">Their type</div>' +
       (sim.length ? '<h4 class="rk-h4">Plays most like</h4><ul class="rk-list rk-type">' + sim.map(m => '<li>' + U.playerEnt(m[0], m[1], m[2]) + '<a class="v rk-link" href="' + RK.compareHref(pid, m[0]) + '">Compare</a></li>').join('') + '</ul>' : '') +
       (c && (c.linemates || []).length && !goalie ? '<h4 class="rk-h4">Most time with</h4><ul class="rk-list rk-type">' + c.linemates.slice(0, 2).map(m => '<li>' + U.playerEnt(m[0], m[1]) + '<span class="v">' + U.f(m[2], 0) + ' min together at 5-on-5</span></li>').join('') + '</ul>' : '') +
       '<div class="qk-aside" style="margin-top:10px">Closest match on this season’s profile: value, scoring, shooting, play-driving and ice time.</div></div></article>' : '';
 
-    let h = '<section class="qk-section rk-sec1"><div class="qk-gside">' + '<div>' + pcardHTML() + '</div>' +
-      '<div class="rk-stack">' + sureCard + gbg + typeCard + '</div></div></section>';
-    // compare (filled once the catalogue is in)
-    if (sim.length >= 1 && !goalie) h += '<section class="qk-section" id="pp-cmp-sec" hidden><div id="pp-cmp-h"></div><article class="qk-card"><div class="qk-card-body"><div id="pp-cmp"></div></div></article></section>';
-    // next game and last game
+    /* 1. the meters (7) beside the tale of the tape against the closest match (5), as the concept */
+    const tape = sim.length >= 1 && !goalie;
+    let h = '<section class="qk-section rk-sec1"><div class="qk-g75"><div>' + pcardHTML() + (goalie ? '' : QK.explain(settleNote, { cls: 'rk-settle' })) + '</div>' +
+      '<div class="rk-stack">' + (tape ? '<div id="pp-tape-h"></div><div class="qk-chips rk-pick" id="pp-tape-pick" role="group" aria-label="Compare with"></div><div id="pp-tape">' + QK.skeleton('lines', 6) + '</div><div id="pp-verd"></div>'
+        : sureCard + typeCard) + '</div></div></section>';
+
+    /* 2. what to watch tonight (the scoreboard bug and the match-up) beside the last game (box score, xG race) */
     const idx = RK.index() || {};
     const teamGames = [].concat(idx.live || [], idx.today || [], idx.upcoming || []).filter(x => x && (x.home === curTeam || x.away === curTeam));
     const nxt = teamGames.filter(x => U.status(x) !== 'final').sort((x, y) => String(x.start).localeCompare(String(y.start)))[0];
     const lastG = lg.length ? lg[lg.length - 1] : null;
-    const recent = (idx.recent || []).filter(x => x && lastG && String(x.game_id) === String(lastG.game_id))[0];
-    const st = {}; ((((RK.state || {}).seasonData || {}).standings || {}).rows || []).forEach(r => { st[r.team] = r; });
+    const recent = (idx.recent || []).concat(idx.today || []).filter(x => x && lastG && String(x.game_id) === String(lastG.game_id))[0];
     if (nxt || lastG) {
       h += '<section class="qk-section"><div class="qk-g2">';
       if (nxt) {
-        const g = U.gameV2(nxt, null, null);
-        h += '<div><div class="qk-kicker" style="margin-bottom:10px">' + (U.status(nxt) === 'live' ? 'Live now' : (QK.fmt.relDay(nxt.start) === 'Today' ? 'What to watch tonight' : 'Next up')) + '</div>' +
-          QK.previewCard(g, { kicker: 'NHL · ' + RK.teamName(nxt.away) + ' at ' + RK.teamName(nxt.home), nick: t => (U.nick ? U.nick(t.abbr) : t.name) }) + '</div>';
+        const live = U.status(nxt) === 'live';
+        h += '<div>' + QK.sectionHead({ kicker: live ? 'Live now' : (QK.fmt.relDay(nxt.start) === 'Today' ? 'What to watch tonight' : 'Next up'), title: nickOf(nxt.away) + ' at ' + nickOf(nxt.home) }) + '<div id="pp-next">' + QK.skeleton('card', 1) + '</div></div>';
       }
       if (lastG) {
+        const rs = String(lastG.result || ''), m = /(\d+)-(\d+)/.exec(rs), won = /^W/.test(rs);
+        const ttl = m ? (won ? RK.teamAbbr(curTeam) + ' ' + m[1] + ', ' + RK.teamAbbr(lastG.opp) + ' ' + m[2] : RK.teamAbbr(lastG.opp) + ' ' + m[2] + ', ' + RK.teamAbbr(curTeam) + ' ' + m[1]) + (/OT|SO/.test(rs) ? ' (' + (/SO/.test(rs) ? 'SO' : 'OT') + ')' : '') : (lastG.home ? 'v ' : 'at ') + RK.teamName(lastG.opp);
         const line = goalie ? (isNum(lastG.gsax) ? U.signed(lastG.gsax, 2) + ' goals saved above expected' : '') : lastG.g + ' G, ' + lastG.a + ' A · ' + lastG.sog + ' shots · ' + U.f(lastG.ixg, 2) + ' expected goals · ' + U.f(lastG.toi, 1) + ' minutes';
-        h += '<div><div class="qk-kicker" style="margin-bottom:10px">Last time out</div>' + (recent ? U.gc(recent, null, null, true) :
-          '<article class="qk-card"><div class="qk-card-body"><div class="qk-feature-meta"><span class="qk-pill">Final · ' + esc(RK.fmtDate(lastG.date, { year: false })) + '</span></div><h3 style="margin:12px 0 4px">' + esc((lastG.home ? 'v ' : 'at ') + RK.teamName(lastG.opp)) + ' · ' + esc(lastG.result || '') + '</h3></div></article>') +
-          (line ? QK.note('<b>' + esc(sur) + ':</b> ' + esc(line) + (isNum(lastG.gs) ? ', game score ' + U.f(lastG.gs, 2) : '') + '.') : '') + '</div>';
+        h += '<div>' + QK.sectionHead({ kicker: 'Last game', title: ttl }) + '<article class="qk-card"><div class="qk-card-body"><div id="pp-box">' + (recent ? U.gc(recent, null, null, true) : '') + '</div>' +
+          (line ? '<p style="margin:12px 0 0;color:var(--ink-2);font-size:15px"><b style="color:var(--ink-1)">' + esc(sur) + ':</b> ' + esc(line) + (isNum(lastG.gs) ? ', game score ' + U.f(lastG.gs, 2) : '') + '.</p>' : '') +
+          '<div id="pp-race"></div></div></article></div>';
       }
       h += '</div></section>';
     }
 
+    /* 3. the game log: every game this season, the best night highlighted */
+    if (lg.length && !goalie) {
+      let bestI = -1, bestP = -1; lg.forEach((r, i) => { const pt = (r.g || 0) + (r.a || 0); if (pt >= bestP) { bestP = pt; bestI = i; } });
+      const bestR = lg[bestI];
+      h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Game log', title: 'Every game this season', sub: bestR && bestP > 0 ? bestP + ' point' + (bestP === 1 ? '' : 's') + ' ' + (bestR.home ? 'against ' : 'at ') + RK.teamName(bestR.opp) + ' is the best night so far (highlighted).' : 'Every game this season, newest first.' }) +
+        '<article class="qk-card"><div class="qk-card-body flush"><div class="qk-table-wrap"><table class="qk-table"><thead><tr><th>Date</th><th>Opp</th><th>Result</th><th class="num">G</th><th class="num">A</th><th class="num">Pts</th><th class="num">Shots</th><th class="num" data-tip="Expected goals from the player’s own shots">Exp. goals</th><th class="num">Minutes</th></tr></thead><tbody>' +
+        lg.map((r, i) => [r, i]).reverse().map(x => { const r = x[0]; return '<tr' + (x[1] === bestI && bestP > 0 ? ' class="hl"' : '') + '><td>' + esc(RK.fmtDate(r.date, { year: false })) + '</td><td>' + (r.home ? 'v ' : '@ ') + esc(RK.teamAbbr(r.opp)) + '</td><td>' + esc(r.result || '') + '</td><td class="num">' + (r.g || 0) + '</td><td class="num">' + (r.a || 0) + '</td><td class="num"><b>' + ((r.g || 0) + (r.a || 0)) + '</b></td><td class="num">' + (isNum(r.sog) ? r.sog : '—') + '</td><td class="num">' + U.f(r.ixg, 2) + '</td><td class="num">' + U.f(r.toi, 1) + '</td></tr>'; }).join('') +
+        '</tbody></table></div></div></article></section>';
+    }
+    /* 4. game by game and their type */
+    if (gbg || (tape && typeCard)) h += '<section class="qk-section"><div class="qk-gside"><div>' + gbg + '</div><div>' + (tape ? typeCard : '') + '</div></div></section>';
     // ── more on the player
     h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'More on the player', title: 'Value, peers and the long view', sub: 'How much the player is worth to the team, where the player sits among ' + peerShort + ', and every season in the data.' }) +
       (k.length ? '<div class="rk-kpis">' + QK.stats(k) + '</div>' : '') +
@@ -253,12 +274,12 @@ function render(el, params, state) {
         xa.nameGap = 40;
         const tip = QKC.tooltip(T, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(125,147,255,.10)' } }, formatter: ps => { const r = lg[ps[0].dataIndex]; return '<b>' + esc((r.home ? 'v ' : 'at ') + r.opp) + ' · ' + esc(r.result || '') + '</b>' + (goalie ? QKC.tipRow(T.model, 'GSAx', U.signed(r.gsax, 2)) : QKC.tipRow(T.coral, 'Goals', r.g) + QKC.tipRow(T.sky, 'Assists', r.a) + QKC.tipRow(T.ink3, 'Shots', r.sog) + QKC.tipRow(T.ink3, 'Expected goals', U.f(r.ixg, 2)) + QKC.tipRow(T.ink3, 'Minutes', U.f(r.toi, 1))); } });
         if (goalie) return { grid: { left: 8, right: 12, top: gT, bottom: gB, containLabel: true }, xAxis: xa, yAxis: ya, tooltip: tip,
-          series: [{ type: 'bar', name: 'GSAx', barMaxWidth: 30, data: lg.map(r => ({ value: r.gsax, itemStyle: { color: r.gsax >= 0 ? T.model : T.coral, borderRadius: 6 } })) }] };
+          series: [{ type: 'bar', name: 'GSAx', barMaxWidth: 30, data: lg.map(r => ({ value: r.gsax, itemStyle: { color: r.gsax >= 0 ? T.model : T.coral } })) }] };
         return { grid: { left: 8, right: 12, top: gT, bottom: gB, containLabel: true }, xAxis: xa, yAxis: ya, tooltip: tip,
-          legend: { top: 0, right: 0, itemWidth: 12, itemHeight: 12, icon: 'roundRect', textStyle: { color: T.ink2, fontFamily: T.fontUI, fontSize: 12 } },
+          legend: { top: 0, right: 0, itemWidth: 12, itemHeight: 12, icon: 'rect', textStyle: { color: T.ink2, fontFamily: T.fontCond, fontSize: 13, fontWeight: 700 } },
           series: [{ type: 'bar', name: 'Goals', stack: 'p', barMaxWidth: 30, data: lg.map(r => r.g || 0), itemStyle: { color: T.coral, borderColor: T.s1, borderWidth: 1 } },
             { type: 'bar', name: 'Assists', stack: 'p', barMaxWidth: 30, itemStyle: { color: T.sky }, data: lg.map((r, i) => {
-              const o = { value: r.a || 0, itemStyle: { color: T.sky, borderRadius: [6, 6, 0, 0], borderColor: T.s1, borderWidth: 1 } };
+              const o = { value: r.a || 0, itemStyle: { color: T.sky, borderColor: T.s1, borderWidth: 1 } };
               if (i === bi && best >= 3) o.label = Object.assign(QKC.annot(T), { show: true, position: 'top', formatter: best + ' points' });
               return o; }) }] };
       }, { label: 'Points in every game this season' });
@@ -284,32 +305,100 @@ function render(el, params, state) {
       if (window.IntersectionObserver) { const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); go(); } }, { rootMargin: '200px' }); io.observe(host); } else go();
     }
 
-    // compare: the player and the two closest matches, on the card's metric set, the best in each row highlighted
-    if (body.querySelector('#pp-cmp-sec')) {
+    // the tale of the tape: the player against one of the closest matches (chips switch), on the card's metric set
+    if (body.querySelector('#pp-tape')) {
       withCat(full => {
         if (!full || !U.alive(body)) return;
-        const ids = [pid].concat(sim.map(m => String(m[0]))).filter(id => full.players[id]).slice(0, 3);
-        if (ids.length < 2) return;
-        const E = ids.map(id => full.players[id]);
+        const others = sim.map(m => String(m[0])).filter(id => full.players[id]);
+        if (!others.length || !full.players[pid]) { body.querySelector('#pp-tape').innerHTML = QK.empty('No comparison yet', 'The closest matches appear once the catalogue has them.'); return; }
         const meta2 = U.metaMap(full);
-        const same = E.every(e => e.group === E[0].group);
-        const grp2 = same ? (E[0].group || 'F') : 'F';
-        const pcOf = e => (same && e.pct_pos ? e.pct_pos : e.pct) || {};
-        const best = {};
-        const groups = (U.SETS[grp2] || U.SETS.F).map(g => ({ label: g[0], rows: g[1].map(x => x[0]).filter(kk => meta2[kk] && !meta2[kk].unavailable).map(kk => {
-          const m = meta2[kk], spx = U.SPEC[kk] || {};
-          const pcs = E.map(e => pcOf(e)[kk]);
-          pcs.forEach((v, i) => { if (isNum(v) && (!best[i] || v - Math.max.apply(null, pcs.filter((_, j) => j !== i).map(z => (isNum(z) ? z : 0))) > best[i].d)) best[i] = { k: kk, d: v - Math.max.apply(null, pcs.filter((_, j) => j !== i).map(z => (isNum(z) ? z : 0))), v: (E[i].values || {})[kk] }; });
-          return { label: spx.label || m.label || kk, tip: spx.tip || m.desc, better: (m.lower || spx.lower) ? 'low' : 'high', values: E.map(e => (e.values || {})[kk]), pctls: pcs, fmt: v => U.fmtBy(m, v) };
-        }) }));
-        const names = E.map(e => RK.playerSurname(ids[E.indexOf(e)]) || e.name);
-        body.querySelector('#pp-cmp-h').innerHTML = QK.sectionHead({ kicker: 'Compare', title: names.slice(0, -1).join(', ') + ' or ' + names[names.length - 1] + '?',
-          sub: 'The closest matches on this season’s profile, side by side against ' + (same ? (U.GROUP_NAME[grp2] || 'their position') : 'all NHL skaters') + '. The best in each row is highlighted; the small pills are percentiles.',
-          actions: '<a class="qk-more" href="' + esc('#/compare/' + ids.map(encodeURIComponent).join('/')) + '">Open in Compare</a>' });
-        const ents = E.map((e, i) => ({ name: e.name, href: RK.playerHref(ids[i]), sub: [RK.teamAbbr(e.team), e.pos, e.gp + ' GP'].join(' · ') }));
-        const verd = E.map((e, i) => best[i] && best[i].d > 0 ? { title: U.ARCHETYPE[best[i].k] || 'The standout', who: names[i], text: 'best of the ' + E.length + ' on ' + lc((U.SPEC[best[i].k] || {}).label || best[i].k) + ' (' + U.fmtBy(meta2[best[i].k], best[i].v) + ').' } : null);
-        body.querySelector('#pp-cmp').innerHTML = QK.compareView({ entities: ents, groups: groups, delta: false }) + QK.verdicts(verd);
-        body.querySelector('#pp-cmp-sec').hidden = false;
+        const drawTape = oid => {
+          const ids = [pid, oid], E = ids.map(id => full.players[id]);
+          const same = E[0].group === E[1].group, grp2 = same ? (E[0].group || 'F') : 'F';
+          const pcOf = e => (same && e.pct_pos ? e.pct_pos : e.pct) || {};
+          const best = {};
+          const groups = (U.SETS[grp2] || U.SETS.F).map(g => ({ label: g[0], rows: g[1].map(x => x[0]).filter(kk => meta2[kk] && !meta2[kk].unavailable).map(kk => {
+            const m = meta2[kk], spx = U.SPEC[kk] || {};
+            const pcs = E.map(e => pcOf(e)[kk]);
+            pcs.forEach((v, i) => { const o = pcs[1 - i]; const d = isNum(v) ? v - (isNum(o) ? o : 0) : null; if (isNum(d) && (!best[i] || d > best[i].d)) best[i] = { k: kk, d: d, v: (E[i].values || {})[kk] }; });
+            return { label: spx.label || m.label || kk, tip: spx.tip || m.desc, better: (m.lower || spx.lower) ? 'low' : 'high', values: E.map(e => (e.values || {})[kk]), pctls: pcs, fmt: v => U.fmtBy(m, v) };
+          }) }));
+          const names = ids.map((id, i) => RK.playerSurname(id) || E[i].name);
+          body.querySelector('#pp-tape-h').innerHTML = QK.sectionHead({ kicker: 'Tale of the tape', title: names[0] + ' or ' + names[1] + '?',
+            sub: 'Bar length = percentile against ' + (same ? (U.GROUP_NAME[grp2] || 'the position') : 'all NHL skaters') + '. The better number in each row is solid.' });
+          const ents = E.map((e, i) => ({ name: e.name, short: names[i], href: RK.playerHref(ids[i]), colour: RK.teamColourRaw(e.team), alt: RK.teamAlt(e.team), sub: [RK.teamName(e.team), e.gp + ' games'].join(' · ') }));
+          body.querySelector('#pp-tape').innerHTML = QK.compareView({ entities: ents, groups: groups });
+          const verd = E.map((e, i) => best[i] && best[i].d > 0 ? { title: U.ARCHETYPE[best[i].k] || 'The standout', who: names[i], text: 'the better of the two on ' + lc((U.SPEC[best[i].k] || {}).label || best[i].k) + ' (' + U.fmtBy(meta2[best[i].k], best[i].v) + ').' } : null);
+          body.querySelector('#pp-verd').innerHTML = QK.verdicts(verd);
+        };
+        const pick = body.querySelector('#pp-tape-pick');
+        pick.innerHTML = others.map((id, i) => '<button type="button" class="qk-chip" data-value="' + esc(id) + '" aria-pressed="' + (i === 0) + '">' + esc(RK.playerSurname(id) || full.players[id].name) + '</button>').join('') +
+          (others.length > 1 ? '<a class="qk-chip" href="' + esc('#/compare/' + [pid].concat(others.slice(0, 2)).map(encodeURIComponent).join('/')) + '">All three in Compare</a>' : '<a class="qk-chip" href="' + esc('#/compare/' + pid) + '">Pick a player</a>');
+        pick.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+          pick.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+          drawTape(b.getAttribute('data-value'));
+        }));
+        drawTape(others[0]);
+      });
+    }
+
+    // what to watch tonight: the scoreboard bug, the bar and how the clubs match up so far (season.json ratings)
+    if (nxt && body.querySelector('#pp-next')) {
+      RK.loadYear('season.json', S).then(sj => {
+        const box = body.querySelector('#pp-next');
+        if (!box || !U.alive(box)) return;
+        const season = RK.ok(sj) ? sj : {};
+        const rows = {}; (((season.standings || {}).rows) || []).forEach(r => { rows[r.team] = r; });
+        const g = U.gameV2(nxt, null, rows);
+        g.away.alt = RK.teamAlt(nxt.away); g.home.alt = RK.teamAlt(nxt.home);
+        const R = season.ratings || {}, ua = (R[nxt.away] || {}).units || {}, uh = (R[nxt.home] || {}).units || {};
+        const fx = [];
+        const add = (label, a, b, f, low) => { if (isNum(a) && isNum(b)) fx.push({ label: label, a: f(a), b: f(b), better: Math.abs(a - b) < 1e-9 ? null : ((a > b) !== !!low ? 'a' : 'b') }); };
+        add('Goals for per game', ua.gf_g, uh.gf_g, v => U.f(v, 1));
+        add('Goals against per game', ua.ga_g, uh.ga_g, v => U.f(v, 1), true);
+        add('Chance share, 5-on-5', ua.xgf_pct5, uh.xgf_pct5, v => U.pct(v, 1));
+        add('Team rating', (rows[nxt.away] || {}).rating, (rows[nxt.home] || {}).rating, v => U.signed(v, 2));
+        const m = nxt.model || {};
+        const extra = isNum(m.p_ot) ? 'Overtime: ' + U.pct(m.p_ot) + ' (about 1 in ' + Math.max(2, Math.round(1 / m.p_ot)) + ').' : '';
+        box.innerHTML = QK.previewCard(g, { layout: 'bug', nick: t => nickOf(t.abbr), factors: fx, factorsTitle: 'How they match up so far', noteExtra: esc(extra) });
+      });
+    }
+
+    // the last game: the box score by period (goals, shots, expected goals) and the expected-goals race
+    if (lastG && body.querySelector('#pp-race')) {
+      RK.loadGame(lastG.game_id).then(d => {
+        if (!RK.ok(d) || !U.alive(body)) return;
+        const ls = d.linescore || [], card = Object.assign({}, d.card || {});
+        const home = card.home || (lastG.home ? curTeam : lastG.opp), away = card.away || (lastG.home ? lastG.opp : curTeam);
+        if (ls.length) {
+          const pl = RK.isPlayoffGame ? RK.isPlayoffGame(card) : false;
+          const sum = (k) => ls.reduce((s, r) => s + (isNum(r[k]) ? r[k] : 0), 0);
+          const row = (ab, side) => '<tr' + (ab === curTeam ? ' class="hl"' : '') + '><td>' + QK.teamMark(U.team(ab), 'sm') + '</td>' + ls.map(r => '<td class="num">' + (isNum(r['g_' + side]) ? r['g_' + side] : '–') + '</td>').join('') +
+            '<td class="num"><b>' + sum('g_' + side) + '</b></td><td class="num">' + sum('s_' + side) + '</td><td class="num">' + U.f(sum('xg_' + side), 2) + '</td></tr>';
+          body.querySelector('#pp-box').innerHTML = '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Team</th>' + ls.map(r => '<th class="num">' + esc(RK.periodLabel ? RK.periodLabel(r.period, { playoff: pl }) : r.period) + '</th>').join('') +
+            '<th class="num">Goals</th><th class="num">Shots</th><th class="num" data-tip="Expected goals: the chance quality of every shot, added up">Exp. goals</th></tr></thead><tbody>' + row(away, 'away') + row(home, 'home') + '</tbody></table></div>';
+        }
+        const race = d.xg_race && Array.isArray(d.xg_race.rows) ? d.xg_race.rows : [];
+        if (race.length > 1) {
+          const ci = {}; (d.xg_race.cols || []).forEach((k, i) => { ci[k] = i; });
+          const [ca, ch] = U.pair(away, home);
+          const host = body.querySelector('#pp-race');
+          host.innerHTML = U.chart('pp-race-c', 260, 'Expected goals through the last game');
+          const x = race.map(r => r[ci.sec] / 60);
+          QKC.mount('#pp-race-c', T => {
+            const mk = (side, col, ab) => ({ type: 'line', name: RK.teamAbbr(ab), step: 'end', showSymbol: false, data: race.map((r, i) => [x[i], r[ci[side]]]), lineStyle: { width: 3, color: col }, itemStyle: { color: col },
+              areaStyle: ab === curTeam ? { color: QKC.hexA(col, 0.12) } : undefined,
+              markPoint: { symbol: 'rect', symbolSize: 9, itemStyle: { color: col, borderColor: T.s1, borderWidth: 2 }, label: { show: false },
+                data: race.map((r, i) => (r[ci.goal] && String(r[ci.goal]) === String(ab) ? { coord: [x[i], r[ci[side]]] } : null)).filter(Boolean) },
+              endLabel: { show: true, formatter: p => RK.teamAbbr(ab) + ' ' + U.f(p.value[1], 1), color: T.ink1, fontFamily: T.fontDisplay, fontSize: 20 } });
+            const xa = QKC.axis(T, { type: 'value', min: 0, max: Math.max(60, Math.ceil(x[x.length - 1] / 5) * 5), interval: 20, split: false, line: true });
+            const ya = QKC.axis(T, { fmt: v => v.toFixed(1) });
+            const gB = 8 + QKC.nameAxis(xa, 'Minutes played', 'bottom'), gT = 14 + QKC.nameAxis(ya, 'Expected goals', 'side');
+            return { grid: { left: 8, right: 80, top: gT, bottom: gB, containLabel: true }, xAxis: xa, yAxis: ya,
+              tooltip: QKC.tooltip(T, { trigger: 'axis', formatter: ps => '<div>Minute ' + esc(U.f(ps[0].value[0], 0)) + '</div>' + ps.map(q => QKC.tipRow(q.color, q.seriesName, U.f(q.value[1], 2) + ' xG')).join('') }),
+              series: [mk('away', ca, away), mk('home', ch, home)] };
+          }, { label: 'Expected goals through the last game' });
+        }
       });
     }
 

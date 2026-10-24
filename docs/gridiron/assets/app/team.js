@@ -96,12 +96,13 @@ GI.route('team', function (el, params) {
       (isNum(sim.p_playoffs) ? 'Our simulations put them in the playoffs ' + (sim.p_playoffs >= 0.995 ? 'almost every time' : sim.p_playoffs < 0.005 ? 'almost never' : GI.pct(sim.p_playoffs, 0) + ' of the time') + (isNum(sim.p_sb) && sim.p_sb >= 0.01 ? ', with a ' + GI.pct(sim.p_sb, 0) + ' chance to win the Super Bowl' : '') + '.' : '');
     let h = '<nav class="gi-crumb" aria-label="Breadcrumb"><a href="#/teams">NFL teams</a><span aria-hidden="true">›</span>' + esc(info.division || '') + '<span aria-hidden="true">›</span>' + esc(GI.teamName(abbr)) + '</nav>' +
       QK.playerHeader({ name: GI.teamName(abbr), split: false, pos: info.conference || '', kicker: recTxt + ' · ' + S, face: abbr,
-      team: { name: info.division || '', abbr: abbr, colour: info.colour, href: GI.standingsHref(S) },
+      team: { name: info.division || '', abbr: abbr, colour: info.colour, alt: info.alt, href: GI.standingsHref(S) },
       meta: [isNum(r.seed) ? ['Seed today', GI.ordinal(r.seed)] : null, (x || {}).coach ? '<span>Head coach <b>' + GI.coachLink(x.coach, S) + '</b></span>' : null, isNum(r.diff) ? ['Point difference', GI.signed(r.diff, 0)] : null],
-      tags: tags, short: shortTxt.trim() || null }) +
-      '<div class="gi-tiles">' + GI.kpis([GI.kpi('Team rating', isNum(v.rating) ? GI.signed(v.rating, 1) : '—', 'points a game against an average team', { signal: true, tip: 'Our team-strength rating on a neutral field' }),
+      /* v4: the black strip of five numbers under the team-colour hero, then "The short version" */
+      strip: [GI.kpi('Team rating', isNum(v.rating) ? GI.signed(v.rating, 1) : '—', 'points a game against an average team', { signal: true, tip: 'Our team-strength rating on a neutral field' }),
         GI.kpi('Make the playoffs', GI.pct(sim.p_playoffs, 0), 'from 20,000 simulated seasons'), GI.kpi('Win the division', GI.pct(sim.p_div, 0), ''), GI.kpi('Win the Super Bowl', GI.pct(sim.p_sb, 1), ''),
-        GI.kpi('Projected wins', GI.num(sim.mean_wins, 1), isNum(sim.w_p05) ? 'likely ' + GI.num(sim.w_p05, 0) + ' to ' + GI.num(sim.w_p95, 0) : '')]) + '</div>';
+        GI.kpi('Projected wins', GI.num(sim.mean_wins, 1), isNum(sim.w_p05) ? 'likely ' + GI.num(sim.w_p05, 0) + ' to ' + GI.num(sim.w_p95, 0) : '')],
+      tags: tags, short: shortTxt.trim() || null });
     h += '<nav class="qk-chips scroll" aria-label="On this page" style="margin-top:12px">' + [['#tp-season', 'How far they go'], ['#needs', 'Strengths and needs'], ['#tp-moves-host', 'Who moves next'], ['#roster', 'Roster'], ['#moves', 'Moves'], ['#tp-sched', 'Schedule'], ['#tp-profile', 'Profile'], ['#tp-4th', 'Fourth downs']]
       .map(a => '<button type="button" class="qk-chip" data-jump="' + a[0] + '">' + esc(a[1]) + '</button>').join('') + '<a class="qk-chip" href="' + GI.compareHref('t:' + abbr) + '">Compare</a></nav>';
     if (!x) h += GI.notBuilt('The ' + S + ' page for ' + GI.teamName(abbr), res[0]);

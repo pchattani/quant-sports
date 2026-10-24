@@ -1,6 +1,7 @@
-/* The Quant Paddock — Compare (#/compare/drivers/<a>/<b>, #/compare/teams/<a>/<b>), part of the Lab, on kit v3: the title
- * becomes the question ("Russell or Antonelli?"), the best value in each row sits under the highlighter, and one-line
- * verdicts (QK.verdicts) say where each leads the other by the most.
+/* The Quant Paddock — Compare (#/compare/drivers/<a>/<b>, #/compare/teams/<a>/<b>), part of the Lab, on kit v4: the title
+ * is the question ("Russell or Antonelli?"), two entries draw the tale of the tape in constructor colours (QK.tape,
+ * team-mates: the second falls to slate with the colour as its rule), and one-line verdicts (QK.verdicts) say where
+ * each leads the other by the most.
  * Drivers: identity cards, the side-by-side view (QK.compareView) on the F1 driver metric set (PD.v2.DRIVER_SET then
  * MORE_DRIVER) with percentiles against the season's drivers at the starts floor, where both sit in the peer
  * distribution, the races they shared, every metric (classic), Elo through their careers and the careers.
@@ -22,7 +23,7 @@ function metricTable(id, metrics, A, B, nA, nB) {
     { key: 'label', label: 'Metric', sticky: true, fmt: function (v, r) { return '<a class="pd-link" href="#/glossary/' + encodeURIComponent(r.key) + '">' + esc(v) + '</a>' + (r.lower ? ' <span class="qk-muted">↓</span>' : ''); } },
     { key: 'group', label: 'Group', fmt: function (v) { return '<span class="qk-muted">' + esc(v) + '</span>'; } },
     { key: 'va', label: nA, num: true, pctl: 'pa', fmt: function (v, r) { return (r.better === 'a' ? '<b>' : '') + PD.fmtVal(v, r.fmt) + (r.better === 'a' ? '</b>' : ''); } },
-    { key: 'gapAbs', label: 'Gap', num: true, tip: 'Percentile-point gap: sky when ' + nA + ' leads, coral when ' + nB + ' does', fmt: function (v, r) { return gapBar(r.gap); } },
+    { key: 'gapAbs', label: 'Gap', num: true, tip: 'Percentile-point gap: blue when ' + nA + ' leads, grey when ' + nB + ' does', fmt: function (v, r) { return gapBar(r.gap); } },
     { key: 'vb', label: nB, num: true, pctl: 'pb', fmt: function (v, r) { return (r.better === 'b' ? '<b>' : '') + PD.fmtVal(v, r.fmt) + (r.better === 'b' ? '</b>' : ''); } }
   ], metrics.map(function (m) {
     var va = (A.values || {})[m.key], vb = (B.values || {})[m.key], pa = (A.pct || {})[m.key], pb = (B.pct || {})[m.key];
@@ -122,21 +123,22 @@ function buildDrivers(ids, ss, careers, elo, season, y) {
     var sum = function (k) { return seasons.reduce(function (s, r) { return s + (r[k] || 0); }, 0); };
     var st = ss[i].year === y ? (stand[id] || {}) : {};
     var e = (((elo || {}).current || {})[id] || {}).elo;
-    var col = i ? CB : CA;
+    var tr = PD.teamColourRaw(d.team || PD.driverTeam(id));
+    var col = tr ? QK.color.team(tr) : (i ? CB : CA);
     var facts = [['Season', ss[i].year || '—'], ['Races', isNum(d.races) ? d.races : '—'], ['Points', isNum(st.points) ? PD.pts(st.points) : '—'], ['Starts', isNum(tot.races) ? tot.races : sum('races')],
       ['Wins', isNum(tot.wins) ? tot.wins : sum('wins')], ['Titles', isNum(tot.titles) ? tot.titles : seasons.filter(function (s) { return s.pos === 1; }).length], ['Elo now', isNum(e) ? PD.num(e, 0) : '—'], ['Peak Elo', isNum(tot.peak_elo) ? PD.num(tot.peak_elo, 0) : '—']];
     return '<div class="qk-card pd-cmp-id" style="--tc:' + col + '"><div class="pd-cmp-id-top"><span class="qk-avatar" style="--tc:' + col + '">' + esc(info.number || PD.driverCode(id)) + '</span><div><b>' + PD.driverLink(id, { name: names[i], dot: false }) + '</b><div class="qk-sub">' +
       (d.team ? PD.teamLink(d.team) : '') + (c.nationality ? ' · ' + esc(c.nationality) : '') + '</div></div></div><div class="pd-facts">' + facts.map(function (f) { return '<div><span>' + f[0] + '</span><b>' + f[1] + '</b></div>'; }).join('') + '</div></div>';
   };
   var Ps = [0, 1].map(function (i) { return ss[i].cat ? PD.v2.peer(ss[i].cat, 'drivers', ss[i].year === y ? season : null) : null; });
-  var ents = [0, 1].map(function (i) { var d = ss[i].d || {}; return { name: names[i], href: PD.driverHref(ids[i]), abbr: short[i], sub: [d.team ? PD.teamName(d.team) : '', ss[i].year ? ss[i].year : '', isNum(d.races) ? d.races + ' starts' : ''].filter(Boolean).join(' · ') }; });
+  var ents = [0, 1].map(function (i) { var d = ss[i].d || {}; return { name: names[i], href: PD.driverHref(ids[i]), abbr: short[i], short: short[i], colour: PD.teamColourRaw(d.team || PD.driverTeam(ids[i])), sub: [d.team ? PD.teamName(d.team) : '', ss[i].year ? ss[i].year : '', isNum(d.races) ? d.races + ' starts' : ''].filter(Boolean).join(' · ') }; });
   var peerTxt = Ps[0] && Ps[1] ? (same ? 'Ranked against ' + esc(Ps[0].label) + ' in ' + ss[0].year + ' (' + Ps[0].n + ' drivers)' : 'Different seasons: each ranked against their own season’s drivers (' + (ss[0].year || '—') + ' v ' + (ss[1].year || '—') + ')') : 'No driver catalogue for one of them (it starts in 2018)';
   var shortOf = [0, 1].filter(function (i) { return Ps[i] && !Ps[i].qualified(ids[i]); }).map(function (i) { return names[i]; });
   ask(short);
   var verd = Ps[0] && Ps[1] ? QK.verdicts(PD.v2.verdicts(Ps, ids, PD.v2.DRIVER_SET.concat(PD.v2.MORE_DRIVER), short)) : '';
   var dOpts = [['driver_effect', 'Race pace v team-mate'], ['quali_driver_effect', 'Qualifying'], ['race_h2h', 'Race H2H'], ['points_per_race', 'Points / race'], ['race_pace', 'Race pace']];
   PD.set('cmp-body', '<div class="pd-cmp-ids">' + card(0) + card(1) + '</div>' +
-    PD.card('Side by side', peerTxt + '. Value, percentile (100 = best) and the difference; the better figure in each row is highlighted.', Ps[0] && Ps[1] ? sideBySide(ids, [ss[0].d, ss[1].d], Ps, PD.v2.DRIVER_SET.concat(PD.v2.MORE_DRIVER), ents) + verd +
+    PD.card('Side by side', peerTxt + '. Bar length = percentile (100 = best); the better number in each row is solid.', Ps[0] && Ps[1] ? sideBySide(ids, [ss[0].d, ss[1].d], Ps, PD.v2.DRIVER_SET.concat(PD.v2.MORE_DRIVER), ents) + verd +
       (shortOf.length ? '<p class="pd-cap">' + esc(shortOf.join(' and ')) + (shortOf.length > 1 ? ' are' : ' is') + ' short of the starts floor: no percentile.</p>' : '') : PD.muted('Nothing to compare yet.'), { cls: 'pd-mt' }) +
     PD.grid((same && Ps[0] ? distCard('cmp-dist', dOpts) : '') +
       PD.card('Races together', '<span id="cmp-sh-s">Head to head in every season both raced.</span>', '<div id="cmp-sh"></div>', { span: 12, flush: true }) +
@@ -206,7 +208,7 @@ function teams(el, a, b, y) {
     var lineup = function (id) { return ((((season || {}).teams || {})[id] || {}).drivers) || Object.keys(((drv || {}).drivers) || {}).filter(function (k) { return drv.drivers[k].team === id; }); };
     var card = function (i) {
       var id = [a, b][i], t = T[id] || {}, s = stand[id] || {}, c = champ[id], pit = t.pit || {};
-      var col = i ? CB : CA;
+      var col = PD.teamColourRaw(id) ? QK.color.team(PD.teamColourRaw(id)) : (i ? CB : CA);
       var facts = [['Position', s.pos ? PD.ordinal(s.pos) : '—'], ['Points', PD.pts(s.points)], ['Wins', s.wins || 0], ['Title', c ? PD.pct(c.p_title) : '—'], ['Median stop', isNum(pit.median_ms) ? PD.num(pit.median_ms / 1000, 2) + 's' : '—'], ['DNFs', (t.log || []).reduce(function (x, r) { return x + (r.dnfs || 0); }, 0)]];
       return '<div class="qk-card pd-cmp-id" style="--tc:' + col + '"><div class="pd-cmp-id-top">' + PD.mark(id, 'lg') + '<div><b>' + PD.teamLink(id, { name: names[i], dot: false }) + '</b><div class="qk-sub">' + lineup(id).map(function (d) { return PD.driverLink(d, { dot: false }); }).join(' · ') + '</div></div></div>' +
         '<div class="pd-facts">' + facts.map(function (f) { return '<div><span>' + f[0] + '</span><b>' + f[1] + '</b></div>'; }).join('') + '</div></div>';
@@ -215,9 +217,9 @@ function teams(el, a, b, y) {
     ask(names);
     var tverd = tP ? QK.verdicts(PD.v2.verdicts([tP, tP], [a, b], PD.v2.TEAM_SET.concat(PD.v2.MORE_TEAM), names)) : '';
     var tOpts = [['car_race_pace', 'Car pace'], ['points_per_race', 'Points / race'], ['dnf_rate', 'DNF rate'], ['pit_lane_v_field', 'Pit lane'], ['strategy_gain', 'Strategy']];
-    var tents = [a, b].map(function (id, i) { return { name: names[i], href: PD.teamHref(id), abbr: PD.teamAbbr(id), sub: lineup(id).map(PD.driverSurname).join(' · ') }; });
+    var tents = [a, b].map(function (id, i) { return { name: names[i], href: PD.teamHref(id), abbr: PD.teamAbbr(id), short: PD.teamAbbr(id), colour: PD.teamColourRaw(id), sub: lineup(id).map(PD.driverSurname).join(' · ') }; });
     PD.set('cmp-body', '<div class="pd-cmp-ids">' + card(0) + card(1) + '</div>' +
-      PD.card('Side by side', (tP ? 'Ranked against ' + esc(tP.label) + ' in ' + y + ' (' + tP.n + ' constructors)' : 'No team catalogue for ' + y) + '. Value, percentile (100 = best) and the difference; the better figure in each row is highlighted.',
+      PD.card('Side by side', (tP ? 'Ranked against ' + esc(tP.label) + ' in ' + y + ' (' + tP.n + ' constructors)' : 'No team catalogue for ' + y) + '. Bar length = percentile (100 = best); the better number in each row is solid.',
         tP ? sideBySide([a, b], [T[a], T[b]], [tP, tP], PD.v2.TEAM_SET.concat(PD.v2.MORE_TEAM), tents) + tverd : PD.muted('Nothing to compare yet.'), { cls: 'pd-mt' }) +
       PD.grid((tP ? distCard('cmt-dist', tOpts) : '') +
         PD.card('Car pace', 'The car effect by round, % of a lap faster than the field, ±1 se.', PD.chartBox('cmt-pace', 360), { span: 12, right: PD.seg('cmt-pk', [['race', 'Race'], ['quali', 'Qualifying']], 'race', 'Session') }) +

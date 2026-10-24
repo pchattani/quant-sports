@@ -387,6 +387,15 @@ function teamColour(id) {
   if (x && x.colour) { var c = String(x.colour); return c.charAt(0) === '#' ? c : '#' + c; }
   return id ? PALETTE[hashIndex(id, PALETTE.length)] : '#6b7383';
 }
+/* The team's colour from the payloads only (index.json / season.json teams[].colour), else null: blocks, heroes and
+   title-race bars take it, and the kit's fallbacks (cobalt v slate, QK.color.block) cover a team without one. Never a
+   palette pick: the front end does not invent team colours. */
+function teamColourRaw(id) {
+  var x = NAMES.teams[id];
+  if (!x || !x.colour) return null;
+  var c = String(x.colour);
+  return c.charAt(0) === '#' ? c : '#' + c;
+}
 /* The team colour lifted to 3:1 on the current card surface (marks, bars, text accents). */
 function tc(id) { return QK.color.team(teamColour(id)); }
 function driverTeam(id) { return (NAMES.drivers[id] || {}).team || null; }
@@ -411,7 +420,7 @@ function teamLink(id, opts) {
 }
 function circuitLink(id, name) { return id ? '<a class="pd-link" href="#/circuit/' + encodeURIComponent(id) + '">' + esc(name || circuitName(id)) + '</a>' : '<span class="qk-muted">—</span>'; }
 function raceLink(y, r, label) { return '<a class="pd-link" href="' + raceHref(y, r) + '">' + esc(label || (y + ' R' + r)) + '</a>'; }
-function mark(t, size) { return QK.teamMark({ name: teamName(t), abbr: teamAbbr(t), colour: teamColour(t) }, size || 'sm'); }
+function mark(t, size) { return QK.teamMark({ name: teamName(t), abbr: teamAbbr(t), colour: teamColourRaw(t) }, size || 'sm'); }
 function teamAbbr(t) {
   var n = teamName(t).replace(/ F1 Team| Racing| Formula One Team| Team/g, '');
   var w = n.split(/\s+/).filter(Boolean);
@@ -474,12 +483,12 @@ function yearPager(base, y) {
   return '<div class="pd-pager">' + (prev ? '<a class="qk-btn" href="#/' + base + '/' + prev + '">← ' + prev + '</a>' : '') + (next ? '<a class="qk-btn" href="#/' + base + '/' + next + '">' + next + ' →</a>' : '') + '</div>';
 }
 /* A kit table. cols: [{key, label, num, fmt(v, row) -> html, sort: false, tip, sticky, cls, pctl}], rows: objects.
- * opts: {sort: {key, dir}, rank, dense (default true), maxHeight, caption}. Returns the QK.table handle. */
+ * opts: {sort: {key, dir}, rank, dense (default true), maxHeight, caption, rowClass(row) -> 'hl'}. Returns the QK.table handle. */
 function table(el, cols, rows, opts) {
   var node = typeof el === 'string' ? document.getElementById(el) : el;
   if (!node) return null;
   var o = opts || {};
-  return QK.table(node, { columns: cols, rows: rows, sort: o.sort || null, rank: !!o.rank, dense: o.dense !== false, maxHeight: o.maxHeight, caption: o.caption });
+  return QK.table(node, { columns: cols, rows: rows, sort: o.sort || null, rank: !!o.rank, dense: o.dense !== false, maxHeight: o.maxHeight, caption: o.caption, rowClass: o.rowClass });
 }
 function set(id, html) { var n = document.getElementById(id); if (n) n.innerHTML = html; return n; }
 function alive(el) { return !!el && el.isConnected; }
@@ -514,7 +523,7 @@ function heatTable(spec) {
   var colour = function (v, k) {
     var t = Math.max(-1, Math.min(1, (v - centers[k]) / max));
     if (s.invert) t = -t;
-    var a = Math.round(Math.abs(t) * 70);
+    var a = Math.round(Math.abs(t) * 60);   /* 60% at most: white figures stay above 4.5:1 on the strongest cell */
     return 'color-mix(in srgb, ' + (t < 0 ? 'var(--div-neg)' : 'var(--div-pos)') + ' ' + a + '%, transparent)';
   };
   var h = '<div class="qk-table-wrap pd-heat-wrap"><table class="qk-table dense pd-heat"><thead><tr><th class="sticky-col">' + esc(s.corner || '') + '</th>';
@@ -624,7 +633,7 @@ return {
   fmtStamp: fmtStamp, countdown: countdown, ordinal: ordinal, fmtVal: fmtVal, parseDate: parseDate, isNum: isNum, titleCase: titleCase,
   shortRace: shortRace, median: median, mean: mean, rowsOf: rowsOf, ageOf: ageOf, finished: finished,
   driverName: driverName, driverCode: driverCode, driverSurname: driverSurname, teamName: teamName, circuitName: circuitName, teamAbbr: teamAbbr,
-  teamColour: teamColour, tc: tc, driverTeam: driverTeam, driverColour: driverColour, compoundColour: compoundColour, COMPOUNDS: COMPOUNDS, PALETTE: PALETTE,
+  teamColour: teamColour, teamColourRaw: teamColourRaw, tc: tc, driverTeam: driverTeam, driverColour: driverColour, compoundColour: compoundColour, COMPOUNDS: COMPOUNDS, PALETTE: PALETTE,
   teamDot: teamDot, driverLink: driverLink, teamLink: teamLink, circuitLink: circuitLink, raceLink: raceLink, raceHref: raceHref, driverHref: driverHref, teamHref: teamHref, mark: mark,
   card: card, grid: grid, chartBox: chartBox, kpi: kpi, kpis: kpis, chip: chip, muted: muted, empty: empty, note: note, aside: aside, notBuilt: notBuilt, col: col,
   pageHead: pageHead, secHead: secHead, subnav: subnav, seg: seg, wireSeg: wireSeg, yearPager: yearPager, table: table, set: set, alive: alive, pctl: pctl,

@@ -596,21 +596,31 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
     return bits.join(' ');
   }
   const faceN = isNum(rank) && rank < 1000 ? String(rank) : null;
+  /* v4: the black strip of five numbers under the hero, each with its tour percentile where there is one: the record,
+     Elo, serve + return, the ranking and our chance of the Finals (else the race position) */
+  const finalsT = isNum(fq) && fq >= 0.005 ? { label: finalsName, value: K.pct(fq, fq > 0.995 || fq < 0.01 ? 1 : 0), signal: true, sub: 'our chance of qualifying', href: K.href(T, 'race'), tip: 'From simulating the rest of the season' } : null;
+  const raceT = { label: 'Race position', value: raceIdx >= 0 ? '#' + (raceIdx + 1) : '—', sub: raceIdx >= 0 ? K.int(raceList[raceIdx][1]) + ' points this year, this week included' : 'outside the race top 100' };
+  const strip = [
+    { label: 'Won–lost this year', value: isNum(vals.wins) && isNum(vals.losses) ? vals.wins + '–' + vals.losses : '—', pctl: isNum(pc.win_pct) ? pc.win_pct : null,
+      sub: isNum(vals.win_pct) ? K.pct(vals.win_pct, 0) + ' of tour-level matches' + (isNum(vals.titles) && vals.titles ? ' · ' + vals.titles + ' title' + (vals.titles === 1 ? '' : 's') : '') : 'tour level' },
+    { label: 'Elo', value: K.num(eloCur ? eloCur.all : vals.elo, 0), pctl: isNum(pc.elo) ? pc.elo : null, sub: eloCur && isNum(eloCur.rank) ? 'No. ' + eloCur.rank + ' by our rating' : 'our strength rating', tip: 'Overall strength rating from every result, adjusted for the opponent. A 100-point edge is about a 64% chance.' },
+    isNum(vals.hold_plus_break) ? { label: 'Serve + return', value: K.fmtV(vals.hold_plus_break, 'pct'), pctl: isNum(pc.hold_plus_break) ? pc.hold_plus_break : null, sub: 'hold ' + K.fmtV(vals.hold, 'pct') + ' + break ' + K.fmtV(vals.brk, 'pct') + ', inferred', tip: 'Hold % plus break %, inferred from set scores: the best single predictor beyond Elo. 100% is an average player.' }
+      : { label: 'Games won', value: K.fmtV(vals.games_won_pct, 'pct'), pctl: isNum(pc.games_won_pct) ? pc.games_won_pct : null, sub: 'share of all games this year' },
+    { label: 'Ranking', value: isNum(rank) ? '#' + rank : '—', sub: off ? K.int(off[2]) + ' points' + (isNum(off[3]) && off[3] ? ' · ' + (off[3] > 0 ? '▲' : '▼') + Math.abs(off[3]) + ' this week' : '') : '' },
+    finalsT || raceT
+  ];
   const hero = QK.playerHeader({ name: name, number: faceN, pos: country || K.TN(T),
     kicker: K.TN(T) + ' · ' + Y + (isNum(nM) ? ' · ' + nM + ' match' + (nM === 1 ? '' : 'es') + ' in' : ''),
     meta: [age !== null ? age + ' years old' : null, hand || null, isNum(c.height) ? K.num(c.height, 0) + ' cm' : null, isNum(rank) ? 'Ranked No. ' + rank : null],
-    tags: [p && p.qualified ? QK.tag('Qualified for percentiles', 'signal') : QK.tag('Below the match floor: no percentiles')], short: shortVersion() });
+    tags: [p && p.qualified ? QK.tag('Qualified for percentiles', 'signal') : QK.tag('Below the match floor: no percentiles')], strip: strip, short: shortVersion() });
   const crumb = '<nav class="ta-crumb" aria-label="Breadcrumb"><a href="' + K.href(T, 'players') + '">Tennis</a><span aria-hidden="true">›</span><a href="' + K.href(T, 'players') + '">' + K.TN(T) + ' players</a><span aria-hidden="true">›</span>' + K.esc(name) + '</nav>';
   const links = '<div class="ta-pl-links">' + (rival ? '<a class="qk-btn" href="' + K.compareHref(T, pid, rival) + '">Compare with ' + K.esc(K.surname(K.name(T, rival))) + '</a>' : '') +
     (h2hTop ? '<a class="qk-btn" href="' + K.h2hHref(T, pid, h2hTop) + '">Head to head v ' + K.esc(K.surname(K.name(T, h2hTop))) + '</a>' : '') +
     '<a class="qk-btn" href="' + K.href(T, 'players') + '">All players</a></div>';
+  /* the numbers the strip leaves out open "More on the player" */
   const tiles = [];
-  if (isNum(fq) && fq >= 0.005) tiles.push({ label: finalsName, value: K.pct(fq, fq > 0.995 || fq < 0.01 ? 1 : 0), signal: true, sub: 'our chance of qualifying', href: K.href(T, 'race'), tip: 'From simulating the rest of the season' });
-  if (isNum(no1) && no1 >= 0.005) tiles.push({ label: 'Year-end No. 1', value: K.pct(no1, 0), signal: !(isNum(fq) && fq >= 0.005), sub: 'our chance, season simulation' });
-  tiles.push({ label: 'Elo', value: K.num(eloCur ? eloCur.all : vals.elo, 0), pctl: pc.elo, sub: eloCur && isNum(eloCur.rank) ? 'No. ' + eloCur.rank + ' by Elo' : 'our strength rating', tip: 'Overall strength rating from every result, adjusted for the opponent' });
-  if (isNum(vals.hold_plus_break)) tiles.push({ label: 'Serve + return', value: K.fmtV(vals.hold_plus_break, 'pct'), pctl: pc.hold_plus_break, sub: 'hold ' + K.fmtV(vals.hold, 'pct') + ' · break ' + K.fmtV(vals.brk, 'pct') + ', inferred', tip: 'Hold % plus break %, inferred from set scores: the best single predictor beyond Elo' });
-  tiles.push({ label: 'Ranking', value: isNum(rank) ? '#' + rank : '—', sub: off ? K.int(off[2]) + ' points' + (isNum(off[3]) && off[3] ? ' · ' + (off[3] > 0 ? '▲' : '▼') + Math.abs(off[3]) : '') : '' });
-  tiles.push({ label: 'Race position', value: raceIdx >= 0 ? '#' + (raceIdx + 1) : '—', sub: raceIdx >= 0 ? K.int(raceList[raceIdx][1]) + ' points this year, this week included' : 'outside the race top 100' });
+  if (isNum(no1) && no1 >= 0.005) tiles.push({ label: 'Year-end No. 1', value: K.pct(no1, 0), signal: true, sub: 'our chance, from simulating the season' });
+  if (finalsT) tiles.push(raceT);
 
   const surfOpts = V.SURF.filter(s => V.inPool(p, s, cat));
   // this season's tour-level results with our pre-match chance (match by match), newest last
@@ -623,10 +633,10 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
     .map(x => x[1] + ' after about <b>' + Math.round(m50[x[0]]) + ' matches</b>' + (V.STAT_KEYS[x[0]] ? ' with statistics' : ''));
   const small = !isNum(nM) || nM < 25;
   const word = n => (n < 11 ? ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'][n] : String(n));
-  const sureCard = '<article class="qk-card cream"><div class="qk-card-body"><div class="qk-kicker">How sure are we?</div><h3 style="margin:8px 0 6px">' +
-    K.esc(isNum(nM) && nM ? (small ? word(nM) + ' match' + (nM === 1 ? ' is' : 'es is') + ' a small sample' : nM + ' matches: the picture is settling') : 'No tour-level matches this year') + '</h3>' +
-    '<p style="margin:0;color:var(--ink-2);font-size:15px">Hold and break are inferred from set scores, not counted point by point, so they firm up more slowly than a served-points stat. The hollow rings on the rail show last season: a dot next to its ring is the steady part of the profile; one far from it is the one to watch.</p>' +
-    (settle.length ? QK.note('Across the tour, ' + settle.join(', ').replace(/, ([^,]*)$/, ', and $1') + '.') : '') + '</div></article>';
+  /* v4: "How sure are we?" sits under the meters as the explain strip */
+  const sampleWords = isNum(nM) && nM ? (small ? word(nM) + ' match' + (nM === 1 ? ' is' : 'es is') + ' a small sample.' : nM + ' matches: the picture is settling.') : 'No tour-level matches this year.';
+  const settleNote = '<b>How sure are we?</b> ' + K.esc(sampleWords) + ' Hold and break are inferred from set scores, not counted point by point, so they firm up more slowly than a served-points stat.' +
+    (settle.length ? ' Across the tour, ' + settle.join(', ').replace(/, ([^,]*)$/, ', and $1') + '.' : '') + ' The ▼ on each meter is last season, where there was one: rows that sit on it are the steady part of the profile.';
   const gbg = log.length ? V.card('Match by match this year', 'Our chance before each tour-level match: blue bars were won, red ones lost. Tall red bars are surprises; short blue ones are upsets.', V.chart('pp-gbg', 260, 'Our pre-match chance in every match this year')) : '';
   const h2hTop2 = (c.h2h || []).filter(r => Array.isArray(r) && r[0]).slice(0, 2);
   const typeCard = sim.length || h2hTop2.length ? '<article class="qk-card"><div class="qk-card-body"><div class="qk-kicker">Their type</div>' +
@@ -634,37 +644,73 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
     (h2hTop2.length ? '<h4 class="ta-h4">Met most often</h4><ul class="ta-type">' + h2hTop2.map(r => '<li><span><a class="ply-link" href="' + K.playerHref(T, r[0]) + '">' + K.esc(K.name(T, r[0])) + '</a><span class="s">' + K.rec(r[1], r[2]) + '</span></span><a class="v" href="' + K.h2hHref(T, pid, r[0]) + '">Head to head</a></li>').join('') + '</ul>' : '') +
     '<div class="qk-aside" style="margin-top:10px">Closest match on this season’s profile: Elo, surface Elos, hold, break and games won' + (T === 'wta' ? ', aces and first serves in.' : ', tiebreaks per set.') + '</div></div></article>' : '';
 
-  let h = crumb + hero + links + '<div class="ta-kpis ta-tiles">' + QK.stats(tiles) + '</div>' +
-    '<section class="qk-section ta-sec1"><div class="qk-gside"><div id="pp-pcard"></div><div class="ta-stack">' + sureCard + gbg + typeCard + '</div></div></section>';
-  if (sim.length) h += '<section class="qk-section" id="pp-cmp-sec" hidden><div id="pp-cmp-h"></div><article class="qk-card"><div class="qk-card-body"><div id="pp-cmp"></div></div></article></section>';
-  // next match and last time out
+  /* 1. the meters (7) with "How sure are we?" beside the tale of the tape against the closest match (5) */
+  const tape = sim.length >= 1;
+  let h = crumb + hero + links +
+    '<section class="qk-section ta-sec1"><div class="qk-g75"><div><div id="pp-pcard"></div>' + QK.explain(settleNote, { cls: 'ta-settle' }) + '</div>' +
+    '<div class="ta-stack">' + (tape ? '<div id="pp-tape-h"></div><div class="qk-chips ta-pick" id="pp-tape-pick" role="group" aria-label="Compare with"></div><div id="pp-tape">' + QK.skeleton('lines', 6) + '</div><div id="pp-verd"></div>'
+      : typeCard + gbg) + '</div></div></section>';
+  /* 2. what to watch (the scoreboard bug and how the two match up) beside the last match (the box score by set and how
+     the match swung, from the match file) */
   const info = TA.tourInfo ? TA.tourInfo(T) : {};
   const mine = x => x && (String(x.p1) === pid || String(x.p2) === pid);
   const fr = TA.fresh || (l => l || []);
   const nxt = fr([].concat(info.live || [], info.today || [], info.upcoming || [])).filter(mine).filter(x => !TA.isFinished(x)).sort((x, y) => String(x.date).localeCompare(String(y.date)))[0];
-  const lastR = (c.results || []).filter(r => r && r.date).slice().sort((x, y) => String(y.date).localeCompare(String(x.date)))[0];
-  const lastCard = lastR ? [].concat(info.today || [], info.recent || []).filter(x => x && x.id === lastR.match)[0] : null;
+  const lastR = (c.results || []).filter(r => r && r.date && r.status !== 'wo').slice().sort((x, y) => String(y.date).localeCompare(String(x.date)))[0];
+  const parseScore = sc => String(sc || '').trim().split(/\s+/).map(x => /^(\d+)-(\d+)(?:\((\d+)\))?$/.exec(x)).filter(Boolean).map(m => [Number(m[1]), Number(m[2]), m[3] ? Number(m[3]) : null]);
   if (nxt || lastR) {
-    h += '<section class="qk-section"><div class="ta-g2">';
+    h += '<section class="qk-section"><div class="qk-g2">';
     if (nxt) {
       const g = TA.kitGame(nxt, T, { initials: true });
       const live = g.status === 'live';
-      h += '<div><div class="qk-kicker" style="margin-bottom:10px">' + (live ? 'Live now' : (QK.fmt.relDay(g.start) === 'Today' ? 'What to watch today' : 'Next up')) + '</div>' +
-        QK.previewCard(g, { kicker: [K.TN(T), g.league, g.note].filter(Boolean).join(' · '), nick: t => t.name }) + '</div>';
+      const rec = x => { const rk = TA.playerRank(T, x), cc = TA.playerCountry(T, x); return [isNum(rk) ? 'No. ' + rk : 'Unranked', cc].filter(Boolean).join(' · '); };
+      g.away.record = rec(nxt.p1); g.home.record = rec(nxt.p2);
+      const ec = (elo || {}).current || {}, e1 = ec[String(nxt.p1)] || {}, e2 = ec[String(nxt.p2)] || {};
+      const sf = (TA.eventInfo(T, nxt.event) || {}).surface;
+      const fx = [];
+      const add = (label, a, b, f, low) => { if (isNum(a) && isNum(b)) fx.push({ label: label, a: f(a), b: f(b), better: Math.abs(a - b) < 1e-9 ? null : ((a > b) !== !!low ? 'a' : 'b') }); };
+      add('Elo rating', e1.all, e2.all, v => K.num(v, 0));
+      if (sf && K.SURF_LABEL[sf] && sf !== 'carpet') add(K.SURF_LABEL[sf] + ' Elo', e1[sf], e2[sf], v => K.num(v, 0));
+      add('Ranking', TA.playerRank(T, nxt.p1), TA.playerRank(T, nxt.p2), v => 'No. ' + v, true);
+      h += '<div>' + QK.sectionHead({ kicker: live ? 'Live now' : (QK.fmt.relDay(g.start) === 'Today' ? 'What to watch today' : 'Next up'), title: TA.playerSurname(T, nxt.p1) + ' v ' + TA.playerSurname(T, nxt.p2),
+        sub: [g.league, g.note].filter(Boolean).join(' · ') }) + QK.previewCard(g, { layout: 'bug', nick: t => t.name, factors: fx, factorsTitle: 'How they match up' }) + '</div>';
     }
     if (lastR) {
-      const oppN = K.name(T, lastR.opp);
-      h += '<div><div class="qk-kicker" style="margin-bottom:10px">Last time out</div>' + (lastCard ? TA.matchCard(lastCard, { tour: T, why: true }) :
-        '<article class="qk-card"><div class="qk-card-body"><div class="qk-feature-meta"><span class="qk-pill">' + K.esc([K.eventName(T, lastR.event), K.ROUND_LABEL[lastR.round] || lastR.round, K.fmtDate(lastR.date, { weekday: false })].filter(Boolean).join(' · ')) + '</span></div>' +
-          '<h3 style="margin:12px 0 4px">' + (lastR.won ? 'Beat ' : 'Lost to ') + '<a class="ply-link" href="' + K.playerHref(T, lastR.opp) + '">' + K.esc(oppN) + '</a></h3><div class="pg-mono" style="color:var(--ink-2)">' + K.esc(lastR.score || '') + '</div></div></article>') +
-        (isNum(lastR.p_pre) ? QK.note('<b>Our pre-match chance for ' + K.esc(sur) + ':</b> ' + K.pct(lastR.p_pre, 0) + '. ' + (lastR.won ? (lastR.p_pre < 0.4 ? 'An upset win.' : 'A win we expected.') : (lastR.p_pre > 0.6 ? 'A surprise defeat.' : 'A defeat we half expected.')) + (lastR.match ? ' <a class="qk-link" href="' + K.matchHref(T, lastR.match) + '">The match centre</a>' : '')) : '') + '</div>';
+      const oppS = K.surname(K.name(T, lastR.opp));
+      const sets = parseScore(lastR.score);
+      const won = !!lastR.won, sw = sets.filter(x => x[0] > x[1]).length, sl = sets.filter(x => x[1] > x[0]).length;
+      const ret = lastR.status === 'ret' || /ret/i.test(String(lastR.score || ''));
+      const ttl = won ? sur + ' ' + sw + ', ' + oppS + ' ' + sl : oppS + ' ' + sl + ', ' + sur + ' ' + sw;
+      const cell = (x, side) => '<td class="num' + (x[side] > x[1 - side] ? ' w' : '') + '">' + x[side] + (isNum(x[2]) && x[side] < x[1 - side] ? '<sup>' + x[2] + '</sup>' : '') + '</td>';
+      const brow = (who, side, me) => '<tr' + (me ? ' class="hl"' : '') + '><td>' + who + '</td>' + sets.map(x => cell(x, side)).join('') + '<td class="num"><b>' + (side ? sl : sw) + '</b></td><td class="num">' + sets.reduce((a, x) => a + x[side], 0) + '</td></tr>';
+      const box = sets.length ? '<div class="qk-table-wrap"><table class="qk-table dense ta-box"><thead><tr><th>Player</th>' + sets.map((x, i) => '<th class="num">Set ' + (i + 1) + '</th>').join('') +
+        '<th class="num">Sets</th><th class="num" data-tip="Games won in the match">Games</th></tr></thead><tbody>' +
+        brow('<a class="ply-link" href="' + K.playerHref(T, pid) + '">' + K.esc(sur) + '</a>', 0, true) + brow('<a class="ply-link" href="' + K.playerHref(T, lastR.opp) + '">' + K.esc(oppS) + '</a>', 1, false) + '</tbody></table></div>' : '';
+      const pre = isNum(lastR.p_pre) ? '<b>Our pre-match chance for ' + K.esc(sur) + ':</b> ' + K.pct(lastR.p_pre, 0) + '. ' + (won ? (lastR.p_pre < 0.4 ? 'An upset win.' : lastR.p_pre < 0.55 ? 'A close call that went the player’s way.' : 'A win we expected.') : (lastR.p_pre > 0.6 ? 'A surprise defeat.' : lastR.p_pre > 0.45 ? 'A close call that went the other way.' : 'A defeat we half expected.')) : '';
+      h += '<div>' + QK.sectionHead({ kicker: 'Last match', title: ttl + (ret ? ' (ret.)' : ''), sub: [K.eventName(T, lastR.event), K.ROUND_LABEL[lastR.round] || lastR.round, K.fmtDate(lastR.date, { weekday: false })].filter(Boolean).join(' · ') }) +
+        '<article class="qk-card"><div class="qk-card-body">' + (box || '<p class="ta-cap">' + K.esc(lastR.score || 'No score recorded') + '</p>') + (pre ? QK.explain(pre, { cls: 'ta-lastline' }) : '') +
+        '<div id="pp-race"></div>' + (lastR.match ? '<a class="qk-more" style="display:inline-block;margin-top:12px" href="' + K.matchHref(T, lastR.match) + '">The match centre</a>' : '') + '</div></article></div>';
     }
     h += '</div></section>';
   }
+  /* 3. the match log: every tour-level match this season, newest first, the biggest upset win highlighted */
+  const yrRes = (c.results || []).filter(r => r && r.date && String(r.date).slice(0, 4) === yr && r.status !== 'wo').slice().sort((x, y) => String(y.date).localeCompare(String(x.date)));
+  if (yrRes.length) {
+    let bi = -1; yrRes.forEach((r, i) => { if (r.won && isNum(r.p_pre) && (bi < 0 || r.p_pre < yrRes[bi].p_pre)) bi = i; });
+    const bestR = bi >= 0 && yrRes[bi].p_pre < 0.5 ? yrRes[bi] : null;
+    h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Match log', title: 'Every match this season',
+      sub: bestR ? 'Beating ' + K.name(T, bestR.opp) + ' at ' + K.eventName(T, bestR.event) + ' with a ' + K.pct(bestR.p_pre, 0) + ' chance is the biggest upset so far (highlighted).' : 'Every tour-level match this season, newest first, with our chance before it.' }) +
+      '<article class="qk-card"><div class="qk-card-body flush"><div class="qk-table-wrap"><table class="qk-table ta-log"><thead><tr><th>Date</th><th>Tournament</th><th>Round</th><th>Opponent</th><th>Result</th><th>Score</th><th class="num" data-tip="Our chance for the player before the first ball">Our chance</th></tr></thead><tbody>' +
+      yrRes.map(r => '<tr' + (r === bestR ? ' class="hl"' : '') + (r.match ? ' data-href="' + K.esc(K.matchHref(T, r.match)) + '"' : '') + '><td>' + K.esc(K.fmtDate(r.date, { year: false, weekday: false })) + '</td><td>' + K.esc(K.eventName(T, r.event)) + '</td><td>' + K.esc(r.round || '') + '</td><td><a class="ply-link" href="' + K.playerHref(T, r.opp) + '">' + K.esc(K.name(T, r.opp)) + '</a></td>' +
+        '<td><b class="' + (r.won ? 'ta-w' : 'ta-l') + '">' + (r.won ? 'Won' : 'Lost') + '</b></td><td class="ta-sc">' + String(r.score || '').split(' ').map(x => '<span>' + K.esc(x) + '</span>').join(' ') + '</td><td class="num">' + (isNum(r.p_pre) ? K.pct(r.p_pre, 0) : '—') + '</td></tr>').join('') +
+      '</tbody></table></div></div></article></section>';
+  }
+  /* 4. match by match and their type */
+  if (tape && (gbg || typeCard)) h += '<section class="qk-section"><div class="qk-gside"><div>' + gbg + '</div><div>' + typeCard + '</div></div></section>';
 
   // ── more on the player: the older sections, on the kit's cards
   h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'More on the player', title: 'Form, luck and the long view', sub: 'Where the ranking is heading, how much of the record is luck, every rating over time and every result in the data.' }) +
-    '<div id="pp-value"></div>' +
+    (tiles.length ? '<div class="ta-kpis">' + QK.stats(tiles) + '</div>' : '') + '<div id="pp-value"></div>' +
     '<div class="qk-grid" style="margin-top:var(--sp-5)">' + (p && p.qualified ? '<div class="qk-span-6">' + V.card('Where ' + K.esc(sur) + ' sits', 'Every qualified player in the peer group; bars coloured by percentile, the player and the median marked',
       '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px;flex-wrap:wrap"></div>' + V.chart('pp-dist', 240, 'Distribution of the peer group')) + '</div>' : '') +
     '<div class="qk-span-6">' + V.card('Ranking', 'Official ranking over time (log scale); gaps are spells without a ranking', V.chart('pp-rank', 280, 'Ranking history'), {}) + '</div></div></section>';
@@ -683,6 +729,7 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
     V.card('Every metric', 'The whole catalogue' + (metrics.length ? ', ' + metrics.length + ' metrics,' : '') + ' as percentiles against the tour or a surface pool (100 = best; ↓ marks metrics where lower is better)', ctl(K.toggle('pp-src', [['tour', 'Tour']].concat(surfOpts.map(s => [s, K.SURF_LABEL[s]])), 'tour')) + '<div id="pp-pct"></div>') +
     '</section>';
   el.innerHTML = h;
+  if (TA.sortable) TA.sortable(el.querySelector('.ta-log'));
 
   // the percentile rail on the spec's metric set, by tour or surface, with last season's ring
   let prev = null, prevN = null, curSf = '';
@@ -760,45 +807,73 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
       const tip = QKC.tooltip(Tk, { trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(125,147,255,.10)' } }, formatter: ps => { const r = log[ps[0].dataIndex]; return '<b>' + (r.won ? 'Beat ' : 'Lost to ') + K.esc(K.name(T, r.opp)) + '</b>' + QKC.tipRow(r.won ? Tk.model : Tk.coral, 'Our chance', K.pct(r.p_pre, 0)) + QKC.tipRow(Tk.ink3, 'Score', K.esc(r.score || '')) + QKC.tipRow(Tk.ink3, 'Event', K.esc(K.eventName(T, r.event))); } });
       const bar = won => log.map((r, i) => {
         if (!!r.won !== won) return { value: null };
-        const o = { value: r.p_pre, itemStyle: { color: won ? Tk.model : Tk.coral, borderRadius: [6, 6, 0, 0] } };
+        const o = { value: r.p_pre, itemStyle: { color: won ? Tk.model : Tk.coral, borderRadius: 0 } };
         if (won && i === up) o.label = Object.assign(QKC.annot(Tk), { show: true, position: 'top', formatter: 'upset, ' + Math.round(r.p_pre * 100) + '%' });
         return o;
       });
       return { grid: { left: 8, right: 30, top: gT, bottom: gB, containLabel: true }, xAxis: xa, yAxis: ya, tooltip: tip,
-        legend: { top: 0, right: 0, itemWidth: 12, itemHeight: 12, icon: 'roundRect', textStyle: { color: Tk.ink2, fontFamily: Tk.fontUI, fontSize: 12 } },
+        legend: { top: 0, right: 0, itemWidth: 12, itemHeight: 12, icon: 'rect', textStyle: { color: Tk.ink2, fontFamily: Tk.fontCond, fontSize: 13, fontWeight: 700 } },
         series: [{ type: 'bar', name: 'Won', stack: 'r', barMaxWidth: 26, data: bar(true), itemStyle: { color: Tk.model } }, { type: 'bar', name: 'Lost', stack: 'r', barMaxWidth: 26, data: bar(false), itemStyle: { color: Tk.coral } }] };
     }, { label: 'Our pre-match chance in every match this year' });
   }
 
-  // compare: the player and the two closest matches on the spec's set, the best in each row highlighted, with verdicts
-  if (document.getElementById('pp-cmp-sec')) {
+  // the tale of the tape: the player against one of the closest matches (chips switch; all three open in Compare)
+  if (document.getElementById('pp-tape')) {
     full().then(fc => {
       if (!K.alive(el)) return;
       const FP = (fc && fc.players) || {};
-      const ids = [pid].concat(sim.map(x => String(x.id))).filter(id => FP[id] && FP[id].qualified).slice(0, 3);
-      if (ids.length < 2) return;
-      const E = ids.map(id => FP[id]);
+      const others = sim.map(x => String(x.id)).filter(id => FP[id] && FP[id].qualified && id !== pid);
+      const tb = document.getElementById('pp-tape');
+      if (!others.length || !FP[pid]) { tb.innerHTML = QK.empty('No comparison yet', 'The closest matches appear once the catalogue has them.'); return; }
       const keys = V.set(T, '');
-      const best = {};
       const GR = [['Strength', ['elo', 'elo_hard', 'elo_clay', 'elo_grass']], ['Results', ['games_won_pct', 'win_pct', 'win_v_top50']], ['Serve and return, inferred from scores', ['hold', 'brk']], ['Serve statistics (WTA)', ['dominance', 'ace_pct']]];
-      const groups = GR.map(g => ({ label: g[0], rows: keys.filter(k => g[1].indexOf(k) >= 0).map(k => {
-        const pcs = E.map(e => V.pctl(e, k, '', fc));
-        pcs.forEach((v, i) => {
-          if (!isNum(v)) return;
-          const others = pcs.filter((_, j) => j !== i).map(z => (isNum(z) ? z : 0));
-          const d = v - Math.max.apply(null, others);
-          if (!best[i] || d > best[i].d) best[i] = { k: k, d: d, v: V.value(E[i], k, '') };
-        });
-        return { label: V.label(k), tip: (V.META[k] || [])[1] || '', better: 'high', values: E.map(e => V.value(e, k, '')), pctls: pcs, fmt: v => V.fmt(k, v) };
-      }) })).filter(g => g.rows.length);
-      const names = ids.map(id => K.surname(K.name(T, id)));
-      document.getElementById('pp-cmp-h').innerHTML = QK.sectionHead({ kicker: 'Compare', title: names.slice(0, -1).join(', ') + ' or ' + names[names.length - 1] + '?',
-        sub: 'The closest matches on this season’s profile, side by side against the ' + K.TN(T) + '. The best in each row is highlighted; the small pills are tour percentiles.',
-        actions: '<a class="qk-more" href="' + K.compareHref(T, ids[0], ids[1]) + (ids[2] ? '/' + encodeURIComponent(ids[2]) : '') + '">Open in Compare</a>' });
-      const ents = E.map((e, i) => ({ name: e.name || K.name(T, ids[i]), href: K.playerHref(T, ids[i]), sub: [e.country, isNum(e.rank) ? 'No. ' + e.rank : '', isNum(e.matches) ? e.matches + ' matches' : ''].filter(Boolean).join(' · ') }));
-      const verd = E.map((e, i) => (best[i] && best[i].d > 0 ? { title: V.ARCHETYPE[best[i].k] || 'The standout', who: names[i], text: 'best of the ' + E.length + ' on ' + lc(V.label(best[i].k)).replace(/ \(inferred\)/, '') + ' (' + V.fmt(best[i].k, best[i].v) + ').' } : null));
-      document.getElementById('pp-cmp').innerHTML = QK.compareView({ entities: ents, groups: groups, delta: false }) + QK.verdicts(verd);
-      document.getElementById('pp-cmp-sec').hidden = false;
+      const drawTape = oid => {
+        const ids = [pid, oid], E = ids.map(id => FP[id]);
+        const best = {};
+        const groups = GR.map(g => ({ label: g[0], rows: keys.filter(k => g[1].indexOf(k) >= 0).map(k => {
+          const pcs = E.map(e => V.pctl(e, k, '', fc));
+          pcs.forEach((v, i) => { const o = pcs[1 - i]; const d = isNum(v) ? v - (isNum(o) ? o : 0) : null; if (isNum(d) && (!best[i] || d > best[i].d)) best[i] = { k: k, d: d, v: V.value(E[i], k, '') }; });
+          return { label: V.label(k), tip: (V.META[k] || [])[1] || '', better: 'high', values: E.map(e => V.value(e, k, '')), pctls: pcs, fmt: v => V.fmt(k, v) };
+        }) })).filter(g => g.rows.length);
+        const names = ids.map(id => K.surname(K.name(T, id)));
+        document.getElementById('pp-tape-h').innerHTML = QK.sectionHead({ kicker: 'Tale of the tape', title: names[0] + ' or ' + names[1] + '?',
+          sub: 'Bar length = percentile against the ' + K.TN(T) + ' this season. The better number in each row is solid.' });
+        const ents = E.map((e, i) => ({ name: e.name || K.name(T, ids[i]), short: names[i], href: K.playerHref(T, ids[i]), sub: [e.country, isNum(e.rank) ? 'No. ' + e.rank : '', isNum(e.matches) ? e.matches + ' matches' : ''].filter(Boolean).join(' · ') }));
+        tb.innerHTML = QK.compareView({ entities: ents, groups: groups });
+        const verd = E.map((e, i) => (best[i] && best[i].d > 0 ? { title: V.ARCHETYPE[best[i].k] || 'The standout', who: names[i], text: 'the better of the two on ' + lc(V.label(best[i].k)).replace(/ \(inferred\)/, '') + ' (' + V.fmt(best[i].k, best[i].v) + ').' } : null));
+        document.getElementById('pp-verd').innerHTML = QK.verdicts(verd);
+      };
+      const pick = document.getElementById('pp-tape-pick');
+      pick.innerHTML = others.slice(0, 3).map((id, i) => '<button type="button" class="qk-chip" data-value="' + K.esc(id) + '" aria-pressed="' + (i === 0) + '">' + K.esc(K.surname(K.name(T, id))) + '</button>').join('') +
+        (others.length > 1 ? '<a class="qk-chip" href="' + K.compareHref(T, pid, others[0]) + '/' + encodeURIComponent(others[1]) + '">All three in Compare</a>' : '<a class="qk-chip" href="' + K.compareHref(T, pid, others[0]) + '">Open in Compare</a>');
+      pick.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+        pick.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+        drawTape(b.getAttribute('data-value'));
+      }));
+      drawTape(others[0]);
+    });
+  }
+  // the last match: how it swung, our chance for the player after every game (the match file's reconstructed path)
+  const lastM = (c.results || []).filter(r => r && r.date && r.status !== 'wo').slice().sort((x, y) => String(y.date).localeCompare(String(x.date)))[0];
+  if (lastM && lastM.match && document.getElementById('pp-race')) {
+    TA.load(TA.matchPath(T, lastM.match)).then(d => {
+      const host = document.getElementById('pp-race');
+      if (!host || !K.ok(d) || !Array.isArray(d.wp) || d.wp.length < 3) return;
+      const meP1 = String(d.p1) === pid;
+      const rows = d.wp.filter(r => Array.isArray(r) && isNum(r[4]));
+      const ys = rows.map(r => (meP1 ? r[4] : 1 - r[4]) * 100);
+      const bounds = []; rows.forEach((r, i) => { if (i && r[1] !== rows[i - 1][1]) bounds.push(i); });
+      host.innerHTML = '<h4 class="ta-h4" style="margin-top:16px">How the match swung</h4>' + V.chart('pp-race-c', 230, 'Our chance for the player after every game of the last match') +
+        '<p class="ta-cap">Our chance for ' + K.esc(sur) + ' after every game' + (d.wp_reconstructed ? '; the order of games inside each set is rebuilt from the set scores' : '') + '. Dashed lines: new sets.</p>';
+      QKC.mount('#pp-race-c', Tk => {
+        const xa = QKC.axis(Tk, { type: 'value', min: 0, max: rows.length - 1, split: false, line: true, fmt: v => String(Math.round(v)) });
+        const ya = QKC.axis(Tk, { min: 0, max: 100, interval: 25, fmt: v => v + '%' });
+        const gB = 8 + QKC.nameAxis(xa, 'Games played', 'bottom'), gT = 14 + QKC.nameAxis(ya, 'Our chance for ' + sur + ' (%)', 'side');
+        return { grid: { left: 8, right: 16, top: gT, bottom: gB, containLabel: true }, xAxis: xa, yAxis: ya,
+          tooltip: QKC.tooltip(Tk, { trigger: 'axis', formatter: ps => { const r = rows[ps[0].dataIndex]; return '<div>Set ' + K.esc(r[1]) + ', games ' + K.esc(meP1 ? r[2] : r[3]) + '–' + K.esc(meP1 ? r[3] : r[2]) + '</div>' + QKC.tipRow(Tk.model, 'Our chance', Math.round(ps[0].value[1]) + '%'); } }),
+          series: [{ type: 'line', name: 'Our chance', step: false, showSymbol: false, data: ys.map((v, i) => [i, v]), lineStyle: { width: 3, color: Tk.model }, itemStyle: { color: Tk.model }, areaStyle: { color: QKC.hexA(Tk.model, 0.12) },
+            markLine: { silent: true, symbol: 'none', lineStyle: { color: Tk.ink3, type: [4, 4], width: 1 }, label: { show: false }, data: [{ yAxis: 50 }].concat(bounds.map(b => ({ xAxis: b - 0.5 }))) } }] };
+      }, { label: 'Our chance for the player after every game of the last match' });
     });
   }
   // every metric
@@ -1118,7 +1193,7 @@ K.styleBlock = (host, T, st, opts) => {
       return { grid: { left: 8, right: 8, top: 52, bottom: 34, containLabel: true }, xAxis: xa, yAxis: [y1, y2],
         legend: { top: 0, left: 0, textStyle: { color: Tk.ink2 }, itemWidth: 12, itemHeight: 8 },
         tooltip: QKC.tooltip(Tk, { trigger: 'axis', formatter: ps => '<b>' + esc(ps[0].axisValue) + ' shots</b>' + ps.map(q => QKC.tipRow(q.color, q.seriesName, Math.round(q.value * 100) + '%')).join('') }),
-        series: [{ type: 'bar', name: 'Share of points', data: bk.map(k => ra.dist[k]), barMaxWidth: 34, itemStyle: { color: QKC.hexA('#5b8def', 0.8), borderRadius: [3, 3, 0, 0] } },
+        series: [{ type: 'bar', name: 'Share of points', data: bk.map(k => ra.dist[k]), barMaxWidth: 34, itemStyle: { color: QKC.hexA('#5b8def', 0.8), borderRadius: 0 } },
           { type: 'line', name: 'Points won', yAxisIndex: 1, data: bk.map(k => (ra.won || {})[k]), lineStyle: { color: Tk.model, width: 2 }, itemStyle: { color: Tk.model }, symbolSize: 6 }] };
     }, { label: 'Rally length' });
   } else document.getElementById(id + '-rally').innerHTML = K.muted('No rally lengths.');

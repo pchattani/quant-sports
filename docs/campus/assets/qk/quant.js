@@ -1837,7 +1837,9 @@ QK.splitHero = function (g, o) {
   var bp = o.blocks || color.blockPair(Ls, Rs, { fav: f ? (f.t === Ls ? 'a' : 'b') : null });
   function subOf(t, role) {
     if (o.sub) return o.sub(t, role);
-    var city = t.city || (t.full && t.name && t.full !== t.name && t.full.indexOf(t.name) > 0 ? t.full.slice(0, t.full.indexOf(t.name)).trim() : '');
+    /* the city: team.city, else the full name ("Winnipeg Jets", from team.full or team.name) less the name shown */
+    var base = String(t.full || t.name || ''), shown = String(nk(t) || ''), at = shown && base !== shown ? base.lastIndexOf(shown) : -1;
+    var city = t.city || (at > 0 && at + shown.length === base.length ? base.slice(0, at).trim() : '');
     return [city, t.record || '', team ? role : ''].filter(Boolean).join(' · ');
   }
   function side(t, b, p, sc, cls, role) {

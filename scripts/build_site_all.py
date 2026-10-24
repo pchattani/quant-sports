@@ -1965,6 +1965,9 @@ def build_hub(entries: list[dict], now: datetime | None = None) -> dict:
         if not c.get("ok"):
             continue
         crests = {t: (info or {}).get("crest") for t, info in (c.get("_teams") or {}).items()}
+        # Club ids too: the public build ships no crests (D6), and the pages find a club's kit colours
+        # (clubs_index.json) and its link by id.
+        tids = {t: (info or {}).get("team_id") for t, info in (c.get("_teams") or {}).items()}
         rows = c.get("_fixtures") or []
         # Outside the window every competition still contributes its latest
         # results day and its next fixtures day, so the scoreboard is never
@@ -1989,6 +1992,10 @@ def build_hub(entries: list[dict], now: datetime | None = None) -> dict:
                 "round": r.get("round"), "detail": r.get("detail", False),
                 "crests": [crests.get(r["home"]), crests.get(r["away"])],
             }
+            if tids.get(r["home"]):
+                item["home_id"] = int(tids[r["home"]])
+            if tids.get(r["away"]):
+                item["away_id"] = int(tids[r["away"]])
             if r.get("model"):
                 item["model"] = {k: r["model"][k] for k in ("h", "d", "a")}
                 if r["model"].get("lineups"):

@@ -228,18 +228,6 @@ def pick_games(ctx, games, n_final=6, n_pre=10, key=None):
     return live + fin[:n_final] + pre[:n_pre]
 
 
-def gap_row(sport, label, model, market, href=None, kind="game", detail=None):
-    if model is None or market is None:
-        return None
-    r = {"sport": sport, "label": label, "model": r4(model), "market": r4(market),
-         "diff": r4(model - market), "kind": kind}
-    if href:
-        r["href"] = href
-    if detail:
-        r["detail"] = detail
-    return r
-
-
 # ───────────────────────────────────────────────────────────── football
 def build_football(ctx: Ctx, base: str, out: dict):
     d = DOCS / "site" / "data"
@@ -253,11 +241,29 @@ def build_football(ctx: Ctx, base: str, out: dict):
     def crest(p):
         return base + p if p else None
 
-    def club_href(p, slug):
+    def tid_of(p, tid=None):
+        if tid:
+            return str(tid)
         if p and "/crests/" in p:
-            tid = p.rsplit("/", 1)[-1].split(".")[0]
-            return base + "#/club/" + tid + "?c=" + slug
+            return p.rsplit("/", 1)[-1].split(".")[0]
         return None
+
+    def club_href(tid, slug):
+        return base + "#/club/" + tid + "?c=" + slug if tid else None
+
+    # Kit colours by club id (clubs_index.json `colour`, `alt`; none for a club without a crest or a national team,
+    # and the kit falls back to cobalt v slate)
+    ci = load(d / "clubs_index.json") or {}
+    kit = {}
+    for row in ci.get("rows") or []:
+        r = dict(zip(ci.get("fields") or [], row))          # a row without colours stops at "comps"
+        if r.get("colour"):
+            kit[str(r.get("id"))] = (r["colour"], r.get("alt"))
+
+    def side(name, p, tid, slug):
+        t = tid_of(p, tid)
+        colour, alt = kit.get(t) or (None, None)
+        return team(name, colour=colour, alt=alt, logo=crest(p), href=club_href(t, slug))
 
     seen, games = set(), []
     days = hub.get("days") or {}
@@ -269,8 +275,8 @@ def build_football(ctx: Ctx, base: str, out: dict):
             cr = m.get("crests") or [None, None]
             mod = m.get("model") or {}
             g = game("football", m.get("comp_name") or m["comp"], m["id"], m["date"], m.get("status"),
-                     team(m["home"], logo=crest(cr[0]), href=club_href(cr[0], m["comp"])),
-                     team(m["away"], logo=crest(cr[1]), href=club_href(cr[1], m["comp"])),
+                     side(m["home"], cr[0], m.get("home_id"), m["comp"]),
+                     side(m["away"], cr[1], m.get("away_id"), m["comp"]),
                      m.get("hs"), m.get("as"),
                      p_home=r4(mod.get("h")), p_draw=r4(mod.get("d")), p_away=r4(mod.get("a")),
                      xg=m.get("xg"), href=base + "#/" + m["comp"] + "/match/" + str(m["id"]),
@@ -285,7 +291,7 @@ def build_football(ctx: Ctx, base: str, out: dict):
     out["games"].extend(picked)
 
     # Title races: model v market outrights per big league
-    titles, gaps = [], []
+    titles = []
     for slug in TITLE_LEAGUES:
         probs = load(d / slug / "probs.json")
         mk = load(d / slug / "market_odds.json") or {}
@@ -294,16 +300,17 @@ def build_football(ctx: Ctx, base: str, out: dict):
         outr = (mk.get("outrights") or {})
         mkt = {t["team"]: t.get("market") for t in (outr.get("teams") or [])} if outr.get("available") else {}
         rows = []
+        ids = {k: (v or {}).get("team_id") for k, v in ((load(d / slug / "teams.json") or {}).get("teams") or {}).items()
+               if isinstance(v, dict)}
         for t in sorted(probs.get("teams", []), key=lambda t: -(t.get("p_title") or 0))[:6]:
-            rows.append({"name": t["team"], "p": r4(t.get("p_title")), "market": r4(mkt.get(t["team"])),
-                         "exp_pts": t.get("exp_pts")})
+            row = {"name": t["team"], "p": r4(t.get("p_title")), "market": r4(mkt.get(t["team"])),
+                   "exp_pts": t.get("exp_pts")}
+            colour = (kit.get(str(ids.get(t["team"]))) or (None, None))[0]
+            if colour:
+                row["colour"] = colour
+            rows.append(row)
         titles.append({"league": comp_names.get(slug, slug), "slug": slug, "rows": rows,
                        "href": base + "#/" + slug + "/probs"})
-        for t in (outr.get("teams") or [])[:8]:
-            gr = gap_row("football", f"{t['team']} to win {comp_names.get(slug, slug)}", t.get("model"),
-                         t.get("market"), base + "#/" + slug + "/market", kind="title")
-            if gr:
-                gaps.append(gr)
     out["charts"]["football_titles"] = titles
 
     favs = []
@@ -322,7 +329,6 @@ def build_football(ctx: Ctx, base: str, out: dict):
                       "value": p.get("value"), "xg": p.get("xg"),
                       "href": base + "#/player/" + str(p["id"]) + "?c=" + p.get("comp", "")})
     out["leaders"]["football"] = {"title": "Goals", "unit": "goals", "rows": goals}
-    out["gaps"].extend(gaps)
 
     n_live = sum(1 for g in games if g["status"] == "live" and in_window(ctx, g))
     today = iso(ctx.now)[:10]
@@ -402,11 +408,6 @@ def build_f1(ctx: Ctx, base: str, out: dict):
                 "field": [{"name": dname(k), "code": (drivers.get(k) or {}).get("code"), "colour": dcol(k),
                            "p": r4(model.get(k)), "market": r4(prices.get(k)),
                            "href": base + "#/driver/" + k} for k in field]}
-        for k in field[:6]:
-            gr = gap_row("f1", f"{dname(k)} to win the {nx.get('name')}", model.get(k), prices.get(k),
-                         race["href"], kind="race")
-            if gr:
-                out["gaps"].append(gr)
         sess = nx.get("sessions") or {}
         out["games"].append(game("f1", "Formula 1", f"{nx.get('year')}-{nx.get('round')}",
                                  sess.get("race") or nx.get("date"), "pre",
@@ -509,12 +510,6 @@ def build_basketball(ctx: Ctx, base: str, out: dict):
                               spread=mk.get("spread_home"), total=m.get("total"), clock=g.get("clock"),
                               period=g.get("period"), wp_home=r4(g.get("wp_home")), note=note,
                               href=base + "#/" + L + "/game/" + str(g["id"])))
-            if norm_status(g["status"]) == "pre":
-                gr = gap_row("basketball", f"{tm(g['away'])['name']} @ {tm(g['home'])['name']} ({LU})",
-                             m.get("p_home"), mk.get("p_home"), base + "#/" + L + "/game/" + str(g["id"]),
-                             detail="home win")
-                if gr:
-                    out["gaps"].append(gr)
         out["games"].extend(pick_games(ctx, games, 4, 6))
         season = load(d / L / str(lg.get("current_season")) / "season.json") or {}
         sim = (season.get("sim") or {}).get("teams") or {}
@@ -582,11 +577,6 @@ def build_tennis(ctx: Ctx, base: str, out: dict):
                      note=m.get("round"), href=base + "#/" + T + "/match/" + str(m["id"]), players=True,
                      tba=True if (m.get("tba") or (start and len(start) == 10)) else None)   # date-only start
             games.append(g)
-            if norm_status(m.get("status")) == "pre":
-                gr = gap_row("tennis", f"{n[0]} v {n[1]} ({TU} {m.get('round')})", mod.get("p1"), mk.get("p1"),
-                             g["href"], detail="first-named player wins")
-                if gr:
-                    out["gaps"].append(gr)
         out["games"].extend(pick_games(ctx, games, 3, 5))
         elo = (tour.get("elo_top") or {}).get("all") or []
         out["leaders"]["tennis_" + T] = {"title": f"{TU} Elo", "unit": "Elo", "rows": [
@@ -634,11 +624,6 @@ def build_baseball(ctx: Ctx, base: str, out: dict):
                           g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")), market_home=r4(mk.get("p_home")),
                           total=m.get("total"), period=g.get("inning"), wp_home=r4(g.get("wp_home")), note=note,
                           href=base + "#/mlb/game/" + str(g["gpk"])))
-        if norm_status(g.get("status")) == "pre":
-            gr = gap_row("baseball", f"{tm(g['away'])['name']} @ {tm(g['home'])['name']}", m.get("p_home"),
-                         mk.get("p_home"), base + "#/mlb/game/" + str(g["gpk"]), detail="home win")
-            if gr:
-                out["gaps"].append(gr)
     out["games"].extend(pick_games(ctx, games, 3, 4))
     ps = idx.get("postseason") or {}
     pteams = ps.get("teams") or {}
@@ -649,14 +634,6 @@ def build_baseball(ctx: Ctx, base: str, out: dict):
             {"name": (teams.get(k) or {}).get("name") or v.get("name"), "abbr": (teams.get(k) or {}).get("abbr"),
              "p": r4(v.get("p_ws")), "colour": (teams.get(k) or {}).get("colour"),
              "href": base + "#/mlb/team/" + k} for k, v in rows]}
-    for s in ps.get("series") or []:
-        if not s.get("done") and s.get("market"):
-            a, b = s["teams"]
-            gr = gap_row("baseball", f"{tm(a)['name']} to win the {s.get('round_name')}", (s.get("p") or [None])[0],
-                         s["market"][0], base + "#/postseason", kind="series",
-                         detail=f"series {s['wins'][0]}-{s['wins'][1]}")
-            if gr:
-                out["gaps"].append(gr)
     series = []
     for s in ps.get("series") or []:
         if not s.get("done"):
@@ -727,31 +704,7 @@ def build_nfl(ctx: Ctx, base: str, out: dict):
                           spread=ln.get("spread_home"), model_spread=m.get("spread"), total=ln.get("total"),
                           period=g.get("qtr"), clock=g.get("clock"), wp_home=r4(g.get("wp_home")),
                           note=f"Week {g.get('week')}", href=base + "#/game/" + g["game_id"]))
-        if norm_status(g["status"]) == "pre":
-            gr = gap_row("nfl", f"{tm(g['away'])['name']} @ {tm(g['home'])['name']}", m.get("p_home"),
-                         mk.get("p_home"), base + "#/game/" + g["game_id"], detail="home win")
-            if gr:
-                out["gaps"].append(gr)
     out["games"].extend(pick_games(ctx, games, 4, 10))
-    for gp in (idx.get("gaps") or [])[:8]:
-        if not gp.get("name"):
-            continue  # game-level gaps are already covered from the games list
-        kind, _, ab = gp["name"].partition(": ")
-        nm = (teams.get(ab) or {}).get("name", ab)
-        parts = kind.split("_")
-        if kind == "playoffs":
-            label = f"{nm} make the playoffs"
-        elif parts[0] == "div":
-            label = f"{nm} win the {' '.join(parts[1:]).upper()}"
-        elif parts[0] == "seed1":
-            label = f"{nm} take the {parts[1].upper()} No. 1 seed"
-        elif parts[0] == "conf":
-            label = f"{nm} win the {parts[1].upper()}"
-        else:
-            label = f"{nm}: {kind}"
-        gr = gap_row("nfl", label, gp["model"], gp["market"], base + "#/markets", kind="futures")
-        if gr:
-            out["gaps"].append(gr)
     po = idx.get("playoff_odds") or {}
     rows = sorted(po.items(), key=lambda kv: -(kv[1].get("p_sb") or 0))[:8]
     out["futures"]["nfl"] = {"title": "Super Bowl", "rows": [
@@ -827,22 +780,7 @@ def build_hockey(ctx: Ctx, base: str, out: dict):
                           total=m.get("total"), period=g.get("period"), clock=g.get("clock"),
                           wp_home=r4(g.get("wp_home")), xg=[(g.get("xg") or {}).get("home"), (g.get("xg") or {}).get("away")] if g.get("xg") else None,
                           note=("OT" if g.get("ot") else None), href=base + "#/game/" + g["game_id"]))
-        if norm_status(g.get("status")) == "pre":
-            gr = gap_row("hockey", f"{tm(g['away'])['name']} @ {tm(g['home'])['name']}", m.get("p_home"),
-                         mk.get("p_home"), base + "#/game/" + g["game_id"], detail="home win")
-            if gr:
-                out["gaps"].append(gr)
     out["games"].extend(pick_games(ctx, games, 5, 8))
-    for gp in idx.get("gaps") or []:
-        if gp.get("kind") == "game":
-            continue
-        nm = (teams.get(gp.get("team")) or {}).get("name", gp.get("team"))
-        lab = {"playoffs": f"{nm} make the playoffs", "division": f"{nm} win the division",
-               "presidents": f"{nm} win the Presidents' Trophy", "cup": f"{nm} win the Stanley Cup"}
-        gr = gap_row("hockey", lab.get(gp["kind"], f"{nm}: {gp['kind']}"),
-                     gp["model"], gp["market"], base + "#/markets", kind="futures")
-        if gr:
-            out["gaps"].append(gr)
     po = idx.get("playoff_odds") or {}
     rows = sorted(po.items(), key=lambda kv: -(kv[1].get("p_cup") or 0))[:8]
     out["futures"]["hockey"] = {"title": "Stanley Cup", "rows": [
@@ -926,7 +864,7 @@ def build_college(ctx: Ctx, base: str, out: dict):
             t = teams.get(str(tid)) or {}
             nm = t.get("short") or t.get("name") or str(tid)
             return team((f"#{rank} " if rank and rank <= 25 else "") + nm, t.get("abbr"), t.get("colour"),
-                        href=base + "#/" + L + "/team/" + str(tid))
+                        href=base + "#/" + L + "/team/" + str(tid), full=t.get("name"), alt=t.get("alt") or t.get("alt_colour"))
 
         seen, games = set(), []
         for g in (lg.get("today") or []) + (lg.get("next_games") or []) + (lg.get("last_games") or []):
@@ -940,11 +878,6 @@ def build_college(ctx: Ctx, base: str, out: dict):
                               tm(g["away"], g.get("ar")), g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
                               market_home=r4(mk.get("p_home")), spread=mk.get("spread_home"), total=m.get("total"),
                               note=note, href=href))
-            if norm_status(g.get("status")) == "pre":
-                gr = gap_row("college", f"{tm(g['away'])['name']} @ {tm(g['home'])['name']} ({LU})",
-                             m.get("p_home"), mk.get("p_home"), href, detail="home win")
-                if gr:
-                    out["gaps"].append(gr)
         out["games"].extend(pick_games(ctx, games, 4, 6))
         rows = [r for r in (lg.get("title_odds") or []) if r.get("p")][:8]
         if rows:
@@ -1215,13 +1148,13 @@ def main(argv=None):
         return
     now = parse_ts(a.now) if a.now else datetime.now(timezone.utc).replace(microsecond=0)
     ctx = Ctx(a.links, now)
-    out = {"games": [], "gaps": [], "futures": {}, "leaders": {}, "charts": {}, "stats": [], "search": []}
+    out = {"games": [], "futures": {}, "leaders": {}, "charts": {}, "stats": [], "search": []}
     sports = []
     for key, folder, repo, label, site in SPORTS + [x for x in PENDING if x[0] in LAUNCHED or a.with_pending]:
         base = ctx.base(folder, repo)
         entry = {"key": key, "label": label, "site": site, "url": base, "data": PUBLIC.format(repo) + "data/",
                  "ok": False}
-        part = {"games": [], "gaps": [], "futures": {}, "leaders": {}, "charts": {}, "stats": [], "search": []}
+        part = {"games": [], "futures": {}, "leaders": {}, "charts": {}, "stats": [], "search": []}
         try:
             entry.update(BUILDERS[key](ctx, base, part))
             if key == "football":
@@ -1240,14 +1173,6 @@ def main(argv=None):
                 else:
                     out[k].update(v)
         sports.append(entry)
-    # Biggest model-v-market disagreements, at most four per sport so one busy market
-    # (NHL playoff futures, say) cannot fill the whole chart.
-    per, gaps = {}, []
-    for g in sorted([g for g in out["gaps"] if abs(g["diff"]) >= 0.03], key=lambda g: -abs(g["diff"])):
-        if per.get(g["sport"], 0) < 4:
-            per[g["sport"]] = per.get(g["sport"], 0) + 1
-            gaps.append(g)
-    out["gaps"] = gaps[:20]
     out["games"].sort(key=lambda g: ({"live": 0, "pre": 1, "final": 2}[g["status"]], g["start"] or ""))
     add_why(out["games"])
     out["calibration"] = calibration_summary()
@@ -1262,7 +1187,7 @@ def main(argv=None):
     if not a.no_kit:
         copy_kit()
     sz = (OUT / "data" / "home.json").stat().st_size
-    log(f"home.json {sz / 1024:.0f} KB · {len(out['games'])} games · {len(out['gaps'])} gaps · "
+    log(f"home.json {sz / 1024:.0f} KB · {len(out['games'])} games · "
         f"{sum(1 for s in sports if s['ok'])}/{len(sports)} sports · {len(search)} search rows")
 
 

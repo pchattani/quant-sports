@@ -6,7 +6,7 @@
  *        calendar window; presets, size and colour encodings, medians, labelled extremes, a highlight search and the
  *        group ranked on the view (data/lab/<window>/<scope>.json, UNIFIED_PAYLOADS 14)
  *   #/compare/players/<a>/<b>[?p3=<c>&view=classic&scope=]
- *        two or three players side by side (Design System 2.0): QK.compareView on the one metric set the player card
+ *        two or three players side by side (kit v4: two draw the tale of the tape, three the table): QK.compareView on the one metric set the player card
  *        uses (FB.PLAYER_SETS, players.js), percentiles against the shared position group, and where each one sits in
  *        that group's distribution; ?view=classic keeps the full pre-redesign comparison ("Every metric (classic)").
  *        A key is a person id, or the old <comp>:<id>
@@ -157,7 +157,8 @@ FB.route('lab', function (el, p) {
     '<section class="qk-card fb-lb-ctl"><div class="qk-card-body" id="lb-ctl">' + FB.loading('lines', 3) + '</div></section>' +
     '<div id="lb-cover"></div>' +
     FB.card('<span id="lb-title">The chart</span>', '<span id="lb-sub"></span>', FB.chartBox('lb-chart', 640, 'Player lab scatter') + '<p class="fb-cap" id="lb-note"></p>', { id: 'lb-chart-card' }) +
-    FB.card('Ranked on this view', 'The group ranked by the sum of standard scores on both axes (better direction); percentiles within the group shown. Top 60.', '<div id="lb-table"></div>', { flush: true });
+    QK.explain('<b>What’s that number?</b> Every dot is one player, and the top-right corner is better than the middle of the group on both axes. <b>Shrink small samples</b> pulls a player with few minutes towards the group’s middle, so a hot few hundred minutes does not top the chart; <b>league-adjust</b> multiplies attacking rates by the scoring factor of the leagues they came from.', { cls: 'fb-mt' }) +
+    FB.card('Ranked on this view', 'The group ranked by the sum of standard scores on both axes (better direction); percentiles within the group shown. Top 60. A standard score is how many spreads above the group’s average a number sits: +1 is better than about five in six.', '<div id="lb-table"></div>', { flush: true, cls: 'fb-mt' });
   return show(el, true);
 });
 
@@ -598,8 +599,10 @@ function buildCompareRole(el, P, R, ix) {
     var x = y.x, club = (x.doc.current_club || {}).name || (y.raw && y.rk && !pooled ? (y.raw.team || '') : '');
     var mins = isNum(y.min) ? FB.int(y.min) + ' min' : 'no minutes in the view';
     var role = x._role;
-    return { name: x.doc.name, abbr: FB.surname(x.doc.name), href: FB.href.player(x.id, x.comp && !pooled ? { c: x.comp } : null), colour: null,
-      sub: [club, role || FB.POS_LABEL[x.doc.pos] || '', mins].filter(Boolean).join(' · ') };
+    var tid = (x.doc.current_club || {}).tid;
+    /* v4: the club's kit and alternate colours when clubs_index.json has them (two players draw the tale of the tape) */
+    return { name: x.doc.name, abbr: FB.surname(x.doc.name), short: FB.surname(x.doc.name), href: FB.href.player(x.id, x.comp && !pooled ? { c: x.comp } : null),
+      colour: tid ? FB.clubColour(tid) : null, alt: tid ? FB.clubAlt(tid) : null, sub: [club, role || FB.POS_LABEL[x.doc.pos] || '', mins].filter(Boolean).join(' · ') };
   });
   var notes = [];
   if (!same) notes.push('Different roles: each percentile is against the player\'s own role group (' + X.map(function (y) { return y.x.doc.name + ': ' + (y.g ? y.g.short : 'no role'); }).join(', ') + '), on the ' + g.short + '\' set.');
@@ -616,8 +619,8 @@ function buildCompareRole(el, P, R, ix) {
   var distKeys = FB.groupKeys(g, 'headline').filter(function (k) { return G.rk && G.rk.PP.values(g, k).length >= 8; }).slice(0, 4);
   var showDist = same && sameComp && distKeys.length && G.rk;
   var names = P.map(function (x) { return FB.surname(x.doc.name); });
-  body.innerHTML = QK.sectionHead({ kicker: 'Side by side', title: cmpQuestion(names), sub: 'Value and percentile ' + esc(FB.peerLine(g, where, min)) + ' (100 = best). The best in each row is highlighted' +
-      (P.length === 2 ? '; the last column is ' + esc(names[0]) + ' minus ' + esc(names[1]) + ', green when ' + esc(names[0]) + ' is better.' : '.'), html: true }) +
+  body.innerHTML = QK.sectionHead({ kicker: P.length === 2 ? 'Tale of the tape' : 'Side by side', title: cmpQuestion(names), sub: (P.length === 2 ? 'Bar length = percentile ' + esc(FB.peerLine(g, where, min).replace(/^v /, 'against ')) + ' (100 = best). The better number in each row is solid.'
+      : 'Value and percentile ' + esc(FB.peerLine(g, where, min).replace(/^v /, 'against ')) + ' (100 = best). The best in each row is highlighted.'), html: true }) +
     FB.card(P.length + ' players, one metric set', 'The headline set for the role from our metrics spec: stable and predictive rates first.',
     (withRow.length >= 2 ? '<div class="fb-cmp-wrap">' + QK.compareView({ entities: ents, groups: groups }) + '</div>' + QK.verdicts(cmpVerdicts(groups, names)) : FB.empty('Not enough to compare', 'At least two players need a line in this view.')) +
     (notes.length ? '<p class="fb-cap">' + notes.map(esc).join(' ') + '</p>' : ''), { cls: 'fb-lb-cv' }) +
@@ -643,9 +646,9 @@ function buildCompareRole(el, P, R, ix) {
   return true;
 }
 
-/* The v2 comparison (STYLE_GUIDE 5, MIGRATION_V2 8): two or three players on the player card's metric set, with each
-   value, its percentile against the position group (100 = best), the better value in bold and, for two, the
-   difference; then where each one sits in the shared peer group. */
+/* The comparison on the position letters (the fallback without the role payload): two or three players on the
+   player card's metric set, each value with its percentile against the position group (100 = best); two draw the
+   tale of the tape (the better number solid), three the table (the best in bold); then where each one sits. */
 var CMP_MARK = ['wpA', 'wpB', 'c5'];
 /* v3: the compare title asks the question ("Saka, Rogers or Mbeumo?"). */
 function cmpQuestion(names) { return names.length === 2 ? names[0] + ' or ' + names[1] + '?' : names.slice(0, -1).join(', ') + ' or ' + names[names.length - 1] + '?'; }
@@ -703,8 +706,9 @@ function buildCompareV2(el, P) {
   var ents = P.map(function (x) {
     var r = x.row || {}, club = (x.doc.current_club || {}).name || r.team || '';
     var mins = isNum(r.minutes) ? FB.int(r.minutes) + ' min' : 'no minutes in the view';
-    return { name: x.doc.name, abbr: FB.surname(x.doc.name), href: FB.href.player(x.id, x.comp && !pooled ? { c: x.comp } : null), colour: null,
-      sub: [club, FB.POS_LABEL[x.doc.pos] || '', mins].filter(Boolean).join(' · ') };
+    var tid = (x.doc.current_club || {}).tid;
+    return { name: x.doc.name, abbr: FB.surname(x.doc.name), short: FB.surname(x.doc.name), href: FB.href.player(x.id, x.comp && !pooled ? { c: x.comp } : null),
+      colour: tid ? FB.clubColour(tid) : null, alt: tid ? FB.clubAlt(tid) : null, sub: [club, FB.POS_LABEL[x.doc.pos] || '', mins].filter(Boolean).join(' · ') };
   });
   var short = P.filter(function (x) { return x.row && x.row.minutes < floor; }).map(function (x) { return x.doc.name; });
   var none = P.filter(function (x) { return !x.row; }).map(function (x) { return x.doc.name; });
@@ -717,8 +721,8 @@ function buildCompareV2(el, P) {
   if (early.length) notes.push(early.join(', ') + (early.length > 1 ? ' have' : ' has') + ' under 900 minutes: a small sample, read the percentiles as early.');
   var distKeys = (DIST[L] || []).filter(function (k) { return meta[k]; });
   var names = P.map(function (x) { return FB.surname(x.doc.name); });
-  body.innerHTML = QK.sectionHead({ kicker: 'Side by side', title: cmpQuestion(names), sub: 'Value and percentile against ' + esc(peer) + (floor ? ' (' + FB.int(floor) + '+ minutes)' : '') + ' (100 = best). The best in each row is highlighted' +
-      (P.length === 2 ? '; the last column is ' + esc(names[0]) + ' minus ' + esc(names[1]) + ', green when ' + esc(names[0]) + ' is better.' : '.'), html: true }) +
+  body.innerHTML = QK.sectionHead({ kicker: P.length === 2 ? 'Tale of the tape' : 'Side by side', title: cmpQuestion(names), sub: (P.length === 2 ? 'Bar length = percentile against ' : 'Value and percentile against ') + esc(peer) + (floor ? ' (' + FB.int(floor) + '+ minutes)' : '') + ' (100 = best). ' +
+      (P.length === 2 ? 'The better number in each row is solid.' : 'The best in each row is highlighted.'), html: true }) +
     FB.card(P.length + ' players, one metric set', 'The set for the position: stable and predictive rates first.',
     (withRow.length >= 2 ? '<div class="fb-cmp-wrap">' + QK.compareView({ entities: ents, groups: groups }) + '</div>' + QK.verdicts(cmpVerdicts(groups, names)) : FB.empty('Not enough to compare', 'At least two players need a line in this view.')) +
     (notes.length ? '<p class="fb-cap">' + notes.map(esc).join(' ') + '</p>' : ''), { cls: 'fb-lb-cv' }) +

@@ -1,16 +1,19 @@
-/* The Quant Ace — Overview (#/ and #/<T>), on kit v3 "Matchday" (the Rink overview is the reference).
+/* The Quant Ace — Overview (#/ and #/<T>), on kit v4 "Broadcast" (the Rink overview, rk-overview.js, is the reference).
  *
  *   ticker: live, today's and the next matches with our chance before the first ball, then the latest results;
  *   the greeting hero (QK.greeting) with the match to watch (QK.featureCard);
  *   stat tiles: our favourite in the tournament in play, the year-end No. 1 favourite, the World No. 1, the Elo No. 1,
  *               matches today (ours first; no market anywhere on the page);
- *   tournaments in play; "What to watch" (match cards with a one-line reason each, Today / Next / Results);
- *   "Who's hot" (QK.hotRow: the race leader, the most titles, the Elo No. 1, the best on clay and grass);
- *   "New here?" beside a "How sure are we?" teaser read from <T>/calibration.json (QK.calib.find), when present;
- *   charts: title chances in the tournament in play, the Elo top 10 by surface, the race to the Finals (our chance of
- *           qualifying) and the year-end No. 1; past years: the champions.
+ *   tournaments in play; "N matches. Our calls." (QK.gameCard with a one-line reason each, Today / Next / Results);
+ *   the black power list (QK.band + QK.hotRow: the race leader, the most titles, the Elo No. 1, the best on clay and
+ *   grass); "We say it. Then we check it." (QK.howSure from <T>/calibration.json) beside "Who's for real?"
+ *   (QKC.quadrant: share of games won, the process, against share of matches won, the results, from value.json's
+ *   luck rows; tennis has no xG, and games won is the steadier number that match wins drift back to); "What's that
+ *   number?"; the title race in our chance only (the tournament in play, the year-end No. 1), the race to the Finals
+ *   and the Elo top 10; past years: the champions. No market anywhere on the page.
  *
- * Reads index.json (tours[T]), <T>/race.json, <T>/calibration.json and the in-play events' <T>/events/<id>.json.
+ * Reads index.json (tours[T]), <T>/race.json, <T>/calibration.json, <T>/value.json (current year) and the in-play
+ * events' <T>/events/<id>.json.
  * Cards still live or upcoming 12 hours after their start are dropped (TA.fresh): a stale snapshot never shows as
  * today. */
 (function (TA) {
@@ -96,7 +99,7 @@ function render(el, params) {
 
     if (isCurrent) {
       const first = nowList.length ? 'now' : nextList.length ? 'next' : 'results';
-      html += '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch ' + when, title: '<span id="ov-gh"></span>', html: true, sub: 'Our chance for each player before the first ball, the favourite in blue, with a line on why it’s worth your time. Once a match starts: the sets and how our call is doing.',
+      html += '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch ' + when, title: '<span id="ov-gh"></span>', html: true, sub: 'Our chance for each player before the first ball, the favourite in blue, and a line on why it’s worth your time. Once it starts: the score set by set.',
         actions: V().seg('ov-when', [['now', 'Today'], ['next', 'Next'], ['results', 'Results']], first, 'Matches') + '<a class="qk-btn" href="' + TA.href(T, 'calendar', Y) + '">Every draw</a>' }) +
         '<div class="qk-watch" id="ov-games"></div></section>';
     }
@@ -114,22 +117,35 @@ function render(el, params) {
       if (!r.length) return;
       hot.push({ sport: 'tennis', title: x[1], name: TA.playerShort(T, r[0][0]), value: Math.round(r[0][1]), unit: x[0] === 'all' ? 'Elo' : TA.surfaceLabel(x[0]) + ' Elo', next: r[1] ? { name: TA.playerShort(T, r[1][0]), value: Math.round(r[1][1]) } : null, expl: x[2], href: TA.playerHref(T, r[0][0]) });
     });
-    if (hot.length >= 3) html += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Who’s hot', title: isCurrent ? 'The form players' : 'The year’s leaders', sub: 'The leaders in the race, the trophy count and our ratings, with the next best for scale.' }) + QK.hotRow(hot.slice(0, 5)) + '</section>';
+    if (hot.length >= 3) html += QK.band(QK.sectionHead({ kicker: 'Who’s hot', title: isCurrent ? 'The form players' : 'The year’s leaders', sub: 'The leaders in the race, the trophy count and our ratings, with the next best for scale.' }) + QK.hotRow(hot.slice(0, 5)));
 
-    // ── New here? beside How sure are we? (the teaser fills when <T>/calibration.json is there)
-    html += '<section class="qk-section qk-gside" id="ov-new"><div id="ov-sure"></div><div>' + QK.newHere({ items: [QK.NEW_HERE[0],
+    // ── We say it. Then we check it. (fills when <T>/calibration.json is there) beside Who's for real? (current year)
+    html += '<section class="qk-section qk-g75"><div><div id="ov-sure-h"></div><div id="ov-sure"></div></div>' +
+      (isCurrent ? '<div class="ta-ov-real">' + QK.sectionHead({ kicker: 'Who’s for real?', title: 'Results v chances', sub: 'Winning games is the steady part of a record; turning them into match wins takes tiebreaks and deciding sets, which come and go. Top-left: winning more matches than the games suggest. Bottom-right: the reverse.' }) +
+        '<div class="qk-card"><div class="qk-card-body"><div id="ov-luck" class="qk-chart" role="img" aria-label="Share of matches won against share of games won">' + QK.skeleton('chart', 1) + '</div><p class="qk-caption" id="ov-luck-cap"></p></div></div></div>' : '<div></div>') + '</section>';
+    html += '<section class="qk-section">' + QK.newHere({ items: [QK.NEW_HERE[0],
       'A <b>percentile</b> ranks a player against the rest of the tour: 90th means better than 90 in 100 qualified players.',
-      'Every forecast is checked against what happened. <a class="qk-link" href="' + TA.href(T, 'calibration') + '">The record is on the calibration page.</a>'] }) + '</div></section>';
+      'Every forecast is checked against what happened. <a class="qk-link" href="' + TA.href(T, 'calibration') + '">The record is on the calibration page.</a>'] }) + '</section>';
 
     // ── charts
     const raceRows = isCurrent && race ? Object.keys(race.finals_qual || {}).map(pid => ({ pid: pid, p: race.finals_qual[pid] })).filter(r => isNum(r.p)).sort((a, b) => b.p - a.p).slice(0, 12) : [];
     const eloKeys = ['all', 'hard', 'clay', 'grass'].filter(k => ((info.elo_top || {})[k] || []).length);
-    html += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Forecasts and ratings', title: 'The tour in charts', sub: 'Our chances from simulating the draw and the season, and our ratings. Tap a row to open the player.' }) + '<div class="qk-grid">';
-    if (titleRows.length) html += '<div class="qk-span-6">' + V().card('Who wins ' + ev0Name, 'Our title chance from simulating the rest of the draw', '<div id="ov-title"></div>', { foot: '<span>Top ten</span><a href="' + TA.eventHref(T, evNow[0].event) + '">The draw and every path →</a>' }) + '</div>';
-    if (eloKeys.length) html += '<div class="qk-span-6">' + V().card('Elo top 10', 'Our strength ratings from every tour-level result', V().seg('ov-sf', eloKeys.map(k => [k, k === 'all' ? 'Overall' : TA.surfaceLabel(k)]), eloKeys[0], 'Surface') + V().chart('ov-elo', 360, 'Elo top 10'), { foot: '<span></span><a href="' + TA.href(T, 'elo') + '">Elo tables and all-time peaks →</a>' }) + '</div>';
-    if (raceRows.length) html += '<div class="qk-span-6">' + V().card('Race to the Finals', 'Our chance of qualifying, from ' + (race.n_sims ? Number(race.n_sims).toLocaleString('en-GB') + ' ' : '') + 'simulated seasons', '<div id="ov-race"></div>', { foot: '<span>Race points when the season was last simulated' + (race.as_of ? ' (' + esc(TA.fmtDate(race.as_of, { year: false, weekday: false })) + ')' : '') + '</span><a href="' + TA.href(T, 'race') + '">The race →</a>' }) + '</div>';
-    if (isCurrent && race && race.year_end_no1 && Object.keys(race.year_end_no1).length) html += '<div class="qk-span-6">' + V().card('Year-end No. 1', 'Our chance of finishing the year ranked No. 1', '<div id="ov-no1"></div>', { foot: '<span></span><a href="' + TA.href(T, 'rankings') + '">Rankings →</a>' }) + '</div>';
-    html += '</div></section>';
+    const hasNo1 = isCurrent && race && race.year_end_no1 && Object.keys(race.year_end_no1).length;
+    if (titleRows.length || hasNo1) {
+      const t0 = titleRows[0];
+      html += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Title race', title: titleRows.length ? 'Who lifts the trophy?' : 'Who finishes No. 1?',
+        sub: (t0 ? (t0.p < 0.2 ? 'Nobody’s better than 1 in 5 in ' + ev0Name + '. ' : TA.playerShort(T, t0.pid) + ' leads our board in ' + ev0Name + ' at ' + TA.pct(t0.p, 0) + '. ') : '') + 'Our chances from simulating the rest of the draw and the season, match by match.',
+        actions: titleRows.length ? '<a class="qk-more" href="' + TA.eventHref(T, evNow[0].event) + '">The draw and every path</a>' : '' }) + '<div class="qk-grid">';
+      if (titleRows.length) html += '<div class="qk-span-6">' + V().card('Who wins ' + ev0Name, 'Our title chance from simulating the rest of the draw', '<div id="ov-title"></div>', { foot: '<span>Top ten</span><a href="' + TA.eventHref(T, evNow[0].event) + '">The draw and every path →</a>' }) + '</div>';
+      if (hasNo1) html += '<div class="qk-span-6">' + V().card('Year-end No. 1', 'Our chance of finishing the year ranked No. 1', '<div id="ov-no1"></div>', { foot: '<span>From ' + (race.n_sims ? Number(race.n_sims).toLocaleString('en-GB') + ' ' : '') + 'simulated seasons</span><a href="' + TA.href(T, 'rankings') + '">Rankings →</a>' }) + '</div>';
+      html += '</div></section>';
+    }
+    if (raceRows.length || eloKeys.length) {
+      html += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Race and ratings', title: 'Who makes the ' + (T === 'wta' ? 'WTA' : 'ATP') + ' Finals?', sub: 'Our chance of qualifying from simulating the rest of the season, beside our strength ratings. Tap a row to open the player.' }) + '<div class="qk-grid">';
+      if (raceRows.length) html += '<div class="qk-span-6">' + V().card('Race to the Finals', 'Our chance of qualifying, from ' + (race.n_sims ? Number(race.n_sims).toLocaleString('en-GB') + ' ' : '') + 'simulated seasons', '<div id="ov-race"></div>', { foot: '<span>Race points when the season was last simulated' + (race.as_of ? ' (' + esc(TA.fmtDate(race.as_of, { year: false, weekday: false })) + ')' : '') + '</span><a href="' + TA.href(T, 'race') + '">The race →</a>' }) + '</div>';
+      if (eloKeys.length) html += '<div class="qk-span-6">' + V().card('Elo top 10', 'Our strength ratings from every tour-level result', V().seg('ov-sf', eloKeys.map(k => [k, k === 'all' ? 'Overall' : TA.surfaceLabel(k)]), eloKeys[0], 'Surface') + V().chart('ov-elo', 360, 'Elo top 10'), { foot: '<span>A 100-point gap makes the higher-rated player about a 64% favourite</span><a href="' + TA.href(T, 'elo') + '">Elo tables →</a>' }) + '</div>';
+      html += '</div></section>';
+    }
     if (!isCurrent) {
       const ch = champions(T, Y);
       if (ch) html += '<section class="qk-section">' + QK.sectionHead({ kicker: Y, title: 'Champions', sub: 'The Slams, the Finals and the 1000s in ' + Y + '.', actions: '<a class="qk-btn" href="' + TA.href(T, 'calendar', Y) + '">Every tournament</a>' }) + '<div class="qk-card">' + ch + '</div></section>';
@@ -145,25 +161,46 @@ function render(el, params) {
 
     el.innerHTML = html;
 
-    /* How sure are we? (teaser): the match model's record from <T>/calibration.json; nothing when the file is absent */
+    /* We say it. Then we check it.: the match model's record from <T>/calibration.json (QK.howSure: the big numbers
+       over the we-said / it-happened bars); nothing when the file is absent. The full record is on the calibration page. */
     TA.load(TA.tpath('calibration.json', T)).then(cj => {
-      const box = el.querySelector('#ov-sure');
+      const box = el.querySelector('#ov-sure'), hd = el.querySelector('#ov-sure-h');
       const cb = box && TA.ok(cj) ? QK.calib.find(cj) : null;
       if (!box) return;
-      if (!cb || !cb.bins.length) { box.innerHTML = ''; return; }
-      const big = cb.bins.slice().sort((a, b) => b.n - a.n)[0];
-      box.innerHTML = '<article class="qk-card" style="height:100%"><div class="qk-card-body"><div class="qk-kicker">How sure are we?</div><h3 style="margin:8px 0 6px">When we say ' + Math.round(big.mean_p * 100) + '%, it happens ' + Math.round(big.freq * 100) + '% of the time</h3>' +
-        '<p style="margin:0 0 6px;color:var(--ink-2)">Across ' + QK.fmt.num(big.n) + ' ' + TA.tourName(T) + ' matches where we gave a player ' + Math.round(big.lo * 100) + '–' + Math.round(big.hi * 100) + '%, that player won ' + QK.fmt.pct(big.freq, 1) + '.</p>' +
-        QK.note('<b>Brier score ' + (isNum(cb.brier) ? cb.brier.toFixed(3) : '—') + '</b> over ' + QK.fmt.num(cb.n) + ' matches' + (cj.years && cj.years.length ? ' since ' + esc(cj.years[0]) : '') + ': 0 is perfect, 0.25 is a coin flip. A rating gap shows up in results more reliably in tennis than in most sports.') +
-        '<a class="qk-more" style="display:inline-block;margin-top:14px" href="' + TA.href(T, 'calibration') + '">The full record</a></div></article>';
+      if (!cb || !cb.bins.length) { box.innerHTML = ''; hd.innerHTML = ''; return; }
+      const ys = (cj.years || []).slice().sort();
+      hd.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every ' + TA.tourName(T) + ' match we have forecast' + (ys.length ? ' since ' + ys[0] : '') + ', grouped by the chance we gave a player. When the two bars match, our numbers mean what they say.',
+        actions: '<a class="qk-more" href="' + TA.href(T, 'calibration') + '">The full record</a>' });
+      QK.howSure(box, { calibration: cj, league: TA.tourName(T), span: ys.length ? ys[0] + '–' + ys[ys.length - 1] : '', subject: 'that player', unit: 'matches' });
     });
+
+    /* Who's for real?: share of matches won (results) against share of games won (the process) this season, from
+       value.json's luck rows (the season block), the top 40 by ranking with 15 or more tour-level matches */
+    if (isCurrent && el.querySelector('#ov-luck')) {
+      TA.load(TA.tpath('value.json', T)).then(vj => {
+        const host = el.querySelector('#ov-luck');
+        if (!host) return;
+        const rows = (((TA.ok(vj) && vj.luck) || {}).rows || []).map(r => ({ pid: String(r.pid), s: r.season || {} }))
+          .filter(r => isNum(r.s.games_share) && isNum(r.s.win_pct) && (r.s.n || 0) >= 15);
+        const rk = r => (isNum(TA.playerRank(T, r.pid)) ? TA.playerRank(T, r.pid) : 9999);
+        const top = rows.sort((a, b) => rk(a) - rk(b)).slice(0, 40);
+        if (top.length < 8) { host.innerHTML = QK.empty('Not yet', 'The chart fills in once enough players have 15 matches this season.'); return; }
+        const pts = top.map(r => ({ x: r.s.games_share * 100, y: r.s.win_pct * 100, label: TA.playerSurname(T, r.pid), name: TA.playerName(T, r.pid) + (isNum(TA.playerRank(T, r.pid)) ? ' · No. ' + TA.playerRank(T, r.pid) : ''),
+          sub: r.s.w + '–' + (r.s.n - r.s.w) + ' this season' + (isNum(r.s.adj_win_pct) ? '; on the games won, about ' + TA.pct(r.s.adj_win_pct, 0) + ' of matches' : ''), href: TA.playerHref(T, r.pid) }));
+        const avgY = pts.reduce((a, p) => a + p.y, 0) / pts.length;
+        QKC.quadrant('#ov-luck', { points: pts, xName: 'Share of games won (%)', yName: 'Share of matches won (%)', refX: 50, refY: avgY,
+          xFmt: v => Math.round(v) + '%', yFmt: v => Math.round(v) + '%', label: TA.tourName(T) + ' players: share of games won against share of matches won' });
+        el.querySelector('#ov-luck-cap').textContent = TA.tourName(T) + ' ' + Y + ', the top ' + pts.length + ' by ranking with 15 or more tour-level matches. Dashed lines: half the games, and the group’s average match record. Tap a player for the page.';
+      });
+    }
 
     if (isCurrent) {
       const draw = w => {
         const list = w === 'next' ? nextList : w === 'results' ? doneList : nowList;
         const gh = el.querySelector('#ov-gh');
         const n = Math.min(9, list.length);
-        if (gh) gh.textContent = w === 'next' ? 'Next up' : w === 'results' ? 'Latest results' : (n ? (n === 1 ? 'One match' : n + ' matches') + ' on the slate' : 'Today');
+        const W = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+        if (gh) gh.textContent = w === 'next' ? 'Next up. Our calls.' : w === 'results' ? 'Latest results' : (n ? (W[n] || n) + ' match' + (n === 1 ? '' : 'es') + '. Our calls.' : 'Today');
         el.querySelector('#ov-games').innerHTML = list.length ? list.slice(0, 9).map(c => TA.matchCard(c, { tour: T, why: true })).join('')
           : QK.empty('No matches', w === 'now' ? 'Nothing on today’s schedule: see the next matches.' : w === 'next' ? 'No matches scheduled yet.' : 'No results yet.');
       };

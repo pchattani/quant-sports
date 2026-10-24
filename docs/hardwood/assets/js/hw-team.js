@@ -1,7 +1,7 @@
-/* The Quant Hardwood — the team page (#/<L>/team/<tid>), on Design System 2.0.
+/* The Quant Hardwood — the team page (#/<L>/team/<tid>), on kit v4 "Broadcast".
  *
- * Overview tab: a team card header in the team colour (record, net rating, projection); stat tiles (our playoff
- * and title chances first, projected wins with the simulation's 90% range, the ratings); the net rating through the
+ * Overview tab: the full-bleed team-colour hero with the black strip of numbers (record, our playoff and title
+ * chances first, projected wins with the simulation's 90% range, the rating); the net rating through the
  * season (±1 standard error shaded, results marked); our season chances and the final-seed distribution; strengths
  * and needs with the best trade targets (current season); the current roster as a leaderboard; the schedule (next
  * games with our win chance and the team's availability line, recent results); moves.
@@ -60,15 +60,17 @@ function render(el, params) {
       { label: 'Net rating', value: U.signed(r.net, 1), sub: isNum(r.rank) ? HW.ordinal(r.rank) + ' of ' + Object.keys((season && season.ratings) || {}).length : '' }
     ];
     if (open) stats.push({ label: 'Projected wins', value: U.f(sim.exp_w, 1), sub: U.f(sim.w_p05, 0) + '–' + U.f(sim.w_p95, 0) });
-    let h = '<nav class="hw-crumb" aria-label="Breadcrumb"><a href="' + esc(HW.href(L, 'teams', S)) + '">' + esc(HW.leagueName(L)) + ' teams</a><span aria-hidden="true">›</span>' + esc(name) + '</nav>' +
-      QK.playerHeader({ name: name, split: false, kicker: U.kicker(L, S), team: { name: [info.conference || s.conf, info.division].filter(Boolean).join(' · ') || HW.leagueName(L), abbr: HW.teamAbbr(L, tid), colour: HW.teamColourRaw(L, tid) },
-        meta: [isNum(r.off) ? ['Offence', U.f(r.off, 1) + ' per 100'] : null, isNum(r.def) ? ['Defence', U.f(r.def, 1) + ' allowed'] : null, isNum(r.pace) ? ['Pace', U.f(r.pace, 1)] : null], stats: stats });
     const tiles = [];
     if (isCur && isNum(sim.p_playoffs)) tiles.push({ label: 'Our playoff chance', value: U.pct(sim.p_playoffs), signal: true, sub: 'from ' + Number(((season.sim || {}).n_sims) || 20000).toLocaleString('en-GB') + ' simulated seasons', tip: 'Our chance of a playoff place (play-in excluded)' });
     if (isCur && isNum(sim.p_title)) tiles.push({ label: 'Our title chance', value: U.pct(sim.p_title), signal: true, sub: isNum(sim.p_conf) ? 'conference ' + U.pct(sim.p_conf) : '' });
     if (open) tiles.push({ label: 'Projected wins', value: U.f(sim.exp_w, 1), sub: '90% range ' + U.f(sim.w_p05, 0) + ' to ' + U.f(sim.w_p95, 0), tip: 'Mean of the simulated seasons; the range holds nine seasons in ten' });
     if (isNum(r.net)) tiles.push({ label: 'Net rating', value: U.signed(r.net, 1), sub: 'per 100 possessions' + (isNum(r.se_net) ? ' ± ' + U.f(r.se_net, 1) : '') + (isNum(r.rank) ? ' · ' + HW.ordinal(r.rank) : ''), tip: 'Our opponent-adjusted net rating (Kalman filter); ± one standard error' });
     if (isNum(r.off)) tiles.push({ label: 'Offence · defence', value: U.f(r.off, 1) + ' · ' + U.f(r.def, 1), sub: 'points scored and allowed per 100' });
+    /* v4: the full-bleed team-colour hero (the alternate colour on the diagonal, the abbreviation outlined) with the
+       black strip of five numbers: the record, our chances, projected wins and the rating */
+    let h = '<nav class="hw-crumb" aria-label="Breadcrumb"><a href="' + esc(HW.href(L, 'teams', S)) + '">' + esc(HW.leagueName(L)) + ' teams</a><span aria-hidden="true">›</span>' + esc(name) + '</nav>' +
+      QK.playerHeader({ name: name, split: false, kicker: U.kicker(L, S), face: HW.teamAbbr(L, tid), team: { name: [info.conference || s.conf, info.division].filter(Boolean).join(' · ') || HW.leagueName(L), abbr: HW.teamAbbr(L, tid), colour: HW.teamColourRaw(L, tid), alt: HW.teamAlt(L, tid) },
+        meta: [isNum(r.off) ? ['Offence', U.f(r.off, 1) + ' per 100'] : null, isNum(r.def) ? ['Defence', U.f(r.def, 1) + ' allowed'] : null, isNum(r.pace) ? ['Pace', U.f(r.pace, 1)] : null], strip: [stats[0]].concat(tiles.length ? tiles.filter(t => t.label !== 'Offence · defence') : stats.slice(1)).slice(0, 5) });
     const base = HW.teamHref(L, tid, S);
     h += '<div style="margin-top:var(--sp-4)"></div>' + U.tabsHTML([{ key: 'overview', label: 'Overview', href: base }, { key: 'detail', label: 'Shots, lineups and the full catalogue', href: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'tab=detail' }], tab);
     if (tab === 'detail') {
@@ -78,7 +80,6 @@ function render(el, params) {
     if (!season && !teams) { el.innerHTML = h + U.empty('Not in this season', name + ' has no data for ' + HW.seasonLabel(L, S) + '.'); return; }
     const path = ((season && season.rating_paths) || {})[tid] || [];
     const log = (T.log || []).slice().sort((x, y) => String(x.date).localeCompare(String(y.date)));
-    h += tiles.length ? '<div class="hw-tiles">' + QK.stats(tiles) + '</div>' : '';
     if (isCur && isNum(sim.p_playoffs)) h += '<div style="margin-top:var(--sp-3)">' + QK.note('<b>' + U.pct(sim.p_playoffs) + '</b> to make the playoffs means ' + esc(HW.teamName(L, tid)) + ' made it in ' +
       (sim.p_playoffs >= 0.995 ? 'nearly all its' : sim.p_playoffs <= 0.005 ? 'almost none of the' : 'about ' + Math.max(1, Math.round(sim.p_playoffs * 10)) + ' of every 10') + ' simulated seasons.' + (isNum(r.net) ? ' A net rating of <b>' + U.signed(r.net, 1) + '</b> is the points per 100 trips the team is better than an average one, after the schedule.' : '')) + '</div>';
     h += '<div class="qk-grid hw-sec">';
@@ -115,6 +116,12 @@ function render(el, params) {
     const txRows = tx ? U.rowsOf(tx).filter(x => String(x.team) === tid) : [];
     const seen = {}, txs = txRows.filter(x => { const k = x.date + x.text; if (seen[k]) return false; seen[k] = 1; return true; }).sort((x, y) => String(y.date).localeCompare(String(x.date))).slice(0, 10);
     const dl = deals && deals.teams ? deals.teams[tid] : null;
+    /* v4: the next game as the scoreboard bug (our chance, the start, both teams in their colours) */
+    if (upcoming.length) {
+      const g0 = upcoming[0], st0 = U.status(g0);
+      h += '<section class="qk-section">' + QK.sectionHead({ kicker: st0 === 'live' ? 'Live now' : (QK.fmt.relDay(g0.date) === 'Today' ? 'What to watch tonight' : 'Next up'), title: U.nick(L, g0.away) + ' at ' + U.nick(L, g0.home) }) +
+        QK.previewCard(U.game(g0, L, { records: U.records(season) }), { layout: 'bug', nick: t => t.short || t.name }) + '</section>';
+    }
     h += '<div class="qk-grid hw-sec">' + U.card2('Schedule', upcoming.length ? 'Next games with our win chance' : 'Results', '<div id="tp-sched"></div>', { cls: 'qk-span-6', flush: true });
     if (txs.length || dl) h += U.card2('Moves', dl ? dl.n + ' rated trade' + (dl.n === 1 ? '' : 's') + ' in 12 months · net ' + U.signed(dl.net_now, 1) + ' WAR in today’s view' : 'Transactions in the last 12 months',
       '<div>' + txs.map(x => '<div class="hw-tx"><span class="d">' + esc(HW.fmtDate(x.date, { year: 'auto', weekday: false })) + '</span><span>' + esc(x.text) + '</span></div>').join('') + '</div>',

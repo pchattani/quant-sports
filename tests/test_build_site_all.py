@@ -292,6 +292,23 @@ def test_hub_upcoming_lists_only_matches_still_to_play() -> None:
     assert hub["days"] == {}
 
 
+def test_hub_items_carry_club_ids_for_kit_colours() -> None:
+    """The public build ships no crests (D6), so the hub names each side's club id: the pages look up the club's kit
+    colours (clubs_index.json) and its link by id."""
+    from datetime import datetime, timezone
+
+    import scripts.build_site_all as b
+
+    pl = {"ok": True, "slug": "premier-league", "name": "Premier League", "kind": "league",
+          "_teams": {"Arsenal": {"team_id": 42, "crest": None}, "Coventry": {"team_id": 7}},
+          "_fixtures": [{"id": "1", "date": "2026-10-18T14:00:00Z", "home": "Arsenal", "away": "Coventry", "status": "scheduled"},
+                        {"id": "2", "date": "2026-10-18T16:00:00Z", "home": "Arsenal", "away": "Unknown", "status": "scheduled"}]}
+    hub = b.build_hub([pl], now=datetime(2026, 10, 17, 12, tzinfo=timezone.utc))
+    m1, m2 = hub["days"]["2026-10-18"]
+    assert (m1["home_id"], m1["away_id"]) == (42, 7)
+    assert m2["home_id"] == 42 and "away_id" not in m2
+
+
 def test_stale_market_odds_keep_only_what_is_still_current(tmp_path) -> None:
     """With no market data back, the previous market_odds.json keeps only lines of fixtures not yet kicked off and a
     title market under MARKET_KEEP_HOURS old (it used to keep last matchday's lines for good)."""

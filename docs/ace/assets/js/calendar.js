@@ -53,7 +53,7 @@ function render(el, params) {
             { v: e.start, html: esc(TA.fmtRange(e.start, e.end)) },
             { v: e.name, html: TA.eventLink(T, e.id, { surface: true }) + (e.level === 'slam' ? ' <span class="chip lv-chip lv-slam">GS</span>' : '') },
             { v: TA.levelRank(e.level), html: esc(TA.levelLabel(e.level, T)) },
-            { v: e.surface, html: '<span style="color:' + TA.surfaceColour(e.surface, e.indoor) + '">' + esc(TA.surfaceLabel(e.surface, e.indoor)) + '</span>' },
+            { v: e.surface, html: TA.surfaceDot(e.surface, e.indoor) + esc(TA.surfaceLabel(e.surface, e.indoor)) },
             { v: e.city, html: esc([e.city, e.country].filter(Boolean).join(', ')) },
             { v: e.draw_size, html: TA.isNum(e.draw_size) ? String(e.draw_size) : '—' },
             { v: e.champion ? TA.playerName(T, e.champion) : '', html: e.champion ? '🏆 ' + TA.playerLink(T, e.champion) : stHtml },

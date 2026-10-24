@@ -727,7 +727,7 @@ a.qk-stat:hover .qk-stat-label { color: var(--volt); }
 .qk-tape-r .b { height: 14px; display: flex; min-width: 0; }
 .qk-tape-r .b.lft { justify-content: flex-end; }
 .qk-tape-r .b i { display: block; height: 100%; }
-.qk-tape-r .b i.dim { opacity: 0.42; }
+.qk-tape-r .b i.dim { opacity: 0.5; }
 .qk-tape-key { display: flex; justify-content: space-between; gap: 8px; font: 700 var(--fs-2xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); margin-top: 10px; }
 @media (max-width: 640px) {
   .qk-tape-head .t { padding: 10px 12px; }
@@ -1029,3 +1029,13 @@ body.qk .qk-split, body.qk .qk-split small, body.qk .qk-split-tn, body.qk .qk-sp
 body.qk .qk-bugxl .tm, body.qk .qk-bugxl .tm span, body.qk .qk-ph, body.qk .qk-ph-name, body.qk .qk-ph-meta > span, body.qk .qk-ph-meta a,
 body.qk .qk-hot-card, body.qk .qk-hot-who, body.qk .qk-hot-val, body.qk .qk-chance-nm, body.qk .qk-chance-nm small { color: #fff; }
 body.qk .qk-split-foot .lab { color: #c7ced9; }
+/* one-column grids never let a child's min-content widen the page (1fr is minmax(auto, 1fr)) */
+@media (max-width: 1000px) { .qk-gside, .qk-g75 { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 640px) {
+  .qk-g2, .qk-g3, .qk-watch { grid-template-columns: minmax(0, 1fr); }
+  .qk-bugxl .md { padding: 8px 8px; }
+  .qk-bugxl .md b { font-size: 1.5rem; }
+  .qk-tape-head .t small { display: none; }
+}
+.qk-tape-head .t > * { max-width: 100%; }
+.qk-bugxl .tm > * { min-width: 0; max-width: 100%; }

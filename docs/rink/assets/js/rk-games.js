@@ -1,8 +1,8 @@
-/* The Quant Rink — Games (#/games[/<date>]) and the game centre (#/game/<id>), on the kit (Design System 2.0).
+/* The Quant Rink — Games (#/games[/<date>]) and the game centre (#/game/<id>), on the kit (v4 "Broadcast").
  *
  * Games: a strip of game days, the day's games as v2 game cards (our chance first, the market a quiet tick), our
  * chance for every home side, and how the model did once games are final.
- * Game centre (the v2 reference game page): scoreboard hero with our win-chance bar, stat tiles (our pre-game and
+ * Game centre (the v4 reference game page): the diagonal split hero (QK.previewCard) with our chance, stat tiles (our pre-game and
  * live chance, expected goals, the biggest swing), then Summary (win probability, expected-goals race, shot map,
  * linescore, three stars, tale of the tape, our pre-game forecast with the market as a reference, the exact-score
  * grid and the goals distribution, the box score) and Detail (the full pre-redesign game centre), ?view=detail.
@@ -111,7 +111,7 @@ function cardOf(d, id) {
   return c;
 }
 
-/* v3 (Matchday) hero: QK.previewCard — away "at" home with records, the score bug when live, our chance for the
+/* v4 (Broadcast) hero: QK.previewCard, the diagonal split — away "at" home with records, the clock when live, our chance for the
    favourite as a big blue number, a plain-English note (overtime and goals in all), the market as a quiet reference
    line before the game (game detail is one of the two places it may appear), and how the clubs match up so far. */
 const TWO_WORD = /(Maple Leafs|Red Wings|Golden Knights|Blue Jackets)$/;
@@ -123,7 +123,10 @@ function hero(c, d, g, season) {
   const [ca, ch] = U.pair(c.away, c.home);
   const rows = {}; (((season && season.standings) || {}).rows || []).forEach(r => { rows[r.team] = r; });
   const rec = t => { const r = rows[t]; return r && isNum(r.w) ? r.w + '–' + r.l + '–' + (r.otl || 0) + (isNum(r.pts) ? ' · ' + r.pts + ' pts' : '') : ''; };
-  const G = Object.assign({}, g, { home: Object.assign({}, g.home, { colour: ch, record: rec(c.home) }), away: Object.assign({}, g.away, { colour: ca, record: rec(c.away) }) });
+  /* v4: the diagonal hero takes the raw kit colours and the alternates (QK.color.blockPair makes them blocks with
+     white type and resolves a clash); the charts keep the lifted pair [ca, ch] */
+  const G = Object.assign({}, g, { home: Object.assign({}, g.home, { colour: RK.teamColourRaw(c.home) || ch, alt: RK.teamAlt(c.home), full: RK.teamName(c.home), record: rec(c.home) }),
+    away: Object.assign({}, g.away, { colour: RK.teamColourRaw(c.away) || ca, alt: RK.teamAlt(c.away), full: RK.teamName(c.away), record: rec(c.away) }) });
   /* the pre-game call stays the pre-game call once the game is over */
   if (st === 'final' && isNum(m.p_home)) G.p_home = Number(m.p_home);
   const R = (season && season.ratings) || {};

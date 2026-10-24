@@ -203,7 +203,9 @@ def level_index(data: Path, level: str, now: datetime) -> dict:
     confs = {str(c): {"name": v.get("name"), "short": v.get("short")} for c, v in (season.get("conferences") or {}).items()}
     used = {str(c.get(k)) for c in today + nxt + last for k in ("home", "away")}
     used |= {r["team"] for r in top25 + model_top + title} | {str(c[1]) for c in champs}
-    team_out = {str(t): {k: v.get(k) for k in ("name", "short", "abbr", "colour", "alt_colour", "conference", "member")}
+    # alt: the kit's name for the second colour (MIGRATION_V4); alt_colour stays for the site's own JS
+    team_out = {str(t): {**{k: v.get(k) for k in ("name", "short", "abbr", "colour", "alt_colour", "conference", "member")},
+                         "alt": v.get("alt") or v.get("alt_colour")}
                 for t, v in teams.items() if v.get("member") or str(t) in used}
     return {"ok": True, "name": NAMES[level], "short": SHORT[level], "sport": canon.sport(level), "current_season": cur,
             "seasons": seasons, "phase": season.get("phase"), "week": season.get("week") if level == "cfb" else None,

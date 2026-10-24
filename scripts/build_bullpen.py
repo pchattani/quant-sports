@@ -63,6 +63,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from oddsmarkets.baseball import analytics as an  # noqa: E402
+from oddsmarkets.baseball import canon  # noqa: E402
 
 logger = logging.getLogger("build_bullpen")
 CSS_SRC = ROOT / "docs" / "site" / "assets" / "style.css"
@@ -588,7 +589,9 @@ def index_payload(b: Build, levels: dict[str, dict], today: date) -> dict:
                              "teams": post.get("teams")} if post else None
         out["leaders"] = leaders
         tms = cur.get("teams") or {}
+        # alt: the second kit colour for the Broadcast hero's clash rule (canon.ALT when the season payload predates it)
         out["teams"] = {t_: {k: r_.get(k) for k in ("name", "abbr", "short", "league", "division", "colour")} |
+                        {"alt": r_.get("alt") or canon.team_alt(t_)} |
                         {k: (r_.get("values") or {}).get(k) for k in ("w", "l", "rating", "p_postseason", "p_ws")}
                         for t_, r_ in (tms.get("teams") or {}).items()}
     return out

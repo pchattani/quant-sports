@@ -1,3 +1,5 @@
+> **Superseded by `MIGRATION_V4.md` (kit v4 "Broadcast", 23 Oct 2026).** Kept as history; follow v4.
+
 # Moving a site to kit v3 "Matchday" (dark only)
 
 For the phase-B agents, one site each. Read `STYLE_GUIDE.md` first (identity, colour, type, copy), open

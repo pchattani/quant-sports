@@ -96,6 +96,12 @@ def main() -> int:
             failed += 1
         time.sleep(PAUSE_S)
     logger.info("crests: %d fetched, %d already present, %d failed", done, skipped, failed)
+    if done:
+        # The kit colours the Broadcast heroes use come from the crests (the public build ships no crests, so the
+        # derived table is what CI reads): re-derive it, then commit oddsmarkets/football/analytics/data/club_colours.json.
+        from oddsmarkets.football.analytics import colours
+        rows = colours.refresh(CRESTS_DIR)
+        logger.info("club colours: %d clubs -> %s (commit it)", len(rows), colours.TABLE)
     return 0 if (done or skipped) else 1
 
 

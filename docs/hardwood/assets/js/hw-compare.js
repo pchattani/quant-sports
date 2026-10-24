@@ -1,17 +1,18 @@
-/* The Quant Hardwood — Compare players (#/<L>/compare/players/<a>/<b>[/<c>]), on Design System 2.0 (the Rink
+/* The Quant Hardwood — Compare players (#/<L>/compare/players/<a>/<b>[/<c>]), on kit v4 "Broadcast" (the Rink
  * compare page is the reference).
  *
  * Two or three players side by side on the one metric set the player card uses (HW.ui.MSET, after the metrics
  * spec): value, a percentile bar against the role (guards, wings or bigs; qualified players), the better value in
- * bold, and for two players the difference. Players of the same role are ranked against that role; a guard with a
+ * bold. Players of the same role are ranked against that role; a guard with a
  * big falls back to every qualified player on the shared headline metrics, and the page says so. Below: where each
  * one sits in the peer distribution of a chosen metric. With one player picked, the other is his most similar
  * player this season (the spec's weighted method within the role); with none, the two best by total impact. Teams (#/<L>/compare/teams/...) and ?view=all open
  * the full pre-redesign comparison (every catalogue metric, radar, shot charts, careers).
  *
- * v3 (Matchday): the title asks the question ("Jokic, Wembanyama or Gilgeous-Alexander?"), the best value in each row
- * sits under the sun highlighter, the percentiles are coloured pills, and a verdict under the table names what each
- * player does best (QK.verdicts, the type from HW.ui.ARCHETYPE).
+ * v4 (Broadcast): the title asks the question ("Jokic, Wembanyama or Gilgeous-Alexander?"); two players are the tale
+ * of the tape in their team colours (bars = percentile, the better number solid), three a table with the best value
+ * under the volt stroke; a verdict under it names what each player does best (QK.verdicts, the type from
+ * HW.ui.ARCHETYPE).
  *
  * Reads <L>/<S>/players.json (the catalogue), <L>/<S>/value.json (roles) and <L>/players/<pid>.json (similar). */
 (function (HW) {
@@ -116,7 +117,8 @@ function draw(body, L, S, E, cat, roles, fellBack) {
         dfmt: pctFmt ? (x => (x > 0 ? '+' : x < 0 ? '−' : '±') + Math.abs(x * 100).toFixed(1) + ' pts') : null };
     })
   }));
-  const ents = E.map(id => { const p = P[id]; return { name: p.name, href: HW.playerHref(L, id, S), abbr: QK.surname(p.name || ''),
+  /* v4: two players draw the tale of the tape in their team colours (QK.tape via QK.compareView); three keep the table */
+  const ents = E.map(id => { const p = P[id]; return { name: p.name, href: HW.playerHref(L, id, S), abbr: QK.surname(p.name || ''), short: QK.surname(p.name || ''), colour: HW.teamColourRaw(L, p.team), alt: HW.teamAlt(L, p.team),
     sub: [HW.teamAbbr(L, p.team), (U.ROLE1 || {})[U.roleOf(p, id, roles)] || p.pos, (p.gp || 0) + ' GP', Number(Math.round(p.min || 0)).toLocaleString('en-GB') + ' min'].join(' · ') }; });
   const short = E.filter(id => !P[id].qualified).map(id => P[id].name);
   /* verdicts: for each player, the metric where the player's percentile beats the others' by the most */
@@ -132,8 +134,8 @@ function draw(body, L, S, E, cat, roles, fellBack) {
   });
   const q = sn.length === 2 ? sn[0] + ' or ' + sn[1] + '?' : sn.slice(0, -1).join(', ') + ' or ' + sn[sn.length - 1] + '?';
   body.innerHTML = U.card2('Players', 'Ranked against ' + esc(peer) + ' in ' + esc(HW.seasonLabel(L, S)) + (fellBack ? ' (the latest season with a catalogue)' : ''), pk.html) +
-    '<section class="qk-section" style="margin-top:var(--sp-8)">' + QK.sectionHead({ kicker: 'Side by side', title: q,
-      sub: 'Value and percentile against ' + peer + ' (100 = best). The best in each row is highlighted' + (E.length === 2 ? '; the last column is ' + sn[0] + ' minus ' + sn[1] + ', green when ' + sn[0] + ' is better.' : '.') }) +
+    '<section class="qk-section" style="margin-top:var(--sp-8)">' + QK.sectionHead({ kicker: E.length === 2 ? 'Tale of the tape' : 'Side by side', title: q,
+      sub: E.length === 2 ? 'Bar length = percentile against ' + peer + ' (100 = best). The better number in each row is solid.' : 'Value and percentile against ' + peer + ' (100 = best). The best in each row is highlighted.' }) +
     U.card2(E.length + ' players, one metric set', 'The headline set for the role from our metrics spec: stable and predictive rates first',
       QK.compareView({ entities: ents, groups: groups }) + QK.verdicts(verd) +
       (short.length ? '<p class="qk-caption">' + esc(short.join(', ')) + (short.length > 1 ? ' are' : ' is') + ' short of the minutes floor (' + Number(cat.min_floor || 0).toLocaleString('en-GB') + '): read the percentiles as early.</p>' : '') +

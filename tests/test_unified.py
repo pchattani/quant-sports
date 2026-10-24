@@ -156,6 +156,26 @@ def test_one_club_across_competitions_and_names(world) -> None:
     assert [p["id"] for p in spain["squad"]["players"]] == ["82474"]
 
 
+def test_clubs_carry_kit_colours_from_the_committed_table(world) -> None:
+    """colour / alt per club (the Broadcast heroes and stripes) come from data/club_colours.json, in the club file and
+    as two clubs_index columns; never for a national team."""
+    from oddsmarkets.football.analytics import colours as C
+
+    d, _, _ = world
+    want = C.club(3202)
+    assert want.get("colour", "").startswith("#")
+    boca = _j(d / "clubs" / "3202.json")
+    assert {k: boca.get(k) for k in want} == want
+    idx = _j(d / "clubs_index.json")
+    f = idx["fields"]
+    assert f[-2:] == ["colour", "alt"]
+    row = next(r for r in idx["rows"] if r[0] == 3202)
+    assert row[f.index("colour")] == want["colour"] and row[f.index("alt")] == want.get("alt")
+    spain = _j(d / "clubs" / "4698.json")
+    assert "colour" not in spain and "alt" not in spain
+    assert len(next(r for r in idx["rows"] if r[0] == 4698)) == f.index("colour")   # no colour columns at all
+
+
 def test_squad_without_roster_lists_only_players_whose_latest_club_it_is(world) -> None:
     d, _, _ = world
     river = _j(d / "clubs" / "3211.json")

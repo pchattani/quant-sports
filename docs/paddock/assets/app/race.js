@@ -1,6 +1,7 @@
 /* The Quant Paddock — the race centre (#/race/<y>/<r>[/laps|strategy|quali|telemetry]).
- * Upcoming (kit v3, after rk-games.js): a preview hero (our favourite as a big blue number with a how-sure note, the
- * top three, the market as one quiet labelled line when there is a usable quote) with the forecast table beside it;
+ * Upcoming (kit v4, after rk-games.js): the diagonal split hero (QK.previewCard: our favourite against our second pick
+ * in constructor colours, a how-sure note, the market as one quiet labelled line when there is a usable quote) with
+ * the forecast table beside it;
  * then the weekend schedule, our forecast before and after qualifying (and the sprint; the market a grey reference
  * tick) and the finishing-position distribution. Finished: awards, the result against the
  * forecast; Laps (positions, gaps, lap times, corrected pace, overtakes, race control); Strategy
@@ -135,7 +136,7 @@ function overviewUpcoming(host, race, season, teams, markets) {
   var nr = (markets || {}).next_race || {};
   var mk = nr.year === race.year && nr.round === race.round && nr.prices && Object.keys(nr.prices).length ? nr.prices : null;
   var raceS = sessions.filter(function (s) { return s.key === 'race'; })[0];
-  host.innerHTML = '<div class="pd-gtop">' + hero(race, main, mk, raceS, post) + '<div class="pd-gside">' +
+  host.innerHTML = '<div class="pd-gtop">' + hero(race, main, mk, raceS, post, teams) + '<div class="pd-gside">' +
     PD.card(post ? 'Our forecast, after qualifying' : 'Our forecast', 'The top ten by our win chance, from ' + (main && main[2].n ? PD.int(main[2].n) : '20,000') + ' simulated races.', '<div id="rc-top"></div>', { flush: true }) +
     PD.kpis([
       PD.kpi('Safety car', main && isNum(main[2].p_sc) ? PD.pct(main[2].p_sc, 0) : '—', 'our chance of at least one' + (main && isNum(main[2].p_vsc) ? ' · VSC ' + PD.pct(main[2].p_vsc, 0) : '')),
@@ -157,24 +158,21 @@ function overviewUpcoming(host, race, season, teams, markets) {
   forecastBlock('rc-fc', views, teams, 'Who wins? Our chance', post ? 'post' : 'pre', mk);
 }
 
-/* v3 (Matchday) hero for a race still to run, after QK.previewCard: the round and circuit, our favourite as a big
-   blue number with the next two, the top three with team marks, a "How sure are we?" note, and the market as one quiet
-   labelled line (game detail is one of the two places it may appear) when a usable quote exists. */
-function hero(race, main, mk, raceS, post) {
+/* v4 (Broadcast) hero for a race still to run, after rk-games.js: QK.previewCard, the diagonal split hero with our
+   favourite against our second pick in their constructors' colours (team-mates: the second driver falls to slate with
+   the constructor colour as the rule), our win chances as the giant numbers, the start time and the circuit between;
+   the market as one quiet labelled line under it when a usable quote exists (race detail is one of the two places it
+   may appear); "How sure are we?" (how often the favourite loses to the field); then the two side by side on podium,
+   points, expected finish and retirement. */
+function hero(race, main, mk, raceS, post, teams) {
   var circ = race.circuit || {};
-  var meta = '<div class="qk-feature-meta"><span class="qk-pill">F1 · ' + esc(circ.name || PD.shortRace(race.name)) + '</span><span class="qk-badge">' + esc(raceS ? PD.fmtDate(raceS.iso, { year: false, time: true }) : PD.fmtDate(race.date, { year: false })) + '</span></div>';
-  if (!main) return '<article class="qk-card qk-feature pd-rhero">' + meta + QK.note('Our forecast for this race is built once the weekend is near.') + '</article>';
-  var ds = main[2].drivers;
-  var ids = Object.keys(ds).sort(function (a, b) { return ds[b].p_win - ds[a].p_win; });
-  var f = ids[0], p = ds[f].p_win, miss = Math.max(1, Math.round(10 * (1 - p)));
-  var row = function (id) { var t = PD.driverTeam(id); return '<div class="qk-feature-row"><div class="t">' + (t ? PD.mark(t, 'md') : '') + '<span>' + esc(PD.driverName(id)) + '</span></div><div class="s pd-feat-p">' + PD.pct(ds[id].p_win, 0) + '</div></div>'; };
-  var mline = mk && isNum(mk[f]) ? '<div class="pd-mkt-line"><span class="qk-mkt">Market (Kalshi / Polymarket), for reference: ' + esc(PD.driverSurname(f)) + ' ' + PD.pct(mk[f], 0) + '</span></div>' : '';
-  return '<article class="qk-card qk-feature pd-rhero">' + meta +
-    '<div class="qk-feature-big"><div class="big">' + PD.pct(p, 0) + '</div><div class="say">chance <b>' + esc(PD.driverSurname(f)) + '</b> wins' + (post ? ', now the grid is set' : '') + '. ' +
-    ids.slice(1, 3).map(function (id) { return esc(PD.driverSurname(id)) + ': <b>' + PD.pct(ds[id].p_win, 0) + '</b>'; }).join(', ') + '.</div></div>' +
-    ids.slice(0, 3).map(row).join('') + mline +
-    QK.note('<b>How sure are we?</b> ' + PD.pct(p, 0) + ' means ' + esc(PD.driverSurname(f)) + ' loses a race like this about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.' +
-      (isNum(ds[f].p_podium) ? ' A podium is ' + PD.pct(ds[f].p_podium, 0) + ', and we expect P' + PD.num(ds[f].exp_pos, 1) + ' on average.' : '')) + '</article>';
+  if (!main) return '<div class="pd-rhero">' + QK.explain('Our forecast for this race is built once the weekend is near: the schedule and last year’s race are below.', { title: 'Not built yet.' }) + '</div>';
+  var R = PD.v2.raceGame(race, main[2].drivers, { start: raceS ? raceS.iso : race.date, league: 'Round ' + race.round + ' · ' + (circ.locality || PD.shortRace(race.name)), teams: teams,
+    extra: post ? 'The grid is set: this is our forecast after qualifying.' : '' });
+  if (!R) return '';
+  var f = R.ids[0];
+  return '<div class="pd-rhero">' + QK.previewCard(R.g, { kicker: 'F1 · ' + (circ.name || PD.shortRace(race.name)), homeFirst: true, note: R.note, factors: R.factors, factorsTitle: 'How the two match up this weekend',
+    market: mk && isNum(mk[f]) ? { p: mk[f], label: 'Market (Kalshi / Polymarket)' } : null }) + '</div>';
 }
 
 // ── finished race: overview ───────────────────────────────────────────────

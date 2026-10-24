@@ -114,7 +114,7 @@ GI.route('coach', function (el, params) {
     const team = String((mine[mine.length - 1] || {}).team || car.team || '').split('/')[0];
     const col = team ? GI.tc(team) : 'var(--accent)';
     document.title = name + ' · ' + GI.SITE;
-    el.innerHTML = QK.playerHeader({ name: name, kicker: 'Head coach', pos: '', team: team ? { name: GI.teamName(team), abbr: GI.teamAbbr(team), colour: GI.teamInfo(team).colour, href: GI.teamHref(team) } : null,
+    el.innerHTML = QK.playerHeader({ name: name, kicker: 'Head coach', pos: '', team: team ? { name: GI.teamName(team), abbr: GI.teamAbbr(team), colour: GI.teamInfo(team).colour, alt: GI.teamInfo(team).alt, href: GI.teamHref(team) } : null,
       meta: [car.nSeasons ? ['Graded', car.nSeasons + ' season' + (car.nSeasons === 1 ? '' : 's') + (car.first ? ', ' + car.first + '–' + car.last : '')] : null, rec ? ['Record', GI.record(rec.w, rec.l, rec.t)] : null],
       stats: [{ label: 'Go rate', value: GI.pct(car.go_rate, 0) }, { label: 'GOE (pts)', value: isNum(car.goe) ? GI.signed(car.goe * 100, 1) : '—' }].concat(isNum(car.lost) ? [{ label: 'Win chance lost', value: GI.num(car.lost * 100, 1) }] : []) }) + nav +
       GI.kpis([GI.kpi('Fourth downs', GI.int(car.n), 'graded, career'), GI.kpi('League would', GI.pct(car.go_exp, 1), 'expected go rate in the same spots'), isNum(car.go_when) ? GI.kpi('Went when our model said go', GI.pct(car.go_when, 0), GI.int(car.should) + ' such fourth downs') : '',

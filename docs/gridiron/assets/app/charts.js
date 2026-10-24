@@ -25,7 +25,7 @@ function ax(T, o) { return QKC.axis(T, o); }
 function trow(c, name, v) { return QKC.tipRow(c, name, v); }
 function thead(t) { return '<div style="font-weight:600;margin-bottom:4px;max-width:280px;white-space:normal">' + t + '</div>'; }
 function hexA(h, a) { return QKC.hexA(h, a); }
-function legend(T, o) { return Object.assign({ top: 0, left: 0, icon: 'roundRect', itemWidth: 12, itemHeight: 4, textStyle: { color: T.ink2, fontSize: 11 }, type: 'scroll', pageTextStyle: { color: T.ink3 } }, o || {}); }
+function legend(T, o) { return Object.assign({ top: 0, left: 0, icon: 'rect', itemWidth: 12, itemHeight: 12, textStyle: { color: T.ink2, fontFamily: T.fontCond, fontSize: 13, fontWeight: 700 }, type: 'scroll', pageTextStyle: { color: T.ink3 } }, o || {}); }
 function narrow(x) { const n = node(x); return n ? n.clientWidth < 560 : false; }
 
 function mount(x, build, label, o) {
@@ -160,7 +160,7 @@ function driveChart(x, drives, o) {
     xA.name = o.xName || 'Field position (yards)'; xA.nameLocation = 'middle'; xA.nameGap = 22;
     return {
       grid: { left: 8, right: 10, top: 46, bottom: 30, containLabel: true },
-      legend: legend(T, { top: 'auto', bottom: 0, data: Object.keys(groups), icon: 'roundRect', itemHeight: 8, itemWidth: 12 }),
+      legend: legend(T, { top: 'auto', bottom: 0, data: Object.keys(groups), icon: 'rect', itemHeight: 8, itemWidth: 12 }),
       xAxis: xA, yAxis: yA,
       tooltip: tip(T, { formatter: p => {
         const d = p.data && p.data.d; if (!d) return '';
@@ -346,7 +346,7 @@ function distBars(x, dist, o) {
       xAxis: ax(T, { type: 'value', name: o.xName, nameLocation: 'middle', nameGap: 26, split: false, line: true, scale: true, fmt: v => (o.signed && v > 0 ? '+' : '') + v }),
       yAxis: (a => { a.axisLine.onZero = false; return a; })(ax(T, { name: o.yName === undefined ? 'Probability' : o.yName, nameAlign: 'left', fmt: v => (pmax < 0.1 ? (v * 100).toFixed(1) : Math.round(v * 100)) + '%' })),
       tooltip: tip(T, { formatter: q => thead((o.signed && q.value[0] > 0 ? '+' : '') + q.value[0] + ' ' + esc(o.unit || 'pts')) + trow(q.color, 'Chance', GI.pct(q.value[1], 1)) }),
-      series: [{ type: 'bar', barWidth: '80%', data: entries.map(e => ({ value: e, itemStyle: { color: colourOf(e[0]), borderRadius: [2, 2, 0, 0] } })),
+      series: [{ type: 'bar', barWidth: '80%', data: entries.map(e => ({ value: e, itemStyle: { color: colourOf(e[0]) } })),
         markLine: ml.length ? { silent: true, symbol: 'none', lineStyle: { color: T.ink2, type: [4, 3] }, label: { color: T.ink2, fontSize: 10, position: 'insideEndTop' }, data: ml } : undefined }]
     };
   }, o.label || 'Distribution');
@@ -367,7 +367,7 @@ function probBars(x, items, o) {
     const xa = ax(T, { min: 0, max: Math.min(1, mx * 1.18 + 0.02), fmt: v => Math.round(v * 100) + '%' });
     const gB = 6 + QKC.nameAxis(xa, o.valName === undefined ? 'Probability' : o.valName, 'bottom');
     const series = [{ type: 'bar', name: o.modelName || 'Our chance', barMaxWidth: 16, cursor: 'pointer',
-      data: list.map(i => ({ value: i.p, href: i.href, itemStyle: { color: i.colour ? lift(i.colour, T) : T.model, borderRadius: [0, 4, 4, 0] } })),
+      data: list.map(i => ({ value: i.p, href: i.href, itemStyle: { color: i.colour ? lift(i.colour, T) : T.model } })),
       label: { show: true, position: 'right', color: T.ink2, fontFamily: T.fontNum, fontSize: 10.5, formatter: q => GI.pct(q.value, q.value < 0.1 ? 1 : 0) } }];
     if (list.some(i => isNum(i.market))) series.push({ type: 'scatter', name: o.marketName || 'Market (reference)', symbol: 'rect', symbolSize: [3, 18], z: 5,
       itemStyle: { color: T.market }, data: list.map((i, k) => (isNum(i.market) ? [i.market, k] : null)).filter(Boolean) });

@@ -62,7 +62,9 @@ U.legacy = (name, node, params, state, query) => {
 };
 
 /* ── teams and players ─────────────────────────────────────────────────── */
-U.team = (L, tid) => ({ name: HW.teamName(L, tid), abbr: HW.teamAbbr(L, tid), colour: HW.teamColourRaw(L, tid), href: HW.teamHref(L, tid) });
+/* v4: the team as the kit draws it: full (the city line on the split hero), short (the nickname), alt (the second kit
+   colour, for clashes; the kit's fallbacks cover a team without one) */
+U.team = (L, tid) => ({ name: HW.teamName(L, tid), full: HW.teamName(L, tid), short: HW.teamShort(L, tid), abbr: HW.teamAbbr(L, tid), colour: HW.teamColourRaw(L, tid), alt: HW.teamAlt(L, tid), href: HW.teamHref(L, tid) });
 U.tcol = (L, tid) => {
   const c = HW.teamColourRaw(L, tid);
   return QK.color.parse(c) ? HW.teamColour(L, tid) : QK.cssVar('--c-other');

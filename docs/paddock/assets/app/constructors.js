@@ -121,7 +121,7 @@ function renderList(el, params) {
     if (!Object.keys(T).length) { PD.set('cl-t', PD.muted('No team catalogue for this season.')); return; }
     QK.leaderboard(document.getElementById('cl-t'), { dense: true, sort: { key: 'pos', dir: 'asc' }, rowHref: function (r) { return PD.teamHref(r.id); }, columns: [
       { key: 'pos', label: 'Pos', num: true, fmt: function (v) { return v < 99 ? String(v) : '—'; } },
-      { key: 'name', label: 'Team', type: 'entity', mark: function (r) { return { name: PD.teamName(r.id), abbr: PD.teamAbbr(r.id), colour: PD.teamColour(r.id) }; }, href: function (r) { return PD.teamHref(r.id); } },
+      { key: 'name', label: 'Team', type: 'entity', mark: function (r) { return { name: PD.teamName(r.id), abbr: PD.teamAbbr(r.id), colour: PD.teamColourRaw(r.id) }; }, href: function (r) { return PD.teamHref(r.id); } },
       { key: 'points', label: 'Pts', num: true, fmt: function (v) { return PD.pts(v); } }
     ].concat(heads.map(function (m) { return { key: m.key, label: PD.v2.label(tmeta, m.key), type: 'pctl', pctl: 'p_' + m.key, tip: PD.v2.tip(tmeta, m.key) + (m.lower ? ' (lower is better)' : ''), fmt: function (v) { return PD.v2.fmt(tmeta, m.key, v); } }; })),
     rows: ids.filter(function (id) { return T[id]; }).map(function (id) {
@@ -163,21 +163,20 @@ function renderTeam(el, params, state) {
     var tcol = PD.tc(id);
     var tP = PD.ok(teams) ? PD.v2.peer(teams, 'teams', season) : null;
     var tpc = tP && tP.pct[id] ? tP.pct[id] : {};
-    var hst = [{ label: 'Points', value: PD.pts(s.points) }, { label: 'Wins', value: String(s.wins || 0) }];
-    if (ch) hst.push({ label: 'Title chance', value: PD.pct(ch.p_title, ch.p_title > 0.99 ? 2 : 1) });
-    var h = '<nav class="pd-crumb" aria-label="Breadcrumb"><a href="#/constructors">F1</a><span aria-hidden="true">›</span><a href="#/constructors">Constructors</a><span aria-hidden="true">›</span>' + esc(name) + '</nav>' + QK.playerHeader({ name: name, split: false, pos: 'Constructor', kicker: y + ' season' + (s.pos ? ' · P' + s.pos + ' in the constructors’ championship' : ''),
-        team: { colour: PD.teamColour(id) }, meta: lineup.map(function (d) { return PD.driverLink(d, { dot: false }); }), stats: hst, tags: tP && tP.qualified(id) ? [QK.tag('In the ' + y + ' peer group', 'signal')] : [] }) +
-      '<div class="pd-links pd-mt">' + (lineup.length >= 2 ? '<a class="qk-btn" href="#/compare/drivers/' + encodeURIComponent(lineup[0]) + '/' + encodeURIComponent(lineup[1]) + '">Compare the drivers</a>' : '') +
-      '<a class="qk-btn" href="#/compare/teams/' + encodeURIComponent(id) + '">Compare with another team</a><a class="qk-btn" href="#/value?tab=needs">Every team’s needs</a></div>';
-    if (!t && !s.team && !lineup.length) { el.innerHTML = h + PD.empty(name + ' is not in the ' + y + ' data', PD.ok(teams) ? 'Pick another season.' : 'The team catalogue is not built yet.'); return; }
-    h += PD.kpis([
+    /* v4: the constructor colour as the full-bleed hero, the six numbers in the black strip under it */
+    var strip = [
       PD.kpi('Constructors', s.pos ? PD.ordinal(s.pos) : '—', isNum(s.points) ? PD.pts(s.points) + ' points · ' + (s.wins || 0) + ' wins' : ''),
       PD.kpi('Title chance', ch ? PD.pct(ch.p_title, ch.p_title > 0.99 ? 2 : 1) : '—', ch ? 'expected ' + PD.num(ch.exp_points, 0) + ' pts (90%: ' + PD.num(ch.p05, 0) + '–' + PD.num(ch.p95, 0) + ')' + (ch.clinched ? ' · clinched' : ch.eliminated ? ' · eliminated' : '') : '', { signal: true, tip: 'Our chance of the constructors’ title' }),
       PD.kpi('Race car pace', last ? PD.signed(-last.effect, 2) + '%' : '—', last ? 'faster than the field · R' + last.round + ' ± ' + PD.num(last.se, 2) : '', { pctl: tpc.car_race_pace }),
       PD.kpi('Quali car pace', lastQ ? PD.signed(-lastQ.effect, 2) + '%' : '—', lastQ ? 'R' + lastQ.round + ' ± ' + PD.num(lastQ.se, 2) : ''),
       PD.kpi('Median stop', isNum(pit.median_ms) ? PD.num(pit.median_ms / 1000, 2) + 's' : '—', isNum(pit.best_ms) ? 'best ' + PD.num(pit.best_ms / 1000, 2) + 's' + (isNum(pit.p_under_2500) ? ' · ' + PD.pct(pit.p_under_2500, 0) + ' under 2.5 s' : '') : ''),
       PD.kpi('Retirements', t ? String(dnfs) : '—', t ? ((t.log || []).length) + ' rounds' : '')
-    ]);
+    ];
+    var h = '<nav class="pd-crumb" aria-label="Breadcrumb"><a href="#/constructors">F1</a><span aria-hidden="true">›</span><a href="#/constructors">Constructors</a><span aria-hidden="true">›</span>' + esc(name) + '</nav>' + QK.playerHeader({ name: name, split: false, pos: 'Constructor', kicker: y + ' season' + (s.pos ? ' · P' + s.pos + ' in the constructors’ championship' : ''),
+        team: { colour: PD.teamColourRaw(id) }, face: PD.teamAbbr(id), meta: lineup.map(function (d) { return PD.driverLink(d, { dot: false }); }), strip: strip, tags: tP && tP.qualified(id) ? [QK.tag('In the ' + y + ' peer group', 'signal')] : [] }) +
+      '<div class="pd-links pd-mt">' + (lineup.length >= 2 ? '<a class="qk-btn" href="#/compare/drivers/' + encodeURIComponent(lineup[0]) + '/' + encodeURIComponent(lineup[1]) + '">Compare the drivers</a>' : '') +
+      '<a class="qk-btn" href="#/compare/teams/' + encodeURIComponent(id) + '">Compare with another team</a><a class="qk-btn" href="#/value?tab=needs">Every team’s needs</a></div>';
+    if (!t && !s.team && !lineup.length) { el.innerHTML = h + PD.empty(name + ' is not in the ' + y + ' data', PD.ok(teams) ? 'Pick another season.' : 'The team catalogue is not built yet.'); return; }
     h += PD.grid('<div class="qk-span-5">' + (tP ? PD.v2.pctCard(tP, id, PD.v2.TEAM_SET, { foot: '<span>Metrics chosen for year-to-year stability and what they predict</span><a href="#/glossary">Glossary →</a>' }) : '') + '</div>' +
       PD.card('Where the team sits', tP ? 'Every constructor in the ' + y + ' peer group; bars coloured by percentile, ' + esc(name) + ' and the median marked.' : '', (tP ? PD.v2.distSeg('tm-dist-m', [['car_race_pace', 'Car pace'], ['points_per_race', 'Points / race'], ['dnf_rate', 'DNF rate'], ['pit_lane_v_field', 'Pit lane'], ['strategy_gain', 'Strategy']]) : '') + PD.chartBox('tm-dist', 260, 'Peer distribution'), { span: 7 }), 'pd-mt');
     h += '<section class="qk-section pd-sec">' + PD.secHead(y + ' season', 'Line-up', y === PD.currentSeason() ? 'Current drivers, from the latest build.' : 'Drivers who raced for the team in ' + y + '.') + '<div class="qk-auto" style="--min:220px" id="tm-lineup"></div></section>';

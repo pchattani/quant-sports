@@ -1,10 +1,10 @@
-/* The Quant Hardwood — Games (#/<L>/games[/<date>]) and the game centre (#/<L>/game/<gid>), on kit v3 "Matchday"
- * (the Rink games and game pages are the reference, MIGRATION_V3.md).
+/* The Quant Hardwood — Games (#/<L>/games[/<date>]) and the game centre (#/<L>/game/<gid>), on kit v4 "Broadcast"
+ * (the Rink games and game pages are the reference, MIGRATION_V4.md).
  *
  * Games: a strip of game days around the chosen one, a date picker and month jump, the day's games as game cards
  * (our chance, a one-line reason, no market), our chance for every home side (the market a quiet ring: game detail
  * only), and how our forecasts did on the day's finished games.
- * Game centre (Summary tab): the QK.previewCard hero (away "at" home with records, the score bug when live, our
+ * Game centre (Summary tab): the QK.previewCard diagonal hero (away "at" home with records, the clock when live, our
  * chance for the favourite with a how-sure note, the match-up factors, the market as a quiet labelled line before
  * tip-off) with stat tiles and our forecast table beside it; then the line score, what goes into our forecast,
  * availability before tip-off (the injury report and each team's availability term), the tale of the tape, win
@@ -127,9 +127,11 @@ function boxTable(node, L, g, tid, S) {
   QK.table(node, { columns: cols, rows: rows, dense: true });
 }
 
-/* v3 (Matchday) hero: QK.previewCard — away "at" home with records, the score bug when live, our chance for the
-   favourite as a big blue number, a plain-English note (the margin and total we expect), the market as a quiet
-   reference line before tip-off (game detail is one of the two places it may appear), and how the teams match up. */
+/* v4 (Broadcast) hero: QK.previewCard, the diagonal split — away "at" home with records, the clock when live, our
+   chance for the favourite, a plain-English note (the margin and total we expect), the market as a quiet reference
+   line before tip-off (game detail is one of the two places it may appear), and how the teams match up. The hero
+   takes the raw kit colours, the alternates and the full names (QK.color.blockPair makes them blocks with white type
+   and resolves a clash; the city line comes from the full name); the charts keep the lifted pair [ca, ch]. */
 function headHTML(L, g, S, season) {
   const st = U.status(g);
   const fin = st === 'final', live = st === 'live', pre = st === 'pre';
@@ -139,7 +141,7 @@ function headHTML(L, g, S, season) {
   const pLive = live && wpl.length ? wpl[wpl.length - 1][1] : null;
   const recs = U.records(season);
   const rec = t => recs[String(t)] || '';
-  const A = Object.assign(U.team(L, g.away), { colour: ca, record: rec(g.away) }), H = Object.assign(U.team(L, g.home), { colour: ch, record: rec(g.home) });
+  const A = Object.assign(U.team(L, g.away), { colour: HW.teamColourRaw(L, g.away) || ca, record: rec(g.away) }), H = Object.assign(U.team(L, g.home), { colour: HW.teamColourRaw(L, g.home) || ch, record: rec(g.home) });
   const tag = g.series && (g.series.summary || g.series.round) ? (g.series.summary || g.series.round) + (g.series.game ? ' · Game ' + g.series.game : '') : (g.stype && g.stype !== 'reg' ? HW.stypeLabel(g.stype) : '');
   const G = { sport: 'basketball', id: g.id, start: g.date, status: st, league: HW.leagueName(L) + (tag ? ' · ' + tag : ''), home: H, away: A,
     hs: isNum(g.hs) ? Number(g.hs) : null, as: isNum(g.as) ? Number(g.as) : null,
@@ -159,7 +161,7 @@ function headHTML(L, g, S, season) {
   const venue = g.venue ? (typeof g.venue === 'object' ? g.venue.name : g.venue) : '';
   const meta = [HW.fmtDate(g.date, { time: true }), g.venue && typeof g.venue === 'object' && g.venue.city ? [g.venue.name, g.venue.city].filter(Boolean).join(', ') : '',
     isNum(g.attendance) && g.attendance > 0 ? Number(g.attendance).toLocaleString('en-GB') + ' fans' : ''].filter(Boolean);
-  return '<div class="hw-preview">' + QK.previewCard(G, { kicker: HW.leagueName(L) + (venue ? ' · ' + venue : '') + (tag ? ' · ' + tag : ''), nick: t => U.nick(L, t === A ? g.away : g.home), colors: [ca, ch], factors: fx,
+  return '<div class="hw-preview">' + QK.previewCard(G, { kicker: tag ? (tag.indexOf(HW.leagueName(L)) === 0 ? tag : HW.leagueName(L) + ' · ' + tag) : HW.leagueName(L) + (venue ? ' · ' + venue : ''), nick: t => U.nick(L, t === A ? g.away : g.home), colors: [ca, ch], factors: fx,
     factorsTitle: 'How they match up this season', noteExtra: extra.length ? 'This time ' + extra.join(', and ') + '.' : '',
     market: pre && isNum(mk.p_home) ? { p: Number(mk.p_home), label: 'Market (' + srcLabel(mk.sources) + ')' } : null }) +
     '<div class="hw-hero-meta">' + meta.map(x => '<span>' + esc(x) + '</span>').join('') + '</div></div>';
@@ -220,7 +222,8 @@ function tape(L, g, season) {
   ];
   if (!rows.some(r => isNum(r.a) && isNum(r.b))) return '';
   const pc = U.pair(L, g.away, g.home);
-  const A = U.team(L, g.away), H = U.team(L, g.home); A.colour = pc[0]; H.colour = pc[1];
+  /* v4: the tape's blocks take the raw kits (and alternates); its bars the lifted, distinct chart pair */
+  const A = U.team(L, g.away), H = U.team(L, g.home);
   return QK.matchupBar({ left: A, right: H, rows: rows, colors: pc });
 }
 

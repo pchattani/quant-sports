@@ -364,6 +364,39 @@ function clubsIndex() {
 }
 function clubRow(tid) { return CLUBS ? CLUBS.byId[String(tid)] || null : null; }
 function clubName(tid, fallback) { var r = clubRow(tid); return r ? r.name : (fallback || ''); }
+/* v4 team colours (STYLE_GUIDE 3, rule 4): a club's kit colour and its alternate from clubs_index.json (`colour`,
+   `alt`) once the football data agent writes them (MIGRATION_V4 payload follow-up). null until then, and the kit's
+   fallback takes over: cobalt for the side we favour, slate for the other. Never invented in the front end. */
+function hexOk(v) { return typeof v === 'string' && /^#?[0-9a-f]{6}$/i.test(v.trim()) ? (v.charAt(0) === '#' ? v.trim() : '#' + v.trim()) : null; }
+function clubColour(tid) { var r = clubRow(tid); return r ? hexOk(r.colour || r.color) : null; }
+function clubAlt(tid) { var r = clubRow(tid); return r ? hexOk(r.alt || r.colour2) : null; }
+/* A short code for tight spots on the v4 heroes (the watermark, the scoreboard bug, the bar keys): the payloads carry
+   no club codes, so it is made from the name: one word -> its first three letters ("ARS"), several -> the initials
+   of the words that count ("Manchester City" -> "MC", "Paris Saint-Germain" -> "PSG"). `other` is the opponent's
+   name: when the two codes would match ("Real Madrid" v "Real Betis"), each takes its last word's first three. */
+var CODE_SKIP = { fc: 1, cf: 1, afc: 1, sc: 1, ac: 1, ca: 1, cd: 1, club: 1, de: 1, del: 1, da: 1, do: 1, of: 1, the: 1, and: 1 };
+function codeWords(name) {
+  return String(name || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9\s-]/g, '').split(/[\s-]+/).filter(function (w) { return w && !CODE_SKIP[w.toLowerCase()]; });
+}
+function clubCode(name, other) {
+  var w = codeWords(name);
+  if (!w.length) return String(name || '').slice(0, 3).toUpperCase();
+  var c = w.length === 1 ? w[0].slice(0, 3) : w.slice(0, 3).map(function (x) { return x.charAt(0); }).join('');
+  c = c.toUpperCase();
+  if (other !== undefined && other !== null) {
+    var o = codeWords(other), oc = o.length === 1 ? o[0].slice(0, 3).toUpperCase() : o.slice(0, 3).map(function (x) { return x.charAt(0); }).join('').toUpperCase();
+    if (oc === c && w.length > 1) c = w[w.length - 1].slice(0, 3).toUpperCase();
+  }
+  return c;
+}
+/* A game (FB.toGame) ready for a v4 hero or bug: both clubs' codes (told apart), and each side's full name kept. */
+function heroGame(g) {
+  if (!g || !g.home || !g.away) return g;
+  g.home.abbr = g.home.abbr || clubCode(g.home.name, g.away.name);
+  g.away.abbr = g.away.abbr || clubCode(g.away.name, g.home.name);
+  if (g.away.abbr === g.home.abbr) g.away.abbr = g.away.abbr + '2';
+  return g;
+}
 /* people_index.json as { list, byId, aliases } (3.6 MB: search and a few lookups only). A duplicate Sofascore id of
    one person (`aliases`, UNIFIED_PAYLOADS 14.4) looks up the person's row, so an old link still finds him. */
 function peopleIndex() {
@@ -872,7 +905,9 @@ function toGame(f, slug, extra) {
   var st = f.status === 'finished' || stale ? 'final' : f.status === 'live' || f.status === 'inprogress' ? 'live' : 'pre';
   var g = {
     sport: 'football', league: (extra && extra.league) || compName(s, true), id: f.id, start: f.date, status: st,
-    home: { name: f.home, logo: hid ? crestUrl(hid) : null }, away: { name: f.away, logo: aid ? crestUrl(aid) : null },
+    /* v4: the club's kit and alternate colours when clubs_index.json has them (else the kit's cobalt v slate rule) */
+    home: { name: f.home, logo: hid ? crestUrl(hid) : null, colour: hid ? clubColour(hid) : null, alt: hid ? clubAlt(hid) : null, full: f.home },
+    away: { name: f.away, logo: aid ? crestUrl(aid) : null, colour: aid ? clubColour(aid) : null, alt: aid ? clubAlt(aid) : null, full: f.away },
     hs: f.hs, as: f.as, note: roundText(f, s, true) + (f.result_missing || (stale && !isNum(f.hs)) ? ' · result not reported' : f.status === 'postponed' ? ' · postponed' : f.status === 'cancelled' ? ' · cancelled' : ''),
     href: f.detail ? href.match(s, f.id) : (extra && extra.href) || href.match(s, f.id)
   };
@@ -1126,7 +1161,8 @@ HANDLERS.teamLegacy = function (el, p) {
 };
 
 function init() {
-  Promise.all([load('competitions.json'), load('crests.json')]).then(function (arr) {
+  /* clubs_index.json up front too: names for links and, once written, the club colours the v4 heroes and stripes use */
+  Promise.all([load('competitions.json'), load('crests.json'), clubsIndex()]).then(function (arr) {
     var idx = arr[0];
     CRESTS = {};
     ((arr[1] || {}).ids || []).forEach(function (id) { CRESTS[String(id)] = 1; });
@@ -1135,7 +1171,6 @@ function init() {
     INDEX.bySlug = {};
     INDEX.comps.forEach(function (c) { INDEX.bySlug[c.slug] = c; });
     bootShell();
-    clubsIndex();          // names for links; small enough to read up front
     load('hub.json').then(hubLive);
     booted = true;
     window.addEventListener('hashchange', render);
@@ -1150,7 +1185,7 @@ return {
   load: load, reload: reload, loadAll: loadAll, rows: rows, FILES: FILES, KIND_FILES: KIND_FILES, FAMILIES: FAMILIES,
   comps: comps, comp: comp, familyOf: familyOf, compName: compName, hasFile: hasFile, compFile: compFile, compFiles: compFiles,
   currentSeason: currentSeason, isLastEdition: isLastEdition, shortSeason: shortSeason, seasonsOf: seasonsOf, loadPastSeason: loadPastSeason,
-  clubsIndex: clubsIndex, hasCrest: hasCrest, clubRow: clubRow, clubName: clubName, peopleIndex: peopleIndex, crestUrl: crestUrl, tidFromCrest: tidFromCrest,
+  clubsIndex: clubsIndex, hasCrest: hasCrest, clubRow: clubRow, clubName: clubName, clubColour: clubColour, clubAlt: clubAlt, clubCode: clubCode, heroGame: heroGame, peopleIndex: peopleIndex, crestUrl: crestUrl, tidFromCrest: tidFromCrest,
   MSET: MSET, ADJ_EXTRA: ADJ_EXTRA, peerGroup: peerGroup, groupKeys: groupKeys, metricInfo: metricInfo, isEarly: isEarly, peerLine: peerLine, peerMin: peerMin,
   roles: roles, rolesFor: rolesFor, rowRole: rowRole, rowGar: rowGar, roleOf: roleOf, garOver: garOver, peerPct: peerPct, fmtSet: fmtSet,
   personId: personId, labIndex: labIndex, labView: labView, labScopeName: labScopeName, labScopeOptions: labScopeOptions, labWindowText: labWindowText, labPct: labPct, LAB_SCOPES: LAB_SCOPES,
