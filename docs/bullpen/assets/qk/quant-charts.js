@@ -16,7 +16,8 @@
  *   QKC.tokens()  QKC.palette()  QKC.axis(T, {ticks})  QKC.legendSeries(T, items)
  *   QKC.plotlyLayout()  and the optional module plotly-ec.js (window.Plotly on this kit) for old views
  * v4: QKC.quadrant(el, spec) ("Who's for real?": results against chances, team-colour dots, the four corners named)
- *     QKC.calibration(el, spec) now draws "we said / it happened" bars by default (style: 'dots' keeps v3)
+ *     QKC.calibration(el, spec): the v3 line chart again by default (24 Oct, the user's choice), its dots joined by
+ *     a cobalt line; style: 'bars' keeps the v4 "we said / it happened" bars
  * v3: QKC.calibration(el, spec) ("How sure are we?": forecast chance against how often it happened, annotated)
  *     QKC.annot(T, extra) (the annotation label style for markLine / markPoint / graphic text: Barlow Condensed)
  * v2: QKC.forecast(el, spec) (538-style chance over time: end labels, annotations, bands, today, projection)
@@ -956,13 +957,16 @@ QKC.chances = function (el, s) {
 
 /* ─────────────────────────────────────── calibration ("How sure are we?") */
 /* QKC.calibration(el, { bins: [{ lo, hi, n, mean_p, freq }] (0-1), subject: 'the home team', unit: 'games',
- *   xName, yName, annotate: true, min, max (axis range in %, default fitted to the bins in steps of 10), label })
- * Our forecast chance (x) against how often it happened (y), one blue dot per bucket sized by its count, the dashed
- * diagonal labelled "dashed line = spot on", and italic notes on the busiest bucket and the top one. */
+ *   xName, yName, annotate: true, min, max (axis range in %, default fitted to the bins in steps of 10), label,
+ *   style: 'bars' (the v4 paired bars instead) })
+ * Our forecast chance (x) against how often it happened (y): a cobalt line through one cobalt dot per bucket, each
+ * dot sized by its count, the grey dashed diagonal labelled "dashed line = spot on", and condensed notes on the
+ * busiest bucket and the top one (the top one in volt: "We said 73%. They won 80% of 429 games."). */
 QKC.calibration = function (el, s) {
   var bins = (s.bins || []).filter(function (b) { return b && isNum(b.mean_p) && isNum(b.freq) && b.n > 0; });
   var subj = s.subject || 'the home team', unit = s.unit || 'games';
-  if (s.style !== 'dots') return calBars(el, s, bins, subj, unit);
+  if (s.style === 'bars') return calBars(el, s, bins, subj, unit);
+  bins = bins.slice().sort(function (a, b) { return a.mean_p - b.mean_p; });
   var lo = Math.max(0, Math.floor(Math.min.apply(null, bins.map(function (b) { return Math.min(b.mean_p, b.freq); }).concat([0.5])) * 10) / 10);
   var hi = Math.min(1, Math.ceil(Math.max.apply(null, bins.map(function (b) { return Math.max(b.mean_p, b.freq); }).concat([0.5])) * 10) / 10);
   var mn = isNum(s.min) ? s.min : lo * 100, mx = isNum(s.max) ? s.max : hi * 100;
@@ -977,7 +981,7 @@ QKC.calibration = function (el, s) {
         else if (b === big && !narrow) { ann = 'big'; note = fmt.num(b.n) + ' ' + unit + ' here:\nsaid ' + Math.round(b.mean_p * 100) + '%, won ' + Math.round(b.freq * 100) + '%'; }
       }
       return { value: [b.mean_p * 100, b.freq * 100], n: b.n, lo: b.lo, hi: b.hi, _ann: ann,
-        label: Object.assign(QKC.annot(T, narrow ? { fontSize: 12 } : null), { show: !!note, formatter: note, position: b === top ? (narrow ? 'bottom' : 'left') : 'right', distance: narrow ? 18 : 12 }) };
+        label: Object.assign(QKC.annot(T, Object.assign(narrow ? { fontSize: 12 } : {}, ann === 'top' ? { color: T.actual } : {})), { show: !!note, formatter: note, position: b === top ? (narrow ? 'bottom' : 'left') : 'right', distance: narrow ? 18 : 12 }) };
     });
     /* The dots sit near the diagonal, so the empty space is the two triangles either side of it. The note on the
      * busiest bucket goes above the diagonal, ending just left of its dot; the note on the top bucket goes below the
@@ -1018,8 +1022,11 @@ QKC.calibration = function (el, s) {
         /* the key to the diagonal, in the bottom-right corner (clear of the dots and the notes) */
         { type: 'scatter', silent: true, z: 1, data: [[mx, mn + (mx - mn) * 0.04]], symbolSize: 0, tooltip: { show: false },
           label: Object.assign(QKC.annot(T, { color: T.ink3 }), { show: true, formatter: 'dashed line = spot on', position: 'left', distance: 4 }) },
+        /* the line joining the buckets, under the dots */
+        { type: 'line', name: 'Our forecasts', z: 2, silent: true, data: bins.map(function (b) { return [b.mean_p * 100, b.freq * 100]; }), symbol: 'none',
+          lineStyle: { color: T.model, width: 2.5 }, tooltip: { show: false } },
         { type: 'scatter', name: 'Our forecasts', z: 3, data: pts,
-          symbolSize: function (v, p) { return 9 + 26 * Math.sqrt((p.data && p.data.n || 0) / nMax); },
+          symbolSize: function (v, p) { return (narrow ? 7 : 9) + (narrow ? 15 : 24) * Math.sqrt((p.data && p.data.n || 0) / nMax); },
           itemStyle: { color: T.model, borderColor: T.s1, borderWidth: 2, opacity: 0.95 },
           labelLayout: placeNote, labelLine: { show: true, lineStyle: { color: T.actual, width: 1 } } }
       ]

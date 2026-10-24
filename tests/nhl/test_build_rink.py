@@ -170,3 +170,52 @@ def test_players_index_without_careers(site):
     idx = rj(d / "players_index.json")
     assert len(idx) == 6 * 20 and all(len(v) == 5 and v[0] for v in idx.values())
     assert not (d / "players").exists()
+
+
+
+def test_index_digest_this_week(site, tmp_path):
+    """index.json "digest": on a build, the stage; from frozen pre-game chances, the week's record, upset and team of
+    the week; the chance log carried forward (a second build the same day replaces that day's snapshot) and the
+    movers against the snapshot about a week old."""
+    B = load_build()
+    assert B.main(site["args"] + ["--no-light", "--no-careers", "--no-history"]) == 0
+    st = rj(site["data"] / "index.json")["digest"]["stage"]
+    assert st["total"] > 0 and 0 <= st["played"] <= st["total"] and 1 <= st["week"] <= st["weeks"]
+
+    def card(i, day, h, a, hs, as_, p):
+        return {"game_id": str(i), "date": f"2026-10-{day:02d}", "start": f"2026-10-{day:02d}T23:00:00Z", "status": "final", "type": "REG",
+                "home": h, "away": a, "hs": hs, "as": as_, "model": {"p_home": p}}
+    cards = [card(1, 19, "COL", "SJS", 5, 1, 0.72), card(2, 18, "EDM", "CHI", 2, 3, 0.70), card(3, 17, "COL", "EDM", 3, 2, 0.55),
+             card(4, 16, "SJS", "CHI", 1, 2, 0.48), card(5, 2, "CHI", "COL", 6, 0, 0.20)]
+    b = B.Build(tmp_path / "d")
+    (tmp_path / "d").mkdir()
+    an.write_json(tmp_path / "d" / "chance_log.json", {"20262027": {"p_playoffs": {"2026-10-13": {"COL": 0.60, "EDM": 0.70, "CHI": 0.30}}}})
+    odds = {"COL": {"p_playoffs": 0.80, "p_cup": 0.12}, "EDM": {"p_playoffs": 0.55, "p_cup": 0.06}, "CHI": {"p_playoffs": 0.31, "p_cup": 0.01}}
+    dig = B.digest_payload(b, cards, odds, "regular", 20262027, date(2026, 10, 20))
+    r = dig["record"]
+    assert (r["n"], r["won"], r["expected"], r["draws"], r["upsets"], r["from"], r["to"]) == (4, 3, 2.5, 0, 1, "2026-10-13", "2026-10-20")
+    assert dig["upset"]["id"] == "2" and dig["upset"]["winner"] == "CHI" and dig["upset"]["p"] == 0.3   # game 5 is weeks old
+    assert dig["hot"]["key"] == "COL" and dig["hot"]["w"] == 2
+    mv = dig["movers"]
+    assert mv["metric"] == "p_playoffs" and mv["since"] == "2026-10-13" and mv["up"][0]["key"] == "COL" and mv["down"][0]["key"] == "EDM"
+    log = rj(tmp_path / "d" / "chance_log.json")["20262027"]
+    assert sorted(log["p_playoffs"]) == ["2026-10-13", "2026-10-20"] and log["p_cup"]["2026-10-20"]["COL"] == 0.12
+    B.digest_payload(b, cards, odds, "regular", 20262027, date(2026, 10, 20))
+    assert sorted(rj(tmp_path / "d" / "chance_log.json")["20262027"]["p_playoffs"]) == ["2026-10-13", "2026-10-20"]
+
+
+def test_featured_prefers_the_big_game_over_the_closest():
+    """digest.featured (the shared significance rule): a game between two clubs whose playoff and Cup chances ride on
+    it, at a normal hour, leads; a dead coin flip with nothing at stake at 08:00 UTC (03:00 in New York) does not."""
+    from datetime import datetime, timezone
+    B = load_build()
+    now = datetime(2026, 10, 24, 15, 0, tzinfo=timezone.utc)
+    cards = [{"game_id": "1", "start": "2026-10-25T08:00:00Z", "status": "scheduled", "type": "REG", "home": "SJS", "away": "CHI", "model": {"p_home": 0.50}},
+             {"game_id": "2", "start": "2026-10-24T23:00:00Z", "status": "scheduled", "type": "REG", "home": "COL", "away": "EDM", "model": {"p_home": 0.62}},
+             {"game_id": "3", "start": "2026-10-24T23:30:00Z", "status": "scheduled", "type": "PRE", "home": "TOR", "away": "MTL", "model": {"p_home": 0.51}}]
+    odds = {"SJS": {"p_playoffs": 0.02, "p_cup": 0.0}, "CHI": {"p_playoffs": 0.01, "p_cup": 0.0}, "COL": {"p_playoffs": 0.6, "p_cup": 0.15},
+            "EDM": {"p_playoffs": 0.55, "p_cup": 0.12}, "TOR": {"p_playoffs": 0.5, "p_cup": 0.05}, "MTL": {"p_playoffs": 0.5, "p_cup": 0.05}}
+    f = B.featured_payload(cards, odds, {"TOR": {"name": "Toronto Maple Leafs"}, "MTL": {"name": "Montréal Canadiens"}}, now)
+    assert [r["id"] for r in f["today"]][:1] == ["2"]
+    assert "1" not in [r["id"] for r in f["today"]]
+    assert "two title contenders" in f["today"][0]["why"]

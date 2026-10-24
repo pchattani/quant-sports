@@ -1021,7 +1021,8 @@ function heatTable(spec) {
   const colour = (v, k) => {
     let t = Math.max(-1, Math.min(1, (v - centers[k]) / max));
     if (s.invert || (s.invertCols && s.invertCols[k])) t = -t;
-    const a = Math.round(Math.abs(t) * 70);
+    /* at most 58%: the white figures keep AA (>= 4.5:1) on the strongest cobalt cell */
+    const a = Math.round(Math.abs(t) * 58);
     return 'color-mix(in srgb, ' + (t < 0 ? 'var(--div-neg)' : 'var(--div-pos)') + ' ' + a + '%, transparent)';
   };
   let h = '<div class="qk-table-wrap gi-heat-wrap"><table class="qk-table dense gi-heat"><thead><tr><th class="sticky-col">' + esc(s.corner || '') + '</th>';

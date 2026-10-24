@@ -912,7 +912,8 @@ function divColour(v, max, invert) {
 function seqColour(t) {
   if (!isNum(t)) return 'transparent';
   const u = Math.max(0, Math.min(1, t));
-  return 'color-mix(in srgb, var(--signal) ' + Math.round(6 + 70 * u) + '%, transparent)';
+  /* at most 56%: the white figures keep AA (>= 4.5:1) on the strongest cell */
+  return 'color-mix(in srgb, var(--signal) ' + Math.round(6 + 50 * u) + '%, transparent)';
 }
 /* A row of segment buttons; returns HTML. items [{key,label}], active key, data attribute name. */
 function toggles(items, active, attr) {

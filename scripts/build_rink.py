@@ -488,6 +488,95 @@ def extras_all(b: Build, seasons: list[int], current: int, res: dict, vres: dict
     return out
 
 
+def _digest_now(today: date) -> datetime:
+    """The digest's clock: now, or the end of --today's UTC day for a dated build (tests, backfills)."""
+    now = datetime.now(timezone.utc)
+    return now if today == now.date() else datetime(today.year, today.month, today.day, 23, 59, tzinfo=timezone.utc)
+
+
+def featured_payload(cards: list[dict], odds: dict, teams_info: dict, now: datetime) -> dict:
+    """digest.featured: the games that matter most, on the shared significance rule (oddsmarkets/common/featured.py:
+    the NHL tier, the stage, the stakes in our season simulation, the start time and hour, live-ness; closeness a
+    small bonus). {"today": [{"id", "score", "why"}] best first, "week": the biggest game of the next seven days}.
+    The front end takes the first game still upcoming or live at the reader's clock."""
+    from oddsmarkets.common import featured as FT
+    nick = {t: str((v or {}).get("name") or t) for t, v in (teams_info or {}).items()}
+
+    def rivalry(h, a):
+        nh, na = nick.get(h, h), nick.get(a, a)
+        for pair, name in FT.RIVALRIES.items():
+            x, y = tuple(pair)
+            if (nh.endswith(x) and na.endswith(y)) or (nh.endswith(y) and na.endswith(x)):
+                return name
+        return None
+    games = []
+    for c in cards:
+        st = "final" if c.get("status") == "final" else "live" if c.get("status") in ("live", "int") else "pre"
+        if st == "final":
+            continue
+        h, a = c.get("home"), c.get("away")
+        oh, oa = (odds or {}).get(h) or {}, (odds or {}).get(a) or {}
+        sig = {"playoff": [oh.get("p_playoffs"), oa.get("p_playoffs")], "title": [oh.get("p_cup"), oa.get("p_cup")]}
+        if c.get("type") == "PRE":
+            sig["preseason"] = True
+        ser = c.get("series")
+        if c.get("type") == "PO":
+            sig["stage"] = "playoff"
+        if isinstance(ser, dict) and ser:
+            sig["series"] = ser
+        rv = rivalry(h, a)
+        if rv:
+            sig["rivalry"] = rv
+        games.append({"sport": "hockey", "league": "NHL", "id": c.get("game_id"), "start": c.get("start"), "status": st,
+                      "home": h, "away": a, "p_home": (c.get("model") or {}).get("p_home"), "wp_home": c.get("wp_home"), "sig": sig})
+    r = FT.rank_featured(games, now)
+    row = lambda x: {"id": x["key"].split(":", 1)[1], "score": x["score"], "why": x.get("reasons") or []}
+    return {"today": [row(x) for x in r["today"]], "week": row(r["week"]) if r.get("week") else None}
+
+
+def digest_payload(b: Build, cards: list[dict], odds: dict, phase: str | None, current: int, today: date,
+                   teams_info: dict | None = None) -> dict:
+    """index.json "digest": the "This week in the NHL" top lines (oddsmarkets/common/digest.py) and the featured
+    candidates (oddsmarkets/common/featured.py, when present). The chance log (data/chance_log.json, one snapshot of
+    every club's playoff and Cup chance per day) is carried forward from the last build; it is never read by the
+    front end."""
+    from oddsmarkets.common import digest as DG
+    now = _digest_now(today)
+    games = [{"id": c.get("game_id"), "start": c.get("start"), "status": "final" if c.get("status") == "final" else "live" if c.get("status") == "live" else "pre",
+              "home": c.get("home"), "away": c.get("away"), "hs": c.get("hs"), "as": c.get("as"),
+              "p_home": (c.get("model") or {}).get("p_home"), "type": c.get("type")} for c in cards]
+    out: dict = {"asof": now.isoformat().replace("+00:00", "Z")[:16] + "Z"}
+    rec = DG.record(games, now)
+    if rec:
+        rec.pop("by", None)                               # one sport here: the split is the Home page's
+        out["record"] = rec
+    up = DG.upset(games, now)
+    if up:
+        out["upset"] = up
+    hot = DG.hot(games, now)
+    if hot:
+        out["hot"] = hot
+    metric = "p_cup" if phase == "playoffs" else "p_playoffs"
+    log_all = an.read_json(b.data / "chance_log.json") or {}
+    log_s = (log_all.get(str(current)) or {}) if isinstance(log_all, dict) else {}
+    cur = {m: {t: o.get(m) for t, o in (odds or {}).items() if o.get(m) is not None} for m in ("p_playoffs", "p_cup")}
+    new_log = {m: DG.roll_log(log_s.get(m), now, cur[m]) for m in ("p_playoffs", "p_cup")}
+    if any(cur.values()):
+        b.write("chance_log.json", {str(current): new_log})
+    mv = DG.movers(new_log.get(metric), cur.get(metric) or {}, now)
+    if mv:
+        out["movers"] = dict(mv, metric=metric)
+    reg = [c for c in cards if c.get("type") == "REG"]
+    if reg:
+        days = sorted(str(c.get("date")) for c in reg if c.get("date"))
+        played = sum(1 for c in reg if c.get("status") == "final")
+        first, last = date.fromisoformat(days[0]), date.fromisoformat(days[-1])
+        out["stage"] = {"phase": phase, "played": played, "total": len(reg), "first": days[0], "last": days[-1],
+                        "week": max(1, min((now.date() - first).days // 7 + 1, (last - first).days // 7 + 1)), "weeks": (last - first).days // 7 + 1}
+    out["featured"] = featured_payload(cards, odds, teams_info or {}, now)
+    return out
+
+
 def index_payload(b: Build, res: dict, current: int, seasons: list[int], today: date) -> dict | None:
     """index.json from the current season's results; None (keep the old file) when the current season was not built."""
     cur = res.get(current) or {}
@@ -521,7 +610,8 @@ def index_payload(b: Build, res: dict, current: int, seasons: list[int], today: 
     gaps.sort(key=lambda x: -abs(x.get("edge") or 0))
     return {"ok": True, "updated_at": _now(), "season": current, "phase": cur.get("phase"), "today": todays, "live": live,
             "recent": recent, "upcoming": upcoming, "playoff_odds": odds, "leaders": cur.get("leaders") or {}, "gaps": gaps[:20],
-            "teams": teams, "seasons": seasons, "models": model_versions(), "sim_reason": None if sim.get("ok") else (sim or {}).get("reason")}
+            "teams": teams, "seasons": seasons, "models": model_versions(), "sim_reason": None if sim.get("ok") else (sim or {}).get("reason"),
+            "digest": b.step("digest", lambda: digest_payload(b, cards, odds, cur.get("phase"), current, today, cur.get("teams_info")), {}) or {}}
 
 
 def players_index_from_stores(b: Build, seasons: list[int]) -> int:

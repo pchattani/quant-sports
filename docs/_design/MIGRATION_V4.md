@@ -46,7 +46,7 @@ live on all nine sites with ec8ad0f1. The same APIs now draw:
   - `hotRow`: the black power list with outlined ranks;
   - `statOfDay`: the volt slab;
   - `newHere`, `shortVersion` and `note`: explain strips;
-  - `howSure`: big numbers over the "we said / it happened" bars;
+  - `howSure`: big numbers over the calibration line chart (the dashed diagonal "spot on"; restored 24 Oct);
   - `scorebug`: black, the clock on red.
 - **Charts:** solid grids, condensed labels, square bars, black tooltips with a volt edge, and calibration as bars.
 - **Specificity guards** stop v3-era site CSS from turning text dark-on-dark: filled selected tabs, link colours on

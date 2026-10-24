@@ -2053,16 +2053,17 @@ QK.howSure = function (el, o) {
   var top = shown[shown.length - 1];
   var d = top ? top.freq - top.mean_p : 0;
   /* v4: three black blocks with the big numbers (how many checked, how the most common call did, the Brier score),
-   * each with a one-line explanation, over the "we said / it happened" bars (QKC.calibration, style 'bars'; o.style
-   * 'dots' keeps the v3 diagonal). o.points: [{ k, b, text }] still overrides the three. */
+   * each with a one-line explanation, over the calibration line chart (QKC.calibration: our forecast against how
+   * often it happened, the dashed diagonal "spot on"; o.style 'bars' draws the v4 paired bars instead). o.points:
+   * [{ k, b, text }] still overrides the three. */
   var tops = top && top !== big ? (Math.abs(d) <= 0.03 ? ' Our biggest favourites won about as often as we said.' : d > 0 ? ' Our biggest favourites won more often than we said.' : ' Our biggest favourites won less often than we said.') : '';
   var pts = o.points || [
     { k: fmt.num(n), b: unit + ' checked', text: (o.league ? o.league + (o.span ? ', ' + o.span : '') : 'Every forecast') + ', against what happened.' },
     big ? { k: fmt.pct(big.freq, 1), b: 'won when we said ' + Math.round(big.mean_p * 100) + '%', text: 'Our most common call: ' + fmt.num(big.n) + ' ' + unit + ' at ' + Math.round(big.lo * 100) + '–' + Math.round(big.hi * 100) + '%.' + tops } : null,
     isNum(brier) ? { k: brier.toFixed(3), b: 'Brier score (0.25 = coin flip)', text: '0 is perfect.' + (brier > 0.22 ? ' Close to random is normal here, so small gains count.' : ' Lower is better.') } : null
   ].filter(Boolean);
-  var dots = o.style === 'dots';
-  var cap = o.caption || ((o.league ? o.league + (o.span ? ', ' + o.span : '') + '. ' : '') + (dots ? 'Bigger dot = more ' + unit + '.' : 'When the two bars match, our numbers mean what they say.') + (left ? ' Buckets with fewer than ' + minN + ' ' + unit + ' left off (' + fmt.num(left) + ' ' + unit + ').' : ''));
+  var dots = o.style !== 'bars';
+  var cap = o.caption || ((o.league ? o.league + (o.span ? ', ' + o.span : '') + '. ' : '') + (dots ? 'Bigger dot = more ' + unit + '. On the dashed line, our numbers mean what they say.' : 'When the two bars match, our numbers mean what they say.') + (left ? ' Buckets with fewer than ' + minN + ' ' + unit + ' left off (' + fmt.num(left) + ' ' + unit + ').' : ''));
   var cid = 'qk-hs-' + Math.random().toString(36).slice(2, 8);
   el.innerHTML = '<div class="qk-howsure"><div class="qk-bignums">' +
     pts.map(function (x) { return '<div><b class="num">' + esc(x.k) + '</b><span>' + esc(x.b) + '</span>' + (x.text ? '<small>' + esc(x.text) + '</small>' : '') + '</div>'; }).join('') + '</div>' +

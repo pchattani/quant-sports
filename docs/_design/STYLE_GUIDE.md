@@ -219,7 +219,7 @@ All builders return HTML strings unless noted. Signatures are in `quant.js` / `q
 | Who's hot | `QK.hotRow(items, { rank })` | the black power list: outlined rank numbers, the sport in volt, the name in Bebas, the big number, the unit and next best, the line on what it means |
 | Stat of the day | `QK.statOfDay` | the volt slab with the big number, cut on a diagonal; the kicker in cobalt |
 | New here | `QK.newHere(o)` | the "What's that number?" strip with three numbered points |
-| How sure | `QK.howSure(el, o)` | three black big-number blocks (checked, the most common call, the Brier score) over the "we said / it happened" bars (`style: 'dots'` keeps the v3 diagonal) |
+| How sure | `QK.howSure(el, o)` | three black big-number blocks (checked, the most common call, the Brier score) over the calibration line chart: our forecast against how often it happened, the dashed diagonal "spot on" (`style: 'bars'` draws the paired bars instead) |
 | Short version | `QK.shortVersion` | the explain strip |
 | Preview card | `QK.previewCard(g, o)` | the split hero (or `layout: 'bug'`), the market line on game detail only, the "How sure" strip, the factors as Bebas numbers with the label between |
 | Score bug (compact) | `QK.scorebug(g)` | black, the clock on red, team edges |
@@ -244,7 +244,10 @@ There is one library, ECharts 5.5.1, and everything themes from the tokens.
   series, and team colours for teams. Bars and legend keys are square.
 - **Annotations** are Barlow Condensed bold (`QKC.annot(T)`). Quadrant and corner names are cobalt capitals. Write
   on the chart instead of a legend wherever a mark can carry its own words.
-- **Calibration** (`QKC.calibration`): per forecast bucket, a cobalt "We said" bar beside a volt "It happened" bar.
+- **Calibration** (`QKC.calibration`): the line chart, as in v3 (the user's choice, 24 Oct 2026). Our forecast on x
+  and how often it happened on y, both in %; a cobalt line through one cobalt dot per bucket, each dot sized by its
+  games; the grey dashed diagonal with "dashed line = spot on"; condensed notes on the busiest bucket and the top
+  one, the top one in volt ("We said 73%. They won 80% of 429 games."). `style: 'bars'` keeps the v4 paired bars.
 - **Quadrant** (`QKC.quadrant`): team-colour dots with their abbreviations, dashed references, and the four corners
   named ("The real deal", "Winning on luck?", "Due a run", "Struggling").
 - **538-style forecast lines** (`QKC.forecast`) keep end labels, bands and a "Today" rule.
