@@ -320,8 +320,11 @@ def build_season(b: Build, league: str, season: int, full: bool, cfg: dict, shar
     teams_payload = b.write_or_fail(d + "teams.json", f"teams {league} {season}",
                                     lambda: TM.build(ctx, cat, lineup_tables, prev_box, ratings_7d), league=league, season=season)
     season_payload = b.step(f"season {league} {season}", lambda: SN.build_season(ctx, cat, ratings_7d))
+    sched_payload = b.step(f"schedule {league} {season} build", lambda: schedule_payload(ctx))
+    if full and season == shared["current"]:
+        season_payload = with_league(b, league, season, season_payload, teams_payload, (sched_payload or {}).get("games") or [], cfg, ctx)
     b.write_or_fail(d + "season.json", f"season.json {league} {season}", lambda: season_payload, league=league, season=season)
-    b.write_or_fail(d + "schedule.json", f"schedule {league} {season}", lambda: schedule_payload(ctx), league=league, season=season)
+    b.write_or_fail(d + "schedule.json", f"schedule {league} {season}", lambda: sched_payload, league=league, season=season)
     awards = None
     if full or cfg["light_awards"]:
         awards = b.write_or_fail(d + "awards.json", f"awards {league} {season}", lambda: AWD.build(ctx), league=league, season=season)
@@ -336,6 +339,31 @@ def build_season(b: Build, league: str, season: int, full: bool, cfg: dict, shar
     b.step(f"manifest {league} {season}", lambda: b.write(f"{d}manifest.json", manifest))
     logger.info("%s %s (%s): %.1f s", league, season, "full" if full else "light", time.perf_counter() - t0)
     return {"catalogue": cat, "ctx": ctx, "blocks": blocks, "awards": awards}
+
+
+def with_league(b: Build, league: str, season: int, sp: dict | None, tp: dict | None, cards: list[dict], cfg: dict, ctx=None) -> dict | None:
+    """season.json with its "league" block (how the race is shaping up, strengths and weaknesses:
+    oddsmarkets/basketball/analytics/race.py on oddsmarkets/common/league.py) and data/<L>/race_log.json carried
+    forward (the whole season's chances, one snapshot a day; the dates before live tracking, or a finished season's
+    whole regular season, rebuilt from the season simulation as of each date inside a time budget a build). A failure
+    leaves season.json as it was."""
+    if not isinstance(sp, dict) or sp.get("ok") is False:
+        return sp
+    from oddsmarkets.basketball.analytics import race as RC
+
+    def run():
+        prev = an.read_json(b.data / league / "race_log.json") or {}
+        runner = RC.asof_runner(league, season, ctx=ctx)
+        budget = RC.REBUILD_BUDGET_S if cfg.get("sims", 0) >= 2000 else 5.0      # --quick (tests, smoke runs): a token rebuild
+        blk, log = RC.build(league, season, sp, tp if isinstance(tp, dict) else None, cards, prev, _digest_now(cfg["today"]),
+                            run_asof=runner, budget_s=budget)
+        if log.get(str(season)):
+            b.write(f"{league}/race_log.json", log)
+        return blk
+    blk = b.step(f"{league} league block {season}", run, None)
+    if blk:
+        sp["league"] = blk
+    return sp
 
 
 def value_current(b: Build, ctx, cat, prev_cat, teams_payload, season_payload, refresh: bool = True) -> None:

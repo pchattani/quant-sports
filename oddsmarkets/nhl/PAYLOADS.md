@@ -99,6 +99,22 @@ Names above are kept; additions and the exact shapes the front end reads:
   table (by slot), teams {abbr: {p_first, p_top2, p_top3, pick_dist}}}; bracket {series [actual: {round, series, teams,
   wins, games, winner}], sim (C's {format, rounds, matchups {round: [{home_ice, other, p, p_home_ice_wins}]}}),
   seeds_now, champion}; ratings {abbr: {units, history, rolling}}; teams.
+  league (current full build only, added 24 Oct 2026: `oddsmarkets/nhl/analytics/race.py` on
+  `oddsmarkets/common/league.py`, schema v1, about 27 KB; drawn by the kit's `league.js` on the standings and team
+  pages) {v, asof, phase, metrics [{key, label}] (p_playoffs, p_div, p_cup), current {metric: {abbr: p}}, history
+  {first, last, days, live_from, rebuilt [days], n}, movers {metric, since, days, up|down [{team, p, d, why}]}, games
+  [{id, start, home, away, p_home, swing, sides {abbr: [if_win, if_loss]}, stakes, why}] (the next seven days), race
+  {abbr: {magic, elim (points, only once within a point a game left), unit, status, all_sims, sos [mean opponent
+  rating left, rank (1 hardest), games], sos_played, next {id, date, opp, home, p, w, l}}}, profile {metrics [{id,
+  label, dir, fmt, unit, chip, group, model}], min_gp 10, early}, teams {abbr: {tier, pct, vals, chips [[text,
+  tone]], luck {a, x, d, close [w, l], flag}, gp}}, tiers [{key, label, sub, teams}], quad {x: off5, y: def5, flipY,
+  xName, yName, corners}, notes}. Luck: wins against the Pythagorean wins (exponent 2) of expected goals for and
+  against; close: one-goal games, overtime and shootouts.
+- **race_log.json** (site-wide, `data/race_log.json`, added 24 Oct 2026; a persistent CI log, `scripts/ci_site.py`
+  LOGS): {season: {p_playoffs | p_div | p_cup: {"YYYY-MM-DD": {abbr: p}}, _meta {rebuilt [days], n, live_from}}}: one
+  snapshot of our chances a day, never trimmed; the days before live tracking began (24 Oct 2026) rebuilt from the
+  season simulation with `through=<day>` (results before that day, team strength fitted through it; 2,000
+  simulations, every 3 days from the first game day, at most 90 s a build).
 - **leaders.json**: {cols [id, value, name, team], skaters {key: {label, fmt, lower, rows}}, goalies {...}, teams {key:
   [[abbr, value]]}}. Counting stats rank everyone; rates the qualified pool.
 - **lab.json** (column-major: data[key][i] belongs to ids[i]): {skaters / goalies: {cols, ids, name, team, pos, qualified,

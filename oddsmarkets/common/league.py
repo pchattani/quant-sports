@@ -317,8 +317,8 @@ def mover_reasons(team: str, d: float, since: str, today: str, results: list[dic
             rl += x["l"] + x["otl"]
         own_share = (me["w"] / me["n"]) if me["n"] else 0.5
         riv_share = rw / (rw + rl) if rw + rl else 0.5
-        if rw + rl >= 4 and ((d > 0 and riv_share <= 0.4 and own_share <= 0.6) or (d < 0 and riv_share >= 0.6 and own_share >= 0.4)
-                             or me["n"] == 0):
+        if rw + rl >= (2 if weekly else 4) and ((d > 0 and riv_share <= 0.4 and own_share <= 0.6) or (d < 0 and riv_share >= 0.6 and own_share >= 0.4)
+                                                or me["n"] == 0):
             why.append(f"Rivals went {rw}-{rl}")
     if sos_rank and n_teams and team in sos_rank and len(why) < 2:
         rk = sos_rank[team]
@@ -334,7 +334,8 @@ def movers(seas: dict, metric: str, current: dict, now, results: list[dict], riv
            min_move: float = 0.02, otl: bool = False, weekly: bool = False) -> dict | None:
     """The biggest risers and fallers in `metric` since the snapshot nearest `days` ago (digest.movers on the race
     log), each with its reasons: {"metric", "since", "days", "up": [{"team", "p", "d", "why"}], "down": [...]}."""
-    mv = DG.movers((seas or {}).get(metric), current, now, days=days, k=k, min_move=min_move)
+    # a weekly sport compares with a snapshot at least six days old, so the window holds a full round of games
+    mv = DG.movers((seas or {}).get(metric), current, now, days=days, k=k, min_move=min_move, min_days=6 if weekly else 1)
     if not mv:
         return None
     today = DG._now(now).date().isoformat()

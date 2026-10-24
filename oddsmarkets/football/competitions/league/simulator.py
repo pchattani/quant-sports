@@ -66,6 +66,12 @@ class LeagueResults:
     p_playoffs: dict[str, float] = field(default_factory=dict)
     p_reach: dict[str, dict[str, float]] = field(default_factory=dict)  # team -> round -> p
     p_cup: dict[str, float] = field(default_factory=dict)
+    # What rides on the next fixtures: the same simulated seasons split by each fixture's result (home win,
+    # draw, away win). One dict per fixture: {"id", "home", "away", "date", "n": [nH, nD, nA],
+    # "title": [[p per team | H], [.. | D], [.. | A]], "bands": {key: [[..H], [..D], [..A]]}} with teams in
+    # `teams` order (None for a result no simulation produced). Empty for the conference and playoff formats,
+    # or when nothing dated is left to play.
+    stakes: list[dict] = field(default_factory=list)
 
     def p_in_band(self, key: str, team: str) -> float:
         return self.p_band.get(key, {}).get(team, 0.0)
@@ -88,10 +94,14 @@ class LeagueSimulator:
         seed: int | None = None,
         chunk: int | None = None,
         boot_model=None,
+        stake_days: float = 7.0,
+        stake_max: int = 12,
     ) -> None:
         self.model = model
         self.state = state
         self.boot_model = boot_model
+        self.stake_days = stake_days
+        self.stake_max = stake_max
         self.cfg = cfg or state.cfg
         self.n_sims = n_sims if n_sims is not None else self.cfg.n_sims
         self.seed = seed if seed is not None else self.cfg.random_seed
@@ -148,11 +158,16 @@ class LeagueSimulator:
             if i is not None:
                 seed_pts[i], seed_gf[i], seed_ga[i], seed_w[i] = rec.points, rec.gf, rec.ga, rec.won
 
-        fixtures = [
-            (self.team_idx[m.home_team], self.team_idx[m.away_team])
-            for m in state.remaining
+        league_left = [
+            m for m in state.remaining
             if not m.is_playoff and m.home_team in self.team_idx and m.away_team in self.team_idx
         ]
+        fixtures = [(self.team_idx[m.home_team], self.team_idx[m.away_team]) for m in league_left]
+        stake_at = self._stake_fixtures(league_left)           # fixture index -> stake slot
+        K = len(stake_at)
+        cnt_out = np.zeros((K, 3), dtype=np.int64)
+        cnt_st_title = np.zeros((K, 3, T), dtype=np.int64)
+        cnt_st_band = {b.key: np.zeros((K, 3, T), dtype=np.int64) for b in cfg.bands}
         logger.info("Simulating %s: %d fixtures remaining, %d sims", cfg.slug, len(fixtures), n)
 
         conf_cols: dict[str, np.ndarray] = {}
@@ -200,13 +215,16 @@ class LeagueSimulator:
             ga = np.tile(seed_ga, (S, 1)).astype(np.int32)
             w = np.tile(seed_w, (S, 1)).astype(np.int32)
             goals = np.zeros((S, T), dtype=np.int32)
+            outcome = np.zeros((S, K), dtype=np.int8) if K else None
 
             # ── league phase ────────────────────────────────────────────────
-            for h, a in fixtures:
+            for j, (h, a) in enumerate(fixtures):
                 hg, ag = self.sampler.sample(h, a, rng, S)
                 home_win = hg > ag
                 draw = hg == ag
                 away_win = ag > hg
+                if K and j in stake_at:
+                    outcome[:, stake_at[j]] = np.where(home_win, 0, np.where(draw, 1, 2))
                 pts[:, h] += cfg.points_win * home_win + cfg.points_draw * draw
                 pts[:, a] += cfg.points_win * away_win + cfg.points_draw * draw
                 w[:, h] += home_win
@@ -231,11 +249,24 @@ class LeagueSimulator:
                 self._liguilla(order, rng, cnt_playoffs, cnt_reach, cnt_cup)
 
             # ── Belgium: the split, with halved points ──────────────────────
+            final_order = None
             if cfg.split:
                 final_order = self._split(order, pts, gd, gf, pair_sampler, rng, goals)
                 np.add.at(cnt_final, (final_order, np.broadcast_to(np.arange(T), final_order.shape)), 1)
                 # The champion is first after the split, not first before it.
                 np.add.at(cnt_split_title, final_order[:, 0], 1)
+
+            # ── the stakes: the same seasons split by the next fixtures' results ──
+            if K:
+                src = final_order if final_order is not None else order
+                pos = np.empty_like(src)
+                np.put_along_axis(pos, src, np.broadcast_to(np.arange(T), src.shape), axis=1)
+                onehot = (outcome[:, :, None] == np.arange(3)[None, None, :]).astype(np.int32)   # (S, K, 3)
+                cnt_out += onehot.sum(axis=0)
+                cnt_st_title += np.einsum("sko,st->kot", onehot, (pos == 0).astype(np.int32))
+                for b in cfg.bands:
+                    inside = ((pos >= b.first - 1) & (pos <= b.last - 1)).astype(np.int32)
+                    cnt_st_band[b.key] += np.einsum("sko,st->kot", onehot, inside)
 
             # ── conferences and playoffs ────────────────────────────────────
             if cfg.conferences:
@@ -267,10 +298,38 @@ class LeagueSimulator:
 
         runtime = time.perf_counter() - start
         logger.info("Simulated %d seasons in %.1fs", n, runtime)
-        return self._assemble(
+        res = self._assemble(
             n, runtime, cnt_pos, cnt_split_title if cfg.split else cnt_title, sum_pts, sum_goals, pts_samples,
             cnt_conf_pos, cnt_playoffs, cnt_reach, cnt_cup, cnt_final, rounds,
         )
+        for j, k in sorted(stake_at.items(), key=lambda kv: kv[1]):
+            m = league_left[j]
+            nk = cnt_out[k]
+
+            def cond(c, k=k, nk=nk):
+                return [(c[k, o] / nk[o]).tolist() if nk[o] else None for o in range(3)]
+
+            res.stakes.append({
+                "id": str(m.game_id), "home": m.home_team, "away": m.away_team,
+                "date": m.date.isoformat().replace("+00:00", "Z") if m.date else None,
+                "n": nk.tolist(), "title": cond(cnt_st_title),
+                "bands": {key: cond(c) for key, c in cnt_st_band.items()},
+            })
+        return res
+
+    def _stake_fixtures(self, league_left) -> dict[int, int]:
+        """The fixtures the stakes split on: the dated league fixtures within `stake_days` of the first one still
+        to play, at most `stake_max`, soonest first, as {fixture index: slot}. Empty for the conference and
+        playoff formats (their title is decided in the playoffs, which the split does not follow)."""
+        if self.cfg.conferences or self.cfg.playoff or not self.stake_max:
+            return {}
+        dated = [(m.date, j) for j, m in enumerate(league_left) if m.date is not None]
+        if not dated:
+            return {}
+        dated.sort(key=lambda x: (x[0], x[1]))
+        first = dated[0][0]
+        pick = [j for d, j in dated if (d - first).total_seconds() <= self.stake_days * 86400][: self.stake_max]
+        return {j: k for k, j in enumerate(pick)}
 
     # ── MLS Cup playoffs ─────────────────────────────────────────────────────
 

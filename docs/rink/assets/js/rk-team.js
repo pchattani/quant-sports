@@ -249,6 +249,8 @@ function render(el, params, state) {
         QK.note('<b>Which line matters most?</b> The expected-goal share (the thick line) predicts the next games better than the goal share: goals swing on a few bounces, chances much less.')) +
       U.card2('Results v chances', 'Cumulative goal difference against cumulative expected-goal difference, game by game', U.chart('tp-cum', 260, 'Goal difference against expected goal difference') +
         QK.note('<b>Who’s for real?</b> When the solid line runs above the dashed one, the club has done better than its chances suggest. Over a season that gap usually shrinks.')) + '</div></div></div></section>';
+    const lo = RK.leagueOpts && RK.ok(sj) ? RK.leagueOpts(sj, S) : null;
+    if (lo) h += '<div id="tp-league"></div>';
 
     if (needs && (needs.grades || []).length) {
       const gr = needs.grades.map(g => '<div class="rk-flex" style="gap:8px;min-width:0"><span class="rk-grade" data-g="' + esc(g.grade) + '">' + esc(g.grade) + '</span><div style="min-width:0"><div style="font-weight:600">' + esc(g.label) + '</div><div class="qk-muted" style="font-size:var(--fs-xs)">' + RK.ordinal(g.rank) + ' of ' + g.n + ' · ' + U.f(g.value, 1) + ' GAR</div></div></div>').join('');
@@ -269,6 +271,7 @@ function render(el, params, state) {
     h += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-' + (tx ? 7 : 12) + '">' + U.card2(next.length ? 'Coming up, and how it went' : 'How it went', next.length ? 'Next games with our win chance; then results' : 'Results, game by game, with our pre-game win chance', '<div id="tp-sched"></div>', { flush: true, foot: '<span>How sure are we? 60% means the club loses a game like that about 4 times in 10.</span>' }) + '</div>' +
       (tx ? '<div class="qk-span-5">' + U.card2('Recent moves', 'Transactions of the last twelve months (ESPN)', '<div id="tp-moves"></div>', { flush: true, foot: '<span>Trades are graded on Value &amp; Moves</span><a href="#/value?tab=moves&team=' + esc(abbr) + '">All moves →</a>' }) + '</div>' : '') + '</div></section>';
     body.innerHTML = h;
+    if (lo) QKL.team(body.querySelector('#tp-league'), Object.assign({}, lo, { meters: false }), abbr);
     fillNext(body, NL.nxt, sj);
     fillLast(body, abbr, NL.last);
 

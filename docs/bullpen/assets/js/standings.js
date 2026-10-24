@@ -33,8 +33,11 @@ function leagueOpts(d, L, S) {
   const order = (a, b) => { const ia = BP.DIVISIONS.indexOf(a), ib = BP.DIVISIONS.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b); };
   const groups = Object.keys(divs).sort(order).map(k => ({ key: k, label: k, teams: divs[k] }))
     .concat(Object.keys(lgs).sort().map(k => ({ key: 'lg:' + k, label: k, teams: lgs[k] })));
+  /* the chart opens on the postseason race (the story of a finished regular season); movers and swings follow the
+     block's own metric (the World Series once the field is set) */
+  const metric = (lg.metrics || []).some(m => m.key === 'p_postseason') ? 'p_postseason' : undefined;
   return { league: lg, teams: teams, groups: groups, season: String(S), loadLog: () => BP.loadLevel('race_log.json', L),
-    title: 'How the races are shaping up', unitGames: 'games' };
+    title: 'How the races are shaping up', unitGames: 'games', metric: metric };
 }
 BP.leagueOpts = leagueOpts;
 

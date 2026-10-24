@@ -475,16 +475,18 @@ def cmd_feed(site: str) -> int:
 # snapshot a day, the last CHANCE_LOG_KEEP days) and the Footballer's frozen pre-match chances (build_site_all.py
 # _forecast_log: {match id: [h, d, a, kick-off ISO, comp]}, written only before kick-off, kept FORECAST_LOG_DAYS).
 CHANCE_LOG_KEEP = 10          # digest.roll_log keep
-RACE_LOG_KEEP = 400           # race_log.json (Campus's season-long race lines, oddsmarkets/college/site.py RACE_LOG_KEEP)
+RACE_LOG_KEEP = 400           # race_log.json (Campus's season-long race lines, oddsmarkets/college/site.py RACE_LOG_KEEP;
+                              # the US sports' league pages, oddsmarkets/common/league.py: the whole season, never trimmed,
+                              # with a "_meta" entry listing the rebuilt days)
 FORECAST_LOG_DAYS = 9         # build_site_all.FORECAST_LOG_DAYS (tests/test_ci_site_logs.py checks they agree)
 LOGS = {
     "football": ("data/forecast_log.json",),
     "paddock": (),            # its movers read season.json title_history, which the build rewrites in full
-    "hardwood": ("data/*/chance_log.json",),
+    "hardwood": ("data/*/chance_log.json", "data/*/race_log.json"),
     "ace": ("data/*/chance_log.json",),
-    "bullpen": ("data/*/chance_log.json",),
-    "gridiron": ("data/chance_log.json",),
-    "rink": ("data/chance_log.json",),
+    "bullpen": ("data/*/chance_log.json", "data/*/race_log.json"),
+    "gridiron": ("data/chance_log.json", "data/race_log.json"),
+    "rink": ("data/chance_log.json", "data/race_log.json"),
     "campus": ("data/*/chance_log.json", "data/*/race_log.json"),
 }
 

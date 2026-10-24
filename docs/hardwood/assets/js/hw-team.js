@@ -89,6 +89,9 @@ function render(el, params) {
       QK.chances(oddsRows.map(x => ({ label: x[0], p: x[1], color: HW.teamColourRaw(L, tid) })), { sort: false, max: 1, key: false }) +
       ((sim.seed_dist || []).length && open ? U.chart('tp-seed', 190, 'Chance of each final seed') : ''), { cls: path.length > 1 ? 'qk-span-4' : 'qk-span-12' });
     h += '</div>';
+    // strengths and weaknesses on the spec's team set, chips and the race (docs/_design/league.js, from season.json "league")
+    const lo = HW.leagueOpts && season ? HW.leagueOpts(season, L, S) : null;
+    if (lo) h += '<div id="tp-league"></div>';
     // strengths and needs
     if (needs && needs.grades) {
       h += '<section class="qk-section">' + U.head({ kicker: 'Roster construction', title: 'Strengths and needs', sub: 'Each position group and unit graded against the league on projected value (WAR over a full season); the best trade targets for each weak spot.' }) + '<div class="qk-grid">' +
@@ -128,6 +131,7 @@ function render(el, params) {
       { cls: 'qk-span-6', flush: true, foot: U.link(HW.href(L, 'value') + '?tab=moves&team=' + encodeURIComponent(tid), 'Trade grades and the full feed') });
     h += '</div>';
     el.innerHTML = h;
+    if (lo) QKL.team(document.getElementById('tp-league'), lo, tid);
 
     // rating path with the se band and results
     if (document.getElementById('tp-path')) {

@@ -767,6 +767,11 @@ competition's `players_live.json` line).
   `metrics` (catalogue entries with `pct` and `lower`), `adjusted_keys`, `min_minutes`, `rule`, `updated_at`.
 - `lab/leaders.json`: this season's top 15 by goals (with xG), assists (with xA) and rating (450+ minutes)
   for `all`, `club` and `intl`: {id, name, team, tid, comp, mix, value, minutes}.
+- **Our value model on every row** (`value_fields.py`, the value-fields step after the value layer, 24 Oct 2026):
+  `role`, `gar90` and `gar` appended to `fields`. `season`: this season's `value/lines.json` lines, one
+  competition's own or the scope's competitions summed (GAR adds; GAR/90 = 90 x GAR / minutes); `last`: last
+  season's lines the same way; `365` and `ytd`: the 12-month value (`value/players.json`). `leaders.json` gains a
+  `gar` board per scope (450+ minutes, top 15 by GAR, with `gar90`).
 - About 79 MB in 221 files on 21 October 2026 (the four retired files were 44 MB). The build deletes
   `players_lab.json`, `players_lab_365.json`, `players_lab_ytd.json` and `players_global.json` from the data
   directory after writing `lab/` (CI's restore step would otherwise copy the deployed ones back for ever).

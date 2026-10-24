@@ -1,0 +1,82 @@
+/* The Quant Footballer — a league's Race tab (race.js) and the profile chips on the table. Kit v4, dark only. */
+
+/* plain-English chips: strengths (up), weak spots (down), style (neutral), luck (volt) */
+.fb-rc-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.fb-rc-chips.all { margin: 0 0 var(--sp-3); }
+.fb-rc-chips.tbl { flex-wrap: nowrap; text-decoration: none; }
+.fb-rc-chip { display: inline-block; padding: 2px 7px; border: 1px solid var(--line-2); border-radius: var(--r-1); font: 700 var(--fs-2xs)/1.35 var(--font-cond); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; color: var(--ink-1); background: var(--s-2); }
+.fb-rc-chip.good { border-color: var(--up); color: var(--up); }
+.fb-rc-chip.bad { border-color: var(--down); color: var(--down); }
+.fb-rc-chip.style { color: var(--ink-2); }
+.fb-rc-chip.luck { border-color: var(--volt); color: var(--volt); }
+
+/* who moved */
+.fb-rc-movers { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.fb-rc-movers li { border-bottom: 1px dashed var(--line-2); padding-bottom: 8px; }
+.fb-rc-mv-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.fb-rc-mv-h b { font: 400 var(--fs-lg)/1 var(--font-display); white-space: nowrap; }
+.fb-rc-mv-s { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; font-size: var(--fs-xs); color: var(--ink-2); }
+.fb-rc-res::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 5px; background: var(--ink-3); }
+.fb-rc-res.W::before { background: var(--up); }
+.fb-rc-res.L::before { background: var(--down); }
+
+/* what is settled */
+.fb-rc-settled { margin: 0; display: grid; gap: 10px; }
+.fb-rc-settled > div { display: grid; grid-template-columns: 170px 1fr; gap: 12px; padding-bottom: 10px; border-bottom: 1px dashed var(--line-2); }
+.fb-rc-settled > div:last-child { border-bottom: 0; padding-bottom: 0; }
+.fb-rc-settled dt { font: 700 var(--fs-xs)/1.3 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; color: var(--volt); }
+.fb-rc-settled dd { margin: 0; color: var(--ink-1); line-height: 1.5; }
+.fb-rc-settled dd b { color: var(--ink-1); }
+
+/* what's at stake next */
+.fb-rc-stakes { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--sp-3); }
+.fb-rc-st { padding: 14px 16px; border-top: 3px solid var(--volt); }
+.fb-rc-st-h { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-weight: 700; }
+.fb-rc-st-w { margin: 4px 0 8px; }
+.fb-rc-st-m { margin-top: 10px; }
+.fb-rc-st-m .qk-kicker { margin-bottom: 4px; }
+.fb-rc-st-t { width: 100%; border-collapse: collapse; font-size: var(--fs-xs); }
+.fb-rc-st-t th, .fb-rc-st-t td { padding: 3px 4px; text-align: right; border-bottom: 1px solid var(--line-1); }
+.fb-rc-st-t thead th { font: 700 var(--fs-2xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); }
+.fb-rc-st-t tbody th { text-align: left; font-weight: 600; color: var(--ink-1); white-space: nowrap; }
+
+/* the run-in */
+.fb-rc-fxs { display: inline-flex; gap: 3px; }
+.fb-rc-fx { display: inline-flex; flex-direction: column; align-items: center; min-width: 38px; padding: 2px 3px; border-radius: var(--r-1); font: 700 var(--fs-2xs)/1.1 var(--font-cond); letter-spacing: 0.03em; }
+.fb-rc-fx small { font-size: 10px; font-weight: 600; opacity: 0.9; }
+
+/* team cards */
+.fb-rc-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: var(--sp-3); align-items: start; }
+.fb-rc-card { padding: 0; }
+.fb-rc-card-h { display: grid; grid-template-columns: 28px auto 1fr; grid-template-areas: 'pos crest name' 'chips chips chips'; gap: 6px 10px; align-items: center; padding: 12px 16px; cursor: pointer; list-style: none; }
+.fb-rc-card-h::-webkit-details-marker { display: none; }
+.fb-rc-card-h::after { content: '+'; position: absolute; right: 14px; top: 12px; font: 400 22px/1 var(--font-display); color: var(--ink-3); }
+.fb-rc-card { position: relative; }
+.fb-rc-card[open] .fb-rc-card-h::after { content: '–'; color: var(--volt); }
+.fb-rc-pos { grid-area: pos; font: 400 var(--fs-xl)/1 var(--font-display); color: var(--ink-3); }
+.fb-rc-card-h .qk-mark { grid-area: crest; }
+.fb-rc-card-n { grid-area: name; display: flex; flex-direction: column; min-width: 0; padding-right: 22px; }
+.fb-rc-card-n b { font: 700 var(--fs-md)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-rc-card-h .fb-rc-chips { grid-area: chips; }
+.fb-rc-card-b { padding: 0 16px 14px; border-top: 1px dashed var(--line-2); }
+.fb-rc-short { margin: 10px 0; color: var(--ink-1); line-height: 1.5; }
+.fb-rc-more { display: inline-block; margin-top: 6px; font: 700 var(--fs-2xs)/1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; color: var(--signal); }
+
+/* the tiers */
+.fb-rc-tiers { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--sp-3); }
+.fb-rc-tier { background: var(--s-2); padding: 10px 12px; border-top: 3px solid var(--ink-3); }
+.fb-rc-tier.title { border-top-color: var(--volt); }
+.fb-rc-tier.up1 { border-top-color: var(--signal); }
+.fb-rc-tier.eu { border-top-color: var(--c-3); }
+.fb-rc-tier.rel { border-top-color: var(--down); }
+.fb-rc-tier ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 5px; }
+.fb-rc-tier li { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.fb-rc-tier li b { font-weight: 700; }
+
+.fb-co-links2 { display: inline-flex; gap: 14px; flex-wrap: wrap; }
+
+@media (max-width: 720px) {
+  .fb-rc-stakes, .fb-rc-cards { grid-template-columns: 1fr; }
+  .fb-rc-settled > div { grid-template-columns: 1fr; gap: 4px; }
+  .fb-rc-st-t { font-size: 11px; }
+}

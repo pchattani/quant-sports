@@ -116,3 +116,16 @@ def test_the_generated_football_workflow_restores_its_logs():
     assert "ci_site.py restore --site football" in wf
     for site in ("rink", "hardwood", "gridiron", "bullpen", "ace", "campus"):
         assert f"ci_site.py restore --site {site}" in (ROOT / "public_repo" / ".github" / "workflows" / f"{site}.yml").read_text(encoding="utf-8")
+
+
+def test_the_us_sports_race_logs_are_kept_between_builds():
+    """oddsmarkets/common/league.py race logs: the whole season (a "_meta" entry lists the rebuilt days)."""
+    assert ci.is_log("rink", "data/race_log.json") and ci.is_log("gridiron", "data/race_log.json")
+    assert ci.is_log("hardwood", "data/nba/race_log.json") and ci.is_log("bullpen", "data/mlb/race_log.json")
+    assert not ci.is_log("rink", "data/20262027/race_log.json")
+    days = {f"2026-{m:02d}-{d:02d}": {"A": 0.5} for m in (4, 5, 6, 7, 8, 9) for d in range(1, 29)}
+    live = {"2026": {"p_postseason": days, "_meta": {"rebuilt": sorted(days)[:20], "n": 2000}}}
+    new = {"2026": {"p_postseason": {"2026-10-24": {"A": 1.0}}}}
+    out, lost = ci.merge_log("race_log.json", live, new, datetime(2026, 10, 24, tzinfo=timezone.utc))
+    assert lost == len(days) + 2 and len(out["2026"]["p_postseason"]) == len(days) + 1
+    assert out["2026"]["_meta"]["rebuilt"] == sorted(days)[:20]

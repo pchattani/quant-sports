@@ -16,7 +16,8 @@
  * o = { league: season.json.league, teams: { key: { abbr, name, colour, href } }, groups: [{ key, label, teams: [keys] }]
  *       (the race chart's switch: divisions or conferences), logUrl (the race log, data/.../race_log.json) or loadLog
  *       (a function returning a promise of it: the site's own cached loader), season
- *       (its key in the log), title (the title's name: 'the Stanley Cup'), unitGames ('games') }
+ *       (its key in the log), title (the section title), metric (the race chart's first metric; default the block's
+ *       notes.metric), unitGames ('games'), meters (false: a team page with its own percentile card) }
  * Copy: neutral, no betting words; our chances only (the market sits on game pages and the Model page). Every chart
  * axis is titled. ES5 only (no ?. or ??). */
 (function (root) {
@@ -167,7 +168,7 @@ function tierTag(L, key) {
   var t = ((L.teams || {})[key] || {}).tier;
   if (!t) return '';
   var row = (L.tiers || []).filter(function (x) { return x.key === t; })[0];
-  return row ? QK.tag(row.label, TIER_TAG[t] || '') : '';
+  return row ? QK.tag(row.label, 'tier' + (TIER_TAG[t] ? ' ' + TIER_TAG[t] : '')) : '';
 }
 function raceFacts(o, key) {
   var L = o.league || {}, r = (L.race || {})[key] || {}, t = (L.teams || {})[key] || {}, notes = L.notes || {};
@@ -210,6 +211,7 @@ function meters(o, key, compact) {
 }
 /* the plain-English read of the record against the numbers, for a card without meters (a team page that draws its
    own percentile card) */
+function lc(x) { x = String(x || ''); return /^[A-Z][a-z]/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x; }
 function luckLine(o, key) {
   var L = o.league || {}, t = (L.teams || {})[key] || {}, lk = t.luck, notes = L.notes || {}, u = notes.luck_unit || 'wins';
   var P = L.profile || {}, pc = t.pct || {}, best = null, worst = null;
@@ -219,7 +221,7 @@ function luckLine(o, key) {
     if (!worst || pc[m.id] < pc[worst.id]) worst = m;
   });
   var out = [];
-  if (best && worst && best !== worst) out.push('Best at <b>' + esc(best.label.toLowerCase()) + '</b> (' + QK.ordinal(pc[best.id]) + ' percentile); weakest at <b>' + esc(worst.label.toLowerCase()) + '</b> (' + QK.ordinal(pc[worst.id]) + ').');
+  if (best && worst && best !== worst) out.push('Best at <b>' + esc(lc(best.label)) + '</b> (' + QK.ordinal(pc[best.id]) + ' percentile); weakest at <b>' + esc(lc(worst.label)) + '</b> (' + QK.ordinal(pc[worst.id]) + ').');
   if (lk) out.push('Record: <b>' + lk.a + ' ' + esc(u) + '</b> against <b>' + lk.x + '</b> expected from its numbers (' + (lk.d >= 0 ? '+' : '−') + Math.abs(lk.d).toFixed(1) + ')' + (lk.close && lk.close[0] + lk.close[1] ? '; ' + lk.close[0] + '-' + lk.close[1] + ' in close games' : '') + '.');
   return out.length ? '<p style="margin:12px 0 0;font:500 var(--fs-sm)/1.5 var(--font-ui);color:var(--ink-2)">' + out.join(' ') + '</p>' : '';
 }
@@ -232,7 +234,7 @@ QKL.card = function (o, key, opts) {
   return '<div class="qkl-card"' + (tc ? ' style="--tc:' + esc(tc) + '"' : '') + '><div style="min-width:0">' +
     (opts.head === false ? '' : '<h4>' + link(o, key, nm(o, key)) + tierTag(L, key) + '</h4>') +
     (QKL.chips(o, key) || '<span class="qk-muted" style="font-size:var(--fs-xs)">No standout strength or weakness yet.</span>') +
-    (opts.meters === false ? luckLine(o, key) : meters(o, key)) + '</div><div style="min-width:0"><div class="qkl-pgh" style="margin-top:4px">The race</div>' +
+    (opts.meters === false ? luckLine(o, key) : meters(o, key)) + '</div><div style="min-width:0"><div class="qkl-pgh" style="margin:4px 0 12px">The race</div>' +
     (facts.length ? '<dl class="qkl-facts">' + facts.map(function (f) { return '<dt>' + esc(f[0]) + '</dt><dd>' + esc(f[1]) + (f[2] ? '<small>' + esc(f[2]) + '</small>' : '') + '</dd>'; }).join('') + '</dl>' : '<p class="qk-muted">Nothing to show yet.</p>') +
     (opts.link !== false && href(o, key) ? '<p style="margin:14px 0 0"><a class="qk-btn" href="' + esc(href(o, key)) + '">' + esc(ab(o, key)) + ' team page</a></p>' : '') +
     (lt.gp !== undefined ? '' : '') + '</div></div>';
@@ -279,7 +281,7 @@ function moversHTML(o) {
     var h = L.history || {};
     return '<p class="qkl-note" style="padding-top:12px">' + (h.days > 1 ? 'No chance moved two points or more this week.' : 'Movers appear once a week of chances is on record' + (h.first ? ' (tracking since ' + esc(dayLabel(h.first)) + ')' : '') + '.') + '</p>';
   }
-  var ml = metricOf(L, mv.metric).label.toLowerCase();
+  var ml = lc(metricOf(L, mv.metric).label);
   function li(r) {
     var up = r.d > 0;
     return '<li>' + QK.teamMark(mark(o, r.team), 'sm') + '<span class="nm">' + link(o, r.team, nm(o, r.team)) + '</span><span class="d ' + (up ? 'qkl-up' : 'qkl-down') + '">' + pts(r.d) + '<small>' + pct(r.p) + '</small></span>' +
@@ -291,7 +293,7 @@ function moversHTML(o) {
 function gamesHTML(o) {
   var L = o.league || {}, gs = L.games || [];
   if (!gs.length) return '<p class="qkl-note" style="padding-top:12px">No games in the next seven days.</p>';
-  var ml = metricOf(L, (L.notes || {}).metric || ((L.metrics || [])[0] || {}).key).label.toLowerCase();
+  var ml = lc(metricOf(L, (L.notes || {}).metric || ((L.metrics || [])[0] || {}).key).label);
   return '<div class="qkl-gm">' + gs.map(function (g) {
     var when = g.start ? fmt.date(g.start) + (String(g.start).length > 10 ? ' · ' + fmt.time(g.start) : '') : '';
     var sides = Object.keys(g.sides || {});
@@ -330,6 +332,7 @@ function raceTable(o, keys, metric, log) {
   }).join('');
   return '<div class="qk-table-wrap"><table class="qk-table dense qkl-tbl">' + head + '<tbody>' + body + '</tbody></table></div>';
 }
+function dayTick(v) { var d = new Date(v); return isNaN(d) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
 function drawChart(sel, o, log, keys, metric) {
   var L = o.league || {}, h = L.history || {};
   var el = typeof sel === 'string' ? document.querySelector(sel) : sel;
@@ -347,8 +350,8 @@ function drawChart(sel, o, log, keys, metric) {
   QKC.forecast(el, {
     x: ser.dates.map(function (d) { return d + 'T12:00:00Z'; }), xType: 'time',
     series: ks.map(function (k) { return { name: ab(o, k), label: ab(o, k), data: ser.series[k], color: tm(o, k).colour }; }),
-    annotations: ann, yName: 'Our ' + metricOf(L, metric).label.toLowerCase() + ' chance', xName: 'Date',
-    label: 'Our ' + metricOf(L, metric).label.toLowerCase() + ' chance over time'
+    annotations: ann, yName: 'Our ' + lc(metricOf(L, metric).label) + ' chance', xName: 'Date', xFmt: dayTick,
+    label: 'Our ' + lc(metricOf(L, metric).label) + ' chance over time'
   });
 }
 QKL.race = function (el, o) {
@@ -360,7 +363,7 @@ QKL.race = function (el, o) {
   if (!groups.length) groups = [{ key: 'all', label: 'League', teams: Object.keys(L.race || L.teams || {}) }];
   var ms = (L.metrics || []).filter(function (m) { return Object.keys((L.current || {})[m.key] || {}).length; });
   if (!ms.length) ms = L.metrics || [];
-  var M = (L.notes || {}).metric || (ms[0] || {}).key, G = o.group || groups[0].key;
+  var M = o.metric || (L.notes || {}).metric || (ms[0] || {}).key, G = o.group || groups[0].key;
   var h = L.history || {};
   var reb = (h.rebuilt || []).length, live = h.live_from;
   var note = live && reb ? 'Tracking live since <b>' + esc(dayLabel(live)) + '</b>. Before that, ' + reb + ' snapshots rebuilt from our season simulation run as of each date (' + esc(String(h.n || 2000)) + ' simulations each), using only the results known then.' :
@@ -384,7 +387,7 @@ QKL.race = function (el, o) {
       var t = document.getElementById(id + '-t');
       if (t) t.innerHTML = raceTable(o, groupKeys(), M, log);
       var cc = document.querySelector('#' + id + '-cc .qk-card-sub');
-      if (cc) cc.textContent = 'Our ' + metricOf(L, M).label.toLowerCase() + ' chance, ' + ((groups.filter(function (x) { return x.key === G; })[0] || {}).label || '');
+      if (cc) cc.textContent = 'Our ' + lc(metricOf(L, M).label) + ' chance, ' + ((groups.filter(function (x) { return x.key === G; })[0] || {}).label || '');
     });
   }
   var sm = document.getElementById(id + '-m'), sg = document.getElementById(id + '-g');
@@ -403,7 +406,8 @@ QKL.shape = function (el, o) {
   var Q = L.quad, T = L.teams || {}, notes = L.notes || {};
   var keys = Object.keys(T);
   var qPts = Q ? keys.map(function (k) { var v = T[k].vals || {}; return isNum(v[Q.x]) && isNum(v[Q.y]) ? { x: v[Q.x], y: Q.flipY ? -v[Q.y] : v[Q.y], name: nm(o, k), label: ab(o, k), color: tm(o, k).colour, href: href(o, k), sub: ((T[k].chips || [])[0] || [])[0] } : null; }).filter(Boolean) : [];
-  var lk = keys.filter(function (k) { return T[k].luck && isNum(T[k].luck.d); }).sort(function (a, b) { return T[b].luck.d - T[a].luck.d; });
+  var P = L.profile || {};
+  var lk = P.early ? [] : keys.filter(function (k) { return T[k].luck && isNum(T[k].luck.d); }).sort(function (a, b) { return T[b].luck.d - T[a].luck.d; });
   var u = notes.luck_unit || 'wins';
   var tiers = (L.tiers || []).map(function (x) {
     return '<div class="qkl-tier"><h5>' + esc(x.label) + '</h5><p>' + esc(x.sub || '') + ' · ' + x.teams.length + '</p><div class="ts">' + x.teams.map(function (k) {
@@ -411,10 +415,16 @@ QKL.shape = function (el, o) {
       return '<a href="' + esc(href(o, k)) + '" title="' + esc(nm(o, k) + (isNum(p[k]) ? ': ' + pct(p[k]) : '')) + '">' + QK.teamMark(mark(o, k), 'sm') + '</a>';
     }).join('') + '</div></div>';
   }).join('');
-  el.innerHTML = '<section class="qk-section qkl-sec">' + QK.sectionHead({ kicker: 'The shape of the league', title: 'Who is good at what, and who is for real', sub: 'Offence against defence, each team’s record against the record its numbers deserved, and the tiers our chances put them in.' }) +
+  var subs = [];
+  if (qPts.length) subs.push('offence against defence');
+  if (lk.length) subs.push('each team’s record against the record its numbers deserved');
+  if (tiers) subs.push('the tiers our chances put them in');
+  var sub = subs.length ? subs.join(', ').replace(/, ([^,]*)$/, ' and $1') : '';
+  el.innerHTML = '<section class="qk-section qkl-sec">' + QK.sectionHead({ kicker: 'The shape of the league', title: 'Who is good at what, and who is for real', sub: sub ? sub.charAt(0).toUpperCase() + sub.slice(1) + '.' : '' }) +
     '<div class="qk-grid">' +
     (qPts.length ? '<div class="qk-span-6">' + card('Offence v defence', Q.sub || 'Up and right is better (the defence axis is turned so fewer allowed is higher); dashed: the league average', '<div class="qk-chart" id="' + id + '-q" style="height:420px"></div>') + '</div>' : '') +
     (lk.length ? '<div class="qk-span-6">' + card('Record v the numbers', 'Actual ' + u + ' minus the ' + u + ' the numbers deserved (' + (notes.luck_basis || 'Pythagorean') + ')', '<div class="qk-chart" id="' + id + '-l" style="height:' + Math.max(320, 16 * lk.length + 70) + 'px"></div><p class="qkl-note">Above zero: winning more than the scoring says, often on close games; it rarely lasts. Below: the record trails the play.' + (notes.close ? ' Close games: ' + esc(notes.close) + '.' : '') + '</p>', { flush: false }) + '</div>' : '') +
+    (P.early && !lk.length && keys.some(function (k) { return T[k].luck; }) ? '<div class="qk-span-6">' + card('Record v the numbers', '', QK.empty('Early days', 'The record against the numbers appears after ' + (P.min_gp || 10) + ' ' + (o.unitGames || 'games') + ': before then one close game moves it more than the play does.')) + '</div>' : '') +
     (tiers ? '<div class="qk-span-12">' + card('The tiers', 'From our chances today', '<div class="qkl-tiers">' + tiers + '</div>', { flush: true }) + '</div>' : '') +
     '</div></section>';
   if (qPts.length && QKC) {
@@ -440,7 +450,7 @@ QKL.team = function (el, o, key) {
   el.innerHTML = '<section class="qk-section qkl-sec">' + QK.sectionHead({ kicker: 'Strengths, weaknesses and the race', title: o.teamTitle || 'What they do well, and where the race stands', html: true,
       sub: 'Percentiles among the league’s teams on our team set, the plain-English read, and our chances over the season.' }) +
     '<div class="qk-grid"><div class="qk-span-12"><section class="qk-card">' + QKL.card(o, key, { head: false, link: false, meters: o.meters }) + '</section></div>' +
-    (ms.length ? '<div class="qk-span-12">' + card('Chances over the season', ms.map(function (m) { return m.label; }).join(', ') + ': ours, one point a day', '<div class="qk-chart" id="' + id + '-c" style="height:320px"></div>') + '</div>' : '') +
+    (ms.length ? '<div class="qk-span-12">' + card('Chances over the season', ms.map(function (m) { return m.label; }).join(', ') + ': ours' + ((L.history || {}).live_from ? ', a snapshot a day since ' + dayLabel(L.history.live_from) + ((L.history.rebuilt || []).length ? '; before that rebuilt from our simulation as of each date' : '') : ''), '<div class="qk-chart" id="' + id + '-c" style="height:320px"></div>') + '</div>' : '') +
     '</div></section>';
   if (!ms.length) return;
   loadLog(o).then(function (log) {
@@ -456,7 +466,7 @@ QKL.team = function (el, o, key) {
     var h = L.history || {};
     QKC.forecast(c, { x: any.dates.map(function (d) { return d + 'T12:00:00Z'; }), xType: 'time', series: series.map(function (s) { return { name: s.name, label: s.label, data: s.data, ours: s.ours }; }),
       annotations: h.live_from && any.dates[0] < h.live_from ? [{ x: h.live_from + 'T12:00:00Z', label: 'Live from ' + dayLabel(h.live_from) }] : [],
-      yName: 'Our chance', xName: 'Date', label: nm(o, key) + ': our chances over the season' });
+      yName: 'Our chance', xName: 'Date', xFmt: dayTick, label: nm(o, key) + ': our chances over the season' });
   });
 };
 

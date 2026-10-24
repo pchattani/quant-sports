@@ -29,13 +29,27 @@ function teamBarCell(v, team) {
   return '<span class="qk-barcell"><span>' + U.pct(v) + '</span><i aria-hidden="true"><b style="width:' + Math.min(100, 100 * v).toFixed(1) + '%;background:' + esc(QK.color.team(RK.teamColourRaw(team))) + '"></b></i></span>';
 }
 
+/* The league module's options (docs/_design/league.js, QKL) from season.json: the clubs, the race chart's groups
+   (divisions, then conferences, then the league) and the race log (data/race_log.json, the site's cached loader). */
+function leagueOpts(d, S) {
+  const L = d && d.league;
+  if (!L || !window.QKL) return null;
+  const rows = ((d.standings || {}).rows || []), teams = {};
+  rows.forEach(r => { teams[r.team] = { abbr: RK.teamAbbr(r.team), name: RK.teamName(r.team), colour: RK.teamColourRaw(r.team), href: RK.teamHref(r.team, S) }; });
+  const groups = [];
+  ((d.standings || {}).divisions || []).forEach(dv => groups.push({ key: dv.division, label: dv.division, teams: (dv.teams || []).slice() }));
+  ['Eastern', 'Western'].forEach(c => { const ts = rows.filter(r => r.conference === c).map(r => r.team); if (ts.length) groups.push({ key: c, label: c.slice(0, 4), teams: ts }); });
+  return { league: L, teams: teams, groups: groups, season: String(S), loadLog: () => RK.load('race_log.json'), title: 'How the race is shaping up', unitGames: 'games' };
+}
+RK.leagueOpts = leagueOpts;
+
 /* One standings block as a v2 leaderboard: heat cells for the 5v5 xG share and our rating (league percentile among
    the 32 clubs), our playoff chance as a bar, the cut line dashed. */
-function stBoard(node, g, pc) {
+function stBoard(node, g, pc, lo) {
   const rows = g.rows.map((r, i) => Object.assign({}, r, { pos: g.label ? g.label(i) : String(i + 1), cut: g.cut !== undefined && i === g.cut, name: RK.teamShort(r.team),
     l10s: Array.isArray(r.l10) ? r.l10.join('-') : (r.l10 || ''), xp: pc.xgf[r.team], rp: pc.rating[r.team] }));
   QK.leaderboard(node, { dense: true, rowClass: r => (r.cut ? 'rk-cut' : ''), rowHref: r => RK.teamHref(r.team), columns: [
-    { key: 'pos', label: '#', sort: false, fmt: v => '<span class="qk-muted">' + esc(v) + '</span>' },
+    { key: 'pos', label: '#', sort: false, fmt: (v, r) => (lo ? QKL.toggle(r.team, RK.teamName(r.team)) : '') + '<span class="qk-muted">' + esc(v) + '</span>' },
     { key: 'name', label: 'Club', type: 'entity', mark: r => U.team(r.team), href: r => RK.teamHref(r.team), sub: 'clinch' },
     { key: 'gp', label: 'GP', num: true }, { key: 'w', label: 'W', num: true }, { key: 'l', label: 'L', num: true }, { key: 'otl', label: 'OTL', num: true },
     { key: 'pts', label: 'PTS', num: true, fmt: v => '<b>' + v + '</b>' }, { key: 'p_pct', label: 'P%', num: true, fmt: v => RK.fmtVal(v, '3') },
@@ -45,7 +59,8 @@ function stBoard(node, g, pc) {
     { key: 'p_playoffs', label: 'Playoffs', num: true, fmt: (v, r) => teamBarCell(v, r.team), tip: 'Our chance of a playoff spot, from 20,000 simulated seasons' },
     { key: 'p_cup', label: 'Cup', num: true, fmt: v => (isNum(v) ? U.pct(v, 1) : '—'), tip: 'Our chance of winning the Stanley Cup' },
     { key: 'l10s', label: 'L10', sort: false }, { key: 'streak', label: 'Strk', sort: false }
-  ], rows: rows });
+  ].concat(lo ? [{ key: 'team', label: 'Profile', sort: false, tip: 'What stands out about the club; press + for its full card (strengths, weaknesses and the race)', fmt: (v, r) => QKL.chip(lo, r.team) || '<span class="qk-muted">—</span>' }] : []), rows: rows });
+  if (lo) QKL.wire(node, lo);
 }
 
 function standingsNew(node, S) {
@@ -55,6 +70,7 @@ function standingsNew(node, S) {
     if (!RK.ok(d) || !((d.standings || {}).rows || []).length) { node.innerHTML = U.card2('Standings', '', QK.empty('Not built yet', RK.reason(d))); return; }
     const st = d.standings, rows = st.rows, by = {};
     rows.forEach(r => { by[r.team] = r; });
+    const lo = leagueOpts(d, S);
     const sim = (d.sim && d.sim.teams) || {};
     const wc = st.wild_card || {};
     const early = rows.every(r => (r.gp || 0) < U.TEAM_MIN_GP);
@@ -86,11 +102,13 @@ function standingsNew(node, S) {
       QK.sectionHead({ kicker: 'The table · ' + RK.seasonLabel(S), title: 'Where everyone stands', sub: esc(RK.regGames(S)) + ' games a club · 2 points a win, 1 for an overtime or shootout loss.' + (early ? ' The heat colours start after ' + U.TEAM_MIN_GP + ' games: earlier ranks are noise.' : ' xGF% and rating cells are coloured by rank among the 32 clubs (red best, blue worst).'), html: true,
         actions: '<div class="qk-seg" id="st-view" role="group" aria-label="Standings view">' + [['wc', 'Wild card'], ['div', 'Divisions'], ['league', 'League']].map((v, i) => '<button type="button" aria-pressed="' + (i === 0) + '" data-value="' + v[0] + '">' + v[1] + '</button>').join('') + '</div>' }) +
       '<div id="st-body"></div>' +
-      QK.note('<b>Reading the table.</b> <b>P%</b> is the share of the points available that a club has taken. <b>xGF%</b> is its share of the 5-on-5 chances (expected goals): over a season it predicts the next games better than the goal difference. <b>Rating</b> is our estimate of how many goals a game better or worse than an average club it is. <b>Playoffs</b> is our chance from ' + QK.fmt.num((d.sim || {}).n || 20000) + ' simulated seasons: 80% still misses about 1 time in 5.') +
+      QK.note('<b>Reading the table.</b> <b>P%</b> is the share of the points available that a club has taken. <b>xGF%</b> is its share of the 5-on-5 chances (expected goals): over a season it predicts the next games better than the goal difference. <b>Rating</b> is our estimate of how many goals a game better or worse than an average club it is. <b>Playoffs</b> is our chance from ' + QK.fmt.num((d.sim || {}).n || 20000) + ' simulated seasons: 80% still misses about 1 time in 5.' + (lo ? ' <b>+</b> opens a club’s card: its strengths and weaknesses against the other 31 and where its race stands.' : '')) +
+      (lo ? '<div id="st-race"></div>' : '') +
       '<section class="qk-section">' + QK.sectionHead({ kicker: 'Season simulation', title: 'Where they finish', sub: 'Each club’s points at the end of the regular season across the simulated seasons: the dot is the mean, the bar the range it lands in nine times out of ten.',
         actions: '<div class="qk-seg" id="st-conf" role="group" aria-label="Conference"><button type="button" aria-pressed="true" data-value="Eastern">East</button><button type="button" aria-pressed="false" data-value="Western">West</button></div>' }) +
       U.card2('Projected full-season points', d.sim && d.sim.n ? QK.fmt.num(d.sim.n) + ' simulations of the rest of the season, from today’s points' : '', U.chart('st-range', 520, 'Projected full-season points with a 90% range') +
         QK.note('<b>Why are the bars so wide?</b> Every club still has most of its games to play, and hockey games are close to coin flips. The bars narrow with every game day.')) + '</section>' +
+      (lo ? '<div id="st-shape"></div>' : '') +
       QK.note('<b>Clinch marks:</b> x playoff spot, y division, z conference, p Presidents\' Trophy, e eliminated. Ties go to points %, then regulation wins, regulation and overtime wins, then wins.' + (d.updated_at ? ' Updated ' + esc(RK.fmtStamp(d.updated_at)) + '.' : ''));
     const draw = v => {
       const groups = [];
@@ -107,9 +125,10 @@ function standingsNew(node, S) {
       if (!groups.length) groups.push({ title: 'League', rows: rows });
       const body = node.querySelector('#st-body');
       body.innerHTML = groups.map((g, i) => '<div class="rk-day rk-grp"' + (i ? '' : ' style="margin-top:0"') + '><b>' + esc(g.title) + '</b>' + (g.sub ? '<span>' + esc(g.sub) + '</span>' : '') + '</div><div class="qk-card rk-st" id="st-g' + i + '"></div>').join('');
-      groups.forEach((g, i) => stBoard(body.querySelector('#st-g' + i), g, pc));
+      groups.forEach((g, i) => stBoard(body.querySelector('#st-g' + i), g, pc, lo));
     };
     draw('wc');
+    if (lo) { QKL.race(node.querySelector('#st-race'), lo); QKL.shape(node.querySelector('#st-shape'), lo); }
     QK.seg(node.querySelector('#st-view'), draw);
     const range = c => {
       const rs = rows.filter(r => r.conference === c).map(r => Object.assign({}, r, sim[r.team] || {})).filter(r => isNum(r.pts_p05) && isNum(r.pts_p95)).sort((a, b) => (b.mean_pts || 0) - (a.mean_pts || 0));

@@ -86,7 +86,7 @@ var COMP_TAB_MAP = {
   'p-table': ['table'], 'p-results': ['fixtures'], 'p-bracket': ['bracket'], 'p-players': ['players'], 'p-leaders': ['players', { view: 'leaders' }]
 };
 /* Competition tabs the new page knows (the competition module may hide some per competition). */
-var COMP_TABS = ['overview', 'table', 'fixtures', 'bracket', 'odds', 'power', 'players', 'analytics', 'clubs', 'seasons'];
+var COMP_TABS = ['overview', 'race', 'table', 'fixtures', 'bracket', 'odds', 'power', 'players', 'analytics', 'clubs', 'seasons'];
 
 function splitHash(hash) {
   var h = String(hash === undefined ? location.hash : hash).replace(/^#\/?/, '');

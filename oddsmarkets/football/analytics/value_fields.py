@@ -6,9 +6,15 @@ reach the earlier payloads here, in a step that runs once the value files are wr
 * `<slug>/players_live.json` players[]: `role` (the formation role of his line in that competition: GK, CB, FB, DM,
   CM, AM, W, ST; a coarse DF / MF / FW for substitute-only lines) and `gar90` (goals added above replacement per 90 in
   that competition, from data/value/lines.json; null under the value model's 90 minutes).
-* `lab/<window>/<scope>.json`: two columns appended to `fields` (existing column positions are unchanged): `role` and
-  `gar90`. The "season" window of a single competition reads that competition's line; every other row reads the
-  person's 12-month value (data/value/players.json).
+* `lab/<window>/<scope>.json`: three columns appended to `fields` (existing column positions are unchanged): `role`,
+  `gar90` and `gar` (goals above replacement, a total). The "season" window reads this season's lines
+  (data/value/lines.json): one competition's own line, or for `all` / `club` / `intl` the lines of the competitions
+  in that scope summed (GAR adds, GAR/90 = 90 x GAR / minutes, as the Compare page's FB.garOver). The "last" window
+  reads last season's lines the same way when the value layer passes them (`prev_lines`). `365` and `ytd` read the
+  person's 12-month value (data/value/players.json). `role` stays the line's role (one competition) or the 12-month
+  role.
+* `lab/leaders.json`: a `gar` board per scope (all, club, intl): this season's top 15 by goals above replacement
+  (rows of lab/season/<scope>.json with 450+ minutes), {id, name, team, tid, comp, mix, value (GAR), minutes, gar90}.
 * `people/<pid>.json` `role`: the 12-month role. The unified step writes it from the value files on disk (the previous
   build's), and `refresh_people_roles` rewrites only the files whose role changed in this build's value layer.
 
@@ -22,7 +28,8 @@ from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
-LAB_EXTRA = ("role", "gar90")
+LAB_EXTRA = ("role", "gar90", "gar")
+LEAD_MIN = 450
 
 
 def _read(path: Path) -> Any:
@@ -60,6 +67,54 @@ def load(data_dir: Path) -> tuple[dict[tuple[str, str], tuple], dict[str, tuple]
     return lines, players
 
 
+def _num(x):
+    return float(x) if isinstance(x, (int, float)) and x == x else None
+
+
+def load_full(data_dir: Path) -> tuple[dict[tuple[str, str], tuple], dict[str, tuple]]:
+    """({(person id, competition slug): (role, gar90, gar, minutes)} from value/lines.json, {person id: (role, gar90,
+    gar)} from value/players.json, gar None when the file has no `gar` column)."""
+    lp = _read(data_dir / "value" / "lines.json")
+    lines = {(str(i), str(c)): (r, g, t, m) for i, c, r, g, t, m in _rows(lp, "id", "comp", "role", "gar90", "gar", "min")}
+    pp = _read(data_dir / "value" / "players.json")
+    if "gar" in ((pp or {}).get("fields") or []):
+        players = {str(i): (r, g, t) for i, r, g, t in _rows(pp, "id", "role", "gar90", "gar")}
+    else:
+        players = {str(i): (r, g, None) for i, r, g in _rows(pp, "id", "role", "gar90")}
+    return lines, players
+
+
+def _comp_scopes(data_dir: Path) -> dict[str, str]:
+    """{competition slug: 'club' | 'international'} from lab/index.json `comps` (empty when absent)."""
+    ix = _read(data_dir / "lab" / "index.json") or {}
+    return {k: (v or {}).get("scope") or "club" for k, v in (ix.get("comps") or {}).items()}
+
+
+def _in_scope(scope: str, comp: str, scopes: dict[str, str]) -> bool:
+    if scope == "all":
+        return True
+    if scope == "club":
+        return scopes.get(comp, "club") != "international"
+    if scope == "intl":
+        return scopes.get(comp) == "international"
+    return comp == scope
+
+
+def _summed(by_pid: dict[str, list], pid: str, scope: str, scopes: dict[str, str]) -> tuple:
+    """(gar90, gar) over a person's lines [(comp, gar, minutes)] in the scope; (None, None) without any."""
+    g = m = 0.0
+    seen = False
+    for comp, t, mins in by_pid.get(pid) or []:
+        if t is None or not mins or not _in_scope(scope, comp, scopes):
+            continue
+        g += t
+        m += mins
+        seen = True
+    if not seen or m <= 0:
+        return None, None
+    return round(90.0 * g / m, 3), round(g, 2)
+
+
 def roles(data_dir: Path) -> dict[str, str]:
     """{person id: 12-month role} from data/value/players.json (the unified step's source for people/<pid>.json)."""
     return {i: r for i, (r, _g) in load(data_dir)[1].items() if r}
@@ -90,9 +145,22 @@ def annotate_players_live(data_dir: Path, lines: dict, players: dict) -> int:
     return n
 
 
-def annotate_lab(data_dir: Path, lines: dict, players: dict) -> int:
-    """role and gar90 appended to every lab file's fields and rows; returns the files rewritten."""
+def annotate_lab(data_dir: Path, lines: dict, players: dict, full: tuple | None = None, prev_lines: dict | None = None) -> int:
+    """role, gar90 and gar appended to every lab file's fields and rows; returns the files rewritten. `full` is
+    load_full()'s pair (read from disk when None); `prev_lines` {(pid, slug): {"role", "gar90", "min"}} is last
+    season's lines for the "last" window."""
     n = 0
+    lf, pf = full if full is not None else load_full(data_dir)
+    scopes = _comp_scopes(data_dir)
+    cur_by: dict[str, list] = {}
+    for (pid, comp), (_r, g90, t, mins) in lf.items():
+        if t is None and _num(g90) is not None and mins:
+            t = g90 * mins / 90.0
+        cur_by.setdefault(pid, []).append((comp, _num(t), mins or 0))
+    prev_by: dict[str, list] = {}
+    for (pid, comp), v in (prev_lines or {}).items():
+        g90, mins = _num((v or {}).get("gar90")), (v or {}).get("min") or 0
+        prev_by.setdefault(pid, []).append((comp, g90 * mins / 90.0 if g90 is not None else None, mins))
     for path in sorted((data_dir / "lab").glob("*/*.json")):
         lab = _read(path)
         if not isinstance(lab, dict) or not isinstance(lab.get("fields"), list) or "player_id" not in lab["fields"]:
@@ -103,8 +171,9 @@ def annotate_lab(data_dir: Path, lines: dict, players: dict) -> int:
             if k not in fields:
                 fields.append(k)
         i_id, i_comp = fields.index("player_id"), fields.index("comp") if "comp" in fields else None
-        i_role, i_gar = fields.index("role"), fields.index("gar90")
-        season = path.parent.name == "season"
+        i_role, i_g90, i_gar = fields.index("role"), fields.index("gar90"), fields.index("gar")
+        window, scope = path.parent.name, path.stem
+        by = cur_by if window == "season" else prev_by if (window == "last" and prev_lines) else None
         for r in lab.get("rows") or []:
             if not isinstance(r, list) or len(r) < width:
                 continue
@@ -112,11 +181,48 @@ def annotate_lab(data_dir: Path, lines: dict, players: dict) -> int:
                 r.append(None)
             pid = str(r[i_id])
             comp = r[i_comp] if i_comp is not None else None
-            ln = lines.get((pid, str(comp))) if season and isinstance(comp, str) else None
-            role, gar = ln if ln else players.get(pid) or (None, None)
-            r[i_role], r[i_gar] = role, gar
+            p12 = pf.get(pid) or (None, None, None)
+            role = p12[0]
+            if by is not None:
+                g90, gar = _summed(by, pid, scope, scopes)
+                if window == "season" and scope not in ("all", "club", "intl"):
+                    ln = lf.get((pid, scope))
+                    role = (ln[0] if ln else None) or role
+                    if ln and _num(ln[1]) is not None:
+                        g90, gar = ln[1], ln[2] if _num(ln[2]) is not None else gar
+                elif window == "last" and scope not in ("all", "club", "intl"):
+                    role = ((prev_lines or {}).get((pid, scope)) or {}).get("role") or role
+            else:
+                g90, gar = p12[1], p12[2]
+            r[i_role], r[i_g90], r[i_gar] = role, g90, gar
         n += _write_if_changed(path, lab)
+    n += annotate_leaders(data_dir)
     return n
+
+
+def annotate_leaders(data_dir: Path) -> int:
+    """lab/leaders.json: a `gar` board per pooled scope from lab/season/<scope>.json (450+ minutes, top 15 by GAR);
+    returns 1 when the file was rewritten."""
+    path = data_dir / "lab" / "leaders.json"
+    board = _read(path)
+    if not isinstance(board, dict) or not isinstance(board.get("scopes"), dict):
+        return 0
+    for scope, lists in board["scopes"].items():
+        lab = _read(data_dir / "lab" / "season" / f"{scope}.json")
+        if not isinstance(lists, dict) or not isinstance(lab, dict) or "gar" not in (lab.get("fields") or []):
+            continue
+        I = {f: i for i, f in enumerate(lab["fields"])}
+        need = ("player_id", "name", "minutes", "gar", "gar90")
+        if not all(k in I for k in need):
+            continue
+        rows = [r for r in lab.get("rows") or [] if isinstance(r, list) and len(r) == len(I)
+                and _num(r[I["gar"]]) is not None and (r[I["minutes"]] or 0) >= LEAD_MIN]
+        rows.sort(key=lambda r: (-r[I["gar"]], -(r[I["minutes"]] or 0)))
+        get = lambda r, k: r[I[k]] if k in I else None
+        lists["gar"] = [{"id": str(get(r, "player_id")), "name": get(r, "name"), "team": get(r, "team"), "tid": get(r, "tid"),
+                         "comp": get(r, "comp"), "mix": get(r, "mix"), "value": get(r, "gar"), "minutes": get(r, "minutes"),
+                         "gar90": get(r, "gar90")} for r in rows[:15]]
+    return int(_write_if_changed(path, board))
 
 
 def refresh_people_roles(data_dir: Path, before: dict[str, str], after: dict[str, str]) -> int:
@@ -256,7 +362,8 @@ def apply(data_dir: Path, roles_before: dict[str, str] | None = None, prev_lines
     if not lines and not players:
         logger.info("value fields: no value layer on disk, nothing added")
         return {"players_live": 0, "lab": 0, "people": 0}
-    out = {"players_live": annotate_players_live(data_dir, lines, players), "lab": annotate_lab(data_dir, lines, players)}
+    out = {"players_live": annotate_players_live(data_dir, lines, players),
+           "lab": annotate_lab(data_dir, lines, players, load_full(data_dir), prev_lines)}
     out["people"] = refresh_people_roles(data_dir, roles_before or {}, {i: r for i, (r, _g) in players.items() if r}) \
         if roles_before is not None else 0
     if prev_lines:

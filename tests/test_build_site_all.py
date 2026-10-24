@@ -191,7 +191,7 @@ raise SystemExit(b.main())
 # inspection; scratchpad headless-Chrome runs check the rendering.
 
 APP_DIR = SITE / "assets" / "app"
-APP_MODULES = ["core", "charts", "overview", "matches", "competition", "clubs", "players", "value", "fantasy", "lab", "model", "boot"]
+APP_MODULES = ["core", "charts", "overview", "matches", "race", "competition", "clubs", "players", "value", "fantasy", "lab", "model", "boot"]
 
 
 def _js() -> str:
@@ -549,7 +549,8 @@ def test_analytics_payloads_for_a_league_and_a_cup(built) -> None:
     for slug in ("premier-league", "champions-league", "mls", "fa-cup", "world-cup", "liga-argentina"):
         assert "analytics" in idx[slug]["tabs"], slug
         a = _load(data, slug, "analytics.json")
-        assert set(a) == ANALYTICS_KEYS, slug
+        # set_pieces (the Race tab, oddsmarkets/football/analytics/race.py) only where the matches have shot maps
+        assert set(a) - {"set_pieces"} == ANALYTICS_KEYS, slug
         assert a["team_metrics"] and a["player_metrics"] and a["minutes_floor"] >= 0
     a = _load(data, "premier-league", "analytics.json")
     assert a["season"] and len(a["rounds"]) == 5

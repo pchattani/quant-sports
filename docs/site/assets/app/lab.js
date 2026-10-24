@@ -4,7 +4,10 @@
  *        the player lab: any two metrics against each other for one position group, one dot per player over every
  *        competition, club football, national-team football or one competition, this season, last season or a
  *        calendar window; presets, size and colour encodings, medians, labelled extremes, a highlight search and the
- *        group ranked on the view (data/lab/<window>/<scope>.json, UNIFIED_PAYLOADS 14)
+ *        group ranked on the view (data/lab/<window>/<scope>.json, UNIFIED_PAYLOADS 14). Our model metrics (GAR/90 and
+ *        GAR from the player value model, value_fields.py) lead every picker as "Our models", then the metrics spec's
+ *        headline set for the position, then the box score by group; names and explanations come from the spec
+ *        (QK.spec, assets/qk/metrics/football.labels.json) and our metrics carry the cobalt "Our model" tag
  *   #/compare/players/<a>/<b>[?p3=<c>&view=classic&scope=]
  *        two or three players side by side (kit v4: two draw the tale of the tape, three the table): QK.compareView on the one metric set the player card
  *        uses (FB.PLAYER_SETS, players.js), percentiles against the shared position group, and where each one sits in
@@ -34,15 +37,15 @@ function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace
 
 var POS = { F: 'Forwards', M: 'Midfielders', D: 'Defenders', G: 'Goalkeepers', O: 'All outfield players' };
 var PRESETS = {
-  F: [['npxg_90', 'xa_90', 'Threat: scoring against creating'], ['shots_90', 'xg_per_shot', 'Shot volume against shot quality'], ['npxg_90', 'finishing', 'Chances against finishing'],
+  F: [['npxg_xa_90', 'gar90', 'Value added against attacking output'], ['npxg_90', 'xa_90', 'Threat: scoring against creating'], ['shots_90', 'xg_per_shot', 'Shot volume against shot quality'], ['npxg_90', 'finishing', 'Chances against finishing'],
     ['xg_per_shot', 'placement', 'Chance quality against shot placement'], ['dribbles_90', 'dribble_pct', 'Dribbling: volume against success'], ['touches_90', 'loss_per_100', 'Involvement against ball security'],
     ['npxg_xa_90', 'def_actions_90', 'Output against work off the ball']],
-  M: [['xa_90', 'key_passes_90', 'Creation: quality against volume'], ['prog_actions_90', 'opp_half_passes_90', 'Progression: carrying against passing'], ['passes_90', 'pass_pct', 'Passing volume against security'],
+  M: [['prog_actions_90', 'gar90', 'Value added against progression'], ['xa_90', 'key_passes_90', 'Creation: quality against volume'], ['prog_actions_90', 'opp_half_passes_90', 'Progression: carrying against passing'], ['passes_90', 'pass_pct', 'Passing volume against security'],
     ['padj_tkl_int_90', 'ball_wins_90', 'Ball winning'], ['npxg_xa_90', 'padj_tkl_int_90', 'Two-way midfielders'], ['shot_creation_90', 'xa_per_kp', 'Creation volume against chance quality']],
-  D: [['padj_tkl_int_90', 'duel_pct', 'Defending: activity against success'], ['aerials_90', 'aerial_pct', 'Aerial presence against dominance'], ['long_balls_90', 'long_ball_pct', 'Long distribution'],
+  D: [['padj_tkl_int_90', 'gar90', 'Value added against defending'], ['padj_tkl_int_90', 'duel_pct', 'Defending: activity against success'], ['aerials_90', 'aerial_pct', 'Aerial presence against dominance'], ['long_balls_90', 'long_ball_pct', 'Long distribution'],
     ['prog_actions_90', 'passes_90', 'Ball-playing defenders'], ['clearances_90', 'blocks_90', 'Defending the box'], ['crosses_90', 'xa_90', 'Attacking full-backs']],
-  G: [['save_pct', 'goals_prevented_90', 'Shot stopping'], ['sweeper_90', 'high_claims_90', 'Command of the area'], ['passes_90', 'long_ball_pct', 'Distribution']],
-  O: [['npxg_xa_90', 'padj_tkl_int_90', 'Attacking output against defending'], ['prog_actions_90', 'shot_creation_90', 'Progression against chance creation'], ['duels_90', 'duel_pct', 'Duels: volume against success']]
+  G: [['goals_prevented_90', 'gar90', 'Value added against shot stopping'], ['save_pct', 'goals_prevented_90', 'Shot stopping'], ['sweeper_90', 'high_claims_90', 'Command of the area'], ['passes_90', 'long_ball_pct', 'Distribution']],
+  O: [['rating', 'gar90', 'Value added against match rating'], ['npxg_xa_90', 'padj_tkl_int_90', 'Attacking output against defending'], ['prog_actions_90', 'shot_creation_90', 'Progression against chance creation'], ['duels_90', 'duel_pct', 'Duels: volume against success']]
 };
 var EXTRA_ADJ = ['npxg_xa_90', 'ga_90', 'shot_creation_90'];
 var WIN_ORDER = ['season', 'last', '365', 'ytd'];
@@ -50,19 +53,67 @@ var SHRINK_K = 450;
 var LAB = null, MU = {}, IX = null;
 var S = null;
 
+/* Our model metrics on the lab rows (value_fields.py appends role, gar90 and gar), in the order they lead the
+   pickers. Names and explanations come from the metrics spec when it has them (QK.spec); these are the fallbacks. */
+var OURS = [
+  { key: 'gar90', label: 'Value added (GAR/90)', fmt: '2', tip: 'Goals of expected goal difference a player adds per 90 minutes over a replacement-level player in the same role, from our player value model (box score plus match rating).' },
+  { key: 'gar', label: 'Goals above replacement (GAR)', fmt: '1', tip: 'Goals of expected goal difference a player adds over a replacement-level player in the same role in these minutes: GAR/90 times minutes over 90.' }
+];
+var NO_SHRINK = { gar: 1 };
+/* The spec's headline metrics for the lab's position letters (its groups are formation roles). */
+var POS_GROUPS = { F: ['st', 'am_w'], M: ['dm_cm', 'am_w'], D: ['cb', 'fb'], G: ['gk'], O: ['cb', 'fb', 'dm_cm', 'am_w', 'st'] };
+var SPEC = null;
+function specLoad() {
+  if (SPEC || !QK.spec || !QK.spec.load) return Promise.resolve(SPEC);
+  return QK.spec.load('football').then(function (c) { SPEC = c; return c; }, function () { return null; });
+}
+/* The spec's display name, with "/90" or "%" where the spec keeps the unit apart from the name. */
+function specLabel(key, fallback) {
+  var m = SPEC ? SPEC.metric(key, 'player') : null;
+  if (!m || !m.label || m.label === key) return fallback;
+  var l = m.label;
+  if (/^per 90$/.test(m.unit || '') && !/90/.test(l)) l += ' /90';
+  return l;
+}
+function specTip(key, fallback) { return SPEC ? SPEC.tip(key, 'player', fallback) : (fallback || ''); }
+/* the spec's one-line explanation alone (the strip names the model itself) */
+function specExplain(key, fallback) { var m = SPEC ? SPEC.metric(key, 'player') : null; return m && m.explain ? m.explain : (fallback || ''); }
+function oursOf(key) {
+  if (SPEC) { var o = SPEC.ours(key); if (o) return o; }
+  return OURS.some(function (m) { return m.key === key; }) ? { name: 'Player value model', about: '' } : null;
+}
+function oursTag(key) { var o = oursOf(key); return o ? QK.ours({ model: o.name, about: o.about }) : ''; }
+function headlineFor(pos) {
+  var out = {}, n = 0;
+  (POS_GROUPS[pos] || []).forEach(function (g) { (SPEC ? SPEC.headline(g) : []).forEach(function (k) { if (out[k] === undefined) out[k] = n++; }); });
+  return out;
+}
+FB.labOurs = { oursOf: oursOf, tag: oursTag, label: specLabel, tip: specTip, explain: specExplain, load: specLoad, metrics: OURS };
+
 /* One view of data/lab/ (one row per person) with the index's catalogue. */
 function prep(ix, view) {
   var meta = {};
-  (ix.metrics || []).forEach(function (m) { meta[m.key] = m; });
+  var ours = OURS.filter(function (m) { return view.idx[m.key] !== undefined; }).map(function (m) {
+    return { key: m.key, label: specLabel(m.key, m.label), group: 'Our models', fmt: m.fmt, scope: 'all', ours: true, desc: specTip(m.key, m.tip) };
+  });
+  var cat = ours.concat((ix.metrics || []).map(function (m) {
+    var c = {}, k;
+    for (k in m) if (Object.prototype.hasOwnProperty.call(m, k)) c[k] = m[k];
+    c.label = specLabel(m.key, m.label);
+    c.desc = specTip(m.key, m.desc || '');
+    return c;
+  }));
+  cat.forEach(function (m) { meta[m.key] = m; });
   meta.minutes = { key: 'minutes', label: 'Minutes', fmt: 'int' };
   meta.age = { key: 'age', label: 'Age', fmt: 'int' };
   var adj = {};
   (ix.adjusted_keys || []).concat(EXTRA_ADJ).forEach(function (k) { adj[k] = 1; });
   var win = (ix.windows || []).filter(function (w) { return w.key === view.window; })[0] || null;
-  return { idx: view.idx, meta: meta, metrics: ix.metrics || [], comps: ix.comps || {}, adj: adj, rows: view.rows, floor: view.floor, window: win, scope: view.scope, updated_at: ix.updated_at };
+  return { idx: view.idx, meta: meta, metrics: cat, comps: ix.comps || {}, adj: adj, rows: view.rows, floor: view.floor, window: win, scope: view.scope, updated_at: ix.updated_at };
 }
 function loadView(win, scope) {
-  return FB.labIndex().then(function (ix) {
+  return Promise.all([FB.labIndex(), specLoad()]).then(function (arr) {
+    var ix = arr[0];
     if (!ix || !ix.scopes) return null;
     IX = ix;
     var have = ix.scopes[win] || {};
@@ -83,14 +134,14 @@ function rawV(r, key) {
 }
 function val(r, key) {
   var v = rawV(r, key);
-  if (v === null || !S.shrink || key === 'minutes' || key === 'age' || MU[key] === undefined) return v;
+  if (v === null || !S.shrink || key === 'minutes' || key === 'age' || NO_SHRINK[key] || MU[key] === undefined) return v;
   var m = r[LAB.idx.minutes] || 0;
   return (m * v + SHRINK_K * MU[key]) / (m + SHRINK_K);
 }
 function label(key) {
   var m = LAB.meta[key] || {}, t = [];
   if (adjOn() && LAB.adj[key]) t.push('adj.');
-  if (S.shrink && key !== 'minutes' && key !== 'age') t.push('shrunk');
+  if (S.shrink && key !== 'minutes' && key !== 'age' && !NO_SHRINK[key]) t.push('shrunk');
   return (m.label || key) + (t.length ? ' (' + t.join(', ') + ')' : '');
 }
 function lower(key) { return !!(LAB.meta[key] || {}).lower; }
@@ -106,18 +157,29 @@ function pool() {
     return (r[I.minutes] || 0) >= S.min;
   });
 }
+/* The position's presets that this view can draw (an older payload without GAR drops the value presets). */
+function presets() {
+  return PRESETS[S.pos].filter(function (pp) { return !LAB || (LAB.idx[pp[0]] !== undefined && LAB.idx[pp[1]] !== undefined); });
+}
 function applyPreset() {
   if (S.preset < 0) return;
-  var p = PRESETS[S.pos][S.preset] || PRESETS[S.pos][0];
+  var ps = presets();
+  var p = ps[S.preset] || ps[0] || PRESETS[S.pos][0];
   S.x = p[0]; S.y = p[1];
 }
 function metricOpts(scope) {
-  var groups = {}, order = [];
+  var groups = {}, order = [], head = headlineFor(S.pos), heads = [];
   LAB.metrics.forEach(function (m) {
     if (S.pos === 'G' ? m.scope === 'out' : m.scope === 'gk') return;
-    if (!groups[m.group]) { groups[m.group] = []; order.push(m.group); }
-    groups[m.group].push([m.key, m.label]);
+    if (!m.ours && head[m.key] !== undefined) { heads.push(m); return; }
+    var g = m.ours ? 'Our models' : 'Box score · ' + m.group;
+    if (!groups[g]) { groups[g] = []; order.push(g); }
+    groups[g].push([m.key, m.label]);
   });
+  if (heads.length) {
+    groups['Box score · key numbers'] = heads.sort(function (a, b) { return head[a.key] - head[b.key]; }).map(function (m) { return [m.key, m.label]; });
+    order.splice(groups['Our models'] ? 1 : 0, 0, 'Box score · key numbers');
+  }
   var out = [];
   if (scope === 'size') out.push(['minutes', 'Minutes played'], ['', 'Same size']);
   if (scope === 'color') out.push(['comp', 'Main competition'], ['team', 'Club'], ['', 'One colour']);
@@ -157,6 +219,7 @@ FB.route('lab', function (el, p) {
     '<section class="qk-card fb-lb-ctl"><div class="qk-card-body" id="lb-ctl">' + FB.loading('lines', 3) + '</div></section>' +
     '<div id="lb-cover"></div>' +
     FB.card('<span id="lb-title">The chart</span>', '<span id="lb-sub"></span>', FB.chartBox('lb-chart', 640, 'Player lab scatter') + '<p class="fb-cap" id="lb-note"></p>', { id: 'lb-chart-card' }) +
+    '<div id="lb-ours" class="fb-mt"></div>' +
     QK.explain('<b>What’s that number?</b> Every dot is one player, and the top-right corner is better than the middle of the group on both axes. <b>Shrink small samples</b> pulls a player with few minutes towards the group’s middle, so a hot few hundred minutes does not top the chart; <b>league-adjust</b> multiplies attacking rates by the scoring factor of the leagues they came from.', { cls: 'fb-mt' }) +
     FB.card('Ranked on this view', 'The group ranked by the sum of standard scores on both axes (better direction); percentiles within the group shown. Top 60. A standard score is how many spreads above the group’s average a number sits: +1 is better than about five in six.', '<div id="lb-table"></div>', { flush: true, cls: 'fb-mt' });
   return show(el, true);
@@ -184,7 +247,7 @@ function controls(el) {
     FB.field('Season', FB.select('lb-win', winOpts(), S.win, 'Season or window')),
     FB.field('Competitions', FB.select('lb-comp', FB.labScopeOptions(IX, S.win), S.scope, 'Which competitions count', 'fb-pl-wide')),
     FB.field('Position', FB.select('lb-pos', Object.keys(POS).map(function (k) { return [k, POS[k]]; }), S.pos, 'Position')),
-    FB.field('Chart', FB.select('lb-preset', PRESETS[S.pos].map(function (pp, i) { return [String(i), pp[2]]; }).concat([['-1', 'Custom axes']]), String(S.preset), 'Preset')),
+    FB.field('Chart', FB.select('lb-preset', presets().map(function (pp, i) { return [String(i), pp[2]]; }).concat([['-1', 'Custom axes']]), String(S.preset), 'Preset')),
     FB.field('Min. minutes', '<span class="fb-lb-range"><input type="range" id="lb-min" min="90" max="2000" step="30" value="' + S.min + '" aria-label="Minimum minutes"><b class="fb-num" id="lb-min-v">' + S.min + '\'</b></span>')
   ]) + FB.toolbar([
     FB.field('X axis', FB.select('lb-x', metricOpts(), S.x, 'X axis')),
@@ -219,6 +282,20 @@ function controls(el) {
   $('lb-q').oninput = function (e) { S.q = e.target.value; clearTimeout(timer); timer = setTimeout(function () { if (FB.alive(el)) draw(el); }, 250); };
 }
 
+/* The cobalt strip under the chart when an axis, the size or the colour is one of our model metrics: what it is,
+   from the spec, and which value-model window this view reads (value_fields.py). */
+function oursNote() {
+  var keys = [S.y, S.x, S.size, S.color].filter(function (k, i, a) { return k && a.indexOf(k) === i && oursOf(k) && LAB.idx[k] !== undefined; });
+  if (!keys.length) return '';
+  var w = S.win, one = single();
+  var src = w === 'season' ? (one ? 'this season’s line in ' + esc(FB.labScopeName(S.scope, IX)) : 'this season’s lines in ' + esc(FB.labScopeName(S.scope, IX).toLowerCase()) + ', added up (GAR/90 is total GAR over total minutes)')
+    : w === 'last' ? 'last season’s lines' + (one ? ' in ' + esc(FB.labScopeName(S.scope, IX)) : ', added up')
+    : 'the value model’s last 12 months (the nearest window it keeps)';
+  return QK.oursExplain(keys.map(function (k) { return '<b>' + esc(label(k)) + '.</b> ' + esc(specExplain(k, (OURS.filter(function (m) { return m.key === k; })[0] || {}).tip)); }).join(' ') +
+    ' In this view it reads ' + src + '. GAR is on one scale across competitions, so it is never league-adjusted. <a href="#/value">Value leaderboard →</a> · <a href="#/model/glossary/gar">Glossary →</a>',
+    { title: 'Our model.' });
+}
+
 function draw(el) {
   if (!FB.alive(el)) return;
   var I = LAB.idx;
@@ -233,7 +310,8 @@ function draw(el) {
   var rows = base0.filter(function (r) { return val(r, S.x) !== null && val(r, S.y) !== null; });
   var scopeName = FB.labScopeName(S.scope, IX);
   var W = LAB.window;
-  FB.set('lb-title', esc(label(S.y)) + ' against ' + esc(label(S.x)));
+  FB.set('lb-title', esc(label(S.y)) + oursTag(S.y) + ' against ' + esc(label(S.x)) + oursTag(S.x));
+  FB.set('lb-ours', oursNote());
   FB.set('lb-sub', FB.int(rows.length) + ' ' + POS[S.pos].toLowerCase() + ' · ' + esc(single() ? scopeName : scopeName.toLowerCase()) + ' · ' + esc(FB.labWindowText(W)) + ' · ' + S.min + '+ minutes · one dot per player');
   if (W && W.start) {
     var present = {};
@@ -335,8 +413,11 @@ function draw(el) {
 
   var trows = ranked.slice(0, 60).map(function (o, i) {
     var r = o.r, vx = val(r, S.x), vy = val(r, S.y);
-    return { i: i + 1, name: r[I.name], pid: r[I.player_id], comp: r[I.comp], team: r[I.team], tid: r[I.tid], mix: compLabel(r), age: r[I.age], min: r[I.minutes], vx: vx, px: pxOf(vx), vy: vy, py: pyOf(vy), z: o.z, href: href(r) };
+    return { i: i + 1, name: r[I.name], pid: r[I.player_id], comp: r[I.comp], team: r[I.team], tid: r[I.tid], mix: compLabel(r), age: r[I.age], min: r[I.minutes], vx: vx, px: pxOf(vx), vy: vy, py: pyOf(vy), z: o.z, href: href(r),
+      g90: I.gar90 !== undefined ? r[I.gar90] : null };
   });
+  var garCol = I.gar90 !== undefined && S.x !== 'gar90' && S.y !== 'gar90';
+  var oc = function (k) { var o = oursOf(k); return o ? { name: o.name, about: o.about } : null; };
   FB.table(el.querySelector('#lb-table'), [
     { key: 'i', label: '#', num: true },
     { key: 'name', label: 'Player', sticky: true, fmt: function (v, r) { return '<a class="fb-link" href="' + esc(r.href) + '">' + esc(v) + '</a>'; } },
@@ -344,10 +425,11 @@ function draw(el) {
     { key: 'mix', label: 'Competitions (minutes)', fmt: function (v) { return '<span class="qk-muted fb-lb-mix">' + esc(v) + '</span>'; } },
     { key: 'age', label: 'Age', num: true },
     { key: 'min', label: 'Min', num: true },
-    { key: 'vx', label: (LAB.meta[S.x] || {}).label || S.x, num: true, pctl: 'px', fmt: function (v) { return fmtK(S.x, v); } },
-    { key: 'vy', label: (LAB.meta[S.y] || {}).label || S.y, num: true, pctl: 'py', fmt: function (v) { return fmtK(S.y, v); } },
+    { key: 'vx', label: (LAB.meta[S.x] || {}).label || S.x, num: true, pctl: 'px', ours: oc(S.x), tip: specTip(S.x, (LAB.meta[S.x] || {}).desc || '') || undefined, fmt: function (v) { return fmtK(S.x, v); } },
+    { key: 'vy', label: (LAB.meta[S.y] || {}).label || S.y, num: true, pctl: 'py', ours: oc(S.y), tip: specTip(S.y, (LAB.meta[S.y] || {}).desc || '') || undefined, fmt: function (v) { return fmtK(S.y, v); } }
+  ].concat(garCol ? [{ key: 'g90', label: 'GAR/90', num: true, ours: oc('gar90'), tip: specTip('gar90', OURS[0].tip), fmt: function (v) { return isNum(v) ? FB.signed(v, 2) : '—'; } }] : []).concat([
     { key: 'z', label: 'Combined', num: true, tip: 'Sum of standard scores on both axes, better direction', fmt: function (v) { return '<b>' + num(v, 2) + '</b>'; } }
-  ], trows, { maxHeight: 620, caption: 'Players ranked on this view' });
+  ]), trows, { maxHeight: 620, caption: 'Players ranked on this view' });
 }
 
 // ══════════════════════════════════════════════════════════════════════ compare
@@ -590,7 +672,8 @@ function buildCompareRole(el, P, R, ix) {
   P.forEach(function (x) { (x.metrics || []).forEach(function (m) { if (!catMeta[m.key]) catMeta[m.key] = m; }); });
   var rowOf = function (k) {
     var info = FB.metricInfo(k) || {}, m = catMeta[k] || {};
-    return { key: k, label: (info.label || m.label || k) + (pooled && adj[k] ? ' (adj.)' : ''), tip: (info.tip || m.desc || '') + (pooled && adj[k] ? ' League-adjusted in this pooled view.' : ''), better: info.lower ? 'low' : 'high',
+    var our = oursOf(k);
+    return { key: k, label: (info.label || m.label || k) + (pooled && adj[k] ? ' (adj.)' : ''), tip: (info.tip || m.desc || '') + (pooled && adj[k] ? ' League-adjusted in this pooled view.' : '') + (our ? ' Our model: ' + our.name + '.' : ''), better: info.lower ? 'low' : 'high',
       values: X.map(function (y) { return y.raw && y.rk ? y.rk.val(y.raw, k) : null; }), pctls: X.map(function (y) { return y.pct ? y.pct[k] : null; }),
       fmt: function (v) { return FB.fmtSet(k, v, m.fmt); } };
   };
@@ -623,7 +706,8 @@ function buildCompareRole(el, P, R, ix) {
       : 'Value and percentile ' + esc(FB.peerLine(g, where, min).replace(/^v /, 'against ')) + ' (100 = best). The best in each row is highlighted.'), html: true }) +
     FB.card(P.length + ' players, one metric set', 'The headline set for the role from our metrics spec: stable and predictive rates first.',
     (withRow.length >= 2 ? '<div class="fb-cmp-wrap">' + QK.compareView({ entities: ents, groups: groups }) + '</div>' + QK.verdicts(cmpVerdicts(groups, names)) : FB.empty('Not enough to compare', 'At least two players need a line in this view.')) +
-    (notes.length ? '<p class="fb-cap">' + notes.map(esc).join(' ') + '</p>' : ''), { cls: 'fb-lb-cv' }) +
+    (notes.length ? '<p class="fb-cap">' + notes.map(esc).join(' ') + '</p>' : '') +
+    (withRow.length >= 2 && FB.groupKeys(g, 'all').indexOf('gar90') >= 0 ? QK.oursExplain('<b>' + esc(specLabel('gar90', OURS[0].label)) + '</b> is our player value model: ' + esc(specExplain('gar90', OURS[0].tip)).replace(/^./, function (c) { return c.toLowerCase(); }) + ' It is on one scale across leagues, so it is never league-adjusted. <a href="#/value">Value leaderboard →</a>', { cls: 'fb-mt' }) : ''), { cls: 'fb-lb-cv' }) +
     (showDist ? FB.card('Where they sit', '<span id="lb-dist-sub"></span>', '<div class="fb-lb-distseg">' + FB.seg('lb-dist-m', distKeys.map(function (k) { return [k, (FB.metricInfo(k) || {}).label || k]; }), distKeys[0], 'Metric') + '</div>' +
       FB.chartBox('lb-dist', 260, 'Peer distribution with the players marked'), { cls: 'fb-mt' }) : '') +
     '<p class="fb-cap">' + P.map(function (x) { return '<a href="' + esc(FB.href.player(x.id)) + '">' + esc(x.doc.name) + ' →</a>'; }).join(' · ') +
@@ -1074,8 +1158,8 @@ function buildClubs(el, K, pool) {
     if (s.form_results) meta.push('<span>' + FB.formChips(s.form_results) + '</span>');
     if (k.pool && k.pool.rank) meta.push('<span>Pooled rank <b>#' + k.pool.rank + '</b></span>');
     var tiles = [
-      FB.kpi('Strength', isNum(s.strength_ppg) ? num(s.strength_ppg, 2) : (k.pool ? num(k.pool.strength, 2) : '—'), { tip: 'Expected points per game against an average opponent at a neutral venue', sub: 'exp. points a game' }),
-      FB.kpi('Elo', isNum(s.elo) ? num(s.elo, 0) : '—', { sub: isNum(s.attack) ? 'att ' + signed(s.attack, 2) + ' · def ' + signed(s.defence, 2) : '' }),
+      FB.kpi('Strength', isNum(s.strength_ppg) ? num(s.strength_ppg, 2) : (k.pool ? num(k.pool.strength, 2) : '—'), { tip: 'Our team rating model: expected points per game against an average opponent at a neutral venue', sub: 'our model · exp. points a game' }),
+      FB.kpi('Elo', isNum(s.elo) ? num(s.elo, 0) : '—', { tip: 'Our Elo rating; att and def are the attack and defence ratings of our team model (goals a match against an average side)', sub: isNum(s.attack) ? 'att ' + signed(s.attack, 2) + ' · def ' + signed(s.defence, 2) : '' }),
       FB.kpi('xG diff / match', isNum(season.xg_diff) ? signed(season.xg_diff, 2) : (isNum(season.xg) && isNum(season.xga) ? signed(season.xg - season.xga, 2) : '—'), { sub: isNum(s.luck) ? 'luck ' + signed(s.luck, 1) + ' pts' : '' }),
       FB.kpi('PPG', isNum(s.ppg) ? num(s.ppg, 2) : '—', { sub: s.played ? s.played + ' played' : '' })
     ];

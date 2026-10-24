@@ -179,7 +179,7 @@ FB.route('players', function (el, p) {
   el.innerHTML = FB.pageHead('Players', 'Every player, every competition',
     'One record per player, however many competitions: search the registry, see who has played most this season, and open any player for a season-by-season career.') +
     playersNav('find') + '<div id="pl-hot" class="fb-pl-hot"></div>' +
-    '<div id="pl-leadscope" class="fb-pl-leadscope"></div><div class="fb-pl-leadgrid" id="pl-leads">' + FB.card('Goals', 'This season, every competition', FB.loading('lines', 5)) + FB.card('Assists', '', FB.loading('lines', 5)) + FB.card('Rating', '450+ minutes', FB.loading('lines', 5)) + '</div>' +
+    '<div id="pl-leadscope" class="fb-pl-leadscope"></div><div class="fb-pl-leadgrid" id="pl-leads">' + FB.card('Value added', 'This season, every competition', FB.loading('lines', 5)) + FB.card('Goals', '', FB.loading('lines', 5)) + FB.card('Assists', '', FB.loading('lines', 5)) + FB.card('Rating', '450+ minutes', FB.loading('lines', 5)) + '</div>' +
     FB.card('Find a player', '<span id="pl-count">Loading the registry…</span>',
       '<div id="pl-tools"></div><div id="pl-table">' + FB.loading('lines', 8) + '</div>', { flush: false }) +
     FB.grid(FB.card('Value leaders', 'Goals above replacement (GAR) over the last 12 months of club football: the goals a player adds over a freely available replacement in the same role. <a href="#/value">Full value leaderboard →</a>',
@@ -197,7 +197,14 @@ FB.route('players', function (el, p) {
     drawMostValuable(el, pi.list);
   });
   var valP = FB.load('value/players.json');
-  valP.then(function (v) { if (FB.alive(el)) drawGar(el, v); });
+  valP.then(function (v) {
+    if (!FB.alive(el)) return;
+    drawGar(el, v);
+    /* the finder's GAR column: our value model's last 12 months, joined on the person id */
+    GAR_BY = {};
+    FB.rows(v).forEach(function (z) { if (isNum(z.gar)) GAR_BY[String(z.id)] = [z.gar, z.gar90]; });
+    if (FIND_REDRAW) FIND_REDRAW();
+  });
   Promise.all([boardP, valP]).then(function (arr) { if (FB.alive(el)) drawHotBand(el, arr[0] || {}, arr[1]); });
   return people;
 });
@@ -268,7 +275,10 @@ function drawLeadCards(el, board, hub) {
   }
   var segBox = el.querySelector('#pl-leadscope');
   if (segBox) segBox.innerHTML = scopes ? FB.toolbar([FB.field('Leaders over', FB.seg('pl-lead-scope', [['all', 'All competitions'], ['club', 'Club competitions'], ['intl', 'National team']], LEAD_SCOPE, 'Leaders over'))]) : '';
+  var garL = (L.gar || []).filter(function (r) { return isNum(r.value); });
   box.innerHTML =
+    (garL.length ? FB.card('Value added' + QK.ours({ model: 'Player value model' }), 'Goals above replacement (GAR), 450+ minutes · ' + esc(sub.replace(/^This season, /, '')) + '. <a href="#/players/leaders?m=gar90">Per 90 →</a>',
+      list(garL, function (v) { return FB.signed(v, 1); }, function (r) { return isNum(r.gar90) ? FB.signed(r.gar90, 2) + '/90' : ''; })) : '') +
     FB.card('Goals', esc(sub), list(L.goals, function (v) { return int(v); }, function (r) { return isNum(r.xg) ? 'xG ' + num(r.xg, 1) : ''; })) +
     FB.card('Assists', esc(sub), list(L.assists, function (v) { return int(v); }, function (r) { return isNum(r.xa) ? 'xA ' + num(r.xa, 1) : ''; })) +
     FB.card('Rating', '450+ minutes, minutes-weighted · ' + esc(sub.replace(/^This season, /, '')), list(L.rating, function (v) { return num(v, 2); }, function (r) { return int(r.minutes) + ' min'; }));
@@ -276,6 +286,7 @@ function drawLeadCards(el, board, hub) {
 }
 
 var FIND = { q: '', pos: '', nat: '', comp: '', min: 0 };
+var GAR_BY = null, FIND_REDRAW = null;
 function drawFinder(el, list, q0) {
   if (q0 && q0.q) FIND.q = q0.q;
   var nats = {};
@@ -305,7 +316,9 @@ function drawFinder(el, list, q0) {
       return true;
     });
     return out.slice(0, 300).map(function (r) {
-      return { id: r.id, name: r.name, pos: r.pos, posName: posLabel(r.pos), age: FB.ageOf(r.dob), nat: r.nat, club: r.club, club_tid: r.club_tid, nt: r.nt, nt_tid: r.nt_tid, season: r.season, min: r.min || 0, mv: r.mv, nc: (r.comps || []).length, _n: out.length };
+      var gv = GAR_BY ? GAR_BY[String(r.id)] : null;
+      return { id: r.id, name: r.name, pos: r.pos, posName: posLabel(r.pos), age: FB.ageOf(r.dob), nat: r.nat, club: r.club, club_tid: r.club_tid, nt: r.nt, nt_tid: r.nt_tid, season: r.season, min: r.min || 0, mv: r.mv, nc: (r.comps || []).length, _n: out.length,
+        gar: gv ? gv[0] : null, gar90: gv ? gv[1] : null };
     });
   }
   function draw() {
@@ -317,12 +330,15 @@ function drawFinder(el, list, q0) {
       { key: 'club', label: 'Club', fmt: function (v, r) { return v ? teamA(r.club_tid, v) : '<span class="qk-muted">—</span>'; } },
       { key: 'nt', label: 'National team', fmt: function (v, r) { return v ? teamA(r.nt_tid, v) : '<span class="qk-muted">' + esc(r.nat || '—') + '</span>'; } },
       { key: 'min', label: 'Minutes', num: true, tip: 'Minutes in the player\'s current season (their own frame: 2026/27 for a European, 2026 for a Brazilian), every competition.', fmt: function (v, r) { return int(v) + ' <span class="qk-muted fb-pl-era">' + esc(r.season || '') + '</span>'; } },
+      { key: 'gar', label: 'GAR', num: true, ours: { name: 'Player value model', about: 'Goals above a replacement-level player in the same role over the last 12 months of club football.' },
+        tip: 'Goals above replacement over the last 12 months of club football, from our player value model; GAR/90 under it.', fmt: function (v, r) { return isNum(v) ? '<b>' + FB.signed(v, 1) + '</b>' + (isNum(r.gar90) ? ' <span class="qk-muted">' + FB.signed(r.gar90, 2) + '/90</span>' : '') : '<span class="qk-muted">—</span>'; } },
       { key: 'mv', label: 'Market value', num: true, tip: 'Sofascore\'s market value, reference only.', fmt: function (v) { return isNum(v) ? FB.money(v) : '—'; } },
       { key: 'nc', label: 'Comps', num: true, tip: 'Competitions played in across the stores.' }
     ];
     if (handle) handle.setRows(rows); else handle = QK.leaderboard(el.querySelector('#pl-table'), { columns: cols, rows: rows, sort: { key: 'min', dir: 'desc' }, dense: true, maxHeight: 620, caption: 'Players' });
   }
   draw();
+  FIND_REDRAW = function () { if (FB.alive(el)) draw(); };
   var input = el.querySelector('#pl-q');
   input.addEventListener('input', function () { clearTimeout(t); t = setTimeout(function () { FIND.q = input.value; FB.setQuery({ q: FIND.q || null }); draw(); }, 140); });
   FB.wireSeg(tools, 'pl-pos', function (v) { FIND.pos = v; draw(); });
@@ -362,7 +378,8 @@ function drawGar(el, v) {
    one competition, this season, last season or a calendar window. Attacking rates can be league-adjusted (the row's
    minutes-weighted scoring factor). Percentiles are against his formation-role group (FB.MSET: CB, FB, DM/CM, AM/W, ST,
    GK) in the view, over max(the group's minimum, the minutes shown); the position letters when the role payload is
-   missing. */
+   missing. Our model metrics (GAR/90 and GAR, value_fields.py) lead the picker as "Our models" and are the default,
+   then the spec's headline set for the role, then the box score by group; names from the spec (FB.labOurs, lab.js). */
 var LD_WIN = [['season', 'This season'], ['last', 'Last season'], ['365', 'Last 12 months'], ['ytd', 'Calendar year so far']];
 function renderLeaders(el, p) {
   var q = p.query || {};
@@ -370,15 +387,22 @@ function renderLeaders(el, p) {
     'Every player once: minutes and rates over every competition played, club football only, national-team football only, or one competition. Attacking rates can be league-adjusted with the pooled model\'s scoring factors so output from different leagues sits on one footing.') +
     playersNav('leaders') +
     '<div id="ld-body">' + FB.card('Loading the board', '', FB.loading('lines', 10)) + '</div>';
-  var st = { win: q.w || 'season', scope: q.c || q.scope || 'all', pos: q.pos || '', min: isNum(Number(q.min)) && q.min !== undefined && q.min !== '' ? Number(q.min) : null, key: q.m || 'npxg_90_adj' };
-  return FB.labIndex().then(function (ix) {
+  var st = { win: q.w || 'season', scope: q.c || q.scope || 'all', pos: q.pos || '', min: isNum(Number(q.min)) && q.min !== undefined && q.min !== '' ? Number(q.min) : null, key: q.m || 'gar90' };
+  var LO = FB.labOurs || null;
+  return Promise.all([FB.labIndex(), LO ? LO.load() : null]).then(function (arr0) {
+    var ix = arr0[0];
     if (!FB.alive(el)) return;
     var body = el.querySelector('#ld-body');
     if (!ix || !ix.scopes) { body.innerHTML = FB.empty('No board yet', 'The leaderboards (data/lab/) are rebuilt with the site.'); return; }
     if (!ix.scopes[st.win]) st.win = 'season';
-    var metrics = ix.metrics || [], adjusted = ix.adjusted_keys || [];
+    var adjusted = ix.adjusted_keys || [];
+    var specL = function (k, f) { return LO ? LO.label(k, f) : f; };
+    var oursOf = function (k) { return LO ? LO.oursOf(k) : null; };
+    var OURS_M = ((LO && LO.metrics) || []).map(function (m) { return { key: m.key, label: specL(m.key, m.label), group: 'Our models', fmt: m.fmt, scope: 'all', ours: true, desc: LO && LO.explain ? LO.explain(m.key, m.tip) : m.tip }; });
+    var BOX_M = (ix.metrics || []).map(function (m) { var c = {}, k; for (k in m) if (Object.prototype.hasOwnProperty.call(m, k)) c[k] = m[k]; c.label = specL(m.key, m.label); return c; });
+    var metrics = BOX_M;
     body.innerHTML = FB.card('<span id="ld-title">Leaders</span>', '<span id="ld-sub"></span>',
-      '<div id="ld-tools"></div>' + QK.explain('<b>What’s that number?</b> A <b>league-adjusted</b> rate multiplies an attacking number by the scoring factor of the leagues it came from (our pooled model), so 0.50 npxG per 90 in a league where goals come easily counts for less than the same in a tougher one. <b>Pctl</b> is the player’s percentile against the same formation role: 90 means better than 90 in 100.', { cls: 'fb-mt' }) +
+      '<div id="ld-tools"></div><div id="ld-ours" class="fb-mt"></div>' + QK.explain('<b>What’s that number?</b> A <b>league-adjusted</b> rate multiplies an attacking number by the scoring factor of the leagues it came from (our pooled model), so 0.50 npxG per 90 in a league where goals come easily counts for less than the same in a tougher one. <b>Pctl</b> is the player’s percentile against the same formation role: 90 means better than 90 in 100.', { cls: 'fb-mt' }) +
       FB.chartBox('ld-chart', 420, 'Top 15 on the chosen metric') + '<div id="ld-table" class="fb-mt"></div>');
     var V = null, R = null;
     var ROLE_SEG = [['', 'All']].concat(FB.MSET.groups.map(function (g) { return [g.id, { gk: 'GK', cb: 'CB', fb: 'FB', dm_cm: 'DM/CM', am_w: 'AM/W', st: 'ST' }[g.id] || g.short]; }));
@@ -386,9 +410,24 @@ function renderLeaders(el, p) {
     function single() { return !FB.LAB_SCOPES[st.scope]; }
     function metricOpts(scope) {
       var groups = [];
-      metrics.filter(function (m) { return scope === 'all' || m.scope === 'all' || m.scope === scope; }).forEach(function (m) {
-        var gr = groups.filter(function (x) { return x.group === m.group; })[0];
-        if (!gr) { gr = { group: m.group, items: [] }; groups.push(gr); }
+      var ours = OURS_M.filter(function (m) { return V && V.idx[m.key] !== undefined; });
+      if (ours.length) groups.push({ group: 'Our models', items: ours.map(function (m) { return [m.key, m.label]; }) });
+      /* the spec's headline set for the role picked (every role's when none is), after our models */
+      var cat = LO && QK.spec ? QK.spec.get('football') : null, head = {}, n = 0;
+      (st.pos && FB.MSET.groups.some(function (g) { return g.id === st.pos; }) ? [st.pos] : ['cb', 'fb', 'dm_cm', 'am_w', 'st', 'gk']).forEach(function (gid) {
+        (cat ? cat.headline(gid) : []).forEach(function (k) { if (head[k] === undefined) head[k] = n++; });
+      });
+      var key = { group: 'Box score · key numbers', items: [] };
+      var shown = metrics.filter(function (m) { return scope === 'all' || m.scope === 'all' || m.scope === scope; });
+      shown.filter(function (m) { return head[m.key] !== undefined; }).sort(function (a, b) { return head[a.key] - head[b.key]; }).forEach(function (m) {
+        key.items.push([m.key, m.label]);
+        if (adjusted.indexOf(m.key) >= 0 && !single()) key.items.push([m.key + '_adj', m.label + ' (league-adjusted)']);
+      });
+      if (key.items.length) groups.push(key);
+      shown.filter(function (m) { return head[m.key] === undefined; }).forEach(function (m) {
+        var gname = 'Box score · ' + m.group;
+        var gr = groups.filter(function (x) { return x.group === gname; })[0];
+        if (!gr) { gr = { group: gname, items: [] }; groups.push(gr); }
         gr.items.push([m.key, m.label]);
         if (adjusted.indexOf(m.key) >= 0 && !single()) gr.items.push([m.key + '_adj', m.label + ' (league-adjusted)']);
       });
@@ -401,7 +440,7 @@ function renderLeaders(el, p) {
       var groups = metricOpts(scope);
       var keys = [];
       groups.forEach(function (gr) { gr.items.forEach(function (i) { keys.push(i[0]); }); });
-      if (keys.indexOf(st.key) < 0) st.key = keys.indexOf(st.key.replace(/_adj$/, '')) >= 0 ? st.key.replace(/_adj$/, '') : (scope === 'gk' ? 'saves_90' : (single() ? 'npxg_90' : 'npxg_90_adj'));
+      if (keys.indexOf(st.key) < 0) st.key = keys.indexOf(st.key.replace(/_adj$/, '')) >= 0 ? st.key.replace(/_adj$/, '') : (keys.indexOf('gar90') >= 0 ? 'gar90' : scope === 'gk' ? 'saves_90' : (single() ? 'npxg_90' : 'npxg_90_adj'));
       el.querySelector('#ld-tools').innerHTML = FB.toolbar([
         FB.field('Season', FB.select('ld-w', LD_WIN.filter(function (w) { return ix.scopes[w[0]]; }), st.win, 'Season or window')),
         FB.field('Competitions', FB.select('ld-c', FB.labScopeOptions(ix, st.win), st.scope, 'Which competitions count', 'fb-pl-wide')),
@@ -433,7 +472,8 @@ function renderLeaders(el, p) {
     function draw() {
       if (!V) return;
       var I = V.idx, key = st.key, base = key.replace(/_adj$/, ''), adj = /_adj$/.test(key);
-      var metric = metrics.filter(function (m) { return m.key === base; })[0] || { fmt: '2', label: key };
+      var metric = OURS_M.concat(metrics).filter(function (m) { return m.key === base; })[0] || { fmt: '2', label: key };
+      var our = oursOf(base), garOn = I.gar90 !== undefined && base !== 'gar90';
       var value = function (r) { var v = I[base] === undefined ? null : r[I[base]]; return isNum(v) ? (adj ? v * (r[I.factor] || 1) : v) : null; };
       /* his role group this season (in this competition for a one-competition view) */
       var roleR = function (r) { return FB.rowRole(R, I.role === undefined ? null : r[I.role], r[I.player_id], single() ? st.scope : null); };
@@ -467,11 +507,14 @@ function renderLeaders(el, p) {
         var v = value(r);
         var gg = grpOf(r), role = rolesOn() ? roleR(r) : null;
         return { i: i + 1, id: r[I.player_id], name: r[I.name], posName: role ? role + (gg ? '' : ' (no formation start)') : posLabel(r[I.position]), team: r[I.team], tid: r[I.tid], comp: r[I.comp], mix: r[I.mix], pos: r[I.position], age: r[I.age], min: r[I.minutes],
-          v: v, raw: r[I[base]], f: r[I.factor], pct: pctOf(v, r), g: per(r, 'goals_90'), a: per(r, 'assists_90'), rt: r[I.rating] };
+          v: v, raw: r[I[base]], f: r[I.factor], pct: pctOf(v, r), g: per(r, 'goals_90'), a: per(r, 'assists_90'), rt: r[I.rating], g90: I.gar90 !== undefined ? r[I.gar90] : null };
       });
       var lab = (metric.label || key) + (adj ? ' (adj.)' : '');
       var W = (ix.windows || []).filter(function (w) { return w.key === st.win; })[0];
-      FB.set('ld-title', esc(lab) + ': ' + esc(FB.labScopeName(st.scope, ix).toLowerCase()));
+      FB.set('ld-title', esc(lab) + (our ? QK.ours({ model: our.name, about: our.about }) : '') + ': ' + esc(FB.labScopeName(st.scope, ix).toLowerCase()));
+      FB.set('ld-ours', our ? QK.oursExplain('<b>' + esc(lab) + '.</b> ' + esc(metric.desc || '') + ' ' +
+        (st.win === 'season' ? 'This season’s value-model lines in ' + (single() ? 'this competition' : 'these competitions, added up') : st.win === 'last' ? 'Last season’s lines' : 'The value model’s last 12 months') +
+        '; on one scale across leagues, so never league-adjusted. <a href="#/value">Value leaderboard →</a>') : '');
       FB.set('ld-sub', FB.int(floorRows.length) + ' players over ' + st.min + ' minutes · ' + esc(FB.labWindowText(W)) + ' · one row per player' +
         (single() ? '' : ', minutes summed across ' + (st.scope === 'intl' ? 'national-team football' : st.scope === 'club' ? 'club competitions' : 'every competition')) +
         (rolesOn() ? '. Heat and Pctl: percentile v the player\'s role group (CBs, full-backs, DMs and CMs, AMs and wingers, strikers, goalkeepers; the formation role this season) in this view, ' + FB.int(Math.max(450, st.min)) + '+ min (goalkeepers ' + FB.int(Math.max(900, st.min)) + '+); none for a player under it or without a formation start.'
@@ -483,12 +526,12 @@ function renderLeaders(el, p) {
         { key: 'team', label: st.scope === 'intl' ? 'National team' : 'Club', fmt: function (v, r) { return teamA(r.tid, v); } },
         { key: 'mix', label: single() ? 'Competition' : 'Competitions (minutes)', fmt: function (v, r) { return single() ? FB.compLink(st.scope, { short: true }) : '<span class="qk-muted fb-lb-mix">' + esc(v || '') + '</span>'; } },
         { key: 'age', label: 'Age', num: true }, { key: 'min', label: 'Min', num: true },
-        { key: 'v', label: lab, type: 'pctl', pctl: 'pct', tip: rolesOn() ? 'Coloured by percentile against the player\'s role group (blue low, red high)' : 'Coloured by percentile among the players shown (blue low, red high)', fmt: function (v) { return '<b>' + FB.fmtMetric(v, metric.fmt) + '</b>'; } },
+        { key: 'v', label: lab, type: 'pctl', pctl: 'pct', ours: our ? { name: our.name, about: our.about } : null, tip: rolesOn() ? 'Coloured by percentile against the player\'s role group (blue low, red high)' : 'Coloured by percentile among the players shown (blue low, red high)', fmt: function (v) { return '<b>' + FB.fmtMetric(v, metric.fmt) + '</b>'; } },
         { key: 'raw', label: 'Raw', num: true, tip: 'Before the league adjustment', fmt: function (v) { return adj ? FB.fmtMetric(v, metric.fmt) : '—'; } },
         { key: 'f', label: 'Factor', num: true, tip: 'The scoring factor (pooled model), minutes-weighted over the competitions played', fmt: function (v) { return nn(v, 2); } },
         { key: 'pct', label: 'Pctl', num: true, tip: rolesOn() ? 'Percentile against the player\'s role group in this view' : 'Percentile among the players shown', fmt: function (v) { return isNum(v) ? FB.pctl(v) : '—'; } },
         { key: 'g', label: 'G', num: true }, { key: 'a', label: 'A', num: true }, { key: 'rt', label: 'Rating', num: true, fmt: function (v) { return nn(v, 2); } }
-      ], rows: data });
+      ].concat(garOn ? [{ key: 'g90', label: 'GAR/90', num: true, ours: oursOf('gar90') || 'Player value model', tip: LO ? LO.tip('gar90', '') : '', fmt: function (v) { return isNum(v) ? FB.signed(v, 2) : '—'; } }] : []), rows: data });
       var top = data.slice(0, 15);
       var box = el.querySelector('#ld-chart');
       if (!top.length) { chartEmpty(box, 'No player clears the filters'); return; }

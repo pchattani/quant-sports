@@ -162,7 +162,7 @@ function tabLabel(c, t) {
   if (t === 'power') return fam === 'international' ? 'Ratings' : 'Power';
   if (t === 'clubs') return fam === 'international' ? 'Nations' : 'Clubs';
   if (t === 'fixtures') return 'Fixtures & results';
-  return { overview: 'Overview', odds: 'Chances', players: 'Players', analytics: 'Analytics', seasons: 'Seasons' }[t] || t;
+  return { overview: 'Overview', race: 'Race', odds: 'Chances', players: 'Players', analytics: 'Analytics', seasons: 'Seasons' }[t] || t;
 }
 /* The tabs a live competition has, from its manifest tabs. */
 function liveTabs(c, nSeasons) {
@@ -173,6 +173,7 @@ function liveTabs(c, nSeasons) {
     if (m) on[m[0]] = 1;
   });
   if (FB.isLastEdition(c)) delete on.odds;
+  if (FB.race && FB.race.eligible(c)) on.race = 1;     // the Race tab (race.js): plain leagues
   if (nSeasons > 1) on.seasons = 1;
   return FB.COMP_TABS.filter(function (t) { return on[t]; });
 }
@@ -398,6 +399,16 @@ function wirePicker(el, c, seasons, tab) {
 
 var LIVE = {};
 
+/* The Race tab (race.js): the race over time, what is settled, the stakes, team cards and the shape of the league. */
+LIVE.race = function (el, body, c, d0) {
+  body.innerHTML = FB.loading('lines', 6);
+  return FB.compFiles(c.slug, ['table', 'probs', 'history', 'strength', 'analytics']).then(function (d1) {
+    if (!FB.alive(el)) return;
+    var d = FB.merge(d0, d1);
+    FB.race.render(el, body, c, d, makeCtx(c, d));
+  });
+};
+
 LIVE.overview = function (el, body, c, d0, q, seasons) {
   var names = ['probs', 'players_live', 'history'].concat(c.kind === 'liga' ? ['zones'] : ['table']);
   body.innerHTML = FB.loading('lines', 6);
@@ -458,7 +469,7 @@ LIVE.overview = function (el, body, c, d0, q, seasons) {
       ) + '</section>' +
       '<section class="qk-section fb-co-sec">' + QK.sectionHead({ kicker: last ? 'Last edition' : 'Title race', title: last ? 'How it finished' : 'Who wins ' + winnerWord(c) + '?', sub: last ? '' : 'Our chances from ' + FB.int(m.n_sims || 0) + ' simulated seasons, beside the players leading the way.' }) +
       FB.grid(
-        FB.card('Who wins ' + esc(winnerWord(c)), last ? 'This edition is over.' : 'Our chance of winning ' + esc(winnerWord(c)) + ', from ' + FB.int(m.n_sims || 0) + ' simulated seasons.', '<div id="co-race"></div>', { span: 7, foot: last ? '' : '<span>Top ten</span><a href="' + esc(FB.href.comp(c.slug, 'odds')) + '">Every club\'s chances →</a>' }) +
+        FB.card('Who wins ' + esc(winnerWord(c)), last ? 'This edition is over.' : 'Our chance of winning ' + esc(winnerWord(c)) + ', from ' + FB.int(m.n_sims || 0) + ' simulated seasons.', '<div id="co-race"></div>', { span: 7, foot: last ? '' : '<span>Top ten</span><span class="fb-co-links2">' + (FB.race && FB.race.eligible(c) ? '<a href="' + esc(FB.href.comp(c.slug, 'race')) + '">How the race is shaping up →</a>' : '') + '<a href="' + esc(FB.href.comp(c.slug, 'odds')) + '">Every club\'s chances →</a></span>' }) +
         FB.card('Leaders', 'This season, every player in the competition.', '<div id="co-leaders" class="fb-co-minis"></div>', { span: 5, foot: '<span></span><a href="' + esc(FB.href.comp(c.slug, 'players')) + '">All players →</a>' })
       ) +
       '<div id="co-hist-wrap"></div></section>' +
@@ -554,12 +565,19 @@ function seasonPills(c, list, activeSid) {
 
 LIVE.table = function (el, body, c, d0, q) {
   if (c.kind === 'liga') return ligaTable(el, body, c, d0, q);
-  return FB.compFiles(c.slug, ['table', 'probs', 'strength']).then(function (d1) {
+  var prof = FB.race && FB.race.eligible(c);
+  return FB.compFiles(c.slug, ['table', 'probs', 'strength'].concat(prof ? ['analytics'] : [])).then(function (d1) {
     if (!FB.alive(el)) return;
     var d = FB.merge(d0, d1), ctx = makeCtx(c, d), t = d.table;
     var formOf = {};
     ((d.strength || {}).rows || []).forEach(function (r) { if ((r.form_results || []).length) formOf[r.team] = r.form_results; });
     ctx.form = formOf;
+    /* each club's two strongest strengths-and-weak-spots chips (race.js), linking to its team card on the Race tab */
+    if (prof && d.analytics && t) {
+      var RM = FB.race.model(c, d);
+      ctx.chips = {};
+      (t.standings || []).forEach(function (r) { ctx.chips[r.team] = FB.race.topChips(FB.race.chipsFor(RM, r.team), 2); });
+    }
     if (!t || (!(t.standings || []).length && !t.conferences)) { body.innerHTML = FB.empty('No table', 'This competition has no table: see its knockout and fixtures.'); return; }
     var isCup = c.kind === 'cup';
     var sub = esc(t.season || '') + ' · ' + t.games_played + '/' + t.total_games + ' matches' + (t.h2h_tiebreak ? ' · level points broken by goal difference here (the league uses head-to-head)' : '');
@@ -631,6 +649,10 @@ function standings(box, ctx, rows, bands, o) {
     ups.forEach(function (b) { cols.push(bar('_b_' + b.key, b.label, 'Our chance of finishing in this band')); });
     if (downs.length) cols.push(bar('_drop', downs.length > 1 ? 'Drop' : downs[0].label, 'Our chance: ' + downs.map(function (b) { return b.label; }).join(' + ')));
   }
+  if (ctx.chips && !o.compact) cols.push({ key: '_prof', label: 'Profile', sort: false, tip: 'The club\'s biggest strength and weak spot against the rest of the league; open the Race tab for its team card', fmt: function (v, r) {
+    var ch = ctx.chips[r.team] || [];
+    return ch.length ? '<a class="fb-rc-chips tbl" href="' + esc(FB.href.comp(ctx.slug, 'race', { club: r.team })) + '">' + ch.map(FB.race.chipHTML).join('') + '</a>' : '<span class="qk-muted">—</span>';
+  } });
   var list = (rows || []).map(function (r) {
     var o2 = FB.merge(r, {});
     ups.forEach(function (b) { o2['_b_' + b.key] = (r.bands || {})[b.key]; });

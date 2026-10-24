@@ -61,6 +61,22 @@ Outs applied for upcoming games). The game payload's `pregame.model.detail` carr
 Win totals live in `markets.json` only (one source of truth), not in season.json. `sim.teams[tid].next.if_win` / `if_loss` are
 interventional (the result forced, the rating draws held at their prior), so one regular-season game moves them by a few points.
 
+`season.json["league"]` (the current season's full build only; `analytics/race.py` on `oddsmarkets/common/league.py`, schema v1,
+about 15-25 KB): how the race is shaping up and each team's strengths and weaknesses, drawn by the kit's league module
+(`assets/qk/league.js`, QKL) on the standings Table tab (an expandable card under each row, a Profile chip column, the race and
+the shape of the league) and the team page. `{"v", "asof", "phase", "metrics": [{key, label}] (p_playoffs, p_div (NBA), p_title),
+"current": {metric: {tid: p}}, "history": {first, last, days, live_from, rebuilt: [days], n}, "movers": {metric, since, days, up/down:
+[{team, p, d, why: [..]}]} | null, "games": [{id, start, home, away, p_home, swing, sides: {tid: [if_win, if_loss]}, stakes?, why?}],
+"race": {tid: {magic?, elim? (wins; only within half the games left), unit, status?, all_sims?, sos: [avg, rank, n], sos_played, next}},
+"profile": {metrics: [spec rows: id, label, dir, fmt, unit, group, model?, style?, chip?], min_gp: 10, early}, "teams": {tid: {tier, pct,
+vals, chips: [[text, tone]], luck: {a, x, d, close, flag}, gp}}, "tiers": [{key, label, sub, teams}], "quad", "notes"}`.
+
+`data/<L>/race_log.json` (persistent CI log, like chance_log.json): `{season: {metric: {"YYYY-MM-DD": {tid: p}}, "_meta": {"rebuilt":
+[days], "n", "live_from"}}}`, one snapshot a day of every team's playoff, division and title chance, never trimmed. Days before live
+tracking (and a finished season's whole regular season) are rebuilt from the season simulation as of each day: through = the day
+before, ratings `ctx.ratings_before(day)` (games strictly before it, from the season's preseason prior), 2,000 simulations a date, every
+2 days (NBA) or 4 (WNBA), 90 s a build; a season with no game left takes no live snapshot.
+
 `schedule.json`: `{"ok","league","season","updated_at","games": [GAME_CARD]}`, every game of the season in date order (league members
 only: no "TBD" slots, no exhibition guests).
 

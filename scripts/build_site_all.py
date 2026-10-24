@@ -123,6 +123,7 @@ from oddsmarkets.football.analytics import lineup_strength  # noqa: E402
 from oddsmarkets.football.sources import kalshi_rates  # noqa: E402
 from oddsmarkets.football.analytics.archive import load_archive  # noqa: E402
 from oddsmarkets.football.analytics.sensitivity import league_sensitivity, liga_sensitivity  # noqa: E402
+from oddsmarkets.football.analytics import race as _race  # noqa: E402
 from oddsmarkets.football.analytics.pool import block_bridges, connections_from_frames, dc_score_matrix, outcome_probs  # noqa: E402
 import scripts.build_site_global as site_global  # noqa: E402
 
@@ -651,7 +652,12 @@ def build_probs_json(state, results: LeagueResults, cfg: LeagueConfig) -> dict:
         teams.append(row)
     sort_key = "p_cup" if cfg.playoff else "p_title"
     teams.sort(key=lambda t: -t.get(sort_key, 0.0))
-    return {"teams": teams, "bands": _band_list(cfg), "has_playoff": bool(cfg.playoff), "updated_at": _now()}
+    out = {"teams": teams, "bands": _band_list(cfg), "has_playoff": bool(cfg.playoff), "updated_at": _now()}
+    # What rides on the next fixtures (the Race tab): the same simulated seasons split by each result.
+    stakes = _race.stakes_payload(results, cfg)
+    if stakes:
+        out["stakes"] = stakes
+    return out
 
 
 def build_bracket_json(state, results: LeagueResults, cfg: LeagueConfig) -> dict:
@@ -1096,8 +1102,11 @@ def build_players_json(players: list[dict], store, boot_probs: dict, candidates:
     return live, {"top_scorer": leaders[:40], "live": leaders}
 
 
-def build_history_json(out_dir: Path, results, cfg, keep_store: int = 400, keep_out: int = 60) -> dict:
-    """Append this run's headline probabilities to the competition's history store."""
+def build_history_json(out_dir: Path, results, cfg, keep_store: int = 400, keep_out: int = 60,
+                       season: str | None = None) -> dict:
+    """Append this run's headline probabilities to the competition's history store. The store also keeps the
+    daily race history (one snapshot per UTC day for the whole season: the Race tab's lines), which history.json
+    carries as "daily"."""
     path = out_dir / "history_store.json"
     store = _read_json(path, {"snapshots": []})
     snapshots = store.get("snapshots", [])
@@ -1122,9 +1131,10 @@ def build_history_json(out_dir: Path, results, cfg, keep_store: int = 400, keep_
     if not any(s.get("ts") == stamp for s in snapshots):
         snapshots.append(snapshot)
     snapshots = snapshots[-keep_store:]
+    daily = _race.roll_daily(store.get("daily"), snapshots, season, results.teams)
     out_dir.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"snapshots": snapshots}, ensure_ascii=False), encoding="utf-8")
-    return {"snapshots": snapshots[-keep_out:], "updated_at": stamp}
+    path.write_text(json.dumps({"snapshots": snapshots, "daily": daily}, ensure_ascii=False), encoding="utf-8")
+    return {"snapshots": snapshots[-keep_out:], "daily": daily["days"], "updated_at": stamp}
 
 
 def fetch_markets_safe(cfg, fixtures: list[dict] | None = None, teams: Iterable[str] | None = None,
@@ -1376,7 +1386,7 @@ def build_team_stats_json(by_team: dict[str, list[dict]]) -> dict:
 def write_analytics(out_dir: Path, store: dict, registry, model, season_filter, players: list[dict],
                     logs: dict, by_team: dict, details: dict, neutral_when=None,
                     floor: int | None = None, season: str | None = None, round_labels: dict | None = None,
-                    lineup_terms: dict[str, dict] | None = None) -> dict:
+                    lineup_terms: dict[str, dict] | None = None, extra: dict | None = None) -> dict:
     """
     The analytics payloads every competition gets; returns the fixtures payload
     for the hub. `floor` is the competition's minutes floor (the one its
@@ -1390,8 +1400,12 @@ def write_analytics(out_dir: Path, store: dict, registry, model, season_filter, 
     write_match_pages(out_dir, details, fixtures["matches"])
     write_player_shards(out_dir, logs, players)
     _write(out_dir, "team_stats.json", build_team_stats_json(by_team))
-    _write(out_dir, "analytics.json", build_analytics(players, logs, by_team, fixtures["matches"], floor=floor,
-                                                      season=season, round_labels=round_labels, updated_at=_now()))
+    analytics = build_analytics(players, logs, by_team, fixtures["matches"], floor=floor,
+                                season=season, round_labels=round_labels, updated_at=_now())
+    for k, v in (extra or {}).items():
+        if v:
+            analytics[k] = v
+    _write(out_dir, "analytics.json", analytics)
     return fixtures
 
 
@@ -1547,12 +1561,17 @@ def build_league(cfg: LeagueConfig, entry: dict, args, sims: int | None,
     _write(out_dir, "players_live.json", live_players)
     _write(out_dir, "player_leaders.json", leaders)
     _write(out_dir, "shots.json", {"players": shots_by_player(_season_view(store), cfg)})
-    _write(out_dir, "history.json", build_history_json(out_dir, results, cfg))
+    _write(out_dir, "history.json", build_history_json(out_dir, results, cfg, season=state.season_name))
     season_id = (store.get("meta") or {}).get("season_id")
+    sp = {}
+    try:
+        sp = _race.set_pieces(_season_view(store), lambda name: normalize_team_name(name, cfg.registry))
+    except Exception as exc:  # noqa: BLE001 - a Race-tab extra never fails the competition's build
+        logger.warning("%s: set-piece profile failed: %s", cfg.slug, exc)
     fixtures = write_analytics(
         out_dir, store, cfg.registry, model, _season_filter(season_id), players,
         player_match_logs(_season_view(store), cfg), team_match_stats(_season_view(store), cfg), match_details(store, cfg),
-        floor=floor, season=state.season_name, lineup_terms=LINEUP_TERMS.get(cfg.slug),
+        floor=floor, season=state.season_name, lineup_terms=LINEUP_TERMS.get(cfg.slug), extra={"set_pieces": sp},
     )
     title_model = dict(results.p_cup if cfg.playoff else results.p_title)
     write_market_odds(out_dir, None if args.no_market else fetch_markets_safe(cfg, fixtures["matches"], title_model.keys(), state.season_name),

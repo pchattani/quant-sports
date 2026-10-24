@@ -710,7 +710,8 @@ QK.chips = function (rootEl, cb, multi) {
 /* ─────────────────────────────────────── table */
 /* QK.table(el, { columns: [{ key, label, num, fmt(v,row) -> html, sort: false, pctl: 'key_of_percentile', tip, cls, sticky }],
  *                rows, sort: { key, dir: 'desc' }, rank: true, dense: true, maxHeight: 480, rowClass(row), rowHref(row) })
- * Header buttons sort (Enter/Space); aria-sort tracks state; rank column re-numbers. */
+ * Header buttons sort (Enter/Space); aria-sort tracks state; rank column re-numbers. A column with `ours` (a model name,
+ * or { name, about }, or true) carries the cobalt "Ours" tag in its head (QK.ours). */
 QK.table = function (el, spec) {
   if (typeof el === 'string') el = $(el);
   var cols = spec.columns, rows = (spec.rows || []).slice();
@@ -733,7 +734,8 @@ QK.table = function (el, spec) {
     var head = '<tr>' + (spec.rank ? '<th class="num" scope="col">#</th>' : '') + cols.map(function (c) {
       var sortable = c.sort !== false;
       var aria = sortable ? ' aria-sort="' + (st && st.key === c.key ? (st.dir === 'asc' ? 'ascending' : 'descending') : 'none') + '"' : '';
-      var lab = c.tip ? '<span data-tip="' + esc(c.tip) + '">' + esc(c.label) + '</span>' : esc(c.label);
+      var lab = (c.tip ? '<span data-tip="' + esc(c.tip) + '">' + esc(c.label) + '</span>' : esc(c.label)) +
+        (c.ours ? QK.ours({ short: true, model: typeof c.ours === 'string' ? c.ours : (c.ours.name || c.ours.model), about: c.ours.about }) : '');
       return '<th scope="col" class="' + (c.num ? 'num ' : '') + (c.sticky ? 'sticky-col' : '') + '"' + aria + ' data-k="' + esc(c.key) + '">' +
         (sortable ? '<button type="button">' + lab + '</button>' : lab) + '</th>';
     }).join('') + '</tr>';

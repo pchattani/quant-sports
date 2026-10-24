@@ -28,10 +28,34 @@ function magic(s) {
   if (cl.postseason || cl.playoffs || cl.top6) t.push('<span class="qk-badge accent" data-tip="Clinched a playoff place">x</span>');
   if (t.length) return t.join(' ');
   const k = ['postseason', 'playoffs', 'top6'].find(x => isNum(mg[x]));
-  return k ? '<span data-tip="Magic number for a playoff place">' + mg[k] + '</span>' : '';
+  /* only once within reach (no more than half the games left, the league block's rule): an 80 in October says nothing */
+  const left = (s.current || {}).remaining;
+  if (k && isNum(left) && mg[k] > left / 2) return '<span class="qk-muted" data-tip="The magic number shows once it is within reach">—</span>';
+  return k ? '<span data-tip="Magic number for a playoff place: wins, or losses by the first team out, to clinch">' + mg[k] + '</span>' : '';
 }
 
-function standingsTable(node, L, S, rows, sim, fmt, league) {
+/* The league module's options (docs/_design/league.js, QKL) from season.json: the teams, the race chart's groups
+   (NBA: the six divisions, then the conferences; WNBA: the league, then the conferences) and the race log
+   (data/<L>/race_log.json, through the site's cached loader). */
+function leagueOpts(season, L, S) {
+  const lg = season && season.league;
+  if (!lg || !window.QKL) return null;
+  const st = season.standings || {}, info = season.teams || {}, fmt = season.format || {}, teams = {}, groups = [];
+  const confs = Object.keys(st).filter(c => (st[c] || []).length).sort();
+  const all = [];
+  confs.forEach(c => (st[c] || []).forEach(r => { all.push(r); const t = String(r.team);
+    teams[t] = { abbr: HW.teamAbbr(L, t), name: HW.teamName(L, t), colour: (info[t] || {}).colour, href: HW.teamHref(L, t, S) }; }));
+  if (fmt.seeding === 'league') groups.push({ key: '__all', label: 'League', teams: all.map(r => String(r.team)) });
+  const divs = [];
+  all.forEach(r => { if (r.division && divs.indexOf(r.division) < 0 && confs.indexOf(r.division) < 0) divs.push(r.division); });
+  divs.sort().forEach(d => groups.push({ key: 'd:' + d, label: d, teams: all.filter(r => r.division === d).map(r => String(r.team)) }));
+  confs.forEach(c => groups.push({ key: 'c:' + c, label: c, teams: (st[c] || []).map(r => String(r.team)) }));
+  return { league: lg, teams: teams, groups: groups, season: String(S), loadLog: () => HW.load(HW.lpath('race_log.json', L)),
+    title: 'How the race is shaping up', unitGames: 'games' };
+}
+HW.leagueOpts = leagueOpts;
+
+function standingsTable(node, L, S, rows, sim, fmt, league, lo) {
   const live = Object.keys(sim).length > 0;
   const pre = live && rows.every(r => !r.w && !r.l);
   if (pre) rows = rows.slice().sort((a, b) => ((sim[b.team] || {}).exp_w || 0) - ((sim[a.team] || {}).exp_w || 0));
@@ -43,7 +67,7 @@ function standingsTable(node, L, S, rows, sim, fmt, league) {
       home_w: (r.home || [])[0], away_w: (r.away || [])[0], l10_w: (r.l10 || [])[0], nm: HW.teamShort(L, r.team) });
   });
   const cols = [
-    { key: 'seedN', label: '#', num: true },
+    { key: 'seedN', label: '#', num: true, fmt: (v, r) => (lo ? QKL.toggle(String(r.team), HW.teamName(L, r.team)) : '') + v },
     { key: 'nm', label: 'Team', type: 'entity', mark: r => U.team(L, r.team), href: r => HW.teamHref(L, r.team, S) },
     { key: 'w', label: 'W-L', num: true, fmt: (v, r) => HW.record(r.w, r.l) },
     { key: 'pct', label: 'Pct', num: true, fmt: v => (isNum(v) ? HW.fmtVal(v, '3') : '—') },
@@ -62,7 +86,10 @@ function standingsTable(node, L, S, rows, sim, fmt, league) {
     cols.push({ key: 'pt', label: 'Title', num: true, fmt: v => '<b>' + U.pct(v) + '</b>' });
     cols.push({ key: 'mg', label: 'Clinch', sort: false, fmt: (v, r) => magic(r.s) });
   }
+  if (lo) cols.push({ key: 'team', label: 'Profile', sort: false, tip: 'What stands out about the team; press + for its full card (strengths, weaknesses and the race)',
+    fmt: (v, r) => QKL.chip(lo, String(r.team)) || '<span class="qk-muted">—</span>' });
   QK.leaderboard(node, { columns: cols, rows: data, dense: true, rowHref: r => HW.teamHref(L, r.team, S) });
+  if (lo) QKL.wire(node, lo);
   // playoff and play-in cut lines (in seed order only)
   const trs = node.querySelectorAll('tbody tr');
   if (trs[direct]) trs[direct].classList.add('hw-cut');
@@ -93,12 +120,14 @@ function standingsTab(node, L, S, params) {
     }
     h += U.card2(open ? 'Standings and our chances' : 'Standings', open && season.sim ? Number(season.sim.n_sims).toLocaleString('en-GB') + ' simulations of the rest of the season. Dashed lines: the playoff' + (fmt.playin ? ' and play-in' : '') + ' cuts.' : 'Records and seeds.',
       (views.length > 1 ? '<div class="qk-seg" id="st-seg" role="group" aria-label="Group" style="margin:0 16px 12px">' + views.map(v => '<button type="button" data-value="' + esc(v[0]) + '" aria-pressed="' + (v[0] === first) + '">' + esc(v[1]) + '</button>').join('') + '</div>' : '') + '<div id="st-table"></div>' +
-      (open ? '<div style="padding:12px 16px 16px">' + QK.note('<b>Playoffs 60%</b> means the team made the playoffs in about 6 of every 10 simulated seasons. <b>Proj W</b> is the average win total across them; hover it for the range that holds nine seasons in ten.') + '</div>' : ''), { flush: true });
+      (open ? '<div style="padding:12px 16px 16px">' + QK.note('<b>Playoffs 60%</b> means the team made the playoffs in about 6 of every 10 simulated seasons. <b>Proj W</b> is the average win total across them; hover it for the range that holds nine seasons in ten.' + (season.league && window.QKL ? ' <b>+</b> opens a team’s card: its strengths and weaknesses against the rest of the league and where its race stands.' : '')) + '</div>' : ''), { flush: true });
     if (open) {
       h += '<div class="qk-grid hw-sec">' + confs.map((c, i) => U.card2(c + ': who makes the playoffs', fmt.playin ? 'Our chance: a top-six seed goes straight through; seeds 7-10 play in' : 'Our chance of a playoff place', U.chart('st-odds-' + i, 22 * (st[c] || []).length + 70, c + ' playoff chances'), { cls: confs.length > 1 ? 'qk-span-6' : 'qk-span-12' })).join('') + '</div>';
     }
+    const lo = leagueOpts(season, L, S);
+    if (lo) h += '<div id="st-race"></div><div id="st-shape"></div>';
     node.innerHTML = h;
-    const draw = k => standingsTable(document.getElementById('st-table'), L, S, k === '__all' ? all() : (st[k] || []), sim, fmt, k === '__all');
+    const draw = k => standingsTable(document.getElementById('st-table'), L, S, k === '__all' ? all() : (st[k] || []), sim, fmt, k === '__all', lo);
     draw(first);
     const seg = document.getElementById('st-seg');
     if (seg) QK.seg(seg, draw);
@@ -109,6 +138,7 @@ function standingsTab(node, L, S, params) {
         : [{ name: 'Playoffs', data: ids.map(t => r3((sim[t] || {}).p_playoffs)) }];
       QKC.bar('#st-odds-' + i, { cats: ids.map(t => HW.teamAbbr(L, t)), series: series, horizontal: true, stack: true, legend: series.length > 1, fmt: v => U.pct(v), max: 1, hrefs: ids.map(t => HW.teamHref(L, t, S)), labelWidth: 46, valName: 'Our playoff chance', catName: 'Team' });
     });
+    if (lo) { QKL.race(document.getElementById('st-race'), lo); QKL.shape(document.getElementById('st-shape'), lo); }
     if (!live) HW.setMeta('');
   });
 }
