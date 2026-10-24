@@ -413,6 +413,106 @@ def value_seasons(b: Build, league: str, seasons: list[int], cats: dict[int, dic
     return n
 
 
+def _digest_now(today: date) -> datetime:
+    """The digest's clock: now, or the end of --today's UTC day for a dated build (tests, backfills)."""
+    now = datetime.now(timezone.utc)
+    return now if today == now.date() else datetime(today.year, today.month, today.day, 23, 59, tzinfo=timezone.utc)
+
+
+def _series_sig(post: dict | None, fmt: dict | None, h: str, a: str) -> dict | None:
+    """featured.py's sig.series for a playoff game: the round's name, the wins so far (home, away), best of."""
+    rounds = (fmt or {}).get("series") or []
+    names: list = []
+    for x in (post or {}).get("series") or []:
+        if x.get("round") not in names:
+            names.append(x.get("round"))
+    for x in (post or {}).get("series") or []:
+        t = [str(v) for v in x.get("teams") or []]
+        if sorted(t) == sorted([h, a]) and not str(x.get("summary") or "").lower().count("wins series"):
+            w = x.get("wins") or {}
+            wh, wa = int(w.get(h) or 0), int(w.get(a) or 0)
+            name = str(x.get("round") or "")
+            k = names.index(x.get("round"))
+            best = rounds[min(k, len(rounds) - 1)] if rounds else 7
+            return {"game": wh + wa + 1, "wins": [wh, wa], "best_of": best, "name": name}
+    return None
+
+
+def league_digest(b: "Build", league: str, season: int, today: date) -> dict:
+    """index.json leagues.<L>.digest: "This week in the <league>" (oddsmarkets/common/digest.py: record, upset, hot,
+    movers from the chance log, the stage) and the games that matter most (oddsmarkets/common/featured.py
+    rank_featured: "today" within 18 hours, "next" the best of the coming week after those, "week" the biggest
+    occasion). Reads the current season's schedule.json and season.json this build wrote: the chance on a
+    finished game is the one schedule.json shows, from the ratings before its day (walk-forward, no injuries), so no
+    look-ahead. Exhibition games are left out of the week. <L>/chance_log.json keeps one title and playoff snapshot a
+    day per team for the movers; the front end never reads it."""
+    from oddsmarkets.common import digest as DG
+    from oddsmarkets.common import featured as FT
+    now = _digest_now(today)
+    d = f"{league}/{season}/"
+    sched = (an.read_json(b.data / (d + "schedule.json")) or {}).get("games") or []
+    sp = an.read_json(b.data / (d + "season.json")) or {}
+    sim = ((sp.get("sim") or {}).get("teams") or {}) if isinstance(sp.get("sim"), dict) else {}
+    phase = sp.get("phase")
+    lg = an.LEAGUE_NAMES.get(league, league.upper())
+    st = lambda c: "final" if c.get("status") == "post" else "live" if c.get("status") == "in" else "pre"
+    games = [{"id": c.get("id"), "sport": "basketball", "league": lg, "start": c.get("date"), "status": st(c), "home": c.get("home"),
+              "away": c.get("away"), "hs": c.get("hs"), "as": c.get("as"), "p_home": (c.get("model") or {}).get("p_home")}
+             for c in sched if c.get("stype") != "pre"]
+    out: dict = {"asof": now.isoformat().replace("+00:00", "Z")[:16] + "Z"}
+    rec = DG.record(games, now)
+    if rec:
+        rec.pop("by", None)
+        out["record"] = rec
+    for k, v in (("upset", DG.upset(games, now)), ("hot", DG.hot(games, now))):
+        if v:
+            out[k] = v
+    metric = "p_title" if phase == "playoffs" else "p_playoffs"
+    cur = {m: {t: v.get(m) for t, v in sim.items() if v.get(m) is not None} for m in ("p_playoffs", "p_title")}
+    log_all = an.read_json(b.data / league / "chance_log.json") or {}
+    log_s = (log_all.get(str(season)) or {}) if isinstance(log_all, dict) else {}
+    new_log = {m: DG.roll_log(log_s.get(m), now, cur[m]) for m in cur}
+    if any(cur.values()):
+        b.write(f"{league}/chance_log.json", {str(season): new_log})
+    if phase != "offseason":
+        mv = DG.movers(new_log.get(metric), cur.get(metric) or {}, now)
+        if mv:
+            out["movers"] = dict(mv, metric=metric)
+    reg = [c for c in sched if c.get("stype") == "reg" and c.get("date")]
+    if reg:
+        days = sorted(str(c["date"])[:10] for c in reg)
+        first, last = date.fromisoformat(days[0]), date.fromisoformat(days[-1])
+        stage = {"phase": phase, "played": sum(1 for c in reg if c.get("status") == "post"), "total": len(reg), "first": days[0], "last": days[-1],
+                 "week": max(1, min((now.date() - first).days // 7 + 1, (last - first).days // 7 + 1)), "weeks": (last - first).days // 7 + 1}
+        live_series = [x for x in ((sp.get("postseason") or {}).get("series") or []) if "wins series" not in str(x.get("summary") or "").lower()]
+        if phase == "playoffs" and live_series:
+            stage["round"] = live_series[-1].get("round")
+        out["stage"] = stage
+    post, fmt = sp.get("postseason"), sp.get("format")
+    fg = []
+    for c in sched:
+        if c.get("status") == "post":
+            continue
+        h, a = str(c.get("home")), str(c.get("away"))
+        sh, sa = sim.get(h) or {}, sim.get(a) or {}
+        sig = {"playoff": [sh.get("p_playoffs"), sa.get("p_playoffs")], "title": [sh.get("p_title"), sa.get("p_title")]}
+        if c.get("stype") == "pre":
+            sig["preseason"] = True
+        if c.get("stype") == "post":
+            ser = _series_sig(post, fmt, h, a)
+            if ser:
+                sig["series"] = ser
+            sig.pop("playoff")
+        fg.append({"sport": "basketball", "league": lg, "id": c.get("id"), "start": c.get("date"), "status": st(c), "home": h, "away": a,
+                   "p_home": (c.get("model") or {}).get("p_home"), "wp_home": c.get("wp_home"), "sig": sig})
+    r = FT.rank_featured(fg, now)
+    row = lambda x: {"id": x["key"].split(":", 1)[1], "score": x["score"], "why": x.get("reasons") or []}
+    nxt = FT.rank_featured(fg, now, horizon_h=24 * 7, limit=8)["today"]   # the rest of the week, for a reader after "today"
+    out["featured"] = {"today": [row(x) for x in r["today"]], "next": [row(x) for x in nxt if x["key"] not in {y["key"] for y in r["today"]}],
+                       "week": row(r["week"]) if r.get("week") else None}
+    return out
+
+
 def schedule_payload(ctx) -> dict:
     """schedule.json: every game of the season (league members only) as a GAME_CARD, in date order."""
     from oddsmarkets.basketball.analytics.games import card, live_state
@@ -657,6 +757,8 @@ def main(argv: list[str] | None = None) -> int:
             if r.get("ctx") is None and lg in out["leagues"]:
                 continue                  # the current season was not built this run: keep its entry
             out["leagues"][lg] = SN.league_index(lg, r.get("ctx"), r["seasons"], r.get("history"), today)
+            if r.get("ctx") is not None:
+                out["leagues"][lg]["digest"] = b.step(f"{lg} digest", lambda: league_digest(b, lg, r["ctx"].season, today), {}) or {}
         return out
     b.write_or_fail("index.json", "index", index)
 

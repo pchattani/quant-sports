@@ -5,7 +5,7 @@ Everything here is read from the per-level payloads the football (B) and basketb
 
     index.json     one block per level: current season, phase, headline, today / next / last games (CARDs),
                    the latest AP top 25, our top 25, title odds (model, with the market where known),
-                   conferences, teams, champions
+                   conferences, teams, champions, and "digest" ("This week in <level>": level_digest)
     glossary.json  the metric definitions every page uses (the payloads' METRIC lists plus the site's own terms)
     search.json    teams of every level and every player with a career file
 
@@ -172,6 +172,116 @@ def headline(level: str, season: dict, title: list[dict], teams: dict, today: li
     return lab + (f" · {fav_s}" if fav_s else "")
 
 
+# ───────────────────────────────────────────────────────────── this week (the overview's digest)
+LEAGUE = {"cfb": "CFB", "mbb": "MBB", "wbb": "WBB"}
+_CFP_STAGE = {"first round": "playoff", "quarterfinal": "quarter", "semifinal": "semi", "championship": "final",
+              "national championship": "final"}
+_NCAA_STAGE = {"elite 8": "quarter", "elite eight": "quarter", "regional final": "quarter", "final four": "semi",
+               "national semifinal": "semi", "national championship": "final", "championship": "final", "final": "final"}
+
+
+def _game_sig(level: str, c: dict, sim: dict, teams: dict) -> dict:
+    """featured.py's sig for one card: AP ranks, the title and playoff (CFP / NCAA field) chances in our season
+    simulation, the stage of a playoff or tournament game, exhibitions, rivalries."""
+    from oddsmarkets.common import featured as FT
+    h, a = str(c.get("home")), str(c.get("away"))
+    sh, sa = sim.get(h) or {}, sim.get(a) or {}
+    po = "p_cfp" if level == "cfb" else "p_ncaa"
+    sig = {"comp": LEAGUE[level], "ranks": [c.get("hr"), c.get("ar")], "title": [sh.get("p_title"), sa.get("p_title")]}
+    st, rd = c.get("stype"), str(c.get("round") or "").strip().lower()
+    if st == "reg":
+        sig["playoff"] = [sh.get(po), sa.get(po)]
+    elif st == "conf":                              # a conference title game: the playoff place often rides on it
+        if level == "cfb" or rd in ("championship", "final", "finals", "f"):
+            sig["stage"] = "conf_final"              # football's one game, basketball's tournament final (not its early rounds)
+        sig["playoff"] = [sh.get(po), sa.get(po)]
+    elif st == "cfp":
+        sig["stage"] = _CFP_STAGE.get(rd, "playoff")
+    elif st == "ncaa":
+        sig["stage"] = _NCAA_STAGE.get(rd, "knockout")
+    elif st in ("pre", "exh"):
+        sig["preseason"] = True
+    nm = lambda t: str((teams.get(t) or {}).get("short") or (teams.get(t) or {}).get("name") or t)
+    rv = FT.RIVALRIES.get(frozenset((nm(h), nm(a))))
+    if rv:
+        sig["rivalry"] = rv
+    return sig
+
+
+def _et_day(s: Any) -> str | None:
+    """The US Eastern calendar date of a start ("2026-11-02"): a TBA game's midnight-Eastern placeholder keeps its day."""
+    t = parse_ts(s)
+    if t is None:
+        return None
+    sports_day(t)                                   # loads the Eastern zone
+    return t.astimezone(_ET).date().isoformat()
+
+
+def level_digest(data: Path, level: str, cur: int, cards: list[dict], season: dict, now: datetime) -> dict:
+    """index.json levels.<L>.digest: "This week in <level>" (oddsmarkets/common/digest.py: our record this week, the
+    upset of the week, the team of the week, the biggest movers in our playoff / tournament chance from the chance
+    log, the stage) and the games that matter most (oddsmarkets/common/featured.py rank_featured: "today" within
+    18 hours, "next" the best of the coming week after those, "week" the biggest occasion).
+
+    A finished game's chance is the card's: the walk-forward pregame prediction (ratings from the games before its
+    day), so no look-ahead. <L>/chance_log.json keeps one snapshot a day of every team's title and playoff chance
+    above half a percent; the front end never reads it."""
+    from oddsmarkets.common import digest as DG
+    from oddsmarkets.common import featured as FT
+    sim = ((season.get("sim") or {}).get("teams") or {})
+    teams = season.get("teams") or {}
+    phase = season.get("phase") or "regular"
+    st = lambda c: "final" if c.get("status") == "post" else "live" if c.get("status") == "in" else "pre"
+    games = [{"id": c.get("id"), "sport": "college", "league": LEAGUE[level], "start": c.get("date"), "status": st(c), "home": c.get("home"),
+              "away": c.get("away"), "hs": c.get("hs"), "as": c.get("as"), "p_home": (c.get("model") or {}).get("p_home")}
+             for c in cards if c.get("stype") not in ("pre", "exh")]
+    out: dict = {"asof": _now_iso(now)[:16] + "Z"}
+    rec = DG.record(games, now)
+    if rec:
+        rec.pop("by", None)
+        out["record"] = rec
+    up = DG.upset(games, now)
+    if up:
+        uc = next((c for c in cards if str(c.get("id")) == str(up["id"])), {})
+        wr, lr = (uc.get("hr"), uc.get("ar")) if up["side"] == "home" else (uc.get("ar"), uc.get("hr"))
+        if wr or lr:
+            up["ranks"] = [wr, lr]                      # AP ranks of the winner and the loser at the time
+        out["upset"] = up
+    hot = DG.hot(games, now)
+    if hot:
+        out["hot"] = hot
+    po = "p_cfp" if level == "cfb" else "p_ncaa"
+    metric = "p_title" if phase in ("playoff", "ncaa", "bowls") else po
+    cur_p = {m: {str(t): v.get(m) for t, v in sim.items() if isinstance(v, dict) and isinstance(v.get(m), (int, float)) and v.get(m) >= 0.005}
+             for m in (po, "p_title")}
+    lp = data / level / "chance_log.json"
+    old = load(lp) or {}
+    log_s = (old.get(str(cur)) or {}) if isinstance(old, dict) else {}
+    new_log = {m: DG.roll_log(log_s.get(m), now, cur_p[m]) for m in cur_p}
+    if any(cur_p.values()):
+        write(lp, {str(cur): new_log})
+    if phase != "offseason":
+        mv = DG.movers(new_log.get(metric), cur_p.get(metric) or {}, now)
+        if mv:
+            out["movers"] = dict(mv, metric=metric)
+    reg = [c for c in cards if c.get("stype") == "reg" and c.get("date")]
+    if reg:
+        days = sorted(_et_day(c["date"]) for c in reg if _et_day(c["date"]))
+        weeks = [c.get("week") for c in reg if isinstance(c.get("week"), int)]
+        out["stage"] = {"phase": phase, "played": sum(1 for c in reg if c.get("status") == "post"), "total": len(reg), "first": days[0],
+                        "last": days[-1], "week": season.get("week") if level == "cfb" else None, "weeks": max(weeks) if weeks else None}
+    fg = [{"sport": "college", "league": LEAGUE[level], "id": c.get("id"), "start": c.get("date"), "status": st(c), "home": str(c.get("home")),
+           "away": str(c.get("away")), "p_home": (c.get("model") or {}).get("p_home"), "sig": _game_sig(level, c, sim, teams)}
+          for c in cards if c.get("status") in ("pre", "in") and not c.get("tba")]
+    r = FT.rank_featured(fg, now)
+    nxt = FT.rank_featured(fg, now, horizon_h=24 * 7, limit=8)["today"]
+    row = lambda x: {"id": str(x["key"].split(":", 1)[1]), "score": x["score"], "why": x.get("reasons") or []}
+    seen = {y["key"] for y in r["today"]}
+    out["featured"] = {"today": [row(x) for x in r["today"]], "next": [row(x) for x in nxt if x["key"] not in seen],
+                       "week": row(r["week"]) if r.get("week") else None}
+    return out
+
+
 def level_index(data: Path, level: str, now: datetime) -> dict:
     seasons = seasons_built(data, level)
     if not seasons:
@@ -211,7 +321,14 @@ def level_index(data: Path, level: str, now: datetime) -> dict:
             "seasons": seasons, "phase": season.get("phase"), "week": season.get("week") if level == "cfb" else None,
             "headline": headline(level, season, title, teams, today, nxt), "today": today, "next_games": nxt,
             "last_games": last, "top25": top25, "model_top": model_top, "title_odds": title, "conferences": confs,
-            "teams": team_out, "champions": champs}
+            "teams": team_out, "champions": champs, "digest": _digest_safe(data, level, cur, cards, season, now)}
+
+
+def _digest_safe(data: Path, level: str, cur: int, cards: list[dict], season: dict, now: datetime) -> dict:
+    try:
+        return level_digest(data, level, cur, cards, season, now)
+    except Exception:  # noqa: BLE001 - the digest never takes the level's index block down
+        return {}
 
 
 def build_index(data: Path, now: datetime | None = None) -> dict:

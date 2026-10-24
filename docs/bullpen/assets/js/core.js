@@ -1000,6 +1000,24 @@ function glossHref(key) { return '#/glossary' + (key ? '/' + encodeURIComponent(
 const RECORDS = {}, FORMS = {};
 /* A postseason game that was never needed (series decided; Stats API status cancelled / not_needed): hidden everywhere. */
 function notNeeded(g) { return !!g && (g.not_needed === true || (String(g.status || '').toLowerCase() === 'cancelled' && g.gtype && g.gtype !== 'R')); }
+/* The same judged from the games themselves, for a payload that still lists an "if necessary" game as scheduled (a
+ * store fetched before the Stats API dropped it): once one club has won a majority of series.of among the round's
+ * final games between the two, the series' games not yet played are not needed. unneededIn(list) -> a predicate. */
+function unneededIn(list) {
+  const key = c => c.gtype + ':' + [String(c.home), String(c.away)].sort().join('-');
+  const wins = {};
+  (list || []).forEach(c => {
+    if (!c || !c.gtype || c.gtype === 'R' || !isFinal(c) || !isNum(c.hs) || !isNum(c.as) || c.hs === c.as) return;
+    const k = key(c), w = String(c.hs > c.as ? c.home : c.away);
+    (wins[k] = wins[k] || {})[w] = (wins[k][w] || 0) + 1;
+  });
+  return c => {
+    if (!c || !c.gtype || c.gtype === 'R' || isFinal(c) || isLive(c)) return false;
+    const of = Number((c.series || {}).of), w = wins[key(c)];
+    if (!of || !w) return false;
+    return Math.max.apply(null, Object.keys(w).map(t => w[t])) >= Math.floor(of / 2) + 1;
+  };
+}
 function setRecords(map) { Object.keys(RECORDS).forEach(k => { delete RECORDS[k]; }); Object.keys(map || {}).forEach(k => { RECORDS[k] = map[k]; }); }
 function setForms(map) { Object.keys(FORMS).forEach(k => { delete FORMS[k]; }); Object.keys(map || {}).forEach(k => { FORMS[k] = map[k]; }); }
 function gameCard(g, opts) {
@@ -1431,7 +1449,7 @@ return {
   halfOf: halfOf, inningLabel: inningLabel, countText: countText, outsText: outsText, basesOf: basesOf, basesHTML: basesHTML, baseOutText: baseOutText,
   pitchName: pitchName, pitchColour: pitchColour, pitchChip: pitchChip, callInfo: callInfo, eventLabel: eventLabel, isHit: isHit,
   roundLabel: roundLabel, roundKey: roundKey, gameState: gameState, isFinal: isFinal, isLive: isLive, statusChip: statusChip, seriesText: seriesText,
-  gameCard: gameCard, titleProbs: titleProbs, notNeeded: notNeeded, setRecords: setRecords, setForms: setForms, RECORDS: RECORDS, FORMS: FORMS,
+  gameCard: gameCard, titleProbs: titleProbs, notNeeded: notNeeded, unneededIn: unneededIn, setRecords: setRecords, setForms: setForms, RECORDS: RECORDS, FORMS: FORMS,
   // names and links
   player: player, playerInfo: playerInfo, playerName: playerName, playerShort: playerShort, playerSurname: playerSurname, isPitcher: isPitcher,
   playerColour: playerColour, playerLink: playerLink, playerHref: playerHref,

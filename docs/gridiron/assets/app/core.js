@@ -609,9 +609,12 @@ function isLive(g) { const s = gameState(g); return s === 'live' || s === 'half'
 function isPre(g) { return gameState(g) === 'pre'; }
 /* A game still marked upcoming (or live) 12 hours after kickoff is a stale snapshot (the hourly build has not caught up):
  * lists of what is on now leave it out (the Home page applies the same guard). */
+/* A game still upcoming or live 12 hours after kick-off is a stale snapshot. On the page clock (QK.now(): an ?asof=
+ * preview reads the week as it stood), not the real one. */
 function isStale(g) {
   const d = parseDate(g && g.kickoff);
-  return !!d && !isFinal(g) && Date.now() - d.getTime() > 12 * 3600 * 1000;
+  const now = window.QK && QK.now ? QK.now() : Date.now();
+  return !!d && !isFinal(g) && now - d.getTime() > 12 * 3600 * 1000;
 }
 function isOT(g) { return !!(g && (g.overtime || (isNum(g.qtr) && Number(g.qtr) >= 5) || (Array.isArray(g.quarters) && g.quarters.length > 4))); }
 /* The home betting line: negative = home favoured. */

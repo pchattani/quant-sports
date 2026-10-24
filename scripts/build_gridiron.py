@@ -471,7 +471,112 @@ def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, cards: li
 
 # ---------------------------------------------------------------------------------------------- site-wide
 
-def index_payload(b: Build, res: dict, current: int, seasons: list[int]) -> dict | None:
+def _digest_now(today: date | None) -> datetime:
+    """The digest's clock: now, or the end of --today's UTC day for a dated build (tests, backfills)."""
+    now = datetime.now(timezone.utc)
+    return now if today is None or today == now.date() else datetime(today.year, today.month, today.day, 23, 59, tzinfo=timezone.utc)
+
+
+POST_STAGE = {"WC": "playoff", "DIV": "quarter", "CON": "semi", "SB": "final"}
+POST_NAME = {"WC": "Wild Card round", "DIV": "Divisional round", "CON": "Conference championships", "SB": "Super Bowl"}
+
+
+def _card_status(c: dict) -> str:
+    st = str(c.get("status") or "")
+    return "final" if st == "final" else "live" if st == "live" else "pre"
+
+
+def featured_payload(cards: list[dict], odds: dict, teams_info: dict, now: datetime) -> dict:
+    """digest.featured: the games that matter most on the shared significance rule (oddsmarkets/common/featured.py:
+    the NFL tier, the postseason round, the playoff and Super Bowl stakes in our season simulation, the start time
+    and hour, live-ness; closeness a small bonus; known rivalries). {"today": [{"id", "score", "why"}] best first,
+    "week": the biggest game of the next seven days}. The front end takes the first game still upcoming or live at
+    the reader's clock."""
+    from oddsmarkets.common import featured as FT
+    nick = {t: str((v or {}).get("name") or t) for t, v in (teams_info or {}).items()}
+
+    def rivalry(h, a):
+        nh, na = nick.get(h, h), nick.get(a, a)
+        for pair, name in FT.RIVALRIES.items():
+            x, y = tuple(pair)
+            if (nh.endswith(" " + x) and na.endswith(" " + y)) or (nh.endswith(" " + y) and na.endswith(" " + x)):
+                return name
+        return None
+    games = []
+    for c in cards:
+        st = _card_status(c)
+        if st == "final":
+            continue
+        h, a = c.get("home"), c.get("away")
+        oh, oa = (odds or {}).get(h) or {}, (odds or {}).get(a) or {}
+        sig = {"title": [oh.get("p_sb"), oa.get("p_sb")]}
+        gt = str(c.get("gtype") or "REG")
+        if gt in POST_STAGE:
+            sig["stage"] = POST_STAGE[gt]
+        else:
+            sig["playoff"] = [oh.get("p_playoffs"), oa.get("p_playoffs")]
+        if gt == "PRE":
+            sig["preseason"] = True
+        rv = rivalry(h, a)
+        if rv:
+            sig["rivalry"] = rv
+        games.append({"sport": "nfl", "league": "NFL", "id": c.get("game_id"), "start": c.get("kickoff"), "status": st,
+                      "home": h, "away": a, "p_home": (c.get("model") or {}).get("p_home"), "wp_home": c.get("wp_home"), "sig": sig})
+    r = FT.rank_featured(games, now)
+
+    def row(x):
+        return {"id": x["key"].split(":", 1)[1], "score": x["score"], "why": x.get("reasons") or []}
+    return {"today": [row(x) for x in r["today"]], "week": row(r["week"]) if r.get("week") else None}
+
+
+def digest_payload(b: Build, cards: list[dict], odds: dict, phase: str | None, week: int | None, current: int, today: date | None,
+                   teams_info: dict | None = None) -> dict:
+    """index.json "digest": the "This week in the NFL" top lines (oddsmarkets/common/digest.py), the stage (the week
+    and the regular season's length) and the featured candidates (featured.py). Finished games carry the frozen
+    pre-game price (manifest "prices", written before kick-off) or the walk-forward backtest price, never one made
+    after the game: no look-ahead. A tie has no result and is left out of the record. chance_log.json keeps one
+    snapshot a day of every team's playoff and Super Bowl chance for the movers; the front end never reads it."""
+    from oddsmarkets.common import digest as DG
+    now = _digest_now(today)
+    games = [{"id": c.get("game_id"), "sport": "nfl", "start": c.get("kickoff"), "status": _card_status(c), "home": c.get("home"),
+              "away": c.get("away"), "hs": c.get("hs"), "as": c.get("as"), "p_home": (c.get("model") or {}).get("p_home")} for c in cards]
+    out: dict = {"asof": now.isoformat().replace("+00:00", "Z")[:16] + "Z"}
+    rec = DG.record(games, now)
+    if rec:
+        rec.pop("by", None)                               # one sport here: the split is the Home page's
+        out["record"] = rec
+    for k, v in (("upset", DG.upset(games, now)), ("hot", DG.hot(games, now, min_games=1))):
+        if v:
+            out[k] = v
+    post = any(str(c.get("gtype")) in POST_STAGE and _card_status(c) != "final" for c in cards)
+    cur = {m: {t: o.get(m) for t, o in (odds or {}).items() if o.get(m) is not None} for m in ("p_playoffs", "p_sb")}
+    log_all = an.read_json(b.data / "chance_log.json") or {}
+    log_s = (log_all.get(str(current)) or {}) if isinstance(log_all, dict) else {}
+    new_log = {m: DG.roll_log(log_s.get(m), now, cur[m]) for m in cur}
+    if any(cur.values()):
+        b.write("chance_log.json", {str(current): new_log})
+    metric = "p_sb" if post else "p_playoffs"
+    mv = DG.movers(new_log.get(metric), cur.get(metric) or {}, now)
+    if mv:
+        out["movers"] = dict(mv, metric=metric)
+    reg = [c for c in cards if str(c.get("gtype") or "REG") == "REG"]
+    st: dict = {"phase": phase, "week": week}
+    if reg:
+        days = sorted(str(c.get("kickoff"))[:10] for c in reg if c.get("kickoff"))
+        st.update(played=sum(1 for c in reg if c.get("status") == "final"), total=len(reg), weeks=max((c.get("week") or 0) for c in reg))
+        if days:
+            st.update(first=days[0], last=days[-1])
+    rounds = [str(c.get("gtype")) for c in cards if str(c.get("gtype")) in POST_STAGE and _card_status(c) != "final"]
+    if rounds:
+        order = list(POST_STAGE)
+        r0 = min(rounds, key=order.index)
+        st.update(round=r0, round_name=POST_NAME[r0])
+    out["stage"] = st
+    out["featured"] = featured_payload(cards, odds, teams_info or {}, now)
+    return out
+
+
+def index_payload(b: Build, res: dict, current: int, seasons: list[int], today: date | None = None) -> dict | None:
     """index.json from the current season's results; None (keep the old file) when the current season was not built."""
     from oddsmarkets.nfl.analytics import season as SN
     cur = res.get(current) or {}
@@ -496,7 +601,8 @@ def index_payload(b: Build, res: dict, current: int, seasons: list[int]) -> dict
     return {"ok": True, "updated_at": _now(), "season": current, "week": wk, "phase": _phase(cur.get("phase")), "games": games, "live": live,
             "recent": recent, "standings_top": top, "playoff_odds": odds, "leaders": cur.get("leaders") or {},
             "gaps": SN.gaps(cards, cur.get("futures")), "teams": teams, "seasons": seasons, "models": model_versions(),
-            "sim_reason": None if sim.get("ok") else (sim or {}).get("reason")}
+            "sim_reason": None if sim.get("ok") else (sim or {}).get("reason"),
+            "digest": b.step("digest", lambda: digest_payload(b, cards, odds, _phase(cur.get("phase")), wk, current, today, cur.get("teams_info")), {}) or {}}
 
 
 def calibration(b: Build, adapters) -> None:
@@ -656,7 +762,7 @@ def main(argv: list[str] | None = None) -> int:
             prev.update(idx)
             b.step("players_index", lambda: b.write("players_index.json", prev))
         logger.info("careers: %d players indexed", len(idx))
-    idx_payload = b.step("index", lambda: index_payload(b, res, current, seasons), None)
+    idx_payload = b.step("index", lambda: index_payload(b, res, current, seasons, cfg["today"]), None)
     if idx_payload:
         b.step("write index.json", lambda: b.write("index.json", idx_payload))
     else:

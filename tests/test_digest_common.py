@@ -100,3 +100,13 @@ def test_log_series_feeds_swing():
     assert {x["key"] for x in ser} == {"A", "B"} and next(x for x in ser if x["key"] == "A")["name"] == "Alpha"
     s = DG.swing(ser, NOW)
     assert s["name"] == "Alpha" and s["delta"] == 0.3 and s["league"] == "NHL"
+
+
+def test_hot_needs_no_pre_game_chance():
+    """Team of the week reads results only (football keeps no forecast on a finished match); `winner` marks a draw."""
+    games = [{"id": 1, "start": "2026-10-22T19:00:00Z", "status": "final", "home": "A", "away": "B", "hs": 2, "as": 0},
+             {"id": 2, "start": "2026-10-19T19:00:00Z", "status": "final", "home": "C", "away": "A", "hs": 1, "as": 1, "winner": "draw"},
+             {"id": 3, "start": "2026-10-18T19:00:00Z", "status": "final", "home": "A", "away": "D", "hs": 3, "as": 1}]
+    h = DG.hot(games, NOW)
+    assert (h["key"], h["w"], h["d"], h["gp"], h["margin"]) == ("A", 2, 1, 3, 4.0)
+    assert DG.record(games, NOW) is None and DG.upset(games, NOW) is None

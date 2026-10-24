@@ -2072,6 +2072,164 @@ def build_hub(entries: list[dict], now: datetime | None = None) -> dict:
     }
 
 
+# ── the overview's "This week in football" digest (hub.json "digest") ──────────────────────────────────────────
+
+DIGEST_BIG = ("premier-league", "la-liga", "serie-a", "bundesliga", "ligue-1", "champions-league")
+DIGEST_MIN_TIER = 30          # featured.TIERS: the competitions whose clubs can be "team of the week" or a title mover
+FORECAST_LOG_DAYS = 9
+
+
+def _forecast_log(prev: dict | None, rows_by_comp: dict, now: datetime) -> dict:
+    """data/forecast_log.json: our pre-match chance for each match, frozen at the last build before kick-off. Football
+    drops a match's forecast once it is finished (the fixtures carry none), so this log is the only no-look-ahead
+    source of "what we said" for the week's record and upset. {match id: [h, d, a, kick-off ISO, comp]}; an entry is
+    only ever written while its kick-off is still ahead, and kept FORECAST_LOG_DAYS days after it."""
+    log = {k: v for k, v in (prev or {}).items() if isinstance(v, list) and len(v) >= 4}
+    lo = now - timedelta(days=FORECAST_LOG_DAYS)
+    for slug, rows in rows_by_comp.items():
+        for r in rows:
+            m, d = r.get("model") or {}, r.get("date")
+            if r.get("status") != "scheduled" or not d or m.get("h") is None:
+                continue
+            try:
+                ko = datetime.fromisoformat(str(d).replace("Z", "+00:00"))
+            except ValueError:
+                continue
+            if now < ko <= now + timedelta(days=FORECAST_LOG_DAYS):
+                log[str(r["id"])] = [round(float(m["h"]), 4), round(float(m.get("d") or 0.0), 4), round(float(m.get("a") or 0.0), 4), d, slug]
+    out = {}
+    for k, v in log.items():
+        try:
+            ko = datetime.fromisoformat(str(v[3]).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if ko >= lo:
+            out[k] = v
+    return out
+
+
+def build_digest(entries: list[dict], data_dir: Path, now: datetime | None = None) -> dict:
+    """hub.json "digest": the overview's top lines (oddsmarkets/common/digest.py) and the featured matches
+    (oddsmarkets/common/featured.py rank_featured). Record and upset read only data/forecast_log.json (the chance
+    frozen before kick-off); movers read each big league's history.json (our title chance run by run)."""
+    from oddsmarkets.common import digest as DG
+    from oddsmarkets.common import featured as FT
+    now = now or datetime.now(timezone.utc)
+    ok = [c for c in entries if c.get("ok")]
+    rows_by = {c["slug"]: (c.get("_fixtures") or []) for c in ok}
+
+    def tier(slug):
+        return FT.TIERS["football"].get(slug, FT.TIERS["football"]["*"])
+    ids = {c["slug"]: {t: (info or {}).get("team_id") for t, info in (c.get("_teams") or {}).items()} for c in ok}
+    names = {c["slug"]: c.get("short_name") or c.get("name") for c in ok}
+
+    def side(slug, t):
+        return {"name": t, "id": ids.get(slug, {}).get(t) or t}
+    out: dict = {"asof": now.isoformat().replace("+00:00", "Z")[:16] + "Z"}
+
+    # the week's record and upset, from the frozen pre-match chances only
+    log = _forecast_log(_read_json(data_dir / "forecast_log.json", {}), rows_by, now)
+    _write(data_dir, "forecast_log.json", log)
+    fin = []
+    for slug, rows in rows_by.items():
+        for r in rows:
+            f = log.get(str(r.get("id")))
+            if r.get("status") != "finished" or not f:
+                continue
+            fin.append({"id": r["id"], "sport": "football", "comp": slug, "league": names.get(slug), "start": r.get("date"), "status": "final",
+                        "home": side(slug, r["home"]), "away": side(slug, r["away"]), "hs": r.get("hs"), "as": r.get("as"),
+                        "p_home": f[0], "p_draw": f[1], "p_away": f[2]})
+    rec = DG.record(fin, now)
+    if rec:
+        rec.pop("by", None)
+        out["record"] = rec
+    up = DG.upset(fin, now)
+    if up:
+        up["comp"] = next(x["comp"] for x in fin if x["id"] == up["id"])
+        out["upset"] = up
+
+    # team of the week, among the clubs of the biggest competitions (two or more matches this week)
+    week = []
+    for slug, rows in rows_by.items():
+        if tier(slug) < DIGEST_MIN_TIER:
+            continue
+        for r in rows:
+            if r.get("status") == "finished" and r.get("hs") is not None:
+                week.append({"id": r["id"], "start": r.get("date"), "status": "final", "home": side(slug, r["home"]), "away": side(slug, r["away"]),
+                             "hs": r.get("hs"), "as": r.get("as"), "comp": slug, **({"winner": "draw"} if r.get("hs") == r.get("as") else {})})
+    hot = DG.hot(week, now)
+    if hot:
+        hot["name"] = next((g[s]["name"] for g in week for s in ("home", "away") if g[s]["id"] == hot["key"]), str(hot["key"]))
+        out["hot"] = hot
+
+    # the biggest title-chance moves this week in the big leagues (history.json: our title chance after each run)
+    moves = []
+    for c in ok:
+        slug = c["slug"]
+        if c.get("kind") != "league" or tier(slug) < DIGEST_MIN_TIER:
+            continue
+        snaps = (_read_json(data_dir / slug / "history.json", {}) or {}).get("snapshots") or []
+        teams = {t for s in snaps[-1:] for t, p in (s.get("title") or {}).items() if (p or 0) >= 0.01}
+        for t in sorted(teams):
+            pts = [[s["ts"], (s.get("title") or {}).get(t)] for s in snaps if s.get("ts") and (s.get("title") or {}).get(t) is not None]
+            sw = DG.swing([{"name": t, "league": names.get(slug), "kind": "title", "points": pts}], now, min_move=0.02)
+            if sw:
+                sw.update({"comp": slug, "id": ids.get(slug, {}).get(t)})
+                sw.pop("href", None)
+                sw.pop("sport", None)
+                moves.append(sw)
+    if moves:
+        out["movers"] = {"up": sorted([m for m in moves if m["delta"] > 0], key=lambda m: -m["delta"])[:2],
+                         "down": sorted([m for m in moves if m["delta"] < 0], key=lambda m: m["delta"])[:2]}
+
+    # the stage: how far the big competitions have gone
+    st = []
+    for slug in DIGEST_BIG:
+        c = next((x for x in ok if x["slug"] == slug), None)
+        if not c:
+            continue
+        rows = [r for r in rows_by.get(slug) or [] if r.get("stage") == "league" and isinstance(r.get("round"), int)]
+        played = [r["round"] for r in rows if r.get("status") == "finished"]
+        nxt = sorted(r["date"] for r in rows if r.get("status") in UPCOMING_STATUSES and r.get("date"))
+        st.append({"comp": slug, "name": c.get("short_name") or c.get("name"), "round": max(played) if played else 0,
+                   "rounds": max((r["round"] for r in rows), default=0), "next": nxt[0] if nxt else None})
+    out["stage"] = {"in_season": sum(1 for c in ok if not c.get("complete")), "big": st}
+
+    # the featured matches: the shared significance rule over the coming week
+    title_p = {c["slug"]: {t.get("team"): t.get("p_title") for t in c.get("_probs") or [] if t.get("team")} for c in ok}
+    games, comp_of = [], {}
+    for slug, rows in rows_by.items():
+        tp = title_p.get(slug) or {}
+        for r in rows:
+            stt = r.get("status")
+            if stt not in UPCOMING_STATUSES or not r.get("date"):
+                continue
+            m = r.get("model") or {}
+            rnd = r.get("round") if isinstance(r.get("round"), str) else None
+            stage = FT.stage_of({"sig": {"round": rnd}}) or ("knockout" if r.get("stage") == "playoff" else None)
+            comp_of[str(r["id"])] = slug
+            games.append({"sport": "football", "league": names.get(slug), "id": r["id"], "start": r["date"],
+                          "status": "live" if stt == "live" else "pre", "home": r["home"], "away": r["away"],
+                          "p_home": m.get("h"), "p_draw": m.get("d"), "p_away": m.get("a"),
+                          "sig": {"comp": slug, "stage": stage, "title": [tp.get(r["home"]) or 0.0, tp.get(r["away"]) or 0.0] if tp else None,
+                                  "rivalry": FT.RIVALRIES.get(frozenset((r["home"], r["away"])))}})
+
+    title_of = {str(g["id"]): g["sig"]["title"] for g in games if g["sig"].get("title") and max(g["sig"]["title"]) >= 0.005}
+
+    def row(x):
+        i = x["key"].split(":", 1)[1]
+        out_ = {"id": i, "comp": comp_of.get(i), "score": x["score"], "why": x.get("reasons") or []}
+        if i in title_of:
+            out_["title"] = [round(float(p), 3) for p in title_of[i]]     # our title chance, home and away
+        return out_
+    r = FT.rank_featured(games, now)
+    today_ids = {x["key"] for x in r["today"]}
+    nxt = FT.rank_featured(games, now, horizon_h=168, limit=13)
+    out["featured"] = {"today": [row(x) for x in r["today"]], "next": [row(x) for x in nxt["today"] if x["key"] not in today_ids][:5],
+                       "week": row(r["week"]) if r.get("week") else None}
+    return out
+
+
 def build_search(entries: list[dict]) -> dict:
     teams, players = [], []
     for c in entries:
@@ -2338,7 +2496,12 @@ def main() -> int:
             "_probs": _read_json(DATA_DIR / slug / "probs.json", {}).get("teams") or [],
             "_bracket": {"p_cup": br.get("p_cup") or {}, "reach": br.get("reach") or {}} if br else None,
         })
-    _write(DATA_DIR, "hub.json", build_hub(hub_entries))
+    hub = build_hub(hub_entries)
+    try:
+        hub["digest"] = build_digest(hub_entries, DATA_DIR)
+    except Exception as exc:  # noqa: BLE001  (a top line is never the reason the hub goes unwritten)
+        logger.error("hub digest failed: %s\n%s", exc, traceback.format_exc())
+    _write(DATA_DIR, "hub.json", hub)
     _write(DATA_DIR, "search.json", build_search(hub_entries))
 
     # The layer above the competitions: the pool, the nations, the archive. Each step degrades on its own; one failing must not take the

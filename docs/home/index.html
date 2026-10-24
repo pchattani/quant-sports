@@ -20,7 +20,30 @@
 <div class="qk-ticker" id="ticker" aria-label="Scores and our chances"></div>
 
 <main id="main" class="qk-page hm-page">
-  <section id="hero" class="hm-hero" aria-label="The game to watch"><div class="qk-skel block" style="height:340px"></div></section>
+  <section id="intro" class="hm-intro" aria-labelledby="intro-h">
+    <div class="qk-sh-kicker">The Quant · free sports numbers</div>
+    <h1 class="hm-intro-h" id="intro-h">Free forecasts, ratings and stats for eight sports, checked against what actually happens.</h1>
+    <ul class="hm-pillars">
+      <li><b>Our chance for every game</b><span>A percentage for each side before the start, and live while it plays.</span></li>
+      <li><b>Who&rsquo;s for real, by the numbers</b><span>Ratings and percentiles that look past the scoreline.</span></li>
+      <li><b>We check our record</b><span>Every forecast is scored against the result, in public.</span></li>
+    </ul>
+    <div class="hm-intro-foot"><a class="qk-more" href="#how">How it works</a></div>
+    <nav class="hm-sportnav" id="sportnav" aria-label="Pick your sport"></nav>
+  </section>
+
+  <section class="qk-section hm-today" id="today" aria-label="Today and this week">
+    <div id="h-today"></div>
+    <div class="hm-today-grid">
+      <div id="feature" class="hm-feature"><div class="qk-skel block" style="height:260px"></div></div>
+      <div id="toplines" class="hm-tls"></div>
+    </div>
+  </section>
+
+  <section class="qk-section" id="around">
+    <div id="h-around"></div>
+    <div class="hm-around" id="around-grid"></div>
+  </section>
 
   <section class="qk-section" id="watch">
     <div id="h-watch"></div>
@@ -38,13 +61,6 @@
 
   <section class="qk-section" id="races"></section>
 
-  <section class="qk-section" id="newhere"></section>
-
-  <section class="qk-section" id="sports">
-    <header class="qk-sh"><div class="qk-sh-main"><div class="qk-sh-kicker">Eight sites, one look</div><h2 class="qk-sh-title">Pick your sport</h2><p class="qk-sh-sub">Each site opens on today’s games, the standings, the players and the models behind them.</p></div></header>
-    <div class="hm-tiles" id="tiles"></div>
-  </section>
-
   <section class="qk-section" id="games">
     <header class="qk-sh"><div class="qk-sh-main"><div class="qk-sh-kicker">Scoreboard</div><h2 class="qk-sh-title">Every game</h2><p class="qk-sh-sub">Our chance on every card, the favourite in blue. Tap a game for the full breakdown.</p></div>
       <div class="qk-sh-actions"><div class="qk-seg" id="when" role="group" aria-label="When"><button type="button" aria-pressed="true" data-value="now">Live &amp; next</button><button type="button" aria-pressed="false" data-value="results">Results</button></div></div></header>
@@ -57,6 +73,8 @@
     <header class="qk-sh"><div class="qk-sh-main"><div class="qk-sh-kicker">One picture per site</div><h2 class="qk-sh-title">Charts of the week</h2><p class="qk-sh-sub">A headline chart from each sport. Tap through for the full story.</p></div></header>
     <div class="qk-grid" id="chart-grid"></div>
   </section>
+
+  <section class="qk-section" id="how"></section>
 
   <p class="qk-sub hm-updated" id="updated"></p>
 </main>

@@ -110,6 +110,90 @@ class Build:
         return payload
 
 
+def with_digest(b: Build, idx: dict) -> dict:
+    """index.json with "digest" ("This week in F1") added; a digest that cannot be built leaves the index as it was."""
+    dig = b.step("digest", lambda: digest_payload(b.data, idx), None)
+    return dict(idx, digest=dig) if dig else idx
+
+
+def digest_payload(data: Path, idx: dict, now: datetime | None = None) -> dict:
+    """index.json "digest" ("This week in F1") from the current season.json and the last race's file on disk:
+
+    stage   rounds run and left, the next round, sprints and points still to win, the leader and the gap;
+    movers  the biggest risers and fallers in our drivers' title chance between the last two title_history snapshots
+            (one per completed round, oddsmarkets/common/digest.py movers), with the rounds they span;
+    last    the last Grand Prix: the winner and the win chance we gave them before the start (the race file's
+            walk-forward forecast after qualifying, else before it: data up to that race only, so no look-ahead),
+            and our favourite; "upset" when the winner had under 40% and was not our favourite;
+    hot     the most points over the last three rounds (season.json progression);
+    featured the next Grand Prix on the shared significance rule (oddsmarkets/common/featured.py rank_featured: F1's
+            tier, the title stakes, the start time and hour). F1 has no head-to-head record to count: "record" is
+            left out."""
+    from oddsmarkets.common import digest as DG
+    from oddsmarkets.common import featured as FT
+    now = now or datetime.now(timezone.utc)
+    y = idx.get("current_season")
+    sp = data / str(y) / "season.json"
+    season = json.loads(sp.read_text(encoding="utf-8")) if sp.exists() else {}
+    out: dict = {"asof": now.strftime("%Y-%m-%dT%H:%MZ")}
+    cal = season.get("calendar") or []
+    st = (season.get("standings") or {}).get("drivers") or []
+    left = [c for c in cal if c.get("status") != "done"]
+    nxt = idx.get("next") or {}
+    out["stage"] = {"done": season.get("rounds_done"), "total": season.get("rounds_total"), "left": len(left),
+                    "sprints_left": sum(1 for c in left if c.get("sprint")),
+                    "points_left": 25 * len(left) + 8 * sum(1 for c in left if c.get("sprint")),
+                    "next": {"round": nxt.get("round"), "name": nxt.get("name"), "start": (nxt.get("sessions") or {}).get("race") or nxt.get("date")} if nxt else None,
+                    "leader": st[0]["driver"] if st else None, "gap": round(st[0]["points"] - st[1]["points"], 1) if len(st) > 1 else None,
+                    "second": st[1]["driver"] if len(st) > 1 else None}
+    hist = sorted([h for h in season.get("title_history") or [] if not h.get("final") and h.get("drivers")], key=lambda h: h["after_round"])
+    if len(hist) >= 2:
+        a, z = hist[-2], hist[-1]
+        cur = {d: v.get("p_title") for d, v in z["drivers"].items() if v.get("p_title") is not None}
+        base = {d: v.get("p_title") for d, v in a["drivers"].items() if v.get("p_title") is not None}
+        day = str(a.get("as_of") or "")[:10] or now.date().isoformat()
+        mv = DG.movers({day: base}, cur, now, days=0, min_days=0, min_move=0.01)
+        if mv:
+            out["movers"] = dict(mv, metric="p_title", since_round=a["after_round"], after_round=z["after_round"])
+    last = idx.get("last") or {}
+    if last.get("winner") and last.get("year") == y:
+        rp = data / str(y) / "races" / f"{last['round']}.json"
+        race = json.loads(rp.read_text(encoding="utf-8")) if rp.exists() else {}
+        fc = race.get("forecast") or {}
+        sim = fc.get("post_quali") if (fc.get("post_quali") or {}).get("drivers") else fc.get("pre_quali")
+        ds = (sim or {}).get("drivers") or {}
+        row = next((c for c in cal if c.get("round") == last["round"]), {})
+        start = f"{last.get('date')}T{row.get('time')}" if row.get("time") else last.get("date")
+        lr = {"round": last["round"], "name": last.get("name"), "start": start, "winner": last["winner"], "team": last.get("winner_team")}
+        if ds:
+            fav = max(ds, key=lambda d: ds[d].get("p_win") or 0)
+            p = (ds.get(last["winner"]) or {}).get("p_win")
+            lr.update({"p": round(p, 4) if p is not None else None, "fav": fav, "fav_p": round(ds[fav].get("p_win") or 0, 4),
+                       "after_quali": sim is fc.get("post_quali")})
+            lr["upset"] = bool(p is not None and p < 0.4 and fav != last["winner"])
+        out["last"] = lr
+    prog = (season.get("progression") or {}).get("drivers") or {}
+    rounds = (season.get("progression") or {}).get("rounds") or []
+    form = []
+    for d, pts in prog.items():
+        if len(pts) >= 4 and pts[-1] is not None and pts[-4] is not None:
+            form.append((pts[-1] - pts[-4], d))
+    if form:
+        form.sort(key=lambda x: (-x[0], x[1]))
+        out["hot"] = {"key": form[0][1], "v": round(form[0][0], 1), "next": form[1][1] if len(form) > 1 else None,
+                      "next_v": round(form[1][0], 1) if len(form) > 1 else None, "rounds": rounds[-3:]}
+    if nxt and out["stage"]["next"] and out["stage"]["next"]["start"]:
+        ch = (season.get("championship") or {}).get("drivers") or {}
+        top = sorted((v.get("p_title") or 0 for v in ch.values()), reverse=True)[:2]
+        g = {"sport": "f1", "league": "F1", "id": str(nxt.get("round")), "start": out["stage"]["next"]["start"], "status": "pre",
+             "event": True, "sig": {"title": top} if top else {}}
+        r = FT.rank_featured([g], now)
+        row = lambda x: {"id": x["key"].split(":", 1)[1], "score": x["score"], "why": x.get("reasons") or []}
+        wk = r.get("week")
+        out["featured"] = {"today": [row(x) for x in r["today"]], "week": row(wk) if wk else None}
+    return out
+
+
 def pick_calibration(committed: Path, cache: Path | None = None) -> dict:
     """calibration.json: the newer of the cached walk-forward backtest (`models.backtest.OUT`) and the committed
     calibration.json, by `generated_at`. The full backtest runs locally and its output is committed; CI restores an
@@ -324,7 +408,7 @@ def main(argv: list[str] | None = None) -> int:
     # site-wide
     metas = {y: b.step(f"meta {y}", lambda: ssn.season_meta(y, current, shared["standings"].get(y))) for y in years}
     cols = b.step("colours current", lambda: ssn.team_colours(current), {})
-    b.write_or_fail("index.json", "index", lambda: ssn.index(current, years, metas, cols))
+    b.write_or_fail("index.json", "index", lambda: with_digest(b, ssn.index(current, years, metas, cols)))
     b.write_or_fail("elo.json", "elo", lambda: ssn.elo_payload(shared["elo"]))
     cats = {y: o.get("catalogue") for y, o in out.items() if (o or {}).get("catalogue") and o["catalogue"].get("ok", True)}
     for y in years:                                       # seasons not rebuilt this run: reuse their drivers.json on disk

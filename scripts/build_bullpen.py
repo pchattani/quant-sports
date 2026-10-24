@@ -542,12 +542,128 @@ def merge_calibration(b: Build, level: str, checks: dict) -> None:
 
 # ---------------------------------------------------------------------------------------------- site-wide
 
+def _digest_now(today: date) -> datetime:
+    """The digest's clock: now, or the end of --today's UTC day for a dated build (tests, backfills)."""
+    now = datetime.now(timezone.utc)
+    return now if today == now.date() else datetime(today.year, today.month, today.day, 23, 59, tzinfo=timezone.utc)
+
+
+POST_STAGE = {"WS": "final", "CS": "semi", "DS": "quarter", "WC": "playoff"}
+
+
+def _card_status(c: dict) -> str:
+    st = str(c.get("status") or "")
+    return "final" if st == "final" else "live" if st == "live" else "pre"
+
+
+def _series_of(c: dict, post: dict | None) -> dict | None:
+    """The postseason series a card belongs to (index.json postseason.series), matched on the two clubs."""
+    pair = {str(c.get("home")), str(c.get("away"))}
+    for s in ((post or {}).get("series") or []):
+        if set(map(str, s.get("teams") or [])) == pair:
+            return s
+    return None
+
+
+def featured_payload(cards: list[dict], teams: dict, post: dict | None, now: datetime) -> dict:
+    """digest.featured: the games that matter most on the shared significance rule (oddsmarkets/common/featured.py:
+    the MLB tier, the postseason stage and series state, the stakes in our season simulation, the start time and
+    hour, live-ness; closeness a small bonus). {"today": [{"id", "score", "why"}] best first, "week": the biggest
+    game of the next seven days}. A postseason card for a series already decided (an "if necessary" game) is left
+    out. The front end takes the first game still upcoming or live at the reader's clock."""
+    from oddsmarkets.common import featured as FT
+    pt = (post or {}).get("teams") or {}
+    games = []
+    for c in cards:
+        st = _card_status(c)
+        if st == "final":
+            continue
+        h, a = str(c.get("home")), str(c.get("away"))
+        th, ta = (teams or {}).get(h) or {}, (teams or {}).get(a) or {}
+        sig = {"title": [(pt.get(h) or {}).get("p_ws", th.get("p_ws")), (pt.get(a) or {}).get("p_ws", ta.get("p_ws"))]}
+        if c.get("series"):
+            ser = _series_of(c, post)
+            if ser and ser.get("done"):
+                continue                                   # an "if necessary" game the series never needs
+            sig["stage"] = POST_STAGE.get(str((ser or {}).get("round") or ""), "playoff")
+            cs = c.get("series") or {}
+            wins = None
+            tm = [str(x) for x in (ser or {}).get("teams") or []]
+            if ser and len(ser.get("wins") or []) == 2 and h in tm and a in tm:
+                wins = [ser["wins"][tm.index(h)], ser["wins"][tm.index(a)]]
+            sig["series"] = {"game": cs.get("game"), "best_of": cs.get("of") or (ser or {}).get("best_of"), "name": cs.get("desc")}
+            if wins:
+                sig["series"]["wins"] = wins
+        else:
+            sig["playoff"] = [th.get("p_postseason"), ta.get("p_postseason")]
+        if c.get("gtype") == "S":
+            sig["preseason"] = True
+        games.append({"sport": "baseball", "league": "MLB", "id": c.get("gpk"), "start": c.get("start"), "status": st,
+                      "home": h, "away": a, "p_home": (c.get("model") or {}).get("p_home"), "wp_home": c.get("wp_home"), "sig": sig})
+    r = FT.rank_featured(games, now)
+
+    def row(x):
+        return {"id": x["key"].split(":", 1)[1], "score": x["score"], "why": x.get("reasons") or []}
+    return {"today": [row(x) for x in r["today"]], "week": row(r["week"]) if r.get("week") else None}
+
+
+def digest_payload(b: Build, cards: list[dict], teams: dict, post: dict | None, phase: str | None, season: int, today: date) -> dict:
+    """index.json "digest" (MLB): the "This week in MLB" top lines (oddsmarkets/common/digest.py), the stage and the
+    featured candidates (featured.py). Finished games carry the frozen pre-game price (manifest "prices", written
+    while the game was still to come, else the walk-forward backtest), so nothing here is look-ahead.
+    mlb/chance_log.json keeps one snapshot a day of every club's postseason and World Series chance for the movers;
+    the front end never reads it."""
+    from oddsmarkets.common import digest as DG
+    now = _digest_now(today)
+    games = [{"id": c.get("gpk"), "sport": "baseball", "start": c.get("start"), "status": _card_status(c), "home": c.get("home"),
+              "away": c.get("away"), "hs": c.get("hs"), "as": c.get("as"), "p_home": (c.get("model") or {}).get("p_home")} for c in cards]
+    out: dict = {"asof": now.isoformat().replace("+00:00", "Z")[:16] + "Z"}
+    rec = DG.record(games, now)
+    if rec:
+        rec.pop("by", None)                               # one sport here: the split is the Home page's
+        out["record"] = rec
+    for k, v in (("upset", DG.upset(games, now)), ("hot", DG.hot(games, now))):
+        if v:
+            out[k] = v
+    pt = (post or {}).get("teams") or {}
+    cur = {"p_ws": {t: (pt.get(t) or {}).get("p_ws", v.get("p_ws")) for t, v in (teams or {}).items()},
+           "p_postseason": {t: v.get("p_postseason") for t, v in (teams or {}).items()}}
+    cur = {m: {t: p for t, p in d.items() if p is not None} for m, d in cur.items()}
+    log_all = an.read_json(b.data / "mlb" / "chance_log.json") or {}
+    log_s = (log_all.get(str(season)) or {}) if isinstance(log_all, dict) else {}
+    new_log = {m: DG.roll_log(log_s.get(m), now, cur[m]) for m in cur}
+    if any(cur.values()):
+        b.write("mlb/chance_log.json", {str(season): new_log})
+    metric = "p_ws" if phase == "postseason" else "p_postseason"
+    mv = DG.movers(new_log.get(metric), cur.get(metric) or {}, now)
+    if mv:
+        out["movers"] = dict(mv, metric=metric)
+    reg = [c for c in cards if c.get("gtype") == "R"]
+    st: dict = {"phase": phase}
+    days = sorted(str(c.get("date"))[:10] for c in reg if c.get("date"))
+    if days:
+        first, last = date.fromisoformat(days[0]), date.fromisoformat(days[-1])
+        st.update(played=sum(1 for c in reg if c.get("status") == "final"), total=len(reg), first=days[0], last=days[-1],
+                  week=max(1, min((now.date() - first).days // 7 + 1, (last - first).days // 7 + 1)), weeks=(last - first).days // 7 + 1)
+    if post and post.get("series"):
+        alive = [s for s in post["series"] if not s.get("done")]
+        st.update(round=post.get("round"), alive=[{"round": s.get("round"), "name": s.get("round_name"), "teams": s.get("teams"),
+                                                    "wins": s.get("wins"), "best_of": s.get("best_of")} for s in alive])
+        champ = [s for s in post["series"] if s.get("round") == "WS" and s.get("done")]
+        if champ:
+            w = champ[0].get("wins") or [0, 0]
+            st["champion"] = champ[0]["teams"][0] if w[0] > w[1] else champ[0]["teams"][1]
+    out["stage"] = st
+    out["featured"] = featured_payload(cards, teams, post, now)
+    return out
+
+
 def index_payload(b: Build, levels: dict[str, dict], today: date) -> dict:
     prev = an.read_json(b.data / "index.json") or {}
     out = {"ok": True, "updated_at": _now(), "levels": dict(prev.get("levels") or {})}
     if "npb" not in levels:
         out["levels"].pop("npb", None)                # NPB is not published (npb.jp terms)
-    for k in ("season", "phase", "today", "recent", "upcoming", "postseason", "leaders", "teams"):
+    for k in ("season", "phase", "today", "recent", "upcoming", "postseason", "leaders", "teams", "digest"):
         out[k] = prev.get(k)
     for lvl, r in levels.items():
         if not r.get("seasons"):
@@ -594,6 +710,7 @@ def index_payload(b: Build, levels: dict[str, dict], today: date) -> dict:
                         {"alt": r_.get("alt") or canon.team_alt(t_)} |
                         {k: (r_.get("values") or {}).get(k) for k in ("w", "l", "rating", "p_postseason", "p_ws")}
                         for t_, r_ in (tms.get("teams") or {}).items()}
+        out["digest"] = b.step("digest", lambda: digest_payload(b, cards, out["teams"], out["postseason"], out["phase"], out["season"], today), {}) or {}
     return out
 
 

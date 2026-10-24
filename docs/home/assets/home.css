@@ -1,6 +1,73 @@
-/* The Quant home (kit v4 "Broadcast") — page layout only; every component comes from the kit (assets/qk). */
+/* The Quant home (kit v4 "Broadcast") — page layout only; every shared component comes from the kit (assets/qk). */
 .hm-page { padding-top: 24px; }
-.hm-hero .qk-split-top { min-height: 340px; }
+
+/* ── the intro: what The Quant is, three pillars, how it works, the sports (no giant hero) */
+.hm-intro { background: var(--block); color: #fff; padding: 22px 24px 0; border-top: 5px solid var(--volt); }
+.hm-intro .qk-sh-kicker { background: var(--volt); color: var(--volt-ink); margin-bottom: 12px; }
+.hm-intro .hm-intro-h { font: 400 clamp(1.625rem, 1.1rem + 1.1vw, 2.25rem)/1 var(--font-display); text-transform: uppercase; letter-spacing: 0.005em; margin: 0; max-width: 46ch; color: #fff; }
+.hm-pillars { list-style: none; margin: 18px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; }
+.hm-pillars li { background: var(--block-2); padding: 12px 14px 13px; border-left: 4px solid var(--volt); min-width: 0; }
+.hm-pillars b { display: block; font: 800 15px/1.15 var(--font-cond); text-transform: uppercase; letter-spacing: 0.04em; color: #fff; }
+.hm-pillars span { display: block; margin-top: 4px; font: 500 14px/1.4 var(--font-ui); color: var(--block-ink-2); }
+.hm-intro-foot { margin-top: 14px; }
+.hm-intro .qk-more { color: var(--volt); border-color: var(--volt); }
+.hm-intro .qk-more:hover { color: #fff; border-color: #fff; }
+.hm-sportnav { display: flex; flex-wrap: wrap; gap: 2px; margin: 18px -24px 0; padding: 0; background: var(--bg); border-top: 2px solid var(--bg); }
+.hm-sn { --sa: var(--accent); flex: 1 1 0; min-width: 120px; display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--block-2); color: #fff; border-bottom: 4px solid var(--sa); font: 800 15px/1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.05em; transition: background var(--t-fast); }
+.hm-sn:hover { background: #1a1e27; color: var(--volt); }
+.hm-sn-ic { width: 26px; height: 26px; display: grid; place-items: center; color: var(--sa); flex: none; }
+.hm-sn-ic svg { width: 18px; height: 18px; }
+.hm-sn-live { margin-left: auto; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--live); animation: qk-pulse 1.4s infinite; }
+
+/* ── today: the game of the day beside the week's top lines */
+.hm-today-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 24px; align-items: start; }
+.hm-feature { min-width: 0; }
+.hm-feature > .qk-explain { margin-top: 0; }
+.hm-also { display: grid; gap: 2px; margin-top: 2px; }
+.hm-also-k { font: 700 var(--fs-2xs)/1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-3); padding: 12px 0 6px; }
+.hm-also a { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; padding: 10px 14px; background: var(--s-1); color: var(--ink-1); border-left: 4px solid var(--card-rule); }
+.hm-also a:hover { border-left-color: var(--volt); }
+.hm-also b { font: 800 15px/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.03em; }
+.hm-also span { font: 600 13px/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); }
+
+/* an F1 race or a title race in the feature slot */
+.hm-event { padding: 16px 18px 18px; color: var(--ink-1); gap: 12px; }
+.hm-event-top { display: flex; flex-wrap: wrap; gap: 6px; }
+.hm-event-name { font: 400 clamp(2rem, 3vw, 2.75rem)/1 var(--font-display); text-transform: uppercase; }
+.hm-event .qk-caption { margin: 0; }
+
+/* the top lines */
+.hm-tls { display: grid; gap: 2px; min-width: 0; }
+.hm-tl { --sa: var(--accent); display: block; background: var(--s-1); border-top: 5px solid var(--card-rule); padding: 14px 16px 15px; color: var(--ink-1); min-width: 0; transition: border-color var(--t-fast); }
+a.hm-tl:hover { border-top-color: var(--volt); color: var(--ink-1); }
+.hm-tl-k { display: inline-block; background: var(--block); color: var(--volt); font: 700 var(--fs-2xs)/1 var(--font-cond); letter-spacing: 0.1em; text-transform: uppercase; padding: 6px 14px 6px 8px; clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%); }
+.hm-tl-row { display: flex; align-items: flex-end; gap: 14px; margin-top: 10px; }
+.hm-tl-num { font: 400 3rem/0.85 var(--font-display); color: var(--volt); flex: none; text-align: left; }
+.hm-tl-num small { font-size: 0.45em; margin-left: 4px; color: var(--ink-2); }
+.hm-tl-head { font: 800 17px/1.15 var(--font-cond); text-transform: uppercase; letter-spacing: 0.03em; min-width: 0; padding-bottom: 2px; }
+.hm-tl-text { margin: 10px 0 0; font: 500 14px/1.45 var(--font-ui); color: var(--ink-2); }
+.hm-tl-text b { color: var(--ink-1); }
+.hm-tl-by { display: block; margin-top: 6px; font: 600 13px/1.35 var(--font-cond); text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-3); }
+
+/* ── around the sports: one line each (pick your sport) */
+.hm-around { display: grid; gap: 2px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.hm-ar { --sa: var(--accent); display: flex; flex-direction: column; gap: 10px; padding: 14px 16px 16px; background: var(--block); color: #fff; border-top: 4px solid var(--sa); min-width: 0; }
+.hm-ar a { color: #fff; }
+.hm-ar-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.hm-ar-top:hover .hm-ar-name { color: var(--volt); }
+.hm-ar-ic { width: 32px; height: 32px; display: grid; place-items: center; background: color-mix(in srgb, var(--sa) 18%, transparent); color: var(--sa); flex: none; }
+.hm-ar-ic svg { width: 18px; height: 18px; }
+.hm-ar-name { font: 400 1.75rem/0.9 var(--font-display); text-transform: uppercase; }
+.hm-ar-site { flex-basis: 100%; font: 700 var(--fs-2xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; color: var(--block-ink-3); }
+.hm-ar-stage { margin: 0; font: 500 14px/1.4 var(--font-ui); color: var(--block-ink-2); }
+.hm-ar-stale { color: var(--block-ink-3); }
+.hm-ar-next, .hm-ar-hot { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; align-items: baseline; padding-top: 10px; border-top: 1px solid var(--card-rule); }
+.hm-ar-next .k, .hm-ar-hot .k { grid-row: span 2; font: 700 11px/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.08em; color: var(--volt); width: 40px; }
+.hm-ar-next b, .hm-ar-hot b { font: 800 15px/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.03em; overflow-wrap: anywhere; }
+.hm-ar-next .w, .hm-ar-hot .w { font: 600 13px/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.05em; color: var(--block-ink-3); text-align: left; }
+.hm-ar-next:hover b, .hm-ar-hot:hover b { color: var(--volt); }
+.hm-ar-hot { margin-top: auto; }
+.hm-ar-next + .hm-ar-hot { margin-top: 0; }
 
 /* "We say it" beside "Who's for real?" */
 .hm-sure > div { min-width: 0; }
@@ -13,23 +80,6 @@
 .hm-race-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
 .hm-race .qk-select { height: 34px; }
 
-/* sport tiles: black blocks, the sport's colour on the icon only */
-.hm-tiles { display: grid; gap: 2px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
-.hm-tile { --sa: var(--accent); position: relative; display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; background: var(--block); color: #fff; min-height: 172px; border-top: 4px solid var(--sa); transition: background var(--t-fast); }
-.hm-tile:hover { background: #0e1015; color: #fff; }
-.hm-tile:hover .hm-tile-name { color: var(--volt); }
-.hm-tile-top { display: flex; align-items: center; gap: 12px; }
-.hm-tile-ic { width: 40px; height: 40px; display: grid; place-items: center; background: color-mix(in srgb, var(--sa) 18%, transparent); color: var(--sa); flex: none; }
-.hm-tile-ic svg { width: 20px; height: 20px; }
-.hm-tile-name { font: 400 2rem/0.9 var(--font-display); text-transform: uppercase; }
-.hm-tile-site { font: 700 var(--fs-2xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; color: var(--block-ink-3); margin-top: 2px; }
-.hm-tile-status { font-size: var(--fs-sm); color: var(--block-ink-2); display: flex; gap: 8px; align-items: center; min-height: 22px; }
-.hm-tile-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--card-rule); }
-.hm-tile-kpis div { min-width: 0; }
-.hm-tile-kpis .l { font: 700 var(--fs-2xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; color: var(--block-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hm-tile-kpis .v { font: 400 1.5rem/1 var(--font-display); text-transform: uppercase; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hm-tile-kpis .s { font-size: var(--fs-2xs); color: var(--block-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
 /* every game */
 .hm-games .qk-gc { animation: qk-rise var(--t-slow) var(--ease) both; }
 .hm-more { display: flex; justify-content: center; margin-top: 18px; }
@@ -41,15 +91,32 @@
 .hm-series-row { display: grid; gap: 10px; padding: 14px 16px; background: var(--s-2); }
 .hm-series-teams { display: flex; justify-content: space-between; align-items: center; gap: 10px; font: 700 16px/1.1 var(--font-cond); text-transform: uppercase; }
 .hm-series-teams .w { font: 400 2.25rem/1 var(--font-display); font-variant-numeric: tabular-nums; }
+
+/* how it works */
+.hm-method { display: grid; gap: 2px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 2px; }
+.hm-method a { --sa: var(--accent); display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--s-1); color: var(--ink-1); border-left: 4px solid var(--sa); font: 700 14px/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.04em; min-width: 0; }
+.hm-method a:hover { color: var(--volt); }
+.hm-method span { color: var(--sa); display: grid; flex: none; }
+.hm-method svg { width: 18px; height: 18px; }
 .hm-updated { text-align: center; margin-top: var(--sp-12); color: var(--ink-3); }
 
+@media (max-width: 1100px) {
+  .hm-around, .hm-method { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 1000px) {
+  .hm-today-grid { grid-template-columns: minmax(0, 1fr); }
+}
 @media (max-width: 600px) {
-  .hm-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .hm-tile { min-height: 0; padding: 14px; gap: 8px; }
-  .hm-tile-kpis, .hm-tile-site { display: none; }
-  .hm-tile-top { flex-direction: column; align-items: flex-start; gap: 8px; }
-  .hm-tile-name { font-size: 1.625rem; }
-  .hm-tile-status { font-size: var(--fs-2xs); }
-  .hm-tile-status .qk-truncate { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .hm-intro { padding: 18px 16px 0; }
+  .hm-pillars { grid-template-columns: minmax(0, 1fr); margin-top: 14px; }
+  .hm-pillars li { padding: 9px 12px 10px; }
+  .hm-pillars span { font-size: 13px; }
+  .hm-ar { padding: 12px 14px 14px; gap: 8px; }
+  .hm-ar-site { display: none; }
+  .hm-ar-next, .hm-ar-hot { padding-top: 8px; }
+  .hm-sportnav { margin: 16px -16px 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hm-sn { min-width: 0; padding: 11px 12px; font-size: 14px; }
+  .hm-around, .hm-method { grid-template-columns: minmax(0, 1fr); }
+  .hm-tl-num { font-size: 2.5rem; }
   .hm-race { padding: 14px 14px 16px; }
 }

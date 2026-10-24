@@ -130,3 +130,57 @@ def test_light_season_skipped_when_unchanged(synth):
     assert p.stat().st_mtime_ns == before
     assert bg.main(_args(synth, "--game-page-seasons", "1", "--no-careers", "--force")) == 0
     assert p.stat().st_mtime_ns != before
+
+
+def test_index_digest_this_week(synth, tmp_path):
+    """index.json "digest": on a build, the stage; from frozen pre-game prices, the week's record (a tie has no
+    result), upset and team of the week; the chance log carried forward one snapshot a day and the movers against
+    the snapshot a week old; the playoff round once the postseason is on."""
+    from datetime import date
+    mod = _load_build()
+    assert mod.main(_args(synth)) == 0
+    idx = json.loads((synth["data"] / "index.json").read_text(encoding="utf-8"))
+    assert "stage" in idx["digest"] and "featured" in idx["digest"]
+
+    def card(i, day, h, a, hs, as_, p, wk=6, gtype="REG"):
+        return {"game_id": f"2026_{wk:02d}_{a}_{h}_{i}", "week": wk, "gtype": gtype, "kickoff": f"2026-10-{day:02d}T17:00:00Z", "status": "final",
+                "home": h, "away": a, "hs": hs, "as": as_, "model": {"p_home": p, "source": "frozen"}}
+    cards = [card(1, 18, "KC", "LV", 31, 10, 0.78), card(2, 18, "BUF", "MIA", 17, 20, 0.70), card(3, 16, "SF", "LA", 24, 21, 0.58),
+             card(4, 15, "DAL", "NYG", 20, 20, 0.60), card(5, 1, "DET", "CHI", 6, 30, 0.85, wk=4)]
+    b = mod.Build(tmp_path / "d")
+    (tmp_path / "d").mkdir()
+    an.write_json(tmp_path / "d" / "chance_log.json", {"2026": {"p_playoffs": {"2026-10-12": {"KC": 0.70, "BUF": 0.90, "MIA": 0.20}}}})
+    odds = {"KC": {"p_playoffs": 0.85, "p_sb": 0.15}, "BUF": {"p_playoffs": 0.75, "p_sb": 0.12}, "MIA": {"p_playoffs": 0.30, "p_sb": 0.01}}
+    dig = mod.digest_payload(b, cards, odds, "regular", 6, 2026, date(2026, 10, 19))
+    r = dig["record"]
+    assert (r["n"], r["won"], r["upsets"], r["draws"]) == (3, 2, 1, 0) and "by" not in r    # the DAL tie is left out
+    assert dig["upset"]["winner"] == "MIA" and dig["upset"]["p"] == 0.3                       # game 5 is weeks old
+    assert dig["hot"]["key"] == "KC" and dig["hot"]["margin"] == 21.0
+    mv = dig["movers"]
+    assert mv["metric"] == "p_playoffs" and mv["since"] == "2026-10-12" and mv["up"][0]["key"] == "KC" and mv["down"][0]["key"] == "BUF"
+    log = json.loads((tmp_path / "d" / "chance_log.json").read_text(encoding="utf-8"))["2026"]
+    assert sorted(log["p_playoffs"]) == ["2026-10-12", "2026-10-19"] and log["p_sb"]["2026-10-19"]["KC"] == 0.15
+    st = dig["stage"]
+    assert (st["week"], st["weeks"], st["played"], st["total"]) == (6, 6, 5, 5) and "round" not in st
+    post = cards + [dict(card(9, 20, "KC", "BUF", None, None, 0.55, wk=20, gtype="DIV"), status="scheduled")]
+    st = mod.digest_payload(b, post, odds, "playoffs", 20, 2026, date(2026, 10, 19))["stage"]
+    assert st["round"] == "DIV" and st["round_name"] == "Divisional round"
+
+
+def test_featured_prefers_the_big_game_over_the_closest(synth):
+    """digest.featured (the shared significance rule): two Super Bowl contenders at 16:25 New York and Bears v Packers
+    with both near the playoff line lead; a dead coin flip between two teams out of the race at 05:00 UTC (01:00 New
+    York) is left out."""
+    from datetime import datetime, timezone
+    mod = _load_build()
+    now = datetime(2026, 10, 18, 12, 0, tzinfo=timezone.utc)
+    pre = lambda i, ko, h, a, p: {"game_id": i, "week": 7, "gtype": "REG", "kickoff": ko, "status": "scheduled", "home": h, "away": a, "model": {"p_home": p}}
+    cards = [pre("1", "2026-10-19T05:00:00Z", "TEN", "CLE", 0.50), pre("2", "2026-10-18T20:25:00Z", "KC", "BUF", 0.60), pre("3", "2026-10-18T17:00:00Z", "GB", "CHI", 0.55)]
+    odds = {"TEN": {"p_playoffs": 0.02, "p_sb": 0.0}, "CLE": {"p_playoffs": 0.01, "p_sb": 0.0}, "KC": {"p_playoffs": 0.8, "p_sb": 0.2},
+            "BUF": {"p_playoffs": 0.75, "p_sb": 0.15}, "GB": {"p_playoffs": 0.5, "p_sb": 0.03}, "CHI": {"p_playoffs": 0.45, "p_sb": 0.02}}
+    names = {"GB": {"name": "Green Bay Packers"}, "CHI": {"name": "Chicago Bears"}}
+    f = mod.featured_payload(cards, odds, names, now)
+    ids = [r["id"] for r in f["today"]]
+    assert sorted(ids[:2]) == ["2", "3"] and ("1" not in ids or ids[-1] == "1")
+    why = {r["id"]: r["why"] for r in f["today"]}
+    assert "two title contenders" in why["2"] and "Bears v Packers" in why["3"]

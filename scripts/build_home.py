@@ -32,6 +32,19 @@ Matchday copy (kit v3, docs/_design/MIGRATION_V3.md), all added fields:
     stats[].title/note   a plain headline for the stat of the day and an "i" note on what the number means
                          for "How sure are we?", read from each site's calibration.json
 
+Top of the page (added fields; the significance rule is oddsmarkets/common/featured.py, the week's numbers
+oddsmarkets/common/digest.py, both shared with the sport overviews):
+    games[].weight       the game's significance score (upcoming and live games only): "N games. Our calls." ranks by it
+    featured             { today: [{ key: "<sport>:<id>", score, reasons }], week: { key, score, reasons } | null }:
+                         the game of the day, best first (the front end takes the first still upcoming or live at
+                         the viewer's clock), and the biggest occasion of the week as the fallback
+    digest               { record, upset, swing, record_sports, left_out }: our favourites over the past 7 days
+                         (only finished games with a chance published before the start), the week's biggest upset,
+                         and the biggest move in a title chance (football's title-chance history, F1's per-round
+                         title history where built)
+    sports[].topline     { stage, next: { title, start, href, league } }: one line per sport on where its season is
+                         and its most significant game or event in the next 7 days
+
 Sites not launched yet (PENDING, e.g. The Quant Campus) are left out of home.json and search.json unless their key
 is in LAUNCHED or --with-pending is given, so the live home page never links a Pages site that does not exist.
 The kit hides them the same way (QK.SPORTS drops `pending` entries outside local preview).
@@ -46,6 +59,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from oddsmarkets.common import digest as DG      # noqa: E402  the week's record, upset, swing (shared with overviews)
+from oddsmarkets.common import featured as FT    # noqa: E402  the significance rule: which game leads the page
+
 DOCS = ROOT / "docs"
 OUT = DOCS / "home"
 
@@ -265,6 +283,12 @@ def build_football(ctx: Ctx, base: str, out: dict):
         colour, alt = kit.get(t) or (None, None)
         return team(name, colour=colour, alt=alt, logo=crest(p), href=club_href(t, slug))
 
+    # our title chances per big league, for the significance score's stakes (a title chance in play)
+    title_p = {}
+    for slug in TITLE_LEAGUES:
+        pr = load(d / slug / "probs.json") or {}
+        title_p[slug] = {t.get("team"): t.get("p_title") for t in pr.get("teams") or [] if t.get("team")}
+
     seen, games = set(), []
     days = hub.get("days") or {}
     for day in sorted(days):
@@ -283,12 +307,19 @@ def build_football(ctx: Ctx, base: str, out: dict):
                      note=(str(m.get("round")).upper() if isinstance(m.get("round"), str) else
                            ("Round " + str(m["round"]) if m.get("round") else None)),
                      rank=pri.get(m["comp"], 99), comp=m["comp"])
+            rnd = m.get("round") if isinstance(m.get("round"), str) else None
+            stage = FT.stage_of({"sig": {"round": rnd}}) or ("knockout" if m.get("stage") == "playoff" else None)
+            tp = title_p.get(m["comp"])
+            g["sig"] = {"comp": m["comp"], "stage": stage,
+                        "title": [tp.get(m["home"]) or 0.0, tp.get(m["away"]) or 0.0] if tp else None,
+                        "rivalry": FT.RIVALRIES.get(frozenset((m["home"], m["away"])))}
             games.append(g)
     picked = pick_games(ctx, games, n_final=8, n_pre=14,
                         key=lambda g: (g.get("rank", 99), g["start"]))
-    for g in picked:
+    for g in games:
         g.pop("rank", None)
     out["games"].extend(picked)
+    out["pool"].extend(games)
 
     # Title races: our chance per big league (the market never reaches the home page, STYLE_GUIDE §3)
     titles = []
@@ -307,6 +338,13 @@ def build_football(ctx: Ctx, base: str, out: dict):
             rows.append(row)
         titles.append({"league": comp_names.get(slug, slug), "slug": slug, "rows": rows,
                        "href": base + "#/" + slug + "/probs"})
+        snaps = (load(d / slug / "history.json") or {}).get("snapshots") or []
+        for r in rows[:4]:
+            pts = [[sn.get("ts"), (sn.get("title") or {}).get(r["name"])] for sn in snaps
+                   if (sn.get("title") or {}).get(r["name"]) is not None]
+            if len(pts) > 1:
+                out["series"].append({"sport": "football", "name": r["name"], "league": comp_names.get(slug, slug),
+                                      "kind": "title", "points": pts, "href": base + "#/" + slug + "/probs"})
     out["charts"]["football_titles"] = titles
 
     favs = []
@@ -330,7 +368,10 @@ def build_football(ctx: Ctx, base: str, out: dict):
     today = iso(ctx.now)[:10]
     n_today = sum(1 for g in games if (g["start"] or "")[:10] == today)
     top = goals[0] if goals else None
+    n_comps = len({g["comp"] for g in games if (g["start"] or "")[:10] == today})
     sp = {"phase": "In season", "status": f"{n_today} matches today" + (f" · {n_live} live" if n_live else ""),
+          "stage": (f"{n_today} matches today in {n_comps} competitions" if n_today else
+                    f"{len(comps.get('competitions', []))} competitions followed"),
           "kpis": [{"label": "Comps", "value": len(comps.get("competitions", []))},
                    {"label": "Today", "value": n_today, "sub": "matches"},
                    {"label": "Top scorer", "value": surname(top["name"]) if top else "—",
@@ -404,12 +445,16 @@ def build_f1(ctx: Ctx, base: str, out: dict):
                            "p": r4(model.get(k)),
                            "href": base + "#/driver/" + k} for k in field]}
         sess = nx.get("sessions") or {}
-        out["games"].append(game("f1", "Formula 1", f"{nx.get('year')}-{nx.get('round')}",
-                                 sess.get("race") or nx.get("date"), "pre",
-                                 team(nx.get("name") or "Grand Prix"), team((nx.get("circuit") or {}).get("name") or ""),
-                                 href=race["href"], note=f"Round {nx.get('round')}", event=True,
-                                 fav=race["field"][0]["name"] if race["field"] else None,
-                                 fav_p=race["field"][0]["p"] if race["field"] else None))
+        gp = game("f1", "Formula 1", f"{nx.get('year')}-{nx.get('round')}",
+                  sess.get("race") or nx.get("date"), "pre",
+                  team(nx.get("name") or "Grand Prix"), team((nx.get("circuit") or {}).get("name") or ""),
+                  href=race["href"], note=f"Round {nx.get('round')}", event=True,
+                  fav=race["field"][0]["name"] if race["field"] else None,
+                  fav_p=race["field"][0]["p"] if race["field"] else None)
+        n_rounds = ((idx.get("seasons_meta") or {}).get(str(year)) or {}).get("rounds")
+        gp["sig"] = {"stage": "final" if n_rounds and nx.get("round") == n_rounds else None}
+        out["games"].append(gp)
+        out["pool"].append(gp)
     out["charts"]["f1_next_race"] = race
 
     prog = season.get("progression") or {}
@@ -430,6 +475,14 @@ def build_f1(ctx: Ctx, base: str, out: dict):
 
     champ = (season.get("championship") or {}).get("drivers") or {}
     title = sorted(champ.items(), key=lambda kv: -(kv[1].get("p_title") or 0))[:6]
+    # the drivers' title chance after each round (season.json title_history, where the build has written it)
+    hist = [h for h in season.get("title_history") or [] if isinstance(h, dict) and h.get("as_of")]
+    for k, _v in title[:4]:
+        pts = [[h["as_of"], ((h.get("drivers") or {}).get(k) or {}).get("p_title")] for h in hist
+               if ((h.get("drivers") or {}).get(k) or {}).get("p_title") is not None]
+        if len(pts) > 1:
+            out["series"].append({"sport": "f1", "name": dname(k), "league": "F1 drivers' title", "kind": "title",
+                                  "points": pts, "href": base + "#/season/" + str(year)})
     out["futures"]["f1"] = {"title": "Drivers' title", "rows": [
         {"name": dname(k), "p": r4(v.get("p_title")),
          "colour": dcol(k), "href": base + "#/driver/" + k} for k, v in title]}
@@ -439,6 +492,8 @@ def build_f1(ctx: Ctx, base: str, out: dict):
     second = st[1] if len(st) > 1 else None
     meta = (idx.get("seasons_meta") or {}).get(str(year)) or {}
     sp = {"phase": f"Round {meta.get('completed', '?')} of {meta.get('rounds', '?')}",
+          "stage": (f"{meta.get('completed')} of {meta.get('rounds')} rounds run" if meta.get("rounds") else None)
+          if meta.get("completed") != meta.get("rounds") else "Season complete",
           "status": (f"Next: {nx.get('name')} · {nice_date(nx.get('date'))}" if nx else "Season complete"),
           "kpis": [{"label": "Leader", "value": surname(dname(leader["driver"])) if leader else "—",
                     "sub": f"{leader['points']:.0f} pts" if leader else None},
@@ -474,17 +529,24 @@ def build_f1(ctx: Ctx, base: str, out: dict):
     return sp
 
 
+PHASE_WORD = {"pre": "preseason", "preseason": "preseason", "regular": "regular season", "reg": "regular season",
+              "post": "playoffs", "playoffs": "playoffs", "postseason": "postseason", "off": "offseason",
+              "offseason": "offseason"}
+
+
 # ───────────────────────────────────────────────────────────── basketball
 def build_basketball(ctx: Ctx, base: str, out: dict):
     d = DOCS / "hardwood" / "data"
     idx = load(d / "index.json")
     if not idx:
         raise RuntimeError("index.json missing")
-    sp_status, kpis = [], []
+    sp_status, kpis, stages = [], [], []
     futures = {}
     for L, lg in (idx.get("leagues") or {}).items():
         teams = lg.get("teams") or {}
         LU = L.upper()
+        season = load(d / L / str(lg.get("current_season")) / "season.json") or {}
+        sim = (season.get("sim") or {}).get("teams") or {}
 
         def tm(tid):
             t = teams.get(str(tid)) or {}
@@ -499,14 +561,22 @@ def build_basketball(ctx: Ctx, base: str, out: dict):
             m = g.get("model") or {}
             ser = g.get("series") or {}
             note = ser.get("round") and (ser["round"] + (f" · G{ser['game']}" if ser.get("game") else ""))
-            games.append(game("basketball", LU, g["id"], g["date"], g["status"], tm(g["home"]), tm(g["away"]),
-                              g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
-                              total=m.get("total"), clock=g.get("clock"),
-                              period=g.get("period"), wp_home=r4(g.get("wp_home")), note=note,
-                              href=base + "#/" + L + "/game/" + str(g["id"])))
+            x = game("basketball", LU, g["id"], g["date"], g["status"], tm(g["home"]), tm(g["away"]),
+                     g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
+                     total=m.get("total"), clock=g.get("clock"),
+                     period=g.get("period"), wp_home=r4(g.get("wp_home")), note=note,
+                     href=base + "#/" + L + "/game/" + str(g["id"]))
+            rnd = str(ser.get("round") or "")
+            x["sig"] = {"preseason": g.get("stype") == "pre",
+                        "stage": "final" if "Finals" in rnd and "Conference" not in rnd else
+                                 "semi" if "Conference Finals" in rnd or "Semifinal" in rnd else
+                                 "playoff" if g.get("stype") == "post" else None,
+                        "series": {"game": ser.get("game"), "best_of": 7 if L == "nba" else 5} if ser.get("game") else None,
+                        "title": [(sim.get(str(g["home"])) or {}).get("p_title"),
+                                  (sim.get(str(g["away"])) or {}).get("p_title")] if sim else None}
+            games.append(x)
         out["games"].extend(pick_games(ctx, games, 4, 6))
-        season = load(d / L / str(lg.get("current_season")) / "season.json") or {}
-        sim = (season.get("sim") or {}).get("teams") or {}
+        out["pool"].extend(games)
         rows = sorted(sim.items(), key=lambda kv: -(kv[1].get("p_title") or 0))
         rows = [(k, v) for k, v in rows if (v.get("p_title") or 0) > 0][:8]
         if rows:
@@ -515,6 +585,10 @@ def build_basketball(ctx: Ctx, base: str, out: dict):
                  "p": r4(v.get("p_title")), "colour": (teams.get(k) or {}).get("colour"),
                  "href": base + "#/" + L + "/team/" + k} for k, v in rows]}
         sp_status.append(f"{LU} {lg.get('phase')}")
+        live_rnd = next((str((g.get("series") or {}).get("round")) for g in (lg.get("today") or []) + (lg.get("next_games") or [])
+                         if (g.get("series") or {}).get("round")), None)
+        ph = str(lg.get("phase") or "")
+        stages.append(live_rnd if live_rnd and live_rnd.startswith(LU) else LU + " " + (live_rnd or PHASE_WORD.get(ph, ph)))
         if rows:
             k0 = rows[0][0]
             kpis.append({"label": f"{LU} fav", "value": (teams.get(k0) or {}).get("short") or k0,
@@ -533,16 +607,19 @@ def build_basketball(ctx: Ctx, base: str, out: dict):
         if len(futures_ordered) > 1:
             out["futures"]["basketball_2"] = futures_ordered[1]
     return {"phase": " · ".join(sp_status), "status": " · ".join(sp_status), "kpis": kpis[:3],
-            "updated_at": idx.get("updated_at")}
+            "stage": " · ".join(stages), "updated_at": idx.get("updated_at")}
 
 
 # ───────────────────────────────────────────────────────────── tennis
+TENNIS_LEVEL = {"slam": "Grand Slam", "finals": "Tour Finals", "m1000": "1000", "500": "500", "250": "250"}
+
+
 def build_tennis(ctx: Ctx, base: str, out: dict):
     d = DOCS / "ace" / "data"
     idx = load(d / "index.json")
     if not idx:
         raise RuntimeError("index.json missing")
-    kpis, status = [], []
+    kpis, status, stages = [], [], []
     for T, tour in (idx.get("tours") or {}).items():
         TU = T.upper()
         names = tour.get("names") or {}
@@ -570,8 +647,15 @@ def build_tennis(ctx: Ctx, base: str, out: dict):
                      sets=[[s[0], s[1]] for s in sets if s[0] is not None] if sets else None,
                      note=m.get("round"), href=base + "#/" + T + "/match/" + str(m["id"]), players=True,
                      tba=True if (m.get("tba") or (start and len(start) == 10)) else None)   # date-only start
+            # the event's level (slam, finals, m1000, 500, 250, other) where the index lists the event; an event it
+            # does not list scores at the default (a minor event)
+            g["sig"] = {"comp": e.get("level") or ("challenger" if "challenger" in str(m.get("event") or "") else None),
+                        "round": m.get("round")}
+            if g.get("tba"):
+                g["sig"]["comp"] = g["sig"]["comp"] or "other"
             games.append(g)
         out["games"].extend(pick_games(ctx, games, 3, 5))
+        out["pool"].extend(games)
         elo = (tour.get("elo_top") or {}).get("all") or []
         out["leaders"]["tennis_" + T] = {"title": f"{TU} Elo", "unit": "Elo", "rows": [
             {"name": names.get(p[0]) or p[0], "value": round(p[1]), "href": base + "#/" + T + "/player/" + p[0]}
@@ -583,12 +667,14 @@ def build_tennis(ctx: Ctx, base: str, out: dict):
                          "sub": f"{elo[0][1]:.0f}"})
         for e in tour.get("events_now") or []:
             status.append(e.get("name"))
+            lv = TENNIS_LEVEL.get(str(e.get("level")))
+            stages.append(f"{TU}: {e.get('name')}" + (f" ({lv})" if lv else ""))
         for pid, nm in names.items():
             out["search"].append(["tennis", nm, f"{TU} player", base + "#/" + T + "/player/" + pid])
     if len(kpis) < 3:
         kpis.append({"label": "Events", "value": len(status), "sub": "in play"})
     return {"phase": "In season", "status": " · ".join(status) or "Between events", "kpis": kpis,
-            "updated_at": idx.get("updated_at")}
+            "stage": " · ".join(stages) or "Between events", "updated_at": idx.get("updated_at")}
 
 
 # ───────────────────────────────────────────────────────────── baseball
@@ -605,6 +691,9 @@ def build_baseball(ctx: Ctx, base: str, out: dict):
         return team(t.get("short") or t.get("name") or str(tid), t.get("abbr"), t.get("colour"),
                     href=base + "#/mlb/team/" + str(tid), full=t.get("name"), alt=t.get("alt"))
 
+    ps = idx.get("postseason") or {}
+    p_ws = {k: v.get("p_ws") for k, v in (ps.get("teams") or {}).items()}
+    open_series = {frozenset(map(str, s.get("teams") or [])): s for s in ps.get("series") or [] if not s.get("done")}
     seen, games = set(), []
     for g in (idx.get("today") or []) + (idx.get("recent") or []) + (idx.get("upcoming") or []):
         if g["gpk"] in seen:
@@ -614,12 +703,23 @@ def build_baseball(ctx: Ctx, base: str, out: dict):
         ser = g.get("series") or {}
         note = ser.get("desc") and (ser["desc"].replace("Championship Series", "CS").replace("Division Series", "DS")
                                     + (f" · G{ser['game']}" if ser.get("game") else ""))
-        games.append(game("baseball", "MLB", g["gpk"], g.get("start"), g.get("status"), tm(g["home"]), tm(g["away"]),
-                          g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
-                          total=m.get("total"), period=g.get("inning"), wp_home=r4(g.get("wp_home")), note=note,
-                          href=base + "#/mlb/game/" + str(g["gpk"])))
+        x = game("baseball", "MLB", g["gpk"], g.get("start"), g.get("status"), tm(g["home"]), tm(g["away"]),
+                 g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
+                 total=m.get("total"), period=g.get("inning"), wp_home=r4(g.get("wp_home")), note=note,
+                 href=base + "#/mlb/game/" + str(g["gpk"]))
+        os_ = open_series.get(frozenset((str(g["home"]), str(g["away"])))) or {}
+        wins = os_.get("wins")
+        if wins and os_.get("teams") and str(os_["teams"][0]) != str(g["home"]):
+            wins = [wins[1], wins[0]]                       # as [home, away]
+        x["sig"] = {"preseason": g.get("gtype") in ("S", "E"),
+                    "series": {"game": ser.get("game"), "best_of": ser.get("of") or 7, "name": ser.get("desc"),
+                               "wins": wins if g.get("status") != "final" else None} if ser.get("desc") else None,
+                    "stage": "final" if g.get("gtype") == "W" else "semi" if g.get("gtype") == "L" else
+                             "playoff" if g.get("gtype") in ("F", "D") else None,
+                    "title": [p_ws.get(str(g["home"])), p_ws.get(str(g["away"]))] if p_ws else None}
+        games.append(x)
     out["games"].extend(pick_games(ctx, games, 3, 4))
-    ps = idx.get("postseason") or {}
+    out["pool"].extend(games)
     pteams = ps.get("teams") or {}
     rows = sorted(pteams.items(), key=lambda kv: -(kv[1].get("p_ws") or 0))
     rows = [(k, v) for k, v in rows if (v.get("p_ws") or 0) > 0]
@@ -668,11 +768,16 @@ def build_baseball(ctx: Ctx, base: str, out: dict):
                              "text": f"The {(teams.get(k0) or {}).get('name')} are the model's World Series "
                                      f"favourite after 20,000 simulations of the bracket.",
                              "href": base + "#/postseason"})
+    in_play = sorted({s["round"] for s in series if s.get("round")})
     return {"phase": (idx.get("phase") or "").capitalize(), "status": (nxt["round"] if nxt else idx.get("phase")),
+            "stage": ("Postseason: " + ", ".join(in_play)) if in_play else PHASE_WORD.get(str(idx.get("phase")), str(idx.get("phase") or "")).capitalize(),
             "kpis": kp, "updated_at": idx.get("updated_at")}
 
 
 # ───────────────────────────────────────────────────────────── NFL
+NFL_ROUND = {"WC": "Wild Card", "DIV": "Divisional round", "CON": "Conference championship", "SB": "Super Bowl"}
+
+
 def build_nfl(ctx: Ctx, base: str, out: dict):
     d = DOCS / "gridiron" / "data"
     idx = load(d / "index.json")
@@ -686,19 +791,27 @@ def build_nfl(ctx: Ctx, base: str, out: dict):
         return team(nickname(t.get("name")) if t.get("name") else a, a, t.get("colour"),
                     href=base + "#/team/" + a, full=t.get("name"), alt=t.get("alt"))
 
+    po = idx.get("playoff_odds") or {}
     seen, games = set(), []
     for g in (idx.get("live") or []) + (idx.get("games") or []) + (idx.get("recent") or []):
         if g["game_id"] in seen:
             continue
         seen.add(g["game_id"])
         m = g.get("model") or {}
-        games.append(game("nfl", "NFL", g["game_id"], g["kickoff"], g["status"], tm(g["home"]), tm(g["away"]),
-                          g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
-                          model_spread=m.get("spread"),
-                          period=g.get("qtr"), clock=g.get("clock"), wp_home=r4(g.get("wp_home")),
-                          note=f"Week {g.get('week')}", href=base + "#/game/" + g["game_id"]))
+        gt = g.get("gtype") or "REG"
+        x = game("nfl", "NFL", g["game_id"], g["kickoff"], g["status"], tm(g["home"]), tm(g["away"]),
+                 g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
+                 model_spread=m.get("spread"),
+                 period=g.get("qtr"), clock=g.get("clock"), wp_home=r4(g.get("wp_home")),
+                 note=NFL_ROUND.get(gt) or f"Week {g.get('week')}", href=base + "#/game/" + g["game_id"])
+        ho, ao = po.get(g["home"]) or {}, po.get(g["away"]) or {}
+        x["sig"] = {"preseason": gt == "PRE",
+                    "stage": {"SB": "final", "CON": "semi", "DIV": "quarter", "WC": "playoff"}.get(gt),
+                    "title": [ho.get("p_sb"), ao.get("p_sb")] if po and gt == "REG" else None,
+                    "playoff": [ho.get("p_playoffs"), ao.get("p_playoffs")] if po and gt == "REG" else None}
+        games.append(x)
     out["games"].extend(pick_games(ctx, games, 4, 10))
-    po = idx.get("playoff_odds") or {}
+    out["pool"].extend(games)
     rows = sorted(po.items(), key=lambda kv: -(kv[1].get("p_sb") or 0))[:8]
     out["futures"]["nfl"] = {"title": "Super Bowl", "rows": [
         {"name": (teams.get(k) or {}).get("name", k), "abbr": k, "p": r4(v.get("p_sb")),
@@ -740,7 +853,10 @@ def build_nfl(ctx: Ctx, base: str, out: dict):
                                      f"per game against an average team since week {h[0][0]}.",
                              "href": base + "#/team/" + ab})
     k0 = rows[0] if rows else None
+    ph = str(idx.get("phase") or "regular")
     return {"phase": f"Week {idx.get('week')}", "status": f"{idx.get('season')} regular season · week {idx.get('week')}",
+            "stage": (f"Week {idx.get('week')} of the regular season" if ph.lower().startswith("reg")
+                      else PHASE_WORD.get(ph, ph).capitalize()),
             "kpis": [{"label": "SB fav", "value": (teams.get(k0[0]) or {}).get("name", "—").split(" ")[-1] if k0 else "—",
                       "sub": f"{k0[1]['p_sb'] * 100:.0f}%" if k0 else None},
                      {"label": "Games", "value": len([g for g in idx.get("games") or []]), "sub": "this week"},
@@ -762,19 +878,31 @@ def build_hockey(ctx: Ctx, base: str, out: dict):
         return team(nickname(t.get("name")) if t.get("name") else a, a, t.get("colour"),
                     href=base + "#/team/" + a, full=t.get("name"), alt=t.get("alt"))
 
+    po = idx.get("playoff_odds") or {}
     seen, games = set(), []
     for g in (idx.get("live") or []) + (idx.get("today") or []) + (idx.get("recent") or []) + (idx.get("upcoming") or []):
         if g["game_id"] in seen:
             continue
         seen.add(g["game_id"])
         m = g.get("model") or {}
-        games.append(game("hockey", "NHL", g["game_id"], g.get("start"), g.get("status"), tm(g["home"]), tm(g["away"]),
-                          g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
-                          total=m.get("total"), period=g.get("period"), clock=g.get("clock"),
-                          wp_home=r4(g.get("wp_home")), xg=[(g.get("xg") or {}).get("home"), (g.get("xg") or {}).get("away")] if g.get("xg") else None,
-                          note=("OT" if g.get("ot") else None), href=base + "#/game/" + g["game_id"]))
+        x = game("hockey", "NHL", g["game_id"], g.get("start"), g.get("status"), tm(g["home"]), tm(g["away"]),
+                 g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
+                 total=m.get("total"), period=g.get("period"), clock=g.get("clock"),
+                 wp_home=r4(g.get("wp_home")), xg=[(g.get("xg") or {}).get("home"), (g.get("xg") or {}).get("away")] if g.get("xg") else None,
+                 note=("OT" if g.get("ot") else None), href=base + "#/game/" + g["game_id"])
+        ser = g.get("series") if isinstance(g.get("series"), dict) else {}
+        ho, ao = po.get(g["home"]) or {}, po.get(g["away"]) or {}
+        gtype = g.get("type") or "REG"
+        reg = gtype == "REG"
+        x["sig"] = {"preseason": gtype in ("PR", "PRE"),
+                    "stage": None if reg or gtype in ("PR", "PRE") else "playoff",
+                    "series": {"game": ser.get("game"), "best_of": 7, "wins": ser.get("wins"),
+                               "name": ser.get("round") or ser.get("name")} if ser.get("game") else None,
+                    "title": [ho.get("p_cup"), ao.get("p_cup")] if po and reg else None,
+                    "playoff": [ho.get("p_playoffs"), ao.get("p_playoffs")] if po and reg else None}
+        games.append(x)
     out["games"].extend(pick_games(ctx, games, 5, 8))
-    po = idx.get("playoff_odds") or {}
+    out["pool"].extend(games)
     rows = sorted(po.items(), key=lambda kv: -(kv[1].get("p_cup") or 0))[:8]
     out["futures"]["hockey"] = {"title": "Stanley Cup", "rows": [
         {"name": (teams.get(k) or {}).get("name", k), "abbr": k, "p": r4(v.get("p_cup")),
@@ -815,7 +943,10 @@ def build_hockey(ctx: Ctx, base: str, out: dict):
         out["search"].append(["hockey", t.get("name"), "NHL team · " + (t.get("division") or ""), base + "#/team/" + k])
     k0 = rows[0] if rows else None
     top = srows[0] if srows else None
+    ph = str(idx.get("phase") or "regular")
     return {"phase": (idx.get("phase") or "").capitalize(),
+            "stage": (("Regular season" + (f", {gp_max} games in" if gp_max else "")) if ph.lower().startswith("reg")
+                      else PHASE_WORD.get(ph, ph).capitalize()),
             "status": f"{sum(1 for g in games if g['status'] == 'live' and in_window(ctx, g))} live · "
                       f"{len(idx.get('upcoming') or [])} upcoming",
             "kpis": [{"label": "Cup fav", "value": (teams.get(k0[0]) or {}).get("name", "—").split(" ")[-1] if k0 else "—",
@@ -841,7 +972,7 @@ def build_college(ctx: Ctx, base: str, out: dict):
     idx = load(d / "index.json")
     if not idx or not idx.get("levels"):
         raise RuntimeError("index.json missing")
-    status, kpis = [], []
+    status, kpis, stages = [], [], []
     phase_lab = {"preseason": "preseason", "regular": "regular season", "conf_champ": "championship week",
                  "bowls": "bowls", "playoff": "playoff", "offseason": "offseason", "conf_tourneys": "conference tournaments",
                  "ncaa": "NCAA tournament"}
@@ -859,6 +990,7 @@ def build_college(ctx: Ctx, base: str, out: dict):
             return team((f"#{rank} " if rank and rank <= 25 else "") + nm, t.get("abbr"), t.get("colour"),
                         href=base + "#/" + L + "/team/" + str(tid), full=t.get("name"), alt=t.get("alt") or t.get("alt_colour"))
 
+        tp = {r.get("team"): r.get("p") for r in lg.get("title_odds") or [] if r.get("team")}
         seen, games = set(), []
         for g in (lg.get("today") or []) + (lg.get("next_games") or []) + (lg.get("last_games") or []):
             if g.get("id") in seen or (g.get("tba") and norm_status(g.get("status")) == "pre"):
@@ -867,11 +999,26 @@ def build_college(ctx: Ctx, base: str, out: dict):
             m = g.get("model") or {}
             note = g.get("round") if g.get("stype") in ("cfp", "ncaa", "bowl") else None
             href = base + "#/" + L + "/game/" + str(g["id"]) + ("" if g.get("season") in (None, S) else f"?season={g['season']}")
-            games.append(game("college", LU, g["id"], g.get("date"), g.get("status"), tm(g["home"], g.get("hr")),
-                              tm(g["away"], g.get("ar")), g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
-                              total=m.get("total"),
-                              note=note, href=href))
+            x = game("college", LU, g["id"], g.get("date"), g.get("status"), tm(g["home"], g.get("hr")),
+                     tm(g["away"], g.get("ar")), g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
+                     total=m.get("total"),
+                     note=note, href=href)
+            rnd = str(g.get("round") or "")
+            stage = None
+            if re.search(r"National Championship|Championship Game|^Final\b", rnd):
+                stage = "final"
+            elif re.search(r"Semifinal|Final Four", rnd):
+                stage = "semi"
+            elif g.get("stype") in ("cfp", "ncaa"):
+                stage = "playoff"
+            elif g.get("stype") == "bowl":
+                stage = "knockout"
+            x["sig"] = {"comp": LU, "preseason": g.get("stype") == "pre", "stage": stage,
+                        "ranks": [g.get("hr"), g.get("ar")],
+                        "title": [tp.get(str(g["home"])), tp.get(str(g["away"]))] if tp else None}
+            games.append(x)
         out["games"].extend(pick_games(ctx, games, 4, 6))
+        out["pool"].extend(games)
         rows = [r for r in (lg.get("title_odds") or []) if r.get("p")][:8]
         if rows:
             out["futures"]["college" if L == "cfb" else "college_" + L] = {
@@ -883,11 +1030,14 @@ def build_college(ctx: Ctx, base: str, out: dict):
             kpis.append({"label": f"{LU} fav", "value": t0.get("short") or t0.get("name") or rows[0]["team"],
                          "sub": f"{(rows[0]['p'] or 0) * 100:.0f}% title"})
         status.append(f"{LU} {phase_lab.get(lg.get('phase'), lg.get('phase') or '')}".strip())
+        if lg.get("phase") not in (None, "offseason"):
+            stages.append(f"{LU} {phase_lab.get(lg.get('phase'), lg.get('phase') or '')}".strip())
     srch = load(d / "search.json") or []
     for r in srch if isinstance(srch, list) else []:
         if r.get("t") and r.get("href"):
             out["search"].append(["college", r["t"], r.get("s") or "", base + r["href"]])
-    return {"phase": " · ".join(status), "status": " · ".join(status), "kpis": kpis[:3], "updated_at": idx.get("updated_at")}
+    return {"phase": " · ".join(status), "status": " · ".join(status), "kpis": kpis[:3],
+            "stage": " · ".join(stages) or " · ".join(status), "updated_at": idx.get("updated_at")}
 
 
 def pct_text(p):
@@ -1070,6 +1220,91 @@ def calibration_summary(docs: Path = DOCS):
     return out
 
 
+# ───────────────────────────────────────────────────────────── the top of the page: the game of the day and the digest
+# Sports whose finished games keep the chance we published before the start (frozen at the last pre-game build, or
+# rebuilt as of the day before with ratings that exclude the game): MLB, NFL, NHL frozen; NBA/WNBA, tennis and college
+# computed as of the day before. Football drops its forecast once a match is finished, so it has no pre-game chance
+# to count and is left out of "Our record this week" (the page says so).
+RECORD_SPORTS = ("nfl", "hockey", "baseball", "basketball", "tennis", "college")
+
+
+def _matchup(g):
+    if g.get("event"):
+        return g["home"].get("name") or "Grand Prix"
+    sep = " v "
+    return (g["home"]["name"] + sep + g["away"]["name"]) if g["sport"] == "football" else (g["away"]["name"] + sep + g["home"]["name"])
+
+
+RECORD_MIN_N = 20     # under this many finished games the week says little: widen to 14 days, and say so
+
+
+def record_with_floor(games, now):
+    """Our favourites' record over the last 7 days, or the last 14 when the week has under RECORD_MIN_N finished games
+    (`days` says which). The front end calls anything still under RECORD_MIN_N a small sample."""
+    rec = DG.record(games, now, days=7)
+    if rec is None or rec["n"] < RECORD_MIN_N:
+        wide = DG.record(games, now, days=14)
+        if wide is not None and (rec is None or wide["n"] > rec["n"]):
+            return dict(wide, days=14)
+    return dict(rec, days=7) if rec else None
+
+
+def top_of_page(now, games, pool, series, sports):
+    """featured, digest and sports[].topline (module docstring), and games[].weight. Adds the featured games to
+    `games` when the per-sport pick left them out."""
+    ranked = FT.rank_featured(pool, now)
+    by_key = {FT.game_key(g): g for g in pool}
+    shown = {FT.game_key(g) for g in games}
+    for row in ranked["today"] + ([ranked["week"]] if ranked["week"] else []):
+        g = by_key.get(row["key"])
+        if g is not None and row["key"] not in shown:
+            games.append(g)
+            shown.add(row["key"])
+    for g in games:
+        if g["status"] in ("pre", "live"):
+            g["weight"] = FT.significance(g, now)["score"]
+
+    def slim(row):
+        return None if not row else {"key": row["key"], "score": row["score"], "reasons": row["reasons"]}
+    featured = {"today": [slim(r) for r in ranked["today"]], "week": slim(ranked["week"])}
+
+    honest = [g for g in pool if g["sport"] in RECORD_SPORTS]
+    rec = record_with_floor(honest, now)
+    up = DG.upset(honest, now, full=True)
+    upset = None
+    if up:
+        g = up["game"]
+        w, l_ = up["winner"], up["loser"]
+        upset = {"sport": g["sport"], "league": g.get("league"), "start": g["start"], "p": up["p"],
+                 "winner": w.get("name"), "loser": l_.get("name"), "winner_abbr": w.get("abbr"),
+                 "score": [g.get("hs"), g.get("as")] if up["side"] == "home" else [g.get("as"), g.get("hs")],
+                 "players": bool(g.get("players")), "href": g.get("href")}
+    swing = DG.swing(series, now)
+    digest = {"record": rec, "upset": upset, "swing": swing,
+              "record_sports": sorted({b["sport"] for b in (rec or {}).get("by", [])}),
+              "left_out": ["football"]}
+
+    # one line per sport: where the season is, and its most significant game or event in the next 7 days
+    for sp in sports:
+        if not sp.get("ok"):
+            continue
+        cands = [g for g in pool if g["sport"] == sp["key"] and g["status"] in ("pre", "live")]
+        best = FT.rank_featured(cands, now, min_score=-1e9)
+        row = (best["today"] or [None])[0] or best["week"]
+        if row is None:                    # nothing in the week (an F1 gap week): the next scheduled game or event
+            later = sorted((g for g in cands if g["status"] == "pre" and g.get("start") and parse_ts(g["start"]) >= now),
+                           key=lambda g: g["start"])
+            row = {"key": FT.game_key(later[0])} if later else None
+        nxt = None
+        if row:
+            g = by_key[row["key"]]
+            nxt = {"title": _matchup(g), "start": g["start"], "league": g.get("league"), "href": g.get("href"),
+                   "live": g["status"] == "live", "tba": g.get("tba")}
+        sp["topline"] = {"stage": sp.pop("stage", None) or sp.get("status"), "next": nxt}
+        sp.pop("stage", None)
+    return {"featured": featured, "digest": digest}
+
+
 BUILDERS = {"football": build_football, "f1": build_f1, "basketball": build_basketball, "tennis": build_tennis,
             "baseball": build_baseball, "nfl": build_nfl, "hockey": build_hockey, "college": build_college}
 
@@ -1105,7 +1340,8 @@ def season_files(docs: Path = DOCS):
     """
     rows = []
     for slug in TITLE_LEAGUES:
-        rows += [("site", "the-quant-footballer", f"{slug}/probs.json")]
+        rows += [("site", "the-quant-footballer", f"{slug}/probs.json"),
+                 ("site", "the-quant-footballer", f"{slug}/history.json")]   # title chance over time: the week's swing
     idx = load(docs / "paddock" / "data" / "index.json") or {}
     if idx.get("current_season"):
         rows.append(("paddock", "the-quant-paddock", f"{idx['current_season']}/season.json"))
@@ -1140,13 +1376,13 @@ def main(argv=None):
         return
     now = parse_ts(a.now) if a.now else datetime.now(timezone.utc).replace(microsecond=0)
     ctx = Ctx(a.links, now)
-    out = {"games": [], "futures": {}, "leaders": {}, "charts": {}, "stats": [], "search": []}
+    out = {"games": [], "futures": {}, "leaders": {}, "charts": {}, "stats": [], "search": [], "pool": [], "series": []}
     sports = []
     for key, folder, repo, label, site in SPORTS + [x for x in PENDING if x[0] in LAUNCHED or a.with_pending]:
         base = ctx.base(folder, repo)
         entry = {"key": key, "label": label, "site": site, "url": base, "data": PUBLIC.format(repo) + "data/",
                  "ok": False}
-        part = {"games": [], "futures": {}, "leaders": {}, "charts": {}, "stats": [], "search": []}
+        part = {"games": [], "futures": {}, "leaders": {}, "charts": {}, "stats": [], "search": [], "pool": [], "series": []}
         try:
             entry.update(BUILDERS[key](ctx, base, part))
             if key == "football":
@@ -1165,11 +1401,15 @@ def main(argv=None):
                 else:
                     out[k].update(v)
         sports.append(entry)
+    pool, series = out.pop("pool"), out.pop("series")
+    top = top_of_page(now, out["games"], pool, series, sports)
     out["games"].sort(key=lambda g: ({"live": 0, "pre": 1, "final": 2}[g["status"]], g["start"] or ""))
     add_why(out["games"])
+    for g in pool:
+        g.pop("sig", None)                 # hints for the significance score only; never written
     out["calibration"] = calibration_summary()
     search = out.pop("search")
-    home = {"version": 1, "updated_at": iso(now), "links": a.links, "sports": sports, **out}
+    home = {"version": 1, "updated_at": iso(now), "links": a.links, "sports": sports, **out, **top}
     (OUT / "data").mkdir(parents=True, exist_ok=True)
     with open(OUT / "data" / "home.json", "w", encoding="utf-8") as fh:
         json.dump(home, fh, ensure_ascii=False, separators=(",", ":"))

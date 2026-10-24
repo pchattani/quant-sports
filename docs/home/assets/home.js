@@ -1,12 +1,13 @@
 /* The Quant home (kit v4 "Broadcast"). Reads data/home.json (scripts/build_home.py) and refreshes live scores in the
  * browser from each sport's published index.json on GitHub Pages (CORS: Access-Control-Allow-Origin *).
  *
- * Page, top to bottom (the Broadcast concept): the black ticker; the game to watch as the diagonal split hero with
- * our chance and "What's that number?"; "Six games. Our calls." (game cards with team stripes and a reason each);
- * the black power list ("Who's hot", one name per sport); the volt stat-of-the-day slab; "We say it. Then we check
- * it." (calibration bars from the sites' calibration.json) beside "Who's for real?" (NHL results against chances);
- * the title race in team colours, one league at a time; "What's that number?"; the sport tiles; every game; charts
- * of the week.
+ * Page, top to bottom: the black ticker; a small intro (what The Quant is, three pillars, "How it works", the
+ * sports); "Today": the game of the day (the significance rule, oddsmarkets/common/featured.py, ranked in the
+ * builder: never the closest call, never "Our pick") beside the week's top lines (the biggest swing in a title
+ * chance, the upset of the week, our favourites' record, from oddsmarkets/common/digest.py); "Around the sports"
+ * (one line per sport: where the season is, the next big game, who's hot); "Six games. Our calls." (ranked by the
+ * same score); the black power list; the volt stat-of-the-day slab; "We say it. Then we check it." beside "Who's
+ * for real?"; the title race; every game; charts of the week; "How it works".
  * Our numbers lead everywhere; the market never appears on this page (STYLE_GUIDE.md §3). ?asof=<ISO> previews an
  * older snapshot (QK.now). */
 (function () {
@@ -27,8 +28,30 @@ var shell = QK.shell({
 });
 
 function sportOf(k) { return QK.sport(k) || { label: k, accent: 'var(--accent)', site: k }; }
-function evening() { var h = new Date(QK.now()).getHours(); return h >= 15 || h < 5; }
-function tonight() { return evening() ? 'tonight' : 'today'; }
+function cap(s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
+function keyOf(g) { return g.sport + ':' + g.id; }
+/* whole days from today to the start, at the viewer's own clock */
+function dayDiff(iso) {
+  var d = new Date(iso); if (isNaN(d)) return null;
+  var t = new Date(QK.now()); t.setHours(0, 0, 0, 0);
+  var x = new Date(d); x.setHours(0, 0, 0, 0);
+  return Math.round((x - t) / 864e5);
+}
+/* The one label rule for a start (featured.py when_label): "Live now"; "Tonight · 20:00" only for a start later
+ * today at 17:00 or after, in the viewer's own time zone; "Today · 14:00"; "Tomorrow · 03:00"; "Sat · 18:30"
+ * within the week; else the date. Never "Our pick". */
+function whenTag(g) {
+  if (g.status === 'live') return 'Live now';
+  if (g.status === 'final') return 'Final';
+  var n = dayDiff(g.start), t = g.tba ? 'time TBA' : fmt.time(g.start);
+  if (n === null) return '';
+  if (n === 0) return (!g.tba && new Date(g.start).getHours() >= 17 ? 'Tonight · ' : 'Today · ') + t;
+  if (n === 1) return 'Tomorrow · ' + t;
+  if (n > 1 && n < 7) return new Date(g.start).toLocaleDateString('en-GB', { weekday: 'short' }) + ' · ' + t;
+  return fmt.date(g.start);
+}
+/* live, or not yet started (a "pre" game more than 30 min past its start is a lagging status, not the game to lead with) */
+function stillOn(g) { return !!g && (g.status === 'live' || (g.status === 'pre' && (new Date(g.start) - QK.now()) / 36e5 > -0.5)); }
 
 /* ───────────────────────────── load */
 QK.fetchJSON('data/home.json', { cache: 'no-cache' }).then(function (j) {
@@ -51,7 +74,7 @@ function prep(g) {
 }
 
 function renderAll() {
-  var jobs = [renderTicker, renderHero, renderWatch, renderHot, renderStats, renderHowSure, renderReal, renderRaces, renderTiles, renderChips, renderGames, renderCharts];
+  var jobs = [renderTicker, renderSportNav, renderFeature, renderToplines, renderAround, renderWatch, renderHot, renderStats, renderHowSure, renderReal, renderRaces, renderChips, renderGames, renderCharts, renderHow];
   jobs.forEach(function (f) { try { f(); } catch (e) { if (window.console) console.error(e); } });
   $('#updated').textContent = 'Data built ' + fmt.ago(D.updated_at) + ' (' + fmt.date(D.updated_at) + ' ' + fmt.time(D.updated_at) + '). Live scores refresh every minute while games are on.';
   QK.seg($('#when'), function (v) { state.when = v; state.shown = PAGE; renderGames(); });
@@ -67,33 +90,165 @@ function renderTicker() {
   shell.setLive(liveMap());
 }
 
-/* ───────────────────────────── the hero: the game to watch as the diagonal split, then "What's that number?" */
-var featureId = null;
-function tagOf(g) {
-  var note = String(g.note || '');
-  var m = /\bG(\d)\b|Game (\d)/.exec(note), n = m ? (m[1] || m[2]) : null;
-  if (/Finals/i.test(note) && n) return note.split(' · ')[0].replace(/\s*G\d\b/, '') + ' · Game ' + n;
-  if (n === '7') return 'Game 7';
-  if (/CS\b|Series/i.test(note) && n) return (g.league || '') + ' · Game ' + n;
-  if (g.status === 'live') return 'The game to watch';
-  return 'Our pick ' + tonight();
-}
-function renderHero() {
-  var list = playable().map(function (g) { return [QK.watchScore(g), g]; }).filter(function (x) { return x[0] > -1e8; }).sort(function (a, b) { return b[0] - a[0]; });
-  var f = list.length ? list[0][1] : null;
-  featureId = f ? f.sport + ':' + f.id : null;
-  $('#hero').innerHTML = f ? QK.splitHero(f, { tag: tagOf(f) }) : QK.explain('<b>Nothing on right now.</b> The next games appear here as soon as they are scheduled.');
+/* ───────────────────────────── the intro's sport links ("Pick your sport", high up) */
+function renderSportNav() {
+  var lm = liveMap();
+  $('#sportnav').innerHTML = QK.SPORTS.map(function (q) {
+    return '<a class="hm-sn" href="' + esc(QK.sportUrl(q.key)) + '" style="--sa:' + q.accent + '"><span class="hm-sn-ic" aria-hidden="true">' + QK.ICON[q.key] + '</span><span class="hm-sn-l">' + esc(q.label) + '</span>' + (lm[q.key] ? '<span class="hm-sn-live" role="img" aria-label="Live now" title="Live now"></span>' : '') + '</a>';
+  }).join('');
 }
 
-/* ───────────────────────────── what to watch: "Six games. Our calls." */
+/* ───────────────────────────── today: the game of the day (the builder's significance rule) */
+var featureId = null;
+function byKey() { var m = {}; D.games.forEach(function (g) { m[keyOf(g)] = g; }); return m; }
+/* the first of the builder's ranked games still upcoming or live at the viewer's clock, else the week's biggest
+ * occasion, else nothing (the card then shows a title race) */
+function pickFeature() {
+  var F = D.featured || {}, m = byKey(), i, r;
+  for (i = 0; i < (F.today || []).length; i++) { r = F.today[i]; if (stillOn(m[r.key])) return { g: m[r.key], r: r, kind: 'today', rest: F.today.slice(i + 1).filter(function (x) { return stillOn(m[x.key]); }).map(function (x) { return m[x.key]; }) }; }
+  if (F.week && stillOn(m[F.week.key])) return { g: m[F.week.key], r: F.week, kind: 'week', rest: [] };
+  return null;
+}
+var SPORT_LEAGUE = { nfl: 'the NFL', basketball: null, baseball: 'MLB', hockey: 'the NHL', f1: 'Formula 1', tennis: null, college: null, football: null };
+function compName(g) {
+  if (g.sport === 'tennis') return String(g.league || 'the tour').split(' · ').slice(-1)[0];
+  if (g.sport === 'basketball' || g.sport === 'college') return g.league === 'CFB' ? 'college football' : g.league === 'MBB' ? 'men’s college basketball' : g.league === 'WBB' ? 'women’s college basketball' : 'the ' + g.league;
+  return SPORT_LEAGUE[g.sport] || g.league || sportOf(g.sport).label;
+}
+function whyFeature(p) {
+  var g = p.g, rs = (p.r.reasons || []).slice(0, 3);
+  var when = g.status === 'live' ? 'it is on now' : (g.tba ? 'it is ' + whenTag(g).replace(' · time TBA', '').toLowerCase() : 'it starts ' + whenTag(g).replace(' · ', ' at ').replace(/^(Today|Tonight|Tomorrow)/, function (x) { return x.toLowerCase(); }) + ' your time');
+  var lead = p.kind === 'week' ? '<b>Nothing big today.</b> The biggest occasion of the next seven days: ' : '<b>Why this one?</b> ';
+  var bits = [compName(g)].concat(rs);
+  var txt = lead + esc(cap(bits.join(', '))) + ', and ' + esc(when) + '.';
+  return txt + ' We rank games by the size of the competition, the stage, what rides on it in our simulations and the start time. How close it is counts only a little.';
+}
+function renderFeature() {
+  var p = pickFeature(), box = $('#feature');
+  var today = fmt.date(new Date(QK.now()).toISOString());
+  /* the head follows the lead game's day at the reader's clock: "today" only when it is on today */
+  var isToday = !!p && (p.g.status === 'live' || dayDiff(p.g.start) === 0);
+  $('#h-today').innerHTML = QK.sectionHead(isToday || !p
+    ? { kicker: 'Today · ' + today, title: 'What matters today', sub: 'The game of the day, the week’s biggest moves, and how our numbers did.' }
+    : { kicker: 'Coming up · ' + whenTag(p.g).split(' · ')[0], title: 'What matters next', sub: 'Nothing that big is on today. The next game that matters, the week’s biggest moves, and how our numbers did.' });
+  featureId = p ? keyOf(p.g) : null;
+  if (!p) { box.innerHTML = raceFallback(); return; }
+  var g = p.g, live = g.status === 'live';
+  var tag = live ? 'Live now · game of the day' : p.kind === 'week' ? 'The big one this week' : isToday ? 'Game of the day' : 'The next big game';
+  var chip = live ? undefined : (g.league || sportOf(g.sport).label) + ' · ' + whenTag(g);
+  var hero = g.event ? eventCard(g, tag, chip) : QK.splitHero(g, { tag: tag, chip: chip, compact: true, note: false });
+  var also = p.rest.slice(0, 2);
+  box.innerHTML = hero + QK.explain(whyFeature(p), { html: true }) +
+    (also.length ? '<div class="hm-also"><span class="hm-also-k">' + alsoLabel(also) + '</span>' + also.map(function (x) { return '<a href="' + esc(x.href || '#') + '"><b>' + esc(matchup(x)) + '</b> <span>' + esc((x.league || '') + ' · ' + whenTag(x)) + '</span></a>'; }).join('') + '</div>' : '');
+}
+/* "Also big today" / "Also big tomorrow" when every game is that day (reader's clock), else "Also coming up" */
+function alsoLabel(list) {
+  var days = list.map(function (x) { return x.status === 'live' ? 0 : dayDiff(x.start); });
+  var same = days.every(function (d) { return d === days[0]; });
+  return same && days[0] === 0 ? 'Also big today' : same && days[0] === 1 ? 'Also big tomorrow' : 'Also coming up';
+}
+function matchup(g) {
+  if (g.event) return g.home && g.home.name || 'Grand Prix';
+  var a = g.away && g.away.name, h = g.home && g.home.name;
+  return g.sport === 'football' ? h + ' v ' + a : a + ' v ' + h;
+}
+/* an F1 Grand Prix as the feature: our chance for the favourite, the rest of the field after */
+function eventCard(g, tag, chip) {
+  var nr = (D.charts || {}).f1_next_race || {}, field = (nr.field || []).slice(0, 5);
+  return '<a class="qk-card hm-event" href="' + esc(g.href || '#') + '"><div class="hm-event-top"><span class="qk-bchip volt">' + esc(tag) + '</span><span class="qk-bchip">' + esc(chip || '') + '</span></div>' +
+    '<div class="hm-event-name">' + esc(g.home && g.home.name || 'Grand Prix') + '</div>' +
+    (field.length ? QK.chances(field.map(function (d) { return { label: d.code || d.name, p: d.p || 0, color: d.colour }; }), { key: false }) + '<div class="qk-caption">Our chance of winning the race, each driver out of 100%.</div>' : '') + '</a>';
+}
+/* nothing scheduled that matters: the tightest title race instead of a minor game */
+function raceFallback() {
+  var F = D.futures || {}, best = null;
+  Object.keys(F).forEach(function (k) {
+    var rows = (F[k].rows || []).filter(function (r) { return r.p > 0; });
+    if (rows.length < 2) return;
+    var gap = rows[0].p - rows[1].p;
+    if (!best || gap < best.gap) best = { k: k, f: F[k], rows: rows, gap: gap };
+  });
+  if (!best) return QK.explain('<b>Nothing on right now.</b> The next big games appear here as soon as they are scheduled.', { html: true });
+  var sp = best.k.split('_')[0];
+  return '<div class="qk-card hm-event"><div class="hm-event-top"><span class="qk-bchip volt">Title race</span></div><div class="hm-event-name">' + esc(question(best.k, best.f.title)) + '</div>' +
+    QK.chances(chanceRows(best.rows.slice(0, 5), sp), { key: false }) + '<div class="qk-caption">No big game today, so here is the closest race we simulate: ' + esc(raceLede(best.rows.map(function (r) { return { name: r.name, p: r.p }; }))) + '</div></div>';
+}
+
+/* ───────────────────────────── today: the week's top lines (oddsmarkets/common/digest.py) */
+var SPORT_SHORT = { nfl: 'NFL', hockey: 'NHL', baseball: 'MLB', basketball: 'NBA/WNBA', tennis: 'tennis', college: 'college', football: 'football', f1: 'F1' };
+function tl(kicker, num, head, text, href, sport) {
+  var sp = sportOf(sport);
+  return '<' + (href ? 'a href="' + esc(href) + '"' : 'div') + ' class="hm-tl" style="--sa:' + (sp.accent || 'var(--accent)') + '"><div class="hm-tl-k">' + esc(kicker) + '</div>' +
+    '<div class="hm-tl-row"><div class="hm-tl-num num">' + num + '</div><div class="hm-tl-head">' + esc(head) + '</div></div><p class="hm-tl-text">' + text + '</p></' + (href ? 'a' : 'div') + '>';
+}
+function pts(d) { var v = Math.round(Math.abs(d) * 100); return (d > 0 ? '+' : d < 0 ? '−' : '±') + v; }
+function sayPct(p) { return Math.round(p * 100) + '%'; }
+function inN(p) { var n = Math.round(1 / Math.max(p, 0.01)); return 'about 1 in ' + n; }
+function renderToplines() {
+  var G = D.digest || {}, out = [];
+  var s = G.swing;
+  if (s && isNum(s.delta)) {
+    var up = s.delta > 0;
+    out.push(tl('Biggest swing this week', pts(s.delta) + '<small>pts</small>', s.name + (s.kind === 'playoff' ? ' play-off chance' : ', ' + s.league),
+      esc(s.name) + '’s ' + (s.kind === 'playoff' ? 'play-off' : 'title') + ' chance went ' + (up ? 'up' : 'down') + ' from <b>' + sayPct(s.from) + '</b> to <b>' + sayPct(s.to) + '</b> since ' + esc(fmt.date(s.since)) + ', in our season simulations. “Pts” are percentage points.', s.href, s.sport));
+  }
+  var u = G.upset;
+  if (u && isNum(u.p)) {
+    var sc = u.score && isNum(u.score[0]) ? ' ' + u.score[0] + '–' + u.score[1] + (u.players ? ' in sets' : '') : '';
+    var lg = String(u.league || '').split(' · ');
+    var the = THE_SPORTS.indexOf(u.sport) >= 0 && !u.players;
+    out.push(tl('Upset of the week', sayPct(u.p), u.players ? surname(u.winner) + ' beat ' + surname(u.loser) : (the ? 'The ' : '') + u.winner + ' beat ' + (the ? 'the ' : '') + u.loser,
+      'Before the start we gave ' + (the ? 'the ' : '') + esc(u.winner) + ' a ' + sayPct(u.p) + ' chance, ' + inN(u.p) + '. They won' + esc(sc) + ' (' + esc(lg[lg.length - 1] || SPORT_SHORT[u.sport] || '') + ', ' + esc(fmt.date(u.start)) + '). A chance that size should still come off now and then.', u.href, u.sport));
+  }
+  var r = G.record;
+  if (r && r.n) {
+    var rate = r.won / r.n, exp = r.expected, sd = Math.sqrt(r.n * r.expected_rate * (1 - r.expected_rate));
+    var verdict = Math.abs(r.won - exp) <= 2 * sd ? 'That is about what an honest forecaster gets.' : r.won < exp ? 'More upsets than our numbers expected.' : 'Favourites did better than our numbers expected.';
+    var by = (r.by || []).map(function (b) { return esc(SPORT_SHORT[b.sport] || b.sport) + ' ' + b.won + '/' + b.n; }).join(' · ');
+    var small = r.n < 20, wk = !r.days || r.days === 7;
+    /* a small sample says little either way: name it, and never call a verdict on it */
+    if (small) verdict = '<b>Small sample:</b> ' + r.n + ' games is too few to judge; a couple of results move this a lot.';
+    out.push(tl(wk ? 'Our record this week' : 'Our record, last ' + r.days + ' days', r.won + '<small>of ' + r.n + '</small>', 'Favourites won ' + sayPct(rate) + '. We expected ' + sayPct(r.expected_rate) + '.',
+      (wk ? '' : 'Too few games this week, so this covers the last ' + r.days + ' days. ') +
+      'Every finished game since ' + esc(ymd(r.from)) + ' with a chance we published before the start. Our favourites’ average chance was ' + sayPct(r.expected_rate) + ', so we expected about ' + Math.round(exp) + ' wins. ' + verdict + (by ? ' <span class="hm-tl-by">' + by + '</span>' : '') +
+      ' <span class="hm-tl-by">Football is left out: its pre-match chances are not kept after kick-off.</span>', '#howsure', null));
+  }
+  $('#toplines').innerHTML = out.length ? out.join('') : QK.explain('<b>This week.</b> The week’s numbers appear here once games have been played.', { html: true });
+}
+var THE_SPORTS = ['nfl', 'hockey', 'baseball', 'basketball'];
+/* 'YYYY-MM-DD' as that calendar day ('Sat 10 Oct'), never shifted by the viewer's time zone */
+function ymd(s) { var m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(s || '')); return m ? fmt.date(new Date(+m[1], +m[2] - 1, +m[3], 12).toISOString()) : fmt.date(s); }
+function surname(n) { var p = String(n || '').split(' '); return p.length > 1 ? p.slice(1).join(' ') : n; }
+
+/* ───────────────────────────── around the sports: one line each (stage, the next big game, who's hot) */
+var HOT_OF = { football: ['football'], f1: ['f1'], basketball: [], tennis: ['tennis_atp', 'tennis_wta'], baseball: ['baseball'], nfl: ['nfl'], hockey: ['hockey'], college: [] };
+function renderAround() {
+  var by = {}; D.sports.forEach(function (s) { by[s.key] = s; });
+  var lm = liveMap(), L = D.leaders || {};
+  $('#h-around').innerHTML = QK.sectionHead({ kicker: 'Pick your sport', title: 'Around the sports', sub: 'Where each season stands, the next game that matters, and who’s hot. Tap a sport for its own site.' });
+  $('#around-grid').innerHTML = QK.SPORTS.map(function (q) {
+    var s = by[q.key] || {}, t = s.topline || {}, n = t.next;
+    var hot = (HOT_OF[q.key] || []).map(function (k) { var l = L[k]; return l && l.rows && l.rows[0] ? l : null; }).filter(Boolean)[0];
+    var hr = hot ? hot.rows[0] : null;
+    return '<article class="hm-ar" style="--sa:' + q.accent + '"><a class="hm-ar-top" href="' + esc(QK.sportUrl(q.key)) + '"><span class="hm-ar-ic" aria-hidden="true">' + QK.ICON[q.key] + '</span><span class="hm-ar-name">' + esc(q.label) + '</span>' + (lm[q.key] ? '<span class="qk-pill live">Live</span>' : '') + '<span class="hm-ar-site">' + esc(q.site) + ' →</span></a>' +
+      '<p class="hm-ar-stage">' + esc(s.ok === false ? 'Data unavailable right now' : (t.stage || s.status || q.leagues)) + (s.stale ? ' <span class="hm-ar-stale">· data ' + esc(Math.round(s.age_hours)) + ' h old</span>' : '') + '</p>' +
+      (n ? '<a class="hm-ar-next" href="' + esc(n.href || QK.sportUrl(q.key)) + '"><span class="k">' + (n.live ? 'Now' : 'Next') + '</span><b>' + esc(n.title) + '</b><span class="w">' + esc(whenTag({ status: n.live ? 'live' : 'pre', start: n.start, tba: n.tba })) + '</span></a>' : '') +
+      (hr ? '<a class="hm-ar-hot" href="' + esc(hr.href || '#') + '"><span class="k">Hot</span><b>' + esc(hr.name) + '</b><span class="w num">' + esc(hr.value) + ' ' + esc(hot.unit || hot.title || '') + '</span></a>' : '') + '</article>';
+  }).join('');
+}
+
+/* ───────────────────────────── what to watch: "Six games. Our calls." (ranked by the significance score) */
 function renderWatch() {
-  var pool = playable().filter(function (g) { return g.sport + ':' + g.id !== featureId; });
-  var upcoming = pool.filter(function (g) { return g.status !== 'final'; }).length;
-  var n = Math.min(6, upcoming);
-  $('#h-watch').innerHTML = QK.sectionHead({ kicker: 'What to watch ' + tonight(), title: n ? (NUMS[n].charAt(0).toUpperCase() + NUMS[n].slice(1)) + ' game' + (n === 1 ? '' : 's') + '. Our calls.' : 'Nothing on right now',
-    sub: 'Our chance for every side. Live games update as they go; the stripe up top splits the chances in team colours.',
+  var pool = playable().filter(function (g) { return keyOf(g) !== featureId && stillOn(g) && (g.status === 'live' || (new Date(g.start) - QK.now()) / 36e5 < 36); });
+  pool.sort(function (a, b) { return (b.weight || 0) - (a.weight || 0); });
+  var per = {}, first = [], rest = [];
+  pool.forEach(function (g) { per[g.sport] = (per[g.sport] || 0) + 1; (per[g.sport] <= 2 ? first : rest).push(g); });
+  pool = first.concat(rest);
+  var n = Math.min(6, pool.length);
+  $('#h-watch').innerHTML = QK.sectionHead({ kicker: 'What to watch next', title: n ? cap(NUMS[n]) + ' game' + (n === 1 ? '' : 's') + '. Our calls.' : 'Nothing on right now',
+    sub: 'The biggest games of the next day and a half, at most two per sport. Our chance for each side, the favourite in blue.',
     actions: '<a class="qk-more" href="#games">All ' + playable().length + ' games</a>' });
-  $('#watch-grid').innerHTML = QK.watchGrid(pool, { limit: 6, card: { why: true } });
+  $('#watch-grid').innerHTML = QK.watchGrid(pool, { limit: 6, pick: false, card: { why: true } });
 }
 
 /* ───────────────────────────── who's hot: the black power list */
@@ -114,7 +269,6 @@ var statIdx = 0, statTimer = null;
 function renderStats() {
   var S = D.stats || [];
   var el = $('#sotd');
-  $('#newhere').innerHTML = QK.newHere();
   if (!S.length) { el.hidden = true; return; }
   statIdx = Math.floor(QK.now() / 864e5) % S.length;
   function paint() {
@@ -229,20 +383,6 @@ function renderRaces() {
   draw(tabs[0].id);
 }
 
-/* ───────────────────────────── sport tiles */
-function renderTiles() {
-  var byKey = {}; D.sports.forEach(function (s) { byKey[s.key] = s; });
-  var lm = liveMap();
-  $('#tiles').innerHTML = QK.SPORTS.map(function (q) {
-    var s = byKey[q.key] || {};
-    var kp = (s.kpis || []).filter(function (k) { var v = k && k.value; return v !== null && v !== undefined && v !== '' && v !== '—' && v !== '-'; }).slice(0, 3);
-    return '<a class="hm-tile" href="' + esc(QK.sportUrl(q.key)) + '" style="--sa:' + q.accent + '">' +
-      '<div class="hm-tile-top"><span class="hm-tile-ic">' + QK.ICON[q.key] + '</span><div style="min-width:0"><div class="hm-tile-name">' + esc(q.label) + '</div><div class="hm-tile-site">' + esc(q.site) + '</div></div></div>' +
-      '<div class="hm-tile-status">' + (lm[q.key] ? '<span class="qk-pill live">Live</span>' : '') + '<span class="qk-truncate">' + esc(s.ok === false ? 'Data unavailable' : (s.status || q.leagues)) + '</span></div>' +
-      (kp.length ? '<div class="hm-tile-kpis">' + kp.map(function (k) { return '<div><div class="l">' + esc(k.label) + '</div><div class="v">' + esc(k.value) + '</div>' + (k.sub ? '<div class="s">' + esc(k.sub) + '</div>' : '') + '</div>'; }).join('') + '</div>' : '') + '</a>';
-  }).join('');
-}
-
 /* ───────────────────────────── every game */
 function gamesFor() {
   return playable().filter(function (g) {
@@ -325,6 +465,14 @@ function renderCharts() {
   jobs.forEach(function (f) { try { f(); } catch (e) { if (window.console) console.error(e); } });
 }
 
+/* ───────────────────────────── how it works */
+var METHOD = { football: '#/model/methodology', college: '#/model' };
+function renderHow() {
+  $('#how').innerHTML = QK.sectionHead({ kicker: 'How it works', title: 'Where the numbers come from', sub: 'Each sport has its own models, built from public data and checked on seasons they never saw.' }) +
+    QK.newHere({ items: QK.NEW_HERE.concat([]) }) +
+    '<div class="hm-method">' + QK.SPORTS.map(function (q) { return '<a href="' + esc(QK.sportUrl(q.key) + (METHOD[q.key] || '#/methodology')) + '" style="--sa:' + q.accent + '"><span aria-hidden="true">' + QK.ICON[q.key] + '</span>' + esc(q.label) + ': how the model works</a>'; }).join('') + '</div>';
+}
+
 /* ───────────────────────────── live scores (browser-side, cross-origin) */
 function norm(s) {
   s = String(s || '').toLowerCase();
@@ -367,7 +515,7 @@ function refreshLive() {
           prep(g); changed = true;
         }
       });
-      if (changed) { renderTicker(); renderHero(); renderWatch(); renderGames(); }
+      if (changed) { renderTicker(); renderSportNav(); renderFeature(); renderWatch(); renderGames(); }
     }, function () { /* offline or blocked: keep the built snapshot */ });
   });
 }

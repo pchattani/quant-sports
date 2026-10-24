@@ -1,13 +1,20 @@
-/* The Quant Paddock — Overview (#/), on kit v4 "Broadcast" (MIGRATION_V4.md, after rk-overview.js): the greeting (the
- * broadcast lower third) over the next Grand Prix as the diagonal split hero (our favourite against our second pick in
- * their constructors' colours, our win chance in volt); the black stat strip; "Six calls. Our numbers." (kit game cards
- * with the constructor-colour stripe and a reason each: the favourite, the closest podium call, the outsider, the title
- * fight, the closest team-mate fight on points, the safety car); the black power list (QK.band + QK.hotRow); "We say
- * it. Then we check it." (QK.howSure from calibration.json) beside "Who's for real?" (QKC.quadrant: points per start
- * against race pace); "What's that number?"; the race weekend (countdown, schedule, our win chance); the title race
- * (points so far and our projection, 538 style; title chances in constructor colours; how the race has moved, with
- * the 90% band, once title_history holds three rounds; the season-end points range; standings with trends); car
- * against driver; how our favourite has fared, the last race and the fantasy projections. No market anywhere here.
+/* The Quant Paddock — Overview (#/), on kit v4 "Broadcast" (MIGRATION_V4.md, after rk-overview.js):
+ *   the intro band (what the site covers, three quick links: the next race centre, Standings, Drivers);
+ *   "This week in F1": the stage line (the next round, rounds and points left, the gap at the top), then the top lines
+ *   from index.json "digest" (scripts/build_paddock.py digest_payload): the biggest title-chance mover between the
+ *   last two rounds (the title favourite until title_history holds two), the last race (the upset of the week when
+ *   the winner had under 40% before the start and was not our favourite), the form driver over three rounds, and
+ *   the next session; then the next Grand Prix as the diagonal split hero (our favourite against our second pick in
+ *   their constructors' colours), tagged with the live or next session in the reader's time ("Live now · Practice 1",
+ *   "Tomorrow · Qualifying"), never "Our pick"; with no race in the coming week the title fight leads instead;
+ *   "N calls. Our numbers." (kit game cards with the constructor-colour stripe and a reason each: the favourite, the
+ *   closest podium call, the outsider, the title fight, the closest team-mate fight on points, the safety car); the
+ *   black power list (QK.band + QK.hotRow); "We say it. Then we check it." (QK.howSure from calibration.json) beside
+ *   "Who's for real?" (QKC.quadrant: points per start against race pace); "What's that number?"; the race weekend
+ *   (countdown, schedule, our win chance); the title race (points so far and our projection, 538 style; title
+ *   chances in constructor colours; how the race has moved, with the 90% band, once title_history holds three
+ *   rounds; the season-end points range; standings with trends); car against driver; how our favourite has fared,
+ *   the last race and the fantasy projections. No market anywhere here.
  * Reads index.json, calibration.json, <y>/season.json, <y>/races/<next>.json, <y>/value.json, <y>/fantasy.json. */
 (function (PD) {
 'use strict';
@@ -28,7 +35,7 @@ function tzName() { try { return Intl.DateTimeFormat().resolvedOptions().timeZon
 /* Countdown + schedule, ticking every second while the page is open. */
 function weekendClock(list, cdId, schedId) {
   function tick() {
-    var now = Date.now();
+    var now = QK.now();
     var upcoming = list.filter(function (s) { return s.t.getTime() > now; })[0];
     var live = list.filter(function (s) { return s.t.getTime() <= now && now < s.t.getTime() + (SESSION_LEN_MIN[s.key] || 60) * 60000; })[0];
     var cd = document.getElementById(cdId);
@@ -48,6 +55,84 @@ function weekendClock(list, cdId, schedId) {
 }
 PD.weekendClock = weekendClock;
 
+/* ── the landing top (the same shape on every sport overview; the Rink's rk-overview.js is the reference) ── */
+var WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+
+/* "Live now" | "Tonight" | "Today" | "Tomorrow" | the weekday | the date, in the reader's own time (QK.now()). */
+function whenLabel(iso, live) {
+  if (live) return 'Live now';
+  var d = new Date(iso), now = new Date(QK.now());
+  if (isNaN(d)) return '';
+  var d0 = function (x) { var y = new Date(x.getTime()); y.setHours(0, 0, 0, 0); return y.getTime(); };
+  var n = Math.round((d0(d) - d0(now)) / 864e5);
+  if (n === 0) return d.getHours() >= 17 ? 'Tonight' : 'Today';
+  if (n === 1) return 'Tomorrow';
+  if (n > 1 && n < 7) return d.toLocaleDateString('en-GB', { weekday: 'long' });
+  return QK.fmt.date(iso);
+}
+function intro(o) {
+  return '<section class="ql-intro" aria-label="About this site"><div class="ql-intro-l"><div class="qk-greet-date">' + esc(o.tag) + '</div>' +
+    '<h1>' + esc(o.title) + '</h1><p>' + esc(o.lede) + '</p></div>' +
+    '<nav class="ql-links" aria-label="Start here">' + o.links.map(function (l) { return '<a href="' + esc(l.href) + '"><b>' + esc(l.label) + '</b><span>' + esc(l.sub) + '</span></a>'; }).join('') + '</nav></section>';
+}
+/* a date-only payload day ("2026-10-25") in en-GB without a time-zone shift */
+function day(d) { return QK.fmt.date(String(d || '').length === 10 ? d + 'T12:00:00' : d); }
+function ptsOf(d) { return (d > 0 ? '+' : '−') + Math.abs(Math.round(d * 100)) + ' pts'; }
+
+/* The weekend's state at the reader's clock: the live session, else the next one (sessionsOf: the weekend's
+   sessions in order), and whether the Grand Prix is within the coming week. */
+function weekendNow(next) {
+  if (!next) return null;
+  var list = sessionsOf(next), now = QK.now();
+  var live = list.filter(function (s) { return s.t.getTime() <= now && now < s.t.getTime() + (SESSION_LEN_MIN[s.key] || 60) * 60000; })[0];
+  var up = list.filter(function (s) { return s.t.getTime() > now; })[0];
+  var race = list.filter(function (s) { return s.key === 'race'; })[0];
+  var rt = race ? race.t.getTime() : (PD.parseDate(next.date) || { getTime: function () { return NaN; } }).getTime();
+  return { live: live || null, next: up || null, race: race || null, soon: isFinite(rt) && rt - now < 7 * 864e5 && rt + 3 * 36e5 > now };
+}
+/* "Round 18 of 23 next: the United States Grand Prix, Sun 25 Oct. Six rounds and up to 150 points left; ..." */
+function stageLine(st) {
+  if (!st) return '';
+  var n = st.next, parts = [];
+  if (n) parts.push('Round ' + n.round + ' of ' + st.total + ' next: the ' + n.name + ', ' + QK.fmt.date(n.start) + '.');
+  else parts.push('The season is complete.');
+  if (st.left) parts.push((WORDS[st.left] || st.left) + ' round' + (st.left === 1 ? '' : 's') + (st.sprints_left ? ' and ' + st.sprints_left + ' sprint' + (st.sprints_left === 1 ? '' : 's') : '') + ' left, up to ' + st.points_left + ' points for one driver.');
+  if (st.leader && st.second && isNum(st.gap)) parts.push(PD.driverSurname(st.leader) + ' leads ' + PD.driverSurname(st.second) + ' by ' + PD.pts(st.gap) + '.');
+  return parts.join(' ');
+}
+function weekTiles(dig, season, wk, next) {
+  var out = [];
+  var mv = dig.movers;
+  var ch = PD.ok(season) && season.championship ? season.championship.drivers || {} : {};
+  if (mv && (mv.up.length || mv.down.length)) {
+    var up = mv.up[0], dn = mv.down[0], lead = up || dn;
+    out.push({ label: 'Biggest mover', value: PD.driverCode(lead.key) + ' ' + ptsOf(lead.d), href: PD.driverHref(lead.key), signal: true,
+      sub: PD.driverName(lead.key) + (lead.d > 0 ? ' climbed' : ' slipped') + ' to ' + PD.pct(lead.p, 0) + ' in our title chance after round ' + mv.after_round + '.' + (up && dn ? ' Biggest fall: ' + PD.driverCode(dn.key) + ' ' + ptsOf(dn.d) + '.' : '') });
+  } else {
+    var ids = Object.keys(ch).filter(function (d) { return isNum(ch[d].p_title); }).sort(function (a, b) { return ch[b].p_title - ch[a].p_title; });
+    if (ids[0]) {
+      var st = dig.stage || {};
+      out.push({ label: 'Title favourite', value: PD.driverCode(ids[0]) + ' ' + PD.pct(ch[ids[0]].p_title, ch[ids[0]].p_title > 0.99 ? 1 : 0), href: '#/standings?tab=odds', signal: true,
+        sub: PD.driverName(ids[0]) + (st.leader === ids[0] && isNum(st.gap) ? ', ' + PD.pts(st.gap) + ' points clear with up to ' + st.points_left + ' left' : '') + ': our chance from 20,000 simulated seasons.' });
+    }
+  }
+  var l = dig.last;
+  if (l && l.winner) {
+    var recent = (QK.now() - Date.parse(l.start)) < 7 * 864e5;
+    out.push({ label: l.upset && recent ? 'Upset of the week' : 'Last race', value: PD.driverCode(l.winner) + (isNum(l.p) ? ' ' + PD.pct(l.p, 0) : ''), href: PD.raceHref(season && season.year || '', l.round),
+      sub: PD.driverName(l.winner) + ' won the ' + l.name + ' on ' + QK.fmt.date(l.start) + '.' + (isNum(l.p) ? ' We gave them ' + PD.pct(l.p, 0) + (l.after_quali ? ' after qualifying' : ' before qualifying') + (l.fav === l.winner ? ', our favourite.' : '; our favourite was ' + PD.driverSurname(l.fav) + ' at ' + PD.pct(l.fav_p, 0) + '.') : '') });
+  }
+  var h = dig.hot;
+  if (h) out.push({ label: 'In form', value: PD.driverCode(h.key) + ' +' + PD.pts(h.v), href: PD.driverHref(h.key),
+    sub: PD.driverName(h.key) + ': ' + PD.pts(h.v) + ' points over rounds ' + h.rounds[0] + '–' + h.rounds[h.rounds.length - 1] + '.' + (h.next ? ' Next best ' + PD.driverSurname(h.next) + ', ' + PD.pts(h.next_v) + '.' : '') });
+  if (wk && (wk.live || wk.next)) {
+    var s = wk.live || wk.next;
+    out.push({ label: wk.live ? 'On track now' : 'Next session', value: s.label + ' ' + (wk.live ? '' : QK.fmt.time(s.iso)), href: next ? PD.raceHref(next.year, next.round) : '#/races', text: true,
+      sub: (wk.live ? 'Live now at the ' : whenLabel(s.iso) + ' at the ') + PD.shortRace(next.name) + ' Grand Prix' + (wk.race && s.key !== 'race' ? '; the race is ' + whenLabel(wk.race.iso).replace(/^(Today|Tonight|Tomorrow)/, function (m) { return m.toLowerCase(); }) + ' at ' + QK.fmt.time(wk.race.iso) : '') + '.' });
+  }
+  return out;
+}
+
 function titleRows(season, kind) {
   var ch = PD.ok(season) && season.championship ? season.championship[kind] || {} : {};
   return Object.keys(ch).filter(function (id) { return !ch[id].eliminated && isNum(ch[id].p_title); })
@@ -65,18 +150,18 @@ function render(el) {
   var idx = PD.index() || {};
   var y = idx.current_season || PD.currentSeason();
   var next = idx.next, last = idx.last;
-  var meta = (idx.seasons_meta || {})[String(y)] || {};
   var kseg = function (id) { return PD.seg(id, [['drivers', 'Drivers'], ['constructors', 'Constructors']], 'drivers', 'Championship'); };
-  var nd = next ? PD.parseDate(next.date) : null;
-  var soon = nd && (nd.getTime() - QK.now()) < 7 * 864e5;
-  var when = next ? (soon ? 'this weekend' : 'next') : 'this season';
+  var wk = weekendNow(next);
+  var when = next ? (wk && wk.soon ? 'this weekend' : 'next') : 'this season';
   var where = next ? (((next.circuit || {}).locality) || PD.shortRace(next.name)) : '';
-  el.innerHTML = QK.greeting({ date: 'F1 · ' + y + (next ? ' · round ' + next.round + ' next' : ' · season complete'),
-    title: esc(QK.greet()) + '! Here’s what’s ' + QK.mark('worth watching') + ' in F1 ' + when + '.',
-    lede: 'Our chance for every Grand Prix and both championships from 20,000 simulated seasons, car pace against driver skill, and the drivers behind it all, in plain English.',
-    ctas: (next ? [{ label: 'Race centre', href: PD.raceHref(next.year, next.round) }] : []).concat([{ label: 'Standings', href: '#/standings', ghost: !!next }]),
-    side: '<div id="ov-feat">' + QK.skeleton('card', 1) + '</div>' }) +
-    '<div id="ov-kpis" style="margin-top:var(--sp-10)">' + QK.skeleton('lines', 2) + '</div>' +
+  var dig = idx.digest || {};
+  el.innerHTML = intro({ tag: 'F1 · ' + y + (next ? ' · round ' + next.round + ' next' : ' · season complete'),
+    title: 'Every F1 race, driver and team, by the numbers.',
+    lede: 'Our chance for this weekend’s Grand Prix, who’s fast right now, and the fight for both titles, from 20,000 simulated seasons, in plain English.',
+    links: [{ label: 'Races', sub: next ? PD.shortRace(next.name) + ' next' : 'Every race centre', href: next ? PD.raceHref(next.year, next.round) : '#/races' },
+      { label: 'Standings', sub: 'And the title race', href: '#/standings' }, { label: 'Drivers', sub: 'Pace and percentiles', href: '#/drivers' }] }) +
+    '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: 'This week in F1', title: '<span id="ov-wkh">The week so far</span>', html: true, sub: esc(stageLine(dig.stage)) }) +
+    '<div id="ov-week"></div><div class="ql-feat" id="ov-feat">' + QK.skeleton('card', 1) + '</div></section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch ' + when, title: '<span id="ov-wh">' + (next ? 'Our calls for ' + esc(where) : 'What the numbers say') + '</span>', html: true,
       sub: 'Our numbers only, each with a line on why it’s worth your time. The stripe across the top of each card is our chance.' }) + '<div class="qk-watch" id="ov-watch">' + QK.skeleton('card', 3) + '</div></section>' +
     '<div id="ov-hot"></div>' +
@@ -109,8 +194,13 @@ function render(el) {
   return Promise.all([PD.load(y + '/season.json'), raceP, PD.load(y + '/value.json'), PD.load(y + '/fantasy.json')]).then(function (arr) {
     if (!PD.alive(el)) return;
     var season = arr[0], race = arr[1], value = arr[2], fan = arr[3];
-    PD.set('ov-feat', feature(next, race, season));
-    tiles(idx, season, race, value, meta);
+    var T = weekTiles(dig, season, wk, next);
+    PD.set('ov-week', T.length ? QK.stats(T) : '');
+    if (T.length >= 3) PD.set('ov-wkh', 'The week in ' + WORDS[T.length].toLowerCase() + ' lines');
+    /* the next Grand Prix leads when it is this week, or when the title is all but decided (the title fight would
+       say nothing); otherwise the title fight */
+    var tr = titleRows(season, 'drivers'), decided = tr[0] && tr[0].model > 0.99;
+    PD.set('ov-feat', wk && (wk.soon || wk.live || (decided && next)) ? feature(next, race, season, wk, dig) : raceLead(season, next));
     watch(next, race, season);
     hot(season, value);
     real(value);
@@ -128,7 +218,7 @@ function render(el) {
    second pick in their constructors' colours (team-mates: the second falls to slate with the colour as its rule), our
    win chance as the giant numbers and the volt "Our pick" tag. Season over: the champion against the runner-up on
    points. No market. */
-function feature(next, race, season) {
+function feature(next, race, season, wk, dig) {
   if (!next) {
     var st = PD.ok(season) ? ((season.standings || {}).drivers || []) : [];
     if (!st[0] || !st[1]) return '';
@@ -141,7 +231,18 @@ function feature(next, race, season) {
   var R = PD.v2.raceGame(next, ns.sim.drivers, { start: ((next.sessions || {}).race) || next.date, href: PD.raceHref(next.year, next.round), league: 'Round ' + next.round + ' · ' + ((next.circuit || {}).locality || PD.shortRace(next.name)),
     extra: ns.post ? 'The grid is set: this is our forecast after qualifying.' : '' });
   if (!R) return '';
-  return QK.splitHero(R.g, { tag: 'Our pick ' + (ns.post ? 'after qualifying' : 'this weekend') + '!', homeFirst: true, sub: PD.v2.sideSub, note: R.note });
+  var tag = wk && wk.live ? 'Live now · ' + wk.live.label : wk && wk.next && wk.soon ? whenLabel(wk.next.iso) + ' · ' + wk.next.label : 'The next Grand Prix';
+  var F = (dig || {}).featured || {}, fr = (F.today || [])[0] || F.week;
+  var why = fr && fr.why && fr.why.length ? '<b>Why this race?</b> ' + esc(fr.why.join(' and ').replace(/^./, function (c) { return c.toUpperCase(); })) + '. ' : '';
+  return QK.splitHero(R.g, { tag: tag, homeFirst: true, sub: PD.v2.sideSub, note: why + (R.note || '') });
+}
+/* No Grand Prix in the coming week: the title fight leads instead (our title chances in constructor colours). */
+function raceLead(season, next) {
+  var rows = titleRows(season, 'drivers').slice(0, 6);
+  if (!rows.length) return next ? feature(next, null, season, null, null) : '';
+  var cr = PD.v2.chanceRows(rows.map(function (r) { return r.id; }), function (id) { return season.championship.drivers[id].p_title; }, true, null);
+  return '<div class="ql-race">' + QK.sectionHead({ kicker: next ? 'No race this weekend' : 'Season complete', title: 'So here’s the title fight', tag: 'h3',
+    sub: 'Our chance of the drivers’ title from 20,000 simulated seasons.' + (next ? ' Next up: the ' + next.name + ', ' + day(next.date) + '.' : '') }) + QK.chances(cr, { max: 1, key: false, oursName: 'Our title chance' }) + '</div>';
 }
 
 /* "What to watch": up to six calls from our own numbers (no market), each a kit game card with the constructor-colour
@@ -171,9 +272,7 @@ function watch(next, race, season) {
   if (ch && st[0]) {
     var lead = st[0], sec = st[1], left = (season.rounds_total || 0) - (season.rounds_done || 0);
     var pl = (ch[lead.driver] || {}).p_title;
-    if (isNum(pl) && pl > 0.995) cards.push({ kicker: 'The title · all but decided', team: lead.team, stripe: pl, href: '#/standings?tab=odds', ft: 'Of simulated seasons · ',
-      rows: [{ team: lead.team, name: PD.driverName(lead.driver), sub: PD.pts(lead.points) + ' points', p: pl, fav: true }],
-      why: PD.pts(lead.points - (sec ? sec.points : 0)) + ' points clear with ' + left + ' round' + (left === 1 ? '' : 's') + ' left.' });
+    if (isNum(pl) && pl > 0.995) { /* the title is all but decided: the "Title favourite" tile at the top says so */ }
     else if (sec && isNum((ch[sec.driver] || {}).p_title)) cards.push({ kicker: 'The title fight', team: sec.team, stripe: ch[sec.driver].p_title, href: '#/standings?tab=odds', ft: 'Our title chance · ',
       rows: [{ team: lead.team, name: PD.driverName(lead.driver), sub: PD.pts(lead.points) + ' points', p: (ch[lead.driver] || {}).p_title, fav: true }, { team: sec.team, name: PD.driverName(sec.driver), sub: PD.pts(sec.points) + ' points', p: ch[sec.driver].p_title }],
       why: 'Can ' + PD.driverSurname(sec.driver) + ' catch ' + PD.driverSurname(lead.driver) + '? ' + PD.pts(lead.points - sec.points) + ' points behind with ' + left + ' round' + (left === 1 ? '' : 's') + ' left.' });
@@ -233,7 +332,7 @@ function howSureBlock() {
     var box = document.getElementById('ov-sure'), hd = document.getElementById('ov-sure-h');
     if (!box || !hd) return;
     if (!PD.v2.calib(cj)) { box.innerHTML = ''; return; }
-    hd.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every driver in every Grand Prix we have forecast, grouped by the win chance we gave before qualifying. When the two bars match, our numbers mean what they say.',
+    hd.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every driver in every Grand Prix we have forecast, grouped by the win chance we gave before qualifying. When the two lines match, our numbers mean what they say.',
       actions: '<a class="qk-more" href="#/model">The full record</a>' });
     PD.v2.howSure(box, cj);
   });
@@ -256,27 +355,6 @@ function real(value) {
   QKC.quadrant('#ov-luck', { points: pts, xName: 'Race pace against the field (% of a lap, right is faster)', yName: 'Points per start', refX: med('x'), refY: med('y'),
     xFmt: function (v) { return PD.signed(v, 1) + '%'; }, yFmt: function (v) { return PD.num(v, 0); }, corners: { tl: 'Winning on luck?', tr: 'The real deal', bl: 'Struggling', br: 'Due a haul' }, label: 'F1 drivers: race pace against points per start' });
   PD.set('ov-luck-cap', 'F1 ' + (value.year || '') + ', drivers with ' + minR + '+ starts. Pace is our lap-time model’s latest estimate, driver and car together. Dashed lines: the field’s medians. Tap a driver for the page.');
-}
-
-function tiles(idx, season, race, value, meta) {
-  var next = idx.next;
-  var st = PD.ok(season) ? (season.standings || {}).drivers || [] : [];
-  var ct = PD.ok(season) ? (season.standings || {}).constructors || [] : [];
-  var lead = st[0], second = st[1];
-  var dr = titleRows(season, 'drivers'), cr = titleRows(season, 'constructors');
-  var ns = nextSim(race);
-  var fav = ns ? Object.keys(ns.sim.drivers).sort(function (a, b) { return ns.sim.drivers[b].p_win - ns.sim.drivers[a].p_win; })[0] : null;
-  var prog = PD.ok(season) && lead ? ((season.progression || {}).drivers || {})[lead.driver] : null;
-  var T = PD.ok(value) && value.teams ? PD.rowsOf(value.team_cols, value.teams).filter(function (r) { return isNum(r.car); }).sort(function (a, b) { return b.car - a.car; }) : [];
-  var list = [];
-  if (next) list.push(PD.kpi(PD.shortRace(next.name) + ' favourite', fav ? esc(PD.driverCode(fav)) + ' ' + PD.pct(ns.sim.drivers[fav].p_win, 0) : '—', fav ? 'our win chance · ' + (ns.post ? 'after qualifying' : 'before qualifying') : 'forecast not built yet', { signal: true, href: PD.raceHref(next.year, next.round), tip: 'Our chance of winning the next Grand Prix, from 20,000 simulated races' }));
-  if (dr[0]) list.push(PD.kpi('Drivers’ title', esc(PD.driverCode(dr[0].id)) + ' ' + PD.pct(dr[0].model, dr[0].model > 0.99 ? 2 : 1), 'our chance · from simulated seasons', { signal: true, href: PD.driverHref(dr[0].id), tip: 'Our chance of winning the drivers’ championship' }));
-  else if (meta.champion) list.push(PD.kpi('Champion', esc(PD.driverName(meta.champion)), 'drivers’ title', { text: true, href: PD.driverHref(meta.champion) }));
-  list.push(PD.kpi('Leader', lead ? esc(PD.driverCode(lead.driver)) + ' ' + PD.pts(lead.points) : '—', lead ? (second ? PD.pts(lead.points - second.points) + ' clear of ' + esc(PD.driverCode(second.driver)) : 'points') : '', { href: lead ? PD.driverHref(lead.driver) : null, trend: prog && prog.length > 1 ? prog : null, trendColor: lead ? PD.tc(lead.team) : null, trendLabel: 'Points after each round' }));
-  list.push(PD.kpi('Constructors', ct[0] ? esc(PD.teamAbbr(ct[0].team)) + ' ' + PD.pts(ct[0].points) : '—', ct[0] ? esc(PD.teamName(ct[0].team)) + (cr[0] ? ' · our title chance ' + PD.pct(cr[0].model, cr[0].model > 0.99 ? 2 : 1) : '') : '', { href: ct[0] ? PD.teamHref(ct[0].team) : null }));
-  list.push(PD.kpi('Fastest car', T[0] ? esc(PD.teamAbbr(T[0].id)) + ' ' + PD.signed(T[0].car, 2) + '%' : '—', T[0] ? 'of a lap faster than the field, latest round' : 'needs lap data', { href: T[0] ? PD.teamHref(T[0].id) : null, tip: 'Our car-pace estimate from the lap-time model' }));
-  list.push(PD.kpi('Rounds run', PD.ok(season) ? season.rounds_done + '/' + season.rounds_total : '—', PD.ok(season) ? (season.calendar || []).filter(function (c) { return c.sprint; }).length + ' sprint weekends' : ''));
-  PD.set('ov-kpis', PD.kpis(list));
 }
 
 function weekend(next, race, season) {

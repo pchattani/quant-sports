@@ -2,13 +2,18 @@
  * (docs/rink/assets/js/rk-overview.js) is the reference page; docs/_design/MIGRATION_V4.md has the steps.
  *
  *   ticker         the black ticker: today's live, coming and finished matches by competition
- *   greeting       QK.greeting (the lower third) over the match to watch as the diagonal split hero (QK.splitHero,
- *                  home first, club colours when clubs_index.json has them, else cobalt for our favourite v slate)
- *   quick links    the big leagues and "All 69": the competition structure stays one tap away
- *   stat strip     matches today, the biggest league's title favourite and Europe's (our chance), the top-rated club on
- *                  the pooled scale, the top scorer across competitions
+ *   intro          what the site covers and how to use it: three quick links (Matches, Competitions, Players), then
+ *                  the big leagues and "All 69" as chips
+ *   this week      "This week in football" (hub.json digest, scripts/build_site_all.py build_digest): the stage of the
+ *                  big leagues, then the top lines as black tiles: the biggest title-chance mover (history.json), the
+ *                  upset of the week and our record (only from forecast_log.json: the chance frozen before kick-off),
+ *                  the team of the week, the biggest races' favourites, the other matches that matter
+ *   the big one    the match that matters most on the shared significance rule (digest.featured: competition tier,
+ *                  stage, the title stakes in our simulations, the hour, closeness a small bonus) as the diagonal split
+ *                  hero, home first, labelled "Live now", "Tonight" (17:00 or later today, the reader's time), "Today",
+ *                  "Tomorrow" or the weekday; nothing big on: the races lead instead
  *   N matches.     game cards for one day (our home / draw / away chance before kick-off, the score and xG after),
- *   Our calls.     each with a line on why, picked by how close and how big the match is; the day and the competition
+ *   Our calls.     each with a line on why, big matches first (digest.featured), then how big and close; the day and the competition
  *                  family are pickers. No market anywhere on this page.
  *   who's hot      the black power list (QK.band + QK.hotRow): goals, assists, rating, finishing, the strongest club
  *   we say it      "We say it. Then we check it." (QK.howSure from data/calibration.json, the walk-forward backtest)
@@ -17,7 +22,7 @@
  *   title race     "Who wins the league?": our title chances for one big league in club colours (ours only), beside
  *                  the race run by run (forecast lines with end labels); then every open race's favourite
  *   leaders        goals against xG across competitions; the strongest clubs on the pooled scale; national teams
- *   leagues        the leagues at a glance: progress, leader, our favourite, top scorer; competitions between editions
+ *   leagues        the leagues at a glance: progress, leader, our favourite, top scorer
  *
  * Football has no live model: a match in play keeps our pre-match chance, labelled "our pre-game chance" (FB.toGame
  * sets pre_only), as on the Home page and the ticker.
@@ -54,7 +59,6 @@ function allHub(h) {
 function isLive(m) { return (m.status === 'live' || m.status === 'inprogress') && !FB.staleLive(m); }
 function famOfSlug(slug) { return FB.familyOf(FB.comp(slug)); }
 function inSeason(c) { return c.ok && !FB.isLastEdition(c); }
-function evening() { var h = new Date().getHours(); return h >= 15 || h < 5; }
 /* How much a match is worth watching: live first, then close calls in the biggest competitions, then soonest. */
 function watchRank(m) {
   var g = FB.toGame(m, m.comp);
@@ -65,16 +69,16 @@ function watchRank(m) {
 
 FB.route('overview', function (el) {
   var comps = FB.comps();
-  var when = evening() ? 'tonight' : 'today';
   var nOk = comps.filter(function (c) { return c.ok; }).length;
   el.innerHTML =
     '<div class="qk-ticker fb-ov-ticker" id="ov-ticker" aria-label="Scores and our chances" hidden></div>' +
-    '<div id="ov-hero">' + greetHTML('') + '</div>' +
+    introHTML() +
     '<div class="fb-ov-quick">' + BIG.concat(['champions-league', 'brasileirao', 'mls', 'liga-argentina', 'libertadores']).filter(function (s) { return FB.comp(s) && FB.comp(s).ok; }).map(function (s) {
       return '<a class="qk-chip" href="' + esc(FB.href.comp(s)) + '">' + esc(FB.compName(s, true)) + '</a>';
     }).join('') + '<a class="qk-chip" href="#/competitions">All ' + nOk + ' →</a></div>' +
-    '<div id="ov-kpis" class="fb-ov-kpis">' + QK.skeleton('lines', 2) + '</div>' +
-    '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch ' + when, title: '<span id="ov-gh">Today</span>', html: true,
+    '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: 'This week in football', title: '<span id="ov-wk">The week so far</span>', html: true, sub: '<span id="ov-stage"></span>' }) +
+      '<div id="ov-week">' + QK.skeleton('lines', 2) + '</div><div id="ov-feat" class="ql-feat"></div></section>' +
+    '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch', title: '<span id="ov-gh">Today</span>', html: true,
         sub: '<span id="ov-day-sub">Our chance for each side, with a line on why it’s worth your time. Kick-off in your time zone; during a match the card keeps our pre-match chance.</span>',
         actions: '<span id="ov-days"></span><a class="qk-more" href="#/matches">Every match</a>' }) +
       '<div class="qk-chips scroll" id="ov-fam" role="group" aria-label="Competition family">' + FAM_CHIPS.map(function (f) {
@@ -107,8 +111,7 @@ FB.route('overview', function (el) {
       ) + '</section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'Leagues', title: 'Every league at a glance', sub: 'How far each league has gone, who leads, our title favourite and the top scorer.', actions: '<a class="qk-more" href="#/competitions">Competitions</a>' }) +
       FB.card('', '', '<div id="ov-leagues"></div>', { flush: true }) + '</section>' +
-    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Between editions', title: 'Last time out', sub: 'Competitions with no edition in progress: the last one, as it finished.' }) +
-      '<div id="ov-last" class="fb-ov-last"></div></section>';
+    '';
 
   QK.chips(el.querySelector('#ov-fam'), function (vals) { view.fam = vals[0] || 'all'; drawCards(el, HUB); });
 
@@ -120,10 +123,9 @@ FB.route('overview', function (el) {
     HUB = arr[0] || { days: {} };
     POOL = arr[1];
     FORM = formMap(POOL);
-    drawHero(el, HUB);
+    drawWeek(el, HUB);
     drawCards(el, HUB);
     drawTicker(el, HUB);
-    drawKpis(el, HUB, POOL);
     drawLeaders(el, HUB);
     drawPool(el, POOL);
     FB.load('lab/leaders.json').then(function (board) { if (FB.alive(el)) drawHot(el, board, HUB, POOL); });
@@ -133,14 +135,13 @@ FB.route('overview', function (el) {
   drawTitle(el);
   drawReal(el);
   drawLeagues(el);
-  drawLast(el);
   FB.load('nations.json').then(function (n) { if (FB.alive(el)) drawNations(el, n); });
 
   /* live: re-read the scoreboard every minute while anything is in play or about to start */
   FB.interval(function () {
     var soon = allHub(HUB).some(function (m) { var t = FB.parseDate(m.date); return isLive(m) || (m.status !== 'finished' && t && Math.abs(t - Date.now()) < 15 * 60000); });
     if (!soon) return;
-    FB.reload('hub.json').then(function (h) { if (!FB.alive(el) || !h) return; HUB = h; FB.hubLive(h); drawCards(el, HUB); drawTicker(el, HUB); drawKpis(el, HUB, POOL); });
+    FB.reload('hub.json').then(function (h) { if (!FB.alive(el) || !h) return; HUB = h; FB.hubLive(h); drawCards(el, HUB); drawTicker(el, HUB); });
   }, 60000);
   return p;
 });
@@ -161,28 +162,137 @@ function extraFor(m, why) {
   };
 }
 
-/* ── the greeting (the lower third) and the match to watch under it as the diagonal split hero: the best match still
-   to come in the next two days, home first, our pre-match chance in the foot */
-function greetHTML(side) {
-  var d = new Date();
-  var n = FB.comps().filter(function (x) { return x.ok; }).length;
-  return QK.greeting({ date: 'Football · ' + FB.DAYS[d.getDay()] + ' ' + d.getDate() + ' ' + FB.MONTHS[d.getMonth()] + ' · ' + FB.comps().filter(inSeason).length + ' competitions in season',
-    title: esc(QK.greet()) + '! Here’s what’s ' + QK.mark('worth watching') + ' in football ' + (evening() ? 'tonight' : 'today') + '.',
-    lede: 'Our chance for every match, title races from 30,000 simulated seasons, expected goals, and a page for every club and player across all ' + n + ' competitions. Every number explained.',
-    ctas: [{ label: 'All matches', href: '#/matches' }, { label: 'Competitions', href: '#/competitions', ghost: true }], side: side });
+/* ── the landing top: the intro band, "This week in football" (hub.json digest: oddsmarkets/common/digest.py, built
+   by scripts/build_site_all.py build_digest) and the match that matters most (digest.featured: the shared
+   significance rule, oddsmarkets/common/featured.py). The page clock is QK.now(), so ?asof= previews agree. */
+function nowDay() { return FB.localDay(new Date(QK.now())); }
+/* "Live now" | "Tonight" | "Today" | "Tomorrow" | the weekday | the date, in the reader's own time. */
+function whenLabel(m) {
+  if (!m) return '';
+  if (isLive(m)) return 'Live now';
+  if (m.status === 'finished') return 'Full time';
+  var d = FB.parseDate(m.date), now = new Date(QK.now());
+  if (!d) return '';
+  var d0 = function (x) { var y = new Date(x.getTime()); y.setHours(0, 0, 0, 0); return y.getTime(); };
+  var n = Math.round((d0(d) - d0(now)) / 864e5);
+  if (n === 0) return d.getHours() >= 17 ? 'Tonight' : 'Today';
+  if (n === 1) return 'Tomorrow';
+  if (n > 1 && n < 7) return d.toLocaleDateString('en-GB', { weekday: 'long' });
+  return QK.fmt.date(m.date);
 }
-function drawHero(el, h) {
-  var box = el.querySelector('#ov-hero');
+function dayOf(iso) { return QK.fmt.date(String(iso || '').length === 10 ? iso + 'T12:00:00' : iso); }
+function introHTML() {
+  var n = FB.comps().filter(function (x) { return x.ok; }).length, live = FB.comps().filter(inSeason).length;
+  var links = [{ label: 'Matches', sub: 'Every match, our chance', href: '#/matches' }, { label: 'Competitions', sub: 'Tables and title races', href: '#/competitions' }, { label: 'Players', sub: 'Leaders and percentiles', href: '#/players' }];
+  return '<section class="ql-intro" aria-label="About this site"><div class="ql-intro-l"><div class="qk-greet-date">Football · ' + esc(String(live)) + ' competitions in season</div>' +
+    '<h1>Every match in ' + esc(String(n)) + ' competitions, by the numbers.</h1>' +
+    '<p>Our chance for today’s matches, who’s for real, and the title races from 30,000 simulated seasons, with a page for every club and player. Every number explained.</p></div>' +
+    '<nav class="ql-links" aria-label="Start here">' + links.map(function (l) { return '<a href="' + esc(l.href) + '"><b>' + esc(l.label) + '</b><span>' + esc(l.sub) + '</span></a>'; }).join('') + '</nav></section>';
+}
+function hubById(h) {
+  var by = {};
+  allHub(h).concat((h || {}).upcoming || []).forEach(function (m) { if (m && m.id) by[String(m.id)] = m; });
+  return by;
+}
+/* The match that matters most at the reader's clock: the first of digest.featured.today still to come or live,
+   then .next (later this week), then .week; with none, null (the page leads with the races instead). */
+function pickFeatured(h) {
+  var F = ((h || {}).digest || {}).featured;
+  if (!F) return null;
+  var by = hubById(h), now = QK.now();
+  var ok = function (f, hrs) {
+    var m = f && by[String(f.id)];
+    if (!m || m.status === 'finished' || m.status === 'postponed' || m.status === 'cancelled') return false;
+    var t = FB.parseDate(m.date), hh = t ? (t - now) / 36e5 : null;
+    if (hh === null) return false;
+    return isLive(m) ? hh > -3 : hh > -0.25 && hh < hrs;
+  };
+  var T = (F.today || []).filter(function (f) { return ok(f, 24); });
+  var N = (F.next || []).filter(function (f) { return ok(f, 24 * 7); });
+  var f = T[0] || N[0] || (ok(F.week, 24 * 7) ? F.week : null);
+  if (!f) return null;
+  var rest = T.concat(N).filter(function (x) { return x !== f; }).map(function (x) { return by[String(x.id)]; });
+  return { m: by[String(f.id)], f: f, later: !T.length, rest: rest };
+}
+function whyOf(f, m) {
+  var lead = (f.why || []).join(' and ');
+  var t = f.title, c = FB.comp(m.comp) || {};
+  var sides = t ? [[m.home, t[0]], [m.away, t[1]]].filter(function (x) { return x[1] >= 0.01; }) : [];
+  var nums = sides.length ? 'our chance to win ' + (c.short_name || c.name || 'it') + ': ' + sides.map(function (x) { return x[0] + ' ' + pct(x[1]); }).join(', ') : '';
+  if (!lead && !nums) return '';
+  return lead ? cap(lead) + (nums ? '; ' + nums : '') + '.' : cap(nums) + '.';
+}
+function drawWeek(el, h) {
+  var dig = (h || {}).digest || {};
+  var feat = pickFeatured(h);
+  var T = [];
+  var mv = dig.movers;
+  if (mv && ((mv.up || []).length || (mv.down || []).length)) {
+    var u0 = (mv.up || [])[0], d0 = (mv.down || [])[0], lead = u0 && (!d0 || Math.abs(u0.delta) >= Math.abs(d0.delta)) ? u0 : d0;
+    var pts = function (x) { return (x.delta > 0 ? '+' : '−') + Math.abs(Math.round(x.delta * 100)) + ' pts'; };
+    var other = lead === u0 ? d0 : u0;
+    T.push({ label: 'Biggest mover', value: lead.name + ' ' + pts(lead), text: lead.name.length > 10, signal: true, href: lead.id ? FB.href.club(lead.id, { c: lead.comp }) : FB.href.comp(lead.comp, 'odds'),
+      sub: (lead.delta > 0 ? 'Up' : 'Down') + ' to ' + pct(lead.to) + ' to win ' + (lead.league || '') + ' since ' + dayOf(lead.since) + '.' + (other ? ' ' + (other.delta > 0 ? 'Biggest rise' : 'Biggest fall') + ': ' + other.name + ' ' + pts(other) + '.' : '') });
+  }
+  var up = dig.upset;
+  if (up) {
+    var w = up.winner || {}, l = up.loser || {}, sc = up.side === 'home' ? up.hs + '–' + up.as : up.as + '–' + up.hs;
+    T.push({ label: 'Upset of the week', value: (w.name || '') + ' ' + pct(up.p), text: String(w.name || '').length > 10, href: FB.href.match(up.comp, up.id),
+      sub: (w.name || '') + ' beat ' + (l.name || '') + ' ' + sc + ' on ' + QK.fmt.date(up.start) + '. We gave them ' + pct(up.p) + ' before kick-off.' });
+  }
+  var hot = dig.hot;
+  if (hot) T.push({ label: 'Team of the week', value: hot.name + ' ' + (hot.d ? 'W' + hot.w + ' D' + hot.d + (hot.l ? ' L' + hot.l : '') : hot.w + '–' + hot.l), text: String(hot.name).length > 10, href: isNum(hot.key) ? FB.href.club(hot.key) : null,
+    sub: hot.w + ' wins' + (hot.d ? ', ' + hot.d + ' draw' + (hot.d === 1 ? '' : 's') : '') + ' in ' + hot.gp + ' matches this week, ' + (hot.margin >= 0 ? '+' : '−') + Math.abs(hot.margin) + ' goal difference.' });
+  var r = dig.record;
+  if (r) T.push({ label: 'Our record this week', value: r.won + ' of ' + r.n, href: '#/model/calibration',
+    sub: 'Our favourites won ' + r.won + ' of ' + r.n + '; we expected ' + num(r.expected, 0) + '.' + (r.draws ? ' ' + r.draws + ' ended level.' : '') });
+  /* fewer than four lines: the biggest races' favourites fill in */
+  ['champions-league'].concat(BIG).forEach(function (s) {
+    if (T.length >= 4) return;
+    var c = FB.comp(s);
+    if (!c || !inSeason(c) || !c.favourite || !isNum(c.p_favourite)) return;
+    T.push({ label: (c.short_name || c.name) + ' favourite', value: c.favourite + ' ' + pct(c.p_favourite), text: String(c.favourite).length > 10, href: FB.href.comp(s, 'odds'),
+      sub: 'Our chance to ' + (c.kind === 'league' ? 'win the league' : 'lift the trophy') + ', from 30,000 simulated seasons.' });
+  });
+  var rest = feat ? feat.rest.filter(Boolean).slice(0, 2) : [];
+  if (rest.length) T.push({ label: 'Also worth a look', value: rest.map(function (m) { return FB.clubCode(m.home, m.away) + '–' + FB.clubCode(m.away, m.home); }).join(' · '), text: rest.length > 1, href: '#/matches',
+    sub: rest.map(function (m) { return whenLabel(m) + (isLive(m) ? '' : ' ' + QK.fmt.time(m.date)) + ': ' + m.home + ' v ' + m.away + ' (' + (m.comp_name || '') + ')'; }).join('. ') + '.' });
+  var box = el.querySelector('#ov-week');
+  if (box) box.innerHTML = T.length ? QK.stats(T) : '';
+  if (T.length >= 3) FB.set('ov-wk', 'The week in ' + NUMW[T.length].toLowerCase() + ' lines');
+  FB.set('ov-stage', esc(stageLine(dig.stage)));
+  drawFeature(el, h, feat);
+}
+function stageLine(st) {
+  if (!st || !(st.big || []).length) return '';
+  var lg = st.big.filter(function (b) { return b.comp !== 'champions-league' && b.round > 0; });
+  var ucl = st.big.filter(function (b) { return b.comp === 'champions-league'; })[0];
+  var parts = lg.map(function (b) { return b.name + ' ' + b.round + ' of ' + b.rounds; });
+  var s = parts.length ? 'Rounds played: ' + parts.join(', ') + '.' : '';
+  if (ucl && ucl.rounds) s += ' The Champions League league phase is ' + ucl.round + ' of ' + ucl.rounds + ' matchdays in' + (ucl.next ? '; next on ' + QK.fmt.date(ucl.next) : '') + '.';
+  return s.trim();
+}
+function drawFeature(el, h, feat) {
+  var box = el.querySelector('#ov-feat');
   if (!box) return;
-  var now = Date.now();
-  var cands = allHub(h).filter(function (m) { var t = FB.parseDate(m.date); return m.status === 'scheduled' && m.model && isNum(m.model.h) && t && t - now > -5 * 60000 && t - now < 48 * 3600e3; });
-  var best = cands.map(function (m) { return [watchRank(m), m]; }).sort(function (a, b) { return b[0] - a[0]; })[0];
-  if (!best) return;
-  var m = best[1], g = FB.heroGame(FB.toGame(m, m.comp));
-  var c = FB.comp(m.comp) || {};
-  var rel = FB.relDay(m.date);
-  box.innerHTML = greetHTML(QK.splitHero(g, { homeFirst: true, noun: 'match', kicker: (c.name || FB.compName(m.comp)) + (g.note ? ' · ' + g.note : ''),
-    tag: rel === 'Today' ? 'Our pick ' + (evening() ? 'tonight' : 'today') : 'Our pick for ' + (rel === 'Tomorrow' ? 'tomorrow' : rel) }));
+  if (feat && feat.m) {
+    var m = feat.m, g = FB.heroGame(FB.toGame(m, m.comp)), c = FB.comp(m.comp) || {};
+    var lab = whenLabel(m), why = whyOf(feat.f, m);
+    var f = isNum(g.p_home) ? [g.p_home, isNum(g.p_draw) ? g.p_draw : 0, isNum(g.p_away) ? g.p_away : 1 - g.p_home - (g.p_draw || 0)] : null;
+    var sure = '';
+    if (f && !isLive(m)) {
+      var fav = f[0] >= f[2] ? m.home : m.away, pf = Math.max(f[0], f[2]), miss = Math.max(1, Math.round(10 * (1 - pf)));
+      sure = ' <b>How sure are we?</b> ' + pct(pf) + ' for ' + esc(fav) + ' means a match like this goes another way about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.';
+    }
+    box.innerHTML = QK.splitHero(g, { homeFirst: true, noun: 'match', kicker: (c.name || FB.compName(m.comp)) + (g.note ? ' · ' + g.note : ''),
+      tag: lab + (feat.later ? ' · The big one this week' : ' · The one to watch'), note: why ? '<b>Why this match?</b> ' + esc(why) + sure : (sure ? sure.slice(1) : undefined) });
+    return;
+  }
+  /* nothing big on: lead with the races */
+  var rows = FB.comps().filter(function (x) { return inSeason(x) && x.favourite && isNum(x.p_favourite) && !x.complete && x.p_favourite < 0.995 && (PROM[x.slug] || 0) >= 9; })
+    .sort(function (a, b) { return (PROM[b.slug] || 0) - (PROM[a.slug] || 0); }).slice(0, 6);
+  box.innerHTML = rows.length ? '<div class="ql-race">' + QK.sectionHead({ kicker: 'No big match today', title: 'So here are the races', sub: 'The favourite in each of the biggest competitions, and our chance it wins.', tag: 'h3' }) +
+    FB.chances(rows.map(function (x) { return { label: x.favourite, sub: x.short_name || x.name, p: x.p_favourite, href: FB.href.comp(x.slug, 'odds'), mark: { name: x.favourite } }; }), { max: 1, key: false }) + '</div>' : '';
 }
 
 /* ── one day's matches: "what to watch" */
@@ -194,7 +304,7 @@ function dayList(h) {
 function drawCards(el, h) {
   var by = dayList(h);
   var keys = Object.keys(by).sort();
-  var t = FB.today();
+  var t = nowDay();
   if (!view.day || keys.indexOf(view.day) < 0) view.day = keys.indexOf(t) >= 0 ? t : (keys.filter(function (k) { return k > t; })[0] || keys[keys.length - 1] || t);
   var days = el.querySelector('#ov-days');
   if (days) {
@@ -208,9 +318,13 @@ function drawCards(el, h) {
   list.forEach(function (m) { var f = famOfSlug(m.comp); counts[f] = (counts[f] || 0) + 1; });
   Array.prototype.forEach.call(el.querySelectorAll('#ov-fam [data-n]'), function (n) { n.textContent = counts[n.getAttribute('data-n')] || 0; });
   if (view.fam !== 'all') list = list.filter(function (m) { return famOfSlug(m.comp) === view.fam; });
-  var rk = {};
-  list.forEach(function (m) { rk[m.id] = watchRank(m); });
-  list.sort(function (a, b) { return (rk[b.id] - rk[a.id]) || String(a.date).localeCompare(String(b.date)); });
+  var rk = {}, sig = {};
+  var F = (h || {}).digest && h.digest.featured;
+  if (F) (F.today || []).concat(F.next || [], F.week ? [F.week] : []).forEach(function (f) { if (!(String(f.id) in sig)) sig[String(f.id)] = f.score; });
+  list.forEach(function (m) { rk[m.id] = (String(m.id) in sig ? 100 + sig[String(m.id)] : 0) + watchRank(m); });
+  /* live first, then the matches still to come (biggest first), then the results */
+  var grp = function (m) { return isLive(m) ? 0 : m.status === 'finished' ? 2 : 1; };
+  list.sort(function (a, b) { return (grp(a) - grp(b)) || (rk[b.id] - rk[a.id]) || String(a.date).localeCompare(String(b.date)); });
   var gh = el.querySelector('#ov-gh');
   var dayName = view.day === t ? 'today' : FB.relDay(view.day + 'T12:00:00');
   var shownN = Math.min(9, list.length);
@@ -233,7 +347,7 @@ function shiftDay(k, n) { var d = FB.parseDate(k + 'T12:00:00'); d.setDate(d.get
 function drawTicker(el, h) {
   var box = el.querySelector('#ov-ticker');
   if (!box) return;
-  var t = FB.today();
+  var t = nowDay();
   var list = allHub(h).filter(function (m) { return isLive(m) || FB.localDay(m.date) === t; });
   if (!list.length) { box.hidden = true; return; }
   var rank = {};
@@ -242,34 +356,6 @@ function drawTicker(el, h) {
   var games = list.slice(0, 40).map(function (m) { return FB.toGame(m, m.comp); });
   box.innerHTML = QK.ticker(games, { group: 'league', max: 40, pill: false });
   box.hidden = false;
-}
-
-/* ── stat tiles: ours first, no market */
-function drawKpis(el, h, pool) {
-  var all = allHub(h);
-  var t = FB.today();
-  var todays = all.filter(function (m) { return FB.localDay(m.date) === t; });
-  var live = all.filter(isLive);
-  var box = el.querySelector('#ov-kpis');
-  if (!box) return;
-  var tiles = [];
-  tiles.push(FB.kpi(live.length ? 'Live now' : 'Matches today', String(live.length || todays.length), {
-    sub: live.length ? todays.length + ' on the slate today'
-      : todays.filter(function (m) { return m.status === 'finished'; }).length + ' finished · ' + todays.filter(function (m) { return m.status === 'scheduled'; }).length + ' to come',
-    cls: live.length ? 'fb-ov-livetile' : '' }));
-  var lead = BIG.map(FB.comp).filter(function (c) { return c && inSeason(c) && c.favourite && isNum(c.p_favourite); })[0];
-  if (lead) tiles.push(FB.kpi((lead.short_name || lead.name) + ' favourite', esc(lead.favourite) + ' ' + pct(lead.p_favourite), { signal: true, text: true, href: FB.href.comp(lead.slug, 'odds'),
-    sub: 'our title chance, from 30,000 simulated seasons', tip: 'Our chance of winning the league in the season simulation' }));
-  var ucl = FB.comp('champions-league');
-  if (ucl && inSeason(ucl) && ucl.favourite && isNum(ucl.p_favourite)) tiles.push(FB.kpi('Champions League favourite', esc(ucl.favourite) + ' ' + pct(ucl.p_favourite), { text: true, href: FB.href.comp(ucl.slug, 'odds'),
-    sub: 'our chance to lift the trophy', tip: 'Our chance of winning the Champions League in the simulation of the rest of the competition' }));
-  var clubs = ((pool || {}).clubs || []).filter(function (c) { return (c.in_league || (c.played || 0) > 0) && isNum(c.strength); }).sort(function (a, b) { return b.strength - a.strength; });
-  if (clubs.length) tiles.push(FB.kpi('Top-rated club', esc(clubs[0].team) + ' ' + num(clubs[0].strength, 2), { text: true, href: clubs[0].team_id ? FB.href.club(clubs[0].team_id) : null,
-    sub: 'points a game we’d expect against an average side', tip: 'Our pooled rating across leagues: the points a game this club would expect against an average side' }));
-  var g = (((h || {}).leaders || {}).goals || [])[0];
-  if (g) tiles.push(FB.kpi('Top scorer', esc(g.name) + ' ' + g.value, { text: true, href: FB.href.player(g.id),
-    sub: esc(g.comp_name || FB.compName(g.comp, true)) + (isNum(g.xg) ? ' · from ' + num(g.xg, 1) + ' expected goals' : ''), tip: 'Goals in one competition this season, the most of any player' }));
-  box.innerHTML = FB.kpis(tiles.slice(0, 5));
 }
 
 /* ── who's hot: the black power list (QK.band + QK.hotRow), one name each, across every competition (lab/leaders.json;
@@ -500,15 +586,4 @@ function drawNations(el, n) {
     box.innerHTML = leadList(t.map(function (x) { return { rank: x.rank, who: FB.clubLink(byName[x.team], x.team), sub: x.confederation || '', v: num(x.strength, 2) }; }));
   });
 }
-function drawLast(el) {
-  var last = FB.comps().filter(function (c) { return c.ok && FB.isLastEdition(c); });
-  var box = el.querySelector('#ov-last');
-  if (!last.length) { box.innerHTML = FB.muted('Every competition followed has an edition in progress.'); return; }
-  box.innerHTML = last.map(function (c) {
-    var won = c.winner && c.winner.team ? c.winner : null;
-    return '<a class="fb-ov-lastc" href="' + esc(FB.href.comp(c.slug)) + '"><span class="qk-kicker">' + esc(FB.currentSeason(c).season) + '</span><b>' + esc(c.name) + '</b>' +
-      '<span class="fb-ov-won">' + (won ? FB.crest(won.tid, won.team, 'sm') + esc(won.team) : '<span class="qk-muted">last edition</span>') + '</span></a>';
-  }).join('');
-}
-
 })(window.FB);

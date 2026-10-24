@@ -142,3 +142,21 @@ def test_partial_run_keeps_index_entry(ace_world_small, build_mod):
     finally:
         SI.index_entry = orig
     assert _j(idx)["tours"]["atp"] == before
+
+
+def test_index_digest_this_week(ace_world_small, build_mod):
+    """tours[T].digest ("This week in tennis") on a full build: the stage with the live event, the featured block,
+    and data/<T>/chance_log.json written when the season simulation ran."""
+    assert build_mod.main(_args(ace_world_small)) == 0
+    d = ace_world_small["data"]
+    dig = _j(d / "index.json")["tours"]["atp"]["digest"]
+    assert dig["asof"].startswith(ace_world_small["today"].isoformat())
+    assert set(dig["featured"]) == {"today", "week"}
+    assert dig["stage"]["now"] and dig["stage"]["now"][0]["id"] == ace_world_small["live_event"]
+    for r in dig["featured"]["today"]:
+        assert r["score"] >= 40 and isinstance(r["why"], list)
+    if "record" in dig:
+        assert dig["record"]["won"] + dig["record"]["upsets"] + dig["record"]["draws"] == dig["record"]["n"]
+    race = _j(d / "atp" / "race.json")
+    if race.get("ok") is not False and race.get("finals_qual"):
+        assert "2026" in _j(d / "atp" / "chance_log.json")

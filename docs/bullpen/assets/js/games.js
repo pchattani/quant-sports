@@ -95,7 +95,8 @@ function render(el, params) {
       list = list.map(c => fresh[c.gpk] || c);
       Object.keys(fresh).forEach(k => { if (!list.find(c => c.gpk === k)) list.push(fresh[k]); });
     }
-    list = list.filter(c => !BP.notNeeded(c));
+    const unneeded = BP.unneededIn(list);
+    list = list.filter(c => !BP.notNeeded(c) && !unneeded(c));
     if (!list.length) { body.innerHTML = BP.card('Games', '', BP.notBuilt('The ' + S + ' schedule', d)); return; }
     const byDate = {};
     list.forEach(c => { if (c && c.date) (byDate[c.date] = byDate[c.date] || []).push(c); });

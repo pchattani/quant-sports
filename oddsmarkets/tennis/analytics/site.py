@@ -226,3 +226,101 @@ def index_entry(td: an.TourData, preds: dict, prices: dict | None, sims: dict[st
                                                                  for p in order],
             "names": {p: td.short(p) for p in set(order) | {x[0] for v in elo_top.values() for x in v}
                       | {e["favourite"][0] for e in evs if e.get("favourite")}}}
+
+
+# ─────────────────────────────────────────────── "This week in tennis" (the overview's digest)
+FEATURED_MIN = 40.0        # a tennis hero needs more than the Home page's 30: a 250 quarter-final at a sane hour is
+                           # about 32, so only a Slam, Finals or 1000 match, a 500 from the quarters, or a 250 final leads
+
+
+def _start(c: dict) -> tuple[str | None, bool]:
+    """(ISO UTC start, tba) from a card's date: "2026-10-17T04:00" is UTC; a bare date has no time (tba)."""
+    d = str(c.get("date") or "")
+    if len(d) == 16:
+        return d + ":00Z", bool(c.get("tba"))
+    if len(d) == 10:
+        return d, True
+    return (d or None), bool(c.get("tba"))
+
+
+def digest_games(cards: list[dict], events: dict, tour: str) -> list[dict]:
+    """Match cards (MT.card) as the shared game dict (oddsmarkets/common/featured.py, digest.py): p1 is "home" and its
+    chance p_home; the winner set from the card (the score is sets, so it says who won only with a retirement read
+    right); the event's level as sig.comp and the round as sig.round. Walkovers are left out (no match was played)."""
+    out = []
+    for c in cards or []:
+        st = str(c.get("status") or "")
+        if st == "wo" or not c.get("p1") or not c.get("p2"):
+            continue
+        status = "final" if st in an.FINISHED else "live" if st == "live" else "pre"
+        start, tba = _start(c)
+        ev = (events or {}).get(c.get("event")) or {}
+        sets = c.get("sets") or []
+        hs = sum(1 for s in sets if s and s[0] is not None and s[1] is not None and s[0] > s[1]) if status != "pre" else None
+        as_ = sum(1 for s in sets if s and s[0] is not None and s[1] is not None and s[1] > s[0]) if status != "pre" else None
+        w = c.get("winner")
+        g = {"sport": "tennis", "league": f"{tour.upper()} · {ev.get('name') or c.get('event')}", "id": c.get("id"), "start": start,
+             "status": status, "home": c.get("p1"), "away": c.get("p2"), "hs": hs, "as": as_, "p_home": (c.get("model") or {}).get("p1"),
+             "wp_home": c.get("wp_now") if status == "live" else None, "note": c.get("round"),
+             "winner": "home" if w and w == c.get("p1") else "away" if w and w == c.get("p2") else None,
+             "sig": {"comp": ev.get("level") or ("challenger" if "challenger" in str(c.get("event") or "") else "other"), "round": c.get("round")}}
+        if tba:
+            g["tba"] = True
+        out.append(g)
+    return out
+
+
+def digest(tour: str, cards: list[dict], events: dict, race_sim: dict | None, prev_log: dict | None, now) -> tuple[dict, dict]:
+    """The tour's index.json "digest" and the chance log to write back (data/<T>/chance_log.json).
+
+    record / upset / hot (the player with the most wins this week) from finished matches' pre-match chances, which
+    are walk-forward (matches.predictions: the Elo from just before the match and the serve/return fit through the
+    day before its month began), so no look-ahead; movers in the race to the Finals and the year-end No. 1 from the
+    log of each build's season simulation; the stage (the tournaments in play, the next big one, the Finals); and
+    the featured match on the shared significance rule, a TBA (date-only) match never featured since its hour is
+    unknown."""
+    from oddsmarkets.common import digest as DG
+    from oddsmarkets.common import featured as FT
+    games = digest_games(cards, events, tour)
+    out: dict = {"asof": now.strftime("%Y-%m-%dT%H:%MZ")}
+    rec = DG.record(games, now)
+    if rec:
+        rec.pop("by", None)
+        out["record"] = rec
+    up = DG.upset(games, now)
+    if up:
+        out["upset"] = {k: up[k] for k in ("id", "start", "side", "winner", "loser", "p", "hs", "as", "league") if k in up}
+    h = DG.hot(games, now)
+    if h:
+        out["hot"] = h
+    log = {}
+    for m in ("finals_qual", "year_end_no1"):
+        cur = {p: v for p, v in ((race_sim or {}).get(m) or {}).items() if isinstance(v, (int, float)) and v >= 0.005}
+        log[m] = DG.roll_log((prev_log or {}).get(m), now, cur)
+    best = None
+    for m in ("finals_qual", "year_end_no1"):
+        cur = (race_sim or {}).get(m) or {}
+        mv = DG.movers(log[m], {p: v for p, v in cur.items() if isinstance(v, (int, float))}, now)
+        if mv:
+            top = max(abs(r["d"]) for r in mv["up"] + mv["down"])
+            if best is None or top > best[0]:
+                best = (top, dict(mv, metric=m))
+    if best:
+        out["movers"] = best[1]
+    today = now.date()
+    lvl = {"slam": 0, "finals": 1, "m1000": 2, "500": 3, "250": 4, "other": 5}
+    evs = [(eid, e) for eid, e in (events or {}).items() if str(e.get("level")) in an.TOUR_LEVELS]
+    live = sorted([(eid, e) for eid, e in evs if e.get("status") == "live" or (str(e.get("start")) <= today.isoformat() <= str(e.get("end")) and e.get("status") != "done")],
+                  key=lambda x: (lvl.get(str(x[1].get("level")), 9), str(x[1].get("start"))))
+    later = sorted([(eid, e) for eid, e in evs if str(e.get("start") or "") > today.isoformat()], key=lambda x: str(x[1].get("start")))
+    ev_ = lambda eid, e: {"id": eid, "name": e.get("name"), "level": e.get("level"), "surface": e.get("surface"), "start": e.get("start"), "end": e.get("end")}
+    big_next = next(((eid, e) for eid, e in later if str(e.get("level")) in ("slam", "finals", "m1000")), None)
+    finals = next(((eid, e) for eid, e in evs if e.get("level") == "finals"), None)
+    out["stage"] = {"now": [ev_(*x) for x in live[:3]], "next": ev_(*later[0]) if later else None, "next_big": ev_(*big_next) if big_next else None,
+                    "finals": ev_(*finals) if finals else None, "done": sum(1 for _, e in evs if e.get("status") == "done"), "total": len(evs)}
+    cand = [g for g in games if not g.get("tba")]
+    r = FT.rank_featured(cand, now, min_score=FEATURED_MIN)
+    row = lambda x: {"id": x["key"].split(":", 1)[1], "score": x["score"], "why": x.get("reasons") or []}
+    wk = r.get("week")
+    out["featured"] = {"today": [row(x) for x in r["today"]], "week": row(wk) if wk and wk.get("week_score", 0) >= FEATURED_MIN - 10 else None}
+    return out, log

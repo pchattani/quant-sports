@@ -9,7 +9,9 @@ way for every site:
     restore  --site S --prev DIR            the previous deploy (a shallow clone of the Pages repo at DIR) fills in
                                             payloads and stores the checkout does not have; for the committed inputs
                                             the pipeline keeps updating (stores, registries, calibrations: the
-                                            site's newer_wins patterns) the copy with the newer stamp wins
+                                            site's newer_wins patterns) the copy with the newer stamp wins; the
+                                            persistent logs (LOGS) always come from the deploy. Football restores
+                                            only its logs (its build writes every other payload itself)
     seed     --site S                       seed-on-miss: when the site's raw inputs are incomplete (a cold or evicted
                                             cache), fetch the full working set the models need before the build
     cachekey --name N --paths P...          key=N-<hash of the files' paths and sizes>: a content key, so an Actions cache
@@ -26,7 +28,10 @@ way for every site:
                                             something changed, push (never a force push)
     deploy   ... --shadow OUT               plan only: write OUT/report.json (added / removed / changed files against
                                             the live site, JSON field differences of the summary payloads) and copy
-                                            the changed and added files to OUT/files/ for inspection; push nothing
+                                            the changed and added files to OUT/files/ for inspection; push nothing.
+                                            Before planning, a persistent log that lost history the live copy still
+                                            holds (a cold restore) is merged back from the live copy, with a
+                                            warning: no run ever resets a log
 
 The prune rules and the guards mirror scripts/local_sites.py (the PC pipeline), which this replaces site by site.
 """
@@ -464,9 +469,106 @@ def cmd_feed(site: str) -> int:
 
 # ── sites ────────────────────────────────────────────────────────────────────────────────────────
 
+# ── persistent logs ──────────────────────────────────────────────────────────────────────────────
+# Payloads each build appends to, starting from the previous deploy's copy (they are never in the checkout): the
+# overview chance logs (oddsmarkets/common/digest.py roll_log: {season: {metric: {"YYYY-MM-DD": {key: p}}}}, one
+# snapshot a day, the last CHANCE_LOG_KEEP days) and the Footballer's frozen pre-match chances (build_site_all.py
+# _forecast_log: {match id: [h, d, a, kick-off ISO, comp]}, written only before kick-off, kept FORECAST_LOG_DAYS).
+CHANCE_LOG_KEEP = 10          # digest.roll_log keep
+FORECAST_LOG_DAYS = 9         # build_site_all.FORECAST_LOG_DAYS (tests/test_ci_site_logs.py checks they agree)
+LOGS = {
+    "football": ("data/forecast_log.json",),
+    "paddock": (),            # its movers read season.json title_history, which the build rewrites in full
+    "hardwood": ("data/*/chance_log.json",),
+    "ace": ("data/*/chance_log.json",),
+    "bullpen": ("data/*/chance_log.json",),
+    "gridiron": ("data/chance_log.json",),
+    "rink": ("data/chance_log.json",),
+    "campus": ("data/*/chance_log.json",),
+}
+
+
+def is_log(site: str, rel: str) -> bool:
+    """rel: a path under the site root ('data/nba/chance_log.json'); True for one of the site's persistent logs."""
+    p = PurePosixPath(rel)
+    return any(len(p.parts) == len(PurePosixPath(pat).parts) and p.match(pat) for pat in LOGS.get(site, ()))
+
+
+def _iso(x):
+    try:
+        d = datetime.fromisoformat(str(x).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+
+def merge_log(name: str, live, new, now: datetime):
+    """(merged, lost): the new log with the history it lost from the live one put back, and how many entries that
+    was (0: nothing lost, merged is new itself). The build's own entries always win."""
+    if not isinstance(live, dict) or not live:
+        return new, 0
+    new = new if isinstance(new, dict) else {}
+    if name == "forecast_log.json":
+        lo = now - timedelta(days=FORECAST_LOG_DAYS) + timedelta(hours=2)
+        back = {}
+        for k, v in live.items():
+            if k in new or not isinstance(v, list) or len(v) < 4:
+                continue
+            ko = _iso(v[3])
+            if ko is not None and ko > lo:
+                back[k] = v
+        return (dict(new, **back), len(back)) if back else (new, 0)
+    out, lost = {k: dict(v) for k, v in new.items() if isinstance(v, dict)}, 0
+    for season, metrics in live.items():
+        if not isinstance(metrics, dict):
+            continue
+        if season not in out and any(str(k) > str(season) for k in out):
+            continue                                            # a new season started: last season's log retires
+        cur = out.setdefault(season, {})
+        for m, days in metrics.items():
+            if not isinstance(days, dict):
+                continue
+            mine = dict(cur.get(m) or {})
+            keep = sorted(set(days) | set(mine))[-CHANCE_LOG_KEEP:]
+            miss = [d for d in keep if d not in mine]
+            if miss:
+                lost += len(miss)
+                mine.update({d: days[d] for d in miss})
+                cur[m] = {d: mine[d] for d in sorted(mine) if d in keep}
+    return (out, lost) if lost else (new, 0)
+
+
+def repair_logs(site: str, clone: Path, now: datetime | None = None) -> list[str]:
+    """Before a deploy: each persistent log on the live site (the clone) that the build's copy lost history from is
+    merged back into the build's copy. One line per repaired log; empty when every log kept its history."""
+    now = now or utcnow()
+    src = ROOT / "docs" / SITES[site]["docs"]
+    fixed = []
+    for pat in LOGS.get(site, ()):
+        for lp in sorted(clone.glob(pat)):
+            rel = lp.relative_to(clone).as_posix()
+            if not is_log(site, rel):
+                continue
+            try:
+                live = json.loads(lp.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            tp = src / rel
+            try:
+                new = json.loads(tp.read_text(encoding="utf-8")) if tp.exists() else {}
+            except Exception:
+                new = {}
+            merged, lost = merge_log(lp.name, live, new, now)
+            if lost:
+                tp.parent.mkdir(parents=True, exist_ok=True)
+                tp.write_text(json.dumps(merged, separators=(",", ":")), encoding="utf-8")
+                fixed.append(f"{rel}: {lost} entries the build lost were merged back from the live copy")
+    return fixed
+
+
 SITES = {
     "football": {"docs": "site", "repo": "the-quant-footballer", "prune": prune_football, "excluded": (),
-                 "guard": guard_payload_floor("site", 2000)},
+                 "restore": "logs", "guard": guard_payload_floor("site", 2000)},
     "paddock": {"docs": "paddock", "repo": "the-quant-paddock", "prune": None, "excluded": (),
                 "newer_wins": ("data/*/store.json", "data/*/sessions/*.json", "data/*/telemetry/*.json",
                                "data/calibration.json"),
@@ -553,13 +655,22 @@ def cmd_restore(site: str, prev: Path) -> int:
     if not src.exists():
         print(f"no previous deploy at {prev}: cold build")
         return 0
-    added = newer = 0
+    added = newer = logs = 0
     patterns = cfg.get("newer_wins", ())
+    only_logs = cfg.get("restore") == "logs"
     for p in src.rglob("*"):
         if not p.is_file():
             continue
         rel = p.relative_to(src)
         target = dst / rel
+        if is_log(site, "data/" + rel.as_posix()):
+            # a persistent log: the deployed copy is the one every build appended to, so it always wins
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(p, target)
+            logs += 1
+            continue
+        if only_logs:
+            continue
         if not target.exists():
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(p, target)
@@ -569,7 +680,7 @@ def cmd_restore(site: str, prev: Path) -> int:
             if a and a > b:
                 shutil.copy2(p, target)
                 newer += 1
-    print(f"restored {added} files the checkout did not have; {newer} stores newer on the deployed site")
+    print(f"restored {added} files the checkout did not have; {newer} stores newer on the deployed site; {logs} persistent logs")
     return 0
 
 
@@ -703,6 +814,8 @@ def cmd_deploy(site: str, clone: Path, shadow: Path | None, allow_mass_delete: b
     if not (clone / ".git").exists():
         print(f"no clone at {clone}", file=sys.stderr)
         return 1
+    for line in repair_logs(site, clone):
+        print(f"::warning::persistent log repaired: {line}")
     p = plan(site, clone, ctx)
     delete_n = len(p["removed"])
     print(f"deploy plan: {p['n_files']} files, {p['bytes'] / 1e6:.0f} MB, {len(p['added'])} added, "

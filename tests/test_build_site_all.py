@@ -807,3 +807,52 @@ raise SystemExit(b.main())
     assert c["games_played"] == 6 and c["favourite"] is None
     meta = json.loads((out / "meta.json").read_text(encoding="utf-8"))
     assert meta["phase"] == "pre" and "November" in meta["phase_note"]
+
+
+def test_hub_digest_freezes_the_pre_match_chance_and_features_the_big_match(tmp_path) -> None:
+    """hub.json "digest": the week's record and upset read only the forecast log (the chance written while kick-off was
+    still ahead; a later build never rewrites it), the team of the week comes from the big competitions, and the
+    featured match is the significant one, not the closest."""
+    from datetime import datetime, timezone
+
+    import scripts.build_site_all as b
+
+    def fx(gid, date, home, away, status="scheduled", hs=None, as_=None, model=None, rnd=7):
+        r = {"id": gid, "date": date, "home": home, "away": away, "status": status, "hs": hs, "as": as_, "stage": "league", "round": rnd}
+        if model:
+            r["model"] = {"h": model[0], "d": model[1], "a": model[2]}
+        return r
+    teams = {"Arsenal": {"team_id": 42}, "Chelsea": {"team_id": 38}, "Everton": {"team_id": 48}, "Wolves": {"team_id": 3}}
+    pl = {"ok": True, "slug": "premier-league", "name": "Premier League", "short_name": "EPL", "kind": "league", "_teams": teams,
+          "_probs": [{"team": "Arsenal", "p_title": 0.4}, {"team": "Chelsea", "p_title": 0.3}, {"team": "Everton", "p_title": 0.0}],
+          "_fixtures": [fx("1", "2026-10-18T14:00:00Z", "Arsenal", "Everton", model=(0.75, 0.15, 0.10)),
+                        fx("2", "2026-10-18T16:30:00Z", "Wolves", "Chelsea", model=(0.20, 0.25, 0.55)),
+                        fx("3", "2026-10-19T19:00:00Z", "Arsenal", "Chelsea", model=(0.45, 0.27, 0.28))]}
+    fr = {"ok": True, "slug": "friendlies", "name": "Friendlies", "kind": "cup", "_teams": {},
+          "_fixtures": [fx("9", "2026-10-19T07:00:00Z", "X", "Y", model=(0.36, 0.28, 0.36))]}
+    # build 1, before the weekend: the log takes the chances still ahead
+    b.build_digest([pl, fr], tmp_path, datetime(2026, 10, 17, 12, tzinfo=timezone.utc))
+    log = json.loads((tmp_path / "forecast_log.json").read_text(encoding="utf-8"))
+    assert log["1"][:3] == [0.75, 0.15, 0.10] and log["2"][:3] == [0.20, 0.25, 0.55]
+    # build 2, after two results: the finished matches carry no model; a model re-fit after kick-off never reaches the log
+    pl["_fixtures"][0].update(status="finished", hs=0, as_=None)
+    pl["_fixtures"][0].update({"as": 1})
+    pl["_fixtures"][0].pop("model")
+    pl["_fixtures"][1].update(status="finished", hs=0, model={"h": 0.99, "d": 0.0, "a": 0.01})
+    pl["_fixtures"][1].update({"as": 3})
+    pl["_fixtures"][2]["model"] = {"h": 0.5, "d": 0.25, "a": 0.25}
+    pl["_fixtures"].append(fx("4", "2026-10-15T19:00:00Z", "Chelsea", "Everton", "finished", 2, 0))
+    pl["_fixtures"].append(fx("5", "2026-10-14T19:00:00Z", "Everton", "Arsenal", "finished", 1, 1))
+    dig = b.build_digest([pl, fr], tmp_path, datetime(2026, 10, 19, 12, tzinfo=timezone.utc))
+    log = json.loads((tmp_path / "forecast_log.json").read_text(encoding="utf-8"))
+    assert log["2"][:3] == [0.20, 0.25, 0.55] and log["3"][:3] == [0.5, 0.25, 0.25]
+    r = dig["record"] if "record" in dig else None
+    assert r is None                                     # two logged results: under the three-match floor
+    u = dig["upset"]
+    assert u["id"] == "1" and u["winner"] == {"name": "Everton", "id": 48} and u["p"] == 0.1 and u["comp"] == "premier-league"
+    assert dig["hot"]["name"] == "Chelsea" and dig["hot"]["w"] == 2
+    st = {x["comp"]: x for x in dig["stage"]["big"]}
+    assert st["premier-league"]["round"] == 7 and st["premier-league"]["next"] == "2026-10-19T19:00:00Z"
+    F = dig["featured"]
+    assert F["today"][0]["id"] == "3" and F["today"][0]["title"] == [0.4, 0.3]
+    assert "9" not in [x["id"] for x in F["today"]]      # a 03:00 New York friendly coin flip never leads

@@ -168,3 +168,59 @@ def test_livery_alt_colours_ride_with_the_team_colour():
             la, lb = lum(ssn.KNOWN_COLOURS[t]), lum(a)
             assert dh >= 50 or (max(la, lb) + 0.05) / (min(la, lb) + 0.05) >= 1.4, t
     assert ssn._alt("red_bull") == {"alt": "#1B2443"} and ssn._alt("nobody") == {}
+
+
+def _digest_world(tmp_path, race_start, hist=True):
+    """A data root with season.json (calendar, standings, progression, championship, title_history) and the last
+    race's file (its walk-forward forecast), as the build writes them."""
+    d = tmp_path / "d"
+    (d / "2026" / "races").mkdir(parents=True)
+    season = {"year": 2026, "rounds_done": 2, "rounds_total": 4,
+              "calendar": [{"round": 1, "status": "done", "time": "13:00:00Z", "sprint": False}, {"round": 2, "status": "done", "time": "13:00:00Z", "sprint": False},
+                           {"round": 3, "status": "next", "sprint": True}, {"round": 4, "status": "upcoming", "sprint": False}],
+              "standings": {"drivers": [{"driver": "a", "points": 50.0}, {"driver": "b", "points": 40.0}]},
+              "progression": {"rounds": [1, 2, 3, 4], "drivers": {"a": [25, 25, 43, 50], "b": [18, 33, 33, 40], "c": [0, 0, 1, 26]}},
+              "championship": {"drivers": {"a": {"p_title": 0.6}, "b": {"p_title": 0.4}}},
+              "title_history": [{"after_round": 1, "as_of": "2026-10-04T20:00:00Z", "drivers": {"a": {"p_title": 0.45}, "b": {"p_title": 0.55}}},
+                                {"after_round": 2, "as_of": "2026-10-11T20:00:00Z", "drivers": {"a": {"p_title": 0.6}, "b": {"p_title": 0.4}}}] if hist else []}
+    (d / "2026" / "season.json").write_text(json.dumps(season), encoding="utf-8")
+    race = {"forecast": {"pre_quali": {"drivers": {"a": {"p_win": 0.5}, "b": {"p_win": 0.3}, "c": {"p_win": 0.05}}},
+                         "post_quali": {"drivers": {"a": {"p_win": 0.55}, "b": {"p_win": 0.3}, "c": {"p_win": 0.04}}}}}
+    (d / "2026" / "races" / "2.json").write_text(json.dumps(race), encoding="utf-8")
+    idx = {"current_season": 2026, "last": {"year": 2026, "round": 2, "name": "Two GP", "winner": "c", "date": "2026-10-11", "winner_team": "t"},
+           "next": {"year": 2026, "round": 3, "name": "Three GP", "date": race_start[:10], "sessions": {"race": race_start}}}
+    return d, idx
+
+
+def test_index_digest_this_week_in_f1(tmp_path):
+    """index.json "digest": the stage, the title-chance movers between the last two rounds, the last race with the
+    winner's pre-race chance (after qualifying) and the upset flag, the form driver, and the next race as featured.
+    No "record" for F1."""
+    from datetime import datetime, timezone
+    bp = _build_module()
+    d, idx = _digest_world(tmp_path, "2026-10-18T13:00:00Z")
+    dig = bp.digest_payload(d, idx, datetime(2026, 10, 17, 20, 0, tzinfo=timezone.utc))
+    st = dig["stage"]
+    assert (st["done"], st["left"], st["sprints_left"], st["points_left"], st["leader"], st["gap"]) == (2, 2, 1, 58, "a", 10.0)
+    assert dig["movers"]["up"][0]["key"] == "a" and dig["movers"]["since_round"] == 1 and dig["movers"]["after_round"] == 2
+    last = dig["last"]
+    assert last["winner"] == "c" and last["p"] == 0.04 and last["after_quali"] is True and last["fav"] == "a" and last["upset"] is True
+    assert last["start"] == "2026-10-11T13:00:00Z"
+    assert dig["hot"]["key"] == "c" and dig["hot"]["v"] == 26 and dig["hot"]["rounds"] == [2, 3, 4]
+    assert "record" not in dig
+    assert [r["id"] for r in dig["featured"]["today"]] == ["3"]
+
+
+def test_featured_race_only_within_the_week(tmp_path):
+    """The Grand Prix leads the page only when it is near: three days out it is the week's event, not today's; ten
+    days out it is neither, and the front end leads with the title fight instead. Without two title_history
+    snapshots there are no movers."""
+    from datetime import datetime, timezone
+    bp = _build_module()
+    now = datetime(2026, 10, 15, 20, 0, tzinfo=timezone.utc)
+    d, idx = _digest_world(tmp_path, "2026-10-18T13:00:00Z", hist=False)
+    f = bp.digest_payload(d, idx, now)
+    assert f["featured"]["today"] == [] and f["featured"]["week"]["id"] == "3" and "movers" not in f
+    idx["next"]["sessions"]["race"] = "2026-10-25T13:00:00Z"
+    f = bp.digest_payload(d, idx, now)
+    assert f["featured"] == {"today": [], "week": None}

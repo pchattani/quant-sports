@@ -125,3 +125,51 @@ def test_pick_games_today_is_the_us_sports_day():
     assert [c["id"] for c in today] == ["thu", "thu_pac"]
     assert [c["id"] for c in last] == ["wed_late"]
     assert [c["id"] for c in nxt] == ["fri"]
+
+
+# ── this week (the overview's digest) ─────────────────────────────────────
+def test_index_digest_this_week(data):
+    """levels.<L>.digest: the stage from the schedule, featured from the shared significance rule, and the chance
+    log next to the level's payloads (the front end never reads it)."""
+    dig = site.build_index(data, NOW)["levels"]["cfb"]["digest"]
+    assert dig["asof"].startswith("2026-10-19T18:00")
+    assert set(dig["featured"]) == {"today", "next", "week"}
+    st = dig.get("stage")
+    if st:
+        assert st["week"] == 8 and 0 <= st["played"] <= st["total"]
+    assert (data / "cfb" / "chance_log.json").exists() or not site.load(data / "cfb" / "2026" / "season.json").get("sim")
+
+
+def _card(i, t, h, a, hs=None, as_=None, p=0.5, status="post", stype="reg", hr=None, ar=None, rnd=None):
+    return {"id": str(i), "date": t, "status": status, "stype": stype, "home": h, "away": a, "hs": hs, "as": as_, "hr": hr, "ar": ar,
+            "round": rnd, "model": {"p_home": p}}
+
+
+def test_level_digest_week_from_frozen_chances(tmp_path):
+    cards = [_card(1, "2026-10-17T19:30:00Z", "1", "2", 31, 10, 0.80, hr=3), _card(2, "2026-10-17T23:00:00Z", "4", "3", 38, 31, 0.12, ar=5),
+             _card(3, "2026-10-18T00:00:00Z", "5", "6", 20, 24, 0.40), _card(4, "2026-10-01T23:00:00Z", "6", "5", 3, 50, 0.95),
+             _card(5, "2026-10-24T16:00:00Z", "1", "3", status="pre", p=0.55, hr=3, ar=5)]
+    season = {"phase": "regular", "week": 8, "sim": {"teams": {"1": {"p_cfp": 0.9, "p_title": 0.3}, "3": {"p_cfp": 0.6, "p_title": 0.1},
+                                                              "4": {"p_cfp": 0.01, "p_title": 0.0}}}}
+    dig = site.level_digest(tmp_path, "cfb", 2026, cards, season, NOW)
+    r = dig["record"]
+    assert (r["n"], r["won"], r["upsets"]) == (3, 2, 1) and "by" not in r     # the weeks-old game is left out
+    u = dig["upset"]
+    assert u["winner"] == "4" and u["loser"] == "3" and u["p"] == 0.12 and u["ranks"] == [None, 5]
+    assert [x["id"] for x in dig["featured"]["next"] + dig["featured"]["today"]][:1] == ["5"]
+    log = site.load(tmp_path / "cfb" / "chance_log.json")
+    snap = log["2026"]["p_cfp"]
+    assert list(snap) == ["2026-10-19"] and "4" in snap["2026-10-19"] and "2" not in snap["2026-10-19"]   # half a percent floor
+
+
+def test_featured_prefers_the_big_game_over_the_closest(tmp_path):
+    """The shared significance rule on college cards: No. 3 v No. 5 with playoff places and title chances riding on
+    it leads; a dead coin flip between two unranked teams with nothing at stake does not, however close."""
+    now = datetime(2026, 10, 24, 14, 0, tzinfo=timezone.utc)
+    cards = [_card(10, "2026-10-24T16:00:00Z", "7", "8", status="pre", p=0.50), _card(11, "2026-10-24T19:30:00Z", "1", "3", status="pre", p=0.62, hr=3, ar=5)]
+    season = {"phase": "regular", "sim": {"teams": {"1": {"p_cfp": 0.7, "p_title": 0.2}, "3": {"p_cfp": 0.5, "p_title": 0.1},
+                                                    "7": {"p_cfp": 0.0, "p_title": 0.0}, "8": {"p_cfp": 0.0, "p_title": 0.0}}}}
+    f = site.level_digest(tmp_path, "cfb", 2026, cards, season, now)["featured"]
+    ids = [x["id"] for x in f["today"]]
+    assert ids[0] == "11" and (ids.index("10") > 0 if "10" in ids else True)
+    assert "#3 v #5" in f["today"][0]["why"] and "two title contenders" in f["today"][0]["why"]

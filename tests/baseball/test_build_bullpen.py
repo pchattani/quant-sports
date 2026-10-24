@@ -155,3 +155,61 @@ def test_public_site_entry():
     assert "cron:" not in wf_text and "workflow_dispatch:" in wf_text
     assert "mlb_hydrate.py" in wf_text and "build_bullpen.py" in wf_text
     assert "git commit" in wf_text and "/tmp/site" in wf_text      # the only commit is to the public site repo
+
+
+def test_index_digest_this_week(built, tmp_path):
+    """index.json "digest": on a build, the stage; from frozen pre-game prices, the week's record, upset and team of the
+    week; the chance log carried forward one snapshot a day and the movers against the snapshot a week old; the
+    postseason stage lists the series still alive."""
+    from datetime import date
+    bb = built["bb"]
+    idx = _read(built["roots"]["data"] / "index.json")
+    assert "stage" in idx["digest"] and idx["digest"]["stage"]["phase"]
+
+    def card(i, day, h, a, hs, as_, p, gtype="R"):
+        return {"gpk": str(i), "date": f"2026-09-{day:02d}", "start": f"2026-09-{day:02d}T23:05:00Z", "status": "final", "gtype": gtype,
+                "home": h, "away": a, "hs": hs, "as": as_, "model": {"p_home": p}}
+    cards = [card(1, 19, "147", "111", 5, 1, 0.62), card(2, 18, "147", "111", 2, 9, 0.66), card(3, 17, "147", "111", 3, 2, 0.58),
+             card(4, 16, "119", "137", 1, 2, 0.47), card(5, 2, "119", "137", 6, 0, 0.30)]
+    b = bb.Build(tmp_path / "d")
+    (tmp_path / "d" / "mlb").mkdir(parents=True)
+    b.write("mlb/chance_log.json", {"2026": {"p_postseason": {"2026-09-13": {"147": 0.70, "111": 0.60, "119": 0.50}}}})
+    teams = {"147": {"p_postseason": 0.92, "p_ws": 0.15}, "111": {"p_postseason": 0.41, "p_ws": 0.03}, "119": {"p_postseason": 0.55, "p_ws": 0.08}}
+    dig = bb.digest_payload(b, cards, teams, None, "regular", 2026, date(2026, 9, 20))
+    r = dig["record"]
+    assert (r["n"], r["won"], r["upsets"], r["from"], r["to"]) == (4, 3, 1, "2026-09-13", "2026-09-20") and "by" not in r
+    assert dig["upset"]["id"] == "2" and dig["upset"]["winner"] == "111" and dig["upset"]["p"] == 0.34   # game 5 is weeks old
+    assert dig["hot"]["key"] == "147" and dig["hot"]["w"] == 2
+    mv = dig["movers"]
+    assert mv["metric"] == "p_postseason" and mv["since"] == "2026-09-13" and mv["up"][0]["key"] == "147" and mv["down"][0]["key"] == "111"
+    log = _read(tmp_path / "d" / "mlb" / "chance_log.json")["2026"]
+    assert sorted(log["p_postseason"]) == ["2026-09-13", "2026-09-20"] and log["p_ws"]["2026-09-20"]["147"] == 0.15
+    st = dig["stage"]
+    assert st["played"] == 5 and st["total"] == 5 and st["last"] == "2026-09-19"
+    post = {"round": "CS", "series": [{"round": "CS", "round_name": "League Championship Series", "teams": ["147", "111"], "wins": [3, 2], "best_of": 7, "done": False},
+                                      {"round": "CS", "round_name": "League Championship Series", "teams": ["119", "137"], "wins": [4, 0], "best_of": 7, "done": True}],
+            "teams": {"147": {"p_ws": 0.4}, "111": {"p_ws": 0.1}}}
+    st = bb.digest_payload(b, cards, teams, post, "postseason", 2026, date(2026, 10, 20))["stage"]
+    assert st["round"] == "CS" and [s["teams"] for s in st["alive"]] == [["147", "111"]]
+
+
+def test_featured_prefers_the_big_game_over_the_closest(built):
+    """digest.featured (the shared significance rule): a League Championship Series Game 7 leads; a dead coin flip
+    between two clubs out of the race at 08:00 UTC is left out; a game of a series already decided (an "if
+    necessary" Game 7) is never featured."""
+    from datetime import datetime, timezone
+    bb = built["bb"]
+    now = datetime(2026, 10, 20, 15, 0, tzinfo=timezone.utc)
+    pre = lambda i, start, h, a, p, series=None, gtype="R": {"gpk": i, "start": start, "status": "pre", "gtype": gtype, "home": h, "away": a,
+                                                             "model": {"p_home": p}, "series": series}
+    cards = [pre("1", "2026-10-21T08:00:00Z", "120", "121", 0.50),
+             pre("2", "2026-10-21T00:08:00Z", "147", "111", 0.56, {"desc": "AL Championship Series", "game": 7, "of": 7}, "L"),
+             pre("3", "2026-10-21T00:00:00Z", "119", "137", 0.51, {"desc": "NL Championship Series", "game": 7, "of": 7}, "L")]
+    teams = {"120": {"p_postseason": 0.0, "p_ws": 0.0}, "121": {"p_postseason": 0.0, "p_ws": 0.0}}
+    post = {"series": [{"round": "CS", "teams": ["147", "111"], "wins": [3, 3], "best_of": 7, "done": False},
+                       {"round": "CS", "teams": ["119", "137"], "wins": [4, 2], "best_of": 7, "done": True}],
+            "teams": {"147": {"p_ws": 0.3}, "111": {"p_ws": 0.2}, "119": {"p_ws": 0.35}, "137": {"p_ws": 0.0}}}
+    f = bb.featured_payload(cards, teams, post, now)
+    ids = [r["id"] for r in f["today"]]
+    assert ids[:1] == ["2"] and "3" not in ids and "1" not in ids
+    assert any("Game 7" in w for w in f["today"][0]["why"])

@@ -1,16 +1,19 @@
-/* The Quant Campus — Overview (#/<L>), on kit v4 "Broadcast" (the Rink overview is the reference, MIGRATION_V4.md).
- *   the greeting (the lower third) over the game to watch as the diagonal split hero (QK.featureCard -> splitHero; the
- *     latest result when nothing is left to play); the black stat strip: the title favourite (ours, in blue), the
- *     top-rated team with its uncertainty, AP No. 1, the next kick-off / tip-off or the live count (a past season: the
- *     champion);
- *   "N games. Our calls.": our picks from live, today's and upcoming games (or what's coming up, or the latest
- *     results), each card with a one-line reason and no market; the black power list from the season leaders; "We say
- *     it. Then we check it." (QK.howSure from <L>/calibration.json when it is there) beside "Who's for real?" (win %
- *     against our rating); "What's that number?";
- *   the title race: our title chances in team colours (ours only: no market on the overview), power ratings with one
- *     standard error,
- *     AP poll v our ranking, the CFP picture (cfb) or bracketology / the bracket (basketball);
- *   leaders: value and the counting leaders, loaded after the page (value.json carries the names).
+/* The Quant Campus — Overview (#/<L>), the kit v4 "Broadcast" landing page (rk-overview.js is the reference).
+ *   For the current season:
+ *   1. the intro band: what the site covers and how to use it, with three quick links (Games, Standings, Players);
+ *   2. "This week in <level>": the stage of the season, then the top lines from index.json levels.<L>.digest
+ *      (oddsmarkets/college/site.py level_digest, on oddsmarkets/common/digest.py): the biggest movers in our playoff
+ *      (CFB) or tournament (basketball) chance, the upset of the week, the team of the week, our record this week;
+ *      on a thin week the title favourite, the top-rated team and AP No. 1; the other games that matter;
+ *   3. the game that matters most on the shared significance rule (digest.featured, oddsmarkets/common/featured.py:
+ *      the level, AP ranks, the stage, the stakes in our simulation, the start time and hour; closeness only a small
+ *      bonus) as the diagonal split hero, labelled "Live now", "Tonight" (only when it truly is tonight in the
+ *      reader's time), "Today", "Tomorrow" or the weekday; with nothing big on, the title race leads instead;
+ *   4. "N games. Our calls." (the big games first, in the same significance order); the black power list from the
+ *      season leaders; "We say it. Then we check it." beside "Who's for real?" (win % against our rating); "What's
+ *      that number?"; the title race (ours only: no market on the overview), power ratings with one standard error,
+ *      AP poll v our ranking, the CFP picture (cfb) or bracketology / the bracket (basketball); the leaders.
+ *   A past season keeps the "looking back" greeting, its champion tiles and the last postseason games.
  * Reads index.json, <L>/<S>/season.json, <L>/<S>/cfp.json | bracket.json, <L>/history.json, <L>/calibration.json,
  * <L>/<S>/schedule.json (past seasons), then <L>/<S>/value.json (lazy). */
 (function (CC) {
@@ -19,6 +22,138 @@ var U = CC.ui, esc = CC.esc, isNum = CC.isNum;
 
 function dataTable(cols, rows, label) {
   return '<details class="cc-data"><summary>' + esc(label || 'Show the numbers as a table') + '</summary>' + U.table(cols, rows, { maxHeight: 360 }) + '</details>';
+}
+
+/* ── the landing top (the same shape on every sport overview) ──────────────────────────────────────────────── */
+var WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+var LEVEL_WORDS = { cfb: 'college football', mbb: 'men’s college basketball', wbb: 'women’s college basketball' };
+/* "Live now" | "Tonight" | "Today" | "Tomorrow" | the weekday | the date, in the reader's own time (QK.now()). */
+function whenLabel(g) {
+  if (!g) return '';
+  if (g.status === 'live') return 'Live now';
+  if (g.status === 'final') return 'Final';
+  var d = new Date(g.start), now = new Date(QK.now());
+  if (isNaN(d)) return '';
+  var d0 = function (x) { var y = new Date(x.getTime()); y.setHours(0, 0, 0, 0); return y.getTime(); };
+  var n = Math.round((d0(d) - d0(now)) / 864e5);
+  if (n === 0) return g.tba ? 'Today' : d.getHours() >= 17 ? 'Tonight' : 'Today';
+  if (n === 1) return 'Tomorrow';
+  if (n > 1 && n < 7) return d.toLocaleDateString('en-GB', { weekday: 'long' });
+  return QK.fmt.date(g.start);
+}
+/* a date-only payload day ("2026-12-12") in en-GB without a time-zone shift */
+function day(d) { return QK.fmt.date(String(d || '').length === 10 ? d + 'T12:00:00' : d); }
+function intro(o) {
+  return '<section class="ql-intro" aria-label="About this site"><div class="ql-intro-l"><div class="qk-greet-date">' + esc(o.tag) + '</div>' +
+    '<h1>' + esc(o.title) + '</h1><p>' + esc(o.lede) + '</p></div>' +
+    '<nav class="ql-links" aria-label="Start here">' + o.links.map(function (l) { return '<a href="' + esc(l.href) + '"><b>' + esc(l.label) + '</b><span>' + esc(l.sub) + '</span></a>'; }).join('') + '</nav></section>';
+}
+function ptsOf(d) { return (d > 0 ? '+' : '−') + Math.abs(Math.round(d * 100)) + ' pts'; }
+function cardsById(info) {
+  var by = {};
+  (info.today || []).concat(info.next_games || []).forEach(function (c) { by[String(c.id)] = c; });
+  return by;
+}
+/* playable at the reader's clock: live and started under 8 hours ago (an older "live" is a stale snapshot), or
+   starting within `hrs` hours (an hour's grace after the start) */
+function playable(c, hrs) {
+  if (!c) return false;
+  var st = CC.status(c);
+  if (st === 'final') return false;
+  var h = (Date.parse(c.date) - QK.now()) / 36e5;
+  return st === 'live' ? h > -8 : h > -1 && h < hrs;
+}
+/* The game that matters most, on the shared significance rule (digest.featured): the first of "today" still
+ * upcoming or live at the reader's clock, then "next" (the best of the rest of the week), else "week" (the biggest
+ * occasion of the next seven days). Nothing big: the page leads with the title race. */
+function pickFeatured(L, info, sim) {
+  var F = (info.digest || {}).featured;
+  if (!F) return null;
+  var by = cardsById(info);
+  var T = (F.today || []).filter(function (f) { return playable(by[String(f.id)], 24); });
+  var N = (F.next || []).filter(function (f) { return playable(by[String(f.id)], 24 * 7); });
+  var f = T[0] || N[0] || (F.week && playable(by[String(F.week.id)], 24 * 7) ? F.week : null);
+  if (!f) return { c: null, rest: [], order: [] };
+  var order = T.concat(N).map(function (x) { return by[String(x.id)]; });
+  return { c: by[String(f.id)], why: reasonsWhy(L, f.why, by[String(f.id)], sim), week: !T.length && !N.length, rest: order.filter(function (c) { return String(c.id) !== String(f.id); }), order: order };
+}
+function reasonsWhy(L, r, c, sim) {
+  var fb = CC.fb(L), po = fb ? 'p_cfp' : 'p_ncaa';
+  var lead = (r || []).filter(Boolean).join(' and ');
+  var a = sim[String(c.away)] || {}, h = sim[String(c.home)] || {}, A = CC.tabbr(L, c.away), H = CC.tabbr(L, c.home);
+  var nums = [isNum(a[po]) && isNum(h[po]) && c.stype === 'reg' ? (fb ? 'our playoff chances ' : 'our chances of the NCAA field ') + A + ' ' + CC.pct(a[po]) + ', ' + H + ' ' + CC.pct(h[po]) : '',
+    isNum(a.p_title) && isNum(h.p_title) && (a.p_title + h.p_title) >= 0.02 ? 'title chances ' + A + ' ' + CC.pct(a.p_title) + ', ' + H + ' ' + CC.pct(h.p_title) : ''].filter(Boolean).join('; ');
+  if (!lead && !nums) return '';
+  return lead ? lead.charAt(0).toUpperCase() + lead.slice(1) + (nums ? ': ' + nums : '') + '.' : nums.charAt(0).toUpperCase() + nums.slice(1) + '.';
+}
+/* Under the hero: why we picked it, then how sure we are. */
+function heroNote(g, why) {
+  var p = g.p_home, sure = '';
+  if (g.status !== 'live' && isNum(p)) {
+    var fav = p >= 0.5 ? g.home : g.away, other = p >= 0.5 ? g.away : g.home, pf = Math.max(p, 1 - p), miss = Math.max(1, Math.round(10 * (1 - pf)));
+    sure = ' <b>How sure are we?</b> ' + CC.pct(pf) + ' for ' + esc(fav.name) + ' means ' + esc(other.name) + ' win a game like this about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.';
+  }
+  return why ? '<b>Why this game?</b> ' + esc(why) + sure : (sure ? sure.slice(1) : undefined);
+}
+var PHASE_LINE = { conf_champ: 'Conference championship week: the title games decide the automatic places in the playoff.', bowls: 'Bowl season, then the playoff rounds.',
+  playoff: 'The College Football Playoff: twelve teams, one champion.', conf_tourneys: 'Conference tournament week: automatic bids on the line before Selection Sunday.',
+  ncaa: 'The NCAA tournament: 68 teams, one champion.', offseason: 'The off-season. Our numbers pick up again with the next schedule.' };
+function stageLine(L, st, ph) {
+  if (PHASE_LINE[ph]) return PHASE_LINE[ph];
+  if (!st) return '';
+  var fb = CC.fb(L);
+  if (ph === 'preseason') return 'Preseason. ' + (fb ? 'Kick-off is ' : 'Tip-off is ') + day(st.first) + '; the regular season runs to ' + day(st.last) + (fb ? '.' : ', then the conference tournaments and March Madness.');
+  if (fb) return 'Week ' + (st.week || '?') + (st.weeks ? ' of ' + st.weeks : '') + ': ' + QK.fmt.num(st.played) + ' of ' + QK.fmt.num(st.total) + ' games played. The regular season ends ' + day(st.last) + ', then the conference title games and the 12-team playoff.';
+  return 'Regular season: ' + QK.fmt.num(st.played) + ' of ' + QK.fmt.num(st.total) + ' games played. It runs to ' + day(st.last) + ', then the conference tournaments and the NCAA tournament.';
+}
+function weekTiles(L, S, info, dig, feat, sim) {
+  var T = [], fb = CC.fb(L), mv = dig.movers;
+  if (mv && (mv.up.length || mv.down.length)) {
+    var up = mv.up[0], dn = mv.down[0], lead = up || dn, what = mv.metric === 'p_title' ? 'title' : fb ? 'playoff' : 'NCAA tournament';
+    T.push({ label: 'Biggest mover', value: CC.tabbr(L, lead.key) + ' ' + ptsOf(lead.d), href: CC.teamHref(L, lead.key, S), signal: true,
+      sub: CC.tname(L, lead.key) + (lead.d > 0 ? ' climbed' : ' slipped') + ' to ' + CC.pct(lead.p) + ' in our ' + what + ' chance since ' + day(mv.since) + '.' + (up && dn ? ' Biggest fall: ' + CC.tabbr(L, dn.key) + ' ' + ptsOf(dn.d) + '.' : '') });
+  }
+  var u = dig.upset;
+  if (u) {
+    var score = u.side === 'home' ? u.hs + '–' + u.as : u.as + '–' + u.hs, rk = u.ranks || [];
+    var nm = function (t, r) { return (isNum(r) && r <= 25 ? 'No. ' + r + ' ' : '') + CC.tshort(L, t); };
+    T.push({ label: 'Upset of the week', value: CC.tabbr(L, u.winner) + ' ' + CC.pct(u.p), href: CC.gameHref(L, u.id, S),
+      sub: nm(u.winner, rk[0]) + ' beat ' + nm(u.loser, rk[1]) + ' ' + score + ' on ' + QK.fmt.date(u.start) + '. We gave them ' + CC.pct(u.p) + ' before the start.' });
+  }
+  var h = dig.hot;
+  if (h) T.push({ label: 'Team of the week', value: CC.tabbr(L, h.key) + ' ' + h.w + '–' + h.l, href: CC.teamHref(L, h.key, S),
+    sub: CC.tname(L, h.key) + ': ' + h.w + ' win' + (h.w === 1 ? '' : 's') + ' in ' + h.gp + ' games, ' + (h.margin >= 0 ? '+' : '−') + Math.abs(Math.round(h.margin)) + ' points overall.' });
+  var r = dig.record;
+  if (r) {
+    var diff = r.won - r.expected;
+    T.push({ label: 'Our record this week', value: r.won + ' of ' + r.n, href: CC.href(L, 'model', null, null, 'tab=calibration'),
+      sub: 'Our favourites won ' + r.won + ' of ' + r.n + '; we expected ' + QK.fmt.num(r.expected, 0) + '. ' + (Math.abs(diff) < 2 ? 'Right on our numbers.' : diff > 0 ? 'A good week for the favourites.' : 'A week of upsets: a 60% call still misses 4 times in 10.') });
+  }
+  /* a thin week (preseason, a one-game week): the title favourite, the top-rated team and AP No. 1 fill in */
+  var t0 = (info.title_odds || [])[0];
+  if (T.length < 4 && t0 && !(mv && mv.metric === 'p_title')) T.unshift({ label: 'Title favourite', value: CC.tabbr(L, t0.team) + ' ' + CC.pct(t0.p), href: CC.teamHref(L, t0.team, S), signal: true,
+    sub: (t0.p < 0.25 ? 'Nobody is better than 1 in 4. ' : '') + CC.tname(L, t0.team) + ' lead our board, from our simulated seasons.' });
+  var m0 = (info.model_top || [])[0];
+  if (T.length < 4 && m0) T.push({ label: 'Top-rated team', value: CC.tabbr(L, m0.team) + ' ' + CC.signed(m0.rating, 1), href: CC.teamHref(L, m0.team, S),
+    sub: CC.tname(L, m0.team) + ': ' + CC.f(Math.abs(m0.rating), 1) + (fb ? ' points better than an average FBS team on a neutral field.' : ' points per 100 possessions better than an average Division I team.') });
+  var a0 = (info.top25 || [])[0];
+  if (T.length < 4 && a0) T.push({ label: 'AP No. 1', value: CC.tshort(L, a0.team), text: true, href: CC.teamHref(L, a0.team, S),
+    sub: 'Top of the latest AP poll' + (a0.record && a0.record !== '0-0' ? ' at ' + a0.record : '') + (m0 && String(m0.team) !== String(a0.team) ? '; we rate ' + CC.tshort(L, m0.team) + ' higher.' : '.') });
+  var rest = (feat && feat.rest || []).filter(Boolean).slice(0, 2);
+  if (rest.length) T.push({ label: 'Also worth a look', value: rest.map(function (c) { return CC.tabbr(L, c.away) + '–' + CC.tabbr(L, c.home); }).join(' · '), href: CC.href(L, 'games'), text: rest.length > 1,
+    sub: rest.map(function (c) { var g = CC.game(c, L), w = whenLabel(g); return w + (g.status === 'live' || g.tba ? '' : ' ' + QK.fmt.time(c.date)) + ': ' + g.away.name + ' at ' + g.home.name; }).join('. ') + '.' });
+  return T;
+}
+/* The featured hero: the game that matters most (labelled for the reader's clock), or the title race. */
+function featHero(L, S, feat, titleRows) {
+  if (feat && feat.c) {
+    var g = CC.game(feat.c, L), lab = whenLabel(g);
+    g.home.record = CC.rec(L, S, feat.c.home); g.away.record = CC.rec(L, S, feat.c.away);
+    return QK.featureCard(g, { scribble: lab + (feat.week ? ' · The big one this week' : ' · The one to watch'), note: heroNote(g, feat.why) });
+  }
+  if (!titleRows.length) return '';
+  return '<div class="ql-race">' + QK.sectionHead({ kicker: CC.fb(L) ? 'No big game today' : 'The season starts soon', title: 'So here’s the title race', sub: 'Our chance of winning the national title, from our simulated seasons.', tag: 'h3' }) +
+    QK.chances(titleRows.slice(0, 6).map(function (r) { return { label: CC.tshort(L, r.team), p: r.p, href: CC.teamHref(L, r.team, S), color: CC.traw(L, r.team), mark: U.mark(L, r.team) }; }), { key: false }) + '</div>';
 }
 
 function tiles(L, S, d, nSims) {
@@ -59,7 +194,7 @@ function tiles(L, S, d, nSims) {
    hours after its start is dropped, MIGRATION_V2.md). */
 function gameLists(L, info) {
   var seen = {};
-  var cut = Date.now() - 12 * 3600 * 1000;
+  var cut = QK.now() - 12 * 3600 * 1000;
   var fresh = function (g) { return g.status === 'post' || CC.tba(g) || !(new Date(g.date).getTime() < cut); };
   function take(list) { return (list || []).filter(function (g) { if (seen[g.id] || !fresh(g)) return false; seen[g.id] = 1; return true; }); }
   var live = take((info.today || []).filter(function (g) { return g.status === 'in'; }));
@@ -76,12 +211,15 @@ function pickScore(c, L) {
   if ((c.hr && c.ar) || (c.hseed && c.aseed)) s += 16;
   return s;
 }
-function watchBlock(L, S, G) {
+function watchBlock(L, S, G, feat) {
   var fb = CC.fb(L);
   var pool = G.live.concat(G.today, G.next).filter(function (c) { return c.status !== 'post'; });
-  var picks = pool.slice().sort(function (x, y) { return pickScore(y, L) - pickScore(x, L); }).slice(0, 6);
-  var when = fb ? 'this week' : (new Date(QK.now()).getHours() >= 15 ? 'tonight' : 'today');
-  var seg = '<div class="qk-seg" id="ov-when" role="group" aria-label="Games"><button type="button" aria-pressed="true" data-value="picks">Our picks</button><button type="button" aria-pressed="false" data-value="next"' + (pool.length ? '' : ' disabled') + '>Coming up</button><button type="button" aria-pressed="false" data-value="results"' + (G.last.length ? '' : ' disabled') + '>Latest results</button></div>';
+  /* the big games first, in the shared significance order (digest.featured); an older payload: the old pick score */
+  var order = feat && feat.order ? feat.order.filter(Boolean) : [];
+  var inPool = {}; pool.forEach(function (c) { inPool[String(c.id)] = 1; });
+  var picks = order.length ? order.filter(function (c) { return inPool[String(c.id)]; }).slice(0, 6) : pool.slice().sort(function (x, y) { return pickScore(y, L) - pickScore(x, L); }).slice(0, 6);
+  var when = fb ? 'this week' : 'today';
+  var seg = '<div class="qk-seg" id="ov-when" role="group" aria-label="Games"><button type="button" aria-pressed="true" data-value="picks">Big games</button><button type="button" aria-pressed="false" data-value="next"' + (pool.length ? '' : ' disabled') + '>Coming up</button><button type="button" aria-pressed="false" data-value="results"' + (G.last.length ? '' : ' disabled') + '>Latest results</button></div>';
   return { picks: picks, pool: pool, html: '<section class="qk-section cc-sec">' + QK.sectionHead({ kicker: 'What to watch ' + when, title: '<span id="ov-gh">Our calls</span>', html: true,
     sub: 'Our chance for each side, with a line on why it’s worth your time. ' + (fb ? 'Ranked teams carry their AP rank.' : 'Ranked and seeded teams carry their number.'), actions: seg }) + '<div id="ov-games"></div></section>' };
 }
@@ -137,19 +275,34 @@ CC.route('overview', function (el, p) {
     /* the builder's headline ("Week 8 · Ohio State lead the title chances at 18%") without its date part */
     var hl = isCur ? CC.copy(info.headline || '').replace(/^[^·]*·\s*/, '') : (champ ? CC.tname(L, champ) + ' won the title' : '');
     var G = isCur ? gameLists(L, info) : { live: [], today: [], next: [], last: [] };
-    var W = isCur ? watchBlock(L, S, G) : null;
-    /* the game to watch: our top pick, else (nothing left to play) the latest result with our pre-game call */
-    var featC = W && W.picks.length ? W.picks[0] : (G.last.length ? G.last.slice().sort(function (x, y) { return String(y.date).localeCompare(String(x.date)); })[0] : null);
-    var feat = featC ? CC.game(featC, L) : null;
-    if (feat) { feat.home.record = CC.rec(L, S, featC.home); feat.away.record = CC.rec(L, S, featC.away); }
-    var evening = new Date(QK.now()).getHours() >= 15;
-    var html = QK.greeting({ date: U.kicker(L, S),
-      title: isCur ? esc(QK.greet()) + '! Here’s what’s ' + QK.mark('worth watching') + ' in ' + esc(fb ? 'college football' : L === 'mbb' ? 'men’s college basketball' : 'women’s college basketball') + ' ' + (fb ? 'this week' : evening ? 'tonight' : 'today') + '.'
-        : esc(CC.LNAME[L] + ' ' + CC.seasonLabel(L, S)) + ', ' + QK.mark('looking back') + '.',
-      lede: (hl ? hl.replace(/\.?$/, '. ') : '') + sub0,
-      ctas: [{ label: 'All games', href: CC.href(L, 'games', null, S) }, { label: 'Standings', href: CC.href(L, 'standings', null, S), ghost: true }],
-      side: feat ? QK.featureCard(feat, { scribble: feat.status === 'live' ? 'Live now' : feat.status === 'final' ? 'The latest result' : 'Our pick ' + (fb ? 'this week' : evening ? 'tonight' : 'today') }) : '' }) +
-      '<div style="margin-top:var(--sp-10)">' + tiles(L, S, d, nSims) + '</div>';
+    var feat = isCur ? pickFeatured(L, info, sim) : null;
+    var W = isCur ? watchBlock(L, S, G, feat) : null;
+    // title chances: ours only (no market on the overview)
+    var titleRows = (isCur ? (info.title_odds || []) : []).filter(function (r) { return isNum(r.p); }).slice(0, 12);
+    if (!titleRows.length) titleRows = Object.keys(sim).filter(function (t) { return isNum(sim[t].p_title) && sim[t].p_title > 0; }).sort(function (x, y) { return sim[y].p_title - sim[x].p_title; }).slice(0, 12).map(function (t) { return { team: t, p: sim[t].p_title }; });
+    var html;
+    if (isCur) {
+      var dig = info.digest || {};
+      var lw = LEVEL_WORDS[L];
+      html = intro({ tag: U.kicker(L, S),
+        title: fb ? 'Every FBS game, team and player, by the numbers.' : 'Every Division I ' + (L === 'mbb' ? 'men’s' : 'women’s') + ' game, team and player, by the numbers.',
+        lede: fb ? 'Our chance for this week’s games, who’s for real, and the race for the 12-team playoff and the national title, in plain English.'
+          : 'Our chance for tonight’s games, who’s for real, and the road to March, in plain English.',
+        links: [{ label: 'Games', sub: 'Every game, our chance', href: CC.href(L, 'games', null, S) }, { label: 'Standings', sub: fb ? 'The playoff picture' : 'Bracketology', href: CC.href(L, 'standings', null, S) },
+          { label: 'Players', sub: 'Value and percentiles', href: CC.href(L, 'players', null, S) }] });
+      var T = weekTiles(L, S, info, dig, feat, sim);
+      var kick = 'This week in ' + lw;
+      html += '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: kick, title: T.length >= 3 ? 'The week in ' + WORDS[T.length].toLowerCase() + ' lines' : 'The week so far', sub: stageLine(L, dig.stage, info.phase || season.phase) }) +
+        (T.length ? QK.stats(T) : '') + '<div class="ql-feat">' + featHero(L, S, feat, titleRows) + '</div></section>';
+    } else {
+      /* a past season: the "looking back" greeting over the last result, and the champion tiles */
+      var featC = G.last.length ? G.last.slice().sort(function (x, y) { return String(y.date).localeCompare(String(x.date)); })[0] : null;
+      var fg = featC ? CC.game(featC, L) : null;
+      html = QK.greeting({ date: U.kicker(L, S), title: esc(CC.LNAME[L] + ' ' + CC.seasonLabel(L, S)) + ', ' + QK.mark('looking back') + '.', lede: (hl ? hl.replace(/\.?$/, '. ') : '') + sub0,
+        ctas: [{ label: 'All games', href: CC.href(L, 'games', null, S) }, { label: 'Standings', href: CC.href(L, 'standings', null, S), ghost: true }],
+        side: fg ? QK.featureCard(fg, { scribble: 'The latest result' }) : '' }) +
+        '<div style="margin-top:var(--sp-10)">' + tiles(L, S, d, nSims) + '</div>';
+    }
     html += isCur ? W.html : pastGames(L, S, a[3]);
     html += '<div id="ov-hot"></div>';
     /* v4: "We say it. Then we check it." beside "Who's for real?" (rating against win %), then "What's that number?" */
@@ -157,9 +310,6 @@ CC.route('overview', function (el, p) {
       '<div class="cc-ov-real">' + QK.sectionHead({ kicker: 'Who’s for real?', title: 'Results v chances', sub: 'Teams top-left are winning more than their rating suggests; bottom-right, the reverse. A soft schedule, luck, or something real?' }) +
       '<div class="qk-card"><div class="qk-card-body"><div id="ov-luck" class="qk-chart" role="img" aria-label="Win percentage against our rating, every team"></div><p class="qk-caption" id="ov-luck-cap"></p></div></div></div></section>';
     html += '<section class="qk-section">' + QK.newHere({ items: [QK.NEW_HERE[0], fb ? 'A <b>rating</b> is points better than an average FBS team on a neutral field: +14 is two touchdowns better.' : 'A <b>rating</b> is points per 100 possessions better than an average Division I team.', 'Every forecast is checked against what happened. <a class="qk-link" href="' + esc(CC.href(L, 'model', null, null, 'tab=calibration')) + '">The record is on the Model page.</a>'] }) + '</section>';
-    // title chances: ours only (no market on the overview)
-    var titleRows = (isCur ? (info.title_odds || []) : []).filter(function (r) { return isNum(r.p); }).slice(0, 12);
-    if (!titleRows.length) titleRows = Object.keys(sim).filter(function (t) { return isNum(sim[t].p_title) && sim[t].p_title > 0; }).sort(function (x, y) { return sim[y].p_title - sim[x].p_title; }).slice(0, 12).map(function (t) { return { team: t, p: sim[t].p_title }; });
     var top = power.slice(0, 25);
     var grid = '<div class="qk-grid cc-grid">';
     if (titleRows.length) grid += '<div class="qk-span-5">' + U.card('National title chances', 'Our chance of winning it all' + (nSims ? ', from ' + QK.fmt.num(nSims) + ' simulated seasons' : '') + ', in team colours.',
@@ -245,7 +395,7 @@ function howSure(L, box, hd) {
     var cb = CC.calib(cj);
     if (!cb || !cb.bins.length) { box.innerHTML = ''; if (hd) hd.innerHTML = ''; return; }
     var yrs = ((cj && cj.seasons) || []).filter(isNum);
-    if (hd) hd.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every ' + CC.LSHORT[L] + ' game we have forecast, each with only the games before it, grouped by the chance we gave the home team. When the two bars match, our numbers mean what they say.',
+    if (hd) hd.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every ' + CC.LSHORT[L] + ' game we have forecast, each with only the games before it, grouped by the chance we gave the home team. When the two lines match, our numbers mean what they say.',
       actions: '<a class="qk-more" href="' + esc(CC.href(L, 'model', null, null, 'tab=calibration')) + '">The full record</a>' });
     QK.howSure(box, { bins: cb.bins, brier: cb.brier, n: cb.n, league: CC.LSHORT[L], span: yrs.length ? CC.seasonLabel(L, yrs[0]) + ' to ' + CC.seasonLabel(L, yrs[yrs.length - 1]) : '', subject: 'the home team' });
   });

@@ -1,5 +1,5 @@
 """
-Which game leads a page, and the "Today / This week" digest: sport-agnostic, shared by the Home builder
+Which game leads a page, and how its start is labelled: sport-agnostic, shared by the Home builder
 (scripts/build_home.py) and the sport sites' overview builders.
 
 Why this exists. The Home page used to lead with whatever game the front end's closeness score liked best, so a
@@ -26,7 +26,8 @@ plus an optional `sig` dict of hints only the sport builder knows (every key opt
 
     comp       a competition key for the tier table (football slug "premier-league"; tennis level "slam",
                "finals", "m1000", "500", "250", "other", "challenger")
-    stage      "final" | "semi" | "quarter" | "playoff" | "knockout" | "league"; finer stage words are mapped
+    stage      "final" | "semi" | "conf_final" (a college conference title game) | "quarter" | "playoff" | "knockout" |
+               "league"; finer stage words are mapped
     round      a raw round label ("F", "SF", "QF", "sf", "final", "r16") when stage is unknown
     series     {"game": n, "wins": [a, b], "best_of": 7, "name": "World Series"} for a playoff series
     preseason  True for exhibition games (NBA/NHL/NFL preseason): heavily discounted
@@ -51,8 +52,8 @@ API
                          Paris) is fine; otherwise -18 (a 03:00 London / 22:00 New York start is still fine)
           close   0-6    6 x (1 - |favourite - underdog|): a small bonus, never the deciding part
     rank_featured(games, now, horizon_h=18, min_score=30, limit=5) -> {"today": [row...], "week": row | None}
-        `today`: playable games (not final, not off, not a stale "pre" 3 h past its start) starting within
-        horizon_h hours or live, scoring at least min_score, best first. `week`: the best game or event in the
+        `today`: live games, or upcoming ones starting within horizon_h hours (a "pre" game more than 30 min past
+        its start is a lagging status and never leads), scoring at least min_score, best first. `week`: the best game or event in the
         next 7 days by tier + stage + stakes alone (the fallback when nothing big is on today). Each row is
         {"key": "<sport>:<id>", "score", "reasons", "label_hint"}. A front end then takes the first row whose
         game is still upcoming or live at the viewer's clock, else `week`, else a title race.
@@ -62,21 +63,9 @@ API
         viewer's own zone (docs/home/assets/home.js `whenTag`); this is the same rule for Python callers.
         Never "Our pick".
 
-    Digest helpers (no look-ahead: they take finished games with the chance that was published BEFORE the
-    start; a caller must pass only sports whose finished-game chances are frozen or computed as of the day
-    before, and say which sports it left out):
-    favourites_record(games, now, days=7) -> {"n", "won", "expected", "from", "to", "by": [{sport, n, won,
-                                               expected}]} | None
-        "Favourites won 31 of 44 (70%); we expected 68%": expected is the mean of the favourites' chances, the
-        number of wins a calibrated forecaster expects. Draws count as a favourite not winning (football's
-        three-way chances), ties with no winner are skipped.
-    upset_of_week(games, now, days=7) -> {"game": g, "p": winner's pre-game chance} | None
-        The final whose winner we gave the lowest pre-game chance.
-    biggest_swing(series, now, days=7, min_move=0.03) -> {"name", "league", "kind", "from", "to", "delta",
-                                                         "since", "href"} | None
-        series: [{"name", "league", "kind": "title" | "playoff", "points": [[iso_ts, p], ...], "href"}].
-        The largest absolute move from the first point at or after now - days (or the earliest point there is,
-        and `since` says when) to the latest point at or before now.
+    The week's digest (our favourites' record, the upset, the biggest swing, the chance log) lives in
+    oddsmarkets/common/digest.py, on this same game dict, so the Home page and the sport overviews show the same
+    numbers.
 
 Tier tables are deliberately plain numbers in one place (TIERS) so a sport builder can read or extend them.
 """
@@ -109,7 +98,7 @@ TIERS: dict[str, dict[str, float]] = {
 }
 PRESEASON_FACTOR = 0.4
 
-STAGE_POINTS = {"final": 28, "semi": 16, "quarter": 9, "playoff": 8, "knockout": 6, "league": 0}
+STAGE_POINTS = {"final": 28, "semi": 16, "conf_final": 12, "quarter": 9, "playoff": 8, "knockout": 6, "league": 0}
 # A championship series or the one-game final of a big league is worth more than a cup final of a minor one: the
 # stage points scale with the tier (a 50-tier final gets the full amount, a 14-tier one about 60%).
 
@@ -233,7 +222,7 @@ def stage_points(g):
     if st and STAGE_POINTS.get(st):
         pts += STAGE_POINTS[st] * scale
         why.append({"final": "a final", "semi": "a semi-final", "quarter": "a quarter-final",
-                    "playoff": "a play-off", "knockout": "a knockout tie"}[st])
+                    "playoff": "a play-off", "knockout": "a knockout tie", "conf_final": "a conference title game"}[st])
     ser = sig.get("series") or {}
     if ser:
         n = ser.get("game")
@@ -366,8 +355,8 @@ def rank_featured(games, now, horizon_h=18, min_score=30, limit=5):
         s = significance(g, now)
         h = s["hours"]
         row = {"key": game_key(g), "score": s["score"], "reasons": s["reasons"], "parts": s["parts"]}
-        if g.get("status") == "live" or (h is not None and h <= horizon_h):
-            if s["score"] >= min_score:
+        if g.get("status") == "live" or (h is not None and -0.5 <= h <= horizon_h):
+            if s["score"] >= min_score:     # a "pre" game past its start is a lagging status: never the lead
                 today.append(row)
         if h is not None and h <= 7 * 24 or g.get("status") == "live":
             p = s["parts"]
@@ -402,101 +391,3 @@ def when_label(start, now, tz_minutes=0, live=False):
     if 1 < days < 7:
         return f"{WEEKDAY[loc.weekday()]} · {hm}"
     return f"{WEEKDAY[loc.weekday()]} {loc.day} {MONTH[loc.month - 1]}"
-
-
-# ───────────────────────────────────────────────────────────── digest
-def _result(g):
-    """(favourite won: bool, favourite's chance, winner's chance) for a final with our pre-game chances; None
-    when there is no pre-game chance or no winner (a draw counts as the favourite not winning)."""
-    if g.get("status") != "final" or g.get("event"):
-        return None
-    tw = two_way(g)
-    hs, as_ = _f(g.get("hs")), _f(g.get("as"))
-    if not tw or hs is None or as_ is None:
-        return None
-    ph, pa, pd = tw
-    fav_home = ph >= pa
-    pf = ph if fav_home else pa
-    if hs == as_:
-        if pd > 0:
-            return False, pf, pd
-        return None
-    home_won = hs > as_
-    return (home_won == fav_home), pf, (ph if home_won else pa)
-
-
-def _recent(games, now, days):
-    lo = now - timedelta(days=days)
-    for g in games:
-        d = parse_ts(g.get("start"))
-        if d is not None and lo <= d <= now:
-            yield g, d
-
-
-def favourites_record(games, now, days=7):
-    """How our favourites did on finished games that started in the last `days` days (module docstring)."""
-    rows = []
-    for g, d in _recent(games, now, days):
-        r = _result(g)
-        if r is None:
-            continue
-        fav_won, pf, _ = r
-        if abs(pf - 0.5) < 1e-9:
-            continue                        # a dead 50/50 has no favourite
-        rows.append((g.get("sport"), fav_won, pf, d))
-    if not rows:
-        return None
-    by = {}
-    for sp, won, pf, _ in rows:
-        b = by.setdefault(sp, {"sport": sp, "n": 0, "won": 0, "exp": 0.0})
-        b["n"] += 1
-        b["won"] += 1 if won else 0
-        b["exp"] += pf
-    n = len(rows)
-    return {"n": n, "won": sum(1 for r in rows if r[1]), "expected": round(sum(r[2] for r in rows) / n, 4),
-            "from": min(r[3] for r in rows).strftime("%Y-%m-%d"), "to": max(r[3] for r in rows).strftime("%Y-%m-%d"),
-            "by": [{"sport": b["sport"], "n": b["n"], "won": b["won"], "expected": round(b["exp"] / b["n"], 4)}
-                   for b in sorted(by.values(), key=lambda b: -b["n"])]}
-
-
-def upset_of_week(games, now, days=7, max_p=0.4):
-    """The final in the last `days` days whose winner had the lowest pre-game chance (at most max_p)."""
-    best = None
-    for g, _ in _recent(games, now, days):
-        r = _result(g)
-        if r is None or r[0]:
-            continue
-        hs, as_ = _f(g.get("hs")), _f(g.get("as"))
-        if hs == as_:
-            continue                        # a draw is a surprise, not an upset winner
-        pw = r[2]
-        if pw <= max_p and (best is None or pw < best["p"]):
-            best = {"game": g, "p": round(pw, 4)}
-    return best
-
-
-def biggest_swing(series, now, days=7, min_move=0.03):
-    """The largest move in a title / playoff chance over the last `days` days (module docstring)."""
-    lo = now - timedelta(days=days)
-    best = None
-    for s in series or []:
-        pts = []
-        for ts, p in s.get("points") or []:
-            d, p = parse_ts(ts), _f(p)
-            if d is not None and p is not None and d <= now:
-                pts.append((d, p))
-        if len(pts) < 2:
-            continue
-        pts.sort()
-        inside = [x for x in pts if x[0] >= lo]
-        first = inside[0] if inside else None
-        if first is None or first == pts[-1]:
-            continue
-        last = pts[-1]
-        delta = last[1] - first[1]
-        if abs(delta) >= min_move and (best is None or abs(delta) > abs(best["delta"])):
-            best = {"name": s.get("name"), "league": s.get("league"), "kind": s.get("kind") or "title",
-                    "from": round(first[1], 4), "to": round(last[1], 4), "delta": round(delta, 4),
-                    "since": first[0].strftime("%Y-%m-%dT%H:%M:%SZ"), "href": s.get("href"),
-                    "sport": s.get("sport")}
-    return best

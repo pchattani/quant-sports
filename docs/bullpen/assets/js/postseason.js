@@ -78,7 +78,8 @@ function pathTable(post, L) {
 function seriesDetail(s, games, L) {
   if (!s) return BP.muted('Click a series in the bracket to see its games.');
   const t = (s.teams || []).map(String);
-  const gl = (s.games || []).map(id => games[id] || { gpk: id }).filter(c => !BP.notNeeded(c));
+  const all = (s.games || []).map(id => games[id] || { gpk: id }), unneeded = BP.unneededIn(all);
+  const gl = all.filter(c => !BP.notNeeded(c) && !unneeded(c));
   const nx = s.next;
   const st = seriesState(s);
   return '<div class="sd-head"><b>' + esc((s.league && BP.roundKey(s.round) !== 'WS' ? s.league + ' ' : '') + BP.roundLabel(BP.roundKey(s.round))) + '</b> · ' +

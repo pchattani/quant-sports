@@ -444,3 +444,28 @@ tr.cut td, .qk-table tr.cut td { border-top: 2px dashed color-mix(in srgb, var(-
 .ta-log td.ta-sc { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ta-log td.ta-sc span + span { margin-left: 0.55em; }
 .ta-page .qk-blk.ta-rk-band { margin-top: 0; margin-bottom: var(--sp-8); }
+
+/* ═════════════════════════════════ the landing top (the same block on every sport overview): the intro band with its
+   three quick links, "This week in <sport>" (the stage line and the top lines as black tiles), the featured game */
+.ql-intro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 560px); gap: 18px 40px; align-items: end; padding: 4px 0 0; }
+.ql-intro-l { min-width: 0; }
+.ql-intro .qk-greet-date { margin-bottom: 10px; }
+.qk .ql-intro h1 { font: 400 clamp(2.125rem, 3.6vw, 3.25rem)/0.95 var(--font-display); letter-spacing: 0.01em; margin: 0; max-width: 18em; }
+.ql-intro p { margin: 10px 0 0; font: 400 var(--fs-md)/1.5 var(--font-ui); color: var(--ink-2); max-width: 44em; }
+.ql-links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; }
+.ql-links a { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 12px 14px 14px; background: var(--block); color: var(--block-ink); text-decoration: none; border-top: 5px solid var(--card-rule); transition: border-color var(--t-fast); }
+.ql-links a:hover, .ql-links a:focus-visible { border-top-color: var(--volt); color: #fff; }
+.ql-links b { font: 400 1.625rem/1 var(--font-display); letter-spacing: 0.02em; text-transform: uppercase; }
+.ql-links b::after { content: ' \2192'; color: var(--volt); }
+.ql-links span { font: 700 var(--fs-2xs)/1.3 var(--font-cond); letter-spacing: 0.06em; text-transform: uppercase; color: var(--block-ink-3); }
+.ql-week .qk-stats { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.ql-week .qk-stat-label { color: var(--volt); }
+.ql-week .qk-stat-v { font-size: clamp(2.25rem, 3vw, 3rem); }
+.ql-week .qk-stat-v.text { font: 400 clamp(1.5rem, 2vw, 1.875rem)/1 var(--font-display); letter-spacing: 0.01em; }
+.ql-week .qk-stat-sub { font-size: 13px; }
+.ql-feat { margin-top: var(--sp-6); }
+.ql-feat:empty { display: none; }
+.ql-race { background: var(--s-1); border-top: 5px solid var(--card-rule); padding: 18px 20px; }
+@media (max-width: 1000px) { .ql-intro { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 720px) { .ql-week .qk-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ql-week .qk-stat-v { font-size: 2rem; } .ql-week .qk-stat:last-child:nth-child(odd) { grid-column: 1 / -1; } }
+@media (max-width: 420px) { .ql-links a { padding: 10px 10px 12px; } .ql-links b { font-size: 1.25rem; } .ql-links b::after { content: none; } .ql-links span { font-size: 11px; } .ql-race { padding: 14px; } }

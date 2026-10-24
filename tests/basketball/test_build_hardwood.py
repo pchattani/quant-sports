@@ -192,3 +192,76 @@ def test_light_season_built_with_raw_files_is_kept_where_they_are_absent():
 def test_jersey_number_rule():
     assert BH.jersey_number("7") == "7" and BH.jersey_number("00") == "00" and BH.jersey_number(23) == "23"
     assert BH.jersey_number(None) is None and BH.jersey_number("") is None and BH.jersey_number("123") is None
+
+
+def test_index_digest_in_the_build(root):
+    """index.json leagues.<L>.digest on a full build: the stage from the schedule, featured from the shared rule, and
+    the chance log next to the league's payloads (the front end never reads it)."""
+    assert _run(root) == 0
+    dig = _load(root / "index.json")["leagues"]["nba"]["digest"]
+    assert dig["asof"].startswith(TODAY)
+    st = dig["stage"]
+    assert st["total"] > 0 and 0 <= st["played"] <= st["total"] and 1 <= st["week"] <= st["weeks"]
+    assert set(dig["featured"]) == {"today", "next", "week"}
+    if "record" in dig:
+        r = dig["record"]
+        assert "by" not in r and r["won"] + r["upsets"] + r["draws"] == r["n"]
+    log = _load(root / "nba" / "chance_log.json")
+    assert list(log) == ["2031"] and list(log["2031"]["p_playoffs"]) == [TODAY]
+
+
+def _sched(data, games, sim, phase="regular", post=None):
+    d = data / "nba" / "2031"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "schedule.json").write_text(json.dumps({"ok": True, "games": games}), encoding="utf-8")
+    (d / "season.json").write_text(json.dumps({"ok": True, "phase": phase, "sim": {"teams": sim}, "postseason": post,
+                                               "format": {"series": [7, 7, 7, 7]}}), encoding="utf-8")
+
+
+def _g(i, day, h, a, hs, as_, p, status="post", stype="reg", hour=0, mo=3):
+    return {"id": str(i), "date": f"2031-{mo:02d}-{day:02d}T{hour:02d}:30:00Z", "status": status, "stype": stype, "home": h, "away": a,
+            "hs": hs, "as": as_, "model": {"p_home": p}}
+
+
+def test_league_digest_week_from_frozen_chances(tmp_path):
+    from datetime import date
+    b = BH.Build(tmp_path)
+    games = [_g(1, 28, "1", "2", 110, 100, 0.70, mo=2), _g(2, 27, "3", "1", 99, 104, 0.80, mo=2), _g(3, 26, "2", "3", 90, 95, 0.40, mo=2),
+             _g(4, 25, "1", "3", 120, 101, 0.66, mo=2), _g(5, 2, "2", "1", 140, 80, 0.10, mo=2), _g(6, 27, "2", "3", 100, 90, 0.5, stype="pre", mo=2)]
+    sim = {"1": {"p_playoffs": 0.9, "p_title": 0.3}, "2": {"p_playoffs": 0.4, "p_title": 0.02}, "3": {"p_playoffs": 0.6, "p_title": 0.1}}
+    _sched(tmp_path, games, sim)
+    (tmp_path / "nba" / "chance_log.json").write_text(json.dumps({"2031": {"p_playoffs": {"2031-02-22": {"1": 0.7, "2": 0.6, "3": 0.6}}}}), encoding="utf-8")
+    dig = BH.league_digest(b, "nba", 2031, date(2031, 3, 1))
+    r = dig["record"]
+    assert (r["n"], r["won"], r["upsets"]) == (4, 3, 1)          # the exhibition and the weeks-old game left out
+    assert dig["upset"]["id"] == "2" and dig["upset"]["winner"] == "1" and dig["upset"]["p"] == 0.2
+    assert dig["hot"]["key"] == "1" and dig["hot"]["w"] == 3
+    mv = dig["movers"]
+    assert mv["since"] == "2031-02-22" and mv["up"][0]["key"] == "1" and mv["down"][0]["key"] == "2"
+
+
+def test_featured_prefers_the_big_game_over_the_closest(tmp_path):
+    """The shared significance rule: two title contenders at 19:30 New York lead; a dead coin flip between two teams
+    with nothing at stake at 08:30 UTC (03:30 New York) and an exhibition do not."""
+    from datetime import date
+    b = BH.Build(tmp_path)
+    games = [_g(10, 2, "5", "6", None, None, 0.50, status="pre", hour=8), _g(11, 2, "1", "3", None, None, 0.63, status="pre", hour=0),
+             _g(12, 2, "2", "4", None, None, 0.51, status="pre", stype="pre", hour=0)]
+    sim = {"1": {"p_playoffs": 0.95, "p_title": 0.3}, "3": {"p_playoffs": 0.8, "p_title": 0.2}, "5": {"p_playoffs": 0.0, "p_title": 0.0},
+           "6": {"p_playoffs": 0.01, "p_title": 0.0}, "2": {"p_playoffs": 0.5, "p_title": 0.05}, "4": {"p_playoffs": 0.5, "p_title": 0.05}}
+    _sched(tmp_path, games, sim)
+    f = BH.league_digest(b, "nba", 2031, date(2031, 3, 1))["featured"]
+    ids = [x["id"] for x in f["today"]]
+    assert ids[0] == "11" and ids[-1] == "10"                    # the 03:30 coin flip ranks last, under the exhibition
+    assert "two title contenders" in f["today"][0]["why"]
+
+
+def test_featured_reads_the_finals_series(tmp_path):
+    from datetime import date
+    b = BH.Build(tmp_path)
+    games = [_g(20, 2, "1", "3", None, None, 0.55, status="pre", stype="post", hour=0)]
+    post = {"series": [{"teams": ["1", "3"], "wins": {"1": 3, "3": 3}, "round": "NBA Finals"}]}
+    _sched(tmp_path, games, {"1": {"p_title": 0.5}, "3": {"p_title": 0.5}}, phase="playoffs", post=post)
+    dig = BH.league_digest(b, "nba", 2031, date(2031, 3, 1))
+    top = dig["featured"]["today"][0]
+    assert top["id"] == "20" and "Game 7: winner takes the series" in top["why"] and "NBA Finals" in top["why"]

@@ -60,7 +60,7 @@ const ptsOf = d => (d > 0 ? '+' : '−') + Math.abs(Math.round(d * 100)) + ' pts
 /* The game that matters most, on the shared significance rule (oddsmarkets/common/featured.py rank_featured: the
  * league tier, the stage, the stakes in our simulations, the start time and hour, live-ness; closeness only a small
  * bonus), from index.json digest.featured: the first of "today" still upcoming or live at the reader's clock, else
- * "week" (the biggest game of the next seven days). An older payload without it gets a stand-in on the same lines
+ * "next" (the big games later in the week), else "week" (the biggest game of the next seven days). An older payload without it gets a stand-in on the same lines
  * from the playoff and Cup chances. With nothing big, the page leads with the race instead. */
 function stakesWhy(c, odds) {
   const a = odds[c.away] || {}, h = odds[c.home] || {};
@@ -93,10 +93,10 @@ function pickFeatured(idx) {
   const ok = (c, hrs) => { if (!c) return false; const st = U.status(c); if (st === 'final') return false; const h = (Date.parse(c.start) - now) / 36e5; return st === 'live' ? h > -8 : h > -1 && h < hrs; };
   const F = (idx.digest || {}).featured;
   if (F && (F.today || F.week)) {
-    const T = (F.today || []).filter(f => ok(by[f.id], 24));
-    const f = T[0] || (F.week && ok(by[F.week.id], 24 * 7) ? F.week : null);
+    const T = (F.today || []).filter(f => ok(by[f.id], 24)), N = (F.next || []).filter(f => ok(by[f.id], 24 * 7));
+    const f = T[0] || N[0] || (F.week && ok(by[F.week.id], 24 * 7) ? F.week : null);
     if (!f) return { c: null, big: false, rest: [] };
-    return { c: by[f.id], why: reasonsWhy(f.why, by[f.id], odds), big: true, week: !T.length, rest: T.slice(1).map(x => by[x.id]) };
+    return { c: by[f.id], why: reasonsWhy(f.why, by[f.id], odds), big: true, week: !T.length, rest: T.concat(N).filter(x => x !== f).map(x => by[x.id]) };
   }
   const night = c => { const hr = new Date(c.start).getHours(); return hr >= 1 && hr < 8; };
   const sc = cards.filter(c => ok(c, 48)).map(c => {

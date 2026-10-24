@@ -93,26 +93,11 @@ def test_when_label_never_says_our_pick():
     assert F.when_label(iso(NOW), NOW, 0, live=True) == "Live now"
 
 
-def test_digest_record_upset_swing():
-    def fin(gid, ph, hs, as_, days_ago, sport="nfl", pd=None):
-        x = g(sport, "NFL", NOW - timedelta(days=days_ago), ph, status="final", gid=gid)
-        x["hs"], x["as"] = hs, as_
-        if pd is not None:
-            x["p_draw"] = pd
-        return x
-    games = [fin("a", 0.7, 20, 10, 1), fin("b", 0.6, 10, 20, 2), fin("c", 0.2, 30, 3, 3),   # c: home won at 20%
-             fin("old", 0.9, 0, 30, 9), fin("d", 0.45, 1, 1, 2, "football", 0.3)]
-    r = F.favourites_record(games, NOW)
-    assert r["n"] == 4 and r["won"] == 1                                # a won; b, c lost; the draw is a miss
-    assert abs(r["expected"] - (0.7 + 0.6 + 0.8 + 0.45) / 4) < 1e-3
-    u = F.upset_of_week(games, NOW)
-    assert u["game"]["id"] == "c" and u["p"] == 0.2
-    s = F.biggest_swing([
-        {"name": "Arsenal", "league": "Premier League", "points": [[iso(NOW - timedelta(days=10)), 0.2],
-                                                                   [iso(NOW - timedelta(days=6)), 0.40],
-                                                                   [iso(NOW - timedelta(hours=1)), 0.52]]},
-        {"name": "City", "league": "Premier League", "points": [[iso(NOW - timedelta(days=6)), 0.55],
-                                                                [iso(NOW), 0.47]]},
-        {"name": "Future", "points": [[iso(NOW - timedelta(days=6)), 0.1], [iso(NOW + timedelta(days=1)), 0.9]]},
-    ], NOW)
-    assert s["name"] == "Arsenal" and abs(s["delta"] - 0.12) < 1e-9     # the 10-day-old point is outside the week
+def test_a_conference_title_game_outranks_a_plain_ranked_game():
+    """stage "conf_final" (a college conference title game) adds stage points and says why."""
+    from datetime import datetime, timezone
+    now = datetime(2026, 12, 5, 12, tzinfo=timezone.utc)
+    base = {"sport": "college", "league": "CFB", "start": "2026-12-05T21:00:00Z", "status": "pre", "p_home": 0.6}
+    conf = F.significance(dict(base, id="1", sig={"stage": "conf_final", "ranks": [8, 15]}), now)
+    reg = F.significance(dict(base, id="2", sig={"ranks": [8, 15]}), now)
+    assert conf["score"] > reg["score"] and "a conference title game" in conf["reasons"]

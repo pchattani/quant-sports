@@ -497,7 +497,8 @@ def _digest_now(today: date) -> datetime:
 def featured_payload(cards: list[dict], odds: dict, teams_info: dict, now: datetime) -> dict:
     """digest.featured: the games that matter most, on the shared significance rule (oddsmarkets/common/featured.py:
     the NHL tier, the stage, the stakes in our season simulation, the start time and hour, live-ness; closeness a
-    small bonus). {"today": [{"id", "score", "why"}] best first, "week": the biggest game of the next seven days}.
+    small bonus). {"today": [{"id", "score", "why"}] best first, "next": the big games later in the week, "week": the
+    biggest game of the next seven days}.
     The front end takes the first game still upcoming or live at the reader's clock."""
     from oddsmarkets.common import featured as FT
     nick = {t: str((v or {}).get("name") or t) for t, v in (teams_info or {}).items()}
@@ -531,7 +532,10 @@ def featured_payload(cards: list[dict], odds: dict, teams_info: dict, now: datet
                       "home": h, "away": a, "p_home": (c.get("model") or {}).get("p_home"), "wp_home": c.get("wp_home"), "sig": sig})
     r = FT.rank_featured(games, now)
     row = lambda x: {"id": x["key"].split(":", 1)[1], "score": x["score"], "why": x.get("reasons") or []}
-    return {"today": [row(x) for x in r["today"]], "week": row(r["week"]) if r.get("week") else None}
+    # "next": the big games after the build's 18-hour window, so a reader later in the day still gets one
+    seen = {x["key"] for x in r["today"]}
+    nxt = [x for x in FT.rank_featured(games, now, horizon_h=168, limit=13)["today"] if x["key"] not in seen][:5]
+    return {"today": [row(x) for x in r["today"]], "next": [row(x) for x in nxt], "week": row(r["week"]) if r.get("week") else None}
 
 
 def digest_payload(b: Build, cards: list[dict], odds: dict, phase: str | None, current: int, today: date,

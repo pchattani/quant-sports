@@ -110,14 +110,15 @@ def result(g: dict) -> str | None:
     return "home" if hs > as_ else "away"
 
 
-def week_finals(games: Iterable[dict], now, days: int = WEEK) -> list[dict]:
-    """Finished games that started in the `days` before `now`, with a pre-game chance and a result."""
+def week_finals(games: Iterable[dict], now, days: int = WEEK, need_p: bool = True) -> list[dict]:
+    """Finished games that started in the `days` before `now`, with a result (and a pre-game chance, unless
+    need_p is False)."""
     n = _now(now)
     lo = n - timedelta(days=days)
     out = []
     for g in games or []:
         t = _dt(g.get("start"))
-        if t is None or not (lo <= t <= n) or result(g) is None or chances(g) is None:
+        if t is None or not (lo <= t <= n) or result(g) is None or (need_p and chances(g) is None):
             continue
         out.append(g)
     return out
@@ -188,7 +189,7 @@ def hot(games: Iterable[dict], now, days: int = WEEK, min_games: int = 2) -> dic
     """The side with the best week: most wins, then the best win share, then the biggest margin.
     {"key", "w", "l", "d", "gp", "margin"} (margin: points / goals / runs for minus against), or None."""
     tab: dict = {}
-    for g in week_finals(games, now, days):
+    for g in week_finals(games, now, days, need_p=False):
         r = result(g)
         hs, as_ = _num(g.get("hs")), _num(g.get("as"))
         for side in ("home", "away"):

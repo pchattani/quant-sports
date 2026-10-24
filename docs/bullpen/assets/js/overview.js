@@ -1,21 +1,21 @@
-/* The Quant Bullpen — Overview (#/ and #/<L>), on kit v4 "Broadcast" (docs/_design/STYLE_GUIDE.md; the Rink overview
- * is the reference, MIGRATION_V4.md).
+/* The Quant Bullpen — Overview (#/ and #/<L>), the kit v4 "Broadcast" landing page (docs/rink/assets/js/rk-overview.js
+ * is the reference).
  *
- *   the greeting (the date tag, the line, buttons) over the game to watch as the diagonal split hero (QK.featureCard
- *              -> QK.splitHero, the clubs' full names and alternate colours), then the black stat strip: games today
- *              (live), the World Series favourite (our chance), the top-rated club, the hitter and pitcher WAR leaders,
- *              how our forecasts score;
- *   "N games. Our calls.": live and today's games, the next ones and the latest results as game cards (records, our
- *              chance, a one-line reason; no market anywhere on the overview);
- *   the black power list (QK.band + QK.hotRow from the leaders); "We say it. Then we check it." (QK.howSure from
- *              mlb/calibration.json) beside "Who's for real?" (QKC.quadrant: win % against run differential a game);
- *              "What's that number?";
- *   the title race: World Series chances in team colours (ours only) and the bracket;
- *   team strength: power ratings, the offence-against-run-prevention map and who has been lucky;
- *   standings by league as a leaderboard with our postseason chance; four leader boards.
+ *   1. the intro band: what the site covers and how to use it, with three quick links (Games, Standings or the
+ *      bracket, Players);
+ *   2. "This week in MLB" (the current MLB season): the stage (the week of the regular season, or the postseason
+ *      round and the series still alive), then the top lines from index.json "digest" (scripts/build_bullpen.py with
+ *      oddsmarkets/common/digest.py): the biggest postseason or World Series chance mover, the upset of the week,
+ *      the team of the week, our record this week and the other games that matter;
+ *   3. the game that matters most, by significance (digest.featured: oddsmarkets/common/featured.py), as the
+ *      diagonal split hero labelled "Live now", "Tonight" (only when it truly is tonight in the reader's time),
+ *      "Today", "Tomorrow" or the weekday; with nothing big on, the World Series race instead;
+ *   4. "N games. Our calls."; the black power list (Who's hot); "We say it. Then we check it." beside "Who's for
+ *      real?"; "What's that number?"; "Who wins the World Series?" with the bracket; the strength map; the
+ *      standings; the leader boards.
  *
- * Reads index.json (cards, postseason, leaders, teams; levels.aaa for Triple-A), <L>/<S>/season.json (standings,
- * ratings, simulation), mlb/calibration.json (backtest: the tile and the How sure teaser). */
+ * Reads index.json (cards, postseason, leaders, teams, digest; levels.aaa for Triple-A), <L>/<S>/season.json
+ * (standings, ratings, simulation), mlb/calibration.json (the How sure section). */
 (function (BP) {
 'use strict';
 
@@ -56,23 +56,132 @@ function hotItems(lead, L) {
 
 BP.ui.hotItems = hotItems;   // leaders.js draws the same power list
 
-function tiles(L, S, src, rows, titles, cal, isCurrent, lv) {
-  const today = isCurrent ? (src.today || []).filter(U.fresh) : [];
-  const live = today.filter(BP.isLive).length;
-  const fav = titles[0] || null;
-  const top = Object.keys(rows).map(t => rows[t]).filter(r => r.rating && isNum(r.rating.net)).sort((a, b) => b.rating.net - a.rating.net)[0];
-  const lead = src.leaders || {};
-  const h = (lead.h_war || [])[0], p = (lead.p_war || [])[0];
-  const pooled = cal && cal.games && cal.games.pooled ? cal.games.pooled : null;
-  const out = [];
-  if (isCurrent) out.push({ label: live ? 'Live now' : 'Games today', value: String(live || today.length), sub: live ? today.length + ' on the slate today' : (today.length ? 'first pitch ' + (QK.fmt.time(today.slice().sort((a, b) => String(a.start).localeCompare(String(b.start)))[0].start) || 'TBD') : 'no games today') });
-  else out.push({ label: 'Games played', value: BP.int(lv.final || lv.games || 0), sub: 'regular season and postseason' });
-  if (fav) out.push({ label: 'World Series favourite', value: BP.teamAbbr(fav.t) + ' ' + U.pct(fav.p), signal: true, href: BP.teamHref(fav.t, L, S), sub: 'from 20,000 simulated brackets', tip: 'Our chance of winning the World Series, from simulating the rest of the season and the bracket' });
-  if (top) out.push({ label: 'Top-rated club', value: BP.teamAbbr(top.tid) + ' ' + U.signed(top.rating.net, 2), href: BP.teamHref(top.tid, L, S), sub: 'runs a game better than an average club', tip: 'Our team rating: offence, defence and pitching in runs per game against an average club' });
-  if (h) out.push({ label: 'Top hitter', value: BP.playerSurname(h[0]) + ' ' + BP.num(h[1], 1), href: BP.playerHref(h[0], { level: L }), sub: 'Bullpen WAR · ' + BP.teamAbbr(BP.player(h[0]).team), tip: 'Our wins above replacement: batting, baserunning, fielding and position' });
-  if (p) out.push({ label: 'Top pitcher', value: BP.playerSurname(p[0]) + ' ' + BP.num(p[1], 1), href: BP.playerHref(p[0], { level: L, role: 'pitcher' }), sub: 'Bullpen WAR · ' + BP.teamAbbr(BP.player(p[0]).team) });
-  if (pooled && pooled.model && out.length < 6) out.push({ label: 'Our game forecasts', value: BP.int(pooled.n_games), unit: 'games', sub: 'log loss ' + BP.num(pooled.model.logloss, 3) + ' · scored before first pitch since 2015', href: '#/calibration', tip: 'Every game since 2015 forecast walk-forward from what was known before the first pitch; lower log loss is better (a coin flip scores 0.693)' });
-  return QK.stats(out.slice(0, 6));
+/* ── the landing top (the same shape on every sport overview) ──────────────────────────────────────────────── */
+const WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+/* "Live now" | "Tonight" | "Today" | "Tomorrow" | the weekday | the date, in the reader's own time (QK.now()). */
+function whenLabel(g) {
+  if (!g) return '';
+  if (g.status === 'live') return 'Live now';
+  if (g.status === 'final') return 'Final';
+  const d = new Date(g.start), now = new Date(QK.now());
+  if (isNaN(d)) return '';
+  const d0 = x => { const y = new Date(x.getTime()); y.setHours(0, 0, 0, 0); return y.getTime(); };
+  const n = Math.round((d0(d) - d0(now)) / 864e5);
+  if (n === 0) return d.getHours() >= 17 ? 'Tonight' : 'Today';
+  if (n === 1) return 'Tomorrow';
+  if (n > 1 && n < 7) return d.toLocaleDateString('en-GB', { weekday: 'long' });
+  return QK.fmt.date(g.start);
+}
+function intro(o) {
+  return '<section class="ql-intro" aria-label="About this site"><div class="ql-intro-l"><div class="qk-greet-date">' + esc(o.tag) + '</div>' +
+    '<h1>' + esc(o.title) + '</h1><p>' + esc(o.lede) + '</p></div>' +
+    '<nav class="ql-links" aria-label="Start here">' + o.links.map(l => '<a href="' + esc(l.href) + '"><b>' + esc(l.label) + '</b><span>' + esc(l.sub) + '</span></a>').join('') + '</nav></section>';
+}
+/* a date-only payload day ("2026-09-27") in en-GB without a time-zone shift */
+const day = d => QK.fmt.date(String(d || '').length === 10 ? d + 'T12:00:00' : d);
+const ptsOf = d => (d > 0 ? '+' : '−') + Math.abs(Math.round(d * 100)) + ' pts';
+const the = t => 'the ' + BP.teamShort(t);
+const The = t => 'The ' + BP.teamShort(t);
+/* "the Mariners lead 3–2" for a postseason series {teams, wins} */
+function seriesState(s) {
+  if (!s || !s.teams || !s.wins || s.wins.length !== 2) return '';
+  const w = s.wins, t = s.teams;
+  if (w[0] === w[1]) return 'level at ' + w[0] + '–' + w[1];
+  const i = w[0] > w[1] ? 0 : 1;
+  return the(t[i]) + ' lead ' + w[i] + '–' + w[1 - i];
+}
+function seriesFor(c, post) {
+  const pair = [String(c.home), String(c.away)].sort().join('|');
+  return ((post && post.series) || []).filter(s => (s.teams || []).map(String).sort().join('|') === pair)[0] || null;
+}
+/* Why the featured game: the shared rule's reasons (the series words replace "a semi-final"), then our numbers. */
+function reasonsWhy(r, c, idx, post) {
+  const pt = (post && post.teams) || {}, it = idx.teams || {};
+  const ws = t => (isNum((pt[t] || {}).p_ws) ? pt[t].p_ws : (it[t] || {}).p_ws);
+  const pp = t => (it[t] || {}).p_postseason;
+  const ser = c.series ? seriesFor(c, post) : null;
+  const lead = (r || []).filter(x => x && !(c.series && /^a (final|semi-final|quarter-final|play-off)$/.test(x))).join(' and ');
+  const head = c.series ? BP.seriesText(c.series) + (ser && seriesState(ser) ? ', ' + seriesState(ser) : '') : '';
+  const A = BP.teamAbbr(c.away), H = BP.teamAbbr(c.home);
+  const nums = isNum(ws(c.away)) && isNum(ws(c.home)) && (ws(c.away) > 0.005 || ws(c.home) > 0.005) ? 'to win the World Series ' + A + ' ' + U.pct(ws(c.away)) + ', ' + H + ' ' + U.pct(ws(c.home))
+    : isNum(pp(c.away)) && isNum(pp(c.home)) ? 'our postseason chances ' + A + ' ' + U.pct(pp(c.away)) + ', ' + H + ' ' + U.pct(pp(c.home)) : '';
+  const parts = [head, lead ? lead.charAt(0).toUpperCase() + lead.slice(1) : ''].filter(Boolean).join('. ');
+  return parts ? parts + (nums ? ': ' + nums : '') + '.' : (nums ? nums.charAt(0).toUpperCase() + nums.slice(1) + '.' : '');
+}
+/* The game that matters most, on the shared significance rule (featured.py rank_featured: the tier, the stage and
+ * the series, the stakes in our simulations, the start time and hour, live-ness; closeness only a small bonus),
+ * from index.json digest.featured: the first of "today" still upcoming or live at the reader's clock, else "week".
+ * An older payload without it gets the old pick (live first, then the closest calls). */
+function pickFeatured(idx, cards, post) {
+  const by = {}, now = QK.now();
+  cards.forEach(c => { by[c.gpk] = c; });
+  const ok = (c, hrs) => { if (!c || BP.isFinal(c) || (BP.notNeeded && BP.notNeeded(c))) return false; const h = (Date.parse(c.start || c.date) - now) / 36e5; return BP.isLive(c) ? h > -8 : h > -1 && h < hrs; };
+  const F = (idx.digest || {}).featured;
+  if (F && (F.today || F.week)) {
+    const T = (F.today || []).filter(f => ok(by[f.id], 24));
+    const f = T[0] || (F.week && ok(by[F.week.id], 24 * 7) ? F.week : null);
+    if (!f) return { c: null, rest: [] };
+    return { c: by[f.id], why: reasonsWhy(f.why, by[f.id], idx, post), week: !T.length, rest: T.slice(1).map(x => by[x.id]) };
+  }
+  const sc = cards.filter(c => ok(c, 48)).map(c => [QK.watchScore(BP.kitGame(c, 'mlb')), c]).filter(x => x[0] > -1e8).sort((a, b) => b[0] - a[0]);
+  return sc.length ? { c: sc[0][1], why: reasonsWhy([], sc[0][1], idx, post), rest: sc.slice(1).map(x => x[1]) } : null;
+}
+/* Under the hero: why we picked it, then how sure we are. */
+function heroNote(g, why) {
+  const p = g.p_home;
+  let sure = '';
+  if (g.status !== 'live' && isNum(p)) {
+    const fav = p >= 0.5 ? g.home : g.away, other = p >= 0.5 ? g.away : g.home, pf = Math.max(p, 1 - p), miss = Math.max(1, Math.round(10 * (1 - pf)));
+    sure = ' <b>How sure are we?</b> ' + U.pct(pf) + ' for the ' + esc(fav.short || fav.name) + ' means the ' + esc(other.short || other.name) + ' win a game like this about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.';
+  }
+  return why ? '<b>Why this game?</b> ' + esc(why) + sure : (sure ? sure.slice(1) : undefined);
+}
+/* "This week in MLB": the stage line. */
+function stageLine(st, phase) {
+  if (!st) return PHASE[phase] ? PHASE[phase] + '.' : '';
+  if (/pre/.test(phase)) return 'Spring training. Opening Day is ' + day(st.first) + '.';
+  if (/off|complete/.test(phase)) return st.champion ? The(st.champion) + ' won the World Series. Our numbers pick up again in spring.' : 'The off-season. Our numbers pick up again in spring.';
+  if (/post/.test(phase)) {
+    if (st.champion) return The(st.champion) + ' won the World Series.';
+    const al = (st.alive || []);
+    if (!al.length) return 'The postseason.';
+    const name = al[0].name || BP.roundLabel(al[0].round);
+    const ser = al.map(s => BP.teamShort(s.teams[0]) + ' v ' + BP.teamShort(s.teams[1]) + ', ' + seriesState(s)).join('; ');
+    return 'The postseason: the ' + name + (al.length > 1 ? 's' : '') + ' (best of ' + (al[0].best_of || 7) + '). ' + ser + '.' + (al[0].round !== 'WS' ? ' The World Series is next.' : '');
+  }
+  return 'Regular season, week ' + st.week + ' of ' + st.weeks + ': ' + QK.fmt.num(st.played) + ' of ' + QK.fmt.num(st.total) + ' games played. It runs to ' + day(st.last) + ', then twelve clubs play for the World Series.';
+}
+function weekTiles(dig, feat, titles, L, S) {
+  const T = [];
+  const mv = dig.movers;
+  if (mv && (mv.up.length || mv.down.length)) {
+    const up = mv.up[0], dn = mv.down[0], lead = up || dn, what = mv.metric === 'p_ws' ? 'World Series' : 'postseason';
+    T.push({ label: 'Biggest mover', value: BP.teamAbbr(lead.key) + ' ' + ptsOf(lead.d), href: BP.teamHref(lead.key, L, S), signal: true,
+      sub: The(lead.key) + (lead.d > 0 ? ' climbed' : ' slipped') + ' to ' + U.pct(lead.p) + ' in our ' + what + ' chance since ' + day(mv.since) + '.' + (up && dn ? ' Biggest fall: ' + BP.teamAbbr(dn.key) + ' ' + ptsOf(dn.d) + '.' : '') });
+  } else if (titles.length) {
+    const f = titles[0];
+    T.push({ label: 'World Series favourite', value: BP.teamAbbr(f.t) + ' ' + U.pct(f.p), href: BP.teamHref(f.t, L, S), signal: true,
+      sub: (f.p < 0.2 ? 'Nobody is better than 1 in 5. ' : '') + The(f.t) + ' lead our board, from 20,000 simulated brackets.' });
+  }
+  const u = dig.upset;
+  if (u) {
+    const score = u.side === 'home' ? u.hs + '–' + u.as : u.as + '–' + u.hs;
+    T.push({ label: 'Upset of the week', value: BP.teamAbbr(u.winner) + ' ' + U.pct(u.p), href: BP.gameHref(u.id, L),
+      sub: The(u.winner) + ' beat ' + the(u.loser) + ' ' + score + ' on ' + QK.fmt.date(u.start) + '. We gave them ' + U.pct(u.p) + ' before first pitch.' });
+  }
+  const h = dig.hot;
+  if (h) T.push({ label: 'Team of the week', value: BP.teamAbbr(h.key) + ' ' + h.w + '–' + h.l, href: BP.teamHref(h.key, L, S),
+    sub: The(h.key) + ': ' + h.w + ' win' + (h.w === 1 ? '' : 's') + ' in ' + h.gp + ' games, ' + (h.margin >= 0 ? '+' : '−') + Math.abs(h.margin) + ' run difference.' });
+  const r = dig.record;
+  if (r) {
+    const diff = r.won - r.expected;
+    T.push({ label: 'Our record this week', value: r.won + ' of ' + r.n, href: '#/calibration',
+      sub: 'Our favourites won ' + r.won + ' of ' + r.n + '; we expected ' + QK.fmt.num(r.expected, 0) + '. ' + (Math.abs(diff) < 2 ? 'Right on our numbers.' : diff > 0 ? 'A good week for the favourites.' : 'A week of upsets: in baseball a 60% call still misses 4 times in 10.') });
+  }
+  const rest = ((feat && feat.rest) || []).filter(Boolean).slice(0, 2);
+  if (rest.length) T.push({ label: 'Also worth a look', value: rest.map(c => BP.teamAbbr(c.away) + '–' + BP.teamAbbr(c.home)).join(' · '), href: BP.href('games', L, S), text: rest.length > 1,
+    sub: rest.map(c => { const w = whenLabel(BP.kitGame(c, L)); return w + (BP.isLive(c) ? '' : ' ' + QK.fmt.time(c.start)) + ': ' + (c.series ? BP.seriesText(c.series, true) + ', ' : '') + 'the ' + BP.teamShort(c.away) + ' at the ' + BP.teamShort(c.home); }).join('. ') + '.' });
+  return T;
 }
 
 function render(el, params) {
@@ -113,29 +222,29 @@ function render(el, params) {
     const hasGames = today.length + next.length + results.length > 0;
     const first = today.length ? 'today' : next.length ? 'next' : 'results';
 
-    const evening = new Date(QK.now()).getHours() >= 15;
-    const when = evening ? 'tonight' : 'today';
-    const lgName = L === 'aaa' ? 'Triple-A' : 'majors';
-    /* the game to watch: live first, then the closest calls in the next two days (QK.watchScore) */
-    const feat = today.concat(next).map(c => Object.assign(BP.kitGame(c, L), { league: c.series ? BP.seriesText(c.series, true) : (L === 'aaa' ? 'Triple-A' : 'MLB') })).filter(g => g.status !== 'final')
-      .map(g => [QK.watchScore(g), g]).filter(x => x[0] > -1e8).sort((a, b) => b[0] - a[0])[0];
+    const when = 'today';
+    const landing = isCurrent && L === 'mlb';
+    const dig = landing ? (idx.digest || {}) : {};
+    const feat = landing ? pickFeatured(idx, today.concat(next), post) : null;
     let h = '';
-    /* the split hero: the level on the status chip, the occasion (a postseason game) or our pick as the volt tag */
-    const featHTML = fg => {
-      const occ = fg.league && fg.league !== 'MLB' && fg.league !== 'Triple-A' ? fg.league : '';
-      return QK.featureCard(Object.assign({}, fg, { league: L === 'aaa' ? 'Triple-A' : 'MLB' }), { scribble: occ || (fg.status === 'live' ? 'Live now!' : 'Our pick ' + when + '!'), nick: t => t.short || t.name });
-    };
-    if (isCurrent && (L === 'mlb' || today.length + next.length > 0)) {
-      h += QK.greeting({ date: kicker, title: esc(QK.greet()) + '! Here’s what’s ' + QK.mark('worth watching') + ' in ' + (L === 'aaa' ? 'Triple-A' : 'the ' + lgName) + ' ' + when + '.',
-        lede: sub, ctas: [{ label: 'All games', href: BP.href('games', L, S) }, { label: inPost && L === 'mlb' ? 'The bracket' : 'Standings', href: inPost && L === 'mlb' ? BP.ghref('postseason') : BP.href('standings', L, S), ghost: true }],
-        side: feat ? featHTML(feat[1]) : '' });
+    if (landing) {
+      h += intro({ tag: kicker, title: 'Every MLB game, team and player, by the numbers.',
+        lede: inPost ? 'Our chance for every postseason game, who wins the World Series from 20,000 simulated brackets, and the Statcast numbers behind the players, in plain English.'
+          : 'Our chance for every game from a plate-appearance simulation with the lineups and starters, the race for October from 20,000 simulated seasons, and Statcast percentiles for every player, in plain English.',
+        links: [{ label: 'Games', sub: 'Every game, our chance', href: BP.href('games', L, S) },
+          inPost ? { label: 'Bracket', sub: 'Every series and path', href: BP.ghref('postseason') } : { label: 'Standings', sub: 'The race for October', href: BP.href('standings', L, S) },
+          { label: 'Players', sub: 'Statcast percentiles', href: BP.href('hitters', L, S) }] });
+      h += '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: 'This week in MLB', title: '<span id="ov-wk">The week so far</span>', html: true, sub: esc(stageLine(dig.stage, phase)) }) +
+        '<div id="ov-week"></div><div id="ov-feat" class="ql-feat"></div></section>';
+    } else if (isCurrent && today.length + next.length > 0) {
+      h += intro({ tag: kicker, title: 'Triple-A, by the numbers.', lede: sub,
+        links: [{ label: 'Games', sub: 'Every game, our chance', href: BP.href('games', L, S) }, { label: 'Standings', sub: 'The table', href: BP.href('standings', L, S) }, { label: 'Prospects', sub: 'Major-league translations', href: BP.href('prospects', L, S) }] });
     } else {
       h += QK.sectionHead({ kicker: kicker, title: title, sub: sub, size: 'lg', tag: 'h1',
         actions: '<a class="qk-btn primary" href="' + BP.href('games', L, S) + '">' + (isCurrent ? 'All games' : 'Every game') + '</a><a class="qk-btn ghost" href="' + BP.href('standings', L, S) + '">Standings</a>' });
     }
-    h += '<div class="bp-tiles">' + tiles(L, S, src, rows, titles, cal, isCurrent, lv) + '</div>';
 
-    if (hasGames) h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch ' + when, title: '<span id="ov-gh">Today</span>', html: true, sub: 'Our chance for each side, with a line on why it’s worth your time. Live games update as they go.',
+    if (hasGames) h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch', title: '<span id="ov-gh">Today</span>', html: true, sub: 'Our chance for each side, with a line on why it’s worth your time. Live games update as they go.',
       actions: U.seg('ov-when', 'Games', [['today', 'Today'], ['next', 'Next'], ['results', 'Results']], first) }) + '<div class="qk-watch" id="ov-games"></div></section>';
     const hot = hotItems(src.leaders || {}, L);
     /* Who's hot: the black power list, the top name on five boards */
@@ -158,16 +267,12 @@ function render(el, params) {
         (inPost ? '<div class="qk-span-' + (titles.length ? 7 : 12) + '">' + U.card2('The bracket', 'Series wins and our chance to win each series', '<div id="ov-bk"></div>', { foot: '<span>' + (post.sims ? BP.int(post.sims) + ' simulated brackets' : '') + '</span>' + U.more(BP.ghref('postseason'), 'Postseason') }) + '</div>' : '') + '</div></section>';
     }
 
-    // team strength
+    // team strength: where each club's strength comes from (the luck and power-rating charts repeat "Who's for real?")
     const haveRatings = Object.keys(rows).some(t => rows[t].rating && isNum(rows[t].rating.net));
-    const haveLuck = Object.keys(rows).some(t => isNum(rows[t].pythag_w));
-    if (haveRatings || haveLuck) {
-      h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Team strength', title: 'Ratings and luck', sub: 'How good each club is per game, where its strength comes from, and whether its record matches its runs.' }) + '<div class="qk-grid">';
-      if (haveRatings) h += '<div class="qk-span-5">' + U.card2('Power ratings', 'Runs a game better than an average club, our ratings', U.chart('ov-power', 560, 'Team ratings'), { foot: '<span>All clubs</span>' + U.more(BP.href('teams', L, S), 'Every team') }) + '</div>' +
-        '<div class="qk-span-7">' + U.card2('Team strength map', 'Offence against run prevention (pitching and defence), runs a game above average. Up and right is better.', U.chart('ov-map', 560, 'Offence against run prevention')) + '</div>';
-      if (haveLuck) h += '<div class="qk-span-12">' + U.card2('Who has been lucky', 'Wins above (or below) the Pythagorean record from runs scored and allowed', U.chart('ov-luck', 300, 'Wins above the Pythagorean record') +
-        QK.note('A club <b>+5</b> here won five more games than its runs scored and allowed usually buy: close wins tend not to last, so expect it to drift back.'), { foot: '<span>The eight luckiest and unluckiest</span>' + U.more(BP.href('standings', L, S), 'Standings') }) + '</div>';
-      h += '</div></section>';
+    if (haveRatings) {
+      h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Team strength', title: 'Bats or arms?', sub: 'Offence against run prevention (pitching and defence), in runs a game above an average club. Up and right is better.',
+        actions: '<a class="qk-more" href="' + BP.href('teams', L, S) + '">Every team</a>' }) +
+        U.card2('Team strength map', 'Runs a game above average, from our team ratings', U.chart('ov-map', 520, 'Offence against run prevention')) + '</section>';
     }
 
     // standings
@@ -186,6 +291,22 @@ function render(el, params) {
         '<li><span class="n">' + (i + 1) + '</span>' + U.playerEnt(x[0], L, BP.teamAbbr(BP.player(x[0]).team), b[0].charAt(0) === 'p' ? 'pitcher' : 'hitter') + '<span class="v">' + esc(b[2](x[1])) + '</span></li>').join('') + '</ul>', { flush: true }) + '</div>').join('') + '</div></section>';
 
     el.innerHTML = h;
+
+    // this week: the top lines, then the game that matters most (or the World Series race when nothing big is on)
+    if (landing) {
+      const T = weekTiles(dig, feat, titles, L, S);
+      el.querySelector('#ov-week').innerHTML = T.length ? QK.stats(T) : '';
+      if (T.length >= 3) el.querySelector('#ov-wk').textContent = 'The week in ' + WORDS[T.length].toLowerCase() + ' lines';
+      const fe = el.querySelector('#ov-feat');
+      if (feat && feat.c) {
+        const g = Object.assign(BP.kitGame(feat.c, L), { league: 'MLB' }), lab = whenLabel(g);
+        const occ = feat.c.series ? BP.seriesText(feat.c.series, true) : (feat.week && !/^(Today|Tonight|Live now)$/.test(lab) ? 'The big one this week' : 'The one to watch');
+        fe.innerHTML = QK.featureCard(g, { scribble: lab + ' · ' + occ, nick: t => t.short || t.name, note: heroNote(g, feat.why) });
+      } else if (titles.length) {  /* nothing big on: lead with the race */
+        fe.innerHTML = '<div class="ql-race">' + QK.sectionHead({ kicker: feat ? 'Nothing big on today' : 'No games soon', title: 'So here’s the race for the World Series', sub: 'Our chance of winning it all, from 20,000 simulated brackets.', tag: 'h3' }) +
+          QK.chances(titles.slice(0, 6).map(r => ({ label: BP.teamShort(r.t), p: r.p, href: BP.teamHref(r.t, L, S), mark: U.team(r.t, L, S), color: U.raw(r.t) })), { key: false }) + '</div>';
+      }
+    }
 
     // draw: games
     if (hasGames) {
@@ -208,11 +329,10 @@ function render(el, params) {
       if (w0 && lede) lede.textContent = (w0.p < 0.2 ? 'Nobody’s better than 1 in 5. The ' + w0.label + ' lead our board at ' + U.pct(w0.p) + '.'
         : 'The ' + w0.label + ' lead at ' + U.pct(w0.p) + (w0.p >= 0.5 ? ': they win it in about ' + Math.round(w0.p * 10) + ' of 10 simulated brackets.' : '.')) + ' Every remaining game and series simulated 20,000 times.';
     }
-    /* We say it. Then we check it.: the game model's record from mlb/calibration.json (QK.howSure: big numbers and the
-       we-said / it-happened bars); the full record is on the Model page */
+    /* We say it. Then we check it.: the game model's record from mlb/calibration.json (QK.howSure, the kit's line chart); the full record is on the Model page */
     const box = el.querySelector('#ov-sure'), hd = el.querySelector('#ov-sure-h');
     if (box && hd) {
-      hd.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every MLB game we have forecast, grouped by the chance we gave the home team. When the two bars match, our numbers mean what they say.',
+      hd.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every MLB game we have forecast, grouped by the chance we gave the home team. When the two lines match, our numbers mean what they say.',
         actions: '<a class="qk-more" href="#/calibration">The full record</a>' });
       QK.howSure(box, { calibration: cal, league: 'MLB', subject: 'the home team' });
     }
@@ -227,20 +347,12 @@ function render(el, params) {
       } else el.querySelector('#ov-real').innerHTML = QK.empty('Not yet', 'The chart fills in after the first games.');
     }
     if (inPost && BP.charts && BP.charts.mlbBracket && el.querySelector('#ov-bk')) BP.charts.mlbBracket(el.querySelector('#ov-bk'), post, { level: L, narrow: true });
-    // power ratings and the strength map
+    // the strength map
     if (haveRatings) {
-      const pw = Object.keys(rows).map(t => rows[t]).filter(r => r.rating && isNum(r.rating.net)).sort((a, b) => b.rating.net - a.rating.net);
-      QKC.bar('#ov-power', { cats: pw.map(r => BP.teamAbbr(r.tid)), series: [{ name: 'Rating', data: pw.map(r => r.rating.net) }], horizontal: true, diverging: true, labels: true, fmt: v => U.signed(v, 2),
-        hrefs: pw.map(r => BP.teamHref(r.tid, L, S)), labelWidth: 44, valName: 'Runs a game against an average club', catName: 'Club', label: 'Power ratings' });
-      const pts = pw.filter(r => isNum(r.rating.off)).map(r => ({ x: r.rating.off, y: (isNum(r.rating.def) ? r.rating.def : 0) + (isNum(r.rating.pitch) ? r.rating.pitch : 0), name: BP.teamName(r.tid), label: BP.teamAbbr(r.tid), color: BP.teamInfo(r.tid).colour, href: BP.teamHref(r.tid, L, S), size: 13 }));
+      const pw = Object.keys(rows).map(t => rows[t]).filter(r => r.rating && isNum(r.rating.net) && isNum(r.rating.off));
+      const pts = pw.map(r => ({ x: r.rating.off, y: (isNum(r.rating.def) ? r.rating.def : 0) + (isNum(r.rating.pitch) ? r.rating.pitch : 0), name: BP.teamName(r.tid), label: BP.teamAbbr(r.tid), color: BP.teamInfo(r.tid).colour, href: BP.teamHref(r.tid, L, S), size: 13 }));
       QKC.scatter('#ov-map', { points: pts, xName: 'Offence (runs a game above average)', yName: 'Run prevention (runs a game)', xFmt: v => U.signed(v, 1), yFmt: v => U.signed(v, 1), refX: 0, refY: 0, labelAll: true,
         quadrants: ['Pitching and defence', 'Complete teams', 'Rebuilding', 'Bats carry them'], label: 'Team strength map' });
-    }
-    if (haveLuck) {
-      const lk = Object.keys(rows).filter(t => isNum(rows[t].pythag_w) && isNum(rows[t].w)).map(t => ({ t: t, v: rows[t].w - rows[t].pythag_w })).sort((a, b) => b.v - a.v);
-      const pk = lk.length > 16 ? lk.slice(0, 8).concat(lk.slice(-8)) : lk;
-      QKC.bar('#ov-luck', { cats: pk.map(r => BP.teamAbbr(r.t)), series: [{ name: 'Wins above Pythagorean', data: pk.map(r => Math.round(r.v * 10) / 10) }], diverging: true, labels: true,
-        fmt: v => U.signed(v, 1), hrefs: pk.map(r => BP.teamHref(r.t, L, S)), label: 'Wins above the Pythagorean record', valName: 'Wins above Pythagorean', catName: 'Club' });
     }
     // standings by league
     if (leagues.length) {

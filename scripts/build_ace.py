@@ -359,8 +359,39 @@ def build_tour(b: Build, tour: str, args, cfg: dict) -> dict:
     entry = None
     if cur_full:
         entry = b.step(f"{tour} index entry", lambda: SI.index_entry(td, preds, prices, sims, race_sim, race_rows))
+        if entry:
+            entry["digest"] = b.step(f"{tour} digest", lambda: digest_payload(b, td, preds, race_sim), {}) or {}
     logger.info("%s: %.1f s", tour, time.perf_counter() - t_tour)
     return {"years": td.years, "entry": entry}
+
+
+def digest_now(today: date) -> datetime:
+    """The digest's clock: now, or the end of --today's UTC day for a dated build (tests, backfills)."""
+    now = datetime.now(timezone.utc)
+    return now if today == now.date() else datetime(today.year, today.month, today.day, 23, 59, tzinfo=timezone.utc)
+
+
+def digest_payload(b: Build, td: an.TourData, preds: dict, race_sim: dict | None) -> dict:
+    """The tour's index.json "digest" ("This week in tennis": analytics/site.py digest) from the tour-level matches
+    eight days either side of today, with data/<T>/chance_log.json (one snapshot a day of the race to the Finals and
+    the year-end No. 1, for the movers; never read by the front end) carried forward."""
+    from oddsmarkets.tennis.analytics import matches as MT
+    from oddsmarkets.tennis.analytics import site as SI
+    lo, hi = td.today - timedelta(days=8), td.today + timedelta(days=8)
+    cards = []
+    for m in td.matches(td.current).values():
+        d = an.day(m.get("date"))
+        if d is None or not (lo <= d <= hi) or not an.is_tour_level(m):
+            continue
+        pr = preds.get(m["id"])
+        cards.append(MT.card(td, m, pr, None, wp_now=MT.wp_now(m, pr) if m.get("status") == "live" else None, light=True))
+    rel = f"{td.tour}/chance_log.json"
+    prev = an.read_json(b.data / rel) or {}
+    prev = prev.get(str(td.current)) if isinstance(prev, dict) else None
+    dig, log = SI.digest(td.tour, cards, td.events(td.current), race_sim, prev, digest_now(td.today))
+    if any(log.values()):
+        b.write(rel, {str(td.current): log})
+    return dig
 
 
 def calibration(b: Build, td: an.TourData, cfg: dict) -> None:

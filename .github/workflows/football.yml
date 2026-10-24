@@ -106,6 +106,10 @@ jobs:
           git clone -q --depth 1 "https://github.com/${PAGES_REPO}.git" "$RUNNER_TEMP/site"
           echo "live site: $(git -C "$RUNNER_TEMP/site" log -1 --format='%h %cI %s')"
 
+      - name: 'Restore the persistent logs from the previous deploy'
+        run: |
+          uv run --frozen python scripts/ci_site.py restore --site football --prev "$RUNNER_TEMP/site"
+
       - name: 'Seed the working set if the cache was cold'
         id: seed
         timeout-minutes: 40
