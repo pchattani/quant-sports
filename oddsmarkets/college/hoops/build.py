@@ -37,6 +37,7 @@ import numpy as np
 from scipy.stats import norm
 
 from oddsmarkets.college import canon
+from oddsmarkets.college.store import jersey_number
 from oddsmarkets.college import informed as INF
 from oddsmarkets.college import packing as PK
 from oddsmarkets.college import store as ST
@@ -1940,7 +1941,7 @@ def career_files(ctx: dict, out: Path, current: int) -> int:
             similar = sim_of.get(p, [])
             page = {"ok": True, "id": p, "name": r["name"], "pos": r["pos"], "level": lv, "updated_at": now_iso(),
                     "class": info.get("class"), "height_in": info.get("height_in"), "weight_lb": info.get("weight_lb"),
-                    "hometown": info.get("hometown"), "seasons": PK.pack(seasons_rows),
+                    "hometown": info.get("hometown"), "number": jersey_number(info.get("jersey")), "seasons": PK.pack(seasons_rows),
                     "current": {"season": ls, "team": r["team"], "log": PK.pack(log), "value": value_row(r, player_rows(ctx, ls)["params"]),
                                 "fantasy": None, **prev_ring(sp_of(ls), sp_of(ls - 1), p, ls - 1)},
                     "moves": mv_of.get(p, []), "similar": similar}

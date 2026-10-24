@@ -170,3 +170,17 @@ def test_career_similar_players_follow_the_spec(built):
                 roles.add(nb["role"])
         assert len(roles) <= 1                                     # one role group
     assert seen > 0
+
+
+def test_career_files_carry_the_jersey_number(built):
+    """The player hero's outlined number: players/<pid>.json `number` from the store's ESPN roster `jersey`."""
+    out, _res = built
+    nums = [load(f).get("number") for f in (out / "mbb" / "players").glob("*.json")]
+    assert nums and any(n is not None for n in nums)
+    assert all(n is None or (isinstance(n, str) and n.isdigit() and len(n) <= 2) for n in nums)
+
+
+def test_jersey_number_rule():
+    from oddsmarkets.college.store import jersey_number
+    assert jersey_number("7") == "7" and jersey_number("00") == "00" and jersey_number(12) == "12"
+    assert jersey_number(None) is None and jersey_number("") is None and jersey_number("A1") is None and jersey_number("123") is None

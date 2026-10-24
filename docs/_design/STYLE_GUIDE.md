@@ -136,8 +136,9 @@ of its own position on the scale, so a 99th-percentile row runs blue to red.
    driver falls to slate with the constructor colour as the rule.
 3. **No colour at all** follows the tennis rule (one rule for every sport): the side we favour is cobalt and the other
    is slate; with no favourite, left is cobalt and right is slate. We never use a nation's flag colour.
-4. **Football clubs** take club colours where the data has them (`colour`), else rule 3. Today the Footballer's data
-   has none, so football heroes are cobalt v slate by our favourite (see MIGRATION_V4 payload follow-ups).
+4. **Football clubs** take club colours where the data has them (`colour`, `alt`), else rule 3. The build merges
+   three layers: Sofascore's `teamColors`, hand-checked overrides, then the crest's dominant colour
+   (`docs/site/UNIFIED_PAYLOADS.md`).
 5. **Marks and chart lines** (monograms, stripes, dots, lines) use the kit as it is, lifted to 3:1 on the card
    (`color.team`). A monogram that would vanish into the card gets an inset outline (`markOutline`). Two kits side by
    side must be distinct (`color.distinct`), else cobalt v grey (`--wp-a` / `--wp-b`).
@@ -185,9 +186,9 @@ All builders return HTML strings unless noted. Signatures are in `quant.js` / `q
 
 | Component | Builder | Where |
 |---|---|---|
-| Diagonal split hero | `QK.splitHero(g, { kicker, tag, nick, sub, homeFirst, noun, note, foot, link, compact, blocks })` | Home, overviews (through `QK.featureCard`), game pages (through `QK.previewCard`) |
+| Diagonal split hero | `QK.splitHero(g, { kicker, tag, chip, nick, sub, homeFirst, noun, note, foot, meters, link, compact, blocks })`; two chances that do not add to 100% (F1: each driver against the field) get two separate meters in the foot, never a split bar | Home, overviews (through `QK.featureCard`), game pages (through `QK.previewCard`) |
 | Scoreboard bug | `QK.scorebug(g, { size: 'xl' })` (= `QK.scorebugXL`) | "What to watch tonight" on player and team pages (`QK.previewCard(g, { layout: 'bug' })`) |
-| Tale of the tape | `QK.tape({ left, right, rows / groups, wins, colors })`; `QK.compareView` (two entities) and `QK.matchupBar` draw it | player pages, compare pages, game pages |
+| Tale of the tape | `QK.tape({ left, right, rows / groups, wins, colors, fav })` (`fav`: with no colours the favourite is cobalt, as on the hero); `QK.compareView` (two entities) and `QK.matchupBar` draw it | player pages, compare pages, game pages |
 | LED meter | `QK.meter(p, { prev, style })`; every `QK.pctlBars` / `QK.pctRail` row | player pages |
 | Explain strip | `QK.explain(html, { title })` | "What's that number?", "How sure are we?" under any number |
 | Black band | `QK.band(html)` | the power list, any black section |
@@ -204,7 +205,7 @@ All builders return HTML strings unless noted. Signatures are in `quant.js` / `q
 | Shell | `QK.shell(opts)` | black top bar, "THE QUANT" with the volt mark, condensed sport tabs with a volt underline, the section nav on `--block-2` |
 | Ticker | `QK.ticker(games, o)` | `--block-2`, condensed, our pre-game chances in volt, the live period in red-orange |
 | Section head | `QK.sectionHead(o)` | the kicker as a volt tag on a black parallelogram, the title in all-caps Bebas (40–64 px); on a black band the tag is volt with black type |
-| Game card | `QK.gameCard(g, o)` | an 8 px stripe in the two team colours split by our chance; the league and time in condensed caps; 52 × 40 squares; Bebas scores and chances (favourite in blue); the foot "Our chance · why" (live: "Chance to win now · ..."); the bar under the rows only with `bar: true` |
+| Game card | `QK.gameCard(g, o)` | an 8 px stripe in the two team colours split by our chance; the league and time in condensed caps; 52 × 40 squares; Bebas scores and chances (favourite in blue); the foot "Our chance · why" (live: "Chance to win now · ..."); the bar under the rows only with `bar: true`; `homeFirst: true` lists the home side first (football) |
 | Win bar | `QK.wpBar(...)` | square team-colour segments, condensed labels |
 | Chance bars | `QK.chances(rows, o)` | the team square, a bar block in the team colour with the name inside in white, our chance in Bebas |
 | Stat tile | `QK.statTile`, `QK.stats` | black blocks 2 px apart, the label in condensed caps, the number in Bebas, the percentile as a square "97th pctl" chip under it |
@@ -267,6 +268,12 @@ There are no count-up numbers and no auto-scrolling ticker. `prefers-reduced-mot
 - Headlines are short and punchy, in capitals by type, not by typing: write them in sentence case and Bebas sets the
   capitals.
 - British spelling.
+
+**Times and dates (one convention, 23 Oct 2026).** Every time and date is en-GB, 24-hour, in the viewer's own time
+zone: "16:00", "Mon 19 Oct", "Today · 19:30", "Sat 18:30". Never the browser locale's "04:00 PM" or "Mon, Oct 19",
+and no zone label: the clock is always the viewer's own. The kit's `QK.fmt.time` / `QK.fmt.date` / `QK.whenShort`
+apply it on the hero, the score bug, game cards and the ticker; site code formats through them, never through
+`toLocaleString()` with no locale.
 
 **Patterns.**
 - **Section titles say the story:** "Six games. Our calls.", "We say it. Then we check it.", "Who lifts the Cup?",

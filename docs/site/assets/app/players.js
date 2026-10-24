@@ -579,8 +579,43 @@ function drawPerson(el, doc, q) {
     else if (tab === 'matches') drawMatches(el, body, doc, R, q);
     else if (tab === 'shots') drawShots(el, body, doc, R, q);
     else drawTransfers(el, body, doc, R);
+    /* the other tabs: the strip's fourth number is value added, as on the overview, once the main competition's
+       line is in (the hero's numbers stay this season's, every competition) */
+    if (tab !== 'overview' && cy0) {
+      var main = R.seasons.filter(function (s) { return s.source === 'live' && compOk(s.comp) && FB.hasFile(s.comp, 'players_live'); }).sort(function (a, b) { return (b.min || 0) - (a.min || 0); });
+      var pick = q.c ? main.filter(function (s) { return s.comp === q.c; })[0] : main[0];
+      stripInfo(doc, pick ? pick.comp : null, function (info) {
+        if (!el.isConnected || !el.querySelector('.qk-strip')) return;
+        setStrip(el, stripTiles(doc, cy0, info), esc('This season, every competition: ' + FB.int(cy0.min) + ' minutes.') +
+          (info.pc && info.where ? ' ' + esc('The chips under the numbers are percentiles against ' + (info.g ? info.g.name : 'the same position') + ' in ' + info.where + ' (100 = best).') : ''));
+      });
+    }
   }
   redraw(q);
+}
+/* The strip's numbers for the tabs without the rail: the player's line in the main competition, its percentiles
+   against the same peers as the overview's rail (pctPanel), and value added; nothing is drawn. done(info) only when
+   there is a line. */
+function stripInfo(doc, slug, done) {
+  if (!slug) return;
+  FB.compFile(slug, 'players_live').then(function (lv) {
+    var players = (lv || {}).players || [];
+    var p = players.filter(function (x) { return String(x.player_id) === String(doc.id); })[0];
+    if (!p) return null;
+    var where = FB.compName(slug) + ' ' + (FB.currentSeason(FB.comp(slug)).season || '');
+    var plain = { p: p, where: where, pc: p.pct || {}, val: function (k) { return p[k]; } };
+    if (!FB.roles) return plain;
+    return FB.rolesFor(players.some(function (x) { return x.role !== undefined; })).then(function (R) {
+      if (!R || !R.ok) return plain;
+      var g = FB.peerGroup(FB.rowRole(R, p.role, doc.id, slug));
+      var valOf = function (r, k) { return k === 'gar90' ? FB.rowGar(R, r.gar90, r.player_id, slug) : r[k]; };
+      var val = function (k) { return valOf(p, k); };
+      if (!g) return { p: p, where: where, val: val };
+      var PP = FB.peerPct({ rows: players, minutes: function (r) { return r.minutes; }, role: function (r) { return FB.rowRole(R, r.role, r.player_id, slug); },
+        val: valOf, floor: lv.minutes_floor });
+      return { g: g, p: p, where: where, pc: PP.pct(p), val: val };
+    });
+  }).then(function (info) { if (info) done(info); }, function () {});
 }
 
 /* ── v3 plain-English pieces for the player page ─────────────────────────── */
@@ -719,9 +754,9 @@ function byYear(rows) {
 // ── overview (kit v4 "Broadcast", the Rink player page's pattern: MIGRATION_V4.md step 4) ─────────────
 
 /* The black strip of five numbers under the hero (QK.playerHeader strip). cy: the season's totals in the filter
-   (byYear); info: the main competition's line once the percentiles are in (pctPanel), else null. Before it arrives,
-   and on the other tabs, the fourth number is goals and assists per 90 (keepers: starts and minutes) rather than
-   value added, which needs the competition line. */
+   (byYear); info: the main competition's line once the percentiles are in (pctPanel on the overview, stripInfo on
+   the other tabs), else null. Until it arrives the fourth number is goals and assists per 90 (keepers: starts and
+   minutes) rather than value added, which needs the competition line. */
 function stripTiles(doc, cy, info) {
   if (!cy) return [];
   var pc = (info && info.pc) || {}, p = (info && info.p) || null, gk = doc.pos === 'G';
@@ -1107,7 +1142,8 @@ function tapeSim(body, doc, info) {
   (info.slug ? FB.compFile(info.slug, 'teams') : Promise.resolve(null)).then(function (td) {
     if (!FB.alive(tbox)) return;
     var TM = (td || {}).teams || {};
-    var tidOf = function (r) { var x = TM[r.team]; return x && x.team_id ? x.team_id : null; };
+    /* the row's own team id when the payload carries it (players_live `tid`), else the club found by name */
+    var tidOf = function (r) { if (r && r.tid) return r.tid; var x = TM[r.team]; return x && x.team_id ? x.team_id : null; };
     var meTid = (doc.current_club || {}).tid || tidOf(info.p);
     var draw = function (i) {
       var s = sim[i];

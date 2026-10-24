@@ -131,7 +131,8 @@ function buildDrivers(ids, ss, careers, elo, season, y) {
       (d.team ? PD.teamLink(d.team) : '') + (c.nationality ? ' · ' + esc(c.nationality) : '') + '</div></div></div><div class="pd-facts">' + facts.map(function (f) { return '<div><span>' + f[0] + '</span><b>' + f[1] + '</b></div>'; }).join('') + '</div></div>';
   };
   var Ps = [0, 1].map(function (i) { return ss[i].cat ? PD.v2.peer(ss[i].cat, 'drivers', ss[i].year === y ? season : null) : null; });
-  var ents = [0, 1].map(function (i) { var d = ss[i].d || {}; return { name: names[i], href: PD.driverHref(ids[i]), abbr: short[i], short: short[i], colour: PD.teamColourRaw(d.team || PD.driverTeam(ids[i])), sub: [d.team ? PD.teamName(d.team) : '', ss[i].year ? ss[i].year : '', isNum(d.races) ? d.races + ' starts' : ''].filter(Boolean).join(' · ') }; });
+  var ents = [0, 1].map(function (i) { var d = ss[i].d || {}; return { name: names[i], href: PD.driverHref(ids[i]), abbr: short[i], short: short[i], colour: PD.teamColourRaw(d.team || PD.driverTeam(ids[i])), alt: PD.teamAlt(d.team || PD.driverTeam(ids[i])), team: d.team || PD.driverTeam(ids[i]), sub: [d.team ? PD.teamName(d.team) : '', ss[i].year ? ss[i].year : '', isNum(d.races) ? d.races + ' starts' : ''].filter(Boolean).join(' · ') }; });
+  PD.v2.mates(ents[0], ents[1]);
   var peerTxt = Ps[0] && Ps[1] ? (same ? 'Ranked against ' + esc(Ps[0].label) + ' in ' + ss[0].year + ' (' + Ps[0].n + ' drivers)' : 'Different seasons: each ranked against their own season’s drivers (' + (ss[0].year || '—') + ' v ' + (ss[1].year || '—') + ')') : 'No driver catalogue for one of them (it starts in 2018)';
   var shortOf = [0, 1].filter(function (i) { return Ps[i] && !Ps[i].qualified(ids[i]); }).map(function (i) { return names[i]; });
   ask(short);
@@ -217,7 +218,7 @@ function teams(el, a, b, y) {
     ask(names);
     var tverd = tP ? QK.verdicts(PD.v2.verdicts([tP, tP], [a, b], PD.v2.TEAM_SET.concat(PD.v2.MORE_TEAM), names)) : '';
     var tOpts = [['car_race_pace', 'Car pace'], ['points_per_race', 'Points / race'], ['dnf_rate', 'DNF rate'], ['pit_lane_v_field', 'Pit lane'], ['strategy_gain', 'Strategy']];
-    var tents = [a, b].map(function (id, i) { return { name: names[i], href: PD.teamHref(id), abbr: PD.teamAbbr(id), short: PD.teamAbbr(id), colour: PD.teamColourRaw(id), sub: lineup(id).map(PD.driverSurname).join(' · ') }; });
+    var tents = [a, b].map(function (id, i) { return { name: names[i], href: PD.teamHref(id), abbr: PD.teamAbbr(id), short: PD.teamAbbr(id), colour: PD.teamColourRaw(id), alt: PD.teamAlt(id), sub: lineup(id).map(PD.driverSurname).join(' · ') }; });
     PD.set('cmp-body', '<div class="pd-cmp-ids">' + card(0) + card(1) + '</div>' +
       PD.card('Side by side', (tP ? 'Ranked against ' + esc(tP.label) + ' in ' + y + ' (' + tP.n + ' constructors)' : 'No team catalogue for ' + y) + '. Bar length = percentile (100 = best); the better number in each row is solid.',
         tP ? sideBySide([a, b], [T[a], T[b]], [tP, tP], PD.v2.TEAM_SET.concat(PD.v2.MORE_TEAM), tents) + tverd : PD.muted('Nothing to compare yet.'), { cls: 'pd-mt' }) +

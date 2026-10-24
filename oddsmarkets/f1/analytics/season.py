@@ -110,6 +110,29 @@ KNOWN_COLOURS = {
     "cooper": "#14532D", "brm": "#3F6212", "matra": "#1E40AF", "march": "#DC2626", "shadow": "#1F2937", "cadillac": "#C0C0C0",
     "audi": "#BB0A30",
 }
+
+# The second livery colour of the recent constructors (a small hand-kept table: the darker colour of each car's
+# livery). The front end's QK.color.blockPair gives the second of two clashing teams its `alt` before slate (Red
+# Bull v Mercedes, two blue cars). A dark alt is told apart from any deepened team block by lightness, so with this
+# table no pair of 2026 constructors falls to slate (a port of the kit rule checked every pair, 23 Oct 2026).
+LIVERY_ALT = {
+    "red_bull": "#1B2443", "mercedes": "#000000", "ferrari": "#111111", "mclaren": "#1E1E1E", "aston_martin": "#00352F",
+    "alpine": "#061A33", "williams": "#041E42", "haas": "#000000", "rb": "#1A2B5E", "sauber": "#000000",
+    "audi": "#000000", "cadillac": "#000000",
+}
+
+
+def team_alt(t: str | None) -> str | None:
+    """A constructor's second livery colour (LIVERY_ALT), else None."""
+    return LIVERY_ALT.get(str(t or ""))
+
+
+def _alt(t: str | None) -> dict:
+    """{"alt": hex} for a payload's team entry when the table has one; {} otherwise (no null written)."""
+    a = team_alt(t)
+    return {"alt": a} if a else {}
+
+
 PALETTE = ["#E6194B", "#3CB44B", "#FFE119", "#4363D8", "#F58231", "#911EB4", "#46F0F0", "#F032E6", "#BCF60C", "#FABEBE",
            "#008080", "#E6BEFF", "#9A6324", "#FFFAC8", "#AAFFC3", "#808000", "#FFD8B1", "#7F7FFF", "#FF6F61", "#6B8E23"]
 
@@ -392,7 +415,7 @@ def build_season(year: int, current: int, *, forecasts: dict | None = None, effe
     teams: dict[str, dict] = {}
     for r in stand["drivers"]:
         for t in r.get("teams") or []:
-            teams.setdefault(t, {"name": team_name(st, t), "colour": colours.get(t), "drivers": []})["drivers"].append(r["driver"])
+            teams.setdefault(t, {"name": team_name(st, t), "colour": colours.get(t), **_alt(t), "drivers": []})["drivers"].append(r["driver"])
     fin = finished(year, current)
     return {
         "ok": True, "year": year, "updated_at": _now(), "rounds_total": len(rs), "rounds_done": len(stand["rounds_done"]),
@@ -475,7 +498,7 @@ def index(current: int, years: list[int], metas: dict[int, dict], colours: dict[
     out["drivers"] = drivers
     cols = colours or team_colours(current)
     tset = set(lineup.values()) | {v["team"] for v in drivers.values() if v["team"]}
-    out["teams"] = {t: {"name": team_name(st, t), "colour": cols.get(t)} for t in sorted(tset)}
+    out["teams"] = {t: {"name": team_name(st, t), "colour": cols.get(t), **_alt(t)} for t in sorted(tset)}
     out["seasons_meta"] = {str(y): metas.get(y) for y in sorted(years, reverse=True) if metas.get(y)}
     return out
 

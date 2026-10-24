@@ -393,8 +393,8 @@ function render(opts) {
     el.innerHTML = '';
     try {
       const out = fn(el, r.params, state);
-      if (out && typeof out.then === 'function') out.then(() => { if (keep) window.scrollTo(0, y0); jumpNav(el, r); }, err => showError(el, err));
-      else { if (keep) window.scrollTo(0, y0); jumpNav(el, r); }
+      if (out && typeof out.then === 'function') out.then(() => { heroBar(el); if (keep) window.scrollTo(0, y0); jumpNav(el, r); }, err => showError(el, err));
+      else { heroBar(el); if (keep) window.scrollTo(0, y0); jumpNav(el, r); }
     } catch (err) { showError(el, err); }
   });
 }
@@ -455,6 +455,24 @@ function sectionBar(r) {
       '<a class="qk-tab" href="' + tabHref(t, L) + '"' + (t[0] === r.name ? ' aria-selected="true" aria-current="page"' : ' aria-selected="false"') + '>' + esc(t[1]) +
       (t[2] === 'mlb' && L !== 'mlb' ? ' <span class="bp-tab-tag">MLB</span>' : '') + '</a>').join('') + '</nav>' : '');
   return bar;
+}
+/* v4: on a page that opens with the full-bleed hero (player, team), the section bar moves under the hero (its strip and
+ * "The short version"), as on the other sites: the hero's kicker already names the level and season, and the back link
+ * goes when the page links the same place (the crumb, the "All teams" button); the meta line stays. */
+function heroBar(el) {
+  const app = el && el.parentNode, bar = app ? app.querySelector(':scope > .bp-secbar') : null;
+  const hero = el ? el.querySelector('.qk-ph') : null;
+  if (!bar || bar.hidden || !hero) return;
+  let after = hero;
+  while (after.nextElementSibling && /(^| )(qk-strip|qk-ph-short)( |$)/.test(after.nextElementSibling.className)) after = after.nextElementSibling;
+  const back = bar.querySelector('.bp-back');
+  if (back && el.querySelector('a[href="' + back.getAttribute('href') + '"]')) back.remove();
+  const k = bar.querySelector('.bp-sec-title > .qk-kicker');
+  if (k) k.remove();
+  const t = bar.querySelector('.bp-sec-title');
+  if (t && !t.children.length) t.remove();
+  bar.classList.add('under-hero');
+  after.parentNode.insertBefore(bar, after.nextSibling);
 }
 function showError(el, err) {
   console.error(err);

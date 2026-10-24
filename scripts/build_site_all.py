@@ -1030,8 +1030,44 @@ def build_boot_candidates_from(players: list[dict], cap_per_team: int = 12) -> l
     return list(merged.values())
 
 
+def player_team_ids(store: dict) -> dict[str, list[tuple[str, str, int]]]:
+    """{player id: [(date, the club's name as the line-up gives it, its Sofascore team id), ...]}, latest first, from
+    the store's line-ups and the matches' home_id / away_id (no new data: both are in the store already)."""
+    matches = store.get("matches") or {}
+    out: dict[str, list[tuple[str, str, int]]] = {}
+    for gid, lu in (store.get("lineups") or {}).items():
+        m = matches.get(str(gid)) or {}
+        if not isinstance(lu, dict) or not isinstance(m, dict):
+            continue
+        ids = {}
+        for side in ("home", "away"):
+            tid = m.get(f"{side}_id")
+            if m.get(side) and str(tid or "").isdigit():
+                ids[str(m[side])] = int(tid)
+        for pid, p in lu.items():
+            t = str((p or {}).get("t") or "") if isinstance(p, dict) else ""
+            if t in ids:
+                out.setdefault(str(pid), []).append((str(m.get("date") or ""), t, ids[t]))
+    for v in out.values():
+        v.sort(reverse=True)
+    return out
+
+
+def _tid_for(row: dict, seen: list[tuple[str, str, int]] | None) -> int | None:
+    """The team id of a players_live row's club: the latest appearance under that club's name, else the latest one
+    (the row's club is the player's latest club, and the build may have normalised its name)."""
+    if not seen:
+        return None
+    for _d, name, tid in seen:
+        if name == row.get("team"):
+            return tid
+    return seen[0][2]
+
+
 def build_players_json(players: list[dict], store, boot_probs: dict, candidates: list[dict], floor: int) -> tuple[dict, dict]:
-    """players_live.json (every player's line, the catalogue, percentiles) and player_leaders.json."""
+    """players_live.json (every player's line, the catalogue, percentiles) and player_leaders.json. Each row carries
+    `tid`, its club's team id (the front end's tale of the tape finds the club by id, not by name)."""
+    tids = player_team_ids(store)
     age = store_age_hours(store)
     fresh = age is not None and age < _stale_after(store)
     prob_team = {c["name"]: c["team"] for c in candidates}
@@ -1053,7 +1089,9 @@ def build_players_json(players: list[dict], store, boot_probs: dict, candidates:
         "ok": bool(players) or fresh, "updated_at": _now(), "checked_at": _now(),
         "matches_covered": len(store.get("lineups", {})), "minutes_floor": floor,
         "metrics": METRICS, "positions": POSITION_LABELS,
-        "players": [{k: v for k, v in p.items() if v is not None} for p in players],
+        # the row's club id rides on the payload row only (the player lines elsewhere stay as they are)
+        "players": [{**{k: v for k, v in p.items() if v is not None},
+                     **({"tid": t} if (t := _tid_for(p, tids.get(str(p.get("player_id"))))) is not None else {})} for p in players],
     }
     return live, {"top_scorer": leaders[:40], "live": leaders}
 

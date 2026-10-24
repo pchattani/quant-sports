@@ -306,7 +306,13 @@ function render(el, params, state) {
     }
 
     // the tale of the tape: the player against one of the closest matches (chips switch), on the card's metric set
-    if (body.querySelector('#pp-tape')) {
+    /* the season catalogue (about 3-4 MB) the tape compares from loads only once the tape is 160 px into the screen (not merely
+       near it: at 1440 px it sits just under the fold), unless the page already has it */
+    const tapeBox = body.querySelector('#pp-tape');
+    if (tapeBox) (catFull || !window.IntersectionObserver ? (f => f()) : (f => { const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); f(); } }, { rootMargin: '0px 0px -160px 0px', threshold: 0.01 });
+      /* observe once the web fonts have set the hero (before that a box under the fold reads as in view) */
+      const go = () => { if (tapeBox.isConnected) io.observe(tapeBox); };
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => setTimeout(go, 50)); else go(); }))(() => {
       withCat(full => {
         if (!full || !U.alive(body)) return;
         const others = sim.map(m => String(m[0])).filter(id => full.players[id]);
@@ -340,7 +346,7 @@ function render(el, params, state) {
         }));
         drawTape(others[0]);
       });
-    }
+    });
 
     // what to watch tonight: the scoreboard bug, the bar and how the clubs match up so far (season.json ratings)
     if (nxt && body.querySelector('#pp-next')) {

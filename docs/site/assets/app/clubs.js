@@ -76,7 +76,7 @@ function dcMatrix(home, away, model, homeAdv) {
   }
   return { h: h, d: d, a: a, lamH: lamH, lamA: lamA, o25: o25, btts: btts, score: best[0] + '–' + best[1], pScore: best[2], m: m };
 }
-/* If they met: our home / draw / away chance (the bar, away on the left as on the game cards), the tiles and the
+/* If they met: our home / draw / away chance (the bar, home on the left as on the game cards), the tiles and the
    score grid. */
 function chanceHTML(id, home, away, model, neutral) {
   var r = dcMatrix(home, away, model, neutral ? 0 : model.home_adv);

@@ -516,6 +516,12 @@ def build_league(b: Build, league: str, args, cfg: dict) -> dict:
     return {"seasons": seasons, "ctx": out_ctx, "history": hist}
 
 
+def jersey_number(v) -> str | None:
+    """A jersey number as ESPN's roster gives it ("7", "00"); None unless one or two digits."""
+    t = str(v).strip() if v is not None else ""
+    return t if t.isdigit() and len(t) <= 2 else None
+
+
 def careers(b: Build, league: str, cats: dict[int, dict], blocks: dict[str, dict]) -> int:
     from oddsmarkets.basketball.analytics import awards as AWD
     from oddsmarkets.basketball.analytics import players as PL
@@ -544,9 +550,13 @@ def careers(b: Build, league: str, cats: dict[int, dict], blocks: dict[str, dict
             latest[pid] = (s, r)
     ca = AWD.career_awards(league, sorted(cats), cats)
     stores_players: dict[str, dict] = {}
+    numbers: dict[str, str] = {}      # the player hero's outlined number: the latest ESPN roster `jersey` on file
     for s in sorted(cats, reverse=True)[:3]:
         for pid, info in (an.load_store(league, s).get("players") or {}).items():
             stores_players.setdefault(pid, info)
+            j = jersey_number((info or {}).get("jersey"))
+            if j is not None:
+                numbers.setdefault(pid, j)
     curs: dict[str, dict | None] = {}
     for pid in rows:
         path = b.data / league / "players" / f"{pid}.json"
@@ -566,7 +576,7 @@ def careers(b: Build, league: str, cats: dict[int, dict], blocks: dict[str, dict
         info = stores_players.get(pid) or {}
         cur = curs.get(pid)
         payload = {"id": pid, "name": names.get(pid), "pos": info.get("pos") or r.get("pos"), "pool": r.get("pool"),
-                   "dob": info.get("dob"), "league": league, "seasons": seasons, "current": cur,
+                   "dob": info.get("dob"), "number": numbers.get(pid), "league": league, "seasons": seasons, "current": cur,
                    "similar": PL.similar(pid, s, r, index, names), "similar_role": sim_role.get(pid, []),
                    "role_card": PL.role_card((cats[s] or {}).get("players") or {}, pid, league, s, cats[s]),
                    "career_awards": ca.get(pid, []), "updated_at": _now()}

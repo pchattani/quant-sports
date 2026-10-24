@@ -257,3 +257,12 @@ def test_career_similar_players_follow_the_spec(built):
         if nb:
             assert nb["qualified_rate"] and nb["pos"] == c["seasons"][-1].get("pos", nb["pos"])
     assert seen > 0
+
+
+def test_career_files_carry_the_jersey_number(built):
+    """The player hero's outlined number: players/<pid>.json `number` from the store's ESPN roster `jersey`."""
+    files = list((built["out"] / "players").glob("*.json"))
+    assert files
+    nums = [_load(f).get("number") for f in files]
+    assert all(n is None or (isinstance(n, str) and n.isdigit() and len(n) <= 2) for n in nums)
+    assert any(n is not None for n in nums)

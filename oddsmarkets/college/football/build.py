@@ -1757,7 +1757,7 @@ def career_files(ctx: dict, out: Path, current: int, sizes: dict) -> int:
         for s in sorted(stores, reverse=True):
             p = (stores[s].get("players") or {}).get(pid)
             if p:
-                for k in ("name", "pos", "class", "height_in", "weight_lb", "hometown"):
+                for k in ("name", "pos", "class", "height_in", "weight_lb", "hometown", "jersey"):
                     if info.get(k) is None and p.get(k) is not None:
                         info[k] = p.get(k)
         last = rows[-1][1]
@@ -1779,7 +1779,8 @@ def career_files(ctx: dict, out: Path, current: int, sizes: dict) -> int:
             current_block.update(prev_ring(prev_cat, pid, last["pos"], current - 1))
         obj = {"ok": True, "id": pid, "name": info.get("name") or last.get("name"), "pos": last["pos"], "level": LEVEL,
                "updated_at": data.now_iso(), "class": info.get("class"), "height_in": info.get("height_in"),
-               "weight_lb": info.get("weight_lb"), "hometown": info.get("hometown"), "seasons": seasons_rows,
+               "weight_lb": info.get("weight_lb"), "hometown": info.get("hometown"), "number": store.jersey_number(info.get("jersey")),
+               "seasons": seasons_rows,
                "current": current_block, "moves": mv_all.get(pid, []), "similar": sim_map.get(pid, [])}
         sizes[f"player:{pid}"] = write(pdir / f"{pid}.json", obj)
         keep.add(f"{pid}.json")

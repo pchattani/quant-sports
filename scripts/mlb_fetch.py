@@ -130,7 +130,9 @@ def current_extras(c: Client, level: str, s: dict, today: date) -> None:
     season = s["season"]
     s["meta"]["standings"] = statsapi.standings(c, season, level)
     last = s["meta"].get("rosters_at")
-    if not last or (datetime.now(timezone.utc) - _iso_dt(last)).total_seconds() > 20 * 3600:
+    # rosters stored before jersey numbers were kept (no "num" map) refresh on the next run, once, as a stale one would
+    old_format = any("num" not in (r or {}) for r in (s["meta"].get("rosters") or {}).values())
+    if not last or old_format or (datetime.now(timezone.utc) - _iso_dt(last)).total_seconds() > 20 * 3600:
         ros = {}
         for tid in sorted(s["teams"]):
             forty, inj = statsapi.roster(c, tid, "40Man", season), statsapi.roster(c, tid, "injured", season)
@@ -138,7 +140,9 @@ def current_extras(c: Client, level: str, s: dict, today: date) -> None:
             # page would otherwise show their MLBAM id
             ros[tid] = {"40man": [r["pid"] for r in forty], "injured": [[r["pid"], r["status"], r["note"]] for r in inj],
                         "names": {r["pid"]: r["name"] for r in forty + inj if r.get("pid") and r.get("name")},
-                        "pos": {r["pid"]: r["pos"] for r in forty + inj if r.get("pid") and r.get("pos")}}
+                        "pos": {r["pid"]: r["pos"] for r in forty + inj if r.get("pid") and r.get("pos")},
+                        # jersey numbers from the same roster answers (jerseyNumber): the player hero's big number
+                        "num": {r["pid"]: r["num"] for r in forty + inj if r.get("pid") and r.get("num")}}
         s["meta"]["rosters"] = ros
         s["meta"]["rosters_at"] = st.now()
     tx = statsapi.transactions(c, today - timedelta(days=14), today, level)

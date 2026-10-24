@@ -89,7 +89,10 @@ def test_build_writes_every_payload(root):
     careers = list((d / "players").glob("*.json"))
     assert len(careers) == 90                                                      # the same 90 ids play both seasons
     pc = _load(careers[0])
-    assert {"id", "name", "pos", "pool", "dob", "seasons", "current", "similar", "career_awards"} <= set(pc)
+    assert {"id", "name", "pos", "pool", "dob", "number", "seasons", "current", "similar", "career_awards"} <= set(pc)
+    # the player hero's outlined number, from the store's ESPN roster `jersey` (add_players gives each one)
+    nums = [_load(f).get("number") for f in careers]
+    assert any(n is not None for n in nums) and all(n is None or (n.isdigit() and len(n) <= 2) for n in nums)
     assert len(pc["seasons"]) == 2 and pc["current"]["season"] == 2031
     # role peers (METRICS_SPEC): similar_role per qualified season, the role card for the latest season
     sims = [x for f in careers for x in _load(f).get("similar_role") or []]
@@ -184,3 +187,8 @@ def test_light_season_built_with_raw_files_is_kept_where_they_are_absent():
     assert not BH.sig_unchanged(local, {**local, "n_pbp": 1400})           # more raw files here: rebuild
     assert not BH.sig_unchanged({**local, "n_pbp": 0}, local)              # raw files arrived: rebuild with them
     assert not BH.sig_unchanged(None, local)
+
+
+def test_jersey_number_rule():
+    assert BH.jersey_number("7") == "7" and BH.jersey_number("00") == "00" and BH.jersey_number(23) == "23"
+    assert BH.jersey_number(None) is None and BH.jersey_number("") is None and BH.jersey_number("123") is None

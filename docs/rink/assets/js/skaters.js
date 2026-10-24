@@ -298,8 +298,14 @@ K.allMetrics = cat => { const M = (cat || {}).metrics; if (M && !Array.isArray(M
 
 K.card = (title, sub, body, id, ctl) => '<div class="card"' + (id ? ' id="' + K.esc(id) + '"' : '') + '>' +
   (title ? '<div class="card-header">' + K.esc(title) + (sub ? ' <span class="card-sub">' + sub + '</span>' : '') + (ctl ? '<span class="gq-ctl">' + ctl + '</span>' : '') + '</div>' : '') + (body || '') + '</div>';
-K.tile = (label, value, sub, cls) => '<div class="kpi' + (cls ? ' ' + cls : '') + '"><div class="kpi-label">' + K.esc(label) + '</div><div class="kpi-value">' + (value === undefined || value === null ? '—' : value) + '</div>' + (sub ? '<div class="kpi-sub">' + sub + '</div>' : '') + '</div>';
-K.tiles = list => { const l = list.filter(Boolean); return l.length ? '<div class="kpi-grid gq-tiles">' + l.join('') + '</div>' : ''; };
+/* v4: the kit's stat tiles (QK.statTile: black blocks, the label in condensed caps, the number in Bebas); value and sub
+   are HTML. A value that is not a number (a player link, a name) is set as text. */
+K.tile = (label, value, sub, cls) => {
+  const v = value === undefined || value === null || value === '' ? '—' : String(value);
+  const plain = v.replace(/<[^>]*>/g, '');
+  return QK.statTile({ label: label, value: v, sub: sub || '', html: true, cls: cls, text: !/^[\s+\-−–—.,%0-9]*$/.test(plain) && !/^[+\-−]?[0-9.,]+\s*[A-Za-z%]{0,4}$/.test(plain) });
+};
+K.tiles = list => { const l = list.filter(Boolean); return l.length ? '<div class="gq-tiles rk-kpis">' + QK.stats(l) + '</div>' : ''; };
 K.toggle = (id, opts, cur) => '<span class="gq-toggle" id="' + K.esc(id) + '">' + opts.map(o => '<button type="button" data-v="' + K.esc(o[0]) + '"' + (String(o[0]) === String(cur) ? ' class="on"' : '') + (o[2] ? ' disabled' : '') + '>' + K.esc(o[1]) + '</button>').join('') + '</span>';
 K.wireToggle = (root, id, fn) => {
   const t = (root || document).querySelector('#' + id);
@@ -732,7 +738,9 @@ K.route = (names, fn) => {
   (Array.isArray(names) ? names : [names]).forEach(n => { try { RK.route(n, fn); } catch (e) { console.warn('route failed', n, e); } });
 };
 /* A page header in the house style. */
-K.head = (title, sub, right, badge, colour) => '<div class="gq-head"' + (colour ? ' style="--tc:' + colour + '"' : '') + '>' + (badge ? '<div class="gq-badge">' + badge + '</div>' : '') +
+/* the badge is a team block: the kit colour darkened until white clears 4.6:1 (QK.color.block) */
+K.blockOf = c => (c && window.QK && QK.color && QK.color.parse && QK.color.parse(c) ? QK.color.block(c).bg : c);
+K.head = (title, sub, right, badge, colour) => '<div class="gq-head"' + (colour ? ' style="--tc:' + K.blockOf(colour) + '"' : '') + '>' + (badge ? '<div class="gq-badge">' + badge + '</div>' : '') +
   '<div class="gq-head-body"><h2>' + title + '</h2>' + (sub ? '<div class="gq-head-sub">' + sub + '</div>' : '') + '</div>' + (right ? '<div class="gq-head-links">' + right + '</div>' : '') + '</div>';
 K.setMeta = html => { if (has('setMeta')) { try { RK.setMeta(html); } catch (e) { /* optional */ } } };
 K.$ = id => document.getElementById(id);
@@ -750,7 +758,8 @@ function renderSkaters(el, params, state) {
   const qp = String(qy.p || qy.g || '').toUpperCase();
   if (qp === 'F' || qp === 'D') { ST.group = qp; ST.pos = ''; }
   if (/^(C|L|R)$/.test(qp)) { ST.group = 'F'; ST.pos = qp; }
-  el.innerHTML = '<div class="card"><div class="card-header">Skaters <span class="card-sub" id="cat-sub">Loading…</span><span class="gq-ctl">' +
+  el.innerHTML = QK.explain('<b>What’s that number?</b> GAR/60 is goals above a replacement-level player per 60 minutes, our all-in value rate. The box beside a number is its percentile against the same position (100 = best; switch to the whole league under Percentiles). Click a header to sort, a row for the player.', { html: true }) +
+    '<div class="card"><div class="card-header">Skaters <span class="card-sub" id="cat-sub">Loading…</span><span class="gq-ctl">' +
     k.toggle('cat-group', [['F', 'Forwards'], ['D', 'Defence'], ['A', 'All']], ST.group) + '</span></div>' +
     '<div class="lab-controls gq-controls">' +
     '<label>Search<input id="cat-q" class="gq-search" type="search" placeholder="name or team…"></label>' +

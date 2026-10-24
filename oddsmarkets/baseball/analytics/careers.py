@@ -186,6 +186,7 @@ def current_blocks(ctx: SeasonContext, hcat: dict | None, pcat: dict | None) -> 
         move[pid] = [[t, _r(h, 1), _r(i, 1), _r(v, 1)] for t, h, i, v in zip(x["pt"], x["hb"], x["ivb"], x["velo"])]
     # rolling (hitters) and splits
     roll, splits = _rolling_splits(ctx, hp, pp)
+    logs = game_logs(ctx, hp, pp)
     phys = ctx.model("physics").get("pitchers") or {}
     tun = ctx.model("tunneling").get("pitchers") or {}
     fat = ctx.model("fatigue").get("pitchers") or {}
@@ -219,12 +220,98 @@ def current_blocks(ctx: SeasonContext, hcat: dict | None, pcat: dict | None) -> 
             blk["fatigue"] = {k: v for k, v in f.items()} if f else None
             blk["pitching_rolling"] = prl.get(pid)
         blk["splits"] = splits.get(pid)
+        blk["log"] = logs.get(pid)
         pj = None
         for kind in ("hitters", "pitchers"):
             if (proj.get(kind) or {}).get(pid):
                 pj = {"kind": kind[:-1], "season": ctx.season + 1, **proj[kind][pid]}
         blk["projection"] = pj
         out[pid] = blk
+    return out
+
+
+LOG_H = ["date", "gpk", "t", "opp", "home", "res", "pa", "ab", "h", "tb", "hr", "bb", "k", "xwoba"]
+LOG_P = ["date", "gpk", "t", "opp", "home", "res", "gs", "outs", "bf", "h", "r", "bb", "k", "hr", "np"]
+
+
+def game_logs(ctx: SeasonContext, hp: dict, pp: dict) -> dict[str, dict]:
+    """{pid: {"hitting": {cols, rows, best}, "pitching": {cols, rows, best}}}: one row per game this season (date order)
+    from the plate-appearance table, for the player page's "Every game this season". Hitting: PA, AB, H, total bases,
+    HR, BB, K and the game's xwOBA; pitching: started, outs, batters faced, H, runs, BB, K, HR, pitches. `res` is the
+    player's team's result ("W 5-3"), `t` the game type (R regular season, F/D/L/W postseason), `home` 1 at home.
+    `best` is the row index of the best game (hitting: total bases + walks, then xwOBA; pitching: a game score,
+    40 + 2 outs + K - 2 BB - 2 H - 3 R - 6 HR)."""
+    pa = (ctx.agg() or {}).get("pa")
+    out: dict[str, dict] = {}
+    if pa is None or not len(pa):
+        return out
+    d = pa.copy()
+    ev = d["events"].astype(str)
+    d["h"] = ev.isin(PG.HIT).astype(int)
+    d["tb"] = ev.map(PG.HIT).fillna(0).astype(int)
+    d["hr"] = (ev == "home_run").astype(int)
+    d["bb"] = ev.isin({"walk", "intent_walk"}).astype(int)
+    d["k"] = ev.isin(PG.K_EV).astype(int)
+    d["pa_n"] = d["is_pa"].astype(int)
+    d["ab"] = (d["is_pa"] & ~ev.isin({"walk", "intent_walk", "hit_by_pitch", "catcher_interf", "sac_fly", "sac_bunt",
+                                       "sac_fly_double_play", "sac_bunt_double_play"})).astype(int)
+    d["w"] = pd.to_numeric(d["woba_value"], errors="coerce").fillna(0.0) * d["pa_n"]
+    d["den"] = pd.to_numeric(d["woba_denom"], errors="coerce").fillna(0.0) * d["pa_n"]
+    bx = ctx.bip()
+    if bx is not None and "xwoba" in bx:
+        d = d.merge(bx[["game_pk", "at_bat_number", "xwoba"]].drop_duplicates(["game_pk", "at_bat_number"]),
+                    on=["game_pk", "at_bat_number"], how="left")
+        d["xw"] = np.where(d["xwoba"].notna(), pd.to_numeric(d["xwoba"], errors="coerce"), d["w"]) * d["pa_n"]
+    else:
+        d["xw"] = d["w"]
+    d["date"] = pd.to_datetime(d["game_date"]).dt.strftime("%Y-%m-%d")
+    games = ctx.games or {}
+
+    def meta(gpk, bat_side_home: bool, own_abbr: str, opp_abbr: str):
+        g = games.get(str(int(gpk))) or {}
+        own_home = bool(bat_side_home)
+        res = None
+        if g.get("status") == "final" and isinstance(g.get("hs"), (int, float)) and isinstance(g.get("as"), (int, float)):
+            a, b = (g["hs"], g["as"]) if own_home else (g["as"], g["hs"])
+            res = f"{'W' if a > b else 'L' if a < b else 'T'} {int(a)}-{int(b)}"
+        return [g.get("gtype") or "R", opp_abbr, 1 if own_home else 0, res]
+
+    # hitting: the batter's half (half 1 = bottom = home batting)
+    hb = d[d["batter"].astype(str).isin(set(hp))]
+    if len(hb):
+        agg = hb.groupby([hb["batter"].astype(str), "game_pk"]).agg(
+            date=("date", "first"), half=("half", "first"), bt=("bat_team", "first"), ft=("fld_team", "first"),
+            pa=("pa_n", "sum"), ab=("ab", "sum"), h=("h", "sum"), tb=("tb", "sum"), hr=("hr", "sum"), bb=("bb", "sum"),
+            k=("k", "sum"), xw=("xw", "sum"), den=("den", "sum")).reset_index()
+        agg = agg[agg["pa"] > 0].sort_values(["batter", "date", "game_pk"])
+        for pid, x in agg.groupby("batter"):
+            rows = []
+            for r in x.itertuples(index=False):
+                t, opp, home, res = meta(r.game_pk, r.half == 1, r.bt, r.ft)
+                rows.append([r.date, int(r.game_pk), t, opp, home, res, int(r.pa), int(r.ab), int(r.h), int(r.tb), int(r.hr),
+                             int(r.bb), int(r.k), _r(an.div(r.xw, r.den), 3)])
+            if rows:
+                sc = [(rw[9] + rw[11], rw[13] if rw[13] is not None else -1) for rw in rows]
+                out.setdefault(pid, {})["hitting"] = {"cols": LOG_H, "rows": rows, "best": max(range(len(rows)), key=lambda i: sc[i])}
+    # pitching: the pitcher's team fields (half 0 = top = home pitching)
+    pb = d[d["pitcher"].astype(str).isin(set(pp))]
+    if len(pb):
+        firsts = pa.sort_values(["game_pk", "half", "at_bat_number"]).drop_duplicates(["game_pk", "half"])
+        starters = set(zip(firsts["pitcher"].astype(str), firsts["game_pk"]))
+        agg = pb.groupby([pb["pitcher"].astype(str), "game_pk"]).agg(
+            date=("date", "first"), half=("half", "first"), bt=("bat_team", "first"), ft=("fld_team", "first"),
+            outs=("outs_rec", "sum"), bf=("pa_n", "sum"), h=("h", "sum"), r=("runs", "sum"), bb=("bb", "sum"),
+            k=("k", "sum"), hr=("hr", "sum"), np_=("n_pitches", "sum")).reset_index()
+        agg = agg.sort_values(["pitcher", "date", "game_pk"])
+        for pid, x in agg.groupby("pitcher"):
+            rows = []
+            for r in x.itertuples(index=False):
+                t, opp, home, res = meta(r.game_pk, r.half == 0, r.ft, r.bt)
+                rows.append([r.date, int(r.game_pk), t, opp, home, res, 1 if (pid, r.game_pk) in starters else 0, int(r.outs),
+                             int(r.bf), int(r.h), int(r.r), int(r.bb), int(r.k), int(r.hr), int(r.np_)])
+            if rows:
+                gsc = [40 + 2 * rw[7] + rw[12] - 2 * rw[11] - 2 * rw[9] - 3 * rw[10] - 6 * rw[13] for rw in rows]
+                out.setdefault(pid, {})["pitching"] = {"cols": LOG_P, "rows": rows, "best": max(range(len(rows)), key=lambda i: gsc[i])}
     return out
 
 
@@ -422,6 +509,17 @@ def add_prev_pct(blocks: dict[str, dict], load) -> int:
     return n
 
 
+def roster_numbers(store: dict) -> dict[str, str]:
+    """{pid: jersey number} from a season store's 40-man and injured rosters (meta.rosters[tid].num, from the roster
+    answers' jerseyNumber)."""
+    out: dict[str, str] = {}
+    for r in ((store.get("meta") or {}).get("rosters") or {}).values():
+        for pid, n in ((r or {}).get("num") or {}).items():
+            if n:
+                out[str(pid)] = str(n)
+    return out
+
+
 def write_careers(write, cats: dict[tuple, dict], blocks: dict[str, dict], history_rows: dict[str, dict] | None,
                   history_extra: set[str] | None, old_reader) -> dict:
     """Write data/players/<pid>.json for every player in the catalogues (all levels and seasons on disk) and every
@@ -442,9 +540,14 @@ def write_careers(write, cats: dict[tuple, dict], blocks: dict[str, dict], histo
     hidx = similar_index(hcats, "hitter", SIMILAR_H)
     pidx = similar_index(pcats, "pitcher", SIMILAR_P)
     stores: dict[str, dict] = {}
+    nums: dict[str, str] = {}
     for (lvl, s) in sorted(cats, key=lambda x: -x[1]):
-        for pid, info in (an.load_store(lvl, s).get("players") or {}).items():
+        st = an.load_store(lvl, s)
+        for pid, info in (st.get("players") or {}).items():
             stores.setdefault(pid, info)
+        nums_now = roster_numbers(st)
+        for pid, n in nums_now.items():
+            nums.setdefault(pid, n)
     index: dict[str, list] = {}
     hist = history_rows or {}
     todo = set(rows) | (history_extra or set())
@@ -464,7 +567,7 @@ def write_careers(write, cats: dict[tuple, dict], blocks: dict[str, dict], histo
         if lv:
             sim = similar(pid, lv[1], hidx if lv[2] == "hitter" else pidx, names)
         name = names.get(pid) or info.get("name") or pe.get("name") or pid
-        payload = {"id": pid, "name": name, "bats": info.get("bats"), "throws": info.get("throws"), "pos": info.get("pos") or (lv[3].get("pos") if lv else None),
+        payload = {"id": pid, "name": name, "number": nums.get(pid) or info.get("num"), "bats": info.get("bats"), "throws": info.get("throws"), "pos": info.get("pos") or (lv[3].get("pos") if lv else None),
                    "dob": info.get("dob") or pe.get("birth"), "debut": info.get("debut") or pe.get("debut"),
                    "ids": {"retro": info.get("retro") or pe.get("retro"), "bbref": info.get("bbref") or pe.get("bbref"),
                            "fg": info.get("fg") or pe.get("fg")},

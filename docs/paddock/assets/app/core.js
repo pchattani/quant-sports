@@ -229,11 +229,11 @@ function learn(path, d) {
   try {
     if (/^index\.json$/.test(path)) {
       Object.keys(d.drivers || {}).forEach(function (id) { putD(id, pick(d.drivers[id], ['name', 'code', 'number', 'nationality', 'team'])); });
-      Object.keys(d.teams || {}).forEach(function (id) { putT(id, pick(d.teams[id], ['name', 'colour'])); });
+      Object.keys(d.teams || {}).forEach(function (id) { putT(id, pick(d.teams[id], ['name', 'colour', 'alt'])); });
       if (d.next && d.next.circuit) putC(d.next.circuit.id, pick(d.next.circuit, ['name', 'country']));
     }
     if (d.teams && !Array.isArray(d.teams) && /season\.json$|teams\.json$/.test(path)) {
-      Object.keys(d.teams).forEach(function (id) { var t = d.teams[id] || {}; if (t.name || t.colour) putT(id, pick(t, ['name', 'colour'])); });
+      Object.keys(d.teams).forEach(function (id) { var t = d.teams[id] || {}; if (t.name || t.colour) putT(id, pick(t, ['name', 'colour', 'alt'])); });
     }
     if (d.names && typeof d.names === 'object' && !Array.isArray(d.names)) {
       Object.keys(d.names).forEach(function (id) { var n = d.names[id]; if (typeof n === 'string' && !(NAMES.drivers[id] || {}).name) putD(id, { name: n }); });
@@ -394,6 +394,14 @@ function teamColourRaw(id) {
   var x = NAMES.teams[id];
   if (!x || !x.colour) return null;
   var c = String(x.colour);
+  return c.charAt(0) === '#' ? c : '#' + c;
+}
+/* The team's second livery colour from the payloads (teams[].alt), else null: the kit's blockPair takes it when two
+   constructors' colours clash (Red Bull v Mercedes), before falling back to slate. */
+function teamAlt(id) {
+  var x = NAMES.teams[id];
+  if (!x || !x.alt) return null;
+  var c = String(x.alt);
   return c.charAt(0) === '#' ? c : '#' + c;
 }
 /* The team colour lifted to 3:1 on the current card surface (marks, bars, text accents). */
@@ -633,7 +641,7 @@ return {
   fmtStamp: fmtStamp, countdown: countdown, ordinal: ordinal, fmtVal: fmtVal, parseDate: parseDate, isNum: isNum, titleCase: titleCase,
   shortRace: shortRace, median: median, mean: mean, rowsOf: rowsOf, ageOf: ageOf, finished: finished,
   driverName: driverName, driverCode: driverCode, driverSurname: driverSurname, teamName: teamName, circuitName: circuitName, teamAbbr: teamAbbr,
-  teamColour: teamColour, teamColourRaw: teamColourRaw, tc: tc, driverTeam: driverTeam, driverColour: driverColour, compoundColour: compoundColour, COMPOUNDS: COMPOUNDS, PALETTE: PALETTE,
+  teamColour: teamColour, teamColourRaw: teamColourRaw, teamAlt: teamAlt, tc: tc, driverTeam: driverTeam, driverColour: driverColour, compoundColour: compoundColour, COMPOUNDS: COMPOUNDS, PALETTE: PALETTE,
   teamDot: teamDot, driverLink: driverLink, teamLink: teamLink, circuitLink: circuitLink, raceLink: raceLink, raceHref: raceHref, driverHref: driverHref, teamHref: teamHref, mark: mark,
   card: card, grid: grid, chartBox: chartBox, kpi: kpi, kpis: kpis, chip: chip, muted: muted, empty: empty, note: note, aside: aside, notBuilt: notBuilt, col: col,
   pageHead: pageHead, secHead: secHead, subnav: subnav, seg: seg, wireSeg: wireSeg, yearPager: yearPager, table: table, set: set, alive: alive, pctl: pctl,

@@ -173,7 +173,7 @@ function renderTeam(el, params, state) {
       PD.kpi('Retirements', t ? String(dnfs) : '—', t ? ((t.log || []).length) + ' rounds' : '')
     ];
     var h = '<nav class="pd-crumb" aria-label="Breadcrumb"><a href="#/constructors">F1</a><span aria-hidden="true">›</span><a href="#/constructors">Constructors</a><span aria-hidden="true">›</span>' + esc(name) + '</nav>' + QK.playerHeader({ name: name, split: false, pos: 'Constructor', kicker: y + ' season' + (s.pos ? ' · P' + s.pos + ' in the constructors’ championship' : ''),
-        team: { colour: PD.teamColourRaw(id) }, face: PD.teamAbbr(id), meta: lineup.map(function (d) { return PD.driverLink(d, { dot: false }); }), strip: strip, tags: tP && tP.qualified(id) ? [QK.tag('In the ' + y + ' peer group', 'signal')] : [] }) +
+        team: { colour: PD.teamColourRaw(id), alt: PD.teamAlt(id) }, face: PD.teamAbbr(id), meta: lineup.map(function (d) { return PD.driverLink(d, { dot: false }); }), strip: strip, tags: tP && tP.qualified(id) ? [QK.tag('In the ' + y + ' peer group', 'signal')] : [] }) +
       '<div class="pd-links pd-mt">' + (lineup.length >= 2 ? '<a class="qk-btn" href="#/compare/drivers/' + encodeURIComponent(lineup[0]) + '/' + encodeURIComponent(lineup[1]) + '">Compare the drivers</a>' : '') +
       '<a class="qk-btn" href="#/compare/teams/' + encodeURIComponent(id) + '">Compare with another team</a><a class="qk-btn" href="#/value?tab=needs">Every team’s needs</a></div>';
     if (!t && !s.team && !lineup.length) { el.innerHTML = h + PD.empty(name + ' is not in the ' + y + ' data', PD.ok(teams) ? 'Pick another season.' : 'The team catalogue is not built yet.'); return; }

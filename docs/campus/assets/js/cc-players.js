@@ -304,7 +304,7 @@ CC.route('player', function (el, p) {
     if (cur.fantasy && isNum(cur.fantasy.proj)) k.push({ label: 'Fantasy projection', value: CC.f(cur.fantasy.proj, 1), sub: 'points next ' + (fb ? 'week' : 'period') });
     /* v4 (Broadcast): the full-bleed team-colour hero (the alternate colour on the diagonal; slate behind a volt
        stripe until the payload has one) with the black strip of five numbers and "The short version" under it */
-    var html = crumb + QK.playerHeader({ name: name, number: d && (isNum(d.jersey) || /^\d+$/.test(String(d.jersey || ''))) ? d.jersey : null, pos: posLabel(cat, pos) || pos, kicker: CC.LSHORT[L] + ' · ' + CC.seasonLabel(L, cur.season || S) + (gpNow ? ' · ' + plural(gpNow, 'game') + ' in' : ''),
+    var html = crumb + QK.playerHeader({ name: name, number: d && /^\d{1,2}$/.test(String(d.number || '')) ? d.number : (d && (isNum(d.jersey) || /^\d+$/.test(String(d.jersey || ''))) ? d.jersey : null), pos: posLabel(cat, pos) || pos, kicker: CC.LSHORT[L] + ' · ' + CC.seasonLabel(L, cur.season || S) + (gpNow ? ' · ' + plural(gpNow, 'game') + ' in' : ''),
         team: t ? { name: t.short || t.name, abbr: t.abbr, colour: t.colour, alt: CC.talt(L, team) || undefined, href: CC.teamHref(L, team, cur.season || S) } : null,
         meta: [(d && d['class']) || (cp && cp['class']) ? (d && d['class']) || cp['class'] : null, hgt ? hgt + (d && isNum(d.weight_lb) ? ', ' + d.weight_lb + ' lb' : '') : null, d && d.hometown ? 'From ' + d.hometown : null],
         strip: k.length ? k.slice(0, 5) : hstats.slice(0, 5), short: short0 || null, tags: cp && cp.qualified !== false ? [QK.tag('Qualified for percentiles', 'signal')] : [] });

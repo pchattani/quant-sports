@@ -923,20 +923,20 @@ function toGame(f, slug, extra) {
   return g;
 }
 /* A game card (kit QK.gameCard, v4: the team-colour stripe): our chance per side before kick-off (the favourite in blue), the home / draw /
-   away bar, the score and xG after it, and with why the italic one-line reason (QK.whyLine). The market is never on
+   away stripe (home first, as football reads), the score and xG after it, and with why the italic one-line reason (QK.whyLine). The market is never on
    a card: it is a quiet reference on the match page only. extra: {league, href, home_form, away_form ('WDLWW', oldest
    first), home_record, away_record, why: true}. */
 function matchCard(f, slug, extra) {
   var g = toGame(f, slug, extra);
-  var html = QK.gameCard(g, { sport: false, market: false, why: !!(extra && extra.why) });
+  var html = QK.gameCard(g, { sport: false, market: false, homeFirst: true, why: !!(extra && extra.why) });
   if (f.status === 'postponed' || f.status === 'cancelled') html = html.replace('class="qk-gc', 'class="qk-gc fb-void');
   return html;
 }
-/* The match page's win-chance bar: our home / draw / away chance, away on the left as on the cards. m: {h, d, a}. */
+/* The match page's win-chance bar: our home / draw / away chance, home on the left as on the cards. m: {h, d, a}. */
 function wpBar(m, home, away, opts) {
   if (!m || !isNum(m.h)) return '';
   var o = opts || {};
-  return QK.wpBar(m.a, m.d, m.h, { name: away || 'Away' }, { name: home || 'Home' }, { size: o.size || 'lg', label: o.label || 'Our win chance' });
+  return QK.wpBar(m.h, m.d, m.a, { name: home || 'Home' }, { name: away || 'Away' }, { size: o.size || 'lg', label: o.label || 'Our win chance' });
 }
 /* Home/draw/away bar with labels: model {h, d, a}. */
 function probBar3(m, opts) {

@@ -344,7 +344,15 @@ def person_record(p: dict) -> dict:
     short = f"{first[:1]}. {last}".strip() if first and last else (p.get("fullName") or "")
     return {"name": p.get("fullName"), "short": short, "bats": (p.get("batSide") or {}).get("code"),
             "throws": (p.get("pitchHand") or {}).get("code"), "pos": (p.get("primaryPosition") or {}).get("abbreviation"),
-            "dob": p.get("birthDate"), "debut": p.get("mlbDebutDate"), "retro": None, "bbref": None, "fg": None}
+            "dob": p.get("birthDate"), "debut": p.get("mlbDebutDate"), "num": jersey(p.get("primaryNumber")),
+            "retro": None, "bbref": None, "fg": None}
+
+
+def jersey(x) -> str | None:
+    """A jersey number as the API gives it ("27", "07"; primaryNumber on a person, jerseyNumber on a roster row), or
+    None when it is missing or not a 1-3 digit number."""
+    s = str(x).strip() if x is not None else ""
+    return s if s.isdigit() and len(s) <= 3 else None
 
 
 def standings(c: Client, season: int, level: str = "mlb") -> dict[str, dict]:
@@ -373,6 +381,7 @@ def roster(c: Client, tid: str, kind: str = "40Man", season: int | None = None) 
     for r in (d or {}).get("roster") or []:
         out.append({"pid": _pid(r.get("person")), "name": (r.get("person") or {}).get("fullName"),
                     "pos": (r.get("position") or {}).get("abbreviation"),
+                    "num": jersey(r.get("jerseyNumber") or (r.get("person") or {}).get("primaryNumber")),
                     "status": (r.get("status") or {}).get("description"), "note": r.get("note")})
     return out
 

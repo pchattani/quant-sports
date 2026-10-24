@@ -57,7 +57,7 @@ NATIONAL_SQUAD_DAYS = 400
 # season's lines are in s/<sid>/season.json. PERSON_LINES = True restores it.
 PERSON_LINES = False
 LINE_MIN_MINUTES = 90
-LINE_DROP = {"player_id", "name", "short_name", "team", "country", "height", "shirt", "age", "is_gk", "position", "pool"}
+LINE_DROP = {"player_id", "name", "short_name", "team", "tid", "country", "height", "shirt", "age", "is_gk", "position", "pool"}
 # Knockout depth, for "how far a club went" in a cup.
 ROUND_DEPTH = {"qualifying": 0, "prelim": 0, "po": 1, "league": 2, "group": 2, "r64": 3, "r32": 4, "r16": 5, "qf": 6, "sf": 7,
                "3rd": 7, "final": 8, "winner": 9}

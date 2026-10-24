@@ -1,9 +1,11 @@
 /* The Quant Paddock — the race centre (#/race/<y>/<r>[/laps|strategy|quali|telemetry]).
  * Upcoming (kit v4, after rk-games.js): the diagonal split hero (QK.previewCard: our favourite against our second pick
  * in constructor colours, a how-sure note, the market as one quiet labelled line when there is a usable quote) with
- * the forecast table beside it;
+ * the forecast table beside it (once the start has passed and no result is in, it says the race is on and keeps our
+ * pre-race chances);
  * then the weekend schedule, our forecast before and after qualifying (and the sprint; the market a grey reference
- * tick) and the finishing-position distribution. Finished: awards, the result against the
+ * tick) and the finishing-position distribution. Finished: the split hero (winner v runner-up, their finishing
+ * positions), awards, the result against the
  * forecast; Laps (positions, gaps, lap times, corrected pace, overtakes, race control); Strategy
  * (stints, pit stops, degradation, weather); Qualifying; Telemetry (two laps overlaid, telemetry.js).
  * Every section says so when its data is missing (no stints, overtakes or race control before 2023,
@@ -171,8 +173,38 @@ function hero(race, main, mk, raceS, post, teams) {
     extra: post ? 'The grid is set: this is our forecast after qualifying.' : '' });
   if (!R) return '';
   var f = R.ids[0];
-  return '<div class="pd-rhero">' + QK.previewCard(R.g, { kicker: 'F1 · ' + (circ.name || PD.shortRace(race.name)), homeFirst: true, note: R.note, factors: R.factors, factorsTitle: 'How the two match up this weekend',
+  /* the start has passed and no classification yet: the race is on (or its result is still to land). The payloads
+     carry no live timing, so the hero keeps our pre-race chances and says so. */
+  var t0 = raceS ? Date.parse(raceS.iso) : NaN, now = QK.now();
+  var on = isNum(t0) && now >= t0, running = on && now - t0 < 3 * 3600 * 1000;
+  var kick = (on ? (running ? 'Racing now · ' : 'Result to come · ') : '') + 'F1 · ' + (circ.name || PD.shortRace(race.name));
+  var note = on ? '<b>What’s that number?</b> Our chances from before the start: ' + (running ? 'the race is on, and ' : '') + 'the result and the race in numbers land here once the race is classified.' : R.note;
+  return '<div class="pd-rhero">' + QK.previewCard(R.g, { kicker: kick, homeFirst: true, note: note, factors: R.factors, factorsTitle: on ? 'How the two matched up before the start' : 'How the two match up this weekend',
     market: mk && isNum(mk[f]) ? { p: mk[f], label: 'Market (Kalshi / Polymarket)' } : null }) + '</div>';
+}
+
+/* v4 hero for a finished race: QK.splitHero with the winner against the runner-up in their constructors' colours
+   (team-mates: the second falls to slate with the constructor colour as the rule), the finishing positions as the
+   giant numbers and the grid slot under each name; no chance bar (the race is over), and "What's that number?" says
+   what we gave each of them before qualifying and how our favourite did. */
+function heroDone(race, res, teams, pre, fav, favRes) {
+  var w = res[0], r2 = res[1];
+  if (!w || !r2 || w.pos !== 1 || r2.pos !== 2) return '';
+  var circ = race.circuit || {};
+  var side = function (x) {
+    var t = PD.v2.side(x.driver, x.team || teams[x.driver]);
+    t.sub = [t.sub, isNum(x.grid) && x.grid > 0 ? 'from P' + x.grid + ' on the grid' : (x.grid === 0 ? 'from the pit lane' : '')].filter(Boolean).join(' · ');
+    return t;
+  };
+  var H = side(w), A = side(r2);
+  PD.v2.mates(H, A);
+  var pw = pre && pre[w.driver] ? pre[w.driver].p_win : null, p2 = pre && pre[r2.driver] ? pre[r2.driver].p_win : null;
+  var note = '<b>What’s that number?</b> The finishing position.' +
+    (isNum(pw) ? ' Before qualifying we gave ' + esc(PD.driverSurname(w.driver)) + ' ' + PD.pct(pw, pw < 0.1 ? 1 : 0) + ' to win' + (isNum(p2) ? ' and ' + esc(PD.driverSurname(r2.driver)) + ' ' + PD.pct(p2, p2 < 0.1 ? 1 : 0) : '') + '.' : '') +
+    (fav && fav !== w.driver && favRes ? ' Our favourite, ' + esc(PD.driverSurname(fav)) + ', ' + (PD.finished(favRes.status) ? 'finished P' + favRes.pos : 'did not finish') + '.' : (fav && fav === w.driver ? ' Our favourite won.' : ''));
+  var g = { sport: 'f1', status: 'final', start: race.date, league: 'Round ' + race.round + ' · ' + (circ.locality || PD.shortRace(race.name)), home: H, away: A, hs: 1, as: 2 };
+  return '<div class="pd-rhero">' + QK.splitHero(g, { kicker: 'F1 · ' + (circ.name || PD.shortRace(race.name)), tag: w.driver === fav ? 'Our favourite won!' : 'Race winner', homeFirst: true, noun: 'race',
+    sub: PD.v2.sideSub, foot: false, link: false, note: note }) + '</div>';
 }
 
 // ── finished race: overview ───────────────────────────────────────────────
@@ -228,14 +260,15 @@ function overviewDone(host, race, season, teams) {
     return '<div class="pd-award" style="--tc:' + esc(PD.tc(team)) + '"><div class="qk-kicker">' + esc(a[1]) + '</div><div class="pd-award-who">' + (x.driver ? PD.driverLink(x.driver, { team: team }) : PD.teamLink(x.team)) + '</div>' +
       (x.label ? '<div class="pd-award-v">' + esc(x.label) + '</div>' : '') + (x.why ? '<div class="pd-award-why">' + esc(x.why) + '</div>' : '') + '</div>';
   });
-  host.innerHTML = PD.kpis([
+  var top = heroDone(race, res, teams, pre, fav, favRes);
+  host.innerHTML = (top ? '<div class="pd-gtop">' + top + '<div class="pd-gside">' : '') + PD.kpis([
     PD.kpi('Winner', winner ? PD.driverLink(winner.driver, { team: teams[winner.driver] }) : '—', winner ? (winner.grid ? 'from P' + winner.grid : '') + (isNum(winnerP) ? ' · our chance was ' + PD.pct(winnerP) : '') : '', { text: true }),
     PD.kpi('Pole', q ? PD.driverLink(q.driver, { team: teams[q.driver] }) : '—', q ? PD.fmtMs(q.q3 || q.q2 || q.q1) : '', { text: true }),
     PD.kpi('Fastest lap', fl ? PD.driverLink(fl.driver, { team: teams[fl.driver] }) : '—', fl ? PD.fmtMs(fl.fastest_ms) : '', { text: true }),
     PD.kpi('Neutralisations', has(race.control) ? String(sc + vsc + red) : '—', has(race.control) ? [sc + ' SC', vsc + ' VSC'].concat(red ? [red + ' red'] : []).join(' · ') : 'no race control data'),
     PD.kpi('Our favourite', fav ? PD.driverLink(fav, { team: teams[fav] }) : '—', fav ? PD.pct(pre[fav].p_win) + ' to win · finished ' + (favRes ? (PD.finished(favRes.status) ? 'P' + favRes.pos : 'DNF') : '—') : 'no pre-race forecast', { text: true })
-  ]) +
-  (fav && winner ? '<div class="pd-mt">' + QK.note(winner.driver === fav ? 'Our favourite won: we gave <b>' + esc(PD.driverName(fav)) + '</b> ' + PD.pct(pre[fav].p_win, 0) + ' before qualifying.'
+  ], top ? 'pd-kpis-2' : '') + (top ? '</div></div>' : '') +
+  (fav && winner && !top ? '<div class="pd-mt">' + QK.note(winner.driver === fav ? 'Our favourite won: we gave <b>' + esc(PD.driverName(fav)) + '</b> ' + PD.pct(pre[fav].p_win, 0) + ' before qualifying.'
     : '<b>' + esc(PD.driverName(winner.driver)) + '</b> won' + (isNum(winnerP) ? ', at ' + PD.pct(winnerP, winnerP < 0.1 ? 1 : 0) + ' in our numbers before qualifying' + (winnerP < 0.1 ? ': a real surprise, about 1 race in ' + Math.round(1 / Math.max(winnerP, 0.001)) : '') : '') + '. Our favourite, ' + esc(PD.driverName(fav)) + ', finished ' + (favRes ? (PD.finished(favRes.status) ? 'P' + favRes.pos : 'out of the race') : 'unclassified') + '.') + '</div>' : '') +
   (cards.length ? '<section class="qk-section pd-sec">' + PD.secHead('Awards', 'The race in numbers', 'Our picks of the race, each with the number behind it.') + '<div class="pd-awards">' + cards.join('') + '</div></section>' : '') +
   PD.grid(

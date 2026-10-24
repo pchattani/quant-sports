@@ -977,7 +977,7 @@ function dcMatrix(home, away, model, homeAdv) {
   }
   return { h: h, d: d, a: a, lamH: lamH, lamA: lamA, o25: o25, btts: btts, score: best[0] + '-' + best[1], pScore: best[2] };
 }
-/* Our chance if they met, at one venue: the win-chance bar (away on the left, as on every card) and the numbers. */
+/* Our chance if they met, at one venue: the win-chance bar (home on the left, as on every card) and the numbers. */
 function chanceCard(title, home, away, model, neutral) {
   var r = dcMatrix(home, away, model, neutral ? 0 : model.home_adv);
   return '<div class="fb-lb-price"><div class="qk-kicker">' + esc(title) + '</div>' + FB.wpBar({ h: r.h, d: r.d, a: r.a }, home.team, away.team, { size: 'sm' }) +

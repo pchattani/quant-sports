@@ -188,7 +188,7 @@ function draw(el, id, y, cat, career, elo, askedY) {
     PD.kpi('Ahead of the team-mate', isNum((d.values || {}).race_h2h) ? PD.pct(d.values.race_h2h, 0) : '—', mate ? 'of races ahead of ' + esc(PD.driverSurname(mate)) : 'of races ahead of the team-mate', { pctl: pc.race_h2h, tip: V.tip(meta, 'race_h2h') })
   ] : null;
   var h = crumb + QK.playerHeader({ name: name, number: info.number, pos: 'Driver', kicker: [y + (races ? ' · ' + races + ' start' + (races === 1 ? '' : 's') + ' in' : ''), info.nationality || (career || {}).nationality || '', age !== null ? (curTeam || (career && (career.seasons || []).some(function (z) { return z.year >= PD.currentSeason() - 1; })) ? 'age ' + age : 'born ' + String(career.dob).slice(0, 4)) : ''].filter(Boolean).join(' · '),
-      team: curT ? { name: PD.teamName(curT), abbr: PD.teamAbbr(curT), colour: PD.teamColourRaw(curT), href: PD.teamHref(curT) } : null,
+      team: curT ? { name: PD.teamName(curT), abbr: PD.teamAbbr(curT), colour: PD.teamColourRaw(curT), alt: PD.teamAlt(curT), href: PD.teamHref(curT) } : null,
       meta: [info.code ? ['Code', info.code] : null, isNum(tot.races) ? ['Starts', String(tot.races)] : null, isNum(tot.races) ? ['Wins', String(tot.wins || 0)] : null, tot.titles ? ['Titles', String(tot.titles)] : null],
       tags: dP && dP.qualified(id) ? [QK.tag('In the ' + y + ' peer group', 'signal')] : [], strip: strip, short: shortVersion() }) +
     (askedY ? PD.note(esc(name) + ' did not race in ' + askedY + '; showing ' + y + ', the latest season with a driver catalogue.') : '');
@@ -314,7 +314,8 @@ function tapeBlock(dP, id, near, mate, y) {
   if (!others.length) { host.innerHTML = QK.empty('No comparison yet', 'The closest matches appear once the driver reaches the starts floor.'); return; }
   var draw = function (oid) {
     var ids = [id, oid], names = ids.map(PD.driverSurname);
-    var ents = ids.map(function (k) { var r = dP.rows[k] || {}; return { name: r.name || PD.driverName(k), short: PD.driverSurname(k), href: PD.driverHref(k), colour: PD.teamColourRaw(r.team), sub: [PD.teamName(r.team), (r.races || 0) + ' starts'].join(' · ') }; });
+    var ents = ids.map(function (k) { var r = dP.rows[k] || {}; return { name: r.name || PD.driverName(k), short: PD.driverSurname(k), href: PD.driverHref(k), colour: PD.teamColourRaw(r.team), alt: PD.teamAlt(r.team), team: r.team, sub: [PD.teamName(r.team), (r.races || 0) + ' starts'].join(' · ') }; });
+    PD.v2.mates(ents[0], ents[1]);
     PD.set('dv-tape-h', QK.sectionHead({ kicker: oid === mate ? 'Tale of the tape · v team-mate' : 'Tale of the tape', title: names[0] + ' or ' + names[1] + '?',
       sub: 'Bar length = percentile against ' + esc(dP.label) + ' in ' + y + '. The better number in each row is solid.' + (oid === mate ? ' Same car, so this is the cleanest comparison there is.' : ''), html: true }));
     PD.set('dv-tape', V2().compare(dP, ids, V2().DRIVER_SET, ents));
@@ -361,7 +362,7 @@ function nextLast(id, d, y, team, mateId, D) {
       if (me) {
         var ids = Object.keys(ds).filter(function (k) { return isNum(ds[k].p_win); }).sort(function (a, b) { return ds[b].p_win - ds[a].p_win; });
         var opp = ids[0] === id ? ids[1] : ids[0];
-        var A = V2().side(id, team), B = V2().side(opp);
+        var A = V2().side(id, team), B = V2().mates(V2().side(id, team), V2().side(opp));
         A.record = A.sub; B.record = B.sub;
         var gg = { sport: 'f1', status: 'pre', start: rs, league: 'Round ' + nx.round, home: A, away: B, p_home: me.p_win, p_away: ds[opp].p_win };
         var fx = [['Podium', 'p_podium', false, function (v) { return PD.pct(v, 0); }], ['Points finish', 'p_points', false, function (v) { return PD.pct(v, 0); }], ['Expected finish', 'exp_pos', true, function (v) { return 'P' + PD.num(v, 1); }], ['Retirement', 'p_dnf', true, function (v) { return PD.pct(v, 0); }]]

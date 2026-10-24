@@ -317,3 +317,6 @@ body.qk { font-size: var(--fs-md); }
 .qk .vv-tab.on { background: var(--ink-1); color: var(--ink-inv); border-color: var(--ink-1); }
 .qk .day-strip a.on { border-color: var(--volt); background: var(--block); color: var(--ink-1); }
 .qk-blk.rk-hot-top { margin-top: var(--sp-5); }
+
+/* v4 final pass: the explain strip opening an older table view sits a step above its card */
+.qk-explain + .card, .qk-explain + .grid-2 { margin-top: var(--sp-4); }

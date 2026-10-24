@@ -140,3 +140,31 @@ def test_calibration_prefers_the_newer_of_cache_and_committed(tmp_path):
     assert bp.pick_calibration(committed, cache)["races"] == 269
     committed.unlink()
     assert bp.pick_calibration(committed, cache)["ok"] is False
+
+
+def test_livery_alt_colours_ride_with_the_team_colour():
+    """`alt` (the second livery colour) for the kit's clash rule (Red Bull v Mercedes): hand-kept, apart from the
+    primary, and written only where the table has one (no null)."""
+    from oddsmarkets.f1.analytics import season as ssn
+    from oddsmarkets.f1.analytics import teams as tms   # noqa: F401  (imports season._alt)
+
+    def hsl_h(h):
+        r, g, b = (int(h[i:i + 2], 16) / 255 for i in (1, 3, 5))
+        mx, mn = max(r, g, b), min(r, g, b)
+        if mx == mn:
+            return None
+        d = mx - mn
+        x = ((g - b) / d) % 6 if mx == r else (b - r) / d + 2 if mx == g else (r - g) / d + 4
+        return 60 * x
+
+    for t in ("red_bull", "mercedes", "ferrari", "mclaren", "aston_martin", "alpine", "williams", "haas", "rb", "audi", "cadillac", "sauber"):
+        a = ssn.team_alt(t)
+        assert a and a.startswith("#") and len(a) == 7, t
+        p, q = hsl_h(ssn.KNOWN_COLOURS[t]), hsl_h(a)
+        if p is not None and q is not None:
+            dh = abs(p - q)
+            dh = min(dh, 360 - dh)
+            lum = lambda h: sum(w * (lambda c: c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4)(int(h[i:i + 2], 16) / 255) for w, i in ((0.2126, 1), (0.7152, 3), (0.0722, 5)))
+            la, lb = lum(ssn.KNOWN_COLOURS[t]), lum(a)
+            assert dh >= 50 or (max(la, lb) + 0.05) / (min(la, lb) + 0.05) >= 1.4, t
+    assert ssn._alt("red_bull") == {"alt": "#1B2443"} and ssn._alt("nobody") == {}

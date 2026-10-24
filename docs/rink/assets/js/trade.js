@@ -199,7 +199,8 @@ function page(el, S, d, query, shown) {
   Object.keys(st.moves).forEach(pid => { const p = byId[pid]; if (!p || st.teams.indexOf(p.team) < 0 || st.teams.indexOf(st.moves[pid]) < 0 || st.moves[pid] === p.team) delete st.moves[pid]; });
   const curves = d.curves, noSim = !curves;
   const range = curves ? Math.max.apply(null, curves.shifts.map(Math.abs)) : null;
-  let h = '<div class="card"><div class="card-header">Trade simulator ' + k.esc(k.sLabel(S)) + ' <span class="card-sub">Pick the clubs and the players moving. Each player carries a rest-of-season Rink value rate (GAR per 60: this season\'s and last season\'s at 0.7, minute-weighted) and projected ice time; incoming players take minutes from the lowest-rated players at their position (a better goalie takes the starts), outgoing minutes go to the next players up. Odds come from re-running the season simulation with each club\'s rating shifted' + (curves ? ' (' + k.int(curves.n_sims) + ' runs a point, shifts ' + curves.shifts.map(x => k.signed(x, 2)).join(', ') + ' goals a game)' : '') + '. <strong>Cap not checked</strong>: there is no free, legitimate salary source we use.</span></div>';
+  let h = QK.explain('<b>What’s that number?</b> The rating change is the club’s goals a game above replacement after the depth chart is rebuilt with the players moving. The chances (play-offs, the Cup) come from re-running our season simulation with the new rating.', { html: true }) +
+    '<div class="card"><div class="card-header">Trade simulator ' + k.esc(k.sLabel(S)) + ' <span class="card-sub">Pick the clubs and the players moving. Each player carries a rest-of-season Rink value rate (GAR per 60: this season\'s and last season\'s at 0.7, minute-weighted) and projected ice time; incoming players take minutes from the lowest-rated players at their position (a better goalie takes the starts), outgoing minutes go to the next players up. Chances come from re-running the season simulation with each club\'s rating shifted' + (curves ? ' (' + k.int(curves.n_sims) + ' runs a point, shifts ' + curves.shifts.map(x => k.signed(x, 2)).join(', ') + ' goals a game)' : '') + '. <strong>Cap not checked</strong>: there is no free, legitimate salary source we use.</span></div>';
   if (shown && Number(shown) !== Number(S)) h += '<div class="pad">' + k.muted('The trade simulator always uses the current season (' + k.esc(k.sLabel(S)) + ').') + '</div>';
   if (noSim) h += '<div class="pad">' + k.muted('No season simulation right now (' + k.esc(d.phase || 'offseason') + '): the page shows the rating change and goals over a full season, without odds.') + '</div>';
   h += '<div class="tr-pick" id="tr-pick"></div></div><div id="tr-rosters"></div><div id="tr-out"></div>';
@@ -271,7 +272,7 @@ function page(el, S, d, query, shown) {
     const dGoals = res.delta * left;
     const dCup = curves ? curveDelta(curves, t, 'p_cup', res.delta) : null;
     const nowTxt = left > 0 ? (dPts !== null ? (dPts >= 1 ? 'wins now' : dPts <= -1 ? 'weakens now' : 'about even now') : (dGoals >= 3 ? 'wins now' : dGoals <= -3 ? 'weakens now' : 'about even now'))
-      : (dCup !== null && Math.abs(dCup) >= 0.005 ? (dCup > 0 ? 'better Cup odds now' : 'worse Cup odds now') : 'no change this season');
+      : (dCup !== null && Math.abs(dCup) >= 0.005 ? (dCup > 0 ? 'a better Cup chance now' : 'a worse Cup chance now') : 'no change this season');
     const dNext = nextIn - nextOut;
     const longTxt = dNext >= 2 ? 'long-term gain' : dNext <= -2 ? 'long-term cost' : 'about even next season';
     const nm = pid => (byId[pid] || {}).name || k.name(pid);
@@ -292,7 +293,7 @@ function page(el, S, d, query, shown) {
         const good = x[0] === 'p_first' ? -1 : 1;
         return [x[1], { v: T[x[0]], html: k.pct(T[x[0]], 1) }, { v: after, html: k.pct(after, 1) }, { v: ch, html: k.isNum(ch) ? '<span class="' + (good * ch > 0.0005 ? 'pg-up' : good * ch < -0.0005 ? 'pg-down' : '') + '">' + k.signed(100 * ch, 1) + ' pp</span>' : '—' }];
       });
-      if (rows.length) o += k.table([{ label: 'Season odds' }, { label: 'Now', align: 'right' }, { label: 'After', align: 'right' }, { label: 'Change', align: 'right' }], rows, { compact: true });
+      if (rows.length) o += k.table([{ label: 'Season chances' }, { label: 'Now', align: 'right' }, { label: 'After', align: 'right' }, { label: 'Change', align: 'right' }], rows, { compact: true });
     }
     const mn = x => k.num(x, x < 1 ? 1 : 0);
     const disp = res.displaced.map(x => k.esc(nm(x[0])) + ' −' + mn(x[1]));

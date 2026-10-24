@@ -51,6 +51,10 @@
 .bp-page a.qk-tab:hover { color: var(--ink-1); }
 .bp-tab-tag { font: 700 9px var(--font-ui); letter-spacing: .06em; color: var(--ink-3); border: 1px solid var(--line-2); border-radius: 0; padding: 1px 4px; margin-left: 4px; vertical-align: 1px; }
 .bp-secbar.is-detail { margin-bottom: var(--sp-4); }
+/* v4: under the hero (core.js heroBar): the meta line (and a back link the page does not already carry) */
+.bp-secbar.under-hero { margin: var(--sp-3) 0 var(--sp-2); }
+.bp-secbar.under-hero .bp-secbar-in { align-items: center; }
+.bp-secbar.under-hero .bp-back { margin-top: 0; }
 .bp-back { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-weight: 600; font-size: var(--fs-sm); color: var(--ink-2) !important; }
 .bp-back:hover { color: var(--accent) !important; }
 .qk-secnav-ctx .bp-level button { padding: 4px 10px; }

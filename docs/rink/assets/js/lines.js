@@ -20,7 +20,8 @@ function render(el, params, state) {
   const qy = params.query || {};
   if (/^(F|D)$/i.test(qy.kind || qy.k || '')) ST.kind = String(qy.kind || qy.k).toUpperCase();
   if (qy.team) ST.team = String(qy.team).toUpperCase();
-  el.innerHTML = '<div class="card"><div class="card-header">Lines <span class="card-sub" id="ln-sub">Loading…</span><span class="gq-ctl">' + k.toggle('ln-kind', [['F', 'Forward lines'], ['D', 'Defence pairs']], ST.kind) + '</span></div>' +
+  el.innerHTML = QK.explain('<b>What’s that number?</b> xGF% is the unit’s share of the expected goals while it is on the ice together at 5-on-5 (50% is even). The shrunk share pulls a small sample towards 50%, so a trio with a few minutes together cannot top the list on luck; the raw share sits beside it.', { html: true }) +
+    '<div class="card"><div class="card-header">Lines <span class="card-sub" id="ln-sub">Loading…</span><span class="gq-ctl">' + k.toggle('ln-kind', [['F', 'Forward lines'], ['D', 'Defence pairs']], ST.kind) + '</span></div>' +
     '<div class="lab-controls gq-controls"><label>Team<select id="ln-team"><option value="">All teams</option></select></label>' +
     '<label><span>Min TOI together <span id="ln-min-v"></span> min</span><input id="ln-min" type="range" min="0" max="600" step="5"></label>' +
     '<label>Player<input id="ln-q" class="gq-search" type="search" placeholder="any player on the unit…"></label></div>' +

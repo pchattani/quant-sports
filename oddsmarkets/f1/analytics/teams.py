@@ -45,6 +45,7 @@ import numpy as np
 
 from oddsmarkets.f1 import canon
 from oddsmarkets.f1.analytics import context, fnum, mean, median, percentiles, rnd as _r, team_name
+from oddsmarkets.f1.analytics.season import _alt as season_alt
 
 logger = logging.getLogger(__name__)
 
@@ -365,7 +366,7 @@ def build(year: int, records: dict[str, dict[int, dict]], driver_values: dict[st
         for m in METRICS:
             x = v[m["key"]]
             rv[m["key"]] = None if x is None else (int(round(x)) if m["fmt"] in ("int", "ms", "gap") else round(float(x), 4))
-        out[t] = {"name": team_name(store, t), "colour": (colours or {}).get(t), "drivers": sorted({x["driver"] for r in tr[t].values() for x in r}),
+        out[t] = {"name": team_name(store, t), "colour": (colours or {}).get(t), **season_alt(t), "drivers": sorted({x["driver"] for r in tr[t].values() for x in r}),
                   "values": rv, "pct": dict(pct.get(t, {})), "pit": pits_out.get(t), "log": logs.get(t, []),
                   "split": split.get(t)}
     metrics = [{**m, "desc": TEAM_DEFINITIONS.get(m["key"], "")} for m in METRICS]

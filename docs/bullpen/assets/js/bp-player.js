@@ -37,11 +37,49 @@ function teamGames(season, tid) {
 }
 function lc(x) { return /^[A-Z][a-z]/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x; }
 /* An IntersectionObserver trigger (once), or straight away on old browsers. */
-function onView(node, fn) {
+function onView(node, fn, margin) {
   if (!node) return;
   if (!window.IntersectionObserver) { fn(); return; }
-  const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); fn(); } }, { rootMargin: '250px' });
-  io.observe(node);
+  const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); fn(); } }, { rootMargin: margin || '250px', threshold: 0.01 });
+  /* observe once the web fonts have set the hero: before that the name is shorter and a box under the fold reads as in view */
+  const go = () => { if (node.isConnected) io.observe(node); };
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => setTimeout(go, 50)); else go();
+}
+
+/* "Every game this season": current.log.<hitting|pitching> {cols, rows, best} (careers.game_logs), newest first, the best
+   game as tr.hl. Hitting: PA, AB, H, total bases, HR, BB, K, xwOBA; pitching: innings, batters faced, H, R, BB, K, HR,
+   pitches. Empty (no section) when the file has no log. */
+function logSection(cur, kind, L, S) {
+  const pit = kind === 'pitcher';
+  const lg = ((cur && cur.log) || {})[pit ? 'pitching' : 'hitting'];
+  if (!lg || !Array.isArray(lg.cols) || !Array.isArray(lg.rows) || !lg.rows.length) return '';
+  const ix = {}; lg.cols.forEach((c, i) => { ix[c] = i; });
+  const g = (r, k) => (ix[k] === undefined ? null : r[ix[k]]);
+  const n = x => (isNum(x) ? String(x) : '—');
+  const ip = o => (isNum(o) ? Math.floor(o / 3) + '.' + (o % 3) : '—');
+  const best = isNum(lg.best) ? lg.best : -1, bR = lg.rows[best];
+  const post = { F: 'Wild Card', D: 'Division Series', L: 'LCS', W: 'World Series' };
+  const head = pit ? [['Innings', 'Innings pitched (.1 = one out)'], ['BF', 'Batters faced'], ['H', 'Hits allowed'], ['R', 'Runs allowed'], ['BB', 'Walks'], ['K', 'Strikeouts'], ['HR', 'Home runs allowed'], ['Pitches', 'Pitches thrown']]
+    : [['PA', 'Plate appearances'], ['AB', 'At-bats'], ['H', 'Hits'], ['TB', 'Total bases'], ['HR', 'Home runs'], ['BB', 'Walks'], ['K', 'Strikeouts'], ['xwOBA', 'What the contact deserved, this game (about .320 is average)']];
+  const cells = r => (pit ? [ip(g(r, 'outs')), n(g(r, 'bf')), n(g(r, 'h')), n(g(r, 'r')), n(g(r, 'bb')), n(g(r, 'k')), n(g(r, 'hr')), n(g(r, 'np'))]
+    : [n(g(r, 'pa')), n(g(r, 'ab')), n(g(r, 'h')), n(g(r, 'tb')), n(g(r, 'hr')), n(g(r, 'bb')), n(g(r, 'k')), isNum(g(r, 'xwoba')) ? BP.fmtAvg(g(r, 'xwoba')) : '—']);
+  const opp = r => (g(r, 'home') ? 'v ' : '@ ') + String(g(r, 'opp') || '');
+  const bestTxt = bR ? (pit ? ip(g(bR, 'outs')) + ' innings, ' + n(g(bR, 'k')) + ' strikeouts and ' + n(g(bR, 'r')) + ' run' + (g(bR, 'r') === 1 ? '' : 's') : n(g(bR, 'h')) + ' hit' + (g(bR, 'h') === 1 ? '' : 's') + ' and ' + n(g(bR, 'tb')) + ' total bases') +
+    ' ' + (g(bR, 'home') ? 'against ' : 'at ') + esc(String(g(bR, 'opp') || '')) + ' on ' + esc(BP.fmtDate(g(bR, 'date'), { year: false })) + ' is the best game so far (highlighted).' : '';
+  /* the latest 15 games and the best one; the rest behind "Every game" */
+  const SHOW = 15, nAll = lg.rows.length;
+  const rows = lg.rows.map((r, i) => [r, i]).reverse().map((x, k) => {
+    const r = x[0], t = g(r, 't'), gpk = g(r, 'gpk');
+    const d = esc(BP.fmtDate(g(r, 'date'), { year: false }));
+    const cls = [x[1] === best ? 'hl' : '', k >= SHOW && x[1] !== best ? 'bp-logmore' : ''].filter(Boolean).join(' ');
+    return '<tr' + (cls ? ' class="' + cls + '"' + (/bp-logmore/.test(cls) ? ' hidden' : '') : '') + '><td>' + (gpk ? '<a href="' + esc(BP.gameHref(gpk, L, S)) + '">' + d + '</a>' : d) + (t && t !== 'R' && post[t] ? ' <span class="qk-tag">' + esc(post[t]) + '</span>' : '') + '</td><td>' + esc(opp(r)) + '</td><td>' + esc(g(r, 'res') || '') + (pit && g(r, 'gs') ? ' · start' : '') + '</td>' +
+      cells(r).map((v, j) => '<td class="num">' + (j === (pit ? 5 : 3) ? '<b>' + esc(v) + '</b>' : esc(v)) + '</td>').join('') + '</tr>';
+  }).join('');
+  return '<section class="qk-section">' + QK.sectionHead({ kicker: 'Game log', title: 'Every game this season', sub: bestTxt || 'Every game this season, newest first.', html: true }) +
+    '<article class="qk-card"><div class="qk-card-body flush"><div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Date</th><th>Opp</th><th>Result</th>' +
+    head.map(hd => '<th class="num" data-tip="' + esc(hd[1]) + '">' + esc(hd[0]) + '</th>').join('') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    (nAll > SHOW + 1 ? '<div class="qk-card-foot"><span>Newest first · the latest ' + SHOW + ' and the best game</span><button type="button" class="qk-btn bp-logall">All ' + nAll + ' games</button></div>' : '') +
+    '</div></article></section>';
 }
 
 function render(el, params, state, route) {
@@ -117,7 +155,7 @@ function draw(el, c) {
     return t;
   }
   /* the hero is built after the five numbers below (its black strip) */
-  const heroOf = strip => QK.playerHeader({ name: p.name, pos: posName, kicker: BP.levelName(L) + ' · ' + S + (pit ? (isNum(n.games) ? ' · ' + n.games + ' games' : '') : (isNum(v.pa) ? ' · ' + v.pa + ' PA' : '')),
+  const heroOf = strip => QK.playerHeader({ name: p.name, number: p.number, pos: posName, kicker: BP.levelName(L) + ' · ' + S + (pit ? (isNum(n.games) ? ' · ' + n.games + ' games' : '') : (isNum(v.pa) ? ' · ' + v.pa + ' PA' : '')),
     team: tid ? { name: BP.teamName(tid), abbr: BP.teamAbbr(tid), colour: U.raw(tid), alt: U.alt(tid), href: BP.teamHref(tid, L, S) } : null,
     meta: [isNum(a) ? a + ' years old' : null, 'Bats ' + (p.bats || '—') + ', throws ' + (p.throws || '—'), p.debut ? 'MLB debut ' + BP.fmtDate(p.debut, { year: true }) : null], tags: tags, strip: strip, short: shortVersion() });
   const role = c.route === 'player' ? null : c.route;
@@ -225,6 +263,8 @@ function draw(el, c) {
     }
     h += '</div></section>';
   }
+  /* the game log: every game this season (current.log, written by the build), newest first, the best one highlighted */
+  h += logSection(cur, kind, L, S);
   /* game by game (the form through the season) and their type, when the tape took the side column */
   if (tapeOn && formCard && typeCard) h += '<section class="qk-section"><div class="qk-gside"><div>' + formCard + '</div><div>' + typeCard + '</div></div></section>';
   else if (tapeOn && (formCard || typeCard)) h += '<section class="qk-section">' + formCard + typeCard + '</section>';
@@ -241,6 +281,8 @@ function draw(el, c) {
   h += '<section class="qk-section" id="pp-mv"></section>';
   h += '<section class="qk-section">' + U.card2('Season by season', 'Every ' + (pit ? 'pitching' : 'hitting') + ' season in the data, all levels', '<div id="pp-career"></div>', { flush: true }) + '</section>';
   el.innerHTML = h;
+  const logAll = el.querySelector('.bp-logall');
+  if (logAll) logAll.addEventListener('click', () => { const t = logAll.closest('.qk-card'); t.querySelectorAll('tr.bp-logmore').forEach(r => { r.hidden = false; }); logAll.remove(); });
 
   // the rail's metric-set switch
   const repaint = () => { const w = el.querySelector('#pp-pwrap'); if (w) { w.innerHTML = railHTML(); wireSet(); } };
@@ -263,6 +305,7 @@ function draw(el, c) {
   }
 
   // the tale of the tape: the player against one of the three closest matches this season (chips switch)
+  /* the season catalogue (4-7 MB) loads only once the tape is 160 px into the screen (at 1440 px it sits at the fold) */
   onView(el.querySelector('#pp-tape'), () => BP.loadYear(catFile, L, S).then(cat => {
     const box = el.querySelector('#pp-tape');
     if (!box || !U.alive(el)) return;
@@ -307,7 +350,7 @@ function draw(el, c) {
       drawTape(b.getAttribute('data-value'));
     }));
     drawTape(cands[0].id);
-  }));
+  }), '0px 0px -160px 0px');
 
   // the last game: the line score by inning (runs, hits, errors) and our win chance through it (the game file)
   if (lastG && el.querySelector('#pp-race')) {

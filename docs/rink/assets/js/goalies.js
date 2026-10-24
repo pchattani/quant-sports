@@ -34,7 +34,8 @@ function typeKeys(metrics, kind) {
 
 function render(el, params, state) {
   const k = K();
-  el.innerHTML = '<div class="card"><div class="card-header">Goaltenders <span class="card-sub" id="gk-sub">Loading…</span></div>' +
+  el.innerHTML = QK.explain('<b>What’s that number?</b> GSAx is goals saved above expected: the goals an average goalie would have let in on the same shots (from our expected-goals model) minus the goals this goalie let in. Above zero is better than average; per 100 shots it compares goalies with different workloads.', { html: true }) +
+    '<div class="card"><div class="card-header">Goaltenders <span class="card-sub" id="gk-sub">Loading…</span></div>' +
     '<div class="lab-controls gq-controls"><label>Search<input id="gk-q" class="gq-search" type="search" placeholder="name or team…"></label>' +
     '<label>Team<select id="gk-team"><option value="">All teams</option></select></label>' +
     '<label><span>Min TOI <span id="gk-floor-v"></span> min</span><input id="gk-floor" type="range" min="0" max="4000" step="20"></label>' +

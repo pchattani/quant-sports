@@ -372,3 +372,13 @@ Sizes from the local build of 16 October 2026.
 - `teams.json` roster rows: hitters add `proj_woba`, `woba_vl`, `woba_vr`; pitchers add `proj_woba`, `gs`, `xra9`,
   `pitching_plus`, `p_start` (null where the catalogue has none).
 - Labels (ids unchanged): `edge_pct` "Shadow%", pitcher `r` "R (on the mound)", `bb` "uBB", hitter `g` "G (with a PA)".
+- `players/<pid>.json` `number` (23 Oct 2026): the jersey number as a string ("4", "07") or null, from the Stats API answers
+  the fetcher already gets: the 40-man / injured roster rows' `jerseyNumber` (`meta.rosters[tid].num`, latest season first),
+  else the person record's `primaryNumber` (`players[pid].num` in the store). The player hero's big outlined number.
+- `players/<pid>.json` `current.log` (23 Oct 2026, `analytics/careers.py:game_logs`): `{hitting|pitching: {cols, rows, best}}`,
+  one row per game this season in date order from the plate-appearance table. Hitting cols `[date, gpk, t, opp, home, res,
+  pa, ab, h, tb, hr, bb, k, xwoba]`; pitching `[date, gpk, t, opp, home, res, gs, outs, bf, h, r, bb, k, hr, np]`; `t` the
+  game type (R, or F/D/L/W in the postseason), `opp` the opponent's abbreviation, `home` 1 at home, `res` the player's
+  club's result ("W 5-3", null before the final), `best` the row of the best game (hitting: total bases + walks, then
+  xwOBA; pitching: 40 + 2 outs + K - 2 BB - 2 H - 3 R - 6 HR). About 8 KB for an everyday player (MLB 4.5 MB and
+  Triple-A 4.0 MB in all, 2026). The player page's "Every game this season".

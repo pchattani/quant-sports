@@ -139,7 +139,7 @@ CC.record = function (w, l) { return isNum(w) && isNum(l) ? w + '–' + l : '—
 CC.date = function (iso, withTime) {
   var d = iso ? new Date(iso) : null;
   if (!d || isNaN(d)) return '—';
-  var s = d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+  var s = fmt.date(iso);   /* the kit's en-GB convention: "Mon 19 Oct" */
   return withTime ? s + ' ' + fmt.time(iso) : s;
 };
 /* Start time not set (TBA): the payload's `tba` flag, else ESPN's placeholder time, midnight US Eastern, on a game not
@@ -501,7 +501,7 @@ function boot() {
     CC.index = idx;
     CC.LEVELS.forEach(function (L) { var i = idx.levels[L] || {}; CC.addTeams(L, i.teams); CC.addConfs(L, i.conferences); });
     var meta = QK.$('#meta-line');
-    if (meta) meta.textContent = 'Data built ' + fmt.ago(idx.updated_at) + ' (' + new Date(idx.updated_at).toLocaleString() + ').';
+    if (meta) meta.textContent = 'Data built ' + fmt.ago(idx.updated_at) + ' (' + fmt.date(idx.updated_at) + ' ' + fmt.time(idx.updated_at) + ').';
     root.addEventListener('hashchange', render);
     render();
   });

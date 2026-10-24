@@ -621,9 +621,14 @@ a.qk-stat:hover .qk-stat-label { color: var(--volt); }
 .qk-ph-stat .l { font: 700 var(--fs-xs) var(--font-cond); text-transform: uppercase; letter-spacing: 0.08em; color: var(--block-ink-3); margin-top: 6px; }
 .qk-ph-stat .s { font: 500 var(--fs-2xs) var(--font-ui); color: var(--block-ink-3); }
 @media (max-width: 640px) {
-  .qk-ph-in { grid-template-columns: 1fr; padding-top: 22px; padding-bottom: 24px; }
-  .qk-ph-num { position: absolute; right: 8px; top: 12px; font-size: 120px; opacity: 0.55; z-index: -1; }
-  .qk-ph-num.txt { font-size: 84px; }
+  /* phones: the number shares the first row with the kicker and the name takes the full width under both, so a long
+   * name ("Davidovich Fokina") or a long kicker never runs under the outlined number */
+  .qk-ph-in { grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 0; align-items: start; padding-top: 18px; padding-bottom: 24px; }
+  .qk-ph-main { display: contents; }
+  .qk-ph-kicker { grid-column: 1; grid-row: 1; align-self: start; justify-self: start; }
+  .qk-ph-num { grid-column: 2; grid-row: 1; align-self: start; font-size: 88px; line-height: 0.75; margin-top: 2px; }
+  .qk-ph-num.txt { font-size: 60px; }
+  .qk-ph-name, .qk-ph-meta, .qk-ph-tags { grid-column: 1 / -1; }
   .qk-ph-bg::after, .qk-ph-bg::before { width: 30%; }
   .qk .qk-ph-name { font-size: clamp(3.25rem, 15vw, 4.5rem) !important; }
   .qk .qk-ph-name.qk-long { font-size: clamp(2.25rem, 10vw, 3rem) !important; }
@@ -712,7 +717,7 @@ a.qk-stat:hover .qk-stat-label { color: var(--volt); }
 .qk-tape-head a.t:hover { color: #fff; }
 .qk-tape-head a.t:hover b { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
 .qk-tape-head .t b { font: 400 clamp(1.9rem, 4vw, 2.875rem)/0.9 var(--font-display); text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.qk-tape-head .t b.qk-long { font-size: clamp(1.4rem, 2.8vw, 2rem) !important; line-height: 1 !important; }
+.qk-tape-head .t b.qk-long { font-size: clamp(1.15rem, 2.4vw, 1.75rem) !important; line-height: 0.95 !important; white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .qk-tape-head .t small, .qk-tape-head .t .wins { font: 700 var(--fs-xs)/1.2 var(--font-cond); letter-spacing: 0.08em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qk-tape-head .t.r { text-align: right; align-items: flex-end; }
 .qk-tape-head .vs { background: var(--volt); color: var(--volt-ink); font: 400 1.875rem/1 var(--font-display); display: grid; place-items: center; padding: 0 16px; }
@@ -964,6 +969,14 @@ a.qk-split:hover .qk-split-tn { text-decoration: underline; text-decoration-thic
 .qk-split-foot .qk-wpbar-lab { color: #c7ced9; }
 .qk-split-foot .qk-wpbar-lab b { color: #fff; }
 .qk-split-foot .qk-wpbar-track { height: 16px; }
+/* two separate chance meters (F1: each driver against the field), each on its own 0-100% track */
+.qk-split-meters { display: grid; gap: 6px; min-width: 0; }
+.qk-split-meters .m { display: grid; grid-template-columns: minmax(0, 7.5rem) minmax(0, 1fr) 3.25rem; gap: 10px; align-items: center; }
+.qk-split-meters .n { font: 700 var(--fs-xs)/1.1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.05em; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qk-split-meters .t { display: block; height: 14px; background: var(--seg-off); }
+.qk-split-meters .t i { display: block; height: 100%; }
+.qk-split-meters .v { font: 400 1.5rem/1 var(--font-display); color: #fff; text-align: right; }
+.qk-split-meters .k { font: 600 var(--fs-2xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.05em; color: #c7ced9; }
 .qk-split + .qk-explain { margin-top: 0; border-top: 1px solid var(--block-line); }
 @media (max-width: 760px) {
   .qk-split-top { grid-template-columns: 1fr; min-height: 0; }

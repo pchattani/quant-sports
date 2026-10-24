@@ -53,7 +53,7 @@ function prep(g) {
 function renderAll() {
   var jobs = [renderTicker, renderHero, renderWatch, renderHot, renderStats, renderHowSure, renderReal, renderRaces, renderTiles, renderChips, renderGames, renderCharts];
   jobs.forEach(function (f) { try { f(); } catch (e) { if (window.console) console.error(e); } });
-  $('#updated').textContent = 'Data built ' + fmt.ago(D.updated_at) + ' (' + new Date(D.updated_at).toLocaleString() + '). Live scores refresh every minute while games are on.';
+  $('#updated').textContent = 'Data built ' + fmt.ago(D.updated_at) + ' (' + fmt.date(D.updated_at) + ' ' + fmt.time(D.updated_at) + '). Live scores refresh every minute while games are on.';
   QK.seg($('#when'), function (v) { state.when = v; state.shown = PAGE; renderGames(); });
 }
 

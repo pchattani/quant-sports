@@ -227,6 +227,12 @@ def _body_ok(k: str, v: Any) -> bool:
     return lo_hi is None or not isinstance(v, (int, float)) or lo_hi[0] <= v <= lo_hi[1]
 
 
+def jersey_number(v: Any) -> str | None:
+    """The jersey number for a player hero, as ESPN's roster `jersey` gives it ("7", "00"); None unless 1-2 digits."""
+    s = str(v).strip() if v is not None else ""
+    return s if s.isdigit() and len(s) <= 2 else None
+
+
 def merge_player(store: dict[str, Any], pid: str, rec: dict[str, Any], tid: str | None = None) -> dict[str, Any]:
     old = store["players"].setdefault(str(pid), {"name": None, "short": None, "pos": None, "jersey": None, "class": None,
                                                  "height_in": None, "weight_lb": None, "hometown": None, "teams": []})

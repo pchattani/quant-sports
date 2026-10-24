@@ -367,7 +367,13 @@ V.side = function (id, team) {
   var t = team || PD.driverTeam(id), info = PD.NAMES.drivers[id] || {};
   var sub = [t ? PD.teamName(t) : '', isNum(info.number) ? '#' + info.number : ''].filter(Boolean).join(' · ');
   /* city: the line QK.splitHero prints under the name when no sub function is passed (QK.previewCard) */
-  return { name: PD.driverSurname(id), abbr: PD.driverCode(id), colour: PD.teamColourRaw(t), full: PD.driverName(id), team: t, sub: sub, city: sub, href: PD.driverHref(id) };
+  return { name: PD.driverSurname(id), abbr: PD.driverCode(id), colour: PD.teamColourRaw(t), alt: PD.teamAlt(t), full: PD.driverName(id), team: t, sub: sub, city: sub, href: PD.driverHref(id) };
+};
+/* Two sides from one constructor: drop the second side's alt, so team-mates keep the F1 rule (the second driver on
+   slate with the constructor colour as the rule) rather than taking the team's second livery colour. Returns b. */
+V.mates = function (a, b) {
+  if (a && b && a.team && a.team === b.team) delete b.alt;
+  return b;
 };
 V.sideSub = function (t) { return t.sub || ''; };
 /* The race as a two-sided "game" for the kit's diagonal hero: our favourite against our second pick, each with our win
@@ -384,7 +390,7 @@ V.raceGame = function (race, ds, o) {
   var note = '<b>How sure are we?</b> ' + PD.pct(p, 0) + ' means ' + esc(PD.driverSurname(a)) + ' loses a race like this about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10: with twenty cars, even a clear favourite is usually under 50%.' +
     (c ? ' ' + esc(PD.driverSurname(c)) + ' is next on ' + PD.pct(ds[c].p_win, 0) + '.' : '') + (o.extra ? ' ' + o.extra : '');
   return { ids: ids, note: note, g: { sport: 'f1', status: 'pre', start: o.start || race.date, league: o.league || ('Round ' + race.round), href: o.href,
-    home: V.side(a, teams[a]), away: V.side(b, teams[b]), p_home: p, p_away: ds[b].p_win },
+    home: V.side(a, teams[a]), away: V.mates(V.side(a, teams[a]), V.side(b, teams[b])), p_home: p, p_away: ds[b].p_win },
     factors: [['Podium', 'p_podium', false, function (v) { return PD.pct(v, 0); }], ['Points finish', 'p_points', false, function (v) { return PD.pct(v, 0); }],
       ['Expected finish', 'exp_pos', true, function (v) { return 'P' + PD.num(v, 1); }], ['Retirement', 'p_dnf', true, function (v) { return PD.pct(v, 0); }]]
       .filter(function (f) { return isNum(ds[a][f[1]]) && isNum(ds[b][f[1]]); })

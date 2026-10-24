@@ -144,7 +144,7 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
       tip: 'Hardwood Plus-Minus (HPM): points per 100 possessions the player adds to the team’s margin over an average player (play-by-play on/off blended with the box score). Offence ' + U.signed(isNum(v.hpm_o) ? v.hpm_o : srow.o, 1) + ', defence ' + U.signed(isNum(v.hpm_d) ? v.hpm_d : srow.d, 1) + '.' },
     swar && isNum(swar.war) ? { label: 'Wins above replacement', value: U.f(swar.war, 1), pctl: isNum(swar.pct_role) ? swar.pct_role : null, sub: 'this season, from impact and minutes', tip: 'Our wins above a replacement-level player this season, from HPM and minutes' }
       : { label: 'Minutes', value: isNum(mpg) ? U.f(mpg, 1) : '—', sub: 'a game' }];
-  let h = crumb + QK.playerHeader({ name: name, pos: role ? (U.ROLE1 || {})[role] || role : pos, kicker: HW.leagueName(L) + ' · ' + HW.seasonLabel(L, S) + (gpNow ? ' · ' + gpNow + ' game' + (gpNow === 1 ? '' : 's') : ''),
+  let h = crumb + QK.playerHeader({ name: name, number: career && /^\d{1,2}$/.test(String(career.number || '')) ? career.number : null, pos: role ? (U.ROLE1 || {})[role] || role : pos, kicker: HW.leagueName(L) + ' · ' + HW.seasonLabel(L, S) + (gpNow ? ' · ' + gpNow + ' game' + (gpNow === 1 ? '' : 's') : ''),
     team: team ? { name: HW.teamName(L, team), abbr: HW.teamAbbr(L, team), colour: HW.teamColourRaw(L, team), alt: HW.teamAlt(L, team), href: HW.teamHref(L, team, S) } : { name: 'Free agent' },
     meta: [age !== null ? age + ' years old' : null, pos ? 'Listed ' + pos : null, p ? Number(Math.round(p.min || 0)).toLocaleString('en-GB') + ' minutes' : null], tags: tags, strip: strip, short: shortVersion() });
   // value tiles (below the fold: "More on the player")
@@ -316,7 +316,13 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
       drawTape(others[0]);
     });
     if ((cat && !cat.__rc) || !window.IntersectionObserver) fill();
-    else { const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); fill(); } }, { rootMargin: '300px' }); io.observe(box); }
+    /* the season catalogue (about 4 MB) loads only once the tape is 160 px into the screen (at 1440 px it sits just under the fold) */
+    else {
+      const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); fill(); } }, { rootMargin: '0px 0px -160px 0px', threshold: 0.01 });
+      /* observe once the web fonts have set the hero (before that a box under the fold reads as in view) */
+      const go = () => { if (box.isConnected) io.observe(box); };
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => setTimeout(go, 50)); else go();
+    }
   }
 
   // what to watch tonight: the scoreboard bug, the bar and how the teams match up this season (season.json ratings)

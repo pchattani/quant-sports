@@ -132,7 +132,7 @@ function feature(next, race, season) {
   if (!next) {
     var st = PD.ok(season) ? ((season.standings || {}).drivers || []) : [];
     if (!st[0] || !st[1]) return '';
-    var c0 = PD.v2.side(st[0].driver, st[0].team), c1 = PD.v2.side(st[1].driver, st[1].team);
+    var c0 = PD.v2.side(st[0].driver, st[0].team), c1 = PD.v2.mates(c0, PD.v2.side(st[1].driver, st[1].team));
     return QK.featureCard({ sport: 'f1', status: 'final', league: 'F1 · ' + (season.year || ''), away: c0, home: c1, as: st[0].points, hs: st[1].points, href: PD.driverHref(st[0].driver) },
       { scribble: 'Champion!', sub: PD.v2.sideSub, note: '<b>What’s that number?</b> Final championship points. ' + esc(PD.driverName(st[0].driver)) + ' finished ' + PD.pts(st[0].points - st[1].points) + ' clear; every race centre is below.' });
   }

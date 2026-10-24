@@ -1,6 +1,6 @@
 /* The Quant Ace — head to head (#/<T>/h2h/<a>/<b>; #/<T>/h2h alone shows the pickers).
  *
- * Design System 2.0: the record and a tale of the tape, our chance on every surface if they met today (the
+ * Kit v4: the record as a player-v-player split hero (QK.splitHero, the tennis rule: cobalt v slate), a tale of the tape, our chance on every surface if they met today (the
  * market-rating term included) with the set-score distribution, the two players' headline percentiles side by side on
  * the surface of their last meeting (METRICS_SPEC.md), where the rivalry has run against our chances, and the
  * serve/return matchup.
@@ -230,10 +230,28 @@ function build(T, a, b, res, body) {
   const tape = [['Elo', eA.all, eB.all, v => k.num(v, 0)], ['Hard-court Elo', eA.hard, eB.hard, v => k.num(v, 0)], ['Clay Elo', eA.clay, eB.clay, v => k.num(v, 0)], ['Grass Elo', eA.grass, eB.grass, v => k.num(v, 0)],
     ['Games won', (pa.values || {}).games_won_pct, (pb.values || {}).games_won_pct, v => k.fmtV(v, 'pct')], ['Hold (inferred)', (pa.values || {}).hold, (pb.values || {}).hold, v => k.fmtV(v, 'pct')],
     ['Break (inferred)', (pa.values || {}).brk, (pb.values || {}).brk, v => k.fmtV(v, 'pct')]].map(r => ({ label: r[0], a: r[1], b: r[2], fmt: r[3], better: 'high' }));
-  const side = (pid, p, nm, cls) => '<div class="ta-h2h-side ' + cls + '"><a class="nm" href="' + k.playerHref(T, pid) + '">' + k.esc(nm) + '</a><span class="sb">' + [p.country || k.country(T, pid), k.isNum(p.rank) ? 'No. ' + p.rank : '', k.isNum(p.age) ? 'age ' + Math.floor(p.age) : ''].filter(Boolean).map(k.esc).join(' · ') + '</span></div>';
-  let h = '<section class="qk-card ta-h2h-hero"><div class="qk-card-body"><div class="ta-h2h-head">' + side(a, pa, nA, 'l') +
-    '<div class="ta-h2h-rec"><div class="n"><span>' + (tally.w || 0) + '</span><span class="dash">–</span><span>' + (tally.l || 0) + '</span></div><div class="s">' + (n ? n + ' tour-level meeting' + (n === 1 ? '' : 's') + (tally.last ? ' · last ' + k.esc(k.fmtDate(tally.last, { weekday: false })) : '') : 'no tour-level meeting yet') + '</div></div>' +
-    side(b, pb, nB, 'r') + '</div>' + QK.matchupBar({ left: L, right: R, rows: tape, colors: ['var(--wp-a)', 'var(--wp-b)'] }) + '</div></section>';
+  /* kit v4 hero: the player-v-player split hero (QK.splitHero), the head-to-head record as the giant numbers, the
+     tennis rule for colour (cobalt for the player we favour on a hard court today, slate for the other; no flags),
+     ranking, country and age under each name; "What's that number?" says what the record is and our chance if they
+     met today. The tale of the tape follows. */
+  const hard = M && k.isNum(ctx.h0) ? matchupModel(T, ctx, a, b, 'hard', 3, 'tb7') : null;
+  const pH = hard && k.isNum(hard.p) ? hard.p : null;
+  const ini = nm => { const q = String(nm || '?').split(' '); return (q.length > 1 ? q[0][0] + q[q.length - 1][0] : q[0].slice(0, 2)).toUpperCase(); };
+  const ent = (pid, p, nm) => ({ name: TA.playerShort(T, pid) || nm, abbr: ini(nm), href: k.playerHref(T, pid),
+    record: [k.isNum(p.rank) ? 'No. ' + p.rank : 'Unranked', p.country || k.country(T, pid), k.isNum(p.age) ? 'age ' + Math.floor(p.age) : ''].filter(Boolean).join(' · ') });
+  const G = { sport: 'tennis', players: true, status: 'final', league: k.TN(T), away: ent(a, pa, nA), home: ent(b, pb, nB), as: tally.w || 0, hs: tally.l || 0 };
+  const fav = k.isNum(pH) ? (pH >= 0.5 ? 'a' : 'b') : null;
+  const meet = n ? n + ' tour-level meeting' + (n === 1 ? '' : 's') + (tally.last ? ', the last on ' + k.esc(k.fmtDate(tally.last, { weekday: false })) : '') : 'no tour-level meeting yet';
+  const lead = !n ? '' : tally.w === tally.l ? ' Level at ' + tally.w + ' each.' : ' ' + k.esc(tally.w > tally.l ? sA : sB) + ' leads ' + Math.max(tally.w, tally.l) + '–' + Math.min(tally.w, tally.l) + '.';
+  const why = '<b>What’s that number?</b> Their head-to-head record: ' + meet + '.' + lead +
+    (k.isNum(pH) ? ' If they met today on a hard court, best of three, our chance is ' + k.esc(pH >= 0.5 ? sA : sB) + ' ' + k.pct(Math.max(pH, 1 - pH), 0) + '; every surface is below.' : '');
+  const hero = QK.splitHero(G, { tag: 'Head to head', nick: t => t.name, noun: 'match', foot: false, link: false, note: why,
+    blocks: QK.color.blockPair({}, {}, { fav: fav }),
+    /* the status chip would read "Final": here the giant numbers are the record, not a score */
+    chip: k.TN(T) + ' · ' + (n ? n + ' meeting' + (n === 1 ? '' : 's') : 'no meeting yet') });
+  let h = '<section class="ta-h2h-hero">' + hero + '</section>' +
+    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Tale of the tape', title: sA + ' or ' + sB + '?', sub: 'Ratings and the inferred serve numbers; the better side of each row is solid.' }) +
+    QK.matchupBar({ left: L, right: R, rows: tape, fav: fav }) + '</section>';
   h += '<section class="qk-section" id="h2-pct-wrap"></section>';
   h += '<div class="card"><div class="card-header">If they met today <span class="card-sub">Our chance on each surface and the set scores it implies. 66% means the favourite still loses about 1 time in 3.</span>' +
     k.toggle('h2-fmt', T === 'atp' ? [['3', 'Best of 3'], ['5', 'Best of 5 (Slam)']] : [['3', 'Tour event'], ['slam', 'Slam (deciding-set tiebreak to 10)']], '3') + '</div><div id="h2-odds"></div></div>';

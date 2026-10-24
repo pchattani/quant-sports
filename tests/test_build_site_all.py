@@ -480,6 +480,28 @@ def test_players_have_positions_percentiles_and_the_catalogue(built) -> None:
         assert "age" in p and "starts" in p
     # No nulls are written: absent means unknown.
     assert all(v is not None for p in players for v in p.values())
+    # each row names its club's team id (the tale of the tape finds the club by id), the id teams.json gives that club
+    teams = _load(data, "premier-league", "teams.json")["teams"]
+    with_tid = [p for p in players if "tid" in p]
+    assert with_tid and len(with_tid) >= 0.9 * len(players)
+    for p in with_tid:
+        if (teams.get(p["team"]) or {}).get("team_id") is not None:
+            assert p["tid"] == teams[p["team"]]["team_id"], p["name"]
+
+
+def test_players_live_tid_follows_the_latest_appearance() -> None:
+    import scripts.build_site_all as b
+
+    store = {"matches": {"1": {"home": "Spurs", "away": "Leeds", "home_id": 33, "away_id": 34, "date": "2026-08-01"},
+                         "2": {"home": "Arsenal", "away": "Spurs", "home_id": 42, "away_id": 33, "date": "2026-09-01"}},
+             "lineups": {"1": {"p1": {"n": "A", "t": "Spurs"}, "p2": {"n": "B", "t": "Leeds"}},
+                         "2": {"p1": {"n": "A", "t": "Arsenal"}}}}
+    seen = b.player_team_ids(store)
+    assert [x[2] for x in seen["p1"]] == [42, 33] and seen["p2"][0][2] == 34
+    assert b._tid_for({"team": "Arsenal"}, seen["p1"]) == 42
+    assert b._tid_for({"team": "Tottenham Hotspur"}, seen["p1"]) == 42      # a normalised name: the latest club
+    assert b._tid_for({"team": "Spurs"}, seen["p1"]) == 33
+    assert b._tid_for({"team": "X"}, None) is None
 
 
 def test_player_shards_and_match_pages(built) -> None:
