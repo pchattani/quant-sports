@@ -38,7 +38,8 @@ function magic(s) {
    (NBA: the six divisions, then the conferences; WNBA: the league, then the conferences) and the race log
    (data/<L>/race_log.json, through the site's cached loader). */
 function leagueOpts(season, L, S) {
-  const lg = season && season.league;
+  /* season.json "league_block" (the payload's "league" is the league code); an object under "league" is read too */
+  const lg = season && (season.league_block || (season.league && typeof season.league === 'object' ? season.league : null));
   if (!lg || !window.QKL) return null;
   const st = season.standings || {}, info = season.teams || {}, fmt = season.format || {}, teams = {}, groups = [];
   const confs = Object.keys(st).filter(c => (st[c] || []).length).sort();

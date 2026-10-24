@@ -1,4 +1,4 @@
-"""The Hardwood's league block (<L>/<S>/season.json["league"]) and race log (data/<L>/race_log.json): how the race is
+"""The Hardwood's league block (<L>/<S>/season.json["league_block"]) and race log (data/<L>/race_log.json): how the race is
 shaping up and each team's strengths and weaknesses, on the shared engine oddsmarkets/common/league.py. NBA and WNBA.
 
 Reads only payload dicts (season.json, teams.json, the schedule cards) plus the race log, so it runs on a deployed
@@ -102,7 +102,7 @@ def _days(cards: list[dict]) -> tuple[str | None, str | None]:
 
 def build(league: str, season: int, season_payload: dict, teams_payload: dict | None, cards: list[dict], race_log: dict | None,
           now: datetime, run_asof: Callable[[str], dict | None] | None = None, budget_s: float = REBUILD_BUDGET_S) -> tuple[dict | None, dict]:
-    """(season.json["league"] or None, the race log to write)."""
+    """(season.json["league_block"] or None, the race log to write)."""
     sp = season_payload or {}
     sim_teams = ((sp.get("sim") or {}).get("teams")) or {}
     log = dict(race_log or {}) if isinstance(race_log, dict) else {}

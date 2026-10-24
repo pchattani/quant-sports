@@ -362,7 +362,7 @@ def with_league(b: Build, league: str, season: int, sp: dict | None, tp: dict | 
         return blk
     blk = b.step(f"{league} league block {season}", run, None)
     if blk:
-        sp["league"] = blk
+        sp["league_block"] = blk          # "league" is already the league code ("nba") in this payload
     return sp
 
 

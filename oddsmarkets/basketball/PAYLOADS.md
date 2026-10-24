@@ -61,7 +61,7 @@ Outs applied for upcoming games). The game payload's `pregame.model.detail` carr
 Win totals live in `markets.json` only (one source of truth), not in season.json. `sim.teams[tid].next.if_win` / `if_loss` are
 interventional (the result forced, the rating draws held at their prior), so one regular-season game moves them by a few points.
 
-`season.json["league"]` (the current season's full build only; `analytics/race.py` on `oddsmarkets/common/league.py`, schema v1,
+`season.json["league_block"]` (the key is not `league`, which already holds the league code "nba" / "wnba"; the current season's full build only; `analytics/race.py` on `oddsmarkets/common/league.py`, schema v1,
 about 15-25 KB): how the race is shaping up and each team's strengths and weaknesses, drawn by the kit's league module
 (`assets/qk/league.js`, QKL) on the standings Table tab (an expandable card under each row, a Profile chip column, the race and
 the shape of the league) and the team page. `{"v", "asof", "phase", "metrics": [{key, label}] (p_playoffs, p_div (NBA), p_title),
