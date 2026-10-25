@@ -356,3 +356,13 @@
 /* round 5: our model metrics (the cobalt tag and explain strip) */
 .pd-lab-ours { margin-top: 12px; }
 .pd-ours { margin-top: 16px; }
+
+/* Constructor page: top performers against the grid (constructors.js topPerformers) */
+.pd-top { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: var(--sp-3); }
+.pd-top-card { padding: 14px 16px; border-top: 4px solid var(--tc, var(--signal)); }
+.pd-top-k { font: 700 var(--fs-2xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.08em; color: var(--volt); }
+.pd-top-n { display: block; margin-top: 2px; font: 400 var(--fs-xl)/1.05 var(--font-display); color: var(--ink-1); text-decoration: none; }
+.pd-top-h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0 6px; }
+.pd-top-big { font: 400 var(--fs-2xl)/1 var(--font-display); color: var(--ink-1); }
+.pd-top-of { flex: 1 1 160px; color: var(--ink-2); font-size: var(--fs-xs); }
+@media (max-width: 720px) { .pd-top { grid-template-columns: 1fr; } }

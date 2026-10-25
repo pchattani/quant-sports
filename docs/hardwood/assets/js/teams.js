@@ -122,7 +122,7 @@ function drawTeam(el, L, S, tid, cat, teams, season, embed) {
     fx.tile('Title', fx.pct(fx.has(sim.p_title) ? sim.p_title : odds.p_title), 'playoffs ' + fx.pct(fx.has(sim.p_playoffs) ? sim.p_playoffs : odds.p_playoffs, 0))
   ].join('') + '</div>';
   const curS = fx.current(L);
-  h += '<div class="card"><div class="card-header">Strengths and needs <span class="card-sub">' + (Number(S) === Number(curS) ? 'Each position group and unit graded against the league on projected value (rest-of-season HPM × projected minutes, in WAR over a full season); the three strongest and weakest, with ranked trade targets for each weakness.' : 'Built for the current season (' + fx.esc(fx.seasonLabel(L, curS)) + ') only.') + '</span></div><div id="tp-needs">' + fx.muted(Number(S) === Number(curS) ? 'Loading…' : '<a href="' + fx.teamHref(L, tid, curS) + '">' + fx.esc(name) + ' in ' + fx.esc(fx.seasonLabel(L, curS)) + ' →</a>') + '</div></div>';
+  h += '<div class="card"><div class="card-header">Strengths and needs <span class="card-sub">' + (Number(S) === Number(curS) ? 'Each position group and unit graded against the league on projected value (rest-of-season HPM × projected minutes, in WAR over a full season); the three strongest and weakest.' : 'Built for the current season (' + fx.esc(fx.seasonLabel(L, curS)) + ') only.') + '</span></div><div id="tp-needs">' + fx.muted(Number(S) === Number(curS) ? 'Loading…' : '<a href="' + fx.teamHref(L, tid, curS) + '">' + fx.esc(name) + ' in ' + fx.esc(fx.seasonLabel(L, curS)) + ' →</a>') + '</div></div>';
   if (Number(S) === Number(curS)) h += '<div class="card"><div class="card-header">Ledger <span class="card-sub">This team\'s trades in the last 12 months, rated on four-season value (at the time, realised since, today\'s view), and every transaction ESPN lists.</span></div><div id="tp-ledger">' + fx.muted('Loading…') + '</div></div>';
   h += '<div class="card"><div class="card-header">Rating path <span class="card-sub">Net rating per 100 after each game from the Kalman filter, ±1 standard error shaded; dots are game results (green won, red lost).</span></div><div id="tp-path" style="height:320px"></div></div>';
   h += '<div class="grid-2"><div class="card"><div class="card-header">Four factors <span class="card-sub">Both ends, with league percentile and the league median.</span></div><div id="tp-ff"></div></div>' +
@@ -275,19 +275,7 @@ function drawNeeds(L, S, tid, nd) {
     nd.grades.map(g => [{ v: g.label, html: fx.esc(g.label) }, { v: g.pct, html: gradePill(g.grade) }, { v: g.value, html: fx.num(g.value, 1) }, { v: g.rank, html: fx.ordinal(g.rank) + ' of ' + g.n }, { v: g.pct, html: fx.pill(g.pct) }]), { compact: true }) + '</div><div class="nd-list">' +
     '<div class="nd-h">Strengths</div>' + (nd.strengths || []).map(s => '<div class="nd-item">' + gradePill(s.grade) + ' <strong>' + fx.esc(s.label) + (s.relative ? ' <span class="muted-inline">(relative: below the league median)</span>' : '') + '</strong> <span class="muted-inline">' + fx.esc(s.evidence) + '</span></div>').join('') +
     '<div class="nd-h">Weaknesses</div>' + (nd.weaknesses || []).map(s => '<div class="nd-item">' + gradePill(s.grade) + ' <strong>' + fx.esc(s.label) + (s.relative ? ' <span class="muted-inline">(relative: above the league median)</span>' : '') + '</strong> <span class="muted-inline">' + fx.esc(s.evidence) + '</span></div>').join('') + '</div></div>';
-  (nd.weaknesses || []).forEach(w => {
-    const tg = w.targets || [];
-    const unit = w.key === 'off' ? 'offence' : w.key === 'def' ? 'defence' : 'net';
-    h += '<div class="nd-ways"><div class="nd-h">Ways to improve: ' + fx.esc(w.label) + '</div>' + (tg.length ? '<div class="nd-tgs">' + tg.map(c => {
-      const pp = (x, lab) => (fx.isNum(x) && Math.abs(x) >= 0.0005 ? ' · ' + lab + ' ' + fx.signed(100 * x, 1) + ' pp' : '');
-      return '<div class="nd-tg' + (c.attainable ? ' nd-att' : '') + '"><div class="nd-tg-h">' + fx.playerLink(L, c.id, c.name) + ' <span class="muted-inline">' + fx.esc(fx.teamAbbr(L, c.team)) + ' · ' + fx.esc(ROLE_ONE[c.role] || c.role || '') + (fx.isNum(c.age) ? ' · ' + fx.num(c.age, 0) : '') + ' · ' + fx.num(c.mpg, 0) + ' min · HPM ' + fx.signed(c.rate, 1) + '</span>' + (c.attainable ? ' <span class="chip ok">attainable</span>' : '') + '</div>' +
-        '<div class="nd-tg-v"><strong>' + fx.signed(c.gain, 1) + '</strong> ' + unit + ' per 100' + (unit !== 'net' ? ' (' + fx.signed(c.gain_net, 1) + ' net)' : '') + ' · ' + fx.signed(c.wins, 1) + (full ? ' wins a season' : ' wins') + pp(c.d_playoffs, 'playoffs') + pp(c.d_title, 'title') + '</div>' +
-        ((c.hints || []).length ? '<div class="nd-hints">' + (c.hints || []).map(fx.esc).join('; ') + '</div>' : '') +
-        '<div class="nd-tg-a"><a href="#/' + L + '/trade?t=' + encodeURIComponent(tid) + ',' + encodeURIComponent(c.team) + '&m=' + encodeURIComponent(c.id) + '-' + encodeURIComponent(tid) + '">Try in the trade simulator →</a></div></div>';
-    }).join('') + '</div>'
-      : fx.muted('No player on another team would add value here.')) + '</div>';
-  });
-  h += '<div class="pg-note">' + fx.esc(nd.note || '') + ' Free agents: ' + fx.esc(nd.free_agents || 'not identified.') + ' Targets are ranked by what each would add in the team\'s rotation (displacing its lowest-rated minutes at that position); "attainable" marks a seller out of contention or with depth at the position, and not one of its two most valuable players. ' + (full ? 'Wins are over a full season (no season simulation now).' : 'Wins and playoff chances come from the season simulation\'s sensitivity curves.') + '</div>';
+  /* no "ways to improve" player lists: the team page names no signings or trade targets (25 Oct 2026) */
   box.innerHTML = h;
   HW.sortable(box);
 }

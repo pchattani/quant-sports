@@ -5,7 +5,7 @@
  * its standard error and national percentile; projected wins and the season chances), the rating through the season,
  * AP v our rank, a percentile card against every team in the country, the schedule with our win chance, the roster
  * with value, strengths and needs, who moves next (movement payload, when published), inferred transfers in and out,
- * suggestions for the weakest units, and the final-wins and seed distributions.
+ * top performers (overall and by position, against the level), and the final-wins and seed distributions.
  * Reads <L>/<S>/teams.json, <L>/<S>/teams/<tid>.json, <L>/<S>/season.json. */
 (function (CC) {
 'use strict';
@@ -93,7 +93,8 @@ function chanceTiles(L, o) {
   return k;
 }
 
-/* Who moves next (MOVES_VIEWS.md, college): the Outlook card and the targets, from the team page's `movement`. */
+/* Who moves next (MOVES_VIEWS.md, college): the Outlook card from the team page's `movement`. The team page shows
+   no potential signings (the user's call, 25 Oct 2026): the targets stay in movement.json for the movement views. */
 var INFERRED = 'Inferred from box scores, not the official transfer portal';
 function moveOutlook(L, S, d) {
   var mv = d && d.movement;
@@ -115,29 +116,10 @@ function moveOutlook(L, S, d) {
       '<td class="num">' + (isNum((mv.p_add || {})[ps]) ? CC.pct(mv.p_add[ps]) + ' ' + U.bar(mv.p_add[ps]) : '—') + '</td></tr>';
   }).join('');
   var tbl = '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Position</th><th class="num">Expected out</th><th class="num"><span data-tip="Base rate: last complete offseason’s inferred transfers in per team">Expected in</span></th><th class="num">Chance of adding</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
-  var tg = '', note = '';
-  if (mv.targets === null || mv.targets === undefined) {
-    if (CC.fb(L)) note = '<p class="cc-note">Targets: not shown for football: our destination model did not beat a simple ranking on held-out seasons.</p>';
-  } else if (mv.targets.length) {
-    tg = U.card('Who they could land', 'Likely transfers ranked by our chance of joining: availability × fit × plausibility.', U.lb('tp-tg'), { flush: true });
-  }
   var byPos = U.card('By position', 'Expected departures and arrivals; ' + (gap && gv > 0 ? esc(gap) + ' has the biggest shortfall' : 'no position is short') + '.', tbl);
   return U.section('Outlook: before ' + esc(nx), 'Who moves next: our chance each player leaves, and the arrivals a team like this usually gets. ' + QK.tag(INFERRED),
-    tiles + '<div class="qk-grid cc-grid">' + (tg ? '<div class="qk-span-5">' + byPos + '</div><div class="qk-span-7">' + tg + '</div>' : '<div class="qk-span-12">' + byPos + note + '</div>') + '</div>', '', 'Movement');
+    tiles + '<div class="qk-grid cc-grid"><div class="qk-span-12">' + byPos + '</div></div>', '', 'Movement');
 }
-function mountTargets(L, S, d, el) {
-  var mv = d && d.movement, node = QK.$('#tp-tg', el);
-  if (!node || !mv || !(mv.targets || []).length) return;
-  QK.leaderboard(node, { dense: true, rank: true, rowHref: function (r) { return CC.playerHref(L, r.id, S); }, columns: [
-    { key: 'name', label: 'Player', type: 'entity', sub: 'sub', mark: function (r) { return U.mark(L, r.team); }, href: function (r) { return CC.playerHref(L, r.id, S); } },
-    { key: 'p_join', label: 'Chance of joining', num: true, fmt: function (v) { return isNum(v) ? (v < 0.001 ? '<0.1%' : CC.pct(v, 1)) : '—'; }, tip: 'The chance the player ends up here; around 0.5% is a strong target among ~360 teams' },
-    { key: 'p_transfer', label: 'Availability', type: 'bar', max: 1, fmt: function (v) { return CC.pct(v); }, tip: 'Our chance the player transfers' },
-    { key: 'pctl', label: 'Fit', num: true, fmt: function (v, r) { return isNum(v) ? QK.ordinal(v) + ' pctl' : '—'; }, tip: 'Production percentile within the position this season' },
-    { key: 'plaus', label: 'Plausibility', num: true, fmt: function (v) { return isNum(v) ? CC.f(v, 1) + '×' : '—'; }, tip: 'This team’s share of the player’s likely destinations against an average team (1×)' },
-    { key: 'why', label: 'Why', sort: false, fmt: function (v) { return '<span class="qk-muted">' + esc(v || '') + '</span>'; } }
-  ], rows: mv.targets.map(function (t) { return Object.assign({ sub: (t.pos || '') + ' · ' + CC.tabbr(L, t.team) }, t); }) });
-}
-
 CC.route('team', function (el, p) {
   var L = p.L, S = p.S, tid = p.id, fb = CC.fb(L);
   el.innerHTML = QK.skeleton('lines', 8);
@@ -227,11 +209,12 @@ CC.route('team', function (el, p) {
     var units = (d && d.units) || [];
     var unitsH = units.length ? QK.pctCard({ title: 'Strengths and needs', peer: 'all ' + peers, sample: 'value by unit this season', groups: [{ label: 'Units, graded A to F', rows: units.map(function (u) { return { label: CC.unit(u.unit) + (u.grade ? ' · ' + u.grade : ''), pctl: isNum(u.pctl) ? u.pctl : null, value: isNum(u.value) ? CC.signed(u.value, 1) : '', tip: CC.unit(u.evidence || '') }; }) }],
       foot: swList(d) }) : U.card('Strengths and needs', '', QK.empty('Not graded yet', 'Units are graded once enough games are in.'));
+    html += topPerformers(L, S, d, fb);
     html += U.section('Roster', 'Value: ' + (fb ? 'EPA above replacement' : 'value above replacement') + ' this season.' + (!CC.isCur(L, S) && !fb && roster.length <= 12 && roster.length ? ' Archive seasons keep the top 12 by minutes.' : ''),
       '<div class="qk-grid cc-grid"><div class="qk-span-8">' + (roster.length ? U.card('', '', U.lb('tp-roster'), { flush: true, cls: 'cc-bare' }) : U.card('Roster', '', QK.empty('No roster yet', 'Rosters come from ESPN; the current one is refreshed weekly.'))) + '</div><div class="qk-span-4">' + unitsH + '</div></div>', '', 'Players');
     // who moves next (published payload only)
     if (CC.isCur(L, S)) html += moveOutlook(L, S, d);
-    // moves that happened and suggestions
+    // moves that happened
     var mv = (d && d.moves) || { 'in': [], out: [] };
     function mvT(list, dir) {
       if (!list || !list.length) return QK.empty(dir === 'in' ? 'No transfers in found' : 'No transfers out found', 'None in our box scores since last season.');
@@ -242,15 +225,6 @@ CC.route('team', function (el, p) {
     }
     html += U.section('Transfers', 'The same ESPN athlete on a new team since last season. ' + QK.tag(INFERRED),
       '<div class="qk-grid cc-grid"><div class="qk-span-6">' + U.card('In', '', mvT(mv['in'], 'in')) + '</div><div class="qk-span-6">' + U.card('Out', '', mvT(mv.out, 'out')) + '</div></div>', '', 'Moves');
-    var sg = (d && d.suggestions) || [];
-    if (sg.length) {
-      html += U.section('Ways to improve', esc((d && d.suggestions_note) || 'Players elsewhere whose on-field value would add most at the weakest units. Not considering eligibility, NIL, fit or availability.'),
-        '<div class="cc-auto wide">' + sg.map(function (s0) {
-          return U.card('Need: ' + CC.unit(s0.need), '', U.table(['Player', 'Team', { label: 'Value', align: 'right' }, { label: 'Gain', align: 'right' }], (s0.candidates || []).map(function (c) {
-            return [{ html: '<a href="' + esc(CC.playerHref(L, c.id, S)) + '">' + esc(c.name || CC.pname(L, c.id)) + '</a>', v: c.name }, { html: U.teamEnt(L, c.team, { season: S, abbr: true }), v: CC.tname(L, c.team) }, { v: c.value, html: CC.f(c.value, 1) }, { v: c.gain, html: CC.signed(c.gain, 1) }];
-          }), { sticky: false }));
-        }).join('') + '</div>', '', 'Suggestions');
-    }
     // season distributions
     if (CC.isCur(L, S) && sim && (sim.w_dist || sim.seed_dist)) {
       html += '<div class="qk-grid cc-grid">' + (sim.w_dist && sim.w_dist.length ? '<div class="qk-span-6">' + U.card('Final win total', 'Our chance of each number of regular-season wins, from the simulated seasons.', U.chart('tp-wd', 220, 'Distribution of final wins')) + '</div>' : '') +
@@ -297,11 +271,36 @@ CC.route('team', function (el, p) {
        .concat(hasLv ? [{ key: 'p_leave', label: 'Chance of leaving', type: 'bar', max: 1, fmt: function (v) { return isNum(v) ? CC.pct(v) : '—'; }, tip: 'Our chance the player is not with the team next season (an inferred transfer or no box-score line). ' + INFERRED }] : []),
         rows: roster.map(function (r) { return Object.assign({ sub: [r.pos, r['class']].filter(Boolean).join(' · '), p_leave: lv[String(r.id)] ? lv[String(r.id)].p : null }, r); }) });
     }
-    mountTargets(L, S, d, el);
     if (CC.isCur(L, S) && sim && sim.w_dist && QK.$('#tp-wd', el)) QKC.bar('#tp-wd', { cats: sim.w_dist.map(function (x, i) { return String(i); }), series: [{ name: 'Chance', color: 'model', data: sim.w_dist }], catName: 'Regular-season wins', valName: 'Chance', fmt: function (v) { return CC.pct(v); } });
     if (CC.isCur(L, S) && sim && sim.seed_dist && QK.$('#tp-sd', el)) { var ks = Object.keys(sim.seed_dist).sort(function (x, y) { return x - y; }); QKC.bar('#tp-sd', { cats: ks.map(function (k0) { return 'Seed ' + k0; }), series: [{ name: 'Chance', color: 'model', data: ks.map(function (k0) { return sim.seed_dist[k0]; }) }], catName: 'Seed', valName: 'Chance', fmt: function (v) { return CC.pct(v); } }); }
   });
 });
+/* Top performers (oddsmarkets/college/top_performers.py, the team page's `top_performers`): the team's best
+   qualified players by our headline metric, and the best at each position, each against every qualified player at
+   that position in FBS / Division I: the percentile (LED meter) and the rank. */
+function topPerformers(L, S, d, fb) {
+  var tp = d && d.top_performers;
+  if (!tp || (!(tp.overall || []).length && !(tp.by_pos || []).length)) {
+    return U.section('Top performers', 'The team’s best players against the rest of the country.', U.card('', '', QK.empty('Not yet', 'Top performers appear once players reach the position’s minimum games this season.')), '', 'Players');
+  }
+  var lab = function (k) { return ((tp.labels || {})[k]) || (k === tp.key ? tp.label : k); };
+  var posName = function (ps) { return CC.posLabel ? CC.posLabel(L, ps) : ps; };
+  var row = function (r, showPos) {
+    var pc = isNum(r.pct) ? r.pct : null;
+    return '<li class="cc-tp-row"><span class="cc-tp-who"><a href="' + esc(CC.playerHref(L, r.id, S)) + '">' + esc(r.name || CC.pname(L, r.id)) + '</a>' +
+      '<small>' + esc((showPos ? r.pos + ' · ' : '') + (isNum(r.gp) ? r.gp + ' games' : '')) + '</small></span>' +
+      '<span class="cc-tp-v num" data-tip="' + esc(lab(r.key)) + '">' + CC.f(r.v, fb ? 1 : 1) + '</span>' +
+      (pc !== null ? QK.meter(pc, { label: esc(r.name || '') + ': ' + QK.ordinal(pc) + ' percentile among ' + r.pos + 's' }) + '<span class="qk-pbox num" style="background:' + QK.pctColor(pc) + ';color:' + QK.pctInk(pc) + '">' + pc + '</span>' : '<span></span><span></span>') +
+      '<span class="cc-tp-rank">' + QK.ordinal(r.rank) + ' of ' + QK.fmt.num(r.n) + ' ' + esc(r.pos) + 's</span></li>';
+  };
+  var ours = tp.ours ? ' ' + QK.ours({ model: fb ? 'value per game: EPA above a replacement-level player' : 'box rating and value above replacement' }) : '';
+  var ov = (tp.overall || []).length ? U.card('Overall', 'The team’s best by ' + esc(lab(tp.key).toLowerCase()) + '; each against the qualified ' + esc(tp.pool) + ' players at the same position.' + ours,
+    '<ol class="cc-tp">' + tp.overall.map(function (r) { return row(r, true); }).join('') + '</ol>') : '';
+  var bp = (tp.by_pos || []).length ? U.card('By position', 'The best qualified player at each position, by the position’s headline metric (' + Object.keys(tp.labels || {}).map(lab).join(', ') + ').' + ours,
+    '<ol class="cc-tp">' + tp.by_pos.map(function (r) { return '<li class="cc-tp-pos">' + esc(posName(r.pos)) + '</li>' + row(r, false); }).join('') + '</ol>') : '';
+  return U.section('Top performers', 'The team’s best players overall and at each position, against every qualified player at that position in ' + esc(tp.pool) + ' (the spec’s minimum games). The meter is the percentile; the rank is among those players.',
+    '<div class="qk-grid cc-grid">' + (ov ? '<div class="qk-span-6">' + ov + '</div>' : '') + (bp ? '<div class="qk-span-' + (ov ? 6 : 12) + '">' + bp + '</div>' : '') + '</div>', '', 'Players');
+}
 function swList(d) {
   if (!d || (!(d.strengths || []).length && !(d.needs || []).length)) return '';
   function li(u) { return '<li>' + CC.ui.grade(u.grade) + '<span><b>' + esc(CC.unit(u.unit)) + '</b> <span class="qk-muted">' + esc(CC.unit(u.evidence || '')) + '</span></span></li>'; }

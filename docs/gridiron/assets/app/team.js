@@ -1,7 +1,8 @@
 /* The Quant Gridiron — the team page (#/team/<abbr>), on kit v3 "Matchday".
  * Header (team tile, record, coach) with "The short version" in plain English, then tiles (rating and our chances) · season path (our chance of each stage as chance bars, final
  * seed, final wins) · ratings through the
- * season · strengths and needs (unit and position grades, who could help, into the trade simulator) ·
+ * season · top performers (overall and by position against the league, QKL.performers) · strengths and needs (unit
+ * and position grades; no potential signings or targets on the team page since round 5) ·
  * the current roster (latest roster and status from valuation.json, grouped by position, with value) and
  * recent moves (ledgers/<abbr>.json) · schedule with our chance and projected margin · QB situation ·
  * team profile percentiles (a percentile card against the 32 teams) · tendencies · fourth downs. Past seasons show what
@@ -50,7 +51,9 @@ function movesBlock(led, S) {
 function needsBlock(abbr, d, S) {
   if (!GI.ok(d) || !d.units) return '';
   const sw = (list, cls) => '<div class="' + cls + '"><h4>' + (cls === 's' ? 'Top strengths' : 'Top weaknesses') + '</h4>' + (list.length ? '<ul>' + list.map(z => '<li><span>' + gradeChip(z.grade) + ' <b>' + esc(GI.copyText(z.label)) + '</b><span class="gi-sub-line">' + esc(GI.copyText(z.evidence || '')) + '</span></span>' + QK.pctlChip(z.pct) + '</li>').join('') + '</ul>' : GI.muted('None stands out.')) + '</div>';
-  const imp = (d.improve || []).map(w => {
+  /* the user (round 5): no potential signings on team pages; the "To improve" candidates (players they could get)
+     are left out here, the grades and the strengths and weaknesses stay. Movement lives on Value & Moves. */
+  const imp = [].map(w => {
     const head = '<h4 style="margin:16px 0 6px">To improve: ' + esc(GI.copyText(w.label)) + '</h4>';
     if (w.note) return head + GI.muted(esc(GI.copyText(w.note)));
     const all = (w.candidates || []).map(c => [c, false]).concat((w.unsigned || []).map(c => [c, true]));
@@ -63,7 +66,35 @@ function needsBlock(abbr, d, S) {
   return GI.card('Strengths and needs', esc(GI.copyText(d.label || '')) + (d.basis_season && d.basis_season !== S ? ' · on ' + d.basis_season + ' values' : '') + ' · percentiles against the 32 teams; grades A from the 80th percentile, B 60th, C 40th, D 20th',
     '<div class="gi-sn">' + sw(d.strengths || [], 's') + sw(d.weaknesses || [], 'w') + '</div>' +
     GI.grid(GI.card('', '', GI.chartBox('tp-pos', 340, 'Position grades: percentile against the league'), { span: 6, cls: 'gi-flat' }) + GI.card('', '', GI.chartBox('tp-units', 340, 'Unit grades: percentile against the league'), { span: 6, cls: 'gi-flat' })) +
-    imp + '<p class="gi-cap">Positions are graded on the per-game value above replacement of the current starters (latest roster; injured reserve left out). Gain is what the player adds here times the game model\'s response (' + GI.num(d.k_resp, 2) + '); wins and playoff chances from the season simulation\'s sensitivity curve. <a href="#/value">Player value →</a> · <a href="#/trade?t=' + abbr + '">Trade simulator →</a></p>', { id: 'needs' });
+    imp + '<p class="gi-cap">Positions are graded on the per-game value above replacement of the current starters (latest roster; injured reserve left out). <a href="#/value">Player value →</a> · <a href="#/trade?t=' + abbr + '">Trade simulator →</a></p>', { id: 'needs' });
+}
+
+/* Top performers (docs/_design/league.js QKL.performers): the team's best players by Gridiron Value (points above a
+   replacement-level player at the position, our model; value.json), overall and by position, each ranked among the
+   league's qualified players at that position (value.json q: the spec's minimums; kickers and punters left out). */
+const TP_POS = [['QB', 'Quarterbacks'], ['RB', 'Running backs'], ['WR', 'Wide receivers'], ['TE', 'Tight ends'], ['EDGE', 'Outside pass rushers'], ['DL', 'Interior line'], ['LB', 'Linebackers'], ['CB', 'Cornerbacks'], ['S', 'Safeties']];
+function topPerformers(abbr, vj, S) {
+  if (!GI.ok(vj) || !Array.isArray(vj.rows) || !Array.isArray(vj.cols)) return null;
+  const ix = {}; vj.cols.forEach((c, i) => { ix[c] = i; });
+  const ok = TP_POS.map(p => p[0]);
+  const all = vj.rows.map(r => ({ pid: r[ix.pid], name: r[ix.name], team: r[ix.team], pos: r[ix.pos], v: r[ix.gvar], q: r[ix.q] }))
+    .filter(r => r.q && isNum(r.v) && ok.indexOf(r.pos) >= 0);
+  const rankIn = list => { const sorted = list.slice().sort((a, b) => b.v - a.v), n = sorted.length, out = {};
+    sorted.forEach((r, i) => { out[r.pid] = { rank: i + 1, n: n, pct: n > 1 ? Math.round(100 * (n - 1 - i) / (n - 1)) : 50 }; }); return out; };
+  const byPos = {}; ok.forEach(p => { byPos[p] = rankIn(all.filter(r => r.pos === p)); });
+  const overall = rankIn(all);
+  const mine = all.filter(r => r.team === abbr).sort((a, b) => b.v - a.v);
+  const row = (r, rk, peer) => ({ name: r.name, href: GI.playerHref(r.pid, S), pos: GI.posLabel(r.pos), value: GI.signed(r.v, 1), pct: rk.pct, rank: rk.rank, n: rk.n, peer: peer });
+  const peerName = p => ((TP_POS.find(x => x[0] === p) || [])[1] || p).toLowerCase();
+  return {
+    kicker: 'Top performers', title: 'Who carries them, and how they compare',
+    sub: 'The best players on the roster by our value model, overall and at each position, ranked against every qualified player in the league.',
+    metric: { label: 'Gridiron Value', unit: 'points above replacement, season to date', model: 'Gridiron Value' },
+    overall: mine.slice(0, 4).map(r => row(r, overall[r.pid], 'qualified players')),
+    groups: TP_POS.map(p => ({ label: p[1], rows: mine.filter(r => r.pos === p[0]).slice(0, 2).map(r => row(r, byPos[p[0]][r.pid], peerName(p[0]))) })),
+    note: 'The box is the league percentile by Gridiron Value among qualified players at the same position (the top cards: among all qualified players); the rank counts the same players. Qualified: the spec\u2019s minimums (attempts, carries or targets a team game; defenders half the team\u2019s games with a credited stat). Defensive values count only box-score splash plays, so they are a floor; offensive linemen are not valued one by one.',
+    empty: 'Top performers appear once players reach the qualifying minimums.'
+  };
 }
 
 GI.route('team', function (el, params) {
@@ -71,6 +102,7 @@ GI.route('team', function (el, params) {
   const S = Number(params.season);
   const cur = S === GI.currentSeason();
   const paths = [GI.ypath('teams.json', S), GI.ypath('season.json', S), GI.ypath('fourth_downs.json', S)].concat(cur ? [GI.ypath('valuation.json', S), GI.ypath('needs/' + abbr + '.json', S), GI.ypath('ledgers/' + abbr + '.json', S)] : []);
+  const vload = GI.load(GI.ypath('value.json', S)).catch(() => null);
   return GI.loadAll(paths).then(res => {
     if (!el.isConnected) return;
     const cat = GI.TM.of(res[0]);
@@ -103,7 +135,7 @@ GI.route('team', function (el, params) {
         GI.kpi('Make the playoffs', GI.pct(sim.p_playoffs, 0), 'from 20,000 simulated seasons'), GI.kpi('Win the division', GI.pct(sim.p_div, 0), ''), GI.kpi('Win the Super Bowl', GI.pct(sim.p_sb, 1), ''),
         GI.kpi('Projected wins', GI.num(sim.mean_wins, 1), isNum(sim.w_p05) ? 'likely ' + GI.num(sim.w_p05, 0) + ' to ' + GI.num(sim.w_p95, 0) : '')],
       tags: tags, short: shortTxt.trim() || null });
-    h += '<nav class="qk-chips scroll" aria-label="On this page" style="margin-top:12px">' + [['#tp-season', 'How far they go'], ['#needs', 'Strengths and needs'], ['#tp-moves-host', 'Who moves next'], ['#roster', 'Roster'], ['#moves', 'Moves'], ['#tp-sched', 'Schedule'], ['#tp-profile', 'Profile'], ['#tp-4th', 'Fourth downs']]
+    h += '<nav class="qk-chips scroll" aria-label="On this page" style="margin-top:12px">' + [['#tp-season', 'How far they go'], ['#tp-top', 'Top performers'], ['#needs', 'Strengths and needs'], ['#tp-moves-host', 'Who moves next'], ['#roster', 'Roster'], ['#moves', 'Moves'], ['#tp-sched', 'Schedule'], ['#tp-profile', 'Profile'], ['#tp-4th', 'Fourth downs']]
       .map(a => '<button type="button" class="qk-chip" data-jump="' + a[0] + '">' + esc(a[1]) + '</button>').join('') + '<a class="qk-chip" href="' + GI.compareHref('t:' + abbr) + '">Compare</a></nav>';
     if (!x) h += GI.notBuilt('The ' + S + ' page for ' + GI.teamName(abbr), res[0]);
     // season path
@@ -115,6 +147,7 @@ GI.route('team', function (el, params) {
        chances over the season (the percentile card stays further down, under Profile) */
     const lo = GI.leagueOpts && GI.ok(res[1]) ? GI.leagueOpts(res[1], S) : null;
     if (lo) h += '<div id="tp-league"></div>';
+    h += '<div id="tp-top"></div>';
     const hist = GI.TM.history(x);
     h += GI.grid(GI.card('Ratings through the season', 'points per game against an average team, after each week', hist.length > 1 ? GI.chartBox('tp-hist', 300, 'Ratings by week') : GI.muted('Rating history starts after week 2.'), { span: 7 }) +
       GI.card('Wins against our forecast', 'Cumulative wins minus the wins our pre-game chances expected', GI.chartBox('tp-woe', 300, 'Wins over expected') +
@@ -145,6 +178,7 @@ GI.route('team', function (el, params) {
     h += GI.card('Fourth downs', 'every fourth down the team faced, graded · <a href="' + GI.ghref('fourth-downs', S, { team: abbr }) + '">in the fourth-down centre →</a>', '<div id="tp-4th-k"></div><div id="tp-4th-t"></div>', { id: 'tp-4th', flush: true });
     el.innerHTML = h;
     if (lo) QKL.team(el.querySelector('#tp-league'), Object.assign({}, lo, { meters: false }), abbr);
+    if (window.QKL && QKL.performers) vload.then(vj => { const host = el.querySelector('#tp-top'), o = topPerformers(abbr, vj, S); if (host && el.isConnected && o) QKL.performers(host, o); });
     el.querySelectorAll('[data-jump]').forEach(a => a.addEventListener('click', () => { const n = el.querySelector(a.getAttribute('data-jump')); if (n && n.scrollIntoView) n.scrollIntoView({ behavior: 'smooth', block: 'start' }); }));
 
     // charts
@@ -188,7 +222,7 @@ GI.route('team', function (el, params) {
     const plays = GI.F ? GI.F.playsOf(res[2]).filter(p => p.team === abbr) : [];
     const go = plays.filter(p => p.choice === 'go').length;
     /* who moves next: the movement payload, after the first paint (current season only) */
-    if (cur && GI.MV) GI.MV.load().then(md => { const host = document.getElementById('tp-moves-host'); if (!host || !el.isConnected) return; host.innerHTML = GI.MV.teamSection(md, abbr, GI.ok(res[4]) ? res[4] : null); GI.sortable(host); });
+    if (cur && GI.MV) GI.MV.load().then(md => { const host = document.getElementById('tp-moves-host'); if (!host || !el.isConnected) return; host.innerHTML = GI.MV.teamSection(md && Object.assign({}, md, { published: Object.assign({}, md.published || {}, { targets: false }) }), abbr, GI.ok(res[4]) ? res[4] : null); GI.sortable(host); });
     GI.set('tp-4th-k', plays.length ? '<div style="padding:14px 16px 0">' + GI.kpis([GI.kpi('Fourth downs', String(plays.length), 'this season'), GI.kpi('Went for it', GI.pct(go / plays.length, 0), go + ' times'),
       isNum(v.go_rate_rec) ? GI.kpi('Went when our model said go', GI.pct(v.go_rate_rec, 0), '') : '', isNum(v.fd_wp_lost) ? GI.kpi('Win chance given away', GI.num(v.fd_wp_lost * 100, 1), 'percentage points, summed', { unit: 'pts' }) : '']) + '</div>' : '');
     if (plays.length) GI.F.table(document.getElementById('tp-4th-t'), plays, S, { team: false, max: 80, maxHeight: 420 });

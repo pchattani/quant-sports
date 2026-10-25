@@ -2,7 +2,9 @@
  * Team page: the current line-up, car pace through the season (race and qualifying, ±1 se, the field
  * faint), points and retirements by round, the run-in (expected points per remaining round), the title
  * (our chance and where the simulations finish), the car/driver split, the pit crew, straight-line v cornering, the two drivers
- * head to head, strengths and needs with the driver swaps that would add most, and every percentile.
+ * head to head, the top performers (each driver against the grid: rank and percentile among the qualified drivers on
+ * the driver metric set, our driver model first), strengths and needs, and every percentile. Driver swaps ("moves
+ * that would add the most") live on the Value page only, not on the team page.
  * The percentile card uses the constructor metric set (PD.v2.TEAM_SET) against the teams at the rounds floor.
  * Reads <y>/teams.json, drivers.json, season.json, needs.json. */
 (function (PD) {
@@ -181,6 +183,7 @@ function renderTeam(el, params, state) {
     h += PD.grid('<div class="qk-span-5">' + (tP ? PD.v2.pctCard(tP, id, PD.v2.TEAM_SET, { foot: '<span>Metrics chosen for year-to-year stability and what they predict</span><a href="#/glossary">Glossary →</a>' }) : '') + '</div>' +
       PD.card('Where the team sits', tP ? 'Every constructor in the ' + y + ' peer group; bars coloured by percentile, ' + esc(name) + ' and the median marked.' : '', (tP ? PD.v2.distSeg('tm-dist-m', [['car_race_pace', 'Car pace'], ['points_per_race', 'Points / race'], ['dnf_rate', 'DNF rate'], ['pit_lane_v_field', 'Pit lane'], ['strategy_gain', 'Strategy']]) : '') + PD.chartBox('tm-dist', 260, 'Peer distribution'), { span: 7 }), 'pd-mt');
     h += '<section class="qk-section pd-sec">' + PD.secHead(y + ' season', 'Line-up', y === PD.currentSeason() ? 'Current drivers, from the latest build.' : 'Drivers who raced for the team in ' + y + '.') + '<div class="qk-auto" style="--min:220px" id="tm-lineup"></div></section>';
+    h += '<section class="qk-section pd-sec">' + PD.secHead('Top performers', 'Against the grid', 'Each of the team\'s drivers ranked against every qualified driver this season, on our driver rating first, then the driver metric set.') + '<div id="tm-top"></div></section>';
     h += PD.grid(
       PD.card('Car pace by race', 'The car’s share of lap time, % of a lap faster than the field, ±1 se shaded; the other cars faint.', PD.chartBox('tm-pace', 360), { span: 8, right: PD.seg('tm-pk', [['race', 'Race'], ['quali', 'Qualifying']], 'race', 'Session') }) +
       PD.card('Title', 'Our chance and where the simulated seasons finish.', '<div id="tm-title"></div>' + PD.chartBox('tm-pd', 180), { span: 4 }) +
@@ -207,6 +210,9 @@ function renderTeam(el, params, state) {
       return '<a class="qk-card is-link pd-dcard" href="' + PD.driverHref(d) + '" style="--tc:' + esc(tcol) + '"><span class="qk-avatar" style="--tc:' + esc(tcol) + '">' + esc(info.number || PD.driverCode(d)) + '</span><div><b>' + esc(PD.driverName(d)) + '</b>' +
         '<div class="qk-sub">' + esc(info.nationality || '') + (row.races ? ' · ' + row.races + ' races' : '') + '</div><div class="pd-dcard-s">' + (x.pos ? 'P' + x.pos + ' · ' : '') + PD.pts(x.points) + ' pts' + (x.wins ? ' · ' + x.wins + ' wins' : '') + '</div></div></a>';
     }).join('') || PD.muted('No drivers listed.'));
+
+    // top performers against the grid
+    topPerformers(drivers, season, lineup, id);
 
     // car pace
     var others = Object.keys((((season || {}).car_pace || {}).race) || {}).filter(function (k) { return k !== id; });
@@ -326,10 +332,45 @@ function needsBlock(needs, id) {
   host.innerHTML = '<section class="qk-section pd-sec">' + PD.secHead('Team needs', 'Strengths and needs', esc(needs.label || '')) +
     PD.grid(PD.card('Areas against the field', 'Percentile among the teams this season; A from the 80th, B 60th, C 40th, D 20th.' + (x.balance ? ' The car ' + esc(x.balance) + '.' : ''), PD.chartBox('tm-areas', Math.max(240, (x.areas || []).length * 30 + 20)), { span: 6 }) +
       PD.card('Strengths', '', '<ul class="pd-glist">' + ((x.strengths || []).map(item).join('') || '<li>None stands out.</li>') + '</ul>', { span: 3 }) +
-      PD.card('Weaknesses', '', '<ul class="pd-glist">' + ((x.weaknesses || []).map(item).join('') || '<li>None below the 40th percentile.</li>') + '</ul>', { span: 3 }) +
-      PD.card('Moves that would add the most', 'Driver swaps run through the championship simulation of the remaining rounds (' + (needs.swaps_n || '') + ' runs, common random numbers): the change in expected constructors’ points.', '<div id="tm-swaps"></div>', { span: 12, flush: true })) + '</section>';
+      PD.card('Weaknesses', '', '<ul class="pd-glist">' + ((x.weaknesses || []).map(item).join('') || '<li>None below the 40th percentile.</li>') + '</ul>', { span: 3 })) + '</section>';
   PD.ch.hbars('tm-areas', (x.areas || []).map(function (a) { return { label: a.label, value: a.pct, colour: gradeC(a.grade), sub: 'Grade ' + (a.grade || '—') + ' · ' + (a.stat || '') }; }), { fmt: function (v) { return PD.num(v, 0); }, min: 0, max: 100, name: 'Percentile', ref: 50, labelWidth: 150, label: 'Graded areas' });
-  swapsTable('tm-swaps', x.best_swaps);
+}
+
+/* Top performers: each driver who raced for the team, best first by our race driver rating, against the qualified
+   drivers of the season (PD.v2.peer: the f1.json floor, pct_peer when the payload has it). Rank is among those
+   drivers on the same metric; "Our model" tags mark the metrics from our own models. */
+var TOP_KEYS = ['driver_effect', 'quali_driver_effect', 'race_pace', 'points_per_race', 'race_h2h', 'quali_h2h', 'lap1_gain', 'team_points_share', 'elo_teammate'];
+function rankOf(P, id, k) {
+  var lower = !!((P.meta || {})[k] || {}).lower, v = ((P.rows[id] || {}).values || {})[k];
+  if (!isNum(v) || !P.qualified(id)) return null;
+  var vals = P.ids.map(function (j) { return ((P.rows[j] || {}).values || {})[k]; }).filter(isNum);
+  var better = vals.filter(function (x) { return lower ? x < v : x > v; }).length;
+  return { rank: better + 1, of: vals.length };
+}
+function topPerformers(drivers, season, lineup, id) {
+  var host = document.getElementById('tm-top');
+  if (!host) return;
+  if (!PD.ok(drivers)) { host.innerHTML = PD.muted('The driver catalogue is not built for this season.'); return; }
+  var V = PD.v2, P = V.peer(drivers, 'drivers', season);
+  var D = drivers.drivers || {};
+  var list = lineup.filter(function (d) { return D[d]; });
+  if (!list.length) { host.innerHTML = PD.muted('No driver of this team is in the catalogue.'); return; }
+  var head = 'driver_effect';
+  var score = function (d) { var pc = P.pct[d]; return pc && isNum(pc[head]) ? pc[head] : -1; };
+  list.sort(function (a, b) { return score(b) - score(a) || ((D[b].races || 0) - (D[a].races || 0)); });
+  var tcol = PD.tc(id);
+  host.innerHTML = '<div class="pd-top">' + list.map(function (d, i) {
+    var q = P.qualified(d), pc = P.pct[d] || {}, rk = rankOf(P, d, head);
+    var top = q && isNum(pc[head]) ? '<div class="pd-top-h"><span class="pd-top-big">' + (rk ? PD.ordinal(rk.rank) : '—') + '</span><span class="pd-top-of">of ' + (rk ? rk.of : P.n) + ' qualified drivers on ' + esc(V.label(P.meta, head)) + ' ' + V.oursTag(head, true, 'driver') + '</span>' + QK.pctlChip(pc[head]) + '</div>' :
+      '<p class="pd-cap">Short of the floor (' + esc(P.label) + '): ' + esc(P.sample(d)) + '. No grid rank yet.</p>';
+    var bars = q ? TOP_KEYS.filter(function (k) { return isNum(pc[k]); }).map(function (k) {
+      var r = rankOf(P, d, k), m50 = V.M50 || {};
+      return { label: V.label(P.meta, k), sub: V.ours(k) ? 'Our model' : '', pctl: pc[k], value: V.fmt(P.meta, k, (D[d].values || {})[k]) + (r ? ' · ' + PD.ordinal(r.rank) + '/' + r.of : ''), tip: V.tip(P.meta, k), early: isNum(m50[k]) && P.size(d) < m50[k] };
+    }) : [];
+    return '<article class="qk-card pd-top-card" style="--tc:' + esc(tcol) + '"><div class="pd-top-k">' + (i === 0 && list.length > 1 && q ? 'Top performer' : 'Driver') + '</div>' +
+      '<a class="pd-top-n" href="' + PD.driverHref(d) + '">' + esc(PD.driverName(d)) + '</a><div class="qk-sub">' + esc(P.sample(d)) + '</div>' + top +
+      (bars.length ? QK.pctlBars(bars) : '') + '</article>';
+  }).join('') + '</div><p class="pd-cap">Peers: ' + esc(P.label) + '. Percentile 100 is the best on the grid; the rank after each value is among the qualified drivers. Metrics marked "Our model" come from our driver model (the car taken out).</p>';
 }
 
 PD.route('constructors', renderList);

@@ -3,7 +3,8 @@
  * Overview tab: the full-bleed team-colour hero with the black strip of numbers (record, our playoff and title
  * chances first, projected wins with the simulation's 90% range, the rating); the net rating through the
  * season (±1 standard error shaded, results marked); our season chances and the final-seed distribution; strengths
- * and needs with the best trade targets (current season); the current roster as a leaderboard; the schedule (next
+ * and needs (current season; no trade targets: the user's call, 25 Oct 2026); top performers overall and by role
+ * against the league (QKL.performers, from players.json's role, qualified flag and role percentiles); the current roster as a leaderboard; the schedule (next
  * games with our win chance and the team's availability line, recent results); moves.
  * Detail tab (?tab=detail): the pre-redesign team page in full (four factors, shot profiles, lineups, on/off,
  * rotation, the whole catalogue in percentiles, the trade ledger).
@@ -31,6 +32,37 @@ function avNote(g, home) {
   const v = home ? av[0] : av[1];
   if (Math.abs(v) < 0.05) return '';
   return '<span class="s" style="white-space:nowrap" data-tip="Availability for the next game: points of margin from who is expected to play (injury report applied), against what the rating already reflects">availability ' + U.sgnHTML(v, 1) + ' pts</span>';
+}
+
+/* Top performers (QKL.performers): the team's best qualified players by HPM (our plus-minus: points per 100
+   possessions better than average), overall and by role (guards / wings / bigs, the spec's role groups), each with its
+   percentile among the league's qualified players of that role (players.json pct_role.hpm, the spec's minutes floor
+   via `qualified`) and its rank among them. */
+const ROLES = [['G', 'Guards', 'guards'], ['W', 'Wings', 'wings'], ['B', 'Bigs', 'bigs']];
+function topPerformers(node, L, S, tid, cat) {
+  if (!node) return;
+  const P = (cat && cat.players) || {};
+  const all = Object.keys(P).map(id => Object.assign({ id: id }, P[id])).filter(p => p.qualified && p.role && isNum((p.values || {}).hpm));
+  const rank = {}, n = {};
+  ROLES.forEach(r => {
+    const pool = all.filter(p => p.role === r[0]).sort((a, b) => b.values.hpm - a.values.hpm);
+    n[r[0]] = pool.length;
+    pool.forEach((p, i) => { rank[p.id] = i + 1; });
+  });
+  const peer = {}; ROLES.forEach(r => { peer[r[0]] = r[2]; });
+  const row = p => ({ name: p.name, href: HW.playerHref(L, p.id, S), pos: U.ROLE1[p.role] || p.pos, value: U.signed(p.values.hpm, 1),
+    pct: (p.pct_role || {}).hpm, rank: rank[p.id], n: n[p.role], peer: peer[p.role] });
+  const mine = all.filter(p => String(p.team) === String(tid)).sort((a, b) => b.values.hpm - a.values.hpm);
+  const floor = cat && cat.min_floor;
+  QKL.performers(node, {
+    title: 'Who carries them, and how they compare',
+    sub: 'The best players by our plus-minus, overall and at each role, against every qualified player in the ' + HW.leagueName(L) + '.',
+    metric: { label: 'HPM', unit: 'points per 100 possessions v average', model: 'HPM (Hardwood plus-minus)' },
+    overall: mine.slice(0, 4).map(row),
+    groups: ROLES.map(r => ({ label: r[1], rows: mine.filter(p => p.role === r[0]).slice(0, 3).map(row) })),
+    note: 'The box is the league percentile among qualified players of the same role (guards, wings, bigs) on HPM, our estimate of the points per 100 possessions a player adds; the rank counts the same players. Qualified: at least ' + (floor || 'the season’s') + ' minutes so far (a fifth of the most played).',
+    empty: 'Nobody has reached the minutes floor yet' + (floor ? ' (' + floor + ' minutes)' : '') + ': the list fills in after a few games.'
+  });
 }
 
 function render(el, params) {
@@ -91,12 +123,13 @@ function render(el, params) {
     h += '</div>';
     // strengths and weaknesses on the spec's team set, chips and the race (docs/_design/league.js, from season.json "league")
     const lo = HW.leagueOpts && season ? HW.leagueOpts(season, L, S) : null;
+    h += '<div id="tp-top"></div>';
     if (lo) h += '<div id="tp-league"></div>';
     // strengths and needs
     if (needs && needs.grades) {
-      h += '<section class="qk-section">' + U.head({ kicker: 'Roster construction', title: 'Strengths and needs', sub: 'Each position group and unit graded against the league on projected value (WAR over a full season); the best trade targets for each weak spot.' }) + '<div class="qk-grid">' +
+      h += '<section class="qk-section">' + U.head({ kicker: 'Roster construction', title: 'Strengths and needs', sub: 'Each position group and unit graded against the league on projected value (WAR over a full season).' }) + '<div class="qk-grid">' +
         U.card2('Grades', '', '<div id="tp-grades"></div>', { cls: 'qk-span-5', flush: true }) +
-        U.card2('Where to improve', 'Ranked by wins added in this rotation', '<div id="tp-targets"></div>', { cls: 'qk-span-7', flush: true }) + '</div></section>';
+        U.card2('Strengths and needs', 'Where the roster is strong and where it is thin', '<div id="tp-targets"></div>', { cls: 'qk-span-7', flush: true }) + '</div></section>';
     }
     const mvT = mv ? (mv.m.teams || {})[tid] : null;
     if (mv && mvT) {
@@ -132,6 +165,7 @@ function render(el, params) {
     h += '</div>';
     el.innerHTML = h;
     if (lo) QKL.team(document.getElementById('tp-league'), lo, tid);
+    if (window.QKL && QKL.performers) topPerformers(document.getElementById('tp-top'), L, S, tid, cat);
 
     // rating path with the se band and results
     if (document.getElementById('tp-path')) {
@@ -166,13 +200,9 @@ function render(el, params) {
         { key: 'label', label: 'Area' }, { key: 'grade', label: 'Grade', fmt: v => U.grade(v) }, { key: 'value', label: 'WAR', num: true, fmt: v => U.f(v, 1), tip: 'Projected WAR over a full season' },
         { key: 'rank', label: 'Rank', num: true, fmt: (v, g) => HW.ordinal(v) + ' of ' + g.n }] });
       const strong = (needs.strengths || []).map(x => '<div class="hw-target"><div class="hw-flex">' + U.grade(x.grade) + '<b>' + esc(x.label) + '</b><span class="qk-badge" style="margin-left:auto">strength</span></div><div class="why">' + esc(x.evidence || '') + '</div></div>').join('');
-      const weak = (needs.weaknesses || []).map(w => {
-        const tg = (w.targets || []).slice(0, 2);
-        return '<div class="hw-target"><div class="hw-flex">' + U.grade(w.grade) + '<b>' + esc(w.label) + '</b><span class="qk-badge" style="margin-left:auto">need</span></div><div class="why">' + esc(w.evidence || '') + '</div>' +
-          tg.map(c => '<div class="hw-flex" style="margin-top:6px">' + U.playerEnt(L, c.id, c.name, c.team, HW.teamAbbr(L, c.team) + ' · ' + (U.ROLE1[c.role] || '') + (isNum(c.age) ? ' · ' + Math.floor(c.age) : '')) +
-            '<span class="v" style="margin-left:auto">' + U.signed(c.wins, 1) + ' wins</span>' + (c.attainable ? '<span class="qk-badge accent">attainable</span>' : '') +
-            '<a class="hw-link" href="' + esc('#/' + L + '/value?tab=trade&t=' + encodeURIComponent(tid) + ',' + encodeURIComponent(c.team) + '&m=' + encodeURIComponent(c.id) + '-' + encodeURIComponent(tid)) + '">Simulate →</a></div>').join('') + '</div>';
-      }).join('');
+      /* needs keep their grade and evidence; the players other teams could give up are not listed (no signings or
+         trade targets on the team page) */
+      const weak = (needs.weaknesses || []).map(w => '<div class="hw-target"><div class="hw-flex">' + U.grade(w.grade) + '<b>' + esc(w.label) + '</b><span class="qk-badge" style="margin-left:auto">need</span></div><div class="why">' + esc(w.evidence || '') + '</div></div>').join('');
       document.getElementById('tp-targets').innerHTML = strong + weak || U.empty('No grades', '');
     }
     // roster

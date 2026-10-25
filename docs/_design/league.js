@@ -85,6 +85,22 @@ var CSS = [
   '.qkl-tier .ts a{text-decoration:none}',
   '.qkl-tbl td.qkl-pct{white-space:nowrap}',
   '.qkl-tbl .mv{font-size:var(--fs-xs);margin-left:6px}',
+  '.qkl-tp{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:var(--sp-3,12px);padding:4px 20px 18px}',
+  '.qkl-tpg{background:var(--s-2);padding:12px 14px;min-width:0}',
+  '.qkl-tpg h5{margin:0 0 6px;font:700 var(--fs-2xs)/1.2 var(--font-cond);text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3)}',
+  '.qkl-pr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;align-items:center;padding:9px 0;border-top:1px solid var(--line-1,#232833)}',
+  '.qkl-pr:first-of-type{border-top:0}',
+  '.qkl-pr .who{min-width:0;font:700 var(--fs-sm)/1.2 var(--font-cond);text-transform:uppercase;letter-spacing:.02em;color:var(--ink-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+  '.qkl-pr .who a{color:inherit;text-decoration:none}',
+  '.qkl-pr .who small{font:600 var(--fs-2xs)/1 var(--font-cond);color:var(--ink-3);margin-left:6px}',
+  '.qkl-pr .v{font:400 1.25rem/1 var(--font-display);color:var(--ink-1);text-align:right;white-space:nowrap}',
+  '.qkl-pr .m{grid-column:1 / 3;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center}',
+  '.qkl-pr .rk{font:600 var(--fs-2xs)/1.2 var(--font-cond);color:var(--ink-3);text-transform:uppercase;white-space:nowrap}',
+  '.qkl-top1{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:var(--sp-3,12px);padding:4px 20px 6px}',
+  '.qkl-top1 .qkl-pr{background:var(--s-2);padding:12px 14px;border-top:0;border-left:4px solid var(--signal)}',
+  '.qkl-pr .m{grid-template-columns:minmax(80px,1fr) auto auto}',
+  '.qkl-pr .m .qk-segs{min-width:80px;width:100%}',
+  '.qkl-top1 .qkl-pr .rk{white-space:normal;max-width:110px;line-height:1.15}',
   '@media (max-width:760px){.qkl-card{grid-template-columns:minmax(0,1fr);padding:14px 12px 16px;max-width:calc(100vw - 32px)}.qkl-mv{padding:0 14px 12px}.qkl-gm,.qkl-tiers{padding:4px 14px 14px}.qkl-note{padding:0 14px 14px}}'
 ].join('\n');
 function css() {
@@ -468,6 +484,39 @@ QKL.team = function (el, o, key) {
       annotations: h.live_from && any.dates[0] < h.live_from ? [{ x: h.live_from + 'T12:00:00Z', label: 'Live from ' + dayLabel(h.live_from) }] : [],
       yName: 'Our chance', xName: 'Date', xFmt: dayTick, label: nm(o, key) + ': our chances over the season' });
   });
+};
+
+/* ─────────────────────────────────────── top performers (team pages) */
+/* QKL.performers(el, { kicker, title, sub, metric: { label, unit, model: 'GAR' (the "Our model" tag; omit for a box
+ *   score) }, overall: [ROW], groups: [{ label, rows: [ROW] }], note (HTML), empty })
+ * ROW = { name, href, pos, value (formatted text), pct (0-100: league percentile among qualified players at the
+ *   position), rank, n (qualified players at the position), peer ('forwards'), sub } -> the team's best players
+ * overall (cards) and by position (LED meters with the percentile box and the rank among the league's qualified). */
+function perfRow(r) {
+  var p = isNum(r.pct) ? Math.max(0, Math.min(100, r.pct)) : null;
+  var rk = isNum(r.rank) && isNum(r.n) ? QK.ordinal(r.rank) + ' of ' + r.n + (r.peer ? ' ' + r.peer : '') : (r.sub || '');
+  return '<div class="qkl-pr"><span class="who">' + (r.href ? '<a href="' + esc(r.href) + '">' + esc(r.name) + '</a>' : esc(r.name)) + (r.pos ? '<small>' + esc(r.pos) + '</small>' : '') + '</span>' +
+    '<span class="v num">' + esc(r.value === undefined || r.value === null ? '—' : r.value) + '</span>' +
+    (p !== null ? '<span class="m">' + QK.meter(p, { label: r.name + ': ' + QK.ordinal(Math.round(p)) + ' percentile' + (rk ? ', ' + rk : '') }) +
+      '<span class="qk-pbox num" style="background:' + QK.pctColor(p) + ';color:' + QK.pctInk(p) + '">' + Math.round(p) + '</span><span class="rk">' + esc(rk) + '</span></span>' :
+      (rk ? '<span class="m"><span class="rk">' + esc(rk) + '</span></span>' : '')) + '</div>';
+}
+QKL.performers = function (el, o) {
+  css();
+  if (typeof el === 'string') el = document.querySelector(el);
+  if (!el) return;
+  o = o || {};
+  var m = o.metric || {};
+  var tag = m.model && QK.ours ? ' ' + QK.ours({ model: m.model, short: false }) : '';
+  var groups = (o.groups || []).filter(function (g) { return g && (g.rows || []).length; });
+  var over = (o.overall || []).filter(Boolean);
+  var body = !over.length && !groups.length ? QK.empty(o.emptyTitle || 'Not enough games yet', o.empty || 'Top performers appear once players reach the sample where the numbers settle.') :
+    (over.length ? '<div class="qkl-top1">' + over.map(perfRow).join('') + '</div>' : '') +
+    (groups.length ? '<div class="qkl-tp">' + groups.map(function (g) { return '<div class="qkl-tpg"><h5>' + esc(g.label) + '</h5>' + g.rows.map(perfRow).join('') + '</div>'; }).join('') + '</div>' : '') +
+    '<p class="qkl-note">' + (o.note || ('The box is the league percentile among qualified players at the same position, by ' + esc(m.label || 'our headline metric') + (m.unit ? ' (' + esc(m.unit) + ')' : '') + '; the rank counts the same players.')) + '</p>';
+  el.innerHTML = '<section class="qk-section qkl-sec">' + QK.sectionHead({ kicker: o.kicker || 'Top performers', title: o.title || 'Who carries them, and how they compare', sub: o.sub || '' }) +
+    '<section class="qk-card"><div class="qk-card-head"><div style="min-width:0"><div class="qk-card-title">' + esc(m.label || 'Top performers') + tag + '</div>' +
+    '<div class="qk-card-sub">The team’s best overall, then the best at each position, against the whole league</div></div></div><div class="qk-card-body" style="padding:0">' + body + '</div></section></section>';
 };
 
 root.QKL = QKL;

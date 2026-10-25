@@ -158,6 +158,10 @@ def build_level(level: str, data: Path, seasons: list[int], a, report: dict, lev
     if cur in seasons:
         from oddsmarkets.college import movement
         step(f"{level}:movement", lambda: movement.write_movement(level, data, cur), report)
+    # top performers on the team pages (oddsmarkets/college/top_performers.py), from each built season's players.json
+    from oddsmarkets.college import top_performers
+    for s in seasons:
+        step(f"{level}:{s}:top", lambda s=s: top_performers.write_top(level, data, s), report)
     # seasons not rebuilt here (CI: restored from the live site) are upgraded to the builder's payload format
     if hasattr(mod, "migrate"):
         built = set(seasons)

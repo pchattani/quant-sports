@@ -187,6 +187,7 @@ function renderTeam(el, params, state) {
        the percentile card above already carries the meters) */
     const lo = BP.leagueOpts && k.ok(res[1]) ? BP.leagueOpts(res[1], L, S) : null;
     if (lo && ((lo.league.teams || {})[tid] || (lo.league.race || {})[tid])) h += '<div id="tm-league"></div>';
+    h += '<div id="tm-top"></div>';
     h += '<div id="tm-mv"></div><div id="tm-value"></div>';
     h += '<div id="tm-moves"></div>';
     h += '<div class="qk-grid" style="margin-top:var(--sp-4)"><div class="qk-span-6">' + U.card2('Regular lineup', 'The nine with the most plate appearances, by xwOBA+ (our expected wOBA); our game forecast uses the posted lineup', '<div id="tm-lineup"></div>') + '</div>' +
@@ -198,6 +199,9 @@ function renderTeam(el, params, state) {
     h += U.card2('Schedule and results', 'Every game with our pre-game win chance; the line is wins minus the wins we expected', U.chart('tm-logc', 260, 'Wins minus expected wins') + '<div id="tm-log"></div>');
     el.innerHTML = h;
     if (document.getElementById('tm-league')) QKL.team(document.getElementById('tm-league'), Object.assign({}, lo, { meters: false }), tid);
+    topPerformers(document.getElementById('tm-top'), L, S, T, tid, v);
+    dropTargets(document.getElementById('tm-mv'));
+    dropTargets(document.getElementById('tm-value'));
     roster(L, S, t, tid, meta);
     lineupLite(L, S, t);
     bullpen(L, S, t, tid, null);
@@ -225,6 +229,84 @@ function renderTeam(el, params, state) {
     if (typeof BP.setMeta === 'function') { try { BP.setMeta(k.esc(k.teamName(tid))); } catch (e) { /* optional */ } }
   });
 }
+/* The team page shows no potential signings (the user, 25 Oct 2026: "remove potential signings from team pages"): the
+   "Who they could get" card of bp-moves.js teamCards and the "Ways to improve" candidates of value.js valueTeam are
+   taken out of this page when they render (both modules still serve Value & Moves; the outlook by position, the
+   strengths and needs and the roster's chance-of-moving column stay). */
+function dropTargets(host) {
+  if (!host) return;
+  const clean = () => {
+    const tg = host.querySelector('#mv-tg');
+    let cut = false;
+    host.querySelectorAll('.qk-card, section.card').forEach(c => {
+      const ttl = c.querySelector('.qk-card-title, .card-header');
+      const t = ttl ? ttl.textContent.trim().toLowerCase() : '';
+      if (t.indexOf('who they could get') === 0 || t.indexOf('ways to improve') === 0 || (tg && c.contains(tg))) {
+        const span = c.parentNode && /qk-span-/.test(c.parentNode.className || '') ? c.parentNode : c;
+        span.parentNode.removeChild(span);
+        cut = true;
+      }
+    });
+    if (cut) host.querySelectorAll('.qk-grid > .qk-span-5').forEach(x => { x.className = 'qk-span-12'; });
+  };
+  clean();
+  if (window.MutationObserver) {
+    const ob = new MutationObserver(clean);
+    ob.observe(host, { childList: true, subtree: true });
+    setTimeout(() => ob.disconnect(), 30000);
+  }
+}
+
+/* Top performers (QKL.performers, docs/_design/league.js): the team's best players by WAR (our model) overall and at
+   each position, each against the league: percentile and rank among the qualified players at that position across all
+   30 rosters in teams.json (no catalogue load). Minimums from the spec (docs/_design/metrics/baseball.json), prorated
+   by team games: 200 PA for hitters, 300 batters faced for starters and 120 for relievers (batters faced ~ 4.25 x IP). */
+const TOP_GROUPS = [['C', 'Catcher', 'catchers'], ['IF', 'Infield', 'infielders'], ['OF', 'Outfield', 'outfielders'], ['DH', 'Designated hitter', 'DHs'],
+  ['SP', 'Starting pitcher', 'starters'], ['RP', 'Relief pitcher', 'relievers']];
+function topGroup(r) {
+  const p = String(r.pos || '');
+  if (r.kind === 'pitcher' || p === 'SP' || p === 'RP' || p === 'P') return p === 'SP' || (p === 'P' && (r.gs || 0) >= 5) ? 'SP' : 'RP';
+  if (p === 'C') return 'C';
+  if (['1B', '2B', '3B', 'SS'].indexOf(p) >= 0) return 'IF';
+  if (['LF', 'CF', 'RF', 'OF'].indexOf(p) >= 0) return 'OF';
+  if (p === 'DH' || p === 'TWP') return 'DH';
+  return null;
+}
+function topPerformers(host, L, S, T, tid, v) {
+  if (!host || !window.QKL) return;
+  const k = K();
+  const games = k.isNum(v.g) && v.g > 0 ? Math.min(162, v.g) : 162, f = games / 162;
+  const qual = r => (topGroup(r) === 'SP' ? (r.ip || 0) * 4.25 >= 300 * f : topGroup(r) === 'RP' ? (r.ip || 0) * 4.25 >= 120 * f : (r.pa || 0) >= 200 * f);
+  /* the league pool: one row a player (a traded player keeps his row with the most playing time) */
+  const pool = {};
+  Object.keys(T).forEach(t => rosterRows(T[t]).forEach(r => {
+    if (!k.isNum(r.war) || !topGroup(r) || !qual(r)) return;
+    const use = (r.pa || 0) + 4.25 * (r.ip || 0), o = pool[r.pid];
+    if (!o || use > o._use) pool[r.pid] = Object.assign({ _use: use, _team: t, _g: topGroup(r) }, r);
+  }));
+  const all = Object.keys(pool).map(p => pool[p]);
+  const pctOf = (list, x) => {
+    const n = list.length, below = list.filter(y => y.war < x.war).length, same = list.filter(y => y.war === x.war).length;
+    return { pct: n > 1 ? Math.round(100 * (below + (same - 1) / 2) / (n - 1)) : 50, rank: list.filter(y => y.war > x.war).length + 1, n: n };
+  };
+  const byG = {};
+  all.forEach(r => { (byG[r._g] = byG[r._g] || []).push(r); });
+  const mine = rosterRows(T[tid] || {}).filter(r => pool[r.pid] && pool[r.pid]._team === String(tid)).map(r => pool[r.pid]);
+  const gl = {}; TOP_GROUPS.forEach(g => { gl[g[0]] = g; });
+  const row = (r, list, peer) => Object.assign({ name: r.name || k.name(r.pid), pos: r.pos, value: k.signed(r.war, 1) + ' WAR', peer: peer,
+    href: r.kind === 'pitcher' || r._g === 'SP' || r._g === 'RP' ? k.pitcherHref(L, r.pid, S) : k.hitterHref(L, r.pid, S) }, pctOf(list, r));
+  const best = mine.slice().sort((a, b) => b.war - a.war);
+  QKL.performers(host, {
+    kicker: 'Top performers', title: 'Who carries them, and how they compare',
+    sub: 'The club’s best players by WAR, overall and at each position, against every qualified player in ' + k.LN(L) + '.',
+    metric: { label: 'WAR', unit: 'wins above replacement this season', model: 'WAR' },
+    overall: best.slice(0, 4).map(r => row(r, all, 'qualified players')),
+    groups: TOP_GROUPS.map(g => ({ label: g[1], rows: best.filter(r => r._g === g[0]).slice(0, 2).map(r => row(r, byG[g[0]] || [], g[2])) })),
+    note: 'Qualified: 200 plate appearances, 300 batters faced for a starter and 120 for a reliever (the spec’s minimums' + (games < 162 ? ', prorated to ' + games + ' games' : '') + '; batters faced estimated from innings). The box is the league percentile at the position by WAR, the rank counts the same players; a traded player counts for the club where he played most. Positions follow each player’s main position on the roster.',
+    empty: 'Nobody on the roster has reached the playing-time minimums yet.'
+  });
+}
+
 /* Lineup and rotation from the team's roster rows (teams.json): no catalogue needed. */
 function lineupLite(L, S, t) {
   const k = K();

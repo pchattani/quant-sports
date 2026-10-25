@@ -318,3 +318,18 @@ a.cc-bt:hover .nm { color: var(--accent); }
 /* round 5: our model metrics (the cobalt tag and explain strip) */
 .cc-lab-ours { margin-top: 12px; }
 .cc-ours { margin-top: 12px; }
+
+/* team page: top performers (cc-teams.js topPerformers) */
+.cc-tp { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.cc-tp-row { display: grid; grid-template-columns: minmax(0, 1fr) 52px minmax(90px, 160px) 40px 110px; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--line-1); }
+.cc-tp-who { display: flex; flex-direction: column; min-width: 0; }
+.cc-tp-who a { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cc-tp-who small { color: var(--ink-3); font-size: var(--fs-2xs); }
+.cc-tp-v { text-align: right; font-weight: 700; }
+.cc-tp-rank { font: 600 var(--fs-2xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-2); text-align: right; }
+.cc-tp-pos { margin-top: 8px; font: 700 var(--fs-2xs)/1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; color: var(--volt); }
+@media (max-width: 720px) {
+  .cc-tp-row { grid-template-columns: minmax(0, 1fr) 44px 40px; }
+  .cc-tp-row .qk-segs { display: none; }
+  .cc-tp-rank { grid-column: 1 / -1; text-align: left; }
+}
