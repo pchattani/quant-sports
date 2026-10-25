@@ -385,8 +385,9 @@ def value_current(b: Build, ctx, cat, prev_cat, teams_payload, season_payload, r
 
 
 def layers_current(b: Build, ctx, cat, prev_cat, res: dict, refresh: bool) -> None:
-    """valuation.json (valuation v2), transactions.json and deals.json (trade ratings) and fantasy.json for the current
-    season (analytics/valuation.py, moves.py, fantasy.py); each isolated, each written {"ok": false} on failure."""
+    """valuation.json (valuation v2), transactions.json, deals.json (trade ratings) and picks.json (draft-pick values for
+    the trade simulator) and fantasy.json for the current season (analytics/valuation.py, moves.py, picks.py,
+    fantasy.py); each isolated, each written {"ok": false} on failure."""
     from oddsmarkets.basketball.analytics import fantasy as FN
     from oddsmarkets.basketball.analytics import moves as MV
     from oddsmarkets.basketball.analytics import valuation as VV
@@ -396,7 +397,7 @@ def layers_current(b: Build, ctx, cat, prev_cat, res: dict, refresh: bool) -> No
     val = b.write_or_fail(d + "valuation.json", f"valuation {league} {season}", lambda: VV.build(
         ctx, cat, prev_cat, res["proj"], res["prm"], res["games_left"], res["injuries"], fit), league=league, season=season)
     mv = b.step(f"moves {league} {season}", lambda: MV.build(ctx, val if (val or {}).get("ok") else None, res["prm"], fit, refresh=refresh))
-    for name in ("transactions", "deals"):
+    for name in ("transactions", "deals", "picks"):
         payload = (mv or {}).get(name) or {"ok": False, "reason": f"{name} could not be built (see the build log)", "league": league, "season": season}
         b.step(f"write {d}{name}.json", lambda: b.write(f"{d}{name}.json", payload))
     if mv:

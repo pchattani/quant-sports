@@ -1080,8 +1080,8 @@ FB.moves = {
       FB.kpi('Expected arrivals', num(mv.in_total, 1), { sub: BASE_TAG + ' players', tip: tipIn })
     ], 'fb-mv-kpis') +
       '<div class="qk-table-wrap fb-mt"><table class="qk-table dense"><thead><tr><th>Unit</th><th class="num">Expected out</th><th class="num">Expected in</th><th class="num" data-tip="The chance of adding at least one player there">Chance of adding</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
-    var ts = mv.targets || [];
-    el.innerHTML = FB.secHead('Who moves next: ' + esc(mv.horizon || ''), 'Our outlook for the window: who is likely to leave, what the club usually brings in, and the players it could sign. Departures and arrivals are base rates; how and where players move, and the shortlist, are models that passed their test on last summer\'s window.', '', 'Movement') +
+    var ts = [];     // no potential signings on the club page (user, 25 Oct 2026); the payload keeps mv.targets
+    el.innerHTML = FB.secHead('Who moves next: ' + esc(mv.horizon || ''), 'Our outlook for the window: who is likely to leave and what the club usually brings in, by unit. Departures and arrivals are base rates from the last window of the same kind.', '', 'Movement') +
       FB.grid(
         FB.card('Outlook: ' + esc(mv.horizon || ''), 'Expected departures and arrivals by unit, with the chance of adding at least one player there.', outlook, { span: 5 }) +
         FB.card('Out and in by unit', 'Players expected to leave (left) and to arrive (right) this window.', FB.chartBox('mv-bf', 230, 'Expected departures and arrivals by unit'), { span: 7 })

@@ -279,9 +279,11 @@ MODEL = [
      "hindsight: the last completed season's HPM aged and shrunk, minutes before the date), realised since (that season's HPM "
      "x the player's possessions for the new team after the date) and today's view (realised + today's projection of the window "
      "while the player is still there). Grade = share of the deal's value received: A >= 65 %, B >= 55 %, C 45-55 %, D >= 35 %, F."),
-    ("pick_curve", "Pick-value curve", "Moves", "Expected WAR of each draft slot over its first four seasons (each floored at "
-     "zero, discounted 0.9), from our value of every pick ESPN lists (a pick who never played counts zero), made "
-     "non-increasing and smoothed. Future picks of unknown slot count their round's mean; swaps and considerations zero."),
+    ("pick_curve", "Pick-value curve", "Moves", "Expected WAR of each draft slot over the drafted player's first four seasons "
+     "(each floored at zero, discounted 0.9), from our value of every pick of the 1996-2022 NBA drafts (WNBA 2018-2023; a pick "
+     "who never played counts zero), kernel-smoothed and made non-increasing, with a bootstrap band; validated walk-forward on "
+     "the 2011-2022 drafts. A traded pick is the curve over its original owner's projected slot (the season simulation this "
+     "season, a regression of win % beyond), with stated protections, conditions and swaps; once used, the player it became."),
     ("fantasy_projection", "Fantasy projection", "Fantasy", "Per game: per-minute rates (impact model) x depth-chart minutes "
      "(injury report applied, usage redistributed while teammates are out) x opponent pace and category defence x rest "
      "factors, blended 50/50 (from 20 games) with the season-to-date line; rest of season and weeks sum the schedule "

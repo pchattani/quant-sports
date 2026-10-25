@@ -375,6 +375,12 @@ def test_playin_and_bracket_on_completed_season():
     assert tot == pytest.approx({"p_title": 1.0, "p_playoffs": 16.0, "p_playin": 8.0})
     lp = np.array([v["p_lottery_pick"] for v in out["teams"].values()])
     assert np.allclose(lp.sum(0), 1.0)
+    # the whole first round and the record order: each team gets one pick, each pick one team (analytics/picks.py)
+    P = np.array([v["p_draft_pick"] for v in out["teams"].values()])
+    R = np.array([v["p_record_rank"] for v in out["teams"].values()])
+    assert P.shape == (30, 30) and np.allclose(P.sum(1), 1.0, atol=1e-3) and np.allclose(P.sum(0), 1.0, atol=1e-3)
+    assert np.allclose(R.sum(1), 1.0, atol=1e-3) and np.allclose(R.sum(0), 1.0, atol=1e-3)
+    assert all(sum(v["p_draft_pick"][14:]) == pytest.approx(v["p_playoffs"], abs=1e-3) for v in out["teams"].values())
     json.dumps(out)
 
 

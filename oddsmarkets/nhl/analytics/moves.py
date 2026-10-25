@@ -38,7 +38,8 @@ transactions endpoint. Values are on-field model value (WAR), never contracts or
    unless the deal is graded C/C or minor. League table: net value (received - sent) by club over the 12 months.
 
 Pick-value curve (`pick_curve`): every pick of the 2010-2019 drafts (records.nhl.com), its discounted WAR over its
-first seven seasons (season k after the draft weighted 0.9^k, WAR floored at 0 a season and scaled to an 82-game
+first PICK_SEASONS (4) NHL seasons within the first PICK_WINDOW (7) after the draft (the players' four-season window;
+until Oct 2026 every one of the seven seasons counted, which favoured picks) (season k after the draft weighted 0.9^k, WAR floored at 0 a season and scaled to an 82-game
 season; picks who never played count 0), averaged by overall pick, made non-increasing (pool adjacent violators) and
 fitted with v(p) = a (p + b)^-c (weighted least squares on the slot means). Cached on the drafts and value payloads.
 """
@@ -66,7 +67,8 @@ DEAL_DAYS = 1
 MINOR_WAR = 0.25
 GRADES = ((0.65, "A"), (0.55, "B"), (0.45, "C"), (0.35, "D"), (-1.0, "F"))
 PICK_DRAFTS = tuple(range(2010, 2020))
-PICK_SEASONS = 7
+PICK_SEASONS = 4                 # NHL seasons counted: the players' four-season window (valuation v2)
+PICK_WINDOW = 7                  # ... within the first seven seasons after the draft (prospects arrive late)
 DISCOUNT = 0.9
 TYPES = {"trade": "Trade", "signing": "Signing", "claim": "Waiver claim", "waivers": "Waivers", "release": "Release",
          "recall": "Recall / assignment", "ir": "Injured reserve", "other": "Other"}
@@ -653,7 +655,7 @@ def pick_values(drafts: dict[int, dict], vr: dict[int, dict]) -> list[tuple[int,
         d = drafts.get(y)
         if not d:
             continue
-        if an.season_id(y + PICK_SEASONS - 1) > last or an.season_id(y + PICK_SEASONS - 1) not in vr:
+        if an.season_id(y + PICK_WINDOW - 1) > last or an.season_id(y + PICK_WINDOW - 1) not in vr:
             continue
         cols = d.get("cols") or []
         for r in d.get("rows") or []:
@@ -662,7 +664,15 @@ def pick_values(drafts: dict[int, dict], vr: dict[int, dict]) -> list[tuple[int,
             if not ov:
                 continue
             pid = str(rec.get("pid") or "")
-            v = sum(DISCOUNT ** k * war.get((an.season_id(y + k), pid), 0.0) for k in range(PICK_SEASONS)) if pid else 0.0
+            v = 0.0
+            used = 0
+            for k in range(PICK_WINDOW):
+                if not pid or used >= PICK_SEASONS:
+                    break
+                key = (an.season_id(y + k), pid)
+                if key in war:                      # a season he played in the NHL: one of his four
+                    v += DISCOUNT ** k * war[key]
+                    used += 1
             out.append((y, ov, int(rec.get("round") or 0), v))
     return out
 
@@ -722,7 +732,7 @@ def pick_curve(drafts: dict[int, dict], vr: dict[int, dict]) -> dict:
              "raw": [[int(x), round(float(v), 3), int(n)] for x, v, n in zip(xs_m, y_m, w_m)],
              "round_avg": round_avg, "round_empirical": emp_round, "r2_slots": round(1 - ss_res / max(ss_tot, 1e-12), 3),
              "r2_bins": round(r2b, 3), "n_picks": len(pv), "drafts": sorted({y for y, *_ in pv}),
-             "seasons": PICK_SEASONS, "discount": DISCOUNT}
+             "seasons": PICK_SEASONS, "window": PICK_WINDOW, "discount": DISCOUNT}
     try:
         an.write_json(p, {"key": key, "curve": curve})
     except OSError:

@@ -166,7 +166,7 @@ function pickCurve(dl) {
   const raw = dl.pick_raw || [];
   k.plot('mv-pc', [{ type: 'scatter', mode: 'markers', x: raw.map(r => r[0]), y: raw.map(r => r[1]), marker: { size: 4, color: 'rgba(139,148,158,0.6)' }, name: 'Mean of the slot', hovertemplate: 'No. %{x}: %{y:.2f} WAR<extra></extra>' },
     { type: 'scatter', mode: 'lines', x: pc.points.map(p => p[0]), y: pc.points.map(p => p[1]), line: { color: k.ACC, width: 2.5 }, name: 'Fitted curve', hovertemplate: 'No. %{x}: %{y:.2f} WAR<extra></extra>' }],
-  k.layout(Object.assign({ margin: { l: 52, r: 12, t: 10, b: 44 }, xaxis: { title: { text: 'Overall pick' } }, yaxis: { title: { text: 'Discounted WAR, first 7 seasons' }, rangemode: 'tozero' } }, k.legendTop())));
+  k.layout(Object.assign({ margin: { l: 52, r: 12, t: 10, b: 44 }, xaxis: { title: { text: 'Overall pick' } }, yaxis: { title: { text: 'Discounted WAR, first 4 NHL seasons' }, rangemode: 'tozero' } }, k.legendTop())));
   const emp = pc.round_empirical || {};
   document.getElementById('mv-pc-t').innerHTML = k.table([{ label: 'Round' }, { label: 'Curve avg', align: 'right', title: 'Fitted curve averaged over the round (slots 32 a round)' }, { label: 'Observed', align: 'right' }, { label: 'Played', align: 'right', title: 'Share of picks with any positive WAR' }, { label: 'Picks', align: 'right' }],
     [1, 2, 3, 4, 5, 6, 7].map(r => { const e = emp[String(r)] || []; return [ORD[r], { v: (pc.round_avg || {})[String(r)], html: k.num((pc.round_avg || {})[String(r)], 2) }, { v: e[0], html: k.num(e[0], 2) }, { v: e[2], html: k.pct(e[2], 0) }, e[1]]; }), { compact: true }) +

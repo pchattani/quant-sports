@@ -93,7 +93,7 @@ MODEL = [
      "C 45-55 %, D >= 35 %, F below; 'minor' when the deal moved under 0.25 WAR. Graded at the time (valuation as of the trade "
      "date, no hindsight) and now (realised since + what is still projected in the original window)."),
     ("pick_value", "Pick-value curve", "Moves", "What a draft slot is worth: the mean discounted WAR of each overall pick over its first "
-     "seven seasons (2010-2019 drafts, picks who never played count zero), fitted with a smooth decreasing curve; future picks of "
+     "four NHL seasons within seven of the draft (2010-2019 drafts, picks who never played count zero), fitted with a smooth decreasing curve; future picks of "
      "unknown slot are valued at the round's average, discounted by the seasons until the draft."),
     ("realised_value", "Realised value", "Moves", "Since a trade: the player's GAR per 60 that season x the player's minutes for the new club "
      "after the trade date / goals per win."),

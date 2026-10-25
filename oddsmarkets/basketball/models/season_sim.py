@@ -58,7 +58,10 @@ Lottery (NBA)
 The 14 non-playoff teams in reverse order of win % (ties drawn at random) take the slots of the
 lottery table (combinations of 1000 for the #1 pick); picks 1-4 are drawn without replacement
 in proportion to combinations, the rest go in slot order. Exact slot-to-pick probabilities are
-enumerated once; pick trades and protections are not modelled (the pick is the team's own).
+enumerated once; pick trades and protections are not modelled (the pick is the team's own). `p_draft_pick` is the
+whole first round (the lottery, then the playoff teams in reverse order of win %) and `p_record_rank` the rank by win
+% (worst first: the second round's order), both with a fixed tie-break so no random draws are added
+(analytics/picks.py values traded picks from them).
 
 Odds conditional on the next game
 --------------------------------
@@ -600,6 +603,9 @@ def simulate(league: str, season: int, n: int = 20000, seed: int = 0, state: dic
     reach = np.zeros((len(series), T))
     win_hist = np.zeros((T, f.games + 1))
     lot = np.zeros((T, len(lottery))) if lottery else None
+    late = np.zeros((T, T))                  # NBA: picks after the lottery (playoff teams, reverse order of win %)
+    rec_rank = np.zeros((T, T))              # rank by win %, worst first (second-round order; WNBA draft order)
+    tie = np.arange(T)[None, :] * 1e-9       # a fixed tie-break (no extra random draws: the other outputs are unchanged)
     nx = {t: {"n_win": 0.0, "n": 0.0, "win": np.zeros(5), "loss": np.zeros(5)} for t in next_col}
     pair_n = [dict() for _ in series]
     rng = np.random.default_rng(seed)
@@ -733,6 +739,11 @@ def simulate(league: str, season: int, n: int = 20000, seed: int = 0, state: dic
             nl = min(len(lottery), int(non.sum(1).min()))
             lo = lo[:, :nl]
             np.add.at(lot, lo.ravel(), np.tile(LM[:nl, :], (S, 1)))
+            nm = int(made.sum(1).min())
+            po = np.argsort(np.where(made, pct + tie, 9.0), axis=1)[:, :nm]
+            np.add.at(late, (po.ravel(), np.tile(np.arange(nm), S)), 1.0)
+        order_all = np.argsort(pct + tie, axis=1)
+        np.add.at(rec_rank, (order_all.ravel(), np.tile(np.arange(T), S)), 1.0)
         # conditional on the next game. Sims where the team won its next game over-represent draws in
         # which it is strong (z, U), so raw conditioning mixes the game's effect with selection on the
         # team's rating. Each sim is reweighted by 1 / P(this result | its draws) so that, within the
@@ -812,6 +823,9 @@ def simulate(league: str, season: int, n: int = 20000, seed: int = 0, state: dic
             "p_title": float(acc["title"][i] / nsim), "p_div": float(acc["div"][i] / nsim) if league == "nba" else None,
             "p_reach": {rounds[r]: float(reach[r][i] / nsim) for r in range(len(series))},
             "p_lottery_pick": [float(x) for x in lot[i] / nsim] if lot is not None else None,
+            "p_draft_pick": ([round(float(x), 5) for x in np.concatenate([lot[i], late[i, :T - len(lottery)]]) / nsim]
+                             if lot is not None else None),
+            "p_record_rank": [round(float(x), 5) for x in rec_rank[i] / nsim],
             "magic": mg[i]["magic"], "tragic": mg[i]["tragic"], "clinched": mg[i]["clinched"],
             "eliminated": mg[i]["eliminated"],
             "win_dist": [round(float(x), 5) for x in wh[i]],

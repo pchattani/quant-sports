@@ -15,10 +15,12 @@ claim, contract, injury list, G League assignment, discipline, staff, other). In
 from X in exchange for ...", "Traded ... to X for ...") the player mentions (a position tag such as G, F, C, G/F,
 Gs, Fs followed by a name, or a further name after "and" / "," that matches a known player) before the exchange
 marker are incoming, those after it outgoing; draft picks ("a 2027 second-round pick", "two second-round picks",
-"the 22nd overall pick", "a 2028 first and second-round pick", "2nd round picks in 2027 and 2030") likewise; swaps,
-"draft considerations" and cash are noted and valued at zero. Names are matched to ESPN ids from the stores
-(accents, apostrophes and suffixes normalised; a close match by edit similarity of at least NAME_CUTOFF when the
-team context agrees); names that do not match are listed, never guessed.
+"the 22nd overall pick", "a 2028 first and second-round pick", "2nd round picks in 2027 and 2030", "a 2030 pick
+swap") likewise, with protections ("top-10 protected", "lottery-protected", "unprotected"), "conditional" and the
+pick's original owner ("originally belonging to the Phoenix Suns", "Chicago's 2026 first-round pick", "via X") where
+the text states them; "draft considerations" and cash are noted and valued at zero. Names are matched to ESPN ids from
+the stores (accents, apostrophes and suffixes normalised; a close match by edit similarity of at least NAME_CUTOFF
+when the team context agrees); names that do not match are listed, never guessed.
 
 Deals
 -----
@@ -33,23 +35,29 @@ value at the time  each incoming player's four-season value AS OF the trade date
                    the last completed season's HPM before the trade plus the fitted ageing step, shrunk towards
                    replacement with PRIOR_SHRINK_MIN pseudo-minutes; minutes a game from his games before the date
                    (half-life 12 games); the receiving team's games left that season; availability and survival as in
-                   valuation v2. Draft picks: the pick-value curve (below) discounted 0.9 per season until the pick
-                   first plays.
+                   valuation v2. A player with no completed season before the trade and a recent draft slot (a
+                   rookie, draft rights) starts from his slot's curve value, blended with the model as he plays
+                   (picks.ROOKIE_INFO_MIN minutes). Draft picks (analytics/picks.py): the curve over the owner's slot
+                   distribution from the standings of the last season completed before the trade, protections,
+                   swaps and conditions as stated, discounted 0.9 a season until the pick first plays. A known slot
+                   that names a drafted player in the same side ("draft rights to X, the 10th overall pick") is the
+                   player, not a second asset.
 realised since     for each incoming player, the sum over his games for the new team after the date of
                    (that season's HPM - replacement) x his possessions / 100 / points per win, weighted 0.9^k by the
                    season (k seasons after the trade's season), so it is on the same footing.
 current view       realised since + today's projection (valuation v2) of the seasons left in the trade's four-season
-                   window while the player is still on that team; picks stay at their curve value.
+                   window while the player is still on that team. A pick not yet used: today's slot distribution
+                   (the season simulation); a pick already used: the player it became for the team that holds it
+                   (realised plus projection, with the slot prior until he has played), else the curve at its slot.
 share and grade    share = value in / (value in + value out) on each basis (positive parts); A >= 0.65, B >= 0.55,
                    C 0.45-0.55, D >= 0.35, F below; a deal moving less than MINOR_WAR in total is "minor". The winner is
                    the side with the largest share; the league table sums each team's net (in - out).
 
 Pick-value curve
 ----------------
-For every draft ESPN lists (NBA 2003 on; WNBA where available) whose first four seasons are complete: each pick's
-WAR in seasons 1-4 after the draft (each season floored at zero, discounted 0.9^j), a pick who never played counting
-zero; the mean by overall pick, made non-increasing (pool-adjacent-violators, weighted by drafts) and smoothed
-over five picks. A future pick of unknown slot is its round's mean.
+analytics/picks.py: every reconstructable draft (NBA 1996-2022, WNBA 2018-2023), a pick's WAR over its first four
+seasons (each floored at zero, discounted 0.9^j; never played = 0), a kernel smoother made non-increasing, with a
+bootstrap band and a walk-forward validation on held-out drafts.
 """
 from __future__ import annotations
 
@@ -67,12 +75,13 @@ import numpy as np
 
 from oddsmarkets.basketball import analytics as an
 from oddsmarkets.basketball.analytics import bio as BIO
+from oddsmarkets.basketball.analytics import picks as PK
 from oddsmarkets.basketball.analytics import valuation as VV
 from oddsmarkets.basketball.analytics import value as VAL
 
 logger = logging.getLogger(__name__)
 
-VERSION = 1
+VERSION = 2
 TX_TTL_HOURS = 3.0
 WINDOW_DAYS = 365
 DEAL_DAYS = 3
@@ -80,8 +89,6 @@ NAME_CUTOFF = 0.84
 PRIOR_SHRINK_MIN = 250.0
 MINOR_WAR = 0.5
 GRADE_CUTS = ((0.65, "A"), (0.55, "B"), (0.45, "C"), (0.35, "D"), (-1.0, "F"))
-PICK_SEASONS = 4
-PICK_SMOOTH = 5
 
 TYPES = {"trade": "Trade", "sign": "Signing", "release": "Waived / released", "claim": "Waiver claim", "contract": "Contract",
          "injury": "Injury list", "assign": "G League / assignment", "discipline": "Discipline", "staff": "Staff", "other": "Other"}
@@ -384,58 +391,103 @@ def _trim_name(n: str) -> str:
     return " ".join(keep).strip().rstrip(",")
 
 
+MOD = r"(?:(?:future|unprotected|conditional|lottery[- ]protected|top[- ]\d{1,2}[- ]protected|protected)\s+)*"
+RND = r"(first|second|third|1st|2nd|3rd)"
 PICK_RE = [
-    # "a 2027 second-round pick", "two second-round draft picks", "a 2028 first and second-round pick", "four second-round picks"
-    re.compile(r"\b(a|an|one|two|three|four|five|six|both|\d)\s+(?:future\s+)?(?:(\d{4,5})\s+)?(first|second|1st|2nd)"
-               r"(?:\s*(?:-|\s)?\s*(?:and|&)\s+(first|second|1st|2nd))?[- ]round(?:\s+draft)?\s+picks?(?:\s+in\s+the\s+(\d{4,5})(?:\s+\w+)?\s+draft)?(\s+swap)?", re.I),
+    # "a 2027 second-round pick", "two second-round draft picks", "a 2028 first and second-round pick", "an unprotected
+    # 2031 first-round draft pick", "a 2030 conditional second-round draft pick", "Chicago's 2026 first-round pick"
+    re.compile(r"\b(?:(a|an|one|two|three|four|five|six|both|\d)\s+)?" + MOD + r"(?:(\d{4,5})\s+)?" + MOD + RND +
+               r"(?:\s*(?:-|\s)?\s*(?:and|&)\s+" + RND + r")?[- ]round(?:\s+draft)?\s+picks?(?:\s+in\s+the\s+(\d{4,5})(?:\s+\w+)?\s+draft)?(\s+swap)?", re.I),
     # "2nd round picks in 2027 and 2030"
-    re.compile(r"\b(first|second|1st|2nd)[- ]round\s+picks?\s+in\s+(\d{4})(?:\s*(?:,|and)\s*(\d{4}))?(?:\s*(?:,|and)\s*(\d{4}))?", re.I),
-    # "the 22nd overall pick", "a No. 29 pick in the 2025 draft", "the 10th overall pick in the 2025 draft"
-    re.compile(r"\b(?:the|a)\s+(?:No\.\s*)?(\d{1,2})(?:st|nd|rd|th)?\s+(?:overall\s+)?(?:draft\s+)?pick(?:\s+in\s+the\s+(\d{4})\s+draft)?", re.I),
-    # "a second-round pick swap", "first-round pick swap"
-    re.compile(r"\b(first|second|1st|2nd)[- ]round\s+(?:draft\s+)?pick\s+swap", re.I),
+    re.compile(r"\b(first|second|third|1st|2nd|3rd)[- ]round\s+picks?\s+in\s+(\d{4})(?:\s*(?:,|and)\s*(\d{4}))?(?:\s*(?:,|and)\s*(\d{4}))?", re.I),
+    # "the 22nd overall pick", "a No. 29 pick in the 2025 draft", "the 10th overall pick in the 2025 draft", "the 2025 No. 11 pick"
+    re.compile(r"\b(?:the|a)\s+(?:(\d{4})\s+)?(?:No\.\s*)?(\d{1,2})(?:st|nd|rd|th)?\s+(?:overall\s+)?(?:draft\s+)?pick(?:\s+in\s+the\s+(\d{4})\s+draft)?", re.I),
+    # "a second-round pick swap", "first-round pick swap in the 2026 draft", "a 2030 pick swap"
+    re.compile(r"\b(?:(\d{4})\s+)?(?:(first|second|1st|2nd)[- ]round\s+)?(?:draft\s+)?pick\s+swap(?:\s+in\s+the\s+(\d{4})\s+draft)?", re.I),
 ]
+PROTECT_RE = re.compile(r"\b(?:top[- ](\d{1,2})[- ]protected|(lottery)[- ]protected|(unprotected))\b", re.I)
+ORIGIN_RE = re.compile(r"^\W*(?:\(\s*)?(?:originally\s+(?:belonging\s+to|owned\s+by|from)|via|belonging\s+to|owned\s+by)\s+(?:the\s+)?", re.I)
 
 
 def picks_in(s: str, default_year: int | None = None) -> list[dict]:
-    """[{"pos", "year", "round", "overall", "n", "swap"}] for the draft picks mentioned in a sentence."""
+    """[{"pos", "end", "year", "round", "overall", "n", "swap", "protect", "cond"}] for the draft picks mentioned in a
+    sentence. protect: N for "top-N protected" ("lottery-protected" -> "lottery"), 0 for "unprotected", None when the
+    text says nothing; cond: "conditional" is in the phrase."""
     out = []
     used: list[tuple[int, int]] = []
 
     def free(a, b):
         return all(b <= x or a >= y for x, y in used)
 
+    def extra(a, b):
+        seg = s[a:min(len(s), b + 40)]
+        nxt = re.search(r"\b(?:and|for|from|in exchange)\b", s[b:b + 40], re.I)
+        if nxt:
+            seg = s[a:b + nxt.start()]
+        m = PROTECT_RE.search(seg)
+        prot = None
+        if m:
+            prot = int(m.group(1)) if m.group(1) else ("lottery" if m.group(2) else 0)
+        return prot, bool(re.search(r"\bconditional\b", seg, re.I))
+
     for m in PICK_RE[3].finditer(s):
         used.append((m.start(), m.end()))
-        out.append({"pos": m.start(), "year": None, "round": ROUND_WORDS[m.group(1).lower()], "overall": None, "n": 1, "swap": True})
-    for m in PICK_RE[0].finditer(s):
-        if not free(m.start(), m.end()):
-            continue
-        used.append((m.start(), m.end()))
-        n = NUM_WORDS.get(m.group(1).lower(), None)
-        if n is None:
-            n = int(m.group(1)) if m.group(1).isdigit() else 1
-        yr = m.group(2) or m.group(5)
-        year = _year(yr)
-        swap = bool(m.group(6))
-        rounds = [ROUND_WORDS[m.group(3).lower()]] + ([ROUND_WORDS[m.group(4).lower()]] if m.group(4) else [])
-        for rd in rounds:
-            out.append({"pos": m.start(), "year": year, "round": rd, "overall": None, "n": n, "swap": swap})
+        rd = ROUND_WORDS[m.group(2).lower()] if m.group(2) else 1
+        prot, cond = extra(m.start(), m.end())
+        out.append({"pos": m.start(), "end": m.end(), "year": _year(m.group(1) or m.group(3)), "round": rd, "overall": None, "n": 1,
+                    "swap": True, "protect": prot, "cond": cond, "round_stated": bool(m.group(2))})
     for m in PICK_RE[1].finditer(s):
         if not free(m.start(), m.end()):
             continue
         used.append((m.start(), m.end()))
         rd = ROUND_WORDS[m.group(1).lower()]
+        prot, cond = extra(m.start(), m.end())
         for g in (m.group(2), m.group(3), m.group(4)):
             if g:
-                out.append({"pos": m.start(), "year": int(g), "round": rd, "overall": None, "n": 1, "swap": False})
+                out.append({"pos": m.start(), "end": m.end(), "year": int(g), "round": rd, "overall": None, "n": 1, "swap": False,
+                            "protect": prot, "cond": cond})
+    for m in PICK_RE[0].finditer(s):
+        if not free(m.start(), m.end()):
+            continue
+        used.append((m.start(), m.end()))
+        c = m.group(1)
+        n = NUM_WORDS.get(c.lower(), None) if c else 1
+        if n is None:
+            n = int(c) if c.isdigit() else 1
+        year = _year(m.group(2) or m.group(5))
+        swap = bool(m.group(6))
+        prot, cond = extra(m.start(), m.end())
+        rounds = [ROUND_WORDS[m.group(3).lower()]] + ([ROUND_WORDS[m.group(4).lower()]] if m.group(4) else [])
+        for rd in rounds:
+            out.append({"pos": m.start(), "end": m.end(), "year": year, "round": rd, "overall": None, "n": n, "swap": swap,
+                        "protect": prot, "cond": cond})
     for m in PICK_RE[2].finditer(s):
         if not free(m.start(), m.end()):
             continue
         used.append((m.start(), m.end()))
-        ov = int(m.group(1))
-        out.append({"pos": m.start(), "year": _year(m.group(2)), "round": None, "overall": ov, "n": 1, "swap": False})
+        ov = int(m.group(2))
+        out.append({"pos": m.start(), "end": m.end(), "year": _year(m.group(1) or m.group(3)), "round": None, "overall": ov, "n": 1,
+                    "swap": False, "protect": None, "cond": False})
     return sorted(out, key=lambda p: p["pos"])
+
+
+def pick_origin(s: str, pk: dict, teams: "TeamIndex", nxt: int | None = None) -> str | None:
+    """The team whose pick it is when the text says so: "originally belonging to the Phoenix Suns", "(via Detroit)"
+    after the pick, or a possessive just before it ("Chicago's 2026 first-round pick")."""
+    tail_end = min(len(s), nxt if nxt is not None else len(s), pk["end"] + 70)
+    tail = s[pk["end"]:tail_end]
+    m = ORIGIN_RE.match(tail)
+    if m:
+        hits = teams.find(tail[m.end():m.end() + 40])
+        if hits and hits[0][0] <= 2:
+            return hits[0][2]
+    head = s[max(0, pk["pos"] - 40):pk["pos"]]
+    mm = re.search(r"([A-Za-z.\s]+?)['’]s\s*$", head)
+    if mm:
+        hits = teams.find(mm.group(1))
+        if hits:
+            return hits[-1][2]
+    return None
 
 
 def _year(s: str | None) -> int | None:
@@ -490,9 +542,13 @@ def parse_row(row: dict, names: NameIndex, teams: TeamIndex) -> dict:
                 if hint and hint != team:
                     info["hint"][pid] = hint
         if typ == "trade":
-            for pk in picks_in(s):
+            pks = picks_in(s)
+            for i_pk, pk in enumerate(pks):
                 incoming = (pk["pos"] < cut) != flip
-                info["picks_in" if incoming else "picks_out"].append({k: pk[k] for k in ("year", "round", "overall", "n", "swap")})
+                nxt = pks[i_pk + 1]["pos"] if i_pk + 1 < len(pks) else None
+                rec = {k: pk.get(k) for k in ("year", "round", "overall", "n", "swap", "protect", "cond")}
+                rec["origin"] = pick_origin(s, pk, teams, nxt)
+                info["picks_in" if incoming else "picks_out"].append(rec)
             for z in ("draft consideration", "cash consideration", "future consideration", "cash"):
                 if z in s.lower() and z not in info["zero"]:
                     info["zero"].append(z)
@@ -632,86 +688,110 @@ def build_deals(parsed: list[dict], names: NameIndex) -> list[dict]:
     return deals
 
 
-# ---------------------------------------------------------------------------------------------- pick-value curve
+# ---------------------------------------------------------------------------------------------- picks
 
-def _pava_decreasing(y: list[float], w: list[float]) -> list[float]:
-    blocks = [[v, wt, 1] for v, wt in zip(y, w)]
-    i = 0
-    while i < len(blocks) - 1:
-        if blocks[i][0] < blocks[i + 1][0]:
-            a, b = blocks[i], blocks[i + 1]
-            wt = a[1] + b[1]
-            blocks[i] = [(a[0] * a[1] + b[0] * b[1]) / wt if wt else (a[0] + b[0]) / 2, wt, a[2] + b[2]]
-            del blocks[i + 1]
-            i = max(0, i - 1)
-        else:
-            i += 1
-    out = []
-    for v, _w, n in blocks:
-        out.extend([v] * n)
-    return out
+def draft_held_before(league: str, d: str) -> int:
+    """The latest draft held on or before a date (NBA late June, WNBA mid April)."""
+    dd = date.fromisoformat(d[:10])
+    cut = (4, 15) if str(league).lower() == "wnba" else (6, 24)
+    return dd.year if (dd.month, dd.day) >= cut else dd.year - 1
 
 
-def pick_curve(league: str, war_by: dict[int, dict[str, float]], last_complete: int) -> dict:
-    """{"picks": [[overall, value]], "rounds": {round: mean}, "n_drafts", "years", "per_pick_n"} (value in WAR over the
-    first PICK_SEASONS seasons after the draft, each floored at zero, discounted 0.9^j)."""
-    dr = BIO.drafts(league)
-    years = [y for y in sorted(dr) if y + PICK_SEASONS <= last_complete and dr[y] and (y + 1) in war_by]
-    by_pick: dict[int, list[float]] = {}
-    rounds: dict[int, int] = {}
-    for y in years:
-        for ov, rd, _pk, _t, aid, _nm, _tr in dr[y]:
-            if not ov:
-                continue
-            v = 0.0
-            for j in range(PICK_SEASONS):
-                w = (war_by.get(y + 1 + j) or {}).get(str(aid or ""))
-                v += (VV.DISCOUNT ** j) * max(0.0, w or 0.0)
-            by_pick.setdefault(int(ov), []).append(v)
-            if rd:
-                rounds[int(ov)] = int(rd)
-    if not by_pick:
-        return {"picks": [], "rounds": {}, "n_drafts": 0, "years": None}
-    ovs = sorted(by_pick)
-    means = [float(np.mean(by_pick[o])) for o in ovs]
-    ws = [float(len(by_pick[o])) for o in ovs]
-    mono = _pava_decreasing(means, ws)
-    h = PICK_SMOOTH // 2
-    sm = [float(np.average(mono[max(0, i - h): i + h + 1], weights=ws[max(0, i - h): i + h + 1])) for i in range(len(mono))]
-    sm = _pava_decreasing(sm, ws)
-    picks = [[o, round(v, 3)] for o, v in zip(ovs, sm)]
-    rmeans: dict[int, list[float]] = {}
-    for o, v in zip(ovs, sm):
-        rmeans.setdefault(rounds.get(o) or (1 if o <= 30 else 2), []).append(v)
-    return {"picks": picks, "raw": [[o, round(m, 3), int(n)] for o, m, n in zip(ovs, means, ws)],
-            "rounds": {str(k): round(float(np.mean(v)), 3) for k, v in sorted(rmeans.items())}, "n_drafts": len(years),
-            "years": [years[0], years[-1]] if years else None, "seasons": PICK_SEASONS}
+def _protect(league: str, v) -> int | None:
+    if v == "lottery":
+        return PK.LOTTERY_PROTECT[PK._lg(league)]
+    return int(v) if v else None
 
 
-def pick_value(curve: dict, p: dict, trade_season: int) -> tuple[float, str]:
-    """(value at the trade, label) of one parsed pick: swaps and unknown rounds are worth zero."""
-    if p.get("swap"):
-        return 0.0, "swap (valued at zero)"
-    pk = {int(o): v for o, v in (curve.get("picks") or [])}
-    if not pk:
-        return 0.0, "no pick-value curve"
+def pick_label(p: dict) -> str:
     if p.get("overall"):
-        v = pk.get(int(p["overall"]))
-        if v is None:
-            v = min(pk.values())
-        lab = f"No. {p['overall']} pick"
-    elif p.get("round"):
-        v = (curve.get("rounds") or {}).get(str(p["round"]))
-        if v is None:
-            v = 0.0
-        lab = f"{p['round']}{'st' if p['round'] == 1 else 'nd' if p['round'] == 2 else 'rd'}-round pick"
+        return f"No. {p['overall']} pick" + (f" ({p['year']})" if p.get("year") else "")
+    rd = PK.ordinal(p.get("round") or 1)
+    yr = f"{p['year']} " if p.get("year") else "future "
+    lab = f"{yr}{rd}"
+    if p.get("swap"):
+        lab += " swap" if p.get("round_stated", True) else " swap (round not stated: 1st assumed)"
+    if p.get("protect") == 0:
+        lab += ", unprotected"
+    elif p.get("protect") == "lottery":
+        lab += ", lottery-protected"
+    elif p.get("protect"):
+        lab += f", top-{p['protect']} protected"
+    if p.get("cond"):
+        lab += ", conditional"
+    return lab
+
+
+def selection(league: str, hist: dict, year: int, rnd: int | None, holder: str | None, overall: int | None = None) -> tuple[int, str | None] | None:
+    """(overall, pid) of the player a used pick became: the slot when known, else the holder's one selection in that
+    round (the traded one when he made several); None when the draft is not held or the holder is ambiguous."""
+    h = (hist or {}).get(int(year)) if year else None
+    if not h or not h.get("listed"):
+        return None
+    if overall:
+        return int(overall), h["slots"].get(int(overall))
+    cands = [ov for ov, t in h["team"].items() if t == str(holder) and (rnd is None or h["round_of"].get(ov) == int(rnd))]
+    if len(cands) > 1:
+        tr = [ov for ov in cands if h["traded"].get(ov)]
+        cands = tr if len(tr) == 1 else cands
+    if len(cands) != 1:
+        return None
+    return cands[0], h["slots"].get(cands[0])
+
+
+def pick_item(league: str, p: dict, d: str, s_tr: int, pm: "PK.PickModel", ctx_data: dict, today: date,
+              player_fn=None) -> dict:
+    """One traded pick: value at the time (no hindsight) and today's view (see the module docstring)."""
+    n = int(p.get("n") or 1)
+    frm, to = p.get("from"), p.get("to")
+    origin = p.get("origin") or frm
+    prot = _protect(league, p.get("protect"))
+    cond = bool(p.get("cond"))
+    item = {"kind": "pick", "label": pick_label(p), "year": p.get("year"), "round": p.get("round"), "overall": p.get("overall"), "n": n,
+            "swap": bool(p.get("swap")), "via": origin if origin and origin != frm else None, "protect": p.get("protect"), "cond": cond,
+            "realised": 0.0}
+    if p.get("overall"):
+        year = p.get("year") or draft_held_before(league, d)
+        fs = PK.first_season(league, year)
+        v = PK.curve_at(pm.curve, int(p["overall"])) * (PK.DISCOUNT ** max(0, fs - s_tr)) * n
+        item.update({"year": year, "v_time": v, "v_now": v, "slot": [int(p["overall"])] * 2, "slot_now": [int(p["overall"])] * 2,
+                     "note": "known slot"})
+        sel = selection(league, ctx_data.get("draft_hist") or {}, year, None, to, int(p["overall"]))
     else:
-        return 0.0, "pick"
-    year = p.get("year") or trade_season + 1
-    first = int(year) + 1                                 # a June draft first plays the season ending the next year
-    k = max(0, first - int(trade_season))
-    lab = (f"{year} " if p.get("year") else "future ") + lab
-    return float(v) * (VV.DISCOUNT ** k) * int(p.get("n") or 1), lab
+        swap_with = to if p.get("swap") else None
+        org = frm if p.get("swap") else origin
+        at = pm.value(org, p.get("year"), p.get("round"), s_tr, basis="time", protect=prot, conditional=cond, swap_with=swap_with, n=n)
+        nw = pm.value(org, p.get("year"), p.get("round"), s_tr, basis="now", protect=prot, conditional=cond, swap_with=swap_with, n=n)
+        item.update({"year": at["year"], "v_time": at["v"], "v_now": nw["v"], "slot": at["slot"], "slot_now": nw["slot"], "note": nw["note"],
+                     "p_convey": nw.get("p_convey")})
+        sel = None
+        if not p.get("swap") and n == 1 and at["year"] <= max(BIO.drafts(league) or {0: 0}):
+            sel = selection(league, ctx_data.get("draft_hist") or {}, at["year"], p.get("round"), to)
+            if sel:
+                fs = PK.first_season(league, at["year"])
+                item["v_now"] = PK.curve_at(pm.curve, sel[0]) * (PK.DISCOUNT ** max(0, fs - s_tr))
+                item["slot_now"] = [sel[0], sel[0]]
+                item["note"] = "used: the curve at its slot"
+    item["remaining"] = item["v_now"]
+    if sel and sel[1] and player_fn is not None:
+        # the pick has been used: today's view is the player it became, for the team that holds it
+        dd = f"{int(item['year'])}-{'04-15' if str(league).lower() == 'wnba' else '06-26'}"
+        it = player_fn(sel[1], dd, to)
+        if it is not None:
+            item.update({"v_now": it["v_now"], "realised": it["realised"], "remaining": it["remaining"], "player": sel[1],
+                         "player_name": it.get("name"), "slot_now": [sel[0], sel[0]], "note": f"used: No. {sel[0]}"})
+    return item
+
+
+def _rookie_prior(league: str, pid: str, s_tr: int, curve: dict) -> tuple[float, int] | None:
+    """(slot curve value discounted to the trade's season, overall) for a player drafted within the last two drafts."""
+    ds = BIO.draft_slot(league, pid)
+    if not ds or not ds[0] or not ds[2]:
+        return None
+    fs = PK.first_season(league, int(ds[0]))
+    if fs < s_tr - 1:
+        return None
+    return PK.curve_at(curve, int(ds[2])) * (PK.DISCOUNT ** max(0, fs - s_tr)), int(ds[2])
 
 
 # ---------------------------------------------------------------------------------------------- per-player history
@@ -771,10 +851,11 @@ def grade(share: float | None, total: float) -> str | None:
     return "F"
 
 
-def rate_deals(league: str, deals: list[dict], ctx_data: dict, fit: dict, prm: dict, curve: dict, today: date) -> list[dict]:
+def rate_deals(league: str, deals: list[dict], ctx_data: dict, fit: dict, prm: dict, pm: "PK.PickModel", today: date) -> list[dict]:
     """Ratings for each deal (see the module docstring). ctx_data: {"rows": {season: {pid: value row}}, "box": DataFrame
     of player-games (seasons around the window, with team_poss / sec), "games_left": {season: {team: {date: left}}},
-    "valuation": {pid: today's valuation row dict}, "names": {pid: name}, "current": season, "roster": {pid: team}}."""
+    "valuation": {pid: today's valuation row dict}, "names": {pid: name}, "current": season, "roster": {pid: team},
+    "draft_hist": picks.history(...)}; pm: the pick model (analytics/picks.py)."""
     rows_by = ctx_data["rows"]
     box = ctx_data["box"]
     val_now = ctx_data.get("valuation") or {}
@@ -788,16 +869,24 @@ def rate_deals(league: str, deals: list[dict], ctx_data: dict, fit: dict, prm: d
         d = dl["date"]
         s_tr = season_of_date(league, d)
         sides = {t: {"team": t, "in": [], "out": []} for t in dl["teams"]}
+        slots_in: dict[str, set] = {}
         for pid, (frm, to) in dl["players"].items():
-            item = _player_item(league, pid, d, s_tr, to, rows_by, by_player.get(pid), fit, prm, ctx_data, val_now, roster, slot_seasons, names)
+            item = _player_item(league, pid, d, s_tr, to, rows_by, by_player.get(pid), fit, prm, ctx_data, val_now, roster, slot_seasons, names,
+                                pm.curve)
+            if item.get("draft_slot"):
+                slots_in.setdefault(to, set()).add(item["draft_slot"])
             if to in sides:
                 sides[to]["in"].append(item)
             if frm in sides:
                 sides[frm]["out"].append(item)
+
+        def player_fn(pid, dd, team):
+            return _player_item(league, pid, dd, s_tr, team, rows_by, by_player.get(pid), fit, prm, ctx_data, val_now, roster, slot_seasons,
+                                names, pm.curve)
         for p in dl["picks"]:
-            v, lab = pick_value(curve, p, s_tr)
-            item = {"kind": "pick", "label": lab, "year": p.get("year"), "round": p.get("round"), "overall": p.get("overall"), "n": p.get("n"),
-                    "swap": bool(p.get("swap")), "v_time": v, "realised": 0.0, "remaining": v, "v_now": v}
+            if p.get("overall") and int(p["overall"]) in (slots_in.get(p.get("to")) or set()):
+                continue                                 # "draft rights to X, the 10th overall pick": X is the asset
+            item = pick_item(league, p, d, s_tr, pm, ctx_data, today, player_fn)
             if p.get("to") in sides:
                 sides[p["to"]]["in"].append(item)
             if p.get("from") in sides:
@@ -827,7 +916,7 @@ def rate_deals(league: str, deals: list[dict], ctx_data: dict, fit: dict, prm: d
     return out
 
 
-def _player_item(league, pid, d, s_tr, to, rows_by, games, fit, prm, ctx_data, val_now, roster, slot_seasons, names) -> dict:
+def _player_item(league, pid, d, s_tr, to, rows_by, games, fit, prm, ctx_data, val_now, roster, slot_seasons, names, curve=None) -> dict:
     """One player's value at the trade (no hindsight), realised since and current view."""
     G = prm["G"]
     prev = None
@@ -863,6 +952,13 @@ def _player_item(league, pid, d, s_tr, to, rows_by, games, fit, prm, ctx_data, v
     sd = VV.player_sd(fit, 0.0, m, basis)
     seed = int(hashlib.sha1(f"{league}{d}{pid}".encode()).hexdigest()[:8], 16)
     vt = VV.value_at(rate, sd, mpg, age, left, full, avail, fit, prm, seed=seed, n=120)
+    prior = _rookie_prior(league, pid, s_tr, curve) if (prev is None and curve) else None
+    w_time = 1.0
+    if prior:
+        m_before = float(before["sec"].sum()) / 60.0 if before is not None and len(before) else 0.0
+        w_time = min(1.0, m_before / PK.ROOKIE_INFO_MIN)
+        vt = {**vt, "v": w_time * vt["v"] + (1.0 - w_time) * prior[0],
+              "p10": w_time * vt["p10"] + (1.0 - w_time) * prior[0] * 0.15, "p90": w_time * vt["p90"] + (1.0 - w_time) * prior[0] * 2.2}
     # realised since: games for the new team after the date
     realised = 0.0
     mins_after = 0.0
@@ -889,19 +985,35 @@ def _player_item(league, pid, d, s_tr, to, rows_by, games, fit, prm, ctx_data, v
                 w = vn.get(f"w{i}")
                 if w is not None:
                     remaining += (VV.DISCOUNT ** k) * w
+    v_now = realised + remaining
+    if prior:
+        # a rookie: the slot prior, less what he has produced, until he has played enough for the model alone
+        m_all = float(games[games["sec"] > 0]["sec"].sum()) / 60.0 if games is not None and len(games) else 0.0
+        w_now = min(1.0, m_all / PK.ROOKIE_INFO_MIN)
+        prior_left = max(0.0, prior[0] - realised) if still else 0.0
+        remaining = w_now * remaining + (1.0 - w_now) * prior_left
+        v_now = realised + remaining
     return {"kind": "player", "id": pid, "name": names.get(pid) or pid, "age": _r(age, 1), "rate": rate, "mpg": mpg, "basis": basis,
             "v_time": vt["v"], "p10": vt["p10"], "p90": vt["p90"], "realised": realised, "gp_after": gp_after, "min_after": mins_after,
-            "remaining": remaining, "v_now": realised + remaining, "still": bool(still)}
+            "remaining": remaining, "v_now": v_now, "still": bool(still), "draft_slot": prior[1] if prior else None,
+            "prior": round(prior[0], 3) if prior else None, "w_prior": round(1.0 - w_time, 3) if prior else None}
 
 
 # ---------------------------------------------------------------------------------------------- payloads
 
 def compact_item(x: dict) -> dict:
     if x["kind"] == "pick":
-        return {"k": "pick", "label": x["label"], "v": _r(x["v_time"], 2), "now": _r(x["v_now"], 2), "swap": x.get("swap") or None}
+        out = {"k": "pick", "label": x["label"], "v": _r(x["v_time"], 2), "now": _r(x["v_now"], 2), "swap": x.get("swap") or None,
+               "year": x.get("year"), "round": x.get("round"), "n": x.get("n") if (x.get("n") or 1) > 1 else None,
+               "via": x.get("via"), "slot": x.get("slot"), "slot_now": x.get("slot_now"), "note": x.get("note") or None,
+               "conv": _r(x.get("p_convey"), 3)}
+        if x.get("player"):
+            out.update({"pid": x["player"], "pname": x.get("player_name"), "real": _r(x.get("realised"), 2), "rem": _r(x.get("remaining"), 2)})
+        return {k: v for k, v in out.items() if v is not None}
     return {"k": "p", "id": x["id"], "name": x["name"], "age": x.get("age"), "rate": _r(x["rate"], 2), "mpg": _r(x["mpg"], 1),
             "v": _r(x["v_time"], 2), "p10": _r(x.get("p10"), 2), "p90": _r(x.get("p90"), 2), "real": _r(x["realised"], 2),
-            "gp": x.get("gp_after"), "rem": _r(x["remaining"], 2), "now": _r(x["v_now"], 2), "still": 1 if x.get("still") else 0}
+            "gp": x.get("gp_after"), "rem": _r(x["remaining"], 2), "now": _r(x["v_now"], 2), "still": 1 if x.get("still") else 0,
+            **({"slot": x["draft_slot"], "prior": x.get("prior"), "wp": x.get("w_prior")} if x.get("draft_slot") else {})}
 
 
 def deals_payload(league: str, season: int, rated: list[dict], curve: dict, n_rows: int, unmatched: list[str],
@@ -940,7 +1052,9 @@ def deals_payload(league: str, season: int, rated: list[dict], curve: dict, n_ro
                 t[k] = [t[k][0], _r(t[k][1], 2)]
     return {"ok": True, "league": league, "season": int(season), "updated_at": updated_at or an.now(), "version": VERSION,
             "window": list(window) if window else None, "deals": deals, "teams": teams,
-            "pick_curve": {k: curve.get(k) for k in ("picks", "raw", "rounds", "n_drafts", "years", "seasons")},
+            "pick_curve": {**{k: curve.get(k) for k in ("v", "lo", "hi", "q10", "q50", "q90", "raw", "rounds", "n_drafts", "n_picks", "years",
+                                                        "seasons", "per_round")},
+                           "picks": [[i + 1, v] for i, v in enumerate(curve.get("v") or [])]},
             "n_rows": n_rows, "unmatched": unmatched[:200],
             "constants": {"discount": VV.DISCOUNT, "slots": VV.SLOTS, "grade_cuts": [[c, g] for c, g in GRADE_CUTS], "minor": MINOR_WAR,
                           "deal_days": DEAL_DAYS, "prior_shrink_min": PRIOR_SHRINK_MIN},
@@ -1015,8 +1129,10 @@ def build(ctx, valuation: dict | None, prm: dict, fit: dict, refresh: bool = Tru
                      if g.get("stype") == "reg"), key=lambda x: x[0])
         games_left[s] = _LeftLookup(gl)
     war_by, rows_by = season_war_rows(league, an.seasons_on_disk(league))
-    last_complete = max([s for s in rows_by if s < season] or [season - 1])
-    curve = pick_curve(league, war_by, last_complete)
+    pfit = PK.fits(league, season, war_by, rows_by)
+    curve = pfit.get("curve") or {}
+    pm = PK.model(league, season, ctx.sim, an.member_teams(ctx.store), fit=pfit, phase=ctx.phase)
+    draft_hist = PK.history(league, war_by, rows_by)
     vrows = {}
     slot_seasons: list[int] = []
     if valuation and valuation.get("ok"):
@@ -1026,8 +1142,8 @@ def build(ctx, valuation: dict | None, prm: dict, fit: dict, refresh: bool = Tru
             m = re.search(r"(\d{4})", str(lab))
             slot_seasons.append(int(m.group(1)) if m else season)
     ctx_data = {"rows": rows_by, "box": box, "games_left": games_left, "valuation": vrows, "names": people, "current": season,
-                "roster": roster, "slot_seasons": slot_seasons}
-    rated = rate_deals(league, deals, ctx_data, fit, prm, curve, today)
+                "roster": roster, "slot_seasons": slot_seasons, "draft_hist": draft_hist}
+    rated = rate_deals(league, deals, ctx_data, fit, prm, pm, today)
     deal_of = {}
     for dl in rated:
         for r in dl["rows"]:
@@ -1035,8 +1151,10 @@ def build(ctx, valuation: dict | None, prm: dict, fit: dict, refresh: bool = Tru
     now = an.now()
     tx = transactions_payload(league, season, parsed, deal_of, since, until, unmatched, updated_at=now, people=people)
     dp = deals_payload(league, season, rated, curve, len(window_rows), sorted(set(unmatched)), updated_at=now, window=(since, until))
-    return {"transactions": tx, "deals": dp, "info": {**info, "rows": len(window_rows), "deals": len(rated),
-                                                      "unmatched": len(set(unmatched))}}
+    teams_pk = sorted(an.member_teams(ctx.store)) or sorted(teams_rec)
+    pk = PK.payload(league, season, pm, pfit, teams_pk, updated_at=now)
+    return {"transactions": tx, "deals": dp, "picks": pk, "info": {**info, "rows": len(window_rows), "deals": len(rated),
+                                                                   "unmatched": len(set(unmatched))}}
 
 
 class _LeftLookup:

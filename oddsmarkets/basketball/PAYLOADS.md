@@ -259,10 +259,22 @@ Type codes: trade, sign, release, claim, contract, injury, assign, discipline, s
             "sides": [{"team","in": [ITEM],"out": [ITEM],"v_in","v_out","share","grade","r_in","r_out","now_in","now_out",
                        "share_now","grade_now"}], "total","total_now","winner","winner_now"}],
  "teams": {tid: {"n","net_time","net_now","net_real","in_time","out_time","best": [deal id, net],"worst": [...]}},
- "pick_curve": {"picks": [[overall, WAR]], "raw": [[overall, mean, drafts]], "rounds": {round: mean}, "n_drafts","years","seasons"},
+ "pick_curve": {"v": [WAR by overall pick], "lo","hi": [80% band], "q10","q50","q90": [one pick's outcome], "picks": [[overall, WAR]],
+                "raw": [[overall, mean, drafts]], "rounds": {round: mean}, "n_drafts","n_picks","years","seasons","per_round"},
  "n_rows","unmatched","constants": {discount, slots, grade_cuts, minor, deal_days, prior_shrink_min}, "note"}
-ITEM player: {"k":"p","id","name","age","rate","mpg","v","p10","p90","real","gp","rem","now","still"}
-ITEM pick:   {"k":"pick","label","v","now","swap"}
+ITEM player: {"k":"p","id","name","age","rate","mpg","v","p10","p90","real","gp","rem","now","still", rookies: "slot","prior","wp"}
+ITEM pick:   {"k":"pick","label","v","now","swap","year","round","n"?,"via"? (original owner),"slot": [p25, p75] at the time,
+              "slot_now","note","conv"? (P conveys, protected), used picks: "pid","pname","real","rem"}
+```
+`picks.json` (analytics/picks.py; the moves page's Pick values tab and the trade simulator):
+```
+{"ok","league","season","updated_at","version","curve": (as pick_curve, plus "p_zero","bandwidth","boot","max_overall"),
+ "validation": {"dev_lodo": {"drafts","mse": {family: MSE}}, "dev_walk_forward", "test": {"drafts","train_lag","n",
+                "metrics": {family: {mse, mae, spearman, bias, skill_v_flat}}, "buckets": [...], "mse_kernel_minus_round": {diff, ci95},
+                "mse_kernel_minus_old"}}  (WNBA: dev_lodo only),
+ "persistence": {"beta": [k=1..7], "sd", "n"}, "history": {"drafts","picks","matched","last_complete"},
+ "teams": {tid: {"years": [next draft ..+6], "r1"/"r2"(/"r3"): [[value, slot p25, slot p75, median slot]], "prot": {N: [value]}}},
+ "constants": {seasons, discount, conditional, unknown_ahead, lottery_protect, presets, rookie_info_min, rounds}, "note"}
 ```
 `v` value at the time (no hindsight), `real` realised since for the new team, `rem` today's projection of the rest of the
 window while he is still there (`still` 1), `now` = real + rem. Grades: A ≥ 0.65 share, B ≥ 0.55, C ≥ 0.45, D ≥ 0.35, F;

@@ -2,7 +2,8 @@
  * ratings (value at the time with no hindsight, realised since, and today's view), the league's winners and
  * losers, and the pick-value curve; plus HW.movesLedger, the team page's ledger.
  *
- * Data: data/<L>/<S>/transactions.json and deals.json for the current season (analytics/moves.py).
+ * Data: data/<L>/<S>/transactions.json, deals.json and picks.json for the current season (analytics/moves.py,
+ * analytics/picks.py: the pick-value curve, its validation and every team's own future picks).
  * Values are four-season WAR (valuation v2), discounted 0.9 a season from the trade's season. A side's share
  * is value in / (value in + value out) on positive parts; grades A >= 0.65, B >= 0.55, C 0.45-0.55, D >= 0.35,
  * F below; "minor" when the deal moved little value. On-field value only: no salaries or contracts. */
@@ -18,14 +19,36 @@ function grade(g) {
   return '<span class="nd-grade nd-' + String(g).toLowerCase() + '">' + FX().esc(g) + '</span>';
 }
 
+function slotTxt(sl) {
+  if (!sl || !sl.length) return '';
+  return sl[0] === sl[1] ? 'slot ' + sl[0] : 'likely slot ' + sl[0] + '–' + sl[1];
+}
+
+/* "2027 1st (via PHX): ≈ 3.4, likely slot 19–27"; a used pick names the player it became. */
+function pickHTML(L, x, basis) {
+  const fx = FX();
+  const now = basis === 'now';
+  const v = now ? x.now : x.v;
+  const sl = now ? x.slot_now : x.slot;
+  let h = '<span class="mv-pick">' + fx.esc(x.label) + (x.n ? ' ×' + x.n : '') + (x.via ? ' (via ' + fx.esc(fx.teamAbbr(L, x.via)) + ')' : '') + '</span>';
+  h += ' <span class="muted-inline">≈ ' + fx.num(v, 1);
+  if (now && x.pid) h += ' → ' + fx.playerLink(L, x.pid, x.pname) + (sl ? ' (No. ' + sl[0] + ')' : '') + (fx.isNum(x.real) ? ', ' + fx.num(x.real, 1) + ' so far' : '');
+  else if (sl && !x.swap) h += ', ' + slotTxt(sl);
+  if (fx.isNum(x.conv)) h += ', conveys ' + fx.num(100 * x.conv, 0) + '%';
+  h += '</span>';
+  if (x.note) h = '<span title="' + fx.esc(x.note) + '">' + h + '</span>';
+  return h;
+}
+
 function itemsHTML(L, items, basis) {
   const fx = FX();
   if (!items || !items.length) return '<span class="muted-inline">nothing of value</span>';
   return items.map(x => {
-    if (x.k === 'pick') return '<span class="mv-pick">' + fx.esc(x.label) + '</span> <span class="muted-inline">' + fx.num(x.v, 1) + '</span>';
+    if (x.k === 'pick') return pickHTML(L, x, basis);
     const v = basis === 'now' ? x.now : x.v;
     const extra = basis === 'now' ? (fx.isNum(x.real) ? ' (' + fx.num(x.real, 1) + ' so far' + (x.still ? '' : ', gone') + ')' : '') : '';
-    return fx.playerLink(L, x.id, x.name) + ' <span class="muted-inline">' + fx.num(v, 1) + extra + '</span>';
+    const rookie = fx.isNum(x.slot) ? ' <span class="chip" title="Drafted No. ' + x.slot + ': valued from the pick curve (' + fx.num(x.prior, 1) + ')' + (fx.isNum(x.wp) ? ', weight ' + fx.num(100 * x.wp, 0) + '% at the time' : '') + ' until he has played">No. ' + x.slot + '</span>' : '';
+    return fx.playerLink(L, x.id, x.name) + rookie + ' <span class="muted-inline">' + fx.num(v, 1) + extra + '</span>';
   }).join(', ');
 }
 
@@ -59,10 +82,11 @@ function render(el, params, state) {
     const q = (params && params.query) || {};
     if (q.mt) ST.tab = q.mt;
     ['basis', 'team', 'type'].forEach(k => { if (q[k]) ST[k] = q[k]; });
-    return HW.loadAll([fx.path(L, S, 'deals.json'), fx.path(L, S, 'transactions.json')]).then(r => {
+    return HW.loadAll([fx.path(L, S, 'deals.json'), fx.path(L, S, 'transactions.json'), fx.path(L, S, 'picks.json')]).then(r => {
       if (!fx.alive(el)) return;
       const dp = r[0], tx = r[1];
       if (!fx.ok(dp) && !fx.ok(tx)) { el.innerHTML = fx.card('Moves', '', fx.notBuilt('Transactions and trade ratings for ' + fx.seasonLabel(L, S), dp || tx)); return; }
+      ST.pk = fx.ok(r[2]) ? r[2] : null;
       draw(el, L, S, dp, tx);
     });
   });
@@ -75,7 +99,7 @@ function draw(el, L, S, dp, tx) {
   let h = '<div class="card"><div class="card-header">Moves ' + fx.esc(fx.seasonLabel(L, S)) + ' <span class="card-sub">Trades, signings and releases from ESPN\'s transactions feed (' +
     fx.esc(fx.fmtDate((tx || {}).since)) + ' – ' + fx.esc(fx.fmtDate((tx || {}).until)) + '), parsed by the site; every trade rated on on-field value in WAR over four seasons (valuation v2). <strong>No salaries or cap</strong>: there is no free, legitimate salary source (Spotrac, HoopsHype and Basketball-Reference terms forbid reuse). <a href="#/methodology">Methodology</a></span></div>';
   h += '<div class="kpi-grid">' + [fx.tile('Transactions', fx.num(((tx || {}).rows || []).length, 0), 'last 12 months'), fx.tile('Trades rated', fx.num(rated.length, 0), 'grouped into deals'),
-    fx.tile('Pick curve', fx.num(((dp || {}).pick_curve || {}).n_drafts, 0) + ' drafts', 'our WAR by draft slot'), fx.tile('Unmatched names', fx.num(((dp || {}).unmatched || []).length, 0), 'listed, never guessed')].join('') + '</div>';
+    fx.tile('Pick curve', fx.num(((dp || {}).pick_curve || {}).n_drafts, 0) + ' drafts', 'our WAR by draft slot, validated on held-out drafts'), fx.tile('Unmatched names', fx.num(((dp || {}).unmatched || []).length, 0), 'listed, never guessed')].join('') + '</div>';
   h += '<div class="pad">' + fx.toggle('mv-tab', [['ratings', 'Trade ratings'], ['feed', 'Feed'], ['picks', 'Pick values']], ST.tab) + ' ' +
     '<span id="mv-basis-w">' + fx.toggle('mv-basis', [['now', 'Today\'s view'], ['time', 'At the time']], ST.basis) + '</span></div></div><div id="mv-body"></div>';
   el.innerHTML = h;
@@ -93,7 +117,7 @@ function body(L, S, dp, tx, rated) {
   const now = ST.basis === 'now';
   const teams = Object.keys((dp || {}).teams || {});
   const rows = teams.map(t => { const x = dp.teams[t]; return { t: t, x: x }; }).sort((a, b) => (now ? b.x.net_now - a.x.net_now : b.x.net_time - a.x.net_time));
-  let h = '<div class="card"><div class="card-header">Winners and losers <span class="card-sub">Net value from each team\'s trades in the last 12 months: at the time (four-season value as of the trade date, no hindsight), realised since (our model\'s value of what the incoming and outgoing players have produced for their new teams, updated as games are played), and today\'s view (realised plus today\'s projection of what is left of the four seasons while the player is still there; picks at curve value).</span></div>' +
+  let h = '<div class="card"><div class="card-header">Winners and losers <span class="card-sub">Net value from each team\'s trades in the last 12 months: at the time (four-season value as of the trade date, no hindsight), realised since (our model\'s value of what the incoming and outgoing players have produced for their new teams, updated as games are played), and today\'s view (realised plus today\'s projection of what is left of the four seasons while the player is still there; a pick from today\'s projected finish of its original owner, or the player it became once used).</span></div>' +
     HW.tableHTML([{ label: '#', align: 'right' }, { label: 'Team' }, { label: 'Deals', align: 'right' }, { label: 'In (time)', align: 'right' }, { label: 'Out (time)', align: 'right' }, { label: 'Net at the time', align: 'right' }, { label: 'Realised net', align: 'right' }, { label: 'Net today', align: 'right' }],
       rows.map((r, i) => [i + 1, { v: fx.teamName(L, r.t), html: fx.teamLink(L, r.t) }, r.x.n, { v: r.x.in_time, html: fx.num(r.x.in_time, 1) }, { v: r.x.out_time, html: fx.num(r.x.out_time, 1) },
         { v: r.x.net_time, html: signedCls(r.x.net_time) }, { v: r.x.net_real, html: signedCls(r.x.net_real) }, { v: r.x.net_now, html: '<strong>' + signedCls(r.x.net_now) + '</strong>' }]), { compact: true, sticky: true }) + '</div>';
@@ -148,15 +172,68 @@ function feed(L, tx, box) {
 function picks(L, dp, box) {
   const fx = FX();
   const pc = (dp || {}).pick_curve || {};
-  if (!(pc.picks || []).length) { box.innerHTML = fx.card('Pick values', '', fx.muted('No pick-value curve: ESPN lists too few drafts for this league.')); return; }
+  const pk = ST.pk || {};
+  const v = pc.v || (pc.picks || []).map(p => p[1]);
+  if (!v.length) { box.innerHTML = fx.card('Pick values', '', fx.muted('No pick-value curve: too few drafts with four complete seasons for this league.')); return; }
   const rounds = pc.rounds || {};
-  box.innerHTML = '<div class="card"><div class="card-header">Pick-value curve <span class="card-sub">Expected value of each draft slot in WAR over the first ' + fx.num(pc.seasons, 0) + ' seasons after the draft (each season floored at zero, discounted 0.9 a season), from our own player value for every pick of the ' + fx.num(pc.n_drafts, 0) + ' drafts ESPN lists from ' + fx.esc((pc.years || [])[0]) + ' to ' + fx.esc((pc.years || [])[1]) + ' (a pick who never played counts zero), made non-increasing and smoothed over five picks. A future pick of unknown slot counts at its round\'s mean (' +
-    Object.keys(rounds).map(k => 'round ' + k + ': ' + fx.num(rounds[k], 2)).join(', ') + '), discounted 0.9 a season until it first plays. Pick swaps, draft and cash considerations count zero.</span></div><div id="mv-pc" style="height:360px"></div>' +
-    HW.tableHTML([{ label: 'Pick', align: 'right' }, { label: 'Curve', align: 'right' }, { label: 'Raw mean', align: 'right' }, { label: 'Drafts', align: 'right' }],
-      (pc.raw || []).filter(r => r[0] <= 10 || r[0] % 5 === 0).map(r => { const c = (pc.picks || []).filter(p => p[0] === r[0])[0]; return [r[0], { v: c ? c[1] : null, html: fx.num(c ? c[1] : null, 2) }, { v: r[1], html: fx.num(r[1], 2) }, r[2]]; }), { compact: true }) + '</div>';
+  const per = pc.per_round || (L === 'wnba' ? 12 : 30);
+  const xs = v.map((_x, i) => i + 1);
+  const rows = xs.filter(o => o <= 14 || o % 5 === 0 || o === per + 1).map(o => {
+    const raw = (pc.raw || []).filter(r => r[0] === o)[0];
+    return [o, { v: v[o - 1], html: '<strong>' + fx.num(v[o - 1], 1) + '</strong>' }, { v: (pc.lo || [])[o - 1], html: fx.num((pc.lo || [])[o - 1], 1) + '–' + fx.num((pc.hi || [])[o - 1], 1) },
+      { v: (pc.q50 || [])[o - 1], html: fx.num((pc.q10 || [])[o - 1], 1) + ' / ' + fx.num((pc.q50 || [])[o - 1], 1) + ' / ' + fx.num((pc.q90 || [])[o - 1], 1) },
+      { v: raw ? raw[1] : null, html: raw ? fx.num(raw[1], 1) : '—' }, raw ? raw[2] : 0];
+  });
+  let h = '<div class="card"><div class="card-header">Pick-value curve <span class="card-sub">What a draft slot is worth, in the players\' unit: wins above replacement over the drafted player\'s first ' + fx.num(pc.seasons, 0) +
+    ' seasons (the rookie-scale years; each season floored at zero, discounted 0.9 a season), from our own value for all ' + fx.num(pc.n_picks, 0) + ' picks of the ' + fx.num(pc.n_drafts, 0) + ' drafts from ' + fx.esc((pc.years || [])[0]) + ' to ' + fx.esc((pc.years || [])[1]) +
+    ' (a pick who never played counts zero). Smoothed with a kernel that widens down the draft and made non-increasing; the band is the 10th–90th percentile over bootstrap resamples of whole drafts. Round averages: ' +
+    Object.keys(rounds).map(k => 'round ' + k + ' ' + fx.num(rounds[k], 1)).join(', ') + '.</span></div><div id="mv-pc" style="height:360px"></div>' +
+    HW.tableHTML([{ label: 'Pick', align: 'right' }, { label: 'Value', align: 'right', title: 'Expected four-season WAR' }, { label: '80% band', align: 'right', title: 'Uncertainty of the expected value (bootstrap over drafts)' },
+      { label: 'One pick: 10th / 50th / 90th', align: 'right', title: 'What a single pick at this slot becomes' }, { label: 'Raw mean', align: 'right' }, { label: 'Drafts', align: 'right' }], rows, { compact: true }) + '</div>';
+  h += validationHTML(L, pk.validation);
+  h += teamPicksHTML(L, pk);
+  h += '<div class="card"><div class="pad pg-note"><strong>How a traded pick is valued.</strong> The pick\'s original owner\'s slot distribution in that draft: this season from the season simulation (the lottery for the 14 non-playoff teams, then the playoff teams in reverse order; the second round in reverse order of record); later drafts from a regression of win % on win % k seasons earlier, fitted on our standings (' +
+    fx.esc(((pk.persistence || {}).beta || []).slice(0, 4).map((b, i) => (i + 1) + ' yr ' + fx.num(b, 2)).join(', ')) + '; none beyond), all teams drawn together and ranked. Value = the curve over that distribution, discounted 0.9 a season to the pick\'s first season. ' +
+    '"At the time" uses only the standings of the last season finished before the trade; today\'s view uses today\'s simulation. Top-N protected picks convey only outside the top N, else roll a year with the same protection and then convey unprotected (ESPN rarely states the terms: our assumption); "conditional" with no terms counts half; a swap is worth the expected gain of taking the better of the two picks. A pick already used is the player it became, valued from the slot until he has played about ' + fx.num((pk.constants || {}).rookie_info_min || 1500, 0) + ' minutes. ' +
+    'No rookie-scale salaries: on-field value only, like the players.</div></div>';
+  box.innerHTML = h;
+  HW.sortable(box);
   QKC.line('#mv-pc', { xType: 'value', series: [{ name: 'Mean by pick', color: QKC.tokens().ink3, width: 0.01, symbols: true, data: (pc.raw || []).map(r => [r[0], r[1]]) },
-    { name: 'Curve', color: 'model', width: 3, data: pc.picks.map(p => [p[0], p[1]]) }].map(x => (x.color === 'model' ? Object.assign(x, { color: QKC.tokens().model }) : x)),
-    xName: 'Overall pick', yName: 'WAR, first four seasons (discounted)', xFmt: v => String(Math.round(v)), yFmt: v => fx.num(v, 1), yMin: 0, legend: true, endLabels: false, label: 'Pick-value curve' });
+    { name: 'Curve (80% band)', color: QKC.tokens().model, width: 3, data: xs.map(o => [o, v[o - 1]]), band: pc.lo && pc.hi ? { lo: pc.lo, hi: pc.hi, x: xs } : undefined }],
+    xName: 'Overall pick', yName: 'WAR, first four seasons (discounted)', xFmt: x => String(Math.round(x)), yFmt: x => fx.num(x, 1), yMin: 0, legend: true, endLabels: false, label: 'Pick-value curve' });
+}
+
+function validationHTML(L, val) {
+  const fx = FX();
+  if (!val || !val.ok) return '';
+  const nm = { kernel: 'Our curve (kernel)', old: 'Five-pick moving average', power: 'Power law', round: 'Round mean', flat: 'One average for every pick' };
+  const dev = (val.dev_lodo || {}).mse || {}, wf = (val.dev_walk_forward || {}).mse || {};
+  let h = '<div class="card"><div class="card-header">Validation <span class="card-sub">';
+  if (val.test) {
+    const t = val.test, m = t.metrics || {};
+    const dk = t.mse_kernel_minus_round || {}, ci = dk.ci95 || [0, 0], top = (t.buckets || [])[0];
+    h += 'Walk-forward on held-out drafts ' + fx.esc(t.drafts[0]) + '–' + fx.esc(t.drafts[1]) + ' (' + fx.num(t.n, 0) + ' picks): each draft predicted only from drafts at least ' + fx.num(t.train_lag, 0) + ' years older, so all their seasons had been played. The curve family was chosen on the development drafts ' + fx.esc((val.dev_lodo || {}).drafts[0]) + '–' + fx.esc((val.dev_lodo || {}).drafts[1]) + ', before the test. ' +
+      'Single picks are very noisy: the curve cuts the squared error of one average for every pick by ' + fx.num(100 * ((m.kernel || {}).skill_v_flat || 0), 0) + '% and ranks picks better than a round mean (rank correlation ' + fx.num((m.kernel || {}).spearman, 2) + ' v ' + fx.num((m.round || {}).spearman, 2) + '); its squared error differs from the round mean\'s by ' + fx.signed(dk.diff, 2) + ' (95% interval ' + fx.signed(ci[0], 2) + ' to ' + fx.signed(ci[1], 2) + (ci[0] <= 0 && ci[1] >= 0 ? ': not a reliable difference' : '') + ').' + (top && top.realised < top.kernel ? ' Picks ' + top.slots[0] + '–' + top.slots[1] + ' of the test drafts produced less than the earlier drafts predicted (' + fx.num(top.realised, 1) + ' v ' + fx.num(top.kernel, 1) + ').' : '') + '</span></div>';
+    h += HW.tableHTML([{ label: 'Method' }, { label: 'Dev MSE', align: 'right', title: 'Leave one development draft out' }, { label: 'Dev walk-forward', align: 'right' }, { label: 'Test MSE', align: 'right' }, { label: 'Test MAE', align: 'right' }, { label: 'Rank corr.', align: 'right' }, { label: 'Bias', align: 'right', title: 'Predicted minus realised' }],
+      Object.keys(nm).filter(k => m[k]).map(k => [{ v: nm[k], html: k === 'kernel' ? '<strong>' + nm[k] + '</strong>' : nm[k] }, { v: dev[k], html: fx.num(dev[k], 2) }, { v: wf[k], html: fx.num(wf[k], 2) }, { v: m[k].mse, html: fx.num(m[k].mse, 2) }, { v: m[k].mae, html: fx.num(m[k].mae, 2) }, { v: m[k].spearman, html: fx.num(m[k].spearman, 2) }, { v: m[k].bias, html: fx.signed(m[k].bias, 2) }]), { compact: true });
+    h += HW.tableHTML([{ label: 'Slots' }, { label: 'Picks', align: 'right' }, { label: 'Realised', align: 'right' }, { label: 'Our curve', align: 'right' }, { label: 'Round mean', align: 'right' }],
+      (t.buckets || []).map(b => [b.slots[0] + '–' + b.slots[1], b.n, { v: b.realised, html: fx.num(b.realised, 2) }, { v: b.kernel, html: fx.num(b.kernel, 2) }, { v: b.round, html: fx.num(b.round, 2) }]), { compact: true });
+  } else {
+    h += 'Only ' + fx.esc((val.dev_lodo || {}).drafts ? (val.dev_lodo.drafts[1] - val.dev_lodo.drafts[0] + 1) : '') + ' drafts have four complete seasons, too few for a sealed test: leave-one-draft-out squared error only.</span></div>';
+    h += HW.tableHTML([{ label: 'Method' }, { label: 'Leave-one-draft-out MSE', align: 'right' }], Object.keys(nm).filter(k => fx.isNum(dev[k])).map(k => [nm[k], { v: dev[k], html: fx.num(dev[k], 2) }]), { compact: true });
+  }
+  return h + '</div>';
+}
+
+function teamPicksHTML(L, pk) {
+  const fx = FX();
+  const teams = Object.keys((pk || {}).teams || {});
+  if (!teams.length) return '';
+  const years = pk.teams[teams[0]].years || [];
+  const rows = teams.map(t => { const x = pk.teams[t]; return [{ v: fx.teamName(L, t), html: fx.teamLink(L, t) }].concat(years.slice(0, 4).map((y, i) => { const r = x.r1[i]; return { v: r[0], html: fx.num(r[0], 1) + ' <span class="muted-inline">' + r[1] + '–' + r[2] + '</span>' }; }))
+    .concat([{ v: (x.r2[0] || [])[0], html: fx.num((x.r2[0] || [])[0], 1) }]); });
+  return '<div class="card"><div class="card-header">Each team\'s own picks <span class="card-sub">Today\'s value of each team\'s own first-round pick (likely slot, 25th–75th percentile) in the next drafts, and its next second-round pick, discounted to this season. ESPN does not say who owns which pick today, so these are the original owners\' picks: the trade simulator values any of them.</span></div>' +
+    HW.tableHTML([{ label: 'Team' }].concat(years.slice(0, 4).map(y => ({ label: y + ' 1st', align: 'right' }))).concat([{ label: years[0] + ' 2nd', align: 'right' }]), rows, { compact: true, sticky: true }) + '</div>';
 }
 
 function syncUrl(L) {

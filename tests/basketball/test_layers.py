@@ -3,6 +3,7 @@ moves.py, fantasy.py, research/fantasy_backtest.py). Synthetic inputs only; no n
 from __future__ import annotations
 
 from datetime import date
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -185,24 +186,6 @@ def test_pick_dedup_across_both_sides():
     assert (p["from"], p["to"], p["year"], p["round"]) == ("LAL", "WSH", 2027, 2)
 
 
-def test_pick_curve_is_non_increasing(monkeypatch):
-    drafts = {y: [[o, 1 if o <= 30 else 2, o, "1", f"d{y}_{o}", "x", False] for o in range(1, 61)] for y in range(2005, 2015)}
-    monkeypatch.setattr(BIO, "drafts", lambda lg: drafts)
-    rng = np.random.default_rng(3)
-    war_by = {}
-    for y in range(2005, 2015):
-        for j in range(1, 5):
-            for o in range(1, 61):
-                war_by.setdefault(y + j, {})[f"d{y}_{o}"] = max(0.0, 6.0 / o ** 0.7 + rng.normal(0, 0.8)) if o % 7 else 0.0
-    c = MV.pick_curve("nba", war_by, 2020)
-    vals = [v for _o, v in c["picks"]]
-    assert c["n_drafts"] == 10 and all(a >= b - 1e-9 for a, b in zip(vals, vals[1:]))
-    assert c["rounds"]["1"] > c["rounds"]["2"]
-    v, lab = MV.pick_value(c, {"year": 2027, "round": 1, "overall": None, "n": 2, "swap": False}, 2026)
-    assert v == pytest.approx(2 * c["rounds"]["1"] * VV.DISCOUNT ** 2) and "2027" in lab
-    assert MV.pick_value(c, {"year": None, "round": 2, "overall": None, "n": 1, "swap": True}, 2026)[0] == 0.0
-
-
 def test_grades_by_share():
     assert MV.grade(0.7, 5.0) == "A" and MV.grade(0.5, 5.0) == "C" and MV.grade(0.2, 5.0) == "F"
     assert MV.grade(0.9, 0.1) == "minor" and MV.grade(None, 5.0) is None
@@ -221,7 +204,7 @@ def test_rate_deals_realised_after_the_date_and_no_hindsight():
                        [{"player_id": "7", "date": "2026-02-10", "team": "CHI", "sec": 1800, "team_poss": 100.0, "season": 2026}])
     deal = {"id": "x", "date": "2026-02-05", "teams": ["BOS", "CHI"], "rows": [], "zero": [], "players": {"6": ["CHI", "BOS"], "7": ["BOS", "CHI"]}, "picks": []}
     ctx = {"rows": rows_by, "box": box, "games_left": {}, "valuation": {}, "names": {}, "current": 2027, "roster": {}, "slot_seasons": []}
-    out = MV.rate_deals("nba", [deal], ctx, FIT, PRM, {"picks": [], "rounds": {}}, date(2026, 10, 1))
+    out = MV.rate_deals("nba", [deal], ctx, FIT, PRM, SimpleNamespace(curve={}), date(2026, 10, 1))
     bos = [s for s in out[0]["sides"] if s["team"] == "BOS"][0]
     vuc = bos["in"][0]
     # at the time: last completed season (3.0), not this season's 10.0
