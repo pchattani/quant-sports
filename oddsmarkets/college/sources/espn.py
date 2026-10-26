@@ -56,6 +56,7 @@ from typing import Any
 import requests
 
 from oddsmarkets.basketball.sources import espn as hw
+from oddsmarkets.common.mojibake import repair as _repair_mojibake
 from .. import canon
 
 logger = logging.getLogger(__name__)
@@ -137,7 +138,8 @@ class Client:
                 logger.warning("espn %s %s answered non-JSON", url, params)
                 self.failures += 1
                 return None
-            return d if isinstance(d, dict) else None
+            # ESPN's older feeds carry double-encoded names (2007 play-by-play): repaired by the safe round trip
+            return _repair_mojibake(d)[0] if isinstance(d, dict) else None
         self.failures += 1
         return None
 

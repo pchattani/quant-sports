@@ -21,6 +21,8 @@ from urllib.parse import urlparse
 
 import requests
 
+from oddsmarkets.common.mojibake import repair as _repair_mojibake
+
 logger = logging.getLogger(__name__)
 
 UA = "The Quant Rink (pchattani.github.io/the-quant-rink; NHL analytics, non-commercial)"
@@ -111,7 +113,9 @@ class Client:
             return None
         self.bytes += len(r.content)
         try:
-            return r.json()
+            # the NHL stats API serves double-encoded names itself ("MontrÃ©al" in 2025-26 shiftcharts, checked
+            # 2026-10-25 against the raw bytes): the safe round trip repairs them and leaves correct text alone
+            return _repair_mojibake(r.json())[0]
         except ValueError:
             logger.warning("%s %s %s answered non-JSON", self.name, url, params or "")
             self.failures += 1

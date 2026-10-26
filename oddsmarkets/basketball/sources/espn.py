@@ -38,6 +38,8 @@ from typing import Any
 
 import requests
 
+from oddsmarkets.common.mojibake import repair as _repair_mojibake
+
 from .. import canon
 
 logger = logging.getLogger(__name__)
@@ -97,7 +99,9 @@ class Client:
                 logger.warning("espn %s %s answered non-JSON", url, params)
                 self.failures += 1
                 return None
-            return d if isinstance(d, dict) else None
+            # ESPN's own older feeds carry double-encoded names ("ChloÃ© Kerr" in 2007-08 WNBA play-by-play):
+            # the safe round trip repairs them and leaves correct text alone
+            return _repair_mojibake(d)[0] if isinstance(d, dict) else None
         self.failures += 1
         return None
 

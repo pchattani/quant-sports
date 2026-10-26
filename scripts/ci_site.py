@@ -659,6 +659,7 @@ def cmd_restore(site: str, prev: Path) -> int:
         print(f"no previous deploy at {prev}: cold build")
         return 0
     added = newer = logs = 0
+    copied: list[str] = []
     patterns = cfg.get("newer_wins", ())
     only_logs = cfg.get("restore") == "logs"
     for p in src.rglob("*"):
@@ -671,6 +672,7 @@ def cmd_restore(site: str, prev: Path) -> int:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(p, target)
             logs += 1
+            copied.append(rel.as_posix())
             continue
         if only_logs:
             continue
@@ -678,12 +680,19 @@ def cmd_restore(site: str, prev: Path) -> int:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(p, target)
             added += 1
+            copied.append(rel.as_posix())
         elif patterns and any(PurePosixPath("data", rel.as_posix()).match(pat) for pat in patterns):
             a, b = _stamp_of(p), _stamp_of(target)
             if a and a > b:
                 shutil.copy2(p, target)
                 newer += 1
+                copied.append(rel.as_posix())
     print(f"restored {added} files the checkout did not have; {newer} stores newer on the deployed site; {logs} persistent logs")
+    # a restored copy is never re-checked at deploy (it equals the live file), so repair mojibake here
+    moji, _sus, moji_files = mojibake_gate(dst, copied, fix=True)
+    if moji:
+        print(f"::warning::mojibake repaired in restored files: {moji} strings in {len(moji_files)} "
+              f"({', '.join(moji_files[:5])})")
     return 0
 
 
@@ -811,6 +820,34 @@ def shadow_report(site: str, p: dict, clone: Path, out: Path, max_copy_bytes: in
     return rep
 
 
+def _mojibake_module():
+    """oddsmarkets/common/mojibake.py by path (stdlib only), without importing the package's heavy __init__."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_om_mojibake", Path(__file__).resolve().parents[1] / "oddsmarkets" / "common" / "mojibake.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def mojibake_gate(src: Path, rels, fix: bool) -> tuple[int, int, list[str]]:
+    """Scan the JSON payloads about to deploy for mojibake (UTF-8 read as cp1252: "MagalhÃ£es"). With fix=True the
+    repairable strings are repaired in place (the safe round trip; correct text is never touched). Returns
+    (repairable strings, suspect strings left alone, files with repairable strings)."""
+    M = _mojibake_module()
+    rep = sus = 0
+    files = []
+    for r in rels:
+        if not (r.endswith(".json") or r.endswith(".json.gz")):
+            continue
+        a, b = M.check_file(src / r, fix=fix)
+        rep += a
+        sus += b
+        if a:
+            files.append(r)
+    return rep, sus, files
+
+
 def cmd_deploy(site: str, clone: Path, shadow: Path | None, allow_mass_delete: bool) -> int:
     cfg = SITES[site]
     ctx = ctx_for(site)
@@ -823,6 +860,12 @@ def cmd_deploy(site: str, clone: Path, shadow: Path | None, allow_mass_delete: b
     delete_n = len(p["removed"])
     print(f"deploy plan: {p['n_files']} files, {p['bytes'] / 1e6:.0f} MB, {len(p['added'])} added, "
           f"{len(p['changed'])} changed, {delete_n} removed (of {p['n_dest']} live), {p['pruned']} pruned")
+    moji, suspect, moji_files = mojibake_gate(p["src"], p["added"] + p["changed"], fix=shadow is None)
+    if moji:
+        print(f"::warning::mojibake {'repaired' if shadow is None else 'found'}: {moji} strings in {len(moji_files)} "
+              f"payloads ({', '.join(moji_files[:5])}); a writer or reader decoded UTF-8 as cp1252")
+    if suspect:
+        print(f"::notice::{suspect} strings carry mojibake-like characters that fail the repair round trip (left alone)")
     if shadow is not None:
         rep = shadow_report(site, p, clone, shadow)
         print(json.dumps({k: rep[k] for k in ("files", "live_files", "added", "changed", "removed", "by_dir")}, indent=1)[:6000])
