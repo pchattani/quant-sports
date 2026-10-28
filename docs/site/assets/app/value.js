@@ -14,7 +14,7 @@
  *                          outlook and targets (clubs.js); FB.movementCard(el, pid, {tid, until}) the player's card
  *                          (players.js). Every view draws nothing when the payload has no movement.
  *
- * Reads data/value/meta.json, players.json, lines.json, transfers.json, club/<tid>.json (UNIFIED_PAYLOADS
+ * Reads data/value/meta.json, players.json, lines.json, season.json, transfers.json, club/<tid>.json (UNIFIED_PAYLOADS
  * 11-12), and each followed league's teams.json, probs.json and sensitivity.json. value/club/<tid>.json exists
  * exactly for the clubs in the thirteen followed leagues' teams.json, so only those are ever requested.
  * The simulator interpolates the build's sensitivity curves and evaluates the fee model's published
@@ -55,7 +55,7 @@ function crest(tid, name) { return crestOk(tid) ? FB.crest(tid, name, 'sm') : ''
 function netText(v) { return has(v) ? (v < 0 ? '−' : '') + money(Math.abs(v)) : '—'; }
 function intl(v) { return has(v) ? Math.round(v).toLocaleString('en-GB') : '—'; }
 
-var META = null, PLAYERS = null, BYID = null, LINES = null, LEAGUE_CLUBS = null;
+var META = null, PLAYERS = null, BYID = null, LINES = null, SEASON = null, LEAGUE_CLUBS = null;
 function feeOn() { return !!(((META || {}).fee || {}).fitted); }
 
 /* the components that drive a value, largest first */
@@ -143,16 +143,21 @@ function validationLine(m) {
 
 function needLines() {
   if (LINES) return Promise.resolve(LINES);
-  return Promise.all([FB.load('value/lines.json'), FB.clubsIndex()]).then(function (d) { LINES = FB.rows(d[0]); return LINES; });
+  return Promise.all([FB.load('value/lines.json'), FB.load('value/season.json'), FB.clubsIndex()]).then(function (d) {
+    SEASON = FB.rows(d[1]);
+    LINES = FB.rows(d[0]);
+    return LINES;
+  });
 }
 
-/* This season's lines (lines.json: one per player per competition) for one scope: a competition's own lines, or one
-   row per player summing his lines over every competition, club competitions or national-team football (minutes, GAR
-   and PAR add up; GAR/90 is their ratio; rating and the components are minutes-weighted; the percentile is against
-   the same unit among the rows shown with 900+ minutes). A merged duplicate id counts as the person. */
+/* This season for one scope: a competition's own lines (lines.json, its current edition), or one row per player over
+   every competition, club competitions or national-team football (value/season.json: the value model summed over
+   exactly the matches of his Lab season line, in his own season, so one competition's latest edition never mixes in
+   from another season; GAR, PAR and minutes add up, GAR/90 is their ratio, the trend is his GAR/90 in the same scope
+   last season). The percentile is against the same unit among the rows shown with 900+ minutes. A merged duplicate
+   id counts as the person. */
 var POOLED = { '': 'All competitions', club: 'Club competitions', intl: 'National team' };
 function seasonLines(q) {
-  var scopeOf = function (slug) { var c = FB.comp(slug) || {}; return c.scope || (FB.kindOf(slug) === 'international' ? 'international' : 'club'); };
   var pid = function (id) { return FB.personId(id); };
   var line = function (l) {
     var pl = BYID[pid(l.id)] || BYID[String(l.id)] || {};
@@ -160,29 +165,15 @@ function seasonLines(q) {
       role: l.role, min: l.min, gar90: l.gar90, gar: l.gar, par: l.par, pct: l.pct, prev90: l.prev90, rt: l.rt, c: l.c, fvi: pl.fvi, proj: pl.proj, mv: pl.mv, v2: pl.v2 };
   };
   if (!(q.c in POOLED)) return (LINES || []).filter(function (l) { return l.comp === q.c; }).map(line);
-  var by = {}, order = [];
-  (LINES || []).forEach(function (l) {
-    var sc = scopeOf(l.comp);
-    if ((q.c === 'club' && sc === 'international') || (q.c === 'intl' && sc !== 'international') || !has(l.gar90)) return;
-    var r = line(l), k = r.id, a = by[k];
-    if (!a) { a = by[k] = { rows: [] }; order.push(k); }
-    a.rows.push(r);
-  });
-  var out = order.map(function (k) {
-    var rs = by[k].rows.slice().sort(function (x, y) { return (y.min || 0) - (x.min || 0); });
-    var main = rs[0], pl = BYID[k] || {};
-    var min = 0, gar = 0, par = 0, rw = 0, rm = 0, pw = 0, pm = 0, comps = [];
-    rs.forEach(function (r) {
-      min += r.min || 0; gar += r.gar || 0; par += r.par || 0;
-      if (has(r.rt)) { rw += r.rt * r.min; rm += r.min; }
-      if (has(r.prev90)) { pw += r.prev90 * r.min; pm += r.min; }
-      comps.push(r.comp);
-    });
-    var c = null;
-    rs.forEach(function (r) { if (!r.c) return; if (!c) c = r.c.map(function () { return 0; }); r.c.forEach(function (v, i) { c[i] += (v || 0) * r.min / Math.max(min, 1); }); });
-    return { id: k, name: main.name, age: main.age, comp: main.comp, comps: comps, tid: q.c === 'intl' ? main.tid : (pl.tid || main.tid), club: q.c === 'intl' ? FB.clubName(main.tid, main.club) : (pl.club || main.club),
-      role: pl.role || main.role, min: min, gar90: min ? gar * 90 / min : null, gar: gar, par: par, pct: null, prev90: pm ? pw / pm : null, rt: rm ? rw / rm : null, c: c,
-      fvi: main.fvi, proj: main.proj, mv: main.mv, v2: main.v2, mix: rs.map(function (r) { return FB.compName(r.comp, true) + ' ' + Math.round(r.min) + '\''; }).join(' · ') };
+  var scope = q.c || 'all';
+  var out = (SEASON || []).filter(function (s) { return s.scope === scope && has(s.gar90); }).map(function (s) {
+    var k = pid(s.id), pl = BYID[k] || BYID[String(s.id)] || {};
+    var cs = s.comps || [], isIntl = scope === 'intl';
+    var tid = isIntl ? s.tid : (pl.tid || s.tid);
+    return { id: k, name: pl.name || s.name || ('#' + s.id), age: pl.age, comp: cs.length ? cs[0][0] : null, comps: cs.map(function (x) { return x[0]; }),
+      tid: tid, club: isIntl ? FB.clubName(s.tid) : (pl.club || FB.clubName(s.tid)), role: pl.role || null, min: s.min, gar90: s.gar90, gar: s.gar, par: s.par,
+      pct: null, prev90: s.prev90, rt: s.rt, c: s.c, fvi: pl.fvi, proj: pl.proj, mv: pl.mv, v2: pl.v2,
+      mix: cs.map(function (x) { return FB.compName(x[0], true) + ' ' + Math.round(x[1]) + '\''; }).join(' · ') };
   });
   var pools = {};
   out.forEach(function (r) { if (r.min >= 900 && has(r.gar90)) (pools[UNIT_OF[r.role] || 'MID'] = pools[UNIT_OF[r.role] || 'MID'] || []).push(r.gar90); });
@@ -298,7 +289,7 @@ function drawPlayersBody(el, q) {
   var rows = valueRows(q).sort(function (a, b) { return (b.gar90 || 0) - (a.gar90 || 0); });
   var shown = rows.slice(0, 150);
   FB.set('va-note', intl(rows.length) + ' players' + (rows.length > shown.length ? ' (the top ' + shown.length + ' shown)' : '') + ' · ' +
-    (season ? ((q.c || '') in POOLED ? 'this season, one row per player: lines summed over ' + (q.c === 'club' ? 'club competitions' : q.c === 'intl' ? 'national-team football' : 'every competition') + '; percentiles within the position group among the players shown with 900+ minutes; trend against last season, minutes-weighted.'
+    (season ? ((q.c || '') in POOLED ? 'this season (each player\'s own, as the Lab), one row per player: his matches summed over ' + (q.c === 'club' ? 'club competitions' : q.c === 'intl' ? 'national-team football' : 'every competition') + '; percentiles within the position group among the players shown with 900+ minutes; trend against his last season in the same scope.'
       : 'this season\'s lines in ' + FB.compName(q.c) + '; percentiles within the competition and position group over its minutes floor; trend against last season in the same competition.')
       : 'club football over the last 12 months, every competition; percentiles among regulars (900+ minutes) in the same role.'));
   var cols = [
@@ -312,7 +303,7 @@ function drawPlayersBody(el, q) {
     { key: 'gar', label: 'GAR', num: true, tip: 'Goals above replacement in these minutes', fmt: function (v) { return has(v) ? signed(v, 1) : '—'; } },
     { key: 'par', label: 'PAR', num: true, tip: 'Points above replacement: GAR times the points a goal of goal difference is worth', fmt: function (v) { return has(v) ? signed(v, 1) : '—'; } }
   ];
-  if (season) cols.push({ key: 'trend', label: 'Trend', num: true, tip: 'GAR/90 change against last season in the same competition (450+ minutes then)', fmt: function (v, r) { return has(r.prev90) ? FB.deltaHTML(r.gar90 - r.prev90, 2) : '—'; } });
+  if (season) cols.push({ key: 'trend', label: 'Trend', num: true, tip: (q.c || '') in POOLED ? 'GAR/90 change against his last season in the same scope (450+ minutes then)' : 'GAR/90 change against last season in the same competition (450+ minutes then)', fmt: function (v, r) { return has(r.prev90) ? FB.deltaHTML(r.gar90 - r.prev90, 2) : '—'; } });
   else cols = cols.concat([
     { key: 'proj', label: 'Proj.', num: true, tip: 'Projected GAR/90: shrunk toward replacement by 900 minutes', fmt: function (v) { return g2(v); } },
     { key: 'v2', label: 'Value', num: true, tip: 'Valuation v2: expected points above replacement over the next four seasons, with its 10-90% band', fmt: function (v, r) { return has(v) ? '<span data-tip="10-90%: ' + num(r.v2lo, 1) + ' to ' + num(r.v2hi, 1) + ' points">' + num(v, 1) + '</span>' : '—'; } },

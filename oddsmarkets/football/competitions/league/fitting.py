@@ -100,13 +100,42 @@ def pooled_tier_levels(team: str) -> str | None:
     return f"domestic-{int(lvl)}" if lvl else tier
 
 
+@cache
+def argentine_clubs() -> frozenset:
+    """The Argentine league's clubs (canonical names) from its store: who `separate_argentina` takes out of the
+    continental tier."""
+    try:
+        from oddsmarkets.football.competitions.liga.store import iter_matches, load_store, store_path
+        st = load_store(store_path())
+        return frozenset(t for m in iter_matches(st) for t in (m.home_team, m.away_team))
+    except Exception:  # noqa: BLE001 - no store: nobody is taken out
+        return frozenset()
+
+
+def without_argentina(base, clubs=None):
+    """`base` with the Argentine league's clubs under a continental cup's prefix in their own tier
+    ("continental-arg"), so the "continental" tier's offset is fitted without them (football_edge.md 6.2: the
+    forward test of Argentina in the pool refits the tier this way in both arms)."""
+    names = argentine_clubs() if clubs is None else frozenset(clubs)
+
+    def tier(team: str) -> str | None:
+        t = base(team)
+        if t == "continental" and ":" in team and team.split(":", 1)[1] in names:
+            return "continental-arg"
+        return t
+    return tier
+
+
 def tier_function():
-    """The tier map the build's pooled fit uses: per level when `pooled_tier_prior.levels` is true."""
+    """The tier map the build's pooled fit uses: per level when `pooled_tier_prior.levels` is true, with the
+    Argentine clubs in their own continental tier when `pooled_tier_prior.separate_argentina` is true (off: the
+    6.2 forward test decides)."""
     try:
         block = json.loads(PARAMS_PATH.read_text(encoding="utf-8")).get("pooled_tier_prior") or {}
     except Exception:  # noqa: BLE001
         block = {}
-    return pooled_tier_levels if block.get("levels") else pooled_tier
+    base = pooled_tier_levels if block.get("levels") else pooled_tier
+    return without_argentina(base) if block.get("separate_argentina") else base
 
 
 @cache

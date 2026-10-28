@@ -585,6 +585,17 @@ def build_value(ctx: ValueContext, R: V.Rows, vm: V.ValueModel | None = None, ou
     upid, uinv = np.unique(R.pid, return_inverse=True)
     repl_row = np.array([repl[role_for(int(p))] for p in upid.tolist()], dtype=np.float64)[uinv.reshape(-1)] if upid.size else np.zeros(0)
     row_gar = vals.sum(axis=1) - repl_row * R.mins / 90.0 if len(R) else np.zeros(0)
+    # and the rest of a Value-page line, as additive columns (value_fields.write_value_season): points above
+    # replacement (GAR x the competition's points per goal, as lines.json `par`), the rating's weighted sum and
+    # minutes, and the components less the role's mean profile for the minutes (summed / (minutes / 90) = lines.json `c`)
+    if len(R):
+        comp_ppg = np.array([ppg.get(s_, ppg_pool) for s_ in R.comps], dtype=np.float64)
+        rmean = np.stack([np.asarray(role_mean.get(role_for(int(p)), np.zeros(nC)), dtype=np.float64) for p in upid.tolist()])[uinv.reshape(-1)]
+        rt_ok = np.isfinite(R.rating)
+        row_extra = np.column_stack([row_gar * comp_ppg[R.comp], np.where(rt_ok, R.rating * R.mins, 0.0), np.where(rt_ok, R.mins, 0.0),
+                                     vals - rmean * (R.mins / 90.0)[:, None]])
+    else:
+        row_extra = np.zeros((0, 3 + nC))
     # For the value-fields step (value_fields.annotate_people_prev): each player's line last season in each competition,
     # with the formation role of that line (the one started in most) and its GAR/90 against that role's replacement.
     prev_out: dict[tuple[str, str], dict] = {}
@@ -598,7 +609,7 @@ def build_value(ctx: ValueContext, R: V.Rows, vm: V.ValueModel | None = None, ou
             # For the fantasy step: each player's expected points above replacement next season (its price proxy).
             "_fantasy_score": {pid: v.get("v2y1", 0.0) for pid, v in trx.players.items()},
             "_prev_lines": prev_out, "_prev_sid": {s: (str(v) if v is not None else None) for s, v in prev_sid.items()},
-            "_row_gar": row_gar}
+            "_row_gar": row_gar, "_row_extra": row_extra}
 
 
 def make_fee_fn(trx: "TR.TransferResult | None", player_info: dict[int, dict], pool_clubs: dict[int, dict]):

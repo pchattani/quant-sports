@@ -322,7 +322,7 @@ class PeopleLines:
         self.meta_pos = {}
 
     def value_views(self, R: Any, row_gar: Any, era_of: Callable[[str, str], str | None],
-                    frames: dict[str, str]) -> dict[str, Any]:
+                    frames: dict[str, str], extra: Any = None) -> dict[str, Any]:
         """The value model's goals above replacement over exactly the matches of each Lab line.
 
         R is the value model's player-match rows (value.Rows) and row_gar each row's GAR (its value less the
@@ -332,7 +332,8 @@ class PeopleLines:
         window keeps the tag of the person's frame, as `views` does. Returns {"windows": {window: {pid: {slug: [GAR,
         minutes]}}}, "intl": [slugs counted as national-team football]}: a Lab row of one competition reads its slug,
         a pooled row (all, club, intl) sums the slugs of its scope, so an international line carries the value of its
-        own international matches and never a club figure."""
+        own international matches and never a club figure. `extra` (n rows x k additive columns: value_payloads'
+        `_row_extra`, PAR, the rating's sums and the components) is summed the same way and appended to each list."""
         import numpy as np
 
         out: dict[str, dict[str, dict[str, list[float]]]] = {w: {} for w in WINDOWS}
@@ -373,9 +374,14 @@ class PeopleLines:
         i3 = i3.reshape(-1)
         gar = np.bincount(i3, weights=np.asarray(row_gar, dtype=np.float64)[rows], minlength=len(u3))
         mins = np.bincount(i3, weights=np.asarray(R.mins, dtype=np.float64)[rows], minlength=len(u3))
+        X = np.asarray(extra, dtype=np.float64) if extra is not None else None
+        if X is not None and (X.ndim != 2 or X.shape[0] != n):
+            X = None
+        ex = (np.column_stack([np.bincount(i3, weights=X[rows, j], minlength=len(u3)) for j in range(X.shape[1])]).tolist()
+              if X is not None and X.shape[1] else [[] for _ in range(len(u3))])
         aliases = getattr(self, "aliases", {}) or {}
         acc: dict[str, dict[tuple[str, str], list[float]]] = {}
-        for (pid, ci, si), g, m in zip(u3.tolist(), gar.tolist(), mins.tolist()):
+        for (pid, ci, si), g, m, e in zip(u3.tolist(), gar.tolist(), mins.tolist(), ex):
             p = str(pid)
             p = aliases.get(p, p)
             per = acc.setdefault(p, {})
@@ -383,15 +389,15 @@ class PeopleLines:
             for tag in sets[si]:
                 a = per.get((slug, tag))
                 if a is None:
-                    per[(slug, tag)] = [g, m]
+                    per[(slug, tag)] = [g, m, *e]
                 else:
-                    a[0] += g
-                    a[1] += m
+                    for j, x in enumerate([g, m, *e]):
+                        a[j] += x
         for pid, per in acc.items():
             frame = frames.get(pid) or "calendar"
             for w in WINDOWS:
                 club_tag, nat_tag = self.window_tags(frame, w)
-                got = {slug: [round(v[0], 4), round(v[1], 1)] for (slug, tag), v in per.items()
+                got = {slug: [round(v[0], 4), round(v[1], 1), *(round(x, 4) for x in v[2:])] for (slug, tag), v in per.items()
                        if tag == (nat_tag if self._by_date(slug) else club_tag)}
                 if got:
                     out[w][pid] = got

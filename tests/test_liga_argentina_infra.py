@@ -349,8 +349,49 @@ def test_discovery_refuses_another_countrys_namesake(monkeypatch) -> None:
     spec = importlib.util.spec_from_file_location("disc_infra", ROOT / "scripts" / "discover_sofascore_leagues.py")
     d = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(d)
-    cfg = CUPS["trofeo-de-campeones"]
+    from dataclasses import replace
+    assert d.resolve_id(CUPS["trofeo-de-campeones"]) == 18436          # pinned: no search
+    cfg = replace(CUPS["trofeo-de-campeones"], sofascore_id=0)         # unpinned, as discovery first saw it
     monkeypatch.setattr(sofascore, "search_tournament", lambda q, hint=None, budget=None: {"id": 1, "name": "Trofeo de Campeones", "category": "Ecuador"})
     assert d.resolve_id(cfg) is None
     monkeypatch.setattr(sofascore, "search_tournament", lambda q, hint=None, budget=None: {"id": 2, "name": "Trofeo de Campeones de la Liga Profesional", "category": "Argentina"})
     assert d.resolve_id(cfg) == 2
+
+
+# ── 6.2: the Argentine clubs out of the continental tier (behind a flag, off) ──
+
+def test_without_argentina_moves_only_argentine_continental_entrants() -> None:
+    from oddsmarkets.football.competitions.league import fitting
+
+    tier = fitting.without_argentina(fitting.pooled_tier, clubs={"Boca Juniors"})
+    assert tier("libertadores:Boca Juniors") == "continental-arg"
+    assert tier("libertadores:Bolívar") == "continental"
+    assert tier("copa-argentina:Boca Juniors") == "domestic"           # only the continental tier changes
+    assert tier("premier-league:Arsenal") is None
+
+
+def test_separate_argentina_is_off_in_production() -> None:
+    from oddsmarkets.football.competitions.league import fitting
+
+    block = json.loads(fitting.PARAMS_PATH.read_text(encoding="utf-8"))["pooled_tier_prior"]
+    assert block["separate_argentina"] is False
+    assert fitting.tier_function() in (fitting.pooled_tier, fitting.pooled_tier_levels)
+
+
+def test_a_fit_takes_the_extra_tier() -> None:
+    import pandas as pd
+    from oddsmarkets.football.competitions.league import fitting
+
+    rng = np.random.default_rng(3)
+    teams = ["premier-league:A", "premier-league:B", "libertadores:Boca Juniors", "libertadores:Bolívar", "libertadores:Nacional"]
+    rows = []
+    for i in range(240):
+        h, a = rng.choice(len(teams), 2, replace=False)
+        rows.append({"home_team": teams[h], "away_team": teams[a], "home_goals": int(rng.poisson(1.4)),
+                     "away_goals": int(rng.poisson(1.1)), "match_date": pd.Timestamp("2026-01-01", tz="UTC") + pd.Timedelta(days=i),
+                     "weight": 1.0})
+    df = pd.DataFrame(rows)
+    tier = fitting.without_argentina(fitting.pooled_tier, clubs={"Boca Juniors"})
+    dc = fitting.fit_dc(df, 0.0035, 1.0, as_of=datetime(2026, 9, 1, tzinfo=timezone.utc), prior_group=tier)
+    p = dc.predict_match("libertadores:Boca Juniors", "libertadores:Bolívar", neutral=False, max_goals=8)
+    assert abs(p.home_win + p.draw + p.away_win - 1) < 1e-6

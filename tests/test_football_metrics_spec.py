@@ -138,3 +138,33 @@ def test_lab_gar_sums_the_windowed_value_per_scope_and_feeds_a_gar_board(tmp_pat
     # no windowed value: a pooled row has no GAR rather than another edition's or scope's
     VF.apply(d, prev_lines=prev, prev_sid={})
     assert rd("season", "intl")["1"] == ["ST", None, None] and rd("last", "club")["1"] == ["ST", None, None]
+
+
+def test_value_season_rows_follow_the_lab_season_per_scope(tmp_path):
+    """value/season.json (the Value page's "This season" pooled views, 28 Oct 2026): one row per person and scope over
+    exactly his Lab season matches, so a latest edition from another season (the World Cup, a 2023 qualifier) never
+    mixes in; PAR, the rating and the components add up; the trend is the same scope last season (450+ minutes)."""
+    import json
+    from oddsmarkets.football.analytics import value_fields as VF
+    d = tmp_path
+    (d / "lab" / "season").mkdir(parents=True)
+    for sc, tid in (("all", 17), ("club", 17), ("intl", 4705)):
+        (d / "lab" / "season" / f"{sc}.json").write_text(json.dumps({"fields": ["player_id", "name", "tid"], "rows": [["1", "A", tid], ["5", "E", 9]]}),
+                                                         encoding="utf-8")
+    # [GAR, minutes, PAR, rating x minutes, rated minutes, two components]
+    lab_value = {"intl": ["nations-league", "world-cup"], "windows": {
+        "season": {"1": {"premier-league": [2.0, 900.0, 3.0, 6300.0, 900.0, 0.9, -0.3], "nations-league": [-1.0, 180.0, -1.2, 1170.0, 180.0, 0.0, 0.2]},
+                   "5": {"premier-league": [0.1, 60.0, 0.1, 0.0, 0.0, 0.0, 0.0]}},
+        "last": {"1": {"premier-league": [5.4, 2700.0, 8.0, 0.0, 0.0, 0.0, 0.0], "world-cup": [3.0, 450.0, 4.0, 0.0, 0.0, 0.0, 0.0]}}}}
+    assert VF.write_value_season(d, lab_value, players={"1": ("ST", 0.2, 5.0)}) == 1
+    doc = json.loads((d / "value" / "season.json").read_text(encoding="utf-8"))
+    rows = {(r[0], r[1]): dict(zip(doc["fields"], r)) for r in doc["rows"]}
+    assert set(rows) == {("1", "all"), ("1", "club"), ("1", "intl")}                 # 60 minutes: under the 90 floor
+    a, c, i = rows[("1", "all")], rows[("1", "club")], rows[("1", "intl")]
+    assert (a["min"], a["gar"], a["gar90"], a["par"], a["rt"]) == (1080, 1.0, round(90 / 1080, 3), 1.8, 6.92)
+    assert a["comps"] == [["premier-league", 900], ["nations-league", 180]] and a["c"] == [0.075, -0.008]
+    assert (c["gar90"], c["gar"], c["tid"], c["prev90"]) == (0.2, 2.0, 17, 0.18)
+    assert (i["gar90"], i["gar"], i["tid"], i["prev90"], i["comps"]) == (-0.5, -1.0, 4705, 0.6, [["nations-league", 180]])
+    assert a["name"] is None                                                          # the page names him from players.json
+    assert VF.write_value_season(d, lab_value, players={"1": ("ST", 0.2, 5.0)}) == 0  # unchanged: not rewritten
+    assert VF.write_value_season(d, None) == 0                                        # no windowed value: left as it is

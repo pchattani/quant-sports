@@ -359,6 +359,12 @@ def test_row_gar_adds_up_to_the_lines(built_value) -> None:
         m = (R.pid == int(ln["id"])) & (R.sid == cur)
         assert float(gar[m].sum()) == pytest.approx(ln["gar"], abs=0.006)
         assert float(R.mins[m].sum()) == pytest.approx(ln["min"], abs=0.5)
+        # the Value page's additive columns (value/season.json): PAR, the rating, the components less the role's mean
+        X = summary["_row_extra"][m]
+        assert float(X[:, 0].sum()) == pytest.approx(ln["par"], abs=0.01)
+        if ln["rt"] is not None:
+            assert float(X[:, 1].sum() / X[:, 2].sum()) == pytest.approx(ln["rt"], abs=0.006)
+        assert [float(x) for x in X[:, 3:].sum(axis=0) / (ln["min"] / 90.0)] == pytest.approx(ln["c"], abs=0.002)
 
 
 def test_sample_floors_are_honoured(built_value) -> None:

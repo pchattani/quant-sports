@@ -350,3 +350,9 @@ def test_value_views_tag_each_match_as_the_lab_does() -> None:
     assert l_club == (0.2, 0.2) and l_intl == (0.325, 0.65) and l_intl != l_club
     # GAR/90 reconciles with the line's own minutes
     assert abs(s_intl[0] * 180 / 90 - s_intl[1]) < 0.01 and abs(l_intl[0] * 180 / 90 - l_intl[1]) < 0.01
+    # extra additive columns (PAR, rating sums, components) ride along, summed over the same matches
+    import numpy as np
+    X = np.column_stack([gar * 2.0, np.ones(len(gar))])
+    out2 = pl.value_views(R, gar, lambda slug, key: era.get((slug, key)), {"30": "split", "40": "calendar"}, extra=X)
+    assert out2["windows"]["season"]["30"]["premier-league"] == [0.9, 270.0, 1.8, 3.0]
+    assert out2["windows"]["last"]["30"]["wc-qual-uefa"] == [0.25, 90.0, 0.5, 1.0]

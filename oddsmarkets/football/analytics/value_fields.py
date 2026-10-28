@@ -16,6 +16,9 @@ reach the earlier payloads here, in a step that runs once the value files are wr
   line's role (one competition) or the 12-month role.
 * `lab/leaders.json`: a `gar` board per scope (all, club, intl): this season's top 15 by goals above replacement
   (rows of lab/season/<scope>.json with 450+ minutes), {id, name, team, tid, comp, mix, value (GAR), minutes, gar90}.
+* `value/season.json`: the Value page's "This season" views over every competition, club competitions or national-team
+  football, one row per person and scope summed over the same matches as his Lab season line (write_value_season), so
+  they never mix one competition's latest edition into another season (28 Oct 2026).
 * `people/<pid>.json` `role`: the 12-month role. The unified step writes it from the value files on disk (the previous
   build's), and `refresh_people_roles` rewrites only the files whose role changed in this build's value layer.
 
@@ -236,6 +239,72 @@ def annotate_leaders(data_dir: Path) -> int:
     return int(_write_if_changed(path, board))
 
 
+SEASON_FIELDS = ["id", "scope", "tid", "name", "min", "gar90", "gar", "par", "rt", "prev90", "comps", "c"]
+SEASON_MIN = 90
+
+
+def _pooled(per_slug: dict | None, scope: str, intl: set[str]) -> dict | None:
+    """One person's windowed lines summed over a pooled scope: {"g", "m", "par", "rtw", "rtm", "c": [...], "comps":
+    [[slug, minutes]]}, None without minutes. Lists are [GAR, minutes, PAR, rating x minutes, rated minutes,
+    components...] (PeopleLines.value_views with value_payloads' `_row_extra`)."""
+    out = None
+    for slug, v in (per_slug or {}).items():
+        if not _in_scope(scope, slug, intl) or not isinstance(v, (list, tuple)) or len(v) < 2:
+            continue
+        g, m = _num(v[0]), _num(v[1])
+        if g is None or not m:
+            continue
+        if out is None:
+            out = {"g": 0.0, "m": 0.0, "par": 0.0, "rtw": 0.0, "rtm": 0.0, "c": [0.0] * max(len(v) - 5, 0), "comps": []}
+        out["g"] += g
+        out["m"] += m
+        if len(v) >= 5:
+            out["par"] += _num(v[2]) or 0.0
+            out["rtw"] += _num(v[3]) or 0.0
+            out["rtm"] += _num(v[4]) or 0.0
+            for j, x in enumerate(v[5:5 + len(out["c"])]):
+                out["c"][j] += _num(x) or 0.0
+        out["comps"].append([slug, int(round(m))])
+    if out is None or out["m"] <= 0:
+        return None
+    out["comps"].sort(key=lambda x: (-x[1], x[0]))
+    return out
+
+
+def write_value_season(data_dir: Path, lab_value: dict | None, players: dict | None = None) -> int:
+    """data/value/season.json: the Value page's "This season" pooled views (all, club, intl), one row per person and
+    scope over exactly the matches of his Lab season line (PeopleLines.value_views: each competition's matches in the
+    person's own season, never another edition), [id, scope, tid (the Lab row's team: his club, or his national team
+    for intl), name (only when value/players.json lacks the id), min, gar90, gar, par, rt, prev90 (GAR/90 in the same
+    scope last season, 450+ minutes), comps [[slug, minutes]], c (components per 90 less the role's mean)]; rows of
+    90+ minutes. Unchanged without the windowed value (the file stays the last value build's). Returns 1 when written."""
+    wins = (lab_value or {}).get("windows") if isinstance(lab_value, dict) else None
+    if not wins or not wins.get("season"):
+        return 0
+    intl = set((lab_value or {}).get("intl") or []) or _intl_slugs(data_dir)
+    players = players or {}
+    rows = []
+    for scope in POOLED:
+        lab = _read(data_dir / "lab" / "season" / f"{scope}.json") or {}
+        f = lab.get("fields") or []
+        I = {k: i for i, k in enumerate(f)}
+        ident = {str(r[I["player_id"]]): (r[I["tid"]] if "tid" in I else None, r[I["name"]] if "name" in I else None)
+                 for r in lab.get("rows") or [] if isinstance(r, list) and len(r) == len(f) and "player_id" in I}
+        for pid, per in wins["season"].items():
+            a = _pooled(per, scope, intl)
+            if a is None or a["m"] < SEASON_MIN:
+                continue
+            b = _pooled((wins.get("last") or {}).get(pid), scope, intl)
+            tid, name = ident.get(pid, (None, None))
+            k = a["m"] / 90.0
+            rows.append([pid, scope, tid, None if pid in players else name, int(round(a["m"])), round(a["g"] / k, 3),
+                         round(a["g"], 2), round(a["par"], 2), round(a["rtw"] / a["rtm"], 2) if a["rtm"] > 0 else None,
+                         round(90.0 * b["g"] / b["m"], 3) if b and b["m"] >= 450 else None, a["comps"],
+                         [round(x / k, 3) for x in a["c"]] or None])
+    rows.sort(key=lambda r: (POOLED.index(r[1]), -(r[6] or 0), r[0]))
+    return int(_write_if_changed(data_dir / "value" / "season.json", {"fields": SEASON_FIELDS, "rows": rows}))
+
+
 def refresh_people_roles(data_dir: Path, before: dict[str, str], after: dict[str, str]) -> int:
     """Rewrite people/<pid>.json `role` where this build's value layer changed it (the unified step wrote the
     previous build's); returns the files rewritten."""
@@ -377,6 +446,8 @@ def apply(data_dir: Path, roles_before: dict[str, str] | None = None, prev_lines
         return {"players_live": 0, "lab": 0, "people": 0}
     out = {"players_live": annotate_players_live(data_dir, lines, players),
            "lab": annotate_lab(data_dir, lines, players, load_full(data_dir), prev_lines, lab_value)}
+    if lab_value:
+        out["season"] = write_value_season(data_dir, lab_value, players)
     out["people"] = refresh_people_roles(data_dir, roles_before or {}, {i: r for i, (r, _g) in players.items() if r}) \
         if roles_before is not None else 0
     if prev_lines:
