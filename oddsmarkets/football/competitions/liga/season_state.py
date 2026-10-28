@@ -208,6 +208,31 @@ class SeasonState:
                 acc.points += rec.points
         return base
 
+    def anual_now(self) -> dict[str, TeamRecord]:
+        """
+        The Tabla Anual as it stands: both tournaments' zone-phase results played so far (the finished
+        Apertura plus the Clausura to date), as the AFA publishes it. Playoff matches never count.
+        `anual_base` is the constant part the simulation starts from; this is what the table shows.
+        """
+        base = {team: TeamRecord() for team in self.teams}
+        for torneo in (self.apertura, self.clausura):
+            for team, rec in torneo.records().items():
+                acc = base.setdefault(team, TeamRecord())
+                acc.played += rec.played
+                acc.won += rec.won
+                acc.drawn += rec.drawn
+                acc.lost += rec.lost
+                acc.gf += rec.gf
+                acc.ga += rec.ga
+                acc.points += rec.points
+        return base
+
+    def anual_standings(self) -> list[tuple[str, TeamRecord]]:
+        """The current Tabla Anual in order: points, goal difference, goals for (the AFA's order; it matched
+        Sofascore's "Anual 2025" table club for club), then name for a stable display."""
+        table = self.anual_now()
+        return sorted(table.items(), key=lambda kv: (-kv[1].points, -kv[1].gd, -kv[1].gf, kv[0]))
+
     def live_torneo(self) -> TorneoState | None:
         """The tournament currently being simulated, if any."""
         for torneo in (self.clausura, self.apertura):
@@ -220,9 +245,10 @@ class SeasonState:
         Current promedio per club: total points divided by total matches across the
         promedio window. Clubs promoted this season have no prior history and are
         scored on the current season alone — which is exactly why the metric is
-        points per match rather than points per season.
+        points per match rather than points per season. The current season counts what has been played so
+        far (the Tabla Anual as it stands), as the published promedios do.
         """
-        current = self.anual_base()
+        current = self.anual_now()
         out: dict[str, float] = {}
         for team in self.teams:
             prior_pts, prior_mp = self.promedios_prior.get(team, (0, 0))

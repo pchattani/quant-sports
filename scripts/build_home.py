@@ -45,6 +45,16 @@ oddsmarkets/common/digest.py, both shared with the sport overviews):
     sports[].topline     { stage, next: { title, start, href, league } }: one line per sport on where its season is
                          and its most significant game or event in the next 7 days
 
+Round 6 (the hub experience; the market quiet beside ours; our record off the page):
+    games[].market_home  the market's chance for the home side (player 1 in tennis), before the start only, and
+    games[].market_src   its source keys ('kalshi', 'polymarket', 'draftkings', 'espn'): the page shows "Market 54%"
+                         small and grey beside our chance (STYLE_GUIDE §3); football has no per-match market here
+    stories              { surprises: [{ sport, league, what, name, short, abbr, colour, href, from, to, since, until,
+                         delta }] (the season's biggest movers in a playoff chance, from each site's race_log.json, at
+                         most one riser and one faller per league, four in all), hot: [{ sport, league, name, abbr,
+                         colour, href, w, l, d, gp, margin, players }] (each site digest's team of the week, best first) }
+    digest.record and calibration stay in the payload; the page no longer shows them (they live on the Model pages).
+
 Sites not launched yet (PENDING, e.g. The Quant Campus) are left out of home.json and search.json unless their key
 is in LAUNCHED or --with-pending is given, so the live home page never links a Pages site that does not exist.
 The kit hides them the same way (QK.SPORTS drops `pending` entries outside local preview).
@@ -224,6 +234,88 @@ def game(sport, league, gid, start, status, home, away, hs=None, as_=None, **kw)
         if v is not None and v != "":
             g[k] = v
     return g
+
+
+def mkt(g, key="p_home"):
+    """The quiet market for a game (round 6): {market_home, market_src} from a site's payload game, before the start
+    only, else {}. The Home page shows it small and grey beside our chance (STYLE_GUIDE §3); the source keys are kept
+    short ('kalshi', 'polymarket', 'draftkings', 'espn') and the kit makes them readable."""
+    m = g.get("market") if isinstance(g.get("market"), dict) else {}
+    p = m.get(key)
+    if p is None or norm_status(g.get("status")) != "pre":
+        return {}
+    src = m.get("sources") or m.get("source") or m.get("src") or []
+    if not isinstance(src, list):
+        src = [src]
+    names = []
+    for x in src:
+        k = (x.get("source") if isinstance(x, dict) else x) or ""
+        k = str(k).lower().split("_")[0]
+        if k and k not in names:
+            names.append(k)
+    return {"market_home": r4(p), "market_src": names or None}
+
+
+def race_moves(out: dict, ctx, sport: str, league: str, log, metric: str, tm, what: str):
+    """Every team's move in one race-log metric over the season so far ({day: {key: p}}, oddsmarkets/common/league.py
+    race logs): the first snapshot against the latest at or before ctx.now (no look-ahead). Candidates for the Home
+    page's "Biggest surprises" go to out["races"]. Skipped when the log is too short, stale, or the race is settled."""
+    snaps = {d: v for d, v in ((log or {}).get(metric) or {}).items() if isinstance(v, dict) and not str(d).startswith("_")}
+    days = sorted(d for d in snaps if parse_ts(d) and parse_ts(d) <= ctx.now)
+    if len(days) < 2:
+        return
+    d0, d1 = days[0], days[-1]
+    if (parse_ts(d1) - parse_ts(d0)).days < 7 or (ctx.now - parse_ts(d1)).days > 10:
+        return
+    last = {k: v for k, v in snaps[d1].items() if isinstance(v, (int, float))}
+    if sum(1 for v in last.values() if 0.02 < v < 0.98) < max(3, 0.3 * len(last)):
+        return                                          # the race is all but settled: no story in it
+    for k, p1 in last.items():
+        p0 = snaps[d0].get(k)
+        if not isinstance(p0, (int, float)):
+            continue
+        t = tm(k)
+        out["races"].append({"sport": sport, "league": league, "what": what, "name": t.get("full") or t.get("name"),
+                             "short": t.get("name"), "abbr": t.get("abbr"), "colour": t.get("colour"), "href": t.get("href"),
+                             "from": round(float(p0), 3), "to": round(float(p1), 3), "since": d0, "until": d1,
+                             "delta": round(float(p1) - float(p0), 3)})
+
+
+def race_log(path: Path, season):
+    log = load(path) or {}
+    if season is not None and str(season) in log:
+        return log[str(season)]
+    return log[sorted(log)[-1]] if log else None
+
+
+def hot_team(out: dict, sport: str, league: str, hot, t: dict, players: bool = False):
+    """The site digest's team (or player) of the week as a Home candidate: {w, l, d, gp, margin} plus the team."""
+    if not isinstance(hot, dict) or not hot.get("gp"):
+        return
+    out["hot_teams"].append({"sport": sport, "league": league, "name": t.get("full") or t.get("name"),
+                             "short": t.get("name"), "abbr": t.get("abbr"), "colour": t.get("colour"), "href": t.get("href"),
+                             "w": hot.get("w") or 0, "l": hot.get("l") or 0, "d": hot.get("d") or 0, "gp": hot.get("gp"),
+                             "margin": hot.get("margin"), "players": players or None})
+
+
+def fan_stories(races, hots):
+    """The Home page's fan stories (round 6): `surprises` (the season's biggest movers in a playoff chance, at most
+    one per sport, risers and fallers) and `hot` (each sport's team of the week, best first)."""
+    by_sport = {}
+    for r in sorted(races or [], key=lambda r: -abs(r["delta"])):
+        if abs(r["delta"]) < 0.15:
+            break
+        key = (r["sport"], r["league"])
+        by_sport.setdefault(key, [])
+        sign = r["delta"] > 0
+        if len(by_sport[key]) < 2 and all((x["delta"] > 0) != sign for x in by_sport[key]):
+            by_sport[key].append(r)
+    firsts = sorted((v[0] for v in by_sport.values()), key=lambda r: -abs(r["delta"]))
+    seconds = sorted((v[1] for v in by_sport.values() if len(v) > 1), key=lambda r: -abs(r["delta"]))
+    surprises = (firsts + seconds)[:4]
+    hot = sorted((h for h in hots or [] if (h.get("gp") or 0) >= 2),
+                 key=lambda h: (-(h["w"] - h["l"]), -(h["w"] / max(1, h["gp"])), -(h.get("margin") or 0)))
+    return {"surprises": surprises, "hot": hot[:6]}
 
 
 def in_window(ctx: Ctx, g) -> bool:
@@ -562,7 +654,7 @@ def build_basketball(ctx: Ctx, base: str, out: dict):
             ser = g.get("series") or {}
             note = ser.get("round") and (ser["round"] + (f" · G{ser['game']}" if ser.get("game") else ""))
             x = game("basketball", LU, g["id"], g["date"], g["status"], tm(g["home"]), tm(g["away"]),
-                     g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
+                     g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")), **mkt(g),
                      total=m.get("total"), clock=g.get("clock"),
                      period=g.get("period"), wp_home=r4(g.get("wp_home")), note=note,
                      href=base + "#/" + L + "/game/" + str(g["id"]))
@@ -577,6 +669,8 @@ def build_basketball(ctx: Ctx, base: str, out: dict):
             games.append(x)
         out["games"].extend(pick_games(ctx, games, 4, 6))
         out["pool"].extend(games)
+        race_moves(out, ctx, "basketball", LU, race_log(d / L / "race_log.json", lg.get("current_season")), "p_playoffs", tm, "playoff chance")
+        hot_team(out, "basketball", LU, (lg.get("digest") or {}).get("hot"), tm((((lg.get("digest") or {}).get("hot")) or {}).get("key")))
         rows = sorted(sim.items(), key=lambda kv: -(kv[1].get("p_title") or 0))
         rows = [(k, v) for k, v in rows if (v.get("p_title") or 0) > 0][:8]
         if rows:
@@ -643,7 +737,7 @@ def build_tennis(ctx: Ctx, base: str, out: dict):
             g = game("tennis", f"{TU} · {e.get('name') or m.get('event')}", m["id"], start, m.get("status"),
                      team(n[0], href=base + "#/" + T + "/player/" + str(m.get("p1"))),
                      team(n[1], href=base + "#/" + T + "/player/" + str(m.get("p2"))),
-                     hs, as_, p_home=r4(mod.get("p1")),
+                     hs, as_, p_home=r4(mod.get("p1")), **mkt(m, "p1"),
                      sets=[[s[0], s[1]] for s in sets if s[0] is not None] if sets else None,
                      note=m.get("round"), href=base + "#/" + T + "/match/" + str(m["id"]), players=True,
                      tba=True if (m.get("tba") or (start and len(start) == 10)) else None)   # date-only start
@@ -656,6 +750,9 @@ def build_tennis(ctx: Ctx, base: str, out: dict):
             games.append(g)
         out["games"].extend(pick_games(ctx, games, 3, 5))
         out["pool"].extend(games)
+        th = (tour.get("digest") or {}).get("hot") or {}
+        if th.get("key") and names.get(th["key"]):
+            hot_team(out, "tennis", TU, th, team(names.get(th["key"]) or str(th["key"]), href=base + "#/" + T + "/player/" + str(th["key"])), players=True)
         elo = (tour.get("elo_top") or {}).get("all") or []
         out["leaders"]["tennis_" + T] = {"title": f"{TU} Elo", "unit": "Elo", "rows": [
             {"name": names.get(p[0]) or p[0], "value": round(p[1]), "href": base + "#/" + T + "/player/" + p[0]}
@@ -704,7 +801,7 @@ def build_baseball(ctx: Ctx, base: str, out: dict):
         note = ser.get("desc") and (ser["desc"].replace("Championship Series", "CS").replace("Division Series", "DS")
                                     + (f" · G{ser['game']}" if ser.get("game") else ""))
         x = game("baseball", "MLB", g["gpk"], g.get("start"), g.get("status"), tm(g["home"]), tm(g["away"]),
-                 g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
+                 g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")), **mkt(g),
                  total=m.get("total"), period=g.get("inning"), wp_home=r4(g.get("wp_home")), note=note,
                  href=base + "#/mlb/game/" + str(g["gpk"]))
         os_ = open_series.get(frozenset((str(g["home"]), str(g["away"])))) or {}
@@ -720,6 +817,8 @@ def build_baseball(ctx: Ctx, base: str, out: dict):
         games.append(x)
     out["games"].extend(pick_games(ctx, games, 3, 4))
     out["pool"].extend(games)
+    race_moves(out, ctx, "baseball", "MLB", race_log(d / "mlb" / "race_log.json", idx.get("season")), "p_postseason", tm, "postseason chance")
+    hot_team(out, "baseball", "MLB", (idx.get("digest") or {}).get("hot"), tm((((idx.get("digest") or {}).get("hot")) or {}).get("key")))
     pteams = ps.get("teams") or {}
     rows = sorted(pteams.items(), key=lambda kv: -(kv[1].get("p_ws") or 0))
     rows = [(k, v) for k, v in rows if (v.get("p_ws") or 0) > 0]
@@ -800,7 +899,7 @@ def build_nfl(ctx: Ctx, base: str, out: dict):
         m = g.get("model") or {}
         gt = g.get("gtype") or "REG"
         x = game("nfl", "NFL", g["game_id"], g["kickoff"], g["status"], tm(g["home"]), tm(g["away"]),
-                 g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
+                 g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")), **mkt(g),
                  model_spread=m.get("spread"),
                  period=g.get("qtr"), clock=g.get("clock"), wp_home=r4(g.get("wp_home")),
                  note=NFL_ROUND.get(gt) or f"Week {g.get('week')}", href=base + "#/game/" + g["game_id"])
@@ -812,6 +911,8 @@ def build_nfl(ctx: Ctx, base: str, out: dict):
         games.append(x)
     out["games"].extend(pick_games(ctx, games, 4, 10))
     out["pool"].extend(games)
+    race_moves(out, ctx, "nfl", "NFL", race_log(d / "race_log.json", idx.get("season")), "p_playoffs", tm, "playoff chance")
+    hot_team(out, "nfl", "NFL", (idx.get("digest") or {}).get("hot"), tm((((idx.get("digest") or {}).get("hot")) or {}).get("key")))
     rows = sorted(po.items(), key=lambda kv: -(kv[1].get("p_sb") or 0))[:8]
     out["futures"]["nfl"] = {"title": "Super Bowl", "rows": [
         {"name": (teams.get(k) or {}).get("name", k), "abbr": k, "p": r4(v.get("p_sb")),
@@ -886,7 +987,7 @@ def build_hockey(ctx: Ctx, base: str, out: dict):
         seen.add(g["game_id"])
         m = g.get("model") or {}
         x = game("hockey", "NHL", g["game_id"], g.get("start"), g.get("status"), tm(g["home"]), tm(g["away"]),
-                 g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
+                 g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")), **mkt(g),
                  total=m.get("total"), period=g.get("period"), clock=g.get("clock"),
                  wp_home=r4(g.get("wp_home")), xg=[(g.get("xg") or {}).get("home"), (g.get("xg") or {}).get("away")] if g.get("xg") else None,
                  note=("OT" if g.get("ot") else None), href=base + "#/game/" + g["game_id"])
@@ -903,6 +1004,8 @@ def build_hockey(ctx: Ctx, base: str, out: dict):
         games.append(x)
     out["games"].extend(pick_games(ctx, games, 5, 8))
     out["pool"].extend(games)
+    race_moves(out, ctx, "hockey", "NHL", race_log(d / "race_log.json", idx.get("season")), "p_playoffs", tm, "playoff chance")
+    hot_team(out, "hockey", "NHL", (idx.get("digest") or {}).get("hot"), tm((((idx.get("digest") or {}).get("hot")) or {}).get("key")))
     rows = sorted(po.items(), key=lambda kv: -(kv[1].get("p_cup") or 0))[:8]
     out["futures"]["hockey"] = {"title": "Stanley Cup", "rows": [
         {"name": (teams.get(k) or {}).get("name", k), "abbr": k, "p": r4(v.get("p_cup")),
@@ -1000,7 +1103,7 @@ def build_college(ctx: Ctx, base: str, out: dict):
             note = g.get("round") if g.get("stype") in ("cfp", "ncaa", "bowl") else None
             href = base + "#/" + L + "/game/" + str(g["id"]) + ("" if g.get("season") in (None, S) else f"?season={g['season']}")
             x = game("college", LU, g["id"], g.get("date"), g.get("status"), tm(g["home"], g.get("hr")),
-                     tm(g["away"], g.get("ar")), g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")),
+                     tm(g["away"], g.get("ar")), g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")), **mkt(g),
                      total=m.get("total"),
                      note=note, href=href)
             rnd = str(g.get("round") or "")
@@ -1019,6 +1122,8 @@ def build_college(ctx: Ctx, base: str, out: dict):
             games.append(x)
         out["games"].extend(pick_games(ctx, games, 4, 6))
         out["pool"].extend(games)
+        race_moves(out, ctx, "college", LU, race_log(d / L / "race_log.json", S), "p_cfp" if L == "cfb" else "p_ncaa", tm,
+                   "College Football Playoff chance" if L == "cfb" else "NCAA tournament chance")
         rows = [r for r in (lg.get("title_odds") or []) if r.get("p")][:8]
         if rows:
             out["futures"]["college" if L == "cfb" else "college_" + L] = {
@@ -1353,6 +1458,12 @@ def season_files(docs: Path = DOCS):
         idx = load(docs / folder / "data" / "index.json") or {}
         if idx.get("season"):
             rows.append((folder, f"the-quant-{folder}", f"{idx['season']}/season.json"))
+    # the season's biggest surprises (fan stories) read each site's race log (fixed paths, for sites present)
+    for folder, rels in (("rink", ["race_log.json"]), ("gridiron", ["race_log.json"]), ("bullpen", ["mlb/race_log.json"]),
+                         ("hardwood", ["nba/race_log.json", "wnba/race_log.json"]),
+                         ("campus", ["cfb/race_log.json", "mbb/race_log.json", "wbb/race_log.json"])):
+        if (docs / folder / "data" / "index.json").exists():
+            rows += [(folder, f"the-quant-{folder}", rel) for rel in rels]
     # "How sure are we?" reads each site's calibration.json (fixed paths, listed here so CI fetches them too)
     for key, folder, rel, league, subject in CALIBRATION:
         if (docs / folder / "data" / "index.json").exists():
@@ -1376,13 +1487,15 @@ def main(argv=None):
         return
     now = parse_ts(a.now) if a.now else datetime.now(timezone.utc).replace(microsecond=0)
     ctx = Ctx(a.links, now)
-    out = {"games": [], "futures": {}, "leaders": {}, "charts": {}, "stats": [], "search": [], "pool": [], "series": []}
+    out = {"games": [], "futures": {}, "leaders": {}, "charts": {}, "stats": [], "search": [], "pool": [], "series": [],
+           "races": [], "hot_teams": []}
     sports = []
     for key, folder, repo, label, site in SPORTS + [x for x in PENDING if x[0] in LAUNCHED or a.with_pending]:
         base = ctx.base(folder, repo)
         entry = {"key": key, "label": label, "site": site, "url": base, "data": PUBLIC.format(repo) + "data/",
                  "ok": False}
-        part = {"games": [], "futures": {}, "leaders": {}, "charts": {}, "stats": [], "search": [], "pool": [], "series": []}
+        part = {"games": [], "futures": {}, "leaders": {}, "charts": {}, "stats": [], "search": [], "pool": [], "series": [],
+                "races": [], "hot_teams": []}
         try:
             entry.update(BUILDERS[key](ctx, base, part))
             if key == "football":
@@ -1403,6 +1516,7 @@ def main(argv=None):
         sports.append(entry)
     pool, series = out.pop("pool"), out.pop("series")
     top = top_of_page(now, out["games"], pool, series, sports)
+    top["stories"] = fan_stories(out.pop("races"), out.pop("hot_teams"))
     out["games"].sort(key=lambda g: ({"live": 0, "pre": 1, "final": 2}[g["status"]], g["start"] or ""))
     add_why(out["games"])
     for g in pool:

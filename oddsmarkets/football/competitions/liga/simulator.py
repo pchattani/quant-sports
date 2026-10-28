@@ -77,6 +77,16 @@ class LigaResults:
     # Simulated league goals per club, for the top-scorer model
     team_goals_mean: dict[str, float] = field(default_factory=dict)
 
+    # The stakes of the next fixtures (league/simulator.py's shape): the same seasons split by each result,
+    # [{id, home, away, date, n: [H, D, A], title, bands: {key: [p|H, p|D, p|A] per team}}]
+    stakes: list[dict] = field(default_factory=list)
+    # Copa Argentina winners the berths were drawn from (club -> share of simulations), when given
+    copa_winner_share: dict[str, float] = field(default_factory=dict)
+
+
+# The races the stakes split on, beside "title" (the top of the Tabla Anual).
+STAKE_KEYS = ("libertadores", "sudamericana", "relegation", "top8")
+
 
 class LigaSimulator:
     """
@@ -95,9 +105,18 @@ class LigaSimulator:
         seed: int | None = None,
         chunk: int | None = None,
         boot_model=None,
+        copa_dist: dict[str, float] | None = None,
+        stake_days: float = 7.0,
+        stake_max: int = 15,
     ) -> None:
         self.model = model
         self.state = state
+        # The Copa Argentina's winner takes a Libertadores place ahead of the Tabla Anual. Until it is known
+        # (cfg.copa_argentina_winner, or a final already played) it is drawn per simulation from the cup's
+        # own simulated winners (build_site_all's cup build); clubs outside the league take no league place.
+        self.copa_dist = {t: float(p) for t, p in (copa_dist or {}).items() if p and p > 0}
+        self.stake_days = stake_days
+        self.stake_max = stake_max
         # Optional top-scorer model, fed the league-phase goals of every simulation.
         # The World Cup wiring calls GoldenBootModel.allocate() only from knockout
         # matches, so it sees 8 of 104 games; here that would hide ~240 of ~255.
@@ -154,13 +173,17 @@ class LigaSimulator:
             if i is not None:
                 seed_pts[i], seed_gf[i], seed_ga[i] = rec.points, rec.gf, rec.ga
 
-        fixtures = [
-            (self.team_idx[m.home_team], self.team_idx[m.away_team])
-            for m in torneo.remaining
+        league_left = [
+            m for m in torneo.remaining
             if not m.is_playoff
             and m.home_team in self.team_idx
             and m.away_team in self.team_idx
         ]
+        fixtures = [(self.team_idx[m.home_team], self.team_idx[m.away_team]) for m in league_left]
+        stake_at = self._stake_fixtures(league_left)
+        K = len(stake_at)
+        cnt_out = np.zeros((K, 3), dtype=np.int64)
+        cnt_st = {key: np.zeros((K, 3, T), dtype=np.int64) for key in ("title",) + STAKE_KEYS}
         logger.info(
             "Simulating %s: %d fixtures remaining, %d sims",
             torneo.key, len(fixtures), n,
@@ -220,6 +243,16 @@ class LigaSimulator:
 
         apertura_champ_idx = self.team_idx.get(self.state.apertura.champion or "")
         copa_idx = self.team_idx.get(cfg.copa_argentina_winner or "")
+        copa_p = None
+        if copa_idx is None and self.copa_dist:
+            total = sum(self.copa_dist.values())
+            copa_p = np.zeros(T + 1, dtype=np.float64)          # the last slot: a club outside the league
+            for team, p in self.copa_dist.items():
+                i = self.team_idx.get(team)
+                copa_p[i if i is not None else T] += p / total
+            copa_p = np.clip(copa_p, 0.0, None)
+            copa_p /= copa_p.sum()
+        cnt_copa = np.zeros(T + 1, dtype=np.int64)
 
         done = 0
         while done < n:
@@ -229,10 +262,11 @@ class LigaSimulator:
             gf = np.tile(seed_gf, (S, 1)).astype(np.int32)
             ga = np.tile(seed_ga, (S, 1)).astype(np.int32)
             goals = np.zeros((S, T), dtype=np.int32)
+            outcome = np.zeros((S, K), dtype=np.int8) if K else None
 
             # ── league phase ────────────────────────────────────────────────
             k = cfg.max_goals + 1
-            for h, a in fixtures:
+            for j, (h, a) in enumerate(fixtures):
                 cdf = self._score_cdf(h, a, neutral=False)
                 idx = np.searchsorted(cdf, rng.random(S), side="right")
                 np.clip(idx, 0, cdf.size - 1, out=idx)
@@ -243,6 +277,8 @@ class LigaSimulator:
                 home_win = hg > ag
                 draw = hg == ag
                 away_win = ag > hg
+                if K and j in stake_at:
+                    outcome[:, stake_at[j]] = np.where(home_win, 0, np.where(draw, 1, 2))
                 pts[:, h] += cfg.points_win * home_win + cfg.points_draw * draw
                 pts[:, a] += cfg.points_win * away_win + cfg.points_draw * draw
                 gf[:, h] += hg
@@ -358,6 +394,11 @@ class LigaSimulator:
             qualified[rows, champions] = True
             if copa_idx is not None:
                 qualified[:, copa_idx] = True
+            elif copa_p is not None:
+                draw_c = rng.choice(T + 1, size=S, p=copa_p)
+                np.add.at(cnt_copa, draw_c, 1)
+                inside = draw_c < T
+                qualified[rows[inside], draw_c[inside]] = True
 
             lib = qualified.copy()
             filled = lib.sum(axis=1)
@@ -414,6 +455,23 @@ class LigaSimulator:
             np.add.at(cnt_rel_any, worst_prom, 1)
             np.add.at(cnt_rel_any, second, 1)
 
+            # ── the stakes: the same seasons split by the next fixtures' results ──
+            if K:
+                onehot = (outcome[:, :, None] == np.arange(3)[None, None, :]).astype(np.int32)   # (S, K, 3)
+                cnt_out += onehot.sum(axis=0)
+                down = np.zeros((S, T), dtype=np.int32)
+                down[rows, worst_prom] = 1
+                down[rows, second] = 1
+                top8 = np.zeros((S, T), dtype=np.int32)
+                for zone_q in qualifiers.values():
+                    top8[rows[:, None], zone_q] = 1
+                first = np.zeros((S, T), dtype=np.int32)
+                first[rows, anual_order[:, 0]] = 1
+                ind = {"title": first, "libertadores": lib.astype(np.int32), "sudamericana": sud.astype(np.int32),
+                       "relegation": down, "top8": top8}
+                for key, mat in ind.items():
+                    cnt_st[key] += np.einsum("sko,st->kot", onehot, mat)
+
             if self.boot_model is not None:
                 self.boot_model.accumulate_batch(goals, self.teams)
 
@@ -430,12 +488,43 @@ class LigaSimulator:
 
         runtime = time.perf_counter() - start
         logger.info("Simulated %d seasons in %.1fs", n, runtime)
-        return self._assemble(
+        res = self._assemble(
             n, runtime, cnt_zone_pos, cnt_zone_win, cnt_top8, cnt_reach, cnt_title,
             cnt_anual_pos, cnt_anual_champ, cnt_lib, cnt_sud,
             cnt_rel_prom, cnt_rel_anual, cnt_rel_any,
             sum_pts, sum_anual_pts, sum_goals, promedio_samples,
         )
+        if copa_p is not None:
+            res.copa_winner_share = {t: float(cnt_copa[i] / n) for t, i in self.team_idx.items() if cnt_copa[i]}
+            if cnt_copa[T]:
+                res.copa_winner_share["(outside the league)"] = float(cnt_copa[T] / n)
+        for j, slot in sorted(stake_at.items(), key=lambda kv: kv[1]):
+            m = league_left[j]
+            nk = cnt_out[slot]
+
+            def cond(c, slot=slot, nk=nk):
+                return [(c[slot, o] / nk[o]).tolist() if nk[o] else None for o in range(3)]
+
+            res.stakes.append({
+                "id": str(m.game_id), "home": m.home_team, "away": m.away_team,
+                "date": m.date.isoformat().replace("+00:00", "Z") if m.date else None,
+                "n": nk.tolist(), "title": cond(cnt_st["title"]),
+                "bands": {key: cond(cnt_st[key]) for key in STAKE_KEYS},
+            })
+        return res
+
+    def _stake_fixtures(self, league_left) -> dict[int, int]:
+        """The fixtures the stakes split on: the dated zone-phase fixtures within `stake_days` of the first one
+        still to play, at most `stake_max`, soonest first, as {fixture index: slot} (league/simulator.py)."""
+        if not self.stake_max:
+            return {}
+        dated = [(m.date, j) for j, m in enumerate(league_left) if m.date is not None]
+        if not dated:
+            return {}
+        dated.sort(key=lambda x: (x[0], x[1]))
+        first = dated[0][0]
+        pick = [j for d, j in dated if (d - first).total_seconds() <= self.stake_days * 86400][: self.stake_max]
+        return {j: k for k, j in enumerate(pick)}
 
     def _assemble(
         self, n, runtime, cnt_zone_pos, cnt_zone_win, cnt_top8, cnt_reach, cnt_title,

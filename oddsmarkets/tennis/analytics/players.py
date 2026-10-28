@@ -937,6 +937,48 @@ def peer_blocks(cat: dict, tour: str) -> dict[str, dict]:
     return out
 
 
+# Progression (round 6; oddsmarkets/common/progression.py, MIGRATION_V4.md "Progression"): every career row carries
+# `dv` / `dp` / `pg` on the tour group's deep set (the spec's atp_all / wta_all headline and secondary metrics, then
+# PROG_EXTRA: point-level serve and return where the year has match stats), the file a `prog` block, and
+# data/<T>/progression_ref.json the peers' quantiles per year.
+PROG_EXTRA = ("dominance", "ace_pct", "first_in", "first_won", "second_won", "bp_saved_pct", "bp_conv_pct", "spw_real",
+              "rpw_real", "hold_real", "brk_real", "tpw", "df_pct")
+PROG_FILE = "progression_ref.json"
+
+
+def progression(cats: dict[int, dict | None], tour: str) -> tuple[dict[str, dict[int, dict]], dict, dict]:
+    """({pid: {year: {dv, dp, pg}}}, progression_ref.json, the files' prog block) from the year catalogues
+    (data/<T>/<year>/players.json): every listed player-year; percentiles (the catalogue's own `pct`, else placed among
+    the year's qualified players) on qualified rows only."""
+    from oddsmarkets.common import progression as PG
+    gid = f"{tour}_all"
+    have = set()
+    for cat in cats.values():
+        for r in ((cat or {}).get("players") or {}).values():
+            have.update(k for k, v in (r.get("values") or {}).items() if v is not None)
+    pb = PG.Builder("tennis", {tour: PG.deep_keys("tennis", [gid], have, extra=PROG_EXTRA)})
+    out: dict[str, dict[int, dict]] = {}
+    for y, cat in sorted(cats.items()):
+        for pid, r in (((cat or {}).get("players")) or {}).items():
+            out.setdefault(str(pid), {})[int(y)] = pb.add(int(y), tour, gid, r.get("values") or {}, bool(r.get("qualified")),
+                                                         pct=r.get("pct"))
+    pb.finish()
+    return out, pb.reference(), pb.prog_block()
+
+
+def merge_progression(payload: dict, rows: dict[int, dict] | None, prog: dict | None) -> dict:
+    """The progression fields onto the career file's seasons[] rows (by year) and its `prog` block."""
+    hit = False
+    for s in payload.get("seasons") or []:
+        r = (rows or {}).get(int(s.get("year") or 0))
+        if r:
+            s.update(r)
+            hit = True
+    if hit and prog:
+        payload["prog"] = prog
+    return payload
+
+
 def prev_pct(prev_cat: dict | None, pid: str, tour: str) -> dict:
     """Last season's percentiles for the career file's current block (kit v3 rail rings, 23 Oct 2026), the shape the
     player page reads (players.js prevFor): {"prev_pct_pos": {"all": last season's tour percentiles (when qualified),

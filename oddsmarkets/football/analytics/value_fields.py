@@ -361,6 +361,7 @@ def apply(data_dir: Path, roles_before: dict[str, str] | None = None, prev_lines
     lines, players = load(data_dir)
     if not lines and not players:
         logger.info("value fields: no value layer on disk, nothing added")
+        _performers(data_dir)
         return {"players_live": 0, "lab": 0, "people": 0}
     out = {"players_live": annotate_players_live(data_dir, lines, players),
            "lab": annotate_lab(data_dir, lines, players, load_full(data_dir), prev_lines)}
@@ -368,5 +369,16 @@ def apply(data_dir: Path, roles_before: dict[str, str] | None = None, prev_lines
         if roles_before is not None else 0
     if prev_lines:
         out["people_prev"] = annotate_people_prev(data_dir, prev_lines, prev_sid or {})
-    logger.info("value fields: %s", out)
+    logger.info("value fields: %s; performers for %d competitions", out, len(_performers(data_dir)))
     return out
+
+
+def _performers(data_dir: Path) -> dict:
+    """The competition pages' top and bottom performers (performers.py), once players_live carries the role and
+    GAR/90; a failure never stops the build."""
+    try:
+        from oddsmarkets.football.analytics import performers
+        return performers.write_all(data_dir)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("performers: %s", exc)
+        return {}

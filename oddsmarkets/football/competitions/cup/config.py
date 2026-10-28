@@ -286,10 +286,10 @@ _DOMESTIC_SLUGS = (
 
 def _domestic(slug: str, name: str, short: str, country: str, search: str, hint: str,
               rounds: tuple[tuple[str, int], ...], sofascore_id: int = 0, family: str = "domestic",
-              neutral_final: bool = True) -> CupConfig:
+              neutral_final: bool = True, neutral_rounds: tuple[str, ...] = ()) -> CupConfig:
     return CupConfig(
         slug=slug, name=name, short_name=short, region=country, sofascore_id=sofascore_id,
-        kind="knockout", n_teams=64, rounds=rounds, final_at_neutral_venue=neutral_final,
+        kind="knockout", n_teams=64, rounds=rounds, final_at_neutral_venue=neutral_final, neutral_rounds=neutral_rounds,
         family=family, search=search, country_hint=hint, detail_scope="followed", round_slugs=_DOMESTIC_SLUGS,
     )
 
@@ -328,8 +328,10 @@ BELGIAN_SUPER_CUP = _domestic("belgian-super-cup", "Belgian Super Cup", "Belgian
 COPA_DO_BRASIL = _domestic("copa-do-brasil", "Copa do Brasil", "Copa do Brasil", "Brazil", "Copa do Brasil", "Brazil",
                            (("r1", 1), ("r2", 1), ("r3", 2), ("r16", 2), ("qf", 2), ("sf", 2), ("final", 2)), sofascore_id=373, neutral_final=False)
 SUPERCOPA_DO_BRASIL = _domestic("supercopa-do-brasil", "Supercopa do Brasil", "Supercopa do Brasil", "Brazil", "Supercopa do Brasil", "Brazil", _ONE, family="super")
+# Every Copa Argentina tie is a single match at a neutral ground (provincial stadiums), so no round has a home side.
 COPA_ARGENTINA = _domestic("copa-argentina", "Copa Argentina", "Copa Argentina", "Argentina", "Copa Argentina", "Argentina",
-                           (("r64", 1), ("r32", 1), ("r16", 1), ("qf", 1), ("sf", 1), ("final", 1)))
+                           (("r64", 1), ("r32", 1), ("r16", 1), ("qf", 1), ("sf", 1), ("final", 1)),
+                           neutral_rounds=("r64", "r32", "r16", "qf", "sf", "final"))
 SUPERCOPA_ARGENTINA = _domestic("supercopa-argentina", "Supercopa Argentina", "Supercopa Argentina", "Argentina", "Supercopa Argentina", "Argentina", _ONE, family="super")
 KINGS_CUP = _domestic("kings-cup", "Saudi King's Cup", "King's Cup", "Saudi Arabia", "King Cup", "Saudi Arabia",
                       (("r32", 1), ("r16", 1), ("qf", 1), ("sf", 1), ("final", 1)), sofascore_id=2058)

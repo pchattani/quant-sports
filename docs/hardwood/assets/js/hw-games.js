@@ -40,7 +40,6 @@ function renderGames(el, params) {
     const games = byDay[day].slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
     const pre = games.filter(g => HW.gameState(g) === 'pre');
     const fin = games.filter(g => HW.gameState(g) === 'post');
-    const mm = pre.filter(g => isNum((g.model || {}).p_home) && isNum((g.market || {}).p_home));
     const months = {};
     days.forEach(x => { const m = x.slice(0, 7); if (!months[m]) months[m] = x; });
     const dl = d => HW.href(L, 'games/' + d, S);
@@ -51,28 +50,17 @@ function renderGames(el, params) {
       '<input type="date" class="qk-input" id="gl-date" aria-label="Pick a date" value="' + esc(day) + '" min="' + esc(days[0]) + '" max="' + esc(days[days.length - 1]) + '">' +
       '<select class="qk-select" id="gl-month" aria-label="Jump to month"><option value="">Jump to month…</option>' + Object.keys(months).map(m => '<option value="' + months[m] + '">' + esc(HW.fmtDate(m + '-15', { weekday: false }).replace(/^\d+ /, '')) + '</option>').join('') + '</select></div>';
     h += '<div class="hw-day"><b>' + esc(HW.fmtDate(day)) + '</b> · ' + games.length + ' game' + (games.length === 1 ? '' : 's') + '</div><div class="qk-watch">' + games.map(g => U.card(g, L, { season: S, records: recs, why: true })).join('') + '</div>';
-    if (mm.length || fin.length) {
-      h += '<div class="qk-grid hw-sec">';
-      if (mm.length) h += U.card2('Our chance for every home side', 'Teal: our win chance. Grey ring: the market (no vig), a reference, not our forecast', U.chart('gl-mm', 34 * mm.length + 60, 'Our home win chance, with the market for reference'), { cls: fin.length ? 'qk-span-7' : 'qk-span-12' });
-      if (fin.length) {
-        const scored = fin.filter(g => isNum((g.model || {}).p_home) && isNum(g.hs) && isNum(g.as));
-        const right = scored.filter(g => (g.model.p_home >= 0.5) === (g.hs > g.as)).length;
-        const brier = scored.length ? scored.reduce((s, g) => s + Math.pow(g.model.p_home - (g.hs > g.as ? 1 : 0), 2), 0) / scored.length : null;
-        h += U.card2('How our forecasts did', scored.length ? right + ' of ' + scored.length + ' of our favourites won' + (isNum(brier) ? ' · Brier score ' + brier.toFixed(3) + ' (0.25 = a coin flip; lower is better)' : '') : 'Results of the day',
-          '<ul class="hw-list">' + fin.map(g => {
-            const p = (g.model || {}).p_home, hw = g.hs > g.as;
-            const fav = isNum(p) ? (p >= 0.5 ? g.home : g.away) : null, pf = isNum(p) ? Math.max(p, 1 - p) : null;
-            const ok = fav !== null && ((fav === g.home) === hw);
-            return '<li><a class="hw-ent" href="' + esc(HW.gameHref(L, g.id, S)) + '"><span class="nm">' + esc(HW.teamAbbr(L, g.away) + ' ' + g.as + ' – ' + g.hs + ' ' + HW.teamAbbr(L, g.home)) + '</span></a>' +
-              '<span class="s">' + (fav ? 'ours: ' + esc(HW.teamAbbr(L, fav)) + ' ' + U.pct(pf) : '') + '</span><span class="v ' + (fav === null ? '' : ok ? 'pos' : 'neg') + '">' + (fav === null ? '' : ok ? '✓' : '✗') + '</span></li>';
-          }).join('') + '</ul>', { cls: mm.length ? 'qk-span-5' : 'qk-span-12', flush: true });
-      }
-      h += '</div>';
+    /* round 6: the market sits quietly on each card; the day's results list our pre-game call, with no scorecard (our
+       record lives on the Model page's "How we're doing" tab) */
+    if (fin.length) {
+      h += '<div class="qk-grid hw-sec">' + U.card2('Results of the day', 'The final score and our pre-game call', '<ul class="hw-list">' + fin.map(g => {
+        const p = (g.model || {}).p_home;
+        const fav = isNum(p) ? (p >= 0.5 ? g.home : g.away) : null, pf = isNum(p) ? Math.max(p, 1 - p) : null;
+        return '<li><a class="hw-ent" href="' + esc(HW.gameHref(L, g.id, S)) + '"><span class="nm">' + esc(HW.teamAbbr(L, g.away) + ' ' + g.as + ' – ' + g.hs + ' ' + HW.teamAbbr(L, g.home)) + '</span></a>' +
+          '<span class="s">' + (fav ? 'ours before the tip: ' + esc(HW.teamAbbr(L, fav)) + ' ' + U.pct(pf) : '') + '</span></li>';
+      }).join('') + '</ul>', { cls: 'qk-span-12', flush: true }) + '</div>';
     }
     el.innerHTML = h;
-    if (mm.length) {
-      QKC.dumbbell('#gl-mm', { rows: mm.map(g => ({ label: HW.teamAbbr(L, g.away) + ' @ ' + HW.teamName(L, g.home), a: g.model.p_home, b: g.market.p_home, href: HW.gameHref(L, g.id, S), sub: 'Market: ' + srcLabel(g.market.sources) })), aName: 'Our chance', bName: 'Market (reference)', labelWidth: 170, valName: 'Home win chance', catName: 'Game' });
-    }
     const go = v => { if (v) HW.go(dl(v)); };
     document.getElementById('gl-date').addEventListener('change', e => go(e.target.value));
     document.getElementById('gl-month').addEventListener('change', e => go(e.target.value));
@@ -136,14 +124,18 @@ function headHTML(L, g, S, season) {
   const st = U.status(g);
   const fin = st === 'final', live = st === 'live', pre = st === 'pre';
   const pc = U.pair(L, g.away, g.home), ca = pc[0], ch = pc[1];
-  const m = (g.pregame || {}).model || {}, mk = (g.pregame || {}).market || {};
+  /* the market: the game file's pre-game market, else the scoreboard card's (index.json), which a game file built
+     earlier may lack */
+  const card = ((HW.leagueInfo(L) || {}).today || []).concat((HW.leagueInfo(L) || {}).next_games || []).filter(c => String(c.id) === String(g.id))[0];
+  const m = (g.pregame || {}).model || {}, mk = (g.pregame || {}).market || (card && card.market) || {};
   const wpl = ((g.wp || {}).model || []);
   const pLive = live && wpl.length ? wpl[wpl.length - 1][1] : null;
   const recs = U.records(season);
   const rec = t => recs[String(t)] || '';
   const A = Object.assign(U.team(L, g.away), { colour: HW.teamColourRaw(L, g.away) || ca, record: rec(g.away) }), H = Object.assign(U.team(L, g.home), { colour: HW.teamColourRaw(L, g.home) || ch, record: rec(g.home) });
   const tag = g.series && (g.series.summary || g.series.round) ? (g.series.summary || g.series.round) + (g.series.game ? ' · Game ' + g.series.game : '') : (g.stype && g.stype !== 'reg' ? HW.stypeLabel(g.stype) : '');
-  const G = { sport: 'basketball', id: g.id, start: g.date, status: st, league: HW.leagueName(L) + (tag ? ' · ' + tag : ''), home: H, away: A,
+  /* round 6: the market's chance sits quietly under the hero (market: 'quiet'), the source on hover */
+  const G = { market_home: pre && isNum(mk.p_home) ? Number(mk.p_home) : null, market_src: srcLabel(mk.sources), sport: 'basketball', id: g.id, start: g.date, status: st, league: HW.leagueName(L) + (tag ? ' · ' + tag : ''), home: H, away: A,
     hs: isNum(g.hs) ? Number(g.hs) : null, as: isNum(g.as) ? Number(g.as) : null,
     p_home: live && isNum(pLive) ? Number(pLive) : (isNum(m.p_home) ? Number(m.p_home) : null), wp_home: live && isNum(pLive) ? Number(pLive) : null,
     p_pre: live && isNum(m.p_home) ? Number(m.p_home) : null, pre_only: live && !isNum(pLive) ? true : undefined,
@@ -163,7 +155,7 @@ function headHTML(L, g, S, season) {
     isNum(g.attendance) && g.attendance > 0 ? Number(g.attendance).toLocaleString('en-GB') + ' fans' : ''].filter(Boolean);
   return '<div class="hw-preview">' + QK.previewCard(G, { kicker: tag ? (tag.indexOf(HW.leagueName(L)) === 0 ? tag : HW.leagueName(L) + ' · ' + tag) : HW.leagueName(L) + (venue ? ' · ' + venue : ''), nick: t => U.nick(L, t === A ? g.away : g.home), colors: [ca, ch], factors: fx,
     factorsTitle: 'How they match up this season', noteExtra: extra.length ? 'This time ' + extra.join(', and ') + '.' : '',
-    market: pre && isNum(mk.p_home) ? { p: Number(mk.p_home), label: 'Market (' + srcLabel(mk.sources) + ')' } : null }) +
+    market: 'quiet' }) +
     '<div class="hw-hero-meta">' + meta.map(x => '<span>' + esc(x) + '</span>').join('') + '</div></div>';
 }
 

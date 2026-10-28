@@ -153,7 +153,8 @@ function hero(g, pre, season) {
   const src = (mk.sources || []).map(GI.titleCase).join(' / ') || 'Kalshi / Polymarket';
   const venue = g.stadium_name || g.stadium || '';
   return '<div class="gi-preview">' + QK.previewCard(G, { kicker: 'NFL' + (venue ? ' · ' + venue : ''), nick: t => t.name, colors: cols, factors: fx, factorsTitle: 'How they match up this season',
-    noteExtra: extra.length ? esc(extra.join(', and ') + '.') : '', market: st === 'pre' && isNum(mk.p_home) ? { p: Number(mk.p_home), label: 'Market (' + src + ')' } : null }) + '</div>';
+    /* round 6: the market quiet under the hero (small and grey, the sources on hover) */
+    noteExtra: extra.length ? esc(extra.join(', and ') + '.') : '', market: st === 'pre' && isNum(mk.p_home) ? { p: Number(mk.p_home), src: mk.sources || null, label: src, quiet: true } : null }) + '</div>';
 }
 /* Before kickoff: what a win or a loss does to each team's playoff chance (season.json next_game, the simulation). */
 function stakes(g, season) {
@@ -600,6 +601,8 @@ GI.route('game', function (el, params) {
     const pre = Object.assign({}, g.pregame || g.pre || { model: g.model, market: g.market, line: g.line });
     if (!pre.model) pre.model = g.model || {};
     if (!pre.market) pre.market = g.market || null;
+    /* round 6: a game file built before the market was captured falls back to the index card's (the quiet market line) */
+    if (!pre.market) { const ix = GI.index() || {}, ic = (ix.games || []).concat(ix.live || []).filter(x => x && x.game_id === id)[0]; if (ic && ic.market) pre.market = ic.market; }
     if (!pre.line) pre.line = g.line || null;
     pre.model = withDists(pre.model || {}, pre.line || g.line);
     const plays = playsOf(g);

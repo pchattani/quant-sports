@@ -189,6 +189,7 @@ function lc(x) { return /^[A-Z][a-z]/.test(x) ? x.charAt(0).toLowerCase() + x.sl
 function plural(n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); }
 
 GI.route('player', function (el, params) {
+  if ((params.query || {}).view === 'progression' && GI.progression) return GI.progression.tab(el, params);
   const pid = String(params.id || '');
   const S = Number(params.season);
   const cur = S === GI.currentSeason();
@@ -268,8 +269,8 @@ GI.route('player', function (el, params) {
       strip: tl, tags: tags, short: short0 || null });
     const NL = {};   /* the next and the last game, for fillNext / fillLast after the first paint */
     const crumb = '<nav class="gi-crumb" aria-label="Breadcrumb"><a href="#/players">NFL players</a><span aria-hidden="true">›</span>' + (team ? '<a href="' + esc(GI.teamHref(team, S)) + '">' + esc(GI.teamName(team)) + '</a><span aria-hidden="true">›</span>' : '') + esc(c.name || pid) + '</nav>';
-    let h = crumb + hero;
-    h += '<div class="gi-toolbar" style="margin-top:var(--sp-6)"><a class="qk-btn primary" href="' + GI.compareHref(pid) + '">Compare</a><a class="qk-btn" id="pp-all" href="' + GI.ghref('players', S, { g: g0 ? g0.code : group }) + '">All ' + esc(peerShort) + '</a></div>';
+    let h = crumb + (window.QPV ? window.QPV.tabsNav([['overview', 'Overview', GI.playerHref(pid, S)], ['progression', 'Progression', GI.playerHref(pid) + '?view=progression']], 'overview') : '') + hero;
+    h += '<div class="gi-toolbar" style="margin-top:var(--sp-6)"><a class="qk-btn primary" href="' + GI.compareHref(pid) + '">Compare</a><a class="qk-btn" href="#/compare/progression/' + encodeURIComponent(pid) + '">Compare progression</a><a class="qk-btn" id="pp-all" href="' + GI.ghref('players', S, { g: g0 ? g0.code : group }) + '">All ' + esc(peerShort) + '</a></div>';
     if (group === 'OL') h += GI.note('Offensive linemen have no individual metrics in the public data. The team page carries the line\'s unit ratings.');
 
     /* How sure are we (filled once the metric spec's M50 samples are in) */

@@ -265,3 +265,29 @@ def test_featured_reads_the_finals_series(tmp_path):
     dig = BH.league_digest(b, "nba", 2031, date(2031, 3, 1))
     top = dig["featured"]["today"][0]
     assert top["id"] == "20" and "Game 7: winner takes the series" in top["why"] and "NBA Finals" in top["why"]
+
+
+def test_progression_fields_and_reference(tmp_path):
+    """Round 6: build_hardwood.progression places every season against the qualified players of its role (the
+    catalogue's pct_role where it has the key), adds WAR from value.json, the age and the injury absences."""
+    cats = {}
+    for s in (2029, 2030):
+        P = {}
+        for i in range(30):
+            role = "GWB"[i % 3]
+            P[str(i)] = {"name": f"P{i}", "role": role, "qualified": i < 27, "age": 20.0 + i / 10, "gp": 60 + i,
+                         "values": {"hpm": i / 10 - 1, "pts100": 20 + i, "ts": 0.5 + i / 300, "games_missed": 22 - i // 2, "injury_dnp": 12 if i == 3 else 0},
+                         "pct_role": {"hpm": 50}}
+        cats[s] = {"players": P}
+        d = tmp_path / "nba" / str(s)
+        d.mkdir(parents=True)
+        (d / "value.json").write_text(json.dumps({"cols": ["id", "war"], "rows": [[str(i), i / 5] for i in range(30)]}), encoding="utf-8")
+    b = BH.Build(tmp_path)
+    ref, rows, keys = BH.progression("nba", cats, b)
+    assert keys[0] == "hpm" and "war" in keys and "pts100" in keys
+    h = rows[(2030, "3")]
+    assert h["pg"] == "nba_guards" and h["age"] == 20.3 and h["miss"] == [21, 12]
+    assert h["dv"][keys.index("war")] == 0.6 and h["dp"][keys.index("hpm")] == 50     # the catalogue's own percentile
+    assert "dp" not in rows[(2030, "28")]                                              # under the floor: values only
+    g = ref["seasons"]["2030"]["nba_wings"]
+    assert g["n"] == 9 and len(g["m"]["pts100"]) == 5 and ref["seasons"]["2030"]["len"] >= 85

@@ -137,6 +137,7 @@ function overviewUpcoming(host, race, season, teams, markets) {
   }
   var nr = (markets || {}).next_race || {};
   var mk = nr.year === race.year && nr.round === race.round && nr.prices && Object.keys(nr.prices).length ? nr.prices : null;
+  if (mk) { mk = Object.assign({}, mk); Object.defineProperty(mk, '_src', { value: nr.sources || [], enumerable: false }); }
   var raceS = sessions.filter(function (s) { return s.key === 'race'; })[0];
   host.innerHTML = '<div class="pd-gtop">' + hero(race, main, mk, raceS, post, teams) + '<div class="pd-gside">' +
     PD.card(post ? 'Our forecast, after qualifying' : 'Our forecast', 'The top ten by our win chance, from ' + (main && main[2].n ? PD.int(main[2].n) : '20,000') + ' simulated races.', '<div id="rc-top"></div>', { flush: true }) +
@@ -179,8 +180,12 @@ function hero(race, main, mk, raceS, post, teams) {
   var on = isNum(t0) && now >= t0, running = on && now - t0 < 3 * 3600 * 1000;
   var kick = (on ? (running ? 'Racing now · ' : 'Result to come · ') : '') + 'F1 · ' + (circ.name || PD.shortRace(race.name));
   var note = on ? '<b>What’s that number?</b> Our chances from before the start: ' + (running ? 'the race is on, and ' : '') + 'the result and the race in numbers land here once the race is classified.' : R.note;
+  /* round 6: the market's win chance for the two drivers in the hero, small and grey under it (kit market: 'quiet'),
+     the source on hover; only with a usable quote (markets.json next_race.prices) and before the start */
+  var g2 = R.ids[1];
+  if (!on && mk && isNum(mk[f]) && isNum(mk[g2])) { R.g.market_home = mk[f]; R.g.market_away = mk[g2]; R.g.market_src = mk._src || ['kalshi', 'polymarket']; }
   return '<div class="pd-rhero">' + QK.previewCard(R.g, { kicker: kick, homeFirst: true, note: note, factors: R.factors, factorsTitle: on ? 'How the two matched up before the start' : 'How the two match up this weekend',
-    market: mk && isNum(mk[f]) ? { p: mk[f], label: 'Market (Kalshi / Polymarket)' } : null }) + '</div>';
+    market: isNum(R.g.market_home) ? 'quiet' : null }) + '</div>';
 }
 
 /* v4 hero for a finished race: QK.splitHero with the winner against the runner-up in their constructors' colours

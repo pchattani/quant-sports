@@ -167,6 +167,11 @@ def build_season(b: Build, season: int, full: bool, cfg: dict, shared: dict) -> 
         skip = "play-by-play not on this machine; payloads kept"
     if skip:
         logger.info("%s: %s, skipped", season, skip)
+        if not (sdir / "performers.json").exists() and (sdir / "players.json").exists():
+            # a season built before the standings page's performers: derive them from the payloads on disk
+            from oddsmarkets.nfl.analytics import performers as PF
+            b.write_or_fail(d + "performers.json", f"performers {season}",
+                            lambda: PF.build(an.read_json(sdir / "players.json"), an.read_json(sdir / "value.json"), season), season=season)
         return {"skipped": True, "rows": CR.reduce_cat(an.read_json(sdir / "players.json"), season), "league": manifest.get("league"),
                 "fourth": an.read_json(sdir / "fourth_downs.json"), "referees": an.read_json(sdir / "referees.json")}
     ctx = SeasonContext(season, full=full, today=cfg["today"], current=current, sims=cfg["sims"],
@@ -286,6 +291,9 @@ def value_pages(b: Build, ctx, cfg: dict, cat: dict | None, tms: dict | None, si
     tab = b.step(f"contracts {season}", lambda: CT.table(season), {}) if (on and full_current) else {}
     res = b.step(f"value {season}", lambda: VL.build(ctx, cat, tms, sim if full_current else None, sens, prev_cat, prev_pv, tab, on), None) or {}
     b.write_or_fail(d + "value.json", f"value page {season}", lambda: res.get("value"), season=season)
+    # the standings page's top and bottom performers (oddsmarkets/nfl/analytics/performers.py)
+    from oddsmarkets.nfl.analytics import performers as PF
+    b.write_or_fail(d + "performers.json", f"performers {season}", lambda: PF.build(cat, res.get("value"), season), season=season)
     if full_current:
         b.write_or_fail(d + "trade.json", f"trade {season}", lambda: res.get("trade"), season=season)
         for t, pl in (res.get("needs") or {}).items():
@@ -758,6 +766,12 @@ def main(argv: list[str] | None = None) -> int:
     if refs:
         b.write_or_fail("referees.json", "referees", lambda: FD.referees(refs))
     rows_by = {s: r.get("rows") for s, r in res.items() if r.get("rows")}
+    prog = None
+    if not args.no_careers and rows_by:
+        # Progression (common.progression): dv / dp / pg on the rows (the career files carry them) and progression_ref.json
+        prog = b.step("progression", lambda: CR.progression(rows_by, lambda s: an.read_json(data / str(s) / "value.json")), None)
+        if prog:
+            b.step("write progression_ref.json", lambda: b.write(CR.PROG_FILE, prog[0]))
     if not args.no_history and rows_by:
         b.write_or_fail("history.json", "history", lambda: HS.build(rows_by, {s: r.get("league") for s, r in res.items()}))
     # calibration: builder C's backtest when it has written one; the existing file otherwise; else a placeholder
@@ -779,7 +793,8 @@ def main(argv: list[str] | None = None) -> int:
             return an.read_json(p) if p.exists() else None
         n_prev = b.step("last-season percentiles", lambda: CR.add_prev_pct(blocks, cat_reader), 0)
         logger.info("careers: last-season percentiles on %s current blocks", n_prev)
-        idx = b.step("careers", lambda: CR.write_careers(b.write, rows_by, blocks, old_reader, current), {}) or {}
+        idx = b.step("careers", lambda: CR.write_careers(b.write, rows_by, blocks, old_reader, current,
+                                                          prog[1] if prog else None), {}) or {}
         if idx:
             prev = an.read_json(data / "players_index.json") or {}
             prev = {k: v for k, v in prev.items() if isinstance(v, list) and CR.real_pid(k)}

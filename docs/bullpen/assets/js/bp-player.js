@@ -85,7 +85,9 @@ function logSection(cur, kind, L, S) {
 function render(el, params, state, route) {
   const pid = String(params.id || '');
   const L = params.level, S = params.season;
-  const view = ((params.query || {}).view) === 'detail' ? 'detail' : 'overview';
+  const vq = (params.query || {}).view;
+  const view = vq === 'detail' || vq === 'progression' ? vq : 'overview';
+  if (view === 'progression' && BP.progression) return BP.progression.tab(el, params, route);   /* bp-progression.js (round 6) */
   const legacy = () => (LEG[route] ? LEG[route](el, params, state) : null);
   if (view === 'detail') {
     const box = document.createElement('div');
@@ -160,7 +162,7 @@ function draw(el, c) {
     meta: [isNum(a) ? a + ' years old' : null, 'Bats ' + (p.bats || '—') + ', throws ' + (p.throws || '—'), p.debut ? 'MLB debut ' + BP.fmtDate(p.debut, { year: true }) : null], tags: tags, strip: strip, short: shortVersion() });
   const role = c.route === 'player' ? null : c.route;
   const base = BP.playerHref(pid, { level: L, role: role, season: S });
-  const tabs = [['overview', 'Overview', base], ['detail', 'Detail: every metric, spray, zones' + (pit ? ', tunnels' : ', bat tracking'), base + (base.indexOf('?') >= 0 ? '&' : '?') + 'view=detail']];
+  const tabs = [['overview', 'Overview', base], ['progression', 'Progression', base + (base.indexOf('?') >= 0 ? '&' : '?') + 'view=progression' + (c.twoWay ? '&kind=' + kind : '')], ['detail', 'Detail: every metric, spray, zones' + (pit ? ', tunnels' : ', bat tracking'), base + (base.indexOf('?') >= 0 ? '&' : '?') + 'view=detail']];
   let twoTabs = '';
   if (c.twoWay) twoTabs = '<div class="qk-seg" role="group" aria-label="Side" style="margin-left:auto"><a class="qk-btn' + (pit ? '' : ' primary') + '" href="' + esc(BP.playerHref(pid, { level: L, role: 'hitter', season: S })) + '">Hitting</a><a class="qk-btn' + (pit ? ' primary' : '') + '" href="' + esc(BP.playerHref(pid, { level: L, role: 'pitcher', season: S })) + '">Pitching</a></div>';
 

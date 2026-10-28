@@ -72,7 +72,7 @@ function performers(host, d, S) {
   RK.loadYear('performers.json', S).then(pf => {
     if (!U.alive(host)) return;
     const views = ((pf && pf.ok !== false && pf.views) || []).slice();
-    const tv = L ? QKL.teamView(L, { label: 'Clubs', peer: 'clubs', ours: 'Team rating model', name: t => RK.teamName(t) }) : null;
+    const tv = L ? QKL.teamView(L, { label: 'Clubs', peer: 'clubs', ours: 'Team rating model', oursIds: ['rating', 'off5', 'def5', 'pp', 'pk', 'goalie'], name: t => RK.teamName(t) }) : null;
     if (tv) views.push(tv);
     QKL.leaders(host, { data: { views: views }, title: 'Who leads the league, and who is struggling',
       sub: 'The top five and the bottom five on each key number: all skaters on our value model first, then forwards, defence and goalies on the numbers that matter for each, and the clubs. Qualified players only; each name opens the player page.',
@@ -415,7 +415,7 @@ function labPage(el, params, state) {
     tabs: [{ key: 'lab', label: 'Chart builder', href: '#/lab' + (U.sq(S) ? '?' + U.sq(S) : '') }, { key: 'compare', label: 'Compare', href: '#/compare' + (U.sq(S) ? '?' + U.sq(S) : '') }], active: tab });
   return U.legacy(tab, body, params, state);
 }
-const MD_TABS = [['methodology', 'Methodology'], ['calibration', 'Calibration'], ['moves', 'Who moves next'], ['glossary', 'Glossary'], ['terms', 'Terms']];
+const MD_TABS = [['methodology', 'Methodology'], ['calibration', 'How we’re doing'], ['moves', 'Who moves next'], ['glossary', 'Glossary'], ['terms', 'Terms']];
 /* Model › Who moves next (MOVES_VIEWS.md "Model page text"): the notes verbatim, the validation of each block on the
    sealed seasons (published or not, with the reason), and the calibration deciles of the published model. */
 const MV_BLOCKS = [['next', 'Not in the lineup next season'], ['deadline', 'Traded or claimed before the deadline'], ['type', 'Kind of departure'], ['arrivals', 'Arrivals by position'], ['targets', 'Targets']];
@@ -448,17 +448,19 @@ function movesModel(node, S) {
     } else node.querySelector('#mv-dec').innerHTML = QK.empty('No deciles published');
   });
 }
-/* v3: "How sure are we?" at the top of the Model page (methodology and calibration): the game model's record from
-   data/calibration.json (QK.howSure), our chance for the home team against how often it won. Nothing when absent. */
+/* Round 6: "How we're doing" (the Model page's calibration tab, id kept so ?tab=calibration and #/calibration still
+   work): our favourites' record over the last week (index.json digest.record) as tiles, then the game model's record
+   from data/calibration.json (QK.doing -> QK.howSure). The overview no longer carries either. */
 function howSure(node) {
   return RK.load('calibration.json').then(cj => {
     if (!U.alive(node)) return;
     const cb = QK.calib.find(RK.ok(cj) ? cj : null);
-    if (!cb) { node.innerHTML = ''; return; }
+    const rec = ((RK.index() || {}).digest || {}).record || null;
+    if (!cb && !rec) { node.innerHTML = ''; return; }
     const ss = (((cj || {}).game_model || {}).seasons || []).slice().sort();
     const span = ss.length ? RK.seasonLabel(ss[0]) + ' to ' + RK.seasonLabel(ss[ss.length - 1]) : '';
-    node.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every game forecast we would have made before puck drop' + (span ? ', ' + esc(span) : '') + ', grouped by the chance we gave the home team, against how often it won. When the two bars match, our numbers mean what they say.' }) + '<div id="md-sure-mod"></div>';
-    QK.howSure(node.querySelector('#md-sure-mod'), { calibration: cj, league: 'NHL', span: span, subject: 'the home team' });
+    QK.doing(node, { record: rec, calibration: cb ? cj : null, league: 'NHL', span: span, subject: 'the home team',
+      sub: 'Our favourites over the last week, then every game forecast we would have made before puck drop' + (span ? ', ' + span : '') + ', grouped by the chance we gave the home team, against how often it won. When the two match, our numbers mean what they say.' });
   });
 }
 function modelPage(el, params, state) {
@@ -468,9 +470,13 @@ function modelPage(el, params, state) {
   const sub = tab === 'glossary' ? 'Every number on the site in plain English: what it measures, and how many games it takes to mean something.' : 'How the models work, how well they have done on seasons they never saw, and what every number means.';
   const body = U.section(el, { section: 'model', title: tab === 'glossary' ? 'Glossary' : 'Model', sub: sub, tabs: tabs, active: tab });
   if (tab === 'moves') return movesModel(body, params.season);
-  if (tab === 'methodology' || tab === 'calibration') {
+  if (tab === 'calibration') {
     body.innerHTML = '<div class="rk-howsure" id="md-sure"></div><div id="md-tab"></div>';
     howSure(body.querySelector('#md-sure'));
+    return U.legacy(tab, body.querySelector('#md-tab'), params, state);
+  }
+  if (tab === 'methodology') {
+    body.innerHTML = QK.explain('<b>How we’re doing.</b> Our recent record and every forecast checked against what happened are on <a class="qk-link" href="#/model?tab=calibration">the How we’re doing tab</a>.') + '<div id="md-tab"></div>';
     return U.legacy(tab, body.querySelector('#md-tab'), params, state);
   }
   if (tab === 'glossary') {

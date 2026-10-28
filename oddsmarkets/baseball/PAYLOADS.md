@@ -47,6 +47,13 @@ be built is `{"ok": false, "reason"}`. Wrapped shapes (`{"ok", ..., "<key>": {..
  "decisions": swing/take value grid, "battrack": {...}, "arsenal": {...}, "movement": points, "release": {...}, "tunnels": [...],
  "fatigue": {...}, "rolling": [[date, xwoba_plus, woba]], "splits": {...}, "projection": {...}}, "similar": [...]}`
 
+Round 6 progression (oddsmarkets/common/progression.py): `"prog": {"v": 1, "keys": {"hitter" | "pitcher": [ids]}}` (the
+spec's hitter-group or SP / RP deep set) and on every MLB season row `"pr": {"dv": [values], "dp": [percentiles against
+the season's position group or role, the catalogue's pct_role], "pg": group}` aligned to `prog.keys[kind]` (nested
+because the rows already carry `dv`, decision value). `data/mlb/progression_ref.json`: each season's qualified peers per
+group (n, [p10, p25, p50, p75, p90] per metric, `len` = team games). Placed in the pool: 200 PA, 300 BF (SP) or 120 BF
+(RP), prorated by team games.
+
 ## Front-end contract (`docs/bullpen/`)
 Copy the Hardwood/Ace shell (`docs/ace/index.html`, `assets/js/{core,charts,fx}.js`, css) as `window.BP`: level switch
 (MLB | AAA), season picker, search, nav (Hub, Games, Standings, Postseason, Hitters, Pitchers, Teams, Leaders, Umpires, Parks,

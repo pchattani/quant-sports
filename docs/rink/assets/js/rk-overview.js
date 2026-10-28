@@ -3,16 +3,18 @@
  *   1. the intro band: what the site covers and how to use it, with three quick links (Games, Playoff race, Players);
  *   2. "This week in the NHL": the stage of the season, then the top lines from index.json "digest" (built by
  *      scripts/build_rink.py with oddsmarkets/common/digest.py): the biggest playoff-chance movers, the upset of the
- *      week, the team of the week, our record this week, and the other games that matter;
+ *      week, the team of the week and the other games that matter;
  *   3. the game that matters most, by significance (digest.featured from the shared rule; a stand-in on stakes until
  *      the payload carries it), as the diagonal split hero, labelled "Live now", "Tonight" (only when it truly is
  *      tonight in the reader's time), "Today", "Tomorrow" or the weekday; with nothing big on, the Cup race instead;
- *   4. "N games. Our calls."; the black power list (Who's hot); "We say it. Then we check it." beside "Who's for
- *      real?"; "What's that number?"; "Who lifts the Cup?" with projected points; the playoff race and standings;
- *      the leader boards.
+ *   4. "N games. Our calls." (the market quiet under our chance); the black power list (Who's hot); Breakout watch;
+ *      "Who's for real?" beside the records in reach and the biggest surprise; the best player nobody talks about;
+ *      "What's that number?"; "Who lifts the Cup?" with projected points; the playoff race and standings; the leader
+ *      boards; a small link to the Model page's "How we're doing" (round 6: our record and calibration live there).
  *
- * Reads index.json, <S>/season.json, <S>/markets.json (our Cup chances only), data/calibration.json. Refreshes every
- * minute while a game is live. */
+ * Reads index.json, <S>/season.json, <S>/markets.json (our Cup chances only); then, lazily, <S>/leaders.json, last
+ * season's leaders.json, <S>/performers.json, race_log.json and a few player files (the fan modules). Refreshes
+ * every minute while a game is live. */
 (function (RK) {
 'use strict';
 
@@ -108,15 +110,9 @@ function pickFeatured(idx) {
   return { c: sc[0][1], why: stakesWhy(sc[0][1], odds), big: sc[0][0] >= 8, rest: sc.slice(1).map(x => x[1]) };
 }
 
-/* Under the hero: why we picked it, then how sure we are (the kit's own line, kept). */
+/* Under the hero: why we picked it (round 6: no "How sure are we?" teaser on the landing page). */
 function heroNote(g, why) {
-  const p = g.p_home;
-  let sure = '';
-  if (g.status !== 'live' && isNum(p)) {
-    const fav = p >= 0.5 ? g.home : g.away, other = p >= 0.5 ? g.away : g.home, pf = Math.max(p, 1 - p), miss = Math.max(1, Math.round(10 * (1 - pf)));
-    sure = ' <b>How sure are we?</b> ' + U.pct(pf) + ' for ' + esc(nick(fav.abbr)) + ' means ' + esc(nick(other.abbr)) + ' win a game like this about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.';
-  }
-  return why ? '<b>Why this game?</b> ' + esc(why) + sure : (sure ? sure.slice(1) : undefined);
+  return why ? '<b>Why this game?</b> ' + esc(why) : false;
 }
 
 /* "This week in the NHL": the stage line, then the top lines as black tiles. */
@@ -148,12 +144,6 @@ function weekTiles(dig, idx, feat, cup) {
   const h = dig.hot;
   if (h) T.push({ label: 'Team of the week', value: RK.teamAbbr(h.key) + ' ' + h.w + '–' + h.l, href: RK.teamHref(h.key),
     sub: RK.teamName(h.key) + ': ' + h.w + ' win' + (h.w === 1 ? '' : 's') + ' in ' + h.gp + ' games, ' + (h.margin >= 0 ? '+' : '−') + Math.abs(h.margin) + ' goal difference.' });
-  const r = dig.record;
-  if (r) {
-    const diff = r.won - r.expected;
-    T.push({ label: 'Our record this week', value: r.won + ' of ' + r.n, href: '#/model?tab=calibration',
-      sub: 'Our favourites won ' + r.won + ' of ' + r.n + '; we expected ' + QK.fmt.num(r.expected, 0) + '. ' + (Math.abs(diff) < 2 ? 'Right on our numbers.' : diff > 0 ? 'A good week for the favourites.' : 'A week of upsets: a 60% call still misses 4 times in 10.') });
-  }
   const rest = (feat && feat.rest || []).slice(0, 2);
   if (rest.length) T.push({ label: 'Also worth a look', value: rest.map(c => RK.teamAbbr(c.away) + '–' + RK.teamAbbr(c.home)).join(' · '), href: '#/games', text: rest.length > 1,
     sub: rest.map(c => { const g = U.game(c), w = whenLabel(g); return w + (g.status === 'live' ? '' : ' ' + QK.fmt.time(c.start)) + ': ' + nick(c.away) + ' at ' + nick(c.home); }).join('. ') + '.' });
@@ -172,6 +162,120 @@ function gamesBlock(idx) {
   return { today: list, upcoming: up, recent: rec };
 }
 
+/* ── round 6: the fan modules (lazy, after the page is up; about 120 KB of small payloads and a few player files) ──
+ *   Breakout watch       this season's points-per-60 board (leaders.json) against last season's: three skaters off last
+ *                        season's top 25 with the biggest jump, last season's rate from the player file (20+ games)
+ *   Records in reach     the points and goals leaders (index.json, the boards on the page) at their club's games
+ *                        played, paced to 82, against the NHL records (Gretzky: 215 points in 1985-86, 92 goals in
+ *                        1981-82)
+ *   Biggest surprise     the largest move in our playoff chance since opening day (race_log.json; the early dates
+ *                        are rebuilt from the results known on each date, never later ones)
+ *   Nobody talks about   a skater on our deep boards (performers.json: isolated impact, xG share, Rink value per 60)
+ *                        but not on the points board, with his percentiles (6+ games, so they exist) and a season line */
+const RECORDS = { p: { v: 215, who: 'Wayne Gretzky', yr: '1985-86', noun: 'points' }, g: { v: 92, who: 'Wayne Gretzky', yr: '1981-82', noun: 'goals' } };
+const f2 = v => (isNum(v) ? v.toFixed(2) : '—');
+function seasonRow(pf, S) { return ((pf && pf.seasons) || []).filter(s => Number(s.season) === Number(S))[0] || null; }
+function seasonLine(pf, key, S, n) {
+  const ss = ((pf && pf.seasons) || []).filter(s => s.values && isNum(s.values[key]) && (s.qualified || Number(s.season) === Number(S)) && Number(s.season) <= Number(S));
+  return ss.slice(-(n || 7));
+}
+function posName(p) { return p === 'D' ? 'D' : p === 'G' ? 'G' : p === 'C' ? 'C' : p === 'L' ? 'LW' : p === 'R' ? 'RW' : (p || ''); }
+function fanModules(el, S, rows) {
+  const prevS = Number(S) - 10001;
+  const recOf = t => { const r = rows[t]; return r && isNum(r.w) ? r.w + '-' + r.l + '-' + (r.otl || 0) : ''; };
+  return Promise.all([RK.load(S + '/leaders.json'), RK.load(prevS + '/leaders.json'), RK.load(S + '/performers.json'), RK.load('race_log.json')]).then(res => {
+    if (!U.alive(el)) return;
+    const L = RK.ok(res[0]) ? res[0] : null, LP = RK.ok(res[1]) ? res[1] : null, PF = RK.ok(res[2]) ? res[2] : null, RL = res[3] || {};
+    const board = (d, k) => (((d || {}).skaters || {})[k] || {}).rows || [];
+    const pts25 = {}; board(L, 'p').forEach(r => { pts25[r[0]] = 1; });
+    const was25 = {}; board(LP, 'p60').concat(board(LP, 'p')).forEach(r => { was25[r[0]] = 1; });
+    const brk = board(L, 'p60').filter(r => !was25[r[0]]).slice(0, 9);
+    const IL = (RK.index() || {}).leaders || {};
+    const ldr = { p: (IL.s_p || [])[0], g: (IL.s_g || [])[0] };
+    /* nobody talks about: on two or more deep boards, never on the points board */
+    const deep = {};
+    ((PF && PF.views) || []).filter(v => v.key === 'forwards' || v.key === 'defence').forEach(v => (v.metrics || []).filter(m => ['rapm_net', 'adj_xgf_pct', 'gar_60', 'xgf60_rel', 'rapm_def'].indexOf(m.key) >= 0).forEach(m => (m.top || []).forEach(t => {
+      if (pts25[t[0]]) return;
+      const d = deep[t[0]] || (deep[t[0]] = { id: t[0], n: 0, best: 99, view: v.key });
+      d.n++; d.best = Math.min(d.best, t[5] || 99);
+    })));
+    const quiets = Object.keys(deep).map(k => deep[k]).sort((a, b) => b.n - a.n || a.best - b.best).slice(0, 4);
+    const ids = brk.map(r => r[0]).concat(quiets.map(q => q.id)).filter(Boolean);
+    return Promise.all(ids.map(id => RK.loadPlayer(id))).then(pfs => {
+      if (!U.alive(el)) return;
+      const P = {}; ids.forEach((id, i) => { if (pfs[i]) P[id] = pfs[i]; });
+      /* Breakout watch */
+      const cards = [];
+      brk.forEach(r => {
+        const pf = P[r[0]], cur = seasonRow(pf, S), prv = seasonRow(pf, prevS);
+        if (!cur || !prv || !isNum((prv.values || {}).p60) || !isNum((cur.values || {}).p60) || (prv.values.gp || 0) < 20 || (cur.values.gp || 0) < 6) return;
+        const now = cur.values.p60, was = prv.values.p60, jump = now - was;
+        if (jump < 0.6) return;
+        cards.push({ r: r, pf: pf, cur: cur, prv: prv, now: now, was: was, jump: jump });
+      });
+      cards.sort((a, b) => b.jump - a.jump);
+      const top = cards.slice(0, 3);
+      const scale = Math.max(4, Math.max.apply(null, top.map(c => c.now).concat([0])) * 1.08);
+      const team = id => (RK.player(id).team || '');
+      const story = top.map(c => {
+        const id = c.r[0], t = c.cur.team || team(id), gp = c.cur.values.gp, line = seasonLine(c.pf, 'p60', S);
+        return { kicker: 'Breakout watch', name: c.pf.name || RK.playerName(id), sub: RK.teamAbbr(t) + ' · ' + posName(c.cur.pos || c.pf.pos) + (isNum(c.cur.age) ? ' · age ' + Math.floor(c.cur.age) : ''),
+          value: '+' + c.jump.toFixed(2), unit: 'points per 60 on last season', colour: RK.teamColourRaw(t), mark: U.team(t), href: RK.playerHref(id) + '?view=progression',
+          from: { label: 'Last season', value: f2(c.was), pos: 100 * c.was / scale }, to: { label: 'This season', value: f2(c.now), pos: 100 * c.now / scale },
+          spark: line.length > 2 ? line.map(s => s.values.p60) : null, sparkLabel: line.length > 2 ? 'Points per 60, ' + RK.seasonLabel(line[0].season) + ' to now' : '',
+          text: (c.cur.values.p || 0) + ' points in ' + gp + ' game' + (gp === 1 ? '' : 's') + ', after ' + f2(c.was) + ' per 60 over ' + c.prv.values.gp + ' games last season.' + (gp < 25 ? ' An early sample: per-60 rates take about 25 games to settle.' : ''),
+          link: { text: 'Progression' } };
+      });
+      const bx = el.querySelector('#ov-break');
+      if (bx) bx.innerHTML = story.length ? '<section class="qk-section">' + QK.sectionHead({ kicker: 'Breakout watch', title: 'Who has found another gear?', sub: 'Skaters on this season’s points-per-60 board who were nowhere near last season’s, ranked by the jump. Every number is points per 60 minutes, all situations.', actions: '<a class="qk-more" href="#/players?tab=leaders">Every leader</a>' }) + QK.storyCards(story) + '</section>' : '';
+
+      /* Records in reach + Biggest surprise (beside Who's for real?) */
+      const side = [];
+      ['p', 'g'].forEach(k => {
+        const r = ldr[k], R = RECORDS[k], t = r ? team(r[0]) : '', gp = t && rows[t] ? rows[t].gp : null;
+        if (!r || !isNum(r[1]) || !isNum(gp) || gp < 1) return;
+        const pace = r[1] / gp * 82;
+        side.push({ kicker: k === 'p' ? 'Records in reach' : 'On pace for', name: RK.playerName(r[0]), sub: RK.teamAbbr(t) + ' · ' + r[1] + ' ' + R.noun + ' through ' + gp + ' club games', colour: RK.teamColourRaw(t), mark: U.team(t), href: RK.playerHref(r[0]),
+          value: Math.round(pace), unit: R.noun + ' over 82 games, on this pace', pace: { now: r[1], pace: pace, target: R.v, label: 'Record' },
+          text: 'The record is ' + R.v + ' ' + R.noun + ', ' + R.who + ' in ' + R.yr + '. ' + (gp < 20 ? gp + ' games in, a pace this hot usually cools.' : Math.round(pace) >= R.v ? 'On pace to break it.' : 'Short of it on this pace.') });
+      });
+      const rl = (RL[String(S)] || {}).p_playoffs || {};
+      const days = Object.keys(rl).filter(d => /^\d{4}-/.test(d)).sort();
+      if (days.length >= 2) {
+        const a = rl[days[0]], b = rl[days[days.length - 1]];
+        const mv = Object.keys(b).filter(t => isNum(a[t]) && isNum(b[t])).map(t => ({ t: t, d: b[t] - a[t], a: a[t], b: b[t] })).sort((x, y) => Math.abs(y.d) - Math.abs(x.d))[0];
+        if (mv && Math.abs(mv.d) >= 0.1) side.push({ kicker: 'Biggest surprise', name: RK.teamName(mv.t), sub: recOf(mv.t) ? recOf(mv.t) + ' so far' : '', colour: RK.teamColourRaw(mv.t), mark: U.team(mv.t), href: RK.teamHref(mv.t),
+          value: (mv.d > 0 ? '+' : '−') + Math.abs(Math.round(mv.d * 100)), unit: 'points of playoff chance',
+          from: { label: 'Opening day', value: U.pct(mv.a), pos: mv.a * 100 }, to: { label: 'Now', value: U.pct(mv.b), pos: mv.b * 100 },
+          text: 'No club’s playoff chance has moved more since opening day, in our season simulations: ' + (mv.d > 0 ? 'up' : 'down') + ' from ' + U.pct(mv.a) + ' to ' + U.pct(mv.b) + '.' });
+      }
+      const sx = el.querySelector('#ov-side');
+      if (sx) sx.innerHTML = side.length ? QK.sectionHead({ kicker: 'Records and surprises', title: 'On pace for history?', sub: 'The leaders’ 82-game pace against the records, and the club our numbers misjudged most.' }) + QK.storyCards(side, { cols: 1 }) : '';
+
+      /* Best player nobody talks about */
+      const quiet = quiets.filter(q => { const f = P[q.id], c = seasonRow(f, S); return f && c && f.current && f.current.pct && Object.keys(f.current.pct).length && ((c.values || {}).gp || 0) >= 6; })[0] || null;
+      const qp = quiet && P[quiet.id], qc = seasonRow(qp, S);
+      const spx = el.querySelector('#ov-spot');
+      if (spx && qp && qc && qp.current && qp.current.pct) {
+        const pc = qp.current.pct, v = qc.values || {}, D = (qc.pos || qp.pos) === 'D';
+        const defs = [['rapm_net', 'Isolated impact (RAPM)', x => U.signed(x, 2), 'Our model: his impact on the goal share, isolated from team-mates and opponents.'],
+          ['xgf_pct', 'On-ice xG share (5v5)', x => U.pct(x, 1), 'The share of expected goals his team gets with him on the ice at 5-on-5.'],
+          ['rapm_def', 'Isolated defence (RAPM)', x => U.signed(x, 2), 'Our model: his defensive impact, isolated from team-mates and opponents.'],
+          ['ixg60', 'Individual xG per 60 (5v5)', x => f2(x), 'Expected goals from his own shots per 60 minutes at 5-on-5.'],
+          ['p60', 'Points per 60', x => f2(x), 'Points per 60 minutes, all situations.']];
+        const stats = defs.filter(d => isNum(pc[d[0]]) && isNum(v[d[0]])).slice(0, 4).map(d => ({ label: d[1], value: d[2](v[d[0]]), pctl: pc[d[0]], tip: d[3] }));
+        const line = seasonLine(qp, 'xgf_pct', S);
+        const t = qc.team || team(quiet.id), top = stats.filter(s => s.pctl >= 90)[0] || stats[0];
+        spx.innerHTML = stats.length ? '<section class="qk-section">' + QK.sectionHead({ kicker: 'Best player nobody talks about', title: 'Off the points board. All over ours.', sub: 'Not in the top 25 for points, but near the top of our deep boards: the play tilts his way. Percentiles against ' + (D ? 'defencemen' : 'forwards') + ' this season.' }) +
+          QK.spotlight({ kicker: 'Spotlight · ' + (D ? 'defence' : 'forward'), name: qp.name, sub: RK.teamName(t) + ' · ' + posName(qc.pos || qp.pos) + (isNum(qc.age) ? ' · ' + Math.floor(qc.age) : ''), number: qp.number, team: { colour: RK.teamColourRaw(t) },
+            headline: top ? QK.ordinal(Math.round(top.pctl)) + ' percentile in ' + top.label.replace(/ \(.*\)$/, '').toLowerCase() + ', with ' + (v.p || 0) + ' points in ' + (v.gp || 0) + ' games.' : '',
+            stats: stats, spark: line.length > 2 ? { values: line.map(s => 100 * s.values.xgf_pct), labels: [RK.seasonLabel(line[0].season), 'now'], label: 'On-ice xG share by season' } : null,
+            text: (v.gp || 0) < 25 ? 'An early-season sample: these rates settle after about 25 games.' : '', links: [{ href: RK.playerHref(quiet.id), text: 'Player page' }, { href: RK.playerHref(quiet.id) + '?view=progression', text: 'Progression' }, { href: '#/compare/progression/' + encodeURIComponent(quiet.id), text: 'Compare careers' }] }) + '</section>' : '';
+      }
+    });
+  });
+}
+
 function render(el) {
   const S = RK.currentSeason();
   const idx = RK.index() || {};
@@ -187,10 +291,12 @@ function render(el) {
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch', title: '<span id="ov-gh">Today</span>', html: true, sub: 'Our chance for each side, with a line on why it’s worth your time. Live games update as they go.', actions: seg }) +
     '<div class="qk-watch" id="ov-games">' + QK.skeleton('card', 3) + '</div></section>' +
     '<div id="ov-hot"></div>' +
-    '<section class="qk-section qk-g75"><div><div id="ov-sure-h"></div><div id="ov-sure"></div></div>' +
+    '<div id="ov-break"></div>' +
+    '<section class="qk-section qk-g75">' +
     '<div class="rk-ov-real">' + QK.sectionHead({ kicker: 'Who’s for real?', title: 'Results v chances', sub: 'Clubs top-left are winning more than their chances suggest; bottom-right, the reverse. Early-season luck, or something real?' }) +
-    '<div class="qk-card"><div class="qk-card-body"><div id="ov-luck" class="qk-chart" role="img" aria-label="Points percentage against share of 5-on-5 expected goals"></div><p class="qk-caption" id="ov-luck-cap"></p></div></div></div></section>' +
-    '<section class="qk-section">' + QK.newHere({ items: [QK.NEW_HERE[0], QK.NEW_HERE[1], 'Every forecast is checked against what happened. <a class="qk-link" href="#/model?tab=calibration">The record is on the Model page.</a>'] }) + '</section>' +
+    '<div class="qk-card"><div class="qk-card-body"><div id="ov-luck" class="qk-chart" role="img" aria-label="Points percentage against share of 5-on-5 expected goals"></div><p class="qk-caption" id="ov-luck-cap"></p></div></div></div><div id="ov-side"></div></section>' +
+    '<div id="ov-spot"></div>' +
+    '<section class="qk-section">' + QK.newHere({ items: [QK.NEW_HERE[0], QK.NEW_HERE[1], '<b>Expected goals</b> (xG) rate every shot by how often that kind of chance goes in: 0.3 xG goes in about 3 times in 10. A club that wins the xG battle usually wins the games, in time.'] }) + '</section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'Title race', title: 'Who lifts the Cup?', sub: '<span id="ov-cup-lede">Our chances from 20,000 simulated seasons.</span>', html: true, actions: '<a class="qk-more" href="#/standings?tab=markets">Every season forecast</a>' }) +
     '<div class="qk-grid"><div class="qk-span-6">' + U.card2('Stanley Cup chances', 'Our chance from 20,000 simulated seasons, in team colours', '<div id="ov-cup"></div>', { foot: '<span>Top ten of 32</span><a href="#/standings?tab=ratings">Power ratings →</a>' }) + '</div>' +
     '<div class="qk-span-6">' + U.card2('Projected full-season points', 'Mean of the simulated seasons (dot) and its 90% range (bar)', U.chart('ov-range', 470, 'Projected points with a 90% range'), { foot: '<span>Range: 5th to 95th percentile of 20,000 seasons</span><a href="#/standings">Standings →</a>' }) + '</div></div></section>' +
@@ -199,19 +305,9 @@ function render(el) {
     '<div class="qk-grid"><div class="qk-span-6">' + U.card2('Playoff chances', 'Our chance of making the playoffs', '<div id="ov-po"></div>') + '</div>' +
     '<div class="qk-span-6">' + U.card2('Standings', 'Points, points % and our playoff chance', '<div id="ov-st"></div>', { flush: true, foot: '<span>Wild-card format</span><a href="#/standings">Full standings →</a>' }) + '</div></div></section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'Leaderboards', title: 'Leaders', sub: 'Counting stats this season, so everyone ranks. Rates with sample floors are on the Players page.', actions: '<a class="qk-btn" href="#/players">Players →</a>' }) +
-    '<div class="qk-grid" id="ov-leaders"></div></section>';
+    '<div class="qk-grid" id="ov-leaders"></div></section>' +
+    '<p class="qk-sub rk-ov-doing"><a class="qk-link" href="#/model?tab=calibration">How we’re doing →</a> Our record and every forecast checked against the result, on the Model page.</p>';
 
-  /* We say it. Then we check it.: the game model's record from data/calibration.json (QK.howSure, the kit's line
-     chart); the full record is on the Model page */
-  RK.load('calibration.json').then(cj => {
-    const box = el.querySelector('#ov-sure'), hd = el.querySelector('#ov-sure-h');
-    const cb = QK.calib.find(RK.ok(cj) ? cj : null);
-    if (!box) return;
-    if (!cb) { box.innerHTML = ''; hd.innerHTML = ''; return; }
-    hd.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every NHL game we have forecast, grouped by the chance we gave the home team. When the two lines match, our numbers mean what they say.',
-      actions: '<a class="qk-more" href="#/model?tab=calibration">The full record</a>' });
-    QK.howSure(box, { calibration: cj, league: 'NHL', subject: 'the home team' });
-  });
   return Promise.all([RK.load(S + '/season.json'), RK.load(S + '/markets.json')]).then(res => {
     if (!U.alive(el)) return;
     const season = RK.ok(res[0]) ? res[0] : {}, mk = RK.ok(res[1]) ? res[1] : {};
@@ -306,6 +402,7 @@ function render(el) {
       return '<div class="qk-span-3">' + U.card2(b[1], '', r.length ? '<ul class="rk-list rk-lead">' + r.map((x, i) => '<li><span class="n">' + (i + 1) + '</span>' + U.playerEnt(x[0], null, RK.player(x[0]).team) + '<span class="v">' + esc(b[2](x[1])) + '</span></li>').join('') + '</ul>' : QK.empty('No leaders yet'), { flush: true }) + '</div>';
     }).join('');
 
+    fanModules(el, S, byTeam);
     RK.setMeta('');
     if ((idx.live || []).length || (idx.today || []).some(g => U.status(g) === 'live')) RK.liveRefresh([S + '/season.json'], 60000);
   });

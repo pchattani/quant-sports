@@ -79,14 +79,16 @@ def _keys(x):
             yield from _keys(v)
 
 
-def test_no_market_field_reaches_home_json(tmp_path, monkeypatch):
-    """STYLE_GUIDE §3: the market never shows on the home page, so home.json carries none (games, title rows, F1 field)."""
+def test_market_is_quiet_on_games_only(tmp_path, monkeypatch):
+    """Round 6 (STYLE_GUIDE §3): a game carries the market's chance (market_home, market_src) before the start so the
+    page can show it small and grey beside ours; title rows, the F1 field and spreads carry no market."""
     def put(rel, obj):
         p = tmp_path / rel
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(json.dumps(obj), encoding="utf-8")
 
     start = bh.iso(NOW + timedelta(hours=3))
+    past = bh.iso(NOW - timedelta(hours=20))
     put("paddock/data/index.json", {"current_season": 2026, "teams": {"mclaren": {"colour": "#FF8000"}},
                                     "drivers": {"norris": {"name": "Lando Norris", "code": "NOR", "team": "mclaren"}},
                                     "next": {"name": "Mexico City GP", "round": 20, "year": 2026, "date": start[:10],
@@ -98,10 +100,15 @@ def test_no_market_field_reaches_home_json(tmp_path, monkeypatch):
                                                                     "2": {"name": "New York Knicks", "abbr": "NYK"}},
                                                           "today": [{"id": 9, "date": start, "status": "pre", "home": 1, "away": 2,
                                                                      "model": {"p_home": 0.6, "total": 221.5},
-                                                                     "market": {"p_home": 0.55, "spread_home": -3.5}}]}}})
+                                                                     "market": {"p_home": 0.55, "spread_home": -3.5,
+                                                                                "sources": ["kalshi", "draftkings_ml", "draftkings_spread"]}},
+                                                                    {"id": 8, "date": past, "status": "final", "home": 2, "away": 1,
+                                                                     "hs": 100, "as": 90, "model": {"p_home": 0.4},
+                                                                     "market": {"p_home": 0.45}}]}}})
     monkeypatch.setattr(bh, "DOCS", tmp_path)
     ctx = bh.Ctx("local", NOW)
-    out = {"games": [], "charts": {}, "futures": {}, "sports": [], "search": [], "pool": [], "series": []}
+    out = {"games": [], "charts": {}, "futures": {}, "sports": [], "search": [], "pool": [], "series": [],
+           "races": [], "hot_teams": []}
     for fn in (bh.build_f1, bh.build_basketball):
         try:
             fn(ctx, "../x/", out)
@@ -109,10 +116,37 @@ def test_no_market_field_reaches_home_json(tmp_path, monkeypatch):
             pass   # a later block wants more fixture than this test gives; the fields below are already written
     assert out["games"] and out["charts"].get("f1_next_race") and out["futures"].get("f1")
     assert [r["name"] for r in out["charts"]["f1_next_race"]["field"]] == ["Lando Norris"]   # model only
-    bad = {k for k in _keys(out) if k.startswith("market") or k == "spread"}
+    nba = {g["id"]: g for g in out["games"] if g["sport"] == "basketball"}
+    assert nba["9"]["market_home"] == 0.55 and nba["9"]["market_src"] == ["kalshi", "draftkings"]
+    assert "market_home" not in nba["8"]                       # finished: the market never shows after the start
+    bad = {k for k in _keys({k: v for k, v in out.items() if k not in ("games", "pool")}) if k.startswith("market") or k == "spread"}
+    bad |= {k for k in _keys(out["games"] + out["pool"]) if k == "spread" or (k.startswith("market") and k not in ("market_home", "market_src"))}
     assert not bad, bad
-    src = (ROOT / "scripts" / "build_home.py").read_text(encoding="utf-8")
-    assert "market_home=" not in src and '"market":' not in src and "market_odds.json" not in src
+
+
+def test_race_moves_and_fan_stories_no_look_ahead():
+    """The season's biggest surprises come from snapshots at or before the build time, at most two per league (one up,
+    one down), and a settled race tells no story."""
+    ctx = bh.Ctx("local", NOW)
+    d0 = (NOW - timedelta(days=30)).strftime("%Y-%m-%d")
+    d1 = (NOW - timedelta(days=1)).strftime("%Y-%m-%d")
+    d2 = (NOW + timedelta(days=2)).strftime("%Y-%m-%d")       # a later snapshot (a --now preview): never read
+    log = {"p_playoffs": {d0: {"A": 0.40, "B": 0.70, "C": 0.5, "D": 0.5}, d1: {"A": 0.90, "B": 0.20, "C": 0.55, "D": 0.45},
+                          d2: {"A": 0.10, "B": 0.99, "C": 0.5, "D": 0.5}, "_meta": {"live_from": d0}}}
+    out = {"races": [], "hot_teams": []}
+    tm = lambda k: bh.team("Team " + k, k, "#123456", href="../x/#/team/" + k)
+    bh.race_moves(out, ctx, "hockey", "NHL", log, "p_playoffs", tm, "playoff chance")
+    by = {r["abbr"]: r for r in out["races"]}
+    assert by["A"]["from"] == 0.4 and by["A"]["to"] == 0.9 and by["A"]["until"] == d1
+    st = bh.fan_stories(out["races"], [])
+    assert [r["abbr"] for r in st["surprises"]] == ["A", "B"]           # one riser, one faller; small moves left out
+    settled = {"p_playoffs": {d0: {k: 0.5 for k in "ABCD"}, d1: {k: (1.0 if k in "AB" else 0.0) for k in "ABCD"}}}
+    out2 = {"races": [], "hot_teams": []}
+    bh.race_moves(out2, ctx, "hockey", "NHL", settled, "p_playoffs", tm, "playoff chance")
+    assert out2["races"] == []
+    bh.hot_team(out2, "nfl", "NFL", {"key": "X", "w": 3, "l": 0, "gp": 3, "margin": 20}, tm("X"))
+    bh.hot_team(out2, "nfl", "NFL", {"key": "Y", "w": 2, "l": 1, "gp": 3, "margin": 30}, tm("Y"))
+    assert [h["abbr"] for h in bh.fan_stories([], out2["hot_teams"])["hot"]] == ["X", "Y"]
 
 
 def test_featured_game_is_the_significant_one_not_a_3am_coin_flip():

@@ -5,7 +5,7 @@
 'use strict';
 
 var esc = PD.esc, isNum = PD.isNum;
-function nav(active) { return PD.subnav([['#/model', 'Calibration', 'calibration'], ['#/methodology', 'Methodology', 'methodology'], ['#/glossary', 'Glossary', 'glossary'], ['#/disclaimer', 'Terms', 'disclaimer']], active, 'Model views'); }
+function nav(active) { return PD.subnav([['#/model', 'How we’re doing', 'calibration'], ['#/methodology', 'Methodology', 'methodology'], ['#/glossary', 'Glossary', 'glossary'], ['#/disclaimer', 'Terms', 'disclaimer']], active, 'Model views'); }
 
 // ── calibration ───────────────────────────────────────────────────────────
 
@@ -53,10 +53,29 @@ function reading(d) {
   return out.join('') || '<p>Not enough scored races for a reading.</p>';
 }
 
+/* Our favourite, round by round (moved from the overview, round 6): the pre-race favourite each round this season, its
+   win chance, filled in the team colour when it won; under it, how many it won against how many we expected. */
+function favourites(season) {
+  if (!PD.ok(season)) return PD.ch.none('cal-fav', 'No calendar.');
+  var done = (season.calendar || []).filter(function (c) { return c.status === 'done' && (c.p_win_top || []).length; }).sort(function (a, b) { return a.round - b.round; });
+  if (!done.length) return PD.ch.none('cal-fav', 'No forecasts stored for this season.');
+  var won = done.filter(function (c) { return c.winner === c.p_win_top[0][0]; }).length;
+  var mean = PD.mean(done.map(function (c) { return c.p_win_top[0][1]; }));
+  PD.ch.columns('cal-fav', { cats: done.map(function (c) { return 'R' + c.round; }), label: 'Our favourite win chance by round',
+    series: [{ name: 'Our favourite’s win chance', data: done.map(function (c) { return c.p_win_top[0][1]; }), colours: done.map(function (c) { return c.winner === c.p_win_top[0][0] ? PD.teamColour(c.winner_team || PD.driverTeam(c.winner)) : PD.col('faint'); }), fmt: function (v) { return PD.pct(v); } }],
+    fmt: function (v) { return Math.round(v * 100) + '%'; }, yMin: 0, xName: 'Round', yName: 'Our favourite’s win chance',
+    tipLabel: function (i) { var c = done[i]; return 'R' + c.round + ' ' + c.name + ': ' + PD.driverName(c.p_win_top[0][0]) + (c.winner === c.p_win_top[0][0] ? ' won' : ' (winner ' + PD.driverName(c.winner) + ')'); } });
+  var n = document.getElementById('cal-fav');
+  if (n) n.insertAdjacentHTML('afterend', '<p class="pd-cap">Our favourite won <b>' + won + ' of ' + done.length + '</b> races this season; its average win chance was ' + PD.pct(mean, 0) + ', so about ' + PD.num(mean * done.length, 1) + ' wins were expected. With twenty cars, even a clear favourite is usually under 50%.</p>');
+}
+
 function calibration(el) {
-  el.innerHTML = PD.pageHead('Model', 'How good are our forecasts?', 'Every Grand Prix since 2014 predicted with only the data before it, then checked against what happened.') + nav('calibration') +
+  el.innerHTML = PD.pageHead('Model', 'How we’re doing', 'Our favourite in every race this season, then every Grand Prix since 2014 predicted with only the data before it and checked against what happened.') + nav('calibration') +
+    '<section class="qk-section pd-sec" id="cal-fav-s">' + QK.sectionHead({ kicker: 'How we’re doing', title: 'Our favourite, round by round', sub: 'Our pre-race favourite each round this season: its win chance, filled in the team colour when it won.' }) +
+    PD.card('', '', PD.chartBox('cal-fav', 300, 'Our favourite’s win chance by round'), {}) + '</section>' +
     '<section class="qk-section pd-sec" id="cal-sure-s">' + QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Our race simulator’s win chance for every driver in every scored race, before qualifying, against how often the driver won. When we say 25%, it should happen about 1 time in 4.' }) + '<div id="cal-sure">' + QK.skeleton('card', 1) + '</div></section>' +
     '<section class="qk-section pd-sec">' + QK.sectionHead({ kicker: 'The backtest', title: 'Every model, every event', sub: 'Before and after qualifying, against simple baselines, for wins, podiums, points and retirements.' }) + '<div id="cal-body">' + PD.empty('Loading the backtest', '') + '</div></section>';
+  PD.load(PD.currentSeason() + '/season.json').then(function (season) { if (PD.alive(el)) favourites(season); });
   return PD.load('calibration.json').then(function (d) {
     if (!PD.alive(el)) return;
     howSure(d);

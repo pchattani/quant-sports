@@ -266,7 +266,7 @@ TABS_KNOCKOUT = ["overview", "bracket", "fixtures", "probs", "power", "team", "p
 TABS_FIXED = ["overview", "bracket", "fixtures", "probs", "matches", "history", "methodology"]
 TABS_PRE = ["overview", "fixtures", "matches", "methodology"]
 TABS_INTERNATIONAL = ["overview", "table", "bracket", "fixtures", "power", "team", "players", "analytics", "matches", "market", "methodology"]
-TABS_LIGA = ["overview", "zones", "bracket", "fixtures", "anual", "relegation", "probs", "power", "team", "players", "analytics", "matches", "market", "history", "methodology"]
+TABS_LIGA = ["overview", "zones", "table", "bracket", "fixtures", "anual", "relegation", "probs", "power", "team", "players", "analytics", "matches", "market", "history", "methodology"]
 
 # Why a cup is fixtures-only before its main phase, per competition.
 PRE_PHASE_NOTES = {
@@ -1617,6 +1617,30 @@ def build_league(cfg: LeagueConfig, entry: dict, args, sims: int | None,
 
 # ── cups ─────────────────────────────────────────────────────────────────────
 
+def knockout_note(cfg) -> str:
+    """The bracket note of a straight knockout, from its own rounds: which are single matches, which two-legged,
+    and where they are played (it once said "two-legged ties until a single-match final" for every national cup,
+    the single-match Copa Argentina, FA Cup and DFB-Pokal included)."""
+    labels = {**CUP_ROUND_LABELS, **{t.key: t.label for t in getattr(cfg, "ties", ()) or ()}}
+    rounds = list(getattr(cfg, "rounds", ()) or ())
+    two = [labels.get(k, k) for k, legs in rounds if legs == 2]
+    neutral = set(getattr(cfg, "neutral_rounds", ()) or ()) | ({"final"} if getattr(cfg, "final_at_neutral_venue", False) else set())
+    if not two:
+        legs = "Every tie is a single match"
+    elif len(two) == len(rounds):
+        legs = "Every tie is two-legged"
+    else:
+        legs = "Single matches, except the " + ", ".join(two) + " (two legs)"
+    if rounds and all(k in neutral for k, _ in rounds):
+        venue = ", all at neutral grounds"
+    elif "final" in neutral:
+        venue = "; the final is at a neutral ground"
+    else:
+        venue = ""
+    return ("A straight knockout whose bracket is read from the draw as it is made. " + legs + venue + ". Rounds "
+            "not yet drawn pair the survivors at random; ties already decided are taken as played.")
+
+
 def build_cup_pre(cfg: CupConfig, store: dict, out_dir: Path, base: dict, args) -> tuple[dict, None]:
     """A cup before its main phase: fixtures, results and match pages only."""
     note = PRE_PHASE_NOTES.get(cfg.slug, "The main phase has not started; the fixtures played so far are listed.")
@@ -1800,9 +1824,7 @@ def build_cup(cfg: CupConfig, entry: dict, args, sims: int | None, pooled: Dixon
                               "every tie is a single match at the centralised finals venue with no home side. "
                               "Pairings not yet drawn are drawn at random; ties already drawn or decided are taken "
                               "as they stand.",
-            "knockout": "A straight knockout whose bracket is read from the draw as it is made: two-legged ties "
-                        "until a single-match final. Rounds not yet drawn pair the survivors at random; ties "
-                        "already decided are taken as played.",
+            "knockout": knockout_note(cfg),
             "fixed": "A fixed ladder of continental champions. A slot filled by another competition's champion "
                      "is drawn per simulation from that competition's own title probabilities. Rounds already "
                      "played are taken as they stand.",
@@ -1894,7 +1916,10 @@ def build_cup(cfg: CupConfig, entry: dict, args, sims: int | None, pooled: Dixon
 
 # ── Argentina, via its own build ─────────────────────────────────────────────
 
-def build_liga(args, sims: int | None) -> dict:
+def build_liga(args, sims: int | None, copa_dist: dict[str, float] | None = None) -> dict:
+    """Argentina: the zones, playoffs, Tabla Anual, promedios and berths (scripts/build_site_liga.py), then the
+    same analytics payloads as every league. `copa_dist` is this run's Copa Argentina winner distribution (the
+    cups are built first), from which the simulation draws the cup's Libertadores place."""
     out_dir = DATA_DIR / LIGA_ARGENTINA_SLUG
     base = {
         "slug": LIGA_ARGENTINA_SLUG, "name": "Liga Profesional de Fútbol",
@@ -1910,11 +1935,15 @@ def build_liga(args, sims: int | None) -> dict:
     liga_build.DATA_DIR = out_dir
     liga_build.STORE_PATH = LIGA_STORE
     liga_build.HISTORY_STORE = out_dir / "history_store.json"
+    liga_build.PAST_STORE = DATA_DIR / "past" / "store.json"
+    liga_build.COPA_BRACKET = DATA_DIR / "copa-argentina" / "bracket.json"
+    liga_build.COPA_DIST = copa_dist or None
     argv = ["build"]
     if sims:
         argv += ["--sims", str(sims)]
-    if args.no_market:
-        argv.append("--no-market")
+    # The markets come from the leagues' pipeline below (Polymarket and Kalshi, The Odds API with a key), not the
+    # Argentine build's own Odds-API-only fetch, which never read the Kalshi and Polymarket listings Argentina has.
+    argv.append("--no-market")
     if args.seed is not None:
         argv += ["--seed", str(args.seed)]
     saved = sys.argv
@@ -1977,6 +2006,17 @@ def build_liga(args, sims: int | None) -> dict:
         _liga.match_details(store, registry=registry),
         floor=floor, season=entry["season"] or year, lineup_terms=LINEUP_TERMS.get(LIGA_ARGENTINA_SLUG),
     )
+    # The market beside our lines, as for every league: the match listings and the title market (the torneo's).
+    if model is not None:
+        from types import SimpleNamespace
+        from oddsmarkets.football.competitions.liga.config import ODDS_API_SPORT
+        mcfg = SimpleNamespace(slug=LIGA_ARGENTINA_SLUG, name=base["name"], odds_api_sport=ODDS_API_SPORT)
+        title_model = {r["team"]: r.get("p_title", 0.0) for r in probs.get("teams") or [] if r.get("team")}
+        try:
+            write_market_odds(out_dir, None if args.no_market else fetch_markets_safe(mcfg, fixtures["matches"], title_model.keys(), entry["season"]),
+                              model, title_model, adjust=lineup_lines(fixtures["matches"]))
+        except Exception as exc:  # noqa: BLE001 - the market is a reference; the competition stands without it
+            logger.warning("%s: market odds failed: %s", LIGA_ARGENTINA_SLUG, exc)
     # The Argentine build resolves crests against its own site; the hub keeps
     # every crest under docs/site/assets/crests, so fill them in here.
     teams_payload = _read_json(out_dir / "teams.json", {}) or {}
@@ -2488,7 +2528,7 @@ def main() -> int:
 
     if not args.skip_liga and (not args.only or LIGA_ARGENTINA_SLUG in args.only):
         try:
-            competitions.append(build_liga(args, args.sims))
+            competitions.append(build_liga(args, args.sims, champions.get("copa-argentina")))
         except Exception as exc:  # noqa: BLE001
             logger.error("liga build failed: %s\n%s", exc, traceback.format_exc())
             competitions.append({
@@ -2558,6 +2598,10 @@ def main() -> int:
     # the value model's role and GAR/90 on players_live, the lab and people files (METRICS_SPEC peer groups)
     _step("value fields", lambda: value_fields.apply(DATA_DIR, roles_before, (value or {}).get("_prev_lines"),
                                                      (value or {}).get("_prev_sid")))
+    # progression (round 6): every person's seasons, club and international, on the role group's deep set, and the
+    # peers' quantiles (data/progression_ref.json); after the value fields so the Lab lines carry GAR/90
+    from oddsmarkets.football.analytics import progression as football_progression
+    _step("progression", lambda: football_progression.apply(DATA_DIR))
     LAST_UNIFIED = None
 
     # Keep entries for competitions not rebuilt this run, so --only never drops

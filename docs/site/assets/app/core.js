@@ -920,15 +920,47 @@ function toGame(f, slug, extra) {
   if (extra && extra.home_record) g.home.record = extra.home_record;
   if (extra && extra.away_record) g.away.record = extra.away_record;
   if (f.xg && st !== 'pre') g.xg = f.xg;
+  /* round 6: the market's home / draw / away chance beside ours, quietly (kit market: 'quiet'), before kick-off only,
+     from the competition's market_odds.json once loadMarkets has read it */
+  var mk = st === 'pre' ? marketOf(s, f.id) : null;
+  if (mk) { g.market_home = mk.home; g.market_draw = mk.draw; g.market_away = mk.away; g.market_src = mk.src; }
   return g;
 }
+/* The market per match (round 6): MKT[slug] = { at, src, by: { matchId: { home, draw, away } } } from
+   <slug>/market_odds.json (matches.fixtures[].market, de-margined). A snapshot older than three days at the page clock
+   is not shown: a stale market is no reference. loadMarkets(slugs) -> Promise, each competition read once. */
+var MKT = {};
+var MKT_MAX_AGE = 3 * 864e5;
+function loadMarkets(slugs) {
+  var todo = [];
+  (slugs || []).forEach(function (s) { if (s && !(s in MKT) && todo.indexOf(s) < 0 && hasFile(s, 'market_odds')) todo.push(s); });
+  return Promise.all(todo.map(function (s) {
+    MKT[s] = null;
+    return compFile(s, 'market_odds').then(function (j) {
+      var by = {};
+      (((j || {}).matches || {}).fixtures || []).forEach(function (x) {
+        var m = x && x.market;
+        if (m && isNum(m.home) && isNum(m.draw) && isNum(m.away)) by[String(x.match_id)] = { home: m.home, draw: m.draw, away: m.away };
+      });
+      MKT[s] = { at: parseDate((j || {}).updated_at), src: (j || {}).sources || [], by: by };
+    }, function () { MKT[s] = null; });
+  }));
+}
+function marketOf(slug, id) {
+  var m = MKT[slug];
+  if (!m || !m.at || !m.by[String(id)]) return null;
+  var now = window.QK && QK.now ? QK.now() : Date.now();
+  if (now - m.at.getTime() > MKT_MAX_AGE) return null;
+  var x = m.by[String(id)];
+  return { home: x.home, draw: x.draw, away: x.away, src: m.src };
+}
 /* A game card (kit QK.gameCard, v4: the team-colour stripe): our chance per side before kick-off (the favourite in blue), the home / draw /
-   away stripe (home first, as football reads), the score and xG after it, and with why the italic one-line reason (QK.whyLine). The market is never on
-   a card: it is a quiet reference on the match page only. extra: {league, href, home_form, away_form ('WDLWW', oldest
+   away stripe (home first, as football reads), the score and xG after it, and with why the italic one-line reason (QK.whyLine). Round 6: the market
+   sits quietly under our chance (kit market: 'quiet') when loadMarkets has read the competition's market file. extra: {league, href, home_form, away_form ('WDLWW', oldest
    first), home_record, away_record, why: true}. */
 function matchCard(f, slug, extra) {
   var g = toGame(f, slug, extra);
-  var html = QK.gameCard(g, { sport: false, market: false, homeFirst: true, why: !!(extra && extra.why) });
+  var html = QK.gameCard(g, { sport: false, market: 'quiet', homeFirst: true, why: !!(extra && extra.why) });
   if (f.status === 'postponed' || f.status === 'cancelled') html = html.replace('class="qk-gc', 'class="qk-gc fb-void');
   return html;
 }
@@ -1196,7 +1228,7 @@ return {
   POS_LABEL: POS_LABEL, POS_GROUP: POS_GROUP, posBadge: posBadge, ROUND_LABELS: ROUND_LABELS, STAGE_LABELS: STAGE_LABELS,
   stageLabel: stageLabel, roundText: roundText, stageText: stageText, coverageChip: coverageChip, formChips: formChips,
   href: href, crest: crest, clubLink: clubLink, playerLink: playerLink, compLink: compLink,
-  toGame: toGame, matchCard: matchCard, gameCard: matchCard, wpBar: wpBar, staleLive: staleLive, probBar3: probBar3, scoreText: scoreText, fixtureRow: fixtureRow,
+  toGame: toGame, matchCard: matchCard, gameCard: matchCard, loadMarkets: loadMarkets, marketOf: marketOf, wpBar: wpBar, staleLive: staleLive, probBar3: probBar3, scoreText: scoreText, fixtureRow: fixtureRow,
   card: card, grid: grid, chartBox: chartBox, kpi: kpi, kpis: kpis, badge: badge, muted: muted, empty: empty, note: note, aside: aside, crumb: crumb, loading: loading,
   pageHead: pageHead, secHead: secHead, chances: chances, subnav: subnav, seg: seg, wireSeg: wireSeg, select: select, toolbar: toolbar, field: field, table: table, set: set,
   pctl: pctl, probBar: probBar, deltaHTML: deltaHTML, heatColour: heatColour, setCompPicker: setCompPicker, hubLive: hubLive

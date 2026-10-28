@@ -524,6 +524,7 @@ const K_ = {
 };
 
 function renderPlayer(el, params, state) {
+  if ((params.query || {}).view === 'progression' && TA.progression) return TA.progression.tab(el, params, state);
   const T = K.T(params, state);
   const pid = String(params.id || params.pid || (params.rest || [])[0] || '');
   el.innerHTML = K.muted('Loading…');
@@ -619,6 +620,7 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
   const crumb = '<nav class="ta-crumb" aria-label="Breadcrumb"><a href="' + K.href(T, 'players') + '">Tennis</a><span aria-hidden="true">›</span><a href="' + K.href(T, 'players') + '">' + K.TN(T) + ' players</a><span aria-hidden="true">›</span>' + K.esc(name) + '</nav>';
   const links = '<div class="ta-pl-links">' + (rival ? '<a class="qk-btn" href="' + K.compareHref(T, pid, rival) + '">Compare with ' + K.esc(K.surname(K.name(T, rival))) + '</a>' : '') +
     (h2hTop ? '<a class="qk-btn" href="' + K.h2hHref(T, pid, h2hTop) + '">Head to head v ' + K.esc(K.surname(K.name(T, h2hTop))) + '</a>' : '') +
+    '<a class="qk-btn" href="#/' + T + '/compare/progression/' + encodeURIComponent(pid) + '">Compare progression</a>' +
     '<a class="qk-btn" href="' + K.href(T, 'players') + '">All players</a></div>';
   /* the numbers the strip leaves out open "More on the player" */
   const tiles = [];
@@ -649,7 +651,7 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
 
   /* 1. the meters (7) with "How sure are we?" beside the tale of the tape against the closest match (5) */
   const tape = sim.length >= 1;
-  let h = crumb + hero + links +
+  let h = crumb + (window.QPV ? window.QPV.tabsNav([['overview', 'Overview', K.playerHref(T, pid)], ['progression', 'Progression', K.playerHref(T, pid) + '?view=progression']], 'overview') : '') + hero + links +
     '<section class="qk-section ta-sec1"><div class="qk-g75"><div><div id="pp-pcard"></div>' + QK.explain(settleNote, { cls: 'ta-settle' }) + '</div>' +
     '<div class="ta-stack">' + (tape ? '<div id="pp-tape-h"></div><div class="qk-chips ta-pick" id="pp-tape-pick" role="group" aria-label="Compare with"></div><div id="pp-tape">' + QK.skeleton('lines', 6) + '</div><div id="pp-verd"></div>'
       : typeCard + gbg) + '</div></div></section>';

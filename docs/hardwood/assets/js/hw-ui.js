@@ -132,12 +132,13 @@ U.game = (g, L, o) => {
     p_pre: live && isNum(g.wp_home) ? preP : null, pre_only: live && !isNum(g.wp_home) ? true : undefined,
     league: (o.league || HW.leagueName(L)) + (tag ? ' · ' + tag : ''),
     home: home, away: away, hs: isNum(g.hs) ? Number(g.hs) : null, as: isNum(g.as) ? Number(g.as) : null,
-    p_home: p, market_home: mk && isNum(mk.p_home) ? Number(mk.p_home) : null, note: st === 'final' && Number(g.period) > 4 ? 'OT' : '',
+    p_home: p, market_home: mk && isNum(mk.p_home) ? Number(mk.p_home) : null, market_src: mk && mk.sources ? U.srcLabel(mk.sources) : null, note: st === 'final' && Number(g.period) > 4 ? 'OT' : '',
     period: isNum(g.period) ? Number(g.period) : null, clock: g.clock, href: HW.gameHref(L, g.id, o.season || g.season)
   };
 };
-/* A game card (kit v3): our chance only, no market (the kit default); o.why adds the italic one-line reason. */
-U.card = (g, L, o) => QK.gameCard(U.game(g, L, o), { sport: false, why: !!(o && o.why) });
+/* A game card: our chance leads, the market sits quietly under it (round 6, market: 'quiet': before the tip only, the
+   source on hover); o.why adds the italic one-line reason. */
+U.card = (g, L, o) => QK.gameCard(U.game(g, L, o), { sport: false, market: 'quiet', why: !!(o && o.why) });
 /* Team nicknames for the preview card ("the Lakers"), two-word ones kept whole. */
 U.nick = (L, tid) => { const n = String(HW.teamName(L, tid) || tid); return /Trail Blazers$/.test(n) ? 'Trail Blazers' : n.split(' ').slice(-1)[0]; };
 

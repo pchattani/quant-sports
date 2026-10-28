@@ -305,10 +305,11 @@ function render(el) {
 }
 
 /* v4 (Broadcast): "We say it. Then we check it." at the top (QK.howSure from calibration.json: our chance against how often the home
-   team won, the Brier score, our most common call and the top end), then the full record below. */
+   team won, the Brier score, our most common call and the top end), then the full record below. Round 6: the page is "How
+   we're doing", and the top is QK.doing: our favourites' record this week (index.json digest.record) over the same chart. */
 GI.route('calibration', function (el, params) {
-  el.innerHTML = GI.pageHead('Model', 'How good are our forecasts?', 'Every game forecast since 2006 checked against what happened, out of sample, with the closing line and the best public alternatives as references.') + GI.sectionNav('model', 'calibration') +
-    '<section class="qk-section" id="cal-sure-sec" style="margin-top:var(--sp-6)">' + QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every pre-game forecast from the game model, walk-forward (each season forecast with only the seasons before it), grouped by the chance we gave the home team. When the two bars match, our numbers mean what they say.' }) + '<div id="cal-sure"></div></section>' +
+  el.innerHTML = GI.pageHead('Model', 'How we’re doing', 'Every game forecast since 2006 checked against what happened, out of sample, with the closing line and the best public alternatives as references.') + GI.sectionNav('model', 'calibration') +
+    '<section class="qk-section" id="cal-sure-sec" style="margin-top:var(--sp-6)"><div id="cal-sure"></div></section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'The full record', title: 'Scores, baselines and the closing line', sub: 'Log-loss and Brier against the closing line and simple baselines, the spread and totals, season odds, expected points and win probability, and the fourth-down model.' }) + '<div id="cal-root" class="gi-page"></div></section>';
   GI.load('calibration.json').then(cj => {
     const box = el.querySelector('#cal-sure');
@@ -316,7 +317,8 @@ GI.route('calibration', function (el, params) {
     const gm = (GI.ok(cj) && cj.game_model) || {};
     const ss = (gm.seasons || []).map(Number).filter(GI.isNum).sort((a, b) => a - b);
     if (!QK.calib.find(GI.ok(cj) ? cj : null)) { box.innerHTML = QK.empty('No forecast record yet', 'The record appears once the calibration build has run.'); return; }
-    QK.howSure(box, { calibration: cj, league: 'NFL', span: ss.length ? ss[0] + ' to ' + ss[ss.length - 1] : '', subject: 'the home team', unit: 'games' });
+    QK.doing(box, { record: ((GI.index() || {}).digest || {}).record || null, calibration: cj, league: 'NFL', span: ss.length ? ss[0] + ' to ' + ss[ss.length - 1] : '', subject: 'the home team', unit: 'games',
+      sub: 'Our favourites’ record over the last week, then every pre-game forecast from the game model, walk-forward (each season forecast with only the seasons before it), grouped by the chance we gave the home team. When the two match, our numbers mean what they say.' });
   });
   return render(el.querySelector('#cal-root')).then(() => { GI.sortable(el); });
 });

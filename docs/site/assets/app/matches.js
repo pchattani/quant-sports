@@ -296,8 +296,13 @@ function hero(c, f, m, hit, mk, side) {
   add('xG for a match', isNum(ta.xg) ? ta.xg : null, isNum(th.xg) ? th.xg : null, function (v) { return num(v, 2); });
   add('xG against a match', isNum(ta.xga) ? ta.xga : null, isNum(th.xga) ? th.xga : null, function (v) { return num(v, 2); }, true);
   add('Elo', a.elo, h.elo, function (v) { return num(v, 0); });
-  var src = mk ? (mk._src || []).map(function (k) { return k === 'kalshi' ? 'Kalshi' : k === 'polymarket' ? 'Polymarket' : k; }) : [];
-  var mref = f.status !== 'finished' && !live && mk && mk.market && isNum(mk.market.home) ? { p: mk.market.home, label: 'Market' + (src.length ? ' (' + src.join(' / ') + ')' : '') } : null;
+  /* round 6: the market's home / draw / away chance in one small grey line under the hero (kit market: 'quiet'), the
+     source on hover; before kick-off only, and only from a snapshot under three days old at the page clock */
+  var mkAt = mk ? FB.parseDate(mk._at) : null, mkFresh = !!mkAt && QK.now() - mkAt.getTime() <= 3 * 864e5;
+  if (f.status !== 'finished' && !live && mkFresh && mk.market && isNum(mk.market.home) && isNum(mk.market.away)) {
+    g.market_home = mk.market.home; g.market_draw = mk.market.draw; g.market_away = mk.market.away; g.market_src = mk._src || [];
+  }
+  var mref = isNum(g.market_home) ? 'quiet' : null;
   var rnd = FB.roundText(f, c.slug);
   var void_ = /postponed|cancelled|not reported/.exec(String(g.note || ''));
   var kick = c.name + (rnd ? ' · ' + rnd : '') + (void_ ? ' · ' + void_[0] : '') + (f.group || (m && m.group) ? ' · Group ' + (f.group || m.group) : '') + (m && m.venue ? ' · ' + m.venue : '');

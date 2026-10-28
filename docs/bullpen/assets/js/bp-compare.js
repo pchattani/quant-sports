@@ -26,6 +26,7 @@ function blockOf(p, kind, L, S) {
 }
 
 function render(el, params, state) {
+  if (params.a === 'progression' && BP.progression) return BP.progression.compare(el, params);  /* #/compare/progression/<ids> (bp-progression.js) */
   const q = params.query || {};
   const L = params.level, S = params.season;
   const ids = [params.a, params.b, q.c].filter(x => x && /^\d+$/.test(String(x)));
@@ -47,7 +48,7 @@ function render(el, params, state) {
     const sn = E.map(x => BP.playerSurname(x.id));
     let h = U.head({ kicker: 'Compare · ' + BP.levelName(L) + ' ' + S, title: E.length >= 2 ? sn.slice(0, -1).join(', ') + ' or ' + sn[sn.length - 1] + '?' : 'Compare players',
       sub: 'Two or three ' + (KIND === 'pitcher' ? 'pitchers' : 'hitters') + ' on the metrics that are stable from year to year and predict next season, chosen for their position or role.',
-      actions: U.seg('cmp-kind', 'Kind', [['hitter', 'Hitters'], ['pitcher', 'Pitchers']], KIND) + '<a class="qk-btn" href="' + esc(href(params.a || '', params.b || '', q.c) + (q.c ? '&' : '?') + 'view=classic') + '">Every metric (classic)</a>' }) +
+      actions: U.seg('cmp-kind', 'Kind', [['hitter', 'Hitters'], ['pitcher', 'Pitchers']], KIND) + '<a class="qk-btn" href="' + esc('#/compare/progression/' + ids.map(encodeURIComponent).join('/') + '?kind=' + KIND) + '">Careers: progression</a>' + '<a class="qk-btn" href="' + esc(href(params.a || '', params.b || '', q.c) + (q.c ? '&' : '?') + 'view=classic') + '">Every metric (classic)</a>' }) +
       '<section class="qk-card"><div class="qk-card-body"><div class="bp-cmp-pick">' + [0, 1, 2].map(i => '<div class="bp-cmp-slot" style="--ec:' + COLS[i] + '"><span class="qk-kicker" style="margin:0">' + (i === 2 ? 'Third (optional)' : i ? 'Second' : 'First') + '</span><div id="cmp-p' + i + '"></div></div>').join('') + '</div></div></section>';
     if (E.length < 2) h += '<div style="margin-top:var(--sp-4)">' + QK.empty('Pick two ' + KIND + 's', ids.length && !E.length ? 'No ' + S + ' ' + BP.levelName(L) + ' ' + KIND + ' season on file for that player: try the classic view.' : 'Type a name above.') + '</div>';
     else {

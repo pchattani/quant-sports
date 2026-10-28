@@ -14,11 +14,18 @@
  *                  "Tomorrow" or the weekday; nothing big on: the races lead instead
  *   N matches.     game cards for one day (our home / draw / away chance before kick-off, the score and xG after),
  *   Our calls.     each with a line on why, big matches first (digest.featured), then how big and close; the day and the competition
- *                  family are pickers. No market anywhere on this page.
+ *                  family are pickers. Round 6: the market sits quietly under our chance (kit market: 'quiet', FB.loadMarkets).
  *   who's hot      the black power list (QK.band + QK.hotRow): goals, assists, rating, finishing, the strongest club
- *   we say it      "We say it. Then we check it." (QK.howSure from data/calibration.json, the walk-forward backtest)
- *                  beside "Who's for real?" (QKC.quadrant: xG share against points per game, one league at a time)
- *   what's that    "What's that number?": three things to know, the third linking the Model page
+ *   breakout       "Breakout watch" (round 6): one big league at a time, the players furthest above their own last season in
+ *                  our value model (GAR per 90, percentile against the league's players in the same role; lab/season and
+ *                  lab/last), then "The best player nobody talks about" (QK.spotlight: top of the value model, almost no
+ *                  goals or assists)
+ *   records        "Records in reach": the big leagues' top scorers on pace against the league record
+ *   for real       "Who's for real?" (QKC.quadrant: xG share against points per game, one league at a time) beside the
+ *                  biggest surprises: the clubs furthest above and below their expected points (pool.json)
+ *   what's that    "What's that number?": three things to know
+ *   Our record and the calibration ("How we're doing") live on the Model page (#/model/calibration); a small link at
+ *   the foot of this page goes there.
  *   title race     "Who wins the league?": our title chances for one big league in club colours (ours only), beside
  *                  the race run by run (forecast lines with end labels); then every open race's favourite
  *   leaders        goals against xG across competitions; the strongest clubs on the pooled scale; national teams
@@ -28,7 +35,8 @@
  * sets pre_only), as on the Home page and the ticker.
  *
  * Reads competitions.json (FB.INDEX), clubs_index.json (names, colours), hub.json, lab/leaders.json, the big
- * leagues' probs.json, strength.json, teams.json and history.json, pool.json, nations.json and calibration.json; each
+ * leagues' probs.json, strength.json, teams.json and history.json, pool.json, nations.json, the big leagues'
+ * lab/season and lab/last files (one league at a time, after the first render) and market_odds.json; each
  * block degrades on its own. While a match is live, hub.json is re-read every minute. A match a cached snapshot still
  * marks live 12 hours after kick-off is not counted as live (FB.staleLive). */
 (function (FB) {
@@ -87,13 +95,20 @@ FB.route('overview', function (el) {
       '<div id="ov-cards" class="qk-watch fb-mt">' + QK.skeleton('card', 3) + '</div>' +
       '<div id="ov-more" class="fb-cap"></div></section>' +
     '<div id="ov-hot">' + QK.skeleton('lines', 2) + '</div>' +
-    '<section class="qk-section qk-g75 fb-ov-sure"><div><div id="ov-sure-h"></div><div id="ov-sure">' + QK.skeleton('chart', 1) + '</div></div>' +
+    '<section class="qk-section fb-ov-fan">' + QK.sectionHead({ kicker: 'Breakout watch', title: '<span id="ov-brk-t">Who’s stepped up</span>', html: true,
+        sub: 'The players furthest above their own last season in our value model, against the same league’s players in their role. Early-season samples: a watch list, not a verdict.',
+        actions: '<span id="ov-fan-pick"></span>' }) +
+      '<div id="ov-brk">' + QK.skeleton('card', 3) + '</div><div id="ov-spot" class="fb-ov-spot"></div></section>' +
+    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Records in reach', title: 'On pace for history?', sub: 'The big leagues’ top scorers, their league goals so far, the pace over a full season and the league record. Early paces rarely hold, which is the fun of watching.' }) +
+      '<div id="ov-records"></div></section>' +
+    '<section class="qk-section qk-g75 fb-ov-sure">' +
       '<div class="fb-ov-real">' + QK.sectionHead({ kicker: 'Who’s for real?', title: 'Results v chances', sub: 'Clubs top-left are winning more than their chances suggest; bottom-right, the reverse. Early-season luck, or something real?' }) +
       '<div id="ov-real-pick" class="fb-ov-pick"></div>' +
-      '<div class="qk-card"><div class="qk-card-body"><div id="ov-real" class="qk-chart" role="img" aria-label="Share of expected goals against points per game, one league"></div><p class="qk-caption" id="ov-real-cap"></p></div></div></div></section>' +
+      '<div class="qk-card"><div class="qk-card-body"><div id="ov-real" class="qk-chart" role="img" aria-label="Share of expected goals against points per game, one league"></div><p class="qk-caption" id="ov-real-cap"></p></div></div></div>' +
+      '<div>' + QK.sectionHead({ kicker: 'Biggest surprises', title: 'Luck or something real?', sub: 'Points won against the points their chances were worth, across the big leagues.' }) + '<div id="ov-surprise"></div></div></section>' +
     '<section class="qk-section">' + QK.newHere({ items: [QK.NEW_HERE[0],
       'A <b>percentile</b> ranks a player against others in the same role (centre-backs with centre-backs, strikers with strikers): 90th means better than 90 in 100.',
-      'Every forecast is checked against what happened. <a class="qk-link" href="#/model/calibration">The record is on the Model page.</a>'] }) + '</section>' +
+      '<b>Expected goals (xG)</b> rate every shot by how often that kind of chance goes in. A club that wins far more points than its xG earns is often due a turn.'] }) + '</section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'Title race', title: '<span id="ov-race-t">Who wins the league?</span>', html: true, sub: '<span id="ov-race-lede">Our chances from 30,000 simulated seasons.</span>',
         actions: '<span id="ov-race-pick"></span>' }) +
       FB.grid(
@@ -111,7 +126,7 @@ FB.route('overview', function (el) {
       ) + '</section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'Leagues', title: 'Every league at a glance', sub: 'How far each league has gone, who leads, our title favourite and the top scorer.', actions: '<a class="qk-more" href="#/competitions">Competitions</a>' }) +
       FB.card('', '', '<div id="ov-leagues"></div>', { flush: true }) + '</section>' +
-    '';
+    '<p class="qk-caption fb-ov-doing"><a class="qk-link" href="#/model/calibration">How we’re doing →</a> Our record, and how often our chances came true, on the Model page.</p>';
 
   QK.chips(el.querySelector('#ov-fam'), function (vals) { view.fam = vals[0] || 'all'; drawCards(el, HUB); });
 
@@ -129,8 +144,14 @@ FB.route('overview', function (el) {
     drawLeaders(el, HUB);
     drawPool(el, POOL);
     FB.load('lab/leaders.json').then(function (board) { if (FB.alive(el)) drawHot(el, board, HUB, POOL); });
+    drawRecords(el, HUB);
+    drawSurprise(el, POOL);
+    drawFan(el);
+    /* the quiet market: read the day's competitions' market files, then redraw the cards and the ticker */
+    var slugs = {};
+    allHub(HUB).forEach(function (m) { if (m.status !== 'finished') slugs[m.comp] = 1; });
+    FB.loadMarkets(Object.keys(slugs)).then(function () { if (FB.alive(el)) { drawCards(el, HUB); drawTicker(el, HUB); } });
   });
-  drawSure(el);
   drawRaces(el);
   drawTitle(el);
   drawReal(el);
@@ -243,9 +264,6 @@ function drawWeek(el, h) {
   var hot = dig.hot;
   if (hot) T.push({ label: 'Team of the week', value: hot.name + ' ' + (hot.d ? 'W' + hot.w + ' D' + hot.d + (hot.l ? ' L' + hot.l : '') : hot.w + '–' + hot.l), text: String(hot.name).length > 10, href: isNum(hot.key) ? FB.href.club(hot.key) : null,
     sub: hot.w + ' wins' + (hot.d ? ', ' + hot.d + ' draw' + (hot.d === 1 ? '' : 's') : '') + ' in ' + hot.gp + ' matches this week, ' + (hot.margin >= 0 ? '+' : '−') + Math.abs(hot.margin) + ' goal difference.' });
-  var r = dig.record;
-  if (r) T.push({ label: 'Our record this week', value: r.won + ' of ' + r.n, href: '#/model/calibration',
-    sub: 'Our favourites won ' + r.won + ' of ' + r.n + '; we expected ' + num(r.expected, 0) + '.' + (r.draws ? ' ' + r.draws + ' ended level.' : '') });
   /* fewer than four lines: the biggest races' favourites fill in */
   ['champions-league'].concat(BIG).forEach(function (s) {
     if (T.length >= 4) return;
@@ -278,14 +296,8 @@ function drawFeature(el, h, feat) {
   if (feat && feat.m) {
     var m = feat.m, g = FB.heroGame(FB.toGame(m, m.comp)), c = FB.comp(m.comp) || {};
     var lab = whenLabel(m), why = whyOf(feat.f, m);
-    var f = isNum(g.p_home) ? [g.p_home, isNum(g.p_draw) ? g.p_draw : 0, isNum(g.p_away) ? g.p_away : 1 - g.p_home - (g.p_draw || 0)] : null;
-    var sure = '';
-    if (f && !isLive(m)) {
-      var fav = f[0] >= f[2] ? m.home : m.away, pf = Math.max(f[0], f[2]), miss = Math.max(1, Math.round(10 * (1 - pf)));
-      sure = ' <b>How sure are we?</b> ' + pct(pf) + ' for ' + esc(fav) + ' means a match like this goes another way about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.';
-    }
     box.innerHTML = QK.splitHero(g, { homeFirst: true, noun: 'match', kicker: (c.name || FB.compName(m.comp)) + (g.note ? ' · ' + g.note : ''),
-      tag: lab + (feat.later ? ' · The big one this week' : ' · The one to watch'), note: why ? '<b>Why this match?</b> ' + esc(why) + sure : (sure ? sure.slice(1) : undefined) });
+      tag: lab + (feat.later ? ' · The big one this week' : ' · The one to watch'), note: why ? '<b>Why this match?</b> ' + esc(why) : false });
     return;
   }
   /* nothing big on: lead with the races */
@@ -354,7 +366,7 @@ function drawTicker(el, h) {
   FB.comps().forEach(function (c, i) { rank[c.slug] = i; });
   list.sort(function (a, b) { return (rank[a.comp] === undefined ? 999 : rank[a.comp]) - (rank[b.comp] === undefined ? 999 : rank[b.comp]) || String(a.date).localeCompare(String(b.date)); });
   var games = list.slice(0, 40).map(function (m) { return FB.toGame(m, m.comp); });
-  box.innerHTML = QK.ticker(games, { group: 'league', max: 40, pill: false });
+  box.innerHTML = QK.ticker(games, { group: 'league', max: 40, pill: false, market: 'quiet' });
   box.hidden = false;
 }
 
@@ -400,27 +412,13 @@ function drawHot(el, board, hub, pool) {
     actions: '<a class="qk-more" href="#/players/leaders">Every leader</a>' }) + (items.length ? QK.hotRow(items) : FB.empty('No leaders yet', 'The leaders appear once the season’s first matches are in.')));
 }
 
-/* ── "We say it. Then we check it.": the match model's walk-forward record from data/calibration.json (QK.howSure: three
-   big numbers over the we-said / it-happened bars); the full record is on the Model page */
+/* The match model's walk-forward record (data/calibration.json) is on the Model page's "How we're doing" tab; FB.calibOf
+   reads it there. */
 function calibOf(j) {
   if (!j) return null;
   return QK.calib.find(j) || QK.calib.find(j.match_model) || QK.calib.find(j.overall) || QK.calib.find(j.model);
 }
 FB.calibOf = calibOf;
-function drawSure(el) {
-  FB.load('calibration.json').then(function (cj) {
-    var box = el.querySelector('#ov-sure'), hd = el.querySelector('#ov-sure-h');
-    if (!box || !FB.alive(el)) return;
-    var cb = calibOf(cj);
-    if (!cb || !cb.bins.length) { box.innerHTML = ''; hd.innerHTML = ''; var sec = el.querySelector('.fb-ov-sure'); if (sec) sec.classList.add('solo'); return; }
-    var subj = (cj && cj.subject) || 'the home side';
-    var nL = cj && Array.isArray(cj.leagues) ? cj.leagues.length : 0;
-    hd.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.',
-      sub: 'Every match in our backtest' + (nL ? ' across ' + nL + ' leagues' : '') + ', grouped by the chance we gave ' + subj + ' to win. When the two bars match, our numbers mean what they say.',
-      actions: '<a class="qk-more" href="#/model/calibration">The full record</a>' });
-    QK.howSure(box, { bins: cb.bins, brier: cb.brier, n: cb.n, league: nL ? nL + ' leagues' : 'Football', span: cj && cj.span, subject: subj, unit: (cj && cj.unit) || 'matches' });
-  });
-}
 
 /* ── title races: our chance only (no market on the overview) */
 function drawRaces(el) {
@@ -585,5 +583,147 @@ function drawNations(el, n) {
     ci.list.forEach(function (r) { if (r.national) byName[r.name] = r.id; });
     box.innerHTML = leadList(t.map(function (x) { return { rank: x.rank, who: FB.clubLink(byName[x.team], x.team), sub: x.confederation || '', v: num(x.strength, 2) }; }));
   });
+}
+
+/* ── round 6: the fan modules ─────────────────────────────────────────────────────────────────────────────────── */
+
+/* Role groups for the percentiles (the lab's `role`): a player is ranked against the same league's players in the same
+   group, each season on its own, among players over that window's minutes floor. */
+var ROLE_GROUP = { GK: 'gk', CB: 'cb', FB: 'fb', DM: 'mf', CM: 'mf', MF: 'mf', AM: 'at', W: 'at', ST: 'st', FW: 'st' };
+var GROUP_NAME = { cb: 'centre-backs', fb: 'full-backs', mf: 'central midfielders', at: 'wingers and attacking midfielders', st: 'strikers', gk: 'goalkeepers' };
+var ROLE_NAME = { CB: 'Centre-back', FB: 'Full-back', DM: 'Defensive midfielder', CM: 'Midfielder', MF: 'Midfielder', AM: 'Attacking midfielder', W: 'Winger', ST: 'Striker', FW: 'Forward', GK: 'Goalkeeper' };
+/* the deep metrics shown for each group in the spotlight (all higher is better) */
+var SPOT_SET = {
+  cb: [['gar90', 'Value added per 90 (our model)', 2], ['padj_tkl_int_90', 'Tackles + interceptions per 90 (possession-adjusted)', 1], ['aerial_pct', 'Aerial duels won (%)', 0], ['prog_actions_90', 'Progressive actions per 90', 1], ['pass_pct', 'Pass completion (%)', 0]],
+  fb: [['gar90', 'Value added per 90 (our model)', 2], ['prog_actions_90', 'Progressive actions per 90', 1], ['xa_90', 'Expected assists per 90', 2], ['padj_tkl_int_90', 'Tackles + interceptions per 90 (possession-adjusted)', 1], ['pass_pct', 'Pass completion (%)', 0]],
+  mf: [['gar90', 'Value added per 90 (our model)', 2], ['prog_actions_90', 'Progressive actions per 90', 1], ['ball_wins_90', 'Ball wins per 90', 1], ['pass_pct', 'Pass completion (%)', 0], ['xa_90', 'Expected assists per 90', 2]],
+  at: [['gar90', 'Value added per 90 (our model)', 2], ['npxg_xa_90', 'Non-penalty xG + xA per 90', 2], ['shot_creation_90', 'Shot-creating actions per 90', 1], ['prog_carries_90', 'Progressive carries per 90', 1], ['dribbles_90', 'Dribbles completed per 90', 1]],
+  st: [['gar90', 'Value added per 90 (our model)', 2], ['npxg_90', 'Non-penalty xG per 90', 2], ['shot_creation_90', 'Shot-creating actions per 90', 1], ['aerials_won_90', 'Aerial duels won per 90', 1], ['xg_per_shot', 'xG per shot', 2]]
+};
+function labRows(doc) {
+  var f = (doc || {}).fields || [], fl = (doc || {}).floor || 0;
+  return ((doc || {}).rows || []).map(function (r) { var o = {}; for (var i = 0; i < f.length; i++) o[f[i]] = r[i]; return o; })
+    .filter(function (r) { return (r.minutes || 0) >= fl && ROLE_GROUP[r.role]; });
+}
+/* percentile of each row's `key` among its role group: { player_id: pct } */
+function groupPct(rows, key) {
+  var by = {}, out = {};
+  rows.forEach(function (r) { if (isNum(r[key])) (by[ROLE_GROUP[r.role]] = by[ROLE_GROUP[r.role]] || []).push(r); });
+  Object.keys(by).forEach(function (g) {
+    var L = by[g], vals = L.map(function (r) { return r[key]; });
+    L.forEach(function (r) {
+      var lo = 0, eq = 0;
+      vals.forEach(function (v) { if (v < r[key]) lo++; else if (v === r[key]) eq++; });
+      out[String(r.player_id)] = L.length > 1 ? 100 * (lo + 0.5 * (eq - 1)) / (L.length - 1) : 50;
+    });
+  });
+  return out;
+}
+var ORD = function (p) { return FB.ordinal ? FB.ordinal(Math.round(p)) : Math.round(p) + 'th'; };
+var FAN = { slug: null };
+function drawFan(el) {
+  var avail = BIG.filter(function (s) { var c = FB.comp(s); return c && inSeason(c); });
+  var pick = el.querySelector('#ov-fan-pick');
+  if (!avail.length) { FB.set('ov-brk', ''); return; }
+  if (!FAN.slug || avail.indexOf(FAN.slug) < 0) FAN.slug = avail[0];
+  if (pick) {
+    pick.innerHTML = avail.length > 1 ? FB.seg('ov-fan-seg', avail.map(function (s) { return [s, FB.compName(s, true)]; }), FAN.slug, 'League') : '';
+    FB.wireSeg(pick, 'ov-fan-seg', function (v) { FAN.slug = v; draw(); });
+  }
+  function draw() {
+    var slug = FAN.slug;
+    Promise.all([FB.load('lab/season/' + slug + '.json'), FB.load('lab/last/' + slug + '.json')]).then(function (arr) {
+      if (!FB.alive(el) || FAN.slug !== slug) return;
+      var S = labRows(arr[0]), L = labRows(arr[1]);
+      var floor = (arr[0] || {}).floor || 0, minMin = Math.max(floor, 360);
+      var lg = FB.compName(slug, true);
+      FB.set('ov-brk-t', 'Who’s stepped up in the ' + esc(lg));
+      var ps = groupPct(S, 'gar90'), pl = groupPct(L, 'gar90');
+      var lastBy = {}; L.forEach(function (r) { lastBy[String(r.player_id)] = r; });
+      /* breakouts: at least 360 minutes this season (and the floor), last season over its floor, now 75th or better,
+         up 25 points or more; the biggest jumps first */
+      var brk = S.filter(function (r) { var id = String(r.player_id); return r.role !== 'GK' && r.minutes >= minMin && isNum(ps[id]) && isNum(pl[id]) && ps[id] >= 75 && ps[id] - pl[id] >= 25; })
+        .sort(function (a, b) { return (ps[String(b.player_id)] - pl[String(b.player_id)]) - (ps[String(a.player_id)] - pl[String(a.player_id)]); }).slice(0, 3);
+      var cards = brk.map(function (r) {
+        var id = String(r.player_id), a = pl[id], b = ps[id], grp = GROUP_NAME[ROLE_GROUP[r.role]], prev = lastBy[id];
+        var colour = r.tid ? FB.clubColour(r.tid) : null;
+        return { kicker: 'Breakout watch', name: r.name, sub: [r.team, ROLE_NAME[r.role] || r.role, isNum(r.age) ? 'age ' + r.age : ''].filter(Boolean).join(' · '),
+          value: '+' + Math.round(b - a), unit: 'percentile points', colour: colour, mark: { name: r.team, logo: r.tid ? FB.crestUrl(r.tid) : null, colour: colour },
+          from: { label: 'Last season', pos: a, value: ORD(a) }, to: { label: 'This season', pos: b, value: ORD(b) }, href: FB.href.player(id),
+          html: true, text: 'Value added per 90 ' + QK.ours({ short: true, model: 'Player value model' }) + ' against the ' + esc(lg) + '’s ' + esc(grp) + ': ' + num(prev.gar90, 2) + ' last season, <b>' + num(r.gar90, 2) + '</b> now. ' +
+            FB.int(r.minutes) + ' minutes so far' + (r.minutes < 900 ? ': a small sample.' : '.') };
+      });
+      FB.set('ov-brk', cards.length ? QK.storyCards(cards) : FB.empty('No breakouts yet', 'Nobody in the ' + lg + ' is 25 percentile points above last season with enough minutes yet.'));
+      /* the best player nobody talks about: the top of the value model among players with almost no goals or assists */
+      var ga = function (r) { return isNum(r.ga_90) ? r.ga_90 * r.minutes / 90 : 0; };
+      var un = S.filter(function (r) { return r.role !== 'GK' && r.minutes >= minMin && isNum(ps[String(r.player_id)]) && ga(r) <= 1.5; })
+        .sort(function (a, b) { return ps[String(b.player_id)] - ps[String(a.player_id)] || b.gar90 - a.gar90; })[0];
+      if (!un) { FB.set('ov-spot', ''); return; }
+      var gk = ROLE_GROUP[un.role], set = SPOT_SET[gk] || SPOT_SET.mf, idu = String(un.player_id);
+      var stats = set.map(function (m) {
+        var P = groupPct(S, m[0]), Q = groupPct(L, m[0]);
+        if (!isNum(un[m[0]]) || !isNum(P[idu])) return null;
+        return { label: m[1], value: num(un[m[0]], m[2]), pctl: P[idu], prev: lastBy[idu] && isNum(Q[idu]) ? Q[idu] : null };
+      }).filter(Boolean);
+      var goals = Math.round((un.goals_90 || 0) * un.minutes / 90), assists = Math.max(0, Math.round(ga(un)) - goals);
+      var top = Math.max(1, Math.round(100 - ps[idu]));
+      el.querySelector('#ov-spot').innerHTML = QK.spotlight({ kicker: 'The best player nobody talks about', name: un.name,
+        sub: [un.team, ROLE_NAME[un.role] || un.role, isNum(un.age) ? 'age ' + un.age : ''].filter(Boolean).join(' · '), team: { colour: un.tid ? FB.clubColour(un.tid) : null },
+        href: FB.href.player(idu),
+        headline: 'Top ' + top + '% of the ' + lg + '’s ' + GROUP_NAME[gk] + ' in our value model, with ' + goals + ' goal' + (goals === 1 ? '' : 's') + ' and ' + assists + ' assist' + (assists === 1 ? '' : 's') + ': the kind of season the scoring charts miss.',
+        stats: stats, text: 'Percentiles against the ' + lg + '’s ' + GROUP_NAME[gk] + ' with ' + FB.int(floor) + '+ minutes this season; ▼ is last season. ' + FB.int(un.minutes) + ' minutes so far.',
+        links: [{ href: FB.href.player(idu), text: 'Player page' }, { href: '#/players/leaders', text: 'Every leader' }] });
+    });
+  }
+  draw();
+}
+
+/* Records in reach: each big league's top scorer (competitions.json top_scorer), league goals so far against the
+   rounds played (hub.json digest.stage), the full-season pace and the league record. Sorted by how close the pace
+   comes to the record; three shown. The records are the leagues' single-season scoring records. */
+var GOAL_RECORDS = {
+  'premier-league': [36, 'Erling Haaland, 2022-23'],
+  'la-liga': [50, 'Lionel Messi, 2011-12'],
+  'serie-a': [36, 'Gonzalo Higuaín, 2015-16, and Ciro Immobile, 2019-20'],
+  bundesliga: [41, 'Robert Lewandowski, 2020-21'],
+  'ligue-1': [44, 'Josip Skoblar, 1970-71']
+};
+function drawRecords(el, h) {
+  var box = el.querySelector('#ov-records');
+  if (!box) return;
+  var big = ((((h || {}).digest || {}).stage || {}).big || []);
+  var rows = big.filter(function (b) { return GOAL_RECORDS[b.comp] && b.round >= 3 && b.rounds; }).map(function (b) {
+    var c = FB.comp(b.comp) || {}, ts = c.top_scorer || {};
+    if (!ts.name || !isNum(ts.goals) || !ts.goals) return null;
+    var rec = GOAL_RECORDS[b.comp], pace = ts.goals / b.round * b.rounds;
+    return { b: b, c: c, ts: ts, rec: rec, pace: pace };
+  }).filter(Boolean).sort(function (x, y) { return y.pace / y.rec[0] - x.pace / x.rec[0]; }).slice(0, 3);
+  if (!rows.length) { box.innerHTML = FB.empty('Too early', 'The paces appear after three rounds.'); return; }
+  box.innerHTML = QK.storyCards(rows.map(function (x) {
+    var lg = x.c.short_name || x.c.name, p = Math.round(x.pace), beat = p > x.rec[0];
+    return { kicker: lg + ' top scorer', name: x.ts.name, sub: x.ts.team || '', value: x.ts.goals, unit: 'league goals, ' + x.b.round + ' rounds in',
+      pace: { now: x.ts.goals, pace: x.pace, target: x.rec[0], label: 'Record', max: Math.max(x.rec[0], x.pace) * 1.1 }, href: x.ts.id ? FB.href.player(x.ts.id) : null,
+      text: 'At this rate, ' + p + ' over ' + x.b.rounds + ' rounds. The ' + lg + ' record is ' + x.rec[0] + ' (' + x.rec[1] + ').' + (beat ? ' On pace to beat it, with ' + (x.b.rounds - x.b.round) + ' rounds to go.' : ' ' + (x.rec[0] - x.ts.goals) + ' more to match it.') };
+  }));
+}
+
+/* The biggest surprises: across the big leagues (pool.json, clubs in their league with five or more matches), the club
+   furthest above the points its chances were worth (`luck`: points less expected points from xG) and the one
+   furthest below. */
+function drawSurprise(el, pool) {
+  var box = el.querySelector('#ov-surprise');
+  if (!box) return;
+  var cl = ((pool || {}).clubs || []).filter(function (c) { return c.in_league && (PROM[c.comp] || 0) >= 5 && (c.played || 0) >= 5 && isNum(c.luck) && isNum(c.ppg); });
+  if (cl.length < 4) { box.innerHTML = FB.empty('Not yet', 'The surprises appear after five matches.'); return; }
+  cl.sort(function (a, b) { return b.luck - a.luck; });
+  var hi = cl[0], lo = cl[cl.length - 1];
+  var card = function (c, up) {
+    var pts = Math.round(c.ppg * c.played), exp = pts - c.luck, colour = c.team_id ? FB.clubColour(c.team_id) : null;
+    return { kicker: up ? 'Winning on luck?' : 'Due a turn?', name: c.team, sub: (c.comp_name || '') + (isNum(c.table_rank) ? ' · ' + ORD(c.table_rank) + ' in the table' : ''),
+      value: (c.luck > 0 ? '+' : '−') + num(Math.abs(c.luck), 1), unit: 'points ' + (up ? 'above' : 'below') + ' expected', colour: colour,
+      mark: { name: c.team, logo: c.team_id ? FB.crestUrl(c.team_id) : null, colour: colour }, href: c.team_id ? FB.href.club(c.team_id, { c: c.comp }) : null,
+      text: pts + ' points from ' + c.played + ' matches; the chances they made and allowed were worth about ' + num(exp, 0) + '. ' + (up ? 'Gaps like this usually close: finishing and saves even out.' : 'The chances say better results are coming.') };
+  };
+  box.innerHTML = QK.storyCards([card(hi, true), card(lo, false)], { cols: 1 });
 }
 })(window.FB);

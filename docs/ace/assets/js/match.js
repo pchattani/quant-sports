@@ -198,10 +198,11 @@ function preBoxes(T, d) {
 }
 
 /* v3 (Matchday) hero: QK.previewCard on the kit shape (p1 on the left, p2 on the right; the kit's tennis defaults
-   read "v" and "a match like this"). The market appears here only before the first ball, as a quiet labelled line. */
+   read "v" and "a match like this"). The market appears only before the first ball, small and grey under the hero
+   (market quiet, round 6), its sources on hover. */
 function hero(T, d, p1, ev, surface) {
   const st = TA.matchState(d), fin = TA.isFinished(d), live = st === 'live', pre = !fin && !live;
-  const mk = (d.pre || {}).market || null;
+  const mk = (d.pre || {}).market || d.market || null;   /* the index card's market when the match file is not out yet */
   const G = TA.kitGame(d, T, { initials: true });
   G.p_home = isNum(p1) ? 1 - p1 : null;
   if (live && isNum(d.wp_now)) { G.wp_home = 1 - d.wp_now; G.pre_only = undefined; }
@@ -230,7 +231,7 @@ function hero(T, d, p1, ev, surface) {
   const miss = isNum(p1) ? Math.max(1, Math.round(10 * (1 - Math.max(p1, 1 - p1)))) : null;
   const finNote = fin && isNum(p1) ? '<b>What’s that number?</b> ' + TA.pct(Math.max(p1, 1 - p1), 0) + ' was our chance for ' + esc(TA.playerSurname(T, p1 >= 0.5 ? d.p1 : d.p2)) + ' before the first ball. A match like this goes the other way about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.' : undefined;
   const card = QK.previewCard(G, { kicker: kick, nick: t => t.name, factors: fx, factorsTitle: 'How they match up', noteExtra: extra, note: finNote,
-    market: pre && mk && isNum(mk.p1) ? { p: 1 - mk.p1, label: 'Market (' + (TA.sourceNames(mk.sources).join(' / ') || 'prediction markets') + ')' } : null });
+    market: pre && mk && isNum(mk.p1) ? { p: 1 - mk.p1, src: mk.sources, quiet: true } : null, marketSource: 'prediction markets' });
   const tba = d.tba || String(d.date || '').length <= 10;
   const meta = [ev.level ? TA.levelLabel(ev.level, T) : '', d.best_of ? 'Best of ' + d.best_of : '',
     pre ? TA.fmtDate(d.date, { year: false }) + (tba ? ', time to be announced' : ' ' + TA.fmtTime(d.date) + ' your time') : TA.fmtDate(d.date, { year: false }), isNum(d.duration_min) ? TA.fmtDuration(d.duration_min) : ''].filter(Boolean);

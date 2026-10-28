@@ -1129,3 +1129,11 @@ a.qk-story:hover .qk-story-nm { color: var(--volt); }
 body.qk .qk-spot-l, body.qk .qk-spot-sub, body.qk .qk-spot-h { color: #fff; }
 @media (max-width: 900px) { .qk-spot { grid-template-columns: minmax(0, 1fr); } .qk-spot-num { font-size: 7rem; } }
 @media (max-width: 640px) { .qk-spot-l { padding: 18px 16px 20px; } .qk-spot-r { padding: 14px 14px 16px; } }
+/* specificity guards for the fan modules: a site's link colours never tint a story card or the spotlight name */
+body.qk a.qk-story, body.qk a.qk-story:hover, body.qk a.qk-story .qk-story-nm { color: var(--ink-1); }
+body.qk a.qk-story:hover .qk-story-nm { color: var(--volt); }
+body.qk a.qk-story .qk-story-t, body.qk a.qk-story:hover .qk-story-t { color: var(--ink-2); }
+body.qk a.qk-story .qk-story-sub, body.qk a.qk-story .qk-story-pl { color: var(--ink-3); }
+body.qk a.qk-story .qk-story-l { color: var(--signal); }
+body.qk .qk-spot .qk-spot-nm a, body.qk .qk-spot .qk-spot-nm a:visited { color: #fff; text-decoration: none; }
+body.qk .qk-spot .qk-spot-nm a:hover { color: var(--volt); }

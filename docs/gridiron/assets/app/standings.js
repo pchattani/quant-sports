@@ -56,6 +56,25 @@ function leagueOpts(d, S, group) {
     title: 'How the playoff race is shaping up', unitGames: 'games' };
 }
 GI.leagueOpts = leagueOpts;
+
+/* Top and bottom performers (QKL.leaders): all players on Gridiron Value (our model), then each position on its spec
+   headline set, from data/<S>/performers.json (oddsmarkets/nfl/analytics/performers.py, about 45 KB: qualified
+   players only), and the teams on the league block's team set (season.json, already loaded). */
+function performers(host, d, S) {
+  if (!host) return;
+  GI.loadYear('performers.json', S).then(pf => {
+    if (!host.isConnected) return;
+    const views = ((pf && pf.ok !== false && pf.views) || []).slice();
+    const tv = d && d.league ? QKL.teamView(d.league, { label: 'Teams', peer: 'teams', ours: 'Team rating model', name: t => GI.teamName(t) }) : null;
+    if (tv) views.push(tv);
+    QKL.leaders(host, { data: { views: views }, title: 'Who leads the league, and who is struggling',
+      sub: 'The top five and the bottom five on each key number: every player on Gridiron Value, our model, then each position on the numbers that matter for it, and the teams. Qualified players only; each name opens the player page.',
+      team: t => ({ abbr: GI.teamAbbr(t), name: GI.teamName(t), colour: GI.teamColour(t), href: GI.teamHref(t, S) }),
+      href: id => GI.playerHref(id, S),
+      note: 'Defensive numbers are per game from the box score (pressures are sacks plus quarterback hits); Gridiron Value counts only the plays a player is credited with, so for defenders it is a floor.',
+      empty: 'The boards fill once players reach the qualifying minimums (14 pass attempts, 6.25 carries or 3 targets a team game, for example).' });
+  });
+}
 function toggle(lo, t) { return lo ? QKL.toggle(t, GI.teamName(t)) : ''; }
 function chipCell(lo, t) { return { html: QKL.chip(lo, t) || '<span class="qk-muted">—</span>', v: '' }; }
 const PROFILE_COL = { label: 'Profile', sortable: false, title: 'What stands out about the team; + opens its card: strengths, weaknesses and the race' };
@@ -239,11 +258,12 @@ GI.route('standings', function (el, params) {
     const body = el.querySelector('#std-body');
     if (view === 'table') {
       const lo = leagueOpts(d, S, GI.DIVISIONS[0]);
-      if (lo) body.insertAdjacentHTML('afterend', '<div id="std-race"></div><div id="std-shape"></div>');
+      if (lo || (window.QKL && QKL.leaders)) body.insertAdjacentHTML('afterend', (lo ? '<div id="std-race"></div>' : '') + '<div id="std-perf"></div>' + (lo ? '<div id="std-shape"></div>' : ''));
       const draw = () => { body.innerHTML = '<div class="gi-toolbar" style="margin-bottom:12px">' + GI.seg('std-tv', [['div', 'Divisions'], ['conf', 'Conferences']], TV, 'Group by') + '</div>' + (TV === 'conf' ? conferencesView(rows, S, lo) : divisionsView(rows, S, lo)) +
         (lo ? '<p class="gi-cap">+ opens a team\u2019s card: its strengths and weaknesses against the other 31 and where its race stands.</p>' : ''); GI.sortable(body); GI.wireSeg(body, 'std-tv', x => { TV = x; draw(); }); if (lo) QKL.wire(body, lo); };
       draw();
       if (lo) { QKL.race(el.querySelector('#std-race'), lo); QKL.shape(el.querySelector('#std-shape'), lo); }
+      if (window.QKL && QKL.leaders) performers(el.querySelector('#std-perf'), d, S);
     } else if (view === 'ratings') { body.innerHTML = ratingsView(d, rows, S); GI.sortable(body); drawRatings(body, d); }
     else if (view === 'wins') { body.innerHTML = winsView(rows, S); drawWins(rows); }
     else {

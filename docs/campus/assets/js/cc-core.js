@@ -203,7 +203,7 @@ CC.game = function (c, L) {
     sport: 'college', id: c.id, start: CC.gameDate(c), status: st, tba: CC.tba(c),
     league: CC.LSHORT[L] + (tag ? ' · ' + tag : (c.conf_game ? ' · Conference' : '')) + (c.neutral && !tag ? ' · Neutral' : ''),
     home: CC.side(L, c, 'home'), away: CC.side(L, c, 'away'), hs: isNum(c.hs) ? c.hs : null, as: isNum(c.as) ? c.as : null,
-    p_home: isNum(m.p_home) ? m.p_home : null, market_home: mk && isNum(mk.p_home) ? mk.p_home : null,
+    p_home: isNum(m.p_home) ? m.p_home : null, market_home: mk && isNum(mk.p_home) ? mk.p_home : null, market_src: mk ? CC.mkSource(mk) || undefined : undefined,
     /* no live chance in the payload: a live game shows our pre-game call, labelled so (kit v3) */
     pre_only: st === 'live' ? true : undefined,
     note: '', period: per, clock: c.clock, href: CC.gameHref(L, c.id, c.season)
@@ -219,14 +219,14 @@ CC.addRecords = function (L, S, standings) {
 CC.rec = function (L, S, tid) { var m = RECS[L][String(S)]; return (m && m[String(tid)]) || ''; };
 var MK_SRC = { kalshi: 'Kalshi', polymarket: 'Polymarket', espn_close: 'ESPN closing line', espn: 'ESPN line' };
 CC.mkSource = function (mk) { return mk && mk.source ? (MK_SRC[mk.source] || mk.source) : ''; };
-/* A game card (kit v3): our chance per team, the favourite in blue, records, the team-colour bar with a key, and no
- * market (the kit's default: the market sits only on the game page and the Model page). o.why adds the italic
- * one-line reason (QK.whyLine). */
+/* A game card (kit v3): our chance per team, the favourite in blue, records, the team-colour bar with a key, and, before
+ * the start, the market's chance small and grey under ours with its source on hover (round 6: market 'quiet';
+ * o.market: false hides it). o.why adds the italic one-line reason (QK.whyLine). */
 CC.card = function (c, L, o) {
   o = o || {};
   var g = CC.game(c, L), S = c.season || (CC.state && CC.state.S);
   g.home.record = CC.rec(L, S, c.home); g.away.record = CC.rec(L, S, c.away);
-  var h = QK.gameCard(g, { sport: false, why: !!o.why });
+  var h = QK.gameCard(g, { sport: false, why: !!o.why, market: o.market === false ? false : 'quiet' });
   /* the kit's badge prints the start time: a TBA game shows its day and "TBA" instead of the midnight placeholder */
   if (g.tba) h = h.replace(QK.statusBadge(g), '<span class="qk-badge">' + esc(fmt.relDay(g.start)) + ' · TBA</span>');
   return h;
@@ -453,7 +453,7 @@ var ROUTES = {};
 CC.route = function (name, fn) { ROUTES[name] = fn; };
 CC.state = { L: null, S: null, sec: 'overview' };
 var SEC_OF = { overview: 'overview', games: 'fixtures', game: 'fixtures', standings: 'standings', teams: 'teams', team: 'teams', players: 'players',
-  player: 'players', value: 'value', fantasy: 'fantasy', lab: 'lab', model: 'model', disclaimer: 'model' };
+  player: 'players', compare: 'players', value: 'value', fantasy: 'fantasy', lab: 'lab', model: 'model', disclaimer: 'model' };
 var shell = null;
 CC.parse = function (hash) {
   var h = String(hash || '').replace(/^#\/?/, '');

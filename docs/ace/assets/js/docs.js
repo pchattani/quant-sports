@@ -303,13 +303,12 @@ function renderMethodology(el, params) {
   });
   const T = (TA.state && TA.state.tour) || 'atp';
   const toc = '<div class="doc-toc"><div class="doc-toc-head">Methodology</div><ol>' + secs.map(s => '<li><a href="#/methodology/' + esc(s.id) + '" data-target="method-' + esc(s.id) + '">' + esc(s.title) + '</a></li>').join('') +
-    '</ol><div class="doc-toc-head" style="margin-top:10px">See also</div><ol><li><a href="#/glossary">Glossary</a></li><li><a href="#/' + T + '/calibration">Calibration</a></li><li><a href="#/disclaimer">Disclaimer and terms</a></li></ol></div>';
+    '</ol><div class="doc-toc-head" style="margin-top:10px">See also</div><ol><li><a href="#/glossary">Glossary</a></li><li><a href="#/' + T + '/calibration">How we’re doing</a></li><li><a href="#/disclaimer">Disclaimer and terms</a></li></ol></div>';
   const intro = '<div class="card"><div class="card-header">Methodology <span class="card-sub">Where the data comes from, how every model works, and where it is wrong. Every constant is the one in the code or its committed fit, and each paragraph names its file.</span></div>' +
     '<div class="doc-meta">' + secs.length + ' sections · the ATP\'s and the WTA\'s committed fits, with the code defaults that apply only without a fit</div></div>';
-  /* kit v4: the Model page opens with "We say it. Then we check it." (QK.howSure) for the tour in view, from <T>/calibration.json when it is
-     there (left out on a deep link, so the section it points to does not move) */
-  const sure = want ? '' : '<section class="qk-section" id="m-sure" style="margin-top:0" hidden>' + QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.',
-    sub: 'Our ' + (T === 'wta' ? 'WTA' : 'ATP') + ' match forecasts against what happened. <a class="qk-link" href="#/' + T + '/calibration">The full record</a> has every score and check.', html: true }) + '<div id="m-howsure"></div></section>';
+  /* round 6: the record and the calibration chart live in the Model section's "How we're doing" tab (#/<T>/calibration);
+     the methodology links there */
+  const sure = want ? '' : QK.explain('<b>How we’re doing.</b> Our recent record and how often our chances came true are on <a class="qk-link" href="#/' + T + '/calibration">the How we’re doing tab</a>.');
   el.innerHTML = sure + '<div class="doc">' + toc + '<div class="doc-body">' + intro + secs.map((s, i) => '<div class="card" id="method-' + esc(s.id) + '"><div class="card-header">' + (i + 1) + '. ' + esc(s.title) +
     ' <a class="doc-anchor" href="#/methodology/' + esc(s.id) + '" title="Link to this section">#</a></div><div class="pad">' + s.html + '</div></div>').join('') + '</div></div>';
   el.querySelectorAll('.doc-toc a[data-target]').forEach(a => a.addEventListener('click', ev => {
@@ -319,13 +318,6 @@ function renderMethodology(el, params) {
     history.replaceState(null, '', a.getAttribute('href'));
   }));
   if (want) { const t = document.getElementById('method-' + String(want).replace(/^m-/, '')); if (t) setTimeout(() => t.scrollIntoView({ block: 'start' }), 0); }
-  if (!want) TA.load(T + '/calibration.json').then(d => {
-    const box = el.querySelector('#m-sure');
-    if (!box || !d || d.ok === false || !QK.calib.find(d)) return;
-    box.hidden = false;
-    const ys = d.years || [];
-    QK.howSure(el.querySelector('#m-howsure'), { calibration: d, league: T === 'wta' ? 'WTA' : 'ATP', span: ys.length ? ys[0] + '–' + ys[ys.length - 1] : '', subject: 'that player', unit: 'matches' });
-  });
 }
 
 if (typeof TA.route === 'function') {

@@ -36,6 +36,14 @@ PLUS_KEYS = {"QB": ["epa_db", "anya", "cpoe", "success", "composite"], "RB": ["r
 LOWER = {"sack_rate"}
 MIN_FILE = {"QB": ("att", 20), "RB": ("carries", 10), "WR": ("targets", 8), "TE": ("targets", 6), "K": ("fga", 3), "P": ("punts", 10),
             "DEF": ("tackles", 10)}
+# Progression (round 6; oddsmarkets/common/progression.py, MIGRATION_V4.md "Progression"): every season row carries
+# `dv` (the kind's deep metric set, aligned to the file's `prog.keys`), `dp` (percentiles within the spec group's
+# qualified players of that season; the catalogue's own pct_pos where it has the key) and `pg` (the spec group);
+# data/progression_ref.json holds the peers' quantiles per season and group. Kinds are the catalogue groups (QB, RB,
+# WR, TE, K, P, DEF); defenders are placed in their role (EDGE, DL, LB, CB, S) from value.json.
+DEF_PG = {"sacks_pg": "sacks", "tfl_pg": "tfl", "tackles_pg": "tackles", "pd_pg": "pd", "ints_pg": "ints", "ff_pg": "ff"}
+DEF_ROLES = ("EDGE", "DL", "LB", "CB", "S")
+PROG_FILE = "progression_ref.json"
 
 
 def real_pid(pid: Any) -> bool:
@@ -64,7 +72,14 @@ def reduce_cat(cat: dict | None, season: int) -> dict[str, dict] | None:
     for pid, r in P.items():
         grp = r.get("group")
         keys = SEASON_KEYS.get(grp) or []
-        vals = {k: (r.get("values") or {}).get(k) for k in keys}
+        rv = r.get("values") or {}
+        vals = {k: rv.get(k) for k in keys}
+        pv = {k: x for k, x in rv.items() if x is not None}        # every catalogue value: the progression's deep set
+        if grp == "DEF":
+            g = an.fnum(r.get("games"))
+            for k, c in DEF_PG.items():
+                if pv.get(k) is None and g and an.fnum(rv.get(c)) is not None:
+                    pv[k] = round(an.fnum(rv.get(c)) / g, 3)
         pl = {}
         if r.get("qualified"):
             for k, (mu, sd) in (plus.get(grp) or {}).items():
@@ -72,7 +87,8 @@ def reduce_cat(cat: dict | None, season: int) -> dict[str, dict] | None:
                 if x is not None:
                     pl[k] = int(round(100 + 10 * ((mu - x) if k in LOWER else (x - mu)) / sd))
         out[pid] = {"season": int(season), "team": r.get("team"), "group": grp, "role": r.get("role"), "pos": r.get("pos"), "name": r.get("name"),
-                    "games": r.get("games"), "qualified": r.get("qualified"), "age": r.get("age"), "values": vals, "plus": pl}
+                    "games": r.get("games"), "qualified": r.get("qualified"), "age": r.get("age"), "values": vals, "plus": pl,
+                    "pv": pv, "pp": r.get("pct_pos") or {}}
     return out
 
 
@@ -428,8 +444,41 @@ def similar_players(cat: dict, n: int | None = None, value: dict | None = None) 
     return out
 
 
+def progression(rows_by_season: dict[int, dict | None], value_reader: Callable[[int], dict | None]) -> tuple[dict, dict]:
+    """Places every reduced row (common.progression.Builder): gvar_pg from the season's value.json, defenders' roles
+    from its pos where the catalogue has none, then `_h` = {dv, dp, pg} on each row in place. Returns
+    (progression_ref.json, the files' `prog` block)."""
+    from oddsmarkets.common import progression as PG
+    vrs = {s: value_rates(value_reader(s)) for s, rows in rows_by_season.items() if rows}
+    have: dict[str, set] = {}
+    for s, rows in rows_by_season.items():
+        for pid, r in (rows or {}).items():
+            x = (vrs.get(s) or {}).get(pid) or {}
+            if x.get("gvar_pg") is not None:
+                r.setdefault("pv", {})["gvar_pg"] = x["gvar_pg"]
+            if r.get("group") == "DEF" and r.get("role") not in DEF_ROLES and x.get("pos") in DEF_ROLES:
+                r["role"] = x["pos"]
+            have.setdefault(r.get("group"), set()).update(k for k, v in (r.get("pv") or {}).items() if v is not None)
+    kinds = {}
+    for role, gid in SPEC_GROUP.items():
+        kinds.setdefault("DEF" if role in DEF_ROLES else role, []).append(gid)
+    keys = {k: PG.deep_keys("nfl", gids, have.get(k) or set(), extra=("gvar_pg",)) for k, gids in kinds.items()}
+    pb = PG.Builder("nfl", keys)
+    for s, rows in sorted(rows_by_season.items()):
+        for pid, r in (rows or {}).items():
+            kind = r.get("group")
+            if kind not in keys:
+                continue
+            gid = SPEC_GROUP.get(r.get("role") if kind == "DEF" else kind)
+            r["_h"] = pb.add(s, kind, gid, r.get("pv") or {}, bool(r.get("qualified")) and bool(gid),
+                             pct=None if kind == "DEF" else r.get("pp"))
+    pb.finish()
+    return pb.reference(), pb.prog_block()
+
+
 def write_careers(write: Callable[[str, Any], None], rows_by_season: dict[int, dict | None], blocks: dict[str, dict],
-                  old_reader: Callable[[str], dict | None] | None = None, current_season: int | None = None) -> dict[str, list]:
+                  old_reader: Callable[[str], dict | None] | None = None, current_season: int | None = None,
+                  prog: dict | None = None) -> dict[str, list]:
     """players/<pid>.json for every player with enough volume in some season; returns the players_index entries
     {pid: [name, team, pos, first_season, last_season]}. Placeholder ids (`real_pid` false, e.g. "0") are skipped."""
     ppl = people.people()
@@ -461,8 +510,11 @@ def write_careers(write: Callable[[str, Any], None], rows_by_season: dict[int, d
                    "number": nums.get(pid) if nums.get(pid) is not None else p.get("number"),
                    "seasons": [{"season": r["season"], "team": r.get("team"), "group": r.get("group"), "role": r.get("role"), "games": r.get("games"),
                                 "qualified": r.get("qualified"), "age": r.get("age"), **(r.get("values") or {}),
-                                "plus": r.get("plus") or {}, "epa": _epa_of(r), "value": _value_of(r)} for r in seasons],
+                                "plus": r.get("plus") or {}, "epa": _epa_of(r), "value": _value_of(r), **(r.get("_h") or {})}
+                               for r in seasons],
                    "current": None, "similar": []}
+        if prog and any(r.get("_h") for r in seasons):
+            payload["prog"] = prog
         blk = blocks.get(pid)
         if blk:
             payload["current"] = {k: blk.get(k) for k in ("season", "log", "charts", "ngs", "ftn", "projection", "values", "pct", "pct_pos",

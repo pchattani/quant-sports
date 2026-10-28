@@ -262,6 +262,18 @@ def followed_clubs(seasons: dict) -> set[str]:
             if current is None or m.get("season_id") == current:
                 out.add(m.get("home"))
                 out.add(m.get("away"))
+    # Argentina's clubs are followed too (its own store and fetcher): without them the Copa Argentina and the
+    # Supercopa fetched no line-ups at all (October 2026: 0 of 60 played ties), so those pages had no players.
+    # Their detail comes out of this run's one budget like every other cup's.
+    liga = ROOT / "docs" / "liga" / "data" / "liga_store.json"
+    if liga.exists():
+        lstore = load_store(liga)
+        sids = [m.get("season_id") for m in (lstore.get("matches") or {}).values() if m.get("season_id")]
+        current = max(sids) if sids else None
+        for m in (lstore.get("matches") or {}).values():
+            if current is None or m.get("season_id") == current:
+                out.add(normalize_team_name(str(m.get("home") or ""), "liga_argentina") or None)
+                out.add(normalize_team_name(str(m.get("away") or ""), "liga_argentina") or None)
     out.discard(None)
     return out
 

@@ -162,6 +162,12 @@ def build_level(level: str, data: Path, seasons: list[int], a, report: dict, lev
     from oddsmarkets.college import top_performers
     for s in seasons:
         step(f"{level}:{s}:top", lambda s=s: top_performers.write_top(level, data, s), report)
+    # the standings pages' top and bottom performers (oddsmarkets/college/performers.py): each built season, and any
+    # season on disk (restored from the live site) that predates the file
+    from oddsmarkets.college import performers
+    for s in sorted(set(seasons) | {int(p.parent.name) for p in (data / level).glob("*/players.json")
+                                    if p.parent.name.isdigit() and not (p.parent / "performers.json").exists()}):
+        step(f"{level}:{s}:performers", lambda s=s: performers.write(level, data, s), report)
     # seasons not rebuilt here (CI: restored from the live site) are upgraded to the builder's payload format
     if hasattr(mod, "migrate"):
         built = set(seasons)

@@ -223,3 +223,65 @@ check it."; "Results v process" becomes "Who's for real?" / "Results v chances".
   has full names but no `alt`; check the others. The hero prints the city from `full` and uses `alt` on a clash.
 - **Last game in the player file.** A `current.last_game` block with the linescore and the race would let player
   pages skip the game-file load.
+
+## Progression (round 6, 28 Oct 2026)
+
+The user: "it's hard to visualize player progression year to year. Build a view that allows us to look at player
+progression year by year and compare players year by year on deep metrics. Make it deep. Make it for all where we have
+history." The kit module is `progression.js` (in `KIT_FILES`, so `design_kit.py` copies it to `assets/qk/`); the
+builder side is `oddsmarkets/common/progression.py`. Reference sites: Rink, Hardwood and Bullpen.
+
+### Data (builders, fields only)
+
+Use `oddsmarkets.common.progression.Builder` in the careers step. For every player-season row, call
+`h = pb.add(season, kind, group_id, values, qualified, pct=site_pct)` and merge `h` into the season row after
+`pb.finish()`:
+
+| Field | Where | What |
+|---|---|---|
+| `prog` | `players/<pid>.json` top level | `{"v": 1, "keys": {"<kind>": [ids]}}`: the deep set per kind. Build it with `deep_keys(sport, [group ids], have)`: the spec groups' headline metrics, then the secondary ones, only ids the data carries |
+| `seasons[i].dv` | each season row | the values, aligned to `prog.keys[kind]` (null where missing; 4 significant figures) |
+| `seasons[i].dp` | qualified rows only | the percentiles 0-100 against that season's qualified peers of the group (the site's own percentile when passed, so the card and the progression agree) |
+| `seasons[i].pg` | each season row | the spec group the row is placed in |
+| `progression_ref.json` | one per sport or league (`data/progression_ref.json`, Hardwood `data/<league>/progression_ref.json`) | `pb.reference(labels, lengths)`: season x group x metric -> `[p10, p25, p50, p75, p90]` and `n` (qualified peers); `len` = games in the season. About 50-150 KB |
+
+Arrays keep the player files small (a deep set of ~40 metrics adds ~350 bytes a season). Run the careers step on every
+season on disk so every season with history gets the fields. Mark short seasons only where the data shows it (a games
+count against the season's length, an injury field): the adapter passes `short: { kind: 'injury' | 'short', tag, text }`.
+
+### Front end
+
+Load the module after `quant-charts.js`: `<script src="assets/qk/progression.js"></script>`. The site adapter turns
+a player file into the kit shapes (in `progression.js`'s header):
+
+```js
+P = { id, name, short, seasons: [{ key, x /* 2015 */, label /* '2015-16' */, age, team: { abbr, name, colour },
+      teams, group, n, nMax, nUnit, small /* under the floor */, partial /* the season in progress: out of the jumps,
+      the peak and the trend, tagged SO FAR */, short /* { kind, tag, text } | null */,
+      values: { id: v }, pct: { id: p } }] }
+M = { id, label, unit, dir, fmt, ours: { name } | null, tip, head }   // from QK.spec: cat.metric(id) + cat.ours(id)
+ref = QK.prog.ref(progressionRefJson);  // ref(group, seasonKey, id) -> { q: [5], n }
+```
+
+| Piece | Call | Use |
+|---|---|---|
+| Career chart | `QKC.progression(el, { player: P, metrics: [M], mode: 'value' \| 'pct', x: 'season' \| 'age', ref: (S, id) => ref(S.group, S.key, id), peerName: 'forwards' })` and `QK.progressionKey({ name, peerName, pctLine: true })` under it | one metric: the value line, the peer median (dashed) and the middle half (25th-75th) of each season's qualified peers, the percentile on a right axis; several metrics: percentiles. Dot size = sample, hollow = under the floor, team changes as dashed verticals ("→ NYR" in the team colour), short seasons tagged under the dot |
+| Percentile heatmap | `QK.progressionGrid({ player: P, metrics: [M], groups: [{ label, ids }], peerName, dropEmpty })` (rows with no value in any season are dropped unless `dropEmpty: false`) | metrics down the side, seasons across (team and age under each), the percentile on the kit scale in each cell, value and sample in the tooltip, our-model rows tagged "Ours"; scrolls inside its card at 375 px |
+| Jumps and drops | `QK.progressionDeltas({ player: P, metrics: [M], limit: 4, peerName })` | the biggest changes between consecutive seasons, in percentile points, with the values |
+| Career arc | `var a = QK.careerArc({ player: P, metrics: headline [M], all: deep [M], key: M (WAR / GAR), peerName })` -> `a.html` (black tiles: peak season, age at peak, the last three seasons' trend, the best key value) and `a.text` ("The short version": put it in `QK.explain(a.text, { title: 'The short version.' })`) | the top of the Progression tab |
+| Compare | `QK.compareProgression(el, { players: [P] (2-4), metrics: [M], cat, metric, x: 'season' \| 'age' \| 'year', y: 'value' \| 'pct', ref: (P, S, id) => ..., peerName: P => ..., onState: s => (update the hash), suggest: [{ name, href }], cyNote })` | controls (metric select with "Our models" / "Box score" optgroups, by season / by age / career year, value / percentile), the chart (the peer band by season when everyone shares a group), the key, and the season-by-season table with each player's best season marked BEST |
+
+Ages: compute every season's age the same way (from the date of birth on one fixed date), never a mix of a
+catalogue's age and a computed one: two seasons at one age keep only the later one.
+
+Pages:
+- **Player page:** a "Progression" tab (`#/player/<id>?view=progression`): the career arc and the short version, the
+  chart with a metric picker (the deep set, ours first) and by season / by age, the heatmap of the position's headline
+  and secondary metrics, the jumps and drops, and a link "Compare progression" to the compare page with the closest
+  matches.
+- **Compare progression:** `#/compare/progression/<id>/<id>[/<id>/<id>]?m=<metric>&x=season|age|year&y=value|pct`,
+  linked from the player page and from Compare.
+- Copy: neutral (no pronouns: the surname or "the player"), no betting words, every axis titled.
+
+Checks as above: esprima, the checker (dark, 1440 and 375, `--banned`), the contrast audit. The showcase has a
+"Progression" block on sample data (`showcase.html#progression`).

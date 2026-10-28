@@ -129,7 +129,7 @@ const ALIASES = {
 const TITLES = {
   hub: 'Overview', event: 'Tournament', match: 'Match centre', player: 'Player', players: 'Players', rankings: 'Rankings',
   race: 'Race', elo: 'Elo', calendar: 'Calendar', h2h: 'Head to head', lab: 'Lab', compare: 'Compare',
-  markets: 'Forecasts', calibration: 'Calibration', value: 'Value', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
+  markets: 'Forecasts', calibration: 'How we’re doing', value: 'Value', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
 };
 const NAV_OF = { hub: 'hub', event: 'calendar', calendar: 'calendar', match: 'hub', player: 'players', players: 'players',
   rankings: 'rankings', race: 'race', elo: 'elo', h2h: 'h2h', lab: 'lab', compare: 'compare', markets: 'markets',
@@ -145,7 +145,7 @@ const SECTION_TABS = {
   players: [['players', 'All players', ''], ['h2h', 'Head to head', '']],
   value: [['value', 'Player value', '']],
   lab: [['lab', 'Scatter lab', ''], ['compare', 'Compare', '']],
-  model: [['methodology', 'Methodology', 'g'], ['calibration', 'Calibration', ''], ['glossary', 'Glossary', 'g'], ['disclaimer', 'Terms', 'g']]
+  model: [['methodology', 'Methodology', 'g'], ['calibration', 'How we’re doing', ''], ['glossary', 'Glossary', 'g'], ['disclaimer', 'Terms', 'g']]
 };
 const SECTION_LABEL = { overview: 'Overview', fixtures: 'Draws', standings: 'Rankings', players: 'Players', value: 'Value', lab: 'Lab', model: 'Model' };
 const SECTION_BLURB = {
@@ -167,7 +167,7 @@ const PAGE_HEAD = {
   value: ['Player value', 'Who is likely to rise or fall over the next year, how much of a record is luck, and whose ranking runs ahead of or behind our rating.'], lab: ['Scatter lab', 'Any two metrics for any group of players.'],
   compare: ['Compare', 'Pick two or three players: they line up on the metrics that best describe and predict their tennis, ranked against their own tour.'],
   methodology: ['How the models work', 'The ratings, the match model, the simulations and how well each has done.'],
-  calibration: ['Calibration', 'How often our chances came true, and how they compare with the closing market as a reference.'],
+  calibration: ['How we’re doing', 'Our recent record and how often our chances came true, then every score and check, with the closing market as a reference.'],
   glossary: ['Glossary', 'Every metric on the site, defined.'], disclaimer: ['Disclaimer and terms', '']
 };
 const DETAIL_OF = { event: 'calendar', match: 'calendar', player: 'players' };
@@ -795,7 +795,8 @@ function matchLink(T, id, label) {
  * and country under the name, our chance in Bebas before the first ball (the favourite in blue), sets won once it
  * starts, and the foot "Our chance · why". Tennis adds the score set by set beside the sets won (tiebreaks in
  * superscript, the set in play in red-orange) and, before the first ball, the likeliest score and the games we expect.
- * opts {tour, event: true (the event name before the round), why: true (the one-line reason), compact}. */
+ * opts {tour, event: true (the event name before the round), why: true (the one-line reason), compact, market: false (no
+ * quiet market)}. */
 function playerObj(T, pid) { const x = NAMES[T][String(pid)] || {}; return { name: playerShort(T, pid), abbr: (x.country || '').slice(0, 3) || fmtInitials(playerName(T, pid)), href: playerHref(T, pid) }; }
 function fmtInitials(n) { const p = String(n || '?').split(' '); return (p.length > 1 ? p[0][0] + p[p.length - 1][0] : p[0].slice(0, 2)).toUpperCase(); }
 function matchCard(c, opts) {
@@ -830,7 +831,8 @@ function matchCard(c, opts) {
   const sub = pid => { const rk = playerRank(T, pid), cc = playerCountry(T, pid); return [isNum(rk) ? 'No. ' + rk : '', cc].filter(Boolean).join(' · '); };
   g.away.record = sub(c.p1) + '\u0001a'; g.home.record = sub(c.p2) + '\u0001h';
   const why = o.why ? (QK.whyLine ? QK.whyLine(g) : '') : false;
-  let h = QK.gameCard(g, { sport: false, form: false, why: why || false });
+  /* round 6: the market's chance small and grey under ours before the first ball (o.market: false hides it) */
+  let h = QK.gameCard(g, { sport: false, form: false, why: why || false, market: o.market === false ? false : 'quiet' });
   ['a', 'h'].forEach((k, side) => {
     const mark = '\u0001' + k + '</small></span><span></span>';
     h = h.replace(mark, '</small></span>' + (nSets ? cells(side) : '<span></span>'));
@@ -852,7 +854,8 @@ function matchCard(c, opts) {
 }
 /* A MATCH_CARD as the kit's game shape (ticker, feature card, preview card, "why" lines): p1 on the top row (away),
  * p2 below (home); p_home is our pre-match chance for p2 (kept after the match as the pre-match call), wp_home the live
- * one; as / hs are sets won. No market: the kit shows it only where a page asks. opts.initials: the monogram reads the
+ * one; as / hs are sets won. market_home / market_src: the market's chance for p2 before the first ball (the kit shows it
+ * only where a page asks, as market: 'quiet', round 6). opts.initials: the monogram reads the
  * player's initials (feature and preview cards) instead of the surname (ticker, bar keys). */
 function kitGame(c, T0, opts) {
   const T = T0 || state.tour, ko = opts || {};
@@ -864,7 +867,8 @@ function kitGame(c, T0, opts) {
   return { sport: 'tennis', league: eventName(T, c.event), note: roundLabel(c.round), id: c.id, start: d ? d.toISOString() : c.date, status: live ? 'live' : fin ? 'final' : 'pre',
     away: ent(c.p1), home: ent(c.p2), as: fin || live ? w[0] : null, hs: fin || live ? w[1] : null,
     p_home: isNum(m.p1) ? 1 - Number(m.p1) : null, wp_home: live && isNum(c.wp_now) ? 1 - Number(c.wp_now) : undefined,
-    pre_only: live && !isNum(c.wp_now) ? true : undefined, href: matchHref(T, c.id), tba: !!c.tba || (c.date && String(c.date).length <= 10) };
+    pre_only: live && !isNum(c.wp_now) ? true : undefined, href: matchHref(T, c.id), tba: !!c.tba || (c.date && String(c.date).length <= 10),
+    market_home: c.market && isNum(c.market.p1) ? 1 - Number(c.market.p1) : undefined, market_src: c.market && c.market.sources ? c.market.sources : undefined };
 }
 /* Before the first ball a card is "upcoming"; a snapshot can keep a match live or upcoming long after it was played.
  * Cards still live or upcoming 12 hours after their start are dropped (the Home page applies the same guard). */

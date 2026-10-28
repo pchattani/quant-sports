@@ -337,11 +337,14 @@ def test_promedio_counts_the_whole_season_not_just_this_tournament() -> None:
     """
     Promedios span the full calendar, so a club bottom of the current tournament but
     strong across the season is safe. This is why the relegation table does not track
-    the live zone table, which reads as a bug until you check it.
+    the live zone table, which reads as a bug until you check it. The current season counts
+    everything played so far (the finished Apertura and the Clausura to date), as the published
+    promedios do; before October 2026 only finished tournaments counted.
     """
     state = _make_state(played_fraction=0.3)
     promedios = state.promedio_now()
-    base = state.anual_base()
+    base = state.anual_now()
+    assert any(base[t].played > state.anual_base()[t].played for t in state.teams)
     for team in state.teams:
         prior_pts, prior_mp = state.promedios_prior.get(team, (0, 0))
         rec = base[team]

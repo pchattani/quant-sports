@@ -33,7 +33,8 @@ function age(dob) { const d = RK.parseDate(dob); if (!d) return null; return Mat
 
 function render(el, params, state) {
   const pid = String(params.id);
-  const view = ((params.query || {}).view) === 'detail' ? 'detail' : 'overview';
+  const vq = (params.query || {}).view;
+  const view = vq === 'detail' || vq === 'progression' ? vq : 'overview';
   const S = RK.currentSeason();
   el.innerHTML = QK.skeleton('card', 1) + QK.skeleton('chart', 1);
   const kindGuess = (RK.player(pid) || {}).pos === 'G' ? 'goalies.json' : 'skaters.json';
@@ -93,13 +94,14 @@ function render(el, params, state) {
       meta: [p.shoots ? (goalie ? 'Catches ' : 'Shoots ') + (p.shoots === 'L' ? 'left' : p.shoots === 'R' ? 'right' : p.shoots) : null, a ? a + ' years old' : null,
         ht ? ht + (isNum(p.weight) ? ', ' + p.weight + ' lb' : '') : null, mates.length === 2 && !goalie ? 'Lines up with ' + mates[0] + ' and ' + mates[1] : null],
       tags: tagsH, strip: tileList(), short: shortVersion() });
-    const tabs = [{ key: 'overview', label: 'Overview', href: RK.playerHref(pid) }, { key: 'detail', label: 'Detail: every metric, shot maps, game log, on-ice, comparisons', href: RK.playerHref(pid) + '?view=detail' }];
+    const tabs = [{ key: 'overview', label: 'Overview', href: RK.playerHref(pid) }, { key: 'progression', label: 'Progression', href: RK.playerHref(pid) + '?view=progression' }, { key: 'detail', label: 'Detail: every metric, shot maps, game log, on-ice, comparisons', href: RK.playerHref(pid) + '?view=detail' }];
     const crumb = '<nav class="rk-crumb" aria-label="Breadcrumb"><a href="#/players">Hockey</a><span aria-hidden="true">›</span>' + (curTeam ? '<a href="' + esc(RK.teamHref(curTeam)) + '">' + esc(RK.teamName(curTeam)) + '</a><span aria-hidden="true">›</span>' : '') + esc(p.name) + '</nav>';
     /* v4 (Broadcast): the hero is the full-bleed team-colour diagonal with the black strip of five numbers and
        "The short version" under it (QK.playerHeader strip / short) */
     el.innerHTML = crumb + hero + '<div style="margin-top:var(--sp-6)">' + U.tabsHTML(tabs, view) + '</div><div id="pp-body"></div>';
     const body = el.querySelector('#pp-body');
     if (view === 'detail') return U.legacy('player', body, params, state);
+    if (view === 'progression') return RK.progression ? RK.progression.tab(body, p) : null;
 
     /* "The short version": what the numbers say, in plain English, from this season's percentiles */
     function lc(x) { return /^[A-Z][a-z]/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x; }

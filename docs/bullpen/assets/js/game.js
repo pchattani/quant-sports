@@ -253,7 +253,8 @@ function header(g, L, S, season) {
     nick: t => t.short || t.name,
     colors: pair, factors: fx, factorsTitle: 'How they match up this season',
     noteExtra: extra.length ? esc(extra.join('; ').replace(/^we/, 'We')) + '.' : '',
-    market: !started && isNum(mk.p_home) ? { p: Number(mk.p_home), label: 'Market (' + (U.srcName(mk.sources) || 'reference') + ')' } : null });
+    /* round 6: the market quiet under the hero (small and grey, the source on hover) */
+    market: !started && isNum(mk.p_home) ? { p: Number(mk.p_home), src: mk.sources || mk.source || null, label: U.srcName(mk.sources) || '', quiet: true } : null });
   const ump = g._ump || {};
   const meta = [];
   if (g.series) meta.push(esc(BP.seriesText(g.series)));

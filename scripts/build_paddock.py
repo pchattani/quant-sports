@@ -468,10 +468,21 @@ def main(argv: list[str] | None = None) -> int:
             from oddsmarkets.f1.analytics import drivers as drv
             cs = ssn.careers(years, shared["standings"], shared["elo"], finished_years)
             on_grid = set(((cats.get(current) or {}).get("drivers") or {}))
+            # Progression: every season's catalogue (1950 on; the ones not loaded above read from disk)
+            allc = dict(cats)
+            for y in years:
+                p = data / str(y) / "drivers.json"
+                if y not in allc and p.exists():
+                    allc[y] = b.step(f"read {p}", lambda: json.loads(p.read_text(encoding="utf-8")))
+            pr = b.step("progression", lambda: drv.progression(allc), None)
+            if pr:
+                b.write(drv.PROG_FILE, pr[1])
             for d, c in cs.items():
                 prev = drv.prev_peer_pct(cats.get(current - 1), d) if d in on_grid else {}
                 if prev:                                  # last season's peer percentiles: the rail's rings
                     c["current"] = {"year": current, **prev}
+                if pr:
+                    drv.merge_progression(c, pr[0].get(d), pr[2])
                 b.write(f"drivers/{d}.json", c)
             return len(cs)
         n = b.step("careers", careers, 0)

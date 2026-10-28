@@ -212,7 +212,13 @@ def build_season(b: Build, league: str, season: int, full: bool, cfg: dict, shar
     sig = season_sig(league, season)
     if not full and not cfg["force"] and sig_unchanged(manifest.get("sig"), sig) and (b.data / league / str(season) / "players.json").exists():
         logger.info("%s %s light: inputs unchanged, skipped", league, season)
-        return {"catalogue": an.read_json(b.data / league / str(season) / "players.json"), "skipped": True}
+        cat0 = an.read_json(b.data / league / str(season) / "players.json")
+        if not (b.data / league / str(season) / "performers.json").exists():
+            # a season built before the standings page's performers: derive them from the catalogue on disk
+            from oddsmarkets.basketball.analytics import performers as PF0
+            b.write_or_fail(d + "performers.json", f"performers {league} {season}", lambda: PF0.build(cat0, league, season),
+                            league=league, season=season)
+        return {"catalogue": cat0, "skipped": True}
     today = cfg["today"]
     ctx = SeasonContext(league, season, current=shared["current"], full=full, elo=shared.get("elo"), sims=cfg["sims"],
                         fetch_markets=cfg["markets"] and full, today=today)
@@ -306,6 +312,10 @@ def build_season(b: Build, league: str, season: int, full: bool, cfg: dict, shar
     hist = _player_history(shared.get("catalogues") or {}, season)
     cat = b.write_or_fail(d + "players.json", f"players {league} {season}", lambda: PL.build(ctx, hist, lineup_tables),
                           league=league, season=season)
+    # the standings page's top and bottom performers (oddsmarkets/basketball/analytics/performers.py)
+    from oddsmarkets.basketball.analytics import performers as PF
+    b.write_or_fail(d + "performers.json", f"performers {league} {season}", lambda: PF.build(cat, league, season),
+                    league=league, season=season)
     ratings_7d = None
     if full and ctx.phase not in ("offseason", "preseason"):
         from oddsmarkets.basketball.models import ratings as R
@@ -652,6 +662,60 @@ def jersey_number(v) -> str | None:
     return t if t.isdigit() and len(t) <= 2 else None
 
 
+# progression (round 6): box rates per game and WAR (value.json) join the spec's deep set for the season-by-season view
+PROG_EXTRA = ["war", "rapm_o", "rapm_d", "wpa", "pts_g", "reb_g", "ast_g", "stl_g", "blk_g", "mpg", "gmsc"]
+ROLE_GROUP_ID = {"G": "guards", "W": "wings", "B": "bigs"}
+
+
+def progression(league: str, cats: dict[int, dict], b: Build | None = None) -> tuple[dict | None, dict, list[str]]:
+    """The progression fields for every player-season (oddsmarkets/common/progression.py): dv / dp / pg against the
+    season's qualified players of the same role (guards, wings, bigs; the catalogue's pct_role where it has the key),
+    plus "miss" [games missed, injury DNPs] for the short-season tag; and the league's progression_ref.json. WAR comes
+    from each season's value.json. Returns (reference, {(season, pid): fields}, keys)."""
+    from oddsmarkets.common import progression as PR
+    gids = [f"{league}_{g}" for g in ("guards", "wings", "bigs")]
+    have: set[str] = set()
+    for c in cats.values():
+        for r in ((c or {}).get("players") or {}).values():
+            have.update((r.get("values") or {}).keys())
+    have.add("war")
+    keys = PR.deep_keys("basketball", gids, have, extra=PROG_EXTRA)
+    pb = PR.Builder("basketball", {"player": keys})
+    handles: dict[tuple, dict] = {}
+    lengths: dict[int, int] = {}
+    for s in sorted(cats):
+        P = (cats[s] or {}).get("players") or {}
+        if not P:
+            continue
+        war: dict[str, float] = {}
+        try:
+            vj = an.read_json((b.data if b else an.data_root()) / league / str(s) / "value.json") or {}
+            cols = vj.get("cols") or []
+            if "id" in cols and "war" in cols:
+                i, j = cols.index("id"), cols.index("war")
+                war = {str(r[i]): r[j] for r in vj.get("rows") or [] if r[j] is not None}
+        except Exception:      # noqa: BLE001 - WAR is an extra
+            war = {}
+        gps = sorted((r.get("gp") or 0) for r in P.values())
+        if gps:
+            lengths[int(s)] = int(gps[int(0.99 * (len(gps) - 1))])
+        for pid, r in P.items():
+            v = dict(r.get("values") or {})
+            if pid in war:
+                v["war"] = war[pid]
+            gid = f"{league}_{ROLE_GROUP_ID.get(r.get('role') or 'W', 'wings')}"
+            h = pb.add(s, "player", gid, v, bool(r.get("qualified")), pct=r.get("pct_role") or {})
+            if r.get("age") is not None:
+                h["age"] = r.get("age")
+            gm, inj = v.get("games_missed"), v.get("injury_dnp")
+            if gm or inj:
+                h["miss"] = [gm, inj]
+            handles[(int(s), pid)] = h
+    pb.finish()
+    ref = pb.reference(labels={f"{league}_guards": "Guards", f"{league}_wings": "Wings", f"{league}_bigs": "Bigs"}, lengths=lengths)
+    return ref, handles, keys
+
+
 def careers(b: Build, league: str, cats: dict[int, dict], blocks: dict[str, dict]) -> int:
     from oddsmarkets.basketball.analytics import awards as AWD
     from oddsmarkets.basketball.analytics import players as PL
@@ -678,6 +742,14 @@ def careers(b: Build, league: str, cats: dict[int, dict], blocks: dict[str, dict
             names[pid] = r.get("name") or names.get(pid) or pid
             rows.setdefault(pid, []).append(PL.season_row(s, r))
             latest[pid] = (s, r)
+    prog_ref, prog_rows, prog_keys = progression(league, cats, b)
+    for pid, rs in rows.items():
+        for r in rs:
+            h = prog_rows.get((int(r["season"]), pid))
+            if h:
+                r.update(h)
+    if prog_ref:
+        b.write(f"{league}/progression_ref.json", prog_ref)
     ca = AWD.career_awards(league, sorted(cats), cats)
     stores_players: dict[str, dict] = {}
     numbers: dict[str, str] = {}      # the player hero's outlined number: the latest ESPN roster `jersey` on file
@@ -710,6 +782,8 @@ def careers(b: Build, league: str, cats: dict[int, dict], blocks: dict[str, dict
                    "similar": PL.similar(pid, s, r, index, names), "similar_role": sim_role.get(pid, []),
                    "role_card": PL.role_card((cats[s] or {}).get("players") or {}, pid, league, s, cats[s]),
                    "career_awards": ca.get(pid, []), "updated_at": _now()}
+        if any("dv" in x for x in seasons):
+            payload["prog"] = {"v": 1, "keys": {"player": prog_keys}}
         b.write(f"{league}/players/{pid}.json", payload)
         n += 1
     return n

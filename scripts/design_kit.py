@@ -2,7 +2,7 @@
 
     from design_kit import copy_kit
     copy_kit(DOCS / "rink")          # -> docs/rink/assets/qk/{tokens.css, quant.css, quant.js, quant-charts.js, plotly-ec.js,
-                                     #    league.js}
+                                     #    league.js, progression.js}
                                      #    and docs/rink/assets/qk/metrics/hockey.json
 
 Every site build calls this once, so all sites ship the same kit version. The style guide
@@ -30,7 +30,9 @@ METRICS = DESIGN / "metrics"
 # copied everywhere so any site can load it without its own copy.
 # league.js (QKL) draws the season payload's "league" block on the US sports' standings and team pages
 # (oddsmarkets/common/league.py); a page that does not load it is unaffected.
-KIT_FILES = ["tokens.css", "quant.css", "quant.js", "quant-charts.js", "plotly-ec.js", "league.js"]
+# progression.js (QKC.progression, QK.progressionGrid, QK.compareProgression ...: round 6) draws a player's career season by
+# season against the peers (oddsmarkets/common/progression.py); a page that does not load it is unaffected.
+KIT_FILES = ["tokens.css", "quant.css", "quant.js", "quant-charts.js", "plotly-ec.js", "league.js", "progression.js"]
 # site folder (docs/<folder>) -> the sport of its metrics file (docs/_design/metrics/<sport>.json)
 SITE_SPORT = {
     "site": "football",

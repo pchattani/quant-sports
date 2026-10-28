@@ -1409,6 +1409,8 @@ class Unified:
             if cut:
                 payload["career_gap"] = {"through": cut}
             payload["years"] = years
+            from oddsmarkets.football.analytics import progression as _prog
+            _prog.carry(people_dir / f"{pid}.json", payload)     # refreshed by the progression step after the value layer
             _write(people_dir / f"{pid}.json", payload)
             written.add(pid)
             # "min" is the minutes of his current season in his own frame, every competition: the same

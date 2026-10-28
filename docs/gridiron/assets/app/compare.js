@@ -120,7 +120,7 @@ const ARCHETYPE = { composite: 'The all-round passer', epa_db: 'The efficient pa
 function compareV2(el, S, ids0, cat) {
   const sq = GI.sq(S);
   let h = GI.pageHead('Lab · ' + S, 'Compare', 'Two or three players side by side on the metrics that best describe and predict their play at their position, each ranked against their own group.') + GI.sectionNav('lab', 'compare') +
-    GI.subnav([['#/compare' + sq, 'Players', 'p'], ['#/compare/t:KC/t:BUF' + sq, 'Teams (classic)', 't'], ['#/compare' + (ids0.length ? '/' + ids0.map(encodeURIComponent).join('/') : '') + '?view=all' + (sq ? '&' + sq.slice(1) : ''), 'Every metric (classic)', 'all']], 'p', 'Compare views');
+    GI.subnav([['#/compare' + sq, 'Players', 'p'], ['#/compare/t:KC/t:BUF' + sq, 'Teams (classic)', 't'], ['#/compare' + (ids0.length ? '/' + ids0.map(encodeURIComponent).join('/') : '') + '?view=all' + (sq ? '&' + sq.slice(1) : ''), 'Every metric (classic)', 'all'], ['#/compare/progression' + (ids0.length ? '/' + ids0.map(encodeURIComponent).join('/') : ''), 'Career progression', 'prog']], 'p', 'Compare views');
   if (!cat) { el.innerHTML = h + GI.notBuilt('The ' + S + ' player catalogue', null); return; }
   const P = cat.players;
   let ids = ids0.filter(id => P[id]);
@@ -247,7 +247,7 @@ GI.route('compare', function (el, params) {
     const metrics = !A || !B ? [] : MODE === 'team' ? (tc.metrics || []) : GI.metricsFor(cat, A.group).filter(m => GI.metricsFor(cat, B.group).some(x => x.key === m.key));
     const sq0 = GI.sq(S);
     let h = GI.pageHead('Lab · ' + S, 'Compare', 'Two players (every metric they share) or two teams, by percentile: the classic comparison.') + GI.sectionNav('lab', 'compare') +
-      GI.subnav([['#/compare' + sq0, 'Players', 'p'], ['#/compare/t:KC/t:BUF' + sq0, 'Teams (classic)', 't'], ['#/compare' + (a0 && !teamId(a0) ? '/' + encodeURIComponent(a0) + (b0 ? '/' + encodeURIComponent(b0) : '') : '') + '?view=all' + (sq0 ? '&' + sq0.slice(1) : ''), 'Every metric (classic)', 'all']], MODE === 'team' ? 't' : 'all', 'Compare views') +
+      GI.subnav([['#/compare' + sq0, 'Players', 'p'], ['#/compare/t:KC/t:BUF' + sq0, 'Teams (classic)', 't'], ['#/compare' + (a0 && !teamId(a0) ? '/' + encodeURIComponent(a0) + (b0 ? '/' + encodeURIComponent(b0) : '') : '') + '?view=all' + (sq0 ? '&' + sq0.slice(1) : ''), 'Every metric (classic)', 'all'], ['#/compare/progression' + (a0 && !teamId(a0) ? '/' + encodeURIComponent(a0) + (b0 && !teamId(b0) ? '/' + encodeURIComponent(b0) : '') : ''), 'Career progression', 'prog']], MODE === 'team' ? 't' : 'all', 'Compare views') +
       GI.card('', '', '<div class="gi-toolbar">' + GI.seg('cmp-mode', [['player', 'Players'], ['team', 'Teams']], MODE, 'Compare') + '<div id="cmp-pa"></div><button type="button" class="qk-btn" id="cmp-swap" aria-label="Swap">⇄</button><div id="cmp-pb"></div></div>');
     if (!src) h += GI.notBuilt('The ' + (MODE === 'team' ? 'team' : 'player') + ' catalogue', MODE === 'team' ? res[1] : res[0]);
     else if (!A || !B) h += QK.empty('Pick ' + (A ? 'a second ' : 'two ') + (MODE === 'team' ? 'teams' : 'players'), (a0 && !A ? a0 + ' is not in the ' + S + ' catalogue. ' : '') + 'Type a name above.');

@@ -48,6 +48,15 @@ def sim_keys(kind: str) -> list[str]:
 LOWER = {"gaa", "xga60"}
 
 
+def prog_keys(kind: str, have: set[str] | None = None) -> list[str]:
+    """The progression deep set (oddsmarkets/common/progression.py): the spec groups' headline then secondary metrics
+    for skaters (forwards, defence) or goalies, only ids the catalogue carries; NHL EDGE tracking (2021-22 on) is left
+    out of the season-by-season view."""
+    from oddsmarkets.common import progression as PR
+    groups = ("forwards", "defence") if kind == "skater" else ("goalies",)
+    return [k for k in PR.deep_keys("hockey", groups, have) if not k.startswith("edge_")]
+
+
 def reduce_cat(cat: dict | None, season: int, kind: str) -> dict[str, dict] | None:
     if not cat or not cat.get("players"):
         return None
@@ -69,8 +78,13 @@ def reduce_cat(cat: dict | None, season: int, kind: str) -> dict[str, dict] | No
             if len(v) >= 8:
                 stats[(grp, k)] = (float(np.mean(v)), float(np.std(v)) or 1.0)
     out = {}
+    have = set().union(*[set((r.get("values") or {}).keys()) for r in P.values()]) if P else set()
+    dkeys = prog_keys(kind, have)
     for pid, r in P.items():
         vals = {k: (r.get("values") or {}).get(k) for k in keys}
+        rv = r.get("values") or {}
+        deep = {k: rv.get(k) for k in dkeys if rv.get(k) is not None}
+        dpct = (r.get("pct_pos") or {}) if kind == "skater" else (r.get("pct_pos") or r.get("pct") or {})
         sim = {k: (r.get("values") or {}).get(k) for k in skeys}
         pl = {}
         if placed(r):
@@ -81,7 +95,8 @@ def reduce_cat(cat: dict | None, season: int, kind: str) -> dict[str, dict] | No
                     pl[k] = int(round(100 + 10 * ((st[0] - x) if k in LOWER else (x - st[0])) / st[1]))
         out[pid] = {"season": int(season), "kind": kind, "team": r.get("team"), "teams": r.get("teams"), "group": r.get("group"),
                     "pos": r.get("pos"), "name": r.get("name"), "age": r.get("age"), "qualified": r.get("qualified"), "values": vals,
-                    "plus": pl, "sim": sim}
+                    "plus": pl, "sim": sim, "deep": deep, "dpct": {k: dpct[k] for k in deep if dpct.get(k) is not None},
+                    "placed": placed(r), "team_games": cat.get("team_games")}
     return out
 
 
@@ -384,6 +399,32 @@ def write_careers(write: Callable[[str, dict], None], rows_by: dict[int, dict[st
     cur = rows_by.get(current) or {}
     for kind in ("skater", "goalie"):
         sims.update(similar({p: r for p, r in cur.items() if r.get("kind") == kind}, kind))
+    # progression (round 6): the deep set per season against that season's position group, and the peer reference
+    from oddsmarkets.common import progression as PR
+    PGROUP = {"F": "forwards", "D": "defence", "G": "goalies"}
+    have = {"skater": set(), "goalie": set()}
+    for rs in rows_by.values():
+        for r in rs.values():
+            if r.get("deep"):
+                have.setdefault(r.get("kind") or "skater", set()).update(r["deep"].keys())
+    pkeys = {kind: prog_keys(kind, have.get(kind) or set()) for kind in ("skater", "goalie")}
+    pb = PR.Builder("hockey", pkeys)
+    handles: dict[tuple, dict] = {}
+    lengths: dict[str, int] = {}
+    for s in sorted(rows_by):
+        for pid, r in (rows_by[s] or {}).items():
+            if r.get("deep") is None:
+                continue
+            kind = r.get("kind") or "skater"
+            gid = PGROUP.get("G" if kind == "goalie" else (r.get("group") or ""))
+            handles[(s, pid)] = pb.add(s, kind, gid, r["deep"], bool(r.get("placed")), pct=r.get("dpct"))
+            if isinstance(r.get("team_games"), (int, float)) and r["team_games"]:
+                lengths[str(s)] = max(lengths.get(str(s), 0), int(r["team_games"]))
+    pb.finish()
+    try:
+        write("progression_ref.json", pb.reference(lengths=lengths))
+    except Exception as exc:          # noqa: BLE001 - the reference is an extra; the careers still write
+        logger.warning("progression_ref.json: %s", exc)
     idx = {}
     n_written = 0
     for pid, seasons in by_pid.items():
@@ -396,8 +437,12 @@ def write_careers(write: Callable[[str, dict], None], rows_by: dict[int, dict[st
         doc = {"id": pid, "name": nm, "pos": info.get("pos") or last.get("pos"),
                "shoots": info.get("shoots"), "dob": info.get("dob"), "height": info.get("height"), "weight": info.get("weight"),
                "number": info.get("number"), "kind": last.get("kind"),
-               "seasons": [{k: r.get(k) for k in ("season", "team", "teams", "pos", "age", "qualified", "values", "plus", "source")} for r in seasons],
+               "seasons": [dict({k: r.get(k) for k in ("season", "team", "teams", "pos", "age", "qualified", "values", "plus", "source")},
+                                **(handles.get((r["season"], pid)) or {})) for r in seasons],
                "current": blocks.get(pid), "similar": sims.get(pid)}
+        kinds = sorted({r.get("kind") or "skater" for r in seasons if (r["season"], pid) in handles})
+        if kinds:
+            doc["prog"] = {"v": PR.VERSION, "keys": {kd: pkeys[kd] for kd in kinds}}
         idx[pid] = [doc["name"], last.get("team"), doc["pos"], seasons[0]["season"], last["season"]]
         old = old_reader(pid)
         if old is not None and _sig(old) == _sig(doc):

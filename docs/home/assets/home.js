@@ -4,12 +4,14 @@
  * Page, top to bottom: the black ticker; a small intro (what The Quant is, three pillars, "How it works", the
  * sports); "Today": the game of the day (the significance rule, oddsmarkets/common/featured.py, ranked in the
  * builder: never the closest call, never "Our pick") beside the week's top lines (the biggest swing in a title
- * chance, the upset of the week, our favourites' record, from oddsmarkets/common/digest.py); "Around the sports"
- * (one line per sport: where the season is, the next big game, who's hot); "Six games. Our calls." (ranked by the
- * same score); the black power list; the volt stat-of-the-day slab; "We say it. Then we check it." beside "Who's
- * for real?"; the title race; every game; charts of the week; "How it works".
- * Our numbers lead everywhere; the market never appears on this page (STYLE_GUIDE.md §3). ?asof=<ISO> previews an
- * older snapshot (QK.now). */
+ * chance, the upset of the week, the team of the week); "Around the sports" (one line per sport: where the season
+ * is, the next big game, who's hot); "Six games. Our calls." (ranked by the same score); the black power list; "The
+ * season's biggest surprises" (story cards: the biggest moves in a playoff chance since the season started, from
+ * the sites' race logs); the volt stat-of-the-day slab; "Who's for real?" beside "On a roll" (each sport's team of
+ * the week); the title race; every game; charts of the week; "How it works".
+ * Round 6: our chance leads; the market sits beside it, small and grey (market: 'quiet', STYLE_GUIDE.md §3) on the
+ * ticker, the game cards and under the game of the day. Our record and calibration live on each site's Model page
+ * ("How we're doing"), linked from the foot. ?asof=<ISO> previews an older snapshot (QK.now). */
 (function () {
 'use strict';
 var $ = QK.$, $$ = QK.$$, esc = QK.esc, fmt = QK.fmt, isNum = QK.isNum;
@@ -69,12 +71,10 @@ QK.fetchJSON('data/home.json', { cache: 'no-cache' }).then(function (j) {
 function prep(g) {
   if (g.status === 'live' && !isNum(g.wp_home)) g.pre_only = true;
   else delete g.pre_only;
-  /* the market never shows on the home page */
-  g.market_home = null;
 }
 
 function renderAll() {
-  var jobs = [renderTicker, renderSportNav, renderFeature, renderToplines, renderAround, renderWatch, renderHot, renderStats, renderHowSure, renderReal, renderRaces, renderChips, renderGames, renderCharts, renderHow];
+  var jobs = [renderTicker, renderSportNav, renderFeature, renderToplines, renderAround, renderWatch, renderHot, renderSurprises, renderStats, renderReal, renderRoll, renderRaces, renderChips, renderGames, renderCharts, renderHow];
   jobs.forEach(function (f) { try { f(); } catch (e) { if (window.console) console.error(e); } });
   $('#updated').textContent = 'Data built ' + fmt.ago(D.updated_at) + ' (' + fmt.date(D.updated_at) + ' ' + fmt.time(D.updated_at) + '). Live scores refresh every minute while games are on.';
   QK.seg($('#when'), function (v) { state.when = v; state.shown = PAGE; renderGames(); });
@@ -86,7 +86,7 @@ function playable() { return D.games.filter(function (g) { return !g.event; }); 
 
 /* ───────────────────────────── ticker (broadcast black) */
 function renderTicker() {
-  $('#ticker').innerHTML = QK.ticker(playable(), { max: 48 });
+  $('#ticker').innerHTML = QK.ticker(playable(), { max: 48, market: 'quiet' });
   shell.setLive(liveMap());
 }
 
@@ -129,8 +129,8 @@ function renderFeature() {
   /* the head follows the lead game's day at the reader's clock: "today" only when it is on today */
   var isToday = !!p && (p.g.status === 'live' || dayDiff(p.g.start) === 0);
   $('#h-today').innerHTML = QK.sectionHead(isToday || !p
-    ? { kicker: 'Today · ' + today, title: 'What matters today', sub: 'The game of the day, the week’s biggest moves, and how our numbers did.' }
-    : { kicker: 'Coming up · ' + whenTag(p.g).split(' · ')[0], title: 'What matters next', sub: 'Nothing that big is on today. The next game that matters, the week’s biggest moves, and how our numbers did.' });
+    ? { kicker: 'Today · ' + today, title: 'What matters today', sub: 'The game of the day, the week’s biggest swing, its upset and the team on a roll.' }
+    : { kicker: 'Coming up · ' + whenTag(p.g).split(' · ')[0], title: 'What matters next', sub: 'Nothing that big is on today. The next game that matters, the week’s biggest swing, its upset and the team on a roll.' });
   featureId = p ? keyOf(p.g) : null;
   if (!p) { box.innerHTML = raceFallback(); return; }
   var g = p.g, live = g.status === 'live';
@@ -138,7 +138,7 @@ function renderFeature() {
   var chip = live ? undefined : (g.league || sportOf(g.sport).label) + ' · ' + whenTag(g);
   var hero = g.event ? eventCard(g, tag, chip) : QK.splitHero(g, { tag: tag, chip: chip, compact: true, note: false });
   var also = p.rest.slice(0, 2);
-  box.innerHTML = hero + QK.explain(whyFeature(p), { html: true }) +
+  box.innerHTML = hero + (g.event ? '' : QK.marketLine(g, { cls: 'hm-feat-mq' })) + QK.explain(whyFeature(p), { html: true }) +
     (also.length ? '<div class="hm-also"><span class="hm-also-k">' + alsoLabel(also) + '</span>' + also.map(function (x) { return '<a href="' + esc(x.href || '#') + '"><b>' + esc(matchup(x)) + '</b> <span>' + esc((x.league || '') + ' · ' + whenTag(x)) + '</span></a>'; }).join('') + '</div>' : '');
 }
 /* "Also big today" / "Also big tomorrow" when every game is that day (reader's clock), else "Also coming up" */
@@ -200,18 +200,12 @@ function renderToplines() {
     out.push(tl('Upset of the week', sayPct(u.p), u.players ? surname(u.winner) + ' beat ' + surname(u.loser) : (the ? 'The ' : '') + u.winner + ' beat ' + (the ? 'the ' : '') + u.loser,
       'Before the start we gave ' + (the ? 'the ' : '') + esc(u.winner) + ' a ' + sayPct(u.p) + ' chance, ' + inN(u.p) + '. They won' + esc(sc) + ' (' + esc(lg[lg.length - 1] || SPORT_SHORT[u.sport] || '') + ', ' + esc(fmt.date(u.start)) + '). A chance that size should still come off now and then.', u.href, u.sport));
   }
-  var r = G.record;
-  if (r && r.n) {
-    var rate = r.won / r.n, exp = r.expected, sd = Math.sqrt(r.n * r.expected_rate * (1 - r.expected_rate));
-    var verdict = Math.abs(r.won - exp) <= 2 * sd ? 'That is about what an honest forecaster gets.' : r.won < exp ? 'More upsets than our numbers expected.' : 'Favourites did better than our numbers expected.';
-    var by = (r.by || []).map(function (b) { return esc(SPORT_SHORT[b.sport] || b.sport) + ' ' + b.won + '/' + b.n; }).join(' · ');
-    var small = r.n < 20, wk = !r.days || r.days === 7;
-    /* a small sample says little either way: name it, and never call a verdict on it */
-    if (small) verdict = '<b>Small sample:</b> ' + r.n + ' games is too few to judge; a couple of results move this a lot.';
-    out.push(tl(wk ? 'Our record this week' : 'Our record, last ' + r.days + ' days', r.won + '<small>of ' + r.n + '</small>', 'Favourites won ' + sayPct(rate) + '. We expected ' + sayPct(r.expected_rate) + '.',
-      (wk ? '' : 'Too few games this week, so this covers the last ' + r.days + ' days. ') +
-      'Every finished game since ' + esc(ymd(r.from)) + ' with a chance we published before the start. Our favourites’ average chance was ' + sayPct(r.expected_rate) + ', so we expected about ' + Math.round(exp) + ' wins. ' + verdict + (by ? ' <span class="hm-tl-by">' + by + '</span>' : '') +
-      ' <span class="hm-tl-by">Football is left out: its pre-match chances are not kept after kick-off.</span>', '#howsure', null));
+  var h = ((D.stories || {}).hot || [])[0];
+  if (h) {
+    var rec = h.w + '–' + h.l + (h.d ? '–' + h.d : '');
+    var lg2 = h.league && h.league !== SPORT_SHORT[h.sport] ? h.league : (SPORT_SHORT[h.sport] || '');
+    out.push(tl(h.players ? 'Player of the week' : 'Team of the week', esc(rec), (h.players ? '' : (THE_SPORTS.indexOf(h.sport) >= 0 ? 'The ' : '')) + (h.name || h.short),
+      esc(h.name || h.short) + (h.players ? ' won ' : ' went ') + h.w + '–' + h.l + (h.d ? '–' + h.d : '') + ' in ' + (h.players ? 'matches' : 'games') + ' over the last week' + (isNum(h.margin) && !h.players ? ', ' + (h.margin >= 0 ? '+' : '−') + Math.abs(Math.round(h.margin)) + ' on the scoreboard' : '') + ' (' + esc(lg2) + '). The best week across our ' + sportCount() + '.', h.href, h.sport));
   }
   $('#toplines').innerHTML = out.length ? out.join('') : QK.explain('<b>This week.</b> The week’s numbers appear here once games have been played.', { html: true });
 }
@@ -248,7 +242,7 @@ function renderWatch() {
   $('#h-watch').innerHTML = QK.sectionHead({ kicker: 'What to watch next', title: n ? cap(NUMS[n]) + ' game' + (n === 1 ? '' : 's') + '. Our calls.' : 'Nothing on right now',
     sub: 'The biggest games of the next day and a half, at most two per sport. Our chance for each side, the favourite in blue.',
     actions: '<a class="qk-more" href="#games">All ' + playable().length + ' games</a>' });
-  $('#watch-grid').innerHTML = QK.watchGrid(pool, { limit: 6, pick: false, card: { why: true } });
+  $('#watch-grid').innerHTML = QK.watchGrid(pool, { limit: 6, pick: false, card: { why: true, market: 'quiet' } });
 }
 
 /* ───────────────────────────── who's hot: the black power list */
@@ -283,23 +277,34 @@ function renderStats() {
   el.addEventListener('mouseleave', restart);
 }
 
-/* ───────────────────────────── "We say it. Then we check it." (calibration) */
-var CAL_ORDER = ['hockey', 'basketball', 'nfl', 'baseball'];
-function renderHowSure() {
-  var C = D.calibration || {};
-  var keys = CAL_ORDER.filter(function (k) { return C[k] && C[k].bins && C[k].bins.length; });
-  var sec = $('#howsure');
-  if (!keys.length) { sec.hidden = true; return; }
-  if (!state.calib || keys.indexOf(state.calib) < 0) state.calib = keys[0];
-  var seg = keys.length > 1 ? '<div class="qk-seg" id="hs-seg" role="group" aria-label="League">' + keys.map(function (k) { return '<button type="button" data-value="' + k + '" aria-pressed="' + (k === state.calib) + '">' + esc(C[k].league) + '</button>'; }).join('') + '</div>' : '';
-  function draw(k) {
-    var c = C[k], since = c.span ? ' since ' + String(c.span).split(' to ')[0] : '';
-    $('#h-howsure').innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.',
-      sub: 'Every ' + c.league + ' game' + since + ', grouped by the chance we gave ' + c.subject + '. When the two bars match, our numbers mean what they say.', actions: seg });
-    QK.howSure('#howsure-body', { bins: c.bins, brier: c.brier, n: c.n, league: c.league, span: c.span, subject: c.subject, unit: c.unit || 'games' });
-    if (seg) QK.seg($('#hs-seg'), function (v) { state.calib = v; draw(v); });
-  }
-  draw(state.calib);
+/* ───────────────────────────── the season's biggest surprises (story cards from the sites' race logs) */
+var WHAT_SHORT = { 'playoff chance': 'Playoff chance', 'postseason chance': 'Postseason chance' };
+function renderSurprises() {
+  var S = ((D.stories || {}).surprises || []).filter(function (r) { return isNum(r.from) && isNum(r.to); });
+  var sec = $('#surprises');
+  if (!S.length) { sec.hidden = true; return; }
+  var day = function (d) { return ymd(d); };
+  sec.innerHTML = QK.sectionHead({ kicker: 'Biggest surprises', title: 'Nobody saw these coming', sub: 'The biggest moves in a ' + (S.every(function (r) { return r.what === 'playoff chance'; }) ? 'playoff' : 'playoff or postseason') + ' chance since each season began, in our season simulations. Up and down, one league at a time.' }) +
+    QK.storyCards(S.map(function (r) {
+      var up = r.delta > 0, lg = SPORT_SHORT[r.sport] === r.league ? r.league : r.league;
+      return { kicker: (up ? 'Climbing · ' : 'Sliding · ') + lg, name: r.name, sub: (WHAT_SHORT[r.what] || cap(r.what)) + ' since ' + day(r.since), sport: r.sport,
+        value: (up ? '+' : '−') + Math.round(Math.abs(r.delta) * 100), unit: 'pts', colour: r.colour, mark: r.abbr ? { abbr: r.abbr, colour: r.colour } : null, href: r.href,
+        from: { label: 'Then', pos: r.from * 100, value: sayPct(r.from) }, to: { label: 'Now', pos: r.to * 100, value: sayPct(r.to) },
+        text: (THE_SPORTS.indexOf(r.sport) >= 0 ? 'The ' : '') + r.short + (up ? ' have climbed from ' : ' have slid from ') + sayPct(r.from) + ' to ' + sayPct(r.to) + ' to ' + (r.what === 'postseason chance' ? 'make the postseason' : r.what === 'playoff chance' ? 'make the playoffs' : 'get there') + '. ' + (up ? (r.from < 0.5 ? 'Outsiders at the start, in the mix now.' : 'From hopeful to near certain.') : (r.from >= 0.5 ? 'Favourites at the start, in trouble now.' : 'A long way back from here.')) };
+    }), { cols: Math.min(4, S.length) }) +
+    '<p class="qk-caption">“Pts” are percentage points. Each season simulation plays out the rest of the schedule thousands of times with our game forecasts.</p>';
+}
+
+/* ───────────────────────────── on a roll: each sport's team (or player) of the week, beside "Who's for real?" */
+function renderRoll() {
+  var H = ((D.stories || {}).hot || []).slice(1, 4), box = $('#roll');
+  if (!H.length) { box.hidden = true; return; }
+  box.innerHTML = QK.sectionHead({ kicker: 'On a roll', title: 'Hot this week', sub: 'More of the week’s best runs: wins and losses over the last seven days.' }) +
+    QK.storyCards(H.map(function (h) {
+      return { kicker: (h.players ? 'Player of the week · ' : 'Team of the week · ') + (h.league || SPORT_SHORT[h.sport] || ''), name: h.name || h.short, sport: h.sport,
+        value: h.w + '–' + h.l + (h.d ? '–' + h.d : ''), unit: h.players ? 'this week' : 'last 7 days', colour: h.colour, mark: h.abbr ? { abbr: h.abbr, colour: h.colour } : null, href: h.href,
+        text: isNum(h.margin) && !h.players ? (h.margin >= 0 ? '+' : '−') + Math.abs(Math.round(h.margin)) + ' on the scoreboard across ' + h.gp + ' games.' : '' };
+    }), { cols: 1 });
 }
 
 /* ───────────────────────────── "Who's for real?": results against chances (NHL) */
@@ -412,7 +417,7 @@ function renderGames() {
   list.slice(0, state.shown).forEach(function (g) {
     var day = g.status === 'live' ? 'Live now' : fmt.relDay(g.start);
     if (day !== lastDay) { html += '<div class="hm-day">' + esc(day) + '</div>'; lastDay = day; }
-    html += QK.gameCard(g, { why: false });
+    html += QK.gameCard(g, { why: false, market: 'quiet' });
   });
   grid.innerHTML = html;
   var more = list.length - state.shown;
@@ -467,10 +472,13 @@ function renderCharts() {
 
 /* ───────────────────────────── how it works */
 var METHOD = { football: '#/model/methodology', college: '#/model' };
+/* each site's "How we're doing" (the Model page tab with our record and calibration, round 6) */
+var DOING = { football: '#/model/calibration', f1: '#/model', basketball: '#/nba/model?tab=calibration', tennis: '#/atp/calibration', baseball: '#/calibration', nfl: '#/calibration', hockey: '#/model?tab=calibration', college: '#/cfb/model?tab=calibration' };
 function renderHow() {
   $('#how').innerHTML = QK.sectionHead({ kicker: 'How it works', title: 'Where the numbers come from', sub: 'Each sport has its own models, built from public data and checked on seasons they never saw.' }) +
-    QK.newHere({ items: QK.NEW_HERE.concat([]) }) +
-    '<div class="hm-method">' + QK.SPORTS.map(function (q) { return '<a href="' + esc(QK.sportUrl(q.key) + (METHOD[q.key] || '#/methodology')) + '" style="--sa:' + q.accent + '"><span aria-hidden="true">' + QK.ICON[q.key] + '</span>' + esc(q.label) + ': how the model works</a>'; }).join('') + '</div>';
+    QK.newHere({ items: [QK.NEW_HERE[0], QK.NEW_HERE[1], 'A <b>season simulation</b> plays out the rest of the schedule thousands of times with our game forecasts, so every team gets a chance of the title and the playoffs.'] }) +
+    '<div class="hm-method">' + QK.SPORTS.map(function (q) { return '<a href="' + esc(QK.sportUrl(q.key) + (METHOD[q.key] || '#/methodology')) + '" style="--sa:' + q.accent + '"><span aria-hidden="true">' + QK.ICON[q.key] + '</span>' + esc(q.label) + ': how the model works</a>'; }).join('') + '</div>' +
+    '<p class="hm-doing"><b>How we’re doing:</b> ' + QK.SPORTS.map(function (q) { return '<a class="qk-link" href="' + esc(QK.sportUrl(q.key) + (DOING[q.key] || '#/model')) + '">' + esc(q.label) + '</a>'; }).join(' · ') + '. Our record and calibration, on each site’s Model page.</p>';
 }
 
 /* ───────────────────────────── live scores (browser-side, cross-origin) */

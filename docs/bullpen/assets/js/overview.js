@@ -6,16 +6,20 @@
  *   2. "This week in MLB" (the current MLB season): the stage (the week of the regular season, or the postseason
  *      round and the series still alive), then the top lines from index.json "digest" (scripts/build_bullpen.py with
  *      oddsmarkets/common/digest.py): the biggest postseason or World Series chance mover, the upset of the week,
- *      the team of the week, our record this week and the other games that matter;
+ *      the team of the week and the other games that matter;
  *   3. the game that matters most, by significance (digest.featured: oddsmarkets/common/featured.py), as the
  *      diagonal split hero labelled "Live now", "Tonight" (only when it truly is tonight in the reader's time),
  *      "Today", "Tomorrow" or the weekday; with nothing big on, the World Series race instead;
- *   4. "N games. Our calls."; the black power list (Who's hot); "We say it. Then we check it." beside "Who's for
- *      real?"; "What's that number?"; "Who wins the World Series?" with the bracket; the strength map; the
- *      standings; the leader boards.
+ *   4. "N games. Our calls." (our chance, the market small and grey beside it); the black power list (Who's hot);
+ *      round 6, the fan modules: "Breakout watch" (the biggest jumps in Bullpen WAR from last season), "Best player
+ *      nobody talks about" (a spotlight with percentiles and his WAR by season), "Who's for real?" beside the
+ *      biggest climb and fall from last season; "What's that number?"; "Who wins the World Series?" with the
+ *      bracket; the strength map; the standings; the leader boards; a small link to "How we're doing" (the Model
+ *      page holds our record and calibration now).
  *
  * Reads index.json (cards, postseason, leaders, teams, digest; levels.aaa for Triple-A), <L>/<S>/season.json
- * (standings, ratings, simulation), mlb/calibration.json (the How sure section). */
+ * (standings, ratings, simulation); lazily, the top hitters' and pitchers' player files and last season's
+ * season.json for the fan modules. */
 (function (BP) {
 'use strict';
 
@@ -126,15 +130,9 @@ function pickFeatured(idx, cards, post) {
   const sc = cards.filter(c => ok(c, 48)).map(c => [QK.watchScore(BP.kitGame(c, 'mlb')), c]).filter(x => x[0] > -1e8).sort((a, b) => b[0] - a[0]);
   return sc.length ? { c: sc[0][1], why: reasonsWhy([], sc[0][1], idx, post), rest: sc.slice(1).map(x => x[1]) } : null;
 }
-/* Under the hero: why we picked it, then how sure we are. */
+/* Under the hero: why we picked it (round 6: the "How sure are we?" line lives on the Model page now). */
 function heroNote(g, why) {
-  const p = g.p_home;
-  let sure = '';
-  if (g.status !== 'live' && isNum(p)) {
-    const fav = p >= 0.5 ? g.home : g.away, other = p >= 0.5 ? g.away : g.home, pf = Math.max(p, 1 - p), miss = Math.max(1, Math.round(10 * (1 - pf)));
-    sure = ' <b>How sure are we?</b> ' + U.pct(pf) + ' for the ' + esc(fav.short || fav.name) + ' means the ' + esc(other.short || other.name) + ' win a game like this about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.';
-  }
-  return why ? '<b>Why this game?</b> ' + esc(why) + sure : (sure ? sure.slice(1) : undefined);
+  return why ? '<b>Why this game?</b> ' + esc(why) : false;
 }
 /* "This week in MLB": the stage line. */
 function stageLine(st, phase) {
@@ -172,12 +170,6 @@ function weekTiles(dig, feat, titles, L, S) {
   const h = dig.hot;
   if (h) T.push({ label: 'Team of the week', value: BP.teamAbbr(h.key) + ' ' + h.w + '–' + h.l, href: BP.teamHref(h.key, L, S),
     sub: The(h.key) + ': ' + h.w + ' win' + (h.w === 1 ? '' : 's') + ' in ' + h.gp + ' games, ' + (h.margin >= 0 ? '+' : '−') + Math.abs(h.margin) + ' run difference.' });
-  const r = dig.record;
-  if (r) {
-    const diff = r.won - r.expected;
-    T.push({ label: 'Our record this week', value: r.won + ' of ' + r.n, href: '#/calibration',
-      sub: 'Our favourites won ' + r.won + ' of ' + r.n + '; we expected ' + QK.fmt.num(r.expected, 0) + '. ' + (Math.abs(diff) < 2 ? 'Right on our numbers.' : diff > 0 ? 'A good week for the favourites.' : 'A week of upsets: in baseball a 60% call still misses 4 times in 10.') });
-  }
   const rest = ((feat && feat.rest) || []).filter(Boolean).slice(0, 2);
   if (rest.length) T.push({ label: 'Also worth a look', value: rest.map(c => BP.teamAbbr(c.away) + '–' + BP.teamAbbr(c.home)).join(' · '), href: BP.href('games', L, S), text: rest.length > 1,
     sub: rest.map(c => { const w = whenLabel(BP.kitGame(c, L)); return w + (BP.isLive(c) ? '' : ' ' + QK.fmt.time(c.start)) + ': ' + (c.series ? BP.seriesText(c.series, true) + ', ' : '') + 'the ' + BP.teamShort(c.away) + ' at the ' + BP.teamShort(c.home); }).join('. ') + '.' });
@@ -192,10 +184,9 @@ function render(el, params) {
   const src = L === 'mlb' ? idx : lv;
   const phase = isCurrent ? String(lv.phase || idx.phase || '') : 'complete';
   el.innerHTML = QK.skeleton('card', 3);
-  return BP.loadAll([BP.ypath('season.json', L, S), 'index.json', L === 'mlb' ? BP.lpath('calibration.json', L) : 'index.json']).then(arr => {
+  return BP.loadAll([BP.ypath('season.json', L, S), 'index.json']).then(arr => {
     if (!U.alive(el)) return;
     const season = BP.ok(arr[0]) ? arr[0] : null;
-    const cal = L === 'mlb' && BP.ok(arr[2]) ? arr[2] : null;
     let post = isCurrent ? (L === 'mlb' ? idx.postseason : lv.postseason) || null : null;
     const sp = season && season.postseason && typeof season.postseason === 'object' && season.postseason.series ? season.postseason : null;
     if (sp) post = Object.assign({}, sp, post || {}, { teams: sp.teams || (post && post.teams), seeds: sp.seeds || (post && post.seeds), series: (post && post.series) || sp.series });
@@ -250,14 +241,15 @@ function render(el, params) {
     /* Who's hot: the black power list, the top name on five boards */
     if (hot.length) h += QK.band(QK.sectionHead({ kicker: isCurrent ? 'Who’s hot' : 'The season’s best', title: isCurrent ? 'The leaders, board by board' : 'Who led the way', sub: 'The top name on five boards, the next best behind, and a line on what the number means.',
       actions: '<a class="qk-more" href="' + BP.href('leaders', L, S) + '">Every leaderboard</a>' }) + QK.hotRow(hot));
-    /* We say it. Then we check it. (MLB: calibration.json) beside Who's for real? (win % against run differential) */
+    /* round 6: the fan modules (MLB, this season): breakout watch, then the spotlight; Who's for real? (win % against
+       run differential) beside the biggest climb and fall from last season. Filled lazily by fanModules. */
+    if (landing) h += '<section class="qk-section" id="ov-break"></section><section class="qk-section" id="ov-spot"></section>';
     const realHTML = '<div class="bp-ov-real">' + QK.sectionHead({ kicker: 'Who’s for real?', title: 'Results v chances', sub: 'Clubs top-left are winning more than their runs suggest; bottom-right, the reverse. Luck in close games, or something real?' }) +
       '<div class="qk-card"><div class="qk-card-body"><div id="ov-real" class="qk-chart" role="img" aria-label="Win percentage against run differential a game"></div><p class="qk-caption" id="ov-real-cap"></p></div></div></div>';
-    const sureOn = L === 'mlb' && isCurrent && !!(cal && QK.calib.find(cal));
-    h += sureOn ? '<section class="qk-section qk-g75"><div><div id="ov-sure-h"></div><div id="ov-sure"></div></div>' + realHTML + '</section>' : '<section class="qk-section">' + realHTML + '</section>';
+    h += landing ? '<section class="qk-section qk-g75">' + realHTML + '<div id="ov-climb"></div></section>' : '<section class="qk-section">' + realHTML + '</section>';
     if (isCurrent) h += '<section class="qk-section">' + QK.newHere({ items: [QK.NEW_HERE[0],
       'A <b>percentile</b> ranks a player against the same position or role (shortstops, starters, relievers): 90th means better than 90 in 100.',
-      'Every forecast is checked against what happened. <a class="qk-link" href="#/calibration">The record is on the Model page.</a>'] }) + '</section>';
+      '<b>Bullpen WAR</b> is ours: wins a player adds over a replacement-level one, from batting, running, fielding and pitching. 2 is a solid regular, 5 or more is All-Star level.'] }) + '</section>';
 
     // season simulation
     if (titles.length || inPost) {
@@ -289,6 +281,8 @@ function render(el, params) {
     if (boards.length) h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Leaderboards', title: 'Leaders', sub: 'This season. Rates with sample floors and percentiles against each position are on the Players pages.', actions: '<a class="qk-btn" href="' + BP.href('leaders', L, S) + '">Every leaderboard</a>' }) +
       '<div class="qk-grid">' + boards.map(b => '<div class="qk-span-3">' + U.card2(b[1], '', '<ul class="bp-list bp-lead">' + lead[b[0]].slice(0, 5).map((x, i) =>
         '<li><span class="n">' + (i + 1) + '</span>' + U.playerEnt(x[0], L, BP.teamAbbr(BP.player(x[0]).team), b[0].charAt(0) === 'p' ? 'pitcher' : 'hitter') + '<span class="v">' + esc(b[2](x[1])) + '</span></li>').join('') + '</ul>', { flush: true }) + '</div>').join('') + '</div></section>';
+    /* our record and calibration live on the Model page ("How we're doing"): one small link here */
+    if (L === 'mlb') h += '<p class="qk-sub bp-ov-doing">Every forecast is checked against the result: <a class="qk-link" href="#/calibration">How we’re doing →</a></p>';
 
     el.innerHTML = h;
 
@@ -329,13 +323,7 @@ function render(el, params) {
       if (w0 && lede) lede.textContent = (w0.p < 0.2 ? 'Nobody’s better than 1 in 5. The ' + w0.label + ' lead our board at ' + U.pct(w0.p) + '.'
         : 'The ' + w0.label + ' lead at ' + U.pct(w0.p) + (w0.p >= 0.5 ? ': they win it in about ' + Math.round(w0.p * 10) + ' of 10 simulated brackets.' : '.')) + ' Every remaining game and series simulated 20,000 times.';
     }
-    /* We say it. Then we check it.: the game model's record from mlb/calibration.json (QK.howSure, the kit's line chart); the full record is on the Model page */
-    const box = el.querySelector('#ov-sure'), hd = el.querySelector('#ov-sure-h');
-    if (box && hd) {
-      hd.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every MLB game we have forecast, grouped by the chance we gave the home team. When the two lines match, our numbers mean what they say.',
-        actions: '<a class="qk-more" href="#/calibration">The full record</a>' });
-      QK.howSure(box, { calibration: cal, league: 'MLB', subject: 'the home team' });
-    }
+    if (landing) fanModules(el, idx, L, S, rows);
     /* Who's for real?: games won against run differential a game (QKC.quadrant), the corners named */
     if (el.querySelector('#ov-real')) {
       const rr = Object.keys(rows).map(t => rows[t]).filter(r => isNum(r.w) && isNum(r.l) && r.w + r.l > 0 && isNum(r.rd));
@@ -377,6 +365,110 @@ function render(el, params) {
     }
     if (today.some(BP.isLive)) BP.liveRefresh([BP.ypath('season.json', L, S)], 60000);
     BP.setMeta(post && post.sims ? BP.int(post.sims) + ' bracket simulations' : '');
+  });
+}
+
+/* ── fan modules (round 6): breakout watch, the best player nobody talks about, the biggest climbs ──────────── */
+/* Read lazily after the page draws: the player files of the top eight hitters and pitchers by Bullpen WAR (about
+ * 30 KB each) and last season's season.json (15 KB). Nothing here is about how our forecasts score. */
+const WAR_TRACK = 9;   /* a breakout card's WAR track runs 0 to 9 (an MVP-level season) */
+const SPOT_KEYS = ['xwoba_plus', 'barrel_pct', 'chase_pct', 'oaa', 'sprint_speed', 'bat_speed', 'hard_pct', 'woba'];
+const SPOT_LABEL = { xwoba_plus: 'xwOBA+ (our expected wOBA)', barrel_pct: 'Barrel rate', chase_pct: 'Chase rate', oaa: 'Outs above average', sprint_speed: 'Sprint speed', bat_speed: 'Bat speed', hard_pct: 'Hard-hit rate', woba: 'wOBA' };
+function spotVal(k, v) {
+  if (!isNum(v)) return '';
+  if (/_pct$/.test(k)) return (100 * v).toFixed(1) + '%';
+  if (k === 'woba' || k === 'xwoba_plus') return BP.fmtAvg(v);
+  if (k === 'sprint_speed') return BP.num(v, 1) + ' ft/s';
+  if (k === 'bat_speed') return BP.num(v, 1) + ' mph';
+  if (k === 'oaa') return U.signed(v, 0);
+  return BP.num(v, 1);
+}
+function mlbSeasons(p, kind, S) { return ((p && p.seasons) || []).filter(s => s.level === 'mlb' && s.kind === kind && isNum(s.war) && s.season <= S); }
+function curBlock(p, kind, S) { const c = (p && p.current) || {}; return c.season === S && c.level === 'mlb' ? (c[kind === 'hitter' ? 'hitting' : 'pitching'] || null) : null; }
+/* this season's WAR against last season's, when last season was a real one (200+ PA or 150+ batters faced) */
+function breakoutOf(p, kind, S) {
+  const ss = mlbSeasons(p, kind, S), cur = ss.filter(s => s.season === S)[0];
+  const prev = ss.filter(s => s.season === S - 1 && (kind === 'hitter' ? (s.pa || 0) >= 200 : (s.bf || 0) >= 150))[0];
+  if (!cur || !prev) return null;
+  const by = {};
+  ss.forEach(s => { by[s.season] = s.war; });
+  const yrs = Object.keys(by).map(Number).sort((a, b) => a - b);
+  return { p: p, kind: kind, cur: cur, prev: prev, gain: cur.war - prev.war, line: yrs.map(y => by[y]), yrs: yrs };
+}
+const JUMP = ['Biggest jump', 'Second biggest', 'Third biggest'];
+function breakoutCard(b, L, S, i) {
+  const blk = curBlock(b.p, b.kind, S) || {}, pc = blk.pct_role || blk.pct || {};
+  const tm = blk.team || b.cur.team, pos = blk.pos || b.cur.pos || (b.kind === 'pitcher' ? 'P' : '');
+  const deep = b.kind === 'hitter' ? (isNum(pc.woba) && pc.woba >= 80 ? 'a wOBA in the ' + QK.ordinal(Math.round(pc.woba)) + ' percentile of his position' : '')
+    : (isNum(pc.stuff_plus) && pc.stuff_plus >= 80 ? 'Stuff+ in the ' + QK.ordinal(Math.round(pc.stuff_plus)) + ' percentile' : (isNum(pc.ra9) && pc.ra9 >= 80 ? 'runs allowed in the ' + QK.ordinal(Math.round(pc.ra9)) + ' percentile' : ''));
+  const work = b.kind === 'hitter' ? BP.int(b.cur.pa) + ' plate appearances' : 'about ' + Math.round(b.cur.ip) + ' innings';
+  return { kicker: JUMP[i] || 'Breakout watch', sport: 'baseball', name: b.p.name, sub: [BP.teamAbbr(tm), pos, isNum(blk.age) ? 'age ' + Math.floor(blk.age) : ''].filter(Boolean).join(' · '),
+    value: U.signed(b.gain, 1), unit: 'WAR on ' + (S - 1), colour: U.raw(tm), mark: U.team(tm, L, S),
+    from: { label: String(S - 1), value: BP.num(b.prev.war, 1), pos: Math.max(0, b.prev.war) / WAR_TRACK * 100 }, to: { label: String(S), value: BP.num(b.cur.war, 1), pos: Math.max(0, b.cur.war) / WAR_TRACK * 100 },
+    spark: b.line.length > 2 ? b.line : null, sparkLabel: b.line.length > 2 ? 'Bullpen WAR, ' + b.yrs[0] + '–' + b.yrs[b.yrs.length - 1] : '',
+    text: 'From ' + BP.num(b.prev.war, 1) + ' Bullpen WAR in ' + (S - 1) + ' to ' + BP.num(b.cur.war, 1) + ' in ' + S + ', over ' + work + (deep ? ', with ' + deep : '') + '.',
+    href: progHref(BP.playerHref(b.p.id, { level: L, role: b.kind })), link: { text: 'Progression' } };
+}
+const progHref = h => h + (h.indexOf('?') >= 0 ? '&' : '?') + 'view=progression';   /* the player's Progression tab (round 6) */
+function spotlightOf(p, rank, L, S) {
+  const blk = curBlock(p, 'hitter', S) || {}, pc = blk.pct_role || blk.pct || {}, v = blk.values || {};
+  const keys = SPOT_KEYS.filter(k => isNum(pc[k])).slice(0, 4);
+  const cur = mlbSeasons(p, 'hitter', S).filter(s => s.season === S)[0] || {};
+  const line = mlbSeasons(p, 'hitter', S);
+  const tm = blk.team || cur.team;
+  return QK.spotlight({ kicker: 'Best player nobody talks about', name: p.name, sub: [BP.teamName(tm), blk.pos || cur.pos, isNum(blk.age) ? 'age ' + Math.floor(blk.age) : ''].filter(Boolean).join(' · '),
+    team: U.team(tm, L, S), href: BP.playerHref(p.id, { level: L, role: 'hitter' }),
+    headline: BP.num(cur.war, 1) + ' Bullpen WAR, ' + QK.ordinal(rank) + ' among MLB hitters, and not in the home-run top ten.',
+    stats: keys.map(k => ({ label: U.label('hitter', k, SPOT_LABEL[k] || k), value: spotVal(k, v[k]), pctl: pc[k] })),
+    spark: line.length > 1 ? { values: line.map(s => s.war), labels: [String(line[0].season), String(line[line.length - 1].season)], label: 'Bullpen WAR by season' } : null,
+    text: 'Percentiles against his position. Bullpen WAR is our own: batting, running and fielding in wins above a replacement-level player.',
+    links: [{ href: BP.playerHref(p.id, { level: L, role: 'hitter' }), text: 'Player page' }, { href: progHref(BP.playerHref(p.id, { level: L, role: 'hitter' })), text: 'Progression' }, { href: BP.ghref('compare'), text: 'Compare' }] });
+}
+/* last season's record against this one: the biggest climb and the biggest fall */
+function climbs(rows, prevRows, L, S) {
+  const out = [];
+  Object.keys(rows).forEach(t => {
+    const a = rows[t], b = prevRows[t];
+    if (!a || !b || !isNum(a.w) || !isNum(a.l) || !isNum(b.w) || !isNum(b.l) || a.w + a.l < 20 || b.w + b.l < 100) return;
+    out.push({ t: t, a: a, b: b, d: a.w / (a.w + a.l) - b.w / (b.w + b.l) });
+  });
+  out.sort((x, y) => y.d - x.d);
+  const full = x => x.a.w + x.a.l >= 160;
+  const card = (x, k) => {
+    const pa = x.a.w / (x.a.w + x.a.l), pb = x.b.w / (x.b.w + x.b.l), pos = p => Math.max(0, Math.min(100, (p - 0.3) / 0.4 * 100));
+    const dw = full(x) ? x.a.w - x.b.w : null;
+    return { kicker: k, sport: 'baseball', name: BP.teamName(x.t), sub: BP.teamAbbr(x.t) + ' · ' + (x.a.division || x.a.league || ''), mark: U.team(x.t, L, S), colour: U.raw(x.t),
+      value: dw !== null ? U.signed(dw, 0) : U.signed(100 * (pa - pb), 0), unit: dw !== null ? 'wins on ' + (S - 1) : 'points of win %',
+      from: { label: (S - 1) + ' ' + x.b.w + '–' + x.b.l, value: BP.fmtAvg(pb), pos: pos(pb) }, to: { label: S + ' ' + x.a.w + '–' + x.a.l, value: BP.fmtAvg(pa), pos: pos(pa) },
+      text: The(x.t) + ' went ' + x.b.w + '–' + x.b.l + ' in ' + (S - 1) + ' and ' + x.a.w + '–' + x.a.l + ' in ' + S + (isNum(x.a.rd) ? ', with a run differential of ' + U.signed(x.a.rd, 0) : '') + '.',
+      href: BP.teamHref(x.t, L, S) };
+  };
+  return out.length >= 2 ? [card(out[0], 'Biggest climb'), card(out[out.length - 1], 'Biggest fall')] : [];
+}
+function fanModules(el, idx, L, S, rows) {
+  const lead = idx.leaders || {};
+  const ids = k => (lead[k] || []).slice(0, 8).map(r => String(r[0]));
+  const hit = ids('h_war'), pit = ids('p_war'), hr = (lead.h_hr || []).map(r => String(r[0]));
+  const files = hit.concat(pit).map(id => BP.load('players/' + id + '.json'));
+  Promise.all(files.concat([BP.load(BP.ypath('season.json', L, S - 1))])).then(res => {
+    if (!U.alive(el)) return;
+    const prevSeason = res.pop();
+    const ps = res.slice(0, hit.length), qs = res.slice(hit.length);
+    const br = ps.map(p => breakoutOf(p, 'hitter', S)).concat(qs.map(p => breakoutOf(p, 'pitcher', S))).filter(b => b && b.gain >= 1.5).sort((a, b) => b.gain - a.gain).slice(0, 3);
+    const bh = el.querySelector('#ov-break');
+    if (bh && br.length) {
+      bh.innerHTML = QK.sectionHead({ kicker: 'Breakout watch', title: 'Who took the leap', sub: 'The biggest jumps in Bullpen WAR from last season, among the top eight hitters and pitchers this season. Last season had to be a real one: 200 plate appearances or 150 batters faced.',
+        actions: '<a class="qk-more" href="' + BP.href('leaders', L, S) + '">Every leaderboard</a>' }) + QK.storyCards(br.map((b, i) => breakoutCard(b, L, S, i)));
+    }
+    /* the best player nobody talks about: the highest-WAR hitter outside the top three and off the home-run board */
+    const sp = el.querySelector('#ov-spot');
+    let pick = null;
+    hit.forEach((id, i) => { if (!pick && i >= 3 && hr.indexOf(id) < 0 && ps[i] && curBlock(ps[i], 'hitter', S)) pick = { p: ps[i], rank: i + 1 }; });
+    if (sp && pick) sp.innerHTML = QK.spotlight ? spotlightOf(pick.p, pick.rank, L, S) : '';
+    const cl = el.querySelector('#ov-climb');
+    const prevRows = prevSeason && BP.standingsRows ? BP.standingsRows(prevSeason) : {};
+    const cards = climbs(rows, prevRows, L, S);
+    if (cl && cards.length) cl.innerHTML = QK.sectionHead({ kicker: 'Biggest surprise', title: 'Up and down', sub: 'This season’s record against last season’s, every club.' }) + QK.storyCards(cards, { cols: 1 });
   });
 }
 

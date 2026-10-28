@@ -493,10 +493,10 @@ ${formula('per club match:  npxG difference (home − away)  ≈  h + Σ_actions
   return S;
 }
 
-var TABS = [['', 'Overview'], ['methodology', 'Methodology'], ['glossary', 'Glossary'], ['calibration', 'Model checks'], ['coverage', 'Data coverage'], ['disclaimer', 'Disclaimer']];
+var TABS = [['', 'Overview'], ['methodology', 'Methodology'], ['glossary', 'Glossary'], ['calibration', 'How we’re doing'], ['coverage', 'Data coverage'], ['disclaimer', 'Disclaimer']];
 
 function head(tab, sub) {
-  return FB.pageHead('Model', tab === 'glossary' ? 'Glossary' : tab === 'methodology' ? 'Methodology' : tab === 'calibration' ? 'Model checks' : tab === 'coverage' ? 'Data coverage' : tab === 'disclaimer' ? 'Disclaimer and terms' : 'How the numbers are made', sub) +
+  return FB.pageHead('Model', tab === 'glossary' ? 'Glossary' : tab === 'methodology' ? 'Methodology' : tab === 'calibration' ? 'How we’re doing' : tab === 'coverage' ? 'Data coverage' : tab === 'disclaimer' ? 'Disclaimer and terms' : 'How the numbers are made', sub) +
     FB.subnav(TABS.map(function (t) { return ['#/model' + (t[0] ? '/' + t[0] : ''), t[1], t[0]]; }), tab, 'Model sections');
 }
 
@@ -512,26 +512,29 @@ FB.route('model', function (el, p) {
 
 // ── overview ────────────────────────────────────────────────────────────────
 
-/* "We say it. Then we check it." (kit v4 QK.howSure: three big numbers over the we-said / it-happened bars): the match
-   model's walk-forward record from data/calibration.json, at the top of the overview and of Model checks. The section
-   stays empty until the file exists (the data build adds it). */
+/* "How we're doing" (round 6: the record and the calibration moved here from the overview): the week's record from
+   hub.json digest.record (finished matches with a chance frozen before kick-off, forecast_log.json), then "We say it.
+   Then we check it.", the match model's walk-forward record from data/calibration.json (kit QK.doing: tiles over
+   QK.howSure). Empty until calibration.json exists. */
 function howSure(el) {
-  return FB.load('calibration.json').then(function (j) {
+  return Promise.all([FB.load('calibration.json'), FB.load('hub.json')]).then(function (arr) {
+    var j = arr[0], hub = arr[1] || {};
     var box = el.querySelector('#md-sure');
     if (!box || !FB.alive(el)) return;
     var cb = FB.calibOf ? FB.calibOf(j) : QK.calib.find(j);
     if (!cb || !cb.bins || !cb.bins.length) { box.innerHTML = ''; return; }
-    box.innerHTML = '<section class="qk-section fb-md-sure">' + QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.',
-      sub: 'Every match in our backtest, grouped by the chance we gave ' + esc((j && j.subject) || 'the home side') + ' to win, against how often it happened. When the two bars match, our numbers mean what they say.' }) + '<div id="md-sure-in"></div></section>';
-    QK.howSure(box.querySelector('#md-sure-in'), { bins: cb.bins, brier: cb.brier, n: cb.n, league: (j && j.league) || 'Football', span: (j && j.span) || '', subject: (j && j.subject) || 'the home side', unit: 'matches' });
+    box.innerHTML = '<section class="qk-section fb-md-sure"><div id="md-sure-in"></div></section>';
+    var subj = (j && j.subject) || 'the home side';
+    QK.doing(box.querySelector('#md-sure-in'), { record: (hub.digest || {}).record, bins: cb.bins, brier: cb.brier, n: cb.n, league: (j && j.league) || '', span: (j && j.span) || '', subject: subj, unit: 'matches',
+      sub: 'Our favourites this week, then every match in our backtest, grouped by the chance we gave ' + subj + ' to win, against how often it happened. When the two match, our numbers mean what they say.' });
   });
 }
 
 function overview(el) {
   var live = FB.comps().filter(function (c) { return c.ok; }).length;
   el.innerHTML = head('', 'Every chance, rating and value on the site comes from a model fitted to match data. Here is what each one does, how well it checks out, and where it is wrong.') +
-    '<div id="md-sure"></div><div id="md-ov" class="fb-md-ov">' + FB.loading('card', 6) + '</div>';
-  howSure(el);
+    '<div id="md-ov" class="fb-md-ov">' + FB.loading('card', 6) + '</div>' +
+    '<p class="qk-caption"><a class="qk-link" href="#/model/calibration">How we’re doing →</a> Our record this week and how often our chances came true.</p>';
   return Promise.all([FB.load('value/meta.json'), FB.load('fantasy/meta.json')]).then(function (arr) {
     if (!FB.alive(el)) return;
     var vm = arr[0] || {}, fm = arr[1] || {};
@@ -674,7 +677,7 @@ function methodology(el, p) {
   var toc = '<nav class="fb-md-toc" aria-label="Contents"><div class="qk-kicker">Contents</div><ol>' +
     (c ? '<li><a href="#method-this" data-target="method-this">This competition</a></li>' : '') +
     S.map(function (s) { return '<li><a href="#/model/methodology/' + esc(s.id) + '" data-target="method-' + esc(s.id) + '">' + esc(s.title) + '</a></li>'; }).join('') +
-    '</ol><div class="qk-kicker fb-md-also">See also</div><ol class="fb-md-also-l"><li><a href="#/model/coverage">Data coverage</a></li><li><a href="#/model/calibration">Model checks</a></li><li><a href="#/model/disclaimer">Disclaimer</a></li></ol></nav>';
+    '</ol><div class="qk-kicker fb-md-also">See also</div><ol class="fb-md-also-l"><li><a href="#/model/coverage">Data coverage</a></li><li><a href="#/model/calibration">How we’re doing</a></li><li><a href="#/model/disclaimer">Disclaimer</a></li></ol></nav>';
   var body = S.map(function (s, i) {
     return '<section class="qk-card fb-md-sec" id="method-' + esc(s.id) + '"><div class="qk-card-head"><div class="fb-card-titles"><h3 class="qk-card-title">' + (i + 1) + '. ' + esc(s.title) +
       ' <a class="fb-md-anchor" href="#/model/methodology/' + esc(s.id) + '" aria-label="Link to this section">#</a></h3></div></div><div class="qk-card-body fb-md-doc">' + FB.fixLinks(s.html) + '</div></section>';
@@ -791,7 +794,7 @@ function glossary(el, p) {
 
 function metaComps() { return FB.comps().filter(function (c) { return c.ok; }); }
 function calibration(el) {
-  el.innerHTML = head('calibration', 'What the models\' own checks say. Every number here is measured on matches the model had not seen when it made the call, or (for the match model) on the matches it was fitted to.') +
+  el.innerHTML = head('calibration', 'Our record, and what the models\' own checks say. Every number here is measured on matches the model had not seen when it made the call, or (for the match model) on the matches it was fitted to.') +
     '<div id="md-sure"></div><div id="md-cal">' + FB.loading('chart', 2) + '</div>';
   howSure(el);
   var leagues = metaComps().filter(function (c) { return FB.familyOf(c) === 'league'; });

@@ -11,7 +11,12 @@
  *                 teams[].profile), set pieces (analytics.json "set_pieces"), and points against expected points
  *   The shape     attack v defence, points v expected points ("Who's for real?"), and the tiers our chances draw
  *
- * Plain leagues only (kind "league"): the conference, playoff and zone formats keep their own tabs. ES5. */
+ * Plain leagues (kind "league") and Argentina (kind "liga"): the conference and playoff formats keep their own tabs.
+ * Argentina's race is run on its Tabla Anual (table.json in the leagues' shape, from build_site_liga.py): the title is
+ * the top of that table (table.json title_key / title_label / title_phrase / title_kpi / title_tier / safety_label
+ * rename it; a league's table.json has none of them, so nothing changes there), the bands are the places that
+ * guarantee a Libertadores or Sudamericana berth and the drop (either route), and two sections of its own follow:
+ * the zone races for the playoff places and the promedio race. ES5. */
 (function (FB) {
 'use strict';
 var QK = window.QK, QKC = window.QKC;
@@ -26,7 +31,9 @@ function sum(a) { return a.reduce(function (s, x) { return s + (isNum(x) ? x : 0
 function shortName(t) { var w = String(t).split(' '); return t.length > 13 && w.length > 1 ? w.slice(0, -1).map(function (x) { return x.charAt(0) + '.'; }).join(' ') + ' ' + w[w.length - 1] : t; }
 
 /* Which competitions get the tab. */
-function eligible(c) { return !!c && c.ok && c.kind === 'league' && c.scope !== 'international' && !FB.isLastEdition(c); }
+function eligible(c) { return !!c && c.ok && (c.kind === 'league' || c.kind === 'liga') && c.scope !== 'international' && !FB.isLastEdition(c); }
+/* A table.json override of the title's words (Argentina: the top of the Tabla Anual), else the league default. */
+function tl(R, key, dflt) { return (R && R.t && R.t[key]) || dflt; }
 
 // ── the model of the race from the payloads ────────────────────────────────
 
@@ -54,18 +61,18 @@ function model(c, d) {
 function chanceOf(R, team, key) {
   var p = R.P[team];
   if (!p) return null;
-  if (key === 'title') return p.p_title;
+  if (key === 'title') return R.t.title_key ? p[R.t.title_key] : p.p_title;
   if (key === 'rel') return R.rel(team);
   return (p.bands || {})[key];
 }
 function metricLabel(R, key) {
-  if (key === 'title') return 'Title';
+  if (key === 'title') return tl(R, 'title_label', 'Title');
   if (key === 'rel') return R.downs.length > 1 ? 'Drop zone' : (R.downs[0] || {}).label || 'Relegation';
   var b = R.bands.filter(function (x) { return x.key === key; })[0];
   return b ? b.label + (b.first === b.last ? '' : ' (top ' + b.last + ')') : key;
 }
 function metricShort(R, key) {
-  if (key === 'title') return 'Title';
+  if (key === 'title') return tl(R, 'title_short', 'Title');
   if (key === 'rel') return 'Drop';
   var b = R.bands.filter(function (x) { return x.key === key; })[0];
   return b ? (b.first === 1 ? 'Top ' + b.last : b.label) : key;
@@ -79,8 +86,9 @@ function histSeries(R, key) {
   var hk = key === 'title' ? 'title' : key === 'rel' ? 'relegation' : 'band';
   var daily = (R.hist.daily || []).filter(function (e) { return e && e[hk]; });
   if (daily.length >= 2) return { pts: daily.map(function (e) { return { x: e.d + 'T12:00:00Z', v: e[hk] }; }), daily: true, since: daily[0].d };
-  var snaps = (R.hist.snapshots || []).filter(function (s) { return s && s[hk]; });
-  if (snaps.length >= 2) return { pts: snaps.map(function (s) { return { x: s.ts, v: s[hk] }; }), daily: false, since: snaps[0].ts };
+  var sk = ((R.t.hist_keys || {})[hk]) || hk;
+  var snaps = (R.hist.snapshots || []).filter(function (s) { return s && s[sk]; });
+  if (snaps.length >= 2) return { pts: snaps.map(function (s) { return { x: s.ts, v: s[sk] }; }), daily: false, since: snaps[0].ts };
   return null;
 }
 function raceChart(box, R, key) {
@@ -205,16 +213,17 @@ function settledHTML(R, ctx) {
     var needTxt = function (x, k) { var nd = x.topK(k).need; return esc(x.team) + ' <b class="fb-num">' + nd + '</b><span class="qk-muted"> of ' + (3 * x.left) + '</span>'; };
     var reach = function (x, k) { return x.topK(k).need <= 3 * x.left; };
     /* our projected line: the projected points of the club ranked k-th by projected points */
-    var projAt = function (k) { var e = R.rows.map(function (r) { return (R.P[r.team] || {}).exp_pts; }).filter(isNum).sort(function (a, b) { return b - a; }); return k <= e.length ? e[k - 1] : null; };
+    var projAt = function (k) { var e = R.rows.map(function (r) { return (R.P[r.team] || {})[R.t.exp_key || 'exp_pts']; }).filter(isNum).sort(function (a, b) { return b - a; }); return k <= e.length ? e[k - 1] : null; };
     var leader = A.slice().sort(function (a, b) { return b.pts - a.pts; })[0];
     var alive = A.filter(function (x) { return x.max >= leader.pts; });
     var tk = leader.topK(1);
     var pj1 = projAt(1);
-    items.push(['Title', tk.sure ? '<b>' + ctx.club(leader.team) + '</b> are champions: no one can reach their points.' :
-      plural(alive.length, 'club') + ' can still mathematically win it' + (alive.length < n ? ' (' + plural(n - alive.length, 'club') + ' cannot)' : ': all of them') + '. ' +
+    var phrase = R.t.title_phrase;
+    items.push([tl(R, 'title_label', 'Title'), tk.sure ? '<b>' + ctx.club(leader.team) + '</b> ' + (phrase ? 'will ' + esc(phrase) : 'are champions') + ': no one can reach their points.' :
+      plural(alive.length, 'club') + ' can still mathematically ' + (phrase ? esc(phrase) : 'win it') + (alive.length < n ? ' (' + plural(n - alive.length, 'club') + ' cannot)' : ': all of them') + '. ' +
       ctx.club(leader.team) + ' lead on ' + leader.pts + '. ' + (reach(leader, 1) ? 'Points that would make it certain whatever the rest do: ' + needTxt(leader, 1) + ' still to play for (fewer if rivals drop points; level points go to goal difference).' :
         'The leader cannot make it certain on its own results yet: a rival could still pass that total.') +
-      (isNum(pj1) ? ' Our projected champion finishes on about <b class="fb-num">' + Math.round(pj1) + '</b> points.' : '')]);
+      (isNum(pj1) ? ' Our projected ' + (phrase ? 'leader' : 'champion') + ' finishes on about <b class="fb-num">' + Math.round(pj1) + '</b> points.' : '')]);
     R.ups.slice(0, 2).forEach(function (b) {
       var sure = A.filter(function (x) { return x.topK(b.last).sure; }), out2 = A.filter(function (x) { return x.topK(b.last).out; });
       var inZone = A.filter(function (x) { return x.pos <= b.last && !x.topK(b.last).sure && reach(x, b.last); }).sort(function (a, c2) { return a.pos - c2.pos; });
@@ -231,7 +240,7 @@ function settledHTML(R, ctx) {
       var bottom = A.filter(function (x) { return !x.topK(safeN).sure && !x.topK(safeN).out; }).sort(function (a, b) { return b.pos - a.pos; }).slice(0, Math.min(6, n - safeN + 3));
       var canAlone = bottom.filter(function (x) { return reach(x, safeN); });
       var pjS = projAt(safeN);
-      items.push(['Safety', (safe.length ? plural(safe.length, 'club') + ' mathematically safe. ' : 'No club is mathematically safe yet. ') +
+      items.push([tl(R, 'safety_label', 'Safety'), (safe.length ? plural(safe.length, 'club') + ' mathematically safe. ' : 'No club is mathematically safe yet. ') +
         (down.length ? '<b>' + down.map(function (x) { return esc(x.team); }).join(', ') + '</b> cannot climb out. ' : '') +
         (canAlone.length ? 'Points that would make the clubs near the bottom safe whatever the rest do: ' + canAlone.map(function (x) { return needTxt(x, safeN); }).join(' · ') + '. ' :
           bottom.length ? 'No club near the bottom can make itself safe on its own results yet: the clubs around it still have too many points to play for. ' : '') +
@@ -240,21 +249,27 @@ function settledHTML(R, ctx) {
   }
   /* what the simulations say that the arithmetic cannot yet */
   var keys = ['title'].concat(R.ups.slice(0, 2).map(function (b) { return b.key; })).concat(R.downs.length ? ['rel'] : []);
-  var every = [], none = [];
+  /* certainties grouped by what is certain ("Arsenal, Chelsea finish top 4"); a club certain of one up band is not
+     listed again for a wider one (Argentina's Libertadores inside "Libertadores or Sudamericana") */
+  var every = [], none = [], byPhrase = {}, order = [], upDone = {};
   keys.forEach(function (k) {
     R.rows.forEach(function (r) {
       var p = chanceOf(R, r.team, k);
-      if (!isNum(p)) return;
-      if (p >= 0.9999 && k !== 'title') every.push(r.team + (k === 'rel' ? ' go down' : ' finish ' + metricShort(R, k).toLowerCase()));
-      if (p >= 0.9999 && k === 'title') every.push(r.team + ' win the title');
+      if (!isNum(p) || p < 0.9999) return;
+      var bk = R.bands.filter(function (x) { return x.key === k; })[0];
+      var ph = k === 'title' ? tl(R, 'title_phrase', 'win the title') : k === 'rel' ? 'go down' : bk && bk.phrase ? bk.phrase : 'finish ' + metricShort(R, k).toLowerCase();
+      if (k !== 'title' && k !== 'rel') { if (upDone[r.team]) return; upDone[r.team] = 1; }
+      if (!byPhrase[ph]) { byPhrase[ph] = []; order.push(ph); }
+      byPhrase[ph].push(r.team);
     });
   });
+  order.forEach(function (ph) { var t = byPhrase[ph]; every.push((t.length > 1 ? t.slice(0, -1).join(', ') + ' and ' + t[t.length - 1] : t[0]) + ' ' + ph); });
   if (R.downs.length) {
     var stayUp = R.rows.filter(function (r) { var p = R.rel(r.team); return isNum(p) && p <= 0.0001; }).length;
     if (stayUp) none.push(plural(stayUp, 'club') + ' never go down');
   }
   var aliveSim = R.rows.filter(function (r) { var p = chanceOf(R, r.team, 'title'); return isNum(p) && p > 0; }).length;
-  none.push(plural(aliveSim, 'club') + ' win the title at least once');
+  none.push(plural(aliveSim, 'club') + ' ' + tl(R, 'title_phrase', 'win the title') + ' at least once');
   items.push(['In ' + sims + ' simulated seasons', (every.length ? 'In every one: ' + every.map(esc).join('; ') + '. ' : '') + none.map(esc).join('; ') + '.']);
   out.push('<dl class="fb-rc-settled">' + items.map(function (x) { return '<div><dt>' + x[0] + '</dt><dd>' + x[1] + '</dd></div>'; }).join('') + '</dl>');
   return out.join('');
@@ -401,7 +416,7 @@ function cardHTML(R, ctx, r) {
   if (sp && sp.pct) SP_KEYS.forEach(function (k) { if (isNum(sp.pct[k[0]])) bars.push({ label: k[1], pctl: sp.pct[k[0]], value: num(sp[k[0]], k[2]), early: played < EARLY }); });
   var p = R.P[team] || {};
   var head = '<summary class="fb-rc-card-h"><span class="fb-rc-pos fb-num">' + esc(r.pos) + '</span>' + FB.crest(ctx.tidOf(team), team, 'md') +
-    '<span class="fb-rc-card-n"><b>' + esc(team) + '</b><span class="fb-cap fb-num">' + r.pts + ' pts · ' + r.played + ' played' + (isNum(p.exp_pts) ? ' · projected ' + num(p.exp_pts, 0) : '') + '</span></span>' +
+    '<span class="fb-rc-card-n"><b>' + esc(team) + '</b><span class="fb-cap fb-num">' + r.pts + ' pts · ' + r.played + ' played' + (isNum(p[R.t.exp_key || 'exp_pts']) ? ' · projected ' + num(p[R.t.exp_key || 'exp_pts'], 0) : '') + '</span></span>' +
     '<span class="fb-rc-chips">' + (chips.length ? topChips(chips, 3).map(chipHTML).join('') : '<span class="qk-muted fb-cap">' + (played < 3 ? 'Too few matches' : 'League average across the board') + '</span>') + '</span></summary>';
   var body = '<div class="fb-rc-card-b"><p class="fb-rc-short">' + esc(shortVersion(R, team, chips)) + '</p>' +
     (chips.length > 3 ? '<div class="fb-rc-chips all">' + chips.map(chipHTML).join('') + '</div>' : '') +
@@ -433,7 +448,7 @@ function shapeCharts(el, R, ctx) {
 function tiersHTML(R, ctx) {
   var up1 = R.up1, others = R.ups.slice(1);
   var tiers = [
-    { key: 'title', name: 'Title contenders', test: function (t) { return (chanceOf(R, t, 'title') || 0) >= 0.05; }, show: 'title' },
+    { key: 'title', name: tl(R, 'title_tier', 'Title contenders'), test: function (t) { return (chanceOf(R, t, 'title') || 0) >= 0.05; }, show: 'title' },
     { key: 'rel', name: 'Relegation scrap', test: function (t) { return R.downs.length && (R.rel(t) || 0) >= 0.1; }, show: 'rel' },
     { key: 'up1', name: up1 ? (up1.first === 1 ? 'Top-' + up1.last + ' race' : up1.label + ' race') : '', test: function (t) { return up1 && (chanceOf(R, t, up1.key) || 0) >= 0.1; }, show: up1 ? up1.key : null },
     { key: 'eu', name: 'Chasing ' + (others.length ? others.map(function (b) { return b.label; }).join(' / ') : 'Europe'), test: function (t) { return others.some(function (b) { return (chanceOf(R, t, b.key) || 0) >= 0.1; }); }, show: others.length ? others[0].key : null },
@@ -455,7 +470,7 @@ function tiersHTML(R, ctx) {
       var p = key ? chanceOf(R, r.team, key) : null;
       return '<li>' + ctx.club(r.team) + (key ? '<b class="fb-num">' + pc(p) + '</b>' : '<span class="fb-num qk-muted">' + r.pts + ' pts</span>') + '</li>';
     }).join('') + '</ul></div>';
-  }).join('') + '</div><p class="fb-cap">Tiers from our chances: title contenders at 5% or more; the ' + (up1 ? esc(up1.label) : 'top-band') + ' race and the chase for the other European places at 10% or more; the relegation scrap at 10% or more; the rest mid-table. The number is the chance that puts each club there.</p>';
+  }).join('') + '</div><p class="fb-cap">Tiers from our chances: ' + esc(tl(R, 'title_tier', 'title contenders').toLowerCase()) + ' at 5% or more; the ' + (up1 ? esc(up1.label) : 'top-band') + ' race and the chase for the other European places at 10% or more; the relegation scrap at 10% or more; the rest mid-table. The number is the chance that puts each club there.</p>';
 }
 
 // ── the tab ────────────────────────────────────────────────────────────────
@@ -464,14 +479,14 @@ function render(el, body, c, d, ctx) {
   var R = model(c, d);
   if (!R.rows.length) { body.innerHTML = FB.empty('No table yet', 'The race appears once the season has a table.'); return; }
   var m = R.m;
-  var keys = [['title', 'Title']].concat(R.up1 ? [[R.up1.key, metricShort(R, R.up1.key)]] : []).concat(R.downs.length ? [['rel', 'Relegation']] : []);
+  var keys = [['title', tl(R, 'title_short', 'Title')]].concat(R.up1 ? [[R.up1.key, metricShort(R, R.up1.key)]] : []).concat(R.downs.length ? [['rel', 'Relegation']] : []);
   var fav = R.rows.map(function (r) { return { t: r.team, p: chanceOf(R, r.team, 'title') || 0 }; }).sort(function (a, b) { return b.p - a.p; })[0];
   var cut = R.up1 ? R.rows.map(function (r) { return { t: r.team, p: chanceOf(R, r.team, R.up1.key) || 0 }; }).sort(function (a, b) { return b.p - a.p; })[R.up1.last - 1] : null;
-  var drop = R.downs.length ? R.rows.map(function (r) { return { t: r.team, p: R.rel(r.team) || 0 }; }).sort(function (a, b) { return b.p - a.p; }) : [];
-  var safeLine = drop.length ? drop[Math.min(drop.length - 1, R.downs.reduce(function (s, b) { return s + b.last - b.first + 1; }, 0))] : null;
+  var drop = R.downs.length ? R.rows.map(function (r) { return { t: r.team, p: R.rel(r.team) || 0, pos: r.pos || 0 }; }).sort(function (a, b) { return b.p - a.p || b.pos - a.pos; }) : [];
+  var safeLine = drop.length ? drop[Math.min(drop.length - 1, R.t.down_places || R.downs.reduce(function (s, b) { return s + b.last - b.first + 1; }, 0))] : null;
   var left = R.t.total_games && isNum(R.t.games_played) ? R.t.total_games - R.t.games_played : null;
   var kp = [
-    FB.kpi('Title favourite', fav && fav.p ? ctx.club(fav.t) : '—', { text: true, signal: true, sub: fav && fav.p ? 'our chance <b>' + pc(fav.p) + '</b>' : '' }),
+    FB.kpi(tl(R, 'title_kpi', 'Title favourite'), fav && fav.p ? ctx.club(fav.t) : '—', { text: true, signal: true, sub: fav && fav.p ? 'our chance <b>' + pc(fav.p) + '</b>' : '' }),
     cut ? FB.kpi('On the ' + esc(metricShort(R, R.up1.key).toLowerCase()) + ' line', ctx.club(cut.t), { text: true, sub: 'the ' + FB.ordinal(R.up1.last) + ' likeliest, at <b>' + pc(cut.p) + '</b>' }) : '',
     safeLine ? FB.kpi('First club above the drop', ctx.club(safeLine.t), { text: true, sub: 'by our chances; down in <b>' + pc(safeLine.p) + '</b> of seasons' }) : '',
     FB.kpi('Matches left', isNum(left) ? '<span class="fb-num">' + left + '</span>' : '—', { sub: R.N ? R.N + ' a club in all' : '' })
@@ -513,6 +528,66 @@ function render(el, body, c, d, ctx) {
   var q = (location.hash.split('?')[1] || '');
   var mm = /(?:^|&)club=([^&]+)/.exec(q);
   if (mm) { var card = document.getElementById('rc-card-' + mm[1]); if (card) { card.open = true; card.scrollIntoView({ block: 'start' }); } }
+  if (c.kind === 'liga') ligaSections(el, body, c, R, ctx);
+}
+
+// ── Argentina: the zone races and the promedio race ─────────────────────────
+
+/* After the Tabla Anual race: each zone's race for the eight playoff places (the points arithmetic over the zone
+   phase, our chance of the top eight and of winning the zone, from zones.json) and the promedio race (the worst
+   three-season averages, their projection and our chance of going down by each route, from relegation.json). */
+function ligaSections(el, body, c, R, ctx) {
+  var host = document.createElement('div');
+  body.insertBefore(host, document.getElementById('rc-cards-sec'));
+  FB.compFiles(c.slug, ['zones', 'relegation']).then(function (d) {
+    if (!FB.alive(el)) return;
+    var z = d.zones || {}, rel = d.relegation || {};
+    var keys = Object.keys(z.zones || {});
+    var cut = z.qualifiers_per_zone || 8;
+    var torneo = z.tournament === 'apertura' ? 'Apertura' : 'Clausura';
+    var html = '';
+    if (keys.length) {
+      html += '<section class="qk-section fb-co-sec">' + QK.sectionHead({ kicker: 'The ' + torneo, title: 'The zone races', sub: 'The top ' + cut + ' of each zone reach the ' + torneo + ' playoffs. Our chances of a place and of winning the zone, and what the arithmetic has settled.' }) +
+        FB.grid(keys.map(function (k, i) {
+          return FB.card('Zona ' + esc(k), zoneLine(z.zones[k], cut), '<div id="rc-zone-' + i + '"></div>', { span: 6, flush: true });
+        }).join('')) + '</section>';
+    }
+    var rows = (rel.rows || []).slice().sort(function (a, b) { return a.promedio_now - b.promedio_now; });
+    if (rows.length) {
+      html += '<section class="qk-section fb-co-sec">' + QK.sectionHead({ kicker: 'Relegation', title: 'The promedio race', sub: 'The club with the worst three-season points per match goes down, beside the last club in the Tabla Anual (when they are the same club, the next-worst promedio goes too).' }) +
+        FB.card('The bottom of the promedios', esc(((rel.prior || {}).note) || ''), '<div id="rc-prom"></div>', { flush: true }) + '</section>';
+    }
+    host.innerHTML = html;
+    keys.forEach(function (k, i) {
+      var zz = z.zones[k], A = arith({ rows: zz.standings || [], N: z.matches_per_team || 16 });
+      var st = {};
+      (A || []).forEach(function (x) { var t = x.topK(cut); st[x.team] = t.sure ? 'In' : t.out ? 'Out' : (t.need <= 3 * x.left ? t.need + ' of ' + (3 * x.left) : '—'); });
+      FB.table($(el, 'rc-zone-' + i), [
+        { key: 'pos', label: '#', num: true },
+        { key: 'team', label: 'Club', sticky: true, fmt: function (v) { return ctx.club(v); } },
+        { key: 'played', label: 'P', num: true }, { key: 'pts', label: 'Pts', num: true, fmt: function (v) { return '<b>' + v + '</b>'; } },
+        { key: 'p_top8', label: 'Top ' + cut, num: true, fmt: function (v) { return pc(v); } },
+        { key: 'p_zone_win', label: 'Zone', num: true, tip: 'Our chance of winning the zone', fmt: function (v) { return pc(v); } },
+        { key: 'team', label: 'Settled', sort: false, tip: 'In: a top-' + cut + ' place is certain. Out: it can no longer be reached. Otherwise the points that would make it certain whatever the rest do, of the points still to play for', fmt: function (v) { return '<span class="fb-num">' + esc(st[v] || '—') + '</span>'; } }
+      ], zz.standings || [], { caption: 'Zona ' + k, sort: { key: 'pos', dir: 'asc' } });
+    });
+    if (rows.length) {
+      var worst = rows.slice(0, 8);
+      FB.table($(el, 'rc-prom'), [
+        { key: 'pos', label: '#', num: true },
+        { key: 'team', label: 'Club', sticky: true, fmt: function (v) { return ctx.club(v); } },
+        { key: 'promedio_now', label: 'Promedio', num: true, tip: 'Points per match over the promedio seasons, this season so far included', fmt: function (v) { return num(v, 3); } },
+        { key: 'matches', label: 'Matches', num: true },
+        { key: 'p50', label: 'Projected', num: true, tip: 'The median final promedio in our simulated seasons (5th to 95th percentile on hover)', fmt: function (v, x) { return '<span title="' + esc(num(x.p05, 3) + ' to ' + num(x.p95, 3)) + '">' + num(v, 3) + '</span>'; } },
+        { key: 'p_promedio', label: 'Down via promedio', num: true, fmt: function (v) { return pc(v); } },
+        { key: 'p_anual', label: 'Down via Tabla Anual', num: true, fmt: function (v) { return pc(v); } },
+        { key: 'p_any', label: 'Down', num: true, fmt: function (v) { return '<b>' + pc(v) + '</b>'; } }
+      ], worst, { caption: 'The promedio race', sort: { key: 'pos', dir: 'asc' } });
+    }
+  });
+}
+function zoneLine(zz, cut) {
+  return (zz.games_played || 0) + ' of ' + (zz.total_games || 0) + ' zone matches played; the top ' + cut + ' go through.';
 }
 
 FB.race = { eligible: eligible, render: render, model: model, chipsFor: chipsFor, chipHTML: chipHTML, topChips: topChips };

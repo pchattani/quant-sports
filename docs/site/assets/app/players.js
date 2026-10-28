@@ -553,6 +553,7 @@ function renderLeaders(el, p) {
 var TABS = [['overview', 'Overview'], ['seasons', 'Season by season'], ['matches', 'Matches'], ['shots', 'Profile & shots'], ['transfers', 'Transfers']];
 
 FB.route('player', function (el, p) {
+  if ((p.query || {}).view === 'progression' && FB.progression) return FB.progression.tab(el, p);
   var pid = String(p.pid || '');
   var q = FB.merge(p.query || {}, {});
   el.innerHTML = FB.loading('card', 1) + FB.loading('lines', 6);
@@ -606,7 +607,8 @@ function drawPerson(el, doc, q) {
 
   var base = '#/player/' + FB.enc(doc.id);
   var keepQs = function (t) { return base + FB.qs({ tab: t === 'overview' ? null : t, scope: q.scope, c: q.c, e: q.e }); };
-  el.innerHTML = hero + FB.subnav(TABS.map(function (t) { return [keepQs(t[0]), t[1], t[0]]; }), tab, 'Player') +
+  var progTab = doc.progression && doc.progression.length && FB.progression ? [[base + FB.qs({ view: 'progression', scope: q.scope === 'intl' ? 'intl' : null }), 'Progression', 'progression']] : [];
+  el.innerHTML = hero + FB.subnav(TABS.map(function (t) { return [keepQs(t[0]), t[1], t[0]]; }).concat(progTab), tab, 'Player') +
     (tab === 'shots' || tab === 'transfers' ? '' : '<div id="pl-filter"></div>') + '<div id="pl-body" class="fb-pl-body"></div>' +
     '<p class="fb-cap fb-pl-links">' + linksLine(doc, R) + '</p>';
 
@@ -739,6 +741,7 @@ function linksLine(doc, R) {
     bits.push('<a href="#/compare/players/' + esc(best.comp) + ':' + esc(doc.id) + '">Compare this player →</a>');
     bits.push('<a href="#/lab/' + esc(best.comp) + '/' + esc(doc.pos === 'G' ? 'G' : (doc.pos || 'M')) + '">Player lab →</a>');
   }
+  if (doc.progression && doc.progression.length) bits.push('<a href="#/compare/progression/' + esc(doc.id) + '">Compare progression →</a>');
   bits.push('<a href="#/value' + FB.qs({ q: doc.name }) + '">Player value →</a>');
   bits.push('<a href="#/value/simulator' + FB.qs({ p: doc.id }) + '">Transfer simulator →</a>');
   bits.push('<a href="#/model/glossary">Glossary →</a>');

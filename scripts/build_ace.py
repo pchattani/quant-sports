@@ -281,6 +281,10 @@ def build_tour(b: Build, tour: str, args, cfg: dict) -> dict:
             catalogues[y] = cat
             if y == cur:
                 b.step(f"write {tour}/players.json", lambda: b.write_if_changed(tour, f"{tour}/players.json", cat))
+                # the tour page's top and bottom performers (oddsmarkets/tennis/analytics/performers.py)
+                from oddsmarkets.tennis.analytics import performers as PF
+                b.step(f"write {tour}/performers.json", lambda: b.write_if_changed(tour, f"{tour}/performers.json", PF.build(cat, tour) or {
+                    "ok": False, "reason": "nobody over the season's floor yet"}))
         pages = {eid for eid, ev in td.events(y).items() if str(ev.get("level")) in an.TOUR_LEVELS} if y in event_years else set()
         b.write_or_fail(f"{tour}/{y}/events.json", f"{tour} {y} events", lambda: EV.events_year(td, y, pages), tour=tour, year=y)
         b.write_or_fail(f"{tour}/{y}/schedule.json", f"{tour} {y} schedule",
@@ -477,6 +481,13 @@ def careers(b: Build, td: an.TourData, entries: dict[int, dict], preds: dict, de
     peer = (b.step(f"{td.tour} peer blocks", lambda: PL.peer_blocks(cat_cur, td.tour), {}) or {}) if (cat_cur or {}).get("players") else {}
     # last season's percentiles for the player page's rail rings (current.prev_pct_pos)
     prev_cat = an.read_json(b.data / td.tour / str(td.current - 1) / "players.json") or {}
+    # Progression: dv / dp / pg on seasons[] and the tour's progression_ref.json, from every year's catalogue on disk
+    prog_rows, prog_block = {}, None
+    pr = b.step(f"{td.tour} progression", lambda: PL.progression(
+        {y: an.read_json(b.data / td.tour / str(y) / "players.json") for y in entries}, td.tour), None)
+    if pr:
+        prog_rows, prog_block = pr[0], pr[2]
+        b.write_if_changed(td.tour, f"{td.tour}/{PL.PROG_FILE}", pr[1])
     n = 0
     for pid in sorted(per):
         ex = extras_cur.get(pid) or {}
@@ -493,6 +504,7 @@ def careers(b: Build, td: an.TourData, entries: dict[int, dict], preds: dict, de
                                     {y: ((tf.get(y) or {}).get(pid) or {}).get("all") or (0, 0) for y in per[pid]})
         if pid in peer:
             payload["peer"] = peer[pid]
+        PL.merge_progression(payload, prog_rows.get(pid), prog_block)
         if b.write_if_changed(td.tour, f"{td.tour}/players/{an.fname(pid)}.json", payload):
             n += 1
     return n

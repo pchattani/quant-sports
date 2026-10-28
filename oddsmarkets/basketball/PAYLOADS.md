@@ -138,10 +138,15 @@ players of that role for `players.ROLE_PCT_KEYS` (the spec's headline and second
 r floored at 0.2, weighted RMS z distance over the features both have; `oddsmarkets/common/similar.py`). About +3.5% on the file.
 Shot-making (`xpps`, `pox100`) uses xPTS model `xpts-2` (no `assisted` feature: assists are recorded on makes only).
 
+`progression_ref.json` (per league, round 6): each season's qualified guards / wings / bigs: n and [p10, p25, p50, p75, p90]
+per deep metric, `len` (games); the progression tab's peer band (oddsmarkets/common/progression.py).
+
 `players/<pid>.json` (per league, not per season: `data/<L>/players/<pid>.json`)
 ```
 {"id","name","pos","pool","dob","league","updated_at",
- "seasons":[{"season","team","gp","min","pts","reb","ast","ts","hpm","o","d","rapm"|null,"box_impact","wpa"|null,"qualified"}],
+ "seasons":[{"season","team","gp","min","pts","reb","ast","ts","hpm","o","d","rapm"|null,"box_impact","wpa"|null,"qualified",
+             "dv","dp","pg","age","miss":[games missed, injury absences]}],   (round 6 progression: dv / dp aligned to prog.keys.player)
+ "prog": {"v":1,"keys":{"player":[the role sets' headline then secondary ids, then war, rapm_o/d, wpa, per-game box]}},
  "current": {"season","team","log":[{"game","date","opp","home","min","pts","reb","ast","stl","blk","tov","fgm","fga","tpm","tpa","ftm","fta","pm","game_score","wpa"}],
              "shots": {"grid": {"cols":["x","y","n","fg","pps","share","lg_fg","lg_pps","fg_diff","pps_diff"],"rows":[...]} (hex cells, r = 1.5 ft),
                        "zones": ZONES, "types": {type:{"n","fg","pps"}}, "n"} | null,

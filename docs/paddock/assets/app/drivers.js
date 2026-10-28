@@ -125,6 +125,7 @@ function renderList(el, params) {
 
 
 function renderDriver(el, params, state) {
+  if ((params.query || {}).view === 'progression' && PD.progression) return PD.progression.tab(el, params);
   var id = params.id;
   var y = state.year || PD.currentSeason();
   el.innerHTML = PD.empty('Loading ' + PD.driverName(id), '');
@@ -191,13 +192,13 @@ function draw(el, id, y, cat, career, elo, askedY) {
     PD.kpi('Points per race', isNum((d.values || {}).points_per_race) ? PD.num(d.values.points_per_race, 2) : '—', (stand.wins || 0) + ' wins · ' + (stand.podiums || 0) + ' podiums · ' + (stand.poles || 0) + ' poles', { pctl: pc.points_per_race }),
     PD.kpi('Ahead of the team-mate', isNum((d.values || {}).race_h2h) ? PD.pct(d.values.race_h2h, 0) : '—', mate ? 'of races ahead of ' + esc(PD.driverSurname(mate)) : 'of races ahead of the team-mate', { pctl: pc.race_h2h, tip: V.tip(meta, 'race_h2h') })
   ] : null;
-  var h = crumb + QK.playerHeader({ name: name, number: info.number, pos: 'Driver', kicker: [y + (races ? ' · ' + races + ' start' + (races === 1 ? '' : 's') + ' in' : ''), info.nationality || (career || {}).nationality || '', age !== null ? (curTeam || (career && (career.seasons || []).some(function (z) { return z.year >= PD.currentSeason() - 1; })) ? 'age ' + age : 'born ' + String(career.dob).slice(0, 4)) : ''].filter(Boolean).join(' · '),
+  var h = crumb + (window.QPV ? window.QPV.tabsNav([['overview', 'Overview', PD.driverHref(id)], ['progression', 'Progression', PD.driverHref(id) + '?view=progression']], 'overview') : '') + QK.playerHeader({ name: name, number: info.number, pos: 'Driver', kicker: [y + (races ? ' · ' + races + ' start' + (races === 1 ? '' : 's') + ' in' : ''), info.nationality || (career || {}).nationality || '', age !== null ? (curTeam || (career && (career.seasons || []).some(function (z) { return z.year >= PD.currentSeason() - 1; })) ? 'age ' + age : 'born ' + String(career.dob).slice(0, 4)) : ''].filter(Boolean).join(' · '),
       team: curT ? { name: PD.teamName(curT), abbr: PD.teamAbbr(curT), colour: PD.teamColourRaw(curT), alt: PD.teamAlt(curT), href: PD.teamHref(curT) } : null,
       meta: [info.code ? ['Code', info.code] : null, isNum(tot.races) ? ['Starts', String(tot.races)] : null, isNum(tot.races) ? ['Wins', String(tot.wins || 0)] : null, tot.titles ? ['Titles', String(tot.titles)] : null],
       tags: dP && dP.qualified(id) ? [QK.tag('In the ' + y + ' peer group', 'signal')] : [], strip: strip, short: shortVersion() }) +
     (askedY ? PD.note(esc(name) + ' did not race in ' + askedY + '; showing ' + y + ', the latest season with a driver catalogue.') : '');
   if (d) {
-    h += '<div class="pd-links pd-mt">' + (mate ? '<a class="qk-btn" href="#/compare/drivers/' + encodeURIComponent(id) + '/' + encodeURIComponent(mate) + '">Compare with ' + esc(PD.driverSurname(mate)) + '</a>' : '') +
+    h += '<div class="pd-links pd-mt"><a class="qk-btn" href="#/compare/progression/' + encodeURIComponent(id) + (mate ? '/' + encodeURIComponent(mate) : '') + '">Compare progression</a>' + (mate ? '<a class="qk-btn" href="#/compare/drivers/' + encodeURIComponent(id) + '/' + encodeURIComponent(mate) + '">Compare with ' + esc(PD.driverSurname(mate)) + '</a>' : '') +
       '<a class="qk-btn" href="#/compare/drivers/' + encodeURIComponent(id) + '">Compare with anyone</a><a class="qk-btn" href="#/lab">Driver lab</a>' + (curT ? '<a class="qk-btn" href="' + PD.teamHref(curT) + '">' + esc(PD.teamName(curT)) + '</a>' : '') + '</div>';
 
     /* How sure are we: the starts so far against where each headline metric settles (f1.json m50) */

@@ -9,13 +9,17 @@
  *   "Tomorrow · Qualifying"), never "Our pick"; with no race in the coming week the title fight leads instead;
  *   "N calls. Our numbers." (kit game cards with the constructor-colour stripe and a reason each: the favourite, the
  *   closest podium call, the outsider, the title fight, the closest team-mate fight on points, the safety car); the
- *   black power list (QK.band + QK.hotRow); "We say it. Then we check it." (QK.howSure from calibration.json) beside
- *   "Who's for real?" (QKC.quadrant: points per start against race pace); "What's that number?"; the race weekend
+ *   black power list (QK.band + QK.hotRow); round 6 fan modules: "Breakout watch" (pace against the team-mate, this
+ *   season's percentile against last season's), "The best driver nobody talks about" (QK.spotlight), "Records in
+ *   reach" (the leaders on pace against Verstappen's 2023 records); "Who's for real?" (QKC.quadrant: points per start
+ *   against race pace) beside the constructors' biggest surprises (points rank against car-pace rank); "What's that
+ *   number?"; the race weekend
  *   (countdown, schedule, our win chance); the title race (points so far and our projection, 538 style; title
  *   chances in constructor colours; how the race has moved, with the 90% band, once title_history holds three
- *   rounds; the season-end points range; standings with trends); car against driver; how our favourite has fared,
- *   the last race and the fantasy projections. No market anywhere here.
- * Reads index.json, calibration.json, <y>/season.json, <y>/races/<next>.json, <y>/value.json, <y>/fantasy.json. */
+ *   rounds; the season-end points range; standings with trends); car against driver; the last race and the fantasy
+ *   projections. Our record (how our favourite fared, the calibration) is on the Model page's "How we're doing"; a
+ *   small link at the foot goes there. No market here (the race page carries it quietly).
+ * Reads index.json, <y>/season.json, <y>/races/<next>.json, <y>/value.json, <y-1>/value.json, <y>/fantasy.json. */
 (function (PD) {
 'use strict';
 
@@ -165,12 +169,16 @@ function render(el) {
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch ' + when, title: '<span id="ov-wh">' + (next ? 'Our calls for ' + esc(where) : 'What the numbers say') + '</span>', html: true,
       sub: 'Our numbers only, each with a line on why it’s worth your time. The stripe across the top of each card is our chance.' }) + '<div class="qk-watch" id="ov-watch">' + QK.skeleton('card', 3) + '</div></section>' +
     '<div id="ov-hot"></div>' +
-    '<section class="qk-section qk-g75"><div><div id="ov-sure-h"></div><div id="ov-sure"></div></div>' +
+    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Breakout watch', title: 'Who’s found pace', sub: 'The drivers furthest above their own last season on race pace against the team-mate, the one yardstick in the same car. Percentiles of the regular drivers each season.', actions: '<a class="qk-more" href="#/value">Driver value</a>' }) +
+    '<div id="ov-brk">' + QK.skeleton('card', 3) + '</div><div id="ov-spot" class="pd-ov-spot"></div></section>' +
+    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Records in reach', title: 'On pace for history?', sub: 'This season’s leaders, their pace over the full calendar and the single-season records.' }) + '<div id="ov-records"></div></section>' +
+    '<section class="qk-section qk-g75">' +
     '<div class="pd-ov-real">' + QK.sectionHead({ kicker: 'Who’s for real?', title: 'Results v pace', sub: 'Drivers top-left are scoring more than their pace suggests; bottom-right, the reverse. A lucky run, or something real?' }) +
-    '<div class="qk-card"><div class="qk-card-body"><div id="ov-luck" class="qk-chart" role="img" aria-label="Points per race against race pace"></div><p class="qk-caption" id="ov-luck-cap"></p></div></div></div></section>' +
+    '<div class="qk-card"><div class="qk-card-body"><div id="ov-luck" class="qk-chart" role="img" aria-label="Points per race against race pace"></div><p class="qk-caption" id="ov-luck-cap"></p></div></div></div>' +
+    '<div>' + QK.sectionHead({ kicker: 'Biggest surprises', title: 'Car or crew?', sub: 'Constructors’ points rank against their car-pace rank this season.' }) + '<div id="ov-surprise"></div></div></section>' +
     '<section class="qk-section">' + QK.newHere({ items: [QK.NEW_HERE[0],
       'A <b>percentile</b> ranks a driver against the other regular drivers this season: 90th means better than 90 in 100. Team-mate numbers take the car out.',
-      'Every forecast is checked against what happened. <a class="qk-link" href="#/model">The record is on the Model page.</a>'] }) + '</section>' +
+      'The <b>team-mate gap</b> is the fairest test of a driver: the only other driver in the same car. 0.1% of a lap is about 0.09 seconds.'] }) + '</section>' +
     '<section class="qk-section" id="ov-wk"></section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'Title race', title: 'Who wins the title?', sub: 'Our chances from 20,000 simulated seasons. The lines are points so far, then our expected points for every round still to run.', actions: kseg('ov-k') }) +
     PD.grid(
@@ -184,12 +192,11 @@ function render(el) {
     PD.grid(
       PD.card('Fastest cars right now', 'Car race pace at the latest round, % of a lap against the field (right is faster), ±1 standard error.', PD.chartBox('ov-cars', 320, 'Car pace by team'), { span: 6 }) +
       PD.card('Best drivers this season', 'Race pace above the team-mate, % of a lap (the driver alone), ±1 standard error; 5+ races.', PD.chartBox('ov-drv', 320, 'Pace above the team-mate'), { span: 6 }), 'pd-mt') + '</section>' +
-    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Track record', title: 'How our favourite fared', sub: 'Our pre-race favourite every round, and the last Grand Prix.', actions: '<a class="qk-more" href="#/model">The full record</a>' }) +
+    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Last time out', title: 'The last race and next weekend’s picks', sub: 'The last Grand Prix, and the fantasy projections for the next one.' }) +
     PD.grid(
-      PD.card('Our favourite, round by round', 'Our pre-race favourite each round: its win chance, filled in the team colour when it won.', PD.chartBox('ov-fav', 300, 'Our favourite’s win chance by round'), { span: 7 }) +
       PD.card('Last race', '', '<div id="ov-last"></div>', { span: 5 }) +
-      PD.card('Fantasy: top projections', 'Expected points next weekend with our scoring table; whiskers run from the 10th to the 90th percentile.', PD.chartBox('ov-fan', 300, 'Fantasy projections'), { span: 12, foot: '<span></span><a href="#/fantasy">All picks and the schedule →</a>' })) + '</section>';
-  howSureBlock();
+      PD.card('Fantasy: top projections', 'Expected points next weekend with our scoring table; whiskers run from the 10th to the 90th percentile.', PD.chartBox('ov-fan', 300, 'Fantasy projections'), { span: 7, foot: '<span></span><a href="#/fantasy">All picks and the schedule →</a>' })) + '</section>' +
+    '<p class="qk-caption pd-ov-doing"><a class="qk-link" href="#/model">How we’re doing →</a> Our favourite round by round, and how often our chances came true, on the Model page.</p>';
   var raceP = next ? PD.load(next.year + '/races/' + next.round + '.json') : Promise.resolve(null);
   return Promise.all([PD.load(y + '/season.json'), raceP, PD.load(y + '/value.json'), PD.load(y + '/fantasy.json')]).then(function (arr) {
     if (!PD.alive(el)) return;
@@ -204,11 +211,13 @@ function render(el) {
     watch(next, race, season);
     hot(season, value);
     real(value);
+    surprises(value);
+    records(season, dig.stage);
+    fanDrivers(value, season);
     weekend(next, race, season);
     title(season);
     cars(value);
     bestDrivers(value);
-    favourites(season);
     lastRace(last, season);
     fantasy(fan);
   });
@@ -234,7 +243,9 @@ function feature(next, race, season, wk, dig) {
   var tag = wk && wk.live ? 'Live now · ' + wk.live.label : wk && wk.next && wk.soon ? whenLabel(wk.next.iso) + ' · ' + wk.next.label : 'The next Grand Prix';
   var F = (dig || {}).featured || {}, fr = (F.today || [])[0] || F.week;
   var why = fr && fr.why && fr.why.length ? '<b>Why this race?</b> ' + esc(fr.why.join(' and ').replace(/^./, function (c) { return c.toUpperCase(); })) + '. ' : '';
-  return QK.splitHero(R.g, { tag: tag, homeFirst: true, sub: PD.v2.sideSub, note: why + (R.note || '') });
+  var c3 = R.ids[2];
+  var more = (c3 ? esc(PD.driverSurname(c3)) + ' is third on ' + PD.pct(ns.sim.drivers[c3].p_win, 0) + '. ' : '') + (ns.post ? 'The grid is set: this is our forecast after qualifying.' : '');
+  return QK.splitHero(R.g, { tag: tag, homeFirst: true, sub: PD.v2.sideSub, note: (why + more) || false });
 }
 /* No Grand Prix in the coming week: the title fight leads instead (our title chances in constructor colours). */
 function raceLead(season, next) {
@@ -323,19 +334,6 @@ function hot(season, value) {
     if (T[0]) items.push({ sport: 'f1', kicker: kick(T[0].id), title: 'Fastest car, % of a lap', name: PD.teamName(T[0].id), value: PD.signed(T[0].car, 2) + '%', next: T[1] ? { name: PD.teamName(T[1].id), value: PD.signed(T[1].car, 2) + '%' } : null, href: PD.teamHref(T[0].id), expl: 'Car race pace against the field at the latest round.' });
   }
   if (items.length) host.innerHTML = QK.band(QK.sectionHead({ kicker: 'Who’s hot', title: 'In form right now', sub: 'The top name on five boards, the next best beside each, and a line on what the number means.', actions: '<a class="qk-more" href="#/drivers">Every driver</a>' }) + QK.hotRow(items.slice(0, 5)));
-}
-
-/* "We say it. Then we check it." (QK.howSure from calibration.json: the race simulator's win chance before qualifying,
-   every driver in every scored race since 2014); the full record is on the Model page. */
-function howSureBlock() {
-  PD.load('calibration.json').then(function (cj) {
-    var box = document.getElementById('ov-sure'), hd = document.getElementById('ov-sure-h');
-    if (!box || !hd) return;
-    if (!PD.v2.calib(cj)) { box.innerHTML = ''; return; }
-    hd.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every driver in every Grand Prix we have forecast, grouped by the win chance we gave before qualifying. When the two lines match, our numbers mean what they say.',
-      actions: '<a class="qk-more" href="#/model">The full record</a>' });
-    PD.v2.howSure(box, cj);
-  });
 }
 
 /* "Who's for real?" (QKC.quadrant): F1's process against results. x is our race pace against the field at the latest
@@ -431,20 +429,6 @@ function bestDrivers(value) {
     { fmt: function (v) { return PD.signed(v, 2) + '%'; }, name: 'Above team-mate', errName: '±1 se', xName: 'Pace above team-mate (%)', label: 'Pace above the team-mate' });
 }
 
-function favourites(season) {
-  if (!PD.ok(season)) return PD.ch.none('ov-fav', 'No calendar.');
-  var done = (season.calendar || []).filter(function (c) { return c.status === 'done' && (c.p_win_top || []).length; }).sort(function (a, b) { return a.round - b.round; });
-  if (!done.length) return PD.ch.none('ov-fav', 'No forecasts stored for this season.');
-  var won = done.filter(function (c) { return c.winner === c.p_win_top[0][0]; }).length;
-  var mean = PD.mean(done.map(function (c) { return c.p_win_top[0][1]; }));
-  PD.ch.columns('ov-fav', { cats: done.map(function (c) { return 'R' + c.round; }), label: 'Our favourite win chance by round',
-    series: [{ name: 'Our favourite’s win chance', data: done.map(function (c) { return c.p_win_top[0][1]; }), colours: done.map(function (c) { return c.winner === c.p_win_top[0][0] ? PD.teamColour(c.winner_team || PD.driverTeam(c.winner)) : PD.col('faint'); }), fmt: function (v) { return PD.pct(v); } }],
-    fmt: function (v) { return Math.round(v * 100) + '%'; }, yMin: 0, xName: 'Round', yName: 'Our favourite’s win chance',
-    tipLabel: function (i) { var c = done[i]; return 'R' + c.round + ' ' + c.name + ': ' + PD.driverName(c.p_win_top[0][0]) + (c.winner === c.p_win_top[0][0] ? ' won' : ' (winner ' + PD.driverName(c.winner) + ')'); } });
-  var n = document.getElementById('ov-fav');
-  if (n) n.insertAdjacentHTML('afterend', '<p class="pd-cap">Our favourite won <b>' + won + ' of ' + done.length + '</b> races; its average win chance was ' + PD.pct(mean, 0) + ', so about ' + PD.num(mean * done.length, 1) + ' wins were expected.</p>');
-}
-
 function lastRace(last, season) {
   if (!last || !last.winner) { PD.set('ov-last', PD.muted('No race run yet this season.')); return; }
   var c = PD.ok(season) ? (season.calendar || []).filter(function (x) { return x.round === last.round; })[0] || {} : {};
@@ -462,6 +446,121 @@ function fantasy(F) {
   var D = PD.rowsOf(F.driver_cols, F.drivers).filter(function (r) { return isNum(r.next); }).sort(function (a, b) { return b.next - a.next; }).slice(0, 8);
   PD.ch.hbars('ov-fan', D.map(function (r) { return { label: r.name, value: r.next, lo: r.p10, hi: r.p90, colour: PD.teamColour(r.team), href: PD.driverHref(r.id), sub: 'Floor ' + PD.num(r.p10, 0) + ', ceiling ' + PD.num(r.p90, 0) + ' · value ' + PD.signed(r.value, 1) }; }),
     { fmt: function (v) { return PD.num(v, 1); }, name: 'Projected points', errName: '10th–90th pct', xName: 'Projected fantasy points', label: 'Fantasy projections' });
+}
+
+
+/* ── round 6: the fan modules ─────────────────────────────────────────────────────────────────────────────────── */
+
+/* percentile of each driver's `key` among the drivers with the value model's minimum races: { id: pct } */
+function fieldPct(rows, key) {
+  var R = rows.filter(function (r) { return isNum(r[key]); }), out = {};
+  R.forEach(function (r) {
+    var lo = 0, eq = 0;
+    R.forEach(function (x) { if (x[key] < r[key]) lo++; else if (x[key] === r[key]) eq++; });
+    out[r.id] = R.length > 1 ? 100 * (lo + 0.5 * (eq - 1)) / (R.length - 1) : 50;
+  });
+  return out;
+}
+function valueRows(value) {
+  if (!PD.ok(value) || !value.drivers) return [];
+  var minR = value.min_races || 5;
+  return PD.rowsOf(value.driver_cols, value.drivers).filter(function (r) { return (r.races || 0) >= minR; })
+    .map(function (r) { r.ppr = isNum(r.points) && r.races ? r.points / r.races : null; return r; });
+}
+/* "Who's found pace": the drivers furthest above their own last season on race pace against the team-mate (value.json
+   pace_tm, the car taken out), as a percentile of the regular drivers each season; then "The best driver nobody talks
+   about" (QK.spotlight): the quickest against his team-mate outside the top six on points. Last season's value.json
+   is a 4 KB file, read after the first render. */
+function fanDrivers(value, season) {
+  var y = (PD.ok(value) && value.year) || PD.currentSeason();
+  PD.load((y - 1) + '/value.json').then(function (prev) {
+    var S = valueRows(value), L = valueRows(prev);
+    var brk = document.getElementById('ov-brk'), spot = document.getElementById('ov-spot');
+    if (!brk) return;
+    if (S.length < 6) { brk.innerHTML = QK.empty('Not yet', 'The pace model needs a few races this season.'); return; }
+    var ps = fieldPct(S, 'pace_tm'), pl = fieldPct(L, 'pace_tm');
+    var lastBy = {}; L.forEach(function (r) { lastBy[r.id] = r; });
+    var up = S.filter(function (r) { return isNum(ps[r.id]) && isNum(pl[r.id]) && ps[r.id] - pl[r.id] >= 20; })
+      .sort(function (a, b) { return (ps[b.id] - pl[b.id]) - (ps[a.id] - pl[a.id]); }).slice(0, 3);
+    brk.innerHTML = up.length ? QK.storyCards(up.map(function (r) {
+      var a = pl[r.id], b = ps[r.id], p = lastBy[r.id], moved = p.team !== r.team;
+      return { sport: 'f1', kicker: 'Breakout watch', name: r.name, sub: PD.teamName(r.team) + ' · ' + r.races + ' races', value: '+' + Math.round(b - a), unit: 'percentile points',
+        colour: PD.teamColourRaw(r.team), mark: { name: PD.teamName(r.team), abbr: PD.teamAbbr(r.team), colour: PD.teamColourRaw(r.team) },
+        from: { label: (y - 1), pos: a, value: QK.ordinal(Math.round(a)) }, to: { label: y, pos: b, value: QK.ordinal(Math.round(b)) }, href: PD.driverHref(r.id) + '?view=progression', link: { text: 'Progression' },
+        text: 'Race pace against the team-mate: ' + PD.signed(p.pace_tm, 2) + '% of a lap last season, ' + PD.signed(r.pace_tm, 2) + '% now (± ' + PD.num(r.pace_tm_se, 2) + ').' +
+          (moved ? ' A new team and a new team-mate since, so the yardstick moved too.' : '') };
+    })) : QK.empty('No big movers', 'Nobody has jumped 20 percentile points on pace against the team-mate since last season.');
+    if (!spot) return;
+    var top6 = {}; (((season || {}).standings || {}).drivers || []).slice(0, 6).forEach(function (r) { top6[r.driver] = 1; });
+    var un = S.filter(function (r) { return !top6[r.id] && isNum(r.pace_tm); }).sort(function (a, b) { return b.pace_tm - a.pace_tm; })[0];
+    if (!un) { spot.innerHTML = ''; return; }
+    var row = function (key, label, f) {
+      var P = fieldPct(S, key), Q = fieldPct(L, key);
+      return isNum(un[key]) && isNum(P[un.id]) ? { label: label, value: f(un[key]), pctl: P[un.id], prev: isNum(Q[un.id]) ? Q[un.id] : null } : null;
+    };
+    var info = PD.NAMES && PD.NAMES.drivers ? PD.NAMES.drivers[un.id] || {} : {};
+    var pos = ((((season || {}).standings || {}).drivers || []).filter(function (r) { return r.driver === un.id; })[0] || {}).pos;
+    spot.innerHTML = QK.spotlight({ kicker: 'The best driver nobody talks about', name: un.name, number: isNum(info.number) ? info.number : '', team: { colour: PD.teamColourRaw(un.team) },
+      sub: PD.teamName(un.team) + (pos ? ' · ' + QK.ordinal(pos) + ' in the championship' : ''), href: PD.driverHref(un.id),
+      headline: QK.ordinal(Math.round(fieldPct(S, 'pace_tm')[un.id])) + ' percentile of the grid on race pace against his team-mate, outside the top six on points: the car is holding the driver back.',
+      stats: [row('pace_tm', 'Race pace v team-mate (% of a lap)', function (v) { return PD.signed(v, 2) + '%'; }), row('quali_tm', 'Qualifying v team-mate (% of a lap)', function (v) { return PD.signed(v, 2) + '%'; }),
+        row('pace_field', 'Race pace v the field, car included (%)', function (v) { return PD.signed(v, 2) + '%'; }), row('ppr', 'Points per start', function (v) { return PD.num(v, 1); })].filter(Boolean),
+      text: 'Percentiles against the ' + S.length + ' drivers with ' + ((value || {}).min_races || 5) + '+ starts; ▼ is last season. Pace is a share of a lap: 0.1% is about 0.09 s.',
+      links: [{ href: PD.driverHref(un.id), text: 'Driver page' }, { href: PD.driverHref(un.id) + '?view=progression', text: 'Progression' }, { href: '#/value', text: 'Driver value' }] });
+  });
+}
+
+/* Records in reach: the season's leaders on pace for a full calendar against the single-season records (Max
+   Verstappen, 2023: 575 points and 19 wins; Sebastian Vettel, 2011: 15 poles). Points include sprints. */
+var F1_RECORDS = { points: [575, 'Max Verstappen, 2023'], wins: [19, 'Max Verstappen, 2023'], poles: [15, 'Sebastian Vettel, 2011'] };
+function records(season, stage) {
+  var host = document.getElementById('ov-records');
+  if (!host) return;
+  var st = PD.ok(season) ? ((season.standings || {}).drivers || []) : [];
+  var done = (season || {}).rounds_done || 0, total = (season || {}).rounds_total || 0;
+  if (!st.length || done < 3 || !total) { host.innerHTML = QK.empty('Too early', 'The paces appear after three rounds.'); return; }
+  var best = function (k) { return st.slice().sort(function (a, b) { return (b[k] || 0) - (a[k] || 0); })[0]; };
+  var cards = [['points', 'Most points', 'points'], ['wins', 'Most wins', 'wins'], ['poles', 'Most poles', 'poles']].map(function (c) {
+    var r = best(c[0]);
+    if (!r || !r[c[0]]) return null;
+    var now = r[c[0]], pace = now / done * total, rec = F1_RECORDS[c[0]];
+    var left = total - done, beat = Math.round(pace) > rec[0];
+    /* the most still possible: every remaining round (points: the stage's points left for one driver, sprints included) */
+    var most = now + (c[0] === 'points' ? ((stage || {}).points_left || left * 25) : left), gone = most < rec[0];
+    return { sport: 'f1', kicker: 'Records in reach · ' + c[1].toLowerCase(), name: PD.driverName(r.driver), sub: PD.teamName(r.team), value: c[0] === 'points' ? PD.pts(now) : now, unit: c[2] + ', ' + done + ' of ' + total + ' rounds',
+      colour: PD.teamColourRaw(r.team), mark: { name: PD.teamName(r.team), abbr: PD.teamAbbr(r.team), colour: PD.teamColourRaw(r.team) }, href: PD.driverHref(r.driver),
+      pace: { now: now, pace: pace, target: rec[0], label: 'Record', max: Math.max(rec[0], pace) * 1.1, fmt: c[0] === 'points' ? function (v) { return PD.pts(Math.round(v)); } : null },
+      text: 'At this rate, ' + Math.round(pace) + ' ' + c[2] + ' over ' + total + ' rounds. The record is ' + rec[0] + ' (' + rec[1] + ').' + (beat ? ' On pace to beat it, with ' + left + ' rounds left.' : gone ? ' Out of reach this year: even a clean sweep of the last ' + left + ' rounds ends at ' + (c[0] === 'points' ? PD.pts(most) : most) + '.' : ' Still possible: ' + (rec[0] - now) + ' more in ' + left + ' rounds.') };
+  }).filter(Boolean);
+  host.innerHTML = cards.length ? QK.storyCards(cards) : '';
+}
+
+/* The biggest surprises among the constructors: points rank against car-pace rank (value.json teams: car pace at the
+   latest round, points this season), the team scoring furthest above its car and the one furthest below (two places
+   or more), and the car on the move: the biggest gain in car pace over the last five rounds (`trend`). */
+function surprises(value) {
+  var host = document.getElementById('ov-surprise');
+  if (!host) return;
+  if (!PD.ok(value) || !value.teams) { host.innerHTML = QK.empty('Not yet', 'The car-pace model needs a few races.'); return; }
+  var T = PD.rowsOf(value.team_cols, value.teams).filter(function (r) { return isNum(r.car) && isNum(r.points); });
+  if (T.length < 4) { host.innerHTML = ''; return; }
+  var byCar = T.slice().sort(function (a, b) { return b.car - a.car; }), byPts = T.slice().sort(function (a, b) { return b.points - a.points; });
+  T.forEach(function (r) { r.rc = byCar.indexOf(r) + 1; r.rp = byPts.indexOf(r) + 1; r.d = r.rc - r.rp; });
+  var hi = T.slice().sort(function (a, b) { return b.d - a.d || a.rp - b.rp; })[0], lo = T.slice().sort(function (a, b) { return a.d - b.d || a.rp - b.rp; })[0];
+  var card = function (r, up) {
+    return { sport: 'f1', kicker: up ? 'Punching above the car' : 'Points left on the table', name: PD.teamName(r.id), sub: QK.ordinal(r.rp) + ' on points · ' + QK.ordinal(r.rc) + ' on car pace',
+      value: (r.d > 0 ? '+' : r.d < 0 ? '−' : '±') + Math.abs(r.d), unit: 'places', colour: PD.teamColourRaw(r.id), mark: { name: PD.teamName(r.id), abbr: PD.teamAbbr(r.id), colour: PD.teamColourRaw(r.id) }, href: PD.teamHref(r.id),
+      text: PD.pts(r.points) + ' points with the ' + QK.ordinal(r.rc) + '-fastest car (' + PD.signed(r.car, 2) + '% of a lap against the field). ' + (up ? 'Strategy, reliability and the drivers are earning more than the pace.' : 'The pace says more points should be coming.') };
+  };
+  var cards = [];
+  if (hi.d >= 2) cards.push(card(hi, true));
+  if (lo.d <= -2) cards.push(card(lo, false));
+  var mv = T.filter(function (r) { return isNum(r.trend); }).sort(function (a, b) { return b.trend - a.trend; })[0];
+  if (mv && mv.trend > 0 && cards.length < 2) cards.push({ sport: 'f1', kicker: 'The car on the move', name: PD.teamName(mv.id), sub: QK.ordinal(mv.rc) + ' on car pace · ' + QK.ordinal(mv.rp) + ' on points',
+    value: PD.signed(mv.trend, 2) + '%', unit: 'of a lap, last five rounds', colour: PD.teamColourRaw(mv.id), mark: { name: PD.teamName(mv.id), abbr: PD.teamAbbr(mv.id), colour: PD.teamColourRaw(mv.id) }, href: PD.teamHref(mv.id),
+    text: 'The biggest gain in car pace over the last five rounds: about ' + PD.num(mv.trend * 0.9, 2) + ' seconds a lap on a 90-second lap. Upgrades working, or the tracks suiting it.' });
+  if (cards.length < 2 && hi.d === 1) cards.unshift(card(hi, true));
+  host.innerHTML = cards.length ? QK.storyCards(cards.slice(0, 2), { cols: 1 }) : QK.empty('No surprises', 'The points order matches the car-pace order.');
 }
 
 PD.route('overview', render);

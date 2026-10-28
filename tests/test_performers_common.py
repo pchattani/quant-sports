@@ -70,3 +70,8 @@ def test_spec_metrics_order_style_and_ours():
     assert [m["key"] for m in P.spec_metrics(spec, "f", only={"p60"})] == ["p60"]
     assert P.spec_metrics(spec, "nope") == []
     assert P.load_spec("hockey")["sport"] == "hockey"
+
+
+def test_spec_tips_drop_builder_references():
+    assert P._tip("Value per game (value.json) from the model.") == "Value per game from the model."
+    assert P._tip("Plain (per 90).") == "Plain (per 90)."

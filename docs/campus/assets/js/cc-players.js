@@ -217,6 +217,7 @@ function lc(x) { x = String(x || ''); return /^[A-Z][a-z]/.test(x) ? x.charAt(0)
 function plural(n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); }
 
 CC.route('player', function (el, p) {
+  if ((p.query || {}).view === 'progression' && CC.progression) return CC.progression.tab(el, p);
   var L = p.L, S = p.S, pid = p.id, fb = CC.fb(L);
   el.innerHTML = QK.skeleton('card', 1) + QK.skeleton('lines', 6);
   return Promise.all([CC.load(CC.lpath(L, 'players/' + pid + '.json')), CC.load(CC.path(L, S, 'players.json')), CC.season(L, S), CC.metrics()]).then(function (a) {
@@ -306,11 +307,12 @@ CC.route('player', function (el, p) {
     if (cur.fantasy && isNum(cur.fantasy.proj)) k.push({ label: 'Fantasy projection', value: CC.f(cur.fantasy.proj, 1), sub: 'points next ' + (fb ? 'week' : 'period') });
     /* v4 (Broadcast): the full-bleed team-colour hero (the alternate colour on the diagonal; slate behind a volt
        stripe until the payload has one) with the black strip of five numbers and "The short version" under it */
-    var html = crumb + QK.playerHeader({ name: name, number: d && /^\d{1,2}$/.test(String(d.number || '')) ? d.number : (d && (isNum(d.jersey) || /^\d+$/.test(String(d.jersey || ''))) ? d.jersey : null), pos: posLabel(cat, pos) || pos, kicker: CC.LSHORT[L] + ' · ' + CC.seasonLabel(L, cur.season || S) + (gpNow ? ' · ' + plural(gpNow, 'game') + ' in' : ''),
+    var html = crumb + (window.QPV && d ? window.QPV.tabsNav([['overview', 'Overview', CC.playerHref(L, pid, S)], ['progression', 'Progression', CC.playerHref(L, pid) + '?view=progression']], 'overview') : '') + QK.playerHeader({ name: name, number: d && /^\d{1,2}$/.test(String(d.number || '')) ? d.number : (d && (isNum(d.jersey) || /^\d+$/.test(String(d.jersey || ''))) ? d.jersey : null), pos: posLabel(cat, pos) || pos, kicker: CC.LSHORT[L] + ' · ' + CC.seasonLabel(L, cur.season || S) + (gpNow ? ' · ' + plural(gpNow, 'game') + ' in' : ''),
         team: t ? { name: t.short || t.name, abbr: t.abbr, colour: t.colour, alt: CC.talt(L, team) || undefined, href: CC.teamHref(L, team, cur.season || S) } : null,
         meta: [(d && d['class']) || (cp && cp['class']) ? (d && d['class']) || cp['class'] : null, hgt ? hgt + (d && isNum(d.weight_lb) ? ', ' + d.weight_lb + ' lb' : '') : null, d && d.hometown ? 'From ' + d.hometown : null],
         strip: k.length ? k.slice(0, 5) : hstats.slice(0, 5), short: short0 || null, tags: cp && cp.qualified !== false ? [QK.tag('Qualified for percentiles', 'signal')] : [] });
     if (vr && vr.why) html += QK.explain('<b>Why that value?</b> ' + esc(vr.why), { cls: 'cc-settle' });
+    if (d && window.QPV) html += '<div class="qk-chips" style="margin-top:var(--sp-4)"><a class="qk-btn" href="' + esc(CC.playerHref(L, pid) + '?view=progression') + '">Season by season</a><a class="qk-btn" href="#/' + L + '/compare/progression/' + encodeURIComponent(pid) + '">Compare progression</a></div>';
 
     /* How sure are we: when the headline numbers are half signal at this playing time (the spec's M50 samples) */
     var small = gpNow < (fb ? 6 : 12);

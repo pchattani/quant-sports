@@ -304,11 +304,21 @@ def test_glossary_history_careers(rink):
     for k in ("log", "shots", "onice", "rapm", "linemates", "deployment", "projection"):
         assert k in doc["current"], k
     assert doc["similar"] and len(doc["similar"][0]) == 4
-    # unchanged content is not rewritten
+    # progression (round 6): the deep set per kind, values (and qualified rows' percentiles) aligned to it, the reference
+    keys = doc["prog"]["keys"]["skater"]
+    assert keys[0] in ("gar_60", "p60") and not any(k.startswith("edge_") for k in keys)
+    row = doc["seasons"][-1]
+    assert len(row["dv"]) == len(keys) and row["pg"] in ("forwards", "defence")
+    assert all(len(r["dp"]) == len(r["dv"]) == len(next(iter(d["prog"]["keys"].values())))
+               for d in written.values() for r in d.get("seasons") or [] if "dp" in r)
+    assert any("dp" in r for d in written.values() for r in d.get("seasons") or [])
+    ref = written["progression_ref.json"]
+    assert ref["q"] == [10, 25, 50, 75, 90] and "20252026" in ref["seasons"]
+    # unchanged content is not rewritten (the reference is rewritten every run)
     written2 = {}
     careers.write_careers(lambda rel, d: written2.__setitem__(rel, d), {20252026: rows}, blocks,
                           lambda p: written.get(f"players/{p}.json"), 20252026, c.players)
-    assert not written2
+    assert set(written2) == {"progression_ref.json"}
 
 
 def test_xg_fallback_probabilities(rink):

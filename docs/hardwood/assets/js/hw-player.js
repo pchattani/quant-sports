@@ -60,7 +60,7 @@ function prevFromFile(career) {
 
 function render(el, params) {
   const L = U.L(params), pid = String(params.id || '');
-  const tab = U.tab(params, ['overview', 'detail'], 'overview');
+  const tab = U.tab(params, ['overview', 'detail', 'progression'], 'overview');
   let S = U.S(params);
   const curS = HW.currentSeason(L);
   el.innerHTML = QK.skeleton('lines', 6);
@@ -155,8 +155,9 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
   const best = Object.keys(aw).filter(x => isNum(aw[x]) || (aw[x] && isNum(aw[x].p))).sort((a, b) => (isNum(aw[b]) ? aw[b] : aw[b].p) - (isNum(aw[a]) ? aw[a] : aw[a].p))[0];
   if (best) k.push({ label: 'Our ' + (best === 'mvp' ? 'MVP' : best.toUpperCase()) + ' chance', value: U.pct(isNum(aw[best]) ? aw[best] : aw[best].p), sub: 'from the award model' });
   const base = HW.playerHref(L, pid, S);
-  h += '<div style="margin-top:var(--sp-6)">' + U.tabsHTML([{ key: 'overview', label: 'Overview', href: base }, { key: 'detail', label: 'Detail: the whole catalogue, on/off and lineups', href: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'tab=detail' }], tab) + '</div>';
+  h += '<div style="margin-top:var(--sp-6)">' + U.tabsHTML([{ key: 'overview', label: 'Overview', href: base }, { key: 'progression', label: 'Progression', href: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'tab=progression' }, { key: 'detail', label: 'Detail: the whole catalogue, on/off and lineups', href: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'tab=detail' }], tab) + '</div>';
   if (tab === 'detail') { el.innerHTML = h + '<div class="hw-sub"></div>'; U.legacy('player', el.querySelector('.hw-sub'), params, null, { embed: 'detail' }); return; }
+  if (tab === 'progression') { el.innerHTML = h + '<div class="hw-sub"></div>'; if (HW.progression) HW.progression.tab(el.querySelector('.hw-sub'), L, career); return; }
 
   // ── the rail (with last season's ring), how sure, game by game, their type
   const peer = role ? U.peerName(L, role) : '';

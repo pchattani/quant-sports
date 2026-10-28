@@ -366,3 +366,7 @@
 .pd-top-big { font: 400 var(--fs-2xl)/1 var(--font-display); color: var(--ink-1); }
 .pd-top-of { flex: 1 1 160px; color: var(--ink-2); font-size: var(--fs-xs); }
 @media (max-width: 720px) { .pd-top { grid-template-columns: 1fr; } }
+/* round 6: the fan modules' spotlight under the breakout cards, and the small link to "How we're doing" */
+.pd-ov-spot { margin-top: 18px; }
+.pd-ov-spot:empty { display: none; }
+.pd-ov-doing { text-align: center; margin-top: 32px; }

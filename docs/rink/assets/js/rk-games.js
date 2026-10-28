@@ -142,9 +142,11 @@ function hero(c, d, g, season) {
   if (pre && isNum(m.p_ot)) extra.push('About ' + (Math.round(1 / m.p_ot) > 1 ? '1 in ' + Math.round(1 / m.p_ot) : 'half') + ' (' + U.pct(m.p_ot) + ') go to overtime');
   if (pre && isNum(m.total)) extra.push('we expect about ' + Math.round(m.total) + ' goals in all');
   const kick = 'NHL' + (d && d.venue ? ' · ' + d.venue : '') + (RK.isPlayoffGame(c) && G.league !== 'NHL' ? ' · ' + G.league : '');
-  const src = RK.srcLineOnly && RK.srcLineOnly(mk.sources) ? 'no-vig line' : (RK.srcLabel(mk.sources) || 'de-vigged');
+  /* round 6: the market's chance sits quietly under the hero (QK.marketLine), the source on hover */
+  const src = RK.srcLineOnly && RK.srcLineOnly(mk.sources) ? 'the no-vig sportsbook line' : (RK.srcLabel(mk.sources) || '');
+  if (pre && isNum(mk.p_home)) { G.market_home = Number(mk.p_home); G.market_src = src; } else G.market_home = null;
   return '<div class="rk-preview">' + QK.previewCard(G, { kicker: kick, nick: t => U.nick(t.abbr), colors: [ca, ch], factors: fx,
-    noteExtra: extra.length ? esc(extra.join(', and ') + '.') : '', market: pre && isNum(mk.p_home) ? { p: Number(mk.p_home), label: 'Market (' + src + ')' } : null }) + '</div>';
+    noteExtra: extra.length ? esc(extra.join(', and ') + '.') : '', market: 'quiet' }) + '</div>';
 }
 
 function kpiStrip(c, d, g) {

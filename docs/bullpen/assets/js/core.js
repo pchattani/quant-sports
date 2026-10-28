@@ -223,7 +223,7 @@ const TITLES = {
   hub: 'Overview', games: 'Games', game: 'Game centre', standings: 'Standings', postseason: 'Postseason', hitters: 'Hitters', pitchers: 'Pitchers',
   hitter: 'Hitter', pitcher: 'Pitcher', player: 'Player', teams: 'Teams', team: 'Team', leaders: 'Leaders', umpires: 'Umpires', umpire: 'Umpire',
   parks: 'Parks', park: 'Park', prospects: 'Prospects', history: 'History', awards: 'Awards', lab: 'Lab', compare: 'Compare', value: 'Value', trade: 'Trade simulator', moves: 'Moves', fantasy: 'Fantasy',
-  markets: 'Forecast board', calibration: 'Calibration', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
+  markets: 'Forecast board', calibration: 'How we’re doing', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
 };
 /* The nine sections (QK.sections('baseball')) and the routes each one holds. */
 const SECTION_OF = { hub: 'overview', games: 'fixtures', game: 'fixtures', markets: 'fixtures', standings: 'standings', postseason: 'standings', awards: 'standings',
@@ -239,7 +239,7 @@ const SECTION_TABS = {
   value: [['value', 'Player value', ''], ['trade', 'Trade simulator', 'mlb'], ['moves', 'Moves & trades', 'mlb']],
   fantasy: [['fantasy', 'Fantasy baseball', 'mlb']],
   lab: [['lab', 'Scatter lab', ''], ['compare', 'Compare', 'g'], ['parks', 'Parks', 'g'], ['umpires', 'Umpires', 'g']],
-  model: [['methodology', 'Methodology', 'g'], ['calibration', 'Calibration', 'g'], ['glossary', 'Glossary', 'g'], ['disclaimer', 'Terms', 'g']]
+  model: [['methodology', 'Methodology', 'g'], ['calibration', 'How we’re doing', 'g'], ['glossary', 'Glossary', 'g'], ['disclaimer', 'Terms', 'g']]
 };
 const SECTION_LABEL = { overview: 'Overview', fixtures: 'Games', standings: 'Standings', teams: 'Teams', players: 'Players', value: 'Value & Moves', fantasy: 'Fantasy', lab: 'Lab', model: 'Model' };
 const SECTION_BLURB = {
@@ -994,9 +994,10 @@ function glossHref(key) { return '#/glossary' + (key ? '/' + encodeURIComponent(
 /* A GAME_CARD as the kit's v2 game card (QK.gameCard; index.json today/recent/upcoming, schedule.json), linking to the
  * game centre: the two clubs with our (or, live, the in-game) win chance, the favourite in the signal colour, the
  * win-probability bar, records (BP.records, filled by pages that load season.json), recent form (BP.forms), the
- * probable starters and our expected total runs. Kit v3: no market on cards unless opts.market === true (game detail
- * only); opts.why adds the italic one-line reason (QK.whyLine).
- * opts {level, season, date: true (show the date), compact, series: true (default), market: false, why}. */
+ * probable starters and our expected total runs. Round 6: before the start the market sits quietly beside our chance
+ * (kit market: 'quiet': small grey "Market 54%", the source on hover); opts.market false hides it, true draws the old
+ * reference bar. opts.why adds the italic one-line reason (QK.whyLine).
+ * opts {level, season, date: true (show the date), compact, series: true (default), market: 'quiet' | false | true, why}. */
 const RECORDS = {}, FORMS = {};
 /* A postseason game that was never needed (series decided; Stats API status cancelled / not_needed): hidden everywhere. */
 function notNeeded(g) { return !!g && (g.not_needed === true || (String(g.status || '').toLowerCase() === 'cancelled' && g.gtype && g.gtype !== 'R')); }
@@ -1040,8 +1041,9 @@ function gameCard(g, opts) {
   k.away.record = sub('away'); k.home.record = sub('home');
   if (FORMS[String(g.away)]) k.away.form = FORMS[String(g.away)];
   if (FORMS[String(g.home)]) k.home.form = FORMS[String(g.home)];
-  if (o.market !== true || !mk) k.market_home = null;
-  let html = window.QK && QK.gameCard ? QK.gameCard(k, { sport: false, why: !!o.why, market: o.market === true, marketLabel: 'Market', marketTip: 'The prediction-market or no-vig line probability for the home side, a reference, not our forecast' }) : '';
+  const mkMode = o.market === true ? true : o.market === false ? false : 'quiet';
+  if (!mkMode || !mk) k.market_home = null;
+  let html = window.QK && QK.gameCard ? QK.gameCard(k, { sport: false, why: !!o.why, market: mkMode, marketLabel: 'Market', marketTip: 'The prediction-market or no-vig line probability for the home side, a reference, not our forecast' }) : '';
   const extra = [];
   if (isNum(m.total) && !fin) extra.push('<span data-tip="Our expected total runs from the plate-appearance simulation">' + num(m.total, 1) + ' runs expected</span>');
   if (live && isNum(g.outs)) extra.push('<span>' + esc(outsText(g.outs)) + '</span>');
@@ -1060,7 +1062,7 @@ function kitGame(g, L) {
   return { sport: 'baseball', league: g.series ? seriesText(g.series, true) : (L === 'aaa' ? 'Triple-A' : 'MLB'), id: g.gpk, start: g.start || g.date,
     status: st === 'live' ? 'live' : st === 'final' ? 'final' : 'pre', home: teamObj(g.home, L), away: teamObj(g.away, L),
     hs: isNum(g.hs) ? g.hs : null, as: isNum(g.as) ? g.as : null,
-    p_home: live && isNum(g.wp_home) ? g.wp_home : (isNum(m.p_home) ? m.p_home : null), market_home: isNum(mk.p_home) ? mk.p_home : null,
+    p_home: live && isNum(g.wp_home) ? g.wp_home : (isNum(m.p_home) ? m.p_home : null), market_home: isNum(mk.p_home) ? mk.p_home : null, market_src: mk.sources || mk.source || null,
     /* v3: live, the kit reads the live chance and keeps our pre-game call for "before the start we had ..." */
     p_pre: live && isNum(g.wp_home) && isNum(m.p_home) ? m.p_home : null, pre_only: live && !isNum(g.wp_home) ? true : undefined,
     period: isNum(g.inning) ? g.inning : null, href: gameHref(g.gpk, L) };

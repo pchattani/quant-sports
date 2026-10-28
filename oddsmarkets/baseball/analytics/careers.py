@@ -386,6 +386,30 @@ def season_row(level: str, season: int, kind: str, r: dict) -> dict:
             **{k: v.get(k) for k in keys}}
 
 
+def prog_keys(kind: str, have: set[str] | None = None) -> list[str]:
+    """The progression deep set (round 6, oddsmarkets/common/progression.py): every hitter group's (or the SP / RP
+    groups') headline then secondary metrics, spec order, only ids the catalogues carry."""
+    from oddsmarkets.common import progression as PR
+    groups = list(dict.fromkeys(HIT_GROUP.values())) if kind == "hitter" else ["sp", "rp"]
+    return PR.deep_keys("baseball", groups, have)
+
+
+def prog_placed(r: dict, kind: str, team_games: Any) -> bool:
+    """Placed in the season's peer pool: the spec minimum (200 PA, 300 BF for starters, 120 for relievers) prorated by
+    the season's team games (60 in 2020)."""
+    g = sim_group(r, kind) or ""
+    stat, full = SIM_MIN["hitter"] if kind == "hitter" else SIM_MIN.get(g, SIM_MIN["rp"])
+    tg = an.fnum(team_games)
+    tg = tg if tg else 162.0
+    n = r.get(stat)
+    if n is None:
+        n = (r.get("values") or {}).get(stat)
+    try:
+        return float(n or 0) >= full * min(1.0, tg / 162.0)
+    except (TypeError, ValueError):
+        return False
+
+
 def sim_group(r: dict, kind: str) -> str | None:
     """The spec peer group of a catalogue row: hitters by position (hitters_all when it is unknown), pitchers by role."""
     if kind == "hitter":
@@ -529,12 +553,40 @@ def write_careers(write, cats: dict[tuple, dict], blocks: dict[str, dict], histo
     rows: dict[str, list] = {}
     latest: dict[str, tuple] = {}
     names: dict[str, str] = {}
+    # progression (round 6): the deep set on every MLB season row against that season's position group (hitters) or
+    # role (SP / RP), and data/mlb/progression_ref.json (each season's peer median and middle half)
+    from oddsmarkets.common import progression as PR
+    have: dict[str, set] = {"hitter": set(), "pitcher": set()}
+    for (lvl, s), c in cats.items():
+        if lvl != "mlb":
+            continue
+        for kind, cat in (("hitter", c.get("hitters")), ("pitcher", c.get("pitchers"))):
+            for r in ((cat or {}).get("players") or {}).values():
+                have[kind].update((r.get("values") or {}).keys())
+    pkeys = {kind: prog_keys(kind, have[kind]) for kind in ("hitter", "pitcher")}
+    pb = PR.Builder("baseball", pkeys, dirs={"pitcher": PR.directions("baseball", ["sp", "rp"]),
+                                            "hitter": PR.directions("baseball", list(dict.fromkeys(HIT_GROUP.values())))})
+    lengths: dict[str, int] = {}
+    pkinds: dict[str, set] = {}
     for (lvl, s), c in sorted(cats.items(), key=lambda kv: (kv[0][1], kv[0][0])):
         for kind, cat in (("hitter", c.get("hitters")), ("pitcher", c.get("pitchers"))):
+            tg = (cat or {}).get("team_games")
+            if lvl == "mlb" and tg:
+                lengths[str(s)] = max(lengths.get(str(s), 0), int(tg))
             for pid, r in ((cat or {}).get("players") or {}).items():
-                rows.setdefault(pid, []).append(season_row(lvl, s, kind, r))
+                row = season_row(lvl, s, kind, r)
+                if lvl == "mlb":
+                    # nested as "pr" ({dv, dp, pg}): the season rows already carry "dv" (decision value)
+                    row["pr"] = pb.add(s, kind, sim_group(r, kind), r.get("values") or {}, prog_placed(r, kind, tg), pct=r.get("pct_role"))
+                    pkinds.setdefault(pid, set()).add(kind)
+                rows.setdefault(pid, []).append(row)
                 names[pid] = r.get("name") or names.get(pid)
                 latest[pid] = (lvl, s, kind, r)
+    pb.finish()
+    try:
+        write("mlb/progression_ref.json", pb.reference(lengths=lengths))
+    except Exception:            # noqa: BLE001 - the reference is an extra; the careers still write
+        pass
     hcats = {k: c.get("hitters") for k, c in cats.items()}
     pcats = {k: c.get("pitchers") for k, c in cats.items()}
     hidx = similar_index(hcats, "hitter", SIMILAR_H)
@@ -574,6 +626,8 @@ def write_careers(write, cats: dict[tuple, dict], blocks: dict[str, dict], histo
                    "seasons": rows.get(pid, []), "history": ({**h, "cols": {"batting": _hist_cols("batting"), "pitching": _hist_cols("pitching")}}
                                                            if h else None),
                    "current": cur, "similar": sim, "movement": moves.get(pid), "updated_at": an.now()}
+        if pkinds.get(pid):
+            payload["prog"] = {"v": PR.VERSION, "keys": {kd: pkeys[kd] for kd in sorted(pkinds[pid])}}
         if h:
             from oddsmarkets.baseball.analytics.history import notice_meta
             payload["meta"] = notice_meta()

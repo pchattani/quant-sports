@@ -235,7 +235,7 @@ R_home += K * (S_h - E_h);  R_away += K * ((1 - S_h) - (1 - E_h))
 
 **How each build uses Elo.**
 - **Leagues** (`build_model`): seeded from last season's final table in `league/data/seasons.json` (`previous_rank`). Clubs missing from it (promoted clubs) are seeded at rank `n_teams`, the bottom. The whole training frame is then replayed with `tournament_type="league"` and `neutral=False`.
-- **Argentina** (`scripts/build_site_liga.py`): seeded from `previous_anual_rank` in `liga/data/season_meta.json`, falling back to the order of the state's team list. Replayed the same way as the leagues.
+- **Argentina** (`scripts/build_site_liga.py`): seeded from `previous_anual_rank` in `liga/data/season_meta.json` when that file exists (it never has), else from last year's Tabla Anual rebuilt from the past results (`liga/tables.py` `previous_rank`, since 28 October 2026; the team list's alphabetical order before). Replayed the same way as the leagues. Every club is in the Dixon-Coles fit, so the ensemble's Elo weight is 0 and the seed moves only the Elo shown on the Power tab.
 - **Cups** (`build_cup`): `EloRatings(k_league=20, home_advantage=50.0)` with **no seeding and no updates**, so every club is at 1500. This matters only in the fallback described in section 4.
 - **Internationals** (`fit_international`): no seeding. Every national-team match is replayed with K = 20 (`"league"`), HA = 50, and the row's `neutral` flag. Friendlies count in full here; the half weight applies only to DC.
 - **World Cup**: see section 12.3.
@@ -394,7 +394,7 @@ A league whose method is `pooled` uses `LeagueView` over the build's pooled fit,
 
 ### 5.3 `scripts/backfill_liga_history.py`
 
-This is a local-only Sofascore job, not a model. It writes the inputs the Argentine model cannot derive, into `oddsmarkets/football/competitions/liga/data/`:
+Never run; since 28 October 2026 the build no longer needs it: the promedio history comes from Sofascore's promedios table in the store, else the past results (`liga/tables.py`, section 8.3), and the Apertura champion from the final in the store. A committed `promedios_history.json` would still take precedence. This is a local-only Sofascore job, not a model. It writes the inputs the Argentine model cannot derive, into `oddsmarkets/football/competitions/liga/data/`:
 - `promedios_history.json`: accumulated points and matches per club for the seasons before the current one, over the `promedio_seasons = 3` window.
 - `season_meta.json`: the Apertura champion and the previous Tabla Anual order, which seeds Elo.
 - `history_matches.csv`: a multi-season DC training set with per-match xG, capped by `--xg-cap` (default 1200).
@@ -565,6 +565,13 @@ Points quantiles (`p05/p50/p95`) come only from the first chunk's first 2,000 si
 
 The format is in `LigaConfig` (`liga/config.py`, 2026): 30 clubs in zones A and B of 15. Each club plays 16 matches per tournament (14 in its zone plus 2 interzone).
 
+**Inputs (since 28 October 2026).**
+- **Dead fixtures.** Sofascore re-lists a postponed match under a new id and keeps the old one "postponed" for good (2026 Apertura: eight, all replayed). `liga/store.py` `drop_dead_fixtures` drops a fixture whose two clubs already played in the same round of the same tournament, and every zone-phase fixture after the tournament's final; superseded copies (`superseded_by`) are skipped. Before, those eight kept the Apertura "incomplete", so the Tabla Anual, the promedios and every berth were computed from the Clausura alone (every club on 0 Tabla Anual points on the site).
+- **Champions** from a played final in the store (`champion_from_final`: the score, else the stored shoot-out `winner` or `pens`).
+- **Promedio history** (`liga/tables.py` `promedio_prior`): Sofascore's "Promedios" table minus its "Anual" table from the same standings answer (the fetcher stores it at most every six hours from its own budget of 100), which is exact; else the past results in `docs/site/data/past/store.json` (the 2024 Liga Profesional and both 2025 tournaments), which lack the 2024 Copa de la Liga (14 matches a club) and are labelled approximate. `relegation.json` `prior` says which.
+- **Copa Argentina winner.** Drawn in every simulated season from the cup's own simulated winners (this run's `build_cup`, else the cup's last `bracket.json` `p_cup`; `copa_dist`), so its Libertadores place is inside the berths; a winner from outside the league takes no league place. `cfg.copa_argentina_winner` still overrides.
+- **Validation.** The 2025 Tabla Anual rebuilt from both tournaments' zone-phase results equals Sofascore's "Anual 2025" table for all 30 clubs (positions, points, matches), which fixes the tiebreak order: points, goal difference, goals for. `anual.json` and `relegation.json` carry `official`, the comparison with Sofascore's 2026 tables once stored. See `docs/research/argentina_audit.md`.
+
 **Process.**
 - **Zone phase.** Only the live tournament's remaining fixtures are simulated. Each zone is ranked by (pts, gd, gf, lots), and the top 8 per zone qualify.
 - **Playoffs.** Single-leg octavos, cuartos, semis and final on a **fixed tree**, `PLAYOFF_PAIRINGS` (A1-B8, A4-B5, A2-B7, A3-B6, B1-A8, B4-A5, B2-A7, B3-A6), with adjacent slots feeding the next round. The better zone rank hosts; when the zone ranks are equal, the left slot hosts. The final is neutral (`final_at_neutral_venue`). Played ties are forced by `"<round>:<slot>"`, not by pair.
@@ -575,7 +582,8 @@ The format is in `LigaConfig` (`liga/config.py`, 2026): 30 clubs in zones A and 
 - **Relegation (2 places):**
   - Promedio = (prior points + Tabla Anual points) / (prior matches + season matches). The prior comes from `promedios_history.json`. The season-matches denominator counts matches played and still to play, and is constant across simulations.
   - The worst promedio goes down. The last club in the Tabla Anual goes down second. If both are the same club, the next-worst promedio goes instead and is counted as a promedio relegation.
-- **Outputs:** `p_zone_position`, `p_top8`, `p_reach`, `p_title`, `p_anual_*`, `p_libertadores`, `p_sudamericana`, `p_relegation_{promedio,anual,any}`, and promedio quantiles. These go to `zones.json`, `bracket.json`, `anual.json`, `relegation.json`, `probs.json` and `history.json`, under both `docs/liga/data/` and `docs/site/data/liga-argentina/`.
+- **Stakes** (as the leagues, section 8.2): the next zone-phase fixtures within seven days (at most 15) split the same seasons by result; metrics the top of the Tabla Anual, Libertadores, Sudamericana, relegation (either route) and a playoff place (`probs.json` `stakes`).
+- **Outputs:** `p_zone_position`, `p_top8`, `p_reach`, `p_title`, `p_anual_*`, `p_libertadores`, `p_sudamericana`, `p_relegation_{promedio,anual,any}`, and promedio quantiles. These go to `zones.json`, `bracket.json`, `anual.json` (the Tabla Anual as it stands: the finished Apertura plus the Clausura so far, with the projections), `relegation.json`, `probs.json` (with the leagues' `bands` and `stakes`), `table.json` (the Tabla Anual in the leagues' shape for the Race tab: bands Libertadores = top 3, the places that guarantee it whatever the champions do; Libertadores or Sudamericana = top 9; relegation = last, with the either-route chance) and `history.json` (with the daily race log), under `docs/site/data/liga-argentina/` (and `docs/liga/data/` when the old standalone build runs).
 
 ### 8.4 Cup simulator: `oddsmarkets/football/competitions/cup/simulator.py`
 

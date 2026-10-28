@@ -250,8 +250,9 @@ U.pctGroups = (row, kind, setKey, gl, which, teamGames, prev) => {
   })).filter(g => g.rows.length);
 };
 /* "How sure are we?" at the top of a Model page (kit v4: "We say it. Then we check it."): <L>/calibration.json read with QK.calib.find, rendered with
-   QK.howSure into a section put first in el; nothing is shown when the level has no game backtest (Triple-A today). */
-U.howSureTop = (el, L) => {
+   QK.howSure into a section put first in el; nothing is shown when the level has no game backtest (Triple-A today).
+   o.doing (round 6, the "How we're doing" tab): QK.doing instead, our recent record (index.json digest.record) over the same chart. */
+U.howSureTop = (el, L, o) => {
   if (!el) return;
   const box = document.createElement('section');
   box.className = 'qk-section bp-sure';
@@ -261,6 +262,12 @@ U.howSureTop = (el, L) => {
     if (!BP.ok(cj) || !QK.calib.find(cj) || !box.isConnected) return;
     const ss = Object.keys((cj.games || {}).seasons || {}).sort();
     box.hidden = false;
+    if (o && o.doing && QK.doing) {
+      const idx = BP.index() || {}, dig = L === 'mlb' ? idx.digest : ((BP.levelInfo(L) || {}).digest);
+      QK.doing(box, { record: (dig || {}).record || null, calibration: cj, league: BP.levelName(L), span: ss.length ? ss[0] + ' to ' + ss[ss.length - 1] : '', subject: 'the home team',
+        sub: 'Our favourites’ record over the last week, then every pre-game forecast since ' + (ss[0] || 'the first season') + ', made walk-forward from what was known before the first pitch, grouped by our chance for the home team. When the two match, our numbers mean what they say.' });
+      return;
+    }
     box.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every pre-game forecast since ' + (ss[0] || 'the first season') + ', made walk-forward from what was known before the first pitch, grouped by our chance for the home team, against how often the home team won. When the two bars match, our numbers mean what they say.' }) + '<div></div>';
     QK.howSure(box.lastChild, { calibration: cj, league: BP.levelName(L), span: ss.length ? ss[0] + ' to ' + ss[ss.length - 1] : '', subject: 'the home team' });
   });

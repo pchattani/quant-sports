@@ -102,7 +102,7 @@ U.game = (c, o) => {
     sport: 'hockey', id: c.game_id || c.id, start: c.start || c.date, status: st,
     league: pg && pg.playoff ? RK.roundName(pg.round) + (pg.game ? ' · Game ' + pg.game : '') : (o.league || 'NHL'),
     home: U.team(c.home), away: U.team(c.away), hs: isNum(c.hs) ? Number(c.hs) : null, as: isNum(c.as) ? Number(c.as) : null,
-    p_home: p, market_home: mk && isNum(mk.p_home) ? Number(mk.p_home) : null, note: note,
+    p_home: p, market_home: mk && isNum(mk.p_home) ? Number(mk.p_home) : null, market_src: mk && mk.sources ? RK.srcLabel(mk.sources) : null, note: note,
     /* v3: live, the kit reads the live chance and keeps our pre-game call for "before the start we had ..." */
     p_pre: live && isNum(m.p_home) ? Number(m.p_home) : null, pre_only: live && !isNum(c.wp_home) ? true : undefined,
     period: isNum(c.period) ? Number(c.period) : null, clock: c.clock, href: RK.gameHref(c.game_id || c.id),
@@ -359,8 +359,9 @@ U.gameV2 = (c, o, rows) => {
   g.home.record = rec(c.home); g.away.record = rec(c.away);
   return g;
 };
-/* v3: no market on cards (kit default market: false); `why` adds the italic one-line reason (QK.whyLine). */
-U.gc = (c, o, rows, why) => QK.gameCard(U.gameV2(c, o, rows), { sport: false, why: why === undefined ? false : why });
+/* Round 6: the market sits quietly under our chance (market: 'quiet', before the start only, the source on hover);
+   `why` adds the italic one-line reason (QK.whyLine). */
+U.gc = (c, o, rows, why) => QK.gameCard(U.gameV2(c, o, rows), { sport: false, market: 'quiet', why: why === undefined ? false : why });
 U.head = o => QK.sectionHead(Object.assign({ kicker: 'NHL · ' + RK.seasonLabel(RK.state.season || RK.currentSeason()) }, o));
 
 })(window.RK);

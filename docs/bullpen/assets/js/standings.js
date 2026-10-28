@@ -263,7 +263,7 @@ function render(el, params) {
     if (rdb) tiles.push({ label: 'Best run differential', value: BP.teamAbbr(rdb.tid) + ' ' + BP.ui.signed(rdb.rd, 0), sub: rdb.rs + ' scored, ' + rdb.ra + ' allowed', href: BP.teamHref(rdb.tid, L, S) });
     if (lk) tiles.push({ label: 'Luckiest', value: BP.teamAbbr(lk.r.tid) + ' ' + BP.ui.signed(lk.v, 1), sub: 'wins above the Pythagorean record', href: BP.teamHref(lk.r.tid, L, S) });
     body.innerHTML = (tiles.length ? '<div class="bp-kpis">' + QK.stats(tiles) + '</div>' : '') + '<div class="toggle-row std-tabs" id="std-tabs">' + BP.toggles([{ key: 'div', label: 'Divisions' }, { key: 'wc', label: 'Wild card' }, { key: 'rt', label: 'Ratings and luck' }], VIEW, 'data-v') + '</div>' +
-      '<div id="std-view"></div>' + (LO ? '<div id="std-race"></div><div id="std-shape"></div>' : '') +
+      '<div id="std-view"></div>' + (LO ? '<div id="std-race"></div>' : '') + (window.QKL && QKL.leaders ? '<div id="std-perf"></div>' : '') + (LO ? '<div id="std-shape"></div>' : '') +
       '<div class="section-note">' + (res.fallback ? 'Computed from the final regular-season games while the season payload is built; our chances and expected records arrive with it. ' : '') +
       'Chances: ' + (d.sim && (d.sim.n_sims || d.sim.sims) ? BP.int(d.sim.n_sims || d.sim.sims) + ' ' : '') + 'simulations of the rest of the season and the bracket from our team ratings (x: clinched a place, y: the division, z: the division and a bye, e: eliminated). ' +
       'Pythagorean records use exponent 1.83. Magic numbers count wins plus division-rival losses to clinch.</div>';
@@ -274,7 +274,27 @@ function render(el, params) {
       if ((LO.league.metrics || []).length) QKL.race(document.getElementById('std-race'), LO);
       QKL.shape(document.getElementById('std-shape'), LO);
     }
+    if (window.QKL && QKL.leaders) performers(document.getElementById('std-perf'), res.fallback ? null : d, L, S);
     BP.setMeta(d.updated_at ? 'Season data ' + esc(BP.fmtStamp(d.updated_at)) : '');
+  });
+}
+
+/* Top and bottom performers (QKL.leaders): all hitters, each fielding position, starters and relievers on their spec
+   headline sets with WAR (our model) first (data/<L>/<S>/performers.json, oddsmarkets/baseball/analytics/performers.py:
+   the spec's minimums prorated by team games), then the clubs on the league block's team set (season.json, loaded). */
+function performers(host, d, L, S) {
+  if (!host) return;
+  const lg = d && d.league;
+  BP.loadYear('performers.json', L, S).then(pf => {
+    if (!host.isConnected) return;
+    const views = ((BP.ok(pf) && pf.views) || []).slice();
+    const tv = lg ? QKL.teamView(lg, { label: 'Clubs', peer: 'clubs', ours: 'Team rating model', name: t => BP.teamName(t) }) : null;
+    if (tv) views.push(tv);
+    QKL.leaders(host, { data: { views: views }, title: 'Who leads ' + (L === 'aaa' ? 'Triple-A' : 'the majors') + ', and who is struggling',
+      sub: 'The top five and the bottom five on each key number: all hitters, every position, starters and relievers, with WAR (our model) first and then the numbers that matter for each role, and the clubs. Qualified players only; each name opens the player page.',
+      team: t => (BP.teamInfo(t).placeholder ? null : { abbr: BP.teamAbbr(t), name: BP.teamName(t), colour: BP.teamColourRaw(t), href: BP.teamHref(t, L, S) }),
+      href: (id, V) => BP.playerHref(id, { role: V.kind === 'pitcher' ? 'pitcher' : 'hitter', level: L, season: S }),
+      empty: 'The boards fill once players reach the spec’s minimums (200 plate appearances, 300 batters faced for starters and 120 for relievers over a full season, prorated).' });
   });
 }
 

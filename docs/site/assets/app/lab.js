@@ -456,7 +456,8 @@ FB.route('compare', function (el, p) {
   var noun = kind === 'players' ? 'player' : 'club';
   var keep = function (extra) { return FB.qs(FB.merge({ p3: c3 || null, view: classic ? 'classic' : null, scope: q0.scope || null }, extra || {})); };
   var viewTabs = kind === 'players' && a && b && a !== '_' ? FB.subnav([['#/compare/players/' + esc(a) + '/' + esc(b) + keep({ view: null }), 'Side by side', 'v2'],
-    ['#/compare/players/' + esc(a) + '/' + esc(b) + keep({ view: 'classic', p3: null }), 'Every metric (classic)', 'classic']], classic ? 'classic' : 'v2', 'Comparison view') : '';
+    ['#/compare/players/' + esc(a) + '/' + esc(b) + keep({ view: 'classic', p3: null }), 'Every metric (classic)', 'classic'],
+    ['#/compare/progression/' + [a, b, c3].filter(function (x) { return x && x !== '_'; }).map(function (x) { return esc(String(x).split(':').pop()); }).join('/') + (q0.scope === 'intl' ? '?scope=intl' : ''), 'Career progression', 'prog']], classic ? 'classic' : 'v2', 'Comparison view') : '';
   el.innerHTML = FB.pageHead('Lab', kind === 'players' ? 'Compare players' : 'Compare clubs',
       kind === 'players' ? 'Two or three players from any competition, side by side on the metrics that best describe and predict their play, ranked against their own position group.' : 'Two clubs from any competition, side by side: our chance if they met, the tale of the tape, style, form, season chances and year by year.') +
     subnav(kind) +

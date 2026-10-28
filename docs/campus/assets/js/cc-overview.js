@@ -3,21 +3,26 @@
  *   1. the intro band: what the site covers and how to use it, with three quick links (Games, Standings, Players);
  *   2. "This week in <level>": the stage of the season, then the top lines from index.json levels.<L>.digest
  *      (oddsmarkets/college/site.py level_digest, on oddsmarkets/common/digest.py): the biggest movers in our playoff
- *      (CFB) or tournament (basketball) chance, the upset of the week, the team of the week, our record this week;
+ *      (CFB) or tournament (basketball) chance, the upset of the week, the team of the week;
  *      on a thin week the title favourite, the top-rated team and AP No. 1; the other games that matter;
  *   3. the game that matters most on the shared significance rule (digest.featured, oddsmarkets/common/featured.py:
  *      the level, AP ranks, the stage, the stakes in our simulation, the start time and hour; closeness only a small
  *      bonus) as the diagonal split hero, labelled "Live now", "Tonight" (only when it truly is tonight in the
  *      reader's time), "Today", "Tomorrow" or the weekday; with nothing big on, the title race leads instead;
- *   4. "N games. Our calls." (the big games first, in the same significance order); the black power list from the
- *      season leaders; "We say it. Then we check it." beside "Who's for real?" (win % against our rating); "What's
- *      that number?"; the title race (ours only: no market on the overview), power ratings with one standard error,
+ *   4. "N games. Our calls." (the big games first, in the same significance order; the market small and grey beside
+ *      our chance, market 'quiet'); the black power list from the season leaders; round 6, the fan stories: "Biggest
+ *      surprise" (the largest rating rises and the biggest fall since the first weekend, from season.json
+ *      rating_paths) and "Best player nobody talks about" (QK.spotlight: the highest value-model player on a team
+ *      outside the AP top 25 and our top 40, from value.json); "Who's for real?" (win % against our rating); "What's
+ *      that number?"; the title race (ours only), power ratings with one standard error,
  *      AP poll v our ranking, the CFP picture (cfb) or bracketology / the bracket (basketball); the leaders.
  *   A past season keeps the "looking back" greeting, its champion tiles and the last postseason games.
- * Reads index.json, <L>/<S>/season.json, <L>/<S>/cfp.json | bracket.json, <L>/history.json, <L>/calibration.json,
+ * Our record and the calibration chart are on the Model page's "How we're doing" tab (?tab=calibration).
+ * Reads index.json, <L>/<S>/season.json, <L>/<S>/cfp.json | bracket.json, <L>/history.json,
  * <L>/<S>/schedule.json (past seasons), then <L>/<S>/value.json (lazy). */
 (function (CC) {
 'use strict';
+var progHref = function (h) { return h + (h.indexOf('?') >= 0 ? '&' : '?') + 'view=progression'; };   /* the player's Progression tab (round 6) */
 var U = CC.ui, esc = CC.esc, isNum = CC.isNum;
 
 function dataTable(cols, rows, label) {
@@ -86,14 +91,9 @@ function reasonsWhy(L, r, c, sim) {
   if (!lead && !nums) return '';
   return lead ? lead.charAt(0).toUpperCase() + lead.slice(1) + (nums ? ': ' + nums : '') + '.' : nums.charAt(0).toUpperCase() + nums.slice(1) + '.';
 }
-/* Under the hero: why we picked it, then how sure we are. */
+/* Under the hero: why we picked it (round 6: no "How sure are we?" line on the overview). */
 function heroNote(g, why) {
-  var p = g.p_home, sure = '';
-  if (g.status !== 'live' && isNum(p)) {
-    var fav = p >= 0.5 ? g.home : g.away, other = p >= 0.5 ? g.away : g.home, pf = Math.max(p, 1 - p), miss = Math.max(1, Math.round(10 * (1 - pf)));
-    sure = ' <b>How sure are we?</b> ' + CC.pct(pf) + ' for ' + esc(fav.name) + ' means ' + esc(other.name) + ' win a game like this about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.';
-  }
-  return why ? '<b>Why this game?</b> ' + esc(why) + sure : (sure ? sure.slice(1) : undefined);
+  return why ? '<b>Why this game?</b> ' + esc(why) : false;
 }
 var PHASE_LINE = { conf_champ: 'Conference championship week: the title games decide the automatic places in the playoff.', bowls: 'Bowl season, then the playoff rounds.',
   playoff: 'The College Football Playoff: twelve teams, one champion.', conf_tourneys: 'Conference tournament week: automatic bids on the line before Selection Sunday.',
@@ -123,12 +123,6 @@ function weekTiles(L, S, info, dig, feat, sim) {
   var h = dig.hot;
   if (h) T.push({ label: 'Team of the week', value: CC.tabbr(L, h.key) + ' ' + h.w + '–' + h.l, href: CC.teamHref(L, h.key, S),
     sub: CC.tname(L, h.key) + ': ' + h.w + ' win' + (h.w === 1 ? '' : 's') + ' in ' + h.gp + ' games, ' + (h.margin >= 0 ? '+' : '−') + Math.abs(Math.round(h.margin)) + ' points overall.' });
-  var r = dig.record;
-  if (r) {
-    var diff = r.won - r.expected;
-    T.push({ label: 'Our record this week', value: r.won + ' of ' + r.n, href: CC.href(L, 'model', null, null, 'tab=calibration'),
-      sub: 'Our favourites won ' + r.won + ' of ' + r.n + '; we expected ' + QK.fmt.num(r.expected, 0) + '. ' + (Math.abs(diff) < 2 ? 'Right on our numbers.' : diff > 0 ? 'A good week for the favourites.' : 'A week of upsets: a 60% call still misses 4 times in 10.') });
-  }
   /* a thin week (preseason, a one-game week): the title favourite, the top-rated team and AP No. 1 fill in */
   var t0 = (info.title_odds || [])[0];
   if (T.length < 4 && t0 && !(mv && mv.metric === 'p_title')) T.unshift({ label: 'Title favourite', value: CC.tabbr(L, t0.team) + ' ' + CC.pct(t0.p), href: CC.teamHref(L, t0.team, S), signal: true,
@@ -305,11 +299,13 @@ CC.route('overview', function (el, p) {
     }
     html += isCur ? W.html : pastGames(L, S, a[3]);
     html += '<div id="ov-hot"></div>';
-    /* v4: "We say it. Then we check it." beside "Who's for real?" (rating against win %), then "What's that number?" */
-    html += '<section class="qk-section qk-g75"><div><div id="ov-sure-h"></div><div id="ov-sure"></div></div>' +
-      '<div class="cc-ov-real">' + QK.sectionHead({ kicker: 'Who’s for real?', title: 'Results v chances', sub: 'Teams top-left are winning more than their rating suggests; bottom-right, the reverse. A soft schedule, luck, or something real?' }) +
-      '<div class="qk-card"><div class="qk-card-body"><div id="ov-luck" class="qk-chart" role="img" aria-label="Win percentage against our rating, every team"></div><p class="qk-caption" id="ov-luck-cap"></p></div></div></div></section>';
-    html += '<section class="qk-section">' + QK.newHere({ items: [QK.NEW_HERE[0], fb ? 'A <b>rating</b> is points better than an average FBS team on a neutral field: +14 is two touchdowns better.' : 'A <b>rating</b> is points per 100 possessions better than an average Division I team.', 'Every forecast is checked against what happened. <a class="qk-link" href="' + esc(CC.href(L, 'model', null, null, 'tab=calibration')) + '">The record is on the Model page.</a>'] }) + '</section>';
+    /* round 6: the fan stories (filled after the page draws), then "Who's for real?" (rating against win %) and "What's
+       that number?" */
+    if (isCur) html += '<section class="qk-section" id="ov-surprise"></section><section class="qk-section" id="ov-spot"></section>';
+    html += '<section class="qk-section cc-ov-real">' + QK.sectionHead({ kicker: 'Who’s for real?', title: 'Results v chances', sub: 'Teams top-left are winning more than their rating suggests; bottom-right, the reverse. A soft schedule, luck, or something real?' }) +
+      '<div class="qk-card"><div class="qk-card-body"><div id="ov-luck" class="qk-chart" style="--h:440px" role="img" aria-label="Win percentage against our rating, every team"></div><p class="qk-caption" id="ov-luck-cap"></p></div></div></section>';
+    html += '<section class="qk-section">' + QK.newHere({ items: [QK.NEW_HERE[0], fb ? 'A <b>rating</b> is points better than an average FBS team on a neutral field: +14 is two touchdowns better.' : 'A <b>rating</b> is points per 100 possessions better than an average Division I team.',
+      'A player’s <b>value</b> is what they add over a replacement-level player at the same position. Compare it within a position.'] }) + '</section>';
     var top = power.slice(0, 25);
     var grid = '<div class="qk-grid cc-grid">';
     if (titleRows.length) grid += '<div class="qk-span-5">' + U.card('National title chances', 'Our chance of winning it all' + (nSims ? ', from ' + QK.fmt.num(nSims) + ' simulated seasons' : '') + ', in team colours.',
@@ -328,10 +324,11 @@ CC.route('overview', function (el, p) {
     grid += '<div class="qk-span-' + (ap.length ? 6 : 12) + '" id="ov-post"></div></div>';
     html += U.section(isCur ? (fb ? 'Who wins the national title?' : 'Who cuts down the nets?') : 'The season in numbers', isCur ? '<span id="ov-title-lede">Our chances from simulating the rest of the season, the ratings behind them and how they compare with the polls.</span>' : '', grid, '', isCur ? 'Title race' : 'Season');
     html += '<div id="ov-leaders"></div>';
+    html += '<p class="qk-sub cc-ov-doing" style="margin-top:var(--sp-8)"><a class="qk-link" href="' + esc(CC.href(L, 'model', null, null, 'tab=calibration')) + '">How we’re doing →</a> Our recent record and how often our chances came true.</p>';
     el.innerHTML = html;
     U.wire(el);
     if (isCur) drawWatch(el, L, W, G);
-    howSure(L, QK.$('#ov-sure', el), QK.$('#ov-sure-h', el));
+    if (isCur) { surprises(L, S, season, power, ap, rec, QK.$('#ov-surprise', el)); unsung(L, S, season, power, ap, QK.$('#ov-spot', el)); }
     realOrNot(L, S, season, ap, QK.$('#ov-luck', el), QK.$('#ov-luck-cap', el));
     if (titleRows.length) {
       QK.$('#ov-title', el).innerHTML = QK.chances(titleRows.map(function (r) { return { label: CC.tshort(L, r.team), p: r.p, href: CC.teamHref(L, r.team, S), color: CC.traw(L, r.team), mark: U.mark(L, r.team) }; }), { key: false }) +
@@ -385,19 +382,53 @@ function leaders(L, S, season, node, hotNode) {
   });
 }
 
-/* We say it. Then we check it.: the game model's walk-forward record (QK.howSure: the big numbers over the we-said /
-   it-happened bars); the full record is on the Model page. Shown only when the level's calibration.json is there
-   (CC.calib reads the kit's shape and the builder's own). */
-function howSure(L, box, hd) {
-  if (!box) return;
-  CC.load(CC.lpath(L, 'calibration.json')).then(function (cj) {
-    if (!U.alive(box)) return;
-    var cb = CC.calib(cj);
-    if (!cb || !cb.bins.length) { box.innerHTML = ''; if (hd) hd.innerHTML = ''; return; }
-    var yrs = ((cj && cj.seasons) || []).filter(isNum);
-    if (hd) hd.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every ' + CC.LSHORT[L] + ' game we have forecast, each with only the games before it, grouped by the chance we gave the home team. When the two lines match, our numbers mean what they say.',
-      actions: '<a class="qk-more" href="' + esc(CC.href(L, 'model', null, null, 'tab=calibration')) + '">The full record</a>' });
-    QK.howSure(box, { bins: cb.bins, brier: cb.brier, n: cb.n, league: CC.LSHORT[L], span: yrs.length ? CC.seasonLabel(L, yrs[0]) + ' to ' + CC.seasonLabel(L, yrs[yrs.length - 1]) : '', subject: 'the home team' });
+/* Round 6, "Biggest surprise": the largest rating rises since the first weekend and the biggest fall (season.json
+   rating_paths: our rating after each week's games; the first point is after the first weekend, so it already has
+   that weekend's results). Teams with four or more points on the path; ranks are among those teams on each date. */
+function surprises(L, S, season, power, ap, rec, node) {
+  if (!node) return;
+  var fb = CC.fb(L), P = season.rating_paths || {};
+  var ids = Object.keys(P).filter(function (t) { var tm = CC.team(L, t); return (P[t] || []).length >= 4 && (!tm || tm.member !== false); });
+  if (ids.length < 20) { node.hidden = true; return; }
+  var first = function (t) { return P[t][0][1]; }, last = function (t) { return P[t][P[t].length - 1][1]; };
+  var rank0 = {}, rank1 = {};
+  ids.slice().sort(function (a, b) { return first(b) - first(a); }).forEach(function (t, i) { rank0[t] = i + 1; });
+  ids.slice().sort(function (a, b) { return last(b) - last(a); }).forEach(function (t, i) { rank1[t] = i + 1; });
+  var byD = ids.slice().sort(function (a, b) { return (last(b) - first(b)) - (last(a) - first(a)); });
+  var picks = [[byD[0], 'Biggest surprise'], [byD[1], 'Rising fast'], [byD[byD.length - 1], 'Biggest fall']].filter(function (x) { return x[0] && Math.abs(last(x[0]) - first(x[0])) >= 3; });
+  if (!picks.length) { node.hidden = true; return; }
+  var N = ids.length, pos = function (r) { return 100 * (1 - (r - 1) / Math.max(1, N - 1)); };
+  var d0 = P[picks[0][0]][0][0], unit = fb ? 'points' : 'points per 100';
+  node.innerHTML = QK.sectionHead({ kicker: 'Biggest surprise', title: 'Who nobody saw coming', sub: 'The biggest moves in our rating since the first weekend (' + day(d0) + '), up and down. The line is the rating week by week; the track is the rank among ' + N + ' teams.',
+    actions: '<a class="qk-more" href="' + esc(CC.href(L, 'teams', null, S)) + '">Every team</a>' }) +
+    QK.storyCards(picks.map(function (x) {
+      var t = x[0], dlt = last(t) - first(t), tm = CC.team(L, t) || {};
+      return { kicker: x[1], name: tm.name || CC.tname(L, t), sub: [rec[t] || '', 'No. ' + rank1[t] + ' in our ratings'].filter(Boolean).join(' · '), href: CC.teamHref(L, t, S), sport: 'college',
+        colour: CC.traw(L, t), mark: U.mark(L, t), value: CC.signed(dlt, 1), unit: unit + ' of rating',
+        from: { label: day(P[t][0][0]), value: 'No. ' + rank0[t], pos: pos(rank0[t]) }, to: { label: 'Now', value: 'No. ' + rank1[t], pos: pos(rank1[t]) },
+        spark: P[t].map(function (p) { return p[1]; }), sparkLabel: 'Our rating, week by week',
+        text: 'Rated ' + CC.signed(first(t), 1) + ' after the first weekend, ' + CC.signed(last(t), 1) + ' now' + (rec[t] ? ', at ' + rec[t] : '') + '. ' + (fb ? 'A point of rating is a point better than an average FBS team on a neutral field.' : 'A point of rating is a point per 100 possessions better than an average team.') };
+    }), { cols: 3 });
+}
+/* Round 6, "Best player nobody talks about": the highest value-model player (value.json leaders) on a team outside the
+   AP top 25 and our top 40, and not in the top three of any season leaderboard (the power list already shows those). */
+function unsung(L, S, season, power, ap, node) {
+  if (!node) return;
+  CC.load(CC.path(L, S, 'value.json')).then(function (v) {
+    if (!U.alive(node)) return;
+    var rows = (CC.ok(v) && v.leaders) || [];
+    var inAp = {}; (ap || []).slice(0, 25).forEach(function (r) { inAp[String(r.team)] = 1; });
+    var pr = {}; (power || []).forEach(function (r, i) { pr[String(r.team)] = r.rank || i + 1; });
+    var lead = {}, LD = season.leaders || {}; Object.keys(LD).forEach(function (k) { (LD[k] || []).slice(0, 3).forEach(function (x) { lead[String(x[0])] = 1; }); });
+    var x = rows.filter(function (r) { return r && r.id && isNum(r.value) && !inAp[String(r.team)] && !lead[String(r.id)] && (pr[String(r.team)] || 999) > 40 && (r.gp || 0) >= 4; })[0];
+    if (!x) { node.hidden = true; return; }
+    var all = rows.filter(function (r) { return isNum(r.value); }), at = all.indexOf(x) + 1;
+    var samePos = all.filter(function (r) { return r.pos === x.pos; }), posRank = samePos.indexOf(x) + 1;
+    var tm = CC.team(L, x.team) || {}, cur = (v.currency || {}).label || 'Value above replacement';
+    node.innerHTML = QK.spotlight({ kicker: 'Best player nobody talks about', name: x.name, sub: [CC.tshort(L, x.team), x.pos, x.class].filter(Boolean).join(' · '), team: { colour: tm.colour, abbr: tm.abbr },
+      href: CC.playerHref(L, x.id, S), headline: 'No. ' + at + ' in our value model' + (posRank ? ' (No. ' + posRank + ' at ' + x.pos + ')' : '') + ', on a team outside the AP top 25 and No. ' + (pr[String(x.team)] || '—') + ' in our ratings.',
+      stats: [{ label: cur, value: CC.f(x.value, 1) }, { label: 'Per game', value: CC.f(x.value_pg, 1) }, { label: 'Percentile, all players', value: isNum(x.pctl) ? QK.ordinal(Math.round(x.pctl)) : '—' }, { label: 'Games', value: String(x.gp || '—') }],
+      text: x.why || '', links: [{ href: CC.playerHref(L, x.id, S), text: 'Player page' }, { href: progHref(CC.playerHref(L, x.id, S)), text: 'Progression' }, { href: CC.teamHref(L, x.team, S), text: CC.tshort(L, x.team) }] });
   });
 }
 

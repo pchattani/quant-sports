@@ -191,7 +191,9 @@ raise SystemExit(b.main())
 # inspection; scratchpad headless-Chrome runs check the rendering.
 
 APP_DIR = SITE / "assets" / "app"
-APP_MODULES = ["core", "charts", "overview", "matches", "race", "competition", "clubs", "players", "value", "fantasy", "lab", "model", "boot"]
+# qk-progview (the progression pages' layout, on the kit's qk/progression.js) loads before core; progression after lab
+APP_MODULES = ["qk-progview", "core", "charts", "overview", "matches", "race", "competition", "clubs", "players", "value", "fantasy", "lab",
+               "progression", "model", "boot"]
 
 
 def _js() -> str:

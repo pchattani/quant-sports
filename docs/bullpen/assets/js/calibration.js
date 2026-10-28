@@ -138,7 +138,7 @@ function render(el, params, state) {
     h += '<div class="grid-2"><div class="card"><div class="card-header">Projection error <span class="card-sub">Weighted RMSE of next-season projections against a Marcel-style baseline; gain = 1 − ours/baseline.</span></div><div id="cal-proj"></div></div>' +
       '<div class="card"><div class="card-header">Framing and fielding against Savant <span class="card-sub">Our framing runs and fielding runs against Savant\'s published leaderboards.</span></div><div id="cal-ext"></div></div></div>';
     el.innerHTML = h;
-    BP.ui.howSureTop(el, L);
+    BP.ui.howSureTop(el, L, { doing: true });
     const pick = v => { if (v === 'all') return P; if (v === 'mkt') return V; const s = (G.seasons || {})[v.slice(1)] || {}; return v.charAt(0) === 'm' ? (s.vs_market || {}) : s; };
     const drawT = v => { const src = pick(v); document.getElementById('cal-table').innerHTML = scoreTable(src, ORDER.filter(m => src[m])); };
     drawT('all');

@@ -131,9 +131,12 @@ Names above are kept; additions and the exact shapes the front end reads:
   1917-18, titles [[club, n]], season_leaders {season: {key: {label, id, name, team, value}}}, league [{season, label, games,
   goals_pg (per team-game, shootout winners out), shots_pg, xg_pg, sv_pct, sh_pct, pp_pct, pk_pct, pen_pg, ot_share,
   so_share, home_win, source}] (seasons on disk; league_cols lists them), seasons (stats REST list)}.
+- **progression_ref.json** (round 6): each season's qualified peers per group (forwards, defence, goalies): n and
+  [p10, p25, p50, p75, p90] per deep metric, `len` = team games; the progression tab's band and median.
 - **players/<pid>.json**: also `number`, `kind` ("skater"/"goalie"), `updated_at`; seasons [{season, team, teams, pos, age,
   qualified, values, plus (100 + 10 z in the season's qualified pool at the position), source ("stats" for stats-REST-only
-  rows)}]; current {season, kind, log {cols, rows}, shots {grid, att, xg, g, points [[x, y, xg, goal]] (≤ 400), point_cols}
+  rows), dv / dp / pg (round 6 progression: the deep set's values and position-group percentiles aligned to
+  `prog.keys[kind]`, oddsmarkets/common/progression.py)}]; prog {v, keys {skater | goalie: [ids]}}; current {season, kind, log {cols, rows}, shots {grid, att, xg, g, points [[x, y, xg, goal]] (≤ 400), point_cols}
   (goalies: shots faced, `faced: true`), onice {5v5 values (toi5, cf60, ca60, cf_pct, xgf60, xga60, xgf_pct, gf60, ga60,
   gf_pct, on_sh_pct, on_sv_pct, pdo, rel and adjusted) + pct + by_strength {"5v5" | "pp" | "pk": {toi (min), cf60, ca60, ff60,
   fa60, sf60, sa60, gf60, ga60, xgf60, xga60, cf_pct, xgf_pct, gf_pct}}}, rapm {rapm_* incl. _se + pct}, deployment,

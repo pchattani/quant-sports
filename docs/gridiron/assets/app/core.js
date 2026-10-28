@@ -159,7 +159,7 @@ const TITLES = {
   teams: 'Teams', team: 'Team', players: 'Players', player: 'Player', leaders: 'Leaders', history: 'All-time',
   value: 'Player value', trade: 'Trade simulator', transactions: 'Transactions', fantasy: 'Fantasy',
   lab: 'Lab', compare: 'Compare', fourth: 'Fourth downs', coaches: 'Coaches', coach: 'Coach',
-  calibration: 'Calibration', methodology: 'Methodology', glossary: 'Glossary', disclaimer: 'Disclaimer and terms'
+  calibration: 'How we’re doing', methodology: 'Methodology', glossary: 'Glossary', disclaimer: 'Disclaimer and terms'
 };
 
 function dec(s) { try { return decodeURIComponent(s); } catch (e) { return s; } }
@@ -907,7 +907,7 @@ function sectionNav(key, active) {
     players: [[ghref('players', S), 'Players', 'players'], [ghref('leaders', S), 'Leaders', 'leaders'], ['#/history', 'All-time', 'history']],
     value: [[ghref('value', S), 'Player value', 'value'], ['#/trade', 'Trade simulator', 'trade'], ['#/transactions', 'Transactions', 'transactions']],
     lab: [[ghref('lab', S), 'Scatter lab', 'lab'], ['#/compare', 'Compare', 'compare'], [ghref('fourth-downs', S), 'Fourth downs', 'fourth'], [ghref('coaches', S), 'Coaches', 'coaches']],
-    model: [['#/calibration', 'Calibration', 'calibration'], ['#/methodology', 'Methodology', 'methodology'], ['#/glossary', 'Glossary', 'glossary'], ['#/disclaimer', 'Terms', 'disclaimer']]
+    model: [['#/calibration', 'How we’re doing', 'calibration'], ['#/methodology', 'Methodology', 'methodology'], ['#/glossary', 'Glossary', 'glossary'], ['#/disclaimer', 'Terms', 'disclaimer']]
   };
   return L[key] ? subnav(L[key], active, 'Views in this section') : '';
 }
@@ -1066,7 +1066,8 @@ function gameCard(g, opts) {
   } else if (live) {
     extra.push('<span><i>' + esc(st === 'half' ? 'Halftime' : (clockText(g.qtr, g.clock) || 'Live')) + '</i>' + (g.down && g.possession ? ' ' + esc(teamAbbr(g.possession)) + ' ' + esc(downDist(g.down, g.dist, g.yl100)) + (isNum(g.yl100) ? ' at ' + esc(fieldPos(g.yl100, g.possession, otherTeam(g, g.possession))) : '') : '') + '</span>');
   }
-  let h = QK.gameCard(x, { sport: false, why: !!o.why });
+  /* round 6: the market quiet beside our chance (small grey "Market 54%", the sources on hover); opts.market false hides it */
+  let h = QK.gameCard(x, { sport: false, why: !!o.why, market: o.market === false ? false : 'quiet' });
   if (extra.length && !o.compact) h = h.indexOf('<div class="qk-aside">') > 0 ? h.replace('<div class="qk-aside">', '<div class="gi-gc-x">' + extra.join('') + '</div><div class="qk-aside">') : h.replace(/<\/(a|div)>$/, '<div class="gi-gc-x">' + extra.join('') + '</div></$1>');
   return h;
 }
@@ -1083,7 +1084,7 @@ function qkGame(g, rows) {
   return { sport: 'nfl', league: 'NFL', id: g.game_id, start: g.kickoff, status: live ? 'live' : (st === 'final' ? 'final' : 'pre'),
     home: T(g.home), away: T(g.away), hs: g.hs, as: g.as, p_home: isNum(p0) ? Number(p0) : null,
     wp_home: live && isNum(g.wp_home) ? Number(g.wp_home) : null, pre_only: live && !isNum(g.wp_home) ? true : undefined,
-    market_home: (g.market || {}).p_home, period: g.qtr, clock: fmtClock(g.clock), note: isOT(g) ? 'OT' : '', href: gameHref(g.game_id) };
+    market_home: (g.market || {}).p_home, market_src: (g.market || {}).sources || null, period: g.qtr, clock: fmtClock(g.clock), note: isOT(g) ? 'OT' : '', href: gameHref(g.game_id) };
 }
 /* Team -> standings row, from season.json rows (for records on game cards). */
 function rowsByTeam(rows) { const o = {}; (rows || []).forEach(r => { if (r && r.team) o[canonTeam(r.team)] = r; }); return o; }
@@ -1158,7 +1159,7 @@ function searchRows() {
     rows.sort((a, b) => a._o - b._o);
     [['Games this week', weekHref(cur, currentWeek())], ['Standings', '#/standings'], ['Power ratings', '#/standings?v=ratings'], ['Playoff picture', '#/playoffs'], ['Season forecasts', '#/futures'],
       ['Player value', '#/value'], ['Trade simulator', '#/trade'], ['Transactions', '#/transactions'], ['Fantasy', '#/fantasy'], ['Leaders', '#/leaders'], ['All-time leaders', '#/history'],
-      ['Scatter lab', '#/lab'], ['Compare players', '#/compare'], ['Fourth downs', '#/fourth-downs'], ['Coaches', '#/coaches'], ['Calibration', '#/calibration'], ['Methodology', '#/methodology'], ['Glossary', '#/glossary']]
+      ['Scatter lab', '#/lab'], ['Compare players', '#/compare'], ['Fourth downs', '#/fourth-downs'], ['Coaches', '#/coaches'], ['How we’re doing', '#/calibration'], ['Methodology', '#/methodology'], ['Glossary', '#/glossary']]
       .forEach(p => rows.unshift({ sport: 'nfl', t: p[0], s: 'Page', href: p[1] }));
     return rows;
   });

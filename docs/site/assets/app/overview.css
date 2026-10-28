@@ -59,3 +59,9 @@
 @media (max-width: 720px) { .ql-week .qk-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ql-week .qk-stat-v { font-size: 2rem; } .ql-week .qk-stat:last-child:nth-child(odd) { grid-column: 1 / -1; } }
 @media (max-width: 420px) { .ql-links a { padding: 10px 10px 12px; } .ql-links b { font-size: 1.25rem; } .ql-links b::after { content: none; } .ql-links span { font-size: 11px; } .ql-race { padding: 14px; } }
 .ql-intro + .fb-ov-quick { margin-top: var(--sp-5); }
+/* round 6: the fan modules (breakout watch, the spotlight, records in reach, the surprises) and the small link to
+   "How we're doing" on the Model page */
+.fb-ov-spot { margin-top: 18px; }
+.fb-ov-spot:empty { display: none; }
+.fb-ov-sure #ov-surprise .qk-stories { gap: 2px; }
+.fb-ov-doing { text-align: center; margin-top: var(--sp-10, 32px); }

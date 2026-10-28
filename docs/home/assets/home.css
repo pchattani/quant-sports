@@ -69,9 +69,18 @@ a.hm-tl:hover { border-top-color: var(--volt); color: var(--ink-1); }
 .hm-ar-hot { margin-top: auto; }
 .hm-ar-next + .hm-ar-hot { margin-top: 0; }
 
-/* "We say it" beside "Who's for real?" */
-.hm-sure > div { min-width: 0; }
-.hm-sure .qk-howsure .qk-chart { --h: 360px; }
+/* "Who's for real?" beside "On a roll" */
+.hm-real > div { min-width: 0; }
+.hm-real .qk-story { padding-top: 14px; padding-bottom: 14px; }
+.hm-real .qk-story-v { font-size: 2.75rem; }
+#roll .qk-stories { gap: 2px; }
+
+/* the quiet market under the game of the day (round 6) */
+.hm-feat-mq { padding: 8px 12px; background: var(--block); }
+
+/* how we're doing: one small line of links to each site's Model page */
+.hm-doing { margin: 14px 0 0; font: 500 14px/1.6 var(--font-ui); color: var(--ink-3); }
+.hm-doing b { font: 700 13px/1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); }
 
 /* title race */
 .hm-race { padding: 18px 20px 20px; }

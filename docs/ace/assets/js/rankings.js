@@ -130,6 +130,20 @@ function profiles(T, rk, race) {
   return html || TA.muted('Player profiles come with the season simulation’s next build.');
 }
 
+/* Top and bottom performers (QKL.leaders): all surfaces (our Elo first, then hold, break and the tour-wide numbers)
+   and each surface on its own spec set, qualified players only (data/<T>/performers.json,
+   oddsmarkets/tennis/analytics/performers.py). Tennis has no positions: the surfaces are the picker. */
+function performers(host, T) {
+  if (!host) return;
+  TA.loadTour('performers.json', T).then(pf => {
+    if (!host.isConnected) return;
+    QKL.leaders(host, { data: TA.ok(pf) ? pf : { views: [] }, title: 'Who leads the tour, and who is struggling', scope: 'tour',
+      sub: 'The top five and the bottom five among this season’s qualified players on each key number: all surfaces with our Elo first, then hard, clay and grass on the numbers that matter there. Each name opens the player page.',
+      team: cc => (cc ? { abbr: cc, name: cc } : null), href: id => TA.playerHref(T, id),
+      empty: 'The boards fill once players reach the season’s match floor.' });
+  });
+}
+
 function render(el, params) {
   const T = params.tour;
   let view = (params.query || {}).v;
@@ -152,7 +166,8 @@ function render(el, params) {
       QK.hotRow(climb.map(r => ({ sport: 'tennis', kicker: TA.tourName(T) + ' · up ' + r[3] + ' place' + (r[3] === 1 ? '' : 's'), title: 'Ranked No. ' + r[0], name: TA.playerShort(T, r[1]), value: '#' + r[0], href: TA.playerHref(T, r[1]),
         expl: TA.num(r[2], 0) + ' ranking points' + (TA.isNum(eloRank[r[1]]) ? '; No. ' + eloRank[r[1]] + ' by our Elo.' : '.') }))), { cls: 'ta-rk-band' }) : '';
     body.innerHTML = band + '<div class="card"><div class="toggle-row" id="rk-tabs">' + TA.toggles(VIEWS, view, 'data-v') + '</div><div class="section-note" id="rk-sub"></div><div id="rk-view"></div></div>' +
-      QK.note('<b>Ranking or Elo?</b> The official ranking adds up points from the last 52 weeks, so it rewards playing a lot and going deep. Our Elo rates every result by who it came against, so it moves faster after an upset. A 100-point Elo gap means the higher-rated player wins about 64% of the time.');
+      QK.note('<b>Ranking or Elo?</b> The official ranking adds up points from the last 52 weeks, so it rewards playing a lot and going deep. Our Elo rates every result by who it came against, so it moves faster after an upset. A 100-point Elo gap means the higher-rated player wins about 64% of the time.') +
+      (window.QKL && QKL.leaders ? '<div id="rk-perf"></div>' : '');
     const show = k => {
       view = k;
       document.getElementById('rk-sub').innerHTML = subs[k];
@@ -164,6 +179,7 @@ function render(el, params) {
     };
     show(view);
     TA.wireToggles(document.getElementById('rk-tabs'), 'data-v', show);
+    if (window.QKL && QKL.leaders) performers(document.getElementById('rk-perf'), T);
     TA.setMeta('Official ranking of ' + esc(TA.fmtDate(rk.date, { year: false })));
   });
 }

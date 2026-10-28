@@ -37,6 +37,7 @@ import numpy as np
 from scipy.stats import norm
 
 from oddsmarkets.college import canon
+from oddsmarkets.college import progression as PROG
 from oddsmarkets.college.store import jersey_number
 from oddsmarkets.college import informed as INF
 from oddsmarkets.college import packing as PK
@@ -1909,6 +1910,22 @@ def career_files(ctx: dict, out: Path, current: int) -> int:
         for k, q in enumerate(box_rows(ctx, s)["pid"]):
             acc_[q].append(k)
         pidx[s] = acc_
+    # Progression (oddsmarkets/college/progression.py): dv / dp / pg on every season with box scores, within the role
+    # (guards, wings, bigs) among the season's qualified players (the catalogue's floor), and progression_ref.json
+    prog_rows, prog_block = {}, None
+    try:
+        recs = {}
+        for s in with_box:
+            sp = sp_of(s)
+            if not sp:
+                continue
+            recs[s] = [{"pid": q, "kind": sp["role_of"].get(q), "q": q in sp["qual"], "values": sp["lines"].get(q) or {},
+                        "pct": sp["pcts_role"].get(q) or None}
+                       for q in sp["rows"]]
+        prog_rows, ref, prog_block = PROG.build(lv, recs)
+        write(out / lv / PROG.PROG_FILE, ref)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("%s progression failed: %s", lv, exc)
     written = set()
     for p in wanted:
         try:
@@ -1925,6 +1942,7 @@ def career_files(ctx: dict, out: Path, current: int) -> int:
                 info = (stores[s].get("players") or {}).get(p) or info
             if not seasons_rows:
                 continue
+            PROG.merge({}, seasons_rows, prog_rows.get(str(p)), None)
             ls = seasons_rows[-1]["season"]
             r = rows_by[ls][p]
             br = box_rows(ctx, ls)
@@ -1948,6 +1966,8 @@ def career_files(ctx: dict, out: Path, current: int) -> int:
                     "current": {"season": ls, "team": r["team"], "log": PK.pack(log), "value": value_row(r, player_rows(ctx, ls)["params"]),
                                 "fantasy": None, **prev_ring(sp_of(ls), sp_of(ls - 1), p, ls - 1)},
                     "moves": mv_of.get(p, []), "similar": similar}
+            if prog_block and prog_rows.get(str(p)):
+                page["prog"] = prog_block
             write(pdir / f"{p}.json", page)
             written.add(f"{p}.json")
             n += 1

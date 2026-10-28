@@ -137,8 +137,8 @@ function render(el, params, state) {
     const models = ORDER.filter(x => M[x]).concat(Object.keys(M).filter(x => ORDER.indexOf(x) < 0));
     const yrs = d.years || [];
     const yrs0 = d.years || [];
-    let h = '<section class="qk-section" style="margin-top:0">' + QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every ' + k.TN(T) + ' match since ' + (yrs0[0] || '') + ', forecast before it was played and checked against the result, grouped by the chance we gave a player. When the two bars match, our numbers mean what they say.' }) +
-      '<div id="cal-howsure"></div></section>' +
+    /* round 6: "How we're doing" (QK.doing): this week's record from the tour's index.json digest, then QK.howSure */
+    let h = '<section class="qk-section" style="margin-top:0" id="cal-doing"></section>' +
       '<section class="qk-section">' + QK.sectionHead({ kicker: 'The full record', title: 'Every score, every check', sub: 'Our match model against its own parts, a ranking baseline and the closing market as a reference.' }) + '</section>' +
       '<p class="ta-cap" style="margin:0 0 12px">Walk-forward backtest: every match predicted with ratings refitted from matches strictly before it and blend weights fitted on earlier years only, scored against what happened, with the closing market beside it as a reference.</p>' +
       '<div class="kpi-grid af-tiles">' + [
@@ -175,7 +175,9 @@ function render(el, params, state) {
       '<p class="muted-inline">Backtest ' + k.esc(d.version || '') + ', generated ' + k.esc(d.generated_at || '') + '.</p></div></div>';
     h += '<div id="cal-market"></div>';
     el.innerHTML = h;
-    QK.howSure(el.querySelector('#cal-howsure'), { calibration: d, league: k.TN(T), span: yrs0.length ? yrs0[0] + '–' + yrs0[yrs0.length - 1] : '', subject: 'that player', unit: 'matches' });
+    const dig = ((TA.tourInfo ? TA.tourInfo(T) : {}) || {}).digest || {};
+    QK.doing(el.querySelector('#cal-doing'), { record: dig.record, calibration: d, league: k.TN(T), span: yrs0.length ? yrs0[0] + '–' + yrs0[yrs0.length - 1] : '', subject: 'a player', unit: 'matches',
+      sub: 'Our favourites this week, then every ' + k.TN(T) + ' match since ' + (yrs0[0] || '') + ', forecast before it was played and checked against the result, grouped by the chance we gave a player. When the two match, our numbers mean what they say.' });
     if (TA.value && TA.value.market) TA.value.market(T, document.getElementById('cal-market')).then(() => {
       const mk = document.getElementById('cal-market');
       if (mk && ((params.query || {}).sec === 'market') && mk.scrollIntoView) mk.scrollIntoView();

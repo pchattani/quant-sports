@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from pathlib import Path
 
 SCHEMA = 1
@@ -117,6 +118,12 @@ def load_spec(sport: str) -> dict:
     return json.loads((SPEC_DIR / f"{sport}.json").read_text(encoding="utf-8"))
 
 
+def _tip(text) -> str:
+    """A spec explanation for the page, without builder references such as "(value.json)"."""
+    t = re.sub(r"\s*\([^()]*\.json[^()]*\)", "", str(text or ""))
+    return re.sub(r"\s{2,}", " ", t).strip()
+
+
 def spec_metrics(spec: dict, group_id: str, *, ours_names: dict | None = None, fmt: dict | None = None,
                  skip: set | None = None, only: set | None = None, extra: list[dict] | None = None) -> list[dict]:
     """The headline metrics of a spec group in the spec's order, our model metrics first: each {"key", "label",
@@ -136,7 +143,7 @@ def spec_metrics(spec: dict, group_id: str, *, ours_names: dict | None = None, f
         if (skip and mid in skip) or (only is not None and mid not in only) or x.get("style"):
             continue
         m = {"key": mid, "label": x.get("display") or mid, "unit": x.get("unit") or "",
-             "dir": "lower" if x.get("direction") == "lower" else "higher", "tip": x.get("explanation") or ""}
+             "dir": "lower" if x.get("direction") == "lower" else "higher", "tip": _tip(x.get("explanation"))}
         if mid in omap:
             mk = omap[mid]
             m["ours"] = (ours_names or {}).get(mk) or (models.get(mk) or {}).get("name") or "Our model"

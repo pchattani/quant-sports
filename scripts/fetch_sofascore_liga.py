@@ -76,6 +76,10 @@ DEFAULT_BUDGET = 100
 BACKFILL_BUDGET = 1000
 DETAIL_PAUSE_S = 1.0
 MAX_CONSECUTIVE_FAILURES = 3
+# Sofascore's standings for the season (the zones of both tournaments, the Tabla Anual and the promedios): one
+# call from the run's own budget, at most every STANDINGS_EVERY_HOURS. The build checks our tables against it
+# and takes the promedio history from it (liga/tables.py); nothing else depends on it.
+STANDINGS_EVERY_HOURS = 6
 
 FINISHED = {"ended", "afterpenalties", "afterextratime", "ap", "aet", "finished"}
 
@@ -187,6 +191,40 @@ def torneo_of_label(label: object) -> str | None:
     return None
 
 
+def _shared_record(ev: dict, season_id: int) -> dict | None:
+    try:
+        out = sofascore.event_record(ev, _canon, season_id, round_slugs=PLAYOFF_SLUGS)
+    except Exception:  # noqa: BLE001 - the Argentine columns still stand without it
+        return None
+    return out[1] if out else None
+
+
+def refresh_standings(store: dict, season_id: int, budget=None, now: datetime | None = None) -> bool:
+    """
+    Sofascore's standings blocks for the season into store["standings"] ({season_id, at, blocks}), when the
+    copy held is older than STANDINGS_EVERY_HOURS or from another season. One call, charged to the run's
+    budget; a failed or empty answer keeps the previous copy. Returns whether a new copy was stored.
+    """
+    now = now or datetime.now(timezone.utc)
+    held = store.get("standings") or {}
+    try:
+        at = datetime.strptime(str(held.get("at")), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        at = None
+    if held.get("season_id") == int(season_id) and at is not None \
+            and (now - at).total_seconds() < STANDINGS_EVERY_HOURS * 3600:
+        return False
+    if budget is not None and not budget.take():
+        return False
+    blocks = sofascore.standings_blocks(SOFASCORE_TOURNAMENT_ID, int(season_id))
+    if not blocks:
+        logger.warning("standings: nothing for season %s; the previous copy is kept", season_id)
+        return False
+    store["standings"] = {"season_id": int(season_id), "at": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "blocks": blocks}
+    logger.info("standings: %s", [b.get("name") for b in blocks])
+    return True
+
+
 def fetch_season_matches(season_id: int, torneos: tuple[str, ...]) -> pd.DataFrame | None:
     """
     Every match of one season id, from the paginated season-events endpoint.
@@ -227,6 +265,9 @@ def fetch_season_matches(season_id: int, torneos: tuple[str, ...]) -> pd.DataFra
             "_torneo": torneo,
             "_season_id": int(season_id),
             "_ko_round": playoff_round(ri.get("slug"), ri.get("name")),
+            # The record every other competition's store holds for this event (stage, shoot-out winner and
+            # penalties, countries); update_store lays the Argentine fields over it.
+            "_record": _shared_record(ev, int(season_id)),
         })
     allm = pd.DataFrame(rows).drop_duplicates(subset="game_id")
 
@@ -327,7 +368,10 @@ def update_store(store: dict, max_new: int = 40, budget=None, refresh: bool = Fa
             ko = None
         round_key = ko or (int(m["week"]) if pd.notna(m.get("week")) else None)
 
+        shared = m.get("_record") if isinstance(m.get("_record"), dict) else {}
         store["matches"][gid] = {
+            # The shared record first (stage, winner, pens, countries ...), the Argentine reading over it.
+            **{k: v for k, v in shared.items() if v is not None},
             "home": home,
             "away": away,
             "round": round_key,
@@ -450,6 +494,14 @@ def main() -> int:
             break
     if n_pre:
         logger.info("pre-match line-ups: %d matches", n_pre)
+    # The season's standings (zones, Tabla Anual, promedios), a few times a day, from the same budget.
+    seasons = load_seasons()
+    current_sid = (seasons[0].get(CLAUSURA) or seasons[0].get(APERTURA)) if seasons else None
+    if current_sid and not sofascore.is_blocked():
+        try:
+            refresh_standings(store, int(current_sid), budget=budget)
+        except Exception as exc:  # noqa: BLE001 - a check, never the reason a run fails
+            logger.warning("standings refresh failed: %s", exc)
     status = update_store(store, max_new=budget.left // sofascore.DETAIL_CALLS, budget=budget, refresh=args.refresh_detail)
     logger.info("detail calls used: %d of %d", budget.used, budget.limit)
 

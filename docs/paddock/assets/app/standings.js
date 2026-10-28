@@ -40,6 +40,41 @@ function render(el, params) {
 
 // ── championship ──────────────────────────────────────────────────────────
 
+/* Top and bottom performers (QKL.leaders): the drivers on the spec's driver set (our race and qualifying driver
+   ratings first, the car taken out) and the constructors on the team set, the top five and the bottom five among the
+   qualified (PD.v2.peer: the f1.json floors), each linked to the driver or team page. From the season's drivers.json
+   and teams.json (the team pages load the same files), after the first paint. */
+var PERF_FMT = { driver_effect: '+3', quali_driver_effect: '+3', race_pace: '+3', car_race_pace: '+3', race_h2h: 'pct0', team_points_share: 'pct0', dnf_rate: 'pct0',
+  pit_under_2500: 'pct0', elo_teammate: '0', points_per_race: '1', lap1_gain: '+2', strategy_gain: '+2', pit_lane_v_field: '+0' };
+function perfView(cat, kind, season, sets) {
+  if (!PD.ok(cat)) return null;
+  var V = PD.v2, P = V.peer(cat, kind, season), team = kind === 'teams', ent = team ? 'constructor' : 'driver';
+  var keys = [].concat.apply([], sets.map(function (g) { return g[1]; }));
+  var ms = keys.map(function (k) {
+    var sm = V.spec ? V.spec.metric(k, ent) : null, o = V.ours(k);
+    var rows = P.ids.map(function (id) { var r = P.rows[id] || {}; return { id: id, name: team ? PD.teamName(id) : PD.driverName(id), team: team ? id : r.team, v: (r.values || {})[k] }; });
+    return QKL.board(rows, { key: k, label: V.label(P.meta, k), unit: sm && sm.unit !== '%' ? sm.unit : '', dir: (P.meta[k] || {}).lower ? 'lower' : 'higher', fmt: PERF_FMT[k] || '2', ours: o ? o.name : '', tip: V.tip(P.meta, k) }, 5);
+  }).filter(function (m) { return m.n > 1; });
+  ms = ms.filter(function (m) { return m.ours; }).concat(ms.filter(function (m) { return !m.ours; }));
+  return ms.length ? { key: kind, label: team ? 'Constructors' : 'Drivers', entity: team ? 'team' : 'player', peer: team ? 'constructors' : 'drivers', min: P.floor + ' ' + P.unit + ' this season', metrics: ms } : null;
+}
+function performers(season) {
+  var host = document.getElementById('st-perf');
+  if (!host || !window.QKL || !QKL.leaders) return;
+  var y = season.year;
+  Promise.all([PD.loadAll([y + '/drivers.json', y + '/teams.json']), PD.v2.specP]).then(function (res) {
+    var arr = res[0];
+    host = document.getElementById('st-perf');
+    if (!host) return;
+    var views = [perfView(arr[0], 'drivers', season, PD.v2.DRIVER_SET), perfView(arr[1], 'teams', season, PD.v2.TEAM_SET)].filter(Boolean);
+    QKL.leaders(host, { data: { views: views }, title: 'Who leads the grid, and who is struggling', scope: 'grid',
+      sub: 'The top five and the bottom five on each key number among this season’s qualified drivers (our driver ratings first: race and qualifying pace against the team-mate, the car taken out) and constructors. Each name opens the driver or team page.',
+      team: function (t) { return t ? { abbr: PD.teamAbbr(t), name: PD.teamName(t), colour: PD.teamColourRaw(t), href: PD.teamHref(t) } : null; },
+      href: function (id) { return PD.driverHref(id); },
+      empty: 'The boards fill once drivers reach the season’s floor of starts.' });
+  });
+}
+
 function championship(season) {
   var ch = season.championship, finished = !ch;
   var sd = (season.standings || {}).drivers || [], sc = (season.standings || {}).constructors || [];
@@ -56,7 +91,7 @@ function championship(season) {
     PD.card('The title race', 'Points after every round, then our expected points to the last round (shaded).', PD.chartBox('st-prog', 400, 'Championship points with our projection'), { span: 8, right: PD.seg('st-prog-k', [['drivers', 'Drivers'], ['constructors', 'Constructors']], 'drivers', 'Progression') }) +
     PD.card('Constructors’ championship', '', '<div id="st-c"></div>', { span: 4, flush: true }) +
     (finished ? '' : PD.card('Where they finish', 'Our chance of each championship position: the share of simulated seasons ending in each place.', PD.chartBox('st-pd', 500), { span: 12, right: PD.seg('st-pd-k', [['drivers', 'Drivers'], ['constructors', 'Constructors']], 'drivers', 'Distribution') })), 'pd-mt');
-  h += '<div id="st-fight"></div><div id="st-shape"></div><div id="st-prof"></div>';
+  h += '<div id="st-fight"></div>' + (window.QKL && QKL.leaders ? '<div id="st-perf"></div>' : '') + '<div id="st-shape"></div><div id="st-prof"></div>';
   PD.set('st-body', h);
   standingsTable('st-d', season, 'drivers');
   standingsTable('st-c', season, 'constructors', true);
@@ -68,6 +103,7 @@ function championship(season) {
     PD.fight.shape('st-shape', season, ex);
     PD.fight.profiles('st-prof', season, ex);
   });
+  performers(season);
   var prog = function (kind) { PD.v2.pointsForecast('st-prog', season, kind, kind === 'drivers' ? 10 : 11); };
   prog('drivers');
   PD.wireSeg(document, 'st-prog-k', prog);

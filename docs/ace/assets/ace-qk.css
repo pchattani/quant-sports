@@ -473,3 +473,4 @@ tr.cut td, .qk-table tr.cut td { border-top: 2px dashed color-mix(in srgb, var(-
 .af-lab-ours { margin-top: 12px; }
 .af-lab-ours .qk-ours { margin-left: 4px; }
 #cmp-view > .qk-explain-ours, .ta-pl-ours { margin-top: 12px; }
+.qkl-ld .qk-pbox { text-align: center; }  /* the league page boards (QKL.leaders): legacy .num right-aligns */

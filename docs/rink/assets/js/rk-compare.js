@@ -22,10 +22,11 @@ const ECOL = ['var(--wp-a)', 'var(--wp-b)', 'var(--c-5)'];
 function head(el, S, active) {
   const sq = U.sq(S) ? '?' + U.sq(S) : '';
   return U.section(el, { section: 'lab', title: 'Compare', sub: 'Two or three players side by side on the metrics that best describe and predict their play, ranked against their own position group.',
-    tabs: [{ key: 'lab', label: 'Chart builder', href: '#/lab' + sq }, { key: 'compare', label: 'Compare', href: '#/compare' + sq }, { key: 'all', label: 'Every metric (classic)', href: '#/compare?view=all' }], active: active });
+    tabs: [{ key: 'lab', label: 'Chart builder', href: '#/lab' + sq }, { key: 'compare', label: 'Compare', href: '#/compare' + sq }, { key: 'prog', label: 'Progression', href: '#/compare/progression' }, { key: 'all', label: 'Every metric (classic)', href: '#/compare?view=all' }], active: active });
 }
 
 function render(el, params, state) {
+  if (params.a === 'progression' && RK.progression) return RK.progression.compare(el, params);  /* #/compare/progression/<ids> (rk-progression.js) */
   const S = params.season || RK.currentSeason();
   let ids = [params.a, params.b].concat(params.rest || []).filter(Boolean).map(String).slice(0, 3);
   const all = ((params.query || {}).view) === 'all';

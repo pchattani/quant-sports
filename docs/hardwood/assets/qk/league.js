@@ -127,7 +127,7 @@ var CSS = [
   '.qkl-ld .v{font:400 1.4rem/1 var(--font-display);color:var(--ink-1);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}',
   '.qkl-ld .m{grid-column:2 / 5;display:grid;grid-template-columns:minmax(80px,1fr) 40px;gap:8px;align-items:center}',
   '.qkl-ld .m .qk-segs{min-width:80px;width:100%;height:16px}',
-  '.qkl-ld .m .qk-pbox{font-size:20px;padding:3px 0 1px}',
+  '.qkl-ld .m .qk-pbox{font-size:20px;padding:3px 0 1px;text-align:center}',
   '.qkl-ld-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}',
   '.qkl-ld-h .qk-tag{vertical-align:middle}',
   '.qkl-dn .qk-card-title{color:var(--ink-2)}',
@@ -167,7 +167,7 @@ function fmtVal(v, f) {
   if (!isNum(v)) return '—';
   if (f === 'pct1') return (v * 100).toFixed(1) + '%';
   if (f === 'pct0') return Math.round(v * 100) + '%';
-  if (f && f.charAt(0) === '+') return fmt.signed(v, Number(f.slice(1)) || 0);
+  if (f && f.charAt(0) === '+') { var sd = Number(f.slice(1)) || 0; return fmt.signed(Math.abs(v) < 0.5 * Math.pow(10, -sd) ? 0 : v, sd); }
   if (f === '3') return v.toFixed(3).replace(/^0\./, '.').replace(/^-0\./, '−.');
   return isNum(Number(f)) ? v.toFixed(Number(f)) : String(v);
 }
@@ -258,7 +258,9 @@ function meters(o, key, compact) {
 }
 /* the plain-English read of the record against the numbers, for a card without meters (a team page that draws its
    own percentile card) */
-function lc(x) { x = String(x || ''); return /^[A-Z][a-z]/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x; }
+/* a label mid-sentence: the first letter lower-cased, except a name (Elo) */
+var KEEP_CASE = /^(Elo|Sofascore|Glicko|Gridiron|Rink|Hardwood|Bullpen|Campus|Paddock|Ace|Footballer)\b/;
+function lc(x) { x = String(x || ''); return /^[A-Z][a-z]/.test(x) && !KEEP_CASE.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x; }
 function luckLine(o, key) {
   var L = o.league || {}, t = (L.teams || {})[key] || {}, lk = t.luck, notes = L.notes || {}, u = notes.luck_unit || 'wins';
   var P = L.profile || {}, pc = t.pct || {}, best = null, worst = null;
@@ -558,9 +560,9 @@ QKL.performers = function (el, o) {
  * o = { data: { views: [VIEW], n }, kicker, title, sub, view (first view's key), metric (first metric's key),
  *       team: fn(teamKey) -> { abbr, name, colour, logo, href } (the mark and the team link),
  *       href: fn(id, VIEW) -> the player page (a team view links through team()), note (HTML, after the footnote),
- *       empty (text) }
+ *       empty (text), scope ('league' in "Bottom of the league on ..."; 'tour', 'grid') }
  * VIEW = { key, label, entity: 'player' | 'team', peer ('centre-backs', for "12th of 80 centre-backs"), min (the
- *          qualifying floor in words: '450 minutes'), metrics: [METRIC] }
+ *          qualifying floor in words: '450 minutes'), note (HTML: this view's own footnote), metrics: [METRIC] }
  * METRIC = { key, label, unit, dir: 'higher' | 'lower', ours (our model's name: the "Our model" tag), fmt (a
  *          QKL.fmtVal code), tip, n (qualified), top: [ROW], bot: [ROW] }
  * ROW = [id, name, team, value, pct (0-100, 100 the best), rank]. oddsmarkets/common/performers.py writes this shape
@@ -585,18 +587,21 @@ QKL.board = function (rows, m, N) {
   out.bot = n > N ? rows2.slice(Math.max(N, n - N)) : [];
   return out;
 };
-/* QKL.teamView(league, { key: 'teams', label: 'Teams', peer: 'teams', ours: 'Team rating model', n }) -> a VIEW of
- * the teams on the league block's team set (L.profile.metrics with L.teams[k].vals; style metrics left out, our model
- * metrics first), or null. Early in the season (profile.early) only our rating is ranked, as on the team cards. */
+/* QKL.teamView(league, { key: 'teams', label: 'Teams', peer: 'teams', ours: 'Team rating model', oursIds: [ids], n })
+ * -> a VIEW of the teams on the league block's team set (L.profile.metrics with L.teams[k].vals; style metrics left
+ * out, our model metrics first: the profile's `model` flag, o.oursIds, or the spec catalogue once QK.spec has loaded
+ * it), or null. Early in the season (profile.early) only our rating is ranked, as on the team cards. */
 QKL.teamView = function (L, o) {
   o = o || {};
   var P = (L || {}).profile || {}, T = (L || {}).teams || {}, keys = Object.keys(T);
   if (!keys.length) return null;
   var ms = (P.metrics || []).filter(function (m) { return !m.style && (!P.early || m.model); });
-  ms = ms.filter(function (m) { return m.model; }).concat(ms.filter(function (m) { return !m.model; }));
+  var cat = QK.spec && QK.spec.get ? QK.spec.get() : null, oid = o.oursIds || [];
+  var isOurs = function (m) { return !!(m.model || oid.indexOf(m.id) >= 0 || (cat && cat.ours(m.id))); };
+  ms = ms.filter(isOurs).concat(ms.filter(function (m) { return !isOurs(m); }));
   var metrics = ms.map(function (m) {
     var rows = keys.map(function (k) { return { id: k, name: (o.name ? o.name(k) : k), team: k, v: ((T[k] || {}).vals || {})[m.id] }; });
-    return QKL.board(rows, { key: m.id, label: m.label, unit: m.unit || '', dir: m.dir === 'lower' ? 'lower' : 'higher', fmt: m.fmt, ours: m.model ? (o.ours || 'Our model') : '', tip: m.tip || '' }, o.n || 5);
+    return QKL.board(rows, { key: m.id, label: m.label, unit: m.unit || '', dir: m.dir === 'lower' ? 'lower' : 'higher', fmt: m.fmt, ours: isOurs(m) ? (o.ours || 'Our model') : '', tip: m.tip || '' }, o.n || 5);
   }).filter(function (m) { return m.n > 1; });
   return metrics.length ? { key: o.key || 'teams', label: o.label || 'Teams', entity: 'team', peer: o.peer || 'teams',
     min: P.early ? 'early in the season only our rating is ranked; the rest after ' + (P.min_gp || 10) + ' games' : '', metrics: metrics } : null;
@@ -652,11 +657,11 @@ QKL.leaders = function (el, o) {
     var tag = M.ours && QK.ours ? QK.ours({ model: M.ours }) : '';
     var lead = '<section class="qk-card"><div class="qk-card-head"><div style="min-width:0"><div class="qk-card-title qkl-ld-h">Leaders' + tag + '</div><div class="qk-card-sub">The top ' + M.top.length + ' of ' + (M.n || M.top.length) + ' qualified ' + esc(who) + ' on ' + lbl + '</div></div></div>' +
       '<div class="qk-card-body" style="padding:0"><ol class="qkl-ld">' + M.top.map(function (r) { return ldRow(o, V, M, r); }).join('') + '</ol></div></section>';
-    var bot = (M.bot || []).length ? '<section class="qk-card qkl-dn"><div class="qk-card-head"><div style="min-width:0"><div class="qk-card-title qkl-ld-h">Struggling</div><div class="qk-card-sub">Bottom of the league on ' + lbl + ' among the ' + (M.n || '') + ' qualified ' + esc(who) + '</div></div></div>' +
+    var bot = (M.bot || []).length ? '<section class="qk-card qkl-dn"><div class="qk-card-head"><div style="min-width:0"><div class="qk-card-title qkl-ld-h">Struggling</div><div class="qk-card-sub">Bottom of the ' + esc(o.scope || 'league') + ' on ' + lbl + ' among the ' + (M.n || '') + ' qualified ' + esc(who) + '</div></div></div>' +
       '<div class="qk-card-body" style="padding:0"><ol class="qkl-ld">' + M.bot.map(function (r) { return ldRow(o, V, M, r); }).join('') + '</ol></div></section>' :
       '<section class="qk-card qkl-dn"><div class="qk-card-head"><div class="qk-card-title">Struggling</div></div><div class="qk-card-body">' + QK.empty('Too few qualified yet', 'The bottom of the board shows once more than ' + M.top.length + ' ' + who + ' qualify.') + '</div></section>';
     var foot = (V.min ? 'Qualified: ' + esc(V.min) + '. ' : '') + 'The box is the percentile among the qualified ' + esc(who) + ' (100 is the best) and the big number on the left the rank.' +
-      (M.dir === 'lower' ? ' Lower is better on ' + esc(lc(M.label)) + ', so the leaders have the lowest numbers.' : '') + (M.tip ? ' <b>' + esc(M.label) + ':</b> ' + esc(M.tip) : '') + (o.note ? ' ' + o.note : '');
+      (M.dir === 'lower' ? ' Lower is better on ' + esc(lc(M.label)) + ', so the leaders have the lowest numbers.' : '') + (M.tip ? ' <b>' + esc(M.label) + ':</b> ' + esc(M.tip) : '') + (V.note ? ' ' + V.note : '') + (o.note ? ' ' + o.note : '');
     var b = document.getElementById(id + '-b');
     if (!b) return;
     b.innerHTML = tiles + '<div class="qk-grid"><div class="qk-span-6">' + lead + '</div><div class="qk-span-6">' + bot + '</div></div><p class="qkl-note" style="padding:12px 0 0">' + foot + '</p>';

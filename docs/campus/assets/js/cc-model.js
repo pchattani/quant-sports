@@ -1,8 +1,8 @@
 /* The Quant Campus — Lab (#/<L>/lab) and Model (#/<L>/model?tab=method|calibration|glossary|terms).
  * Lab: build-your-own scatter and table over lab_teams.json / lab_players.json (pick x, y, filter, colour by
  * conference or position; the table beside the chart holds the same rows).
- * Model: "We say it. Then we check it." at the top (kit v4: QK.howSure from <L>/calibration.json, shown only when the file is
- * there), methodology (docs/campus/MODELS_CFB.md or MODELS_HOOPS.md rendered), the walk-forward backtest against
+ * Model: the "How we're doing" tab (?tab=calibration; round 6: QK.doing, our favourites' record this week and QK.howSure from
+ * <L>/calibration.json, shown only when the file is there, then the backtest), methodology (docs/campus/MODELS_CFB.md or MODELS_HOOPS.md rendered), the walk-forward backtest against
  * closing lines (calibration.json), the glossary (data/glossary.json) and the terms.
  * Payload copy still reworded here for the local payloads (23 Oct 2026): noteV2 (the local mbb / wbb / cfb
  * calibration.json notes say "price"), GLOSS_V2 / GLOSS_DROP (the local glossary.json carries "Edge", "Fair spread"
@@ -354,21 +354,23 @@ function movesMethod(L, node) {
 
 CC.route('model', function (el, p) {
   var L = p.L, S = p.S, fb = CC.fb(L);
-  var list = [['method', 'Methodology'], ['calibration', 'Calibration'], ['glossary', 'Glossary'], ['terms', 'Terms']];
+  var list = [['method', 'Methodology'], ['calibration', 'How we’re doing'], ['glossary', 'Glossary'], ['terms', 'Terms']];
   var tab = U.tab(p, ['method', 'calibration', 'glossary', 'terms'], 'method');
   el.innerHTML = U.head('Model', 'How our numbers are made, how well they have done (with the market’s closing numbers as the benchmark), and what every term means.', U.kicker(L, S)) +
-    (tab === 'method' || tab === 'calibration' ? '<div id="mb-sure"></div>' : '') + U.tabs(L, 'model', list, null, tab) + '<div id="mb">' + QK.skeleton('lines', 8) + '</div>';
+    U.tabs(L, 'model', list, null, tab) + (tab === 'calibration' ? '<div id="mb-sure"></div>' : tab === 'method' ? '<div style="margin-top:var(--sp-6)">' + QK.explain('<b>How we’re doing.</b> Our recent record and how often our chances came true are on <a class="qk-link" href="' + esc(CC.href(L, 'model', null, null, 'tab=calibration')) + '">the How we’re doing tab</a>.') + '</div>' : '') + '<div id="mb">' + QK.skeleton('lines', 8) + '</div>';
   var body = QK.$('#mb', el);
-  /* How sure are we? (QK.howSure): our chance against how often the home team won, walk-forward, from the level's
+  /* round 6, "How we're doing" (QK.doing) at the top of its tab: our favourites' record this week (index.json
+     levels.<L>.digest.record), then our chance against how often the home team won, walk-forward, from the level's
      calibration.json when it is there (CC.calib reads the kit's shape and the builder's own) */
   if (QK.$('#mb-sure', el)) CC.load(CC.lpath(L, 'calibration.json')).then(function (cj) {
     var host = QK.$('#mb-sure', el);
     var cb = CC.calib(cj);
     if (!host || !U.alive(host) || !cb) return;
     var ss = (cj.seasons || []).map(Number).filter(isNum).sort(function (x, y) { return x - y; });
-    host.innerHTML = '<section class="qk-section cc-sec" style="margin-top:var(--sp-6)">' + QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.',
-      sub: 'Every pre-game forecast from the game model, each made with only the games before it, grouped by the chance we gave the home team. When the two bars match, our numbers mean what they say.' }) + '<div id="mb-sure-m"></div></section>';
-    QK.howSure(QK.$('#mb-sure-m', host), { bins: cb.bins, brier: cb.brier, n: cb.n, league: CC.LSHORT[L], span: ss.length ? CC.seasonLabel(L, ss[0]) + ' to ' + CC.seasonLabel(L, ss[ss.length - 1]) : '', subject: 'the home team', unit: 'games' });
+    host.innerHTML = '<section class="qk-section cc-sec" style="margin-top:var(--sp-6)" id="mb-sure-m"></section>';
+    var rec = (CC.info(L).digest || {}).record;
+    QK.doing(QK.$('#mb-sure-m', host), { record: rec, bins: cb.bins, brier: cb.brier, n: cb.n, league: CC.LSHORT[L], span: ss.length ? CC.seasonLabel(L, ss[0]) + ' to ' + CC.seasonLabel(L, ss[ss.length - 1]) : '', subject: 'the home team', unit: 'games',
+      sub: (rec && rec.n ? 'Our favourites this week, then every ' : 'Every ') + 'pre-game forecast from the game model, each made with only the games before it, grouped by the chance we gave the home team. When the two match, our numbers mean what they say.' });
   });
   if (tab === 'terms') { var t = document.getElementById('disclaimer-template'); body.innerHTML = t ? t.innerHTML : ''; return null; }
   if (tab === 'calibration') return CC.load(CC.lpath(L, 'calibration.json')).then(function (d) { if (U.alive(el)) calibration(body, L, d); });

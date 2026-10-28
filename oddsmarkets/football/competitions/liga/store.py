@@ -222,6 +222,9 @@ def iter_matches(
     for gid, raw in (store.get("matches") or {}).items():
         if torneo is not None and raw.get("torneo") != torneo:
             continue
+        if raw.get("superseded_by"):
+            # The old copy of a re-listed fixture (mark_superseded): the league and cup readers drop it too.
+            continue
         home = normalize_team_name(str(raw.get("home", "")), "liga_argentina")
         away = normalize_team_name(str(raw.get("away", "")), "liga_argentina")
         if not home or not away:
@@ -323,11 +326,64 @@ def torneo_from_store(
                 playoff_results[f"{round_name}:{slot_idx}"] = normalize_team_name(
                     str(w), "liga_argentina"
                 )
+            elif isinstance(pens := (store.get("matches") or {}).get(match.game_id, {}).get("pens"), (list, tuple)) \
+                    and len(pens) == 2 and pens[0] != pens[1]:
+                playoff_results[f"{round_name}:{slot_idx}"] = match.home_team if pens[0] > pens[1] else match.away_team
+
+    remaining = drop_dead_fixtures(finished, remaining)
+    if champion is None:
+        champion = champion_from_final(store, finished)
 
     return TorneoState(
         key=torneo, zones=zones, finished=finished, remaining=remaining,
         playoff_results=playoff_results, champion=champion, cfg=cfg,
     )
+
+
+def _pair_round(m: LigaMatch) -> tuple:
+    return (frozenset((m.home_team, m.away_team)), str(m.round_name))
+
+
+def drop_dead_fixtures(finished: list[LigaMatch], remaining: list[LigaMatch]) -> list[LigaMatch]:
+    """
+    The fixtures still to play, without the dead ones.
+
+    Sofascore re-lists a postponed match under a new event id and keeps the old one as "postponed" for good
+    (2026 Apertura: eight round-6, 7 and 9 fixtures, all replayed under new ids; Clausura round 11, Sarmiento v
+    River Plate, listed three times). Read as still to play, they kept the Apertura "incomplete", so the Tabla
+    Anual, the promedios and every berth were computed without its 240 matches (October 2026). A fixture is dead
+    when the same two clubs already played in the same round of the same tournament, or when the tournament's
+    final has been played (nothing of its zone phase can still count).
+    """
+    played = {_pair_round(m) for m in finished}
+    final_done = any(m.round_name == "final" for m in finished)
+    keep = []
+    for m in remaining:
+        if _pair_round(m) in played:
+            continue
+        if final_done:
+            continue
+        keep.append(m)
+    return keep
+
+
+def champion_from_final(store: dict[str, Any], finished: list[LigaMatch]) -> str | None:
+    """The winner of a played final: the score, else the stored shoot-out winner or penalties."""
+    raw_matches = store.get("matches") or {}
+    for m in finished:
+        if m.round_name != "final":
+            continue
+        if m.home_goals > m.away_goals:
+            return m.home_team
+        if m.away_goals > m.home_goals:
+            return m.away_team
+        raw = raw_matches.get(m.game_id) or {}
+        if raw.get("winner"):
+            return normalize_team_name(str(raw["winner"]), "liga_argentina")
+        pens = raw.get("pens")
+        if isinstance(pens, (list, tuple)) and len(pens) == 2 and pens[0] != pens[1]:
+            return m.home_team if pens[0] > pens[1] else m.away_team
+    return None
 
 
 def season_state_from_store(

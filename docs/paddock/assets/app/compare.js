@@ -62,7 +62,8 @@ function wireDist(id, P, rows, names, opts) {
 }
 function picker(kind, a, b, opts) {
   var sel = function (id, cur) { return '<select class="qk-select" id="' + id + '"><option value="">Pick…</option>' + opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (o[0] === cur ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select>'; };
-  return '<div class="pd-toolbar pd-cmp-pick"><i class="pd-dot" style="--tc:var(--wp-a)"></i>' + sel('cmp-a', a) + '<span class="qk-muted">v</span><i class="pd-dot" style="--tc:var(--wp-b)"></i>' + sel('cmp-b', b) + '<button type="button" class="qk-btn" id="cmp-swap">⇄ Swap</button></div>';
+  return '<div class="pd-toolbar pd-cmp-pick"><i class="pd-dot" style="--tc:var(--wp-a)"></i>' + sel('cmp-a', a) + '<span class="qk-muted">v</span><i class="pd-dot" style="--tc:var(--wp-b)"></i>' + sel('cmp-b', b) + '<button type="button" class="qk-btn" id="cmp-swap">⇄ Swap</button>' +
+    (kind !== 'teams' && (a || b) ? '<a class="qk-btn" href="#/compare/progression' + [a, b].filter(Boolean).map(function (x) { return '/' + encodeURIComponent(x); }).join('') + '">Compare the careers year by year</a>' : '') + '</div>';
 }
 function wire(kind, a, b) {
   var go = function () { var x = document.getElementById('cmp-a').value, y = document.getElementById('cmp-b').value; if (x && y && x !== y) location.hash = '#/compare/' + kind + '/' + encodeURIComponent(x) + '/' + encodeURIComponent(y); else if (x && !y) location.hash = '#/compare/' + kind + '/' + encodeURIComponent(x); };

@@ -4,19 +4,24 @@
  *   1. the intro band: what the site covers and how to use it, with three quick links (Games, Standings, Players);
  *   2. "This week in the <league>": the stage of the season, then the top lines from index.json leagues.<L>.digest
  *      (scripts/build_hardwood.py league_digest, on oddsmarkets/common/digest.py): the biggest playoff (or title)
- *      chance mover, the upset of the week, the team of the week, our record this week, the other games that matter;
+ *      chance mover, the upset of the week, the team of the week, the other games that matter;
  *   3. the game that matters most on the shared significance rule (digest.featured, oddsmarkets/common/featured.py)
  *      as the diagonal split hero, labelled "Live now", "Tonight" (only when it truly is tonight in the reader's
  *      time), "Today", "Tomorrow" or the weekday; with nothing big on, the title race leads instead;
- *   4. "N games. Our calls."; the black power list (Who's hot); "We say it. Then we check it." beside "Who's for
- *      real?" (win % against net rating); "What's that number?"; series in progress (playoffs); the title race in
+ *   4. "N games. Our calls." (the market quiet under our chance, round 6); the black power list (Who's hot); Breakout
+ *      watch; "Who's for real?" (win % against net rating) beside the biggest surprise and, in the NBA, the scoring
+ *      leader against the record; the best player nobody talks about; "What's that number?"; series in progress
+ *      (playoffs); the title race in
  *      team colours (ours only: no market anywhere on the overview) beside the award races; projected wins with the
  *      90% range and power ratings; the playoff picture; most valuable players and the games that swing the most;
- *      the leader boards (qualified only).
+ *      the leader boards (qualified only); a small link to the Model page's "How we're doing" (our record and
+ *      calibration live there since round 6).
  * A past season shows its champion, the stat tiles, "Who's for real?", final standings and leaders.
- * Reads index.json, <L>/<S>/season.json, <L>/calibration.json, <L>/<S>/awards.json, <L>/<S>/valuation.json, <L>/history.json. */
+ * Reads index.json, <L>/<S>/season.json, <L>/<S>/awards.json, <L>/<S>/valuation.json, <L>/history.json; then, lazily,
+ * <L>/<S>/value.json, last season's value.json, <L>/<S>/performers.json and <L>/race_log.json (the fan modules). */
 (function (HW) {
 'use strict';
+const progHref = h => h + (h.indexOf('?') >= 0 ? '&' : '?') + 'tab=progression';   /* the player's Progression tab (round 6) */
 
 const U = HW.ui, esc = HW.esc, isNum = HW.isNum;
 const AWN = { mvp: 'MVP', roy: 'Rookie', dpoy: 'Defence', sixth: 'Sixth', mip: 'Most improved', clutch: 'Clutch' };
@@ -74,15 +79,9 @@ function reasonsWhy(L, r, c, sim, ph) {
   if (!lead && !nums) return '';
   return lead ? lead.charAt(0).toUpperCase() + lead.slice(1) + (nums ? ': ' + nums : '') + '.' : nums.charAt(0).toUpperCase() + nums.slice(1) + '.';
 }
-/* Under the hero: why we picked it, then how sure we are. */
+/* Under the hero: why we picked it (round 6: no "How sure are we?" teaser on the landing page). */
 function heroNote(L, g, why) {
-  const p = g.p_home;
-  let sure = '';
-  if (g.status !== 'live' && isNum(p)) {
-    const fav = p >= 0.5 ? g.home : g.away, other = p >= 0.5 ? g.away : g.home, pf = Math.max(p, 1 - p), miss = Math.max(1, Math.round(10 * (1 - pf)));
-    sure = ' <b>How sure are we?</b> ' + U.pct(pf) + ' for the ' + esc(fav.short || fav.name) + ' means the ' + esc(other.short || other.name) + ' win a game like this about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.';
-  }
-  return why ? '<b>Why this game?</b> ' + esc(why) + sure : (sure ? sure.slice(1) : undefined);
+  return why ? '<b>Why this game?</b> ' + esc(why) : false;
 }
 /* "This week in the <league>": the stage line, then the top lines as black tiles. */
 function stageLine(L, st, ph) {
@@ -113,12 +112,6 @@ function weekTiles(L, S, dig, feat, sim, extra) {
   const h = dig.hot;
   if (h) T.push({ label: 'Team of the week', value: HW.teamAbbr(L, h.key) + ' ' + h.w + '–' + h.l, href: HW.teamHref(L, h.key, S),
     sub: 'The ' + HW.teamName(L, h.key) + ': ' + h.w + ' win' + (h.w === 1 ? '' : 's') + ' in ' + h.gp + ' games, ' + (h.margin >= 0 ? '+' : '−') + Math.abs(Math.round(h.margin)) + ' points overall.' });
-  const r = dig.record;
-  if (r) {
-    const diff = r.won - r.expected;
-    T.push({ label: 'Our record this week', value: r.won + ' of ' + r.n, href: HW.href(L, 'model') + '?tab=calibration',
-      sub: 'Our favourites won ' + r.won + ' of ' + r.n + '; we expected ' + QK.fmt.num(r.expected, 0) + '. ' + (Math.abs(diff) < 2 ? 'Right on our numbers.' : diff > 0 ? 'A good week for the favourites.' : 'A week of upsets: a 60% call still misses 4 times in 10.') });
-  }
   /* a thin week (preseason, a playoff round): the series in play, the top-rated team and the MVP race fill in */
   (extra || []).forEach(x => { if (T.length < 4) T.push(x); });
   const rest = (feat && feat.rest || []).filter(Boolean).slice(0, 2);
@@ -210,6 +203,94 @@ function gamesBlock(d) {
   return { today: today, next: next, last: last };
 }
 
+/* ── round 6: the fan modules (lazy, after the page is up; small payloads only, about 100 KB) ──
+ *   Breakout watch      players near the top of our impact model (HPM) this season who were well down their role's
+ *                       percentiles last season: this season from <S>/value.json (qualified), or early in a season
+ *                       before it is built, the role boards' top HPM in <S>/performers.json; last season from
+ *                       <S-1>/value.json (qualified only). The two percentiles are each season's own, role by role.
+ *   Biggest surprise    the largest move in our playoff (or title) chance since the first logged day (race_log.json;
+ *                       early dates rebuilt from the results known on each date)
+ *   Records in reach    NBA only: the scoring leader's points a game against Wilt Chamberlain's 50.4 (1961-62)
+ *   Nobody talks about  a player on our deep role boards (performers.json) but not on the points leaderboard, as a
+ *                       spotlight with the percentiles he posts on those boards */
+const ROLE = { G: 'guards', W: 'wings', B: 'bigs' };
+function fanModules(el, L, S, season, isCur) {
+  const prevS = Number(S) - 1, LN = HW.leagueName(L);
+  return Promise.all([HW.load(HW.path('value.json', L, S)), HW.load(HW.path('value.json', L, prevS)), HW.load(HW.path('performers.json', L, S)), HW.load(HW.lpath('race_log.json', L))]).then(arr => {
+    if (!U.alive(el)) return;
+    const rowsOf = d => (U.ok(d) && d.cols && d.rows ? d.rows.map(r => { const o = {}; d.cols.forEach((c, i) => { o[c] = r[i]; }); return o; }) : []);
+    const cur = rowsOf(arr[0]).filter(r => r.q), prev = {}, PF = U.ok(arr[2]) ? arr[2] : null, RL = U.ok(arr[3]) ? arr[3] : {};
+    rowsOf(arr[1]).forEach(r => { if (r.q) prev[String(r.id)] = r; });
+    const early = !cur.length;
+    let now = cur.map(r => ({ id: String(r.id), name: r.name, team: r.team, role: r.role, hpm: r.hpm, pct: r.pct_role, gp: r.gp }));
+    if (early && PF) (PF.views || []).forEach(v => {
+      const role = Object.keys(ROLE).filter(k => ROLE[k] === v.key)[0];
+      if (!role) return;
+      ((v.metrics || []).filter(m => m.key === 'hpm')[0] || { top: [] }).top.forEach(t => now.push({ id: String(t[0]), name: t[1], team: t[2], role: role, hpm: t[3], pct: t[4] }));
+    });
+    const LDS = (season || {}).leaders || {}, ld = LDS.pts || [], onPts = {};
+    Object.keys(LDS).forEach(k => (LDS[k] || []).forEach(r => { onPts[String(r[0])] = 1; }));
+    /* Breakout watch */
+    const brk = now.filter(r => prev[r.id] && isNum(r.pct) && isNum(prev[r.id].pct_role) && r.pct >= 75 && r.pct - prev[r.id].pct_role >= 25)
+      .map(r => Object.assign({ was: prev[r.id] }, r)).sort((a, b) => (b.pct - b.was.pct_role) - (a.pct - a.was.pct_role)).slice(0, 3);
+    const roleN = r => (ROLE[r] || 'players');
+    const cards = brk.map(r => ({ kicker: 'Breakout watch', name: r.name || HW.playerName(L, r.id), sub: HW.teamAbbr(L, r.team) + ' · ' + roleN(r.role).replace(/s$/, ''), colour: HW.teamColourRaw(L, r.team), mark: U.team(L, r.team), href: progHref(HW.playerHref(L, r.id, S)),
+      value: '+' + Math.round(r.pct - r.was.pct_role), unit: 'percentile points on last season',
+      from: { label: 'Last season', value: QK.ordinal(Math.round(r.was.pct_role)), pos: r.was.pct_role }, to: { label: 'This season', value: QK.ordinal(Math.round(r.pct)), pos: r.pct },
+      text: 'Total impact (HPM), our plus-minus model, among ' + roleN(r.role) + ': ' + U.signed(r.hpm, 1) + ' points per 100 possessions this season, after ' + U.signed(r.was.hpm, 1) + ' over ' + r.was.gp + ' games last season.' + (early ? ' Early in the season: a small sample that settles after about 20 games.' : isNum(r.gp) && r.gp < 20 ? ' ' + r.gp + ' games in: a small sample.' : ''),
+      link: { text: 'Progression' } }));
+    const bx = el.querySelector('#ov-break');
+    if (bx) bx.innerHTML = cards.length ? '<section class="qk-section">' + QK.sectionHead({ kicker: 'Breakout watch', title: isCur ? 'Who has found another gear?' : 'The season’s breakouts', sub: 'Near the top of our impact model this season, well down it last season. Percentiles against the same role (guards, wings or bigs), each season on its own.',
+      actions: '<a class="qk-more" href="' + esc(HW.href(L, 'players', S)) + '">Every player</a>' }) + QK.storyCards(cards) + '</section>' : '';
+
+    /* Records in reach + Biggest surprise, beside Who's for real? */
+    const side = [];
+    if (L === 'nba' && ld[0] && isNum(ld[0][1])) {
+      const id = String(ld[0][0]), p = HW.NAMES[L].players[id] || {}, v = ld[0][1];
+      side.push({ kicker: 'Records in reach', name: p.name || HW.playerName(L, id), sub: (p.team ? HW.teamAbbr(L, p.team) + ' · ' : '') + 'top scorer', colour: p.team ? HW.teamColourRaw(L, p.team) : null, mark: p.team ? U.team(L, p.team) : null, href: HW.playerHref(L, id, S),
+        value: U.f(v, 1), unit: 'points a game', pace: { now: v, target: 50.4, max: 55, label: 'Record', fmt: x => U.f(x, 1) },
+        text: 'The record is 50.4 points a game, Wilt Chamberlain in 1961-62. ' + (early ? 'A few games in, a scoring average this high rarely holds.' : v >= 40 ? 'Rarefied air.' : 'Still a long way short.') });
+    }
+    const ph = String((HW.leagueInfo(L) || {}).phase || (season || {}).phase || '');
+    const pick = (/play/.test(ph) ? ['p_title'] : ['p_playoffs', 'p_title']).map(m => {
+      const lg = (RL[String(S)] || {})[m] || {}, days = Object.keys(lg).filter(d => /^\d{4}-/.test(d)).sort();
+      if (days.length < 2) return null;
+      const a = lg[days[0]], b = lg[days[days.length - 1]];
+      const mv = Object.keys(b).filter(t => isNum(a[t]) && isNum(b[t])).map(t => ({ t: t, d: b[t] - a[t], a: a[t], b: b[t], m: m, since: days[0] })).sort((x, y) => Math.abs(y.d) - Math.abs(x.d))[0];
+      return mv || null;
+    }).filter(Boolean).sort((x, y) => Math.abs(y.d) - Math.abs(x.d))[0];
+    if (pick && Math.abs(pick.d) >= 0.05) {
+      const what = pick.m === 'p_title' ? 'title' : 'playoff';
+      side.push({ kicker: 'Biggest surprise', name: HW.teamName(L, pick.t), sub: (U.records(season)[String(pick.t)] || '') + (/reg/.test(ph) ? ' so far' : ''), colour: HW.teamColourRaw(L, pick.t), mark: U.team(L, pick.t), href: HW.teamHref(L, pick.t, S),
+        value: (pick.d > 0 ? '+' : '−') + Math.abs(Math.round(pick.d * 100)), unit: 'points of ' + what + ' chance',
+        from: { label: day(pick.since), value: U.pct(pick.a), pos: pick.a * 100 }, to: { label: 'Now', value: U.pct(pick.b), pos: pick.b * 100 },
+        text: 'No team’s ' + what + ' chance has moved more since ' + day(pick.since) + ', in our season simulations: ' + (pick.d > 0 ? 'up' : 'down') + ' from ' + U.pct(pick.a) + ' to ' + U.pct(pick.b) + '.' });
+    }
+    const sx = el.querySelector('#ov-side');
+    if (sx) sx.innerHTML = side.length ? QK.sectionHead({ kicker: 'Records and surprises', title: L === 'nba' ? 'Chasing Wilt?' : 'Who surprised us?', sub: 'The team our numbers misjudged most' + (L === 'nba' ? ', and the scoring leader against the record.' : '.') }) + QK.storyCards(side, { cols: 1 }) : '';
+
+    /* Best player nobody talks about: on two or more deep role boards, not on the points leaderboard */
+    const deep = {};
+    ((PF && PF.views) || []).filter(v => ROLE.G === v.key || ROLE.W === v.key || ROLE.B === v.key).forEach(v => (v.metrics || []).forEach(m => (m.top || []).forEach(t => {
+      const id = String(t[0]);
+      if (onPts[id]) return;
+      const d = deep[id] || (deep[id] = { id: id, name: t[1], team: t[2], view: v.key, n: 0, rows: [] });
+      if (d.rows.length < 5 && d.rows.every(x => x.key !== m.key)) d.rows.push({ key: m.key, label: m.label, value: m.fmt === '+1' ? U.signed(t[3], 1) : /pct|ts/.test(m.key) && t[3] <= 1 ? U.pct(t[3], 1) : U.f(t[3], 1), pctl: t[4], tip: (m.ours ? 'Our model: ' + m.ours + '. ' : '') + (m.tip || '') });
+      d.n++;
+    })));
+    const shown = {}; brk.forEach(r => { shown[r.id] = 1; });
+    const q = Object.keys(deep).map(k => deep[k]).filter(d => d.rows.length >= 2 && !shown[d.id]).sort((a, b) => b.n - a.n)[0];
+    const spx = el.querySelector('#ov-spot');
+    if (spx && q) {
+      const p = HW.NAMES[L].players[q.id] || {};
+      spx.innerHTML = '<section class="qk-section">' + QK.sectionHead({ kicker: 'Best player nobody talks about', title: 'Off the leaderboards. All over ours.', sub: 'On none of the leaderboards, but in the top five of our ' + q.view + ' boards ' + q.n + ' times. Percentiles against ' + q.view + ' this season.' }) +
+        QK.spotlight({ kicker: 'Spotlight · ' + q.view.replace(/s$/, ''), name: q.name, sub: HW.teamName(L, q.team) + (p.age ? ' · ' + Math.floor(p.age) : ''), number: p.num || p.jersey || '', team: { colour: HW.teamColourRaw(L, q.team) },
+          headline: 'A top-five ' + q.view.replace(/s$/, '') + ' on ' + q.n + ' of our ' + q.view + ' boards, ' + LN + ' ' + HW.seasonLabel(L, S) + '.',
+          stats: q.rows.slice(0, 4), text: early ? 'Early in the season: these numbers settle after about 20 games.' : '', links: [{ href: HW.playerHref(L, q.id, S), text: 'Player page' }, { href: progHref(HW.playerHref(L, q.id, S)), text: 'Progression' }, { href: HW.href(L, 'compare'), text: 'Compare' }] }) + '</section>';
+    }
+  });
+}
+
 function render(el, params) {
   const L = U.L(params), S = U.S(params);
   const info = HW.leagueInfo(L);
@@ -256,7 +337,7 @@ function render(el, params) {
     const LN = HW.leagueName(L);
     const dig = info.digest || {};
     const feat = isCur ? pickFeatured(L, info, sim) : null;
-    let h = (tickList.length ? '<div class="qk-ticker hw-ticker" aria-label="Scores and our chances">' + QK.ticker(tickList, { group: false, league: true }) + '</div>' : '');
+    let h = (tickList.length ? '<div class="qk-ticker hw-ticker" aria-label="Scores and our chances">' + QK.ticker(tickList, { group: false, league: true, market: 'quiet' }) + '</div>' : '');
     if (isCur) {
       h += intro({ tag: U.kicker(L, S),
         title: 'Every ' + LN + ' game, player and team, by the numbers.',
@@ -297,13 +378,15 @@ function render(el, params) {
     if (hot.length) h += QK.band(QK.sectionHead({ kicker: isCur ? 'Who’s hot' : 'The season’s best', title: isCur ? 'The leaders, stat by stat' : 'Who led the way',
       sub: 'The top name on five boards, the next best behind, and a line on what the number means. Qualified players only.',
       actions: '<a class="qk-more" href="' + esc(HW.href(L, 'players', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=leaders') + '">Every leader</a>' }) + QK.hotRow(hot));
-    /* We say it. Then we check it. (filled from calibration.json) beside Who's for real? (win % against net rating) */
+    /* Breakout watch, then Who's for real? (win % against net rating) beside the surprise and the record chase, then the
+       best player nobody talks about (round 6: the fan modules, filled lazily by fanModules) */
+    h += '<div id="ov-break"></div>';
     const realHTML = '<div class="hw-ov-real">' + QK.sectionHead({ kicker: 'Who’s for real?', title: 'Results v chances', sub: 'Teams top-left are winning more than their play suggests; bottom-right, the reverse. Luck, or something real?' }) +
       '<div class="qk-card"><div class="qk-card-body"><div id="ov-luck" class="qk-chart" role="img" aria-label="Win percentage against net rating"></div><p class="qk-caption" id="ov-luck-cap"></p></div></div></div>';
-    h += isCur ? '<section class="qk-section qk-g75"><div><div id="ov-sure-h"></div><div id="ov-sure"></div></div>' + realHTML + '</section>' : '<section class="qk-section">' + realHTML + '</section>';
+    h += '<section class="qk-section qk-g75">' + realHTML + '<div id="ov-side"></div></section><div id="ov-spot"></div>';
     if (isCur) h += '<section class="qk-section">' + QK.newHere({ items: [QK.NEW_HERE[0],
       'A <b>percentile</b> ranks a player against the same role (guards, wings or bigs): 90th means better than 90 in 100.',
-      'Every forecast is checked against what happened. <a class="qk-link" href="' + esc(HW.href(L, 'model') + '?tab=calibration') + '">The record is on the Model page.</a>'] }) + '</section>';
+      '<b>HPM</b>, our plus-minus model, is the points per 100 possessions a player adds over an average player: 0 is average, and the higher, the more he adds.'] }) + '</section>';
     if (liveSeries.length) {
       h += '<section class="qk-section">' + U.head({ kicker: 'Playoffs', title: 'Series in progress', sub: 'The bracket has every round and each team’s chance of reaching it.', actions: '<a class="qk-btn" href="' + esc(HW.href(L, 'standings') + '?tab=bracket') + '">Bracket →</a>' }) +
         '<div class="hw-mini-grid">' + liveSeries.map(x => seriesTile(L, x, sim)).join('') + '</div></section>';
@@ -355,6 +438,7 @@ function render(el, params) {
           ld[k].slice(0, 5).map((r, i) => { const p = HW.NAMES[L].players[String(r[0])] || {};
             return '<li><span class="n">' + (i + 1) + '</span>' + U.playerEnt(L, r[0], p.name, p.team, null, S) + '<span class="v">' + HW.fmtVal(r[1], k === 'ts' ? 'pct' : k === 'hpm' ? 'pm' : '1') + '</span></li>'; }).join('') + '</ul></div>').join('') + '</div></section>';
     }
+    if (isCur) h += '<p class="qk-sub hw-ov-doing"><a class="qk-link" href="' + esc(HW.href(L, 'model') + '?tab=calibration') + '">How we’re doing →</a> Our record and every forecast checked against the result, on the Model page.</p>';
     el.innerHTML = h;
 
     // ── scoreboard
@@ -433,17 +517,7 @@ function render(el, params) {
       QKC.bar('#ov-war', { cats: vrows.map(r => r.name), series: [{ name: 'WAR', data: vrows.map(r => Math.round(r.w0 * 10) / 10) }], horizontal: true, labels: true, fmt: v => U.f(v, 1),
         colors: vrows.map(r => U.tcol(L, r.team)), hrefs: vrows.map(r => HW.playerHref(L, r.id)), labelWidth: 150, valName: seasonWar ? 'Wins above replacement' : 'Projected WAR, rest of season', catName: 'Player' });
     }
-    /* We say it. Then we check it.: the game model's record from <L>/calibration.json (QK.howSure: big numbers and
-       the we-said / it-happened bars); the full record is on the Model page */
-    if (isCur) HW.load(L + '/calibration.json').then(cj => {
-      const box = el.querySelector('#ov-sure'), hd = el.querySelector('#ov-sure-h');
-      const cb = QK.calib.find(U.ok(cj) ? cj : null);
-      if (!box || !hd) return;
-      if (!cb || !cb.bins.length) { box.innerHTML = ''; hd.innerHTML = ''; return; }
-      hd.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every ' + LN + ' game we have forecast, grouped by the chance we gave the home team. When the two lines match, our numbers mean what they say.',
-        actions: '<a class="qk-more" href="' + esc(HW.href(L, 'model') + '?tab=calibration') + '">The full record</a>' });
-      QK.howSure(box, { calibration: cj, league: LN, subject: 'the home team' });
-    });
+    fanModules(el, L, S, season, isCur);
     const nx = upcoming[0];
     if (nx && !today.some(g => HW.gameState(g) === 'in' && U.fresh(g))) HW.interval(() => { const n = document.getElementById('ov-cd'); if (n) n.innerHTML = cdHTML(L, nx); }, 30000);
     HW.setMeta(nSims ? Number(nSims).toLocaleString('en-GB') + ' season simulations' + (season.updated_at ? ' · model ' + esc(HW.fmtStamp(season.updated_at)) : '') : '');

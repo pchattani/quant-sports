@@ -473,6 +473,7 @@ LIVE.overview = function (el, body, c, d0, q, seasons) {
         FB.card('Leaders', 'This season, every player in the competition.', '<div id="co-leaders" class="fb-co-minis"></div>', { span: 5, foot: '<span></span><a href="' + esc(FB.href.comp(c.slug, 'players')) + '">All players →</a>' })
       ) +
       '<div id="co-hist-wrap"></div></section>' +
+      '<div id="co-perf"></div>' +
       '<section class="qk-section fb-co-sec">' + QK.sectionHead({ kicker: 'Behind the numbers', title: 'How we model it', sub: 'The settings, the record and the format behind this competition’s pages, and every season we have.' }) +
       FB.grid(
         FB.card('How this competition is modelled', esc(c.name) + ': the model settings, calibration and format behind its pages.', modelCard(c, d), { span: 7, foot: '<span></span><a href="#/model/methodology?c=' + esc(FB.enc(c.slug)) + '">Full methodology →</a>' }) +
@@ -497,6 +498,7 @@ LIVE.overview = function (el, body, c, d0, q, seasons) {
     };
     var minis = [mini('goals', 'Goals', 'int'), mini('assists', 'Assists', 'int'), mini('xg', 'Expected goals', '1'), mini('rating', 'Rating', '2')].filter(Boolean).join('');
     $(el, 'co-leaders').innerHTML = minis || cardMsg('No player data yet.');
+    performers($(el, 'co-perf'), c);
     // run-by-run
     var snaps = ((d.history || {}).snapshots || []).filter(function (s) { return s.title; });
     if (snaps.length >= 2 && !last) {
@@ -505,6 +507,26 @@ LIVE.overview = function (el, body, c, d0, q, seasons) {
     }
   });
 };
+
+/* Top and bottom performers (QKL.leaders): all players on our value model, then each position group on its spec
+   headline set, then the clubs (data/<slug>/performers.json, oddsmarkets/football/analytics/performers.py: qualified
+   players only, the spec's 450 minutes, 900 for goalkeepers, and the competition's floor). The section is left out
+   while nobody qualifies (a cup early in its run). */
+function performers(host, c) {
+  if (!host || !window.QKL || !QKL.leaders || !FB.hasFile(c.slug, 'players_live')) return;
+  Promise.all([FB.load(c.slug + '/performers.json'), FB.clubsIndex()]).then(function (arr) {
+    var pf = arr[0];
+    if (!FB.alive(host) || !pf || !(pf.views || []).length) return;
+    QKL.leaders(host, { data: pf, title: 'Who leads the league, and who is struggling',
+      sub: 'The top five and the bottom five on each key number: every player on our value model first, then each position on the numbers that matter for it, and the clubs. Qualified players only; each name opens the player page.',
+      team: function (k) {
+        if (!/^\d+$/.test(String(k))) return { name: k, abbr: FB.clubCode(k) };
+        var nm = FB.clubName(k);
+        return { name: nm, abbr: nm ? FB.clubCode(nm) : '', colour: FB.clubColour(k), logo: FB.crestUrl(k), href: FB.href.club(k, { c: c.slug }) };
+      },
+      href: function (id) { return FB.href.player(id, { c: c.slug }); } });
+  });
+}
 
 /* Our chances after each model run, 538-style (QKC.forecast): one line per club labelled at its end, no legend. */
 function historyChart(box, snaps, key, n, yName) {

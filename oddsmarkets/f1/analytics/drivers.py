@@ -707,6 +707,64 @@ def prev_peer_pct(cat: dict | None, driver: str) -> dict:
     return {"prev_pct_pos": dict(pc), "prev_peer": {"year": y, "races": r.get("races"), "floor": fl, "qualified": True}}
 
 
+# Progression (round 6; oddsmarkets/common/progression.py, MIGRATION_V4.md "Progression"): every career season row
+# carries `dv` / `dp` / `pg` on the drivers' deep set (the spec's headline and secondary metrics the catalogues carry,
+# then PROG_EXTRA), the file a `prog` block, and data/progression_ref.json the peers' quantiles per season. The pace and
+# driver-effect metrics exist from 1996 (lap times); Elo, team-mate head-to-heads and points from 1950.
+PROG_EXTRA = ("race_pace_tm_delta", "quali_gap_pole_pct", "laps_led_share", "top5_rate", "finish_rate")
+PROG_EXTRA_DIR = {"race_pace_tm_delta": "lower", "quali_gap_pole_pct": "lower", "laps_led_share": "higher", "top5_rate": "higher",
+                  "finish_rate": "higher"}
+PROG_FILE = "progression_ref.json"
+
+
+def _floor_of(cat: dict, year: int) -> int:
+    if cat.get("peer_floor"):
+        return int(cat["peer_floor"])
+    try:
+        return peer_floor(int(year))
+    except Exception:                                            # noqa: BLE001
+        return PEER_MIN_FULL
+
+
+def progression(cats: dict[int, dict | None]) -> tuple[dict[str, dict[int, dict]], dict, dict]:
+    """({driver: {year: {dv, dp, pg}}}, progression_ref.json, the files' prog block) from the season catalogues
+    (data/<year>/drivers.json). Qualified = starts at or over the season's peer floor (8 in a finished season of 16+
+    rounds, fewer in short or unfinished ones); percentiles the catalogue's pct_peer where it has one, else placed among
+    the season's qualified drivers."""
+    from oddsmarkets.common import progression as PG
+    have = set()
+    for cat in cats.values():
+        for r in ((cat or {}).get("drivers") or {}).values():
+            have.update(k for k, v in (r.get("values") or {}).items() if v is not None)
+    pb = PG.Builder("f1", {"drivers": PG.deep_keys("f1", ["drivers"], have, extra=PROG_EXTRA)})
+    pb.dirs.update(PROG_EXTRA_DIR)                               # the extras the spec does not list
+    out: dict[str, dict[int, dict]] = {}
+    for y, cat in sorted(cats.items()):
+        D = (cat or {}).get("drivers") or {}
+        if not D:
+            continue
+        fl = _floor_of(cat, y)
+        for d, r in D.items():
+            q = (r.get("races") or 0) >= fl
+            out.setdefault(d, {})[int(y)] = pb.add(int(y), "drivers", "drivers", r.get("values") or {}, q,
+                                                   pct=r.get("pct_peer") if q else None)
+    pb.finish()
+    return out, pb.reference(), pb.prog_block()
+
+
+def merge_progression(career: dict, rows: dict[int, dict] | None, prog: dict | None) -> dict:
+    """The progression fields onto a career file's seasons[] rows (by year) and its `prog` block."""
+    hit = False
+    for s in career.get("seasons") or []:
+        r = (rows or {}).get(int(s.get("year") or 0))
+        if r:
+            s.update(r)
+            hit = True
+    if hit and prog:
+        career["prog"] = prog
+    return career
+
+
 # Similar drivers (the spec's recipe): the eight headline metrics, z-scored within each season among its qualifying
 # drivers, weighted by season-to-season r floored at 0.2; weighted Euclidean distance; the 5 nearest driver-seasons from
 # 1996 on, the driver's own seasons excluded. A feature missing for either driver-season (a pointless team has no

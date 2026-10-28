@@ -66,6 +66,7 @@ const ECOL = ['var(--wp-a)', 'var(--wp-b)', 'var(--plum)'];
    catalogue; the catalogue then loads only for the distribution and the classic every-metric table. Without the blocks
    (older builds, past years) the catalogue loads first, as before. */
 function render(el, params, state) {
+  if (params.a === 'progression' && TA.progression) return TA.progression.compare(el, params, state);
   const k = K(), T = k.T(params, state), V = TA.v2;
   let ids = [params.a, params.b].concat(params.rest || []).filter(Boolean).map(String).slice(0, 3);
   const Y = k.Y(params, state, T);
@@ -95,7 +96,7 @@ function render(el, params, state) {
           }
           return draw(cat);
           function draw(catX) {
-            el.innerHTML = '<div class="ta-cmp-pick">' + [0, 1, 2].map(i => '<div class="ta-cmp-slot" style="--ec:' + ECOL[i] + '"><span class="qk-kicker">' + (i === 2 ? 'Third player (optional)' : 'Player ' + (i + 1)) + '</span><span id="cmp-p' + i + '"></span></div>').join('') + '</div><div id="cmp-body"></div>';
+            el.innerHTML = '<div class="ta-cmp-pick">' + [0, 1, 2].map(i => '<div class="ta-cmp-slot" style="--ec:' + ECOL[i] + '"><span class="qk-kicker">' + (i === 2 ? 'Third player (optional)' : 'Player ' + (i + 1)) + '</span><span id="cmp-p' + i + '"></span></div>').join('') + '</div>' + (ids.length ? '<div class="ta-pl-links"><a class="qk-btn" href="#/' + T + '/compare/progression/' + ids.map(encodeURIComponent).join('/') + '">Compare the careers year by year</a></div>' : '') + '<div id="cmp-body"></div>';
             const cur = ids.slice();
             const go = () => { const list = cur.filter(Boolean); if (list.length >= 2) location.hash = k.href(T, 'compare/' + list.map(encodeURIComponent).join('/')); };
             [0, 1, 2].forEach(i => k.picker(document.getElementById('cmp-p' + i), { T: T, value: ids[i], placeholder: i === 2 ? 'Add a third…' : 'Type a player…', onPick: id => { cur[i] = id; go(); } }));

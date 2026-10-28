@@ -26,6 +26,7 @@ function tabs(L, S, active, ids) {
   const base = '#/' + L + '/compare/players' + (ids && ids.length ? '/' + ids.map(encodeURIComponent).join('/') : '');
   return [{ key: 'compare', label: 'Players, side by side', href: base + (sq ? '?' + sq : '') },
     { key: 'all', label: 'Every metric (classic)', href: base + '?view=all' + (sq ? '&' + sq : '') },
+    { key: 'prog', label: 'Progression', href: '#/' + L + '/compare/progression' + (ids && ids.length ? '/' + ids.map(encodeURIComponent).join('/') : '') },
     { key: 'teams', label: 'Teams', href: '#/' + L + '/compare/teams' + (sq ? '?' + sq : '') }];
 }
 

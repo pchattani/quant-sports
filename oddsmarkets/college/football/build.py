@@ -31,6 +31,7 @@ from scipy.stats import norm
 
 from oddsmarkets.college import canon, store
 from oddsmarkets.college import informed as INF
+from oddsmarkets.college import progression as PROG
 
 from . import (
     backtest,
@@ -994,6 +995,9 @@ POS_KEYS = {"QB": ["value", "value_pg", "epa", "epa_play", "pass_yds", "pass_td"
             "DB": ["value", "value_pg", "tkl", "tfl", "sacks", "pd", "def_int"], "K": ["value", "value_pg", "fgm", "fga"],
             "P": ["value", "value_pg"], "OL": ["value"]}
 POS_KEYS_BOX = {p: list(ks) for p, ks in POS_KEYS.items()}       # the season totals (careers' similar players)
+# every value a season line can carry for the progression's deep set (oddsmarkets/college/progression.py)
+PROG_VALUE_KEYS = sorted({"value", "value_pg", "epa", "epa_play", "pass_yds", "pass_td", "rush_yds", "rec_yds", "tkl", "sacks",
+                          "tfl", "pd", "def_int", "fgm", "fga"} | {k for ks in players.RATE_FIELDS.values() for k in ks})
 for _p, _ks in players.RATE_FIELDS.items():
     POS_KEYS[_p] = POS_KEYS[_p] + [k for k in _ks if k not in POS_KEYS[_p]]
 MIN_FLOOR = {"QB": 5, "RB": 4, "WR": 4, "TE": 4, "DL": 4, "LB": 4, "DB": 4, "K": 4, "P": 4, "OL": 4}
@@ -1748,6 +1752,19 @@ def career_files(ctx: dict, out: Path, current: int, sizes: dict) -> int:
     sim_map = similar_players(vals, current)
     pc_path = out / str(current - 1) / "players.json"
     prev_cat = json.loads(pc_path.read_text(encoding="utf-8")) if pc_path.exists() else None
+    # Progression (oddsmarkets/college/progression.py): dv / dp / pg on every season row of the window, rate percentiles
+    # among the season's rate-qualified FBS players of the position, and data/cfb/progression_ref.json
+    prog_rows, prog_block = {}, None
+    try:
+        recs = {}
+        for s, v in vals.items():
+            mem_s = {t for t, x in ((stores[s].get("teams") or {}).items()) if x.get("member")}
+            recs[s] = [{"pid": r["pid"], "kind": r["pos"], "q": r["team"] in mem_s and players.rate_qualified(r),
+                        "values": {k: r.get(k) for k in PROG_VALUE_KEYS if k in r}} for r in v.to_dict("records")]
+        prog_rows, ref, prog_block = PROG.build(LEVEL, recs)
+        write(out / PROG.PROG_FILE, ref)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("cfb progression failed: %s", exc)
     pdir = out / "players"
     n = 0
     keep = set()
@@ -1782,6 +1799,7 @@ def career_files(ctx: dict, out: Path, current: int, sizes: dict) -> int:
                "weight_lb": info.get("weight_lb"), "hometown": info.get("hometown"), "number": store.jersey_number(info.get("jersey")),
                "seasons": seasons_rows,
                "current": current_block, "moves": mv_all.get(pid, []), "similar": sim_map.get(pid, [])}
+        PROG.merge(obj, seasons_rows, prog_rows.get(str(pid)), prog_block)
         sizes[f"player:{pid}"] = write(pdir / f"{pid}.json", obj)
         keep.add(f"{pid}.json")
         n += 1

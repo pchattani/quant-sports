@@ -59,6 +59,8 @@ from oddsmarkets.football.competitions.liga.store import (  # noqa: E402
     store_age_hours,
     training_frame,
 )
+from oddsmarkets.football.competitions.liga import tables as liga_tables  # noqa: E402
+from oddsmarkets.football.analytics import race as _race  # noqa: E402
 from oddsmarkets.football.sources.teams import normalize_team_name  # noqa: E402
 from oddsmarkets.football.core import (  # noqa: E402
     DixonColesModel,
@@ -75,6 +77,12 @@ DATA_DIR = SITE_DIR / "data"
 STORE_PATH = DATA_DIR / "liga_store.json"
 HISTORY_STORE = DATA_DIR / "history_store.json"
 PKG_DATA = ROOT / "oddsmarkets" / "football" / "competitions" / "liga" / "data"
+# Past league seasons (the archive fetcher's results store): the promedio history before this season.
+PAST_STORE = ROOT / "docs" / "site" / "data" / "past" / "store.json"
+# The Copa Argentina's simulated winners ({club: p}), set by build_site_all from this run's cup build (the cups
+# are built before Argentina). None: the cup's last bracket.json, else the berth is left to the table.
+COPA_DIST: dict | None = None
+COPA_BRACKET = ROOT / "docs" / "site" / "data" / "copa-argentina" / "bracket.json"
 
 # Fitted from walk-forward log-loss over the committed seasons by
 # scripts/tune_liga_model.py. Until that has been run against real data these are
@@ -248,6 +256,7 @@ def build_zones_json(state, results: LigaResults, cfg: LigaConfig) -> dict:
     return {
         "tournament": torneo.key,
         "qualifiers_per_zone": cfg.qualifiers_per_zone,
+        "matches_per_team": cfg.matches_per_team_per_torneo,
         "zones": zones,
         "updated_at": _now(),
     }
@@ -283,17 +292,40 @@ def build_bracket_json(state, results: LigaResults, cfg: LigaConfig) -> dict:
     }
 
 
-def build_anual_json(state, results: LigaResults, cfg: LigaConfig) -> dict:
-    base = state.anual_base()
+def table_places(cfg: LigaConfig) -> tuple[int, int]:
+    """The Tabla Anual places that guarantee a berth whatever the champions do: (Libertadores through the table,
+    last place that guarantees at least the Sudamericana). Six Libertadores places less the three automatic
+    ones (Apertura and Clausura champions, Copa Argentina winner) leave at least three to the table; a champion
+    already in them passes its place down, never up. Twelve continental places less at most three automatic ones
+    leave at least nine."""
+    lib = max(cfg.libertadores_berths - 3, 0)
+    return lib, lib + cfg.sudamericana_berths
+
+
+def build_anual_json(state, results: LigaResults, cfg: LigaConfig, store: dict | None = None,
+                     copa: dict | None = None) -> dict:
+    """
+    The Tabla Anual as it stands (the finished Apertura plus the Clausura so far, zone phases only), in the
+    AFA's order, with where our simulations finish each club. Until October 2026 the table showed only the
+    tournaments the simulator held as finished, and eight dead Apertura fixtures kept that empty: every club
+    on 0 points.
+    """
+    now = state.anual_standings()
+    by_torneo = {key: state.torneo(key).records() for key in (APERTURA, CLAUSURA)}
+    proj = sorted(state.teams, key=lambda t: -results.expected_anual_points.get(t, 0.0))
+    proj_pos = {t: i for i, t in enumerate(proj, start=1)}
+    torneo = state.live_torneo() or state.clausura
     rows = []
-    for team in state.teams:
-        rec = base.get(team)
+    for pos, (team, rec) in enumerate(now, start=1):
         rows.append({
-            "team": team,
-            "pts_now": rec.points if rec else 0,
-            "played": rec.played if rec else 0,
-            "gd": rec.gd if rec else 0,
+            "pos": pos, "team": team, "zone": torneo.zone_of(team),
+            "played": rec.played, "w": rec.won, "d": rec.drawn, "l": rec.lost,
+            "gf": rec.gf, "ga": rec.ga, "gd": rec.gd, "pts": rec.points,
+            "pts_now": rec.points,
+            "apertura_pts": by_torneo[APERTURA].get(team).points if by_torneo[APERTURA].get(team) else 0,
+            "clausura_pts": by_torneo[CLAUSURA].get(team).points if by_torneo[CLAUSURA].get(team) else 0,
             "exp_pts": round(results.expected_anual_points.get(team, 0.0), 2),
+            "proj_pos": proj_pos.get(team),
             "p_champion": round(results.p_anual_champion.get(team, 0.0), 5),
             "p_libertadores": round(results.p_libertadores.get(team, 0.0), 5),
             "p_sudamericana": round(results.p_sudamericana.get(team, 0.0), 5),
@@ -301,43 +333,62 @@ def build_anual_json(state, results: LigaResults, cfg: LigaConfig) -> dict:
             # Full finishing distribution, for the position heatmap.
             "p_pos": [round(p, 5) for p in results.p_anual_position.get(team, [])],
         })
-    rows.sort(key=lambda r: (-r["exp_pts"], -r["pts_now"]))
-    for i, row in enumerate(rows, start=1):
-        row["pos"] = i
+    lib_table, sud_last = table_places(cfg)
+    official = liga_tables.official_table(store or {}, "anual")
+    check = liga_tables.compare(now, official)
+    if check is not None:
+        check.update({k: v for k, v in liga_tables.official_meta(store or {}).items() if k != "blocks"})
     return {
         "rows": rows,
+        "matches_per_team": cfg.matches_per_team_per_torneo * 2,
+        "games_played": sum(r.played for _, r in now) // 2,
+        "total_games": cfg.matches_per_torneo * 2,
+        "tiebreak": ["pts", "gd", "gf"],
         "berths": {
             "libertadores": cfg.libertadores_berths,
             "sudamericana": cfg.sudamericana_berths,
-            "copa_argentina_winner": cfg.copa_argentina_winner,
+            "table_libertadores": lib_table,
+            "table_sudamericana_last": sud_last,
+            "apertura_champion": state.apertura.champion,
+            "clausura_champion": state.clausura.champion,
+            "copa_argentina_winner": cfg.copa_argentina_winner or (copa or {}).get("winner"),
+            "copa_argentina": copa or None,
             "note": (
                 "Los campeones del Apertura, del Clausura y de la Copa Argentina "
                 "clasifican directo a la Libertadores; los cupos restantes salen de "
-                "esta tabla. La Copa Argentina queda fuera del modelo: si su campeón "
-                "ya está definido se toma como dado, y si no, se asume que ese cupo "
-                "se resuelve por la tabla."
+                "esta tabla, y los seis siguientes van a la Sudamericana. Mientras la "
+                "Copa Argentina se juega, su campeón sale de nuestras simulaciones de la copa."
             ),
             "note_en": (
-                "The Apertura, Clausura and Copa Argentina champions qualify directly "
-                "for the Libertadores; the remaining berths come from this table. The "
-                "Copa Argentina is outside the model: if its winner is already decided "
-                "it is taken as given, otherwise that berth is assumed to resolve through "
-                "the table."
+                "The Apertura, Clausura and Copa Argentina champions qualify directly for the Libertadores; "
+                "the remaining places go down this table, and the next six clubs not already in go to the "
+                "Sudamericana. A champion already high in the table passes its place down, so the top "
+                + str(lib_table) + " are always in the Libertadores and the top " + str(sud_last) + " always "
+                "in one of the two. While the Copa Argentina is being played, its winner is drawn in every "
+                "simulated season from our simulations of the cup."
             ),
         },
+        "official": check,
         "updated_at": _now(),
     }
 
 
-def build_relegation_json(state, results: LigaResults, cfg: LigaConfig) -> dict:
+def build_relegation_json(state, results: LigaResults, cfg: LigaConfig, prior_info: dict | None = None,
+                          store: dict | None = None) -> dict:
     promedios = state.promedio_now()
+    now = state.anual_now()
     rows = []
     for team in state.teams:
         prior_pts, prior_mp = state.promedios_prior.get(team, (0, 0))
         q = results.promedio_quantiles.get(team, (0.0, 0.0, 0.0))
+        rec = now.get(team)
         rows.append({
             "team": team,
             "promedio_now": round(promedios.get(team, 0.0), 4),
+            "points": prior_pts + (rec.points if rec else 0),
+            "matches": prior_mp + (rec.played if rec else 0),
+            "season_points": rec.points if rec else 0,
+            "season_matches": rec.played if rec else 0,
             "prior_points": prior_pts,
             "prior_matches": prior_mp,
             "p05": round(q[0], 4), "p50": round(q[1], 4), "p95": round(q[2], 4),
@@ -348,8 +399,22 @@ def build_relegation_json(state, results: LigaResults, cfg: LigaConfig) -> dict:
     rows.sort(key=lambda r: r["promedio_now"])
     for i, row in enumerate(rows, start=1):
         row["pos"] = i
+    # Sofascore's promedios table beside ours (same order: worst first), when the store holds it.
+    official = liga_tables.official_table(store or {}, "promedios")
+    check = None
+    if official:
+        diffs = []
+        for r in rows:
+            o = official.get(r["team"])
+            if not o or o.get("points") != r["points"] or o.get("matches") != r["matches"]:
+                diffs.append({"team": r["team"], "ours": [r["points"], r["matches"]],
+                              "official": [o.get("points"), o.get("matches")] if o else None})
+        check = {"clubs": len(rows), "same": len(rows) - len(diffs), "diffs": diffs[:30],
+                 **{k: v for k, v in liga_tables.official_meta(store or {}).items() if k != "blocks"}}
     return {
         "rows": rows,
+        "prior": prior_info or {},
+        "official": check,
         "rules": {
             "places": cfg.relegation_places,
             "promedio_seasons": cfg.promedio_seasons,
@@ -371,7 +436,91 @@ def build_relegation_json(state, results: LigaResults, cfg: LigaConfig) -> dict:
     }
 
 
-def build_probs_json(state, results: LigaResults) -> dict:
+RACE_SEASON = "2026-anual"     # the daily race log's key; a new key starts it afresh (October 2026 fix)
+
+
+def race_bands(cfg: LigaConfig) -> list[dict]:
+    """The Race tab's bands on the Tabla Anual (docs/site/assets/app/race.js): the places that guarantee a
+    Libertadores or at least a Sudamericana berth, and last place, which goes down. The probabilities behind
+    them are the berths and relegation by every route (the champions, the cup, the promedio)."""
+    lib, sud_last = table_places(cfg)
+    n = cfg.n_teams
+    return [
+        {"key": "libertadores", "label": "Libertadores", "first": 1, "last": lib, "kind": "up",
+         "phrase": "reach the Libertadores"},
+        {"key": "continental", "label": "Libertadores or Sudamericana", "first": 1, "last": sud_last, "kind": "up",
+         "phrase": "reach the Libertadores or the Sudamericana"},
+        {"key": "relegation", "label": "Relegation", "first": n, "last": n, "kind": "down", "phrase": "go down"},
+    ]
+
+
+def _band_probs(results: LigaResults, team: str) -> dict:
+    return {
+        "libertadores": round(results.p_libertadores.get(team, 0.0), 5),
+        "sudamericana": round(results.p_sudamericana.get(team, 0.0), 5),
+        "continental": round(results.p_libertadores.get(team, 0.0) + results.p_sudamericana.get(team, 0.0), 5),
+        "relegation": round(results.p_relegation_any.get(team, 0.0), 5),
+        "top8": round(results.p_top8.get(team, 0.0), 5),
+    }
+
+
+def build_stakes(results: LigaResults) -> list[dict]:
+    """probs.json "stakes" in the leagues' shape (analytics/race.py stakes_payload), the title being the top of
+    the Tabla Anual and "top8" a place in this tournament's playoffs."""
+    from types import SimpleNamespace
+
+    bands = [SimpleNamespace(key="libertadores", label="Libertadores", kind="up"),
+             SimpleNamespace(key="sudamericana", label="Sudamericana", kind="up"),
+             SimpleNamespace(key="relegation", label="Relegation", kind="down"),
+             SimpleNamespace(key="top8", label="Playoff place", kind="up")]
+    out = _race.stakes_payload(results, SimpleNamespace(bands=bands))
+    for s in out:
+        for m in s.get("m") or []:
+            if m.get("key") == "title":
+                m["label"] = "Top of the Tabla Anual"
+    return out
+
+
+def build_table_json(state, results: LigaResults, cfg: LigaConfig, anual: dict) -> dict:
+    """table.json in the leagues' shape, on the Tabla Anual, for the shared Race tab: the standings with the
+    berth and relegation chances as bands, the points arithmetic over the 32 zone matches a club plays a year,
+    and the title as the top of the Tabla Anual (`title_key`). The zone tables stay in zones.json."""
+    rows = []
+    for r in anual["rows"]:
+        rows.append({
+            "pos": r["pos"], "team": r["team"], "zone": r.get("zone"),
+            "played": r["played"], "w": r["w"], "d": r["d"], "l": r["l"],
+            "gf": r["gf"], "ga": r["ga"], "gd": r["gd"], "pts": r["pts"],
+            "exp_pts": r["exp_pts"], "p_title": r["p_champion"], "p_pos": r["p_pos"],
+            "bands": _band_probs(results, r["team"]),
+        })
+    return {
+        "season": f"{cfg.season_year}",
+        "view": "anual",
+        "label": "Tabla Anual",
+        "title_key": "p_anual",
+        "title_label": "Top of the Tabla Anual",
+        "title_short": "Top",
+        "title_phrase": "top the Tabla Anual",
+        "title_kpi": "Favourite to top it",
+        "title_tier": "Tabla Anual contenders",
+        "safety_label": "Clear of last place",
+        "hist_keys": {"title": "anual", "band": "libertadores", "relegation": "relegation"},
+        "exp_key": "exp_anual_pts",
+        "down_places": cfg.relegation_places,
+        "bands": race_bands(cfg),
+        "tiebreak": ["pts", "gd", "gf"],
+        "h2h_tiebreak": False,
+        "games_played": anual["games_played"],
+        "total_games": anual["total_games"],
+        "matches_per_team": anual["matches_per_team"],
+        "standings": rows,
+        "updated_at": _now(),
+    }
+
+
+def build_probs_json(state, results: LigaResults, cfg: LigaConfig | None = None) -> dict:
+    cfg = cfg or DEFAULT_CONFIG
     torneo = state.live_torneo() or state.clausura
     teams = []
     for team in state.teams:
@@ -388,9 +537,15 @@ def build_probs_json(state, results: LigaResults) -> dict:
             "p_sudamericana": round(results.p_sudamericana.get(team, 0.0), 5),
             "p_relegation": round(results.p_relegation_any.get(team, 0.0), 5),
             "exp_pts": round(results.expected_points.get(team, 0.0), 2),
+            "exp_anual_pts": round(results.expected_anual_points.get(team, 0.0), 2),
+            "bands": _band_probs(results, team),
         })
     teams.sort(key=lambda t: -t["p_title"])
-    return {"teams": teams, "updated_at": _now()}
+    out = {"teams": teams, "bands": race_bands(cfg), "has_playoff": True, "updated_at": _now()}
+    stakes = build_stakes(results)
+    if stakes:
+        out["stakes"] = stakes
+    return out
 
 
 def build_players_json(
@@ -484,7 +639,8 @@ def build_boot_candidates(store, results: LigaResults, cap_per_team: int = 12) -
     return list(merged.values())
 
 
-def build_strength_json(model, state, results: LigaResults, store, cfg: LigaConfig) -> dict:
+def build_strength_json(model, state, results: LigaResults, store, cfg: LigaConfig,
+                        prev_rank: dict[str, int] | None = None) -> dict:
     """
     Power rankings: what the fitted model believes, next to what the table says.
 
@@ -497,8 +653,10 @@ def build_strength_json(model, state, results: LigaResults, store, cfg: LigaConf
 
     def _elo_factory():
         elo = EloRatings(k_league=ELO_K_LEAGUE, home_advantage=ELO_HOME_ADVANTAGE)
+        # Seeded like the model's Elo: last year's Tabla Anual (the team list's alphabetical order before
+        # October 2026, which put Aldosivi top of every trajectory's starting line).
         elo.seed_from_ranking(
-            {t: i + 1 for i, t in enumerate(state.teams)}, n_teams=len(state.teams)
+            prev_rank or {t: i + 1 for i, t in enumerate(state.teams)}, n_teams=len(state.teams)
         )
         return elo
 
@@ -576,10 +734,21 @@ def build_history_json(results: LigaResults, keep_store: int = 400, keep_out: in
     """
     store = _read_json(HISTORY_STORE, {"snapshots": []})
     snapshots = store.get("snapshots", [])
+    # Runs before the October 2026 fix computed the Tabla Anual without the Apertura: their anual and
+    # relegation series are dropped (the Clausura title line is kept).
+    for snap in snapshots:
+        if isinstance(snap, dict) and not snap.get("v"):
+            snap.pop("anual", None)
+            snap.pop("relegation", None)
     stamp = _now()
     top = sorted(results.p_title.items(), key=lambda kv: -kv[1])[:16]
     snapshot = {
         "ts": stamp,
+        "v": 2,
+        "libertadores": {
+            t: round(p, 5)
+            for t, p in sorted(results.p_libertadores.items(), key=lambda kv: -kv[1])[:16]
+        },
         "title": {t: round(p, 5) for t, p in top},
         "anual": {
             t: round(p, 5)
@@ -593,11 +762,19 @@ def build_history_json(results: LigaResults, keep_store: int = 400, keep_out: in
     if not any(s.get("ts") == stamp for s in snapshots):
         snapshots.append(snapshot)
     snapshots = snapshots[-keep_store:]
+    # The Race tab's daily log (analytics/race.py roll_daily), on the Tabla Anual: its top, the Libertadores
+    # and relegation by either route, one entry a day for the season.
+    race_snaps = [
+        {"ts": x.get("ts"), "title": x.get("anual"), "band": x.get("libertadores"), "band_key": "libertadores",
+         "relegation": x.get("relegation")}
+        for x in snapshots if isinstance(x, dict) and x.get("v")
+    ]
+    daily = _race.roll_daily(store.get("daily"), race_snaps, RACE_SEASON, results.teams)
     HISTORY_STORE.parent.mkdir(parents=True, exist_ok=True)
     HISTORY_STORE.write_text(
-        json.dumps({"snapshots": snapshots}, ensure_ascii=False), encoding="utf-8"
+        json.dumps({"snapshots": snapshots, "daily": daily}, ensure_ascii=False), encoding="utf-8"
     )
-    return {"snapshots": snapshots[-keep_out:], "updated_at": stamp}
+    return {"snapshots": snapshots[-keep_out:], "daily": daily["days"], "updated_at": stamp}
 
 
 def write_market_odds(markets: dict | None) -> None:
@@ -709,11 +886,21 @@ def main() -> int:
         )
         return 1
 
-    promedios = _read_json(PKG_DATA / "promedios_history.json", {})
-    prior = {t: (int(v.get("points", 0)), int(v.get("matches", 0)))
-             for t, v in promedios.items()}
+    # The promedio history before this season: a committed promedios_history.json when there is one (the old
+    # backfill job's output; never produced), else Sofascore's promedios table in the store, else our past
+    # results (liga/tables.py says which, and the relegation payload carries it).
     meta_extra = _read_json(PKG_DATA / "season_meta.json", {})
+    promedios = _read_json(PKG_DATA / "promedios_history.json", {})
+    if promedios:
+        prior = {t: (int(v.get("points", 0)), int(v.get("matches", 0))) for t, v in promedios.items()}
+        prior_info = {"source": "file", "note": "Promedio history from promedios_history.json."}
+    else:
+        past = ((_read_json(PAST_STORE, {}) or {}).get("seasons") or {}).get("liga-argentina") or {}
+        prior, prior_info = liga_tables.promedio_prior(store, past, cfg.season_year, cfg.promedio_seasons)
+    logger.info("promedio history: %s, %d clubs", prior_info.get("source"), len(prior))
 
+    # Champions: a played final in the store names them (liga/store.py champion_from_final); the meta file
+    # only fills a gap.
     state = season_state_from_store(
         store, cfg,
         promedios_prior=prior,
@@ -722,9 +909,28 @@ def main() -> int:
     )
     logger.info(state.summary())
 
+    # The Copa Argentina winner: this run's cup simulation, else the cup's last published bracket.
+    copa_dist = COPA_DIST
+    if copa_dist is None:
+        copa_dist = ((_read_json(COPA_BRACKET, {}) or {}).get("p_cup")) or None
+    copa_info = None
+    if copa_dist:
+        known = [t for t, p in copa_dist.items() if p >= 0.9999]
+        unmatched = [t for t in copa_dist if t not in state.teams and copa_dist[t] > 0.001]
+        copa_info = {"winner": known[0] if known else None, "source": "copa-argentina simulation",
+                     "outside_league": round(sum(copa_dist[t] for t in unmatched), 4)}
+        logger.info("Copa Argentina winner: %s; outside the league %.3f (%s)",
+                    known[0] if known else "drawn per simulation", copa_info["outside_league"], unmatched[:6])
+
     train_df = training_frame(store)
     logger.info("training frame: %d matches", len(train_df))
-    model, cal = build_model(train_df, state.teams, meta_extra.get("previous_anual_rank"))
+    # The Elo seed: last year's Tabla Anual, from the past results when the meta file has none. With every club
+    # in the Dixon-Coles fit the ensemble's Elo weight is 0, so the seed moves only the Elo shown on the Power tab.
+    prev_rank = meta_extra.get("previous_anual_rank")
+    if not prev_rank:
+        past_all = ((_read_json(PAST_STORE, {}) or {}).get("seasons") or {}).get("liga-argentina") or {}
+        prev_rank = liga_tables.previous_rank(past_all, store, state.teams, cfg.season_year) or None
+    model, cal = build_model(train_df, state.teams, prev_rank)
 
     if state.live_torneo() is None:
         logger.error("Season is complete — nothing to simulate")
@@ -736,18 +942,22 @@ def main() -> int:
         logger.warning("No scorer candidates in the store — skipping the top-scorer race")
 
     results = LigaSimulator(
-        model, state, cfg=cfg, seed=args.seed, boot_model=boot
+        model, state, cfg=cfg, seed=args.seed, boot_model=boot, copa_dist=copa_dist
     ).run()
+    if copa_info is not None and results.copa_winner_share:
+        copa_info["drawn"] = {t: round(p, 4) for t, p in sorted(results.copa_winner_share.items(), key=lambda kv: -kv[1])[:8]}
     boot_probs = boot.probabilities(results.n_sims) if boot else {}
 
     _write("teams.json", build_teams_json(state, results, store))
     _write("zones.json", build_zones_json(state, results, cfg))
     _write("bracket.json", build_bracket_json(state, results, cfg))
-    _write("anual.json", build_anual_json(state, results, cfg))
-    _write("relegation.json", build_relegation_json(state, results, cfg))
-    _write("probs.json", build_probs_json(state, results))
+    anual = build_anual_json(state, results, cfg, store, copa_info)
+    _write("anual.json", anual)
+    _write("table.json", build_table_json(state, results, cfg, anual))
+    _write("relegation.json", build_relegation_json(state, results, cfg, prior_info, store))
+    _write("probs.json", build_probs_json(state, results, cfg))
     _write("history.json", build_history_json(results))
-    _write("strength.json", build_strength_json(model, state, results, store, cfg))
+    _write("strength.json", build_strength_json(model, state, results, store, cfg, prev_rank))
 
     live_players, leaders = build_players_json(store, results, boot_probs, candidates)
     _write("players_live.json", live_players)
@@ -780,6 +990,16 @@ def main() -> int:
         "games_total": torneo.total_league_games,
         "league_complete": torneo.league_complete,
         "apertura_champion": state.apertura.champion,
+        "clausura_champion": state.clausura.champion,
+        "anual_games_played": anual["games_played"],
+        "anual_games_total": anual["total_games"],
+        "promedio_history": prior_info.get("source"),
+        "official_check": {
+            "anual": (anual.get("official") or {}).get("same_position"),
+            "clubs": len(state.teams),
+            "at": (store.get("standings") or {}).get("at"),
+        } if anual.get("official") else None,
+        "copa_argentina": copa_info,
         "store_fresh": store_fresh,
         "synthetic": synthetic,
         "store_age_hours": round(age, 1) if age is not None else None,

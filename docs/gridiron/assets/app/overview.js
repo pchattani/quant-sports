@@ -3,13 +3,17 @@
  *   the ticker; the intro band (what the site covers, how to use it, three quick links: Games, Playoff race,
  *   Players); "This week in the NFL": the stage (the week of the season, or the playoff round), then the top lines
  *   from index.json "digest" (scripts/build_gridiron.py with oddsmarkets/common/digest.py): the biggest playoff or
- *   Super Bowl chance mover, the upset of the week, the team of the week, our record this week and the other games
- *   that matter; the game that matters most by significance (digest.featured: oddsmarkets/common/featured.py) as the
+ *   Super Bowl chance mover, the upset of the week, the team of the week and the other games that matter; the game that matters most by significance (digest.featured: oddsmarkets/common/featured.py) as the
  *   diagonal split hero, labelled "Live now", "Tonight" (only when it truly is tonight in the reader's time), "Today",
  *   "Tomorrow" or the weekday, else the Super Bowl race; "N games. Our calls." (the games that matter first); the
- *   black power list; "We say it. Then we check it." beside "Who's for real?"; "What's that number?"; "Who lifts the
- *   Lombardi Trophy?" beside projected wins; offence v defence; the playoff race division by division; leaders.
- * Reads index.json, <S>/season.json, glossary.json (leader labels), calibration.json (the How sure section). */
+ *   black power list; round 6, the fan modules: "Records in reach" (each leader's 17-game pace against the
+ *   single-season record), "Breakout watch" (the biggest jumps in our value-a-game percentile from last season), "Best
+ *   player nobody talks about" (a spotlight), "Who's for real?" beside the biggest turnaround and fall from last
+ *   season; "What's that number?"; "Who lifts the Lombardi Trophy?" beside projected wins; offence v defence; the
+ *   playoff race division by division; leaders; a small link to "How we're doing" (our record and calibration live on
+ *   the Model page). Game cards and the ticker carry the market small and grey beside our chance.
+ * Reads index.json, <S>/season.json, glossary.json (leader labels); lazily, <S>/leaders.json, the value leaders'
+ * player files and last season's season.json for the fan modules. */
 (function (GI) {
 'use strict';
 
@@ -94,15 +98,9 @@ function pickFeatured(idx, games, po) {
   const list = games.filter(g => ok(g, 24 * 7)).sort((a, b) => watchVal(b, po) - watchVal(a, po));
   return list.length ? { c: list[0], why: reasonsWhy([], list[0], po), rest: list.slice(1, 3), order: [] } : null;
 }
-/* Under the hero: why we picked it, then how sure we are. */
+/* Under the hero: why we picked it (round 6: the "How sure are we?" line lives on the Model page now). */
 function heroNote(g, why) {
-  const p = g.p_home;
-  let sure = '';
-  if (g.status !== 'live' && isNum(p)) {
-    const fav = p >= 0.5 ? g.home : g.away, other = p >= 0.5 ? g.away : g.home, pf = Math.max(p, 1 - p), miss = Math.max(1, Math.round(10 * (1 - pf)));
-    sure = ' <b>How sure are we?</b> ' + GI.pct(pf, 0) + ' for the ' + esc(fav.name) + ' means the ' + esc(other.name) + ' win a game like this about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.';
-  }
-  return why ? '<b>Why this game?</b> ' + esc(why) + sure : (sure ? sure.slice(1) : undefined);
+  return why ? '<b>Why this game?</b> ' + esc(why) : false;
 }
 /* "This week in the NFL": the stage line. */
 function stageLine(st, ph) {
@@ -133,12 +131,6 @@ function weekTiles(dig, feat, po) {
   const h = dig.hot;
   if (h) T.push({ label: 'Team of the week', value: GI.teamAbbr(h.key) + ' ' + h.w + '–' + h.l, href: GI.teamHref(h.key),
     sub: The(h.key) + ': ' + (h.gp === 1 ? 'the biggest win of the week, ' : h.w + ' wins in ' + h.gp + ' games, ') + (h.margin >= 0 ? '+' : '−') + Math.abs(h.margin) + ' points.' });
-  const r = dig.record;
-  if (r) {
-    const diff = r.won - r.expected;
-    T.push({ label: 'Our record this week', value: r.won + ' of ' + r.n, href: '#/calibration',
-      sub: 'Our favourites won ' + r.won + ' of ' + r.n + '; we expected ' + QK.fmt.num(r.expected, 0) + '. ' + (Math.abs(diff) < 1.5 ? 'Right on our numbers.' : diff > 0 ? 'A good week for the favourites.' : 'A week of upsets: a 60% call still misses 4 times in 10.') });
-  }
   const rest = ((feat && feat.rest) || []).filter(Boolean).slice(0, 2);
   if (rest.length) T.push({ label: 'Also worth a look', value: rest.map(g => GI.teamAbbr(g.away) + '–' + GI.teamAbbr(g.home)).join(' · '), href: '#/games', text: rest.length > 1,
     sub: rest.map(g => { const w = whenLabel(GI.qkGame(g)); return w + (GI.isLive(g) ? '' : ' ' + QK.fmt.time(g.kickoff)) + ': the ' + GI.teamShort(g.away) + ' at the ' + GI.teamShort(g.home); }).join('. ') + '.' });
@@ -183,6 +175,133 @@ function seasonRows(season) {
 }
 
 
+/* ── fan modules (round 6): records in reach, breakout watch, the best player nobody talks about, the turnarounds ── */
+/* Read lazily after the page draws: <S>/leaders.json (75 KB), the player files of the leaders on the value boards (about
+ * 7 KB each, thirty at most) and last season's season.json (40 KB). Nothing here is about how our forecasts score. */
+const GROUP_PL = { qb: 'quarterbacks', rb: 'running backs', wr: 'receivers', te: 'tight ends', edge: 'pass rushers', idl: 'interior linemen', lb: 'linebackers', cb: 'cornerbacks', s: 'safeties' };
+/* single-season records (regular season), public and long-standing */
+const RECORDS = [['QB', 'pass_yds', 5477, 'Peyton Manning, 2013', 'passing yards'], ['QB', 'pass_td', 55, 'Peyton Manning, 2013', 'passing touchdowns'],
+  ['RB', 'rush_yds', 2105, 'Eric Dickerson, 1984', 'rushing yards'], ['RB', 'rush_td', 28, 'LaDainian Tomlinson, 2006', 'rushing touchdowns'],
+  ['WR', 'rec_yds', 1964, 'Calvin Johnson, 2012', 'receiving yards'], ['WR', 'rec_td', 23, 'Randy Moss, 2007', 'receiving touchdowns'],
+  ['DEF', 'sacks', 22.5, 'Michael Strahan, 2001, and T.J. Watt, 2021', 'sacks']];
+const VALUE_BOARDS = [['QB', 'composite'], ['RB', 'value'], ['WR', 'value'], ['TE', 'value'], ['DEF', 'def_value']];
+const SPOT_KEYS = { rb: ['ryoe', 'rush_epa', 'explosive', 'rush_success'], wr: ['rec_epa_tgt', 'target_share', 'croe', 'yacoe'], te: ['rec_epa_tgt', 'target_share', 'croe', 'yacoe'],
+  edge: ['pressures_pg', 'sacks_pg', 'tfl_pg', 'splash_pg'], idl: ['pressures_pg', 'sacks_pg', 'tfl_pg', 'splash_pg'], lb: ['tackles_pg', 'tfl_pg', 'pressures_pg', 'splash_pg'] };
+const SPOT_LABEL = { ryoe: 'Rush yards over expected', rush_epa: 'Rush EPA per carry', explosive: 'Explosive-run rate', rush_success: 'Rush success rate', rec_epa_tgt: 'Receiving EPA per target',
+  target_share: 'Target share', croe: 'Catch rate over expected', yacoe: 'Yards after catch over expected', pressures_pg: 'Pressures a game', sacks_pg: 'Sacks a game', tfl_pg: 'Tackles for loss a game',
+  splash_pg: 'Splash plays a game', tackles_pg: 'Tackles a game', pd_pg: 'Passes defended a game', ff_pg: 'Forced fumbles a game', yac_rec: 'Yards after catch per catch', catch_rate: 'Catch rate', adot: 'Average depth of target' };
+const JUMP = ['Biggest jump', 'Second biggest', 'Third biggest'];
+function seasonOf(p, S) { return ((p && p.seasons) || []).filter(s => s.season === S)[0] || null; }
+/* a season's value and percentile for one metric: s.pct (the older player file) or the compact dv / dp arrays in the
+   order of p.prog.keys[group] (the progression-era player file) */
+function metricOf(p, s, k) {
+  if (!s) return { v: null, pct: null };
+  if (s.pct && isNum(s.pct[k])) return { v: isNum(s[k]) ? s[k] : null, pct: s.pct[k] };
+  const keys = p && p.prog && p.prog.keys ? p.prog.keys[s.group] : null, i = keys ? keys.indexOf(k) : -1;
+  if (i >= 0 && Array.isArray(s.dp)) return { v: Array.isArray(s.dv) && isNum(s.dv[i]) ? s.dv[i] : (isNum(s[k]) ? s[k] : null), pct: isNum(s.dp[i]) ? s.dp[i] : null };
+  return { v: isNum(s[k]) ? s[k] : null, pct: null };
+}
+function qualPct(p, s) { return s && s.qualified ? metricOf(p, s, 'gvar_pg').pct : null; }
+function gvar(p, s) { return metricOf(p, s, 'gvar_pg').v; }
+function spotVal(k, v) { if (!isNum(v)) return ''; if (/share|rate|success|explosive/.test(k) && Math.abs(v) <= 1) return (100 * v).toFixed(1) + '%'; return GI.num(v, Math.abs(v) >= 10 ? 1 : 2); }
+function paceCards(lead, files, S) {
+  const out = [];
+  RECORDS.forEach(r => {
+    const top = (((lead.players || {})[r[0]] || {})[r[1]] || [])[0];
+    const p = top ? files[top[0]] : null, s = p ? seasonOf(p, S) : null;
+    if (!s || !isNum(s[r[1]]) || !isNum(s.games) || s.games < 3) return;
+    const pace = s[r[1]] / s.games * 17;
+    out.push({ r: r, p: p, s: s, v: s[r[1]], pace: pace, ratio: pace / r[2] });
+  });
+  out.sort((a, b) => b.ratio - a.ratio);
+  return out.slice(0, 3).map(x => {
+    const half = x.r[1] === 'sacks', f = v => (half ? GI.num(v, 1) : QK.fmt.num(Math.round(v)));
+    const on = x.ratio >= 1;
+    return { kicker: on ? 'On record pace' : 'Records in reach', sport: 'nfl', name: x.p.name, sub: [GI.teamAbbr(x.s.team), x.p.pos, x.s.games + ' games'].join(' · '),
+      value: f(x.pace), unit: x.r[4] + ' pace', colour: GI.teamInfo(x.s.team).colour, mark: { name: GI.teamName(x.s.team), abbr: GI.teamAbbr(x.s.team), colour: GI.teamInfo(x.s.team).colour },
+      pace: { now: x.v, pace: x.pace, target: x.r[2], label: 'Record', fmt: f },
+      text: f(x.v) + ' ' + x.r[4] + ' in ' + x.s.games + ' games. At that rate, ' + f(x.pace) + ' over 17 games; the record is ' + f(x.r[2]) + ' (' + x.r[3] + '). ' + (x.s.games <= 8 ? x.s.games + ' games is a small sample: early paces usually cool.' : ''),
+      href: GI.playerHref(x.p.id) };
+  });
+}
+function breakoutCards(files, S) {
+  const out = [];
+  Object.keys(files).forEach(id => {
+    const p = files[id], c = seasonOf(p, S), b = seasonOf(p, S - 1), pc = qualPct(p, c), pb = qualPct(p, b);
+    if (!isNum(pc) || !isNum(pb) || pc < 75 || pc - pb < 25) return;
+    out.push({ p: p, c: c, b: b, pc: pc, pb: pb, d: pc - pb });
+  });
+  out.sort((a, b) => b.d - a.d);
+  return out.slice(0, 3).map((x, i) => {
+    const grp = GROUP_PL[x.c.pg] || 'players at the position';
+    const line = (x.p.seasons || []).filter(s => s.qualified && isNum(gvar(x.p, s)) && s.season <= S);
+    return { kicker: JUMP[i], sport: 'nfl', name: x.p.name, sub: [GI.teamAbbr(x.c.team), x.p.pos, isNum(x.c.age) ? 'age ' + Math.floor(x.c.age) : ''].filter(Boolean).join(' · '),
+      value: '+' + Math.round(x.d), unit: 'percentile points', colour: GI.teamInfo(x.c.team).colour, mark: { name: GI.teamName(x.c.team), abbr: GI.teamAbbr(x.c.team), colour: GI.teamInfo(x.c.team).colour },
+      from: { label: String(S - 1), value: QK.ordinal(Math.round(x.pb)), pos: x.pb }, to: { label: S + ' so far', value: QK.ordinal(Math.round(x.pc)), pos: x.pc },
+      spark: line.length > 2 ? line.map(s => gvar(x.p, s)) : null, sparkLabel: line.length > 2 ? 'Value a game (ours), ' + line[0].season + '–' + line[line.length - 1].season : '',
+      text: 'From the ' + QK.ordinal(Math.round(x.pb)) + ' to the ' + QK.ordinal(Math.round(x.pc)) + ' percentile of ' + grp + ' in value a game, our player value model. ' + x.c.games + ' games in: a small sample, so watch whether it holds.',
+      href: GI.playerHref(x.p.id) + '?view=progression', link: { text: 'Progression' } };
+  });
+}
+function spotlightHTML(files, lead, S) {
+  const counted = {}, topOfBoard = {};
+  RECORDS.forEach(r => (((lead.players || {})[r[0]] || {})[r[1]] || []).slice(0, 10).forEach(x => { counted[x[0]] = 1; }));
+  VALUE_BOARDS.forEach(v => { const t = (((lead.players || {})[v[0]] || {})[v[1]] || [])[0]; if (t) topOfBoard[t[0]] = 1; });
+  let best = null;
+  Object.keys(files).forEach(id => {
+    const p = files[id], c = seasonOf(p, S), pc = qualPct(p, c), gv = gvar(p, c);
+    if (!c || c.pg === 'qb' || !isNum(pc) || pc < 90 || counted[id] || topOfBoard[id] || !isNum(gv)) return;
+    if (!best || gv > best.gv) best = { p: p, c: c, pc: pc, gv: gv };
+  });
+  if (!best) return '';
+  const c = best.c, P = best.p, keys = (SPOT_KEYS[c.pg] || Object.keys(c.pct || {}).filter(k => k !== 'gvar_pg')).filter(k => isNum(metricOf(P, c, k).pct)).slice(0, 4);
+  const line = (P.seasons || []).filter(s => s.qualified && isNum(gvar(P, s)) && s.season <= S);
+  const grp = GROUP_PL[c.pg] || 'players at the position';
+  return QK.spotlight({ kicker: 'Best player nobody talks about', name: best.p.name, sub: [GI.teamName(c.team), best.p.pos, isNum(c.age) ? 'age ' + Math.floor(c.age) : ''].filter(Boolean).join(' · '),
+    number: best.p.number, team: { name: GI.teamName(c.team), abbr: GI.teamAbbr(c.team), colour: GI.teamInfo(c.team).colour }, href: GI.playerHref(best.p.id),
+    headline: QK.ordinal(Math.round(best.pc)) + ' percentile of ' + grp + ' in value a game, and on none of the yardage, touchdown or sack top tens.',
+    stats: [{ label: 'Value a game (ours)', value: GI.num(best.gv, 2), pctl: best.pc }].concat(keys.slice(0, 3).map(k => ({ label: SPOT_LABEL[k] || GI.titleCase(k), value: spotVal(k, metricOf(P, c, k).v), pctl: metricOf(P, c, k).pct }))),
+    spark: line.length > 1 ? { values: line.map(s => gvar(P, s)), labels: [String(line[0].season), String(line[line.length - 1].season)], label: 'Value a game by season' } : null,
+    text: 'Percentiles against qualified ' + grp + ' this season, ' + c.games + ' games in. Value a game is our player value model: what he adds over a replacement-level player, per game.',
+    links: [{ href: GI.playerHref(best.p.id), text: 'Player page' }, { href: GI.playerHref(best.p.id) + '?view=progression', text: 'Progression' }, { href: '#/compare', text: 'Compare' }] });
+}
+function turnCards(rows, prevRows, po, S) {
+  const prev = {};
+  prevRows.forEach(r => { prev[GI.canonTeam(r.team)] = r; });
+  const pctOf = r => (r.w + 0.5 * (r.t || 0)) / Math.max(1, r.w + r.l + (r.t || 0));
+  const out = rows.filter(r => prev[GI.canonTeam(r.team)] && r.w + r.l + (r.t || 0) >= 3).map(r => { const b = prev[GI.canonTeam(r.team)]; return { r: r, b: b, d: pctOf(r) - pctOf(b) }; }).sort((x, y) => y.d - x.d);
+  if (out.length < 2) return [];
+  const card = (x, k) => ({ kicker: k, sport: 'nfl', name: GI.teamName(x.r.team), sub: GI.teamAbbr(x.r.team) + ' · ' + (x.r.division || ''), colour: GI.teamInfo(x.r.team).colour,
+    mark: { name: GI.teamName(x.r.team), abbr: GI.teamAbbr(x.r.team), colour: GI.teamInfo(x.r.team).colour }, value: (x.d > 0 ? '+' : '−') + Math.abs(Math.round(100 * x.d)), unit: 'points of win %',
+    from: { label: (S - 1) + ' ' + GI.record(x.b.w, x.b.l, x.b.t), value: Math.round(100 * pctOf(x.b)) + '%', pos: 100 * pctOf(x.b) }, to: { label: S + ' ' + GI.record(x.r.w, x.r.l, x.r.t), value: Math.round(100 * pctOf(x.r)) + '%', pos: 100 * pctOf(x.r) },
+    text: The(x.r.team) + ' went ' + GI.record(x.b.w, x.b.l, x.b.t) + ' last season and are ' + GI.record(x.r.w, x.r.l, x.r.t) + ' now' + (isNum((po[x.r.team] || {}).p_playoffs) ? '; our playoff chance is ' + GI.pct(po[x.r.team].p_playoffs, 0) + '.' : '.'),
+    href: GI.teamHref(x.r.team) });
+  return [card(out[0], 'Biggest turnaround'), card(out[out.length - 1], 'Biggest fall')];
+}
+function fanModules(el, S, rows, po) {
+  GI.loadAll([GI.ypath('leaders.json', S), GI.ypath('season.json', S - 1)]).then(res => {
+    if (!el.isConnected) return;
+    const lead = GI.ok(res[0]) ? res[0] : {}, prevRows = GI.ok(res[1]) ? seasonRows(res[1]) : [];
+    const turn = turnCards(rows, prevRows, po, S);
+    if (turn.length) GI.set('ov-turn', QK.sectionHead({ kicker: 'Biggest surprise', title: 'Up and down', sub: 'This season’s record so far against last season’s, every team.' }) + QK.storyCards(turn, { cols: 1 }));
+    const ids = {};
+    VALUE_BOARDS.forEach(v => ((((lead.players || {})[v[0]] || {})[v[1]]) || []).slice(0, 6).forEach(x => { ids[x[0]] = 1; }));
+    RECORDS.forEach(r => { const t = ((((lead.players || {})[r[0]] || {})[r[1]]) || [])[0]; if (t) ids[t[0]] = 1; });
+    const list = Object.keys(ids);
+    return Promise.all(list.map(id => GI.loadPlayer(id))).then(ps => {
+      if (!el.isConnected) return;
+      const files = {};
+      ps.forEach((p, i) => { if (p && GI.ok(p)) files[list[i]] = p; });
+      const pc = paceCards(lead, files, S);
+      if (pc.length) GI.set('ov-pace', QK.sectionHead({ kicker: 'Records in reach', title: 'On pace for history?', sub: 'Each leader’s rate so far over a 17-game season, against the single-season record. Early in a season every pace looks huge; the bars show how far there is to go.', actions: '<a class="qk-more" href="#/leaders">Every leaderboard</a>' }) + QK.storyCards(pc));
+      const bc = breakoutCards(files, S);
+      if (bc.length) GI.set('ov-break', QK.sectionHead({ kicker: 'Breakout watch', title: 'Who took the leap', sub: 'The biggest jumps in our value-a-game percentile from last season, among the leaders on the value boards. Both seasons qualified.' }) + QK.storyCards(bc));
+      const sp = spotlightHTML(files, lead, S);
+      if (sp) GI.set('ov-spot', sp);
+    });
+  });
+}
+
 GI.route('overview', function (el) {
   const idx = GI.index() || {};
   if (!GI.ok(idx)) { el.innerHTML = GI.pageHead('NFL', 'The Quant Gridiron', '') + GI.notBuilt('The overview', idx); return; }
@@ -206,7 +325,7 @@ GI.route('overview', function (el) {
     const L = idx.leaders || {};
     const dig = idx.digest || {};
     const feat = pickFeatured(idx, games.concat((idx.live || []).filter(g => g && !liveIds[g.game_id] && GI.isLive(g))), po);
-    const tick = games.length ? '<div class="qk-ticker gi-ticker" aria-label="This week\'s games">' + QK.ticker(games.map(g => GI.qkGame(g, byTeam)), { group: 'league', pill: false }) + '</div>' : '';
+    const tick = games.length ? '<div class="qk-ticker gi-ticker" aria-label="This week\'s games">' + QK.ticker(games.map(g => GI.qkGame(g, byTeam)), { group: 'league', pill: false, market: 'quiet' }) + '</div>' : '';
     const wk = GI.weekLabel(W, S);
 
     el.innerHTML = tick +
@@ -224,11 +343,12 @@ GI.route('overview', function (el) {
 
       '<div id="ov-hot"></div>' +
 
-      '<section class="qk-section qk-g75"><div><div id="ov-sure-h"></div><div id="ov-sure"></div></div>' +
+      '<section class="qk-section" id="ov-pace"></section><section class="qk-section" id="ov-break"></section><section class="qk-section" id="ov-spot"></section>' +
+      '<section class="qk-section qk-g75">' +
         '<div class="gi-ov-real">' + QK.sectionHead({ kicker: 'Who’s for real?', title: 'Results v chances', sub: 'Teams top-left are winning more than their play suggests; bottom-right, the reverse. A hot start, or something real?' }) +
-        '<div class="qk-card"><div class="qk-card-body"><div id="ov-luck" class="qk-chart" role="img" aria-label="Win percentage against EPA per play margin, every team"></div><p class="qk-caption" id="ov-luck-cap"></p></div></div></div></section>' +
+        '<div class="qk-card"><div class="qk-card-body"><div id="ov-luck" class="qk-chart" role="img" aria-label="Win percentage against EPA per play margin, every team"></div><p class="qk-caption" id="ov-luck-cap"></p></div></div></div><div id="ov-turn"></div></section>' +
 
-      '<section class="qk-section">' + QK.newHere({ items: [QK.NEW_HERE[0], 'A <b>rating</b> is points a game better than an average team on a neutral field: +7 is a touchdown better.', 'Every forecast is checked against what happened. <a class="qk-link" href="#/calibration">The record is on the Model page.</a>'] }) + '</section>' +
+      '<section class="qk-section">' + QK.newHere({ items: [QK.NEW_HERE[0], 'A <b>rating</b> is points a game better than an average team on a neutral field: +7 is a touchdown better.', '<b>EPA</b> (expected points added) scores every play by how much it moved the expected score: a first down on third and long is worth more than a short gain on first down.'] }) + '</section>' +
 
       '<section class="qk-section">' + QK.sectionHead({ kicker: 'Title race', title: 'Who lifts the Lombardi Trophy?', sub: '<span id="ov-sb-lede">Our chances from 20,000 simulated seasons.</span>', html: true, actions: '<a class="qk-more" href="#/futures">Every season forecast</a>' }) +
         GI.grid(GI.card('Super Bowl chances', 'Our chance from 20,000 simulated seasons, in team colours', '<div id="ov-sb"></div>', { span: 6, foot: '<span>Top ten of 32</span><a href="#/playoffs">Bracket →</a>' }) +
@@ -242,7 +362,9 @@ GI.route('overview', function (el) {
         GI.card('', '', divisionsGrid(rows)) + '</section>' +
 
       '<section class="qk-section">' + GI.secHead({ kicker: 'Leaderboards', title: 'The top ten', sub: S + ' to date, qualified players. Percentiles with sample floors are on the Players page.', actions: '<a class="qk-more" href="#/leaders">Every leaderboard</a>' }) +
-        GI.card('', '', '<div id="ov-ld-seg"></div>' + GI.chartBox('ov-leaders', 380, 'Leaderboard')) + '</section>';
+        GI.card('', '', '<div id="ov-ld-seg"></div>' + GI.chartBox('ov-leaders', 380, 'Leaderboard')) + '</section>' +
+      /* our record and calibration live on the Model page ("How we're doing"): one small link here */
+      '<p class="qk-sub gi-ov-doing">Every forecast is checked against the result: <a class="qk-link" href="#/calibration">How we’re doing →</a></p>';
 
     /* What to watch: our six picks (live first, then the closest calls with the most at stake), every game this week,
        or last week's results with our pre-game call; each card with its one-line reason, no market */
@@ -277,17 +399,8 @@ GI.route('overview', function (el) {
     const hot = hotItems(L, G);
     GI.set('ov-hot', hot.length ? QK.band(QK.sectionHead({ kicker: 'Who’s hot', title: 'The leaders, board by board', sub: 'The top name on five of our leaderboards, qualified players only, and a line on what each number means.', actions: '<a class="qk-more" href="#/leaders">Every leaderboard</a>' }) + QK.hotRow(hot)) : '');
 
-    /* We say it. Then we check it.: the game model's record from calibration.json (QK.howSure, the kit's line chart); the full record is on the Model page */
-    GI.load('calibration.json').then(cj => {
-      const box = el.querySelector('#ov-sure'), hd = el.querySelector('#ov-sure-h');
-      if (!box) return;
-      const cb = QK.calib.find(GI.ok(cj) ? cj : null);
-      if (!cb || !cb.bins.length) { box.innerHTML = ''; hd.innerHTML = ''; return; }
-      const yrs = ((cj.game_model || {}).seasons || []).filter(isNum);
-      hd.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every NFL game we have forecast before kickoff, grouped by the chance we gave the home team. When the two lines match, our numbers mean what they say.',
-        actions: '<a class="qk-more" href="#/calibration">The full record</a>' });
-      QK.howSure(box, { calibration: cj, league: 'NFL', span: yrs.length ? yrs[0] + ' to ' + yrs[yrs.length - 1] : '', subject: 'the home team' });
-    });
+    /* round 6: the fan modules, lazily (records in reach, breakout watch, the spotlight, the turnarounds) */
+    fanModules(el, S, rows, po);
 
     /* Who's for real?: win % against the EPA-per-play margin (offence EPA a play less the EPA a play allowed) */
     const luck = rows.filter(r => r.w + r.l + (r.t || 0) > 0 && ratings[r.team] && isNum((ratings[r.team].values || {}).off_epa) && isNum((ratings[r.team].values || {}).def_epa));

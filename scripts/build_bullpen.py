@@ -158,22 +158,27 @@ def reduce_cat(cat: dict | None, kind: str) -> dict | None:
     from oddsmarkets.baseball.analytics import careers as CR
     if not cat or not cat.get("players"):
         return None
-    keys = set(CR.SEASON_KEYS_H + CR.SIMILAR_H) if kind == "hitter" else set(CR.SEASON_KEYS_P + CR.SIMILAR_P)
+    deep = set(CR.prog_keys(kind))            # the progression deep set (round 6) and its position percentiles
+    keys = set(CR.SEASON_KEYS_H + CR.SIMILAR_H) | deep if kind == "hitter" else set(CR.SEASON_KEYS_P + CR.SIMILAR_P) | deep
     out = {}
     for pid, r in cat["players"].items():
         out[pid] = {"name": r.get("name"), "team": r.get("team"), "pos": r.get("pos"), "role": r.get("role"), "pa": r.get("pa"),
-                    "bf": r.get("bf"), "values": {k: v for k, v in (r.get("values") or {}).items() if k in keys}}
+                    "bf": r.get("bf"), "values": {k: v for k, v in (r.get("values") or {}).items() if k in keys},
+                    "pct_role": {k: v for k, v in (r.get("pct_role") or {}).items() if k in deep}}
     return {"players": out, "team_games": cat.get("team_games")}
 
 
 def small_files(b: Build, d: str, sdir: Path, level: str, season: int, hit: dict | None, pit: dict | None,
                 only_missing: bool = False) -> None:
-    """peers.json and league_types.json (analytics/peers.py): what the player page needs from the 4-7 MB catalogues.
+    """peers.json and league_types.json (analytics/peers.py): what the player page needs from the 4-7 MB catalogues;
+    performers.json (analytics/performers.py): the standings page's top and bottom performers.
     Skipped seasons write them only when absent (from the catalogues on disk)."""
     from oddsmarkets.baseball.analytics import peers as PE
+    from oddsmarkets.baseball.analytics import performers as PF
     if not (hit or {}).get("ok") and not (pit or {}).get("ok"):
         return
-    for name, fn in (("peers.json", lambda: PE.build(hit, pit, level, season)), ("league_types.json", lambda: PE.league_types(pit, level, season))):
+    for name, fn in (("peers.json", lambda: PE.build(hit, pit, level, season)), ("league_types.json", lambda: PE.league_types(pit, level, season)),
+                     ("performers.json", lambda: PF.build(hit, pit, level, season))):
         if only_missing and (sdir / name).exists():
             continue
         b.write_or_fail(d + name, f"{name} {level} {season}", fn, level=level, season=season)

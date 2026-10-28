@@ -126,7 +126,9 @@ function standingsTab(node, L, S, params) {
       h += '<div class="qk-grid hw-sec">' + confs.map((c, i) => U.card2(c + ': who makes the playoffs', fmt.playin ? 'Our chance: a top-six seed goes straight through; seeds 7-10 play in' : 'Our chance of a playoff place', U.chart('st-odds-' + i, 22 * (st[c] || []).length + 70, c + ' playoff chances'), { cls: confs.length > 1 ? 'qk-span-6' : 'qk-span-12' })).join('') + '</div>';
     }
     const lo = leagueOpts(season, L, S);
-    if (lo) h += '<div id="st-race"></div><div id="st-shape"></div>';
+    if (lo) h += '<div id="st-race"></div>';
+    if (window.QKL && QKL.leaders) h += '<div id="st-perf"></div>';
+    if (lo) h += '<div id="st-shape"></div>';
     node.innerHTML = h;
     const draw = k => standingsTable(document.getElementById('st-table'), L, S, k === '__all' ? all() : (st[k] || []), sim, fmt, k === '__all', lo);
     draw(first);
@@ -140,7 +142,27 @@ function standingsTab(node, L, S, params) {
       QKC.bar('#st-odds-' + i, { cats: ids.map(t => HW.teamAbbr(L, t)), series: series, horizontal: true, stack: true, legend: series.length > 1, fmt: v => U.pct(v), max: 1, hrefs: ids.map(t => HW.teamHref(L, t, S)), labelWidth: 46, valName: 'Our playoff chance', catName: 'Team' });
     });
     if (lo) { QKL.race(document.getElementById('st-race'), lo); QKL.shape(document.getElementById('st-shape'), lo); }
+    if (window.QKL && QKL.leaders) performers(document.getElementById('st-perf'), season, L, S);
     if (!live) HW.setMeta('');
+  });
+}
+/* Top and bottom performers (QKL.leaders): all players on our plus-minus first, then guards, wings and bigs on their
+   spec headline sets (data/<L>/<S>/performers.json, oddsmarkets/basketball/analytics/performers.py: qualified players
+   only, the catalogue's minutes floor), then the teams on the league block's team set (season.json, already loaded). */
+function performers(host, season, L, S) {
+  if (!host) return;
+  const lg = season && (season.league_block || (season.league && typeof season.league === 'object' ? season.league : null));
+  const info = (season && season.teams) || {};
+  HW.load(HW.path('performers.json', L, S)).then(pf => {
+    if (!U.alive(host)) return;
+    const views = ((U.ok(pf) && pf.views) || []).slice();
+    const tv = lg ? QKL.teamView(lg, { label: 'Teams', peer: 'teams', ours: 'Team rating model', name: t => HW.teamName(L, t) }) : null;
+    if (tv) views.push(tv);
+    QKL.leaders(host, { data: { views: views }, title: 'Who leads the ' + HW.leagueName(L) + ', and who is struggling',
+      sub: 'The top five and the bottom five on each key number: every player on our plus-minus first, then guards, wings and bigs on the numbers that matter for each role, and the teams. Qualified players only; each name opens the player page.',
+      team: t => ({ abbr: HW.teamAbbr(L, t), name: HW.teamName(L, t), colour: (info[t] || {}).colour, href: HW.teamHref(L, t, S) }),
+      href: id => HW.playerHref(L, id, S),
+      empty: 'The boards fill once players reach the minutes floor (a fifth of the season’s most played).' });
   });
 }
 function r3(v) { return isNum(v) ? Math.round(v * 1000) / 1000 : 0; }
@@ -467,19 +489,28 @@ function renderModel(el, params, state) {
   const r = state.route;
   let tab = r === 'glossary' ? 'glossary' : r === 'methodology' ? 'methodology' : r === 'disclaimer' ? 'terms' : U.tab(params, ['methodology', 'calibration', 'markets', 'moves', 'glossary', 'terms'], 'methodology');
   const body = U.section(el, { title: 'Model', kicker: HW.leagueName(L) + ' · how it works', sub: 'How the models are built, how well they have done, and what every number means.',
-    tabs: U.tabs(L, 'model', [['methodology', 'Methodology'], ['calibration', 'Calibration'], ['markets', 'Our forecasts v the market'], ['moves', 'Who moves next'], ['glossary', 'Glossary'], ['terms', 'Terms']], null), active: tab });
+    tabs: U.tabs(L, 'model', [['methodology', 'Methodology'], ['calibration', 'How we’re doing'], ['markets', 'Our forecasts v the market'], ['moves', 'Who moves next'], ['glossary', 'Glossary'], ['terms', 'Terms']], null), active: tab });
   if (tab === 'moves') return movesModel(body, L);
   const v = { methodology: 'methodology', calibration: 'calibration', markets: 'markets', glossary: 'glossary', terms: 'disclaimer' }[tab];
   if (tab !== 'methodology' && tab !== 'calibration') return U.legacy(v, body, params);
-  /* How sure are we? at the top: the game model's calibration from <L>/calibration.json (shown only when present) */
+  /* Round 6: "How we're doing" (the calibration tab, id kept so ?tab=calibration still works): our favourites' record
+     over the last week (index.json digest.record) as tiles, then the game model's record from <L>/calibration.json
+     (QK.doing -> QK.howSure). The methodology tab links it; the overview no longer carries either. */
+  if (tab === 'methodology') {
+    body.innerHTML = QK.explain('<b>How we’re doing.</b> Our recent record and every forecast checked against what happened are on <a class="qk-link" href="' + esc(HW.href(L, 'model') + '?tab=calibration') + '">the How we’re doing tab</a>.') + '<div></div>';
+    return U.legacy(v, body.lastChild, params);
+  }
   body.innerHTML = '<section class="qk-section hw-sure" id="md-sure" hidden></section><div></div>';
   HW.load(L + '/calibration.json').then(cj => {
     const box = body.querySelector('#md-sure');
-    if (!box || !U.ok(cj) || !QK.calib.find(cj)) return;
-    const ss = (cj.seasons || []).slice().sort((a, b) => a - b);
+    const rec = ((HW.leagueInfo(L) || {}).digest || {}).record || null;
+    const ok = U.ok(cj) && QK.calib.find(cj);
+    if (!box || (!ok && !rec)) return;
+    const ss = ok ? (cj.seasons || []).slice().sort((a, b) => a - b) : [];
+    const span = ss.length ? HW.seasonLabel(L, ss[0]) + ' to ' + HW.seasonLabel(L, ss[ss.length - 1]) : '';
     box.hidden = false;
-    box.innerHTML = QK.sectionHead({ kicker: 'How sure are we?', title: 'We say it. Then we check it.', sub: 'Every pre-game forecast in the test seasons, grouped by the chance we gave the home team, against how often the home team won. When the two bars match, our numbers mean what they say.' }) + '<div id="md-sure-m"></div>';
-    QK.howSure(box.querySelector('#md-sure-m'), { calibration: cj, league: HW.leagueName(L), span: ss.length ? HW.seasonLabel(L, ss[0]) + ' to ' + HW.seasonLabel(L, ss[ss.length - 1]) : '', subject: 'the home team' });
+    QK.doing(box, { record: rec, calibration: ok ? cj : null, league: HW.leagueName(L), span: span, subject: 'the home team',
+      sub: 'Our favourites over the last week, then every pre-game forecast in the test seasons' + (span ? ' (' + span + ')' : '') + ', grouped by the chance we gave the home team, against how often the home team won. When the two match, our numbers mean what they say.' });
   });
   return U.legacy(v, body.lastChild, params);
 }

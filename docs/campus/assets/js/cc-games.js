@@ -161,7 +161,7 @@ function hero(L, g, season) {
   var venue = g.venue && g.venue.name ? g.venue.name : '';
   var src = CC.mkSource(mk);
   return '<div class="cc-preview">' + QK.previewCard(G, { kicker: CC.LSHORT[L] + ' · ' + tag + (venue ? ' · ' + venue : ''), nick: function (x) { return x.name; }, colors: cols, factors: fx, factorsTitle: CC.isCur(L, g.season) ? 'How they match up this season' : 'How they matched up',
-    noteExtra: extra.length ? esc(extra.join(', and ') + '.') : '', market: pre && isNum(mk.p_home) ? { p: mk.p_home, label: 'Market' + (src ? ' (' + src + ')' : '') } : null }) + '</div>';
+    noteExtra: extra.length ? esc(extra.join(', and ') + '.') : '', market: pre && isNum(mk.p_home) ? { p: mk.p_home, src: src || undefined, quiet: true } : null }) + '</div>';
 }
 function heroMeta(L, g) {
   var venue = g.venue && g.venue.name ? g.venue.name + (g.venue.city ? ', ' + g.venue.city : '') + (g.venue.state ? ', ' + g.venue.state : '') : '';
