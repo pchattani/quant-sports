@@ -923,7 +923,7 @@ The fetch: finished seasons newest first, round-robin (every competition's last 
 leagues, then continental club competitions, then national and super cups, then national-team competitions; a
 competition stops after two seasons without statistics; seasons under way last, refreshed every seven days at most.
 150 calls in the hourly task (under `data/deploy/locks/sofascore.lock`, which the task holds while its fetchers run)
-and a gap runner the task starts each hour (`--gap-runner`: one batch of 150 at :28 under the same lock, no call after
+and a gap runner the task starts each hour (`--gap-runner`: a batch of 150 at :22 and another at :40 under the same lock, no call after
 :50, six hours' wait after a 403). `--status` prints progress and an ETA. The stores travel like the other stores (the
 task's engine commit, `push_stores.py`) and `export_public.py` classes every `store.json` under `docs/site/data` as a store.
 
