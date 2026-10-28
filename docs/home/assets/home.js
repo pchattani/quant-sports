@@ -1,7 +1,7 @@
-/* The Quant home (kit v4 "Broadcast"). Reads data/home.json (scripts/build_home.py) and refreshes live scores in the
+/* The Quant Sports home (kit v4 "Broadcast"). Reads data/home.json (scripts/build_home.py) and refreshes live scores in the
  * browser from each sport's published index.json on GitHub Pages (CORS: Access-Control-Allow-Origin *).
  *
- * Page, top to bottom: the black ticker; a small intro (what The Quant is, three pillars, "How it works", the
+ * Page, top to bottom: the black ticker; a small intro (what The Quant Sports is, three pillars, "How it works", the
  * sports); "Today": the game of the day (the significance rule, oddsmarkets/common/featured.py, ranked in the
  * builder: never the closest call, never "Our pick") beside the week's top lines (the biggest swing in a title
  * chance, the upset of the week, the team of the week); "Around the sports" (one line per sport: where the season

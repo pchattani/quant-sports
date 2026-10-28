@@ -14,9 +14,17 @@ To move a page over, follow `MIGRATION_V4.md`.
 
 ## 1. Identity
 
-**Name.** The Quant. Each site is "The Quant <Site>": Footballer, Paddock, Hardwood, Ace, Bullpen, Gridiron, Rink or
-Campus. The logo is "THE QUANT" in Bebas Neue after a volt parallelogram. A site adds its name in its sport accent
-("THE QUANT RINK").
+**Name.** The Quant Sports (since 28 October 2026; before that "The Quant"). The Quant is an umbrella for other,
+non-sports projects, so the sports hub always says "Sports". The landing page is The Quant Sports (the URL stays
+`pchattani.github.io/the-quant/`). Each sport site keeps its own name, "The Quant <Site>": Footballer, Paddock,
+Hardwood, Ace, Bullpen, Gridiron, Rink or Campus.
+
+**Logo.** A volt parallelogram, then the wordmark in Bebas Neue:
+- the hub (Home, and every site's footer): "THE QUANT SPORTS", with SPORTS in volt (`b.qk-brand-hub`);
+- a sport site: "THE QUANT RINK", the site name in its sport accent.
+
+Copy that names the hub (titles, meta tags, the footer, link labels) says "The Quant Sports"; the kit keeps the name in
+`QK.HUB_NAME`.
 
 **What it is.** A fun sports hub for people who like numbers: what to watch tonight, our forecasts, ratings and the
 stats behind them, each explained. It is not a betting site. The headline is always our forecast, our rating or a
@@ -213,7 +221,7 @@ All builders return HTML strings unless noted. Signatures are in `quant.js` / `q
 
 | Component | Builder | v4 look |
 |---|---|---|
-| Shell | `QK.shell(opts)` | black top bar, "THE QUANT" with the volt mark, condensed sport tabs with a volt underline, the section nav on `--block-2` |
+| Shell | `QK.shell(opts)` | black top bar, "THE QUANT SPORTS" (Home) or "THE QUANT <SITE>" with the volt mark, condensed sport tabs with a volt underline, the section nav on `--block-2` |
 | Ticker | `QK.ticker(games, o)` | `--block-2`, condensed, our pre-game chances in volt, the live period in red-orange |
 | Section head | `QK.sectionHead(o)` | the kicker as a volt tag on a black parallelogram, the title in all-caps Bebas (40–64 px); on a black band the tag is volt with black type |
 | Game card | `QK.gameCard(g, o)` | an 8 px stripe in the two team colours split by our chance; the league and time in condensed caps; 52 × 40 squares; Bebas scores and chances (favourite in blue); the foot "Our chance · why" (live: "Chance to win now · ..."); the bar under the rows only with `bar: true`; `homeFirst: true` lists the home side first (football) |

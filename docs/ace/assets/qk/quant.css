@@ -67,6 +67,8 @@ body.qk::before { content: none; }
 .qk-brand-mark svg { display: none; }
 .qk-brand-name { font-size: inherit; }
 .qk-brand-name b { color: var(--accent); font-weight: 400; font-style: normal; }
+/* the hub: "THE QUANT SPORTS", SPORTS in volt beside the volt mark (a sport site's name takes its sport accent) */
+.qk-brand-name b.qk-brand-hub, .qk-footer-brand b.qk-brand-hub { color: var(--volt); font-weight: 400; font-style: normal; }
 .qk-brand-sep { display: none; }
 
 .qk-sports { display: flex; gap: 2px; align-items: stretch; align-self: stretch; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; mask-image: linear-gradient(90deg, #000 94%, transparent); -webkit-mask-image: linear-gradient(90deg, #000 94%, transparent); }

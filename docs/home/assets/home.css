@@ -1,7 +1,7 @@
-/* The Quant home (kit v4 "Broadcast") — page layout only; every shared component comes from the kit (assets/qk). */
+/* The Quant Sports home (kit v4 "Broadcast") — page layout only; every shared component comes from the kit (assets/qk). */
 .hm-page { padding-top: 24px; }
 
-/* ── the intro: what The Quant is, three pillars, how it works, the sports (no giant hero) */
+/* ── the intro: what The Quant Sports is, three pillars, how it works, the sports (no giant hero) */
 .hm-intro { background: var(--block); color: #fff; padding: 22px 24px 0; border-top: 5px solid var(--volt); }
 .hm-intro .qk-sh-kicker { background: var(--volt); color: var(--volt-ink); margin-bottom: 12px; }
 .hm-intro .hm-intro-h { font: 400 clamp(1.625rem, 1.1rem + 1.1vw, 2.25rem)/1 var(--font-display); text-transform: uppercase; letter-spacing: 0.005em; margin: 0; max-width: 46ch; color: #fff; }

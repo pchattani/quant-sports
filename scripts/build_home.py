@@ -1,4 +1,4 @@
-"""Build The Quant home page data (docs/home/data/home.json + search.json) and copy the design kit.
+"""Build The Quant Sports home page data (docs/home/data/home.json + search.json) and copy the design kit.
 
 The home page (docs/home/) is a static page in the shared design system. It reads one compact,
 normalised file written here from the sport sites' already-built data trees:

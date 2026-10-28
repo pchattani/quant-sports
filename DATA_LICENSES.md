@@ -1,7 +1,7 @@
 # Data sources, credits and terms
 
-The sites built from this repository (The Quant Footballer, Paddock, Hardwood, Ace, Bullpen, Gridiron, Rink and Campus)
-are non-commercial. They publish model outputs and compact facts derived from the sources below, credit each
+The sites built from this repository (The Quant Sports and its sites The Quant Footballer, Paddock, Hardwood, Ace,
+Bullpen, Gridiron, Rink and Campus) are non-commercial. They publish model outputs and compact facts derived from the sources below, credit each
 source on the site, and do not re-host raw feeds. The rule throughout: a source whose terms forbid reuse or
 redistribution is not used (Nippon Professional Baseball's npb.jp, Basketball-Reference, Pro Football
 Reference, Spotrac, HoopsHype and OverTheCap contracts are left out for that reason).

@@ -288,6 +288,9 @@ QK.ICON = ICON;
 /* ─────────────────────────────────────── sports registry + IA */
 var PUB = 'https://pchattani.github.io/';
 QK.HOME_URL = PUB + 'the-quant/';
+/* the hub's name: the landing page is "The Quant Sports" (28 Oct 2026; The Quant is an umbrella for other, non-sports
+ * projects). Each sport site keeps its own name, "The Quant <Site>". The URL stays the-quant/. */
+QK.HUB_NAME = 'The Quant Sports';
 /* pending: true marks a site that is built but not launched (no public Pages site yet). It stays out of the
  * switcher, footer and home page everywhere except on its own pages and in local preview (QK.visible). */
 QK.ALL_SPORTS = [
@@ -386,11 +389,11 @@ QK.shell = function (o) {
   document.body.classList.add('qk');
   QK.bleedFix();
   var sp = sportKey ? QK.sport(sportKey) : null;
-  var brand = '<a class="qk-brand" href="' + esc(QK.homeUrl()) + '" aria-label="' + esc(sp ? sp.site + ': home of The Quant' : 'The Quant home') + '">' +
+  var brand = '<a class="qk-brand" href="' + esc(QK.homeUrl()) + '" aria-label="' + esc(sp ? sp.site + ', part of ' + QK.HUB_NAME + ': all sports' : QK.HUB_NAME + ': home') + '">' +
     '<span class="qk-brand-mark" aria-hidden="true"></span>' +
-    '<span class="qk-brand-name">the quant' + (sp ? ' <b>' + esc(sp.site.replace('The Quant ', '').toLowerCase()) + '</b>' : '') + '</span></a>';
+    '<span class="qk-brand-name">the quant ' + (sp ? '<b>' + esc(sp.site.replace('The Quant ', '').toLowerCase()) + '</b>' : '<b class="qk-brand-hub">sports</b>') + '</span></a>';
   var sports = '<nav class="qk-sports" aria-label="Sports">' +
-    '<a class="qk-sport" style="--sa:var(--sun)" href="' + esc(QK.homeUrl()) + '"' + (sportKey ? '' : ' aria-current="page"') + '>' + ICON.home + 'Today</a>' +
+    '<a class="qk-sport" style="--sa:var(--sun)" href="' + esc(QK.homeUrl()) + '" title="' + esc(QK.HUB_NAME) + ': today in every sport"' + (sportKey ? '' : ' aria-current="page"') + '>' + ICON.home + 'Today</a>' +
     QK.SPORTS.map(function (s) {
       return '<a class="qk-sport" data-sport="' + s.key + '" style="--sa:' + s.accent + '" href="' + esc(QK.sportUrl(s.key)) + '"' +
         (s.key === sportKey ? ' aria-current="page"' : '') + '>' + ICON[s.key] + esc(s.label) + '<span class="qk-sport-live" hidden><span class="qk-sport-dot" aria-label="live now"></span></span></a>';
@@ -452,8 +455,9 @@ QK.footer = function (sel) {
   var el = typeof sel === 'string' ? $(sel) : sel;
   if (!el) { el = document.createElement('footer'); document.body.appendChild(el); }
   el.className = 'qk-footer';
-  el.innerHTML = '<div class="qk-footer-in"><div><div class="qk-footer-brand"><span class="qk-brand-mark" aria-hidden="true"></span>the quant</div><br>Free sports numbers, explained. Made for fans who like a stat.<br>' +
+  el.innerHTML = '<div class="qk-footer-in"><div><div class="qk-footer-brand"><span class="qk-brand-mark" aria-hidden="true"></span><span>the quant <b class="qk-brand-hub">sports</b></span></div><br>Free sports numbers, explained. Made for fans who like a stat.<br>' +
     'Our chances are model estimates, not betting advice.</div><nav aria-label="All sports">' +
+    '<a href="' + esc(QK.homeUrl()) + '">' + esc(QK.HUB_NAME) + '</a>' +
     QK.SPORTS.map(function (s) { return '<a href="' + esc(QK.sportUrl(s.key)) + '">' + esc(s.site) + '</a>'; }).join('') + '</nav></div>';
 };
 
