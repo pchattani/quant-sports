@@ -80,7 +80,7 @@ logging.getLogger("oddsmarkets.sports.world_cup.models.elo").setLevel(logging.WA
 logging.getLogger("oddsmarkets.sports.world_cup.models.dixon_coles").setLevel(logging.WARNING)
 
 SITE_DATA = ROOT / "docs" / "site" / "data"
-LIGA_STORE = ROOT / "docs" / "liga" / "data" / "liga_store.json"
+LIGA_STORE = liga_store.store_path()
 OUT_PATH = ROOT / "oddsmarkets" / "football" / "competitions" / "league" / "data" / "model_params.json"
 
 # Staged grid: the Dixon-Coles side first, then Elo, then the blend. Staging keeps

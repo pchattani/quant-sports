@@ -537,6 +537,7 @@ function drawOverview(body, C, q) {
 
   drawYears(body, C, q);
   drawNow(body, C);
+  if (doc.home === 'liga-argentina') drawArgentina(body.querySelector('#cl-now'), C);
   var nl = C.matches.filter(function (m) { return !q.c || m.comp === q.c; });
   var next = nl.filter(function (m) { return (m.status === 'scheduled' || m.status === 'live') && !FB.staleLive(m); }).sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); }).slice(0, 2);
   var last = nl.filter(function (m) { return m.status === 'finished'; }).slice(0, 2);
@@ -588,6 +589,36 @@ function drawYears(body, C, q) {
     { key: 'wonN', label: 'Trophies', fmt: function (v, r) { return (r.won || []).length ? (r.won || []).map(function (s) { return '<span class="fb-cl-trophy">' + esc(FB.compName(s, true)) + '</span>'; }).join(' ') : ''; } },
     { key: 'partial', label: 'Record', fmt: function (v) { return v ? '<span class="fb-cov partial" data-tip="An archive table without W-D-L is in this season: the sums count the rest">Partial</span>' : '<span class="fb-cov full">Full</span>'; } }
   ], rows.map(function (y) { return FB.merge(y, { gd: y.gf - y.ga, ppg: ppgOf(y), wonN: (y.won || []).length }); }), { caption: 'Year by year' });
+}
+
+/* An Argentine club's Tabla Anual place and promedio under its competitions this season (anual.json, relegation.json):
+   the two tables that decide its continental places and whether it goes down. */
+function drawArgentina(box, C) {
+  var slug = 'liga-argentina';
+  if (!box || !FB.hasFile(slug, 'anual')) return;
+  FB.compFiles(slug, ['anual', 'relegation', 'teams']).then(function (d) {
+    if (!FB.alive(box)) return;
+    var teams = (d.teams || {}).teams || {};
+    var name = (C.doc.names || {})[slug] || Object.keys(teams).filter(function (n) { return String(teams[n].team_id) === String(C.tid); })[0];
+    var a = ((d.anual || {}).rows || []).filter(function (r) { return r.team === name; })[0];
+    var rel = (d.relegation || {}).rows || [];
+    var r = rel.filter(function (x) { return x.team === name; })[0];
+    if (!a && !r) return;
+    var list = box.querySelector('.fb-cl-now') || (function () { box.innerHTML = '<ul class="fb-cl-now"></ul>'; return box.querySelector('.fb-cl-now'); })();
+    var href = FB.href.comp(slug, 'table', { view: 'anual' });
+    var li = function (label, href2, fin, rec, tip) {
+      return '<li>' + FB.kindChip('league') + '<span class="fb-cl-now-c"><a class="fb-link" href="' + esc(href2) + '">' + esc(label) + '</a></span>' +
+        '<span class="fb-cl-now-f">' + fin + '</span><span class="fb-cl-now-rec fb-num"' + (tip ? ' data-tip="' + esc(tip) + '" tabindex="0"' : '') + '>' + rec + '</span></li>';
+    };
+    var out = '';
+    if (a) out += li('Tabla Anual', href, FB.ordinal(a.pos) + ' of ' + ((d.anual || {}).rows || []).length,
+      a.pts + ' pts · ' + a.played + ' played · Libertadores ' + pct(a.p_libertadores, a.p_libertadores > 0 && a.p_libertadores < 0.1 ? 1 : 0),
+      'Both tournaments\' zone-phase points; it decides the continental places behind the champions and the Copa Argentina winner');
+    if (r) out += li('Promedio', FB.href.comp(slug, 'table', { view: 'relegation' }), num(r.promedio_now, 3) + ' · ' + FB.ordinal(rel.length + 1 - r.pos) + ' of ' + rel.length,
+      (r.points || 0) + ' pts in ' + (r.matches || 0) + ' · down ' + pct(r.p_any, r.p_any > 0 && r.p_any < 0.1 ? 1 : 0),
+      'Points per match over three seasons; the worst promedio goes down beside the last club in the Tabla Anual');
+    list.insertAdjacentHTML('beforeend', out);
+  });
 }
 
 function drawNow(body, C) {
@@ -644,7 +675,7 @@ function drawMost(box, C) {
 function headline(c, prob, bands) {
   if (!prob) return [];
   var k = c.kind;
-  if (k === 'liga') return [['Champion', prob.p_title], ['Top 8', prob.p_top8], ['Relegation', prob.p_relegation]];
+  if (k === 'liga') return [['Champion', prob.p_title], ['Top 8', prob.p_top8], ['Libertadores', prob.p_libertadores], ['Relegation', prob.p_relegation]];
   if (k === 'conference') return [['MLS Cup', prob.p_cup], ['Playoffs', prob.p_playoffs], ['Shield', prob.p_title]];
   if (k === 'playoff') return [['Champion', prob.p_cup], ['Liguilla', prob.p_playoffs]];
   if (k === 'cup') return [['Win it', prob.p_cup], ['Reach the final', prob.p_conference]];
@@ -671,7 +702,7 @@ function drawDossier(box, C, slug) {
     var ts = ((d.team_stats || {}).teams || {})[name] || { season: {}, matches: [] };
     var season = ts.season || {};
     var tiles = headline(c, prob, (d.probs || {}).bands).filter(function (h) { return isNum(h[1]); }).map(function (h, i) { return FB.kpi(h[0], pct(h[1], h[1] < 0.1 && h[1] > 0 ? 1 : 0), { signal: i === 0, sub: 'our chance' }); });
-    if (row) tiles.unshift(FB.kpi('Table', FB.ordinal(row.pos), { sub: row.pts + ' pts · ' + row.w + '-' + row.d + '-' + row.l }));
+    if (row) tiles.unshift(FB.kpi(c.kind === 'liga' ? 'Tabla Anual' : 'Table', FB.ordinal(row.pos), { sub: row.pts + ' pts · ' + row.w + '-' + row.d + '-' + row.l }));
     if (isNum(str.strength_ppg)) tiles.push(FB.kpi('Rating', num(str.strength_ppg, 2), { sub: 'Elo ' + num(str.elo, 0) + (str.strength_rank ? ' · rank ' + str.strength_rank : '') }));
     if (isNum(season.xg)) tiles.push(FB.kpi('xG for / against', num(season.xg, 2) + ' / ' + num(season.xga, 2), { sub: 'a match' }));
     if (isNum(str.luck)) tiles.push(FB.kpi('Luck', signed(str.luck, 1), { sub: 'points above the xG', tip: 'Actual points minus the points the xG deserved' }));

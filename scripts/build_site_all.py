@@ -104,6 +104,7 @@ from oddsmarkets.football.competitions.league.store import (  # noqa: E402
 )
 from oddsmarkets.football.competitions.liga import store as _liga  # noqa: E402
 from oddsmarkets.football.competitions.liga.store import overdue as _liga_overdue  # noqa: E402
+from oddsmarkets.football.competitions.liga.store import store_path as _liga_store_path  # noqa: E402
 from oddsmarkets.football.core.markets import build_match_markets, build_outright_markets  # noqa: E402
 from oddsmarkets.football.competitions.liga.strength import (  # noqa: E402
     FORM_WINDOW,
@@ -133,7 +134,7 @@ logger = logging.getLogger("build-all")
 SITE_DIR = ROOT / "docs" / "site"
 DATA_DIR = SITE_DIR / "data"
 SEASONS_PATH = ROOT / "oddsmarkets" / "football" / "competitions" / "league" / "data" / "seasons.json"
-LIGA_STORE = ROOT / "docs" / "liga" / "data" / "liga_store.json"
+LIGA_STORE = _liga_store_path()       # docs/site/data/liga-argentina/store.json (legacy docs/liga copy before)
 # How many cup matches bridge each league into the pooled fit, and each
 # continental block to the others, from the last pooled frame.
 POOL_CONNECTIONS: dict[str, int] = {}
@@ -1233,6 +1234,56 @@ def write_market_odds(out_dir: Path, raw: dict | None, model, title_model: dict[
             "ok": False, "updated_at": None, "checked_at": _now(),
             "matches": {"fixtures": []}, "outrights": {"available": False, "teams": []},
         })
+
+
+# The cards and the match page hide a market snapshot older than this (docs/site/assets/app/core.js MKT_MAX_AGE).
+MARKET_FRESH_HOURS = 72
+# A watched competition with a fixture this close to kick-off is expected to carry a market (Kalshi and Polymarket
+# list the big leagues' and the UEFA cups' matches several days ahead).
+MARKET_EXPECT_HOURS = 48
+MARKET_WATCH_CUPS = ("champions-league", "europa-league", "conference-league")
+
+
+def market_freshness(data_dir: Path, slugs: Iterable[str], now: datetime | None = None) -> dict:
+    """How fresh the competitions' market files are after a build. Returns {"fresh": [slugs priced within
+    MARKET_FRESH_HOURS], "stale": [(slug, hours since the last priced snapshot or None, fixtures due)]}: a competition
+    is stale when it has a not-started fixture kicking off within MARKET_EXPECT_HOURS and no market snapshot under
+    MARKET_FRESH_HOURS old, so its cards show no market. (Before 28 Oct 2026 nothing reported this: a fetch that kept
+    returning nothing only showed as missing markets on the site.)"""
+    now = now or datetime.now(timezone.utc)
+    fresh: list[str] = []
+    stale: list[tuple[str, float | None, int]] = []
+    for slug in slugs:
+        mk = _read_json(data_dir / slug / "market_odds.json", None)
+        if mk is None:
+            continue
+        upd = _parse_utc(mk.get("updated_at")) if mk.get("updated_at") else None
+        age = (now - upd).total_seconds() / 3600 if upd else None
+        if age is not None and age <= MARKET_FRESH_HOURS:
+            fresh.append(slug)
+            continue
+        due = 0
+        for f in _read_json(data_dir / slug / "fixtures.json", {}).get("matches") or []:
+            k = _parse_utc(f.get("date")) if f.get("status") == "scheduled" and f.get("date") else None
+            if k is not None and now < k <= now + timedelta(hours=MARKET_EXPECT_HOURS):
+                due += 1
+        if due:
+            stale.append((slug, age, due))
+    return {"fresh": fresh, "stale": stale}
+
+
+def report_market_freshness(fr: dict) -> None:
+    """One log line on the markets' freshness, and a GitHub Actions warning (an annotation on the run's summary page)
+    when a watched competition with fixtures due has no fresh market."""
+    stale = fr["stale"]
+    logger.info("market freshness: %d competitions priced within %d h; stale with fixtures due in %d h: %s",
+                len(fr["fresh"]), MARKET_FRESH_HOURS, MARKET_EXPECT_HOURS,
+                ", ".join(f"{s} ({'never' if a is None else f'{a:.0f} h'}, {n} due)" for s, a, n in stale) or "none")
+    if stale and os.getenv("GITHUB_ACTIONS") == "true":
+        head = "no football market priced in this build" if not fr["fresh"] else "football markets stale"
+        print(f"::warning title=Stale football markets::{head}: "
+              + ", ".join(f"{s} last priced {'never' if a is None else f'{a:.0f} h ago'}" for s, a, _n in stale)
+              + " (cards hide a market older than 3 days; check the Kalshi / Polymarket fetch in this log)", flush=True)
 
 
 # ── analytics payloads (shared by leagues, cups and Argentina) ───────────────
@@ -2623,6 +2674,9 @@ def main() -> int:
 
     n_built = sum(1 for c in competitions if c.get("ok"))
     logger.info("Built %d/%d competitions", n_built, len(competitions))
+    if not args.no_market:
+        watched = [c["slug"] for c in competitions if c.get("ok") and (c["slug"] in LEAGUES or c["slug"] in MARKET_WATCH_CUPS)]
+        _step("market freshness", lambda: report_market_freshness(market_freshness(DATA_DIR, watched)))
     return 0 if n_built else 1
 
 

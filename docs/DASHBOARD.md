@@ -30,7 +30,7 @@ Contents
 ## 1. Architecture
 
 ```
-Sofascore stores (docs/site/data/<slug>/store.json, docs/liga/data/liga_store.json,
+Sofascore stores (docs/site/data/<slug>/store.json, Argentina's included since 28 Oct 2026,
                   docs/site/data/{archive,squads,past}/store.json)
         │   refreshed from a residential connection (scripts/refresh_sofascore_all.ps1)
         ▼
@@ -820,7 +820,7 @@ store in the module global `LAST_BUILD`. Its CLI: `--sims`, `--no-market`,
 
 `build_liga` in `build_site_all.py` points the module at
 `docs/site/data/liga-argentina/` (overriding `SITE_DIR`, `DATA_DIR`, `STORE_PATH`
-= `docs/liga/data/liga_store.json`, `HISTORY_STORE`), calls its `main()` with the
+= `liga/store.py store_path()`: `docs/site/data/liga-argentina/store.json`, `HISTORY_STORE`), calls its `main()` with the
 forwarded flags, then re-writes `players_live.json` with the catalogue and
 percentiles the site expects, runs `write_analytics` for the season's matches
 (which also removes `match_detail.json`), and fills crest paths into `teams.json`.
@@ -1138,7 +1138,7 @@ Found while writing this document.
 
 | Site | Path | Status |
 |---|---|---|
-| Argentine Liga Profesional | `docs/liga/` (`index.html`, `assets/app.js`, `assets/style.css`, `data/`) | The original single-competition site, in Spanish (`lang="es"`; Bootstrap 5.3 and Plotly 2.27 from CDNs). Built by `scripts/build_site_liga.py` into `docs/liga/data/` when run standalone. Its workflow, `.github/workflows/update_liga.yml`, is superseded by `update_site.yml`: the schedule is off and it runs only by hand (its deploy key has never worked). Its store `docs/liga/data/liga_store.json` is still the input for The Quant Footballer's Argentina pages. |
+| Argentine Liga Profesional | `docs/liga/` (`index.html`, `assets/app.js`, `assets/style.css`, `data/`) | The original single-competition site, in Spanish (`lang="es"`; Bootstrap 5.3 and Plotly 2.27 from CDNs). Built by `scripts/build_site_liga.py` into `docs/liga/data/` when run standalone. Its workflow, `.github/workflows/update_liga.yml`, is superseded by `update_site.yml`: the schedule is off and it runs only by hand (its deploy key has never worked). Its store moved to `docs/site/data/liga-argentina/store.json` on 28 October 2026 (`liga/store.py` `store_path`), with the other competitions'. |
 | World Cup 2026 | `docs/wc/` (`index.html`, `assets/app.js`, `assets/style.css`, `data/`) | Archived; its workflow (`.github/workflows/update_wc.yml`) is manual-only, with the schedule removed. |
 
 Neither shares code with `docs/site/`; changes to The Quant Footballer's front-end

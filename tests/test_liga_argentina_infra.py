@@ -306,3 +306,51 @@ def test_knockout_note_follows_the_rounds() -> None:
     assert "two-legged" not in mod.knockout_note(CUPS["copa-argentina"]).lower()
     assert "(two legs)" in mod.knockout_note(CUPS["copa-del-rey"])
     assert "Every tie is two-legged" not in mod.knockout_note(CUPS["fa-cup"])
+
+
+# ── round 6b: berths as they stand, the store's place, the discovery guard ──
+
+def test_berths_now_use_the_actual_counts() -> None:
+    b = _load_build()
+    state = _make_state(played_fraction=0.5)            # Apertura champion Belgrano; Clausura and Copa open
+    order = [t for t, _ in state.anual_standings()]
+    status, summary = b.berths_now(state, CFG, order, None)
+    vals = list(status.values())
+    assert status["Belgrano"] == "lib_auto"
+    assert summary["open_titles"] == 2 and summary["table_libertadores"] == 3
+    assert vals.count("lib") == 3 and vals.count("lib_open") == 2
+    assert vals.count("sud") == 4 and vals.count("sud_open") == 2
+    assert status[order[-1]] == "down_anual" and vals.count("down_promedio") == 1
+    # a decided Copa winner closes one open title
+    winner = next(t for t in order[10:] if t != "Belgrano")
+    status2, summary2 = b.berths_now(state, CFG, order, winner)
+    assert status2[winner] == "lib_auto" and summary2["open_titles"] == 1
+    assert list(status2.values()).count("lib") == 3
+
+
+def test_store_path_prefers_the_shared_location(tmp_path, monkeypatch) -> None:
+    from oddsmarkets.football.competitions.liga import store as L
+
+    new, old = tmp_path / "site" / "store.json", tmp_path / "liga" / "liga_store.json"
+    monkeypatch.setattr(L, "STORE_PATH", new)
+    monkeypatch.setattr(L, "LEGACY_STORE_PATH", old)
+    old.parent.mkdir(parents=True)
+    old.write_text("{}", encoding="utf-8")
+    assert L.store_path() == old
+    new.parent.mkdir(parents=True)
+    new.write_text("{}", encoding="utf-8")
+    assert L.store_path() == new
+
+
+def test_discovery_refuses_another_countrys_namesake(monkeypatch) -> None:
+    from oddsmarkets.football.competitions.cup.config import CUPS
+    from oddsmarkets.football.sources import sofascore
+
+    spec = importlib.util.spec_from_file_location("disc_infra", ROOT / "scripts" / "discover_sofascore_leagues.py")
+    d = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(d)
+    cfg = CUPS["trofeo-de-campeones"]
+    monkeypatch.setattr(sofascore, "search_tournament", lambda q, hint=None, budget=None: {"id": 1, "name": "Trofeo de Campeones", "category": "Ecuador"})
+    assert d.resolve_id(cfg) is None
+    monkeypatch.setattr(sofascore, "search_tournament", lambda q, hint=None, budget=None: {"id": 2, "name": "Trofeo de Campeones de la Liga Profesional", "category": "Argentina"})
+    assert d.resolve_id(cfg) == 2

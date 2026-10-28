@@ -265,7 +265,8 @@ def followed_clubs(seasons: dict) -> set[str]:
     # Argentina's clubs are followed too (its own store and fetcher): without them the Copa Argentina and the
     # Supercopa fetched no line-ups at all (October 2026: 0 of 60 played ties), so those pages had no players.
     # Their detail comes out of this run's one budget like every other cup's.
-    liga = ROOT / "docs" / "liga" / "data" / "liga_store.json"
+    from oddsmarkets.football.competitions.liga.store import store_path as _liga_store_path
+    liga = _liga_store_path()
     if liga.exists():
         lstore = load_store(liga)
         sids = [m.get("season_id") for m in (lstore.get("matches") or {}).values() if m.get("season_id")]

@@ -62,7 +62,8 @@ logger = logging.getLogger("fetch-squads")
 
 SITE_DATA = ROOT / "docs" / "site" / "data"
 SQUADS_PATH = SITE_DATA / "squads" / "store.json"
-LIGA_STORE = ROOT / "docs" / "liga" / "data" / "liga_store.json"
+from oddsmarkets.football.competitions.liga.store import store_path as _liga_store_path  # noqa: E402
+LIGA_STORE = _liga_store_path()
 
 DEFAULT_BUDGET = 20
 REFRESH_DAYS = 3

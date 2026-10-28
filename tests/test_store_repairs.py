@@ -46,7 +46,8 @@ def real_shaped_store():
     This is what a real fetch produces: `store["zones"]` holds squad membership, but
     no individual match carries a zone.
     """
-    path = ROOT / "docs" / "liga" / "data" / "liga_store.json"
+    from oddsmarkets.football.competitions.liga.store import store_path
+    path = store_path()
     if not path.exists():
         pytest.skip("no sample store; run scripts/make_liga_sample_store.py")
     store = json.loads(path.read_text(encoding="utf-8"))

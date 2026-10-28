@@ -57,8 +57,10 @@ from oddsmarkets.football.competitions.liga.config import (  # noqa: E402
 )
 from oddsmarkets.football.competitions.liga.store import (  # noqa: E402
     EMPTY_STORE,
+    STORE_PATH as SHARED_STORE_PATH,
     load_store,
     save_store,
+    store_path,
 )
 from oddsmarkets.football.sources import sofascore  # noqa: E402
 from oddsmarkets.football.sources.teams import normalize_team_name  # noqa: E402
@@ -66,7 +68,10 @@ from oddsmarkets.football.sources.teams import normalize_team_name  # noqa: E402
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger("fetch-liga")
 
-STORE_PATH = ROOT / "docs" / "liga" / "data" / "liga_store.json"
+# Read from where the store is (liga/store.py store_path: the shared location, else the legacy docs/liga copy on the
+# first run after the move); always written to the shared one, docs/site/data/liga-argentina/store.json.
+STORE_PATH = SHARED_STORE_PATH
+READ_PATH = store_path()
 SEASONS_PATH = ROOT / "oddsmarkets" / "football" / "competitions" / "liga" / "data" / "seasons.json"
 
 # Detail calls per run (five per match): twenty matches by default, paced at about
@@ -396,7 +401,12 @@ def update_store(store: dict, max_new: int = 40, budget=None, refresh: bool = Fa
     ]
     ids = [str(x) for x in finished["game_id"]]
     by_date = lambda g: str((store["matches"].get(g) or {}).get("date") or "")  # noqa: E731
-    fresh = sorted((g for g in ids if g not in store["lineups"]), key=by_date, reverse=True)
+    # A match Sofascore answered without line-ups waits for its retry, then is given up on: the leagues' back-off
+    # (fetch_sofascore_leagues._due / record_miss), so a match with no line-ups is not asked every hour for good.
+    now = datetime.now(timezone.utc)
+    missing = store.get("detail_missing") or {}
+    fresh = sorted((g for g in ids if g not in store["lineups"] and _leagues()._due(missing, g, now)),
+                   key=by_date, reverse=True)
     stale = sorted((g for g in ids if refresh and g in store["lineups"] and g not in store["team_stats"]),
                    key=by_date, reverse=True)
     queue = (fresh + stale)[:max_new]
@@ -419,13 +429,33 @@ def update_store(store: dict, max_new: int = 40, budget=None, refresh: bool = Fa
             ok = False
             logger.debug("detail fetch failed for %s: %s", gid, exc)
         status["new_fetched" if ok else "failures"] += 1
-        misses = 0 if ok else misses + 1
+        if ok:
+            (store.get("detail_missing") or {}).pop(gid, None)
+            misses = 0
+        elif sofascore.LAST_DETAIL_MISS in ("no-lineups", "no-stats"):
+            _leagues().record_miss(store, gid, sofascore.LAST_DETAIL_MISS)       # answered: not a block
+        else:
+            misses += 1
         if sofascore.is_blocked() or misses >= MAX_CONSECUTIVE_FAILURES:
             logger.warning("Sofascore is not answering detail calls — stopping detail for this run")
             break
         time.sleep(DETAIL_PAUSE_S)
 
     return status
+
+
+_LEAGUES_MOD = None
+
+
+def _leagues():
+    """The leagues' fetcher module (its detail back-off), loaded once."""
+    global _LEAGUES_MOD
+    if _LEAGUES_MOD is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("fetch_sofascore_leagues", ROOT / "scripts" / "fetch_sofascore_leagues.py")
+        _LEAGUES_MOD = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_LEAGUES_MOD)
+    return _LEAGUES_MOD
 
 
 def _fetch_match_detail(store: dict, gid: str, meta: dict, mdf=None, budget=None) -> bool:
@@ -469,7 +499,7 @@ def main() -> int:
             return 1
         logger.warning("probe failed — carrying on")
 
-    store = load_store(STORE_PATH)
+    store = load_store(READ_PATH)
     if (store.get("meta") or {}).get("synthetic"):
         # The committed placeholder store is generated, and its fixtures carry their
         # own ids. Merging real matches into it would leave both sets in place, and
@@ -512,6 +542,12 @@ def main() -> int:
         )
         return 1
 
+    # The leagues' store meta (fetch_sofascore_leagues): which competition and season the store is for.
+    if seasons_meta := load_seasons():
+        sid = seasons_meta[0].get(CLAUSURA) or seasons_meta[0].get(APERTURA)
+        store["meta"] = {**(store.get("meta") or {}), "league": "liga-argentina", "season_id": int(sid) if sid else None,
+                         "season_name": f"Liga Profesional {seasons_meta[0].get('year')}",
+                         "fixtures_refreshed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
     save_store(store, STORE_PATH)
     logger.info(
         "Store: %d matches, %d with detail, %d with team stats (+%d this run, %d failures)",

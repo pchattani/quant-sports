@@ -331,8 +331,8 @@ def sofascore_matches(slug: str, site_data: Path | None = None) -> pd.DataFrame:
     site_data = site_data or ROOT / "docs" / "site" / "data"
     rows = []
     paths = [site_data / slug / "store.json", site_data / "past" / "store.json"]
-    if slug == "liga-argentina":
-        paths.append(ROOT / "docs" / "liga" / "data" / "liga_store.json")
+    if slug == "liga-argentina" and not paths[0].exists():
+        paths.append(ROOT / "docs" / "liga" / "data" / "liga_store.json")     # before the store moved (round 6)
     for p in paths:
         if not p.exists():
             continue

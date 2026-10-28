@@ -1,5 +1,5 @@
 {
-  "discovered_at": "2026-09-30T23:02:34Z",
+  "discovered_at": "2026-10-28T06:59:29Z",
   "leagues": {
     "premier-league": {
       "tournament_id": 17,
@@ -2369,6 +2369,27 @@
       "conferences": {},
       "previous_rank": {},
       "family": "international"
+    },
+    "trofeo-de-campeones": {
+      "tournament_id": 18436,
+      "seasons": [
+        {
+          "season_id": 87606,
+          "name": "Trofeo de Campeones 2025",
+          "year": "2025",
+          "tournament_id": 18436
+        },
+        {
+          "season_id": 69936,
+          "name": "Trofeo de Campeones 2024",
+          "year": "2024",
+          "tournament_id": 18436
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
     }
   }
 }

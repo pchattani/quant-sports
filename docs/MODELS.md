@@ -11,7 +11,7 @@ Paths are relative to the repository root. "The build" means `scripts/build_site
 ### 1.1 How the models feed each other
 
 ```
-Sofascore stores (docs/site/data/<slug>/store.json, docs/liga/data/liga_store.json)
+Sofascore stores (docs/site/data/<slug>/store.json; Argentina docs/site/data/liga-argentina/store.json since 28 Oct 2026)
   |
   | training_frame(): finished matches; goals, plus team xG where lineups exist
   |

@@ -337,6 +337,36 @@ def test_stale_market_odds_keep_only_what_is_still_current(tmp_path) -> None:
     assert all(f["match_id"] != "1" for f in written["matches"]["fixtures"])
 
 
+def test_market_freshness_flags_watched_competitions_with_fixtures_due(tmp_path, monkeypatch, capsys) -> None:
+    """A competition with a fixture due within MARKET_EXPECT_HOURS and no market snapshot under MARKET_FRESH_HOURS
+    old is reported stale, and on GitHub Actions the report is a ::warning annotation."""
+    from datetime import datetime, timezone
+
+    import scripts.build_site_all as b
+
+    now = datetime(2026, 10, 28, 12, tzinfo=timezone.utc)
+
+    def comp(slug, updated_at, kickoffs):
+        (tmp_path / slug).mkdir()
+        (tmp_path / slug / "market_odds.json").write_text(json.dumps({"ok": updated_at is not None, "updated_at": updated_at}), encoding="utf-8")
+        (tmp_path / slug / "fixtures.json").write_text(json.dumps({"matches": [
+            {"id": str(i), "date": k, "status": st} for i, (k, st) in enumerate(kickoffs)]}), encoding="utf-8")
+
+    comp("fresh", "2026-10-28T06:00:00Z", [("2026-10-29T12:00:00Z", "scheduled")])
+    comp("stale", "2026-10-18T01:11:39Z", [("2026-10-29T12:00:00Z", "scheduled")])
+    comp("never", None, [("2026-10-28T20:00:00Z", "scheduled")])
+    comp("quiet", "2026-10-18T01:11:39Z", [("2026-11-08T12:00:00Z", "scheduled"), ("2026-10-28T11:00:00Z", "live")])
+    fr = b.market_freshness(tmp_path, ["fresh", "stale", "never", "quiet", "missing"], now)
+    assert fr["fresh"] == ["fresh"]
+    assert [(s, None if a is None else round(a), n) for s, a, n in fr["stale"]] == [("stale", 251, 1), ("never", None, 1)]
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    b.report_market_freshness(fr)
+    out = capsys.readouterr().out
+    assert out.startswith("::warning title=Stale football markets::football markets stale: stale last priced 251 h ago")
+    b.report_market_freshness({"fresh": ["fresh"], "stale": []})
+    assert "::warning" not in capsys.readouterr().out
+
+
 # ── tuned model parameters ───────────────────────────────────────────────────
 
 def test_model_params_fall_back_to_defaults_and_read_tuned_entries(tmp_path, monkeypatch) -> None:

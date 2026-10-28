@@ -72,6 +72,12 @@ def resolve_id(cfg) -> int | None:
     if not hit:
         logger.error("%s: Sofascore search found nothing for %r (%s)", cfg.slug, cfg.search, cfg.country_hint)
         return None
+    # A national or super cup must be its own country's: search can rank another country's namesake first when the
+    # country's own is missing (a "Trofeo de Campeones" exists in more than one country).
+    hint = getattr(cfg, "country_hint", None)
+    if getattr(cfg, "family", "") in ("domestic", "super") and hint and sofascore._fold(hint) not in sofascore._fold(hit.get("category")):
+        logger.error("%s: search found %s %r in %s, not %s; not taken", cfg.slug, hit["id"], hit["name"], hit["category"], hint)
+        return None
     logger.info("%s: resolved to %s %r (%s)", cfg.slug, hit["id"], hit["name"], hit["category"])
     return int(hit["id"])
 

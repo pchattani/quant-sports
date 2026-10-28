@@ -52,6 +52,22 @@ def test_football_restores_only_its_logs(tmp_path, monkeypatch):
     assert not (data / "hub.json").exists()
 
 
+def test_football_restores_its_market_files_for_the_builder_to_read_back(tmp_path, monkeypatch):
+    """market_odds.json comes back from the deploy (a fetch that returns nothing then keeps the unplayed lines and
+    their updated_at, so staleness shows); a copy the checkout has is left alone, and nothing deeper matches."""
+    monkeypatch.setattr(ci, "ROOT", tmp_path)
+    prev = tmp_path / "prev"
+    _w(prev / "data" / "premier-league" / "market_odds.json", {"ok": True, "updated_at": "2026-10-28T05:43:58Z"})
+    _w(prev / "data" / "la-liga" / "market_odds.json", {"ok": True, "updated_at": "2026-10-28T05:44:08Z"})
+    _w(prev / "data" / "archive" / "x" / "market_odds.json", {"deep": True})
+    data = tmp_path / "docs" / "site" / "data"
+    _w(data / "la-liga" / "market_odds.json", {"ok": False, "updated_at": None})
+    assert ci.main(["restore", "--site", "football", "--prev", str(prev)]) == 0
+    assert _r(data / "premier-league" / "market_odds.json")["updated_at"] == "2026-10-28T05:43:58Z"
+    assert _r(data / "la-liga" / "market_odds.json")["updated_at"] is None
+    assert not (data / "archive" / "x" / "market_odds.json").exists()
+
+
 def test_the_deployed_log_wins_over_a_checkout_copy(tmp_path, monkeypatch):
     monkeypatch.setattr(ci, "ROOT", tmp_path)
     prev = tmp_path / "prev"

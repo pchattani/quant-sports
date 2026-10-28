@@ -32,7 +32,8 @@ logger = logging.getLogger("fetch-crests")
 
 CRESTS_DIR = ROOT / "docs" / "site" / "assets" / "crests"
 STORES = [ROOT / "docs" / "site" / "data" / slug / "store.json" for slug in list(LEAGUES) + list(CUPS)]
-STORES.append(ROOT / "docs" / "liga" / "data" / "liga_store.json")
+from oddsmarkets.football.competitions.liga.store import store_path as _liga_store_path  # noqa: E402
+STORES.append(_liga_store_path())
 PAUSE_S = 0.3
 
 

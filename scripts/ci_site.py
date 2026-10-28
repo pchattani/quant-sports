@@ -571,7 +571,8 @@ def repair_logs(site: str, clone: Path, now: datetime | None = None) -> list[str
 
 SITES = {
     "football": {"docs": "site", "repo": "the-quant-footballer", "prune": prune_football, "excluded": (),
-                 "restore": "logs", "guard": guard_payload_floor("site", 2000)},
+                 "restore": "logs", "restore_also": ("data/*/market_odds.json",),
+                 "guard": guard_payload_floor("site", 2000)},
     "paddock": {"docs": "paddock", "repo": "the-quant-paddock", "prune": None, "excluded": (),
                 "newer_wins": ("data/*/store.json", "data/*/sessions/*.json", "data/*/telemetry/*.json",
                                "data/calibration.json"),
@@ -662,6 +663,10 @@ def cmd_restore(site: str, prev: Path) -> int:
     copied: list[str] = []
     patterns = cfg.get("newer_wins", ())
     only_logs = cfg.get("restore") == "logs"
+    # restored along with the logs: the previous build's output the builder reads back (football: each competition's
+    # market_odds.json, so a fetch that returns nothing keeps the lines still to kick off and their updated_at instead
+    # of an empty file with none; before 28 Oct 2026 every CI build started without them)
+    also = cfg.get("restore_also", ())
     for p in src.rglob("*"):
         if not p.is_file():
             continue
@@ -673,6 +678,14 @@ def cmd_restore(site: str, prev: Path) -> int:
             shutil.copy2(p, target)
             logs += 1
             copied.append(rel.as_posix())
+            continue
+        if also and any(len(rel.parts) + 1 == len(PurePosixPath(pat).parts) and PurePosixPath("data", rel.as_posix()).match(pat)
+                        for pat in also):
+            if not target.exists():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(p, target)
+                added += 1
+                copied.append(rel.as_posix())
             continue
         if only_logs:
             continue

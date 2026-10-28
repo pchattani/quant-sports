@@ -74,7 +74,9 @@ logger = logging.getLogger("build-liga")
 
 SITE_DIR = ROOT / "docs" / "liga"
 DATA_DIR = SITE_DIR / "data"
-STORE_PATH = DATA_DIR / "liga_store.json"
+# Argentina's store, with every other competition's (liga/store.py store_path; the old docs/liga copy before).
+from oddsmarkets.football.competitions.liga.store import store_path as _store_path  # noqa: E402
+STORE_PATH = _store_path()
 HISTORY_STORE = DATA_DIR / "history_store.json"
 PKG_DATA = ROOT / "oddsmarkets" / "football" / "competitions" / "liga" / "data"
 # Past league seasons (the archive fetcher's results store): the promedio history before this season.
@@ -302,6 +304,53 @@ def table_places(cfg: LigaConfig) -> tuple[int, int]:
     return lib, lib + cfg.sudamericana_berths
 
 
+BERTH_LABELS = {
+    "lib_auto": "Libertadores: a champion",
+    "lib": "Libertadores",
+    "lib_open": "Libertadores if an open title goes to a club already in, else Sudamericana",
+    "sud": "Sudamericana",
+    "sud_open": "Sudamericana if an open title goes to a club already in",
+    "down_anual": "Relegated: last in the Tabla Anual",
+    "down_promedio": "Relegated: the worst promedio",
+}
+
+
+def berths_now(state, cfg: LigaConfig, order: list[str], copa_winner: str | None) -> tuple[dict[str, str], dict]:
+    """
+    Where each club stands if the season ended today, with the actual berth counts: six Libertadores places, the
+    Apertura and Clausura champions and the Copa Argentina winner first (a title still to be decided holds a place
+    open), the rest down the Tabla Anual, then six Sudamericana places for the next clubs not already in; and the
+    two relegations, the worst promedio and the last club in the Tabla Anual (the next-worst promedio when they are
+    the same club). Returns ({club: status}, summary). Statuses: BERTH_LABELS.
+    """
+    teams = set(order)
+    autos: list[tuple[str, str]] = []
+    for team, why in ((state.apertura.champion, "Apertura champion"), (state.clausura.champion, "Clausura champion"),
+                      (copa_winner, "Copa Argentina winner")):
+        if team and team not in [a for a, _ in autos]:
+            autos.append((team, why))
+    open_titles = (0 if state.clausura.champion else 1) + (0 if copa_winner else 1)
+    lib_left = max(cfg.libertadores_berths - len(autos) - open_titles, 0)
+    sud_sure = max(cfg.sudamericana_berths - open_titles, 0)
+    status: dict[str, str] = {t: "lib_auto" for t, _ in autos if t in teams}
+    rest = [t for t in order if t not in status]
+    plan = ["lib"] * lib_left + ["lib_open"] * open_titles + ["sud"] * sud_sure + ["sud_open"] * open_titles
+    for team, st in zip(rest, plan):
+        status[team] = st
+    prom = state.promedio_now()
+    worst = sorted(prom, key=lambda t: (prom[t], t))
+    last = order[-1] if order else None
+    if worst:
+        down_p = worst[0] if worst[0] != last else (worst[1] if len(worst) > 1 else None)
+        if last:
+            status[last] = "down_anual"
+        if down_p:
+            status[down_p] = "down_promedio"
+    summary = {"autos": [{"team": t, "why": w} for t, w in autos], "open_titles": open_titles,
+               "table_libertadores": lib_left, "labels": BERTH_LABELS}
+    return status, summary
+
+
 def build_anual_json(state, results: LigaResults, cfg: LigaConfig, store: dict | None = None,
                      copa: dict | None = None) -> dict:
     """
@@ -334,6 +383,10 @@ def build_anual_json(state, results: LigaResults, cfg: LigaConfig, store: dict |
             "p_pos": [round(p, 5) for p in results.p_anual_position.get(team, [])],
         })
     lib_table, sud_last = table_places(cfg)
+    copa_winner = cfg.copa_argentina_winner or (copa or {}).get("winner")
+    status, now_summary = berths_now(state, cfg, [t for t, _ in now], copa_winner)
+    for r in rows:
+        r["berth_now"] = status.get(r["team"])
     official = liga_tables.official_table(store or {}, "anual")
     check = liga_tables.compare(now, official)
     if check is not None:
@@ -353,6 +406,7 @@ def build_anual_json(state, results: LigaResults, cfg: LigaConfig, store: dict |
             "clausura_champion": state.clausura.champion,
             "copa_argentina_winner": cfg.copa_argentina_winner or (copa or {}).get("winner"),
             "copa_argentina": copa or None,
+            "now": now_summary,
             "note": (
                 "Los campeones del Apertura, del Clausura y de la Copa Argentina "
                 "clasifican directo a la Libertadores; los cupos restantes salen de "

@@ -36,6 +36,18 @@ from oddsmarkets.football.sources.teams import normalize_team_name
 
 logger = logging.getLogger(__name__)
 
+# Argentina's store sits with every other competition's since round 6 (28 October 2026):
+# docs/site/data/liga-argentina/store.json. The old standalone site's copy is read only when the new one does not
+# exist yet (the first hour after the move, or an old checkout).
+_ROOT = Path(__file__).resolve().parents[4]
+STORE_PATH = _ROOT / "docs" / "site" / "data" / "liga-argentina" / "store.json"
+LEGACY_STORE_PATH = _ROOT / "docs" / "liga" / "data" / "liga_store.json"
+
+
+def store_path() -> Path:
+    """Where to read Argentina's store from: the shared location, else the legacy one while it is the only copy."""
+    return STORE_PATH if STORE_PATH.exists() or not LEGACY_STORE_PATH.exists() else LEGACY_STORE_PATH
+
 # Sofascore status strings that mean the match is over.
 FINISHED_STATUSES = {"ended", "afterpenalties", "afterextratime", "ap", "aet", "finished"}
 LIVE_STATUSES = {"inprogress", "live", "halftime", "firsthalf", "secondhalf"}
