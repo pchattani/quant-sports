@@ -456,3 +456,7 @@ td.gi-ours-cell { text-align: left; }
 .gi-lab-wn { align-items: center; margin-bottom: var(--sp-3); }
 .gi-lab-sim { margin-top: var(--sp-3); }
 .gi-lab-sim .gi-cap { margin: 0; }
+
+/* round 9: the game page's forecast table wraps inside its card (the market cell was clipped at 1440) */
+.gi-fc-t td, .gi-fc-t th { white-space: normal; }
+.gi-fc-t td:last-child { min-width: 64px; }

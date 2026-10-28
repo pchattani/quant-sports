@@ -393,7 +393,7 @@ def build_game(ctx: SeasonContext, gid: str, parsed: dict | None = None) -> dict
     lineups, rot = _safe(lambda: lineup_block(ts, g), (None, None)) or (None, None)
     out = {"ok": True, "id": str(gid), "league": ctx.league, "season": ctx.season, "date": g.get("date"), "status": g.get("status"),
            "stype": g.get("stype"), "home": h, "away": a, "hs": g.get("hs"), "as": g.get("as"), "periods": g.get("periods"),
-           "neutral": bool(g.get("neutral")), "line": g.get("line"), "series": g.get("series"), "venue": g.get("venue"),
+           "neutral": bool(g.get("neutral")), "line": g.get("line"), "series": _series(ctx, g), "venue": g.get("venue"),
            "attendance": g.get("attendance"),
            "teams": {t: an.team_info(ctx.store, t) for t in (h, a)},
            "pregame": pregame, "box": box if g.get("box") else {}, "four_factors": ff if g.get("box") else {},
@@ -443,7 +443,14 @@ def card(ctx: SeasonContext, g: dict, live: dict | None = None) -> dict:
             "model": {"p_home": m.get("p_home"), "margin": an.rnd(m.get("margin"), 2), "total": an.rnd(m.get("total"), 1),
                       **_av_card(m)} if m else None,
             "market": {k: mk.get(k) for k in ("p_home", "spread_home", "total", "sources")} if mk else None,
-            "wp_home": (live or {}).get("wp_home"), "espn_wp": (live or {}).get("espn_wp"), "series": g.get("series")}
+            "wp_home": (live or {}).get("wp_home"), "espn_wp": (live or {}).get("espn_wp"), "series": _series(ctx, g)}
+
+
+def _series(ctx: SeasonContext, g: dict) -> dict | None:
+    """The game's series block with the round's normalised name (season.series_round: WNBA "Playoff Series" ->
+    Semi-finals / WNBA Finals)."""
+    from oddsmarkets.basketball.analytics.season import series_round
+    return _safe(lambda: series_round(ctx, g), g.get("series"))
 
 
 def live_state(ctx: SeasonContext, g: dict) -> dict | None:

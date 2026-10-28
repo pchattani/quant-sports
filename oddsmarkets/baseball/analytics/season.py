@@ -69,6 +69,125 @@ def series_list(ctx: SeasonContext, sim: dict | None, markets: dict | None) -> l
     return out
 
 
+# season.json's layout version: a skipped (unchanged) season whose season.json is older is rebuilt from its store and
+# teams.json (cheap), so a builder fix reaches past seasons without their pitch tables (2: the played postseason).
+SEASON_VERSION = 2
+POST_GTYPES = ("F", "D", "L", "W", "C")
+ROUND_OF_GTYPE = {"F": "WC", "D": "DS", "L": "CS", "W": "WS", "C": "CH"}
+REACH_ORDER = ["WC", "DS", "CS", "LC", "WS", "CH"]   # LC: a Triple-A league final (IL, PCL)
+
+
+def actual_postseason(ctx: SeasonContext) -> dict | None:
+    """
+    The postseason as it was played, from the store's postseason games (no simulation): every series with its
+    teams (the home team of game 1 first: it held home field), wins, winner and games; the seeds and division
+    winners (MLB: the standings' tiebreak order, reconciled with the observed bracket, so a tiebreak we cannot
+    reproduce never moves a team); the furthest round each team reached and the champion. Used for finished
+    seasons and for any season whose simulation is off (Triple-A), so a past season shows what happened instead of
+    an empty template. None when the store has no postseason game.
+    """
+    from oddsmarkets.baseball.models import season_sim as SS
+    games = sorted((g for g in ctx.games.values() if str((g or {}).get("gtype") or "") in POST_GTYPES),
+                   key=lambda g: (str(g.get("date")), str(g.get("start") or ""), str(g.get("gpk"))))
+    if not games:
+        return None
+    acc: dict[tuple, dict] = {}
+    for g in games:
+        gt = str(g.get("gtype"))
+        h, a = str(g.get("home")), str(g.get("away"))
+        key = (gt, frozenset((h, a)))
+        sr = g.get("series") or {}
+        s = acc.setdefault(key, {"gtype": gt, "home_field": h, "other": a, "wins": {h: 0, a: 0}, "games": [],
+                                 "desc": sr.get("desc"), "of": sr.get("of"), "first": str(g.get("date"))})
+        if str(g.get("status") or "") in ("cancelled", "postponed"):
+            continue
+        s["games"].append(str(g.get("gpk")))
+        if SS.is_final(g):
+            w = h if int(g["hs"]) > int(g["as"]) else a
+            s["wins"][w] = s["wins"].get(w, 0) + 1
+    series = []
+    for s in sorted(acc.values(), key=lambda x: (POST_GTYPES.index(x["gtype"]), x["first"])):
+        a, b = s["home_field"], s["other"]
+        rnd = ROUND_OF_GTYPE[s["gtype"]]
+        if ctx.level != "mlb" and rnd == "WS":
+            rnd = "LC"
+        best = an.inum(s.get("of")) or BEST_OF.get(rnd) or 1
+        need = best // 2 + 1
+        wa, wb = s["wins"].get(a, 0), s["wins"].get(b, 0)
+        done = wa >= need or wb >= need
+        series.append({"id": f"{rnd}-{a}-{b}", "round": rnd, "round_name": s.get("desc") or ROUND_NAME.get(rnd), "teams": [a, b],
+                       "wins": [wa, wb], "best_of": best, "p": None, "done": done, "next": None, "market": None,
+                       "winner": (a if wa > wb else b) if done else None, "games": s["games"]})
+    reached: dict[str, str] = {}
+    for s in series:
+        for t in s["teams"]:
+            if t not in reached or REACH_ORDER.index(s["round"]) > REACH_ORDER.index(reached[t]):
+                reached[t] = s["round"]
+    last = series[-1]
+    champion = last["winner"] if last["done"] and last["round"] in ("WS", "CH") else None
+    teams: dict[str, dict] = {t: {"league": an.team_info(ctx.store, t).get("league"), "reached": r} for t, r in reached.items()}
+    seeds: dict[str, list] = {}
+    if ctx.level == "mlb":
+        try:
+            seeds = _actual_seeds(ctx, series, reached, teams)
+        except Exception:                                        # noqa: BLE001 - the bracket stands without seeds
+            seeds = {}
+    for t, rec in teams.items():
+        k = REACH_ORDER.index(rec["reached"]) if rec.get("reached") in REACH_ORDER else -1
+        rec.update({"name": an.team_info(ctx.store, t)["name"], "p_ds": 1.0 if k >= 1 else 0.0, "p_lcs": 1.0 if k >= 2 else 0.0,
+                    "p_pennant": 1.0 if k >= 4 else 0.0, "p_ws": 1.0 if t == champion else 0.0, "champion": t == champion})
+    return {"round": last["round"], "series": series, "seeds": seeds or None, "teams": teams, "matrix": None, "sims": None,
+            "actual": True, "champion": champion, "complete": champion is not None}
+
+
+def _actual_seeds(ctx: SeasonContext, series: list[dict], reached: dict, teams: dict) -> dict:
+    """Seeds per league for a played MLB postseason; writes seed, div_winner and the clinch flag into `teams`."""
+    from oddsmarkets.baseball.models import season_sim as SS
+    st = SS.standings(ctx.store)
+    order = st["order"]
+    idx = {t: i for i, t in enumerate(order)}
+    leagues, _ = SS.team_leagues(ctx.store)
+    obs = {}
+    for s in series:
+        if s["round"] in ("WC", "DS", "CS") and s["teams"][0] in idx and s["teams"][1] in idx:
+            obs[(s["round"], idx[s["teams"][0]], idx[s["teams"][1]])] = tuple(s["wins"])
+    seeds: dict[str, list] = {}
+    for lg in ("AL", "NL"):
+        part = [t for t in reached if leagues.get(t) == lg and t in st["teams"]]
+        if not part:
+            continue
+        if len(part) == 6 and len(st["seeds"].get(lg) or []) == 6:
+            sd = SS.reconcile_seeds({lg: [idx[t] for t in st["seeds"][lg]]}, obs, leagues, order)[lg]
+            seeds[lg] = [order[i] for i in sd]
+            continue
+        # older formats (five teams a league to 2021, eight in 2020): division winners first, then (2020) the
+        # runners-up, then the rest, each by record; a Wild Card round's home team is the higher seed of its pair
+        rank = {t: k for k, t in enumerate(sorted(order, key=lambda t: -(st["teams"][t]["pct"] or 0)))}
+        divw = {t for t in part if st["teams"][t].get("div_winner")}
+        runners = set()
+        if len(part) == 8:
+            for dv in {st["teams"][t]["division"] for t in part}:
+                rest = sorted((t for t in part if st["teams"][t]["division"] == dv and t not in divw), key=lambda t: rank[t])
+                if rest:
+                    runners.add(rest[0])
+        ordered = sorted(part, key=lambda t: (0 if t in divw else 1 if t in runners else 2, rank[t]))
+        for s in series:
+            if s["round"] == "WC" and leagues.get(s["teams"][0]) == lg:
+                h, o = s["teams"]
+                if h in ordered and o in ordered and ordered.index(h) > ordered.index(o):
+                    i, j = ordered.index(h), ordered.index(o)
+                    ordered[i], ordered[j] = o, h
+        seeds[lg] = ordered
+    for lg, lst in seeds.items():
+        byes = 2 if len(lst) == 6 else 0
+        for k, t in enumerate(lst):
+            rec = teams.setdefault(t, {"league": lg})
+            rec["seed"] = k + 1
+            rec["div_winner"] = bool(st["teams"][t].get("div_winner"))
+            rec["clinched"] = "z" if k < byes else ("y" if rec["div_winner"] else "w")
+    return seeds
+
+
 def current_round(series: list[dict]) -> str | None:
     live = [s["round"] for s in series if not s.get("done")]
     pool = live or [s["round"] for s in series]
@@ -87,6 +206,16 @@ def build(ctx: SeasonContext, teams: dict | None, sim: dict | None, markets: dic
     meta_st = (ctx.store.get("meta") or {}).get("standings") or {}
     gp = [r["w"] + r["l"] for r in rec.values()]
     lg_rpg = (sum(r["rs"] for r in rec.values()) / max(sum(gp), 1)) if rec else 4.4
+    # no simulation of the postseason (a finished season, or a level whose simulation is off): the bracket as played,
+    # and the final standings' seeds, division winners and games behind from the games themselves
+    act = actual_postseason(ctx) if not post.get("available") else None
+    act_st: dict = {}
+    if not st and ctx.level == "mlb":
+        try:
+            from oddsmarkets.baseball.models import season_sim as SS
+            act_st = {t: {"gb": v.get("gb")} for t, v in SS.standings(ctx.store)["teams"].items()}
+        except Exception:                                        # noqa: BLE001
+            act_st = {}
     divisions: dict[str, list] = {}
     for t in an.real_teams(ctx.store):
         info = an.team_info(ctx.store, t)
@@ -102,6 +231,14 @@ def build(ctx: SeasonContext, teams: dict | None, sim: dict | None, markets: dic
         p = pt.get(t) or {}
         ss = st.get(t) or {}
         ms = meta_st.get(t) or {}
+        if not ss and act_st:
+            ss = act_st.get(t) or {}
+        if act and not p and not s:
+            p = (act.get("teams") or {}).get(t) or {}
+            if p:
+                ss = {**ss, "seed": p.get("seed", ss.get("seed")), "div_winner": p.get("div_winner", ss.get("div_winner"))}
+                if not ms.get("clinched") and p.get("clinched"):
+                    ms = {**ms, "clinched": p.get("clinched")}
         row = {"tid": t, "name": info["name"], "abbr": info["abbr"], "short": info["short"], "league": info["league"],
                "division": info["division"], "w": r["w"], "l": r["l"], "pct": an.rnd(an.div(r["w"], g), 3), "gb": ss.get("gb", ms.get("gb")),
                "rs": r["rs"], "ra": r["ra"], "rd": r["rs"] - r["ra"],
@@ -121,13 +258,13 @@ def build(ctx: SeasonContext, teams: dict | None, sim: dict | None, markets: dic
     for d in divisions.values():
         d.sort(key=lambda x: (-(x["pct"] or 0), -x["w"]))
     series = series_list(ctx, sim, markets)
-    bracket = None
+    bracket = act or None
     if post.get("available"):
         bracket = {"round": current_round(series), "series": series, "seeds": post.get("seeds"),
                    "teams": {t: {**v, "name": an.team_info(ctx.store, t)["name"]} for t, v in pt.items()},
                    "matrix": post.get("matrix"), "sims": post.get("sims")}
     ratings = {t: {"off": v.get("off_rpg"), "def": v.get("def_rpg"), "pit": v.get("pit_rpg"), "total": v.get("rating")} for t, v in tv.items()}
-    return {**CT.season_meta(ctx), "standings": divisions, "ratings": ratings, "league_rpg": an.rnd(lg_rpg, 3),
+    return {**CT.season_meta(ctx), "version": SEASON_VERSION, "standings": divisions, "ratings": ratings, "league_rpg": an.rnd(lg_rpg, 3),
             "sim": {"available": bool(sim.get("available")), "basis": sim.get("basis"), "reason": sim.get("reason"),
                     "kind": "postseason" if post else ("regular" if sim.get("regular") else None),
                     "sims": (sim.get("regular") or post or {}).get("sims"), "remaining_games": (sim.get("regular") or {}).get("remaining_games")},

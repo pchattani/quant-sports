@@ -103,6 +103,19 @@ function loadGlossary() {
   });
 }
 
+/* The catalogue's sample denominators (analytics/*.py `den`) in words: never a raw code on the page. */
+const UNIT_WORDS = { pa: 'plate appearances', bip: 'balls in play', pitches: 'pitches', bf: 'batters faced', fb: 'fastballs', br: 'breaking balls',
+  os: 'off-speed pitches', bat_swings: 'tracked swings', swings: 'swings', chances: 'fielding chances', called: 'called pitches', pa_l: 'plate appearances v left-handers',
+  pa_r: 'plate appearances v right-handers', bf_l: 'left-handed batters faced', bf_r: 'right-handed batters faced', iz: 'pitches in the zone', oz: 'pitches out of the zone',
+  heart: 'pitches over the heart of the plate', shadow: 'pitches on the edges', chase: 'chase-zone pitches', waste: 'waste pitches', v95: 'pitches at 95+ mph',
+  v90: 'pitches at 90-95 mph', vlo: 'pitches under 90 mph', tto3: 'batters faced a third time or more' };
+function unitWord(e) {
+  const u = e && e.unit;
+  if (u) return UNIT_WORDS[u] || String(u).replace(/_/g, ' ');
+  return /pitch|whiff|swing|chase|velo|spin|stuff/.test((e && e.key) || '') ? 'pitches' : 'plate appearances';
+}
+/* a stabilisation point worth printing: one or more of the unit (a fit that rounds to 0 says nothing) */
+function stabOf(e) { const k = K(); return k && k.isNum(e.stabilises_at) && e.stabilises_at >= 1 ? Number(e.stabilises_at) : null; }
 function tagsOf(e) {
   const tags = [];
   const f = e.fmt;
@@ -114,7 +127,7 @@ function tagsOf(e) {
   if (e.lower) tags.push(['lower is better', 'lower']);
   if (e.scope && !/^(all|hitter|pitcher|team)$/.test(e.scope)) tags.push([String(e.scope).replace(/_/g, ' '), 'out']);
   const k = K();
-  if (k && k.isNum(e.stabilises_at)) tags.push(['stabilises ~' + k.int(e.stabilises_at) + ' ' + (e.unit || (/pitch|whiff|swing|chase|velo|spin|stuff/.test(e.key) ? 'pitches' : 'PA')), 'gk']);
+  if (k && stabOf(e) !== null) tags.push(['stabilises ~' + k.int(stabOf(e)) + ' ' + unitWord(e), 'gk']);
   return tags.map(t => '<span class="gl-tag' + (t[1] ? ' ' + t[1] : '') + '">' + esc(t[0]) + '</span>').join('');
 }
 let USED_IDS = {};
@@ -142,7 +155,7 @@ function renderGlossary(el, params) {
     (g.model || []).forEach(t => { let grp = MT.find(x => x[0] === (t.group || 'Models')); if (!grp) { grp = [t.group || 'Models', []]; MT.unshift(grp); } if (!grp[1].some(y => y[1] === t.label)) grp[1].unshift([t.key + '_model', t.label, t.desc]); });
     const nMetrics = groups.reduce((s, x) => s + (x.entries || []).length, 0);
     const nModel = MT.reduce((s0, x) => s0 + x[1].length, 0);
-    const nStab = groups.reduce((s, x) => s + (x.entries || []).filter(e => typeof e.stabilises_at === 'number').length, 0);
+    const nStab = groups.reduce((s, x) => s + (x.entries || []).filter(e => stabOf(e) !== null).length, 0);
     const index = groups.map(x => '<a href="#/glossary/g:' + esc(slug(x.name)) + '" data-group="' + esc(slug(x.name)) + '">' + esc(x.name) + '</a>').join('') +
       MT.map(x => '<a href="#/glossary/g:model-' + esc(slug(x[0])) + '" data-group="model-' + esc(slug(x[0])) + '">' + esc(x[0]) + '</a>').join('');
     const cardOf = (name, sl, entries, isModel) => '<div class="card gl-group" data-group="' + esc(sl) + '"><div class="card-header">' + esc(name) + ' <span class="card-sub">' + entries.length + '</span></div><dl class="gl-list">' + entries.map(e => entryHTML(e, isModel)).join('') + '</dl></div>';
@@ -160,10 +173,10 @@ function renderGlossary(el, params) {
     if (nStab && K()) {
       const k = K();
       const rows = [];
-      groups.forEach(x => (x.entries || []).forEach(e => { if (k.isNum(e.stabilises_at)) rows.push(e); }));
+      groups.forEach(x => (x.entries || []).forEach(e => { if (stabOf(e) !== null) rows.push(e); }));
       rows.sort((a, b) => a.stabilises_at - b.stabilises_at);
       document.getElementById('gl-stab').innerHTML = k.table([{ label: 'Metric' }, { label: 'Group' }, { label: 'Stabilises at', align: 'right' }, { label: 'Unit' }],
-        rows.map(e => [{ v: e.label, html: '<a href="#/glossary/' + encodeURIComponent(e.key) + '">' + esc(e.label || e.key) + '</a>' }, { v: e.group || '', html: esc(e.group || '') }, { v: e.stabilises_at, html: '<strong>' + k.int(e.stabilises_at) + '</strong>' }, { v: e.unit || '', html: esc(e.unit || '') }]), { compact: true });
+        rows.map(e => [{ v: e.label, html: '<a href="#/glossary/' + encodeURIComponent(e.key) + '">' + esc(e.label || e.key) + '</a>' }, { v: e.group || '', html: esc(e.group || '') }, { v: e.stabilises_at, html: '<strong>' + k.int(e.stabilises_at) + '</strong>' }, { v: unitWord(e), html: esc(unitWord(e)) }]), { compact: true });
       k.sortable(document.getElementById('gl-stab'));
     }
     const input = document.getElementById('gl-search'), kindSel = document.getElementById('gl-kind'), count = document.getElementById('gl-count');

@@ -881,6 +881,12 @@ def _pct(x):
     return f"{100 * x:.0f}%"
 
 
+def _n(v: float, word: str) -> str:
+    """'1 TD', '3 TDs': a whole count with its noun in the right number."""
+    k = int(round(v or 0))
+    return f"{k} {word}" + ("" if k == 1 else "s")
+
+
 def picks(rows: list[dict], K: dict, D: dict, w: int) -> dict:
     """Our suggested picks with reasons (PPR): start (projected well above where his season so far ranks him), waiver
     targets (likely available: outside the top scorers at the position; ranked by rest-of-season points per game with
@@ -911,7 +917,9 @@ def picks(rows: list[dict], K: dict, D: dict, w: int) -> dict:
                                      "why": f"projected {x['ppr']:.1f} ({pos}{rw} this week) against {pos}{rs} on points per game so far"
                                             + ("; " + "; ".join(why) if why else "")})
             # waivers
-            if rank_t.get(x["pid"], 999) > WAIVER_N.get(pos, 30) and x["status"] not in OUT_STATUS and (x.get("ros_g") or 0) >= 3:
+            # a waiver target must be able to play: not on a reserve list and not ruled out (or doubtful) this week
+            if (rank_t.get(x["pid"], 999) > WAIVER_N.get(pos, 30) and x["status"] not in OUT_STATUS
+                    and x.get("inj") not in ("Out", "Doubtful", "IR") and (x.get("ros_g") or 0) >= 3):
                 ros_pg = (x["ros_ppr"] or 0) / max(x["ros_g"] or 1, 1)
                 trend = 0.0
                 rs_ = []
@@ -933,10 +941,10 @@ def picks(rows: list[dict], K: dict, D: dict, w: int) -> dict:
                 if pos != "QB" and x["xfp"] / g >= {"RB": 9, "WR": 9, "TE": 7}.get(pos, 9) and diff <= -2.0:
                     out["buy_low"].append({"pid": x["pid"], "pos": pos, "score": -diff,
                                            "why": f"usage worth {x['xfp'] / g:.1f} PPR points a game, scoring {(x['pts_ppr'] or 0) / g:.1f}"
-                                                  + (f"; {x['td']:.0f} TDs on {x['xtd']:.1f} expected" if tdd <= -1 else "")})
+                                                  + (f"; {_n(x['td'], 'TD')} on {x['xtd']:.1f} expected" if tdd <= -1 else "")})
                 if pos != "QB" and diff >= 2.5 and tdd >= 1.5:
                     out["sell_high"].append({"pid": x["pid"], "pos": pos, "score": diff,
-                                             "why": f"{x['td']:.0f} TDs on {x['xtd']:.1f} expected; scoring {(x['pts_ppr'] or 0) / g:.1f} a game on "
+                                             "why": f"{_n(x['td'], 'TD')} on {x['xtd']:.1f} expected; scoring {(x['pts_ppr'] or 0) / g:.1f} a game on "
                                                     f"usage worth {x['xfp'] / g:.1f}"})
             if g >= 4 and pos in ("WR", "TE", "RB") and (x.get("ros_ppr") or 0) > 0:
                 d_t = (x.get("tgt_sh3") or 0) - (x.get("tgt_sh") or 0)

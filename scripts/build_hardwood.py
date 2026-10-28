@@ -471,8 +471,8 @@ def _series_sig(post: dict | None, fmt: dict | None, h: str, a: str) -> dict | N
             w = x.get("wins") or {}
             wh, wa = int(w.get(h) or 0), int(w.get(a) or 0)
             name = str(x.get("round") or "")
-            k = names.index(x.get("round"))
-            best = rounds[min(k, len(rounds) - 1)] if rounds else 7
+            k = int(x["rnum"]) - 1 if isinstance(x.get("rnum"), int) else names.index(x.get("round"))
+            best = x.get("best_of") or (rounds[min(k, len(rounds) - 1)] if rounds else 7)
             return {"game": wh + wa + 1, "wins": [wh, wa], "best_of": best, "name": name}
     return None
 

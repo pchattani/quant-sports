@@ -200,8 +200,69 @@ def build_season(ctx: SeasonContext, players_cat: dict | None, ratings_7d: dict 
     return out
 
 
+def round_label(league: str, k: int, n: int) -> str:
+    """The round's name by its place (1-based k of n rounds): ESPN calls every WNBA round after the first "Playoff
+    Series", so names come from the bracket's depth, never the feed. NBA: First round, Conference semi-finals,
+    Conference finals, NBA Finals; WNBA: First round, (Second round,) Semi-finals, WNBA Finals."""
+    from_end = n - k
+    if from_end <= 0:
+        return f"{league.upper()} Finals"
+    if league == "nba":
+        names = ["Conference finals", "Conference semi-finals", "First round"]
+    else:
+        names = ["Semi-finals", "Second round", "First round"] if n >= 4 else ["Semi-finals", "First round"]
+    return names[from_end - 1] if from_end - 1 < len(names) else f"Round {k}"
+
+
+def normalise_rounds(series: list[dict], league: str, fmt: dict | None, conf_of: dict | None = None,
+                     finished: bool = False) -> list[dict]:
+    """Give each playoff series (stype post) its place in the bracket: `rnum` (1-based round), `rkey` (the format's
+    round key: r1, semis, conf_finals, finals), `round` (the round's name, normalised: round_label), `round_src` (the
+    feed's own name), `conf` (both teams' conference before the NBA Finals) and `winner` (the team that reached the
+    wins needed, or the one that played on). The round is the depth: one more than the most series either team had
+    already played, in start order, which holds with byes (WNBA 2016-21) and old best-of-five first rounds. Play-in
+    series are left as they are. Mutates and returns `series`."""
+    fmt = fmt or {}
+    keys = list(fmt.get("rounds") or [])
+    best = list(fmt.get("series") or [])
+    post = [s for s in series if s.get("stype") == "post"]
+    post.sort(key=lambda s: min((str(x.get("date") or "") for x in s.get("games") or []), default=""))
+    played: dict[str, int] = {}
+    for s in post:
+        t = [str(x) for x in s.get("teams") or []]
+        s["rnum"] = 1 + max([played.get(x, 0) for x in t] or [0])
+        for x in t:
+            played[x] = played.get(x, 0) + 1
+    n = max([len(keys)] + [s["rnum"] for s in post] or [1])
+    for s in post:
+        k = s["rnum"]
+        if s.get("round") is not None and "round_src" not in s:
+            s["round_src"] = s.get("round")
+        s["round"] = round_label(league, k, n)
+        off = n - len(keys)
+        s["rkey"] = keys[k - 1 - off] if keys and 0 <= k - 1 - off < len(keys) else ("finals" if k == n else f"r{k}")
+        t = [str(x) for x in s.get("teams") or []]
+        if conf_of and league == "nba" and k < n and len(t) == 2 and conf_of.get(t[0]) and conf_of.get(t[0]) == conf_of.get(t[1]):
+            s["conf"] = conf_of[t[0]]
+        w = s.get("wins") or {}
+        bo = best[min(k - 1 - off, len(best) - 1)] if best and k - 1 - off >= 0 else None
+        need = (bo // 2 + 1) if bo else None
+        win = next((x for x in t if need and int(w.get(x) or 0) >= need), None)
+        if win is None:
+            later = [x for x in t if any(o.get("rnum", 0) > k and x in [str(y) for y in o.get("teams") or []] for o in post)]
+            win = later[0] if len(later) == 1 else None
+        if win is None and "wins series" in str(s.get("summary") or "").lower():
+            win = max(t, key=lambda x: int(w.get(x) or 0)) if t else None
+        if win is None and finished and k == n and t and int(w.get(t[0]) or 0) != int(w.get(t[-1]) or 0):
+            win = max(t, key=lambda x: int(w.get(x) or 0))
+        s["winner"] = win
+        s["best_of"] = bo
+    return series
+
+
 def postseason(ctx: SeasonContext) -> dict | None:
-    """Played play-in and playoff games grouped by series (the actual bracket so far)."""
+    """Played play-in and playoff games grouped by series (the actual bracket so far), each playoff series with its
+    normalised round (normalise_rounds)."""
     series: dict[str, dict] = {}
     for gid, g in sorted(ctx.games.items(), key=lambda kv: str(kv[1].get("date") or "")):
         if g.get("stype") not in ("post", "playin"):
@@ -217,7 +278,40 @@ def postseason(ctx: SeasonContext) -> dict | None:
             s["wins"][w] = s["wins"].get(w, 0) + 1
         if (g.get("series") or {}).get("summary"):
             s["summary"] = g["series"]["summary"]
-    return {"series": list(series.values())} if series else None
+    if not series:
+        return None
+    conf_of = {t: an.team_info(ctx.store, t).get("conference") for t in ctx.teams}
+    pending = any(g.get("stype") == "post" and g.get("status") in ("pre", "in") for g in ctx.games.values())
+    return {"series": normalise_rounds(list(series.values()), ctx.league, _fmt(ctx), conf_of, finished=not pending)}
+
+
+def series_round(ctx: SeasonContext, g: dict) -> dict | None:
+    """A game's `series` block with the normalised round name (the game card and the game page): ESPN's own name
+    for every WNBA round after the first is "Playoff Series"."""
+    ser = g.get("series")
+    if not ser or g.get("stype") != "post":
+        return ser
+    cache = getattr(ctx, "_round_names", None)
+    if cache is None:
+        cache = {}
+        try:
+            for s in (postseason(ctx) or {}).get("series") or []:
+                if s.get("stype") == "post":
+                    cache["|".join(sorted(str(x) for x in s.get("teams") or []))] = s.get("round")
+        except Exception:  # noqa: BLE001
+            cache = {}
+        try:
+            ctx._round_names = cache
+        except Exception:  # noqa: BLE001
+            pass
+    name = cache.get("|".join(sorted((str(g.get("home")), str(g.get("away"))))))
+    if not name:
+        return ser
+    out = dict(ser)
+    if out.get("round") and out.get("round") != name:
+        out["round_src"] = out.get("round")
+    out["round"] = name
+    return out
 
 
 def _safe(fn, default=None):

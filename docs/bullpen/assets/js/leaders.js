@@ -40,7 +40,9 @@ function render(el, params, state) {
   if (q.k && /^(hitter|pitcher|sp|rp|pitch)$/.test(q.k)) S0.kind = q.k === 'pitcher' ? 'sp' : q.k;
   if (q.m) S0.metric = q.m;
   if (q.pt) S0.pt = q.pt;
-  el.innerHTML = QK.sectionHead({ kicker: 'Leaderboards · ' + k.LN(L), title: 'Leaderboards', sub: 'Any metric for hitters, starters, relievers or one pitch type, best or worst first, with the sample floor in your hands. Percentile cells rank each player against his own peer group past its floor (starters with starters, relievers with relievers; 100 = best).' }) +
+  const ars = !!params.arsenal;
+  el.innerHTML = (ars ? QK.sectionHead({ kicker: 'Pitch types · ' + k.LN(L), title: 'Pitch by pitch', sub: 'One pitch type at a time: the best four-seamers, sinkers, sliders, curveballs, changeups and the rest on Stuff+, Location+, movement, velocity and results, with the floor in your hands. The hitter, starter and reliever boards live in the Scouting Room.' })
+    : QK.sectionHead({ kicker: 'Leaderboards · ' + k.LN(L), title: 'Leaderboards', sub: 'Any metric for hitters, starters, relievers or one pitch type, best or worst first, with the sample floor in your hands. Percentile cells rank each player against his own peer group past its floor (starters with starters, relievers with relievers; 100 = best).' })) +
     QK.note('A <b>90th percentile</b> means better than 90 in 100 of the players past the floor. Rates need a sample: early in a season the floor is prorated, so small samples are kept out.') +
     hotBand(L) +
     '<section class="qk-card"><div class="qk-card-body"><div class="bp-ctl">' +
@@ -206,4 +208,12 @@ function glance(L, S, lead, hc, pc) {
 }
 
 if (typeof BP.route === 'function') { BP.route('leaders', render); try { BP.route('#/<L>/leaders', render); } catch (e) { /* bound */ } }
+/* Round 8: #/<L>/leaders redirects to the Scouting Room (core.js); the per-pitch-type boards stay here as "Pitch types"
+   (#/<L>/arsenal, a tab of the Scouting Room), opening on the pitch-type board. */
+if (typeof BP.route === 'function') BP.route('arsenal', (el, params, state) => {
+  params.arsenal = true;
+  params.query = Object.assign({}, params.query || {});
+  if (!params.query.k) params.query.k = 'pitch';
+  return render(el, params, state);
+});
 })(window.BP || (window.BP = {}));

@@ -33,7 +33,14 @@
  * falls back to the next metric of its set); NPB's own ids stand in for the spec's (VIEW_NPB). The pickers list the
  * view's three sets first, the presets lead with the view's, a "Position view" line sits under the control, the ranked
  * table gains a value column (the view's colour metric, else the next value metric, when it is not on an axis) with
- * its percentile in the group, and "Most like" uses the view's metrics (4 excellence, 4 production, 2 value). */
+ * its percentile in the group, and "Most like" uses the view's metrics (4 excellence, 4 production, 2 value).
+ * Round 8 (28 Oct 2026): the Lab is the Scouting Room's Chart view (bp-scout.js). BP.lab.mount(host, L, S, ext) draws
+ * the same chart, presets, colour, shrink, medians, corners, ranked table and "Most like" inside the room, without its own
+ * group, window, minimum and highlight controls: those come from the room's one control bar through ext = { within,
+ * bg ('H'|'SP'|'RP'), pg (position code), min (null: the spec floor), q, x, y, color, keep(get) -> bool (the room's team,
+ * age and hand filters; get(field) reads the row), onPick(pid, kind) (a point or a name opens the room's profile drawer),
+ * onAxes({ x, y, color }) (the axes into the room's address) }. #/<L>/lab redirects to #/<L>/scout?view=chart (core.js);
+ * the standalone page stays for NPB. */
 (function (BP) {
 'use strict';
 
@@ -52,6 +59,7 @@ const PRESETS = [
 ];
 const NO_SHRINK = /^(pa|bf|n|g|gs|age|season|ip|war.*|.*_runs|runs.*|decision_value|dv|dv_zone|dv_chase|rv|re24|wpa.*|bsr|wsb|oaa.*|sra|framing_rate|arm|sprint_speed|hp_to_1b|pop_time|rar|pos_runs|repl_runs)$|plus$|_plus|^proj_|^pre_/;
 let LAB = null, LABK = '', LAB_PRESETS = [], N_LABEL = {}, LAB_META = {};
+let EXT = null;    // the Scouting Room's state when the chart is mounted inside it (BP.lab.mount), else null
 /* NPB: where the play-by-play metrics come from, and how the expected stats were fitted and checked (npb/<S>/lab.json). */
 function npbNote(keys) {
   const k = K();
@@ -104,6 +112,7 @@ const S0 = { kind: 'hitter', within: 'broad', bg: 'H', pg: 'C', win: null, min: 
 const MU = {};
 /* the hash: the group and, for custom axes, the axes (?kind= under Broad, ?within=pos&pos= under Position) */
 function writeHash() {
+  if (EXT) { if (EXT.onAxes) EXT.onAxes({ x: S0.preset < 0 ? S0.x : '', y: S0.preset < 0 ? S0.y : '', color: S0.preset < 0 ? S0.color : '' }); return; }
   try {
     const h = location.hash || '#/lab', i = h.indexOf('?'), base = i < 0 ? h : h.slice(0, i);
     const keep = (i < 0 ? '' : h.slice(i + 1)).split('&').filter(kv => kv && ['kind', 'within', 'pos', 'x', 'y', 'q'].indexOf(kv.split('=')[0]) < 0);
@@ -268,7 +277,10 @@ function sync() {
   $('lab-shrink').checked = S0.shrink; $('lab-q').value = S0.q;
 }
 function applyPreset() { const P = presetList(); if (S0.preset < 0 || !P.length) return; const p = P[S0.preset] || P[0]; S0.x = p.x; S0.y = p.y; if (p.color !== undefined) S0.color = p.color || 'team'; }
-function rowsNow() { const g = G(); return g.rows.filter(r => (g.idx.win === undefined || String(raw(r, 'win')) === String(S0.win)) && inGroup(r)); }
+function rowsNow() {
+  const g = G(), keep = EXT && EXT.keep ? EXT.keep : null;
+  return g.rows.filter(r => (g.idx.win === undefined || String(raw(r, 'win')) === String(S0.win)) && inGroup(r) && (!keep || keep(f => raw(r, f))));
+}
 /* "Most like": the five nearest the highlighted player within the group on screen, on the group's spec headline metrics */
 function simStrip(L, rows, hits, nm) {
   const k = K();
@@ -337,7 +349,7 @@ function draw(L, S) {
   const diag = (/xwoba/.test(S0.x) && /xwoba|^woba$/.test(S0.y)) || (/^woba$/.test(S0.x) && /xwoba/.test(S0.y));
   const fx = meta(S0.x).fmt === 'pct' ? (v => Math.round(v * 100) + '%') : (v => fmt(S0.x, v));
   const fy = meta(S0.y).fmt === 'pct' ? (v => Math.round(v * 100) + '%') : (v => fmt(S0.y, v));
-  QKC.scatter('#lab-chart', { points: rows.map(r => ({ x: val(r, S0.x), y: val(r, S0.y), name: nm(r) + ' · ' + k.teamAbbr(tm(r)) + ' · ' + k.int(raw(r, 'n')) + ' ' + nU(),
+  QKC.scatter('#lab-chart', { onClick: EXT && EXT.onPick ? (pt => EXT.onPick(pt.id, S0.kind)) : undefined, points: rows.map(r => ({ id: String(raw(r, 'id')), x: val(r, S0.x), y: val(r, S0.y), name: nm(r) + ' · ' + k.teamAbbr(tm(r)) + ' · ' + k.int(raw(r, 'n')) + ' ' + nU(),
     label: labelled.has(r) ? k.surname(nm(r)) : ' ', color: hits.indexOf(r) >= 0 ? T.ink1 : colorOf(r), size: hits.indexOf(r) >= 0 ? 14 : size(r), href: href(r) })),
     xName: label(S0.x) + (lower(S0.x) ? ' (better to the right)' : ''), yName: label(S0.y) + (lower(S0.y) ? ' (better up)' : ''), xFmt: fx, yFmt: fy, refX: mx, refY: my, labelAll: true,
     xInverse: lower(S0.x), yInverse: lower(S0.y), diagonal: diag ? { label: 'equal' } : undefined, legendItems: legend, label: label(S0.y) + ' against ' + label(S0.x) });
@@ -348,7 +360,7 @@ function draw(L, S) {
     'Labelled: the eight furthest into the good corner, the four furthest from it' + (hits.length ? ', and your search (white)' : '') + '. Marker size is the sample.' +
     (S0.shrink ? ' Rates marked "shrunk" are pulled to the median of the players on screen by their own stabilisation point: (n·x + k·median)/(n + k) with k = 3/7 of the sample at which the metric reaches 0.7 split-half reliability (' + (shrinkable(S0.x) ? k.esc(mX.label || S0.x) + ' k = ' + k.int(kOf(S0.x)) : '') + (shrinkable(S0.x) && shrinkable(S0.y) ? ', ' : '') + (shrinkable(S0.y) ? k.esc(mY.label || S0.y) + ' k = ' + k.int(kOf(S0.y)) : '') + '). Model scores (the "+" scores), WAR and run totals are never shrunk here: the models regularise them already. Nor are fielding rates, framing and tool speeds (arm, sprint speed), whose sample is not plate appearances.' : '') +
     (mX.desc ? '<br><strong>' + k.esc(BP.ui.label(S0.kind, S0.x, mX.label)) + '</strong>: ' + k.esc(mX.desc) : '') + (mY.desc ? '<br><strong>' + k.esc(BP.ui.label(S0.kind, S0.y, mY.label)) + '</strong>: ' + k.esc(mY.desc) : '') + npbNote([S0.x, S0.y]));
-  QK.leaderboard(document.getElementById('lab-table'), { dense: true, rank: true, maxHeight: 620, rowClass: o => (hits.indexOf(o._r) >= 0 ? 'is-me' : ''), rowHref: o => o.href, columns: [
+  QK.leaderboard(document.getElementById('lab-table'), { dense: true, rank: true, maxHeight: 620, rowClass: o => (hits.indexOf(o._r) >= 0 ? 'is-me' : ''), rowHref: EXT ? null : (o => o.href), columns: [
     { key: 'name', label: S0.kind === 'pitcher' ? 'Pitcher' : S0.kind === 'team' ? 'Club' : 'Hitter', type: 'entity', sub: 'sub', mark: o => (S0.kind === 'team' ? U.team(o.id, L, S) : (o.team ? U.team(o.team, L, S) : null)), href: o => o.href },
     { key: 'n', label: nU(), num: true, fmt: v => k.int(v) },
     { key: 'vx', label: label(S0.x), type: 'pctl', pctl: 'px', fmt: v => fmt(S0.x, v) },
@@ -361,23 +373,46 @@ function draw(L, S) {
   BP.ui.tagHeads(document.getElementById('lab-table'), VK ? { vx: S0.x, vy: S0.y, vv: VK } : { vx: S0.x, vy: S0.y });
 }
 
+/* The controls and cards. embedded (the Scouting Room's Chart): no section head, and the group, window, minimum and
+   highlight controls are kept hidden (the room's bar drives them). */
+function markup(L, embedded) {
+  const k = K(), U = BP.ui;
+  const hide = embedded ? ' hidden style="display:none"' : '';
+  return (embedded ? '' : QK.sectionHead({ kicker: 'Lab · ' + k.LN(L), title: 'Any two metrics', sub: 'Plot one metric against another for a season or a window, colour by club, position or a third metric, and rank everyone on both, within a broad group (hitters, starters, relievers) or one position. Position opens on what makes a player at that position good, against their hitting (pitchers: run prevention), coloured by their overall value. Presets ask the questions our models were built to answer.' })) +
+    '<section class="qk-card"><div class="qk-card-body"><div id="lab-wn-host" class="bp-lab-within"' + hide + '></div><div id="lab-why"' + hide + '></div><div class="bp-ctl">' +
+    '<label' + hide + '>Window<select id="lab-win"></select></label><label>Preset<select id="lab-preset" class="gq-wide"></select></label>' +
+    '<label>X axis<select id="lab-x"></select></label><label>Y axis<select id="lab-y"></select></label><button type="button" id="lab-swap" class="qk-btn" title="Swap the axes">⇄ Swap</button>' +
+    '<label>Colour<select id="lab-color"></select></label><label' + hide + '>Min <span id="lab-min-u"></span> <b id="lab-min-v"></b><input id="lab-min" type="range" min="0" max="700" step="5"></label>' +
+    '<label class="bp-check"><input id="lab-shrink" type="checkbox"> shrink by stabilisation</label><label' + hide + '>Highlight<input id="lab-q" class="gq-search" type="search" placeholder="player or team…"></label>' +
+    '</div></div></section>' +
+    '<div class="qk-grid" style="margin-top:var(--sp-4)"><div class="qk-span-12">' + U.card2(embedded ? 'Any two metrics' : 'The chart', '<span id="lab-sub">Loading…</span>', '<div id="lab-ours"></div>' + U.chart('lab-chart', 560, embedded ? 'Scouting Room scatter' : 'Lab scatter') + '<div id="lab-sim" class="bp-lab-sim"></div><p class="bp-note" id="lab-note"></p>') + '</div>' +
+    '<div class="qk-span-12">' + U.card2('Ranked', 'By the combined standard score on both axes (top 300); the cells are percentiles within the group on screen', '<div id="lab-table"></div>', { flush: true }) + '</div></div>';
+}
 function render(el, params, state) {
   const k = K();
-  const U = BP.ui;
   const L = k.L(params, state);
-  el.innerHTML = QK.sectionHead({ kicker: 'Lab · ' + k.LN(L), title: 'Any two metrics', sub: 'Plot one metric against another for a season or a window, colour by club, position or a third metric, and rank everyone on both, within a broad group (hitters, starters, relievers) or one position. Position opens on what makes a player at that position good, against their hitting (pitchers: run prevention), coloured by their overall value. Presets ask the questions our models were built to answer.' }) +
-    '<section class="qk-card"><div class="qk-card-body"><div id="lab-wn-host" class="bp-lab-within"></div><div id="lab-why"></div><div class="bp-ctl">' +
-    '<label>Window<select id="lab-win"></select></label><label>Preset<select id="lab-preset" class="gq-wide"></select></label>' +
-    '<label>X axis<select id="lab-x"></select></label><label>Y axis<select id="lab-y"></select></label><button type="button" id="lab-swap" class="qk-btn" title="Swap the axes">⇄ Swap</button>' +
-    '<label>Colour<select id="lab-color"></select></label><label>Min <span id="lab-min-u"></span> <b id="lab-min-v"></b><input id="lab-min" type="range" min="0" max="700" step="5"></label>' +
-    '<label class="bp-check"><input id="lab-shrink" type="checkbox"> shrink by stabilisation</label><label>Highlight<input id="lab-q" class="gq-search" type="search" placeholder="player or team…"></label>' +
-    '</div></div></section>' +
-    '<div class="qk-grid" style="margin-top:var(--sp-4)"><div class="qk-span-12">' + U.card2('The chart', '<span id="lab-sub">Loading…</span>', '<div id="lab-ours"></div>' + U.chart('lab-chart', 560, 'Lab scatter') + '<div id="lab-sim" class="bp-lab-sim"></div><p class="bp-note" id="lab-note"></p>') + '</div>' +
-    '<div class="qk-span-12">' + U.card2('Ranked', 'By the combined standard score on both axes (top 300); the cells are percentiles within the group on screen', '<div id="lab-table"></div>', { flush: true }) + '</div></div>';
+  EXT = null;
+  el.innerHTML = markup(L, false);
+  return boot(el, L, params, state, params.query || {});
+}
+/* The Scouting Room's Chart: draw into host with the room's state (ext, above). Returns a promise. */
+function mount(host, L, S, ext) {
+  EXT = ext || {};
+  S0.color = 'team';      // each mount starts from the group's own colour (Position: the view's value metric)
+  host.innerHTML = markup(L, true);
+  const qy = { q: EXT.q || '' };
+  if (EXT.within === 'pos') { qy.within = 'pos'; qy.pos = EXT.pg; } else qy.kind = { H: 'hitter', SP: 'sp', RP: 'rp' }[EXT.bg] || 'hitter';
+  if (EXT.x) qy.x = EXT.x;
+  if (EXT.y) qy.y = EXT.y;
+  return boot(host, L, { season: S, level: L, query: qy }, { level: L, season: S }, qy, EXT);
+}
+function boot(el, L, params, state, qy0, ext) {
+  const k = K(), U = BP.ui;
   return k.ready().then(() => {
     const S = k.S(params, state);
     // NPB: one file (npb/<S>/lab.json: hitters, pitchers and clubs); MLB and Triple-A fall back to the catalogues
-    const more = L === 'npb' ? [Promise.resolve(null), Promise.resolve(null), Promise.resolve(null)] : [k.loadY(L, S, 'hitters.json'), k.loadY(L, S, 'pitchers.json'), k.loadNames()];
+    // the room (ext) reads lab.json alone (the catalogues are 5-10 MB each); its team games come with ext.tg
+    const more = L === 'npb' ? [Promise.resolve(null), Promise.resolve(null), Promise.resolve(null)] : ext ? [Promise.resolve(null), Promise.resolve(null), k.loadNames()] : [k.loadY(L, S, 'hitters.json'), k.loadY(L, S, 'pitchers.json'), k.loadNames()];
     return Promise.all([k.loadY(L, S, 'lab.json')].concat(more).concat([U.specReady()])).then(res => ({ S: S, res: res }));
   }).then(o => {
     if (!k.alive(el)) return;
@@ -387,15 +422,17 @@ function render(el, params, state) {
     if (pc) k.learnCat(pc);
     const key = L + '/' + S;
     if (LABK !== key) { LAB = prep(res[0], hc, pc); LABK = key; S0.win = null; S0.min = null; S0.x = ''; S0.y = ''; S0.preset = 0; }
+    VIEWK = '';      // the room's filters change the group on screen: the view's metric check runs again
     if (!Object.keys(LAB).length) { $('lab-chart').innerHTML = QK.empty('Not built yet', 'The ' + k.LN(L) + ' ' + S + ' lab file is not available.'); $('lab-sub').textContent = ''; return; }
-    const qy = params.query || {};
-    TG = (pc && pc.team_games) || (hc && hc.team_games) || null;
+    const qy = qy0 || {};
+    TG = (pc && pc.team_games) || (hc && hc.team_games) || (ext && ext.tg) || null;
     if (!TG && LAB.team) TG = Math.max.apply(null, LAB.team.rows.map(r => Number(r[LAB.team.idx.n]) || 0).concat([0])) || null;
     const KQ = { hitter: 'H', pitcher: 'SP', sp: 'SP', rp: 'RP', team: 'T', clubs: 'T' };
     if (qy.kind && KQ[qy.kind]) { S0.bg = KQ[qy.kind]; S0.within = 'broad'; }
     const wq = QK.within.read(qy, POSN);
     if (qy.within) { S0.within = wq.within; if (wq.within === 'pos') S0.pg = wq.pos; }
     if (typeof qy.q === 'string') S0.q = qy.q;
+    if (ext) { S0.minFor = null; S0.min = null; }
     const avail = c => !!LAB[GROUPS[c][0]];
     if (!avail(code())) { S0.within = 'broad'; S0.bg = BROAD.filter(avail)[0] || 'H'; }
     S0.kind = grp()[0];
@@ -413,11 +450,14 @@ function render(el, params, state) {
       if (!S0.x || g.idx[S0.x] === undefined || !S0.y || g.idx[S0.y] === undefined) { if (S0.preset < 0) S0.preset = 0; applyPreset(); }
       if (!S0.x || !S0.y) { const ms = g.metrics; S0.x = (ms[0] || {}).key || 'n'; S0.y = (ms[1] || {}).key || 'n'; S0.preset = -1; }
     };
+    if (ext) { S0.x = ''; S0.y = ''; S0.preset = 0; }                       // the room: its address names the axes, else the view or preset 0
     if (S0.within === 'pos') { S0.x = ''; S0.y = ''; S0.preset = 0; }      // Position opens on its default view unless the address names axes
     if (qy.x && G().idx[qy.x] !== undefined) { S0.x = qy.x; S0.preset = -1; }
     if (qy.y && G().idx[qy.y] !== undefined) { S0.y = qy.y; S0.preset = -1; }
     reset();
+    if (ext && typeof ext.min === 'number') S0.min = ext.min;               // the room's minimum (its slider), else the spec floor
     if (S0.within === 'pos' && S0.preset < 0) { const pv = posView(); if (pv && pv.color) S0.color = pv.color; }   // axes from the address, colour from the view
+    if (ext && ext.color && (ext.color === 'team' || ext.color === 'pos' || G().idx[ext.color] !== undefined)) S0.color = ext.color;
     sync();
     const redraw = () => draw(L, S);
     /* a new group: the axes stay when the kind does (starters to relievers), the minimum goes back to the group's floor */
@@ -462,6 +502,7 @@ function render(el, params, state) {
   });
 }
 
+BP.lab = { mount: mount, render: render };
 if (typeof BP.route === 'function') { BP.route('lab', render); try { BP.route('#/<L>/lab', render); } catch (e) { /* bound */ } }
 if (typeof BP.routeNpb === 'function') BP.routeNpb('lab', render);
 })(window.BP || (window.BP = {}));

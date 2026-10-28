@@ -423,7 +423,7 @@ function render(el, params) {
     const seasonWar = !vrows.length && sv;
     if (seasonWar) vrows = U.rowsOf(sv).filter(r => isNum(r.war) && r.q).sort((a, b) => b.war - a.war).slice(0, 12).map(r => Object.assign({}, r, { w0: r.war }));
     if (vrows.length || lev.length) {
-      h += '<section class="qk-section">' + U.head({ kicker: 'Value', title: 'Who matters, and which games do', sub: seasonWar ? 'Wins above replacement from HPM and minutes.' : 'Projected wins above replacement for the rest of the season, and the games that swing the most.', actions: '<a class="qk-btn" href="' + esc(HW.href(L, 'value')) + '">Value &amp; Moves →</a>' }) + '<div class="qk-grid">' +
+      h += '<section class="qk-section">' + U.head({ kicker: 'Value', title: lev.length ? (vrows.length ? 'Who matters, and which games do' : 'The games that matter most') : 'Who matters most', sub: (seasonWar ? 'Wins above replacement from HPM and minutes.' : 'Projected wins above replacement for the rest of the season.') + (lev.length ? ' And the games that swing the most.' : ''), actions: '<a class="qk-btn" href="' + esc(HW.href(L, 'value')) + '">Value &amp; Moves →</a>' }) + '<div class="qk-grid">' +
         (vrows.length ? '<div class="qk-span-' + (lev.length ? 7 : 12) + '">' + U.card2('Most valuable players', seasonWar ? 'Wins above replacement over the season (qualified players)' : 'Projected WAR, rest of season (current rosters)', U.chart('ov-war', 28 * vrows.length + 60, 'Most valuable players')) + '</div>' : '') +
         (lev.length ? '<div class="qk-span-' + (vrows.length ? 5 : 12) + '">' + U.card2('Games that matter most', 'Combined swing in both teams’ ' + (ph === 'playoffs' ? 'title' : 'playoff') + ' chances between a win and a loss', '<ul class="hw-list hw-lead">' + lev.slice(0, 8).map(x =>
           '<li><a href="' + esc(HW.gameHref(L, x.id, x.season || S)) + '" class="hw-ent"><span class="nm">' + esc(HW.teamAbbr(L, x.away) + ' @ ' + HW.teamAbbr(L, x.home)) + '</span><span class="sb">' + esc(HW.fmtDate(x.date, { year: false })) + '</span></a>' +
@@ -472,7 +472,7 @@ function render(el, params) {
         label: HW.teamAbbr(L, r.team), color: HW.teamColourRaw(L, r.team), href: HW.teamHref(L, r.team, S) }));
       if (pts.length >= 6) {
         const gps = luck.map(r => r.w + r.l), g0 = Math.min.apply(null, gps), g1 = Math.max.apply(null, gps);
-        QKC.quadrant('#ov-luck', { points: pts, xName: 'Net rating (points per 100 possessions)', yName: 'Games won (%)', refX: 0, refY: 50,
+        QKC.quadrant('#ov-luck', { points: pts, xName: 'Net rating (points per 100 possessions)', yName: 'Games won (%)', refX: 0, refY: 50, yMin: 0, yMax: 100,
           xFmt: v => U.signed(v, 0), yFmt: v => Math.round(v) + '%', label: LN + ' teams: net rating against games won' });
         document.getElementById('ov-luck-cap').textContent = LN + ' ' + HW.seasonLabel(L, S) + ', ' + (g0 === g1 ? g0 : g0 + '–' + g1) + ' games each. Net rating is our opponent-adjusted points per 100 possessions better than an average team. Dashed lines: an average team and a .500 record. Tap a team for its page.';
       } else document.getElementById('ov-luck').innerHTML = QK.empty('Not yet', 'The chart fills in after the first games.');

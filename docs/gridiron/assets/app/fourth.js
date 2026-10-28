@@ -168,21 +168,24 @@ GI.route('fourth', function (el, params) {
       const worst = list.filter(p => isNum(p.lost)).sort((a, b) => b.lost - a.lost)[0];
       GI.set('fd-kpis', GI.kpis([GI.kpi('Fourth downs', GI.int(n), n !== plays.length ? 'of ' + GI.int(plays.length) + ' this season' : 'this season'),
         GI.kpi('Went for it', n ? GI.pct(go / n, 0) : '—', GI.int(go) + ' times' + (model ? ' · model said go ' + GI.int(rec) : '')),
-        model ? GI.kpi('Agreed with our model', recN ? GI.pct(agree / recN, 0) : '—', GI.int(list.filter(p => p.rec === 'go' && p.choice !== 'go').length) + ' times it said go and they kicked') : '',
+        model ? GI.kpi('Agreed with our model', recN ? GI.pct(agree / recN, 0) : '—', recN ? GI.int(agree) + ' of ' + GI.int(recN) + ' calls matched the model’s pick; ' + GI.int(list.filter(p => p.rec === 'go' && p.choice !== 'go').length) + ' times it said go and they kicked' : '') : '',
         model ? GI.kpi('Win chance given away', GI.num(lost * 100, 1), 'percentage points, summed over these decisions', { unit: 'pts', signal: true }) : '',
         worst ? GI.kpi('Costliest call', GI.num(worst.lost * 100, 1),  esc((worst.team || '') + ' ' + GI.weekLabel(worst.week, S, true) + ': ' + (F.LAB[worst.choice] || worst.choice) + ' on 4th & ' + (worst.dist || '?')), { unit: 'pts', href: worst.gid ? GI.gameHref(worst.gid) : null }) : '']));
       F.table(document.getElementById('fd-table'), list, S, { onPick: pick, max: 500 });
       GI.set('fd-tsub', n + ' decisions' + (n > 500 ? ' (first 500)' : '') + ' · ' + (model ? 'sorted by win probability lost; best option bold, the choice underlined' : 'newest first') + ' · click a row for its options');
       const pts = list.filter(p => isNum(p.yl) && isNum(p.dist));
-      if (pts.length) GI.ch.mount('fd-map', T => ({
-        grid: { left: 8, right: 14, top: 30, bottom: 30, containLabel: true },
+      if (pts.length) GI.ch.mount('fd-map', T => { const xa = GI.ch.ax(T, { min: 0, max: 100, inverse: true, interval: 10 }), ya = GI.ch.ax(T, { min: 0, max: 16, interval: 2 });
+        /* the legend on its own row, the y title under it (it was clipped by the legend) */
+        const gB = 8 + QKC.nameAxis(xa, 'Yards to the end zone', 'bottom'), gT = 34 + QKC.nameAxis(ya, 'Yards to go (capped at 15)', 'side');
+        return {
+        grid: { left: 8, right: 14, top: gT, bottom: gB, containLabel: true },
         legend: GI.ch.legend(T, { data: ['go', 'punt', 'fg'].map(x => F.LAB[x]) , icon: 'circle', itemWidth: 9, itemHeight: 9 }),
-        xAxis: GI.ch.ax(T, { min: 0, max: 100, inverse: true, interval: 10, name: 'Yards to the end zone', nameLocation: 'middle', nameGap: 24 }),
-        yAxis: GI.ch.ax(T, { min: 0, max: 16, interval: 2, name: 'Yards to go' }),
+        xAxis: xa,
+        yAxis: ya,
         tooltip: GI.ch.tip(T, { formatter: q => { const p = q.data.p; return GI.ch.thead(esc((p.team || '') + ' ' + GI.weekLabel(p.week, S, true) + ': 4th & ' + p.dist + ' at ' + GI.fieldPos(p.yl, p.team, p.opp))) + GI.ch.trow(F.COL[p.choice], 'Did', F.LAB[p.choice] || p.choice) + (p.rec ? GI.ch.trow(F.COL[p.rec], 'Model', F.LAB[p.rec]) : '') + (isNum(p.lost) ? GI.ch.trow(T.ink3, 'WP lost', GI.num(p.lost * 100, 1) + ' pts') : ''); } }),
         series: ['go', 'punt', 'fg'].map(rc => ({ type: 'scatter', name: F.LAB[rc], symbolSize: 8, itemStyle: { color: F.COL[rc], opacity: 0.8 },
           data: pts.filter(p => (model ? p.rec : p.choice) === rc).map(p => ({ value: [p.yl, Math.min(p.dist, 15) + (((p.id || 0) % 7) - 3) * 0.05], p: p, itemStyle: F.grade(p).key === 'bad' ? { borderColor: GI.BAD, borderWidth: 2.5 } : undefined })) }))
-      }), 'Fourth downs on the field', { onClick: q => { if (q.data && q.data.p) pick(q.data.p); } });
+      }; }, 'Fourth downs on the field', { onClick: q => { if (q.data && q.data.p) pick(q.data.p); } });
       else GI.ch.none('fd-map', 'No field positions in this selection.');
       if (!ST.sel || list.indexOf(ST.sel) < 0) pick(list[0] || null); else pick(ST.sel);
     };

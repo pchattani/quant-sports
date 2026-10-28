@@ -223,7 +223,9 @@ function forecastBlock(g, pre) {
   const mlP = isNum(ln.ml_home) && isNum(ln.ml_away) ? GI.devigAm([ln.ml_home, ln.ml_away]) : null;
   const mg = GI.homeLine(m);
   const srcs = (mk.sources || []).map(GI.titleCase).join(' / ');
-  const mkCell = isNum(mk.p_home) ? H + ' ' + GI.pct(mk.p_home, 0) + ' (' + (srcs || 'Kalshi / Polymarket') + ')' : (isNum(mlP) ? H + ' ' + GI.pct(mlP, 0) + ' (no-vig line, ' + (((ln.close || ln.open || {}).src) || 'sportsbook') + ' via ESPN)' : '—');
+  /* the market cell stays short (the column is narrow beside ours): the chance, with its source in the tooltip */
+  const mkSrc = isNum(mk.p_home) ? 'Prediction markets: ' + (srcs || 'Kalshi / Polymarket') : isNum(mlP) ? 'The closing moneyline without the margin (' + (((ln.close || ln.open || {}).src) || 'a sportsbook') + ', via ESPN)' : '';
+  const mkCell = isNum(mk.p_home) ? H + ' ' + GI.pct(mk.p_home, 0) : (isNum(mlP) ? H + ' ' + GI.pct(mlP, 0) : '—');
   const rows = [['Who wins', isNum(m.p_home) ? H + ' ' + GI.pct(m.p_home, 0) + ' · ' + A + ' ' + GI.pct(1 - m.p_home - (isNum(m.p_tie) ? m.p_tie : 0), 0) + (isNum(m.p_tie) && m.p_tie >= 0.001 ? ' · tie ' + GI.pct(m.p_tie, 1) : '') : '—', mkCell]];
   if (isNum(mg)) rows.push(['Projected margin', Math.abs(mg) < 0.5 ? 'even' : GI.teamAbbr(mg < 0 ? g.home : g.away) + ' by ' + GI.num(Math.abs(mg), 1) + ' points', '']);
   if (isNum(m.p_cover_home) && isNum(lLine) && Math.abs(lLine) >= 1) {
@@ -233,8 +235,9 @@ function forecastBlock(g, pre) {
   }
   if (isNum(m.total)) rows.push(['Total points', GI.num(m.total, 1) + ' expected' + (isNum(m.p_over) && isNum(lTot) ? ' · ' + Math.ceil(Number(lTot)) + ' or more: ' + GI.pct(m.p_over, 0) : ''), '']);
   if (isNum(m.home_pts) && isNum(m.away_pts)) rows.push(['Projected score', A + ' ' + GI.num(m.away_pts, 1) + ' – ' + GI.num(m.home_pts, 1) + ' ' + H, '']);
-  return '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Question</th><th>Our forecast</th><th><span data-tip="The prediction-market probability or the no-vig sportsbook line, shown as a reference, not our forecast">Market</span></th></tr></thead><tbody>' +
-    rows.map(r => '<tr><td>' + esc(r[0]) + '</td><td class="num gi-ours-cell">' + esc(r[1]) + '</td><td class="num qk-muted" style="text-align:left">' + esc(r[2]) + '</td></tr>').join('') + '</tbody></table></div>';
+  return '<div class="qk-table-wrap"><table class="qk-table dense gi-fc-t"><thead><tr><th>Question</th><th>Our forecast</th><th><span data-tip="The prediction-market chance or the closing line without the margin, a reference only, not our forecast">Market</span></th></tr></thead><tbody>' +
+    rows.map((r, i) => '<tr><td>' + esc(r[0]) + '</td><td class="num gi-ours-cell">' + esc(r[1]) + '</td><td class="num qk-muted" style="text-align:left"' + (i === 0 && mkSrc ? ' data-tip="' + esc(mkSrc) + '" tabindex="0"' : '') + '>' + esc(r[2]) + '</td></tr>').join('') + '</tbody></table></div>' +
+    (mkSrc ? '<p class="gi-cap">Market: ' + esc(mkSrc) + '.</p>' : '');
 }
 /* Tale of the tape: the two teams' season profile from the team-strength ratings (season.json ratings[team].values). */
 function tape(season, g) {
@@ -406,7 +409,7 @@ function fourthTable(g, fd) {
 }
 function keyPlaysBlock(g, kp) {
   if (!kp.length) return '';
-  return GI.card('Key plays', 'by win probability added for ' + esc(GI.teamAbbr(g.home)) + ' (numbered on the chart)', GI.tableHTML([{ label: '#', align: 'right', sortable: false }, { label: 'When', sortable: false }, { label: 'Team', sortable: false }, { label: 'Play', sortable: false }, { label: 'EPA', align: 'right', sortable: false }, { label: 'WPA', align: 'right', sortable: false }],
+  return GI.card('Key plays', 'the biggest swings in win probability (numbered on the chart) · EPA and WPA are for the team with the ball', GI.tableHTML([{ label: '#', align: 'right', sortable: false }, { label: 'When', sortable: false }, { label: 'Team', sortable: false, title: 'The team with the ball' }, { label: 'Play', sortable: false }, { label: 'EPA', align: 'right', sortable: false, title: 'Expected points added for the team with the ball' }, { label: 'WPA', align: 'right', sortable: false, title: 'Win probability added for the team with the ball, percentage points' }],
     kp.map((p, k) => [k + 1, esc(GI.clockText(p.qtr, p.clock)), { html: p.team ? GI.teamChip(p.team) : '' }, { html: '<span class="gi-play-desc">' + esc(p.desc || '') + '</span>' },
       { html: isNum(p.epa) ? GI.signed(p.epa, 2) : '—' }, { html: isNum(p.wpa) ? GI.ptsEdge(p.wpa * 100, 1) : '—' }])));
 }
@@ -446,6 +449,12 @@ function flowTab(g, pre, plays) {
   let h = espnNote(g) + GI.card('Win chance through the game', esc(GI.teamAbbr(g.home)) + ' (home) · ' + (wp.name === 'Our model' ? 'our model' : esc(wp.name)) + ' solid' + (wp.espn.length ? ', ESPN dotted' : '') + ' · ◆ 4th downs by grade · ● scores · numbers: key plays' +
     (wp.name !== 'Our model' ? ' · our WP model is not fitted for this game, so nflfastR\'s published WP is shown' : ''),
     hasWp ? (wp.espn.length && wp.ours.length >= 2 ? QK.keys([{ name: wp.name === 'Our model' ? 'Our model' : wp.name, color: 'var(--ink-1)' }, { name: 'ESPN', color: 'var(--ink-3)', kind: 'line' }]) : '') + GI.chartBox('gm-wp', 360, 'Win probability through the game') : GI.muted(GI.isPre(g) ? 'The win-probability chart starts at kickoff.' : 'No win-probability path for this game yet.'));
+  /* the in-game model's prior is the closing spread (nflverse spread_line, models/wp.py), not our pre-game forecast, so its
+     first number can sit away from our pre-game call: say so, with both numbers (SB 2025: our 47% for NE, 29% at the first snap) */
+  const w0 = wp.name === 'Our model' && wp.ours[0] && isNum(wp.ours[0].p) ? wp.ours[0] : null, p0 = (pre.model || {}).p_home;
+  if (hasWp && w0 && isNum(p0) && Math.abs(w0.p - p0) >= 0.05) {
+    h += GI.note('<b>Why the line does not start at our pre-game call.</b> The in-game model starts from the closing spread (its pre-game information, as nflfastR’s does), not from our pre-game forecast: at the first snap it gave ' + esc(GI.teamAbbr(g.home)) + ' ' + GI.pct(w0.p, 0) + ', where our game model had ' + GI.pct(p0, 0) + '. From there it moves with the score, the clock, the down and the field position.');
+  }
   h += GI.card('Drive chart', 'every drive from where it started to where it ended, own goal line on the left; colour is the result', hasDrives ? GI.chartBox('gm-drives', 400, 'Drive chart') +
     '<details style="margin-top:10px"><summary class="qk-sub">Drive table</summary>' + driveTable(g, g.drives) + '</details>' : GI.muted(GI.isPre(g) ? 'Drives appear at kickoff.' : 'No drives yet.'));
   h += fourthTable(g, fd) + keyPlaysBlock(g, kp) + awardsBlock(g);
@@ -580,12 +589,21 @@ GI.route('game', function (el, params) {
     if (!el.isConnected) return;
     const meta = GI.parseGameId(id);
     if (!GI.ok(g0)) {
+      /* a page that failed to build (an {ok: false} stub) or is not built: the game's card from index.json or the week
+         file (status, score, our chance), and a plain note; a failed page is unsigned in the build manifest, so the next
+         build retries it */
       const idx = GI.index() || {};
-      const c = ['games', 'live', 'recent'].reduce((acc, k) => acc || (idx[k] || []).find(x => x && x.game_id === id), null);
-      el.innerHTML = GI.pageHead(meta ? GI.weekLink(meta.season, meta.week) : 'Game', meta ? GI.teamName(meta.away) + ' at ' + GI.teamName(meta.home) : 'Game ' + id, '', meta ? GI.weekNav(meta.season, meta.week) : '') +
-        (c ? '<div style="max-width:380px">' + GI.gameCard(c) + '</div>' : '') +
-        GI.notBuilt('The game centre for this game', g0) + (meta && meta.season < GI.currentSeason() - 1 ? GI.muted('Game centres are kept for the current and the previous season; the week pages keep every result.') : '');
-      return;
+      const c0 = ['live', 'games', 'recent'].reduce((acc, k) => acc || (idx[k] || []).find(x => x && x.game_id === id), null);
+      const fromWeek = c0 || !meta ? Promise.resolve(c0) : GI.loadWeek(meta.week, meta.season).then(w => (GI.ok(w) ? (w.games || []).find(x => x && x.game_id === id) : null) || null);
+      return fromWeek.then(c => {
+        if (!el.isConnected) return;
+        const failed = g0 && g0.ok === false;
+        el.innerHTML = GI.pageHead(meta ? GI.weekLink(meta.season, meta.week) : 'Game', meta ? GI.teamName(meta.away) + ' at ' + GI.teamName(meta.home) : 'Game ' + id, '', meta ? GI.weekNav(meta.season, meta.week) : '') +
+          (c ? '<div style="max-width:420px">' + GI.gameCard(c, { date: true }) + '</div>' : '') +
+          (failed ? QK.empty('The game centre is being rebuilt', 'The play-by-play, win probability and box score for this game did not build on the last update. Every update retries it; the result and our pre-game call are above.')
+            : GI.notBuilt('The game centre for this game', g0)) +
+          (meta && meta.season < GI.currentSeason() - 1 ? GI.muted('Game centres are kept for the current and the previous season; the week pages keep every result.') : '');
+      });
     }
     const g = Object.assign({}, g0.card || {}, g0);
     const gm = g0.game && typeof g0.game === 'object' ? g0.game : null;

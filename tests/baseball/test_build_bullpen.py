@@ -60,6 +60,14 @@ def test_full_build_writes_every_payload(built):
     assert sched["games"] and {"gpk", "date", "model", "market", "line", "probables"} <= set(sched["games"][0])
     lab = _read(s / "lab.json")
     assert set(lab["kinds"]) == {"hitter", "pitcher"} and lab["fields"][0] == "pid"
+    # round 8 (the Scouting Room): age, hand and the fielding / framing samples by name, and every catalogue metric
+    assert lab["fields"] == ["pid", "name", "team", "pos", "n", "age", "hand", "chances", "called"]
+    hcat = _read(s / "hitters.json")
+    assert [m["key"] for m in lab["metrics"]["hitter"]] == [m["key"] for m in hcat["metrics"]]
+    for kind in ("hitter", "pitcher"):
+        for r in lab["rows"][kind]:
+            assert len(r) == len(lab["fields"]) + len(lab["metrics"][kind])
+            assert r[6] in (None, "L", "R", "S")
     for name in ("umpires", "fielders", "awards"):          # model-backed payloads without models: isolated failures
         p = _read(s / f"{name}.json")
         assert p.get("ok") is False and p.get("reason")

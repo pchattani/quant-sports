@@ -737,6 +737,12 @@ def _wpa_leaders(ctx: SeasonContext, gp: pd.DataFrame, wpa: dict) -> list:
 def page_sig(g: dict, n_pitches: int, model_versions: tuple) -> str:
     parts = [PAGE_VERSION, model_versions, g.get("status"), g.get("hs"), g.get("as"), bool(g.get("lines")), g.get("lineups") is not None,
              g.get("umpire_hp"), n_pitches, json.dumps(g.get("abs"), sort_keys=True, default=str)]
+    if g.get("status") != "final":
+        # a postseason placeholder is written before its teams, date or starters are known ("if necessary" games, the
+        # World Series before the pennants are won); any of them changing must rewrite the page. Final pages keep their
+        # old signature, so this costs no rebuild of finished games.
+        parts += [str(g.get("home")), str(g.get("away")), str(g.get("date")), str(g.get("start")), str(g.get("venue")),
+                  json.dumps(g.get("probables"), sort_keys=True, default=str)]
     return hashlib.sha1(json.dumps(parts, default=str).encode()).hexdigest()[:16]
 
 

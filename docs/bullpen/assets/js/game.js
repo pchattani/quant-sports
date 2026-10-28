@@ -249,7 +249,9 @@ function header(g, L, S, season) {
   if (!started && isNum(m.extra_innings) && m.extra_innings > 0.02) extra.push('about 1 game in ' + Math.max(2, Math.round(1 / m.extra_innings)) + ' like this goes to extra innings');
   const sp = g.probables || {};
   const spLine = !started && (sp.home || sp.away) ? '<div class="bp-sp-line"><span>Probable starters</span>' + (sp.away ? BP.playerLink(sp.away, { role: 'pitcher', level: L, surname: true }) : 'TBD') + ' <span class="qk-muted">v</span> ' + (sp.home ? BP.playerLink(sp.home, { role: 'pitcher', level: L, surname: true }) : 'TBD') + '</div>' : '';
-  const card = QK.previewCard(G, { kicker: (L === 'aaa' ? 'Triple-A' : 'MLB') + (tag ? ' · ' + (g.series ? BP.seriesText(g.series, true) : tag) : (g._park && g._park.name ? ' · ' + g._park.name : '')),
+  const lvlWord = L === 'aaa' ? 'Triple-A' : 'MLB', tagShort = g.series ? BP.seriesText(g.series, true) : tag;
+  /* the occasion names its level already ("Triple-A National Championship Game"): no "Triple-A · Triple-A ..." */
+  const card = QK.previewCard(G, { kicker: tag ? (tagShort.indexOf(lvlWord) === 0 ? tagShort : lvlWord + ' · ' + tagShort) : lvlWord + (g._park && g._park.name ? ' · ' + g._park.name : ''),
     nick: t => t.short || t.name,
     colors: pair, factors: fx, factorsTitle: 'How they match up this season',
     noteExtra: extra.length ? esc(extra.join('; ').replace(/^we/, 'We')) + '.' : '',

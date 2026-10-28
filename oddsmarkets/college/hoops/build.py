@@ -959,14 +959,14 @@ def conf_tourneys_actual(ctx, s, b) -> dict:
 # ── teams ───────────────────────────────────────────────────────────────────
 
 TEAM_METRICS = [("rating", "Rating", "Ratings", "signed2", False, "Adjusted efficiency margin per 100 possessions v an average D-I team"),
-                ("off", "Offense", "Ratings", "1", False, "Adjusted points scored per 100 possessions"),
-                ("def", "Defense", "Ratings", "1", True, "Adjusted points allowed per 100 possessions"),
+                ("off", "Offence", "Ratings", "1", False, "Adjusted points scored per 100 possessions"),
+                ("def", "Defence", "Ratings", "1", True, "Adjusted points allowed per 100 possessions"),
                 ("tempo", "Tempo", "Ratings", "1", False, "Adjusted possessions per 40 minutes"),
                 ("sos", "SOS", "Ratings", "signed2", False, "Mean rating of opponents played"),
                 ("luck", "Luck", "Ratings", "signed2", False, "Wins above expectation per game (actual - model)"),
                 ("wpct", "Win %", "Record", "3", False, "Winning percentage"),
                 ("efg", "eFG%", "Shooting", "3", False, "Effective field-goal percentage"),
-                ("opp_efg", "Opp eFG%", "Defense", "3", True, "Opponents' effective field-goal percentage"),
+                ("opp_efg", "Opp eFG%", "Defence", "3", True, "Opponents' effective field-goal percentage"),
                 ("tpar", "3PA rate", "Shooting", "3", False, "Three-point attempts per field-goal attempt"),
                 ("tp_pct", "3P%", "Shooting", "3", False, "Three-point percentage"),
                 ("ft_pct", "FT%", "Shooting", "3", False, "Free-throw percentage"),
@@ -975,11 +975,11 @@ TEAM_METRICS = [("rating", "Rating", "Ratings", "signed2", False, "Adjusted effi
                 ("tov_rate", "TO rate", "Ball", "3", True, "Turnovers per possession (box scores)"),
                 ("orb_rate", "OReb%", "Rebounding", "3", False, "Offensive rebound percentage (box scores)"),
                 ("drb_rate", "DReb%", "Rebounding", "3", False, "Defensive rebound percentage (box scores)"),
-                ("opp_tov_rate", "Forced TO rate", "Defense", "3", False, "Opponent turnovers per possession (box scores)"),
-                ("blk_rate", "Block rate", "Defense", "3", False, "Blocks per opponent two-point attempt (box scores)"),
+                ("opp_tov_rate", "Forced TO rate", "Defence", "3", False, "Opponent turnovers per possession (box scores)"),
+                ("blk_rate", "Block rate", "Defence", "3", False, "Blocks per opponent two-point attempt (box scores)"),
                 # already in `values`; listed so the catalogue labels them (the defensive four factors: metrics spec)
-                ("opp_ftr", "Opp FT rate", "Defense", "3", True, "Opponents' free-throw attempts per field-goal attempt"),
-                ("stl_rate", "Steal rate", "Defense", "3", False, "Steals per opponent possession (box scores)")]
+                ("opp_ftr", "Opp FT rate", "Defence", "3", True, "Opponents' free-throw attempts per field-goal attempt"),
+                ("stl_rate", "Steal rate", "Defence", "3", False, "Steals per opponent possession (box scores)")]
 
 
 def _metric(k, label, group, fmt, lower, desc):
@@ -1246,8 +1246,8 @@ def players_payload(ctx, s) -> dict:
     rolen = Counter(v["role"] for v in out.values())
     return {"ok": True, "level": ctx["level"], "season": s, "updated_at": now_iso(),
             "metrics": [_metric(*m) for m in PLAYER_METRICS],
-            "positions": {"G": {"label": "Guards", "n": posn.get("G", 0)}, "F": {"label": "Forwards", "n": posn.get("F", 0)},
-                          "C": {"label": "Centers", "n": posn.get("C", 0)}},
+            "positions": {"G": {"label": "Guard", "n": posn.get("G", 0)}, "F": {"label": "Forward", "n": posn.get("F", 0)},
+                          "C": {"label": "Centre", "n": posn.get("C", 0)}},
             "roles": {k: {"label": PL.ROLE_LABEL[k], "n": rolen.get(k, 0)} for k in ("G", "W", "B")},
             "role_rule": {"threshold": role_thr, "rule": "G = listed G; B = listed C, or a listed F (150+ minutes) whose "
                           "z(REB/100) + z(BLK/100) - z(3PA rate) - z(AST/100) is above the midpoint of the guards' and centres' means; "

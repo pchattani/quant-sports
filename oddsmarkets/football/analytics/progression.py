@@ -19,8 +19,9 @@ Seasons before the stores come from Sofascore's season totals (the archive's pro
 the league-wide season tables: UNIFIED_PAYLOADS 16): box numbers only, never the Lab's deep set. A row's `st` is the
 share of its minutes from those totals (rows with no line-ups behind them); absent when none.
 
-Writes people/<pid>.json `progression` (rows {key, scope, era, min, apps, g, a, tid, team, teams, comps, kd, dv, dp,
-pg, st}) and `prog` = {"v", "keys_in": "progression_ref.json"}, and data/progression_ref.json, which also carries the
+Writes people/<pid>.json `progression` (rows {key ("club:2025/26": the scope and the season), min, tid, team, teams,
+kd, dv, dp, pg, st}; scope, era, apps, goals, assists and the competition count are kept in memory only since 28 Oct 2026,
+when the season tables multiplied the rows: the key carries the first two and no page read the rest) and `prog` = {"v", "keys_in": "progression_ref.json"}, and data/progression_ref.json, which also carries the
 kinds' key lists (`prog.keys`: one copy instead of one per people file, about 25 MB); a file is rewritten only when
 its content changes.
 """
@@ -46,6 +47,7 @@ MIN_Q_DEFAULT = 450
 MIN_ROW = 90
 LAB_SKIP = {"tid", "age", "matches", "factor", "minutes"}
 LAB_MATCH = 0.2
+WRITE_DROP = ("scope", "era", "apps", "g", "a", "comps")      # in memory only (the key holds scope and season)
 # GAR / GAR90 come from the Lab line of the scope: value_fields scores each line over its own matches (28 Oct 2026),
 # so an international row carries the value of its international matches, as a club row its club matches
 
@@ -214,7 +216,10 @@ def _place(rows: dict[str, list[dict]]) -> tuple[dict[str, list[dict]], dict, di
             kind = r.pop("_kind")
             for k in ("_gid", "_v", "_q"):
                 r.pop(k)
-            lst.append({**r, "kd": kind, **h})
+            row = {**r, "kd": kind, **h}
+            for k in WRITE_DROP:
+                row.pop(k, None)
+            lst.append(row)
         out[pid] = lst
     return out, pb.reference(), pb.prog_block()
 

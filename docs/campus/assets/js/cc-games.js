@@ -160,7 +160,7 @@ function hero(L, g, season) {
   var tag = CC.roundLabel(g) || (g.conf_game ? 'Conference game' : 'Non-conference');
   var venue = g.venue && g.venue.name ? g.venue.name : '';
   var src = CC.mkSource(mk);
-  return '<div class="cc-preview">' + QK.previewCard(G, { kicker: CC.LSHORT[L] + ' · ' + tag + (venue ? ' · ' + venue : ''), nick: function (x) { return x.name; }, colors: cols, factors: fx, factorsTitle: CC.isCur(L, g.season) ? 'How they match up this season' : 'How they matched up',
+  return '<div class="cc-preview">' + QK.previewCard(G, { kicker: CC.LSHORT[L] + ' · ' + tag + (venue ? ' · ' + venue : ''), nick: function (x) { return x.name; }, colors: cols, factors: fx, factorsTitle: CC.isCur(L, g.season) ? 'How they match up this season' : 'How they matched up', vs: g.neutral ? 'v' : undefined,
     noteExtra: extra.length ? esc(extra.join(', and ') + '.') : '', market: pre && isNum(mk.p_home) ? { p: mk.p_home, src: src || undefined, quiet: true } : null }) + '</div>';
 }
 function heroMeta(L, g) {
@@ -233,16 +233,16 @@ function tape(L, g, season) {
   var R = (season && season.ratings) || {}, a = R[String(g.away)] || {}, h = R[String(g.home)] || {}, fb = CC.fb(L);
   var rows = fb ? [
     { label: 'Rating (points v average)', a: a.rating, b: h.rating, fmt: function (v) { return CC.signed(v, 1); }, tip: 'Our rating: expected margin against an average FBS team on a neutral field' },
-    { label: 'Offense (points added a game)', a: a.off, b: h.off, fmt: function (v) { return CC.f(v, 1); } },
-    { label: 'Defense (points prevented a game)', a: a.def, b: h.def, fmt: function (v) { return CC.f(v, 1); } },
+    { label: 'Offence (points added a game)', a: a.off, b: h.off, fmt: function (v) { return CC.f(v, 1); } },
+    { label: 'Defence (points prevented a game)', a: a.def, b: h.def, fmt: function (v) { return CC.f(v, 1); } },
     { label: 'Offensive EPA per play', a: a.epa_off, b: h.epa_off, fmt: function (v) { return CC.signed(v, 3); } },
     { label: 'Defensive EPA per play allowed', a: a.epa_def, b: h.epa_def, fmt: function (v) { return CC.signed(v, 3); }, better: 'low' },
     { label: 'Offensive success rate', a: a.sr_off, b: h.sr_off, fmt: function (v) { return CC.pct(v, 1); } },
     { label: 'Strength of schedule', a: a.sos, b: h.sos, fmt: function (v) { return CC.signed(v, 1); } }
   ] : [
     { label: 'Rating (margin per 100)', a: a.rating, b: h.rating, fmt: function (v) { return CC.signed(v, 1); }, tip: 'Our rating: adjusted efficiency margin per 100 possessions' },
-    { label: 'Offense (points per 100)', a: a.off, b: h.off, fmt: function (v) { return CC.f(v, 1); } },
-    { label: 'Defense (points allowed per 100)', a: a.def, b: h.def, fmt: function (v) { return CC.f(v, 1); }, better: 'low' },
+    { label: 'Offence (points per 100)', a: a.off, b: h.off, fmt: function (v) { return CC.f(v, 1); } },
+    { label: 'Defence (points allowed per 100)', a: a.def, b: h.def, fmt: function (v) { return CC.f(v, 1); }, better: 'low' },
     { label: 'Strength of schedule', a: a.sos, b: h.sos, fmt: function (v) { return CC.signed(v, 1); } }
   ];
   if (!rows.some(function (r) { return isNum(r.a) && isNum(r.b); })) return '';
@@ -269,7 +269,7 @@ function boxFootball(L, g) {
   var bx = g.box || {};
   var tabs = [g.away, g.home].filter(function (t) { return bx[t] && bx[t].players; });
   if (!tabs.length) return '';
-  var CATS = [['passing', 'Passing'], ['rushing', 'Rushing'], ['receiving', 'Receiving'], ['defensive', 'Defense'], ['interceptions', 'Interceptions'], ['kicking', 'Kicking'], ['punting', 'Punting'], ['kickReturns', 'Kick returns'], ['puntReturns', 'Punt returns'], ['fumbles', 'Fumbles']];
+  var CATS = [['passing', 'Passing'], ['rushing', 'Rushing'], ['receiving', 'Receiving'], ['defensive', 'Defence'], ['interceptions', 'Interceptions'], ['kicking', 'Kicking'], ['punting', 'Punting'], ['kickReturns', 'Kick returns'], ['puntReturns', 'Punt returns'], ['fumbles', 'Fumbles']];
   var SHORT = { cmp: 'C', att: 'ATT', passing_yards: 'YDS', yards_per_pass_attempt: 'AVG', passing_touchdowns: 'TD', interceptions: 'INT', adj_qbr: 'QBR', rushing_attempts: 'CAR', rushing_yards: 'YDS', yards_per_rush_attempt: 'AVG',
     rushing_touchdowns: 'TD', long_rushing: 'LONG', receptions: 'REC', receiving_yards: 'YDS', yards_per_reception: 'AVG', receiving_touchdowns: 'TD', long_reception: 'LONG', total_tackles: 'TOT', solo_tackles: 'SOLO',
     sacks: 'SACKS', tackles_for_loss: 'TFL', passes_defended: 'PD', qb_hits: 'QB HITS', defensive_touchdowns: 'TD', fgm: 'FGM', fga: 'FGA', field_goal_pct: 'PCT', long_field_goal_made: 'LONG', extra_points: 'XP', total_kicking_points: 'PTS' };
@@ -333,7 +333,15 @@ function leadersBlock(L, g) {
 CC.route('game', function (el, p) {
   var L = p.L, S = p.S, gid = p.id;
   el.innerHTML = QK.skeleton('lines', 6);
-  return Promise.all([CC.load(CC.path(L, S, 'games/' + gid + '.json')), CC.load(CC.path(L, S, 'schedule.json')), CC.season(L, S)]).then(function (a) {
+  /* a game page exists for the current season and the previous postseason (CC.hasPage): other games are the recap
+     card from the schedule, with no request for a file that was never built */
+  var cur = CC.isCur(L, S);
+  return Promise.all([cur ? CC.load(CC.path(L, S, 'games/' + gid + '.json')) : Promise.resolve(null), CC.load(CC.path(L, S, 'schedule.json')), CC.season(L, S)]).then(function (a) {
+    if (cur || !CC.ok(a[1])) return a;
+    var c0 = (a[1].games || []).filter(function (c) { return String(c.id) === String(gid); })[0];
+    if (c0 && !CC.hasPage(L, Object.assign({ season: S }, c0), S)) return a;
+    return CC.load(CC.path(L, S, 'games/' + gid + '.json')).then(function (g) { a[0] = g; return a; });
+  }).then(function (a) {
     if (!U.alive(el)) return;
     var g = CC.ok(a[0]) ? a[0] : null, sch = CC.ok(a[1]) ? a[1] : null;
     if (g && g.teams) CC.addTeams(L, g.teams);
@@ -344,7 +352,7 @@ CC.route('game', function (el, p) {
     var season = CC.ok(a[2]) ? a[2] : null;
     var back = '<div class="qk-kicker" style="margin-bottom:10px"><a href="' + esc(CC.href(L, 'games', null, g.season, fb && isNum(g.week) && g.stype === 'reg' ? 'w=w' + g.week : '')) + '">← ' + esc(CC.LSHORT[L]) + ' games</a></div>';
     var html = back + '<div class="cc-gtop"><div class="qk-stack">' + hero(L, g, season) + heroMeta(L, g) + '</div><div class="qk-stack">' + tiles(L, g) + pregame(L, g) + '</div></div>';
-    if (g.light) html += QK.note(st === 'pre' ? 'The full game page appears on game day.' : 'This game has no detailed page (game pages are kept for the current season and the last postseason); the result and the pregame numbers are above.');
+    if (g.light) html += QK.note(st === 'pre' ? 'The full game page appears on game day.' : 'The recap: this game has no detailed page (game pages are kept for the current season and the last postseason), so the result and our pre-game numbers are above.');
     var tp = tape(L, g, season);
     /* before the game there is no win-chance path: the tale of the tape takes the row */
     html += st === 'pre' ? '<div style="margin-top:var(--sp-6)">' + tp + '<div id="gc-wpcard"></div></div><div>'

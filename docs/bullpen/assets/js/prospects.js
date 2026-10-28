@@ -72,7 +72,7 @@ function render(el, params, state) {
       rows.sort((a, b) => (k.isNum(a.rank) ? a.rank : 9999) - (k.isNum(b.rank) ? b.rank : 9999) || ((key ? mle(b)[key[0]] : 0) || 0) - ((key ? mle(a)[key[0]] : 0) || 0));
       const href = r => (pit ? k.pitcherHref('aaa', r.pid, S) : k.hitterHref('aaa', r.pid, S));
       $('pr-card').innerHTML = U.card2(pit ? 'Pitchers' : 'Hitters', rows.length + ' players · Triple-A ' + S + ' · sorted by the major-league translation; blue columns are the major-league equivalents', '<div id="pr-table"></div>', { flush: true,
-        foot: '<span>Major-league equivalents shift each Triple-A rate on the log-odds scale by the average change of players who played both levels in the same season, shrunk towards defaults. Ranks need 100+ PA or BF. Triple-A Statcast starts in 2023.</span>' });
+        foot: '<span class="bp-fn">Major-league equivalents shift each Triple-A rate on the log-odds scale by the average change of players who played both levels in the same season, shrunk towards defaults. Ranks need 100+ PA or BF. Triple-A Statcast starts in 2023.</span>' });
       if (!rows.length) { $('pr-table').innerHTML = QK.empty('Nobody here', 'No prospect matches these filters.'); previews([], pit, S, mle, call); return; }
       const cols = [{ key: 'name', label: pit ? 'Pitcher' : 'Hitter', type: 'entity', sub: 'sub', mark: r => (r.parent || r.org ? U.team(r.parent || r.org, 'mlb') : null), href: href }]
         .concat(AC.map(c => ({ key: 'a_' + c[0], label: c[1], num: true, fmt: x => k.fmtV(x, c[2]), tip: 'Triple-A ' + c[1] })))

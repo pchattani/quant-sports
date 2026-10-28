@@ -159,7 +159,7 @@ function ratingsView(d, rows, S) {
   if (!RDIV) RDIV = GI.DIVISIONS[0];
   return GI.grid(GI.card('Power map', 'offence v defence rating, points per game against an average team', GI.chartBox('rt-map', 460, 'Offence against defence'), { span: 7 }) +
       GI.card('Rating by week', 'overall rating · pick a division', GI.seg('rt-div', GI.DIVISIONS.map(x => [x, x.replace(/ (East|West|North|South)$/, s => ' ' + s.trim().charAt(0))]), RDIV, 'Division') + GI.chartBox('rt-chart', 400, 'Rating by week'), { span: 5 })) +
-    GI.card('Unit ratings', 'opponent-adjusted, with priors and time decay · red above the league median, blue below', GI.heatTable({ cols: keys.map(k => ({ label: k[1], title: k[2] })), corner: 'Team', center: 'col',
+    GI.card('Unit ratings', 'opponent-adjusted, with priors and time decay · red above the league median, blue below', GI.heatTable({ cols: keys.map(k => ({ label: k[1], title: k[2] })), corner: 'Team', center: 'col', invert: true,
       rows: sorted.map(t => ({ label: GI.teamLink(t, { short: true, season: S }), values: keys.map(k => rat[t][k[0]]), fmts: keys.map(k => (v => GI.signed(v, k[3]))) })) }));
 }
 function drawRatings(el, d) {
@@ -170,7 +170,8 @@ function drawRatings(el, d) {
     xName: 'Offence (pts/g)', yName: 'Defence (pts/g)', refX: 0, refY: 0, labelAll: true, xFmt: v => GI.signed(v, 0), yFmt: v => GI.signed(v, 0), quadrants: ['Defence carries', 'Contenders', 'Rebuilding', 'Offence carries'] });
   const drawDiv = () => {
     const list = Object.keys(rat).filter(t => GI.teamInfo(t).division === RDIV);
-    GI.ch.lines('rt-chart', list.map(t => ({ name: GI.teamAbbr(t), x: rat[t].history.map(h => h.w), y: rat[t].history.map(h => h.net), colour: GI.teamColour(t), symbol: true })), { xName: 'Week', yName: 'Rating (pts/g v average)', yFmt: v => GI.signed(v, 1), xLabel: x => 'Week ' + x, ref: { y: 0 } });
+    const cs = GI.distinctColours(list);
+    GI.ch.lines('rt-chart', list.map((t, i) => ({ name: GI.teamAbbr(t), x: rat[t].history.map(h => h.w), y: rat[t].history.map(h => h.net), colour: cs[i], symbol: true })), { xName: 'Week', yName: 'Rating (pts/g v average)', yFmt: v => GI.signed(v, 1), xLabel: x => 'Week ' + x, ref: { y: 0 } });
   };
   GI.wireSeg(el, 'rt-div', v => { RDIV = v; drawDiv(); });
   drawDiv();

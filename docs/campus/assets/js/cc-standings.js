@@ -20,7 +20,7 @@ CC.route('standings', function (el, p) {
   var sub = { race: 'How the race is shaping up: our chances over time, who moved and why, what is at stake next, the road left and the tiers.', cards: 'Every team’s strengths and weaknesses against the rest of the country, and the shape of the league.',
     conferences: 'Conference and overall records with our rating and the chance to win the conference.', polls: 'The voters next to the model.', playoff: 'The 12-team College Football Playoff: the bracket, everyone’s chance to reach each round, and how the committee may rank them.',
     bowls: 'Who reaches six wins, and the bowl games announced so far.', bracket: 'The NCAA tournament: the bracket by region, each team’s chance to reach each round, and our first-round upset chances.', conftourneys: 'Our chance to win each conference tournament (formats approximated where no bracket is published).' }[tab];
-  el.innerHTML = U.head('Standings', sub, U.kicker(L, S)) + U.tabs(L, 'standings', list, S, tab) + QK.note('<b>How to read the chances:</b> each is the share of our simulated seasons in which it happens. A 30% playoff chance still comes off about 1 season in 3.') + '<div id="st-body">' + QK.skeleton('lines', 6) + '</div><div id="st-perf"></div>';
+  el.innerHTML = U.head('Standings', sub, U.kicker(L, S)) + U.tabs(L, 'standings', list, S, tab) + chanceNote(L, S, tab) + '<div id="st-body">' + QK.skeleton('lines', 6) + '</div><div id="st-perf"></div>';
   var body = QK.$('#st-body', el);
   var none = Promise.resolve(null);
   return Promise.all([CC.season(L, S), (tab === 'playoff' || tab === 'bowls' || tab === 'bracket' || tab === 'conftourneys' || tab === 'race') ? CC.load(CC.path(L, S, fb ? 'cfp.json' : 'bracket.json')) : none,
@@ -41,6 +41,15 @@ CC.route('standings', function (el, p) {
     if ((tab === 'race' || tab === 'conferences') && window.QKL && QKL.leaders) performers(QK.$('#st-perf', el), L, S);
   });
 });
+
+/* "How to read the chances", only on the tabs that show chances from our simulated seasons (round 9: not on Polls or
+   History), in the level's own words. */
+function chanceNote(L, S, tab) {
+  var on = { race: 1, playoff: 1, bowls: 1, bracket: 1, conftourneys: 1, conferences: CC.isCur(L, S) ? 1 : 0 };
+  if (!on[tab]) return '';
+  return QK.note('<b>How to read the chances:</b> each is the share of our simulated seasons in which it happens. ' +
+    (CC.fb(L) ? 'A 30% playoff chance still comes off about 1 season in 3.' : 'A 30% chance of a place in the NCAA tournament still comes off about 1 season in 3.'));
+}
 
 /* Top and bottom performers (QKL.leaders) under the race and the conferences: all players on our value model (box
    rating first in basketball), each position on its spec headline set, and the teams on our ratings, from

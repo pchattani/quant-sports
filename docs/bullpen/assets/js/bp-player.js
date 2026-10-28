@@ -37,10 +37,15 @@ function teamGames(season, tid) {
 }
 function lc(x) { return /^[A-Z][a-z]/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x; }
 /* An IntersectionObserver trigger (once), or straight away on old browsers. */
-function onView(node, fn, margin) {
+/* idleMs: also run that long after the page settles, scrolled to or not (round 9: the tape beside the meters sits at the
+   fold, and a reader who never scrolled saw its grey placeholders for good; the first paint stays light) */
+function onView(node, fn, margin, idleMs) {
   if (!node) return;
   if (!window.IntersectionObserver) { fn(); return; }
-  const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); fn(); } }, { rootMargin: margin || '250px', threshold: 0.01 });
+  let done = false;
+  const run = () => { if (done || !node.isConnected) return; done = true; io.disconnect(); fn(); };
+  const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) run(); }, { rootMargin: margin || '250px', threshold: 0.01 });
+  if (idleMs) setTimeout(() => { if (window.requestIdleCallback) window.requestIdleCallback(run, { timeout: 2000 }); else run(); }, idleMs);
   /* observe once the web fonts have set the hero: before that the name is shorter and a box under the fold reads as in view */
   const go = () => { if (node.isConnected) io.observe(node); };
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => setTimeout(go, 50)); else go();
@@ -352,7 +357,7 @@ function draw(el, c) {
       drawTape(b.getAttribute('data-value'));
     }));
     drawTape(cands[0].id);
-  }), '0px 0px -160px 0px');
+  }), '0px 0px -160px 0px', 2500);
 
   // the last game: the line score by inning (runs, hits, errors) and our win chance through it (the game file)
   if (lastG && el.querySelector('#pp-race')) {

@@ -89,7 +89,8 @@ function lines(x, series, o) {
     return {
       grid: { left: 8, right: 16, top: (o.legend === false || list.length < 2 ? 18 : 34) + (o.yName ? 12 : 0), bottom: o.xName ? 26 : 8, containLabel: true },
       legend: o.legend === false || list.length < 2 ? undefined : legend(T, { data: list.map(s => s.name) }),
-      xAxis: Object.assign(ax(T, { type: 'value', name: o.xName, nameLocation: 'middle', nameGap: 26, min: o.xMin, max: o.xMax, fmt: o.xFmt, split: false, line: true, scale: true }), intX ? { minInterval: 1 } : {}),
+      /* whole-number x (seasons, weeks): the axis ends at the data, never a rounded 2030 */
+      xAxis: Object.assign(ax(T, { type: 'value', name: o.xName, nameLocation: 'middle', nameGap: 26, min: o.xMin !== undefined ? o.xMin : (intX ? 'dataMin' : undefined), max: o.xMax !== undefined ? o.xMax : (intX ? 'dataMax' : undefined), fmt: o.xFmt, split: false, line: true, scale: true }), intX ? { minInterval: 1 } : {}),
       yAxis: (a => { a.axisLine.onZero = false; return a; })(ax(T, { name: o.yName, nameAlign: 'left', nameLocation: o.inverse ? 'start' : 'end', min: o.yMin, max: o.yMax, fmt: o.yFmt, scale: o.yMin === undefined, inverse: !!o.inverse })),
       tooltip: tip(T, { trigger: 'axis', formatter: ps => {
         const real = ps.filter(p => p.seriesName && p.seriesType === 'line' && list.some(s => s.name === p.seriesName));
@@ -257,7 +258,7 @@ function wpChart(x, ours, o) {
       tooltip: tip(T, { trigger: 'item', formatter: q => {
         if (q.seriesName === 'Score') { const s = q.data.s; return thead(esc(GI.teamAbbr(s.team)) + ' ' + esc(s.kind || 'score')) + esc(String(s.desc || '').slice(0, 140)); }
         if (q.seriesName === '4th down') { const s = q.data.f, g = q.data.g; return thead('4th down · ' + esc(GI.teamAbbr(s.team || '')) + ' ' + esc(GI.choiceLabel(s.choice))) + trow(g.colour, g.label, isNum(s.wp_lost) ? GI.num(Math.abs(s.wp_lost) * 100, 1) + ' pts lost' : '') + (s.rec ? trow(T.ink3, 'Model said', GI.choiceLabel(s.rec)) : '') + (s.desc ? '<div style="max-width:280px;white-space:normal;color:' + T.ink3 + '">' + esc(String(s.desc).slice(0, 140)) + '</div>' : ''); }
-        if (q.seriesName === 'Key play') { const s = q.data.t; return thead('Key play ' + q.data.k) + trow(T.ink3, hn + ' WPA', GI.signed((s.wpa || 0) * 100, 1) + ' pts') + '<div style="max-width:280px;white-space:normal">' + esc(String(s.desc || '').slice(0, 160)) + '</div>'; }
+        if (q.seriesName === 'Key play') { const s = q.data.t; return thead('Key play ' + q.data.k) + trow(T.ink3, (s.team ? GI.teamAbbr(s.team) + ' (with the ball)' : 'Offence') + ' WPA', GI.signed((s.wpa || 0) * 100, 1) + ' pts') + '<div style="max-width:280px;white-space:normal">' + esc(String(s.desc || '').slice(0, 160)) + '</div>'; }
         const r = main[q.dataIndex]; if (!r) return '';
         return '<div style="color:' + T.ink3 + ';font-size:11px">' + esc(GI.clockText(r.qtr, r.clock)) + '</div>' + trow(hc, hn, GI.pct(r.p, 1)) + trow(ac, an, GI.pct(1 - r.p, 1)) +
           (r.desc ? '<div style="max-width:300px;white-space:normal;margin-top:4px;color:' + T.ink2 + '">' + esc(String(r.desc).slice(0, 160)) + '</div>' : '');
@@ -411,11 +412,13 @@ function reliability(x, series, o) {
   const f = o.fmt || (v => Math.round(v * 100) + '%');
   return mount(x, T => {
     const maxN = Math.max.apply(null, S.map(s => Math.max.apply(null, s.b.map(b => b.n || 1))));
+    const xa = ax(T, { min: lo, max: hi, fmt: f }), ya = ax(T, { min: lo, max: hi, fmt: f });
+    const gB = 8 + QKC.nameAxis(xa, o.xName || 'Forecast', 'bottom'), gT = (S.length > 1 ? 30 : 8) + QKC.nameAxis(ya, o.yName || 'Observed', 'side');
     return {
-      grid: { left: 8, right: 16, top: S.length > 1 ? 30 : 12, bottom: 28, containLabel: true },
+      grid: { left: 8, right: 16, top: gT, bottom: gB, containLabel: true },
       legend: S.length > 1 ? legend(T, { data: S.map(s => s.name) }) : undefined,
-      xAxis: ax(T, { min: lo, max: hi, fmt: f, name: o.xName || 'Forecast', nameLocation: 'middle', nameGap: 26 }),
-      yAxis: ax(T, { min: lo, max: hi, fmt: f, name: o.yName || 'Observed' }),
+      xAxis: xa,
+      yAxis: ya,
       tooltip: tip(T, { formatter: q => thead(esc(q.seriesName)) + trow(q.color, 'Forecast', f(q.value[0])) + trow(q.color, 'Observed', f(q.value[1])) + trow(T.ink3, 'n', GI.int(q.value[2])) }),
       series: [{ type: 'line', silent: true, data: [[lo, lo], [hi, hi]], showSymbol: false, lineStyle: { color: T.axis, type: [3, 3], width: 1 }, tooltip: { show: false } }]
         .concat(S.map((s, i) => { const c = s.colour ? lift(s.colour, T) : T.cat[i % 8]; return { type: 'line', name: s.name, data: s.b.map(b => [b.x, b.y, b.n]), symbolSize: v => 5 + 12 * Math.sqrt((v[2] || 1) / maxN), lineStyle: { color: c, width: 1.6, type: s.dash ? 'dashed' : 'solid' }, itemStyle: { color: c } }; }))

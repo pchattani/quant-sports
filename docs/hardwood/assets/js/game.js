@@ -342,7 +342,13 @@ function seasonGames(L, S) {
   const isCur = S === HW.currentSeason(L);
   return HW.loadAll([HW.path('schedule.json', L, S), HW.path('teams.json', L, S), HW.lpath('markets.json', L)]).then(arr => {
     const out = {};
-    const put = g => { if (g && g.id) out[String(g.id)] = Object.assign({}, out[String(g.id)] || {}, g); };
+    /* a later source fills a game in but never blanks it: an index card built without a market (or a score) must not
+       wipe the schedule's (round 9: the quiet "Market N%" went missing on cards whose index copy had market: null) */
+    const put = g => {
+      if (!g || !g.id) return;
+      const o = out[String(g.id)] = Object.assign({}, out[String(g.id)] || {});
+      Object.keys(g).forEach(k => { if (g[k] !== null && g[k] !== undefined) o[k] = g[k]; else if (!(k in o)) o[k] = g[k]; });
+    };
     const sch = arr[0];
     if (HW.ok(sch)) (Array.isArray(sch) ? sch : (sch.games || [])).forEach(put);
     const tm = HW.ok(arr[1]) ? arr[1].teams || {} : {};

@@ -424,10 +424,10 @@ def units(level: str, rows: dict, team_stats: dict[str, dict]) -> dict[str, list
         top[r["team"]][r["pos"]].append(r)
     teams = sorted(set(pos_val) | set(team_stats))
     facets = [("G", "Guards", False), ("F", "Forwards", False), ("C", "Centers", False),
-              ("off", "Offense (adj. pts/100)", False), ("def", "Defense (adj. pts/100 allowed)", True),
+              ("off", "Offence (adj. pts/100)", False), ("def", "Defence (adj. pts/100 allowed)", True),
               ("efg", "Shooting (eFG%)", False), ("tov_rate", "Ball security (TO rate)", True),
               ("orb_rate", "Offensive rebounding", False), ("ftr", "Getting to the line (FTA/FGA)", False),
-              ("opp_efg", "Shot defense (opp. eFG%)", True)]
+              ("opp_efg", "Shot defence (opp. eFG%)", True)]
     vals = {}
     for key, _, low in facets:
         v = {}

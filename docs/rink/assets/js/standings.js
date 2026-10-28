@@ -241,7 +241,11 @@ function flatRatings(d) {
     const x = src[t] || {};
     if (!x.units) { out[t] = x; return; }
     const u = x.units;
-    const o = { history: x.history || x.rolling || [], pct: {}, raw: true };
+    /* history ([[date, overall]]) is empty when the rating model publishes none ([] is truthy, so `history || rolling`
+       never fell back); the rolling 10-game 5v5 xG share ([[game, date, xgf, gf, cf]]) stands in, said so on the chart */
+    const hist = Array.isArray(x.history) && x.history.length ? x.history : null;
+    const roll = !hist && Array.isArray(x.rolling) ? x.rolling.filter(r => Array.isArray(r) && r[1] && isNum(r[2])).map(r => [r[1], Math.round(r[2] * 1000) / 10]) : [];
+    const o = { history: hist || roll, histKind: hist ? 'rating' : 'xgf', pct: {}, raw: true };
     Object.keys(U_KEYS).forEach(k => { if (isNum(u[k])) o[U_KEYS[k]] = Number(u[k]); if (u.pct && isNum(u.pct[k])) o.pct[U_KEYS[k]] = Number(u.pct[k]); });
     if (!isNum(o.overall) && isNum(x.rating)) o.overall = Number(x.rating);
     out[t] = o;
@@ -266,16 +270,20 @@ function ratingsView(d, rows, S) {
   const divs = RK.DIVISIONS.filter(dv => teams.some(t => RK.teamDiv(t) === dv));
   if (!RDIV || divs.indexOf(RDIV) < 0) RDIV = divs[0];
   return '<div><div>' + RK.card('Team ratings', hasPct ? 'overall: goals per game above average; units: 5v5 xGF/60 and xGA/60, special teams and goaltending · colour: league percentile (red good)' : 'goals per game above average, by component · red good, blue poor', heat) + '</div><div>' +
-    RK.card('Rating history', 'overall rating through the season', '<div class="toggle-row">' + RK.toggles(divs.map(x => ({ key: x, label: x })), RDIV, 'data-rdiv') + '</div><div id="rt-hist"></div>') + '</div></div>';
+    RK.card(teams.some(t => (rt[t] || {}).histKind === 'rating') ? 'Rating history' : 'Form through the season', teams.some(t => (rt[t] || {}).histKind === 'rating') ? 'overall rating through the season' : 'share of 5-on-5 expected goals over the last 10 games, game by game (the rating model publishes no day-by-day history)', '<div class="toggle-row">' + RK.toggles(divs.map(x => ({ key: x, label: x })), RDIV, 'data-rdiv') + '</div><div id="rt-hist"></div>') + '</div></div>';
 }
 function drawRatings(el, d) {
   const box = el.querySelector('#rt-hist');
   if (!box) return;
   const rt = flatRatings(d);
-  const series = Object.keys(rt).filter(t => RK.teamDiv(t) === RDIV && Array.isArray((rt[t] || {}).history) && rt[t].history.length).map(t => ({
-    name: RK.teamAbbr(t), x: rt[t].history.map(h => h[0]), y: rt[t].history.map(h => h[1]), colour: RK.teamColour(t), hover: esc(RK.teamAbbr(t)) + ' %{x}: %{y:+.2f}<extra></extra>' }));
+  const xgf = !Object.keys(rt).some(t => (rt[t] || {}).histKind === 'rating');
+  const ts = Object.keys(rt).filter(t => RK.teamDiv(t) === RDIV && Array.isArray((rt[t] || {}).history) && rt[t].history.length);
+  const cols = {};
+  ts.forEach((t, i) => { const prev = ts.slice(0, i).map(u => cols[u]); let c = RK.ui.tcol(t); if (prev.some(q => !(QK.color.distinct ? QK.color.distinct(q, c) : true))) { const al = RK.teamAlt(t); const c2 = QK.color.parse(al) ? QK.color.team(al) : null; c = c2 && !prev.some(q => !QK.color.distinct(q, c2)) ? c2 : QKC.tokens().cat[i % 8]; } cols[t] = c; });
+  const series = ts.map(t => ({
+    name: RK.teamAbbr(t), x: rt[t].history.map(h => h[0]), y: rt[t].history.map(h => h[1]), colour: cols[t], hover: esc(RK.teamAbbr(t)) + (xgf ? ' %{x}: %{y:.1f}%<extra></extra>' : ' %{x}: %{y:+.2f}<extra></extra>') }));
   RK.purge(box);
-  RK.charts.lines(box, series, { height: 340, xTitle: 'Date', yTitle: 'Goals per game above average', emptyText: 'No rating history yet.' });
+  RK.charts.lines(box, series, { height: 340, xTitle: 'Date', yTitle: xgf ? '5v5 xG share, last 10 games (%)' : 'Goals per game above average', emptyText: 'No games played yet.' });
 }
 function lotteryView(d, rows, S) {
   let L = d.lottery || d.draft || null;

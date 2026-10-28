@@ -18,24 +18,45 @@ const esc = RK.esc;
 const isNum = RK.isNum;
 
 function sideOf(s, keys) { for (let i = 0; i < keys.length; i++) { const v = s[keys[i]]; if (v) return typeof v === 'object' ? v : { team: v }; } return null; }
+/* SEEDS: team -> seed ('C1', 'WC2') for the season on screen, from season.json bracket.seeds_now (set by bracketOf). */
+let SEEDS = {};
+const seedRank = sd => { const m = /^([A-Z]+)(\d)$/.exec(String(sd || '')); return m ? (m[1] === 'WC' ? 10 : 0) + Number(m[2]) : 50; };
 function normSeries(s0, rnd) {
   const s = s0 || {};
-  const a = sideOf(s, ['top', 'high', 'home', 'team_a', 'a']) || {}, b = sideOf(s, ['bottom', 'low', 'away', 'team_b', 'b']) || {};
+  let a = sideOf(s, ['top', 'high', 'home', 'team_a', 'a']) || {}, b = sideOf(s, ['bottom', 'low', 'away', 'team_b', 'b']) || {};
+  /* the build's shape for a real series: {round, series, teams: [a, b], wins: {abbr: n}, games, winner}; the higher
+     seed goes on top, a side missing from wins has won none (a sweep) */
+  if (Array.isArray(s.teams) && s.teams.length === 2 && !a.team) {
+    const w = s.wins || {}, t = s.teams.map(RK.canonTeam);
+    const side = x => ({ team: x, seed: SEEDS[x] || null, wins: isNum(w[x]) ? Number(w[x]) : 0 });
+    const flip = seedRank(SEEDS[t[1]]) < seedRank(SEEDS[t[0]]);
+    a = side(flip ? t[1] : t[0]); b = side(flip ? t[0] : t[1]);
+  }
   const pTop = isNum(s.p_top) ? Number(s.p_top) : (isNum(s.p_a) ? Number(s.p_a) : (isNum(a.p) ? Number(a.p) : (isNum(b.p) ? 1 - Number(b.p) : null)));
   return { round: isNum(s.round) ? Number(s.round) : rnd, conf: RK.confName(s.conference || s.conf || (a.team ? RK.teamConf(a.team) : '')),
     a: { team: a.team ? RK.canonTeam(a.team) : null, seed: a.seed || null, wins: isNum(a.wins) ? Number(a.wins) : null },
     b: { team: b.team ? RK.canonTeam(b.team) : null, seed: b.seed || null, wins: isNum(b.wins) ? Number(b.wins) : null },
-    p: pTop, market: isNum(s.market_top) ? Number(s.market_top) : null, winner: s.winner ? RK.canonTeam(s.winner) : null, games: s.games || [], label: s.label || '' };
+    p: pTop, market: isNum(s.market_top) ? Number(s.market_top) : null, winner: s.winner ? RK.canonTeam(s.winner) : null, games: s.games || [], label: s.label || '', n: isNum(s.series) ? Number(s.series) : 0 };
 }
 /* The bracket from the payload: {rounds: {1: [SERIES], ...}, champion, projected: false} or null. */
 function bracketOf(d) {
   const b = d && d.bracket;
   if (!b) return null;
+  SEEDS = {};
+  const sn = b.seeds_now || {}, DV = {};
+  (((d.standings || {}).rows) || []).forEach(r => { if (r && r.team && r.division) DV[RK.canonTeam(r.team)] = r.division; });
+  Object.keys(sn).forEach(c => {
+    const x = sn[c] || {}, lead = (x.leaders || []).map(RK.canonTeam), wc = (x.wild_card || []).map(RK.canonTeam);
+    const divs = {};
+    lead.forEach(t => { const dv = DV[t] || RK.teamDiv(t) || '?'; divs[dv] = (divs[dv] || 0) + 1; SEEDS[t] = dv.charAt(0) + divs[dv]; });
+    wc.forEach((t, i) => { SEEDS[t] = 'WC' + (i + 1); });
+  });
   const out = { rounds: {}, champion: b.champion ? RK.canonTeam(b.champion) : null, projected: !!b.projected };
   if (Array.isArray(b)) b.forEach(s => { const x = normSeries(s, 1); (out.rounds[x.round] = out.rounds[x.round] || []).push(x); });
   else if (Array.isArray(b.rounds)) b.rounds.forEach((r, i) => (r.series || r.matchups || []).forEach(s => { const x = normSeries(s, isNum(r.round) ? Number(r.round) : i + 1); (out.rounds[x.round] = out.rounds[x.round] || []).push(x); }));
   else if (Array.isArray(b.series)) b.series.forEach(s => { const x = normSeries(s, 1); (out.rounds[x.round] = out.rounds[x.round] || []).push(x); });
   else if (b.series && typeof b.series === 'object') Object.keys(b.series).forEach(k => (b.series[k] || []).forEach(s => { const r = { r1: 1, r2: 2, conf_final: 3, final: 4 }[k] || parseInt(k, 10) || 1; const x = normSeries(s, r); (out.rounds[x.round] = out.rounds[x.round] || []).push(x); }));
+  Object.keys(out.rounds).forEach(r => { out.rounds[r].sort((x, y) => (x.n || 0) - (y.n || 0)); });
   return Object.keys(out.rounds).length ? out : null;
 }
 /* "If the season ended today": the first round from the wild-card standings, later rounds to be decided. */
@@ -128,6 +149,25 @@ function oddsTable(rows, cupMkt, S) {
   }), { compact: true, cls: 'std-table' });
 }
 
+/* A finished (or running) postseason without a simulation: how far each club went, from the real series. */
+function reachTable(b, S) {
+  const T = {};
+  [1, 2, 3, 4].forEach(r => (b.rounds[r] || []).filter(Boolean).forEach(x => [x.a, x.b].forEach((side, i) => {
+    if (!side.team) return;
+    const o = T[side.team] || (T[side.team] = { team: side.team, seed: side.seed, round: 0, w: 0, l: 0, out: null });
+    const other = i ? x.a : x.b;
+    o.round = Math.max(o.round, r); o.w += side.wins || 0; o.l += other.wins || 0;
+    const win = x.winner || (side.wins >= 4 ? side.team : other.wins >= 4 ? other.team : null);
+    if (win && win !== side.team) o.out = { r: r, by: other.team, sc: (other.wins || 0) + '–' + (side.wins || 0) };
+  })));
+  const list = Object.keys(T).map(k => T[k]).sort((x, y) => (y.round - x.round) || ((x.out ? 1 : 0) - (y.out ? 1 : 0)) || (y.w - y.l) - (x.w - x.l));
+  if (!list.length) return '';
+  return RK.tableHTML([{ label: 'Club' }, { label: 'Seed' }, { label: 'Went as far as' }, { label: 'Games won–lost', align: 'right' }, { label: 'Knocked out by' }],
+    list.map(o => ({ _href: RK.teamHref(o.team, S), cells: [{ html: RK.teamLink(o.team, { short: true, season: S }), v: o.team }, { v: o.seed || '' },
+      { html: o.out ? esc(RT[o.round]) : (b.champion === o.team ? '<b>Won the Stanley Cup</b>' : esc(RT[o.round]) + ' (still playing)'), v: o.round + (o.out ? 0 : 0.5) },
+      { html: o.w + '–' + o.l, v: o.w - o.l }, { html: o.out ? RK.teamLink(o.out.by, { abbr: true, season: S }) + ' ' + esc(o.out.sc) : '—', v: o.out ? o.out.by : '' }] })), { compact: true, cls: 'std-table' });
+}
+
 RK.route('playoffs', function (el, params) {
   const S = params.season;
   const cur = S === RK.currentSeason();
@@ -154,10 +194,14 @@ RK.route('playoffs', function (el, params) {
       RK.card('Bracket', isProj ? 'the first round from today\'s wild-card standings · percentages: our chance to win the series' : 'series score and our chance to win the series',
         b ? bracketHTML(b) : RK.muted('No bracket for this season yet.')) +
       (isProj ? likelyBlock(d) : '') +
-      RK.card('Chances by round', 'our chances from the season simulation', oddsTable(rows, cupMkt, S)) +
+      (!isProj && !rows.some(r => isNum(r.p_playoffs) || isNum(r.p_cup)) ? RK.card('How far each club went', 'the sixteen clubs, by the round they reached · series results', reachTable(b, S))
+        : RK.card('Chances by round', 'our chances from the season simulation', oddsTable(rows, cupMkt, S))) +
       '<div class="chart-note">In each conference the division winner with more points plays the second wild card; the other plays the first. Series chances come from our game model with home ice. For information only.</div>';
     RK.sortable(el);
   });
 });
+
+/* shared with the season recap (rk-recap.js) and the series pages */
+RK.bracket = { of: bracketOf, html: bracketHTML, reach: reachTable, RT: RT };
 
 })(window.RK);

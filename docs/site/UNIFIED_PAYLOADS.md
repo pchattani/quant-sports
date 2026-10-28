@@ -954,6 +954,12 @@ task's engine commit, `push_stores.py`) and `export_public.py` classes every `st
   the field hold half the minutes); the Lab's deep set and our model's numbers (GAR, line-up value) stay on the Lab's
   seasons.
 - The per-season peer quantiles (`QK.prog.ref`) now pool every person's table seasons, so old seasons have peer bands.
+- A written progression row is `{key, min, tid, team, teams, kd, dv, dp, pg, st}`: `scope` and `era` are read from the
+  key (`"club:2025/26"`), and `apps`, `g`, `a`, `comps` (no page read them) stay in the build's memory.
+- Sizes (local build, 28 Oct 16:40, 328 of the competition-seasons collected, back to 2020/21 in the leagues):
+  `data/people/` 129.6 MB before the tables, 148.0 MB with them (77k `hist` rows for 18k people, 7.6 MB of it `hist`);
+  the raw tables 28.5 MB so far (stores, never deployed). Projected when the collection ends: people about 175-185 MB,
+  the deployed site about 720 MB of GitHub Pages' 1 GB, so no gzip-at-rest or separate data repo is needed yet.
 - Front end (`assets/app/progression.js`): a season with `st` >= 0.5 reads "minutes · Sofascore season totals" in every
   tooltip (chart, grid headers, compare), and the header says how many seasons (and which) come from Sofascore's
   season totals.

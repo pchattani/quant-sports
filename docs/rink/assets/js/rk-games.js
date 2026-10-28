@@ -89,7 +89,7 @@ function gamesPage(el, params) {
     if (!list.length) h += U.card2('No games', '', QK.empty('No games on ' + RK.fmtDate(day), next ? 'Next game day: ' + RK.fmtDate(next, { year: false }) : (RK.ok(sch) ? '' : 'The schedule is not built yet.')));
     else {
       h += '<div class="rk-games rk-gc">' + list.map(g => U.gc(g, { league: QK.fmt.time(g.start) || 'NHL' })).join('') + '</div>';
-      if (pre.length) h += '<section class="qk-section">' + U.card2('Our chance for every home side', 'Teal: our win chance (overtime and shootout included). Grey ring: the market, for reference', U.chart('gd-mvm', Math.max(200, 34 * pre.length + 50), 'Our home win chance, with the market for reference')) + '</section>';
+      if (pre.length) h += '<section class="qk-section">' + U.card2('Our chance for every home side', 'Blue: our win chance (overtime and shootout included). Grey ring: the market, for reference', U.chart('gd-mvm', Math.max(200, 34 * pre.length + 50), 'Our home win chance, with the market for reference')) + '</section>';
       h += review(list);
     }
     el.innerHTML = h;

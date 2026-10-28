@@ -526,14 +526,17 @@ def write_careers(write: Callable[[str, Any], None], rows_by_season: dict[int, d
             if old and (old.get("current") or {}).get("season") in [r["season"] for r in seasons]:
                 payload["current"] = old.get("current")
                 payload["similar"] = old.get("similar") or []
+        # the index (search, names, position tags) shows a defender's charted role (EDGE, IDL, LB, CB, S): the pool his
+        # percentiles use, not the roster listing (Myles Garrett is an "LB" in the players release, an EDGE in our pools)
+        ipos = last.get("role") if last.get("group") == "DEF" and last.get("role") else payload["pos"]
         if old_reader is not None:
             old = old_reader(pid)
             if old is not None and _same(old, payload):
-                idx[pid] = [payload["name"], last.get("team"), payload["pos"], seasons[0]["season"], last["season"]]
+                idx[pid] = [payload["name"], last.get("team"), ipos, seasons[0]["season"], last["season"]]
                 continue
         write(f"players/{pid}.json", payload)
         written += 1
-        idx[pid] = [payload["name"], last.get("team"), payload["pos"], seasons[0]["season"], last["season"]]
+        idx[pid] = [payload["name"], last.get("team"), ipos, seasons[0]["season"], last["season"]]
     logger.info("careers: %d files written, %d indexed", written, len(idx))
     return idx
 

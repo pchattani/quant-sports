@@ -95,7 +95,7 @@ function valuePage(el, params) {
       const vtxt = ['H', 'P'].map(k => { const v = (pj[k] || {}).validation; if (!v) return ''; const r = v.rmse || {};
         return (k === 'H' ? 'Hitters' : 'Pitchers') + ': out-of-sample RMSE ' + BP.num(r.projection, 2) + ' against ' + BP.num(r.last_season, 2) + ' for last season\'s rate and ' + BP.num(r.league_rate, 2) + ' for the league rate (' + esc(v.unit) + ', ' + (v.targets || []).length + ' target seasons, players with ' + v.min_n + '+).'; }).filter(Boolean).join(' ');
       $('val-card').innerHTML = U.card2('The leaderboard', sel.length + (V.kind === 'SP' ? ' starting pitchers' : V.kind === 'RP' ? ' relief pitchers' : ' hitters') + ' · ' + esc((d.units || {})[PIT() ? 'P' : 'H'] || '') + ' · the cell colour is the WAR percentile among qualified ' + (PIT() ? (V.kind === 'SP' ? 'starters' : 'relievers') + ' (starters and relievers are ranked apart)' : 'hitters') + '', '<div id="val-table"></div>',
-        { flush: true, foot: '<span>' + esc((d.notes || []).join(' ')) + (vtxt ? ' Projection check: ' + vtxt : '') + ' Floors: ' + fl.H + ' PA, ' + (fl.SP ? 'starters ' + fl.SP + ' BF, relievers ' + fl.RP + ' BF' : fl.P + ' BF') + '.</span>' });
+        { flush: true, foot: '<span class="bp-fn">' + esc((d.notes || []).join(' ')) + (vtxt ? ' Projection check: ' + vtxt : '') + ' Floors: ' + fl.H + ' PA, ' + (fl.SP ? 'starters ' + fl.SP + ' BF, relievers ' + fl.RP + ' BF' : fl.P + ' BF') + '.</span>' });
       if (!sel.length) $('val-table').innerHTML = QK.empty('Nobody here', 'Lower the floor or widen the filters.');
       else QK.leaderboard($('val-table'), { dense: true, rank: true, maxHeight: 640, rowHref: o => o.href, columns: [
         { key: 'name', label: PIT() ? 'Pitcher' : 'Hitter', type: 'entity', sub: 'sub', mark: o => (o.team ? U.team(o.team, L, S) : null), href: o => o.href },
@@ -148,7 +148,7 @@ function drawV2(d, F, sel, L, S, $) {
       (ivh && ivp ? ' Injured-list model: mean absolute error ' + n1(ivh.mae_model) + ' days against ' + n1(ivh.mae_mean) + ' for the league mean (hitters), ' + n1(ivp.mae_model) + ' against ' + n1(ivp.mae_mean) + ' (pitchers); it did not improve playing-time projections walk-forward, so it is shown as risk and not used in them.' : '');
     $('val-v2card').innerHTML = QK.sectionHead({ kicker: 'The next five seasons', title: 'Who holds value', sub: 'Expected WAR next season and over three with the 80% band of what players with that expectation went on to produce; the five-season value (discounted 8% a year); injured-list risk; wins over the median starter at the same position. The same filters as the leaderboard.' }) +
       '<div class="qk-grid"><div class="qk-span-5">' + U.card2('Next season, with its range', 'The fifteen with the most five-season value: expected WAR next season (dot) and its 80% band', list.length ? U.chart('val-range', 470, 'Next season WAR with an 80% band') : QK.empty('Nobody here')) + '</div>' +
-      '<div class="qk-span-7">' + U.card2('Valuation', list.length + ' players', '<div id="val-v2"></div>', { flush: true, foot: '<span>' + note + '</span>' }) + '</div></div>';
+      '<div class="qk-span-7">' + U.card2('Valuation', list.length + ' players', '<div id="val-v2"></div>', { flush: true, foot: '<span class="bp-fn">' + note + '</span>' }) + '</div></div>';
     if (!list.length) return;
     const top = list.slice(0, 15).filter(r => isNum(r[F.lo1]) && isNum(r[F.hi1]));
     if (top.length) QKC.range('#val-range', { rows: top.map(r => ({ label: BP.playerSurname(r[F.pid]) + ' · ' + BP.teamAbbr(r[F.team]), lo: r[F.lo1], hi: r[F.hi1], mid: r[F.e1], href: phref(L, r[F.pid], S, r[F.kind]), sub: 'five seasons ' + s1(r[F.v5]) })),
@@ -167,7 +167,7 @@ function drawV2(d, F, sel, L, S, $) {
     const LV = { aaa: 'Triple-A', aa: 'Double-A', hia: 'High-A', a: 'Single-A' };
     const list = sel.filter(r => isNum(r[F.p_value])).sort((a, b) => b[F.p_value] - a[F.p_value]).slice(0, 200);
     $('val-v2card').innerHTML = U.card2('Prospect value', 'Expected MLB WAR over the next four seasons (discounted) from the season\'s minor-league line at the highest level reached; the same filters as the leaderboard', '<div id="val-v2"></div>',
-      { flush: true, foot: '<span>' + esc(((d.prospects || {}).notes || []).join(' ')) + '</span>' });
+      { flush: true, foot: '<span class="bp-fn">' + esc(((d.prospects || {}).notes || []).join(' ')) + '</span>' });
     if (!list.length) { $('val-v2').innerHTML = QK.empty('Nobody here'); return; }
     QK.leaderboard($('val-v2'), { dense: true, rank: true, maxHeight: 560, rowHref: o => o.href, columns: [
       { key: 'name', label: 'Player', type: 'entity', sub: 'sub', mark: o => (o.team ? U.team(o.team, L, S) : null), href: o => o.href },

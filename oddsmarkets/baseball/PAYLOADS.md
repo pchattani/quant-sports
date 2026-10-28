@@ -135,6 +135,16 @@ SERIES also has `round_name`, `p_sim` (simulation: the next game priced with its
 matrix), `done`, `market_sources`, and
 `next: {home, away, p_home, gpk, date, start}`; `teams[0]` holds home field; `p` = `p_sim` for a live series, else `p_closed`.
 
+**The postseason as played** (round 9, `"version": 2`; `season.actual_postseason`): a season with no bracket simulation (every
+finished season, and Triple-A) carries `postseason: {round, series, seeds {AL, NL} | null, teams {tid: {league, reached
+WC|DS|CS|LC|WS|CH, seed, div_winner, clinched z|y|w, p_ds, p_lcs, p_pennant, p_ws (1 or 0: what happened), champion, name}},
+matrix null, sims null, actual: true, champion, complete}`; each series adds `winner` and `p` is null. Rounds come from the game
+types (F WC, D DS, L CS, W WS, C CH; Triple-A's W is LC, a league final), names and lengths from the games' `series`. MLB seeds
+use the standings' tiebreak order reconciled with the observed bracket (`season_sim.reconcile_seeds`; the 2015-2021 and 2020
+formats: division winners, then runners-up in 2020, then the rest, a Wild Card host the higher seed). The standings rows take
+the seeds, division winners, clinch flags and games behind. A skipped past season whose season.json has an older `version` is
+rebuilt from its store and teams.json (`build_bullpen.refresh_season_json`).
+
 **`league`** (the current season's full build, both levels; `oddsmarkets/baseball/analytics/race.py` on the shared engine
 `oddsmarkets/common/league.py`, schema v1, about 25 KB; drawn by the kit's `docs/_design/league.js` on the standings and team
 pages): `{v, asof, phase, metrics: [{key, label}] (p_postseason, p_div, p_ws; empty for Triple-A, which has no simulation),
@@ -200,9 +210,12 @@ inning, batter, pitcher, wpa}]`. Without pitch data on the machine an existing p
   "weather_effects", "model_ok"}` (keyed by venue id).
 - `leaders.json`: `{"hitters"|"pitchers": {key: [[pid, value, name, tid]] x25}, "teams": {key: [[tid, value]]}, "pitch_types": {pt:
   {stuff|pitching|whiff: [[pid, value, name, tid, n, velo]]}}, "hitters_min_pa", "pitchers_min_bf", "top"}`.
-- `lab.json`: `{"fields": ["pid","name","team","pos","n"], "metrics": {"hitter": [METRIC], "pitcher": [METRIC]}, "rows": {"hitter":
-  [[pid, name, tid, pos, n, v1, v2, ...]] (values in metrics order), "pitcher": [...]}, "kinds", "presets": [{kind, x, y, label}]}`
-  (players with 50+ PA / BF).
+- `lab.json`: `{"fields": ["pid","name","team","pos","n","age","hand","chances","called"], "metrics": {"hitter": [METRIC],
+  "pitcher": [METRIC]}, "rows": {"hitter": [[pid, name, tid, pos, n, age, hand, chances, called, v1, v2, ...]] (values in
+  metrics order), "pitcher": [...]}, "kinds", "presets": [{kind, x, y, label}]}` (players with 50+ PA / BF). Every catalogue
+  metric, the counting stats included (round 8, 28 Oct 2026: the Scouting Room's board, the Chart and the Leaders read it);
+  `hand` is bats (hitters) or throws (pitchers); `chances` and `called` (hitters only, else null) are the fielding and framing
+  samples behind those floors. About 6.6% larger than before (MLB 2026: 1.04 to 1.11 MB).
 - `awards.json`: `{"awards": {al_mvp|nl_mvp|al_cy|nl_cy|al_roy|nl_roy: {label, league, award, model {pid: p}, rows [{pid, name, p,
   value, team, features {feature: raw value}}], market, vs_market, features [names], fit, reason}}, "source", "verified_winners",
   "value_source"}`. Feature values are builder D's raw candidate features (MVP value, hr, team win%, woba; Cy value, k, ip, ra9

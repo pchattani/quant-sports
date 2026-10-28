@@ -88,9 +88,42 @@ function bySeries(id, obj, opts) {
 
 /* ── sections ──────────────────────────────────────────────────────────── */
 
+/* calibration.json "xg" keyed by season (the build's shape since the walk-forward xG, 22 Oct 2026): {S: {benchmark:
+   {ours, moneypuck: {n, log_loss, auc, brier}, n_matched}, validation, model}}. The season in progress is out of sample
+   for both models; for completed seasons ours is walk-forward (each scored by a model trained on earlier seasons only)
+   while MoneyPuck's published values may come from a model that saw them. Every sentence is computed from the numbers. */
+function xgBySeason(X, out, read) {
+  const k = K();
+  const ss = Object.keys(X).filter(x => /^\d{8}$/.test(x)).sort();
+  const rows = ss.map(x => { const b = (X[x] || {}).benchmark || {}, o = b.ours || {}, m = b.moneypuck || {};
+    return { s: x, n: k.first(o.n, b.n_matched), o: k.first(o.log_loss, o.logloss), m: k.first(m.log_loss, m.logloss), oa: o.auc, ma: m.auc, base: k.first(o.log_loss_base, m.log_loss_base) }; })
+    .filter(r => k.isNum(r.o) && k.isNum(r.m));
+  if (!rows.length) { out.push(k.card('Expected goals against MoneyPuck', '', k.muted('The comparison of our xG with MoneyPuck’s on the same shots has not been published yet.'))); return; }
+  const cur = rows[rows.length - 1], curOOS = Number(cur.s) === Number(k.curSeason());
+  const mpBetter = rows.filter(r => r.m < r.o), ourBetter = rows.filter(r => r.o < r.m);
+  const credit = (RK.MONEYPUCK_CREDIT || 'xG benchmark data from MoneyPuck.com');
+  const gap = cur.o - cur.m;
+  const head = (curOOS ? 'This season, on ' + k.int(cur.n) + ' shots both models score before the fact, ' : 'In ' + k.sLabel(cur.s) + ', on ' + k.int(cur.n) + ' shots, ') +
+    (gap > 0 ? 'MoneyPuck’s xG is sharper than ours: a log-loss of ' + k.num(cur.m, 4) + ' against our ' + k.num(cur.o, 4) + ' (lower is better).' : gap < 0 ? 'our xG is sharper than MoneyPuck’s: ' + k.num(cur.o, 4) + ' against ' + k.num(cur.m, 4) + ' (lower is better).' : 'the two are level.');
+  read.push('<p><strong>Expected goals.</strong> ' + head + ' Across the ' + rows.length + ' seasons on record MoneyPuck’s is sharper in ' + mpBetter.length + (ourBetter.length ? ' and ours in ' + ourBetter.length + ' (' + ourBetter.map(r => k.sLabel(r.s)).join(', ') + ')' : '') +
+    '. MoneyPuck sees more than the NHL’s free play-by-play shows (passes before the shot, screens), so expect it to stay ahead; we use its numbers only as the benchmark.</p>');
+  let h = '<div class="card"><div class="card-header">Expected goals against MoneyPuck <span class="card-sub">Every unblocked shot both cover, ' + k.esc(k.sLabel(rows[0].s)) + ' to ' + k.esc(k.sLabel(cur.s)) + '; y = 1 when it was a goal. ' + k.esc(credit) + '.</span></div>' +
+    '<div class="gq-read"><p><strong>' + (gap > 0 ? 'MoneyPuck beats our xG.' : gap < 0 ? 'Our xG beats MoneyPuck this season.' : 'Level.') + '</strong> ' + head + '</p>' +
+    '<p>For past seasons ours is scored walk-forward (each season by a model trained only on the seasons before it), while MoneyPuck’s published numbers for a finished season may come from a model that had seen it. The season in progress is the fair test: neither model has seen those shots.</p></div>' +
+    '<div class="grid-2"><div><div class="gq-sub-head">Log-loss by season (lower is better)</div><div id="cal-xg-yr" class="gf-chart"></div></div><div><div class="gq-sub-head">Season by season</div><div class="gq-pad" id="cal-xg-t"></div></div></div></div>';
+  out.push(h);
+  setTimeout(() => {
+    const obj = {}; rows.forEach(r => { obj[r.s] = { ours_xg: r.o, moneypuck: r.m }; });
+    bySeries('cal-xg-yr', obj, { yt: 'Log-loss per shot' });
+    k.set('cal-xg-t', k.table([{ label: 'Season' }, { label: 'Shots', align: 'right' }, { label: 'Ours', align: 'right', title: 'Our xG log-loss (lower is better)' }, { label: 'MoneyPuck', align: 'right', title: 'MoneyPuck xG log-loss' }, { label: 'AUC ours', align: 'right' }, { label: 'AUC MoneyPuck', align: 'right' }, { label: 'Sharper', sortable: false }],
+      rows.slice().reverse().map(r => [{ v: r.s, html: '<strong>' + k.esc(k.sLabel(r.s)) + '</strong>' + (Number(r.s) === Number(k.curSeason()) ? ' <span class="muted-inline">(both out of sample)</span>' : '') }, { v: r.n, html: k.int(r.n) },
+        { v: r.o, html: k.num(r.o, 4) }, { v: r.m, html: k.num(r.m, 4) }, { v: r.oa, html: k.num(r.oa, 3) }, { v: r.ma, html: k.num(r.ma, 3) }, { v: r.o - r.m, html: r.m < r.o ? 'MoneyPuck' : r.o < r.m ? 'Ours' : 'Level' }]), { compact: true }));
+  }, 0);
+}
 function xgSection(d, out, read) {
   const k = K();
   const X = get(d, ['xg', 'xg_model', 'models.xg', 'shots']);
+  if (X && typeof X === 'object' && Object.keys(X).some(x => /^\d{8}$/.test(x))) { xgBySeason(X, out, read); return; }
   if (!X || typeof X !== 'object') { out.push(k.card('Expected goals against MoneyPuck', '', k.muted('The comparison of our xG with MoneyPuck\'s on the same shots has not been published yet.'))); return; }
   const ALL = scorers(X.all || X.metrics || X.pooled || X);
   const credit = (RK.MONEYPUCK_CREDIT || 'xG benchmark data from MoneyPuck.com');

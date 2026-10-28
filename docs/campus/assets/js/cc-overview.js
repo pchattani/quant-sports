@@ -64,7 +64,7 @@ function cardsById(info) {
 function playable(c, hrs) {
   if (!c) return false;
   var st = CC.status(c);
-  if (st === 'final') return false;
+  if (st === 'final' || QK.awaiting(CC.game(c, CC.state.L))) return false;
   var h = (Date.parse(c.date) - QK.now()) / 36e5;
   return st === 'live' ? h > -8 : h > -1 && h < hrs;
 }
@@ -188,8 +188,9 @@ function tiles(L, S, d, nSims) {
    hours after its start is dropped, MIGRATION_V2.md). */
 function gameLists(L, info) {
   var seen = {};
-  var cut = QK.now() - 12 * 3600 * 1000;
-  var fresh = function (g) { return g.status === 'post' || CC.tba(g) || !(new Date(g.date).getTime() < cut); };
+  /* a game the data still calls upcoming or live after it must have finished is waiting for its result (QK.awaiting):
+     never in "What to watch", never featured */
+  var fresh = function (g) { return g.status === 'post' || !QK.awaiting(CC.game(g, L)); };
   function take(list) { return (list || []).filter(function (g) { if (seen[g.id] || !fresh(g)) return false; seen[g.id] = 1; return true; }); }
   var live = take((info.today || []).filter(function (g) { return g.status === 'in'; }));
   var today = take(info.today);
@@ -211,11 +212,30 @@ function watchBlock(L, S, G, feat) {
   /* the big games first, in the shared significance order (digest.featured); an older payload: the old pick score */
   var order = feat && feat.order ? feat.order.filter(Boolean) : [];
   var inPool = {}; pool.forEach(function (c) { inPool[String(c.id)] = 1; });
-  var picks = order.length ? order.filter(function (c) { return inPool[String(c.id)]; }).slice(0, 6) : pool.slice().sort(function (x, y) { return pickScore(y, L) - pickScore(x, L); }).slice(0, 6);
-  var when = fb ? 'this week' : 'today';
+  var picks = order.filter(function (c) { return c && inPool[String(c.id)]; }).slice(0, 6);
+  if (!picks.length) picks = pool.slice().sort(function (x, y) { return pickScore(y, L) - pickScore(x, L); }).slice(0, 6);
+  var when = watchWhen(picks.length ? picks : pool, fb);
   var seg = '<div class="qk-seg" id="ov-when" role="group" aria-label="Games"><button type="button" aria-pressed="true" data-value="picks">Big games</button><button type="button" aria-pressed="false" data-value="next"' + (pool.length ? '' : ' disabled') + '>Coming up</button><button type="button" aria-pressed="false" data-value="results"' + (G.last.length ? '' : ' disabled') + '>Latest results</button></div>';
   return { picks: picks, pool: pool, html: '<section class="qk-section cc-sec">' + QK.sectionHead({ kicker: 'What to watch ' + when, title: '<span id="ov-gh">Our calls</span>', html: true,
     sub: 'Our chance for each side, with a line on why it’s worth your time. ' + (fb ? 'Ranked teams carry their AP rank.' : 'Ranked and seeded teams carry their number.'), actions: seg }) + '<div id="ov-games"></div></section>' };
+}
+/* "What to watch today | tonight | this week | next": from the games on show, never "today" for later games. */
+function watchWhen(list, fb) {
+  var ws = (list || []).map(function (c) { var g = CC.game(c, CC.state.L); return g.status === 'live' ? 'Live now' : whenLabel(g); });
+  if (!ws.length) return fb ? 'this week' : 'next';
+  if (ws.every(function (w) { return w === 'Live now' || w === 'Today' || w === 'Tonight'; })) return ws.indexOf('Tonight') >= 0 && ws.indexOf('Today') < 0 ? 'tonight' : 'today';
+  var last = (list || []).map(function (c) { return Date.parse(c.date); }).filter(isFinite).sort(function (a, b) { return b - a; })[0];
+  return isFinite(last) && last - QK.now() < 7 * 864e5 ? 'this week' : 'next';
+}
+/* Nothing upcoming in the index (a stale snapshot, or a quiet midweek): the next slate from the schedule, the games
+   within a week of the next start, the big ones first (the old pick score). */
+function nextSlate(L, sched) {
+  var up = ((sched && sched.games) || []).filter(function (c) { return c.status === 'pre' && !QK.awaiting(CC.game(c, L)) && Date.parse(c.date) > QK.now() - 3600e3; })
+    .sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
+  if (!up.length) return [];
+  var t0 = Date.parse(up[0].date);
+  return up.filter(function (c) { return Date.parse(c.date) - t0 < 7 * 864e5; }).sort(function (x, y) { return pickScore(y, L) - pickScore(x, L); }).slice(0, 12)
+    .sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
 }
 function drawWatch(el, L, W, G) {
   var NUM = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six'];
@@ -247,7 +267,7 @@ CC.route('overview', function (el, p) {
   var actions = '<a class="qk-btn" href="' + esc(CC.href(L, 'games', null, S)) + '">All games</a><a class="qk-btn" href="' + esc(CC.href(L, 'standings', null, S)) + '">Standings</a>';
   el.innerHTML = U.head(title, esc(sub0), U.kicker(L, S), actions) + QK.skeleton('lines', 5);
   return Promise.all([CC.season(L, S), CC.load(CC.path(L, S, fb ? 'cfp.json' : 'bracket.json')),
-    CC.load(CC.lpath(L, 'history.json')), isCur ? Promise.resolve(null) : CC.load(CC.path(L, S, 'schedule.json'))]).then(function (a) {
+    CC.load(CC.lpath(L, 'history.json')), !isCur || !gameLists(L, info).today.concat(gameLists(L, info).next).some(function (c) { return c.status !== 'post'; }) ? CC.load(CC.path(L, S, 'schedule.json')) : Promise.resolve(null)]).then(function (a) {
     if (!U.alive(el)) return;
     var season = CC.ok(a[0]) ? a[0] : null, post = CC.ok(a[1]) ? a[1] : null, hist = CC.ok(a[2]) ? a[2] : null;
     if (!season) { el.innerHTML = U.head(title, '', U.kicker(L, S)) + U.missing('This season', a[0]); return; }
@@ -270,6 +290,7 @@ CC.route('overview', function (el, p) {
     var hl = isCur ? CC.copy(info.headline || '').replace(/^[^·]*·\s*/, '') : (champ ? CC.tname(L, champ) + ' won the title' : '');
     var G = isCur ? gameLists(L, info) : { live: [], today: [], next: [], last: [] };
     var feat = isCur ? pickFeatured(L, info, sim) : null;
+    if (isCur && !G.live.concat(G.today, G.next).some(function (c) { return c.status !== 'post'; }) && CC.ok(a[3])) G.next = nextSlate(L, a[3]);
     var W = isCur ? watchBlock(L, S, G, feat) : null;
     // title chances: ours only (no market on the overview)
     var titleRows = (isCur ? (info.title_odds || []) : []).filter(function (r) { return isNum(r.p); }).slice(0, 12);

@@ -178,7 +178,7 @@ function nextHTML(m) {
   return card('Who leaves next', 'The chance each rostered player is not with the club by ' + esc((d.horizons || {}).next) + ', split by how; ranked from the most likely' + (rows.length === 300 ? ' (the first 300)' : ''),
     col.legend + (rows.length ? board('mv-next', { dense: true, rank: true, maxHeight: 680, columns: [ENT(), { key: 'age', label: 'Age', num: true, fmt: v => n1(v) }, { key: 'value', label: (d.unit || 'WAR'), num: true, fmt: v => s2(v), tip: 'Value, the last two seasons blended 3:2' }, col.col],
       rows: rows.map(r => ({ pid: r[F.pid], name: nameOf(r[F.pid], r[F.name]), team: r[F.team], sub: (r[F.pos] || '') + ' · ' + BP.teamAbbr(r[F.team]), age: r[F.age], value: r[F.value], _mv: r, p_move: r[F.p_next] })) }) : QK.empty('Nobody here')),
-    { foot: '<span>' + esc((d.notes || []).slice(0, 2).join(' ')) + '</span><a href="#/methodology#who-moves-next">How →</a>' });
+    { foot: '<span class="bp-fn">' + esc((d.notes || []).slice(0, 2).join(' ')) + '</span><a href="#/methodology#who-moves-next">How →</a>' });
 }
 
 function feedHTML(mv) {
@@ -192,7 +192,7 @@ function feedHTML(mv) {
     { key: 'date', label: 'Date', fmt: v => esc(BP.fmtDate(v)) }, { key: 'kind', label: 'Move', fmt: (v, o) => '<span class="mv-k mv-' + esc(v) + '">' + esc(o.kl) + '</span>' }, ENT(),
     { key: 'from', label: 'From', fmt: v => (v ? esc(BP.teamAbbr(v)) : '') }, { key: 'to', label: 'To', fmt: v => (v ? esc(BP.teamAbbr(v)) : '') }, { key: 'detail', label: 'Detail', sort: false, fmt: v => '<span class="qk-muted">' + esc(v || '') + '</span>' }],
     rows: list.slice(0, 600).map(r => ({ date: r[F.date], kind: r[F.kind], kl: (mv.kinds || {})[r[F.kind]] || r[F.kind], pid: r[F.pid], name: nameOf(r[F.pid], N[r[F.pid]]), team: r[F.to] || r[F.from], sub: '', from: r[F.from], to: r[F.to], detail: r[F.detail] })) }) : QK.empty('Nothing here'),
-    { flush: true, foot: '<span>' + esc((mv.notes || []).join(' ')) + '</span>' });
+    { flush: true, foot: '<span class="bp-fn">' + esc((mv.notes || []).join(' ')) + '</span>' });
 }
 
 function ilHTML(mv) {

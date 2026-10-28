@@ -62,9 +62,12 @@ function filtered() { const q = GI.fold(ST.q.trim()); return ROWS.filter(r => (S
 function picks() {
   const P = D.picks || {};
   const box = (title, sub, list, fn) => GI.card(esc(title), sub.charAt(0).toUpperCase() + sub.slice(1), list && list.length ? '<ol class="gi-pick-l">' + list.map(fn).join('') + '</ol>' : GI.muted('None this week.'), { span: 4 });
-  const ply = z => { const r = BY[z.pid] || {}; return '<li><div class="gi-pick-top"><span>' + nm(r) + ' <span class="gi-tag">' + esc(z.pos) + '</span></span>' + (isNum(r[ST.f]) ? '<span class="gi-num">' + GI.num(r[ST.f], 1) + ' · ROS ' + GI.num(ros(r), 0) + '</span>' : '') + '</div><p class="gi-why">' + esc(z.why) + '</p></li>'; };
+  const why = t => String(t || '').replace(/(^|[^0-9.])1 (TD|sack|interception)s\b/g, '$11 $2');
+  const ply = z => { const r = BY[z.pid] || {}; return '<li><div class="gi-pick-top"><span>' + nm(r) + ' <span class="gi-tag">' + esc(z.pos) + '</span></span>' + (isNum(r[ST.f]) ? '<span class="gi-num">' + GI.num(r[ST.f], 1) + ' · ROS ' + GI.num(ros(r), 0) + '</span>' : '') + '</div><p class="gi-why">' + esc(why(z.why)) + '</p></li>'; };
+  /* a waiver target must be able to play this week: nobody ruled out, doubtful or on a reserve list (older builds listed them) */
+  const canPlay = z => { const r = BY[z.pid] || {}; return !/^(Out|Doubtful|IR)$/.test(String(r.inj || '')) && !/^(RES|PUP|SUS|NWT|EXE|RET|CUT|NON|UFA)$/.test(String(r.status || '')); };
   const tm = z => '<li><div class="gi-pick-top"><span>' + GI.teamChip(z.team) + ' v ' + esc(z.opp || '') + '</span><span class="gi-num">' + GI.num(z.proj, 1) + '</span></div><p class="gi-why">' + esc(z.why) + '</p></li>';
-  return GI.grid(box('Start', 'projected well above season rank (PPR)', P.start, ply) + box('Waiver targets', 'likely available; rising usage', P.waiver, ply) + box('Buy low', 'usage worth more points than scored so far', P.buy_low, ply) +
+  return GI.grid(box('Start', 'projected well above season rank (PPR)', P.start, ply) + box('Waiver targets', 'likely available and able to play; rising usage', (P.waiver || []).filter(canPlay), ply) + box('Buy low', 'usage worth more points than scored so far', P.buy_low, ply) +
     box('Sell high', 'scoring on touchdowns the usage does not support', P.sell_high, ply) + box('Breakouts', 'usage up over the last three games', P.breakout, ply) +
     box('Stream a D/ST', 'this week, with the next four', P.dst, tm) + box('Stream a kicker', 'this week, with the next four', P.k, tm)) +
     '<p class="gi-cap">Picks are computed in PPR from the same projections as the tables; the reasons are the model\'s inputs, not news. Model suggestions only.</p>';

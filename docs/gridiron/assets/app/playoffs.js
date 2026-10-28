@@ -104,7 +104,7 @@ GI.route('playoffs', function (el, params) {
     const sbm = (((d.bracket || {}).sim || {}).sb_matchups || []).slice(0, 10);
     const list = rows.filter(r => isNum(r.p_sb)).sort((a, b) => (b.p_sb || 0) - (a.p_sb || 0));
     el.innerHTML = GI.pageHead('Standings', S + ' playoff picture', esc(fmt) + (m.projected ? ' · <b>projected</b> from today\'s seeds' : ''), pager) + nav +
-      GI.card(m.projected ? 'Projected bracket' : 'Bracket', m.projected ? 'If the season ended today · each matchup with our win chance' : 'Our win chance for each game, the score once played', S < 2020 ? GI.muted('The bracket view follows the 14-team format (2020 on). The seeds and chances below still apply.') : bracketHTML(m)) +
+      GI.card(m.projected ? 'Projected bracket' : 'Bracket', m.projected ? 'If the season ended today: today’s seeds. Each team’s chance of reaching each round is in “Round by round” below; a game’s win chance appears once the matchup is set' : 'Our win chance for each game, the score once played', S < 2020 ? GI.muted('The bracket view follows the 14-team format (2020 on). The seeds and chances below still apply.') : bracketHTML(m)) +
       (d.league && window.QKL ? '<div id="po-race"></div>' : '') +
       GI.grid(GI.card('Super Bowl chances', 'Our chance from 20,000 simulated seasons', '<div id="po-sb"></div>' + QK.note('Even the favourite misses most seasons: a 20% chance means four seasons in five end without the trophy.'), { span: 7 }) +
         GI.card('Likeliest Super Bowls', 'Share of our simulated seasons', sbm.length ? GI.chartBox('po-sbm', 440, 'Likeliest Super Bowl matchups') : GI.muted('Matchups arrive with the season simulation.'), { span: 5 })) +

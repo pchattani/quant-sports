@@ -53,7 +53,12 @@ function draw(el, L, S, v, asked) {
   const roles = v.roles || ROLE;
   const tName = id => fx.teamName(L, id);
   let h = '';
-  if (asked) h += '<div class="card"><div class="pad">' + fx.muted('The ' + fx.esc(fx.seasonLabel(L, asked)) + ' regular season has not started, so this page shows ' + fx.esc(fx.seasonLabel(L, S)) + '. Each team\'s projected value for ' + fx.esc(fx.seasonLabel(L, asked)) + ' is on its team page ("Strengths and needs") and in the <a href="' + fx.href(L, 'trade') + '">trade simulator</a>.') + '</div></div>';
+  /* round 9: early in a season the current rates are shown, marked early (WAR is small and HPM noisy for a few weeks);
+     "has not started" only when the season really has not (the builder writes this season's rows from the first game) */
+  const maxGp = Math.max.apply(null, rows.map(r => r.gp || 0).concat([0]));
+  if (!asked && maxGp > 0 && maxGp < 20) h += '<div class="qk-note" style="margin-bottom:14px"><span class="qk-tag">Early</span> ' + maxGp + ' game' + (maxGp === 1 ? '' : 's') + ' into ' + fx.esc(fx.seasonLabel(L, S)) + ': WAR counts the season so far, so the totals are small, and the rates (HPM) move a lot until about 20 games. Read the order, not the size.</div>';
+  const notYet = asked && HW.phase(L) !== 'preseason' && Number(asked) === Number(HW.currentSeason(L));
+  if (asked) h += '<div class="card"><div class="pad">' + fx.muted('The ' + fx.esc(fx.seasonLabel(L, asked)) + (notYet ? ' value file has no players yet (it fills with the next build after the first games)' : ' regular season has not started') + ', so this page shows ' + fx.esc(fx.seasonLabel(L, S)) + '. Each team\'s projected value for ' + fx.esc(fx.seasonLabel(L, asked)) + ' is on its team page ("Strengths and needs") and in the <a href="' + fx.href(L, 'trade') + '">trade simulator</a>.') + '</div></div>';
   h += '<div class="card"><div class="card-header">Player value ' + fx.esc(fx.seasonLabel(L, S)) + ' <span class="card-sub">Wins above replacement (WAR): a player\'s HPM (impact per 100 possessions, above an average player) over the possessions the player was on the floor, measured from a replacement player (' + fx.signed(cur.replacement, 1) + ' per 100), at ' + fx.num(cur.points_per_win, 1) + ' points of margin per win (the game model\'s margin spread × √2π). Possessions = minutes × league pace (' + fx.num(cur.pace, 1) + ') / ' + fx.num(cur.game_minutes, 0) + '. <a href="#/methodology">Methodology</a></span></div>';
   const top = rows.filter(r => r.q).sort((a, b) => b.war - a.war);
   const best = v.best || {};

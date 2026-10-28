@@ -160,8 +160,8 @@ CC.route('team', function (el, p) {
     var defLow = dm ? !!dm.lower : !fb;
     var k = [{ label: 'Our rating', value: CC.signed(R.rating, 1), signal: true, pctl: pc('rating'), sub: (isNum(R.se) ? '± ' + CC.f(R.se, 1) + ' · ' : '') + (fb ? 'points v an average FBS team' : 'per 100 v an average D-I team'),
       tip: (fb ? 'Expected margin against an average FBS team on a neutral field' : 'Adjusted efficiency margin per 100 possessions') + '; ± is one standard error; the chip is the national percentile' }];
-    if (isNum(R.off)) k.push({ label: 'Offense', value: CC.f(R.off, 1), pctl: pc('off'), sub: fb ? 'points a game added' : 'adjusted points per 100' });
-    if (isNum(R.def)) k.push({ label: 'Defense', value: CC.f(R.def, 1), pctl: pc('def'), sub: defLow ? 'points allowed per 100 (lower is better)' : 'points a game prevented' });
+    if (isNum(R.off)) k.push({ label: 'Offence', value: CC.f(R.off, 1), pctl: pc('off'), sub: fb ? 'points a game added' : 'adjusted points per 100' });
+    if (isNum(R.def)) k.push({ label: 'Defence', value: CC.f(R.def, 1), pctl: pc('def'), sub: defLow ? 'points allowed per 100 (lower is better)' : 'points a game prevented' });
     if (CC.isCur(L, S)) k = k.concat(chanceTiles(L, sim));
     /* v4: the numbers are the black strip under the team-colour hero (QK.playerHeader strip), "The short version" after */
     html = html.replace('%STRIP_HTML%', QK.statStrip(k.slice(0, 6)));
@@ -177,7 +177,7 @@ CC.route('team', function (el, p) {
           var m0 = bk[m.id], pp0 = pc(m.id);
           if (!m0 || FL[m.id] || !isNum(pp0)) return null;
           var v0 = (stx[m.id] && isNum(stx[m.id].v)) ? stx[m.id].v : ((cat.teams[tid] || {}).values || {})[m.id];
-          return { label: m.d || m0.label, pctl: pp0, value: CC.fmtMetric(m0, v0), tip: (m.x || m0.desc || '') + (m.style ? ' Describes how the team plays, not how well: shown in grey.' : ''), style: !!m.style };
+          return { label: CC.uk(m.d || m0.label), pctl: pp0, value: CC.fmtMetric(m0, v0), tip: (m.x || m0.desc || '') + (m.style ? ' Describes how the team plays, not how well: shown in grey.' : ''), style: !!m.style };
         };
         var hRows = TG.m.filter(function (m) { return m.set === 'h'; }).map(rowOf).filter(Boolean);
         var sRows = TG.m.filter(function (m) { return m.set === 's'; }).map(rowOf).filter(Boolean);
@@ -187,11 +187,11 @@ CC.route('team', function (el, p) {
         if (FL[m0.key]) return;
         var v = (stx[m0.key] && isNum(stx[m0.key].v)) ? stx[m0.key].v : ((cat.teams[tid] || {}).values || {})[m0.key], pp = pc(m0.key);
         if (!isNum(pp)) return;
-        var row = { label: m0.label, pctl: pp, value: CC.fmtMetric(m0, v), tip: m0.desc || '' };
+        var row = { label: CC.uk(m0.label), pctl: pp, value: CC.fmtMetric(m0, v), tip: m0.desc || '' };
         if (/off|ppg|^ypp$|third|pass_epa|rush_epa|explosive|efg|tpar|ftr|orb|ast|^tov_rate|tp_pct|ft_pct/.test(m0.key) && !/allowed|opp_|def/.test(m0.key)) off.push(row);
         else if (/def|allowed|papg|opp_|drb|blk|stl/.test(m0.key)) def.push(row); else oth.push(row);
       });
-      if (!groups.length) groups = [{ label: 'Offense', rows: off }, { label: 'Defense', rows: def }, { label: 'Overall and schedule', rows: oth }];
+      if (!groups.length) groups = [{ label: 'Offence', rows: off }, { label: 'Defence', rows: def }, { label: 'Overall and schedule', rows: oth }];
     }
     var nTeams = cat && cat.teams ? Object.keys(cat.teams).length : null;
     var pcard = QK.pctCard({ title: 'Percentile rankings', peer: 'all ' + (nTeams ? nTeams + ' ' : '') + peers, sample: (isNum(R.games) && R.games > 0 ? R.games + ' games rated' : 'preseason ratings, no games yet') + ' · ' + CC.seasonLabel(L, S), groups: groups,

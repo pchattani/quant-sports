@@ -70,7 +70,8 @@ function floorText(L, cat, pos) {
   if (isNum(f.gp)) return f.gp + '+ games' + (isNum(f.mpg) ? ', ' + f.mpg + '+ min a game' : '');
   return '';
 }
-function posLabel(cat, pos) { var x = ((cat && cat.positions) || {})[pos]; return x && x.label ? x.label : pos; }
+/* one player's position, singular ("Forward", never the catalogue's group name "Forwards"; CC.posName) */
+function posLabel(cat, pos) { var n = CC.posName(CC.state.L, pos); if (n && n !== pos) return n; var x = ((cat && cat.positions) || {})[pos]; return x && x.label ? CC.uk(x.label) : pos; }
 
 CC.route('players', function (el, p) {
   var L = p.L, S = p.S, fb = CC.fb(L), q0 = p.query || {};

@@ -716,6 +716,23 @@ function pair(a, b) {
   }
   return [ca, cb];
 }
+/* Colours for several clubs on one chart (lines, dots): each club's colour lifted to 3:1 on the card, kept apart from
+ * every colour already given (kit rule QK.color.distinct); a club that clashes takes its alternate, else the next free
+ * chart slot (--c-1 ... --c-8). Returns the colours in the order of `teams`. */
+function distinctColours(teams) {
+  const out = [];
+  const ok = c => out.every(x => (QK.color.distinct ? QK.color.distinct(x, c) : QK.color.contrast(x, c) >= 1.6));
+  const slots = [1, 2, 3, 4, 5, 6, 7, 8].map(i => QK.cssVar('--c-' + i)).filter(c => QK.color.parse(c));
+  (teams || []).forEach(t => {
+    let c = tc(t);
+    if (!ok(c)) {
+      const alt = teamInfo(t).alt, a2 = QK.color.parse(alt) ? QK.color.team(alt) : null;
+      c = a2 && ok(a2) ? a2 : (slots.filter(ok)[0] || c);
+    }
+    out.push(c);
+  });
+  return out;
+}
 /* <a> to the team page. opts {abbr, short, name, season, mark: true (default) | false, dot}. */
 function teamLink(t, opts) {
   if (!t) return '<span class="qk-muted">—</span>';
@@ -1210,7 +1227,7 @@ return {
   otherTeam: otherTeam, driveResult: driveResult, gradeOf: gradeOf, choiceLabel: choiceLabel, gameState: gameState, isFinal: isFinal, isLive: isLive, isPre: isPre, isOT: isOT, isStale: isStale,
   homeLine: homeLine, spreadText: spreadText, surnameOf: surnameOf, qbText: qbText, weatherText: weatherText, titleProbs: titleProbs,
   player: player, playerName: playerName, playerShort: playerShort, playerSurname: playerSurname, playerHref: playerHref, playerLink: playerLink, playerColour: playerColour, canonTeam: canonTeam,
-  teamInfo: teamInfo, pair: pair, teamName: teamName, teamShort: teamShort, teamAbbr: teamAbbr, teamColour: teamColour, tc: tc, teamHref: teamHref, teamLink: teamLink, teamChip: teamChip, mark: mark,
+  teamInfo: teamInfo, pair: pair, distinctColours: distinctColours, teamName: teamName, teamShort: teamShort, teamAbbr: teamAbbr, teamColour: teamColour, tc: tc, teamHref: teamHref, teamLink: teamLink, teamChip: teamChip, mark: mark,
   gameHref: gameHref, matchupLink: matchupLink, coachHref: coachHref, coachLink: coachLink, weekHref: weekHref, standingsHref: standingsHref, playoffsHref: playoffsHref,
   compareHref: compareHref, glossHref: glossHref, ghref: ghref, sq: sq,
   GROUPS: GROUPS, GROUP_NAME: GROUP_NAME, GROUP_ONE: GROUP_ONE, groupOf: groupOf, SAMPLE: SAMPLE, sampleKey: sampleKey, sampleOf: sampleOf, scopeOk: scopeOk, metaOf: metaOf,

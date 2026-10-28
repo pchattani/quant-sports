@@ -16,6 +16,10 @@ SEASON_BOARDS = [("QB", "epa_db", "EPA / dropback"), ("QB", "anya", "ANY/A"), ("
 # single-season boards need a full season's volume (a hot September does not make an all-time list)
 SEASON_FLOOR = {"QB": ("att", 250), "RB": ("carries", 120), "WR": ("targets", 60), "TE": ("targets", 45), "K": ("fga", 18),
                 "P": ("punts", 40), "DEF": ("tackles", 40)}
+# single-season records in our data (1999 on), for "records in reach": [key, group (None = any), label]
+RECORD_KEYS = [("pass_yds", "QB", "Passing yards"), ("pass_td", "QB", "Passing touchdowns"), ("rush_yds", None, "Rushing yards"),
+               ("rush_td", None, "Rushing touchdowns"), ("rec_yds", None, "Receiving yards"), ("rec_td", None, "Receiving touchdowns"),
+               ("sacks", "DEF", "Sacks"), ("ints", "DEF", "Interceptions")]
 CAREER_BOARDS = [("QB", "pass_yds", "Passing yards"), ("QB", "pass_td", "Passing TD"), ("QB", "epa_total", "Total EPA (QB)"),
                  (None, "value", "Gridiron Value"), ("RB", "rush_yds", "Rushing yards"), ("RB", "rush_td", "Rushing TD"),
                  (None, "rec_yds", "Receiving yards"), (None, "rec_td", "Receiving TD"), ("DEF", "sacks", "Sacks"),
@@ -79,8 +83,22 @@ def build(rows_by_season: dict[int, dict | None], league: dict[int, dict | None]
                     e["team"] = r.get("team")
         rows = sorted(([p, e["name"], e["first"], e["last"], e["seasons"], round(e["v"], 2)] for p, e in tot.items()), key=lambda x: -x[5])
         career_boards[f"{(grp or 'all').lower()}_{k}"] = {"label": label, "group": grp, "key": k, "rows": rows[:25]}
+    # the single-season records in our data: the ten best seasons per key (a page takes the best before the season it shows)
+    records = {}
+    for k, grp, label in RECORD_KEYS:
+        cand = []
+        for s, rows in rows_by_season.items():
+            for pid, r in (rows or {}).items():
+                if grp is not None and r.get("group") != grp:
+                    continue
+                v = an.fnum((r.get("pv") or {}).get(k, (r.get("values") or {}).get(k)))
+                if v is not None and v > 0:
+                    cand.append([pid, r.get("name"), s, r.get("team"), round(v, 1)])
+        cand.sort(key=lambda x: (-x[4], x[2]))
+        records[k] = {"label": label, "group": grp, "rows": cand[:10]}
     trends = [league[s] for s in sorted(league) if league.get(s)]
     return {"ok": True, "updated_at": an.now(), "seasons": sorted(rows_by_season), "season_cols": ["pid", "name", "season", "team", "value", "plus"],
+            "season_records": records, "record_cols": ["pid", "name", "season", "team", "value"],
             "season_leaders": season_boards, "career_cols": ["pid", "name", "first", "last", "seasons", "total"], "career_leaders": career_boards,
             "league": trends, "era_note": "plus = 100 + 10 z within the season's qualified pool at the position (lower-is-better rates reversed).",
             "season_floor": {g: {"metric": k, "min": v} for g, (k, v) in SEASON_FLOOR.items()},

@@ -4,9 +4,14 @@
  *
  * Sections (docs/REDESIGN.md), each a group of routes with its own tab strip (SECTION_TABS below):
  *   Overview #/<L> · Games (scoreboard, game centre, odds board) · Standings (standings, postseason,
- *   awards, history) · Teams · Players (hitters, pitchers, leaderboards, prospects, player pages) ·
- *   Value & Moves (value, trade simulator, moves) · Fantasy · Lab (scatter lab, compare, parks,
- *   umpires) · Model (methodology, calibration, glossary, terms). Every old route still resolves.
+ *   awards, history) · Teams (teams, parks, umpires) · Scouting Room (the room, pitch types, compare, prospects,
+ *   player pages) · Value & Moves (value, trade simulator, moves) · Fantasy · Model (methodology, calibration,
+ *   glossary, terms). Every old route still resolves.
+ * Round 8 (28 Oct 2026, the Bullpen pilot): Players and the Lab merged into the Scouting Room (#/<L>/scout,
+ * bp-scout.js; the kit's QK.sections('baseball', { scout: true })). The old #/<L>/hitters, #/<L>/pitchers,
+ * #/<L>/leaders and #/<L>/lab redirect into it with their parameters mapped (redirectOf below: kind, within / pos, x, y,
+ * colour, q, a leaderboard's metric as the board's sort); the per-pitch-type leaderboards moved to #/<L>/arsenal
+ * ("Pitch types"). NPB keeps its own pages (no redirect while the level is npb).
  *
  * A static shell over JSON payloads under data/ (see oddsmarkets/baseball/PAYLOADS.md).
  * Every page module registers itself with BP.route(name, renderFn) and never edits this
@@ -17,10 +22,11 @@
  *   #/<L>/games[/<date>]               games of a day (YYYY-MM-DD)
  *   #/<L>/game/<gpk>                   game centre
  *   #/<L>/standings                    standings
- *   #/<L>/hitters  #/<L>/pitchers      catalogues
+ *   #/<L>/scout                        the Scouting Room (?view=board|chart|leaders, within, pos, kind, team, age, hand, q, p, cmp)
+ *   #/<L>/hitters  #/<L>/pitchers      catalogues (redirect to the Scouting Room)
  *   #/<L>/hitter/<pid>  #/<L>/pitcher/<pid>  #/player/<pid>   player pages
  *   #/<L>/teams  #/<L>/team/<tid>      teams
- *   #/<L>/leaders  #/<L>/lab           leaderboards, lab
+ *   #/<L>/leaders  #/<L>/lab           leaderboards, lab (redirect to the Scouting Room); #/<L>/arsenal: per-pitch-type boards
  *   #/<L>/value  #/<L>/trade           player value and the best at each position; the trade simulator
  *   #/postseason  #/markets  #/umpires  #/umpire/<id>  #/parks  #/park/<vid>  #/prospects
  *   #/history  #/awards  #/compare[/<a>[/<b>]]  #/calibration  #/glossary[/<key>]  #/methodology  #/disclaimer
@@ -203,6 +209,8 @@ addRoute('prospects', 'prospects', true);
 addRoute('history', 'history', true);
 addRoute('awards', 'awards', true);
 addRoute('lab', 'lab');
+addRoute('scout', 'scout');
+addRoute('arsenal', 'arsenal');
 addRoute('value', 'value');
 addRoute('trade', 'trade');
 addRoute('moves', 'moves');
@@ -218,48 +226,80 @@ addRoute('methodology', 'methodology', true);
 addRoute('disclaimer', 'disclaimer', true);
 
 const ALIASES = { home: 'hub', index: 'hub', '': 'hub', overview: 'hub', schedule: 'games', scores: 'games', fixtures: 'games', playoffs: 'postseason', docs: 'methodology',
-  leaderboards: 'leaders', umpire_scorecards: 'umpires', ballparks: 'parks', players: 'hitters', model: 'methodology', odds: 'markets', terms: 'disclaimer' };
+  leaderboards: 'leaders', umpire_scorecards: 'umpires', ballparks: 'parks', players: 'scout', scouting: 'scout', model: 'methodology', odds: 'markets', terms: 'disclaimer' };
 const TITLES = {
   hub: 'Overview', games: 'Games', game: 'Game centre', standings: 'Standings', postseason: 'Postseason', hitters: 'Hitters', pitchers: 'Pitchers',
   hitter: 'Hitter', pitcher: 'Pitcher', player: 'Player', teams: 'Teams', team: 'Team', leaders: 'Leaders', umpires: 'Umpires', umpire: 'Umpire',
-  parks: 'Parks', park: 'Park', prospects: 'Prospects', history: 'History', awards: 'Awards', lab: 'Lab', compare: 'Compare', value: 'Value', trade: 'Trade simulator', moves: 'Moves', fantasy: 'Fantasy',
+  parks: 'Parks', park: 'Park', prospects: 'Prospects', history: 'History', awards: 'Awards', lab: 'Lab', scout: 'Scouting Room', arsenal: 'Pitch types', compare: 'Compare', value: 'Value', trade: 'Trade simulator', moves: 'Moves', fantasy: 'Fantasy',
   markets: 'Forecast board', calibration: 'How we’re doing', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
 };
-/* The nine sections (QK.sections('baseball')) and the routes each one holds. */
+/* The sections (QK.sections('baseball', { scout: true }): Players and Lab are one "Scouting Room") and the routes each holds. */
 const SECTION_OF = { hub: 'overview', games: 'fixtures', game: 'fixtures', markets: 'fixtures', standings: 'standings', postseason: 'standings', awards: 'standings',
-  history: 'standings', teams: 'teams', team: 'teams', hitters: 'players', pitchers: 'players', hitter: 'players', pitcher: 'players', player: 'players',
-  leaders: 'players', prospects: 'players', value: 'value', trade: 'value', moves: 'value', fantasy: 'fantasy', lab: 'lab', compare: 'lab', parks: 'lab',
-  park: 'lab', umpires: 'lab', umpire: 'lab', methodology: 'model', calibration: 'model', glossary: 'model', disclaimer: 'model' };
+  history: 'standings', teams: 'teams', team: 'teams', hitters: 'scout', pitchers: 'scout', hitter: 'scout', pitcher: 'scout', player: 'scout',
+  leaders: 'scout', prospects: 'scout', value: 'value', trade: 'value', moves: 'value', fantasy: 'fantasy', lab: 'scout', scout: 'scout', arsenal: 'scout',
+  compare: 'scout', parks: 'teams', park: 'teams', umpires: 'teams', umpire: 'teams', methodology: 'model', calibration: 'model', glossary: 'model', disclaimer: 'model' };
 /* Tabs per section: [route, label, scope] with scope 'g' (a global route), 'mlb' (MLB only) or '' (per level). */
 const SECTION_TABS = {
   fixtures: [['games', 'Scoreboard', ''], ['markets', 'Forecast board', 'g']],
   standings: [['standings', 'Standings', ''], ['postseason', 'Postseason', 'g'], ['awards', 'Award races', 'g'], ['history', 'All-time', 'g']],
-  teams: [['teams', 'All teams', '']],
-  players: [['hitters', 'Hitters', ''], ['pitchers', 'Pitchers', ''], ['leaders', 'Leaderboards', ''], ['prospects', 'Prospects', 'g']],
+  teams: [['teams', 'All teams', ''], ['parks', 'Parks', 'g'], ['umpires', 'Umpires', 'g']],
+  scout: [['scout', 'Scouting Room', ''], ['arsenal', 'Pitch types', ''], ['compare', 'Compare', 'g'], ['prospects', 'Prospects', 'g']],
   value: [['value', 'Player value', ''], ['trade', 'Trade simulator', 'mlb'], ['moves', 'Moves & trades', 'mlb']],
   fantasy: [['fantasy', 'Fantasy baseball', 'mlb']],
-  lab: [['lab', 'Scatter lab', ''], ['compare', 'Compare', 'g'], ['parks', 'Parks', 'g'], ['umpires', 'Umpires', 'g']],
   model: [['methodology', 'Methodology', 'g'], ['calibration', 'How we’re doing', 'g'], ['glossary', 'Glossary', 'g'], ['disclaimer', 'Terms', 'g']]
 };
-const SECTION_LABEL = { overview: 'Overview', fixtures: 'Games', standings: 'Standings', teams: 'Teams', players: 'Players', value: 'Value & Moves', fantasy: 'Fantasy', lab: 'Lab', model: 'Model' };
+const SECTION_LABEL = { overview: 'Overview', fixtures: 'Games', standings: 'Standings', teams: 'Teams', scout: 'Scouting Room', value: 'Value & Moves', fantasy: 'Fantasy', model: 'Model' };
 const SECTION_BLURB = {
   fixtures: 'Every game, by the numbers: our win chance from a plate-appearance simulation with the lineups and starters, live while games are on.',
   standings: 'Divisions, wild cards, the postseason bracket and title chances from the season simulation.',
-  teams: 'Ratings, rosters, schedules, strengths and needs for every club.',
-  players: 'Percentiles against each player\'s position or role, expected stats, arsenals and projections.',
+  teams: 'Every club ranked, profiled and set against the rest: our ratings, the team metrics, strengths and weaknesses, head to head.',
+  scout: 'Every player and every metric, judged against the same position: sort the board, chart any two numbers, scan the leaders, open a profile, pin up to four to compare.',
   value: 'What every player is worth now and over the next five seasons, trades rated and simulated.',
   fantasy: 'Rotisserie and points rankings, dynasty values, picks, closers, steals and the weekly streamers.',
-  lab: 'Build your own charts: any two metrics, head-to-head comparisons, parks and umpires.',
   model: 'How the models work, how well they have done, and every metric defined.'
 };
 /* Detail pages: the list they belong to (the back link in the section bar). */
-const DETAIL_OF = { game: 'games', team: 'teams', hitter: 'hitters', pitcher: 'pitchers', player: 'hitters', park: 'parks', umpire: 'umpires' };
+const DETAIL_OF = { game: 'games', team: 'teams', hitter: 'scout', pitcher: 'scout', player: 'scout', park: 'parks', umpire: 'umpires' };
 const NAV_OF = { hub: 'hub', games: 'games', game: 'games', standings: 'standings', postseason: 'postseason', hitters: 'hitters', hitter: 'hitters',
   pitchers: 'pitchers', pitcher: 'pitchers', player: 'hitters', teams: 'teams', team: 'teams', leaders: 'leaders', umpires: 'umpires', umpire: 'umpires',
-  parks: 'parks', park: 'parks', prospects: 'prospects', history: 'history', awards: 'awards', lab: 'lab', compare: 'compare', value: 'value', trade: 'trade', moves: 'moves', fantasy: 'fantasy', markets: 'markets',
+  parks: 'parks', park: 'parks', prospects: 'prospects', history: 'history', awards: 'awards', lab: 'scout', scout: 'scout', arsenal: 'arsenal', compare: 'compare', value: 'value', trade: 'trade', moves: 'moves', fantasy: 'fantasy', markets: 'markets',
   calibration: 'calibration', glossary: 'glossary', methodology: 'methodology' };
 // Where a page lands when the level is switched (id pages fall back to their list).
-const SWITCH_TO = { game: 'games', hitter: 'hitters', pitcher: 'pitchers', player: 'hitters', team: 'teams' };
+const SWITCH_TO = { game: 'games', hitter: 'scout', pitcher: 'scout', player: 'scout', team: 'teams' };
+
+/* Round 8: the old Players and Lab routes open the Scouting Room, their parameters mapped (never on the npb level, whose
+   pages are its own). Returns the new hash, or null. */
+const POS_CODE = { C: 'C', '1B': '1B', '2B': '2B', '3B': '3B', SS: 'SS', CF: 'CF', LF: 'LF-RF', RF: 'LF-RF', OF: 'LF-RF', 'LF-RF': 'LF-RF', 'LF/RF': 'LF-RF', DH: 'DH', SP: 'SP', RP: 'RP' };
+function qstr(o) {
+  const k = Object.keys(o).filter(x => o[x] !== undefined && o[x] !== null && o[x] !== '');
+  return k.length ? '?' + k.map(x => encodeURIComponent(x) + '=' + encodeURIComponent(o[x])).join('&') : '';
+}
+function redirectOf(r) {
+  if (['hitters', 'pitchers', 'leaders', 'lab'].indexOf(r.name) < 0 || state.level === 'npb' || r.level === 'npb') return null;
+  const q = r.params.query || {}, out = {};
+  const L = r.level || state.level;
+  if (r.name === 'hitters') out.kind = 'hitter';
+  if (r.name === 'pitchers') out.kind = /^rp$/i.test(q.role || q.r || '') ? 'rp' : 'sp';
+  if (r.name === 'leaders') {
+    const k = String(q.k || '');
+    if (k === 'pitch') return '#/' + L + '/arsenal' + qstr(Object.assign({}, q));
+    out.kind = k === 'sp' || k === 'pitcher' ? 'sp' : k === 'rp' ? 'rp' : 'hitter';
+    out.view = q.m ? 'board' : 'leaders';
+    if (q.m) { out.add = q.m; out.sort = q.m; }
+  }
+  if (r.name === 'lab') {
+    out.view = 'chart';
+    const kd = String(q.kind || '');
+    if (kd === 'pitcher' || kd === 'sp') out.kind = 'sp'; else if (kd === 'rp') out.kind = 'rp'; else if (kd === 'hitter') out.kind = 'hitter';
+    ['x', 'y', 'color'].forEach(k => { if (q[k]) out[k] = q[k]; });
+  }
+  const pos = q.within === 'pos' ? q.pos : (r.name !== 'lab' ? q.pos : null);
+  if (pos && POS_CODE[String(pos).toUpperCase()]) { out.within = 'pos'; out.pos = POS_CODE[String(pos).toUpperCase()]; delete out.kind; }
+  if (q.team) out.team = q.team;
+  if (q.q) out.q = q.q;
+  if (q.s || q.season || q.y) out.s = q.s || q.season || q.y;
+  return '#/' + L + '/scout' + qstr(out);
+}
 
 function normPattern(s) {
   let p = String(s || '').trim().replace(/^#/, '').replace(/^\/+|\/+$/g, '').replace(/<(\w+)>/g, ':$1');
@@ -356,11 +396,19 @@ function render(opts) {
   runCleanups();
   closeSearch();
   setRecords({}); setForms({});
-  const r = parseHash();
+  let r = parseHash();
+  const rd = redirectOf(r);
+  if (rd) { try { history.replaceState(null, '', rd); } catch (e) { /* no history API */ } r = parseHash(rd); }
   const prevLevel = state.level, prevSeason = state.season;
   if (r.level) setLevelState(r.level);
   r.params.level = state.level;
-  const S = r.params.season || currentSeason(state.level);
+  let S = r.params.season || currentSeason(state.level);
+  // a dated scoreboard link names its own season: #/mlb/games/2025-10-01 opens 2025 even when the link (or the season
+  // picker) carries another year
+  if (r.name === 'games' && /^\d{4}-\d\d-\d\d$/.test(String(r.params.date || ''))) {
+    const y = Number(String(r.params.date).slice(0, 4));
+    if (y !== S && seasons(state.level).indexOf(y) >= 0) S = y;
+  }
   r.params.season = S;
   state.season = S;
   state.route = r.name;
@@ -870,7 +918,7 @@ function seriesText(s, short) {
   if (s.summary) return String(s.summary);
   const desc = s.desc || roundLabel(s.round) || '';
   return (short ? desc.replace('Wild Card Series', 'WC').replace('Division Series', 'DS').replace('Championship Series', 'CS') : desc) +
-    (isNum(s.game) ? ' · Game ' + s.game + (isNum(s.of) && !short ? ' of ' + s.of : '') : '');
+    (isNum(s.game) && !(Number(s.of) === 1 || / Game$/.test(desc)) ? ' · Game ' + s.game + (isNum(s.of) && !short ? ' of ' + s.of : '') : '');
 }
 
 // ── names, teams, links ────────────────────────────────────────────────────
@@ -1350,7 +1398,7 @@ function fillSeasonPicker() {
 /* Section hrefs follow the level and season shown. */
 function sectionHrefs(L, S) {
   return { overview: '#/' + L + sq(L, S), fixtures: href('games', L, S), standings: href('standings', L, S), teams: href('teams', L, S),
-    players: href('hitters', L, S), value: href('value', L, S), fantasy: '#/mlb/fantasy', lab: href('lab', L, S), model: '#/methodology' };
+    scout: href('scout', L, S), value: href('value', L, S), fantasy: '#/mlb/fantasy', model: '#/methodology' };
 }
 function updateHeader() {
   const L = state.level, S = state.season;
@@ -1413,7 +1461,7 @@ function init() {
   if (window.QK) {
     SHELL = QK.shell({
       sport: 'baseball', section: 'overview',
-      sections: QK.sections('baseball').map(s => Object.assign({}, s, { href: s.key === 'overview' ? '#/' : '#/' + s.key })),
+      sections: QK.sections('baseball', { scout: true }).map(s => Object.assign({}, s, { href: s.key === 'overview' ? '#/' : '#/' + s.key })),
       ctx: ctxHTML(),
       search: { load: loadSearch }
     });

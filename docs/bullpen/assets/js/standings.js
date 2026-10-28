@@ -16,6 +16,7 @@ const esc = BP.esc;
 const isNum = BP.isNum;
 let VIEW = 'div';
 let LO = null;      // the league module's options (docs/_design/league.js, QKL) for the season on show, or null
+let SIMCOLS = true; // false on a level with no season simulation (Triple-A: index.json levels.aaa.sim is false): no chance columns
 
 /* QKL options from season.json's "league" block (oddsmarkets/baseball/analytics/race.py): the clubs, the race chart's
    groups (divisions, then the two leagues) and the race log (data/<L>/race_log.json through the site's cached loader). */
@@ -155,17 +156,17 @@ function divisionTable(list, L, S) {
       { v: r.rs, html: esc(isNum(r.rs) ? r.rs : '—'), cls: 'hide-sm' }, { v: r.ra, html: esc(isNum(r.ra) ? r.ra : '—'), cls: 'hide-sm' },
       { v: r.rd, html: isNum(r.rd) ? '<span class="' + (r.rd > 0 ? 'edge-pos' : r.rd < 0 ? 'edge-neg' : '') + '">' + BP.signed(r.rd, 0) + '</span>' : '—' },
       { v: r.pythag_w, html: isNum(r.pythag_w) ? BP.record(r.pythag_w, r.pythag_l) + (isNum(luck) && Math.abs(luck) >= 3 ? ' <span class="' + (luck > 0 ? 'edge-pos' : 'edge-neg') + '" title="Wins above Pythagorean record">' + BP.signed(luck, 0) + '</span>' : '') : '—', cls: 'hide-sm' },
-      { v: ew, html: isNum(ew) ? BP.record(ew, el) : '—', cls: 'hide-sm', title: 'Expected record from our team ratings (offence, defence, pitching)' },
-      oddsCell(s.p_postseason), Object.assign(oddsCell(s.p_division), { cls: 'hide-sm' }), Object.assign(oddsCell(s.p_bye), { cls: 'hide-sm' }), oddsCell(s.p_ws),
-      Object.assign(magicCell(r), { align: 'right', cls: 'hide-sm' })].concat(LO ? [profileCell(r)] : []) };
+      { v: ew, html: isNum(ew) ? BP.record(ew, el) : '—', cls: 'hide-sm', title: 'Expected record from our team ratings (offence, defence, pitching)' }]
+      .concat(SIMCOLS ? [oddsCell(s.p_postseason), Object.assign(oddsCell(s.p_division), { cls: 'hide-sm' }), Object.assign(oddsCell(s.p_bye), { cls: 'hide-sm' }), oddsCell(s.p_ws),
+        Object.assign(magicCell(r), { align: 'right', cls: 'hide-sm' })] : []).concat(LO ? [profileCell(r)] : []) };
   });
   return BP.tableHTML([{ label: 'Team' }, { label: 'W', align: 'right' }, { label: 'L', align: 'right' }, { label: 'Pct', align: 'right' }, { label: 'GB', align: 'right' },
     { label: 'RS', align: 'right', cls: 'hide-sm' }, { label: 'RA', align: 'right', cls: 'hide-sm' }, { label: 'Diff', align: 'right' },
     { label: 'Pythag', align: 'right', cls: 'hide-sm', title: 'Pythagorean record from runs scored and allowed (exponent 1.83); the figure is wins above it' },
-    { label: 'Expected', align: 'right', cls: 'hide-sm', title: 'Our expected record from the team ratings' },
-    { label: 'Playoffs', align: 'right', title: 'Our chance of a postseason place (season simulation)' }, { label: 'Division', align: 'right', cls: 'hide-sm' },
-    { label: 'Bye', align: 'right', cls: 'hide-sm', title: 'A top-two seed: straight to the Division Series' }, { label: 'WS', align: 'right', title: 'Our World Series chance' },
-    { label: 'Magic', align: 'right', cls: 'hide-sm', title: 'Division magic number: wins plus rival losses to clinch' }].concat(LO ? [PROFILE_COL] : []), rows, { compact: true, cls: 'std-table' });
+    { label: 'Expected', align: 'right', cls: 'hide-sm', title: 'Our expected record from the team ratings' }]
+    .concat(SIMCOLS ? [{ label: 'Playoffs', align: 'right', title: 'Our chance of a postseason place (season simulation)' }, { label: 'Division', align: 'right', cls: 'hide-sm' },
+      { label: 'Bye', align: 'right', cls: 'hide-sm', title: 'A top-two seed: straight to the Division Series' }, { label: 'WS', align: 'right', title: 'Our World Series chance' },
+      { label: 'Magic', align: 'right', cls: 'hide-sm', title: 'Division magic number: wins plus rival losses to clinch' }] : []).concat(LO ? [PROFILE_COL] : []), rows, { compact: true, cls: 'std-table' });
 }
 function wildcardTable(list, L, S) {
   // the division leaders sit out; the rest are ranked by win percentage, the cut after the third
@@ -218,9 +219,10 @@ function ratingsPanel(el, all, L, S) {
 
 function render(el, params) {
   const L = params.level, S = params.season;
-  el.innerHTML = QK.sectionHead({ kicker: 'Standings · ' + BP.levelName(L) + ' ' + S, title: 'The table', sub: 'Records, run differential, Pythagorean and expected records, and our chances from the season simulation.',
+  const simOn = BP.levelInfo(L).sim !== false;
+  el.innerHTML = QK.sectionHead({ kicker: 'Standings · ' + BP.levelName(L) + ' ' + S, title: 'The table', sub: 'Records, run differential, Pythagorean and expected records' + (simOn ? ', and our chances from the season simulation.' : '.'),
     actions: '<a class="qk-btn" href="' + BP.ghref('postseason') + '">Postseason</a><a class="qk-btn" href="' + BP.href('teams', L, S) + '">Teams</a>' }) +
-    QK.note('<b>Pythagorean</b> is the record a club’s runs scored and allowed usually buy; a gap to the real record is mostly close-game luck. <b>Postseason 60%</b> means the club made it in about 6 of every 10 simulated seasons.') + '<div id="std-body">' + QK.skeleton('card', 2) + '</div>';
+    QK.note('<b>Pythagorean</b> is the record a club’s runs scored and allowed usually buy; a gap to the real record is mostly close-game luck. ' + (simOn ? '<b>Postseason 60%</b> means the club made it in about 6 of every 10 simulated seasons.' : '')) + '<div id="std-body">' + QK.skeleton('card', 2) + '</div>';
   return BP.loadYear('season.json', L, S).then(d => {
     if (!el.isConnected) return null;
     if (BP.ok(d) && (d.standings || d.sim)) return { d: d, rows: rowsOf(d) };
@@ -238,6 +240,8 @@ function render(el, params) {
     const divOrder = Object.keys(divs).sort((a, b) => { const ia = BP.DIVISIONS.indexOf(a), ib = BP.DIVISIONS.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b); });
     const d = res.d || {};
     LO = res.fallback ? null : leagueOpts(d, L, S);
+    SIMCOLS = BP.levelInfo(L).sim !== false;
+    if (!SIMCOLS && VIEW === 'wc') VIEW = 'div';
     const draw = () => {
       const box = document.getElementById('std-view');
       if (VIEW === 'div') {
@@ -262,11 +266,13 @@ function render(el, params) {
     if (best) tiles.push({ label: 'Best record', value: BP.teamAbbr(best.tid) + ' ' + best.w + '-' + best.l, sub: BP.fmtAvg(best.pct), href: BP.teamHref(best.tid, L, S) });
     if (rdb) tiles.push({ label: 'Best run differential', value: BP.teamAbbr(rdb.tid) + ' ' + BP.ui.signed(rdb.rd, 0), sub: rdb.rs + ' scored, ' + rdb.ra + ' allowed', href: BP.teamHref(rdb.tid, L, S) });
     if (lk) tiles.push({ label: 'Luckiest', value: BP.teamAbbr(lk.r.tid) + ' ' + BP.ui.signed(lk.v, 1), sub: 'wins above the Pythagorean record', href: BP.teamHref(lk.r.tid, L, S) });
-    body.innerHTML = (tiles.length ? '<div class="bp-kpis">' + QK.stats(tiles) + '</div>' : '') + '<div class="toggle-row std-tabs" id="std-tabs">' + BP.toggles([{ key: 'div', label: 'Divisions' }, { key: 'wc', label: 'Wild card' }, { key: 'rt', label: 'Ratings and luck' }], VIEW, 'data-v') + '</div>' +
+    const tabs = [{ key: 'div', label: 'Divisions' }].concat(SIMCOLS ? [{ key: 'wc', label: 'Wild card' }] : []).concat([{ key: 'rt', label: 'Ratings and luck' }]);
+    body.innerHTML = (tiles.length ? '<div class="bp-kpis">' + QK.stats(tiles) + '</div>' : '') + '<div class="toggle-row std-tabs" id="std-tabs">' + BP.toggles(tabs, VIEW, 'data-v') + '</div>' +
       '<div id="std-view"></div>' + (LO ? '<div id="std-race"></div>' : '') + (window.QKL && QKL.leaders ? '<div id="std-perf"></div>' : '') + (LO ? '<div id="std-shape"></div>' : '') +
       '<div class="section-note">' + (res.fallback ? 'Computed from the final regular-season games while the season payload is built; our chances and expected records arrive with it. ' : '') +
-      'Chances: ' + (d.sim && (d.sim.n_sims || d.sim.sims) ? BP.int(d.sim.n_sims || d.sim.sims) + ' ' : '') + 'simulations of the rest of the season and the bracket from our team ratings (x: clinched a place, y: the division, z: the division and a bye, e: eliminated). ' +
-      'Pythagorean records use exponent 1.83. Magic numbers count wins plus division-rival losses to clinch.</div>';
+      (SIMCOLS ? 'Chances: ' + (d.sim && (d.sim.n_sims || d.sim.sims) ? BP.int(d.sim.n_sims || d.sim.sims) + ' ' : '') + 'simulations of the rest of the season and the bracket from our team ratings (x: clinched a place, y: the division, z: the division and a bye, e: eliminated). ' :
+        'We do not simulate the Triple-A season, so the table shows records, run differential and our team ratings only. ') +
+      'Pythagorean records use exponent 1.83.' + (SIMCOLS ? ' Magic numbers count wins plus division-rival losses to clinch.' : '') + '</div>';
     BP.wireToggles(document.getElementById('std-tabs'), 'data-v', k => { VIEW = k; draw(); });
     draw();
     if (LO) {

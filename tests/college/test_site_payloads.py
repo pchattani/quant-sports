@@ -173,3 +173,21 @@ def test_featured_prefers_the_big_game_over_the_closest(tmp_path):
     ids = [x["id"] for x in f["today"]]
     assert ids[0] == "11" and (ids.index("10") > 0 if "10" in ids else True)
     assert "#3 v #5" in f["today"][0]["why"] and "two title contenders" in f["today"][0]["why"]
+
+
+def test_pick_games_reaches_the_next_slate():
+    """A Sunday in football: one Tuesday game in the next 3 days, the Saturday slate four days later. "What to
+    watch" must still get Saturday (round 9: it was empty Sunday to Wednesday)."""
+    now = datetime(2026, 10, 25, 16, 0, tzinfo=timezone.utc)            # Sunday noon Eastern
+    cards = [fixture.card("tue", "2026-10-27T23:30:00Z", "pre", "1", "2", p=0.5)]
+    cards += [fixture.card(f"sat{i}", f"2026-10-31T{16 + i % 8:02d}:00:00Z", "pre", "1", "2", p=0.5) for i in range(12)]
+    cards += [fixture.card("next_sat", "2026-11-07T16:00:00Z", "pre", "1", "2", p=0.5)]
+    today, nxt, last = site.pick_games(cards, now)
+    ids = [c["id"] for c in nxt]
+    assert "tue" in ids and sum(1 for i in ids if i.startswith("sat")) == 12 and "next_sat" not in ids
+
+
+def test_next_games_carry_the_featured_games():
+    cards = [fixture.card("a", "2026-10-20T16:00:00Z", "pre", "1", "2", p=0.5), fixture.card("b", "2026-10-24T16:00:00Z", "pre", "1", "2", p=0.5)]
+    out = site.with_featured(cards, [], [cards[0]], {"today": [], "next": [{"id": "b"}], "week": None})
+    assert [c["id"] for c in out] == ["a", "b"]

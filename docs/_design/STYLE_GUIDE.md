@@ -249,6 +249,25 @@ All builders return HTML strings unless noted. Signatures are in `quant.js` / `q
 | Note, aside, mark | `QK.note`, `QK.aside`, `QK.mark` | the explain strip on `--s-2`; ▸ in volt; the key phrase in volt |
 | v1 (kept) | `QK.kpi`, `QK.matchCard`, `QK.tick`, `QK.mvm`, `QK.table`, `QK.tableHTML`, `QK.pctlBars`, `QK.pctlChip` | restyled |
 
+**Round 8: the Scouting Room and the Teams page** (`scout.js`, loaded after `quant-charts.js`; pilot: the Bullpen)
+
+| Component | Builder | Where |
+|---|---|---|
+| Nav switch | `QK.sections(sport, { scout: true })`: "Players" becomes "Scouting Room" (`#/scout`), "Lab" is hidden | every site at rollout, one line |
+| Control bar | `QK.scoutBar([{ label, html, cls }])`, with `QK.within.html` above it | the one bar that drives every Scouting Room view |
+| Board | `QK.board(el, { sets, meta, rows, val, peers, ranked, lead, sort, page, pin, onPick, onState, csv })` | the deep table: column-set chips, any metric added, percentile cells against the peers, sticky name, top 50 then "Show all", "Download CSV" of what is on screen |
+| Heat grid | `QK.heatGrid(el, spec)` (the Board's spec; every row, filled cells, Values or Percentiles) | the team profile grid |
+| Power board | `QK.powerBars(rows, { groups, parts, valueLabel, unit, formN })` | clubs ranked by our rating, a bar split into parts around zero, the total as a volt tick |
+| Leader card | `QK.leaderCard({ title, ours, top, bottom, stripId })` + `QKC.strip(el, { values, xName, fmt, lower })` | small multiples: top five, bottom three, a dot strip with the median |
+| Profile | `QK.drawer.open({ html: QK.profile(o) })` | selecting a player anywhere opens it; no page change |
+| Compare tray | `QK.tray({ max: 4, item, body: ids => QK.trayCompare(o), href })` | pin up to four, side by side on percentile bars |
+| Strengths | `QK.strengths({ best, worst })` | a club's three best and three worst metrics as percentile chips |
+| Tape gap | `QK.tape({ ..., gap: true })` | head to head: the gap in percentile points under each metric |
+
+The CSV helpers are `QK.csv(cols, rows)` and `QK.download(name, text)`. `QK.formDots(f, n)` shows the last n results
+(the power board shows ten). `QKC.scatter` takes `onClick(point)` (the drawer instead of a page change) and `pad: '8%'`.
+The showcase has a "Scouting Room" block (`showcase.html#scouting`).
+
 Glossary tooltips stay: any `data-tip`, and every known column abbreviation (`QK.GLOSS`). Tooltips are black with a
 volt edge.
 

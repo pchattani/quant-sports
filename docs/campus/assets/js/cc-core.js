@@ -205,7 +205,7 @@ CC.game = function (c, L) {
     home: CC.side(L, c, 'home'), away: CC.side(L, c, 'away'), hs: isNum(c.hs) ? c.hs : null, as: isNum(c.as) ? c.as : null,
     p_home: isNum(m.p_home) ? m.p_home : null, market_home: mk && isNum(mk.p_home) ? mk.p_home : null, market_src: mk ? CC.mkSource(mk) || undefined : undefined,
     /* no live chance in the payload: a live game shows our pre-game call, labelled so (kit v3) */
-    pre_only: st === 'live' ? true : undefined,
+    pre_only: st === 'live' ? true : undefined, neutral: c.neutral ? true : undefined,
     note: '', period: per, clock: c.clock, href: CC.gameHref(L, c.id, c.season)
   };
 };
@@ -249,7 +249,24 @@ CC.unit = function (s) { return String(s || '').replace(/DL\/edge/gi, 'Defensive
 /* Payload copy in our voice (headlines written by the builder): "title odds" -> "title chances". Still needed for the
  * local payloads: index.json headlines and the basketball season.json say "title odds" (23 Oct 2026; the deployed
  * index.json is clean, so this goes after the next local rebuild). DL/edge (CC.unit) is the payloads' unit name and stays. */
-CC.copy = function (s) { return String(s || '').replace(/\btitle odds\b/gi, 'title chances').replace(/\bodds\b/gi, 'chances'); };
+CC.copy = function (s) { return CC.uk(String(s || '').replace(/\btitle odds\b/gi, 'title chances').replace(/\bodds\b/gi, 'chances')); };
+/* British spelling for payload labels (round 9): the builders write "Offence" / "Defence" from 28 Oct 2026; payloads
+ * built before that still say "Offense" / "Defense" until their next build. */
+CC.uk = function (s) { return String(s === undefined || s === null ? '' : s).replace(/\b(O|o)ffense/g, '$1ffence').replace(/\b(D|d)efense/g, '$1efence').replace(/\bCenters?\b/g, 'Centre'); };
+/* One player's position in words, singular ("Guard", not the catalogue's plural group name "Guards"). */
+var POS_NAME = { QB: 'Quarterback', RB: 'Running back', WR: 'Wide receiver', TE: 'Tight end', OL: 'Offensive line', DL: 'Defensive line', LB: 'Linebacker', DB: 'Defensive back',
+  K: 'Kicker', P: 'Punter', G: 'Guard', F: 'Forward', C: 'Centre', W: 'Wing', B: 'Big' };
+CC.posName = function (L, pos) { return POS_NAME[String(pos || '').toUpperCase()] || String(pos || ''); };
+/* Does a game have its own page? Game pages are written for the current season and the previous season's
+ * postseason (PAYLOADS.md size budget; football's conference title games are not among them). Other games link to
+ * the recap card on the game route, which then reads the schedule only (no 404 for a file never built). */
+CC.hasPage = function (L, c, S) {
+  var s = Number((c && c.season) || S);
+  if (CC.isCur(L, s)) return true;
+  if (s !== Number(CC.cur(L)) - 1 || !c) return false;
+  var st = c.stype || 'reg';
+  return st !== 'reg' && st !== 'pre' && st !== 'exh' && !(CC.fb(L) && st === 'conf');
+};
 
 /* ── comparison metric sets (METRICS_SPEC.md; assets/js/cc-metrics.js, generated from docs/_design/metrics/college.json) ──
  * Loaded on demand by the pages that compare (players, player, teams, team, lab), so first loads do not grow. */

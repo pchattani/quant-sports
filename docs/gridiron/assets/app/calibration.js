@@ -99,8 +99,7 @@ function gamesSection(d, out, read) {
     k.tile('Coin flip', k.num(Math.LN2, 4), 'log-loss of 50/50')]);
   h += '<div class="gq-pad" id="cal-table"></div>';
   h += '<div class="gi-o2"><div><div class="gq-sub-head">Reliability: who wins</div><div id="cal-rel" class="gi-chart"></div></div><div><div class="gq-sub-head">Log-loss by season</div><div id="cal-years" class="gi-chart"></div></div></div>';
-  const books = G.books || {};
-  if (Object.keys(books).length) h += '<div class="gq-sub-head">ESPN closing lines by book (2017 on), each against the model on the same games</div><div id="cal-books"></div>';
+  /* one closing-line reference (the de-vigged consensus close above), no per-sportsbook table (round 9) */
   h += '<div class="gi-o2"><div><div class="gq-sub-head">Against the spread: P(home covers the closing spread)</div><div id="cal-ats"></div><div id="cal-ats-c" class="gi-chart"></div></div>' +
     '<div><div class="gq-sub-head">Totals: P(over the closing total)</div><div id="cal-tot"></div><div id="cal-tot-c" class="gi-chart"></div></div></div>';
   if (G.hfa_by_season && Object.keys(G.hfa_by_season).length > 2) h += '<div class="gq-sub-head">Home-field advantage by season (points, fitted)</div><div id="cal-hfa" class="gi-chart"></div>';
@@ -137,11 +136,7 @@ function gamesSection(d, out, read) {
       GI.ch.lines(node, names.map(x => ({ name: lab(x), x: seasons.map(Number), y: seasons.map(s => ((PS[s] || {})[x] || {}).logloss), colour: COL[x] || null, dash: /market/.test(x), symbol: true }))
         .concat([{ name: 'Coin', x: seasons.map(Number), y: seasons.map(() => Math.LN2), colour: '#7d8590', dash: true }]), { yFmt: v => GI.num(v, 3), xFmt: String, xLabel: String, xName: 'Season', yName: 'Log-loss' });
     } else if (node) { node.innerHTML = k.muted('One season only.'); node.style.height = 'auto'; }
-    if (Object.keys(books).length) {
-      k.set('cal-books', k.table([{ label: 'Book' }, { label: 'Games', align: 'right' }, { label: 'Book log-loss', align: 'right' }, { label: 'Model, same games', align: 'right' }, { label: 'Model v book', sortable: false }],
-        Object.keys(books).map(b => { const x = books[b], bk = x.book || {}, mo = x.model_same_games || {};
-          return [{ v: b, html: '<strong>' + k.esc(b) + '</strong>' }, { v: bk.n, html: k.int(bk.n) }, { v: bk.logloss, html: k.num(bk.logloss, 4) }, { v: mo.logloss, html: k.num(mo.logloss, 4) }, { v: '', html: vchip(verdict(mo.logloss, bk.logloss, true)) }]; }), { compact: true }));
-    }
+  /* one closing-line reference (the de-vigged consensus close above), no per-sportsbook table (round 9) */
     side('cal-ats', 'cal-ats-c', G.ats, 'covers', [], 'Against the spread');
     side('cal-tot', 'cal-tot-c', G.totals, 'overs', [], 'Totals');
     if (G.hfa_by_season && k.$('cal-hfa')) { const xs = Object.keys(G.hfa_by_season).sort(); GI.ch.lines('cal-hfa', [{ name: 'Home-field advantage', x: xs.map(Number), y: xs.map(s => G.hfa_by_season[s]), symbol: true, area: true }], { legend: false, yFmt: v => GI.num(v, 1) + ' pts', xFmt: String, xLabel: String, yMin: 0, xName: 'Season', yName: 'Home-field advantage (pts)' }); }
@@ -159,7 +154,7 @@ function side(id, cid, A, what, read, title, textOnly) {
   const se = k.isNum(pk.win_rate) && pk.n ? Math.sqrt(pk.win_rate * (1 - pk.win_rate) / pk.n) : null;
   const pv = k.isNum(pk.win_rate) ? verdict(pk.win_rate, 0.5, false, se) : null;
   let h = k.tiles([k.tile('Scored', k.int(A.n), 'pushes left out'), k.tile('Log-loss', k.num(A.logloss, 4), 'coin ' + k.num(coin, 4) + ' · ' + (v === 'tie' ? 'a tie' : v === 'win' ? 'better than a coin' : 'worse than a coin')),
-    k.isNum(pk.win_rate) ? k.tile('Model\'s side (P ≥ 55%)', k.pct(pk.win_rate, 1), k.int(pk.n) + ' games' + (se ? ' · ±' + k.num(200 * se, 1) + ' pp (2 SE)' : '') + ' · break-even at −110 is 52.4%') : '']);
+    k.isNum(pk.win_rate) ? k.tile('Model\'s side (P ≥ 55%)', k.pct(pk.win_rate, 1), k.int(pk.n) + ' games' + (se ? ' · ±' + k.num(200 * se, 1) + ' pp (2 SE)' : '') + ' · a coin is 50%') : '']);
   if (k.isNum(A.rmse_model_total)) h += '<div class="pg-note gq-note">Total points RMSE: model ' + k.num(A.rmse_model_total, 2) + ', closing total ' + k.num(A.rmse_market_total, 2) + ' (' + ({ tie: 'a tie', win: 'model closer', lose: 'market closer' })[verdict(A.rmse_model_total, A.rmse_market_total, true)] + ').</div>';
   if (!textOnly) {
   k.set(id, h.replace('kpi-grid gq-tiles', 'kpi-grid gq-tiles gq-tiles-3'));
@@ -169,7 +164,7 @@ function side(id, cid, A, what, read, title, textOnly) {
   }
   read.push('<p><strong>' + title + '.</strong> Against the closing ' + (what === 'covers' ? 'spread' : 'total') + ', the model\'s probability scores ' + k.num(A.logloss, 4) + ' against a coin\'s ' + k.num(coin, 4) + ' over ' + k.int(A.n) + ' games: ' +
     (v === 'tie' ? 'a tie with a coin, which is what a closing line should allow. ' : v === 'win' ? 'better than a coin. ' : 'worse than a coin: the model adds noise to the closing number here. ') +
-    (k.isNum(pk.win_rate) ? 'Where it leans 55% or more, its side ' + (what === 'covers' ? 'covered' : 'won') + ' ' + k.pct(pk.win_rate, 1) + ' of ' + k.int(pk.n) + (se ? ' (±' + k.num(200 * se, 1) + ' points)' : '') + ': ' + (pv === 'tie' ? 'a tie with 50%.' : pv === 'win' ? (pk.win_rate < 0.524 ? 'above 50% but below 52.4% (the break-even at standard −110 lines).' : 'above the 52.4% break-even; treat as provisional.') : 'below 50%.') : '') + '</p>');
+    (k.isNum(pk.win_rate) ? 'Where it leans 55% or more, its side ' + (what === 'covers' ? 'covered' : 'won') + ' ' + k.pct(pk.win_rate, 1) + ' of ' + k.int(pk.n) + (se ? ' (±' + k.num(200 * se, 1) + ' points)' : '') + ': ' + (pv === 'tie' ? 'a tie with 50%.' : pv === 'win' ? 'above 50%, a small lean on a sample this size; treat it as provisional.' : 'below 50%.') : '') + '</p>');
 }
 
 /* Season odds (calibration.json "season_sim": {metrics: {playoffs, div, bye, conf, sb: score + by_week}, n_sims, check_weeks}). */

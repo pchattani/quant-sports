@@ -179,11 +179,18 @@ function seasonRows(season) {
 /* Read lazily after the page draws: <S>/leaders.json (75 KB), the player files of the leaders on the value boards (about
  * 7 KB each, thirty at most) and last season's season.json (40 KB). Nothing here is about how our forecasts score. */
 const GROUP_PL = { qb: 'quarterbacks', rb: 'running backs', wr: 'receivers', te: 'tight ends', edge: 'pass rushers', idl: 'interior linemen', lb: 'linebackers', cb: 'cornerbacks', s: 'safeties' };
-/* single-season records (regular season), public and long-standing */
-const RECORDS = [['QB', 'pass_yds', 5477, 'Peyton Manning, 2013', 'passing yards'], ['QB', 'pass_td', 55, 'Peyton Manning, 2013', 'passing touchdowns'],
-  ['RB', 'rush_yds', 2105, 'Eric Dickerson, 1984', 'rushing yards'], ['RB', 'rush_td', 28, 'LaDainian Tomlinson, 2006', 'rushing touchdowns'],
-  ['WR', 'rec_yds', 1964, 'Calvin Johnson, 2012', 'receiving yards'], ['WR', 'rec_td', 23, 'Randy Moss, 2007', 'receiving touchdowns'],
-  ['DEF', 'sacks', 22.5, 'Michael Strahan, 2001, and T.J. Watt, 2021', 'sacks']];
+/* the leader boards a record chase reads: [leaders.json group, key, the words]; the record itself is the best season in
+   our play-by-play before this one (history.json season_records, 1999 on), never a hard-coded figure */
+const RECORDS = [['QB', 'pass_yds', 'passing yards'], ['QB', 'pass_td', 'passing touchdowns'], ['RB', 'rush_yds', 'rushing yards'], ['RB', 'rush_td', 'rushing touchdowns'],
+  ['WR', 'rec_yds', 'receiving yards'], ['WR', 'rec_td', 'receiving touchdowns'], ['DEF', 'sacks', 'sacks']];
+/* the record before season S: the best row of history.json season_records[key] from an earlier season (ties: every holder) */
+function recordBefore(hist, key, S) {
+  const b = ((hist && hist.season_records) || {})[key];
+  const rows = ((b && b.rows) || []).filter(r => isNum(r[2]) && r[2] < S && isNum(r[4]));
+  if (!rows.length) return null;
+  const top = rows[0][4], who = rows.filter(r => r[4] === top);
+  return { value: top, who: who.map(r => r[1] + ', ' + r[2]).join(', and ') };
+}
 const VALUE_BOARDS = [['QB', 'composite'], ['RB', 'value'], ['WR', 'value'], ['TE', 'value'], ['DEF', 'def_value']];
 const SPOT_KEYS = { rb: ['ryoe', 'rush_epa', 'explosive', 'rush_success'], wr: ['rec_epa_tgt', 'target_share', 'croe', 'yacoe'], te: ['rec_epa_tgt', 'target_share', 'croe', 'yacoe'],
   edge: ['pressures_pg', 'sacks_pg', 'tfl_pg', 'splash_pg'], idl: ['pressures_pg', 'sacks_pg', 'tfl_pg', 'splash_pg'], lb: ['tackles_pg', 'tfl_pg', 'pressures_pg', 'splash_pg'] };
@@ -204,9 +211,12 @@ function metricOf(p, s, k) {
 function qualPct(p, s) { return s && s.qualified ? metricOf(p, s, 'gvar_pg').pct : null; }
 function gvar(p, s) { return metricOf(p, s, 'gvar_pg').v; }
 function spotVal(k, v) { if (!isNum(v)) return ''; if (/share|rate|success|explosive/.test(k) && Math.abs(v) <= 1) return (100 * v).toFixed(1) + '%'; return GI.num(v, Math.abs(v) >= 10 ? 1 : 2); }
-function paceCards(lead, files, S) {
+function paceCards(lead, files, S, hist) {
   const out = [];
-  RECORDS.forEach(r => {
+  RECORDS.forEach(r0 => {
+    const rec = recordBefore(hist, r0[1], S);
+    if (!rec) return;
+    const r = [r0[0], r0[1], rec.value, rec.who, r0[2]];
     const top = (((lead.players || {})[r[0]] || {})[r[1]] || [])[0];
     const p = top ? files[top[0]] : null, s = p ? seasonOf(p, S) : null;
     if (!s || !isNum(s[r[1]]) || !isNum(s.games) || s.games < 3) return;
@@ -220,7 +230,7 @@ function paceCards(lead, files, S) {
     return { kicker: on ? 'On record pace' : 'Records in reach', sport: 'nfl', name: x.p.name, sub: [GI.teamAbbr(x.s.team), x.p.pos, x.s.games + ' games'].join(' · '),
       value: f(x.pace), unit: x.r[4] + ' pace', colour: GI.teamInfo(x.s.team).colour, mark: { name: GI.teamName(x.s.team), abbr: GI.teamAbbr(x.s.team), colour: GI.teamInfo(x.s.team).colour },
       pace: { now: x.v, pace: x.pace, target: x.r[2], label: 'Record', fmt: f },
-      text: f(x.v) + ' ' + x.r[4] + ' in ' + x.s.games + ' games. At that rate, ' + f(x.pace) + ' over 17 games; the record is ' + f(x.r[2]) + ' (' + x.r[3] + '). ' + (x.s.games <= 8 ? x.s.games + ' games is a small sample: early paces usually cool.' : ''),
+      text: f(x.v) + ' ' + x.r[4] + ' in ' + x.s.games + ' games. At that rate, ' + f(x.pace) + ' over 17 games; the most in a season since 1999 in our play-by-play is ' + f(x.r[2]) + ' (' + x.r[3] + '). ' + (x.s.games <= 8 ? x.s.games + ' games is a small sample: early paces usually cool.' : ''),
       href: GI.playerHref(x.p.id) };
   });
 }
@@ -279,9 +289,9 @@ function turnCards(rows, prevRows, po, S) {
   return [card(out[0], 'Biggest turnaround'), card(out[out.length - 1], 'Biggest fall')];
 }
 function fanModules(el, S, rows, po) {
-  GI.loadAll([GI.ypath('leaders.json', S), GI.ypath('season.json', S - 1)]).then(res => {
+  GI.loadAll([GI.ypath('leaders.json', S), GI.ypath('season.json', S - 1), 'history.json']).then(res => {
     if (!el.isConnected) return;
-    const lead = GI.ok(res[0]) ? res[0] : {}, prevRows = GI.ok(res[1]) ? seasonRows(res[1]) : [];
+    const lead = GI.ok(res[0]) ? res[0] : {}, prevRows = GI.ok(res[1]) ? seasonRows(res[1]) : [], hist = GI.ok(res[2]) ? res[2] : null;
     const turn = turnCards(rows, prevRows, po, S);
     if (turn.length) GI.set('ov-turn', QK.sectionHead({ kicker: 'Biggest surprise', title: 'Up and down', sub: 'This season’s record so far against last season’s, every team.' }) + QK.storyCards(turn, { cols: 1 }));
     const ids = {};
@@ -292,8 +302,8 @@ function fanModules(el, S, rows, po) {
       if (!el.isConnected) return;
       const files = {};
       ps.forEach((p, i) => { if (p && GI.ok(p)) files[list[i]] = p; });
-      const pc = paceCards(lead, files, S);
-      if (pc.length) GI.set('ov-pace', QK.sectionHead({ kicker: 'Records in reach', title: 'On pace for history?', sub: 'Each leader’s rate so far over a 17-game season, against the single-season record. Early in a season every pace looks huge; the bars show how far there is to go.', actions: '<a class="qk-more" href="#/leaders">Every leaderboard</a>' }) + QK.storyCards(pc));
+      const pc = paceCards(lead, files, S, hist);
+      if (pc.length) GI.set('ov-pace', QK.sectionHead({ kicker: 'Records in reach', title: 'On pace for history?', sub: 'Each leader’s rate so far over a 17-game season, against the most in a season in our play-by-play (1999 on, regular season). Early in a season every pace looks huge; the bars show how far there is to go.', actions: '<a class="qk-more" href="#/leaders">Every leaderboard</a>' }) + QK.storyCards(pc));
       const bc = breakoutCards(files, S);
       if (bc.length) GI.set('ov-break', QK.sectionHead({ kicker: 'Breakout watch', title: 'Who took the leap', sub: 'The biggest jumps in our value-a-game percentile from last season, among the leaders on the value boards. Both seasons qualified.' }) + QK.storyCards(bc));
       const sp = spotlightHTML(files, lead, S);

@@ -135,11 +135,13 @@ function headHTML(L, g, S, season) {
   const A = Object.assign(U.team(L, g.away), { colour: HW.teamColourRaw(L, g.away) || ca, record: rec(g.away) }), H = Object.assign(U.team(L, g.home), { colour: HW.teamColourRaw(L, g.home) || ch, record: rec(g.home) });
   const tag = g.series && (g.series.summary || g.series.round) ? (g.series.summary || g.series.round) + (g.series.game ? ' · Game ' + g.series.game : '') : (g.stype && g.stype !== 'reg' ? HW.stypeLabel(g.stype) : '');
   /* round 6: the market's chance sits quietly under the hero (market: 'quiet'), the source on hover */
-  const G = { market_home: pre && isNum(mk.p_home) ? Number(mk.p_home) : null, market_src: srcLabel(mk.sources), sport: 'basketball', id: g.id, start: g.date, status: st, league: HW.leagueName(L) + (tag ? ' · ' + tag : ''), home: H, away: A,
+  const G0 = { market_home: pre && isNum(mk.p_home) ? Number(mk.p_home) : null, market_src: srcLabel(mk.sources), sport: 'basketball', id: g.id, start: g.date, status: st, league: HW.leagueName(L) + (tag ? ' · ' + tag : ''), home: H, away: A,
     hs: isNum(g.hs) ? Number(g.hs) : null, as: isNum(g.as) ? Number(g.as) : null,
     p_home: live && isNum(pLive) ? Number(pLive) : (isNum(m.p_home) ? Number(m.p_home) : null), wp_home: live && isNum(pLive) ? Number(pLive) : null,
     p_pre: live && isNum(m.p_home) ? Number(m.p_home) : null, pre_only: live && !isNum(pLive) ? true : undefined,
     period: isNum(g.period) ? Number(g.period) : (isNum(g.periods) ? Number(g.periods) : null), clock: g.clock, note: fin && Number(g.periods) > 4 ? 'OT' : '' };
+  const G = QK.settle ? QK.settle(G0) : G0;
+  if (G.status === 'awaiting') G.market_home = null;
   const R = (season && season.ratings) || {};
   const ra = R[String(g.away)] || {}, rh = R[String(g.home)] || {};
   const fx = [];
@@ -265,11 +267,36 @@ function awardsHTML(L, g, S) {
   return U.card2('Game awards', extra.join(' · '), '<ul class="hw-list">' + items.join('') + '</ul>', { flush: true, cls: 'qk-span-5' });
 }
 
+/* round 9: a game file is rebuilt only inside the build window, so a finished game can still say "pre" (or "in") in its
+   own file. The season's schedule.json (rebuilt every run) wins for the status and the score, and fills the
+   pre-game market and model when the game file has none; a game the data still calls upcoming hours after its start
+   reads "Result to come" (QK.settle), never a pre-game hero. */
+function withSchedule(g, sch) {
+  const row = sch ? (sch.games || []).find(x => String(x.id) === String(g.id)) : null;
+  if (!row) return g;
+  const out = Object.assign({}, g);
+  if (row.status === 'post' && g.status !== 'post' && isNum(row.hs) && isNum(row.as)) {
+    out.status = 'post'; out.hs = row.hs; out.as = row.as;
+    if (isNum(row.period)) out.periods = row.period;
+    out.clock = null;
+  }
+  const pre = Object.assign({}, g.pregame || {});
+  if (!pre.market && row.market) pre.market = row.market;
+  if (!(pre.model && isNum(pre.model.p_home)) && row.model && isNum(row.model.p_home)) pre.model = Object.assign({}, row.model);
+  out.pregame = pre;
+  if (!out.series && row.series) out.series = row.series;
+  return out;
+}
+
 function renderGame(el, params) {
   const L = U.L(params), gid = params.id;
   const tab = U.tab(params, ['summary', 'detail'], 'summary');
   el.innerHTML = QK.skeleton('lines', 6);
-  return GC().loadGame(L, params.season, gid).then(res => (res && U.ok(res.d) ? HW.load(HW.path('season.json', L, res.s)).then(sn => { res.season = U.ok(sn) ? sn : null; return res; }) : res)).then(res => {
+  return GC().loadGame(L, params.season, gid).then(res => (res && U.ok(res.d) ? Promise.all([HW.load(HW.path('season.json', L, res.s)), HW.load(HW.path('schedule.json', L, res.s))]).then(a => {
+    res.season = U.ok(a[0]) ? a[0] : null;
+    res.d = withSchedule(res.d, U.ok(a[1]) ? a[1] : null);
+    return res;
+  }) : res)).then(res => {
     if (!U.alive(el)) return;
     if (!res || !U.ok(res.d)) { el.innerHTML = U.secHead('Game', '', null, null, U.kicker(L, U.S(params))) + U.empty('Game not available', 'This game page has not been built yet.') + '<p>' + U.link(HW.href(L, 'games'), 'All games') + '</p>'; return; }
     const g = res.d, S = res.s;

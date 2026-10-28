@@ -465,6 +465,8 @@ QKC.dumbbell = function (el, s) {
  *         quadrants: ['top-left text', 'top-right', 'bottom-left', 'bottom-right'], labelTop: 6,
  *         yInverse / xInverse (ranks: 1 at the top), diagonal: true | { label } (the y = x line, e.g. model v actual),
  *         legendItems: [{ name, color }] (what the point colours mean) } */
+/* spec.onClick(point, index) (round 8): a click on a point calls it instead of following point.href (the Scouting Room
+ * opens its profile drawer); spec.pad ('8%'): room around the points on both axes, so the corner names stay clear. */
 QKC.scatter = function (el, s) {
   return QKC.mount(el, function (T) {
     var pts = s.points;
@@ -493,8 +495,8 @@ QKC.scatter = function (el, s) {
     return {
       grid: gr,
       legend: legendItems.length ? legendOpt(T, { icon: 'circle', left: 'auto', right: 0, data: legendItems.map(function (it) { return it.name; }) }) : undefined,
-      xAxis: axis(T, { fmt: s.xFmt, name: s.xName, nameLocation: 'middle', nameGap: 30, scale: true, min: s.xMin, max: s.xMax, inverse: !!s.xInverse, ticks: s.xTicks }),
-      yAxis: axis(T, { fmt: s.yFmt, name: s.yName, scale: true, min: s.yMin, max: s.yMax, inverse: !!s.yInverse, ticks: s.yTicks, nameLocation: s.yInverse ? 'start' : 'end', nameAlign: 'left', nameGap: lifted ? 24 : undefined }),
+      xAxis: axis(T, { fmt: s.xFmt, name: s.xName, nameLocation: 'middle', nameGap: 30, scale: true, min: s.xMin, max: s.xMax, inverse: !!s.xInverse, ticks: s.xTicks, boundaryGap: s.pad ? [s.pad, s.pad] : undefined }),
+      yAxis: axis(T, { fmt: s.yFmt, name: s.yName, scale: true, min: s.yMin, max: s.yMax, inverse: !!s.yInverse, ticks: s.yTicks, boundaryGap: s.pad ? [s.pad, s.pad] : undefined, nameLocation: s.yInverse ? 'start' : 'end', nameAlign: 'left', nameGap: lifted ? 24 : undefined }),
       tooltip: tooltip(T, { formatter: function (p) { if (p.seriesIndex !== 0 || p.componentType !== 'series') return ''; var d = pts[p.dataIndex]; return '<div style="font-weight:600;margin-bottom:4px">' + esc(d.name) + '</div>' + tipRow(p.color, s.xName || 'x', s.xFmt ? s.xFmt(d.x) : fmt.num(d.x, 2)) + tipRow(p.color, s.yName || 'y', s.yFmt ? s.yFmt(d.y) : fmt.num(d.y, 2)); } }),
       graphic: s.quadrants ? quadrantLabels(T, s.quadrants, lifted ? 14 : 0) : undefined,
       series: [{
@@ -509,7 +511,7 @@ QKC.scatter = function (el, s) {
         markLine: ml.length ? { silent: true, symbol: 'none', lineStyle: { color: T.axis, type: [4, 4], width: 1 }, label: { show: false }, data: ml } : undefined
       }].concat(QKC.legendSeries(T, legendItems.map(function (it) { return { name: it.name, color: it.color, icon: 'circle' }; })))
     };
-  }, { label: s.label });
+  }, { label: s.label, onClick: s.onClick ? function (p) { if (p.componentType === 'series' && p.seriesIndex === 0 && p.data) s.onClick(pts[p.dataIndex], p.dataIndex); } : undefined });
 };
 function avg(a) { return a.reduce(function (x, y) { return x + y; }, 0) / (a.length || 1); }
 function spread(pts, k) { var v = pts.map(function (p) { return p[k]; }); return Math.max.apply(null, v) - Math.min.apply(null, v); }

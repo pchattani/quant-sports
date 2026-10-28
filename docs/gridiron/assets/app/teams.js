@@ -74,16 +74,19 @@ GI.route('teams', function (el, params) {
       GI.set('tm-table', GI.tableHTML(cols, body, { sticky: true }));
       GI.sortable(document.getElementById('tm-table'));
       const pts = list.map(t => ({ t: t, x: (T[t].values || {}).off_epa, y: (T[t].values || {}).def_epa, p: first((rows[t] || {}).p_playoffs, (T[t].sim || {}).p_playoffs) })).filter(p => isNum(p.x) && isNum(p.y));
-      if (pts.length > 2) GI.ch.mount('tm-map', Tk => ({
-        grid: { left: 8, right: 24, top: 18, bottom: 30, containLabel: true },
-        xAxis: GI.ch.ax(Tk, { name: 'Offence EPA per play', nameLocation: 'middle', nameGap: 26, scale: true, fmt: v => GI.signed(v, 2) }),
-        yAxis: GI.ch.ax(Tk, { name: 'Defence EPA allowed', scale: true, inverse: true, fmt: v => GI.signed(v, 2) }),
+      if (pts.length > 2) GI.ch.mount('tm-map', Tk => { const xa = GI.ch.ax(Tk, { scale: true, fmt: v => GI.signed(v, 2) }), ya = GI.ch.ax(Tk, { scale: true, inverse: true, fmt: v => GI.signed(v, 2) });
+        /* the y title over the top of the plot (the axis is flipped, so less allowed is up), never on the x title */
+        const gB = 8 + QKC.nameAxis(xa, 'Offence EPA per play', 'bottom'); ya.name = 'Defence EPA allowed (less is up)'; ya.nameLocation = 'start'; ya.nameGap = 10; ya.nameTextStyle.align = 'left';
+        return {
+        grid: { left: 8, right: 24, top: 30, bottom: gB, containLabel: true },
+        xAxis: xa,
+        yAxis: ya,
         tooltip: GI.ch.tip(Tk, { formatter: q => { const p = q.data.p; return GI.ch.thead(esc(GI.teamName(p.t))) + GI.ch.trow(q.color, 'Offence', GI.signed(p.x, 3)) + GI.ch.trow(q.color, 'Defence allows', GI.signed(p.y, 3)) + (isNum(p.p) ? GI.ch.trow(Tk.ink3, 'Playoffs', GI.pct(p.p, 0)) : ''); } }),
         series: [{ type: 'scatter', symbolSize: (v, q) => 9 + 22 * (isNum(q.data.p.p) ? q.data.p.p : 0.2),
           label: { show: true, formatter: q => q.data.p.t, position: 'top', color: Tk.ink2, fontSize: 10, fontWeight: 600 }, labelLayout: { hideOverlap: true },
           data: pts.map(p => ({ value: [p.x, p.y], p: p, href: GI.teamHref(p.t, S), itemStyle: { color: GI.ch.lift(GI.teamColour(p.t), Tk), borderColor: Tk.s1, borderWidth: 1.5 } })),
           markLine: { silent: true, symbol: 'none', lineStyle: { color: Tk.axis, type: [4, 4] }, label: { show: false }, data: [{ xAxis: GI.median(pts.map(p => p.x)) }, { yAxis: GI.median(pts.map(p => p.y)) }] } }]
-      }), 'Offence against defence per play');
+      }; }, 'Offence against defence per play');
     };
     GI.wireSeg(el, 'tm-conf', v => { ST.conf = v; draw(); });
     GI.wireSeg(el, 'tm-view', v => { ST.view = v; draw(); });

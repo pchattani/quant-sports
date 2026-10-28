@@ -181,7 +181,7 @@ function renderTeam(el, params, state) {
     let h = hero + '<div class="bp-flexrow" style="justify-content:flex-end;margin-top:var(--sp-4)">' + links + '</div>';
     h += '<div class="qk-grid"><div class="qk-span-5"><div class="bp-stack">' +
       (stages.length ? U.card2('Season simulation', 'Our chance of reaching each stage' + (k.isNum(r.magic) ? ' · magic number ' + k.esc(r.magic) : ''), QK.chances(stages.map(x => ({ label: x[1], p: od[x[0]], color: (BP.teamInfo(tid) || {}).colour })), { sort: false, max: 1, key: false })) : '') +
-      QK.pctCard({ title: 'Team profile', peer: 'MLB clubs', sample: k.isNum(v.g) ? v.g + ' games' : '', groups: tGroups, foot: '<span>Percentiles among the ' + Object.keys(T).length + ' clubs; 100 = best</span><a href="' + k.compareHref('t' + tid, '') + '?view=classic">Every metric →</a>' }) +
+      QK.pctCard({ title: 'Team profile', peer: 'MLB clubs', sample: k.isNum(v.g) ? v.g + ' games' : '', groups: tGroups, foot: '<span class="bp-fn">Percentiles among the ' + Object.keys(T).length + ' clubs; 100 = best</span><a href="' + k.compareHref('t' + tid, '') + '?view=classic">Every metric →</a>' }) +
       '</div></div><div class="qk-span-7">' + U.card2('Roster value', 'Bullpen WAR this season for everyone who played for the club (latest team), with the 40-man roster and injured list where recorded', '' + BP.ui.chart('tm-war', 330, 'Roster WAR') + '<div id="tm-roster" style="margin-top:12px"></div>') + '</div></div>';
     /* strengths, weaknesses and the race (docs/_design/league.js: the chips, the race facts and our chances over the season;
        the percentile card above already carries the meters) */

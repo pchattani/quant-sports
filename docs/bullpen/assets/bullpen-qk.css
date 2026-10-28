@@ -487,3 +487,5 @@ input[type=number],
 .bp-lab-within { padding-bottom: var(--sp-3); margin-bottom: var(--sp-3); border-bottom: 1px solid var(--line-2); }
 .bp-lab-sim { margin-top: var(--sp-3); }
 .bp-lab-sim .bp-note { margin: 0; }
+/* round 9: a card foot carrying sentences (method notes, sources) reads as prose, not as condensed capitals */
+.qk-card-foot > .bp-fn { text-transform: none; letter-spacing: 0; font: 500 var(--fs-xs)/1.45 var(--font-ui); color: var(--ink-3); flex: 1 1 320px; }

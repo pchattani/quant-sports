@@ -5,8 +5,11 @@ leaders: the top N of every catalogue metric (hitters, pitchers, teams), directi
 metric's sample floor and the reference pool's minimum (hitters PA, pitchers BF, scaled to the season's team games;
 counting stats use everyone), plus the best pitches of each type by Stuff+ and Pitching+ (100+ thrown).
 
-lab: column-oriented rows for any-two-metric scatter plots: {"fields": [...], "metrics": {kind: [METRIC]},
-"rows": {kind: [[pid, name, team, pos, sample, v1, v2, ...]]}, "kinds": ["hitter", "pitcher"], "presets"}.
+lab: column-oriented rows for any-two-metric scatter plots and the Scouting Room: {"fields": [...], "metrics": {kind:
+[METRIC]}, "rows": {kind: [[pid, name, team, pos, sample, age, hand, chances, called, v1, v2, ...]]}, "kinds": ["hitter",
+"pitcher"], "presets"}. Every catalogue metric is carried (the counting stats too, since round 8: the Scouting Room's board
+keeps the catalogue's depth); age (years, one decimal), hand (bats for hitters, throws for pitchers) and the fielding and
+framing samples (chances, called pitches; hitters only) feed its filters and the fielding and framing floors.
 """
 from __future__ import annotations
 
@@ -15,6 +18,8 @@ from oddsmarkets.baseball.analytics import hitters as H
 from oddsmarkets.baseball.analytics import pitchers as P
 
 TOP = 25
+# lab.json row fields before the metric values (the Scouting Room reads them by name)
+LAB_FIELDS = ("pid", "name", "team", "pos", "n", "age", "hand", "chances", "called")
 PRESETS = [
     {"kind": "pitcher", "x": "stuff_plus", "y": "ra9", "label": "Stuff against results"},
     {"kind": "pitcher", "x": "pitching_plus", "y": "xwoba_plus", "label": "Pitching+ against xwOBA+ allowed"},
@@ -81,18 +86,23 @@ def build(ctx, hitters: dict | None, pitchers: dict | None, teams: dict | None) 
 
 def lab(ctx, hitters: dict | None, pitchers: dict | None) -> dict:
     out = {"ok": True, "level": ctx.level, "season": ctx.season, "updated_at": an.now(), "kinds": [],
-           "fields": ["pid", "name", "team", "pos", "n"], "metrics": {}, "rows": {}, "presets": PRESETS}
+           "fields": list(LAB_FIELDS), "metrics": {}, "rows": {}, "presets": PRESETS}
     for kind, cat, nkey, floor in (("hitter", hitters, "pa", 50), ("pitcher", pitchers, "bf", 50)):
         if not cat or not cat.get("players"):
             continue
-        mets = [m for m in cat["metrics"] if m["fmt"] != "int" or m["key"] in ("hr", "so", "w", "sv", "sb")]
+        mets = list(cat["metrics"])
         out["kinds"].append(kind)
         out["metrics"][kind] = mets
         rows = []
         for pid, r in cat["players"].items():
             if (r.get(nkey) or 0) < floor:
                 continue
-            rows.append([pid, r.get("name"), r.get("team"), r.get("pos") if kind == "hitter" else r.get("role"), r.get(nkey)]
+            n = r.get("n") or {}
+            age = r.get("age")
+            rows.append([pid, r.get("name"), r.get("team"), r.get("pos") if kind == "hitter" else r.get("role"), r.get(nkey),
+                         round(age, 1) if isinstance(age, (int, float)) else None,
+                         r.get("bats") if kind == "hitter" else r.get("throws"),
+                         n.get("chances") if kind == "hitter" else None, n.get("called") if kind == "hitter" else None]
                         + [r["values"].get(m["key"]) for m in mets])
         out["rows"][kind] = rows
     if not out["kinds"]:

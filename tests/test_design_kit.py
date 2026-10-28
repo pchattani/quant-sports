@@ -79,3 +79,19 @@ def test_every_sport_registers_its_own_models():
         assert set(reg["metrics"].values()) <= set(reg["models"]), sport
         ids = {m["id"] for g in spec["groups"] for m in g["metrics"]}
         assert ids & set(reg["metrics"]), sport          # at least one spec metric is ours
+
+
+def test_scout_kit_ships_and_switches_the_nav():
+    """Round 8: scout.js is a kit file (every site gets it) and quant.js carries the one-line nav switch."""
+    assert "scout.js" in design_kit.KIT_FILES
+    src = (design_kit.DESIGN / "scout.js").read_text(encoding="utf-8")
+    for api in ("QK.board = ", "QK.heatGrid = ", "QK.powerBars = ", "QK.leaderCard = ", "QKC.strip = ", "QK.drawer = ",
+                "QK.profile = ", "QK.tray = ", "QK.trayCompare = ", "QK.strengths = ", "QK.csv = "):
+        assert api in src, api
+    assert "?." not in src.replace("'?.'", "") and "??" not in src
+    q = (design_kit.DESIGN / "quant.js").read_text(encoding="utf-8")
+    assert "QK.SCOUT = { key: 'scout', label: 'Scouting Room', route: '#/scout' }" in q
+    assert "if (scout && s.key === 'lab') return null;" in q
+    for folder in list(design_kit.SITE_SPORT) + ["home"]:
+        copy = ROOT / "docs" / folder / "assets" / "qk" / "scout.js"
+        assert copy.read_bytes() == (design_kit.DESIGN / "scout.js").read_bytes(), folder

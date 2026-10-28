@@ -1382,7 +1382,7 @@ function setSeason(S0) {
   if (r === 'standings') { go(standingsHref(S)); return; }
   if (r === 'playoffs') { go(playoffsHref(S)); return; }
   if (r === 'games' || r === 'game') { go(gamesHref(null, S)); return; }
-  if (r === 'hub' && S !== cur) { go(standingsHref(S)); return; }
+  if (r === 'hub') { go(S !== cur ? '#/?s=' + S : '#/'); return; }
   const h = String(location.hash || '#/').replace(/\?.*$/, '');
   const q = Object.assign({}, state.params.query || {});
   delete q.y; delete q.season; delete q.d;

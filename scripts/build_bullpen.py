@@ -216,6 +216,7 @@ def build_season(b: Build, level: str, season: int, full: bool, cfg: dict, share
         logger.info("%s %s: %s, skipped", level, season, skip)
         hit0, pit0 = an.read_json(sdir / "hitters.json"), an.read_json(sdir / "pitchers.json")
         small_files(b, d, sdir, level, season, hit0, pit0, only_missing=True)
+        refresh_season_json(b, level, season, sdir, cfg)
         return {"skipped": True, "hitters": reduce_cat(hit0, "hitter"), "pitchers": reduce_cat(pit0, "pitcher")}
     ctx = SeasonContext(level, season, full=full, today=cfg["today"], current=current, sims=cfg["sims"],
                         fetch_markets=cfg["markets"] and full and current and level == "mlb", use_models=not cfg["no_models"])
@@ -288,6 +289,29 @@ def build_season(b: Build, level: str, season: int, full: bool, cfg: dict, share
     gc.collect()
     logger.info("%s %s (%s): %.1f s", level, season, "full" if full else "light", time.perf_counter() - t0)
     return out
+
+
+def refresh_season_json(b: Build, level: str, season: int, sdir: Path, cfg: dict) -> None:
+    """A skipped season keeps its payloads, but a season.json from an older layout (analytics/season.py SEASON_VERSION:
+    2 adds the postseason as played, the final seeds, division winners and clinches) is rebuilt from the store and the
+    teams.json on disk. No simulation: a past season's bracket is the one that was played."""
+    from oddsmarkets.baseball.analytics import season as SN
+    from oddsmarkets.baseball.analytics.context import SeasonContext
+    old = an.read_json(sdir / "season.json") or {}
+    if (old.get("version") or 1) >= SN.SEASON_VERSION or not (sdir / "teams.json").exists():
+        return
+    tms = an.read_json(sdir / "teams.json")
+    if not (tms or {}).get("ok", True):
+        return
+
+    def run():
+        ctx = SeasonContext(level, season, full=False, today=cfg["today"], current=False, use_models=False)
+        out = SN.build(ctx, tms, None, None)
+        if old.get("league") and "league" not in out:
+            out["league"] = old["league"]
+        ctx.release()
+        return out
+    b.write_or_fail(f"{level}/{season}/season.json", f"season (refresh) {level} {season}", run, level=level, season=season)
 
 
 def with_league(b: Build, level: str, season: int, spl: dict | None, tms: dict | None, cards: list[dict], cfg: dict) -> dict | None:

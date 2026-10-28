@@ -156,7 +156,7 @@ function render(el, params) {
     if (upcoming.length) {
       const g0 = upcoming[0], st0 = U.status(g0);
       h += '<section class="qk-section">' + QK.sectionHead({ kicker: st0 === 'live' ? 'Live now' : (QK.fmt.relDay(g0.date) === 'Today' ? 'What to watch tonight' : 'Next up'), title: U.nick(L, g0.away) + ' at ' + U.nick(L, g0.home) }) +
-        QK.previewCard(U.game(g0, L, { records: U.records(season) }), { layout: 'bug', nick: t => t.short || t.name }) + '</section>';
+        QK.previewCard(U.game(g0, L, { records: U.records(season) }), { layout: 'bug', nick: t => t.short || t.name, market: 'quiet' }) + '</section>';
     }
     h += '<div class="qk-grid hw-sec">' + U.card2('Schedule', upcoming.length ? 'Next games with our win chance' : 'Results', '<div id="tp-sched"></div>', { cls: 'qk-span-6', flush: true });
     if (txs.length || dl) h += U.card2('Moves', dl ? dl.n + ' rated trade' + (dl.n === 1 ? '' : 's') + ' in 12 months · net ' + U.signed(dl.net_now, 1) + ' WAR in today’s view' : 'Transactions in the last 12 months',

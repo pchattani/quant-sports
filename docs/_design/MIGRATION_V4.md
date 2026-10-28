@@ -285,3 +285,39 @@ Pages:
 
 Checks as above: esprima, the checker (dark, 1440 and 375, `--banned`), the contrast audit. The showcase has a
 "Progression" block on sample data (`showcase.html#progression`).
+
+## Scouting Room and Teams page (round 8, 28 Oct 2026)
+
+The user: "Consolidate the Players page with the lab and rename the lab... clean graphics and tables on players that are
+meaningful to the sport, positions etc... Do not lose the depth of metrics. The Teams page also looks mediocre... find a
+better way to display along with a lot more information comparing teams." The Bullpen is the pilot and the reference:
+`docs/bullpen/assets/js/bp-scout.js` (the room), `bp-teams.js` (the Teams page), `lab.js` (`BP.lab.mount`: the Lab as the
+room's Chart view), `core.js` (routes, redirects, the nav switch). The kit pieces are in `scout.js` (STYLE_GUIDE §5).
+
+### Rollout, per site
+
+1. **Nav.** `QK.sections(sport, { scout: true })`; add a `scout` route; map the old Players and Lab routes into it with
+   their parameters (the Bullpen's `redirectOf` in `core.js`); move Compare and Prospects under the Scouting Room and
+   parks / venues / referees under Teams.
+2. **Load** `<script src="assets/qk/scout.js" defer></script>` after `quant-charts.js`.
+3. **The room** (`#/<L>/scout`): one control bar (`QK.within` + `QK.scoutBar`: season, the minimum sample from the spec
+   floor, team, age band, hand or foot where the payload has it, search); "Top of the position" (`QK.hotRow`, five of the
+   view's metrics, one per family); view tabs Board | Chart | Leaders (`?view=`); the profile drawer (`?p=`) and the
+   compare tray (`?cmp=`). Everything in the address.
+4. **Payload.** The room reads one column-oriented file of every player and every metric (the site's `lab.json`), with
+   `age` and `hand` per row (the Bullpen added `age`, `hand`, `chances`, `called`: +6.6%). Never the 5-10 MB catalogues.
+5. **Teams** (`#/<L>/teams`): power board, team profile grid, style map (presets per sport, the corners named), strengths
+   and weaknesses, head to head (`QK.tape` with `gap: true`), and "Through the season" only where the game log or a race
+   log already carries it.
+
+### What changes per sport
+
+| Site | Groups (Broad / Position) | Rating parts on the power board | Style-map presets |
+|---|---|---|---|
+| Footballer | outfield / goalkeepers; GK, CB, FB, DM, CM, AM, W, ST | attack (xG for) / defence (xG against) | xG for v against, press v possession, set pieces v open play |
+| Hardwood / Campus basketball | all players; guards, wings, bigs | offence / defence net rating | pace v efficiency, three-point rate v rim rate, rebounding v turnovers |
+| Rink | skaters / goalies; C, W, D, G | 5v5 offence / defence, special teams | xGF% v points%, PP v PK, shot quality v volume |
+| Gridiron / Campus football | offence / defence / specialists; QB ... K | offence / defence / special teams EPA | pass v rush EPA, early-down success v explosiveness |
+| Paddock | drivers (one group) | qualifying / race pace | qualifying v race delta, tyre degradation v pace |
+| Ace | ATP / WTA by surface | serve / return | serve points won v return points won (no teams page: tennis has no clubs) |
+

@@ -341,7 +341,7 @@ GI.route('player', function (el, params) {
         const bits = group === 'QB' ? [isNum(L.p_att) ? L.p_cmp + ' of ' + L.p_att : '', isNum(L.p_yds) ? L.p_yds + ' yards' : '', isNum(L.p_td) ? plural(L.p_td, 'touchdown') : '', isNum(L.p_ints) && L.p_ints ? plural(L.p_ints, 'interception') : '', isNum(L.p_epa) ? GI.signed(L.p_epa, 1) + ' EPA passing' : '']
           : group === 'RB' ? [isNum(L.r_car) ? plural(L.r_car, 'carry').replace('carrys', 'carries') + ' for ' + L.r_yds + ' yards' : '', isNum(L.x_rec) && L.x_rec ? L.x_rec + ' catches for ' + L.x_yds : '', isNum(L.r_td) && L.r_td ? plural(L.r_td, 'rushing touchdown') : '']
           : group === 'WR' || group === 'TE' ? [isNum(L.x_tgt) ? L.x_rec + ' catches on ' + plural(L.x_tgt, 'target') : '', isNum(L.x_yds) ? L.x_yds + ' yards' : '', isNum(L.x_td) && L.x_td ? plural(L.x_td, 'touchdown') : '']
-          : group === 'DEF' ? [isNum(L.d_tkl) ? plural(L.d_tkl, 'tackle') : '', isNum(L.d_sacks) && L.d_sacks ? GI.num(L.d_sacks, L.d_sacks % 1 ? 1 : 0) + ' sacks' : '', isNum(L.d_int) && L.d_int ? plural(L.d_int, 'interception') : '', isNum(L.d_pd) && L.d_pd ? plural(L.d_pd, 'pass') + ' defensed' : '']
+          : group === 'DEF' ? [isNum(L.d_tkl) ? plural(L.d_tkl, 'tackle') : '', isNum(L.d_sacks) && L.d_sacks ? GI.num(L.d_sacks, L.d_sacks % 1 ? 1 : 0) + (L.d_sacks === 1 ? ' sack' : ' sacks') : '', isNum(L.d_int) && L.d_int ? plural(L.d_int, 'interception') : '', isNum(L.d_pd) && L.d_pd ? plural(L.d_pd, 'pass') + ' defensed' : '']
           : group === 'K' ? [isNum(L.k_fga) ? L.k_fgm + ' of ' + L.k_fga + ' field goals' : '', isNum(L.k_xpa) ? L.k_xpm + ' of ' + L.k_xpa + ' extra points' : '']
           : group === 'P' ? [isNum(L.u_punts) ? plural(L.u_punts, 'punt') : '', isNum(L.u_net) ? GI.num(L.u_net, 1) + ' net average' : ''] : [];
         const line = bits.filter(Boolean).join(', ').replace('passs', 'passes');
@@ -409,6 +409,11 @@ GI.route('player', function (el, params) {
           const home = GI.canonTeam(L.team) === GI.canonTeam(x.home), me = GI.teamAbbr(L.team);
           const col = GI.tc(L.team);
           const data = pts.map(r => [Math.max(0, (3600 - Number(r.game_seconds_remaining)) / 60), 100 * (home ? Number(r[key]) : 1 - Number(r[key]))]);
+          /* the model's last play is a few seconds before the end: close the line at the result (100, 0 or 50 on a tie) */
+          if (GI.isFinal(x) && isNum(x.hs) && isNum(x.as)) {
+            const my = home ? x.hs - x.as : x.as - x.hs, endMin = Math.max(60, data[data.length - 1][0]);
+            data.push([endMin, my > 0 ? 100 : my < 0 ? 0 : 50]);
+          }
           GI.set('pp-race', GI.chartBox('pp-race-c', 240, me + ' chance to win through the last game'));
           GI.ch.mount('pp-race-c', T => {
             const xa = QKC.axis(T, { type: 'value', min: 0, max: Math.max(60, Math.ceil(data[data.length - 1][0] / 15) * 15), interval: 15, split: false, line: true });

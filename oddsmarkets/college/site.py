@@ -108,14 +108,39 @@ def sports_day(t: datetime):
     return (t.astimezone(_ET) - timedelta(hours=5)).date()
 
 
+SLATE_MIN = 8                  # games on one sports day that make it a slate (a college football Saturday has 50+)
+
+
+def next_slate_end(cards: list[dict], now: datetime) -> datetime:
+    """The end of the next slate: the last start on the first sports day after today, within a week, with SLATE_MIN or
+    more games still to play. On a Sunday to Wednesday in football that is Saturday, so "What to watch" always has
+    the coming weekend; in basketball season a slate is usually tomorrow (inside the 3 days anyway). `now` when there
+    is none."""
+    day0 = sports_day(now)
+    by: dict = {}
+    for c in cards:
+        t = parse_ts(c.get("date"))
+        if t is None or c.get("status") != "pre" or not (now < t <= now + timedelta(days=7)):
+            continue
+        d = sports_day(t)
+        if d != day0:
+            by.setdefault(d, []).append(t)
+    for d in sorted(by):
+        if len(by[d]) >= SLATE_MIN:
+            return max(by[d])
+    return now
+
+
 def pick_games(cards: list[dict], now: datetime) -> tuple[list, list, list]:
     """today / next_games / last_games of PAYLOADS.md. Today = the US sports day of `now` (`sports_day`: Eastern
     date, games before 5 am Eastern on the evening before; plus anything live), so a Wednesday-night game that ends
     after midnight UTC is not shown as Thursday's; next = the next 3 days (at most 40, ranked and close games
-    first); when nothing falls in the next 3 days (preseason), the next 40 games within 3 weeks instead; last = the
-    last 2 days before today (at most 40)."""
+    first), stretched to the end of the next slate (`next_slate_end`: football's Saturday is never left out on a
+    Sunday to Wednesday); when nothing falls in that window (preseason), the next 40 games within 3 weeks instead;
+    last = the last 2 days before today (at most 40)."""
     today, nxt, last = [], [], []
     day0 = sports_day(now)
+    end = max(now + timedelta(days=3), next_slate_end(cards, now))
     for c in cards:
         t = parse_ts(c.get("date"))
         if t is None or c.get("status") in ("canceled", "postponed") and t < now - timedelta(days=2):
@@ -123,7 +148,7 @@ def pick_games(cards: list[dict], now: datetime) -> tuple[list, list, list]:
         day = sports_day(t)
         if c.get("status") == "in" or day == day0:
             today.append(c)
-        elif now < t <= now + timedelta(days=3) and c.get("status") == "pre":
+        elif now < t <= end and c.get("status") == "pre":
             nxt.append(c)
         elif now - timedelta(days=2) <= t and day < day0 and c.get("status") == "post":
             last.append(c)
@@ -299,7 +324,8 @@ def level_digest(data: Path, level: str, cur: int, cards: list[dict], season: di
             out["movers"] = dict(mv, metric=metric)
     reg = [c for c in cards if c.get("stype") == "reg" and c.get("date")]
     if reg:
-        days = sorted(_et_day(c["date"]) for c in reg if _et_day(c["date"]))
+        # the first and last day from games with a set start (a TBA game's placeholder time is not a tip-off)
+        days = sorted(_et_day(c["date"]) for c in reg if not c.get("tba") and _et_day(c["date"])) or             sorted(_et_day(c["date"]) for c in reg if _et_day(c["date"]))
         weeks = [c.get("week") for c in reg if isinstance(c.get("week"), int)]
         out["stage"] = {"phase": phase, "played": sum(1 for c in reg if c.get("status") == "post"), "total": len(reg), "first": days[0],
                         "last": days[-1], "week": season.get("week") if level == "cfb" else None, "weeks": max(weeks) if weeks else None}
@@ -327,6 +353,8 @@ def level_index(data: Path, level: str, now: datetime) -> dict:
     cards = (sched or {}).get("games") or [] if ok(sched) else []
     teams = season.get("teams") or {}
     today, nxt, last = pick_games(cards, now)
+    dig = _digest_safe(data, level, cur, cards, season, now)
+    nxt = with_featured(cards, today, nxt, dig.get("featured") or {})
     ap = ((season.get("polls") or {}).get("ap") or [])[:25]
     rec = _record(season.get("standings") or {})
     top25 = [{"rank": r.get("rank"), "team": str(r.get("team")), "prev": r.get("prev"), "record": rec.get(str(r.get("team")))} for r in ap]
@@ -354,7 +382,19 @@ def level_index(data: Path, level: str, now: datetime) -> dict:
             "seasons": seasons, "phase": season.get("phase"), "week": season.get("week") if level == "cfb" else None,
             "headline": headline(level, season, title, teams, today, nxt), "today": today, "next_games": nxt,
             "last_games": last, "top25": top25, "model_top": model_top, "title_odds": title, "conferences": confs,
-            "teams": team_out, "champions": champs, "digest": _digest_safe(data, level, cur, cards, season, now)}
+            "teams": team_out, "champions": champs, "digest": dig}
+
+
+def with_featured(cards: list[dict], today: list, nxt: list, featured: dict) -> list:
+    """next_games plus any featured game (digest.featured: today / next / week) not already listed, in date order:
+    the overview's hero and "What to watch" read their cards from today + next_games, so a featured game outside
+    the window would otherwise vanish from the page."""
+    have = {str(c.get("id")) for c in today + nxt}
+    want = [str(f.get("id")) for k in ("today", "next") for f in (featured.get(k) or []) if f]
+    if featured.get("week"):
+        want.append(str(featured["week"].get("id")))
+    add = [c for c in cards if str(c.get("id")) in set(want) - have]
+    return sorted(nxt + add, key=lambda c: c.get("date") or "") if add else nxt
 
 
 def _digest_safe(data: Path, level: str, cur: int, cards: list[dict], season: dict, now: datetime) -> dict:
@@ -381,8 +421,8 @@ SITE_TERMS = [
     ("Ratings", [
         ("rating", "Rating", "Football: expected points margin against an average FBS team on a neutral field. Basketball: "
                              "adjusted efficiency margin, points per 100 possessions against an average Division I team."),
-        ("off", "Offense", "Points (football: per game; basketball: per 100 possessions) the offense adds against average opposition."),
-        ("def", "Defense", "Points allowed against average opposition; lower is better."),
+        ("off", "Offence", "Points (football: per game; basketball: per 100 possessions) the offence adds against average opposition."),
+        ("def", "Defence", "Points allowed against average opposition; lower is better."),
         ("se", "Uncertainty (±)", "Standard error of the rating: how far it could be off with the games played so far."),
         ("sos", "Strength of schedule", "Mean rating of the opponents a team has played and still has to play."),
         ("tempo", "Tempo", "Possessions per 40 minutes (basketball)."),

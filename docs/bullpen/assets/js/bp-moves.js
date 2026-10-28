@@ -135,7 +135,7 @@ function playerCard(host, pid, L, S) {
       '<div style="margin-top:8px">' + typeKeys(m) + '</div><div class="bp-note">' + esc(ctx) + '</div>' +
       (deadlineLine(m) ? '<div class="bp-note">' + deadlineLine(m) + '</div>' : (isNum(row[F.p_dl]) ? '<div class="bp-note">' + esc(d.deadline_label === 'traded' ? 'Traded' : 'Moved') + ' before the deadline: <b>' + pct(row[F.p_dl]) + '</b></div>' : '')) +
       (fits.length ? '<div class="qk-kicker" style="margin:12px 0 6px">Clubs that fit</div><ul class="bp-list">' + fits.slice(0, 5).map(f => '<li>' + U.teamEnt(f.t, 'mlb') + '<span class="v">' + pct(f.p, 1) + '</span></li>').join('') + '</ul>' : ''),
-      { foot: '<span>An estimate from on-field value and history; no contract data</span><a href="#/methodology#who-moves-next">How →</a>' });
+      { foot: '<span class="bp-fn">An estimate from on-field value and history; no contract data</span><a href="#/methodology#who-moves-next">How →</a>' });
   });
   if ('IntersectionObserver' in window) {
     const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); go(); } }, { rootMargin: '200px' });

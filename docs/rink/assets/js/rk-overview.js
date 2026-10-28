@@ -276,7 +276,10 @@ function fanModules(el, S, rows) {
   });
 }
 
-function render(el) {
+function render(el, params) {
+  /* a past season (#/?s=<S>) reads as its recap (rk-recap.js), never as this season's page */
+  const SP = params && params.season ? Number(params.season) : null;
+  if (SP && SP !== Number(RK.currentSeason()) && RK.recap) return RK.recap.render(el, SP);
   const S = RK.currentSeason();
   const idx = RK.index() || {};
   const dig = idx.digest || {};

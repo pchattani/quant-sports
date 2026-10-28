@@ -41,6 +41,11 @@ function rcCatalogue(career, rc, pid, S) {
   const p = { name: career.name, team: row.team, pos: career.pos, age: isFinite(d) ? (Date.now() - d) / (365.25 * 864e5) : null, gp: row.gp, min: row.min,
     qualified: !!rc.qualified, role: rc.role, pct_role: rc.pct_role,
     values: { hpm: row.hpm, hpm_o: row.o, hpm_d: row.d, ts: row.ts, pts_g: row.pts, reb_g: row.reb, ast_g: row.ast, rapm: row.rapm, box_impact: row.box_impact } };
+  /* round 9: every meter row needs its value, not only the nine above: the season row's deep set (`dv`, aligned to
+     prog.keys[kind], the progression fields every career file carries) fills the rest */
+  const pk = (career.prog && career.prog.keys) || {};
+  const ids = pk.player || pk[Object.keys(pk)[0]] || [];
+  (row.dv || []).forEach((x, i) => { const k = ids[i]; if (k && isNum(x) && !isNum(p.values[k])) p.values[k] = x; });
   const players = {}; players[pid] = p;
   return { ok: true, players: players, min_floor: rc.min_floor, metrics: [], __rc: rc };
 }
@@ -341,7 +346,7 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
       add('Points allowed per 100', ra.def, rh.def, x => U.f(x, 1), true);
       const m = nxt.model || {};
       const extra = U.status(nxt) === 'pre' && isNum(m.margin) ? 'We expect ' + HW.teamAbbr(L, m.margin >= 0 ? nxt.home : nxt.away) + ' by about ' + Math.max(1, Math.round(Math.abs(m.margin))) + (isNum(m.total) ? ', with about ' + Math.round(m.total) + ' points in all' : '') + '.' : '';
-      box.innerHTML = QK.previewCard(g, { layout: 'bug', nick: t => t.short || t.name, factors: fx, factorsTitle: 'How they match up this season', noteExtra: esc(extra) });
+      box.innerHTML = QK.previewCard(g, { layout: 'bug', nick: t => t.short || t.name, factors: fx, factorsTitle: 'How they match up this season', noteExtra: esc(extra), market: 'quiet' });
     });
   }
 

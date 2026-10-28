@@ -34,7 +34,9 @@ function forecastTable(cards) {
     const fav = pH === null ? 'home' : (pH >= 0.5 ? 'home' : 'away');
     const mp = pH === null ? null : (fav === 'home' ? pH : 1 - pH);
     const mg = GI.homeLine(m);
+    const waiting = !fin && QK.awaiting(GI.qkGame(g));
     const status = fin ? '<b>' + esc(GI.teamAbbr(g.away)) + ' ' + esc(g.as) + ', ' + esc(GI.teamAbbr(g.home)) + ' ' + esc(g.hs) + '</b>' + (GI.isOT(g) ? ' OT' : '')
+      : waiting ? '<span class="qk-badge" title="Played; the result arrives with the next update">Result to come</span>'
       : live ? '<span class="qk-badge live">' + esc(GI.clockText(g.qtr, g.clock) || 'Live') + '</span>' : esc(GI.fmtDate(g.kickoff, { year: false })) + ' ' + esc(GI.fmtTime(g.kickoff));
     return { _href: GI.gameHref(g.game_id), cells: [
       { html: GI.matchupLink(g.game_id, g.away, g.home), v: g.game_id },
@@ -68,6 +70,29 @@ function review(games) {
       GI.kpi('Points miss', tN ? GI.num(tAbs / tN, 1) : '—', tN ? 'points, average distance from our expected total' : '', { unit: tN ? 'pts' : '' })]));
 }
 
+/* The week file is written when the week's pages are built; index.json is rewritten on every build (and every 15 minutes
+ * in game windows), so its cards carry the latest status, score and chances. Overlay them on the week file's games so the
+ * week page never contradicts the overview: a final stays final, and a game is never moved back from final or live. */
+const RANK = { pre: 0, live: 1, half: 1, final: 2 };
+const LIVE_KEYS = ['status', 'hs', 'as', 'qtr', 'clock', 'possession', 'down', 'dist', 'yl100', 'wp_home', 'overtime', 'qbs'];
+function overlay(games, S) {
+  const idx = GI.index() || {};
+  if (Number(idx.season) !== Number(S)) return games;
+  const by = {};
+  ['recent', 'games', 'live'].forEach(k => (idx[k] || []).forEach(x => { if (x && x.game_id) by[x.game_id] = x; }));
+  return games.map(g => {
+    const x = by[g.game_id];
+    if (!x) return g;
+    const o = Object.assign({}, g);
+    const rg = RANK[GI.gameState(g)], rx = RANK[GI.gameState(x)];
+    if (!(isNum(rg) && isNum(rx) && rx < rg)) LIVE_KEYS.forEach(k => { if (x[k] !== undefined && x[k] !== null) o[k] = x[k]; });
+    if (x.model && isNum(x.model.p_home)) o.model = Object.assign({}, g.model || {}, x.model);
+    if (x.market && !o.market) o.market = x.market;
+    return o;
+  });
+}
+GI.weekOverlay = overlay;
+
 GI.route('games', function (el, params) {
   const S = Number(params.season);
   const w = isNum(params.week) ? Number(params.week) : (S === GI.currentSeason() ? GI.currentWeek() : 1);
@@ -83,7 +108,7 @@ GI.route('games', function (el, params) {
     if (!el.isConnected) return;
     const label = GI.weekLabel(w, S);
     if (!GI.ok(d)) { el.innerHTML = GI.pageHead('Games · ' + S, label, GI.gtypeLabel(GI.weekType(w, S)), GI.weekNav(S, w)) + strip(S, w) + GI.notBuilt('The ' + S + ' schedule', d); return; }
-    const games = (d.games || []).slice().sort((a, b) => String(a.kickoff).localeCompare(String(b.kickoff)) || String(a.game_id).localeCompare(String(b.game_id)));
+    const games = overlay(d.games || [], S).sort((a, b) => String(a.kickoff).localeCompare(String(b.kickoff)) || String(a.game_id).localeCompare(String(b.game_id)));
     const days = [];
     games.forEach(g => { const day = GI.localDay(g.kickoff) || 'TBD'; let x = days.find(z => z.day === day); if (!x) { x = { day: day, games: [] }; days.push(x); } x.games.push(g); });
     const span = days.length ? GI.fmtDate(days[0].day, { year: false }) + (days.length > 1 ? ' – ' + GI.fmtDate(days[days.length - 1].day, { year: false }) : '') : '';

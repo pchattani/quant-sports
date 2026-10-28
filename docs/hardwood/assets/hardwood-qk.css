@@ -18,7 +18,7 @@ body.qk { font-size: var(--fs-md); }
 .qk .hw-main { min-height: 62vh; padding-top: var(--sp-5); }
 #app > .page { min-width: 0; }
 .qk a { color: inherit; }
-.qk #app a:not([class]), .qk #app .prose-dark a, .qk #app .chart-note a, .qk #app .section-note a { color: var(--accent); }
+.qk #app a:not([class]), .qk #app .prose-dark a, .qk #app .chart-note a, .qk #app .section-note a { color: var(--signal); }
 .qk #app a:not([class]):hover { text-decoration: underline; text-underline-offset: 3px; }
 
 .qk .card {
@@ -96,7 +96,7 @@ body.qk { font-size: var(--fs-md); }
 .hw-fv { position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-pop); background: var(--s-glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--line-2); }
 .hw-fv[hidden] { display: none; }
 .hw-fv-in { max-width: var(--page-max); margin: 0 auto; padding: 12px var(--gutter); display: flex; gap: 14px; align-items: center; justify-content: space-between; font-size: var(--fs-xs); color: var(--ink-2); flex-wrap: wrap; }
-.hw-fv a { color: var(--accent); }
+.hw-fv a { color: var(--signal); }
 .qk-secnav-ctx .qk-select { height: 30px; font-size: var(--fs-xs); }
 
 /* ═════════════════════════════════ 4. redesigned pages */
@@ -119,16 +119,16 @@ body.qk { font-size: var(--fs-md); }
 .hw-list .v { margin-left: auto; font: 600 var(--fs-sm) var(--font-num); white-space: nowrap; }
 .hw-list .n { color: var(--ink-3); font: 500 var(--fs-xs) var(--font-num); width: 18px; text-align: right; flex: none; }
 .hw-list .s { color: var(--ink-3); font-size: var(--fs-xs); }
-.hw-list a:hover { color: var(--accent); }
-.hw-link { color: var(--accent) !important; font-weight: 600; font-size: var(--fs-xs); }
+.hw-list a:hover { color: var(--signal); }
+.hw-link { color: var(--signal) !important; font-weight: 600; font-size: var(--fs-xs); }
 .hw-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .hw-ent { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
 .hw-ent .nm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hw-ent .sb { color: var(--ink-3); font-size: var(--fs-xs); white-space: nowrap; }
-.hw-ent:hover .nm { color: var(--accent); }
+.hw-ent:hover .nm { color: var(--signal); }
 .hw-flex { display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap; }
 .hw-note { color: var(--ink-3); font-size: var(--fs-xs); margin-top: 8px; }
-.hw-note a { color: var(--accent); }
+.hw-note a { color: var(--signal); }
 .hw-cards { display: grid; gap: var(--sp-4); }
 .hw-mini-grid { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
 .hw-teamtile { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; background: var(--s-1); border: 1px solid var(--line-1); border-radius: 0; min-width: 0; position: relative; overflow: hidden; }
@@ -501,3 +501,31 @@ input[type=number],
 .hw-lab-sim { padding: 8px 14px 0; }
 .hw-lab-sim .pg-note { margin: 0; }
 @media (max-width: 600px) { .hw-lab-within .qk-select { flex: 1 1 100%; max-width: 100%; } }
+
+/* ═════════════════════════════════ round 9: links in cobalt (the kit's "ours / primary action" blue), never the sport accent */
+.qk #app .qk-legal a, .qk #app .legal a, .qk #app .md-body a, .qk #app .hw-doc a { color: var(--signal); }
+/* the real playoff bracket (hw-bracket.js): rounds as columns, each series a block with team-colour ticks, seeds and wins */
+.hw-br-wrap { overflow-x: auto; padding: 4px 0 8px; }
+.hw-br { display: grid; grid-template-columns: repeat(var(--cols, 5), minmax(168px, 1fr)); gap: 12px; min-width: min-content; }
+.hw-br.compact { grid-template-columns: repeat(var(--cols, 5), minmax(132px, 1fr)); gap: 8px; }
+.hw-brr { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.hw-brr-b { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: space-around; gap: 8px; }
+.hw-brr-h { font: 700 var(--fs-2xs)/1.2 var(--font-cond); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); padding: 0 0 4px; border-bottom: 2px solid var(--line-2); }
+.hw-brr-h small { font: inherit; color: var(--ink-3); letter-spacing: 0.04em; text-transform: none; }
+.hw-brs { display: block; background: var(--block-2); border-top: 3px solid var(--card-rule); padding: 6px 8px 7px; text-decoration: none; color: var(--block-ink); transition: border-color var(--t-fast); }
+.hw-brs:hover, .hw-brs:focus-visible { border-top-color: var(--volt); }
+.hw-brs.done { border-top-color: var(--line-2); }
+.hw-brs.tbd { color: var(--block-ink-3); text-align: center; padding: 14px 8px; }
+.hw-brs-t { display: grid; grid-template-columns: 6px 18px minmax(0, 1fr) auto; gap: 6px; align-items: center; padding: 2px 0; }
+.hw-brs-t i { width: 6px; height: 18px; display: block; }
+.hw-brs-t .sd { font: 600 11px/1 var(--font-cond); color: var(--block-ink-3); text-align: right; }
+.hw-brs-t .nm { font: 700 var(--fs-sm)/1.2 var(--font-cond); letter-spacing: 0.03em; text-transform: uppercase; color: var(--block-ink); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hw-brs-t .w { font: 400 1.25rem/1 var(--font-display); color: var(--block-ink); min-width: 1ch; text-align: right; }
+.hw-brs-t.won .w { color: var(--volt); }
+.hw-brs-t.out .nm, .hw-brs-t.out .w { color: var(--block-ink-3); }
+.hw-brs-n { display: block; margin-top: 3px; font: 600 11px/1.3 var(--font-cond); letter-spacing: 0.04em; text-transform: uppercase; color: var(--block-ink-3); }
+.hw-brch { display: block; background: var(--tc, var(--signal-deep)); border-bottom: 6px solid var(--te, transparent); color: #fff; padding: 14px 12px; text-decoration: none; clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%); }
+.hw-brch .k { display: block; font: 700 var(--fs-2xs)/1.2 var(--font-cond); letter-spacing: 0.08em; text-transform: uppercase; color: #fff; }
+.hw-brch b { display: block; font: 400 1.75rem/1 var(--font-display); letter-spacing: 0.02em; text-transform: uppercase; margin-top: 4px; }
+.hw-brr-pi .hw-brs-t .nm { font-size: var(--fs-xs); }
+@media (max-width: 600px) { .hw-br { grid-template-columns: repeat(var(--cols, 5), minmax(150px, 1fr)); } }

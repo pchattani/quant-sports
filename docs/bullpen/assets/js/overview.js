@@ -69,6 +69,7 @@ function whenLabel(g) {
   if (g.status === 'final') return 'Final';
   const d = new Date(g.start), now = new Date(QK.now());
   if (isNaN(d)) return '';
+  if (g.status === 'pre' && d.getTime() <= now.getTime() && !QK.awaiting(g)) return 'Under way';
   const d0 = x => { const y = new Date(x.getTime()); y.setHours(0, 0, 0, 0); return y.getTime(); };
   const n = Math.round((d0(d) - d0(now)) / 864e5);
   if (n === 0) return d.getHours() >= 17 ? 'Tonight' : 'Today';
@@ -119,7 +120,13 @@ function reasonsWhy(r, c, idx, post) {
 function pickFeatured(idx, cards, post) {
   const by = {}, now = QK.now();
   cards.forEach(c => { by[c.gpk] = c; });
-  const ok = (c, hrs) => { if (!c || BP.isFinal(c) || (BP.notNeeded && BP.notNeeded(c))) return false; const h = (Date.parse(c.start || c.date) - now) / 36e5; return BP.isLive(c) ? h > -8 : h > -1 && h < hrs; };
+  /* a card still "pre" up to 4 h after its start is almost surely under way (statuses lag the hourly build): it stays the
+     lead; past that it is waiting for its result (QK.awaiting) and is never featured */
+  const ok = (c, hrs) => {
+    if (!c || BP.isFinal(c) || (BP.notNeeded && BP.notNeeded(c)) || QK.awaiting(BP.kitGame(c, 'mlb'))) return false;
+    const h = (Date.parse(c.start || c.date) - now) / 36e5;
+    return BP.isLive(c) ? h > -10 : h > -4 && h < hrs;
+  };
   const F = (idx.digest || {}).featured;
   if (F && (F.today || F.week)) {
     const T = (F.today || []).filter(f => ok(by[f.id], 24));
@@ -294,7 +301,7 @@ function render(el, params) {
       const fe = el.querySelector('#ov-feat');
       if (feat && feat.c) {
         const g = Object.assign(BP.kitGame(feat.c, L), { league: 'MLB' }), lab = whenLabel(g);
-        const occ = feat.c.series ? BP.seriesText(feat.c.series, true) : (feat.week && !/^(Today|Tonight|Live now)$/.test(lab) ? 'The big one this week' : 'The one to watch');
+        const occ = feat.c.series ? BP.seriesText(feat.c.series, true) : (feat.week && !/^(Today|Tonight|Live now|Under way)$/.test(lab) ? 'The big one this week' : 'The one to watch');
         fe.innerHTML = QK.featureCard(g, { scribble: lab + ' · ' + occ, nick: t => t.short || t.name, note: heroNote(g, feat.why) });
       } else if (titles.length) {  /* nothing big on: lead with the race */
         fe.innerHTML = '<div class="ql-race">' + QK.sectionHead({ kicker: feat ? 'Nothing big on today' : 'No games soon', title: 'So here’s the race for the World Series', sub: 'Our chance of winning it all, from 20,000 simulated brackets.', tag: 'h3' }) +
@@ -339,7 +346,7 @@ function render(el, params) {
     if (haveRatings) {
       const pw = Object.keys(rows).map(t => rows[t]).filter(r => r.rating && isNum(r.rating.net) && isNum(r.rating.off));
       const pts = pw.map(r => ({ x: r.rating.off, y: (isNum(r.rating.def) ? r.rating.def : 0) + (isNum(r.rating.pitch) ? r.rating.pitch : 0), name: BP.teamName(r.tid), label: BP.teamAbbr(r.tid), color: BP.teamInfo(r.tid).colour, href: BP.teamHref(r.tid, L, S), size: 13 }));
-      QKC.scatter('#ov-map', { points: pts, xName: 'Offence (runs a game above average)', yName: 'Run prevention (runs a game)', xFmt: v => U.signed(v, 1), yFmt: v => U.signed(v, 1), refX: 0, refY: 0, labelAll: true,
+      QKC.scatter('#ov-map', { points: pts, xName: 'Offence (runs a game above average)', yName: 'Run prevention (runs a game)', xFmt: v => U.signed(v, 1), yFmt: v => U.signed(v, 1), refX: 0, refY: 0, labelAll: true, pad: '12%',
         quadrants: ['Pitching and defence', 'Complete teams', 'Rebuilding', 'Bats carry them'], label: 'Team strength map' });
     }
     // standings by league

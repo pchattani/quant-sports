@@ -33,7 +33,7 @@ function probsOf(x) {
 function render(el, params, state) {
   const k = K();
   const L = 'mlb';   // the award models are MLB only
-  el.innerHTML = QK.sectionHead({ kicker: 'Award races · MLB', title: 'Who wins the awards', sub: 'Our chance for every candidate from the season so far: a conditional logit on value and the features voters reward, fitted on the 2015–2025 winners. The grey tick is the Kalshi / Polymarket number, de-vigged across the field, for reference.' }) +
+  el.innerHTML = QK.sectionHead({ kicker: 'Award races · MLB', title: 'Who wins the awards', sub: 'Our chance for every candidate from the season so far: a conditional logit on value and the features voters reward, fitted on the 2015–2025 winners.' }) +
     '<p class="bp-note" id="aw-sub"></p><div id="aw-body"></div>';
   return k.ready().then(() => {
     const S = k.S(params, state);

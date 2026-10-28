@@ -103,7 +103,7 @@ function renderList(el, params, state) {
       const sk = r => { const v = ae(r); return k.isNum(v) ? v : -1; };
       list.sort((a, b) => sk(b) - sk(a));
       $('um-card').innerHTML = U.card2('Every umpire', list.length + ' of ' + rows.length + ' home-plate umpires, ' + S + ' · cells coloured by percentile among umpires (100 = best); expected accuracy and zone size describe style, so they are grey', '<div id="um-table"></div>', { flush: true,
-        foot: '<span>Rule-book zone: |plate_x| ≤ 0.83 ft between sz_bot − 0.12 and sz_top + 0.12 ft. Expected accuracy comes from the called-strike model without the umpire\'s own effect.</span>' });
+        foot: '<span class="bp-fn">Rule-book zone: |plate_x| ≤ 0.83 ft between sz_bot − 0.12 and sz_top + 0.12 ft. Expected accuracy comes from the called-strike model without the umpire\'s own effect.</span>' });
       if (!list.length) { $('um-table').innerHTML = QK.empty('Nobody here', 'Lower the minimum games.'); scatter([], pr, cols); return; }
       QK.leaderboard($('um-table'), { dense: true, rank: true, maxHeight: 620, rowHref: r => k.umpHref(r.id), columns: [{ key: 'name', label: 'Umpire', type: 'entity', href: r => k.umpHref(r.id) }]
         .concat(cols.map(c => (/^(games|called)$/.test(c[0]) || c[3] === 'int' ? { key: 'c_' + c[0], label: c[1], num: true, fmt: v => fmtC(c, v), tip: c[4] }
@@ -130,7 +130,7 @@ function scatter(list, pr, cols) {
   if (pts.length < 3) { node.innerHTML = QK.empty('Not enough umpires', 'Too few umpires have both numbers.'); return; }
   const maxG = Math.max.apply(null, pts.map(p => p.g));
   QKC.scatter('#um-chart', { points: pts.map(p => ({ x: 100 * p.x, y: 100 * p.y, name: (p.r.name || k.umpName(p.r.id)) + ' · ' + p.g + ' games', label: k.surname(p.r.name || k.umpName(p.r.id)), color: QK.pctHex(c0 && pr[c0[0]] ? pr[c0[0]](p.x, p.r) : 50), size: 6 + 12 * Math.sqrt(p.g / maxG), href: k.umpHref(p.r.id) })),
-    xName: 'Accuracy above expected (points)', yName: 'Consistency (%)', xFmt: v => k.signed(v, 1), yFmt: v => k.num(v, 0), refX: 0, labelTop: 6, quadrants: ['Consistent, misses more', 'Accurate and consistent', '', 'Accurate, own zone moves'], label: 'Umpire accuracy and consistency' });
+    xName: 'Accuracy above expected (points)', yName: 'Consistency (%)', xFmt: v => k.signed(v, 1), yFmt: v => k.num(v, Math.abs(v - Math.round(v)) > 0.01 ? 1 : 0), refX: 0, labelTop: 6, pad: '10%', quadrants: ['Consistent, misses more', 'Accurate and consistent', '', 'Accurate, own zone moves'], label: 'Umpire accuracy and consistency' });
 }
 
 function absPanel(a, Lv) {

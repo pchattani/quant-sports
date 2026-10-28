@@ -93,6 +93,15 @@ function render(el, params) {
     const seeds = seedOf(season);
     const cards = isCurrent ? (info.last_games || []).concat(info.today || [], info.next_games || []) : [];
     const live = seriesFromCards(cards);
+    /* round 9: the real bracket from season.json postseason.series (hw-bracket.js), for every season that has playoff
+       games; a finished season shows only that (the simulation's bracket and paths are for a season still running) */
+    const R = HW.bracket ? HW.bracket.rounds(season, L) : null;
+    const done = !!(R && R.champion);
+    if (R && (R.rounds.length || R.playin.length)) {
+      html += HW.card(done ? 'How the playoffs went' : 'The bracket so far', done ? 'Every series with its result; tap one for its games' : 'The series played and under way, with the wins so far; tap one for its games',
+        HW.bracket.html(L, S, season) + '<div class="section-note">Seeds in grey; wins in each series on the right. ' + (L === 'wnba' ? 'Seeding is league-wide.' : 'Seeding is by conference; the play-in decides the 7 and 8 seeds.') + '</div>');
+    }
+    if (done) { body.innerHTML = html; HW.setMeta(''); return; }
     if (rounds.length && br.matchups) {
       const n = rounds.length;
       const groups = Object.keys(br.groups || {});

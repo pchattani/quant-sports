@@ -27,15 +27,18 @@ function compareHref(scope) {
   var h = QPV.hrefFor('#/compare/progression/');
   return function (ids, q) { return h(ids, (scope && scope !== 'club' ? 'scope=' + scope + (q ? '&' : '') : '') + (q || '')); };
 }
+/* a row's scope and season: from its key ("club:2025/26"), which is all the file keeps since 28 Oct 2026 */
+function scopeOf(r) { return r.scope || String(r.key || '').split(':')[0]; }
+function eraOf(r) { return r.era || String(r.key || '').split(':').slice(1).join(':'); }
 /* the season axis: a split season by the year it ends (2025/26 -> 2026), a calendar one by itself */
 function eraX(era) { var s = String(era || ''), y = parseInt(s.slice(0, 4), 10); return isNaN(y) ? null : (s.indexOf('/') >= 0 ? y + 1 : y); }
 
 function toP(doc, scope, keysOf) {
   var curEra = ((doc.years || [])[0] || {}).era;
-  var rows = (doc.progression || []).filter(function (r) { return r.scope === scope; });
+  var rows = (doc.progression || []).filter(function (r) { return scopeOf(r) === scope; });
   var byX = {};
   rows.forEach(function (r) {
-    var x = eraX(r.era);
+    var x = eraX(eraOf(r));
     if (x === null) return;
     if (!byX[x] || (r.min || 0) > (byX[x].min || 0)) byX[x] = r;     /* a move between a split and a calendar frame: the longer season */
   });
@@ -45,14 +48,15 @@ function toP(doc, scope, keysOf) {
       var r = byX[x], ks = keysOf[r.kd] || [];
       var nm = r.team || (r.tid ? FB.clubName(r.tid) : '');
       var tot = isNum(r.st) && r.st >= 0.5;     /* mostly Sofascore's season totals (no line-ups behind them) */
-      return { key: r.key, x: x, label: r.era, age: QPV.ageAt(doc.dob, x, String(r.era).indexOf('/') >= 0 ? 0 : 6), cy: i + 1,
+      var era = eraOf(r);
+      return { key: r.key, x: x, label: era, age: QPV.ageAt(doc.dob, x, String(era).indexOf('/') >= 0 ? 0 : 6), cy: i + 1,
         team: nm ? { abbr: FB.clubCode(nm), name: nm, colour: r.tid ? FB.clubColour(r.tid) : null } : null, teams: (r.teams || []).length > 1 ? r.teams.map(function (t) { return FB.clubCode(FB.clubName(t) || String(t)); }) : null,
         group: r.pg || null, n: r.min, nUnit: tot ? 'minutes · Sofascore season totals' : 'minutes', small: !(r.dp && r.dp.length), values: QPV.zip(ks, r.dv), pct: QPV.zip(ks, r.dp), kd: r.kd,
-        totals: tot, partial: !!curEra && r.era === curEra };
+        totals: tot, partial: !!curEra && era === curEra };
     }) };
 }
 function mainKind(doc, scope) {
-  var ks = (doc.progression || []).filter(function (r) { return r.scope === scope; }).map(function (r) { return r.kd; });
+  var ks = (doc.progression || []).filter(function (r) { return scopeOf(r) === scope; }).map(function (r) { return r.kd; });
   return ks.indexOf('gk') >= 0 ? 'gk' : ks.indexOf('out') >= 0 ? 'out' : 'box';
 }
 function groupOf(P) { return (P.seasons.slice().reverse().filter(function (s) { return s.group; })[0] || {}).group; }
@@ -77,7 +81,7 @@ function tab(el, p) {
     var doc = res[0], ref = res[1] || {}, cat = res[2];
     if (!doc || !doc.id) { el.innerHTML = QK.empty('Player not found', 'Search for a player with /.'); return; }
     var has = { club: false, intl: false };
-    (doc.progression || []).forEach(function (r) { has[r.scope] = true; });
+    (doc.progression || []).forEach(function (r) { has[scopeOf(r)] = true; });
     var scope = q.scope === 'intl' && has.intl ? 'intl' : (has.club ? 'club' : (has.intl ? 'intl' : 'club'));
     document.title = doc.name + ' · Progression · The Quant Footballer';
     var keysOf = ((ref.prog || {}).keys) || {};

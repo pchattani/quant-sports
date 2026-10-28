@@ -165,7 +165,7 @@ function rankHTML(d, HF, PF) {
       { key: 'last', label: 'Last', num: true, fmt: v => (isNum(v) ? '#' + v : '—'), tip: 'Last season\'s value rank' },
       { key: 'flags', label: 'Notes', sort: false, fmt: v => flagsHTML(v) }]);
   const sub = list.length + ' players · ' + (pts ? 'points under your scoring' : '5x5 for a ' + (lg.teams || 12) + '-team mixed league, $' + (lg.budget || 260) + ' budget') + (list.length > 500 ? ' · the first 500 shown' : '');
-  return card('Rankings', esc(sub), rows.length ? board('fx-rank', { dense: true, rank: true, maxHeight: 720, columns: cols, rows: rows }) : QK.empty('Nobody here', 'No player matches these filters.'), { flush: true, foot: '<span>' + esc((d.notes || []).join(' ')) + '</span>' });
+  return card('Rankings', esc(sub), rows.length ? board('fx-rank', { dense: true, rank: true, maxHeight: 720, columns: cols, rows: rows }) : QK.empty('Nobody here', 'No player matches these filters.'), { flush: true, foot: '<span class="bp-fn">' + esc((d.notes || []).join(' ')) + '</span>' });
 }
 
 // ── dynasty ─────────────────────────────────────────────────────────────────

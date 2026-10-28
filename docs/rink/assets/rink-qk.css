@@ -351,3 +351,26 @@ body.qk { font-size: var(--fs-md); }
 .rk-lab-sim { padding: 8px 14px 0; }
 .rk-lab-sim .gq-note { margin: 0; }
 @media (max-width: 600px) { .rk-lab-within .qk-select { flex: 1 1 100%; max-width: 100%; } }
+
+/* round 9: the value components on the player page, bars around zero */
+.rk-comps li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(80px, 38%) 4.5rem; gap: 12px; align-items: center; }
+.rk-cbar { position: relative; display: block; height: 12px; background: var(--seg-off); }
+.rk-cbar::after { content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; background: var(--ink-3); }
+.rk-cbar i { position: absolute; top: 0; bottom: 0; display: block; }
+
+/* round 9: the season recap (rk-recap.js) */
+.rk-calls li { display: grid; grid-template-columns: 9.5rem minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) 7rem auto; gap: 12px; align-items: center; }
+.rk-calls li.hit { box-shadow: inset 4px 0 0 var(--signal); }
+.rk-calls li.miss { box-shadow: inset 4px 0 0 var(--c-2); }
+.rk-calls .rd { font: 700 var(--fs-xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+.rk-calls .m { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
+.rk-calls .f b { color: var(--signal); }
+.rk-aw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.rk-aw { border-top-color: var(--tc); }
+.rk-aw-w { display: flex; align-items: center; gap: 8px; margin: 8px 0 4px; font: 400 1.75rem/1 var(--font-display); }
+.rk-aw-s { color: var(--ink-3); font: 600 var(--fs-xs)/1.3 var(--font-cond); text-transform: uppercase; letter-spacing: 0.05em; }
+.rk-aw-o { margin-top: 10px; color: var(--ink-2); font-size: var(--fs-sm); }
+@media (max-width: 760px) {
+  .rk-calls li { grid-template-columns: minmax(0, 1fr) auto; }
+  .rk-calls .rd { grid-column: 1 / -1; }
+}

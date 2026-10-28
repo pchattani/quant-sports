@@ -43,7 +43,14 @@ function render(el, params, state) {
   return Promise.all([RK.loadPlayer(pid), labels(), RK.loadYear('value.json', S), RK.loadYear('valuation.json', S), U.moves(S)]).then(res0 => {
     const pf = res0[0], cc = pf && pf.current;
     const fileP = !!(cc && cc.pct_pos && Object.keys(cc.pct_pos).length && cc.peer);
-    return (fileP ? Promise.resolve(null) : RK.loadYear(pf && (pf.kind === 'goalie' || pf.pos === 'G') ? 'goalies.json' : kindGuess, S)).then(cat0 => res0.slice(0, 4).concat([cat0, fileP, res0[4]]));
+    const fileK = pf && (pf.kind === 'goalie' || pf.pos === 'G') ? 'goalies.json' : kindGuess;
+    /* a player with no games this season (injured, unsigned) falls back to the last season played: its catalogue gives
+       the percentiles, labelled with that season (round 9) */
+    const lastS = pf && (pf.seasons || []).length ? Math.max.apply(null, pf.seasons.map(x => Number(x.season) || 0)) : null;
+    return (fileP ? Promise.resolve(null) : RK.loadYear(fileK, S)).then(cat0 => {
+      if (fileP || (cat0 && cat0.players && cat0.players[pid]) || !lastS || lastS >= Number(S)) return [cat0, Number(S)];
+      return RK.loadYear(fileK, lastS).then(cp => (cp && cp.players && cp.players[pid] ? [cp, lastS] : [cat0, Number(S)]));
+    }).then(cs => res0.slice(0, 4).concat([cs[0], fileP, res0[4], cs[1]]));
   }).then(res => {
     if (!U.alive(el)) return;
     const p = res[0];
@@ -62,6 +69,7 @@ function render(el, params, state) {
     const a = age(p.dob);
     const ht = isNum(p.height) ? Math.floor(p.height / 12) + '′' + (p.height % 12) + '″' : '';
     const fileP = res[5];
+    const catS = res[7] || Number(S), past = catS !== Number(S);
     let catP = res[4] && res[4].players ? res[4].players[pid] : null;
     let cat = catP ? res[4] : null;
     if (fileP) {
@@ -82,7 +90,7 @@ function render(el, params, state) {
     const pp = (catP && (catP.pct_pos || catP.pct)) || {};
     const SETS = U.SETS[group] || U.SETS.F;
     const peerShort = goalie ? 'goalies' : (U.PEER_SHORT[group] || 'skaters');
-    const prevS = String(Number(S) - 10001);
+    const prevS = String(catS - 10001);
     const prevSeason = seasons.filter(x => String(x.season) === prevS)[0] || null;
     const tagsH = [];
     if (catP && catP.qualified) tagsH.push(QK.tag('Qualified for percentiles', 'signal'));
@@ -157,13 +165,13 @@ function render(el, params, state) {
     }
     if (goalie && c && c.goalie) { const gg = c.goalie; k.push({ label: 'High-danger save %', value: RK.fmtVal(gg.sv_pct_high, '3'), pctl: pp.sv_pct_high, sub: 'expected ' + RK.fmtVal(gg.xfsv_pct, '3') + ' overall' }); }
 
-    const peerOf = () => (catP ? (catP.pct_pos ? (U.GROUP_NAME[group] || 'the same position') + (isNum(catP.peerN) ? ' (' + catP.peerN + ' qualified)' : '') : 'all NHL skaters') : '');
+    const peerOf = () => (catP ? (catP.pct_pos ? (U.GROUP_NAME[group] || 'the same position') + (isNum(catP.peerN) ? ' (' + catP.peerN + ' qualified)' : '') : 'all NHL skaters') + (past ? ', ' + RK.seasonLabel(catS) : '') : '');
     /* last season's ring: the player file's current.prev_pct_pos / prev_peer (same peer group; c99a4ba9), else last
        season's catalogue (about 4 MB), loaded only when the rail scrolls into view */
     let prevPct = c && c.prev_pct_pos && Object.keys(c.prev_pct_pos).length ? c.prev_pct_pos : null, prevGp = prevPct ? ((c.prev_peer || {}).gp) : null;
-    const pcardHTML = () => QK.pctRail({ id: 'pp-pcard', kicker: 'How they stack up', title: 'Percentiles: how the player ranks', peer: peerOf(), sample: catP ? U.sampleLine(catP, cat.reference, goalie) : '',
+    const pcardHTML = () => QK.pctRail({ id: 'pp-pcard', kicker: past ? 'How they stacked up · ' + RK.seasonLabel(catS) : 'How they stack up', title: past ? 'Last season’s percentiles' : 'Percentiles: how the player ranks', peer: peerOf(), sample: catP ? U.sampleLine(catP, cat.reference, goalie) : '',
       groups: catP ? U.pctGroups(catP, meta, SETS, null, prevPct) : [], ringLabel: 'last season' + (isNum(prevGp) ? ' (' + prevGp + ' games)' : ''),
-      note: goalie && catP ? U.goalieNote(catP) : '', emptyText: catP ? 'This player is short of the sample floors for this season.' : 'No current-season profile yet.' });
+      note: (past ? 'No games yet in ' + RK.seasonLabel(S) + ': these are the ' + RK.seasonLabel(catS) + ' percentiles, the last season played. ' : '') + (goalie && catP ? U.goalieNote(catP) : ''), emptyText: catP ? 'This player is short of the sample floors for this season.' : 'No current-season profile yet.' });
 
     /* How sure are we: when the numbers settle at this ice time (the spec's M50 samples, docs/METRICS_SPEC.md) */
     function settleLine() {
@@ -181,7 +189,7 @@ function render(el, params, state) {
     const nickOf = ab => (U.nick ? U.nick(ab) : RK.teamName(ab));
     const small = gpNow < 30;
     const NUMW = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
-    const sampleWords = gpNow ? (small ? (gpNow < 11 ? NUMW[gpNow] : gpNow) + ' game' + (gpNow === 1 ? ' is' : 's is') + ' a small sample.' : gpNow + ' games: the picture is settling.') : 'No games yet this season.';
+    const sampleWords = gpNow ? (small ? (gpNow < 11 ? NUMW[gpNow] : gpNow) + ' game' + (gpNow === 1 ? ' is' : 's is') + ' a small sample.' : gpNow + ' games: the picture is settling.') + (past ? ' (' + RK.seasonLabel(catS) + ')' : '') : 'No games yet this season.';
     /* v4: "How sure are we?" sits under the meters as the explain strip (skaters); goalies keep the explained card */
     const settleNote = '<b>How sure are we?</b> ' + esc(sampleWords) + ' ' + (settleLine() ? settleLine() + ' ' : '') +
       (prevPct ? 'The ▼ marks last season: rows that sit on it are the steady part of the profile; the ones far from it are the ones to watch.' : '');
@@ -241,7 +249,7 @@ function render(el, params, state) {
     h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'More on the player', title: 'Value, peers and the long view', sub: 'How much the player is worth to the team, where the player sits among ' + peerShort + ', and every season in the data.' }) +
       (k.length ? '<div class="rk-kpis">' + QK.stats(k) + '</div>' : '') +
       '<div class="qk-grid" style="margin-top:var(--sp-5)"><div class="qk-span-6">' +
-      (catP ? U.card2('Among peers', 'Every qualified ' + (U.GROUP_NAME[group] || 'player').replace('NHL ', '') + ' this season; bars coloured by percentile', '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('pp-dist', 260, 'Distribution of the peer group')) : '') + '</div>' +
+      (catP ? U.card2('Among peers', 'Every qualified ' + (U.GROUP_NAME[group] || 'player').replace('NHL ', '') + (past ? ' in ' + RK.seasonLabel(catS) : ' this season') + '; bars coloured by percentile', '<div class="qk-seg" id="pp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('pp-dist', 260, 'Distribution of the peer group')) : '') + '</div>' +
       '<div class="qk-span-6">' + U.card2('Season by season', goalie ? 'Save % and goals saved above expected' : 'Points and value by season; 100 = average for a qualified player at the position', U.chart('pp-seasons', 300, 'Season by season')) + '</div></div></section>';
 
     // season table
@@ -250,10 +258,20 @@ function render(el, params, state) {
     // splits, shots, value, movement
     h += '<section class="qk-section"><div class="qk-grid">';
     if (c && c.shots && Array.isArray(c.shots.points) && c.shots.points.length) h += '<div class="qk-span-6">' + U.card2(goalie ? 'Shots faced' : 'Shot map', (goalie ? 'Unblocked shots faced' : 'Last ' + c.shots.points.length + ' unblocked attempts') + ', attacking right; filled = goal, size = xG', '<div id="pp-shots"></div>') + '</div>';
-    h += '<div class="qk-span-6">' + U.card2('Splits', 'This season', '<div id="pp-splits"></div>', { flush: true }) + '</div>';
+    if ((c && c.onice && Object.keys(c.onice.by_strength || {}).length) || lg.length) h += '<div class="qk-span-6">' + U.card2('Splits', 'This season', '<div id="pp-splits"></div>', { flush: true }) + '</div>';
     h += '</div></section>';
     const side = [];
-    if (vrow && (vrow.why || []).length) side.push('<div class="qk-span-6">' + U.card2('Where the value comes from', 'GAR by component this season', '<ul class="rk-list">' + vrow.why.map(w => '<li><span>' + esc(w[0]) + '</span><span class="v">' + esc(isNum(w[1]) ? (Math.abs(w[1]) < 1 && w[0].indexOf('%') >= 0 ? RK.fmtVal(w[1], '3') : U.signed(w[1], 2)) : '') + '</span></li>').join('') + '</ul>', { flush: true, foot: '<span></span><a href="#/value">Value leaderboard →</a>' }) + '</div>');
+    /* every component of the value model (value.json carries all six; "why" names only the top two), as bars around zero */
+    const COMPS = goalie ? [['gsax', 'Goals saved above expected']] : [['ev_off', 'Even-strength offence'], ['ev_def', 'Even-strength defence'], ['pp', 'Power play'], ['pk', 'Penalty kill'], ['shooting', 'Finishing'], ['pen', 'Penalties drawn and taken']];
+    const comps = vrow ? COMPS.filter(cc => isNum(vrow[cc[0]])) : [];
+    if (comps.length) {
+      const mx = Math.max(0.5, Math.max.apply(null, comps.map(cc => Math.abs(vrow[cc[0]]))));
+      const bar = v => '<span class="rk-cbar" aria-hidden="true"><i style="' + (v >= 0 ? 'left:50%' : 'right:50%') + ';width:' + (50 * Math.abs(v) / mx).toFixed(1) + '%;background:' + (v >= 0 ? 'var(--signal)' : 'var(--c-2)') + '"></i></span>';
+      side.push('<div class="qk-span-6">' + U.card2('Where the value comes from', 'Goals above replacement by part of the game, ' + RK.seasonLabel(S) + ' (total ' + U.signed(vrow.gar, 1) + ')',
+        '<ul class="rk-list rk-comps">' + comps.map(cc => '<li><span>' + esc(cc[1]) + '</span>' + bar(vrow[cc[0]]) + '<span class="v num">' + U.signed(vrow[cc[0]], 1) + '</span></li>').join('') + '</ul>' +
+        (gpNow < 15 ? '<p class="rk-note" style="margin:8px 16px 12px">Early in the season most parts sit near zero: the special-teams and finishing parts need a few hundred minutes before they move.</p>' : ''),
+        { flush: true, foot: '<span>Blue adds value, orange costs it</span><a href="#/value">Value leaderboard →</a>' }) + '</div>');
+    }
     // movement (MOVES_VIEWS.md §4): our chance the player is not in the lineup next season, the type split, the deadline base rate
     const M = res[6], mvr = M ? M.byPid[pid] : null;
     if (mvr && isNum(mvr.p_next)) {
@@ -289,7 +307,7 @@ function render(el, params, state) {
 
     // the catalogue (peer distribution, values for the compare) and last season's percentiles (the rings), lazily
     let catFull = cat && cat.players ? cat : null, catP0 = null;
-    const withCat = cb => { if (catFull) { cb(catFull); return; } if (catP0) { catP0.then(cb); return; } catP0 = RK.loadYear(goalie ? 'goalies.json' : 'skaters.json', S).then(full => { catFull = full && full.players ? full : null; return catFull; }); catP0.then(cb); };
+    const withCat = cb => { if (catFull) { cb(catFull); return; } if (catP0) { catP0.then(cb); return; } catP0 = RK.loadYear(goalie ? 'goalies.json' : 'skaters.json', catS).then(full => { catFull = full && full.players ? full : null; return catFull; }); catP0.then(cb); };
     const repaint = () => { const old = body.querySelector('#pp-pcard'); if (old) old.outerHTML = pcardHTML(); };
     if (catP && !prevPct && body.querySelector('#pp-pcard')) {
       const host = body.querySelector('#pp-pcard');
@@ -526,7 +544,7 @@ function render(el, params, state) {
       const rows = part('Home', lg.filter(r => r.home)) + part('Away', lg.filter(r => !r.home)) + part('Last 5', lg.slice(-5)) + part('Season', lg);
       sh += '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Games</th><th class="num">GP</th>' + (goalie ? '<th class="num">SV%</th><th class="num">GSAx</th><th class="num">GA/GP</th>' : '<th class="num">G-A</th><th class="num">P/GP</th><th class="num">ixG/GP</th><th class="num">TOI</th>') + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
-    spEl.innerHTML = sh || QK.empty('No splits yet');
+    if (spEl) spEl.innerHTML = sh || QK.empty('No splits yet');
     RK.setMeta(p.updated_at ? 'Player file ' + esc(RK.fmtStamp(p.updated_at)) : '');
   });
 }
