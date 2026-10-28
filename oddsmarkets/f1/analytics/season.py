@@ -625,6 +625,46 @@ def elo_payload(history: dict | None) -> dict:
     return {"updated_at": _now(), "all_time": at, "current": cur, "params": h.get("params") or {}, "seasons": h.get("seasons") or []}
 
 
+HALL_MIN_STARTS = 8
+
+
+def hall_payload(careers: dict[str, dict], top: int = 100) -> dict:
+    """hall_of_fame.json (round 9): the greatest drivers and the greatest seasons by our driver model, from 1950.
+
+    The driver model across eras is the team-mate Elo (the only rating every season has: head-to-heads in the same car;
+    the lap-time ratings start in the 1990s). A season's rating is the driver's team-mate Elo after its last race, for
+    seasons with HALL_MIN_STARTS or more starts; `gain` is how far the season moved it. The hall ranks careers by their
+    peak team-mate Elo. Results (wins, points position, titles) come from the career files beside them."""
+    seasons, hall = [], []
+    for d, c in (careers or {}).items():
+        by = {}
+        for e in c.get("elo") or []:
+            if len(e) >= 4 and e[3] is not None:
+                by.setdefault(e[0], []).append(e)
+        rows = {s.get("year"): s for s in c.get("seasons") or []}
+        prev_end = None
+        for y in sorted(by):
+            es = sorted(by[y], key=lambda e: e[1])
+            end, start = es[-1][3], (prev_end if prev_end is not None else es[0][3])
+            prev_end = end
+            s = rows.get(y) or {}
+            if (s.get("races") or len(es)) < HALL_MIN_STARTS:
+                continue
+            seasons.append({"driver": d, "name": c.get("name") or d, "year": y, "team": s.get("team"), "tm_elo": round(float(end), 1),
+                            "field_elo": round(float(es[-1][2]), 1) if es[-1][2] is not None else None, "gain": round(float(end - start), 1),
+                            "starts": s.get("races") or len(es), "wins": s.get("wins"), "pos": s.get("pos"), "points": s.get("points")})
+        t = c.get("totals") or {}
+        if t.get("peak_elo_teammate") is not None and (t.get("races") or 0) >= 20:
+            hall.append({"driver": d, "name": c.get("name") or d, "peak_tm": t.get("peak_elo_teammate"), "peak_field": t.get("peak_elo"),
+                         "titles": t.get("titles") or 0, "wins": t.get("wins") or 0, "starts": t.get("races"),
+                         "years": [t.get("first_year"), t.get("last_year")], "teams": t.get("teams") or []})
+    climbs = sorted(seasons, key=lambda r: -r["gain"])[:top]          # the biggest single-season climbs: kinder to short careers
+    seasons.sort(key=lambda r: -r["tm_elo"])
+    hall.sort(key=lambda r: -(r["peak_tm"] or 0))
+    return {"ok": bool(seasons), "updated_at": _now(), "min_starts": HALL_MIN_STARTS, "rating": "team-mate Elo after the season's last race",
+            "seasons": seasons[:top], "climbs": climbs, "hall": hall[:top]}
+
+
 def season_age(dob: Any, year: int) -> int | None:
     """Age in whole years on 1 July of the season: one fixed date for every season (MIGRATION_V4 "Ages"), so two seasons
     never share an age and the Scouting Room's age band means the same thing in March and in December."""

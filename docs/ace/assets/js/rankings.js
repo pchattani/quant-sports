@@ -1,20 +1,16 @@
-/* The Quant Ace — rankings (#/<T>/rankings).
+/* The Quant Ace — rankings (#/<T>/rankings, #/<T>/defend, #/<T>/profiles): three of the Rankings section's five views
+ * (round 9: Official, Race, Elo, Points to defend, Profiles, one tab each; Race is race.js, Elo is elo.js).
  *
  *   official: the latest official ranking with weekly movement, next to each player's Elo rank
  *             (the gap shows who the ranking over- or under-rates), the race position and points to defend;
- *   elo: the Elo ranking with surface ratings and the official rank beside it;
- *   race: the year-to-date race with the Finals cut;
- *   to defend: the points each top player drops week by week over the coming year (a heat grid);
+ *   defend:   the points each top player drops week by week over the coming year (a heat grid);
  *   profiles: strengths and weak spots of the top 32 as cards (race-shape.js, from race.json "profiles"); the
  *             official view carries the same plain-English chips in a column (round 5, 24 Oct 2026).
- *
- * ?v=official|elo|race|defend picks the view. Reads <T>/rankings.json and <T>/race.json. */
+ * A finished season shows its season-end ranking (ta-past.js). Reads <T>/rankings.json and <T>/race.json. */
 (function (TA) {
 'use strict';
 
 const esc = TA.esc;
-const VIEWS = [{ key: 'official', label: 'Official' }, { key: 'elo', label: 'Elo' }, { key: 'race', label: 'Race (this week included)' }, { key: 'defend', label: 'Points to defend' },
-  { key: 'profiles', label: 'Strengths and weak spots' }];
 
 function moveHTML(m) {
   if (!TA.isNum(m) || Number(m) === 0) return '<span class="muted-inline">–</span>';
@@ -49,34 +45,7 @@ function official(T, rk, eloRank, raceRank, race) {
     { label: 'Strengths and weak spots', sortable: false, title: 'Plain-English reads of the season against the tour (percentiles among qualified players); hover a chip for the number', cls: 'hide-sm' }], rows, { compact: true, sticky: true });
 }
 
-function elo(T, rk, offRank) {
-  const rows = (rk.elo || []).slice(0, 200).map(r => {
-    const sf = r[3] || {};
-    return { _href: TA.playerHref(T, r[1]), cells: [{ v: r[0], html: '<b>' + r[0] + '</b>' }, { v: TA.playerName(T, r[1]), html: TA.playerLink(T, r[1], { country: true }) },
-      { v: r[2], html: '<b>' + TA.num(r[2], 0) + '</b>' }].concat(['hard', 'clay', 'grass'].map(s => ({ v: sf[s], html: TA.isNum(sf[s]) ? TA.num(sf[s], 0) : '—', cls: s === 'grass' ? 'hide-sm' : '' })),
-      [{ v: offRank[r[1]], html: TA.isNum(offRank[r[1]]) ? String(offRank[r[1]]) : '—' }]) };
-  });
-  if (!rows.length) return TA.muted('No Elo ranking yet.');
-  return TA.tableHTML([{ label: 'Rank', align: 'right' }, { label: 'Player' }, { label: 'Elo', align: 'right' },
-    { label: 'Hard', align: 'right' }, { label: 'Clay', align: 'right' }, { label: 'Grass', align: 'right', cls: 'hide-sm' }, { label: 'Official', align: 'right' }], rows, { compact: true, sticky: true }) +
-    '<a class="more-link" href="' + TA.href(T, 'elo') + '">Elo histories and all-time peaks →</a>';
-}
 
-function raceView(T, rk, race, offRank) {
-  const list = rk.race || [];
-  if (!list.length) return TA.muted('The race starts with the first tournament of the year.');
-  const cut = list[7] ? list[7][1] : null;
-  const rows = list.slice(0, 60).map((r, i) => {
-    const fq = ((race || {}).finals_qual || {})[r[0]];
-    return { _href: TA.playerHref(T, r[0]), _class: i === 8 ? 'cut' : '', cells: [{ v: i + 1, html: '<b>' + (i + 1) + '</b>' }, { v: TA.playerName(T, r[0]), html: TA.playerLink(T, r[0], { country: true }) },
-      { v: r[1], html: TA.num(r[1], 0) }, { v: TA.isNum(cut) ? r[1] - cut : null, html: TA.isNum(cut) && i !== 7 ? TA.signed(r[1] - cut, 0) : (i === 7 ? '<span class="muted-inline">8th</span>' : '—'), cls: 'hide-sm' },
-      { v: offRank[r[0]], html: TA.isNum(offRank[r[0]]) ? String(offRank[r[0]]) : '—', cls: 'hide-sm' }, { v: fq, html: TA.isNum(fq) ? TA.probCell(fq) : '—' }] };
-  });
-  return TA.tableHTML([{ label: '#', align: 'right' }, { label: 'Player' }, { label: 'Race points', align: 'right' }, { label: 'v 8th', align: 'right', title: 'Points ahead of (or behind) the eighth place, the last automatic Finals place', cls: 'hide-sm' },
-    { label: 'Official', align: 'right', cls: 'hide-sm' }, { label: 'Finals (our chance)', title: 'Our chance of qualifying, from the season simulation (which starts from its own, earlier snapshot of the race)' }], rows, { compact: true }) +
-    '<div class="section-note">The dashed line marks the top eight, the automatic Finals places (a Grand Slam champion ranked 9th to 20th can take the last place at the ATP Finals). ' +
-    '<a href="' + TA.href(T, 'race') + '">The full race simulation →</a></div>';
-}
 
 /* to_defend rows are [event, when, points]: `when` is the drop-off date (ISO) or an ISO week number. */
 function whenKey(w) { return typeof w === 'string' ? w.slice(0, 10) : String(w); }
@@ -100,7 +69,7 @@ function defend(T, rk) {
   offIds.forEach(p => td[p].forEach(r => { (evOf[whenKey(r[1])] = evOf[whenKey(r[1])] || {})[r[0]] = 1; }));
   const max = Math.max.apply(null, [].concat.apply([], offIds.map(p => td[p].map(r => r[2] || 0)))) || 1;
   const sumAt = (p, k) => td[p].filter(r => whenKey(r[1]) === k).reduce((a, r) => a + (r[2] || 0), 0);
-  const heat = TA.charts.heatTable({
+  const heat = heatTable({
     corner: 'Player', scale: 'seq', max: max,
     cols: keys.map(k => ({ label: whenLabel(whens[k]), title: Object.keys(evOf[k] || {}).map(e => TA.eventName(T, e, true)).join(', ') })),
     rows: offIds.map(p => ({ label: TA.playerLink(T, p, { surname: true, rank: true }), values: keys.map(k => (sumAt(p, k) ? sumAt(p, k) : null)),
@@ -112,6 +81,16 @@ function defend(T, rk) {
     esc(Object.keys(evOf[x.k] || {}).map(e => TA.eventName(T, e)).join(', ')) + '</div></div>').join('') + '</div>';
   return '<div class="section-note">Points the top 30 earned in the last 12 months, by the date they drop off the ranking. A player who repeats last year’s result keeps them; anything less loses ranking points. Hover a cell for the event.</div>' +
     heat + '<div class="day-head">The heaviest drop-offs across the top 30</div>' + big;
+}
+/* the points-to-defend grid: players down the side, drop-off weeks across, each cell shaded by its points (round 9: the
+   chart helper it once called was never shipped, so the view failed) */
+function heatTable(o) {
+  const max = o.max || 1;
+  return '<div class="qk-table-wrap ta-heat"><table class="qk-table dense"><thead><tr><th>' + esc(o.corner || '') + '</th>' +
+    o.cols.map(c => '<th class="num"' + (c.title ? ' title="' + esc(c.title) + '"' : '') + '>' + esc(c.label) + '</th>').join('') + '</tr></thead><tbody>' +
+    o.rows.map(r => '<tr><td>' + r.label + '</td>' + r.values.map((v, i) => TA.isNum(v)
+      ? '<td class="num" style="background:' + TA.seqColour(v / max) + '"' + ((r.titles || [])[i] ? ' title="' + esc(r.titles[i]) + '"' : '') + '>' + esc(o.fmt ? o.fmt(v) : v) + '</td>'
+      : '<td class="num muted-inline">·</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
 }
 function isoWeek(d) {
   const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -130,83 +109,67 @@ function profiles(T, rk, race) {
   return html || TA.muted('Player profiles come with the season simulation’s next build.');
 }
 
-/* Top and bottom performers (QKL.leaders): all surfaces (our Elo first, then hold, break and the tour-wide numbers)
-   and each surface on its own spec set, qualified players only (data/<T>/performers.json,
-   oddsmarkets/tennis/analytics/performers.py). Tennis has no positions: the surfaces are the picker. */
-function performers(host, T) {
-  if (!host) return;
-  TA.loadTour('performers.json', T).then(pf => {
-    if (!host.isConnected) return;
-    QKL.leaders(host, { data: TA.ok(pf) ? pf : { views: [] }, title: 'Who leads the tour, and who is struggling', scope: 'tour',
-      sub: 'The top five and the bottom five among this season’s qualified players on each key number: all surfaces with our Elo first, then hard, clay and grass on the numbers that matter there. Each name opens the player page.',
-      team: cc => (cc ? { abbr: cc, name: cc } : null), href: id => TA.playerHref(T, id),
-      empty: 'The boards fill once players reach the season’s match floor.' });
-  });
-}
 
-/* A finished season (round 9): the season-end official ranking and the season-end Elo from that year's catalogue
-   (ta-past.js); the race, the points to defend and the profiles belong to the season in play. */
+/* A finished season (round 9): the season-end official ranking from that year's catalogue (ta-past.js); Elo is the Elo
+   view's, and the points to defend and the profiles belong to the season in play. */
 function renderPast(el, T, Y, view) {
-  const PV = [{ key: 'official', label: 'Official, season’s end' }, { key: 'elo', label: 'Elo, season’s end' }];
-  if (!PV.some(v => v.key === view)) view = 'official';
   el.innerHTML = '<div id="rk-body">' + QK.skeleton('lines', 8) + '</div>';
   return TA.past.cat(T, Y).then(cat => {
     if (!el.isConnected) return;
     const body = document.getElementById('rk-body');
     if (!cat) { body.innerHTML = TA.card('Rankings ' + Y, '', TA.muted('The ' + Y + ' season file is not on the site.')); return; }
-    body.innerHTML = TA.past.band(T, Y, cat) + '<div class="card"><div class="toggle-row" id="rk-tabs">' + TA.toggles(PV, view, 'data-v') + '</div><div id="rk-view"></div></div>' + TA.past.note(Y);
-    const show = k => {
-      const v = document.getElementById('rk-view');
-      v.innerHTML = k === 'elo' ? TA.past.eloTable(T, Y, cat, 'elo') : TA.past.officialTable(T, Y, cat);
-      TA.sortable(v);
-      if (TA.v2 && TA.v2.oursHeads) TA.v2.oursHeads(v, { Elo: 'elo', Hard: 'elo_hard', Clay: 'elo_clay', Grass: 'elo_grass', 'Elo rank': 'elo_rank' });
-    };
-    show(view);
-    TA.wireToggles(document.getElementById('rk-tabs'), 'data-v', show);
+    const other = view === 'defend' || view === 'profiles';
+    body.innerHTML = TA.past.band(T, Y, cat) + (other ? QK.note('<b>' + (view === 'defend' ? 'Points to defend' : 'Profiles') + '</b> belong to the season in play. <a href="' + TA.href(T, view) + '">See them for ' + TA.currentYear(T) + ' →</a>') : '') +
+      '<div class="card"><div class="card-header">Official ranking, the season’s end <span class="card-sub">' + Y + ' · each player’s ranking at their last tour-level match, beside our Elo</span></div><div id="rk-view"></div></div>' + TA.past.note(Y);
+    const v = document.getElementById('rk-view');
+    v.innerHTML = TA.past.officialTable(T, Y, cat);
+    TA.sortable(v);
+    if (TA.v2 && TA.v2.oursHeads) TA.v2.oursHeads(v, { Elo: 'elo', 'Elo rank': 'elo_rank' });
     TA.setMeta(TA.tourName(T) + ' ' + Y + ' · the season’s end');
   });
 }
 
-function render(el, params) {
+/* Round 9 (Phase 2): Rankings is one page with views, each a tab of the section: Official (#/<T>/rankings), Race
+   (#/<T>/race, race.js), Elo (#/<T>/elo, elo.js), Points to defend (#/<T>/defend) and Profiles (#/<T>/profiles). The old
+   ?v= links land on their tab (core.js redirectOf). The tour's leaders on each number are the Scouting Room's Leaders. */
+function render(el, params, state) {
   const T = params.tour;
-  let view = (params.query || {}).v;
+  const route = (state && state.route) || 'rankings';
+  let view = route === 'defend' || route === 'profiles' ? route : 'official';
   if (TA.past && TA.past.is(T, params.year)) return renderPast(el, T, params.year, view);
-  if (!VIEWS.some(v => v.key === view)) view = 'official';
   el.innerHTML = '<div id="rk-body">' + QK.skeleton('lines', 8) + '</div>';
   return TA.loadAll([TA.tpath('rankings.json', T), TA.tpath('race.json', T)]).then(arr => {
     if (!el.isConnected) return;
     const rk = arr[0], race = TA.ok(arr[1]) ? arr[1] : null;
     const body = document.getElementById('rk-body');
     if (!TA.ok(rk)) { body.innerHTML = TA.card('Rankings', '', TA.notBuilt('The rankings payload', rk)); return; }
-    const eloRank = {}, offRank = {}, raceRank = {};
+    const eloRank = {}, raceRank = {};
     (rk.elo || []).forEach(r => { eloRank[r[1]] = r[0]; });
-    (rk.official || []).forEach(r => { offRank[r[1]] = r[0]; });
     (rk.race || []).forEach((r, i) => { raceRank[r[0]] = i + 1; });
     const subs = { official: 'as of ' + esc(TA.fmtDate(rk.date)) + ' · Elo rank and race position beside each player',
-      elo: 'surface-blended Elo; surface columns are the surface ratings', profiles: 'the top 32: percentiles among this season’s qualified players, with a plain-English read of each', race: 'points won this calendar year, this week included (the race simulation starts from its own snapshot)', defend: 'points dropping off over the next 12 months' };
-    /* v4: the black power list of this week's biggest climbers inside the top 100 (places gained since the last ranking) */
-    const climb = (rk.official || []).filter(r => r[0] <= 100 && TA.isNum(r[3]) && r[3] > 0).sort((a, b) => b[3] - a[3] || a[0] - b[0]).slice(0, 5);
-    const band = climb.length >= 3 ? QK.band(QK.sectionHead({ kicker: 'Who’s climbing', title: 'The week’s big movers', sub: 'The biggest climbs inside the top 100 since the last ranking. Points come from the last 52 weeks, so a deep run lifts a player straight away.' }) +
-      QK.hotRow(climb.map(r => ({ sport: 'tennis', kicker: TA.tourName(T) + ' · up ' + r[3] + ' place' + (r[3] === 1 ? '' : 's'), title: 'Ranked No. ' + r[0], name: TA.playerShort(T, r[1]), value: '#' + r[0], href: TA.playerHref(T, r[1]),
-        expl: TA.num(r[2], 0) + ' ranking points' + (TA.isNum(eloRank[r[1]]) ? '; No. ' + eloRank[r[1]] + ' by our Elo.' : '.') }))), { cls: 'ta-rk-band' }) : '';
-    body.innerHTML = band + '<div class="card"><div class="toggle-row" id="rk-tabs">' + TA.toggles(VIEWS, view, 'data-v') + '</div><div class="section-note" id="rk-sub"></div><div id="rk-view"></div></div>' +
-      QK.note('<b>Ranking or Elo?</b> The official ranking adds up points from the last 52 weeks, so it rewards playing a lot and going deep. Our Elo rates every result by who it came against, so it moves faster after an upset. A 100-point Elo gap means the higher-rated player wins about 64% of the time.') +
-      (window.QKL && QKL.leaders ? '<div id="rk-perf"></div>' : '');
-    const show = k => {
-      view = k;
-      document.getElementById('rk-sub').innerHTML = subs[k];
-      const v = document.getElementById('rk-view');
-      v.innerHTML = k === 'elo' ? elo(T, rk, offRank) : k === 'race' ? raceView(T, rk, race, offRank) : k === 'defend' ? defend(T, rk) : k === 'profiles' ? profiles(T, rk, race) : official(T, rk, eloRank, raceRank, race);
-      TA.sortable(v);
-      TA.shape.wire(v);
-      if (TA.v2 && TA.v2.oursHeads) TA.v2.oursHeads(v, { Elo: 'elo', Hard: 'elo_hard', Clay: 'elo_clay', Grass: 'elo_grass', 'Elo rank': 'elo_rank', 'Finals (our chance)': 'p_finals' });
-    };
-    show(view);
-    TA.wireToggles(document.getElementById('rk-tabs'), 'data-v', show);
-    if (window.QKL && QKL.leaders) performers(document.getElementById('rk-perf'), T);
+      profiles: 'the top 32: percentiles among this season’s qualified players, with a plain-English read of each', defend: 'points dropping off over the next 12 months' };
+    const titles = { official: 'The official ranking', profiles: 'Strengths and weak spots', defend: 'Points to defend' };
+    let band = '';
+    if (view === 'official') {
+      /* v4: the black power list of this week's biggest climbers inside the top 100 (places gained since the last ranking) */
+      const climb = (rk.official || []).filter(r => r[0] <= 100 && TA.isNum(r[3]) && r[3] > 0).sort((a, b) => b[3] - a[3] || a[0] - b[0]).slice(0, 5);
+      band = climb.length >= 3 ? QK.band(QK.sectionHead({ kicker: 'Who’s climbing', title: 'The week’s big movers', sub: 'The biggest climbs inside the top 100 since the last ranking. Points come from the last 52 weeks, so a deep run lifts a player straight away.' }) +
+        QK.hotRow(climb.map(r => ({ sport: 'tennis', kicker: TA.tourName(T) + ' · up ' + r[3] + ' place' + (r[3] === 1 ? '' : 's'), title: 'Ranked No. ' + r[0], name: TA.playerShort(T, r[1]), value: '#' + r[0], href: TA.playerHref(T, r[1]),
+          expl: TA.num(r[2], 0) + ' ranking points' + (TA.isNum(eloRank[r[1]]) ? '; No. ' + eloRank[r[1]] + ' by our Elo.' : '.') }))), { cls: 'ta-rk-band' }) : '';
+    }
+    body.innerHTML = band + '<div class="card"><div class="card-header">' + esc(titles[view]) + ' <span class="card-sub">' + subs[view] + '</span></div><div id="rk-view"></div></div>' +
+      (view === 'official' ? QK.note('<b>Ranking or Elo?</b> The official ranking adds up points from the last 52 weeks, so it rewards playing a lot and going deep. Our Elo rates every result by who it came against, so it moves faster after an upset. A 100-point Elo gap means the higher-rated player wins about 64% of the time. <a href="' + TA.href(T, 'elo') + '">The Elo view →</a>') : '') +
+      '<p class="ta-moved">Who leads the tour on each number, top five and bottom three: <a href="' + TA.href(T, 'scout') + '?view=leaders">the Scouting Room’s Leaders →</a></p>';
+    const v = document.getElementById('rk-view');
+    v.innerHTML = view === 'defend' ? defend(T, rk) : view === 'profiles' ? profiles(T, rk, race) : official(T, rk, eloRank, raceRank, race);
+    TA.sortable(v);
+    TA.shape.wire(v);
+    if (TA.v2 && TA.v2.oursHeads) TA.v2.oursHeads(v, { 'Elo rank': 'elo_rank', 'Finals (our chance)': 'p_finals', Finals: 'p_finals' });
     TA.setMeta('Official ranking of ' + esc(TA.fmtDate(rk.date, { year: false })));
   });
 }
 
 TA.route('rankings', render);
+TA.route('defend', render);
+TA.route('profiles', render);
 })(window.TA);

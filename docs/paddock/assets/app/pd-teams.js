@@ -17,6 +17,9 @@
  *      Compare teams (#/compare/teams/<a>/<b> redirects here).
  *   6. Through the season: the car's race or qualifying pace by round (season.json car_pace) and points added up
  *      round by round (teams.json log), for the constructors picked (?trend=, clubs=).
+ *   7. Qualifying head to head (round 9, Phase 4): each team's two regular drivers, round by round, a square for whoever
+ *      qualified ahead (the team colour for the driver ahead on the season, slate for the other), the count and the
+ *      median gap (drivers.json log quali_pos and values quali_gap_tm_pct / _ms).
  * Percentiles are the payload's (teams.json "pct", direction-aware, 100 = best); a metric without one is ranked among
  * the constructors on screen. Older-browser rule: no optional chaining, no nullish coalescing. */
 (function (PD) {
@@ -106,7 +109,8 @@ function writeQ() {
 }
 
 /* ── render ──────────────────────────────────────────────────────────────── */
-var SECS = [['tm-power', 'Power board'], ['tm-grid', 'Team profile'], ['tm-map', 'Style map'], ['tm-sw', 'Strengths and weaknesses'], ['h2h', 'Head to head'], ['tm-trend', 'Through the season']];
+var SECS = [['tm-power', 'Power board'], ['tm-grid', 'Team profile'], ['tm-map', 'Style map'], ['tm-sw', 'Strengths and weaknesses'], ['h2h', 'Head to head'], ['tm-quali', 'Qualifying duels'], ['tm-trend', 'Through the season']];
+var DRV = null;
 function jump(id) {
   var t = document.getElementById(id);
   if (!t) return;
@@ -120,9 +124,10 @@ function render(el, params) {
     '<nav class="tm-jump" aria-label="On this page"><div class="qk-chips scroll">' + SECS.map(function (s) { return '<a class="qk-chip" href="#' + s[0] + '" data-jump="' + s[0] + '">' + esc(s[1]) + '</a>'; }).join('') + '</div></nav>' +
     SECS.map(function (s) { return '<section class="qk-section tm-sec" id="' + s[0] + '">' + QK.skeleton('lines', 3) + '</section>'; }).join('');
   QK.$$('[data-jump]', el).forEach(function (a) { a.addEventListener('click', function (ev) { ev.preventDefault(); jump(a.getAttribute('data-jump')); }); });
-  return Promise.all([PD.load(ST.y + '/teams.json'), PD.load(ST.y + '/season.json'), PD.v2.specP]).then(function (res) {
+  return Promise.all([PD.load(ST.y + '/teams.json'), PD.load(ST.y + '/season.json'), PD.v2.specP, PD.load(ST.y + '/drivers.json')]).then(function (res) {
     if (!PD.alive(el)) return;
     var cat = res[0];
+    DRV = PD.ok(res[3]) ? res[3].drivers || null : null;
     SEA = PD.ok(res[1]) ? res[1] : null;
     if (!PD.ok(cat) || !cat.teams || !Object.keys(cat.teams).length) { SECS.forEach(function (s) { PD.set(s[0], ''); }); PD.set('tm-power', PD.notBuilt('The ' + ST.y + ' team catalogue', cat)); return; }
     T = cat.teams; MS = cat.metrics || [];
@@ -130,7 +135,7 @@ function render(el, params) {
     STAND = {}; (((SEA || {}).standings || {}).constructors || []).forEach(function (s) { STAND[s.team] = s; });
     SPLIT = (SEA || {}).car_driver_split || {};
     ROUNDS = Math.max(1, (SEA && SEA.rounds_done) || Math.max.apply(null, ids().map(function (t) { return ((T[t] || {}).log || []).length; }).concat([1])));
-    powerBoard(); grid(); styleMap(); strengths(); h2h(); trend();
+    powerBoard(); grid(); styleMap(); strengths(); h2h(); qualiDuels(); trend();
     if (ST.sec) setTimeout(function () { jump(ST.sec); }, 60);
   });
 }
@@ -309,6 +314,46 @@ function trend() {
   QK.$$('[data-set]', host).forEach(function (b) { b.addEventListener('click', function () { ST.clubs = b.getAttribute('data-set') === 'all' ? list.slice() : list.slice(0, 5); writeQ(); trend(); }); });
   PD.wireSeg(host, 'tm-tr', function (x) { ST.trend = x; writeQ(); trend(); });
   PD.wireSeg(host, 'tm-kind', function (x) { ST.kind = x; writeQ(); trend(); });
+}
+
+/* 7. qualifying head to head by team */
+function qualiDuels() {
+  var host = document.getElementById('tm-quali');
+  if (!host) return;
+  if (!DRV) { host.innerHTML = ''; return; }
+  var rowsOut = [];
+  byPower(ids()).forEach(function (t) {
+    var ds = Object.keys(DRV).filter(function (d) { return (DRV[d].log || []).some(function (l) { return l.team === t; }); });
+    var n = function (d) { return (DRV[d].log || []).filter(function (l) { return l.team === t && isNum(l.quali_pos); }).length; };
+    ds.sort(function (a, b) { return n(b) - n(a); });
+    if (ds.length < 2) return;
+    var A = ds[0], B = ds[1], la = {}, lb = {};
+    (DRV[A].log || []).forEach(function (l) { if (l.team === t && isNum(l.quali_pos)) la[l.round] = l.quali_pos; });
+    (DRV[B].log || []).forEach(function (l) { if (l.team === t && isNum(l.quali_pos)) lb[l.round] = l.quali_pos; });
+    var rounds = Object.keys(la).filter(function (r) { return lb[r] !== undefined && la[r] !== lb[r]; }).map(Number).sort(function (a, b) { return a - b; });
+    if (!rounds.length) return;
+    var wa = rounds.filter(function (r) { return la[r] < lb[r]; }).length;
+    if (wa * 2 < rounds.length) { var x = A; A = B; B = x; var y = la; la = lb; lb = y; wa = rounds.length - wa; }
+    rowsOut.push({ t: t, A: A, B: B, rounds: rounds, la: la, lb: lb, wa: wa, gap: ((DRV[B].values || {}).quali_gap_tm_pct), gapMs: ((DRV[B].values || {}).quali_gap_tm_ms) });
+  });
+  if (!rowsOut.length) { host.innerHTML = ''; return; }
+  var cleanest = rowsOut.slice().sort(function (a, b) { return (b.wa / b.rounds.length) - (a.wa / a.rounds.length); })[0];
+  var closest = rowsOut.slice().sort(function (a, b) { return Math.abs(a.wa / a.rounds.length - 0.5) - Math.abs(b.wa / b.rounds.length - 0.5); })[0];
+  var sur = PD.driverSurname;
+  host.innerHTML = QK.sectionHead({ kicker: 'Qualifying duels', title: 'Who wins Saturday, team by team', sub: 'Every session both drivers set a time for the same team: a square for whoever qualified ahead, in the team colour for the driver ahead on the season and slate for the other. The only fair qualifying test: same car, same day.' }) +
+    PD.kpis([
+      PD.kpi('Most one-sided', esc(sur(cleanest.A)) + ' ' + cleanest.wa + '–' + (cleanest.rounds.length - cleanest.wa), esc(PD.teamName(cleanest.t)) + ' · against ' + esc(PD.driverName(cleanest.B)), { text: true }),
+      PD.kpi('Closest', esc(sur(closest.A)) + ' ' + closest.wa + '–' + (closest.rounds.length - closest.wa), esc(PD.teamName(closest.t)) + ' · against ' + esc(PD.driverName(closest.B)), { text: true })
+    ]) +
+    '<div class="qk-card pd-mt"><div class="qk-card-body"><div class="pd-qd">' + rowsOut.map(function (r) {
+      var bk = QK.color.block(PD.teamColourRaw(r.t));
+      var sq = r.rounds.map(function (k) { var a = r.la[k] < r.lb[k]; return '<i class="' + (a ? 'a' : 'b') + '" style="' + (a ? 'background:' + bk.bg : '') + '" title="Round ' + k + ': ' + esc(sur(a ? r.A : r.B)) + ' ahead (P' + (a ? r.la[k] : r.lb[k]) + ' v P' + (a ? r.lb[k] : r.la[k]) + ')">' + (a ? sur(r.A) : sur(r.B)).charAt(0) + '</i>'; }).join('');
+      return '<div class="pd-qd-row"><span class="pd-qd-t">' + PD.mark(r.t) + '<a href="' + esc(thref(r.t)) + '">' + esc(PD.teamName(r.t)) + '</a></span>' +
+        '<span class="pd-qd-n"><b>' + PD.driverLink(r.A, { name: sur(r.A), dot: false, y: ST.y }) + ' ' + r.wa + '</b> – ' + (r.rounds.length - r.wa) + ' ' + PD.driverLink(r.B, { name: sur(r.B), dot: false, y: ST.y }) +
+        (isNum(r.gap) ? '<small>' + esc(sur(r.B)) + ' ' + PD.signed(r.gap, 2) + '% of a lap' + (isNum(r.gapMs) ? ' (' + PD.signed(r.gapMs / 1000, 3) + ' s)' : '') + ' a session, median</small>' : '') + '</span>' +
+        '<span class="pd-qd-sq" role="img" aria-label="' + esc(sur(r.A) + ' ahead in ' + r.wa + ' of ' + r.rounds.length + ' sessions') + '">' + sq + '</span></div>';
+    }).join('') + '</div></div></div>' +
+    QK.explain('Each square is one qualifying session, in round order; the letter is the driver who qualified ahead. The median gap is the second driver’s, in % of the lap against the team-mate (+ is slower).', { title: 'How to read it.' });
 }
 
 PD.route('constructors', render);

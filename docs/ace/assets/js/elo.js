@@ -16,14 +16,18 @@ let ES = { sort: 'all', show: 50, peak: 'all', line: 'all', picks: null, win: 'a
 
 function render(el, params, state) {
   const k = K(), T = k.T(params, state);
-  el.innerHTML = '<div class="card"><div class="card-header">' + k.TN(T) + ' Elo <span class="card-sub" id="el-sub">Loading…</span>' +
+  /* round 9 (Phase 3): the headline numbers (the top three on the chosen surface), then the chart, then the table */
+  const tableCard = '<div class="card"><div class="card-header" id="el-head">' + k.TN(T) + ' Elo <span class="card-sub" id="el-sub">Loading…</span>' +
     '<span class="pg-ctl">rank by ' + k.toggle('el-sort', [['all', 'Overall'], ['hard', 'Hard'], ['clay', 'Clay'], ['grass', 'Grass']], ES.sort) + '</span></div>' +
-    '<div class="af-elo-top" id="el-top"></div><div id="el-table">' + k.muted('Loading…') + '</div>' +
-    '<div class="pg-note" id="el-note"></div>' + '<div style="padding:0 22px 18px">' + QK.note('<b>Reading Elo.</b> A 100-point gap means the higher-rated player wins about 64% of the time, 200 points about 76%. Surface ratings use matches on that surface only, so a clay specialist can sit far higher on clay than overall.') + '</div></div>' +
+    '<div id="el-table">' + k.muted('Loading…') + '</div>' +
+    '<div class="pg-note" id="el-note"></div>' + '<div style="padding:0 22px 18px">' + QK.note('<b>Reading Elo.</b> A 100-point gap means the higher-rated player wins about 64% of the time, 200 points about 76%. Surface ratings use matches on that surface only, so a clay specialist can sit far higher on clay than overall.') + '</div></div>';
+  el.innerHTML = '<div class="af-elo-top ta-elo-top" id="el-top"></div>' +
     '<div class="card"><div class="card-header">Elo over time <span class="card-sub">Pick up to eight players; the line follows every match they played.</span>' +
     k.toggle('el-line', [['all', 'Overall'], ['hard', 'Hard'], ['clay', 'Clay'], ['grass', 'Grass']], ES.line) + '</div>' +
     '<div class="lab-controls af-controls"><label>Add a player<span id="el-pick"></span></label><label>Window<select id="el-win"><option value="all">Everything on file</option><option value="5">Last 5 years</option><option value="2">Last 2 years</option><option value="1">Last year</option></select></label>' +
     '<label>&nbsp;<button type="button" id="el-reset">Top 5 now</button></label></div><div id="el-chips" class="af-chips"></div><div id="el-chart" style="height:440px"></div><div class="pg-note" id="el-chart-note"></div></div>' +
+    tableCard +
+    '<section class="qk-section ta-el-surf" id="el-surf"></section>' +
     '<div class="card"><div class="card-header">All-time peaks <span class="card-sub" id="el-peak-sub"></span>' + k.toggle('el-peak', [['all', 'Overall'], ['hard', 'Hard'], ['clay', 'Clay'], ['grass', 'Grass']], ES.peak) + '</div><div id="el-peaks"></div></div>';
   /* a finished season (round 9): the table and the line picks start from that year's season-end Elo (its catalogue) */
   const Y = params.year, past = TA.past && TA.past.is(T, Y);
@@ -34,7 +38,7 @@ function render(el, params, state) {
       const cur = {};
       TA.past.byElo(res[2], 'elo').forEach((x, i) => { cur[x.id] = { all: TA.past.val(x.p, 'elo'), hard: TA.past.val(x.p, 'elo_hard'), clay: TA.past.val(x.p, 'elo_clay'), grass: TA.past.val(x.p, 'elo_grass'), n: x.p.matches, rank: i + 1, off: x.p.rank }; });
       E = Object.assign({}, E, { current: cur, _now: E.current, _year: Y });
-      el.querySelector('.card-header').firstChild.textContent = k.TN(T) + ' Elo at the end of ' + Y + ' ';
+      document.getElementById('el-head').firstChild.textContent = k.TN(T) + ' Elo at the end of ' + Y + ' ';
     }
     if (!k.ok(E) || !E.current) { document.getElementById('el-table').innerHTML = k.notBuilt('The ' + k.TN(T) + ' Elo file', E); document.getElementById('el-sub').textContent = ''; return; }
     const q = (params.query || {}).p;
@@ -61,6 +65,14 @@ function render(el, params, state) {
       drawLines(T, E);
     });
     drawLines(T, E);
+    /* round 9: the surface ratings (best on each surface, the specialists, the weakest), moved here from Value; the
+       current season only (value.json), ?s=hard|clay|grass */
+    const sh = document.getElementById('el-surf');
+    if (sh && !past && TA.value && TA.value.surfaces) {
+      sh.innerHTML = QK.sectionHead({ kicker: 'Surfaces', title: 'Who is best on each surface', sub: 'Our model rating on one surface (surface Elo, the game-share Elo and the serve and return record there) against the overall one: the best on it, who gains most and who loses most.' }) + '<div id="el-surf-b"></div>';
+      const sq = { s: (params.query || {}).s, _route: ch => { try { history.replaceState(null, '', TA.href(T, 'elo') + (ch.s ? '?s=' + ch.s : '')); } catch (e) { /* old browsers */ } } };
+      TA.value.surfaces(T, document.getElementById('el-surf-b'), sq).then(() => { if ((params.query || {}).s && sh.scrollIntoView) sh.scrollIntoView(); });
+    }
   });
 }
 
@@ -70,8 +82,10 @@ function drawTable(T, E) {
   ids.sort((a, b) => cur[b][s] - cur[a][s]);
   const shown = ids.slice(0, ES.show);
   const top = document.getElementById('el-top');
-  // A podium strip: the top three on the chosen surface.
-  top.innerHTML = ids.slice(0, 3).map((id, i) => '<a class="af-podium" href="' + k.playerHref(T, id) + '" style="--sc:' + k.surfColour(s) + '"><span class="af-pod-rk">' + (i + 1) + '</span><span class="af-pod-n">' + k.esc(k.name(T, id)) + '</span><span class="af-pod-v">' + k.num(cur[id][s], 0) + '</span></a>').join('');
+  // the headline numbers: the top three on the chosen surface, as black stat tiles (round 9: number, then chart, then table)
+  const sl = s === 'all' ? 'overall' : s;
+  top.innerHTML = ids.length ? QK.stats(ids.slice(0, 3).map((id, i) => ({ label: 'No. ' + (i + 1) + ' · ' + sl + ' Elo' + (E._year ? ', end of ' + E._year : ''), value: k.num(cur[id][s], 0),
+    sub: k.name(T, id) + (k.country(T, id) ? ' · ' + k.country(T, id) : ''), href: k.playerHref(T, id), signal: i === 0 }))) : '';
   const best = {};
   ['all', 'hard', 'clay', 'grass'].forEach(x => { best[x] = Math.max.apply(null, ids.map(id => cur[id][x]).filter(k.isNum)); });
   const cell = (id, x) => {

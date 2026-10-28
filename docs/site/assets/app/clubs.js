@@ -445,12 +445,47 @@ function recordTiles(ms) {
     FB.kpi('Clean sheets', String(cs), { sub: done.length ? pct(cs / done.length) + ' of matches' : '' })
   ]);
 }
+/* Round 9, Phase 4: who was missing last time out, and what it cost: the club's latest match with line-ups in its home
+   league (the league's fixtures.json says which have a match file), the match file's injured, suspended and doubtful
+   players, each with our projected value from the club's value file (FB.absenceRows). Nothing for a national team or a
+   club outside the followed leagues. */
+function clubAbsences(box, C) {
+  var doc = C.doc, home = doc.home;
+  if (!box || doc.national || !home || !FB.hasValueFile(C.tid)) return;
+  FB.compFiles(home, ['fixtures', 'teams']).then(function (d) {
+    var tm = (d.teams || {}).teams || {}, name = null;
+    Object.keys(tm).forEach(function (n) { if (String(tm[n].team_id) === C.tid) name = n; });
+    if (!name) return null;
+    var f = ((d.fixtures || {}).matches || []).filter(function (x) { return x.status === 'finished' && x.detail && (x.home === name || x.away === name); })
+      .sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); })[0];
+    if (!f) return null;
+    return FB.load(home + '/matches/' + f.id + '.json').then(function (m) {
+      var side = f.home === name ? 'home' : 'away';
+      var list = (((m || {}).missing) || {})[side] || [];
+      var inSquad = {};
+      ((((m || {}).lineups) || {})[side] || []).forEach(function (e) { if (e.id) inSquad[String(e.id)] = 1; });
+      list = list.filter(function (p) { return !(p.id && inSquad[String(p.id)]); });
+      return FB.absenceRows(C.tid, list).then(function (rows) { return { f: f, rows: rows, name: name }; });
+    });
+  }).then(function (r) {
+    if (!r || !box.isConnected) return;
+    var reg = r.rows.filter(function (x) { return x.regular && isNum(x.proj); });
+    var cost = reg.reduce(function (a, x) { return a + x.proj; }, 0);
+    var opp = r.f.home === r.name ? r.f.away : r.f.home;
+    box.innerHTML = FB.card('Who was missing last time out', esc(FB.fmtDate(r.f.date)) + ' v ' + esc(opp) + ' (' + esc(FB.compName(C.doc.home, true)) + ')' + (r.rows.length ? ': ' + r.rows.length + ' absent' + (reg.length ? ', ' + reg.length + ' of them regulars worth about ' + signed(cost, 2) + ' goals of expected goal difference a match' : '') : '') + '.',
+      r.rows.length ? '<ul class="fb-mx-ab">' + r.rows.map(function (x) {
+        return '<li><span class="fb-mx-abn">' + (x.id ? FB.playerLink(x.id, x.name) : esc(x.name)) + (x.role ? ' <span class="qk-muted">' + esc(x.role) + '</span>' : '') + '</span><span class="fb-mx-abw ' + esc(x.why) + '">' + esc(x.why) + '</span><b class="fb-num">' + (isNum(x.proj) ? signed(x.proj, 2) : '—') + '</b></li>';
+      }).join('') + '</ul><p class="fb-cap">The number is our projected value: goals of expected goal difference a match above a replacement-level player. <a href="' + esc(FB.href.match(C.doc.home, r.f.id)) + '">The match →</a></p>'
+        : FB.muted('Nobody was listed missing.'));
+  });
+}
 function drawOverview(body, C, q) {
   var doc = C.doc;
   var ms = C.matches.filter(keepFn(FB.merge(q, { e: q.e || C.cur })));
   var cdossier = q.c && FB.comp(q.c) && C.live.some(function (s) { return s.comp === q.c; });
   body.innerHTML = '<div class="qk-kicker fb-cl-k">' + esc(q.e || C.cur) + (q.c ? ' · ' + esc(FB.compName(q.c)) : ' · every competition') + '</div>' + recordTiles(ms) +
     (cdossier ? '<div id="cl-dossier" class="fb-sec"></div>' : '') +
+    '<section class="fb-sec" id="cl-abs"></section>' +
     '<section class="fb-sec" id="cl-perf"></section>' +
     '<section class="fb-sec">' + FB.card('Year by year', (q.c ? 'In ' + esc(FB.compName(q.c)) + ' only. ' : 'Every competition summed per season, ') + 'oldest to newest: results by colour, points per game on the line. ' +
       (C.frame === 'calendar' ? 'Seasons are calendar years.' : 'Seasons run July to June; summer tournaments close the season they end.'),
@@ -481,6 +516,7 @@ function drawOverview(body, C, q) {
   if (C.valueLeague) FB.load('value/club/' + C.tid + '.json').then(function (d) { if (FB.alive(body)) drawNeedsMini(body.querySelector('#cl-needs-mini'), C, d); });
   drawMost(body.querySelector('#cl-most'), C);
   drawPerformers(body.querySelector('#cl-perf'), C);
+  clubAbsences(body.querySelector('#cl-abs'), C);
   if (cdossier) drawDossier(body.querySelector('#cl-dossier'), C, q.c);
 }
 

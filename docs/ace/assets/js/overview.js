@@ -210,6 +210,54 @@ function fanStories(el, T, vj) {
     actions: '<a class="qk-more" href="' + TA.href(T, 'value') + '?v=luck">Luck, player by player</a>' }) + QK.storyCards(cards, { cols: 3 });
 }
 
+/* Round 9 (Phase 4): records in reach, from history.json (every tour-level champion since 2000 for the ATP, 2007 for the
+   WTA). For the active players (ranked inside the top 100) the closest chases on the Grand Slam and the title lists: the
+   next mark above them and who holds it. The lists cover our files only, so the cards say "since <year>". Weeks at No. 1
+   need the weekly rankings, which the files do not keep, so there is no card for them. */
+function recordsInReach(host, T, hist, rk) {
+  if (!host) return;
+  /* active = in this week's official ranking (rankings.json), not a retired player's last rank on file */
+  const now = {};
+  (((rk && rk.ok !== false) ? rk.official : null) || []).forEach(r => { now[String(r[1])] = r[0]; });
+  const ev = (hist || {}).events || {}, slam = {}, ttl = {};
+  Object.keys(ev).forEach(tid => {
+    const e = ev[tid] || {};
+    if (e.level === 'q' || e.level === 'ch') return;
+    (e.champions || []).forEach(c => { const pid = String(c[1]); ttl[pid] = (ttl[pid] || 0) + 1; if (e.level === 'slam') slam[pid] = (slam[pid] || 0) + 1; });
+  });
+  const since = ((TA.fk || {}).FIRST_YEAR || {})[T] || (T === 'wta' ? 2007 : 2000);
+  const rank = pid => now[String(pid)];
+  const active = pid => isNum(rank(pid)) && rank(pid) <= 100;
+  const chases = (cnt, what) => {
+    const all = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]);
+    return all.filter(p => active(p) && cnt[p] >= 1).map(p => {
+      const above = all.filter(q => cnt[q] > cnt[p]);
+      if (!above.length) return { p: p, n: cnt[p], top: true, what: what };
+      const mark = Math.min.apply(null, above.map(q => cnt[q]));
+      const holders = above.filter(q => cnt[q] === mark);
+      return { p: p, n: cnt[p], mark: mark, gap: mark - cnt[p], holders: holders, what: what, rec: all[0], recN: cnt[all[0]] };
+    });
+  };
+  const sl = chases(slam, 'slam'), tl = chases(ttl, 'title');
+  const pick = list => list.filter(x => !x.top).sort((a, b) => a.gap - b.gap || b.n - a.n);
+  const cards = [];
+  const recCard = (cnt, label) => { const all = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]); if (!all.length) return null;
+    const p = all[0]; return { kicker: 'The record since ' + since, name: TA.playerName(T, p), sub: (active(p) ? 'Active · No. ' + rank(p) : 'Retired or outside the top 100') + ' · ' + TA.tourName(T), href: TA.playerHref(T, p), sport: 'tennis',
+      value: String(cnt[p]), unit: label, text: (all[1] ? 'Next on the list: ' + TA.playerName(T, all[1]) + ' with ' + cnt[all[1]] + '.' : '') }; };
+  const chaseCard = x => ({ kicker: x.what === 'slam' ? 'Grand Slams in reach' : 'Titles in reach', name: TA.playerName(T, x.p), sub: 'No. ' + rank(x.p) + ' · ' + TA.tourName(T), href: TA.playerHref(T, x.p), sport: 'tennis',
+    value: String(x.n), unit: x.what === 'slam' ? 'Grand Slam titles since ' + since : 'tour-level titles since ' + since,
+    pace: { now: x.n, target: x.mark, max: x.mark, label: 'Level with ' + TA.playerSurname(T, x.holders[0]) },
+    text: x.gap + ' more to draw level with ' + x.holders.map(q => TA.playerName(T, q)).join(' and ') + ' on ' + x.mark + ', ' + (x.gap + 1) + ' to pass.' });
+  const r1 = recCard(slam, 'Grand Slam titles');
+  if (r1) cards.push(r1);
+  pick(sl).slice(0, 2).forEach(x => cards.push(chaseCard(x)));
+  pick(tl).filter(x => cards.every(c => c.name !== TA.playerName(T, x.p))).slice(0, 3 - Math.min(2, cards.length - 1)).forEach(x => cards.push(chaseCard(x)));
+  if (cards.length < 2) { host.innerHTML = ''; return; }
+  host.innerHTML = QK.sectionHead({ kicker: 'Records in reach', title: 'Chasing the lists', sub: 'Grand Slam and tour-level titles on our files, every champion since ' + since + ': the record, and the active players closest to the next mark above them.' }) +
+    QK.storyCards(cards.slice(0, 4), { cols: Math.min(4, cards.length) }) +
+    '<p class="qk-caption">Counts start in ' + since + ', the first ' + TA.tourName(T) + ' season on our files, so earlier titles are not in them. Weeks at No. 1 are not counted: our files keep the latest ranking, not every week’s.</p>';
+}
+
 function render(el, params) {
   const T = params.tour, Y = params.year;
   const info = TA.tourInfo(T);
@@ -247,13 +295,16 @@ function render(el, params) {
     const tourW = T === 'wta' ? 'WTA' : 'ATP';
     const dig = isCurrent ? (info.digest || {}) : {};
     const feat = isCurrent ? pickFeatured(dig, nowList.concat(nextList)) : null;
+    /* round 9: one of each module. The lead's fallback race (nothing big on) is not repeated further down, and the Elo
+       leaders live in the power list only (the Elo view has the tables) */
+    const used = {};
     let html = (tick.length ? '<div class="qk-ticker ta-ticker" aria-label="Scoreboard">' + QK.ticker(tick, { group: 'league', pill: false, market: 'quiet' }) + '</div>' : '') +
       intro({ tag: kicker,
         title: isCurrent ? 'Every ' + tourW + ' match, player and tournament, by the numbers.' : 'The ' + TA.tourName(T) + ' in ' + Y + ', as it finished.',
         lede: isCurrent ? 'Our chance for every match, title chances from simulating every draw, who’s for real, and the race to the Finals, in plain English.'
           : 'The ' + Y + ' season: the champions, the rankings and the ratings as they finished.',
         links: [{ label: evNow.length ? 'Draws' : 'Tournaments', sub: evNow.length ? ev0Name : 'The calendar and every draw', href: evNow.length ? TA.eventHref(T, evNow[0].event) : TA.href(T, 'calendar', Y) },
-          { label: 'Rankings', sub: 'And the race to the Finals', href: TA.href(T, 'rankings', Y) }, { label: 'Players', sub: 'Ratings and percentiles', href: TA.href(T, 'players', Y) }] });
+          { label: 'Rankings', sub: 'And the race to the Finals', href: TA.href(T, 'rankings', Y) }, { label: 'Scouting Room', sub: 'Every player, every metric', href: TA.href(T, 'scout', Y) }] });
     if (isCurrent) {
       const wt = weekTiles(T, dig, race, feat, yeFav);
       html += '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: 'This week in ' + tourW + ' tennis', title: wt.length >= 3 ? 'The week in ' + WORDS[wt.length].toLowerCase() + ' lines' : 'The week so far', sub: stageLine(T, dig.stage) }) +
@@ -267,6 +318,9 @@ function render(el, params) {
         const no1 = race && race.year_end_no1 ? Object.keys(race.year_end_no1).map(pid => ({ pid: pid, p: race.year_end_no1[pid] })).filter(r => isNum(r.p) && r.p > 0.002).sort((a, b) => b.p - a.p) : [];
         const fq = race && race.finals_qual ? Object.keys(race.finals_qual).map(pid => ({ pid: pid, p: race.finals_qual[pid] })).filter(r => isNum(r.p) && r.p > 0.01 && r.p < 0.995).sort((a, b) => b.p - a.p) : [];
         const sm = evNow.length ? 'Nothing big on right now' : 'Between tournaments';
+        if (fq.length >= 3) used.fq = 1;
+        else if (no1.length >= 2) used.no1 = 1;
+        else if (titleRows.length) used.title = 1;
         if (fq.length >= 3) html += '<div class="ql-race">' + QK.sectionHead({ kicker: sm, title: 'So here’s the race to the Finals', sub: 'Our chance of qualifying for the ' + tourW + ' Finals, for the players still in the hunt, from simulating the rest of the season.', tag: 'h3' }) +
           QK.chances(fq.slice(0, 8).map(r => ({ label: TA.playerShort(T, r.pid), p: r.p, href: TA.playerHref(T, r.pid) })), { max: 1, key: false, oursName: 'Our chance of qualifying' }) + '</div>';
         else if (no1.length >= 2) html += '<div class="ql-race">' + QK.sectionHead({ kicker: sm, title: 'So here’s the race for No. 1', sub: 'Our chance of finishing the year ranked No. 1, from simulating the rest of the season.', tag: 'h3' }) +
@@ -277,6 +331,9 @@ function render(el, params) {
       html += '</div></section>';
     }
 
+    /* round 9: a finished season opens on its recap (ta-past.js: the champions, the Finals' last four as played with our
+       calls, our call going into every big event against who won, the season-end top ten, the best by our numbers) */
+    if (!isCurrent) html += '<div id="ov-recap"></div>';
     if (evNow.length) {
       html += '<section class="qk-section">' + QK.sectionHead({ kicker: 'In play', title: 'Tournaments this week', sub: 'Open one for the draw, every path through it and our title chances from simulating the rest of it.' }) + '<div class="ta-evcards">' +
         evNow.map(e => {
@@ -308,13 +365,14 @@ function render(el, params) {
       if (!r.length) return;
       hot.push({ sport: 'tennis', title: x[1], name: TA.playerShort(T, r[0][0]), value: Math.round(r[0][1]), unit: x[0] === 'all' ? 'Elo' : TA.surfaceLabel(x[0]) + ' Elo', next: r[1] ? { name: TA.playerShort(T, r[1][0]), value: Math.round(r[1][1]) } : null, expl: x[2], href: TA.playerHref(T, r[0][0]) });
     });
-    if (hot.length >= 3) html += QK.band(QK.sectionHead({ kicker: 'Who’s hot', title: isCurrent ? 'The form players' : 'The year’s leaders', sub: 'The leaders in the race, the trophy count and our ratings, with the next best for scale.' }) + QK.hotRow(hot.slice(0, 5)));
+    if (isCurrent && hot.length >= 3) html += QK.band(QK.sectionHead({ kicker: 'Who’s hot', title: isCurrent ? 'The form players' : 'The year’s leaders', sub: 'The leaders in the race, the trophy count and our ratings, with the next best for scale.' }) + QK.hotRow(hot.slice(0, 5)));
 
     // ── round 6: the fan stories (value.json, current year), then Who's for real?
     if (isCurrent) {
       html += '<section class="qk-section" id="ov-break"></section>' +
         '<section class="qk-section" id="ov-spot"></section>' +
-        '<section class="qk-section" id="ov-clutch"></section>';
+        '<section class="qk-section" id="ov-clutch"></section>' +
+        '<section class="qk-section" id="ov-records"></section>';
       html += '<section class="qk-section ta-ov-real">' + QK.sectionHead({ kicker: 'Who’s for real?', title: 'Results v chances', sub: 'Winning games is the steady part of a record; turning them into match wins takes tiebreaks and deciding sets, which come and go. Top-left: winning more matches than the games suggest. Bottom-right: the reverse.' }) +
         '<div class="qk-card"><div class="qk-card-body"><div id="ov-luck" class="qk-chart" style="--h:440px" role="img" aria-label="Share of matches won against share of games won">' + QK.skeleton('chart', 1) + '</div><p class="qk-caption" id="ov-luck-cap"></p></div></div></section>';
     }
@@ -323,21 +381,22 @@ function render(el, params) {
       'An <b>Elo rating</b> moves with every result: beat a stronger player, gain more. A 100-point gap makes the higher-rated player about a 64% favourite.'] }) + '</section>';
 
     // ── charts
-    const raceRows = isCurrent && race ? Object.keys(race.finals_qual || {}).map(pid => ({ pid: pid, p: race.finals_qual[pid] })).filter(r => isNum(r.p)).sort((a, b) => b.p - a.p).slice(0, 12) : [];
-    const eloKeys = ['all', 'hard', 'clay', 'grass'].filter(k => ((info.elo_top || {})[k] || []).length);
-    const hasNo1 = isCurrent && race && race.year_end_no1 && Object.keys(race.year_end_no1).length;
-    if (titleRows.length || hasNo1) {
+    const raceRows = isCurrent && race && !used.fq ? Object.keys(race.finals_qual || {}).map(pid => ({ pid: pid, p: race.finals_qual[pid] })).filter(r => isNum(r.p)).sort((a, b) => b.p - a.p).slice(0, 12) : [];
+    const eloKeys = [];
+    const hasNo1 = isCurrent && race && race.year_end_no1 && Object.keys(race.year_end_no1).length && !used.no1;
+    const showTitle = titleRows.length && !used.title;
+    if (showTitle || hasNo1) {
       const t0 = titleRows[0];
-      html += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Title race', title: titleRows.length ? 'Who lifts the trophy?' : 'Who finishes No. 1?',
+      html += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Title race', title: showTitle ? 'Who lifts the trophy?' : 'Who finishes No. 1?',
         sub: (t0 ? (t0.p < 0.2 ? 'Nobody’s better than 1 in 5 in ' + ev0Name + '. ' : TA.playerShort(T, t0.pid) + ' leads our board in ' + ev0Name + ' at ' + TA.pct(t0.p, 0) + '. ') : '') + 'Our chances from simulating the rest of the draw and the season, match by match.',
-        actions: titleRows.length ? '<a class="qk-more" href="' + TA.eventHref(T, evNow[0].event) + '">The draw and every path</a>' : '' }) + '<div class="qk-grid">';
-      if (titleRows.length) html += '<div class="qk-span-6">' + V().card('Who wins ' + ev0Name, 'Our title chance from simulating the rest of the draw', '<div id="ov-title"></div>', { foot: '<span>Top ten</span><a href="' + TA.eventHref(T, evNow[0].event) + '">The draw and every path →</a>' }) + '</div>';
+        actions: showTitle ? '<a class="qk-more" href="' + TA.eventHref(T, evNow[0].event) + '">The draw and every path</a>' : '' }) + '<div class="qk-grid">';
+      if (showTitle) html += '<div class="qk-span-6">' + V().card('Who wins ' + ev0Name, 'Our title chance from simulating the rest of the draw', '<div id="ov-title"></div>', { foot: '<span>Top ten</span><a href="' + TA.eventHref(T, evNow[0].event) + '">The draw and every path →</a>' }) + '</div>';
       if (hasNo1) html += '<div class="qk-span-6">' + V().card('Year-end No. 1', 'Our chance of finishing the year ranked No. 1', '<div id="ov-no1"></div>', { foot: '<span>From ' + (race.n_sims ? Number(race.n_sims).toLocaleString('en-GB') + ' ' : '') + 'simulated seasons</span><a href="' + TA.href(T, 'rankings') + '">Rankings →</a>' }) + '</div>';
       html += '</div></section>';
     }
-    if (raceRows.length || eloKeys.length) {
-      html += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Race and ratings', title: 'Who makes the ' + (T === 'wta' ? 'WTA' : 'ATP') + ' Finals?', sub: 'Our chance of qualifying from simulating the rest of the season, beside our strength ratings. Tap a row to open the player.' }) + '<div class="qk-grid">';
-      if (raceRows.length) html += '<div class="qk-span-6">' + V().card('Race to the Finals', 'Our chance of qualifying, from ' + (race.n_sims ? Number(race.n_sims).toLocaleString('en-GB') + ' ' : '') + 'simulated seasons', '<div id="ov-race"></div>', { foot: '<span>Race points when the season was last simulated' + (race.as_of ? ' (' + esc(TA.fmtDate(race.as_of, { year: false, weekday: false })) + ')' : '') + '</span><a href="' + TA.href(T, 'race') + '">The race →</a>' }) + '</div>';
+    if (raceRows.length) {
+      html += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Race to the Finals', title: 'Who makes the ' + (T === 'wta' ? 'WTA' : 'ATP') + ' Finals?', sub: 'Our chance of qualifying from simulating the rest of the season. Tap a row to open the player.' }) + '<div class="qk-grid">';
+      if (raceRows.length) html += '<div class="qk-span-8">' + V().card('Race to the Finals', 'Our chance of qualifying, from ' + (race.n_sims ? Number(race.n_sims).toLocaleString('en-GB') + ' ' : '') + 'simulated seasons', '<div id="ov-race"></div>', { foot: '<span>Race points when the season was last simulated' + (race.as_of ? ' (' + esc(TA.fmtDate(race.as_of, { year: false, weekday: false })) + ')' : '') + '</span><a href="' + TA.href(T, 'race') + '">The race →</a>' }) + '</div>';
       if (eloKeys.length) html += '<div class="qk-span-6">' + V().card('Elo top 10', 'Our strength ratings from every tour-level result', V().seg('ov-sf', eloKeys.map(k => [k, k === 'all' ? 'Overall' : TA.surfaceLabel(k)]), eloKeys[0], 'Surface') + V().chart('ov-elo', 360, 'Elo top 10'), { foot: '<span>A 100-point gap makes the higher-rated player about a 64% favourite</span><a href="' + TA.href(T, 'elo') + '">Elo tables →</a>' }) + '</div>';
       html += '</div></section>';
     }
@@ -346,7 +405,7 @@ function render(el, params) {
       if (ch) html += '<section class="qk-section">' + QK.sectionHead({ kicker: Y, title: 'Champions', sub: 'The Slams, the Finals and the 1000s in ' + Y + '.', actions: '<a class="qk-btn" href="' + TA.href(T, 'calendar', Y) + '">Every tournament</a>' }) + '<div class="qk-card">' + ch + '</div></section>';
     }
     html += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Explore', title: 'More on the ' + TA.tourName(T) }) + '<div class="ov-explore">' + [
-      [TA.href(T, 'players', Y), 'Players', 'Ranked against their tour on the metrics that predict'],
+      [TA.href(T, 'scout', Y), 'Scouting Room', 'Every player ranked against the tour or one surface, on every metric'],
       [TA.href(T, 'h2h'), 'Head to head', 'Any two players, any surface'],
       [TA.href(T, 'value'), 'Value', 'Breakouts, luck, over- and undervalued players'],
       [TA.href(T, 'compare'), 'Compare', 'Two or three players side by side'],
@@ -355,8 +414,10 @@ function render(el, params) {
     ].map(x => '<a class="qk-card is-link ov-x" href="' + x[0] + '"><b>' + esc(x[1]) + '</b><span>' + esc(x[2]) + '</span></a>').join('') + '</div></section>';
 
     el.innerHTML = html;
+    if (!isCurrent && TA.past && TA.past.recap) TA.past.recap(el.querySelector('#ov-recap'), T, Y);
 
     if (isCurrent) TA.load(TA.tpath('value.json', T)).then(vj => { if (el.isConnected && TA.ok(vj)) fanStories(el, T, vj); });
+    if (isCurrent) TA.loadAll([TA.tpath('history.json', T), TA.tpath('rankings.json', T)]).then(r2 => { if (el.isConnected && TA.ok(r2[0])) recordsInReach(el.querySelector('#ov-records'), T, r2[0], r2[1]); });
 
     /* Who's for real?: share of matches won (results) against share of games won (the process) this season, from
        value.json's luck rows (the season block), the top 40 by ranking with 15 or more tour-level matches */
@@ -390,7 +451,7 @@ function render(el, params) {
       draw(nowList.length ? 'now' : nextList.length ? 'next' : 'results');
       QK.seg(el.querySelector('#ov-when'), draw);
     }
-    if (titleRows.length) el.querySelector('#ov-title').innerHTML = QK.chances(titleRows.slice(0, 10).map(r => ({ label: TA.playerShort(T, r.pid), p: r.p, href: TA.playerHref(T, r.pid), sub: isNum(TA.playerRank(T, r.pid)) ? 'No. ' + TA.playerRank(T, r.pid) : '' })), { oursName: 'Our title chance', key: false });
+    if (showTitle) el.querySelector('#ov-title').innerHTML = QK.chances(titleRows.slice(0, 10).map(r => ({ label: TA.playerShort(T, r.pid), p: r.p, href: TA.playerHref(T, r.pid), sub: isNum(TA.playerRank(T, r.pid)) ? 'No. ' + TA.playerRank(T, r.pid) : '' })), { oursName: 'Our title chance', key: false });
     if (eloKeys.length) {
       const drawElo = k => {
         const rows = (info.elo_top || {})[k] || [];

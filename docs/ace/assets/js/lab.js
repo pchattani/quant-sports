@@ -20,7 +20,14 @@
  *
  * Data: data/<T>/lab.json, column-oriented {"fields": ["id","name","year","matches", ...metric keys],
  * "metrics": [METRIC], "rows": [[...]], "years": [...]}. An optional "surface" field (rows per
- * player-year-surface, "all" for the whole year) enables the surface filter. Uses TA.fk. */
+ * player-year-surface, "all" for the whole year) enables the surface filter. Uses TA.fk.
+ *
+ * Round 9 (28 Oct 2026): the Lab is the Scouting Room's Chart view (ta-scout.js). TA.lab.mount(host, T, ext) draws the
+ * chart and the ranked table inside the room: the room's control bar owns the season, the group (Broad or a surface),
+ * the minimum, the country and age filters (ext.keep) and the search, so those controls are hidden here; the presets,
+ * the axes (opening on the group's view: hold against break, coloured by Elo or the surface Elo), the colour and the
+ * shrink stay. A click on a dot opens the room's profile drawer (ext.onPick) and the axes go to the room's address
+ * (ext.onAxes). #/<T>/lab itself redirects to #/<T>/scout?view=chart (core.js). */
 (function (TA) {
 'use strict';
 
@@ -51,6 +58,7 @@ const SURF_FLOOR = { hard: 10, clay: 8, grass: 5 };               // the spec's 
 const SURF_COPY = /^(name|rank|best_rank|points|elo.*)$/;          // ratings a surface row takes from the year's all-surface row
 
 let LAB = null, LABT = null;
+let EXT = null;    // the Scouting Room's state when the chart is mounted inside it (TA.lab.mount), else null
 let S = { win: null, within: 'broad', surf: 'all', min: 10, shrink: true, preset: 0, x: '', y: '', color: 'country', q: '' };
 const MU = {};
 
@@ -110,6 +118,7 @@ function surfFloor(sf) { const c = TA.v2.spec, g = c && c.group ? c.group(TA.v2.
 /* the group's spec headline ids that this payload carries, in the spec's order */
 function headKeys() { const c = TA.v2.spec; return (c ? c.headline(specGroup()) : []).filter(key => LAB.idx[key] !== undefined && avail(key)); }
 function writeHash() {
+  if (EXT) { if (EXT.onAxes) EXT.onAxes({ x: S.x, y: S.y, color: S.color }); return; }
   const h = String(location.hash || ''), qi = h.indexOf('?');
   const q = {};
   (qi >= 0 ? h.slice(qi + 1) : '').split('&').forEach(kv => { if (!kv) return; const i = kv.indexOf('='); q[i >= 0 ? kv.slice(0, i) : kv] = i >= 0 ? kv.slice(i + 1) : ''; });
@@ -212,7 +221,7 @@ function applyPreset() {
 
 function draw() {
   const k = K(), C = k.C, T = LABT;
-  const base0 = windowRows().filter(r => (raw(r, 'matches') || 0) >= S.min);
+  const base0 = windowRows().filter(r => (raw(r, 'matches') || 0) >= S.min && (!EXT || !EXT.keep || EXT.keep(r)));
   Object.keys(MU).forEach(key => delete MU[key]);
   [S.x, S.y, S.color].forEach(key => { if (key && LAB.idx[key] !== undefined && shrinkable(key)) MU[key] = k.median(base0.map(r => raw(r, key))); });
   const rows = base0.filter(r => val(r, S.x) !== null && val(r, S.y) !== null);
@@ -298,7 +307,7 @@ function draw() {
     };
   }, { label: label(S.y) + ' against ' + label(S.x) });
   const inst = window.echarts && echarts.getInstanceByDom(chart);
-  if (inst) { inst.off('click'); inst.on('click', ev => { const id = String(((ev.data || {}).id) || '').split('|')[0]; if (id) location.hash = k.playerHref(T, id); }); }
+  if (inst) { inst.off('click'); inst.on('click', ev => { const id = String(((ev.data || {}).id) || '').split('|')[0]; if (!id) return; if (EXT && EXT.onPick) EXT.onPick(id); else location.hash = k.playerHref(T, id); }); }
   const mX = LAB.meta[S.x] || {}, mY = LAB.meta[S.y] || {};
   set('lab-note', 'Dotted lines are the medians of the players on screen (' + k.esc(groupName()) + '). ' + (lower(S.x) || lower(S.y) ? 'Axes where less is better (and the ranking) are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
     (diag ? 'The dashed diagonal is equality: a dot above it won more points on serve than the score model inferred. ' : '') +
@@ -328,41 +337,67 @@ function draw() {
   TA.v2.oursHeads(host, hm);
 }
 
-function render(el, params, state) {
-  const k = K(), T = k.T(params, state);
-  el.innerHTML = '<div class="card"><div class="card-header">' + k.TN(T) + ' player lab <span class="card-sub" id="lab-sub">Loading…</span></div>' +
-    '<div id="lab-wn-host" class="ta-lab-within"></div>' +
+/* The controls and cards. embedded (the Scouting Room's Chart): the years, the group, the minimum and the highlight are
+   the room's (hidden here), and the chart's card leads */
+function markup(T, embedded) {
+  const k = K(), hide = embedded ? ' hidden style="display:none"' : '';
+  return '<div class="card"><div class="card-header">' + (embedded ? 'Any two metrics' : k.TN(T) + ' player lab') + ' <span class="card-sub" id="lab-sub">Loading…</span></div>' +
+    '<div id="lab-wn-host" class="ta-lab-within"' + hide + '></div>' +
     '<div class="lab-controls af-controls">' +
-    '<label>Years<select id="lab-win"></select></label>' +
+    '<label' + hide + '>Years<select id="lab-win"></select></label>' +
     '<label>Preset<select id="lab-preset" class="af-wide"></select></label>' +
     '<label>X axis<select id="lab-x"></select></label>' +
     '<label>Y axis<select id="lab-y"></select></label>' +
     '<label>&nbsp;<button type="button" id="lab-swap" title="Swap the axes">⇄ swap</button></label>' +
     '<label>Colour<select id="lab-color"></select></label>' +
-    '<label>Min matches <span id="lab-min-v"></span><input id="lab-min" type="range" min="0" max="80" step="1"></label>' +
+    '<label' + hide + '>Min matches <span id="lab-min-v"></span><input id="lab-min" type="range" min="0" max="80" step="1"></label>' +
     '<label class="inline"><input id="lab-shrink" type="checkbox"> shrink small samples</label>' +
-    '<label>Highlight<input id="lab-q" class="pg-search" type="search" placeholder="player or country…"></label>' +
+    '<label' + hide + '>Highlight<input id="lab-q" class="pg-search" type="search" placeholder="player or country…"></label>' +
     '</div><div id="lab-chart" class="af-lab-chart qk-chart" style="--h:520px" role="img" aria-label="Scatter of the two chosen metrics"></div><div id="lab-sim" class="ta-lab-sim"></div><div class="pg-note" id="lab-note"></div><div id="lab-ours" class="af-lab-ours"></div></div>' +
-    '<div class="card"><div class="card-header">Ranked <span class="card-sub">The group by the combined standard score on both axes (top 300). Click a row for the player.</span></div><div id="lab-table"></div></div>';
+    '<div class="card"><div class="card-header">Ranked <span class="card-sub">The group by the combined standard score on both axes (top 300). ' + (embedded ? 'Tap a name for the profile.' : 'Click a row for the player.') + '</span></div><div id="lab-table"></div></div>';
+}
+/* the group's view (the spec's "view": hold against break, coloured by Elo or the surface Elo), for the room's opening axes */
+function viewAxes() {
+  const c = TA.v2.spec, g = c && c.group ? c.group(specGroup()) : null;
+  const v = g && g.view && QK.within.view ? QK.within.view(g, key => LAB.idx[key] !== undefined && avail(key)) : null;
+  return v && v.x && v.y ? v : null;
+}
+
+function setup(el, T, Y, qy, ext) {
+  const k = K();
+  EXT = ext || null;
+  el.innerHTML = markup(T, !!EXT);
   return k.ready().then(() => Promise.all([TA.load(T + '/lab.json'), k.loadNames(T), TA.v2.specP])).then(res => {
     if (!k.alive(el)) return;
     const rawLab = res[0];
     if (!rawLab || rawLab.ok === false || !(rawLab.rows || []).length) { document.getElementById('lab-chart').innerHTML = k.notBuilt('The ' + k.TN(T) + ' lab file', rawLab); document.getElementById('lab-sub').textContent = ''; return; }
-    if (LABT !== T) { S.win = null; S.x = ''; S.y = ''; S.preset = 0; }
+    if (LABT !== T || EXT) { S.win = null; S.x = ''; S.y = ''; S.preset = 0; }
     LAB = prep(rawLab); LABT = T;
-    const Y = k.Y(params, state, T);
     if (S.win === null || (typeof S.win === 'number' && LAB.years.indexOf(S.win) < 0)) S.win = LAB.years.indexOf(Y) >= 0 ? Y : (LAB.years[0] !== undefined ? LAB.years[0] : LAB.labels[0]);
-    const qw = QK.within.read(params.query || {}, LAB.srows ? SURFS : []);
-    const was = S.within + '|' + S.surf;
-    S.within = qw.within; S.surf = qw.within === 'pos' ? qw.pos : 'all';
-    if (was !== S.within + '|' + S.surf) S.min = bySurf() ? surfFloor(S.surf) : LAB.minMatches;
-    const maxN = Math.max.apply(null, windowRows().map(r => raw(r, 'matches') || 0).concat([10]));
-    if (S.min > maxN * 0.5) S.min = Math.max(0, Math.round(maxN * 0.2));
-    document.getElementById('lab-min').max = String(Math.max(40, Math.ceil(maxN / 10) * 10));
-    const qy = params.query || {};
-    if (typeof qy.q === 'string') S.q = qy.q;                    // ?q= highlights a player (shared links)
-    if (qy.x && LAB.idx[qy.x] !== undefined) { S.x = qy.x; S.preset = -1; }
-    if (qy.y && LAB.idx[qy.y] !== undefined) { S.y = qy.y; S.preset = -1; }
+    if (EXT) {
+      S.within = EXT.within === 'pos' && LAB.srows ? 'pos' : 'broad'; S.surf = S.within === 'pos' ? EXT.surf : 'all';
+      S.min = k.isNum(EXT.min) ? EXT.min : (bySurf() ? surfFloor(S.surf) : LAB.minMatches);
+      S.q = EXT.q || '';
+    } else {
+      const qw = QK.within.read(qy || {}, LAB.srows ? SURFS : []);
+      const was = S.within + '|' + S.surf;
+      S.within = qw.within; S.surf = qw.within === 'pos' ? qw.pos : 'all';
+      if (was !== S.within + '|' + S.surf) S.min = bySurf() ? surfFloor(S.surf) : LAB.minMatches;
+      const maxN = Math.max.apply(null, windowRows().map(r => raw(r, 'matches') || 0).concat([10]));
+      if (S.min > maxN * 0.5) S.min = Math.max(0, Math.round(maxN * 0.2));
+    }
+    const maxN2 = Math.max.apply(null, windowRows().map(r => raw(r, 'matches') || 0).concat([10]));
+    document.getElementById('lab-min').max = String(Math.max(40, Math.ceil(maxN2 / 10) * 10));
+    const q0 = qy || {};
+    if (!EXT && typeof q0.q === 'string') S.q = q0.q;                    // ?q= highlights a player (shared links)
+    const wx = EXT ? EXT.x : q0.x, wy = EXT ? EXT.y : q0.y;
+    if (wx && LAB.idx[wx] !== undefined && avail(wx)) { S.x = wx; S.preset = -1; }
+    if (wy && LAB.idx[wy] !== undefined && avail(wy)) { S.y = wy; S.preset = -1; }
+    if (EXT && (!S.x || !S.y)) {
+      const v = viewAxes();
+      if (v) { S.x = S.x || v.x; S.y = S.y || (v.y !== S.x ? v.y : v.x); if (v.color) S.color = v.color; S.preset = presetList().findIndex(p => p.x === S.x && p.y === S.y); }
+    }
+    if (EXT && EXT.color && (EXT.color === 'country' || EXT.color === 'year' || (LAB.idx[EXT.color] !== undefined && avail(EXT.color)))) S.color = EXT.color;
     if (!S.x || LAB.idx[S.x] === undefined || !S.y || LAB.idx[S.y] === undefined) { if (S.preset < 0) S.preset = 0; applyPreset(); }
     if (!S.x || !S.y) { const ms = LAB.metrics; S.x = (ms[0] || {}).key || 'matches'; S.y = (ms[1] || {}).key || 'matches'; S.preset = -1; }
     sync();
@@ -383,6 +418,13 @@ function render(el, params, state) {
     draw();
   });
 }
+function render(el, params, state) {
+  const k = K(), T = k.T(params, state);
+  return setup(el, T, k.Y(params, state, T), params.query || {}, null);
+}
+/* the Scouting Room's Chart: ext { year, within, surf, min, q, x, y, color, keep(rawRow), onPick(id), onAxes({ x, y, color }) } */
+function mount(host, T, ext) { return setup(host, T, (ext || {}).year, {}, ext || {}); }
 
+TA.lab = { mount: mount, render: render };
 if (typeof TA.route === 'function') TA.route('lab', render);
 })(window.TA || (window.TA = {}));

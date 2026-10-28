@@ -23,6 +23,8 @@ rather than omitted.
 `data/markets.json` — `{"updated_at", "drivers_title": TITLE, "constructors_title": TITLE, "next_race": {"year","round","prices": {driverId: p}, "model": {driverId: p}, "sources": [...]}, "h2h": [...]}`
   TITLE = `{"available", "prices": {id: p}, "model": {id: p}, "edge": {id: rel}, "sources": [...], "eliminated": [...], "implied_total"}`
 `data/elo.json` — `{"all_time": [{"driver","name","peak_teammate","peak_field","peak_quali","races","years":[a,b]}] (top 200), "current": {driverId: {"elo","elo_teammate","elo_quali"}}}`
+`data/hall_of_fame.json` — round 9 (`season.hall_payload`, written by the careers step): `{"ok", "min_starts": 8, "rating", "seasons": [{driver, name, year, team, tm_elo, field_elo, gain, starts, wins, pos, points}] (top 100 by team-mate Elo after the season), "climbs": [same rows, top 100 by the season's gain], "hall": [{driver, name, peak_tm, peak_field, titles, wins, starts, years, teams}] (top 100 by peak team-mate Elo, 20+ starts)}`; about 37 KB.
+
 `data/lab.json` — column-oriented like the football lab: `{"fields": [...], "metrics": [{key,label,group,fmt,lower,desc}], "rows": [[...]] , "windows": {"season": year}}`; fields start `driver, name, team, year, races, age` (round 9: `age` = whole years on 1 July of the season, from the store's date of birth, for the Scouting Room's age band; null when unknown)
   one row per driver-season 2018→ (driverId, name, team, year, races, then every catalogue metric value).
 

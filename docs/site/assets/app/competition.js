@@ -598,8 +598,42 @@ LIVE.races = function (el, body, c, d0) {
     if (race.length) gb.innerHTML = FB.chances(race.map(function (r) { return { label: r.name, sub: r.goals + ' goals', p: r.model, href: r.id ? FB.href.player(r.id) : null }; }), { limit: 12, oursName: 'Our chance of finishing top scorer' });
     else gb.innerHTML = goals.length ? '<ol class="fb-co-perf">' + goals.map(function (p) { return '<li>' + FB.playerLink(p.player_id, p.name) + '<span class="qk-muted fb-co-mt">' + esc(p.team) + '</span><b class="fb-num">' + p.goals + '</b><span class="qk-muted fb-num">xG ' + num(p.xg, 1) + '</span></li>'; }).join('') + '</ol>' : cardMsg('No goals yet.');
     $(el, 'co-leaders').innerHTML = leadersMinis(players) || cardMsg('No player data yet.');
+    raceOverTime(el, body, c, d0, players);
   });
 };
+/* Round 9, Phase 4: the Golden Boot and the assists race over time, from the clubs' match logs
+   (data/<slug>/players/<club-slug>.json, which the competition already writes): the leading six, goals or assists
+   added up match by match, on the calendar. */
+function raceOverTime(el, body, c, d0, players) {
+  var tm = (d0.teams || {}).teams || {};
+  var host = document.createElement('section');
+  host.className = 'qk-section fb-co-sec';
+  body.appendChild(host);
+  var draw = function (key) {
+    var top = players.filter(function (p) { return (p[key] || 0) > 0 && tm[p.team] && tm[p.team].slug; }).sort(function (a, b) { return (b[key] - a[key]) || ((b.xg || 0) - (a.xg || 0)); }).slice(0, 6);
+    if (top.length < 2) { host.innerHTML = ''; return; }
+    var slugs = uniq(top.map(function (p) { return tm[p.team].slug; }));
+    Promise.all(slugs.map(function (s) { return FB.load(c.slug + '/players/' + s + '.json'); })).then(function (docs) {
+      if (!FB.alive(el)) return;
+      var logs = {};
+      docs.forEach(function (d) { var ps = (d || {}).players || {}; Object.keys(ps).forEach(function (id) { logs[String(id)] = ps[id].matches || []; }); });
+      var field = key === 'goals' ? 'g' : 'a';
+      var series = top.map(function (p, i) {
+        var ms = (logs[String(p.player_id)] || []).slice().sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
+        var s = 0, data = [];
+        ms.forEach(function (m) { s += m[field] || 0; var t = FB.parseDate(m.date); if (t) data.push([t.getTime(), s]); });
+        return { name: FB.surname(p.name), label: FB.surname(p.name) + ' ' + s, data: data, step: true };
+      }).filter(function (x) { return x.data.length; });
+      host.innerHTML = QK.sectionHead({ kicker: key === 'goals' ? 'The race' : 'The assists race', title: key === 'goals' ? 'The Golden Boot race, match by match' : 'Who sets them up, match by match',
+        sub: 'The leading six, their ' + (key === 'goals' ? 'goals' : 'assists') + ' in this competition added up after each match, from the clubs’ match logs.', actions: FB.seg('co-gbk', [['goals', 'Goals'], ['assists', 'Assists']], key, 'Race') }) +
+        '<div class="qk-card"><div class="qk-card-body"><div id="co-gbr" class="qk-chart" style="--h:400px" role="img" aria-label="The race over time"></div></div></div>';
+      QKC.line(host.querySelector('#co-gbr'), { xType: 'time', series: series, step: 'end', endLabels: true, yMin: 0,
+        xFmt: function (v) { var d = new Date(v); return d.getDate() + ' ' + FB.MONTHS[d.getMonth()]; }, xName: 'Date', yName: key === 'goals' ? 'Goals' : 'Assists', label: 'The race over time' });
+      FB.wireSeg(host, 'co-gbk', function (v) { draw(v); });
+    });
+  };
+  draw('goals');
+}
 /* A finished edition leads with how it finished: the final (or the champions' table), the champions' road through
    the knockout with the scores, and the Golden Boot podium. */
 function howItFinished(c, ctx, fx, players, champ, standings) {
@@ -953,7 +987,41 @@ LIVE.fixtures = function (el, body, c, d0, q) {
   var all = ((d0.fixtures || {}).matches || []).map(ctx.withIds);
   if (!all.length) { body.innerHTML = FB.empty('No fixtures yet'); return; }
   fixtureBrowser(el, body, c, ctx, all, q, false);
+  calledRound(el, body, c, ctx, all);
 };
+/* Round 9, Phase 4: "How we called the round": the latest round with three or more finished matches whose chance we
+   froze before kick-off (forecast_log.json: id -> [home, draw, away, kick-off, competition]): how often our favourite
+   won against how often we expected it to, the biggest surprise, and each match with the chance we gave the result. */
+function calledRound(el, body, c, ctx, all) {
+  FB.load('forecast_log.json').then(function (log) {
+    if (!FB.alive(el) || !log) return;
+    var done = all.filter(function (f) { return f.status === 'finished' && isNum(f.hs) && isNum(f.as) && log[String(f.id)]; });
+    var rounds = {};
+    done.forEach(function (f) { var k = (f.stage || 'league') + '|' + f.round; (rounds[k] = rounds[k] || []).push(f); });
+    var keys = Object.keys(rounds).filter(function (k) { return rounds[k].length >= 3; })
+      .sort(function (a, b) { var la = rounds[a].map(function (f) { return f.date; }).sort().pop(), lb = rounds[b].map(function (f) { return f.date; }).sort().pop(); return String(lb).localeCompare(String(la)); });
+    if (!keys.length) return;
+    var ms = rounds[keys[0]].map(function (f) {
+      var l = log[String(f.id)], p = [l[0], l[1], l[2]], res = f.hs > f.as ? 0 : f.hs === f.as ? 1 : 2, fav = p.indexOf(Math.max.apply(null, p));
+      return { f: f, p: p, res: res, fav: fav, pres: p[res] };
+    });
+    var hits = ms.filter(function (m) { return m.fav === m.res; }).length;
+    var exp = ms.reduce(function (s, m) { return s + m.p[m.fav]; }, 0);
+    var upset = ms.slice().sort(function (a, b) { return a.pres - b.pres; })[0];
+    var who = function (m) { return m.res === 1 ? 'A draw' : (m.res === 0 ? m.f.home : m.f.away) + ' won'; };
+    var host = document.createElement('section');
+    host.className = 'qk-section fb-co-sec';
+    host.innerHTML = QK.sectionHead({ kicker: 'How we called it', title: 'How we called ' + (FB.roundText(ms[0].f, c.slug) || 'the latest round').replace(/^R(\d)/, 'round $1').toLowerCase(), sub: 'Our chances frozen before kick-off for the ' + ms.length + ' matches of the latest round we logged, against the results.' }) +
+      FB.kpis([
+        FB.kpi('Our favourite won', hits + ' of ' + ms.length, { signal: true, sub: 'we expected about ' + num(exp, 1) + ' of ' + ms.length }),
+        FB.kpi('Biggest surprise', esc(who(upset)), { text: true, sub: esc(upset.f.home + ' ' + upset.f.hs + '–' + upset.f.as + ' ' + upset.f.away) + ': we gave that ' + pct(upset.pres) })
+      ]) +
+      '<div class="qk-card fb-mt"><div class="qk-card-body"><div class="fb-fxlist">' + ms.map(function (m) {
+        return '<div class="fb-co-called' + (m.fav === m.res ? ' hit' : '') + '">' + FB.fixtureRow(m.f, { slug: c.slug, date: true }) + '<span class="fb-co-calledp" title="Our chance of this result before kick-off">' + (m.fav === m.res ? '✓ ' : '') + pct(m.pres) + '</span></div>';
+      }).join('') + '</div><p class="fb-cap">The number is the chance we gave the result that happened; a tick marks our favourite winning. A 60% favourite should still lose four times in ten. Our full record: <a href="#/model/calibration">How we’re doing</a>.</p></div></div>';
+    body.insertBefore(host, body.firstChild);
+  });
+}
 function fixtureBrowser(el, body, c, ctx, all, q, past) {
   var stages = uniq(all.map(function (f) { return f.stage || 'league'; }));
   var first = {};

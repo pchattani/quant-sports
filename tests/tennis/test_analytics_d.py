@@ -286,7 +286,7 @@ def test_model_payload_and_lab_surface_block(ace_world):
     assert mj["final_set_rules"]["slams"]["wimbledon"] == "tb10"
     cats = {y: PL.build(td, y) for y in td.years}
     lab = SI.lab(td, cats)
-    assert lab["fields"][:5] == ["id", "name", "year", "qualified", "rank"] and lab["fields"].count("matches") == 1
+    assert lab["fields"][:7] == ["id", "name", "year", "qualified", "rank", "age", "hand"] and lab["fields"].count("matches") == 1
     assert all(len(r) == len(lab["fields"]) for r in lab["rows"])
     sb = lab["surface"]
     assert sb["fields"][:4] == ["id", "year", "surface", "matches"] and sb["rows"]
@@ -295,3 +295,20 @@ def test_model_payload_and_lab_surface_block(ace_world):
     p0 = ace_world["order"][0]
     assert ra[p0] and all(len(r) == 7 and r[5] in (0, 1) for r in ra[p0])
     assert [r[0] for r in ra[p0]] == sorted(r[0] for r in ra[p0])
+
+
+def test_favourites_use_only_pre_event_ratings(ace_world):
+    """favourites.json (round 9): the top-rated main-draw entrant of each event, rated before their first match of it."""
+    from oddsmarkets.tennis.analytics import events as EV
+    td = an.TourData("atp", ace_world["today"])
+    fv = EV.favourites(td)
+    assert fv["ok"] and fv["events"]
+    w = float(td.elo_params().get("w_surf", 0.5))
+    for eid, (pid, elo, n) in list(fv["events"].items())[:20]:
+        assert n >= 4 and isinstance(elo, float)
+        y = an.year_of(eid) if hasattr(an, "year_of") else int(eid.rsplit("-", 1)[1])
+        ms = sorted((m for m in td.matches(y).values() if m.get("event") == eid), key=lambda m: (str(m.get("date") or ""), an.ROUND_ORDER.get(m.get("round"), 5)))
+        first = next(m for m in ms if pid in (str(m.get("p1")), str(m.get("p2"))) and td.elo_row(m["id"]) is not None)
+        g = td.elo_row(first["id"])
+        ai, si = (8, 9) if str(g[2]) == pid else (10, 11)
+        assert abs(elo - round(w * g[si] + (1 - w) * g[ai], 1)) < 1e-6

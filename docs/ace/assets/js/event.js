@@ -131,8 +131,10 @@ function render(el, params) {
       title: esc(ev.name || TA.eventName(T, id)) + ' ' + (Y || ''), html: true, size: 'lg', tag: 'h1',
       sub: esc(TA.fmtRange(ev.start, ev.end)) + (ev.draw_size ? ' · draw of ' + esc(ev.draw_size) : '') + (ev.best_of ? ' · best of ' + esc(ev.best_of) : '') +
         ' · <a href="' + TA.href(T, 'calendar', Y) + '">' + esc(TA.tourName(T)) + ' tournaments</a>', actions: '<div class="ev-side">' + side + '</div>' }) + '</div>' +
-      '<div id="ev-draw"></div><div class="grid-2"><div id="ev-odds"></div><div id="ev-side"></div></div><div id="ev-race"></div><div id="ev-results"></div><div id="ev-more"></div>';
+      '<div id="ev-draw"></div><div id="ev-pick"></div><div class="grid-2"><div id="ev-odds"></div><div id="ev-side"></div></div><div id="ev-race"></div><div id="ev-results"></div><div id="ev-more"></div>';
 
+    /* round 9: the draw pick'em (ta-pickem.js), in this browser only */
+    if (TA.pickem) TA.pickem.mount(document.getElementById('ev-pick'), T, id, cards, sim, champ ? String(champ) : (st === 'done' ? true : false));
     // ── the draw
     const hasDraw = (draw.slots || []).length > 0;
     const drawSub = (draw.source === 'reconstructed' ? 'rebuilt from the matches played; seeds not shown' : draw.source === 'wta' ? 'the WTA draw with seeds and entry types' : '') +

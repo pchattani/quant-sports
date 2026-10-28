@@ -58,6 +58,38 @@ def events_year(td: an.TourData, year: int, pages: set[str] | None = None) -> di
     return {"ok": True, "tour": td.tour, "year": int(year), "updated_at": an.now(), "events": out}
 
 
+def favourites(td: an.TourData) -> dict:
+    """data/<T>/favourites.json (round 9, the Draws calendar's cards): for every tour-level event of every year on file,
+    our top-rated entrant going in: the entrant with the highest surface-blended Elo (w_surf x surface + (1 - w_surf) x
+    overall) before their first match of the event, read from the Elo history's pre-match ratings, so nothing from the
+    event itself (or later) enters. {"ok", "tour", "events": {event_id: [pid, blended Elo, entrants rated]}}."""
+    w = float(td.elo_params().get("w_surf", 0.5))
+    out: dict[str, list] = {}
+    for y in td.years:
+        by: dict[str, list[dict]] = defaultdict(list)
+        for m in td.matches(y).values():
+            by[m.get("event")].append(m)
+        for eid, ev in td.events(y).items():
+            if str(ev.get("level")) not in an.TOUR_LEVELS:
+                continue
+            ms = sorted(by.get(eid) or [], key=lambda m: (str(m.get("date") or ""), an.ROUND_ORDER.get(m.get("round"), 5)))
+            first: dict[str, float] = {}
+            for m in ms:
+                g = td.elo_row(m.get("id"))
+                if g is None:
+                    continue
+                for pid, ai, si in ((str(g[2]), 8, 9), (str(g[3]), 10, 11)):
+                    if pid not in first and g[ai] is not None and g[si] is not None:
+                        first[pid] = w * float(g[si]) + (1 - w) * float(g[ai])
+            main = {str(p) for m in ms if m.get("round") not in ("Q1", "Q2", "Q3") for p in (m.get("p1"), m.get("p2")) if p}
+            cand = {p: v for p, v in first.items() if p in main}
+            if len(cand) < 4:
+                continue
+            fav = max(cand, key=lambda p: cand[p])
+            out[eid] = [fav, round(cand[fav], 1), len(cand)]
+    return {"ok": True, "tour": td.tour, "updated_at": an.now(), "w_surf": w, "events": out}
+
+
 def history(td: an.TourData) -> dict:
     """{"events": {tid: {"name","level","surface","champions": [[year, pid, runner_up]]}}} for tour-level events."""
     out: dict[str, dict] = {}

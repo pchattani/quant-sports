@@ -84,7 +84,7 @@ function tinfo(t) {
 function byRating(list) { return list.slice().sort(function (a, b) { var x = v(a, 'rating'), y = v(b, 'rating'); return (isNum(y) ? y : -9) - (isNum(x) ? x : -9) || String(a).localeCompare(String(b)); }); }
 function setQ(patch) { FB.setQuery(patch); }
 
-var SECS = [['tm-power', 'Power board'], ['tm-grid', 'Team profile'], ['tm-map', 'Style map'], ['tm-sw', 'Strengths and weaknesses'], ['tm-h2h', 'Head to head'], ['tm-trend', 'Through the season'], ['tm-xi', 'Teams of the week']];
+var SECS = [['tm-power', 'Power board'], ['tm-sos', 'Schedule'], ['tm-grid', 'Team profile'], ['tm-map', 'Style map'], ['tm-sw', 'Strengths and weaknesses'], ['tm-h2h', 'Head to head'], ['tm-trend', 'Through the season'], ['tm-xi', 'Teams of the week']];
 
 /* el: the page, body: the tab's box, c: the competition, d: { meta, teams, fixtures, strength, analytics, probs, table },
    ctx: competition.js makeCtx, q: the query, xi(el, host): the team-of-the-week renderer */
@@ -112,7 +112,7 @@ FB.teamsTab = function (el, body, c, d, ctx, q, xi) {
     var off = ['.qk-topbar', '.qk-secnav'].reduce(function (s, sel) { return s + ((document.querySelector(sel) || {}).offsetHeight || 0); }, 0) + 12;
     window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - off, behavior: QK.reducedMotion && QK.reducedMotion() ? 'auto' : 'smooth' });
   }); });
-  power(); grid(); styleMap(); strengths(); h2h(); trend();
+  power(); schedule(); grid(); styleMap(); strengths(); h2h(); trend();
   var xh = document.getElementById('tm-xi');
   if (xh && xi) xi(el, xh); else if (xh) xh.remove();
 };
@@ -153,6 +153,31 @@ function power() {
       parts: [{ key: 'att', label: 'Attack', color: 'var(--c-2)' }, { key: 'def', label: 'Defence', color: 'var(--c-3)' }] }) + '</div></div>' +
     QK.explain('An <b>xG margin of +1.0</b> means a ' + word() + ' creates a goal’s worth of chances a match more than it allows. The ranking is our rating, which also weighs the goals actually scored and the opposition: the two disagree most for a ' + word() + ' with a kind or hard schedule so far. The full table is on <a href="' + esc(FB.href.comp(C.slug, 'table')) + '">' + (C.kind === 'cup' ? 'the table' : 'Table') + '</a>.', { title: 'What’s that number?' });
   FB.wireSeg(host, 'tm-pw', function (x) { ST.pw = x; setQ({ pw: x === 'all' ? 'all' : null }); power(); });
+}
+
+/* 1b. strength of schedule (round 9, Phase 4): the average rating of the opponents each club has played and has still
+   to play (strength.json sos_played / sos_remaining: our rating, points a game against an average side), the hardest
+   run-in first; the gap is how much easier or harder the rest of the season is than the start. */
+function schedule() {
+  var host = document.getElementById('tm-sos');
+  if (!host) return;
+  var rows = T.filter(function (t) { var r = ROWS[t]; return r && isNum(r.sos_played) && isNum(r.sos_remaining); });
+  if (rows.length < 4) { host.innerHTML = ''; return; }
+  rows.sort(function (a, b) { return ROWS[b].sos_remaining - ROWS[a].sos_remaining; });
+  var hard = rows[0], easy = rows[rows.length - 1];
+  var swing = rows.slice().sort(function (a, b) { return (ROWS[b].sos_remaining - ROWS[b].sos_played) - (ROWS[a].sos_remaining - ROWS[a].sos_played); })[0];
+  host.innerHTML = QK.sectionHead({ kicker: 'Schedule', title: 'Who has the hardest run-in?', sub: 'The average rating of the opponents each ' + word() + ' has played so far and has still to play (our rating: the points a game an opponent would take against an average side). Hardest run-in first.' }) +
+    FB.kpis([
+      FB.kpi('Hardest run-in', esc(tinfo(hard).name), { text: true, sub: 'opponents average ' + num(ROWS[hard].sos_remaining, 2) + ' points a game' }),
+      FB.kpi('Easiest run-in', esc(tinfo(easy).name), { text: true, sub: 'opponents average ' + num(ROWS[easy].sos_remaining, 2) }),
+      FB.kpi('Biggest step up', esc(tinfo(swing).name), { text: true, sub: signed(ROWS[swing].sos_remaining - ROWS[swing].sos_played, 2) + ' against the start of the season' })
+    ]) +
+    '<div class="qk-card fb-mt"><div class="qk-card-body"><div id="tm-sos-c" class="qk-chart" style="--h:' + Math.max(320, rows.length * 24 + 70) + 'px" role="img" aria-label="Strength of schedule"></div></div></div>' +
+    QK.explain('A difference of <b>0.10</b> in the average opponent is worth roughly a tenth of a point a match: over ten matches, about one point. The next five opponents of each club, coloured by our chance of winning each, are on the <a href="' + esc(FB.href.comp(C.slug, 'race')) + '">Race</a> tab.', { title: 'What’s that number?' });
+  QKC.bar(document.getElementById('tm-sos-c'), { horizontal: true, legend: true, labelWidth: 130, fmt: function (v) { return num(v, 2); }, cats: rows.map(function (t) { return tinfo(t).name; }),
+    series: [{ name: 'Played so far', data: rows.map(function (t) { return ROWS[t].sos_played; }), color: QK.cssVar('--ink-4') }, { name: 'Still to play', data: rows.map(function (t) { return ROWS[t].sos_remaining; }), color: QK.cssVar('--signal') }],
+    min: Math.max(0, Math.floor(Math.min.apply(null, rows.map(function (t) { return Math.min(ROWS[t].sos_played, ROWS[t].sos_remaining); })) * 10) / 10 - 0.1),
+    valName: 'Average opponent rating (points a game)', catName: intl() ? 'Team' : 'Club', label: 'Strength of schedule' });
 }
 
 /* 2. the team profile grid */

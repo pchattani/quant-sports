@@ -3,10 +3,19 @@
  * through the kit's QKC on ECharts).
  *
  * Sections (docs/REDESIGN.md; tennis labels): Overview #/<T> · Draws (tournaments, draws and draw
- * simulations, match centre, odds board) · Rankings (rankings, race, Elo) · Players (players, player
- * pages, head to head) · Value (breakouts, luck, over- and undervalued) · Lab (scatter lab, compare) ·
- * Model (methodology, calibration, glossary, terms). Tennis has no Teams and no Fantasy. Every old
- * route still resolves.
+ * simulations, match centre, odds board) · Rankings (rankings, race, Elo) · Scouting Room (the room, player pages,
+ * Compare, Head to head) · Value (breakouts, luck, over- and undervalued) · Model (methodology, calibration, glossary,
+ * terms). Tennis has no Teams and no Fantasy. Every old route still resolves.
+ *
+ * Round 9 (28 Oct 2026): Players and the Lab are one page, the Scouting Room (#/<T>/scout, ta-scout.js;
+ * QK.sections('tennis', { scout: true })), with Compare and Head to head as its other tabs. #/<T>/players and #/<T>/lab
+ * redirect into it with their parameters mapped (redirectOf: the lab's surface group, axes, colour and highlight).
+ * Round 9 (Phase 2): Rankings is one page with five views, one tab each: Official (#/<T>/rankings), Race (#/<T>/race),
+ * Elo (#/<T>/elo, with the surface ratings that were Value › Surfaces), Points to defend (#/<T>/defend) and Profiles
+ * (#/<T>/profiles); the old rankings?v= links land on their tab. The Model section runs How it works, How we're doing,
+ * Our forecasts v the market (#/<T>/versus, was Value › Market), Who moves next (#/<T>/who-moves-next, was
+ * Value › Validation), Glossary, Terms. Draws › Forecasts is gone: our chances live on the overview's "What to watch"
+ * and the tournament pages, and #/<T>/markets (#/odds) opens the overview.
  *
  * A static shell over JSON payloads under data/ (see oddsmarkets/tennis/PAYLOADS.md).
  * Every page module registers itself with TA.route(name, renderFn) and never edits this
@@ -17,7 +26,9 @@
  *   #/<T>/event/<event_id>          event (tournament page; event_id = "<tid>-<year>")
  *   #/<T>/match/<mid>               match centre
  *   #/<T>/player/<pid>              player
- *   #/<T>/players  rankings  race  elo  calendar  lab  markets  calibration  value (?v=breakout|luck|over|surface|market|validation)
+ *   #/<T>/scout                     the Scouting Room (?view=board|chart|leaders, within=pos&pos=<surface>, min, ctry, age, q, p, cmp)
+ *   #/<T>/players  #/<T>/lab        redirect to the Scouting Room
+ *   #/<T>/rankings  race  elo  calendar  markets  calibration  value (?v=breakout|luck|over|surface|market|validation)
  *   #/<T>/h2h[/<a>[/<b>]]           head to head
  *   #/<T>/compare[/<a>[/<b>]]       compare players
  *   #/glossary[/<key>]  #/methodology  #/disclaimer   (global; a tour prefix is accepted)
@@ -102,6 +113,11 @@ addRoute('event/:id', 'event');
 addRoute('match/:id', 'match');
 addRoute('player/:id', 'player');
 addRoute('players', 'players');
+addRoute('scout', 'scout');
+addRoute('defend', 'defend');
+addRoute('profiles', 'profiles');
+addRoute('versus', 'versus');
+addRoute('who-moves-next', 'who-moves-next');
 addRoute('rankings', 'rankings');
 addRoute('race', 'race');
 addRoute('elo', 'elo');
@@ -128,45 +144,48 @@ const ALIASES = {
 };
 const TITLES = {
   hub: 'Overview', event: 'Tournament', match: 'Match centre', player: 'Player', players: 'Players', rankings: 'Rankings',
-  race: 'Race', elo: 'Elo', calendar: 'Calendar', h2h: 'Head to head', lab: 'Lab', compare: 'Compare',
-  markets: 'Forecasts', calibration: 'How we’re doing', value: 'Value', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
+  race: 'Race', elo: 'Elo', calendar: 'Calendar', h2h: 'Head to head', lab: 'Lab', compare: 'Compare', scout: 'Scouting Room',
+  markets: 'Forecasts', calibration: 'How we’re doing', defend: 'Points to defend', profiles: 'Profiles', versus: 'Our forecasts v the market', 'who-moves-next': 'Who moves next', value: 'Value', glossary: 'Glossary', methodology: 'How it works', disclaimer: 'Disclaimer & terms'
 };
-const NAV_OF = { hub: 'hub', event: 'calendar', calendar: 'calendar', match: 'hub', player: 'players', players: 'players',
-  rankings: 'rankings', race: 'race', elo: 'elo', h2h: 'h2h', lab: 'lab', compare: 'compare', markets: 'markets',
+const NAV_OF = { hub: 'hub', event: 'calendar', calendar: 'calendar', match: 'hub', player: 'scout', players: 'scout', scout: 'scout',
+  rankings: 'rankings', race: 'race', elo: 'elo', h2h: 'h2h', lab: 'scout', compare: 'compare', markets: 'markets',
   calibration: 'calibration', value: 'value', glossary: 'glossary', methodology: 'methodology' };
 /* The sections (QK.sections('tennis')) and the routes each one holds. */
 const SECTION_OF = { hub: 'overview', calendar: 'fixtures', event: 'fixtures', match: 'fixtures', markets: 'fixtures', rankings: 'standings', race: 'standings',
-  elo: 'standings', players: 'players', player: 'players', h2h: 'players', value: 'value', lab: 'lab', compare: 'lab', methodology: 'model',
+  elo: 'standings', defend: 'standings', profiles: 'standings', versus: 'model', 'who-moves-next': 'model', players: 'scout', player: 'scout', scout: 'scout', h2h: 'scout', value: 'value', lab: 'scout', compare: 'scout', methodology: 'model',
   calibration: 'model', glossary: 'model', disclaimer: 'model' };
 /* Tabs per section: [route, label, scope] with scope 'g' (a global route) or '' (per tour). */
 const SECTION_TABS = {
-  fixtures: [['calendar', 'Tournaments', ''], ['markets', 'Forecasts', '']],
-  standings: [['rankings', 'Rankings', ''], ['race', 'Race to the Finals', ''], ['elo', 'Elo ratings', '']],
-  players: [['players', 'All players', ''], ['h2h', 'Head to head', '']],
+  fixtures: [['calendar', 'Tournaments', '']],
+  standings: [['rankings', 'Official', ''], ['race', 'Race', ''], ['elo', 'Elo', ''], ['defend', 'Points to defend', ''], ['profiles', 'Profiles', '']],
+  scout: [['scout', 'Scouting Room', ''], ['compare', 'Compare', ''], ['h2h', 'Head to head', '']],
   value: [['value', 'Player value', '']],
-  lab: [['lab', 'Scatter lab', ''], ['compare', 'Compare', '']],
-  model: [['methodology', 'Methodology', 'g'], ['calibration', 'How we’re doing', ''], ['glossary', 'Glossary', 'g'], ['disclaimer', 'Terms', 'g']]
+  model: [['methodology', 'How it works', 'g'], ['calibration', 'How we’re doing', ''], ['versus', 'Our forecasts v the market', ''], ['who-moves-next', 'Who moves next', ''],
+    ['glossary', 'Glossary', 'g'], ['disclaimer', 'Terms', 'g']]
 };
-const SECTION_LABEL = { overview: 'Overview', fixtures: 'Draws', standings: 'Rankings', players: 'Players', value: 'Value', lab: 'Lab', model: 'Model' };
+const SECTION_LABEL = { overview: 'Overview', fixtures: 'Draws', standings: 'Rankings', scout: 'Scouting Room', value: 'Value', model: 'Model' };
 const SECTION_BLURB = {
   fixtures: 'Every tournament with its draw, our title chances from simulating the rest of it, and our win chance for every match.',
   standings: 'The official rankings, the race to the year-end Finals with our chance of qualifying, and our surface Elo ratings.',
-  players: 'Serve and return ratings, surface Elo, form and results for every player, ranked against their tour, and any two head to head.',
+  scout: 'Every player and every metric: a deep board ranked against the tour or one surface, any two metrics on a chart, the leaders, a profile for anyone, and Compare and Head to head.',
   value: 'Who is breaking out, who has been lucky, and whose ranking runs ahead of or behind their level.',
-  lab: 'Build your own charts from any two metrics, and put two or three players side by side on the metrics that predict.',
   model: 'How the models work, how well they have done, and every metric defined.'
 };
 /* v2 page heads: route -> [title, sub-line] (the section blurb when the sub-line is empty). */
 const PAGE_HEAD = {
   calendar: ['Tournaments', 'Every tournament of the year with its level, surface and champion; open one for the draw and our title chances.'],
   markets: ['Forecasts', 'Our win chance for every open match and our title chance in every tournament in play, from the same models as the match centre.'],
-  rankings: ['Rankings', 'The official ranking points, beside our Elo for every player.'],
+  rankings: ['Rankings', 'The official ranking, the race to the Finals, our Elo, the points each player defends and their strengths, one view each.'],
+  defend: ['Points to defend', 'The ranking points each top player drops over the coming year, week by week.'],
+  profiles: ['Strengths and weak spots', 'The top 32, read against this season’s qualified players: what each does best and where each is weakest.'],
+  versus: ['Our forecasts v the market', 'Our match chances lined up against the closing line and the prediction markets, player by player: a reference, not a recommendation.'],
+  'who-moves-next': ['Who moves next', 'How our breakout model has done at calling the climbers and the fallers, forecast blind season by season.'],
   race: ['Race to the Finals', 'Points in this year’s race and our chance of qualifying, from simulating the rest of the season.'],
-  elo: ['Elo ratings', 'Our strength ratings from every tour-level result, overall and by surface.'],
-  players: ['Players', ''], h2h: ['Head to head', 'Any two players: their record, how they match up on each surface and our chance if they met today.'],
+  elo: ['Elo ratings', 'Our strength ratings from every tour-level result, overall and by surface: who is best on each surface, the specialists, every player’s Elo over time and the all-time peaks.'],
+  players: ['Players', ''], scout: ['Scouting Room', 'Every player with 10+ tour-level matches on every metric we hold, ranked against the tour or one surface: the board, any two metrics on a chart, the leaders, a profile for anyone and a tray to compare up to four.'], h2h: ['Head to head', 'Any two players: their record, how they match up on each surface and our chance if they met today.'],
   value: ['Player value', 'Who is likely to rise or fall over the next year, how much of a record is luck, and whose ranking runs ahead of or behind our rating.'], lab: ['Scatter lab', 'Any two metrics for any group of players.'],
   compare: ['Compare', 'Pick two or three players: they line up on the metrics that best describe and predict their tennis, ranked against their own tour.'],
-  methodology: ['How the models work', 'The ratings, the match model, the simulations and how well each has done.'],
+  methodology: ['How it works', 'What the site does and how each model works, in plain words first; every source and constant under Technical detail.'],
   calibration: ['How we’re doing', 'Our recent record and how often our chances came true, then every score and check, with the closing market as a reference.'],
   glossary: ['Glossary', 'Every metric on the site, defined.'], disclaimer: ['Disclaimer and terms', '']
 };
@@ -176,9 +195,37 @@ const PAGE_HEAD_PAST = {
   race: ['Race to the Finals', 'How the season ended: the Finals champion and the season-end top ten.'],
   elo: ['Elo ratings', 'Our strength ratings at the season’s end, overall and by surface, with every player’s Elo over time and the all-time peaks.']
 };
-const DETAIL_OF = { event: 'calendar', match: 'calendar', player: 'players' };
+const DETAIL_OF = { event: 'calendar', match: 'calendar', player: 'scout' };
 // Where a page lands when the tour is switched (id pages fall back to their list).
-const SWITCH_TO = { event: 'calendar', match: 'hub', player: 'players', h2h: 'h2h', compare: 'compare' };
+const SWITCH_TO = { event: 'calendar', match: 'hub', player: 'scout', h2h: 'h2h', compare: 'compare' };
+
+/* Round 9: the old Players and Lab routes land in the Scouting Room with their parameters (the lab's surface group,
+   axes, colour and highlight; ?y= the year stays the year, a lab's y axis becomes ay). */
+function qstr(o) { const k = Object.keys(o).filter(x => o[x] !== undefined && o[x] !== null && o[x] !== ''); return k.length ? '?' + k.map(x => encodeURIComponent(x) + '=' + encodeURIComponent(o[x])).join('&') : ''; }
+function redirectOf(r) {
+  const q = r.params.query || {}, out = {}, T0 = r.tour || state.tour;
+  const yy = /^\d{4}$/.test(q.y || '') ? { y: q.y } : {};
+  /* Phase 2: the Rankings views are tabs; Value's market, validation and surface views moved; the forecast board is gone */
+  if (r.name === 'rankings' && ['elo', 'race', 'defend', 'profiles'].indexOf(q.v) >= 0) return '#/' + T0 + '/' + q.v + qstr(yy);
+  if (r.name === 'value' && q.v === 'market') return '#/' + T0 + '/versus';
+  if (r.name === 'value' && q.v === 'validation') return '#/' + T0 + '/who-moves-next' + qstr({ h: q.h });
+  if (r.name === 'value' && q.v === 'surface') return '#/' + T0 + '/elo' + qstr({ s: q.s });
+  if (r.name === 'calibration' && q.sec === 'market') return '#/' + T0 + '/versus';
+  if (r.name === 'markets') return '#/' + T0;
+  if (r.name !== 'players' && r.name !== 'lab') return null;
+  if (r.name === 'lab') {
+    out.view = 'chart';
+    if (q.x) out.ax = q.x;
+    if (q.y && !/^\d{4}$/.test(q.y)) out.ay = q.y;
+    if (q.color) out.ac = q.color;
+  }
+  if (q.within === 'pos' && ['hard', 'clay', 'grass'].indexOf(q.pos) >= 0) { out.within = 'pos'; out.pos = q.pos; }
+  else if (['hard', 'clay', 'grass'].indexOf(q.s || q.surface) >= 0) { out.within = 'pos'; out.pos = q.s || q.surface; }
+  if (q.q) out.q = q.q;
+  if (q.country || q.ctry) out.ctry = q.country || q.ctry;
+  if (/^\d{4}$/.test(q.y || '')) out.y = q.y;
+  return '#/' + (r.tour || state.tour) + '/scout' + qstr(out);
+}
 
 function normPattern(s) {
   let p = String(s || '').trim().replace(/^#/, '').replace(/^\/+|\/+$/g, '').replace(/<(\w+)>/g, ':$1');
@@ -266,7 +313,9 @@ let booted = false, renderSeq = 0;
 function render() {
   runCleanups();
   closeSearch();
-  const r = parseHash();
+  let r = parseHash();
+  const rd = redirectOf(r);
+  if (rd) { try { history.replaceState(null, '', rd); } catch (e) { /* no history API */ } r = parseHash(rd); }
   const prevTour = state.tour, prevYear = state.year;
   if (r.tour) setTourState(r.tour);
   r.params.tour = state.tour;
@@ -1136,8 +1185,8 @@ function fillYearPicker() {
   pickerFilled = true;
 }
 function sectionHrefs(T, Y) {
-  return { overview: '#/' + T + yq(T, Y), fixtures: href(T, 'calendar', Y), standings: href(T, 'rankings', Y), players: href(T, 'players', Y),
-    value: href(T, 'value'), lab: href(T, 'lab', Y), model: '#/methodology' };
+  return { overview: '#/' + T + yq(T, Y), fixtures: href(T, 'calendar', Y), standings: href(T, 'rankings', Y), scout: href(T, 'scout', Y),
+    value: href(T, 'value'), model: '#/methodology' };
 }
 function updateHeader() {
   const T = state.tour, Y = state.year;
@@ -1193,7 +1242,7 @@ function init() {
   if (window.QK) {
     SHELL = QK.shell({
       sport: 'tennis', section: 'overview',
-      sections: QK.sections('tennis', { value: 'Value', fantasy: null }).map(x => Object.assign({}, x, { href: x.key === 'overview' ? '#/' : '#/' + x.key })),
+      sections: QK.sections('tennis', { value: 'Value', fantasy: null, scout: true }).map(x => Object.assign({}, x, { href: x.key === 'overview' ? '#/' : '#/' + x.key })),
       ctx: ctxHTML(),
       search: { load: loadSearch }
     });

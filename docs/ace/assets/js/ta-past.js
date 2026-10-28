@@ -96,4 +96,48 @@ P.race = (el, T, Y) => {
     TA.setMeta(TA.tourName(T) + ' ' + Y + ' · a finished season');
   });
 };
+/* The overview of a finished season (round 9, Phase 3): a recap, not an empty current-season page.
+ *   the champions (the band); the Finals' last four as played, with our pre-match call on each card; our call going into
+ *   every big event (our top-rated entrant, favourites.json) against who won; the season-end top ten (the top eight
+ *   marked); the best by our numbers (season-end Elo overall and on each surface). */
+P.recap = (host, T, Y) => {
+  if (!host) return Promise.resolve();
+  host.innerHTML = QK.skeleton('card', 2);
+  const ch = P.champions(T, Y);
+  return Promise.all([P.cat(T, Y), TA.loadTour('favourites.json', T), ch.finals && ch.finals.page ? TA.load(TA.eventPath(T, ch.finals.id)) : Promise.resolve(null)   /* event pages exist for the recent years only */]).then(res => {
+    if (!host.isConnected) return;
+    const cat = res[0], FV = TA.ok(res[1]) ? (res[1].events || {}) : {}, fe = TA.ok(res[2]) ? res[2] : null;
+    let h = cat ? P.band(T, Y, cat) : '';
+    /* the Finals' semi-finals and final as played */
+    const dm = fe && fe.draw && fe.draw.matches ? fe.draw.matches : {};
+    const ko = Object.keys(dm).map(k => dm[k]).filter(m => m && (m.round === 'SF' || m.round === 'F')).sort((a, b) => TA.roundIndex(a.round) - TA.roundIndex(b.round) || String(a.date).localeCompare(String(b.date)));
+    if (ko.length) h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'How it ended', title: 'The ' + (ch.finals.name || TA.levelLabel('finals', T)) + ', last four', sub: 'The semi-finals and the final as played, each with our chance before the first ball.', actions: '<a class="qk-more" href="' + TA.eventHref(T, ch.finals.id) + '">The full draw</a>' }) +
+      '<div class="qk-watch">' + ko.map(m => TA.matchCard(m, { tour: T, why: false, market: false })).join('') + '</div></section>';
+    /* our call going into every big event */
+    const big = P.events(T, Y).filter(e => ['slam', 'finals', 'm1000'].indexOf(e.level) >= 0 && e.champion).sort((a, b) => String(a.start).localeCompare(String(b.start)));
+    const called = big.filter(e => FV[e.id]), hits = called.filter(e => String(FV[e.id][0]) === String(e.champion));
+    if (called.length) h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Our call, then what happened', title: 'Our top-rated going in won ' + hits.length + ' of ' + called.length, sub: 'For every Grand Slam, the Finals and every 1000: the entrant with the highest Elo for the surface before their first match there, against the champion. One player against a whole draw wins far less often than not.' }) +
+      '<div class="qk-card"><div class="qk-card-body">' + TA.tableHTML([{ label: 'Tournament' }, { label: 'Our top-rated going in' }, { label: 'Elo', align: 'right', cls: 'hide-sm' }, { label: 'Champion' }, { label: '', align: 'center', sortable: false }],
+        called.map(e => { const f = FV[e.id], hit = String(f[0]) === String(e.champion); return { _href: TA.eventHref(T, e.id), _class: hit ? 'ta-hit' : '', cells: [
+          { v: e.start, html: TA.eventLink(T, e.id, { surface: true }) }, { v: TA.playerName(T, f[0]), html: TA.playerLink(T, f[0], { year: Y }) }, { v: f[1], html: TA.num(f[1], 0), cls: 'hide-sm' },
+          { v: TA.playerName(T, e.champion), html: TA.playerLink(T, e.champion, { year: Y }) }, { v: hit ? 1 : 0, html: '<span class="ta-cc-mark ' + (hit ? 'hit' : 'miss') + '" aria-label="' + (hit ? 'Hit' : 'Miss') + '">' + (hit ? '✓' : '✗') + '</span>' }] }; }), { compact: true }) + '</div></div></section>';
+    /* the season-end top ten and the best by our numbers */
+    if (cat) {
+      const top = P.ranked(cat).slice(0, 10);
+      const rows = top.map(x => ({ _href: TA.playerHref(T, x.id, Y), _class: x.p.rank === 8 ? 'cut' : '', cells: [{ v: x.p.rank, html: '<b>' + x.p.rank + '</b>' },
+        { v: x.p.name, html: TA.playerLink(T, x.id, { name: x.p.name, country: true, year: Y }) }, { v: val(x.p, 'wins'), html: rec(x.p) },
+        { v: val(x.p, 'titles'), html: isNum(val(x.p, 'titles')) ? String(val(x.p, 'titles')) : '—' }, { v: val(x.p, 'elo'), html: isNum(val(x.p, 'elo')) ? TA.num(val(x.p, 'elo'), 0) : '—' }] }));
+      const best = [['elo', 'Elo No. 1'], ['elo_hard', 'Best on hard'], ['elo_clay', 'Best on clay'], ['elo_grass', 'Best on grass']].map(b => {
+        const l = P.byElo(cat, b[0]); if (!l.length) return null;
+        return { sport: 'tennis', kicker: b[1] + ', end of ' + Y, name: l[0].p.short || l[0].p.name, value: Math.round(val(l[0].p, b[0])), title: b[0] === 'elo' ? 'Elo' : TA.surfaceLabel(b[0].slice(4)) + ' Elo', next: l[1] ? { name: l[1].p.short || l[1].p.name, value: Math.round(val(l[1].p, b[0])) } : null, href: TA.playerHref(T, l[0].id, Y) };
+      }).filter(Boolean);
+      h += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-6">' + QK.sectionHead({ kicker: 'Final standings', title: 'The season-end top ten', sub: 'Each player’s official ranking at their last tour-level match of ' + Y + '; the dashed line is under eighth.', tag: 'h3', actions: '<a class="qk-more" href="' + TA.href(T, 'rankings', Y) + '">The full ranking</a>' }) +
+        '<div class="qk-card">' + TA.tableHTML([{ label: 'Rank', align: 'right' }, { label: 'Player' }, { label: 'Record', align: 'right' }, { label: 'Titles', align: 'right' }, { label: 'Elo', align: 'right' }], rows, { compact: true }) + '</div></div>' +
+        '<div class="qk-span-6">' + QK.sectionHead({ kicker: 'By our numbers', title: 'The best of ' + Y, sub: 'Our Elo at the season’s end, overall and on each surface, with the next best for scale.', tag: 'h3', actions: '<a class="qk-more" href="' + TA.href(T, 'elo', Y) + '">Elo, ' + Y + '</a>' }) +
+        QK.hotRow(best, { rank: false }) + '</div></div></section>';
+    }
+    host.innerHTML = h || QK.empty('Not on file', 'The ' + Y + ' season files are not on the site.');
+    TA.sortable(host);
+  });
+};
 })(window.TA);

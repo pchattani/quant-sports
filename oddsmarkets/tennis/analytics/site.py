@@ -40,12 +40,14 @@ def players_index(td: an.TourData) -> dict:
 
 
 def lab(td: an.TourData, catalogues: dict[int, dict]) -> dict:
-    """Column-oriented player-seasons (at least LAB_MIN_MATCHES matches) with the official "rank" column, plus a
-    compact "surface" block: player-season x surface rows (at least LAB_MIN_SURFACE matches on it) over the
-    surface-capable metrics only (players.SURFACE_KEYS, "matches" first)."""
+    """Column-oriented player-seasons (at least LAB_MIN_MATCHES matches) with the official "rank" column and the
+    catalogue's "age" (at the season's end) and the player's "hand" (R / L, the registry's; the Scouting Room's age and
+    plays filters, round 9), plus a compact "surface" block:
+    player-season x surface rows (at least LAB_MIN_SURFACE matches on it) over the surface-capable metrics only
+    (players.SURFACE_KEYS, "matches" first)."""
     from oddsmarkets.tennis.analytics.players import METRICS, SURFACE_KEYS, tour_metrics
     keys = [m["key"] for m in METRICS]
-    fields = ["id", "name", "year", "qualified", "rank"] + keys
+    fields = ["id", "name", "year", "qualified", "rank", "age", "hand"] + keys
     skeys = ["matches"] + [k for k in SURFACE_KEYS if k != "matches"]
     sfields = ["id", "year", "surface"] + skeys
     rows, srows, years = [], [], []
@@ -58,7 +60,8 @@ def lab(td: an.TourData, catalogues: dict[int, dict]) -> dict:
         for pid, r in pl.items():
             v = r.get("values") or {}
             if (r.get("matches") or 0) >= LAB_MIN_MATCHES:
-                rows.append([pid, r.get("name"), int(y), bool(r.get("qualified")), v.get("rank")] + [v.get(k) for k in keys])
+                rows.append([pid, r.get("name"), int(y), bool(r.get("qualified")), v.get("rank"), r.get("age"),
+                             (td.players.get(pid) or {}).get("hand")] + [v.get(k) for k in keys])
             for srf, sv in (r.get("values_surface") or {}).items():
                 if (sv.get("matches") or 0) >= LAB_MIN_SURFACE:
                     srows.append([pid, int(y), srf] + [sv.get(k) for k in skeys])

@@ -173,8 +173,19 @@ function lines(x, series, o) {
   return mount(x, function (T) {
     var out = [];
     var main = list.filter(function (s) { return !s.faint; });
+    /* team colours kept apart (STYLE_GUIDE §3 rule 5): a main line whose colour cannot be told from one already drawn
+       takes the next free chart slot; a team's second driver keeps its team colour, dashed */
+    var drawn = [], slot = 0;
+    var apart = function (s, c) {
+      if (s.faint || !s.colour || s.dash) return c;
+      var clash = drawn.some(function (d) { return d.k !== s.colour && !QK.color.distinct(d.c, c); });
+      if (clash) { while (slot < 8 && drawn.some(function (d) { return !QK.color.distinct(d.c, T.cat[slot]); })) slot++; c = T.cat[slot % 8]; slot++; }
+      drawn.push({ k: s.colour, c: c });
+      return c;
+    };
     list.forEach(function (s, i) {
       var c = s.colour ? lift(s.colour, T) : T.cat[main.indexOf(s) % 8];
+      if (!s.faint) c = apart(s, c);
       if (s.faint) c = QKC.hexA(c, 0.28);
       if (s.band && s.band.length > 1) {
         /* the ±se band as one polygon (a custom series: stacking does not work on a value x axis) */
@@ -229,7 +240,9 @@ function columns(x, o) {
       var base = { name: s.name, yAxisIndex: s.axis === 1 ? 1 : 0, z: s.type === 'bar' || !s.type ? 2 : 4 };
       if (s.type === 'line') return Object.assign(base, { type: 'line', data: s.data, symbol: 'circle', symbolSize: 6, lineStyle: { color: c, width: 2 }, itemStyle: { color: c }, connectNulls: true });
       if (s.type === 'scatter') return Object.assign(base, { type: 'scatter', data: s.data, symbol: s.symbol || 'circle', symbolSize: s.size || 10, itemStyle: { color: c } });
-      return Object.assign(base, { type: 'bar', stack: s.stack, barMaxWidth: 26, data: s.data.map(function (v, j) {
+      /* the legend key takes the series colour (per-bar colours: the first bar's), so the key matches the bars */
+      var lk = s.colours && s.colours[0] ? lift(s.colours[0], T) : (o.colours && i === 0 && o.colours[0] ? lift(o.colours[0], T) : c);
+      return Object.assign(base, { type: 'bar', stack: s.stack, barMaxWidth: 26, itemStyle: { color: lk }, data: s.data.map(function (v, j) {
         var cc = o.colours && i === 0 && o.colours[j] ? lift(o.colours[j], T) : (s.colours && s.colours[j] ? lift(s.colours[j], T) : c);
         return { value: v, href: o.hrefs ? o.hrefs[j] : undefined, itemStyle: { color: cc, borderRadius: s.stack ? 0 : [3, 3, 0, 0] } };
       }), label: s.labels ? { show: true, position: 'top', color: T.ink2, fontSize: 10, fontFamily: T.fontNum, formatter: function (p) { return s.fmt ? s.fmt(p.value) : PD.num(p.value, 0); } } : undefined,
@@ -297,6 +310,8 @@ function heat(x, o) {
     var xa = ax(T, { type: 'category', data: o.xs, split: false }); xa.position = 'top'; xa.axisLabel.color = T.ink2; xa.axisLabel.fontSize = 10;
     var ya = ax(T, { type: 'category', data: o.ys, split: false, inverse: true }); ya.axisLabel.color = T.ink2; ya.axisLabel.width = narrow(x) ? 76 : 130; ya.axisLabel.overflow = 'truncate';
     var range = o.diverging ? (o.invert ? [T.pos, T.mid, T.neg] : [T.neg, T.mid, T.pos]) : [QKC.hexA(T.seq[0], 0.4), T.seq[2], T.seq[4]];
+    /* o.pct: percentiles 0-100 on the kit's percentile scale (blue worst, red best), the figure in the scale's own ink */
+    if (o.pct) { lo = 0; hi = 100; range = [0, 25, 50, 75, 100].map(function (q) { return QK.pctHex(q); }); }
     var titled = heatTitles(xa, ya, o.xName, o.yName);
     return {
       grid: { left: 6, right: 8, top: 24 + titled, bottom: o.legend === false ? 4 : 40, containLabel: true },
@@ -304,7 +319,7 @@ function heat(x, o) {
       visualMap: { show: o.legend !== false, min: lo, max: hi, orient: 'horizontal', left: 'center', bottom: 0, itemWidth: 10, itemHeight: 140, calculable: false,
         textStyle: { color: T.ink3, fontFamily: T.fontNum, fontSize: 10 }, formatter: function (v) { return o.fmt ? o.fmt(v) : PD.num(v, 1); }, inRange: { color: range } },
       tooltip: tip(T, { formatter: function (p) { return head(o.ys[p.value[1]] + ' · ' + o.xs[p.value[0]], T) + '<div style="font-family:var(--font-num)">' + esc(o.tipFmt ? o.tipFmt(p.value) : (o.fmt ? o.fmt(p.value[2]) : PD.num(p.value[2], 2))) + '</div>'; } }),
-      series: [{ type: 'heatmap', data: o.data.filter(function (d) { return isNum(d[2]); }).map(function (d) { return { value: d, href: o.hrefs ? o.hrefs[d[1]] : undefined }; }),
+      series: [{ type: 'heatmap', data: o.data.filter(function (d) { return isNum(d[2]); }).map(function (d) { return { value: d, href: o.hrefs ? o.hrefs[d[1]] : undefined, label: o.pct ? { color: QK.pctInk(d[2]) } : undefined }; }),
         itemStyle: { borderColor: T.s1, borderWidth: 2, borderRadius: 3 },
         label: { show: o.cell !== false, fontFamily: T.fontNum, fontSize: 9.5, color: T.ink1, formatter: function (p) { return o.fmt ? o.fmt(p.value[2]) : PD.num(p.value[2], 1); } } }]
     };

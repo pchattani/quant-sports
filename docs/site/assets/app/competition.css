@@ -180,3 +180,8 @@
 .fb-co-rolli .s { color: var(--ink-3); font-size: var(--fs-xs); }
 .fb-co-rolli .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fb-co-rolli .k { text-align: right; color: var(--ink-3); font-size: var(--fs-xs); }
+/* round 9: how we called the round */
+.fb-co-called { display: grid; grid-template-columns: minmax(0, 1fr) 76px; align-items: center; gap: 8px; }
+.fb-co-calledp { font: 400 1.35rem/1 var(--font-display); text-align: right; color: var(--ink-3); }
+.fb-co-called.hit .fb-co-calledp { color: var(--signal); }
+@media (max-width: 600px) { .fb-co-called { grid-template-columns: minmax(0, 1fr) 46px; gap: 4px; } .fb-co-calledp { font-size: 1.05rem; } }

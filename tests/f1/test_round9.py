@@ -18,3 +18,17 @@ def test_lab_payload_carries_age():
     ages = {(r[0], r[3]): r[i] for r in lab["rows"]}
     assert ages[("a", 2026)] == 26 and ages[("a", 2025)] == 25 and ages[("b", 2026)] is None
     assert all(len(r) == len(lab["fields"]) for r in lab["rows"])
+
+
+def test_hall_payload_ranks_seasons_and_careers_by_team_mate_elo():
+    careers = {
+        "a": {"name": "A", "elo": [[2000, r, 1500, 1500 + 10 * r] for r in range(1, 11)] + [[2001, r, 1500, 1600 - r] for r in range(1, 11)],
+              "seasons": [{"year": 2000, "team": "t", "races": 10, "wins": 3, "pos": 1, "points": 90}, {"year": 2001, "team": "t", "races": 10}],
+              "totals": {"peak_elo_teammate": 1600, "peak_elo": 1700, "titles": 1, "wins": 3, "races": 20, "first_year": 2000, "last_year": 2001}},
+        "b": {"name": "B", "elo": [[2000, r, 1500, 1500] for r in range(1, 4)], "seasons": [{"year": 2000, "races": 3}],
+              "totals": {"peak_elo_teammate": 1500, "races": 3}}}
+    h = ssn.hall_payload(careers)
+    assert h["ok"] and [(r["driver"], r["year"]) for r in h["seasons"]] == [("a", 2000), ("a", 2001)]   # b: 3 starts
+    assert h["seasons"][0]["tm_elo"] == 1600 and h["seasons"][0]["gain"] == 90       # from its first race's rating
+    assert h["seasons"][1]["gain"] == -10                                             # from the end of 2000
+    assert [r["driver"] for r in h["hall"]] == ["a"]                                  # under 20 starts: out

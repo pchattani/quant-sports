@@ -193,7 +193,7 @@ raise SystemExit(b.main())
 APP_DIR = SITE / "assets" / "app"
 # qk-progview (the progression pages' layout, on the kit's qk/progression.js) loads before core; progression after lab
 APP_MODULES = ["qk-progview", "core", "charts", "overview", "matches", "race", "competition", "clubs", "players", "value", "fantasy", "lab",
-               "progression", "model", "boot"]
+               "scout-room", "teams", "progression", "model", "boot"]
 
 
 def _js() -> str:
@@ -227,8 +227,9 @@ def test_every_route_has_a_page() -> None:
     declared = set(re.findall(r"addRoute\('[^']*', '([A-Za-z]+)'", core))
     registered = set(re.findall(r"FB\.route\('([A-Za-z]+)'", js)) | set(re.findall(r"HANDLERS\.([A-Za-z]+) = ", core))
     assert declared and declared <= registered, sorted(declared - registered)
-    for section in ("overview", "matches", "competitions", "competition", "clubs", "club", "players", "player",
-                    "value", "fantasy", "lab", "compare", "model"):
+    # round 9: the Scouting Room (#/scout) took over the old players and lab pages, which now redirect into it
+    for section in ("overview", "matches", "competitions", "competition", "clubs", "club", "scout", "player",
+                    "value", "fantasy", "compare", "model"):
         assert section in declared, section
 
 

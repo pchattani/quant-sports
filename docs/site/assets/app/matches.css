@@ -112,3 +112,10 @@
 .fb-fx-xi { margin-right: 6px; font-size: 10px; padding: 1px 5px; }
 .fb-mx-cmp th, .fb-mx-cmp td { padding-left: 8px; padding-right: 8px; }
 .fb-mx-cmp thead th { white-space: normal; vertical-align: bottom; }
+/* round 9: absences */
+.fb-mx-ab { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 2px; }
+.fb-mx-ab li { display: grid; grid-template-columns: minmax(0, 1fr) auto 56px; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line-1); font-size: var(--fs-sm); }
+.fb-mx-abn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-mx-abw { font: 700 var(--fs-2xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+.fb-mx-abw.injured, .fb-mx-abw.suspended { color: var(--live); }
+.fb-mx-ab b { text-align: right; }

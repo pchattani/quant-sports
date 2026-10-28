@@ -950,6 +950,31 @@ function compLink(slug, opts) {
   return '<a class="fb-link fb-comp" href="' + esc(href.comp(slug, o.tab, o.q)) + '"><i style="--k:' + kindColor(kindOf(slug)) + '"></i>' + esc(o.short ? (c.short_name || c.name) : c.name) + '</a>';
 }
 
+// ── absences (round 9, Phase 4) ─────────────────────────────────────────────
+
+/* The clubs of the followed leagues have a value file (value/club/<tid>.json, its units' depth: each player's projected
+   GAR/90 and minutes); only those are requested, so nothing 404s. */
+var VALUE_HOMES = { 'premier-league': 1, 'la-liga': 1, 'serie-a': 1, 'bundesliga': 1, 'ligue-1': 1, 'eredivisie': 1, 'primeira-liga': 1, 'brasileirao': 1, 'mls': 1,
+  'saudi-pro-league': 1, 'liga-mx': 1, 'belgian-pro-league': 1, 'liga-argentina': 1 };
+function hasValueFile(tid) { var r = clubRow(tid); return !!(r && !r.national && VALUE_HOMES[r.home]); }
+/* The players a club is missing, valued: list [{ id, n, type, reason }] (a match's `missing`) -> Promise of rows
+   [{ id, name, type ('missing' | 'doubtful'), why ('injured' | 'suspended' | 'doubtful'), proj (projected GAR/90, goals of
+   expected goal difference a match), min (minutes this season), role, regular (one of the club's ten most-played) }],
+   the most valuable first; proj is null for a club without a value file or a player outside its depth chart. */
+function absenceRows(tid, list) {
+  var file = tid && hasValueFile(tid) ? load('value/club/' + tid + '.json') : Promise.resolve(null);
+  return file.then(function (vc) {
+    var by = {}, all = [];
+    ((vc || {}).units || []).forEach(function (u) { (u.depth || []).forEach(function (p) { by[String(p.id)] = p; all.push(p); }); });
+    var top = all.slice().sort(function (a, b) { return (b.min || 0) - (a.min || 0); }).slice(0, 10).map(function (p) { return String(p.id); });
+    return (list || []).map(function (x) {
+      var p = by[String(x.id)] || null;
+      var why = String(x.type || '') === 'doubtful' ? 'doubtful' : String(x.reason) === '3' ? 'suspended' : 'injured';
+      return { id: x.id, name: x.n || (p || {}).name || '', type: x.type, why: why, proj: p && isNum(p.proj) ? p.proj : null, min: p ? p.min : null, role: p ? p.role : '', regular: top.indexOf(String(x.id)) >= 0 };
+    }).sort(function (a, b) { return (isNum(b.proj) ? b.proj : -9) - (isNum(a.proj) ? a.proj : -9); });
+  });
+}
+
 // ── games ─────────────────────────────────────────────────────────────────
 
 /* A fixture (fixtures.json / hub.json / clubs matches) -> the kit's game shape for QK.matchCard and QK.tick.
@@ -1314,7 +1339,7 @@ return {
   POS_LABEL: POS_LABEL, POS_GROUP: POS_GROUP, posBadge: posBadge, ROUND_LABELS: ROUND_LABELS, STAGE_LABELS: STAGE_LABELS,
   stageLabel: stageLabel, roundText: roundText, stageText: stageText, coverageChip: coverageChip, formChips: formChips,
   href: href, crest: crest, clubLink: clubLink, playerLink: playerLink, compLink: compLink,
-  toGame: toGame, matchCard: matchCard, gameCard: matchCard, loadMarkets: loadMarkets, marketOf: marketOf, wpBar: wpBar, staleLive: staleLive, probBar3: probBar3, scoreText: scoreText, fixtureRow: fixtureRow,
+  absenceRows: absenceRows, hasValueFile: hasValueFile, toGame: toGame, matchCard: matchCard, gameCard: matchCard, loadMarkets: loadMarkets, marketOf: marketOf, wpBar: wpBar, staleLive: staleLive, probBar3: probBar3, scoreText: scoreText, fixtureRow: fixtureRow,
   card: card, grid: grid, chartBox: chartBox, kpi: kpi, kpis: kpis, detailNow: detailNow, dataAge: dataAge, dataTile: dataTile, badge: badge, muted: muted, empty: empty, note: note, aside: aside, crumb: crumb, loading: loading,
   pageHead: pageHead, secHead: secHead, chances: chances, subnav: subnav, seg: seg, wireSeg: wireSeg, select: select, toolbar: toolbar, field: field, table: table, set: set,
   pctl: pctl, probBar: probBar, deltaHTML: deltaHTML, heatColour: heatColour, setCompPicker: setCompPicker, hubLive: hubLive

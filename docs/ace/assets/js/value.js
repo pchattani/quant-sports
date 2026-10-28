@@ -1,13 +1,15 @@
 /* The Quant Ace — Value (#/<T>/value), Design System 2.0: who is likely to rise or fall over the next 6-12 months, how
- * much of a record is luck, and whose ranking runs ahead of or behind our rating. The market comparison lives on the
- * Model section's calibration page (TA.value.market), as a reference; ?v=market redirects there.
+ * much of a record is luck, and whose ranking runs ahead of or behind our rating. Round 9: the market comparison is the
+ * Model section's "Our forecasts v the market" (#/<T>/versus, TA.value.market), the validation its "Who moves next"
+ * (#/<T>/who-moves-next, TA.value.validation), and the surfaces the Rankings section's Elo view (TA.value.surfaces); the
+ * old ?v=market / validation / surface links land there.
  *
  *   ?v=breakout     breakout and regression candidates with their reasons, the points calendar, the age curve
  *   ?v=luck         wins above expectation and its components (last 52 weeks or this season), and why it is luck
  *   ?v=over         official rank against the rank the model implies; points at that rank
- *   ?v=surface      surface ratings against the overall rating (specialists)
+ *   (surfaces)      surface ratings against the overall rating (specialists): drawn in the Elo view
  *   (market)        the closing market and Kalshi against our pre-match chance: drawn on the calibration page
- *   ?v=validation   the walk-forward record of the breakout model and the luck evidence
+ *   (validation)    the walk-forward record of the breakout model and the luck evidence: Model › Who moves next
  *   (?h=12m|6m on breakout and validation, ?w=52w|season on luck, ?s=hard|clay|grass on surface)
  *
  * Reads <T>/value.json and <T>/value_validation.json (analytics/value.py). TA.value.card(T, pid, el) draws the
@@ -16,9 +18,10 @@
 'use strict';
 
 const esc = TA.esc, isNum = TA.isNum;
+/* round 9: Surfaces moved to the Rankings section's Elo view (TA.value.surfaces) and Validation to the Model section's
+   "Who moves next" (#/<T>/who-moves-next, TA.value.validation); the old ?v= links land there (core.js redirectOf) */
 const VIEWS = [
-  { key: 'breakout', label: 'Breakouts' }, { key: 'luck', label: 'Luck' }, { key: 'over', label: 'Ranking v our rating' },
-  { key: 'surface', label: 'Surfaces' }, { key: 'validation', label: 'Validation' }
+  { key: 'breakout', label: 'Breakouts' }, { key: 'nextgen', label: 'Next Gen (U21)' }, { key: 'luck', label: 'Luck' }, { key: 'over', label: 'Ranking v our rating' }
 ];
 const H_LABEL = { '12m': '12 months', '6m': '6 months' };
 const FEATURE_LABEL = {
@@ -117,7 +120,7 @@ function breakout(T, V, Val, body, q) {
     testStrip(V, h) +
     '<div class="section-note">Every player in the official top ' + (V.universe || 150) + ' gets a forecast of where the ranking will be in ' + H_LABEL[h] +
     '. The model was fitted on quarterly snapshots since ' + (T === 'atp' ? '2008' : '2009') + ' and is scored here on years it never saw (' +
-    '<a href="' + TA.href(T, 'value') + '?v=validation&h=' + h + '">validation</a>). The reasons are the features that move each forecast most against the average player; ' +
+    '<a href="' + TA.href(T, 'who-moves-next') + '?h=' + h + '">validation</a>). The reasons are the features that move each forecast most against the average player; ' +
     '▲ pushes the rank up, ▼ down. ' + (isNum(base) ? 'About ' + TA.pct(base, 0) + ' of players outside the top 10 break out in a typical ' + H_LABEL[h] + '.' : '') + '</div></div>' +
     '<div class="card"><div class="card-header">Who could break out <span class="card-sub">Most likely to rise by a third or more, outside the top 10</span></div>' + breakoutTable(T, rise, h, 'rise') + '</div>' +
     '<div class="card"><div class="card-header">Who could slip back <span class="card-sub">Most likely to fall by half or more (and 5+ places), or out of tour-level draws</span></div>' + breakoutTable(T, fall, h, 'fall') + '</div>' +
@@ -292,6 +295,38 @@ function overTable(T, list) {
     { v: r.elo_rank, html: [r.elo_rank, r.g_rank, r.sr_rank].map(x => (isNum(x) ? x : '—')).join(' · '), cls: 'hide-sm' }] })), { compact: true });
 }
 
+/* Round 9 (Phase 4): the Next Gen board. The under-21s in the breakout model's universe (age on the model's as-of day),
+   ranked by where it sees them in twelve months: the ranking now against our forecast (the middle 80% as the range), the
+   chance of a big climb, the Elo trend over six months and last year's matches. The model is the Breakouts view's,
+   validated on Model › Who moves next. */
+function rankPos(r) { return isNum(r) && r > 0 ? Math.max(0, Math.min(100, 100 * (1 - Math.log(r) / Math.log(400)))) : 0; }
+function nextGen(T, V, Val, body) {
+  const B = V.breakout || {};
+  const rows = (B.rows || []).filter(r => isNum(r.age) && r.age < 21 && isNum(r.rank) && isNum(r.r12m)).sort((a, b) => a.r12m - b.r12m);
+  if (!rows.length) { body.innerHTML = TA.card('Next Gen', '', TA.muted('No under-21 players in the model’s ranking universe right now.')); return; }
+  const def = B.rise_def || {};
+  const ours = QK.ours ? QK.ours({ short: true, model: 'Breakout model' }) : '';
+  const top = rows.slice(0, 3).map(r => {
+    const goal = Math.max(1, Math.min(Math.round(r.rank * Math.exp(isNum(def.log) ? def.log : -0.405)), r.rank - (def.places || 5)));
+    return { kicker: 'Next Gen', name: TA.playerName(T, r.pid), sub: [TA.playerCountry(T, r.pid), 'age ' + Math.floor(r.age)].filter(Boolean).join(' · '), href: TA.playerHref(T, r.pid) + '?view=progression', sport: 'tennis',
+      value: rk(r.r12m), unit: 'our forecast in a year',
+      from: { label: 'Ranked now', value: rk(r.rank), pos: rankPos(r.rank) }, to: { label: 'A year on', value: rk(r.r12m), pos: rankPos(r.r12m) },
+      text: (isNum(r.p_rise12m) ? TA.pct(r.p_rise12m, 0) + ' chance of a big climb (No. ' + goal + ' or better). ' : '') + (isNum(r.d_elo) && Math.abs(r.d_elo) >= 25 ? 'Elo ' + (r.d_elo > 0 ? 'up ' : 'down ') + Math.abs(Math.round(r.d_elo)) + ' in six months.' : ''), link: { text: 'Progression' } };
+  });
+  body.innerHTML = '<section class="qk-section">' + QK.sectionHead({ kicker: 'Next Gen', title: 'The under-21s, a year from now', html: true,
+      sub: 'Every player under 21 in the ' + TA.tourName(T) + ' top ' + (V.universe || 150) + ', ordered by where our breakout model' + ours + ' sees them in twelve months.',
+      actions: '<a class="qk-more" href="' + TA.href(T, 'scout') + '?age=u21">Every under-21 in the Scouting Room</a>' }) + QK.storyCards(top, { cols: 3 }) + '</section>' +
+    '<div class="card"><div class="card-header">The board <span class="card-sub">' + rows.length + ' players · forecasts as of ' + esc(TA.fmtDate(V.as_of, { weekday: false })) + '</span></div>' +
+    TA.tableHTML([{ label: '#', align: 'right' }, { label: 'Player' }, { label: 'Age', align: 'right' }, { label: 'Rank now', align: 'right' }, { label: 'In 12 months', align: 'right', title: 'Our forecast ranking a year on, with the middle 80% of outcomes' },
+      { label: 'Big climb', align: 'right', title: 'Our chance of a big climb within a year' }, { label: 'Elo, 6 months', align: 'right', cls: 'hide-sm', title: 'Change in Elo over the last six months' }, { label: 'Matches, 12 months', align: 'right', cls: 'hide-sm' }],
+    rows.map((r, i) => ({ _href: TA.playerHref(T, r.pid), cells: [{ v: i + 1, html: '<b>' + (i + 1) + '</b>' }, { v: TA.playerName(T, r.pid), html: TA.playerLink(T, r.pid, { country: true }) },
+      { v: r.age, html: TA.num(r.age, 1) }, { v: r.rank, html: String(r.rank) },
+      { v: r.r12m, html: '<b>' + rk(r.r12m) + '</b>' + (isNum(r.lo12m) ? ' <span class="muted-inline">' + Math.round(r.lo12m) + '–' + Math.round(r.hi12m) + '</span>' : '') },
+      { v: r.p_rise12m, html: isNum(r.p_rise12m) ? TA.pct(r.p_rise12m, 0) : '—' }, { v: r.d_elo, html: coloured(r.d_elo, 0), cls: 'hide-sm' }, { v: r.n12, html: isNum(r.n12) ? String(r.n12) : '—', cls: 'hide-sm' }] })), { compact: true }) + '</div>' +
+    QK.note('<b>How sure are we?</b> Young players move the most and the hardest to call: the range is where the ranking lands 8 times in 10 in our forecast. The model’s record is on <a href="' + TA.href(T, 'who-moves-next') + '">Model › Who moves next</a>.');
+  TA.sortable(body);
+}
+
 function over(T, V, Val, body) {
   const rows = ((V.value || {}).rows || []).filter(r => isNum(r.rank) && isNum(r.imp));
   const top200 = rows.filter(r => r.rank <= 200);
@@ -340,7 +375,7 @@ function surface(T, V, Val, body, q) {
     '<div class="grid-2"><div class="card"><div class="card-header">Specialists <span class="card-sub">Gain most on ' + esc(TA.surfaceLabel(s).toLowerCase()) + '</span></div>' + tbl(spec.slice(0, 12)) + '</div>' +
     '<div class="card"><div class="card-header">Weakest on it <span class="card-sub">Lose most on ' + esc(TA.surfaceLabel(s).toLowerCase()) + '</span></div>' + tbl(spec.slice().reverse().slice(0, 12)) + '</div></div>';
   TA.sortable(body);
-  TA.wireToggles(document.getElementById('vx-s'), 'data-s', k => { q.s = k; setQuery(T, { v: 'surface', s: k }); surface(T, V, Val, body, q); });
+  TA.wireToggles(document.getElementById('vx-s'), 'data-s', k => { q.s = k; if (q._route) q._route({ s: k }); else setQuery(T, { v: 'surface', s: k }); surface(T, V, Val, body, q); });
 }
 
 // ── market v model ─────────────────────────────────────────────────────────
@@ -434,7 +469,7 @@ function validation(T, V, Val, body, q) {
     '<div class="card"><div class="card-header">Age curve</div><div id="vx-age2" style="height:300px"></div></div>' +
     '<div class="day-head">The last scored snapshots</div><div class="grid-2">' + recentHTML + '</div>';
   TA.sortable(body);
-  TA.wireToggles(document.getElementById('vx-vh'), 'data-h', k => { q.h = k; setQuery(T, { v: 'validation', h: k }); validation(T, V, Val, body, q); });
+  TA.wireToggles(document.getElementById('vx-vh'), 'data-h', k => { q.h = k; if (q._route) q._route({ h: k }); else setQuery(T, { v: 'validation', h: k }); validation(T, V, Val, body, q); });
   const ys = years.filter(y => per[y] && per[y].rho);
   const xs = ys.map(Number);
   const yn = document.getElementById('vx-yr');
@@ -456,17 +491,16 @@ function render(el, params) {
   const T = params.tour;
   const q = Object.assign({}, params.query || {});
   let view = q.v;
-  if (view === 'market') { TA.go(TA.href(T, 'calibration') + '?sec=market'); return null; }
   if (!VIEWS.some(v => v.key === view)) view = 'breakout';
   const tabs = '<nav class="qk-tabs ta-tabs" aria-label="Value views">' + VIEWS.map(v => '<a class="qk-tab" href="#/' + T + '/value?v=' + v.key + '"' + (v.key === view ? ' aria-selected="true" aria-current="page"' : ' aria-selected="false"') + '>' + esc(v.label) + '</a>').join('') +
-    '<a class="qk-tab" href="#/methodology/m-value" aria-selected="false">Method</a></nav>';
+    '</nav><p class="ta-moved">How the breakout model is built: <a href="#/methodology/m-value">Model › How it works</a>. How well it has called the climbers: <a href="' + TA.href(T, 'who-moves-next') + '">Model › Who moves next</a>.</p>';
   el.innerHTML = tabs + '<div id="vx-body" style="margin-top:var(--sp-4)">' + QK.skeleton('lines', 6) + '</div>';
   return TA.loadAll([TA.tpath('value.json', T), TA.tpath('value_validation.json', T)]).then(arr => {
     if (!el.isConnected) return;
     const V = arr[0], Val = TA.ok(arr[1]) ? arr[1] : null;
     const body = document.getElementById('vx-body');
     if (!TA.ok(V)) { body.innerHTML = TA.card('Value', '', TA.notBuilt('The Value section', V)); return; }
-    const fn = { breakout: breakout, luck: luck, over: over, surface: surface, validation: validation }[view];
+    const fn = { breakout: breakout, nextgen: nextGen, luck: luck, over: over }[view];
     fn(T, V, Val, body, q);
     TA.setMeta('Value as of ' + esc(TA.fmtDate(V.as_of, { year: false })) + (V.model_asof ? ' · model fitted ' + esc(TA.fmtDate(V.model_asof, { weekday: false })) : ''));
   });
@@ -496,7 +530,7 @@ function card(T, pid, el) {
       v ? (isNum(v.rank) && isNum(v.imp) ? (v.rank > v.imp ? 'underrated by ' + (v.rank - v.imp) + ' places' : v.rank < v.imp ? 'overrated by ' + (v.imp - v.rank) + ' places' : 'in line') + ' · rating ' + n0(v.R) + ' · ' : '') + '<a href="' + link('over') + '">ranking v our rating →</a>' : 'not rated (fewer than 10 rated matches or inactive)'));
     const why = b && (b.why12m || []).length ? '<div class="vx-card-why">Forecast drivers: ' + reasonsHTML(T, b, '12m', 4) + '</div>' : '';
     el.innerHTML = TA.v2.card('Where the ranking is heading', 'Our ranking forecast for a year from now, how much of the last 52 weeks was luck, and whether the ranking runs ahead of or behind our rating (' +
-      '<a href="' + link('validation') + '">how good is this?</a>)', '<div class="kpi-grid">' + tiles.join('') + '</div>' + why +
+      '<a href="' + TA.href(T, 'who-moves-next') + '">how good is this?</a>)', '<div class="kpi-grid">' + tiles.join('') + '</div>' + why +
       QK.note((b && isNum(b.lo12m) && isNum(b.hi12m) ? 'The range ' + Math.round(b.lo12m) + '–' + Math.round(b.hi12m) + ' is where the ranking lands 8 times in 10 in our forecast. ' : '') + 'Luck counts wins beyond what the games won predicted, kind draws and walkovers; it rarely repeats from one year to the next.'), { cls: 'vx-card' });
   });
 }
@@ -511,6 +545,25 @@ function marketView(T, el) {
   });
 }
 
-TA.value = { card: card, market: marketView };
+/* The surface ratings (best on a surface, specialists, weakest) for the Rankings section's Elo view; q.s picks the surface,
+   q._route(change) keeps the address. */
+function surfacesView(T, el, q) {
+  if (!el) return Promise.resolve();
+  return TA.load(TA.tpath('value.json', T)).then(V => {
+    if (!el.isConnected) return;
+    if (!TA.ok(V)) { el.innerHTML = ''; return; }
+    surface(T, V, null, el, q || {});
+  });
+}
+/* The breakout model's walk-forward record for the Model section's "Who moves next" */
+function validationView(T, el, q) {
+  if (!el) return Promise.resolve();
+  return TA.loadAll([TA.tpath('value.json', T), TA.tpath('value_validation.json', T)]).then(arr => {
+    if (!el.isConnected) return;
+    validation(T, arr[0] || {}, TA.ok(arr[1]) ? arr[1] : null, el, q || {});
+  });
+}
+
+TA.value = { card: card, market: marketView, surfaces: surfacesView, validation: validationView };
 TA.route('value', render);
 })(window.TA);

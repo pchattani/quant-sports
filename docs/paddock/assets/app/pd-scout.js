@@ -13,7 +13,8 @@
  *            added, percentile cells against the peers, the top 50 then "Show all", "Download CSV";
  *   chart    the Lab (lab.js, PD.lab.mount): presets, any two metrics, size, colour, shrink, medians, the ranked table;
  *   leaders  small multiples: the top five and the bottom three on the view's key metrics over a dot strip of the grid;
- *   alltime  the all-time Elo boards (peak against the field since 1950), moved here from the Drivers list.
+ *   alltime  the hall of fame and the greatest seasons by our driver model since 1950 (the team-mate Elo, hall_of_fame.json:
+ *            round 9, Phase 4), then the all-time Elo boards (peak against the field), moved here from the Drivers list.
  * Selecting a driver anywhere (a name, a point, a card) opens the profile drawer (?p=<id>): percentile meters for the
  * view's sets, headline numbers, "Most like" and links to the driver page, progression and Compare. Pin up to four (the +
  * on a row, or the drawer's button) to the compare tray (?cmp=<id>,<id>): side by side on percentile bars; "Full compare"
@@ -375,14 +376,15 @@ function leadersView(host) {
 
 /* All-time: Elo since 1950 (peak against the field, the team-mate and in qualifying), moved from the Drivers list */
 function allTime(host) {
-  host.innerHTML = '<div class="sc-alltime">' + QK.sectionHead({ kicker: 'All-time', title: 'The best ever, by Elo', sub: 'Our Elo from every head-to-head since 1950: against the whole field, against the team-mate only, and in qualifying. 1500 is average; the peak is the highest a driver reached.' }) +
+  host.innerHTML = '<div class="sc-alltime"><div id="sc-hall"></div>' + QK.sectionHead({ kicker: 'All-time', title: 'The best ever, by Elo', sub: 'Our Elo from every head-to-head since 1950: against the whole field, against the team-mate only, and in qualifying. 1500 is average; the peak is the highest a driver reached.' }) +
     PD.grid(PD.card('Peak field Elo, top 15', '', PD.chartBox('sc-elo', 420, 'All-time peak Elo'), { span: 5 }) +
       PD.card('The top 50', 'Sortable; tap a name for the driver page.', '<div id="sc-elo-t"></div>', { span: 7, flush: true })) + '</div>';
+  hall();
   PD.load('elo.json').then(function (elo) {
     if (!host.isConnected) return;
     var at = ((elo || {}).all_time || []).slice();
     var cur = PD.currentSeason();
-    PD.ch.hbars('sc-elo', at.slice(0, 15).map(function (x) { return { label: x.name, value: x.peak_field, href: PD.driverHref(x.driver, cur), colour: PD.col('coral'), sub: (x.years || []).join('–') + ' · ' + x.races + ' races' }; }),
+    PD.ch.hbars('sc-elo', at.slice().sort(function (a, b) { return (b.peak_field || 0) - (a.peak_field || 0); }).slice(0, 15).map(function (x) { return { label: x.name, value: x.peak_field, href: PD.driverHref(x.driver, cur), colour: PD.col('teal'), sub: (x.years || []).join('–') + ' · ' + x.races + ' races' }; }),
       { fmt: function (v) { return PD.num(v, 0); }, min: 1500, name: 'Peak field Elo', emptyText: 'No Elo history.', label: 'All-time Elo' });
     if (!at.length) { PD.set('sc-elo-t', PD.muted('No Elo history.')); return; }
     PD.table('sc-elo-t', [
@@ -394,6 +396,36 @@ function allTime(host) {
       { key: 'peak_quali', label: 'Peak quali', num: true, fmt: function (v) { return PD.num(v, 0); } }
     ], at.slice(0, 50).map(function (x) { return Object.assign({ span: (x.years || []).join('–') }, x); }), { sort: { key: 'peak_field', dir: 'desc' }, rank: true, maxHeight: 520 });
     PD.v2.oursHeads(document.getElementById('sc-elo-t'), { 'Peak field': 'elo', 'Peak v team-mate': 'elo_teammate', 'Peak quali': 'elo' });
+  });
+}
+
+/* The hall of fame and the greatest seasons (hall_of_fame.json): our driver model across every era is the team-mate Elo
+   (same car, same day; the lap-time ratings start in the 1990s). A season's rating is the team-mate Elo after its last
+   race (8+ starts); "Biggest climb" is how far one season moved it, kinder to short careers. */
+var HALL_MODE = 'rating';
+function hall() {
+  var host = document.getElementById('sc-hall');
+  if (!host) return;
+  PD.load('hall_of_fame.json').then(function (H) {
+    if (!host.isConnected) return;
+    if (!H || !H.ok) { host.innerHTML = ''; return; }
+    var cur = PD.currentSeason();
+    var top = (H.hall || []).slice(0, 12);
+    host.innerHTML = QK.sectionHead({ kicker: 'Hall of fame', title: 'The greatest drivers, by our driver model', sub: 'Our team-mate Elo from every Grand Prix since 1950: a rating from head-to-heads in the same car, the fairest test across eras (1500 is average). Ranked by the peak each driver reached; 20+ starts.' }) +
+      '<div class="pd-hall">' + top.map(function (r, i) {
+        var t = (r.teams || [])[r.teams.length - 1];
+        return '<a class="pd-hall-c" href="' + esc(PD.driverHref(r.driver, cur)) + '"><span class="rk qk-outline">' + (i + 1) + '</span><b>' + esc(r.name) + '</b><span class="v num">' + PD.num(r.peak_tm, 0) + '</span>' +
+          '<small>' + esc((r.years || []).join('–')) + ' · ' + r.titles + ' title' + (r.titles === 1 ? '' : 's') + ' · ' + r.wins + ' wins · ' + r.starts + ' starts</small></a>';
+      }).join('') + '</div>' +
+      '<section class="qk-section pd-sec">' + QK.sectionHead({ kicker: 'Greatest seasons', title: HALL_MODE === 'climb' ? 'The biggest single-season climbs' : 'The highest-rated seasons', sub: HALL_MODE === 'climb' ? 'How far one season moved a driver’s team-mate Elo: beating a rated team-mate counts most.' : 'The team-mate Elo after the season’s last race, 8+ starts.',
+        actions: PD.seg('sc-hm', [['rating', 'Highest rating'], ['climb', 'Biggest climb']], HALL_MODE, 'Greatest seasons') }) +
+      PD.card('', '', PD.chartBox('sc-hall-c', 560, 'Greatest seasons'), {}) + '</section>';
+    var list = (HALL_MODE === 'climb' ? H.climbs : H.seasons) || [];
+    list = list.slice(0, 20);
+    PD.ch.hbars('sc-hall-c', list.map(function (r) { return { label: r.name + ' ' + r.year, value: HALL_MODE === 'climb' ? r.gain : r.tm_elo, href: PD.driverHref(r.driver, r.year), colour: PD.teamColour(r.team),
+      sub: PD.teamName(r.team) + ' · ' + r.starts + ' starts · ' + (r.wins || 0) + ' wins' + (r.pos ? ' · P' + r.pos + ' in the championship' : '') + ' · team-mate Elo ' + PD.num(r.tm_elo, 0) }; }),
+      { fmt: function (v) { return HALL_MODE === 'climb' ? PD.signed(v, 0) : PD.num(v, 0); }, min: HALL_MODE === 'climb' ? 0 : 1500, name: HALL_MODE === 'climb' ? 'Team-mate Elo gained' : 'Team-mate Elo', xName: HALL_MODE === 'climb' ? 'Team-mate Elo gained in the season' : 'Team-mate Elo after the season', label: 'Greatest seasons' });
+    PD.wireSeg(host, 'sc-hm', function (v) { HALL_MODE = v; hall(); });
   });
 }
 

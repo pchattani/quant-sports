@@ -1,6 +1,7 @@
 /* The Quant Paddock — Value & Moves (#/value[/<y>][?tab=drivers|swap|needs]).
  *   Driver value: the car/driver decomposition in % of a lap (positive = faster): pace above the
- *     team-mate (the driver alone, ±se) and above the field (driver and car now); cars by latest pace.
+ *     team-mate (the driver alone, ±se) and above the field (driver and car now); cars by latest pace; then Car v
+ *     driver (round 9, moved from Standings: car pace by round, driver effects, the points split, Elo; ?sec=cvd).
  *   Swap simulator (was #/swap): put driver X in car Y — both drivers' and both teams' seasons re-run
  *     through the championship simulation of the remaining rounds. Shareable: ?tab=swap&x=&w=.
  *   Team needs: every team's graded areas, and the driver moves that would add the most points.
@@ -22,15 +23,24 @@ function render(el, params) {
     '<div class="pd-mt">' + PD.note(tab === 'swap' ? 'The swap runs the rest of the season again with two drivers in each other’s seats, using the same random draws, so the difference is the swap and not luck.' : tab === 'needs' ? 'Each team is graded against the others in every area: <b>A</b> from the 80th percentile, then B, C and D every 20 points.' : '<b>Pace above the team-mate</b> is the driver alone, the car taken out; <b>pace above the field</b> is driver and car together. Both are shares of a lap: 0.5% is about 0.45 seconds.') + '</div>' + '<div id="vl-body">' + PD.empty('Loading', '') + '</div>';
   if (tab === 'swap') return swap(el, q);
   if (tab === 'needs') return needs(el);
-  return value(el, y);
+  return value(el, y, q.sec);
 }
 
 // ── driver value ──────────────────────────────────────────────────────────
 
-function value(el, y) {
-  return (y >= 1994 ? PD.load(y + '/value.json') : Promise.resolve({ ok: false, reason: 'the decomposition starts in 1994' })).then(function (d) {
+function value(el, y, sec) {
+  return Promise.all([y >= 1994 ? PD.load(y + '/value.json') : Promise.resolve({ ok: false, reason: 'the decomposition starts in 1994' }), PD.load(y + '/season.json')]).then(function (both) {
+    var d = both[0], season = both[1];
     if (!PD.alive(el)) return;
-    if (!PD.ok(d) || !d.drivers) { PD.set('vl-body', PD.notBuilt('The ' + y + ' value table', d) + (y < 1994 ? PD.muted('The decomposition starts in 1994, when lap times begin.') : '')); return; }
+    var cvd = function () {
+      if (!PD.ok(season) || !PD.carDriver) return;
+      var body = document.getElementById('vl-body');
+      if (!body) return;
+      body.insertAdjacentHTML('beforeend', '<section class="qk-section pd-sec" id="cvd">' + PD.secHead('Car v driver', 'Who has the car, who has the driver', 'Moved here from Standings: the car’s pace round by round, every driver against the car, and each team’s points split into the car and its drivers.') + '<div id="vl-cvd"></div></section>');
+      PD.carDriver('vl-cvd', season);
+      if (sec === 'cvd') setTimeout(function () { var t = document.getElementById('cvd'); if (t) t.scrollIntoView({ block: 'start' }); }, 80);
+    };
+    if (!PD.ok(d) || !d.drivers) { PD.set('vl-body', PD.notBuilt('The ' + y + ' value table', d) + (y < 1994 ? PD.muted('The decomposition starts in 1994, when lap times begin.') : '')); cvd(); return; }
     var D = PD.rowsOf(d.driver_cols, d.drivers), T = PD.rowsOf(d.team_cols, d.teams);
     var minR = d.min_races || 5;
     var full = D.filter(function (r) { return (r.races || 0) >= minR; });
@@ -77,6 +87,7 @@ function value(el, y) {
       { key: 'points', label: 'Points', num: true, fmt: function (v) { return PD.pts(v); } },
       { key: 'p_title', label: 'Title', num: true, fmt: function (v) { return isNum(v) ? PD.chance(v) : '—'; } }
     ], T, { sort: { key: 'rank', dir: 'asc' } });
+    cvd();
   });
 }
 
@@ -84,19 +95,25 @@ function value(el, y) {
 
 function swap(el, q) {
   var Y = PD.currentSeason();
-  return PD.loadAll([Y + '/swap.json', Y + '/value.json']).then(function (res) {
+  return PD.loadAll([Y + '/swap.json', Y + '/value.json', Y + '/needs.json']).then(function (res) {
     if (!PD.alive(el)) return;
-    var SW = res[0], VAL = res[1];
+    var SW = res[0], VAL = res[1], ND = res[2];
     if (!PD.ok(SW) || !SW.lineup) { PD.set('vl-body', PD.notBuilt('The ' + Y + ' swap table', SW) + PD.muted('It needs a season still to run: the swaps go through the championship simulation of the remaining rounds.')); return; }
     var L = SW.lineup;
     var nm = function (d) { return (SW.names || {})[d] || PD.driverName(d); };
     var drivers = Object.keys(L).sort(function (a, b) { return (L[a] + a).localeCompare(L[b] + b); });
     var teams = drivers.map(function (d) { return L[d]; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
-    var ST = { x: L[q.x] ? q.x : drivers[0], w: null };
-    ST.w = L[q.w] && L[q.w] !== L[ST.x] ? q.w : null;
+    /* with nothing picked, open on the most lopsided swap on the grid: the move that adds the most expected
+       constructors' points to the receiving team (needs.json best_swaps), else the first driver */
+    var top = null;
+    if (PD.ok(ND) && ND.teams) Object.keys(ND.teams).forEach(function (t) { (ND.teams[t].best_swaps || []).forEach(function (s) { if (L[s.in] && L[s.out] && (!top || s.gain_pts > top.gain_pts)) top = Object.assign({ to: t }, s); }); });
+    var pre = !L[q.x] && top;
+    var ST = { x: L[q.x] ? q.x : (top ? top.in : drivers[0]), w: null };
+    ST.w = L[q.w] && L[q.w] !== L[ST.x] ? q.w : (pre ? top.out : null);
     PD.set('vl-body', PD.card('The swap', esc(SW.label || '') + ' ' + (SW.remaining || []).length + ' sessions left.',
       '<div class="pd-toolbar pd-swap"><label>Driver<select class="qk-select" id="sw-x"></select></label><span class="pd-swap-arrow" aria-hidden="true">→</span><label>Into the car of<select class="qk-select" id="sw-t"></select></label><label>Replacing<select class="qk-select" id="sw-w"></select></label>' +
-      '<button type="button" class="qk-btn" id="sw-share">Copy link</button></div>') + '<div id="sw-out" class="pd-mt"></div>');
+      '<button type="button" class="qk-btn" id="sw-share">Copy link</button></div>' +
+      (pre ? '<p class="pd-cap">Opened on the most lopsided swap on the grid: ' + esc(nm(top.in)) + ' into ' + esc(PD.teamName(top.to)) + '’s car for ' + esc(nm(top.out)) + ' adds ' + PD.signed(top.gain_pts, 1) + ' expected points to ' + esc(PD.teamName(top.to)) + '. Pick any driver and seat.</p>' : '')) + '<div id="sw-out" class="pd-mt"></div>');
     var fill = function () {
       var sx = document.getElementById('sw-x'), st = document.getElementById('sw-t'), sw = document.getElementById('sw-w');
       sx.innerHTML = teams.map(function (t) { return '<optgroup label="' + esc(PD.teamName(t)) + '">' + drivers.filter(function (d) { return L[d] === t; }).map(function (d) { return '<option value="' + esc(d) + '"' + (d === ST.x ? ' selected' : '') + '>' + esc(nm(d)) + '</option>'; }).join('') + '</optgroup>'; }).join('');
@@ -128,7 +145,14 @@ function swap(el, q) {
         { label: PD.teamName(ty), now: (pt[ty] || [])[0], then: (pt[ty] || [])[0] + dd.ty[0], kind: 't', id: ty, title: [(pt[ty] || [])[1], clip((pt[ty] || [])[1] + dd.ty[1])] },
         { label: PD.teamName(tx), now: (pt[tx] || [])[0], then: (pt[tx] || [])[0] + dd.tx[0], kind: 't', id: tx, title: [(pt[tx] || [])[1], clip((pt[tx] || [])[1] + dd.tx[1])] }
       ];
-      box.innerHTML = PD.grid(
+      /* round 9: the hero number first: what the swap does to the team receiving the driver */
+      var hero = PD.kpis([
+        PD.kpi(PD.teamName(ty) + ' with ' + PD.driverSurname(ST.x), PD.signed(dd.ty[0], 1), 'expected constructors’ points over the rest of the season', { signal: true, cls: 'pd-hero-n' }),
+        PD.kpi(nm(ST.x), PD.signed(dd.x[0], 1), 'expected points in the ' + PD.teamName(ty) + ' car'),
+        PD.kpi(nm(ST.w), PD.signed(dd.w[0], 1), 'expected points in the ' + PD.teamName(tx) + ' car'),
+        PD.kpi(PD.teamName(tx), PD.signed(dd.tx[0], 1), 'expected constructors’ points')
+      ]);
+      box.innerHTML = hero + PD.grid(
         PD.card('Expected season points', 'Now (grey) against with the swap (colour).', PD.chartBox('sw-ch', 300), { span: 7 }) +
         PD.card('What moves', '', '<div id="sw-t2"></div>', { span: 5, flush: true })) +
         PD.note(esc(nm(ST.x)) + ': pace above team-mate ' + (isNum(eff[ST.x]) ? PD.signed(-eff[ST.x], 3) + '%' : '—') + '; ' + esc(nm(ST.w)) + ': ' + (isNum(eff[ST.w]) ? PD.signed(-eff[ST.w], 3) + '%' : '—') +
@@ -170,11 +194,21 @@ function needs(el) {
     ids.forEach(function (t, yi) { (d.teams[t].areas || []).forEach(function (a) { data.push([areas.map(function (x) { return x.key; }).indexOf(a.key), yi, a.pct]); }); });
     var moves = [];
     ids.forEach(function (t) { (d.teams[t].best_swaps || []).forEach(function (s) { moves.push(Object.assign({ to: t }, s)); }); });
-    PD.set('vl-body', PD.note(esc(d.label || '')) + PD.grid(
+    /* round 9 (a legacy tab rebuilt): the headline numbers, then the chart, the table and the explain strip */
+    var avgP = function (t) { return PD.mean((d.teams[t].areas || []).map(function (a) { return a.pct; })); };
+    var best = ids.slice().sort(function (a, b) { return avgP(b) - avgP(a); })[0];
+    var worst = null;
+    ids.forEach(function (t) { (d.teams[t].areas || []).forEach(function (a) { if (!worst || a.pct < worst.a.pct || (a.pct === worst.a.pct && avgP(t) > avgP(worst.t))) worst = { t: t, a: a }; }); });
+    var topMove = moves.slice().sort(function (a, b) { return b.gain_pts - a.gain_pts; })[0];
+    PD.set('vl-body', PD.kpis([
+      PD.kpi('Most complete team', best ? PD.teamLink(best) : '—', best ? 'average ' + PD.ordinal(Math.round(avgP(best))) + ' percentile across the areas' : '', { text: true }),
+      PD.kpi('Biggest need', worst ? esc(PD.teamAbbr(worst.t)) + ' · ' + esc(worst.a.label.replace(/ \(.*\)$/, '')) : '—', worst ? PD.ordinal(worst.a.pct) + ' percentile, grade ' + esc(worst.a.grade || '—') : '', { text: true }),
+      PD.kpi('The move that adds most', topMove ? esc(PD.driverSurname(topMove.in)) + ' to ' + esc(PD.teamAbbr(topMove.to)) : '—', topMove ? PD.signed(topMove.gain_pts, 1) + ' expected constructors’ points' : '', { text: true, href: topMove ? '#/value?tab=swap&x=' + encodeURIComponent(topMove.in) + '&w=' + encodeURIComponent(topMove.out) : null })
+    ]) + PD.grid(
       PD.card('Every team, graded', 'Percentile against the other teams in each area (100 = best).', PD.chartBox('nd-heat', 420), { span: 12 }) +
       PD.card('The best moves', 'The driver swaps that would add the most expected constructors’ points to the receiving team, across the grid.', '<div id="nd-moves"></div>', { span: 12, flush: true }), 'pd-mt'));
     PD.ch.heat('nd-heat', { xs: areas.map(function (a) { return a.label.replace(/ \(.*\)$/, '').replace('Development through the season', 'Development'); }), ys: ids.map(function (t) { return d.teams[t].name || PD.teamName(t); }), xName: 'Area', yName: 'Constructor', data: data, hrefs: ids.map(PD.teamHref),
-      fmt: function (v) { return PD.num(v, 0); }, diverging: true, mid: 50, label: 'Team needs heatmap' });
+      fmt: function (v) { return PD.num(v, 0); }, pct: true, label: 'Team needs heatmap' });
     PD.table('nd-moves', [
       { key: 'to', label: 'Team', sticky: true, fmt: function (v) { return PD.teamLink(v); } },
       { key: 'in_name', label: 'In', fmt: function (v, r) { return PD.driverLink(r.in, { name: v }); } },
@@ -185,6 +219,8 @@ function needs(el) {
       { key: 'other_change', label: 'Seller', num: true, fmt: function (v) { return PD.signed(v, 1); } },
       { key: 'sim', label: '', sort: false, fmt: function (v, r) { return '<a class="pd-link" href="#/value?tab=swap&x=' + encodeURIComponent(r.in) + '&w=' + encodeURIComponent(r.out) + '">Simulate →</a>'; } }
     ], moves, { sort: { key: 'gain_pts', dir: 'desc' }, maxHeight: 560 });
+    var nb = document.getElementById('vl-body');
+    if (nb) nb.insertAdjacentHTML('beforeend', '<div class="pd-mt">' + QK.explain('Each area is a percentile among this season’s teams (100 = best): A from the 80th, then B, C and D every 20 points, F below the 20th. ' + esc(PD.v2.copy(d.label || '')), { title: 'What’s that number?' }) + '</div>');
   });
 }
 

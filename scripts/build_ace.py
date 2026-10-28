@@ -261,6 +261,7 @@ def build_tour(b: Build, tour: str, args, cfg: dict) -> dict:
     for p, v in ((race_sim or {}).get("year_end_no1") or {}).items():
         extras_cur.setdefault(p, {})["p_no1"] = v
     hist = b.write_or_fail(f"{tour}/history.json", f"{tour} history", lambda: EV.history(td), tour=tour)
+    b.write_or_fail(f"{tour}/favourites.json", f"{tour} favourites", lambda: EV.favourites(td), tour=tour)
     entries: dict[int, dict] = {}
     catalogues: dict[int, dict] = {}
     want_entries = set(full) | set(light) | (set(td.years) if not args.no_careers else set())

@@ -262,6 +262,47 @@ function renderMatch(el, c, f, m, mk, hit, side) {
   el.innerHTML = html;
   if (m && (m.shots || m.lineups || m.team_stats)) detail(el, c, f, m);
   else preview(el, c, f, tape);
+  absences(el, c, f, m);
+}
+
+/* Round 9, Phase 4: who is missing and what it costs. A match with line-ups lists each side's injured, suspended and
+   doubtful players (the match file's `missing`); a match whose XIs are in also lists the usual starters left out
+   (fixtures[].xi out, each with the value the line-up model gives them). Each player carries our projected value
+   (GAR/90 from the club's value file: goals of expected goal difference a match above a replacement-level player);
+   the regulars' sum is what the side is missing, about, if a replacement-level player stands in. */
+function absences(el, c, f, m) {
+  var miss = (m && m.missing) || {};
+  var x = f.xi || {};
+  var sides = ['home', 'away'].map(function (s) {
+    var inSquad = {};
+    (((m || {}).lineups || {})[s] || []).forEach(function (e) { if (e.id) inSquad[String(e.id)] = 1; });
+    return { side: s, name: s === 'home' ? f.home : f.away, tid: s === 'home' ? f.home_id : f.away_id,
+      list: (miss[s] || (x[s] || {}).missing || []).filter(function (p) { return !(p.id && inSquad[String(p.id)]); }), out: ((x[s] || {}).out || []) };
+  });
+  if (!sides.some(function (s) { return s.list.length || s.out.length; })) return;
+  var host = document.createElement('section');
+  host.className = 'qk-section';
+  el.appendChild(host);
+  Promise.all(sides.map(function (s) { return FB.absenceRows(s.tid, s.list); })).then(function (rows) {
+    if (!FB.alive(el)) return;
+    var col = function (s, rs) {
+      var reg = rs.filter(function (r) { return r.regular && isNum(r.proj); });
+      var cost = reg.reduce(function (a, r) { return a + r.proj; }, 0);
+      var outV = s.out.filter(function (o) { return isNum(o.v); }).reduce(function (a, o) { return a + o.v; }, 0);
+      var head = rs.length ? FB.kpi('Missing', String(rs.length), { sub: reg.length ? reg.length + ' regular' + (reg.length === 1 ? '' : 's') + ', worth about ' + FB.signed(cost, 2) + ' goals a match' : 'none of them a regular' }) : '';
+      var headOut = s.out.length ? FB.kpi('Usual starters left out', String(s.out.length), { sub: 'worth ' + FB.signed(outV, 2) + ' goals a match to the usual XI' }) : '';
+      var li = rs.map(function (r) {
+        return '<li><span class="fb-mx-abn">' + (r.id ? FB.playerLink(r.id, r.name) : esc(r.name)) + (r.role ? ' <span class="qk-muted">' + esc(r.role) + '</span>' : '') + '</span>' +
+          '<span class="fb-mx-abw ' + esc(r.why) + '">' + esc(r.why) + '</span><b class="fb-num">' + (isNum(r.proj) ? FB.signed(r.proj, 2) : '—') + '</b></li>';
+      }).join('') + s.out.map(function (o) {
+        return '<li><span class="fb-mx-abn">' + FB.playerLink(o.id, o.n || ('#' + o.id)) + '</span><span class="fb-mx-abw out">left out</span><b class="fb-num">' + (isNum(o.v) ? FB.signed(o.v, 2) : '—') + '</b></li>';
+      }).join('');
+      return FB.card(FB.clubLink(s.tid, s.name), (rs.length + s.out.length) + ' absent', FB.kpis([head, headOut].filter(Boolean)) + '<ul class="fb-mx-ab">' + li + '</ul>', { span: 6 });
+    };
+    host.innerHTML = QK.sectionHead({ kicker: 'Absences', title: 'Who’s missing, and what it costs', sub: 'Injured, suspended and doubtful players' + (sides.some(function (s) { return s.out.length; }) ? ', and the usual starters left out of the XI' : '') + '. The number is our projected value: goals of expected goal difference a match above a replacement-level player.' }) +
+      FB.grid(col(sides[0], rows[0]) + col(sides[1], rows[1])) +
+      QK.explain('A regular worth <b>+0.20</b> is about one goal of difference every five matches over the player a club could sign cheaply. Values come from the player value model; a player outside a followed league has none (—).', { title: 'What’s that number?' });
+  });
 }
 
 /* The hero (kit v4 QK.previewCard, the diagonal split as on the Rink game page): football's home-first order ("Home v
@@ -430,8 +471,7 @@ function xiCard(f) {
       : FB.kpi('Against the usual XI', '—', { sub: 'too few earlier line-ups to compare' });
     return FB.card(FB.clubLink(key === 'home' ? f.home_id : f.away_id, name), (s.f ? 'Formation ' + esc(s.f) : 'Starting XI'),
       FB.kpis([head]) + '<ol class="fb-cxi">' + list + '</ol>' +
-      (out ? '<div class="qk-kicker fb-mt">Usual starters not in the XI</div><ul class="fb-cxi-out">' + out + '</ul>' : '') +
-      (miss ? '<p class="fb-cap">Listed as missing (injured or suspended): ' + miss + '.</p>' : ''), { span: 6 });
+      (out || miss ? '<p class="fb-cap">Who is missing and what it costs: the Absences section below.</p>' : ''), { span: 6 });
   }
   var lead = x.applied
     ? 'Our forecast above includes them: each XI is valued against the club\'s usual XI and the difference (' + FB.signed(x.d, 2) + ' goals a match, home minus away) tilts the expected goals.'
@@ -782,9 +822,7 @@ function drawBench(el, m) {
     if (starters.length) out += '<div class="fb-mx-bt">Starting XI</div><ul class="fb-mx-list">' + starters.map(row).join('') + '</ul>';
     if (subs.length) out += '<div class="fb-mx-bt">Came on</div><ul class="fb-mx-list">' + subs.map(row).join('') + '</ul>';
     if (unused.length) out += '<div class="fb-mx-bt">Unused</div><ul class="fb-mx-list">' + unused.map(row).join('') + '</ul>';
-    if (missing.length) out += '<div class="fb-mx-bt">Missing</div><ul class="fb-mx-list miss">' + missing.map(function (x) {
-      return '<li><span></span><span></span><span class="fb-mx-pn">' + (x.id ? FB.playerLink(x.id, x.n) : esc(x.n)) + '</span><span class="qk-muted">' + esc(String(x.reason) === '3' ? 'suspended' : String(x.type || '') === 'doubtful' ? 'doubtful' : 'injured') + '</span><span></span></li>';
-    }).join('') + '</ul>';
+    /* the missing players are the Absences section's (valued), below the line-ups */
     if (!list.length && !missing.length) out += FB.muted('No line-up.');
     return out + '</div>';
   }

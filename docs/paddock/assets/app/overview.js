@@ -14,10 +14,10 @@
  *   reach" (the leaders on pace against Verstappen's 2023 records); "Who's for real?" (QKC.quadrant: points per start
  *   against race pace) beside the constructors' biggest surprises (points rank against car-pace rank); "What's that
  *   number?"; the race weekend
- *   (countdown, schedule, our win chance); the title race (points so far and our projection, 538 style; title
- *   chances in constructor colours; how the race has moved, with the 90% band, once title_history holds three
- *   rounds; the season-end points range; standings with trends); car against driver; the last race and the fantasy
- *   projections. Our record (how our favourite fared, the calibration) is on the Model page's "How we're doing"; a
+ *   (countdown, schedule, our win chance); the title race (points so far and our projection, 538 style, beside our
+ *   title chances, or the standings when the hero is already the title fight: round 9, one module of each); the last
+ *   race and the fantasy projections. Car against driver lives on Value › Driver value, the season-end ranges and the
+ *   title race after each round on Standings › Chances. Our record (how our favourite fared, the calibration) is on the Model page's "How we're doing"; a
  *   small link at the foot goes there. No market here (the race page carries it quietly).
  * Reads index.json, <y>/season.json, <y>/races/<next>.json, <y>/value.json, <y-1>/value.json, <y>/fantasy.json. */
 (function (PD) {
@@ -183,20 +183,12 @@ function render(el) {
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'Title race', title: 'Who wins the title?', sub: 'Our chances from 20,000 simulated seasons. The lines are points so far, then our expected points for every round still to run.', actions: kseg('ov-k') }) +
     PD.grid(
       PD.card('The title race', 'Championship points by round; past the Today line, our projection.', PD.chartBox('ov-prog', 380, 'Championship points with our projection'), { span: 8 }) +
-      PD.card('Title chances', '<span id="ov-odds-s">Our chance of winning the title.</span>', '<div id="ov-odds"></div>', { span: 4, foot: '<span></span><a href="#/standings?tab=odds">Every title chance →</a>' }) +
-      '<div class="qk-span-12" id="ov-hist-w" hidden>' + PD.card('How the race has moved', 'Our expected final points after each round, with the band where 90% of simulated seasons end (5th to 95th percentile).', '<div id="ov-hist" class="qk-chart" style="--h:320px" role="img" aria-label="Expected final points after each round, with a 90% band"></div>') + '</div>' +
-      PD.card('Where the points land', 'Season-end points: the bar spans the 5th to 95th percentile of the simulated seasons, the dot is our expectation.', PD.chartBox('ov-range', 360, 'Season-end points range'), { span: 6 }) +
-      PD.card('Standings', 'Points so far and the trend after every round.', '<div id="ov-std"></div>', { span: 6, flush: true, foot: '<span></span><a href="#/standings">Full standings and magic numbers →</a>' })) + '</section>' +
-    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Car and driver', title: 'Who’s fast right now', sub: 'The lap-time model splits pace into the car and the driver. Bars are our estimates with one standard error either side.', actions: '<a class="qk-more" href="#/value">Driver value</a>' }) +
-    QK.explain('Pace is a share of a lap: <b>0.5%</b> is about 0.45 seconds on a 90-second lap, roughly the gap between a front-row car and a midfield one.', { title: 'What’s that number?' }) +
-    PD.grid(
-      PD.card('Fastest cars right now', 'Car race pace at the latest round, % of a lap against the field (right is faster), ±1 standard error.', PD.chartBox('ov-cars', 320, 'Car pace by team'), { span: 6 }) +
-      PD.card('Best drivers this season', 'Race pace above the team-mate, % of a lap (the driver alone), ±1 standard error; 5+ races.', PD.chartBox('ov-drv', 320, 'Pace above the team-mate'), { span: 6 }), 'pd-mt') + '</section>' +
+      PD.card('<span id="ov-odds-h">Title chances</span>', '<span id="ov-odds-s">Our chance of winning the title.</span>', '<div id="ov-odds"></div>', { span: 4, flush: false, foot: '<span></span><a href="#/standings?tab=chances">Every title chance, and where they finish →</a>' })) + '</section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'Last time out', title: 'The last race and next weekend’s picks', sub: 'The last Grand Prix, and the fantasy projections for the next one.' }) +
     PD.grid(
       PD.card('Last race', '', '<div id="ov-last"></div>', { span: 5 }) +
       PD.card('Fantasy: top projections', 'Expected points next weekend with our scoring table; whiskers run from the 10th to the 90th percentile.', PD.chartBox('ov-fan', 300, 'Fantasy projections'), { span: 7, foot: '<span></span><a href="#/fantasy">All picks and the schedule →</a>' })) + '</section>' +
-    '<p class="qk-caption pd-ov-doing"><a class="qk-link" href="#/model">How we’re doing →</a> Our favourite round by round, and how often our chances came true, on the Model page.</p>';
+    '<p class="qk-caption pd-ov-doing"><a class="qk-link" href="#/calibration">How we’re doing →</a> Our favourite round by round, and how often our chances came true, on the Model page.</p>';
   var raceP = next ? PD.load(next.year + '/races/' + next.round + '.json') : Promise.resolve(null);
   return Promise.all([PD.load(y + '/season.json'), raceP, PD.load(y + '/value.json'), PD.load(y + '/fantasy.json')]).then(function (arr) {
     if (!PD.alive(el)) return;
@@ -207,7 +199,8 @@ function render(el) {
     /* the next Grand Prix leads when it is this week, or when the title is all but decided (the title fight would
        say nothing); otherwise the title fight */
     var tr = titleRows(season, 'drivers'), decided = tr[0] && tr[0].model > 0.99;
-    PD.set('ov-feat', wk && (wk.soon || wk.live || (decided && next)) ? feature(next, race, season, wk, dig) : raceLead(season, next));
+    var raceHero = !!(wk && (wk.soon || wk.live || (decided && next)));
+    PD.set('ov-feat', raceHero ? feature(next, race, season, wk, dig) : raceLead(season, next));
     watch(next, race, season);
     hot(season, value);
     real(value);
@@ -215,9 +208,8 @@ function render(el) {
     records(season, dig.stage);
     fanDrivers(value, season);
     weekend(next, race, season);
-    title(season);
-    cars(value);
-    bestDrivers(value);
+    /* one title-chance module on the page: when the hero is the title fight, the title section shows the standings */
+    title(season, !raceHero && tr.length > 0);
     lastRace(last, season);
     fantasy(fan);
   });
@@ -376,15 +368,16 @@ function weekend(next, race, season) {
   PD.set('ov-who', QK.chances(rows, { oursName: 'Our win chance' }));
 }
 
-function title(season) {
+function title(season, heroIsTitle) {
   var draw = function (kind) {
     PD.v2.pointsForecast('ov-prog', season, kind, 6);
-    PD.v2.rangeChart('ov-range', season, kind, 10);
-    var hw = document.getElementById('ov-hist-w');
-    if (hw) hw.hidden = !PD.v2.titleHistory('ov-hist', season, kind, 6, 'pts');
-    standings(season, kind);
     var host = document.getElementById('ov-odds');
     if (!host) return;
+    if (heroIsTitle || !PD.ok(season) || !season.championship) {
+      PD.set('ov-odds-h', 'Standings'); PD.set('ov-odds-s', 'Points so far and the trend after every round.');
+      host.id = 'ov-std'; standings(season, kind); host.id = 'ov-odds';
+      return;
+    }
     if (!PD.ok(season) || !season.championship) { PD.set('ov-odds-s', 'The championship is decided.'); host.innerHTML = PD.muted('No simulation for a finished season.'); return; }
     var rows = titleRows(season, kind).slice(0, 8);
     var isD = kind === 'drivers';
@@ -412,21 +405,6 @@ function standings(season, kind) {
     { key: 'points', label: 'Pts', num: true, fmt: function (v) { return '<b>' + PD.pts(v) + '</b>'; } },
     { key: 'gap', label: 'Gap', num: true, fmt: function (v) { return v ? '−' + PD.pts(v) : '—'; } }
   ], rows: list.map(function (r) { var id = isD ? r.driver : r.team; return { pos: r.pos, id: id, team: r.team, name: isD ? PD.driverName(id) : PD.teamName(id), sub: isD ? PD.teamAbbr(r.team) : '', trend: prog[id] || [], points: r.points, gap: leadPts - r.points }; }) });
-}
-
-function cars(value) {
-  if (!PD.ok(value) || !value.teams) return PD.ch.none('ov-cars', 'Car pace is estimated once a race has lap data.');
-  var T = PD.rowsOf(value.team_cols, value.teams).filter(function (r) { return isNum(r.car); }).sort(function (a, b) { return b.car - a.car; });
-  PD.ch.hbars('ov-cars', T.map(function (r) { return { label: PD.teamName(r.id), value: r.car, lo: r.car - (r.car_se || 0), hi: r.car + (r.car_se || 0), colour: PD.teamColour(r.id), href: PD.teamHref(r.id),
-    sub: 'Season mean ' + PD.signed(r.car_mean, 2) + '% · last five rounds ' + PD.signed(r.trend, 2) }; }), { fmt: function (v) { return PD.signed(v, 2) + '%'; }, name: 'Car pace', errName: '±1 se', xName: 'Car pace (% of a lap)', label: 'Car pace by team' });
-}
-
-function bestDrivers(value) {
-  if (!PD.ok(value) || !value.drivers) return PD.ch.none('ov-drv', 'Driver value needs lap data (1994 on).');
-  var minR = value.min_races || 5;
-  var D = PD.rowsOf(value.driver_cols, value.drivers).filter(function (r) { return isNum(r.pace_tm) && (r.races || 0) >= minR; }).sort(function (a, b) { return b.pace_tm - a.pace_tm; }).slice(0, 10);
-  PD.ch.hbars('ov-drv', D.map(function (r) { return { label: r.name, value: r.pace_tm, lo: r.pace_tm - (r.pace_tm_se || 0), hi: r.pace_tm + (r.pace_tm_se || 0), colour: PD.teamColour(r.team), href: PD.driverHref(r.id), sub: PD.teamName(r.team) + ' · ' + r.races + ' races' }; }),
-    { fmt: function (v) { return PD.signed(v, 2) + '%'; }, name: 'Above team-mate', errName: '±1 se', xName: 'Pace above team-mate (%)', label: 'Pace above the team-mate' });
 }
 
 function lastRace(last, season) {

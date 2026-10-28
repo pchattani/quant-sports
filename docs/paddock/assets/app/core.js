@@ -14,7 +14,8 @@
  * Round 9: the Drivers list and the Lab are the Scouting Room (#/drivers[/<y>] -> #/scout?s=<y>, #/lab?x=&y=&q= ->
  * #/scout?view=chart&x=&y=&q=, bare #/compare[/drivers[/<a>]] -> the room's compare tray), and Compare teams is the
  * Teams page's head to head (#/compare/teams/<a>/<b> -> #/constructors?a=&b=&sec=h2h).
- *   #/model  #/methodology[/<sec>]  #/calibration  #/glossary[/<key>]  #/disclaimer   [model]
+ *   #/model = #/methodology[/<sec>] (How it works)  #/calibration (How we're doing)  #/versus (Our forecasts v the
+ *   market; #/markets lands here)  #/glossary[/<key>]  #/disclaimer   [model]
  * Old routes are redirected through ROUTE_MAP (see below) so every link ever shared still lands.
  * The season comes from the address only (round 9): a page without a year in its route is the current season, and the
  * links a page draws to a driver or a constructor carry the page's season (#/driver/<id>/<y>), so the year never
@@ -66,6 +67,7 @@ addRoute('model', 'model', 'model');
 addRoute('methodology', 'methodology', 'model');
 addRoute('methodology/:sec', 'methodology', 'model');
 addRoute('calibration', 'calibration', 'model');
+addRoute('versus', 'versus', 'model');
 addRoute('glossary', 'glossary', 'model');
 addRoute('glossary/:key', 'glossary', 'model');
 addRoute('disclaimer', 'disclaimer', 'model');
@@ -79,7 +81,7 @@ var ROUTE_MAP = [
   ['season', 'standings'], ['season/:year', 'standings/:year'],
   ['calendar', 'races'], ['season-races', 'races'],
   ['teams', 'constructors'], ['teams/:year', 'constructors/:year'],
-  ['markets', 'standings', { tab: 'odds' }],
+  ['markets', 'versus'],
   ['swap', 'value', { tab: 'swap' }],
   ['race/:year/:round/qualifying', 'race/:year/:round/quali'],
   ['race/:year/:round/results', 'race/:year/:round'],
@@ -94,7 +96,7 @@ var ROUTE_MAP = [
 var TITLES = {
   overview: '', races: 'Races', circuits: 'Circuits', circuit: 'Circuit', race: 'Race centre', standings: 'Standings',
   constructors: 'Constructors', team: 'Constructor', scout: 'Scouting Room', driver: 'Driver', value: 'Value & Moves',
-  fantasy: 'Fantasy', compare: 'Compare', model: 'Model', methodology: 'Methodology',
+  fantasy: 'Fantasy', compare: 'Compare', model: 'How it works', versus: 'Our forecasts v the market', methodology: 'Methodology',
   calibration: 'Calibration', glossary: 'Glossary', disclaimer: 'Disclaimer and terms'
 };
 
@@ -453,7 +455,11 @@ function teamLink(id, opts) {
 function circuitLink(id, name) { return id ? '<a class="pd-link" href="#/circuit/' + encodeURIComponent(id) + '">' + esc(name || circuitName(id)) + '</a>' : '<span class="qk-muted">—</span>'; }
 function raceLink(y, r, label) { return '<a class="pd-link" href="' + raceHref(y, r) + '">' + esc(label || (y + ' R' + r)) + '</a>'; }
 function mark(t, size) { return QK.teamMark({ name: teamName(t), abbr: teamAbbr(t), colour: teamColourRaw(t) }, size || 'sm'); }
+/* the grid's own short codes where the name rule would collide (Red Bull Racing and RB both read "RB") */
+var TEAM_ABBR = { red_bull: 'RBR', rb: 'RB', alphatauri: 'AT', toro_rosso: 'STR', aston_martin: 'AMR', racing_point: 'RP', force_india: 'FI', alfa: 'ALF', sauber: 'SAU', haas: 'HAA', alpine: 'ALP', mclaren: 'MCL',
+  mercedes: 'MER', ferrari: 'FER', williams: 'WIL', audi: 'AUD', cadillac: 'CAD', renault: 'REN', lotus_f1: 'LOT', manor: 'MAN', marussia: 'MRS', caterham: 'CAT' };
 function teamAbbr(t) {
+  if (TEAM_ABBR[t]) return TEAM_ABBR[t];
   var n = teamName(t).replace(/ F1 Team| Racing| Formula One Team| Team/g, '');
   var w = n.split(/\s+/).filter(Boolean);
   return (w.length > 1 ? w.map(function (x) { return x.charAt(0); }).join('') : n.slice(0, 3)).slice(0, 3).toUpperCase();
@@ -618,7 +624,7 @@ function searchRows() {
     Object.keys(circ).forEach(function (id) { var c = circ[id]; if (c && c.name) add('c:' + id, c.name, 'Circuit · ' + (c.country || '') + ((c.history || []).length ? ' · ' + c.history.length + ' races' : ''), '#/circuit/' + id); });
     var s = arr[2];
     if (ok(s)) (s.calendar || []).forEach(function (c) { add('r:' + c.round, s.year + ' ' + c.name, 'Race · round ' + c.round + ' · ' + fmtDate(c.date, { weekday: false }), raceHref(s.year, c.round)); });
-    [['Standings', '#/standings'], ['Title chances', '#/standings?tab=odds'], ['Driver value', '#/value'], ['Driver-swap simulator', '#/value?tab=swap'], ['Fantasy', '#/fantasy'], ['Scouting Room', '#/scout'], ['Build your own chart', '#/scout?view=chart'], ['Compare drivers', '#/scout'], ['Teams: head to head', '#/constructors?sec=h2h'], ['How it works', '#/methodology'], ['How we’re doing', '#/model'], ['Glossary', '#/glossary']]
+    [['Standings', '#/standings'], ['Title chances', '#/standings?tab=chances'], ['Every champion', '#/standings?tab=history'], ['Driver value', '#/value'], ['Driver-swap simulator', '#/value?tab=swap'], ['Fantasy', '#/fantasy'], ['Scouting Room', '#/scout'], ['Build your own chart', '#/scout?view=chart'], ['Compare drivers', '#/scout'], ['Teams: head to head', '#/constructors?sec=h2h'], ['How it works', '#/methodology'], ['How we’re doing', '#/model'], ['Glossary', '#/glossary']]
       .forEach(function (p) { add('p:' + p[0], p[0], 'Page', p[1]); });
     return rows;
   });

@@ -71,7 +71,7 @@ def test_build_writes_every_payload(ace_world_small, build_mod):
     p0 = ace_world_small["order"][0]
     assert pi[p0][0] == f"Player {p0[-3:]}" and pi[p0][3] == 1
     lab = _j(a / "lab.json")
-    assert lab["fields"][:5] == ["id", "name", "year", "qualified", "rank"] and lab["rows"] and len(lab["rows"][0]) == len(lab["fields"])
+    assert lab["fields"][:7] == ["id", "name", "year", "qualified", "rank", "age", "hand"] and lab["rows"] and len(lab["rows"][0]) == len(lab["fields"])
     assert set(lab["years"]) == {2025, 2026}
     mk = _j(a / "markets.json")
     assert set(mk) >= {"updated_at", "matches", "futures"}

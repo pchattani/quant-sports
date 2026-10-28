@@ -17,11 +17,14 @@
 'use strict';
 
 const K = () => TA.fk;
-const LABELS = { model: 'Our match model', model_fund: 'Ours without the market rating', elo: 'Elo', serve_return: 'Serve/return chain', rank: 'Ranking', pinnacle: 'Pinnacle closing', b365: 'Bet365 closing', avg: 'Average closing', max: 'Best closing line', bt: 'Bradley-Terry' };
+const LABELS = { model: 'Our match model', model_fund: 'Ours without the market rating', elo: 'Elo', serve_return: 'Serve/return chain', rank: 'Ranking', pinnacle: 'Closing line (Pinnacle)', b365: 'Bet365 closing', avg: 'Closing line (average)', max: 'Best closing line', bt: 'Bradley-Terry' };
 const ORDER = ['model', 'model_fund', 'elo', 'serve_return', 'rank', 'bt', 'pinnacle', 'b365', 'avg', 'max'];
 /* ours in blue, our components and baselines in the kit's other categorical colours, the market rows in quiet warm greys */
 const COL = { model: '#7d93ff', model_fund: '#d4ff3a', elo: '#ff6a4d', serve_return: '#5ec8f0', rank: '#c39be8', bt: '#8fd16a', pinnacle: '#8a93a3', b365: '#6b7383', avg: '#c3c9d4', max: '#5b6372' };
 const BOOK = { pinnacle: 1, b365: 1, avg: 1, max: 1 };
+/* round 9: one closing-line reference (Pinnacle, and the bookmakers' average where Pinnacle is missing), never a table of
+   individual bookmakers */
+const HIDE = { b365: 1, max: 1 };
 const label = k => LABELS[k] || String(k).replace(/_/g, ' ');
 const H = p => (p > 0 && p < 1 ? -(p * Math.log(p) + (1 - p) * Math.log(1 - p)) : null);
 
@@ -88,7 +91,7 @@ function reading(d, T) {
     const gap = ll(V, 'model') - ll(V, 'pinnacle');
     const share = k.isNum(ll(V, 'rank')) && ll(V, 'rank') > ll(V, 'pinnacle') ? (ll(V, 'rank') - ll(V, 'model')) / (ll(V, 'rank') - ll(V, 'pinnacle')) : null;
     out.push('<p><strong>Model against Pinnacle.</strong> On the ' + k.int((V.pinnacle || {}).n) + ' matches with a Pinnacle close, the model scores ' + k.num(ll(V, 'model'), 4) + ' and Pinnacle\'s de-vigged closing line ' + k.num(ll(V, 'pinnacle'), 4) +
-      (k.isNum(ll(V, 'avg')) ? ' (the market average ' + k.num(ll(V, 'avg'), 4) + ', Bet365 ' + k.num(ll(V, 'b365'), 4) + ')' : '') + '. ' +
+      (k.isNum(ll(V, 'avg')) ? ' (the bookmakers’ average ' + k.num(ll(V, 'avg'), 4) + ')' : '') + '. ' +
       (gap > 0 ? 'The closing market is sharper by ' + k.num(gap, 4) + ' nats a match. That is the expected order: the close knows about injuries, fatigue, form within the week and money the model never sees. ' +
         (share !== null ? 'Measured from the ranking baseline, the model closes ' + k.num(100 * share, 0) + '% of the distance to Pinnacle.' : '') +
         (k.isNum(ll(V, 'model_fund')) && ll(V, 'model_fund') > ll(V, 'pinnacle') ? ' Without the market rating the gap would be ' + k.num(ll(V, 'model_fund') - ll(V, 'pinnacle'), 4) + ' nats: learning from past closing lines closes ' + k.num(100 * (ll(V, 'model_fund') - ll(V, 'model')) / (ll(V, 'model_fund') - ll(V, 'pinnacle')), 0) + '% of it. The market rating uses only matches finished before the day being forecast, never the match’s own closing line.' : '')
@@ -134,7 +137,7 @@ function render(el, params, state) {
     if (!k.alive(el)) return;
     if (!d || d.ok === false || !d.metrics) { el.innerHTML = k.card('Calibration · ' + k.TN(T), '', k.notBuilt('The ' + k.TN(T) + ' backtest', d)); return; }
     const M = d.metrics, D = d.distributions || {}, TT = d.tournaments || {};
-    const models = ORDER.filter(x => M[x]).concat(Object.keys(M).filter(x => ORDER.indexOf(x) < 0));
+    const models = ORDER.filter(x => M[x] && !HIDE[x]).concat(Object.keys(M).filter(x => ORDER.indexOf(x) < 0 && !HIDE[x]));
     const yrs = d.years || [];
     const yrs0 = d.years || [];
     /* round 6: "How we're doing" (QK.doing): this week's record from the tour's index.json digest, then QK.howSure */
@@ -173,15 +176,11 @@ function render(el, params, state) {
     h += '<div class="card"><div class="card-header">Notes <span class="card-sub">From the backtest itself.</span></div><div class="pad doc-body"><ul>' + (d.notes || []).map(n => '<li>' + k.esc(String(n).replace(/closing prices/g, 'closing lines').replace(/closing price/g, 'closing line')) + '</li>').join('') +
       '<li>Each match is oriented to a side picked by a hash of its id, so "player 1" is a coin toss and the base rate sits near 50%.</li><li>Details in the <a href="#/methodology/backtest">methodology</a>.</li></ul>' +
       '<p class="muted-inline">Backtest ' + k.esc(d.version || '') + ', generated ' + k.esc(d.generated_at || '') + '.</p></div></div>';
-    h += '<div id="cal-market"></div>';
+    h += '<p class="ta-moved">Our match chances against the closing market and the prediction markets, player by player: <a href="' + TA.href(T, 'versus') + '">Model › Our forecasts v the market →</a></p>';
     el.innerHTML = h;
     const dig = ((TA.tourInfo ? TA.tourInfo(T) : {}) || {}).digest || {};
     QK.doing(el.querySelector('#cal-doing'), { record: dig.record, calibration: d, league: k.TN(T), span: yrs0.length ? yrs0[0] + '–' + yrs0[yrs0.length - 1] : '', subject: 'a player', unit: 'matches',
       sub: 'Our favourites this week, then every ' + k.TN(T) + ' match since ' + (yrs0[0] || '') + ', forecast before it was played and checked against the result, grouped by the chance we gave a player. When the two match, our numbers mean what they say.' });
-    if (TA.value && TA.value.market) TA.value.market(T, document.getElementById('cal-market')).then(() => {
-      const mk = document.getElementById('cal-market');
-      if (mk && ((params.query || {}).sec === 'market') && mk.scrollIntoView) mk.scrollIntoView();
-    });
 
     // Scores.
     const drawTable = scope => {
@@ -190,7 +189,7 @@ function render(el, params, state) {
       else if (scope === 'avg') src = d.vs_avg || {};
       else if (scope.charAt(0) === 'l') src = (d.per_level || {})[scope.slice(1)] || {};
       else if (scope.charAt(0) === 'y') src = (d.per_year || {})[scope.slice(1)] || {};
-      document.getElementById('cal-table').innerHTML = k.table(SCORE_COLS, scoreRows(src, ORDER.filter(x => src[x]).concat(Object.keys(src).filter(x => ORDER.indexOf(x) < 0))), { compact: true });
+      document.getElementById('cal-table').innerHTML = k.table(SCORE_COLS, scoreRows(src, ORDER.filter(x => src[x] && !HIDE[x]).concat(Object.keys(src).filter(x => ORDER.indexOf(x) < 0 && !HIDE[x]))), { compact: true });
       k.sortable('cal-table');
     };
     drawTable('all');

@@ -50,6 +50,11 @@ function render(el) {
       PD.kpi('Rank correlation', bd.model ? PD.num(bd.model.spearman, 2) : '—', bd.std ? 'season average ' + PD.num(bd.std.spearman, 2) : '')
     ]);
     if (F.label) h += PD.note(esc(PD.v2.copy(F.label)));
+    /* round 9: the chart first, floor to ceiling (Campus's fantasy chart is the model): the top 20 projections with the
+       10th to 90th percentile of the simulated weekends */
+    if (live.length) h += '<section class="qk-section pd-sec">' + PD.secHead('Floor to ceiling', 'How many points, and how sure', 'The top 20 drivers by projected points next weekend: the dot is our projection, the bar runs from the floor to the ceiling (the 10th to the 90th percentile of the simulated weekends). A long bar is a boom-or-bust pick.') +
+      PD.grid(PD.card('', '', '<div id="ft-rng" class="qk-chart" style="--h:640px" role="img" aria-label="Projected fantasy points with the floor and ceiling, top 20"></div>', { span: 8 }) +
+        '<div class="qk-span-4">' + QK.explain('<b>Floor and ceiling.</b> In 1 weekend in 10 a driver scores below the floor, in 1 in 10 above the ceiling. A retirement costs 20 points, so the floors of drivers in fragile cars sit low even when the projection is high.', { title: 'What’s that number?' }) + '</div>') + '</section>';
     if (F.picks && Object.keys(F.picks).length) {
       h += '<section class="qk-section pd-sec">' + PD.secHead('Fantasy', 'Our picks', 'Suggestions from our projections, with the reasons the numbers give. Not the official game’s player costs or ownership.') + '<div class="qk-auto pd-picks" style="--min:260px">' +
         PICKS.map(function (g) {
@@ -72,6 +77,10 @@ function render(el) {
       PD.card('Season so far', 'Actual points per weekend with our table, the last ten rounds.', '<div id="ft-h"></div>', { span: 5, flush: true }), 'pd-mt');
     h += '<div id="ft-bt"></div>' + '<div id="ft-sc"></div>';
     PD.set('ft-body', h);
+
+    var rng = live.filter(function (r) { return isNum(r.p10) && isNum(r.p90); }).sort(function (a, b) { return b.next - a.next; }).slice(0, 20);
+    if (rng.length && document.getElementById('ft-rng')) QKC.range('#ft-rng', { rows: rng.map(function (r) { return { label: PD.driverName(r.id), lo: r.p10, hi: r.p90, mid: r.next, href: PD.driverHref(r.id), color: PD.teamColour(r.team), sub: PD.teamName(r.team) }; }),
+      loName: 'Floor', hiName: 'Ceiling', midName: 'Projection', valName: 'Fantasy points next weekend', fmt: function (v) { return PD.num(v, 1); }, ref: { x: 0, label: '0' } });
 
     // breakdown
     var ci = {};

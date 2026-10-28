@@ -279,6 +279,7 @@ function overviewDone(host, race, season, teams) {
   PD.grid(
     PD.card('Result', race.sprint && race.sprint.length ? 'Sprint result below.' : '', '<div id="rc-res"></div>', { span: 7, flush: true }) +
     PD.card('Forecast v result', 'Where we expected each driver to finish (blue) against where they did (ring).', PD.chartBox('rc-eva', 560), { span: 5 }) +
+    PD.card('Win chance through the race', '<span id="rc-wp-s">Our chance of winning after every lap.</span>', PD.chartBox('rc-wp', 380, 'Win chance after every lap'), { span: 12 }) +
     PD.card('Positions lap by lap', 'Team colours; a team’s second driver is dashed. Bands: safety car (amber), red flag.', PD.chartBox('rc-pos-mini', 420), { span: 12, foot: '<a href="' + PD.raceHref(race.year, race.round, 'laps') + '">Gaps, lap times, overtakes and race control →</a>' }) +
     (race.sprint && race.sprint.length ? PD.card('Sprint result', '', '<div id="rc-sprint"></div>', { span: 12, flush: true }) : ''), 'pd-mt') +
   '<div id="rc-prefc" class="pd-mt"></div>';
@@ -291,8 +292,56 @@ function overviewDone(host, race, season, teams) {
     aName: 'Our expectation', bName: 'Finished', min: 0, max: Math.max(20, order.length + 1), labelWidth: 44, valName: 'Finishing position', fmt: function (v, d) { return isNum(v) ? 'P' + (d === 0 ? Math.round(v) : PD.num(v, 1)) : '—'; } });
   else PD.ch.none('rc-eva', 'No forecast to compare with.');
   positionChart('rc-pos-mini', race, res, teams, nLaps);
+  winChance('rc-wp', race, res);
   var views = forecastViews(race);
   if (views.length) forecastBlock('rc-prefc', views, teams, 'The forecast before the race', views.some(function (v) { return v[0] === 'post'; }) ? 'post' : 'pre', null);
+}
+
+/* Win chance through the race (round 9, Phase 4): after every lap, a conditional logit over the drivers still running,
+     s_i = a (R/N) log p0_i - (b gap_i + c (pos_i - 1)) / sqrt(R + 1),
+   R the laps still to run of N, gap_i seconds behind the leader, pos_i the running position, p0_i our simulator's chance
+   after qualifying (before it when the grid was not in; a grid prior exp(-k (grid - 1)) when no forecast was stored).
+   Fitted by scripts/f1_inrace_wp.py on the lap files of 124 races (2018-23) and checked on 65 (2024-26): log-loss of the
+   winner per lap 0.843, against 0.869 for the running order alone and 1.409 for the pre-race prior alone
+   (oddsmarkets/f1/models/fitted/inrace_wp.json). An estimate from the order and the gaps, not a re-run of the simulator. */
+var WP = { a: 0.4857, b: 0.4412, c: 2.6699, k: 0.4538 };
+function winChance(id, race, res) {
+  var laps = race.laps || {}, n = laps.n || 0;
+  if (!has(laps.positions) || !laps.gaps || n < 10) { PD.ch.none(id, 'The lap-by-lap chance needs lap positions and gaps (2018 on in our files).'); PD.set('rc-wp-s', 'Our chance of winning after every lap.'); return; }
+  var f = race.forecast || {}, sim = (f.post_quali || {}).drivers || (f.pre_quali || {}).drivers || null, src = (f.post_quali || {}).drivers ? 'after qualifying' : 'before qualifying';
+  var grid = {};
+  res.forEach(function (x) { grid[x.driver] = x.grid; });
+  var ids = Object.keys(laps.positions).filter(function (d) { return grid[d] !== undefined; });
+  var p0 = {};
+  if (sim) ids.forEach(function (d) { var p = (sim[d] || {}).p_win; p0[d] = isNum(p) && p > 0 ? p : 0.001; });
+  else { var z = 0; ids.forEach(function (d) { p0[d] = Math.exp(-WP.k * ((grid[d] || 20) - 1)); z += p0[d]; }); ids.forEach(function (d) { p0[d] /= z; }); }
+  var tot = 0; ids.forEach(function (d) { tot += p0[d]; }); ids.forEach(function (d) { p0[d] /= tot || 1; });
+  var path = {};
+  ids.forEach(function (d) { path[d] = [[0, p0[d]]]; });
+  for (var L = 1; L <= n; L++) {
+    var R = n - L, s = {}, mx = -Infinity, act = [];
+    ids.forEach(function (d) {
+      var pos = (laps.positions[d] || [])[L - 1], gap = ((laps.gaps || {})[d] || [])[L - 1];
+      if (!isNum(pos) || !isNum(gap)) return;
+      var v = WP.a * (R / n) * Math.log(p0[d]) - (WP.b * Math.min(gap, 120) + WP.c * (pos - 1)) / Math.sqrt(R + 1);
+      s[d] = v; act.push(d); if (v > mx) mx = v;
+    });
+    if (!act.length) continue;
+    var zz = 0;
+    act.forEach(function (d) { s[d] = Math.exp(s[d] - mx); zz += s[d]; });
+    ids.forEach(function (d) { path[d].push([L, act.indexOf(d) >= 0 ? s[d] / zz : 0]); });
+  }
+  var win = (res[0] || {}).driver;
+  var peak = function (d) { return Math.max.apply(null, path[d].map(function (p) { return p[1]; })); };
+  var show = ids.slice().sort(function (a, b) { return peak(b) - peak(a); }).slice(0, 5);
+  if (win && show.indexOf(win) < 0) show.push(win);
+  var low = path[win] ? Math.min.apply(null, path[win].map(function (p) { return p[1]; })) : null;
+  PD.set('rc-wp-s', 'After every lap, from the gap to the leader, the running order and the laps left, starting ' + (sim ? 'from our forecast ' + src : 'from the grid (no forecast of ours was stored for this race)') + '. ' +
+    (win && isNum(low) ? esc(PD.driverSurname(win)) + ' won from a low of ' + PD.pct(low, 0) + '.' : ''));
+  var seenT = {};
+  PD.ch.lines(id, show.map(function (d) { var t = (res.filter(function (x) { return x.driver === d; })[0] || {}).team || PD.driverTeam(d), dash = !!seenT[t]; seenT[t] = 1;
+    return { name: PD.driverName(d), short: PD.driverCode(d), colour: PD.teamColour(t), dash: dash, width: d === win ? 3 : 1.8, data: path[d] }; }),
+    { xName: 'Lap', yName: 'Win chance', endLabels: true, legend: false, yMin: 0, yMax: 1, xMin: 0, xMax: n, yFmt: function (v) { return Math.round(v * 100) + '%'; }, xFmt: function (v) { return 'L' + v; }, xLabel: function (v) { return 'After lap ' + v; }, label: 'Win chance after every lap' });
 }
 
 function positionChart(id, race, res, teams, nLaps) {

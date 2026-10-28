@@ -477,6 +477,7 @@ def main(argv: list[str] | None = None) -> int:
             pr = b.step("progression", lambda: drv.progression(allc), None)
             if pr:
                 b.write(drv.PROG_FILE, pr[1])
+            b.write_or_fail("hall_of_fame.json", "hall of fame", lambda: ssn.hall_payload(cs))
             for d, c in cs.items():
                 prev = drv.prev_peer_pct(cats.get(current - 1), d) if d in on_grid else {}
                 if prev:                                  # last season's peer percentiles: the rail's rings

@@ -65,7 +65,7 @@ function entryHTML(e, isModel) {
   const q = [e.label, e.key, e.desc, e.group, e.scope, isModel ? 'model' : ''].join(' ');
   return '<div class="gl-entry" id="gl-' + esc(e.key) + '" data-q="' + esc(fold(q)) + '" data-scope="' + esc(isModel ? 'model' : (e.scope || 'all')) + '">' +
     '<dt><span>' + esc(e.label || e.key) + ' <a class="doc-anchor" href="#/glossary/' + encodeURIComponent(e.key) + '" title="Link to this entry">#</a></span>' +
-    '<span class="gl-tags"><span class="gl-key">' + esc(e.key) + '</span>' + (isModel ? '<span class="gl-tag model">model</span>' : fmtHint(e)) + '</span></dt>' +
+    '<span class="gl-tags">' + (isModel ? '<span class="gl-tag model">model</span>' : fmtHint(e)) + '</span></dt>' +
     '<dd>' + (e.desc ? esc(copy(e.desc)) : '<span class="muted-inline">No definition yet.</span>') + '</dd></div>';
 }
 
@@ -112,9 +112,19 @@ function renderGlossary(el, params) {
         e.classList.toggle('hidden', !hit); if (hit) shown++;
       });
       cards.forEach(c => c.classList.toggle('hidden', !c.querySelector('.gl-entry:not(.hidden)')));
+      /* round 9: the groups open on a search and fold back (but the first) without one, so the page is not one long wall */
+      cards.forEach((c, i) => c.classList.toggle('shut', !(needle || kind) && i > 0 && !c.classList.contains('open')));
       document.getElementById('gl-none').style.display = shown ? 'none' : '';
       count.textContent = needle || kind ? shown + ' of ' + total + ' entries' : total + ' entries';
     };
+    cards.forEach(c => {
+      const hd = c.querySelector('.card-header');
+      if (!hd) return;
+      hd.setAttribute('role', 'button'); hd.setAttribute('tabindex', '0');
+      const tog = () => { const open = c.classList.contains('shut'); c.classList.toggle('open', open); c.classList.toggle('shut', !open); };
+      hd.addEventListener('click', ev => { if (!ev.target.closest('a')) tog(); });
+      hd.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); tog(); } });
+    });
     input.addEventListener('input', filter);
     input.addEventListener('keydown', ev => { if (ev.key === 'Escape') { input.value = ''; filter(); } });
     kindSel.addEventListener('change', filter);
@@ -122,16 +132,16 @@ function renderGlossary(el, params) {
     root.querySelectorAll('.gl-index a').forEach(a => a.addEventListener('click', ev => {
       ev.preventDefault();
       const grp = root.querySelector('.gl-group[data-group="' + a.dataset.group + '"]');
-      if (grp) { grp.classList.remove('hidden'); grp.scrollIntoView({ block: 'start' }); }
+      if (grp) { grp.classList.remove('hidden', 'shut'); grp.classList.add('open'); grp.scrollIntoView({ block: 'start' }); }
       history.replaceState(null, '', a.getAttribute('href'));
     }));
     if (key) {
       if (key.indexOf('g:') === 0) {
         const grp = root.querySelector('.gl-group[data-group="' + key.slice(2).replace(/"/g, '') + '"]');
-        if (grp) setTimeout(() => grp.scrollIntoView({ block: 'start' }), 0);
+        if (grp) { grp.classList.remove('shut'); grp.classList.add('open'); setTimeout(() => grp.scrollIntoView({ block: 'start' }), 0); }
       } else {
         const e = document.getElementById('gl-' + key);
-        if (e) { e.classList.add('hit'); setTimeout(() => e.scrollIntoView({ block: 'center' }), 50); setTimeout(() => e.scrollIntoView({ block: 'center' }), 400); }
+        if (e) { const g0 = e.closest('.gl-group'); if (g0) { g0.classList.remove('shut'); g0.classList.add('open'); } e.classList.add('hit'); setTimeout(() => e.scrollIntoView({ block: 'center' }), 50); setTimeout(() => e.scrollIntoView({ block: 'center' }), 400); }
         else { input.value = key; filter(); }
       }
     }
@@ -309,8 +319,13 @@ function renderMethodology(el, params) {
   /* round 6: the record and the calibration chart live in the Model section's "How we're doing" tab (#/<T>/calibration);
      the methodology links there */
   const sure = want ? '' : QK.explain('<b>How we’re doing.</b> Our recent record and how often our chances came true are on <a class="qk-link" href="#/' + T + '/calibration">the How we’re doing tab</a>.');
-  el.innerHTML = sure + '<div class="doc">' + toc + '<div class="doc-body">' + intro + secs.map((s, i) => '<div class="card" id="method-' + esc(s.id) + '"><div class="card-header">' + (i + 1) + '. ' + esc(s.title) +
-    ' <a class="doc-anchor" href="#/methodology/' + esc(s.id) + '" title="Link to this section">#</a></div><div class="pad">' + s.html + '</div></div>').join('') + '</div></div>';
+  /* round 9: "How it works" for fans first (ta-howitworks.js: what the site does, one picture per model), the full
+     methodology folded under "Technical detail" (open when a link names a section) */
+  const fan = TA.howItWorks ? TA.howItWorks.html() : '';
+  el.innerHTML = fan + sure + '<details class="ta-fold ta-tech" id="m-tech"' + (want || !fan ? ' open' : '') + '><summary>Technical detail <span class="muted-inline">every source, model, constant and code path, in ' + secs.length + ' sections</span></summary>' +
+    '<div class="doc">' + toc + '<div class="doc-body">' + intro + secs.map((s, i) => '<div class="card" id="method-' + esc(s.id) + '"><div class="card-header">' + (i + 1) + '. ' + esc(s.title) +
+    ' <a class="doc-anchor" href="#/methodology/' + esc(s.id) + '" title="Link to this section">#</a></div><div class="pad">' + s.html + '</div></div>').join('') + '</div></div></details>';
+  if (fan) TA.howItWorks.draw(el);
   el.querySelectorAll('.doc-toc a[data-target]').forEach(a => a.addEventListener('click', ev => {
     ev.preventDefault();
     const t = document.getElementById(a.dataset.target);

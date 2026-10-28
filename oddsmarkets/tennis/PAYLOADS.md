@@ -18,6 +18,7 @@ MATCH_CARD = `{"id","event","round","date","status","p1","p2","winner","sets","l
  "wp_now": p1 live win prob | null}`
 `data/glossary.json` (as in Hardwood). `data/<T>/calibration.json` (backtest; committed). `data/<T>/history.json`
 `{"events": {tid: {"name","level","surface","champions": [[year, pid, runner_up]]}}}`.
+`data/<T>/favourites.json` (round 9; the Draws calendar cards and a past season's recap) `{"w_surf", "events": {event_id: [pid, blended Elo, entrants rated]}}`: every tour-level event's top-rated main-draw entrant going in, by the surface-blended Elo before their first match of the event (`events.favourites`).
 `data/<T>/players_index.json` `{pid: [name, short, country, latest_rank]}` (search; all players with ≥1 tour match since 2000/2007).
 
 ## Per tour
@@ -134,7 +135,7 @@ are the spec's headline then secondary ids (docs/_design/metrics/tennis.json); `
 groups take Elo percentiles from the surface pool); similar = the 5 nearest by the spec's weighted recipe (`d` in pooled
 standard deviations), tour view for qualified players, a surface view per surface pool the player is in.
 
-**lab.json**: `fields` = `["id","name","year","qualified","rank", ...metric keys]` (`matches` once, among the metric keys;
+**lab.json**: `fields` = `["id","name","year","qualified","rank","age","hand", ...metric keys]` (`age`: the catalogue's age at the season's end; `hand`: R / L from the registry; round 9) (`matches` once, among the metric keys;
 rows with ≥ 10 matches); `"surface": {"fields": ["id","year","surface","matches", ...surface keys], "rows": [...],
 "min_matches": 5}` (player-season × surface).
 
