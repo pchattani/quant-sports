@@ -333,11 +333,11 @@ COPA_ARGENTINA = _domestic("copa-argentina", "Copa Argentina", "Copa Argentina",
                            (("r64", 1), ("r32", 1), ("r16", 1), ("qf", 1), ("sf", 1), ("final", 1)),
                            neutral_rounds=("r64", "r32", "r16", "qf", "sf", "final"))
 SUPERCOPA_ARGENTINA = _domestic("supercopa-argentina", "Supercopa Argentina", "Supercopa Argentina", "Argentina", "Supercopa Argentina", "Argentina", _ONE, family="super")
-# The Apertura champion against the Clausura champion, in December. Its Sofascore id is resolved by the hourly
-# discovery (search "Trofeo de Campeones", Argentina only: discover_sofascore_leagues refuses a national or super cup
-# whose category is not its country, so the French "Trophee des Champions" or another country's trophy cannot be
-# taken), then held in seasons.json like every discovered competition.
-TROFEO_DE_CAMPEONES = _domestic("trofeo-de-campeones", "Trofeo de Campeones", "Trofeo de Campeones", "Argentina", "Trofeo de Campeones", "Argentina", _ONE, family="super")
+# The Apertura champion against the Clausura champion, in December. Sofascore id 18436 ("Trofeo de Campeones",
+# category Argentina; editions 2024 and 2025), found by the hourly discovery on 28 Oct 2026 under the Argentina-only
+# guard and pinned here, so the French "Trophee des Champions" (339) or another country's trophy can never be taken.
+TROFEO_DE_CAMPEONES = _domestic("trofeo-de-campeones", "Trofeo de Campeones", "Trofeo de Campeones", "Argentina", "Trofeo de Campeones", "Argentina", _ONE,
+                                sofascore_id=18436, family="super")
 KINGS_CUP = _domestic("kings-cup", "Saudi King's Cup", "King's Cup", "Saudi Arabia", "King Cup", "Saudi Arabia",
                       (("r32", 1), ("r16", 1), ("qf", 1), ("sf", 1), ("final", 1)), sofascore_id=2058)
 SAUDI_SUPER_CUP = _domestic("saudi-super-cup", "Saudi Super Cup", "Saudi Super Cup", "Saudi Arabia", "Saudi Super Cup", "Saudi Arabia", _FOUR, family="super")
